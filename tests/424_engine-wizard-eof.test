@@ -104,7 +104,7 @@ for mode in eof ioerror; do
     status=$(run "$mode")
     test "$status" = 255 || fail "$mode: the engine ended with [$status], want 255"
     test "$(asked "$mode")" -eq 1 || fail "$mode: asked $(asked "$mode") times, expected 1"
-    grep -q "No project name given" "${dir}/${mode}.out" ||
+    command grep -q "No project name given" "${dir}/${mode}.out" ||
         fail "$mode: the engine gave up without saying why"
 done
 
@@ -116,7 +116,7 @@ ok "an exhausted stdin ends the wizard after one prompt"
 
 run typed >/dev/null
 test "$(asked typed)" -eq 2 || fail "typed: asked $(asked typed) times, expected 2"
-grep -q "No project name given" "${dir}/typed.out" &&
+command grep -q "No project name given" "${dir}/typed.out" &&
     fail "typed: a blank line at a terminal was taken for the end of the stream"
 
 ok "a blank line still prints the option list and asks again"

@@ -55,7 +55,7 @@ run_as() {
     local out line
     out=$(exec -a "$1" "${bin}" -#test=pathbin 2>&1) ||
         fail "the copy did not run as argv[0]=$1: ${out}"
-    line=$(grep '^path_bin=' <<<"${out}") || fail "no path_bin line in: ${out}"
+    line=$(command grep '^path_bin=' <<<"${out}") || fail "no path_bin line in: ${out}"
     got=${line#path_bin=}
 }
 

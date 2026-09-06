@@ -33,7 +33,7 @@ crawl() { # crawl ARG...
 # Basenames of the mirror, so the checks read what was written rather than a
 # path this host may spell differently (macOS $TMPDIR, Windows ':' -> '_').
 saved() { find "${out}" -type f ! -path '*hts-cache*' | sed 's|.*/||' | sort; }
-has_name() { grep -Fqx "$1" <<<"$(saved)"; }
+has_name() { command grep -Fqx "$1" <<<"$(saved)"; }
 # The directories too, which is where a preset or a template is visible.
 tree_names() { find "${out}" ! -path '*hts-cache*' | sed 's|.*/||' | sort; }
 has_dir() { test -n "$(find "${out}" -type d -name "$1")"; }
@@ -133,7 +133,7 @@ has_dir tpl || fail_dump "--structure template never reached -N" "${tmp}/log"
 crawl --structure=I0 "${url}"
 { test "${RC}" -ne 0 && test "${RC}" -ne 134; } ||
     fail_dump "--structure=I0 not refused (exit ${RC})" "${tmp}/log"
-grep -q 'does not take the value' "${tmp}/log" ||
+command grep -q 'does not take the value' "${tmp}/log" ||
     fail_dump "--structure=I0 refused without saying why" "${tmp}/log"
 ! has_name page.html || fail_dump "--structure=I0 still mirrored" "${tmp}/log"
 

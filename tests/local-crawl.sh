@@ -617,7 +617,7 @@ while test "$i" -lt "${#audit[@]}"; do
         ;;
     --files)
         i=$((i + 1))
-        nFiles=$(grep -E "^HTTrack Website Copier/[^ ]* mirror complete in " "${logroot}/hts-log.txt" |
+        nFiles=$(command grep -E "^HTTrack Website Copier/[^ ]* mirror complete in " "${logroot}/hts-log.txt" |
             sed -e 's/.*[[:space:]]\([^ ]*\)[[:space:]]files written.*/\1/g')
         assert_equals "checking files" "${audit[$i]}" "$nFiles"
         ;;

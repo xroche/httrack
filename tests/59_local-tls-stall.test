@@ -54,7 +54,7 @@ if test "$wall" -ge 30 || test "$wall" -lt 3; then
     cat "$tmpdir/log" >&2
     exit 1
 fi
-grep -q 'Handshake Time Out' "$tmpdir/crawl1/hts-log.txt" ||
+command grep -q 'Handshake Time Out' "$tmpdir/crawl1/hts-log.txt" ||
     fail_dump "crawl ended in ${wall}s but not on a handshake timeout" "$tmpdir/crawl1/hts-log.txt"
 echo "OK: stalled TLS handshake reaped by --timeout after ${wall}s"
 

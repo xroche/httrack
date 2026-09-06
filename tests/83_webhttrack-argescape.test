@@ -30,48 +30,48 @@ cmdline=$(htsserver_get /server/step4.html |
     sed -n '/<textarea name="command"/,/<\/textarea>/p')
 
 # Control: without the fields in the page every assertion below is vacuous.
-grep -q -- '--user-agent' <<<"${cmdline}" ||
+command grep -q -- '--user-agent' <<<"${cmdline}" ||
     fail "no --user-agent in the generated command line (probe blind)"
 
 # A plain value is passed through untouched: the escaping must not mangle the
 # ordinary case.
-grep -qF -- '--path "/tmp/p/plain proj"' <<<"${cmdline}" ||
+command grep -qF -- '--path "/tmp/p/plain proj"' <<<"${cmdline}" ||
     fail "a plain quoted value was not passed through: ${cmdline}"
 
 # The quote is escaped, so the split keeps it inside the value...
-grep -qF -- '--user-agent "Moz\" -V \"touch /tmp/pwn"' <<<"${cmdline}" ||
+command grep -qF -- '--user-agent "Moz\" -V \"touch /tmp/pwn"' <<<"${cmdline}" ||
     fail "the quote in the user-agent was not escaped: ${cmdline}"
 
 # ...and the raw form, which would end the argument and hand -V to the option
 # parser, is gone.
-grep -qF -- '--user-agent "Moz" -V "touch' <<<"${cmdline}" &&
+command grep -qF -- '--user-agent "Moz" -V "touch' <<<"${cmdline}" &&
     fail "the user-agent still closes its argument early: ${cmdline}"
 
 # A backslash is escaped too, or the split would eat it along with the quote
 # that follows.
-grep -qF -- '--footer "a\\b\"c"' <<<"${cmdline}" ||
+command grep -qF -- '--footer "a\\b\"c"' <<<"${cmdline}" ||
     fail "the backslash in the footer was not escaped: ${cmdline}"
 
 # The url and filter fields sit outside quotes, where a backslash cannot escape
 # anything: one quote there flips the parity of every quote after it, so the
 # escaping above would protect nothing. They must not emit a raw quote at all.
-grep -qF -- 'http://x/a%22b' <<<"${cmdline}" ||
+command grep -qF -- 'http://x/a%22b' <<<"${cmdline}" ||
     fail "the quote in the url field was not neutralised: ${cmdline}"
-grep -qF -- '+*.png%22' <<<"${cmdline}" ||
+command grep -qF -- '+*.png%22' <<<"${cmdline}" ||
     fail "the quote in the filter field was not neutralised: ${cmdline}"
-grep -qF -- 'http://x/a"b' <<<"${cmdline}" &&
+command grep -qF -- 'http://x/a"b' <<<"${cmdline}" &&
     fail "the url field still emits a raw quote: ${cmdline}"
 
 # The whole textarea is HTML too: a field holding its closing tag must come back
 # as entities, or the value lands in the page as markup.
-grep -qF -- '+*.png%22&lt;/textarea&gt;' <<<"${cmdline}" ||
+command grep -qF -- '+*.png%22&lt;/textarea&gt;' <<<"${cmdline}" ||
     fail "the filter field was not HTML-escaped: ${cmdline}"
-grep -qF -- '+*.png%22</textarea>' <<<"${cmdline}" &&
+command grep -qF -- '+*.png%22</textarea>' <<<"${cmdline}" &&
     fail "the filter field still closes the textarea: ${cmdline}"
 
 # The sitemap url is quoted like the user-agent, so it takes the same escape.
 # Its box is ticked: a cleared one gates the value out.
-grep -qF -- '--sitemap-url "http://x/s.xml\"b"' <<<"${cmdline}" ||
+command grep -qF -- '--sitemap-url "http://x/s.xml\"b"' <<<"${cmdline}" ||
     fail "the quote in the sitemap url was not escaped: ${cmdline}"
 
 echo "PASS"

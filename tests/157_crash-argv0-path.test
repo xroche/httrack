@@ -45,18 +45,18 @@ PATH="${stage}${bindir}:${PATH}" \
     run_with_timeout 60 httrack -#test=strsafe overflow \
     "this string is far too long for the buffer" >"${out}" 2>&1 || rc=$?
 test "${rc}" -ne 124 || fail "the crash handler did not finish within the deadline"
-grep -q '^Caught signal ' "${out}" || fail "the installed binary printed no backtrace"
-if grep -q 'No stack trace available' "${out}"; then
+command grep -q '^Caught signal ' "${out}" || fail "the installed binary printed no backtrace"
+if command grep -q 'No stack trace available' "${out}"; then
     skip "this build produced no backtrace"
 fi
 
 # Control: without a bare argv[0] in the raw trace there is nothing to repair,
 # and the assertions below would pass on a report that never needed the fix.
 # glibc drops the "+0x" offset when the load bias is zero, as in a non-PIE build.
-grep -qE '^httrack\((\+0x[0-9a-f]+)?\)' "${out}" ||
+command grep -qE '^httrack\((\+0x[0-9a-f]+)?\)' "${out}" ||
     skip "the main program is not reported as a bare argv[0] here"
 
-headers=$(grep -E '^/.*/httrack:$' "${out}" || true)
+headers=$(command grep -E '^/.*/httrack:$' "${out}" || true)
 test -n "${headers}" || fail "the report has no symbolized block for the executable"
 # Every frame of a module is claimed in one pass, so a second block for the
 # executable means library frames were misattributed to it.
@@ -71,7 +71,7 @@ test "${exe}" -ef "${bin}" || fail "the report names ${exe}, not the running ${b
 block=$(awk -v h="${header}" '$0 == h { on = 1; next } /^\// { on = 0 } on' "${out}")
 # " at " pins the symbol column: both addr2line -Cfipa and llvm-symbolizer -p
 # emit it, and a path component named "main" does not.
-grep -qE '(^|[^[:alnum:]_])(sig_fatal|main) at ' <<<"${block}" ||
+command grep -qE '(^|[^[:alnum:]_])(sig_fatal|main) at ' <<<"${block}" ||
     fail "the executable's block names no frame: ${block}"
 
 echo "the crash report named ${exe} and its own frames"

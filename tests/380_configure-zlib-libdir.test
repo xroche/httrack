@@ -117,7 +117,7 @@ expect_fail() { # expect_fail DESC PREFIX
     dir=${work}/build${n}
     ! run_configure "${dir}" --with-zlib="${prefix}" ||
         fail "${desc}: configure accepted a prefix with no libz under it"
-    grep -q 'no libz found' "${dir}/configure.log" ||
+    command grep -q 'no libz found' "${dir}/configure.log" ||
         fail "${desc}: configure failed without naming the missing library"
     echo "ok: ${desc}"
     skip_if_out_of_budget "$((cases - n))" "$((SECONDS - began))"

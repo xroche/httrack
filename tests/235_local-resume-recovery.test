@@ -90,8 +90,8 @@ run_with_timeout 120 httrack -O "$out" --quiet --disable-security-limits \
 test "$rc" -ne 124 || fail "the crawl never terminated"
 log="${out}/hts-log.txt"
 # Without these the recovery could not have been exercised at all.
-grep -q 'Unusable partial-content range' <"$log" || fail "the resume was never rejected; the test proved nothing"
-grep -q 'Restarting whole file' <"$log" || fail "the restart did not run outside the retry budget"
+command grep -q 'Unusable partial-content range' <"$log" || fail "the resume was never rejected; the test proved nothing"
+command grep -q 'Restarting whole file' <"$log" || fail "the restart did not run outside the retry budget"
 got=$(blob_size "$out")
 test "$got" -eq "$resume_full" || fail "blob.bin is ${got} bytes, expected ${resume_full}"
 echo "OK (${got} bytes)"
@@ -109,7 +109,7 @@ run_with_timeout 120 httrack -O "$out" --quiet --disable-security-limits \
     --robots=0 --timeout=30 -c1 --retries=0 --continue \
     "${BASEURL}/resume206loop/index.html" >"${out}.log2" 2>&1 || rc=$?
 test "$rc" -ne 124 || fail "the crawl never terminated; the restart is unbounded"
-grep -q 'Unusable partial-content range' <"${out}/hts-log.txt" || fail "the resume was never rejected; the latch was not exercised"
+command grep -q 'Unusable partial-content range' <"${out}/hts-log.txt" || fail "the resume was never rejected; the latch was not exercised"
 restarts=$(count_matching_lines 'Restarting whole file' <"${out}/hts-log.txt")
 test "$restarts" -eq 1 || fail "${restarts} free restarts, expected exactly 1 (latch)"
 echo "OK (1 free restart, then bounded)"
@@ -129,7 +129,7 @@ run_with_timeout 120 httrack -O "$out" --quiet --disable-security-limits \
 test "$rc" -ne 124 || fail "the crawl never terminated; the alias hop reset the latch"
 log="${out}/hts-log.txt"
 # Without the hop the alternation was never driven and the rest proves nothing.
-grep -q 'Warning moved treated' <"$log" || fail "no alias hop; the re-record path was never reached"
+command grep -q 'Warning moved treated' <"$log" || fail "no alias hop; the re-record path was never reached"
 restarts=$(count_matching_lines 'Restarting whole file' <"$log")
 test "$restarts" -eq 1 || fail "${restarts} free restarts across the alias hops, expected 1"
 retries=$(count_matching_lines 'Retry after error' <"$log")
@@ -150,7 +150,7 @@ if [ ! -r "${UNLINKFAIL_LA:-}" ]; then
     echo "resume-recovery: ${UNLINKFAIL_LA:-\$UNLINKFAIL_LA} was not built" >&2
     exit 1
 fi
-if grep -q "^dlname=''" "$UNLINKFAIL_LA"; then
+if command grep -q "^dlname=''" "$UNLINKFAIL_LA"; then
     echo "resume-recovery: static-only build, skipping the interposed leg"
     exit 0
 fi

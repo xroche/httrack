@@ -46,13 +46,13 @@ run() { # run LIST -> sets $log and $mirror
     mirror="$out"
 }
 loghas() {
-    grep -Eq "$1" "$log" || {
+    command grep -Eq "$1" "$log" || {
         cut -c1-200 "$log"
         fail "expected /$1/ in $log"
     }
 }
 lognot() {
-    if grep -Eq "$1" "$log"; then
+    if command grep -Eq "$1" "$log"; then
         cut -c1-200 "$log"
         fail "unexpected /$1/ in $log"
     fi

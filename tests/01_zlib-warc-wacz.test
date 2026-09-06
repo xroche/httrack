@@ -13,7 +13,7 @@ set -euo pipefail
 httrack_bin=$(httrack_path)
 
 registry=$("$httrack_bin" -#test 2>&1 || true)
-if ! grep -q '^  warc-wacz' <<<"$registry"; then
+if ! command grep -q '^  warc-wacz' <<<"$registry"; then
     echo "warc-wacz self-test unavailable (build without OpenSSL); skipping"
     exit 77
 fi

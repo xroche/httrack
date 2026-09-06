@@ -19,7 +19,7 @@ same_set() { # same_set <list A> <list B>: newline-separated, order-insensitive
 
 # Capture it all first, so a crash after the -%F line still fails the test.
 help=$(httrack --quiet --help 2>/dev/null) || fail "httrack --help exited $?"
-help_line=$(grep -m1 -- ' %F  footer string' <<<"${help}") ||
+help_line=$(command grep -m1 -- ' %F  footer string' <<<"${help}") ||
     fail "--help prints no -%F line"
 
 # " ...; fields {addr} {path} ..., or legacy %s)"
@@ -48,9 +48,9 @@ fi
 check_page() { # check_page <html file> <tag wrapping each {name}>
     local page="$1" tag="$2" doc
     test -r "${page}" || fail "no ${page}"
-    doc=$(grep -o "<${tag}>{[^{}<]*}</${tag}>" "${page}" |
+    doc=$(command grep -o "<${tag}>{[^{}<]*}</${tag}>" "${page}" |
         sed "s,</*${tag}>,,g" | sort -u || true)
-    grep -qx '{addr}' <<<"${doc}" ||
+    command grep -qx '{addr}' <<<"${doc}" ||
         fail "no <${tag}>{field}</${tag}> names parsed out of ${page}"
     same_set "${engine}" "${doc}" || {
         echo "${page} lists different -%F fields than the engine." >&2

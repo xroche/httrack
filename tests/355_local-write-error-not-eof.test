@@ -58,19 +58,19 @@ crawl_onto_dead_pipe() {
 assert_write_error() {
     local what="$1" name="$2"
 
-    grep -q "Unable to write file .*${name}" <<<"$log" ||
+    command grep -q "Unable to write file .*${name}" <<<"$log" ||
         fail "${what}: nothing said the file could not be written: ${log}"
-    grep -q 'Write error on disk' <<<"$log" ||
+    command grep -q 'Write error on disk' <<<"$log" ||
         fail "${what}: the failure was not reported as a write error: ${log}"
     # r.size counts bytes read, so a body our own write cut short must never
     # be reported as one the server truncated.
-    if grep -q 'Incorrect length' <<<"$log"; then
+    if command grep -q 'Incorrect length' <<<"$log"; then
         fail "${what}: a write error was reported as a truncated download: ${log}"
     fi
-    if grep -qF "$name" <<<"$cached"; then
+    if command grep -qF "$name" <<<"$cached"; then
         fail "${what}: a file that never reached the disk counts as mirrored: ${cached}"
     fi
-    if grep -qE 'Mirror aborted|disk full' <<<"$log"; then
+    if command grep -qE 'Mirror aborted|disk full' <<<"$log"; then
         fail "${what}: a write error outside the fatal class gave up the mirror: ${log}"
     fi
 }
@@ -112,17 +112,17 @@ local_crawl --log "${tmpdir}/log-decode" "${common[@]}" --retries=0 \
     -O "$decode" "${BASEURL}/diskfull/gzindex.html"
 log=$(<"${decode}/hts-log.txt")
 cached=$(<"${decode}/hts-cache/new.txt")
-grep -q 'Unable to write file .*gz\.bin' <<<"$log" ||
+command grep -q 'Unable to write file .*gz\.bin' <<<"$log" ||
     fail "a decode our own filesystem refused was blamed on the coded body: ${log}"
-if grep -qE 'Mirror aborted|disk full' <<<"$log"; then
+if command grep -qE 'Mirror aborted|disk full' <<<"$log"; then
     fail "a non-fatal failure under the decode gave up the mirror: ${log}"
 fi
-gzrow=$(grep -F '/gz.bin' <<<"$cached" || true)
-grep -q "error (" <<<"$gzrow" ||
+gzrow=$(command grep -F '/gz.bin' <<<"$cached" || true)
+command grep -q "error (" <<<"$gzrow" ||
     fail "a body that never reached the disk was not recorded as failed: ${gzrow}"
 test ! -e "${decodesite}/gz.bin" ||
     fail "the coded bytes were committed as the file we could not decode"
-grep -q DISKFULL-GZPAGE "${decodesite}/gzpage.html" ||
+command grep -q DISKFULL-GZPAGE "${decodesite}/gzpage.html" ||
     fail "the rest of the mirror did not survive the failed decode"
 ok "a decode that cannot write its output names our own filesystem"
 
@@ -139,7 +139,7 @@ mkdir -p "${updsite}/~hts-tmp/gz.bin.u"
 local_crawl --log "${tmpdir}/log-update2" "${common[@]}" --retries=0 --update \
     -O "$upd" "${BASEURL}/diskfull/gzindex.html"
 log=$(<"${upd}/hts-log.txt")
-grep -q 'Unable to write file .*gz\.bin' <<<"$log" ||
+command grep -q 'Unable to write file .*gz\.bin' <<<"$log" ||
     fail "the update pass did not fail the decode it was set up to fail: ${log}"
 test "$(wc -c <"${updsite}/gz.bin" 2>/dev/null || echo 0)" -eq "$before" ||
     fail "the purge deleted the copy the failed decode preserved: ${log}"
@@ -150,12 +150,12 @@ clean="${tmpdir}/clean"
 local_crawl --log "${tmpdir}/log-clean" "${common[@]}" --retries=0 -O "$clean" \
     "${BASEURL}/diskfull/splitindex.html"
 log=$(<"${clean}/hts-log.txt")
-if grep -qE 'Write error on disk|Unable to write file' <<<"$log"; then
+if command grep -qE 'Write error on disk|Unable to write file' <<<"$log"; then
     fail "a body that reached the disk was reported as a write error: ${log}"
 fi
 test "$(wc -c <"${clean}/127.0.0.1_${SRV_PORT}/diskfull/split.bin")" -eq 8000 ||
     fail "the control mirror did not write the whole body"
-grep -qF 'split.bin' "${clean}/hts-cache/new.txt" ||
+command grep -qF 'split.bin' "${clean}/hts-cache/new.txt" ||
     fail "the control mirror did not count the file it wrote"
 ok "a body that reaches the disk is not reported as a write error"
 
@@ -165,11 +165,11 @@ cleannoclen="${tmpdir}/clean-noclen"
 local_crawl --log "${tmpdir}/log-clean-noclen" "${common[@]}" --retries=0 \
     -O "$cleannoclen" "${BASEURL}/diskfull/noclenindex.html"
 log=$(<"${cleannoclen}/hts-log.txt")
-if grep -qE 'Write error on disk|Unable to write file' <<<"$log"; then
+if command grep -qE 'Write error on disk|Unable to write file' <<<"$log"; then
     fail "a close-delimited body that reached the disk was reported as a write error: ${log}"
 fi
 test "$(wc -c <"${cleannoclen}/127.0.0.1_${SRV_PORT}/diskfull/noclen.bin")" -eq 100 ||
     fail "the control mirror did not write the whole close-delimited body"
-grep -qF 'noclen.bin' "${cleannoclen}/hts-cache/new.txt" ||
+command grep -qF 'noclen.bin' "${cleannoclen}/hts-cache/new.txt" ||
     fail "the control mirror did not count the close-delimited file it wrote"
 ok "a close-delimited body that reaches the disk is not reported as a write error"

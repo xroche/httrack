@@ -104,8 +104,8 @@ echo OK
 
 printf '[lazy-loaded image inlined] ..\t'
 # src is the placeholder a real page ships; the asset rides data-src.
-grep -q 'data-src="data:image/svg+xml;base64,' "$page" || fail "data-src was not inlined"
-if grep -q 'data-src="lazy.svg"' "$page"; then
+command grep -q 'data-src="data:image/svg+xml;base64,' "$page" || fail "data-src was not inlined"
+if command grep -q 'data-src="lazy.svg"' "$page"; then
     echo "FAIL: data-src kept its link"
     exit 1
 fi
@@ -114,44 +114,44 @@ echo OK
 
 printf '[stylesheet inlined, recursively] ..\t'
 extract "$page" "text/css" "${tmpdir}/got.css" || fail "no inlined stylesheet"
-grep -q 'url(data:image/svg+xml;base64,' "${tmpdir}/got.css" || fail "url() inside the inlined stylesheet was not inlined"
+command grep -q 'url(data:image/svg+xml;base64,' "${tmpdir}/got.css" || fail "url() inside the inlined stylesheet was not inlined"
 extract "${tmpdir}/got.css" "text/css" "${tmpdir}/got2.css" || fail "@import was not inlined"
-grep -q 'url(data:image/svg+xml;base64,' "${tmpdir}/got2.css" || fail "url() inside the @import'ed stylesheet was not inlined"
+command grep -q 'url(data:image/svg+xml;base64,' "${tmpdir}/got2.css" || fail "url() inside the @import'ed stylesheet was not inlined"
 echo OK
 
 # --- what must keep its link ------------------------------------------------
 printf '[page links stay relative] ..\t'
-grep -q 'href="other.html"' "$page" || fail "the link to another page was not left relative"
+command grep -q 'href="other.html"' "$page" || fail "the link to another page was not left relative"
 test -f "${out}/127.0.0.1_${SRV_PORT}/other.html" || fail "the linked page is missing from the mirror"
 echo OK
 
 printf '[a navigational rel keeps its link] ..\t'
 # The page carries a later rel="stylesheet"; reading rel past its own value let
 # this canonical link inherit it and inline the page it names.
-grep -q 'rel="canonical" href="other.html"' "$page" || fail "rel=canonical was inlined"
+command grep -q 'rel="canonical" href="other.html"' "$page" || fail "rel=canonical was inlined"
 echo OK
 
 printf '[an unnamed tag cannot skip the deny rules] ..\t'
 # An unquoted value ending at '>' loses the tag name, which used to read as
 # "a CSS body" and took these past every tag-bearing deny rule.
-grep -q '<a href=pixel.svg>' "$page" || fail "an unquoted anchor was inlined"
-grep -q '<iframe src=pixel.svg>' "$page" || fail "an unquoted iframe was inlined"
+command grep -q '<a href=pixel.svg>' "$page" || fail "an unquoted anchor was inlined"
+command grep -q '<iframe src=pixel.svg>' "$page" || fail "an unquoted iframe was inlined"
 echo OK
 
 printf '[a rel-less link keeps its link] ..\t'
 # Nothing loads it, so it is not an asset however inlinable the file looks.
-grep -q '<link href="style_norel.css">' "$page" || fail "a <link> with no rel was inlined"
+command grep -q '<link href="style_norel.css">' "$page" || fail "a <link> with no rel was inlined"
 test -f "${out}/127.0.0.1_${SRV_PORT}/style_norel.css" || fail "style_norel.css is missing, so the probe proves nothing"
 echo OK
 
 printf '[over-cap asset stays a link] ..\t'
-grep -q 'src="big.svg"' "$page" || fail "the over-cap asset did not keep its link"
+command grep -q 'src="big.svg"' "$page" || fail "the over-cap asset did not keep its link"
 test -f "${out}/127.0.0.1_${SRV_PORT}/big.svg" || fail "the over-cap asset is missing from the mirror"
-grep -q 'over the 4096-byte cap' "${out}/hts-log.txt" || fail "the over-cap asset was not reported in the log"
+command grep -q 'over the 4096-byte cap' "${out}/hts-log.txt" || fail "the over-cap asset was not reported in the log"
 echo OK
 
 printf '[the mirror still works] ..\t'
-if grep -q 'href="style.css"' "$page"; then
+if command grep -q 'href="style.css"' "$page"; then
     echo "FAIL: the stylesheet link survived"
     exit 1
 fi
@@ -161,9 +161,9 @@ echo OK
 # --- a second run must not re-encode ----------------------------------------
 printf '[idempotent under --update] ..\t'
 # HTTrack stamps the time into its own footer comment, so compare without it.
-grep -v 'Mirrored from' "$page" >"${tmpdir}/page1.html"
+command grep -v 'Mirrored from' "$page" >"${tmpdir}/page1.html"
 local_crawl --log "${tmpdir}/log2" "${common[@]}" --single-file --single-file-max-size 4096 --update "${BASEURL}/index.html"
-grep -v 'Mirrored from' "$page" >"${tmpdir}/page2.html"
+command grep -v 'Mirrored from' "$page" >"${tmpdir}/page2.html"
 cmp -s "${tmpdir}/page1.html" "${tmpdir}/page2.html" || fail "the second run changed the page"
 # A double-encoded payload would decode to another data: URI, not to the SVG.
 extract "$page" "image/svg+xml" "${tmpdir}/got2.svg" || fail "no inlined image after the second run"
@@ -177,7 +177,7 @@ off="${tmpdir}/off"
 mkdir "$off"
 local_crawl --log "${tmpdir}/log3" -O "$off" "${opts[@]}" -%Z0 "${BASEURL}/index.html"
 offpage="${off}/127.0.0.1_${SRV_PORT}/index.html"
-if grep -q 'base64,' "$offpage"; then
+if command grep -q 'base64,' "$offpage"; then
     echo "FAIL: -%Z0 still inlined"
     exit 1
 fi
@@ -188,7 +188,7 @@ for cap in notanumber 12abc 0 99999999999999999999; do
     local_crawl --log "${tmpdir}/log4" -O "$bad" "${opts[@]}" \
         --single-file-max-size "$cap" "${BASEURL}/index.html" || rc=$?
     test "$rc" -ne 0 || fail "--single-file-max-size $cap was accepted"
-    grep -q 'positive size' "${tmpdir}/log4" ||
+    command grep -q 'positive size' "${tmpdir}/log4" ||
         fail_dump "--single-file-max-size $cap was refused without saying so" "${tmpdir}/log4"
 done
 test ! -e "${bad}/127.0.0.1_${SRV_PORT}/index.html" || fail "a rejected cap still crawled"
@@ -201,7 +201,7 @@ printf '[a page cannot forge a mark] ..\t'
 # inlined elsewhere on the page, so the encoder was demonstrably willing.
 forged=$(sed -n 's/.*<p>\(id=[^<]*\)<\/p>.*/\1/p' "$page")
 test "$forged" = 'id=pixel.svg end' || fail "the page was altered: $forged"
-grep -q 'data:image/svg+xml;base64,' "$page" || fail "nothing was inlined at all, so the probe proves nothing"
+command grep -q 'data:image/svg+xml;base64,' "$page" || fail "nothing was inlined at all, so the probe proves nothing"
 echo OK
 
 printf '[a mark cannot ride in on a header] ..\t'
@@ -210,13 +210,13 @@ printf '[a mark cannot ride in on a header] ..\t'
 # an expansion would leave a data: URI.
 markpage="${out}/127.0.0.1_${SRV_PORT}/sfmark.html"
 test -f "$markpage" || fail "the charset-mark page was not mirrored"
-if grep -q 'charset=data:' "$markpage"; then
+if command grep -q 'charset=data:' "$markpage"; then
     echo "FAIL: a charset-borne mark was expanded"
     exit 1
 fi
 # The mark is deleted and its reference kept: without this the check above
 # passes on a page that never carried a charset.
-grep -q 'content="text/html;charset=pixel.svg" />' "$markpage" || fail "the charset never reached the page, so nothing was proven"
+command grep -q 'content="text/html;charset=pixel.svg" />' "$markpage" || fail "the charset never reached the page, so nothing was proven"
 echo OK
 
 printf '[no file keeps a mark] ..\t'
@@ -225,7 +225,7 @@ printf '[no file keeps a mark] ..\t'
 # grep's own status, kept out of a pipeline that would launder it: 0 matched,
 # 1 clean, anything above that means the sweep never read the tree.
 st=0
-marked=$(grep -rlE '#![0-9a-f]{16}\.[-cj]\.[0-9]+' \
+marked=$(command grep -rlE '#![0-9a-f]{16}\.[-cj]\.[0-9]+' \
     "${out}/127.0.0.1_$SRV_PORT" 2>/dev/null) || st=$?
 test "$st" -le 1 || fail "the mark sweep could not read the mirror (grep exit $st)"
 marked=$(printf '%s' "$marked" | tr '\n' ' ')
@@ -236,12 +236,12 @@ printf '[an unrecognised type still inlines from its context] ..\t'
 # style_noext and app_noext have no usable extension, so only the referencing
 # context says what they are. plain.css/plain.js are the control: they inline
 # either way, so a failure here is the context path and not the encoder.
-grep -q 'href="data:text/css;base64,' "$page" || fail "no stylesheet inlined at all"
-if grep -q 'href="style_noext"' "$page"; then
+command grep -q 'href="data:text/css;base64,' "$page" || fail "no stylesheet inlined at all"
+if command grep -q 'href="style_noext"' "$page"; then
     echo "FAIL: extensionless stylesheet was not inlined"
     exit 1
 fi
-if grep -q 'src="app_noext"' "$page"; then
+if command grep -q 'src="app_noext"' "$page"; then
     echo "FAIL: extensionless script was not inlined"
     exit 1
 fi
@@ -249,13 +249,13 @@ echo OK
 
 printf '[a fragment survives onto the data: URI] ..\t'
 # An SVG fragment selects a view, so dropping it renders the wrong thing (#766).
-grep -q 'data:image/svg+xml;base64,[A-Za-z0-9+/=]*#icon' "$page" || fail "the fragment was dropped"
+command grep -q 'data:image/svg+xml;base64,[A-Za-z0-9+/=]*#icon' "$page" || fail "the fragment was dropped"
 echo OK
 
 printf '[a page link is not inlined even when it names an asset] ..\t'
 # <a href> to an image: only the deny rule stops this, since the MIME gate
 # would happily take it. Without the rule the anchor becomes a data: URI.
-grep -q '<a href="pixel.svg">raw</a>' "$page" || fail "an anchor to an inlinable asset was rewritten"
+command grep -q '<a href="pixel.svg">raw</a>' "$page" || fail "an anchor to an inlinable asset was rewritten"
 echo OK
 
 printf '[-%%M refuses to pair with --single-file] ..\t'
@@ -279,7 +279,7 @@ mkdir "$chg"
 local_crawl --log "${tmpdir}/log6" -O "$chg" "${opts[@]}" --single-file --changes "${BASEURL}/index.html"
 chgpage="${chg}/127.0.0.1_${SRV_PORT}/index.html"
 test -f "$chgpage" || fail "--changes produced no mirrored page"
-grep -q 'base64,' "$chgpage" || fail "--changes suppressed the inlining"
+command grep -q 'base64,' "$chgpage" || fail "--changes suppressed the inlining"
 # Via a file, never a heredoc inside $(...): bash 3.2 (macOS) ends the
 # substitution at the ")" and runs the body as shell commands.
 cat >"${tmpdir}/report.py" <<'REPORT'
@@ -336,13 +336,13 @@ esac
 printf '[the unresolved-reference warning is clipped] ..\t'
 # The self-test drives a 90 KB reference through it, so an unclipped build puts
 # all of it in the log. The first check is the floor: no warning proves nothing.
-grep -q 'resolves to no mirrored file' <<<"$st" || fail "the self-test logged no unresolved reference"
+command grep -q 'resolves to no mirrored file' <<<"$st" || fail "the self-test logged no unresolved reference"
 awk 'length($0) > 1024 { exit 1 }' <<<"$st" || fail "a log line ran past the clip"
 echo OK
 
 # --- project reload restores the saved keys ---------------------------------
 distdir=$(cd "${top_srcdir}" && pwd)
 printf '[project reload maps the keys back] ..\t'
-grep -q 'do:copy:SingleFile:singlefile' "${distdir}/html/server/step2.html" || fail "step2.html does not restore SingleFile"
-grep -q 'do:copy:SingleFileMaxSize:singlefilemax' "${distdir}/html/server/step2.html" || fail "step2.html does not restore SingleFileMaxSize"
+command grep -q 'do:copy:SingleFile:singlefile' "${distdir}/html/server/step2.html" || fail "step2.html does not restore SingleFile"
+command grep -q 'do:copy:SingleFileMaxSize:singlefilemax' "${distdir}/html/server/step2.html" || fail "step2.html does not restore SingleFileMaxSize"
 echo OK

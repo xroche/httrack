@@ -80,7 +80,7 @@ start=$SECONDS
 crawl stall 5 60 "ftp://127.0.0.1:${liveport}/stall.bin"
 stalled=$((SECONDS - start))
 sent=$(<"$cmds")
-grep -q '^RETR ' <<<"$sent" || fail "the body transfer never started: ${sent}"
+command grep -q '^RETR ' <<<"$sent" || fail "the body transfer never started: ${sent}"
 logged stall 'Time out (5)'
 test "$stalled" -lt 40 ||
     fail "a stalled body transfer took ${stalled}s under --timeout=5"

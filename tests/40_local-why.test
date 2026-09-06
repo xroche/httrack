@@ -15,7 +15,7 @@ why() {
     shift
     # tr: the engine's LF macro is a literal CRLF, which only MSYS folds away.
     out="$(httrack -O "$tmpdir/p" -q "$@" | tr -d '\r' |
-        grep -E 'accepted|rejected|no filter|unable')"
+        command grep -E 'accepted|rejected|no filter|unable')"
     test "$out" == "$want" || {
         echo "want: $want"
         echo "got : $out"

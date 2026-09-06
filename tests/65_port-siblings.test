@@ -36,10 +36,10 @@ websrv() {
 
 web_refused() {
     websrv "$1"
-    grep -q "couldn't set the port number" "$tmp/web.log" ||
+    command grep -q "couldn't set the port number" "$tmp/web.log" ||
         fail "#614: htsserver --port '$1' not refused"
     # it must not have reached the listen socket on some other port
-    ! grep -q "^URL=" "$tmp/web.log" ||
+    ! command grep -q "^URL=" "$tmp/web.log" ||
         fail "#614: htsserver --port '$1' listened anyway"
 }
 
@@ -56,16 +56,16 @@ web_accepted() {
     local pid=$!
     test -n "$had_m" || shell_is_msys || set +m
     local waited=0
-    until grep -qE "^URL=http://.*:$port/|couldn't set the port number|Unable to initialize a temporary server" "$tmp/web.log"; do
+    until command grep -qE "^URL=http://.*:$port/|couldn't set the port number|Unable to initialize a temporary server" "$tmp/web.log"; do
         test "$waited" -lt 20 || break
         sleep 1
         waited=$((waited + 1))
     done
     kill_tree "$pid"
     wait "$pid" 2>/dev/null || true
-    ! grep -q "couldn't set the port number" "$tmp/web.log" ||
+    ! command grep -q "couldn't set the port number" "$tmp/web.log" ||
         fail "#614: htsserver --port '$port' wrongly refused"
-    grep -qE "^URL=http://.*:$port/|Unable to initialize a temporary server" "$tmp/web.log" ||
+    command grep -qE "^URL=http://.*:$port/|Unable to initialize a temporary server" "$tmp/web.log" ||
         fail "#614: htsserver --port '$port' never reached the listener"
 }
 
@@ -88,7 +88,7 @@ web_exits() {
 
     : >"$tmp/exit.log"
     run_with_timeout 30 htsserver "$tmp" "$@" >"$tmp/exit.log" 2>&1 || rc=$?
-    grep -q "^EXITED" "$tmp/exit.log" ||
+    command grep -q "^EXITED" "$tmp/exit.log" ||
         fail "#753: htsserver ${*:-(no options)} never finished serving"
     # exactly 1, not merely "not 124": a crash or an assertf abort also escapes
     # the wait, and would otherwise read as a pass
@@ -107,13 +107,13 @@ web_exits --ppid $$
 
 proxy_refused() {
     run_with_timeout 3 proxytrack "127.0.0.1:$1" 127.0.0.1:3130 >"$tmp/pt.log" 2>&1 || true
-    grep -q "^usage:" "$tmp/pt.log" ||
+    command grep -q "^usage:" "$tmp/pt.log" ||
         fail "#614: proxytrack port '$1' not refused"
 }
 
 proxy_accepted() {
     run_with_timeout 3 proxytrack "127.0.0.1:$1" 127.0.0.1:3130 >"$tmp/pt.log" 2>&1 || true
-    ! grep -q "^usage:" "$tmp/pt.log" ||
+    ! command grep -q "^usage:" "$tmp/pt.log" ||
         fail "#614: proxytrack port '$1' wrongly refused"
 }
 

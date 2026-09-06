@@ -47,7 +47,7 @@ crawl() { # crawl FOOTER [LABEL], leaving the mirrored page in $body
 
 # Which line the footer lands on follows the page's own newlines, so find it by
 # its marker rather than by position.
-footer_line() { firstline "$(tr -d '\r' <<<"$body" | grep -F "$mark" || true)"; }
+footer_line() { firstline "$(tr -d '\r' <<<"$body" | command grep -F "$mark" || true)"; }
 
 path_expansion() { # the length {path} expands to
     local line
@@ -81,7 +81,7 @@ sweep() { # sweep LABEL: walk the expansion across the point where footers drop
         footer="${footer}$(printf '{path}%.0s' $(seq 1 "$reps"))"
         test ${#footer} -lt 254 || fail "footer template is ${#footer} chars"
         crawl "$footer" "a $1 page at expansion ${total}"
-        if grep -q "$mark" <<<"$body"; then
+        if command grep -q "$mark" <<<"$body"; then
             line=$(footer_line)
             # Whole or not at all: a clipped footer runs into the page below it.
             test "${#line}" -eq "$total" ||

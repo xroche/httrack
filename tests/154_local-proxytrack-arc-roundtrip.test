@@ -70,13 +70,13 @@ test "$inner" != '\n\n' || fail "declared length still counts the blank line"
     printf '\n'
 } >"$dir/empty.arc"
 convert "$dir/empty.arc" "$dir/d.arc" >/dev/null
-! grep -q 'Unexpected' "$dir/log" || fail "empty archive reported as corrupt"
+! command grep -q 'Unexpected' "$dir/log" || fail "empty archive reported as corrupt"
 
 # ...but a length running past the end of the file still is.
 {
     arc_filedesc 99999
 } >"$dir/truncated.arc"
 convert "$dir/truncated.arc" "$dir/e.arc" >/dev/null || true
-grep -q 'Unexpected' "$dir/log" || fail "a length past the end of the file loaded as an empty archive"
+command grep -q 'Unexpected' "$dir/log" || fail "a length past the end of the file loaded as an empty archive"
 
 echo "OK: proxytrack re-reads the .arc it writes"

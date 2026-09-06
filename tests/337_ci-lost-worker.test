@@ -89,31 +89,31 @@ report() { # report LOG -> $out, $summary
 }
 
 report "$tmp/clean.log"
-grep -q 'no MSYS fork failure and no lost worker' <<<"$out" || fail "a clean leg said: $out"
-grep -q '^MSYS forks: 0 died, 0 retried, 0 given up; 0 worker(s) lost$' <<<"$summary" ||
+command grep -q 'no MSYS fork failure and no lost worker' <<<"$out" || fail "a clean leg said: $out"
+command grep -q '^MSYS forks: 0 died, 0 retried, 0 given up; 0 worker(s) lost$' <<<"$summary" ||
     fail "a clean leg summarised: $summary"
-grep -q '::' <<<"$out" && fail "a clean leg raised an annotation: $out"
+command grep -q '::' <<<"$out" && fail "a clean leg raised an annotation: $out"
 
 report "$tmp/forks.log"
-grep -q '::warning title=MSYS fork failures::' <<<"$out" || fail "the fork leg raised none: $out"
-grep -q 'workers lost' <<<"$out" && fail "the fork leg invented a lost worker: $out"
-grep -q '; 0 worker(s) lost$' <<<"$summary" || fail "the fork leg summarised: $summary"
+command grep -q '::warning title=MSYS fork failures::' <<<"$out" || fail "the fork leg raised none: $out"
+command grep -q 'workers lost' <<<"$out" && fail "the fork leg invented a lost worker: $out"
+command grep -q '; 0 worker(s) lost$' <<<"$summary" || fail "the fork leg summarised: $summary"
 
 report "$tmp/lost.log"
 # The whole defect: this sentence, unqualified, is what called the #1352 leg clean.
-grep -q 'no MSYS fork failure and no lost worker' <<<"$out" &&
+command grep -q 'no MSYS fork failure and no lost worker' <<<"$out" &&
     fail "a leg that lost a worker read as clean: $out"
-grep -q 'but 1 worker(s) left no status' <<<"$out" || fail "the lost leg said: $out"
-grep -q '::error title=workers lost with no status::' <<<"$out" ||
+command grep -q 'but 1 worker(s) left no status' <<<"$out" || fail "the lost leg said: $out"
+command grep -q '::error title=workers lost with no status::' <<<"$out" ||
     fail "the lost leg raised no error annotation: $out"
-grep -q '86_local-proxytrack-cache-longfields.test' <<<"$out" ||
+command grep -q '86_local-proxytrack-cache-longfields.test' <<<"$out" ||
     fail "the lost leg named no test: $out"
-grep -q '; 1 worker(s) lost$' <<<"$summary" || fail "the lost leg summarised: $summary"
+command grep -q '; 1 worker(s) lost$' <<<"$summary" || fail "the lost leg summarised: $summary"
 
 report "$tmp/both.log"
-grep -q '::warning title=MSYS fork failures::' <<<"$out" || fail "both: no fork annotation: $out"
-grep -q '::error title=workers lost with no status::' <<<"$out" || fail "both: no lost annotation: $out"
-grep -q '; 1 worker(s) lost$' <<<"$summary" || fail "both: summarised $summary"
+command grep -q '::warning title=MSYS fork failures::' <<<"$out" || fail "both: no fork annotation: $out"
+command grep -q '::error title=workers lost with no status::' <<<"$out" || fail "both: no lost annotation: $out"
+command grep -q '; 1 worker(s) lost$' <<<"$summary" || fail "both: summarised $summary"
 
 # The control on all of it: without the LOST rule the counter is the old one, and
 # reads this very console as clean.
@@ -121,12 +121,12 @@ old=$tmp/old
 mkdir -p "$old"
 cp "$testdir/ci-windows-suite.sh" "$testdir/testlib.sh" "$testdir/proclib.sh" "$old/"
 chmod u+w "$old"/*.sh # distcheck's srcdir is read-only, and cp carries that over
-grep -v '/\^LOST / { lost++; next }' "$old/ci-windows-suite.sh" >"$old/mutant.sh"
+command grep -v '/\^LOST / { lost++; next }' "$old/ci-windows-suite.sh" >"$old/mutant.sh"
 cmp -s "$old/ci-windows-suite.sh" "$old/mutant.sh" &&
     fail "the blind-counter mutant changed nothing, so it proves nothing"
 mv "$old/mutant.sh" "$old/ci-windows-suite.sh"
 oldout=$(cd "$old" && bash -c '. ./ci-windows-suite.sh; ci_report_fork_failures "$1"' _ "$tmp/lost.log")
-grep -q 'no MSYS fork failure and no lost worker' <<<"$oldout" ||
+command grep -q 'no MSYS fork failure and no lost worker' <<<"$oldout" ||
     fail "the blind counter did not misread the lost leg, so the new rule is not what fixes it: $oldout"
 
 # --- and the same thing end to end, with a worker really killed --------------
@@ -238,8 +238,8 @@ run_suite() { # run_suite <dir>
 stage "$tmp/ok" ':'
 run_suite "$tmp/ok"
 test "$rc" -eq 0 || fail "a clean stub suite exited $rc: $(<"$tmp/out")"
-grep -q "^ran=$ran pass=92 fail=0 skip=$nskip lost=0$" "$tmp/out" ||
-    fail "clean tally: $(grep '^ran=' "$tmp/out" || true)"
+command grep -q "^ran=$ran pass=92 fail=0 skip=$nskip lost=0$" "$tmp/out" ||
+    fail "clean tally: $(command grep '^ran=' "$tmp/out" || true)"
 
 stage "$tmp/killed" "$killer"
 run_suite "$tmp/killed"
@@ -247,13 +247,13 @@ case "$(<"$share/killed")" in
 none*) fail "the stub killed no worker, so the run proves nothing: $(<"$share/killed")" ;;
 esac
 # On its own line, not folded into the failures: the counter step reads these back.
-grep -q '^LOST 906_engine-lost.test (worker left no status; ' "$tmp/out" ||
+command grep -q '^LOST 906_engine-lost.test (worker left no status; ' "$tmp/out" ||
     fail "the vanished worker was not reported: $(<"$tmp/out")"
-grep -q "^ran=$ran pass=91 fail=0 skip=$nskip lost=1$" "$tmp/out" ||
-    fail "lost tally: $(grep '^ran=' "$tmp/out" || true)"
-grep -q '::error::worker(s) vanished with no status, re-run this leg: 906_engine-lost.test' "$tmp/out" ||
+command grep -q "^ran=$ran pass=91 fail=0 skip=$nskip lost=1$" "$tmp/out" ||
+    fail "lost tally: $(command grep '^ran=' "$tmp/out" || true)"
+command grep -q '::error::worker(s) vanished with no status, re-run this leg: 906_engine-lost.test' "$tmp/out" ||
     fail "the suite did not name the vanished worker: $(<"$tmp/out")"
-grep -q '::error::failing:' "$tmp/out" &&
+command grep -q '::error::failing:' "$tmp/out" &&
     fail "a killed worker was reported as a failing test: $(<"$tmp/out")"
 # 3, so the workflow can tell a leg to repeat from a leg to investigate (#1228).
 test "$rc" -eq 3 || fail "a lost worker exited $rc, want 3: $(<"$tmp/out")"
@@ -268,9 +268,9 @@ run_suite "$tmp/killedskip"
 case "$(<"$share/killed")" in
 none*) fail "the pinned-skip stub killed no worker: $(<"$share/killed")" ;;
 esac
-grep -q "^LOST $pinned (worker left no status; " "$tmp/out" ||
+command grep -q "^LOST $pinned (worker left no status; " "$tmp/out" ||
     fail "the vanished skip was not reported: $(<"$tmp/out")"
-grep -q '::error::skip set changed from expected' "$tmp/out" ||
+command grep -q '::error::skip set changed from expected' "$tmp/out" ||
     fail "the skip set did not change, so this run reaches the wrong gate: $(<"$tmp/out")"
 test "$rc" -eq 3 ||
     fail "a worker lost from the pinned skips exited $rc, want 3: $(<"$tmp/out")"
@@ -278,7 +278,7 @@ ok "a skip that vanished is still a leg to repeat"
 
 # The counter reading that very console back, which is the path the Windows leg takes.
 report "$tmp/out"
-grep -q '::error title=workers lost with no status::' <<<"$out" ||
+command grep -q '::error title=workers lost with no status::' <<<"$out" ||
     fail "the counter read the suite's own console as clean: $out"
 
 # A loss alongside a real failure: the failure decides, or a red ships as a leg to
@@ -289,9 +289,9 @@ run_suite "$tmp/mixed"
 case "$(<"$share/killed")" in
 none*) fail "the mixed stub killed no worker: $(<"$share/killed")" ;;
 esac
-grep -q '^LOST 906_engine-lost.test (worker left no status; ' "$tmp/out" ||
+command grep -q '^LOST 906_engine-lost.test (worker left no status; ' "$tmp/out" ||
     fail "the vanished worker was not reported beside the failure: $(<"$tmp/out")"
-grep -q '::error::failing: 900_zlib-pass.test' "$tmp/out" ||
+command grep -q '::error::failing: 900_zlib-pass.test' "$tmp/out" ||
     fail "the failing test was not named: $(<"$tmp/out")"
 test "$rc" -eq 1 ||
     fail "a failure alongside a loss exited $rc, want 1: $(<"$tmp/out")"

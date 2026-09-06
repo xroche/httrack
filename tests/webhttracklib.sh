@@ -158,7 +158,7 @@ htsserver_start() {
         done
         test -z "${HTS_URL}" || break
         # Only a lost bind is worth redrawing; anything else is a regression.
-        grep -qE "${BIND_LOST}" "${HTS_LOG}" ||
+        command grep -qE "${BIND_LOST}" "${HTS_LOG}" ||
             fail "htsserver did not come up: $(<"${HTS_LOG}")"
         test -z "${port}" ||
             fail "htsserver could not bind port ${port}: $(<"${HTS_LOG}")"

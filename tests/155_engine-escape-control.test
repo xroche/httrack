@@ -33,5 +33,5 @@ selftest_run_queued
 
 # The in-binary table also checks the bytes past the NUL, which printing cannot show.
 got=$(httrack "-#test=escape-control") || fail "self-test exited non-zero"
-grep -q "escape-control self-test OK" <<<"$got" ||
+command grep -q "escape-control self-test OK" <<<"$got" ||
     fail "unexpected self-test output: $got"

@@ -16,20 +16,20 @@ test -f "${guide}" || fail "no ${guide}"
 # ---- every pane points at a section the guide really has ----
 
 printf '[each pane links a guide section that exists] ..\t'
-anchors=$(grep -oh 'guide\.html#web/[a-z0-9-]*' "${distdir}"/html/server/*.html |
+anchors=$(command grep -oh 'guide\.html#web/[a-z0-9-]*' "${distdir}"/html/server/*.html |
     sed 's|.*#web/||' | LC_ALL=C sort -u)
 # An empty list would walk the loop below without ever reading the guide.
 found=$(count_matching_lines . <<<"${anchors}")
 test "${found}" -ge 10 || fail "only ${found} guide anchors under html/server/"
 for a in ${anchors}; do
-    tag=$(grep -m1 -o "<[^>]*id=\"${a}\"[^>]*>" "${guide}" || true)
+    tag=$(command grep -m1 -o "<[^>]*id=\"${a}\"[^>]*>" "${guide}" || true)
     test -n "${tag}" ||
         fail "a pane links guide.html#web/${a}, which the guide has no id for"
     # guide.css hides a section scoped to another platform, so the link would
     # open the guide and scroll nowhere.
     case ${tag} in
     *data-for=*)
-        grep -q 'data-for="[^"]*web' <<<"${tag}" ||
+        command grep -q 'data-for="[^"]*web' <<<"${tag}" ||
             fail "guide section ${a} is not shown for web: ${tag}"
         ;;
     esac
@@ -61,18 +61,18 @@ step3.html step-address
 step4.html step-ready
 PAIRS
 )
-linked=$(grep -l 'guide\.html#web/' "${distdir}"/html/server/*.html | wc -l)
+linked=$(command grep -l 'guide\.html#web/' "${distdir}"/html/server/*.html | wc -l)
 test "${linked}" -eq "$(count_matching_lines . <<<"${pairs}")" ||
     fail "${linked} pages link the guide, the table below pins a different number"
 while read -r page anchor; do
-    grep -qF "guide.html#web/${anchor}\"" "${distdir}/html/server/${page}" ||
+    command grep -qF "guide.html#web/${anchor}\"" "${distdir}/html/server/${page}" ||
         fail "${page} must link guide.html#web/${anchor}"
 done <<<"${pairs}"
 # Control: the loop proves nothing unless a wrong anchor really misses.
-! grep -qF 'id="no-such-section"' "${guide}" ||
+! command grep -qF 'id="no-such-section"' "${guide}" ||
     fail "the control anchor exists, so the loop above cannot discriminate"
 # The step*.html stubs redirect without the platform, so no pane may name one.
-stale=$(grep -l 'href="/step[0-9]*\.html"\|/server/help\.html\|/server/file\.html' \
+stale=$(command grep -l 'href="/step[0-9]*\.html"\|/server/help\.html\|/server/file\.html' \
     "${distdir}"/html/server/*.html || true)
 test -z "${stale}" || fail "a pane still links a retired page: ${stale}"
 printf 'ok\n'
@@ -176,7 +176,7 @@ await() { # await MARKER WHAT
     local start=$SECONDS body
     while :; do
         body=$(htsserver_get "${PANE}")
-        grep -qF "$1" <<<"${body}" && return 0
+        command grep -qF "$1" <<<"${body}" && return 0
         htsserver_alive || fail "htsserver died waiting for $2"
         test "$((SECONDS - start))" -lt 120 || fail "the panel never reached $2"
         poll_wait 0.2
@@ -197,7 +197,7 @@ htsserver_client --path /server/index.html --field "sid=${sid}" --field lang=1 >
 serves "${PANE}" "${IDLE}" 'back in English'
 # Control: the markers asserted below are absent until a crawl sets them.
 # refresh.html is skipped, being the running pane itself.
-idle_panes=$(grep -vxF /server/refresh.html <<<"${PANES}")
+idle_panes=$(command grep -vxF /server/refresh.html <<<"${PANES}")
 # shellcheck disable=SC2086 # deliberately split path lists
 probe refutes "${RUNNING}" 'idle' ${idle_panes}
 docs_reachable 'idle'

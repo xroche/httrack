@@ -27,10 +27,10 @@ run() {
 # Every assertion below is about the crawl log, testlib's own included.
 fail_dump_var LOG
 loghas() {
-    grep -Eq "$1" "$LOG" || fail "expected /$1/ in $LOG"
+    command grep -Eq "$1" "$LOG" || fail "expected /$1/ in $LOG"
 }
 lognot() {
-    if grep -Eq "$1" "$LOG"; then fail "unexpected /$1/ in $LOG"; fi
+    if command grep -Eq "$1" "$LOG"; then fail "unexpected /$1/ in $LOG"; fi
 }
 
 # readable list: its one URL is loaded and counted (count must be non-zero)

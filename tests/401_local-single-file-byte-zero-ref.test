@@ -50,6 +50,6 @@ echo OK
 # The reference at offset 0 is what the classifier used to mishandle, so it is
 # the one that has to come back inlined.
 printf '[reference at offset 0 followed] ..\t'
-grep -q 'url(data:image/svg+xml;base64,' "${tmpdir}/got.css" ||
+command grep -q 'url(data:image/svg+xml;base64,' "${tmpdir}/got.css" ||
     fail "the url() opening the stylesheet was not inlined"
 echo OK

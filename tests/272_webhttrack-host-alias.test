@@ -14,7 +14,7 @@ distdir=$(cd "${distdir}" && pwd)
 htsserver_require
 
 printf '[project reload maps the key back] ..\t'
-grep -q "do:copy:HostAlias:hostalias" "${distdir}/html/server/step2.html" ||
+command grep -q "do:copy:HostAlias:hostalias" "${distdir}/html/server/step2.html" ||
     fail "step2.html does not restore HostAlias"
 echo OK
 
@@ -108,10 +108,10 @@ while IFS= read -r arg; do
 done <"${work}/emitted"
 # Rejected flags exit 255 like a URL-less run, so match the diagnostic.
 out=$(httrack "${argv[@]}" 2>&1) || true
-if grep -q "Unknown option" <<<"${out}"; then
+if command grep -q "Unknown option" <<<"${out}"; then
     fail "the engine rejects ${argv[0]}: ${out}"
 fi
 # Control: the same probe on a flag that does not exist.
 out=$(httrack "${argv[0]}es" "${argv[1]}" 2>&1) || true
-grep -q "Unknown option" <<<"${out}" || fail "the unknown-option probe proves nothing"
+command grep -q "Unknown option" <<<"${out}" || fail "the unknown-option probe proves nothing"
 echo OK

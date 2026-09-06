@@ -95,7 +95,7 @@ ci_skip_list=unset-marker
 rc=0
 ci_expected_skips_for_backend bogus >"$tmp/bogus.err" 2>&1 || rc=$?
 test "$rc" -ne 0 || fail "an unknown backend was accepted"
-grep -q "::error::no expected-skip list for backend 'bogus'" "$tmp/bogus.err" ||
+command grep -q "::error::no expected-skip list for backend 'bogus'" "$tmp/bogus.err" ||
     fail "the unknown backend was not reported: $(cat "$tmp/bogus.err")"
 test "$ci_skip_list" = unset-marker || fail "an unknown backend touched ci_skip_list: [$ci_skip_list]"
 
@@ -138,7 +138,7 @@ cmp -s "$testdir/ci-windows-suite.sh" "$tmp/empty-mutant.sh" &&
     if ci_expected_skips_for_backend bogus; then rc=0; else rc=1; fi
     printf 'rc=%s list=[%s]' "$rc" "$ci_skip_list"
 ) >"$tmp/empty-mutant.out"
-grep -q '^rc=0 list=\[\]$' "$tmp/empty-mutant.out" ||
+command grep -q '^rc=0 list=\[\]$' "$tmp/empty-mutant.out" ||
     fail "the empty-fallback mutant did not silently accept an unknown backend: $(<"$tmp/empty-mutant.out")"
 
 echo "ci-windows skip-backend ratchet OK"

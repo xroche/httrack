@@ -24,7 +24,7 @@ written=$(
     done | sort -u
 )
 listed=$(awk '/ini_list_keys\[\] = /,/^\};/' "${distdir}/src/htsserver.c" |
-    grep -o '"[^"]*"' | tr -d '"' | sort -u)
+    command grep -o '"[^"]*"' | tr -d '"' | sort -u)
 # Floor: two gutted lists compare equal.
 test "$(printf '%s\n' "${written}" | wc -l)" -ge 9 ||
     fail "only $(printf '%s\n' "${written}" | wc -l) listid keys in step4.html"

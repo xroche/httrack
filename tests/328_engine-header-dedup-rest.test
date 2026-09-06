@@ -153,8 +153,8 @@ assert_same() { # assert_same BASE TAG
 # lost trailing newline on both sides alike.
 assert_same_but() { # assert_same_but BASE TAG RE
     local base=$tmpdir/$2.base got=$tmpdir/$2.got
-    grep -Ev "$3" "$tmpdir/$1.req" >"$base" || true
-    grep -Ev "$3" "$tmpdir/$2.req" >"$got" || true
+    command grep -Ev "$3" "$tmpdir/$1.req" >"$base" || true
+    command grep -Ev "$3" "$tmpdir/$2.req" >"$got" || true
     diff "$base" "$got" || fail "$2: the request outside $3 differs from $1's"
 }
 

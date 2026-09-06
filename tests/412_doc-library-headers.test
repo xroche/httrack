@@ -26,7 +26,7 @@ same_set() { # same_set <list A> <list B>: newline-separated, order-insensitive
 parse_installed() { # parse_installed <makefile>
     sed -n '/DevIncludes_DATA[[:space:]]*[+:]*=/,/[^\\]$/p' "$1" |
         sed 's/^[[:space:]]*DevIncludes_DATA[[:space:]]*[+:]*=//; s/\\$//' |
-        tr -s ' \t' '\n' | sed 's,.*/,,' | grep '\.h$' | sort -u
+        tr -s ' \t' '\n' | sed 's,.*/,,' | command grep '\.h$' | sort -u
 }
 
 # Project headers a .c includes, either bracket style, indented or not: a name
@@ -41,7 +41,7 @@ parse_includes() { # parse_includes <c file>
         d && /^[[:space:]]*#[[:space:]]*endif\>/ { if (n == 0) { d = 0; next } ; n-- }
         !d
     ' "$1" |
-        grep -oE '^[[:space:]]*#[[:space:]]*include[[:space:]]*[<"][A-Za-z0-9._-]+\.h[">]' |
+        command grep -oE '^[[:space:]]*#[[:space:]]*include[[:space:]]*[<"][A-Za-z0-9._-]+\.h[">]' |
         sed 's,^[^<"]*[<"],,; s,[">].*,,' | sort -u |
         while read -r h; do
             if test -e "${srcdir}/src/${h}" || test -e "${here}/${h}"; then
@@ -78,7 +78,7 @@ same_set "$(parse_includes "${fixture}/probe.c")" 'htsbase.h
 htslib.h' || fail "parse_includes misreads an indented, bracketed or #if 0 include"
 
 installed=$(parse_installed "${makefile}")
-grep -qx 'httrack-library.h' <<<"${installed}" ||
+command grep -qx 'httrack-library.h' <<<"${installed}" ||
     fail "parsed no DevIncludes_DATA list out of ${makefile}"
 
 if same_set "${installed}" "${installed}
@@ -88,7 +88,7 @@ fi
 
 # <li><tt>name.h</tt></li> under the headers section.
 listed=$(sed -n '/<h3 id="headers">/,/<h3 id="examples">/p' "${page}" |
-    grep -o '<li><tt>[a-z0-9.-]*\.h</tt></li>' |
+    command grep -o '<li><tt>[a-z0-9.-]*\.h</tt></li>' |
     sed 's,.*<tt>,,; s,</tt>.*,,' | sort -u)
 test -n "${listed}" || fail "parsed no header list out of ${page}"
 
@@ -104,7 +104,7 @@ internal=$(parse_includes "${frontend}" | comm -23 - <(printf '%s\n' "${installe
 test -n "${internal}" || fail "parsed no private includes out of ${frontend}"
 
 quoted=$(sed -n '/engine-internal headers (/,/install does not carry/p' "${page}" |
-    grep -o '<tt>[a-z0-9.-]*\.h</tt>' | sed 's,</*tt>,,g' | sort -u)
+    command grep -o '<tt>[a-z0-9.-]*\.h</tt>' | sed 's,</*tt>,,g' | sort -u)
 test -n "${quoted}" || fail "parsed no private-include list out of ${page}"
 
 same_set "${internal}" "${quoted}" || {

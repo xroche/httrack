@@ -116,7 +116,7 @@ hb_now() { hb_time=$SECONDS; }
 ci_watchdog_wait=${ci_watchdog_wait:-30}
 
 # True once the launched interpreter has announced itself.
-ci_watchdog_spoke() { grep -q '^watchdog ready$' watchdog.log; }
+ci_watchdog_spoke() { command grep -q '^watchdog ready$' watchdog.log; }
 
 # Start the off-box telemetry over the progress log $1, setting ci_watchdog_pid;
 # return 1 with no PowerShell available. Forks nothing and kills nothing, so it

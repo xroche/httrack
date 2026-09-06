@@ -54,7 +54,7 @@ export HTTRACK_STDERR_CAPTURE_DIR=$cap
 
 # 2. The case this exists for: stderr discarded, the copy survives anyway.
 run_wrapped 'echo "runtime error: store to address 0x1 with insufficient space" >&2' 2>/dev/null
-grep -rq 'insufficient space' "$cap" || fail "a discarded UBSan report left no copy"
+command grep -rq 'insufficient space' "$cap" || fail "a discarded UBSan report left no copy"
 copies=("$cap"/349_probe.*.log)
 [ -e "${copies[0]}" ] || fail "the copy is not named after the test: $(echo "$cap"/*)"
 
@@ -64,20 +64,20 @@ out=$(run_wrapped 'echo out; echo err-passed >&2; exit 7' 2>"$tmp/on.err") || rc
 assert_eq 7 "$rc" "exit status under capture"
 assert_eq out "$out" "stdout under capture"
 assert_eq err-passed "$(cat "$tmp/on.err")" "stderr under capture"
-grep -rq err-passed "$cap" || fail "the copy missed a passed-through line"
-grep -rq '^out$' "$cap" && fail "stdout leaked into the capture"
+command grep -rq err-passed "$cap" || fail "the copy missed a passed-through line"
+command grep -rq '^out$' "$cap" && fail "stdout leaked into the capture"
 
 # 4. The collector reads the copies, and says so only when one carries a finding.
 logs=$tmp/logs
 mkdir -p "$logs"
 "$sh_run" "$report" -s "$cap" "$logs" >"$tmp/hit.out" 2>&1 && fail "the collector missed the report"
-grep -q 'insufficient space' "$tmp/hit.out" || fail "the collector did not print the finding: $(cat "$tmp/hit.out")"
+command grep -q 'insufficient space' "$tmp/hit.out" || fail "the collector did not print the finding: $(cat "$tmp/hit.out")"
 
 rm -rf "$cap"
 run_wrapped 'echo ordinary chatter >&2' 2>/dev/null
 "$sh_run" "$report" -s "$cap" "$logs" >"$tmp/clean.out" 2>&1 ||
     fail "the collector reddened a clean run: $(cat "$tmp/clean.out")"
-grep -q 'ordinary chatter' "$tmp/clean.out" && fail "the collector printed a clean capture"
+command grep -q 'ordinary chatter' "$tmp/clean.out" && fail "the collector printed a clean capture"
 
 # 4b. A directory that is not there is the wiring having moved, and scanning
 # nothing must not read as a clean run.

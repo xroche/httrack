@@ -79,7 +79,7 @@ fold() {
     LC_ALL=C sort >"${work}/actual"
 
 # An install that staged nothing matches nothing; say that, not a 300-line diff.
-grep -qx '@BINDIR@/httrack' "${work}/actual" || fail "nothing staged under ${stage}"
+command grep -qx '@BINDIR@/httrack' "${work}/actual" || fail "nothing staged under ${stage}"
 
 # Named one by one, not by their directory: dropping all of @LIBDIR@/httrack
 # would unpin whatever else lands there, and a removal would then go unseen.
@@ -90,7 +90,7 @@ plugin_re="^@LIBDIR@/httrack/lib(${plugins})\\.so(\\.[0-9][0-9]*(\\.@revision@)?
 if [ "${EXAMPLE_LIBS:-yes}" = yes ]; then
     LC_ALL=C sort "${manifest}" >"${work}/expected"
 else
-    LC_ALL=C grep -Ev "${plugin_re}" "${manifest}" | LC_ALL=C sort >"${work}/expected"
+    LC_ALL=C command grep -Ev "${plugin_re}" "${manifest}" | LC_ALL=C sort >"${work}/expected"
     # Ten plugins, three names each; a rename would silently match fewer.
     dropped=$(($(lines_of "${manifest}") - $(lines_of "${work}/expected")))
     test "${dropped}" -eq 30 ||

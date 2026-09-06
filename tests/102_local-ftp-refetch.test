@@ -121,12 +121,12 @@ test -z "$(listed gone)" || fail "the report calls something gone: $(listed gone
 unchanged=$(listed unchanged)
 changed=$(listed changed)
 for name in keep empty; do
-    grep -qx "${host}/${name}.bin:$(size_of "${tmpdir}/snap/${name}.bin")" <<<"$unchanged" ||
+    command grep -qx "${host}/${name}.bin:$(size_of "${tmpdir}/snap/${name}.bin")" <<<"$unchanged" ||
         fail "${name}.bin is not reported unchanged at its previous size"
-    if grep -q "^${host}/${name}.bin:" <<<"$changed"; then
+    if command grep -q "^${host}/${name}.bin:" <<<"$changed"; then
         fail "${name}.bin is reported changed as well"
     fi
 done
-grep -qx "${host}/stay.bin:$(size_of "${out}/${host}/stay.bin")" <<<"$changed" ||
+command grep -qx "${host}/stay.bin:$(size_of "${out}/${host}/stay.bin")" <<<"$changed" ||
     fail "stay.bin is not reported changed"
 ok "the change report calls the kept files unchanged and the refreshed one changed"

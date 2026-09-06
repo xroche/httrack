@@ -11,4 +11,4 @@ dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
 
 out=$(httrack -O /dev/null -#test=ioexact "$dir")
-grep -q "ioexact:.*OK" <<<"$out"
+command grep -q "ioexact:.*OK" <<<"$out"

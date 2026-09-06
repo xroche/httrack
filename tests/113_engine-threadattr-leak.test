@@ -18,7 +18,7 @@ if [ ! -r "${THREADATTRFAIL_LA:-}" ]; then
     echo "threadattr: ${THREADATTRFAIL_LA:-\$THREADATTRFAIL_LA} was not built" >&2
     exit 1
 fi
-if grep -q "^dlname=''" "$THREADATTRFAIL_LA"; then
+if command grep -q "^dlname=''" "$THREADATTRFAIL_LA"; then
     skip "threadattr: static-only build, nothing to preload"
 fi
 if [ ! -r "${THREADATTRFAIL_LIB:-}" ]; then

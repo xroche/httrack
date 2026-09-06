@@ -24,7 +24,7 @@ test "${#sid}" -eq 32 || fail "did not scrape a 32-hex sid from the page (got '$
 # with a reply that is visible in the headers. Matched from a here-string, not a
 # pipe: grep -q SIGPIPEs the producer, and pipefail then buries the verdict.
 resp=$(htsserver_post "sid=${sid}&redirect=/accepted")
-grep -q '^Location: /accepted' <<<"${resp}" ||
+command grep -q '^Location: /accepted' <<<"${resp}" ||
     fail "a body carrying the correct sid was refused"
 
 # Refuse: missing and wrong. A missing one is the regression under test — the
@@ -33,12 +33,12 @@ grep -q '^Location: /accepted' <<<"${resp}" ||
 for bad in "redirect=/nosid" "sid=&redirect=/empty" \
     "sid=00000000000000000000000000000000&redirect=/wrong"; do
     resp=$(htsserver_post "${bad}")
-    grep -q '^Location:' <<<"${resp}" &&
+    command grep -q '^Location:' <<<"${resp}" &&
         fail "body accepted without a valid sid: ${bad}"
     # A refusal has to be a well-formed reply, not a headerless fragment: the
     # release build used to emit only Content-length, which reads as a protocol
     # error to any client and hides the reason.
-    grep -q '^HTTP/1\.0 403 ' <<<"${resp}" ||
+    command grep -q '^HTTP/1\.0 403 ' <<<"${resp}" ||
         fail "refusal was not a 403: ${bad}"
 done
 
@@ -49,20 +49,20 @@ done
 store_page() {
     # a dead probe or a non-page reply must not read as "the store was not written"
     page=$(htsserver_get /server/step3.html) || fail "the key store probe failed"
-    grep -q '^HTTP/1\.0 200 ' <<<"${page}" ||
+    command grep -q '^HTTP/1\.0 200 ' <<<"${page}" ||
         fail "the key store probe did not answer: '$(head -1 <<<"${page}")'"
 }
 
 htsserver_post "projname=UNAUTHWRITE" >/dev/null 2>&1 || true
 store_page
-grep -q 'UNAUTHWRITE' <<<"${page}" &&
+command grep -q 'UNAUTHWRITE' <<<"${page}" &&
     fail "a body without a valid sid was written to the key store"
 
 # Paired accept case: without it the assertion above passes even if the server
 # simply ignores every body, which would prove nothing.
 htsserver_post "sid=${sid}&projname=AUTHWRITE" >/dev/null 2>&1 || true
 store_page
-grep -q 'AUTHWRITE' <<<"${page}" ||
+command grep -q 'AUTHWRITE' <<<"${page}" ||
     fail "a body carrying the correct sid was not written to the key store"
 
 echo "PASS"

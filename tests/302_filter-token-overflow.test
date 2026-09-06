@@ -24,7 +24,7 @@ why() { # why RULE-FILE
     out="$(httrack -O "$tmpdir/p" -q --why http://www.example.com/a.png \
         -%S "$1" http://www.example.com/)" ||
         fail "httrack exited $? on $(basename "$1")"
-    grep -E 'accepted|rejected|no filter|unable' <<<"$out"
+    command grep -E 'accepted|rejected|no filter|unable' <<<"$out"
 }
 
 # An over-long rule, then the one that decides.
@@ -87,5 +87,5 @@ assert_file "$tmpdir/m/127.0.0.1_$SRV_PORT/index.html" "the seed that fits"
 log="$(<"$tmpdir/m/hts-log.txt")"
 assert_match "URL longer than $maxurl bytes, ignored: $BASEURL/aaa" "$log" \
     "refusal named in the log"
-assert_eq 1 "$(grep -cE 'Warning:|Error:' <<<"$log")" \
+assert_eq 1 "$(command grep -cE 'Warning:|Error:' <<<"$log")" \
     "messages the refused seed cost"

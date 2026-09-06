@@ -109,13 +109,13 @@ spent=$((SECONDS - began))
 
 test "$rc" -eq 124 || fail "a tick that never waits exited $rc, not 124: $(<"$tmp/broken.log")"
 # With the count, or a guard tripping on the first tick reads the same.
-grep -q 'poll tick ran 10 times' "$tmp/broken.log" ||
+command grep -q 'poll tick ran 10 times' "$tmp/broken.log" ||
     fail "no verdict naming the tenth tick: $(<"$tmp/broken.log")"
-grep -q '^NOFORK child.sh$' "$tmp/progress" ||
+command grep -q '^NOFORK child.sh$' "$tmp/progress" ||
     fail "the off-box watchdog got no marker: $(<"$tmp/progress")"
 # The deadline path writes DUMP and spends the whole 60s, so either says the guard
 # is gone and the budget is what ended the loop.
-grep -q '^DUMP ' "$tmp/progress" && fail "the loop ran to its 60s deadline, not the guard"
+command grep -q '^DUMP ' "$tmp/progress" && fail "the loop ran to its 60s deadline, not the guard"
 test "$spent" -lt 30 || fail "took ${spent}s to give up on a tick that returns at once"
 childpid=$(<"$tmp/childpid")
 test -n "$childpid" || fail "the child never started"
@@ -129,12 +129,12 @@ REAP_GRACE=5 reap_bounded "$childpid" ||
 : >"$tmp/progress"
 : >"$tmp/ticks"
 run_timeout "$tmp/flaky" "$tmp/flaky.log" || fail "an intermittent tick failed the run: $(<"$tmp/flaky.log")"
-grep -q 'NOFORK' "$tmp/progress" && fail "ticks that fail every other call were read as a wedge"
+command grep -q 'NOFORK' "$tmp/progress" && fail "ticks that fail every other call were read as a wedge"
 
 # Control: a working sleep must reach neither branch, or the assertions above would
 # hold for any run at all.
 : >"$tmp/progress"
 run_timeout "" "$tmp/ok.log" || fail "a healthy run failed: $(<"$tmp/ok.log")"
-grep -q 'NOFORK' "$tmp/progress" && fail "a healthy poll tick was read as a broken one"
+command grep -q 'NOFORK' "$tmp/progress" && fail "a healthy poll tick was read as a broken one"
 
 echo "test-timeout poll guard OK"

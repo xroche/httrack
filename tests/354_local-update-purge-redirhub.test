@@ -76,7 +76,7 @@ assert_purged false "$out"
 local_crawl --log "${tmpdir}/tlog3" "${common[@]}" -O "$out" --update \
     "${BASEURL}/twicefail/index.html"
 assert_gave_up "$out" '/twicefail/thub\.html'
-grep -q 'tchild\.html' "${site}/thub.html" ||
+command grep -q 'tchild\.html' "${site}/thub.html" ||
     fail "the kept copy of thub.html no longer links tchild.html"
 assert_alive "${site}/tchild.html" TWICEFAIL-CHILD
 assert_purged false "$out"

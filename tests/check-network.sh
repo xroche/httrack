@@ -26,7 +26,7 @@ else
 
     # cached result ?
     if test -f $cache; then
-        if grep -q "ok" $cache; then
+        if command grep -q "ok" $cache; then
             exit 0
         else
             echo "online tests are disabled (cached)" >&2

@@ -27,7 +27,7 @@ test -r "$src" || fail "cannot read $src"
 codec=$(sed -n '/--- the .ref resume state/,/^int back_serialize_ref(/p' "$src")
 test -n "$codec" || fail "the .ref codec block moved; this check reads nothing"
 
-if grep -qE 'hts_f(read|write)_exact\(&' <<<"$codec"; then
+if command grep -qE 'hts_f(read|write)_exact\(&' <<<"$codec"; then
     fail "the .ref codec hands an object's own storage to the stream"
 fi
 
@@ -37,6 +37,6 @@ for shift in \
     'v >> \(8 \* i\)' \
     'b\[3\] << 24' \
     'b\[i\] << \(8 \* i\)'; do
-    grep -qE "$shift" <<<"$codec" ||
+    command grep -qE "$shift" <<<"$codec" ||
         fail "the .ref codec no longer spells out the byte order ($shift)"
 done

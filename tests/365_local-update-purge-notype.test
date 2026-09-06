@@ -21,7 +21,7 @@ common=(--quiet --disable-security-limits --robots=0 --retries=1 -c1 --timeout=2
 # themselves are asserted on the files; this only pins the report agreeing.
 purge_says() {
     local want="$1" json="${2}/hts-changes.json"
-    grep -q "\"purged\": ${want}" "$json" ||
+    command grep -q "\"purged\": ${want}" "$json" ||
         fail "expected \"purged\": ${want} in $(<"$json")"
 }
 
@@ -44,7 +44,7 @@ holds_nuls() {
     local want got
     want=$(($(wc -c <"$1") - 8))
     test "$want" -gt 10 || fail "$1 is too short to carry the blob's NULs"
-    got=$(od -An -v -c -j 8 -N "$want" "$1" | tr -s ' ' '\n' | grep -c '^\\0$' || true)
+    got=$(od -An -v -c -j 8 -N "$want" "$1" | tr -s ' ' '\n' | command grep -c '^\\0$' || true)
     test "$got" -eq "$want" || fail "$1 kept $got of its $want NUL bytes"
 }
 
@@ -65,7 +65,7 @@ blob_case() {
 
     local_crawl --log "${tmpdir}/${case}2" "${common[@]}" -O "$out" --update \
         "${BASEURL}/ctpurge/${case}/index.html"
-    grep -qE "Error:.*\(-[0-9]+\).*at link .*/ctpurge/${case}/blob\.bin" \
+    command grep -qE "Error:.*\(-[0-9]+\).*at link .*/ctpurge/${case}/blob\.bin" \
         "${out}/hts-log.txt" ||
         fail "${case}: the blob re-fetch did not fail, so nothing was tested"
     test -s "$copy" || fail "${case}: the failed blob lost its copy (#746)"
@@ -100,7 +100,7 @@ test -s "${site}/gone.html" || fail "pass 1 did not mirror gone.html"
 for crawl in 2 3; do
     local_crawl --log "${tmpdir}/twice${crawl}" "${common[@]}" -O "$out" --update \
         "${BASEURL}/ctpurge/twice/index.html"
-    grep -qE "Error:.*\(-[0-9]+\).*at link .*/ctpurge/twice/blob\.html" \
+    command grep -qE "Error:.*\(-[0-9]+\).*at link .*/ctpurge/twice/blob\.html" \
         "${out}/hts-log.txt" ||
         fail "crawl ${crawl}: the blob re-fetch did not fail, so nothing was tested"
 done

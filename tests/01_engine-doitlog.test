@@ -64,7 +64,7 @@ echo 'NEWCONTENT' >"$site/a.html"
 rc=0
 "$bin" -O "$out" --quiet >/dev/null 2>&1 || rc=$?
 test "$rc" -eq 0 || fail "second reprise exited $rc"
-grep -q NEWCONTENT "$(find "$out" -path '*/a.html' -print -quit)" || fail "reprise did not pick up the changed source (inserted url not re-crawled)"
+command grep -q NEWCONTENT "$(find "$out" -path '*/a.html' -print -quit)" || fail "reprise did not pick up the changed source (inserted url not re-crawled)"
 
 # --- 3. an empty quoted arg survives the doit.log round-trip (#106) ----------
 # -%F "" (empty footer) records an empty "" token in doit.log; -r2 follows it so
@@ -76,7 +76,7 @@ rc=0
 "$bin" "$url" -O "$out2" --quiet -n -%v0 -%F "" -r2 >/dev/null 2>&1 || rc=$?
 test "$rc" -eq 0 || fail "initial mirror with empty footer exited $rc"
 # precondition: the writer put the empty token on disk for the reader to reload.
-grep -q ' -%F "" -r2' "$out2/hts-cache/doit.log" || {
+command grep -q ' -%F "" -r2' "$out2/hts-cache/doit.log" || {
     echo "FAIL: empty footer not recorded as -%F \"\" -r2 in doit.log"
     grep -- '-%F' "$out2/hts-cache/doit.log" || true
     exit 1
@@ -87,7 +87,7 @@ grep -q ' -%F "" -r2' "$out2/hts-cache/doit.log" || {
 rc=0
 "$bin" -O "$out2" --quiet >/dev/null 2>&1 || rc=$?
 test "$rc" -eq 0 || fail "empty-footer reprise exited $rc (empty token dropped from doit.log?)"
-grep -q ' -%F "" -r2' "$out2/hts-cache/doit.log" || {
+command grep -q ' -%F "" -r2' "$out2/hts-cache/doit.log" || {
     echo "FAIL: empty footer did not survive the doit.log reload round-trip"
     grep -- '-%F' "$out2/hts-cache/doit.log" || true
     exit 1
@@ -109,18 +109,18 @@ rc=0
 test "$rc" -eq 0 || fail "initial mirror with a leading-quote footer exited $rc"
 page=$(find "$out3" -path '*/site3/index.html' -print -quit)
 test -n "$page" || fail "mirrored page missing after the leading-quote mirror"
-grep -qF "$footer" "$page" || fail "run 1 did not inject the footer verbatim"
+command grep -qF "$footer" "$page" || fail "run 1 did not inject the footer verbatim"
 rc=0
 "$bin" -O "$out3" --quiet >/dev/null 2>&1 || rc=$?
 test "$rc" -eq 0 || fail "leading-quote reprise exited $rc"
-grep -qF "$footer" "$page" || {
+command grep -qF "$footer" "$page" || {
     echo "FAIL: the footer changed across the reprise (leading quote written raw?)"
     grep -o '<!--[^>]*MARK[^>]*-->' "$page" | head -1
     exit 1
 }
 # -r2 sits after the footer. A plain ' -r2' match would also hit it *inside* a
 # swallowed footer, so pin the escaped token and its neighbour instead.
-grep -qF -- '-%F "\"<!-- MARK -->" -r2' "$out3/hts-cache/doit.log" || {
+command grep -qF -- '-%F "\"<!-- MARK -->" -r2' "$out3/hts-cache/doit.log" || {
     echo "FAIL: footer and -r2 are not two tokens in the regenerated doit.log"
     head -1 "$out3/hts-cache/doit.log"
     exit 1
@@ -138,7 +138,7 @@ rc=0
 "$bin" "file://$site4/index.html" -O "$out4" --quiet -n -%v0 '"""+*foo*""' \
     >/dev/null 2>&1 || rc=$?
 test "$rc" -eq 0 || fail "initial mirror with a leading-quote filter exited $rc"
-grep -qF -- '"\"+*foo*"' "$out4/hts-cache/doit.log" || {
+command grep -qF -- '"\"+*foo*"' "$out4/hts-cache/doit.log" || {
     echo "FAIL: the filter was not recorded escaped"
     head -1 "$out4/hts-cache/doit.log"
     exit 1

@@ -44,7 +44,7 @@ post_as() { # $1 = Host value, "" sends none
 
 for good in "127.0.0.1" "127.0.0.1:${HTS_PORT}" "localhost" "localhost:${HTS_PORT}" \
     "LocalHost:${HTS_PORT}" "[::1]" "[::1]:${HTS_PORT}" ""; do
-    grep -q '^Location: /accepted' <<<"$(post_as "${good}")" ||
+    command grep -q '^Location: /accepted' <<<"$(post_as "${good}")" ||
         fail "Host '${good}' was refused"
 done
 echo "ok: the panel answers at every authority it is reachable at"
@@ -73,7 +73,7 @@ if test -n "${selfname}"; then
     # Upper-cased too: the compare is case-insensitive, as it is for localhost.
     for good in "${selfname}" "${selfname}:${HTS_PORT}" \
         "$(printf '%s' "${selfname}" | tr '[:lower:]' '[:upper:]')"; do
-        grep -q '^Location: /accepted' <<<"$(post_as "${good}")" ||
+        command grep -q '^Location: /accepted' <<<"$(post_as "${good}")" ||
             fail "Host '${good}', this host's own name, was refused"
     done
     echo "ok: the panel answers at this host's own name"
@@ -93,15 +93,15 @@ if test -n "${selfname}"; then
 fi
 for bad in "${bad_hosts[@]}"; do
     resp=$(post_as "${bad}")
-    grep -q '^HTTP/1\.0 403 ' <<<"${resp}" ||
+    command grep -q '^HTTP/1\.0 403 ' <<<"${resp}" ||
         fail "POST with Host '${bad}' was not a 403: '$(firstline "${resp}")'"
-    grep -q '^Location:' <<<"${resp}" && fail "POST with Host '${bad}' still ran"
+    command grep -q '^Location:' <<<"${resp}" && fail "POST with Host '${bad}' still ran"
     # GET too: a guard sitting on the POST path alone is the shape of the last
     # bug found here.
     resp=$(htsserver_client --host "${bad}" --path /server/index.html)
-    grep -q '^HTTP/1\.0 403 ' <<<"${resp}" ||
+    command grep -q '^HTTP/1\.0 403 ' <<<"${resp}" ||
         fail "GET with Host '${bad}' was not a 403: '$(firstline "${resp}")'"
-    grep -q 'name="sid"' <<<"${resp}" &&
+    command grep -q 'name="sid"' <<<"${resp}" &&
         fail "GET with Host '${bad}' still handed out a session id"
 done
 echo "ok: a foreign authority is refused, on every method"
@@ -110,21 +110,21 @@ echo "ok: a foreign authority is refused, on every method"
 # key store that later requests render from. step3 interpolates ${projname}.
 store_page() {
     page=$(htsserver_get /server/step3.html) || fail "the key store probe failed"
-    grep -q '^HTTP/1\.0 200 ' <<<"${page}" ||
+    command grep -q '^HTTP/1\.0 200 ' <<<"${page}" ||
         fail "the key store probe did not answer: '$(firstline "${page}")'"
 }
 
 htsserver_client --host evil.example --path / \
     --post "sid=${sid}&projname=REBOUND" >/dev/null 2>&1 || true
 store_page
-grep -q 'REBOUND' <<<"${page}" &&
+command grep -q 'REBOUND' <<<"${page}" &&
     fail "a body sent with a foreign Host reached the key store"
 # Paired accept: without it the assertion above passes on a server that ignores
 # every body, which would prove nothing.
 htsserver_client --host "127.0.0.1:${HTS_PORT}" --path / \
     --post "sid=${sid}&projname=SAMEHOST" >/dev/null 2>&1 || true
 store_page
-grep -q 'SAMEHOST' <<<"${page}" ||
+command grep -q 'SAMEHOST' <<<"${page}" ||
     fail "a body sent with our own Host was not written to the key store"
 echo "ok: a refused body is not applied"
 

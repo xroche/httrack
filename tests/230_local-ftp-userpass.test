@@ -34,8 +34,8 @@ crawl() {
 # --- a plain login goes out unchanged ----------------------------------------
 crawl "bob:secret" || fail "the plain-login crawl never finished"
 sent=$(<"$cmds")
-grep -qxF "USER bob" <<<"$sent" || fail "no USER bob on the wire: ${sent}"
-grep -qxF "PASS secret" <<<"$sent" || fail "no PASS secret on the wire: ${sent}"
+command grep -qxF "USER bob" <<<"$sent" || fail "no USER bob on the wire: ${sent}"
+command grep -qxF "PASS secret" <<<"$sent" || fail "no PASS secret on the wire: ${sent}"
 cmp -s "${out}/127.0.0.1_${FTP_PORT}/f.txt" "${root}/f.txt" ||
     fail "the login did not bring the body back; mirror holds $(find "$out" -type f)"
 ok "bob:secret reaches the server verbatim, and mirrors"
@@ -46,9 +46,9 @@ user=$(repeat_chars 255 a)
 pass=$(repeat_chars 255 b)
 crawl "${user}:${pass}" || fail "the 255-byte login crawl never finished"
 sent=$(<"$cmds")
-grep -qxF "USER ${user}" <<<"$sent" ||
+command grep -qxF "USER ${user}" <<<"$sent" ||
     fail "the wire user is not the 255 bytes the URL named: $(grep -a '^USER' <<<"$sent")"
-grep -qxF "PASS ${pass}" <<<"$sent" ||
+command grep -qxF "PASS ${pass}" <<<"$sent" ||
     fail "the wire pass is not the 255 bytes the URL named: $(grep -a '^PASS' <<<"$sent")"
 ok "a 255-byte user and password reach the server unclipped"
 

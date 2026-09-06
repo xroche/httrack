@@ -47,7 +47,7 @@ control() {
     if out=$(bash "$checker" "$dir" 2>&1); then
         fail "$name: the checker accepted a name make check would not run"
     fi
-    grep -q "$want" <<<"$out" || fail "$name: wrong diagnostic: $out"
+    command grep -q "$want" <<<"$out" || fail "$name: wrong diagnostic: $out"
 }
 
 control misnamed 'outside the' ': >ghost.test'
@@ -103,7 +103,7 @@ printf '#!/bin/sh\nexit 1\n' >"$work/stub/git"
 chmod +x "$work/stub/git"
 out=$(PATH="$work/stub:$PATH" bash "$checker" "$testdir" 2>&1) ||
     fail "the checker failed outright with git stubbed out: $out"
-grep -q 'skipping the tracked-set check' <<<"$out" ||
+command grep -q 'skipping the tracked-set check' <<<"$out" ||
     fail "a git that cannot answer read as a clean tracked set: $out"
 
 if command -v git >/dev/null 2>&1; then

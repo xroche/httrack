@@ -16,7 +16,7 @@ fi
 printf '/** GENERATED FILE (%s), DO NOT EDIT **/\n\n' "$0"
 for i in *.TXT; do
     echo "processing $i" >&2
-    grep -vE "^(#|$)" "$i" | grep -E "^0x" | sed -e 's/[[:space:]]/ /g' | cut -f1,2 -d' ' |
+    command grep -vE "^(#|$)" "$i" | grep -E "^0x" | sed -e 's/[[:space:]]/ /g' | cut -f1,2 -d' ' |
         (
             unset arr
             while read -r LINE; do

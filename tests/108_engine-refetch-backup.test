@@ -13,7 +13,7 @@ cleanup_push rm -rf "$dir"
 
 rc=0
 out=$(httrack -O /dev/null -#test=refetchbackup "$dir" 2>&1) || rc=$?
-if test "$rc" -ne 0 || ! grep -q "refetchbackup: OK" <<<"$out"; then
+if test "$rc" -ne 0 || ! command grep -q "refetchbackup: OK" <<<"$out"; then
     echo "FAIL (exit $rc): $out" >&2
     exit 1
 fi

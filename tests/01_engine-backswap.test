@@ -6,4 +6,4 @@ set -euo pipefail
 # A ready slot still owning a temporary must stay in memory: swapping it out
 # clears the entry, which unlinks the re-fetch backup (#771).
 out=$(httrack -O /dev/null -#test=backswap)
-grep -q "backswap self-test: OK" <<<"$out"
+command grep -q "backswap self-test: OK" <<<"$out"

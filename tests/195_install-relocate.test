@@ -48,7 +48,7 @@ rpath_entries() {
     otool) raw=$(LC_ALL=C otool -l "$1" 2>/dev/null |
         awk '/LC_RPATH/ { f = 1 } f && $1 == "path" { print $2; f = 0 }') ;;
     esac
-    tr ':' '\n' <<<"${raw}" | grep -v '^$' || true
+    tr ':' '\n' <<<"${raw}" | command grep -v '^$' || true
 }
 
 is_token() {
@@ -112,7 +112,7 @@ copybase=${copy}${base#"${stage}"}
 cd "${work}"
 out=$(env -u LD_LIBRARY_PATH -u DYLD_LIBRARY_PATH "${copy}${bindir}/httrack" --version 2>&1) ||
     fail "the copied binary did not start: ${out}"
-grep -q 'HTTrack version' <<<"${out}" || fail "unexpected --version output: ${out}"
+command grep -q 'HTTrack version' <<<"${out}" || fail "unexpected --version output: ${out}"
 
 # Starting is not enough: take the copy's own library away and the binary has to
 # stop working. If it still runs, another libhttrack answered and the run above

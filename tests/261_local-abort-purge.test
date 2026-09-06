@@ -111,9 +111,9 @@ test "$rc" -ne 124 || fail "the terminated crawl was still running 120s later"
 log=$(<"${out}/hts-log.txt")
 # The exit has to land in the outer loop's own branch, the one that falls
 # through to the purge. A bailout jumps past it and proves nothing.
-grep -q 'Exit requested by shell or user' <<<"$log" ||
+command grep -q 'Exit requested by shell or user' <<<"$log" ||
     fail "the crawl did not end through the engine's exit path: ${log}"
-! grep -q 'restoring previous one' <<<"$log" ||
+! command grep -q 'restoring previous one' <<<"$log" ||
     fail "the abort rolled the session back, which skips the purge anyway: ${log}"
 # And the run must really have left links behind, or there is nothing to purge.
 for name in c d e; do
@@ -131,6 +131,6 @@ for name in c d e; do
 done
 ok "the files the aborted run never reached kept their previous copies"
 
-grep -q 'mirror aborted after' <<<"$log" ||
+command grep -q 'mirror aborted after' <<<"$log" ||
     fail "the aborted run still reports a complete mirror: ${log}"
 ok "the summary reports the abort"

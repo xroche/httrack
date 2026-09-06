@@ -31,6 +31,6 @@ test "$moved" -gt 0 || fail "no slot was ever spooled, so the name was never bui
 serr=$(count_matching_lines 'serialize error' "$enginelog")
 test "$serr" -eq 0 || {
     echo "the spool refused to write:"
-    grep 'serialize error' "$enginelog"
+    command grep 'serialize error' "$enginelog"
     exit 1
 }

@@ -128,7 +128,7 @@ reject() { # reject <label> <expected message> <env argument>...
     shift 2
     run "$label" "$@"
     test "$status" -ne 0 || fail "configure accepted $label"
-    grep -q "$want" <<<"$log" || {
+    command grep -q "$want" <<<"$log" || {
         echo "$label rejected without '$want':" >&2
         tail -5 <<<"$log" >&2
         exit 1
@@ -153,7 +153,7 @@ accept() {
         exit 1
     fi
     if test -n "$want"; then
-        grep -q "$want" <<<"$log" || {
+        command grep -q "$want" <<<"$log" || {
             echo "$label configured without '$want':" >&2
             tail -5 <<<"$log" >&2
             exit 1
@@ -180,7 +180,7 @@ probe() { # probe <run number> <seconds of budget left> <command>...
 # A wedge must fail even with the budget gone, or #922 comes back as a skip.
 rc=$(probe 90 6 sleep 999)
 test "$rc" -eq 1 || fail "a silent configure with 6s of budget reported $rc, want 1"
-grep -q 'wrote nothing' "$tmp/probe.log" || fail "the hang was not named: $(<"$tmp/probe.log")"
+command grep -q 'wrote nothing' "$tmp/probe.log" || fail "the hang was not named: $(<"$tmp/probe.log")"
 # Slow but talking is the emulated buildd, and a skip there beats the harness kill.
 rc=$(probe 91 6 bash -c 'while :; do echo tick; sleep 1; done')
 test "$rc" -eq 77 || fail "a slow but writing configure with 6s of budget reported $rc, want 77"
@@ -192,7 +192,7 @@ test "$rc" -eq 1 || fail "a silent configure with a child of its own reported $r
 sleep 1
 # Not through a pipe: grep -q would leave ps_snapshot writing into a closed one,
 # and pipefail would then read the leaked child as an absent one.
-! grep -q '[s]leep 987' <<<"$(ps_snapshot)" || fail "the killed run left its child running"
+! command grep -q '[s]leep 987' <<<"$(ps_snapshot)" || fail "the killed run left its child running"
 # The pacer must not fire before the case is judged: run() returns with the verdict
 # still unread, and a skip there would bury a configure that answered wrongly. Through
 # the real run(), since a stub cannot see a pacer left inside the one it replaced.
@@ -262,7 +262,7 @@ reject posix-env 'POSIXLY_CORRECT or SHELLOPTS' "BASH_SHELL=$sh" POSIXLY_CORRECT
 # probe has to decide which one to blame instead of reading the environment.
 reject sh-mode-in-posix-env "BASH_SHELL=$tmp/sh is a bash in POSIX sh-mode" \
     "BASH_SHELL=$tmp/sh" POSIXLY_CORRECT=1
-if grep -q 'POSIXLY_CORRECT or SHELLOPTS' <<<"$log"; then
+if command grep -q 'POSIXLY_CORRECT or SHELLOPTS' <<<"$log"; then
     echo "a bash invoked as sh was blamed on the environment:" >&2
     tail -5 <<<"$log" >&2
     exit 1

@@ -55,7 +55,7 @@ for h in config.h htsfeatures.h; do
     [ -f "$abs_top_builddir/$h" ] || skip "$abs_top_builddir/$h is missing"
     sed 's|^#define DLLIB 1|/* #undef DLLIB */|' "$abs_top_builddir/$h" >"$tmp/nodl/$h"
 done
-grep -q '^/\* #undef DLLIB \*/$' "$tmp/nodl/config.h" ||
+command grep -q '^/\* #undef DLLIB \*/$' "$tmp/nodl/config.h" ||
     fail "config.h no longer defines DLLIB the way this test strips it"
 
 cpp_argv=(-E -I"$tmp/nodl" -I"$abs_top_builddir" -I"$abs_top_builddir/src"
@@ -74,10 +74,10 @@ printf '#include "htsglobal.h"\nPROBE HTS_DLOPEN\n' >"$tmp/probe.c"
 "${cc_argv[@]}" "${cpp_argv[@]}" "$tmp/probe.c" >"$tmp/probe.i" 2>/dev/null ||
     fail "the probe TU did not preprocess"
 assert_eq "PROBE 0" "$(sed -n 's/^PROBE .*/&/p' "$tmp/probe.i" | tail -1)" "HTS_DLOPEN without DLLIB"
-grep -q 'smallserver_setkey("USEZLIB"' "$tmp/nodl.i" ||
+command grep -q 'smallserver_setkey("USEZLIB"' "$tmp/nodl.i" ||
     fail "the preprocessed htsweb.c carries no key at all, so the check below proves nothing"
 
-! grep -q 'smallserver_setkey("DLOPEN"' "$tmp/nodl.i" ||
+! command grep -q 'smallserver_setkey("DLOPEN"' "$tmp/nodl.i" ||
     fail "a build without dlopen still publishes DLOPEN=1 to the web UI"
 
 echo "ok: the @ set, the platform name and the dlopen key all report what the build did"

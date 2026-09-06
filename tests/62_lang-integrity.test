@@ -337,7 +337,7 @@ LC_ALL=C awk -v keys="$keys" '
 # lang.def, so a reword on one side alone silently drifts the two apart (#1117).
 for scope in "Mirror %s and every host below it" "Ignore %s and every host below it"; do
     for f in "$eng" "$def" "$top_srcdir/src/httrack.c"; do
-        if ! LC_ALL=C grep -qF "$scope" "$f"; then
+        if ! LC_ALL=C command grep -qF "$scope" "$f"; then
             echo "${f##*/}: missing the wizard scope answer \"$scope\""
             fail=1
         fi
@@ -481,7 +481,7 @@ fi
 # One probe per letter the catalogs actually got wrong, so a widened set
 # also fails loudly rather than only through the pin above.
 printf 'Five bad\na\\Pb\\Dc\\Kd\\he\\sf\n' >"$tmp/letters.txt"
-nbad=$(unknown_escapes "$tmp/letters.txt" letters.txt | LC_ALL=C grep -c 'is not an escape') || true
+nbad=$(unknown_escapes "$tmp/letters.txt" letters.txt | LC_ALL=C command grep -c 'is not an escape') || true
 if [ "${nbad:-0}" -ne 5 ]; then
     echo "the escape check named ${nbad:-0} of 5 bad escape letters"
     exit 1
@@ -913,7 +913,7 @@ if [ "$ncmp" -lt $((nfiles * nlist * 9 / 10)) ]; then
 fi
 # An unknown ${LANG_*} renders as nothing rather than erroring, so check that
 # every macro the templates interpolate, in any wrapper form, resolves.
-LC_ALL=C grep -oh '[$]{[^}]*LANG_[A-Za-z0-9_]*}' "$top_srcdir"/html/server/*.html |
+LC_ALL=C command grep -oh '[$]{[^}]*LANG_[A-Za-z0-9_]*}' "$top_srcdir"/html/server/*.html |
     LC_ALL=C sed 's|.*\(LANG_[A-Za-z0-9_]*\)}|\1|' | LC_ALL=C sort -u >"$tmp/used"
 nused=$(wc -l <"$tmp/used")
 if [ "$nused" -lt 100 ]; then

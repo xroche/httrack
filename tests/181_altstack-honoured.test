@@ -19,7 +19,7 @@ require_httrack
 # A --disable-shared build has nothing to preload; anything else missing is a
 # build problem, not a skip, or the legs below would pass vacuously.
 [ -r "${ALTSTACKPROBE_LA:-}" ] || fail "${ALTSTACKPROBE_LA:-\$ALTSTACKPROBE_LA} was not built"
-if grep -q "^dlname=''" "$ALTSTACKPROBE_LA"; then
+if command grep -q "^dlname=''" "$ALTSTACKPROBE_LA"; then
     echo "static-only build, skipping" >&2
     exit 77
 fi
@@ -41,13 +41,13 @@ probe_run() {
 }
 
 # One is already installed: nothing may replace it.
-if grep -q "ALTSTACK-OWN" <<<"$(probe_run keep)"; then
+if command grep -q "ALTSTACK-OWN" <<<"$(probe_run keep)"; then
     fail "httrack replaced an alternate signal stack that was already installed"
 fi
 
 # None is installed: httrack must provide one, which also proves the marker
 # asserted absent above can fire at all.
-grep -q "ALTSTACK-OWN" <<<"$(probe_run none)" ||
+command grep -q "ALTSTACK-OWN" <<<"$(probe_run none)" ||
     fail "httrack installed no alternate signal stack of its own"
 
 # And the borrowed stack has to be usable: the point of deferring is that the
@@ -55,5 +55,5 @@ grep -q "ALTSTACK-OWN" <<<"$(probe_run none)" ||
 rc=0
 out=$(ALTSTACK_MODE=keep LD_PRELOAD="$ALTSTACKPROBE_LIB" httrack -#c=stack 2>&1) || rc=$?
 test "$rc" -eq 134 || fail "-#c=stack on a borrowed alt stack exited $rc, expected 134"
-grep -q "Please report the problem" <<<"$out" ||
+command grep -q "Please report the problem" <<<"$out" ||
     fail "-#c=stack on a borrowed alt stack: report truncated, the handler died halfway"

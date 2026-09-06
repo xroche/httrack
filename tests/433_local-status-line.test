@@ -55,7 +55,7 @@ assert_refused() { # assert_refused CASE MSG CODE
     test ! -f "$(mirrored "$case")" ||
         fail "$case: a malformed status line was mirrored"
     logtext=$(cat "$out/$case/hts-log.txt")
-    grep -qF "$want" <<<"$logtext" ||
+    command grep -qF "$want" <<<"$logtext" ||
         fail_dump "$case: log lacks [$want]" "$out/$case/hts-log.txt"
 }
 
@@ -102,7 +102,7 @@ assert_accepted noversion 200 OK text/html
 # human, and the code before it still stands.
 assert_refused lonecr "Not Found" 404
 lonecrlog=$(cat "$out/lonecr/hts-log.txt")
-! grep -qF "INJECTED" <<<"$lonecrlog" ||
+! command grep -qF "INJECTED" <<<"$lonecrlog" ||
     fail_dump "lonecr: the reason phrase forged a log line" \
         "$out/lonecr/hts-log.txt"
 

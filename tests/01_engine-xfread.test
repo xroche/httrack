@@ -40,7 +40,7 @@ fail() {
 # Match with here-strings, not `echo | grep -q`: under pipefail the early grep
 # exit SIGPIPEs echo and fails the pipeline even when the pattern matched.
 has() {
-    grep -qxF "$1" <<<"$out" || fail "$1"
+    command grep -qxF "$1" <<<"$out" || fail "$1"
 }
 
 # adr= and code= are read after the call, so a guard that allocates before

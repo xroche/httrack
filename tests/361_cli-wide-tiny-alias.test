@@ -43,10 +43,10 @@ expand_run() {
     assert_eq 0 "${RC}" "${label} exited"
     assert_file "${tmp}/out/hts-log.txt" "${label}"
     line=$(sed -n 2p "${tmp}/out/hts-log.txt")
-    grep -qF -- "${want}" <<<"${line}" ||
+    command grep -qF -- "${want}" <<<"${line}" ||
         fail "${label}: the engine was handed ${line}, wanted ${want}"
     WARNED=no
-    ! grep -q 'cannot add its connection count' "${tmp}/run.log" || WARNED=yes
+    ! command grep -q 'cannot add its connection count' "${tmp}/run.log" || WARNED=yes
 }
 
 # the count went on, with nothing to report
@@ -121,9 +121,9 @@ warned ' +*.gif ' 'tiny allow' --tiny-allow '*.gif'
 
 # -#h returns before any crawl, so it is read straight off the run
 run_log=$(httrack -O "${tmp}/out" --quiet --wide-version 2>&1) || fail "--wide-version exited $?"
-grep -q 'cannot add its connection count' <<<"${run_log}" ||
+command grep -q 'cannot add its connection count' <<<"${run_log}" ||
     fail "--wide-version applied silently: ${run_log}"
-grep -q 'HTTrack version' <<<"${run_log}" ||
+command grep -q 'HTTrack version' <<<"${run_log}" ||
     fail "--wide-version stopped printing the version: ${run_log}"
 ok "a prefix that cannot be glued on warns, and the alias still runs"
 

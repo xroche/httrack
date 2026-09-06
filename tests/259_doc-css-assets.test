@@ -44,7 +44,7 @@ for css in "${srcdir}"/html/*.css; do
         test -f "${work}/dist/${ref}" ||
             fail "${name} reaches ${ref}, which is not in the tarball"
         checked=$((checked + 1))
-    done <<<"$(grep -o 'url([^)]*)' "${css}" || true)"
+    done <<<"$(command grep -o 'url([^)]*)' "${css}" || true)"
 done
 
 # Floor: a scrape that matched nothing passes every check above.

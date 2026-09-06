@@ -6,4 +6,4 @@ set -euo pipefail
 # webhttrack posts its command line as one string: the argv split must grow past
 # 1024 arguments and keep a quote inside a value out of the option parser.
 out=$(httrack -O /dev/null -#test=cmdline-split run)
-grep -q "cmdline-split self-test OK" <<<"$out"
+command grep -q "cmdline-split self-test OK" <<<"$out"

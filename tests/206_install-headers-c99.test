@@ -172,7 +172,7 @@ EOF
 for std in "${stds[@]}"; do
     pp=$("${cc_argv[@]}" "${cpp_argv[@]}" "-std=$std" -E "$tmp/strnlen.c") ||
         fail "cannot preprocess the htssafe_strnlen_ probe under -std=$std"
-    if grep -q 'return strnlen' <<<"$pp"; then
+    if command grep -q 'return strnlen' <<<"$pp"; then
         fail "-std=$std left htssafe_strnlen_ on libc, the differential proves nothing"
     fi
 done

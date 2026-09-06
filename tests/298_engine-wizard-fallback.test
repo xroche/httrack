@@ -12,8 +12,8 @@ set -euo pipefail
 # an unreadable reply refuses, like the empty one the prompt documents
 selftest_queue "-foo.com/dir/page.html" wizardfilter -999 foo.com /dir/page.html
 reply=$(httrack -O /dev/null -#test=wizardverdict -999)
-grep -q "forbidden=1 stop=0 prio=42" <<<"$reply" || fail "-999 did not refuse: $reply"
-grep -q "could not read your answer" <<<"$reply" || fail "-999 refused silently: $reply"
+command grep -q "forbidden=1 stop=0 prio=42" <<<"$reply" || fail "-999 did not refuse: $reply"
+command grep -q "could not read your answer" <<<"$reply" || fail "-999 refused silently: $reply"
 
 # a host with no domain below it takes the scope answer over the host itself
 selftest_queue "+127.0.0.1:8080/*" wizardfilter 1000 127.0.0.1:8080 /x

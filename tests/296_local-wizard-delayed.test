@@ -45,24 +45,24 @@ local_crawl --stdin "$answers" --log "${tmpdir}/crawl.log" -- \
     "http://127.0.0.1:${SRV_PORT}/wizdelayed/index.html" || rc=$?
 test "$rc" -eq 0 || fail "the crawl exited $rc"
 
-grep -q 'beyond this mirror scope' "${tmpdir}/crawl.log" ||
+command grep -q 'beyond this mirror scope' "${tmpdir}/crawl.log" ||
     fail "the wizard never asked about the foreign link"
 
 # what the mirror holds, which is what the user sees
 page="${tmpdir}/mirror/127.0.0.1_${foreign}/a.html"
 test -f "$page" || fail "the authorized link is missing from the mirror"
-grep -q "$MARKER" "$page" || fail "the authorized link was saved without its body"
+command grep -q "$MARKER" "$page" || fail "the authorized link was saved without its body"
 left=$(find "${tmpdir}/mirror" -name '*.delayed' -print)
 test -z "$left" || fail "placeholder names left in the mirror: $left"
 # both references, including the second one the stored placeholder came back for
 index="${tmpdir}/mirror/127.0.0.1_${SRV_PORT}/wizdelayed/index.html"
-local_refs=$(grep -o "127\.0\.0\.1_${foreign}/a\.html" "$index" | wc -l)
+local_refs=$(command grep -o "127\.0\.0\.1_${foreign}/a\.html" "$index" | wc -l)
 test "$local_refs" -eq 2 ||
     fail "$local_refs of the 2 references were rewritten to the mirrored page"
 
 # secondary: the engine's own account of the same failure
 log="${tmpdir}/mirror/hts-log.txt"
-! grep -q 'Duplicate entry in hts_wait_delayed' "$log" ||
+! command grep -q 'Duplicate entry in hts_wait_delayed' "$log" ||
     fail "the link was recorded before its type was resolved"
-! grep -q 'probably looping, type unknown' "$log" ||
+! command grep -q 'probably looping, type unknown' "$log" ||
     fail "the authorized link was dropped as looping"

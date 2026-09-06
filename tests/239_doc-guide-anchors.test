@@ -19,13 +19,13 @@ main=$(awk '/<main[ >]/ { inmain = 1 } inmain { print } /<\/main>/ { inmain = 0 
 
 check() { # check <anchor>: present once, and reachable on Android
     local hits tag platforms
-    hits=$(grep -o "id=\"$1\"" <<<"${main}" | wc -l || true)
+    hits=$(command grep -o "id=\"$1\"" <<<"${main}" | wc -l || true)
     test "${hits}" -eq 1 || {
         echo "FAIL: ${hits} elements inside <main> carry id=\"$1\", want 1" >&2
         return 1
     }
-    tag=$(grep -m1 "id=\"$1\"" <<<"${main}")
-    platforms=$(grep -o 'data-for="[^"]*"' <<<"${tag}" | sed 's/^data-for="//; s/"$//' || true)
+    tag=$(command grep -m1 "id=\"$1\"" <<<"${main}")
+    platforms=$(command grep -o 'data-for="[^"]*"' <<<"${tag}" | sed 's/^data-for="//; s/"$//' || true)
     # guide.css hides one platform's elements from the others, so an anchor on a
     # win-only element scrolls nowhere.
     if test -n "${platforms}"; then

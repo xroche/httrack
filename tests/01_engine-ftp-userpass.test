@@ -13,7 +13,7 @@ cleanup_push rm -rf "${tmpdir}"
 
 out=$(httrack -O "${tmpdir}/st" "-#test=ftp-userpass" run 2>&1) ||
     fail "self-test exited non-zero: ${out}"
-grep -q "ftp-userpass self-test OK" <<<"${out}" || fail "unexpected output: ${out}"
+command grep -q "ftp-userpass self-test OK" <<<"${out}" || fail "unexpected output: ${out}"
 
 # The reachable half: a URL carries the userinfo straight into user[256]/pass[256].
 probe() {
@@ -26,13 +26,13 @@ probe() {
 # The bare name has no ':' to bound it, only the '@', and is the worse branch.
 for u in "$(repeat_chars 256):pw" "u:$(repeat_chars 256)" "$(repeat_chars 256)"; do
     log=$(probe "${u}")
-    grep -q "FTP user name or password too long" <<<"${log}" ||
+    command grep -q "FTP user name or password too long" <<<"${log}" ||
         fail "over-long userinfo was not refused: ${log}"
 done
 
 # 255 still fits, and a plain login is the outsider a widened gate would refuse.
 for u in "$(repeat_chars 255):pw" "u:$(repeat_chars 255)" "$(repeat_chars 255)" "bob:secret"; do
     log=$(probe "${u}")
-    grep -q "Unable to connect to the server" <<<"${log}" ||
+    command grep -q "Unable to connect to the server" <<<"${log}" ||
         fail "userinfo that fits did not reach the connect: ${log}"
 done

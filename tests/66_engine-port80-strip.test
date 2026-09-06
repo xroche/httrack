@@ -10,4 +10,4 @@ set -euo pipefail
 # (#638): an explicit :80 on https/ftp stays, :443/:21 strip under their own
 # scheme. All assertions live in the engine self-test.
 out=$(httrack -O /dev/null -#test=stripport)
-grep -q "stripport self-test OK" <<<"$out"
+command grep -q "stripport self-test OK" <<<"$out"

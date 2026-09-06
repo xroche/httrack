@@ -31,7 +31,7 @@ run() { # run OUT ARG...
 # --autotest is -#t, which prints one line and mirrors nothing.
 run autotest "${url}" --quiet -n --autotest
 assert_eq 0 "${RC}" "--autotest exited"
-grep -q 'AUTOCHECK OK' "${log}" || fail_dump "--autotest ran no autocheck" "${log}"
+command grep -q 'AUTOCHECK OK' "${log}" || fail_dump "--autotest ran no autocheck" "${log}"
 ! mirror_has_name "${out}" page.html ||
     fail_dump "--autotest mirrored the URL" "${log}"
 
@@ -40,7 +40,7 @@ run xfrstats "${url}" --quiet -n --debug-xfrstats
 assert_eq 0 "${RC}" "--debug-xfrstats exited"
 mirror_has_name "${out}" page.html ||
     fail_dump "--debug-xfrstats mirrored nothing" "${log}"
-! grep -q 'AUTOCHECK' "${log}" ||
+! command grep -q 'AUTOCHECK' "${log}" ||
     fail_dump "--debug-xfrstats ran the autocheck" "${log}"
 
 # --extract-cache is -#E, which writes hts-cache/meta.zip beside the cache.
@@ -48,7 +48,7 @@ run extract "${url}" --quiet -n
 assert_eq 0 "${RC}" "the mirror feeding --extract-cache exited"
 run extract --extract-cache
 assert_eq 0 "${RC}" "--extract-cache exited"
-grep -q 'extracted meta-data' "${log}" ||
+command grep -q 'extracted meta-data' "${log}" ||
     fail_dump "--extract-cache extracted nothing" "${log}"
 assert_file "${out}/hts-cache/meta.zip" "--extract-cache"
 
@@ -57,7 +57,7 @@ run debugcache "${url}" --quiet -n
 assert_eq 0 "${RC}" "the mirror feeding --debug-cache exited"
 run debugcache --debug-cache '*'
 assert_eq 0 "${RC}" "--debug-cache exited"
-grep -q 'cache entry' "${log}" || fail_dump "--debug-cache listed nothing" "${log}"
+command grep -q 'cache entry' "${log}" || fail_dump "--debug-cache listed nothing" "${log}"
 test ! -f "${out}/hts-cache/meta.zip" ||
     fail_dump "--debug-cache extracted the meta-data" "${log}"
 
@@ -67,9 +67,9 @@ run testfilters --debug-testfilters '*.gif' 'foo.gif'
 # 134 is an abort, which would read as a refusal without being one
 { test "${RC}" -ne 0 && test "${RC}" -ne 134; } ||
     fail_dump "--debug-testfilters was accepted (exit ${RC})" "${log}"
-grep -q 'Unknown option: debug-testfilters' "${log}" ||
+command grep -q 'Unknown option: debug-testfilters' "${log}" ||
     fail_dump "--debug-testfilters refused without saying why" "${log}"
-! grep -q 'not recognized' "${log}" ||
+! command grep -q 'not recognized' "${log}" ||
     fail_dump "--debug-testfilters still reaches the engine's option switch" "${log}"
 
 ok "the -# alias rows reach the option they name"

@@ -7,4 +7,4 @@ set -euo pipefail
 # followed through, not turned into a self-pointing "moved" stub. The decision
 # helper is exercised by the engine self-test.
 out=$(httrack -O /dev/null -#test=redirect-samefile run)
-grep -q "redirect-samefile self-test OK" <<<"$out"
+command grep -q "redirect-samefile self-test OK" <<<"$out"

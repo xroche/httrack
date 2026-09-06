@@ -71,12 +71,12 @@ test "$rc" -eq 124 || fail "wedged test reported $rc, want 124"
 # Never before the budget, or a slow-but-healthy test would be killed too.
 test "$fired" -ge 5 || fail "the guard fired early (${fired}s of a 5s budget)"
 test "$fired" -lt 30 || fail "the guard fired late (${fired}s)"
-grep -q 'marker: the wedged test started' "$out" || fail "the test's own output was lost"
+command grep -q 'marker: the wedged test started' "$out" || fail "the test's own output was lost"
 # The header, not a bare name: the process list quotes the test's path too, so a
 # wrapper that named nothing would still match that.
-grep -q '^===== TIMEOUT: 90_wedged.test exceeded' "$out" ||
+command grep -q '^===== TIMEOUT: 90_wedged.test exceeded' "$out" ||
     fail "the diagnostics do not name the test"
-grep -q "own process tree" "$out" || fail "no process list in the diagnostics"
+command grep -q "own process tree" "$out" || fail "no process list in the diagnostics"
 
 # Announced BEFORE the dump, not merely at some point during it: the watchdog reading
 # that log takes the silence of a dump for a wedge. Only a slow dump tells the two
@@ -104,12 +104,12 @@ printf 'sleep 3\necho "slow but healthy"\n' >"$tmp/92_slow.test"
 rc=0
 HTTRACK_TEST_TIMEOUT=45 bash "$driver" "$tmp/92_slow.test" >"$out" 2>&1 || rc=$?
 test "$rc" -eq 0 || fail "a healthy 3s test under a 45s budget reported $rc"
-grep -q 'slow but healthy' "$out" || fail "healthy test output lost"
-! grep -q 'TIMEOUT' "$out" || fail "the guard fired on a healthy test"
+command grep -q 'slow but healthy' "$out" || fail "healthy test output lost"
+! command grep -q 'TIMEOUT' "$out" || fail "the guard fired on a healthy test"
 
 # The killed tree must really be gone, or the next test inherits its ports.
 sleep 1
-! grep -q "$tmp/90_wedged.test" <<<"$(ps_snapshot)" ||
+! command grep -q "$tmp/90_wedged.test" <<<"$(ps_snapshot)" ||
     fail "the wedged test survived the guard"
 
 # --- the budget is wall clock, not a count of poll iterations ----------------
@@ -133,8 +133,8 @@ for want in 0 1 77 99; do
     rc=0
     HTTRACK_TEST_TIMEOUT=60 bash "$driver" "$tmp/91_plain.test" >"$out" 2>&1 || rc=$?
     test "$rc" -eq "$want" || fail "exit $want came back as $rc"
-    grep -q "ran with $want" "$out" || fail "output lost for exit $want"
-    ! grep -q 'TIMEOUT' "$out" || fail "the guard fired on a test that exited at once"
+    command grep -q "ran with $want" "$out" || fail "output lost for exit $want"
+    ! command grep -q 'TIMEOUT' "$out" || fail "the guard fired on a test that exited at once"
 done
 
 # A budget of 0 disables the guard: the test still runs, and is not killed. Its
@@ -143,13 +143,13 @@ printf 'echo "guard off"\nexit 3\n' >"$tmp/93_off.test"
 rc=0
 HTTRACK_TEST_TIMEOUT=0 bash "$driver" "$tmp/93_off.test" >"$out" 2>&1 || rc=$?
 test "$rc" -eq 3 || fail "disabled guard changed the exit status ($rc)"
-grep -q 'guard off' "$out" || fail "output lost with the guard disabled"
+command grep -q 'guard off' "$out" || fail "output lost with the guard disabled"
 
 # --- the test reads the same budget the guard enforces ----------------------
 # skip_if_out_of_budget paces against it, so a raw or absent value would pace
 # against a number the guard is not using.
 saw_budget() { # saw_budget <want> <label>
-    grep -qx "budget=$1" "$out" ||
+    command grep -qx "budget=$1" "$out" ||
         fail "$2 reached the test as '$(cat "$out")', want budget=$1"
 }
 # shellcheck disable=SC2016 # the fixture has to read the variable, not us
@@ -205,12 +205,12 @@ printf '# TEST_TIMEOUT_AT_LEAST: 900\nsleep 4\necho "outlived the default"\n' \
 rc=0
 HTTRACK_TEST_TIMEOUT=2 bash "$driver" "$tmp/97_raise.test" >"$out" 2>&1 || rc=$?
 test "$rc" -eq 0 || fail "a 4s test that raised the budget to 900 reported $rc"
-grep -q 'outlived the default' "$out" || fail "the raised budget killed the test anyway"
+command grep -q 'outlived the default' "$out" || fail "the raised budget killed the test anyway"
 printf '# TEST_TIMEOUT_AT_LEAST: 1\nsleep 3\necho "not shrunk"\n' >"$tmp/97_raise.test"
 rc=0
 HTTRACK_TEST_TIMEOUT=600 bash "$driver" "$tmp/97_raise.test" >"$out" 2>&1 || rc=$?
 test "$rc" -eq 0 || fail "a 3s test asking for a 1s budget reported $rc"
-grep -q 'not shrunk' "$out" || fail "the header shrank the budget and killed the test"
+command grep -q 'not shrunk' "$out" || fail "the header shrank the budget and killed the test"
 
 # --- one budget parser, and what is left of it ------------------------------
 secs() { # secs <value in the environment> <seconds it must read as>
@@ -239,11 +239,11 @@ if test "$got" -gt "$((60 - at))" || test "$got" -lt "$((60 - at2))"; then
     fail "a 60s budget left $got with $at to $at2 gone, want $((60 - at2))..$((60 - at))"
 fi
 HTTRACK_TEST_TIMEOUT=0 bash "$driver" "$tmp/98_left.test" >"$out" 2>&1
-grep -q '^left=0 ' "$out" || fail "a disabled guard left '$(cat "$out")', want 0"
+command grep -q '^left=0 ' "$out" || fail "a disabled guard left '$(cat "$out")', want 0"
 # Never 0 on an exhausted budget: a child would read that as the guard being off.
 HTTRACK_TEST_TIMEOUT=1 bash -c '. "$1"; sleep 2; echo "left=$(budget_left)"' \
     _ "${testdir}/testlib.sh" >"$out" 2>&1
-grep -qx 'left=1' "$out" || fail "an exhausted budget left '$(cat "$out")', want 1"
+command grep -qx 'left=1' "$out" || fail "an exhausted budget left '$(cat "$out")', want 1"
 
 # --- a test too slow to finish skips instead of being killed ----------------
 # hppa spends ~150s on one configure run, and 124 takes the build down where 77
@@ -261,7 +261,7 @@ test "$rc" -eq 77 || fail "a 60s step under a 20s budget reported $rc, want 77"
 rc=0
 HTTRACK_TEST_TIMEOUT=600 bash "$driver" "$tmp/94_pacer.test" >"$out" 2>&1 || rc=$?
 test "$rc" -eq 0 || fail "a 60s step under a 600s budget reported $rc, want 0"
-grep -q 'the pacer let it through' "$out" || fail "the pacer skipped a test that fits"
+command grep -q 'the pacer let it through' "$out" || fail "the pacer skipped a test that fits"
 
 # The reserve is half a step over the last one, and only a budget between the two
 # sizes proves it: 100s alone would fit under 140, 150s does not.
@@ -347,16 +347,16 @@ if ! target_is_windows && test -r /proc/self/stat; then
         case "$(head -n1 <<<"$snap")" in
         [0-9]*) fail "the no-ps listing has no header: $snap" ;;
         esac
-        ! grep -qE "^$outside " <<<"$snap" ||
+        ! command grep -qE "^$outside " <<<"$snap" ||
             fail "no-ps group list reported pid $outside, in another group"
-        read -r _ rppid rpgid _ <<<"$(grep -E "^$fake " <<<"$snap")"
+        read -r _ rppid rpgid _ <<<"$(command grep -E "^$fake " <<<"$snap")"
         test "$rppid $rpgid" = "$fppid $pgid" ||
             fail "no-ps row for $fake reads ppid/pgid '$rppid $rpgid', want '$fppid $pgid'"
         engines=$(list_engine_pids "$pgid")
-        grep -qx "$fake" <<<"$engines" || fail "no-ps engine list lost pid $fake"
-        grep -qx "$emul" <<<"$engines" ||
+        command grep -qx "$fake" <<<"$engines" || fail "no-ps engine list lost pid $fake"
+        command grep -qx "$emul" <<<"$engines" ||
             fail "no-ps engine list lost emulated pid $emul"
-        ! grep -qx "$outside" <<<"$engines" ||
+        ! command grep -qx "$outside" <<<"$engines" ||
             fail "no-ps engine list reached outside the group (pid $outside)"
         # A platform with no stack mechanism must say so and leave the engine
         # alone. Shimmed, because no CI leg is one: the Hurd branch below runs
@@ -365,7 +365,7 @@ if ! target_is_windows && test -r /proc/self/stat; then
         printf '#!/bin/sh\ncase "$1" in -s) echo GNU;; *) exec %s "$@";; esac\n' \
             "$(command -v uname)" >"$tmp/nops/uname"
         chmod +x "$tmp/nops/uname"
-        grep -q "no stack mechanism known for GNU" <<<"$(request_engine_backtraces "$pgid")" ||
+        command grep -q "no stack mechanism known for GNU" <<<"$(request_engine_backtraces "$pgid")" ||
             fail "a platform with no stack mechanism reported nothing"
         case "$(procstate "$fake")" in
         Z | gone) fail "the no-mechanism branch signalled pid $fake" ;;
@@ -374,7 +374,7 @@ if ! target_is_windows && test -r /proc/self/stat; then
 
         # The chain, not just its input: this is what reported nothing on Fedora.
         stacks=$(request_engine_backtraces "$pgid")
-        ! grep -q 'no engine process left' <<<"$stacks" ||
+        ! command grep -q 'no engine process left' <<<"$stacks" ||
             fail "no-ps stack request found no engine to signal: $stacks"
         # Only Linux signals; elsewhere (Hurd's uname reports "GNU") the chain
         # owes the reader its no-mechanism report instead of silence.
@@ -386,13 +386,13 @@ if ! target_is_windows && test -r /proc/self/stat; then
             *) fail "the SIGABRT never reached pid $fake" ;;
             esac
         else
-            grep -q 'no stack mechanism known' <<<"$stacks" ||
+            command grep -q 'no stack mechanism known' <<<"$stacks" ||
                 fail "no stack mechanism was reported on $(uname -s): $stacks"
         fi
         # With neither source the dump must say so, not print an empty section.
         # shellcheck disable=SC2317 # reached through ps_snapshot
         proc_snapshot() { return 1; }
-        grep -q 'no process list' <<<"$(list_stray_processes "$pgid" group)" ||
+        command grep -q 'no process list' <<<"$(list_stray_processes "$pgid" group)" ||
             fail "a host with no ps and no /proc produced no notice"
     )
     kill "$fake" "$outside" "$emul" 2>/dev/null || true
@@ -447,13 +447,13 @@ EOF
 rc=0
 HTTRACK_TEST_TIMEOUT=20 bash "$driver" "$tmp/92_stalled.test" >"$out" 2>&1 || rc=$?
 
-if grep -qE 'python3 not found|could not discover server port' "$out"; then
+if command grep -qE 'python3 not found|could not discover server port' "$out"; then
     echo "SKIP: local crawl prerequisites missing" >&2
     exit 77
 fi
 test "$rc" -eq 124 || fail "stalled crawl reported $rc, want 124"
 
-if grep -q 'No stack trace available on this OS' "$out"; then
+if command grep -q 'No stack trace available on this OS' "$out"; then
     echo "suite timeout OK (no backtrace() on this platform)"
     exit 0
 fi
@@ -464,13 +464,13 @@ case "$(uname -s)" in
 Linux)
     # sig_fatal writes to the engine's own stderr, so this reaching our log also
     # proves the crawl-log salvage worked.
-    grep -q '^Caught signal ' "$out" || fail "no engine backtrace was salvaged"
+    command grep -q '^Caught signal ' "$out" || fail "no engine backtrace was salvaged"
     ;;
 Darwin)
-    grep -q '^Call graph:' "$out" || fail "sample(1) produced no call graph"
+    command grep -q '^Call graph:' "$out" || fail "sample(1) produced no call graph"
     ;;
 *)
-    grep -q 'no stack mechanism known' "$out" ||
+    command grep -q 'no stack mechanism known' "$out" ||
         fail "unknown platform reported neither a stack nor its absence"
     echo "suite timeout OK (no stack mechanism on $(uname -s))"
     exit 0
@@ -480,7 +480,7 @@ esac
 # Matching "httrack" alone would pass on the process list above.
 # Naming them needs the symbolizer, which a build without <spawn.h> cannot run.
 if build_names_frames; then
-    grep -qE '\b(back_wait|httpmirror|hts_main_internal)\b' "$out" ||
+    command grep -qE '\b(back_wait|httpmirror|hts_main_internal)\b' "$out" ||
         fail "the stack names no engine frame"
 fi
 

@@ -37,8 +37,8 @@ crawl() { # crawl ARG...
 # The mirrored page, by marker: relative path, or empty if the crawl saved none.
 # The top index carries no marker, so it drops out without being named.
 marked() {
-    (cd "${out}" && grep -rlF "${marker}" . 2>/dev/null |
-        grep -v '^\./hts-cache/' | sort | tr '\n' ' ') || true
+    (cd "${out}" && command grep -rlF "${marker}" . 2>/dev/null |
+        command grep -v '^\./hts-cache/' | sort | tr '\n' ' ') || true
 }
 has_index() { test -e "${out}/index.html"; }
 
@@ -47,7 +47,7 @@ refused() { # refused ARG...
     # 134 is an abort, which would read as a refusal without being one
     { test "${RC}" -ne 0 && test "${RC}" -ne 134; } ||
         fail_dump "$* not refused (exit ${RC})" "${tmp}/log"
-    grep -q 'does not take the value' "${tmp}/log" ||
+    command grep -q 'does not take the value' "${tmp}/log" ||
         fail_dump "$* refused without saying why" "${tmp}/log"
     # a value taken as a template would exit 0, so this pins the reason too
     test -z "$(marked)" || fail_dump "$* still mirrored: $(marked)" "${tmp}/log"
@@ -59,7 +59,7 @@ accepted() { # accepted WANTED-PATH ARG...
     crawl "$@" "${url}"
     assert_eq 0 "${RC}" "$* exited"
     assert_eq "${want} " "$(marked)" "$* mirrored"
-    ! grep -q 'does not take the value' "${tmp}/log" ||
+    ! command grep -q 'does not take the value' "${tmp}/log" ||
         fail_dump "$* drew a refusal" "${tmp}/log"
 }
 

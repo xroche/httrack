@@ -131,7 +131,7 @@ while IFS= read -r page; do
         elif g=$(gap_index "${rel}" "${link}"); then
             gap_seen[g]=resolves
         fi
-    done < <(LC_ALL=C grep -Eio "(href|src)[[:space:]]*=[[:space:]]*[\"'][^\"']*[\"']" "${page}" || true)
+    done < <(LC_ALL=C command grep -Eio "(href|src)[[:space:]]*=[[:space:]]*[\"'][^\"']*[\"']" "${page}" || true)
 done < <({
     find "${stage}${htmldir}" -name '*.html'
     find "${stage}${docdir}" -name '*.html'

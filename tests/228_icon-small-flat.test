@@ -24,7 +24,7 @@ test "${n}" -le 4 || fail "16x16 icon has ${n} colours, the stems are antialiase
 
 # Both flats present: an all-field tile and an all-ink one are flat too.
 for flat in '#9999cc' '#040404'; do
-    grep -q " ${flat}\$" <<<"${small}" || fail "16x16 icon has no ${flat} pixel"
+    command grep -q " ${flat}\$" <<<"${small}" || fail "16x16 icon has no ${flat} pixel"
 done
 
 # A hairline and a near-solid block both satisfy every count above.

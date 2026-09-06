@@ -25,20 +25,20 @@ for bad in 'sscanf(com + 1, "%d", (int *) &opt->urlmode);' \
     'sscanf(com + 1, "%d", (uint8_t *) &opt->urlmode);' \
     'sscanf(com + 1, "%d", (int32_t *) &opt->urlmode);' \
     'sscanf(com + 1, "%d", (unsigned int *) &opt->urlmode);'; do
-    grep -qE "$pattern" <<<"$bad" || fail "the pattern cannot match: $bad"
+    command grep -qE "$pattern" <<<"$bad" || fail "the pattern cannot match: $bad"
 done
 
 # And a pattern matching everything would be just as silent, so pin the two
 # forms that must stay clear: the direct scan and scanOptInt().
 for good in 'sscanf(com + 1, "%d", &opt->urlmode);' \
     'scanOptInt(com + 1, &opt->urlmode);'; do
-    grep -qE "$pattern" <<<"$good" && fail "the pattern matches a good line: $good"
+    command grep -qE "$pattern" <<<"$good" && fail "the pattern matches a good line: $good"
 done
 
-found=$(grep -nE "$pattern" "$src" || true)
+found=$(command grep -nE "$pattern" "$src" || true)
 [ -z "$found" ] || fail "option scan writing through a cast pointer in $src:
 $found"
 
-grep -q 'scanOptInt' "$src" || fail "scanOptInt() has left $src"
+command grep -q 'scanOptInt' "$src" || fail "scanOptInt() has left $src"
 
 echo "optscan: no option scan in htscoremain.c writes through a cast pointer"

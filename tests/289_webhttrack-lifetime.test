@@ -60,9 +60,9 @@ printf '[an abandoned WebHTTrack server stops on its own] ..\t'
 # in a browser: a client that stopped naming its window, or spelled the farewell
 # differently, would leave every case below testing the server against itself.
 js="${HTS_DISTDIR}/html/server/ping.js"
-grep -qF '"/ping?w=" + PING_WINDOW' "${js}" || fail "ping.js stopped naming its window"
-grep -qF 'ping_url("e=bye")' "${js}" || fail "ping.js stopped saying goodbye"
-grep -qF '"sid=" + encodeURIComponent(sid)' "${js}" ||
+command grep -qF '"/ping?w=" + PING_WINDOW' "${js}" || fail "ping.js stopped naming its window"
+command grep -qF 'ping_url("e=bye")' "${js}" || fail "ping.js stopped saying goodbye"
+command grep -qF '"sid=" + encodeURIComponent(sid)' "${js}" ||
     fail "ping.js stopped signing its goodbye, which the server then ignores"
 
 # 1. The heartbeat must never be answered from a cache: a reply the browser
@@ -73,8 +73,8 @@ bye_port=${HTS_PORT}
 sid=$(page_sid "${bye_port}")
 test "${#sid}" -eq 32 || fail "no session id on the wizard's first page"
 reply=$(get "${bye_port}" '/ping?w=w1')
-grep -q '^HTTP/1\.0 200 ' <<<"${reply}" || fail "no pong: $(head -1 <<<"${reply}")"
-grep -qi '^Cache-Control:.*no-cache' <<<"${reply}" ||
+command grep -q '^HTTP/1\.0 200 ' <<<"${reply}" || fail "no pong: $(head -1 <<<"${reply}")"
+command grep -qi '^Cache-Control:.*no-cache' <<<"${reply}" ||
     fail "the heartbeat is cacheable: ${reply}"
 
 # 2. Closing one of two windows must not end a session the other is still using.
@@ -228,7 +228,7 @@ test "${#sid}" -eq 32 || fail "no session id to quit with"
 "${HTS_PYTHON}" "${testdir}/httpclient.py" --port "${HTS_PORT}" \
     --path /server/exit.html --field "sid=${sid}" --field command=quit >/dev/null
 died_within "${quit_pid}" "${grace}" || fail "Quit did not stop the server"
-! grep -q 'Unable to create the server' "${HTS_LOG}" ||
+! command grep -q 'Unable to create the server' "${HTS_LOG}" ||
     fail "a clean quit reported a server it could not create: $(<"${HTS_LOG}")"
 
 htsserver_stop

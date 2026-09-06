@@ -43,7 +43,7 @@ uncommented() { sed -e 's/^[[:space:]]*#.*$//' -e "/['\"]/! s/[[:space:]]#.*$//"
 # Telemetry only, so every spawn and kill idiom is out, aliases and short forms
 # included: PowerShell needs neither the System. prefix nor a space after '&'.
 forbidden_calls() {
-    uncommented "$1" | grep -nEi \
+    uncommented "$1" | command grep -nEi \
         'Start-Process|Start-Job|Start-ThreadJob|(Start|Stop)-Service|Stop-Process|Invoke-Expression|Invoke-Item|Invoke-Command|Invoke-(Cim|Wmi)Method|Get-WmiObject|Register-Scheduled(Job|Task)|WScript\.Shell|taskkill|cmd\.exe|wmic|schtasks|Diagnostics\.Process|\.Kill\(|(^|[^-a-zA-Z0-9_])(iex|saps|spps|spjb|sajb|spsv|sasv|start|kill)([^-a-zA-Z0-9_]|$)|(^|[^-a-zA-Z0-9_])&[^-a-zA-Z0-9_=&]'
 }
 if hits=$(forbidden_calls "$wdscript"); then
@@ -74,33 +74,33 @@ for probe in 'Start-Process notepad.exe' 'Stop-Process -Id 4 -Force' \
 done
 
 # shellcheck disable=SC2016 # $env: is PowerShell's, not this shell's
-grep -q '\$env:WATCHDOG_TOKEN' "$wdscript" ||
+command grep -q '\$env:WATCHDOG_TOKEN' "$wdscript" ||
     fail "the watchdog does not read its token from the environment"
 # Captured, not piped: grep -qi's early exit can SIGPIPE sed, and pipefail
 # would turn that into "no token found".
 params=$(sed -n '/^param(/,/^)/p' "$wdscript")
-if grep -qi 'token' <<<"$params"; then
+if command grep -qi 'token' <<<"$params"; then
     fail "the watchdog takes its token as a parameter, where the process list exposes it"
 fi
-grep -q "ApiBase = 'https://api.github.com'" "$wdscript" ||
+command grep -q "ApiBase = 'https://api.github.com'" "$wdscript" ||
     fail "the watchdog's default endpoint is not the GitHub API"
 # One state, so nothing downstream can read a verdict out of a status that only
 # carries telemetry. The job's own conclusion is the verdict.
-test "$(grep -c "state = 'success'" "$wdscript")" -eq 1 ||
+test "$(command grep -c "state = 'success'" "$wdscript")" -eq 1 ||
     fail "the watchdog posts something other than the one telemetry state"
 # The token stays in the driver's own shell: exported, every test it runs would
 # inherit a credential that can post statuses. 172 drives that end to end.
-grep -q '^unset WATCHDOG_TOKEN$' "$driver" ||
+command grep -q '^unset WATCHDOG_TOKEN$' "$driver" ||
     fail "the driver leaves its token in the environment its tests inherit"
 # A background holder of the step's stdout keeps the step open past the suite (#949).
-grep -q '>>watchdog.log 2>&1' "$driver" ||
+command grep -q '>>watchdog.log 2>&1' "$driver" ||
     fail "the watchdog's output is not redirected off the step's stdout"
 
 # Sourcing the driver is enough to start an interpreter that can post, so every
 # test that does it has to scrub first.
 scrubs() {
-    grep -q 'ci-windows-suite\.sh' "$1" || return 0
-    grep -qx 'unset WATCHDOG_TOKEN WATCHDOG_REPO WATCHDOG_SHA WATCHDOG_URL' "$1"
+    command grep -q 'ci-windows-suite\.sh' "$1" || return 0
+    command grep -qx 'unset WATCHDOG_TOKEN WATCHDOG_REPO WATCHDOG_SHA WATCHDOG_URL' "$1"
 }
 for t in "$testdir"/*.test; do
     scrubs "$t" || fail "$(basename "$t") can reach the driver without scrubbing its credentials"
@@ -200,7 +200,7 @@ if test -x "$bin/pwsh"; then
             local n=0
             reads=$((reads + 1))
             test "$reads" -eq 1 || {
-                grep -q '^watchdog ready$' watchdog.log
+                command grep -q '^watchdog ready$' watchdog.log
                 return $?
             }
             : >race-go
@@ -222,20 +222,20 @@ if test -x "$bin/pwsh"; then
         sleep 0.1
     done
     test -r "$posixtmp/argv" || fail "the watchdog was never launched"
-    grep -qx -- '-SelfTest' "$posixtmp/argv" && fail "the production launch runs the self-test"
+    command grep -qx -- '-SelfTest' "$posixtmp/argv" && fail "the production launch runs the self-test"
     # Bypass is load-bearing: Windows PowerShell refuses an unsigned .ps1 without it.
     for flag in -NoProfile -NonInteractive -ExecutionPolicy Bypass -File; do
-        grep -qx -- "$flag" "$posixtmp/argv" ||
+        command grep -qx -- "$flag" "$posixtmp/argv" ||
             fail "the launch dropped $flag: $(tr '\n' ' ' <"$posixtmp/argv")"
     done
-    grep -qx -- '-ApiBase' "$posixtmp/argv" &&
+    command grep -qx -- '-ApiBase' "$posixtmp/argv" &&
         fail "the production launch redirects the status API away from GitHub"
-    grep -qx -- '-NoPost' "$posixtmp/argv" &&
+    command grep -qx -- '-NoPost' "$posixtmp/argv" &&
         fail "the production launch cannot post at all"
     # Native form, because a non-MSYS interpreter cannot resolve a /d/a/... path.
-    grep -qx -- "$(nativepath "$wdscript")" "$posixtmp/argv" ||
+    command grep -qx -- "$(nativepath "$wdscript")" "$posixtmp/argv" ||
         fail "the launch did not name the script: $(tr '\n' ' ' <"$posixtmp/argv")"
-    grep -qx -- "$(nativepath "$posixtmp/progress.log")" "$posixtmp/argv" ||
+    command grep -qx -- "$(nativepath "$posixtmp/progress.log")" "$posixtmp/argv" ||
         fail "the launch did not pass the progress log"
 else
     # Deferred, not taken here: the workflow audits below need no exec.
@@ -393,7 +393,7 @@ PY
     wfpy=$(nativepath "$tmp/wf.py")
     said=$("$py" "$wfpy" audit "$(nativepath "$workflow")") ||
         fail "the workflow audit did not run: $said"
-    grep -q '^BAD ' <<<"$said" && fail "$(grep '^BAD ' <<<"$said" | sed 's/^BAD //')"
+    command grep -q '^BAD ' <<<"$said" && fail "$(grep '^BAD ' <<<"$said" | sed 's/^BAD //')"
     # The tightest of the backends' step budgets: the watchdog has to fit inside
     # whichever ends first. sed rather than head, which would SIGPIPE the sort.
     cap=$(($(sed -n 's/^timeout=//p' <<<"$said" | sort -n | sed -n 1p) * 60))
@@ -411,9 +411,9 @@ PY
         said=$("$py" "$wfpy" audit "$(nativepath "$tmp/wf.yml")") ||
             fail "the workflow audit did not run on the ${m%%:*} control: $said"
         if test -z "${m#*:}"; then
-            grep -q '^BAD ' <<<"$said" && fail "a reformatted workflow fails the audit: $said"
+            command grep -q '^BAD ' <<<"$said" && fail "a reformatted workflow fails the audit: $said"
         else
-            grep -q "^BAD .*${m#*:}" <<<"$said" ||
+            command grep -q "^BAD .*${m#*:}" <<<"$said" ||
                 fail "the ${m%%:*} control did not trip the audit: $said"
         fi
     done
@@ -538,7 +538,7 @@ sink_stop() {
 export WATCHDOG_TOKEN=n0tat0ken WATCHDOG_REPO=octo/nowhere WATCHDOG_SHA=0000000
 
 # The log rides into the job's artifact, which nothing secret-masks.
-token_free() { ! grep -q "$WATCHDOG_TOKEN" "$1"; }
+token_free() { ! command grep -q "$WATCHDOG_TOKEN" "$1"; }
 
 run_posting() {
     local secs=$1
@@ -568,7 +568,7 @@ cadence_leg() {
         echo "$n API calls at a 100s cadence over 4s, want 1"
         return 1
     }
-    grep -q '36_local-bigcrawl.test' "$posts" || {
+    command grep -q '36_local-bigcrawl.test' "$posts" || {
         echo "the posted status does not name the test in flight: $(<"$posts")"
         return 1
     }
@@ -673,7 +673,7 @@ backoff_leg() {
     fi
     # Every attempt here is refused, so each one after the first must say how many
     # went missing: x= is what separates a stopped box from a network that healed.
-    grep -q ' x=[1-9]' "$posts" || {
+    command grep -q ' x=[1-9]' "$posts" || {
         echo "no posted status counted the failures before it: $(<"$posts")"
         return 1
     }
@@ -702,7 +702,7 @@ for psrun in "${psruns[@]}"; do
 
     out=$(run_wd 120 -File "$(nativepath "$wdscript")" -SelfTest) ||
         fail "the $psrun self-test failed: $out"
-    grep -q 'watchdog self-test OK' <<<"$out" || fail "the $psrun self-test said: $out"
+    command grep -q 'watchdog self-test OK' <<<"$out" || fail "the $psrun self-test said: $out"
 
     # A mutant the script survives is a property nothing is checking. Graded on
     # the assertion named: one that merely fails to parse would read as caught.
@@ -712,7 +712,7 @@ for psrun in "${psruns[@]}"; do
         cmp -s "$wdscript" "$m" && fail "mutant $name changed nothing, so it proves nothing"
         said=$(run_wd 120 -File "$(nativepath "$m")" -SelfTest) || rc=$?
         test "$rc" -ne 0 || fail "mutant $name passed the $psrun self-test: $said"
-        grep -q "self-test FAIL: .*$want" <<<"$said" ||
+        command grep -q "self-test FAIL: .*$want" <<<"$said" ||
             fail "mutant $name tripped no assertion of its own: $said"
     }
     # shellcheck disable=SC2016 # PowerShell variables, quoted for sed
@@ -768,17 +768,17 @@ for psrun in "${psruns[@]}"; do
     fast=$(count_matching_lines 't=[0-9]*s q=' <<<"$out")
     # Against the slow leg, not a floor: a probe tick is not instant.
     test "$fast" -gt "$slow" || fail "$fast status lines at 1s against $slow at 100s: $out"
-    grep -q '36_local-bigcrawl.test' <<<"$out" || fail "the status does not name the test in flight: $out"
-    grep -q '95_local-sitemap' <<<"$out" && fail "the status named a test that was never in flight"
+    command grep -q '36_local-bigcrawl.test' <<<"$out" || fail "the status does not name the test in flight: $out"
+    command grep -q '95_local-sitemap' <<<"$out" && fail "the status named a test that was never in flight"
     # Trips if the scrub and -NoPost were both lost: only a real attempt logs this.
-    grep -q 'status post failed' <<<"$out" && fail "a test leg reached the status API"
+    command grep -q 'status post failed' <<<"$out" && fail "a test leg reached the status API"
 
     # An unreadable log must not read as a wedged one.
     out=$(run_wd 60 -File "$(nativepath "$wdscript")" \
         -ProgressLog "$(nativepath "$tmp/no-such.log")" \
         -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 3) ||
         fail "the $psrun loop exited nonzero on a missing log: $out"
-    grep -q 'q=?s' <<<"$out" || fail "a missing log reported a staticness: $out"
+    command grep -q 'q=?s' <<<"$out" || fail "a missing log reported a staticness: $out"
 
     # The legs below read the sink, not the loop, and they exercise the script's
     # decisions rather than the interpreter's: one flavour is enough.
@@ -823,7 +823,7 @@ for psrun in "${psruns[@]}"; do
         cmp -s "$wdscript" "$m" && fail "mutant $name changed nothing, so it proves nothing"
         said=$("${leg}_leg" "$(nativepath "$m")") &&
             fail "mutant $name passed the $leg leg"
-        grep -q "$want" <<<"$said" || fail "mutant $name tripped no check of its own: $said"
+        command grep -q "$want" <<<"$said" || fail "mutant $name tripped no check of its own: $said"
     }
     mutate_leg status-every-poll \
         "s/if ((Get-WatchdogAction \$now \$postedAt \$IntervalSeconds) -eq 'post')/if (\$true)/" \

@@ -72,7 +72,7 @@ echo "OK (terminated)"
 
 # The repair path must actually have run, else this is just a copy of test 48.
 printf '[cache repair fired] ..\t'
-grep -q 'damaged cache' "${out}/hts-log.txt" 2>/dev/null || fail "repair path did not run; damage was ineffective"
+command grep -q 'damaged cache' "${out}/hts-log.txt" 2>/dev/null || fail "repair path did not run; damage was ineffective"
 echo "OK"
 
 blob=$(find "$out" -name blob.bin 2>/dev/null | head -1)

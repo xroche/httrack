@@ -69,13 +69,13 @@ for want in "$(rec www.example.com / GOODFIRST v1)" \
     "$(rec www.example.com "/$(repeat_chars 254 A)" PATH255 v)" \
     "$(rec www.example.com / BIGVAL "$(repeat_chars 500 v)")" \
     "$(rec www.example.com / GOODLAST v2)"; do
-    grep -qxF "$want" <<<"$loaded" ||
+    command grep -qxF "$want" <<<"$loaded" ||
         fail "a line that fits did not load whole: ${want:0:40}... in $jar_out"
 done
 
 for gone in DOM2000 DOM256 PATH2000 PATH256 NAME2000 NAME1024 JARCAP \
     BIGVAL7900 LONGLINE; do
-    ! grep -q "$gone" <<<"$loaded" ||
+    ! command grep -q "$gone" <<<"$loaded" ||
         fail "$gone was stored from a line that had to be refused: $jar_out"
 done
 
@@ -90,18 +90,18 @@ refusals=(
     "name field is 1024 bytes (maximum 1023)"
 )
 for want in "${refusals[@]}"; do
-    grep -qF "Cookies: ignoring a line whose $want: $jar" <<<"$log" ||
+    command grep -qF "Cookies: ignoring a line whose $want: $jar" <<<"$log" ||
         fail "no refusal for the $want in $out/hts-log.txt"
 done
 n=$(count_matching_lines 'ignoring a line whose' <<<"$log")
 assert_eq "${#refusals[@]}" "$n" "refused jar lines"
 
 # a 7900-byte value fits its destination, so it is the jar's cap that drops it
-! grep -q 'value field is' <<<"$log" ||
+! command grep -q 'value field is' <<<"$log" ||
     fail "a value the widest destination holds was refused: $out/hts-log.txt"
 for want in "the jar did not store 'JARCAP" \
     "the jar did not store 'BIGVAL7900'" \
     "ignoring an over-long line (8049 bytes, maximum 7999)"; do
-    grep -qF "Cookies: $want" <<<"$log" ||
+    command grep -qF "Cookies: $want" <<<"$log" ||
         fail "no report of [$want] in $out/hts-log.txt"
 done

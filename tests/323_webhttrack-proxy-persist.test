@@ -18,18 +18,18 @@ printf '[the proxy keys name the rendered fields] ..\t'
 # actually draws, which is the whole of the bug.
 for pair in "Proxy:prox" "Port:portprox" "ProxyType:proxytype"; do
     key=${pair%:*} var=${pair#*:}
-    grep -q "do:copy:${key}:${var}}" "${distdir}/html/server/step2.html" ||
+    command grep -q "do:copy:${key}:${var}}" "${distdir}/html/server/step2.html" ||
         fail "step2.html does not restore ${key} into ${var}"
     # Any directive prefix must end in a colon, or [a-z]* swallows one variable
     # name into another and Proxy=${portprox} passes as Proxy/prox.
-    grep -q "^${key}=[\$]{\([a-z]*:\)*${var}[:}]" "${distdir}/html/server/step4.html" ||
+    command grep -q "^${key}=[\$]{\([a-z]*:\)*${var}[:}]" "${distdir}/html/server/step4.html" ||
         fail "step4.html does not save ${var} as ${key}"
-    grep -q "name=\"${var}\"" "${distdir}/html/server/option10.html" ||
+    command grep -q "name=\"${var}\"" "${distdir}/html/server/option10.html" ||
         fail "option10.html draws no ${var} field"
 done
 # One write each: two Proxy= lines disagreed about which variable they carried.
 for key in Proxy Port ProxyType; do
-    n=$(grep -c "^${key}=" "${distdir}/html/server/step4.html")
+    n=$(command grep -c "^${key}=" "${distdir}/html/server/step4.html")
     test "${n}" -eq 1 || fail "step4.html writes ${key} ${n} times"
 done
 echo OK

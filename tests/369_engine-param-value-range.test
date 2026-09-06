@@ -21,7 +21,7 @@ refuses() { # refuses WORD...
     out=$(httrack "-#test=optalias" "$@" 2>&1) || rc=$?
     { test "${rc}" -ne 0 && test "${rc}" -ne 134; } ||
         fail "$* not refused (exit ${rc})"
-    grep -q 'does not take the value' <<<"${out}" ||
+    command grep -q 'does not take the value' <<<"${out}" ||
         fail "$* refused without saying why: ${out}"
 }
 

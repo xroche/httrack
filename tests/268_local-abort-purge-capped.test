@@ -45,7 +45,7 @@ test "$rc" -ne 124 || fail "the capped crawl overran its deadline"
 log=$(<"${out}/hts-log.txt")
 # Named, not the bare "giving up": a fatal write error prints that too, so an
 # ENOSPC crawl would satisfy the assertion while the cap never fired.
-grep -q 'seconds passed\.\. giving up' <<<"$log" || fail "the time cap never fired: ${log}"
+command grep -q 'seconds passed\.\. giving up' <<<"$log" || fail "the time cap never fired: ${log}"
 # Fewer links than pass 1 saw is what says some were dropped; without it this
 # passes on a mirror that simply finished.
 scanned=$(sed -n 's/.* : \([0-9][0-9]*\) links scanned.*/\1/p' <<<"$log" | tail -1)
@@ -59,6 +59,6 @@ for name in "${leaves[@]}"; do
 done
 ok "the capped run kept the files it never reached"
 
-grep -q 'mirror aborted after' <<<"$log" ||
+command grep -q 'mirror aborted after' <<<"$log" ||
     fail "the capped run still reports a complete mirror: ${log}"
 ok "the summary reports the abort"

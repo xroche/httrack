@@ -5,4 +5,4 @@ set -euo pipefail
 
 # HT_ADD_HTMLESCAPED* must reserve the escaper's worst case (6 for _full).
 out=$(httrack -O /dev/null -#test=escape-room run)
-grep -q "escape-room self-test OK" <<<"$out"
+command grep -q "escape-room self-test OK" <<<"$out"

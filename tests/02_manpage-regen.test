@@ -30,7 +30,7 @@ README="$top_srcdir/README" bash "$gen" httrack >"$tmp" 2>/dev/null || fail "mak
 
 # Ignore the two intentionally date-dependent lines (page date, copyright year).
 # Temp files, not process substitution, so this works under a POSIX /bin/sh.
-strip_volatile() { grep -vE '^\.TH httrack |^Copyright \(C\) 1998-'; }
+strip_volatile() { command grep -vE '^\.TH httrack |^Copyright \(C\) 1998-'; }
 strip_volatile <"$committed" >"$committed_clean"
 strip_volatile <"$tmp" >"$generated_clean"
 

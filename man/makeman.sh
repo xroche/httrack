@@ -36,9 +36,9 @@ year=${date_str##* }
 
 help=$("$httrack" --quiet --help 2>/dev/null)
 
-st=$(printf '%s\n' "$help" | grep -n 'General options' | head -1 | cut -d: -f1)
-en=$(printf '%s\n' "$help" | grep -nE '^example' | head -1 | cut -d: -f1)
-en2=$(printf '%s\n' "$help" | grep -nE '^HTTrack version' | tail -1 | cut -d: -f1)
+st=$(printf '%s\n' "$help" | command grep -n 'General options' | head -1 | cut -d: -f1)
+en=$(printf '%s\n' "$help" | command grep -nE '^example' | head -1 | cut -d: -f1)
+en2=$(printf '%s\n' "$help" | command grep -nE '^HTTrack version' | tail -1 | cut -d: -f1)
 
 # SYNOPSIS: one "[ -x, --long ]" per option carrying a long name (skip "#" guru
 # options, as the original did).

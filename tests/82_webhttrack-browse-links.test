@@ -16,7 +16,7 @@ htsserver_require
 # Control: a glob matching nothing would leave the grep below with no input.
 pages=("${distdir}"/html/server/*.html)
 test "${#pages[@]}" -ge 20 || fail "only ${#pages[@]} GUI pages under ${distdir}"
-bad=$(grep -l 'file://' "${pages[@]}" || true)
+bad=$(command grep -l 'file://' "${pages[@]}" || true)
 test -z "${bad}" || fail "file: link left in: ${bad}"
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_browse.XXXXXX") || fail "no tmpdir"

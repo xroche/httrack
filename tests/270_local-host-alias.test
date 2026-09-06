@@ -85,7 +85,7 @@ out=$(httrack 'http://127.0.0.1:1/x.html' -O "$odir" \
     echo "FAIL: httrack accepted a malformed --host-alias rule"
     exit 1
 }
-grep -q "Invalid host-alias rule" <<<"$out" || {
+command grep -q "Invalid host-alias rule" <<<"$out" || {
     echo "FAIL: no diagnostic for a malformed --host-alias rule: $out"
     exit 1
 }
@@ -103,7 +103,7 @@ out=$(httrack 'http://127.0.0.1:1/x.html' -O "$odir" \
     echo "FAIL: httrack accepted a --host-alias rule naming a path"
     exit 1
 }
-grep -q "a path" <<<"$out" || {
+command grep -q "a path" <<<"$out" || {
     echo "FAIL: the diagnostic does not name the path: $out"
     exit 1
 }

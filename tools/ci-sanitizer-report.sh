@@ -53,7 +53,7 @@ report() { # report LABEL FILE
 
 scan() { # scan LABEL FILE -- report FILE only if it carries a finding
     [ -f "$2" ] || return 0
-    grep -qE "$pattern" "$2" 2>/dev/null && report "$1" "$2"
+    command grep -qE "$pattern" "$2" 2>/dev/null && report "$1" "$2"
     return 0
 }
 
@@ -61,7 +61,7 @@ scan() { # scan LABEL FILE -- report FILE only if it carries a finding
 # diagnostic stays visible, and a deliberate one does not turn the build red.
 for f in "$log_dir"/*; do
     [ -f "$f" ] || continue
-    if grep -qE "$pattern" "$f" 2>/dev/null; then
+    if command grep -qE "$pattern" "$f" 2>/dev/null; then
         report "sanitizer report" "$f"
     else
         echo "=== other sanitizer output (not a finding): $f"

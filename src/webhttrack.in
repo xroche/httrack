@@ -41,7 +41,7 @@ function lang_index {
     tag=$(echo "${locale}" | cut -f1 -d'.' | cut -f1 -d'@' | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z_')
     # a few languages carry a region-specific entry (zh_tw, pt_br); else use the bare language
     for t in "${tag}" "${tag%%_*}"; do
-        n=$(grep -E "^${t}:" "${indexes}" | cut -f2 -d':')
+        n=$(command grep -E "^${t}:" "${indexes}" | cut -f2 -d':')
         test -n "${n}" && break
     done
     test -n "${n}" || n=1
@@ -118,7 +118,7 @@ fi
 # "browse" command
 if test "$1" = "browse"; then
     if test -f "${HOME}/.httrack.ini"; then
-        INDEXF=$(tr '\r' '\n' <"${HOME}/.httrack.ini" | grep -E "^path=" | cut -f2- -d'=')
+        INDEXF=$(tr '\r' '\n' <"${HOME}/.httrack.ini" | command grep -E "^path=" | cut -f2- -d'=')
         if test -n "${INDEXF}" -a -d "${INDEXF}" -a -f "${INDEXF}/index.html"; then
             INDEXF="${INDEXF}/index.html"
         else
@@ -146,7 +146,7 @@ while ! test -n "$SRVURL"; do
     MAXCOUNT=$((MAXCOUNT - 1))
     test $MAXCOUNT -gt 0 || exit 1
     test $MAXCOUNT -lt 50 && echo "waiting for server to reply.."
-    SRVURL=$(grep -E URL= "${TMPSRVFILE}" | cut -f2- -d=)
+    SRVURL=$(command grep -E URL= "${TMPSRVFILE}" | cut -f2- -d=)
     test ! "$SRVURL" = "error" || ! log "Could not spawn htsserver" || exit 1
     test -n "$SRVURL" || sleep 1
 done
@@ -168,7 +168,7 @@ function reap_browser {
 function cleanup {
     test -n "$1" && log "Nasty signal caught, cleaning up.."
     # Do not kill if browser exited (chrome bug issue) ; server will die itself
-    test -n "$1" && test -f "${TMPSRVFILE}" && SRVPID=$(grep -E PID= "${TMPSRVFILE}" | cut -f2- -d=)
+    test -n "$1" && test -f "${TMPSRVFILE}" && SRVPID=$(command grep -E PID= "${TMPSRVFILE}" | cut -f2- -d=)
     test -n "${SRVPID}" && kill -9 "${SRVPID}"
     test -f "${TMPSRVFILE}" && rm "${TMPSRVFILE}"
     reap_browser
@@ -185,7 +185,7 @@ launch_browser "${BROWSEREXE}" "${SRVURL}" &
 BROWSERPID=$!
 # Deliberately not SRVPID, which cleanup would then kill, taking a running mirror
 # with it.
-SESSIONPID=$(grep -E PID= "${TMPSRVFILE}" | cut -f2- -d=)
+SESSIONPID=$(command grep -E PID= "${TMPSRVFILE}" | cut -f2- -d=)
 wait_for_session "${BROWSERPID}" "${SESSIONPID}"
 
 # That's all, folks!

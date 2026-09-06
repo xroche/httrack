@@ -26,7 +26,7 @@ chmod -R u+w "${work}"
 chrome="${work}/tools/doc-chrome.py"
 page="${work}/html/index.html"
 
-shipped=$(grep -o '&copy; 1998-[0-9]\{4\}' "${page}" | head -1 | grep -o '[0-9]\{4\}$')
+shipped=$(command grep -o '&copy; 1998-[0-9]\{4\}' "${page}" | head -1 | command grep -o '[0-9]\{4\}$')
 test -n "${shipped}" || fail "no footer copyright year in ${page}"
 # Derived, not pinned: a literal pair goes red the January the tree ships it.
 later=$((shipped + 1))
@@ -73,7 +73,7 @@ restore
 # SOURCE_DATE_EPOCH has to reach the stamp, or every check above is vacuous.
 SOURCE_DATE_EPOCH="${epoch}" python3 "${chrome}" >/dev/null 2>&1 ||
     fail "regeneration under SOURCE_DATE_EPOCH failed"
-grep -q "&copy; 1998-${later} " "${page}" ||
+command grep -q "&copy; 1998-${later} " "${page}" ||
     fail "SOURCE_DATE_EPOCH=${epoch} did not stamp ${later} into the footer"
 
 # The tolerance is symmetric: today's generator accepts the ${later} tree.

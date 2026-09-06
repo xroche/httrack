@@ -57,9 +57,9 @@ b64='[A-Za-z0-9+/=]+'
 printf '[fragment survives onto the data: URI] ..\t'
 # Matching the data: prefix as well is what makes this more than "#icon-foo is
 # somewhere in the page": an un-inlined reference would carry it too.
-grep -Eq "src=\"data:image/svg\\+xml;base64,${b64}#icon-foo\"" "$page" ||
+command grep -Eq "src=\"data:image/svg\\+xml;base64,${b64}#icon-foo\"" "$page" ||
     fail "img src lost its fragment: $(grep -o 'src="[^"]*"' "$page" | head -n2)"
-grep -Eq "srcset=\"data:image/svg\\+xml;base64,${b64}#icon-set 2x\"" "$page" ||
+command grep -Eq "srcset=\"data:image/svg\\+xml;base64,${b64}#icon-set 2x\"" "$page" ||
     fail "srcset lost its fragment or its descriptor"
 echo OK
 
@@ -73,10 +73,10 @@ if m is None:
     sys.exit(1)
 open(sys.argv[2], "wb").write(base64.b64decode(m.group(1)))
 PY
-grep -Eq "url\\(data:image/svg\\+xml;base64,${b64}#icon-css\\)" "${tmpdir}/got.css" ||
+command grep -Eq "url\\(data:image/svg\\+xml;base64,${b64}#icon-css\\)" "${tmpdir}/got.css" ||
     fail "url() lost its fragment: $(<"${tmpdir}/got.css")"
 # Over the cap, so it stays a link, rebased onto the page's directory: it still
 # names the sprite sheet, so it still needs the selector.
-grep -q 'url(big.svg#icon-big)' "${tmpdir}/got.css" ||
+command grep -q 'url(big.svg#icon-big)' "${tmpdir}/got.css" ||
     fail "the rebased over-cap url() lost its fragment"
 echo OK

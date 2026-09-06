@@ -45,7 +45,7 @@ ci_suite_heartbeat 1 1 "$progress" 2 4242 >"$tmp/real" 2>&1
 spent=$((SECONDS - began))
 test "$spent" -ge 2 || fail "killed after ${spent}s of a 2s window: hb_now runs fast"
 test "$spent" -le 8 || fail "took ${spent}s to notice a 2s static window: hb_now is not seconds"
-grep -q '^KILL 4242 at ' "$tmp/real" || fail "a static log was not killed on the real clock"
+command grep -q '^KILL 4242 at ' "$tmp/real" || fail "a static log was not killed on the real clock"
 
 # Virtual clock, started well away from zero so the quiet window is measured from
 # when the watchdog began rather than from whatever the clock happened to read.
@@ -121,22 +121,22 @@ for t in "${said[@]:1}"; do
     prev=$t
 done
 
-grep -q "in flight: RUN ${wrote}s%25a%25b.test at ${wrote}s" "$tmp/out" ||
+command grep -q "in flight: RUN ${wrote}s%25a%25b.test at ${wrote}s" "$tmp/out" ||
     fail "annotation does not name the escaped test in flight: $(head -3 "$tmp/out")"
-grep -q "$(printf '\r')" "$tmp/out" && fail "a CR reached the annotation, truncating it"
-grep -q '98_earlier' "$tmp/out" && fail "annotation names the first test, not the one in flight"
-grep -qx '0 named' "$tmp/strayargs" || fail "process list not host-wide: $(<"$tmp/strayargs")"
+command grep -q "$(printf '\r')" "$tmp/out" && fail "a CR reached the annotation, truncating it"
+command grep -q '98_earlier' "$tmp/out" && fail "annotation names the first test, not the one in flight"
+command grep -qx '0 named' "$tmp/strayargs" || fail "process list not host-wide: $(<"$tmp/strayargs")"
 
 # Joined with %0A and bounded to eight, and no separator left dangling: the
 # runner reads to end of line, so a trailing one is a visible empty tail.
 first=$(sed -n '/^::notice title=suite still running::/{p;q;}' "$tmp/out")
 for i in 1 8; do
-    grep -q "%0A(stub $i)" <<<"$first" || fail "annotation lost process line $i"
+    command grep -q "%0A(stub $i)" <<<"$first" || fail "annotation lost process line $i"
 done
 # By identity, not by count: any eight lines satisfy a tally, including the wrong
 # eight, which is what a bound applied at the far end would leave.
-grep -q '(stub 9)' <<<"$first" && fail "annotation carried more than the eight lines it bounds"
-grep -q '%0A$' "$tmp/out" && fail "annotation ends on a dangling %0A separator"
+command grep -q '(stub 9)' <<<"$first" && fail "annotation carried more than the eight lines it bounds"
+command grep -q '%0A$' "$tmp/out" && fail "annotation ends on a dangling %0A separator"
 
 # A command is only read at the head of a line, so every annotation opens one.
 awk '/^::(notice|error) title=/ { if (prev != "") bad = 1 } { prev = $0 } END { exit bad }' "$tmp/out" ||
@@ -168,7 +168,7 @@ killed=$(sed -n 's/^KILL 4242 at \([0-9]*\)$/\1/p' "$tmp/capped")
 test -n "$killed" || fail "a suite still reporting outlived its wall-clock cap"
 test "$killed" -ge 5480 || fail "capped at $killed, inside the 480s cap"
 test "$killed" -le 5600 || fail "capped at $killed, want 5480 within a tick"
-grep -q '480s cap reached' "$tmp/capped" || fail "the cap kill was announced as something else"
+command grep -q '480s cap reached' "$tmp/capped" || fail "the cap kill was announced as something else"
 test "$(<"$tmp/lastwrite")" -ge 5480 || fail "the log stopped moving: nothing here needed the cap"
 
 # taskkill is a grandchild of its own target, so a leaves-first /T would reap the

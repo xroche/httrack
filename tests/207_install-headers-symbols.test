@@ -73,7 +73,7 @@ links() {
 
 # Without both controls every verdict below is vacuous. Compiler-generated
 # statics ("a.2") are not spellable in C, so skip past them.
-pos=$(grep -x hts_is_available "$tmp/exported" || head -1 "$tmp/exported")
+pos=$(command grep -x hts_is_available "$tmp/exported" || head -1 "$tmp/exported")
 neg=$(awk '/^[A-Za-z_][A-Za-z0-9_]*$/ { print; exit }' "$tmp/hidden")
 links "$pos" || {
     head -5 "$tmp/ctl.log" >&2

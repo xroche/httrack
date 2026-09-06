@@ -6,4 +6,4 @@ set -euo pipefail
 # A maximal host plus a maximal path must fit the dedup key, not the field
 # behind it (#1160).
 out=$(httrack -O /dev/null -#test=hashkey-bounds run)
-grep -q "hashkey-bounds self-test OK" <<<"$out"
+command grep -q "hashkey-bounds self-test OK" <<<"$out"

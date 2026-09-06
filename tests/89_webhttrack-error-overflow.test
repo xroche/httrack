@@ -36,7 +36,7 @@ check_clipped() {
     test "${full}" -gt "${msgmax}" ||
         fail "a ${full}-byte message fits in ${msgmax}: it cannot show a clip"
     page=$(htsserver_get /server/error.html | tr -d '\r')
-    line=$(printf '%s\n' "${page}" | grep "^${prefix}") || {
+    line=$(printf '%s\n' "${page}" | command grep "^${prefix}") || {
         shown=$(printf '%s\n' "${page}" | grep '^Unable to ' | cut -c1-80 || true)
         fail "the error page reports '${shown:-nothing}', want: ${prefix}"
     }
@@ -88,7 +88,7 @@ test "${written}" -lt "${#profile}" ||
 check_clipped "Unable to write ${#profile} bytes in the the init file " "${path}/p"
 
 reply=$(htsserver_get /server/index.html || true)
-grep -q '200 OK' <<<"$reply" ||
+command grep -q '200 OK' <<<"$reply" ||
     fail "the server stopped answering after the refused saves"
 
 echo "PASS"

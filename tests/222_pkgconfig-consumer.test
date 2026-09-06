@@ -112,7 +112,7 @@ if [ ! -f "${staged_libdir}/libhttrack.a" ] ||
 elif ! "${cc_argv[@]}" "${static_cflags_argv[@]}" -static -o "${work}/consumer-static" \
     "${work}/consumer.c" "${static_libs_argv[@]}" 2>"${work}/cc-static.log"; then
     # A sanitized build's archive needs the runtime -static cannot supply.
-    if grep -q -e __asan -e __ubsan -e __tsan -e __msan "${work}/cc-static.log"; then
+    if command grep -q -e __asan -e __ubsan -e __tsan -e __msan "${work}/cc-static.log"; then
         echo "the build is sanitized, its archive does not link -static; skipping" >&2
     else
         head -20 "${work}/cc-static.log" >&2

@@ -40,22 +40,22 @@ save_post() {
 }
 
 reply=$(htsserver_post "$(save_post '../escape')" /server/step4.html)
-grep -q '^Location: /server/error.html' <<<"${reply}" ||
+command grep -q '^Location: /server/error.html' <<<"${reply}" ||
     fail "the traversing save was not refused: ${reply}"
 test ! -e "${work}/escape" || fail "..: wrote outside ${work}/websites"
 # A save that failed for another reason (unwritable parent, missing field)
 # would land on the same page, so read what the page says.
-grep -q 'escapes its parent directory' <<<"$(htsserver_get /server/error.html)" ||
+command grep -q 'escapes its parent directory' <<<"$(htsserver_get /server/error.html)" ||
     fail "the error page does not name the refusal"
 
 reply=$(htsserver_post "$(save_post 'a/../../escape2')" /server/step4.html)
-grep -q '^Location: /server/error.html' <<<"${reply}" ||
+command grep -q '^Location: /server/error.html' <<<"${reply}" ||
     fail "a nested .. was not refused: ${reply}"
 test ! -e "${work}/escape2" || fail "a/../..: wrote outside ${work}/websites"
 
 # A backslash separates too: the posted path is client text, not this host's.
 reply=$(htsserver_post "$(save_post '..\escape3')" /server/step4.html)
-grep -q '^Location: /server/error.html' <<<"${reply}" ||
+command grep -q '^Location: /server/error.html' <<<"${reply}" ||
     fail "a backslashed .. was not refused: ${reply}"
 
 # Reading is gated the same way, or the load path hands the form a file the
@@ -63,15 +63,15 @@ grep -q '^Location: /server/error.html' <<<"${reply}" ||
 body=$(urlform sid "${sid}" path "${base}" projname proj loadprojname '../outside')
 htsserver_post "${body}" /server/step2.html >/dev/null
 page=$(htsserver_get /server/step2.html)
-grep -q 'name="projcateg"' <<<"${page}" || fail "step2.html did not render the form"
-! grep -q 'PATHGUARD-LEAK' <<<"${page}" || fail "loaded a profile outside the path"
+command grep -q 'name="projcateg"' <<<"${page}" || fail "step2.html did not render the form"
+! command grep -q 'PATHGUARD-LEAK' <<<"${page}" || fail "loaded a profile outside the path"
 
 # Control: ".." inside a name is a name, not a traversal. Without it a guard
 # that refused everything would pass.
 reply=$(htsserver_post "$(save_post 'ok..name')" /server/step4.html)
-! grep -q '^Location: /server/error.html' <<<"${reply}" ||
+! command grep -q '^Location: /server/error.html' <<<"${reply}" ||
     fail "a legitimate .. in a name was refused: ${reply}"
-grep -q 'PATHGUARD-PROFILE' "${work}/websites/ok..name/hts-cache/winprofile.ini" ||
+command grep -q 'PATHGUARD-PROFILE' "${work}/websites/ok..name/hts-cache/winprofile.ini" ||
     fail "the accepted save wrote no profile"
 
 htsserver_cleanup

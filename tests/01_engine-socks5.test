@@ -7,4 +7,4 @@ set -euo pipefail
 # server replies (frame draining, oversize rejects, RFC 1929 fields).
 
 out=$(httrack -O /dev/null '-#test=socks5')
-grep -q "socks5 self-test OK" <<<"$out"
+command grep -q "socks5 self-test OK" <<<"$out"

@@ -53,7 +53,7 @@ rc=0
 test "$rc" -eq 0 || fail "rc-file crawl exited $rc"
 assert_file "$d1/hts-cache/doit.log" "no doit.log, so the rc file was not processed"
 # A truncated copy would cut the token; require the full -F value.
-grep -q -- "-F $marker" "$d1/hts-cache/doit.log" || {
+command grep -q -- "-F $marker" "$d1/hts-cache/doit.log" || {
     echo "FAIL: user-agent alias missing or truncated in doit.log"
     head -1 "$d1/hts-cache/doit.log"
     exit 1
@@ -94,7 +94,7 @@ short=$(sed -n '1p' "$d2/hts-cache/doit.log" | tr ' ' '\n' |
     awk -v n="${#val}" '/^a+$/ && length($0) != n {c++} END {print c + 0}')
 test "$short" -eq 0 || fail "$short user-agent value(s) reached doit.log clipped"
 for marker in "$first" "$last"; do
-    grep -q -- "-F $marker" "$d2/hts-cache/doit.log" || fail "$marker never reached the rebuilt command line"
+    command grep -q -- "-F $marker" "$d2/hts-cache/doit.log" || fail "$marker never reached the rebuilt command line"
 done
 
 exit 0

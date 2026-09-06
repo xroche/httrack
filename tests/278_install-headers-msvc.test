@@ -17,7 +17,7 @@ workflow="$top/.github/workflows/windows-build.yml"
 
 test -r "$sweep" || fail "no $sweep"
 # EXTRA_DIST, or a dist tarball ships 269 without the sweep it drives.
-grep -q 'install-headers-sweep\.sh' "$testdir/Makefile.am" ||
+command grep -q 'install-headers-sweep\.sh' "$testdir/Makefile.am" ||
     fail "install-headers-sweep.sh is not in EXTRA_DIST"
 
 tmp=$(mktemp -d) || exit 1
@@ -203,7 +203,7 @@ for m in none:'' drop:'want exactly one' comment:'want exactly one' \
     if test -z "${m#*:}"; then
         test -z "$said" || fail "a reformatted workflow fails the audit: $said"
     else
-        grep -q "^BAD .*${m#*:}" <<<"$said" ||
+        command grep -q "^BAD .*${m#*:}" <<<"$said" ||
             fail "the ${m%%:*} control did not trip the audit: $said"
     fi
 done

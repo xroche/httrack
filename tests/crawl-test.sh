@@ -129,7 +129,7 @@ function start-crawl {
             ;;
         --errors)
             shift
-            assert_equals "checking errors" "$1" "$(grep -iEc "^[0-9\:]*[[:space:]]Error:" "${tmp}/hts-log.txt")"
+            assert_equals "checking errors" "$1" "$(command grep -iEc "^[0-9\:]*[[:space:]]Error:" "${tmp}/hts-log.txt")"
             ;;
         --found)
             shift
@@ -153,7 +153,7 @@ function start-crawl {
             ;;
         --files)
             shift
-            nFiles=$(grep -E "^HTTrack Website Copier/[^ ]* mirror complete in " "${tmp}/hts-log.txt" |
+            nFiles=$(command grep -E "^HTTrack Website Copier/[^ ]* mirror complete in " "${tmp}/hts-log.txt" |
                 sed -e 's/.*[[:space:]]\([^ ]*\)[[:space:]]files written.*/\1/g')
             assert_equals "checking files" "$1" "$nFiles"
             ;;

@@ -5,4 +5,4 @@ set -euo pipefail
 
 # Entity/URL unescapers reserve one byte for the trailing NUL (no 1-byte OOB).
 out=$(httrack -O /dev/null -#test=unescape-bounds run)
-grep -q "unescape-bounds self-test OK" <<<"$out"
+command grep -q "unescape-bounds self-test OK" <<<"$out"

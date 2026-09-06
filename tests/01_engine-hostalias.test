@@ -6,4 +6,4 @@ set -euo pipefail
 # --host-alias: hostname folding for scope, savename and the dedup key. All
 # assertions live in the engine self-test (hts_host_alias & friends).
 out=$(httrack -O /dev/null -#test=hostalias)
-grep -q "host-alias self-test OK" <<<"$out"
+command grep -q "host-alias self-test OK" <<<"$out"

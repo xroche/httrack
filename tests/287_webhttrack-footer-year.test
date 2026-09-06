@@ -18,11 +18,11 @@ printf '[every server footer takes its year from the clock] ..\t'
 
 # The probe below reads one page, so sweep them all here: converting index.html
 # and leaving the other 22 stamped would still serve a correct-looking reply.
-stamped=$({ grep -l '&copy; 1998-[0-9]' "${distdir}"/html/server/*.html || true; })
+stamped=$({ command grep -l '&copy; 1998-[0-9]' "${distdir}"/html/server/*.html || true; })
 test -z "${stamped}" || fail "footers still carry a stamped year: ${stamped}"
-footers=$({ grep -l 'id="footer"' "${distdir}"/html/server/*.html || true; } | wc -l)
+footers=$({ command grep -l 'id="footer"' "${distdir}"/html/server/*.html || true; } | wc -l)
 # shellcheck disable=SC2016 # the literal ${...} is what we look for
-tokens=$({ grep -lF '1998-${date:year}' "${distdir}"/html/server/*.html || true; } | wc -l)
+tokens=$({ command grep -lF '1998-${date:year}' "${distdir}"/html/server/*.html || true; } | wc -l)
 test "${footers}" -gt 20 || fail "only ${footers} server pages carry a footer"
 test "${tokens}" -eq "${footers}" || fail "${footers} footers, ${tokens} take the token"
 
@@ -56,16 +56,16 @@ test "${local_year}" -eq $((pinned + 1)) || skip "TZ=${TZ} is not honored here"
 export SOURCE_DATE_EPOCH="${epoch}"
 htsserver_start --root "${root}" --home "${work}"
 reply=$(htsserver_get /server/probe-1165.html)
-grep -q '^HTTP/1.[01] 200' <<<"${reply}" || fail "probe page: ${reply}"
-grep -q "year=\[${pinned}\]" <<<"${reply}" ||
+command grep -q '^HTTP/1.[01] 200' <<<"${reply}" || fail "probe page: ${reply}"
+command grep -q "year=\[${pinned}\]" <<<"${reply}" ||
     fail "SOURCE_DATE_EPOCH=${epoch} did not reach the expansion as UTC: ${reply}"
-grep -q 'unknown=\[\] longer=\[\]' <<<"${reply}" ||
+command grep -q 'unknown=\[\] longer=\[\]' <<<"${reply}" ||
     fail "a field that is not year expands to something: ${reply}"
 
 # A shipped page must carry the token, not a stamped year.
 reply=$(htsserver_get /server/index.html)
-grep -q '^HTTP/1.[01] 200' <<<"${reply}" || fail "index.html: ${reply}"
-grep -q "&copy; 1998-${pinned} Xavier Roche &amp; other contributors" <<<"${reply}" ||
+command grep -q '^HTTP/1.[01] 200' <<<"${reply}" || fail "index.html: ${reply}"
+command grep -q "&copy; 1998-${pinned} Xavier Roche &amp; other contributors" <<<"${reply}" ||
     fail "the index.html footer does not follow the clock: ${reply}"
 # shellcheck disable=SC2016 # ditto: the raw token must not survive
 case ${reply} in
@@ -88,7 +88,7 @@ for override in '' abc 99999999999999999999 -1 -62230000000 67768036191676799; d
     reply=$(htsserver_get /server/probe-1165.html)
     # Re-read: a New Year crossing mid-request is not a failure.
     after=$(date +%Y)
-    grep -qE "year=\[(${now}|${after})\]" <<<"${reply}" ||
+    command grep -qE "year=\[(${now}|${after})\]" <<<"${reply}" ||
         fail "SOURCE_DATE_EPOCH='${override}' gives neither ${now} nor ${after}: ${reply}"
     htsserver_stop
 done

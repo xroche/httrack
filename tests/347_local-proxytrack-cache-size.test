@@ -62,12 +62,12 @@ read_back() {
 
 # control: without it, a fix that rejected every entry would pass the rest
 read_back "$dir/good.zip"
-grep -qF "$BODY" "$dir/out.arc" || fail "an untouched cache lost its body"
+command grep -qF "$BODY" "$dir/out.arc" || fail "an untouched cache lost its body"
 
 forge_size "$dir/neg.zip" -1
 read_back "$dir/neg.zip"
-grep -q "$bad_size" "$dir/out.arc" || fail "a negative X-Size was accepted"
-if grep -qF "$BODY" "$dir/out.arc"; then
+command grep -q "$bad_size" "$dir/out.arc" || fail "a negative X-Size was accepted"
+if command grep -qF "$BODY" "$dir/out.arc"; then
     fail "a negative X-Size still returned a body"
 fi
 
@@ -76,7 +76,7 @@ fi
 for value in "$over_int_max" "$at_int_max"; do
     forge_size "$dir/big-$value.zip" "$value"
     read_back "$dir/big-$value.zip"
-    grep -q "$bad_size" "$dir/out.arc" ||
+    command grep -q "$bad_size" "$dir/out.arc" ||
         fail "an in-cache X-Size of $value was accepted"
 done
 
@@ -85,14 +85,14 @@ done
 forge_size "$dir/hdronly.zip" "$over_int_max"
 poke "$dir/hdronly.zip" 'X-In-Cache: 1' 'X-In-Cache: 0'
 read_back "$dir/hdronly.zip"
-if grep -q "$bad_size" "$dir/out.arc"; then
+if command grep -q "$bad_size" "$dir/out.arc"; then
     fail "a headers-only X-Size of $over_int_max was refused"
 fi
 
 forge_size "$dir/hdrneg.zip" -1
 poke "$dir/hdrneg.zip" 'X-In-Cache: 1' 'X-In-Cache: 0'
 read_back "$dir/hdrneg.zip"
-grep -q "$bad_size" "$dir/out.arc" ||
+command grep -q "$bad_size" "$dir/out.arc" ||
     fail "a headers-only negative X-Size was accepted"
 
 exit 0

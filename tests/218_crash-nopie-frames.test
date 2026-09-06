@@ -50,10 +50,10 @@ build "${work}/probe-pie" || {
 }
 out=${work}/pie.log
 LC_ALL=C "${work}/probe-pie" >"${out}" 2>&1 || fail "the control probe exited non-zero"
-if grep -q 'No stack trace available' "${out}"; then
+if command grep -q 'No stack trace available' "${out}"; then
     skip "this build produced no backtrace"
 fi
-grep -qE 'probe_frame at .*nopieprobe\.c:[0-9]+' "${out}" ||
+command grep -qE 'probe_frame at .*nopieprobe\.c:[0-9]+' "${out}" ||
     skip "nothing is symbolized here, even from an absolute path"
 
 # Same probe under the loader: there /proc/self/exe is ld.so, and only dladdr()
@@ -68,9 +68,9 @@ if [ -n "${interp}" ] && [ -x "${interp}" ]; then
     rc=0
     LC_ALL=C run_with_timeout 60 "${interp}" "${work}/probe-pie" >"${out}" 2>&1 || rc=$?
     test "${rc}" -ne 124 || fail "the loader-launched probe did not finish in time"
-    grep -qxF "${work}/probe-pie:" "${out}" ||
+    command grep -qxF "${work}/probe-pie:" "${out}" ||
         fail "launched through ${interp}, the report heads no block with the program"
-    grep -qE 'probe_frame at .*nopieprobe\.c:[0-9]+' "${out}" ||
+    command grep -qE 'probe_frame at .*nopieprobe\.c:[0-9]+' "${out}" ||
         fail "launched through ${interp}, the report resolves no source line"
 fi
 
@@ -84,9 +84,9 @@ rc=0
 LC_ALL=C PATH="${altdir}:${PATH}" \
     run_with_timeout 60 probe-renamed >"${out}" 2>&1 || rc=$?
 test "${rc}" -ne 124 || fail "the symlinked probe did not finish in time"
-grep -qxF "${work}/probe-pie:" "${out}" ||
+command grep -qxF "${work}/probe-pie:" "${out}" ||
     fail "launched as probe-renamed, the report heads no block with the program"
-grep -qE 'probe_frame at .*nopieprobe\.c:[0-9]+' "${out}" ||
+command grep -qE 'probe_frame at .*nopieprobe\.c:[0-9]+' "${out}" ||
     fail "launched as probe-renamed, the report resolves no source line"
 
 if ! build "${work}/probe-nopie" -no-pie -fno-pie; then
@@ -98,7 +98,7 @@ mkdir "${bindir}"
 mv "${work}/probe-nopie" "${bindir}/probe-nopie"
 if command -v readelf >/dev/null; then
     LC_ALL=C readelf -h "${bindir}/probe-nopie" >"${work}/elf.txt"
-    grep -qE '^[[:space:]]*Type:[[:space:]]+EXEC' "${work}/elf.txt" ||
+    command grep -qE '^[[:space:]]*Type:[[:space:]]+EXEC' "${work}/elf.txt" ||
         skip "the toolchain ignored -no-pie and linked a PIE anyway"
 fi
 
@@ -112,11 +112,11 @@ LC_ALL=C PATH="${bindir}:${PATH}" \
 test "${rc}" -ne 124 || fail "the probe did not finish within the deadline"
 if ! command -v readelf >/dev/null; then
     # glibc drops the "+0x" offset when the load bias is zero.
-    grep -qE '^probe-nopie\(\) \[0x' "${out}" ||
+    command grep -qE '^probe-nopie\(\) \[0x' "${out}" ||
         skip "no zero-bias frame in the report; this is no ET_EXEC"
 fi
 
-headers=$(grep -E '^/.*/probe-nopie:$' "${out}" || true)
+headers=$(command grep -E '^/.*/probe-nopie:$' "${out}" || true)
 test -n "${headers}" || fail "the report has no symbolized block for the executable"
 # Every frame of a module is claimed in one pass, so a second block for the
 # executable means library frames were misattributed to it.
@@ -127,7 +127,7 @@ test "${exe}" -ef "${bindir}/probe-nopie" || fail "the report names ${exe}"
 block=$(awk -v h="${headers}" '$0 == h { on = 1; next } /^\// { on = 0 } on' "${out}")
 # " at " pins the symbol column: both addr2line -Cfipa and llvm-symbolizer -p
 # emit it. A wrong offset resolves to "?? ??:0" instead.
-grep -qE '(^|[^[:alnum:]_])probe_frame at .*nopieprobe\.c:[0-9]+' <<<"${block}" ||
+command grep -qE '(^|[^[:alnum:]_])probe_frame at .*nopieprobe\.c:[0-9]+' <<<"${block}" ||
     fail "the executable's block resolves no source line: ${block}"
 
 echo "the non-PIE report named ${exe} and resolved its own frames"

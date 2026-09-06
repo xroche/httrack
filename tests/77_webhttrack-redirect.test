@@ -64,11 +64,11 @@ X-Injected: pwned' "${sid}") || fail "no response to a CRLF redirect value"
 htsserver_stop
 # Here-string, not a pipe: grep -q SIGPIPEs the producer on the first match, and
 # pipefail then turns the hit into a silent pass.
-grep -qi 'X-Injected' <<<"${resp}" &&
+command grep -qi 'X-Injected' <<<"${resp}" &&
     fail "CRLF in the redirect value reached the response"
-test "$(grep -ci '^Location:' <<<"${resp}")" -eq 0 ||
+test "$(command grep -ci '^Location:' <<<"${resp}")" -eq 0 ||
     fail "CRLF redirect still emitted a Location header"
-test "$(grep -c '^HTTP/1\.' <<<"${resp}")" -eq 1 ||
+test "$(command grep -c '^HTTP/1\.' <<<"${resp}")" -eq 1 ||
     fail "CRLF redirect did not yield exactly one status line"
 
 # Loopback unless asked otherwise. Assert the socket, not the announcement.
@@ -98,7 +98,7 @@ fi
 # An empty --bind must not quietly fall back to every interface. Bounded: if it
 # were accepted the server would listen instead of exiting.
 run_with_timeout 15 htsserver "${HTS_DISTDIR}/" --bind "" >"${bindlog}" 2>&1 || true
-grep -q -- "--bind needs an address" "${bindlog}" ||
+command grep -q -- "--bind needs an address" "${bindlog}" ||
     fail "empty --bind not refused: $(<"${bindlog}")"
 
 test -z "${unobserved}" || skip "${unobserved}: the listen-address half never ran"

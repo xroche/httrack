@@ -21,7 +21,7 @@ test -n "${report}" || fail "httrack -#test=features said nothing"
 
 # macro_is CONFIG MACRO VALUE: does config.h define MACRO to VALUE?
 macro_is() {
-    grep -q "^#define $2 $3\$" "$1"
+    command grep -q "^#define $2 $3\$" "$1"
 }
 
 # want_feature NAME: 1 or 0, derived from config.h rather than from the report.

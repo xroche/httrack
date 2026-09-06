@@ -106,7 +106,7 @@ found=$(scan "${sources[@]}")
 # A scanner that matched nothing would report a clean tree just as well.
 [ -n "$found" ] || fail "the scan found no timeb use at all; htslib.c has three"
 
-bad=$(grep '^BAD ' <<<"$found" || true)
+bad=$(command grep '^BAD ' <<<"$found" || true)
 [ -z "$bad" ] || fail "unguarded timeb use, which bionic does not ship:
 $bad"
 

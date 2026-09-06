@@ -69,7 +69,7 @@ sleep 1
 echo 'NEWCONTENT' >"${root}/a.html"
 crawl changed --update
 test "$(count_log_errors "$log")" = 0 || fail "update (changed) reported errors"
-grep -q NEWCONTENT "${host}/a.html" || fail "the update did not pick up the changed source"
+command grep -q NEWCONTENT "${host}/a.html" || fail "the update did not pick up the changed source"
 test "$(verdict a.html)" != untouched || fail "a.html was reported untouched after it changed"
 for f in index.html sub/b.html; do
     test "$(verdict "$f")" = untouched ||

@@ -35,7 +35,7 @@ htsserver_start
 
 # The page that offers the pairs is the count's only source, so a ninth row
 # flows through here instead of desyncing three literals.
-pairs=$(grep -c '<input name="ext[0-9]*"' "${HTS_DISTDIR}/html/server/option11.html")
+pairs=$(command grep -c '<input name="ext[0-9]*"' "${HTS_DISTDIR}/html/server/option11.html")
 test "${pairs}" -ge 8 || fail "option11.html offers only ${pairs} MIME pairs"
 
 out="${work}/crawl"
@@ -119,7 +119,7 @@ PY
 
 log="${out}/hts-log.txt"
 start=${SECONDS}
-while ! grep -q "HTTrack Website Copier/" "${log}" 2>/dev/null; do
+while ! command grep -q "HTTrack Website Copier/" "${log}" 2>/dev/null; do
     htsserver_alive || fail "htsserver died: $(tail -n 20 "${log}" 2>/dev/null)"
     test "$((SECONDS - start))" -lt 120 || fail_dump "the crawl did not end" "${log}"
     poll_wait 0.2
@@ -129,13 +129,13 @@ done
 doit="${out}/hts-cache/doit.log"
 assert_file "${doit}" "the crawl recorded no invocation"
 argv=$(head -1 "${doit}")
-grep -q -- "-u2" <<<"${argv}" || fail "the type check never reached the engine: ${argv}"
-grep -q -- "-%A foo=text/html" <<<"${argv}" ||
+command grep -q -- "-u2" <<<"${argv}" || fail "the type check never reached the engine: ${argv}"
+command grep -q -- "-%A foo=text/html" <<<"${argv}" ||
     fail "the first MIME pair never reached the engine: ${argv}"
 # One token per line, so grep -c counts the flags rather than the single line.
-assume_flags=$(tr ' ' '\n' <<<"${argv}" | grep -c -- '-%A' || true)
+assume_flags=$(tr ' ' '\n' <<<"${argv}" | command grep -c -- '-%A' || true)
 assert_eq "${pairs}" "${assume_flags}" "-%A flags in the recorded argv"
-! grep -q -- "-F " <<<"${argv}" || fail "a blank browser id still sent -F: ${argv}"
+! command grep -q -- "-F " <<<"${argv}" || fail "a blank browser id still sent -F: ${argv}"
 
 # The rule changed the crawl, not just the argv: without it data.foo stays a
 # binary the engine never opens, so deep.html is unreachable.

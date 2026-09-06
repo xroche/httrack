@@ -54,7 +54,7 @@ test ! -f "${mirrored}" ||
     fail "--updatehttrack mirrored ${mirrored}, so it ran as a crawl"
 assert_eq 0 "$(count_matching_lines "${usage_marker}" "${tmp}/run.log")" \
     "--updatehttrack printed the usage"
-grep -qF -- '--updatehttrack' <<<"${LOG}" ||
+command grep -qF -- '--updatehttrack' <<<"${LOG}" ||
     fail "--updatehttrack failed without naming itself: ${LOG}"
 ok "--updatehttrack is refused instead of walked as a cluster"
 

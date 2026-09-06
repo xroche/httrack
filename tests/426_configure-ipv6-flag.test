@@ -71,7 +71,7 @@ check_state() {
     for hdr in config.h htsfeatures.h; do
         # The whole bug: an undefined HTS_INET6 lets htsglobal.h pick, so the
         # installed header set never says which layout it was built with.
-        grep -qx "#define HTS_INET6 ${want}" "${dir}/${hdr}" ||
+        command grep -qx "#define HTS_INET6 ${want}" "${dir}/${hdr}" ||
             fail_dump "${desc}: ${hdr} does not define HTS_INET6 to ${want}" \
                 "${dir}/${hdr}" "${dir}/configure.log"
     done
@@ -96,7 +96,7 @@ expect() { # expect DESC SEED WANT-VALUE WANT-SUMMARY ARG...
     run_configure "${work}/build${n}" "${seed}" "$@" ||
         fail_dump "${desc}: configure failed" "${work}/build${n}/configure.log"
     check_state "${desc}" "${last_dir}" "${want}"
-    grep -q "whether IPv6 support is enabled\.\.\. ${summary}\$" "${last_dir}/configure.log" ||
+    command grep -q "whether IPv6 support is enabled\.\.\. ${summary}\$" "${last_dir}/configure.log" ||
         fail_dump "${desc}: configure did not report '${summary}'" "${last_dir}/configure.log"
     echo "ok: ${desc}"
     pace "$((SECONDS - began))"
@@ -109,7 +109,7 @@ expect_fail() { # expect_fail DESC SEED WANT-TEXT ARG...
     n=$((n + 1))
     ! run_configure "${work}/build${n}" "${seed}" "$@" ||
         fail_dump "${desc}: configure succeeded" "${work}/build${n}/configure.log"
-    grep -q "${text}" "${last_dir}/configure.log" ||
+    command grep -q "${text}" "${last_dir}/configure.log" ||
         fail_dump "${desc}: configure failed without saying '${text}'" "${last_dir}/configure.log"
     echo "ok: ${desc}"
     pace "$((SECONDS - began))"
@@ -138,7 +138,7 @@ expect "--disable-ipv6 is honoured" have 0 "no (requested)" --disable-ipv6
 
 # A build that asked for no IPv6 has no reason to care what the host has. It
 # reads the run above, so it stays attached to it.
-if grep -q "getaddrinfo" "${last_dir}/configure.log"; then
+if command grep -q "getaddrinfo" "${last_dir}/configure.log"; then
     fail_dump "--disable-ipv6 still probed for getaddrinfo" "${last_dir}/configure.log"
 fi
 
@@ -156,12 +156,12 @@ expect "--disable-auto-features leaves IPv6 on auto" have 1 "yes (auto)" --disab
 n=$((n + 1))
 run_configure "${work}/build${n}" probe ||
     fail_dump "an unseeded configure failed" "${work}/build${n}/configure.log"
-grep -q "checking for getaddrinfo in -lc" "${last_dir}/configure.log" ||
+command grep -q "checking for getaddrinfo in -lc" "${last_dir}/configure.log" ||
     fail_dump "an unseeded configure ran no getaddrinfo probe" "${last_dir}/configure.log"
-if grep -q "whether IPv6 support is enabled\.\.\. yes (auto)$" "${last_dir}/configure.log"; then
+if command grep -q "whether IPv6 support is enabled\.\.\. yes (auto)$" "${last_dir}/configure.log"; then
     probed=yes
     check_state "the unseeded probe" "${last_dir}" 1
-elif grep -q "whether IPv6 support is enabled\.\.\. no (auto)$" "${last_dir}/configure.log"; then
+elif command grep -q "whether IPv6 support is enabled\.\.\. no (auto)$" "${last_dir}/configure.log"; then
     probed=no
     check_state "the unseeded probe" "${last_dir}" 0
 else

@@ -10,7 +10,7 @@ set -euo pipefail
 
 # From the engine, so a cap that moves moves the boundaries probed below.
 caps=$(httrack -O /dev/null -#test=filtercap) || fail "filtercap self-test failed"
-limits=$(grep '^filtercap: ' <<<"$caps") || fail "no limits line in: $caps"
+limits=$(command grep '^filtercap: ' <<<"$caps") || fail "no limits line in: $caps"
 read -r _ rulecap argvcap <<<"$limits"
 rulecap=${rulecap#rule=}
 argvcap=${argvcap#argv=}
@@ -37,7 +37,7 @@ why() { # why RULE-FILE
     rm -rf "$tmpdir/p"
     out="$(httrack -O "$tmpdir/p" -q --why "$URL" -%S "$1" http://www.example.com/)" ||
         fail "httrack exited $? on $(basename "$1")"
-    grep -E 'accepted|rejected|no filter|unable' <<<"$out"
+    command grep -E 'accepted|rejected|no filter|unable' <<<"$out"
 }
 
 # At the cap the rule is kept, so the one that decides is the second.

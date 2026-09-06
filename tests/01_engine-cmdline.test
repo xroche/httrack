@@ -55,7 +55,7 @@ refused() {
 # assert continue mode was entered: it drops the URL list, so with no cache to
 # resume the run ends on the usage screen rather than on any other error
 continued() {
-    { test "$RC" -ne 0 && grep -q 'usage:' "$1/.log"; } ||
+    { test "$RC" -ne 0 && command grep -q 'usage:' "$1/.log"; } ||
         fail "$2 (exit $RC)"
 }
 
@@ -162,11 +162,11 @@ accepted "$tmp/pre-proto" "#615: -@i2 before the URL broke the crawl"
 # is only observable via the ">8, limited to 8" warning: -c16 trips it, and would
 # stop tripping it if a trailing -K reset the count back to the default 4.
 warned() {
-    grep -q 'simultaneous connections limited to' "$1/hts-log.txt" ||
+    command grep -q 'simultaneous connections limited to' "$1/hts-log.txt" ||
         fail "$2"
 }
 not_warned() {
-    ! grep -q 'simultaneous connections limited to' "$1/hts-log.txt" ||
+    ! command grep -q 'simultaneous connections limited to' "$1/hts-log.txt" ||
         fail "$2"
 }
 run "$tmp/soc-c16" -c16

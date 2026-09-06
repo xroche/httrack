@@ -40,11 +40,11 @@ import sys, zipfile
 for i in sorted(zipfile.ZipFile(sys.argv[1]).infolist(), key=lambda i: i.filename):
     print(i.filename)
 ' "${out}/hts-cache/new.zip" | tr -d '\r')
-test "$(grep -c . <<<"$cached")" = 2 || fail "want 2 cache entries, got: $cached"
+test "$(command grep -c . <<<"$cached")" = 2 || fail "want 2 cache entries, got: $cached"
 
 # -#C returns as soon as it has listed, so -O comes first; the listing is CRLF.
 listing=$(httrack -O "$out" -#C '*' 2>"${tmpdir}/dashc.err" | tr -d '\r')
-if grep -q 'No cache entry found' "${tmpdir}/dashc.err"; then
+if command grep -q 'No cache entry found' "${tmpdir}/dashc.err"; then
     fail "-#C '*' found nothing in a cache holding: ${cached}"
 fi
 
@@ -63,9 +63,9 @@ ok "-#C lists every entry of the ZIP cache, each with the size stored for it"
 
 # The filter still narrows, so the listing is not just "print everything".
 one=$(httrack -O "$out" -#C '*child*' 2>/dev/null | tr -d '\r')
-test "$(grep -c '^X-URL: ' <<<"$one")" = 1 ||
+test "$(command grep -c '^X-URL: ' <<<"$one")" = 1 ||
     fail "-#C '*child*' matched more than child.html: ${one}"
-grep -q '^X-URL: .*/site/child\.html$' <<<"$one" ||
+command grep -q '^X-URL: .*/site/child\.html$' <<<"$one" ||
     fail "-#C '*child*' listed the wrong entry: ${one}"
 ok "a filtered listing narrows to the entries the pattern matches"
 
@@ -99,11 +99,11 @@ print(name)
 ' "${grafted}/hts-cache/new.zip" | tr -d '\r')
 
 listing=$(httrack -O "$grafted" -#C '*' 2>/dev/null | tr -d '\r')
-test "$(grep -c '^X-URL: ' <<<"$listing")" = 3 ||
+test "$(command grep -c '^X-URL: ' <<<"$listing")" = 3 ||
     fail "want the 2 crawled entries and the grafted one: ${listing}"
-grep -qF "X-URL: ${graft}" <<<"$listing" ||
+command grep -qF "X-URL: ${graft}" <<<"$listing" ||
     fail "the entry grafted into the ZIP was not listed: ${listing}"
-if grep -q 'noheaders' <<<"$listing"; then
+if command grep -q 'noheaders' <<<"$listing"; then
     fail "an entry the index refuses was listed anyway: ${listing}"
 fi
 ok "the listing follows the ZIP index, and skips what that index refuses"
@@ -113,7 +113,7 @@ ok "the listing follows the ZIP index, and skips what that index refuses"
 rc=0
 none=$(httrack -O "$out" -#C '*no-such-url*' 2>&1) || rc=$?
 test "$rc" = 0 || fail "a filter matching nothing exited ${rc}"
-grep -q "No cache entry found for '\*no-such-url\*'" <<<"$none" ||
+command grep -q "No cache entry found for '\*no-such-url\*'" <<<"$none" ||
     fail "a filter matching nothing did not say so: ${none}"
 
 # The cache has to OPEN for the empty-index branch to be the one that answers,
@@ -129,8 +129,8 @@ rc=0
 none=$(httrack -O "$drained" -#C '*' 2>"${tmpdir}/drained.err") || rc=$?
 test "$rc" = 0 || fail "-#C over an empty index exited ${rc}"
 # the warning rides cache.log, which -#C points at stdout
-grep -q 'Corrupted cache entry' <<<"$none" ||
+command grep -q 'Corrupted cache entry' <<<"$none" ||
     fail "the ZIP never opened, so an empty index is not what answered: ${none}"
-grep -q 'No cache entry found' "${tmpdir}/drained.err" ||
+command grep -q 'No cache entry found' "${tmpdir}/drained.err" ||
     fail "an empty index did not report itself empty: ${none}"
 ok "an empty result still reports no entry"

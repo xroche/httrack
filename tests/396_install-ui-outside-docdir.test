@@ -74,15 +74,15 @@ htsserver_start --root "${served}"
 serves() { # serves PATH MARKER WHAT
     local body
     body=$(htsserver_get "$1")
-    grep -q '^HTTP/1.0 200 OK' <<<"${body}" ||
+    command grep -q '^HTTP/1.0 200 OK' <<<"${body}" ||
         fail "$3: $1 answered $(firstline "${body}")"
-    grep -qF "$2" <<<"${body}" || fail "$3: $1 served without ${2}"
+    command grep -qF "$2" <<<"${body}" || fail "$3: $1 served without ${2}"
 }
 
 absent() { # absent PATH WHAT
     local body
     body=$(htsserver_get "$1")
-    grep -q '^HTTP/1.0 404' <<<"${body}" ||
+    command grep -q '^HTTP/1.0 404' <<<"${body}" ||
         fail "$2: $1 answered $(firstline "${body}") rather than 404"
 }
 
@@ -101,9 +101,9 @@ absent /doc/html/no-such-page.html 'a complete tree'
 # documentation where it used to sit would 404 for a user and pass every
 # assertion above. /website/ needs a mirror, and /server/ is the panel itself.
 panel=$(htsserver_get /server/index.html)
-links=$(grep -o 'href="/[^"]*"' <<<"${panel}" |
+links=$(command grep -o 'href="/[^"]*"' <<<"${panel}" |
     sed -e 's|^href="||' -e 's|"$||' -e 's|#.*||' |
-    grep -vE '^/(website|server)/' | LC_ALL=C sort -u) || true
+    command grep -vE '^/(website|server)/' | LC_ALL=C sort -u) || true
 test "$(count_matching_lines . <<<"${links}")" -ge 2 ||
     fail "the panel links fewer than two documentation pages"
 for link in ${links}; do
@@ -134,7 +134,7 @@ webhttrack_browse || {
 # runs above are not passing on a check that stopped firing.
 rm -rf "${served}/html"
 if webhttrack_browse; then fail "webhttrack accepted a tree with no served UI"; fi
-grep -qE 'Could not find .*/html$' "${work}/browse.log" ||
+command grep -qE 'Could not find .*/html$' "${work}/browse.log" ||
     fail "webhttrack failed for some other reason: $(cat "${work}/browse.log")"
 
 htsserver_cleanup

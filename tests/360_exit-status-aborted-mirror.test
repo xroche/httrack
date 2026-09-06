@@ -52,7 +52,7 @@ crawl_status clean index.html
 test "$rc" -eq 0 || fail "a completed mirror exited $rc: $(<"$rc_log")"
 # The engine's own verdict, not just a file on disk: a crawl that mirrored the
 # entry page and then gave up would satisfy the weaker check and exit 0 too.
-grep -q 'mirror complete in' <<<"$log" ||
+command grep -q 'mirror complete in' <<<"$log" ||
     fail "the control crawl did not finish, so its exit 0 proves nothing: ${log}"
 ok "a mirror that completes still exits 0"
 
@@ -61,13 +61,13 @@ site="${tmpdir}/stream/127.0.0.1_${SRV_PORT}/diskfull"
 mkdir -p "$site"
 ln -s /dev/full "${site}/big.bin"
 crawl_status stream index.html
-grep -q 'Mirror aborted: keeping all previously mirrored files' <<<"$log" ||
+command grep -q 'Mirror aborted: keeping all previously mirrored files' <<<"$log" ||
     fail "the fixture did not abort the mirror, so the status proves nothing: ${log}"
 test "$rc" -eq "$ABORTED" || fail "an aborted mirror exited $rc, wanted $ABORTED"
 ok "a mirror the engine aborts exits $ABORTED"
 
 # stderr is the only place httrack.c says why, and it used to be empty here.
-grep -q 'mirror aborted' <"$rc_log" ||
+command grep -q 'mirror aborted' <"$rc_log" ||
     fail "the non-zero exit came with no reason: $(<"$rc_log")"
 ok "and says so on stderr rather than printing an empty error"
 
@@ -76,7 +76,7 @@ site="${tmpdir}/page/127.0.0.1_${SRV_PORT}/diskfull"
 mkdir -p "$site"
 ln -s /dev/full "${site}/small.html"
 crawl_status page smallindex.html
-grep -q 'Fatal write error, giving up' <<<"$log" ||
+command grep -q 'Fatal write error, giving up' <<<"$log" ||
     fail "the page arm did not reach the fatal write path: ${log}"
 test "$rc" -eq "$ABORTED" || fail "the page arm exited $rc, wanted $ABORTED"
 ok "the page path aborts with the same status"
@@ -85,7 +85,7 @@ ok "the page path aborts with the same status"
 mkdir -p "${tmpdir}/cache/hts-cache"
 ln -s /dev/full "${tmpdir}/cache/hts-cache/new.zip"
 crawl_status cache index.html
-grep -q 'Mirror aborted: disk full or filesystem problems' <<<"$log" ||
+command grep -q 'Mirror aborted: disk full or filesystem problems' <<<"$log" ||
     fail "the cache arm did not reach the fatal cache write: ${log}"
 # The cache zip is the only /dev/full node this arm creates, and it is still
 # the symlink, so no page or file write is what reported the full disk.
@@ -98,7 +98,7 @@ ok "a cache write failure aborts with the same status"
 # -#L caps the link table. The parser reached that cap and returned quietly
 # while htsAddLink's identical refusal aborted, so one limit gave two statuses.
 crawl_status linklimit index.html "-#L1"
-grep -q 'Too many URLs, giving up' <<<"$log" ||
+command grep -q 'Too many URLs, giving up' <<<"$log" ||
     fail "the link cap was not reached, so the status proves nothing: ${log}"
 test "$rc" -eq "$ABORTED" || fail "the link-cap arm exited $rc, wanted $ABORTED"
 ok "the link cap aborts with the same status, disk or no disk"

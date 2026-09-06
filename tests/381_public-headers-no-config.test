@@ -71,7 +71,7 @@ read_idents() { # read_idents FILE...
           print out line; out = "" }' |
         sed -e 's|^[[:space:]]*#[[:space:]]*define[[:space:]][A-Za-z_][A-Za-z0-9_]*||' \
             -e 's|^[[:space:]]*#[[:space:]]*undef[[:space:]][A-Za-z_][A-Za-z0-9_]*||' |
-        grep -o '[A-Za-z_][A-Za-z0-9_]*' | sort -u
+        command grep -o '[A-Za-z_][A-Za-z0-9_]*' | sort -u
 }
 config_macros "$abs_top_builddir/config.h" >"$tmp/config.names"
 config_macros "$inc/htsfeatures.h" >"$tmp/public.names"
@@ -79,8 +79,8 @@ read_idents "$inc"/*.h >"$tmp/read.names"
 # The scan reads nothing useful if it misses the switch this test exists for, or
 # the type macro that no #if mentions.
 for must in HTS_INET6 in_port_t sa_family_t; do
-    grep -qx "$must" "$tmp/read.names" || fail "the header scan found no $must, it proves nothing"
-    grep -qx "$must" "$tmp/public.names" || fail "htsfeatures.h does not carry $must"
+    command grep -qx "$must" "$tmp/read.names" || fail "the header scan found no $must, it proves nothing"
+    command grep -qx "$must" "$tmp/public.names" || fail "htsfeatures.h does not carry $must"
 done
 missing=$(comm -12 "$tmp/config.names" "$tmp/read.names" | comm -23 - "$tmp/public.names")
 [ -z "$missing" ] ||
@@ -92,7 +92,7 @@ missing=$(comm -12 "$tmp/config.names" "$tmp/read.names" | comm -23 - "$tmp/publ
 httrack -O /dev/null '-#test=pubheaders' | tr -d '\r' >"$tmp/library.out"
 for key in 'sizeof SOCaddr' 'sizeof INTsys' 'sizeof htsblk' 'offsetof htsblk.address' \
     'offsetof htsblk.etag' 'sizeof httrackp' 'HTS_INET6 = ' 'HTS_USEOPENSSL = '; do
-    grep -q "^$key" "$tmp/library.out" || fail "-#test=pubheaders no longer reports [$key]"
+    command grep -q "^$key" "$tmp/library.out" || fail "-#test=pubheaders no longer reports [$key]"
 done
 [ "$(wc -l <"$tmp/library.out")" -ge 12 ] || fail "-#test=pubheaders reports fewer fields than it used to"
 
@@ -111,9 +111,9 @@ diff -u "$tmp/library.out" "$tmp/consumer.out" ||
 # of the above was measuring anything. Which value is wrong depends on the
 # build, so flip it rather than writing 0 over a build that already has 0.
 chmod -R u+w "$inc"
-grep -qx '#define HTS_INET6 1' "$inc/htsfeatures.h" && wrong=0 || wrong=1
+command grep -qx '#define HTS_INET6 1' "$inc/htsfeatures.h" && wrong=0 || wrong=1
 sed -i.bak "s|^#define HTS_INET6 .*|#define HTS_INET6 $wrong|" "$inc/htsfeatures.h" && rm -f "$inc/htsfeatures.h.bak"
-grep -qx "#define HTS_INET6 $wrong" "$inc/htsfeatures.h" || fail "the negative control did not rewrite HTS_INET6"
+command grep -qx "#define HTS_INET6 $wrong" "$inc/htsfeatures.h" || fail "the negative control did not rewrite HTS_INET6"
 probe "$tmp/wrong.out" || fail "the wrong-HTS_INET6 consumer did not build, so the diff below never ran"
 ! diff -q "$tmp/library.out" "$tmp/wrong.out" >/dev/null ||
     fail "HTS_INET6=$wrong changed no size or offset, so this test cannot see the bug it guards"
@@ -122,11 +122,11 @@ probe "$tmp/wrong.out" || fail "the wrong-HTS_INET6 consumer did not build, so t
 # what installing config.h was buying. Which way it breaks is decided, not
 # whichever happens: HTS_DO_NOT_REDEFINE_in_addr_t means the platform declares
 # in_addr_t, so htsnet.h's own typedef of it stops the consumer compiling.
-grep -qx '#define HTS_DO_NOT_REDEFINE_in_addr_t /\*\*/' "$inc/htsfeatures.h" &&
+command grep -qx '#define HTS_DO_NOT_REDEFINE_in_addr_t /\*\*/' "$inc/htsfeatures.h" &&
     want=nocompile || want=differs
 rm -f "$inc/htsfeatures.h"
 sed -i.bak '/^#include "htsfeatures.h"$/d' "$inc/htsglobal.h" && rm -f "$inc/htsglobal.h.bak"
-! grep -q '^#include "htsfeatures.h"$' "$inc/htsglobal.h" ||
+! command grep -q '^#include "htsfeatures.h"$' "$inc/htsglobal.h" ||
     fail "the negative control did not strip the include"
 if probe "$tmp/patched.out"; then
     got=differs

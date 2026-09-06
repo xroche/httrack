@@ -46,7 +46,7 @@ expect_fail() { # expect_fail RE LABEL: the checker must reject, and say why
     if out=$("${python}" "${checker}" "${work}/html" 2>&1); then
         fail "${2}: the checker still passes: ${out}"
     fi
-    grep -q "$1" <<<"${out}" || fail "${2}: no /$1/ in: ${out}"
+    command grep -q "$1" <<<"${out}" || fail "${2}: no /$1/ in: ${out}"
 }
 
 # One defect at a time, or one arm could be covering for another.
@@ -117,7 +117,7 @@ restore
 # floor is the only arm left that can fire.
 rm -f "${work}"/html/img/*
 sed 's|<img [^>]*>||g' "${pristine}/guide.html" >"${guide}"
-if grep -q 'src="img/' "${guide}"; then
+if command grep -q 'src="img/' "${guide}"; then
     fail "the img-less guide still references img/"
 fi
 expect_fail 'want at least' "an img-less guide"

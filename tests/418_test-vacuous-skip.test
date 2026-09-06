@@ -159,7 +159,7 @@ for bug in brace case trailing oneline shift mention; do
     said=$(scan "$tmp/$bug.test") || fail "the scanner exited nonzero: $said"
     # The line too: a report naming the file alone would not point at the bail-out.
     want=$(awk '/exit 0/ { print NR; exit }' "$tmp/$bug.test")
-    grep -q "$bug\\.test:${want}:" <<<"$said" ||
+    command grep -q "$bug\\.test:${want}:" <<<"$said" ||
         fail "$bug.test bails out at line ${want} and went unreported: ${said:-(silence)}"
 done
 for clean in skips late stub indented piped helper; do
@@ -172,7 +172,7 @@ ok "the scanner separates a vacuous bail-out from an honest one"
 # carried across, the first file's assertions vouch for every file behind it and
 # the scan below reports nothing whatever it is fed.
 said=$(scan "$tmp/late.test" "$tmp/brace.test") || fail "the scanner exited nonzero: $said"
-grep -q 'brace\.test:' <<<"$said" ||
+command grep -q 'brace\.test:' <<<"$said" ||
     fail "a file scanned after an asserting one went unreported: ${said:-(silence)}"
 ok "the scanner starts each file over"
 

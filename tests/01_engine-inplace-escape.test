@@ -5,4 +5,4 @@ set -euo pipefail
 
 # inplace_escape_*() must match escape_*() on a copy: guards the shared helper.
 out=$(httrack -O /dev/null -#test=inplace-escape run)
-grep -q "inplace-escape self-test OK" <<<"$out"
+command grep -q "inplace-escape self-test OK" <<<"$out"

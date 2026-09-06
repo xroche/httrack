@@ -88,7 +88,7 @@ fixed=$((last_alen - ${#BODY}))
 # The reported bug: 12000 bytes wrap "sizeof - strlen - 1", so the guard passes.
 build_arc OK "" 12000
 convert_check "over-long cached headers"
-grep -q 'clipped to' "$dir/log" ||
+command grep -q 'clipped to' "$dir/log" ||
     fail "a clipped header block was not reported on stderr"
 
 # Three sources at once, each with its own limit: the reason phrase is cut at

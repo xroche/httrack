@@ -17,10 +17,10 @@ out=$(httrack -#test=cache-writefail "$dir")
 
 # Match the exact success line (error logs also go to stdout); a renamed/removed
 # test prints the registry to stderr, which exits non-zero but never prints this.
-grep -qx "cache-writefail: OK" <<<"$out" || fail "expected 'cache-writefail: OK', got: $out"
+command grep -qx "cache-writefail: OK" <<<"$out" || fail "expected 'cache-writefail: OK', got: $out"
 
 # A skipped entry must be warned about with its URL.
-grep -q "entry not cached: example.com/" <<<"$out" || fail "expected a URL-bearing skip warning"
+command grep -q "entry not cached: example.com/" <<<"$out" || fail "expected a URL-bearing skip warning"
 
 # A backend that cannot truncate rolls back by rewinding, and says so (#1402).
-grep -q "cache rollback incomplete" <<<"$out" || fail "expected a warning about the incomplete rollback"
+command grep -q "cache rollback incomplete" <<<"$out" || fail "expected a warning about the incomplete rollback"

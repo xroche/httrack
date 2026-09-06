@@ -28,7 +28,7 @@ assert_clean_run() {
         echo "$report" >&2
         fail "$1: the crawl produced a sanitizer report (#1051)"
     }
-    ! grep -Eq 'AddressSanitizer:|MemorySanitizer:|runtime error:' "$errlog" ||
+    ! command grep -Eq 'AddressSanitizer:|MemorySanitizer:|runtime error:' "$errlog" ||
         fail "$1: the crawl produced a sanitizer report (#1051)"
 }
 

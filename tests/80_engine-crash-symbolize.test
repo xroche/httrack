@@ -23,9 +23,9 @@ rc=0
 run_with_timeout 60 httrack -#test=strsafe overflow "$overflow" >"$out" 2>&1 || rc=$?
 test "$rc" -ne 124 || fail "the crash handler did not finish within the deadline"
 
-grep -q '^Caught signal ' "$out" ||
+command grep -q '^Caught signal ' "$out" ||
     fail_dump "no 'Caught signal' line:" "$out"
-if grep -q 'No stack trace available on this OS' "$out"; then
+if command grep -q 'No stack trace available on this OS' "$out"; then
     echo "no backtrace() on this platform; skipping" >&2
     exit 77
 fi
@@ -33,14 +33,14 @@ fi
 # anywhere else an empty trace is the regression this test exists to catch.
 case "$(uname -m)" in
 arm | armv*)
-    if grep -q 'No stack trace available' "$out"; then
+    if command grep -q 'No stack trace available' "$out"; then
         echo "no unwind tables in this ARM build; skipping" >&2
         exit 77
     fi
     ;;
 esac
 # Unconditional and first: symbolizing must never cost the raw trace.
-grep -q "$rawframe" "$out" ||
+command grep -q "$rawframe" "$out" ||
     fail_dump "raw module+offset frames are gone:" "$out"
 
 build_names_frames || skip "built without <spawn.h>, so frames stay module+offset"
@@ -63,7 +63,7 @@ while read -r mod off; do
     resolved=$((resolved + 1))
     addr2line -Cfip -e "$mod" "$off" 2>/dev/null >>"$oracle" || true
 done <"$frames"
-if ! grep -qE 'st_strsafe|strcpy_safe_' "$oracle"; then
+if ! command grep -qE 'st_strsafe|strcpy_safe_' "$oracle"; then
     # Which stage came up empty, because the skip alone names no suspect and
     # this is the form the emulated s390x leg has been reporting.
     echo "parsed $(wc -l <"$frames") frames, resolved ${resolved} of them to a file" >&2
@@ -71,7 +71,7 @@ if ! grep -qE 'st_strsafe|strcpy_safe_' "$oracle"; then
     dump_file "$oracle"
     # Under qemu-user the trace stops at the vdso trampoline, so the engine
     # frames are missing rather than unnamed: say which of the two it is.
-    if grep -q 'sigreturn' "$out"; then
+    if command grep -q 'sigreturn' "$out"; then
         skip "the unwinder stopped at the signal frame, so no engine frame reached the trace"
     fi
     skip "addr2line names no hidden symbol in this build"
@@ -80,8 +80,8 @@ fi
 # The payload. Dropping the raw frames first is what makes it specific: both
 # names are static, so .dynsym could never have carried them. Not anchored on
 # the "0xOFF:" line, the inline chain puts the name on either half.
-symbolized=$(grep -v "$rawframe" "$out" || true)
-grep -qE 'st_strsafe|strcpy_safe_' <<<"$symbolized" ||
+symbolized=$(command grep -v "$rawframe" "$out" || true)
+command grep -qE 'st_strsafe|strcpy_safe_' <<<"$symbolized" ||
     fail_dump "the handler did not name the hidden frames:" "$out"
 
 # Opt-out: raw trace kept, nothing spawned.
@@ -90,7 +90,7 @@ rc=0
 run_with_timeout 60 httrack -#test=strsafe overflow "$overflow" >"$raw" 2>&1 || rc=$?
 unset HTTRACK_NO_SYMBOLIZE
 test "$rc" -ne 124 || fail "the opt-out run did not finish within the deadline"
-grep -q "$rawframe" "$raw" ||
+command grep -q "$rawframe" "$raw" ||
     fail_dump "the opt-out lost the raw trace:" "$raw"
-! grep -q '^0x[0-9a-f]*: ' "$raw" ||
+! command grep -q '^0x[0-9a-f]*: ' "$raw" ||
     fail_dump "the opt-out still symbolized:" "$raw"

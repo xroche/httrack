@@ -18,7 +18,7 @@ cleanup_push htsserver_cleanup_dir "${base}"
 reply=
 fetch() {
     reply=$(htsserver_get "$1") || fail "the request for $1 failed"
-    grep -q "^HTTP/1\.0 $2 " <<<"${reply}" ||
+    command grep -q "^HTTP/1\.0 $2 " <<<"${reply}" ||
         fail "$1: wanted a $2 reply, got '$(head -1 <<<"${reply}")'"
 }
 
@@ -40,13 +40,13 @@ echo "LOGMARKER" >"${base}/proj/hts-log.txt"
 # any successful save: commandEnd then swaps the error page for the finished one.
 htsserver_get /server/style.css >/dev/null # leaves a path behind in fsfile
 saved=$(htsserver_post "sid=${sid}&command=httrack&command_do=save&winprofile=x&path=${base}/$(printf '%0300d' 0)&projname=p")
-grep -q '^Location: /server/error.html' <<<"${saved}" ||
+command grep -q '^Location: /server/error.html' <<<"${saved}" ||
     fail "the refused save did not redirect to the error page"
 
 # No project yet, so no root to serve from.
 htsserver_post "sid=${sid}&projpath=${base}/" >/dev/null
 fetch /website/secret.txt 404
-grep -q SECRETMARKER <<<"${reply}" &&
+command grep -q SECRETMARKER <<<"${reply}" &&
     fail "a posted projpath served a file outside any project"
 
 # Positive control: step4's "save settings" flow registers the project without
@@ -58,28 +58,28 @@ htsserver_post "${body}" >/dev/null
 test -f "${base}/proj/hts-cache/winprofile.ini" ||
     fail "the project was not registered: $(<"${HTS_LOG}")"
 fetch /website/hts-log.txt 200
-grep -q LOGMARKER <<<"${reply}" ||
+command grep -q LOGMARKER <<<"${reply}" ||
     fail "the registered project's mirror is not served"
 
 # Same request with the root repointed: the project is legitimate, projpath is
 # not what decides where the bytes come from.
 htsserver_post "sid=${sid}&projpath=${base}/" >/dev/null
 fetch /website/secret.txt 404
-grep -q SECRETMARKER <<<"${reply}" &&
+command grep -q SECRETMARKER <<<"${reply}" &&
     fail "a posted projpath repointed the served root"
 htsserver_post "sid=${sid}&projpath=/etc/" >/dev/null
 fetch /website/passwd 404
-grep -q '^root:' <<<"${reply}" &&
+command grep -q '^root:' <<<"${reply}" &&
     fail "a posted projpath read an arbitrary system file"
 
 # A ".." anywhere in the recorded root would escape the mirror on every later
 # request, so the save must be refused and the previous root kept.
 htsserver_post "sid=${sid}&command=httrack&command_do=save&winprofile=x&path=${base}/proj&projname=.." >/dev/null
 fetch /website/secret.txt 404
-grep -q SECRETMARKER <<<"${reply}" &&
+command grep -q SECRETMARKER <<<"${reply}" &&
     fail "a '..' in the saved project path escaped the mirror root"
 fetch /website/hts-log.txt 200
-grep -q LOGMARKER <<<"${reply}" ||
+command grep -q LOGMARKER <<<"${reply}" ||
     fail "rejecting the '..' root also lost the previous one"
 
 # The root is now the server's own, but it is still built from two posted

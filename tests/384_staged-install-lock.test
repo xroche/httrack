@@ -73,7 +73,7 @@ AWK
 
 lint_files() { awk -f "${lint}" "$@"; }
 totals_of() { sed -n 's/^TOTALS //p' <<<"$1"; }
-offenders_of() { grep -v '^TOTALS ' <<<"$1" || true; }
+offenders_of() { command grep -v '^TOTALS ' <<<"$1" || true; }
 
 cd "${srcdir}/tests"
 files=(*.sh *.py)
@@ -225,7 +225,7 @@ for ((round = 1; round <= rounds; round++)); do
     install_lock_read_pid "${INSTALL_LOCK}"
     test "${INSTALL_LOCK_PID}" = "${corpse}" ||
         fail "round ${round}: the stale lock was removed, pid is now [${INSTALL_LOCK_PID}]"
-    grep -q "${INSTALL_LOCK}" "${work}/stale.log" ||
+    command grep -q "${INSTALL_LOCK}" "${work}/stale.log" ||
         fail "round ${round}: the refusal does not name the file to remove"
     rm -f "${INSTALL_LOCK}"
 done

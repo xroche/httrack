@@ -12,7 +12,7 @@ cleanup_push rm -rf "${tmpdir}"
 
 out=$(httrack -O "${tmpdir}/st" "-#test=ftp-cmdlen" run 2>&1) ||
     fail "self-test exited non-zero: ${out}"
-grep -q "ftp-cmdlen self-test OK" <<<"${out}" || fail "unexpected output: ${out}"
+command grep -q "ftp-cmdlen self-test OK" <<<"${out}" || fail "unexpected output: ${out}"
 
 # The reachable half: the copy into _adr[256] aborted on a long host.
 probe_host() {
@@ -24,14 +24,14 @@ probe_host() {
 
 for n in 256 257 300; do
     log=$(probe_host "$(repeat_chars "${n}")")
-    grep -q "Host name too long" <<<"${log}" ||
+    command grep -q "Host name too long" <<<"${log}" ||
         fail "a ${n}-byte host was not rejected: ${log}"
 done
 
 # 255 still fits _adr[256]; 127.0.0.1:1 is the outsider a widened gate swallows.
 log=$(probe_host "$(repeat_chars 255)")
-grep -q "Unable to get server's address" <<<"${log}" ||
+command grep -q "Unable to get server's address" <<<"${log}" ||
     fail "a 255-byte host did not reach the resolver: ${log}"
 log=$(probe_host "127.0.0.1:1")
-grep -q "Unable to connect to the server" <<<"${log}" ||
+command grep -q "Unable to connect to the server" <<<"${log}" ||
     fail "a normal host did not reach the connect: ${log}"

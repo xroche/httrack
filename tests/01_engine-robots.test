@@ -5,4 +5,4 @@ set -euo pipefail
 
 # robots.txt RFC 9309 Allow/Disallow precedence (#452): longest match wins.
 out=$(httrack -O /dev/null -#test=robots run)
-grep -q "robots self-test OK" <<<"$out"
+command grep -q "robots self-test OK" <<<"$out"

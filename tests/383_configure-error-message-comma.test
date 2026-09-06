@@ -36,9 +36,9 @@ run_bad() {
     (cd "$tmp/bld-$name" && bash "$tmp/src/configure" "$@") >"$log" 2>&1 || status=$?
     test "$status" -eq 1 || fail_dump "configure --$name exited $status, want 1" "$log"
     out=$(<"$log")
-    grep -qF "configure: error: $expect" <<<"$out" ||
+    command grep -qF "configure: error: $expect" <<<"$out" ||
         fail_dump "configure --$name did not print the full message '$expect'" "$log"
-    grep -qE '^[^:]*configure: line [0-9]+:' <<<"$out" &&
+    command grep -qE '^[^:]*configure: line [0-9]+:' <<<"$out" &&
         fail_dump "configure --$name leaked a bash error alongside the message" "$log"
     return 0
 }

@@ -90,7 +90,7 @@ holds 'local_server_start --env LOCAL_SERVER_VERBOSE=1
 import sys, urllib.request
 urllib.request.urlopen("http://127.0.0.1:%s/simple/basic.html" % sys.argv[1]).read()
 PY
-grep -q "GET /simple/basic.html" "$SRV_LOG"'
+command grep -q "GET /simple/basic.html" "$SRV_LOG"'
 ok "--env is exported to the server"
 
 ## Two servers coexist on their own ports, and both are reaped
@@ -101,9 +101,9 @@ local_server_start --log "${tmpdir}/b.log"
 test "$a" != "$SRV_PORT" || fail "both servers took port $a"
 # Two servers, two logs: one shared default would leave the second port
 # discoverable in the first log and hide a --log that never took effect.
-grep -q "PORT ${a}$" "${tmpdir}/a.log" || fail "a.log holds no announcement"
-grep -q "PORT ${SRV_PORT}$" "${tmpdir}/b.log" || fail "b.log holds no announcement"
-! grep -q "PORT ${SRV_PORT}$" "${tmpdir}/a.log" || fail "both servers logged to a.log"
+command grep -q "PORT ${a}$" "${tmpdir}/a.log" || fail "a.log holds no announcement"
+command grep -q "PORT ${SRV_PORT}$" "${tmpdir}/b.log" || fail "b.log holds no announcement"
+! command grep -q "PORT ${SRV_PORT}$" "${tmpdir}/a.log" || fail "both servers logged to a.log"
 printf "%s %s\n" "$apid" "$SRV_PID" >"${tmpdir}/pids"'
 read -r apid bpid <"${tmpdir}/s${subject}/pids"
 # The subject has exited, so its cleanups have run.
@@ -143,7 +143,7 @@ export SHIM_ARGV="$argv"
 PATH="$(posixpath "$shim"):$PATH"
 # By content, not by path spelling. crawled() below catches an unreachable shim
 # too, but names neither the real binary it reached nor the split PATH entry.
-grep -q SHIM_ARGV "$(command -v httrack)" 2>/dev/null ||
+command grep -q SHIM_ARGV "$(command -v httrack)" 2>/dev/null ||
     fail "the shim is not on PATH: $(command -v httrack)"
 url="http://127.0.0.1:1/x"
 
@@ -154,11 +154,11 @@ crawled() { # crawled ARGS...
     : >"$argv"
     # Not the last command, so its status is captured rather than the grep's.
     local_crawl "$@" || rc=$?
-    grep -qxF -- "$url" "$argv" || fail "httrack never ran, or lost its URL"
+    command grep -qxF -- "$url" "$argv" || fail "httrack never ran, or lost its URL"
     return "$rc"
 }
-has() { grep -qxF -- "$1" "$argv" || fail "${2:-missing argument $1}"; }
-hasnt() { ! grep -qxF -- "$1" "$argv" || fail "${2:-unwanted argument $1}"; }
+has() { command grep -qxF -- "$1" "$argv" || fail "${2:-missing argument $1}"; }
+hasnt() { ! command grep -qxF -- "$1" "$argv" || fail "${2:-unwanted argument $1}"; }
 
 crawled -O /dev/null "$url"
 has '--max-time=120' "local_crawl dropped its default --max-time"

@@ -26,25 +26,25 @@ done < <(find "${htmldir}" -type f \
 test "${#pages[@]}" -ge 60 || fail "only ${#pages[@]} markup files under html/"
 listing=$(printf '%s\n' "${pages[@]}")
 for want in faq.html cache.html server/index.html server/finished.html server/step2.html; do
-    grep -qxF "${htmldir}/${want}" <<<"${listing}" ||
+    command grep -qxF "${htmldir}/${want}" <<<"${listing}" ||
         fail "candidate list misses html/${want}: the scan cannot see the pages it is for"
 done
 
 # Leading space so data-target and friends do not match. Unquoted values are not
 # covered; nothing in the tree writes one.
-attr() { grep -ohE "[[:space:]][Tt][Aa][Rr][Gg][Ee][Tt][[:space:]]*=[[:space:]]*$1" "${pages[@]}" || true; }
+attr() { command grep -ohE "[[:space:]][Tt][Aa][Rr][Gg][Ee][Tt][[:space:]]*=[[:space:]]*$1" "${pages[@]}" || true; }
 values=$(
     attr '"[^"]*"'
     attr "'[^']*'"
 )
-values=$(tr -d "\"' \\t" <<<"${values}" | sed 's/^[Tt][Aa][Rr][Gg][Ee][Tt]=//' | grep . || true)
+values=$(tr -d "\"' \\t" <<<"${values}" | sed 's/^[Tt][Aa][Rr][Gg][Ee][Tt]=//' | command grep . || true)
 
 seen=$(count_matching_lines . <<<"${values}")
 test "${seen}" -ge 50 || fail "only ${seen} target attributes found under html/"
 
 # Anything but the four keywords is a named context: _new and new_ both were.
 # Nothing here wants a named one, so the keywords are the whole allowlist.
-bad=$(grep -vxE '_blank|_self|_parent|_top' <<<"${values}" | LC_ALL=C sort -u || true)
+bad=$(command grep -vxE '_blank|_self|_parent|_top' <<<"${values}" | LC_ALL=C sort -u || true)
 test -z "${bad}" || fail "not a target keyword: $(tr '\n' ' ' <<<"${bad}")"
 
 # ---- print palette ----
@@ -75,11 +75,11 @@ inroot {
 }' "${css}")
 
 value_of() { awk -v s="$1" -v n="$2" '$1 == s && $2 == n { $1 = ""; $2 = ""; sub(/^ +/, ""); print }' <<<"${tokens}"; }
-count_in() { awk -v s="$1" '$1 == s' <<<"${tokens}" | grep -c . || true; }
+count_in() { awk -v s="$1" '$1 == s' <<<"${tokens}" | command grep -c . || true; }
 
 # Independent count, so a token the awk above never saw cannot pass unrestored.
 declared=$(sed -n '/^@media (prefers-color-scheme: dark) {$/,/^}$/p' "${css}" |
-    grep -oE -- '--[A-Za-z0-9_-]+[[:space:]]*:' | grep -c . || true)
+    command grep -oE -- '--[A-Za-z0-9_-]+[[:space:]]*:' | grep -c . || true)
 test "${declared}" -ge 5 || fail "found no dark palette in ${css} to compare against"
 test "$(count_in dark)" -eq "${declared}" ||
     fail "awk read $(count_in dark) of ${declared} dark tokens in ${css}: the parse is broken"

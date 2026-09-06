@@ -30,9 +30,9 @@ art="${TMPDIR}/artifact.log"
 printf '[running httrack ...] ..\t' >"$art"
 dump_crawl_logs >>"$art"
 
-grep -qF "$verdict" "$art" || fail "hts-log.txt verdict not salvaged"
-grep -qF "httrack stdout marker" "$art" || fail "httrack stdout not salvaged"
-grep -q '^--- .*hts-log.txt' "$art" || fail "dump glued its header onto the unterminated line"
+command grep -qF "$verdict" "$art" || fail "hts-log.txt verdict not salvaged"
+command grep -qF "httrack stdout marker" "$art" || fail "httrack stdout not salvaged"
+command grep -q '^--- .*hts-log.txt' "$art" || fail "dump glued its header onto the unterminated line"
 
 # Cleared, so the next timing-out test cannot re-report this crawl as its own.
 test ! -d "$d" || fail "salvaged tmpdir left behind"

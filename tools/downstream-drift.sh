@@ -79,7 +79,7 @@ fetch() {
 expect() {
     local id=$1 recipe=$2 pattern=$3 msg=$4
     shift 4
-    if ! grep -qF -- "$pattern" "$recipe"; then
+    if ! command grep -qF -- "$pattern" "$recipe"; then
         flag "$id" "the recipe no longer contains '$pattern'; prune this check"
         return
     fi
@@ -101,7 +101,7 @@ carried_patch() {
     fetch "$url" "$work/patch"
     for p in 0 1 2; do
         out=$(patch -d "$top" "-p$p" --dry-run --force <"$work/patch" 2>&1) || continue
-        if grep -q 'with fuzz' <<<"$out"; then
+        if command grep -q 'with fuzz' <<<"$out"; then
             flag "$id" "applies only with fuzz, so its context has moved: $(tr '\n' ' ' <<<"$out")"
             return
         fi
@@ -122,7 +122,7 @@ carried_patch() {
 glob_contains() {
     local pattern=$1
     shift
-    grep -qF -- "$pattern" "$@"
+    command grep -qF -- "$pattern" "$@"
 }
 coucal_names_gcc() {
     grep -v '^[[:space:]]*#' "$top/src/coucal/Makefile" | grep -qw gcc
@@ -150,7 +150,7 @@ fetch "$gentoo_raw/$ebuild" "$work/gentoo.ebuild"
 
 expect gentoo-zlib-tripwire "$work/gentoo.ebuild" '{ZLIB_HOME}/lib' \
     "src_prepare greps m4/check_zlib.m4 for it and dies without it, so every non-lib libdir (amd64) fails to build" \
-    grep -qF '{ZLIB_HOME}/lib' "$top/m4/check_zlib.m4"
+    command grep -qF '{ZLIB_HOME}/lib' "$top/m4/check_zlib.m4"
 expect gentoo-docs "$work/gentoo.ebuild" 'DOCS=( AUTHORS README greetings.txt history.txt )' \
     "one of the four DOCS files is gone; einstalldocs dies" \
     test -f "$top/AUTHORS" -a -f "$top/README" -a -f "$top/greetings.txt" -a -f "$top/history.txt"
@@ -176,7 +176,7 @@ fetch "$obsd_raw/Makefile" "$work/openbsd.mk"
 
 expect openbsd-online-tests "$work/openbsd.mk" '--enable-online-unit-tests=no' \
     "configure no longer offers --enable-online-unit-tests" \
-    grep -qF online-unit-tests "$top/configure.ac"
+    command grep -qF online-unit-tests "$top/configure.ac"
 expect openbsd-bash-files "$work/openbsd.mk" '${WRKSRC}/src/webhttrack' \
     "src/webhttrack is generated from webhttrack.in since #899, and the pre-configure perl dies on a missing file" \
     test -f "$top/src/webhttrack"
@@ -191,10 +191,10 @@ fetch "$termux_raw/build.sh" "$work/termux.sh"
 
 expect termux-werror-sed "$work/termux.sh" 's/-Werror/-Wno-error/g' \
     "configure.ac no longer passes -Werror, so the sed is dead" \
-    grep -qF -- -Werror "$top/configure.ac"
+    command grep -qF -- -Werror "$top/configure.ac"
 expect termux-with-zlib "$work/termux.sh" --with-zlib \
     "configure no longer offers --with-zlib" \
-    grep -qF -- --with-zlib "$top/m4/check_zlib.m4"
+    command grep -qF -- --with-zlib "$top/m4/check_zlib.m4"
 for p in html-Makefile.in.patch htsglobal.h.patch src-Makefile.in.patch \
     src-htsbacktrace.c.patch src-proxy-proxytrack.h.patch store.c.patch; do
     carried_patch "termux-$p" "$termux_raw/$p"

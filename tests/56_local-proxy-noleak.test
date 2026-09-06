@@ -61,18 +61,18 @@ HTTRACK_DEBUG_RESOLVE="decoyhost:127.0.0.2,127.0.0.1" \
 log="$out/hts-log.txt"
 
 # the origin must have seen no connection (no leak/bypass)
-if grep -qE '"(GET|POST|HEAD|CONNECT) ' "$SRV_LOG"; then
+if command grep -qE '"(GET|POST|HEAD|CONNECT) ' "$SRV_LOG"; then
     echo "FAIL: origin was contacted directly, bypassing the proxy"
     cat "$SRV_LOG"
     exit 1
 fi
 
 # the crawl must fail at the proxy (proves it really tried the proxy, not a no-op)
-grep -q 'Connect Error' "$log" ||
+command grep -q 'Connect Error' "$log" ||
     fail_dump "expected a proxy connect error" "$log"
 
 # and it must not have tried an origin-address fallback under the proxy
-if grep -q "trying next address" "$log"; then
+if command grep -q "trying next address" "$log"; then
     echo "FAIL: fell back to an origin address under a proxy"
     cat "$log"
     exit 1

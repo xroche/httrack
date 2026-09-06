@@ -5,4 +5,4 @@
 set -euo pipefail
 
 out=$(httrack -O /dev/null -#test=addlink)
-grep -q "addlink self-test OK" <<<"$out"
+command grep -q "addlink self-test OK" <<<"$out"

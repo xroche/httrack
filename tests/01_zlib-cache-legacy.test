@@ -12,7 +12,7 @@ cleanup_push rm -rf "$dir"
 
 # the refusal errors land on stdout (no log file); pin them and the verdict
 out=$(httrack -#test=cache-legacy "$dir" 2>/dev/null)
-cnt=$(printf '%s\n' "$out" | grep -c 'no longer supported' || true)
+cnt=$(printf '%s\n' "$out" | command grep -c 'no longer supported' || true)
 test "$cnt" = 2 || fail "expected 2 refusal messages, got $cnt"
 out=$(printf '%s\n' "$out" | tail -n1)
 

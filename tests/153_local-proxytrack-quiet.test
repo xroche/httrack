@@ -84,7 +84,7 @@ request_log() { # log
 # them before issuing a request rather than sorting it out afterwards.
 wait_banner() { # log
     local waited=0
-    until grep -q '^PID=' "$1" && grep -q '^processed: ' "$1"; do
+    until command grep -q '^PID=' "$1" && command grep -q '^processed: ' "$1"; do
         test "$waited" -lt 100 || fail "proxytrack never finished its startup banner: $(<"$1")"
         sleep 0.1
         waited=$((waited + 1))
@@ -135,7 +135,7 @@ test "$listed" -eq 4 ||
 # The enumeration is what builds the table, so the served 207s are what make
 # the check below mean anything.
 waited=0
-until test "$(request_log "$quietlog" | grep -ci ' \* log: HTTP [^ ]* 207 [0-9]* propfind ' || true)" -ge 2; do
+until test "$(request_log "$quietlog" | command grep -ci ' \* log: HTTP [^ ]* 207 [0-9]* propfind ' || true)" -ge 2; do
     test "$waited" -lt 50 ||
         fail_dump "fewer than two PROPFINDs were answered 207, so the check below proves nothing" "$quietlog"
     sleep 0.1
@@ -153,7 +153,7 @@ wait_drained "$quietlog"
 # The property is that serving adds nothing but the access log, so whitelist
 # what a line may be; naming strings that must be absent would pass any
 # reworded or differently shaped leak.
-extra=$(request_log "$quietlog" | grep -vE '^( \* log: (HTTP|ICP) .*)?$' || true)
+extra=$(request_log "$quietlog" | command grep -vE '^( \* log: (HTTP|ICP) .*)?$' || true)
 test -z "$extra" ||
     fail "serving a PROPFIND wrote this to proxytrack's console:: $extra"
 
@@ -169,10 +169,10 @@ loudlog=$ptlog loudport=$proxyport loudpid=$ptpid ptpid=
 
 resp=$(propfind "$loudport" "") ||
     fail_dump "PROPFIND under HTS_LOG did not answer" "$loudlog"
-grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" ||
+command grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" ||
     fail "expected 207 Multi-Status under HTS_LOG: $resp"
 waited=0
-until grep -qE 'hashtable .*summary:' "$loudlog"; do
+until command grep -qE 'hashtable .*summary:' "$loudlog"; do
     test "$waited" -lt 50 ||
         fail_dump "HTS_LOG=1 did not restore the hashtable summary" "$loudlog"
     sleep 0.1
@@ -180,7 +180,7 @@ until grep -qE 'hashtable .*summary:' "$loudlog"; do
 done
 # Pin the routed shape whole: a severity, then the message, and nothing in
 # between where the table address used to be.
-grep -qE '^ \* debug: hashtable "[^"]*" summary:' "$loudlog" ||
+command grep -qE '^ \* debug: hashtable "[^"]*" summary:' "$loudlog" ||
     fail_dump "the summary under HTS_LOG did not come through proxytrack's log" "$loudlog"
 
 echo "OK: PROPFIND leaves no hashtable statistics on the console, HTS_LOG restores them"

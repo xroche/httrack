@@ -49,21 +49,21 @@ propfind() {
 amps=$("$python" -c "print('&' * 900)" | tr -d '\r')
 resp=$(propfind "$amps") ||
     fail_dump "proxytrack died on an escapexml-amplified PROPFIND" "$ptlog"
-grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" || {
+command grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" || {
     echo "FAIL: expected 207 Multi-Status for the amplified path"
     head -c 512 <<<"$resp"
     exit 1
 }
 # Count what came back: a clipped path answers 207 too. The run appears in
 # the href and again in the displayname.
-got=$({ grep -o '&amp;' <<<"$resp" || true; } | wc -l)
+got=$({ command grep -o '&amp;' <<<"$resp" || true; } | wc -l)
 test "$got" -eq 1800 || fail "900 ampersands went in, $got came back escaped, wanted 1800"
 
 # Unescaped, so the bound is shown to be on the written length, not on '&'.
 plain=$("$python" -c "print('a' * 900)" | tr -d '\r')
 resp=$(propfind "$plain") ||
     fail_dump "proxytrack died on a 900-byte plain PROPFIND path" "$ptlog"
-grep -q "<href>/webdav/x/$plain</href>" <<<"$resp" || fail "a 900-byte path did not come back whole"
+command grep -q "<href>/webdav/x/$plain</href>" <<<"$resp" || fail "a 900-byte path did not come back whole"
 
 # Depth: 1 is the only route into the enumeration branch, which builds each
 # item URL from the prefix and the child name. A child directory is enumerated
@@ -72,13 +72,13 @@ grep -q "<href>/webdav/x/$plain</href>" <<<"$resp" || fail "a 900-byte path did 
 resp=$("$curl" -s -i --max-time 30 -X PROPFIND -H "Depth: 1" \
     "http://127.0.0.1:$proxyport/webdav/example.com/") ||
     fail_dump "proxytrack died on a Depth: 1 listing" "$ptlog"
-grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" ||
+command grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" ||
     fail "expected 207 Multi-Status for the Depth: 1 listing: $resp"
 for want in '<href>/webdav/example\.com</href>' \
     '<href>/webdav/example\.com/page\.html</href>' \
     '<href>/webdav/example\.com/sub</href>' \
     '<displayname>sub</displayname>'; do
-    grep -q "$want" <<<"$resp" ||
+    command grep -q "$want" <<<"$resp" ||
         fail "the Depth: 1 listing is missing $want: $resp"
 done
 responses=$(count_matching_lines '<response ' <<<"$resp")
@@ -88,7 +88,7 @@ test "$responses" -eq 3 ||
 # The overflow killed the listener, so a later request is the liveness proof.
 resp=$(propfind "") ||
     fail_dump "proxytrack died before the follow-up listing" "$ptlog"
-grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" ||
+command grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" ||
     fail "expected 207 Multi-Status on the follow-up listing: $resp"
 
 echo "OK: an escapexml-amplified PROPFIND path is served whole and does not overflow"

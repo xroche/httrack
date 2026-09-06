@@ -43,7 +43,7 @@ refused() { # refused ARG...
     # 134 is an abort, which would read as a refusal without being one
     { test "${RC}" -ne 0 && test "${RC}" -ne 134; } ||
         fail_dump "$* not refused (exit ${RC})" "${tmp}/log"
-    grep -q 'does not take the value' "${tmp}/log" ||
+    command grep -q 'does not take the value' "${tmp}/log" ||
         fail_dump "$* refused without saying why" "${tmp}/log"
     # the mirror must not be there at all, in either layout
     ! has_name page.html || fail_dump "$* still mirrored" "${tmp}/log"
@@ -56,7 +56,7 @@ accepted() { # accepted ARG...
     # either layout: bare -L is 8.3, so --long-names=on lands there too
     has_name page.html || has_name PAGE.HTM ||
         fail_dump "$* mirrored nothing" "${tmp}/log"
-    ! grep -q 'does not take the value' "${tmp}/log" ||
+    ! command grep -q 'does not take the value' "${tmp}/log" ||
         fail_dump "$* drew a refusal" "${tmp}/log"
 }
 
@@ -83,7 +83,7 @@ refused --max-files=,,,5
 # The message names the option that was typed. --cache=OFF used to report
 # "Option O needs [...] a path", -O being reached out of the middle of OFF.
 crawl --cache=OFF
-grep -q 'Option --cache does not take the value OFF' "${tmp}/log" ||
+command grep -q 'Option --cache does not take the value OFF' "${tmp}/log" ||
     fail_dump "--cache=OFF blamed another option" "${tmp}/log"
 
 # Negative control: the values these rows do take still run, and say nothing.
@@ -118,7 +118,7 @@ refused --structure=1L0
 # What still separates the classes: the template, which "param" would mangle.
 accepted --structure=1
 crawl --structure=%h%p/%n%q.%t
-! grep -q 'does not take the value' "${tmp}/log" ||
+! command grep -q 'does not take the value' "${tmp}/log" ||
     fail_dump "--structure template refused" "${tmp}/log"
 
 exit 0

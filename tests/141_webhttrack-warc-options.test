@@ -14,7 +14,7 @@ htsserver_require
 
 printf '[project reload maps the keys back] ..\t'
 for key in Warc:warc WarcFile:warcfile WarcMaxSize:warcmaxsize WarcCdx:warccdx Wacz:wacz; do
-    grep -q "do:copy:${key}" "${distdir}/html/server/step2.html" ||
+    command grep -q "do:copy:${key}" "${distdir}/html/server/step2.html" ||
         fail "step2.html does not restore ${key%%:*}"
 done
 echo OK

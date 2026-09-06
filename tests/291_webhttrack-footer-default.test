@@ -19,14 +19,14 @@ printf '[a fresh profile prefills the named-field footer] ..\t'
 mkdir -p "${work}/websites"
 htsserver_start --home "${work}"
 reply=$(htsserver_get /server/option6.html)
-grep -q '^HTTP/1.[01] 200' <<<"${reply}" || fail "option6.html: ${reply}"
+command grep -q '^HTTP/1.[01] 200' <<<"${reply}" || fail "option6.html: ${reply}"
 
 value=$(firstline "$(sed -n 's/.*name="footer" value="\([^"]*\)".*/\1/p' <<<"${reply}")")
 test -n "${value}" || fail "option6.html serves no footer field: ${reply}"
 case ${value} in
 *'%s'*) fail "the prefilled footer is still positional: ${value}" ;;
 esac
-grep -q '{url}.*{date}' <<<"${value}" || fail "prefilled footer: ${value}"
+command grep -q '{url}.*{date}' <<<"${value}" || fail "prefilled footer: ${value}"
 
 htsserver_stop
 # A leaked server wedges the parallel harness behind a green log.

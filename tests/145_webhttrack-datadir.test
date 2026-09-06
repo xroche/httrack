@@ -13,7 +13,7 @@ datadir="${CONFIGURED_DATADIR:?not run under make check}"
 
 test -r "${script}" || fail "no ${script}"
 
-line=$(grep '^SRCHDISTPATH=' "${script}") || fail "no SRCHDISTPATH in ${script}"
+line=$(command grep '^SRCHDISTPATH=' "${script}") || fail "no SRCHDISTPATH in ${script}"
 case "${line}" in
 *'@datadir@'*) fail "@datadir@ was never substituted: ${line}" ;;
 esac

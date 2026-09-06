@@ -36,24 +36,24 @@ crawl() { # crawl MIRRORDIR [httrack args...], sets $log
 # "ignore this link": the answer forbids it and inserts the single-link filter
 answers 0
 crawl "$tmp/m0" -W
-grep -q "$tag '0' (n=0) for $link: forbidden, filters: -$link\$" "$log" ||
+command grep -q "$tag '0' (n=0) for $link: forbidden, filters: -$link\$" "$log" ||
     fail "the answer line is wrong in $log"
 # the prefix fspc() tallies by: a notice is a message, never a warning
-grep -q "Info:.*$tag '0'" "$log" ||
+command grep -q "Info:.*$tag '0'" "$log" ||
     fail "the answer is not tallied as a message in $log"
 
 # "ignore the whole host": same reply path, a different filter. The log echoes
 # what was inserted, so a hardcoded pattern would still read -.../x.html here.
 answers 2
 crawl "$tmp/m2" -W
-grep -q "$tag '2' (n=2) for $link: forbidden, filters: -other.invalid/[*]\$" "$log" ||
+command grep -q "$tag '2' (n=2) for $link: forbidden, filters: -other.invalid/[*]\$" "$log" ||
     fail "the answer line does not echo the inserted filter in $log"
 
 # a host-scope answer, which accepts and inserts two filters: the starred form
 # misses the apex, so both slots must reach the log, in insertion order
 answers 1000
 crawl "$tmp/m1000" -W
-grep -q "$tag '1000' (n=1000) for $link: allowed, filters: [+][*].other.invalid/[*] [+]other.invalid/[*]\$" "$log" ||
+command grep -q "$tag '1000' (n=1000) for $link: allowed, filters: [+][*].other.invalid/[*] [+]other.invalid/[*]\$" "$log" ||
     fail "a two-filter answer is not logged whole in $log"
 
 # nobody was asked: the automatic resolution stays at the debug level. This run
@@ -61,5 +61,5 @@ grep -q "$tag '1000' (n=1000) for $link: allowed, filters: [+][*].other.invalid/
 # the CLI always registers query3, so no test here reaches that guard.
 answers 0
 crawl "$tmp/mauto"
-! grep -q "$tag" "$log" ||
+! command grep -q "$tag" "$log" ||
     fail "a non-interactive run logged an answer in $log"

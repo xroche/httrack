@@ -33,7 +33,7 @@ if [ ! -r "${RENAMEFAIL_LA:-}" ]; then
     echo "renameover: ${RENAMEFAIL_LA:-\$RENAMEFAIL_LA} was not built" >&2
     exit 1
 fi
-if grep -q "^dlname=''" "$RENAMEFAIL_LA"; then
+if command grep -q "^dlname=''" "$RENAMEFAIL_LA"; then
     echo "renameover: static-only build, skipping the interposed legs"
     exit 0
 fi

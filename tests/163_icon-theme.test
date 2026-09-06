@@ -27,7 +27,7 @@ png_size() {
 # hicolor names its directories by pixel size, plus "scalable" for the vector.
 icon_dirs() {
     find "$1" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sed 's|.*/||' |
-        grep -E '^([0-9]+x[0-9]+|scalable)$' | sort || true
+        command grep -E '^([0-9]+x[0-9]+|scalable)$' | sort || true
 }
 
 sizes=$(icon_dirs "${div}")
@@ -54,8 +54,8 @@ hicolor=$(find "${work}/inst" -type d -name hicolor)
 for name in ${sizes}; do
     if [ "${name}" = scalable ]; then
         svg="${hicolor}/scalable/apps/httrack.svg"
-        grep -q '<svg' "${svg}" || fail "${svg} has no <svg> root"
-        grep -q 'viewBox' "${svg}" || fail "${svg} has no viewBox, so it will not scale"
+        command grep -q '<svg' "${svg}" || fail "${svg} has no <svg> root"
+        command grep -q 'viewBox' "${svg}" || fail "${svg} has no viewBox, so it will not scale"
         continue
     fi
     got=$(png_size "${hicolor}/${name}/apps/httrack.png")

@@ -35,7 +35,7 @@ configure="${abs_top_srcdir:-}/configure"
 test -r "$configure" || fail "no configure script at $configure; tests/Makefile.am must export abs_top_srcdir"
 
 help=$(bash "$configure" --help)
-grep -q '^  *BASH_SHELL ' <<<"$help" || fail "configure --help does not advertise BASH_SHELL (AC_ARG_VAR missing)"
+command grep -q '^  *BASH_SHELL ' <<<"$help" || fail "configure --help does not advertise BASH_SHELL (AC_ARG_VAR missing)"
 
 tmp=$(mktemp -d)
 cleanup_push rm -rf "$tmp"

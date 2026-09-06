@@ -91,7 +91,7 @@ mirror_names() { # mirror_names DIR
     find "$1" -type f | sed 's|.*/||'
 }
 mirror_has_name() { # mirror_has_name DIR BASENAME
-    grep -Fqx "$2" <<<"$(mirror_names "$1")"
+    command grep -Fqx "$2" <<<"$(mirror_names "$1")"
 }
 
 # Every step skip_if_out_of_budget projects against ran. A skip is an exit, so a
@@ -522,7 +522,7 @@ have_feature() {
             fail "httrack -#test=features failed"
         test -n "${HTS_FEATURES}" || fail "httrack -#test=features said nothing"
     fi
-    grep -q "^$1 1\$" <<<"${HTS_FEATURES}"
+    command grep -q "^$1 1\$" <<<"${HTS_FEATURES}"
 }
 
 # Longest surviving run of char $2 in file $1, or 0: the length a field was
@@ -676,8 +676,8 @@ declared_header_count() {
 build_names_frames() {
     local conf="${abs_top_builddir:?}/config.h"
     test -r "${conf}" || fail "no config.h at ${conf}"
-    grep -q '^#define HAVE_BACKTRACE ' "${conf}" &&
-        grep -q '^#define HAVE_SPAWN_H ' "${conf}"
+    command grep -q '^#define HAVE_BACKTRACE ' "${conf}" &&
+        command grep -q '^#define HAVE_SPAWN_H ' "${conf}"
 }
 
 # Which harness drives the tests: `msys` for an MSYS/Git Bash shell, `wsl2` for
@@ -877,15 +877,15 @@ BIND_LOST="Unable to (initialize a temporary server|create the server)"
 # port; a proxytrack that announces neither ends the test here.
 proxytrack_bound() { # proxytrack_bound LOG PID
     local log=$1 pid=$2 waited=0
-    until grep -qE "$PT_LISTENING|$BIND_LOST" "$log"; do
+    until command grep -qE "$PT_LISTENING|$BIND_LOST" "$log"; do
         # An exit flushes the log, so re-read it rather than calling this dead.
         kill -0 "$pid" 2>/dev/null || break
         test "$waited" -lt 50 || fail "proxytrack never announced its listen port: $(<"$log")"
         sleep 0.1
         waited=$((waited + 1))
     done
-    grep -q "$PT_LISTENING" "$log" && return 0
-    grep -qE "$BIND_LOST" "$log" || fail "proxytrack exited before listening: $(<"$log")"
+    command grep -q "$PT_LISTENING" "$log" && return 0
+    command grep -qE "$BIND_LOST" "$log" || fail "proxytrack exited before listening: $(<"$log")"
     return 1
 }
 

@@ -17,7 +17,7 @@ if ! test -f "index.txt"; then
 fi
 
 # Convert crlf to lf
-if test "$(head index.txt -n 1 | tr '\r' '#' | grep -c '#')" = "1"; then
+if test "$(head index.txt -n 1 | tr '\r' '#' | command grep -c '#')" = "1"; then
     echo "Converting index to Unix LF style (not CR/LF) .."
     mv -f index.txt index.txt.old
     tr -d '\r' <index.txt.old >index.txt
@@ -29,7 +29,7 @@ while test -n "$keyword"; do
     read -r keyword
 
     if test -n "$keyword"; then
-        FOUNDK="$(grep -niE "^$keyword" index.txt)"
+        FOUNDK="$(command grep -niE "^$keyword" index.txt)"
 
         if test -n "$FOUNDK"; then
             if ! test "$(echo "$FOUNDK" | wc -l)" = "1"; then
@@ -41,11 +41,11 @@ while test -n "$keyword"; do
             else
                 # One match
                 N=$(echo "$FOUNDK" | cut -f1 -d':')
-                PM=$(tail "+$N" index.txt | grep -nE "\(" | head -n 1)
-                if ! echo "$PM" | grep "ignored" >/dev/null; then
+                PM=$(tail "+$N" index.txt | command grep -nE "\(" | head -n 1)
+                if ! echo "$PM" | command grep "ignored" >/dev/null; then
                     M=$(echo "$PM" | cut -f1 -d':')
                     echo "Found in:"
-                    tail "+$N" index.txt | head -n "$M" | grep -E "[0-9]* " | cut -f2 -d' '
+                    tail "+$N" index.txt | head -n "$M" | command grep -E "[0-9]* " | cut -f2 -d' '
                 else
                     echo "keyword ignored (too many hits)"
                 fi

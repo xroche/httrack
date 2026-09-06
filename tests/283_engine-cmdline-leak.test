@@ -140,7 +140,7 @@ for form in linux bsd; do
     linux) script -qec 'test -t 1 && echo TTYOK' "$tmp/ttyprobe" >/dev/null 2>&1 || true ;;
     bsd) script -q "$tmp/ttyprobe" /bin/sh -c 'test -t 1 && echo TTYOK' >/dev/null 2>&1 || true ;;
     esac
-    if grep -q TTYOK "$tmp/ttyprobe" 2>/dev/null; then
+    if command grep -q TTYOK "$tmp/ttyprobe" 2>/dev/null; then
         tty_form=$form
         break
     fi

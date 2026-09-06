@@ -175,7 +175,7 @@ relink() {
         done <"$deplist"
         rp="@loader_path/$(uprefix "${bin%/*}")Frameworks"
         otool -l "$bin" | awk '/LC_RPATH/ {r = 1} r && $1 == "path" {print $2; r = 0}' >"$deplist"
-        grep -qxF "$rp" "$deplist" || rewrite -add_rpath "$rp" "$bin"
+        command grep -qxF "$rp" "$deplist" || rewrite -add_rpath "$rp" "$bin"
         # install_name_tool invalidates the signature, and arm64 kills an unsigned Mach-O.
         [ "$bin" = "$mainexe" ] && continue
         codesign -f -s - "$bin"
@@ -257,7 +257,7 @@ test "$nmach" -gt 0 || fail "scanned no Mach-O files at all, the check proved no
 find "$app/Contents" -type f >"$list"
 while IFS= read -r f; do
     file "$f" | grep -q text || continue
-    grep -q -- "$prefix" "$f" 2>/dev/null && fail "$f embeds the staging prefix"
+    command grep -q -- "$prefix" "$f" 2>/dev/null && fail "$f embeds the staging prefix"
 done <"$list"
 
 # CFBundleIconFile is a Resources basename with an optional extension, so resolve it

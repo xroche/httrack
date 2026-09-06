@@ -168,7 +168,7 @@ serve() { # $1 = tag, $2 = lang index; leaves the reply in ${reply}
     htsserver_start --root "${root}" --home "${work}/h$1" lang "$2"
     reply=$(htsserver_get /server/about.html)
     htsserver_stop
-    grep -q '^HTTP/1.[01] 200' <<<"${reply}" || fail "about.html for language $2: ${reply}"
+    command grep -q '^HTTP/1.[01] 200' <<<"${reply}" || fail "about.html for language $2: ${reply}"
 }
 
 # Names unique to one catalog, so the page must follow the language rather than
@@ -176,9 +176,9 @@ serve() { # $1 = tag, $2 = lang index; leaves the reply in ${reply}
 check() { # $1 = lang index, $2 = LANGUAGE_NAME, $3 = name shown, $4 = name not shown
     local reply
     serve "$1" "$1"
-    grep -q "$2: " <<<"${reply}" || fail "about.html for language $1 has no '$2:' credit line"
-    grep -q "$3" <<<"${reply}" || fail "about.html for language $1 does not name $3"
-    if grep -q "$4" <<<"${reply}"; then
+    command grep -q "$2: " <<<"${reply}" || fail "about.html for language $1 has no '$2:' credit line"
+    command grep -q "$3" <<<"${reply}" || fail "about.html for language $1 does not name $3"
+    if command grep -q "$4" <<<"${reply}"; then
         fail "about.html for language $1 still names $4"
     fi
     # shellcheck disable=SC2016 # the raw token is what must not survive
@@ -208,9 +208,9 @@ PY
 reply=''
 serve markup 1
 for planted in Zzz Yyy; do
-    grep -q "${planted}&lt;/pre&gt;&lt;script&gt;" <<<"${reply}" ||
+    command grep -q "${planted}&lt;/pre&gt;&lt;script&gt;" <<<"${reply}" ||
         fail "about.html does not escape markup out of a catalog (${planted}): ${reply}"
-    if grep -q "${planted}</pre>" <<<"${reply}"; then
+    if command grep -q "${planted}</pre>" <<<"${reply}"; then
         fail "about.html serves catalog markup raw (${planted}): ${reply}"
     fi
 done

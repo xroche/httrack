@@ -146,8 +146,8 @@ undrained_in() { # undrained_in DIR
     for f in "$1"/*.test; do
         test -r "$f" || continue
         SCANNED=$((SCANNED + 1))
-        grep -q 'selftest_queue' "$f" || continue
-        grep -q 'selftest_run_queued' "$f" || UNDRAINED="$UNDRAINED $f"
+        command grep -q 'selftest_queue' "$f" || continue
+        command grep -q 'selftest_run_queued' "$f" || UNDRAINED="$UNDRAINED $f"
     done
 }
 

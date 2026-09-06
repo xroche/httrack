@@ -14,13 +14,13 @@ elapsed=$((SECONDS - start))
 # Skip (not fail) on causes unrelated to the watchdog: no python3/server, or a
 # port-announce race (flaky-13).
 test "$rc" -ne 77 || skip "local crawl prerequisites missing"
-! grep -q "could not discover server port" <<<"$out" || skip "server port announce raced"
+! command grep -q "could not discover server port" <<<"$out" || skip "server port announce raced"
 
 # The message prints only on the 124 reap, and 25s < the engine's --timeout=30, so
 # together they pin the fast exit on the 3s watchdog, not httrack giving up.
 test "$rc" -ne 0 || fail "stalled crawl reported success"
 test "$elapsed" -lt 25 || fail "watchdog fired late (${elapsed}s)"
-grep -q "watchdog fired" <<<"$out" ||
+command grep -q "watchdog fired" <<<"$out" ||
     fail "crawl failed but not via the watchdog: $out"
 
 echo "crawl watchdog OK (reaped in ${elapsed}s)"

@@ -41,7 +41,7 @@ run() { # run ARG...
 mirrored() {
     (cd "${tmp}/out" && find . -type f ! -path './hts-cache/*' ! -name '.log' \
         ! -name 'hts-log.txt' ! -name '*.gif' ! -name '*.lock' -print |
-        grep -v '^\./index\.html$' | sort)
+        command grep -v '^\./index\.html$' | sort)
 }
 
 # Only the layout on disk tells whether -N applied: hts-cache/doit.log is the
@@ -59,7 +59,7 @@ refused() { # refused WANTED-MESSAGE ARG...
     shift
     run "$@"
     { test "${RC}" -ne 0 && test "${RC}" -ne 134; } || fail "$* not refused (exit ${RC})"
-    grep -q "${want}" "${tmp}/out/.log" ||
+    command grep -q "${want}" "${tmp}/out/.log" ||
         fail "$* refused without saying why: $(<"${tmp}/out/.log")"
 }
 

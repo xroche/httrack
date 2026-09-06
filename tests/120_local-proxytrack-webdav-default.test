@@ -70,13 +70,13 @@ propfind() {
 
 resp=$(propfind page.html) ||
     fail_dump "PROPFIND on an exact cache entry did not answer" "$ptlog"
-grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" ||
+command grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" ||
     fail "expected 207 Multi-Status: $resp"
-grep -q '<displayname>Default Document for the Folder</displayname>' <<<"$resp" ||
+command grep -q '<displayname>Default Document for the Folder</displayname>' <<<"$resp" ||
     fail "the default document of the entry was not listed: $resp"
 # The name alone would still pass on a truncated or garbage URL, so pin the
 # href: the default document is the collection path plus an empty name.
-grep -q '<href>/webdav/example\.com/page\.html/</href>' <<<"$resp" ||
+command grep -q '<href>/webdav/example\.com/page\.html/</href>' <<<"$resp" ||
     fail "the default document was listed under the wrong href: $resp"
 responses=$(count_matching_lines '<response ' <<<"$resp")
 test "$responses" -eq 2 ||
@@ -85,7 +85,7 @@ test "$responses" -eq 2 ||
 # The crash killed the process, so a second request is the liveness proof.
 resp=$(propfind "") ||
     fail_dump "proxytrack died serving the previous PROPFIND" "$ptlog"
-grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" ||
+command grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" ||
     fail "expected 207 Multi-Status on the follow-up listing: $resp"
 
 # Leftover traces echoed the client's body and the generated response (#911).
@@ -94,7 +94,7 @@ sentinel=PT911-DAV-BODY-CANARY
 pad=$(printf '%8192s' '')
 resp=$(propfind "" -H 'Expect:' --data-binary "$sentinel${pad// /x}") ||
     fail_dump "proxytrack died serving a PROPFIND carrying a body" "$ptlog"
-grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" ||
+command grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" ||
     fail "expected 207 Multi-Status on the canary listing: $resp"
 
 # The 207 is what makes the absence below mean something: a depth-rejected
@@ -113,7 +113,7 @@ done
 # could only ever miss: these two are what a re-added trace would carry.
 log=$(<"$ptlog")
 for marker in "$sentinel" 'Default Document for the Folder'; do
-    if grep -q "$marker" <<<"$log"; then
+    if command grep -q "$marker" <<<"$log"; then
         echo "FAIL: a PROPFIND echoed '$marker' into proxytrack's output"
         printf '%s\n' "$log"
         exit 1

@@ -20,9 +20,9 @@ cleanup_push rm -rf "${work}"
 xpm_size() {
     local geom hdr
     hdr=$(head -1 "$1")
-    grep -q '^/\* XPM \*/$' <<<"${hdr}" || fail "$1 has no XPM header"
-    grep -q '^static char \*' "$1" || fail "$1 has no pixmap declaration"
-    geom=$(grep -m1 '^"' "$1" | tr -d '"')
+    command grep -q '^/\* XPM \*/$' <<<"${hdr}" || fail "$1 has no XPM header"
+    command grep -q '^static char \*' "$1" || fail "$1 has no pixmap declaration"
+    geom=$(command grep -m1 '^"' "$1" | tr -d '"')
     case "${geom}" in
     [0-9]*' '[0-9]*' '[0-9]*' '[0-9]*) ;;
     *) fail "$1: bad geometry line '${geom}'" ;;

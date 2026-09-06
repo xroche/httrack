@@ -82,7 +82,7 @@ spied() { # spied [PROTO...]: echoes the ports, leaves "KIND PORT" in $typelog
 }
 
 drew() { # drew KIND PORT
-    grep -Fxq "$1 $2" "$typelog"
+    command grep -Fxq "$1 $2" "$typelog"
 }
 
 ## a port nothing holds is bindable, one already bound is not
@@ -103,12 +103,12 @@ ok "an unheld port binds and a held one does not"
 port=$(spied tcp) || fail "freeport tcp failed"
 bindable tcp "$port" || fail "the tcp port $port does not bind as tcp"
 drew SOCK_STREAM "$port" || fail "freeport tcp drew $port elsewhere: $(<"$typelog")"
-! grep -q SOCK_DGRAM "$typelog" || fail "freeport tcp opened a udp socket"
+! command grep -q SOCK_DGRAM "$typelog" || fail "freeport tcp opened a udp socket"
 
 port=$(spied udp) || fail "freeport udp failed"
 bindable udp "$port" || fail "the udp port $port does not bind as udp"
 drew SOCK_DGRAM "$port" || fail "freeport udp drew $port elsewhere: $(<"$typelog")"
-! grep -q SOCK_STREAM "$typelog" || fail "freeport udp opened a tcp socket"
+! command grep -q SOCK_STREAM "$typelog" || fail "freeport udp opened a tcp socket"
 ok "each protocol is probed in its own"
 
 ## a mixed pair, the shape start_proxytrack asks for, in that order
@@ -145,7 +145,7 @@ proxytrack_fails() { # proxytrack_fails HTTP_ADDR ICP_ADDR: echoes its error lin
     run_with_timeout 20 proxytrack "$1" "$2" >"$log" 2>&1 || rc=$?
     test "$rc" -ne 124 || fail "proxytrack never exited on $1 $2: $(<"$log")"
     test "$rc" -ne 0 || fail "proxytrack started on $1 $2: $(<"$log")"
-    grep '^Unable to initialize a temporary server' "$log" ||
+    command grep '^Unable to initialize a temporary server' "$log" ||
         fail "proxytrack failed without the harness's banner: $(<"$log")"
 }
 

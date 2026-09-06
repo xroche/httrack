@@ -51,7 +51,7 @@ expect_counts_match() {
     local label="$1" rep="${2:-$report}" bucket n
     printf '[%s] ..\t' "$label"
     for bucket in new changed unchanged gone; do
-        n=$(listed "$bucket" "$rep" | grep -c . || true)
+        n=$(listed "$bucket" "$rep" | command grep -c . || true)
         test "$(field "$bucket" "$rep")" == "$n" ||
             fail_dump "${bucket} count $(field "$bucket" "$rep") but $n listed" "$rep"
     done

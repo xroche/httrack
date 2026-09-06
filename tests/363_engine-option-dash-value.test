@@ -46,7 +46,7 @@ noparam() { # noparam LABEL ARG...
 
 accepted() { # accepted LABEL
     test "$rc" -eq 0 || fail "$1: exited $rc: $stderr"
-    ! grep -q 'Syntax error' <<<"$stderr" || fail "$1: $stderr"
+    ! command grep -q 'Syntax error' <<<"$stderr" || fail "$1: $stderr"
 }
 
 # A refusal leaves no mirror behind and says why on stderr, never only on the
@@ -62,10 +62,10 @@ refused() { # refused LABEL RE...
     # optparam_error() states the reason and stops, then the option's own help
     # line: "Syntax error:", the reason, at most one more. Advice appended to
     # either lands outside that shape.
-    if grep -qE 'takes a value|needs to be followed by a parameter' <<<"$stderr"; then
-        test "$(grep -c . <<<"$stderr")" -le 3 ||
+    if command grep -qE 'takes a value|needs to be followed by a parameter' <<<"$stderr"; then
+        test "$(command grep -c . <<<"$stderr")" -le 3 ||
             fail "$label: the refusal says more than the reason and the help: $stderr"
-        grep -qE '(<param>|names an option|read as the next option)$' <<<"$stderr" ||
+        command grep -qE '(<param>|names an option|read as the next option)$' <<<"$stderr" ||
             fail "$label: the refusal reason does not end where it should: $stderr"
     fi
     while test $# -gt 0; do
@@ -227,7 +227,7 @@ test "$rc" -ne 0 || fail "no URL at all: exited 0"
 assert_match 'No URL to mirror' "$stderr" "no URL at all"
 # Inert where the v6 resolver was not compiled in, and then it says so.
 parse -@i9
-if ! grep -q 'v6 routines not compiled' <<<"$stdout"; then
+if ! command grep -q 'v6 routines not compiled' <<<"$stdout"; then
     refused "-@i9" 'Unknown value for -@i: 9'
 fi
 echo OK

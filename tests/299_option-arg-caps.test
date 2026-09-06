@@ -51,7 +51,7 @@ while read -r opt macro msg; do
     out=$(run "$opt" "$val" "${n}b") || rc=$?
     test "$rc" -ne 0 || fail "$opt accepted a value of exactly $macro ($limit)"
     # the message pins which check fired, so an unrelated panic cannot pass
-    grep -qF "$msg" <<<"$out" || fail "$opt was not rejected by \"$msg\""
+    command grep -qF "$msg" <<<"$out" || fail "$opt was not rejected by \"$msg\""
 done <<<"$caps"
 
 test "$n" -eq 6 || fail "expected 6 caps, checked $n"

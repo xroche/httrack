@@ -124,8 +124,8 @@ assert_value() { # assert_value TAG FIELD VALUE
 # substitution would eat a lost trailing newline on both sides alike.
 assert_same_but() { # assert_same_but TAG RE
     local base=$tmpdir/$1.base got=$tmpdir/$1.got
-    grep -Ev "$2" "$tmpdir/plain.req" >"$base" || true
-    grep -Ev "$2" "$tmpdir/$1.req" >"$got" || true
+    command grep -Ev "$2" "$tmpdir/plain.req" >"$base" || true
+    command grep -Ev "$2" "$tmpdir/$1.req" >"$got" || true
     diff "$base" "$got" || fail "$1: the request outside $2 differs from the box-free one"
 }
 

@@ -62,9 +62,9 @@ start_proxytrack "$dir/pt" launch_proxytrack
 test "$(count_matching_lines '<response ' "$dir/resp.xml")" -eq 3 ||
     fail_dump "expected the root and its two entries" "$dir/resp.xml"
 
-grep -q '<getlastmodified>Sun, 06 Nov 1994 08:49:37 GMT</getlastmodified>' "$dir/resp.xml" ||
+command grep -q '<getlastmodified>Sun, 06 Nov 1994 08:49:37 GMT</getlastmodified>' "$dir/resp.xml" ||
     fail_dump "the entry's Last-Modified was shifted by the server's timezone" "$dir/resp.xml"
-grep -q '<getlastmodified>Wed, 01 Jan 2025 00:00:00 GMT</getlastmodified>' "$dir/resp.xml" ||
+command grep -q '<getlastmodified>Wed, 01 Jan 2025 00:00:00 GMT</getlastmodified>' "$dir/resp.xml" ||
     fail_dump "the ARC record date was shifted by the server's timezone" "$dir/resp.xml"
 
 echo "OK: a WebDAV listing dates both entries in GMT on a UTC+5:30 host"

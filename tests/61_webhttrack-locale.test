@@ -19,9 +19,9 @@ test -r "${distdir}/lang.indexes" || fail "no ${distdir}/lang.indexes"
 funcs=$(sed -n '/^function lang_index/,/^}/p' "${script}")
 # End on the next section, not a blank line: a blank line grown inside the block
 # would truncate the lift and silently stop testing everything below it.
-grep -q '^# Find the browser' "${script}" || fail "locale block terminator moved in ${script}"
+command grep -q '^# Find the browser' "${script}" || fail "locale block terminator moved in ${script}"
 block=$(sed -n '/^# Locale/,/^# Find the browser/p' "${script}" | sed '$d')
-grep -q 'LANGN=.*lang_index' <<<"${block}" || fail "could not lift the whole locale block from ${script}"
+command grep -q 'LANGN=.*lang_index' <<<"${block}" || fail "could not lift the whole locale block from ${script}"
 
 # Run the lifted block against whatever locale vars the caller exported.
 run_block() {

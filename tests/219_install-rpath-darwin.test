@@ -79,7 +79,7 @@ for exe in httrack htsserver; do
     bin=${stage}${bindir}/${exe}
     test -r "${bin}" || fail "no ${exe} in ${stage}${bindir}"
     rpaths=$(dylib_rpaths "${bin}")
-    grep -qxF '@loader_path/../lib' <<<"${rpaths}" ||
+    command grep -qxF '@loader_path/../lib' <<<"${rpaths}" ||
         fail "${exe} carries no @loader_path/../lib rpath, so a copied tree resolves nothing"
     found=0
     while read -r dep; do
@@ -88,7 +88,7 @@ for exe in httrack htsserver; do
         *) continue ;;
         esac
         found=$((found + 1))
-        grep -qxF "${dep}" <<<"${idlist}" ||
+        command grep -qxF "${dep}" <<<"${idlist}" ||
             fail "${exe} loads ${dep}, which is not the id the installed library carries"
     done < <(dylib_deps "${bin}")
     test "${found}" -ge 1 ||

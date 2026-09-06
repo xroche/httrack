@@ -165,7 +165,7 @@ expect() { # expect CODEC WANT-SUBDIR REJECTED-SUBDIR DESC PREFIX ARG...
     # The emitted flag is not the probe. Detection linking under the old
     # unresolved path while only the flag is fixed would pass every check
     # above, so read the link command configure actually ran.
-    probe=$(grep -e '-o conftest' "${dir}/config.log" | grep -e "-l${lib}" || true)
+    probe=$(command grep -e '-o conftest' "${dir}/config.log" | command grep -e "-l${lib}" || true)
     probe=$(tr '\n' ' ' <<<"${probe}")
     test -n "${probe}" || fail_dump "${desc}: config.log has no -l${lib} link probe" "${dir}/config.log"
     case " ${probe} " in
@@ -178,9 +178,9 @@ expect() { # expect CODEC WANT-SUBDIR REJECTED-SUBDIR DESC PREFIX ARG...
 
     # PACKAGING.md quotes this qualifier as the packager's confirmation of who
     # chose, so both halves of it are pinned here, in one run that has both.
-    grep -q "the ${codec} content coding\.\.\. yes (requested)" "${dir}/configure.log" ||
+    command grep -q "the ${codec} content coding\.\.\. yes (requested)" "${dir}/configure.log" ||
         fail_dump "${desc}: an explicit --with-${codec} was not reported as (requested)" "${dir}/configure.log"
-    grep -qE "the ${other} content coding\.\.\. (yes|no) \(auto\)" "${dir}/configure.log" ||
+    command grep -qE "the ${other} content coding\.\.\. (yes|no) \(auto\)" "${dir}/configure.log" ||
         fail_dump "${desc}: the unrequested ${other} coding was not reported as (auto)" "${dir}/configure.log"
 
     echo "ok: ${desc} -> ${want}"
@@ -194,7 +194,7 @@ expect_fail() { # expect_fail CODEC DESC PREFIX
     dir=${work}/build${n}
     ! run_configure "${dir}" --with-"${codec}"="${prefix}" ||
         fail_dump "${desc}: configure accepted a prefix with no lib${lib} under it" "${dir}/configure.log"
-    grep -q "no lib${lib} found" "${dir}/configure.log" ||
+    command grep -q "no lib${lib} found" "${dir}/configure.log" ||
         fail_dump "${desc}: configure failed without naming the missing library" "${dir}/configure.log"
     echo "ok: ${desc}"
     skip_if_out_of_budget "$((cases - n))" "$((SECONDS - began))"

@@ -26,7 +26,7 @@ local_server_start --env CHARREF_LOG="$reqlog" --root "$root"
     >"${tmpdir}/crawl.log" 2>&1 || true
 
 query_of() {
-    grep -F "/charref/$1.html?" "$reqlog" | cut -f1 |
+    command grep -F "/charref/$1.html?" "$reqlog" | cut -f1 |
         sed "s|^/charref/$1.html?||" | sort -u
 }
 
@@ -39,7 +39,7 @@ check() {
     shift 3
     printf '[%s] ..\t' "$label"
     got=$(query_of "$page") || got=
-    count=$(grep -F "/charref/${page}.html?" "$reqlog" | cut -f2 | sort -u) || count=
+    count=$(command grep -F "/charref/${page}.html?" "$reqlog" | cut -f2 | sort -u) || count=
     for want in "$@"; do
         if test "$got" == "$want"; then
             ok=1
@@ -88,7 +88,7 @@ check "declared shift_jis page" qsjis 4 \
 # differ on the trailing shift back to ASCII, so the bytes are not one string.
 printf '[declared iso-2022-jp page] ..\t'
 jis=$(query_of qjis) || jis=
-jiscount=$(grep -F "/charref/qjis.html?" "$reqlog" | cut -f2 | sort -u) || jiscount=
+jiscount=$(command grep -F "/charref/qjis.html?" "$reqlog" | cut -f2 | sort -u) || jiscount=
 for field in ${jis//&/ }; do
     case "$field" in
     a=%1b\$B* | c=%1b\$B*)

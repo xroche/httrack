@@ -25,7 +25,7 @@ out=$(httrack -O /dev/null -#test=instpaths) || rc=$?
 
 value_of() { # value_of KEY
     local line
-    line=$(grep "^$1=" <<<"$out") || fail "no $1 line in: $out"
+    line=$(command grep "^$1=" <<<"$out") || fail "no $1 line in: $out"
     printf '%s\n' "${line#"$1"=}"
 }
 
@@ -60,7 +60,7 @@ pp=$("${cc_argv[@]}" -E -I"${abs_top_srcdir:?}/src" -I"$abs_top_builddir" \
 
 expanded() { # expanded KEY: the macro, with adjacent string literals joined
     local line
-    line=$(grep "^hts_$1=" <<<"$pp") || fail "no hts_$1 line in the preprocessed header"
+    line=$(command grep "^hts_$1=" <<<"$pp") || fail "no hts_$1 line in the preprocessed header"
     printf '%s\n' "${line#hts_"$1"=}" | tr -d ' "'
 }
 
@@ -74,7 +74,7 @@ assert_eq /probe/share/httrack/ "$(expanded httrackdir)" "the probe reaches the 
 
 # The wiring itself: a -D the build never passes falls back to that same literal.
 for pair in PREFIX:prefix SYSCONFDIR:sysconfdir BINDIR:bindir LIBDIR:libdir DATADIR:datadir; do
-    grep -q -- "-D${pair%%:*}=.*\$(${pair##*:})" "$abs_top_srcdir/src/Makefile.am" ||
+    command grep -q -- "-D${pair%%:*}=.*\$(${pair##*:})" "$abs_top_srcdir/src/Makefile.am" ||
         fail "src/Makefile.am does not pass -D${pair%%:*} from \$(${pair##*:})"
 done
 

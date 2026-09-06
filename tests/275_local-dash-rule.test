@@ -29,7 +29,7 @@ parse() {
 
 accepted() { # accepted LABEL
     test "$rc" -eq 0 || fail "$1: exited $rc: $out"
-    ! grep -q "$syntax_re" <<<"$out" || fail "$1: $out"
+    ! command grep -q "$syntax_re" <<<"$out" || fail "$1: $out"
 }
 
 refused() { # refused RE LABEL
@@ -76,7 +76,7 @@ echo OK
 printf '[a malformed dash rule is named, not blamed on -%%C] ..\t'
 parse --host-alias -nope
 refused 'Rejected: -nope' "malformed --host-alias"
-! grep -q '%C' <<<"$out" || fail "the host-alias error still names -%C: $out"
+! command grep -q '%C' <<<"$out" || fail "the host-alias error still names -%C: $out"
 echo OK
 
 # Both would land in the host verbatim. '\v' and not '\n': the argv filter

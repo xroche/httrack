@@ -52,7 +52,7 @@ got=$(LC_ALL=C sort "$tmp/killed")
 test "$got" = "$want" || fail "kill_tree without a winpid ran: $got"
 # The defect itself: whatever the matcher reports as an engine, the kill names.
 for e in $ENGINE_EXES; do
-    grep -qxF "/F /IM $e.exe" "$tmp/killed" || fail "kill_tree leaves $e.exe running"
+    command grep -qxF "/F /IM $e.exe" "$tmp/killed" || fail "kill_tree leaves $e.exe running"
 done
 
 # The pid the caller read while the job was alive, which is what spares the host
@@ -82,7 +82,7 @@ test "$(<"$tmp/killed")" = '/F /T /PID 4242' ||
 : >"$tmp/killed"
 out=$(kill_tree 99 4242 python.exe)
 test ! -s "$tmp/killed" || fail "pid 4242 was killed as a python.exe: $(<"$tmp/killed")"
-grep -q '::warning::pid 4242 no longer runs python.exe' <<<"$out" ||
+command grep -q '::warning::pid 4242 no longer runs python.exe' <<<"$out" ||
     fail "the skipped kill was not reported: $out"
 # Gone from the table entirely, which is what a freed winpid usually looks like.
 : >"$tmp/killed"
@@ -114,14 +114,14 @@ unset -f kill win_capture reap_bounded
 
 : >"$tmp/killed"
 out=$(reap_leftover_processes 99_probe.test)
-grep -q '99_probe.test left processes behind' <<<"$out" || fail "the leak was not attributed: $out"
-grep -q 'proxytrack.exe' <<<"$out" || fail "the leftover proxytrack was not named: $out"
+command grep -q '99_probe.test left processes behind' <<<"$out" || fail "the leak was not attributed: $out"
+command grep -q 'proxytrack.exe' <<<"$out" || fail "the leftover proxytrack was not named: $out"
 for e in $ENGINE_EXES; do
-    grep -qxF "/F /IM $e.exe" "$tmp/killed" || fail "reap_leftover_processes leaves $e.exe running"
+    command grep -qxF "/F /IM $e.exe" "$tmp/killed" || fail "reap_leftover_processes leaves $e.exe running"
 done
 # Deliberately spared: the runner may run a python.exe of its own, and tasklist
 # cannot tell it from a leaked fixture server.
-if grep -qxF '/F /IM python.exe' "$tmp/killed"; then fail "the reap killed an unrelated python.exe"; fi
+if command grep -qxF '/F /IM python.exe' "$tmp/killed"; then fail "the reap killed an unrelated python.exe"; fi
 
 # Near misses, not an idle host, are what a widened image matcher lets through.
 tasklist() {
@@ -139,9 +139,9 @@ test ! -s "$tmp/killed" || fail "an unrelated process was reaped: $(<"$tmp/kille
 # fixture server is still visible to a reader.
 tasklist() { printf 'htsserver.exe   99 Console\npython.exe   98 Console\ntrackpad.exe   78 Console\n'; }
 out=$(list_stray_processes 0 named)
-grep -q 'htsserver.exe' <<<"$out" || fail "the stray listing dropped an engine: $out"
-grep -q 'python.exe' <<<"$out" || fail "the stray listing dropped python: $out"
-if grep -q 'trackpad' <<<"$out"; then fail "the stray listing caught an unrelated process: $out"; fi
+command grep -q 'htsserver.exe' <<<"$out" || fail "the stray listing dropped an engine: $out"
+command grep -q 'python.exe' <<<"$out" || fail "the stray listing dropped python: $out"
+if command grep -q 'trackpad' <<<"$out"; then fail "the stray listing caught an unrelated process: $out"; fi
 
 # The bug was a second engine list drifting from the first, so fail on any name
 # still written by hand inside a taskkill or a process-matching grep. Both files
@@ -149,7 +149,7 @@ if grep -q 'trackpad' <<<"$out"; then fail "the stray listing caught an unrelate
 for f in testlib.sh proclib.sh; do
     test -r "$top_srcdir/tests/$f" || fail "no $f to sweep for hand-written engine names"
 done
-stray=$(grep -nE '(taskkill|tasklist|grep -Ei)[^#]*(httrack|proxytrack|htsserver|webhttrack)' \
+stray=$(command grep -nE '(taskkill|tasklist|grep -Ei)[^#]*(httrack|proxytrack|htsserver|webhttrack)' \
     "$top_srcdir/tests/testlib.sh" "$top_srcdir/tests/proclib.sh" |
     grep -vE 'ENGINE_EXES|ENGINE_IMAGE_RE' || true)
 test -z "$stray" || fail "engine names hand-written outside ENGINE_EXES:

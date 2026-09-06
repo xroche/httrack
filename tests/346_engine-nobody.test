@@ -5,4 +5,4 @@
 set -euo pipefail
 
 out=$(httrack -O /dev/null -#test=nobody run)
-grep -q "nobody self-test OK" <<<"$out"
+command grep -q "nobody self-test OK" <<<"$out"

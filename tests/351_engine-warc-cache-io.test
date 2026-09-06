@@ -28,7 +28,7 @@ seekfail_ready() {
     if [ ! -r "${SEEKFAIL_LA:-}" ]; then
         fail "${SEEKFAIL_LA:-\$SEEKFAIL_LA} was not built"
     fi
-    if grep -q "^dlname=''" "$SEEKFAIL_LA"; then
+    if command grep -q "^dlname=''" "$SEEKFAIL_LA"; then
         echo "static-only build, skipping the cap legs" >&2
         return 1
     fi
@@ -48,7 +48,7 @@ if seekfail_ready; then
     out=$(ASAN_OPTIONS="$asan_opts" SEEKFAIL_CAP=1099511627774 LD_PRELOAD="$SEEKFAIL_LIB" \
         httrack -O "$tmp/out" "-#test=warc-offset" "$tmp/" 2>&1) || rc=$?
     test "$rc" -eq 0 || fail "a capped filesystem must not fail warc-offset: $out"
-    grep -q "past this filesystem's file-size cap" <<<"$out" ||
+    command grep -q "past this filesystem's file-size cap" <<<"$out" ||
         fail "the skipped offset was not reported: $out"
 
     # Refusing every wide offset must fail the tally, not pass silently.
@@ -56,7 +56,7 @@ if seekfail_ready; then
     out=$(ASAN_OPTIONS="$asan_opts" SEEKFAIL_CAP=2147483647 LD_PRELOAD="$SEEKFAIL_LIB" \
         httrack -O "$tmp/out" "-#test=warc-offset" "$tmp/" 2>&1) || rc=$?
     test "$rc" -ne 0 || fail "warc-offset passed with no offset past 2GB: $out"
-    grep -q "no offset past 2GB was measurable" <<<"$out" ||
+    command grep -q "no offset past 2GB was measurable" <<<"$out" ||
         fail "warc-offset failed for another reason: $out"
 
     # Only EFBIG is excused; any other errno is a real seek failure to report.
@@ -65,7 +65,7 @@ if seekfail_ready; then
         ASAN_OPTIONS="$asan_opts" LD_PRELOAD="$SEEKFAIL_LIB" \
         httrack -O "$tmp/out" "-#test=warc-offset" "$tmp/" 2>&1) || rc=$?
     test "$rc" -ne 0 || fail "warc-offset excused a non-EFBIG seek failure: $out"
-    grep -q "cannot seek to 1099511627775" <<<"$out" ||
+    command grep -q "cannot seek to 1099511627775" <<<"$out" ||
         fail "warc-offset failed for another reason: $out"
 fi
 httrack -O "$tmp/out" "-#test=cache-readfail" "$tmp/"

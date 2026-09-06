@@ -11,9 +11,9 @@ set -euo pipefail
 out=$(httrack -O /dev/null -#test=filtercap)
 
 # a rule at the cap is still taken, silently, and still decides the URL
-grep -q '^at the cap: stored=1 rules=1 verdict=1 warned=0$' <<<"$out" || fail "at the cap: $out"
+command grep -q '^at the cap: stored=1 rules=1 verdict=1 warned=0$' <<<"$out" || fail "at the cap: $out"
 # one byte more, and one past what the matcher reads: refused (the array did
 # not grow and its verdict did not move) and warned about
-grep -q '^one past the cap: stored=0 rules=1 verdict=1 warned=1$' <<<"$out" || fail "one past: $out"
-grep -q '^past the matcher: stored=0 rules=1 verdict=1 warned=1$' <<<"$out" || fail "past matcher: $out"
-grep -q '^filtercap self-test OK$' <<<"$out" || fail "self-test did not finish: $out"
+command grep -q '^one past the cap: stored=0 rules=1 verdict=1 warned=1$' <<<"$out" || fail "one past: $out"
+command grep -q '^past the matcher: stored=0 rules=1 verdict=1 warned=1$' <<<"$out" || fail "past matcher: $out"
+command grep -q '^filtercap self-test OK$' <<<"$out" || fail "self-test did not finish: $out"

@@ -127,7 +127,7 @@ notarize() {
         --issuer "$notary_issuer" --wait --timeout 2h >"$nlog" 2>&1 || st=$?
     cat "$nlog"
     # A rejected submission has exited 0 in the past, so read the verdict, not just $?.
-    if [ "$st" -ne 0 ] || ! grep -q "status: Accepted" "$nlog"; then
+    if [ "$st" -ne 0 ] || ! command grep -q "status: Accepted" "$nlog"; then
         id=$(sed -n 's/^ *id: \([0-9a-fA-F][0-9a-fA-F-]*\)$/\1/p' "$nlog" | head -1)
         # The rejection reason lives only in this log.
         [ -z "$id" ] || xcrun notarytool log "$id" --key "$notary_key" \
@@ -153,7 +153,7 @@ name=${label:-$version}
 # The filename is what a user reads before downloading, so name the arch (#1083).
 # An arch counts only if every Mach-O carries it: one thin dylib and the app is not universal.
 arch=$(while IFS= read -r _bin; do lipo -archs "$_bin" | tr ' ' '\n'; done <"$mach" |
-    grep -v '^$' | sort | uniq -c |
+    command grep -v '^$' | sort | uniq -c |
     awk -v n="$(wc -l <"$mach")" '$1 == n { print $2 }' | sort | paste -sd- -)
 test -n "$arch" || fail "the bundle's Mach-O files share no architecture"
 case "$arch" in
@@ -189,7 +189,7 @@ if [ "$skip_notarize" -eq 0 ]; then
         fail "Gatekeeper rejected $app"
     }
     cat "$nlog"
-    grep -q "source=Notarized Developer ID" "$nlog" ||
+    command grep -q "source=Notarized Developer ID" "$nlog" ||
         fail "$app assessed, but not as a notarized Developer ID app"
     spctl --assess --type open --context context:primary-signature -vv "$dmg" >"$nlog" 2>&1 || {
         cat "$nlog" >&2

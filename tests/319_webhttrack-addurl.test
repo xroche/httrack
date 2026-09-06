@@ -67,7 +67,7 @@ done
 # The summary line is written once, at the end, so it cannot already be true:
 # waiting on it is what makes the cache and log checks below meaningful.
 start=$SECONDS
-while ! grep -q "HTTrack Website Copier/" "${log}"; do
+while ! command grep -q "HTTrack Website Copier/" "${log}"; do
     test "$((SECONDS - start))" -lt 90 || fail "the crawl did not end"
     poll_wait 0.2
 done
@@ -80,13 +80,13 @@ test -z "${left}" || fail "a delayed placeholder survived: ${left}"
 # A rename alone is not the fix: a record still holding the placeholder makes
 # every later reference to it spin in the type waiter and get dropped. Both
 # lines reach the log at the default verbosity, as errors and warnings do.
-! grep -q "Duplicate entry in hts_wait_delayed" "${log}" ||
+! command grep -q "Duplicate entry in hts_wait_delayed" "${log}" ||
     fail "the added link's own record collided in the type waiter"
-! grep -q "probably looping, type unknown" "${log}" ||
+! command grep -q "probably looping, type unknown" "${log}" ||
     fail "the added link was dropped as looping"
 
 # The cache index holds the URL and the name it was saved under.
-cached=$(grep "/added/page.html" "${out}/hts-cache/new.txt" || true)
+cached=$(command grep "/added/page.html" "${out}/hts-cache/new.txt" || true)
 test -n "${cached}" || fail "the added URL was never cached"
 case ${cached} in
 *.delayed*) fail "the cache recorded a placeholder: ${cached}" ;;

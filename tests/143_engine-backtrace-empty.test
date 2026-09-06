@@ -23,7 +23,7 @@ if [ ! -r "${NOBACKTRACE_LA:-}" ]; then
     echo "${NOBACKTRACE_LA:-\$NOBACKTRACE_LA} was not built" >&2
     exit 1
 fi
-if grep -q "^dlname=''" "$NOBACKTRACE_LA"; then
+if command grep -q "^dlname=''" "$NOBACKTRACE_LA"; then
     echo "static-only build, skipping" >&2
     exit 77
 fi
@@ -44,7 +44,7 @@ test "$rc" -eq 134 || {
     echo "the plain crash exited $rc, not 134" >&2
     exit 1
 }
-if grep -q 'No stack trace available' <<<"$plain"; then
+if command grep -q 'No stack trace available' <<<"$plain"; then
     echo "no working backtrace() in this build; skipping" >&2
     exit 77
 fi
@@ -56,17 +56,17 @@ test "$rc" -eq 134 || {
     printf '%s\n' "$out" >&2
     exit 1
 }
-grep -q "^Caught signal 6$" <<<"$out" || {
+command grep -q "^Caught signal 6$" <<<"$out" || {
     echo "no 'Caught signal' line:" >&2
     printf '%s\n' "$out" >&2
     exit 1
 }
-grep -q 'No stack trace available: unwinding failed' <<<"$out" || {
+command grep -q 'No stack trace available: unwinding failed' <<<"$out" || {
     echo "an empty backtrace left no diagnostic:" >&2
     printf '%s\n' "$out" >&2
     exit 1
 }
-grep -q "Please report the problem" <<<"$out" || {
+command grep -q "Please report the problem" <<<"$out" || {
     echo "the handler stopped before its closing line:" >&2
     printf '%s\n' "$out" >&2
     exit 1

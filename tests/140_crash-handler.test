@@ -18,14 +18,14 @@ assert_crash() {
 
     out=$(httrack "-#c=$kind" 2>&1) || rc=$?
     test "$rc" -eq 134 || exit 1
-    grep -q "Deliberate '$kind' crash requested" <<<"$out" || exit 1
-    grep -q "^Caught signal $signum$" <<<"$out" || exit 1
+    command grep -q "Deliberate '$kind' crash requested" <<<"$out" || exit 1
+    command grep -q "^Caught signal $signum$" <<<"$out" || exit 1
     # A frame, or the notice where the OS has no backtrace() (anything but
     # Linux). Symbol names are unreliable under -fvisibility=hidden, and the
     # frame format is libc-specific, so match an address only.
-    grep -qE '0x[0-9a-f]+|No stack trace available' <<<"$out" || exit 1
+    command grep -qE '0x[0-9a-f]+|No stack trace available' <<<"$out" || exit 1
     # The handler ran to its end rather than faulting midway.
-    grep -q "Please report the problem" <<<"$out" || exit 1
+    command grep -q "Please report the problem" <<<"$out" || exit 1
 }
 
 assert_crash segv 11
@@ -35,16 +35,16 @@ assert_crash abort 6
 rc=0
 out=$(httrack -#c 2>&1) || rc=$?
 test "$rc" -eq 134 || exit 1
-grep -q "Deliberate 'segv' crash requested" <<<"$out" || exit 1
+command grep -q "Deliberate 'segv' crash requested" <<<"$out" || exit 1
 
 # An unknown kind is a usage error: the exit is the usual panic 255, not a
 # death, and the diagnostic names the kinds.
 rc=0
 err=$(httrack -#c=bogus 2>&1) || rc=$?
 test "$rc" -eq 255 || exit 1
-grep -q "expects one of:" <<<"$err" || exit 1
-grep -q "segv" <<<"$err" || exit 1
-if grep -q "Deliberate" <<<"$err"; then
+command grep -q "expects one of:" <<<"$err" || exit 1
+command grep -q "segv" <<<"$err" || exit 1
+if command grep -q "Deliberate" <<<"$err"; then
     exit 1
 fi
 
@@ -52,6 +52,6 @@ fi
 rc=0
 err=$(httrack -#C 2>&1) || rc=$?
 test "$rc" -eq 255 || exit 1
-if grep -q "Deliberate" <<<"$err"; then
+if command grep -q "Deliberate" <<<"$err"; then
     exit 1
 fi

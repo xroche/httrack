@@ -45,7 +45,7 @@ check() {
     [ -z "$missing" ] || fail "$proj is missing: $missing"
 
     extra=$(comm -13 <(am_sources "$var") <(proj_sources "$proj") |
-        grep -v -x -F "$win_only" | tr '\n' ' ' || true)
+        command grep -v -x -F "$win_only" | tr '\n' ' ' || true)
     [ -z "$extra" ] || fail "$proj builds sources $var does not: $extra"
 }
 

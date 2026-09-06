@@ -31,9 +31,9 @@ crash_report() {
     out=$(httrack "-#c=$kind" 2>&1) || rc=$?
     test "$rc" -eq 134 ||
         fail "-#c=$kind exited $rc, expected 134 (139 means the handler never ran)"
-    grep -q "Deliberate '$kind' crash requested" <<<"$out" ||
+    command grep -q "Deliberate '$kind' crash requested" <<<"$out" ||
         fail "-#c=$kind: the deliberate-crash notice is missing"
-    grep -q "Please report the problem" <<<"$out" ||
+    command grep -q "Please report the problem" <<<"$out" ||
         fail "-#c=$kind: report truncated, the handler died halfway"
     printf '%s\n' "$out"
 }
@@ -44,7 +44,7 @@ crash_report() {
 deepest_repeat() {
     local addrs
 
-    addrs=$(grep -oE '0x[0-9a-f]+' <<<"$1" || true)
+    addrs=$(command grep -oE '0x[0-9a-f]+' <<<"$1" || true)
     if [ -z "$addrs" ]; then
         echo 0
         return
@@ -67,8 +67,8 @@ if [ "$traced" -eq 0 ]; then
     exit 0
 fi
 
-grep -q "^Caught signal 11$" <<<"$segv" || fail "-#c=segv: no 'Caught signal 11' line"
-grep -q "^Caught signal 11$" <<<"$stack" || fail "-#c=stack: no 'Caught signal 11' line"
+command grep -q "^Caught signal 11$" <<<"$segv" || fail "-#c=segv: no 'Caught signal 11' line"
+command grep -q "^Caught signal 11$" <<<"$stack" || fail "-#c=stack: no 'Caught signal 11' line"
 
 # Measured on x86-64: recursion 256 frames/~250 repeats, control 11/1.
 stack_deep=$(deepest_repeat "$stack")

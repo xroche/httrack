@@ -26,7 +26,7 @@ crash_report() {
     out=$(timeout -s KILL 60 httrack "-#c=$kind" 2>&1) || rc=$?
     test "$rc" -ne 137 || fail "-#c=$kind wedged: the handler never came back"
     test "$rc" -eq 134 || fail "-#c=$kind exited $rc, expected 134"
-    grep -q "Please report the problem" <<<"$out" ||
+    command grep -q "Please report the problem" <<<"$out" ||
         fail "-#c=$kind: report truncated, the handler died halfway"
     printf '%s\n' "$out"
 }
@@ -34,7 +34,7 @@ crash_report() {
 # Control: an ordinary fault walks the same spawn path with no lock held, so a
 # build that cannot report at all fails here rather than passing the real case.
 plain=$(crash_report segv)
-if grep -q 'No stack trace available on this OS' <<<"$plain"; then
+if command grep -q 'No stack trace available on this OS' <<<"$plain"; then
     echo "no backtrace() in this build; skipping" >&2
     exit 77
 fi
@@ -42,7 +42,7 @@ fi
 # empty trace has no module block to assert on.
 case "$(uname -m)" in
 arm | armv*)
-    if grep -q 'No stack trace available' <<<"$plain"; then
+    if command grep -q 'No stack trace available' <<<"$plain"; then
         echo "no unwind tables in this ARM build; skipping" >&2
         exit 77
     fi
@@ -52,8 +52,8 @@ locked=$(crash_report atfork)
 
 # The module header is written just before the spawn: no header, no code under test.
 if command -v addr2line >/dev/null || command -v llvm-symbolizer >/dev/null; then
-    grep -qE '^/.+:$' <<<"$plain" || fail "-#c=segv: no symbolizer was spawned"
-    grep -qE '^/.+:$' <<<"$locked" ||
+    command grep -qE '^/.+:$' <<<"$plain" || fail "-#c=segv: no symbolizer was spawned"
+    command grep -qE '^/.+:$' <<<"$locked" ||
         fail "-#c=atfork: no symbolizer was spawned, the deadlock went untested"
 else
     echo "no addr2line and no llvm-symbolizer: spawn path not exercised" >&2
@@ -63,11 +63,11 @@ fi
 # Unanchored width: -a pads to the target pointer size, 8 nibbles on 32-bit.
 if command -v addr2line >/dev/null; then
     # A name, not just the shape: an all-"??" regression still emits the offsets.
-    grep -qE '^0x[0-9a-f]+: [A-Za-z_]' <<<"$locked" ||
+    command grep -qE '^0x[0-9a-f]+: [A-Za-z_]' <<<"$locked" ||
         fail "-#c=atfork: no symbolized frame, addr2line never ran"
     # The child's stdout is redirected onto the report fd, prebuilt at startup:
     # symbolized frames belong on stderr, never on the crawler's own stdout.
     leaked=$(timeout -s KILL 60 httrack '-#c=segv' 2>/dev/null |
-        grep -cE '^0x[0-9a-f]+: ' || true)
+        command grep -cE '^0x[0-9a-f]+: ' || true)
     test "$leaked" -eq 0 || fail "$leaked symbolized frames leaked to stdout"
 fi

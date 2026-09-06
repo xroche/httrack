@@ -53,7 +53,7 @@ refused() { # refused WANTED-MESSAGE ARG...
     shift
     crawl "$@"
     { test "${RC}" -ne 0 && test "${RC}" -ne 134; } || fail "$* not refused (exit ${RC})"
-    grep -q "${want}" "${tmp}/out/.log" ||
+    command grep -q "${want}" "${tmp}/out/.log" ||
         fail "$* refused without saying why: $(<"${tmp}/out/.log")"
 }
 
@@ -88,7 +88,7 @@ test -n "$(find "${tmp}/out" -type f -name page.html -print -quit)" ||
 # Every option that carries a value must emit a short form the engine parses
 # whole: a digit left over reaches "invalid option" and kills the run (#1200).
 rows=$(httrack -O /dev/null "-#test=optalias" -list)
-test "$(grep -c . <<<"${rows}")" -ge 150 || fail "short option list: ${rows}"
+test "$(command grep -c . <<<"${rows}")" -ge 150 || fail "short option list: ${rows}"
 while read -r class name; do
     case ${class} in
     onoff | level) ;;
@@ -98,7 +98,7 @@ while read -r class name; do
         # --advanced-wait=N is a sleep, so only its 0 comes back
         test "${name}" != advanced-wait || test "${value}" = 0 || continue
         crawl "--${name}=${value}"
-        ! grep -q 'invalid option' "${tmp}/out/.log" ||
+        ! command grep -q 'invalid option' "${tmp}/out/.log" ||
             fail "--${name}=${value} (${class}) emits a short form the engine rejects"
     done
 done <<<"${rows}"
@@ -107,7 +107,7 @@ done <<<"${rows}"
 # dead. This does not see two rows that share a class but target different
 # short options; --test is one, and is harmless because the help agrees.
 for name in $(awk '{print $2}' <<<"${rows}" | sort | uniq -d); do
-    n=$(awk -v k="${name}" '$2 == k {print $1}' <<<"${rows}" | sort -u | grep -c .)
+    n=$(awk -v k="${name}" '$2 == k {print $1}' <<<"${rows}" | sort -u | command grep -c .)
     test "${n}" -eq 1 ||
         fail "--${name} has ${n} classes in the table; the first row silently wins"
 done
@@ -133,18 +133,18 @@ echo "file://${tmp}/page.html" >"${tmp}/urls.txt"
 for name in list filelist urllist filterlist; do
     crawl "--${name}=${tmp}/urls.txt"
     test "${RC}" -eq 0 || fail "--${name}=FILE exited ${RC}"
-    ! grep -q 'Syntax error' "${tmp}/out/.log" ||
+    ! command grep -q 'Syntax error' "${tmp}/out/.log" ||
         fail "--${name}=FILE is refused, but its synonym takes the same value"
 done
 
 # Non-circular control on the classes, since the sweep above reads the table it
 # is checking: every --name=0 the wizard writes has to be a row that takes a
 # value, or the flag means the opposite of the box (#1195, #1200).
-literals=$(grep -o -- '--[a-z0-9-]*=0' "${distdir}/html/server/step4.html" |
+literals=$(command grep -o -- '--[a-z0-9-]*=0' "${distdir}/html/server/step4.html" |
     sed -e 's/^--//' -e 's/=0$//' | sort -u)
-test "$(grep -c . <<<"${literals}")" -ge 10 || fail "step4.html scan came up short"
+test "$(command grep -c . <<<"${literals}")" -ge 10 || fail "step4.html scan came up short"
 while read -r name; do
-    class=$(grep -m1 -E "^[a-z0-9]+ ${name}\$" <<<"${rows}" || true)
+    class=$(command grep -m1 -E "^[a-z0-9]+ ${name}\$" <<<"${rows}" || true)
     test -n "${class}" || fail "step4.html writes --${name}=0, which is no option"
     test "${class%% *}" != single ||
         fail "step4.html writes --${name}=0, but its class takes no value"

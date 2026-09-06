@@ -5,4 +5,4 @@ set -euo pipefail
 
 # HTTP status -> reason phrase, including the modern 429/451 (#453).
 out=$(httrack -O /dev/null -#test=status run)
-grep -q "status self-test OK" <<<"$out"
+command grep -q "status self-test OK" <<<"$out"

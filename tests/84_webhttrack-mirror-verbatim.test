@@ -46,16 +46,16 @@ printf 'Hostile mirrored page.\nsid=${_sid} copy=${sid}\ntrailing backslash: \\\
     >"${mirror}"
 
 htsserver_client --path /website/hostile.html --head-file "${hdr}" --body-file "${body}"
-grep -q '^HTTP/1\.0 200 ' "${hdr}" || fail "mirrored page not served: $(head -1 "${hdr}")"
-grep -qF "${sid}" "${body}" &&
+command grep -q '^HTTP/1\.0 200 ' "${hdr}" || fail "mirrored page not served: $(head -1 "${hdr}")"
+command grep -qF "${sid}" "${body}" &&
     fail "the session id was expanded into mirrored content"
 # shellcheck disable=SC2016 # the directives are the payload, not shell expansions
-grep -qF '${_sid}' "${body}" || fail "\${_sid} did not survive verbatim"
+command grep -qF '${_sid}' "${body}" || fail "\${_sid} did not survive verbatim"
 # shellcheck disable=SC2016
-grep -qF '${sid}' "${body}" || fail "\${sid} did not survive verbatim"
+command grep -qF '${sid}' "${body}" || fail "\${sid} did not survive verbatim"
 cmp -s "${mirror}" "${body}" || fail "mirrored file not served byte for byte"
 # The mirror stays browsable: verbatim must not mean served as a download.
-grep -qi '^Content-type: text/html' "${hdr}" ||
+command grep -qi '^Content-type: text/html' "${hdr}" ||
     fail "mirrored page lost its text/html type: $(<"${hdr}")"
 
 # The other direction: a running crawl rebinds /website/ to the new project, so
@@ -76,7 +76,7 @@ htsserver_client --path /step4.html --field "sid=${sid}" --field "path=${work}" 
 start=$SECONDS
 while :; do
     htsserver_client --path /server/index.html >"${work}/pane.txt"
-    if grep -qF 'In progress:' "${work}/pane.txt"; then
+    if command grep -qF 'In progress:' "${work}/pane.txt"; then
         break
     fi
     test "$((SECONDS - start))" -lt 60 ||
@@ -91,7 +91,7 @@ cp "${mirror}" "${crawled}"
 echo "served from the crawl project" >>"${crawled}"
 
 htsserver_client --path /website/hostile.html --head-file "${hdr}" --body-file "${body}"
-grep -q '^HTTP/1\.0 200 ' "${hdr}" ||
+command grep -q '^HTTP/1\.0 200 ' "${hdr}" ||
     fail "running crawl: /website/ was not served: $(head -1 "${hdr}")"
 # cmp, not a "not the GUI page" check: that is only one of the wrong answers.
 cmp -s "${crawled}" "${body}" ||
@@ -100,7 +100,7 @@ cmp -s "${crawled}" "${body}" ||
 # A crawl ending mid-probe leaves the checks above reading the finished pane and
 # passing for the wrong reason, so pin the state they ran in.
 htsserver_client --path /server/index.html >"${work}/pane.txt"
-grep -qF 'In progress:' "${work}/pane.txt" ||
+command grep -qF 'In progress:' "${work}/pane.txt" ||
     fail "the crawl ended during the probes, so /website/ never faced a running one"
 
 echo "PASS"

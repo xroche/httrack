@@ -103,7 +103,7 @@ run_configure() { # run_configure DIR ARG...
         >"${dir}/configure.log" 2>&1 || rc=$?
     # autoconf only warns about a flag it does not know, so a run that lost one
     # would otherwise report the status quo as a pass.
-    if test "${rc}" -eq 0 && grep -q 'unrecognized options' "${dir}/configure.log"; then
+    if test "${rc}" -eq 0 && command grep -q 'unrecognized options' "${dir}/configure.log"; then
         fail_dump "configure did not recognise every flag it was given" "${dir}/configure.log"
     fi
     return "${rc}"
@@ -122,21 +122,21 @@ assert_state() { # assert_state DIR NAME on|off
     # HAVE_BACKTRACE is defined or absent; the rest are defined to 1 or 0.
     if test "${f}" = backtrace; then
         if test "${want}" = on; then
-            grep -q '^#define HAVE_BACKTRACE 1$' "${dir}/config.h" ||
+            command grep -q '^#define HAVE_BACKTRACE 1$' "${dir}/config.h" ||
                 fail_dump "${f}: config.h does not define HAVE_BACKTRACE" "${dir}/config.h"
         else
-            ! grep -q '^#define HAVE_BACKTRACE' "${dir}/config.h" ||
+            ! command grep -q '^#define HAVE_BACKTRACE' "${dir}/config.h" ||
                 fail_dump "${f}: config.h still defines HAVE_BACKTRACE" "${dir}/config.h"
         fi
     else
-        grep -q "^#define ${macro} ${value}\$" "${dir}/config.h" ||
+        command grep -q "^#define ${macro} ${value}\$" "${dir}/config.h" ||
             fail_dump "${f}: config.h does not define ${macro} to ${value}" "${dir}/config.h"
     fi
 
     # The installed header a consumer of libhttrack compiles against. config.h
     # is not installed and cannot stand in for it.
     if test -n "$(feature_public "${f}")"; then
-        grep -q "^#define ${macro} ${value}\$" "${dir}/htsfeatures.h" ||
+        command grep -q "^#define ${macro} ${value}\$" "${dir}/htsfeatures.h" ||
             fail_dump "${f}: htsfeatures.h does not carry ${macro} ${value}" \
                 "${dir}/htsfeatures.h"
     fi
@@ -157,10 +157,10 @@ assert_state() { # assert_state DIR NAME on|off
     # neither config.h nor src/Makefile passes through.
     if test -n "${pc}"; then
         if test "${want}" = off; then
-            ! grep -qE "^(Requires|Libs)\\.private:.*${pc}" "${dir}/src/libhttrack.pc" ||
+            ! command grep -qE "^(Requires|Libs)\\.private:.*${pc}" "${dir}/src/libhttrack.pc" ||
                 fail_dump "${f}: libhttrack.pc still names ${pc}" "${dir}/src/libhttrack.pc"
         else
-            grep -qE "^(Requires|Libs)\\.private:.*${pc}" "${dir}/src/libhttrack.pc" ||
+            command grep -qE "^(Requires|Libs)\\.private:.*${pc}" "${dir}/src/libhttrack.pc" ||
                 fail_dump "${f}: libhttrack.pc does not name ${pc}" "${dir}/src/libhttrack.pc"
         fi
     fi
@@ -224,7 +224,7 @@ SRC
 # are checked before the first run and before any skip.
 help=$(bash "${shadow}/configure" --help) || fail "configure --help failed"
 for flag in --disable-auto-features $(for f in ${features}; do feature_flag "${f}"; done); do
-    grep -q -e "${flag}" <<<"${help}" || fail "configure --help does not offer ${flag}"
+    command grep -q -e "${flag}" <<<"${help}" || fail "configure --help does not offer ${flag}"
 done
 
 # --disable-auto-features makes the flags after it the whole optional set, so a
@@ -623,7 +623,7 @@ n=$((n + 1))
 # A value the switch does not understand must not read as one of the two it does.
 ! run_configure "${work}/bogus" --enable-auto-features=maybe ||
     fail_dump "--enable-auto-features=maybe was accepted" "${work}/bogus/configure.log"
-grep -q 'bad value for auto-features' "${work}/bogus/configure.log" ||
+command grep -q 'bad value for auto-features' "${work}/bogus/configure.log" ||
     fail_dump "configure refused the value without saying which flag" "${work}/bogus/configure.log"
 echo "ok: a value that is neither yes nor no is refused"
 pace "$((SECONDS - began))"
@@ -633,7 +633,7 @@ n=$((n + 1))
 # Same for a feature's own tri-state: an unknown value must not fall through.
 ! run_configure "${work}/btbogus" --enable-backtrace=bogus ||
     fail_dump "--enable-backtrace=bogus was accepted" "${work}/btbogus/configure.log"
-grep -q 'bad value for backtrace' "${work}/btbogus/configure.log" ||
+command grep -q 'bad value for backtrace' "${work}/btbogus/configure.log" ||
     fail_dump "configure refused the value without saying which flag" "${work}/btbogus/configure.log"
 echo "ok: an unknown --enable-backtrace value is refused"
 pace "$((SECONDS - began))"
@@ -644,7 +644,7 @@ n=$((n + 1))
 mkdir -p "${work}/empty"
 ! run_configure "${work}/reject" --disable-auto-features --with-brotli="${work}/empty" ||
     fail_dump "an explicit --with-brotli at an empty prefix was accepted" "${work}/reject/configure.log"
-grep -q 'brotli requested at' "${work}/reject/configure.log" ||
+command grep -q 'brotli requested at' "${work}/reject/configure.log" ||
     fail_dump "configure failed without naming the prefix it was given" "${work}/reject/configure.log"
 echo "ok: an explicit prefix with no library still fails the build"
 pace "$((SECONDS - began))"
@@ -688,7 +688,7 @@ HDR
 ! run_configure "${work}/ic-bare" --with-iconv "CPPFLAGS=-I${work}/noiconv ${CPPFLAGS:-}" ||
     fail_dump "a bare --with-iconv was accepted where iconv_open does not link" \
         "${work}/ic-bare/configure.log"
-grep -q 'iconv requested but no iconv.h with a linkable iconv_open' \
+command grep -q 'iconv requested but no iconv.h with a linkable iconv_open' \
     "${work}/ic-bare/configure.log" ||
     fail_dump "configure failed without saying that iconv was the request" \
         "${work}/ic-bare/configure.log"
@@ -725,7 +725,7 @@ if prefix=$(iconv_fixture lib64); then
     rm -rf "${prefix:?}/lib64"
     ! run_configure "${work}/icdir-nolib" --with-iconv="${prefix}" ||
         fail_dump "a prefix with no libiconv was accepted" "${work}/icdir-nolib/configure.log"
-    grep -q 'no libiconv found in any of' "${work}/icdir-nolib/configure.log" ||
+    command grep -q 'no libiconv found in any of' "${work}/icdir-nolib/configure.log" ||
         fail_dump "configure rejected the prefix without naming the directories it tried" \
             "${work}/icdir-nolib/configure.log"
     echo "ok: --with-iconv=DIR resolves the libdir, links the renaming header, and reports a miss"

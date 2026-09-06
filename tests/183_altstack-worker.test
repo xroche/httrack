@@ -33,7 +33,7 @@ crash_report() {
     out=$(httrack "-#c=$kind" 2>&1) || rc=$?
     test "$rc" -eq 134 ||
         fail "-#c=$kind exited $rc, expected 134 (139 means the handler never ran)"
-    grep -q "Please report the problem" <<<"$out" ||
+    command grep -q "Please report the problem" <<<"$out" ||
         fail "-#c=$kind: report truncated, the handler died halfway"
     printf '%s\n' "$out"
 }
@@ -50,7 +50,7 @@ frame_count() {
 plain=$(crash_report segv)
 worker=$(crash_report threadstack)
 
-grep -q "Crash test worker thread started" <<<"$worker" ||
+command grep -q "Crash test worker thread started" <<<"$worker" ||
     fail "-#c=threadstack: no worker was spawned, nothing was tested"
 
 if [ "$traced" -eq 0 ]; then
@@ -79,7 +79,7 @@ test "$plain_frames" -lt 100 ||
 
 # Naming no frame at all is the unwinder failing outright, not a weak one, and
 # the floor below would take it for loong64. hts_print_backtrace() says which.
-if grep -q "No stack trace available" <<<"$worker"; then
+if command grep -q "No stack trace available" <<<"$worker"; then
     fail "-#c=threadstack: the report carries no stack trace at all"
 fi
 
@@ -97,7 +97,7 @@ fi
 # workers that do return, and the syscall trace says what each did with its
 # stack -- 64kB a worker, and an unmap the kernel is not told about first.
 [ -r "${ALTSTACKPROBE_LA:-}" ] || fail "${ALTSTACKPROBE_LA:-\$ALTSTACKPROBE_LA} was not built"
-if grep -q "^dlname=''" "$ALTSTACKPROBE_LA"; then
+if command grep -q "^dlname=''" "$ALTSTACKPROBE_LA"; then
     echo "static-only build, no release trace" >&2
     exit 0
 fi
@@ -114,7 +114,7 @@ rc=0
 out=$(ALTSTACK_TRACE="$trace" LD_PRELOAD="$ALTSTACKPROBE_LIB" \
     httrack -#test=threadwait 2>&1) || rc=$?
 test "$rc" -eq 0 || fail "-#test=threadwait exited $rc: $out"
-grep -q "threadwait self-test: OK" <<<"$out" ||
+command grep -q "threadwait self-test: OK" <<<"$out" ||
     fail "-#test=threadwait did not report OK, no workers to judge: $out"
 [ -s "$trace" ] || fail "the probe traced no sigaltstack() call at all"
 
