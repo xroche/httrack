@@ -148,6 +148,16 @@ static int mock_read_calls(const char *name) {
   return calls;
 }
 
+/* Backend calls that have returned, ordering their writes against ours. */
+static int mock_read_finished(void) {
+  int n;
+
+  hts_mutexlock(&mock_lock);
+  n = mock_finished;
+  hts_mutexrelease(&mock_lock);
+  return n;
+}
+
 /* Wait for n backend calls to return, ordering their writes against ours. */
 static void mock_wait_finished(int n) {
   for (;;) {
@@ -588,7 +598,7 @@ int dns_timeout_selftests(httrackp *opt) {
   const char *err = NULL;
   lock_probe probe;
   TStamp start, elapsed;
-  int count;
+  int count, finished;
 
   failures = 0;
   hts_dns_set_resolver_backend(&mock_backend);
@@ -605,11 +615,16 @@ int dns_timeout_selftests(httrackp *opt) {
   start = mtime_local();
   count = hts_dns_resolve_all(opt, "slow.test", addrs, HTS_MAXADDRNUM, &err);
   elapsed = mtime_local() - start;
+  finished = mock_read_finished();
 
   /* the resolve returns on opt->timeout, not when the resolver deigns to
      answer: this is what lets --max-time and --timeout fire (#606). The bound
      is derived from opt->timeout, never from the mock's sleep, or a resolve
-     that ignored opt->timeout would still pass under the mock. */
+     that ignored opt->timeout would still pass under the mock. The finished
+     count is a tripwire on the fixture rather than a second bound: the mock
+     returns well after the clock fires, so it can only speak alone if
+     MOCK_SLOW_MS ever stops being the larger of the two. */
+  CHECK(finished == 0);
   CHECK(elapsed < (TStamp) opt->timeout * 1000 + 500);
   CHECK(count == 0); /* a timeout is reported as "does not resolve" */
 
