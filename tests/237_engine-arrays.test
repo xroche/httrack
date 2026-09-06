@@ -31,18 +31,16 @@ case "$err" in
     ;;
 esac
 
-# Room of SIZE_MAX: doubling used to wrap the capacity to 0 and spin forever.
+# Room of SIZE_MAX: doubling used to wrap the capacity to 0 and spin forever,
+# and the allocation it ends on used to abort the process instead of letting
+# the caller fail just the page it was building.
 # ASan kills the process on an over-large request unless told to return NULL.
 err=$(ASAN_OPTIONS="${ASAN_OPTIONS-}${ASAN_OPTIONS:+:}allocator_may_return_null=1" \
-    run_bounded httrack -#test=arrays overflow-loop 2>&1) || true
+    run_bounded httrack -O /dev/null -#test=arrays overflow-loop 2>&1) || true
 case "$err" in
-*"arrays: NOT aborted"*)
-    echo "SIZE_MAX room was NOT caught" >&2
-    exit 1
-    ;;
-*"memory allocation failed"*) ;;
+*"arrays: growth failure OK"*) ;;
 *)
-    echo "expected the growth to terminate and fail to allocate, got: $err" >&2
+    echo "expected the growth to fail and be reported, got: $err" >&2
     exit 1
     ;;
 esac

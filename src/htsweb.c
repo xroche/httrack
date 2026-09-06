@@ -824,9 +824,12 @@ int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_back * b
                   strcatbuff(s, back[i].url_adr);
                 else
                   strcatbuff(s, "localhost");
+                /* url_adr and url_fil are each as wide as s, and this is
+                   the progress display: clip rather than abort */
                 if (back[i].url_fil[0] != '/')
-                  strcatbuff(s, "/");
-                strcatbuff(s, back[i].url_fil);
+                  strlncatbuff(s, "/", sizeof(s), sizeof(s) - 1 - strlen(s));
+                strlncatbuff(s, back[i].url_fil, sizeof(s),
+                             sizeof(s) - 1 - strlen(s));
 
                 StatsBuffer[index].file[0] = '\0';
                 {

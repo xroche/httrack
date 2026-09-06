@@ -34,6 +34,9 @@ n=0
 cases=9
 last_dir=
 
+# The two rejections below give up early, and projecting a full configure off one
+# of them is how the s390x leg ran into its budget instead of skipping.
+
 # Seeding the cache variable is the answer a host without getaddrinfo gives, and
 # AC_CHECK_LIB takes the same action-if-not-found branch either way. "have"
 # forces the other answer so every case below means the same on any host; the
@@ -90,7 +93,7 @@ expect() { # expect DESC SEED WANT-VALUE WANT-SUMMARY ARG...
     grep -q "whether IPv6 support is enabled\.\.\. ${summary}\$" "${last_dir}/configure.log" ||
         fail_dump "${desc}: configure did not report '${summary}'" "${last_dir}/configure.log"
     echo "ok: ${desc}"
-    skip_if_out_of_budget "$((cases - n))" "$((SECONDS - began))"
+    pace "$((cases - n))" "$((SECONDS - began))"
 }
 
 expect_fail() { # expect_fail DESC SEED WANT-TEXT ARG...
@@ -103,33 +106,38 @@ expect_fail() { # expect_fail DESC SEED WANT-TEXT ARG...
     grep -q "${text}" "${last_dir}/configure.log" ||
         fail_dump "${desc}: configure failed without saying '${text}'" "${last_dir}/configure.log"
     echo "ok: ${desc}"
-    skip_if_out_of_budget "$((cases - n))" "$((SECONDS - began))"
+    pace "$((cases - n))" "$((SECONDS - began))"
 }
 
 # The probe must define the macro either way, and this is the case master
 # fails: it warned and left HTS_INET6 undefined. First, so a slow host's budget
-# cannot skip past the guard the test exists for.
+# cannot skip past the guard the test exists for, and so the pace above projects
+# against a full configure from the very first step.
 expect "the default probes and reports the loss" hide 0 "no (auto)"
+
+# The two rejections next: configure gives up on the flag itself, so these are
+# the cheapest steps here and a host that can afford few runs more of them.
+# The probe cannot overrule an explicit yes, and the diagnostic has to name the
+# flag that gets the packager past it.
+expect_fail "a value that is not yes/no/auto is rejected" have \
+    "bad value for ipv6, expected yes/no/auto" --enable-ipv6=bogus
+expect_fail "--enable-ipv6=yes without getaddrinfo is fatal" hide \
+    "no getaddrinfo in libc. Pass --disable-ipv6" --enable-ipv6=yes
+
 expect "the default probes and finds getaddrinfo" have 1 "yes (auto)"
 
 # An explicit request is answered by the request, and says which it was.
 expect "--enable-ipv6=yes is honoured" have 1 "yes (requested)" --enable-ipv6=yes
 expect "--disable-ipv6 is honoured" have 0 "no (requested)" --disable-ipv6
 
-# A build that asked for no IPv6 has no reason to care what the host has.
+# A build that asked for no IPv6 has no reason to care what the host has. It
+# reads the run above, so it stays attached to it.
 if grep -q "getaddrinfo" "${last_dir}/configure.log"; then
     fail_dump "--disable-ipv6 still probed for getaddrinfo" "${last_dir}/configure.log"
 fi
 
 # Spelling the default out loud reaches the same place the default does.
 expect "--enable-ipv6=auto probes" have 1 "yes (auto)" --enable-ipv6=auto
-
-# The probe cannot overrule an explicit yes, and the diagnostic has to name the
-# flag that gets the packager past it.
-expect_fail "--enable-ipv6=yes without getaddrinfo is fatal" hide \
-    "no getaddrinfo in libc. Pass --disable-ipv6" --enable-ipv6=yes
-expect_fail "a value that is not yes/no/auto is rejected" have \
-    "bad value for ipv6, expected yes/no/auto" --enable-ipv6=bogus
 
 # IPv6 is deliberately not one of the automagic features: defaulting it off with
 # them would move SOCaddr under every recipe that passes that flag.

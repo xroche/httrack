@@ -28,6 +28,7 @@ post_redirect() {
 # this discriminates where the announced URL cannot.
 probe_alias() {
     "${HTS_PYTHON}" -c 'import socket, sys
+sys.stdout.reconfigure(newline="\n")  # the word below is compared byte for byte
 s = socket.socket()
 try:
     s.bind(("127.0.0.2", int(sys.argv[1])))
@@ -41,7 +42,9 @@ finally:
 
 # Non-repeating and not a round number: a truncation, a reorder or a dropped
 # interior byte all stay visible.
-long=$("${HTS_PYTHON}" -c 'print("".join(chr(33 + i % 90) for i in range(4097)))')
+long=$("${HTS_PYTHON}" -c 'import sys
+sys.stdout.reconfigure(newline="\n")  # a CR here would be a 4098th byte to echo
+print("".join(chr(33 + i % 90) for i in range(4097)))')
 htsserver_start
 sid=$(htsserver_sid)
 test "${#sid}" -eq 32 || fail "did not scrape a 32-hex sid (got '${sid}')"

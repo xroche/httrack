@@ -129,6 +129,34 @@ HTSEXT_API T_SOC catch_url_init(int *port, /* 128 bytes */ char *adr) {
   return soc;
 }
 
+/* Accumulate the request headers into "data" (CATCH_URL_DATA_SIZE bytes, on
+   entry holding the request line) and feed them to treathead(). HTS_FALSE if
+   the block did not fit: a clipped header block is not the request the browser
+   sent, so the caller drops the capture rather than replay a prefix. */
+static hts_boolean catch_url_headers(T_SOC soc, char *data, htsblk *blkretour) {
+  char line[1000];
+  size_t used = strlen(data); /* invariant: used < CATCH_URL_DATA_SIZE */
+
+  do {
+    size_t need;
+
+    /* a clipped header is not the one the browser sent: dropping it
+       beats replaying a prefix */
+    if (socinput(soc, line, (int) sizeof(line)))
+      continue;
+    treathead(NULL, NULL, NULL, blkretour, line); // traiter
+    need = strlen(line) + 2;                      // the CRLF this line carries
+    if (need >= CATCH_URL_DATA_SIZE - used)
+      return HTS_FALSE;
+    strlcatbuff(data, line, CATCH_URL_DATA_SIZE);
+    strlcatbuff(data, "\r\n", CATCH_URL_DATA_SIZE);
+    used += need;
+    /* the empty line ending the block was appended just above, which is why no
+       final CRLF is added afterwards */
+  } while (strnotempty(line));
+  return HTS_TRUE;
+}
+
 // 2 - Wait for URL
 
 // catch_url
@@ -199,37 +227,30 @@ HTSEXT_API hts_boolean catch_url(T_SOC soc, char *url, char *method,
             blkretour.location = loc;   // si non nul, contiendra l'adresse véritable en cas de moved xx
             // Lire en têtes restants
             sprintf(data, "%s %s %s\r\n", method, af.fil, protocol);
-            while(strnotempty(line)) {
-              /* a clipped header is not the one the browser sent: dropping it
-                 beats replaying a prefix */
-              if (socinput(soc, line, 1000))
-                continue;
-              treathead(NULL, NULL, NULL, &blkretour, line);    // traiter
-              strlcatbuff(data, line, CATCH_URL_DATA_SIZE);
-              strlcatbuff(data, "\r\n", CATCH_URL_DATA_SIZE);
-            }
-            // CR/LF final de l'en tête inutile car déja placé via la ligne vide
-            // juste au dessus
-            if (blkretour.totalsize > 0) {
-              int pos = (int) strlen(data);
-              /* the headers already took part of data[], so bound the body by
-                 the room they left rather than by a constant */
-              int len = (int) min(blkretour.totalsize,
-                                  (LLint) (CATCH_URL_DATA_SIZE - 1 - pos));
+            if (catch_url_headers(soc, data, &blkretour)) {
+              if (blkretour.totalsize > 0) {
+                int pos = (int) strlen(data);
+                /* the headers already took part of data[], so bound the body by
+                   the room they left rather than by a constant */
+                int len = (int) min(blkretour.totalsize,
+                                    (LLint) (CATCH_URL_DATA_SIZE - 1 - pos));
 
-              // Copier le reste (post éventuel)
-              while((len > 0)
-                    && ((r = recv(soc, (char *) data + pos, len, 0)) > 0)) {
-                pos += r;
-                len -= r;
-                data[pos] = '\0';       // terminer par NULL
+                // Copier le reste (post éventuel)
+                while ((len > 0) &&
+                       ((r = recv(soc, (char *) data + pos, len, 0)) > 0)) {
+                  pos += r;
+                  len -= r;
+                  data[pos] = '\0'; // terminer par NULL
+                }
               }
+              // Envoyer page
+              sprintf(line, CATCH_RESPONSE);
+              send(soc, line, (int) strlen(line), 0);
+              // OK!
+              retour = 1;
+            } else {
+              data[0] = '\0'; // no prefix handed back
             }
-            // Envoyer page
-            sprintf(line, CATCH_RESPONSE);
-            send(soc, line, (int) strlen(line), 0);
-            // OK!
-            retour = 1;
           }
         }
       } // sinon erreur

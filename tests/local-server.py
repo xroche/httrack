@@ -3348,6 +3348,28 @@ class Handler(SimpleHTTPRequestHandler):
             )
         self.send_error(404)
 
+    # Basic auth, so a test can tell a credential that arrived from one the
+    # engine dropped. child.html carries no userinfo: reaching it needs the
+    # credentials the engine stored for the directory.
+    def route_basicauth(self):
+        want = "Basic " + base64.b64encode(b"user:secret").decode()
+        if self.headers.get("Authorization") != want:
+            self.send_response(401)
+            self.send_header("WWW-Authenticate", 'Basic realm="t"')
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        if self.path.endswith("/child.html"):
+            body = b"<html><body>AUTHED-CHILD</body></html>"
+        else:
+            # Absolute and credential-free, so following it needs the stored
+            # prefix rather than the parent URL's own userinfo.
+            child = "http://%s/basicauth/child.html" % self.headers.get("Host")
+            body = (
+                '<html><body>AUTHED<a href="%s">c</a></body></html>' % child
+            ).encode()
+        self.send_raw(body, "text/html")
+
     ROUTES = {
         "/sfmark.html": route_singlefile_mark,
         "/cookies/entrance.php": route_entrance,
@@ -3862,6 +3884,9 @@ class Handler(SimpleHTTPRequestHandler):
             return True
         if path.startswith("/charset/"):
             self.route_charset()
+            return True
+        if path.startswith("/basicauth/"):
+            self.route_basicauth()
             return True
         if path.startswith("/charref/"):
             self.route_charref()
