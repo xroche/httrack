@@ -6,7 +6,7 @@
 
 # Windows runs the whole body once per PowerShell flavour, and every leg runs the
 # watchdog for a window of real seconds: 248s on three pinned cores at -j16, the
-# shape of the macOS runner. The retry leg below can add 120s more per flavour.
+# shape of the macOS runner. The retry below can add 240s more per flavour.
 # TEST_TIMEOUT_AT_LEAST: 900
 
 set -euo pipefail
@@ -773,9 +773,24 @@ for psrun in "${psruns[@]}"; do
     fast=$(count_matching_lines 't=[0-9]*s q=' <<<"$out")
     # A turn of the loop costs whatever the box gives it, and a 3-core runner
     # under -j16 spent the whole 5s window on one turn, so both legs came back
-    # with one line. Widen the window rather than grade that sample: 30s still
-    # outran a 160-way overcommit on three cores, where 5s lost at 48.
+    # with one line. Widen rather than grade that sample: 30s still outran a
+    # 160-way overcommit on three cores, where 5s lost at 48.
+    #
+    # Both legs widen together, or the comparison loosens. $slow is pinned at 1,
+    # so this reads "at least two posts in the window", and moving the 1s leg
+    # alone would relax it to a 15s cadence. A watchdog on a hardcoded 10s
+    # schedule lands in this branch and then clears that bar, so the 100s leg
+    # re-run at the same window is what catches it, because it posts there too.
+    # A floor scaled to the window cannot replace the ratio, since a starved box
+    # posts every ~10s honestly.
     if test "$fast" -le "$slow"; then
+        out=$(run_wd 120 -File "$(nativepath "$wdscript")" \
+            -ProgressLog "$(nativepath "$tmp/progress.log")" \
+            -IntervalSeconds 100 -PollSeconds 1 -MaxSeconds 30) ||
+            fail "the $psrun slow-cadence loop exited nonzero over 30s: $out"
+        slow=$(count_matching_lines 't=[0-9]*s q=' <<<"$out")
+        test "$slow" -eq 1 ||
+            fail "$slow status lines at a 100s cadence over 30s, want 1: $out"
         out=$(run_wd 120 -File "$(nativepath "$wdscript")" \
             -ProgressLog "$(nativepath "$tmp/progress.log")" \
             -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 30) ||

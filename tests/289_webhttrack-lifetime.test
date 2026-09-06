@@ -221,7 +221,10 @@ start_case
 crawl_pid=${HTS_PID}
 crawl_port=${HTS_PORT}
 clog="${work}/content.log"
-"${HTS_PYTHON}" "${testdir}/local-server.py" --root "${work}" >"${clog}" 2>&1 &
+# Verbose, so the log records each request served and the guard below can read
+# the crawl's progress from the fixture rather than from the server under test.
+LOCAL_SERVER_VERBOSE=1 \
+    "${HTS_PYTHON}" "${testdir}/local-server.py" --root "${work}" >"${clog}" 2>&1 &
 csrv=$!
 cport=$(discover_server_port "${clog}" "${csrv}") || fail "no content server"
 
@@ -236,10 +239,14 @@ test "${#sid}" -eq 32 || fail "no session id to start a mirror with"
     >/dev/null
 
 ping "${crawl_port}" w1
-w1_at=${SECONDS}
 bye "${crawl_port}" w1 "${sid}"
 sleep $((grace + 2))
-still_in_window "${w1_at}" "the goodbye and its grace"
+# Not the ping window: the veto freezes the idle clock, so what this case rests
+# on is the mirror still being in flight. The margin is about a second, since the
+# probe lands near 4.5s of the slow page's 5s. The fixture logs that page once it
+# has been served, so a log naming it is a crawl that may already be over.
+! grep -q 'abortpurge/slow\.html' "${clog}" ||
+    skip "the mirror's slow page was already served, so a departure here proves nothing"
 kill -0 "${crawl_pid}" 2>/dev/null ||
     fail "the crawling server quit, taking its mirror with it"
 # A crawl that never started would leave the veto unexercised, and the survival
