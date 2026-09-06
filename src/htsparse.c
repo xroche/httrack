@@ -473,7 +473,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       int intag = 0;            // on est dans un tag
       int incomment = 0;        // dans un <!--
       int inscript = 0;         // dans un scipt pour applets javascript)
-      int incss = 0;            /* stylesheet: url(x) may drop its quotes */
+      int incss = 0;            /* CSS lets url(x) go unquoted */
       int inscript_locked = 0;  // in locked script (ie. js file)
       signed char inscript_state[INSCRIPT_NSTATES][257];
       INSCRIPT inscript_state_pos = INSCRIPT_START;
@@ -959,11 +959,13 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
               // ** while(is_realspace(*(--a)));
               if (*a == '<') {  // sûr que c'est un tag?
-                if (check_tag(intag_start, "script"))
+                if (check_tag(intag_start, "script")) {
                   inscript_name = "script";
-                else
+                  incss = 0;
+                } else {
                   inscript_name = "style";
-                incss = (check_tag(intag_start, "script") == 0);
+                  incss = 1;
+                }
                 inscript = 1;
                 inscript_state_pos = INSCRIPT_START;
                 intag = 1;      // because après <script> on y est .. - pas utile
@@ -1301,8 +1303,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                            On est désormais dans du code javascript
                          */
                         inscript_name = "";
-                        /* style= is CSS, every other hts_detect_js[] entry is
-                         * JS. */
+                        /* Only style= means CSS in hts_detect_js[]. */
                         incss = is_style_attr;
                         inscript = inscript_tag = 1;
                         inscript_state_pos = INSCRIPT_START;
@@ -1515,7 +1516,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         /* CSS writes url(foo.png) unquoted, but JavaScript's
                            new URL(x) matches the same token, so an unquoted
                            operand there rewrites the expression itself. */
-                        can_avoid_quotes = !inscript || incss;
+                        can_avoid_quotes = incss;
                         quotes_replacement = ')';
                       }
                       if (!nc)
@@ -1952,6 +1953,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                    On est désormais dans du code javascript
                  */
                 inscript_name = "";
+                /* A javascript: URL is JavaScript, whatever an earlier
+                   <style> left in incss. */
+                incss = 0;
                 inscript_tag = inscript = 1;
                 inscript_state_pos = INSCRIPT_START;
                 inscript_tag_lastc = quote;     /* à attendre à la fin */

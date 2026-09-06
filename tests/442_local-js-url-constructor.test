@@ -2,13 +2,15 @@
 #
 # htsparse spots a CSS url(...) by matching the token "url" before a "(" and
 # accepts an unquoted operand, because CSS is written that way. JavaScript's
-# new URL(x) matches the same token, so the expression itself was rewritten as
-# a URL: excalidraw.com's shipped bundle became new URL(https://host/e), where
-# the // comments out the rest of the line and the file stops parsing.
+# new URL(x) matches the same token, so the operand was taken for a link and
+# rewritten, and a bundle whose new URL(e) became new URL(https://host/e) stops
+# parsing at the "//".
 #
-# The CSS cases are asserted alongside because two candidate fixes each cured
-# the JavaScript and silently dropped one of them: inscript is set for
-# text/css documents too, so it cannot tell the two apart on its own.
+# The contract: inside a script an unquoted operand is an expression and must
+# survive untouched; in CSS it is a URL and must still be rewritten. All four
+# places CSS reaches the parser are asserted, because a fix that keys on
+# "inside a script" alone drops one of them: htsparse sets that flag for
+# text/css documents too.
 
 set -euo pipefail
 
@@ -20,33 +22,40 @@ cleanup_push rm -rf "$work"
 root="$work/root"
 mkdir -p "$root"
 
-# One page carrying every context the fix has to keep apart: an external
-# script, an external stylesheet, a <style> block and a style= attribute.
+# One page carrying every context the fix must keep apart. The style=
+# attribute comes before the <style> block, so each one is the first CSS the
+# parser meets and neither can cover for the other, and the javascript: URL
+# comes after both, where a stale "this is CSS" state would show up.
 cat >"$root/index.html" <<'EOF'
 <!DOCTYPE html><html><head>
-<link rel="stylesheet" href="s.css">
-<style>body { background: url(inline.png); }</style>
+<link rel="stylesheet" href="sheet.css">
 </head><body>
 <div style="background:url(attr.png)">x</div>
-<script src="u.js"></script>
+<style>body { background: url(inline.png); }</style>
+<a href="javascript:new URL(later).href">l</a>
+<script src="script.js"></script>
 </body></html>
 EOF
 
-# new URL(e) takes a variable, not a URL. Rewriting it breaks the script.
-cat >"$root/u.js" <<'EOF'
+# Operands a URL-shaped guess would still mangle: a bare name, a dotted
+# expression, and one carrying a slash.
+cat >"$root/script.js" <<'EOF'
 function f(e) { return new URL(e).href; }
-window.name = f("http://example.com/x");
+var here = new URL(location.href).href;
+var ratio = new URL(width/height).href;
 EOF
 
-printf 'div { background: url(sheet.png); }\n' >"$root/s.css"
+printf 'div { background: url(sheet.png); }\n' >"$root/sheet.css"
 for img in inline attr sheet; do
     printf '\211PNG\r\n\032\n' >"$root/$img.png"
 done
 
 bash "$top_srcdir/tests/local-crawl.sh" --root "$root" \
     --errors 0 \
-    --found u.js --found s.css \
+    --found script.js --found sheet.css \
     --found inline.png --found attr.png --found sheet.png \
-    --file-matches u.js 'new URL\(e\)' \
-    --file-not-matches u.js 'new URL\([^e)]' \
+    --file-matches script.js 'new URL\(e\)' \
+    --file-matches script.js 'new URL\(location\.href\)' \
+    --file-matches script.js 'new URL\(width/height\)' \
+    --file-matches index.html 'javascript:new URL\(later\)' \
     httrack BASEURL/index.html -q -%v0 -r3
