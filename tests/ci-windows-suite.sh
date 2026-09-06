@@ -275,6 +275,7 @@ expected_skips_wsl2="01_engine-footer-overflow.test
 377_engine-install-paths.test
 398_engine-build-features.test
 424_engine-wizard-eof.test
+444_local-stop-keeps-resume.test
 294_local-wizard-eof.test
 24_local-resume-overlap.test"
 
