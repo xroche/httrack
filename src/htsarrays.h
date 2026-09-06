@@ -45,8 +45,8 @@ Please visit our Website: http://www.httrack.com
 
 #include "htssafe.h"
 
-/* Abort (with the failed byte count) when a growth allocation fails. The
-   array macros never return an out-of-memory error; they assert and abort. */
+/* Abort on a NULL the caller has no way to fail gracefully. Not what the array
+   macros do: they record the failure and let the caller decide. */
 static HTS_UNUSED void hts_record_assert_memory_failed(const size_t size) {
   fprintf(stderr, "memory allocation failed (%lu bytes)", (long int) size);
   assertf(!"memory allocation failed");
@@ -66,10 +66,19 @@ static HTS_UNUSED void hts_record_assert_memory_failed(const size_t size) {
     size_t size;                                                               \
     /** Capacity. **/                                                          \
     size_t capa;                                                               \
+    /** Sticky: a growth allocation returned NULL. **/                         \
+    hts_boolean failed;                                                        \
   }
 
 /** Initializer for an empty array (no backing store, size and capacity 0). **/
-#define EMPTY_TYPED_ARRAY {{NULL}, 0, 0}
+#define EMPTY_TYPED_ARRAY {{NULL}, 0, 0, HTS_FALSE}
+
+/**
+ * Has a growth allocation failed on this array?
+ * Sticky, so one test covers a run of appends; what was added before the
+ * failure is still there, what came after is not.
+ **/
+#define TypedArrayFailed(A) ((A).failed)
 
 /** Array size, in elements. **/
 #define TypedArraySize(A) ((A).size)
@@ -105,41 +114,51 @@ static HTS_UNUSED void hts_record_assert_memory_failed(const size_t size) {
 
 /**
  * Ensure at least 'ROOM' elements can be put in the remaining space.
- * After a call to this macro, TypedArrayRoom(A) is guaranteed to be at
- * least equal to 'ROOM'. Aborts if the total would not fit a size_t.
+ * On success TypedArrayRoom(A) is at least 'ROOM'; on an allocation failure
+ * the array keeps its previous contents and TypedArrayFailed(A) turns true.
+ * Aborts only if the total would not fit a size_t, which is a caller bug.
  **/
 #define TypedArrayEnsureRoom(A, ROOM)                                          \
   do {                                                                         \
-    const size_t room_ = (ROOM);                                               \
-    /* Largest element count whose byte size still fits a size_t. */           \
-    const size_t maxCapa_ = (size_t) -1 / TypedArrayWidth(A);                  \
-    const size_t minCapa_ = maxCapa_ < 16 ? maxCapa_ : 16;                     \
-    size_t capa_ = TypedArrayCapa(A);                                          \
-    assertf(room_ <= maxCapa_ - TypedArraySize(A));                            \
-    /* Saturating: a plain capa_*2 wraps to 0 and the loop never ends. */      \
-    while (capa_ - TypedArraySize(A) < room_) {                                \
-      capa_ = capa_ < minCapa_       ? minCapa_                                \
-              : capa_ > maxCapa_ / 2 ? maxCapa_                                \
-                                     : capa_ * 2;                              \
-    }                                                                          \
-    TypedArrayCapa(A) = capa_;                                                 \
-    TypedArrayPtr(A) = realloct(TypedArrayPtr(A), capa_ * TypedArrayWidth(A)); \
-    if (TypedArrayPtr(A) == NULL) {                                            \
-      hts_record_assert_memory_failed(capa_ *TypedArrayWidth(A));              \
+    if (!TypedArrayFailed(A)) {                                                \
+      const size_t room_ = (ROOM);                                             \
+      /* Largest element count whose byte size still fits a size_t. */         \
+      const size_t maxCapa_ = (size_t) -1 / TypedArrayWidth(A);                \
+      const size_t minCapa_ = maxCapa_ < 16 ? maxCapa_ : 16;                   \
+      size_t capa_ = TypedArrayCapa(A);                                        \
+      void *newPtr_;                                                           \
+      assertf(room_ <= maxCapa_ - TypedArraySize(A));                          \
+      /* Saturating: a plain capa_*2 wraps to 0 and the loop never ends. */    \
+      while (capa_ - TypedArraySize(A) < room_) {                              \
+        capa_ = capa_ < minCapa_       ? minCapa_                              \
+                : capa_ > maxCapa_ / 2 ? maxCapa_                              \
+                                       : capa_ * 2;                            \
+      }                                                                        \
+      /* Via a temporary: realloc keeps the old block on failure. */           \
+      newPtr_ = realloct(TypedArrayPtr(A), capa_ * TypedArrayWidth(A));        \
+      if (newPtr_ != NULL) {                                                   \
+        TypedArrayPtr(A) = newPtr_;                                            \
+        TypedArrayCapa(A) = capa_;                                             \
+      } else {                                                                 \
+        TypedArrayFailed(A) = HTS_TRUE;                                        \
+      }                                                                        \
     }                                                                          \
   } while (0)
 
-/** Add an element. Macro, first element evaluated multiple times. **/
+/** Add an element, unless the array has already failed to grow. Macro, first
+    element evaluated multiple times. **/
 #define TypedArrayAdd(A, E)                                                    \
   do {                                                                         \
     TypedArrayEnsureRoom(A, 1);                                                \
-    assertf(TypedArraySize(A) < TypedArrayCapa(A));                            \
-    TypedArrayTail(A) = (E);                                                   \
-    TypedArraySize(A)++;                                                       \
+    if (!TypedArrayFailed(A)) {                                                \
+      assertf(TypedArraySize(A) < TypedArrayCapa(A));                          \
+      TypedArrayTail(A) = (E);                                                 \
+      TypedArraySize(A)++;                                                     \
+    }                                                                          \
   } while (0)
 
 /**
- * Add 'COUNT' elements from 'PTR'.
+ * Add 'COUNT' elements from 'PTR', unless the array has already failed to grow.
  * Macro, first element evaluated multiple times.
  **/
 #define TypedArrayAppend(A, PTR, COUNT)                                        \
@@ -151,15 +170,18 @@ static HTS_UNUSED void hts_record_assert_memory_failed(const size_t size) {
     } else {                                                                   \
       const void *const source_ = (PTR);                                       \
       TypedArrayEnsureRoom(A, count_);                                         \
-      assertf(count_ <= TypedArrayRoom(A));                                    \
-      memcpy(&TypedArrayTail(A), source_, count_ *TypedArrayWidth(A));         \
-      TypedArraySize(A) += count_;                                             \
+      if (!TypedArrayFailed(A)) {                                              \
+        assertf(count_ <= TypedArrayRoom(A));                                  \
+        memcpy(&TypedArrayTail(A), source_, count_ *TypedArrayWidth(A));       \
+        TypedArraySize(A) += count_;                                           \
+      }                                                                        \
     }                                                                          \
   } while (0)
 
-/** Clear an array, freeing memory and clearing size and capacity. **/
+/** Clear an array, freeing memory and clearing size, capacity and failure. **/
 #define TypedArrayFree(A)                                                      \
   do {                                                                         \
+    TypedArrayFailed(A) = HTS_FALSE;                                           \
     if (TypedArrayPtr(A) != NULL) {                                            \
       TypedArrayCapa(A) = TypedArraySize(A) = 0;                               \
       freet(TypedArrayPtr(A));                                                 \

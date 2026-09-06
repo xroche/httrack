@@ -89,9 +89,11 @@ Please visit our Website: http://www.httrack.com
     const char *const str_ = (A); \
     size_t size_; \
     TypedArrayEnsureRoom(output_buffer, strlen(str_) * (FACTOR) + 1024); \
-    size_ = FUNCTION(str_, &TypedArrayTail(output_buffer), \
-                     TypedArrayRoom(output_buffer)); \
-    TypedArraySize(output_buffer) += size_; \
+    if (!TypedArrayFailed(output_buffer)) { \
+      size_ = FUNCTION(str_, &TypedArrayTail(output_buffer), \
+                       TypedArrayRoom(output_buffer)); \
+      TypedArraySize(output_buffer) += size_; \
+    } \
   } \
 } while(0)
 
@@ -3447,6 +3449,12 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
         lastsaved = html;        // dernier écrit+1
         // ----------
 
+        /* The rewritten page outgrew what we can allocate, so end the parse
+           here and fail the page rather than the crawl. */
+        if (TypedArrayFailed(output_buffer)) {
+          html = r->adr + r->size;
+        }
+
         // Checks
         if (back_add_stats != opt->state.back_add_stats) {
           back_add_stats = opt->state.back_add_stats;
@@ -3488,7 +3496,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       opt->state._hts_cancel = 0;       // pas de cancel
 
       if ((opt->getmode & HTS_GETMODE_HTML) && (ptr > 0)) {
-        {
+        if (!TypedArrayFailed(output_buffer)) {
           char *cAddr = TypedArrayElts(output_buffer);
           int cSize = (int) TypedArraySize(output_buffer);
 
@@ -3512,7 +3520,12 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
         }
 
         /* Flush and save to disk */
-        if (TypedArraySize(output_buffer) != 0) {
+        if (TypedArrayFailed(output_buffer)) {
+          hts_log_print(opt, LOG_ERROR,
+                        "Not enough memory to rewrite %s%s, page skipped",
+                        urladr(), urlfil());
+          error = 1;
+        } else if (TypedArraySize(output_buffer) != 0) {
           hts_finish_html_file(
               opt, cache, r, &fp, TypedArrayElts(output_buffer),
               TypedArraySize(output_buffer), urladr(), urlfil(), savename());
