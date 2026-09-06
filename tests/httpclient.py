@@ -16,7 +16,7 @@ def host_header(args):
     return "Host: %s\r\n" % args.host if args.host else ""
 
 
-def build_request(args):
+def build_request(args, path):
     if args.field or args.post is not None:
         if args.field:
             # urlencode, not quote(): a browser sends "+" for a space, and the
@@ -28,10 +28,10 @@ def build_request(args):
             "POST %s HTTP/1.0\r\n%s"
             "Content-type: application/x-www-form-urlencoded\r\n"
             "Content-length: %d\r\n\r\n%s"
-            % (args.path or "/", host_header(args), len(body), body)
+            % (path or "/", host_header(args), len(body), body)
         )
     return "GET %s HTTP/1.0\r\n%s\r\n" % (
-        args.path or "/server/index.html",
+        path or "/server/index.html",
         host_header(args),
     )
 
@@ -39,7 +39,11 @@ def build_request(args):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--port", type=int, required=True)
-    p.add_argument("--path")
+    p.add_argument(
+        "--path",
+        action="append",
+        help="request path; repeatable, each sent on its own connection",
+    )
     p.add_argument("--post", help="raw urlencoded body; POSTs it")
     p.add_argument(
         "--field",
@@ -62,9 +66,17 @@ def main():
     p.add_argument("--body-file", help="write the body here, not to stdout")
     args = p.parse_args()
 
+    paths = args.path or [None]
+    if len(paths) > 1 and (args.head_file or args.body_file):
+        p.error("--head-file and --body-file take a single --path")
+    for path in paths:
+        request(args, path)
+
+
+def request(args, path):
     s = socket.create_connection(("127.0.0.1", args.port), 10)
     s.settimeout(args.timeout)
-    s.sendall(build_request(args).encode())
+    s.sendall(build_request(args, path).encode())
     out = b""
     try:
         while True:

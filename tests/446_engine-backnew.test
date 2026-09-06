@@ -1,0 +1,26 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# back_new() sizes the backing table from -cN, so a table nobody can allocate
+# must come back as the NULL httpmirror() already logs and gives up on, not as
+# an abort. The cap is RLIMIT_AS, so hosts where it is advisory report a skip;
+# ASan needs telling to return NULL rather than die.
+rc=0
+out=$(ASAN_OPTIONS="${ASAN_OPTIONS-}${ASAN_OPTIONS:+:}allocator_may_return_null=1" \
+    httrack -O /dev/null -#test=backnew 2>&1) || rc=$?
+test "$rc" -eq 0 || fail "-#test=backnew: exited $rc, output: $out"
+case "$out" in
+"backnew: oom OK") ;;
+*skipped*)
+    echo "SKIP: $out" >&2
+    ;;
+*)
+    fail "expected the failed allocation to be reported, got: $out"
+    ;;
+esac
+
+exit 0

@@ -159,6 +159,33 @@ refused the command line, or a cache operation it asked for failed. No mirror ra
 .I /etc/httrack.conf
 .RS
 The system wide configuration file.
+.RE
+.PP
+A running mirror also watches its own output directory for these. Creating one
+is how a script drives an engine it has no other handle on. On Windows, which
+has no cross\-process
+.BR kill (1),
+it is the only way.
+.TP
+.I hts\-in_progress.lock
+Written when the mirror starts and deleted when it ends. It records the command
+line, and names the two request files below.
+.TP
+.I hts\-stop.lock
+Create it to pause the mirror. The engine deletes it, lets the transfers already
+in flight finish, writes
+.I hts\-paused.lock
+and waits. Delete that one to carry on.
+.TP
+.I hts\-abort.lock
+Create it to stop the mirror and keep what it has downloaded, so that a later
+.I \-\-continue
+resumes from there rather than starting over. The engine deletes it and stops.
+It acts only on a request stamped later than
+.IR hts\-in_progress.lock ,
+so one left behind by an earlier run does not stop this mirror. Create the file
+again if the mirror had only just started. A request the engine cannot delete is
+ignored too, because it would otherwise stop the mirror on every later poll.
 .SH ENVIRONMENT
 .IP HOME
 Is being used if you defined in /etc/httrack.conf the line

@@ -51,6 +51,7 @@ Please visit our Website: http://www.httrack.com
 
 /* Static definitions */
 static int fexist(const char *s);
+static int fnewer(const char *a, const char *b);
 static int linput(FILE * fp, char *s, int max);
 
 // htswrap_add
@@ -764,9 +765,23 @@ static int __cdecl htsshow_check_mime(t_hts_callbackarg * carg, httrackp * opt,
 }
 static void __cdecl htsshow_pause(t_hts_callbackarg * carg, httrackp * opt,
                                   const char *lockfile) {
-  while(fexist(lockfile)) {
+  String abortlock = STRING_EMPTY, progress = STRING_EMPTY;
+
+  /* Strings, because a truncated path would leave a paused engine polling one
+     nothing can create. */
+  StringCopy(abortlock, StringBuff(opt->path_log));
+  StringCat(abortlock, HTS_ABORT_LOCKNAME);
+  StringCopy(progress, StringBuff(opt->path_log));
+  StringCat(progress, "hts-in_progress.lock");
+  /* Leaving the wait is all this has to do, because the engine takes the
+     request at its next check. Same staleness rule as hts_take_abort_request(),
+     or a request an earlier run left would defeat the pause. */
+  while (fexist(lockfile) &&
+         !fnewer(StringBuff(abortlock), StringBuff(progress))) {
     Sleep(1000);
   }
+  StringFree(progress);
+  StringFree(abortlock);
 }
 static void __cdecl htsshow_filesave(t_hts_callbackarg * carg, httrackp * opt,
                                      const char *file) {
@@ -813,6 +828,17 @@ static int __cdecl htsshow_receiveheader(t_hts_callbackarg * carg,
 }
 
 /* *** Various functions *** */
+
+/* Was A modified after B? False unless both exist and A is a plain file. */
+static int fnewer(const char *a, const char *b) {
+  struct stat sa, sb;
+
+  if (stat(a, &sa) != 0 || !S_ISREG(sa.st_mode))
+    return 0;
+  if (stat(b, &sb) != 0)
+    return 0;
+  return sa.st_mtime > sb.st_mtime;
+}
 
 static int fexist(const char *s) {
   struct stat st;

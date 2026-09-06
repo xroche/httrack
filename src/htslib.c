@@ -843,12 +843,15 @@ typedef struct buff_struct {
   size_t capacity;
   /** Buffer write position ; MUST point to a valid \0. **/
   size_t pos;
+  /** Did a print not fit? Every later one is then skipped. **/
+  hts_boolean overflow;
 } buff_struct;
 
 static void print_buffer(buff_struct*const str, const char *format, ...)
   HTS_PRINTF_FUN(2, 3);
 
-/* Prints on a static buffer. asserts in case of overflow. */
+/* Prints on a static buffer, raising str->overflow rather than writing past
+   its end; what to do about a partial buffer is the caller's call. */
 static void print_buffer(buff_struct*const str, const char *format, ...) {
   size_t result;
   va_list args;
@@ -859,13 +862,20 @@ static void print_buffer(buff_struct*const str, const char *format, ...) {
   assertf(str != NULL);
   assertf(str->pos < str->capacity);
 
+  if (str->overflow)
+    return;
+
   /* Print */
   position = &str->buffer[str->pos];
   remaining = str->capacity - str->pos;
   va_start(args, format);
   result = (size_t) vsnprintf(position, remaining, format, args);
   va_end(args);
-  assertf(result < remaining);
+  if (result >= remaining) {
+    position[0] = '\0';
+    str->overflow = HTS_TRUE;
+    return;
+  }
 
   /* Increment. */
   str->pos += strlen(position);
@@ -1010,6 +1020,21 @@ void http_append_custom_headers(char *dst, size_t dst_size,
   append_custom_headers(&bstr, headers);
 }
 
+/* See htslib.h. Clipping rather than aborting: a body bigger than the request
+   block has always been truncated here, so an abort would be a new way to lose
+   the mirror. */
+size_t http_postfile_body(char *buffer, size_t buffer_size, size_t pos,
+                          FILE *fp) {
+  size_t room;
+  size_t got;
+
+  assertf(pos < buffer_size);
+  room = buffer_size - pos - 1; /* the NUL every consumer strlen()s up to */
+  got = fread(&buffer[pos], 1, room, fp);
+  buffer[pos + got] = '\0';
+  return pos + strlen(&buffer[pos]);
+}
+
 // envoi d'une requète
 int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
                   const char *xsend, const char *adr, const char *fil,
@@ -1051,7 +1076,6 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
           linput(fp, line, 1000);
           /* widths bound method[256], url[HTS_URLMAXSIZE*2], protocol[256] */
           if (sscanf(line, "%255s %2047s %255s", method, url, protocol) == 3) {
-            size_t ret;
             // http proxy: absolute-URI; socks/CONNECT tunnel: origin-form
             if (retour->req.proxy.active &&
                 !hts_proxy_is_socks(retour->req.proxy.name) &&
@@ -1064,13 +1088,9 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
               print_buffer(&bstr,
                        "%s %s %s\r\n", method, url, protocol);
             }
-            // lire le reste en brut
-            ret = fread(&bstr.buffer[bstr.pos],
-                        bstr.capacity - bstr.pos, 1, fp);
-            if ((int) ret < 0) {
-              return -1;
-            }
-            bstr.pos += strlen(&bstr.buffer[bstr.pos]);
+            // the rest of the file goes out raw
+            bstr.pos =
+                http_postfile_body(bstr.buffer, bstr.capacity, bstr.pos, fp);
           }
           fclose(fp);
         }
@@ -1315,6 +1335,17 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
         print_buffer(&bstr, "%s",
                    unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                                  search_tag + strlen(POSTTOK) + 1));
+  }
+
+  /* Nothing sums the fields above against the request buffer. A clipped
+     request would fetch another resource, or drop the credentials. */
+  if (bstr.overflow) {
+    hts_log_print(opt, LOG_WARNING, "Request header too large for %s%s",
+                  jump_identification_const(adr), fil);
+    deletesoc_r(retour);
+    strcpybuff(retour->msg, "Request header too large");
+    retour->soc = INVALID_SOCKET;
+    return -1;
   }
 #if HDEBUG
 #endif
