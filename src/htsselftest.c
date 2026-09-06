@@ -54,6 +54,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscache.h"
 #include "htscache_selftest.h"
 #include "htsdns_selftest.h"
+#include "htscatchurl.h"
 #include "htscharset.h"
 #include "htscmdline.h"
 #include "htscoremain.h"
@@ -13410,6 +13411,226 @@ static int st_pubheaders(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* One header line socinput() keeps whole (it drops any line over 999 bytes). */
+#define ST_CATCHURL_PAD 990
+#define ST_CATCHURL_REQ "GET http://example.com/ HTTP/1.0\r\n"
+/* what data[] receives for that request, before any header */
+#define ST_CATCHURL_LINE "GET / HTTP/1.0\r\n"
+
+typedef struct st_catchurl_arg {
+  int port;
+  int pads; /* ST_CATCHURL_PAD-byte header lines */
+  int tail; /* length of one last header line */
+} st_catchurl_arg;
+
+/* The browser side of catch_url(): "pads" padding lines, then one of "tail". */
+static void st_catchurl_client(void *varg) {
+  const st_catchurl_arg *const arg = (const st_catchurl_arg *) varg;
+  char hdr[ST_CATCHURL_PAD + 2];
+  struct sockaddr_in sa;
+  T_SOC cli;
+  int i;
+
+  memset(hdr, 'a', sizeof(hdr));
+  memcpy(hdr, "X-Pad: ", 7);
+  hdr[ST_CATCHURL_PAD] = '\r';
+  hdr[ST_CATCHURL_PAD + 1] = '\n';
+  memset(&sa, 0, sizeof(sa));
+  sa.sin_family = AF_INET;
+  sa.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  sa.sin_port = htons((unsigned short) arg->port);
+  cli = (T_SOC) socket(AF_INET, SOCK_STREAM, 0);
+  assertf(cli != INVALID_SOCKET);
+  assertf(connect(cli, (struct sockaddr *) &sa, sizeof(sa)) == 0);
+  assertf(send(cli, ST_CATCHURL_REQ, (int) strlen(ST_CATCHURL_REQ), 0) > 0);
+  for (i = 0; i < arg->pads; i++)
+    assertf(send(cli, hdr, (int) sizeof(hdr), 0) == (int) sizeof(hdr));
+  assertf(arg->tail >= 7 && arg->tail <= ST_CATCHURL_PAD);
+  hdr[arg->tail] = '\r';
+  hdr[arg->tail + 1] = '\n';
+  assertf(send(cli, hdr, arg->tail + 2, 0) == arg->tail + 2);
+  assertf(send(cli, "\r\n", 2, 0) == 2);
+  (void) recv(cli, hdr, (int) sizeof(hdr), 0);
+  deletesoc(cli);
+}
+
+/* catch_url() listens on whatever address gethostname() resolves to, which is
+   not loopback on a host whose name has a LAN or public A record, so the header
+   block below is remote input. The assertions sit on the last block data[]
+   holds and the first it does not, since a bound one byte out is the bug. */
+static int st_catchurl(httrackp *opt, int argc, char **argv) {
+  /* the request line, then each header with its CRLF, then the empty line */
+  const size_t line = strlen(ST_CATCHURL_LINE);
+  const int pads = (int) ((CATCH_URL_DATA_SIZE - line) / (ST_CATCHURL_PAD + 2));
+  const size_t used = line + (size_t) pads * (ST_CATCHURL_PAD + 2);
+  /* what is left for a last header, its CRLF, and the empty line's CRLF */
+  const int fits = (int) (CATCH_URL_DATA_SIZE - 1 - used) - 4;
+  char BIGSTK url[HTS_URLMAXSIZE * 2];
+  char method[32];
+  char *data = malloct(CATCH_URL_DATA_SIZE);
+  st_catchurl_arg arg;
+  struct sockaddr_in sa;
+  SOClen len = sizeof(sa);
+  T_SOC srv;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  assertf(data != NULL);
+  memset(&sa, 0, sizeof(sa));
+  sa.sin_family = AF_INET;
+  sa.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  srv = (T_SOC) socket(AF_INET, SOCK_STREAM, 0);
+  assertf(srv != INVALID_SOCKET);
+  assertf(bind(srv, (struct sockaddr *) &sa, sizeof(sa)) == 0);
+  assertf(listen(srv, 4) == 0);
+  assertf(getsockname(srv, (struct sockaddr *) &sa, &len) == 0);
+  arg.port = ntohs(sa.sin_port);
+  arg.pads = pads;
+
+  /* the largest block data[] holds: it comes back filled to the last byte */
+  arg.tail = fits;
+  url[0] = method[0] = data[0] = '\0';
+  assertf(hts_newthread(st_catchurl_client, &arg) == 0);
+  assertf(catch_url(srv, url, method, data) != HTS_FALSE);
+  htsthread_wait();
+  assertf(strcmp(method, "GET") == 0);
+  assertf(strcmp(url, "http://example.com/") == 0);
+  assertf(strncmp(data, ST_CATCHURL_LINE "X-Pad: aaa", line + 10) == 0);
+  assertf(strlen(data) == CATCH_URL_DATA_SIZE - 1);
+
+  /* one byte more: refused, and no prefix handed back */
+  arg.tail = fits + 1;
+  url[0] = method[0] = data[0] = '\0';
+  assertf(hts_newthread(st_catchurl_client, &arg) == 0);
+  assertf(catch_url(srv, url, method, data) == HTS_FALSE);
+  htsthread_wait();
+  deletesoc(srv);
+  assertf(data[0] == '\0');
+  printf("catchurl self-test OK (%d headers plus %d bytes kept, %d refused)\n",
+         pads, fits, fits + 1);
+  freet(data);
+  return 0;
+}
+
+/* A path of exactly "n" bytes, both ends '/' so bauth_prefix() keeps all of
+   it: the key it builds is truncated at the last slash. */
+static void st_urlbounds_path(char *fil, size_t n) {
+  assertf(n >= 2);
+  memset(fil, 'a', n);
+  fil[0] = fil[n - 1] = '/';
+  fil[n] = '\0';
+}
+
+/* #1561 stops ident_url_relatif() emitting a fil longer than HTS_URLMAXSIZE,
+   but the consumers that append one into an HTS_URLMAXSIZE*2 buffer have to
+   refuse it themselves, or the next producer re-arms every one of them. Each
+   case here is the last path the buffer holds, and the first it does not. */
+static int st_urlbounds(httrackp *opt, int argc, char **argv) {
+  const htsfilters savedfilters = opt->filters;
+  const hts_wizard savedwizard = opt->wizard;
+  const int savedgetmode = opt->getmode;
+  const hts_robots savedrobots = opt->robots;
+  lien_url **savedliens = opt->liens;
+  FILE *savedlog = opt->log;
+  /* lien_url holds non-const strings, so the primary link owns its own */
+  char adrbuf[] = "www.example.com", filroot[] = "/", savname[] = "index.html";
+  const char *const adr = adrbuf;
+  /* the wizard builds "http://" + adr + fil, basic auth builds adr + fil */
+  const size_t wzfits =
+      HTS_URLMAXSIZE * 2 - strlen("http://") - strlen(adr) - 1;
+  const size_t bafits = HTS_URLMAXSIZE * 2 - strlen(adr) - 1;
+  char BIGSTK fil[HTS_URLMAXSIZE * 2];
+  char BIGSTK prefix[HTS_URLMAXSIZE * 2];
+  lien_url primary, *liens[1];
+  t_cookie *cookie = calloct(sizeof(t_cookie), 1);
+  char **filters = NULL;
+  int filptr = 0, prio = 0;
+
+  (void) argc;
+  (void) argv;
+  assertf(cookie != NULL);
+  opt->log = NULL; /* the paths below are 2 KB of noise */
+  assertf(filters_init(&filters, opt->maxfilter, 0) != 0);
+  opt->filters.filters = &filters;
+  opt->filters.filptr = &filptr;
+
+  /* hts_testlinksize(): -1 is "forbidden" to its one caller, back_checksize */
+  st_urlbounds_path(fil, wzfits);
+  assertf(hts_testlinksize(opt, adr, fil, 1) == 0);
+  st_urlbounds_path(fil, wzfits + 1);
+  assertf(hts_testlinksize(opt, adr, fil, 1) == -1);
+
+  /* An ordinary URL is still keyed, stored and matched. It goes first so the
+     refused lookups below actually read the key: against an empty jar
+     bauth_check() never touches it, and a missing NULL guard would show. */
+  strcpybuff(fil, "/secure/page.html?a=b");
+  assertf(bauth_prefix(prefix, adr, fil) == prefix);
+  assertf(strcmp(prefix, "www.example.com/secure/") == 0);
+  assertf(bauth_add(cookie, adr, fil, "dXNlcjpwYXNz") == 1);
+  assertf(bauth_check(cookie, adr, fil) != NULL);
+
+  /* bauth_prefix(): the key it keeps fills its buffer to the last byte, and
+     #1561's guard then refuses to store a key wider than bauth_chain */
+  st_urlbounds_path(fil, bafits);
+  assertf(bauth_prefix(prefix, adr, fil) == prefix);
+  assertf(strlen(prefix) == HTS_URLMAXSIZE * 2 - 1);
+  assertf(bauth_add(cookie, adr, fil, "dXNlcjpwYXNz") == 0);
+  /* one byte more: no key at all, and both callers survive the NULL */
+  st_urlbounds_path(fil, bafits + 1);
+  assertf(bauth_prefix(prefix, adr, fil) == NULL);
+  assertf(bauth_check(cookie, adr, fil) == NULL);
+  assertf(bauth_add(cookie, adr, fil, "dXNlcjpwYXNz") == 0);
+
+  /* hts_acceptlink_()'s wizard arm builds the same pair. A primary link (ptr
+     0) resolves without asking the front end, so the verdict is the guard's:
+     0 authorized, 1 forbidden. */
+  memset(&primary, 0, sizeof(primary));
+  primary.adr = adrbuf;
+  primary.fil = filroot;
+  primary.sav = savname;
+  liens[0] = &primary;
+  opt->liens = liens;
+  opt->wizard = HTS_WIZARD_ASK;
+  opt->getmode |= HTS_GETMODE_NONHTML;
+  opt->robots = HTS_ROBOTS_NEVER;
+  st_urlbounds_path(fil, wzfits);
+  assertf(hts_acceptlink(opt, 0, adr, fil, NULL, NULL, &prio, NULL) == 0);
+  filptr = 0; /* the primary link left its own filters */
+  st_urlbounds_path(fil, wzfits + 1);
+  assertf(hts_acceptlink(opt, 0, adr, fil, NULL, NULL, &prio, NULL) == 1);
+
+  /* #1561 bounds ident_url_relatif(), not ident_url_absolute(), which still
+     takes a scheme-less URL of HTS_URLMAXSIZE*2 - 1 bytes and splits off a
+     path past the wizard's limit. These bounds are defence in depth, not
+     dead code, and this case fails the day that stops being true. */
+  {
+    lien_adrfil af;
+    char BIGSTK url[HTS_URLMAXSIZE * 2];
+
+    memset(url, 'a', sizeof(url) - 1);
+    memcpy(url, "h.test/", 7);
+    url[sizeof(url) - 1] = '\0';
+    assertf(ident_url_absolute(url, &af) >= 0);
+    assertf(strcmp(af.adr, "h.test") == 0);
+    assertf(hts_testlinksize(opt, af.adr, af.fil, 1) == -1);
+  }
+
+  opt->log = savedlog;
+  opt->liens = savedliens;
+  opt->wizard = savedwizard;
+  opt->getmode = savedgetmode;
+  opt->robots = savedrobots;
+  bauth_free(cookie);
+  freet(cookie);
+  freet(filters[0]);
+  freet(filters);
+  opt->filters = savedfilters;
+  printf("urlbounds self-test OK (wizard %d/%d, auth %d/%d)\n", (int) wzfits,
+         (int) wzfits + 1, (int) bafits, (int) bafits + 1);
+  return 0;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: name -> handler, with a usage hint and a one-line description. */
 /* ------------------------------------------------------------ */
@@ -13443,6 +13664,12 @@ static const struct selftest_entry {
     {"addrport", "",
      "\"host:port\" of a peer address is bounded and complete (#1493)",
      st_addrport},
+    {"catchurl", "",
+     "an over-long request header block fails the capture, not the process",
+     st_catchurl},
+    {"urlbounds", "",
+     "an over-long path is refused by the wizard and auth consumers",
+     st_urlbounds},
     {"simplify", "<path>", "collapse ./ and ../ in a path", st_simplify},
     {"expandhome", "<path>", "expand a leading ~/ into $HOME", st_expandhome},
     {"stripquery", "", "--strip-query pattern/key stripping self-test",

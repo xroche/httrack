@@ -1,0 +1,14 @@
+#!/bin/bash
+#
+# catch_url() listens on whatever address gethostname() resolves to, so its
+# request headers are remote input; a block over 32 KB of them aborted the
+# process. #1561 stops one producer of an over-long path, so the wizard and
+# basic-auth consumers of one are bounded here as well.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+selftest_queue "catchurl self-test OK (33 headers plus 11 bytes kept, 12 refused)" catchurl
+selftest_queue "urlbounds self-test OK (wizard 2025/2026, auth 2032/2033)" urlbounds
+selftest_run_queued
