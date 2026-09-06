@@ -280,13 +280,45 @@ expected_skips_msys="01_engine-footer-overflow.test
 424_engine-wizard-eof.test"
 
 # Measured, not predicted: windows-build run 33927128153, both platforms alike.
-# The msys list plus what the Linux shell cannot do to a native process:
+# Written out rather than derived from the msys list above: the two lists are
+# pinned expectations of different shells, and a name leaving one has to be a
+# visible edit to the other.
+# The reasons above, plus what the Linux shell cannot do to a native process:
 # 294: the wizard's feof||ferror arm never fires on a stdin the Linux shell owns
 # across interop, so it spins to the watchdog; 296 passes with a real answer
 # file, which places the fault at EOF and closed stdin rather than the wizard.
 # 24: no graceful stop crosses the boundary, so pass 1 cannot be interrupted in
-# the state the resume needs. Each of these three skips itself, in the test.
-expected_skips_wsl2="$expected_skips_msys
+# the state the resume needs. Each of these two skips itself, in the test.
+expected_skips_wsl2="01_engine-footer-overflow.test
+253_local-ftp-close-once.test
+113_engine-threadattr-leak.test
+100_local-purge-longpath.test
+158_local-link-control-bytes.test
+114_local-update-304-leak.test
+283_engine-cmdline-leak.test
+120_local-proxytrack-webdav-default.test
+143_engine-backtrace-empty.test
+152_engine-string-oom.test
+153_local-proxytrack-quiet.test
+215_engine-datadir-ospath.test
+243_local-ftp-deadhost-interrupt.test
+255_local-ftp-sigterm.test
+261_local-abort-purge.test
+262_local-signal-receive.test
+263_local-ftp-stop-window.test
+235_local-resume-recovery.test
+48_local-crange-memresume.test
+71_local-crange-repaircache.test
+80_engine-crash-symbolize.test
+88_local-proxytrack-badmtime.test
+241_local-single-file-gui.test
+288_testlib-holdport.test
+350_local-diskfull-abort.test
+352_engine-filesave-diskfull.test
+355_local-write-error-not-eof.test
+377_engine-install-paths.test
+398_engine-build-features.test
+424_engine-wizard-eof.test
 294_local-wizard-eof.test
 24_local-resume-overlap.test"
 
