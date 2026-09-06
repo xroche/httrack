@@ -261,8 +261,11 @@ test "$rc" -eq 3 || fail "a lost worker exited $rc, want 3: $(<"$tmp/out")"
 # Again with the killer on one of the pinned skips. That run reaches the skip-set
 # gate, which exits before the lost gate unless it is told a vanished worker
 # explains the difference: the reason this stays a leg to repeat.
+# No pipe: bash's printf writes a line at a time, so head -1 leaving early
+# gives it SIGPIPE, and pipefail turns that into this test's own failure.
 # shellcheck disable=SC2086 # the splitting is what picks one name
-pinned=$(printf '%s\n' $expected_skips | head -1)
+set -- $expected_skips
+pinned=$1
 stage "$tmp/killedskip" "$killer" "$pinned"
 run_suite "$tmp/killedskip"
 case "$(<"$share/killed")" in

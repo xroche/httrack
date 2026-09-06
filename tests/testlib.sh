@@ -1194,6 +1194,18 @@ skip_if_out_of_budget() { # skip_if_out_of_budget <steps left> <seconds the last
     exit 77
 }
 
+# The costliest step pace() has seen. Each test is its own process, so loading
+# this is the reset.
+PACE_COSTLIEST=0
+
+# skip_if_out_of_budget against the costliest step so far rather than the last
+# one: a caller orders its steps by what they mean, so a cheap one projects a
+# reserve the slow step after it cannot fit in (#1568).
+pace() { # pace <steps left> <seconds the step took>
+    test "$2" -le "${PACE_COSTLIEST}" || PACE_COSTLIEST=$2
+    skip_if_out_of_budget "$1" "${PACE_COSTLIEST}"
+}
+
 # Seconds left of the budget, for a child pacing itself against it (269 hands it to
 # the sweep). Never below 1 unless the guard is off, when it stays 0.
 budget_left() {

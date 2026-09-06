@@ -26,7 +26,10 @@ Please visit our Website: http://www.httrack.com
 */
 
 /* Fuzz the charset codecs: hts_convertStringToUTF8/FromUTF8 and the
-   UTF-8/UCS4 primitives (htscharset.c). First input byte picks the charset. */
+   UTF-8/UCS4 primitives (htscharset.c). First input byte picks the charset.
+   Whichever conversion backend the build chose answers here, so on an iconv
+   build this covers the glue around iconv() and fuzz-codepage covers the
+   built-in tables that same build leaves uncompiled. */
 #include "fuzz.h"
 #include "htscharset.h"
 

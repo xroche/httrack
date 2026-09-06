@@ -499,6 +499,12 @@ int bauth_add(t_cookie * cookie, const char *adr, const char *fil, const char *a
 
       if (prefix == NULL)
         return 0;
+      /* A clipped prefix matches more URLs than were authenticated. */
+      if (strlen(prefix) >= sizeof(chain->prefix) ||
+          strlen(auth) >= sizeof(chain->auth)) {
+        return 0;
+      }
+
       /* fin de la chaine */
       while(chain->next)
         chain = chain->next;
