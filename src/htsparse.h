@@ -58,7 +58,7 @@ struct htsmoduleStructExtended {
 
   /* Error handling */
   int *error_;
-  int *exit_xh_;
+  volatile int *exit_xh_;
   int *store_errpage_;
 
   /* Structural */

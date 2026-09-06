@@ -6,7 +6,7 @@ TESTS = @TESTS_LIST@
 # Committed binary fixture read by 01_zlib-cache-golden.test. List it
 # explicitly: automake does not expand wildcards in EXTRA_DIST, so a glob would
 # silently drop it from the dist tarball and break "make distcheck".
-EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c nobacktrace.c altstackprobe.c nopieprobe.c printnumprobe.c closetrack.c ftpcancel.c seekfail.c pubheaderlayout.c chainplug.c crawl-test.sh run-all-tests.sh check-network.sh check-test-names.sh \
+EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c nobacktrace.c altstackprobe.c nopieprobe.c printnumprobe.c closetrack.c ftpcancel.c stopresume.c seekfail.c pubheaderlayout.c chainplug.c crawl-test.sh run-all-tests.sh check-network.sh check-test-names.sh \
 	proxy-https-server.py socks5-server.py proxy-connect-server.py \
 	proxytestlib.py tls-stall-server.py warc-validate.py wacz-validate.py \
 	header-injection-server.py header-injection-check.py \
@@ -93,6 +93,7 @@ TESTS_ENVIRONMENT += ALTSTACKPROBE_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/libaltsta
 TESTS_ENVIRONMENT += CLOSETRACK_LA=$(abs_builddir)/libclosetrack.la
 TESTS_ENVIRONMENT += CLOSETRACK_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/libclosetrack.so
 TESTS_ENVIRONMENT += FTPCANCEL_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/libftpcancel.so
+TESTS_ENVIRONMENT += STOPRESUME_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/libstopresume.so
 TESTS_ENVIRONMENT += SEEKFAIL_LA=$(abs_builddir)/libseekfail.la
 TESTS_ENVIRONMENT += SEEKFAIL_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/libseekfail.so
 TESTS_ENVIRONMENT += STRINGOOM_BIN=$(abs_builddir)/stringoom$(EXEEXT)
@@ -110,6 +111,7 @@ TESTS_ENVIRONMENT += HTTRACK_STDERR_WRAP_EXE=$(abs_builddir)/stderrwrap$(EXEEXT)
 # libtool build a shared module rather than a static-only convenience library.
 check_LTLIBRARIES = librenamefail.la libunlinkfail.la libthreadattrfail.la \
 	libnobacktrace.la libaltstackprobe.la libclosetrack.la libftpcancel.la \
+	libstopresume.la \
 	libseekfail.la
 librenamefail_la_SOURCES = renamefail.c
 librenamefail_la_LDFLAGS = -module -avoid-version -rpath $(abs_builddir)
@@ -143,6 +145,11 @@ libclosetrack_la_LIBADD = $(DL_LIBS)
 libftpcancel_la_SOURCES = ftpcancel.c
 libftpcancel_la_LDFLAGS = -module -avoid-version -rpath $(abs_builddir)
 libftpcancel_la_LIBADD = $(DL_LIBS) -lpthread
+
+# stop driver for 444_local-stop-keeps-resume.test
+libstopresume_la_SOURCES = stopresume.c
+libstopresume_la_LDFLAGS = -module -avoid-version -rpath $(abs_builddir)
+libstopresume_la_LIBADD = $(DL_LIBS) -lpthread
 
 # fseeko() ceiling for 351_engine-warc-cache-io.test
 libseekfail_la_SOURCES = seekfail.c

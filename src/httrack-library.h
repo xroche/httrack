@@ -402,10 +402,11 @@ HTSEXT_API char *hts_errmsg(httrackp *opt);
 HTSEXT_API int hts_setpause(httrackp *opt, int);
 
 /** Ask the running mirror to terminate (sets the stop flag under the state
-   lock, so it is safe to call from another thread). @p force is currently
-   ignored.
+    lock, so it is safe to call from another thread). @p keep_resume asks the
+    engine to keep the partial-transfer metadata a later --continue needs,
+    rather than erase it as it does at the end of a completed mirror.
     @return 0; no-op if @p opt is NULL. */
-HTSEXT_API int hts_request_stop(httrackp *opt, hts_boolean force);
+HTSEXT_API int hts_request_stop(httrackp *opt, hts_boolean keep_resume);
 
 /** Queue a single in-progress file, by URL, to be cancelled by the engine.
     @p url is copied internally. Takes the state lock, so it is thread-safe.

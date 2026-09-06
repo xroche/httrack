@@ -225,8 +225,9 @@ struct htsoptstate {
   /** set to request the mirror to stop; volatile: polled without a lock */
   volatile int stop;
   /** why the mirror ended early: 1 asked for, 2 rolled back, -1 engine fatal
-      (the only one hts_main2() reports); not the process exit status */
-  int exit_xh;
+      (the only one hts_main2() reports); not the process exit status.
+      volatile: signal handlers write it and the mirror loop polls it */
+  volatile int exit_xh;
   int back_add_stats;
   /* */
   int mimehtml_created; /**< MIME/MHTML output already started */

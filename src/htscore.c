@@ -3697,11 +3697,14 @@ HTSEXT_API int hts_setpause(httrackp * opt, int p) {
 }
 
 // ask for termination
-HTSEXT_API int hts_request_stop(httrackp *opt, hts_boolean force) {
+HTSEXT_API int hts_request_stop(httrackp *opt, hts_boolean keep_resume) {
   if (opt != NULL) {
     hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
     hts_mutexlock(&opt->state.lock);
     opt->state.stop = 1;
+    /* 1, as SIGTERM writes, spares hts-cache/ref for a later --continue */
+    if (keep_resume)
+      opt->state.exit_xh = 1;
     hts_mutexrelease(&opt->state.lock);
   }
   return 0;
