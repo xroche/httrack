@@ -464,6 +464,7 @@ fi
 test -z "$noexec_reason" || skip "$noexec_reason"
 
 psruns=()
+psdead=()
 for c in pwsh powershell.exe powershell; do
     command -v "$c" >/dev/null 2>&1 || continue
     # powershell and powershell.exe are one interpreter under two names.
@@ -471,11 +472,22 @@ for c in pwsh powershell.exe powershell; do
     for p in ${psruns[@]+"${psruns[@]}"}; do
         test "${p%.exe}" != "${c%.exe}" || seen=1
     done
-    test "$seen" -eq 1 || psruns+=("$c")
+    test "$seen" -eq 1 && continue
+    # On PATH is not the same as able to start. An interpreter that dies in its
+    # own startup leaves every leg with no output, which reads here as a mutant
+    # that asserted nothing, and blames the test for the machine.
+    if ! psprobe=$(run_with_timeout 30 "$c" -NoProfile -Command 'exit 0' 2>&1); then
+        psdead+=("$c: $(firstline "$psprobe")")
+        continue
+    fi
+    psruns+=("$c")
 done
 if test "${#psruns[@]}" -eq 0; then
-    echo "SKIP: no PowerShell here, the watchdog's own self-test cannot run"
-    exit 77
+    # Two different states, and only one of them is about this machine having no
+    # PowerShell: say which, or a broken interpreter reads as an absent one.
+    test "${#psdead[@]}" -eq 0 ||
+        skip "PowerShell is on PATH but will not start: ${psdead[*]}"
+    skip "no PowerShell here, the watchdog's own self-test cannot run"
 fi
 
 # Bounded: a mutant that loops forever would otherwise be caught only by the step
