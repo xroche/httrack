@@ -36,6 +36,14 @@ Please visit our Website: http://www.httrack.com
 #include "htsmodules.h"
 #include "coucal.h"
 
+/* The engine hands htsparse the page's declared charset; NULL turns conversion
+   off (-%T0) and "" is the undeclared case the parser guesses iso-8859-1 for.
+   Both, plus a real charset, reach different transforms, so the input picks. */
+static const char *const charsets[] = {
+    NULL,          "",     "iso-8859-1", "utf-8", "shift_jis", "windows-1252",
+    "iso-2022-jp", "big5", "koi8-r",
+};
+
 /* htsparse ignores str.addLink on the internal parse; stub it. */
 static int fuzz_addlink(htsmoduleStruct *str, char *link) {
   (void) str;
@@ -46,6 +54,7 @@ static int fuzz_addlink(htsmoduleStruct *str, char *link) {
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   static int inited = 0;
 
+  const char *charset;
   httrackp *opt;
   cache_back cache;
   hash_struct hash;
@@ -66,6 +75,11 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   char base[HTS_URLMAXSIZE * 2] = "";
   char codebase[HTS_URLMAXSIZE * 2] = "";
   char err_msg[1024] = "";
+
+  if (size == 0)
+    return 0;
+  charset = charsets[data[0] % (sizeof(charsets) / sizeof(charsets[0]))];
+  data++, size--;
 
   if (!inited) {
     hts_init();
@@ -128,7 +142,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   str.hashptr = &hash;
   str.numero_passe = 0;
   str.ptr_ = &ptr;
-  str.page_charset_ = NULL;
+  str.page_charset_ = charset;
 
   stre.r_ = &r;
   stre.error_ = &error;
