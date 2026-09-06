@@ -1,0 +1,38 @@
+#!/bin/bash
+#
+# A <base href> is consumed while the links under it are rewritten, and nothing
+# was written back, so the mirror kept the element with its attribute gone:
+# "<base >". That is the one value meaning "no base", and a framework that
+# requires one (Angular throws "No base href set") then refuses to start, which
+# leaves an otherwise complete mirror of a single-page app showing nothing.
+#
+# Links in the mirror are already rewritten relative to their own page, so "./"
+# is the value that preserves how they resolve.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+work=$(mktemp -d)
+trap 'set +e; rm -rf "$work"' EXIT
+root="$work/root"
+mkdir -p "$root"
+
+# The page sits at the document root under <base href="/">, the one relative
+# form that already resolves correctly, so this asserts what is written out
+# without depending on how a base is resolved.
+cat >"$root/index.html" <<'EOF'
+<!DOCTYPE html><html><head><base href="/"><title>t</title></head>
+<body><a href="page.html">p</a><img src="pic.png"></body></html>
+EOF
+cat >"$root/page.html" <<'EOF'
+<!DOCTYPE html><html><body>reached</body></html>
+EOF
+printf '\211PNG\r\n\032\n' >"$root/pic.png"
+
+bash "$top_srcdir/tests/local-crawl.sh" --root "$root" \
+    --errors 0 \
+    --found page.html --found pic.png \
+    --file-matches index.html '<base href="\./">' \
+    --file-not-matches index.html '<base >' \
+    httrack BASEURL/index.html -q -%v0 -r3

@@ -2714,6 +2714,12 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                     // écrire lien
                     if ((p_type == 2) || (p_type == -2)) {      // base href ou codebase, sauter
+                      /* An emptied base href leaves <base >, which means "no
+                         base" and stops a framework that requires one (Angular
+                         throws). Links are already rewritten relative to their
+                         own page, so "./" preserves how they resolve. */
+                      if (p_type == 2)
+                        HT_ADD("href=\"./\"");
                       lastsaved = eadr - 1 + 1; // sauter "
                     }
                     /* */
