@@ -669,8 +669,23 @@ throttle_leg() {
     sink_stop
     calls=$(count_matching_lines . "$posts")
     lines=$(count_matching_lines 't=[0-9]*s q=' "$legout")
+    # A starved box spends the window on a handful of turns, and a 3-core runner
+    # under -j16 reached 2 ticks in 8s. Widen once, as the cadence and backoff
+    # legs do, rather than refusing to grade the starved sample.
+    if test "$lines" -lt 3; then
+        sink_start 201
+        run_posting 120 -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
+            -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 30 >"$legout" 2>&1 || {
+            sink_stop
+            echo "the loop exited nonzero over 30s: $(<"$legout")"
+            return 1
+        }
+        sink_stop
+        calls=$(count_matching_lines . "$posts")
+        lines=$(count_matching_lines 't=[0-9]*s q=' "$legout")
+    fi
     test "$lines" -ge 3 || {
-        echo "$lines due ticks over 8s at a 1s interval: too few to judge a throttle"
+        echo "$lines due ticks over 30s at a 1s interval: the box is too starved to judge a throttle"
         return 1
     }
     test $((calls * 4)) -ge $((lines * 3)) || {
