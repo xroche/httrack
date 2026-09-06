@@ -261,10 +261,12 @@ static size_t hts_record_link_alloc(httrackp *opt) {
   }
   memset(link, 0, sizeof(*link));
 
-  // Add new lien_url pointer to the array of links
+  // Add new lien_url pointer to the array of links, plus the guard NULL
+  TypedArrayEnsureRoom(liensbuf->ptr, 2);
+  if (!TypedArrayHasRoom(liensbuf->ptr, 2)) {
+    return (size_t) -1;
+  }
   TypedArrayAdd(liensbuf->ptr, link);
-
-  // Ensure we have a guard NULL
   TypedArrayAdd(liensbuf->ptr, NULL);
   TypedArraySize(liensbuf->ptr)--;
 
@@ -474,6 +476,71 @@ hts_boolean hts_scan_token(char **ptr, char *dest, size_t destsize) {
     a++;
   *ptr = a;
   return len < destsize ? HTS_TRUE : HTS_FALSE;
+}
+
+/* UTF-8 byte count of the BMP code point 'unic'; an unpaired surrogate is
+   emitted as a single '?'. Ranges:
+   http://www.unicode.org/reports/tr28/tr28-3.html#conformance */
+static size_t utf8_width(unsigned int unic) {
+  if (unic <= 0x7F)
+    return 1;
+  else if (unic <= 0x7FF)
+    return 2;
+  else if (unic >= 0xD800 && unic <= 0xDFFF)
+    return 1;
+  else
+    return 3;
+}
+
+/* Read the 'i'th UCS2 code unit of 'src'. */
+static unsigned int ucs2_unit(const unsigned char *src, size_t i,
+                              hts_boolean swap) {
+  return swap ? src[i * 2] + (src[i * 2 + 1] << 8)
+              : (src[i * 2] << 8) + src[i * 2 + 1];
+}
+
+char *hts_ucs2_to_utf8(const unsigned char *src, size_t size, hts_boolean swap,
+                       size_t *outsize) {
+  const size_t units = size / 2;
+  /* Signed and wide, because three bytes per unit overflows a 32-bit size_t. */
+  LLint total = 0;
+  size_t i;
+  size_t offs = 0;
+  char *dest;
+
+  /* Sized exactly, because one output byte per code unit does not hold: a
+     UTF-16 BOM alone is three UTF-8 bytes. */
+  for (i = 0; i < units; i++) {
+    total += (LLint) utf8_width(ucs2_unit(src, i, swap));
+  }
+  if (!hts_inmem_size_fits(total + 1)) {
+    return NULL;
+  }
+  dest = (char *) malloct((size_t) total + 1);
+  if (dest == NULL) {
+    return NULL;
+  }
+
+  for (i = 0; i < units; i++) {
+    const unsigned int unic = ucs2_unit(src, i, swap);
+
+    if (unic <= 0x7F) {
+      dest[offs++] = (char) unic;
+    } else if (unic <= 0x7FF) {
+      dest[offs++] = (char) (0xC0 | (unic >> 6));
+      dest[offs++] = (char) (0x80 | (unic & 0x3F));
+    } else if (unic >= 0xD800 && unic <= 0xDFFF) {
+      dest[offs++] = '?'; /* ill-formed */
+    } else {
+      dest[offs++] = (char) (0xE0 | (unic >> 12));
+      dest[offs++] = (char) (0x80 | ((unic >> 6) & 0x3F));
+      dest[offs++] = (char) (0x80 | (unic & 0x3F));
+    }
+  }
+  assertf(offs == (size_t) total);
+  dest[offs] = '\0';
+  *outsize = offs;
+  return dest;
 }
 
 /* does it look like XML ? (SVG et al.) */
@@ -1415,101 +1482,31 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
                      && ((unsigned char) r.adr[1]) == 0xff)
                 )
               ) {
-#define CH_ADD(c) do {															\
-	if (new_offs + 1 > new_capa) {										\
-		new_capa *= 2;																	\
-		new_adr = (unsigned char*) realloct(new_adr,    \
-		                                    new_capa); 	\
-		assertf(new_adr != NULL);												\
-	}																									\
-	new_adr[new_offs++] = (unsigned char) (c);        \
-} while(0)
-#define CH_ADD_RNG1(c, r, o) do {                   \
-	CH_ADD( (c) / (r) + (o) );                        \
-	c = (c) % (r);                                    \
-} while(0)
-#define CH_ADD_RNG0(c, o) do {                      \
-	CH_ADD_RNG1(c, 1, o); 	 													\
-} while(0)
-#define CH_ADD_RNG2(c, r, r2, o) do {               \
-	CH_ADD_RNG1(c, (r) * (r2), o);	 									\
-} while(0)
-              int new_capa = (int) (r.size / 2 + 1);
-              int new_offs = 0;
-              unsigned char *prev_adr = (unsigned char *) r.adr;
-              unsigned char *new_adr = (unsigned char *) malloct(new_capa);
-              int i;
-              int swap = (((unsigned char) r.adr[0]) == 0xff);
+              size_t new_size = 0;
+              char *const new_adr = hts_ucs2_to_utf8(
+                  (const unsigned char *) r.adr, (size_t) r.size,
+                  ((unsigned char) r.adr[0]) == 0xff ? HTS_TRUE : HTS_FALSE,
+                  &new_size);
 
-              assertf(new_adr != NULL);
-              /* 
-                 See http://www.unicode.org/reports/tr28/tr28-3.html#conformance 
-                 U+0000..U+007F 00..7F       
-                 U+0080..U+07FF C2..DF  80..BF      
-                 U+0800..U+0FFF E0      A0..BF  80..BF    
-                 U+1000..U+CFFF E1..EC  80..BF  80..BF    
-                 U+D000..U+D7FF ED      80..9F  80..BF    
-                 U+D800..U+DFFF
-                 U+E000..U+FFFF EE..EF  80..BF  80..BF    
-               */
-              for(i = 0; i < r.size / 2; i++) {
-                unsigned short int unic = 0;
-
-                if (swap)
-                  unic = prev_adr[i * 2] + (prev_adr[i * 2 + 1] << 8);
-                else
-                  unic = (prev_adr[i * 2] << 8) + prev_adr[i * 2 + 1];
-                if (unic <= 0x7F) {
-                  /* U+0000..U+007F 00..7F      */
-                  CH_ADD_RNG0(unic, 0x00);
-                } else if (unic <= 0x07FF) {
-                  /* U+0080..U+07FF C2..DF  80..BF */
-                  unic -= 0x0080;
-                  CH_ADD_RNG1(unic, 0xbf - 0x80 + 1, 0xc2);
-                  CH_ADD_RNG0(unic, 0x80);
-                } else if (unic <= 0x0FFF) {
-                  /* U+0800..U+0FFF E0      A0..BF  80..BF */
-                  unic -= 0x0800;
-                  CH_ADD_RNG2(unic, 0xbf - 0x80 + 1, 0xbf - 0xa0 + 1, 0xe0);
-                  CH_ADD_RNG1(unic, 0xbf - 0x80 + 1, 0xa0);
-                  CH_ADD_RNG0(unic, 0x80);
-                } else if (unic <= 0xCFFF) {
-                  /* U+1000..U+CFFF E1..EC  80..BF  80..BF */
-                  unic -= 0x1000;
-                  CH_ADD_RNG2(unic, 0xbf - 0x80 + 1, 0xbf - 0x80 + 1, 0xe1);
-                  CH_ADD_RNG1(unic, 0xbf - 0x80 + 1, 0x80);
-                  CH_ADD_RNG0(unic, 0x80);
-                } else if (unic <= 0xD7FF) {
-                  /* U+D000..U+D7FF ED      80..9F  80..BF */
-                  unic -= 0xD000;
-                  CH_ADD_RNG2(unic, 0xbf - 0x80 + 1, 0x9f - 0x80 + 1, 0xed);
-                  CH_ADD_RNG1(unic, 0xbf - 0x80 + 1, 0x80);
-                  CH_ADD_RNG0(unic, 0x80);
-                } else if (unic <= 0xDFFF) {
-                  /* U+D800..U+DFFF */
-                  CH_ADD('?');
-                  /* ill-formed */
-                } else {        /* if (unic <= 0xFFFF) */
-
-                  /* U+E000..U+FFFF EE..EF  80..BF  80..BF */
-                  unic -= 0xE000;
-                  CH_ADD_RNG2(unic, 0xbf - 0x80 + 1, 0xbf - 0x80 + 1, 0xee);
-                  CH_ADD_RNG1(unic, 0xbf - 0x80 + 1, 0x80);
-                  CH_ADD_RNG0(unic, 0x80);
-                }
+              if (new_adr == NULL) {
+                /* Fail the page, not the crawl: http_xfread1() answers the
+                   same NULL the same way. */
+                hts_log_print(
+                    opt, LOG_ERROR,
+                    "Not enough memory to convert %s%s from UCS2 to UTF-8",
+                    urladr(), urlfil());
+                r.statuscode = STATUSCODE_INVALID;
+                strcpybuff(r.msg, "Not enough memory");
+                error = 1;
+              } else {
+                hts_log_print(opt, LOG_WARNING,
+                              "File %s%s converted from UCS2 to UTF-8 (old "
+                              "size: %d bytes, new size: %d bytes)",
+                              urladr(), urlfil(), (int) r.size, (int) new_size);
+                freet(r.adr);
+                r.adr = new_adr;
+                r.size = (LLint) new_size;
               }
-              hts_log_print(opt, LOG_WARNING,
-                            "File %s%s converted from UCS2 to UTF-8 (old size: %d bytes, new size: %d bytes)",
-                            urladr(), urlfil(), (int) r.size, new_offs);
-              freet(r.adr);
-              r.adr = NULL;
-              r.size = new_offs;
-              CH_ADD(0);
-              r.adr = (char *) new_adr;
-#undef CH_ADD
-#undef CH_ADD_RNG0
-#undef CH_ADD_RNG1
-#undef CH_ADD_RNG2
               /* NULs count too where the wire declared nothing: the body is
                  the only evidence there is, and the blanking below would
                  corrupt what the server left untyped (#1415). Same ratio and
@@ -1525,13 +1522,12 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
             }
 
             /* This hack allows you to avoid problems with parsing '\0' characters  */
-            if (!is_binary) {
+            if (!is_binary && !error) {
               for(i = 0; i < r.size; i++) {
                 if (r.adr[i] == '\0')
                   r.adr[i] = ' ';
               }
             }
-
           }
 
         }

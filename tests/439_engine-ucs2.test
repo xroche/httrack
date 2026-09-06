@@ -1,0 +1,30 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# UCS2 to UTF-8 re-encoding (driven by 'httrack -#test=ucs2').
+
+# Every BMP code unit, plus a BOM and an unpaired surrogate.
+assert_selftest "ucs2: OK" ucs2 run
+
+# An output the process cannot allocate must come back as a NULL the caller
+# fails the page on, not as an abort. The cap is RLIMIT_AS, so hosts where it
+# is advisory report a skip; ASan needs telling to return NULL rather than die.
+rc=0
+out=$(ASAN_OPTIONS="${ASAN_OPTIONS-}${ASAN_OPTIONS:+:}allocator_may_return_null=1" \
+    httrack -O /dev/null -#test=ucs2 oom 2>&1) || rc=$?
+test "$rc" -eq 0 || fail "-#test=ucs2 oom: exited $rc, output: $out"
+case "$out" in
+"ucs2: oom OK") ;;
+*skipped*)
+    echo "SKIP: $out" >&2
+    ;;
+*)
+    fail "expected the failed allocation to be reported, got: $out"
+    ;;
+esac
+
+exit 0

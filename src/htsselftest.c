@@ -89,6 +89,7 @@ Please visit our Website: http://www.httrack.com
 #include <string.h>
 #include <wchar.h>
 #ifndef _WIN32
+#include <sys/resource.h> /* RLIMIT_AS, to starve one allocation */
 #include <sys/socket.h>
 #include <unistd.h>
 #else
@@ -2151,6 +2152,131 @@ static int st_arena(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Serialize 'count' UCS2 code units, re-encode them and compare the result
+   against 'expect' (its length taken as the expected byte count, so a NUL is
+   not usable inside a case). */
+static int ucs2_check(const unsigned short *units, size_t count,
+                      const char *expect, hts_boolean swap) {
+  const size_t want = strlen(expect);
+  unsigned char *src = (unsigned char *) malloct(count * 2 + 1);
+  size_t got_size = (size_t) -1;
+  char *got;
+  size_t i;
+  int err = 0;
+
+  if (src == NULL)
+    return 1;
+  for (i = 0; i < count; i++) {
+    src[i * 2 + (swap ? 0 : 1)] = (unsigned char) (units[i] & 0xff);
+    src[i * 2 + (swap ? 1 : 0)] = (unsigned char) (units[i] >> 8);
+  }
+  got = hts_ucs2_to_utf8(src, count * 2, swap, &got_size);
+  if (got == NULL || got_size != want || memcmp(got, expect, want) != 0 ||
+      got[got_size] != '\0')
+    err = 1;
+  freet(got);
+  freet(src);
+  return err;
+}
+
+static int st_ucs2(httrackp *opt, int argc, char **argv) {
+  /* A BOM, ASCII, a two-byte and a three-byte code point, and an unpaired
+     surrogate: only the ASCII one is a single output byte. */
+  static const unsigned short mixed[] = {0xFEFF, 'a', 0x00E9, 0x20AC, 0xD800};
+  static const char mixed_utf8[] = "\xEF\xBB\xBF"
+                                   "a"
+                                   "\xC3\xA9"
+                                   "\xE2\x82\xAC"
+                                   "?";
+  static const unsigned short empty[] = {0};
+
+  (void) opt;
+  if (argc >= 1 && strcmp(argv[0], "oom") == 0) {
+#ifndef _WIN32
+    /* Starve the output allocation. Big enough that the allocator must ask
+       the kernel rather than serve it from what it already holds. */
+    enum { units = 512 * 1024 };
+
+    unsigned char *src = (unsigned char *) malloct(units * 2);
+    struct rlimit saved, tight;
+    size_t out_size = 0;
+    char *out;
+    size_t i;
+
+    if (src == NULL || getrlimit(RLIMIT_AS, &saved) != 0) {
+      printf("ucs2: cannot cap memory, skipped\n");
+      freet(src);
+      return 0;
+    }
+    for (i = 0; i < units; i++) { /* U+20AC, three UTF-8 bytes each */
+      src[i * 2] = 0x20;
+      src[i * 2 + 1] = 0xAC;
+    }
+    tight = saved;
+    tight.rlim_cur = 1024 * 1024;
+    if (setrlimit(RLIMIT_AS, &tight) != 0) {
+      printf("ucs2: cannot cap memory, skipped\n");
+      freet(src);
+      return 0;
+    }
+    out = hts_ucs2_to_utf8(src, units * 2, HTS_FALSE, &out_size);
+    (void) setrlimit(RLIMIT_AS, &saved);
+    freet(src);
+    if (out != NULL) {
+      /* The cap did not bite (a host where RLIMIT_AS is advisory), so this run
+         proves nothing either way. */
+      freet(out);
+      printf("ucs2: cap did not bite, skipped\n");
+      return 0;
+    }
+    printf("ucs2: oom OK\n");
+    return 0;
+#else
+    printf("ucs2: cannot cap memory, skipped\n");
+    return 0;
+#endif
+  } else {
+    int err = 0;
+
+    if (ucs2_check(mixed, sizeof(mixed) / sizeof(mixed[0]), mixed_utf8,
+                   HTS_TRUE))
+      err = 1;
+    if (ucs2_check(mixed, sizeof(mixed) / sizeof(mixed[0]), mixed_utf8,
+                   HTS_FALSE))
+      err = 1;
+    /* Every BMP code unit, to pin the encoder against its ranges. */
+    {
+      unsigned int u;
+
+      for (u = 0; u <= 0xFFFF && !err; u++) {
+        const unsigned short unit = (unsigned short) u;
+        char expect[4];
+        size_t len = 0;
+
+        if (u <= 0x7F)
+          expect[len++] = (char) u;
+        else if (u <= 0x7FF) {
+          expect[len++] = (char) (0xC0 | (u >> 6));
+          expect[len++] = (char) (0x80 | (u & 0x3F));
+        } else if (u >= 0xD800 && u <= 0xDFFF)
+          expect[len++] = '?';
+        else {
+          expect[len++] = (char) (0xE0 | (u >> 12));
+          expect[len++] = (char) (0x80 | ((u >> 6) & 0x3F));
+          expect[len++] = (char) (0x80 | (u & 0x3F));
+        }
+        expect[len] = '\0';
+        if (u != 0 && ucs2_check(&unit, 1, expect, HTS_TRUE))
+          err = 1;
+      }
+    }
+    if (ucs2_check(empty, 0, "", HTS_TRUE))
+      err = 1;
+    printf("ucs2: %s\n", err ? "FAIL" : "OK");
+    return err;
+  }
+}
+
 static int st_arrays(httrackp *opt, int argc, char **argv) {
   /* volatile keeps the sizes below opaque, so these stay runtime checks rather
      than compile-time allocation warnings. */
@@ -2169,13 +2295,24 @@ static int st_arrays(httrackp *opt, int argc, char **argv) {
     printf("arrays: NOT aborted (%p)\n", TypedArrayPtr(w));
     return 1;
   } else if (argc >= 1 && strcmp(argv[0], "overflow-loop") == 0) {
-    /* Doubling past SIZE_MAX used to wrap capa to 0 and spin forever. */
+    /* Doubling past SIZE_MAX used to wrap capa to 0 and spin forever, and the
+       allocation it ends on used to abort the process. */
     TypedArray(char) a = EMPTY_TYPED_ARRAY;
+    int err = 0;
 
-    room = (size_t) -1;
+    TypedArrayAppend(a, "kept", 4);
+    room = (size_t) -1 - TypedArraySize(a);
     TypedArrayEnsureRoom(a, room);
-    printf("arrays: NOT aborted (%p)\n", TypedArrayPtr(a)); /* unreachable */
-    return 1;
+    if (TypedArrayHasRoom(a, room))
+      err = 1;
+    /* The bytes already there survive, and the append that cannot fit is a
+       no-op rather than a smash. */
+    TypedArrayAppend(a, "lost", room);
+    if (TypedArraySize(a) != 4 || memcmp(TypedArrayElts(a), "kept", 4) != 0)
+      err = 1;
+    printf("arrays: growth failure %s\n", err ? "FAIL" : "OK");
+    TypedArrayFree(a);
+    return err;
   } else {
     const int err = array_growth_selftests();
 
@@ -13730,8 +13867,10 @@ static const struct selftest_entry {
      st_strsprintf},
     {"arena", "", "htsarena.h hands out addresses that never move", st_arena},
     {"arrays", "[overflow-capa|overflow-loop]",
-     "htsarrays.h growth reaches the requested room, overflow aborts",
+     "htsarrays.h growth reaches the requested room, or reports it failed",
      st_arrays},
+    {"ucs2", "[oom]", "UCS2 to UTF-8 re-encoding, and its failure return",
+     st_ucs2},
     {"pubheaders", "",
      "layout of the installed structs configure's switches decide",
      st_pubheaders},
