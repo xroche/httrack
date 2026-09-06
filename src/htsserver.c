@@ -1463,7 +1463,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                 commandEndRequested = 1;
                 hts_request_stop(global_opt, 0);
               } else {
-                hts_request_stop(global_opt, 1);        /* note: the force flag does not have anyeffect yet */
+                /* a second press stops now, keeping the resume data */
+                hts_request_stop(global_opt, 1);
                 commandEndRequested = 2;        /* will break the loop() callback */
               }
             }
