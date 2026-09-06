@@ -21,53 +21,6 @@ ci_annotate() {
     printf '\n::%s title=%s::%s\n' "$level" "$title" "$msg"
 }
 
-# Count the MSYS fork-emulation failures in the console log $1, and the workers the
-# suite lost with them (#1273). A worker can die without bash saying a word, so those
-# counts at zero are not by themselves a clean leg (#1352).
-ci_report_fork_failures() {
-    local log=$1 died retried gaveup lost
-    test -r "$log" || {
-        echo "no console log at $log: MSYS fork failures not counted"
-        return 0
-    }
-    # Split on CR first: the console carries stdout and stderr merged, so two
-    # messages can share a physical line and a line count would see one. bash
-    # retries on EAGAIN alone, so a give-up can carry any strerror; each `next`
-    # keeps one message out of a second class. The LOST verdicts sit at column 0,
-    # where the suite's indented failure tails cannot forge one.
-    read -r died retried gaveup lost <<<"$(tr '\r' '\n' <"$log" | awk '
-        /^LOST / { lost++; next }
-        /fork: child -1|child_info_fork::abort|sync_with_child:/ { died++; next }
-        /reserve memory for parent stack/ { died++; next }
-        /fork: retry:/ { retried++; next }
-        /: fork: / { gaveup++ }
-        END { print died + 0, retried + 0, gaveup + 0, lost + 0 }')"
-    test -z "${GITHUB_STEP_SUMMARY:-}" ||
-        printf 'MSYS forks: %s died, %s retried, %s given up; %s worker(s) lost\n' \
-            "$died" "$retried" "$gaveup" "$lost" >>"$GITHUB_STEP_SUMMARY"
-    if test $((died + retried + gaveup)) -eq 0; then
-        # Never bare: "no MSYS fork failure" alone is what called the #1352 leg clean.
-        if test "$lost" -eq 0; then
-            echo "no MSYS fork failure and no lost worker in $log"
-        else
-            echo "no MSYS fork failure in $log, but $lost worker(s) left no status"
-        fi
-    else
-        ci_annotate warning "MSYS fork failures" "$(
-            printf '%s child(ren) died at DLL init, %s retry wait(s), %s fork(s) given up\n' \
-                "$died" "$retried" "$gaveup"
-            # -a: one NUL in the log would otherwise cost every sample line.
-            tr '\r' '\n' <"$log" | grep -am 3 -e 'fork: child -1' -e 'sync_with_child:' \
-                -e 'child_info_fork::abort' -e 'reserve memory' -e ': fork: ' || true
-        )"
-    fi
-    # error, not warning: a lost worker is re-run where a fork storm is investigated.
-    test "$lost" -eq 0 || ci_annotate error "workers lost with no status" "$(
-        printf '%s worker(s) died before reporting: re-run this leg, and see #1228\n' "$lost"
-        tr '\r' '\n' <"$log" | grep -am 3 '^LOST ' || true
-    )"
-}
-
 # Classify test $1's outcome from what its worker left in results dir $2, into
 # ci_outcome (pass, skip, fail, lost) and ci_rc. "lost" is a worker that died before
 # writing any status: an infrastructure symptom, not a test result. Assigned, not
@@ -324,7 +277,8 @@ expected_skips_wsl2="01_engine-footer-overflow.test
 
 # Sets ci_skip_list to the pinned skip set for backend $1, failing loudly if
 # there is none: an unknown backend must never fall back to an empty list,
-# which would make any skip look expected.
+# which would make any skip look expected. Only wsl2 runs in CI now, so the msys
+# set is what a hand run from Git Bash is held to and nothing re-checks it.
 ci_skip_list=''
 ci_expected_skips_for_backend() {
     case "$1" in
