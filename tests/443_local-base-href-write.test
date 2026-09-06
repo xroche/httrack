@@ -2,37 +2,55 @@
 #
 # A <base href> is consumed while the links under it are rewritten, and nothing
 # was written back, so the mirror kept the element with its attribute gone:
-# "<base >". That is the one value meaning "no base", and a framework that
-# requires one (Angular throws "No base href set") then refuses to start, which
-# leaves an otherwise complete mirror of a single-page app showing nothing.
+# "<base >". An element with no href means "no base", and a framework requiring
+# one refuses to start (Angular throws "No base href set"), which leaves an
+# otherwise complete mirror of a single-page app showing nothing.
 #
-# Links in the mirror are already rewritten relative to their own page, so "./"
-# is the value that preserves how they resolve.
+# The value has to be empty rather than "./". Both supply the attribute, but
+# "./" makes the base the directory, so a fragment-only reference such as
+# href="#f" then resolves to the directory instead of to the page, and every
+# in-page anchor on a page that is not the directory index leads away from it.
+# An empty href keeps the document itself as the base, which is what master's
+# hrefless element already meant.
 
 set -euo pipefail
 
-: "${top_srcdir:=..}"
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
 
 work=$(mktemp -d)
-trap 'set +e; rm -rf "$work"' EXIT
+cleanup_push rm -rf "$work"
 root="$work/root"
-mkdir -p "$root"
+mkdir -p "$root/sub/j"
 
-# The page sits at the document root under <base href="/">, the one relative
-# form that already resolves correctly, so this asserts what is written out
-# without depending on how a base is resolved.
 cat >"$root/index.html" <<'EOF'
-<!DOCTYPE html><html><head><base href="/"><title>t</title></head>
-<body><a href="page.html">p</a><img src="pic.png"></body></html>
+<!DOCTYPE html><html><body><a href="sub/page.html">p</a></body></html>
 EOF
-cat >"$root/page.html" <<'EOF'
+
+# The page carrying the base sits below the document root, so a base of "./"
+# and a base of "" pick different directories and neither can pass for the
+# other. <base href="/"> is the relative form master already resolves
+# correctly, so what is asserted is what gets written out, not how a base is
+# resolved. The applet is here because its codebase shares the write site the
+# fix touches and must keep its own value.
+cat >"$root/sub/page.html" <<'EOF'
+<!DOCTYPE html><html><head><base href="/"><title>t</title></head>
+<body><a href="#f">f</a> <a href="target.html">r</a> <a name="f">A</a>
+<applet codebase="j/" code="A.class" width="1" height="1"></applet>
+</body></html>
+EOF
+cat >"$root/target.html" <<'EOF'
 <!DOCTYPE html><html><body>reached</body></html>
 EOF
-printf '\211PNG\r\n\032\n' >"$root/pic.png"
+echo stub >"$root/sub/j/A.class"
 
 bash "$top_srcdir/tests/local-crawl.sh" --root "$root" \
     --errors 0 \
-    --found page.html --found pic.png \
-    --file-matches index.html '<base href="\./">' \
-    --file-not-matches index.html '<base >' \
-    httrack BASEURL/index.html -q -%v0 -r3
+    --found target.html \
+    --file-matches sub/page.html '<base href="">' \
+    --file-not-matches sub/page.html '<base >' \
+    --file-not-matches sub/page.html '<base href="\./">' \
+    --file-matches sub/page.html 'href="#f"' \
+    --file-matches sub/page.html 'codebase="j/"' \
+    --file-not-matches sub/page.html 'applet href' \
+    httrack BASEURL/index.html -q -%v0 -r4

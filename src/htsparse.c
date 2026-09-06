@@ -2716,10 +2716,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     if ((p_type == 2) || (p_type == -2)) {      // base href ou codebase, sauter
                       /* An emptied base href leaves <base >, which means "no
                          base" and stops a framework that requires one (Angular
-                         throws). Links are already rewritten relative to their
-                         own page, so "./" preserves how they resolve. */
+                         throws). An empty href keeps the document itself as the
+                         base, so every reference resolves as it did. */
                       if (p_type == 2)
-                        HT_ADD("href=\"./\"");
+                        HT_ADD("href=\"\"");
                       lastsaved = eadr - 1 + 1; // sauter "
                     }
                     /* */
