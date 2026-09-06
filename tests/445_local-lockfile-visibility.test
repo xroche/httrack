@@ -32,11 +32,13 @@ require_httrack
 local_server_start
 
 out="${tmpdir}/mirror"
+crawllog="${tmpdir}/log"
+fail_dump_var crawllog
 # Rate-capped /bigfiles/ is the shape that reaches the check: a /trickle/ crawl
 # parks in the wait for its one busy socket and read nothing there for 30s.
 httrack -O "$out" --quiet --disable-security-limits --robots=0 \
     --timeout=30 --retries=0 -c1 --max-rate=200000 \
-    "${BASEURL}/bigfiles/index.html" >"${tmpdir}/log" 2>&1 &
+    "${BASEURL}/bigfiles/index.html" >"$crawllog" 2>&1 &
 crawlpid=$!
 
 printf '[the engine stamped the run] ..\t'
@@ -69,8 +71,10 @@ while test -e "${out}/${STOPLOCK}"; do
     tenths=$((tenths + 1))
     test "$tenths" -le "$DEADLINE_TENTHS" ||
         fail "$((DEADLINE_TENTHS / 10))s on, the engine had not read ${STOPLOCK}"
+    # The mirror ending is also the end of the window we can observe, and the
+    # two readings of that are the same file on disk.
     kill -0 "$crawlpid" 2>/dev/null ||
-        fail "the crawl exited before reading ${STOPLOCK}"
+        fail "the engine exited with ${STOPLOCK} still there, $tenths tenths of a second after it was written: it either never read the request or never reached the check"
     sleep 0.1
 done
 # Printed, not asserted: a bound tight enough to be interesting would flake.
