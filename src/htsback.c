@@ -101,15 +101,25 @@ typedef enum {
 static hts_mirror_limit back_mirror_limit(httrackp *opt);
 static hts_boolean back_mirror_capped(const httrackp *opt);
 
+/* NULL when the slot table cannot be allocated, which httpmirror() already
+   answers by aborting the mirror with a message. Failing here rather than
+   aborting the process: back_max grows with -cN, so the size is the user's. */
 struct_back *back_new(httrackp *opt, int back_max) {
   int i;
   struct_back *sback = calloct(1, sizeof(struct_back));
 
+  if (sback == NULL)
+    return NULL;
   sback->count = back_max;
   sback->lnk = (lien_back *) calloct((back_max + 1), sizeof(lien_back));
   sback->connect_fallback = (hts_connect_fallback *) calloct(
       (back_max + 1), sizeof(hts_connect_fallback));
   sback->ready = coucal_new(0);
+  if (sback->lnk == NULL || sback->connect_fallback == NULL ||
+      sback->ready == NULL) {
+    back_free(&sback);
+    return NULL;
+  }
   hts_set_hash_handler(sback->ready, opt);
   coucal_set_name(sback->ready, "back_new");
   sback->ready_size_bytes = 0;
