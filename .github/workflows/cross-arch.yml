@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-24.04
     # sid, not stable: the point is to predict what the sid buildds will say.
     container: debian:sid
-    # Nine ports in series, where one matrix leg took 30.
+    # Nine ports in series, where one leg's budget was 30.
     timeout-minutes: 60
     steps:
       - name: Install the toolchains
@@ -37,8 +37,8 @@ jobs:
           sed -i 's/^Types: deb$/Types: deb deb-src/' \
             /etc/apt/sources.list.d/debian.sources
           apt-get update
-          # Every port in one call: this was 35s of each 83s matrix leg, and it
-          # is the whole reason nine legs collapse into one job.
+          # Every port in one call, since nine separate jobs paid this same
+          # apt-get nine times.
           apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
             dpkg-dev git ca-certificates \
@@ -72,10 +72,10 @@ jobs:
               arch=${port%%:*}
               triplet=${port#*:}
               echo "::group::$arch ($triplet)"
-              # A subshell per port, so a failure stops that port only: the
-              # matrix ran fail-fast: false, and one red port must not hide the
-              # next. Its status is read after it, never as the left side of
-              # ||, which would suppress the errexit inside it.
+              # A subshell per port, so a failure stops that port only and one
+              # red port cannot hide the next. Its status is read after it,
+              # never as the left side of ||, which would suppress the errexit
+              # inside it.
               (
                   set -euo pipefail
                   export DEB_HOST_ARCH=$arch TRIPLET=$triplet
