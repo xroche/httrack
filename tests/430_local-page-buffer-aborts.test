@@ -1,0 +1,207 @@
+#!/bin/bash
+#
+# Two htsparse buffers whose width a page picks: the raw source span of an
+# <applet> code= attribute, on both the in-scope and the off-host codebase
+# branch, and a link the page's charset inflates threefold past the 1023-byte
+# entry check. All three aborted instead of refusing.
+
+set -e
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+python=$(find_python) || skip "python3 not found"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_pgabort.XXXXXX") || exit 1
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+doc="${tmpdir}/doc"
+mkdir -p "$doc"
+
+# The span between "code" and "=" is copied verbatim into the rewritten tag. An
+# off-host codebase puts the class out of scope, which is a second copy of the
+# same append against a second fixed buffer.
+pad=$(printf '%2048s' '')
+cat >"${doc}/index.html" <<'HTML'
+<html><body><a href="applet.html">a</a><a href="offhost.html">o</a>
+<a href="cp1252.html">c</a><a href="cp1252-2040.html">q</a>
+<a href="cp1252-2043.html">b</a><a href="cp1252-2031.html">k</a>
+<a href="cp1252-2032.html">l</a><a href="cp1252-query.html">y</a>
+</body></html>
+HTML
+printf '<html><body><applet code%s="x.class"></applet></body></html>\n' "$pad" \
+    >"${doc}/applet.html"
+printf '<html><body><applet codebase="http://elsewhere.invalid/" code%s="x.class"></applet></body></html>\n' \
+    "$pad" >"${doc}/offhost.html"
+printf '<html><body>class</body></html>\n' >"${doc}/x.class"
+
+# Which buffer a converted link reaches is decided by its converted LENGTH
+# alone, so the lengths are what the fixtures pin. windows-1252 0x80 becomes
+# U+20AC, three bytes: 680 of them make 2040, which leaves an escape append
+# exactly sizeof(void *) of room; 681 make 2043, which no longer fits a
+# "http://" prepended to it; 683 make 2049, past the buffer itself.
+"$python" - "$(nativepath "$doc")" <<'PY'
+import os
+import sys
+
+body = (b'<html><head><meta charset="windows-1252"></head><body>'
+        b'<a href="\x93s\x94.html">short</a>'
+        b'<a href="' + b"\x93" * 683 + b'">long</a></body></html>\n')
+open(os.path.join(sys.argv[1], "cp1252.html"), "wb").write(body)
+head = b'<html><head><meta charset="windows-1252"></head><body>'
+open(os.path.join(sys.argv[1], "cp1252-2040.html"), "wb").write(
+    head + b'<a href="' + b"\x80" * 680 + b'">q</a></body></html>\n')
+open(os.path.join(sys.argv[1], "cp1252-2043.html"), "wb").write(
+    head + b'<base href="' + b"\x80" * 681 + b'"></body></html>\n')
+# The two that straddle the threshold: 677 quotes make 2031 and an ASCII byte
+# in front makes 2032. A link this long cannot be mirrored on any platform, a
+# save-path check drops it far earlier, so what the pair pins is which side of
+# the PARSE guard each lands on.
+open(os.path.join(sys.argv[1], "cp1252-2031.html"), "wb").write(
+    head + b'<a href="' + b"\x80" * 677 + b'">k</a></body></html>\n')
+open(os.path.join(sys.argv[1], "cp1252-2032.html"), "wb").write(
+    head + b'<a href="a' + b"\x80" * 677 + b'">l</a></body></html>\n')
+# A converted path at the ceiling plus a query, which is appended after it: the
+# base tag is what makes a later stage prepend a scheme to the result.
+open(os.path.join(sys.argv[1], "cp1252-query.html"), "wb").write(
+    head + b'<base href="' + b"\x80" * 677 + b'?' + b"q" * 12 +
+    b'"></body></html>\n')
+# str path, so Windows names it through the wide API rather than a codepage.
+open(os.path.join(sys.argv[1], "\u201cs\u201d.html"), "wb").write(
+    b"<html><body>SHORTCONVERTED</body></html>\n")
+PY
+
+local_server_start --root "$doc"
+require_httrack
+
+out="${tmpdir}/crawl"
+mkdir "$out"
+rc=0
+local_crawl --log "${tmpdir}/log" -O "$out" --quiet --robots=0 --timeout=30 \
+    --retries=0 "${BASEURL}/index.html" || rc=$?
+test "$rc" -eq 0 || fail "crawl exited $rc: $(cat "${tmpdir}/log")"
+
+host="${out}/127.0.0.1_${SRV_PORT}"
+
+# The attribute span is not URL-shaped, so clipping it would emit a broken tag:
+# both branches must carry all 2048 bytes through to the mirror.
+span_kept() { # span_kept MIRRORED-PAGE
+    "$python" - "$(nativepath "$1")" <<'PY'
+import sys
+
+d = open(sys.argv[1], "rb").read()
+i = 0
+while True:
+    i = d.find(b"code", i)
+    if i < 0:
+        sys.exit(1)
+    j = i + 4
+    n = 0
+    while d[j + n:j + n + 1] == b" ":
+        n += 1
+    if n == 2048 and d[j + n:j + n + 1] == b"=":
+        sys.exit(0)
+    i += 4
+PY
+}
+
+printf '[applet code span kept whole] ..\t'
+span_kept "${host}/applet.html" || fail "code= span was clipped"
+echo OK
+
+printf '[off-host codebase keeps it too] ..\t'
+span_kept "${host}/offhost.html" || fail "code= span was clipped off-host"
+echo OK
+
+# A truncated URL names a different resource, so the inflated link is refused
+# and said so, not clipped and fetched.
+printf '[inflated link refused, not clipped] ..\t'
+grep -q 'Link is too long after charset conversion' "${out}/hts-log.txt" ||
+    fail "no charset-conversion refusal in $(cat "${out}/hts-log.txt")"
+echo OK
+
+# The control the refusal message cannot give: a guard that refused every
+# converted link would print that warning more often, not less.
+# By content, not by name: what a platform makes of the converted name is a
+# different question from whether the link was followed at all.
+printf '[short converted link still mirrored] ..\t'
+"$python" - "$(nativepath "$host")" <<'PY' || fail "the short cp1252 link was not fetched"
+import os
+import sys
+
+for root, dirs, files in os.walk(sys.argv[1]):
+    for name in files:
+        with open(os.path.join(root, name), "rb") as fh:
+            if b"SHORTCONVERTED" in fh.read():
+                sys.exit(0)
+sys.exit(1)
+PY
+echo OK
+
+printf '[nothing mirrored under a clipped name] ..\t'
+"$python" - "$(nativepath "$host")" <<'PY' || fail "mirrored a clipped URL"
+import os
+import sys
+
+for root, dirs, files in os.walk(os.fsencode(sys.argv[1])):
+    for name in dirs + files:
+        if len(name) > 100:
+            sys.stderr.write("over-long mirror entry %r\n" % name[:60])
+            sys.exit(1)
+PY
+test -s "${host}/cp1252.html" || fail "the page carrying the refused link is gone"
+echo OK
+
+# Each length selects a different destination, so each fixture has to survive.
+printf '[every converted length survives] ..\t'
+for page in cp1252-2040.html cp1252-2043.html cp1252-query.html; do
+    test -s "${host}/${page}" || fail "$page is not mirrored"
+done
+test "$(grep -c 'Link is too long after charset conversion' "${out}/hts-log.txt")" -ge 3 ||
+    fail "not every over-long conversion was refused: $(cat "${out}/hts-log.txt")"
+echo OK
+
+# One byte apart, so the guard cannot drift without one of the two firing. The
+# refusal names the link as it arrived, before conversion, which is what tells
+# the two fixtures apart. Each run has to end where its log LINE ends, and that
+# line ends with CRLF on Windows, so the run is read off the split line rather
+# than matched up to a "\n".
+printf '[the threshold sits between 2031 and 2032] ..\t'
+"$python" - "$(nativepath "${out}/hts-log.txt")" <<'PY' || fail "the conversion guard moved"
+import re
+import sys
+
+tag = b"Link is too long after charset conversion: "
+run = b"\x80" * 677
+refused = set()
+for line in re.split(b"\r\n|\n|\r", open(sys.argv[1], "rb").read()):
+    i = line.find(tag)
+    if i >= 0:
+        refused.add(line[i + len(tag):])
+# Without this, a log that lost the message passes both tests below.
+if not refused:
+    sys.stderr.write("no refusal to read the threshold off\n")
+    sys.exit(1)
+if run in refused:
+    sys.stderr.write("2031 was refused: the guard is a byte too tight\n")
+    sys.exit(1)
+if b"a" + run not in refused:
+    sys.stderr.write("2032 was accepted: the guard is a byte too loose\n")
+    sys.exit(1)
+PY
+echo OK
+
+# The append site is its own bug, reachable whenever a caller has that much
+# room left, so it is pinned away from the crawl as well.
+printf '[escape append tolerates a pointer-sized remainder] ..\t'
+assert_selftest "escape-append-room self-test OK" escape-append-room
+echo OK
+
+# Its consumers rebuild "http://" + adr + "/" + fil from what it returns, so
+# every arm owes them the same ceiling. The query arm did not keep it.
+printf '[every relative-url arm bounds the path it builds] ..\t'
+assert_selftest "identrel self-test OK" identrel
+echo OK

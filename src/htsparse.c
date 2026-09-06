@@ -95,6 +95,13 @@ Please visit our Website: http://www.httrack.com
 /** Append to the output buffer the string 'A'. **/
 #define HT_ADD(A) HT_ADD_N(A, strlen(A))
 
+/* Room a later stage still needs inside lien[]: a scheme it may prepend
+   ("http://") plus a ".class" it may append, and the NUL. */
+#define HTS_LINK_TAIL_ROOM 16
+
+/** Append to the output buffer the first N bytes of 'A' (NUL-stopped). **/
+#define HT_ADD_BUF(A, N) HT_ADD_N(A, htssafe_strnlen_(A, N))
+
 /** Append 'A' to the output buffer, html-escaped; FACTOR = max byte expansion. **/
 #define HT_ADD_HTMLESCAPED_ANY(A, FUNCTION, FACTOR) do { \
   if ((opt->getmode & 1) != 0 && ptr>0) { \
@@ -2185,7 +2192,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     char BIGSTK tempo[sizeof(lien)];
 
                     if (escape_control_url(lien, tempo, sizeof(tempo)) <
-                        sizeof(tempo)) {
+                        sizeof(tempo) - HTS_LINK_TAIL_ROOM) {
                       strcpybuff(lien, tempo);
                     } else {
                       error = 1;
@@ -2205,7 +2212,17 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       hts_log_print(opt, LOG_DEBUG,
                         "engine: save-name: '%s' charset conversion from '%s' to '%s'",
                         charset, lien, s);
-                      strcpybuff(lien, s);
+                      /* One byte can become three, and a clipped URL names
+                         another resource, so drop the link instead. */
+                      if (strlen(s) < sizeof(lien) - HTS_LINK_TAIL_ROOM) {
+                        strcpybuff(lien, s);
+                      } else {
+                        error = 1;
+                        hts_log_print(
+                            opt, LOG_WARNING,
+                            "Link is too long after charset conversion: %s",
+                            lien);
+                      }
                       free(s);
                     }
                   }
@@ -2248,12 +2265,13 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   // leaving the encoding as-is (unlike the file part)
                   // and copy back query
                   {
+                    const size_t cap = sizeof(lien) - HTS_LINK_TAIL_ROOM;
                     const size_t used = strlen(lien);
 
                     // the append grows the query too, and clips silently on
                     // overflow: drop, or we fetch a query nobody wrote (#982)
-                    if (append_escape_check_url(query, lien, sizeof(lien)) >=
-                        sizeof(lien) - used) {
+                    if (used >= cap || append_escape_check_url(
+                                           query, lien, cap) >= cap - used) {
                       error = 1;
                       hts_log_print(opt, LOG_DEBUG,
                                     "link rejected (query does not fit) %s",
@@ -2381,6 +2399,14 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                       if (ident_url_relatif(lien, urladr(), urlfil(), &af2) < 0) {
                         error = 1;
+                      } else if (strlen(af2.adr) + strlen(af2.fil) >=
+                                 sizeof(lien) - HTS_LINK_TAIL_ROOM -
+                                     sizeof("http:///")) {
+                        /* the rebuild below is unbounded in the two of them */
+                        error = 1;
+                        hts_log_print(opt, LOG_WARNING,
+                                      "Link is too long once resolved: %s",
+                                      lien);
                       } else {
                         strcpybuff(lien, "http://");
                         strcatbuff(lien, af2.adr);
@@ -2950,10 +2976,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             // érire codebase="chemin"
                             if ((opt->getmode & HTS_GETMODE_HTML) &&
                                 (ptr > 0)) {
-                              char BIGSTK tempo4[HTS_URLMAXSIZE * 2];
-
-                              tempo4[0] = '\0';
-
                               if (strnotempty(tempo_pat)) {
                                 HT_ADD("codebase=\"http://");
                                 if (!opt->passprivacy) {
@@ -2967,8 +2989,12 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                 HT_ADD("\" ");
                               }
 
-                              strncatbuff(tempo4, lastsaved, p_flush - lastsaved);
-                              HT_ADD(tempo4);   // refresh code="
+                              /* The page picks this span's width, so it goes
+                                 to the growable output, not a fixed buffer. */
+                              if (p_flush > lastsaved) {
+                                HT_ADD_BUF(lastsaved,
+                                           (size_t) (p_flush - lastsaved));
+                              }
                               HT_ADD(tempo);
                             }
                           }
@@ -3110,18 +3136,18 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             // érire codebase="chemin"
                             if ((opt->getmode & HTS_GETMODE_HTML) &&
                                 (ptr > 0)) {
-                              char BIGSTK tempo4[HTS_URLMAXSIZE * 2];
-
-                              tempo4[0] = '\0';
-
                               if (strnotempty(tempo_pat)) {
                                 HT_ADD("codebase=\"");
                                 HT_ADD_HTMLESCAPED(tempo_pat);
                                 HT_ADD("\" ");
                               }
 
-                              strncatbuff(tempo4, lastsaved, p_flush - lastsaved);
-                              HT_ADD(tempo4);   // refresh code="
+                              /* The page picks this span's width, so it goes
+                                 to the growable output, not a fixed buffer. */
+                              if (p_flush > lastsaved) {
+                                HT_ADD_BUF(lastsaved,
+                                           (size_t) (p_flush - lastsaved));
+                              }
                             }
                           }
                         }

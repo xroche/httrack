@@ -1272,15 +1272,25 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
 
           if (!direct_url) {    // pas ftp:// par exemple
             char user_pass[256];
+            const size_t idlen = a > astart ? (size_t) (a - astart) - 1 : 0;
 
             user_pass[0] = '\0';
-            strncatbuff(user_pass, astart, (int) (a - astart) - 1);
-            strcpybuff(user_pass, 
-              unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), user_pass));
-            code64((unsigned char *) user_pass, (int) strlen(user_pass),
-                   (unsigned char *) autorisation, 0);
-            if (strcmp(fil, "/robots.txt"))     /* pas robots.txt */
-              bauth_add(cookie, astart, fil, autorisation);
+            /* A clipped credential authenticates as somebody else. */
+            if (idlen < sizeof(user_pass)) {
+              strncatbuff(user_pass, astart, idlen);
+              strcpybuff(user_pass,
+                         unescape_http(OPT_GET_BUFF(opt),
+                                       OPT_GET_BUFF_SIZE(opt), user_pass));
+              code64((unsigned char *) user_pass, (int) strlen(user_pass),
+                     (unsigned char *) autorisation, 0);
+              if (strcmp(fil, "/robots.txt")) /* pas robots.txt */
+                bauth_add(cookie, astart, fil, autorisation);
+            } else {
+              /* 'a' is past the '@': the log gets the host, not the secret. */
+              hts_log_print(
+                  opt, LOG_WARNING,
+                  "authorization dropped, credentials too long for %s", a);
+            }
           }
         } else if ((a = bauth_check(cookie, real_adr, fil)))
           strcpybuff(autorisation, a);
@@ -4263,12 +4273,22 @@ HTSEXT_API char *escape_check_url_addr(const char *const src,
 
 // Same as above, but appending to "dest"
 #undef DECLARE_APPEND_ESCAPE_VERSION
+/* clang-format off: an edit realigns all backslashes, churning the macro. */
+/* clang-format off */
 #define DECLARE_APPEND_ESCAPE_VERSION(NAME) \
 HTSEXT_API size_t append_ ##NAME(const char *const src, char *const dest, const size_t size) { \
   const size_t len = strnlen(dest, size); \
   assertf(len < size); \
+  RUNTIME_TIME_CHECK_SIZE(size); \
+  /* The remainder is computed, so the one value the size heuristic reads as \
+     a caller mistake is a legitimate near-full buffer here: report it as the \
+     overflow the caller already tests for. */ \
+  if (size - len == sizeof(void *)) { \
+    return size - len; \
+  } \
   return NAME(src, dest + len, size - len); \
 }
+/* clang-format on */
 
 DECLARE_APPEND_ESCAPE_VERSION(escape_in_url)
 DECLARE_APPEND_ESCAPE_VERSION(escape_spc_url)

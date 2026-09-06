@@ -1,0 +1,45 @@
+#!/bin/bash
+#
+# htsparse.c's output_buffer only reports a failed growth if every macro that
+# grows it latches output_oom. #1561's HT_ADD_BUF reached it without doing so.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+src="${testdir}/../src/htsparse.c"
+test -r "$src" || fail "no source at $src"
+
+# Report every macro that grows output_buffer without latching, and every
+# growth sitting outside a macro body altogether.
+unlatched() { # unlatched FILE
+    awk '
+    /^#define/ { name = $2; sub(/\(.*/, "", name); body = $0; open = /\\$/
+                 if (!open) { check(); name = "" }
+                 next }
+    open { body = body "\n" $0; if ($0 !~ /\\$/) { open = 0; check(); name = "" }
+           next }
+    /TypedArray(EnsureRoom|Append|Add)\(output_buffer/ {
+        print "outside any macro, line " NR }
+    function check() {
+        if (body ~ /TypedArray(EnsureRoom|Append|Add)\(output_buffer/ &&
+            body !~ /output_oom/) print name
+    }' "$1"
+}
+
+got=$(unlatched "$src")
+test -z "$got" || fail "reaches output_buffer without latching output_oom: $got"
+
+# The checker is silent on a clean file, so a broken one would pass too.
+work=$(mktemp -d "${TMPDIR:-/tmp}/oblatch.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "$work"
+sed 's|^#define HT_ADD_BUF(A, N) HT_ADD_N(.*|#define HT_ADD_BUF(A, N) TypedArrayAppend(output_buffer, A, N)|' \
+    "$src" >"$work/mutant.c"
+cmp -s "$src" "$work/mutant.c" && fail "the mutant edit matched nothing; HT_ADD_BUF was renamed"
+case "$(unlatched "$work/mutant.c")" in
+*HT_ADD_BUF*) ;;
+*) fail "the checker missed HT_ADD_BUF appending straight to output_buffer" ;;
+esac
+
+exit 0
