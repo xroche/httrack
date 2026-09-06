@@ -1,0 +1,77 @@
+#!/bin/bash
+# A running engine takes a request as a file in its output directory. Under the
+# wsl2 backend the shell that writes one is Linux and the engine that reads it is
+# a native exe on the other side of drvfs, and nothing had measured that crossing.
+# 24_local-resume-overlap.test cannot be ported to that backend until it holds.
+set -eu
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+STOPLOCK=hts-stop.lock
+PROGRESSLOCK=hts-in_progress.lock
+# Past this, the request is unreachable rather than late.
+DEADLINE_TENTHS=300
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_lockvis.XXXXXX") || exit 1
+crawlpid=
+cleanup() {
+    if test -n "$crawlpid"; then
+        kill_tree "$crawlpid"
+        wait "$crawlpid" 2>/dev/null || true
+    fi
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+mtime() { # mtime <file>, whole seconds, which is what get_filetime compares
+    stat -c '%Y' "$1" 2>/dev/null || stat -f '%m' "$1"
+}
+
+require_httrack
+local_server_start
+
+out="${tmpdir}/mirror"
+# Rate-capped /bigfiles/ is the shape that reaches the check: a /trickle/ crawl
+# parks in the wait for its one busy socket and read nothing there for 30s.
+httrack -O "$out" --quiet --disable-security-limits --robots=0 \
+    --timeout=30 --retries=0 -c1 --max-rate=200000 \
+    "${BASEURL}/bigfiles/index.html" >"${tmpdir}/log" 2>&1 &
+crawlpid=$!
+
+printf '[the engine stamped the run] ..\t'
+started=
+for _ in $(seq 1 "$DEADLINE_TENTHS"); do
+    test -e "${out}/${PROGRESSLOCK}" && started=1 && break
+    kill -0 "$crawlpid" 2>/dev/null || break
+    sleep 0.1
+done
+test -n "$started" || fail "no ${PROGRESSLOCK} appeared; the crawl never got going"
+echo "OK"
+
+# A stop request is honoured only when its mtime beats the run's own lock, whole
+# seconds, so a shell clock behind the one stamping files writes an inert file.
+printf '[a request written now is newer than the run] ..\t'
+sleep 1.1
+: >"${out}/request-probe"
+run=$(mtime "${out}/${PROGRESSLOCK}")
+req=$(mtime "${out}/request-probe")
+test "$req" -gt "$run" ||
+    fail "a file written $((req - run))s after the run's own lock is not newer than it"
+echo "OK (+$((req - run))s)"
+
+# The crossing itself: the engine unlinks the request as it reads it, where
+# everything after that waits on the transfers and would measure the server.
+printf '[the engine reads a request the shell wrote] ..\t'
+: >"${out}/${STOPLOCK}"
+tenths=0
+while test -e "${out}/${STOPLOCK}"; do
+    tenths=$((tenths + 1))
+    test "$tenths" -le "$DEADLINE_TENTHS" ||
+        fail "$((DEADLINE_TENTHS / 10))s on, the engine had not read ${STOPLOCK}"
+    kill -0 "$crawlpid" 2>/dev/null ||
+        fail "the crawl exited before reading ${STOPLOCK}"
+    sleep 0.1
+done
+# Printed, not asserted: a bound tight enough to be interesting would flake.
+echo "OK (read within $((tenths + 1)) tenths of a second)"
