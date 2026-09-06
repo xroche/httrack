@@ -35,8 +35,7 @@ test "$((SECONDS - start))" -lt 15 || fail "watchdog fired late"
 
 # The native descendant tree is really dead, not orphaned. The Windows arm reads
 # /proc/<pid>/winpid, which only MSYS has, so it asks about that shell and not
-# about the binary; on POSIX a surviving grandchild would touch the marker after
-# we stop waiting.
+# about the binary; on POSIX it asks whether the grandchild's own pid still runs.
 rc=0
 if shell_is_msys; then
     # Existence by exact Windows PID, not a global ping.exe count: the timing
@@ -73,16 +72,29 @@ if shell_is_msys; then
     while alive "$w" && test "$((SECONDS - start))" -lt "$REAP_GRACE"; do sleep 1; done
     ! alive "$w" || fail "native ping grandchild (pid $w) survived the watchdog"
 else
-    started="$tmp/started" marker="$tmp/alive"
-    # The grandchild (backgrounded subshell) marks that it ran, then would touch
-    # the marker after the deadline; killing only the direct child orphans it, so
-    # the marker still appears. started present + marker absent = ran and reaped.
-    # shellcheck disable=SC2016 # $1/$2 expand in the sh -c child, by design
-    run_with_timeout 2 sh -c '{ : >"$1"; sleep 10; : >"$2"; } & wait' _ "$started" "$marker" || rc=$?
+    started="$tmp/started" pidfile="$tmp/gcpid"
+    grandchild_lives() { kill -0 "$gcpid" 2>/dev/null && ! pid_is_zombie "$gcpid"; }
+    reap_grandchild() { test -z "${gcpid:-}" || kill -9 "$gcpid" 2>/dev/null || true; }
+    # The grandchild marks that it ran, hands back its own pid and then execs a
+    # sleep that outlasts every deadline here, so killing only the direct child
+    # leaves that one pid running. A marker it wrote on a timer instead would go
+    # missing whenever the scheduler starved it, and missing reads as reaped.
+    # shellcheck disable=SC2016 # $1, $2 and $! expand in the sh -c child, by design
+    run_with_timeout 2 sh -c '{ : >"$1"; exec sleep 300; } & echo $! >"$2"; wait' _ "$started" "$pidfile" || rc=$?
     test "$rc" -eq 124 || fail "grandchild hang reported $rc"
     test -e "$started" || fail "positive control: grandchild never ran"
-    sleep 12
-    test ! -e "$marker" || fail "watchdog left a grandchild running"
+    gcpid=$(cat "$pidfile" 2>/dev/null) || gcpid=
+    test -n "$gcpid" || fail "positive control: the grandchild named no pid"
+    cleanup_push reap_grandchild
+    # A probe that answers "gone" for everything would call any survivor reaped.
+    kill -0 "$$" || fail "kill -0 cannot see this shell, so it can see nothing"
+    # Zombie counts as dead: who reaps an orphan is prompt on a workstation and
+    # not on a buildd, and reap_bounded already splits them that way.
+    start=$SECONDS
+    while grandchild_lives; do
+        test "$((SECONDS - start))" -lt "$REAP_GRACE" || fail "watchdog left a grandchild running (pid $gcpid)"
+        poll_wait 1
+    done
 fi
 
 # Wall clock, not iteration count: under starvation a poll costs more than it asks,
