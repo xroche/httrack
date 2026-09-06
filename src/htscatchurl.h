@@ -43,6 +43,34 @@ Please visit our Website: http://www.httrack.com
 // Capacity contract for the catch_url() 'data' buffer (32 Kb).
 #define CATCH_URL_DATA_SIZE 32768
 
+/* Longest request header line the catcher keeps. It clears Apache's
+   LimitRequestFieldSize (8190) and sits a byte under nginx's 8k header buffer,
+   so an authenticated Cookie: or Bearer those servers accept fits here too.
+   The buffer stays a quarter of the block above, which bounds the header
+   loop. */
+#define CATCH_URL_LINE_MAX 8191
+#define CATCH_URL_LINE_SIZE (CATCH_URL_LINE_MAX + 1)
+
+#define CATCH_URL_STR_(x) #x
+#define CATCH_URL_STR(x) CATCH_URL_STR_(x)
+
+/* Why a capture stopped. The browser resends the same request on retry, so the
+   user needs to know which of these happened. */
+typedef enum {
+  CATCH_URL_OK = 0,
+  CATCH_URL_ERR_REQUEST, /* no request line, or one too long or malformed */
+  CATCH_URL_ERR_URL,     /* the request line named no absolute URL */
+  CATCH_URL_ERR_HEADER,  /* one header line did not fit CATCH_URL_LINE_SIZE */
+  CATCH_URL_ERR_BLOCK    /* the headers did not fit CATCH_URL_DATA_SIZE */
+} catch_url_status;
+
+/* catch_url(), reporting why the capture failed rather than that it did. */
+catch_url_status catch_url_capture(T_SOC soc, char *url, char *method,
+                                   char *data);
+
+/* One line naming a catch_url_capture() status, for the user. */
+const char *catch_url_strerror(catch_url_status status);
+
 // Fonctions
 /* Read one line off a socket; HTS_TRUE if it did not fit "s". */
 hts_boolean socinput(T_SOC soc, char *s, int max);

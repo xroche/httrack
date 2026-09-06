@@ -13912,8 +13912,12 @@ static int st_pubheaders(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* One header line socinput() keeps whole (it drops any line over 999 bytes). */
+/* One header line socinput() keeps whole. */
 #define ST_CATCHURL_PAD 990
+/* One it cannot: the capture is refused on the line, not on a count. */
+#define ST_CATCHURL_LONG (CATCH_URL_LINE_SIZE + 808)
+/* More such lines than any budget the request block could hold. */
+#define ST_CATCHURL_FLOOD 4000
 #define ST_CATCHURL_REQ "GET http://example.com/ HTTP/1.0\r\n"
 /* what data[] receives for that request, before any header */
 #define ST_CATCHURL_LINE "GET / HTTP/1.0\r\n"
@@ -13924,25 +13928,50 @@ typedef struct st_catchurl_arg {
   int tail; /* length of one last header line */
 } st_catchurl_arg;
 
+/* Loopback client connected to what st_catchurl_listen() made. */
+static T_SOC st_catchurl_connect(int port) {
+  struct sockaddr_in sa;
+  T_SOC cli;
+
+  memset(&sa, 0, sizeof(sa));
+  sa.sin_family = AF_INET;
+  sa.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  sa.sin_port = htons((unsigned short) port);
+  cli = (T_SOC) socket(AF_INET, SOCK_STREAM, 0);
+  assertf(cli != INVALID_SOCKET);
+  assertf(connect(cli, (struct sockaddr *) &sa, sizeof(sa)) == 0);
+  return cli;
+}
+
+/* Listener on an ephemeral loopback port, reported in "port". */
+static T_SOC st_catchurl_listen(int *port) {
+  struct sockaddr_in sa;
+  SOClen len = sizeof(sa);
+  T_SOC srv;
+
+  memset(&sa, 0, sizeof(sa));
+  sa.sin_family = AF_INET;
+  sa.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  srv = (T_SOC) socket(AF_INET, SOCK_STREAM, 0);
+  assertf(srv != INVALID_SOCKET);
+  assertf(bind(srv, (struct sockaddr *) &sa, sizeof(sa)) == 0);
+  assertf(listen(srv, 4) == 0);
+  assertf(getsockname(srv, (struct sockaddr *) &sa, &len) == 0);
+  *port = ntohs(sa.sin_port);
+  return srv;
+}
+
 /* The browser side of catch_url(): "pads" padding lines, then one of "tail". */
 static void st_catchurl_client(void *varg) {
   const st_catchurl_arg *const arg = (const st_catchurl_arg *) varg;
   char hdr[ST_CATCHURL_PAD + 2];
-  struct sockaddr_in sa;
-  T_SOC cli;
+  T_SOC cli = st_catchurl_connect(arg->port);
   int i;
 
   memset(hdr, 'a', sizeof(hdr));
   memcpy(hdr, "X-Pad: ", 7);
   hdr[ST_CATCHURL_PAD] = '\r';
   hdr[ST_CATCHURL_PAD + 1] = '\n';
-  memset(&sa, 0, sizeof(sa));
-  sa.sin_family = AF_INET;
-  sa.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-  sa.sin_port = htons((unsigned short) arg->port);
-  cli = (T_SOC) socket(AF_INET, SOCK_STREAM, 0);
-  assertf(cli != INVALID_SOCKET);
-  assertf(connect(cli, (struct sockaddr *) &sa, sizeof(sa)) == 0);
   assertf(send(cli, ST_CATCHURL_REQ, (int) strlen(ST_CATCHURL_REQ), 0) > 0);
   for (i = 0; i < arg->pads; i++)
     assertf(send(cli, hdr, (int) sizeof(hdr), 0) == (int) sizeof(hdr));
@@ -13970,46 +13999,121 @@ static int st_catchurl(httrackp *opt, int argc, char **argv) {
   char method[32];
   char *data = malloct(CATCH_URL_DATA_SIZE);
   st_catchurl_arg arg;
-  struct sockaddr_in sa;
-  SOClen len = sizeof(sa);
   T_SOC srv;
 
   (void) opt;
   (void) argc;
   (void) argv;
   assertf(data != NULL);
-  memset(&sa, 0, sizeof(sa));
-  sa.sin_family = AF_INET;
-  sa.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-  srv = (T_SOC) socket(AF_INET, SOCK_STREAM, 0);
-  assertf(srv != INVALID_SOCKET);
-  assertf(bind(srv, (struct sockaddr *) &sa, sizeof(sa)) == 0);
-  assertf(listen(srv, 4) == 0);
-  assertf(getsockname(srv, (struct sockaddr *) &sa, &len) == 0);
-  arg.port = ntohs(sa.sin_port);
+  srv = st_catchurl_listen(&arg.port);
   arg.pads = pads;
 
   /* the largest block data[] holds: it comes back filled to the last byte */
   arg.tail = fits;
   url[0] = method[0] = data[0] = '\0';
   assertf(hts_newthread(st_catchurl_client, &arg) == 0);
-  assertf(catch_url(srv, url, method, data) != HTS_FALSE);
+  assertf(catch_url_capture(srv, url, method, data) == CATCH_URL_OK);
   htsthread_wait();
   assertf(strcmp(method, "GET") == 0);
   assertf(strcmp(url, "http://example.com/") == 0);
   assertf(strncmp(data, ST_CATCHURL_LINE "X-Pad: aaa", line + 10) == 0);
   assertf(strlen(data) == CATCH_URL_DATA_SIZE - 1);
 
-  /* one byte more: refused, and no prefix handed back */
+  /* one byte more: refused on the block, and no prefix handed back */
   arg.tail = fits + 1;
   url[0] = method[0] = data[0] = '\0';
   assertf(hts_newthread(st_catchurl_client, &arg) == 0);
-  assertf(catch_url(srv, url, method, data) == HTS_FALSE);
+  assertf(catch_url_capture(srv, url, method, data) == CATCH_URL_ERR_BLOCK);
   htsthread_wait();
   deletesoc(srv);
   assertf(data[0] == '\0');
   printf("catchurl self-test OK (%d headers plus %d bytes kept, %d refused)\n",
          pads, fits, fits + 1);
+  freet(data);
+  return 0;
+}
+
+/* One over-long header line in a block small enough to leave in a single
+   send(), so no later write can fail once the capture has hung up. */
+static void st_catchurl_over_client(void *varg) {
+  const st_catchurl_arg *const arg = (const st_catchurl_arg *) varg;
+  char *blk = malloct(ST_CATCHURL_LONG + 128);
+  const size_t req = strlen(ST_CATCHURL_REQ);
+  T_SOC cli = st_catchurl_connect(arg->port);
+  size_t n = req + ST_CATCHURL_LONG;
+
+  assertf(blk != NULL);
+  memcpy(blk, ST_CATCHURL_REQ, req);
+  memcpy(blk + req, "X-Pad: ", 7);
+  memset(blk + req + 7, 'a', ST_CATCHURL_LONG - 7);
+  /* the CRLF the long line ends on, then a header that does fit, then the
+     empty line: what a line-count or byte-count bound would still accept */
+  memcpy(blk + n, "\r\nX-Ok: 1\r\n\r\n", 13);
+  n += 13;
+  assertf(send(cli, blk, (int) n, 0) == (int) n);
+  (void) recv(cli, blk, ST_CATCHURL_LONG, 0);
+  deletesoc(cli);
+  freet(blk);
+}
+
+/* A peer sending nothing but over-long header lines. Each one used to charge
+   the block budget nothing, so the capture read them for as long as they came;
+   the send loop now ends on the hang-up instead of on its own cap. */
+static void st_catchurl_flood_client(void *varg) {
+  const st_catchurl_arg *const arg = (const st_catchurl_arg *) varg;
+  const int len = ST_CATCHURL_LONG + 2;
+  char *hdr = malloct((size_t) len);
+  T_SOC cli = st_catchurl_connect(arg->port);
+  int i;
+
+  assertf(hdr != NULL);
+  memset(hdr, 'a', (size_t) len);
+  memcpy(hdr, "X-Pad: ", 7);
+  hdr[ST_CATCHURL_LONG] = '\r';
+  hdr[ST_CATCHURL_LONG + 1] = '\n';
+  assertf(send(cli, ST_CATCHURL_REQ, (int) strlen(ST_CATCHURL_REQ), 0) > 0);
+  for (i = 0; i < ST_CATCHURL_FLOOD; i++) {
+    if (send(cli, hdr, len, 0) != len)
+      break;
+  }
+  assertf(i < ST_CATCHURL_FLOOD);
+  deletesoc(cli);
+  freet(hdr);
+}
+
+/* A header line the line buffer cannot hold fails the capture. Skipping one
+   left the block missing a header the browser sent, and charged the 32 KB
+   budget nothing, so a peer sending only such lines held catch_url() open. */
+static int st_catchurl_overlong(httrackp *opt, int argc, char **argv) {
+  char BIGSTK url[HTS_URLMAXSIZE * 2];
+  char method[32];
+  char *data = malloct(CATCH_URL_DATA_SIZE);
+  st_catchurl_arg arg;
+  T_SOC srv;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  assertf(data != NULL);
+  srv = st_catchurl_listen(&arg.port);
+  arg.pads = arg.tail = 0;
+
+  /* one over-long line, far under any block bound: refused, nothing kept */
+  url[0] = method[0] = data[0] = '\0';
+  assertf(hts_newthread(st_catchurl_over_client, &arg) == 0);
+  assertf(catch_url_capture(srv, url, method, data) == CATCH_URL_ERR_HEADER);
+  htsthread_wait();
+  assertf(data[0] == '\0');
+
+  /* nothing but over-long lines: the capture ends on the first one */
+  url[0] = method[0] = data[0] = '\0';
+  assertf(hts_newthread(st_catchurl_flood_client, &arg) == 0);
+  assertf(catch_url_capture(srv, url, method, data) == CATCH_URL_ERR_HEADER);
+  htsthread_wait();
+  deletesoc(srv);
+  assertf(data[0] == '\0');
+  printf("catchurl over-long header self-test OK (%d bytes refused: %s)\n",
+         ST_CATCHURL_LONG, catch_url_strerror(CATCH_URL_ERR_HEADER));
   freet(data);
   return 0;
 }
@@ -14213,6 +14317,9 @@ static const struct selftest_entry {
     {"catchurl", "",
      "an over-long request header block fails the capture, not the process",
      st_catchurl},
+    {"catchurl-overlong", "",
+     "a request header line the line buffer cannot hold fails the capture",
+     st_catchurl_overlong},
     {"postprocsize", "",
      "a postprocess-html callback cannot claim bytes it was not handed",
      st_postprocsize},
