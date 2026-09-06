@@ -1,0 +1,34 @@
+#!/bin/bash
+#
+# Nothing else in the suite loads a plugin at runtime, so the shipped
+# postprocess example only ever had to compile. It read past the buffer the
+# engine handed it and freed that buffer, on the first page of any crawl.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+: "${top_srcdir:=..}"
+
+[ "${EXAMPLE_LIBS:-yes}" = yes ] || skip "--disable-example-libs builds no plugin"
+[ -n "${CHANGECONTENT_LIB:-}" ] || skip "CHANGECONTENT_LIB unset, no automake environment"
+
+lib=
+for suffix in so dylib; do
+    if [ -r "${CHANGECONTENT_LIB}.${suffix}" ]; then
+        lib="${CHANGECONTENT_LIB}.${suffix}"
+        break
+    fi
+done
+[ -n "${lib}" ] || skip "nothing built at ${CHANGECONTENT_LIB}.so"
+
+# basic.html's title is "Sample test", and the replacement is shorter because
+# that is the only direction a reply left in the engine's buffer may take. The
+# closing tag proves the shrink moved the rest of the page down rather than
+# truncating it.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 5 \
+    --file-matches 'simple/basic.html' 'NEW test' \
+    --file-not-matches 'simple/basic.html' 'Sample' \
+    --file-matches 'simple/basic.html' '</body>' \
+    httrack 'BASEURL/simple/basic.html' --wrapper "${lib},Sample=NEW"
