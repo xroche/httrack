@@ -1080,6 +1080,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
       hts_log_print(opt, LOG_PANIC,
                     "Not enough memory, can not allocate %d backing slots",
                     back_max);
+      freet(primary);
+      XH_extuninit;
       return 0;
     }
   }

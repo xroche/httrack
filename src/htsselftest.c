@@ -12337,8 +12337,11 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
     }                                                                          \
   } while (0)
 
-  cache.hashtable = coucal_new(0);
+  /* before the cleanup label has anything to free */
   sback = back_new(opt, SLOTS);
+  if (sback == NULL)
+    return 77;
+  cache.hashtable = coucal_new(0);
   back = sback->lnk;
   if (!st_backstop_arm(opt, sback, status, r, SLOTS, SLOT_DNS)) {
     skipped = 1;
