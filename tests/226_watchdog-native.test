@@ -4,6 +4,11 @@
 # reaches the status API, the process APIs it must never name, and the driver
 # wiring no .ps1 can check for itself.
 
+# Windows runs the whole body once per PowerShell flavour, and every leg runs the
+# watchdog for a window of real seconds: 248s on three pinned cores at -j16, the
+# shape of the macOS runner. The retry leg below can add 120s more per flavour.
+# TEST_TIMEOUT_AT_LEAST: 900
+
 set -euo pipefail
 
 # Before the driver is sourced: with these set, anything it starts posts a commit
@@ -812,29 +817,46 @@ for psrun in "${psruns[@]}"; do
     fi
     legs=(cadence throttle staticness backoff)
     test "$devfull" -eq 0 || legs+=(fullstdout)
+    # These legs, the leaky control under them and the eight mutant legs after it
+    # each run the watchdog for a window of its own, so a host too slow to finish
+    # them skips rather than meets the guard. The costliest so far is what the
+    # next one will take, since a cheap leg under-projects the slow one after it.
+    planned=$((${#legs[@]} + 1 + 8 + devfull))
+    ran=0
+    costliest=0
+    pace() { # pace <seconds the step took>
+        test "$1" -le "$costliest" || costliest=$1
+        ran=$((ran + 1))
+        skip_if_out_of_budget "$((planned - ran))" "$costliest"
+    }
     for leg in "${legs[@]}"; do
         : >"$legout"
+        leg_at=$SECONDS
         said=$("${leg}_leg" "$(nativepath "$wdscript")") ||
             fail "the $psrun watchdog fails the $leg leg: $said"
         token_free "$legout" || fail "the $leg leg logged the status token"
+        pace $((SECONDS - leg_at))
     done
     # Control: a catch block widened to the whole exception is how it would get out.
     leaky="$tmp/token-in-log.ps1"
     # shellcheck disable=SC2016 # PowerShell variables, quoted for sed
     sed '/status post failed/s/$_.Exception.Message/$script:Token/' "$wdscript" >"$leaky"
     cmp -s "$wdscript" "$leaky" && fail "the leaky mutant changed nothing, so it proves nothing"
+    leg_at=$SECONDS
     backoff_leg "$(nativepath "$leaky")" >/dev/null || true
     token_free "$legout" && fail "the token audit cannot see a logged token"
+    pace $((SECONDS - leg_at))
 
     # Same shape as mutate() above, graded by a leg instead of the self-test, and
     # on the diagnosis rather than the exit status for the same reason.
     mutate_leg() {
-        local name=$1 expr=$2 leg=$3 want=$4 m="$tmp/$1.ps1" said
+        local name=$1 expr=$2 leg=$3 want=$4 m="$tmp/$1.ps1" said at=$SECONDS
         sed "$expr" "$wdscript" >"$m"
         cmp -s "$wdscript" "$m" && fail "mutant $name changed nothing, so it proves nothing"
         said=$("${leg}_leg" "$(nativepath "$m")") &&
             fail "mutant $name passed the $leg leg"
         grep -q "$want" <<<"$said" || fail "mutant $name tripped no check of its own: $said"
+        pace $((SECONDS - at))
     }
     mutate_leg status-every-poll \
         "s/if ((Get-WatchdogAction \$now \$postedAt \$IntervalSeconds) -eq 'post')/if (\$true)/" \
