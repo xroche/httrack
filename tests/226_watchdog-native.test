@@ -883,6 +883,17 @@ for psrun in "${psruns[@]}"; do
         -ProgressLog "$(nativepath "$tmp/no-such.log")" \
         -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 3) ||
         fail "the $psrun loop exited nonzero on a missing log: $out"
+    # Three seconds is the tightest window here, and a starved box spent all of
+    # it on one turn: zero status lines, which is not a wrong staticness but no
+    # answer at all. Widen once, as the throttle and backoff legs do.
+    if ! grep -q 't=[0-9]*s q=' <<<"$out"; then
+        out=$(run_wd 120 -File "$(nativepath "$wdscript")" \
+            -ProgressLog "$(nativepath "$tmp/no-such.log")" \
+            -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 30) ||
+            fail "the $psrun loop exited nonzero on a missing log over 30s: $out"
+    fi
+    grep -q 't=[0-9]*s q=' <<<"$out" ||
+        fail "the $psrun loop posted no status in 30s: the box is too starved to judge a missing log"
     grep -q 'q=?s' <<<"$out" || fail "a missing log reported a staticness: $out"
 
     # The legs below read the sink, not the loop, and they exercise the script's
