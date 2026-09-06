@@ -241,6 +241,11 @@ test "${#sid}" -eq 32 || fail "no session id to start a mirror with"
 ping "${crawl_port}" w1
 bye "${crawl_port}" w1 "${sid}"
 sleep $((grace + 2))
+# The crawl fetches the index before the probe, so its line is a positive control
+# on the pattern below: without it the fixture stopped logging and the guard
+# would match nothing, silently.
+grep -q 'abortpurge/index\.html' "${clog}" ||
+    fail "the fixture logged no request, so the guard below is disarmed: $(<"${clog}")"
 # Not the ping window: the veto freezes the idle clock, so what this case rests
 # on is the mirror still being in flight. The margin is about a second, since the
 # probe lands near 4.5s of the slow page's 5s. The fixture logs that page once it

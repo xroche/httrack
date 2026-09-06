@@ -776,13 +776,17 @@ for psrun in "${psruns[@]}"; do
     # with one line. Widen rather than grade that sample: 30s still outran a
     # 160-way overcommit on three cores, where 5s lost at 48.
     #
-    # Both legs widen together, or the comparison loosens. $slow is pinned at 1,
-    # so this reads "at least two posts in the window", and moving the 1s leg
-    # alone would relax it to a 15s cadence. A watchdog on a hardcoded 10s
-    # schedule lands in this branch and then clears that bar, so the 100s leg
-    # re-run at the same window is what catches it, because it posts there too.
-    # A floor scaled to the window cannot replace the ratio, since a starved box
-    # posts every ~10s honestly.
+    # Both legs widen together, or the comparison loosens: $slow is pinned at 1,
+    # so this reads "at least two posts in the window". A watchdog on a fixed
+    # cadence that ignores -IntervalSeconds posts the same count on both legs,
+    # so the re-run pin or the ratio rejects it whatever that cadence is.
+    #
+    # The wider pair does not reach a cadence proportional to the option,
+    # IntervalSeconds * k for k in (5, 30]: that posts once on the 100s leg and
+    # floor(30/k)+1 on the 1s leg, clearing both checks, where the 5s pair
+    # caught everything above k=5. Counting cannot close that band, because a
+    # healthy watchdog starved to a ~10s turn and a k=10 mutant both give
+    # slow=1 fast=4.
     if test "$fast" -le "$slow"; then
         out=$(run_wd 120 -File "$(nativepath "$wdscript")" \
             -ProgressLog "$(nativepath "$tmp/progress.log")" \
