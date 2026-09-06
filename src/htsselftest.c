@@ -13955,6 +13955,31 @@ static int st_catchurl(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* What a postprocess-html callback may claim. Two capacities, or a bound that
+   ignored "size" and hardcoded one would pass. */
+static int st_postprocsize(httrackp *opt, int argc, char **argv) {
+  char buf[16], own[16];
+  size_t size;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (size = 4; size <= sizeof(buf); size *= 4) {
+    /* an in-place edit may shrink or keep what it was handed, never grow */
+    assertf(hts_postprocess_reply_ok(buf, 0, buf, size));
+    assertf(hts_postprocess_reply_ok(buf, (int) size - 1, buf, size));
+    assertf(hts_postprocess_reply_ok(buf, (int) size, buf, size));
+    assertf(!hts_postprocess_reply_ok(buf, (int) size + 1, buf, size));
+    /* a buffer of the callback's own is bounded by the callback */
+    assertf(hts_postprocess_reply_ok(own, (int) size + 1, buf, size));
+    /* neither may be negative */
+    assertf(!hts_postprocess_reply_ok(buf, -1, buf, size));
+    assertf(!hts_postprocess_reply_ok(own, -1, buf, size));
+  }
+  printf("postprocess reply self-test OK\n");
+  return 0;
+}
+
 /* A path of exactly "n" bytes, both ends '/' so bauth_prefix() keeps all of
    it: the key it builds is truncated at the last slash. */
 static void st_urlbounds_path(char *fil, size_t n) {
@@ -14112,6 +14137,9 @@ static const struct selftest_entry {
     {"catchurl", "",
      "an over-long request header block fails the capture, not the process",
      st_catchurl},
+    {"postprocsize", "",
+     "a postprocess-html callback cannot claim bytes it was not handed",
+     st_postprocsize},
     {"postfile", "<short> <long> <embedded-nul> <empty>",
      "a >postfile: body is clipped to the request block and terminated",
      st_postfile},

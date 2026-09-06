@@ -133,6 +133,16 @@ hts_boolean hts_redirect_same_savefile(httrackp *opt, const char *cur_adr,
                                        const char *moved_fil);
 
 /*
+  Can a postprocess-html callback's reply be applied? "html" and "len" are what
+  it returned, "buffer" and "size" what it was handed. A reply keeping the same
+  pointer edited the engine's own buffer in place, so it holds only the bytes it
+  was given. A reply carrying its own buffer is bounded by that buffer instead.
+  Neither may report a negative count, which an int "len" allows.
+*/
+hts_boolean hts_postprocess_reply_ok(const char *html, int len,
+                                     const char *buffer, size_t size);
+
+/*
   Take a pending stop request, deleting the request file, and answer whether the
   mirror must now stop. True only for a request newer than this run's own
   hts-in_progress.lock and deletable, so neither one inherited from an earlier
