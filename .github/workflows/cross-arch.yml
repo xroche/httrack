@@ -4,10 +4,12 @@
 # first thing to see the code.
 name: Cross-arch
 
+# Not a required check and compile-only, so it rides master rather than every
+# pull request: nine jobs there delay the last job of every other run, and a
+# ports-only break costs a fix-forward rather than a bad release.
 on:
   push:
     branches: [master]
-  pull_request:
   workflow_dispatch:
 
 # Least privilege: the workflow only needs to read the repo.
