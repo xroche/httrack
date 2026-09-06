@@ -14014,6 +14014,48 @@ static int st_catchurl(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* What a postprocess-html callback may claim, and out of whose storage. Two
+   capacities and every offset, or a bound that ignored "size" or looked only at
+   the base pointer would pass. */
+static int st_postprocsize(httrackp *opt, int argc, char **argv) {
+  char buf[16] = {0}, own[16] = {0};
+  const size_t capa = sizeof(buf);
+  size_t size;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  /* the engine's own storage, whatever the reply points at inside it */
+  assertf(hts_postprocess_reply_inplace(buf, buf, capa));
+  assertf(hts_postprocess_reply_inplace(buf + capa - 1, buf, capa));
+  assertf(!hts_postprocess_reply_inplace(buf + capa, buf, capa));
+  assertf(!hts_postprocess_reply_inplace(own, buf, capa));
+  assertf(!hts_postprocess_reply_inplace(buf, buf, 0));
+  for (size = 4; size <= capa; size *= 2) {
+    size_t at;
+
+    for (at = 0; at <= size; at++) {
+      /* in place, a reply owns what is left of "size" past its own offset */
+      assertf(hts_postprocess_reply_ok(buf + at, (int) (size - at), buf, size,
+                                       capa));
+      /* one past the storage is another object's business, not ours to bound */
+      if (at < capa)
+        assertf(!hts_postprocess_reply_ok(buf + at, (int) (size - at) + 1, buf,
+                                          size, capa));
+    }
+    /* in the buffer's slack, past every byte the engine handed out */
+    if (size < capa)
+      assertf(!hts_postprocess_reply_ok(buf + size + 1, 0, buf, size, capa));
+    /* a buffer of the callback's own is bounded by the callback */
+    assertf(hts_postprocess_reply_ok(own, (int) capa + 1, buf, size, capa));
+    /* neither may report a negative count */
+    assertf(!hts_postprocess_reply_ok(own, -1, buf, size, capa));
+    assertf(!hts_postprocess_reply_ok(buf, -1, buf, size, capa));
+  }
+  printf("postprocess reply self-test OK\n");
+  return 0;
+}
+
 /* A path of exactly "n" bytes, both ends '/' so bauth_prefix() keeps all of
    it: the key it builds is truncated at the last slash. */
 static void st_urlbounds_path(char *fil, size_t n) {
@@ -14171,6 +14213,9 @@ static const struct selftest_entry {
     {"catchurl", "",
      "an over-long request header block fails the capture, not the process",
      st_catchurl},
+    {"postprocsize", "",
+     "a postprocess-html callback cannot claim bytes it was not handed",
+     st_postprocsize},
     {"postfile", "<short> <long> <embedded-nul> <empty>",
      "a >postfile: body is clipped to the request block and terminated",
      st_postfile},

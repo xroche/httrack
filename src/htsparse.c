@@ -81,6 +81,17 @@ Please visit our Website: http://www.httrack.com
   } \
 } while(0)
 
+/** Set the output buffer's size, latching output_oom rather than claiming
+    bytes it never had room for. **/
+#define HT_SET_SIZE(N) do { \
+  const size_t size_ = (N); \
+  if (size_ <= TypedArrayCapa(output_buffer)) { \
+    TypedArraySize(output_buffer) = size_; \
+  } else { \
+    output_oom = HTS_TRUE; \
+  } \
+} while(0)
+
 /** Append bytes to the output buffer up to the pointer 'html'. **/
 #define HT_add_adr do { \
   if ( (opt->getmode & 1) != 0 && ptr > 0 ) { \
@@ -3547,16 +3558,28 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
           if (RUN_CALLBACK4(opt, postprocess, &cAddr, &cSize, urladr(), urlfil()) == 1) {
             hts_log_print(opt, LOG_DEBUG,
               "engine: postprocess-html: callback modified data, applying %d bytes", cSize);
-            /* The callback either edits output_buffer in place (cAddr
-               unchanged) or hands back its own buffer (cAddr changed). Only
-               the latter needs a copy: re-appending output_buffer onto itself
-               would read freed memory, as the append's realloc can relocate
-               the block out from under cAddr. */
-            if (cAddr != TypedArrayElts(output_buffer)) {
-              TypedArraySize(output_buffer) = 0;
-              HT_ADD_N(cAddr, (size_t) cSize);
+            /* A reply pointing anywhere into output_buffer edited it in
+               place and is moved down. Appending it onto itself instead would
+               memcpy overlapping bytes, after an EnsureRoom whose realloc can
+               relocate the block out from under cAddr. */
+            if (!hts_postprocess_reply_ok(cAddr, cSize,
+                                          TypedArrayElts(output_buffer),
+                                          TypedArraySize(output_buffer),
+                                          TypedArrayCapa(output_buffer))) {
+              hts_log_print(opt, LOG_ERROR,
+                            "engine: postprocess-html: callback returned %d "
+                            "bytes for %s%s, page skipped",
+                            cSize, urladr(), urlfil());
+              HT_SET_SIZE(0);
+              error = 1;
+            } else if (hts_postprocess_reply_inplace(
+                           cAddr, TypedArrayElts(output_buffer),
+                           TypedArrayCapa(output_buffer))) {
+              memmove(TypedArrayElts(output_buffer), cAddr, (size_t) cSize);
+              HT_SET_SIZE((size_t) cSize);
             } else {
-              TypedArraySize(output_buffer) = (size_t) cSize;
+              HT_SET_SIZE(0);
+              HT_ADD_N(cAddr, (size_t) cSize);
             }
           }
         }
@@ -3593,6 +3616,30 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
   ENGINE_SAVE_CONTEXT();
 
   return 0;
+}
+
+/* Contract in htsparse.h. */
+hts_boolean hts_postprocess_reply_inplace(const char *html, const char *buffer,
+                                          size_t capa) {
+  /* through uintptr_t: comparing pointers into unrelated objects is not
+     defined, and the callback's buffer is one */
+  const uintptr_t at = (uintptr_t) html, base = (uintptr_t) buffer;
+
+  return buffer != NULL && at >= base && at - base < capa;
+}
+
+/* Contract in htsparse.h. */
+hts_boolean hts_postprocess_reply_ok(const char *html, int len,
+                                     const char *buffer, size_t size,
+                                     size_t capa) {
+  if (len < 0 || html == NULL)
+    return HTS_FALSE;
+  if (hts_postprocess_reply_inplace(html, buffer, capa)) {
+    const size_t at = (size_t) (html - buffer);
+
+    return at <= size && (size_t) len <= size - at;
+  }
+  return HTS_TRUE;
 }
 
 /* Mirror the savename to tell whether a redirect saves to the same file (#159);

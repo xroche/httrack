@@ -1,7 +1,9 @@
 #!/bin/bash
 #
 # htsparse.c's output_buffer only reports a failed growth if every macro that
-# grows it latches output_oom. #1561's HT_ADD_BUF reached it without doing so.
+# grows it latches output_oom, and it only stays inside its allocation if
+# nothing sets its size or storage directly. #1561's HT_ADD_BUF grew it without
+# latching. A plugin's byte count was assigned straight into its size.
 
 set -euo pipefail
 
@@ -11,20 +13,25 @@ set -euo pipefail
 src="${testdir}/../src/htsparse.c"
 test -r "$src" || fail "no source at $src"
 
-# Report every macro that grows output_buffer without latching, and every
-# growth sitting outside a macro body altogether.
+# Report every macro that grows output_buffer or sets its size, capacity or
+# storage without latching, and every such write sitting outside a macro body
+# altogether. A bare assignment is the route no growth call can see.
 unlatched() { # unlatched FILE
     awk '
+    BEGIN {
+        grow = "TypedArray(EnsureRoom|Append|Add)\\(output_buffer"
+        set = "(TypedArray(Size|Capa|Elts|Ptr)\\(output_buffer\\)" \
+              "|output_buffer\\.(size|capa|data))" \
+              "[ \t]*(\\+\\+|--|[-+*/]?=([^=]|$))"
+    }
     /^#define/ { name = $2; sub(/\(.*/, "", name); body = $0; open = /\\$/
                  if (!open) { check(); name = "" }
                  next }
     open { body = body "\n" $0; if ($0 !~ /\\$/) { open = 0; check(); name = "" }
            next }
-    /TypedArray(EnsureRoom|Append|Add)\(output_buffer/ {
-        print "outside any macro, line " NR }
+    $0 ~ grow || $0 ~ set { print "outside any macro, line " NR }
     function check() {
-        if (body ~ /TypedArray(EnsureRoom|Append|Add)\(output_buffer/ &&
-            body !~ /output_oom/) print name
+        if ((body ~ grow || body ~ set) && body !~ /output_oom/) print name
     }' "$1"
 }
 
@@ -34,12 +41,22 @@ test -z "$got" || fail "reaches output_buffer without latching output_oom: $got"
 # The checker is silent on a clean file, so a broken one would pass too.
 work=$(mktemp -d "${TMPDIR:-/tmp}/oblatch.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "$work"
+
+# A growth straight out of a macro that never latches.
 sed 's|^#define HT_ADD_BUF(A, N) HT_ADD_N(.*|#define HT_ADD_BUF(A, N) TypedArrayAppend(output_buffer, A, N)|' \
-    "$src" >"$work/mutant.c"
-cmp -s "$src" "$work/mutant.c" && fail "the mutant edit matched nothing; HT_ADD_BUF was renamed"
-case "$(unlatched "$work/mutant.c")" in
+    "$src" >"$work/grow.c"
+cmp -s "$src" "$work/grow.c" && fail "the mutant edit matched nothing; HT_ADD_BUF was renamed"
+case "$(unlatched "$work/grow.c")" in
 *HT_ADD_BUF*) ;;
 *) fail "the checker missed HT_ADD_BUF appending straight to output_buffer" ;;
+esac
+
+# A size set with no growth call for the rule above to see.
+sed 's|HT_SET_SIZE(0);|TypedArraySize(output_buffer) = 0;|' "$src" >"$work/size.c"
+cmp -s "$src" "$work/size.c" && fail "the mutant edit matched nothing; HT_SET_SIZE was renamed"
+case "$(unlatched "$work/size.c")" in
+*"outside any macro"*) ;;
+*) fail "the checker missed a bare TypedArraySize(output_buffer) assignment" ;;
 esac
 
 exit 0
