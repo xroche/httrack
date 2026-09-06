@@ -6387,6 +6387,73 @@ static void st_addrport_case(int family, unsigned int port,
   freet(arena);
 }
 
+/* One http_postfile_body() case, run into a request block followed by a
+   poisoned guard. A missing terminator shows up as a returned position that
+   walked into the poison instead of stopping inside the block. */
+static int st_postfile_case(const char *path, size_t start, size_t expect,
+                            const char *what) {
+  enum { capacity = 64, guard = 16 };
+
+  char *arena = malloct(capacity + guard);
+  FILE *fp = FOPEN(path, "rb");
+  size_t pos;
+  size_t i;
+  int err = 0;
+
+  if (arena == NULL || fp == NULL) {
+    printf("  FAIL %s: cannot open %s\n", what, path);
+    freet(arena);
+    if (fp != NULL)
+      fclose(fp);
+    return 1;
+  }
+  memset(arena, '#', capacity + guard);
+  arena[capacity + guard - 1] = '\0'; /* a runaway strlen ends here, not past */
+  memset(arena, 'R', start);          /* what the request line already wrote */
+  arena[start] = '\0';
+
+  pos = http_postfile_body(arena, capacity, start, fp);
+  fclose(fp);
+
+  if (pos != expect) {
+    printf("  FAIL %s: position %d, expected %d\n", what, (int) pos,
+           (int) expect);
+    err = 1;
+  } else if (arena[pos] != '\0') {
+    printf("  FAIL %s: no terminator at %d\n", what, (int) pos);
+    err = 1;
+  }
+  for (i = capacity; i + 1 < capacity + guard; i++) {
+    if (arena[i] != '#') {
+      printf("  FAIL %s: guard byte %d written\n", what, (int) (i - capacity));
+      err = 1;
+      break;
+    }
+  }
+  freet(arena);
+  return err;
+}
+
+/* >postfile: bodies, read raw into the request block. Fixture paths in argv:
+   shorter than the room left, longer than it, one holding a NUL, and empty. */
+static int st_postfile(httrackp *opt, int argc, char **argv) {
+  int err = 0;
+
+  (void) opt;
+  if (argc < 4) {
+    printf("usage: -#test=postfile <short> <long> <embedded-nul> <empty>\n");
+    return 1;
+  }
+  /* room left is 64 - 8 - 1 = 55 bytes */
+  err |= st_postfile_case(argv[0], 8, 8 + 3, "short");
+  err |= st_postfile_case(argv[1], 8, 8 + 55, "long");
+  err |= st_postfile_case(argv[2], 8, 8 + 2, "embedded-nul");
+  err |= st_postfile_case(argv[3], 8, 8, "empty");
+
+  printf("postfile self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 static int st_addrport(httrackp *opt, int argc, char **argv) {
   (void) opt;
   (void) argc;
@@ -14045,6 +14112,9 @@ static const struct selftest_entry {
     {"catchurl", "",
      "an over-long request header block fails the capture, not the process",
      st_catchurl},
+    {"postfile", "<short> <long> <embedded-nul> <empty>",
+     "a >postfile: body is clipped to the request block and terminated",
+     st_postfile},
     {"urlbounds", "",
      "an over-long path is refused by the wizard and auth consumers",
      st_urlbounds},

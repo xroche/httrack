@@ -1,0 +1,22 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# A >postfile: body is read raw into the request block, which the WARC stash,
+# the sendhead callback and sendc() all read back with strlen(). Drives
+# -#test=postfile over four fixtures, none of which ends in a NUL of its own.
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+printf 'abc' >"$dir/short"
+repeat_chars 200 A >"$dir/long"
+printf 'ab\000cd' >"$dir/embnul"
+: >"$dir/empty"
+
+assert_selftest "postfile self-test: OK" postfile \
+    "$dir/short" "$dir/long" "$dir/embnul" "$dir/empty"
+
+exit 0
