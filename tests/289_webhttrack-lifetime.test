@@ -54,6 +54,15 @@ died_within() {
     done
 }
 
+# A probe landing past the ping window cannot tell a live server from an idle
+# death, so skip: the sample is starved, not the server. It is only a backstop
+# for a loaded runner, since case 4's batched flood costs 0.04-0.15s, not 0.9s.
+still_in_window() {
+    local spent=$((SECONDS - $1))
+    test "${spent}" -lt "${timeout}" ||
+        skip "$2 took ${spent}s of a ${timeout}s ping window, so this proves nothing"
+}
+
 printf '[an abandoned WebHTTrack server stops on its own] ..\t'
 
 # The page and the server agree on one wire format, and only the page half runs
@@ -81,8 +90,10 @@ grep -qi '^Cache-Control:.*no-cache' <<<"${reply}" ||
 # A hidden tab has its timers throttled to as little as one wake-up a minute, so
 # this cannot rest on the survivor answering inside the grace.
 ping "${bye_port}" w2
+w2_at=${SECONDS}
 bye "${bye_port}" w1 "${sid}"
 sleep $((grace + 2))
+still_in_window "${w2_at}" "closing one of two windows and its grace"
 kill -0 "${bye_pid}" 2>/dev/null ||
     fail "closing one window ended a session another window still had open"
 
@@ -90,13 +101,16 @@ kill -0 "${bye_pid}" 2>/dev/null ||
 # session-id nor the Origin gate, and any local process or visited page can send
 # it. Only a heartbeat may go unproven, and a heartbeat only extends a life.
 ping "${bye_port}" w2 e=bye
+w2_at=${SECONDS}
 sleep $((grace + 2))
+still_in_window "${w2_at}" "the unsigned goodbye and its grace"
 kill -0 "${bye_pid}" 2>/dev/null ||
     fail "an unauthenticated goodbye ended the session"
 
 # 4. A flood of window ids must not push a real window out of the table: with
 # the last real one evicted, saying goodbye to the flood would end the session.
-# One more than the table holds, so the refusal itself is exercised.
+# Seventeen ids against sixteen slots w2 already holds one of, so two are
+# refused and the refusal itself is exercised.
 #
 # w2's ping window starts here, not at whatever case 3 spent, and the re-ping
 # runs before the flood because pinging after would revive an evicted window.
@@ -115,11 +129,8 @@ done
 "${HTS_PYTHON}" "${testdir}/httpclient.py" --port "${bye_port}" "${flood[@]}" \
     --field "sid=${sid}" >/dev/null
 sleep $((grace + 2))
-# Read the clock next to the probe, so a slow run reads as elapsed time here
-# rather than as a false eviction below.
-elapsed=$((SECONDS - w2_at))
-test "${elapsed}" -lt "${timeout}" ||
-    fail "the flood and its grace took ${elapsed}s of w2's ${timeout}s window, so this proves nothing"
+# A slow run then reads as elapsed time here, not as a false eviction below.
+still_in_window "${w2_at}" "the flood and its grace"
 kill -0 "${bye_pid}" 2>/dev/null ||
     fail "a flood of window ids evicted the real window and ended the session"
 
@@ -176,6 +187,7 @@ sleeper=
 
 # The crashed window must outlive its setup, or the floor asserted below could
 # be met by the time these four servers took to start.
+still_in_window "${lost_at}" "starting the four servers"
 kill -0 "${lost_pid}" 2>/dev/null ||
     fail "the idle timeout fired during setup, $((SECONDS - lost_at))s in"
 
@@ -224,8 +236,10 @@ test "${#sid}" -eq 32 || fail "no session id to start a mirror with"
     >/dev/null
 
 ping "${crawl_port}" w1
+w1_at=${SECONDS}
 bye "${crawl_port}" w1 "${sid}"
 sleep $((grace + 2))
+still_in_window "${w1_at}" "the goodbye and its grace"
 kill -0 "${crawl_pid}" 2>/dev/null ||
     fail "the crawling server quit, taking its mirror with it"
 # A crawl that never started would leave the veto unexercised, and the survival

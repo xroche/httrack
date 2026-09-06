@@ -127,8 +127,10 @@ them. That is how the mojibake in issue #1463 reached Fedora users.
 
 ## The test suite in a buildroot
 
-`make check -j"$(nproc)"`. Each crawl test binds its own ephemeral-port server,
-so parallelism never contends and a serial run costs minutes for nothing.
+`make check -j16`. Each crawl test binds its own ephemeral-port server, so
+parallelism never contends and a serial run costs minutes for nothing. The width
+is not a core count, because the tests mostly sleep and an idle core covers a
+sleeping one. On four cores `-j8` takes 245s and `-j16` takes 161s.
 
 The suite is offline but needs python3, which several buildroots lack. Without it
 most tests skip and the suite still exits 0, so read the `# TOTAL:` and `# PASS:`

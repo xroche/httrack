@@ -766,6 +766,17 @@ for psrun in "${psruns[@]}"; do
     test "$spent" -ge 4 || fail "a 5s watchdog returned after ${spent}s: MaxSeconds is not seconds"
     test "$spent" -le 20 || fail "a 5s watchdog ran ${spent}s: it does not stop on its own"
     fast=$(count_matching_lines 't=[0-9]*s q=' <<<"$out")
+    # A turn of the loop costs whatever the box gives it, and a 3-core runner
+    # under -j16 spent the whole 5s window on one turn, so both legs came back
+    # with one line. Widen the window rather than grade that sample: 30s still
+    # outran a 160-way overcommit on three cores, where 5s lost at 48.
+    if test "$fast" -le "$slow"; then
+        out=$(run_wd 120 -File "$(nativepath "$wdscript")" \
+            -ProgressLog "$(nativepath "$tmp/progress.log")" \
+            -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 30) ||
+            fail "the $psrun loop exited nonzero over 30s: $out"
+        fast=$(count_matching_lines 't=[0-9]*s q=' <<<"$out")
+    fi
     # Against the slow leg, not a floor: a probe tick is not instant.
     test "$fast" -gt "$slow" || fail "$fast status lines at 1s against $slow at 100s: $out"
     grep -q '36_local-bigcrawl.test' <<<"$out" || fail "the status does not name the test in flight: $out"
