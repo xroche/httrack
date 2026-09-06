@@ -1010,6 +1010,21 @@ void http_append_custom_headers(char *dst, size_t dst_size,
   append_custom_headers(&bstr, headers);
 }
 
+/* See htslib.h. Clipping rather than aborting: a body bigger than the request
+   block has always been truncated here, so an abort would be a new way to lose
+   the mirror. */
+size_t http_postfile_body(char *buffer, size_t buffer_size, size_t pos,
+                          FILE *fp) {
+  size_t room;
+  size_t got;
+
+  assertf(pos < buffer_size);
+  room = buffer_size - pos - 1; /* the NUL every consumer strlen()s up to */
+  got = fread(&buffer[pos], 1, room, fp);
+  buffer[pos + got] = '\0';
+  return pos + strlen(&buffer[pos]);
+}
+
 // envoi d'une requète
 int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
                   const char *xsend, const char *adr, const char *fil,
@@ -1051,7 +1066,6 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
           linput(fp, line, 1000);
           /* widths bound method[256], url[HTS_URLMAXSIZE*2], protocol[256] */
           if (sscanf(line, "%255s %2047s %255s", method, url, protocol) == 3) {
-            size_t ret;
             // http proxy: absolute-URI; socks/CONNECT tunnel: origin-form
             if (retour->req.proxy.active &&
                 !hts_proxy_is_socks(retour->req.proxy.name) &&
@@ -1064,13 +1078,9 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
               print_buffer(&bstr,
                        "%s %s %s\r\n", method, url, protocol);
             }
-            // lire le reste en brut
-            ret = fread(&bstr.buffer[bstr.pos],
-                        bstr.capacity - bstr.pos, 1, fp);
-            if ((int) ret < 0) {
-              return -1;
-            }
-            bstr.pos += strlen(&bstr.buffer[bstr.pos]);
+            // the rest of the file goes out raw
+            bstr.pos =
+                http_postfile_body(bstr.buffer, bstr.capacity, bstr.pos, fp);
           }
           fclose(fp);
         }

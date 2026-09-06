@@ -233,6 +233,14 @@ hts_boolean hts_body_missing_unexpectedly(const htsblk *r);
 void http_append_custom_headers(char *dst, size_t dst_size,
                                 const char *headers);
 
+/* Append the raw remainder of a >postfile: body into buffer (capacity
+   buffer_size) at write position pos, and return the new position. Clips to
+   the room left, and always leaves a NUL at the position returned: the request
+   block is read back with strlen() by the WARC stash, the sendhead callback
+   and sendc(). A NUL inside the file ends the request there. */
+size_t http_postfile_body(char *buffer, size_t buffer_size, size_t pos,
+                          FILE *fp);
+
 /* Switch soc between blocking and non-blocking mode; false on failure, with
    errno (WSAGetLastError() on Windows) set. */
 hts_boolean socket_set_nonblocking(T_SOC soc, hts_boolean nonblocking);

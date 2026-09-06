@@ -16,6 +16,12 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# The suite mostly sleeps because each test binds its own server and waits on it,
+# so the right width is not a core count. Measured on 4 cores: -j8 245s, -j16
+# 161s. Every "make check" here takes it, distcheck and deb included.
+env:
+  CHECK_JOBS: 16
+
 jobs:
   build:
     name: build (${{ matrix.arch }}, ${{ matrix.cc }}${{ matrix.label }})
@@ -115,13 +121,12 @@ jobs:
           grep -qw accept <<<"$syms" || { echo "::error::-DFTP_PASV=0 built no active-mode code"; exit 1; }
           rm -f $objs
 
-      # A backstop only: tests/test-timeout.sh bounds each test, and a healthy run
-      # is a minute here, two on macOS. Without it a stall ran to the job's 6h default.
+      # A backstop only: tests/test-timeout.sh bounds each test. Without it a stall
+      # ran to the job's 6h default.
       - name: Test
         timeout-minutes: 20
         run: |
-          jobs=$(( $(nproc) * 2 )); [ "$jobs" -le 16 ] || jobs=16
-          make check -j"$jobs"
+          make check -j"$CHECK_JOBS"
 
       - name: Print the test log on failure
         if: failure()
@@ -166,8 +171,7 @@ jobs:
           sudo find /usr/bin /usr/local/bin -maxdepth 1 -name 'python3*' \
             -exec mv {} {}.hidden \;
           ! command -v python3
-          jobs=$(( $(nproc) * 2 )); [ "$jobs" -le 16 ] || jobs=16
-          make check -j"$jobs"
+          make check -j"$CHECK_JOBS"
 
       - name: Print the test log on failure
         if: failure()
@@ -206,8 +210,7 @@ jobs:
         timeout-minutes: 20
         run: |
           set -euo pipefail
-          jobs=$(( $(nproc) * 2 )); [ "$jobs" -le 16 ] || jobs=16
-          tools/hostile-net.sh make check -j"$jobs"
+          tools/hostile-net.sh make check -j"$CHECK_JOBS"
           # A refusal landing before connect() returns skips on the older probe
           # instead, leaving the settle this leg exists to guard unrun.
           cat tests/246_engine-connect-stop.log
@@ -217,8 +220,7 @@ jobs:
         timeout-minutes: 20
         run: |
           set -euo pipefail
-          jobs=$(( $(nproc) * 2 )); [ "$jobs" -le 16 ] || jobs=16
-          tools/buildroot-net.sh make check -j"$jobs"
+          tools/buildroot-net.sh make check -j"$CHECK_JOBS"
           # Only the widening half needs an address the namespace lacks, so a
           # run that never reached the loopback half proves nothing.
           cat tests/335_webhttrack-bind-loopback.log
@@ -284,8 +286,7 @@ jobs:
         timeout-minutes: 25
         run: |
           set -euo pipefail
-          jobs=$(( $(nproc) * 2 )); [ "$jobs" -le 16 ] || jobs=16
-          make check -j"$jobs"
+          make check -j"$CHECK_JOBS"
 
       - name: Print the test log on failure
         if: failure()
@@ -337,8 +338,7 @@ jobs:
       - name: Test
         timeout-minutes: 20
         run: |
-          jobs=$(( $(sysctl -n hw.ncpu) * 2 )); [ "$jobs" -le 16 ] || jobs=16
-          make check -j"$jobs"
+          make check -j"$CHECK_JOBS"
 
       - name: Print the test log on failure
         if: failure()
@@ -533,8 +533,7 @@ jobs:
       - name: Test
         timeout-minutes: 20
         run: |
-          jobs=$(( $(nproc) * 2 )); [ "$jobs" -le 16 ] || jobs=16
-          make check -j"$jobs"
+          make check -j"$CHECK_JOBS"
 
       - name: Print the test log on failure
         if: failure()
@@ -596,8 +595,7 @@ jobs:
         timeout-minutes: 20
         run: |
           mkdir -p "$GITHUB_WORKSPACE/sanitizer-logs" "$GITHUB_WORKSPACE/sanitizer-stderr"
-          jobs=$(( $(nproc) * 2 )); [ "$jobs" -le 16 ] || jobs=16
-          make check -j"$jobs"
+          make check -j"$CHECK_JOBS"
 
       - name: Print the test log on failure
         if: failure()
@@ -664,8 +662,7 @@ jobs:
           # 01_engine-* only; zlib-dependent self-tests are named 01_zlib-* and
           # skipped here (uninstrumented libz floods MSan with false positives).
           tests="$(cd tests && ls 01_engine-*.test | tr '\n' ' ')"
-          jobs=$(( $(nproc) * 2 )); [ "$jobs" -le 16 ] || jobs=16
-          make check -j"$jobs" TESTS="$tests"
+          make check -j"$CHECK_JOBS" TESTS="$tests"
 
       - name: Print the test log on failure
         if: failure()
@@ -790,8 +787,7 @@ jobs:
       - name: Test
         timeout-minutes: 20
         run: |
-          jobs=$(( $(nproc) * 2 )); [ "$jobs" -le 16 ] || jobs=16
-          make check -j"$jobs"
+          make check -j"$CHECK_JOBS"
 
       - name: Print the test log on failure
         if: failure()
@@ -840,8 +836,7 @@ jobs:
         timeout-minutes: 20
         run: |
           set -euo pipefail
-          jobs=$(( $(nproc) * 2 )); [ "$jobs" -le 16 ] || jobs=16
-          make -C ../bld-off check -j"$jobs" ||
+          make -C ../bld-off check -j"$CHECK_JOBS" ||
             { cat ../bld-off/tests/test-suite.log 2>/dev/null; exit 1; }
 
       - name: iconv alone off
@@ -863,8 +858,7 @@ jobs:
         timeout-minutes: 20
         run: |
           set -euo pipefail
-          jobs=$(( $(nproc) * 2 )); [ "$jobs" -le 16 ] || jobs=16
-          make -C ../bld-mixed check -j"$jobs" ||
+          make -C ../bld-mixed check -j"$CHECK_JOBS" ||
             { cat ../bld-mixed/tests/test-suite.log 2>/dev/null; exit 1; }
 
   # The cell of #1139: a libc exporting getrandom() without shipping
@@ -901,8 +895,7 @@ jobs:
       - name: Test
         timeout-minutes: 20
         run: |
-          jobs=$(( $(nproc) * 2 )); [ "$jobs" -le 16 ] || jobs=16
-          make check -j"$jobs"
+          make check -j"$CHECK_JOBS"
 
       - name: Print the test log on failure
         if: failure()
@@ -942,8 +935,7 @@ jobs:
       - name: Test
         timeout-minutes: 20
         run: |
-          jobs=$(( $(nproc) * 2 )); [ "$jobs" -le 16 ] || jobs=16
-          make check -j"$jobs"
+          make check -j"$CHECK_JOBS"
 
       - name: Print the test log on failure
         if: failure()
@@ -1016,8 +1008,8 @@ jobs:
       #
       # DEB_BUILD_OPTIONS trims work CI does not need (release builds via
       # mkdeb.sh are untouched): noautodbgsym drops the -dbgsym packages whose
-      # LTO payloads are slow to compress and that CI never ships; parallel uses
-      # every core.
+      # LTO payloads are slow to compress and that CI never ships; parallel widens
+      # both dh_auto_build and dh_auto_test, and the test pass is nearly all of it.
       - name: Build and lint Debian packages
         run: |
           set -euo pipefail
@@ -1025,7 +1017,7 @@ jobs:
           # container runs as root, so mkdeb's git calls (superproject and the
           # coucal submodule) trip "dubious ownership"; mark them all safe.
           git config --global --add safe.directory "*"
-          export DEB_BUILD_OPTIONS="noautodbgsym parallel=$(nproc)"
+          export DEB_BUILD_OPTIONS="noautodbgsym parallel=$CHECK_JOBS"
           bash tools/mkdeb.sh --unsigned --no-release-artifacts
 
   # Release-tarball integrity: `make distcheck` rolls the dist tarball, then
@@ -1054,7 +1046,8 @@ jobs:
           set -euo pipefail
           autoreconf -fi
           ./configure
-          make -j"$(nproc)" distcheck
+          # -j reaches make check through the jobserver, which is the expensive part.
+          make -j"$CHECK_JOBS" distcheck
 
   dco:
     name: DCO sign-off
