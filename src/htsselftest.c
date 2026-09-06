@@ -3255,18 +3255,20 @@ static int st_headerdedup(httrackp *opt, int argc, char **argv) {
   char *req, *tmp, *headers;
   const char *appended;
   size_t i, reqlen, blocklen;
+  /* Only an exact capacity puts a line's last byte on the buffer's last byte */
+  size_t capacity = argc > 2 ? (size_t) atoi(argv[2]) : 2 * half;
 
   (void) opt;
   if (argc < 2) {
     fprintf(stderr, "headerdedup: needs a request and a header block\n");
     return 1;
   }
-  req = malloct(2 * half);
+  req = malloct(capacity > 2 * half ? capacity : 2 * half);
   tmp = malloct(half);
   reqlen = st_decode_body(argv[0], req, half);
   blocklen = st_decode_body(argv[1], tmp, half);
   /* st_decode_body clips, and a clipped case grades an input nobody wrote */
-  if (reqlen + 1 >= half || blocklen + 1 >= half) {
+  if (reqlen + 1 >= half || blocklen + 1 >= half || capacity <= reqlen) {
     fprintf(stderr, "headerdedup: argument longer than %d bytes\n",
             (int) half - 2);
     freet(tmp);
@@ -3277,7 +3279,7 @@ static int st_headerdedup(httrackp *opt, int argc, char **argv) {
   /* exact-size copy so a sanitizer traps an over-read of the block */
   headers = strdupt(tmp);
   freet(tmp);
-  http_append_custom_headers(req, 2 * half, headers);
+  http_append_custom_headers(req, capacity, headers);
   for (i = 0; appended[i] != '\0'; i++) {
     if (appended[i] == '\r')
       printf("\\r");
@@ -13785,7 +13787,7 @@ static const struct selftest_entry {
     {"headerfield", "<headers> <field>",
      "is <field> already present in the custom request-header block",
      st_headerfield},
-    {"headerdedup", "<request> <headers>",
+    {"headerdedup", "<request> <headers> [capacity]",
      "what the custom header block adds to a request that has some (#1340)",
      st_headerdedup},
     {"headerlong", "[header-name:]",

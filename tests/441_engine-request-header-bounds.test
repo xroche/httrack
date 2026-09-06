@@ -28,13 +28,17 @@ serverpid=$!
 port=$(discover_server_port "$tmpdir/server.out" "$serverpid") || exit 1
 
 # htscoremain refuses an argv of HTS_CDLMAXSIZE, so the box is filled a line at
-# a time; twenty of these pass 16384, one does not.
-pad=$(printf '%0.sp' $(seq 990))
-fit=(-%X "X-Pad0: $pad")
-big=()
-for i in $(seq 0 19); do
-    big+=(-%X "X-Pad$i: $pad")
-done
+# a time. At 980 bytes a line the request passes 16384 between 16 lines and 17,
+# and a whole line is the smallest step this fixture can take, so 16 lands 205
+# bytes short of the buffer and 17 lands 786 bytes past it.
+pad=$(printf '%0.sp' $(seq 980))
+box() { # box N -> BOX, the -%X arguments for N header lines
+    local i
+    BOX=()
+    for ((i = 0; i < $1; i++)); do
+        BOX+=(-%X "X-Pad$i: $pad")
+    done
+}
 
 requests() {
     local n=0 f
@@ -55,26 +59,47 @@ crawl() { # crawl TAG [args...]
     test "$rc" -eq 0 || fail "$tag: the crawl exited $rc"
 }
 
-printf '[a box that fits reaches the wire] ..\t'
-crawl fits "${fit[@]}"
-sent=$(requests)
-test "$sent" -ge 1 || fail "no request reached the server"
-grep -q "^X-Pad0: $pad" "$wire.$sent" ||
-    fail "the box line is missing from the request"
-! grep -q 'Request header too large' "$tmpdir/fits/hts-log.txt" ||
-    fail "a request that fits was refused"
-test -s "$tmpdir/fits/127.0.0.1_$port/plain.html" || fail "nothing was mirrored"
-echo OK
-
-printf '[an over-long box refuses instead of aborting] ..\t'
-before=$(requests)
-crawl over "${big[@]}"
-grep -q 'Request header too large' "$tmpdir/over/hts-log.txt" ||
-    fail "no refusal in $(cat "$tmpdir/over/hts-log.txt")"
-echo OK
+fits() { # fits TAG N: the box goes out and the page is mirrored
+    local sent
+    box "$2"
+    crawl "$1" "${BOX[@]}"
+    sent=$(requests)
+    test "$sent" -ge 1 || fail "$1: no request reached the server"
+    grep -q "^X-Pad0: $pad" "$wire.$sent" ||
+        fail "$1: the box line is missing from the request"
+    ! grep -q 'Request header too large' "$tmpdir/$1/hts-log.txt" ||
+        fail "$1: a request that fits was refused"
+    test -s "$tmpdir/$1/127.0.0.1_$port/plain.html" || fail "$1: nothing was mirrored"
+}
 
 # A clipped request is not the one the crawl meant to make, so the refusal has
-# to happen before the socket, not after it.
-printf '[nothing is sent once it does not fit] ..\t'
-assert_eq "$before" "$(requests)" "requests reaching the server"
+# to happen before the socket: the server must see nothing at all.
+over() { # over TAG N: the request is refused and never sent
+    local before
+    before=$(requests)
+    box "$2"
+    crawl "$1" "${BOX[@]}"
+    grep -q 'Request header too large' "$tmpdir/$1/hts-log.txt" ||
+        fail "$1: no refusal in $(cat "$tmpdir/$1/hts-log.txt")"
+    assert_eq "$before" "$(requests)" "$1: requests reaching the server"
+}
+
+printf '[a box that fits reaches the wire] ..\t'
+fits one 1
 echo OK
+
+# One line apart, so a guard that moved would take one of the two with it. A
+# guard tripping on any half-full buffer fails the first, one accepting a
+# request a byte too long fails the second.
+printf '[16 lines fit, 17 do not] ..\t'
+fits edge 16
+over past 17
+echo OK
+
+# A whole header line is the smallest step a crawl can take, so the byte the
+# guard turns on is pinned here instead: through http_append_custom_headers,
+# whose buffer size the case names. A line exactly filling it is dropped, and
+# one byte shorter still goes in.
+selftest_queue 'XXXXXXXXXXXXX' headerdedup AB XXXXXXXXXXXXX 16
+selftest_queue '' headerdedup AB XXXXXXXXXXXXXX 16
+selftest_run_queued
