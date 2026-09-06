@@ -3445,7 +3445,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   adr_next++;
                 }
                 /* Jump to near end (index hack) */
-                if (!adr_next || *adr_next != '<') {
+                if (*adr_next != '<') {
                   if (html - r->adr < r->size - 4
                       && r->size > 4
                     ) {
