@@ -95,6 +95,7 @@ else
         test "$((SECONDS - start))" -lt "$REAP_GRACE" || fail "watchdog left a grandchild running (pid $gcpid)"
         poll_wait 1
     done
+    gcpid= # disarm: the number is free to be recycled from here on
 fi
 
 # Wall clock, not iteration count: under starvation a poll costs more than it asks,

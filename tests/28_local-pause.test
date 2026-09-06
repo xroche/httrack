@@ -1,10 +1,10 @@
 #!/bin/bash
 #
-# --pause (#185): a fixed inter-file delay must slow a multi-file crawl. Measure
-# the same crawl with and without --pause and compare: the harness overhead
-# cancels, leaving only the pause. Integer seconds keep it portable (BSD date
-# has no %N). The cancelling holds only while the box times the same crawl the
-# same way twice, so a missing delta is re-timed before it convicts --pause.
+# --pause (#185): a fixed inter-file delay must slow a multi-file crawl. One
+# --pause value sets min and max alike, so the engine cannot launch N files in
+# less than (N-1) pauses however fast the box is. That floor is what is asserted
+# here. The old test compared two whole crawls and wanted the paused one 2s
+# slower, which a loaded box manufactures out of its own noise.
 
 set -e
 
@@ -15,28 +15,30 @@ set -e
 # run() swallows its exit-77 and the serverless 0s/0s crawl looks like a fail.
 find_python >/dev/null || skip "python3 not found"
 
+# The engine's own "files written" count. --files asserts it on every pass, so a
+# fixture that gains or loses a link reds here instead of leaving the floor stale.
+files=18
+pause=2
+# Two off the count rather than one, because the top-level index is written
+# without a fetch of its own and the floor has to stay a floor.
+floor=$(((files - 2) * pause))
+
 run() { # echoes the wall-clock seconds of one crawl
     local t0 t1
     t0=$(date +%s)
-    bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files "$files" \
         httrack 'BASEURL/types/index.html' -c1 "$@" >/dev/null 2>&1
     t1=$(date +%s)
     echo $((t1 - t0))
 }
 
 base=$(run)
-paused=$(run --pause 0.5)
-delta=$((paused - base))
+paused=$(run --pause "$pause")
 
-echo "crawl: ${base}s, with --pause 0.5: ${paused}s (delta ${delta}s)"
-if [ "$delta" -lt 2 ]; then
-    # A loaded box moves both crawls by more than the pause adds, so a missing
-    # delta only convicts --pause where the unpaused crawl repeats its own time.
-    again=$(run)
-    noise=$((again - base))
-    [ "$noise" -ge 0 ] || noise=$((-noise))
-    [ "$noise" -lt 2 ] ||
-        skip "the unpaused crawl timed ${base}s then ${again}s; a ${delta}s delta says nothing on this box"
-    echo "FAIL: --pause did not delay the crawl (delta ${delta}s)" >&2
-    exit 1
-fi
+echo "crawl: ${base}s, with --pause ${pause}: ${paused}s (floor ${floor}s)"
+# A pause only ever adds time, so no load can push a working crawl under this.
+test "$paused" -ge "$floor" ||
+    fail "--pause did not delay the crawl: ${paused}s for ${files} files ${pause}s apart"
+# And the floor decides nothing on a box that reaches it unpaused anyway.
+test "$base" -lt "$floor" ||
+    skip "the unpaused crawl took ${base}s, past the ${floor}s floor: this box cannot show the pause"
