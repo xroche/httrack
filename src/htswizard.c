@@ -746,8 +746,8 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
   // un lien spécial avant même de tester sa position, sa hiérarchie etc.
   // peut court-circuiter le forbidden_url précédent
   if (opt->wizard && !hts_wizard_url_fits(adr, fil)) {
-    hts_log_print(opt, LOG_WARNING,
-                  "link too long for the wizard, forbidden: %s%s", adr, fil);
+    hts_log_print(opt, LOG_DEBUG, "(wizard) link too long, forbidden: %s%s",
+                  adr, fil);
     forbidden_url = 1;      // URL interdite
   } else if (opt->wizard) { // le wizard entre en action..
     //
