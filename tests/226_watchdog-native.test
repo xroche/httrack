@@ -253,6 +253,7 @@ else
     # owns it, and an ordinary reformatting of the workflow must not move it.
     cat >"$tmp/wf.py" <<'PY'
 import re
+import copy
 import sys
 
 import yaml
@@ -283,6 +284,19 @@ for _run, _want in [("bash ./ci-windows-suite.sh $dir", True),
 
 def suite_steps(wf):
     return [s for s in steps_of(wf) if runs_suite(s)]
+
+# These three grade the LAST suite step, which one leg cannot be: with a single
+# step [-1] is [0], so they edit the step they compare against and emit an
+# unmutated workflow the audit rightly accepts. Add the second step they need,
+# under its own context, or every one of them also trips the shared-context rule
+# it is not testing.
+def second_suite_step(wf):
+    if len(suite_steps(wf)) < 2:
+        extra = copy.deepcopy(suite_steps(wf)[0])
+        extra["env"]["WATCHDOG_CONTEXT"] += " (second)"
+        suite_jobs(wf)[0]["steps"].append(extra)
+    return suite_steps(wf)[-1]
+
 
 def suite_jobs(wf):
     return [
@@ -365,12 +379,12 @@ def mutate(wf, kind):
     elif kind == "sha":
         suite_steps(wf)[0]["env"]["WATCHDOG_SHA"] = "${{ github.sha }}"
     elif kind == "lastenv":
-        suite_steps(wf)[-1]["env"]["WATCHDOG_TOKEN"] = "literal"
+        second_suite_step(wf)["env"]["WATCHDOG_TOKEN"] = "literal"
     elif kind == "sharedcontext":
-        suite_steps(wf)[-1]["env"]["WATCHDOG_CONTEXT"] = \
+        second_suite_step(wf)["env"]["WATCHDOG_CONTEXT"] = \
             suite_steps(wf)[0]["env"]["WATCHDOG_CONTEXT"]
     elif kind == "lasttimeout":
-        suite_steps(wf)[-1].pop("timeout-minutes", None)
+        second_suite_step(wf).pop("timeout-minutes", None)
     elif kind == "context":
         suite_steps(wf)[0]["env"]["WATCHDOG_CONTEXT"] = "windows-suite"
     elif kind == "url":
