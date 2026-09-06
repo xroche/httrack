@@ -256,51 +256,16 @@ jobs:
 
       - name: Restore the WSL rootfs
         id: wslrootfs
-        if: always()
         uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}\wsl-rootfs.tar.gz
           key: wsl-rootfs-jammy-amd64-v1
 
-      - name: Run the engine test suite (offline tests)
-        shell: bash
-        working-directory: tests
-        timeout-minutes: 45
-        env:
-          # Half of 2*nproc: MSYS fork emulation breaks first under the pressure
-          # eight in flight put on a 4-vCPU runner (#1273).
-          HTTRACK_SUITE_JOBS: 4
-          # Through the environment, never argv, which the process list exposes.
-          WATCHDOG_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          WATCHDOG_REPO: ${{ github.repository }}
-          # The PR head, not github.sha: a merge commit is garbage-collected, and
-          # these statuses are the only trace a lost runner leaves (#1228).
-          WATCHDOG_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-          WATCHDOG_CONTEXT: windows-suite (${{ matrix.platform }}, ${{ matrix.configuration }})
-          WATCHDOG_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          # Teed: the MSYS fork failures (#1273) land on this stderr, which no
-          # later step can read back.
-          bash ./ci-windows-suite.sh \
-            "$(cygpath -u "$GITHUB_WORKSPACE")/src/${{ matrix.platform }}/${{ matrix.configuration }}" \
-            2>&1 | tee suite-console.log
-
-      # Its own step: the watchdog can kill the suite's step before it counts,
-      # which is exactly when the count is worth having.
-      - name: Count the MSYS fork failures and the lost workers
-        if: always()
-        shell: bash
-        working-directory: tests
-        run: |
-          . ./ci-windows-suite.sh
-          ci_report_fork_failures suite-console.log
-
       # WSL2 brings up in ~35s on a hosted runner with no reboot and no
       # third-party action: the three features are already enabled on the image.
-      # It buys a real Linux shell against the same native httrack.exe, where
-      # MSYS's fork emulation is what breaks first under load (#1273).
+      # It buys a real Linux shell against the same native httrack.exe, and is
+      # the only suite leg since MSYS's fork emulation wedged its own (#1273).
       - name: Bring up WSL2
-        if: always()
         # Still non-gating now that the suite step gates: a failed import
         # reaches that step, which names it and reds there. Failing here too
         # would report one cause twice, and less clearly.
@@ -308,8 +273,21 @@ jobs:
         shell: pwsh
         timeout-minutes: 15
         run: |
-          wsl --update
-          if ($LASTEXITCODE -ne 0) { throw "wsl --update failed" }
+          # Three tries with a pause, like the rootfs download below: this call
+          # has failed on a transient and blocked a merge for it, and it now
+          # gates the only Windows suite there is.
+          for ($i = 1; $i -le 3; $i++) {
+            try {
+              wsl --update
+              if ($LASTEXITCODE -ne 0) { throw "exit $LASTEXITCODE" }
+              break
+            }
+            catch {
+              Write-Host "wsl --update attempt $i failed: $($_.Exception.Message)"
+              if ($i -eq 3) { throw }
+              Start-Sleep -Seconds (5 * $i)
+            }
+          }
           wsl --set-default-version 2
           $root = "$env:RUNNER_TEMP\wsl-rootfs.tar.gz"
           # jammy, not noble: the noble rootfs asset 404s as of 2026-09. The
@@ -343,20 +321,20 @@ jobs:
           wsl -d httrack-suite -- sh -c 'echo mounts:; ls -d /mnt/*'
 
       - name: Save the WSL rootfs
-        if: always() && steps.wslrootfs.outputs.cache-hit != 'true'
+        if: steps.wslrootfs.outputs.cache-hit != 'true'
         uses: actions/cache/save@v6
         with:
           path: ${{ runner.temp }}\wsl-rootfs.tar.gz
           key: wsl-rootfs-jammy-amd64-v1
 
       - name: Run the engine test suite (offline tests, WSL2)
-        if: always()
         shell: bash
         working-directory: tests
-        # 45 like the msys step, and 226_watchdog-native.test enforces it: the
-        # suite's own 1500s deadline plus the watchdog's 900s does not fit in less.
+        # 226_watchdog-native.test enforces this: the suite's own 1500s deadline
+        # plus the watchdog's 900s does not fit in less.
         timeout-minutes: 45
         env:
+          # One worker per vCPU on the hosted runner.
           HTTRACK_SUITE_JOBS: 4
           WATCHDOG_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WATCHDOG_REPO: ${{ github.repository }}
@@ -395,7 +373,9 @@ jobs:
           # takes SIGPIPE, and pipefail would red a step whose distro was there.
           distros=$(wsl -l -q | tr -d '\0\r')
           grep -qx httrack-suite <<<"$distros" || {
-            echo "::error::no httrack-suite distro: the Bring up WSL2 step did not finish"
+            # One annotation is one line: a newline would drop all but the first.
+            seen=${distros//$'\n'/ }
+            echo "::error::no httrack-suite distro (wsl -l -q gave: ${seen:-(none)}): the Bring up WSL2 step did not finish"
             exit 1
           }
           export HTS_WS="$ws"
@@ -404,11 +384,10 @@ jobs:
           wsl -d httrack-suite -- sh -c 'cd "$HTS_WS/tests" && exec bash ./ci-windows-suite.sh "$HTS_BIN"' 2>&1 | tee suite-console-wsl2.log
 
       # The engine ships ~90 tests and none had ever run on Windows: "make check"
-      # is Linux/macOS only. These are the offline ones, driven from Git Bash
-      # against the native httrack.exe. They subsume the self-tests this step
-      # used to run inline (codecs, cache, fsize).
-      # The *_local-* ones crawl the bundled Python server over loopback: the real
-      # TLS handshake, cache and file writer, which nothing else on Windows covers.
+      # is Linux/macOS only. These are the offline ones, run against the native
+      # httrack.exe. The *_local-* ones crawl the bundled Python server over
+      # loopback: the real TLS handshake, cache and file writer, which nothing
+      # else on Windows covers.
       - name: Upload the test logs
         if: always()
         uses: actions/upload-artifact@v7

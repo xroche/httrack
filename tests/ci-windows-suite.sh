@@ -21,53 +21,6 @@ ci_annotate() {
     printf '\n::%s title=%s::%s\n' "$level" "$title" "$msg"
 }
 
-# Count the MSYS fork-emulation failures in the console log $1, and the workers the
-# suite lost with them (#1273). A worker can die without bash saying a word, so those
-# counts at zero are not by themselves a clean leg (#1352).
-ci_report_fork_failures() {
-    local log=$1 died retried gaveup lost
-    test -r "$log" || {
-        echo "no console log at $log: MSYS fork failures not counted"
-        return 0
-    }
-    # Split on CR first: the console carries stdout and stderr merged, so two
-    # messages can share a physical line and a line count would see one. bash
-    # retries on EAGAIN alone, so a give-up can carry any strerror; each `next`
-    # keeps one message out of a second class. The LOST verdicts sit at column 0,
-    # where the suite's indented failure tails cannot forge one.
-    read -r died retried gaveup lost <<<"$(tr '\r' '\n' <"$log" | awk '
-        /^LOST / { lost++; next }
-        /fork: child -1|child_info_fork::abort|sync_with_child:/ { died++; next }
-        /reserve memory for parent stack/ { died++; next }
-        /fork: retry:/ { retried++; next }
-        /: fork: / { gaveup++ }
-        END { print died + 0, retried + 0, gaveup + 0, lost + 0 }')"
-    test -z "${GITHUB_STEP_SUMMARY:-}" ||
-        printf 'MSYS forks: %s died, %s retried, %s given up; %s worker(s) lost\n' \
-            "$died" "$retried" "$gaveup" "$lost" >>"$GITHUB_STEP_SUMMARY"
-    if test $((died + retried + gaveup)) -eq 0; then
-        # Never bare: "no MSYS fork failure" alone is what called the #1352 leg clean.
-        if test "$lost" -eq 0; then
-            echo "no MSYS fork failure and no lost worker in $log"
-        else
-            echo "no MSYS fork failure in $log, but $lost worker(s) left no status"
-        fi
-    else
-        ci_annotate warning "MSYS fork failures" "$(
-            printf '%s child(ren) died at DLL init, %s retry wait(s), %s fork(s) given up\n' \
-                "$died" "$retried" "$gaveup"
-            # -a: one NUL in the log would otherwise cost every sample line.
-            tr '\r' '\n' <"$log" | grep -am 3 -e 'fork: child -1' -e 'sync_with_child:' \
-                -e 'child_info_fork::abort' -e 'reserve memory' -e ': fork: ' || true
-        )"
-    fi
-    # error, not warning: a lost worker is re-run where a fork storm is investigated.
-    test "$lost" -eq 0 || ci_annotate error "workers lost with no status" "$(
-        printf '%s worker(s) died before reporting: re-run this leg, and see #1228\n' "$lost"
-        tr '\r' '\n' <"$log" | grep -am 3 '^LOST ' || true
-    )"
-}
-
 # Classify test $1's outcome from what its worker left in results dir $2, into
 # ci_outcome (pass, skip, fail, lost) and ci_rc. "lost" is a worker that died before
 # writing any status: an infrastructure symptom, not a test result. Assigned, not
@@ -283,19 +236,53 @@ expected_skips_msys="01_engine-footer-overflow.test
 444_local-stop-keeps-resume.test"
 
 # Measured, not predicted: windows-build run 33927128153, both platforms alike.
-# The msys list plus what the Linux shell cannot do to a native process:
+# Written out rather than derived from the msys list above: the two lists are
+# pinned expectations of different shells, and a name leaving one has to be a
+# visible edit to the other.
+# The reasons above, plus what the Linux shell cannot do to a native process:
 # 294: the wizard's feof||ferror arm never fires on a stdin the Linux shell owns
 # across interop, so it spins to the watchdog; 296 passes with a real answer
 # file, which places the fault at EOF and closed stdin rather than the wizard.
 # 24: no graceful stop crosses the boundary, so pass 1 cannot be interrupted in
-# the state the resume needs. Each of these three skips itself, in the test.
-expected_skips_wsl2="$expected_skips_msys
+# the state the resume needs. Each of these two skips itself, in the test.
+expected_skips_wsl2="01_engine-footer-overflow.test
+253_local-ftp-close-once.test
+113_engine-threadattr-leak.test
+100_local-purge-longpath.test
+158_local-link-control-bytes.test
+114_local-update-304-leak.test
+283_engine-cmdline-leak.test
+120_local-proxytrack-webdav-default.test
+143_engine-backtrace-empty.test
+152_engine-string-oom.test
+153_local-proxytrack-quiet.test
+215_engine-datadir-ospath.test
+243_local-ftp-deadhost-interrupt.test
+255_local-ftp-sigterm.test
+261_local-abort-purge.test
+262_local-signal-receive.test
+263_local-ftp-stop-window.test
+235_local-resume-recovery.test
+48_local-crange-memresume.test
+71_local-crange-repaircache.test
+80_engine-crash-symbolize.test
+88_local-proxytrack-badmtime.test
+241_local-single-file-gui.test
+288_testlib-holdport.test
+350_local-diskfull-abort.test
+352_engine-filesave-diskfull.test
+355_local-write-error-not-eof.test
+377_engine-install-paths.test
+398_engine-build-features.test
+424_engine-wizard-eof.test
+444_local-stop-keeps-resume.test
 294_local-wizard-eof.test
 24_local-resume-overlap.test"
 
 # Sets ci_skip_list to the pinned skip set for backend $1, failing loudly if
 # there is none: an unknown backend must never fall back to an empty list,
-# which would make any skip look expected.
+# which would make any skip look expected. Only wsl2 runs in CI now, so the msys
+# set is what a hand run from Git Bash is held to and nothing re-checks it.
 ci_skip_list=''
 ci_expected_skips_for_backend() {
     case "$1" in

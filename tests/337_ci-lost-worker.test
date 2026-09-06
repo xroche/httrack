@@ -1,9 +1,9 @@
 #!/bin/bash
 #
 # A worker of ci-windows-suite.sh that dies before writing any status (#1352): the
-# tally must call it lost rather than failed, the counter must never call the leg
-# clean, and the suite must end on a status that says re-run, not investigate. Driven
-# here because the Windows leg, where it happens, keeps no evidence of it.
+# tally must call it lost rather than failed, and the suite must end on a status
+# that says re-run, not investigate. Driven here because the Windows leg, where it
+# happens, keeps no evidence of it.
 
 set -euo pipefail
 
@@ -56,78 +56,6 @@ mkdir -p "$lostdir"
         esac
     done
 )
-
-# --- the counter, over four consoles ----------------------------------------
-
-# Real lines from the #1273 run, kept in step with 313_ci-fork-failures.test.
-forkline='1 [main] bash 1728 dofork: child -1 - forked process 3984 died unexpectedly, retry 0, exit code 0xC0000142, errno 11'
-lostline='LOST 86_local-proxytrack-cache-longfields.test (worker left no status; 0-byte log: it died before its test wrote anything)'
-
-{
-    echo 'PASS 244_local-tty-output.test'
-    echo 'ran=263 pass=239 fail=0 skip=23 lost=0'
-} >"$tmp/clean.log"
-{
-    echo "$forkline"
-    echo './ci-windows-suite.sh: fork: retry: Resource temporarily unavailable'
-} >"$tmp/forks.log"
-{
-    echo 'PASS 244_local-tty-output.test'
-    echo "$lostline"
-    # Indented, as the suite reports a failure tail: a test cannot forge a verdict.
-    echo '      LOST 99_decoy.test (worker left no status; 0-byte log)'
-} >"$tmp/lost.log"
-{
-    echo "$forkline"
-    echo "$lostline"
-} >"$tmp/both.log"
-
-report() { # report LOG -> $out, $summary
-    : >"$GITHUB_STEP_SUMMARY"
-    out=$(ci_report_fork_failures "$1") || fail "the counter exited nonzero on $1"
-    summary=$(<"$GITHUB_STEP_SUMMARY")
-}
-
-report "$tmp/clean.log"
-grep -q 'no MSYS fork failure and no lost worker' <<<"$out" || fail "a clean leg said: $out"
-grep -q '^MSYS forks: 0 died, 0 retried, 0 given up; 0 worker(s) lost$' <<<"$summary" ||
-    fail "a clean leg summarised: $summary"
-grep -q '::' <<<"$out" && fail "a clean leg raised an annotation: $out"
-
-report "$tmp/forks.log"
-grep -q '::warning title=MSYS fork failures::' <<<"$out" || fail "the fork leg raised none: $out"
-grep -q 'workers lost' <<<"$out" && fail "the fork leg invented a lost worker: $out"
-grep -q '; 0 worker(s) lost$' <<<"$summary" || fail "the fork leg summarised: $summary"
-
-report "$tmp/lost.log"
-# The whole defect: this sentence, unqualified, is what called the #1352 leg clean.
-grep -q 'no MSYS fork failure and no lost worker' <<<"$out" &&
-    fail "a leg that lost a worker read as clean: $out"
-grep -q 'but 1 worker(s) left no status' <<<"$out" || fail "the lost leg said: $out"
-grep -q '::error title=workers lost with no status::' <<<"$out" ||
-    fail "the lost leg raised no error annotation: $out"
-grep -q '86_local-proxytrack-cache-longfields.test' <<<"$out" ||
-    fail "the lost leg named no test: $out"
-grep -q '; 1 worker(s) lost$' <<<"$summary" || fail "the lost leg summarised: $summary"
-
-report "$tmp/both.log"
-grep -q '::warning title=MSYS fork failures::' <<<"$out" || fail "both: no fork annotation: $out"
-grep -q '::error title=workers lost with no status::' <<<"$out" || fail "both: no lost annotation: $out"
-grep -q '; 1 worker(s) lost$' <<<"$summary" || fail "both: summarised $summary"
-
-# The control on all of it: without the LOST rule the counter is the old one, and
-# reads this very console as clean.
-old=$tmp/old
-mkdir -p "$old"
-cp "$testdir/ci-windows-suite.sh" "$testdir/testlib.sh" "$testdir/proclib.sh" "$old/"
-chmod u+w "$old"/*.sh # distcheck's srcdir is read-only, and cp carries that over
-grep -v '/\^LOST / { lost++; next }' "$old/ci-windows-suite.sh" >"$old/mutant.sh"
-cmp -s "$old/ci-windows-suite.sh" "$old/mutant.sh" &&
-    fail "the blind-counter mutant changed nothing, so it proves nothing"
-mv "$old/mutant.sh" "$old/ci-windows-suite.sh"
-oldout=$(cd "$old" && bash -c '. ./ci-windows-suite.sh; ci_report_fork_failures "$1"' _ "$tmp/lost.log")
-grep -q 'no MSYS fork failure and no lost worker' <<<"$oldout" ||
-    fail "the blind counter did not misread the lost leg, so the new rule is not what fixes it: $oldout"
 
 # --- and the same thing end to end, with a worker really killed --------------
 
@@ -278,11 +206,6 @@ grep -q '::error::skip set changed from expected' "$tmp/out" ||
 test "$rc" -eq 3 ||
     fail "a worker lost from the pinned skips exited $rc, want 3: $(<"$tmp/out")"
 ok "a skip that vanished is still a leg to repeat"
-
-# The counter reading that very console back, which is the path the Windows leg takes.
-report "$tmp/out"
-grep -q '::error title=workers lost with no status::' <<<"$out" ||
-    fail "the counter read the suite's own console as clean: $out"
 
 # A loss alongside a real failure: the failure decides, or a red ships as a leg to
 # repeat and nobody investigates it.
