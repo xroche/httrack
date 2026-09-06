@@ -1288,16 +1288,20 @@ run_with_timeout() {
     fi
     local secs=$1
     shift
-    local had_m=
+    local had_m='' is_msys=''
+    # Resolved before job control goes on: shell_is_msys forks, and a fork between
+    # "set -m" and "set +m" makes bash report the job it just reaped ("[1]+ Done")
+    # on our stderr, which local_crawl has pointed at the crawl log.
+    ! shell_is_msys || is_msys=1
     case "$-" in *m*) had_m=1 ;; esac
-    shell_is_msys || set -m # own process group, so kill_tree can signal the group
+    test -n "$is_msys" || set -m # own process group, so kill_tree can signal the group
     case $stdin in
     '') "$@" & ;;
     closed) "$@" <&- & ;;
     *) "$@" <"$stdin" & ;;
     esac
     local pid=$!
-    test -n "$had_m" || shell_is_msys || set +m
+    test -n "$had_m" || test -n "$is_msys" || set +m
     # Read while the job is certainly alive: by kill time /proc/<pid>/winpid is gone.
     local winpid=''
     ! target_is_windows || winpid=$(win_pid "$pid")

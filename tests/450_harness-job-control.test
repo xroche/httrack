@@ -1,0 +1,53 @@
+#!/bin/bash
+#
+# run_with_timeout must resolve the backend before it turns job control on. A
+# fork between "set -m" and "set +m" makes bash report the job it has just
+# reaped ("[1]+ Done") on stderr, and local_crawl points that stderr at the
+# crawl log, so the harness lands inside the crawl's own output. Only some bash
+# builds print it (5.2.21 on Ubuntu 24.04 does, 5.2.37 does not), so the log is
+# no witness here; the call is.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/jobctl.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "$work"
+
+msys=no
+! shell_is_msys || msys=yes
+flag="${work}/called"
+
+# Stands in for the real probe from here on: it records every call made under
+# job control and still answers what the real one answered, so nothing
+# downstream changes shape.
+shell_is_msys() {
+    case "$-" in *m*) printf '%s\n' "$-" >>"$flag" ;; esac
+    test "$msys" = yes
+}
+
+## the fixed window makes no such call
+: >"$flag"
+run_with_timeout 30 true || fail "run_with_timeout failed on a trivial job"
+test ! -s "$flag" ||
+    fail "run_with_timeout probed the backend under job control ($(<"$flag")), so bash announces the reaped job on the crawl log"
+ok "run_with_timeout resolves the backend outside the job-control window"
+
+## and the probe would have seen the call it is looking for
+#
+# It records nothing on a fixed harness, so a probe hooked to the wrong function,
+# or one whose recording arm never runs, passes above just as well. The shape
+# below is the one run_with_timeout carried until this test was written.
+: >"$flag"
+(
+    had_m=''
+    case "$-" in *m*) had_m=1 ;; esac
+    shell_is_msys || set -m
+    true &
+    pid=$!
+    test -n "$had_m" || shell_is_msys || set +m
+    wait "$pid"
+) || fail "the control shape failed on a trivial job"
+test -s "$flag" || fail "the probe missed a backend call made under job control"
+ok "the probe still sees a backend call inside the window"
