@@ -112,8 +112,7 @@ assert_erased() { # assert_erased <name> <how> <why>
 
 printf '[a stop asked to keep the resume data keeps it] ..\t'
 assert_kept keep keep "hts-cache/ref was erased under a keep_resume stop"
-# The two below pin exit_xh at 1 rather than at any non-zero value: -1 would
-# exit non-zero, and 2 would keep the directory without the banner.
+# Together these pin exit_xh at 1: -1 exits non-zero, 2 skips the banner.
 test "$crawl_rc" -eq 0 ||
     fail "the keep_resume stop exited ${crawl_rc}, expected 0"
 assert_logged "${tmpdir}/keep" 'MIRROR ABORTED' \
@@ -132,9 +131,8 @@ printf '[a --max-time cap still erases it] ..\t'
 assert_erased maxtime maxtime "hts-cache/ref survived the engine's own cap stop"
 echo "PASS"
 
-# What the kept directory is for. /stopresume/blob.bin stalls its first GET
-# after 4096 bytes and answers a Range with a 206, so the refetch either
-# resumes or restarts, and the test can tell which.
+# What the kept directory is for: /stopresume/blob.bin stalls its first GET
+# after 4096 bytes and answers a Range with a 206, so a restart is visible.
 printf '[a --continue resumes from where the stop left off] ..\t'
 full=8200 # len(STOPRESUME_BODY) = len("STOPRSM-") + 8192
 out="${tmpdir}/resume"
