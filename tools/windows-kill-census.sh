@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# Kill-rate census per arm (#1228), with windows-build as the control, because a
-# window whose control shows no kill measures nothing.
+# Kill-rate census for the Windows runner deaths (#1228), per windows-build job.
 set -euo pipefail
 
 repo=xroche/httrack
@@ -35,8 +34,7 @@ done
 # filter=all, or a rerun hides the killed attempt and the census reads ~40% low
 # (#1228). A killed job keeps no log and no artifact, so what survives is the job
 # record: an unfinished step, or no steps at all once they age out, or a job the
-# run left behind with no conclusion. $2 is the event filter, which keeps the
-# probe's smoke-dose PR jobs out of its scheduled full-dose census.
+# run left behind with no conclusion. $2 optionally restricts the event type.
 census() {
     local wf=$1 event=${2:-} runs id filter=() total
     test -n "$event" && filter=(-f "event=$event")
@@ -97,7 +95,4 @@ report() {
 
 echo "window: $since .. today, repo $repo"
 echo
-{
-    census windows-kill-probe.yml schedule
-    census windows-build.yml
-} | report
+census windows-build.yml | report
