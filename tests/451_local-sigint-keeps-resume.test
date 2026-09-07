@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# One ^C tears down the transfer in flight and leaves its half-written file on
-# disk, then erased the hts-cache/ref entry describing it, so the --continue
-# that followed refetched the whole body from byte zero (#1595).
+# One ^C tore down the transfer in flight and left its half-written file on
+# disk, then erased the hts-cache/ref entry describing it. The --continue that
+# followed refetched the whole body from byte zero (#1595).
 
 set -euo pipefail
 
@@ -27,6 +27,11 @@ cleanup_push cleanup
 resumed_at="${tmpdir}/resumed"
 local_server_start --env STOPRESUME_MARK="$resumed_at"
 
+# How long a body may take to reach its temp-ref, and how long the ^C may take
+# to end the run.
+ref_wait_s=60
+stop_wait_s=180
+
 out="${tmpdir}/sigint"
 refdir="${out}/hts-cache/ref"
 mkdir -p "$out"
@@ -37,7 +42,7 @@ crawlpid=$!
 
 # The temp-ref appearing is what says a body is in flight and has resume data
 # to lose. A ^C sent before that would leave nothing either way.
-for _ in $(seq 1 600); do
+for _ in $(seq 1 $((ref_wait_s * 10))); do
     test -n "$(find "$refdir" -name '*.ref' 2>/dev/null)" && break
     kill -0 "$crawlpid" 2>/dev/null || break
     poll_wait 0.1
@@ -46,15 +51,17 @@ test -n "$(find "$refdir" -name '*.ref' 2>/dev/null)" ||
     fail "no temp-ref was written, so the ^C decides nothing"
 
 kill -INT "$crawlpid"
-for _ in $(seq 1 900); do
+for _ in $(seq 1 $((stop_wait_s * 5))); do
     kill -0 "$crawlpid" 2>/dev/null || break
     poll_wait 0.2
 done
 if kill -0 "$crawlpid" 2>/dev/null; then
     fail "the crawl never ended after the ^C"
 fi
-wait "$crawlpid" 2>/dev/null || true
+crawl_rc=0
+wait "$crawlpid" 2>/dev/null || crawl_rc=$?
 crawlpid=
+test "$crawl_rc" -eq 0 || fail "the ^C run exited ${crawl_rc}, so it did not stop cleanly"
 
 printf '[one ^C keeps the ref of the transfer it cut] ..\t'
 # Guarded, not "find 2>/dev/null": under pipefail a missing directory is find's
@@ -70,16 +77,16 @@ echo "PASS"
 
 printf '[a --continue resumes from where the ^C left off] ..\t'
 full=8200 # len(STOPRESUME_BODY) = len("STOPRSM-") + 8192
-# Not piped into head: the producer would take SIGPIPE and fail the pipeline.
-blobs=$(find "$out" -name blob.bin)
-blob=${blobs%%$'\n'*}
+blob=$(find "$out" -name blob.bin)
 test -s "$blob" || fail "the ^C left no partial body to resume"
+partial=$(wc -c <"$blob")
 local_crawl --log "${tmpdir}/continue.log" -O "$out" --quiet \
     --disable-security-limits --robots=0 --timeout=30 -c1 --continue \
     "${BASEURL}/stopresume/index.html" || fail "the --continue crawl failed"
 test -s "$resumed_at" || fail "the --continue sent no Range; it restarted the file"
 at=$(head -1 "$resumed_at")
-test "$at" -gt 0 || fail "the --continue asked for the file from byte 0"
+test "$at" -eq "$partial" ||
+    fail "the --continue asked from byte ${at}, but ${partial} were already on disk"
 got=$(wc -c <"$blob")
 test "$got" -eq "$full" || fail "blob.bin is ${got} bytes, expected ${full}"
 echo "PASS (resumed at ${at} of ${full})"

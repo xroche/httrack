@@ -937,12 +937,16 @@ hts_boolean back_finalize_backup(httrackp *opt, lien_back *const back,
     }
     /* On failure keep the backup: an orphaned temp beats losing the good copy.
      */
-    if (!hts_rename_over(opt, back->tmpfile, back->url_sav))
+    if (!hts_rename_over(opt, back->tmpfile, back->url_sav)) {
       hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
                     "could not restore %s; previous copy kept as %s",
                     back->url_sav, back->tmpfile);
-    else
+    } else {
       back_tmpdir_drop(back->tmpfile);
+      /* The restore replaced the partial, so its byte ranges now describe a
+         file that is gone (#1595). */
+      url_savename_refname_remove(opt, back->url_adr, back->url_fil);
+    }
   }
   back->tmpfile = NULL;
   return commit == wanted ? HTS_TRUE : HTS_FALSE;
@@ -3287,8 +3291,8 @@ static int back_abort_stopped(httrackp *opt, struct_back *sback) {
 
     if (!back_is_live(status) || (grace && !back_is_preconnect(status)))
       continue;
-    /* The partial stays on disk, so its hts-cache/ref must outlive the run or
-       the next --continue refetches the file whole (#1595). */
+    /* The partial stays on disk, so hts-cache/ref must outlive the run or
+       --continue refetches it whole (#1595). */
     if (back->r.is_write && !IS_DELAYED_EXT(back->url_sav))
       opt->stop_left_partial = HTS_TRUE;
     /* fatal, as back_add() reports a stop: no retry may reschedule the link */

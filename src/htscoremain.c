@@ -3066,9 +3066,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     }
 
     /* Not or cleanly interrupted; erase hts-cache/ref temporary directory.
-       A ^C raises state.stop alone and leaves exit_xh at 0, so a run that cut
-       a transfer mid-body must still keep what that partial resumes from
-       (#1595). */
+       A ^C raises state.stop but leaves exit_xh at 0, so keep the ref when a
+       transfer was cut mid-body (#1595). */
     if (opt->state.exit_xh == 0 && !opt->stop_left_partial) {
       // erase ref files if not interrupted
       DIR *dir;
