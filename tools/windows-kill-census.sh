@@ -34,12 +34,11 @@ done
 # filter=all, or a rerun hides the killed attempt and the census reads ~40% low
 # (#1228). A killed job keeps no log and no artifact, so what survives is the job
 # record: an unfinished step, or no steps at all once they age out, or a job the
-# run left behind with no conclusion. $2 optionally restricts the event type.
+# run left behind with no conclusion.
 census() {
-    local wf=$1 event=${2:-} runs id filter=() total
-    test -n "$event" && filter=(-f "event=$event")
+    local wf=$1 runs id total
     total=$(gh api -X GET "repos/$repo/actions/workflows/$wf/runs" \
-        -f "created=>=$since" -f per_page=1 "${filter[@]}" -q .total_count 2>/dev/null) || {
+        -f "created=>=$since" -f per_page=1 -q .total_count 2>/dev/null) || {
         echo "no runs of $wf in $repo" >&2
         return 0
     }
@@ -49,7 +48,7 @@ census() {
         echo "$wf: $total runs since $since, only the newest 1000 are readable" >&2
     fi
     runs=$(gh api --paginate -X GET "repos/$repo/actions/workflows/$wf/runs" \
-        -f "created=>=$since" -f per_page=100 "${filter[@]}" \
+        -f "created=>=$since" -f per_page=100 \
         -q '.workflow_runs[] | select(.status == "completed") | .id')
     for id in $runs; do
         gh api "repos/$repo/actions/runs/$id/jobs?filter=all&per_page=100" -q \
