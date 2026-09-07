@@ -68,6 +68,8 @@ for probe in 'Start-Process notepad.exe' 'Stop-Process -Id 4 -Force' \
     'Invoke-Command -ScriptBlock { 1 }' 'Register-ScheduledJob -Name x -ScriptBlock { 1 }' \
     'Register-ScheduledTask -TaskName x -Action $a' \
     '(New-Object -ComObject WScript.Shell).Run("x")' \
+    'Start-ThreadJob { 1 }' 'Invoke-Item x.exe' 'cmd.exe /c x' 'wmic process call create x' \
+    'schtasks /Create /TN x /TR y' \
     'Write-Host "#795"; Start-Process x'; do
     {
         cat "$wdscript"
@@ -84,6 +86,10 @@ grep -q '\$env:WATCHDOG_TOKEN' "$wdscript" ||
 # Captured, not piped: grep -qi's early exit can SIGPIPE sed, and pipefail
 # would turn that into "no token found".
 params=$(sed -n '/^param(/,/^)/p' "$wdscript")
+# Graded only once the block is in hand: 'param (' is a spelling PowerShell takes
+# and this range does not, and an empty $params makes the grep below false for the
+# very declaration it exists to reject.
+test -n "$params" || fail "the watchdog's param block could not be read, so the token audit proves nothing"
 if grep -qi 'token' <<<"$params"; then
     fail "the watchdog takes its token as a parameter, where the process list exposes it"
 fi
@@ -581,22 +587,127 @@ posted_pairs() {
     sed -n 's/.*t=\([0-9]*\)s q=\([0-9?]*\)s.*/\1 \2/p' "$posts"
 }
 
-# One property per leg, each returning its diagnosis so a mutant can be required
-# to trip that same check rather than merely to fail.
-cadence_leg() {
-    local n
-    sink_start 201
-    printf 'RUN 36_local-bigcrawl.test at 41s\n' >"$tmp/progress.log"
-    run_posting 60 -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
-        -IntervalSeconds 100 -PollSeconds 1 -MaxSeconds 4 >"$legout" 2>&1 || {
-        sink_stop
+# The ceiling the static-capped mutant below puts on staticness. Named once,
+# because the staticness leg has to run past it for that mutant to be visible.
+STATIC_CAP_MUTANT=5
+
+# Three states, not two: held (0), violated (1), could not measure (77). A starved
+# sample is not a verdict, and grading one as a mutant caught is how a real defect
+# gets accepted.
+UNMEASURED=77
+unmeasured() {
+    echo "$*"
+    return "$UNMEASURED"
+}
+
+# The due ticks' t= values: the watchdog's own clock, not this shell's.
+tick_times() {
+    sed -n 's/.*t=\([0-9]*\)s q=.*/\1/p' "$1"
+}
+
+# Seconds between due ticks, which at -IntervalSeconds 1 is one turn of the loop.
+tick_gaps() {
+    tick_times "$1" | awk 'NR > 1 { print $1 - p } { p = $1 }'
+}
+
+# The turn cost a leg has to survive. Prints nothing on no sample, never a 0.
+worst_gap() {
+    tick_gaps "$1" | sort -n | tail -1
+}
+
+# The posts after the last one that still read the log as moving, which is where
+# staticness has to start tracking elapsed time one for one. Taken from the data:
+# this shell's clock has a different origin from the watchdog's t= and drifts from
+# it under load, so a threshold computed here selects the wrong samples.
+silent_tail() {
+    posted_pairs | awk '$2 ~ /^[0-9]+$/ {
+        c++; tv[c] = $1; qv[c] = $2
+        if ($2 <= 1) { last = c }
+    } END { for (i = last + 1; i <= c; i++) print tv[i], qv[i] }'
+}
+
+# Which due ticks a landed call sits on. The log line and the call body carry the
+# same t=, so the two join on it. In ticks, never in seconds: they coincide only
+# while a turn costs exactly one second.
+call_ticks() {
+    awk 'NR == FNR { t[$1] = FNR; next } ($1 in t) { print t[$1] }' \
+        <(tick_times "$1") <(posted_pairs)
+}
+
+# Runs the watchdog for one leg. A 124 is the harness killing the window, which
+# says nothing about the watchdog, so it is graded apart from a nonzero exit.
+run_leg() { # run_leg <timeout seconds> <watchdog args...>
+    local secs=$1 rc=0
+    shift
+    run_posting "$secs" "$@" >"$legout" 2>&1 || rc=$?
+    case $rc in
+    0) ;;
+    124) unmeasured "the loop did not finish its ${secs}s window: too starved to judge this leg" ;;
+    *)
         echo "the loop exited nonzero: $(<"$legout")"
         return 1
-    }
+        ;;
+    esac
+}
+
+# What one turn of the loop costs here, measured once per interpreter: at a 1s
+# interval every turn is due, so the widest gap between two due ticks is one turn.
+# Every window below is sized in turns, because a turn measures 1s on an idle box
+# and 17s on three pinned cores under a 192-way overcommit, and a window in
+# absolute seconds counts an event the slow box never had time to produce.
+# Prints nothing when it could not measure, which is not the same as a fast box.
+turn_cost() {
+    local out gap
+    printf 'RUN 36_local-bigcrawl.test at 41s\n' >"$tmp/progress.log"
+    out=$(run_wd 120 -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
+        -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 12) || return 0
+    printf '%s\n' "$out" >"$tmp/calibrate.log"
+    gap=$(worst_gap "$tmp/calibrate.log")
+    # One sample yields no gap at all, and a zero would divide every window below
+    # by nothing: both mean the calibration failed, not that turns are free.
+    if test -z "$gap" || test "$gap" -lt 1; then
+        return 0
+    fi
+    echo "$gap"
+}
+
+# One property per leg, each returning its diagnosis so a mutant can be required
+# to trip that same check rather than merely to fail. A leg answers 77 through
+# unmeasured() when the box denied it a sample, and never grades one.
+cadence_leg() {
+    local rc=0 interval window gaps bad ticks now_turn
+    # Above the turn cost by a clear margin, so a gap equal to the interval is the
+    # watchdog obeying the option rather than the box setting the pace. Counting
+    # posts in a fixed window cannot separate those two.
+    interval=$((turn * 3))
+    window=$((interval * 3))
+    sink_start 201
+    printf 'RUN 36_local-bigcrawl.test at 41s\n' >"$tmp/progress.log"
+    run_leg $((window * 4 + 60)) -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
+        -IntervalSeconds "$interval" -PollSeconds 1 -MaxSeconds "$window" || rc=$?
     sink_stop
-    n=$(count_matching_lines . "$posts")
-    test "$n" -eq 1 || {
-        echo "$n API calls at a 100s cadence over 4s, want 1"
+    test "$rc" -eq 0 || return "$rc"
+    # Three posts at least, or there is no gap to compare against the interval.
+    ticks=$(count_matching_lines 't=[0-9]*s q=' "$legout")
+    if test "$ticks" -lt 3; then
+        # A short count has two causes, so re-measure the box against the pristine
+        # script now. Still turning at its calibrated rate means the missing ticks
+        # are the cadence; slower, and the box really cannot answer.
+        now_turn=$(turn_cost "$(nativepath "$wdscript")")
+        if test -z "$now_turn" || test "$now_turn" -gt "$turn"; then
+            unmeasured "$ticks due ticks in ${window}s at a ${interval}s interval, and a turn now costs ${now_turn:-more than 12}s against ${turn}s at calibration"
+            return "$UNMEASURED"
+        fi
+        echo "$ticks due ticks in ${window}s at a ${interval}s interval while a turn still costs ${now_turn}s: the cadence is not what -IntervalSeconds says"
+        return 1
+    fi
+    # The absolute anchor: a cadence of the option times k reports gaps of
+    # interval*k, which no width of window hides.
+    gaps=$(tick_gaps "$legout")
+    bad=$(awk -v want="$interval" -v slack="$turn" \
+        '{ d = $1 - want; if (d < 0) d = -d; if (d > slack) n++ } END { print n + 0 }' <<<"$gaps")
+    test "$bad" -eq 0 || {
+        echo "due ticks ${interval}s apart were asked for and $(tr '\n' ' ' <<<"$gaps")came back: the cadence is not what -IntervalSeconds says"
         return 1
     }
     grep -q '36_local-bigcrawl.test' "$posts" || {
@@ -615,30 +726,49 @@ cadence_leg() {
 # Staticness has to follow the log through movement and then through silence,
 # which is why this leg is the long one.
 staticness_leg() {
-    local moved dq dt legpid stop
+    local moved dq dt legpid stop rc=0 window silent samples
+    # Two samples in the silent half is the floor, since one cannot show a
+    # difference. It also has to outrun the cap static-capped applies, or a bounded
+    # staticness and a true one agree across the whole sample and that mutant reads
+    # as caught by a leg that never separated them.
+    silent=$((turn * 3))
+    test "$silent" -ge $((STATIC_CAP_MUTANT * 2)) || silent=$((STATIC_CAP_MUTANT * 2))
+    window=$((turn * 3 + silent))
     sink_start 201
     printf 'RUN 36_local-bigcrawl.test at 0s\n' >"$tmp/progress.log"
-    run_posting 90 -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
-        -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 16 >"$legout" 2>&1 &
+    run_posting $((window * 4 + 60)) -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
+        -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds "$window" >"$legout" 2>&1 &
     legpid=$!
     # Started on the first status that lands rather than on this shell's clock:
     # an interpreter three seconds into its own startup would see silence only,
     # and the moving half would go untested.
-    for _ in $(seq 1 300); do
+    for _ in $(seq 1 600); do
         test -s "$posts" && break
         sleep 0.1
     done
-    stop=$((SECONDS + 3))
+    # Graded, not assumed: writing and then differencing a log the watchdog never
+    # read reports a staticness defect for an interpreter that never started.
+    test -s "$posts" || {
+        wait "$legpid" || true
+        sink_stop
+        unmeasured "no status in 60s, so the moving half was never observed: too starved to judge a staticness"
+        return "$UNMEASURED"
+    }
+    stop=$((SECONDS + turn * 3))
     while test "$SECONDS" -lt "$stop"; do
         printf 'RUN 36_local-bigcrawl.test at %ss\n' "$SECONDS" >>"$tmp/progress.log"
         sleep 0.4
     done
-    wait "$legpid" || {
-        sink_stop
+    wait "$legpid" || rc=$?
+    sink_stop
+    test "$rc" -ne 124 || {
+        unmeasured "the loop did not finish its ${window}s window: too starved to judge a staticness"
+        return "$UNMEASURED"
+    }
+    test "$rc" -eq 0 || {
         echo "the loop exited nonzero: $(<"$legout")"
         return 1
     }
-    sink_stop
     moved=$(posted_pairs | awk '$2 ~ /^[0-9]+$/ && $1 >= 2 && $2 <= 1 { n++ } END { print n + 0 }')
     test "$moved" -ge 1 || {
         echo "no post read the log as moving while it was being written: $(posted_pairs | tr '\n' '/')"
@@ -646,9 +776,17 @@ staticness_leg() {
     }
     # Once the log stops, staticness is elapsed time minus a constant, so it has
     # to track it one for one. A bound on it would report every wedge as the cap.
-    dq=$(posted_pairs | awk '$1 >= 6 && $2 ~ /^[0-9]+$/ { if (f == "") f = $2; l = $2 } END { print l - f }')
-    dt=$(posted_pairs | awk '$1 >= 6 && $2 ~ /^[0-9]+$/ { if (f == "") f = $1; l = $1 } END { print l - f }')
-    if test "${dq:-0}" -ne "${dt:-0}" || test "${dq:-0}" -lt 4; then
+    samples=$(silent_tail | awk 'END { print NR + 0 }')
+    test "$samples" -ge 2 || {
+        unmeasured "$samples posts after the log went quiet: too starved to judge a staticness"
+        return "$UNMEASURED"
+    }
+    dq=$(silent_tail | awk 'NR == 1 { f = $2 } { l = $2 } END { print l - f }')
+    dt=$(silent_tail | awk 'NR == 1 { f = $1 } { l = $1 } END { print l - f }')
+    # Within a second, not equal: q and t are sampled off the same clock but
+    # rounded independently, so a starved box desynchronises them by one and an
+    # exact comparison reported that as a staticness that does not track.
+    if test "$dq" -lt 1 || test $((dq - dt)) -gt 1 || test $((dt - dq)) -gt 1; then
         echo "staticness moved ${dq}s over ${dt}s of silence: $(posted_pairs | tr '\n' '/')"
         return 1
     fi
@@ -657,95 +795,70 @@ staticness_leg() {
 # Every due tick logs its line before the throttle decides, so these two counts
 # are a ratio no slow box can move: one to one while nothing is being skipped.
 throttle_leg() {
-    local calls lines
+    local calls lines rc=0 window
+    # Sized in turns, never widened after a short sample: re-running a count
+    # assertion in a wider window is strictly weaker than the one that just failed.
+    window=$((turn * 4))
     sink_start 201
     printf 'RUN 36_local-bigcrawl.test at 41s\n' >"$tmp/progress.log"
-    run_posting 60 -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
-        -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 8 >"$legout" 2>&1 || {
-        sink_stop
-        echo "the loop exited nonzero: $(<"$legout")"
-        return 1
-    }
+    run_leg $((window * 4 + 60)) -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
+        -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds "$window" || rc=$?
     sink_stop
+    test "$rc" -eq 0 || return "$rc"
     calls=$(count_matching_lines . "$posts")
     lines=$(count_matching_lines 't=[0-9]*s q=' "$legout")
-    # A starved box spends the window on a handful of turns, and a 3-core runner
-    # under -j16 reached 2 ticks in 8s. Widen once, as the backoff leg does,
-    # rather than refusing to grade the starved sample.
-    if test "$lines" -lt 3; then
-        sink_start 201
-        run_posting 120 -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
-            -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 30 >"$legout" 2>&1 || {
-            sink_stop
-            echo "the loop exited nonzero over 30s: $(<"$legout")"
-            return 1
-        }
-        sink_stop
-        calls=$(count_matching_lines . "$posts")
-        lines=$(count_matching_lines 't=[0-9]*s q=' "$legout")
-    fi
     test "$lines" -ge 3 || {
-        echo "$lines due ticks over 30s at a 1s interval: the box is too starved to judge a throttle"
-        return 1
+        unmeasured "$lines due ticks over ${window}s at a 1s interval: too starved to judge a throttle"
+        return "$UNMEASURED"
     }
-    test $((calls * 4)) -ge $((lines * 3)) || {
+    # Exact, not a ratio: with an accepting sink nothing is ever owed a skip, so
+    # every due tick must have reached the API.
+    test "$calls" -eq "$lines" || {
         echo "$calls of $lines due ticks reached an accepting API: a landed post throttles the next"
         return 1
     }
 }
 
-# Calls a healthy backoff owes in $1 due ticks: it skips 1, then 2, 4, 8, 16,
-# doubling to a cap of 32, so its c-th call lands on tick 1, 3, 6, 11, 20, 37.
-backoff_calls_due() {
-    local due=1 skip=1 n=0
+# The ticks a healthy backoff posts on, in order: 1, 3, 6, 11, 20, 37. Positions
+# rather than a count, which is blind to a loop that posts its first few and then
+# stops for good over a window where both owe the same number of calls.
+backoff_ticks_due() {
+    local due=1 skip=1 out=''
     while test "$due" -le "$1"; do
-        n=$((n + 1))
+        out="$out $due"
         due=$((due + skip + 1))
         skip=$((skip * 2))
         test "$skip" -le 32 || skip=32
     done
-    echo "$n"
+    echo "${out# }"
 }
 
 backoff_leg() {
-    local calls lines want
+    local lines rc=0 window landed
+    window=$((turn * 8))
     sink_start 403
     printf 'RUN 36_local-bigcrawl.test at 41s\n' >"$tmp/progress.log"
-    run_posting 60 -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
-        -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 8 >"$legout" 2>&1 || {
-        sink_stop
-        echo "the loop exited nonzero: $(<"$legout")"
-        return 1
-    }
+    run_leg $((window * 4 + 60)) -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
+        -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds "$window" || rc=$?
     sink_stop
-    calls=$(count_matching_lines . "$posts")
+    test "$rc" -eq 0 || return "$rc"
     lines=$(count_matching_lines 't=[0-9]*s q=' "$legout")
-    # A starved box spends the window on a handful of turns, and at six ticks or
-    # fewer a doubling backoff and a flat one owe the same calls. Widen, don't
-    # grade. Six still admits that one tie, and the counts separate from seven.
-    if test "$lines" -lt 6; then
-        sink_start 403
-        run_posting 120 -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
-            -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 30 >"$legout" 2>&1 || {
-            sink_stop
-            echo "the loop exited nonzero over 30s: $(<"$legout")"
-            return 1
-        }
-        sink_stop
-        calls=$(count_matching_lines . "$posts")
-        lines=$(count_matching_lines 't=[0-9]*s q=' "$legout")
-    fi
-    test "$lines" -ge 6 || {
-        echo "$lines due ticks over 30s at a 1s interval: too few to judge a backoff"
+    # Seven, not six: at six ticks or fewer a doubling backoff and a flat one owe
+    # the same calls, and the old floor of six admitted exactly that tie.
+    test "$lines" -ge 7 || {
+        unmeasured "$lines due ticks over ${window}s at a 1s interval: too few to judge a backoff"
+        return "$UNMEASURED"
+    }
+    # Positions, not a total. A count is blind to a loop that posts its first few
+    # and then stops for good, which owes exactly the same number of calls over a
+    # short window; the ticks the calls landed on separate them, and imply the
+    # count anyway.
+    landed=$(call_ticks "$legout" | tr '\n' ' ')
+    landed=${landed% }
+    test "$landed" = "$(backoff_ticks_due "$lines")" || {
+        echo "calls landed on ticks ${landed:-none} of $lines where a doubling backoff owes $(backoff_ticks_due "$lines"): the skips do not double"
         return 1
     }
-    # Graded against the ticks that happened, so starvation shrinks both counts
-    # together: a loop that gives up posts fewer, one that never skips posts more.
-    want=$(backoff_calls_due "$lines")
-    if test "$calls" -ne "$want"; then
-        echo "$calls calls and $lines log lines against an API rejecting every one: nothing backs off"
-        return 1
-    fi
     # Every attempt here is refused, so each one after the first must say how many
     # went missing: x= is what separates a stopped box from a network that healed.
     grep -q ' x=[1-9]' "$posts" || {
@@ -755,20 +868,27 @@ backoff_leg() {
 }
 
 fullstdout_leg() {
-    local n
+    local n window
+    window=$((turn * 4))
     sink_start 201
     printf 'RUN 36_local-bigcrawl.test at 41s\n' >"$tmp/progress.log"
-    run_posting 60 -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
-        -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 5 >/dev/full 2>&1 || true
+    # The exit status is deliberately discarded: the loop is expected to survive a
+    # write it cannot make, and what it managed to post is the evidence.
+    run_posting $((window * 4 + 60)) -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
+        -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds "$window" >/dev/full 2>&1 || true
     sink_stop
     n=$(count_matching_lines . "$posts")
-    test "$n" -ge 2 || {
+    # Three, so the leg sees the loop survive more than a single failed write.
+    test "$n" -ge 3 || {
         echo "$n posts with a full stdout: a failed log write took the loop with it"
         return 1
     }
 }
 
 first=1
+# Every check that could not run is recorded here and printed before the OK line:
+# a check that did not run reads exactly like a check that passed.
+skipped=()
 for psrun in "${psruns[@]}"; do
     psargs=(-NoProfile -NonInteractive)
     case $psrun in
@@ -822,80 +942,67 @@ for psrun in "${psruns[@]}"; do
     # shellcheck disable=SC2016
     mutate default-poll 's/\[int\]\$PollSeconds = 5/[int]$PollSeconds = 50/' 'default poll'
 
-    # Timed and counted by this shell, never read out of what the watchdog
-    # writes: the cadence and the deadline are both mine to set.
-    printf 'RUN 36_local-bigcrawl.test at 41s\n' >"$tmp/progress.log"
-    out=$(run_wd 60 -File "$(nativepath "$wdscript")" \
-        -ProgressLog "$(nativepath "$tmp/progress.log")" \
-        -IntervalSeconds 100 -PollSeconds 1 -MaxSeconds 5) ||
-        fail "the $psrun slow-cadence loop exited nonzero: $out"
-    slow=$(count_matching_lines 't=[0-9]*s q=' <<<"$out")
-    test "$slow" -eq 1 || fail "$slow status lines at a 100s cadence over 5s, want 1: $out"
-
-    began=$SECONDS
-    out=$(run_wd 60 -File "$(nativepath "$wdscript")" \
-        -ProgressLog "$(nativepath "$tmp/progress.log")" \
-        -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 5) ||
-        fail "the $psrun loop exited nonzero: $out"
-    spent=$((SECONDS - began))
-    test "$spent" -ge 4 || fail "a 5s watchdog returned after ${spent}s: MaxSeconds is not seconds"
-    test "$spent" -le 20 || fail "a 5s watchdog ran ${spent}s: it does not stop on its own"
-    fast=$(count_matching_lines 't=[0-9]*s q=' <<<"$out")
-    # A turn of the loop costs whatever the box gives it, and a 3-core runner
-    # under -j16 spent the whole 5s window on one turn, so both legs came back
-    # with one line. Widen rather than grade that sample: 30s still outran a
-    # 160-way overcommit on three cores, where 5s lost at 48.
-    #
-    # Both legs widen together, or the comparison loosens: $slow is pinned at 1,
-    # so this reads "at least two posts in the window". A watchdog on a fixed
-    # cadence that ignores -IntervalSeconds posts the same count on both legs,
-    # so the re-run pin or the ratio rejects it whatever that cadence is.
-    #
-    # The wider pair does not reach a cadence proportional to the option,
-    # IntervalSeconds * k for k in (5, 30]: that posts once on the 100s leg and
-    # floor(30/k)+1 on the 1s leg, clearing both checks, where the 5s pair
-    # caught everything above k=5. Counting cannot close that band, because a
-    # healthy watchdog starved to a ~10s turn and a k=10 mutant both give
-    # slow=1 fast=4.
-    if test "$fast" -le "$slow"; then
-        out=$(run_wd 120 -File "$(nativepath "$wdscript")" \
-            -ProgressLog "$(nativepath "$tmp/progress.log")" \
-            -IntervalSeconds 100 -PollSeconds 1 -MaxSeconds 30) ||
-            fail "the $psrun slow-cadence loop exited nonzero over 30s: $out"
-        slow=$(count_matching_lines 't=[0-9]*s q=' <<<"$out")
-        test "$slow" -eq 1 ||
-            fail "$slow status lines at a 100s cadence over 30s, want 1: $out"
-        out=$(run_wd 120 -File "$(nativepath "$wdscript")" \
-            -ProgressLog "$(nativepath "$tmp/progress.log")" \
-            -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 30) ||
-            fail "the $psrun loop exited nonzero over 30s: $out"
-        fast=$(count_matching_lines 't=[0-9]*s q=' <<<"$out")
+    # One calibration run per interpreter, because everything below sizes its
+    # window in turns of the loop rather than in absolute seconds.
+    turn=$(turn_cost "$(nativepath "$wdscript")")
+    if test -z "$turn"; then
+        skipped+=("the whole $psrun body: no two due ticks in 12s, so the box could not be calibrated")
+        continue
     fi
-    # Against the slow leg, not a floor: a probe tick is not instant.
-    test "$fast" -gt "$slow" || fail "$fast status lines at 1s against $slow at 100s: $out"
+    echo "note: one turn of the $psrun watchdog loop costs ${turn}s here"
+
+    # Anchored on the watchdog's own clock, not on a count in a fixed window: a
+    # healthy watchdog on a slow box and one whose cadence is the option times k
+    # both post fewer times than asked, so no count separates them. The gap between
+    # two due ticks is absolute, and does so at any load.
+    interval=$((turn * 3))
+    window=$((interval * 3))
+    printf 'RUN 36_local-bigcrawl.test at 41s\n' >"$tmp/progress.log"
+    out=$(run_wd $((window * 4 + 60)) -File "$(nativepath "$wdscript")" \
+        -ProgressLog "$(nativepath "$tmp/progress.log")" \
+        -IntervalSeconds "$interval" -PollSeconds 1 -MaxSeconds "$window") ||
+        fail "the $psrun loop exited nonzero: $out"
+    printf '%s\n' "$out" >"$tmp/cadence.log"
+    # Read out of the watchdog's own stop line, never off this shell's clock, which
+    # interpreter startup dominates: a loop stopping ten times too early still
+    # spends several seconds of somebody else's.
+    stopped=$(sed -n 's/.*stopping after \([0-9]*\)s.*/\1/p' <<<"$out" | tail -1)
+    test -n "$stopped" || fail "the $psrun loop never reported stopping: $out"
+    test "$stopped" -ge "$((window - turn))" ||
+        fail "a ${window}s watchdog stopped after ${stopped}s by its own clock: MaxSeconds is not seconds"
+    test "$stopped" -le "$((window + turn * 2))" ||
+        fail "a ${window}s watchdog ran ${stopped}s by its own clock: it does not stop on its own"
+    ticks=$(count_matching_lines 't=[0-9]*s q=' "$tmp/cadence.log")
+    if test "$ticks" -lt 3; then
+        skipped+=("the $psrun cadence check: $ticks due ticks in ${window}s at a ${interval}s interval")
+    else
+        gaps=$(tick_gaps "$tmp/cadence.log")
+        bad=$(awk -v want="$interval" -v slack="$turn" \
+            '{ d = $1 - want; if (d < 0) d = -d; if (d > slack) n++ } END { print n + 0 }' <<<"$gaps")
+        test "$bad" -eq 0 ||
+            fail "due ticks ${interval}s apart were asked for and $(tr '\n' ' ' <<<"$gaps")came back: the cadence is not what -IntervalSeconds says"
+    fi
     grep -q '36_local-bigcrawl.test' <<<"$out" || fail "the status does not name the test in flight: $out"
     grep -q '95_local-sitemap' <<<"$out" && fail "the status named a test that was never in flight"
     # Trips if the scrub and -NoPost were both lost: only a real attempt logs this.
     grep -q 'status post failed' <<<"$out" && fail "a test leg reached the status API"
 
     # An unreadable log must not read as a wedged one.
-    out=$(run_wd 60 -File "$(nativepath "$wdscript")" \
+    window=$((turn * 3))
+    out=$(run_wd $((window * 4 + 60)) -File "$(nativepath "$wdscript")" \
         -ProgressLog "$(nativepath "$tmp/no-such.log")" \
-        -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 3) ||
+        -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds "$window") ||
         fail "the $psrun loop exited nonzero on a missing log: $out"
-    # Three seconds is the tightest window here, and a starved box spent all of
-    # it on one turn: zero status lines, which is not a wrong staticness but no
-    # answer at all. Widen once, as the throttle and backoff legs do.
-    if ! grep -q 't=[0-9]*s q=' <<<"$out"; then
-        out=$(run_wd 120 -File "$(nativepath "$wdscript")" \
-            -ProgressLog "$(nativepath "$tmp/no-such.log")" \
-            -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 30) ||
-            fail "the $psrun loop exited nonzero on a missing log over 30s: $out"
+    ticks=$(count_matching_lines 't=[0-9]*s q=' <<<"$out")
+    if test "$ticks" -eq 0; then
+        skipped+=("the $psrun missing-log check: no status in ${window}s")
+    else
+        # Universal, not existential. Asking whether ONE post said the staticness
+        # was unknown lets through a watchdog that reports a staticness on all the
+        # others, which is the defect this check exists for.
+        test "$(count_matching_lines 'q=?s' <<<"$out")" -eq "$ticks" ||
+            fail "a missing log reported a staticness on $((ticks - $(count_matching_lines 'q=?s' <<<"$out"))) of $ticks posts: $out"
     fi
-    grep -q 't=[0-9]*s q=' <<<"$out" ||
-        fail "the $psrun loop posted no status in 30s: the box is too starved to judge a missing log"
-    grep -q 'q=?s' <<<"$out" || fail "a missing log reported a staticness: $out"
-
     # The legs below read the sink, not the loop, and they exercise the script's
     # decisions rather than the interpreter's: one flavour is enough.
     test "$first" -eq 1 || continue
@@ -907,23 +1014,50 @@ for psrun in "${psruns[@]}"; do
 
     # ENOSPC on stdout, a state the sick runner reaches. Measured, since the leg
     # rests on it: MSYS hands a native PowerShell a /dev/full it can write to.
+    # The probe has to fail CLOSED. A timeout and an interpreter dying in its own
+    # startup are both nonzero exits too, and reading either as "ENOSPC is
+    # observable here" turns on a leg whose premise was never proved.
     devfull=0
-    # shellcheck disable=SC2016 # PowerShell source, not this shell's expansions
-    if test -w /dev/full &&
-        ! run_with_timeout 60 "$psrun" "${psargs[@]}" \
+    devfull_why='/dev/full is not writable here'
+    if test -w /dev/full; then
+        full_rc=0
+        # shellcheck disable=SC2016 # PowerShell source, not this shell's expansions
+        run_with_timeout 60 "$psrun" "${psargs[@]}" \
             -Command '$ErrorActionPreference = "Stop"; Write-Host ("x" * 200000)' \
-            >/dev/full 2>/dev/null; then
-        devfull=1
+            >/dev/full 2>/dev/null || full_rc=$?
+        # The same interpreter and the same command with room to write, which is
+        # what separates "the write failed" from "the run failed".
+        ctl_rc=0
+        # shellcheck disable=SC2016
+        run_with_timeout 60 "$psrun" "${psargs[@]}" \
+            -Command '$ErrorActionPreference = "Stop"; Write-Host ("x" * 200000)' \
+            >/dev/null 2>&1 || ctl_rc=$?
+        if test "$full_rc" -eq 0; then
+            devfull_why='the write to /dev/full succeeded, so ENOSPC is not observable'
+        elif test "$full_rc" -eq 124; then
+            devfull_why='the ENOSPC probe timed out, which says nothing about ENOSPC'
+        elif test "$ctl_rc" -ne 0; then
+            devfull_why='the interpreter cannot run the probe with room to write either'
+        else
+            devfull=1
+        fi
     fi
-    legs=(cadence throttle staticness backoff)
+    test "$devfull" -eq 1 || echo "note: the full-stdout leg and its mutant did not run: $devfull_why"
+
+    # Longest first, so the projection below is an upper bound from the start: a
+    # cheap leg run first under-projects the expensive one after it, and the pacer
+    # then walks into a step it cannot afford and meets the guard as a hard 124.
+    legs=(cadence backoff staticness throttle)
     test "$devfull" -eq 0 || legs+=(fullstdout)
     # These legs, the leaky control under them and the eight mutant legs after it
     # each run the watchdog for a window of its own, so a host too slow to finish
     # them skips rather than meets the guard. The costliest so far is what the
     # next one will take, since a cheap leg under-projects the slow one after it.
-    planned=$((${#legs[@]} + 1 + 8 + devfull))
+    planned=$((${#legs[@]} + 1 + 11 + devfull))
     ran=0
-    costliest=0
+    # Seeded from a turn rather than from zero: the first leg is then projected
+    # off a measurement of this box instead of off nothing.
+    costliest=$((turn * 8 + 10))
     pace() { # pace <seconds the step took>
         test "$1" -le "$costliest" || costliest=$1
         ran=$((ran + 1))
@@ -932,9 +1066,21 @@ for psrun in "${psruns[@]}"; do
     for leg in "${legs[@]}"; do
         : >"$legout"
         leg_at=$SECONDS
-        said=$("${leg}_leg" "$(nativepath "$wdscript")") ||
-            fail "the $psrun watchdog fails the $leg leg: $said"
-        token_free "$legout" || fail "the $leg leg logged the status token"
+        rc=0
+        said=$("${leg}_leg" "$(nativepath "$wdscript")") || rc=$?
+        case $rc in
+        0)
+            # The audit needs a log to read, and the full-stdout leg sends the
+            # watchdog to /dev/full by construction, so it never leaves one.
+            if test -s "$legout"; then
+                token_free "$legout" || fail "the $leg leg logged the status token"
+            elif test "$leg" != fullstdout; then
+                fail "the $leg leg left no log, so the token audit proves nothing"
+            fi
+            ;;
+        "$UNMEASURED") skipped+=("the $leg leg: $said") ;;
+        *) fail "the $psrun watchdog fails the $leg leg: $said" ;;
+        esac
         pace $((SECONDS - leg_at))
     done
     # Control: a catch block widened to the whole exception is how it would get out.
@@ -943,32 +1089,44 @@ for psrun in "${psruns[@]}"; do
     sed '/status post failed/s/$_.Exception.Message/$script:Token/' "$wdscript" >"$leaky"
     cmp -s "$wdscript" "$leaky" && fail "the leaky mutant changed nothing, so it proves nothing"
     leg_at=$SECONDS
+    : >"$legout"
     backoff_leg "$(nativepath "$leaky")" >/dev/null || true
-    token_free "$legout" && fail "the token audit cannot see a logged token"
+    # Graded only against a log that exists: on an empty one the audit below cannot
+    # fail, so it would report a working token audit without having tested it.
+    if test -s "$legout"; then
+        token_free "$legout" && fail "the token audit cannot see a logged token"
+    else
+        skipped+=("the leaky-token control: the leg left no log to audit")
+    fi
     pace $((SECONDS - leg_at))
 
     # Same shape as mutate() above, graded by a leg instead of the self-test, and
     # on the diagnosis rather than the exit status for the same reason.
     mutate_leg() {
-        local name=$1 expr=$2 leg=$3 want=$4 m="$tmp/$1.ps1" said at=$SECONDS
+        local name=$1 expr=$2 leg=$3 want=$4 m="$tmp/$1.ps1" said at=$SECONDS rc=0
         sed "$expr" "$wdscript" >"$m"
         cmp -s "$wdscript" "$m" && fail "mutant $name changed nothing, so it proves nothing"
-        said=$("${leg}_leg" "$(nativepath "$m")") &&
-            fail "mutant $name passed the $leg leg"
-        grep -q "$want" <<<"$said" || fail "mutant $name tripped no check of its own: $said"
+        : >"$legout"
+        said=$("${leg}_leg" "$(nativepath "$m")") || rc=$?
+        case $rc in
+        0) fail "mutant $name passed the $leg leg" ;;
+        # Neither a catch nor a failure: the leg never got a sample, and grading a
+        # mutant on that records a mutation it never exercised as one it caught.
+        "$UNMEASURED") skipped+=("the $name mutant: $said") ;;
+        *) grep -q "$want" <<<"$said" || fail "mutant $name tripped no check of its own: $said" ;;
+        esac
         pace $((SECONDS - at))
     }
     mutate_leg status-every-poll \
         "s/if ((Get-WatchdogAction \$now \$postedAt \$IntervalSeconds) -eq 'post')/if (\$true)/" \
-        cadence 'API calls at a 100s cadence'
+        cadence 'the cadence is not what -IntervalSeconds says'
     # shellcheck disable=SC2016 # PowerShell variables, quoted for sed
     mutate_leg static-unknown 's/\$static = \$now - \$movedAt/$static = -1/' \
         cadence 'posted no staticness'
     # shellcheck disable=SC2016
     mutate_leg static-elapsed 's/\$static = \$now - \$movedAt/$static = $now/' \
         staticness 'read the log as moving'
-    # shellcheck disable=SC2016
-    mutate_leg static-capped 's/if (\$tail.Ok) { \$static = \$now - \$movedAt }/if ($tail.Ok) { $static = [Math]::Min($now - $movedAt, 5) }/' \
+    mutate_leg static-capped "s/if (\$tail.Ok) { \$static = \$now - \$movedAt }/if (\$tail.Ok) { \$static = [Math]::Min(\$now - \$movedAt, $STATIC_CAP_MUTANT) }/" \
         staticness 'staticness moved'
     # shellcheck disable=SC2016
     mutate_leg skip-when-none-owed 's/if (\$skip -gt 0)/if ($skip -ge 0)/' \
@@ -977,15 +1135,39 @@ for psrun in "${psruns[@]}"; do
     mutate_leg success-skips 's/if (\$Ok) { return @(0, 0) }/if ($Ok) { return @(1, 0) }/' \
         throttle 'a landed post throttles the next'
     # shellcheck disable=SC2016
-    mutate_leg backoff-never-skips 's/if (\$skip -gt 0)/if ($false)/' backoff 'nothing backs off'
+    mutate_leg backoff-never-skips 's/if (\$skip -gt 0)/if ($false)/' backoff 'the skips do not double'
     # shellcheck disable=SC2016
     mutate_leg failures-not-counted \
         's/if (\$ok) { \$failed = 0; \$lagMax = 0 } else { \$failed++ }/$failed = 0/' \
         backoff 'counted the failures before it'
+    # A cadence that scales the option rather than ignoring it posts on time and
+    # merely too rarely, which no comparison of two counts separates from a slow
+    # box. Both sites, or it is a cruder defect: scaling the comparison alone
+    # leaves $postedAt at one unscaled interval and the first status never goes out.
+    # shellcheck disable=SC2016
+    mutate_leg cadence-scaled \
+        's/\$postedAt = -\$IntervalSeconds/$postedAt = -($IntervalSeconds * 6)/; s/(Get-WatchdogAction \$now \$postedAt \$IntervalSeconds)/(Get-WatchdogAction $now $postedAt ($IntervalSeconds * 6))/' \
+        cadence 'the cadence is not what -IntervalSeconds says'
+    # shellcheck disable=SC2016
+    mutate_leg backoff-flat 's/return \[Math\]::Min(\$Current \* 2, 32)/return 1/' \
+        backoff 'the skips do not double'
+    # Posts its first few and then stops for good, which over a short window owes
+    # the same calls as a healthy backoff and only the positions reject.
+    # shellcheck disable=SC2016
+    mutate_leg backoff-stops 's/if (\$skip -gt 0)/if ($failed -ge 3)/' \
+        backoff 'the skips do not double'
     if test "$devfull" -eq 1; then
         mutate_leg log-write-fatal 's/try { \(Write-Host .*\) } catch { }/\1/' \
             fullstdout 'took the loop with it'
     fi
+    # The pacer stops the run when the budget runs out, so the count of steps that
+    # reported in is the only thing separating a full pass from a partial one.
+    assert_steps_ran "$planned" "$ran"
 done
 
+# Notes rather than a failure: a starved box legitimately cannot judge some of
+# these, but it must not go quiet about which.
+if test "${#skipped[@]}" -ne 0; then
+    printf 'note: not exercised: %s\n' "${skipped[@]}"
+fi
 echo "native watchdog OK (${psruns[*]})"
