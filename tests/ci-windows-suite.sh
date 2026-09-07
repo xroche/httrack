@@ -202,7 +202,9 @@ ci_suite_heartbeat() {
 # engine-wizard-eof drives the wizard through a pty, and Windows builds Python
 # with neither pty nor os.fork;
 # stop-keeps-resume drives the stop through an LD_PRELOAD shim, which Windows
-# has no equivalent for.
+# has no equivalent for;
+# sigint-keeps-resume sends a real SIGINT, which neither shell can deliver to a
+# native httrack.exe.
 expected_skips_msys="01_engine-footer-overflow.test
 253_local-ftp-close-once.test
 113_engine-threadattr-leak.test
@@ -233,7 +235,8 @@ expected_skips_msys="01_engine-footer-overflow.test
 377_engine-install-paths.test
 398_engine-build-features.test
 424_engine-wizard-eof.test
-444_local-stop-keeps-resume.test"
+444_local-stop-keeps-resume.test
+451_local-sigint-keeps-resume.test"
 
 # Measured, not predicted: windows-build run 33927128153, both platforms alike.
 # Written out rather than derived from the msys list above: the two lists are
@@ -276,6 +279,7 @@ expected_skips_wsl2="01_engine-footer-overflow.test
 398_engine-build-features.test
 424_engine-wizard-eof.test
 444_local-stop-keeps-resume.test
+451_local-sigint-keeps-resume.test
 294_local-wizard-eof.test
 24_local-resume-overlap.test"
 
