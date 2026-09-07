@@ -1035,6 +1035,11 @@ size_t http_postfile_body(char *buffer, size_t buffer_size, size_t pos,
   return pos + strlen(&buffer[pos]);
 }
 
+hts_boolean hts_location_is_safe(const char *location) {
+  return (location == NULL || strstr(location, POSTTOK) == NULL) ? HTS_TRUE
+                                                                 : HTS_FALSE;
+}
+
 // envoi d'une requète
 int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
                   const char *xsend, const char *adr, const char *fil,
@@ -1703,10 +1708,7 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
           p++; // skip spaces
         if (strlen(rcvd + p) < HTS_LOCATION_SIZE) {
           strlcpybuff(retour->location, rcvd + p, HTS_LOCATION_SIZE);
-          /* A Location naming >post: or >postfile: would make the engine send
-             a local file back to the server that chose it. Three separate
-             places follow a redirect, so it is refused here. */
-          if (strstr(retour->location, POSTTOK) != NULL) {
+          if (!hts_location_is_safe(retour->location)) {
             hts_log_print(NULL, LOG_WARNING,
                           "Location naming a post token, redirect ignored");
             retour->location[0] = '\0';
