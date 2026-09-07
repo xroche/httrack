@@ -1035,6 +1035,11 @@ size_t http_postfile_body(char *buffer, size_t buffer_size, size_t pos,
   return pos + strlen(&buffer[pos]);
 }
 
+hts_boolean hts_location_is_safe(const char *location) {
+  return (location == NULL || strstr(location, POSTTOK) == NULL) ? HTS_TRUE
+                                                                 : HTS_FALSE;
+}
+
 // envoi d'une requète
 int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
                   const char *xsend, const char *adr, const char *fil,
@@ -1053,17 +1058,20 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
      at their own source buffers, so the worst case emitted does not grow. */
   char BIGSTK esc[HTS_URLMAXSIZE * 2];
 
+  /* Only a user-supplied URL has no referer, so a crawled page cannot name
+     >postfile: below and have the engine send it a local file. */
+  const char *const post_fil = strnotempty(referer_adr) ? "" : fil;
+
   // Initialize buffer
   buffer_head_request[0] = '\0';
 
-  // possibilité non documentée: >post: et >postfile:
-  // si présence d'un tag >post: alors executer un POST
-  // exemple: http://www.example.com/test.cgi?foo>post:posteddata=10&foo=5
-  // si présence d'un tag >postfile: alors envoyer en tête brut contenu dans le fichier en question
-  // exemple: http://www.example.com/test.cgi?foo>postfile:post0.txt
-  search_tag = strstr(fil, POSTTOK ":");
+  // Undocumented: >post: posts what follows it, >postfile: sends the file it
+  // names as the raw request.
+  // example: http://www.example.com/test.cgi?foo>post:posteddata=10&foo=5
+  // example: http://www.example.com/test.cgi?foo>postfile:post0.txt
+  search_tag = strstr(post_fil, POSTTOK ":");
   if (!search_tag) {
-    search_tag = strstr(fil, POSTTOK "file:");
+    search_tag = strstr(post_fil, POSTTOK "file:");
     if (search_tag) {           // postfile
       if (mode == 0) {          // GET!
         FILE *fp =
@@ -1698,9 +1706,14 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
       if (retour->location) {
         while(is_realspace(*(rcvd + p)))
           p++; // skip spaces
-        if (strlen(rcvd + p) < HTS_LOCATION_SIZE)
+        if (strlen(rcvd + p) < HTS_LOCATION_SIZE) {
           strlcpybuff(retour->location, rcvd + p, HTS_LOCATION_SIZE);
-        else {
+          if (!hts_location_is_safe(retour->location)) {
+            hts_log_print(NULL, LOG_WARNING,
+                          "Location naming a post token, redirect ignored");
+            retour->location[0] = '\0';
+          }
+        } else {
           /* no opt here, so this only reaches a registered log callback */
           hts_log_print(NULL, LOG_WARNING,
                         "Location header too long (%d bytes), redirect ignored",

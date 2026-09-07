@@ -1917,6 +1917,9 @@ static hts_boolean ref_get_record(FILE *fp, lien_back *dst) {
       !ref_get_str(fp, dst->r.etag, sizeof(dst->r.etag)) ||
       !ref_get_str(fp, dst->r.cdispo, sizeof(dst->r.cdispo)))
     return HTS_FALSE;
+  /* A resume ref written before the engine refused these, or edited since */
+  if (!hts_location_is_safe(dst->location_buffer))
+    dst->location_buffer[0] = '\0';
   if (!ref_get_blob(fp, &dst->r.adr, &body))
     return HTS_FALSE;
   if (!ref_get_heapstr(fp, &dst->r.headers)) {
