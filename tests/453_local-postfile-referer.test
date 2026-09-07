@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# >postfile: makes the engine send a local file as the raw request. Honouring it
-# for a link extracted from a crawled page hands that page's host any file the
-# process can open, so the tokens are read only from a URL the user supplied.
+# >postfile: makes the engine send a local file as the raw request. A crawled
+# page can link to that token, so it would name any file the process can open.
+# The tokens are read only from a URL the user supplied.
 
 set -euo pipefail
 
@@ -22,39 +22,60 @@ cleanup() {
 }
 cleanup_push cleanup
 
-# Three whitespace-separated tokens on the first line, or the sscanf reading it
-# fails and nothing goes out: this is the file shape that leaks.
+# The first line needs three whitespace-separated tokens, or sscanf fails and
+# nothing goes out. This is the shape that leaks. It ends without the blank line
+# that closes a header block, as a stolen file generally would, so the server
+# reads it to its own timeout rather than to a terminator.
 secret=$tmpdir/secret.txt
-printf 'GET /stolen HTTP/1.0\r\nX-Secret: %s\r\n\r\n' "$MARKER" >"$secret"
+printf 'GET /stolen HTTP/1.0\r\nX-Secret: %s\r\n' "$MARKER" >"$secret"
 
 wire=$tmpdir/wire
-fail_dump_var wire
+srverr=$tmpdir/server.err
+fail_dump_var wire srverr
 "$python" "$(nativepath "$testdir/postfile-server.py")" "$(nativepath "$wire")" \
-    "$(nativepath "$secret")" >"$tmpdir/server.out" 2>"$tmpdir/server.err" &
+    "$(nativepath "$secret")" >"$tmpdir/server.out" 2>"$srverr" &
 serverpid=$!
 port=$(discover_server_port "$tmpdir/server.out" "$serverpid") || exit 1
 
-crawl() { # crawl TAG URL
+crawl() { # crawl TAG [httrack args...]
     local tag=$1 rc=0
     shift
+    crawllog=$tmpdir/$tag.log
+    fail_dump_var crawllog
     run_with_timeout 120 httrack "$@" -O "$tmpdir/$tag" --robots=0 --retries=0 \
-        -c1 --quiet -%v0 >"$tmpdir/$tag.log" 2>&1 || rc=$?
+        -c1 --quiet -%v0 >"$crawllog" 2>&1 || rc=$?
     test "$rc" -ne 124 || fail "$tag: the crawl watchdog fired"
+    test "$rc" -le 128 || fail "$tag: the crawl ended abnormally ($rc)"
 }
 
 leaked() { count_matching_lines "$MARKER" "$wire"; }
 
 crawl page "http://127.0.0.1:$port/"
 
-assert_eq 0 "$(leaked)" "the secret file reached the server"
+assert_eq 0 "$(leaked)" "lines of the secret file on the wire"
 assert_eq 0 "$(count_matching_lines '^POST ' "$wire")" \
     "POST requests from a page-extracted >post: link"
-# Both absences above are vacuous unless the link was reached, and a gated one
-# goes out as the ordinary GET it should have been all along.
-test "$(count_matching_lines '^GET /leak\.html' "$wire")" -ne 0 ||
-    fail "the gated link was not requested as a plain GET"
+# Both checks above prove nothing unless the links were reached. Each must go
+# out as the plain GET it always was, carrying its query whole: an engine that
+# stripped the token instead of ignoring it would request a different URL and
+# still leak nothing.
+for path in leak post; do
+    test "$(count_matching_lines "^GET /$path\.html?>post" "$wire")" -ne 0 ||
+        fail "the gated /$path.html link was not requested with its query intact"
+done
+
+# A redirect carries the token with no link naming it, and reaches the engine
+# through three followers rather than the one the referer guards. The server
+# picks its own Location, so the hop is refused where the header is stored.
+crawl redir "http://127.0.0.1:$port/redir.html"
+test "$(count_matching_lines '^GET /redir\.html' "$wire")" -ne 0 ||
+    fail "the redirecting page was never fetched"
+assert_eq 0 "$(count_matching_lines '^GET /leak2\.gif' "$wire")" \
+    "requests for the target of a redirect naming a post token"
+assert_eq 0 "$(leaked)" "lines of the secret file after a redirect"
 
 # Control: the same token on the command line still sends the file, so the gate
-# turns on where the URL came from rather than removing the feature.
+# turns on where the URL came from rather than removing the feature. 328 covers
+# the command-line >post: half.
 crawl cli "http://127.0.0.1:$port/leak.html?>postfile:$(nativepath "$secret")"
 test "$(leaked)" -ne 0 || fail "a command-line >postfile: sent nothing"

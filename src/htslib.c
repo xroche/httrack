@@ -1701,9 +1701,17 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
       if (retour->location) {
         while(is_realspace(*(rcvd + p)))
           p++; // skip spaces
-        if (strlen(rcvd + p) < HTS_LOCATION_SIZE)
+        if (strlen(rcvd + p) < HTS_LOCATION_SIZE) {
           strlcpybuff(retour->location, rcvd + p, HTS_LOCATION_SIZE);
-        else {
+          /* A Location naming >post: or >postfile: would make the engine send
+             a local file back to the server that chose it. Three separate
+             places follow a redirect, so it is refused here. */
+          if (strstr(retour->location, POSTTOK) != NULL) {
+            hts_log_print(NULL, LOG_WARNING,
+                          "Location naming a post token, redirect ignored");
+            retour->location[0] = '\0';
+          }
+        } else {
           /* no opt here, so this only reaches a registered log callback */
           hts_log_print(NULL, LOG_WARNING,
                         "Location header too long (%d bytes), redirect ignored",
