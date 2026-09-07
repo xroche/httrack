@@ -2406,8 +2406,11 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       }
                     }
 
-                    /* base has always authority */
-                    if (p_type == 2 && !link_has_authority(lien)) {
+                    /* A base with no authority is a relative reference
+                       (RFC 3986 5.2), bar the hostname shape legacy markup
+                       writes. */
+                    if (p_type == 2 && !link_has_authority(lien) &&
+                        link_base_is_hostname(lien)) {
                       char BIGSTK tmp[HTS_URLMAXSIZE * 2];
 
                       strcpybuff(tmp, "http://");

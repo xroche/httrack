@@ -1,0 +1,61 @@
+#!/bin/bash
+#
+# htsparse prefixed "http://" to any <base href> without an authority, so a
+# relative base named a host: "./" became http://./ and the crawl lost every
+# asset the page hangs off it. Angular's own demo app ships <base href="./">
+# and mirrored to a single file.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+: "${top_srcdir:=..}"
+
+work=$(mktemp -d)
+trap 'set +e; rm -rf "$work"' EXIT
+
+root="$work/root"
+mkdir -p "$root"
+printf 'reached\n' >"$root/page.html"
+
+# Each base resolves into its own directory, so no case can pass for another.
+page() {
+    mkdir -p "$root/$1"
+    cat >"$root/$1/index.html" <<HTML
+<!DOCTYPE html><html><head><base href="$2"><title>t</title></head>
+<body><a href="page.html">p</a></body></html>
+HTML
+}
+
+page dot './'
+page slash '/'
+page rel 'sub/'
+page host 'www.example.com/'
+printf 'reached\n' >"$root/dot/page.html"
+mkdir -p "$root/rel/sub"
+printf 'reached\n' >"$root/rel/sub/page.html"
+
+# --debug-log is what puts the resolved link in the log. The filter is on
+# every case so the base value is the only variable, and because the default
+# scope would not reach a link sent above the start page.
+crawl() {
+    bash "$top_srcdir/tests/local-crawl.sh" --root "$root" --errors 0 "$@" \
+        '+BASEHOST/*' --debug-log
+}
+
+crawl --found dot/page.html --log-not-found 'http://\./' \
+    httrack BASEURL/dot/index.html -q -%v0 -r3
+
+crawl --found page.html --log-not-found 'http://\.' \
+    httrack BASEURL/slash/index.html -q -%v0 -r3
+
+# A base with no dot in it: a fix keyed on the leading "." alone passes the
+# two above and sends this one to the host "sub".
+crawl --found rel/sub/page.html --log-not-found 'http://sub/' \
+    httrack BASEURL/rel/index.html -q -%v0 -r3
+
+# The shape the 2003 rule was written for still names a host, so a plain
+# revert to RFC 3986 fails here.
+crawl --log-found 'http://www\.example\.com/page\.html' \
+    httrack BASEURL/host/index.html -q -%v0 -r3
