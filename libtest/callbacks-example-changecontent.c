@@ -19,9 +19,8 @@
       httrack --wrapper mycallback,own,OLD=NEW ..
 
       Without "own" the page is edited inside the engine's buffer, which cannot
-      grow, so NEW must not be longer than OLD. With it the callback answers
-      with a buffer of its own, of any length, reused for every page and freed
-      from uninit because the engine copies out of it and frees nothing.
+      grow, so NEW must not be longer than OLD. See html/plug.html for what the
+      engine does with each of the two replies.
 */
 
 #include <stdio.h>
@@ -49,8 +48,7 @@ typedef struct t_my_userdef {
   const char *to;
   size_t to_len;
   int own;      /* answer with a buffer of our own */
-  char *buffer; /* that buffer, grown as needed and reused for every page */
-  size_t capacity;
+  char *buffer; /* that buffer, resized per page and freed from uninit */
 } t_my_userdef;
 
 /* 
@@ -80,7 +78,6 @@ EXTERNAL_FUNCTION int hts_plug(httrackp * opt, const char *argv) {
     return 0; /* failure */
   userdef->own = own;
   userdef->buffer = NULL;
-  userdef->capacity = 0;
   userdef->pair = hts_strdup(arg);
   if (userdef->pair == NULL) {
     hts_free(userdef);
@@ -93,7 +90,7 @@ EXTERNAL_FUNCTION int hts_plug(httrackp * opt, const char *argv) {
   userdef->to_len = strlen(userdef->to);
 
   /* A reply left inside the engine's own buffer may shrink the page, never
-     grow it, so a longer replacement has nowhere to go. */
+     grow it, so a longer replacement has nowhere to go. Our own buffer can. */
   if (!userdef->own && userdef->to_len > userdef->from_len) {
     fprintf(stderr, "changecontent: NEW cannot be longer than OLD\n");
     hts_free(userdef->pair);
@@ -122,9 +119,8 @@ static void uninit(t_hts_callbackarg *carg) {
   hts_free(userdef);
 }
 
-/* Write src, with every OLD replaced by NEW, into dst, and return what was
-   written. dst may be src, because that caller keeps NEW no longer than OLD, so
-   the write never passes the read. */
+/* Write src into dst, replacing OLD with NEW, and return the bytes written.
+   dst may be src, because that caller never asks for a NEW longer than OLD. */
 static size_t apply_pair(const t_my_userdef *userdef, char *dst,
                          const char *src, size_t size) {
   size_t in, out = 0;
@@ -142,8 +138,8 @@ static size_t apply_pair(const t_my_userdef *userdef, char *dst,
   return out;
 }
 
-/* What apply_pair will write for these bytes, counting the matches rather than
-   assuming the page can only shrink. */
+/* What apply_pair will write for these bytes. apply_pair must never write more
+   than this, so the two walk the bytes the same way. */
 static size_t apply_pair_size(const t_my_userdef *userdef, const char *src,
                               size_t size) {
   size_t in, matches = 0;
@@ -163,7 +159,7 @@ static int postprocess(t_hts_callbackarg * carg, httrackp * opt, char **html,
                        int *len, const char *url_address,
                        const char *url_file) {
   t_my_userdef *const userdef = (t_my_userdef *) CALLBACKARG_USERDEF(carg);
-  char *buffer;
+  char *page;
   size_t size, out;
 
   /* Call parent functions if multiple callbacks are chained. */
@@ -177,26 +173,24 @@ static int postprocess(t_hts_callbackarg * carg, httrackp * opt, char **html,
 
   /* Process: the engine's buffer is not a C string, so read exactly *len bytes
      of it and free nothing. */
-  buffer = *html;
-  if (buffer == NULL || *len <= 0)
+  page = *html;
+  if (page == NULL || *len <= 0)
     return 1;
   size = (size_t) *len;
 
   if (userdef->own) {
-    const size_t need = apply_pair_size(userdef, buffer, size);
+    /* One spare byte, so a page rewritten to nothing still answers with a
+       buffer rather than with NULL. */
+    char *const grown = (char *) hts_realloc(
+        userdef->buffer, apply_pair_size(userdef, page, size) + 1);
 
-    if (need > userdef->capacity) {
-      char *const grown = (char *) hts_realloc(userdef->buffer, need);
-
-      if (grown == NULL)
-        return 1; /* leave the page as the engine had it */
-      userdef->buffer = grown;
-      userdef->capacity = need;
-    }
-    out = apply_pair(userdef, userdef->buffer, buffer, size);
+    if (grown == NULL)
+      return 1; /* leave the page as the engine had it */
+    userdef->buffer = grown;
+    out = apply_pair(userdef, userdef->buffer, page, size);
     *html = userdef->buffer;
   } else {
-    out = apply_pair(userdef, buffer, buffer, size);
+    out = apply_pair(userdef, page, page, size);
   }
   *len = (int) out;
 

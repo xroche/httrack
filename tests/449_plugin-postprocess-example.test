@@ -34,14 +34,12 @@ bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 5 \
     httrack 'BASEURL/simple/basic.html' --wrapper "${lib},Sample=NEW"
 
 # The other reply shape: the callback answers with a buffer of its own, which
-# the engine copies out of and never frees. The replacement is longer than the
-# text it replaces, which the in-place arm refuses, so it can only have arrived
-# through that copy. The crawl also runs five pages through the one buffer the
-# plugin reuses and frees itself, so an engine freeing it would leave the second
-# page reading it back.
-LONG=OWNED-BY-THE-PLUGIN-AND-LONGER-THAN-THE-PAGE-IT-REPLACES-IN
-bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 5 \
-    --file-matches 'simple/basic.html' "$LONG test" \
-    --file-not-matches 'simple/basic.html' 'Sample' \
+# the engine copies out of and never frees. Seeded at link.html so the crawl
+# rewrites two pages whose mirrored names are both predictable, which is what
+# shows the one buffer still producing whole pages after the first.
+LONG=OWNED-BY-THE-PLUGIN-AND-LONGER-THAN-THE-TEXT-IT-REPLACES
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    --file-matches 'simple/link.html' "$LONG link" \
+    --file-matches 'simple/basic.html' "$LONG <a" \
     --file-matches 'simple/basic.html' '</body>' \
-    httrack 'BASEURL/simple/basic.html' --wrapper "${lib},own,Sample=$LONG"
+    httrack 'BASEURL/simple/link.html' --wrapper "${lib},own,This is a =$LONG "
