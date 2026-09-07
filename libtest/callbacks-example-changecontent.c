@@ -1,6 +1,6 @@
 /*
     HTTrack external callbacks example : rewrite the content of mirrored pages
-    Example of a postprocess-html callback editing a page in place
+    Example of a postprocess-html callback, in both shapes the reply may take
     .c file
 
     How to build: (callback.so or callback.dll)
@@ -16,6 +16,11 @@
 
     How to use:
       httrack --wrapper mycallback,OLD=NEW ..
+      httrack --wrapper mycallback,own,OLD=NEW ..
+
+      Without "own" the page is edited inside the engine's buffer, which cannot
+      grow, so NEW must not be longer than OLD. See html/plug.html for what the
+      engine does with each of the two replies.
 */
 
 #include <stdio.h>
@@ -42,6 +47,8 @@ typedef struct t_my_userdef {
   size_t from_len;
   const char *to;
   size_t to_len;
+  int own;      /* answer with a buffer of our own */
+  char *buffer; /* that buffer, resized per page and freed from uninit */
 } t_my_userdef;
 
 /* 
@@ -49,12 +56,19 @@ module entry point
 */
 EXTERNAL_FUNCTION int hts_plug(httrackp * opt, const char *argv) {
   const char *arg = strchr(argv, ',');
-  const char *sep = arg != NULL ? strchr(++arg, '=') : NULL;
+  const char *sep;
+  int own = 0;
   t_my_userdef *userdef;
+
+  if (arg != NULL && strncmp(++arg, "own,", 4) == 0) {
+    own = 1;
+    arg += 4;
+  }
+  sep = arg != NULL ? strchr(arg, '=') : NULL;
 
   if (sep == NULL || sep == arg) {
     fprintf(stderr,
-            "changecontent: expected --wrapper changecontent,OLD=NEW\n");
+            "changecontent: expected --wrapper changecontent,[own,]OLD=NEW\n");
     return 0; /* failure */
   }
 
@@ -62,6 +76,8 @@ EXTERNAL_FUNCTION int hts_plug(httrackp * opt, const char *argv) {
   userdef = (t_my_userdef *) hts_malloc(sizeof(t_my_userdef));
   if (userdef == NULL)
     return 0; /* failure */
+  userdef->own = own;
+  userdef->buffer = NULL;
   userdef->pair = hts_strdup(arg);
   if (userdef->pair == NULL) {
     hts_free(userdef);
@@ -74,8 +90,8 @@ EXTERNAL_FUNCTION int hts_plug(httrackp * opt, const char *argv) {
   userdef->to_len = strlen(userdef->to);
 
   /* A reply left inside the engine's own buffer may shrink the page, never
-     grow it, so a longer replacement has nowhere to go. */
-  if (userdef->to_len > userdef->from_len) {
+     grow it, so a longer replacement has nowhere to go. Our own buffer can. */
+  if (!userdef->own && userdef->to_len > userdef->from_len) {
     fprintf(stderr, "changecontent: NEW cannot be longer than OLD\n");
     hts_free(userdef->pair);
     hts_free(userdef);
@@ -98,17 +114,53 @@ static void uninit(t_hts_callbackarg *carg) {
   }
 
   /* Process */
+  hts_free(userdef->buffer);
   hts_free(userdef->pair);
   hts_free(userdef);
+}
+
+/* Write src into dst, replacing OLD with NEW, and return the bytes written.
+   dst may be src, because that caller never asks for a NEW longer than OLD. */
+static size_t apply_pair(const t_my_userdef *userdef, char *dst,
+                         const char *src, size_t size) {
+  size_t in, out = 0;
+
+  for (in = 0; in < size;) {
+    if (size - in >= userdef->from_len &&
+        memcmp(src + in, userdef->from, userdef->from_len) == 0) {
+      memcpy(dst + out, userdef->to, userdef->to_len);
+      out += userdef->to_len;
+      in += userdef->from_len;
+    } else {
+      dst[out++] = src[in++];
+    }
+  }
+  return out;
+}
+
+/* What apply_pair will write for these bytes. apply_pair must never write more
+   than this, so the two walk the bytes the same way. */
+static size_t apply_pair_size(const t_my_userdef *userdef, const char *src,
+                              size_t size) {
+  size_t in, matches = 0;
+
+  for (in = 0; in + userdef->from_len <= size;) {
+    if (memcmp(src + in, userdef->from, userdef->from_len) == 0) {
+      matches++;
+      in += userdef->from_len;
+    } else {
+      in++;
+    }
+  }
+  return size - matches * userdef->from_len + matches * userdef->to_len;
 }
 
 static int postprocess(t_hts_callbackarg * carg, httrackp * opt, char **html,
                        int *len, const char *url_address,
                        const char *url_file) {
-  const t_my_userdef *userdef =
-      (const t_my_userdef *) CALLBACKARG_USERDEF(carg);
-  char *buffer;
-  size_t size, in, out = 0;
+  t_my_userdef *const userdef = (t_my_userdef *) CALLBACKARG_USERDEF(carg);
+  char *page;
+  size_t size, out;
 
   /* Call parent functions if multiple callbacks are chained. */
   if (CALLBACKARG_PREV_FUN(carg, postprocess) != NULL) {
@@ -119,21 +171,26 @@ static int postprocess(t_hts_callbackarg * carg, httrackp * opt, char **html,
     }
   }
 
-  /* Process: the engine keeps this buffer and it is not a C string, so read
-     exactly *len bytes, edit them where they are, and free nothing. */
-  buffer = *html;
-  if (buffer == NULL || *len <= 0)
+  /* Process: the engine's buffer is not a C string, so read exactly *len bytes
+     of it and free nothing. */
+  page = *html;
+  if (page == NULL || *len <= 0)
     return 1;
   size = (size_t) *len;
-  for (in = 0; in < size;) {
-    if (size - in >= userdef->from_len &&
-        memcmp(buffer + in, userdef->from, userdef->from_len) == 0) {
-      memcpy(buffer + out, userdef->to, userdef->to_len);
-      out += userdef->to_len;
-      in += userdef->from_len;
-    } else {
-      buffer[out++] = buffer[in++];
-    }
+
+  if (userdef->own) {
+    /* One spare byte, so a page rewritten to nothing still answers with a
+       buffer rather than with NULL. */
+    char *const grown = (char *) hts_realloc(
+        userdef->buffer, apply_pair_size(userdef, page, size) + 1);
+
+    if (grown == NULL)
+      return 1; /* leave the page as the engine had it */
+    userdef->buffer = grown;
+    out = apply_pair(userdef, userdef->buffer, page, size);
+    *html = userdef->buffer;
+  } else {
+    out = apply_pair(userdef, page, page, size);
   }
   *len = (int) out;
 

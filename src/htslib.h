@@ -83,6 +83,12 @@ typedef struct lien_adrfilsave lien_adrfilsave;
 // (à modifier avec celle-ci)
 #define POSTTOK "?>post"
 
+/* Is this Location free of the >post: tokens? A redirect naming one makes the
+   engine send a local file back to whoever chose the value, so every place
+   that fills a location has to refuse it, the cache and a resume ref
+   included. */
+hts_boolean hts_location_is_safe(const char *location);
+
 #include "htsopt.h"
 
 #define READ_ERROR (-1)
