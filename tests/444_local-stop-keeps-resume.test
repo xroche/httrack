@@ -119,10 +119,14 @@ assert_logged "${tmpdir}/keep" 'MIRROR ABORTED' \
     "the run did not record an interrupted mirror"
 echo "PASS"
 
-# The control: the same stop asked the other way still erases, so the arm above
-# cannot pass on a fix that simply stopped erasing.
-printf '[a plain stop still erases it] ..\t'
-assert_erased drop drop "hts-cache/ref survived a stop that did not ask to keep it"
+# The partial this stop cut stays on disk whoever asked for the stop, so its
+# byte ranges stay with it (#1595). What keep_resume still decides is exit_xh,
+# which drives the interrupted-mirror banner, so the two stops still part ways.
+# The cap arm below is what keeps the arm above honest.
+printf '[a plain stop keeps the ref too, but logs no banner] ..\t'
+assert_kept drop drop "hts-cache/ref was erased under a stop that cut a body mid-transfer"
+! grep -q 'MIRROR ABORTED' "${tmpdir}/drop/hts-log.txt" ||
+    fail "a stop that did not ask to keep the resume data logged the abort banner"
 echo "PASS"
 
 # The engine raises the stop flag itself when a cap is reached, and that run
