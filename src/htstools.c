@@ -376,6 +376,18 @@ int link_has_authority(const char *lien) {
   return 0;
 }
 
+hts_boolean link_base_is_hostname(const char *lien) {
+  const char *a;
+
+  if (*lien == '.')
+    return HTS_FALSE;
+  for (a = lien; *a != '\0' && *a != '/' && *a != '?' && *a != '#'; a++) {
+    if (*a == '.' || *a == ':')
+      return HTS_TRUE;
+  }
+  return HTS_FALSE;
+}
+
 int link_has_authorization(const char *lien) {
   const char *adr = jump_protocol_const(lien);
   const char *firstslash = strchr(adr, '/');

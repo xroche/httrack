@@ -1,0 +1,88 @@
+#!/bin/bash
+#
+# A relative <base href> such as "./" was read as a hostname, so httrack
+# fetched none of the assets hanging off it. An Angular app mirrors to one page.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+: "${top_srcdir:=..}"
+
+work=$(mktemp -d)
+trap 'set +e; rm -rf "$work"' EXIT
+
+# Each row is a start directory, the base it carries, and where the link must
+# resolve. Only the base value varies.
+#
+#   dot     "./"                  dot/page.html
+#   sub     "seg/"                sub/seg/page.html
+#   subdot  "seg/v1.0/"           subdot/seg/v1.0/page.html
+#   query   "x?v=1.0"             query/page.html
+#   port    "myhost:8080/"        the host myhost:8080, asserted in the log
+#   host    "cdn.example.co.uk/"  the host cdn.example.co.uk, asserted in the log
+#
+# A dotless first segment reads as relative even when it names a real host, so
+# <base href="intranet/"> resolves like "seg/" here. It is deliberate, because
+# the two are the same string and RFC 3986 5.2 counts both relative.
+#
+# No case covers the "#" terminator: htsparse ends a link at a bare "#", so only
+# a pathological "ho&#s.t/" reaches the predicate carrying one, and a fixture
+# path holding "&#" is not worth the portability risk.
+root="$work/root"
+mkdir -p "$root"
+
+page() {
+    mkdir -p "$root/$1"
+    cat >"$root/$1/index.html" <<HTML
+<!DOCTYPE html><html><head><base href="$2"><title>t</title></head>
+<body><a href="page.html">p</a></body></html>
+HTML
+}
+
+page dot './'
+page sub 'seg/'
+page subdot 'seg/v1.0/'
+page query 'x?v=1.0'
+page port 'myhost:8080/'
+page host 'cdn.example.co.uk/'
+
+mkdir -p "$root/sub/seg" "$root/subdot/seg/v1.0"
+printf 'reached\n' >"$root/dot/page.html"
+printf 'reached\n' >"$root/sub/seg/page.html"
+printf 'reached\n' >"$root/subdot/seg/v1.0/page.html"
+printf 'reached\n' >"$root/query/page.html"
+
+# --debug-log is what puts the resolved link in the log for the two host cases.
+crawl() {
+    bash "$top_srcdir/tests/local-crawl.sh" --root "$root" --errors 0 "$@" \
+        --debug-log
+}
+
+crawl --found dot/page.html --log-not-found 'http://\./' \
+    httrack BASEURL/dot/index.html -q -%v0 -r3
+
+# A fix keyed on the leading "." alone passes the case above, then sends this
+# dotless base to the host "seg".
+crawl --found sub/seg/page.html --log-not-found 'http://seg/' \
+    httrack BASEURL/sub/index.html -q -%v0 -r3
+
+# A fix looking for the dot anywhere rather than in the first segment passes
+# every other case, then sends this one to the host "seg".
+crawl --found subdot/seg/v1.0/page.html --log-not-found 'http://seg/' \
+    httrack BASEURL/subdot/index.html -q -%v0 -r3
+
+# The first segment ends at the query, so the dot in "v=1.0" names no host.
+crawl --found query/page.html --log-not-found 'http://x' \
+    httrack BASEURL/query/index.html -q -%v0 -r3
+
+# A host is not always dotted, so the colon has to count as well.
+crawl --log-found 'http://myhost:8080/page\.html' \
+    httrack BASEURL/port/index.html -q -%v0 -r3
+
+# The legacy <base href="www.example.com/"> shape still names a host. Neither
+# label is "www" and the suffix is not ".com", so a fix keyed on either one
+# fails here, as does a plain revert to RFC 3986.
+crawl --log-found 'http://cdn\.example\.co\.uk/page\.html' \
+    httrack BASEURL/host/index.html -q -%v0 -r3
