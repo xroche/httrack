@@ -379,7 +379,7 @@ int link_has_authority(const char *lien) {
 hts_boolean link_base_is_hostname(const char *lien) {
   const char *a;
 
-  if (*lien == '/' || *lien == '.')
+  if (*lien == '.')
     return HTS_FALSE;
   for (a = lien; *a != '\0' && *a != '/' && *a != '?' && *a != '#'; a++) {
     if (*a == '.' || *a == ':')

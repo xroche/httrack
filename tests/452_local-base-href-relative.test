@@ -1,9 +1,7 @@
 #!/bin/bash
 #
-# htsparse prefixed "http://" to any <base href> without an authority, so a
-# relative base named a host: "./" became http://./ and the crawl lost every
-# asset the page hangs off it. Angular's own demo app ships <base href="./">
-# and mirrored to a single file.
+# A relative <base href> such as "./" was read as a hostname, so httrack
+# fetched none of the assets hanging off it. An Angular app mirrors to one page.
 
 set -euo pipefail
 
@@ -15,11 +13,22 @@ set -euo pipefail
 work=$(mktemp -d)
 trap 'set +e; rm -rf "$work"' EXIT
 
+# Each row is a start directory, the base it carries, and where the link must
+# land under the mirror root. Only the base value varies.
+#
+#   dot     "./"                dot/page.html               its own directory
+#   sub     "sub/"              sub/sub/page.html           a relative subdir
+#   subdot  "sub/v1.0/"         subdot/sub/v1.0/page.html   a dot further in
+#   query   "x?v=1.0"           query/page.html             a dot in the query
+#   port    "myhost:8080/"      a remote host, nothing mirrored
+#   host    "www.example.com/"  a remote host, nothing mirrored
+#
+# A dotless first segment reads as relative even when it names a real host, so
+# <base href="intranet/"> resolves like "sub/" here. That is deliberate: it and
+# a relative directory are the same string, and RFC 3986 5.2 calls both relative.
 root="$work/root"
 mkdir -p "$root"
-printf 'reached\n' >"$root/page.html"
 
-# Each base resolves into its own directory, so no case can pass for another.
 page() {
     mkdir -p "$root/$1"
     cat >"$root/$1/index.html" <<HTML
@@ -29,16 +38,21 @@ HTML
 }
 
 page dot './'
-page slash '/'
-page rel 'sub/'
+page sub 'sub/'
+page subdot 'sub/v1.0/'
+page query 'x?v=1.0'
+page port 'myhost:8080/'
 page host 'www.example.com/'
-printf 'reached\n' >"$root/dot/page.html"
-mkdir -p "$root/rel/sub"
-printf 'reached\n' >"$root/rel/sub/page.html"
 
-# --debug-log is what puts the resolved link in the log. The filter is on
-# every case so the base value is the only variable, and because the default
-# scope would not reach a link sent above the start page.
+mkdir -p "$root/sub/sub" "$root/subdot/sub/v1.0"
+printf 'reached\n' >"$root/dot/page.html"
+printf 'reached\n' >"$root/sub/sub/page.html"
+printf 'reached\n' >"$root/subdot/sub/v1.0/page.html"
+printf 'reached\n' >"$root/query/page.html"
+
+# --debug-log is what puts the resolved link in the log. The filter runs on
+# every case so the base stays the only variable, and because the default
+# scope stops at the start page's own directory.
 crawl() {
     bash "$top_srcdir/tests/local-crawl.sh" --root "$root" --errors 0 "$@" \
         '+BASEHOST/*' --debug-log
@@ -47,15 +61,25 @@ crawl() {
 crawl --found dot/page.html --log-not-found 'http://\./' \
     httrack BASEURL/dot/index.html -q -%v0 -r3
 
-crawl --found page.html --log-not-found 'http://\.' \
-    httrack BASEURL/slash/index.html -q -%v0 -r3
+# A fix keyed on the leading "." alone passes the case above, then sends this
+# dotless base to the host "sub".
+crawl --found sub/sub/page.html --log-not-found 'http://sub/' \
+    httrack BASEURL/sub/index.html -q -%v0 -r3
 
-# A base with no dot in it: a fix keyed on the leading "." alone passes the
-# two above and sends this one to the host "sub".
-crawl --found rel/sub/page.html --log-not-found 'http://sub/' \
-    httrack BASEURL/rel/index.html -q -%v0 -r3
+# A fix looking for the dot anywhere rather than in the first segment passes
+# every other case, then sends this one to the host "sub".
+crawl --found subdot/sub/v1.0/page.html --log-not-found 'http://sub/' \
+    httrack BASEURL/subdot/index.html -q -%v0 -r3
 
-# The shape the 2003 rule was written for still names a host, so a plain
+# The first segment ends at the query, so the dot in "v=1.0" names no host.
+crawl --found query/page.html --log-not-found 'http://x' \
+    httrack BASEURL/query/index.html -q -%v0 -r3
+
+# A host is not always dotted, so the colon has to count as well.
+crawl --log-found 'http://myhost:8080/page\.html' \
+    httrack BASEURL/port/index.html -q -%v0 -r3
+
+# The shape the original rule was written for still names a host, so a plain
 # revert to RFC 3986 fails here.
 crawl --log-found 'http://www\.example\.com/page\.html' \
     httrack BASEURL/host/index.html -q -%v0 -r3

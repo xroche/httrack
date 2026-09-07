@@ -68,9 +68,9 @@ const char *hts_memstr(const char *hay, size_t haylen, const char *needle,
 
 int lienrelatif(char *s, size_t ssize, const char *link, const char *curr);
 int link_has_authority(const char *lien);
-/* Should a base href carrying no authority be read as a hostname rather than
-   the relative reference RFC 3986 5.2 makes it? True only of a first segment
-   holding a dot or a colon, so "./", "../", "/x" and "sub/" stay relative. */
+/* Does a base href with no authority name a host rather than the relative
+   reference RFC 3986 5.2 makes it? True only when its first segment holds a
+   dot or a colon, so "./", "../", "/x" and "sub/" stay relative. */
 hts_boolean link_base_is_hostname(const char *lien);
 int link_has_authorization(const char *lien);
 void long_to_83(int mode, char *n83, size_t n83size, char *save);
