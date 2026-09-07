@@ -624,6 +624,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   /* per mirror, not per opt: an embedder reusing one opt would otherwise
      carry the last run's verdict and never purge again */
   opt->links_unqueued = HTS_FALSE;
+  opt->stop_left_partial = HTS_FALSE;
 
   /* before the first bailout below, each of which leaves it false */
   *completed_out = HTS_FALSE;

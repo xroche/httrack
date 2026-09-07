@@ -712,6 +712,14 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
             }
           } while (offset < readSizeHeader && !lineEof);
 
+          /* A cache written before the engine refused these, or edited since */
+          if (!hts_location_is_safe(r.location)) {
+            hts_log_print(opt, LOG_WARNING,
+                          "cached Location naming a post token, dropped: %s%s",
+                          adr, fil);
+            r.location[0] = '\0';
+          }
+
           /* Previous entry. cache_add() stores X-Save relative (it strips
              path_html_utf8), so the read re-prepends the current one, which
              may have grown since the entry was written. */

@@ -11901,13 +11901,46 @@ static int st_refetchbackup(httrackp *opt, int argc, char **argv) {
     err++;
   }
 
-  /* An aborted transfer restores, as before. */
-  back_refetch_backup(opt, back);
-  ro_put(back->url_sav, "partial");
-  back_finalize_backup(opt, back, HTS_FALSE);
-  if (!ro_is(back->url_sav, "new")) {
-    fprintf(stderr, "refetchbackup: an aborted re-fetch kept the partial\n");
-    err++;
+  /* An aborted transfer restores, as before. The resume reference goes with
+     the partial it described, because a kept one would make the next run ask
+     past the restored copy's end (#1595). */
+  {
+    String saved = STRING_EMPTY;
+
+    StringCopy(saved, StringBuff(opt->path_log));
+    /* explicit separator, as above: fconcat() joins without one, which would
+       put the reference in a sibling of the directory under test */
+    StringCopy(opt->path_log, argv[0]);
+    StringCat(opt->path_log, "/");
+    strcpybuff(back->url_adr, "127.0.0.1");
+    strcpybuff(back->url_fil, "/refetch.bin");
+    back_refetch_backup(opt, back);
+    ro_put(back->url_sav, "partial");
+    /* a real mirror already has hts-cache/, and the writer only mkdirs ref/ */
+    (void) structcheck(
+        url_savename_refname_fullpath(opt, back->url_adr, back->url_fil));
+    if (back_serialize_ref(opt, back) != 0 ||
+        !fexist_utf8(
+            url_savename_refname_fullpath(opt, back->url_adr, back->url_fil))) {
+      fprintf(stderr, "refetchbackup: could not seed a resume reference\n");
+      err++;
+    }
+    back_finalize_backup(opt, back, HTS_FALSE);
+    if (!ro_is(back->url_sav, "new")) {
+      fprintf(stderr, "refetchbackup: an aborted re-fetch kept the partial\n");
+      err++;
+    }
+    if (fexist_utf8(
+            url_savename_refname_fullpath(opt, back->url_adr, back->url_fil))) {
+      fprintf(stderr, "refetchbackup: the restore kept the partial's ref\n");
+      err++;
+    }
+    (void) RMDIR(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                         StringBuff(opt->path_log), CACHE_REFNAME));
+    (void) RMDIR(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                         StringBuff(opt->path_log), "hts-cache"));
+    StringCopy(opt->path_log, StringBuff(saved));
+    StringFree(saved);
   }
 
   (void) UNLINK(back->url_sav);
@@ -12508,11 +12541,52 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
     opt->maxsite = 0;
     HTS_STAT.HTS_TOTAL_RECV = recv_was;
   }
+
+  /* The stop keeps hts-cache/ref for a partial that outlives it, not for every
+     slot it killed (#1595). A .delayed placeholder goes with its own ref, so it
+     is not one. */
+  {
+    static const struct {
+      const char *what;
+      hts_boolean is_write;
+      const char *url_sav;
+      hts_boolean kept;
+    } partial[] = {
+        {"a slot writing nothing to disk", HTS_FALSE, "", HTS_FALSE},
+        {"a .delayed placeholder", HTS_TRUE,
+         "hts-backstop-selftest.tmp." DELAYED_EXT, HTS_FALSE},
+        {"a partial file", HTS_TRUE, "hts-backstop-selftest.tmp", HTS_TRUE}};
+
+    int c;
+
+    for (c = 0; c < (int) (sizeof(partial) / sizeof(partial[0])) && !err; c++) {
+      opt->state.stop = 0;
+      if (!st_backstop_arm(opt, sback, status, r, SLOTS, SLOT_DNS)) {
+        skipped = 1;
+        goto cleanup;
+      }
+      back[SLOT_XFER].r.is_write = partial[c].is_write;
+      strcpybuff(back[SLOT_XFER].url_sav, partial[c].url_sav);
+      opt->stop_left_partial = HTS_FALSE;
+      hts_request_stop(opt, 0);
+
+      back_wait(sback, opt, &cache, 0);
+
+      if (opt->stop_left_partial != partial[c].kept) {
+        printf("  FAIL line %d: %s must %s the resume data\n", __LINE__,
+               partial[c].what, partial[c].kept ? "keep" : "drop");
+        err = 1;
+      }
+      back[SLOT_XFER].r.is_write = 0;
+      back[SLOT_XFER].url_sav[0] = '\0';
+    }
+  }
 #undef CHECK
 
 cleanup:
   opt->maxsite = 0;
   opt->state.stop = 0;
+  opt->stop_left_partial = HTS_FALSE;
   for (i = 0; i < SLOTS; i++)
     deletehttp(&back[i].r);
   back_free(&sback);

@@ -32,3 +32,14 @@ bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 5 \
     --file-not-matches 'simple/basic.html' 'Sample' \
     --file-matches 'simple/basic.html' '</body>' \
     httrack 'BASEURL/simple/basic.html' --wrapper "${lib},Sample=NEW"
+
+# The other reply shape: the callback answers with a buffer of its own, which
+# the engine copies out of and never frees. Seeded at link.html so the crawl
+# rewrites two pages whose mirrored names are both predictable, which is what
+# shows the one buffer still producing whole pages after the first.
+LONG=OWNED-BY-THE-PLUGIN-AND-LONGER-THAN-THE-TEXT-IT-REPLACES
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    --file-matches 'simple/link.html' "$LONG link" \
+    --file-matches 'simple/basic.html' "$LONG <a" \
+    --file-matches 'simple/basic.html' '</body>' \
+    httrack 'BASEURL/simple/link.html' --wrapper "${lib},own,This is a =$LONG "
