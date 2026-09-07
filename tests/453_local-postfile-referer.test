@@ -1,0 +1,60 @@
+#!/bin/bash
+#
+# >postfile: makes the engine send a local file as the raw request. Honouring it
+# for a link extracted from a crawled page hands that page's host any file the
+# process can open, so the tokens are read only from a URL the user supplied.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+MARKER=EXFILTRATED-BY-A-CRAWLED-PAGE
+
+python=$(find_python) || skip "python3 missing"
+require_httrack
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_postfile.XXXXXX") || exit 1
+serverpid=
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+# Three whitespace-separated tokens on the first line, or the sscanf reading it
+# fails and nothing goes out: this is the file shape that leaks.
+secret=$tmpdir/secret.txt
+printf 'GET /stolen HTTP/1.0\r\nX-Secret: %s\r\n\r\n' "$MARKER" >"$secret"
+
+wire=$tmpdir/wire
+fail_dump_var wire
+"$python" "$(nativepath "$testdir/postfile-server.py")" "$(nativepath "$wire")" \
+    "$(nativepath "$secret")" >"$tmpdir/server.out" 2>"$tmpdir/server.err" &
+serverpid=$!
+port=$(discover_server_port "$tmpdir/server.out" "$serverpid") || exit 1
+
+crawl() { # crawl TAG URL
+    local tag=$1 rc=0
+    shift
+    run_with_timeout 120 httrack "$@" -O "$tmpdir/$tag" --robots=0 --retries=0 \
+        -c1 --quiet -%v0 >"$tmpdir/$tag.log" 2>&1 || rc=$?
+    test "$rc" -ne 124 || fail "$tag: the crawl watchdog fired"
+}
+
+leaked() { count_matching_lines "$MARKER" "$wire"; }
+
+crawl page "http://127.0.0.1:$port/"
+
+assert_eq 0 "$(leaked)" "the secret file reached the server"
+assert_eq 0 "$(count_matching_lines '^POST ' "$wire")" \
+    "POST requests from a page-extracted >post: link"
+# Both absences above are vacuous unless the link was reached, and a gated one
+# goes out as the ordinary GET it should have been all along.
+test "$(count_matching_lines '^GET /leak\.html' "$wire")" -ne 0 ||
+    fail "the gated link was not requested as a plain GET"
+
+# Control: the same token on the command line still sends the file, so the gate
+# turns on where the URL came from rather than removing the feature.
+crawl cli "http://127.0.0.1:$port/leak.html?>postfile:$(nativepath "$secret")"
+test "$(leaked)" -ne 0 || fail "a command-line >postfile: sent nothing"
