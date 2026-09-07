@@ -32,3 +32,16 @@ bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 5 \
     --file-not-matches 'simple/basic.html' 'Sample' \
     --file-matches 'simple/basic.html' '</body>' \
     httrack 'BASEURL/simple/basic.html' --wrapper "${lib},Sample=NEW"
+
+# The other reply shape: the callback answers with a buffer of its own, which
+# the engine copies out of and never frees. The replacement is longer than the
+# text it replaces, which the in-place arm refuses, so it can only have arrived
+# through that copy. The crawl also runs five pages through the one buffer the
+# plugin reuses and frees itself, so an engine freeing it would leave the second
+# page reading it back.
+LONG=OWNED-BY-THE-PLUGIN-AND-LONGER-THAN-THE-PAGE-IT-REPLACES-IN
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 5 \
+    --file-matches 'simple/basic.html' "$LONG test" \
+    --file-not-matches 'simple/basic.html' 'Sample' \
+    --file-matches 'simple/basic.html' '</body>' \
+    httrack 'BASEURL/simple/basic.html' --wrapper "${lib},own,Sample=$LONG"
