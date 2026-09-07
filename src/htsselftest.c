@@ -11901,14 +11901,17 @@ static int st_refetchbackup(httrackp *opt, int argc, char **argv) {
     err++;
   }
 
-  /* An aborted transfer restores, as before, and the resume reference goes
-     with the partial it described: a kept one makes the next run ask for a
-     range past the end of the restored copy (#1595). */
+  /* An aborted transfer restores, as before. The resume reference goes with
+     the partial it described, because a kept one would make the next run ask
+     past the restored copy's end (#1595). */
   {
-    char BIGSTK log_was[HTS_URLMAXSIZE * 2];
+    String saved = STRING_EMPTY;
 
-    strcpybuff(log_was, StringBuff(opt->path_log));
+    StringCopy(saved, StringBuff(opt->path_log));
+    /* explicit separator, as above: fconcat() joins without one, which would
+       put the reference in a sibling of the directory under test */
     StringCopy(opt->path_log, argv[0]);
+    StringCat(opt->path_log, "/");
     strcpybuff(back->url_adr, "127.0.0.1");
     strcpybuff(back->url_fil, "/refetch.bin");
     back_refetch_backup(opt, back);
@@ -11916,7 +11919,9 @@ static int st_refetchbackup(httrackp *opt, int argc, char **argv) {
     /* a real mirror already has hts-cache/, and the writer only mkdirs ref/ */
     (void) structcheck(
         url_savename_refname_fullpath(opt, back->url_adr, back->url_fil));
-    if (back_serialize_ref(opt, back) != 0) {
+    if (back_serialize_ref(opt, back) != 0 ||
+        !fexist_utf8(
+            url_savename_refname_fullpath(opt, back->url_adr, back->url_fil))) {
       fprintf(stderr, "refetchbackup: could not seed a resume reference\n");
       err++;
     }
@@ -11934,7 +11939,8 @@ static int st_refetchbackup(httrackp *opt, int argc, char **argv) {
                          StringBuff(opt->path_log), CACHE_REFNAME));
     (void) RMDIR(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                          StringBuff(opt->path_log), "hts-cache"));
-    StringCopy(opt->path_log, log_was);
+    StringCopy(opt->path_log, StringBuff(saved));
+    StringFree(saved);
   }
 
   (void) UNLINK(back->url_sav);

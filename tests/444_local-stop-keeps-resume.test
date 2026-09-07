@@ -121,7 +121,7 @@ echo "PASS"
 
 # The partial this stop cut stays on disk whoever asked for the stop, so its
 # byte ranges stay with it (#1595). What keep_resume still decides is exit_xh,
-# and so the interrupted-mirror banner, so the two stops still part ways here.
+# which drives the interrupted-mirror banner, so the two stops still part ways.
 # The cap arm below is what keeps the arm above honest.
 printf '[a plain stop keeps the ref too, but logs no banner] ..\t'
 assert_kept drop drop "hts-cache/ref was erased under a stop that cut a body mid-transfer"

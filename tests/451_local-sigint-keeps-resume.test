@@ -27,8 +27,8 @@ cleanup_push cleanup
 resumed_at="${tmpdir}/resumed"
 local_server_start --env STOPRESUME_MARK="$resumed_at"
 
-# How long a body may take to reach its temp-ref, and how long the ^C may take
-# to end the run.
+# The body must reach its temp-ref within the first budget, and the ^C must end
+# the run within the second.
 ref_wait_s=60
 stop_wait_s=180
 
