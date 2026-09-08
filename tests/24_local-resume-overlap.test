@@ -31,10 +31,9 @@ common=(-O "$out" --quiet --disable-security-limits --robots=0 --timeout=30 --re
 refdir="${out}/hts-cache/ref"
 
 # pass 1: interrupt once flaky.bin's prefix is streaming (partial + temp-ref).
-# The stop is hts-abort.lock, the file a running engine polls for (436), not a
-# signal: no signal a WSL2 shell sends reaches a native httrack.exe, and taskkill
-# /F takes away the temp-ref pass 2 resumes from. Every backend takes that path,
-# so the Linux leg exercises what Windows runs.
+# The stop is hts-abort.lock, the file a running engine polls for (436). No
+# signal a WSL2 shell sends reaches a native httrack.exe, so every backend takes
+# that path and the Linux leg exercises what Windows runs.
 printf '[pass 1: interrupt flaky.bin] ..\t'
 httrack "${common[@]}" "${BASEURL}/overlap/index.html" >"${tmpdir}/log1" 2>&1 &
 crawlpid=$!
@@ -44,8 +43,7 @@ wait_until "test -s '$counter' && test -e '${out}/hts-in_progress.lock'" \
 # in whole seconds, so wait one out before writing it.
 sleep 1.1
 : >"${out}/hts-abort.lock"
-# Well inside --timeout=30: past that the stalled fetch ends on its own and the
-# mirror runs to a normal finish, which is not the state pass 2 needs.
+# This 10s wait stays inside --timeout=30, so the fetch is still stalled.
 wait_until "test ! -e '${out}/hts-abort.lock'" \
     "10s on, the engine had not read the stop request" 100
 # Unwinding a transfer cut mid-socket takes a while, as it does in 436.
