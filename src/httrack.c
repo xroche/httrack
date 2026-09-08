@@ -774,7 +774,7 @@ static void __cdecl htsshow_pause(t_hts_callbackarg * carg, httrackp * opt,
   StringCopy(progress, StringBuff(opt->path_log));
   StringCat(progress, "hts-in_progress.lock");
   /* Leaving the wait is all this has to do, because the engine takes the
-     request at its next check. Same staleness rule as hts_take_abort_request(),
+     request at its next check. Same staleness rule as hts_take_lock_request(),
      or a request an earlier run left would defeat the pause. */
   while (fexist(lockfile) &&
          !fnewer(StringBuff(abortlock), StringBuff(progress))) {

@@ -2901,9 +2901,9 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             fprintf(fp, "\"%s\" ", argv[i]);
         }
         fprintf(fp, LF);
-        fprintf(fp,
-                "To pause the engine: create an empty file named 'hts-stop.lock'"
-                LF);
+        fprintf(fp, "To pause the engine: create an empty file named "
+                    "'" HTS_PAUSE_LOCKNAME "' (a copy left by an earlier run is"
+                    " ignored: create it again)" LF);
         fprintf(fp,
                 "To stop it and keep the mirror: create an empty file named "
                 "'" HTS_ABORT_LOCKNAME "' (a copy left by an earlier run is"

@@ -2408,12 +2408,15 @@ one to carry on.</p>
 <p style="margin-left:18%;">Create it to stop the mirror
 and keep what it has downloaded, so that a later
 <i>--continue</i> resumes from there rather than starting
-over. The engine deletes it and stops. It acts only on a
-request stamped later than <i>hts-in_progress.lock</i>, so
-one left behind by an earlier run does not stop this mirror.
-Create the file again if the mirror had only just started. A
+over. The engine deletes it and stops.</p>
+
+<p style="margin-left:9%; margin-top: 1em">The engine acts
+on either request only when the file is stamped later than
+<i>hts-in_progress.lock</i>, so one left behind by an
+earlier run reaches neither this mirror nor the next. Create
+the file again if the mirror had only just started. A
 request the engine cannot delete is ignored too, because it
-would otherwise stop the mirror on every later poll.</p>
+would otherwise fire on every later poll.</p>
 
 <h2>ENVIRONMENT
 <a name="ENVIRONMENT"></a>

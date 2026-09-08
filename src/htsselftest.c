@@ -13873,10 +13873,11 @@ static int st_batch(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
-// -#test=abortlock <dir>: hts_take_abort_request() stops the mirror only for a
-// request stamped after this run's hts-in_progress.lock that it could also
-// delete, and it leaves every other lock file alone.
-static hts_boolean st_abortlock_touch(const char *path) {
+// -#test=abortlock|stoplock <dir>: hts_take_lock_request() takes a request only
+// when it is stamped after this run's hts-in_progress.lock and the engine could
+// also delete it, and it leaves every other lock file alone. TAG prefixes the
+// output, so the two runs of the same rule are told apart in the log.
+static hts_boolean st_lockrule_touch(const char *path) {
   FILE *const fp = FOPEN(path, "wb");
 
   if (fp == NULL)
@@ -13885,45 +13886,54 @@ static hts_boolean st_abortlock_touch(const char *path) {
   return HTS_TRUE;
 }
 
-static hts_boolean st_abortlock_stamp(const char *path, time_t when) {
+static hts_boolean st_lockrule_stamp(const char *path, time_t when) {
   STRUCT_UTIMBUF times;
 
   times.actime = times.modtime = when;
   return UTIME(path, &times) == 0 ? HTS_TRUE : HTS_FALSE;
 }
 
-/* Set up <dir>/, its progress and pause locks, and a request stamped WHEN. */
-static hts_boolean st_abortlock_setup(const char *dir, char *lock,
-                                      size_t locksz, char *progress,
-                                      size_t progresssz, char *stop,
-                                      size_t stopsz, time_t when) {
-  strlcpybuff(lock, dir, locksz);
-  strlcatbuff(lock, HTS_ABORT_LOCKNAME, locksz);
-  strlcpybuff(progress, dir, progresssz);
-  strlcatbuff(progress, "hts-in_progress.lock", progresssz);
-  strlcpybuff(stop, dir, stopsz);
-  strlcatbuff(stop, "hts-stop.lock", stopsz);
-  structcheck(lock);
-  return st_abortlock_touch(progress) && st_abortlock_touch(stop) &&
-         st_abortlock_touch(lock) && st_abortlock_stamp(lock, when);
+/* The other request file, which taking NAME must leave untouched. */
+static const char *st_lockrule_other(const char *name) {
+  return strcmp(name, HTS_ABORT_LOCKNAME) == 0 ? HTS_PAUSE_LOCKNAME
+                                               : HTS_ABORT_LOCKNAME;
 }
 
-/* A request the engine cannot remove must never stop the mirror. Only a real
-   failed unlink proves that, and nothing portable makes one happen, so this
-   names what covered it rather than skipping in silence. */
-static int st_abortlock_undeletable(httrackp *opt, const char *base) {
+/* Set up <dir>/, its progress lock and both requests, NAME stamped at WHEN. */
+static hts_boolean st_lockrule_setup(const char *dir, const char *name,
+                                     char *lock, size_t locksz, char *progress,
+                                     size_t progresssz, char *other,
+                                     size_t othersz, time_t when) {
+  strlcpybuff(lock, dir, locksz);
+  strlcatbuff(lock, name, locksz);
+  strlcpybuff(progress, dir, progresssz);
+  strlcatbuff(progress, "hts-in_progress.lock", progresssz);
+  strlcpybuff(other, dir, othersz);
+  strlcatbuff(other, st_lockrule_other(name), othersz);
+  structcheck(lock);
+  return st_lockrule_touch(progress) && st_lockrule_touch(other) &&
+         st_lockrule_touch(lock) && st_lockrule_stamp(lock, when);
+}
+
+/* A request the engine cannot remove must never be taken. Only a real failed
+   unlink proves that, and nothing portable makes one happen, so this names
+   what covered it rather than skipping in silence. */
+static int st_lockrule_undeletable(httrackp *opt, const char *base,
+                                   const char *tag, const char *name) {
 #ifdef _WIN32
   (void) opt;
   (void) base;
+  (void) name;
   /* The real case is a sharing violation, which needs a second process. */
-  printf("abortlock: undeletable request: NOT COVERED (no portable way to make"
-         " DeleteFile fail here)\n");
+  printf("%s: undeletable request: NOT COVERED (no portable way to make"
+         " DeleteFile fail here)\n",
+         tag);
   return 0;
 #else
   char BIGSTK rodir[HTS_URLMAXSIZE];
   char BIGSTK rolock[HTS_URLMAXSIZE * 2];
   char BIGSTK roprogress[HTS_URLMAXSIZE * 2];
-  char BIGSTK rostop[HTS_URLMAXSIZE * 2];
+  char BIGSTK roother[HTS_URLMAXSIZE * 2];
   const uid_t self = geteuid();
   uid_t drop = self;
   int rofd;
@@ -13932,22 +13942,22 @@ static int st_abortlock_undeletable(httrackp *opt, const char *base) {
 
   strlcpybuff(rodir, base, sizeof(rodir));
   strlcatbuff(rodir, "readonly/", sizeof(rodir));
-  if (!st_abortlock_setup(rodir, rolock, sizeof(rolock), roprogress,
-                          sizeof(roprogress), rostop, sizeof(rostop),
-                          time(NULL) + 60)) {
-    fprintf(stderr, "abortlock: cannot set up %s\n", rolock);
+  if (!st_lockrule_setup(rodir, name, rolock, sizeof(rolock), roprogress,
+                         sizeof(roprogress), roother, sizeof(roother),
+                         time(NULL) + 60)) {
+    fprintf(stderr, "%s: cannot set up %s\n", tag, rolock);
     return 1;
   }
   /* One descriptor for both mode changes, so the name is resolved once. */
   rofd = open(rodir, O_RDONLY | O_DIRECTORY);
   if (rofd == -1) {
-    fprintf(stderr, "abortlock: cannot open %s\n", rodir);
+    fprintf(stderr, "%s: cannot open %s\n", tag, rodir);
     return 1;
   }
   /* Still readable, because an engine that saw no request at all would pass
      this for the wrong reason. */
   if (fchmod(rofd, 0555) != 0) {
-    fprintf(stderr, "abortlock: cannot make %s read-only\n", rodir);
+    fprintf(stderr, "%s: cannot make %s read-only\n", tag, rodir);
     close(rofd);
     return 1;
   }
@@ -13957,9 +13967,9 @@ static int st_abortlock_undeletable(httrackp *opt, const char *base) {
 
     drop = pw != NULL ? pw->pw_uid : (uid_t) 65534;
     if (seteuid(drop) != 0) {
-      printf("abortlock: undeletable request: NOT COVERED (root, and euid %d "
+      printf("%s: undeletable request: NOT COVERED (root, and euid %d "
              "is not reachable)\n",
-             (int) drop);
+             tag, (int) drop);
       (void) fchmod(rofd, 0700);
       close(rofd);
       return 0;
@@ -13971,35 +13981,34 @@ static int st_abortlock_undeletable(httrackp *opt, const char *base) {
      own unlink, and ENOENT means the euid cannot reach the request at all. */
   errno = 0;
   if (UNLINK(rolock) == 0) {
-    printf("abortlock: undeletable request: NOT COVERED (euid %d could still"
+    printf("%s: undeletable request: NOT COVERED (euid %d could still"
            " delete %s)\n",
-           (int) drop, rolock);
+           tag, (int) drop, rolock);
   } else if (errno == ENOENT) {
-    printf("abortlock: undeletable request: NOT COVERED (%s is out of reach of"
+    printf("%s: undeletable request: NOT COVERED (%s is out of reach of"
            " euid %d)\n",
-           rodir, (int) drop);
+           tag, rodir, (int) drop);
   } else {
     for (poll = 0; poll < 2; poll++) {
-      if (hts_take_abort_request(opt)) {
+      if (hts_take_lock_request(opt, name)) {
         fprintf(stderr,
-                "abortlock: a request that cannot be deleted stopped "
-                "the mirror (poll %d)\n",
-                poll);
+                "%s: a request that cannot be deleted was taken (poll %d)\n",
+                tag, poll);
         err = 1;
       }
     }
     errno = 0;
     if (UNLINK(rolock) == 0 || errno == ENOENT) {
-      fprintf(stderr, "abortlock: the undeletable request went away\n");
+      fprintf(stderr, "%s: the undeletable request went away\n", tag);
       err = 1;
     }
-    printf("abortlock: undeletable request: covered (unwritable directory,"
+    printf("%s: undeletable request: covered (unwritable directory,"
            " euid %d)\n",
-           (int) drop);
+           tag, (int) drop);
   }
 
   if (self == 0 && seteuid(self) != 0) {
-    fprintf(stderr, "abortlock: cannot get euid %d back\n", (int) self);
+    fprintf(stderr, "%s: cannot get euid %d back\n", tag, (int) self);
     err = 1;
   }
   (void) fchmod(rofd, 0700);
@@ -14008,17 +14017,18 @@ static int st_abortlock_undeletable(httrackp *opt, const char *base) {
 #endif
 }
 
-static int st_abortlock(httrackp *opt, int argc, char **argv) {
+static int st_lockrule(httrackp *opt, int argc, char **argv, const char *tag,
+                       const char *name) {
   char BIGSTK base[HTS_URLMAXSIZE];
   char BIGSTK lock[HTS_URLMAXSIZE * 2];
   char BIGSTK progress[HTS_URLMAXSIZE * 2];
-  char BIGSTK stop[HTS_URLMAXSIZE * 2];
+  char BIGSTK other[HTS_URLMAXSIZE * 2];
   String saved = STRING_EMPTY;
   time_t started;
   int err = 0;
 
   if (argc < 1) {
-    fprintf(stderr, "usage: -#test=abortlock <writable directory>\n");
+    fprintf(stderr, "usage: -#test=%s <writable directory>\n", tag);
     return 1;
   }
   strcpybuff(base, argv[0]);
@@ -14029,79 +14039,86 @@ static int st_abortlock(httrackp *opt, int argc, char **argv) {
   StringCopy(opt->path_log, base);
 
   strlcpybuff(lock, base, sizeof(lock));
-  strlcatbuff(lock, HTS_ABORT_LOCKNAME, sizeof(lock));
+  strlcatbuff(lock, name, sizeof(lock));
   structcheck(lock);
-  if (hts_take_abort_request(opt)) {
-    fprintf(stderr, "abortlock: a mirror with no request was told to stop\n");
+  if (hts_take_lock_request(opt, name)) {
+    fprintf(stderr, "%s: a mirror with no request took one\n", tag);
     err = 1;
   }
 
-  if (!st_abortlock_setup(base, lock, sizeof(lock), progress, sizeof(progress),
-                          stop, sizeof(stop), time(NULL))) {
-    fprintf(stderr, "abortlock: cannot set up %s\n", base);
+  if (!st_lockrule_setup(base, name, lock, sizeof(lock), progress,
+                         sizeof(progress), other, sizeof(other), time(NULL))) {
+    fprintf(stderr, "%s: cannot set up %s\n", tag, base);
     err = 1;
   }
   started = get_filetime(progress);
   if (started == (time_t) -1) {
-    fprintf(stderr, "abortlock: %s has no timestamp\n", progress);
+    fprintf(stderr, "%s: %s has no timestamp\n", tag, progress);
     err = 1;
   }
 
   /* Same second as the run's own start: left behind by an earlier mirror. */
-  if (!st_abortlock_stamp(lock, started)) {
-    fprintf(stderr, "abortlock: cannot stamp %s\n", lock);
+  if (!st_lockrule_stamp(lock, started)) {
+    fprintf(stderr, "%s: cannot stamp %s\n", tag, lock);
     err = 1;
   }
-  if (hts_take_abort_request(opt)) {
-    fprintf(stderr, "abortlock: a request no newer than the mirror it found "
-                    "stopped it\n");
+  if (hts_take_lock_request(opt, name)) {
+    fprintf(stderr,
+            "%s: a request no newer than the mirror it found was taken\n", tag);
     err = 1;
   }
   if (!fexist_utf8(lock)) {
-    fprintf(stderr, "abortlock: a request the engine refused was deleted\n");
+    fprintf(stderr, "%s: a request the engine refused was deleted\n", tag);
     err = 1;
   }
 
   /* Stamped after the mirror started: aimed at this run. */
-  if (!st_abortlock_touch(lock) || !st_abortlock_stamp(lock, started + 1)) {
-    fprintf(stderr, "abortlock: cannot stamp %s\n", lock);
+  if (!st_lockrule_touch(lock) || !st_lockrule_stamp(lock, started + 1)) {
+    fprintf(stderr, "%s: cannot stamp %s\n", tag, lock);
     err = 1;
   }
-  if (!hts_take_abort_request(opt)) {
-    fprintf(stderr, "abortlock: a request the engine can delete was ignored\n");
+  if (!hts_take_lock_request(opt, name)) {
+    fprintf(stderr, "%s: a request the engine can delete was ignored\n", tag);
     err = 1;
   }
   if (fexist_utf8(lock)) {
-    fprintf(stderr, "abortlock: the request outlived the stop it caused\n");
+    fprintf(stderr, "%s: the request outlived the action it caused\n", tag);
     err = 1;
   }
-  if (!fexist_utf8(progress) || !fexist_utf8(stop)) {
-    fprintf(stderr,
-            "abortlock: taking a request deleted a neighbouring lock\n");
+  if (!fexist_utf8(progress) || !fexist_utf8(other)) {
+    fprintf(stderr, "%s: taking a request deleted a neighbouring lock\n", tag);
     err = 1;
   }
-  if (hts_take_abort_request(opt)) {
-    fprintf(stderr, "abortlock: one request stopped the mirror twice\n");
+  if (hts_take_lock_request(opt, name)) {
+    fprintf(stderr, "%s: one request was taken twice\n", tag);
     err = 1;
   }
 
-  /* No progress lock means no mirror to stop, whatever the request says. */
+  /* No progress lock means no mirror to reach, whatever the request says. */
   (void) UNLINK(progress);
-  if (!st_abortlock_touch(lock) || !st_abortlock_stamp(lock, time(NULL) + 60)) {
-    fprintf(stderr, "abortlock: cannot re-create %s\n", lock);
+  if (!st_lockrule_touch(lock) || !st_lockrule_stamp(lock, time(NULL) + 60)) {
+    fprintf(stderr, "%s: cannot re-create %s\n", tag, lock);
     err = 1;
   }
-  if (hts_take_abort_request(opt)) {
-    fprintf(stderr, "abortlock: a request stopped a mirror that never ran\n");
+  if (hts_take_lock_request(opt, name)) {
+    fprintf(stderr, "%s: a request reached a mirror that never ran\n", tag);
     err = 1;
   }
 
-  err |= st_abortlock_undeletable(opt, base);
+  err |= st_lockrule_undeletable(opt, base, tag, name);
 
   StringCopy(opt->path_log, StringBuff(saved));
   StringFree(saved);
-  printf("abortlock self-test: %s\n", err ? "FAIL" : "OK");
+  printf("%s self-test: %s\n", tag, err ? "FAIL" : "OK");
   return err;
+}
+
+static int st_abortlock(httrackp *opt, int argc, char **argv) {
+  return st_lockrule(opt, argc, argv, "abortlock", HTS_ABORT_LOCKNAME);
+}
+
+static int st_stoplock(httrackp *opt, int argc, char **argv) {
+  return st_lockrule(opt, argc, argv, "stoplock", HTS_PAUSE_LOCKNAME);
 }
 
 // -#test=ioexact <dir>: the hts_fread_exact/hts_fwrite_exact contract - a
@@ -14638,6 +14655,9 @@ static const struct selftest_entry {
     {"abortlock", "<writable directory>",
      "an abort request stops the mirror only if it is fresh and deletable",
      st_abortlock},
+    {"stoplock", "<writable directory>",
+     "a pause request pauses the mirror only if it is fresh and deletable",
+     st_stoplock},
     {"catchurl", "",
      "an over-long request header block fails the capture, not the process",
      st_catchurl},

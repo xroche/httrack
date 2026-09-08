@@ -155,12 +155,13 @@ hts_boolean hts_postprocess_reply_ok(const char *html, int len,
                                      size_t capa);
 
 /*
-  Take a pending stop request, deleting the request file, and answer whether the
-  mirror must now stop. True only for a request newer than this run's own
+  Take the pending request NAME (HTS_ABORT_LOCKNAME or HTS_PAUSE_LOCKNAME) in
+  the output directory, deleting the file, and answer whether the mirror must
+  act on it. True only for a request newer than this run's own
   hts-in_progress.lock and deletable, so neither one inherited from an earlier
-  run nor one the engine cannot remove ever stops this mirror.
+  run nor one the engine cannot remove ever reaches the mirror.
 */
-hts_boolean hts_take_abort_request(httrackp *opt);
+hts_boolean hts_take_lock_request(httrackp *opt, const char *name);
 
 /*
   Process user intercations: pause, add link, delete link..

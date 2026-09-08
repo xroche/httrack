@@ -181,11 +181,13 @@ and waits. Delete that one to carry on.
 Create it to stop the mirror and keep what it has downloaded, so that a later
 .I \-\-continue
 resumes from there rather than starting over. The engine deletes it and stops.
-It acts only on a request stamped later than
+.PP
+The engine acts on either request only when the file is stamped later than
 .IR hts\-in_progress.lock ,
-so one left behind by an earlier run does not stop this mirror. Create the file
-again if the mirror had only just started. A request the engine cannot delete is
-ignored too, because it would otherwise stop the mirror on every later poll.
+so one left behind by an earlier run reaches neither this mirror nor the next.
+Create the file again if the mirror had only just started. A request the engine
+cannot delete is ignored too, because it would otherwise fire on every later
+poll.
 .SH ENVIRONMENT
 .IP HOME
 Is being used if you defined in /etc/httrack.conf the line
