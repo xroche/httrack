@@ -2,8 +2,9 @@
 #
 # A worker of ci-windows-suite.sh that dies before writing any status (#1352): the
 # tally must call it lost rather than failed, and the suite must end on a status
-# that says re-run, not investigate. Driven here because the Windows leg, where it
-# happens, keeps no evidence of it.
+# that says re-run, not investigate. The workflow counts them again off the console
+# the step teed, for the runs the watchdog kills before that verdict (#1588). Driven
+# here because the Windows leg, where it happens, keeps no evidence of it.
 
 set -euo pipefail
 
@@ -168,6 +169,8 @@ run_suite "$tmp/ok"
 test "$rc" -eq 0 || fail "a clean stub suite exited $rc: $(<"$tmp/out")"
 grep -q "^ran=$ran pass=92 fail=0 skip=$nskip lost=0$" "$tmp/out" ||
     fail "clean tally: $(grep '^ran=' "$tmp/out" || true)"
+# A whole healthy run for the counter below: no LOST line, and a tally saying lost=0.
+cp "$tmp/out" "$tmp/console-clean.log"
 
 stage "$tmp/killed" "$killer"
 run_suite "$tmp/killed"
@@ -185,6 +188,8 @@ grep -q '::error::failing:' "$tmp/out" &&
     fail "a killed worker was reported as a failing test: $(<"$tmp/out")"
 # 3, so the workflow can tell a leg to repeat from a leg to investigate (#1228).
 test "$rc" -eq 3 || fail "a lost worker exited $rc, want 3: $(<"$tmp/out")"
+# And a run one worker short: one LOST verdict, and a tally saying lost=1.
+cp "$tmp/out" "$tmp/console-lost.log"
 
 # Again with the killer on one of the pinned skips. That run reaches the skip-set
 # gate, which exits before the lost gate unless it is told a vanished worker
@@ -222,5 +227,107 @@ grep -q '::error::failing: 900_zlib-pass.test' "$tmp/out" ||
 test "$rc" -eq 1 ||
     fail "a failure alongside a loss exited $rc, want 1: $(<"$tmp/out")"
 ok "a real failure outranks a lost worker"
+
+# --- and the count a later step makes off the console it left ----------------
+
+# The suite's own verdict is gone when the watchdog kills its step, so the workflow
+# counts again from the console the step teed.
+counted=''
+count_lost() { # count_lost <console log>
+    local crc=0
+    : >"$GITHUB_STEP_SUMMARY"
+    counted=$(ci_report_lost_workers "$1") || crc=$?
+    # The step runs under if:always() in an errexit shell, so any non-zero here reds
+    # a leg whose suite was healthy. The two guard arms at the end exercise it.
+    test "$crc" -eq 0 || fail "counting $1 exited $crc: $counted"
+}
+
+count_lost "$tmp/console-lost.log"
+grep -q '::error title=workers lost with no status::' <<<"$counted" ||
+    fail "a console with a lost worker raised no annotation: $counted"
+grep -q '1 worker(s) died before reporting' <<<"$counted" ||
+    fail "the count is wrong on a real lost-worker console: $counted"
+# Without a sample line the reader goes back to a log the runner may no longer have.
+grep -q 'LOST 906_engine-lost.test' <<<"$counted" ||
+    fail "the annotation quotes no LOST line: $counted"
+grep -q '^1 worker(s) lost with no status$' "$GITHUB_STEP_SUMMARY" ||
+    fail "step summary says $(<"$GITHUB_STEP_SUMMARY")"
+
+# A clean console still says so: a silent step and a broken counter read alike.
+count_lost "$tmp/console-clean.log"
+grep -q 'no lost worker in ' <<<"$counted" || fail "a clean console said: $counted"
+! grep -q '::error' <<<"$counted" || fail "a clean console raised an annotation: $counted"
+grep -q '^0 worker(s) lost with no status$' "$GITHUB_STEP_SUMMARY" ||
+    fail "a clean console wrote no count: $(<"$GITHUB_STEP_SUMMARY")"
+
+# Two verdicts joined by a CR, since the console is stdout and stderr merged, and
+# two decoys the driver itself can print: a failure tail is indented.
+printf 'LOST a.test (worker left no status; no log at all)\rLOST b.test (worker left no status; no log at all)\n    LOST c.test\nthe test printed LOST d.test\n' \
+    >"$tmp/console-cr.log"
+count_lost "$tmp/console-cr.log"
+grep -q '2 worker(s) died before reporting' <<<"$counted" ||
+    fail "the CR-joined console counted wrong: $counted"
+
+# More than two, so a counter that clamps is not green here. The watchdog killed this
+# step, so there is no tally, and the third verdict is joined onto a failure tail that
+# ends mid-line: a test killed on its budget leaves its log that way, and sed keeps it.
+lostline='(worker left no status; no log at all)'
+{
+    echo "LOST 900_a.test $lostline"
+    echo "      a failure tail of the test that ran out of budget"
+    echo "LOST 901_b.test $lostline"
+    printf '      and this tail ends with no newline at all'
+    echo "LOST 902_c.test $lostline"
+    echo "LOST 903_d.test $lostline"
+} >"$tmp/console-join.log"
+count_lost "$tmp/console-join.log"
+grep -q '4 worker(s) died before reporting' <<<"$counted" ||
+    fail "a killed step's console counted wrong: $counted"
+grep -q '^4 worker(s) lost with no status$' "$GITHUB_STEP_SUMMARY" ||
+    fail "the killed step's count did not reach the summary: $(<"$GITHUB_STEP_SUMMARY")"
+
+# The mirror image, on one verdict: a bare CR inside an indented tail puts the word at
+# a line head, and a test can print it in prose. Neither carries the rest of a verdict.
+{
+    echo "LOST 904_e.test $lostline"
+    printf '      progress 99%%\rLOST 905_f.test\n'
+    echo "the test printed LOST 906_g.test"
+} >"$tmp/console-decoy.log"
+count_lost "$tmp/console-decoy.log"
+grep -q '1 worker(s) died before reporting' <<<"$counted" ||
+    fail "the decoys were counted as verdicts: $counted"
+
+# Where the two disagree the tally wins, since the suite counted its own workers. No
+# driver writes this console: the disagreement is what says which side was read.
+{
+    echo "LOST 907_h.test $lostline"
+    echo "LOST 908_i.test $lostline"
+    printf '      one more tail with no final newline'
+    echo "ran=100 pass=90 fail=2 skip=0 lost=8"
+} >"$tmp/console-tally.log"
+count_lost "$tmp/console-tally.log"
+grep -q '8 worker(s) died before reporting' <<<"$counted" ||
+    fail "the count did not come from the tally the suite wrote: $counted"
+grep -q '^8 worker(s) lost with no status$' "$GITHUB_STEP_SUMMARY" ||
+    fail "the tally count did not reach the summary: $(<"$GITHUB_STEP_SUMMARY")"
+
+# The suite step can die before writing a log; the counter step still runs.
+count_lost "$tmp/console-absent.log"
+grep -q 'not counted' <<<"$counted" || fail "a missing log said: $counted"
+
+# Neither a summary the runner refuses nor a log path that is a directory may red a
+# step that runs on every leg. Both would, since GitHub's bash carries errexit.
+crc=0
+counted=$(GITHUB_STEP_SUMMARY="$tmp" ci_report_lost_workers "$tmp/console-clean.log") || crc=$?
+test "$crc" -eq 0 || fail "an unappendable step summary made the counter exit $crc"
+grep -q '::warning::the lost-worker count did not reach the step summary' <<<"$counted" ||
+    fail "an unappendable step summary was not reported: $counted"
+grep -q 'no lost worker in ' <<<"$counted" ||
+    fail "the count is gone when the summary cannot take it: $counted"
+crc=0
+counted=$(ci_report_lost_workers "$tmp") || crc=$?
+test "$crc" -eq 0 || fail "a log path that is a directory made the counter exit $crc"
+grep -q 'not counted' <<<"$counted" || fail "a directory as the log said: $counted"
+ok "the console count matches what the suite lost"
 
 echo "lost-worker classification OK"
