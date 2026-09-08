@@ -1778,7 +1778,11 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                     url_ok = 1;
                                   else if (hts_lastchar(tempo) ==
                                            '/') {       // un slash: ok..
-                                    if (inscript)       // sinon si pas javascript, méfiance (répertoire style base?)
+                                    /* A trailing slash alone is no evidence
+                                       inside a script, where "/" and "image/"
+                                       are ordinary strings. */
+                                    if (inscript &&
+                                        link_dir_is_multisegment(tempo))
                                       url_ok = 1;
                                   }
                                 }

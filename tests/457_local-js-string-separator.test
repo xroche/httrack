@@ -1,0 +1,53 @@
+#!/bin/bash
+#
+# A quoted string ending in a slash counted as a directory link inside a script,
+# so httrack rewrote JavaScript's own separators. split("/") became
+# split("index-2.html") and the mirrored bundle behaved differently.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+: "${top_srcdir:=..}"
+
+work=$(mktemp -d)
+trap 'set +e; rm -rf "$work"' EXIT
+
+root="$work/root"
+mkdir -p "$root/subdir" "$root/api/v1" "$root/assets/img" "$root/cdir"
+
+cat >"$root/index.html" <<'EOF'
+<!DOCTYPE html><html><head><link rel="stylesheet" href="s.css">
+<script src="app.js"></script></head><body>x</body></html>
+EOF
+
+# Every string here ends in a slash. Only the last two name a path of more than
+# one segment, and only those two may be rewritten.
+cat >"$root/app.js" <<'EOF'
+var parts = "a/b".split("/");
+var mime = "image/";
+var key = "Alt+/";
+var rep = "ab".replace(/b/, "$&/");
+var runs = "////";
+var one = "subdir/";
+var api = "/api/v1/";
+var ast = "assets/img/";
+EOF
+
+echo '.a { background: url("cdir/"); }' >"$root/s.css"
+for d in subdir api/v1 assets/img cdir; do
+    printf 'reached\n' >"$root/$d/index.html"
+done
+
+bash "$top_srcdir/tests/local-crawl.sh" --root "$root" --errors 0 \
+    --file-matches 'app.js' 'split\("/"\)' \
+    --file-matches 'app.js' '"image/"' \
+    --file-matches 'app.js' '"Alt\+/"' \
+    --file-matches 'app.js' '"\$&/"' \
+    --file-matches 'app.js' '"////"' \
+    --found api/v1/index.html \
+    --found assets/img/index.html \
+    --found cdir/index.html \
+    --not-found subdir/index.html \
+    httrack BASEURL/index.html -q -%v0 -r4
