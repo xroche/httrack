@@ -12623,6 +12623,33 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
     opt->maxsite = 0;
     HTS_STAT.HTS_TOTAL_RECV = recv_was;
   }
+  /* back_delete_all(), the shutdown every exit reaches. A capped mirror can end
+     through the link loop before either sweep runs (htscore.c, on
+     back_checkmirror), and the partial is on disk just the same. Its own slot
+     table, so the fixture above is not torn down early. */
+  if (!err) {
+    struct_back *shut = back_new(opt, 1);
+
+    if (shut == NULL) {
+      err = 1;
+    } else {
+      cache_back shutcache;
+
+      memset(&shutcache, 0, sizeof(shutcache));
+      shutcache.hashtable = coucal_new(0);
+      shut->lnk[0].status = STATUS_TRANSFER;
+      shut->lnk[0].r.soc = INVALID_SOCKET;
+      shut->lnk[0].r.is_write = 1;
+      strcpybuff(shut->lnk[0].url_sav, "hts-backstop-selftest.tmp");
+      opt->abort_left_partial = HTS_FALSE;
+
+      back_delete_all(opt, &shutcache, shut);
+
+      CHECK(opt->abort_left_partial);
+      back_free(&shut);
+      coucal_delete(&shutcache.hashtable);
+    }
+  }
 #undef CHECK
 
 cleanup:
