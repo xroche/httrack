@@ -12587,21 +12587,25 @@ static hts_boolean st_backstop_arm(httrackp *opt, struct_back *sback,
    capped mirror can end through the link loop before either sweep runs
    (htscore.c, on back_checkmirror), and the partial is on disk just the same.
    Returns 77 on an allocation failure, as st_backstop() does. */
-static int st_backstop_shutdown(httrackp *opt) {
+static int st_backstop_check_shutdown(httrackp *opt) {
+  /* back_delete_all() raises the flag only for a live slot writing a file of
+     its own, so each row below drops one of those three conditions. */
   static const struct {
     const char *what;
     int status;
-    short is_write;
+    hts_boolean is_write;
     const char *url_sav;
     hts_boolean kept;
-  } shutdown[] = {
-      {"a partial file", STATUS_TRANSFER, 1, "hts-backstop-selftest.tmp",
-       HTS_TRUE},
-      {"a .delayed placeholder", STATUS_TRANSFER, 1,
-       "hts-backstop-selftest.tmp." DELAYED_EXT, HTS_FALSE},
-      {"a slot writing nothing to disk", STATUS_TRANSFER, 0, "", HTS_FALSE},
-      {"a slot no longer live", STATUS_FREE, 1, "hts-backstop-selftest.tmp",
-       HTS_FALSE}};
+  } shutdown[] = {{"a slot already finished", STATUS_READY, HTS_TRUE,
+                   "hts-backstop-selftest.tmp", HTS_FALSE},
+                  {"an FTP slot its worker owns", STATUS_FTP_TRANSFER, HTS_TRUE,
+                   "hts-backstop-selftest.tmp", HTS_FALSE},
+                  {"a slot writing nothing to disk", STATUS_TRANSFER, HTS_FALSE,
+                   "", HTS_FALSE},
+                  {"a .delayed placeholder", STATUS_TRANSFER, HTS_TRUE,
+                   "hts-backstop-selftest.tmp." DELAYED_EXT, HTS_FALSE},
+                  {"a partial file", STATUS_TRANSFER, HTS_TRUE,
+                   "hts-backstop-selftest.tmp", HTS_TRUE}};
 
   int err = 0;
   size_t c;
@@ -12610,8 +12614,10 @@ static int st_backstop_shutdown(httrackp *opt) {
     struct_back *shut = back_new(opt, 1);
     cache_back shutcache;
 
-    if (shut == NULL)
+    if (shut == NULL) {
+      printf("backstop: SKIP (no slot table for the shutdown cases)\n");
       return 77;
+    }
     memset(&shutcache, 0, sizeof(shutcache));
     shutcache.hashtable = coucal_new(0);
     shut->lnk[0].status = shutdown[c].status;
@@ -12855,7 +12861,7 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
     HTS_STAT.HTS_TOTAL_RECV = recv_was;
   }
   if (!err) {
-    const int rc = st_backstop_shutdown(opt);
+    const int rc = st_backstop_check_shutdown(opt);
 
     if (rc == 77) {
       skipped = 1;
