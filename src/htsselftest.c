@@ -13875,8 +13875,7 @@ static int st_batch(httrackp *opt, int argc, char **argv) {
 
 // -#test=abortlock|stoplock <dir>: hts_take_lock_request() takes a request only
 // when it is stamped after this run's hts-in_progress.lock and the engine could
-// also delete it, and it leaves every other lock file alone. TAG prefixes the
-// output, so the two runs of the same rule are told apart in the log.
+// also delete it. It leaves every other lock file alone.
 static hts_boolean st_lockrule_touch(const char *path) {
   FILE *const fp = FOPEN(path, "wb");
 

@@ -2412,11 +2412,11 @@ over. The engine deletes it and stops.</p>
 
 <p style="margin-left:9%; margin-top: 1em">The engine acts
 on either request only when the file is stamped later than
-<i>hts-in_progress.lock</i>, so one left behind by an
-earlier run reaches neither this mirror nor the next. Create
-the file again if the mirror had only just started. A
-request the engine cannot delete is ignored too, because it
-would otherwise fire on every later poll.</p>
+<i>hts-in_progress.lock</i>. A request left behind by an
+earlier run therefore reaches neither this mirror nor the
+next. Create the file again if the mirror had only just
+started. A request the engine cannot delete is ignored too,
+because it would otherwise fire on every later poll.</p>
 
 <h2>ENVIRONMENT
 <a name="ENVIRONMENT"></a>

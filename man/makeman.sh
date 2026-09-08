@@ -183,8 +183,9 @@ Create it to stop the mirror and keep what it has downloaded, so that a later
 resumes from there rather than starting over. The engine deletes it and stops.
 .PP
 The engine acts on either request only when the file is stamped later than
-.IR hts\-in_progress.lock ,
-so one left behind by an earlier run reaches neither this mirror nor the next.
+.IR hts\-in_progress.lock .
+A request left behind by an earlier run therefore reaches neither this mirror
+nor the next.
 Create the file again if the mirror had only just started. A request the engine
 cannot delete is ignored too, because it would otherwise fire on every later
 poll.

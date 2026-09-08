@@ -16,15 +16,9 @@ tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_abortlock.XXXXXX") || exit 1
 crawlpid=
 cleanup() {
     if test -n "$crawlpid"; then kill -9 "$crawlpid" 2>/dev/null || true; fi
-    # The rule self-test leaves a directory it made read-only on purpose.
-    chmod -R u+w "$tmpdir" 2>/dev/null || true
     rm -rf "$tmpdir"
 }
 cleanup_push cleanup
-
-# mktemp gives 0700, which the unprivileged euid the rule self-test borrows on a
-# root runner cannot walk through.
-chmod 0755 "$tmpdir"
 
 wait_until() { # wait_until <shell condition> <message> [tenths, default 300]
     for _ in $(seq 1 "${3:-300}"); do
@@ -48,19 +42,7 @@ next_second() { sleep 1; }
 
 require_httrack
 
-printf '[the rule itself] ..\t'
-st_out=$(httrack -O "${tmpdir}/st" "-#test=abortlock" \
-    "$(nativepath "${tmpdir}/rule")" 2>&1) ||
-    fail "the rule self-test exited non-zero: ${st_out}"
-case "$st_out" in
-*"abortlock self-test: OK"*) ;;
-*) fail "the rule self-test did not report OK: ${st_out}" ;;
-esac
-# Nothing portable makes a delete fail, so that arm names what covered it here
-# rather than skipping in silence.
-coverage=$(printf '%s\n' "$st_out" | command grep 'undeletable request: ') ||
-    fail "the rule self-test said nothing about an undeletable request"
-echo "OK (${coverage#*: })"
+assert_lockrule_selftest abortlock
 
 local_server_start
 common=(--quiet --disable-security-limits --robots=0 --timeout=30 --retries=0 -c1)
