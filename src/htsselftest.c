@@ -6638,53 +6638,70 @@ static int st_postfile(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* Names the string on failure, since a bare line number cannot say which row
+   went red. */
+static void st_linkdir_case(const char *lien, hts_boolean frag_or_query,
+                            hts_boolean multisegment) {
+  const hts_boolean got_frag = link_dir_has_fragment_or_query(lien);
+  const hts_boolean got_multi = link_dir_is_multisegment(lien);
+
+  if (got_frag != frag_or_query || got_multi != multisegment) {
+    fprintf(stderr,
+            "linkdir \"%s\": fragment %d multisegment %d, wanted %d and %d\n",
+            lien, got_frag, got_multi, frag_or_query, multisegment);
+    assertf(!"linkdir case failed");
+  }
+}
+
 static int st_linkdir(httrackp *opt, int argc, char **argv) {
   size_t i;
 
-  /* Each row states what the two helpers answer for one string. The engine
-     asks link_dir_has_fragment_or_query first, on the source bytes, and
-     link_dir_is_multisegment later, on the string the fragment cut left. */
+  /* Each row states what the two helpers answer for one string, in the order
+     the engine asks them: link_dir_has_fragment_or_query on the source bytes,
+     then link_dir_is_multisegment on what the fragment cut left. */
   static const struct {
     const char *lien;
+    hts_boolean frag_or_query;
     hts_boolean multisegment;
-    hts_boolean fragment;
   } cases[] = {
-      /* what #1612 refused, and still must */
+      /* #1612 refused these, and still must */
       {"/", HTS_FALSE, HTS_FALSE},
       {"image/", HTS_FALSE, HTS_FALSE},
       {"Alt+/", HTS_FALSE, HTS_FALSE},
       {"$&/", HTS_FALSE, HTS_FALSE},
       {"////", HTS_FALSE, HTS_FALSE},
       /* a second segment is evidence on its own */
-      {"a/b/", HTS_TRUE, HTS_FALSE},
-      {"/api/v1/", HTS_TRUE, HTS_FALSE},
-      /* the site root and a named directory, both with a marker */
-      {"/#top", HTS_FALSE, HTS_TRUE},
-      {"/?q=1", HTS_FALSE, HTS_TRUE},
-      {"img/#x", HTS_FALSE, HTS_TRUE},
-      {"img/?q=1", HTS_FALSE, HTS_TRUE},
+      {"a/b/", HTS_FALSE, HTS_TRUE},
+      {"/api/v1/", HTS_FALSE, HTS_TRUE},
+      /* the site root and a named directory both carry a marker */
+      {"/#top", HTS_TRUE, HTS_FALSE},
+      {"/?q=1", HTS_TRUE, HTS_FALSE},
+      {"img/#x", HTS_TRUE, HTS_FALSE},
+      {"img/?q=1", HTS_TRUE, HTS_FALSE},
+      {"a/b/#x", HTS_TRUE, HTS_TRUE},
       /* the marker must open a path, not follow a name or nothing */
       {"page.html#x", HTS_FALSE, HTS_FALSE},
+      {"page.html?q=1", HTS_FALSE, HTS_FALSE},
       {"#top", HTS_FALSE, HTS_FALSE},
       {"?q=1", HTS_FALSE, HTS_FALSE},
       {"", HTS_FALSE, HTS_FALSE},
       /* a run of slashes carries no name, so the marker buys nothing */
-      {"////#x", HTS_TRUE, HTS_FALSE},
-      {"//#x", HTS_TRUE, HTS_FALSE},
+      {"////#x", HTS_FALSE, HTS_TRUE},
+      {"//#x", HTS_FALSE, HTS_TRUE},
       /* an entity before the marker decodes into an earlier one */
-      {"//&num;/#x", HTS_TRUE, HTS_FALSE},
+      {"//&num;/#x", HTS_FALSE, HTS_TRUE},
       {"/&#35;", HTS_FALSE, HTS_FALSE},
       {"a&b/#x", HTS_FALSE, HTS_FALSE},
       /* an '&' after the marker is part of the query, so it is left alone */
-      {"/?a=1&b=2", HTS_FALSE, HTS_TRUE},
+      {"/?a=1&b=2", HTS_TRUE, HTS_FALSE},
   };
 
   (void) opt;
   (void) argc;
   (void) argv;
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
-    assertf(link_dir_is_multisegment(cases[i].lien) == cases[i].multisegment);
-    assertf(link_dir_has_fragment_or_query(cases[i].lien) == cases[i].fragment);
+    st_linkdir_case(cases[i].lien, cases[i].frag_or_query,
+                    cases[i].multisegment);
   }
   printf("linkdir self-test OK\n");
   return 0;

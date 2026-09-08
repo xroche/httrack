@@ -2,10 +2,11 @@
 #
 # Pins link_dir_is_multisegment and link_dir_has_fragment_or_query, the pair
 # that decides whether a quoted directory string inside a script is a link.
-# A crawl cannot reach every clause: "page.html#x" never gets that far, because
-# the caller only asks once the cut string already ends in a slash.
+# A crawl calls both on anything quoted, but reads the answer only once the cut
+# string ends in a slash, so it cannot tell a wrong verdict on "page.html#x"
+# from a right one.
 
-set -eu
+set -euo pipefail
 
 out=$(httrack -#test=linkdir) || {
     echo "httrack -#test=linkdir exited non-zero: $out" >&2
