@@ -2,8 +2,9 @@
 #
 # A worker of ci-windows-suite.sh that dies before writing any status (#1352): the
 # tally must call it lost rather than failed, and the suite must end on a status
-# that says re-run, not investigate. Driven here because the Windows leg, where it
-# happens, keeps no evidence of it.
+# that says re-run, not investigate. The workflow counts them again off the console
+# the step teed, for the runs the watchdog kills before that verdict (#1588). Driven
+# here because the Windows leg, where it happens, keeps no evidence of it.
 
 set -euo pipefail
 
@@ -168,6 +169,8 @@ run_suite "$tmp/ok"
 test "$rc" -eq 0 || fail "a clean stub suite exited $rc: $(<"$tmp/out")"
 grep -q "^ran=$ran pass=92 fail=0 skip=$nskip lost=0$" "$tmp/out" ||
     fail "clean tally: $(grep '^ran=' "$tmp/out" || true)"
+# A real console for the counter below, so a change to what the driver prints reaches it.
+cp "$tmp/out" "$tmp/console-clean.log"
 
 stage "$tmp/killed" "$killer"
 run_suite "$tmp/killed"
@@ -185,6 +188,7 @@ grep -q '::error::failing:' "$tmp/out" &&
     fail "a killed worker was reported as a failing test: $(<"$tmp/out")"
 # 3, so the workflow can tell a leg to repeat from a leg to investigate (#1228).
 test "$rc" -eq 3 || fail "a lost worker exited $rc, want 3: $(<"$tmp/out")"
+cp "$tmp/out" "$tmp/console-lost.log"
 
 # Again with the killer on one of the pinned skips. That run reaches the skip-set
 # gate, which exits before the lost gate unless it is told a vanished worker
@@ -222,5 +226,46 @@ grep -q '::error::failing: 900_zlib-pass.test' "$tmp/out" ||
 test "$rc" -eq 1 ||
     fail "a failure alongside a loss exited $rc, want 1: $(<"$tmp/out")"
 ok "a real failure outranks a lost worker"
+
+# --- and the count a later step makes off the console it left ----------------
+
+# The suite's own verdict is gone when the watchdog kills its step, so the workflow
+# counts again from the console the step teed.
+counted=''
+count_lost() { # count_lost <console log>
+    : >"$GITHUB_STEP_SUMMARY"
+    counted=$(ci_report_lost_workers "$1") || fail "counting $1 failed"
+}
+
+count_lost "$tmp/console-lost.log"
+grep -q '::error title=workers lost with no status::' <<<"$counted" ||
+    fail "a console with a lost worker raised no annotation: $counted"
+grep -q '1 worker(s) died before reporting' <<<"$counted" ||
+    fail "the count is wrong on a real lost-worker console: $counted"
+# Without a sample line the reader goes back to a log the runner may no longer have.
+grep -q 'LOST 906_engine-lost.test' <<<"$counted" ||
+    fail "the annotation quotes no LOST line: $counted"
+grep -q '^1 worker(s) lost with no status$' "$GITHUB_STEP_SUMMARY" ||
+    fail "step summary says $(<"$GITHUB_STEP_SUMMARY")"
+
+# A clean console still says so: a silent step and a broken counter read alike.
+count_lost "$tmp/console-clean.log"
+grep -q 'no lost worker in ' <<<"$counted" || fail "a clean console said: $counted"
+! grep -q '::error' <<<"$counted" || fail "a clean console raised an annotation: $counted"
+grep -q '^0 worker(s) lost with no status$' "$GITHUB_STEP_SUMMARY" ||
+    fail "a clean console wrote no count: $(<"$GITHUB_STEP_SUMMARY")"
+
+# Two verdicts joined by a CR, since the console is stdout and stderr merged, and
+# two decoys the driver itself can print: a failure tail is indented.
+printf 'LOST a.test (worker left no status; no log at all)\rLOST b.test (worker left no status; no log at all)\n    LOST c.test\nthe test printed LOST d.test\n' \
+    >"$tmp/console-cr.log"
+count_lost "$tmp/console-cr.log"
+grep -q '2 worker(s) died before reporting' <<<"$counted" ||
+    fail "the CR-joined console counted wrong: $counted"
+
+# The suite step can die before writing a log; the counter step still runs.
+count_lost "$tmp/console-absent.log"
+grep -q 'not counted' <<<"$counted" || fail "a missing log said: $counted"
+ok "the console count matches what the suite lost"
 
 echo "lost-worker classification OK"

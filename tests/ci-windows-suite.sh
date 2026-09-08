@@ -51,6 +51,33 @@ ci_lost_reason() {
     fi
 }
 
+# Count the workers the suite lost in console log $1, and say so when it lost none:
+# a silent step and a broken counter read alike (#1352). The suite names them itself,
+# so this is the count for a run whose step the watchdog killed before it could.
+ci_report_lost_workers() {
+    local log=$1 lost
+    test -r "$log" || {
+        echo "no console log at $log: lost workers not counted"
+        return 0
+    }
+    # Split on CR first: this console is stdout and stderr merged, so two messages
+    # can share a physical line and a line count would see one. Anchored, because
+    # the suite's indented failure tails quote a LOST line too.
+    lost=$(tr '\r' '\n' <"$log" | awk '/^LOST /{n++} END{print n + 0}')
+    test -z "${GITHUB_STEP_SUMMARY:-}" ||
+        printf '%s worker(s) lost with no status\n' "$lost" >>"$GITHUB_STEP_SUMMARY"
+    if test "$lost" -eq 0; then
+        echo "no lost worker in $log"
+    else
+        # error, not warning: a leg that lost a worker is one to re-run.
+        ci_annotate error "workers lost with no status" "$(
+            printf '%s worker(s) died before reporting: re-run this leg, and see #1228\n' "$lost"
+            # -a: one NUL in the log would otherwise cost every sample line.
+            tr '\r' '\n' <"$log" | grep -am 3 '^LOST ' || true
+        )"
+    fi
+}
+
 # End a wedged suite before its runner dies: a step that fails on its own terms
 # keeps its log, a lost runner keeps nothing, annotations included (#795). Quiet
 # for $1s, then names the test in flight from $3 every $2s; kills $5 once $3 has
