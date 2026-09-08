@@ -1733,11 +1733,15 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             //
                             if ((!strchr(tempo, ' ')) || inscript) {    // espace dedans: méfiance! (sauf dans code javascript)
                               int invalid_url = 0;
+                              hts_boolean only_slashes;
 
                               // escape                              
                               unescape_amp(tempo);
 
-                              // Couper au # ou ? éventuel
+                              // The cut below erases "/#frag" down to "/".
+                              only_slashes = hts_rtrimlen(tempo, "/") == 0;
+
+                              // Cut at any # or ?
                               {
                                 char *a = strchr(tempo, '#');
 
@@ -1768,19 +1772,17 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                 if (c != '+') { // PAS de plus à la fin
                                   // "Comparisons of scheme names MUST be
                                   // case-insensitive" (RFC2616)
-                                  if ((strfield(tempo, "http:"))
-                                      || (strfield(tempo, "ftp:"))
+                                  // These schemes leave no doubt.
+                                  if ((strfield(tempo, "http:")) ||
+                                      (strfield(tempo, "ftp:"))
 #if HTS_USEOPENSSL
-                                      || (strfield(tempo, "https:")
-                                      )
+                                      || (strfield(tempo, "https:"))
 #endif
-                                    )   // ok pas de problème
+                                  )
                                     url_ok = 1;
                                   else if (hts_lastchar(tempo) == '/') {
-                                    // a directory: trusted only in a script,
-                                    // and never a pure-slash separator
-                                    if (inscript &&
-                                        tempo[strspn(tempo, "/")] != '\0')
+                                    // A script's lone "/" is a separator.
+                                    if (inscript && !only_slashes)
                                       url_ok = 1;
                                   }
                                 }

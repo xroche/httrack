@@ -1,44 +1,61 @@
 #!/bin/bash
 #
-# A quoted string ending in "/" is read as a directory URL inside a script, so
-# a bare "/" was rewritten to the mirror's index page: split("/") turned into
-# split("index.html") and the script threw at load. AddToAny's page.js is one
-# of those, and its share icons never appeared in the mirror.
+# Inside a script, htsparse reads a quoted string ending in "/" as a directory
+# URL. A string that is only a slash therefore became the site root. split("/")
+# came out of the mirror as split("index.html"), and the script threw at load.
+# AddToAny's page.js opens with that call, and its share icons never appeared in
+# a mirror carrying it. See https://forum.httrack.com/readmsg/43082/index.html.
 #
 # A rooted directory string still has to be rewritten, so a fix that refuses
 # every trailing slash fails here too.
 
 set -euo pipefail
 
-# shellcheck source=tests/testlib.sh
-. "${0%"${0##*/}"}./testlib.sh"
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
 
 work=$(mktemp -d)
 cleanup_push rm -rf "$work"
 root="$work/root"
-mkdir -p "$root/sub"
+mkdir -p "$root/sub" "$root/assets"
 
+# data-path is not a link attribute, and outside a script a trailing slash is
+# not trusted, so "assets/" must survive. assets/index.html exists only so that
+# a build rewriting the attribute fails on the attribute and not on a 404.
 cat >"$root/index.html" <<'HTML'
-<!DOCTYPE html><html><body><script src="script.js"></script></body></html>
+<!DOCTYPE html><html><body>
+<div data-path="assets/">x</div>
+<script src="script.js"></script></body></html>
 HTML
 
+# The fixture holds both poles. parts and dbl must survive verbatim, because a
+# "/" there is a separator and not a URL. img, dir, frag and query are real
+# links and are still rewritten. img reaches sub/pic.png, dir reaches
+# sub/index.html, and frag and query reach a copy of the root page.
 cat >"$root/script.js" <<'JS'
 var parts = location.href.split("/");
-var joined = ["a", "b"].join("/");
 var img = "sub/pic.png";
 var dir = "/sub/";
+var frag = "/#top";
+var query = "/?q=1";
+var dbl = "//";
 JS
 
 printf '\211PNG\r\n\032\n' >"$root/sub/pic.png"
 printf '<html><body>s</body></html>\n' >"$root/sub/index.html"
+printf '<html><body>a</body></html>\n' >"$root/assets/index.html"
 
-bash "$top_srcdir/tests/local-crawl.sh" --root "$root" \
+# Two assertions kill no mutant. dbl is output-identical under a rule keyed on
+# strcmp(tempo, "/"), because a later stage drops "//" anyway, so it pins the
+# behaviour instead. --found sub/pic.png only proves the script was scanned.
+bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$root")" \
     --errors 0 \
-    --found script.js \
     --found sub/pic.png \
     --found sub/index.html \
     --file-matches script.js 'split\("/"\)' \
-    --file-matches script.js 'join\("/"\)' \
-    --file-matches script.js 'img = "sub/pic\.png"' \
+    --file-matches script.js 'dbl = "//"' \
     --file-matches script.js 'dir = "sub/index\.html"' \
+    --file-matches script.js 'frag = "index-2\.html#top"' \
+    --file-matches script.js 'query = "index5835\.html\?q=1"' \
+    --file-matches index.html 'data-path="assets/"' \
     httrack BASEURL/index.html -q -%v0 -r3
