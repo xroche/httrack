@@ -388,6 +388,19 @@ hts_boolean link_base_is_hostname(const char *lien) {
   return HTS_FALSE;
 }
 
+hts_boolean link_dir_is_multisegment(const char *lien) {
+  size_t slashes = 0, other = 0;
+  const char *a;
+
+  for (a = lien; *a != '\0'; a++) {
+    if (*a == '/')
+      slashes++;
+    else
+      other++;
+  }
+  return (slashes >= 2 && other != 0) ? HTS_TRUE : HTS_FALSE;
+}
+
 int link_has_authorization(const char *lien) {
   const char *adr = jump_protocol_const(lien);
   const char *firstslash = strchr(adr, '/');

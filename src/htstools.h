@@ -72,6 +72,10 @@ int link_has_authority(const char *lien);
    reference RFC 3986 5.2 makes it? True only when its first segment holds a
    dot or a colon, so a dotless "sub/" stays relative. */
 hts_boolean link_base_is_hostname(const char *lien);
+/* Does a string hold a path of more than one segment? A script string ending
+   in a slash is no evidence alone, because "/", "image/" and "$&/" all end
+   that way too. A second slash is. */
+hts_boolean link_dir_is_multisegment(const char *lien);
 int link_has_authorization(const char *lien);
 void long_to_83(int mode, char *n83, size_t n83size, char *save);
 void longfile_to_83(int mode, char *n83, size_t n83size, char *save);
