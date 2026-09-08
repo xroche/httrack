@@ -5,6 +5,10 @@
 # that says re-run, not investigate. The workflow counts them again off the console
 # the step teed, for the runs the watchdog kills before that verdict (#1588). Driven
 # here because the Windows leg, where it happens, keeps no evidence of it.
+#
+# Four staged suite runs of 121 stubs each is real work, not a wedge: 87s here, past
+# the 600s guard on a loaded macOS runner. The arms pace themselves inside the raise.
+# TEST_TIMEOUT_AT_LEAST: 1200
 
 set -euo pipefail
 
@@ -151,16 +155,23 @@ stage() { # stage <dir> <lost stub body>
     fi
 }
 
-# Drive the suite staged in $1 into $tmp/out, its status into $rc.
+# Drive the suite staged in $1 into $tmp/out, its status into $rc and what it cost
+# into $arm_took, which paces the arm after it.
 rc=0
+arm_took=0
 run_suite() { # run_suite <dir>
+    local began=$SECONDS
     rc=0
     (
         cd "$1"
         RUNNER_TEMP="$1/rt" GITHUB_STEP_SUMMARY="$tmp/summary" HTTRACK_SUITE_JOBS=6 \
             bash ./ci-windows-suite.sh "$bin"
     ) >"$tmp/out" 2>&1 || rc=$?
+    arm_took=$((SECONDS - began))
 }
+
+# Expensive first already: the console counts below read what the first two arms left.
+arms_left=4
 
 # The control first: the same stubs with nothing killed have to come out green, or
 # the run below proves only that a stub suite cannot pass.
@@ -171,6 +182,8 @@ grep -q "^ran=$ran pass=92 fail=0 skip=$nskip lost=0$" "$tmp/out" ||
     fail "clean tally: $(grep '^ran=' "$tmp/out" || true)"
 # A whole healthy run for the counter below: no LOST line, and a tally saying lost=0.
 cp "$tmp/out" "$tmp/console-clean.log"
+arms_left=$((arms_left - 1))
+pace "$arms_left" "$arm_took"
 
 stage "$tmp/killed" "$killer"
 run_suite "$tmp/killed"
@@ -190,6 +203,8 @@ grep -q '::error::failing:' "$tmp/out" &&
 test "$rc" -eq 3 || fail "a lost worker exited $rc, want 3: $(<"$tmp/out")"
 # And a run one worker short: one LOST verdict, and a tally saying lost=1.
 cp "$tmp/out" "$tmp/console-lost.log"
+arms_left=$((arms_left - 1))
+pace "$arms_left" "$arm_took"
 
 # Again with the killer on one of the pinned skips. That run reaches the skip-set
 # gate, which exits before the lost gate unless it is told a vanished worker
@@ -211,6 +226,8 @@ grep -q '::error::skip set changed from expected' "$tmp/out" ||
 test "$rc" -eq 3 ||
     fail "a worker lost from the pinned skips exited $rc, want 3: $(<"$tmp/out")"
 ok "a skip that vanished is still a leg to repeat"
+arms_left=$((arms_left - 1))
+pace "$arms_left" "$arm_took"
 
 # A loss alongside a real failure: the failure decides, or a red ships as a leg to
 # repeat and nobody investigates it.
@@ -227,6 +244,9 @@ grep -q '::error::failing: 900_zlib-pass.test' "$tmp/out" ||
 test "$rc" -eq 1 ||
     fail "a failure alongside a loss exited $rc, want 1: $(<"$tmp/out")"
 ok "a real failure outranks a lost worker"
+arms_left=$((arms_left - 1))
+# Nothing left to pace: this only catches an arm added without counting it.
+assert_steps_ran 0 "$arms_left"
 
 # --- and the count a later step makes off the console it left ----------------
 
