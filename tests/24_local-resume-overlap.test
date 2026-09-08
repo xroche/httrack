@@ -10,11 +10,6 @@ set -eu
 # shellcheck source=tests/crawllib.sh
 . "${0%"${0##*/}"}./crawllib.sh"
 
-# No graceful stop crosses the boundary: a Linux signal reaches the interop
-# relay, and taskkill /F reaches the engine too hard to let pass 1 write the
-# temp-ref pass 2 resumes from. The spike left that gap open deliberately.
-test "$(suite_backend)" != wsl2 ||
-    skip "no graceful stop reaches a Windows exe from a WSL2 shell"
 root=$(nativepath "${testdir}/server-root")
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_198.XXXXXX") || exit 1
@@ -36,24 +31,25 @@ common=(-O "$out" --quiet --disable-security-limits --robots=0 --timeout=30 --re
 refdir="${out}/hts-cache/ref"
 
 # pass 1: interrupt once flaky.bin's prefix is streaming (partial + temp-ref).
+# The stop is hts-abort.lock, the file a running engine polls for (436), not a
+# signal: no signal a WSL2 shell sends reaches a native httrack.exe, and taskkill
+# /F takes away the temp-ref pass 2 resumes from. Every backend takes that path,
+# so the Linux leg exercises what Windows runs.
 printf '[pass 1: interrupt flaky.bin] ..\t'
 httrack "${common[@]}" "${BASEURL}/overlap/index.html" >"${tmpdir}/log1" 2>&1 &
 crawlpid=$!
-for _ in $(seq 1 300); do
-    test -s "$counter" && break
-    kill -0 "$crawlpid" 2>/dev/null || break
-    sleep 0.1
-done
-sleep 0.5
-# A Linux signal reaches the wsl2 interop relay, not the engine, and a pass 1
-# that runs on finishes the very fetch pass 2 has to resume.
-# The backend, not the binary: MSYS signals the engine directly and pass 1 gets
-# to write its temp-ref, so the harder kill_tree there takes it away.
-if test "$(suite_backend)" = wsl2; then
-    kill_tree "$crawlpid"
-else
-    kill -TERM "$crawlpid" 2>/dev/null || true
-fi
+wait_until "test -s '$counter' && test -e '${out}/hts-in_progress.lock'" \
+    "the crawl never reached flaky.bin"
+# The engine honours a request only when it is newer than its own progress lock,
+# in whole seconds, so wait one out before writing it.
+sleep 1.1
+: >"${out}/hts-abort.lock"
+# Well inside --timeout=30: past that the stalled fetch ends on its own and the
+# mirror runs to a normal finish, which is not the state pass 2 needs.
+wait_until "test ! -e '${out}/hts-abort.lock'" \
+    "10s on, the engine had not read the stop request" 100
+# Unwinding a transfer cut mid-socket takes a while, as it does in 436.
+wait_until "! kill -0 '$crawlpid' 2>/dev/null" "the engine never shut down" 900
 wait "$crawlpid" 2>/dev/null || true
 crawlpid=
 test -n "$(find "$refdir" -name '*.ref' 2>/dev/null)" || fail "no temp-ref survived pass 1; cannot drive the resume"
