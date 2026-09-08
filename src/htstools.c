@@ -401,6 +401,15 @@ hts_boolean link_dir_is_multisegment(const char *lien) {
   return (slashes >= 2 && other != 0) ? HTS_TRUE : HTS_FALSE;
 }
 
+hts_boolean link_dir_has_fragment(const char *lien) {
+  const size_t cut = strcspn(lien, "#?");
+
+  if (cut == 0 || lien[cut] == '\0' || lien[cut - 1] != '/')
+    return HTS_FALSE;
+  /* "/" is the site root, and anything longer needs a name. */
+  return (cut == 1 || strspn(lien, "/") < cut) ? HTS_TRUE : HTS_FALSE;
+}
+
 int link_has_authorization(const char *lien) {
   const char *adr = jump_protocol_const(lien);
   const char *firstslash = strchr(adr, '/');

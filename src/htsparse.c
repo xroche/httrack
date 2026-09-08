@@ -1744,14 +1744,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             if ((!strchr(tempo, ' ')) || inscript) {    // espace dedans: méfiance! (sauf dans code javascript)
                               int invalid_url = 0;
 
-                              /* A '#' or '?' right after a slash opens a
-                                 fragment or a query. Read the source bytes,
-                                 because unescape_amp turns "&#35;" into a '#'
-                                 no script wrote. */
-                              size_t cut = strcspn(tempo, "#?");
-                              int had_fragment_or_query = cut > 0 &&
-                                                          tempo[cut] != '\0' &&
-                                                          tempo[cut - 1] == '/';
+                              /* Ask before the cut destroys the evidence
+                                 and unescape_amp forges it. */
+                              int had_fragment_or_query =
+                                  link_dir_has_fragment(tempo);
 
                               // escape                              
                               unescape_amp(tempo);

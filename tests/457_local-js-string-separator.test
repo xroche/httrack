@@ -38,6 +38,7 @@ var rep = "ab".replace(/b/, "$&/");  // one slash: kept
 var runs = "////";                   // no name, only slashes: kept
 var ent = "a/b".split("/&num;");     // an entity is not a fragment: kept
 var num = "a/b".split("/&#35;");     // nor is a numeric one: kept
+var only = "////#x";                 // a fragment, but no name: kept
 var one = "subdir/";                 // one slash: kept, so never fetched
 var two = "a/b/";                    // two slashes, short name: followed
 var api = "/api/v1/";                // three slashes: followed
@@ -66,6 +67,7 @@ bash "$top_srcdir/tests/local-crawl.sh" --root "$root" --errors 0 \
     --file-matches 'app.js' '"////"' \
     --file-matches 'app.js' 'split\("/&num;"\)' \
     --file-matches 'app.js' 'split\("/&#35;"\)' \
+    --file-matches 'app.js' '"////#x"' \
     --file-matches 'app.js' '"index[^"]*\.html#top"' \
     --file-matches 'app.js' '"index[^"]*\.html\?q=1"' \
     --file-matches 'app.js' '"fragdir/index\.html#x"' \
