@@ -145,6 +145,8 @@ Please visit our Website: http://www.httrack.com
  * Append to the output buffer the string 'A', html-escaped for & and
  * high chars.
  **/
+/* Its one caller passes a percent-encoded path, and appends any query through
+   HT_ADD_HTMLESCAPED, so no bare & reaches it. */
 #define HT_ADD_HTMLESCAPED_FULL(A) \
   HT_ADD_HTMLESCAPED_ANY(A, escape_for_html_print_full, HTS_HTMLESCAPE_FULL_MAXEXP)
 /* clang-format on */

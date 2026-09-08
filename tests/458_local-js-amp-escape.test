@@ -17,34 +17,37 @@ trap 'set +e; rm -rf "$work"' EXIT
 root="$work/root"
 mkdir -p "$root"
 
-# One query letter pair per context, so no assertion can pass for another. The
-# markup cases sit after the script and style blocks, which catches a fix that
-# turns escaping off and never turns it back on.
+# One query letter pair per context, so no assertion can pass for another. A
+# script sits on each side of the markup, because a condition that latches
+# leaks in one direction only and one ordering would miss it.
 cat >"$root/index.html" <<'EOF'
 <!DOCTYPE html><html><head>
 <link rel="stylesheet" href="s.css">
 <script src="app.js"></script>
-<script>var inline = "q.html?a=1&b=2";</script>
-<style>.s { background: url("q.html?c=1&d=2"); }</style>
+<script>var inline = "q.html?a=1&b=2";</script>   <!-- raw text -->
+<style>.s { background: url("q.html?c=1&d=2"); }</style>   <!-- raw text -->
 </head><body>
-<a href="q.html?e=1&f=2">h</a>
-<div style="background: url('q.html?g=1&h=2')">d</div>
-<a href="javascript:go('q.html?i=1&j=2')">j</a>
+<a href="q.html?e=1&f=2">h</a>                            <!-- markup -->
+<div style="background: url('q.html?g=1&h=2')">d</div>    <!-- markup -->
+<a href="javascript:go('q.html?i=1&j=2')">j</a>           <!-- markup -->
+<script>var trailing = "q.html?o=1&p=2";</script>  <!-- raw text, after markup -->
 </body></html>
 EOF
 
-echo 'var ext = "q.html?k=1&l=2";' >"$root/app.js"
-echo '.c { background: url("q.html?m=1&n=2"); }' >"$root/s.css"
+echo 'var ext = "q.html?k=1&l=2";' >"$root/app.js"              # raw text
+echo '.c { background: url("q.html?m=1&n=2"); }' >"$root/s.css" # raw text
 printf 'x\n' >"$root/q.html"
 
-# Raw text keeps the ampersand; markup keeps the entity. Each pattern fails if
-# the other form is emitted, so no negative assertion is needed.
+# Raw text keeps the ampersand, markup keeps the entity. Each pattern fails if
+# the other form is emitted, so no negative assertion is needed. The order
+# below follows the fixture above.
 bash "$top_srcdir/tests/local-crawl.sh" --root "$root" --errors 0 \
-    --file-matches 'app.js' 'k=1&l=2' \
-    --file-matches 's.css' 'm=1&n=2' \
     --file-matches 'index.html' 'a=1&b=2' \
     --file-matches 'index.html' 'c=1&d=2' \
     --file-matches 'index.html' 'e=1&amp;f=2' \
     --file-matches 'index.html' 'g=1&amp;h=2' \
     --file-matches 'index.html' 'i=1&amp;j=2' \
+    --file-matches 'index.html' 'o=1&p=2' \
+    --file-matches 'app.js' 'k=1&l=2' \
+    --file-matches 's.css' 'm=1&n=2' \
     httrack BASEURL/index.html -q -%v0 -r3
