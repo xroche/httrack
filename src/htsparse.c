@@ -1776,9 +1776,11 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 #endif
                                     )   // ok pas de problème
                                     url_ok = 1;
-                                  else if (hts_lastchar(tempo) ==
-                                           '/') {       // un slash: ok..
-                                    if (inscript)       // sinon si pas javascript, méfiance (répertoire style base?)
+                                  else if (hts_lastchar(tempo) == '/') {
+                                    // a directory: trusted only in a script,
+                                    // and never a pure-slash separator
+                                    if (inscript &&
+                                        tempo[strspn(tempo, "/")] != '\0')
                                       url_ok = 1;
                                   }
                                 }

@@ -1,0 +1,44 @@
+#!/bin/bash
+#
+# A quoted string ending in "/" is read as a directory URL inside a script, so
+# a bare "/" was rewritten to the mirror's index page: split("/") turned into
+# split("index.html") and the script threw at load. AddToAny's page.js is one
+# of those, and its share icons never appeared in the mirror.
+#
+# A rooted directory string still has to be rewritten, so a fix that refuses
+# every trailing slash fails here too.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+work=$(mktemp -d)
+cleanup_push rm -rf "$work"
+root="$work/root"
+mkdir -p "$root/sub"
+
+cat >"$root/index.html" <<'HTML'
+<!DOCTYPE html><html><body><script src="script.js"></script></body></html>
+HTML
+
+cat >"$root/script.js" <<'JS'
+var parts = location.href.split("/");
+var joined = ["a", "b"].join("/");
+var img = "sub/pic.png";
+var dir = "/sub/";
+JS
+
+printf '\211PNG\r\n\032\n' >"$root/sub/pic.png"
+printf '<html><body>s</body></html>\n' >"$root/sub/index.html"
+
+bash "$top_srcdir/tests/local-crawl.sh" --root "$root" \
+    --errors 0 \
+    --found script.js \
+    --found sub/pic.png \
+    --found sub/index.html \
+    --file-matches script.js 'split\("/"\)' \
+    --file-matches script.js 'join\("/"\)' \
+    --file-matches script.js 'img = "sub/pic\.png"' \
+    --file-matches script.js 'dir = "sub/index\.html"' \
+    httrack BASEURL/index.html -q -%v0 -r3
