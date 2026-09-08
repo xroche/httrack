@@ -1,0 +1,23 @@
+#!/bin/bash
+# --replace-external picks the placeholder from the link's type: an image gets
+# external.gif, anything else external.html. The extension list behind that
+# choice knew only .gif/.jpg/.xbm, so a .png <img> was handed an HTML page.
+# The page.html line is a control for the ishtml() path this change leaves alone.
+# f.zzzz has no known type, which is what the get_httptype_sized() guard is for.
+set -e
+
+: "${top_srcdir:=..}"
+
+# The placeholders sit at the mirror root, one level above the host root.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    --file-matches 'extplaceholder/index.html' 'external\.gif\?link=[^"]*/a\.gif' \
+    --file-matches 'extplaceholder/index.html' 'external\.gif\?link=[^"]*/b\.png' \
+    --file-matches 'extplaceholder/index.html' 'external\.gif\?link=[^"]*/c\.jpeg' \
+    --file-matches 'extplaceholder/index.html' 'external\.gif\?link=[^"]*/d\.webp' \
+    --file-matches 'extplaceholder/index.html' 'external\.gif\?link=[^"]*/e\.xbm' \
+    --file-matches 'extplaceholder/index.html' 'external\.html\?link=[^"]*/s\.js' \
+    --file-matches 'extplaceholder/index.html' 'external\.html\?link=[^"]*/f\.zzzz' \
+    --file-matches 'extplaceholder/index.html' 'external\.html\?link=[^"]*/page\.html' \
+    --file-matches '../external.gif' '^GIF89a' \
+    --file-not-matches '../external.html' '^GIF89a' \
+    httrack 'BASEURL/extplaceholder/index.html' -r1 -x
