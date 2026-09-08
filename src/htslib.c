@@ -882,33 +882,6 @@ static void print_buffer(buff_struct*const str, const char *format, ...) {
   assertf(str->pos < str->capacity);
 }
 
-/* Copy the cookie scope of request host adr into dst: the host without its
-   port, because RFC 6265 scopes a cookie to a host alone and a jar exported
-   from a browser therefore never records one. HTS_FALSE if it does not fit,
-   which the callers treat as "no cookie". */
-static hts_boolean cookie_host(char *dst, size_t dst_size, const char *adr) {
-  const char *const host = jump_identification_const(adr);
-  const char *port;
-  size_t len;
-
-  if (host[0] == '[') { // bracketed IPv6 literal, [::1]:8080
-    const char *const end = strchr(host, ']');
-
-    port = end != NULL && end[1] == ':' ? end + 1 : NULL;
-  } else {
-    port = strchr(host, ':');
-    // several colons means a bare IPv6 literal, which has no port to cut
-    if (port != NULL && strchr(port + 1, ':') != NULL)
-      port = NULL;
-  }
-  len = port != NULL ? (size_t) (port - host) : strlen(host);
-  if (len >= dst_size)
-    return HTS_FALSE;
-  dst[0] = '\0';
-  strlncatbuff(dst, host, dst_size, len);
-  return HTS_TRUE;
-}
-
 /* Append the request "Cookie:" header line for every stored cookie matching
    domain/path. The port in domain is ignored (see cookie_host). RFC 6265
    form: bare "name=value" pairs joined by "; ", no $Version/$Path attributes
@@ -924,7 +897,7 @@ static int append_cookie_header(buff_struct *bstr, t_cookie *cookie,
 
   if (cookie == NULL)
     return 0;
-  if (!cookie_host(host, sizeof(host), domain))
+  if (!cookie_host(domain, host, sizeof(host)))
     return 0;
   domain = host;
   b = cookie->data;
@@ -1768,7 +1741,7 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
 #endif
     /* Over-long host overflows the fail-safe domain[] copy (abort); drop it. */
     host[0] = '\0';
-    if (adr != NULL && !cookie_host(host, sizeof(host), adr))
+    if (adr != NULL && !cookie_host(adr, host, sizeof(host)))
       return;
     while(*a) {
       char *token_st, *token_end;
@@ -1781,8 +1754,7 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
       //
 
       // initialiser cookie lu actuellement
-      if (adr)
-        strcpybuff(domain, host); // domaine
+      strcpybuff(domain, host); // domaine; no adr means empty, refused below
       strcpybuff(path, "/");    // chemin (/)
       strcpybuff(cook_name, "");        // nom cookie (MYCOOK)
       strcpybuff(cook_value, "");       // valeur (ID=toto,S=1234)

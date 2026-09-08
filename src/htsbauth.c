@@ -45,15 +45,48 @@ Please visit our Website: http://www.httrack.com
 
 /* END specific definitions */
 
+/* See htsbauth.h. */
+hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size) {
+  const char *host = jump_identification_const(adr);
+  size_t len;
+
+  if (host[0] == '[') { // bracketed IPv6 literal, [::1]:8080
+    const char *const end = strchr(host, ']');
+
+    host++;
+    len = end != NULL ? (size_t) (end - host) : strlen(host);
+  } else {
+    const char *port = strchr(host, ':');
+
+    // several colons means a bare IPv6 literal, which has no port to cut
+    if (port != NULL && strchr(port + 1, ':') != NULL)
+      port = NULL;
+    len = port != NULL ? (size_t) (port - host) : strlen(host);
+  }
+  // an empty domain is a suffix of every host, so it would match all of them
+  if (len == 0 || len >= dst_size)
+    return HTS_FALSE;
+  dst[0] = '\0';
+  strlncatbuff(dst, host, dst_size, len);
+  return HTS_TRUE;
+}
+
 // gestion des cookie
 // ajoute, dans l'ordre
 // !=0 : erreur
 int cookie_add(t_cookie * cookie, const char *cook_name, const char *cook_value,
                const char *domain, const char *path) {
   char buffer[8192];
+  char host[256];
   char *a = cookie->data;
   char *insert;
   char cook[16384];
+
+  /* One representation per host, because an old or hand-edited jar carries a
+     port the send side no longer queries with. */
+  if (!cookie_host(domain, host, sizeof(host)))
+    return -1;
+  domain = host;
 
   // effacer éventuel cookie en double
   cookie_del(cookie, cook_name, domain, path);

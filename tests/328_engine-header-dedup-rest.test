@@ -198,6 +198,13 @@ assert_once boxcookie Cookie
 assert_value boxcookie Cookie box=1
 assert_same_but cookie boxcookie '^Cookie:'
 
+# an older httrack, and a hand-edited jar, wrote the port into the domain field;
+# the send side queries the bare host, so cookie_load has to normalise it off
+printf '127.0.0.1:%s\tTRUE\t/\tFALSE\t1999999999\tsess\tPERSIST\n' \
+    "$port" >"$jar"
+probe portjar 1 "$base" --cookies-file "$jar"
+assert_value portjar Cookie sess=PERSIST
+
 # base64("user:pass"), per RFC 7617
 probe proxy 1 http://plain.example/leaf.html -P "user:pass@127.0.0.1:$port" '+*'
 assert_value proxy Proxy-Authorization 'Basic dXNlcjpwYXNz'
