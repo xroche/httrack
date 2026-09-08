@@ -37,9 +37,10 @@ stop_crawl() {
     fi
 }
 
-# The request has to land in a later whole second than the progress lock, which
-# is what the engine compares it against.
-next_second() { sleep 1; }
+# The request has to be stamped after the progress lock. Sub-second stamps make
+# that true as soon as it is written, so only a filesystem keeping whole seconds
+# still needs the wait. assert_lockrule_selftest is what measures this one.
+next_second() { if test "$LOCKRULE_SUBSECOND" != yes; then sleep 1; fi; }
 
 require_httrack
 
@@ -49,9 +50,10 @@ local_server_start
 common=(--quiet --disable-security-limits --robots=0 --timeout=30 --retries=0 -c1)
 
 # Before the staleness rule the engine took any hts-stop.lock it found, so a
-# copy left in a reused output directory paused the next mirror. The request is
-# left unstamped, so it lands in the whole second the progress lock does. That
-# is the only second where "no newer than the run" differs from "older than it".
+# copy left in a reused output directory paused the next mirror. Here the
+# request is written before the mirror starts, so it is plainly the older file.
+# The boundary, a request stamped in the second the mirror started, belongs to
+# the self-test above, which can stamp both files to the nanosecond.
 printf '[a request left behind does not pause the next mirror] ..\t'
 out="${tmpdir}/stale"
 mkdir -p "$out"

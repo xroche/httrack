@@ -4165,31 +4165,26 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
 
 }
 
-/* Modification time of NAME in the output directory, (time_t) -1 if absent. */
-static time_t hts_lock_time(httrackp *opt, const char *name) {
-  return get_filetime(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                              StringBuff(opt->path_log), name));
-}
-
 hts_boolean hts_take_lock_request(httrackp *opt, const char *name) {
-  time_t asked, started;
+  /* OPT_GET_BUFF rotates, so both paths stay valid at once. */
+  const char *const request = fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                      StringBuff(opt->path_log), name);
+  const char *const progress =
+      fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+              StringBuff(opt->path_log), "hts-in_progress.lock");
 
-  if (!fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                           StringBuff(opt->path_log), name)))
+  if (!fexist_utf8(request))
     return HTS_FALSE;
   /* A request no newer than this run's progress lock was aimed at an earlier
-     mirror, so it is neither ours to act on nor ours to delete. Whole seconds
-     everywhere, so a clock stepping back makes the file inert meanwhile. */
-  asked = hts_lock_time(opt, name);
-  started = hts_lock_time(opt, "hts-in_progress.lock");
-  if (asked == (time_t) -1 || started == (time_t) -1 || asked <= started)
+     mirror, so it is neither ours to act on nor ours to delete. The comparison
+     is sub-second, so a script that asks the moment the mirror starts is heard.
+     A clock stepping back still makes the file inert meanwhile. */
+  if (!hts_file_is_newer(request, progress))
     return HTS_FALSE;
-  UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                 StringBuff(opt->path_log), name));
+  UNLINK(request);
   /* A lock still there is one we may never be able to remove, and acting on it
      would fire on this poll and on every one after it. */
-  if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                          StringBuff(opt->path_log), name)))
+  if (fexist_utf8(request))
     return HTS_FALSE;
   return HTS_TRUE;
 }

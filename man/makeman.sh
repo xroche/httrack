@@ -186,9 +186,11 @@ The engine acts on either request only when the file is stamped later than
 .IR hts\-in_progress.lock .
 A request left behind by an earlier run therefore reaches neither this mirror
 nor the next.
-Create the file again if the mirror had only just started. A request the engine
-cannot delete is ignored too, because it would otherwise fire on every later
-poll.
+The two stamps are compared at the finest resolution the filesystem keeps, so a
+request created the moment the mirror starts is still heard. Only where the
+filesystem stamps whole seconds does the request have to land in a later one.
+A request the engine cannot delete is ignored too, because it would otherwise
+fire on every later poll.
 .SH ENVIRONMENT
 .IP HOME
 Is being used if you defined in /etc/httrack.conf the line

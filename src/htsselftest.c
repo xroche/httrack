@@ -13892,6 +13892,132 @@ static hts_boolean st_lockrule_stamp(const char *path, time_t when) {
   return UTIME(path, &times) == 0 ? HTS_TRUE : HTS_FALSE;
 }
 
+/* Stamp PATH at SEC plus NSEC, both in the units hts_file_mtime() reports, so
+   the caller reads SEC back rather than taking it from a clock. False on
+   failure, and NSEC is dropped where this build has no sub-second call. */
+static hts_boolean st_lockrule_stamp_ns(const char *path, int64_t sec,
+                                        int32_t nsec) {
+#if defined(_WIN32)
+  LPWSTR wpath = hts_pathToUCS2(path);
+  ULARGE_INTEGER ticks;
+  FILETIME ft;
+  HANDLE h;
+  hts_boolean ok;
+
+  if (wpath == NULL)
+    return HTS_FALSE;
+  h = CreateFileW(wpath, FILE_WRITE_ATTRIBUTES,
+                  FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL,
+                  OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+  freet(wpath);
+  if (h == INVALID_HANDLE_VALUE)
+    return HTS_FALSE;
+  ticks.QuadPart = (ULONGLONG) sec * 10000000ULL + (ULONGLONG) (nsec / 100);
+  ft.dwLowDateTime = ticks.LowPart;
+  ft.dwHighDateTime = ticks.HighPart;
+  ok = SetFileTime(h, NULL, NULL, &ft) ? HTS_TRUE : HTS_FALSE;
+  CloseHandle(h);
+  return ok;
+#elif defined(HAVE_UTIMENSAT)
+  struct timespec times[2];
+
+  times[0].tv_sec = times[1].tv_sec = (time_t) sec;
+  times[0].tv_nsec = times[1].tv_nsec = (long) nsec;
+  return utimensat(AT_FDCWD, path, times, 0) == 0 ? HTS_TRUE : HTS_FALSE;
+#else
+  return st_lockrule_stamp(path, (time_t) sec);
+#endif
+}
+
+/* The sub-second arm of the rule: a request stamped in the very second the
+   mirror started, which is where a script asking as soon as it sees
+   hts-in_progress.lock lands. Reports what covered it, because a filesystem
+   keeping whole seconds cannot hold any of these cases. */
+static int st_lockrule_subsecond(httrackp *opt, const char *tag,
+                                 const char *name, const char *lock,
+                                 const char *progress) {
+  /* Half a second survives every sub-second granularity a filesystem has. */
+  const int32_t later = 500000000, same = 400000000, earlier = 300000000;
+  hts_filetime_t started, probe;
+  int err = 0;
+
+  if (!hts_file_mtime(progress, &started)) {
+    fprintf(stderr, "%s: %s has no timestamp\n", tag, progress);
+    return 1;
+  }
+  if (!st_lockrule_touch(lock) ||
+      !st_lockrule_stamp_ns(lock, started.sec, later) ||
+      !hts_file_mtime(lock, &probe)) {
+    fprintf(stderr, "%s: cannot stamp %s\n", tag, lock);
+    return 1;
+  }
+  if (probe.sec != started.sec) {
+    fprintf(stderr, "%s: %s was stamped in the wrong second\n", tag, lock);
+    err = 1;
+  }
+  if (probe.nsec != later) {
+    /* An identity pin, so a reader that reports a value nobody asked for is
+       not mistaken for a filesystem that rounds. */
+    printf("%s: same-second request: NOT COVERED (asked for %d ns, read back"
+           " %d)\n",
+           tag, (int) later, (int) probe.nsec);
+    (void) UNLINK(lock);
+    return err;
+  }
+
+  if (!st_lockrule_stamp_ns(progress, started.sec, same)) {
+    fprintf(stderr, "%s: cannot stamp %s\n", tag, progress);
+    return 1;
+  }
+  if (!hts_take_lock_request(opt, name)) {
+    fprintf(stderr,
+            "%s: a request made in the second the mirror started was"
+            " ignored\n",
+            tag);
+    err = 1;
+  }
+  if (fexist_utf8(lock)) {
+    fprintf(stderr, "%s: the request outlived the action it caused\n", tag);
+    err = 1;
+  }
+
+  /* Equal to the nanosecond is not later, so this is still an earlier run's. */
+  if (!st_lockrule_touch(lock) ||
+      !st_lockrule_stamp_ns(lock, started.sec, same)) {
+    fprintf(stderr, "%s: cannot stamp %s\n", tag, lock);
+    return 1;
+  }
+  if (hts_take_lock_request(opt, name)) {
+    fprintf(stderr,
+            "%s: a request stamped exactly when the mirror started was"
+            " taken\n",
+            tag);
+    err = 1;
+  }
+
+  /* Same second, earlier nanosecond: the progress lock's own sub-second part
+     has to be read, or this one reads as newer than a zero. Re-created,
+     because the case above fails by deleting it. */
+  if (!st_lockrule_touch(lock) ||
+      !st_lockrule_stamp_ns(lock, started.sec, earlier)) {
+    fprintf(stderr, "%s: cannot stamp %s\n", tag, lock);
+    return 1;
+  }
+  if (hts_take_lock_request(opt, name)) {
+    fprintf(stderr,
+            "%s: a request older than the mirror by a fraction was taken\n",
+            tag);
+    err = 1;
+  }
+  if (!fexist_utf8(lock)) {
+    fprintf(stderr, "%s: a request the engine refused was deleted\n", tag);
+    err = 1;
+  }
+  (void) UNLINK(lock);
+  printf("%s: same-second request: covered (sub-second stamps)\n", tag);
+  return err;
+}
+
 /* The other request file, which taking NAME must leave untouched. */
 static const char *st_lockrule_other(const char *name) {
   return strcmp(name, HTS_ABORT_LOCKNAME) == 0 ? HTS_PAUSE_LOCKNAME
@@ -14092,6 +14218,8 @@ static int st_lockrule(httrackp *opt, int argc, char **argv, const char *tag,
     fprintf(stderr, "%s: one request was taken twice\n", tag);
     err = 1;
   }
+
+  err |= st_lockrule_subsecond(opt, tag, name, lock, progress);
 
   /* No progress lock means no mirror to reach, whatever the request says. */
   (void) UNLINK(progress);

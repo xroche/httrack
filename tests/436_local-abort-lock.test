@@ -36,9 +36,10 @@ stop_crawl() {
     fi
 }
 
-# The request has to land in a later whole second than the progress lock, which
-# is what the engine compares it against.
-next_second() { sleep 1; }
+# The request has to be stamped after the progress lock. Sub-second stamps make
+# that true as soon as it is written, so only a filesystem keeping whole seconds
+# still needs the wait. assert_lockrule_selftest is what measures this one.
+next_second() { if test "$LOCKRULE_SUBSECOND" != yes; then sleep 1; fi; }
 
 require_httrack
 
@@ -71,7 +72,9 @@ httrack -O "$out" "${common[@]}" --max-rate=200000 \
     "${BASEURL}/bigfiles/index.html" >"${tmpdir}/log-keep" 2>&1 &
 crawlpid=$!
 wait_until "test -e '${out}/${PROGRESSLOCK}'" "the crawl never got going"
-next_second
+# A whole second whatever the filesystem stamps: the abort has to find a
+# transfer already running, or there is no resume data for it to keep.
+sleep 1
 : >"${out}/${ABORTLOCK}"
 wait_until "test ! -e '${out}/${ABORTLOCK}'" \
     "30s on, a running engine had not read the request"

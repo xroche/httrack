@@ -183,9 +183,13 @@ assert_gave_up() {
 
 # The abort and pause requests obey one rule, so 436 and 459 both drive its
 # self-test: assert_lockrule_selftest abortlock|stoplock. It owns the directory
-# it runs in, because the undeletable arm leaves one read-only on purpose.
+# it runs in, because the undeletable arm leaves one read-only on purpose. It
+# also sets LOCKRULE_SUBSECOND, which says whether $TMPDIR stamps files finer
+# than a whole second, so a caller knows if a request it writes right after the
+# progress lock is ordered after it.
+LOCKRULE_SUBSECOND=no
 assert_lockrule_selftest() {
-    local tag=$1 dir st_out coverage
+    local tag=$1 dir st_out coverage subsecond
     dir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_${tag}.XXXXXX") ||
         fail "cannot make a directory for the ${tag} self-test"
     cleanup_push rm -rf "$dir"
@@ -206,5 +210,12 @@ assert_lockrule_selftest() {
     # here rather than skipping in silence.
     coverage=$(printf '%s\n' "$st_out" | command grep 'undeletable request: ') ||
         fail "the rule self-test said nothing about an undeletable request"
-    echo "OK (${coverage#*: })"
+    subsecond=$(printf '%s\n' "$st_out" | command grep 'same-second request: ') ||
+        fail "the rule self-test said nothing about a same-second request"
+    # shellcheck disable=SC2034 # set here for the caller, not used here
+    case "$subsecond" in
+    *"same-second request: covered"*) LOCKRULE_SUBSECOND=yes ;;
+    *) LOCKRULE_SUBSECOND=no ;;
+    esac
+    echo "OK (${coverage#*: }, ${subsecond#*request: })"
 }
