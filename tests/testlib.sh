@@ -84,6 +84,15 @@ assert_match() { # assert_match RE TEXT [LABEL]
 
 assert_file() { test -f "$1" || fail "${2:+$2: }missing file: $1"; }
 
+# Poll a condition, and name what never happened when it runs out.
+wait_until() { # wait_until CONDITION MESSAGE [tenths, default 300]
+    for _ in $(seq 1 "${3:-300}"); do
+        if eval "$1"; then return 0; fi
+        sleep 0.1
+    done
+    fail "$2"
+}
+
 # Basenames of the files a mirror wrote, so a check reads what was written
 # rather than a path this host may spell differently (macOS $TMPDIR, Windows
 # ':' -> '_').

@@ -2,7 +2,7 @@
 # A running engine takes a request as a file in its output directory. Under the
 # wsl2 backend the shell that writes one is Linux and the engine that reads it is
 # a native exe on the other side of drvfs, and nothing had measured that crossing.
-# 24_local-resume-overlap.test cannot be ported to that backend until it holds.
+# 24_local-resume-overlap.test now cuts its pass 1 through that crossing.
 set -eu
 
 # shellcheck source=tests/crawllib.sh

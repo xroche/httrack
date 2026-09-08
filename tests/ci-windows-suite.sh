@@ -297,12 +297,11 @@ expected_skips_msys="01_engine-footer-overflow.test
 # Written out rather than derived from the msys list above: the two lists are
 # pinned expectations of different shells, and a name leaving one has to be a
 # visible edit to the other.
-# The reasons above, plus what the Linux shell cannot do to a native process:
-# 294: the wizard's feof||ferror arm never fires on a stdin the Linux shell owns
-# across interop, so it spins to the watchdog; 296 passes with a real answer
+# The reasons above, plus the one thing the Linux shell cannot do to a native
+# process: 294's wizard never reaches its feof||ferror arm on a stdin that shell
+# owns across interop, so it spins to the watchdog; 296 passes with a real answer
 # file, which places the fault at EOF and closed stdin rather than the wizard.
-# 24: no graceful stop crosses the boundary, so pass 1 cannot be interrupted in
-# the state the resume needs. Each of these two skips itself, in the test.
+# 294 skips itself, in the test.
 expected_skips_wsl2="01_engine-footer-overflow.test
 253_local-ftp-close-once.test
 113_engine-threadattr-leak.test
@@ -335,8 +334,7 @@ expected_skips_wsl2="01_engine-footer-overflow.test
 424_engine-wizard-eof.test
 444_local-stop-keeps-resume.test
 451_local-sigint-keeps-resume.test
-294_local-wizard-eof.test
-24_local-resume-overlap.test"
+294_local-wizard-eof.test"
 
 # Sets ci_skip_list to the pinned skip set for backend $1, failing loudly if
 # there is none: an unknown backend must never fall back to an empty list,
