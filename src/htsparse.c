@@ -1744,6 +1744,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             if ((!strchr(tempo, ' ')) || inscript) {    // espace dedans: méfiance! (sauf dans code javascript)
                               int invalid_url = 0;
 
+                              /* The cut below erases the '#' or '?' that says
+                                 this string is a URL. */
+                              int had_fragment_or_query = 0;
+
                               // escape                              
                               unescape_amp(tempo);
 
@@ -1751,11 +1755,15 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                               {
                                 char *a = strchr(tempo, '#');
 
-                                if (a)
+                                if (a) {
                                   *a = '\0';
+                                  had_fragment_or_query = 1;
+                                }
                                 a = strchr(tempo, '?');
-                                if (a)
+                                if (a) {
                                   *a = '\0';
+                                  had_fragment_or_query = 1;
+                                }
                               }
 
                               // vérifier qu'il n'y a pas de caractères spéciaux
@@ -1790,9 +1798,11 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                            '/') {       // un slash: ok..
                                     /* A trailing slash alone is no evidence
                                        inside a script, where "/" and "image/"
-                                       are ordinary strings. */
+                                       are ordinary strings. A second segment
+                                       is, and so is a fragment or query. */
                                     if (inscript &&
-                                        link_dir_is_multisegment(tempo))
+                                        (had_fragment_or_query ||
+                                         link_dir_is_multisegment(tempo)))
                                       url_ok = 1;
                                   }
                                 }

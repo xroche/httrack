@@ -2,7 +2,8 @@
 #
 # A quoted string ending in a slash counted as a directory link inside a script,
 # so httrack rewrote JavaScript's own separators. split("/") became
-# split("index-2.html") and the mirrored bundle behaved differently.
+# split("index-2.html") and the mirrored bundle behaved differently. Requiring a
+# second slash then stopped rewriting "/#top" and "/?q=1", which are URLs.
 
 set -euo pipefail
 
@@ -15,15 +16,17 @@ work=$(mktemp -d)
 trap 'set +e; rm -rf "$work"' EXIT
 
 root="$work/root"
-mkdir -p "$root/subdir" "$root/a/b" "$root/api/v1" "$root/assets/img" "$root/cdir"
+mkdir -p "$root/subdir" "$root/a/b" "$root/api/v1" "$root/assets/img" "$root/cdir" \
+    "$root/fragdir"
 
 cat >"$root/index.html" <<'EOF'
 <!DOCTYPE html><html><head><link rel="stylesheet" href="s.css">
 <script src="app.js"></script></head><body>x</body></html>
 EOF
 
-# Every string below ends in a slash. Only a path of more than one segment may
-# be followed, so each line carries the count that decides it.
+# Every string below ends in a slash, or in a fragment or query that follows
+# one. On the slash alone only a path of more than one segment may be followed,
+# so each line carries what decides it.
 cat >"$root/app.js" <<'EOF'
 var parts = "a/b".split("/");        // one slash: kept
 var mime = "image/";                 // one slash: kept
@@ -34,10 +37,13 @@ var one = "subdir/";                 // one slash: kept, so never fetched
 var two = "a/b/";                    // two slashes, short name: followed
 var api = "/api/v1/";                // three slashes: followed
 var ast = "assets/img/";             // two slashes: followed
+var frag = "/#top";                  // one slash, but a fragment: followed
+var qry = "/?q=1";                   // one slash, but a query: followed
+var rel = "fragdir/#x";              // one slash, but a fragment: followed
 EOF
 
 echo '.a { background: url("cdir/"); }' >"$root/s.css"
-for d in subdir a/b api/v1 assets/img cdir; do
+for d in subdir a/b api/v1 assets/img cdir fragdir; do
     printf 'reached\n' >"$root/$d/index.html"
 done
 
@@ -49,9 +55,13 @@ bash "$top_srcdir/tests/local-crawl.sh" --root "$root" --errors 0 \
     --file-matches 'app.js' '"Alt\+/"' \
     --file-matches 'app.js' '"\$&/"' \
     --file-matches 'app.js' '"////"' \
+    --file-matches 'app.js' '"index[^"]*\.html#top"' \
+    --file-matches 'app.js' '"index[^"]*\.html\?q=1"' \
+    --file-matches 'app.js' '"fragdir/index\.html#x"' \
     --not-found subdir/index.html \
     --found a/b/index.html \
     --found api/v1/index.html \
     --found assets/img/index.html \
     --found cdir/index.html \
+    --found fragdir/index.html \
     httrack BASEURL/index.html -q -%v0 -r4
