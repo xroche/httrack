@@ -2,27 +2,54 @@
 #
 # Dependabot's vcpkg ecosystem tracks vcpkg's release tags, so a baseline pinned
 # to a newer commit reads as behind and is bumped backwards. #1614 reverted a
-# security pin that way, unattended, so those bumps must not auto-merge.
+# security pin that way, unattended, so those bumps must not auto-merge. The
+# gate only runs on GitHub, so this audits the condition rather than the merge.
 
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-: "${top_srcdir:=..}"
+top=${abs_top_srcdir:-$(cd "$testdir/.." && pwd)}
+wf="$top/.github/workflows/dependabot-automerge.yml"
 
-wf="$top_srcdir/.github/workflows/dependabot-automerge.yml"
-[ -r "$wf" ] || fail "cannot read $wf"
+if ! test -r "$wf"; then
+    test -d "$top/.github" && fail "$wf is gone but $top/.github is not"
+    skip "no .github under $top (dist tarball), so the audit has nothing to read"
+fi
 
-# Dependabot names a branch dependabot/<ecosystem>/<dir>/<dep>-<version>, so the
-# prefix is what tells the ecosystems apart.
-grep -q "startsWith(github.event.pull_request.head.ref, 'dependabot/vcpkg/')" "$wf" ||
-    fail "the auto-merge gate no longer excludes the vcpkg ecosystem"
+# Read the gate itself, not the whole file: a substring can sit in a comment or
+# in a second job and prove nothing about what arms. The condition is a folded
+# scalar, so its own lines are the ones indented under it.
+cond=$(awk '/^    if: >-$/ {inif=1; next} inif && /^      / {print; next} inif {exit}' "$wf")
+[ -n "$cond" ] || fail "could not read the auto-merge condition out of $wf"
 
-grep -q '!startsWith' "$wf" ||
-    fail "the vcpkg branch prefix is named but not negated, so it would gate auto-merge ON"
+# One job, so no unguarded sibling can arm auto-merge on its own.
+jobs=$(grep -c '^    runs-on:' "$wf")
+[ "$jobs" = 1 ] || fail "expected one job in $wf, found $jobs"
 
-# The other ecosystems still auto-merge, so the exclusion must not have grown
-# into a blanket refusal.
-grep -q "github.event.pull_request.user.login == 'dependabot\[bot\]'" "$wf" ||
-    fail "the dependabot author check is gone, so nothing arms auto-merge at all"
+case $cond in
+*"&& !startsWith(github.event.pull_request.head.ref, 'dependabot/vcpkg/')"*) ;;
+*) fail "the gate does not exclude the vcpkg ecosystem with an && conjunct" ;;
+esac
+
+# Turning any conjunct into a disjunction arms every pull request in the repo,
+# because one true term would then be enough.
+case $cond in
+*"||"*) fail "the gate is not a pure conjunction, so one term can arm it alone" ;;
+esac
+
+# The author check is what makes this dependabot-only. github.actor is the
+# event sender, so swapping to it would widen the gate silently.
+case $cond in
+*"github.event.pull_request.user.login == 'dependabot[bot]'"*) ;;
+*) fail "the gate no longer checks the pull request author" ;;
+esac
+
+# The prefix above assumes dependabot's default branch separator. Configuring
+# another one renames the branches and the exclusion stops matching, silently.
+conf="$top/.github/dependabot.yml"
+[ -r "$conf" ] || fail "cannot read $conf"
+if grep -q 'pull-request-branch-name' "$conf"; then
+    fail "$conf sets a branch-name separator, so the vcpkg prefix may not match"
+fi
