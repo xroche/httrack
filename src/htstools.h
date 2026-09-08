@@ -76,6 +76,11 @@ hts_boolean link_base_is_hostname(const char *lien);
    in a slash is no evidence alone, because "/", "image/" and "$&/" all end
    that way too. A second slash is. */
 hts_boolean link_dir_is_multisegment(const char *lien);
+/* Does a fragment or a query open right after a directory path? True for
+   "/#top" and "img/#x". False for "page.html#x", for "////#x" which has no
+   name, and for "//&num;/#x" where an entity hides an earlier marker. Pass
+   the source bytes, because unescape_amp forges a '#' out of "&#35;". */
+hts_boolean link_dir_has_fragment_or_query(const char *lien);
 int link_has_authorization(const char *lien);
 void long_to_83(int mode, char *n83, size_t n83size, char *save);
 void longfile_to_83(int mode, char *n83, size_t n83size, char *save);
