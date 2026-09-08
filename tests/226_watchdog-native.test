@@ -309,13 +309,20 @@ def runs_suite(s):
 for _run, _want in [("bash ./ci-windows-suite.sh $dir", True),
                     ('bash "$GITHUB_WORKSPACE/tests/ci-windows-suite.sh" $dir', True),
                     ("bash ci-windows-suite.sh $dir", True),
-                    (". ./ci-windows-suite.sh\nci_report_fork_failures x.log", False),
+                    (". ./ci-windows-suite.sh\nci_report_lost_workers x.log", False),
                     ("source ./ci-windows-suite.sh", False)]:
     if runs_suite({"run": _run}) is not _want:
         sys.exit("the suite-step matcher is wrong for: %r" % _run)
 
 def suite_steps(wf):
     return [s for s in steps_of(wf) if runs_suite(s)]
+
+# The step that counts the lost workers off the console the suite teed (#1588). It is
+# not a suite step, so nothing above it looks at it.
+COUNT_RUN = re.compile(r"(?<![.\w])ci_report_lost_workers\b")
+
+def lost_count_steps(job):
+    return [s for s in (job.get("steps") or []) if COUNT_RUN.search(str(s.get("run", "")))]
 
 # These three grade the LAST suite step, which one leg cannot be. With a single
 # step [-1] is [0], so they edit the step they compare against and emit an
@@ -367,6 +374,14 @@ def audit(wf):
     if len(jobs) != 1 or not found:
         bad.append("%d jobs and %d steps run the suite, cannot tell which is watched" % (len(jobs), len(found)))
         return bad
+    # The suite's own tally dies with a step the watchdog killed, which is the run the
+    # count is for: a separate step reads the console back, and only if:always() runs it.
+    counters = lost_count_steps(jobs[0])
+    if len(counters) != 1:
+        bad.append("%d steps count the lost workers, want 1" % len(counters))
+    elif counters[0].get("if") != "always()":
+        bad.append("the lost-worker count does not run on a killed leg: if is %r"
+                   % counters[0].get("if"))
     perms = perms_of(wf, jobs[0])
     if perms.get("statuses") != "write":
         bad.append("the suite job cannot post a commit status: statuses is %r" % perms.get("statuses"))
@@ -423,6 +438,15 @@ def mutate(wf, kind):
         suite_steps(wf)[0]["env"]["WATCHDOG_URL"] = "${{ github.server_url }}"
     elif kind == "cap":
         suite_steps(wf)[0].pop("timeout-minutes")
+    elif kind == "nocount":
+        j = suite_jobs(wf)[0]
+        drop = {id(s) for s in lost_count_steps(j)}
+        j["steps"] = [s for s in j["steps"] if id(s) not in drop]
+    elif kind == "twocounts":
+        j = suite_jobs(wf)[0]
+        j["steps"].append(copy.deepcopy(lost_count_steps(j)[0]))
+    elif kind == "countif":
+        lost_count_steps(suite_jobs(wf)[0])[0].pop("if", None)
     elif kind != "none":
         raise SystemExit("unknown mutation " + kind)
     return wf
@@ -452,7 +476,9 @@ PY
         context:'does not name matrix.platform' url:'does not link the run' \
         cap:'no timeout-minutes of its own' lastenv:'WATCHDOG_TOKEN is' \
         sharedcontext:'share a WATCHDOG_CONTEXT' \
-        lasttimeout:'no timeout-minutes of its own'; do
+        lasttimeout:'no timeout-minutes of its own' \
+        nocount:'0 steps count the lost workers' twocounts:'2 steps count the lost workers' \
+        countif:'does not run on a killed leg'; do
         "$py" "$wfpy" mutate "$(nativepath "$workflow")" "${m%%:*}" >"$tmp/wf.yml"
         said=$("$py" "$wfpy" audit "$(nativepath "$tmp/wf.yml")") ||
             fail "the workflow audit did not run on the ${m%%:*} control: $said"

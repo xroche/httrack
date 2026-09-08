@@ -51,29 +51,57 @@ ci_lost_reason() {
     fi
 }
 
+# Every LOST verdict in console log $1, one per line. Matched by the whole shape the
+# suite prints: a test killed on its budget leaves its log mid-line, so its indented
+# failure tail joins the next verdict onto itself, and a tail can quote the bare word.
+ci_lost_verdicts() {
+    awk '{
+        while (match($0, /LOST [^ ]+ \(worker left no status;[^)]*\)/)) {
+            print substr($0, RSTART, RLENGTH)
+            $0 = substr($0, RSTART + RLENGTH)
+        }
+    }' "$1"
+}
+
+# The lost count the suite itself wrote into console log $1, empty when the console
+# carries no tally. Anchored at the end of the line only, since an unterminated
+# failure tail can carry a prefix onto it, and the last match wins.
+ci_console_lost_tally() {
+    tr -d '\r' <"$1" | awk '
+        match($0, /ran=[0-9]+ pass=[0-9]+ fail=[0-9]+ skip=[0-9]+ lost=[0-9]+$/) {
+            n = substr($0, RSTART, RLENGTH)
+            sub(/.*lost=/, "", n)
+        }
+        END { print n }'
+}
+
 # Count the workers the suite lost in console log $1, and say so when it lost none:
-# a silent step and a broken counter read alike (#1352). The suite names them itself,
-# so this is the count for a run whose step the watchdog killed before it could.
+# a silent step and a broken counter read alike (#1352). Nothing here may fail: the
+# step runs under if:always() in an errexit shell, so a non-zero reds a healthy leg.
 ci_report_lost_workers() {
-    local log=$1 lost
-    test -r "$log" || {
+    local log=$1 lost samples
+    # -f as well as -r, because awk on a directory exits non-zero.
+    if test ! -f "$log" || test ! -r "$log"; then
         echo "no console log at $log: lost workers not counted"
         return 0
-    }
-    # Split on CR first: this console is stdout and stderr merged, so two messages
-    # can share a physical line and a line count would see one. Anchored, because
-    # the suite's indented failure tails quote a LOST line too.
-    lost=$(tr '\r' '\n' <"$log" | awk '/^LOST /{n++} END{print n + 0}')
-    test -z "${GITHUB_STEP_SUMMARY:-}" ||
-        printf '%s worker(s) lost with no status\n' "$lost" >>"$GITHUB_STEP_SUMMARY"
+    fi
+    samples=$(ci_lost_verdicts "$log")
+    lost=$(ci_console_lost_tally "$log")
+    # No tally means the watchdog killed the step before the suite's own verdict,
+    # which is the run this count exists for: take what it had printed by then.
+    test -n "$lost" || lost=$(printf '%s' "$samples" | awk 'NF { n++ } END { print n + 0 }')
+    if test -n "${GITHUB_STEP_SUMMARY:-}"; then
+        # A summary file the runner will not take is not a suite failure.
+        printf '%s worker(s) lost with no status\n' "$lost" >>"$GITHUB_STEP_SUMMARY" 2>/dev/null ||
+            echo "::warning::the lost-worker count did not reach the step summary"
+    fi
     if test "$lost" -eq 0; then
         echo "no lost worker in $log"
     else
         # error, not warning: a leg that lost a worker is one to re-run.
         ci_annotate error "workers lost with no status" "$(
             printf '%s worker(s) died before reporting: re-run this leg, and see #1228\n' "$lost"
-            # -a: one NUL in the log would otherwise cost every sample line.
-            tr '\r' '\n' <"$log" | grep -am 3 '^LOST ' || true
+            test -z "$samples" || printf '%s\n' "$samples" | awk 'NR <= 3'
         )"
     fi
 }
