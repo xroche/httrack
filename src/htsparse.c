@@ -4176,9 +4176,8 @@ hts_boolean hts_take_lock_request(httrackp *opt, const char *name) {
   if (!fexist_utf8(request))
     return HTS_FALSE;
   /* A request no newer than this run's progress lock was aimed at an earlier
-     mirror, so it is neither ours to act on nor ours to delete. The comparison
-     is sub-second, so a script that asks the moment the mirror starts is heard.
-     A clock stepping back still makes the file inert meanwhile. */
+     mirror, so it is neither ours to act on nor ours to delete. A clock
+     stepping back still makes the file inert meanwhile. */
   if (!hts_file_is_newer(request, progress))
     return HTS_FALSE;
   UNLINK(request);

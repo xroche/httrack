@@ -197,9 +197,9 @@ static HTS_INLINE HTS_UNUSED hts_boolean hts_localtime(time_t t,
    only against another value hts_file_mtime() produced, because the epoch is
    the platform's. */
 typedef struct hts_filetime_t {
-  int64_t sec;
+  int64_t sec;  /* not a time_t: Windows counts from 1601, so never print it */
   int32_t nsec; /* 0 where neither the build nor the filesystem is finer */
-  /* A plain file: S_ISREG, or on Windows anything that is not a directory. */
+  /* S_ISREG, except on Windows, where every non-directory counts as one. */
   hts_boolean is_plain_file;
 } hts_filetime_t;
 
@@ -208,10 +208,8 @@ typedef struct hts_filetime_t {
 hts_boolean hts_file_mtime(const char *file, hts_filetime_t *when);
 
 /* Is A a plain file stamped strictly later than B? False unless both can be
-   read. Sub-second where the platform gives it, so a request written in the
-   very second a mirror started is still ordered against that mirror's own
-   hts-in_progress.lock. Exported because the httrack program applies the same
-   rule and sees only the library's exported symbols. */
+   read. Sub-second where the platform gives it, so a request made in the second
+   a mirror started still sorts after that mirror's hts-in_progress.lock. */
 HTSEXT_API hts_boolean hts_file_is_newer(const char *a, const char *b);
 
 /* Library internal definictions */

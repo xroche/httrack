@@ -829,11 +829,12 @@ static int __cdecl htsshow_receiveheader(t_hts_callbackarg * carg,
 
 /* *** Various functions *** */
 
+/* Note: utf-8 */
 static int fexist(const char *s) {
-  struct stat st;
+  STRUCT_STAT st;
 
   memset(&st, 0, sizeof(st));
-  if (stat(s, &st) == 0) {
+  if (STAT(s, &st) == 0) {
     if (S_ISREG(st.st_mode)) {
       return 1;
     }

@@ -13929,15 +13929,41 @@ static hts_boolean st_lockrule_stamp_ns(const char *path, int64_t sec,
 #endif
 }
 
-/* The sub-second arm of the rule: a request stamped in the very second the
-   mirror started, which is where a script asking as soon as it sees
-   hts-in_progress.lock lands. Reports what covered it, because a filesystem
-   keeping whole seconds cannot hold any of these cases. */
+/* Does hts_file_mtime() report the nanoseconds the filesystem holds? This is
+   what tells a reader that invents or drops them apart from a filesystem that
+   rounds. True where the build cannot read them at all. */
+static hts_boolean st_lockrule_nsec_matches_stat(const char *path,
+                                                 int32_t nsec) {
+#if !defined(_WIN32) && (defined(HAVE_STRUCT_STAT_ST_MTIM_TV_NSEC) ||          \
+                         defined(HAVE_STRUCT_STAT_ST_MTIMESPEC_TV_NSEC))
+  STRUCT_STAT buf;
+  long raw;
+
+  if (STAT(path, &buf) != 0)
+    return HTS_FALSE;
+#if defined(HAVE_STRUCT_STAT_ST_MTIM_TV_NSEC)
+  raw = (long) buf.st_mtim.tv_nsec;
+#else
+  raw = (long) buf.st_mtimespec.tv_nsec;
+#endif
+  return nsec == (int32_t) raw ? HTS_TRUE : HTS_FALSE;
+#else
+  (void) path;
+  (void) nsec;
+  return HTS_TRUE;
+#endif
+}
+
+/* The sub-second arm of the rule. A script that asks as soon as it sees
+   hts-in_progress.lock lands in the second the mirror started, which is the
+   boundary here. Reports what covered it, because a filesystem keeping whole
+   seconds holds none of these stamps. */
 static int st_lockrule_subsecond(httrackp *opt, const char *tag,
                                  const char *name, const char *lock,
                                  const char *progress) {
-  /* Half a second survives every sub-second granularity a filesystem has. */
-  const int32_t later = 500000000, same = 400000000, earlier = 300000000;
+  /* A microsecond apart, because 436 and 459 write their request as soon as
+     the progress lock appears and nothing spaces the two writes. */
+  const int32_t later = 500001000, same = 500000000, earlier = 499999000;
   hts_filetime_t started, probe;
   int err = 0;
 
@@ -13951,16 +13977,21 @@ static int st_lockrule_subsecond(httrackp *opt, const char *tag,
     fprintf(stderr, "%s: cannot stamp %s\n", tag, lock);
     return 1;
   }
-  if (probe.sec != started.sec) {
-    fprintf(stderr, "%s: %s was stamped in the wrong second\n", tag, lock);
-    err = 1;
+  /* Before believing the read back, pin it to what the filesystem holds. */
+  if (!st_lockrule_nsec_matches_stat(lock, probe.nsec)) {
+    fprintf(stderr,
+            "%s: hts_file_mtime() does not report %s's own nanoseconds\n", tag,
+            lock);
+    (void) UNLINK(lock);
+    return 1;
   }
-  if (probe.nsec != later) {
-    /* An identity pin, so a reader that reports a value nobody asked for is
-       not mistaken for a filesystem that rounds. */
+  if (probe.sec != started.sec || probe.nsec != later) {
+    /* The filesystem rounded the stamp, so none of the cases below can be
+       placed. Whole seconds are all a FAT or exFAT volume keeps. */
     printf("%s: same-second request: NOT COVERED (asked for %d ns, read back"
-           " %d)\n",
-           tag, (int) later, (int) probe.nsec);
+           " %d%s)\n",
+           tag, (int) later, (int) probe.nsec,
+           probe.sec != started.sec ? ", in another second" : "");
     (void) UNLINK(lock);
     return err;
   }
@@ -14013,8 +14044,27 @@ static int st_lockrule_subsecond(httrackp *opt, const char *tag,
     fprintf(stderr, "%s: a request the engine refused was deleted\n", tag);
     err = 1;
   }
+
+  /* An earlier second is earlier whatever the fraction says, or a request left
+     by the run before would be taken for one aimed at this mirror. */
+  if (!st_lockrule_stamp_ns(lock, started.sec - 1, later)) {
+    fprintf(stderr, "%s: cannot stamp %s\n", tag, lock);
+    return 1;
+  }
+  if (hts_take_lock_request(opt, name)) {
+    fprintf(stderr,
+            "%s: a request from the second before the mirror started was"
+            " taken\n",
+            tag);
+    err = 1;
+  }
+  if (!fexist_utf8(lock)) {
+    fprintf(stderr, "%s: a request the engine refused was deleted\n", tag);
+    err = 1;
+  }
   (void) UNLINK(lock);
-  printf("%s: same-second request: covered (sub-second stamps)\n", tag);
+  printf("%s: same-second request: covered (stamps a microsecond apart)\n",
+         tag);
   return err;
 }
 
