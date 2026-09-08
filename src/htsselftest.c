@@ -5213,6 +5213,187 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* Store a Set-Cookie header as if it arrived from host, then report whether
+   the jar sends it back to query. */
+static hts_boolean cookie_roundtrip(const char *host, const char *header,
+                                    const char *query, const char *needle) {
+  static t_cookie cookie;
+  htsblk r;
+  char line[256];
+  char hdr[1024];
+
+  memset(&r, 0, sizeof(r));
+  cookie.max_len = sizeof(cookie.data);
+  cookie.data[0] = '\0';
+  strcpybuff(line, header); // treathead NUL-cuts in place: never a literal
+  treathead(&cookie, host, "/", &r, line);
+  http_cookie_header(&cookie, query, "/", hdr, sizeof(hdr));
+  return strstr(hdr, needle) != NULL ? HTS_TRUE : HTS_FALSE;
+}
+
+/* cookie_host must map ADR to WANT, or refuse ADR when WANT is NULL. */
+static hts_boolean cookie_host_is(const char *adr, const char *want) {
+  char host[256];
+  const hts_boolean ok = cookie_host(adr, host, sizeof(host));
+
+  if (want == NULL)
+    return ok ? HTS_FALSE : HTS_TRUE;
+  return ok && strcmp(host, want) == 0 ? HTS_TRUE : HTS_FALSE;
+}
+
+/* Report a missed expectation under its own label, and count it. */
+static int cookie_expect(hts_boolean got, hts_boolean want, const char *what) {
+  if (got == want)
+    return 0;
+  printf("cookie-port: %s\n", what);
+  return 1;
+}
+
+/* A cookie is scoped to a host, never to a port (RFC 6265), so a jar exported
+   from a browser carries no port and must still match. */
+static int st_cookieport(httrackp *opt, int argc, char **argv) {
+  static const struct {
+    const char *adr;
+    const char *want; // NULL: cookie_host must refuse it
+  } hosts[] = {
+      {"example.com", "example.com"},   // the 99% path, untouched
+      {".example.com", ".example.com"}, // a wildcard domain, untouched
+      {"example.com:8080", "example.com"},
+      {"user:pass@example.com:8080", "example.com"},
+      {"[::1]:8080", "::1"}, // one representation, bracketed or bare
+      {"[::1]", "::1"},
+      {"::1", "::1"},
+      {"", NULL}, // an empty domain is a suffix of every host
+      {":8080", NULL},
+      {"[]:80", NULL},
+  };
+
+  static const struct {
+    const char *host, *header, *query, *needle;
+    hts_boolean want;
+    const char *what;
+  } trips[] = {
+      // an explicit domain= never carries a port, so a port kept on the query
+      // side loses the cookie outright
+      {"localhost:8080", "Set-Cookie: withdom=D; path=/; domain=localhost",
+       "localhost:8080", "withdom=D", HTS_TRUE, "domain=localhost off :8080"},
+      // no domain=, so the default is the request host: stripping on one side
+      // only breaks these two
+      {"localhost:8080", "Set-Cookie: plain=P; path=/", "localhost:8080",
+       "plain=P", HTS_TRUE, "no domain= off :8080"},
+      {"localhost:8080", "Set-Cookie: plain=P; path=/", "localhost:9090",
+       "plain=P", HTS_TRUE, ":8080 reaches :9090"},
+      {"example.com", "Set-Cookie: plain=P; path=/", "other.com", "plain=P",
+       HTS_FALSE, "example.com must not reach other.com"},
+      // the wildcard match is by suffix, so the port must be off the query
+      {"www.example.com:8080",
+       "Set-Cookie: wild=W; path=/; domain=.example.com", "api.example.com",
+       "wild=W", HTS_TRUE, "domain=.example.com must reach api.example.com"},
+      // a bracketed IPv6 literal has a port to cut, a bare one has not, and
+      // both spellings must reach the same jar entry either way round
+      {"[::1]:8080", "Set-Cookie: six=6; path=/", "[::1]:9090", "six=6",
+       HTS_TRUE, "[::1]:8080 reaches [::1]:9090"},
+      {"::1", "Set-Cookie: six=6; path=/", "::1", "six=6", HTS_TRUE,
+       "::1 reaches ::1"},
+      {"[::1]:8080", "Set-Cookie: six=6; path=/", "::1", "six=6", HTS_TRUE,
+       "[::1]:8080 reaches ::1"},
+      {"::1", "Set-Cookie: six=6; path=/", "[::1]:8080", "six=6", HTS_TRUE,
+       "::1 reaches [::1]:8080"},
+      // truncating a bare IPv6 literal at its first colon would leave an empty
+      // domain, and an empty domain is a suffix of every host
+      {"::1", "Set-Cookie: six=6; path=/", "example.com", "six=6", HTS_FALSE,
+       "::1 must not reach example.com"},
+      {":8080", "Set-Cookie: pwn=OWNED; path=/", "victim.example", "pwn=OWNED",
+       HTS_FALSE, "a host that is only a port must not reach victim.example"},
+      // a bracketed single-colon literal is the one spelling whose normalised
+      // form still holds a colon, so normalising it twice would file it under
+      // "x" while every query still asks for "x:1"
+      {"[x:1]:80", "Set-Cookie: odd=O; path=/", "[x:1]:80", "odd=O", HTS_TRUE,
+       "the store side normalised the host twice"},
+  };
+
+  static t_cookie jar;
+  char hdr[1024];
+  size_t i;
+  int err = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  for (i = 0; i < sizeof(hosts) / sizeof(hosts[0]); i++) {
+    char what[512];
+
+    snprintf(what, sizeof(what), "'%s' is not scoped to %s", hosts[i].adr,
+             hosts[i].want != NULL ? hosts[i].want : "(refused)");
+    err |= cookie_expect(cookie_host_is(hosts[i].adr, hosts[i].want), HTS_TRUE,
+                         what);
+    if (hosts[i].want == NULL)
+      continue;
+    /* Idempotence: the store and send paths must survive a second pass, or a
+       host normalised twice lands under a name no query ever asks for. */
+    snprintf(what, sizeof(what), "'%s' does not survive a second pass",
+             hosts[i].want);
+    err |= cookie_expect(cookie_host_is(hosts[i].want, hosts[i].want), HTS_TRUE,
+                         what);
+  }
+  for (i = 0; i < sizeof(trips) / sizeof(trips[0]); i++) {
+    err |= cookie_expect(cookie_roundtrip(trips[i].host, trips[i].header,
+                                          trips[i].query, trips[i].needle),
+                         trips[i].want, trips[i].what);
+  }
+
+  /* A jar loaded from a browser file holds bare hosts; the port on the wire
+     must not hide them. Control: another host stays filtered out. */
+  jar.max_len = sizeof(jar.data);
+  jar.data[0] = '\0';
+  if (cookie_add(&jar, "fromfile", "F", "localhost", "/") != 0 ||
+      cookie_add(&jar, "junk", "x", "example.org", "/") != 0) {
+    printf("cookie-port: FAIL (cookie_add setup)\n");
+    return 1;
+  }
+  http_cookie_header(&jar, "localhost:8080", "/", hdr, sizeof(hdr));
+  err |= cookie_expect(strstr(hdr, "fromfile=F") != NULL, HTS_TRUE,
+                       "a bare jar host is hidden by the port on the wire");
+  err |= cookie_expect(strstr(hdr, "junk") != NULL, HTS_FALSE,
+                       "example.org leaked to localhost");
+
+  /* An older httrack, and a hand-edited jar, wrote the port into the domain
+     field. cookie_find can never match a stored domain longer than the query,
+     so the jar has to be normalised as it is read. */
+  jar.data[0] = '\0';
+  if (cookie_add(&jar, "sess", "PERSIST", "127.0.0.1:8080", "/") != 0 ||
+      cookie_add(&jar, "sixjar", "V", "[::1]:8080", "/") != 0) {
+    printf("cookie-port: FAIL (cookie_add setup, port form)\n");
+    return 1;
+  }
+  http_cookie_header(&jar, "127.0.0.1", "/", hdr, sizeof(hdr));
+  err |= cookie_expect(strstr(hdr, "sess=PERSIST") != NULL, HTS_TRUE,
+                       "a jar storing 127.0.0.1:8080 lost its session");
+  http_cookie_header(&jar, "::1", "/", hdr, sizeof(hdr));
+  err |= cookie_expect(strstr(hdr, "sixjar=V") != NULL, HTS_TRUE,
+                       "a jar storing [::1]:8080 lost its session");
+  err |= cookie_expect(cookie_add(&jar, "pwn", "OWNED", "", "/") == 0,
+                       HTS_FALSE, "an empty domain entered the jar");
+
+  /* cookie_del normalises like cookie_add, so one string reaches the same
+     entry through either. Control: the neighbour stays. */
+  jar.data[0] = '\0';
+  if (cookie_add(&jar, "gone", "G", "example.com:8080", "/") != 0 ||
+      cookie_add(&jar, "kept", "K", "other.example", "/") != 0) {
+    printf("cookie-port: FAIL (cookie_add setup, delete form)\n");
+    return 1;
+  }
+  cookie_del(&jar, "gone", "example.com:8080", "/");
+  err |= cookie_expect(strstr(jar.data, "gone") != NULL, HTS_FALSE,
+                       "a port-qualified delete missed its cookie");
+  err |= cookie_expect(strstr(jar.data, "kept") != NULL, HTS_TRUE,
+                       "the delete took its neighbour with it");
+
+  printf("cookie-port: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 /* cookie_add must refuse rather than write past max_len, whatever the caller
    set that to, and must leave the bytes beyond it alone. */
 static int st_cookiecap(httrackp *opt, int argc, char **argv) {
@@ -14609,6 +14790,8 @@ static const struct selftest_entry {
      st_dnstimeout},
     {"cookies", "", "cookie request-header self-test", st_cookies},
     {"cookiecap", "", "cookie_add honours max_len", st_cookiecap},
+    {"cookieport", "", "cookies are scoped to a host, not to a port",
+     st_cookieport},
     {"useragent", "", "default User-Agent self-test", st_useragent},
     {"makeindex", "[dir]", "hts_finish_makeindex footer/refresh self-test",
      st_makeindex},

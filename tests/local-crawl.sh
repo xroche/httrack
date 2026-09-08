@@ -36,9 +36,9 @@
 # --file-mode asserts its octal permissions (e.g. 644); POSIX hosts only.
 # --rerun-args runs a second pass (same server and mirror dir) with the given
 # extra httrack args appended, e.g. an --update run under a cap.
-# --cookie writes a Netscape cookies.txt (scoped to the discovered host:port,
-# which the ephemeral port forces into the cookie domain) and passes it to
-# httrack via --cookies-file, to exercise preloaded cookies.
+# --cookie writes a Netscape cookies.txt (scoped to the bare host, the way a
+# browser exports one) and passes it to httrack via --cookies-file, to
+# exercise preloaded cookies.
 # --rerun-dead re-runs with the server stopped: the no-data rollback must
 # restore the previous hts-cache generation byte-identical.
 # --archive-kept-on-rerun: the second pass must leave the first pass's
@@ -267,8 +267,8 @@ if test "${#cookies[@]}" -gt 0; then
     jar="${tmpdir}/cookies.txt"
     : >"$jar"
     for spec in "${cookies[@]}"; do
-        printf '127.0.0.1:%s\tTRUE\t/\tFALSE\t1999999999\t%s\t%s\n' \
-            "$port" "${spec%%=*}" "${spec#*=}" >>"$jar"
+        printf '127.0.0.1\tTRUE\t/\tFALSE\t1999999999\t%s\t%s\n' \
+            "${spec%%=*}" "${spec#*=}" >>"$jar"
     done
     hts+=(--cookies-file "$jar")
 fi

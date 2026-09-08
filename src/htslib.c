@@ -883,18 +883,23 @@ static void print_buffer(buff_struct*const str, const char *format, ...) {
 }
 
 /* Append the request "Cookie:" header line for every stored cookie matching
-   domain/path. RFC 6265 form: bare "name=value" pairs joined by "; ", no
-   $Version/$Path attributes (those are RFC 2965 syntax that modern servers
-   reject, issue #151). Returns the number of cookies emitted. */
+   domain/path. The port in domain is ignored (see cookie_host). RFC 6265
+   form: bare "name=value" pairs joined by "; ", no $Version/$Path attributes
+   (those are RFC 2965 syntax that modern servers reject, issue #151).
+   Returns the number of cookies emitted. */
 static int append_cookie_header(buff_struct *bstr, t_cookie *cookie,
                                 const char *domain, const char *path) {
   char buffer[8192];
+  char host[256];
   char *b;
   int cook = 0;
   int max_cookies = 8;
 
   if (cookie == NULL)
     return 0;
+  if (!cookie_host(domain, host, sizeof(host)))
+    return 0;
+  domain = host;
   b = cookie->data;
   do {
     b = cookie_find(b, "", domain, path); // next matching cookie
@@ -1726,6 +1731,7 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
              (cookie)) {        // ohh un cookie
     char *a = rcvd + p;         // pointeur
     char domain[256];           // domaine cookie (.netscape.com)
+    char scoped[256];           // adr with no identification, brackets or port
     char path[256];             // chemin (/)
     char cook_name[256];        // nom cookie (MYCOOK)
     char BIGSTK cook_value[8192];       // valeur (ID=toto,S=1234)
@@ -1733,8 +1739,10 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
 #if DEBUG_COOK
     printf("set-cookie detected\n");
 #endif
-    /* Over-long host overflows the fail-safe domain[] copy (abort); drop it. */
-    if (adr && strlen(jump_identification_const(adr)) >= sizeof(domain))
+    /* Refuse a host cookie_host() cannot scope, and one too long for the
+       default-domain copy below (that would abort the mirror). */
+    if (adr != NULL && (strlen(adr) >= sizeof(domain) ||
+                        !cookie_host(adr, scoped, sizeof(scoped))))
       return;
     while(*a) {
       char *token_st, *token_end;
@@ -1747,8 +1755,9 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
       //
 
       // initialiser cookie lu actuellement
-      if (adr)
-        strcpybuff(domain, jump_identification_const(adr));   // domaine
+      /* raw, because cookie_add() normalises and doing that twice is not the
+         same as doing it once; no adr means empty, which it refuses */
+      strcpybuff(domain, adr != NULL ? adr : "");
       strcpybuff(path, "/");    // chemin (/)
       strcpybuff(cook_name, "");        // nom cookie (MYCOOK)
       strcpybuff(cook_value, "");       // valeur (ID=toto,S=1234)

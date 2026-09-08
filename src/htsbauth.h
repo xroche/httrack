@@ -40,6 +40,8 @@ Please visit our Website: http://www.httrack.com
 
 #include <sys/types.h>
 
+#include "htsglobal.h" /* hts_boolean */
+
 /** One stored credential: the longest-prefix match against a request's
     host+path selects which auth header to send. */
 #ifndef HTS_DEF_FWSTRUCT_bauth_chain
@@ -73,9 +75,20 @@ typedef struct httrackp httrackp;
 #endif
 
 /* cookies */
+
+/** Copy ADR's host into DST, without identification, IPv6 brackets or port,
+    because RFC 6265 scopes a cookie to a host and a browser jar has none.
+    HTS_FALSE means the caller sends no cookie. */
+hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size);
+
+/** Store cook_name=cook_value for domain/path, with domain normalised by
+    cookie_host. !=0 if the jar refused it, an empty domain included. */
 int cookie_add(t_cookie *cookie, const char *cook_name, const char *cook_value,
                const char *domain, const char *path);
 
+/** Erase cook_name for domain/path, with domain normalised by cookie_host as
+    cookie_add does. Always 0: a domain nothing can be stored under holds
+    nothing to erase. */
 int cookie_del(t_cookie *cookie, const char *cook_name, const char *domain,
                const char *path);
 

@@ -221,7 +221,8 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, const char *xsend
                   htsblk * retour);
 /* Build the request "Cookie:" header line for stored cookies matching
    domain/path into dst (NUL-terminated), wrapping the logic http_sendhead()
-   uses. Returns cookies emitted. */
+   uses. A port in domain is ignored (see cookie_host). Returns cookies
+   emitted. */
 int http_cookie_header(t_cookie *cookie, const char *domain, const char *path,
                        char *dst, size_t dst_size);
 

@@ -1,0 +1,17 @@
+#!/bin/bash
+#
+# A cookie is scoped to a host and not to a port, so a jar exported from a
+# browser (which records no port) must match a site served off :8080.
+# Driven by the 'httrack -#test=cookieport' selftest.
+
+set -eu
+
+# 'run' is an ignored placeholder argument.
+out=$(httrack -#test=cookieport run)
+
+# Exact-match the success line so a renamed or removed selftest (it prints the
+# registry to stderr) cannot pass.
+test "$out" = "cookie-port: OK" || {
+    echo "expected 'cookie-port: OK', got: $out" >&2
+    exit 1
+}
