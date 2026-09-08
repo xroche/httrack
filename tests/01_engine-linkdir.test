@@ -1,0 +1,18 @@
+#!/bin/bash
+#
+# Pins link_dir_is_multisegment and link_dir_has_fragment_or_query, the pair
+# that decides whether a quoted directory string inside a script is a link.
+# A crawl cannot reach every clause: "page.html#x" never gets that far, because
+# the caller only asks once the cut string already ends in a slash.
+
+set -eu
+
+out=$(httrack -#test=linkdir) || {
+    echo "httrack -#test=linkdir exited non-zero: $out" >&2
+    exit 1
+}
+
+test "$out" = "linkdir self-test OK" || {
+    echo "expected 'linkdir self-test OK', got: $out" >&2
+    exit 1
+}

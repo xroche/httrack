@@ -402,8 +402,7 @@ hts_boolean link_dir_is_multisegment(const char *lien) {
 }
 
 hts_boolean link_dir_has_fragment_or_query(const char *lien) {
-  /* Stop at '&' as well, because an entity before the marker decodes into an
-     earlier one, and unescape_amp would then cut where this never looked. */
+  /* A '&' before the marker may decode into an earlier one, so answer no. */
   const size_t cut = strcspn(lien, "#?&");
 
   if (cut == 0 || lien[cut] == '\0' || lien[cut] == '&' || lien[cut - 1] != '/')

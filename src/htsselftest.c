@@ -60,6 +60,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscoremain.h"
 #include "htsencoding.h"
 #include "htsescape.h"
+#include "htstools.h"
 #include "htsftp.h"
 #include "htsmd5.h"
 #include "htssniff.h"
@@ -6635,6 +6636,58 @@ static int st_postfile(httrackp *opt, int argc, char **argv) {
 
   printf("postfile self-test: %s\n", err ? "FAIL" : "OK");
   return err;
+}
+
+static int st_linkdir(httrackp *opt, int argc, char **argv) {
+  size_t i;
+
+  /* Each row states what the two helpers answer for one string. The engine
+     asks link_dir_has_fragment_or_query first, on the source bytes, and
+     link_dir_is_multisegment later, on the string the fragment cut left. */
+  static const struct {
+    const char *lien;
+    hts_boolean multisegment;
+    hts_boolean fragment;
+  } cases[] = {
+      /* what #1612 refused, and still must */
+      {"/", HTS_FALSE, HTS_FALSE},
+      {"image/", HTS_FALSE, HTS_FALSE},
+      {"Alt+/", HTS_FALSE, HTS_FALSE},
+      {"$&/", HTS_FALSE, HTS_FALSE},
+      {"////", HTS_FALSE, HTS_FALSE},
+      /* a second segment is evidence on its own */
+      {"a/b/", HTS_TRUE, HTS_FALSE},
+      {"/api/v1/", HTS_TRUE, HTS_FALSE},
+      /* the site root and a named directory, both with a marker */
+      {"/#top", HTS_FALSE, HTS_TRUE},
+      {"/?q=1", HTS_FALSE, HTS_TRUE},
+      {"img/#x", HTS_FALSE, HTS_TRUE},
+      {"img/?q=1", HTS_FALSE, HTS_TRUE},
+      /* the marker must open a path, not follow a name or nothing */
+      {"page.html#x", HTS_FALSE, HTS_FALSE},
+      {"#top", HTS_FALSE, HTS_FALSE},
+      {"?q=1", HTS_FALSE, HTS_FALSE},
+      {"", HTS_FALSE, HTS_FALSE},
+      /* a run of slashes carries no name, so the marker buys nothing */
+      {"////#x", HTS_TRUE, HTS_FALSE},
+      {"//#x", HTS_TRUE, HTS_FALSE},
+      /* an entity before the marker decodes into an earlier one */
+      {"//&num;/#x", HTS_TRUE, HTS_FALSE},
+      {"/&#35;", HTS_FALSE, HTS_FALSE},
+      {"a&b/#x", HTS_FALSE, HTS_FALSE},
+      /* an '&' after the marker is part of the query, so it is left alone */
+      {"/?a=1&b=2", HTS_FALSE, HTS_TRUE},
+  };
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    assertf(link_dir_is_multisegment(cases[i].lien) == cases[i].multisegment);
+    assertf(link_dir_has_fragment_or_query(cases[i].lien) == cases[i].fragment);
+  }
+  printf("linkdir self-test OK\n");
+  return 0;
 }
 
 static int st_addrport(httrackp *opt, int argc, char **argv) {
@@ -14632,6 +14685,10 @@ static const struct selftest_entry {
     {"scantoken", "",
      "option-string token copy is bounded and reports a refusal (#1271)",
      st_scantoken},
+    {"linkdir", "",
+     "a quoted directory string is a link only with a second segment, or a "
+     "fragment or query opening right after the path",
+     st_linkdir},
     {"addrport", "",
      "\"host:port\" of a peer address is bounded and complete (#1493)",
      st_addrport},
