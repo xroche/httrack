@@ -86,10 +86,10 @@ int cookie_add(t_cookie * cookie, const char *cook_name, const char *cook_value,
      port the send side no longer queries with. */
   if (!cookie_host(domain, host, sizeof(host)))
     return -1;
-  domain = host;
 
-  // effacer éventuel cookie en double
+  // erase any duplicate; cookie_del normalises too, so it takes the raw domain
   cookie_del(cookie, cook_name, domain, path);
+  domain = host;
   if (strlen(cook_value) > 1024)
     return -1;                  // trop long
   if (strlen(cook_name) > 256)
@@ -165,13 +165,19 @@ int cookie_add(t_cookie * cookie, const char *cook_name, const char *cook_value,
 // effacer cookie si existe
 int cookie_del(t_cookie * cookie, const char *cook_name, const char *domain, const char *path) {
   char *a, *b;
+  char host[256];
 
-  b = cookie_find(cookie->data, cook_name, domain, path);
+  /* Same normalisation as cookie_add, or the pair would disagree on where a
+     port-qualified domain was stored. */
+  if (!cookie_host(domain, host, sizeof(host)))
+    return 0; // nothing can be stored under it, so nothing to delete
+
+  b = cookie_find(cookie->data, cook_name, host, path);
   if (b) {
     a = cookie_nextfield(b);
     cookie_delete(b, cookie->max_len - (size_t) (b - cookie->data), a - b);
 #if DEBUG_COOK
-    printf("deleted old cookie: %s %s %s\n", cook_name, domain, path);
+    printf("deleted old cookie: %s %s %s\n", cook_name, host, path);
 #endif
   }
   return 0;

@@ -1731,7 +1731,7 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
              (cookie)) {        // ohh un cookie
     char *a = rcvd + p;         // pointeur
     char domain[256];           // domaine cookie (.netscape.com)
-    char host[256];             // default domain: the request host, no port
+    char scoped[256];           // adr with no identification, brackets or port
     char path[256];             // chemin (/)
     char cook_name[256];        // nom cookie (MYCOOK)
     char BIGSTK cook_value[8192];       // valeur (ID=toto,S=1234)
@@ -1739,9 +1739,10 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
 #if DEBUG_COOK
     printf("set-cookie detected\n");
 #endif
-    /* Over-long host overflows the fail-safe domain[] copy (abort); drop it. */
-    host[0] = '\0';
-    if (adr != NULL && !cookie_host(adr, host, sizeof(host)))
+    /* Refuse a host cookie_host() cannot scope, and one too long for the
+       default-domain copy below (that would abort the mirror). */
+    if (adr != NULL && (strlen(adr) >= sizeof(domain) ||
+                        !cookie_host(adr, scoped, sizeof(scoped))))
       return;
     while(*a) {
       char *token_st, *token_end;
@@ -1754,7 +1755,9 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
       //
 
       // initialiser cookie lu actuellement
-      strcpybuff(domain, host); // domaine; no adr means empty, refused below
+      /* raw, because cookie_add() normalises and doing that twice is not the
+         same as doing it once; no adr means empty, which it refuses */
+      strcpybuff(domain, adr != NULL ? adr : "");
       strcpybuff(path, "/");    // chemin (/)
       strcpybuff(cook_name, "");        // nom cookie (MYCOOK)
       strcpybuff(cook_value, "");       // valeur (ID=toto,S=1234)

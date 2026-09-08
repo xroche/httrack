@@ -86,6 +86,9 @@ hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size);
 int cookie_add(t_cookie *cookie, const char *cook_name, const char *cook_value,
                const char *domain, const char *path);
 
+/** Erase cook_name for domain/path, with domain normalised by cookie_host as
+    cookie_add does. Always 0: a domain nothing can be stored under holds
+    nothing to erase. */
 int cookie_del(t_cookie *cookie, const char *cook_name, const char *domain,
                const char *path);
 

@@ -5305,6 +5305,11 @@ static int st_cookieport(httrackp *opt, int argc, char **argv) {
        "::1 must not reach example.com"},
       {":8080", "Set-Cookie: pwn=OWNED; path=/", "victim.example", "pwn=OWNED",
        HTS_FALSE, "a host that is only a port must not reach victim.example"},
+      // a bracketed single-colon literal is the one spelling whose normalised
+      // form still holds a colon, so normalising it twice would file it under
+      // "x" while every query still asks for "x:1"
+      {"[x:1]:80", "Set-Cookie: odd=O; path=/", "[x:1]:80", "odd=O", HTS_TRUE,
+       "the store side normalised the host twice"},
   };
 
   static t_cookie jar;
@@ -5322,6 +5327,14 @@ static int st_cookieport(httrackp *opt, int argc, char **argv) {
     snprintf(what, sizeof(what), "'%s' is not scoped to %s", hosts[i].adr,
              hosts[i].want != NULL ? hosts[i].want : "(refused)");
     err |= cookie_expect(cookie_host_is(hosts[i].adr, hosts[i].want), HTS_TRUE,
+                         what);
+    if (hosts[i].want == NULL)
+      continue;
+    /* Idempotence: the store and send paths must survive a second pass, or a
+       host normalised twice lands under a name no query ever asks for. */
+    snprintf(what, sizeof(what), "'%s' does not survive a second pass",
+             hosts[i].want);
+    err |= cookie_expect(cookie_host_is(hosts[i].want, hosts[i].want), HTS_TRUE,
                          what);
   }
   for (i = 0; i < sizeof(trips) / sizeof(trips[0]); i++) {
@@ -5362,6 +5375,20 @@ static int st_cookieport(httrackp *opt, int argc, char **argv) {
                        "a jar storing [::1]:8080 lost its session");
   err |= cookie_expect(cookie_add(&jar, "pwn", "OWNED", "", "/") == 0,
                        HTS_FALSE, "an empty domain entered the jar");
+
+  /* cookie_del normalises like cookie_add, so one string reaches the same
+     entry through either. Control: the neighbour stays. */
+  jar.data[0] = '\0';
+  if (cookie_add(&jar, "gone", "G", "example.com:8080", "/") != 0 ||
+      cookie_add(&jar, "kept", "K", "other.example", "/") != 0) {
+    printf("cookie-port: FAIL (cookie_add setup, delete form)\n");
+    return 1;
+  }
+  cookie_del(&jar, "gone", "example.com:8080", "/");
+  err |= cookie_expect(strstr(jar.data, "gone") != NULL, HTS_FALSE,
+                       "a port-qualified delete missed its cookie");
+  err |= cookie_expect(strstr(jar.data, "kept") != NULL, HTS_TRUE,
+                       "the delete took its neighbour with it");
 
   printf("cookie-port: %s\n", err ? "FAIL" : "OK");
   return err;
