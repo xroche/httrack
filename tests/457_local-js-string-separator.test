@@ -27,9 +27,9 @@ cat >"$root/index.html" <<'EOF'
 <body><div data-x="deep/sub/">x</div></body></html>
 EOF
 
-# Each string below holds a slash near its end, and its trailing comment names
-# what decides whether httrack may follow it. The last line repeats a refusal
-# after the followed ones, so a flag that leaks between strings is caught.
+# Every string below ends in a slash once any fragment or query is cut. Its
+# trailing comment names what decides whether httrack may follow it. The last
+# line repeats a refusal after the followed ones, so a leaking flag shows.
 cat >"$root/app.js" <<'EOF'
 var parts = "a/b".split("/");        // one slash: kept
 var mime = "image/";                 // one slash: kept
@@ -37,8 +37,9 @@ var key = "Alt+/";                   // one slash: kept
 var rep = "ab".replace(/b/, "$&/");  // one slash: kept
 var runs = "////";                   // no name, only slashes: kept
 var ent = "a/b".split("/&num;");     // an entity is not a fragment: kept
-var num = "a/b".split("/&#35;");     // nor is a numeric one: kept
+var num = "a/b".split("/&#35;");     // nor a numeric entity: kept
 var only = "////#x";                 // a fragment, but no name: kept
+var anch = "#top";                   // no slash before it at all: kept
 var one = "subdir/";                 // one slash: kept, so never fetched
 var two = "a/b/";                    // two slashes, short name: followed
 var api = "/api/v1/";                // three slashes: followed
@@ -55,10 +56,11 @@ for d in subdir a/b api/v1 assets/img cdir fragdir deep/sub; do
 done
 
 # The cdir case cannot fail on the helper, since CSS url() reaches the parser by
-# another path. A fix that drops the inscript test is caught by the data-x
-# attribute, because outside a script a two-segment string must stay put.
-# The three index*.html matches pin the rewritten form, where "/" becomes the
-# mirror's root page and may gain a collision suffix.
+# another path. The data-x attribute catches a fix that drops the inscript test,
+# because outside a script a two-segment string must stay put. The two index*
+# matches pin the rewritten form, where "/" becomes the mirror's root page and
+# may gain a collision suffix. The anch case reaches the leading-marker path,
+# where the sanitizer legs catch a dropped length guard.
 bash "$top_srcdir/tests/local-crawl.sh" --root "$root" --errors 0 \
     --file-matches 'app.js' 'split\("/"\)' \
     --file-matches 'app.js' '"image/"' \
@@ -68,6 +70,7 @@ bash "$top_srcdir/tests/local-crawl.sh" --root "$root" --errors 0 \
     --file-matches 'app.js' 'split\("/&num;"\)' \
     --file-matches 'app.js' 'split\("/&#35;"\)' \
     --file-matches 'app.js' '"////#x"' \
+    --file-matches 'app.js' '"#top"' \
     --file-matches 'app.js' '"index[^"]*\.html#top"' \
     --file-matches 'app.js' '"index[^"]*\.html\?q=1"' \
     --file-matches 'app.js' '"fragdir/index\.html#x"' \

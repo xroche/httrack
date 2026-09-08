@@ -1795,9 +1795,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                            '/') {       // un slash: ok..
                                     /* A trailing slash alone is no evidence
                                        inside a script, where "/" and "image/"
-                                       are ordinary strings. A second segment
-                                       is evidence, and so is a fragment or a
-                                       query. */
+                                       are ordinary strings. */
                                     if (inscript &&
                                         (had_fragment_or_query ||
                                          link_dir_is_multisegment(tempo)))
