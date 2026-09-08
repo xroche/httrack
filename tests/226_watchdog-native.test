@@ -28,13 +28,34 @@ tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_wdnat.XXXXXX")
 sinkpidfile="$tmp/sink.pid"
 : >"$sinkpidfile"
 toppid=$$
-trap 'set +e; stop_server "$(cat "$sinkpidfile" 2>/dev/null)"; rm -rf "$tmp"' EXIT
+trap 'set +e; report_gaps; stop_server "$(cat "$sinkpidfile" 2>/dev/null)"; rm -rf "$tmp"' EXIT
 trap 'exit 1' TERM
 # Signalled, since a bare exit only ends the subshell a leg runs in.
 fail() {
     echo "FAIL: $*" >&2
     kill -TERM "$toppid" 2>/dev/null || true
     exit 1
+}
+
+# Automake hides a passing test's log, so the step summary is the only channel a
+# note reaches a reader through. Never fatal: a diagnostic that kills the run
+# would turn a reportable gap into a red one.
+note_coverage() {
+    echo "note: $*"
+    { test -z "${GITHUB_STEP_SUMMARY:-}" ||
+        echo "226_watchdog-native: $*" >>"$GITHUB_STEP_SUMMARY"; } 2>/dev/null || true
+}
+
+# Checks that could not run. Reported from the EXIT trap, because the pacer's
+# skip_if_out_of_budget exits from inside testlib and would otherwise take the
+# whole list with it on exactly the starved run the list exists for.
+skipped=()
+report_gaps() {
+    local gap
+    for gap in ${skipped[@]+"${skipped[@]}"}; do
+        note_coverage "not exercised: $gap"
+    done
+    skipped=()
 }
 
 test -r "$wdscript" || fail "no $wdscript"
@@ -256,9 +277,9 @@ fi
 py=$(find_python || true)
 if ! test -r "$workflow"; then
     test -d "$top/.github" && fail "$workflow is gone but $top/.github is not"
-    echo "note: no .github under $top (dist tarball), the workflow audits did not run"
+    note_coverage "no .github under $top (dist tarball), the workflow audits did not run"
 elif test -z "$py" || ! "$py" -c 'import yaml' 2>/dev/null; then
-    echo "note: no python3 with PyYAML here, the workflow audits did not run"
+    note_coverage "no python3 with PyYAML here, the workflow audits did not run"
 else
     # Parsed, not grepped: every key below has to be read from the block that
     # owns it, and an ordinary reformatting of the workflow must not move it.
@@ -928,9 +949,7 @@ fullstdout_leg() {
 }
 
 first=1
-# Every check that could not run is recorded here and printed before the OK line:
-# a check that did not run reads exactly like a check that passed.
-skipped=()
+
 for psrun in "${psruns[@]}"; do
     psargs=(-NoProfile -NonInteractive)
     case $psrun in
@@ -1103,7 +1122,7 @@ for psrun in "${psruns[@]}"; do
     test "$first" -eq 1 || continue
     first=0
     if test -z "$py"; then
-        echo "note: no python3 here, the posting legs did not run"
+        note_coverage "no python3 here, the posting legs did not run"
         continue
     fi
 
@@ -1137,7 +1156,7 @@ for psrun in "${psruns[@]}"; do
             devfull=1
         fi
     fi
-    test "$devfull" -eq 1 || echo "note: the full-stdout leg and its mutant did not run: $devfull_why"
+    test "$devfull" -eq 1 || note_coverage "the full-stdout leg and its mutant did not run: $devfull_why"
 
     # Longest first, so the projection below is an upper bound from the start: a
     # cheap leg run first under-projects the expensive one after it, and the pacer
@@ -1262,7 +1281,5 @@ done
 
 # Notes rather than a failure: a starved box legitimately cannot judge some of
 # these, but it must not go quiet about which.
-if test "${#skipped[@]}" -ne 0; then
-    printf 'note: not exercised: %s\n' "${skipped[@]}"
-fi
+report_gaps
 echo "native watchdog OK (${psruns[*]})"
