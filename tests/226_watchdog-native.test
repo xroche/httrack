@@ -1015,6 +1015,7 @@ for psrun in "${psruns[@]}"; do
         if test -n "$box" && test "$box" -le 30; then
             fail "the $psrun watchdog gave under two due ticks in 12s at a 1s interval, on a box that ran ten 1s sleeps in ${box}s"
         fi
+        # shellcheck disable=SC2031 # main shell: the $( ) above is not an enclosing subshell
         skipped+=("the whole $psrun body: ten 1s sleeps took ${box:-over 120}s, so the box could not be calibrated")
         continue
     fi
