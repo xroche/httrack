@@ -3273,6 +3273,10 @@ static void back_abort_slot(httrackp *opt, struct_back *sback, const int p,
   /* drop a .delayed placeholder; real partials survive for resume */
   if (back->r.is_write && IS_DELAYED_EXT(back->url_sav))
     back_delayed_discard(opt, back);
+  else if (back->r.is_write)
+    /* That partial outlives the run, so hts-cache/ref must too or the next
+       --continue refetches the file whole (#1595). */
+    opt->abort_left_partial = HTS_TRUE;
   back->r.statuscode = statuscode;
   strcpybuff(back->r.msg, msg);
   back->status = STATUS_READY;
@@ -3289,15 +3293,10 @@ static int back_abort_stopped(httrackp *opt, struct_back *sback) {
   int i;
 
   for (i = 0; i < sback->count; i++) {
-    const lien_back *const back = &sback->lnk[i];
-    const int status = back->status;
+    const int status = sback->lnk[i].status;
 
     if (!back_is_live(status) || (grace && !back_is_preconnect(status)))
       continue;
-    /* The partial stays on disk, so hts-cache/ref must outlive the run or
-       --continue refetches it whole (#1595). */
-    if (back->r.is_write && !IS_DELAYED_EXT(back->url_sav))
-      opt->stop_left_partial = HTS_TRUE;
     /* fatal, as back_add() reports a stop: no retry may reschedule the link */
     back_abort_slot(opt, sback, i, STATUSCODE_INVALID, "mirror stopped by user",
                     WARC_TRUNC_NONE);
@@ -3307,7 +3306,8 @@ static int back_abort_stopped(httrackp *opt, struct_back *sback) {
 }
 
 /* Abort every live slot once a cap has overrun its grace, and return the
-   count. Its partial body is archived: the truncation is the user's own cap. */
+   count. Its partial body is archived, because the truncation is the user's own
+   cap, and back_abort_slot() keeps the resume data describing it. */
 static int back_abort_limit(httrackp *opt, struct_back *sback,
                             const hts_mirror_limit limit) {
   const hts_boolean size = limit == HTS_MIRROR_LIMIT_SIZE;

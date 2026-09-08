@@ -591,11 +591,11 @@ struct httrackp {
                                    were never queued and the update purge would
                                    treat them as gone. Live state, so
                                    copy_htsopt must leave it alone. Tail: ABI */
-  hts_boolean stop_left_partial; /**< a user stop cut a body mid-transfer, so
-                                      the partial it left needs its
-                                      hts-cache/ref kept. Live state, so
-                                      copy_htsopt must leave it alone.
-                                      Tail: ABI */
+  hts_boolean abort_left_partial; /**< a teardown cut a body mid-transfer, so
+                                       the partial it left needs its
+                                       hts-cache/ref kept. Live state, so
+                                       copy_htsopt must leave it alone.
+                                       Tail: ABI */
 };
 
 /* Running statistics for a mirror. */
