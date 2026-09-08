@@ -1738,7 +1738,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                               // escape                              
                               unescape_amp(tempo);
 
-                              // The cut below erases "/#frag" down to "/".
+                              // Decide before the cut turns "/#frag" into "/".
                               only_slashes = hts_rtrimlen(tempo, "/") == 0;
 
                               // Cut at any # or ?
@@ -1772,7 +1772,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                 if (c != '+') { // PAS de plus à la fin
                                   // "Comparisons of scheme names MUST be
                                   // case-insensitive" (RFC2616)
-                                  // These schemes leave no doubt.
                                   if ((strfield(tempo, "http:")) ||
                                       (strfield(tempo, "ftp:"))
 #if HTS_USEOPENSSL

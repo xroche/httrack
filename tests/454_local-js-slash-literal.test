@@ -1,13 +1,11 @@
 #!/bin/bash
 #
-# Inside a script, htsparse reads a quoted string ending in "/" as a directory
-# URL. A string that is only a slash therefore became the site root. split("/")
-# came out of the mirror as split("index.html"), and the script threw at load.
-# AddToAny's page.js opens with that call, and its share icons never appeared in
-# a mirror carrying it. See https://forum.httrack.com/readmsg/43082/index.html.
+# In a script, a lone "/" was rewritten to the site root, so split("/") came out
+# as split("index.html") and the script threw at load.
+# See https://forum.httrack.com/readmsg/43082/index.html.
 #
-# A rooted directory string still has to be rewritten, so a fix that refuses
-# every trailing slash fails here too.
+# A rooted directory string must still be rewritten, so refusing every trailing
+# slash fails here too.
 
 set -euo pipefail
 
@@ -32,6 +30,10 @@ HTML
 # "/" there is a separator and not a URL. img, dir, frag and query are real
 # links and are still rewritten. img reaches sub/pic.png, dir reaches
 # sub/index.html, and frag and query reach a copy of the root page.
+#
+# amp is the accepted tradeoff. unescape_amp runs before the flag is read, so
+# "&#47;" reads as a lone slash and the root link it spells stops being
+# rewritten.
 cat >"$root/script.js" <<'JS'
 var parts = location.href.split("/");
 var img = "sub/pic.png";
@@ -39,23 +41,33 @@ var dir = "/sub/";
 var frag = "/#top";
 var query = "/?q=1";
 var dbl = "//";
+var amp = "&#47;";
 JS
 
 printf '\211PNG\r\n\032\n' >"$root/sub/pic.png"
 printf '<html><body>s</body></html>\n' >"$root/sub/index.html"
 printf '<html><body>a</body></html>\n' >"$root/assets/index.html"
 
-# Two assertions kill no mutant. dbl is output-identical under a rule keyed on
-# strcmp(tempo, "/"), because a later stage drops "//" anyway, so it pins the
-# behaviour instead. --found sub/pic.png only proves the script was scanned.
+# Two assertions kill no mutant. dbl pins behaviour instead, because
+# substituting strcmp(tempo, "/") at the flag's computation point differs only
+# on repeated slashes, which a later stage drops anyway. --found sub/pic.png
+# only proves the script was scanned.
+#
+# The rewritten names carry a hash and a collision suffix htsname.c is free to
+# change, so match the property under test, which is the missing leading slash.
+audit=(
+    --errors 0
+    --found sub/pic.png
+    --found sub/index.html
+    # survives verbatim:
+    --file-matches script.js 'split\("/"\)'
+    --file-matches script.js 'dbl = "//"'
+    --file-matches script.js 'amp = "&#47;"'
+    --file-matches index.html 'data-path="assets/"'
+    # rewritten:
+    --file-matches script.js 'dir = "sub/index\.html"'
+    --file-matches script.js 'frag = "[^"/]*\.html#top"'
+    --file-matches script.js 'query = "[^"/]*\.html\?q=1"'
+)
 bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$root")" \
-    --errors 0 \
-    --found sub/pic.png \
-    --found sub/index.html \
-    --file-matches script.js 'split\("/"\)' \
-    --file-matches script.js 'dbl = "//"' \
-    --file-matches script.js 'dir = "sub/index\.html"' \
-    --file-matches script.js 'frag = "index-2\.html#top"' \
-    --file-matches script.js 'query = "index5835\.html\?q=1"' \
-    --file-matches index.html 'data-path="assets/"' \
-    httrack BASEURL/index.html -q -%v0 -r3
+    "${audit[@]}" httrack BASEURL/index.html -q -%v0 -r3
