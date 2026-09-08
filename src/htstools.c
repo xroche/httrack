@@ -402,9 +402,11 @@ hts_boolean link_dir_is_multisegment(const char *lien) {
 }
 
 hts_boolean link_dir_has_fragment_or_query(const char *lien) {
-  const size_t cut = strcspn(lien, "#?");
+  /* Stop at '&' as well, because an entity before the marker decodes into an
+     earlier one, and unescape_amp would then cut where this never looked. */
+  const size_t cut = strcspn(lien, "#?&");
 
-  if (cut == 0 || lien[cut] == '\0' || lien[cut - 1] != '/')
+  if (cut == 0 || lien[cut] == '\0' || lien[cut] == '&' || lien[cut - 1] != '/')
     return HTS_FALSE;
   /* "/" is the site root, and anything longer needs a name. */
   return (cut == 1 || strspn(lien, "/") < cut) ? HTS_TRUE : HTS_FALSE;

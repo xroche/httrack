@@ -40,6 +40,7 @@ var ent = "a/b".split("/&num;");     // an entity is not a fragment: kept
 var num = "a/b".split("/&#35;");     // nor a numeric entity: kept
 var only = "////#x";                 // a fragment, but no name: kept
 var anch = "#top";                   // no slash before it at all: kept
+var forge = "//&num;/#x";            // an entity hides an earlier marker: kept
 var one = "subdir/";                 // one slash: kept, so never fetched
 var two = "a/b/";                    // two slashes, short name: followed
 var api = "/api/v1/";                // three slashes: followed
@@ -47,6 +48,7 @@ var ast = "assets/img/";             // two slashes: followed
 var frag = "/#top";                  // one slash, but a fragment: followed
 var qry = "/?q=1";                   // one slash, but a query: followed
 var rel = "fragdir/#x";              // a directory and a fragment: followed
+var amp = "/?a=1&b=2";               // the & sits inside the query: followed
 var late = "audio/";                 // one slash, and last of all: kept
 EOF
 
@@ -71,6 +73,8 @@ bash "$top_srcdir/tests/local-crawl.sh" --root "$root" --errors 0 \
     --file-matches 'app.js' 'split\("/&#35;"\)' \
     --file-matches 'app.js' '"////#x"' \
     --file-matches 'app.js' '"#top"' \
+    --file-matches 'app.js' '"//&num;/#x"' \
+    --file-matches 'app.js' '"index[^"]*\.html\?a=1&b=2"' \
     --file-matches 'app.js' '"index[^"]*\.html#top"' \
     --file-matches 'app.js' '"index[^"]*\.html\?q=1"' \
     --file-matches 'app.js' '"fragdir/index\.html#x"' \
