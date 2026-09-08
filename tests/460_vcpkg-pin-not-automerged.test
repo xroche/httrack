@@ -1,0 +1,28 @@
+#!/bin/bash
+#
+# Dependabot's vcpkg ecosystem tracks vcpkg's release tags, so a baseline pinned
+# to a newer commit reads as behind and is bumped backwards. #1614 reverted a
+# security pin that way, unattended, so those bumps must not auto-merge.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+: "${top_srcdir:=..}"
+
+wf="$top_srcdir/.github/workflows/dependabot-automerge.yml"
+[ -r "$wf" ] || fail "cannot read $wf"
+
+# Dependabot names a branch dependabot/<ecosystem>/<dir>/<dep>-<version>, so the
+# prefix is what tells the ecosystems apart.
+grep -q "startsWith(github.event.pull_request.head.ref, 'dependabot/vcpkg/')" "$wf" ||
+    fail "the auto-merge gate no longer excludes the vcpkg ecosystem"
+
+grep -q '!startsWith' "$wf" ||
+    fail "the vcpkg branch prefix is named but not negated, so it would gate auto-merge ON"
+
+# The other ecosystems still auto-merge, so the exclusion must not have grown
+# into a blanket refusal.
+grep -q "github.event.pull_request.user.login == 'dependabot\[bot\]'" "$wf" ||
+    fail "the dependabot author check is gone, so nothing arms auto-merge at all"
