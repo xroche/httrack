@@ -129,9 +129,17 @@ Please visit our Website: http://www.httrack.com
   } \
 } while(0)
 
-/** Append to the output buffer the string 'A', html-escaped for &. **/
-#define HT_ADD_HTMLESCAPED(A) \
-  HT_ADD_HTMLESCAPED_ANY(A, escape_for_html_print, HTS_HTMLESCAPE_MAXEXP)
+/** Append to the output buffer the string 'A', html-escaped for &.
+    A script or style element holds raw text, and so does an external script or
+    stylesheet, so an entity written there would never be decoded. An inline
+    handler such as onclick= is still markup, which inscript_tag marks. **/
+#define HT_ADD_HTMLESCAPED(A) do { \
+  if (inscript && !inscript_tag) { \
+    HT_ADD(A); \
+  } else { \
+    HT_ADD_HTMLESCAPED_ANY(A, escape_for_html_print, HTS_HTMLESCAPE_MAXEXP); \
+  } \
+} while(0)
 
 /**
  * Append to the output buffer the string 'A', html-escaped for & and

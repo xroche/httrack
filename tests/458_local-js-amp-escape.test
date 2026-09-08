@@ -1,0 +1,50 @@
+#!/bin/bash
+#
+# A rewritten URL was html-escaped wherever it landed, so a mirrored script got
+# "?a=1&amp;b=2" and sent those five characters in the query. Neither JavaScript
+# nor CSS decodes an entity.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+: "${top_srcdir:=..}"
+
+work=$(mktemp -d)
+trap 'set +e; rm -rf "$work"' EXIT
+
+root="$work/root"
+mkdir -p "$root"
+
+# One query letter pair per context, so no assertion can pass for another. The
+# markup cases sit after the script and style blocks, which catches a fix that
+# turns escaping off and never turns it back on.
+cat >"$root/index.html" <<'EOF'
+<!DOCTYPE html><html><head>
+<link rel="stylesheet" href="s.css">
+<script src="app.js"></script>
+<script>var inline = "q.html?a=1&b=2";</script>
+<style>.s { background: url("q.html?c=1&d=2"); }</style>
+</head><body>
+<a href="q.html?e=1&f=2">h</a>
+<div style="background: url('q.html?g=1&h=2')">d</div>
+<a href="javascript:go('q.html?i=1&j=2')">j</a>
+</body></html>
+EOF
+
+echo 'var ext = "q.html?k=1&l=2";' >"$root/app.js"
+echo '.c { background: url("q.html?m=1&n=2"); }' >"$root/s.css"
+printf 'x\n' >"$root/q.html"
+
+# Raw text keeps the ampersand; markup keeps the entity. Each pattern fails if
+# the other form is emitted, so no negative assertion is needed.
+bash "$top_srcdir/tests/local-crawl.sh" --root "$root" --errors 0 \
+    --file-matches 'app.js' 'k=1&l=2' \
+    --file-matches 's.css' 'm=1&n=2' \
+    --file-matches 'index.html' 'a=1&b=2' \
+    --file-matches 'index.html' 'c=1&d=2' \
+    --file-matches 'index.html' 'e=1&amp;f=2' \
+    --file-matches 'index.html' 'g=1&amp;h=2' \
+    --file-matches 'index.html' 'i=1&amp;j=2' \
+    httrack BASEURL/index.html -q -%v0 -r3
