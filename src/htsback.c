@@ -3273,9 +3273,9 @@ static void back_abort_slot(httrackp *opt, struct_back *sback, const int p,
   /* drop a .delayed placeholder; real partials survive for resume */
   if (back->r.is_write && IS_DELAYED_EXT(back->url_sav))
     back_delayed_discard(opt, back);
+  /* That partial outlives the run, so hts-cache/ref must too or the next
+     --continue refetches the file whole (#1595). */
   else if (back->r.is_write)
-    /* That partial outlives the run, so hts-cache/ref must too or the next
-       --continue refetches the file whole (#1595). */
     opt->abort_left_partial = HTS_TRUE;
   back->r.statuscode = statuscode;
   strcpybuff(back->r.msg, msg);

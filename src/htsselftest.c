@@ -12365,6 +12365,10 @@ static void st_backstop_slot(struct_back *sback, int p, int status,
 /* A network that rejects TEST-NET-1 instead of dropping it answers in ms. */
 #define ST_BACKSTOP_SETTLE_MS 500
 
+/* Bytes the size cap allows. back_maxsize_grace() spares the transfers already
+   running for another tenth of it, so the cases below spell that tenth out. */
+#define ST_BACKSTOP_CAP 1000
+
 /* Refill every slot: a fresh pending connect for each state that owns a socket,
    plus the poison the assertions read back. False if the blackhole answered. */
 static hts_boolean st_backstop_arm(httrackp *opt, struct_back *sback,
@@ -12507,9 +12511,10 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
     CHECK(strcmp(back[SLOT_FTP].r.msg, "untouched") == 0);
   }
 
-  /* A cap raises the stop flag itself and leaves the transfers already running
-     a grace (#77, #481): the sweep takes the pre-connect slots only until the
-     grace overruns, and back_wait's own limit block ends the rest. */
+  /* back_abort_stopped(), still in grace. A cap raises the stop flag itself and
+     leaves the transfers already running a grace (#77, #481), so the sweep
+     takes the pre-connect slots only and back_abort_limit() ends the rest
+     later. */
   if (!err) {
     const LLint recv_was = HTS_STAT.HTS_TOTAL_RECV;
 
@@ -12520,9 +12525,10 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
     }
     for (i = 0; i < SLOTS; i++)
       swept[i] = r[i].soc;
-    /* cap reached, a tenth of it still to overrun before the hard stop */
-    HTS_STAT.HTS_TOTAL_RECV = 1000;
-    opt->maxsite = 1000;
+    /* cap reached, its whole grace still to overrun before the hard stop */
+    HTS_STAT.HTS_TOTAL_RECV = ST_BACKSTOP_CAP;
+    opt->maxsite = ST_BACKSTOP_CAP;
+    /* already false here, but it keeps the check below local to this block */
     opt->abort_left_partial = HTS_FALSE;
     hts_request_stop(opt, 0);
 
@@ -12545,9 +12551,9 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
     HTS_STAT.HTS_TOTAL_RECV = recv_was;
   }
 
-  /* The stop keeps hts-cache/ref for a partial that outlives it, not for every
-     slot it killed (#1595). A .delayed placeholder goes with its own ref, so it
-     is not one. */
+  /* back_abort_stopped() keeps hts-cache/ref for a partial that outlives the
+     stop, not for every slot it killed (#1595). A .delayed placeholder goes
+     with its own ref, so it is not one. */
   {
     static const struct {
       const char *what;
@@ -12585,9 +12591,9 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
     }
   }
 
-  /* Past its grace a cap tears down the transfers the grace spared, through the
-     same back_abort_slot(), so the partial it cuts keeps its resume data like
-     any other (#1595). */
+  /* back_abort_limit(), past the grace. It tears down the transfers the grace
+     spared, through the same back_abort_slot(), so the partial it cuts keeps
+     its resume data like any other (#1595). */
   if (!err) {
     const LLint recv_was = HTS_STAT.HTS_TOTAL_RECV;
 
@@ -12599,15 +12605,18 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
     back[SLOT_XFER].r.is_write = 1;
     strcpybuff(back[SLOT_XFER].url_sav, "hts-backstop-selftest.tmp");
     opt->abort_left_partial = HTS_FALSE;
-    /* the cap plus the whole grace, so the limit block ends every live slot */
-    opt->maxsite = 1000;
-    HTS_STAT.HTS_TOTAL_RECV = 1000 + 1000 / 10;
+    /* well past any grace, so the limit block ends every live slot and tuning
+       back_maxsize_grace() cannot quietly put this case back inside it */
+    opt->maxsite = ST_BACKSTOP_CAP;
+    HTS_STAT.HTS_TOTAL_RECV = ST_BACKSTOP_CAP * 2;
     hts_request_stop(opt, 0);
 
     back_wait(sback, opt, &cache, 0);
 
     CHECK(back[SLOT_XFER].status == STATUS_READY);
-    CHECK(back[SLOT_XFER].r.statuscode == STATUSCODE_TIMEOUT);
+    /* not the statuscode: the arming poison is STATUSCODE_TIMEOUT too, so it
+       cannot tell an untouched slot from a swept one */
+    CHECK(strcmp(back[SLOT_XFER].r.msg, "Mirror Size Limit") == 0);
     CHECK(opt->abort_left_partial);
     back[SLOT_XFER].r.is_write = 0;
     back[SLOT_XFER].url_sav[0] = '\0';
