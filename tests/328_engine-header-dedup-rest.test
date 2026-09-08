@@ -189,8 +189,8 @@ assert_value boxhop Referer http://box.example/
 assert_same_but hop boxhop '^Referer:'
 
 jar=$tmpdir/cookies.txt
-printf '127.0.0.1:%s\tTRUE\t/\tFALSE\t1999999999\tsession\topensesame\n' \
-    "$port" >"$jar"
+# bare host, the way a browser exports one: a cookie has no port
+printf '127.0.0.1\tTRUE\t/\tFALSE\t1999999999\tsession\topensesame\n' >"$jar"
 probe cookie 1 "$base" --cookies-file "$jar"
 assert_value cookie Cookie session=opensesame
 probe boxcookie 1 "$base" --cookies-file "$jar" -%X 'Cookie: box=1'

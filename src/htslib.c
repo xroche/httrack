@@ -882,19 +882,51 @@ static void print_buffer(buff_struct*const str, const char *format, ...) {
   assertf(str->pos < str->capacity);
 }
 
+/* Copy the cookie scope of request host adr into dst: the host without its
+   port, because RFC 6265 scopes a cookie to a host alone and a jar exported
+   from a browser therefore never records one. HTS_FALSE if it does not fit,
+   which the callers treat as "no cookie". */
+static hts_boolean cookie_host(char *dst, size_t dst_size, const char *adr) {
+  const char *const host = jump_identification_const(adr);
+  const char *port;
+  size_t len;
+
+  if (host[0] == '[') { // bracketed IPv6 literal, [::1]:8080
+    const char *const end = strchr(host, ']');
+
+    port = end != NULL && end[1] == ':' ? end + 1 : NULL;
+  } else {
+    port = strchr(host, ':');
+    // several colons means a bare IPv6 literal, which has no port to cut
+    if (port != NULL && strchr(port + 1, ':') != NULL)
+      port = NULL;
+  }
+  len = port != NULL ? (size_t) (port - host) : strlen(host);
+  if (len >= dst_size)
+    return HTS_FALSE;
+  dst[0] = '\0';
+  strlncatbuff(dst, host, dst_size, len);
+  return HTS_TRUE;
+}
+
 /* Append the request "Cookie:" header line for every stored cookie matching
-   domain/path. RFC 6265 form: bare "name=value" pairs joined by "; ", no
-   $Version/$Path attributes (those are RFC 2965 syntax that modern servers
-   reject, issue #151). Returns the number of cookies emitted. */
+   domain/path. The port in domain is ignored (see cookie_host). RFC 6265
+   form: bare "name=value" pairs joined by "; ", no $Version/$Path attributes
+   (those are RFC 2965 syntax that modern servers reject, issue #151).
+   Returns the number of cookies emitted. */
 static int append_cookie_header(buff_struct *bstr, t_cookie *cookie,
                                 const char *domain, const char *path) {
   char buffer[8192];
+  char host[256];
   char *b;
   int cook = 0;
   int max_cookies = 8;
 
   if (cookie == NULL)
     return 0;
+  if (!cookie_host(host, sizeof(host), domain))
+    return 0;
+  domain = host;
   b = cookie->data;
   do {
     b = cookie_find(b, "", domain, path); // next matching cookie
@@ -1726,6 +1758,7 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
              (cookie)) {        // ohh un cookie
     char *a = rcvd + p;         // pointeur
     char domain[256];           // domaine cookie (.netscape.com)
+    char host[256];             // default domain: the request host, no port
     char path[256];             // chemin (/)
     char cook_name[256];        // nom cookie (MYCOOK)
     char BIGSTK cook_value[8192];       // valeur (ID=toto,S=1234)
@@ -1734,7 +1767,8 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
     printf("set-cookie detected\n");
 #endif
     /* Over-long host overflows the fail-safe domain[] copy (abort); drop it. */
-    if (adr && strlen(jump_identification_const(adr)) >= sizeof(domain))
+    host[0] = '\0';
+    if (adr != NULL && !cookie_host(host, sizeof(host), adr))
       return;
     while(*a) {
       char *token_st, *token_end;
@@ -1748,7 +1782,7 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
 
       // initialiser cookie lu actuellement
       if (adr)
-        strcpybuff(domain, jump_identification_const(adr));   // domaine
+        strcpybuff(domain, host); // domaine
       strcpybuff(path, "/");    // chemin (/)
       strcpybuff(cook_name, "");        // nom cookie (MYCOOK)
       strcpybuff(cook_value, "");       // valeur (ID=toto,S=1234)
