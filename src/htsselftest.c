@@ -5256,7 +5256,8 @@ static int st_cookieport(httrackp *opt, int argc, char **argv) {
     const char *adr;
     const char *want; // NULL: cookie_host must refuse it
   } hosts[] = {
-      {"example.com", "example.com"}, // the 99% path, untouched
+      {"example.com", "example.com"},   // the 99% path, untouched
+      {".example.com", ".example.com"}, // a wildcard domain, untouched
       {"example.com:8080", "example.com"},
       {"user:pass@example.com:8080", "example.com"},
       {"[::1]:8080", "::1"}, // one representation, bracketed or bare
@@ -5284,6 +5285,10 @@ static int st_cookieport(httrackp *opt, int argc, char **argv) {
        "plain=P", HTS_TRUE, ":8080 reaches :9090"},
       {"example.com", "Set-Cookie: plain=P; path=/", "other.com", "plain=P",
        HTS_FALSE, "example.com must not reach other.com"},
+      // the wildcard match is by suffix, so the port must be off the query
+      {"www.example.com:8080",
+       "Set-Cookie: wild=W; path=/; domain=.example.com", "api.example.com",
+       "wild=W", HTS_TRUE, "domain=.example.com must reach api.example.com"},
       // a bracketed IPv6 literal has a port to cut, a bare one has not, and
       // both spellings must reach the same jar entry either way round
       {"[::1]:8080", "Set-Cookie: six=6; path=/", "[::1]:9090", "six=6",
