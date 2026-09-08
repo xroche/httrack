@@ -2849,37 +2849,30 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                 cat_data_len = HTS_DATA_UNKNOWN_HTML_LEN;
                               }
                               break;
-                            default:   // inconnu
-                              // asp, cgi..
-                              if ((strfield2
-                                   (afs.af.fil + max(0, strlen(afs.af.fil) - 4),
-                                    ".gif"))
-                                  ||
-                                  (strfield2
-                                   (afs.af.fil + max(0, strlen(afs.af.fil) - 4),
-                                    ".jpg"))
-                                  ||
-                                  (strfield2
-                                   (afs.af.fil + max(0, strlen(afs.af.fil) - 4),
-                                    ".xbm"))
-                                  /*|| (ishtml(opt,fil)!=0) */
-                                ) {
+                            default: { // anything else: asp, cgi, images..
+                              char BIGSTK mime[HTS_MIMETYPE_SIZE];
+
+                              // an <img> needs an image placeholder, or the
+                              // browser just draws a broken image
+                              if (get_httptype_sized(opt, mime, sizeof(mime),
+                                                     afs.af.fil, 0) &&
+                                  strfield(mime, "image/")) {
                                 patch_it = 1;   // redirect
-                                add_url = 1;    // avec link aussi
+                                add_url = 1;    // with link too
                                 cat_name = "external.gif";
                                 cat_nb = 1;
                                 cat_data = HTS_DATA_UNKNOWN_GIF;
                                 cat_data_len = HTS_DATA_UNKNOWN_GIF_LEN;
-                              } else {  /* if (is_dyntype(get_ext(fil))) */
-
+                              } else {
                                 patch_it = 1;   // redirect
-                                add_url = 1;    // avec link?
+                                add_url = 1;    // with link?
                                 cat_name = "external.html";
                                 cat_nb = 0;
                                 cat_data = HTS_DATA_UNKNOWN_HTML;
                                 cat_data_len = HTS_DATA_UNKNOWN_HTML_LEN;
                               }
                               break;
+                            }
                             } // html,gif
 
                             if (patch_it) {

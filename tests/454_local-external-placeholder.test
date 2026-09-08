@@ -1,0 +1,17 @@
+#!/bin/bash
+# --replace-external picks the placeholder from the link's type: an image gets
+# external.gif, anything else external.html. The extension list behind that
+# choice knew only .gif/.jpg/.xbm, so a .png <img> was handed an HTML page.
+set -e
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    --file-matches 'extplaceholder/index.html' 'external\.gif\?link=[^"]*/a\.gif' \
+    --file-matches 'extplaceholder/index.html' 'external\.gif\?link=[^"]*/b\.png' \
+    --file-matches 'extplaceholder/index.html' 'external\.gif\?link=[^"]*/c\.jpeg' \
+    --file-matches 'extplaceholder/index.html' 'external\.gif\?link=[^"]*/d\.webp' \
+    --file-matches 'extplaceholder/index.html' 'external\.html\?link=[^"]*/page\.html' \
+    --file-matches 'extplaceholder/index.html' 'external\.html\?link=[^"]*/s\.js' \
+    --file-not-matches 'extplaceholder/index.html' 'external\.html\?link=[^"]*\.(png|jpeg|webp|gif)' \
+    httrack 'BASEURL/extplaceholder/index.html' -r1 -x
