@@ -124,10 +124,9 @@ assert_kept drop drop "hts-cache/ref was erased under a stop that cut a body mid
     fail "a stop that did not ask to keep the resume data logged the abort banner"
 echo "PASS"
 
-# A cap past its grace tears down the transfers the grace spared, through the
-# same teardown a stop uses, so it leaves the same partials and keeps the same
-# byte ranges (#1595). The mirror ended where the user asked, but the file it
-# was fetching did not.
+# A cap past its grace uses the same teardown a stop does, so it leaves the same
+# partials and byte ranges (#1595). The mirror ended where the user asked, but
+# the file it was fetching did not.
 printf '[a --max-time cap keeps it too] ..\t'
 assert_kept maxtime maxtime "hts-cache/ref was erased under the engine's own cap stop"
 echo "PASS"
@@ -151,9 +150,9 @@ got=$(wc -c <"$blob")
 test "$got" -eq "$full" || fail "blob.bin is ${got} bytes, expected ${full}"
 echo "PASS (resumed at ${at} of ${full})"
 
-# The control, on the run that just finished: it wrote blob.bin to disk, so it
-# had a ref of its own to erase, and nothing cut it short. Without this the arms
-# above would pass on a fix that simply stopped erasing.
+# The run that just finished wrote blob.bin, so it had a ref of its own to erase
+# and nothing cut it short. Without this control, the arms above would pass on a
+# fix that simply stopped erasing.
 printf '[the completed --continue erases the directory again] ..\t'
 test ! -d "${out}/hts-cache/ref" ||
     fail "hts-cache/ref survived a mirror nothing interrupted"
