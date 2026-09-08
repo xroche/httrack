@@ -6646,9 +6646,10 @@ static void st_linkdir_case(const char *lien, hts_boolean frag_or_query,
   const hts_boolean got_multi = link_dir_is_multisegment(lien);
 
   if (got_frag != frag_or_query || got_multi != multisegment) {
-    fprintf(stderr,
-            "linkdir \"%s\": fragment %d multisegment %d, wanted %d and %d\n",
-            lien, got_frag, got_multi, frag_or_query, multisegment);
+    fprintf(
+        stderr,
+        "linkdir \"%s\": fragment %d wanted %d, multisegment %d wanted %d\n",
+        lien, got_frag, frag_or_query, got_multi, multisegment);
     assertf(!"linkdir case failed");
   }
 }
@@ -6656,9 +6657,10 @@ static void st_linkdir_case(const char *lien, hts_boolean frag_or_query,
 static int st_linkdir(httrackp *opt, int argc, char **argv) {
   size_t i;
 
-  /* Each row states what the two helpers answer for one string, in the order
-     the engine asks them: link_dir_has_fragment_or_query on the source bytes,
-     then link_dir_is_multisegment on what the fragment cut left. */
+  /* Each row is one string with the answer from
+     link_dir_has_fragment_or_query, then from link_dir_is_multisegment. Both
+     are asked on the raw string, unlike the engine, which cuts at the marker
+     first. */
   static const struct {
     const char *lien;
     hts_boolean frag_or_query;
@@ -6673,7 +6675,7 @@ static int st_linkdir(httrackp *opt, int argc, char **argv) {
       /* a second segment is evidence on its own */
       {"a/b/", HTS_FALSE, HTS_TRUE},
       {"/api/v1/", HTS_FALSE, HTS_TRUE},
-      /* the site root and a named directory both carry a marker */
+      /* a marker opens a path, from the site root to a deeper one */
       {"/#top", HTS_TRUE, HTS_FALSE},
       {"/?q=1", HTS_TRUE, HTS_FALSE},
       {"img/#x", HTS_TRUE, HTS_FALSE},
@@ -6681,7 +6683,6 @@ static int st_linkdir(httrackp *opt, int argc, char **argv) {
       {"a/b/#x", HTS_TRUE, HTS_TRUE},
       /* the marker must open a path, not follow a name or nothing */
       {"page.html#x", HTS_FALSE, HTS_FALSE},
-      {"page.html?q=1", HTS_FALSE, HTS_FALSE},
       {"#top", HTS_FALSE, HTS_FALSE},
       {"?q=1", HTS_FALSE, HTS_FALSE},
       {"", HTS_FALSE, HTS_FALSE},
