@@ -123,11 +123,18 @@ paced() {
     skip_if_out_of_budget "$((cases - n))" "$took"
 }
 
+# What configure resolved BASH_SHELL to, read out of the Makefile it wrote.
+makefile_bash_shell() {
+    sed -n 's/^BASH_SHELL = //p' "$rundir/Makefile"
+}
+
 reject() { # reject <label> <expected message> <env argument>...
     local label=$1 want=$2
     shift 2
     run "$label" "$@"
-    test "$status" -ne 0 || fail "configure accepted $label"
+    # Which BASH_SHELL it ended up with says whether the override arrived at all.
+    test "$status" -ne 0 ||
+        fail_dump "configure accepted $label, BASH_SHELL = $(makefile_bash_shell)" "$rundir/log"
     grep -q "$want" <<<"$log" || {
         echo "$label rejected without '$want':" >&2
         tail -5 <<<"$log" >&2
@@ -146,7 +153,7 @@ accept() {
         tail -10 <<<"$log" >&2
         exit 1
     }
-    got=$(sed -n 's/^BASH_SHELL = //p' "$rundir/Makefile")
+    got=$(makefile_bash_shell)
     test -n "$got" || fail "$label configured, but the Makefile carries no BASH_SHELL"
     if test -n "$path" && test "$got" != "$path"; then
         echo "$label reached the Makefile as $got" >&2
