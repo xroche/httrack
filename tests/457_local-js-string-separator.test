@@ -15,39 +15,43 @@ work=$(mktemp -d)
 trap 'set +e; rm -rf "$work"' EXIT
 
 root="$work/root"
-mkdir -p "$root/subdir" "$root/api/v1" "$root/assets/img" "$root/cdir"
+mkdir -p "$root/subdir" "$root/a/b" "$root/api/v1" "$root/assets/img" "$root/cdir"
 
 cat >"$root/index.html" <<'EOF'
 <!DOCTYPE html><html><head><link rel="stylesheet" href="s.css">
 <script src="app.js"></script></head><body>x</body></html>
 EOF
 
-# Every string here ends in a slash. Only the last two name a path of more than
-# one segment, and only those two may be rewritten.
+# Every string below ends in a slash. Only a path of more than one segment may
+# be followed, so each line carries the count that decides it.
 cat >"$root/app.js" <<'EOF'
-var parts = "a/b".split("/");
-var mime = "image/";
-var key = "Alt+/";
-var rep = "ab".replace(/b/, "$&/");
-var runs = "////";
-var one = "subdir/";
-var api = "/api/v1/";
-var ast = "assets/img/";
+var parts = "a/b".split("/");        // one slash: kept
+var mime = "image/";                 // one slash: kept
+var key = "Alt+/";                   // one slash: kept
+var rep = "ab".replace(/b/, "$&/");  // one slash: kept
+var runs = "////";                   // no name, only slashes: kept
+var one = "subdir/";                 // one slash: kept, so never fetched
+var two = "a/b/";                    // two slashes, short name: followed
+var api = "/api/v1/";                // three slashes: followed
+var ast = "assets/img/";             // two slashes: followed
 EOF
 
 echo '.a { background: url("cdir/"); }' >"$root/s.css"
-for d in subdir api/v1 assets/img cdir; do
+for d in subdir a/b api/v1 assets/img cdir; do
     printf 'reached\n' >"$root/$d/index.html"
 done
 
+# The cdir case cannot fail on the helper, since CSS url() reaches the parser by
+# another path. It is here to catch a fix that drops the inscript test instead.
 bash "$top_srcdir/tests/local-crawl.sh" --root "$root" --errors 0 \
     --file-matches 'app.js' 'split\("/"\)' \
     --file-matches 'app.js' '"image/"' \
     --file-matches 'app.js' '"Alt\+/"' \
     --file-matches 'app.js' '"\$&/"' \
     --file-matches 'app.js' '"////"' \
+    --not-found subdir/index.html \
+    --found a/b/index.html \
     --found api/v1/index.html \
     --found assets/img/index.html \
     --found cdir/index.html \
-    --not-found subdir/index.html \
     httrack BASEURL/index.html -q -%v0 -r4
