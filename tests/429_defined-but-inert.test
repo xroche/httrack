@@ -60,7 +60,7 @@ grep -q '^/\* #undef DLLIB \*/$' "$tmp/nodl/config.h" ||
 
 cpp_argv=(-E -I"$tmp/nodl" -I"$abs_top_builddir" -I"$abs_top_builddir/src"
     -I"$abs_top_srcdir/src" -I"$abs_top_srcdir/src/coucal" -I"$abs_top_srcdir/src/minizip"
-    -DHTS_INTERNAL_BUILD -DHAVE_CONFIG_H)
+    -DHTS_INTERNAL_BUILD)
 if [ -n "${TEST_CPPFLAGS:-}" ]; then
     read -r -a extra_argv <<<"$TEST_CPPFLAGS"
     cpp_argv+=("${extra_argv[@]}")
