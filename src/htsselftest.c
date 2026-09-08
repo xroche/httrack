@@ -6659,8 +6659,8 @@ static int st_linkdir(httrackp *opt, int argc, char **argv) {
 
   /* Each row is one string with the answer from
      link_dir_has_fragment_or_query, then from link_dir_is_multisegment. Both
-     are asked on the raw string, unlike the engine, which cuts at the marker
-     first. */
+     are asked on the raw string here. The engine asks the first on the raw
+     string too, but the second on what the marker cut left. */
   static const struct {
     const char *lien;
     hts_boolean frag_or_query;
@@ -6683,6 +6683,7 @@ static int st_linkdir(httrackp *opt, int argc, char **argv) {
       {"a/b/#x", HTS_TRUE, HTS_TRUE},
       /* the marker must open a path, not follow a name or nothing */
       {"page.html#x", HTS_FALSE, HTS_FALSE},
+      {"page.html?q=1", HTS_FALSE, HTS_FALSE},
       {"#top", HTS_FALSE, HTS_FALSE},
       {"?q=1", HTS_FALSE, HTS_FALSE},
       {"", HTS_FALSE, HTS_FALSE},
