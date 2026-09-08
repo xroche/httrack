@@ -2852,8 +2852,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             default: { // anything else: asp, cgi, images..
                               char BIGSTK mime[HTS_MIMETYPE_SIZE];
 
-                              // an <img> needs an image placeholder, or the
-                              // browser just draws a broken image
+                              // A name the mime table calls an image gets a
+                              // GIF, not a broken <img>.
                               if (get_httptype_sized(opt, mime, sizeof(mime),
                                                      afs.af.fil, 0) &&
                                   strfield(mime, "image/")) {
