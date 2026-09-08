@@ -77,10 +77,10 @@ hts_boolean link_base_is_hostname(const char *lien);
    that way too. A second slash is. */
 hts_boolean link_dir_is_multisegment(const char *lien);
 /* Does a fragment or a query open right after a directory path? True for
-   "/#top" and "img/#x", false for "////#x", which carries no name. Pass the
-   source bytes, because unescape_amp turns "&#35;" into a '#' no script
-   wrote. */
-hts_boolean link_dir_has_fragment(const char *lien);
+   "/#top" and "img/#x". False for "page.html#x", whose marker follows a name,
+   and for "////#x", which carries no name. Pass the source bytes, because
+   unescape_amp turns "&#35;" into a '#' no script wrote. */
+hts_boolean link_dir_has_fragment_or_query(const char *lien);
 int link_has_authorization(const char *lien);
 void long_to_83(int mode, char *n83, size_t n83size, char *save);
 void longfile_to_83(int mode, char *n83, size_t n83size, char *save);

@@ -1746,8 +1746,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                               /* Ask before the cut destroys the evidence
                                  and unescape_amp forges it. */
-                              int had_fragment_or_query =
-                                  link_dir_has_fragment(tempo);
+                              hts_boolean had_fragment_or_query =
+                                  link_dir_has_fragment_or_query(tempo);
 
                               // escape                              
                               unescape_amp(tempo);

@@ -401,7 +401,7 @@ hts_boolean link_dir_is_multisegment(const char *lien) {
   return (slashes >= 2 && other != 0) ? HTS_TRUE : HTS_FALSE;
 }
 
-hts_boolean link_dir_has_fragment(const char *lien) {
+hts_boolean link_dir_has_fragment_or_query(const char *lien) {
   const size_t cut = strcspn(lien, "#?");
 
   if (cut == 0 || lien[cut] == '\0' || lien[cut - 1] != '/')
