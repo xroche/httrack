@@ -28,7 +28,7 @@ tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_wdnat.XXXXXX")
 sinkpidfile="$tmp/sink.pid"
 : >"$sinkpidfile"
 toppid=$$
-trap 'set +e; report_gaps; stop_server "$(cat "$sinkpidfile" 2>/dev/null)"; rm -rf "$tmp"' EXIT
+trap 'set +e; stop_server "$(cat "$sinkpidfile" 2>/dev/null)"; rm -rf "$tmp"; report_gaps' EXIT
 trap 'exit 1' TERM
 # Signalled, since a bare exit only ends the subshell a leg runs in.
 fail() {
@@ -46,9 +46,9 @@ note_coverage() {
         echo "226_watchdog-native: $*" >>"$GITHUB_STEP_SUMMARY"; } 2>/dev/null || true
 }
 
-# Checks that could not run. Reported from the EXIT trap, because the pacer's
-# skip_if_out_of_budget exits from inside testlib and would otherwise take the
-# whole list with it on exactly the starved run the list exists for.
+# Checks that could not run, reported before the OK line and again from the EXIT
+# trap. The trap is the fallback: the pacer's skip_if_out_of_budget exits from
+# inside testlib, and would otherwise take the whole list with it.
 skipped=()
 report_gaps() {
     local gap
@@ -1015,7 +1015,7 @@ for psrun in "${psruns[@]}"; do
         if test -n "$box" && test "$box" -le 30; then
             fail "the $psrun watchdog gave under two due ticks in 12s at a 1s interval, on a box that ran ten 1s sleeps in ${box}s"
         fi
-        # shellcheck disable=SC2031 # main shell: the $( ) above is not an enclosing subshell
+        # shellcheck disable=SC2031 # only fires under -x, and this is the main shell
         skipped+=("the whole $psrun body: ten 1s sleeps took ${box:-over 120}s, so the box could not be calibrated")
         continue
     fi
