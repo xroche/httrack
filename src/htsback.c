@@ -100,6 +100,7 @@ typedef enum {
 
 static hts_mirror_limit back_mirror_limit(httrackp *opt);
 static hts_boolean back_mirror_capped(const httrackp *opt);
+static hts_boolean back_is_live(const int status);
 
 /* NULL when the slot table cannot be allocated, which httpmirror() already
    answers by aborting the mirror with a message. Failing here rather than
@@ -226,6 +227,17 @@ void back_delete_all(httrackp * opt, cache_back * cache, struct_back * sback) {
     /* An FTP worker writes through its slot until it returns, so nothing here
        may wipe or free one under it. */
     ftp_stop_workers();
+    /* A slot still writing when the mirror ends leaves its partial on disk, so
+       hts-cache/ref must outlive the run (#1595). back_abort_slot() catches the
+       ones a sweep took, and the link loop can end a capped mirror before that
+       sweep ever runs (htscore.c, back_checkmirror). */
+    for (i = 0; i < sback->count; i++) {
+      const lien_back *const back = &sback->lnk[i];
+
+      if (back_is_live(back->status) && back->r.is_write &&
+          !IS_DELAYED_EXT(back->url_sav))
+        opt->abort_left_partial = HTS_TRUE;
+    }
     // delete live slots
     for(i = 0; i < sback->count; i++) {
       back_delete(opt, cache, sback, i);
@@ -3273,6 +3285,10 @@ static void back_abort_slot(httrackp *opt, struct_back *sback, const int p,
   /* drop a .delayed placeholder; real partials survive for resume */
   if (back->r.is_write && IS_DELAYED_EXT(back->url_sav))
     back_delayed_discard(opt, back);
+  /* That partial outlives the run, so hts-cache/ref must too or the next
+     --continue refetches the file whole (#1595). */
+  else if (back->r.is_write)
+    opt->abort_left_partial = HTS_TRUE;
   back->r.statuscode = statuscode;
   strcpybuff(back->r.msg, msg);
   back->status = STATUS_READY;
@@ -3289,15 +3305,10 @@ static int back_abort_stopped(httrackp *opt, struct_back *sback) {
   int i;
 
   for (i = 0; i < sback->count; i++) {
-    const lien_back *const back = &sback->lnk[i];
-    const int status = back->status;
+    const int status = sback->lnk[i].status;
 
     if (!back_is_live(status) || (grace && !back_is_preconnect(status)))
       continue;
-    /* The partial stays on disk, so hts-cache/ref must outlive the run or
-       --continue refetches it whole (#1595). */
-    if (back->r.is_write && !IS_DELAYED_EXT(back->url_sav))
-      opt->stop_left_partial = HTS_TRUE;
     /* fatal, as back_add() reports a stop: no retry may reschedule the link */
     back_abort_slot(opt, sback, i, STATUSCODE_INVALID, "mirror stopped by user",
                     WARC_TRUNC_NONE);
@@ -3307,7 +3318,8 @@ static int back_abort_stopped(httrackp *opt, struct_back *sback) {
 }
 
 /* Abort every live slot once a cap has overrun its grace, and return the
-   count. Its partial body is archived: the truncation is the user's own cap. */
+   count. Its partial body is archived, because the truncation is the user's own
+   cap, and back_abort_slot() keeps the resume data describing it. */
 static int back_abort_limit(httrackp *opt, struct_back *sback,
                             const hts_mirror_limit limit) {
   const hts_boolean size = limit == HTS_MIRROR_LIMIT_SIZE;
