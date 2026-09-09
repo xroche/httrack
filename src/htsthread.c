@@ -101,6 +101,7 @@ typedef struct hts_thread_s {
 /* Set once before any thread is spawned, hence unlocked. */
 static void *(*thread_enter)(void) = NULL;
 static void (*thread_leave)(void *cookie) = NULL;
+static void (*thread_runner)(void (*fun)(void *arg), void *arg) = NULL;
 
 HTSEXT_API void hts_set_thread_hooks(void *(*enter)(void),
                                      void (*leave)(void *cookie)) {
@@ -109,6 +110,11 @@ HTSEXT_API void hts_set_thread_hooks(void *(*enter)(void),
 
   thread_enter = paired ? enter : NULL;
   thread_leave = paired ? leave : NULL;
+}
+
+HTSEXT_API void hts_set_thread_runner(void (*runner)(void (*fun)(void *arg),
+                                                     void *arg)) {
+  thread_runner = runner;
 }
 
 #ifdef _WIN32
@@ -126,7 +132,10 @@ static void *hts_entry_point(void *tharg)
 
   cookie = thread_enter != NULL ? thread_enter() : NULL;
   /* run */
-  fun(arg);
+  if (thread_runner != NULL)
+    thread_runner(fun, arg);
+  else
+    fun(arg);
   if (thread_leave != NULL)
     thread_leave(cookie);
 

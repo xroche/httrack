@@ -21,6 +21,10 @@ Linux) traced=1 ;;
 *) traced=0 ;;
 esac
 require_httrack
+have_feature crashtest || {
+    echo "built with --disable-crash-test, skipping" >&2
+    exit 77
+}
 # --disable-auto-features drops backtrace() on Linux too, and only the trace
 # text below needs it; the sigaltstack half still applies.
 test "${traced}" -eq 0 || have_feature backtrace || traced=0
@@ -52,6 +56,13 @@ worker=$(crash_report threadstack)
 
 grep -q "Crash test worker thread started" <<<"$worker" ||
     fail "-#c=threadstack: no worker was spawned, nothing was tested"
+
+# A worker fault with the stack intact. threadstack moves two variables at once,
+# a thread the handler never registered and no stack left to run it on, so it
+# cannot show on its own that the handler reaches a worker at all.
+worker_plain=$(crash_report threadsegv)
+grep -q "Crash test worker thread started" <<<"$worker_plain" ||
+    fail "-#c=threadsegv: no worker was spawned, nothing was tested"
 
 if [ "$traced" -eq 0 ]; then
     exit 0

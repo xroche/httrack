@@ -68,6 +68,14 @@ HTSEXT_API int hts_newthread(void (*fun) (void *arg), void *arg);
 HTSEXT_API void hts_set_thread_hooks(void *(*enter)(void),
                                      void (*leave)(void *cookie));
 
+/* Runs each worker's body inside a caller-supplied frame, for a crash handler
+   that has to lexically enclose the call: Android's COFFEE_TRY is sigsetjmp
+   plus a block, which the hooks above cannot express. 'runner' must call
+   'fun(arg)' exactly once; NULL restores the plain call. Set before spawning,
+   and it runs between 'enter' and 'leave'. */
+HTSEXT_API void hts_set_thread_runner(void (*runner)(void (*fun)(void *arg),
+                                                     void *arg));
+
 HTSEXT_API void htsthread_wait_n(int n_wait);
 
 /* Locking functions */

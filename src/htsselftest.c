@@ -1271,6 +1271,11 @@ static int st_features(httrackp *opt, int argc, char **argv) {
 #else
   printf("iconv 1\n");
 #endif
+#ifdef HTS_CRASH_TEST
+  printf("crashtest 1\n");
+#else
+  printf("crashtest 0\n");
+#endif
   return 0;
 }
 
@@ -13074,6 +13079,94 @@ static int st_threadwait(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* A crash handler that has to lexically wrap the worker body gets in through
+   hts_set_thread_runner(); the hooks only bracket the call. Records the order
+   so a runner that never encloses the body, or one the engine calls beside
+   fun() rather than around it, both fail. */
+static htsmutex threadrunner_lock = HTSMUTEX_INIT;
+static int threadrunner_before = 0;
+static int threadrunner_body = 0;
+static int threadrunner_after = 0;
+static int threadrunner_out_of_order = 0;
+
+static void threadrunner_count(int *what) {
+  hts_mutexlock(&threadrunner_lock);
+  (*what)++;
+  hts_mutexrelease(&threadrunner_lock);
+}
+
+static void threadrunner_body_fn(void *arg) {
+  (void) arg;
+  hts_mutexlock(&threadrunner_lock);
+  /* The body must run inside the runner, never before it or after it. */
+  if (threadrunner_before != 1 || threadrunner_after != 0)
+    threadrunner_out_of_order = 1;
+  threadrunner_body++;
+  hts_mutexrelease(&threadrunner_lock);
+}
+
+static void threadrunner_runner(void (*fun)(void *arg), void *arg) {
+  threadrunner_count(&threadrunner_before);
+  fun(arg);
+  threadrunner_count(&threadrunner_after);
+}
+
+static int threadrunner_spawn(void) {
+  if (hts_newthread(threadrunner_body_fn, NULL) != 0) {
+    fprintf(stderr, "threadrunner: cannot spawn\n");
+    return 1;
+  }
+  htsthread_wait();
+  return 0;
+}
+
+static int st_threadrunner(httrackp *opt, int argc, char **argv) {
+  int err = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  hts_set_thread_runner(threadrunner_runner);
+  err = threadrunner_spawn();
+  /* Cleared before any check can return early: the runner is process-global
+     and selftest_queue runs the rest of the file in this same engine. */
+  hts_set_thread_runner(NULL);
+  if (err != 0)
+    return err;
+
+  if (threadrunner_before != 1 || threadrunner_after != 1) {
+    fprintf(stderr, "threadrunner: runner entered %d time(s), left %d\n",
+            threadrunner_before, threadrunner_after);
+    err = 1;
+  }
+  if (threadrunner_body != 1) {
+    fprintf(stderr, "threadrunner: the body ran %d time(s), expected once\n",
+            threadrunner_body);
+    err = 1;
+  }
+  if (threadrunner_out_of_order) {
+    fprintf(stderr, "threadrunner: the body ran outside the runner\n");
+    err = 1;
+  }
+
+  /* NULL restores the plain call: the worker runs, the runner does not. */
+  if (threadrunner_spawn() != 0)
+    return 1;
+  if (threadrunner_body != 2) {
+    fprintf(stderr, "threadrunner: no runner, the body ran %d time(s)\n",
+            threadrunner_body);
+    err = 1;
+  }
+  if (threadrunner_before != 1 || threadrunner_after != 1) {
+    fprintf(stderr, "threadrunner: a cleared runner still ran\n");
+    err = 1;
+  }
+
+  printf("threadrunner self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 /* #794: hts_gmtime() must own its output. The table is an independent oracle;
    the threaded phase is what corrupts if it ever goes back to gmtime()'s
    shared static. */
@@ -15052,6 +15145,9 @@ static const struct selftest_entry {
     {"assumemime", "[128|256|1024]",
      "--assume value clipped to each MIME destination", st_assumemime},
     {"features", "", "which optional features this build has", st_features},
+    {"threadrunner", "",
+     "a registered thread runner encloses each worker body exactly once",
+     st_threadrunner},
     {"charset", "<charset> <hex:..|string>",
      "convert a string to UTF-8 from a charset", st_charset},
     {"syscharset", "", "UTF-8 <-> system codepage conversion (WIN32 only)",

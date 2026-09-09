@@ -7,6 +7,15 @@
 
 set -eu
 
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+require_httrack
+have_feature crashtest || {
+    echo "built with --disable-crash-test, skipping" >&2
+    exit 77
+}
+
 ulimit -c 0 # a deliberate crash must not litter the box with cores
 
 # Dies from a caught fault, announcing it was deliberate and printing the

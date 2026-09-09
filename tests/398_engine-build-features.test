@@ -39,11 +39,12 @@ want_feature() {
         ;;
     # Absent, or defined to anything but 0, means iconv is compiled in.
     iconv) macro_is "${config}" HTS_USEICONV 0 && echo 0 || echo 1 ;;
+    crashtest) macro_is "${config}" HTS_CRASH_TEST 1 && echo 1 || echo 0 ;;
     *) fail "unknown feature $1" ;;
     esac
 }
 
-known="brotli zstd backtrace iconv"
+known="brotli zstd backtrace iconv crashtest"
 for f in ${known}; do
     got=$(sed -n "s/^${f} //p" <<<"${report}")
     test -n "${got}" || fail "-#test=features reports nothing for ${f}"

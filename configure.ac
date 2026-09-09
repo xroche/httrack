@@ -503,6 +503,29 @@ AS_IF([test x"$backtrace_platform" = x"no"],
 	[AC_MSG_RESULT([$backtrace_have (requested)])])
 AC_SUBST([BACKTRACE_LIBS])
 
+## -#c faults on purpose so the crash handlers can be tested. On by default
+## because the suite drives it; an application embedding the engine wants it
+## gone, as the option is otherwise reachable from whatever argv it builds.
+AC_ARG_ENABLE([crash-test],
+	[AS_HELP_STRING([--disable-crash-test],
+		[drop the hidden -#c option, which crashes on purpose to test crash handlers @<:@default=enabled@:>@])],
+	[
+	case "${enableval}" in
+	no|yes)
+		crash_test=$enableval
+		;;
+	*)
+		AC_MSG_ERROR([bad value for crash-test, expected yes/no])
+		;;
+	esac
+	],
+	[crash_test=yes])
+AC_MSG_CHECKING([whether to build the deliberate-crash test option])
+AC_MSG_RESULT([$crash_test])
+AS_IF([test x"$crash_test" = x"yes"],
+	[AC_DEFINE([HTS_CRASH_TEST], [1],
+		[Define to 1 to build the hidden -#c crash-test option.])])
+
 ## CSPRNG for the --single-file mark; /dev/urandom is the fallback
 AC_CHECK_FUNCS([getrandom])
 

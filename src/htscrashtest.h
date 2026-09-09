@@ -40,6 +40,8 @@ Please visit our Website: http://www.httrack.com
 extern "C" {
 #endif
 
+#ifdef HTS_CRASH_TEST
+
 /* Crash the process on purpose, after announcing it on stderr so the log tells
    a deliberate crash from a real one. 'kind' selects the fault and defaults to
    "segv" when NULL or empty; hts_crash_test_kinds() lists the accepted names.
@@ -48,6 +50,8 @@ hts_boolean hts_crash_test(const char *kind);
 
 /* The names hts_crash_test() accepts, comma-separated, for diagnostics. */
 const char *hts_crash_test_kinds(void);
+
+#endif
 
 #ifdef __cplusplus
 }
