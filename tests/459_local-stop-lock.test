@@ -1,0 +1,74 @@
+#!/bin/bash
+# hts-stop.lock is how a script pauses a running engine, under the same staleness
+# rule as hts-abort.lock. The engine pauses only for a request stamped later than
+# the run's own hts-in_progress.lock that it could also delete, so a copy an
+# earlier mirror left behind no longer pauses the next one.
+set -eu
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+# The C side has HTS_PAUSE_LOCKNAME for the first of these.
+STOPLOCK=hts-stop.lock
+PAUSEDLOCK=hts-paused.lock
+PROGRESSLOCK=hts-in_progress.lock
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_stoplock.XXXXXX") || exit 1
+crawlpid=
+cleanup() {
+    if test -n "$crawlpid"; then kill -9 "$crawlpid" 2>/dev/null || true; fi
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+stop_crawl() {
+    if test -n "$crawlpid"; then
+        kill -9 "$crawlpid" 2>/dev/null || true
+        wait "$crawlpid" 2>/dev/null || true
+        crawlpid=
+    fi
+}
+
+require_httrack
+
+assert_lockrule_selftest stoplock
+
+local_server_start
+common=(--quiet --disable-security-limits --robots=0 --timeout=30 --retries=0 -c1)
+
+# Before the staleness rule the engine took any hts-stop.lock it found, so a
+# copy left in a reused output directory paused the next mirror. Dated back,
+# because the engine backdates its own progress lock by a second. A file written
+# just before the mirror starts lands inside that second.
+printf '[a request left behind does not pause the next mirror] ..\t'
+out="${tmpdir}/stale"
+mkdir -p "$out"
+touch -t 200001010000 "${out}/${STOPLOCK}"
+httrack -O "$out" "${common[@]}" "${BASEURL}/simple/basic.html" \
+    >"${tmpdir}/log-stale" 2>&1 &
+crawlpid=$!
+wait_until "! kill -0 '$crawlpid' 2>/dev/null" \
+    "60s on, the mirror had not finished: the request it inherited paused it" 600
+wait "$crawlpid" 2>/dev/null || fail "the mirror failed outright"
+crawlpid=
+test -e "${out}/${STOPLOCK}" ||
+    fail "the mirror deleted a request that was never aimed at it"
+test -n "$(find "$out" -name 'basic.html' 2>/dev/null)" ||
+    fail "the mirror saved nothing"
+echo "OK"
+
+# The control for the arm above: the same file, stamped after this run started,
+# still pauses. Rate-capped /bigfiles/ keeps the engine polling long enough.
+printf '[a request aimed at this run pauses it] ..\t'
+out="${tmpdir}/fresh"
+httrack -O "$out" "${common[@]}" --max-rate=200000 \
+    "${BASEURL}/bigfiles/index.html" >"${tmpdir}/log-fresh" 2>&1 &
+crawlpid=$!
+wait_until "test -e '${out}/${PROGRESSLOCK}'" "the crawl never got going"
+: >"${out}/${STOPLOCK}"
+wait_until "test -e '${out}/${PAUSEDLOCK}'" \
+    "30s on, a running engine had not paused"
+test ! -e "${out}/${STOPLOCK}" ||
+    fail "the engine paused without taking the request that asked for it"
+stop_crawl
+echo "OK"

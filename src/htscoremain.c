@@ -2901,13 +2901,13 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             fprintf(fp, "\"%s\" ", argv[i]);
         }
         fprintf(fp, LF);
-        fprintf(fp,
-                "To pause the engine: create an empty file named 'hts-stop.lock'"
-                LF);
+        fprintf(fp, "To pause the engine: create an empty file named "
+                    "'" HTS_PAUSE_LOCKNAME "' (an earlier run's copy is"
+                    " ignored, so create it again)" LF);
         fprintf(fp,
                 "To stop it and keep the mirror: create an empty file named "
-                "'" HTS_ABORT_LOCKNAME "' (a copy left by an earlier run is"
-                " ignored: create it again)" LF);
+                "'" HTS_ABORT_LOCKNAME "' (an earlier run's copy is"
+                " ignored, so create it again)" LF);
 #if USE_BEGINTHREAD
         fprintf(fp, "PID=%d\n", (int) getpid());
 #ifndef _WIN32
@@ -2918,6 +2918,13 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 #endif
         fclose(fp);
         fp = NULL;
+        /* One second back, so a request written the instant this file appears
+           sorts after it even where the filesystem stamps whole seconds. */
+        if (!hts_file_backdate(n_lock, 1) && opt->log != NULL)
+          hts_log_print(
+              opt, LOG_WARNING,
+              "engine: could not date hts-in_progress.lock back, so a"
+              " stop request written in this first second is ignored");
       }
       // fichier log        
       if (opt->log) {

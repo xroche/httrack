@@ -2877,6 +2877,119 @@ time_t get_filetime(const char *file) {
 }
 
 /* Note: utf-8 */
+hts_boolean hts_file_mtime(const char *file, hts_filetime_t *when) {
+#ifdef _WIN32
+  /* _wstat64()'s st_mtime is whole seconds even in an x64 build, and whole
+     seconds cannot order a request against a mirror that started in the same
+     one. GetFileAttributesExW reports 100ns ticks. */
+  WIN32_FILE_ATTRIBUTE_DATA attr;
+  LPWSTR wfile = hts_pathToUCS2(file);
+  ULARGE_INTEGER ticks;
+
+  if (wfile == NULL)
+    return HTS_FALSE;
+  if (!GetFileAttributesExW(wfile, GetFileExInfoStandard, &attr)) {
+    freet(wfile);
+    return HTS_FALSE;
+  }
+  freet(wfile);
+  ticks.LowPart = attr.ftLastWriteTime.dwLowDateTime;
+  ticks.HighPart = attr.ftLastWriteTime.dwHighDateTime;
+  when->sec = (int64_t) (ticks.QuadPart / 10000000ULL);
+  when->nsec = (int32_t) ((ticks.QuadPart % 10000000ULL) * 100);
+  when->is_plain_file = (attr.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0
+                            ? HTS_TRUE
+                            : HTS_FALSE;
+  return HTS_TRUE;
+#else
+  STRUCT_STAT buf;
+
+  if (STAT(file, &buf) != 0)
+    return HTS_FALSE;
+  when->sec = (int64_t) buf.st_mtime;
+#if defined(HAVE_STRUCT_STAT_ST_MTIM_TV_NSEC)
+  when->nsec = (int32_t) buf.st_mtim.tv_nsec; /* POSIX 2008 */
+#elif defined(HAVE_STRUCT_STAT_ST_MTIMESPEC_TV_NSEC)
+  when->nsec = (int32_t) buf.st_mtimespec.tv_nsec; /* macOS, older BSD */
+#else
+  /* Whole seconds, which is all a FAT or exFAT filesystem keeps anyway. */
+  when->nsec = 0;
+#endif
+  when->is_plain_file = S_ISREG(buf.st_mode) ? HTS_TRUE : HTS_FALSE;
+  return HTS_TRUE;
+#endif
+}
+
+/* Note: utf-8 */
+hts_boolean hts_file_is_newer(const char *a, const char *b) {
+  hts_filetime_t ta, tb;
+
+  if (!hts_file_mtime(a, &ta) || !ta.is_plain_file)
+    return HTS_FALSE;
+  if (!hts_file_mtime(b, &tb))
+    return HTS_FALSE;
+  if (ta.sec != tb.sec)
+    return ta.sec > tb.sec ? HTS_TRUE : HTS_FALSE;
+  return ta.nsec > tb.nsec ? HTS_TRUE : HTS_FALSE;
+}
+
+/* Note: utf-8 */
+hts_boolean hts_file_backdate(const char *file, int seconds) {
+  hts_filetime_t when;
+
+  /* The file's own stamp rather than a fresh clock reading, so the two can not
+     disagree about when this file was written. */
+  if (!hts_file_mtime(file, &when))
+    return HTS_FALSE;
+  when.sec -= seconds;
+#ifdef _WIN32
+  {
+    LPWSTR wfile = hts_pathToUCS2(file);
+    ULARGE_INTEGER ticks;
+    FILETIME ft;
+    HANDLE h;
+    hts_boolean ok;
+
+    if (wfile == NULL)
+      return HTS_FALSE;
+    h = CreateFileW(wfile, FILE_WRITE_ATTRIBUTES,
+                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                    NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    freet(wfile);
+    if (h == INVALID_HANDLE_VALUE)
+      return HTS_FALSE;
+    if (when.sec < 0) { /* no write time on this volume */
+      CloseHandle(h);
+      return HTS_FALSE;
+    }
+    ticks.QuadPart =
+        (ULONGLONG) when.sec * 10000000ULL + (ULONGLONG) (when.nsec / 100);
+    ft.dwLowDateTime = ticks.LowPart;
+    ft.dwHighDateTime = ticks.HighPart;
+    ok = SetFileTime(h, NULL, NULL, &ft) ? HTS_TRUE : HTS_FALSE;
+    CloseHandle(h);
+    return ok;
+  }
+#elif defined(HAVE_UTIMENSAT)
+  {
+    struct timespec times[2];
+
+    times[0].tv_sec = times[1].tv_sec = (time_t) when.sec;
+    times[0].tv_nsec = times[1].tv_nsec = (long) when.nsec;
+    return utimensat(AT_FDCWD, file, times, 0) == 0 ? HTS_TRUE : HTS_FALSE;
+  }
+#else
+  {
+    struct timeval times[2];
+
+    times[0].tv_sec = times[1].tv_sec = (time_t) when.sec;
+    times[0].tv_usec = times[1].tv_usec = (long) (when.nsec / 1000);
+    return utimes(file, times) == 0 ? HTS_TRUE : HTS_FALSE;
+  }
+#endif
+}
+
+/* Note: utf-8 */
 int get_filetime_rfc822(const char *file, char *date) {
   STRUCT_STAT buf;
 

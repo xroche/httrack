@@ -24,10 +24,6 @@ cleanup() {
 }
 cleanup_push cleanup
 
-mtime() { # mtime <file>, whole seconds, which is what get_filetime compares
-    stat -c '%Y' "$1" 2>/dev/null || stat -f '%m' "$1"
-}
-
 require_httrack
 local_server_start
 

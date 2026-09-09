@@ -16,15 +16,9 @@ tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_abortlock.XXXXXX") || exit 1
 crawlpid=
 cleanup() {
     if test -n "$crawlpid"; then kill -9 "$crawlpid" 2>/dev/null || true; fi
-    # The rule self-test leaves a directory it made read-only on purpose.
-    chmod -R u+w "$tmpdir" 2>/dev/null || true
     rm -rf "$tmpdir"
 }
 cleanup_push cleanup
-
-# mktemp gives 0700, which the unprivileged euid the rule self-test borrows on a
-# root runner cannot walk through.
-chmod 0755 "$tmpdir"
 
 stop_crawl() {
     if test -n "$crawlpid"; then
@@ -34,25 +28,9 @@ stop_crawl() {
     fi
 }
 
-# The request has to land in a later whole second than the progress lock, which
-# is what the engine compares it against.
-next_second() { sleep 1; }
-
 require_httrack
 
-printf '[the rule itself] ..\t'
-st_out=$(httrack -O "${tmpdir}/st" "-#test=abortlock" \
-    "$(nativepath "${tmpdir}/rule")" 2>&1) ||
-    fail "the rule self-test exited non-zero: ${st_out}"
-case "$st_out" in
-*"abortlock self-test: OK"*) ;;
-*) fail "the rule self-test did not report OK: ${st_out}" ;;
-esac
-# Nothing portable makes a delete fail, so that arm names what covered it here
-# rather than skipping in silence.
-coverage=$(printf '%s\n' "$st_out" | command grep 'undeletable request: ') ||
-    fail "the rule self-test said nothing about an undeletable request"
-echo "OK (${coverage#*: })"
+assert_lockrule_selftest abortlock
 
 local_server_start
 common=(--quiet --disable-security-limits --robots=0 --timeout=30 --retries=0 -c1)
@@ -65,7 +43,11 @@ httrack -O "$out" "${common[@]}" "${BASEURL}/trickle/index.html" \
     >"${tmpdir}/log-running" 2>&1 &
 crawlpid=$!
 wait_until "test -e '${out}/${PROGRESSLOCK}'" "the crawl never got going"
-next_second
+# The engine dates that lock a second back, so a request written the instant it
+# appears is newer than it whatever resolution the filesystem keeps.
+: >"${tmpdir}/probe"
+test "$(mtime "${tmpdir}/probe")" -gt "$(mtime "${out}/${PROGRESSLOCK}")" ||
+    fail "the engine did not date ${PROGRESSLOCK} back, so a request written the moment it appears can tie it"
 : >"${out}/${ABORTLOCK}"
 wait_until "test ! -e '${out}/${ABORTLOCK}'" \
     "30s on, a running engine had not read the request"
@@ -81,7 +63,9 @@ httrack -O "$out" "${common[@]}" --max-rate=200000 \
     "${BASEURL}/bigfiles/index.html" >"${tmpdir}/log-keep" 2>&1 &
 crawlpid=$!
 wait_until "test -e '${out}/${PROGRESSLOCK}'" "the crawl never got going"
-next_second
+# The abort has to find a transfer already running, or there is no resume data
+# for it to keep.
+sleep 1
 : >"${out}/${ABORTLOCK}"
 wait_until "test ! -e '${out}/${ABORTLOCK}'" \
     "30s on, a running engine had not read the request"
@@ -100,7 +84,6 @@ httrack -O "$out" "${common[@]}" --max-rate=200000 \
     "${BASEURL}/bigfiles/index.html" >"${tmpdir}/log-paused" 2>&1 &
 crawlpid=$!
 wait_until "test -e '${out}/${PROGRESSLOCK}'" "the crawl never got going"
-next_second
 : >"${out}/hts-stop.lock"
 wait_until "test -e '${out}/hts-paused.lock'" "the engine never paused"
 # A frozen mirror writes nothing, and the wait re-reads once a second, so three
@@ -119,10 +102,12 @@ stop_crawl
 echo "OK"
 
 # A request older than the mirror that finds it was aimed at an earlier run.
+# Dated back, because the engine backdates its own progress lock by a second. A
+# file written just before the mirror starts lands inside that second.
 printf '[a request left behind does not stop the next mirror] ..\t'
 out="${tmpdir}/stale"
 mkdir -p "$out"
-: >"${out}/${ABORTLOCK}"
+touch -t 200001010000 "${out}/${ABORTLOCK}"
 local_crawl --log "${tmpdir}/log-stale" -O "$out" "${common[@]}" \
     "${BASEURL}/simple/basic.html" || fail "the mirror failed outright"
 test -n "$(find "$out" -name 'basic.html' 2>/dev/null)" ||

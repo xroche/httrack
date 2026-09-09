@@ -4171,31 +4171,25 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
 
 }
 
-/* Modification time of NAME in the output directory, (time_t) -1 if absent. */
-static time_t hts_lock_time(httrackp *opt, const char *name) {
-  return get_filetime(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                              StringBuff(opt->path_log), name));
-}
+hts_boolean hts_take_lock_request(httrackp *opt, const char *name) {
+  /* OPT_GET_BUFF rotates, so both paths stay valid at once. */
+  const char *const request = fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                      StringBuff(opt->path_log), name);
+  const char *const progress =
+      fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+              StringBuff(opt->path_log), "hts-in_progress.lock");
 
-hts_boolean hts_take_abort_request(httrackp *opt) {
-  time_t asked, started;
-
-  if (!fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                           StringBuff(opt->path_log), HTS_ABORT_LOCKNAME)))
+  if (!fexist_utf8(request))
     return HTS_FALSE;
   /* A request no newer than this run's progress lock was aimed at an earlier
-     mirror, so it neither stops this one nor is ours to delete. Whole seconds
-     everywhere, so a clock stepping back makes the file inert meanwhile. */
-  asked = hts_lock_time(opt, HTS_ABORT_LOCKNAME);
-  started = hts_lock_time(opt, "hts-in_progress.lock");
-  if (asked == (time_t) -1 || started == (time_t) -1 || asked <= started)
+     mirror, and is neither ours to act on nor to delete. A clock stepping back
+     still makes the file inert meanwhile. */
+  if (!hts_file_is_newer(request, progress))
     return HTS_FALSE;
-  UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                 StringBuff(opt->path_log), HTS_ABORT_LOCKNAME));
+  UNLINK(request);
   /* A lock still there is one we may never be able to remove, and acting on it
-     would stop the mirror on this poll and on every one after it. */
-  if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                          StringBuff(opt->path_log), HTS_ABORT_LOCKNAME)))
+     would fire on this poll and on every one after it. */
+  if (fexist_utf8(request))
     return HTS_FALSE;
   return HTS_TRUE;
 }
@@ -4215,7 +4209,7 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
 #endif
 
   /* Windows has no cross-process SIGTERM: a stop request arrives as a file. */
-  if (hts_take_abort_request(opt)) {
+  if (hts_take_lock_request(opt, HTS_ABORT_LOCKNAME)) {
     hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
     *stre->exit_xh_ = 1;
     XH_uninit;
@@ -4226,16 +4220,8 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
   {
     int do_pause = 0;
 
-    // user pause lockfile : create hts-paused.lock --> HTTrack will be paused
-    if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                            StringBuff(opt->path_log), "hts-stop.lock"))) {
-      // remove lockfile
-      UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                     StringBuff(opt->path_log), "hts-stop.lock"));
-      if (!fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                               StringBuff(opt->path_log), "hts-stop.lock"))) {
-        do_pause = 1;
-      }
+    if (hts_take_lock_request(opt, HTS_PAUSE_LOCKNAME)) {
+      do_pause = 1;
     }
     // after receving N bytes, pause
     if (opt->fragment > 0) {
@@ -4383,7 +4369,7 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
       }
       /* Read here as well, or a mirror down to its last socket sees no stop
          request until the transfer it waits on has ended. */
-      if (hts_take_abort_request(opt)) {
+      if (hts_take_lock_request(opt, HTS_ABORT_LOCKNAME)) {
         hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
         *stre->exit_xh_ = 1;
       }

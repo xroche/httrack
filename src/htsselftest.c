@@ -13989,10 +13989,10 @@ static int st_batch(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
-// -#test=abortlock <dir>: hts_take_abort_request() stops the mirror only for a
-// request stamped after this run's hts-in_progress.lock that it could also
-// delete, and it leaves every other lock file alone.
-static hts_boolean st_abortlock_touch(const char *path) {
+// -#test=abortlock|stoplock <dir>: hts_take_lock_request() takes a request only
+// when it is stamped after this run's hts-in_progress.lock and the engine could
+// also delete it. It leaves every other lock file alone.
+static hts_boolean st_lockrule_touch(const char *path) {
   FILE *const fp = FOPEN(path, "wb");
 
   if (fp == NULL)
@@ -14001,45 +14001,248 @@ static hts_boolean st_abortlock_touch(const char *path) {
   return HTS_TRUE;
 }
 
-static hts_boolean st_abortlock_stamp(const char *path, time_t when) {
+static hts_boolean st_lockrule_stamp(const char *path, time_t when) {
   STRUCT_UTIMBUF times;
 
   times.actime = times.modtime = when;
   return UTIME(path, &times) == 0 ? HTS_TRUE : HTS_FALSE;
 }
 
-/* Set up <dir>/, its progress and pause locks, and a request stamped WHEN. */
-static hts_boolean st_abortlock_setup(const char *dir, char *lock,
-                                      size_t locksz, char *progress,
-                                      size_t progresssz, char *stop,
-                                      size_t stopsz, time_t when) {
-  strlcpybuff(lock, dir, locksz);
-  strlcatbuff(lock, HTS_ABORT_LOCKNAME, locksz);
-  strlcpybuff(progress, dir, progresssz);
-  strlcatbuff(progress, "hts-in_progress.lock", progresssz);
-  strlcpybuff(stop, dir, stopsz);
-  strlcatbuff(stop, "hts-stop.lock", stopsz);
-  structcheck(lock);
-  return st_abortlock_touch(progress) && st_abortlock_touch(stop) &&
-         st_abortlock_touch(lock) && st_abortlock_stamp(lock, when);
+/* Stamp PATH at SEC plus NSEC, both in the units hts_file_mtime() reports, so
+   the caller reads SEC back rather than taking it from a clock. False on
+   failure, and NSEC is dropped where this build has no sub-second call. */
+static hts_boolean st_lockrule_stamp_ns(const char *path, int64_t sec,
+                                        int32_t nsec) {
+#if defined(_WIN32)
+  LPWSTR wpath = hts_pathToUCS2(path);
+  ULARGE_INTEGER ticks;
+  FILETIME ft;
+  HANDLE h;
+  hts_boolean ok;
+
+  if (wpath == NULL)
+    return HTS_FALSE;
+  h = CreateFileW(wpath, FILE_WRITE_ATTRIBUTES,
+                  FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL,
+                  OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+  freet(wpath);
+  if (h == INVALID_HANDLE_VALUE)
+    return HTS_FALSE;
+  ticks.QuadPart = (ULONGLONG) sec * 10000000ULL + (ULONGLONG) (nsec / 100);
+  ft.dwLowDateTime = ticks.LowPart;
+  ft.dwHighDateTime = ticks.HighPart;
+  ok = SetFileTime(h, NULL, NULL, &ft) ? HTS_TRUE : HTS_FALSE;
+  CloseHandle(h);
+  return ok;
+#elif defined(HAVE_UTIMENSAT)
+  struct timespec times[2];
+
+  times[0].tv_sec = times[1].tv_sec = (time_t) sec;
+  times[0].tv_nsec = times[1].tv_nsec = (long) nsec;
+  return utimensat(AT_FDCWD, path, times, 0) == 0 ? HTS_TRUE : HTS_FALSE;
+#else
+  return st_lockrule_stamp(path, (time_t) sec);
+#endif
 }
 
-/* A request the engine cannot remove must never stop the mirror. Only a real
-   failed unlink proves that, and nothing portable makes one happen, so this
-   names what covered it rather than skipping in silence. */
-static int st_abortlock_undeletable(httrackp *opt, const char *base) {
+/* Does hts_file_mtime() report the seconds and nanoseconds the filesystem
+   holds? This is what tells a reader that invents or drops either apart from a
+   filesystem that rounds. Vacuously true where STAT() has no nanosecond field,
+   and on Windows, where it offers nothing independent of the reader's own
+   GetFileAttributesExW. */
+static hts_boolean st_lockrule_time_matches_stat(const char *path, int64_t sec,
+                                                 int32_t nsec) {
+#if !defined(_WIN32) && (defined(HAVE_STRUCT_STAT_ST_MTIM_TV_NSEC) ||          \
+                         defined(HAVE_STRUCT_STAT_ST_MTIMESPEC_TV_NSEC))
+  STRUCT_STAT buf;
+  long raw;
+
+  if (STAT(path, &buf) != 0)
+    return HTS_FALSE;
+#if defined(HAVE_STRUCT_STAT_ST_MTIM_TV_NSEC)
+  raw = (long) buf.st_mtim.tv_nsec;
+#else
+  raw = (long) buf.st_mtimespec.tv_nsec;
+#endif
+  return sec == (int64_t) buf.st_mtime && nsec == (int32_t) raw ? HTS_TRUE
+                                                                : HTS_FALSE;
+#else
+  (void) path;
+  (void) sec;
+  (void) nsec;
+  return HTS_TRUE;
+#endif
+}
+
+/* The sub-second arm of the rule. A script that asks as soon as it sees
+   hts-in_progress.lock lands in the second the mirror started, which is the
+   boundary here. Reports what covered it, because a filesystem keeping whole
+   seconds holds none of these stamps. */
+static int st_lockrule_subsecond(httrackp *opt, const char *tag,
+                                 const char *name, const char *lock,
+                                 const char *progress) {
+  /* A microsecond apart, because 436 and 459 write their request as soon as
+     the progress lock appears and nothing spaces the two writes. */
+  const int32_t later = 500001000, same = 500000000, earlier = 499999000;
+  hts_filetime_t started, probe;
+  int err = 0;
+
+  if (!hts_file_mtime(progress, &started)) {
+    fprintf(stderr, "%s: %s has no timestamp\n", tag, progress);
+    return 1;
+  }
+  if (!st_lockrule_touch(lock) ||
+      !st_lockrule_stamp_ns(lock, started.sec, later) ||
+      !hts_file_mtime(lock, &probe)) {
+    fprintf(stderr, "%s: cannot stamp %s\n", tag, lock);
+    return 1;
+  }
+  /* Before believing the read back, pin it to what the filesystem holds. */
+  if (!st_lockrule_time_matches_stat(lock, probe.sec, probe.nsec)) {
+    fprintf(stderr,
+            "%s: hts_file_mtime() does not report %s's own seconds and"
+            " nanoseconds\n",
+            tag, lock);
+    (void) UNLINK(lock);
+    return 1;
+  }
+  if (probe.sec != started.sec || probe.nsec != later) {
+    /* The stamp did not come back as asked, so none of the cases below can be
+       placed. A FAT or exFAT volume rounds it to whole, even seconds. */
+    printf("%s: same-second request: NOT COVERED (asked for %d ns, read back"
+           " %d%s)\n",
+           tag, (int) later, (int) probe.nsec,
+           probe.sec != started.sec ? ", in another second" : "");
+    (void) UNLINK(lock);
+    return err;
+  }
+
+  if (!st_lockrule_stamp_ns(progress, started.sec, same)) {
+    fprintf(stderr, "%s: cannot stamp %s\n", tag, progress);
+    return 1;
+  }
+  if (!hts_take_lock_request(opt, name)) {
+    fprintf(stderr,
+            "%s: a request made in the second the mirror started was"
+            " ignored\n",
+            tag);
+    err = 1;
+  }
+  if (fexist_utf8(lock)) {
+    fprintf(stderr, "%s: the request outlived the action it caused\n", tag);
+    err = 1;
+  }
+
+  /* Equal to the nanosecond is not later, so this is still an earlier run's. */
+  if (!st_lockrule_touch(lock) ||
+      !st_lockrule_stamp_ns(lock, started.sec, same)) {
+    fprintf(stderr, "%s: cannot stamp %s\n", tag, lock);
+    return 1;
+  }
+  if (hts_take_lock_request(opt, name)) {
+    fprintf(stderr,
+            "%s: a request stamped exactly when the mirror started was"
+            " taken\n",
+            tag);
+    err = 1;
+  }
+
+  /* Same second, earlier nanosecond: the progress lock's own sub-second part
+     has to be read, or this one reads as newer than a zero. Re-created,
+     because the case above fails by deleting it. */
+  if (!st_lockrule_touch(lock) ||
+      !st_lockrule_stamp_ns(lock, started.sec, earlier)) {
+    fprintf(stderr, "%s: cannot stamp %s\n", tag, lock);
+    return 1;
+  }
+  if (hts_take_lock_request(opt, name)) {
+    fprintf(stderr,
+            "%s: a request older than the mirror by a fraction was taken\n",
+            tag);
+    err = 1;
+  }
+  if (!fexist_utf8(lock)) {
+    fprintf(stderr, "%s: a request the engine refused was deleted\n", tag);
+    err = 1;
+  }
+
+  /* An earlier second is earlier despite the fraction, or a request left
+     by the run before would be taken for one aimed at this mirror. */
+  if (!st_lockrule_stamp_ns(lock, started.sec - 1, later)) {
+    fprintf(stderr, "%s: cannot stamp %s\n", tag, lock);
+    return 1;
+  }
+  if (hts_take_lock_request(opt, name)) {
+    fprintf(stderr,
+            "%s: a request from the second before the mirror started was"
+            " taken\n",
+            tag);
+    err = 1;
+  }
+  if (!fexist_utf8(lock)) {
+    fprintf(stderr, "%s: a request the engine refused was deleted\n", tag);
+    err = 1;
+  }
+  (void) UNLINK(lock);
+
+  /* Backdating keeps the fraction, or the second it buys the engine would be
+     short by up to another one. */
+  if (!hts_file_backdate(progress, 1) || !hts_file_mtime(progress, &probe)) {
+    fprintf(stderr, "%s: cannot backdate %s\n", tag, progress);
+    return 1;
+  }
+  if (probe.sec != started.sec - 1 || probe.nsec != same) {
+    fprintf(stderr,
+            "%s: backdating %s moved it by something other than one second\n",
+            tag, progress);
+    err = 1;
+  }
+  printf("%s: same-second request: covered (stamps a microsecond apart)\n",
+         tag);
+  return err;
+}
+
+/* The other request file, which taking NAME must leave untouched. */
+static const char *st_lockrule_other(const char *name) {
+  return strcmp(name, HTS_ABORT_LOCKNAME) == 0 ? HTS_PAUSE_LOCKNAME
+                                               : HTS_ABORT_LOCKNAME;
+}
+
+/* Set up <dir>/, its progress lock and both requests, NAME stamped at WHEN. */
+static hts_boolean st_lockrule_setup(const char *dir, const char *name,
+                                     char *lock, size_t locksz, char *progress,
+                                     size_t progresssz, char *other,
+                                     size_t othersz, time_t when) {
+  strlcpybuff(lock, dir, locksz);
+  strlcatbuff(lock, name, locksz);
+  strlcpybuff(progress, dir, progresssz);
+  strlcatbuff(progress, "hts-in_progress.lock", progresssz);
+  strlcpybuff(other, dir, othersz);
+  strlcatbuff(other, st_lockrule_other(name), othersz);
+  structcheck(lock);
+  return st_lockrule_touch(progress) && st_lockrule_touch(other) &&
+         st_lockrule_touch(lock) && st_lockrule_stamp(lock, when);
+}
+
+/* A request the engine cannot remove must never be taken. Only a real failed
+   unlink proves that, and nothing portable makes one happen, so this names
+   what covered it rather than skipping in silence. */
+static int st_lockrule_undeletable(httrackp *opt, const char *base,
+                                   const char *tag, const char *name) {
 #ifdef _WIN32
   (void) opt;
   (void) base;
+  (void) name;
   /* The real case is a sharing violation, which needs a second process. */
-  printf("abortlock: undeletable request: NOT COVERED (no portable way to make"
-         " DeleteFile fail here)\n");
+  printf("%s: undeletable request: NOT COVERED (no portable way to make"
+         " DeleteFile fail here)\n",
+         tag);
   return 0;
 #else
   char BIGSTK rodir[HTS_URLMAXSIZE];
   char BIGSTK rolock[HTS_URLMAXSIZE * 2];
   char BIGSTK roprogress[HTS_URLMAXSIZE * 2];
-  char BIGSTK rostop[HTS_URLMAXSIZE * 2];
+  char BIGSTK roother[HTS_URLMAXSIZE * 2];
   const uid_t self = geteuid();
   uid_t drop = self;
   int rofd;
@@ -14048,22 +14251,22 @@ static int st_abortlock_undeletable(httrackp *opt, const char *base) {
 
   strlcpybuff(rodir, base, sizeof(rodir));
   strlcatbuff(rodir, "readonly/", sizeof(rodir));
-  if (!st_abortlock_setup(rodir, rolock, sizeof(rolock), roprogress,
-                          sizeof(roprogress), rostop, sizeof(rostop),
-                          time(NULL) + 60)) {
-    fprintf(stderr, "abortlock: cannot set up %s\n", rolock);
+  if (!st_lockrule_setup(rodir, name, rolock, sizeof(rolock), roprogress,
+                         sizeof(roprogress), roother, sizeof(roother),
+                         time(NULL) + 60)) {
+    fprintf(stderr, "%s: cannot set up %s\n", tag, rolock);
     return 1;
   }
   /* One descriptor for both mode changes, so the name is resolved once. */
   rofd = open(rodir, O_RDONLY | O_DIRECTORY);
   if (rofd == -1) {
-    fprintf(stderr, "abortlock: cannot open %s\n", rodir);
+    fprintf(stderr, "%s: cannot open %s\n", tag, rodir);
     return 1;
   }
   /* Still readable, because an engine that saw no request at all would pass
      this for the wrong reason. */
   if (fchmod(rofd, 0555) != 0) {
-    fprintf(stderr, "abortlock: cannot make %s read-only\n", rodir);
+    fprintf(stderr, "%s: cannot make %s read-only\n", tag, rodir);
     close(rofd);
     return 1;
   }
@@ -14073,9 +14276,9 @@ static int st_abortlock_undeletable(httrackp *opt, const char *base) {
 
     drop = pw != NULL ? pw->pw_uid : (uid_t) 65534;
     if (seteuid(drop) != 0) {
-      printf("abortlock: undeletable request: NOT COVERED (root, and euid %d "
+      printf("%s: undeletable request: NOT COVERED (root, and euid %d "
              "is not reachable)\n",
-             (int) drop);
+             tag, (int) drop);
       (void) fchmod(rofd, 0700);
       close(rofd);
       return 0;
@@ -14087,35 +14290,34 @@ static int st_abortlock_undeletable(httrackp *opt, const char *base) {
      own unlink, and ENOENT means the euid cannot reach the request at all. */
   errno = 0;
   if (UNLINK(rolock) == 0) {
-    printf("abortlock: undeletable request: NOT COVERED (euid %d could still"
+    printf("%s: undeletable request: NOT COVERED (euid %d could still"
            " delete %s)\n",
-           (int) drop, rolock);
+           tag, (int) drop, rolock);
   } else if (errno == ENOENT) {
-    printf("abortlock: undeletable request: NOT COVERED (%s is out of reach of"
+    printf("%s: undeletable request: NOT COVERED (%s is out of reach of"
            " euid %d)\n",
-           rodir, (int) drop);
+           tag, rodir, (int) drop);
   } else {
     for (poll = 0; poll < 2; poll++) {
-      if (hts_take_abort_request(opt)) {
+      if (hts_take_lock_request(opt, name)) {
         fprintf(stderr,
-                "abortlock: a request that cannot be deleted stopped "
-                "the mirror (poll %d)\n",
-                poll);
+                "%s: a request that cannot be deleted was taken (poll %d)\n",
+                tag, poll);
         err = 1;
       }
     }
     errno = 0;
     if (UNLINK(rolock) == 0 || errno == ENOENT) {
-      fprintf(stderr, "abortlock: the undeletable request went away\n");
+      fprintf(stderr, "%s: the undeletable request went away\n", tag);
       err = 1;
     }
-    printf("abortlock: undeletable request: covered (unwritable directory,"
+    printf("%s: undeletable request: covered (unwritable directory,"
            " euid %d)\n",
-           (int) drop);
+           tag, (int) drop);
   }
 
   if (self == 0 && seteuid(self) != 0) {
-    fprintf(stderr, "abortlock: cannot get euid %d back\n", (int) self);
+    fprintf(stderr, "%s: cannot get euid %d back\n", tag, (int) self);
     err = 1;
   }
   (void) fchmod(rofd, 0700);
@@ -14124,17 +14326,18 @@ static int st_abortlock_undeletable(httrackp *opt, const char *base) {
 #endif
 }
 
-static int st_abortlock(httrackp *opt, int argc, char **argv) {
+static int st_lockrule(httrackp *opt, int argc, char **argv, const char *tag,
+                       const char *name) {
   char BIGSTK base[HTS_URLMAXSIZE];
   char BIGSTK lock[HTS_URLMAXSIZE * 2];
   char BIGSTK progress[HTS_URLMAXSIZE * 2];
-  char BIGSTK stop[HTS_URLMAXSIZE * 2];
+  char BIGSTK other[HTS_URLMAXSIZE * 2];
   String saved = STRING_EMPTY;
   time_t started;
   int err = 0;
 
   if (argc < 1) {
-    fprintf(stderr, "usage: -#test=abortlock <writable directory>\n");
+    fprintf(stderr, "usage: -#test=%s <writable directory>\n", tag);
     return 1;
   }
   strcpybuff(base, argv[0]);
@@ -14145,79 +14348,123 @@ static int st_abortlock(httrackp *opt, int argc, char **argv) {
   StringCopy(opt->path_log, base);
 
   strlcpybuff(lock, base, sizeof(lock));
-  strlcatbuff(lock, HTS_ABORT_LOCKNAME, sizeof(lock));
+  strlcatbuff(lock, name, sizeof(lock));
   structcheck(lock);
-  if (hts_take_abort_request(opt)) {
-    fprintf(stderr, "abortlock: a mirror with no request was told to stop\n");
+  if (hts_take_lock_request(opt, name)) {
+    fprintf(stderr, "%s: a mirror with no request took one\n", tag);
     err = 1;
   }
 
-  if (!st_abortlock_setup(base, lock, sizeof(lock), progress, sizeof(progress),
-                          stop, sizeof(stop), time(NULL))) {
-    fprintf(stderr, "abortlock: cannot set up %s\n", base);
+  if (!st_lockrule_setup(base, name, lock, sizeof(lock), progress,
+                         sizeof(progress), other, sizeof(other), time(NULL))) {
+    fprintf(stderr, "%s: cannot set up %s\n", tag, base);
     err = 1;
   }
   started = get_filetime(progress);
   if (started == (time_t) -1) {
-    fprintf(stderr, "abortlock: %s has no timestamp\n", progress);
+    fprintf(stderr, "%s: %s has no timestamp\n", tag, progress);
     err = 1;
   }
 
-  /* Same second as the run's own start: left behind by an earlier mirror. */
-  if (!st_abortlock_stamp(lock, started)) {
-    fprintf(stderr, "abortlock: cannot stamp %s\n", lock);
+  /* Left behind by an earlier mirror, in the run's own start second. On a
+     filesystem keeping fractions this reads as the earlier-fraction case, so it
+     pins the boundary only where the stamps are whole seconds. */
+  if (!st_lockrule_stamp(lock, started)) {
+    fprintf(stderr, "%s: cannot stamp %s\n", tag, lock);
     err = 1;
   }
-  if (hts_take_abort_request(opt)) {
-    fprintf(stderr, "abortlock: a request no newer than the mirror it found "
-                    "stopped it\n");
+  if (hts_take_lock_request(opt, name)) {
+    fprintf(stderr,
+            "%s: a request no newer than the mirror it found was taken\n", tag);
     err = 1;
   }
   if (!fexist_utf8(lock)) {
-    fprintf(stderr, "abortlock: a request the engine refused was deleted\n");
+    fprintf(stderr, "%s: a request the engine refused was deleted\n", tag);
+    err = 1;
+  }
+
+  /* The engine backdates its own progress lock by a second, so a request
+     written the instant that lock appears is newer than it. */
+  if (!hts_file_backdate(progress, 1)) {
+    fprintf(stderr, "%s: cannot backdate %s\n", tag, progress);
+    err = 1;
+  }
+  if (!hts_take_lock_request(opt, name)) {
+    fprintf(stderr,
+            "%s: with the progress lock backdated, a request stamped when the"
+            " mirror started was still refused\n",
+            tag);
+    err = 1;
+  }
+  /* A minute earlier is an earlier run's, backdating or not. */
+  if (!st_lockrule_touch(lock) || !st_lockrule_stamp(lock, started - 60)) {
+    fprintf(stderr, "%s: cannot stamp %s\n", tag, lock);
+    err = 1;
+  }
+  if (hts_take_lock_request(opt, name)) {
+    fprintf(stderr, "%s: a request a minute older than the mirror was taken\n",
+            tag);
+    err = 1;
+  }
+  if (!fexist_utf8(lock)) {
+    fprintf(stderr, "%s: a request the engine refused was deleted\n", tag);
+    err = 1;
+  }
+  if (!st_lockrule_stamp(progress, started)) {
+    fprintf(stderr, "%s: cannot put %s back to when the mirror started\n", tag,
+            progress);
     err = 1;
   }
 
   /* Stamped after the mirror started: aimed at this run. */
-  if (!st_abortlock_touch(lock) || !st_abortlock_stamp(lock, started + 1)) {
-    fprintf(stderr, "abortlock: cannot stamp %s\n", lock);
+  if (!st_lockrule_touch(lock) || !st_lockrule_stamp(lock, started + 1)) {
+    fprintf(stderr, "%s: cannot stamp %s\n", tag, lock);
     err = 1;
   }
-  if (!hts_take_abort_request(opt)) {
-    fprintf(stderr, "abortlock: a request the engine can delete was ignored\n");
+  if (!hts_take_lock_request(opt, name)) {
+    fprintf(stderr, "%s: a request the engine can delete was ignored\n", tag);
     err = 1;
   }
   if (fexist_utf8(lock)) {
-    fprintf(stderr, "abortlock: the request outlived the stop it caused\n");
+    fprintf(stderr, "%s: the request outlived the action it caused\n", tag);
     err = 1;
   }
-  if (!fexist_utf8(progress) || !fexist_utf8(stop)) {
-    fprintf(stderr,
-            "abortlock: taking a request deleted a neighbouring lock\n");
+  if (!fexist_utf8(progress) || !fexist_utf8(other)) {
+    fprintf(stderr, "%s: taking a request deleted a neighbouring lock\n", tag);
     err = 1;
   }
-  if (hts_take_abort_request(opt)) {
-    fprintf(stderr, "abortlock: one request stopped the mirror twice\n");
+  if (hts_take_lock_request(opt, name)) {
+    fprintf(stderr, "%s: one request was taken twice\n", tag);
     err = 1;
   }
 
-  /* No progress lock means no mirror to stop, whatever the request says. */
+  err |= st_lockrule_subsecond(opt, tag, name, lock, progress);
+
+  /* No progress lock means no mirror to reach, whatever the request says. */
   (void) UNLINK(progress);
-  if (!st_abortlock_touch(lock) || !st_abortlock_stamp(lock, time(NULL) + 60)) {
-    fprintf(stderr, "abortlock: cannot re-create %s\n", lock);
+  if (!st_lockrule_touch(lock) || !st_lockrule_stamp(lock, time(NULL) + 60)) {
+    fprintf(stderr, "%s: cannot re-create %s\n", tag, lock);
     err = 1;
   }
-  if (hts_take_abort_request(opt)) {
-    fprintf(stderr, "abortlock: a request stopped a mirror that never ran\n");
+  if (hts_take_lock_request(opt, name)) {
+    fprintf(stderr, "%s: a request reached a mirror that never ran\n", tag);
     err = 1;
   }
 
-  err |= st_abortlock_undeletable(opt, base);
+  err |= st_lockrule_undeletable(opt, base, tag, name);
 
   StringCopy(opt->path_log, StringBuff(saved));
   StringFree(saved);
-  printf("abortlock self-test: %s\n", err ? "FAIL" : "OK");
+  printf("%s self-test: %s\n", tag, err ? "FAIL" : "OK");
   return err;
+}
+
+static int st_abortlock(httrackp *opt, int argc, char **argv) {
+  return st_lockrule(opt, argc, argv, "abortlock", HTS_ABORT_LOCKNAME);
+}
+
+static int st_stoplock(httrackp *opt, int argc, char **argv) {
+  return st_lockrule(opt, argc, argv, "stoplock", HTS_PAUSE_LOCKNAME);
 }
 
 // -#test=ioexact <dir>: the hts_fread_exact/hts_fwrite_exact contract - a
@@ -14758,6 +15005,9 @@ static const struct selftest_entry {
     {"abortlock", "<writable directory>",
      "an abort request stops the mirror only if it is fresh and deletable",
      st_abortlock},
+    {"stoplock", "<writable directory>",
+     "a pause request pauses the mirror only if it is fresh and deletable",
+     st_stoplock},
     {"catchurl", "",
      "an over-long request header block fails the capture, not the process",
      st_catchurl},

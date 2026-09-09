@@ -193,6 +193,32 @@ static HTS_INLINE HTS_UNUSED hts_boolean hts_localtime(time_t t,
 #endif
 }
 
+/* A modification time at the finest resolution this build can read. Compare it
+   only against another value hts_file_mtime() produced, because the epoch is
+   the platform's. */
+typedef struct hts_filetime_t {
+  int64_t sec;  /* not a time_t: Windows counts from 1601, so never print it */
+  int32_t nsec; /* 0 where neither the build nor the filesystem is finer */
+  /* S_ISREG, except on Windows, where every non-directory counts as one. */
+  hts_boolean is_plain_file;
+} hts_filetime_t;
+
+/* Read FILE's modification time into WHEN. False if it can not be read, and
+   WHEN is then untouched. */
+hts_boolean hts_file_mtime(const char *file, hts_filetime_t *when);
+
+/* Is A a plain file stamped strictly later than B? False unless both can be
+   read. Sub-second where the platform gives it, so a request made in the second
+   a mirror started still sorts after that mirror's hts-in_progress.lock.
+   Exported because httrack.c links the library and sees only exported
+   symbols. */
+HTSEXT_API hts_boolean hts_file_is_newer(const char *a, const char *b);
+
+/* Move FILE's modification time SECONDS back, keeping the fraction, which the
+   utimes fallback rounds down to the microsecond. False if the stamp could not
+   be read or written, and FILE then keeps the time it had. */
+hts_boolean hts_file_backdate(const char *file, int seconds);
+
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 

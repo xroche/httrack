@@ -424,6 +424,18 @@ AX_CHECK_ALIGNED_ACCESS_REQUIRED
 # check for various headers
 AC_CHECK_HEADERS([execinfo.h spawn.h sys/ioctl.h sys/random.h sys/sysctl.h])
 
+# Sub-second file modification times, so a stop request created in the second a
+# mirror started can still be ordered against that mirror's progress lock. The
+# first member is POSIX 2008, the second is macOS and the older BSDs. Without
+# either, the rule falls back on whole seconds.
+AC_CHECK_MEMBERS([struct stat.st_mtim.tv_nsec, struct stat.st_mtimespec.tv_nsec],
+	[], [], [[#include <sys/types.h>
+#include <sys/stat.h>]])
+
+# utimensat() stamps a file below the whole second, which is how the lock-rule
+# self-test places a request inside the second the progress lock was written.
+AC_CHECK_FUNCS([utimensat])
+
 ### Where an optional feature's default comes from (meson's auto_features)
 AC_MSG_CHECKING([whether to probe for optional features nobody asked for])
 AC_ARG_ENABLE([auto-features],

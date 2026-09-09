@@ -110,6 +110,10 @@ extern "C" {
    its work; Windows, which has no cross-process SIGTERM, has no other way. */
 #define HTS_ABORT_LOCKNAME "hts-abort.lock"
 
+/* Created in the output directory to ask a running engine to pause. The engine
+   answers with hts-paused.lock, and deleting that one resumes the mirror. */
+#define HTS_PAUSE_LOCKNAME "hts-stop.lock"
+
 /* Library-internal only (engine translation units that define
    HTS_INTERNAL_BYTECODE); not part of the consumer surface. */
 #ifdef HTS_INTERNAL_BYTECODE
