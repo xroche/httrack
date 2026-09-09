@@ -26,7 +26,8 @@
 # --log-found/--log-not-found grep (ERE) the crawl's hts-log.txt.
 # --max/--min-mirror-bytes bound the mirrored content bytes (host root).
 # --file-matches/--file-not-matches grep (ERE) a mirrored file (PATH under the
-# host root), to assert rewritten link/content survived the crawl.
+# host root), to assert rewritten link/content survived the crawl. Both fail
+# when PATH is missing.
 # --cache-found/--cache-not-found assert whether hts-cache/new.zip holds an
 # entry whose URL ends with URLTAIL, e.g. /dir/page.html; being mirrored and
 # being cached are separate outcomes (#840).
@@ -719,7 +720,12 @@ while test "$i" -lt "${#audit[@]}"; do
         path="${audit[$((i + 1))]}"
         i=$((i + 2))
         info "checking ${path} lacks ${audit[$i]}"
-        if grep -aqE "${audit[$i]}" "${hostroot}/${path}"; then
+        # grep exits 2 on a missing path, which reads like "no match": test the
+        # file first, or a crawl that wrote nothing satisfies this audit (#1627).
+        if test ! -f "${hostroot}/${path}"; then
+            result "no such file ${hostroot}/${path}"
+            exit 1
+        elif grep -aqE "${audit[$i]}" "${hostroot}/${path}"; then
             result "matched"
             exit 1
         else result "OK"; fi

@@ -47,6 +47,18 @@ test "$rc" -ne 0 || fail "a wrong file count reported success: $out"
 assert_match "expected '999'" "$out" "the audit names the value it wanted"
 ok "a failing audit fails the run"
 
+# A negative file audit on a file the crawl never wrote: grep exits 2 there,
+# which is indistinguishable from "no match", so the audit passed on anything
+# (#1627). The floor below it proves the audit still passes when it should.
+run --errors 0 --file-not-matches 'simple/nosuchfile.html' 'anything' httrack "$url"
+test "$rc" -ne 0 || fail "a negative file audit passed on a missing file: $out"
+assert_match "no such file" "$out" "the missing path is named"
+ok "a negative file audit fails when the file is missing"
+
+run --errors 0 --file-not-matches 'simple/basic.html' 'NOT-IN-THIS-PAGE' httrack "$url"
+test "$rc" -eq 0 || fail "a negative file audit failed on a present file: $out"
+ok "a negative file audit still passes on a file lacking the marker"
+
 # A directory named after a searched word must not answer for the crawl (#1220):
 # TMPDIR plants one on the command line the log echoes.
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_logbody.XXXXXX") || exit 1
