@@ -9,10 +9,11 @@ set -euo pipefail
 
 # The mirror bound is the load-bearing half: it fires while <100 KB is saved,
 # so the cap can only have tripped on received volume, not saved bytes (which
-# would exceed the cap and fetch all 16 links). The floor is what makes the
-# ceiling mean anything: only the seed page is saved, 575 bytes of it.
+# would exceed the cap and fetch all 16 links). The floor matters because only
+# the seed page, 575 bytes, is saved.
 bash "$top_srcdir/tests/local-crawl.sh" \
     --log-found 'More than 500000 bytes have been transferred.. giving up' \
+    --found maxrecv/index.html \
     --max-mirror-bytes 100000 \
     --min-mirror-bytes 400 \
     httrack 'BASEURL/maxrecv/index.html' -M500000 -c4

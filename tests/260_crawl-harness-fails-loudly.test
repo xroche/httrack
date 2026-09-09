@@ -47,17 +47,59 @@ test "$rc" -ne 0 || fail "a wrong file count reported success: $out"
 assert_match "expected '999'" "$out" "the audit names the value it wanted"
 ok "a failing audit fails the run"
 
-# A negative file audit on a file the crawl never wrote: grep exits 2 there,
-# which is indistinguishable from "no match", so the audit passed on anything
-# (#1627). The floor below it proves the audit still passes when it should.
-run --errors 0 --file-not-matches 'simple/nosuchfile.html' 'anything' httrack "$url"
+# grep exits 2 on a file it cannot read, which reads as "no match" and makes the
+# audit meaningless (#1627). The runs below it prove it still passes on a real
+# miss, an empty file included.
+run --errors 0 --file-not-matches 'simple/nosuchfile.html' 'x' httrack "$url"
 test "$rc" -ne 0 || fail "a negative file audit passed on a missing file: $out"
-assert_match "no such file" "$out" "the missing path is named"
+assert_match "no regular file" "$out" "the missing path is named"
 ok "a negative file audit fails when the file is missing"
 
-run --errors 0 --file-not-matches 'simple/basic.html' 'NOT-IN-THIS-PAGE' httrack "$url"
+# A directory is not a readable file either, and grep's status for one varies
+# by platform.
+run --errors 0 --plant-dir simple/adir --file-not-matches 'simple/adir' 'x' \
+    httrack "$url"
+test "$rc" -ne 0 || fail "a negative file audit passed on a directory: $out"
+assert_match "no regular file" "$out" "the directory is not taken for a file"
+ok "a negative file audit fails on a directory at the audited path"
+
+# The other exit 2 comes from a regular file grep cannot open, and root reads
+# one regardless.
+if test "$(id -u)" -eq 0; then
+    ok "SKIP the unreadable-file case, root reads it regardless"
+else
+    # The host root sits three levels under $TMPDIR, so a layout change fails
+    # the assert below rather than passing quietly.
+    unread=$(mktemp -d "${TMPDIR:-/tmp}/httrack_unread.XXXXXX") || exit 1
+    cleanup_push rm -rf "$unread"
+    echo marker >"$unread/locked.dat"
+    chmod 000 "$unread/locked.dat"
+    rc=0
+    out=$(TMPDIR="$unread" bash "$crawl" --errors 0 \
+        --file-not-matches '../../../locked.dat' 'marker' \
+        httrack "$url" 2>&1) || rc=$?
+    test "$rc" -ne 0 || fail "an unreadable file passed the audit: $out"
+    assert_match "grep could not read" "$out" "the unreadable path is named"
+    ok "a negative file audit fails on a file grep cannot read"
+fi
+
+run --errors 0 --file-not-matches 'simple/basic.html' 'NOT-HERE' httrack "$url"
 test "$rc" -eq 0 || fail "a negative file audit failed on a present file: $out"
 ok "a negative file audit still passes on a file lacking the marker"
+
+# A 0-byte mirrored file lacks every marker, so it must pass rather than read
+# as absent. errpage/empty.html is the fixture's genuine zero-length 200.
+run --errors 1 --file-not-matches 'errpage/empty.html' 'x' \
+    httrack 'BASEURL/errpage/index.html'
+test "$rc" -eq 0 || fail "a negative file audit failed on an empty file: $out"
+ok "a negative file audit passes on an empty mirrored file"
+
+# The mirror bounds share the vacuity, because an empty mirror is under every
+# ceiling. Seeding at a 404 under -o0 leaves the host root present and empty.
+run --errors 1 --min-mirror-bytes 400 httrack 'BASEURL/errpage/missing.html' -o0
+test "$rc" -ne 0 || fail "a mirror floor passed on an empty mirror: $out"
+assert_match "mirror too small" "$out" "the floor names what it wanted"
+ok "a mirror floor fails when nothing was saved"
 
 # A directory named after a searched word must not answer for the crawl (#1220):
 # TMPDIR plants one on the command line the log echoes.
