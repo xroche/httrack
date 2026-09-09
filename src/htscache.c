@@ -1052,21 +1052,42 @@ static char *reconcile_path(httrackp *opt, const char *name) {
                  StringBuff(opt->path_log), name);
 }
 
-/* Replace the new-generation file by the old one, when the old one exists. */
-static void reconcile_promote(httrackp *opt, const char *oldname,
-                              const char *newname) {
-  if (fexist_utf8(reconcile_path(opt, oldname))) {
+/* Replace the new-generation file by the old one, when the old one exists.
+   hts_rename_over() parks whatever is in the way instead of deleting it first,
+   so a failed move never leaves the mirror with neither generation. */
+static hts_boolean reconcile_promote(httrackp *opt, const char *oldname,
+                                     const char *newname) {
+  if (!fexist_utf8(reconcile_path(opt, oldname)))
+    return HTS_TRUE;
+  return hts_rename_over(opt, reconcile_path(opt, oldname),
+                         reconcile_path(opt, newname));
+}
+
+/* Same, for a sidecar. A sidecar with no old counterpart is dropped rather than
+   kept, because it lists the run being replaced and the update purge would read
+   it against the promoted cache. */
+static hts_boolean reconcile_promote_sidecar(httrackp *opt, const char *oldname,
+                                             const char *newname) {
+  if (!fexist_utf8(reconcile_path(opt, oldname))) {
     UNLINK(reconcile_path(opt, newname));
-    RENAME(reconcile_path(opt, oldname), reconcile_path(opt, newname));
+    return HTS_TRUE;
   }
+  return reconcile_promote(opt, oldname, newname);
 }
 
 /* Promote cache and sidecars together, so old.lst never describes a different
    run than old.zip. */
 static void reconcile_promote_generation(httrackp *opt) {
-  reconcile_promote(opt, "hts-cache/old.zip", "hts-cache/new.zip");
-  reconcile_promote(opt, "hts-cache/old.lst", "hts-cache/new.lst");
-  reconcile_promote(opt, "hts-cache/old.txt", "hts-cache/new.txt");
+  hts_boolean ok =
+      reconcile_promote(opt, "hts-cache/old.zip", "hts-cache/new.zip");
+
+  if (!reconcile_promote_sidecar(opt, "hts-cache/old.lst", "hts-cache/new.lst"))
+    ok = HTS_FALSE;
+  if (!reconcile_promote_sidecar(opt, "hts-cache/old.txt", "hts-cache/new.txt"))
+    ok = HTS_FALSE;
+  if (!ok)
+    hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
+                  "Cache: the previous generation was restored only in part");
 }
 
 void hts_cache_reconcile(httrackp *opt, hts_cache_reconcile_mode mode) {
@@ -1078,10 +1099,9 @@ void hts_cache_reconcile(httrackp *opt, hts_cache_reconcile_mode mode) {
       reconcile_promote(opt, "hts-cache/old.zip", "hts-cache/new.zip");
     break;
   case CACHE_RECONCILE_INTERRUPTED:
-    /* Aborted run: the next run rotates new.zip over old.zip, so the
-       generation that loses here is gone. Keep the larger one, size being the
-       only proxy for how much a cache holds; both files must exist, as fsize()
-       reads -1 for a missing one and PROMOTE owns that case. */
+    /* Aborted run: keep the larger generation, because the next run's rotation
+       erases the smaller one. Both files must exist, as fsize() reads -1 for a
+       missing one, and a missing new.zip is PROMOTE's case. */
     if (!opt->cache ||
         !fexist_utf8(reconcile_path(opt, "hts-in_progress.lock")))
       break;

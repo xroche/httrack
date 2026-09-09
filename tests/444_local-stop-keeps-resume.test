@@ -112,6 +112,11 @@ test "$crawl_rc" -eq 0 ||
     fail "the keep_resume stop exited ${crawl_rc}, expected 0"
 assert_logged "${tmpdir}/keep" 'MIRROR ABORTED' \
     "the run did not record an interrupted mirror"
+# The advice itself, because a banner naming no remedy is what #1636 replaced.
+assert_logged "${tmpdir}/keep" 'Start it again with --continue' \
+    "the banner does not tell the reader how to resume"
+! grep -q 'erasing the hts-cache' "${tmpdir}/keep/hts-log.txt" ||
+    fail "the banner still asks the reader to erase the cache a resume needs"
 echo "PASS"
 
 # The partial this stop cut stays on disk whoever asked for the stop, so its
@@ -156,4 +161,22 @@ echo "PASS (resumed at ${at} of ${full})"
 printf '[the completed --continue erases the directory again] ..\t'
 test ! -d "${out}/hts-cache/ref" ||
     fail "hts-cache/ref survived a mirror nothing interrupted"
+echo "PASS"
+
+# The lock is unlinked whatever ended the run, so the startup reconcile never
+# sees a stop. Left alone, the next run rotates the fragment over the complete
+# generation and it is gone.
+printf '[a stop keeps the complete cache generation] ..\t'
+out="${tmpdir}/gen"
+mkdir -p "$out"
+local_crawl --log "${tmpdir}/gen.log1" -O "$out" --quiet \
+    --disable-security-limits --robots=0 --timeout=30 -c2 \
+    "${BASEURL}/bigfiles/index.html" || fail "the crawl that fills the cache failed"
+complete="${tmpdir}/gen-complete.zip"
+cp "${out}/hts-cache/new.zip" "$complete"
+stop_and_report gen keep
+test ! -e "${out}/hts-cache/old.zip" ||
+    fail "the stopped run left both generations, so the next run drops one"
+cmp -s "${out}/hts-cache/new.zip" "$complete" ||
+    fail "the stopped run left its own fragment where the complete cache was"
 echo "PASS"

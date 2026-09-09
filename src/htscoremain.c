@@ -3079,6 +3079,11 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       }
     }
 
+    /* The lock goes at the end of this block, and the startup arm needs it, so
+       an abort that returns normally has to reconcile here or never. */
+    if (opt->state.exit_xh != 0)
+      hts_cache_reconcile(opt, CACHE_RECONCILE_INTERRUPTED);
+
     /* Not or cleanly interrupted; erase hts-cache/ref temporary directory.
        A ^C or a cap leaves exit_xh at 0, so keep the ref when either cut a
        transfer mid-body (#1595). */
