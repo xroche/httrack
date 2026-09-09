@@ -121,6 +121,45 @@ void hts_strip_default_port(char *lien, size_t size);
 hts_boolean hts_dirty_link_is_url(httrackp *opt, const char *str, size_t len,
                                   char lastc, hts_boolean inscript);
 
+/* A link the script scanner found, as an offset and a length from the cursor
+   it was given. "unquoted_end" is the byte an unquoted CSS url(...) operand
+   stops at, and '\0' when the operand was quoted. */
+typedef struct hts_js_link {
+  int offset;
+  int length;
+  char unquoted_end;
+} hts_js_link;
+
+/*
+  Does the script or CSS at "cursor" hand a URL to one of the constructs the
+  engine follows (.src, .location, .href, .open, .replace, .link, url(),
+  import)? "buffer" is the first byte of the document, which the keyword tests
+  read backwards from. "in_tag" says the script is an attribute value such as
+  onclick="...", and "tag_lastc" the quote that attribute is written with.
+  "in_css" allows url() to take an unquoted operand. Fills "link" and answers
+  true when a URL was found.
+*/
+hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
+                             const char *buffer, hts_boolean in_tag,
+                             char tag_lastc, hts_boolean in_css,
+                             hts_js_link *link);
+
+/*
+  May the dirty parser take the in-tag quoted value at "quote" for a link?
+  "tag_start" is the tag's first byte, the '<'. False when the quote is not an
+  attribute value at all, and false for the attribute names that never carry
+  one: hts_nodetect (id, name and friends) and an xmlns declaration.
+*/
+hts_boolean dirty_attr_detectable(const char *quote, const char *tag_start);
+
+/*
+  The attribute name owning the quoted value at "quote" inside the tag starting
+  at "tag_start", spanning [name, *nend). NULL when the quote is not an
+  attribute value at all.
+*/
+const char *dirty_attr_name(const char *quote, const char *tag_start,
+                            const char **nend);
+
 /*
   Check for 301,302.. errors ("moved") and handle them; re-isuue requests, make
   rediretc file, handle filters considerations..

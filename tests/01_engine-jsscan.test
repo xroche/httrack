@@ -1,0 +1,21 @@
+#!/bin/bash
+#
+# Pins hts_js_scan_link, which finds the URL a script statement hands to .src,
+# .location, .open, url() and friends. The engine sweeps the shapes those
+# statements take, one representative per class rather than every byte, against
+# a model of the rules.
+
+set -euo pipefail
+
+out=$(httrack -#test=jsscan) || {
+    echo "httrack -#test=jsscan exited non-zero: $out" >&2
+    exit 1
+}
+
+case "$out" in
+"jsscan self-test OK"*) ;;
+*)
+    echo "expected 'jsscan self-test OK', got: $out" >&2
+    exit 1
+    ;;
+esac

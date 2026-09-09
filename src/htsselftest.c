@@ -6958,6 +6958,438 @@ static int st_dirtylink(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* ------------------------------------------------------------ */
+/* -#test=jsscan: the script scanner, keyword to operand.        */
+/* ------------------------------------------------------------ */
+
+/* Keyword a script assignment or call may carry a URL through, with what must
+   follow it and what may close the statement. Order matters: the engine takes
+   the first that matches. */
+static const struct jsscan_word {
+  const char *word;
+  char sep;              /* byte that must follow the keyword, 0 for none */
+  const char *ends;      /* what may close it, NULL for the default */
+  hts_boolean no_mime;   /* window.open("text/html") is a type, not a URL */
+  hts_boolean no_method; /* xhr.open("GET", url): the method is not a URL */
+  int guard;             /* 0 none, 1 the tag's own quote before, 2 a space
+                            before, 3 no name byte before, 4 a space after */
+} jsscan_words[] = {
+    {".src", '=', NULL, HTS_FALSE, HTS_FALSE, 0},
+    {"src", '=', NULL, HTS_FALSE, HTS_FALSE, 1},
+    {".location", '=', NULL, HTS_FALSE, HTS_FALSE, 0},
+    {":location", '=', NULL, HTS_FALSE, HTS_FALSE, 0},
+    {"location", '=', NULL, HTS_FALSE, HTS_FALSE, 2},
+    {".href", '=', NULL, HTS_FALSE, HTS_FALSE, 0},
+    {".open", '(', "),", HTS_TRUE, HTS_TRUE, 0},
+    {".replace", '(', ")", HTS_FALSE, HTS_FALSE, 0},
+    {".link", '(', ")", HTS_FALSE, HTS_FALSE, 0},
+    {"url", '(', ")", HTS_FALSE, HTS_FALSE, 3},
+    {"import", 0, NULL, HTS_FALSE, HTS_FALSE, 4},
+};
+
+/* What hts_js_scan_link is meant to find, restated: one of the keywords above,
+   its separator, a quoted operand, and a byte closing the statement. */
+static hts_boolean jsscan_model(httrackp *opt, const char *cursor,
+                                const char *buffer, hts_boolean in_tag,
+                                char tag_lastc, hts_boolean in_css, int *offset,
+                                int *length) {
+  const char *const dflt_ends = in_tag ? ";\"'" : ";";
+  const struct jsscan_word *w = NULL;
+  const char *ends;
+  const char *a, *b;
+  char prev;
+  hts_boolean unquoted = HTS_FALSE, quoted;
+  size_t i, n;
+  int len;
+
+  if ((opt->parsejava & HTSPARSE_NO_JAVASCRIPT) != 0)
+    return HTS_FALSE;
+  prev = html_prevc(cursor, buffer);
+
+  for (i = 0; i < sizeof(jsscan_words) / sizeof(jsscan_words[0]); i++) {
+    const int l = strfield(cursor, jsscan_words[i].word);
+
+    if (l == 0)
+      continue;
+    switch (jsscan_words[i].guard) {
+    case 1:
+      if (!in_tag || tag_lastc != prev)
+        continue;
+      break;
+    case 2:
+      if (!isspace(prev))
+        continue;
+      break;
+    case 3:
+      /* The engine leaves its "url" match in place when this guard fails, so
+         "aurl=" and "_url=" go on to match the plain assignment form. Modelled
+         as the engine behaves, not as the guard reads. */
+      if (isalnum(prev) || prev == '_') {
+        w = &jsscan_words[0]; /* borrow the plain "name=" shape */
+        a = cursor + l;
+        goto matched;
+      }
+      break;
+    case 4:
+      if (!is_space(cursor[l]))
+        continue;
+      break;
+    default:
+      break;
+    }
+    w = &jsscan_words[i];
+    a = cursor + l;
+    goto matched;
+  }
+  return HTS_FALSE;
+
+matched:
+  ends = w->ends != NULL ? w->ends : dflt_ends;
+  while (is_realspace(*a))
+    a++;
+  if (w->sep != 0) {
+    if (*a != w->sep)
+      return HTS_FALSE;
+    a++;
+    while (is_realspace(*a))
+      a++;
+  }
+  quoted = (*a == '"' || *a == '\'') ? HTS_TRUE : HTS_FALSE;
+  /* CSS lets url() take a bare operand, which then ends at the ')' */
+  unquoted = (!quoted && in_css && w->sep == '(' && strcmp(w->word, "url") == 0)
+                 ? HTS_TRUE
+                 : HTS_FALSE;
+  if (!quoted && !unquoted)
+    return HTS_FALSE;
+  if (quoted)
+    a++;
+  for (b = a; *b != '\0'; b++) {
+    if (quoted ? (*b == '"' || *b == '\'') : (*b == ')'))
+      break;
+  }
+  if (*b == '\0') /* truncated input: no closing delimiter */
+    return HTS_FALSE;
+
+  { /* the statement must close after the operand */
+    const char *c = b + (quoted ? 1 : 0);
+
+    while (*c == ' ')
+      c++;
+    if (strchr(ends, *c) == NULL && *c != '\n' && *c != '\r' &&
+        !(w->guard == 4 && b[quoted ? 1 : 0] == ' '))
+      return HTS_FALSE;
+  }
+  len = (int) (b - a);
+  if (len == 0) /* nothing between the delimiters */
+    return HTS_FALSE;
+
+  if (w->no_mime) {
+    for (i = 0; hts_main_mime[i] != NULL && hts_main_mime[i][0] != '\0'; i++) {
+      const int l = strfield(a, hts_main_mime[i]);
+
+      if (l && a[l] == '/')
+        return HTS_FALSE;
+    }
+  }
+  if (w->no_method) {
+    static const char *const methods[] = {"GET",    "POST",  "PUT",
+                                          "DELETE", "HEAD",  "OPTIONS",
+                                          "PATCH",  "TRACE", NULL};
+
+    for (i = 0; methods[i] != NULL; i++) {
+      if (strlen(methods[i]) == (size_t) len && strfield(a, methods[i]) == len)
+        return HTS_FALSE;
+    }
+  }
+
+  /* a leading ',' or ';' says this is code, and a quote or a control byte says
+     the operand never was one string */
+  for (n = 0, i = 0; i < (size_t) len; i++) {
+    if (a[i] == ',' || a[i] == ';') {
+      if (n == 0)
+        return HTS_FALSE;
+    } else if (a[i] == '"' || a[i] == '\'' || a[i] == '\t' || a[i] == '\r' ||
+               a[i] == '\n') {
+      return HTS_FALSE;
+    } else if (a[i] != ' ') {
+      n++;
+    }
+  }
+  *offset = (int) (a - cursor);
+  *length = len;
+  return HTS_TRUE;
+}
+
+/* One snippet in one context, engine against model. */
+static void jsscan_one(httrackp *opt, dirtylink_sweep *sw, const char *text,
+                       size_t at, hts_boolean in_tag, char tag_lastc,
+                       hts_boolean in_css) {
+  hts_js_link got;
+  int woff = 0, wlen = 0;
+  const hts_boolean wanted = jsscan_model(opt, text + at, text, in_tag,
+                                          tag_lastc, in_css, &woff, &wlen);
+  const hts_boolean found =
+      hts_js_scan_link(opt, text + at, text, in_tag, tag_lastc, in_css, &got);
+
+  sw->cases++;
+  if (found)
+    sw->accepted++;
+  if (sw->dump) {
+    printf("%d\t%d\t%d\t%d\t%d\t%s\n", (int) found, got.offset, got.length,
+           (int) in_tag, (int) in_css, text);
+    return;
+  }
+  if (found != wanted ||
+      (found && (got.offset != woff || got.length != wlen))) {
+    if (sw->bad < 20) {
+      fprintf(stderr,
+              "jsscan \"%s\" (at %d, %s, %s): engine %d [%d,%d], "
+              "model %d [%d,%d]\n",
+              text, (int) at, in_tag ? "in tag" : "free", in_css ? "css" : "js",
+              (int) found, got.offset, got.length, (int) wanted, woff, wlen);
+    }
+    sw->bad++;
+  }
+}
+
+/* Snippets built as prefix + keyword + separator + quote + operand + tail, one
+   representative per class the scanner branches on rather than every byte. */
+static void jsscan_sweep(httrackp *opt, dirtylink_sweep *sw) {
+  static const char *const prefix[] = {"", " ", "a", "_", "\""};
+  static const char *const word[] = {
+      ".src",     "src",    ".SRC",  ".location", ":location",
+      "location", ".href",  ".open", ".replace",  ".link",
+      "url",      "import", "foo"};
+  static const char *const sep[] = {"=", "(", ",", "", " ="};
+  static const char *const quote[] = {"\"", "'", ""};
+  static const char *const operand[] = {"a.gif", "text/html", "GET", ",x",
+                                        "x;y",   "",          "a b"};
+  static const char *const tail[] = {";", ")", ",", "\n", " ;", "", "x"};
+  char text[128];
+  size_t p, w, s, q, o, t;
+
+  for (p = 0; p < sizeof(prefix) / sizeof(prefix[0]); p++) {
+    for (w = 0; w < sizeof(word) / sizeof(word[0]); w++) {
+      for (s = 0; s < sizeof(sep) / sizeof(sep[0]); s++) {
+        for (q = 0; q < sizeof(quote) / sizeof(quote[0]); q++) {
+          for (o = 0; o < sizeof(operand) / sizeof(operand[0]); o++) {
+            for (t = 0; t < sizeof(tail) / sizeof(tail[0]); t++) {
+              const size_t at = strlen(prefix[p]);
+              size_t c;
+
+              text[0] = '\0';
+              strcatbuff(text, prefix[p]);
+              strcatbuff(text, word[w]);
+              strcatbuff(text, sep[s]);
+              strcatbuff(text, quote[q]);
+              strcatbuff(text, operand[o]);
+              strcatbuff(text, quote[q]);
+              strcatbuff(text, tail[t]);
+              for (c = 0; c < 4; c++) {
+                jsscan_one(opt, sw, text, at, (c & 1) ? HTS_TRUE : HTS_FALSE,
+                           '"', (c & 2) ? HTS_TRUE : HTS_FALSE);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+static int st_jsscan(httrackp *opt, int argc, char **argv) {
+  dirtylink_sweep sw;
+
+  memset(&sw, 0, sizeof(sw));
+  sw.dump = (argc > 0 && strcmp(argv[0], "dump") == 0) ? HTS_TRUE : HTS_FALSE;
+  jsscan_sweep(opt, &sw);
+  if (sw.dump)
+    return 0;
+  if (sw.bad != 0) {
+    fprintf(stderr, "jsscan: %d of %d swept cases disagree with the model\n",
+            (int) sw.bad, (int) sw.cases);
+    printf("jsscan self-test FAILED (%d cases swept, %d links)\n",
+           (int) sw.cases, (int) sw.accepted);
+    return 1;
+  }
+  printf("jsscan self-test OK (%d cases swept, %d links)\n", (int) sw.cases,
+         (int) sw.accepted);
+  return 0;
+}
+
+/* ------------------------------------------------------------ */
+/* -#test=tagattr: which in-tag quoted value the dirty parser may read */
+/* ------------------------------------------------------------ */
+
+/* Is this attribute name one that never carries a link? */
+static hts_boolean tagattr_is_nodetect(const char *name, size_t len) {
+  size_t i;
+
+  for (i = 0; strnotempty(hts_nodetect[i]); i++) {
+    if (strlen(hts_nodetect[i]) == len && strfield(name, hts_nodetect[i]))
+      return HTS_TRUE;
+  }
+  if (len >= 5 && strfield(name, "xmlns") && (len == 5 || name[5] == ':'))
+    return HTS_TRUE;
+  return HTS_FALSE;
+}
+
+/* A tag whose attribute we built ourselves, so the name the walk must resolve
+   is known rather than recomputed. */
+static int tagattr_case(const char *before, const char *name, const char *gap,
+                        char quote, hts_boolean want) {
+  char text[256];
+  const char *nend = NULL;
+  const char *quotep, *got;
+  size_t at;
+  int err = 0;
+
+  text[0] = '\0';
+  strcatbuff(text, "<a ");
+  strcatbuff(text, before);
+  at = strlen(text);
+  strcatbuff(text, name);
+  strcatbuff(text, gap);
+  strcatbuff(text, "=");
+  strcatbuff(text, gap);
+  quotep = text + strlen(text);
+  {
+    const char q[2] = {quote, '\0'};
+
+    strcatbuff(text, q);
+  }
+  strcatbuff(text, "x.gif\">");
+
+  got = dirty_attr_name(quotep, text, &nend);
+  if (got == NULL || got != text + at || nend != text + at + strlen(name)) {
+    fprintf(stderr, "tagattr \"%s\": name resolved as %s, wanted \"%s\"\n",
+            text, got == NULL ? "(none)" : got, name);
+    err = 1;
+  }
+  if (dirty_attr_detectable(quotep, text) != want) {
+    fprintf(stderr, "tagattr \"%s\": detectable %d, wanted %d\n", text,
+            (int) !want, (int) want);
+    err = 1;
+  }
+  return err;
+}
+
+/* Every string of up to four bytes over the alphabet the walk branches on,
+   sitting between the tag and the quote. Nothing here is a valid tag, so the
+   check is on what the walk may claim, not on a second walk. */
+static int tagattr_junk(dirtylink_sweep *sw) {
+  static const char alphabet[] = "= \"'a<\t";
+  const size_t n = sizeof(alphabet) - 1;
+  char text[16];
+  size_t len;
+  int err = 0;
+
+  for (len = 0; len <= 4; len++) {
+    size_t i, k, total = 1;
+
+    for (k = 0; k < len; k++)
+      total *= n;
+    for (i = 0; i < total; i++) {
+      const char *nend = NULL;
+      const char *name;
+      const char *quotep;
+      const char *a;
+      size_t v = i;
+
+      text[0] = '<';
+      for (k = 0; k < len; k++) {
+        text[1 + k] = alphabet[v % n];
+        v /= n;
+      }
+      text[1 + len] = '"';
+      text[2 + len] = '\0';
+      quotep = text + 1 + len;
+      name = dirty_attr_name(quotep, text, &nend);
+      sw->cases++;
+
+      /* the value must close an "name=", whatever else the tag holds */
+      a = quotep - 1;
+      while (a > text && is_taborspace(*a))
+        a--;
+      if (*a != '=' || a == text) {
+        if (name != NULL) {
+          if (sw->bad++ < 20)
+            fprintf(stderr, "tagattr \"%s\": named an attribute with no '='\n",
+                    text);
+          err = 1;
+        }
+        continue;
+      }
+      if (name == NULL)
+        continue;
+      /* a name is one token inside the tag, past the tag's own name */
+      if (name <= text + 1 || nend <= name || nend > quotep) {
+        if (sw->bad++ < 20)
+          fprintf(stderr, "tagattr \"%s\": name span out of the tag\n", text);
+        err = 1;
+      } else {
+        const char *p;
+
+        for (p = name; p < nend; p++) {
+          if (*p == '=' || *p == '"' || *p == '\'' || is_realspace(*p)) {
+            if (sw->bad++ < 20)
+              fprintf(stderr, "tagattr \"%s\": name holds a separator\n", text);
+            err = 1;
+            break;
+          }
+        }
+      }
+      if (dirty_attr_detectable(quotep, text) !=
+          (tagattr_is_nodetect(name, (size_t) (nend - name)) ? HTS_FALSE
+                                                             : HTS_TRUE)) {
+        if (sw->bad++ < 20)
+          fprintf(stderr, "tagattr \"%s\": verdict does not follow the name\n",
+                  text);
+        err = 1;
+      }
+      if (dirty_attr_detectable(quotep, text))
+        sw->accepted++;
+    }
+  }
+  return err;
+}
+
+static int st_tagattr(httrackp *opt, int argc, char **argv) {
+  /* names that may carry a link, and names that never do */
+  static const char *const linky[] = {"href",   "src",        "data-src",
+                                      "srcset", "background", "longdesc",
+                                      "xmlnsx", "onclick"};
+  static const char *const nolink[] = {"id",    "name",  "alt",
+                                       "class", "title", "type",
+                                       "style", "xmlns", "xmlns:xlink"};
+  static const char *const before[] = {"", "id=\"x\" ", "alt = 'y'\t"};
+  static const char *const gap[] = {"", " ", "\t", "  "};
+  dirtylink_sweep sw;
+  size_t b, g, i;
+  int err = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  memset(&sw, 0, sizeof(sw));
+  for (b = 0; b < sizeof(before) / sizeof(before[0]); b++) {
+    for (g = 0; g < sizeof(gap) / sizeof(gap[0]); g++) {
+      for (i = 0; i < sizeof(linky) / sizeof(linky[0]); i++)
+        err |= tagattr_case(before[b], linky[i], gap[g], '"', HTS_TRUE);
+      for (i = 0; i < sizeof(nolink) / sizeof(nolink[0]); i++)
+        err |= tagattr_case(before[b], nolink[i], gap[g], '\'', HTS_FALSE);
+    }
+  }
+  err |= tagattr_junk(&sw);
+  if (err) {
+    printf("tagattr self-test FAILED (%d junk tags swept)\n", (int) sw.cases);
+    return 1;
+  }
+  printf("tagattr self-test OK (%d junk tags swept, %d readable)\n",
+         (int) sw.cases, (int) sw.accepted);
+  return 0;
+}
+
 static int st_addrport(httrackp *opt, int argc, char **argv) {
   (void) opt;
   (void) argc;
@@ -14961,6 +15393,14 @@ static const struct selftest_entry {
      "is a quoted string a link? sweeps the parser's alphabet against a model, "
      "or dumps its verdicts",
      st_dirtylink},
+    {"jsscan", "[dump]",
+     "does a script statement hand a URL to .src, .location, .open, url() and "
+     "friends? sweeps the shapes against a model",
+     st_jsscan},
+    {"tagattr", "",
+     "may the dirty parser read this in-tag quoted value? resolves the owning "
+     "attribute and refuses the names that carry no link",
+     st_tagattr},
     {"addrport", "",
      "\"host:port\" of a peer address is bounded and complete (#1493)",
      st_addrport},
