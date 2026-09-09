@@ -1014,8 +1014,7 @@ dump_crawl_logs() {
 # nothing is distinctive enough, which the callers treat as "unknown" (#1228).
 win_marker() { # win_marker <path to a NUL-separated cmdline>
     test -r "$1" || return 0
-    # Grouped, because the failing redirect is reported by the shell, not by tr,
-    # and the pid can die between the test above and the open.
+    # The pid can die after the test, and the shell reports that failed redirect.
     { tr '\0' '\n' <"$1"; } 2>/dev/null |
         awk 'NR == 1 { next }
              /^-/ { next }

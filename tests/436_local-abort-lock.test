@@ -41,8 +41,6 @@ fail_dump_var crawllog
 printf '[a running engine takes the request] ..\t'
 out="${tmpdir}/running"
 crawllog="${tmpdir}/log-running"
-# Own it: an engine-created directory went missing under WSL2 mid-test.
-mkdir -p "$out"
 httrack -O "$out" "${common[@]}" "${BASEURL}/trickle/index.html" \
     >"$crawllog" 2>&1 &
 crawlpid=$!
@@ -64,7 +62,6 @@ echo "OK"
 printf '[an abort keeps the cut transfers] ..\t'
 out="${tmpdir}/keep"
 crawllog="${tmpdir}/log-keep"
-mkdir -p "$out"
 httrack -O "$out" "${common[@]}" --max-rate=200000 \
     "${BASEURL}/bigfiles/index.html" >"$crawllog" 2>&1 &
 crawlpid=$!
@@ -87,7 +84,6 @@ echo "OK"
 printf '[a paused engine takes the request] ..\t'
 out="${tmpdir}/paused"
 crawllog="${tmpdir}/log-paused"
-mkdir -p "$out"
 httrack -O "$out" "${common[@]}" --max-rate=200000 \
     "${BASEURL}/bigfiles/index.html" >"$crawllog" 2>&1 &
 crawlpid=$!
