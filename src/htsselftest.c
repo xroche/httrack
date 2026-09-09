@@ -12618,8 +12618,8 @@ static void st_backstop_slot(struct_back *sback, int p, int status,
 /* A network that rejects TEST-NET-1 instead of dropping it answers in ms. */
 #define ST_BACKSTOP_SETTLE_MS 500
 
-/* Bytes the size cap allows. back_maxsize_grace() spares the transfers already
-   running for another tenth of it, so the cases below spell that tenth out. */
+/* Bytes the size cap allows. back_maxsize_grace() spares running transfers a
+   further tenth, so the past-grace case below doubles it. */
 #define ST_BACKSTOP_CAP 1000
 
 /* Refill every slot: a fresh pending connect for each state that owns a socket,
@@ -12653,6 +12653,68 @@ static hts_boolean st_backstop_arm(httrackp *opt, struct_back *sback,
     }
   }
   return HTS_TRUE;
+}
+
+/* back_delete_all(), the shutdown every exit reaches, on its own slot table. A
+   capped mirror can end through the link loop before either sweep runs
+   (htscore.c, on back_checkmirror), and the partial is on disk just the same.
+   Returns 77 on an allocation failure, as st_backstop() does. */
+static int st_backstop_check_shutdown(httrackp *opt) {
+  /* back_delete_all() raises the flag only for a live slot writing a file of
+     its own. back_is_live() is a RANGE, 0 < status < STATUS_FTP_TRANSFER, so
+     the rows walk it: one on each side, and two inside it far enough apart that
+     narrowing the range to its first status fails. */
+  static const struct {
+    const char *what;
+    int status;
+    hts_boolean is_write;
+    const char *url_sav;
+    hts_boolean kept;
+  } shutdown[] = {{"a free slot", STATUS_FREE, HTS_TRUE,
+                   "hts-backstop-selftest.tmp", HTS_FALSE},
+                  {"a slot already finished", STATUS_READY, HTS_TRUE,
+                   "hts-backstop-selftest.tmp", HTS_FALSE},
+                  {"an FTP slot", STATUS_FTP_TRANSFER, HTS_TRUE,
+                   "hts-backstop-selftest.tmp", HTS_FALSE},
+                  {"a slot writing nothing to disk", STATUS_TRANSFER, HTS_FALSE,
+                   "", HTS_FALSE},
+                  {"a .delayed placeholder", STATUS_TRANSFER, HTS_TRUE,
+                   "hts-backstop-selftest.tmp." DELAYED_EXT, HTS_FALSE},
+                  {"a partial file", STATUS_TRANSFER, HTS_TRUE,
+                   "hts-backstop-selftest.tmp", HTS_TRUE},
+                  {"a partial file awaiting its next chunk", STATUS_CHUNK_WAIT,
+                   HTS_TRUE, "hts-backstop-selftest.tmp", HTS_TRUE}};
+
+  int err = 0;
+  size_t c;
+
+  for (c = 0; c < sizeof(shutdown) / sizeof(shutdown[0]) && !err; c++) {
+    struct_back *shut = back_new(opt, 1);
+    cache_back shutcache;
+
+    if (shut == NULL) {
+      printf("backstop: SKIP (no slot table for the shutdown cases)\n");
+      return 77;
+    }
+    memset(&shutcache, 0, sizeof(shutcache));
+    shutcache.hashtable = coucal_new(0);
+    shut->lnk[0].status = shutdown[c].status;
+    shut->lnk[0].r.soc = INVALID_SOCKET;
+    shut->lnk[0].r.is_write = shutdown[c].is_write;
+    strcpybuff(shut->lnk[0].url_sav, shutdown[c].url_sav);
+    opt->abort_left_partial = HTS_FALSE;
+
+    back_delete_all(opt, &shutcache, shut);
+
+    if (opt->abort_left_partial != shutdown[c].kept) {
+      printf("  FAIL line %d: %s must %s the resume data at shutdown\n",
+             __LINE__, shutdown[c].what, shutdown[c].kept ? "keep" : "drop");
+      err = 1;
+    }
+    back_free(&shut);
+    coucal_delete(&shutcache.hashtable);
+  }
+  return err;
 }
 
 /* A user stop must drop every slot but the FTP one (#1073, #1110). */
@@ -12876,32 +12938,14 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
     opt->maxsite = 0;
     HTS_STAT.HTS_TOTAL_RECV = recv_was;
   }
-  /* back_delete_all(), the shutdown every exit reaches. A capped mirror can end
-     through the link loop before either sweep runs (htscore.c, on
-     back_checkmirror), and the partial is on disk just the same. Its own slot
-     table, so the fixture above is not torn down early. */
   if (!err) {
-    struct_back *shut = back_new(opt, 1);
+    const int rc = st_backstop_check_shutdown(opt);
 
-    if (shut == NULL) {
-      err = 1;
-    } else {
-      cache_back shutcache;
-
-      memset(&shutcache, 0, sizeof(shutcache));
-      shutcache.hashtable = coucal_new(0);
-      shut->lnk[0].status = STATUS_TRANSFER;
-      shut->lnk[0].r.soc = INVALID_SOCKET;
-      shut->lnk[0].r.is_write = 1;
-      strcpybuff(shut->lnk[0].url_sav, "hts-backstop-selftest.tmp");
-      opt->abort_left_partial = HTS_FALSE;
-
-      back_delete_all(opt, &shutcache, shut);
-
-      CHECK(opt->abort_left_partial);
-      back_free(&shut);
-      coucal_delete(&shutcache.hashtable);
+    if (rc == 77) {
+      skipped = 1;
+      goto cleanup;
     }
+    err = rc;
   }
 #undef CHECK
 
