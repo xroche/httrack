@@ -798,12 +798,12 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 #endif
   hts_cache_reconcile(opt, CACHE_RECONCILE_PROMOTE);
 
-  /* Interrupted mirror detected */
+  /* Interrupted mirror over a pre-3.31 (2003) cache: cache_init() refuses that
+     .dat/.ndx pair, so say so rather than send the user restoring it. */
   if (!opt->quiet) {
     if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                             StringBuff(opt->path_log),
                             "hts-in_progress.lock"))) {
-      /* Old cache */
       if ((fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                                StringBuff(opt->path_log),
                                "hts-cache/old.dat"))) &&
@@ -813,9 +813,12 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         if (opt->log != NULL) {
           fprintf(opt->log, "Warning!\n");
           fprintf(opt->log,
-                  "An aborted mirror has been detected!\nThe current temporary cache is required for any update operation and only contains data downloaded during the last aborted session.\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\nThis can easily be done here by erasing the hts-cache/new.* files\n");
+                  "An aborted mirror has been detected, over a cache this "
+                  "version can no longer read: hts-cache/old.dat and old.ndx "
+                  "are the pre-3.31 format, dropped in 2003.\n");
           fprintf(opt->log,
-                  "Please restart HTTrack with --continue (-iC1) option to override this message!\n");
+                  "Restart HTTrack with --continue (-iC1) to go on; the site "
+                  "will be mirrored again from scratch.\n");
         }
         htsmain_free();
         return 0;
@@ -3070,7 +3073,9 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     if (opt->state.exit_xh == 1) {
       if (opt->log) {
         fprintf(opt->log,
-                "* * MIRROR ABORTED! * *\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\nThis can easily be done here by erasing the hts-cache/new.* files]\n");
+                "* * MIRROR ABORTED! * *\nThe mirror stopped before the end. "
+                "Start it again with --continue to resume it.\nThe cache is "
+                "kept: nothing has to be restored or deleted by hand.\n");
       }
     }
 
