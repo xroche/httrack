@@ -78,7 +78,8 @@ typedef struct httrackp httrackp;
 
 /** Copy ADR's host into DST, lowercased and without identification, IPv6
     brackets or port. RFC 6265 scopes a cookie to a host, matches that host
-    without case, and a browser jar records no port.
+    without case, and a browser jar records no port. A bracketed literal's
+    zone id keeps the bare '%' that a jar carries, not the URI's "%25".
     HTS_FALSE means the caller sends no cookie. */
 hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size);
 

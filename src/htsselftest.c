@@ -5278,6 +5278,21 @@ static int st_cookieport(httrackp *opt, int argc, char **argv) {
       {"", NULL}, // an empty domain is a suffix of every host
       {":8080", NULL},
       {"[]:80", NULL},
+      // a URI spells a zone id's '%' as "%25" and a jar carries it bare
+      {"[fe80::1%25eth0]:8080", "fe80::1%eth0"},
+      {"[fe80::1%25eth0]", "fe80::1%eth0"},
+      {"fe80::1%eth0", "fe80::1%eth0"},     // a browser export carries this
+      {"fe80::1%25eth0", "fe80::1%25eth0"}, // a bare '%' is literal already
+      {"fe80::1%250", "fe80::1%250"},       // scope index 250, not zone 0
+      {"host%25name.example", "host%25name.example"}, // a name has no zone id
+      // the rest of the zone id keeps whatever escapes it carries
+      {"[fe80::1%25eth%250]", "fe80::1%eth%250"},
+      {"[fe80::1%2525eth0]", "fe80::1%25eth0"}, // a zone id may open with "%25"
+      {"[fe80::1%]:80", "fe80::1%"}, // truncated, so it decodes nothing
+      {"[fe80::1%2]:80", "fe80::1%2"},
+      {"[fe80::1%a5eth0]", "fe80::1%a5eth0"}, // 'a5' is not the introducer
+      // an empty zone id is malformed, and still lands on one jar entry
+      {"[fe80::1%25]:80", "fe80::1%"},
   };
 
   static const struct {
@@ -5322,6 +5337,14 @@ static int st_cookieport(httrackp *opt, int argc, char **argv) {
       // "x" while every query still asks for "x:1"
       {"[x:1]:80", "Set-Cookie: odd=O; path=/", "[x:1]:80", "odd=O", HTS_TRUE,
        "the store side normalised the host twice"},
+      // a link-local host reaches the zone id spelling a browser exports, and
+      // stops at another zone
+      {"[fe80::1%25eth0]:8080", "Set-Cookie: zone=Z; path=/", "fe80::1%eth0",
+       "zone=Z", HTS_TRUE, "[fe80::1%25eth0] does not reach fe80::1%eth0"},
+      {"fe80::1%eth0", "Set-Cookie: zone=Z; path=/", "[fe80::1%25eth0]:8080",
+       "zone=Z", HTS_TRUE, "fe80::1%eth0 does not reach [fe80::1%25eth0]"},
+      {"[fe80::1%25eth0]:8080", "Set-Cookie: zone=Z; path=/", "fe80::1%eth1",
+       "zone=Z", HTS_FALSE, "a cookie on %eth0 reached %eth1"},
   };
 
   static t_cookie jar;
@@ -5385,6 +5408,15 @@ static int st_cookieport(httrackp *opt, int argc, char **argv) {
   http_cookie_header(&jar, "::1", "/", hdr, sizeof(hdr));
   err |= cookie_expect(strstr(hdr, "sixjar=V") != NULL, HTS_TRUE,
                        "a jar storing [::1]:8080 lost its session");
+  /* Only this case drives cookie_add with a zone id, which the host rows above
+     never do. */
+  if (cookie_add(&jar, "zonejar", "Z", "[fe80::1%25eth0]:8080", "/") != 0) {
+    printf("cookie-port: FAIL (cookie_add setup, zone id form)\n");
+    return 1;
+  }
+  http_cookie_header(&jar, "fe80::1%eth0", "/", hdr, sizeof(hdr));
+  err |= cookie_expect(strstr(hdr, "zonejar=Z") != NULL, HTS_TRUE,
+                       "a jar storing [fe80::1%25eth0] lost its session");
   err |= cookie_expect(cookie_add(&jar, "pwn", "OWNED", "", "/") == 0,
                        HTS_FALSE, "an empty domain entered the jar");
 
