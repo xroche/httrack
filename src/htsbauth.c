@@ -48,11 +48,13 @@ Please visit our Website: http://www.httrack.com
 /* See htsbauth.h. */
 hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size) {
   const char *host = jump_identification_const(adr);
+  hts_boolean literal = HTS_FALSE;
   size_t len;
 
   if (host[0] == '[') { // bracketed IPv6 literal, [::1]:8080
     const char *const end = strchr(host, ']');
 
+    literal = HTS_TRUE;
     host++;
     len = end != NULL ? (size_t) (end - host) : strlen(host);
   } else {
@@ -68,9 +70,9 @@ hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size) {
     return HTS_FALSE;
   dst[0] = '\0';
   strlncatbuff(dst, host, dst_size, len);
-  /* RFC 6874 escapes a zone id's '%' as "%25" in a URI, and a jar carries the
-     bare '%'. Only a literal has a zone id, and only its introducer decodes. */
-  if (strchr(dst, ':') != NULL) {
+  /* "%25" is RFC 6874's URI spelling of a zone id's '%'. Only a bracketed
+     literal carries it, because a bare host's '%' is already literal. */
+  if (literal) {
     char *const zone = strchr(dst, '%');
 
     if (zone != NULL && zone[1] == '2' && zone[2] == '5')
