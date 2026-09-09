@@ -273,9 +273,10 @@ jobs:
         shell: pwsh
         timeout-minutes: 15
         run: |
-          # Three tries with a pause, like the rootfs download below: this call
-          # has failed on a transient and blocked a merge for it, and it now
-          # gates the only Windows suite there is.
+          # Three tries, then carry on regardless: this endpoint 403s per runner,
+          # and one leg has 403'd while its sibling on the same run updated fine.
+          # The import and the uname below are the proof WSL works, and both stay
+          # fatal, so giving up here costs a clear error rather than a wrong pass.
           for ($i = 1; $i -le 3; $i++) {
             try {
               wsl --update
@@ -284,8 +285,10 @@ jobs:
             }
             catch {
               Write-Host "wsl --update attempt $i failed: $($_.Exception.Message)"
-              if ($i -eq 3) { throw }
-              Start-Sleep -Seconds (5 * $i)
+              if ($i -eq 3) {
+                Write-Host "wsl --update never succeeded, so the import below decides"
+              }
+              else { Start-Sleep -Seconds (5 * $i) }
             }
           }
           wsl --set-default-version 2
