@@ -112,9 +112,9 @@ void hts_strip_default_port(char *lien, size_t size);
 
 /*
   Does a quoted string the dirty parser found look like a link? "str" and "len"
-  are the string as the source spells it, "lastc" the first non-blank byte after
-  its closing quote, and "inscript" says it sits in JavaScript or CSS rather
-  than in a tag attribute. The verdict is taken on what the cut at '#' and '?'
+  are the string as the source spells it. "lastc" is the first non-blank byte
+  after its closing quote, and "inscript" says it sits in JavaScript or CSS,
+  not in a tag attribute. The verdict is taken on what the cut at '#' and '?'
   leaves, so "/#top" is judged as "/". A string of HTS_URLMAXSIZE bytes or more
   is refused, a length the parser never offers.
 */
@@ -122,8 +122,9 @@ hts_boolean hts_dirty_link_is_url(httrackp *opt, const char *str, size_t len,
                                   char lastc, hts_boolean inscript);
 
 /* A link the script scanner found, as an offset and a length from the cursor
-   it was given. "unquoted_end" is the byte an unquoted CSS url(...) operand
-   stops at, and '\0' when the operand was quoted. */
+   it was given. "unquoted_end" is the byte an unquoted CSS url() operand stops
+   at, and '\0' when the operand was quoted. All three fields are zero when the
+   scanner found nothing. */
 typedef struct hts_js_link {
   int offset;
   int length;
@@ -131,13 +132,12 @@ typedef struct hts_js_link {
 } hts_js_link;
 
 /*
-  Does the script or CSS at "cursor" hand a URL to one of the constructs the
-  engine follows (.src, .location, .href, .open, .replace, .link, url(),
-  import)? "buffer" is the first byte of the document, which the keyword tests
-  read backwards from. "in_tag" says the script is an attribute value such as
-  onclick="...", and "tag_lastc" the quote that attribute is written with.
-  "in_css" allows url() to take an unquoted operand. Fills "link" and answers
-  true when a URL was found.
+  Does the script or CSS at "cursor" hand a URL to .src, .location, .href,
+  .open, .replace, .link, url() or import? "buffer" is the first byte of the
+  document, which the keyword tests read backwards from. "in_tag" says the
+  script is an attribute value such as onclick="...", and "tag_lastc" the quote
+  that attribute is written with. "in_css" lets url() take an unquoted operand.
+  Fills "link" and answers true when a URL was found.
 */
 hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
                              const char *buffer, hts_boolean in_tag,
@@ -147,18 +147,18 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
 /*
   May the dirty parser take the in-tag quoted value at "quote" for a link?
   "tag_start" is the tag's first byte, the '<'. False when the quote is not an
-  attribute value at all, and false for the attribute names that never carry
-  one: hts_nodetect (id, name and friends) and an xmlns declaration.
+  attribute value. Also false for the attribute names that never carry one:
+  hts_nodetect (id, name and friends) and an xmlns declaration.
 */
-hts_boolean dirty_attr_detectable(const char *quote, const char *tag_start);
+hts_boolean hts_dirty_attr_detectable(const char *quote, const char *tag_start);
 
 /*
-  The attribute name owning the quoted value at "quote" inside the tag starting
-  at "tag_start", spanning [name, *nend). NULL when the quote is not an
-  attribute value at all.
+  Finds the attribute name owning the quoted value at "quote" inside the tag
+  starting at "tag_start", spanning [name, *nend). Returns NULL when the quote
+  is not an attribute value, and leaves *nend unspecified when it does.
 */
-const char *dirty_attr_name(const char *quote, const char *tag_start,
-                            const char **nend);
+const char *hts_dirty_attr_name(const char *quote, const char *tag_start,
+                                const char **nend);
 
 /*
   Check for 301,302.. errors ("moved") and handle them; re-isuue requests, make

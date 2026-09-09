@@ -20,3 +20,11 @@ case "$out" in
     exit 1
     ;;
 esac
+
+# A sweep whose corpus collapses still prints OK, so pin the floor here.
+swept=${out#*OK (}
+swept=${swept%% *}
+test "$swept" -ge 300000 || {
+    echo "expected at least 300000 cases swept, got: $out" >&2
+    exit 1
+}

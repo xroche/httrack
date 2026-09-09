@@ -240,8 +240,8 @@ static void hts_automate_lookup(const script_automate *aut) {
 }
 
 /* Contract in htsparse.h. */
-const char *dirty_attr_name(const char *quote, const char *tag_start,
-                            const char **nend) {
+const char *hts_dirty_attr_name(const char *quote, const char *tag_start,
+                                const char **nend) {
   const char *a = quote - 1;
   while (a > tag_start && is_taborspace(*a))
     a--;
@@ -261,9 +261,10 @@ const char *dirty_attr_name(const char *quote, const char *tag_start,
 
 /* Contract in htsparse.h. Resolves the owning attribute itself, since
    intag_startattr is unreliable mid-tag. */
-hts_boolean dirty_attr_detectable(const char *quote, const char *tag_start) {
+hts_boolean hts_dirty_attr_detectable(const char *quote,
+                                      const char *tag_start) {
   const char *nend;
-  const char *name = dirty_attr_name(quote, tag_start, &nend);
+  const char *name = hts_dirty_attr_name(quote, tag_start, &nend);
   int i;
   if (name == NULL)
     return HTS_FALSE;
@@ -390,17 +391,16 @@ hts_boolean hts_dirty_link_is_url(httrackp *opt, const char *str, size_t len,
   if (tempo[0] == '.' && isalnum((unsigned char) tempo[1])) // ".gif"
     return HTS_FALSE;
 
-  // Un plus à la fin? Alors ne pas prendre sauf si extension
-  // ("/toto.html#"+tag)
-  if (lastc != '+') { // PAS de plus à la fin
+  // a trailing '+' concatenates, so only an extension speaks for the string
+  if (lastc != '+') {
     // "Comparisons of scheme names MUST be case-insensitive" (RFC2616)
     if ((strfield(tempo, "http:")) || (strfield(tempo, "ftp:"))
 #if HTS_USEOPENSSL
         || (strfield(tempo, "https:"))
 #endif
-            ) // ok pas de problème
+    )
       url_ok = HTS_TRUE;
-    else if (hts_lastchar(tempo) == '/') { // un slash: ok..
+    else if (hts_lastchar(tempo) == '/') {
       /* A trailing slash alone is no evidence inside a script, where "/" and
          "image/" are ordinary strings. */
       if (inscript &&
@@ -408,15 +408,15 @@ hts_boolean hts_dirty_link_is_url(httrackp *opt, const char *str, size_t len,
         url_ok = HTS_TRUE;
     }
   }
-  // Prendre si extension reconnue
+  // a recognized extension names a file
   if (!url_ok) {
     if (get_httptype_sized(opt, type, sizeof(type), tempo,
                            0)) // recognized type
       url_ok = HTS_TRUE;
     else if (is_dyntype(get_ext(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                tempo))) // reconnu php,cgi,asp..
+                                tempo))) // php, cgi, asp
       url_ok = HTS_TRUE;
-    // MAIS pas les foobar@aol.com !!
+    // but not foobar@aol.com
     if (strchr(tempo, '@'))
       url_ok = HTS_FALSE;
   }
@@ -428,7 +428,7 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
                              const char *buffer, hts_boolean in_tag,
                              char tag_lastc, hts_boolean in_css,
                              hts_js_link *link) {
-  char expected = '='; // caractère attendu après
+  char expected = '='; // byte that must follow the keyword
   const char *expected_end = ";";
   int can_avoid_quotes = 0;
   char quotes_replacement = '\0';
@@ -450,7 +450,8 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
     return HTS_FALSE;
 
   if (in_tag)
-    expected_end = ";\"\'"; // voir a href="javascript:doc.location='foo'"
+    expected_end = ";\"\'"; // a href="javascript:doc.location='foo'" ends on
+                            // the attribute's quote
 
   nc = strfield(cursor, ".src"); // nom.src="image";
   if (!nc && in_tag && tag_lastc == html_prevc(cursor, buffer))
@@ -468,26 +469,26 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
     nc = strfield(cursor, ".href"); // document.location="doc"
   if (!nc)
     if ((nc = strfield(cursor, ".open"))) { // window.open("doc",..
-      expected = '(';                       // parenthèse
-      expected_end = "),";                  // fin: virgule ou parenthèse
-      ensure_not_mime = 1;   //* ensure the url is not a mime type */
+      expected = '(';
+      expected_end = "),";   // ends on a comma or the paren
+      ensure_not_mime = 1;   // refuse a mime type
       ensure_not_method = 1; // xhr.open: don't grab method
     }
   if (!nc)
     if ((nc = strfield(cursor, ".replace"))) { // window.replace("url")
-      expected = '(';                          // parenthèse
-      expected_end = ")";                      // fin: parenthèse
+      expected = '(';
+      expected_end = ")";
     }
   if (!nc)
     if ((nc = strfield(cursor, ".link"))) { // window.link("url")
-      expected = '(';                       // parenthèse
-      expected_end = ")";                   // fin: parenthèse
+      expected = '(';
+      expected_end = ")";
     }
   if (!nc && (nc = strfield(cursor, "url")) &&
       (!isalnum(html_prevc(cursor, buffer))) &&
       html_prevc(cursor, buffer) != '_') { // url(url)
-    expected = '(';                        // parenthèse
-    expected_end = ")";                    // fin: parenthèse
+    expected = '(';
+    expected_end = ")";
     /* CSS writes url(foo.png) unquoted, but JavaScript's new URL(x) matches
        the same token, so an unquoted operand there rewrites the expression
        itself. */
@@ -1815,7 +1816,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           // delimiter required after it (mid-tag attrs, #201)
                           if (strchr("),;>/+\r\n", c) ||
                               (intag && !inscript && intag_start_valid &&
-                               dirty_attr_detectable(html, intag_start))) {
+                               hts_dirty_attr_detectable(html, intag_start))) {
                             // '/' covers a value followed by a JS comment
                             int url_ok = hts_dirty_link_is_url(
                                 opt, html + 1, (size_t) count, c, inscript);
