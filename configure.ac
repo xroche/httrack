@@ -503,9 +503,8 @@ AS_IF([test x"$backtrace_platform" = x"no"],
 	[AC_MSG_RESULT([$backtrace_have (requested)])])
 AC_SUBST([BACKTRACE_LIBS])
 
-## -#c faults on purpose so the crash handlers can be tested. On by default
-## because the suite drives it; an application embedding the engine wants it
-## gone, as the option is otherwise reachable from whatever argv it builds.
+## On by default because the suite drives -#c; an embedding application drops it
+## so the deliberate crash leaves whatever argv it builds.
 AC_ARG_ENABLE([crash-test],
 	[AS_HELP_STRING([--disable-crash-test],
 		[drop the hidden -#c option, which crashes on purpose to test crash handlers @<:@default=enabled@:>@])],

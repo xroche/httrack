@@ -17,6 +17,14 @@ command -v httrack >/dev/null || {
     echo "could not find httrack" >&2
     exit 1
 }
+# have_feature crashtest, open-coded: this file sources no testlib.
+case "$(httrack -#test=features 2>/dev/null)" in
+*"crashtest 1"*) ;;
+*)
+    echo "built with --disable-crash-test, skipping" >&2
+    exit 77
+    ;;
+esac
 # A --disable-shared build has nothing to preload; anything else missing is a
 # build problem, not a skip, or the leg below would pass vacuously.
 if [ ! -r "${NOBACKTRACE_LA:-}" ]; then

@@ -79,6 +79,21 @@ else
     echo "ok: gb2312 does not convert, as a tables-only build cannot"
 fi
 
+# The report and config.h can agree and both be wrong about the binary, so the
+# crash option is checked against behaviour too: an unknown kind names the kinds.
+rc=0
+kinds=$(httrack -#c=bogus 2>&1) || rc=$?
+if have_feature crashtest; then
+    grep -q "expects one of:" <<<"${kinds}" ||
+        fail "crashtest is reported on, but -#c=bogus said '${kinds}'"
+    echo "ok: -#c answers, as the report says"
+else
+    if grep -q "expects one of:" <<<"${kinds}"; then
+        fail "crashtest is reported off, but -#c=bogus still names the kinds"
+    fi
+    echo "ok: -#c is gone, as the report says"
+fi
+
 # windows-1252 is the spelling HTTP headers use for the cp1252 table, and the
 # fallback used to miss it, so it is the case a tables-only build must still do.
 got=$(httrack -#test=charset windows-1252 hex:80 2>/dev/null) || got=

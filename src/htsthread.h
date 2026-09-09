@@ -68,13 +68,16 @@ HTSEXT_API int hts_newthread(void (*fun) (void *arg), void *arg);
 HTSEXT_API void hts_set_thread_hooks(void *(*enter)(void),
                                      void (*leave)(void *cookie));
 
-/* Runs each worker's body inside a caller-supplied frame, for a crash handler
-   that has to lexically enclose the call: Android's COFFEE_TRY is sigsetjmp
-   plus a block, which the hooks above cannot express. 'runner' must call
-   'fun(arg)' exactly once; NULL restores the plain call. Set before spawning,
-   and it runs between 'enter' and 'leave'. */
-HTSEXT_API void hts_set_thread_runner(void (*runner)(void (*fun)(void *arg),
-                                                     void *arg));
+/* Runs one worker body. See hts_set_thread_runner(). */
+typedef void (*hts_thread_runner)(void (*fun)(void *arg), void *arg);
+
+/* Wraps each worker body in a caller-supplied frame, for a crash handler that
+   must lexically enclose the call rather than bracket it, such as sigsetjmp
+   plus a block. 'runner' must call 'fun(arg)' exactly once, and NULL restores
+   the plain call. Returns the runner it replaced, so an embedder can chain or
+   put one back. Set it before spawning, because the pointer is read unlocked.
+   It runs between 'enter' and 'leave'. */
+HTSEXT_API hts_thread_runner hts_set_thread_runner(hts_thread_runner runner);
 
 HTSEXT_API void htsthread_wait_n(int n_wait);
 

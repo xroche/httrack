@@ -13079,15 +13079,27 @@ static int st_threadwait(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
-/* A crash handler that has to lexically wrap the worker body gets in through
-   hts_set_thread_runner(); the hooks only bracket the call. Records the order
-   so a runner that never encloses the body, or one the engine calls beside
-   fun() rather than around it, both fail. */
+/* Confirms the runner runs the body exactly once, on the worker, and neither
+   beside it nor on the caller. */
+#ifdef _WIN32
+typedef DWORD threadrunner_id;
+#define threadrunner_self() GetCurrentThreadId()
+#define threadrunner_same(a, b) ((a) == (b))
+#else
+typedef pthread_t threadrunner_id;
+#define threadrunner_self() pthread_self()
+#define threadrunner_same(a, b) (pthread_equal((a), (b)) != 0)
+#endif
+
 static htsmutex threadrunner_lock = HTSMUTEX_INIT;
 static int threadrunner_before = 0;
-static int threadrunner_body = 0;
 static int threadrunner_after = 0;
-static int threadrunner_out_of_order = 0;
+static int threadrunner_body = 0;
+/* What the runner had done when the body ran: 1 and 0 from inside it. */
+static int threadrunner_seen_before = 0;
+static int threadrunner_seen_after = 0;
+static threadrunner_id threadrunner_body_thread;
+static threadrunner_id threadrunner_runner_thread;
 
 static void threadrunner_count(int *what) {
   hts_mutexlock(&threadrunner_lock);
@@ -13095,45 +13107,65 @@ static void threadrunner_count(int *what) {
   hts_mutexrelease(&threadrunner_lock);
 }
 
+static void threadrunner_reset(void) {
+  threadrunner_before = 0;
+  threadrunner_after = 0;
+  threadrunner_body = 0;
+  threadrunner_seen_before = 0;
+  threadrunner_seen_after = 0;
+}
+
 static void threadrunner_body_fn(void *arg) {
   (void) arg;
   hts_mutexlock(&threadrunner_lock);
-  /* The body must run inside the runner, never before it or after it. */
-  if (threadrunner_before != 1 || threadrunner_after != 0)
-    threadrunner_out_of_order = 1;
+  threadrunner_seen_before = threadrunner_before;
+  threadrunner_seen_after = threadrunner_after;
+  threadrunner_body_thread = threadrunner_self();
   threadrunner_body++;
   hts_mutexrelease(&threadrunner_lock);
 }
 
 static void threadrunner_runner(void (*fun)(void *arg), void *arg) {
+  threadrunner_runner_thread = threadrunner_self();
   threadrunner_count(&threadrunner_before);
   fun(arg);
   threadrunner_count(&threadrunner_after);
 }
 
-static int threadrunner_spawn(void) {
+static hts_boolean threadrunner_spawn(void) {
   if (hts_newthread(threadrunner_body_fn, NULL) != 0) {
     fprintf(stderr, "threadrunner: cannot spawn\n");
-    return 1;
+    return HTS_FALSE;
   }
   htsthread_wait();
-  return 0;
+  return HTS_TRUE;
 }
 
 static int st_threadrunner(httrackp *opt, int argc, char **argv) {
+  const threadrunner_id caller = threadrunner_self();
+  hts_boolean spawned;
   int err = 0;
 
   (void) opt;
   (void) argc;
   (void) argv;
 
-  hts_set_thread_runner(threadrunner_runner);
-  err = threadrunner_spawn();
-  /* Cleared before any check can return early: the runner is process-global
-     and selftest_queue runs the rest of the file in this same engine. */
-  hts_set_thread_runner(NULL);
-  if (err != 0)
-    return err;
+  /* Every check below reads what the worker wrote, which htsthread_wait()
+     published through the mutex in process_chain_add(). */
+  threadrunner_reset();
+  if (hts_set_thread_runner(threadrunner_runner) != NULL) {
+    fprintf(stderr, "threadrunner: a runner was installed already\n");
+    return 1;
+  }
+  spawned = threadrunner_spawn();
+  /* Cleared before any check can return early, because the runner is
+     process-global and selftest_queue reuses this engine. */
+  if (hts_set_thread_runner(NULL) != threadrunner_runner) {
+    fprintf(stderr, "threadrunner: the setter did not hand back the runner\n");
+    err = 1;
+  }
+  if (!spawned)
+    return 1;
 
   if (threadrunner_before != 1 || threadrunner_after != 1) {
     fprintf(stderr, "threadrunner: runner entered %d time(s), left %d\n",
@@ -13145,21 +13177,37 @@ static int st_threadrunner(httrackp *opt, int argc, char **argv) {
             threadrunner_body);
     err = 1;
   }
-  if (threadrunner_out_of_order) {
-    fprintf(stderr, "threadrunner: the body ran outside the runner\n");
+  if (threadrunner_seen_before != 1 || threadrunner_seen_after != 0) {
+    fprintf(stderr, "threadrunner: the body saw the runner at %d/%d, not 1/0\n",
+            threadrunner_seen_before, threadrunner_seen_after);
+    err = 1;
+  }
+  /* The frame must be the worker's, because a sigsetjmp on the caller's stack
+     catches nothing the worker does. */
+  if (threadrunner_same(threadrunner_body_thread, caller) ||
+      !threadrunner_same(threadrunner_body_thread,
+                         threadrunner_runner_thread)) {
+    fprintf(stderr,
+            "threadrunner: the body did not run on the runner's worker\n");
     err = 1;
   }
 
   /* NULL restores the plain call: the worker runs, the runner does not. */
-  if (threadrunner_spawn() != 0)
+  threadrunner_reset();
+  if (!threadrunner_spawn())
     return 1;
-  if (threadrunner_body != 2) {
+  if (threadrunner_body != 1) {
     fprintf(stderr, "threadrunner: no runner, the body ran %d time(s)\n",
             threadrunner_body);
     err = 1;
   }
-  if (threadrunner_before != 1 || threadrunner_after != 1) {
-    fprintf(stderr, "threadrunner: a cleared runner still ran\n");
+  if (threadrunner_before != 0 || threadrunner_after != 0) {
+    fprintf(stderr, "threadrunner: a cleared runner still entered %d time(s)\n",
+            threadrunner_before);
+    err = 1;
+  }
+  if (threadrunner_same(threadrunner_body_thread, caller)) {
+    fprintf(stderr, "threadrunner: the body ran on the caller's thread\n");
     err = 1;
   }
 

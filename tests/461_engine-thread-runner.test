@@ -1,13 +1,11 @@
 #!/bin/bash
 #
-# hts_set_thread_runner() lets an embedder wrap each worker body in a frame the
-# enter/leave hooks cannot express, such as Android's COFFEE_TRY (sigsetjmp
-# plus a block). Driven by the 'httrack -#test=threadrunner' selftest.
+# hts_set_thread_runner() wraps each worker body in a caller frame. See
+# htsthread.h for the contract. Driven by the engine's own selftest.
 
 set -eu
 
-# 'run' is an ignored placeholder argument.
-out=$(httrack -#test=threadrunner run)
+out=$(httrack -#test=threadrunner)
 
 # Exact-match the success line so a renamed or removed selftest (it prints the
 # registry to stderr) cannot pass.

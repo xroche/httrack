@@ -57,9 +57,7 @@ worker=$(crash_report threadstack)
 grep -q "Crash test worker thread started" <<<"$worker" ||
     fail "-#c=threadstack: no worker was spawned, nothing was tested"
 
-# A worker fault with the stack intact. threadstack moves two variables at once,
-# a thread the handler never registered and no stack left to run it on, so it
-# cannot show on its own that the handler reaches a worker at all.
+# threadsegv keeps the worker's stack intact; see htscrashtest.c for why.
 worker_plain=$(crash_report threadsegv)
 grep -q "Crash test worker thread started" <<<"$worker_plain" ||
     fail "-#c=threadsegv: no worker was spawned, nothing was tested"
@@ -77,6 +75,18 @@ SEGV | BUS | ILL) ;;
 *)
     printf '%s\n' "$worker" >&2
     fail "-#c=threadstack: caught signal '${caught:-none}', expected a fault"
+    ;;
+esac
+
+# An ordinary fault, so it names a signal and stays shallow where the runaway
+# recursion below does not. Without this, threadsegv would also pass on a build
+# that faulted the main thread after the worker printed its banner.
+caught_plain=$(sed -n '/^Caught signal [0-9][0-9]*$/{s/.* //;p;q;}' <<<"$worker_plain")
+case "$(kill -l "${caught_plain:-x}" 2>/dev/null || true)" in
+SEGV | BUS | ILL) ;;
+*)
+    printf '%s\n' "$worker_plain" >&2
+    fail "-#c=threadsegv: caught signal '${caught_plain:-none}', expected a fault"
     ;;
 esac
 

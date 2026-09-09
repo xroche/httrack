@@ -112,14 +112,12 @@ static void crash_worker_thread(void *arg) {
   fn();
 }
 
-/* Faults 'fn' on an engine worker. 'fn' is read through the caller's frame,
-   which outlives the worker because the wait below never returns. */
+/* Faults 'fn' on an engine worker. The worker reads 'fn' out of this frame,
+   which the wait below holds open until the worker has returned. */
 static void crash_on_worker(crash_fn fn) {
-  crash_fn shared = fn;
-
   /* Aborting on a spawn failure keeps the caller's exit status a crash, so the
      test reads "no worker started" rather than "the handler never ran". */
-  if (hts_newthread(crash_worker_thread, &shared) != 0)
+  if (hts_newthread(crash_worker_thread, &fn) != 0)
     abortLog("crash test: cannot spawn a worker thread");
   htsthread_wait_n(0); /* the worker takes the process down from there */
 }
@@ -130,9 +128,9 @@ static CRASH_NOINLINE void crash_threadstack(void) {
   crash_on_worker(crash_stack);
 }
 
-/* A worker fault with the stack intact, so a handler that copes with the main
-   thread but not with a thread it never registered shows up on its own:
-   threadstack moves both variables at once and cannot separate them. */
+/* Faults a worker with its stack intact, unlike threadstack which spends it
+   too, so a handler that copes with the main thread but not with a thread it
+   never registered shows up on its own. */
 static CRASH_NOINLINE void crash_threadsegv(void) {
   crash_on_worker(crash_segv);
 }
@@ -216,10 +214,5 @@ hts_boolean hts_crash_test(const char *kind) {
   }
   return HTS_FALSE;
 }
-
-#else
-
-/* An empty translation unit is not valid C. */
-typedef int hts_crash_test_disabled_t;
 
 #endif
