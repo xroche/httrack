@@ -113,12 +113,15 @@ Please visit our Website: http://www.httrack.com
 
 #else
 
-/* config.h is private: an autoconf consumer has one of its own, so only the
-   switches the installed headers read are published, in htsfeatures.h. */
+/* config.h is private, because an autoconf consumer has one of its own, so the
+   switches the installed headers read are published in htsfeatures.h too. Our
+   own build reads config.h and must not need the generated public header, or a
+   consumer compiling these sources without autotools cannot build at all. */
 #ifdef HTS_INTERNAL_BUILD
 #include "config.h"
-#endif
+#else
 #include "htsfeatures.h"
+#endif
 
 #ifndef SETUID
 #define HTS_DO_NOT_USE_UID
