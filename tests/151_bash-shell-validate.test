@@ -114,11 +114,14 @@ run() { # run <label> <env argument>...
             exit 77
         fi
     done
-    wait "$pid" 2>/dev/null || true
-    # Not from `wait`: on a recycled pid bash 3.2 answers with an older run's status.
+    wait "$pid" 2>/dev/null || true # nothing reads it, but bash 3.2 may still need the reap
+    # Not from bash 3.2's `wait`, which answers a recycled pid with an older status.
     test -r "$rundir/status" ||
         fail_dump "$label recorded no exit status, so it was killed ${waited}s in" "$rundir/log"
-    status=$(<"$rundir/status")
+    status=
+    read -r status <"$rundir/status" || true # an empty file is a kill mid-write, never a 0
+    test -n "$status" ||
+        fail_dump "$label recorded half an exit status, so it was killed ${waited}s in" "$rundir/log"
     log=$(<"$rundir/log")
     took=$((SECONDS - began))
     echo "run $n ($label): exit $status"
@@ -231,20 +234,29 @@ verdict() { # verdict <accept|reject> <run number> <status the child exits with>
 }
 verdict accept 80 1 # configure rejected what it must accept
 verdict reject 81 0 # configure accepted what it must reject
-# `wait` is not the witness here: on macOS, bash 3.2 saves one exit status per pid and
-# never replaces it, so a run on a recycled pid was told an older run's status. Those
-# are nearly all 0, so a rejected BASH_SHELL read as accepted (#1607).
-rc=0
+# A stale 0 from `wait` made a rejected BASH_SHELL read as accepted on bash 3.2 (#1607).
+stale=0
 (
-    # shellcheck disable=SC2030,SC2031 # the isolation is the point: the real run is next door
-    n=93
+    n=93 # past the real cases, or run1 gets made twice and the second mkdir aborts the test
     configure_cmd=(bash -c 'exit 3')
-    # shellcheck disable=SC2317 # run() calls it; a shadowed builtin is invisible here
-    wait() { builtin wait "$@" >/dev/null 2>&1 || true; } # what the stale answer looks like
+    # shellcheck disable=SC2317 # run() calls this shadowed builtin
+    wait() { builtin wait "$@" >/dev/null 2>&1 || true; } # a stale answer looks like this
     run stale-status
     test "$status" -eq 3
-) >/dev/null 2>&1 || rc=$?
-test "$rc" -eq 0 || fail "run() took the shell's word for the exit status instead of the run's own"
+) >"$tmp/stale.log" 2>&1 || stale=$?
+test "$stale" -eq 0 ||
+    fail_dump "run() took the shell's word for the exit status instead of the run's own" "$tmp/stale.log"
+# Only a kill from outside run() reaches the missing-status check, since both watchdogs exit first.
+killed=0
+(
+    n=94
+    configure_cmd=(bash -c "kill -9 \$PPID; sleep 10")
+    run killed-run
+) >"$tmp/killed.log" 2>&1 || killed=$?
+test "$killed" -eq 1 ||
+    fail_dump "a run whose shell was killed reported $killed, want 1" "$tmp/killed.log"
+grep -q 'recorded no exit status' "$tmp/killed.log" ||
+    fail_dump "the killed run did not report a missing exit status" "$tmp/killed.log"
 # The probes ran in subshells, so the real cases below start from a clean count.
 cases=16
 n=0
