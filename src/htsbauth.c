@@ -48,11 +48,13 @@ Please visit our Website: http://www.httrack.com
 /* See htsbauth.h. */
 hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size) {
   const char *host = jump_identification_const(adr);
+  hts_boolean literal = HTS_FALSE;
   size_t len;
 
   if (host[0] == '[') { // bracketed IPv6 literal, [::1]:8080
     const char *const end = strchr(host, ']');
 
+    literal = HTS_TRUE;
     host++;
     len = end != NULL ? (size_t) (end - host) : strlen(host);
   } else {
@@ -68,6 +70,16 @@ hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size) {
     return HTS_FALSE;
   dst[0] = '\0';
   strlncatbuff(dst, host, dst_size, len);
+  // host names are case-insensitive, so one folded spelling reaches one entry
+  hts_lowcase(dst);
+  /* "%25" is RFC 6874's URI spelling of a zone id's '%'. Only a bracketed
+     literal carries it, because a bare host's '%' is already literal. */
+  if (literal) {
+    char *const zone = strchr(dst, '%');
+
+    if (zone != NULL && zone[1] == '2' && zone[2] == '5')
+      memmove(zone + 1, zone + 3, strlen(zone + 3) + 1);
+  }
   return HTS_TRUE;
 }
 
@@ -192,7 +204,7 @@ static int cookie_cmp_wildcard_domain(const char *chk_dom, const char *domain) {
   const size_t l = n < m ? n : m;
   int i;
   for (i = (int) l - 1; i >= 0; i--) {
-    if (chk_dom[n - i - 1] != domain[m - i - 1]) {
+    if (!streql(chk_dom[n - i - 1], domain[m - i - 1])) {
       return 1;
     }
   }
@@ -223,12 +235,16 @@ char *cookie_find(char *s, const char *cook_name, const char *domain, const char
       t = (strcmp(cookie_get(buffer, a, 5), cook_name) == 0);   // tester si même nom
     if (t) {                    // même nom ou nom qualconque
       //
-      const char *chk_dom = cookie_get(buffer, a, 0); // domaine concerné par le cookie
+      const char *chk_dom = cookie_get(buffer, a, 0); // cookie's own domain
+      const size_t dom_len = strlen(chk_dom);
+      const size_t qry_len = strlen(domain);
 
-      if ((strlen(chk_dom) <= strlen(domain) &&
-        strcmp(chk_dom, domain + strlen(domain) - strlen(chk_dom)) == 0) ||
-        !cookie_cmp_wildcard_domain(chk_dom, domain)) {  // même domaine
-          //
+      /* The domain folds (a jar written elsewhere may hold any case) but the
+         path below does not, because RFC 6265 path-match is byte-exact. */
+      if ((dom_len <= qry_len &&
+           strcmpnocase(chk_dom, domain + qry_len - dom_len) == 0) ||
+          !cookie_cmp_wildcard_domain(chk_dom, domain)) { // same domain
+        //
         const char *chk_path = cookie_get(buffer, a, 2);    // chemin concerné par le cookie
 
         if (strlen(chk_path) <= strlen(path)) {
