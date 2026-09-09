@@ -84,6 +84,15 @@ assert_match() { # assert_match RE TEXT [LABEL]
 
 assert_file() { test -f "$1" || fail "${2:+$2: }missing file: $1"; }
 
+# Poll a condition, and name what never happened when it runs out.
+wait_until() { # wait_until CONDITION MESSAGE [tenths, default 300]
+    for _ in $(seq 1 "${3:-300}"); do
+        if eval "$1"; then return 0; fi
+        sleep 0.1
+    done
+    fail "$2"
+}
+
 # Basenames of the files a mirror wrote, so a check reads what was written
 # rather than a path this host may spell differently (macOS $TMPDIR, Windows
 # ':' -> '_').
@@ -1184,13 +1193,14 @@ budget_secs() {
     echo "$((10#$budget))"
 }
 
-skip_if_out_of_budget() { # skip_if_out_of_budget <steps left> <seconds the last took>
+skip_if_out_of_budget() { # skip_if_out_of_budget <steps left> <seconds the last took> [what they cover]
     local budget need=$(($2 + $2 / 2))
 
     budget=$(budget_secs)
     test "$1" -gt 0 && test "$budget" -gt 0 || return 0
     test "$((SECONDS + need))" -ge "$budget" || return 0
-    echo "$1 steps left, the last took ${2}s and the budget is ${budget}s; skipping" >&2
+    # $3 names what goes unchecked, or the log says a count and the reader guesses.
+    echo "$1 steps left, the last took ${2}s and the budget is ${budget}s; skipping${3:+ $3}" >&2
     exit 77
 }
 
@@ -1201,9 +1211,9 @@ PACE_COSTLIEST=0
 # skip_if_out_of_budget against the costliest step so far rather than the last
 # one: a caller orders its steps by what they mean, so a cheap one projects a
 # reserve the slow step after it cannot fit in (#1568).
-pace() { # pace <steps left> <seconds the step took>
+pace() { # pace <steps left> <seconds the step took> [what those steps cover]
     test "$2" -le "${PACE_COSTLIEST}" || PACE_COSTLIEST=$2
-    skip_if_out_of_budget "$1" "${PACE_COSTLIEST}"
+    skip_if_out_of_budget "$1" "${PACE_COSTLIEST}" "${3:-}"
 }
 
 # Seconds left of the budget, for a child pacing itself against it (269 hands it to

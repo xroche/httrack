@@ -51,6 +51,61 @@ ci_lost_reason() {
     fi
 }
 
+# Every LOST verdict in console log $1, one per line. Matched by the whole shape the
+# suite prints: a test killed on its budget leaves its log mid-line, so its indented
+# failure tail joins the next verdict onto itself, and a tail can quote the bare word.
+ci_lost_verdicts() {
+    awk '{
+        while (match($0, /LOST [^ ]+ \(worker left no status;[^)]*\)/)) {
+            print substr($0, RSTART, RLENGTH)
+            $0 = substr($0, RSTART + RLENGTH)
+        }
+    }' "$1"
+}
+
+# The lost count the suite itself wrote into console log $1, empty when the console
+# carries no tally. Anchored at the end of the line only, since an unterminated
+# failure tail can carry a prefix onto it, and the last match wins.
+ci_console_lost_tally() {
+    tr -d '\r' <"$1" | awk '
+        match($0, /ran=[0-9]+ pass=[0-9]+ fail=[0-9]+ skip=[0-9]+ lost=[0-9]+$/) {
+            n = substr($0, RSTART, RLENGTH)
+            sub(/.*lost=/, "", n)
+        }
+        END { print n }'
+}
+
+# Count the workers the suite lost in console log $1, and say so when it lost none:
+# a silent step and a broken counter read alike (#1352). Nothing here may fail: the
+# step runs under if:always() in an errexit shell, so a non-zero reds a healthy leg.
+ci_report_lost_workers() {
+    local log=$1 lost samples
+    # -f as well as -r, because awk on a directory exits non-zero.
+    if test ! -f "$log" || test ! -r "$log"; then
+        echo "no console log at $log: lost workers not counted"
+        return 0
+    fi
+    samples=$(ci_lost_verdicts "$log")
+    lost=$(ci_console_lost_tally "$log")
+    # No tally means the watchdog killed the step before the suite's own verdict,
+    # which is the run this count exists for: take what it had printed by then.
+    test -n "$lost" || lost=$(printf '%s' "$samples" | awk 'NF { n++ } END { print n + 0 }')
+    if test -n "${GITHUB_STEP_SUMMARY:-}"; then
+        # A summary file the runner will not take is not a suite failure.
+        printf '%s worker(s) lost with no status\n' "$lost" >>"$GITHUB_STEP_SUMMARY" 2>/dev/null ||
+            echo "::warning::the lost-worker count did not reach the step summary"
+    fi
+    if test "$lost" -eq 0; then
+        echo "no lost worker in $log"
+    else
+        # error, not warning: a leg that lost a worker is one to re-run.
+        ci_annotate error "workers lost with no status" "$(
+            printf '%s worker(s) died before reporting: re-run this leg, and see #1228\n' "$lost"
+            test -z "$samples" || printf '%s\n' "$samples" | awk 'NR <= 3'
+        )"
+    fi
+}
+
 # End a wedged suite before its runner dies: a step that fails on its own terms
 # keeps its log, a lost runner keeps nothing, annotations included (#795). Quiet
 # for $1s, then names the test in flight from $3 every $2s; kills $5 once $3 has
@@ -242,12 +297,11 @@ expected_skips_msys="01_engine-footer-overflow.test
 # Written out rather than derived from the msys list above: the two lists are
 # pinned expectations of different shells, and a name leaving one has to be a
 # visible edit to the other.
-# The reasons above, plus what the Linux shell cannot do to a native process:
-# 294: the wizard's feof||ferror arm never fires on a stdin the Linux shell owns
-# across interop, so it spins to the watchdog; 296 passes with a real answer
+# The reasons above, plus the one thing the Linux shell cannot do to a native
+# process: 294's wizard never reaches its feof||ferror arm on a stdin that shell
+# owns across interop, so it spins to the watchdog; 296 passes with a real answer
 # file, which places the fault at EOF and closed stdin rather than the wizard.
-# 24: no graceful stop crosses the boundary, so pass 1 cannot be interrupted in
-# the state the resume needs. Each of these two skips itself, in the test.
+# 294 skips itself, in the test.
 expected_skips_wsl2="01_engine-footer-overflow.test
 253_local-ftp-close-once.test
 113_engine-threadattr-leak.test
@@ -280,8 +334,7 @@ expected_skips_wsl2="01_engine-footer-overflow.test
 424_engine-wizard-eof.test
 444_local-stop-keeps-resume.test
 451_local-sigint-keeps-resume.test
-294_local-wizard-eof.test
-24_local-resume-overlap.test"
+294_local-wizard-eof.test"
 
 # Sets ci_skip_list to the pinned skip set for backend $1, failing loudly if
 # there is none: an unknown backend must never fall back to an empty list,

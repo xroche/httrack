@@ -1744,6 +1744,11 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             if ((!strchr(tempo, ' ')) || inscript) {    // espace dedans: méfiance! (sauf dans code javascript)
                               int invalid_url = 0;
 
+                              /* Ask before the cut destroys the evidence
+                                 and unescape_amp forges it. */
+                              hts_boolean had_fragment_or_query =
+                                  link_dir_has_fragment_or_query(tempo);
+
                               // escape                              
                               unescape_amp(tempo);
 
@@ -1792,7 +1797,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                        inside a script, where "/" and "image/"
                                        are ordinary strings. */
                                     if (inscript &&
-                                        link_dir_is_multisegment(tempo))
+                                        (had_fragment_or_query ||
+                                         link_dir_is_multisegment(tempo)))
                                       url_ok = 1;
                                   }
                                 }

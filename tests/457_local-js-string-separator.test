@@ -2,7 +2,10 @@
 #
 # A quoted string ending in a slash counted as a directory link inside a script,
 # so httrack rewrote JavaScript's own separators. split("/") became
-# split("index-2.html") and the mirrored bundle behaved differently.
+# split("index-2.html") and the mirrored bundle behaved differently. Requiring a
+# second slash then stopped rewriting "/#top" and "/?q=1", which are URLs. The
+# evidence must come from the source bytes, because unescape_amp decodes
+# "&num;" to a '#' before the parser looks.
 
 set -euo pipefail
 
@@ -15,43 +18,73 @@ work=$(mktemp -d)
 trap 'set +e; rm -rf "$work"' EXIT
 
 root="$work/root"
-mkdir -p "$root/subdir" "$root/a/b" "$root/api/v1" "$root/assets/img" "$root/cdir"
+mkdir -p "$root/subdir" "$root/a/b" "$root/api/v1" "$root/assets/img" "$root/cdir" \
+    "$root/fragdir" "$root/deep/sub"
 
 cat >"$root/index.html" <<'EOF'
 <!DOCTYPE html><html><head><link rel="stylesheet" href="s.css">
-<script src="app.js"></script></head><body>x</body></html>
+<script src="app.js"></script></head>
+<body><div data-x="deep/sub/">x</div></body></html>
 EOF
 
-# Every string below ends in a slash. Only a path of more than one segment may
-# be followed, so each line carries the count that decides it.
+# Every string below ends in a slash once any fragment or query is cut. Its
+# trailing comment names what decides whether httrack may follow it. The last
+# line repeats a refusal after the followed ones, so a leaking flag shows.
 cat >"$root/app.js" <<'EOF'
 var parts = "a/b".split("/");        // one slash: kept
 var mime = "image/";                 // one slash: kept
 var key = "Alt+/";                   // one slash: kept
 var rep = "ab".replace(/b/, "$&/");  // one slash: kept
 var runs = "////";                   // no name, only slashes: kept
+var ent = "a/b".split("/&num;");     // an entity is not a fragment: kept
+var num = "a/b".split("/&#35;");     // nor a numeric entity: kept
+var only = "////#x";                 // a fragment, but no name: kept
+var anch = "#top";                   // no slash before it at all: kept
+var forge = "//&num;/#x";            // an entity hides an earlier marker: kept
 var one = "subdir/";                 // one slash: kept, so never fetched
 var two = "a/b/";                    // two slashes, short name: followed
 var api = "/api/v1/";                // three slashes: followed
 var ast = "assets/img/";             // two slashes: followed
+var frag = "/#top";                  // one slash, but a fragment: followed
+var qry = "/?q=1";                   // one slash, but a query: followed
+var rel = "fragdir/#x";              // a directory and a fragment: followed
+var amp = "/?a=1&b=2";               // the & sits inside the query: followed
+var late = "audio/";                 // one slash, and last of all: kept
 EOF
 
 echo '.a { background: url("cdir/"); }' >"$root/s.css"
-for d in subdir a/b api/v1 assets/img cdir; do
+for d in subdir a/b api/v1 assets/img cdir fragdir deep/sub; do
     printf 'reached\n' >"$root/$d/index.html"
 done
 
 # The cdir case cannot fail on the helper, since CSS url() reaches the parser by
-# another path. It is here to catch a fix that drops the inscript test instead.
+# another path. The data-x attribute catches a fix that drops the inscript test,
+# because outside a script a two-segment string must stay put. The two index*
+# matches pin the rewritten form, where "/" becomes the mirror's root page and
+# may gain a collision suffix. The anch case reaches the leading-marker path,
+# where the sanitizer legs catch a dropped length guard.
 bash "$top_srcdir/tests/local-crawl.sh" --root "$root" --errors 0 \
     --file-matches 'app.js' 'split\("/"\)' \
     --file-matches 'app.js' '"image/"' \
     --file-matches 'app.js' '"Alt\+/"' \
     --file-matches 'app.js' '"\$&/"' \
     --file-matches 'app.js' '"////"' \
+    --file-matches 'app.js' 'split\("/&num;"\)' \
+    --file-matches 'app.js' 'split\("/&#35;"\)' \
+    --file-matches 'app.js' '"////#x"' \
+    --file-matches 'app.js' '"#top"' \
+    --file-matches 'app.js' '"//&num;/#x"' \
+    --file-matches 'app.js' '"index[^"]*\.html\?a=1&b=2"' \
+    --file-matches 'app.js' '"index[^"]*\.html#top"' \
+    --file-matches 'app.js' '"index[^"]*\.html\?q=1"' \
+    --file-matches 'app.js' '"fragdir/index\.html#x"' \
+    --file-matches 'app.js' '"audio/"' \
+    --file-matches 'index.html' 'data-x="deep/sub/"' \
     --not-found subdir/index.html \
+    --not-found deep/sub/index.html \
     --found a/b/index.html \
     --found api/v1/index.html \
     --found assets/img/index.html \
     --found cdir/index.html \
+    --found fragdir/index.html \
     httrack BASEURL/index.html -q -%v0 -r4

@@ -20,14 +20,6 @@ cleanup() {
 }
 cleanup_push cleanup
 
-wait_until() { # wait_until <shell condition> <message> [tenths, default 300]
-    for _ in $(seq 1 "${3:-300}"); do
-        if eval "$1"; then return 0; fi
-        sleep 0.1
-    done
-    fail "$2"
-}
-
 stop_crawl() {
     if test -n "$crawlpid"; then
         kill -9 "$crawlpid" 2>/dev/null || true

@@ -60,6 +60,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscoremain.h"
 #include "htsencoding.h"
 #include "htsescape.h"
+#include "htstools.h"
 #include "htsftp.h"
 #include "htsmd5.h"
 #include "htssniff.h"
@@ -6635,6 +6636,77 @@ static int st_postfile(httrackp *opt, int argc, char **argv) {
 
   printf("postfile self-test: %s\n", err ? "FAIL" : "OK");
   return err;
+}
+
+/* Names the string on failure, since a bare line number cannot say which row
+   went red. */
+static void st_linkdir_case(const char *lien, hts_boolean frag_or_query,
+                            hts_boolean multisegment) {
+  const hts_boolean got_frag = link_dir_has_fragment_or_query(lien);
+  const hts_boolean got_multi = link_dir_is_multisegment(lien);
+
+  if (got_frag != frag_or_query || got_multi != multisegment) {
+    fprintf(
+        stderr,
+        "linkdir \"%s\": fragment %d wanted %d, multisegment %d wanted %d\n",
+        lien, got_frag, frag_or_query, got_multi, multisegment);
+    assertf(!"linkdir case failed");
+  }
+}
+
+static int st_linkdir(httrackp *opt, int argc, char **argv) {
+  size_t i;
+
+  /* Each row is one string with the answer from
+     link_dir_has_fragment_or_query, then from link_dir_is_multisegment. Both
+     are asked on the raw string here. The engine asks the first on the raw
+     string too, but the second on what the marker cut left. */
+  static const struct {
+    const char *lien;
+    hts_boolean frag_or_query;
+    hts_boolean multisegment;
+  } cases[] = {
+      /* #1612 refused these, and still must */
+      {"/", HTS_FALSE, HTS_FALSE},
+      {"image/", HTS_FALSE, HTS_FALSE},
+      {"Alt+/", HTS_FALSE, HTS_FALSE},
+      {"$&/", HTS_FALSE, HTS_FALSE},
+      {"////", HTS_FALSE, HTS_FALSE},
+      /* a second segment is evidence on its own */
+      {"a/b/", HTS_FALSE, HTS_TRUE},
+      {"/api/v1/", HTS_FALSE, HTS_TRUE},
+      /* a marker opens a path, from the site root to a deeper one */
+      {"/#top", HTS_TRUE, HTS_FALSE},
+      {"/?q=1", HTS_TRUE, HTS_FALSE},
+      {"img/#x", HTS_TRUE, HTS_FALSE},
+      {"img/?q=1", HTS_TRUE, HTS_FALSE},
+      {"a/b/#x", HTS_TRUE, HTS_TRUE},
+      /* the marker must open a path, not follow a name or nothing */
+      {"page.html#x", HTS_FALSE, HTS_FALSE},
+      {"page.html?q=1", HTS_FALSE, HTS_FALSE},
+      {"#top", HTS_FALSE, HTS_FALSE},
+      {"?q=1", HTS_FALSE, HTS_FALSE},
+      {"", HTS_FALSE, HTS_FALSE},
+      /* a run of slashes carries no name, so the marker buys nothing */
+      {"////#x", HTS_FALSE, HTS_TRUE},
+      {"//#x", HTS_FALSE, HTS_TRUE},
+      /* an entity before the marker decodes into an earlier one */
+      {"//&num;/#x", HTS_FALSE, HTS_TRUE},
+      {"/&#35;", HTS_FALSE, HTS_FALSE},
+      {"a&b/#x", HTS_FALSE, HTS_FALSE},
+      /* an '&' after the marker is part of the query, so it is left alone */
+      {"/?a=1&b=2", HTS_TRUE, HTS_FALSE},
+  };
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    st_linkdir_case(cases[i].lien, cases[i].frag_or_query,
+                    cases[i].multisegment);
+  }
+  printf("linkdir self-test OK\n");
+  return 0;
 }
 
 static int st_addrport(httrackp *opt, int argc, char **argv) {
@@ -14826,6 +14898,10 @@ static const struct selftest_entry {
     {"scantoken", "",
      "option-string token copy is bounded and reports a refusal (#1271)",
      st_scantoken},
+    {"linkdir", "",
+     "a quoted directory string is a link only with a second segment, or a "
+     "fragment or query opening right after the path",
+     st_linkdir},
     {"addrport", "",
      "\"host:port\" of a peer address is bounded and complete (#1493)",
      st_addrport},

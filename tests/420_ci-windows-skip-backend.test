@@ -27,12 +27,13 @@ ci_expected_skips_for_backend wsl2 || fail "wsl2 was rejected as an unknown back
 test "$ci_skip_list" = "$expected_skips_wsl2" || fail "wsl2 did not select its own list"
 
 # --- the lists' CONTENT, not just which one is chosen ---------------------
-# A spot-check of the names that moved, not of all 29: a rename inside the part
-# no row pins is caught by the driver's own set compare on a live Windows leg,
-# and neither can see a listed test that in fact runs.
+# A spot-check of the names that moved, not of every entry: a rename inside the
+# part no row pins is caught by the driver's own set compare on a live Windows
+# leg, and neither can see a listed test that in fact runs.
 # 420 compared each list against itself, so editing either one stayed green.
-# "neither" is a name that left a list: 386 ran once python stopped bypassing
-# the shim, and nothing must put it back without measuring it again.
+# "neither" is a name that left a list, and nothing must put one back without
+# measuring it again: 386 ran once python stopped bypassing the shim, and 24
+# once its pass-1 interrupt went through hts-abort.lock instead of a signal.
 ci_expected_skips_for_backend msys || fail "msys was rejected"
 msys_list=$ci_skip_list
 ci_expected_skips_for_backend wsl2 || fail "wsl2 was rejected"
@@ -69,7 +70,7 @@ while read -r name where; do
 done <<'EOF'
 386_local-proxytrack-dav-tz.test neither
 294_local-wizard-eof.test wsl2-only
-24_local-resume-overlap.test wsl2-only
+24_local-resume-overlap.test neither
 241_local-single-file-gui.test both
 288_testlib-holdport.test both
 EOF
