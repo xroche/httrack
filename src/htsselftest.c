@@ -5407,7 +5407,7 @@ static int st_cookieport(httrackp *opt, int argc, char **argv) {
 }
 
 /* Write one raw jar record, the way a file written elsewhere reaches
-   cookie_find: cookie_add would fold the domain on the way in. */
+   cookie_find, because cookie_add would fold the domain on the way in. */
 static void cookie_seed(t_cookie *jar, const char *domain, const char *path) {
   jar->max_len = sizeof(jar->data);
   snprintf(jar->data, sizeof(jar->data),
@@ -5415,8 +5415,10 @@ static void cookie_seed(t_cookie *jar, const char *domain, const char *path) {
 }
 
 /* RFC 6265 matches a cookie domain without regard to case, because host names
-   are case-insensitive. The path beside it is byte-exact. */
+   are case-insensitive. The name and the path beside it are byte-exact. */
 static int st_cookiecase(httrackp *opt, int argc, char **argv) {
+  static const char LABEL[] = "cookie-case";
+
   static const struct {
     const char *adr, *want;
   } hosts[] = {
@@ -5432,11 +5434,9 @@ static int st_cookiecase(httrackp *opt, int argc, char **argv) {
     hts_boolean want;
     const char *what;
   } jars[] = {
-      // the stored domain is as long as the query, so cookie_find decides
+      // the shape #1625 was reported with
       {"Example.COM", "/", "example.com", "/", HTS_TRUE,
        "a jar domain 'Example.COM' never reaches example.com"},
-      {"example.com", "/", "EXAMPLE.com", "/", HTS_TRUE,
-       "a query for 'EXAMPLE.com' misses the jar"},
       // shorter than the query, the one shape the wildcard compare refuses
       {"Example.COM", "/", "www.example.com", "/", HTS_TRUE,
        "'Example.COM' never reaches www.example.com"},
@@ -5447,11 +5447,25 @@ static int st_cookiecase(httrackp *opt, int argc, char **argv) {
        "a wildcard '.Example.COM' never reaches example.com"},
       {".Example.COM", "/", "notexample.com", "/", HTS_FALSE,
        ".Example.COM leaked to notexample.com"},
-      // the fold stops at the domain: /Dir/ and /dir/ are two paths
+      // the fold stops at the domain, so /Dir/ and /dir/ are two paths
       {"example.com", "/Dir/", "example.com", "/Dir/page", HTS_TRUE,
        "an exact path stopped matching"},
       {"example.com", "/Dir/", "example.com", "/dir/page", HTS_FALSE,
        "the path match folded case"},
+  };
+
+  /* http_cookie_header folds the query through cookie_host before it asks, so
+     only a direct call says what cookie_find promises a caller of its own. */
+  static const struct {
+    const char *name, *query;
+    hts_boolean want;
+    const char *what;
+  } finds[] = {
+      {"id", "WWW.EXAMPLE.com", HTS_TRUE,
+       "cookie_find refused an unfolded query domain"},
+      {"id", "www.example.com", HTS_TRUE, "cookie_find missed its own jar"},
+      // RFC 6265 makes the cookie name byte-exact, like the path
+      {"ID", "www.example.com", HTS_FALSE, "the name compare folded case"},
   };
 
   static t_cookie jar;
@@ -5468,8 +5482,7 @@ static int st_cookiecase(httrackp *opt, int argc, char **argv) {
 
     snprintf(what, sizeof(what), "'%s' is not scoped to %s", hosts[i].adr,
              hosts[i].want);
-    err |= cookie_expect_at("cookie-case",
-                            cookie_host_is(hosts[i].adr, hosts[i].want),
+    err |= cookie_expect_at(LABEL, cookie_host_is(hosts[i].adr, hosts[i].want),
                             HTS_TRUE, what);
   }
 
@@ -5478,31 +5491,39 @@ static int st_cookiecase(httrackp *opt, int argc, char **argv) {
   jar.max_len = sizeof(jar.data);
   jar.data[0] = '\0';
   if (cookie_add(&jar, "id", "A", "Example.COM", "/") != 0) {
-    printf("cookie-case: FAIL (cookie_add setup)\n");
+    printf("%s: FAIL (cookie_add setup)\n", LABEL);
     return 1;
   }
-  err |=
-      cookie_expect_at("cookie-case", strstr(jar.data, "example.com\t") != NULL,
-                       HTS_TRUE, "the jar did not store a folded domain");
-  err |= cookie_expect_at("cookie-case", strstr(jar.data, "Example") != NULL,
-                          HTS_FALSE, "the jar kept the domain's original case");
+  err |= cookie_expect_at(LABEL, strstr(jar.data, "example.com\t") != NULL,
+                          HTS_TRUE, "the jar did not store a folded domain");
+  err |= cookie_expect_at(LABEL, strstr(jar.data, "Example") != NULL, HTS_FALSE,
+                          "the jar kept the domain's original case");
 
   for (i = 0; i < sizeof(jars) / sizeof(jars[0]); i++) {
     cookie_seed(&jar, jars[i].domain, jars[i].path);
     http_cookie_header(&jar, jars[i].query, jars[i].qpath, hdr, sizeof(hdr));
-    err |= cookie_expect_at("cookie-case", strstr(hdr, "id=A") != NULL,
-                            jars[i].want, jars[i].what);
+    err |= cookie_expect_at(LABEL, strstr(hdr, "id=A") != NULL, jars[i].want,
+                            jars[i].what);
   }
 
-  /* The report's own shape: a server naming its own host in another case. */
+  cookie_seed(&jar, "example.com", "/");
+  for (i = 0; i < sizeof(finds) / sizeof(finds[0]); i++) {
+    err |= cookie_expect_at(
+        LABEL,
+        cookie_find(jar.data, finds[i].name, finds[i].query, "/") != NULL,
+        finds[i].want, finds[i].what);
+  }
+
+  /* The store side of the same report, for example a server that names its
+     own host in another case. */
   err |= cookie_expect_at(
-      "cookie-case",
+      LABEL,
       cookie_roundtrip("example.com",
                        "Set-Cookie: sess=S; path=/; domain=Example.COM",
                        "example.com", "sess=S"),
       HTS_TRUE, "domain=Example.COM never came back to example.com");
 
-  printf("cookie-case: %s\n", err ? "FAIL" : "OK");
+  printf("%s: %s\n", LABEL, err ? "FAIL" : "OK");
   return err;
 }
 

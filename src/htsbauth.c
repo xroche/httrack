@@ -229,8 +229,8 @@ char *cookie_find(char *s, const char *cook_name, const char *domain, const char
       const size_t dom_len = strlen(chk_dom);
       const size_t qry_len = strlen(domain);
 
-      /* The domain folds (a jar written elsewhere may hold any case), the
-         path below does not: RFC 6265 path-match is byte-exact. */
+      /* The domain folds (a jar written elsewhere may hold any case) but the
+         path below does not, because RFC 6265 path-match is byte-exact. */
       if ((dom_len <= qry_len &&
            strcmpnocase(chk_dom, domain + qry_len - dom_len) == 0) ||
           !cookie_cmp_wildcard_domain(chk_dom, domain)) { // same domain

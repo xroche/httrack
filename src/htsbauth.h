@@ -77,7 +77,7 @@ typedef struct httrackp httrackp;
 /* cookies */
 
 /** Copy ADR's host into DST, lowercased and without identification, IPv6
-    brackets or port, because RFC 6265 scopes a cookie to a host, matches it
+    brackets or port. RFC 6265 scopes a cookie to a host, matches that host
     without case, and a browser jar records no port.
     HTS_FALSE means the caller sends no cookie. */
 hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size);
