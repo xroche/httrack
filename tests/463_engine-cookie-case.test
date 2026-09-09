@@ -1,0 +1,17 @@
+#!/bin/bash
+#
+# Host names are case-insensitive, so a cookies.txt whose domain field carries
+# a capital letter must still be sent (RFC 6265). The path beside it stays
+# byte-exact. Driven by the 'httrack -#test=cookiecase' selftest.
+
+set -eu
+
+# 'run' is an ignored placeholder argument.
+out=$(httrack -#test=cookiecase run)
+
+# Exact-match the success line so a renamed or removed selftest (it prints the
+# registry to stderr) cannot pass.
+test "$out" = "cookie-case: OK" || {
+    echo "expected 'cookie-case: OK', got: $out" >&2
+    exit 1
+}

@@ -5248,12 +5248,17 @@ static hts_boolean cookie_host_is(const char *adr, const char *want) {
   return ok && strcmp(host, want) == 0 ? HTS_TRUE : HTS_FALSE;
 }
 
-/* Report a missed expectation under its own label, and count it. */
-static int cookie_expect(hts_boolean got, hts_boolean want, const char *what) {
+/* Report a missed expectation under LABEL, and count it. */
+static int cookie_expect_at(const char *label, hts_boolean got,
+                            hts_boolean want, const char *what) {
   if (got == want)
     return 0;
-  printf("cookie-port: %s\n", what);
+  printf("%s: %s\n", label, what);
   return 1;
+}
+
+static int cookie_expect(hts_boolean got, hts_boolean want, const char *what) {
+  return cookie_expect_at("cookie-port", got, want, what);
 }
 
 /* A cookie is scoped to a host, never to a port (RFC 6265), so a jar exported
@@ -5430,6 +5435,127 @@ static int st_cookieport(httrackp *opt, int argc, char **argv) {
                        "the delete took its neighbour with it");
 
   printf("cookie-port: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
+/* Write one raw jar record, the way a file written elsewhere reaches
+   cookie_find, because cookie_add would fold the domain on the way in. */
+static void cookie_seed(t_cookie *jar, const char *domain, const char *path) {
+  jar->max_len = sizeof(jar->data);
+  snprintf(jar->data, sizeof(jar->data),
+           "%s\tTRUE\t%s\tFALSE\t1999999999\tid\tA\n", domain, path);
+}
+
+/* RFC 6265 matches a cookie domain without regard to case, because host names
+   are case-insensitive. The name and the path beside it are byte-exact. */
+static int st_cookiecase(httrackp *opt, int argc, char **argv) {
+  static const char LABEL[] = "cookie-case";
+
+  static const struct {
+    const char *adr, *want;
+  } hosts[] = {
+      {"Example.COM", "example.com"},
+      {"WWW.Example.COM:8080", "www.example.com"},
+      {"[::FFFF:1]:80", "::ffff:1"},
+      {"example.com", "example.com"}, // the 99% path, untouched
+  };
+
+  static const struct {
+    const char *domain, *path; // as the jar on disk holds them
+    const char *query, *qpath; // as the request asks for them
+    hts_boolean want;
+    const char *what;
+  } jars[] = {
+      // the shape #1625 was reported with
+      {"Example.COM", "/", "example.com", "/", HTS_TRUE,
+       "a jar domain 'Example.COM' never reaches example.com"},
+      // shorter than the query, the one shape the wildcard compare refuses
+      {"Example.COM", "/", "www.example.com", "/", HTS_TRUE,
+       "'Example.COM' never reaches www.example.com"},
+      {"Example.COM", "/", "other.example", "/", HTS_FALSE,
+       "Example.COM leaked to other.example"},
+      // longer than the query, so only cookie_cmp_wildcard_domain can match it
+      {".Example.COM", "/", "example.com", "/", HTS_TRUE,
+       "a wildcard '.Example.COM' never reaches example.com"},
+      {".Example.COM", "/", "notexample.com", "/", HTS_FALSE,
+       ".Example.COM leaked to notexample.com"},
+      // the fold stops at the domain, so /Dir/ and /dir/ are two paths
+      {"example.com", "/Dir/", "example.com", "/Dir/page", HTS_TRUE,
+       "an exact path stopped matching"},
+      {"example.com", "/Dir/", "example.com", "/dir/page", HTS_FALSE,
+       "the path match folded case"},
+  };
+
+  /* http_cookie_header folds the query through cookie_host before it asks, so
+     only a direct call says what cookie_find promises a caller of its own. */
+  static const struct {
+    const char *name, *query;
+    hts_boolean want;
+    const char *what;
+  } finds[] = {
+      {"id", "WWW.EXAMPLE.com", HTS_TRUE,
+       "cookie_find refused an unfolded query domain"},
+      {"id", "www.example.com", HTS_TRUE, "cookie_find missed its own jar"},
+      // RFC 6265 makes the cookie name byte-exact, like the path
+      {"ID", "www.example.com", HTS_FALSE, "the name compare folded case"},
+  };
+
+  static t_cookie jar;
+  char hdr[1024];
+  size_t i;
+  int err = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  for (i = 0; i < sizeof(hosts) / sizeof(hosts[0]); i++) {
+    char what[512];
+
+    snprintf(what, sizeof(what), "'%s' is not scoped to %s", hosts[i].adr,
+             hosts[i].want);
+    err |= cookie_expect_at(LABEL, cookie_host_is(hosts[i].adr, hosts[i].want),
+                            HTS_TRUE, what);
+  }
+
+  /* The jar is written back to cookies.txt for other tools to read, so the
+     folded spelling has to be the one stored, not one the compare forgives. */
+  jar.max_len = sizeof(jar.data);
+  jar.data[0] = '\0';
+  if (cookie_add(&jar, "id", "A", "Example.COM", "/") != 0) {
+    printf("%s: FAIL (cookie_add setup)\n", LABEL);
+    return 1;
+  }
+  err |= cookie_expect_at(LABEL, strstr(jar.data, "example.com\t") != NULL,
+                          HTS_TRUE, "the jar did not store a folded domain");
+  err |= cookie_expect_at(LABEL, strstr(jar.data, "Example") != NULL, HTS_FALSE,
+                          "the jar kept the domain's original case");
+
+  for (i = 0; i < sizeof(jars) / sizeof(jars[0]); i++) {
+    cookie_seed(&jar, jars[i].domain, jars[i].path);
+    http_cookie_header(&jar, jars[i].query, jars[i].qpath, hdr, sizeof(hdr));
+    err |= cookie_expect_at(LABEL, strstr(hdr, "id=A") != NULL, jars[i].want,
+                            jars[i].what);
+  }
+
+  cookie_seed(&jar, "example.com", "/");
+  for (i = 0; i < sizeof(finds) / sizeof(finds[0]); i++) {
+    err |= cookie_expect_at(
+        LABEL,
+        cookie_find(jar.data, finds[i].name, finds[i].query, "/") != NULL,
+        finds[i].want, finds[i].what);
+  }
+
+  /* The store side of the same report, for example a server that names its
+     own host in another case. */
+  err |= cookie_expect_at(
+      LABEL,
+      cookie_roundtrip("example.com",
+                       "Set-Cookie: sess=S; path=/; domain=Example.COM",
+                       "example.com", "sess=S"),
+      HTS_TRUE, "domain=Example.COM never came back to example.com");
+
+  printf("%s: %s\n", LABEL, err ? "FAIL" : "OK");
   return err;
 }
 
@@ -15432,6 +15558,8 @@ static const struct selftest_entry {
     {"cookiecap", "", "cookie_add honours max_len", st_cookiecap},
     {"cookieport", "", "cookies are scoped to a host, not to a port",
      st_cookieport},
+    {"cookiecase", "", "cookie domains match without regard to case",
+     st_cookiecase},
     {"useragent", "", "default User-Agent self-test", st_useragent},
     {"makeindex", "[dir]", "hts_finish_makeindex footer/refresh self-test",
      st_makeindex},
