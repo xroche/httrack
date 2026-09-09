@@ -76,8 +76,11 @@ run() { # run <label> <env argument>...
     # Own process group, so the kills below reach what configure spawned: bash 3.2 keeps
     # the subshell it runs in, and killing that alone leaves the child running (macOS).
     set -m
-    (cd "$rundir" && env "$@" "${configure_cmd[@]}") \
-        >"$rundir/log" 2>&1 &
+    (
+        set +e
+        cd "$rundir" && env "$@" "${configure_cmd[@]}"
+        echo $? >"$rundir/status"
+    ) >"$rundir/log" 2>&1 &
     local pid=$! waited=0 quiet=0 size=0 now left
     test -n "$had_m" || set +m
     # A hang is silence, not slowness: configure writes a line per probe,
@@ -111,7 +114,11 @@ run() { # run <label> <env argument>...
             exit 77
         fi
     done
-    wait "$pid" || status=$?
+    wait "$pid" 2>/dev/null || true
+    # Not from `wait`: on a recycled pid bash 3.2 answers with an older run's status.
+    test -r "$rundir/status" ||
+        fail_dump "$label recorded no exit status, so it was killed ${waited}s in" "$rundir/log"
+    status=$(<"$rundir/status")
     log=$(<"$rundir/log")
     took=$((SECONDS - began))
     echo "run $n ($label): exit $status"
@@ -224,6 +231,20 @@ verdict() { # verdict <accept|reject> <run number> <status the child exits with>
 }
 verdict accept 80 1 # configure rejected what it must accept
 verdict reject 81 0 # configure accepted what it must reject
+# `wait` is not the witness here: on macOS, bash 3.2 saves one exit status per pid and
+# never replaces it, so a run on a recycled pid was told an older run's status. Those
+# are nearly all 0, so a rejected BASH_SHELL read as accepted (#1607).
+rc=0
+(
+    # shellcheck disable=SC2030,SC2031 # the isolation is the point: the real run is next door
+    n=93
+    configure_cmd=(bash -c 'exit 3')
+    # shellcheck disable=SC2317 # run() calls it; a shadowed builtin is invisible here
+    wait() { builtin wait "$@" >/dev/null 2>&1 || true; } # what the stale answer looks like
+    run stale-status
+    test "$status" -eq 3
+) >/dev/null 2>&1 || rc=$?
+test "$rc" -eq 0 || fail "run() took the shell's word for the exit status instead of the run's own"
 # The probes ran in subshells, so the real cases below start from a clean count.
 cases=16
 n=0
