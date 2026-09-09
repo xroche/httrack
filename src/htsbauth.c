@@ -195,28 +195,32 @@ int cookie_del(t_cookie * cookie, const char *cook_name, const char *domain, con
   return 0;
 }
 
-// Matches wildcard cookie domains that start with a dot
-// chk_dom: the domain stored in the cookie (potentially wildcard).
-// domain: query domain
-static int cookie_cmp_wildcard_domain(const char *chk_dom, const char *domain) {
-  const size_t n = strlen(chk_dom);
-  const size_t m = strlen(domain);
-  const size_t l = n < m ? n : m;
-  int i;
-  for (i = (int) l - 1; i >= 0; i--) {
-    if (!streql(chk_dom[n - i - 1], domain[m - i - 1])) {
-      return 1;
-    }
-  }
-  if (m < n && chk_dom[0] == '.') {
-    return 0;
-  }
-  else if (m != n) {
-    return 1;
-  }
-  return 0;
-}
+/* See htsbauth.h. */
+hts_boolean cookie_domain_match(const char *jar_dom, const char *host) {
+  size_t dom_len;
+  const size_t host_len = strlen(host);
 
+  // a Netscape jar writes ".example.com" where RFC 6265 stores example.com
+  if (jar_dom[0] == '.')
+    jar_dom++;
+  dom_len = strlen(jar_dom);
+  // an empty domain is a suffix of every host, so it would match all of them
+  if (dom_len == 0 || dom_len > host_len)
+    return HTS_FALSE;
+  if (strcmpnocase(jar_dom, host + host_len - dom_len) != 0)
+    return HTS_FALSE;
+  if (dom_len == host_len)
+    return HTS_TRUE; // the same host
+  /* Shorter than the host, so it is only a parent domain if the byte before it
+     ends a label: "example.com" is no parent of the buyable wwwexample.com. */
+  if (host[host_len - dom_len - 1] != '.')
+    return HTS_FALSE;
+  /* An address has no parent domain, or "1.1" would reach 192.168.1.1, and
+     cookie_host unbrackets IPv6, so a colon left here is an address too. */
+  if (hts_host_is_ipv4(host, host_len) || memchr(host, ':', host_len) != NULL)
+    return HTS_FALSE;
+  return HTS_TRUE;
+}
 
 // rechercher cookie à partir de la position s (par exemple s=cookie.data)
 // renvoie pointeur sur ligne, ou NULL si introuvable
@@ -236,14 +240,10 @@ char *cookie_find(char *s, const char *cook_name, const char *domain, const char
     if (t) {                    // même nom ou nom qualconque
       //
       const char *chk_dom = cookie_get(buffer, a, 0); // cookie's own domain
-      const size_t dom_len = strlen(chk_dom);
-      const size_t qry_len = strlen(domain);
 
-      /* The domain folds (a jar written elsewhere may hold any case) but the
-         path below does not, because RFC 6265 path-match is byte-exact. */
-      if ((dom_len <= qry_len &&
-           strcmpnocase(chk_dom, domain + qry_len - dom_len) == 0) ||
-          !cookie_cmp_wildcard_domain(chk_dom, domain)) { // same domain
+      /* The path below is byte-exact where the domain is not, because RFC 6265
+         folds a host name and matches a path literally. */
+      if (cookie_domain_match(chk_dom, domain)) { // same domain
         //
         const char *chk_path = cookie_get(buffer, a, 2);    // chemin concerné par le cookie
 
