@@ -209,7 +209,9 @@ hts_boolean hts_file_mtime(const char *file, hts_filetime_t *when);
 
 /* Is A a plain file stamped strictly later than B? False unless both can be
    read. Sub-second where the platform gives it, so a request made in the second
-   a mirror started still sorts after that mirror's hts-in_progress.lock. */
+   a mirror started still sorts after that mirror's hts-in_progress.lock.
+   Exported because httrack.c links the library and sees only exported
+   symbols. */
 HTSEXT_API hts_boolean hts_file_is_newer(const char *a, const char *b);
 
 /* Library internal definictions */

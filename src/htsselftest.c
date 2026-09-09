@@ -14001,10 +14001,12 @@ static hts_boolean st_lockrule_stamp_ns(const char *path, int64_t sec,
 #endif
 }
 
-/* Does hts_file_mtime() report the nanoseconds the filesystem holds? This is
-   what tells a reader that invents or drops them apart from a filesystem that
-   rounds. True where the build cannot read them at all. */
-static hts_boolean st_lockrule_nsec_matches_stat(const char *path,
+/* Does hts_file_mtime() report the seconds and nanoseconds the filesystem
+   holds? This is what tells a reader that invents or drops either apart from a
+   filesystem that rounds. Vacuously true where STAT() has no nanosecond field,
+   and on Windows, where it offers nothing independent of the reader's own
+   GetFileAttributesExW. */
+static hts_boolean st_lockrule_time_matches_stat(const char *path, int64_t sec,
                                                  int32_t nsec) {
 #if !defined(_WIN32) && (defined(HAVE_STRUCT_STAT_ST_MTIM_TV_NSEC) ||          \
                          defined(HAVE_STRUCT_STAT_ST_MTIMESPEC_TV_NSEC))
@@ -14018,9 +14020,11 @@ static hts_boolean st_lockrule_nsec_matches_stat(const char *path,
 #else
   raw = (long) buf.st_mtimespec.tv_nsec;
 #endif
-  return nsec == (int32_t) raw ? HTS_TRUE : HTS_FALSE;
+  return sec == (int64_t) buf.st_mtime && nsec == (int32_t) raw ? HTS_TRUE
+                                                                : HTS_FALSE;
 #else
   (void) path;
+  (void) sec;
   (void) nsec;
   return HTS_TRUE;
 #endif
@@ -14050,16 +14054,17 @@ static int st_lockrule_subsecond(httrackp *opt, const char *tag,
     return 1;
   }
   /* Before believing the read back, pin it to what the filesystem holds. */
-  if (!st_lockrule_nsec_matches_stat(lock, probe.nsec)) {
+  if (!st_lockrule_time_matches_stat(lock, probe.sec, probe.nsec)) {
     fprintf(stderr,
-            "%s: hts_file_mtime() does not report %s's own nanoseconds\n", tag,
-            lock);
+            "%s: hts_file_mtime() does not report %s's own seconds and"
+            " nanoseconds\n",
+            tag, lock);
     (void) UNLINK(lock);
     return 1;
   }
   if (probe.sec != started.sec || probe.nsec != later) {
-    /* The filesystem rounded the stamp, so none of the cases below can be
-       placed. Whole seconds are all a FAT or exFAT volume keeps. */
+    /* The stamp did not come back as asked, so none of the cases below can be
+       placed. A FAT or exFAT volume rounds it to whole, even seconds. */
     printf("%s: same-second request: NOT COVERED (asked for %d ns, read back"
            " %d%s)\n",
            tag, (int) later, (int) probe.nsec,
