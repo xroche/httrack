@@ -1075,6 +1075,22 @@ static hts_boolean reconcile_promote_sidecar(httrackp *opt, const char *oldname,
   return reconcile_promote(opt, oldname, newname);
 }
 
+/* How many entries a cache generation holds, or -1 when it is absent or will
+   not open. Coverage is what decides which generation to keep, and a file size
+   is its bodies' size, not its reach. */
+static LLint reconcile_entries(httrackp *opt, const char *name) {
+  unz_global_info64 gi;
+  unzFile zip;
+  LLint entries = -1;
+
+  if ((zip = hts_unzOpen_utf8(reconcile_path(opt, name))) == NULL)
+    return -1;
+  if (unzGetGlobalInfo64(zip, &gi) == UNZ_OK)
+    entries = (LLint) gi.number_entry;
+  unzClose(zip);
+  return entries;
+}
+
 /* Promote cache and sidecars together, so old.lst never describes a different
    run than old.zip. */
 static void reconcile_promote_generation(httrackp *opt) {
@@ -1099,16 +1115,16 @@ void hts_cache_reconcile(httrackp *opt, hts_cache_reconcile_mode mode) {
       reconcile_promote(opt, "hts-cache/old.zip", "hts-cache/new.zip");
     break;
   case CACHE_RECONCILE_INTERRUPTED:
-    /* Aborted run: keep the larger generation, because the next run's rotation
-       erases the smaller one. Both files must exist, as fsize() reads -1 for a
-       missing one, and a missing new.zip is PROMOTE's case. */
+    /* Aborted run: keep the generation reaching further, because the next run's
+       rotation erases the other one. new.zip must exist, as a missing one is
+       PROMOTE's case. A generation that will not open counts -1, so a damaged
+       cache never beats a readable one. */
     if (!opt->cache ||
         !fexist_utf8(reconcile_path(opt, "hts-in_progress.lock")))
       break;
     if (fexist_utf8(reconcile_path(opt, "hts-cache/new.zip")) &&
-        fexist_utf8(reconcile_path(opt, "hts-cache/old.zip")) &&
-        fsize_utf8(reconcile_path(opt, "hts-cache/old.zip")) >
-            fsize_utf8(reconcile_path(opt, "hts-cache/new.zip")))
+        reconcile_entries(opt, "hts-cache/old.zip") >
+            reconcile_entries(opt, "hts-cache/new.zip"))
       reconcile_promote_generation(opt);
     break;
   case CACHE_RECONCILE_ROLLBACK:
