@@ -1,8 +1,8 @@
 #!/bin/bash
-# hts-stop.lock is how a script pauses a running engine. It follows the same
-# staleness rule as hts-abort.lock: the engine pauses only for a request stamped
-# later than the run's own hts-in_progress.lock that it could also delete, so a
-# copy an earlier mirror left behind no longer pauses the next one.
+# hts-stop.lock is how a script pauses a running engine, under the same staleness
+# rule as hts-abort.lock. The engine pauses only for a request stamped later than
+# the run's own hts-in_progress.lock that it could also delete, so a copy an
+# earlier mirror left behind no longer pauses the next one.
 set -eu
 
 # shellcheck source=tests/crawllib.sh

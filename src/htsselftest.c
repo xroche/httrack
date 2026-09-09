@@ -14117,7 +14117,7 @@ static int st_lockrule_subsecond(httrackp *opt, const char *tag,
     err = 1;
   }
 
-  /* An earlier second is earlier whatever the fraction says, or a request left
+  /* An earlier second is earlier despite the fraction, or a request left
      by the run before would be taken for one aimed at this mirror. */
   if (!st_lockrule_stamp_ns(lock, started.sec - 1, later)) {
     fprintf(stderr, "%s: cannot stamp %s\n", tag, lock);
