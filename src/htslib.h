@@ -214,9 +214,9 @@ hts_boolean hts_file_mtime(const char *file, hts_filetime_t *when);
    symbols. */
 HTSEXT_API hts_boolean hts_file_is_newer(const char *a, const char *b);
 
-/* Move FILE's modification time SECONDS back, keeping the fraction it already
-   carried. False if the stamp could not be read or written, and FILE then keeps
-   the time it had. */
+/* Move FILE's modification time SECONDS back, keeping the fraction, which the
+   utimes fallback rounds down to the microsecond. False if the stamp could not
+   be read or written, and FILE then keeps the time it had. */
 hts_boolean hts_file_backdate(const char *file, int seconds);
 
 /* Library internal definictions */

@@ -2958,6 +2958,10 @@ hts_boolean hts_file_backdate(const char *file, int seconds) {
     freet(wfile);
     if (h == INVALID_HANDLE_VALUE)
       return HTS_FALSE;
+    if (when.sec < 0) { /* no write time on this volume */
+      CloseHandle(h);
+      return HTS_FALSE;
+    }
     ticks.QuadPart =
         (ULONGLONG) when.sec * 10000000ULL + (ULONGLONG) (when.nsec / 100);
     ft.dwLowDateTime = ticks.LowPart;

@@ -14322,7 +14322,9 @@ static int st_lockrule(httrackp *opt, int argc, char **argv, const char *tag,
     err = 1;
   }
 
-  /* Same second as the run's own start: left behind by an earlier mirror. */
+  /* Left behind by an earlier mirror, in the run's own start second. On a
+     filesystem keeping fractions this reads as the earlier-fraction case, so it
+     pins the boundary only where the stamps are whole seconds. */
   if (!st_lockrule_stamp(lock, started)) {
     fprintf(stderr, "%s: cannot stamp %s\n", tag, lock);
     err = 1;

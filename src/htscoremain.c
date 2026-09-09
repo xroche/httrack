@@ -2920,7 +2920,11 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         fp = NULL;
         /* One second back, so a request written the instant this file appears
            sorts after it even where the filesystem stamps whole seconds. */
-        (void) hts_file_backdate(n_lock, 1);
+        if (!hts_file_backdate(n_lock, 1) && opt->log != NULL)
+          hts_log_print(
+              opt, LOG_WARNING,
+              "engine: could not date hts-in_progress.lock back, so a"
+              " stop request written in this first second is ignored");
       }
       // fichier log        
       if (opt->log) {
