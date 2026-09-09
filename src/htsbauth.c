@@ -211,8 +211,8 @@ hts_boolean cookie_domain_match(const char *jar_dom, const char *host) {
     return HTS_FALSE;
   if (dom_len == host_len)
     return HTS_TRUE; // the same host
-  /* Shorter than the host, so it is only a parent domain if the byte before it
-     ends a label: "example.com" is no parent of the buyable wwwexample.com. */
+  /* Shorter than the host, so it is a parent domain only if the byte before it
+     ends a label, for example "example.com" is no parent of wwwexample.com. */
   if (host[host_len - dom_len - 1] != '.')
     return HTS_FALSE;
   /* An address has no parent domain, or "1.1" would reach 192.168.1.1, and

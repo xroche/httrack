@@ -5474,7 +5474,7 @@ static int st_cookiecase(httrackp *opt, int argc, char **argv) {
        "'Example.COM' never reaches www.example.com"},
       {"Example.COM", "/", "other.example", "/", HTS_FALSE,
        "Example.COM leaked to other.example"},
-      // longer than the query, so only cookie_cmp_wildcard_domain can match it
+      // longer than the query, so only the leading-dot strip can match it
       {".Example.COM", "/", "example.com", "/", HTS_TRUE,
        "a wildcard '.Example.COM' never reaches example.com"},
       {".Example.COM", "/", "notexample.com", "/", HTS_FALSE,
@@ -5609,11 +5609,16 @@ static int st_cookiedomain(httrackp *opt, int argc, char **argv) {
       /* An empty domain is a suffix of every host. */
       {"", "example.com", HTS_FALSE,
        "an empty jar domain leaked to example.com"},
-      {".", "example.com", HTS_FALSE,
-       "a jar domain of one dot leaked to example.com"},
       {"", "", HTS_FALSE, "an empty jar domain matched an empty host"},
 
-      /* An address has no parent domain: every dot is inside the value. */
+      /* RFC 6265 5.2.3 strips one leading dot, so a second one leaves an empty
+         label. "..example.com" is no domain, and must therefore reach none. */
+      {"..example.com", "www.example.com", HTS_FALSE,
+       "'..example.com' reached www.example.com"},
+      {"..example.com", "example.com", HTS_FALSE,
+       "'..example.com' reached example.com"},
+
+      /* An address has no parent domain, because every dot is inside it. */
       {"1.1", "192.168.1.1", HTS_FALSE,
        "the jar domain 1.1 leaked to 192.168.1.1"},
       {"0.1", "127.0.0.1", HTS_FALSE, "the jar domain 0.1 leaked to 127.0.0.1"},
@@ -5625,7 +5630,9 @@ static int st_cookiedomain(httrackp *opt, int argc, char **argv) {
        "3.4 leaked to the IPv6 literal ::ffff:1.2.3.4"},
       {"1", "::1", HTS_FALSE, "the jar domain 1 leaked to ::1"},
 
-      /* Longer than the host, and a trailing dot is a label of its own. */
+      /* Longer than the host, and a trailing dot is a label of its own. These
+         three document the dom_len guard rather than pin it, because dropping
+         it leaves a read one byte short of the host that mismatches anyway. */
       {"www.example.com", "example.com", HTS_FALSE,
        "a child domain reached its parent"},
       {"example.com", "example.com.", HTS_FALSE,
