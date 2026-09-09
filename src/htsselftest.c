@@ -5273,13 +5273,14 @@ static int st_cookieport(httrackp *opt, int argc, char **argv) {
       {"", NULL}, // an empty domain is a suffix of every host
       {":8080", NULL},
       {"[]:80", NULL},
-      // RFC 6874 spells the zone id's '%' as "%25" inside the brackets only
+      // a zone id is spelled "%25" in a URI and bare in a jar, either spelling
+      // of the host
       {"[fe80::1%25eth0]:8080", "fe80::1%eth0"},
       {"[fe80::1%25eth0]", "fe80::1%eth0"},
-      {"fe80::1%eth0", "fe80::1%eth0"},     // what a browser export carries
-      {"fe80::1%25eth0", "fe80::1%25eth0"}, // no brackets, so nothing to decode
-      {"host%25name.example", "host%25name.example"}, // a name, not a literal
-      {"[fe80::1%2525eth0]", "fe80::1%25eth0"},       // the introducer, once
+      {"fe80::1%25eth0", "fe80::1%eth0"}, // what an older httrack wrote
+      {"fe80::1%eth0", "fe80::1%eth0"},   // what a browser export carries
+      {"host%25name.example", "host%25name.example"}, // a name has no zone id
+      {"[fe80::1%25eth%250]", "fe80::1%eth%250"},     // past the introducer
       {"[fe80::1%]:80", "fe80::1%"}, // truncated: no decode, no overread
       {"[fe80::1%2]:80", "fe80::1%2"},
   };
@@ -5367,6 +5368,12 @@ static int st_cookieport(httrackp *opt, int argc, char **argv) {
                          trips[i].want, trips[i].what);
   }
 
+  /* The introducer decodes once. "%2525" is a zone id starting with an escaped
+     '%', so a second pass over the result would eat that one too. Kept out of
+     the idempotence loop above for that reason. */
+  err |= cookie_expect(cookie_host_is("[fe80::1%2525eth0]", "fe80::1%25eth0"),
+                       HTS_TRUE, "the decode ran past the zone id introducer");
+
   /* A jar loaded from a browser file holds bare hosts; the port on the wire
      must not hide them. Control: another host stays filtered out. */
   jar.max_len = sizeof(jar.data);
@@ -5397,6 +5404,15 @@ static int st_cookieport(httrackp *opt, int argc, char **argv) {
   http_cookie_header(&jar, "::1", "/", hdr, sizeof(hdr));
   err |= cookie_expect(strstr(hdr, "sixjar=V") != NULL, HTS_TRUE,
                        "a jar storing [::1]:8080 lost its session");
+  /* An older httrack wrote the URI spelling of a zone id into the jar, so the
+     jar side has to be normalised on load as the port form is. */
+  if (cookie_add(&jar, "zonejar", "Z", "fe80::1%25eth0", "/") != 0) {
+    printf("cookie-port: FAIL (cookie_add setup, zone id form)\n");
+    return 1;
+  }
+  http_cookie_header(&jar, "fe80::1%eth0", "/", hdr, sizeof(hdr));
+  err |= cookie_expect(strstr(hdr, "zonejar=Z") != NULL, HTS_TRUE,
+                       "a jar storing fe80::1%25eth0 lost its session");
   err |= cookie_expect(cookie_add(&jar, "pwn", "OWNED", "", "/") == 0,
                        HTS_FALSE, "an empty domain entered the jar");
 
