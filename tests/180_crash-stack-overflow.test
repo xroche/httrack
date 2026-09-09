@@ -22,6 +22,10 @@ Linux) traced=1 ;;
 *) traced=0 ;;
 esac
 require_httrack
+have_feature crashtest || {
+    echo "built with --disable-crash-test, skipping" >&2
+    exit 77
+}
 
 # Dies from a caught fault, announcing it and running the report to its end.
 # The handler finishes in abort(), so the shell sees SIGABRT (134).

@@ -39,11 +39,12 @@ want_feature() {
         ;;
     # Absent, or defined to anything but 0, means iconv is compiled in.
     iconv) macro_is "${config}" HTS_USEICONV 0 && echo 0 || echo 1 ;;
+    crashtest) macro_is "${config}" HTS_CRASH_TEST 1 && echo 1 || echo 0 ;;
     *) fail "unknown feature $1" ;;
     esac
 }
 
-known="brotli zstd backtrace iconv"
+known="brotli zstd backtrace iconv crashtest"
 for f in ${known}; do
     got=$(sed -n "s/^${f} //p" <<<"${report}")
     test -n "${got}" || fail "-#test=features reports nothing for ${f}"
@@ -76,6 +77,21 @@ else
     test -z "${ni}" ||
         fail "iconv is reported off, but gb2312 converted to '${ni}'"
     echo "ok: gb2312 does not convert, as a tables-only build cannot"
+fi
+
+# The report and config.h can agree and both be wrong about the binary, so the
+# crash option is checked against behaviour too: an unknown kind names the kinds.
+rc=0
+kinds=$(httrack -#c=bogus 2>&1) || rc=$?
+if have_feature crashtest; then
+    grep -q "expects one of:" <<<"${kinds}" ||
+        fail "crashtest is reported on, but -#c=bogus said '${kinds}'"
+    echo "ok: -#c answers, as the report says"
+else
+    if grep -q "expects one of:" <<<"${kinds}"; then
+        fail "crashtest is reported off, but -#c=bogus still names the kinds"
+    fi
+    echo "ok: -#c is gone, as the report says"
 fi
 
 # windows-1252 is the spelling HTTP headers use for the cp1252 table, and the

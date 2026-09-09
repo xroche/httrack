@@ -21,6 +21,10 @@ Linux) traced=1 ;;
 *) traced=0 ;;
 esac
 require_httrack
+have_feature crashtest || {
+    echo "built with --disable-crash-test, skipping" >&2
+    exit 77
+}
 # --disable-auto-features drops backtrace() on Linux too, and only the trace
 # text below needs it; the sigaltstack half still applies.
 test "${traced}" -eq 0 || have_feature backtrace || traced=0
@@ -53,6 +57,11 @@ worker=$(crash_report threadstack)
 grep -q "Crash test worker thread started" <<<"$worker" ||
     fail "-#c=threadstack: no worker was spawned, nothing was tested"
 
+# threadsegv keeps the worker's stack intact; see htscrashtest.c for why.
+worker_plain=$(crash_report threadsegv)
+grep -q "Crash test worker thread started" <<<"$worker_plain" ||
+    fail "-#c=threadsegv: no worker was spawned, nothing was tested"
+
 if [ "$traced" -eq 0 ]; then
     exit 0
 fi
@@ -66,6 +75,18 @@ SEGV | BUS | ILL) ;;
 *)
     printf '%s\n' "$worker" >&2
     fail "-#c=threadstack: caught signal '${caught:-none}', expected a fault"
+    ;;
+esac
+
+# An ordinary fault, so it names a signal and stays shallow where the runaway
+# recursion below does not. Without this, threadsegv would also pass on a build
+# that faulted the main thread after the worker printed its banner.
+caught_plain=$(sed -n '/^Caught signal [0-9][0-9]*$/{s/.* //;p;q;}' <<<"$worker_plain")
+case "$(kill -l "${caught_plain:-x}" 2>/dev/null || true)" in
+SEGV | BUS | ILL) ;;
+*)
+    printf '%s\n' "$worker_plain" >&2
+    fail "-#c=threadsegv: caught signal '${caught_plain:-none}', expected a fault"
     ;;
 esac
 

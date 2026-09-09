@@ -1,0 +1,15 @@
+#!/bin/bash
+#
+# hts_set_thread_runner() wraps each worker body in a caller frame. See
+# htsthread.h for the contract. Driven by the engine's own selftest.
+
+set -eu
+
+out=$(httrack -#test=threadrunner)
+
+# Exact-match the success line so a renamed or removed selftest (it prints the
+# registry to stderr) cannot pass.
+test "$out" = "threadrunner self-test: OK" || {
+    echo "expected 'threadrunner self-test: OK', got: $out" >&2
+    exit 1
+}

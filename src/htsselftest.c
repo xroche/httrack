@@ -1272,6 +1272,11 @@ static int st_features(httrackp *opt, int argc, char **argv) {
 #else
   printf("iconv 1\n");
 #endif
+#ifdef HTS_CRASH_TEST
+  printf("crashtest 1\n");
+#else
+  printf("crashtest 0\n");
+#endif
   return 0;
 }
 
@@ -13091,6 +13096,138 @@ static int st_threadwait(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* Confirms the runner encloses the body exactly once, on the worker. */
+#ifdef _WIN32
+typedef DWORD threadrunner_id;
+#define threadrunner_self() GetCurrentThreadId()
+#define threadrunner_same(a, b) ((a) == (b))
+#else
+typedef pthread_t threadrunner_id;
+#define threadrunner_self() pthread_self()
+#define threadrunner_same(a, b) (pthread_equal((a), (b)) != 0)
+#endif
+
+static htsmutex threadrunner_lock = HTSMUTEX_INIT;
+static int threadrunner_before = 0;
+static int threadrunner_after = 0;
+static int threadrunner_body = 0;
+/* What the runner had done when the body ran, 1 and 0 from inside it. */
+static int threadrunner_seen_before = 0;
+static int threadrunner_seen_after = 0;
+static threadrunner_id threadrunner_body_thread;
+static threadrunner_id threadrunner_runner_thread;
+
+static void threadrunner_count(int *what) {
+  hts_mutexlock(&threadrunner_lock);
+  (*what)++;
+  hts_mutexrelease(&threadrunner_lock);
+}
+
+static void threadrunner_reset(void) {
+  threadrunner_before = 0;
+  threadrunner_after = 0;
+  threadrunner_body = 0;
+  threadrunner_seen_before = 0;
+  threadrunner_seen_after = 0;
+}
+
+static void threadrunner_body_fn(void *arg) {
+  (void) arg;
+  hts_mutexlock(&threadrunner_lock);
+  threadrunner_seen_before = threadrunner_before;
+  threadrunner_seen_after = threadrunner_after;
+  threadrunner_body_thread = threadrunner_self();
+  threadrunner_body++;
+  hts_mutexrelease(&threadrunner_lock);
+}
+
+static void threadrunner_runner(void (*fun)(void *arg), void *arg) {
+  threadrunner_runner_thread = threadrunner_self();
+  threadrunner_count(&threadrunner_before);
+  fun(arg);
+  threadrunner_count(&threadrunner_after);
+}
+
+static hts_boolean threadrunner_spawn(void) {
+  if (hts_newthread(threadrunner_body_fn, NULL) != 0) {
+    fprintf(stderr, "threadrunner: cannot spawn\n");
+    return HTS_FALSE;
+  }
+  htsthread_wait();
+  return HTS_TRUE;
+}
+
+static int st_threadrunner(httrackp *opt, int argc, char **argv) {
+  const threadrunner_id caller = threadrunner_self();
+  hts_boolean spawned;
+  int err = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  /* Unlocked, because htsthread_wait() published the worker's writes. */
+  threadrunner_reset();
+  if (hts_set_thread_runner(threadrunner_runner) != NULL) {
+    fprintf(stderr, "threadrunner: a runner was installed already\n");
+    return 1;
+  }
+  spawned = threadrunner_spawn();
+  /* Process-global, so clear it before any check can return early. */
+  if (hts_set_thread_runner(NULL) != threadrunner_runner) {
+    fprintf(stderr, "threadrunner: the setter did not hand back the runner\n");
+    err = 1;
+  }
+  if (!spawned)
+    return 1;
+
+  if (threadrunner_before != 1 || threadrunner_after != 1) {
+    fprintf(stderr, "threadrunner: runner entered %d time(s), left %d\n",
+            threadrunner_before, threadrunner_after);
+    err = 1;
+  }
+  if (threadrunner_body != 1) {
+    fprintf(stderr, "threadrunner: the body ran %d time(s), expected once\n",
+            threadrunner_body);
+    err = 1;
+  }
+  if (threadrunner_seen_before != 1 || threadrunner_seen_after != 0) {
+    fprintf(stderr, "threadrunner: the body saw the runner at %d/%d, not 1/0\n",
+            threadrunner_seen_before, threadrunner_seen_after);
+    err = 1;
+  }
+  /* A sigsetjmp on the caller's stack would catch nothing the worker does. */
+  if (threadrunner_same(threadrunner_body_thread, caller) ||
+      !threadrunner_same(threadrunner_body_thread,
+                         threadrunner_runner_thread)) {
+    fprintf(stderr,
+            "threadrunner: the body did not run on the runner's worker\n");
+    err = 1;
+  }
+
+  /* NULL restores the plain call. */
+  threadrunner_reset();
+  if (!threadrunner_spawn())
+    return 1;
+  if (threadrunner_body != 1) {
+    fprintf(stderr, "threadrunner: no runner, the body ran %d time(s)\n",
+            threadrunner_body);
+    err = 1;
+  }
+  if (threadrunner_before != 0 || threadrunner_after != 0) {
+    fprintf(stderr, "threadrunner: a cleared runner still entered %d time(s)\n",
+            threadrunner_before);
+    err = 1;
+  }
+  if (threadrunner_same(threadrunner_body_thread, caller)) {
+    fprintf(stderr, "threadrunner: the body ran on the caller's thread\n");
+    err = 1;
+  }
+
+  printf("threadrunner self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 /* #794: hts_gmtime() must own its output. The table is an independent oracle;
    the threaded phase is what corrupts if it ever goes back to gmtime()'s
    shared static. */
@@ -15081,6 +15218,9 @@ static const struct selftest_entry {
     {"assumemime", "[128|256|1024]",
      "--assume value clipped to each MIME destination", st_assumemime},
     {"features", "", "which optional features this build has", st_features},
+    {"threadrunner", "",
+     "a registered thread runner encloses each worker body exactly once",
+     st_threadrunner},
     {"charset", "<charset> <hex:..|string>",
      "convert a string to UTF-8 from a charset", st_charset},
     {"syscharset", "", "UTF-8 <-> system codepage conversion (WIN32 only)",

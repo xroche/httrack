@@ -47,6 +47,8 @@ Please visit our Website: http://www.httrack.com
 #define CRASH_HAS_ATFORK
 #endif
 
+#ifdef HTS_CRASH_TEST
+
 #if defined(_MSC_VER)
 #define CRASH_NOINLINE __declspec(noinline)
 #elif defined(__GNUC__)
@@ -100,21 +102,34 @@ static CRASH_NOINLINE char blow_the_stack(size_t depth) {
 /* Faults with no stack left for the handler, unless it runs on an altstack. */
 static CRASH_NOINLINE void crash_stack(void) { (void) blow_the_stack(0); }
 
-static void crash_stack_thread(void *arg) {
-  (void) arg;
+typedef void (*crash_fn)(void);
+
+static void crash_worker_thread(void *arg) {
+  const crash_fn fn = *(const crash_fn *) arg;
+
   fprintf(stderr, "** Crash test worker thread started\n");
   fflush(stderr);
-  crash_stack();
+  fn();
+}
+
+/* Faults 'fn' on a worker. The wait below holds this frame until it returns. */
+static void crash_on_worker(crash_fn fn) {
+  /* Aborting on a spawn failure keeps the caller's exit status a crash, so the
+     test reads "no worker started" rather than "the handler never ran". */
+  if (hts_newthread(crash_worker_thread, &fn) != 0)
+    abortLog("crash test: cannot spawn a worker thread");
+  htsthread_wait_n(0); /* the worker takes the process down from there */
 }
 
 /* Same runaway recursion in an engine worker: the fatal handler needs an
    alternate stack in every thread, not just the main one (#969). */
 static CRASH_NOINLINE void crash_threadstack(void) {
-  /* Aborting on a spawn failure keeps the caller's exit status a crash, so the
-     test reads "no worker started" rather than "the handler never ran". */
-  if (hts_newthread(crash_stack_thread, NULL) != 0)
-    abortLog("crash test: cannot spawn a worker thread");
-  htsthread_wait_n(0); /* the worker takes the process down from there */
+  crash_on_worker(crash_stack);
+}
+
+/* Faults a worker with its stack intact, unlike threadstack. */
+static CRASH_NOINLINE void crash_threadsegv(void) {
+  crash_on_worker(crash_segv);
 }
 
 #ifdef CRASH_HAS_ATFORK
@@ -144,6 +159,7 @@ static const struct {
     {"trap", crash_trap},
     {"stack", crash_stack},
     {"threadstack", crash_threadstack},
+    {"threadsegv", crash_threadsegv},
     {"atfork", crash_atfork},
 };
 
@@ -195,3 +211,5 @@ hts_boolean hts_crash_test(const char *kind) {
   }
   return HTS_FALSE;
 }
+
+#endif
