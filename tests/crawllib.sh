@@ -216,3 +216,31 @@ assert_lockrule_selftest() {
         fail "the rule self-test said nothing about a same-second request"
     echo "OK (${coverage#*: }, ${subsecond#*request: })"
 }
+
+# Ask a running engine for something by dropping NAME in its output directory.
+# A bare redirect there reports ENOENT for three reasons a caller cannot separate.
+write_lock_request() { # write_lock_request DIR NAME PID
+    local dir=$1 name=$2 pid=$3
+    : >"${dir}/${name}" 2>/dev/null && return 0
+    kill -0 "$pid" 2>/dev/null ||
+        fail "the engine exited before it could be asked for ${name}"
+    test -d "$(dirname "$dir")" ||
+        fail "$(dirname "$dir") is gone: something removed it under a running test"
+    fail "${name} could not be written into ${dir}"
+}
+
+# wait_until for a condition only a live engine can reach, so an engine that
+# died is named, not blamed for missing the request. Liveness is read before the
+# condition, so one the engine satisfies as it exits is still taken.
+wait_until_still_running() { # wait_until_still_running CONDITION MESSAGE PID
+    local cond=$1 msg=$2 pid=$3 alive
+    for _ in $(seq 1 300); do
+        alive=1
+        kill -0 "$pid" 2>/dev/null || alive=
+        if eval "$cond"; then return 0; fi
+        test -n "$alive" ||
+            fail "the engine exited first, so it never reached: ${msg}"
+        sleep 0.1
+    done
+    fail "$msg"
+}

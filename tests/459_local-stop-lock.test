@@ -35,6 +35,7 @@ assert_lockrule_selftest stoplock
 
 local_server_start
 common=(--quiet --disable-security-limits --robots=0 --timeout=30 --retries=0 -c1)
+fail_dump_var crawllog
 
 # Before the staleness rule the engine took any hts-stop.lock it found, so a
 # copy left in a reused output directory paused the next mirror. Dated back,
@@ -42,10 +43,11 @@ common=(--quiet --disable-security-limits --robots=0 --timeout=30 --retries=0 -c
 # just before the mirror starts lands inside that second.
 printf '[a request left behind does not pause the next mirror] ..\t'
 out="${tmpdir}/stale"
+crawllog="${tmpdir}/log-stale"
 mkdir -p "$out"
 touch -t 200001010000 "${out}/${STOPLOCK}"
 httrack -O "$out" "${common[@]}" "${BASEURL}/simple/basic.html" \
-    >"${tmpdir}/log-stale" 2>&1 &
+    >"$crawllog" 2>&1 &
 crawlpid=$!
 wait_until "! kill -0 '$crawlpid' 2>/dev/null" \
     "60s on, the mirror had not finished: the request it inherited paused it" 600
@@ -61,13 +63,14 @@ echo "OK"
 # still pauses. Rate-capped /bigfiles/ keeps the engine polling long enough.
 printf '[a request aimed at this run pauses it] ..\t'
 out="${tmpdir}/fresh"
+crawllog="${tmpdir}/log-fresh"
 httrack -O "$out" "${common[@]}" --max-rate=200000 \
-    "${BASEURL}/bigfiles/index.html" >"${tmpdir}/log-fresh" 2>&1 &
+    "${BASEURL}/bigfiles/index.html" >"$crawllog" 2>&1 &
 crawlpid=$!
-wait_until "test -e '${out}/${PROGRESSLOCK}'" "the crawl never got going"
-: >"${out}/${STOPLOCK}"
-wait_until "test -e '${out}/${PAUSEDLOCK}'" \
-    "30s on, a running engine had not paused"
+wait_until_still_running "test -e '${out}/${PROGRESSLOCK}'" "the crawl never got going" "$crawlpid"
+write_lock_request "$out" "$STOPLOCK" "$crawlpid"
+wait_until_still_running "test -e '${out}/${PAUSEDLOCK}'" \
+    "30s on, a running engine had not paused" "$crawlpid"
 test ! -e "${out}/${STOPLOCK}" ||
     fail "the engine paused without taking the request that asked for it"
 stop_crawl

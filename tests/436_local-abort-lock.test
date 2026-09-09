@@ -34,23 +34,25 @@ assert_lockrule_selftest abortlock
 
 local_server_start
 common=(--quiet --disable-security-limits --robots=0 --timeout=30 --retries=0 -c1)
+fail_dump_var crawllog
 
 # /trickle/ hands out eight .bin pages, two bytes a second for a minute each, so
 # the single socket is busy and only the reading inside that wait can see this.
 printf '[a running engine takes the request] ..\t'
 out="${tmpdir}/running"
+crawllog="${tmpdir}/log-running"
 httrack -O "$out" "${common[@]}" "${BASEURL}/trickle/index.html" \
-    >"${tmpdir}/log-running" 2>&1 &
+    >"$crawllog" 2>&1 &
 crawlpid=$!
-wait_until "test -e '${out}/${PROGRESSLOCK}'" "the crawl never got going"
+wait_until_still_running "test -e '${out}/${PROGRESSLOCK}'" "the crawl never got going" "$crawlpid"
 # The engine dates that lock a second back, so a request written the instant it
 # appears is newer than it whatever resolution the filesystem keeps.
 : >"${tmpdir}/probe"
 test "$(mtime "${tmpdir}/probe")" -gt "$(mtime "${out}/${PROGRESSLOCK}")" ||
     fail "the engine did not date ${PROGRESSLOCK} back, so a request written the moment it appears can tie it"
-: >"${out}/${ABORTLOCK}"
-wait_until "test ! -e '${out}/${ABORTLOCK}'" \
-    "30s on, a running engine had not read the request"
+write_lock_request "$out" "$ABORTLOCK" "$crawlpid"
+wait_until_still_running "test ! -e '${out}/${ABORTLOCK}'" \
+    "30s on, a running engine had not read the request" "$crawlpid"
 stop_crawl
 echo "OK"
 
@@ -59,16 +61,17 @@ echo "OK"
 # does the -E budget, so only the directory tells them apart.
 printf '[an abort keeps the cut transfers] ..\t'
 out="${tmpdir}/keep"
+crawllog="${tmpdir}/log-keep"
 httrack -O "$out" "${common[@]}" --max-rate=200000 \
-    "${BASEURL}/bigfiles/index.html" >"${tmpdir}/log-keep" 2>&1 &
+    "${BASEURL}/bigfiles/index.html" >"$crawllog" 2>&1 &
 crawlpid=$!
-wait_until "test -e '${out}/${PROGRESSLOCK}'" "the crawl never got going"
+wait_until_still_running "test -e '${out}/${PROGRESSLOCK}'" "the crawl never got going" "$crawlpid"
 # The abort has to find a transfer already running, or there is no resume data
 # for it to keep.
 sleep 1
-: >"${out}/${ABORTLOCK}"
-wait_until "test ! -e '${out}/${ABORTLOCK}'" \
-    "30s on, a running engine had not read the request"
+write_lock_request "$out" "$ABORTLOCK" "$crawlpid"
+wait_until_still_running "test ! -e '${out}/${ABORTLOCK}'" \
+    "30s on, a running engine had not read the request" "$crawlpid"
 # The erase happens at shutdown, and unwinding the cut transfer takes a while.
 wait_until "! kill -0 '$crawlpid' 2>/dev/null" "the engine never shut down" 900
 wait "$crawlpid" 2>/dev/null || true
@@ -80,12 +83,13 @@ echo "OK"
 # The pause wait watches for it too, or a paused engine is unreachable.
 printf '[a paused engine takes the request] ..\t'
 out="${tmpdir}/paused"
+crawllog="${tmpdir}/log-paused"
 httrack -O "$out" "${common[@]}" --max-rate=200000 \
-    "${BASEURL}/bigfiles/index.html" >"${tmpdir}/log-paused" 2>&1 &
+    "${BASEURL}/bigfiles/index.html" >"$crawllog" 2>&1 &
 crawlpid=$!
-wait_until "test -e '${out}/${PROGRESSLOCK}'" "the crawl never got going"
-: >"${out}/hts-stop.lock"
-wait_until "test -e '${out}/hts-paused.lock'" "the engine never paused"
+wait_until_still_running "test -e '${out}/${PROGRESSLOCK}'" "the crawl never got going" "$crawlpid"
+write_lock_request "$out" hts-stop.lock "$crawlpid"
+wait_until_still_running "test -e '${out}/hts-paused.lock'" "the engine never paused" "$crawlpid"
 # A frozen mirror writes nothing, and the wait re-reads once a second, so three
 # seconds cover an iteration that saw the file and a resumed 200KB/s transfer.
 frozen=$(du -sk "$out")
@@ -95,9 +99,9 @@ test "$(du -sk "$out")" = "$frozen" ||
     fail "a request left by an earlier run lifted the pause"
 test -e "${out}/${ABORTLOCK}" ||
     fail "the pause wait deleted a request that was never aimed at it"
-: >"${out}/${ABORTLOCK}"
-wait_until "test ! -e '${out}/${ABORTLOCK}'" \
-    "30s on, a paused engine had not read the request"
+write_lock_request "$out" "$ABORTLOCK" "$crawlpid"
+wait_until_still_running "test ! -e '${out}/${ABORTLOCK}'" \
+    "30s on, a paused engine had not read the request" "$crawlpid"
 stop_crawl
 echo "OK"
 
