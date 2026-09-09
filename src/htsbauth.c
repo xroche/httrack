@@ -68,6 +68,8 @@ hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size) {
     return HTS_FALSE;
   dst[0] = '\0';
   strlncatbuff(dst, host, dst_size, len);
+  // host names are case-insensitive, so one folded spelling reaches one entry
+  hts_lowcase(dst);
   return HTS_TRUE;
 }
 
@@ -192,7 +194,7 @@ static int cookie_cmp_wildcard_domain(const char *chk_dom, const char *domain) {
   const size_t l = n < m ? n : m;
   int i;
   for (i = (int) l - 1; i >= 0; i--) {
-    if (chk_dom[n - i - 1] != domain[m - i - 1]) {
+    if (!streql(chk_dom[n - i - 1], domain[m - i - 1])) {
       return 1;
     }
   }
@@ -223,12 +225,16 @@ char *cookie_find(char *s, const char *cook_name, const char *domain, const char
       t = (strcmp(cookie_get(buffer, a, 5), cook_name) == 0);   // tester si même nom
     if (t) {                    // même nom ou nom qualconque
       //
-      const char *chk_dom = cookie_get(buffer, a, 0); // domaine concerné par le cookie
+      const char *chk_dom = cookie_get(buffer, a, 0); // cookie's own domain
+      const size_t dom_len = strlen(chk_dom);
+      const size_t qry_len = strlen(domain);
 
-      if ((strlen(chk_dom) <= strlen(domain) &&
-        strcmp(chk_dom, domain + strlen(domain) - strlen(chk_dom)) == 0) ||
-        !cookie_cmp_wildcard_domain(chk_dom, domain)) {  // même domaine
-          //
+      /* The domain folds (a jar written elsewhere may hold any case), the
+         path below does not: RFC 6265 path-match is byte-exact. */
+      if ((dom_len <= qry_len &&
+           strcmpnocase(chk_dom, domain + qry_len - dom_len) == 0) ||
+          !cookie_cmp_wildcard_domain(chk_dom, domain)) { // same domain
+        //
         const char *chk_path = cookie_get(buffer, a, 2);    // chemin concerné par le cookie
 
         if (strlen(chk_path) <= strlen(path)) {
