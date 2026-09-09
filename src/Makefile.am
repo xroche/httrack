@@ -78,7 +78,7 @@ webhttrack: webhttrack.in Makefile
 CLEANFILES = webhttrack
 
 libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
-	htscache_selftest.c htsdns_selftest.c htsselftest.c \
+	htscache_selftest.c htsdns_selftest.c htsparse_selftest.c htsselftest.c \
 	htscatchurl.c htsfilters.c htsftp.c htshash.c coucal/coucal.c \
 	htscmdline.c htshelp.c htslib.c htsurlport.c htsdate.c htscoremain.c \
 	htsname.c htsrobots.c htstools.c htsrandom.c htswizard.c \
@@ -89,7 +89,7 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	md5.c \
 	minizip/ioapi.c minizip/mztools.c minizip/unzip.c minizip/zip.c \
 	hts-indextmpl.h htsalias.h htsback.h htsbase.h htssafe.h htsdate.h \
-	htsbasenet.h htsbauth.h htscache.h htscache_selftest.h htsdns_selftest.h htsselftest.h htscatchurl.h  \
+	htsbasenet.h htsbauth.h htscache.h htscache_selftest.h htsdns_selftest.h htsparse_selftest.h htsselftest.h htscatchurl.h  \
 	htscmdline.h htsconfig.h htscore.h htsparse.h htscoremain.h htsdefines.h  \
 	htsfilters.h htsftp.h htsglobal.h htshash.h coucal/coucal.h \
 	htshelp.h htsindex.h htsio.h htslib.h htsurlport.h htsmd5.h \

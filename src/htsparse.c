@@ -239,10 +239,9 @@ static void hts_automate_lookup(const script_automate *aut) {
   }
 }
 
-/* Attribute name owning the quoted value at 'quote' inside a tag, spanning
-   [name, *nend); NULL when the quote is not an attribute value. */
-static const char *dirty_attr_name(const char *quote, const char *tag_start,
-                                   const char **nend) {
+/* Contract in htsparse.h. */
+const char *hts_dirty_attr_name(const char *quote, const char *tag_start,
+                                const char **nend) {
   const char *a = quote - 1;
   while (a > tag_start && is_taborspace(*a))
     a--;
@@ -260,13 +259,12 @@ static const char *dirty_attr_name(const char *quote, const char *tag_start,
   return a < *nend && a > tag_start + 1 ? a : NULL;
 }
 
-/* Accept the in-tag quoted value at 'quote' for dirty parsing? Resolves the
-   owning attribute itself (intag_startattr is unreliable mid-tag) and rejects
-   no-detect/xmlns names. */
-static hts_boolean dirty_attr_detectable(const char *quote,
-                                         const char *tag_start) {
+/* Contract in htsparse.h. Resolves the owning attribute itself, since
+   intag_startattr is unreliable mid-tag. */
+hts_boolean hts_dirty_attr_detectable(const char *quote,
+                                      const char *tag_start) {
   const char *nend;
-  const char *name = dirty_attr_name(quote, tag_start, &nend);
+  const char *name = hts_dirty_attr_name(quote, tag_start, &nend);
   int i;
   if (name == NULL)
     return HTS_FALSE;
@@ -347,6 +345,260 @@ static int is_http_method(const char *s, size_t len) {
       return 1;
   }
   return 0;
+}
+
+/* Contract in htsparse.h. */
+hts_boolean hts_dirty_link_is_url(httrackp *opt, const char *str, size_t len,
+                                  char lastc, hts_boolean inscript) {
+  char BIGSTK tempo[HTS_URLMAXSIZE * 2];
+  char type[256];
+  hts_boolean url_ok = HTS_FALSE;
+  hts_boolean had_fragment_or_query;
+  char *a;
+
+  /* The parser never offers more, and a caller that does gets no verdict
+     rather than an aborted process. */
+  if (len >= HTS_URLMAXSIZE)
+    return HTS_FALSE;
+  tempo[0] = '\0';
+  type[0] = '\0';
+  strncatbuff(tempo, str, len);
+
+  /* A space is suspicious outside script code */
+  if (strchr(tempo, ' ') != NULL && !inscript)
+    return HTS_FALSE;
+
+  /* Ask before the cut destroys the evidence and unescape_amp forges it. */
+  had_fragment_or_query = link_dir_has_fragment_or_query(tempo);
+
+  unescape_amp(tempo);
+
+  /* Cut at the fragment or the query */
+  if ((a = strchr(tempo, '#')) != NULL)
+    *a = '\0';
+  if ((a = strchr(tempo, '?')) != NULL)
+    *a = '\0';
+
+  /* No special characters allowed */
+  if (!strnotempty(tempo))
+    return HTS_FALSE;
+  if (strchr(tempo, '*') || strchr(tempo, '<') || strchr(tempo, '>') ||
+      strchr(tempo, ',')     /* list of files ? */
+      || strchr(tempo, '\"') /* potential parsing bug */
+      || strchr(tempo, '\'') /* potential parsing bug */
+  )
+    return HTS_FALSE;
+  if (tempo[0] == '.' && isalnum((unsigned char) tempo[1])) // ".gif"
+    return HTS_FALSE;
+
+  // a trailing '+' concatenates, so only an extension speaks for the string
+  if (lastc != '+') {
+    // "Comparisons of scheme names MUST be case-insensitive" (RFC2616)
+    if ((strfield(tempo, "http:")) || (strfield(tempo, "ftp:"))
+#if HTS_USEOPENSSL
+        || (strfield(tempo, "https:"))
+#endif
+    )
+      url_ok = HTS_TRUE;
+    else if (hts_lastchar(tempo) == '/') {
+      /* A trailing slash alone is no evidence inside a script, where "/" and
+         "image/" are ordinary strings. */
+      if (inscript &&
+          (had_fragment_or_query || link_dir_is_multisegment(tempo)))
+        url_ok = HTS_TRUE;
+    }
+  }
+  // a recognized extension names a file
+  if (!url_ok) {
+    if (get_httptype_sized(opt, type, sizeof(type), tempo,
+                           0)) // recognized type
+      url_ok = HTS_TRUE;
+    else if (is_dyntype(get_ext(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                tempo))) // php, cgi, asp
+      url_ok = HTS_TRUE;
+    // but not foobar@aol.com
+    if (strchr(tempo, '@'))
+      url_ok = HTS_FALSE;
+  }
+  return url_ok;
+}
+
+/* Contract in htsparse.h. */
+hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
+                             const char *buffer, hts_boolean in_tag,
+                             char tag_lastc, hts_boolean in_css,
+                             hts_js_link *link) {
+  char expected = '='; // byte that must follow the keyword
+  const char *expected_end = ";";
+  int can_avoid_quotes = 0;
+  char quotes_replacement = '\0';
+  int ensure_not_mime = 0;
+  // .open(method,url): reject an HTTP-method first arg (#218)
+  int ensure_not_method = 0;
+  // @import: the quoted token is the URL; a trailing media/supports/layer
+  // condition is not part of it
+  int is_import = 0;
+  const char *a;
+  int nc;
+
+  link->offset = 0;
+  link->length = 0;
+  link->unquoted_end = '\0';
+
+  /* Can we parse javascript ? */
+  if ((opt->parsejava & HTSPARSE_NO_JAVASCRIPT) != 0)
+    return HTS_FALSE;
+
+  if (in_tag)
+    expected_end = ";\"\'"; // a href="javascript:doc.location='foo'" ends on
+                            // the attribute's quote
+
+  nc = strfield(cursor, ".src"); // nom.src="image";
+  if (!nc && in_tag && tag_lastc == html_prevc(cursor, buffer))
+    nc = strfield(cursor, "src"); // onXXX='src="image";'
+  if (!nc)
+    nc = strfield(cursor, ".location"); // document.location="doc"
+  if (!nc)
+    nc = strfield(cursor, ":location"); // javascript:location="doc"
+  if (!nc) {                            // location="doc"
+    if ((nc = strfield(cursor, "location")) &&
+        !isspace(html_prevc(cursor, buffer)))
+      nc = 0;
+  }
+  if (!nc)
+    nc = strfield(cursor, ".href"); // document.location="doc"
+  if (!nc)
+    if ((nc = strfield(cursor, ".open"))) { // window.open("doc",..
+      expected = '(';
+      expected_end = "),";   // ends on a comma or the paren
+      ensure_not_mime = 1;   // refuse a mime type
+      ensure_not_method = 1; // xhr.open: don't grab method
+    }
+  if (!nc)
+    if ((nc = strfield(cursor, ".replace"))) { // window.replace("url")
+      expected = '(';
+      expected_end = ")";
+    }
+  if (!nc)
+    if ((nc = strfield(cursor, ".link"))) { // window.link("url")
+      expected = '(';
+      expected_end = ")";
+    }
+  if (!nc && (nc = strfield(cursor, "url")) &&
+      (!isalnum(html_prevc(cursor, buffer))) &&
+      html_prevc(cursor, buffer) != '_') { // url(url)
+    expected = '(';
+    expected_end = ")";
+    /* CSS writes url(foo.png) unquoted, but JavaScript's new URL(x) matches
+       the same token, so an unquoted operand there rewrites the expression
+       itself. */
+    can_avoid_quotes = in_css;
+    quotes_replacement = ')';
+  }
+  if (!nc)
+    if ((nc = strfield(cursor, "import"))) { // import "url"
+      if (is_space(*(cursor + nc))) {
+        expected = 0; // no char expected
+        is_import = 1;
+      } else
+        nc = 0;
+    }
+  if (!nc)
+    return HTS_FALSE;
+
+  a = cursor + nc;
+  while (is_realspace(*a))
+    a++;
+  if ((*a != expected) && expected)
+    return HTS_FALSE;
+  if (expected)
+    a++;
+  while (is_realspace(*a))
+    a++;
+  if ((*a != 34) && (*a != '\'') && (!can_avoid_quotes))
+    return HTS_FALSE;
+
+  {
+    const char *b, *c;
+    int ndelim = 1;
+    int valid_url = 0;
+
+    if ((*a == 34) || (*a == '\''))
+      a++;
+    else
+      ndelim = 0;
+    b = a;
+    if (ndelim) {
+      while ((*b != 34) && (*b != '\'') && (*b != '\0'))
+        b++;
+    } else {
+      while ((*b != quotes_replacement) && (*b != '\0'))
+        b++;
+    }
+    c = b--;
+    // no closing delimiter here (truncated input):
+    // Don't scan past the buffer NUL or capture it.
+    if (*c != '\0') {
+      c += ndelim;
+      while (*c == ' ')
+        c++;
+      valid_url = (strchr(expected_end, *c)) || (*c == '\n') || (*c == '\r') ||
+                  (is_import && *(b + 1 + ndelim) == ' ');
+    }
+    if (!valid_url)
+      return HTS_FALSE;
+    // URL end = last char (b), not the delimiter
+    c = b;
+    if ((int) (c - a + 1) == 0) // nothing between the delimiters
+      return HTS_FALSE;
+    if (ensure_not_mime) {
+      int i = 0;
+
+      while (a != NULL && hts_main_mime[i] != NULL &&
+             hts_main_mime[i][0] != '\0') {
+        int p;
+
+        if ((p = strfield(a, hts_main_mime[i])) && a[p] == '/') {
+          a = NULL;
+        }
+        i++;
+      }
+    }
+    // XHR.open's "GET" etc. is a method, not a URL
+    if (a != NULL && ensure_not_method &&
+        is_http_method(a, (size_t) (c - a + 1)))
+      a = NULL;
+    // Check for bogus links (Vasiliy)
+    if (a != NULL) {
+      const size_t size = c - a + 1;
+      size_t i;
+      int first = 1;
+
+      for (i = 0; i < size; i++) {
+        // Suspicious (in code ?), abort.
+        if (a[i] == ',' || a[i] == ';') {
+          if (first) {
+            a = NULL;
+            break;
+          }
+        }
+        // Suspicious, abort.
+        else if (a[i] == '"' || a[i] == '\'' || a[i] == '\t' || a[i] == '\r' ||
+                 a[i] == '\n') {
+          a = NULL;
+          break;
+        } else if (a[i] != ' ') {
+          first = 0;
+        }
+      }
+    }
+    if (a == NULL)
+      return HTS_FALSE;
+    link->offset = (int) (a - cursor);
+    link->length = (int) (c - a + 1);
+    link->unquoted_end = can_avoid_quotes ? quotes_replacement : '\0';
+    return HTS_TRUE;
+  }
 }
 
 /* Percent-encode '(' and ')' in a link emitted into an unquoted url(...) (CSS
@@ -1474,192 +1726,26 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       }
                     }
                   } else if (inscript_state_pos == INSCRIPT_START) {
-                    /*
-                       Script Analyzing - different types supported:
-                       foo="url"
-                       foo("url") or foo(url)
-                       foo "url"
-                     */
-                    char expected = '=';        // caractère attendu après
-                    const char *expected_end = ";";
-                    int can_avoid_quotes = 0;
-                    char quotes_replacement = '\0';
-                    int ensure_not_mime = 0;
-                    // .open(method,url): reject an HTTP-method first arg (#218)
-                    int ensure_not_method = 0;
-                    // @import: the quoted token is the URL; a trailing
-                    // media/supports/layer condition is not part of it
-                    int is_import = 0;
+                    /* Script analyzing: foo="url", foo("url"), foo(url),
+                       foo "url" */
+                    hts_js_link jslink;
 
-                    if (inscript_tag)
-                      expected_end = ";\"\'";   // voir a href="javascript:doc.location='foo'"
+                    if (hts_js_scan_link(opt, html, r->adr, inscript_tag,
+                                         inscript_tag_lastc, incss, &jslink)) {
+                      if ((opt->debug > 1) && (opt->log != NULL)) {
+                        char str[512];
 
-                    /* Can we parse javascript ? */
-                    if ((opt->parsejava & HTSPARSE_NO_JAVASCRIPT) == 0) {
-                      int nc;
-
-                      nc = strfield(html, ".src");       // nom.src="image";
-                      if (!nc && inscript_tag && inscript_tag_lastc == *(html - 1))
-                        nc = strfield(html, "src");       // onXXX='src="image";'
-                      if (!nc)
-                        nc = strfield(html, ".location");        // document.location="doc"
-                      if (!nc)
-                        nc = strfield(html, ":location");        // javascript:location="doc"
-                      if (!nc) {        // location="doc"
-                        if ((nc = strfield(html, "location")) &&
-                            !isspace(html_prevc(html, r->adr)))
-                          nc = 0;
+                        str[0] = '\0';
+                        strncatbuff(str, html + jslink.offset,
+                                    minimum(jslink.length, 32));
+                        hts_log_print(opt, LOG_DEBUG,
+                                      "link detected in javascript: %s", str);
                       }
-                      if (!nc)
-                        nc = strfield(html, ".href");    // document.location="doc"
-                      if (!nc)
-                        if ((nc = strfield(html, ".open"))) {    // window.open("doc",..
-                          expected = '(';       // parenthèse
-                          expected_end = "),";  // fin: virgule ou parenthèse
-                          ensure_not_mime = 1;  //* ensure the url is not a mime type */
-                          ensure_not_method = 1; // xhr.open: don't grab method
-                        }
-                      if (!nc)
-                        if ((nc = strfield(html, ".replace"))) { // window.replace("url")
-                          expected = '(';       // parenthèse
-                          expected_end = ")";   // fin: parenthèse
-                        }
-                      if (!nc)
-                        if ((nc = strfield(html, ".link"))) {    // window.link("url")
-                          expected = '(';       // parenthèse
-                          expected_end = ")";   // fin: parenthèse
-                        }
-                      if (!nc && (nc = strfield(html, "url")) &&
-                          (!isalnum(html_prevc(html, r->adr))) &&
-                          html_prevc(html, r->adr) != '_') { // url(url)
-                        expected = '('; // parenthèse
-                        expected_end = ")";     // fin: parenthèse
-                        /* CSS writes url(foo.png) unquoted, but JavaScript's
-                           new URL(x) matches the same token, so an unquoted
-                           operand there rewrites the expression itself. */
-                        can_avoid_quotes = incss;
-                        quotes_replacement = ')';
-                      }
-                      if (!nc)
-                        if ((nc = strfield(html, "import"))) {   // import "url"
-                          if (is_space(*(html + nc))) {
-                            expected = 0;       // no char expected
-                            is_import = 1;
-                          } else
-                            nc = 0;
-                        }
-                      if (nc) {
-                        const char *a;
-
-                        a = html + nc;
-                        while(is_realspace(*a))
-                          a++;
-                        if ((*a == expected) || (!expected)) {
-                          if (expected)
-                            a++;
-                          while(is_realspace(*a))
-                            a++;
-                          if ((*a == 34) || (*a == '\'') || (can_avoid_quotes)) {
-                            const char *b, *c;
-                            int ndelim = 1;
-                            int valid_url = 0;
-
-                            if ((*a == 34) || (*a == '\''))
-                              a++;
-                            else
-                              ndelim = 0;
-                            b = a;
-                            if (ndelim) {
-                              while((*b != 34) && (*b != '\'') && (*b != '\0'))
-                                b++;
-                            } else {
-                              while((*b != quotes_replacement) && (*b != '\0'))
-                                b++;
-                            }
-                            c = b--;
-                            // no closing delimiter here (truncated input):
-                            // Don't scan past the buffer NUL or capture it.
-                            if (*c != '\0') {
-                              c += ndelim;
-                              while (*c == ' ')
-                                c++;
-                              valid_url =
-                                  (strchr(expected_end, *c)) || (*c == '\n') ||
-                                  (*c == '\r') ||
-                                  (is_import && *(b + 1 + ndelim) == ' ');
-                            }
-                            if (valid_url) {
-                              // URL end = last char (b), not the delimiter
-                              c = b;
-                              if ((int) (c - a + 1)) {
-                                if (ensure_not_mime) {
-                                  int i = 0;
-
-                                  while(a != NULL && hts_main_mime[i] != NULL
-                                        && hts_main_mime[i][0] != '\0') {
-                                    int p;
-
-                                    if ((p = strfield(a, hts_main_mime[i]))
-                                        && a[p] == '/') {
-                                      a = NULL;
-                                    }
-                                    i++;
-                                  }
-                                }
-                                // XHR.open's "GET" etc. is a method, not a URL
-                                if (a != NULL && ensure_not_method &&
-                                    is_http_method(a, (size_t) (c - a + 1))) {
-                                  a = NULL;
-                                }
-                                // Check for bogus links (Vasiliy)
-                                if (a != NULL) {
-                                  const size_t size = c - a + 1;
-                                  size_t i;
-                                  int first = 1;
-
-                                  for(i = 0; i < size; i++) {
-                                    // Suspicious (in code ?), abort.
-                                    if (a[i] == ',' || a[i] == ';') {
-                                      if (first) {
-                                        a = NULL;
-                                        break;
-                                      }
-                                    }
-                                    // Suspicious, abort.
-                                    else if (a[i] == '"' || a[i] == '\''
-                                             || a[i] == '\t' || a[i] == '\r'
-                                             || a[i] == '\n') {
-                                      a = NULL;
-                                      break;
-                                    } else if (a[i] != ' ') {
-                                      first = 0;
-                                    }
-                                  }
-                                }
-                                if (a != NULL) {
-                                  if ((opt->debug > 1) && (opt->log != NULL)) {
-                                    char str[512];
-
-                                    str[0] = '\0';
-                                    strncatbuff(str, a,
-                                                minimum((int) (c - a + 1), 32));
-                                    hts_log_print(opt, LOG_DEBUG,
-                                                  "link detected in javascript: %s",
-                                                  str);
-                                  }
-                                  p = (int) (a - html);  // p non nul: TRAITER CHAINE COMME FICHIER
-                                  if (can_avoid_quotes) {
-                                    ending_p = quotes_replacement;
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-
+                      p = jslink.offset; // p non nul: TRAITER CHAINE COMME
+                                         // FICHIER
+                      if (jslink.unquoted_end != '\0')
+                        ending_p = jslink.unquoted_end;
                     }
-                    /* HTSPARSE_NO_JAVASCRIPT */
                   }
                 }
               }
@@ -1730,148 +1816,61 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           // delimiter required after it (mid-tag attrs, #201)
                           if (strchr("),;>/+\r\n", c) ||
                               (intag && !inscript && intag_start_valid &&
-                               dirty_attr_detectable(html, intag_start))) {
+                               hts_dirty_attr_detectable(html, intag_start))) {
                             // '/' covers a value followed by a JS comment
-                            char BIGSTK tempo[HTS_URLMAXSIZE * 2];
-                            char type[256];
-                            int url_ok = 0;     // url valide?
+                            int url_ok = hts_dirty_link_is_url(
+                                opt, html + 1, (size_t) count, c, inscript);
 
-                            tempo[0] = '\0';
-                            type[0] = '\0';
-                            //
-                            strncatbuff(tempo, html + 1, count);
-                            //
-                            if ((!strchr(tempo, ' ')) || inscript) {    // espace dedans: méfiance! (sauf dans code javascript)
-                              int invalid_url = 0;
+                            if (url_ok) {
 
-                              /* Ask before the cut destroys the evidence
-                                 and unescape_amp forges it. */
-                              hts_boolean had_fragment_or_query =
-                                  link_dir_has_fragment_or_query(tempo);
+                              // Check if not fodbidden tag (id,name..)
+                              if (intag_start_valid) {
+                                if (intag_start)
+                                  if (intag_startattr)
+                                    if (intag)
+                                      if (!inscript)
+                                        if (!incomment) {
+                                          int i = 0, nop = 0;
 
-                              // escape                              
-                              unescape_amp(tempo);
-
-                              // Couper au # ou ? éventuel
-                              {
-                                char *a = strchr(tempo, '#');
-
-                                if (a)
-                                  *a = '\0';
-                                a = strchr(tempo, '?');
-                                if (a)
-                                  *a = '\0';
+                                          while (
+                                              (nop == 0) &&
+                                              (strnotempty(hts_nodetect[i]))) {
+                                            nop = rech_tageq(intag_startattr,
+                                                             hts_nodetect[i]);
+                                            i++;
+                                          }
+                                          // Forbidden tag
+                                          if (nop) {
+                                            url_ok = 0;
+                                            hts_log_print(opt, LOG_DEBUG,
+                                                          "dirty parsing: bad "
+                                                          "tag avoided: %s",
+                                                          hts_nodetect[i - 1]);
+                                          }
+                                          // xmlns / xmlns:prefix declare
+                                          // XML namespaces, not resources
+                                          // (#191)
+                                          else {
+                                            const int xl = strfield(
+                                                intag_startattr, "xmlns");
+                                            const char xc = intag_startattr[xl];
+                                            if (xl && (xc == ':' || xc == '=' ||
+                                                       is_space(xc))) {
+                                              url_ok = 0;
+                                              hts_log_print(
+                                                  opt, LOG_DEBUG,
+                                                  "dirty parsing: xmlns "
+                                                  "namespace avoided");
+                                            }
+                                          }
+                                        }
                               }
 
-                              // vérifier qu'il n'y a pas de caractères spéciaux
-                              if (!strnotempty(tempo))
-                                invalid_url = 1;
-                              else if (strchr(tempo, '*')
-                                       || strchr(tempo, '<')
-                                       || strchr(tempo, '>')
-                                       || strchr(tempo, ',')    /* list of files ? */
-                                       ||strchr(tempo, '\"')    /* potential parsing bug */
-                                       ||strchr(tempo, '\'')    /* potential parsing bug */
-                                )
-                                invalid_url = 1;
-                              else if (tempo[0] == '.' && isalnum(tempo[1]))    // ".gif"
-                                invalid_url = 1;
-
-                              /* non invalide? */
-                              if (!invalid_url) {
-                                // Un plus à la fin? Alors ne pas prendre sauf si extension ("/toto.html#"+tag)
-                                if (c != '+') { // PAS de plus à la fin
-                                  // "Comparisons of scheme names MUST be
-                                  // case-insensitive" (RFC2616)
-                                  if ((strfield(tempo, "http:"))
-                                      || (strfield(tempo, "ftp:"))
-#if HTS_USEOPENSSL
-                                      || (strfield(tempo, "https:")
-                                      )
-#endif
-                                    )   // ok pas de problème
-                                    url_ok = 1;
-                                  else if (hts_lastchar(tempo) ==
-                                           '/') {       // un slash: ok..
-                                    /* A trailing slash alone is no evidence
-                                       inside a script, where "/" and "image/"
-                                       are ordinary strings. */
-                                    if (inscript &&
-                                        (had_fragment_or_query ||
-                                         link_dir_is_multisegment(tempo)))
-                                      url_ok = 1;
-                                  }
-                                }
-                                // Prendre si extension reconnue
-                                if (!url_ok) {
-                                  if (get_httptype_sized(opt, type,
-                                                         sizeof(type), tempo,
-                                                         0)) // recognized type
-                                    url_ok = 1;
-                                  else if (is_dyntype(get_ext(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), tempo)))       // reconnu php,cgi,asp..
-                                    url_ok = 1;
-                                  // MAIS pas les foobar@aol.com !!
-                                  if (strchr(tempo, '@'))
-                                    url_ok = 0;
-                                }
-                                //
-                                // Ok, cela pourrait être une URL
-                                if (url_ok) {
-
-                                  // Check if not fodbidden tag (id,name..)
-                                  if (intag_start_valid) {
-                                    if (intag_start)
-                                      if (intag_startattr)
-                                        if (intag)
-                                          if (!inscript)
-                                            if (!incomment) {
-                                              int i = 0, nop = 0;
-
-                                              while((nop == 0)
-                                                    &&
-                                                    (strnotempty
-                                                     (hts_nodetect[i]))) {
-                                                nop =
-                                                  rech_tageq(intag_startattr,
-                                                             hts_nodetect[i]);
-                                                i++;
-                                              }
-                                              // Forbidden tag
-                                              if (nop) {
-                                                url_ok = 0;
-                                                hts_log_print(opt, LOG_DEBUG,
-                                                              "dirty parsing: bad tag avoided: %s",
-                                                              hts_nodetect[i -
-                                                                           1]);
-                                              }
-                                              // xmlns / xmlns:prefix declare
-                                              // XML namespaces, not resources
-                                              // (#191)
-                                              else {
-                                                const int xl = strfield(
-                                                    intag_startattr, "xmlns");
-                                                const char xc =
-                                                    intag_startattr[xl];
-                                                if (xl &&
-                                                    (xc == ':' || xc == '=' ||
-                                                     is_space(xc))) {
-                                                  url_ok = 0;
-                                                  hts_log_print(
-                                                      opt, LOG_DEBUG,
-                                                      "dirty parsing: xmlns "
-                                                      "namespace avoided");
-                                                }
-                                              }
-                                            }
-                                  }
-
-                                  // Accepter URL, on la traitera comme une URL normale!!
-                                  if (url_ok) {
-                                    valid_p = 1;
-                                    p = 0;
-                                  }
-
-                                }
+                              // Accepter URL, on la traitera comme une URL
+                              // normale!!
+                              if (url_ok) {
+                                valid_p = 1;
+                                p = 0;
                               }
                             }
                           }

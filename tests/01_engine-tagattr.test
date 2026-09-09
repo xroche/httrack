@@ -1,0 +1,29 @@
+#!/bin/bash
+#
+# Pins dirty_attr_name and dirty_attr_detectable, which decide whether an in-tag
+# quoted value belongs to an attribute the dirty parser may read. Tags built
+# from a known attribute check the walk against the name it must resolve, and a
+# sweep of malformed tags checks what the walk may claim.
+
+set -euo pipefail
+
+out=$(httrack -#test=tagattr) || {
+    echo "httrack -#test=tagattr exited non-zero: $out" >&2
+    exit 1
+}
+
+case "$out" in
+"tagattr self-test OK"*) ;;
+*)
+    echo "expected 'tagattr self-test OK', got: $out" >&2
+    exit 1
+    ;;
+esac
+
+# A sweep whose corpus collapses still prints OK, so pin the floor here.
+swept=${out#*OK (}
+swept=${swept%% *}
+test "$swept" -ge 9000 || {
+    echo "expected at least 9000 junk tags swept, got: $out" >&2
+    exit 1
+}

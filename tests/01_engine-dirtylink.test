@@ -1,0 +1,30 @@
+#!/bin/bash
+#
+# Pins hts_dirty_link_is_url, which decides whether a quoted string inside a
+# script or a tag is a link. The engine sweeps every string of up to four bytes
+# over the alphabet the predicate branches on against a model of its rules, so a
+# family cannot go untested for want of somebody imagining it: #1612 shipped
+# because nothing had ever produced "/#top".
+
+set -euo pipefail
+
+out=$(httrack -#test=dirtylink) || {
+    echo "httrack -#test=dirtylink exited non-zero: $out" >&2
+    exit 1
+}
+
+case "$out" in
+"dirtylink self-test OK"*) ;;
+*)
+    echo "expected 'dirtylink self-test OK', got: $out" >&2
+    exit 1
+    ;;
+esac
+
+# A sweep whose corpus collapses still prints OK, so pin the floor here.
+swept=${out#*OK (}
+swept=${swept%% *}
+test "$swept" -ge 300000 || {
+    echo "expected at least 300000 cases swept, got: $out" >&2
+    exit 1
+}

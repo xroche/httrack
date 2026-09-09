@@ -54,6 +54,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscache.h"
 #include "htscache_selftest.h"
 #include "htsdns_selftest.h"
+#include "htsparse_selftest.h"
 #include "htscatchurl.h"
 #include "htscharset.h"
 #include "htscmdline.h"
@@ -6707,6 +6708,22 @@ static int st_linkdir(httrackp *opt, int argc, char **argv) {
   }
   printf("linkdir self-test OK\n");
   return 0;
+}
+
+static int st_dirtylink(httrackp *opt, int argc, char **argv) {
+  return parse_selftest_dirtylink(
+      opt, (argc > 0 && strcmp(argv[0], "dump") == 0) ? HTS_TRUE : HTS_FALSE);
+}
+
+static int st_jsscan(httrackp *opt, int argc, char **argv) {
+  return parse_selftest_jsscan(
+      opt, (argc > 0 && strcmp(argv[0], "dump") == 0) ? HTS_TRUE : HTS_FALSE);
+}
+
+static int st_tagattr(httrackp *opt, int argc, char **argv) {
+  (void) argc;
+  (void) argv;
+  return parse_selftest_tagattr(opt);
 }
 
 static int st_addrport(httrackp *opt, int argc, char **argv) {
@@ -14999,6 +15016,18 @@ static const struct selftest_entry {
      "a quoted directory string is a link only with a second segment, or a "
      "fragment or query opening right after the path",
      st_linkdir},
+    {"dirtylink", "[dump]",
+     "is a quoted string a link? sweeps the parser's alphabet against a model, "
+     "or dumps its verdicts",
+     st_dirtylink},
+    {"jsscan", "[dump]",
+     "does a script statement hand a URL to .src, .location, .open, url() and "
+     "friends? sweeps the shapes against a model",
+     st_jsscan},
+    {"tagattr", "",
+     "may the dirty parser read this in-tag quoted value? resolves the owning "
+     "attribute and refuses the names that carry no link",
+     st_tagattr},
     {"addrport", "",
      "\"host:port\" of a peer address is bounded and complete (#1493)",
      st_addrport},
