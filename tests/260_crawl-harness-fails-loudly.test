@@ -95,11 +95,16 @@ test "$rc" -eq 0 || fail "a negative file audit failed on an empty file: $out"
 ok "a negative file audit passes on an empty mirrored file"
 
 # The mirror bounds share the vacuity, because an empty mirror is under every
-# ceiling. Seeding at a 404 under -o0 leaves the host root present and empty.
-run --errors 1 --min-mirror-bytes 400 httrack 'BASEURL/errpage/missing.html' -o0
-test "$rc" -ne 0 || fail "a mirror floor passed on an empty mirror: $out"
+# ceiling and only a floor says anything landed. Both runs use the healthy crawl
+# and bounds no platform can straddle, since how much a crawl saves varies.
+run --errors 0 --min-mirror-bytes 99999999 httrack "$url"
+test "$rc" -ne 0 || fail "a mirror floor passed under the bound: $out"
 assert_match "mirror too small" "$out" "the floor names what it wanted"
-ok "a mirror floor fails when nothing was saved"
+ok "a mirror floor fails when the mirror is under the bound"
+
+run --errors 0 --min-mirror-bytes 1 httrack "$url"
+test "$rc" -eq 0 || fail "a mirror floor failed over the bound: $out"
+ok "a mirror floor passes when the mirror is over the bound"
 
 # A directory named after a searched word must not answer for the crawl (#1220):
 # TMPDIR plants one on the command line the log echoes.
