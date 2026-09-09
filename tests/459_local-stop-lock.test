@@ -64,10 +64,12 @@ out="${tmpdir}/fresh"
 httrack -O "$out" "${common[@]}" --max-rate=200000 \
     "${BASEURL}/bigfiles/index.html" >"${tmpdir}/log-fresh" 2>&1 &
 crawlpid=$!
-wait_until "test -e '${out}/${PROGRESSLOCK}'" "the crawl never got going"
-: >"${out}/${STOPLOCK}"
-wait_until "test -e '${out}/${PAUSEDLOCK}'" \
-    "30s on, a running engine had not paused"
+wait_until_running "test -e '${out}/${PROGRESSLOCK}'" "the crawl never got going" \
+    "$crawlpid" "${tmpdir}/log-fresh"
+lock_request "$out" "$STOPLOCK" "$crawlpid" "${tmpdir}/log-fresh"
+wait_until_running "test -e '${out}/${PAUSEDLOCK}'" \
+    "30s on, a running engine had not paused" \
+    "$crawlpid" "${tmpdir}/log-fresh"
 test ! -e "${out}/${STOPLOCK}" ||
     fail "the engine paused without taking the request that asked for it"
 stop_crawl

@@ -216,3 +216,35 @@ assert_lockrule_selftest() {
         fail "the rule self-test said nothing about a same-second request"
     echo "OK (${coverage#*: }, ${subsecond#*request: })"
 }
+
+# Drop NAME in a running engine's output directory to ask it for something. The
+# engine makes that directory itself, so a bare redirect there can report ENOENT
+# for three different reasons, and this one names which.
+lock_request() { # lock_request DIR NAME PID LOG
+    local dir=$1 name=$2 pid=$3 log=$4 i
+    for ((i = 0; i < 50; i++)); do
+        if test -d "$dir" && : >"${dir}/${name}" 2>/dev/null; then return 0; fi
+        kill -0 "$pid" 2>/dev/null ||
+            fail_dump "the engine exited before it could be asked for ${name}" "$log"
+        test -d "$(dirname "$dir")" ||
+            fail "$(dirname "$dir") is gone: something removed it under a running test"
+        sleep 0.1
+    done
+    fail_dump "5s on, ${name} could not be written into ${dir}" "$log"
+}
+
+# wait_until for a condition only a live engine can reach, so an engine that
+# died is named rather than blamed for ignoring a request it never saw.
+wait_until_running() { # wait_until_running CONDITION MSG PID LOG [tenths, default 300]
+    local cond=$1 msg=$2 pid=$3 log=$4 i alive
+    for ((i = 0; i < ${5:-300}; i++)); do
+        # Sampled before the condition, so one satisfied on the way out is taken.
+        alive=1
+        kill -0 "$pid" 2>/dev/null || alive=
+        if eval "$cond"; then return 0; fi
+        test -n "$alive" ||
+            fail_dump "the engine exited first, so it never reached: ${msg}" "$log"
+        sleep 0.1
+    done
+    fail_dump "$msg" "$log"
+}
