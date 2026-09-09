@@ -12589,23 +12589,29 @@ static hts_boolean st_backstop_arm(httrackp *opt, struct_back *sback,
    Returns 77 on an allocation failure, as st_backstop() does. */
 static int st_backstop_check_shutdown(httrackp *opt) {
   /* back_delete_all() raises the flag only for a live slot writing a file of
-     its own, so each row below drops one of those three conditions. */
+     its own. back_is_live() is a RANGE, 0 < status < STATUS_FTP_TRANSFER, so
+     the rows walk it: one on each side, and two inside it far enough apart that
+     narrowing the range to its first status fails. */
   static const struct {
     const char *what;
     int status;
     hts_boolean is_write;
     const char *url_sav;
     hts_boolean kept;
-  } shutdown[] = {{"a slot already finished", STATUS_READY, HTS_TRUE,
+  } shutdown[] = {{"a free slot", STATUS_FREE, HTS_TRUE,
                    "hts-backstop-selftest.tmp", HTS_FALSE},
-                  {"an FTP slot its worker owns", STATUS_FTP_TRANSFER, HTS_TRUE,
+                  {"a slot already finished", STATUS_READY, HTS_TRUE,
+                   "hts-backstop-selftest.tmp", HTS_FALSE},
+                  {"an FTP slot", STATUS_FTP_TRANSFER, HTS_TRUE,
                    "hts-backstop-selftest.tmp", HTS_FALSE},
                   {"a slot writing nothing to disk", STATUS_TRANSFER, HTS_FALSE,
                    "", HTS_FALSE},
                   {"a .delayed placeholder", STATUS_TRANSFER, HTS_TRUE,
                    "hts-backstop-selftest.tmp." DELAYED_EXT, HTS_FALSE},
                   {"a partial file", STATUS_TRANSFER, HTS_TRUE,
-                   "hts-backstop-selftest.tmp", HTS_TRUE}};
+                   "hts-backstop-selftest.tmp", HTS_TRUE},
+                  {"a partial file awaiting its next chunk", STATUS_CHUNK_WAIT,
+                   HTS_TRUE, "hts-backstop-selftest.tmp", HTS_TRUE}};
 
   int err = 0;
   size_t c;
