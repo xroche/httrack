@@ -13079,8 +13079,7 @@ static int st_threadwait(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
-/* Confirms the runner runs the body exactly once, on the worker, and neither
-   beside it nor on the caller. */
+/* Confirms the runner encloses the body exactly once, on the worker. */
 #ifdef _WIN32
 typedef DWORD threadrunner_id;
 #define threadrunner_self() GetCurrentThreadId()
@@ -13095,7 +13094,7 @@ static htsmutex threadrunner_lock = HTSMUTEX_INIT;
 static int threadrunner_before = 0;
 static int threadrunner_after = 0;
 static int threadrunner_body = 0;
-/* What the runner had done when the body ran: 1 and 0 from inside it. */
+/* What the runner had done when the body ran, 1 and 0 from inside it. */
 static int threadrunner_seen_before = 0;
 static int threadrunner_seen_after = 0;
 static threadrunner_id threadrunner_body_thread;
@@ -13150,16 +13149,14 @@ static int st_threadrunner(httrackp *opt, int argc, char **argv) {
   (void) argc;
   (void) argv;
 
-  /* Every check below reads what the worker wrote, which htsthread_wait()
-     published through the mutex in process_chain_add(). */
+  /* Unlocked, because htsthread_wait() published the worker's writes. */
   threadrunner_reset();
   if (hts_set_thread_runner(threadrunner_runner) != NULL) {
     fprintf(stderr, "threadrunner: a runner was installed already\n");
     return 1;
   }
   spawned = threadrunner_spawn();
-  /* Cleared before any check can return early, because the runner is
-     process-global and selftest_queue reuses this engine. */
+  /* Process-global, so clear it before any check can return early. */
   if (hts_set_thread_runner(NULL) != threadrunner_runner) {
     fprintf(stderr, "threadrunner: the setter did not hand back the runner\n");
     err = 1;
@@ -13182,8 +13179,7 @@ static int st_threadrunner(httrackp *opt, int argc, char **argv) {
             threadrunner_seen_before, threadrunner_seen_after);
     err = 1;
   }
-  /* The frame must be the worker's, because a sigsetjmp on the caller's stack
-     catches nothing the worker does. */
+  /* A sigsetjmp on the caller's stack would catch nothing the worker does. */
   if (threadrunner_same(threadrunner_body_thread, caller) ||
       !threadrunner_same(threadrunner_body_thread,
                          threadrunner_runner_thread)) {
@@ -13192,7 +13188,7 @@ static int st_threadrunner(httrackp *opt, int argc, char **argv) {
     err = 1;
   }
 
-  /* NULL restores the plain call: the worker runs, the runner does not. */
+  /* NULL restores the plain call. */
   threadrunner_reset();
   if (!threadrunner_spawn())
     return 1;

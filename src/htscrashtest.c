@@ -112,8 +112,7 @@ static void crash_worker_thread(void *arg) {
   fn();
 }
 
-/* Faults 'fn' on an engine worker. The worker reads 'fn' out of this frame,
-   which the wait below holds open until the worker has returned. */
+/* Faults 'fn' on a worker. The wait below holds this frame until it returns. */
 static void crash_on_worker(crash_fn fn) {
   /* Aborting on a spawn failure keeps the caller's exit status a crash, so the
      test reads "no worker started" rather than "the handler never ran". */
@@ -128,9 +127,7 @@ static CRASH_NOINLINE void crash_threadstack(void) {
   crash_on_worker(crash_stack);
 }
 
-/* Faults a worker with its stack intact, unlike threadstack which spends it
-   too, so a handler that copes with the main thread but not with a thread it
-   never registered shows up on its own. */
+/* Faults a worker with its stack intact, unlike threadstack. */
 static CRASH_NOINLINE void crash_threadsegv(void) {
   crash_on_worker(crash_segv);
 }

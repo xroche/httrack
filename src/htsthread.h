@@ -68,15 +68,11 @@ HTSEXT_API int hts_newthread(void (*fun) (void *arg), void *arg);
 HTSEXT_API void hts_set_thread_hooks(void *(*enter)(void),
                                      void (*leave)(void *cookie));
 
-/* Runs one worker body. See hts_set_thread_runner(). */
 typedef void (*hts_thread_runner)(void (*fun)(void *arg), void *arg);
 
-/* Wraps each worker body in a caller-supplied frame, for a crash handler that
-   must lexically enclose the call rather than bracket it, such as sigsetjmp
-   plus a block. 'runner' must call 'fun(arg)' exactly once, and NULL restores
-   the plain call. Returns the runner it replaced, so an embedder can chain or
-   put one back. Set it before spawning, because the pointer is read unlocked.
-   It runs between 'enter' and 'leave'. */
+/* Wraps each worker body in a caller-supplied frame, between 'enter' and
+   'leave'. The runner must call 'fun(arg)' once, and NULL clears it. Returns
+   the previous runner. Set it before spawning, since it is read unlocked. */
 HTSEXT_API hts_thread_runner hts_set_thread_runner(hts_thread_runner runner);
 
 HTSEXT_API void htsthread_wait_n(int n_wait);

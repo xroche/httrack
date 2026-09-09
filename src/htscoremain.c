@@ -967,8 +967,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   }
 
   /* -#c[=KIND]: crash on purpose, to test crash handlers only (see
-     htscrashtest.h). Handled here so it needs no dummy URL either. Off unless
-     the build asked for it, so a shipped application carries no such path. */
+     htscrashtest.h). Handled here so it needs no dummy URL either. */
 #ifdef HTS_CRASH_TEST
   {
     int k;
