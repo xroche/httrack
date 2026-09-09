@@ -5273,6 +5273,15 @@ static int st_cookieport(httrackp *opt, int argc, char **argv) {
       {"", NULL}, // an empty domain is a suffix of every host
       {":8080", NULL},
       {"[]:80", NULL},
+      // RFC 6874 spells the zone id's '%' as "%25" inside the brackets only
+      {"[fe80::1%25eth0]:8080", "fe80::1%eth0"},
+      {"[fe80::1%25eth0]", "fe80::1%eth0"},
+      {"fe80::1%eth0", "fe80::1%eth0"},     // what a browser export carries
+      {"fe80::1%25eth0", "fe80::1%25eth0"}, // no brackets, so nothing to decode
+      {"host%25name.example", "host%25name.example"}, // a name, not a literal
+      {"[fe80::1%2525eth0]", "fe80::1%25eth0"},       // the introducer, once
+      {"[fe80::1%]:80", "fe80::1%"}, // truncated: no decode, no overread
+      {"[fe80::1%2]:80", "fe80::1%2"},
   };
 
   static const struct {
@@ -5317,6 +5326,14 @@ static int st_cookieport(httrackp *opt, int argc, char **argv) {
       // "x" while every query still asks for "x:1"
       {"[x:1]:80", "Set-Cookie: odd=O; path=/", "[x:1]:80", "odd=O", HTS_TRUE,
        "the store side normalised the host twice"},
+      // a link-local host reaches the zone id spelling a browser exports, and
+      // stops at another zone
+      {"[fe80::1%25eth0]:8080", "Set-Cookie: zone=Z; path=/", "fe80::1%eth0",
+       "zone=Z", HTS_TRUE, "[fe80::1%25eth0] does not reach fe80::1%eth0"},
+      {"fe80::1%eth0", "Set-Cookie: zone=Z; path=/", "[fe80::1%25eth0]:8080",
+       "zone=Z", HTS_TRUE, "fe80::1%eth0 does not reach [fe80::1%25eth0]"},
+      {"[fe80::1%25eth0]:8080", "Set-Cookie: zone=Z; path=/", "fe80::1%eth1",
+       "zone=Z", HTS_FALSE, "a cookie on %eth0 reached %eth1"},
   };
 
   static t_cookie jar;
