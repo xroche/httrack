@@ -76,8 +76,11 @@ run() { # run <label> <env argument>...
     # Own process group, so the kills below reach what configure spawned: bash 3.2 keeps
     # the subshell it runs in, and killing that alone leaves the child running (macOS).
     set -m
-    (cd "$rundir" && env "$@" "${configure_cmd[@]}") \
-        >"$rundir/log" 2>&1 &
+    (
+        set +e
+        cd "$rundir" && env "$@" "${configure_cmd[@]}"
+        echo $? >"$rundir/status"
+    ) >"$rundir/log" 2>&1 &
     local pid=$! waited=0 quiet=0 size=0 now left
     test -n "$had_m" || set +m
     # A hang is silence, not slowness: configure writes a line per probe,
@@ -111,7 +114,14 @@ run() { # run <label> <env argument>...
             exit 77
         fi
     done
-    wait "$pid" || status=$?
+    wait "$pid" 2>/dev/null || true # nothing reads it, but bash 3.2 may still need the reap
+    # Not from bash 3.2's `wait`, which answers a recycled pid with an older status.
+    test -r "$rundir/status" ||
+        fail_dump "$label recorded no exit status, so it was killed ${waited}s in" "$rundir/log"
+    status=
+    read -r status <"$rundir/status" || true # an empty file is a kill mid-write, never a 0
+    test -n "$status" ||
+        fail_dump "$label recorded half an exit status, so it was killed ${waited}s in" "$rundir/log"
     log=$(<"$rundir/log")
     took=$((SECONDS - began))
     echo "run $n ($label): exit $status"
@@ -224,6 +234,60 @@ verdict() { # verdict <accept|reject> <run number> <status the child exits with>
 }
 verdict accept 80 1 # configure rejected what it must accept
 verdict reject 81 0 # configure accepted what it must reject
+# A stale 0 from `wait` made a rejected BASH_SHELL read as accepted on bash 3.2 (#1607).
+stale=0
+(
+    n=93 SAMPLE=1 # past the real cases, or run1 gets made twice and the second mkdir aborts the test
+    # Two digits, so a status read one byte at a time cannot pass for the whole answer.
+    configure_cmd=(bash -c 'exit 42')
+    # shellcheck disable=SC2317 # run() calls this shadowed builtin
+    wait() { builtin wait "$@" >/dev/null 2>&1 || true; } # a stale answer looks like this
+    run stale-status
+    test "$status" -eq 42
+) >"$tmp/stale.log" 2>&1 || stale=$?
+test "$stale" -eq 0 ||
+    fail_dump "run() took the shell's word for the exit status instead of the run's own" "$tmp/stale.log"
+# The other direction of #1607: a stale non-zero must not make an accepted BASH_SHELL read
+# as rejected, which the case above cannot see because its own run answers non-zero.
+fresh=0
+(
+    n=94 SAMPLE=1
+    configure_cmd=(bash -c 'exit 0')
+    # shellcheck disable=SC2317 # run() calls this shadowed builtin
+    wait() {
+        builtin wait "$@" >/dev/null 2>&1 || true
+        return 9
+    }
+    run fresh-status
+    test "$status" -eq 0
+) >"$tmp/fresh.log" 2>&1 || fresh=$?
+test "$fresh" -eq 0 ||
+    fail_dump "run() read a zero exit status as the shell's non-zero answer" "$tmp/fresh.log"
+# Only a kill from outside run() reaches the missing-status check, since both watchdogs exit first.
+killed=0
+(
+    n=95 SAMPLE=1
+    # Nothing after the kill: it would outlive the dead process group and stray into other tests.
+    configure_cmd=(bash -c "kill -9 \$PPID")
+    run killed-run
+) >"$tmp/killed.log" 2>&1 || killed=$?
+test "$killed" -eq 1 ||
+    fail_dump "a run whose shell was killed reported $killed, want 1" "$tmp/killed.log"
+grep -q 'recorded no exit status' "$tmp/killed.log" ||
+    fail_dump "the killed run did not report a missing exit status" "$tmp/killed.log"
+# A kill between the redirect creating the status file and the echo filling it leaves it empty.
+half=0
+(
+    n=96 SAMPLE=1
+    # The child runs in the run directory, so this is the file run() goes on to read.
+    # shellcheck disable=SC2016 # $PPID is the child's own parent, not this shell's
+    configure_cmd=(bash -c ': >status; kill -9 $PPID')
+    run half-status
+) >"$tmp/half.log" 2>&1 || half=$?
+test "$half" -eq 1 ||
+    fail_dump "a run whose status file stayed empty reported $half, want 1" "$tmp/half.log"
+grep -q 'recorded half an exit status' "$tmp/half.log" ||
+    fail_dump "the empty status file was not reported as half an exit status" "$tmp/half.log"
 # The probes ran in subshells, so the real cases below start from a clean count.
 cases=16
 n=0
