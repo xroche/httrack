@@ -6709,6 +6709,255 @@ static int st_linkdir(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Case-insensitive prefix test, so the model does not lean on strfield. */
+static hts_boolean dirtylink_ci_prefix(const char *s, const char *prefix) {
+  size_t i;
+
+  for (i = 0; prefix[i] != '\0'; i++) {
+    if (tolower((unsigned char) s[i]) != tolower((unsigned char) prefix[i]))
+      return HTS_FALSE;
+  }
+  return HTS_TRUE;
+}
+
+/* The rules hts_dirty_link_is_url answers, restated from the parser's intent
+   rather than copied from its code: a disagreement is a finding about one of
+   the two. link_dir_has_fragment_or_query, unescape_amp and the mime tables
+   are reused, being data or separately pinned (-#test=linkdir). */
+static hts_boolean dirtylink_model(httrackp *opt, const char *str, char lastc,
+                                   hts_boolean inscript) {
+  char BIGSTK cut[HTS_URLMAXSIZE * 2];
+  char type[256];
+  hts_boolean opens_path, by_ext;
+  size_t i, slashes = 0, named = 0, len;
+
+  if (strlen(str) >= HTS_URLMAXSIZE)
+    return HTS_FALSE;
+  /* a space reads as prose, except in script code */
+  if (strchr(str, ' ') != NULL && !inscript)
+    return HTS_FALSE;
+  /* asked on the source bytes, before an entity can forge a marker */
+  opens_path = link_dir_has_fragment_or_query(str);
+
+  strlcpybuff(cut, str, sizeof(cut));
+  unescape_amp(cut);
+  cut[strcspn(cut, "#?")] = '\0';
+  len = strlen(cut);
+
+  if (len == 0)
+    return HTS_FALSE;
+  if (strpbrk(cut, "*<>,\"'") != NULL)
+    return HTS_FALSE;
+  if (cut[0] == '.' && isalnum((unsigned char) cut[1])) /* ".gif" */
+    return HTS_FALSE;
+
+  by_ext = (get_httptype_sized(opt, type, sizeof(type), cut, 0) ||
+            is_dyntype(get_ext(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), cut)))
+               ? HTS_TRUE
+               : HTS_FALSE;
+
+  /* a string the source continues with '+' is an expression, so only an
+     extension speaks for it */
+  if (lastc != '+') {
+    if (dirtylink_ci_prefix(cut, "http:") || dirtylink_ci_prefix(cut, "ftp:")
+#if HTS_USEOPENSSL
+        || dirtylink_ci_prefix(cut, "https:")
+#endif
+    )
+      return HTS_TRUE;
+    for (i = 0; i < len; i++) {
+      if (cut[i] == '/')
+        slashes++;
+      else
+        named++;
+    }
+    if (cut[len - 1] == '/' && inscript &&
+        (opens_path || (slashes >= 2 && named != 0)))
+      return HTS_TRUE;
+  }
+  /* an address is not a link */
+  return (by_ext && strchr(cut, '@') == NULL) ? HTS_TRUE : HTS_FALSE;
+}
+
+typedef struct dirtylink_sweep {
+  size_t cases;
+  size_t bad;
+  size_t accepted;
+  hts_boolean dump;
+} dirtylink_sweep;
+
+/* One string against both, in each context the parser can offer. */
+static void dirtylink_one(httrackp *opt, dirtylink_sweep *sw, const char *str) {
+  static const char lastcs[] = {')', '+'};
+  size_t i, j;
+
+  for (i = 0; i < sizeof(lastcs); i++) {
+    for (j = 0; j < 2; j++) {
+      const hts_boolean inscript = j != 0 ? HTS_TRUE : HTS_FALSE;
+      const hts_boolean got =
+          hts_dirty_link_is_url(opt, str, strlen(str), lastcs[i], inscript);
+
+      sw->cases++;
+      if (got)
+        sw->accepted++;
+      if (sw->dump) {
+        printf("%d\t%c\t%d\t%s\n", (int) got, lastcs[i], (int) inscript, str);
+        continue;
+      }
+      if (got != dirtylink_model(opt, str, lastcs[i], inscript)) {
+        if (sw->bad < 20) {
+          fprintf(stderr,
+                  "dirtylink \"%s\" (next byte '%c', %s): engine says %d, "
+                  "model says %d\n",
+                  str, lastcs[i], inscript ? "in script" : "in tag", (int) got,
+                  (int) !got);
+        }
+        sw->bad++;
+      }
+    }
+  }
+}
+
+/* Every string of up to four bytes over the alphabet the predicate branches
+   on, so no family goes untested for want of somebody imagining it. */
+static void dirtylink_enumerate_bytes(httrackp *opt, dirtylink_sweep *sw) {
+  static const char alphabet[] = "/?#&.:+*<>,\"'a@ ";
+  const size_t n = sizeof(alphabet) - 1;
+  char buf[8];
+  size_t len;
+
+  for (len = 0; len <= 4; len++) {
+    size_t i, k, total = 1;
+
+    for (k = 0; k < len; k++)
+      total *= n;
+    for (i = 0; i < total; i++) {
+      size_t v = i;
+
+      for (k = 0; k < len; k++) {
+        buf[k] = alphabet[v % n];
+        v /= n;
+      }
+      buf[len] = '\0';
+      dirtylink_one(opt, sw, buf);
+    }
+  }
+}
+
+/* The branches four bytes cannot reach: a scheme, a name, an extension. */
+static void dirtylink_enumerate_tokens(httrackp *opt, dirtylink_sweep *sw) {
+  static const char *const tok[] = {
+      "",      "http:", "HTTPS:", "ftp:", "mailto:", "a",  "ab", ".gif",
+      ".php",  "a.gif", "a.html", "/",    "//",      "#x", "?q", "&amp;",
+      "&#35;", "@",     ".",      ":",    "+",       " "};
+  const size_t n = sizeof(tok) / sizeof(tok[0]);
+  char buf[64];
+  size_t i, j, k;
+
+  for (i = 0; i < n; i++) {
+    for (j = 0; j < n; j++) {
+      for (k = 0; k < n; k++) {
+        buf[0] = '\0';
+        strcatbuff(buf, tok[i]);
+        strcatbuff(buf, tok[j]);
+        strcatbuff(buf, tok[k]);
+        dirtylink_one(opt, sw, buf);
+      }
+    }
+  }
+}
+
+static int st_dirtylink(httrackp *opt, int argc, char **argv) {
+  /* Verdicts to hold whatever the sweep says, each naming why. */
+  static const struct {
+    const char *str;
+    char lastc;
+    hts_boolean inscript;
+    hts_boolean want;
+  } cases[] = {
+      /* a directory string alone is no link, in script or in a tag (#1612) */
+      {"/", ')', HTS_TRUE, HTS_FALSE},
+      {"image/", ')', HTS_TRUE, HTS_FALSE},
+      {"Alt+/", ')', HTS_TRUE, HTS_FALSE},
+      {"$&/", ')', HTS_TRUE, HTS_FALSE},
+      /* a fragment or query opening a path is (#1618) */
+      {"/#top", ')', HTS_TRUE, HTS_TRUE},
+      {"/?q=1", ')', HTS_TRUE, HTS_TRUE},
+      {"img/#x", ')', HTS_TRUE, HTS_TRUE},
+      /* so is a second segment */
+      {"a/b/", ')', HTS_TRUE, HTS_TRUE},
+      {"/a/b/", ')', HTS_TRUE, HTS_TRUE},
+      /* outside script code a trailing slash never is, since a base href and a
+         bare directory string look alike */
+      {"a/b/", ')', HTS_FALSE, HTS_FALSE},
+      /* a scheme speaks for itself, whatever follows */
+      {"http://ex.co/", ')', HTS_FALSE, HTS_TRUE},
+      {"HTTP://ex.co/", ')', HTS_FALSE, HTS_TRUE},
+      {"ftp://ex.co/", ')', HTS_FALSE, HTS_TRUE},
+      {"mailto:a@b.c", ')', HTS_TRUE, HTS_FALSE},
+      {"javascript:void(0)", ')', HTS_TRUE, HTS_FALSE},
+      /* an extension names a file, even where the string is concatenated */
+      {"a.gif", '+', HTS_TRUE, HTS_TRUE},
+      {"a.php", '+', HTS_TRUE, HTS_TRUE},
+      {"page.html", ')', HTS_FALSE, HTS_TRUE},
+      {"page.html#f", ')', HTS_FALSE, HTS_TRUE},
+      /* but a '+' rules out everything an extension does not carry */
+      {"http://ex.co/", '+', HTS_TRUE, HTS_FALSE},
+      {"a/b/", '+', HTS_TRUE, HTS_FALSE},
+      /* an address is not a link */
+      {"foobar@aol.com", ')', HTS_TRUE, HTS_FALSE},
+      /* a bare extension is a type name, not a file */
+      {".gif", ')', HTS_TRUE, HTS_FALSE},
+      /* code punctuation rules a string out */
+      {"a*.gif", ')', HTS_TRUE, HTS_FALSE},
+      {"a,b.gif", ')', HTS_TRUE, HTS_FALSE},
+      {"<b>.gif", ')', HTS_TRUE, HTS_FALSE},
+      /* the cut leaves nothing to name */
+      {"#f", ')', HTS_TRUE, HTS_FALSE},
+      {"?q=1", ')', HTS_TRUE, HTS_FALSE},
+      {"", ')', HTS_TRUE, HTS_FALSE},
+      /* a space is prose outside script code, and ordinary inside it */
+      {"a b.gif", ')', HTS_FALSE, HTS_FALSE},
+      {"a b.gif", ')', HTS_TRUE, HTS_TRUE},
+  };
+
+  dirtylink_sweep sw;
+  size_t i;
+  int err = 0;
+
+  memset(&sw, 0, sizeof(sw));
+  sw.dump = (argc > 0 && strcmp(argv[0], "dump") == 0) ? HTS_TRUE : HTS_FALSE;
+
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    const hts_boolean got =
+        hts_dirty_link_is_url(opt, cases[i].str, strlen(cases[i].str),
+                              cases[i].lastc, cases[i].inscript);
+
+    if (got != cases[i].want) {
+      fprintf(stderr,
+              "dirtylink \"%s\" (next byte '%c', %s): got %d, "
+              "wanted %d\n",
+              cases[i].str, cases[i].lastc,
+              cases[i].inscript ? "in script" : "in tag", (int) got,
+              (int) cases[i].want);
+      err = 1;
+    }
+  }
+
+  dirtylink_enumerate_bytes(opt, &sw);
+  dirtylink_enumerate_tokens(opt, &sw);
+  if (sw.dump)
+    return 0;
+  if (sw.bad != 0) {
+    fprintf(stderr, "dirtylink: %d of %d swept cases disagree with the model\n",
+            (int) sw.bad, (int) sw.cases);
+    err = 1;
+  }
+  printf("dirtylink self-test %s (%d cases swept, %d links)\n",
+         err ? "FAILED" : "OK", (int) sw.cases, (int) sw.accepted);
+  return err;
+}
+
 static int st_addrport(httrackp *opt, int argc, char **argv) {
   (void) opt;
   (void) argc;
@@ -14708,6 +14957,10 @@ static const struct selftest_entry {
      "a quoted directory string is a link only with a second segment, or a "
      "fragment or query opening right after the path",
      st_linkdir},
+    {"dirtylink", "[dump]",
+     "is a quoted string a link? sweeps the parser's alphabet against a model, "
+     "or dumps its verdicts",
+     st_dirtylink},
     {"addrport", "",
      "\"host:port\" of a peer address is bounded and complete (#1493)",
      st_addrport},

@@ -111,6 +111,17 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre);
 void hts_strip_default_port(char *lien, size_t size);
 
 /*
+  Does a quoted string the dirty parser found look like a link? "str" and "len"
+  are the string as the source spells it, "lastc" the first non-blank byte after
+  its closing quote, and "inscript" says it sits in JavaScript or CSS rather
+  than in a tag attribute. The verdict is taken on what the cut at '#' and '?'
+  leaves, so "/#top" is judged as "/". A string of HTS_URLMAXSIZE bytes or more
+  is refused, a length the parser never offers.
+*/
+hts_boolean hts_dirty_link_is_url(httrackp *opt, const char *str, size_t len,
+                                  char lastc, hts_boolean inscript);
+
+/*
   Check for 301,302.. errors ("moved") and handle them; re-isuue requests, make
   rediretc file, handle filters considerations..
   Parameters: The public module structure, and the private module variables
