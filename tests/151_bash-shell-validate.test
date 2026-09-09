@@ -143,7 +143,17 @@ reject() { # reject <label> <expected message> <env argument>...
     paced
 }
 
-# accept <label> <expected $(BASH_SHELL), "" for any> <expected message, "" for none> <env argument>...
+# The #895 condition for a case with no fixed expected path: a real bash, and not one in
+# POSIX sh-mode. "env -i" so no inherited POSIXLY_CORRECT or SHELLOPTS puts it there.
+# shellcheck disable=SC2016 # the probes must reach the shell under test unexpanded
+usable_bash() { # usable_bash <path>
+    test -n "$(env -i "$1" -c 'echo "${BASH_VERSINFO[0]}"' 2>/dev/null)" || return 1
+    case $(env -i "$1" -c 'echo ":$SHELLOPTS:"' 2>/dev/null) in
+    *:posix:*) return 1 ;;
+    esac
+}
+
+# accept <label> <expected $(BASH_SHELL), "" for whatever the PATH search finds> <expected message, "" for none> <env argument>...
 accept() {
     local label=$1 path=$2 want=$3
     shift 3
@@ -155,8 +165,13 @@ accept() {
     }
     got=$(makefile_bash_shell)
     test -n "$got" || fail "$label configured, but the Makefile carries no BASH_SHELL"
-    if test -n "$path" && test "$got" != "$path"; then
-        echo "$label reached the Makefile as $got" >&2
+    if test -n "$path"; then
+        test "$got" = "$path" || {
+            echo "$label reached the Makefile as $got" >&2
+            exit 1
+        }
+    elif ! usable_bash "$got"; then
+        echo "$label resolved BASH_SHELL to $got, which is not a bash outside POSIX mode" >&2
         exit 1
     fi
     if test -n "$want"; then
@@ -236,6 +251,8 @@ took=0
 # just timed: behind the cheap ones it read far too low and 151 met the harness
 # kill instead (#1146). Positive control first, as in 196.
 accept override "$tmp/mybash" '' "BASH_SHELL=$tmp/mybash"
+# A set-but-empty override searches like no override at all, and what it finds still has
+# to be usable: falling back to /bin/sh here is #895 again, with configure exiting 0.
 accept empty '' '' BASH_SHELL=
 # No override: an unusable bash is a warning, so a box that has none still builds.
 accept searched "$tmp/fakebin/bash" 'no usable bash found' -u BASH_SHELL "PATH=$tmp/fakebin:$PATH"
