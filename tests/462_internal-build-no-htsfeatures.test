@@ -22,36 +22,48 @@ fi
 read -r -a cc_argv <<<"${CC:-cc}"
 command -v "${cc_argv[0]}" >/dev/null 2>&1 || skip "no C compiler (${cc_argv[0]})"
 
+src="$testdir/../src"
 tmp=$(mktemp -d) || exit 1
 cleanup_push rm -rf "$tmp"
 
-# What the embedder has: its own config.h, the sources, and nothing generated.
+# What the embedder has: its own config.h, the sources, nothing generated.
 cp "$abs_top_builddir/config.h" "$tmp/config.h"
-[ ! -e "$tmp/htsfeatures.h" ] || fail "the probe directory holds a generated header"
 printf '#include "htsglobal.h"\n' >"$tmp/tu.c"
 
-cpp_argv=(-I"$tmp" -I"$testdir/../src")
+cpp_argv=(-I"$tmp" -I"$src")
 if [ -n "${TEST_CPPFLAGS:-}" ]; then
     read -r -a extra_argv <<<"$TEST_CPPFLAGS"
-    cpp_argv+=("${extra_argv[@]}")
+    # The +"..." form keeps bash 3.2 from tripping over an empty array here.
+    cpp_argv+=(${extra_argv[@]+"${extra_argv[@]}"})
 fi
 
-probe() { # probe LOGFILE [extra cc args...]
+probe() { # probe LOGFILE [cc args...]
     local log="$1"
     shift
     "${cc_argv[@]}" "$@" "${cpp_argv[@]}" -fsyntax-only "$tmp/tu.c" >"$log" 2>&1
 }
+
+# A toolchain that cannot manage this has nothing to say about the header.
+printf '#include <stdio.h>\n' >"$tmp/bare.c"
+"${cc_argv[@]}" "${cpp_argv[@]}" -fsyntax-only "$tmp/bare.c" 2>/dev/null ||
+    skip "${cc_argv[*]} cannot compile a bare <stdio.h>"
 
 if ! probe "$tmp/internal.log" -DHTS_INTERNAL_BUILD; then
     head -5 "$tmp/internal.log" >&2
     fail "an internal build cannot compile htsglobal.h without htsfeatures.h"
 fi
 
-# Control: the same probe with no config.h to fall back on must miss the public
-# header, or the check above would pass on a path that reaches one anyway.
+# Control: the same probe minus the define must miss the public header, or the
+# check above would pass on an include path that reaches one anyway.
 if probe "$tmp/consumer.log"; then
     fail "a consumer built without htsfeatures.h, so the probe reaches one somewhere"
 fi
 grep -q "htsfeatures.h" "$tmp/consumer.log" ||
     fail "the control failed for some other reason: $(head -1 "$tmp/consumer.log")"
+
+# The gate above covers the tree only while htsglobal.h is the sole includer.
+others=$(grep -rl '^#include "htsfeatures.h"' "$src" | grep -v '/htsglobal\.h$' || true)
+[ -z "$others" ] || fail "these bypass the gate and include htsfeatures.h: $others"
+
 echo "ok: htsglobal.h needs htsfeatures.h only outside HTS_INTERNAL_BUILD"
+exit 0
