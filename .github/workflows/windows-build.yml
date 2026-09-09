@@ -273,10 +273,8 @@ jobs:
         shell: pwsh
         timeout-minutes: 15
         run: |
-          # Three tries, then carry on regardless: this endpoint 403s per runner,
-          # and one leg has 403'd while its sibling on the same run updated fine.
-          # The import and the uname below are the proof WSL works, and both stay
-          # fatal, so giving up here costs a clear error rather than a wrong pass.
+          # Three tries, then carry on, because this endpoint 403s per runner VM
+          # and waiting longer cannot help. The import and its uname check are still fatal.
           for ($i = 1; $i -le 3; $i++) {
             try {
               wsl --update
