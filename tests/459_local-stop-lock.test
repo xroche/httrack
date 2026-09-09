@@ -29,11 +29,6 @@ stop_crawl() {
     fi
 }
 
-# The request has to be stamped after the progress lock. Sub-second stamps make
-# that true as soon as it is written, so only a filesystem keeping whole seconds
-# still needs the wait. assert_lockrule_selftest is what measures this one.
-next_second() { if test "$LOCKRULE_SUBSECOND" != yes; then sleep 1; fi; }
-
 require_httrack
 
 assert_lockrule_selftest stoplock
@@ -42,14 +37,13 @@ local_server_start
 common=(--quiet --disable-security-limits --robots=0 --timeout=30 --retries=0 -c1)
 
 # Before the staleness rule the engine took any hts-stop.lock it found, so a
-# copy left in a reused output directory paused the next mirror. Here the
-# request is written before the mirror starts, so it is plainly the older file.
-# The boundary, a request stamped in the second the mirror started, belongs to
-# the self-test above, which can stamp both files to the nanosecond.
+# copy left in a reused output directory paused the next mirror. Dated back,
+# because the engine backdates its own progress lock by a second. A file written
+# just before the mirror starts lands inside that second.
 printf '[a request left behind does not pause the next mirror] ..\t'
 out="${tmpdir}/stale"
 mkdir -p "$out"
-: >"${out}/${STOPLOCK}"
+touch -t 200001010000 "${out}/${STOPLOCK}"
 httrack -O "$out" "${common[@]}" "${BASEURL}/simple/basic.html" \
     >"${tmpdir}/log-stale" 2>&1 &
 crawlpid=$!
@@ -71,7 +65,6 @@ httrack -O "$out" "${common[@]}" --max-rate=200000 \
     "${BASEURL}/bigfiles/index.html" >"${tmpdir}/log-fresh" 2>&1 &
 crawlpid=$!
 wait_until "test -e '${out}/${PROGRESSLOCK}'" "the crawl never got going"
-next_second
 : >"${out}/${STOPLOCK}"
 wait_until "test -e '${out}/${PAUSEDLOCK}'" \
     "30s on, a running engine had not paused"

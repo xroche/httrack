@@ -183,12 +183,10 @@ Create it to stop the mirror and keep what it has downloaded, so that a later
 resumes from there rather than starting over. The engine deletes it and stops.
 .PP
 The engine acts on either request only when the file is stamped later than
-.IR hts\-in_progress.lock .
-A request left behind by an earlier run therefore reaches neither this mirror
-nor the next.
-The two stamps are compared at the finest resolution the filesystem keeps, so a
-request created the moment the mirror starts is still heard. Only where the
-filesystem stamps whole seconds does the request have to land in a later one.
+.IR hts\-in_progress.lock ,
+which the mirror dates one second back when it starts. A request created after
+the mirror started is therefore heard at once, on every filesystem. One left
+behind by an earlier run is ignored.
 A request the engine cannot delete is ignored too, because it would otherwise
 fire on every later poll.
 .SH ENVIRONMENT

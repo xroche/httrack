@@ -14140,6 +14140,19 @@ static int st_lockrule_subsecond(httrackp *opt, const char *tag,
     err = 1;
   }
   (void) UNLINK(lock);
+
+  /* Backdating keeps the fraction, or the second it buys the engine would be
+     short by up to another one. */
+  if (!hts_file_backdate(progress, 1) || !hts_file_mtime(progress, &probe)) {
+    fprintf(stderr, "%s: cannot backdate %s\n", tag, progress);
+    return 1;
+  }
+  if (probe.sec != started.sec - 1 || probe.nsec != same) {
+    fprintf(stderr,
+            "%s: backdating %s moved it by something other than one second\n",
+            tag, progress);
+    err = 1;
+  }
   printf("%s: same-second request: covered (stamps a microsecond apart)\n",
          tag);
   return err;
@@ -14321,6 +14334,39 @@ static int st_lockrule(httrackp *opt, int argc, char **argv, const char *tag,
   }
   if (!fexist_utf8(lock)) {
     fprintf(stderr, "%s: a request the engine refused was deleted\n", tag);
+    err = 1;
+  }
+
+  /* The engine backdates its own progress lock by a second, so a request
+     written the instant that lock appears is newer than it. */
+  if (!hts_file_backdate(progress, 1)) {
+    fprintf(stderr, "%s: cannot backdate %s\n", tag, progress);
+    err = 1;
+  }
+  if (!hts_take_lock_request(opt, name)) {
+    fprintf(stderr,
+            "%s: with the progress lock backdated, a request stamped when the"
+            " mirror started was still refused\n",
+            tag);
+    err = 1;
+  }
+  /* A minute earlier is an earlier run's, backdating or not. */
+  if (!st_lockrule_touch(lock) || !st_lockrule_stamp(lock, started - 60)) {
+    fprintf(stderr, "%s: cannot stamp %s\n", tag, lock);
+    err = 1;
+  }
+  if (hts_take_lock_request(opt, name)) {
+    fprintf(stderr, "%s: a request a minute older than the mirror was taken\n",
+            tag);
+    err = 1;
+  }
+  if (!fexist_utf8(lock)) {
+    fprintf(stderr, "%s: a request the engine refused was deleted\n", tag);
+    err = 1;
+  }
+  if (!st_lockrule_stamp(progress, started)) {
+    fprintf(stderr, "%s: cannot put %s back to when the mirror started\n", tag,
+            progress);
     err = 1;
   }
 

@@ -181,13 +181,15 @@ assert_gave_up() {
         "no transport failure gave up on ${2}"
 }
 
+# mtime FILE: modification time in whole seconds, the coarsest resolution any
+# filesystem the engine runs on keeps.
+mtime() {
+    stat -c '%Y' "$1" 2>/dev/null || stat -f '%m' "$1"
+}
+
 # The abort and pause requests obey one rule, so 436 and 459 both drive its
 # self-test: assert_lockrule_selftest abortlock|stoplock. It owns the directory
-# it runs in, because the undeletable arm leaves one read-only on purpose. It
-# also sets LOCKRULE_SUBSECOND, which says whether $TMPDIR stamps files finer
-# than a whole second, so a caller knows if a request it writes right after the
-# progress lock is ordered after it.
-LOCKRULE_SUBSECOND=no
+# it runs in, because the undeletable arm leaves one read-only on purpose.
 assert_lockrule_selftest() {
     local tag=$1 dir st_out coverage subsecond
     dir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_${tag}.XXXXXX") ||
@@ -212,10 +214,5 @@ assert_lockrule_selftest() {
         fail "the rule self-test said nothing about an undeletable request"
     subsecond=$(printf '%s\n' "$st_out" | command grep 'same-second request: ') ||
         fail "the rule self-test said nothing about a same-second request"
-    # shellcheck disable=SC2034 # set here for the caller, not used here
-    case "$subsecond" in
-    *"same-second request: covered"*) LOCKRULE_SUBSECOND=yes ;;
-    *) LOCKRULE_SUBSECOND=no ;;
-    esac
     echo "OK (${coverage#*: }, ${subsecond#*request: })"
 }

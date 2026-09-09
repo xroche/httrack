@@ -2934,6 +2934,58 @@ hts_boolean hts_file_is_newer(const char *a, const char *b) {
 }
 
 /* Note: utf-8 */
+hts_boolean hts_file_backdate(const char *file, int seconds) {
+  hts_filetime_t when;
+
+  /* The file's own stamp rather than a fresh clock reading, so the two can not
+     disagree about when this file was written. */
+  if (!hts_file_mtime(file, &when))
+    return HTS_FALSE;
+  when.sec -= seconds;
+#ifdef _WIN32
+  {
+    LPWSTR wfile = hts_pathToUCS2(file);
+    ULARGE_INTEGER ticks;
+    FILETIME ft;
+    HANDLE h;
+    hts_boolean ok;
+
+    if (wfile == NULL)
+      return HTS_FALSE;
+    h = CreateFileW(wfile, FILE_WRITE_ATTRIBUTES,
+                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                    NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    freet(wfile);
+    if (h == INVALID_HANDLE_VALUE)
+      return HTS_FALSE;
+    ticks.QuadPart =
+        (ULONGLONG) when.sec * 10000000ULL + (ULONGLONG) (when.nsec / 100);
+    ft.dwLowDateTime = ticks.LowPart;
+    ft.dwHighDateTime = ticks.HighPart;
+    ok = SetFileTime(h, NULL, NULL, &ft) ? HTS_TRUE : HTS_FALSE;
+    CloseHandle(h);
+    return ok;
+  }
+#elif defined(HAVE_UTIMENSAT)
+  {
+    struct timespec times[2];
+
+    times[0].tv_sec = times[1].tv_sec = (time_t) when.sec;
+    times[0].tv_nsec = times[1].tv_nsec = (long) when.nsec;
+    return utimensat(AT_FDCWD, file, times, 0) == 0 ? HTS_TRUE : HTS_FALSE;
+  }
+#else
+  {
+    struct timeval times[2];
+
+    times[0].tv_sec = times[1].tv_sec = (time_t) when.sec;
+    times[0].tv_usec = times[1].tv_usec = (long) (when.nsec / 1000);
+    return utimes(file, times) == 0 ? HTS_TRUE : HTS_FALSE;
+  }
+#endif
+}
+
+/* Note: utf-8 */
 int get_filetime_rfc822(const char *file, char *date) {
   STRUCT_STAT buf;
 

@@ -2918,6 +2918,9 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 #endif
         fclose(fp);
         fp = NULL;
+        /* One second back, so a request written the instant this file appears
+           sorts after it even where the filesystem stamps whole seconds. */
+        (void) hts_file_backdate(n_lock, 1);
       }
       // fichier log        
       if (opt->log) {

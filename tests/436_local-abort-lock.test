@@ -28,11 +28,6 @@ stop_crawl() {
     fi
 }
 
-# The request has to be stamped after the progress lock. Sub-second stamps make
-# that true as soon as it is written, so only a filesystem keeping whole seconds
-# still needs the wait. assert_lockrule_selftest is what measures this one.
-next_second() { if test "$LOCKRULE_SUBSECOND" != yes; then sleep 1; fi; }
-
 require_httrack
 
 assert_lockrule_selftest abortlock
@@ -48,7 +43,11 @@ httrack -O "$out" "${common[@]}" "${BASEURL}/trickle/index.html" \
     >"${tmpdir}/log-running" 2>&1 &
 crawlpid=$!
 wait_until "test -e '${out}/${PROGRESSLOCK}'" "the crawl never got going"
-next_second
+# The engine dates that lock a second back, so a request written the instant it
+# appears is newer than it whatever resolution the filesystem keeps.
+: >"${tmpdir}/probe"
+test "$(mtime "${tmpdir}/probe")" -gt "$(mtime "${out}/${PROGRESSLOCK}")" ||
+    fail "the engine did not date ${PROGRESSLOCK} back, so a request written the moment it appears can tie it"
 : >"${out}/${ABORTLOCK}"
 wait_until "test ! -e '${out}/${ABORTLOCK}'" \
     "30s on, a running engine had not read the request"
@@ -64,8 +63,8 @@ httrack -O "$out" "${common[@]}" --max-rate=200000 \
     "${BASEURL}/bigfiles/index.html" >"${tmpdir}/log-keep" 2>&1 &
 crawlpid=$!
 wait_until "test -e '${out}/${PROGRESSLOCK}'" "the crawl never got going"
-# A whole second whatever the filesystem stamps: the abort has to find a
-# transfer already running, or there is no resume data for it to keep.
+# The abort has to find a transfer already running, or there is no resume data
+# for it to keep.
 sleep 1
 : >"${out}/${ABORTLOCK}"
 wait_until "test ! -e '${out}/${ABORTLOCK}'" \
@@ -85,7 +84,6 @@ httrack -O "$out" "${common[@]}" --max-rate=200000 \
     "${BASEURL}/bigfiles/index.html" >"${tmpdir}/log-paused" 2>&1 &
 crawlpid=$!
 wait_until "test -e '${out}/${PROGRESSLOCK}'" "the crawl never got going"
-next_second
 : >"${out}/hts-stop.lock"
 wait_until "test -e '${out}/hts-paused.lock'" "the engine never paused"
 # A frozen mirror writes nothing, and the wait re-reads once a second, so three
@@ -104,10 +102,12 @@ stop_crawl
 echo "OK"
 
 # A request older than the mirror that finds it was aimed at an earlier run.
+# Dated back, because the engine backdates its own progress lock by a second. A
+# file written just before the mirror starts lands inside that second.
 printf '[a request left behind does not stop the next mirror] ..\t'
 out="${tmpdir}/stale"
 mkdir -p "$out"
-: >"${out}/${ABORTLOCK}"
+touch -t 200001010000 "${out}/${ABORTLOCK}"
 local_crawl --log "${tmpdir}/log-stale" -O "$out" "${common[@]}" \
     "${BASEURL}/simple/basic.html" || fail "the mirror failed outright"
 test -n "$(find "$out" -name 'basic.html' 2>/dev/null)" ||
