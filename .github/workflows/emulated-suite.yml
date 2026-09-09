@@ -45,7 +45,7 @@ jobs:
       - name: Register the binfmt handlers
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           # Registered with the F flag, so the kernel holds the interpreter open
           # and the container needs no copy of it.
           sudo apt-get install -y --no-install-recommends qemu-user-static binfmt-support
