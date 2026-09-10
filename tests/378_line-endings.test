@@ -24,8 +24,6 @@ bad() {
 
 keeps_crlf() {
     case "$1" in
-    # WinHTTrack and other out-of-tree readers want the catalogs CRLF.
-    lang.def | lang/*.txt) return 0 ;;
     # Byte-exact fuzz vectors: the CRs are part of the input.
     fuzz/corpus/*) return 0 ;;
     esac
@@ -49,15 +47,15 @@ done < <(git -C "$top" ls-files --eol)
 # A listing that came back short would satisfy the loop vacuously.
 [ "$walked" -gt 100 ] || bad "git ls-files --eol listed only $walked entries"
 
-# -text, not eol=crlf: the latter renormalizes the blob to LF on the next add.
+# The catalogs are LF now, so the pin has to say so rather than leave them alone.
 pinned=0
 while read -r f; do
     pinned=$((pinned + 1))
-    pin=$(git -C "$top" check-attr text -- "$f" | sed 's/.*: //')
-    [ "$pin" = unset ] ||
-        bad "$f is pinned text=$pin, not -text, so git may rewrite its endings"
-done < <(git -C "$top" ls-files -- lang.def 'lang/*.txt')
-[ "$pinned" -gt 20 ] || bad "only $pinned catalogs listed; the -text pin covers nothing"
+    pin=$(git -C "$top" check-attr eol -- "$f" | sed 's/.*: //')
+    [ "$pin" = lf ] ||
+        bad "$f is pinned eol=$pin, not lf, so a Windows checkout may put CRs back"
+done < <(git -C "$top" ls-files -- lang.def lang.indexes 'lang/*.txt')
+[ "$pinned" -gt 20 ] || bad "only $pinned catalogs listed; the eol=lf pin covers nothing"
 
 # Converted for the packagers; the pin is what stops a Windows checkout undoing it.
 for f in httrack-doc.html src/proxy/AUTHORS src/proxy/changelog.txt; do

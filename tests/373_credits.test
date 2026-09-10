@@ -197,13 +197,20 @@ check 10 Türkçe Aksoy Lagadec
 "${HTS_PYTHON}" - "${root}/lang/English.txt" <<'PY' || fail "cannot plant the markup probe"
 import sys
 path = sys.argv[1]
-lines = open(path, "rb").read().split(b"\r\n")
+# Split on LF and strip any CR, so the probe plants whatever the catalogs' line
+# endings are; the two-character escape \r\n inside a value is not touched.
+lines = [l.rstrip(b"\r") for l in open(path, "rb").read().split(b"\n")]
+planted = 0
 for i, line in enumerate(lines):
     if line == b"LANGUAGE_AUTHOR":
         lines[i + 1] = b"Zzz</pre><script>alert(1)</script>"
+        planted += 1
     elif i % 2 == 0 and line.startswith(b"\\r\\n(Please notify us"):
         lines[i + 1] = b"Yyy</pre><script>alert(2)</script>"
-open(path, "wb").write(b"\r\n".join(lines))
+        planted += 1
+if planted != 2:
+    sys.exit("planted %d of 2 probes; the catalog shape moved" % planted)
+open(path, "wb").write(b"\n".join(lines))
 PY
 reply=''
 serve markup 1
