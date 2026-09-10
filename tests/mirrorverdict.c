@@ -75,9 +75,8 @@ static const char *verdict_name(hts_tristate verdict) {
   return "bogus";
 }
 
-/* Where a front end really reads the verdict: WinHTTrack's end callback raises
-   a flag, its polling loop then calls hts_mirror_completed(). So the engine
-   must store the verdict before it fires this. */
+/* WinHTTrack reads the verdict here: its end callback raises a flag and its
+   polling loop then calls hts_mirror_completed(). */
 static int end_verdict(t_hts_callbackarg *carg, httrackp *opt) {
   (void) carg;
   printf("end: %s\n", verdict_name(hts_mirror_completed(opt)));

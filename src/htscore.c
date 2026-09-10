@@ -918,8 +918,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
                  url);
       }
       freet(primary);
-      /* --why answered; no mirror was asked for. Stored before the teardown
-         below, whose end callback a front end reads the verdict from. */
+      /* --why answered; no mirror was asked for. The store comes first
+         because the teardown below fires the end callback. */
       set_mirror_completed(opt, completed_out, HTS_TRUE);
       XH_extuninit;
       return 1;
