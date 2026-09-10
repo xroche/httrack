@@ -1052,19 +1052,60 @@ static char *reconcile_path(httrackp *opt, const char *name) {
                  StringBuff(opt->path_log), name);
 }
 
-/* Interrupted-run heuristic: prefer the old generation when the new cache
-   stalled below NEW_TINY while the old one grew past OLD_SOLID (historical
-   arbitrary thresholds). */
-#define CACHE_RECONCILE_NEW_TINY 32768
-#define CACHE_RECONCILE_OLD_SOLID 65536
+/* Replace the new-generation file by the old one, when the old one exists. A
+   failed hts_rename_over() always leaves one generation behind, since it parks
+   the file in the way instead of deleting it. */
+static hts_boolean reconcile_promote(httrackp *opt, const char *oldname,
+                                     const char *newname) {
+  if (!fexist_utf8(reconcile_path(opt, oldname)))
+    return HTS_TRUE;
+  return hts_rename_over(opt, reconcile_path(opt, oldname),
+                         reconcile_path(opt, newname));
+}
 
-/* Replace the new-generation file by the old one, when the old one exists. */
-static void reconcile_promote(httrackp *opt, const char *oldname,
-                              const char *newname) {
-  if (fexist_utf8(reconcile_path(opt, oldname))) {
+/* Same, for a sidecar. A sidecar with no old counterpart is dropped rather than
+   kept, because it lists the run being replaced and the update purge would read
+   it against the promoted cache. */
+static hts_boolean reconcile_promote_sidecar(httrackp *opt, const char *oldname,
+                                             const char *newname) {
+  if (!fexist_utf8(reconcile_path(opt, oldname))) {
     UNLINK(reconcile_path(opt, newname));
-    RENAME(reconcile_path(opt, oldname), reconcile_path(opt, newname));
+    return HTS_TRUE;
   }
+  return reconcile_promote(opt, oldname, newname);
+}
+
+/* How many entries a cache generation holds, or -1 when it is absent or will
+   not open. Coverage is what decides which generation to keep, and a file size
+   is its bodies' size, not its reach. */
+static LLint reconcile_entries(httrackp *opt, const char *name) {
+  unz_global_info64 gi;
+  unzFile zip;
+  LLint entries = -1;
+
+  if ((zip = hts_unzOpen_utf8(reconcile_path(opt, name))) == NULL)
+    return -1;
+  /* A damaged directory claiming a count that casts negative just loses the
+     comparison below, which is the safe way to lose. */
+  if (unzGetGlobalInfo64(zip, &gi) == UNZ_OK)
+    entries = (LLint) gi.number_entry;
+  unzClose(zip);
+  return entries;
+}
+
+/* Promote cache and sidecars together, so old.lst never describes a different
+   run than old.zip. */
+static void reconcile_promote_generation(httrackp *opt) {
+  hts_boolean ok =
+      reconcile_promote(opt, "hts-cache/old.zip", "hts-cache/new.zip");
+
+  if (!reconcile_promote_sidecar(opt, "hts-cache/old.lst", "hts-cache/new.lst"))
+    ok = HTS_FALSE;
+  if (!reconcile_promote_sidecar(opt, "hts-cache/old.txt", "hts-cache/new.txt"))
+    ok = HTS_FALSE;
+  if (!ok)
+    hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
+                  "Cache: the previous generation was restored only in part");
 }
 
 void hts_cache_reconcile(httrackp *opt, hts_cache_reconcile_mode mode) {
@@ -1072,33 +1113,30 @@ void hts_cache_reconcile(httrackp *opt, hts_cache_reconcile_mode mode) {
   case CACHE_RECONCILE_PROMOTE:
     /* Previous run rotated new.* to old.* then died before writing: promote
        the old generation back, whichever format it uses. */
-    if (!fexist_utf8(reconcile_path(opt, "hts-cache/new.zip")))
-      reconcile_promote(opt, "hts-cache/old.zip", "hts-cache/new.zip");
+    if (!fexist_utf8(reconcile_path(opt, "hts-cache/new.zip")) &&
+        !reconcile_promote(opt, "hts-cache/old.zip", "hts-cache/new.zip"))
+      hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
+                    "Cache: could not restore the previous generation");
     break;
   case CACHE_RECONCILE_INTERRUPTED:
-    /* Aborted run: keep the larger generation when the new cache is
-       suspiciously small next to the old one. The new file must exist: fsize()
-       is -1 for a missing file, which would spuriously pass the "< TINY" test
-       and overwrite a solid old generation that PROMOTE/ROLLBACK should keep.
-     */
+    /* Aborted run: keep the generation reaching further, because the next run's
+       rotation erases the other one. */
     if (!opt->cache ||
         !fexist_utf8(reconcile_path(opt, "hts-in_progress.lock")))
       break;
-    if (fexist_utf8(reconcile_path(opt, "hts-cache/new.zip")) &&
-        fexist_utf8(reconcile_path(opt, "hts-cache/old.zip")) &&
-        fsize_utf8(reconcile_path(opt, "hts-cache/new.zip")) <
-            CACHE_RECONCILE_NEW_TINY &&
-        fsize_utf8(reconcile_path(opt, "hts-cache/old.zip")) >
-            CACHE_RECONCILE_OLD_SOLID &&
-        fsize_utf8(reconcile_path(opt, "hts-cache/old.zip")) >
-            fsize_utf8(reconcile_path(opt, "hts-cache/new.zip")))
-      reconcile_promote(opt, "hts-cache/old.zip", "hts-cache/new.zip");
+    {
+      const LLint kept = reconcile_entries(opt, "hts-cache/new.zip");
+
+      /* A new.zip that is absent belongs to PROMOTE, and one that will not open
+         still holds the local headers cache_init() rotates for cache_repair().
+         Both read -1 here, and neither is ours to overwrite. */
+      if (kept >= 0 && reconcile_entries(opt, "hts-cache/old.zip") > kept)
+        reconcile_promote_generation(opt);
+    }
     break;
   case CACHE_RECONCILE_ROLLBACK:
-    /* Nothing transferred: restore the previous generation and sidecars. */
-    reconcile_promote(opt, "hts-cache/old.zip", "hts-cache/new.zip");
-    reconcile_promote(opt, "hts-cache/old.lst", "hts-cache/new.lst");
-    reconcile_promote(opt, "hts-cache/old.txt", "hts-cache/new.txt");
+    /* Nothing transferred: restore the previous generation. */
+    reconcile_promote_generation(opt);
     break;
   }
 }

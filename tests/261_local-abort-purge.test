@@ -22,7 +22,6 @@ root="${tmpdir}/root"
 out="${tmpdir}/crawl"
 modes="${tmpdir}/modes"
 cmds="${tmpdir}/cmds"
-lst="${out}/hts-cache"
 mkdir -p "$root" "$out"
 
 names=(a b c d e)
@@ -116,8 +115,10 @@ grep -q 'Exit requested by shell or user' <<<"$log" ||
 ! grep -q 'restoring previous one' <<<"$log" ||
     fail "the abort rolled the session back, which skips the purge anyway: ${log}"
 # And the run must really have left links behind, or there is nothing to purge.
+# The server's own command log, not new.lst: an aborted run now leaves the
+# generation the reconcile restored, which lists what pass 2 mirrored (#1636).
 for name in c d e; do
-    ! grep -aq "${name}\.bin" "${lst}/new.lst" ||
+    ! grep -aq "${name}\.bin" "$cmds" ||
         fail "${name}.bin was reached after all; the abort came too late"
 done
 grep -aq "V3-a-" "${out}/${host}/a.bin" ||

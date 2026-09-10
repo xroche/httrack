@@ -1153,6 +1153,79 @@ static void reconcile_put(httrackp *opt, const char *name, LLint size) {
   fclose(fp);
 }
 
+/* Write a valid cache generation of `entries` files, each carrying `body`
+   stored bytes. Stored, not deflated, so the file size follows `body` and a
+   case can make the shallower generation the physically larger one. */
+static void reconcile_put_zip(httrackp *opt, const char *name, LLint entries,
+                              size_t body) {
+  zipFile zf = hts_zipOpen_utf8(reconcile_st_path(opt, name), 0);
+  zip_fileinfo fi;
+  char chunk[4096];
+  LLint i;
+
+  assertf(zf != NULL);
+  memset(&fi, 0, sizeof(fi));
+  memset(chunk, 'e', sizeof(chunk));
+  for (i = 0; i < entries; i++) {
+    char entry[64];
+    size_t left;
+
+    snprintf(entry, sizeof(entry), "entry%03d.dat", (int) i);
+    assertf(zipOpenNewFileInZip(zf, entry, &fi, NULL, 0, NULL, 0, NULL, 0,
+                                Z_NO_COMPRESSION) == ZIP_OK);
+    for (left = body; left != 0;) {
+      const size_t n = left < sizeof(chunk) ? left : sizeof(chunk);
+
+      assertf(zipWriteInFileInZip(zf, chunk, (unsigned) n) == ZIP_OK);
+      left -= n;
+    }
+    assertf(zipCloseFileInZip(zf) == ZIP_OK);
+  }
+  assertf(zipClose(zf, NULL) == ZIP_OK);
+}
+
+/* Cut `cut` bytes off `name`, which is how a hard kill leaves new.zip: local
+   headers on disk, no central directory. */
+static void reconcile_truncate(httrackp *opt, const char *name, LLint cut) {
+  const LLint size = fsize(reconcile_st_path(opt, name));
+  const size_t left = (size_t) (size - cut);
+  char *buf;
+  FILE *fp;
+
+  assertf(size > cut);
+  buf = (char *) malloct(left);
+  assertf(buf != NULL);
+  fp = FOPEN(reconcile_st_path(opt, name), "rb");
+  assertf(fp != NULL);
+  assertf(hts_fread_exact(buf, left, fp));
+  fclose(fp);
+  fp = FOPEN(reconcile_st_path(opt, name), "wb");
+  assertf(fp != NULL);
+  assertf(hts_fwrite_exact(buf, left, fp));
+  fclose(fp);
+  freet(buf);
+}
+
+/* Expect `name` to hold `entries` entries, or -1 if absent or unreadable. */
+static int reconcile_expect_zip(httrackp *opt, const char *name, LLint entries,
+                                const char *what) {
+  unz_global_info64 gi;
+  unzFile zip = hts_unzOpen_utf8(reconcile_st_path(opt, name));
+  LLint got = -1;
+
+  if (zip != NULL) {
+    if (unzGetGlobalInfo64(zip, &gi) == UNZ_OK)
+      got = (LLint) gi.number_entry;
+    unzClose(zip);
+  }
+  if (got != entries) {
+    fprintf(stderr, "cache-reconcile: %s: %s holds %d entries, expected %d\n",
+            what, name, (int) got, (int) entries);
+    return 1;
+  }
+  return 0;
+}
+
 /* Expect `name` to weigh `size` bytes, or be absent when size == -1. */
 static int reconcile_expect(httrackp *opt, const char *name, LLint size,
                             const char *what) {
@@ -1169,8 +1242,16 @@ static int reconcile_expect(httrackp *opt, const char *name, LLint size,
 int cache_reconcile_selftest(httrackp *opt, const char *dir) {
   int failures = 0;
 
-  /* around the interrupted-run thresholds (new < 32768, old > 65536) */
-  static const LLint TINY = 1024, MID = 40000, SOLID = 131072;
+  /* Sidecar byte sizes; only their ordering matters. */
+  static const LLint SMALL = 1024, MEDIUM = 40000, LARGE = 131072;
+  /* Cache generations, in entries: what the reconcile actually compares. */
+  static const LLint EMPTY = 0, PARTIAL = 2, COMPLETE = 9;
+  /* Bytes again, not entries: filler under a .zip name will not open. */
+  static const LLint DAMAGED = 131072;
+  /* reconcile_put_zip() body size; only interrupted-fatnew wants one. */
+  static const size_t NO_BODY = 0;
+  /* An end-of-central-directory record carrying no comment field. */
+  static const LLint ZIP_DIRECTORY_END = 22;
 
   selftest_setup_dir(opt, dir);
 #ifdef _WIN32
@@ -1181,134 +1262,265 @@ int cache_reconcile_selftest(httrackp *opt, const char *dir) {
 
   /* PROMOTE: a zip old generation replaces a missing new one */
   reconcile_wipe(opt);
-  reconcile_put(opt, "hts-cache/old.zip", SOLID);
+  reconcile_put_zip(opt, "hts-cache/old.zip", COMPLETE, NO_BODY);
   hts_cache_reconcile(opt, CACHE_RECONCILE_PROMOTE);
-  failures += reconcile_expect(opt, "hts-cache/new.zip", SOLID, "promote-zip");
+  failures +=
+      reconcile_expect_zip(opt, "hts-cache/new.zip", COMPLETE, "promote-zip");
   failures += reconcile_expect(opt, "hts-cache/old.zip", -1, "promote-zip");
 
   /* PROMOTE: an existing new.zip is left alone */
   reconcile_wipe(opt);
-  reconcile_put(opt, "hts-cache/new.zip", TINY);
-  reconcile_put(opt, "hts-cache/old.zip", SOLID);
+  reconcile_put_zip(opt, "hts-cache/new.zip", PARTIAL, NO_BODY);
+  reconcile_put_zip(opt, "hts-cache/old.zip", COMPLETE, NO_BODY);
   hts_cache_reconcile(opt, CACHE_RECONCILE_PROMOTE);
-  failures +=
-      reconcile_expect(opt, "hts-cache/new.zip", TINY, "promote-zip-noop");
-  failures +=
-      reconcile_expect(opt, "hts-cache/old.zip", SOLID, "promote-zip-noop");
+  failures += reconcile_expect_zip(opt, "hts-cache/new.zip", PARTIAL,
+                                   "promote-zip-noop");
+  failures += reconcile_expect_zip(opt, "hts-cache/old.zip", COMPLETE,
+                                   "promote-zip-noop");
 
   /* PROMOTE: the removed pre-3.31 legacy pair is left alone */
   reconcile_wipe(opt);
-  reconcile_put(opt, "hts-cache/old.dat", SOLID);
-  reconcile_put(opt, "hts-cache/old.ndx", TINY);
+  reconcile_put(opt, "hts-cache/old.dat", LARGE);
+  reconcile_put(opt, "hts-cache/old.ndx", SMALL);
   hts_cache_reconcile(opt, CACHE_RECONCILE_PROMOTE);
   failures += reconcile_expect(opt, "hts-cache/new.dat", -1, "promote-dat");
   failures += reconcile_expect(opt, "hts-cache/new.ndx", -1, "promote-dat");
-  failures += reconcile_expect(opt, "hts-cache/old.dat", SOLID, "promote-dat");
-  failures += reconcile_expect(opt, "hts-cache/old.ndx", TINY, "promote-dat");
+  failures += reconcile_expect(opt, "hts-cache/old.dat", LARGE, "promote-dat");
+  failures += reconcile_expect(opt, "hts-cache/old.ndx", SMALL, "promote-dat");
 
   /* INTERRUPTED: no lock file, no action */
   reconcile_wipe(opt);
-  reconcile_put(opt, "hts-cache/new.zip", TINY);
-  reconcile_put(opt, "hts-cache/old.zip", SOLID);
+  reconcile_put_zip(opt, "hts-cache/new.zip", PARTIAL, NO_BODY);
+  reconcile_put_zip(opt, "hts-cache/old.zip", COMPLETE, NO_BODY);
   hts_cache_reconcile(opt, CACHE_RECONCILE_INTERRUPTED);
-  failures +=
-      reconcile_expect(opt, "hts-cache/new.zip", TINY, "interrupted-nolock");
+  failures += reconcile_expect_zip(opt, "hts-cache/new.zip", PARTIAL,
+                                   "interrupted-nolock");
 
-  /* INTERRUPTED: an absent new.zip must NOT promote old.zip (fsize(-1) would
-     spuriously pass "< TINY"); leave the solid old generation for ROLLBACK */
+  /* INTERRUPTED: caching off, no action */
   reconcile_wipe(opt);
   reconcile_put(opt, "hts-in_progress.lock", 0);
-  reconcile_put(opt, "hts-cache/old.zip", SOLID);
+  reconcile_put_zip(opt, "hts-cache/new.zip", PARTIAL, NO_BODY);
+  reconcile_put_zip(opt, "hts-cache/old.zip", COMPLETE, NO_BODY);
+  {
+    const hts_cachemode saved = opt->cache;
+
+    opt->cache = 0;
+    hts_cache_reconcile(opt, CACHE_RECONCILE_INTERRUPTED);
+    opt->cache = saved;
+  }
+  failures += reconcile_expect_zip(opt, "hts-cache/new.zip", PARTIAL,
+                                   "interrupted-nocache");
+  failures += reconcile_expect_zip(opt, "hts-cache/old.zip", COMPLETE,
+                                   "interrupted-nocache");
+
+  /* INTERRUPTED: an absent new.zip must NOT promote old.zip; that generation
+     belongs to PROMOTE */
+  reconcile_wipe(opt);
+  reconcile_put(opt, "hts-in_progress.lock", 0);
+  reconcile_put_zip(opt, "hts-cache/old.zip", COMPLETE, NO_BODY);
   hts_cache_reconcile(opt, CACHE_RECONCILE_INTERRUPTED);
   failures +=
       reconcile_expect(opt, "hts-cache/new.zip", -1, "interrupted-nonew");
-  failures +=
-      reconcile_expect(opt, "hts-cache/old.zip", SOLID, "interrupted-nonew");
+  failures += reconcile_expect_zip(opt, "hts-cache/old.zip", COMPLETE,
+                                   "interrupted-nonew");
 
-  /* INTERRUPTED: stalled tiny new.zip loses to a solid old.zip (was dead for
-     zip caches: the arm was gated on a legacy new.dat) */
+  /* INTERRUPTED: the shallower generation loses whole, sidecars included, and
+     the old names are gone rather than copied */
   reconcile_wipe(opt);
   reconcile_put(opt, "hts-in_progress.lock", 0);
-  reconcile_put(opt, "hts-cache/new.zip", TINY);
-  reconcile_put(opt, "hts-cache/old.zip", SOLID);
+  reconcile_put_zip(opt, "hts-cache/new.zip", PARTIAL, NO_BODY);
+  reconcile_put(opt, "hts-cache/new.lst", SMALL);
+  reconcile_put(opt, "hts-cache/new.txt", SMALL);
+  reconcile_put_zip(opt, "hts-cache/old.zip", COMPLETE, NO_BODY);
+  reconcile_put(opt, "hts-cache/old.lst", MEDIUM);
+  reconcile_put(opt, "hts-cache/old.txt", MEDIUM);
   hts_cache_reconcile(opt, CACHE_RECONCILE_INTERRUPTED);
-  failures +=
-      reconcile_expect(opt, "hts-cache/new.zip", SOLID, "interrupted-zip");
-  failures += reconcile_expect(opt, "hts-cache/old.zip", -1, "interrupted-zip");
+  failures += reconcile_expect_zip(opt, "hts-cache/new.zip", COMPLETE,
+                                   "interrupted-oldwins-sidecars");
+  failures += reconcile_expect(opt, "hts-cache/new.lst", MEDIUM,
+                               "interrupted-oldwins-sidecars");
+  failures += reconcile_expect(opt, "hts-cache/new.txt", MEDIUM,
+                               "interrupted-oldwins-sidecars");
+  failures += reconcile_expect(opt, "hts-cache/old.zip", -1,
+                               "interrupted-oldwins-sidecars");
+  failures += reconcile_expect(opt, "hts-cache/old.lst", -1,
+                               "interrupted-oldwins-sidecars");
+  failures += reconcile_expect(opt, "hts-cache/old.txt", -1,
+                               "interrupted-oldwins-sidecars");
 
-  /* INTERRUPTED: old below the confidence threshold, keep new */
+  /* INTERRUPTED: a sidecar the old generation lacks is dropped, so the losing
+     run's file list cannot outlive it */
   reconcile_wipe(opt);
   reconcile_put(opt, "hts-in_progress.lock", 0);
-  reconcile_put(opt, "hts-cache/new.zip", TINY);
-  reconcile_put(opt, "hts-cache/old.zip", MID);
+  reconcile_put_zip(opt, "hts-cache/new.zip", PARTIAL, NO_BODY);
+  reconcile_put(opt, "hts-cache/new.lst", SMALL);
+  reconcile_put_zip(opt, "hts-cache/old.zip", COMPLETE, NO_BODY);
   hts_cache_reconcile(opt, CACHE_RECONCILE_INTERRUPTED);
-  failures +=
-      reconcile_expect(opt, "hts-cache/new.zip", TINY, "interrupted-smallold");
+  failures += reconcile_expect_zip(opt, "hts-cache/new.zip", COMPLETE,
+                                   "interrupted-orphan-sidecar");
+  failures += reconcile_expect(opt, "hts-cache/new.lst", -1,
+                               "interrupted-orphan-sidecar");
 
-  /* INTERRUPTED: new big enough to trust, keep it */
+  /* INTERRUPTED: reach decides, not weight. new.zip carries fewer entries in a
+     physically larger file, and still loses; a byte comparison keeps it. */
   reconcile_wipe(opt);
   reconcile_put(opt, "hts-in_progress.lock", 0);
-  reconcile_put(opt, "hts-cache/new.zip", MID);
-  reconcile_put(opt, "hts-cache/old.zip", SOLID);
+  reconcile_put_zip(opt, "hts-cache/new.zip", PARTIAL, 65536);
+  reconcile_put_zip(opt, "hts-cache/old.zip", COMPLETE, NO_BODY);
+  if (fsize(reconcile_st_path(opt, "hts-cache/new.zip")) <=
+      fsize(reconcile_st_path(opt, "hts-cache/old.zip"))) {
+    fprintf(stderr, "cache-reconcile: interrupted-fatnew: new.zip is not the "
+                    "larger file, so the case tests nothing\n");
+    failures++;
+  }
   hts_cache_reconcile(opt, CACHE_RECONCILE_INTERRUPTED);
+  failures += reconcile_expect_zip(opt, "hts-cache/new.zip", COMPLETE,
+                                   "interrupted-fatnew");
+
+  /* INTERRUPTED: a generation that will not open counts as no reach, so a
+     damaged old.zip never displaces a readable new one */
+  reconcile_wipe(opt);
+  reconcile_put(opt, "hts-in_progress.lock", 0);
+  reconcile_put_zip(opt, "hts-cache/new.zip", PARTIAL, NO_BODY);
+  reconcile_put(opt, "hts-cache/old.zip", DAMAGED);
+  hts_cache_reconcile(opt, CACHE_RECONCILE_INTERRUPTED);
+  failures += reconcile_expect_zip(opt, "hts-cache/new.zip", PARTIAL,
+                                   "interrupted-damaged-old");
+  failures += reconcile_expect(opt, "hts-cache/old.zip", DAMAGED,
+                               "interrupted-damaged-old");
+
+  /* INTERRUPTED: a new.zip that will not open is left alone, even against a
+     readable old one: cache_init() rotates it and cache_repair() recovers it */
+  reconcile_wipe(opt);
+  reconcile_put(opt, "hts-in_progress.lock", 0);
+  reconcile_put(opt, "hts-cache/new.zip", DAMAGED);
+  reconcile_put_zip(opt, "hts-cache/old.zip", COMPLETE, NO_BODY);
+  hts_cache_reconcile(opt, CACHE_RECONCILE_INTERRUPTED);
+  failures += reconcile_expect(opt, "hts-cache/new.zip", DAMAGED,
+                               "interrupted-damaged-new");
+  failures += reconcile_expect_zip(opt, "hts-cache/old.zip", COMPLETE,
+                                   "interrupted-damaged-new");
+
+  /* INTERRUPTED: a hard kill leaves new.zip with no central directory, so a
+     promote would delete entries cache_repair() could still recover. */
+  reconcile_wipe(opt);
+  reconcile_put(opt, "hts-in_progress.lock", 0);
+  reconcile_put_zip(opt, "hts-cache/new.zip", COMPLETE, NO_BODY);
+  reconcile_truncate(opt, "hts-cache/new.zip", ZIP_DIRECTORY_END);
+  reconcile_put_zip(opt, "hts-cache/old.zip", EMPTY, NO_BODY);
+  failures += reconcile_expect_zip(opt, "hts-cache/new.zip", -1,
+                                   "interrupted-truncated-new fixture");
+  {
+    const LLint before = fsize(reconcile_st_path(opt, "hts-cache/new.zip"));
+
+    hts_cache_reconcile(opt, CACHE_RECONCILE_INTERRUPTED);
+    failures += reconcile_expect(opt, "hts-cache/new.zip", before,
+                                 "interrupted-truncated-new");
+  }
+  failures += reconcile_expect_zip(opt, "hts-cache/old.zip", EMPTY,
+                                   "interrupted-truncated-new");
+
+  /* INTERRUPTED: a stop that cached nothing still restores what came before it,
+     so reaching zero and failing to open must not count alike */
+  reconcile_wipe(opt);
+  reconcile_put(opt, "hts-in_progress.lock", 0);
+  reconcile_put_zip(opt, "hts-cache/new.zip", EMPTY, NO_BODY);
+  reconcile_put_zip(opt, "hts-cache/old.zip", COMPLETE, NO_BODY);
+  hts_cache_reconcile(opt, CACHE_RECONCILE_INTERRUPTED);
+  failures += reconcile_expect_zip(opt, "hts-cache/new.zip", COMPLETE,
+                                   "interrupted-emptynew");
+
+  /* INTERRUPTED: the aborted run reached further than the previous one, keep it
+   */
+  reconcile_wipe(opt);
+  reconcile_put(opt, "hts-in_progress.lock", 0);
+  reconcile_put_zip(opt, "hts-cache/new.zip", COMPLETE, NO_BODY);
+  reconcile_put_zip(opt, "hts-cache/old.zip", PARTIAL, NO_BODY);
+  hts_cache_reconcile(opt, CACHE_RECONCILE_INTERRUPTED);
+  failures += reconcile_expect_zip(opt, "hts-cache/new.zip", COMPLETE,
+                                   "interrupted-newwins");
+  failures += reconcile_expect_zip(opt, "hts-cache/old.zip", PARTIAL,
+                                   "interrupted-newwins");
+
+  /* INTERRUPTED: equal reach does not promote, so nothing moves at all */
+  reconcile_wipe(opt);
+  reconcile_put(opt, "hts-in_progress.lock", 0);
+  reconcile_put_zip(opt, "hts-cache/new.zip", PARTIAL, NO_BODY);
+  reconcile_put_zip(opt, "hts-cache/old.zip", PARTIAL, NO_BODY);
+  reconcile_put(opt, "hts-cache/new.lst", SMALL);
+  reconcile_put(opt, "hts-cache/old.lst", LARGE);
+  hts_cache_reconcile(opt, CACHE_RECONCILE_INTERRUPTED);
+  failures += reconcile_expect_zip(opt, "hts-cache/old.zip", PARTIAL,
+                                   "interrupted-tie");
   failures +=
-      reconcile_expect(opt, "hts-cache/new.zip", MID, "interrupted-bignew");
+      reconcile_expect(opt, "hts-cache/new.lst", SMALL, "interrupted-tie");
+  failures +=
+      reconcile_expect(opt, "hts-cache/old.lst", LARGE, "interrupted-tie");
 
   /* INTERRUPTED: the removed pre-3.31 legacy pair is left alone */
   reconcile_wipe(opt);
   reconcile_put(opt, "hts-in_progress.lock", 0);
-  reconcile_put(opt, "hts-cache/new.dat", TINY);
-  reconcile_put(opt, "hts-cache/new.ndx", TINY);
-  reconcile_put(opt, "hts-cache/old.dat", SOLID);
-  reconcile_put(opt, "hts-cache/old.ndx", MID);
+  reconcile_put(opt, "hts-cache/new.dat", SMALL);
+  reconcile_put(opt, "hts-cache/new.ndx", SMALL);
+  reconcile_put(opt, "hts-cache/old.dat", LARGE);
+  reconcile_put(opt, "hts-cache/old.ndx", MEDIUM);
   hts_cache_reconcile(opt, CACHE_RECONCILE_INTERRUPTED);
   failures +=
-      reconcile_expect(opt, "hts-cache/new.dat", TINY, "interrupted-dat");
+      reconcile_expect(opt, "hts-cache/new.dat", SMALL, "interrupted-dat");
   failures +=
-      reconcile_expect(opt, "hts-cache/new.ndx", TINY, "interrupted-dat");
+      reconcile_expect(opt, "hts-cache/new.ndx", SMALL, "interrupted-dat");
   failures +=
-      reconcile_expect(opt, "hts-cache/old.dat", SOLID, "interrupted-dat");
+      reconcile_expect(opt, "hts-cache/old.dat", LARGE, "interrupted-dat");
   failures +=
-      reconcile_expect(opt, "hts-cache/old.ndx", MID, "interrupted-dat");
+      reconcile_expect(opt, "hts-cache/old.ndx", MEDIUM, "interrupted-dat");
 
   /* ROLLBACK: the old zip generation is restored (a zip cache used to lose
      its only good generation here) */
   reconcile_wipe(opt);
-  reconcile_put(opt, "hts-cache/new.zip", TINY);
-  reconcile_put(opt, "hts-cache/old.zip", SOLID);
+  reconcile_put_zip(opt, "hts-cache/new.zip", PARTIAL, NO_BODY);
+  reconcile_put_zip(opt, "hts-cache/old.zip", COMPLETE, NO_BODY);
   hts_cache_reconcile(opt, CACHE_RECONCILE_ROLLBACK);
-  failures += reconcile_expect(opt, "hts-cache/new.zip", SOLID, "rollback-zip");
+  failures +=
+      reconcile_expect_zip(opt, "hts-cache/new.zip", COMPLETE, "rollback-zip");
   failures += reconcile_expect(opt, "hts-cache/old.zip", -1, "rollback-zip");
 
   /* ROLLBACK: sidecars are restored regardless of format */
   reconcile_wipe(opt);
-  reconcile_put(opt, "hts-cache/new.lst", TINY);
-  reconcile_put(opt, "hts-cache/old.lst", MID);
-  reconcile_put(opt, "hts-cache/old.txt", MID);
+  reconcile_put(opt, "hts-cache/new.lst", SMALL);
+  reconcile_put(opt, "hts-cache/old.lst", MEDIUM);
+  reconcile_put(opt, "hts-cache/old.txt", MEDIUM);
   hts_cache_reconcile(opt, CACHE_RECONCILE_ROLLBACK);
-  failures += reconcile_expect(opt, "hts-cache/new.lst", MID, "rollback-lst");
-  failures += reconcile_expect(opt, "hts-cache/new.txt", MID, "rollback-txt");
+  failures +=
+      reconcile_expect(opt, "hts-cache/new.lst", MEDIUM, "rollback-lst");
+  failures +=
+      reconcile_expect(opt, "hts-cache/new.txt", MEDIUM, "rollback-txt");
+  failures += reconcile_expect(opt, "hts-cache/old.lst", -1, "rollback-lst");
+  failures += reconcile_expect(opt, "hts-cache/old.txt", -1, "rollback-txt");
 
   /* ROLLBACK: sidecars restored, the removed pre-3.31 pair left alone */
   reconcile_wipe(opt);
-  reconcile_put(opt, "hts-cache/new.dat", TINY);
-  reconcile_put(opt, "hts-cache/old.dat", SOLID);
-  reconcile_put(opt, "hts-cache/old.ndx", MID);
-  reconcile_put(opt, "hts-cache/old.lst", MID);
-  reconcile_put(opt, "hts-cache/old.txt", MID);
+  reconcile_put(opt, "hts-cache/new.dat", SMALL);
+  reconcile_put(opt, "hts-cache/old.dat", LARGE);
+  reconcile_put(opt, "hts-cache/old.ndx", MEDIUM);
+  reconcile_put(opt, "hts-cache/old.lst", MEDIUM);
+  reconcile_put(opt, "hts-cache/old.txt", MEDIUM);
   hts_cache_reconcile(opt, CACHE_RECONCILE_ROLLBACK);
-  failures += reconcile_expect(opt, "hts-cache/new.dat", TINY, "rollback-dat");
+  failures += reconcile_expect(opt, "hts-cache/new.dat", SMALL, "rollback-dat");
   failures += reconcile_expect(opt, "hts-cache/new.ndx", -1, "rollback-dat");
-  failures += reconcile_expect(opt, "hts-cache/old.dat", SOLID, "rollback-dat");
-  failures += reconcile_expect(opt, "hts-cache/old.ndx", MID, "rollback-dat");
-  failures += reconcile_expect(opt, "hts-cache/new.lst", MID, "rollback-dat");
-  failures += reconcile_expect(opt, "hts-cache/new.txt", MID, "rollback-dat");
+  failures += reconcile_expect(opt, "hts-cache/old.dat", LARGE, "rollback-dat");
+  failures +=
+      reconcile_expect(opt, "hts-cache/old.ndx", MEDIUM, "rollback-dat");
+  failures +=
+      reconcile_expect(opt, "hts-cache/new.lst", MEDIUM, "rollback-dat");
+  failures +=
+      reconcile_expect(opt, "hts-cache/new.txt", MEDIUM, "rollback-dat");
 
   /* ROLLBACK: nothing to restore, the new generation stays */
   reconcile_wipe(opt);
-  reconcile_put(opt, "hts-cache/new.zip", TINY);
+  reconcile_put(opt, "hts-cache/new.zip", SMALL);
   hts_cache_reconcile(opt, CACHE_RECONCILE_ROLLBACK);
-  failures += reconcile_expect(opt, "hts-cache/new.zip", TINY, "rollback-noop");
+  failures +=
+      reconcile_expect(opt, "hts-cache/new.zip", SMALL, "rollback-noop");
 
   reconcile_wipe(opt);
   return failures;

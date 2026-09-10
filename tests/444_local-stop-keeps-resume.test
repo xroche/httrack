@@ -112,6 +112,11 @@ test "$crawl_rc" -eq 0 ||
     fail "the keep_resume stop exited ${crawl_rc}, expected 0"
 assert_logged "${tmpdir}/keep" 'MIRROR ABORTED' \
     "the run did not record an interrupted mirror"
+# The advice itself, because a banner naming no remedy is what #1636 replaced.
+assert_logged "${tmpdir}/keep" 'Start it again with --continue' \
+    "the banner does not tell the reader how to resume"
+! grep -q 'erasing the hts-cache' "${tmpdir}/keep/hts-log.txt" ||
+    fail "the banner still asks the reader to erase the cache a resume needs"
 echo "PASS"
 
 # The partial this stop cut stays on disk whoever asked for the stop, so its
@@ -156,4 +161,38 @@ echo "PASS (resumed at ${at} of ${full})"
 printf '[the completed --continue erases the directory again] ..\t'
 test ! -d "${out}/hts-cache/ref" ||
     fail "hts-cache/ref survived a mirror nothing interrupted"
+echo "PASS"
+
+# A stop drops the lock before the startup reconcile could run, so without the
+# abort-site call the next run rotates the fragment over the complete generation.
+keeps_generation() { # keeps_generation <name> <how>
+    local name=$1 how=$2
+    local out="${tmpdir}/${name}" complete="${tmpdir}/${name}-complete.zip"
+
+    mkdir -p "$out"
+    local_crawl --log "${tmpdir}/${name}.log1" -O "$out" --quiet \
+        --disable-security-limits --robots=0 --timeout=30 -c2 \
+        "${BASEURL}/bigfiles/index.html" ||
+        fail "${name}: the crawl that fills the cache failed"
+    test -s "${out}/hts-cache/new.zip" ||
+        fail "${name}: the first crawl cached nothing, so there is nothing to keep"
+    cp "${out}/hts-cache/new.zip" "$complete"
+    stop_and_report "$name" "$how"
+    # Or a run that finished would red below, pointing at the wrong thing.
+    test "$refs_left" -gt 0 ||
+        fail "${name}: the second run was not cut short, so it decides nothing"
+    test ! -e "${out}/hts-cache/old.zip" ||
+        fail "${name}: both generations were left, so the next run drops one"
+    cmp -s "${out}/hts-cache/new.zip" "$complete" ||
+        fail "${name}: the run left its own fragment where the complete cache was"
+}
+
+printf '[a stop keeps the complete cache generation] ..\t'
+keeps_generation gen keep
+echo "PASS"
+
+# A cap leaves exit_xh at 0, the same as a ^C, so the reconcile reads the
+# engine's completed verdict rather than that flag.
+printf '[a capped run keeps it too] ..\t'
+keeps_generation gencap maxtime
 echo "PASS"

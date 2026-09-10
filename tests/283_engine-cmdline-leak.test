@@ -165,6 +165,8 @@ else
     # the missing sign-off carry the teeth here.
     out=$(cat "$d/typescript")
     assert_match 'aborted mirror has been detected' "$out" 'aborted mirror'
+    # Which cache it means, so a revert to the old restore-it advice reds here.
+    assert_match 'old.ndx' "$out" 'aborted mirror names the legacy cache'
     if [[ $out =~ Thanks\ for\ using ]]; then
         fail 'aborted mirror: reached the end of the run, not the early exit'
     fi
