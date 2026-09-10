@@ -205,8 +205,8 @@ HTSEXT_API httrackp *hts_create_opt(void);
     opt; wait until hts_has_stopped() is true. */
 HTSEXT_API void hts_free_opt(httrackp *opt);
 
-/** Return sizeof(httrackp) as the library sees it, for caller-vs-library struct
-    ABI mismatch checks. */
+/** Return sizeof(httrackp) as the library sees it, which is the size
+    hts_create_opt() allocates. */
 HTSEXT_API size_t hts_sizeof_opt(void);
 
 /** Snapshot opt's error/warning/info counters and return a pointer to them.
