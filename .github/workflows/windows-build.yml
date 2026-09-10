@@ -261,6 +261,32 @@ jobs:
           path: ${{ runner.temp }}\wsl-rootfs.tar.gz
           key: wsl-rootfs-jammy-amd64-v1
 
+      - name: Restore the WSL kernel package
+        id: wslkernel
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ runner.temp }}\wsl_update_x64.msi
+          key: wsl-kernel-msi-v1
+
+      # Fetched on a healthy run so it is already here on a run that needs it.
+      - name: Fetch the WSL kernel package
+        if: steps.wslkernel.outputs.cache-hit != 'true'
+        id: wslkernelfetch
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $msi = "$env:RUNNER_TEMP\wsl_update_x64.msi"
+          $url = "https://wslstorestorage.blob.core.windows.net/wslblob/wsl_update_x64.msi"
+          for ($i = 1; $i -le 3; $i++) {
+            try { Invoke-WebRequest -UseBasicParsing -OutFile $msi $url; break }
+            catch {
+              Write-Host "kernel package download attempt $i failed: $($_.Exception.Message)"
+              if ($i -lt 3) { Start-Sleep -Seconds (5 * $i) }
+            }
+          }
+          if (-not (Test-Path $msi)) { exit 1 }
+          Write-Host "kernel package fetched, $((Get-Item $msi).Length) bytes"
+
       # WSL2 brings up in ~35s on a hosted runner with no reboot and no
       # third-party action: the three features are already enabled on the image.
       # It buys a real Linux shell against the same native httrack.exe, and is
@@ -273,21 +299,31 @@ jobs:
         shell: pwsh
         timeout-minutes: 15
         run: |
-          # Three tries, then carry on, because this endpoint 403s per runner VM
-          # and waiting longer cannot help. The import and its uname check are still fatal.
+          # Three tries, then fall back to the cached package below, because this
+          # endpoint 403s per runner VM and waiting longer cannot help.
+          $updated = $false
           for ($i = 1; $i -le 3; $i++) {
             try {
               wsl --update
               if ($LASTEXITCODE -ne 0) { throw "exit $LASTEXITCODE" }
+              $updated = $true
               break
             }
             catch {
               Write-Host "wsl --update attempt $i failed: $($_.Exception.Message)"
-              if ($i -eq 3) {
-                Write-Host "wsl --update never succeeded, so the import below decides"
-              }
-              else { Start-Sleep -Seconds (5 * $i) }
+              if ($i -lt 3) { Start-Sleep -Seconds (5 * $i) }
             }
+          }
+          # wsl --update is what installs the kernel component, so a 403 there
+          # leaves the import failing with "requires an update to its kernel
+          # component". Installing the package by hand is what recovers it.
+          if (-not $updated) {
+            $msi = "$env:RUNNER_TEMP\wsl_update_x64.msi"
+            if (Test-Path $msi) {
+              $p = Start-Process msiexec.exe -Wait -PassThru -ArgumentList '/i', "`"$msi`"", '/quiet', '/norestart'
+              Write-Host "installed the kernel package by hand, msiexec exit $($p.ExitCode)"
+            }
+            else { Write-Host "no kernel package here, so the import below decides" }
           }
           wsl --set-default-version 2
           $root = "$env:RUNNER_TEMP\wsl-rootfs.tar.gz"
@@ -327,6 +363,13 @@ jobs:
         with:
           path: ${{ runner.temp }}\wsl-rootfs.tar.gz
           key: wsl-rootfs-jammy-amd64-v1
+
+      - name: Save the WSL kernel package
+        if: steps.wslkernel.outputs.cache-hit != 'true' && steps.wslkernelfetch.outcome == 'success'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ runner.temp }}\wsl_update_x64.msi
+          key: wsl-kernel-msi-v1
 
       - name: Run the engine test suite (offline tests, WSL2)
         shell: bash
