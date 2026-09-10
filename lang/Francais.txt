@@ -202,14 +202,10 @@ Durant:\n
 Voyez le fichier journal au besoin\n\nCliquez sur TERMINER pour quitter WinHTTrack\n\nMerci d'utiliser WinHTTrack!
 Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) if necessary to ensure that everything is OK.\n\nThanks for using WinHTTrack!
 la copie du site est terminée\nCliquez sur OK pour quitter WinHTTrack\nConsultez au besoin les fichiers journaux pour vérifier que tout s'est bien passé\n\nMerci d'utiliser WinHTTrack!
-* * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
-* * COPIE INTERROMPUE! * *\r\nLe cache temporaire actuel est nécessaire pour toute mise à jour et ne contient que les données téléchargées durant la présente session interrompue.\r\nIl est possible que le cache précédent contienne des données plus complètes; si vous ne voulez pas perdre ces données, vous devez le restaurer et effacer le cache actuel.\r\n[Note: Cette opération peut être facilement effectuée ici en effacant les fichiers hts-cache/new.*]\r\n\r\nPensez-vous que le cache précédent pourrait contenir des informations plus complètes, et voulez-vous le restaurer?
 * * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 * * ERREUR DE COPIE! * *\r\nHTTrack a détecté que la copie courante était vide. Si il s'agissait d'une mise à jour, l'ancienne copie a été restaurée.\r\nRaison: soit la (les) première(s) page(s) n'ont pu être téléchargées, soit un problème de connexion est survenu.\r\n=> Vérifiez que le site existe toujours, et/ou vérifiez les réglages du proxy! <=
 \n\nTip: Click [View log file] to see warning or error messages
 \nConseil: sélectionnez la commande 'Voir le fichier journal' pour visionner les messages d'erreur et d'avertissement
-Error deleting a hts-cache/new.* file, please do it manually
-Erreur lors de l'effacement d'un fichier hts-cache/new.*, veuillez l'effacer manuellement
 Do you really want to quit WinHTTrack Website Copier?
 Voulez-vous vraiment quitter WinHTTrack Website Copier?
 - Mirroring Mode -\n\nEnter address(es) in URL box

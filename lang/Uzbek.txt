@@ -202,14 +202,10 @@ Davomida:\n
 Agar, zarurat bo’lsa, log faylni ko’ring.\n\nWinHTTrack chiqish uchun OKni bosing.\n\nWinHTTrackdan foydalanganligingiz uchun tashakkur!
 Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) if necessary to ensure that everything is OK.\n\nThanks for using WinHTTrack!
 Ko’zgu yaratish bajarildi.\nDasturdan chiqish uchun OKni bosing.\nKo’chirib olish muvaffaqiyatli bajarilganligini ko’rish uchun log fayl(lar)ni ko’ring.\n\nWinHTTrackdan foydalanganligingiz uchun tashakkur!
-* * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
-* * KO’CHIRIB OLISH BEKOR QILINDI! * *\r\nВременный кэш, созданный во время текущей сессий, содержит данные, загруженные только во время данной сессии и потребуется только в случае возобновления закачки.\r\nОднако, предыдущий кэш может содержать более полную информацию. Если вы не хотите потерять эти данные, вам нужно удалить текущий кэш и возобновить предыдущий.\r\n(Это можно легко сделать прямо здесь, удалив файлы hts-cache/new.]\r\n\r\nСчитаете ли вы, что предыдущий кэш может содержать более полную информацию, и хотите ли вы восстановить его?
 * * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 * * XATOLIK! * *\r\nJoriy ko’zgu - bo’sh. Agar yangilanadigan bo’lsa, oldingi ko’zgu tiklanadi.\r\nSababi: birinchi sahifa(lar) topilmadi yoki bog’lanib bo’lmadi.\r\n=> Veb-saytning mavjudligiga ishonch hosil qiling, и/yoki proksi-serverning o’rnatilganligini tekshiring! <=
 \n\nTip: Click [View log file] to see warning or error messages
 \nMaslahat: Xatolik va ogohlantirishlar haqidagi xabarni ko’rish uchun [log faylni ko’rish]ni bosing.
-Error deleting a hts-cache/new.* file, please do it manually
-hts-cache/new.* faylini o’chirishda xatolik, iltimos, uni o’zingiz o’chiring.\r\n
 Do you really want to quit WinHTTrack Website Copier?
 Siz haqiqatan ham WinHTTrackdan chiqishni xohlaysizmi?
 - Mirroring Mode -\n\nEnter address(es) in URL box
