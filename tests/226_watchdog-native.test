@@ -921,6 +921,38 @@ backoff_ticks_due() {
     echo "${out# }"
 }
 
+# A backoff that never doubles: 1, 3, 5, 7. The floor below is derived against
+# it, so a change to either schedule moves the floor.
+flat_ticks_due() {
+    local due=1 out=''
+    while test "$due" -le "$1"; do
+        out="$out $due"
+        due=$((due + 2))
+    done
+    echo "${out# }"
+}
+
+# The fewest due ticks whose two schedules disagree. Prints nothing when they
+# never separate, which is a leg that can judge nothing rather than a floor of 0.
+separating_ticks() { # separating_ticks <rival schedule function> [limit]
+    local n=1
+    while test "$n" -le "${2:-64}"; do
+        test "$(backoff_ticks_due "$n")" = "$("$1" "$n")" || {
+            echo "$n"
+            return 0
+        }
+        n=$((n + 1))
+    done
+}
+
+BACKOFF_FLOOR=$(separating_ticks flat_ticks_due)
+test -n "$BACKOFF_FLOOR" ||
+    fail "a doubling backoff and a flat one land on the same ticks throughout: the backoff leg can judge nothing"
+# Control: without it a derivation off by one, or a hand-kept constant, reads as
+# a floor while grading windows where the two schedules still tie.
+test "$(backoff_ticks_due $((BACKOFF_FLOOR - 1)))" = "$(flat_ticks_due $((BACKOFF_FLOOR - 1)))" ||
+    fail "the two schedules already differ at $((BACKOFF_FLOOR - 1)) due ticks, so the derived floor of $BACKOFF_FLOOR skips a window it could judge"
+
 backoff_leg() {
     local ticks rc=0 window landed
     window=$((turn * 8))
@@ -931,10 +963,9 @@ backoff_leg() {
     sink_stop
     test "$rc" -eq 0 || return "$rc"
     ticks=$(count_matching_lines 't=[0-9]*s q=' "$legout")
-    # Seven, not six: at six or fewer a doubling backoff and a flat one owe the
-    # same calls, so six admitted that tie.
-    test "$ticks" -ge 7 || {
-        unmeasured "$ticks due ticks over ${window}s at a 1s interval: too few to judge a backoff"
+    # Under the floor a doubling backoff and a flat one land on the same ticks.
+    test "$ticks" -ge "$BACKOFF_FLOOR" || {
+        unmeasured "$ticks due ticks over ${window}s at a 1s interval, under the $BACKOFF_FLOOR that separate a doubling backoff from a flat one: too few to judge a backoff"
         return "$UNMEASURED"
     }
     # Positions, not a total. A count is blind to a loop that posts its first few
