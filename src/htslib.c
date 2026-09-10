@@ -6675,13 +6675,6 @@ HTSEXT_API size_t hts_sizeof_opt(void) {
   return sizeof(httrackp);
 }
 
-HTSEXT_API hts_boolean hts_opt_layout_compatible(size_t caller_sizeof_opt) {
-  /* hts_create_opt() allocates with the library's size, so a caller compiled
-     smaller only ever touches the prefix it knows; a bigger one would run past
-     the allocation. */
-  return caller_sizeof_opt <= sizeof(httrackp) ? HTS_TRUE : HTS_FALSE;
-}
-
 /* The runtime assert below cannot see a same-sized non-callback member. */
 HTS_STATIC_ASSERT(offsetof(t_hts_htmlcheck_callbacks, extsavename) +
                           sizeof(t_hts_htmlcheck_callbacks_item) ==

@@ -294,8 +294,9 @@ int main(int argc, char **argv) {
   signal_handlers();
   hts_init();
 
-  // Check version compatibility
-  if (!hts_opt_layout_compatible(sizeof(httrackp))) {
+  /* hts_create_opt() allocates the library's size, so a bigger caller would
+     run past it, but a smaller one only touches the prefix it knows. */
+  if (sizeof(httrackp) > hts_sizeof_opt()) {
     fprintf(stderr,
             "this httrack %s needs an option structure of %lu bytes, but "
             "library version %s has %lu\n",

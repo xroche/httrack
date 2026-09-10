@@ -205,16 +205,9 @@ HTSEXT_API httrackp *hts_create_opt(void);
     opt; wait until hts_has_stopped() is true. */
 HTSEXT_API void hts_free_opt(httrackp *opt);
 
-/** Return sizeof(httrackp) as the library sees it, for caller-vs-library struct
-    ABI mismatch checks. */
+/** Return sizeof(httrackp) as the library sees it, which is the size
+    hts_create_opt() allocates. */
 HTSEXT_API size_t hts_sizeof_opt(void);
-
-/** May a caller that compiled sizeof(httrackp) as caller_sizeof_opt use this
-    library? Only one direction is safe: the caller must not be bigger than the
-    library, because hts_create_opt() allocates with the library's size. A
-    smaller caller reads only the prefix it knows, so a field appended to the
-    tail of httrackp keeps older binaries working. */
-HTSEXT_API hts_boolean hts_opt_layout_compatible(size_t caller_sizeof_opt);
 
 /** Snapshot opt's error/warning/info counters and return a pointer to them.
     Returns NULL if opt is NULL. The result aliases a single process-global
