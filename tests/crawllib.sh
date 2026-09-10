@@ -227,7 +227,9 @@ write_lock_request() { # write_lock_request DIR NAME PID
     kill -0 "$pid" 2>/dev/null ||
         fail "the engine exited before it could be asked for ${name}"
     # It walks up because the path crosses the driver's TMPDIR, the test's
-    # mktemp directory and the crawl output (#1639).
+    # mktemp directory and the crawl output (#1639). The last two arms only
+    # bound it, since a relative path ends at the cwd and an absolute one at the
+    # root.
     while test ! -d "$up"; do
         gone=$up
         case $up in
