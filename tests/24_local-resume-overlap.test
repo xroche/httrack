@@ -42,7 +42,7 @@ wait_until "test -s '$counter' && test -e '${out}/hts-in_progress.lock'" \
 # The engine honours a request only when it is newer than its own progress lock,
 # in whole seconds, so wait one out before writing it.
 sleep 1.1
-: >"${out}/hts-abort.lock"
+write_lock_request "$out" hts-abort.lock "$crawlpid"
 # This 10s wait stays inside --timeout=30, so the fetch is still stalled.
 wait_until "test ! -e '${out}/hts-abort.lock'" \
     "10s on, the engine had not read the stop request" 100

@@ -51,7 +51,7 @@ echo "OK"
 # seconds, so a shell clock behind the one stamping files writes an inert file.
 printf '[a request written now is newer than the run] ..\t'
 sleep 1.1
-: >"${out}/request-probe"
+write_lock_request "$out" request-probe "$crawlpid"
 run=$(mtime "${out}/${PROGRESSLOCK}")
 req=$(mtime "${out}/request-probe")
 test "$req" -gt "$run" ||
@@ -61,7 +61,7 @@ echo "OK (+$((req - run))s)"
 # The crossing itself: the engine unlinks the request as it reads it, where
 # everything after that waits on the transfers and would measure the server.
 printf '[the engine reads a request the shell wrote] ..\t'
-: >"${out}/${STOPLOCK}"
+write_lock_request "$out" "$STOPLOCK" "$crawlpid"
 tenths=0
 while test -e "${out}/${STOPLOCK}"; do
     tenths=$((tenths + 1))

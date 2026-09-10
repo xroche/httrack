@@ -251,4 +251,17 @@ test "$elapsed" -lt 15 || fail "the watchdog outran its deadline: ${elapsed}s"
 unset CRAWL_DEADLINE
 ok "CRAWL_DEADLINE drives the watchdog, which reds a wedged crawl"
 
+## write_lock_request names the component that went missing
+holds 'mkdir -p "${tmpdir}/out"
+write_lock_request "${tmpdir}/out" hts-stop.lock $$
+test -e "${tmpdir}/out/hts-stop.lock"'
+ok "write_lock_request writes the request"
+
+# A grandparent: naming the parent is what the helper already did before it
+# walked, so that arm would pass either way.
+fires 'mkdir -p "${tmpdir}/ht.1/req.AAA/fresh"
+rm -rf "${tmpdir}/ht.1"
+write_lock_request "${tmpdir}/ht.1/req.AAA/fresh" hts-stop.lock $$' '/ht.1 is gone'
+ok "a vanished directory is named, deepest first"
+
 echo "PASS"
