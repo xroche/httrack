@@ -257,11 +257,28 @@ write_lock_request "${tmpdir}/out" hts-stop.lock $$
 test -e "${tmpdir}/out/hts-stop.lock"'
 ok "write_lock_request writes the request"
 
-# A grandparent: naming the parent is what the helper already did before it
-# walked, so that arm would pass either way.
+# The old helper already named the parent, so removing only the parent would
+# prove nothing.
 fires 'mkdir -p "${tmpdir}/ht.1/req.AAA/fresh"
 rm -rf "${tmpdir}/ht.1"
 write_lock_request "${tmpdir}/ht.1/req.AAA/fresh" hts-stop.lock $$' '/ht.1 is gone'
-ok "a vanished directory is named, deepest first"
+# One line, or the failing redirect leaked the shell's own message past the
+# 2>/dev/null beside it.
+assert_eq 1 "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" "lines the helper printed"
+ok "a vanished grandparent is named, not the parent"
+
+# The real #1639 shape, where only the crawl output went.
+fires 'mkdir -p "${tmpdir}/ht.2"
+write_lock_request "${tmpdir}/ht.2/fresh" hts-stop.lock $$' '/fresh is gone'
+assert_match '/ht\.2 survives\)' "$out" "the deepest surviving directory"
+ok "a vanished output directory is named, with the survivor above it"
+
+fires 'mkdir -p "${tmpdir}/x"
+sleep 0 &
+pid=$!
+wait "$pid"
+rm -rf "${tmpdir}/x"
+write_lock_request "${tmpdir}/x" hts-stop.lock "$pid"' 'the engine exited before it could be asked'
+ok "a dead engine is named before the path is walked"
 
 echo "PASS"

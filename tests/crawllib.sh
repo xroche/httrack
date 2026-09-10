@@ -221,13 +221,13 @@ assert_lockrule_selftest() {
 # A bare redirect there reports ENOENT for three reasons a caller cannot separate.
 write_lock_request() { # write_lock_request DIR NAME PID
     local dir=$1 name=$2 pid=$3 gone='' up=$1
-    # Braced: the shell reports a failing redirect before it applies the
-    # 2>/dev/null beside it (#1637).
+    # The shell reports a failing redirect before it applies the 2>/dev/null
+    # beside it (#1637).
     { : >"${dir}/${name}"; } 2>/dev/null && return 0
     kill -0 "$pid" 2>/dev/null ||
         fail "the engine exited before it could be asked for ${name}"
-    # The deepest surviving directory, since the path crosses the driver's
-    # TMPDIR, the test's mktemp directory and the crawl output (#1639).
+    # It walks up because the path crosses the driver's TMPDIR, the test's
+    # mktemp directory and the crawl output (#1639).
     while test ! -d "$up"; do
         gone=$up
         case $up in
