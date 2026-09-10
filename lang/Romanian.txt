@@ -204,6 +204,8 @@ Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) i
 Operaţia de clonare terminată. \nClick Ieşire pentru a părăsi WinHTTrack. \nVezi fişierele jurnal dacă este necesar, pentru a vă asigura că totul e OK. \n\nVă mulţumim că folosiţi WinHTTrack!
 * * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 * * EROARE CLONARE! * *\r\nHTTrack a detectat că, clona curentă este goală. Dacă a fost o actualizare, clona precedentă a fost restaurată.\r\nMotivul: Fie prima(ele) pagină(i) nu pot(ate) fi găsită(e), fie a intervenit o problemă de conectare.\r\n=>Asiguraţi-vă că situl există şi/sau verificaţi setările legate de proxy!<=
+Mirroring operation stopped before the end.\nThe files already downloaded are kept.\nSee log file(s) if necessary.\n\nThanks for using WinHTTrack!
+Mirroring operation stopped before the end.\nThe files already downloaded are kept.\nSee log file(s) if necessary.\n\nThanks for using WinHTTrack!
 \n\nTip: Click [View log file] to see warning or error messages
 \n\nSfat:Click [Vizualizează fişierul jurnal] pentru a vedea mesajele de avertizare sau eroare.
 Do you really want to quit WinHTTrack Website Copier?

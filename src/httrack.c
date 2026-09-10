@@ -294,16 +294,19 @@ int main(int argc, char **argv) {
   signal_handlers();
   hts_init();
 
-  // Check version compatibility
-  if (hts_sizeof_opt() != sizeof(httrackp)) {
+  /* hts_create_opt() allocates the library's size, so a bigger caller would
+     run past it, but a smaller one only touches the prefix it knows. */
+  if (sizeof(httrackp) > hts_sizeof_opt()) {
     fprintf(stderr,
-      "incompatible current httrack library version %s, expected version %s",
-      hts_version(), HTTRACK_VERSIONID);
+            "this httrack %s needs an option structure of %lu bytes, but "
+            "library version %s has %lu\n",
+            HTTRACK_VERSIONID, (unsigned long) sizeof(httrackp), hts_version(),
+            (unsigned long) hts_sizeof_opt());
     abortLog("incompatible httrack library version, please update both httrack and its library");
   }
 
   opt = global_opt = hts_create_opt();
-  assert(opt->size_httrackp == sizeof(httrackp));
+  assert(opt->size_httrackp >= sizeof(httrackp));
 
   CHAIN_FUNCTION(opt, init, htsshow_init, NULL);
   CHAIN_FUNCTION(opt, uninit, htsshow_uninit, NULL);

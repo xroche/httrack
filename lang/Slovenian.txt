@@ -204,6 +204,8 @@ Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) i
 Zrcaljenje je popolnoma dokončano.\nKliknite na gumb Izhod za konec dela s programom WinHTTrack.\nPreberite log datoteko(e), če se želite prepričati, da je bilo vse vredu.\n\nZahvaljujemo se za to, da ste uporabljali WinHTTrack!
 * * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 * * NAPAKA MED ZRCALJENJEM! * *\r\nHTTrack je ugotovil, da je aktivno zrcaljenje prazno. Če je bilo nadgrajeno bo obnovljeno prejšnje zrcaljenje.\r\nVzrok: prva stran ni bila najdena ali pa vsebuje napake.\r\n=> Prepričajte se ali spletna stran sploh obstaja in/ ali ste preverili vaše nastavitve proxy strežnika! <=
+Mirroring operation stopped before the end.\nThe files already downloaded are kept.\nSee log file(s) if necessary.\n\nThanks for using WinHTTrack!
+Mirroring operation stopped before the end.\nThe files already downloaded are kept.\nSee log file(s) if necessary.\n\nThanks for using WinHTTrack!
 \n\nTip: Click [View log file] to see warning or error messages
 \n\nNamig: Kliknite na [Preglej log datoteko] kjer boste lahko prebrali vsa opozorila in sporočila o napakah
 Do you really want to quit WinHTTrack Website Copier?

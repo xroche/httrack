@@ -204,6 +204,8 @@ Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) i
 Spejlkopieringen fuldført.\nKlik på Afslut for at afslutte WinHTTrack.\nSe logfil(erne) for at sikre at alt forløb OK.\n\nTak for at du brugte WinHTTrack!\r\n
 * * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 * * SPEJLKOPIERINGS FEJL! * *\r\nWinHTTrack har opdaget at den igangværende spejlkopiering er tom. Hvis du var i gang med at opdatere, vil den tidligere spejlkopiering blive gendannet.\r\nMulig årsag: den første side kunne enten ikke findes eller der opstod et problem med forbindelsen.\r\n=> Kontroller at webstedet findes og/eller kontroller proxy-indstillingerne! <=
+Mirroring operation stopped before the end.\nThe files already downloaded are kept.\nSee log file(s) if necessary.\n\nThanks for using WinHTTrack!
+Mirroring operation stopped before the end.\nThe files already downloaded are kept.\nSee log file(s) if necessary.\n\nThanks for using WinHTTrack!
 \n\nTip: Click [View log file] to see warning or error messages
 \n\nTip: klik på [Vis logfil] for at se advarsels- og fejlmeddelelser
 Do you really want to quit WinHTTrack Website Copier?

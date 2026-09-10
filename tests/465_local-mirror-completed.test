@@ -1,0 +1,84 @@
+#!/bin/bash
+#
+# hts_main2() returns 0 both for a mirror that reached its end and for one the
+# caller stopped, so an embedding GUI cannot tell them apart from the exit code.
+# hts_mirror_completed() is what separates them: HTS_TRUE against HTS_FALSE for
+# the same return code, over four runs against the same local server. Two of
+# them cover the stores no crawl reaches, which are --why answering and a
+# mirror the engine gives up on before its crawl.
+
+set -eu
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+# Unset means this is not an automake run, so the helper does not exist. Set but
+# missing is a build problem, not a skip, or the assertions below pass vacuously.
+if [ -z "${MIRRORVERDICT_BIN:-}" ]; then
+    echo "MIRRORVERDICT_BIN unset, no automake environment, skipping" >&2
+    exit 77
+fi
+[ -r "$MIRRORVERDICT_BIN" ] || fail "$MIRRORVERDICT_BIN was not built"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_verdict.XXXXXX") || exit 1
+cleanup() {
+    set +e
+    rm -rf "$tmpdir"
+}
+# Pushed before the server starts, so its teardown (LIFO) reaps ahead of this.
+cleanup_push cleanup
+
+local_server_start
+
+# run_case <case>; echoes the program's output. The case names its output dir.
+run_case() {
+    local out="${tmpdir}/$1"
+    mkdir -p "$out"
+    run_with_timeout "$(crawl_deadline)" "$MIRRORVERDICT_BIN" \
+        "$1" "${BASEURL}/simple/basic.html" "$(nativepath "$out")" \
+        2>"${tmpdir}/$1.err"
+}
+
+# The verdict must start as "no mirror has run", whatever the run then does.
+for case_name in finish stop why refuse; do
+    reply=$(run_case "$case_name") ||
+        fail "$case_name case exited non-zero: $reply $(cat "${tmpdir}/${case_name}.err")"
+    grep -q '^before: default$' <<<"$reply" ||
+        fail "$case_name case did not start at HTS_DEFAULT: $reply"
+    # Every case ends at the same exit code; only the verdict separates them.
+    grep -q '^rc: 0$' <<<"$reply" || fail "$case_name case did not return 0: $reply"
+    printf '%s\n' "$reply" >"${tmpdir}/${case_name}.out"
+done
+
+grep -q '^after: true$' <"${tmpdir}/finish.out" ||
+    fail "a mirror that ran to its end did not read HTS_TRUE: $(cat "${tmpdir}/finish.out")"
+# Without this the stop case is self-confirming: a run that died before its
+# first progress tick also prints "rc: 0", "after: false" and mirrors nothing.
+grep -q '^stop: requested$' <"${tmpdir}/stop.out" ||
+    fail "the Stop button was never pushed: $(cat "${tmpdir}/stop.out")"
+grep -q '^after: false$' <"${tmpdir}/stop.out" ||
+    fail "a stopped mirror did not read HTS_FALSE: $(cat "${tmpdir}/stop.out")"
+
+# The two runs must really have ended differently, or "false" would be the
+# verdict of a mirror that quietly finished anyway. The linked pages land under
+# hashed names (the fixture varies the query string), so count them.
+mirrored=$(find "${tmpdir}/finish/127.0.0.1_${SRV_PORT}/simple" -type f 2>/dev/null | wc -l)
+test "$mirrored" -ge 2 ||
+    fail "the finished mirror kept $mirrored files, so it followed no link"
+test ! -e "${tmpdir}/stop/127.0.0.1_${SRV_PORT}" ||
+    fail "the stopped mirror kept files, so it was not stopped"
+
+# --why answers a filter question and asks for no mirror, so it reads HTS_TRUE:
+# a GUI must not show abort text for it.
+grep -qE 'by rule #|no filter rule matches' <"${tmpdir}/why.out" ||
+    fail "--why printed no verdict, so its reading proves nothing: $(cat "${tmpdir}/why.out")"
+grep -q '^after: true$' <"${tmpdir}/why.out" ||
+    fail "--why did not read HTS_TRUE: $(cat "${tmpdir}/why.out")"
+
+# A mirror that starts and then fails must read HTS_FALSE, never HTS_DEFAULT:
+# HTS_DEFAULT promises no mirror started, and a GUI reading it stays silent
+# about a real failure.
+grep -q '^start: refused$' <"${tmpdir}/refuse.out" ||
+    fail "no mirror was refused, so nothing here failed: $(cat "${tmpdir}/refuse.out")"
+grep -q '^after: false$' <"${tmpdir}/refuse.out" ||
+    fail "a mirror refused at its start did not read HTS_FALSE: $(cat "${tmpdir}/refuse.out")"

@@ -326,12 +326,16 @@ int main(int argc, char *argv[]) {
   }
   smallserver_setkey("HTTRACK_WEB", HTTRACK_WEB);
 
-  /* Check version compatibility */
-  if (hts_sizeof_opt() != sizeof(httrackp)) {
+  /* hts_create_opt() allocates the library's size, so a bigger caller would
+     run past it, but a smaller one only touches the prefix it knows. */
+  if (sizeof(httrackp) > hts_sizeof_opt()) {
     fprintf(stderr,
-      "** CRITICAL: incompatible current httrack library version %s, expected version %s",
-      hts_version(), HTTRACK_VERSIONID);
-    smallserver_setkey("HTTRACK_INCOMPATIBLE_VERSIONID", hts_version());
+            "** CRITICAL: this webhttrack %s needs an option structure of %lu "
+            "bytes, but library version %s has %lu\n",
+            HTTRACK_VERSIONID, (unsigned long) sizeof(httrackp), hts_version(),
+            (unsigned long) hts_sizeof_opt());
+    abortLog("incompatible httrack library version, please update both "
+             "webhttrack and its library");
   }
 
   /* Session id: the only thing authenticating a command, so it is seeded from
@@ -452,7 +456,7 @@ static void back_launch_cmd(void *pP) {
   /* init */
   hts_init();
   global_opt = opt = hts_create_opt();
-  assert(opt->size_httrackp == sizeof(httrackp));
+  assert(opt->size_httrackp >= sizeof(httrackp));
 
   /* run */
   commandReturn = webhttrack_runmain(opt, argc, argv);

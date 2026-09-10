@@ -204,6 +204,8 @@ Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) i
 El volcado ha finalizado.\nPulse OK para salir de WinHTTrack\n\nConsulte los ficheros de auditoría para verificar que todo ha salido bien\n\n¡Gracias por utilizar WinHTTrack!
 * * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 * * ¡ERROR DE VOLCADO! * *\r\nHTTrack ha detectado que el volcado actual está vacío. Si se trataba de una actualización, el volcado anterior ha sido recuperado.\r\nRazón: no se ha(n) encontrado la(s) primera(s) página(s), o ha habido un problema de conexión.\r\n=> Asegúrese de que el sitio web existe aún, y/o compruebe los ajustes de su proxy! <=
+Mirroring operation stopped before the end.\nThe files already downloaded are kept.\nSee log file(s) if necessary.\n\nThanks for using WinHTTrack!
+Mirroring operation stopped before the end.\nThe files already downloaded are kept.\nSee log file(s) if necessary.\n\nThanks for using WinHTTrack!
 \n\nTip: Click [View log file] to see warning or error messages
 \n\nConsejo: Pulse [Ver ficheros auditoría] para ver los errores y mensajes
 Do you really want to quit WinHTTrack Website Copier?
