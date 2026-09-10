@@ -66,4 +66,4 @@ done
 
 [ "$fail" -eq 0 ] || exit 1
 
-echo "line endings: $walked tracked entries, LF everywhere but the $pinned catalogs git is told to leave alone"
+echo "line endings: $walked tracked entries, LF everywhere, the $pinned catalogs included"

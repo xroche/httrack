@@ -21,9 +21,10 @@ httrack-doc.html text eol=lf
 src/proxy/AUTHORS text eol=lf
 src/proxy/changelog.txt text eol=lf
 
-# Two out-of-tree readers parse these, and neither needs the CR the old pin kept:
-# WinHTTrack's linput() drops every CR byte, and httrack-android's
-# tools/build_strings.sh strips them. Both confirmed by those repos, 2026-09-10.
+# Both out-of-tree catalog readers drop CR: WinHTTrack's own linput() and
+# httrack-android's tools/build_strings.sh. lang.indexes is stricter, because
+# lang_index() in src/webhttrack.in greps it raw, so a CR reaches the language
+# number.
 lang.def text eol=lf
 lang/*.txt text eol=lf
 lang.indexes text eol=lf
