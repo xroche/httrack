@@ -891,9 +891,8 @@ staticness_leg() {
         return "$UNMEASURED"
     }
     # A watchdog that reports every low staticness as zero has those zeros cut as
-    # movement, so the tail it leaves is linear and past the cap like a healthy one.
-    # What separates them is the jump at the seam, and only there: one that
-    # under-reports without jumping moves this bound along with the reading.
+    # movement, so its tail clears the guards above. Only the jump at the seam
+    # separates it, and an under-report without a jump moves this bound with it.
     bound=$(silent_bound)
     first=$(silent_tail | awk 'NR == 1 { print $2 }')
     test -n "$bound" || {
@@ -1309,7 +1308,7 @@ for psrun in "${psruns[@]}"; do
         staticness 'read the log as moving'
     mutate_leg static-capped "s/if (\$tail.Ok) { \$static = \$now - \$movedAt }/if (\$tail.Ok) { \$static = [Math]::Min(\$now - \$movedAt, $STATIC_CAP_MUTANT) }/" \
         staticness 'staticness moved'
-    # The mirror image of static-capped: exact above the threshold, flat zero
+    # The mirror image of static-capped is exact above the threshold and flat zero
     # below it, so every wedge shorter than one reads as no wedge at all.
     mutate_leg static-zero-under-cap \
         "s/if (\$tail.Ok) { \$static = \$now - \$movedAt }/if (\$tail.Ok) { \$static = \$now - \$movedAt; if (\$static -lt $STATIC_CAP_MUTANT) { \$static = 0 } }/" \
