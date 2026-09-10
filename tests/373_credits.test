@@ -191,19 +191,48 @@ check 1 English Lagadec Klueting
 check 4 Deutsch Klueting Lagadec
 check 10 Türkçe Aksoy Lagadec
 
+# An upgrading user keeps the CRLF catalogs they already have, and this tree
+# ships none now, so make one and read it back.
+recode() { # recode <catalog> <lf|crlf>
+    "${HTS_PYTHON}" - "$1" "$2" <<'PY' || fail "cannot recode $1 to $2"
+import sys
+path, how = sys.argv[1], sys.argv[2]
+body = open(path, "rb").read().replace(b"\r\n", b"\n")
+open(path, "wb").write(body if how == "lf" else body.replace(b"\n", b"\r\n"))
+PY
+}
+recode "${root}/lang/English.txt" crlf
+# Or a recode that quietly did nothing would serve the LF file a second time.
+LC_ALL=C grep -qU $'\r' "${root}/lang/English.txt" ||
+    fail "the CRLF catalog carries no CR, so this case reads the LF one again"
+serve crlf 1
+grep -q "English: " <<<"${reply}" ||
+    fail "a CRLF catalog lost its credit line: ${reply}"
+grep -q "Lagadec" <<<"${reply}" ||
+    fail "a CRLF catalog did not name its translator: ${reply}"
+recode "${root}/lang/English.txt" lf
+
 # The page interpolates catalog text into a <pre>, so the escaper is what stops a
 # translator's punctuation reaching the browser as markup. Both keys it reads,
-# because an escaper covering one is not enough.
+# and the second one contains \r\n escapes, so a loader mangling those would
+# not find it.
 "${HTS_PYTHON}" - "${root}/lang/English.txt" <<'PY' || fail "cannot plant the markup probe"
 import sys
 path = sys.argv[1]
-lines = open(path, "rb").read().split(b"\r\n")
+# Split on LF and strip CR, so the probe plants whatever line endings the
+# catalog has.
+lines = [l.rstrip(b"\r") for l in open(path, "rb").read().split(b"\n")]
+planted = 0
 for i, line in enumerate(lines):
     if line == b"LANGUAGE_AUTHOR":
         lines[i + 1] = b"Zzz</pre><script>alert(1)</script>"
+        planted += 1
     elif i % 2 == 0 and line.startswith(b"\\r\\n(Please notify us"):
         lines[i + 1] = b"Yyy</pre><script>alert(2)</script>"
-open(path, "wb").write(b"\r\n".join(lines))
+        planted += 1
+if planted != 2:
+    sys.exit("planted %d of 2 probes; the catalog shape moved" % planted)
+open(path, "wb").write(b"\n".join(lines))
 PY
 reply=''
 serve markup 1

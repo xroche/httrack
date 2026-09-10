@@ -21,10 +21,13 @@ httrack-doc.html text eol=lf
 src/proxy/AUTHORS text eol=lf
 src/proxy/changelog.txt text eol=lf
 
-# WinHTTrack and other out-of-tree readers expect the catalogs CRLF.
-# -text, not eol=crlf, which would renormalize every blob to LF on the next add.
-lang.def -text
-lang/*.txt -text
+# Both out-of-tree catalog readers drop CR: WinHTTrack's own linput() and
+# httrack-android's tools/build_strings.sh. lang.indexes is stricter, because
+# lang_index() in src/webhttrack.in greps it raw, so a CR reaches the language
+# number.
+lang.def text eol=lf
+lang/*.txt text eol=lf
+lang.indexes text eol=lf
 
 # Byte-exact fuzz vectors, whatever their line endings look like.
 fuzz/corpus/** -text
