@@ -918,9 +918,10 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
                  url);
       }
       freet(primary);
-      XH_extuninit;
-      /* --why answered; no mirror was asked for */
+      /* --why answered; no mirror was asked for. Stored before the teardown
+         below, whose end callback a front end reads the verdict from. */
       set_mirror_completed(opt, completed_out, HTS_TRUE);
+      XH_extuninit;
       return 1;
     }
 
@@ -2345,6 +2346,10 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
 
 cleanup:
   /* single exit: every bailout jumps here, so the closes below always run */
+  /* Verdict first: XH_uninit below fires the end callback, and a front end
+     woken by it reads the verdict right there. `completed` is already final,
+     because nothing below this label assigns it. */
+  set_mirror_completed(opt, completed_out, completed);
   warc_close_opt(opt); /* a no-op once warc_abort_opt() has run */
   /* An abort never ran hts_changes_indexed(), so its report would be false;
      free it rather than overwrite the previous run's true one. */
@@ -2361,7 +2366,6 @@ cleanup:
   if (rollback)
     hts_cache_reconcile(opt, CACHE_RECONCILE_ROLLBACK);
 
-  set_mirror_completed(opt, completed_out, completed);
   return retcode;
 }
 
