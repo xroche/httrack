@@ -1,0 +1,18 @@
+#!/bin/bash
+#
+# A jar domain reaches a host only when it names that host, or a parent domain
+# ending a whole label of it (RFC 6265 5.1.3). A byte suffix would send
+# example.com's cookie to the separately registrable wwwexample.com (#1638).
+# Driven by the 'httrack -#test=cookiedomain' selftest.
+
+set -eu
+
+# 'run' is an ignored placeholder argument.
+out=$(httrack -#test=cookiedomain run)
+
+# Exact-match the success line so a renamed or removed selftest (it prints the
+# registry to stderr) cannot pass.
+test "$out" = "cookie-domain: OK" || {
+    echo "expected 'cookie-domain: OK', got: $out" >&2
+    exit 1
+}

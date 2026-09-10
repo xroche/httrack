@@ -793,7 +793,7 @@ cadence_leg() {
 
 # Staticness has to follow the log through movement and then through silence.
 staticness_leg() {
-    local moved dq dt legpid stop rc=0 window silent samples before during
+    local moved dq dt peak legpid stop rc=0 window silent samples before during
     # Two samples in the silent half is the floor, since one cannot show a
     # difference. It also has to outrun the cap static-capped applies, or a bounded
     # staticness and a true one agree across the whole sample and that mutant reads
@@ -870,6 +870,15 @@ staticness_leg() {
         echo "staticness moved ${dq}s over ${dt}s of silence: $(posted_pairs | tr '\n' '/')"
         return 1
     fi
+    # A silent half at or under the cap reads the same under either watchdog, so it
+    # proves nothing. The guard therefore runs after the dq == dt comparison,
+    # because dq and dt share one clock and never disagree from starvation alone.
+    # A mismatch past that point is a real defect, so skipping it would drop a catch.
+    peak=$(silent_tail | awk '$2 > m { m = $2 } END { print m + 0 }')
+    test "$peak" -gt "$STATIC_CAP_MUTANT" || {
+        unmeasured "staticness reached ${peak}s over ${dt}s of silence, at or under the ${STATIC_CAP_MUTANT}s cap: too starved to judge a staticness"
+        return "$UNMEASURED"
+    }
 }
 
 # Every due tick logs its line before the throttle decides, so these two counts

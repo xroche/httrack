@@ -64,8 +64,9 @@ log=$(tr -d '\r' <"$out/hts-log.txt")
 
 # match whole lines: a clipping fix would still store the cookie name, and
 # only the rest of the line says the field was cut
+# the domain comes back lowercased (#1625), the uppercase path beside it does not
 for want in "$(rec www.example.com / GOODFIRST v1)" \
-    "$(rec "$(repeat_chars 255 A)" / DOM255 v)" \
+    "$(rec "$(repeat_chars 255 a)" / DOM255 v)" \
     "$(rec www.example.com "/$(repeat_chars 254 A)" PATH255 v)" \
     "$(rec www.example.com / BIGVAL "$(repeat_chars 500 v)")" \
     "$(rec www.example.com / GOODLAST v2)"; do

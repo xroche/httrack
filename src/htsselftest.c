@@ -5248,12 +5248,17 @@ static hts_boolean cookie_host_is(const char *adr, const char *want) {
   return ok && strcmp(host, want) == 0 ? HTS_TRUE : HTS_FALSE;
 }
 
-/* Report a missed expectation under its own label, and count it. */
-static int cookie_expect(hts_boolean got, hts_boolean want, const char *what) {
+/* Report a missed expectation under LABEL, and count it. */
+static int cookie_expect_at(const char *label, hts_boolean got,
+                            hts_boolean want, const char *what) {
   if (got == want)
     return 0;
-  printf("cookie-port: %s\n", what);
+  printf("%s: %s\n", label, what);
   return 1;
+}
+
+static int cookie_expect(hts_boolean got, hts_boolean want, const char *what) {
+  return cookie_expect_at("cookie-port", got, want, what);
 }
 
 /* A cookie is scoped to a host, never to a port (RFC 6265), so a jar exported
@@ -5430,6 +5435,254 @@ static int st_cookieport(httrackp *opt, int argc, char **argv) {
                        "the delete took its neighbour with it");
 
   printf("cookie-port: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
+/* Write one raw jar record, the way a file written elsewhere reaches
+   cookie_find, because cookie_add would fold the domain on the way in. */
+static void cookie_seed(t_cookie *jar, const char *domain, const char *path) {
+  jar->max_len = sizeof(jar->data);
+  snprintf(jar->data, sizeof(jar->data),
+           "%s\tTRUE\t%s\tFALSE\t1999999999\tid\tA\n", domain, path);
+}
+
+/* RFC 6265 matches a cookie domain without regard to case, because host names
+   are case-insensitive. The name and the path beside it are byte-exact. */
+static int st_cookiecase(httrackp *opt, int argc, char **argv) {
+  static const char LABEL[] = "cookie-case";
+
+  static const struct {
+    const char *adr, *want;
+  } hosts[] = {
+      {"Example.COM", "example.com"},
+      {"WWW.Example.COM:8080", "www.example.com"},
+      {"[::FFFF:1]:80", "::ffff:1"},
+      {"example.com", "example.com"}, // the 99% path, untouched
+  };
+
+  static const struct {
+    const char *domain, *path; // as the jar on disk holds them
+    const char *query, *qpath; // as the request asks for them
+    hts_boolean want;
+    const char *what;
+  } jars[] = {
+      // the shape #1625 was reported with
+      {"Example.COM", "/", "example.com", "/", HTS_TRUE,
+       "a jar domain 'Example.COM' never reaches example.com"},
+      // shorter than the query, the one shape the wildcard compare refuses
+      {"Example.COM", "/", "www.example.com", "/", HTS_TRUE,
+       "'Example.COM' never reaches www.example.com"},
+      {"Example.COM", "/", "other.example", "/", HTS_FALSE,
+       "Example.COM leaked to other.example"},
+      // longer than the query, so only the leading-dot strip can match it
+      {".Example.COM", "/", "example.com", "/", HTS_TRUE,
+       "a wildcard '.Example.COM' never reaches example.com"},
+      {".Example.COM", "/", "notexample.com", "/", HTS_FALSE,
+       ".Example.COM leaked to notexample.com"},
+      // the fold stops at the domain, so /Dir/ and /dir/ are two paths
+      {"example.com", "/Dir/", "example.com", "/Dir/page", HTS_TRUE,
+       "an exact path stopped matching"},
+      {"example.com", "/Dir/", "example.com", "/dir/page", HTS_FALSE,
+       "the path match folded case"},
+  };
+
+  /* http_cookie_header folds the query through cookie_host before it asks, so
+     only a direct call says what cookie_find promises a caller of its own. */
+  static const struct {
+    const char *name, *query;
+    hts_boolean want;
+    const char *what;
+  } finds[] = {
+      {"id", "WWW.EXAMPLE.com", HTS_TRUE,
+       "cookie_find refused an unfolded query domain"},
+      {"id", "www.example.com", HTS_TRUE, "cookie_find missed its own jar"},
+      // RFC 6265 makes the cookie name byte-exact, like the path
+      {"ID", "www.example.com", HTS_FALSE, "the name compare folded case"},
+  };
+
+  static t_cookie jar;
+  char hdr[1024];
+  size_t i;
+  int err = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  for (i = 0; i < sizeof(hosts) / sizeof(hosts[0]); i++) {
+    char what[512];
+
+    snprintf(what, sizeof(what), "'%s' is not scoped to %s", hosts[i].adr,
+             hosts[i].want);
+    err |= cookie_expect_at(LABEL, cookie_host_is(hosts[i].adr, hosts[i].want),
+                            HTS_TRUE, what);
+  }
+
+  /* The jar is written back to cookies.txt for other tools to read, so the
+     folded spelling has to be the one stored, not one the compare forgives. */
+  jar.max_len = sizeof(jar.data);
+  jar.data[0] = '\0';
+  if (cookie_add(&jar, "id", "A", "Example.COM", "/") != 0) {
+    printf("%s: FAIL (cookie_add setup)\n", LABEL);
+    return 1;
+  }
+  err |= cookie_expect_at(LABEL, strstr(jar.data, "example.com\t") != NULL,
+                          HTS_TRUE, "the jar did not store a folded domain");
+  err |= cookie_expect_at(LABEL, strstr(jar.data, "Example") != NULL, HTS_FALSE,
+                          "the jar kept the domain's original case");
+
+  for (i = 0; i < sizeof(jars) / sizeof(jars[0]); i++) {
+    cookie_seed(&jar, jars[i].domain, jars[i].path);
+    http_cookie_header(&jar, jars[i].query, jars[i].qpath, hdr, sizeof(hdr));
+    err |= cookie_expect_at(LABEL, strstr(hdr, "id=A") != NULL, jars[i].want,
+                            jars[i].what);
+  }
+
+  cookie_seed(&jar, "example.com", "/");
+  for (i = 0; i < sizeof(finds) / sizeof(finds[0]); i++) {
+    err |= cookie_expect_at(
+        LABEL,
+        cookie_find(jar.data, finds[i].name, finds[i].query, "/") != NULL,
+        finds[i].want, finds[i].what);
+  }
+
+  /* The store side of the same report, for example a server that names its
+     own host in another case. */
+  err |= cookie_expect_at(
+      LABEL,
+      cookie_roundtrip("example.com",
+                       "Set-Cookie: sess=S; path=/; domain=Example.COM",
+                       "example.com", "sess=S"),
+      HTS_TRUE, "domain=Example.COM never came back to example.com");
+
+  printf("%s: %s\n", LABEL, err ? "FAIL" : "OK");
+  return err;
+}
+
+/* RFC 6265 section 5.1.3 lets a jar domain reach a host only when it names
+   that host, or a parent domain ending a whole label of a name. A byte suffix
+   is not enough: wwwexample.com and notevil.com are separately registrable. */
+static int st_cookiedomain(httrackp *opt, int argc, char **argv) {
+  static const char LABEL[] = "cookie-domain";
+
+  static const struct {
+    const char *jar_dom, *host;
+    hts_boolean want;
+    const char *what;
+  } pairs[] = {
+      /* The same host, the 99% path. An address names itself too, so the rule
+         below must refuse a parent without refusing this. */
+      {"example.com", "example.com", HTS_TRUE, "a jar lost its own host"},
+      {"EXAMPLE.com", "example.com", HTS_TRUE,
+       "an identical host stopped folding case"},
+      {"localhost", "localhost", HTS_TRUE,
+       "a single-label host lost its cookie"},
+      {"127.0.0.1", "127.0.0.1", HTS_TRUE,
+       "an IPv4 literal lost its own cookie"},
+      {"::1", "::1", HTS_TRUE, "an IPv6 literal lost its own cookie"},
+      {"example.com.", "example.com.", HTS_TRUE,
+       "a trailing-dot FQDN lost its own cookie"},
+
+      /* A parent domain, cut on a label boundary. */
+      {"example.com", "www.example.com", HTS_TRUE,
+       "example.com never reaches www.example.com"},
+      {"example.com", "a.b.example.com", HTS_TRUE,
+       "example.com never reaches a.b.example.com"},
+      {".example.com", "example.com", HTS_TRUE,
+       "'.example.com' never reaches example.com"},
+      {".example.com", "www.example.com", HTS_TRUE,
+       "'.example.com' never reaches www.example.com"},
+      {".EXAMPLE.com", "WWW.example.com", HTS_TRUE,
+       "a dotted jar domain stopped folding case"},
+
+      /* #1638: a byte suffix that starts mid-label. Both hosts are separately
+         registrable, so this is a cross-origin leak. */
+      {"example.com", "wwwexample.com", HTS_FALSE,
+       "example.com leaked to wwwexample.com"},
+      {"evil.com", "notevil.com", HTS_FALSE, "evil.com leaked to notevil.com"},
+      {"ample.com", "example.com", HTS_FALSE,
+       "ample.com leaked to example.com"},
+      {".example.com", "wwwexample.com", HTS_FALSE,
+       "'.example.com' leaked to wwwexample.com"},
+      {"e.com", "we.com", HTS_FALSE, "e.com leaked to we.com"},
+
+      /* An empty domain is a suffix of every host. */
+      {"", "example.com", HTS_FALSE,
+       "an empty jar domain leaked to example.com"},
+      {"", "", HTS_FALSE, "an empty jar domain matched an empty host"},
+
+      /* RFC 6265 5.2.3 strips one leading dot, so a second one leaves an empty
+         label. "..example.com" is no domain, and must therefore reach none. */
+      {"..example.com", "www.example.com", HTS_FALSE,
+       "'..example.com' reached www.example.com"},
+      {"..example.com", "example.com", HTS_FALSE,
+       "'..example.com' reached example.com"},
+
+      /* An address has no parent domain, because every dot is inside it. */
+      {"1.1", "192.168.1.1", HTS_FALSE,
+       "the jar domain 1.1 leaked to 192.168.1.1"},
+      {"0.1", "127.0.0.1", HTS_FALSE, "the jar domain 0.1 leaked to 127.0.0.1"},
+      {".1.1", "192.168.1.1", HTS_FALSE,
+       "a leading dot let 1.1 reach 192.168.1.1"},
+      {"168.1.1", "192.168.1.1", HTS_FALSE, "168.1.1 leaked to 192.168.1.1"},
+      /* cookie_host unbrackets IPv6, so this is the shape that arrives here */
+      {"3.4", "::ffff:1.2.3.4", HTS_FALSE,
+       "3.4 leaked to the IPv6 literal ::ffff:1.2.3.4"},
+      {"1", "::1", HTS_FALSE, "the jar domain 1 leaked to ::1"},
+
+      /* Longer than the host, and a trailing dot is a label of its own. These
+         three document the dom_len guard rather than pin it, because dropping
+         it leaves a read one byte short of the host that mismatches anyway. */
+      {"www.example.com", "example.com", HTS_FALSE,
+       "a child domain reached its parent"},
+      {"example.com", "example.com.", HTS_FALSE,
+       "example.com leaked to the FQDN example.com."},
+      {"example.com.", "example.com", HTS_FALSE,
+       "the FQDN example.com. leaked to example.com"},
+  };
+
+  /* The same rule as the jar sees it, so a caller reaching cookie_find through
+     the request path gets the same verdict as a direct call. */
+  static const struct {
+    const char *jar_dom, *query;
+    hts_boolean want;
+    const char *what;
+  } trips[] = {
+      {"example.com", "wwwexample.com", HTS_FALSE,
+       "the jar sent example.com's cookie to wwwexample.com"},
+      {"example.com", "www.example.com", HTS_TRUE,
+       "the jar withheld example.com's cookie from www.example.com"},
+      {".example.com", "www.example.com", HTS_TRUE,
+       "the jar withheld '.example.com' from www.example.com"},
+      {"1.1", "192.168.1.1", HTS_FALSE,
+       "the jar sent 1.1's cookie to 192.168.1.1"},
+      {"192.168.1.1", "192.168.1.1", HTS_TRUE,
+       "the jar withheld an address cookie from its own address"},
+  };
+
+  static t_cookie jar;
+  char hdr[1024];
+  size_t i;
+  int err = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  for (i = 0; i < sizeof(pairs) / sizeof(pairs[0]); i++) {
+    err |= cookie_expect_at(
+        LABEL, cookie_domain_match(pairs[i].jar_dom, pairs[i].host),
+        pairs[i].want, pairs[i].what);
+  }
+
+  for (i = 0; i < sizeof(trips) / sizeof(trips[0]); i++) {
+    cookie_seed(&jar, trips[i].jar_dom, "/");
+    http_cookie_header(&jar, trips[i].query, "/", hdr, sizeof(hdr));
+    err |= cookie_expect_at(LABEL, strstr(hdr, "id=A") != NULL, trips[i].want,
+                            trips[i].what);
+  }
+
+  printf("%s: %s\n", LABEL, err ? "FAIL" : "OK");
   return err;
 }
 
@@ -15432,6 +15685,10 @@ static const struct selftest_entry {
     {"cookiecap", "", "cookie_add honours max_len", st_cookiecap},
     {"cookieport", "", "cookies are scoped to a host, not to a port",
      st_cookieport},
+    {"cookiedomain", "", "a jar domain reaches a host only on a label boundary",
+     st_cookiedomain},
+    {"cookiecase", "", "cookie domains match without regard to case",
+     st_cookiecase},
     {"useragent", "", "default User-Agent self-test", st_useragent},
     {"makeindex", "[dir]", "hts_finish_makeindex footer/refresh self-test",
      st_makeindex},
