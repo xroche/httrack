@@ -10,7 +10,7 @@ This file lists all changes and fixes that have been made for HTTrack
 + New: --enable-ipv6 and --disable-ipv6 pin IPv6 support. It used to follow whatever the build machine had, and it changes the layout of an installed struct, so two builds of the same source disagreed without saying so (#1552)
 + Fixed: --disable-ipv6 failed to build, and on an IPv4-only build -@i2 exited 255 (#1552)
 + New: --disable-auto-features stops the build machine from deciding which optional codings and libraries are compiled in, so a packager gets the same binary from the same recipe. --enable-backtrace=yes/no/auto and --with-iconv[=DIR] pin two more of those choices (#1509)
-+ New: an embedding application can ask hts_mirror_completed() whether the last mirror reached the end of its crawl. The return code of hts_main2() cannot answer that, because a mirror the user stopped returns 0 just like a finished one (#1660)
++ New: an embedding application can ask hts_mirror_completed() whether the last mirror reached the end of its crawl. The return code of hts_main2() cannot answer that, because a mirror the user stopped returns 0 just like a finished one (#1660, #1662)
 + New: each front end needs a change of its own before it can tell a mirror the user stopped from a completed one (#1660)
 + New: an embedding application can wrap each engine worker thread in its own crash handler with hts_set_thread_runner(), and --disable-crash-test compiles out the -#c crash test, which such an application used to ship as a deliberate crash reachable from its command line (#1630)
 + New: hts_findgetsize64() returns the size of a file past 2 GB (#1546)
