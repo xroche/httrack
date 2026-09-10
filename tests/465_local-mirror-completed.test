@@ -6,6 +6,10 @@
 # the same return code, over four runs against the same local server. Two of
 # them cover the stores no crawl reaches, which are --why answering and a
 # mirror the engine gives up on before its crawl.
+#
+# The verdict is read twice per run: after hts_main2() returns, and from inside
+# the end callback, which is where WinHTTrack reads it. The engine must store
+# the verdict before it fires that callback, or the two readings disagree.
 
 set -eu
 
@@ -52,12 +56,17 @@ done
 
 grep -q '^after: true$' <"${tmpdir}/finish.out" ||
     fail "a mirror that ran to its end did not read HTS_TRUE: $(cat "${tmpdir}/finish.out")"
+# A completed mirror reports itself as stopped if end fires before the store.
+grep -q '^end: true$' <"${tmpdir}/finish.out" ||
+    fail "the end callback of a completed mirror did not read HTS_TRUE: $(cat "${tmpdir}/finish.out")"
 # Without this the stop case is self-confirming: a run that died before its
 # first progress tick also prints "rc: 0", "after: false" and mirrors nothing.
 grep -q '^stop: requested$' <"${tmpdir}/stop.out" ||
     fail "the Stop button was never pushed: $(cat "${tmpdir}/stop.out")"
 grep -q '^after: false$' <"${tmpdir}/stop.out" ||
     fail "a stopped mirror did not read HTS_FALSE: $(cat "${tmpdir}/stop.out")"
+grep -q '^end: false$' <"${tmpdir}/stop.out" ||
+    fail "the end callback of a stopped mirror did not read HTS_FALSE: $(cat "${tmpdir}/stop.out")"
 
 # The two runs must really have ended differently, or "false" would be the
 # verdict of a mirror that quietly finished anyway. The linked pages land under
@@ -74,6 +83,8 @@ grep -qE 'by rule #|no filter rule matches' <"${tmpdir}/why.out" ||
     fail "--why printed no verdict, so its reading proves nothing: $(cat "${tmpdir}/why.out")"
 grep -q '^after: true$' <"${tmpdir}/why.out" ||
     fail "--why did not read HTS_TRUE: $(cat "${tmpdir}/why.out")"
+grep -q '^end: true$' <"${tmpdir}/why.out" ||
+    fail "--why did not read HTS_TRUE from its end callback: $(cat "${tmpdir}/why.out")"
 
 # A mirror that starts and then fails must read HTS_FALSE, never HTS_DEFAULT:
 # HTS_DEFAULT promises no mirror started, and a GUI reading it stays silent
@@ -82,3 +93,5 @@ grep -q '^start: refused$' <"${tmpdir}/refuse.out" ||
     fail "no mirror was refused, so nothing here failed: $(cat "${tmpdir}/refuse.out")"
 grep -q '^after: false$' <"${tmpdir}/refuse.out" ||
     fail "a mirror refused at its start did not read HTS_FALSE: $(cat "${tmpdir}/refuse.out")"
+grep -q '^end: false$' <"${tmpdir}/refuse.out" ||
+    fail "the end callback of a refused mirror did not read HTS_FALSE: $(cat "${tmpdir}/refuse.out")"

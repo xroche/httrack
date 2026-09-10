@@ -22,8 +22,9 @@ Please visit our Website: http://www.httrack.com
 */
 
 /* Reads hts_mirror_completed() the way an embedding GUI does: around one real
-   mirror driven through hts_main2(). 465_local-mirror-completed.test runs it
-   once per case named by argv[1]: finish, stop, why or refuse. */
+   mirror driven through hts_main2(), and from inside the end callback, which
+   is where WinHTTrack reads it. 465_local-mirror-completed.test runs it once
+   per case named by argv[1]: finish, stop, why or refuse. */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -74,6 +75,14 @@ static const char *verdict_name(hts_tristate verdict) {
   return "bogus";
 }
 
+/* WinHTTrack reads the verdict here: its end callback raises a flag and its
+   polling loop then calls hts_mirror_completed(). */
+static int end_verdict(t_hts_callbackarg *carg, httrackp *opt) {
+  (void) carg;
+  printf("end: %s\n", verdict_name(hts_mirror_completed(opt)));
+  return 1;
+}
+
 int main(int argc, char **argv) {
   /* Arrays rather than string literals: hts_main2() takes a writable argv.
      av[0..2] are placed by hand below, the rest appended by the loop. */
@@ -99,6 +108,7 @@ int main(int argc, char **argv) {
   }
   printf("before: %s\n", verdict_name(hts_mirror_completed(opt)));
 
+  CHAIN_FUNCTION(opt, end, end_verdict, NULL);
   if (strcmp(argv[1], "stop") == 0)
     CHAIN_FUNCTION(opt, loop, stop_now, NULL);
   if (strcmp(argv[1], "refuse") == 0)

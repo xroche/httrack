@@ -425,13 +425,14 @@ HTSEXT_API void hts_cancel_parsing(httrackp *opt);
    so safe to poll from another thread. Wait for this before hts_free_opt(). */
 HTSEXT_API hts_boolean hts_has_stopped(httrackp *opt);
 
-/** Did the last mirror on @p opt reach the end of its crawl? HTS_TRUE if it
-    did, HTS_FALSE if it gave up or was stopped, HTS_DEFAULT if no mirror has
-    started on this opt. hts_main2() returns 0 for a mirror stopped on purpose,
-    so its code cannot answer this. Compare the result against the named
-    constants and never test it as a boolean, because HTS_DEFAULT is -1 and
-    therefore true. Read under the engine state lock, so safe to poll from
-    another thread. */
+/** Did the last mirror on @p opt reach the end of its crawl? HTS_TRUE once it
+   has, HTS_FALSE while it is still running or if it gave up or was stopped,
+   HTS_DEFAULT if no mirror has started on this opt. The value is final by the
+   time the end callback runs, which is where a front end reads it. hts_main2()
+   returns 0 for a mirror stopped on purpose, so its code cannot answer this.
+   Compare the result against the named constants and never test it as a
+   boolean, because HTS_DEFAULT is -1 and therefore true. Read under the engine
+   state lock, so safe to poll from another thread. */
 HTSEXT_API hts_tristate hts_mirror_completed(httrackp *opt);
 
 /* Tools */
