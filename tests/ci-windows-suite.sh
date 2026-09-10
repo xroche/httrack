@@ -356,7 +356,7 @@ ci_expected_skips_for_backend() {
 # ones a second pattern matched in ci_repeats. Scheduling a test twice gives two
 # workers the same TMPDIR, and run_one_test removes it as it starts (#1639).
 ci_tests=() ci_repeats=''
-ci_expand_categories() { # ci_expand_categories LABEL:PATTERN...
+ci_expand_categories() {
     local c matched t seen=' '
     ci_tests=() ci_repeats=''
     shopt -s nullglob
@@ -622,6 +622,8 @@ categories=(runnable:'00_runnable*.test' engine:'*_engine-*.test' zlib:'*_zlib-*
     proxy-https:'*_crawl_proxy_https.test' log-salvage:'*_crawl-log-salvage.test')
 ci_expand_categories "${categories[@]}" || exit 1
 tests=(${ci_tests[@]+"${ci_tests[@]}"})
+# notice, not warning: reap_leftover_processes spends the warning budget, and
+# this fires once, before the heartbeat starts spending the notice one.
 test -z "$ci_repeats" ||
     ci_annotate notice "a test matched two categories" \
         "scheduled once each: ${ci_repeats}"

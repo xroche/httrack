@@ -124,8 +124,8 @@ reporter_stopped() {
 
 # One per glob the driver enumerates: an empty category is counted as a failing
 # test named after the unexpanded pattern, which would drown the accounting.
-# 00_runnable_local-smoke is the overlap: the runnable pattern has no leading
-# "*_", so it is the one a two-token name can match beside another category.
+# 00_runnable_local-smoke is the overlap. The runnable pattern has no leading
+# "*_", so a two-token name can match it beside another category.
 for t in 00_runnable 00_runnable_local-smoke 13_zlib-pass 14_local-pass \
     15_watchdog-pass 16_crawl_proxy_https 17_crawl-log-salvage 18_testlib-pass \
     19_crawllib 20_crawl-harness-pass; do
