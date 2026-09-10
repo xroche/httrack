@@ -32,6 +32,10 @@ AC_CONFIG_HEADERS(config.h)
 # header we can install without handing a consumer our PACKAGE_* and HAVE_*.
 AC_CONFIG_HEADERS([htsfeatures.h:src/htsfeatures.h.in])
 AM_INIT_AUTOMAKE([subdir-objects])
+# 3:22:0: revision-only bump. httrackp gained two tail fields
+# (abort_left_partial, mirror_completed) and four exports arrived
+# (hts_file_is_newer, hts_findgetsize64, hts_set_thread_runner,
+# hts_mirror_completed). No installed struct moved and nothing went away.
 # 3:21:0: revision-only bump. hts_findgetsize64() arrived beside hts_findgetsize(),
 # which stays exported with the same signature; no installed struct moved and
 # nothing went away.
@@ -57,10 +61,6 @@ AM_INIT_AUTOMAKE([subdir-objects])
 # names lien_back.location_buffer's existing size, it does not change it.
 # 3:14:0: revision-only bump. httrackp gained a tail field (host_alias) and #1202
 # added an export (hts_host_alias_rule_ok); no layout moved, nothing went away.
-# 3:22:0: revision-only bump. httrackp gained two tail fields
-# (abort_left_partial, mirror_completed) and four exports arrived
-# (hts_file_is_newer, hts_findgetsize64, hts_set_thread_runner,
-# hts_mirror_completed). No installed struct moved and nothing went away.
 # 3:13:0: revision-only bump. htsstrings.h's StringRoomTotal grew saturation in
 # its macro body; no installed struct moved and no export came or went.
 # 3:12:0: revision-only bump. httrackp gained a tail field (singlefile_state) and

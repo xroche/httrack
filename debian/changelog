@@ -1,17 +1,23 @@
 httrack (3.50.2-1) unstable; urgency=medium
 
-  * New upstream release.  Full list in history.txt: mostly bounds fixes on
-    input a hostile page or server controls, cookies read from a browser's
-    cookies.txt, and what a mirror stopped early keeps for its resume.
+  * New upstream release, mostly security and correctness fixes.  Full list
+    in history.txt.
   * debian/rules: build with --disable-auto-features, so this recipe decides
     which optional codings and libraries are compiled in rather than whatever
     the build machine happens to have.  The flags after it name the whole
     optional set: brotli, zstd, iconv and backtrace.
-  * debian/control: add pkgconf to Build-Depends, which those checks use.
-  * The WebHTTrack interface moved upstream out of $(docdir), which packagers
-    strip, to /usr/share/httrack/html/server.  httrack-doc now ships the
-    manual under html/doc alone, and a symlink_to_dir maintscript carries the
-    upgrade past the /usr/share/doc/httrack/html symlink 3.50.1-1 shipped.
+  * debian/control: add pkgconf to Build-Depends.  It is what lets configure
+    fill in libhttrack.pc's Requires.private.  Without it, every private
+    dependency falls back to Libs.private, so the installed .pc would follow
+    whatever the build machine holds.
+  * debian/rules: drop the block that moved the manual into
+    /usr/share/httrack/html and left /usr/share/doc/httrack/html as a symlink
+    to it.  Upstream moved the WebHTTrack interface out of $(docdir), which
+    packagers strip, so that swap is no longer needed.  The manual's real
+    files now ship in /usr/share/doc/httrack/html, and
+    /usr/share/httrack/html/doc is the symlink that reaches them.  The
+    symlink_to_dir maintscript carries the upgrade past the symlink 3.50.1-1
+    shipped, which dpkg will not replace with a directory on its own.
 
  -- Xavier Roche <xavier@debian.org>  Thu, 10 Sep 2026 14:40:10 +0200
 
