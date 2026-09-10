@@ -268,7 +268,7 @@ jobs:
           path: ${{ runner.temp }}\wsl_update_x64.msi
           key: wsl-kernel-msi-v1
 
-      # Fetched on a healthy run so it is already here on a run that needs it.
+      # A healthy run fetches it for the run that needs it.
       - name: Fetch the WSL kernel package
         if: steps.wslkernel.outputs.cache-hit != 'true'
         id: wslkernelfetch
@@ -276,11 +276,21 @@ jobs:
         shell: pwsh
         run: |
           $msi = "$env:RUNNER_TEMP\wsl_update_x64.msi"
+          $part = "$msi.part"
           $url = "https://wslstorestorage.blob.core.windows.net/wslblob/wsl_update_x64.msi"
           for ($i = 1; $i -le 3; $i++) {
-            try { Invoke-WebRequest -UseBasicParsing -OutFile $msi $url; break }
+            try {
+              Invoke-WebRequest -UseBasicParsing -OutFile $part $url
+              # Cache keys are immutable, so a half-written file would be
+              # restored for ever and disable this fallback for good.
+              $n = (Get-Item $part).Length
+              if ($n -lt 8MB) { throw "short file, $n bytes" }
+              Move-Item -Force $part $msi
+              break
+            }
             catch {
               Write-Host "kernel package download attempt $i failed: $($_.Exception.Message)"
+              Remove-Item -Force -ErrorAction SilentlyContinue $part
               if ($i -lt 3) { Start-Sleep -Seconds (5 * $i) }
             }
           }
@@ -314,9 +324,8 @@ jobs:
               if ($i -lt 3) { Start-Sleep -Seconds (5 * $i) }
             }
           }
-          # wsl --update is what installs the kernel component, so a 403 there
-          # leaves the import failing with "requires an update to its kernel
-          # component". Installing the package by hand is what recovers it.
+          # wsl --update installs the kernel component, so a 403 there breaks the
+          # import with "requires an update to its kernel component".
           if (-not $updated) {
             $msi = "$env:RUNNER_TEMP\wsl_update_x64.msi"
             if (Test-Path $msi) {
