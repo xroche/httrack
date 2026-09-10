@@ -295,15 +295,17 @@ int main(int argc, char **argv) {
   hts_init();
 
   // Check version compatibility
-  if (hts_sizeof_opt() != sizeof(httrackp)) {
+  if (!hts_opt_layout_compatible(sizeof(httrackp))) {
     fprintf(stderr,
-      "incompatible current httrack library version %s, expected version %s",
-      hts_version(), HTTRACK_VERSIONID);
+            "this httrack %s needs an option structure of %lu bytes, but "
+            "library version %s has %lu\n",
+            HTTRACK_VERSIONID, (unsigned long) sizeof(httrackp), hts_version(),
+            (unsigned long) hts_sizeof_opt());
     abortLog("incompatible httrack library version, please update both httrack and its library");
   }
 
   opt = global_opt = hts_create_opt();
-  assert(opt->size_httrackp == sizeof(httrackp));
+  assert(opt->size_httrackp >= sizeof(httrackp));
 
   CHAIN_FUNCTION(opt, init, htsshow_init, NULL);
   CHAIN_FUNCTION(opt, uninit, htsshow_uninit, NULL);

@@ -15038,6 +15038,21 @@ static int st_pubheaders(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* The caller-vs-library httrackp size guard. No argument prints the library's
+   own size, one argument the verdict for a caller compiled at that size. */
+static int st_optsize(httrackp *opt, int argc, char **argv) {
+  (void) opt;
+  if (argc < 1) {
+    printf("optsize: library %lu\n", (unsigned long) hts_sizeof_opt());
+  } else {
+    const size_t caller = (size_t) strtoul(argv[0], NULL, 10);
+
+    printf("optsize: %s\n",
+           hts_opt_layout_compatible(caller) ? "compatible" : "incompatible");
+  }
+  return 0;
+}
+
 /* One header line socinput() keeps whole. */
 #define ST_CATCHURL_PAD 990
 /* One it cannot: the capture is refused on the line, not on a count. */
@@ -15450,6 +15465,10 @@ static const struct selftest_entry {
      "may the dirty parser read this in-tag quoted value? resolves the owning "
      "attribute and refuses the names that carry no link",
      st_tagattr},
+    {"optsize", "[caller sizeof(httrackp)]",
+     "may a caller compiled at that size use this library? no argument prints "
+     "the library's own size",
+     st_optsize},
     {"addrport", "",
      "\"host:port\" of a peer address is bounded and complete (#1493)",
      st_addrport},
