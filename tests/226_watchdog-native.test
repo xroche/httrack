@@ -682,6 +682,16 @@ silent_tail() {
     } END { for (i = last + 1; i <= c; i++) print tv[i], qv[i] }'
 }
 
+# What the first post after the log went quiet may read, and what it did. Same cut
+# as silent_tail: the post before it read q <= 1, and a healthy staticness rises
+# one per second, so that reading plus the seconds between the two is the ceiling.
+silent_bound() {
+    posted_pairs | awk '$2 ~ /^[0-9]+$/ {
+        c++; tv[c] = $1; qv[c] = $2
+        if ($2 <= 1) { last = c }
+    } END { if (last > 0 && last < c) print qv[last] + tv[last + 1] - tv[last], qv[last + 1] }'
+}
+
 # Which due ticks a landed call sits on. The log line and the call body carry the
 # same t=, so the two join on it. In ticks, never in seconds: they coincide only
 # while a turn costs exactly one second.
@@ -793,7 +803,7 @@ cadence_leg() {
 
 # Staticness has to follow the log through movement and then through silence.
 staticness_leg() {
-    local moved dq dt peak legpid stop rc=0 window silent samples before during
+    local moved dq dt peak legpid stop rc=0 window silent samples before during bound first
     # Two samples in the silent half is the floor, since one cannot show a
     # difference. It also has to outrun the cap static-capped applies, or a bounded
     # staticness and a true one agree across the whole sample and that mutant reads
@@ -878,6 +888,20 @@ staticness_leg() {
     test "$peak" -gt "$STATIC_CAP_MUTANT" || {
         unmeasured "staticness reached ${peak}s over ${dt}s of silence, at or under the ${STATIC_CAP_MUTANT}s cap: too starved to judge a staticness"
         return "$UNMEASURED"
+    }
+    # What is left to catch a watchdog that reports every low staticness as zero:
+    # its zeros are cut as movement, so the tail that survives is linear and past
+    # the cap. The moving check above is what guarantees a post to bound against.
+    read -r bound first <<<"$(silent_bound)"
+    # Both watchdogs read the same up to the cap, so a bound that high is a starved
+    # sample rather than a verdict.
+    if test "$bound" -ge "$STATIC_CAP_MUTANT"; then
+        unmeasured "the first quiet post could have read ${bound}s and still be healthy, at or over the ${STATIC_CAP_MUTANT}s cap: too starved to judge a staticness"
+        return "$UNMEASURED"
+    fi
+    test "$first" -le "$bound" || {
+        echo "staticness jumped to ${first}s on the first quiet post where ${bound}s was the most it could read: $(posted_pairs | tr '\n' '/')"
+        return 1
     }
 }
 
@@ -1199,11 +1223,11 @@ for psrun in "${psruns[@]}"; do
     # then walks into a step it cannot afford and meets the guard as a hard 124.
     legs=(cadence backoff staticness throttle)
     test "$devfull" -eq 0 || legs+=(fullstdout)
-    # These legs, the leaky control under them and the eight mutant legs after it
+    # These legs, the leaky control under them and the twelve mutant legs after it
     # each run the watchdog for a window of its own, so a host too slow to finish
     # them skips rather than meets the guard. The costliest so far is what the
     # next one will take, since a cheap leg under-projects the slow one after it.
-    planned=$((${#legs[@]} + 1 + 11 + devfull))
+    planned=$((${#legs[@]} + 1 + 12 + devfull))
     ran=0
     # Seeded from a turn rather than from zero: the first leg is then projected
     # off a measurement of this box instead of off nothing.
@@ -1278,6 +1302,11 @@ for psrun in "${psruns[@]}"; do
         staticness 'read the log as moving'
     mutate_leg static-capped "s/if (\$tail.Ok) { \$static = \$now - \$movedAt }/if (\$tail.Ok) { \$static = [Math]::Min(\$now - \$movedAt, $STATIC_CAP_MUTANT) }/" \
         staticness 'staticness moved'
+    # The mirror image of static-capped: exact above the threshold, flat zero
+    # below it, so every wedge shorter than one reads as no wedge at all.
+    mutate_leg static-zero-under-cap \
+        "s/if (\$tail.Ok) { \$static = \$now - \$movedAt }/if (\$tail.Ok) { \$static = \$now - \$movedAt; if (\$static -lt $STATIC_CAP_MUTANT) { \$static = 0 } }/" \
+        staticness 'staticness jumped to'
     # shellcheck disable=SC2016
     mutate_leg skip-when-none-owed 's/if (\$skip -gt 0)/if ($skip -ge 0)/' \
         throttle 'a landed post throttles the next'
