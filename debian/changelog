@@ -1,3 +1,20 @@
+httrack (3.50.2-1) unstable; urgency=medium
+
+  * New upstream release.  Full list in history.txt: mostly bounds fixes on
+    input a hostile page or server controls, cookies read from a browser's
+    cookies.txt, and what a mirror stopped early keeps for its resume.
+  * debian/rules: build with --disable-auto-features, so this recipe decides
+    which optional codings and libraries are compiled in rather than whatever
+    the build machine happens to have.  The flags after it name the whole
+    optional set: brotli, zstd, iconv and backtrace.
+  * debian/control: add pkgconf to Build-Depends, which those checks use.
+  * The WebHTTrack interface moved upstream out of $(docdir), which packagers
+    strip, to /usr/share/httrack/html/server.  httrack-doc now ships the
+    manual under html/doc alone, and a symlink_to_dir maintscript carries the
+    upgrade past the /usr/share/doc/httrack/html symlink 3.50.1-1 shipped.
+
+ -- Xavier Roche <xavier@debian.org>  Thu, 10 Sep 2026 14:40:10 +0200
+
 httrack (3.50.1-1) unstable; urgency=medium
 
   * New upstream release, bug fixes only.  Full list in history.txt.

@@ -1,6 +1,6 @@
 AC_PREREQ([2.71])
 
-AC_INIT([httrack], [3.50.1], [roche+packaging@httrack.com], [httrack], [https://www.httrack.com/])
+AC_INIT([httrack], [3.50.2], [roche+packaging@httrack.com], [httrack], [https://www.httrack.com/])
 AC_COPYRIGHT([
 HTTrack Website Copier, Offline Browser for Windows and Unix
 Copyright (C) 1998-2015 Xavier Roche and other contributors
@@ -57,6 +57,10 @@ AM_INIT_AUTOMAKE([subdir-objects])
 # names lien_back.location_buffer's existing size, it does not change it.
 # 3:14:0: revision-only bump. httrackp gained a tail field (host_alias) and #1202
 # added an export (hts_host_alias_rule_ok); no layout moved, nothing went away.
+# 3:22:0: revision-only bump. httrackp gained two tail fields
+# (abort_left_partial, mirror_completed) and four exports arrived
+# (hts_file_is_newer, hts_findgetsize64, hts_set_thread_runner,
+# hts_mirror_completed). No installed struct moved and nothing went away.
 # 3:13:0: revision-only bump. htsstrings.h's StringRoomTotal grew saturation in
 # its macro body; no installed struct moved and no export came or went.
 # 3:12:0: revision-only bump. httrackp gained a tail field (singlefile_state) and
@@ -72,7 +76,7 @@ AM_INIT_AUTOMAKE([subdir-objects])
 # moves nothing). Soname stays .so.3: HTTrackQt is the only consumer of the installed
 # headers, so a libhttrack4 rename isn't worth it.
 # (3:0:0 was the htsblk mime-buffer widening, the ABI break that moved .so.2 -> .so.3.)
-VERSION_INFO="3:21:0"
+VERSION_INFO="3:22:0"
 AM_MAINTAINER_MODE
 AC_USE_SYSTEM_EXTENSIONS
 
