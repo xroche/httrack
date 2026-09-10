@@ -163,20 +163,29 @@ test ! -d "${out}/hts-cache/ref" ||
     fail "hts-cache/ref survived a mirror nothing interrupted"
 echo "PASS"
 
-# The lock is unlinked whatever ended the run, so the startup reconcile never
-# sees a stop. Left alone, the next run rotates the fragment over the complete
-# generation and it is gone.
+# A stop drops the lock before the startup reconcile could run, so without the
+# abort-site call the next run rotates the fragment over the complete generation.
+keeps_generation() { # keeps_generation <name> <how>
+    local out="${tmpdir}/$1" complete="${tmpdir}/$1-complete.zip"
+
+    mkdir -p "$out"
+    local_crawl --log "${tmpdir}/$1.log1" -O "$out" --quiet \
+        --disable-security-limits --robots=0 --timeout=30 -c2 \
+        "${BASEURL}/bigfiles/index.html" || fail "$1: the crawl that fills the cache failed"
+    cp "${out}/hts-cache/new.zip" "$complete"
+    stop_and_report "$1" "$2"
+    test ! -e "${out}/hts-cache/old.zip" ||
+        fail "$1: both generations were left, so the next run drops one"
+    cmp -s "${out}/hts-cache/new.zip" "$complete" ||
+        fail "$1: the run left its own fragment where the complete cache was"
+}
+
 printf '[a stop keeps the complete cache generation] ..\t'
-out="${tmpdir}/gen"
-mkdir -p "$out"
-local_crawl --log "${tmpdir}/gen.log1" -O "$out" --quiet \
-    --disable-security-limits --robots=0 --timeout=30 -c2 \
-    "${BASEURL}/bigfiles/index.html" || fail "the crawl that fills the cache failed"
-complete="${tmpdir}/gen-complete.zip"
-cp "${out}/hts-cache/new.zip" "$complete"
-stop_and_report gen keep
-test ! -e "${out}/hts-cache/old.zip" ||
-    fail "the stopped run left both generations, so the next run drops one"
-cmp -s "${out}/hts-cache/new.zip" "$complete" ||
-    fail "the stopped run left its own fragment where the complete cache was"
+keeps_generation gen keep
+echo "PASS"
+
+# A cap leaves exit_xh at 0, the same as a ^C, so the reconcile reads the
+# engine's completed verdict rather than that flag.
+printf '[a capped run keeps it too] ..\t'
+keeps_generation gencap maxtime
 echo "PASS"

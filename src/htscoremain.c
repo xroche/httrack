@@ -3011,6 +3011,10 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       }
     }
 
+    /* httpmirror()'s own verdict on whether the mirror ran to the end; the
+       cache reconcile below is the only reader outside the mirror block. */
+    hts_boolean completed = HTS_FALSE;
+
     /* Info for wrappers */
     hts_log_print(opt, LOG_DEBUG, "engine: init");
 
@@ -3026,7 +3030,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     // ------------------------------------------------------------
     opt->state._hts_in_mirror = 1;
     {
-      hts_boolean completed = HTS_FALSE;
       const int mirrored = httpmirror(url, opt, &completed);
 
       if (mirrored == 0) {
@@ -3080,8 +3083,9 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     }
 
     /* The lock goes at the end of this block, and the startup arm needs it, so
-       an abort that returns normally has to reconcile here or never. */
-    if (opt->state.exit_xh != 0)
+       an abort that returns normally has to reconcile here or never. A cap or a
+       ^C leaves exit_xh at 0, so ask the engine's verdict instead. */
+    if (!completed)
       hts_cache_reconcile(opt, CACHE_RECONCILE_INTERRUPTED);
 
     /* Not or cleanly interrupted; erase hts-cache/ref temporary directory.

@@ -1052,9 +1052,9 @@ static char *reconcile_path(httrackp *opt, const char *name) {
                  StringBuff(opt->path_log), name);
 }
 
-/* Replace the new-generation file by the old one, when the old one exists.
-   hts_rename_over() parks whatever is in the way instead of deleting it first,
-   so a failed move never leaves the mirror with neither generation. */
+/* Replace the new-generation file by the old one, when the old one exists. A
+   failed hts_rename_over() always leaves one generation behind, since it parks
+   the file in the way instead of deleting it. */
 static hts_boolean reconcile_promote(httrackp *opt, const char *oldname,
                                      const char *newname) {
   if (!fexist_utf8(reconcile_path(opt, oldname)))
@@ -1085,8 +1085,11 @@ static LLint reconcile_entries(httrackp *opt, const char *name) {
 
   if ((zip = hts_unzOpen_utf8(reconcile_path(opt, name))) == NULL)
     return -1;
+  /* Clamped: a damaged central directory can claim a count that casts negative,
+     which would read as "will not open". */
   if (unzGetGlobalInfo64(zip, &gi) == UNZ_OK)
-    entries = (LLint) gi.number_entry;
+    entries = gi.number_entry > (ZPOS64_T) INT_MAX ? (LLint) INT_MAX
+                                                   : (LLint) gi.number_entry;
   unzClose(zip);
   return entries;
 }
@@ -1111,21 +1114,26 @@ void hts_cache_reconcile(httrackp *opt, hts_cache_reconcile_mode mode) {
   case CACHE_RECONCILE_PROMOTE:
     /* Previous run rotated new.* to old.* then died before writing: promote
        the old generation back, whichever format it uses. */
-    if (!fexist_utf8(reconcile_path(opt, "hts-cache/new.zip")))
-      reconcile_promote(opt, "hts-cache/old.zip", "hts-cache/new.zip");
+    if (!fexist_utf8(reconcile_path(opt, "hts-cache/new.zip")) &&
+        !reconcile_promote(opt, "hts-cache/old.zip", "hts-cache/new.zip"))
+      hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
+                    "Cache: could not restore the previous generation");
     break;
   case CACHE_RECONCILE_INTERRUPTED:
     /* Aborted run: keep the generation reaching further, because the next run's
-       rotation erases the other one. new.zip must exist, as a missing one is
-       PROMOTE's case. A generation that will not open counts -1, so a damaged
-       cache never beats a readable one. */
+       rotation erases the other one. */
     if (!opt->cache ||
         !fexist_utf8(reconcile_path(opt, "hts-in_progress.lock")))
       break;
-    if (fexist_utf8(reconcile_path(opt, "hts-cache/new.zip")) &&
-        reconcile_entries(opt, "hts-cache/old.zip") >
-            reconcile_entries(opt, "hts-cache/new.zip"))
-      reconcile_promote_generation(opt);
+    {
+      const LLint kept = reconcile_entries(opt, "hts-cache/new.zip");
+
+      /* A new.zip that is absent belongs to PROMOTE, and one that will not open
+         still holds the local headers cache_init() rotates for cache_repair().
+         Both read -1 here, and neither is ours to overwrite. */
+      if (kept >= 0 && reconcile_entries(opt, "hts-cache/old.zip") > kept)
+        reconcile_promote_generation(opt);
+    }
     break;
   case CACHE_RECONCILE_ROLLBACK:
     /* Nothing transferred: restore the previous generation. */

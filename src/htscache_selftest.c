@@ -1156,12 +1156,12 @@ static void reconcile_put(httrackp *opt, const char *name, LLint size) {
 /* Write a valid cache generation of `entries` files, each carrying `body`
    stored bytes. Stored, not deflated, so the file size follows `body` and a
    case can make the shallower generation the physically larger one. */
-static void reconcile_put_zip(httrackp *opt, const char *name, int entries,
+static void reconcile_put_zip(httrackp *opt, const char *name, LLint entries,
                               size_t body) {
   zipFile zf = hts_zipOpen_utf8(reconcile_st_path(opt, name), 0);
   zip_fileinfo fi;
   char chunk[4096];
-  int i;
+  LLint i;
 
   assertf(zf != NULL);
   memset(&fi, 0, sizeof(fi));
@@ -1170,7 +1170,7 @@ static void reconcile_put_zip(httrackp *opt, const char *name, int entries,
     char entry[64];
     size_t left;
 
-    snprintf(entry, sizeof(entry), "entry%03d.dat", i);
+    snprintf(entry, sizeof(entry), "entry%03d.dat", (int) i);
     assertf(zipOpenNewFileInZip(zf, entry, &fi, NULL, 0, NULL, 0, NULL, 0,
                                 Z_NO_COMPRESSION) == ZIP_OK);
     for (left = body; left != 0;) {
@@ -1184,22 +1184,43 @@ static void reconcile_put_zip(httrackp *opt, const char *name, int entries,
   assertf(zipClose(zf, NULL) == ZIP_OK);
 }
 
-/* Expect `name` to hold `entries` cache entries, or -1 when it is absent or
-   will not open. */
-static int reconcile_expect_zip(httrackp *opt, const char *name, int entries,
+/* Cut `cut` bytes off `name`, which is how a hard kill leaves new.zip: local
+   headers on disk, no central directory. */
+static void reconcile_truncate(httrackp *opt, const char *name, LLint cut) {
+  const LLint size = fsize(reconcile_st_path(opt, name));
+  const size_t left = (size_t) (size - cut);
+  char *buf;
+  FILE *fp;
+
+  assertf(size > cut);
+  buf = (char *) malloct(left);
+  assertf(buf != NULL);
+  fp = FOPEN(reconcile_st_path(opt, name), "rb");
+  assertf(fp != NULL);
+  assertf(hts_fread_exact(buf, left, fp));
+  fclose(fp);
+  fp = FOPEN(reconcile_st_path(opt, name), "wb");
+  assertf(fp != NULL);
+  assertf(hts_fwrite_exact(buf, left, fp));
+  fclose(fp);
+  freet(buf);
+}
+
+/* Expect `name` to hold `entries` entries, or -1 if absent or unreadable. */
+static int reconcile_expect_zip(httrackp *opt, const char *name, LLint entries,
                                 const char *what) {
   unz_global_info64 gi;
   unzFile zip = hts_unzOpen_utf8(reconcile_st_path(opt, name));
-  int got = -1;
+  LLint got = -1;
 
   if (zip != NULL) {
     if (unzGetGlobalInfo64(zip, &gi) == UNZ_OK)
-      got = (int) gi.number_entry;
+      got = (LLint) gi.number_entry;
     unzClose(zip);
   }
   if (got != entries) {
     fprintf(stderr, "cache-reconcile: %s: %s holds %d entries, expected %d\n",
-            what, name, got, entries);
+            what, name, (int) got, (int) entries);
     return 1;
   }
   return 0;
@@ -1224,7 +1245,11 @@ int cache_reconcile_selftest(httrackp *opt, const char *dir) {
   /* Sidecar byte sizes; only their ordering matters. */
   static const LLint SMALL = 1024, MEDIUM = 40000, LARGE = 131072;
   /* Cache generations, in entries: what the reconcile actually compares. */
-  static const int EMPTY = 0, PARTIAL = 2, COMPLETE = 9;
+  static const LLint EMPTY = 0, PARTIAL = 2, COMPLETE = 9;
+  /* Filler bytes under a .zip name: a generation that will not open. */
+  static const LLint DAMAGED = 131072;
+  /* reconcile_put_zip() body size; only interrupted-fatnew wants one. */
+  static const size_t NO_BODY = 0;
 
   selftest_setup_dir(opt, dir);
 #ifdef _WIN32
@@ -1235,7 +1260,7 @@ int cache_reconcile_selftest(httrackp *opt, const char *dir) {
 
   /* PROMOTE: a zip old generation replaces a missing new one */
   reconcile_wipe(opt);
-  reconcile_put_zip(opt, "hts-cache/old.zip", COMPLETE, 0);
+  reconcile_put_zip(opt, "hts-cache/old.zip", COMPLETE, NO_BODY);
   hts_cache_reconcile(opt, CACHE_RECONCILE_PROMOTE);
   failures +=
       reconcile_expect_zip(opt, "hts-cache/new.zip", COMPLETE, "promote-zip");
@@ -1243,8 +1268,8 @@ int cache_reconcile_selftest(httrackp *opt, const char *dir) {
 
   /* PROMOTE: an existing new.zip is left alone */
   reconcile_wipe(opt);
-  reconcile_put_zip(opt, "hts-cache/new.zip", PARTIAL, 0);
-  reconcile_put_zip(opt, "hts-cache/old.zip", COMPLETE, 0);
+  reconcile_put_zip(opt, "hts-cache/new.zip", PARTIAL, NO_BODY);
+  reconcile_put_zip(opt, "hts-cache/old.zip", COMPLETE, NO_BODY);
   hts_cache_reconcile(opt, CACHE_RECONCILE_PROMOTE);
   failures += reconcile_expect_zip(opt, "hts-cache/new.zip", PARTIAL,
                                    "promote-zip-noop");
@@ -1263,8 +1288,8 @@ int cache_reconcile_selftest(httrackp *opt, const char *dir) {
 
   /* INTERRUPTED: no lock file, no action */
   reconcile_wipe(opt);
-  reconcile_put_zip(opt, "hts-cache/new.zip", PARTIAL, 0);
-  reconcile_put_zip(opt, "hts-cache/old.zip", COMPLETE, 0);
+  reconcile_put_zip(opt, "hts-cache/new.zip", PARTIAL, NO_BODY);
+  reconcile_put_zip(opt, "hts-cache/old.zip", COMPLETE, NO_BODY);
   hts_cache_reconcile(opt, CACHE_RECONCILE_INTERRUPTED);
   failures += reconcile_expect_zip(opt, "hts-cache/new.zip", PARTIAL,
                                    "interrupted-nolock");
@@ -1272,8 +1297,8 @@ int cache_reconcile_selftest(httrackp *opt, const char *dir) {
   /* INTERRUPTED: caching off, no action */
   reconcile_wipe(opt);
   reconcile_put(opt, "hts-in_progress.lock", 0);
-  reconcile_put_zip(opt, "hts-cache/new.zip", PARTIAL, 0);
-  reconcile_put_zip(opt, "hts-cache/old.zip", COMPLETE, 0);
+  reconcile_put_zip(opt, "hts-cache/new.zip", PARTIAL, NO_BODY);
+  reconcile_put_zip(opt, "hts-cache/old.zip", COMPLETE, NO_BODY);
   {
     const hts_cachemode saved = opt->cache;
 
@@ -1290,7 +1315,7 @@ int cache_reconcile_selftest(httrackp *opt, const char *dir) {
      belongs to PROMOTE */
   reconcile_wipe(opt);
   reconcile_put(opt, "hts-in_progress.lock", 0);
-  reconcile_put_zip(opt, "hts-cache/old.zip", COMPLETE, 0);
+  reconcile_put_zip(opt, "hts-cache/old.zip", COMPLETE, NO_BODY);
   hts_cache_reconcile(opt, CACHE_RECONCILE_INTERRUPTED);
   failures +=
       reconcile_expect(opt, "hts-cache/new.zip", -1, "interrupted-nonew");
@@ -1301,10 +1326,10 @@ int cache_reconcile_selftest(httrackp *opt, const char *dir) {
      the old names are gone rather than copied */
   reconcile_wipe(opt);
   reconcile_put(opt, "hts-in_progress.lock", 0);
-  reconcile_put_zip(opt, "hts-cache/new.zip", PARTIAL, 0);
+  reconcile_put_zip(opt, "hts-cache/new.zip", PARTIAL, NO_BODY);
   reconcile_put(opt, "hts-cache/new.lst", SMALL);
   reconcile_put(opt, "hts-cache/new.txt", SMALL);
-  reconcile_put_zip(opt, "hts-cache/old.zip", COMPLETE, 0);
+  reconcile_put_zip(opt, "hts-cache/old.zip", COMPLETE, NO_BODY);
   reconcile_put(opt, "hts-cache/old.lst", MEDIUM);
   reconcile_put(opt, "hts-cache/old.txt", MEDIUM);
   hts_cache_reconcile(opt, CACHE_RECONCILE_INTERRUPTED);
@@ -1325,9 +1350,9 @@ int cache_reconcile_selftest(httrackp *opt, const char *dir) {
      run's file list cannot outlive it */
   reconcile_wipe(opt);
   reconcile_put(opt, "hts-in_progress.lock", 0);
-  reconcile_put_zip(opt, "hts-cache/new.zip", PARTIAL, 0);
+  reconcile_put_zip(opt, "hts-cache/new.zip", PARTIAL, NO_BODY);
   reconcile_put(opt, "hts-cache/new.lst", SMALL);
-  reconcile_put_zip(opt, "hts-cache/old.zip", COMPLETE, 0);
+  reconcile_put_zip(opt, "hts-cache/old.zip", COMPLETE, NO_BODY);
   hts_cache_reconcile(opt, CACHE_RECONCILE_INTERRUPTED);
   failures += reconcile_expect_zip(opt, "hts-cache/new.zip", COMPLETE,
                                    "interrupted-orphan-sidecar");
@@ -1339,7 +1364,7 @@ int cache_reconcile_selftest(httrackp *opt, const char *dir) {
   reconcile_wipe(opt);
   reconcile_put(opt, "hts-in_progress.lock", 0);
   reconcile_put_zip(opt, "hts-cache/new.zip", PARTIAL, 65536);
-  reconcile_put_zip(opt, "hts-cache/old.zip", COMPLETE, 0);
+  reconcile_put_zip(opt, "hts-cache/old.zip", COMPLETE, NO_BODY);
   if (fsize(reconcile_st_path(opt, "hts-cache/new.zip")) <=
       fsize(reconcile_st_path(opt, "hts-cache/old.zip"))) {
     fprintf(stderr, "cache-reconcile: interrupted-fatnew: new.zip is not the "
@@ -1354,39 +1379,62 @@ int cache_reconcile_selftest(httrackp *opt, const char *dir) {
      damaged old.zip never displaces a readable new one */
   reconcile_wipe(opt);
   reconcile_put(opt, "hts-in_progress.lock", 0);
-  reconcile_put_zip(opt, "hts-cache/new.zip", PARTIAL, 0);
-  reconcile_put(opt, "hts-cache/old.zip", LARGE);
+  reconcile_put_zip(opt, "hts-cache/new.zip", PARTIAL, NO_BODY);
+  reconcile_put(opt, "hts-cache/old.zip", DAMAGED);
   hts_cache_reconcile(opt, CACHE_RECONCILE_INTERRUPTED);
   failures += reconcile_expect_zip(opt, "hts-cache/new.zip", PARTIAL,
                                    "interrupted-damaged-old");
-  failures += reconcile_expect(opt, "hts-cache/old.zip", LARGE,
+  failures += reconcile_expect(opt, "hts-cache/old.zip", DAMAGED,
                                "interrupted-damaged-old");
 
-  /* INTERRUPTED: and the same the other way, so a damaged new.zip loses */
+  /* INTERRUPTED: a new.zip that will not open is left alone, even against a
+     readable old one: cache_init() rotates it and cache_repair() recovers it */
   reconcile_wipe(opt);
   reconcile_put(opt, "hts-in_progress.lock", 0);
-  reconcile_put(opt, "hts-cache/new.zip", LARGE);
-  reconcile_put_zip(opt, "hts-cache/old.zip", PARTIAL, 0);
+  reconcile_put(opt, "hts-cache/new.zip", DAMAGED);
+  reconcile_put_zip(opt, "hts-cache/old.zip", COMPLETE, NO_BODY);
   hts_cache_reconcile(opt, CACHE_RECONCILE_INTERRUPTED);
-  failures += reconcile_expect_zip(opt, "hts-cache/new.zip", PARTIAL,
+  failures += reconcile_expect(opt, "hts-cache/new.zip", DAMAGED,
+                               "interrupted-damaged-new");
+  failures += reconcile_expect_zip(opt, "hts-cache/old.zip", COMPLETE,
                                    "interrupted-damaged-new");
 
-  /* INTERRUPTED: a readable but empty generation still beats an unreadable one,
-     so "reached nothing" and "will not open" must not count alike */
+  /* INTERRUPTED: the case that matters, because the file is recoverable. A hard
+     kill leaves new.zip without its central directory, and promoting over it
+     would delete entries cache_repair() would have brought back. */
   reconcile_wipe(opt);
   reconcile_put(opt, "hts-in_progress.lock", 0);
-  reconcile_put(opt, "hts-cache/new.zip", LARGE);
-  reconcile_put_zip(opt, "hts-cache/old.zip", EMPTY, 0);
+  reconcile_put_zip(opt, "hts-cache/new.zip", COMPLETE, NO_BODY);
+  reconcile_truncate(opt, "hts-cache/new.zip", 22);
+  reconcile_put_zip(opt, "hts-cache/old.zip", EMPTY, NO_BODY);
+  failures += reconcile_expect_zip(opt, "hts-cache/new.zip", -1,
+                                   "interrupted-truncated-new fixture");
+  {
+    const LLint before = fsize(reconcile_st_path(opt, "hts-cache/new.zip"));
+
+    hts_cache_reconcile(opt, CACHE_RECONCILE_INTERRUPTED);
+    failures += reconcile_expect(opt, "hts-cache/new.zip", before,
+                                 "interrupted-truncated-new");
+  }
+  failures += reconcile_expect_zip(opt, "hts-cache/old.zip", EMPTY,
+                                   "interrupted-truncated-new");
+
+  /* INTERRUPTED: a stop that cached nothing still restores what came before it,
+     so reaching zero and failing to open must not count alike */
+  reconcile_wipe(opt);
+  reconcile_put(opt, "hts-in_progress.lock", 0);
+  reconcile_put_zip(opt, "hts-cache/new.zip", EMPTY, NO_BODY);
+  reconcile_put_zip(opt, "hts-cache/old.zip", COMPLETE, NO_BODY);
   hts_cache_reconcile(opt, CACHE_RECONCILE_INTERRUPTED);
-  failures += reconcile_expect_zip(opt, "hts-cache/new.zip", EMPTY,
-                                   "interrupted-empty-beats-damaged");
+  failures += reconcile_expect_zip(opt, "hts-cache/new.zip", COMPLETE,
+                                   "interrupted-emptynew");
 
   /* INTERRUPTED: the aborted run reached further than the previous one, keep it
    */
   reconcile_wipe(opt);
   reconcile_put(opt, "hts-in_progress.lock", 0);
-  reconcile_put_zip(opt, "hts-cache/new.zip", COMPLETE, 0);
-  reconcile_put_zip(opt, "hts-cache/old.zip", PARTIAL, 0);
+  reconcile_put_zip(opt, "hts-cache/new.zip", COMPLETE, NO_BODY);
+  reconcile_put_zip(opt, "hts-cache/old.zip", PARTIAL, NO_BODY);
   hts_cache_reconcile(opt, CACHE_RECONCILE_INTERRUPTED);
   failures += reconcile_expect_zip(opt, "hts-cache/new.zip", COMPLETE,
                                    "interrupted-newwins");
@@ -1396,8 +1444,8 @@ int cache_reconcile_selftest(httrackp *opt, const char *dir) {
   /* INTERRUPTED: equal reach does not promote, so nothing moves at all */
   reconcile_wipe(opt);
   reconcile_put(opt, "hts-in_progress.lock", 0);
-  reconcile_put_zip(opt, "hts-cache/new.zip", PARTIAL, 0);
-  reconcile_put_zip(opt, "hts-cache/old.zip", PARTIAL, 0);
+  reconcile_put_zip(opt, "hts-cache/new.zip", PARTIAL, NO_BODY);
+  reconcile_put_zip(opt, "hts-cache/old.zip", PARTIAL, NO_BODY);
   reconcile_put(opt, "hts-cache/new.lst", SMALL);
   reconcile_put(opt, "hts-cache/old.lst", LARGE);
   hts_cache_reconcile(opt, CACHE_RECONCILE_INTERRUPTED);
@@ -1428,8 +1476,8 @@ int cache_reconcile_selftest(httrackp *opt, const char *dir) {
   /* ROLLBACK: the old zip generation is restored (a zip cache used to lose
      its only good generation here) */
   reconcile_wipe(opt);
-  reconcile_put_zip(opt, "hts-cache/new.zip", PARTIAL, 0);
-  reconcile_put_zip(opt, "hts-cache/old.zip", COMPLETE, 0);
+  reconcile_put_zip(opt, "hts-cache/new.zip", PARTIAL, NO_BODY);
+  reconcile_put_zip(opt, "hts-cache/old.zip", COMPLETE, NO_BODY);
   hts_cache_reconcile(opt, CACHE_RECONCILE_ROLLBACK);
   failures +=
       reconcile_expect_zip(opt, "hts-cache/new.zip", COMPLETE, "rollback-zip");
