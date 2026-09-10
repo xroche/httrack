@@ -124,9 +124,11 @@ reporter_stopped() {
 
 # One per glob the driver enumerates: an empty category is counted as a failing
 # test named after the unexpanded pattern, which would drown the accounting.
-for t in 00_runnable 13_zlib-pass 14_local-pass 15_watchdog-pass \
-    16_crawl_proxy_https 17_crawl-log-salvage 18_testlib-pass 19_crawllib \
-    20_crawl-harness-pass; do
+# 00_runnable_local-smoke is the overlap: the runnable pattern has no leading
+# "*_", so it is the one a two-token name can match beside another category.
+for t in 00_runnable 00_runnable_local-smoke 13_zlib-pass 14_local-pass \
+    15_watchdog-pass 16_crawl_proxy_https 17_crawl-log-salvage 18_testlib-pass \
+    19_crawllib 20_crawl-harness-pass; do
     printf '#!/bin/sh\nexit 0\n' >"$run/$t.test"
 done
 # One test reports back what it inherited: the token the step is handed can post
@@ -159,13 +161,15 @@ assert_staged
 # The skip set and the pass floor are pinned to the real suite, so a stub run
 # ends on the floor; what is under test is the tally that reaches it.
 test "$rc" -eq 1 || fail "stub suite exited $rc, want 1 from the pass floor"
-# The category list is concatenated, never deduped, so two globs claiming one
-# test would run it twice and inflate every tally the gates read.
+# Two globs claiming one test would run it twice, and the second worker removes
+# the TMPDIR the first is still writing into (#1639).
 dup=$(awk '/^RUN /{print $2}' suite-progress.log | sort | uniq -d)
 test -z "$dup" || fail "a test was selected by two categories: $dup"
-grep -q '^ran=12 pass=10 fail=1 skip=1 lost=0$' <<<"$out" ||
+grep -q '^::notice title=a test matched two categories::scheduled once each: 00_runnable_local-smoke.test$' <<<"$out" ||
+    fail "the test matching two categories was not named: $out"
+grep -q '^ran=13 pass=11 fail=1 skip=1 lost=0$' <<<"$out" ||
     fail "wrong tally: $(grep '^ran=' <<<"$out")"
-grep -q '::error::only 10 tests passed (1 skipped)' <<<"$out" ||
+grep -q '::error::only 11 tests passed (1 skipped)' <<<"$out" ||
     fail "the pass floor did not report the count"
 grep -q 'FAIL 12_engine-fail.test (exit 3)' <<<"$out" || fail "the failing test was not named"
 # The report has to carry the run that failed, not just the trace that passed,
@@ -218,7 +222,7 @@ grep -q '^ran=' <<<"$out" && fail "the suite ran a test with a category empty: $
 # The first category names a single test, and a name nullglob cannot empty would
 # never reach the gate at all.
 printf '#!/bin/sh\nexit 0\n' >"$run/13_zlib-pass.test"
-rm -f "$run/00_runnable.test"
+rm -f "$run/00_runnable.test" "$run/00_runnable_local-smoke.test"
 rc=0
 out=$(RUNNER_TEMP="$tmp" GITHUB_STEP_SUMMARY="$tmp/summary" \
     bash ./ci-windows-suite.sh "$bin" 2>&1) || rc=$?

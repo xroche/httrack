@@ -352,6 +352,39 @@ ci_expected_skips_for_backend() {
     esac
 }
 
+# Expand the label:pattern arguments into ci_tests, each test once, and list the
+# ones a second pattern matched in ci_repeats. Scheduling a test twice gives two
+# workers the same TMPDIR, and run_one_test removes it as it starts (#1639).
+ci_tests=() ci_repeats=''
+ci_expand_categories() { # ci_expand_categories LABEL:PATTERN...
+    local c matched t seen=' '
+    ci_tests=() ci_repeats=''
+    shopt -s nullglob
+    for c in "$@"; do
+        # shellcheck disable=SC2206 # expanding the pattern is the point
+        matched=(${c#*:})
+        # Named, and before anything runs: left unexpanded the pattern reaches
+        # test-timeout.sh literally and is counted as a test failing 127 (#952).
+        if test -z "${matched[0]:-}"; then
+            echo "::error::test category ${c%%:*} matched no tests (${c#*:})"
+            shopt -u nullglob
+            return 1
+        fi
+        for t in "${matched[@]}"; do
+            case "$seen" in
+            *" $t "*)
+                ci_repeats="${ci_repeats}${ci_repeats:+ }$t"
+                continue
+                ;;
+            esac
+            seen="$seen$t "
+            ci_tests+=("$t")
+        done
+    done
+    shopt -u nullglob
+    return 0
+}
+
 # Only a direct run drives a suite. Asked of the shell, not derived from $0,
 # which a caller can set to this very path (172_ci-windows-driver.test).
 (return 0 2>/dev/null) && return 0
@@ -579,28 +612,19 @@ count_workers() {
 
 # label:pattern, globbed rather than enumerated so a new NNN_engine-*.test or
 # NNN_local-*.test is picked up instead of silently getting zero coverage. Every
-# entry carries a metacharacter, or nullglob cannot empty it and the gate below
-# has nothing to catch.
+# entry carries a metacharacter, or nullglob cannot empty it and the gate in
+# ci_expand_categories has nothing to catch.
 # testlib and crawllib cover what most tests here rest on.
 categories=(runnable:'00_runnable*.test' engine:'*_engine-*.test' zlib:'*_zlib-*.test'
     local:'*_local-*.test' watchdog:'*_watchdog*.test'
     testlib:'*_testlib-*.test' crawllib:'*_crawllib*.test'
     crawl-harness:'*_crawl-harness-*.test'
     proxy-https:'*_crawl_proxy_https.test' log-salvage:'*_crawl-log-salvage.test')
-tests=()
-shopt -s nullglob
-for c in "${categories[@]}"; do
-    # shellcheck disable=SC2206 # expanding the pattern is the point
-    matched=(${c#*:})
-    # Named, and before anything runs: left unexpanded the pattern reaches
-    # test-timeout.sh literally and is counted as a test failing 127 (#952).
-    test -n "${matched[0]:-}" || {
-        echo "::error::test category ${c%%:*} matched no tests (${c#*:})"
-        exit 1
-    }
-    tests+=("${matched[@]}")
-done
-shopt -u nullglob
+ci_expand_categories "${categories[@]}" || exit 1
+tests=(${ci_tests[@]+"${ci_tests[@]}"})
+test -z "$ci_repeats" ||
+    ci_annotate notice "a test matched two categories" \
+        "scheduled once each: ${ci_repeats}"
 
 pids=() ran_tests=()
 for t in "${tests[@]}"; do
