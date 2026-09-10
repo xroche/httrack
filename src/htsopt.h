@@ -596,6 +596,11 @@ struct httrackp {
                                        hts-cache/ref kept. Live state, so
                                        copy_htsopt must leave it alone.
                                        Tail: ABI */
+  hts_tristate mirror_completed;  /**< httpmirror()'s verdict, read back by
+                                       hts_mirror_completed(). HTS_DEFAULT
+                                       until a mirror starts. Live state, so
+                                       copy_htsopt must leave it alone.
+                                       Tail: ABI */
 };
 
 /* Running statistics for a mirror. */

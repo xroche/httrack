@@ -553,6 +553,16 @@ static int look_like_xml(const char *s) {
 
 // Début de httpmirror, robot
 // url1 peut être multiple
+/* Write httpmirror()'s verdict to both the caller's out-parameter and the opt,
+   where hts_mirror_completed() can still read it after the call returns. */
+static void set_mirror_completed(httrackp *opt, hts_boolean *completed_out,
+                                 hts_boolean completed) {
+  *completed_out = completed;
+  hts_mutexlock(&opt->state.lock);
+  opt->mirror_completed = completed;
+  hts_mutexrelease(&opt->state.lock);
+}
+
 int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   char *primary = NULL;         // première page, contenant les liens à scanner
   hash_struct hash;             // système de hachage, accélère la recherche dans les liens
@@ -627,7 +637,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   opt->abort_left_partial = HTS_FALSE;
 
   /* before the first bailout below, each of which leaves it false */
-  *completed_out = HTS_FALSE;
+  set_mirror_completed(opt, completed_out, HTS_FALSE);
 
   // noter heure actuelle de départ en secondes
   memset(&HTS_STAT, 0, sizeof(HTS_STAT));
@@ -909,7 +919,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
       }
       freet(primary);
       XH_extuninit;
-      *completed_out = HTS_TRUE; /* --why answered; no mirror was asked for */
+      /* --why answered; no mirror was asked for */
+      set_mirror_completed(opt, completed_out, HTS_TRUE);
       return 1;
     }
 
@@ -2350,7 +2361,7 @@ cleanup:
   if (rollback)
     hts_cache_reconcile(opt, CACHE_RECONCILE_ROLLBACK);
 
-  *completed_out = completed;
+  set_mirror_completed(opt, completed_out, completed);
   return retcode;
 }
 
@@ -3717,6 +3728,14 @@ HTSEXT_API hts_boolean hts_has_stopped(httrackp *opt) {
   ended = opt->state.is_ended;
   hts_mutexrelease(&opt->state.lock);
   return ended;
+}
+
+HTSEXT_API hts_tristate hts_mirror_completed(httrackp *opt) {
+  hts_tristate completed;
+  hts_mutexlock(&opt->state.lock);
+  completed = opt->mirror_completed;
+  hts_mutexrelease(&opt->state.lock);
+  return completed;
 }
 
 // URLs injected into a running mirror

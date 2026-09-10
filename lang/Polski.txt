@@ -204,6 +204,8 @@ Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) i
 Zakończono tworzenie lustra.\r\nKliknij OK aby wyjść z WinHTTrack.\r\nSprawdź logi, upewnij się, czy wszystko przebiegło dobrze.\r\nDziękujemy za używanie HTTrack !
 * * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 * * BŁĄD LUSTRA! * *\r\nHTtrack stwierdza ze obecne lustro jest puste. Jeśli było to uaktualnienie, to przywrócono poprzednią wersję lustra. Powód: Nie można było odczytać pierwszych stron lub wystąpił błąd połączenia.\r\n=> Upewnij się czy strona ciągle istnieje, lub też sprawdź ustawienia proxy! <=
+Mirroring operation stopped before the end.\nThe files already downloaded are kept.\nSee log file(s) if necessary.\n\nThanks for using WinHTTrack!
+Mirroring operation stopped before the end.\nThe files already downloaded are kept.\nSee log file(s) if necessary.\n\nThanks for using WinHTTrack!
 \n\nTip: Click [View log file] to see warning or error messages
 Tip: Kliknij (Pokaż logi) aby zobaczyć informacje o błędach i ostrzeżeniach
 Do you really want to quit WinHTTrack Website Copier?

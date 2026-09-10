@@ -275,7 +275,7 @@ HTSEXT_API int htswrap_init(void); // DEPRECATED - DUMMY FUNCTION
 HTSEXT_API int htswrap_free(void); // DEPRECATED - DUMMY FUNCTION
 
 /** Register callback @p fct under @p name in opt's callback table (for example
-    "start", "check-html", "linkdetected"). Returns 1 on success, 0 if @p name
+    "start", "check-html", "linkdetected"). Returns 0 on success, 1 if @p name
    is not a known slot. Prefer CHAIN_FUNCTION(), which preserves any prior
    callback. */
 HTSEXT_API int htswrap_add(httrackp *opt, const char *name, void *fct);
@@ -424,6 +424,15 @@ HTSEXT_API void hts_cancel_parsing(httrackp *opt);
 /** Nonzero once the mirror has fully ended. Read under the engine state lock,
    so safe to poll from another thread. Wait for this before hts_free_opt(). */
 HTSEXT_API hts_boolean hts_has_stopped(httrackp *opt);
+
+/** Did the last mirror on @p opt reach the end of its crawl? HTS_TRUE if it
+    did, HTS_FALSE if it gave up or was stopped, HTS_DEFAULT if no mirror has
+    started on this opt. hts_main2() returns 0 for a mirror stopped on purpose,
+    so its code cannot answer this. Compare the result against the named
+    constants and never test it as a boolean, because HTS_DEFAULT is -1 and
+    therefore true. Read under the engine state lock, so safe to poll from
+    another thread. */
+HTSEXT_API hts_tristate hts_mirror_completed(httrackp *opt);
 
 /* Tools */
 /** Ensure the directory chain leading to @p path exists, creating missing

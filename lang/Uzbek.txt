@@ -204,6 +204,8 @@ Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) i
 Ko’zgu yaratish bajarildi.\nDasturdan chiqish uchun OKni bosing.\nKo’chirib olish muvaffaqiyatli bajarilganligini ko’rish uchun log fayl(lar)ni ko’ring.\n\nWinHTTrackdan foydalanganligingiz uchun tashakkur!
 * * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 * * XATOLIK! * *\r\nJoriy ko’zgu - bo’sh. Agar yangilanadigan bo’lsa, oldingi ko’zgu tiklanadi.\r\nSababi: birinchi sahifa(lar) topilmadi yoki bog’lanib bo’lmadi.\r\n=> Veb-saytning mavjudligiga ishonch hosil qiling, и/yoki proksi-serverning o’rnatilganligini tekshiring! <=
+Mirroring operation stopped before the end.\nThe files already downloaded are kept.\nSee log file(s) if necessary.\n\nThanks for using WinHTTrack!
+Mirroring operation stopped before the end.\nThe files already downloaded are kept.\nSee log file(s) if necessary.\n\nThanks for using WinHTTrack!
 \n\nTip: Click [View log file] to see warning or error messages
 \nMaslahat: Xatolik va ogohlantirishlar haqidagi xabarni ko’rish uchun [log faylni ko’rish]ni bosing.
 Do you really want to quit WinHTTrack Website Copier?

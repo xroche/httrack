@@ -259,7 +259,9 @@ ci_suite_heartbeat() {
 # stop-keeps-resume drives the stop through an LD_PRELOAD shim, which Windows
 # has no equivalent for;
 # sigint-keeps-resume sends a real SIGINT, which neither shell can deliver to a
-# native httrack.exe.
+# native httrack.exe;
+# mirror-completed drives a helper binary that only the automake build produces,
+# so MIRRORVERDICT_BIN is unset here and the test skips itself.
 expected_skips_msys="01_engine-footer-overflow.test
 253_local-ftp-close-once.test
 113_engine-threadattr-leak.test
@@ -291,7 +293,8 @@ expected_skips_msys="01_engine-footer-overflow.test
 398_engine-build-features.test
 424_engine-wizard-eof.test
 444_local-stop-keeps-resume.test
-451_local-sigint-keeps-resume.test"
+451_local-sigint-keeps-resume.test
+465_local-mirror-completed.test"
 
 # Measured, not predicted: windows-build run 33927128153, both platforms alike.
 # Written out rather than derived from the msys list above: the two lists are
@@ -302,6 +305,8 @@ expected_skips_msys="01_engine-footer-overflow.test
 # owns across interop, so it spins to the watchdog; 296 passes with a real answer
 # file, which places the fault at EOF and closed stdin rather than the wizard.
 # 294 skips itself, in the test.
+# mirror-completed drives a helper binary that only the automake build produces,
+# so MIRRORVERDICT_BIN is unset here and the test skips itself.
 expected_skips_wsl2="01_engine-footer-overflow.test
 253_local-ftp-close-once.test
 113_engine-threadattr-leak.test
@@ -334,6 +339,7 @@ expected_skips_wsl2="01_engine-footer-overflow.test
 424_engine-wizard-eof.test
 444_local-stop-keeps-resume.test
 451_local-sigint-keeps-resume.test
+465_local-mirror-completed.test
 294_local-wizard-eof.test"
 
 # Sets ci_skip_list to the pinned skip set for backend $1, failing loudly if

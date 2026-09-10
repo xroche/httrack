@@ -6,7 +6,7 @@ TESTS = @TESTS_LIST@
 # Committed binary fixture read by 01_zlib-cache-golden.test. List it
 # explicitly: automake does not expand wildcards in EXTRA_DIST, so a glob would
 # silently drop it from the dist tarball and break "make distcheck".
-EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c nobacktrace.c altstackprobe.c nopieprobe.c printnumprobe.c closetrack.c ftpcancel.c stopresume.c seekfail.c pubheaderlayout.c chainplug.c crawl-test.sh run-all-tests.sh check-network.sh check-test-names.sh \
+EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c nobacktrace.c altstackprobe.c nopieprobe.c printnumprobe.c closetrack.c ftpcancel.c stopresume.c seekfail.c pubheaderlayout.c chainplug.c mirrorverdict.c crawl-test.sh run-all-tests.sh check-network.sh check-test-names.sh \
 	proxy-https-server.py socks5-server.py proxy-connect-server.py \
 	proxytestlib.py tls-stall-server.py warc-validate.py wacz-validate.py \
 	header-injection-server.py header-injection-check.py \
@@ -99,6 +99,9 @@ TESTS_ENVIRONMENT += STOPRESUME_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/libstopresum
 TESTS_ENVIRONMENT += SEEKFAIL_LA=$(abs_builddir)/libseekfail.la
 TESTS_ENVIRONMENT += SEEKFAIL_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/libseekfail.so
 TESTS_ENVIRONMENT += STRINGOOM_BIN=$(abs_builddir)/stringoom$(EXEEXT)
+# 465_local-mirror-completed.test drives a real mirror through libhttrack;
+# libtool names this a wrapper script, which is what has to be run.
+TESTS_ENVIRONMENT += MIRRORVERDICT_BIN=$(abs_builddir)/mirrorverdict$(EXEEXT)
 # 215_engine-datadir-ospath.test runs the engine from a copy, so it needs the
 # real binary rather than the libtool wrapper script, plus the loader variable
 # libtool picked for this platform.
@@ -160,9 +163,17 @@ libseekfail_la_LIBADD = $(DL_LIBS)
 
 # realloc stub for 152_engine-string-oom.test; links nothing, so it stays a
 # plain binary rather than a libtool wrapper script.
-check_PROGRAMS = stringoom stderrwrap
+check_PROGRAMS = stringoom stderrwrap mirrorverdict
 stringoom_SOURCES = stringoom.c
 stringoom_CPPFLAGS = -I$(top_srcdir)/src
+
+# Embedder's view of the mirror verdict, for 465_local-mirror-completed.test:
+# links libhttrack and reads it through the installed headers only.
+mirrorverdict_SOURCES = mirrorverdict.c
+mirrorverdict_CPPFLAGS = -I$(top_srcdir)/src @DEFAULT_CFLAGS@ @THREADS_CFLAGS@ \
+	@V6_FLAG@ @LFS_FLAG@
+mirrorverdict_LDADD = $(top_builddir)/src/libhttrack.la $(THREADS_LIBS) \
+	$(SOCKET_LIBS)
 
 # Body of the PATH shims below.
 stderrwrap_SOURCES = stderrwrap.c
