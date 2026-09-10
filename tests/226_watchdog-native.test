@@ -682,14 +682,15 @@ silent_tail() {
     } END { for (i = last + 1; i <= c; i++) print tv[i], qv[i] }'
 }
 
-# What the first post after the log went quiet may read, and what it did. Same cut
-# as silent_tail: the post before it read q <= 1, and a healthy staticness rises
-# one per second, so that reading plus the seconds between the two is the ceiling.
+# The most the first post after the log went quiet may read, since the post before
+# it read q <= 1 and a healthy staticness rises one per second. It prints nothing
+# when no post precedes that one.
 silent_bound() {
-    posted_pairs | awk '$2 ~ /^[0-9]+$/ {
-        c++; tv[c] = $1; qv[c] = $2
-        if ($2 <= 1) { last = c }
-    } END { if (last > 0 && last < c) print qv[last] + tv[last + 1] - tv[last], qv[last + 1] }'
+    local at
+    at=$(silent_tail | awk 'NR == 1 { print $1 }')
+    test -n "$at" || return 0
+    posted_pairs | awk -v at="$at" '$2 ~ /^[0-9]+$/ && $1 < at { q = $2; t = $1 }
+        END { if (t != "") print q + at - t }'
 }
 
 # Which due ticks a landed call sits on. The log line and the call body carry the
@@ -889,10 +890,16 @@ staticness_leg() {
         unmeasured "staticness reached ${peak}s over ${dt}s of silence, at or under the ${STATIC_CAP_MUTANT}s cap: too starved to judge a staticness"
         return "$UNMEASURED"
     }
-    # What is left to catch a watchdog that reports every low staticness as zero:
-    # its zeros are cut as movement, so the tail that survives is linear and past
-    # the cap. The moving check above is what guarantees a post to bound against.
-    read -r bound first <<<"$(silent_bound)"
+    # A watchdog that reports every low staticness as zero has those zeros cut as
+    # movement, so the tail it leaves is linear and past the cap like a healthy one.
+    # What separates them is the jump at the seam, and only there: one that
+    # under-reports without jumping moves this bound along with the reading.
+    bound=$(silent_bound)
+    first=$(silent_tail | awk 'NR == 1 { print $2 }')
+    test -n "$bound" || {
+        unmeasured "no post before the quiet ones to bound their first against: too starved to judge a staticness"
+        return "$UNMEASURED"
+    }
     # Both watchdogs read the same up to the cap, so a bound that high is a starved
     # sample rather than a verdict.
     if test "$bound" -ge "$STATIC_CAP_MUTANT"; then
