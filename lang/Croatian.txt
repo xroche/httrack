@@ -202,14 +202,10 @@ Tijekom zrcaljenja je nastao jedan problem\n
 \nPojedinosti po potrebi pogledajte u zapisničkoj datoteci.\n\nKliknite na ZAVRŠITI za okončavanje rada WinHTTrack Website Copiera.\n\nHvala Vam na uporabi WinHTTracka!
 Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) if necessary to ensure that everything is OK.\n\nThanks for using WinHTTrack!
 Zrcaljenje je dovršeno.\nKliknite na Svršetak za okončavanje rada s WinHTTrackom.\nPogledajte po potrebi u zapisnik(e) kako bi se uvjerili da je sve u redu.\n\nHvala Vam na uporabi WinHTTracka!!
-* * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
-* * ZRCALJENJE JE PREKINUTO! * *\r\nTekući privremeni međuspremnik će biti potreban za neku buduću aktualizaciju i sadrži samo podatke, koji su preuzeti tijekom upravo prekinutog zasjedanja.\r\nPrethodni međuspremnik možda sadrži potpunije podatke; ukoliko te podatke ne želite izgubiti, morate ih ponovno uspostaviti i izbrisati tekući međuspremnik.\r\n[Napomena: To se jednostavno može napraviti brisanjem datoteka hts-cache/new.*]\r\n\r\nMislite li da ovom zasjedanju prethodeći međuspremnik može sadržavati potpunije podatke, i želite li ga ponovno uspostaviti?
 * * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 * * POGREŠKA PRI ZRCALJENJU! * *\r\nHTTrack je zapazio da je tekuće zrcalo prazno. Ukoliko je to bila neka dogradnja, onda je prethodno zrcalo ponovno uspostavljeno.\r\nRazlog: ili prva stranica nije mogla biti pronađena, ili se pak pojavio neki problem.\r\n=> Uvjerite se da dotično mrežno mjesto još uvijek postoji, i/ili provjerite postavke Vašeg usmjerivača! <=
 \n\nTip: Click [View log file] to see warning or error messages
 \n\nPreporuka: Kliknite na [Prikazati zapisničke datoteke], kako bi vidjeli upozorenja ili dojave pogreški
-Error deleting a hts-cache/new.* file, please do it manually
-Pogreška pri brisanju datoteke hts-cache/new.*, molim obavite to ručno
 Do you really want to quit WinHTTrack Website Copier?
 Doista želite okončati rad s WinHTTrack Website Copierom?
 - Mirroring Mode -\n\nEnter address(es) in URL box

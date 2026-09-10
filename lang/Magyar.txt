@@ -202,14 +202,10 @@ A tükrözés közben hiba történt\n
 \nNézze meg a naplófájlt, ha szükséges.\n\nKattintson a BEFEJEZÉS gombra a WinHTTrack webhely másolóból való kilépéshez.\n\nKöszönet a WinHTTrack használatáért!
 Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) if necessary to ensure that everything is OK.\n\nThanks for using WinHTTrack!
 A tükrözés befejeződött.\nKattintson az OK gombra a WinHTTrack bezárásához.\nNézze meg a naplófájl(oka)t, ha szükséges, hogy meggyőződjön róla, minden rendben van-e.\n\nKöszönet a WinHTTrack használatáért!
-* * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
-* * TÜKRÖZÉS MEGSZAKÍTVA! * *\r\nA frissítéshez az aktuális ideiglenes gyorsítótárra van szükség, és csak az imént megszakított művelettel letöltött adatokat tartalmazza.\r\nA régi gyorsítótár bizonyára több információt tartalmaz; ha nem akarja elveszíteni azt az információt, vissza kell állítania és törölnie a jelenlegi gyorsítótárat.\r\n[Megjegyzés: Ez könnyen elvégezhető itt a hts-cache/new fájlok* törlésével.]\r\n\r\nÚgy gondolja, hogy a régi gyorsítótár teljesebb információt tartalmazhat, és vissza kívánja állítani?
 * * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 * * TÜKRÖZÉSI HIBA! * *\r\nA HTTrack felismerte, hogy az aktuális tükrözés üres. Ha frissítés volt, vissza lett állítva az előző tükrözés.\r\nOk: az első oldal(ak) vagy nem találhatók, vagy csatlakozási probléma lépett föl.\r\n=> Nézze meg, hogy a webhely létezik-e még, és/vagy ellenőrizze a proxy beállításokat! <=
 \n\nTip: Click [View log file] to see warning or error messages
 \nTipp: Kattintson a [Naplófájl megjelenítése] menüpontra a figyelmeztetések vagy hibaüzenetek megtekintéséhez
-Error deleting a hts-cache/new.* file, please do it manually
-Hiba a hts-cache/new.* fájl törléskor, végezze el kézzel
 Do you really want to quit WinHTTrack Website Copier?
 Valóban ki kíván lépni a WinHTTrack webhely másolóból?
 - Mirroring Mode -\n\nEnter address(es) in URL box

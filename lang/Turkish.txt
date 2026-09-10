@@ -202,14 +202,10 @@ Yansı işlemi sırasında bir hata oluştu\n
 \nGerekirse kayıt dosyasına bakabilirsiniz.\n\nWinHTTrack Website Copier'dan çıkmak için BİTİR'e tıklayın.\n\nWinHTTrack kullandığınız için teşekkürler!
 Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) if necessary to ensure that everything is OK.\n\nThanks for using WinHTTrack!
 Yansı işlemi tamamlandı.\nWinHTTrack'dan çıkmak için Çıkış'a tıklayın.\nHer şeyin düzgün yapıldığından emin olmak için kayıt dosyasına bakabilirsiniz.\n\nWinHTTrack kullandığınız için teşekkürler!
-* * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
-* * YANSI İŞLEMİ İPTAL EDİLDİ! * *\r\nHerhangi bir güncelleme işlemi için şu anki geçici önbellek gereklidir ve bu önbellek yalnızca iptal edilen oturum sırasında indirilen verileri içerir.\r\nÖnceki önbellek daha eksiksiz bilgi içerebilir; bu bilgiyi kaybetmek istemiyorsanız, önceki önbelleği geri yükleyip mevcut önbelleği silmelisiniz.\r\n[Not: Bu işlem, hts-cache/new.* dosyalarını silerek kolayca yapılabilir]\r\n\r\nÖnceki önbelleğin daha eksiksiz bilgi içerdiğini düşünüyor ve onu geri yüklemek istiyor musunuz?
 * * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 * * YANSI İŞLEMİ HATASI! * *\r\nHTTrack, mevcut yansının boş olduğunu tespit etti. Eğer bu bir güncelleme ise, önceki yansı geri alındı.\r\nNedeni: Başlangıç sayfa(lar)ı bulunamadı veya bir bağlantı sorunu oluştu.\r\n=> Web sitesinin hâlâ var olup olmadığını ve/veya vekil sunucu ayarlarınızı kontrol edin! <=
 \n\nTip: Click [View log file] to see warning or error messages
 \n\nİpucu: Hata ve uyarı mesajlarını görmek için [Kayıt dosyasını göster]'e tıklayın
-Error deleting a hts-cache/new.* file, please do it manually
-hts-cache/new.* dosyaları silinirken hata oluştu, lütfen kendiniz yapın
 Do you really want to quit WinHTTrack Website Copier?
 WinHTTrack Website Copier'dan çıkmak istediğinize emin misiniz?
 - Mirroring Mode -\n\nEnter address(es) in URL box

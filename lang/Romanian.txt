@@ -202,14 +202,10 @@ A survenit o eroare în timpul operaţiei de clonare
 \nVezi jurnalul (log-ul)  dacă este necesar. \n\nClick TERMINARE pentru a ieşi din WinHTTrack Website Copier.\n\nVă mulţumim că folosiţi WinHTTrack!
 Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) if necessary to ensure that everything is OK.\n\nThanks for using WinHTTrack!
 Operaţia de clonare terminată. \nClick Ieşire pentru a părăsi WinHTTrack. \nVezi fişierele jurnal dacă este necesar, pentru a vă asigura că totul e OK. \n\nVă mulţumim că folosiţi WinHTTrack!
-* * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
-* *CLONARE ÎNTRERUPTĂ! * * \r\nCache-ul teporar este necesar pentru orice operaţie de actualizare şi nu conţine decât datele descărcate în timpul sesiunii curente întrerupte.\r\nCache-ul precedent poate conţine informaţia mai completă; dacă nu doriţi să pierdeţi aceste date, trebuie să restauraţi şi să ştergeţi cache-ul curent\r\n(Notă: Această operaţie poate fi făcută cu uşurinţă prin ştergerea fişierelor hts-cache/new.*)\r\n\r\n Credeşi că vechiul cache poate conţine mai multe informaţii şi doriţi să le restauraţi?
 * * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 * * EROARE CLONARE! * *\r\nHTTrack a detectat că, clona curentă este goală. Dacă a fost o actualizare, clona precedentă a fost restaurată.\r\nMotivul: Fie prima(ele) pagină(i) nu pot(ate) fi găsită(e), fie a intervenit o problemă de conectare.\r\n=>Asiguraţi-vă că situl există şi/sau verificaţi setările legate de proxy!<=
 \n\nTip: Click [View log file] to see warning or error messages
 \n\nSfat:Click [Vizualizează fişierul jurnal] pentru a vedea mesajele de avertizare sau eroare.
-Error deleting a hts-cache/new.* file, please do it manually
-Eroare la ştergerea fisierului hts-cache/new.* , vă rog ştergeţi fişierul manual.
 Do you really want to quit WinHTTrack Website Copier?
 Chiar doriţi să părăsiţi WinHTTrack Website Copier?
 - Mirroring Mode -\n\nEnter address(es) in URL box
