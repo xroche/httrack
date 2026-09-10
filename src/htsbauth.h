@@ -109,6 +109,13 @@ void cookie_delete(char *s, size_t s_size, size_t pos);
 
 const char *cookie_get(char *buffer, const char *cookie_base, int param);
 
+/** Does the jar domain JAR_DOM cover the host HOST? RFC 6265 5.1.3 says it
+    does when the two name the same host, or when JAR_DOM ends a whole label of
+    HOST and HOST is not an address literal. A leading dot on JAR_DOM, the
+    Netscape jar form, names the same domain. Case folds on both sides, but
+    nothing is normalised here, so pass HOST through cookie_host first. */
+hts_boolean cookie_domain_match(const char *jar_dom, const char *host);
+
 /** First jar record at or after S matching cook_name (empty: any name),
     domain and path, or NULL. The domain match ignores case, the path match
     does not. */
