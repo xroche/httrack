@@ -797,9 +797,7 @@ staticness_leg() {
     # Two samples in the silent half is the floor, since one cannot show a
     # difference. It also has to outrun the cap static-capped applies, or a bounded
     # staticness and a true one agree across the whole sample and that mutant reads
-    # as caught by a leg that never separated them. Sized in the watchdog's
-    # seconds and not in the staticness a starved box actually posts, so the end
-    # of this function grades that height too.
+    # as caught by a leg that never separated them.
     silent=$((turn * 3))
     test "$silent" -ge $((STATIC_CAP_MUTANT * 2)) || silent=$((STATIC_CAP_MUTANT * 2))
     window=$((turn * 3 + silent))
@@ -872,12 +870,11 @@ staticness_leg() {
         echo "staticness moved ${dq}s over ${dt}s of silence: $(posted_pairs | tr '\n' '/')"
         return 1
     fi
-    # A silent half that never climbed past the cap static-capped applies is one a
-    # bounded staticness would have posted unchanged, so the tracking held over a
-    # sample that separates nothing. After the comparison, not before: dq and dt
-    # come off one clock and never disagree from starvation, so a mismatch is a
-    # real defect at any height and skipping on it would drop a catch.
-    peak=$(silent_tail | awk '{ l = $2 } END { print l + 0 }')
+    # A silent half at or under the cap reads the same under either watchdog, so it
+    # proves nothing. The guard therefore runs after the dq == dt comparison,
+    # because dq and dt share one clock and never disagree from starvation alone.
+    # A mismatch past that point is a real defect, so skipping it would drop a catch.
+    peak=$(silent_tail | awk '$2 > m { m = $2 } END { print m + 0 }')
     test "$peak" -gt "$STATIC_CAP_MUTANT" || {
         unmeasured "staticness reached ${peak}s over ${dt}s of silence, at or under the ${STATIC_CAP_MUTANT}s cap: too starved to judge a staticness"
         return "$UNMEASURED"
