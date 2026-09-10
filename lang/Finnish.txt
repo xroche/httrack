@@ -204,6 +204,8 @@ Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) i
 Peilausoperaatio valmis.\nPaina poistu sulkeaksesi WinHTTrackin.\nKatso lokitiedosto(j)a varmistaaksesi, että kaikki on kunnossa.\n\nKiitoksia WinHTTrackin käytöstä!
 * * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 * * PEILIVIRHE! * *\r\nHTTrack huomasi, että nykyinen peili on tyhjä. Jos se oli päivitys, edellinen peli on palautettu.\r\nSyy: ensimmäiset sivut eivät löytyneet tai tapahtui yhteysvirhe.\r\n=> Varmista että nettisivu on yhä olemassa ja tarkista välityspalvelinasetuksesi! <=
+Mirroring operation stopped before the end.\nThe files already downloaded are kept.\nSee log file(s) if necessary.\n\nThanks for using WinHTTrack!
+Mirroring operation stopped before the end.\nThe files already downloaded are kept.\nSee log file(s) if necessary.\n\nThanks for using WinHTTrack!
 \n\nTip: Click [View log file] to see warning or error messages
 \n\nVinkki: Paina [Näytä lokitiedosto] nähdäksesi varoitus- ja virheviestit
 Do you really want to quit WinHTTrack Website Copier?

@@ -204,6 +204,8 @@ Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) i
 Kopeerimisoperatsioon on lõpetatud.\nKliki Välju, et sulgeda WinHTTrack.\nVaata logifaili veendumaks, et kõik on korras.\n\nTänan WinHTTrack'i kasutamise eest!
 * * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
 * * KOPEERIMISE VIGA! * *\r\nHTTrack leidis, et praegune veebikoopia on tühi. Kui see on uuendus, taastatakse eelmine koopia.\r\nPõhjus: esimest lehekülge ei leitud, või on ühenduse probleemid.\r\n=> Veendu, et veebisait ikka alles on, ja/või kontrolli proxy seadistust! <=
+Mirroring operation stopped before the end.\nThe files already downloaded are kept.\nSee log file(s) if necessary.\n\nThanks for using WinHTTrack!
+Mirroring operation stopped before the end.\nThe files already downloaded are kept.\nSee log file(s) if necessary.\n\nThanks for using WinHTTrack!
 \n\nTip: Click [View log file] to see warning or error messages
 \n\nVihje: Hoiatuste ja veateadete nägemiseks kliki [Vaata logifaili]
 Do you really want to quit WinHTTrack Website Copier?

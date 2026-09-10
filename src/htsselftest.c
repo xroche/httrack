@@ -2449,6 +2449,43 @@ static int st_copyopt(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* hts_mirror_completed() answers HTS_DEFAULT until a mirror has run, so a GUI
+   whose hts_main2() bailed out early does not read that as an abort. The
+   verdict is live state, so copy_htsopt() must not carry it between opts. */
+static int st_mirrorcompleted(httrackp *opt, int argc, char **argv) {
+  httrackp *from = hts_create_opt();
+  httrackp *to = hts_create_opt();
+  int err = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  if (hts_mirror_completed(from) != HTS_DEFAULT)
+    err = 1;
+  if (hts_mirror_completed(to) != HTS_DEFAULT)
+    err = 1;
+
+  /* A verdict never travels: not onto an opt that has none, */
+  from->mirror_completed = HTS_TRUE;
+  to->mirror_completed = HTS_DEFAULT;
+  copy_htsopt(from, to);
+  if (hts_mirror_completed(to) != HTS_DEFAULT)
+    err = 1;
+  /* nor over one the target earned itself. HTS_FALSE clears copy_htsopt's
+     "> -1" guard, so a field added to it would be copied here. */
+  from->mirror_completed = HTS_FALSE;
+  to->mirror_completed = HTS_TRUE;
+  copy_htsopt(from, to);
+  if (hts_mirror_completed(to) != HTS_TRUE)
+    err = 1;
+
+  hts_free_opt(from);
+  hts_free_opt(to);
+  printf("mirror-completed: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 /* The handler below pins the enumerator NAME; these pin the NUMBERS, which are
    ABI in the installed htsopt.h and are what -C prints. */
 HTS_STATIC_ASSERT(HTS_CACHE_NONE == 0, cache_none_is_0);
@@ -15547,6 +15584,9 @@ static const struct selftest_entry {
      "layout of the installed structs configure's switches decide",
      st_pubheaders},
     {"copyopt", "", "copy_htsopt option-copy self-test", st_copyopt},
+    {"mirrorcompleted", "",
+     "a fresh opt has no mirror verdict, and copy_htsopt carries none",
+     st_mirrorcompleted},
     {"cachedefault", "", "-C default is C1 cache-priority, not C2",
      st_cachedefault},
     {"lastchar", "",

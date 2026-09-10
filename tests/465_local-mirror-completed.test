@@ -1,0 +1,63 @@
+#!/bin/bash
+#
+# hts_main2() returns 0 both for a mirror that reached its end and for one the
+# caller stopped, so an embedding GUI cannot tell them apart from the exit code.
+# hts_mirror_completed() is what separates them: HTS_TRUE against HTS_FALSE for
+# the same return code, over two runs against the same local server.
+
+set -eu
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+# Unset means this is not an automake run, so the helper does not exist. Set but
+# missing is a build problem, not a skip, or the assertions below pass vacuously.
+if [ -z "${MIRRORVERDICT_BIN:-}" ]; then
+    echo "MIRRORVERDICT_BIN unset, no automake environment, skipping" >&2
+    exit 77
+fi
+[ -r "$MIRRORVERDICT_BIN" ] || fail "$MIRRORVERDICT_BIN was not built"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_verdict.XXXXXX") || exit 1
+cleanup() {
+    set +e
+    rm -rf "$tmpdir"
+}
+# Pushed before the server starts, so its teardown (LIFO) reaps ahead of this.
+cleanup_push cleanup
+
+local_server_start
+
+# run_case <case> <outdir-name>; echoes the program's three lines.
+run_case() {
+    local out="${tmpdir}/$2"
+    mkdir -p "$out"
+    run_with_timeout "$(crawl_deadline)" "$MIRRORVERDICT_BIN" \
+        "$1" "${BASEURL}/simple/basic.html" "$(nativepath "$out")" \
+        2>"${tmpdir}/$2.err"
+}
+
+# The verdict must start as "no mirror has run", whatever the run then does.
+for case_name in finish stop; do
+    reply=$(run_case "$case_name" "$case_name") ||
+        fail "$case_name case exited non-zero: $reply $(cat "${tmpdir}/${case_name}.err")"
+    grep -q '^before: default$' <<<"$reply" ||
+        fail "$case_name case did not start at HTS_DEFAULT: $reply"
+    # Both cases end at the same exit code; only the verdict separates them.
+    grep -q '^rc: 0$' <<<"$reply" || fail "$case_name case did not return 0: $reply"
+    printf '%s\n' "$reply" >"${tmpdir}/${case_name}.out"
+done
+
+grep -q '^after: true$' <"${tmpdir}/finish.out" ||
+    fail "a mirror that ran to its end did not read HTS_TRUE: $(cat "${tmpdir}/finish.out")"
+grep -q '^after: false$' <"${tmpdir}/stop.out" ||
+    fail "a stopped mirror did not read HTS_FALSE: $(cat "${tmpdir}/stop.out")"
+
+# The two runs must really have ended differently, or "false" would be the
+# verdict of a mirror that quietly finished anyway. The linked pages land under
+# hashed names (the fixture varies the query string), so count them.
+mirrored=$(find "${tmpdir}/finish/127.0.0.1_${SRV_PORT}/simple" -type f 2>/dev/null | wc -l)
+test "$mirrored" -ge 2 ||
+    fail "the finished mirror kept $mirrored files, so it followed no link"
+test ! -e "${tmpdir}/stop/127.0.0.1_${SRV_PORT}" ||
+    fail "the stopped mirror kept files, so it was not stopped"
