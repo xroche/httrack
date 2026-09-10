@@ -257,13 +257,11 @@ write_lock_request "${tmpdir}/out" hts-stop.lock $$
 test -e "${tmpdir}/out/hts-stop.lock"'
 ok "write_lock_request writes the request"
 
-# The old helper already named the parent, so removing only the parent would
-# prove nothing.
+# A grandparent, since the old helper already named the parent.
 fires 'mkdir -p "${tmpdir}/ht.1/req.AAA/fresh"
 rm -rf "${tmpdir}/ht.1"
 write_lock_request "${tmpdir}/ht.1/req.AAA/fresh" hts-stop.lock $$' '/ht.1 is gone'
-# One line, or the failing redirect leaked the shell's own message past the
-# 2>/dev/null beside it.
+# One line, or the failing redirect leaked the shell's own message.
 assert_eq 1 "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" "lines the helper printed"
 ok "a vanished grandparent is named, not the parent"
 
@@ -273,12 +271,22 @@ write_lock_request "${tmpdir}/ht.2/fresh" hts-stop.lock $$' '/fresh is gone'
 assert_match '/ht\.2 survives\)' "$out" "the deepest surviving directory"
 ok "a vanished output directory is named, with the survivor above it"
 
-fires 'mkdir -p "${tmpdir}/x"
-sleep 0 &
+fires 'sleep 0 &
 pid=$!
 wait "$pid"
-rm -rf "${tmpdir}/x"
-write_lock_request "${tmpdir}/x" hts-stop.lock "$pid"' 'the engine exited before it could be asked'
+write_lock_request "${tmpdir}/gone" hts-stop.lock "$pid"' 'the engine exited before it could be asked'
 ok "a dead engine is named before the path is walked"
+
+# A relative path leaves the walk with nothing to strip, where the cwd is what
+# stops it.
+fires 'cd "$tmpdir"
+write_lock_request rel.dir/out hts-stop.lock $$' 'rel.dir is gone (. survives)'
+ok "a relative path stops the walk at the working directory"
+
+# At the other end, stripping the last component leaves an empty string, and
+# the root is what survives.
+fires 'write_lock_request /no-such-top-level-dir/out hts-stop.lock $$' \
+    '/no-such-top-level-dir is gone (/ survives)'
+ok "an absolute path stops the walk at the root"
 
 echo "PASS"
