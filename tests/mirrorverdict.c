@@ -23,7 +23,7 @@ Please visit our Website: http://www.httrack.com
 
 /* Reads hts_mirror_completed() the way an embedding GUI does: around one real
    mirror driven through hts_main2(). 465_local-mirror-completed.test runs it
-   once per case named by argv[1]. */
+   once per case named by argv[1]: finish, stop, why or refuse. */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,6 +32,8 @@ Please visit our Website: http://www.httrack.com
 #include "httrack-library.h"
 #include "htsopt.h"
 #include "htsdefines.h"
+
+static int stop_asked = 0;
 
 /* The Stop button, pushed at the engine's first progress tick. */
 static int stop_now(t_hts_callbackarg *carg, httrackp *opt, lien_back *back,
@@ -45,8 +47,21 @@ static int stop_now(t_hts_callbackarg *carg, httrackp *opt, lien_back *back,
   (void) lien_ntot;
   (void) stat_time;
   (void) stats;
+  if (!stop_asked) {
+    stop_asked = 1;
+    printf("stop: requested\n"); /* the run really reached a progress tick */
+  }
   hts_request_stop(opt, HTS_FALSE);
-  return 1;
+  return 1; /* keep going; the stop request is what ends the mirror */
+}
+
+/* The Refuse case: a start callback saying no makes httpmirror() give up
+   before its crawl, which is a mirror that started and failed. */
+static int refuse_start(t_hts_callbackarg *carg, httrackp *opt) {
+  (void) carg;
+  (void) opt;
+  printf("start: refused\n");
+  return 0; /* 0 aborts the mirror */
 }
 
 static const char *verdict_name(hts_tristate verdict) {
@@ -60,19 +75,20 @@ static const char *verdict_name(hts_tristate verdict) {
 }
 
 int main(int argc, char **argv) {
-  static char prog[] = "mirrorverdict";
-  static char opt_outdir[] = "-O";
-  static char opt_quiet[] = "--quiet";
-  static char opt_robots[] = "--robots=0";
-  static char opt_conns[] = "-c1";
-  static char opt_maxtime[] = "--max-time=120";
+  /* Arrays rather than string literals: hts_main2() takes a writable argv.
+     av[0..2] are placed by hand below, the rest appended by the loop. */
+  static char av[][16] = {"mirrorverdict", "-O",  "--why",         "--quiet",
+                          "--robots=0",    "-c1", "--max-time=120"};
+  const size_t av_loop_from = 3;
   httrackp *opt;
   char *args[16];
+  size_t i;
   int argn = 0;
   int rc;
 
   if (argc != 4) {
-    fprintf(stderr, "usage: mirrorverdict finish|stop <url> <outdir>\n");
+    fprintf(stderr,
+            "usage: mirrorverdict finish|stop|why|refuse <url> <outdir>\n");
     return 2;
   }
   hts_init();
@@ -85,16 +101,19 @@ int main(int argc, char **argv) {
 
   if (strcmp(argv[1], "stop") == 0)
     CHAIN_FUNCTION(opt, loop, stop_now, NULL);
+  if (strcmp(argv[1], "refuse") == 0)
+    CHAIN_FUNCTION(opt, start, refuse_start, NULL);
 
-  /* Arrays rather than string literals: hts_main2() takes a writable argv. */
-  args[argn++] = prog;
+  args[argn++] = av[0];
   args[argn++] = argv[2];
-  args[argn++] = opt_outdir;
+  args[argn++] = av[1];
   args[argn++] = argv[3];
-  args[argn++] = opt_quiet;
-  args[argn++] = opt_robots;
-  args[argn++] = opt_conns;
-  args[argn++] = opt_maxtime;
+  if (strcmp(argv[1], "why") == 0) {
+    args[argn++] = av[2];
+    args[argn++] = argv[2]; /* --why asks about the URL it was given */
+  }
+  for (i = av_loop_from; i < sizeof(av) / sizeof(av[0]); i++)
+    args[argn++] = av[i];
   args[argn] = NULL;
   rc = hts_main2(argn, args, opt);
 

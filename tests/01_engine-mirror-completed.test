@@ -1,24 +1,11 @@
 #!/bin/bash
 #
-# hts_mirror_completed() must read HTS_DEFAULT before any mirror has run, so an
-# embedding GUI whose hts_main2() bailed out early (an argv error) does not show
-# abort text for a mirror that never started. Driven by the in-process
-# 'httrack -#test=mirrorcompleted' test.
 
-set -eu
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
 
-# 'run' is an ignored placeholder argument. The status is read rather than left
-# to errexit, so a failing case reports the line it printed.
-status=0
-out=$(httrack -#test=mirrorcompleted run) || status=$?
-test "$status" -eq 0 || {
-    echo "the self-test exited $status, saying: $out" >&2
-    exit 1
-}
-
-# Exact-match the success line so a renamed or removed test (it prints the
-# registry to stderr) cannot pass.
-test "$out" = "mirror-completed: OK" || {
-    echo "expected 'mirror-completed: OK', got: $out" >&2
-    exit 1
-}
+# hts_mirror_completed() reads HTS_DEFAULT before any mirror has run, so a GUI
+# whose hts_main2() bailed out early does not show abort text for a mirror that
+# never started. 'run' is an ignored placeholder argument.
+assert_selftest "mirror-completed: OK" mirrorcompleted run

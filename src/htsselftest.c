@@ -2466,14 +2466,14 @@ static int st_mirrorcompleted(httrackp *opt, int argc, char **argv) {
   if (hts_mirror_completed(to) != HTS_DEFAULT)
     err = 1;
 
-  /* A verdict never travels: not onto an opt that has none, */
+  /* A verdict never travels onto an opt that has none. */
   from->mirror_completed = HTS_TRUE;
   to->mirror_completed = HTS_DEFAULT;
   copy_htsopt(from, to);
   if (hts_mirror_completed(to) != HTS_DEFAULT)
     err = 1;
-  /* nor over one the target earned itself. HTS_FALSE clears copy_htsopt's
-     "> -1" guard, so a field added to it would be copied here. */
+  /* A verdict never overwrites one the target earned itself, which is what a
+     copy_htsopt change would silently break. */
   from->mirror_completed = HTS_FALSE;
   to->mirror_completed = HTS_TRUE;
   copy_htsopt(from, to);
