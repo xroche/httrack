@@ -166,18 +166,25 @@ echo "PASS"
 # A stop drops the lock before the startup reconcile could run, so without the
 # abort-site call the next run rotates the fragment over the complete generation.
 keeps_generation() { # keeps_generation <name> <how>
-    local out="${tmpdir}/$1" complete="${tmpdir}/$1-complete.zip"
+    local name=$1 how=$2
+    local out="${tmpdir}/${name}" complete="${tmpdir}/${name}-complete.zip"
 
     mkdir -p "$out"
-    local_crawl --log "${tmpdir}/$1.log1" -O "$out" --quiet \
+    local_crawl --log "${tmpdir}/${name}.log1" -O "$out" --quiet \
         --disable-security-limits --robots=0 --timeout=30 -c2 \
-        "${BASEURL}/bigfiles/index.html" || fail "$1: the crawl that fills the cache failed"
+        "${BASEURL}/bigfiles/index.html" ||
+        fail "${name}: the crawl that fills the cache failed"
+    test -s "${out}/hts-cache/new.zip" ||
+        fail "${name}: the first crawl cached nothing, so there is nothing to keep"
     cp "${out}/hts-cache/new.zip" "$complete"
-    stop_and_report "$1" "$2"
+    stop_and_report "$name" "$how"
+    # Or a run that finished would red below, pointing at the wrong thing.
+    test "$refs_left" -gt 0 ||
+        fail "${name}: the second run was not cut short, so it decides nothing"
     test ! -e "${out}/hts-cache/old.zip" ||
-        fail "$1: both generations were left, so the next run drops one"
+        fail "${name}: both generations were left, so the next run drops one"
     cmp -s "${out}/hts-cache/new.zip" "$complete" ||
-        fail "$1: the run left its own fragment where the complete cache was"
+        fail "${name}: the run left its own fragment where the complete cache was"
 }
 
 printf '[a stop keeps the complete cache generation] ..\t'

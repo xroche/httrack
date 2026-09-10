@@ -1246,10 +1246,12 @@ int cache_reconcile_selftest(httrackp *opt, const char *dir) {
   static const LLint SMALL = 1024, MEDIUM = 40000, LARGE = 131072;
   /* Cache generations, in entries: what the reconcile actually compares. */
   static const LLint EMPTY = 0, PARTIAL = 2, COMPLETE = 9;
-  /* Filler bytes under a .zip name: a generation that will not open. */
+  /* Bytes again, not entries: filler under a .zip name will not open. */
   static const LLint DAMAGED = 131072;
   /* reconcile_put_zip() body size; only interrupted-fatnew wants one. */
   static const size_t NO_BODY = 0;
+  /* An end-of-central-directory record carrying no comment field. */
+  static const LLint ZIP_DIRECTORY_END = 22;
 
   selftest_setup_dir(opt, dir);
 #ifdef _WIN32
@@ -1399,13 +1401,12 @@ int cache_reconcile_selftest(httrackp *opt, const char *dir) {
   failures += reconcile_expect_zip(opt, "hts-cache/old.zip", COMPLETE,
                                    "interrupted-damaged-new");
 
-  /* INTERRUPTED: the case that matters, because the file is recoverable. A hard
-     kill leaves new.zip without its central directory, and promoting over it
-     would delete entries cache_repair() would have brought back. */
+  /* INTERRUPTED: a hard kill leaves new.zip with no central directory, so a
+     promote would delete entries cache_repair() could still recover. */
   reconcile_wipe(opt);
   reconcile_put(opt, "hts-in_progress.lock", 0);
   reconcile_put_zip(opt, "hts-cache/new.zip", COMPLETE, NO_BODY);
-  reconcile_truncate(opt, "hts-cache/new.zip", 22);
+  reconcile_truncate(opt, "hts-cache/new.zip", ZIP_DIRECTORY_END);
   reconcile_put_zip(opt, "hts-cache/old.zip", EMPTY, NO_BODY);
   failures += reconcile_expect_zip(opt, "hts-cache/new.zip", -1,
                                    "interrupted-truncated-new fixture");

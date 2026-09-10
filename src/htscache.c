@@ -1085,11 +1085,10 @@ static LLint reconcile_entries(httrackp *opt, const char *name) {
 
   if ((zip = hts_unzOpen_utf8(reconcile_path(opt, name))) == NULL)
     return -1;
-  /* Clamped: a damaged central directory can claim a count that casts negative,
-     which would read as "will not open". */
+  /* A damaged directory claiming a count that casts negative just loses the
+     comparison below, which is the safe way to lose. */
   if (unzGetGlobalInfo64(zip, &gi) == UNZ_OK)
-    entries = gi.number_entry > (ZPOS64_T) INT_MAX ? (LLint) INT_MAX
-                                                   : (LLint) gi.number_entry;
+    entries = (LLint) gi.number_entry;
   unzClose(zip);
   return entries;
 }
