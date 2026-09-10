@@ -220,13 +220,28 @@ assert_lockrule_selftest() {
 # Ask a running engine for something by dropping NAME in its output directory.
 # A bare redirect there reports ENOENT for three reasons a caller cannot separate.
 write_lock_request() { # write_lock_request DIR NAME PID
-    local dir=$1 name=$2 pid=$3
-    : >"${dir}/${name}" 2>/dev/null && return 0
+    local dir=$1 name=$2 pid=$3 gone='' up=$1
+    # The shell reports a failing redirect before it applies the 2>/dev/null
+    # beside it (#1637).
+    { : >"${dir}/${name}"; } 2>/dev/null && return 0
     kill -0 "$pid" 2>/dev/null ||
         fail "the engine exited before it could be asked for ${name}"
-    test -d "$(dirname "$dir")" ||
-        fail "$(dirname "$dir") is gone: something removed it under a running test"
-    fail "${name} could not be written into ${dir}"
+    # It walks up because the path crosses the driver's TMPDIR, the test's
+    # mktemp directory and the crawl output (#1639).
+    while test ! -d "$up"; do
+        gone=$up
+        case $up in
+        */?*) up=${up%/*} ;;
+        *)
+            up=.
+            break
+            ;;
+        esac
+        test -n "$up" || up=/
+    done
+    test -z "$gone" ||
+        fail "${gone} is gone (${up} survives): something removed it under a running test"
+    fail "${name} could not be written into ${dir}, which is still there"
 }
 
 # wait_until for a condition only a live engine can reach, so an engine that
