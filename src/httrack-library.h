@@ -810,6 +810,17 @@ HTSEXT_API hts_boolean hts_findisfile(find_handle find);
     temporary entries. Else 0. */
 HTSEXT_API hts_boolean hts_findissystem(find_handle find);
 
+/* Worker threads */
+#ifndef HTS_DEF_FWTYPE_hts_thread_runner
+#define HTS_DEF_FWTYPE_hts_thread_runner
+typedef void (*hts_thread_runner)(void (*fun)(void *arg), void *arg);
+#endif
+
+/** Wraps each worker body in a caller-supplied frame. The runner must call
+    'fun(arg)' once, and NULL clears it. Returns the previous runner. Set it
+    before spawning, since it is read unlocked. */
+HTSEXT_API hts_thread_runner hts_set_thread_runner(hts_thread_runner runner);
+
 /* UTF-8 aware FILE API */
 /* On non-Windows these macros resolve directly to the POSIX calls. On Windows
    they map to the hts_*_utf8 wrappers below, which convert the UTF-8 path to
