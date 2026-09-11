@@ -1259,6 +1259,12 @@ pid_state() { # pid_state PID
     # Hurd's ps takes the pid positionally and rejects -p, so ask both ways.
     st=$(ps -o state= -p "$1" 2>/dev/null) ||
         st=$(ps -o state= "$1" 2>/dev/null) || st=
+    # One row, or none: a ps that answered for more than one pid, or printed a
+    # header, cannot say which state belongs to this one, and concatenating the
+    # rows invents a state no column held.
+    case $st in
+    *$'\n'*) st='' ;;
+    esac
     # Trimmed, since a padded column would read as neither state.
     PID_STATE=${st//[[:space:]]/}
 }

@@ -136,7 +136,7 @@ test -z "$noise" || fail "a failed open reached the caller's stderr: $noise"
 # The ps route, which no host with a working /proc reaches. Padded, since a
 # column with spaces around it used to read as neither state. Two stubs, because
 # Hurd's ps rejects -p and takes the pid positionally.
-mkdir -p "$tmp/psposix" "$tmp/pshurd" "$tmp/psnone"
+mkdir -p "$tmp/psposix" "$tmp/pshurd" "$tmp/psnone" "$tmp/psmulti"
 cat >"$tmp/psposix/ps" <<'STUB'
 #!/bin/sh
 for a; do test "$a" != -p || { echo " Z+ "; exit 0; }; done
@@ -147,12 +147,22 @@ cat >"$tmp/pshurd/ps" <<'STUB'
 for a; do test "$a" != -p || exit 64; done
 echo " Z+ "
 STUB
-chmod +x "$tmp/psposix/ps" "$tmp/pshurd/ps"
+# Two rows, which is what a ps that ignored the empty header would print. The
+# first names a state, and it is not this pid's.
+cat >"$tmp/psmulti/ps" <<'STUB'
+#!/bin/sh
+printf 'Z\nR\n'
+STUB
+chmod +x "$tmp/psposix/ps" "$tmp/pshurd/ps" "$tmp/psmulti/ps"
 path_was=$PATH
 for stub in psposix pshurd; do
     PATH=$tmp/$stub:$path_was
     pid_is_zombie "$absent" || fail "$stub ps named state Z and it was read as running"
 done
+PATH=$tmp/psmulti:$path_was
+pid_is_zombie "$unreadable_live" && fail "two ps rows were concatenated into an exit"
+pid_state_readable "$unreadable_live" && fail "an answer naming two pids was called readable"
+PATH=$path_was
 # A build root with no ps at all, which Fedora's is: neither route answers, so
 # the helper must say so rather than guess.
 # shellcheck disable=SC2123 # a PATH holding one empty directory is how ps goes missing
