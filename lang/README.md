@@ -2,6 +2,8 @@
 
 Interface strings live here, one `.txt` file per language. `English.txt` is the reference: every other file maps each English string to its translation.
 
+**Send a translation only into a language you read natively, and never send machine or LLM output.** Nobody here can check it, and a bad string is worse than the English it would replace.
+
 ## File format
 
 Plain text, entries in consecutive pairs of lines:
@@ -28,15 +30,28 @@ A few `LANGUAGE_*` entries at the top describe the file itself:
 | Key | Meaning |
 | --- | --- |
 | `LANGUAGE_NAME` | Name shown in the language picker, in its own language (`Deutsch`, not `German`) |
+| `LANGUAGE_FILE` | The filename without `.txt`, in ASCII (`Portugues-Brasil`). It reaches the update endpoint as `Language=` |
 | `LANGUAGE_ISO` | ISO 639 code, with region if needed (`de`, `pt_BR`) |
 | `LANGUAGE_AUTHOR` | Your name and contact |
 | `LANGUAGE_WINDOWSID` | Windows locale name used by WinHTTrack (`German (Standard)`) |
 
-## Adding or updating a language
+## Updating a language
 
-1. Copy `English.txt` to `<Language>.txt`, or edit the existing file.
-2. Translate each second line; leave the English keys untouched.
-3. Fill in the `LANGUAGE_*` header for a new file.
-4. Open a pull request, or attach the file to a GitHub issue.
+Edit `<Language>.txt`: translate each second line and leave the English keys untouched. Then open a pull request, or attach the file to a GitHub issue.
 
 When new strings land in `English.txt` they show up untranslated (as English) until a translator fills them in.
+
+## Adding a language
+
+A translator only has to send the catalog: copy `English.txt` to `<Language>.txt`, translate what you can, and fill in the `LANGUAGE_*` header. A partial file is worth sending. A maintainer does the rest.
+
+## Wiring a new catalog into the build
+
+The suite fails until all of this is done:
+
+- `lang.def`: append the basename and the next `LANGUAGE_<N>`.
+- `lang.indexes`: append `<iso>:<N>` for that same N, with the code lowercased (`pt_br`). webhttrack turns the caller's locale into that number, so a wrong one serves another catalog.
+- `tests/62_lang-untranslated.counts` and `tests/62_lang-linebreaks.counts`: add one row to each.
+- `tests/install-manifest.txt`: add the installed `lang/<Language>.txt` path.
+- `greetings.txt`: add a row under `Translations` for the translator, keyed by the English name of the language. `AUTHORS` and `html/contact.html` repeat that roster, so the row goes into all three.
+- `tests/373_credits.test`: add a `LABEL` entry when `LANGUAGE_WINDOWSID` is not that English name (`Uzbek Latin`, `FYRO Macedonian`).
