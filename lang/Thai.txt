@@ -1,0 +1,1052 @@
+LANGUAGE_NAME
+ไทย
+LANGUAGE_FILE
+Thai
+LANGUAGE_ISO
+th
+LANGUAGE_AUTHOR
+Placeholder Name (placeholder at example.com) \r\n
+LANGUAGE_WINDOWSID
+Thai
+OK
+Placeholder:OK
+Cancel
+Placeholder:Cancel
+Exit
+Placeholder:Exit
+Close
+Placeholder:Close
+Cancel changes
+Placeholder:Cancel changes
+Click to confirm
+Placeholder:Click to confirm
+Click to get help!
+Placeholder:Click to get help!
+Click to return to previous screen
+Placeholder:Click to return to previous screen
+Click to go to next screen
+Placeholder:Click to go to next screen
+Hide password
+Placeholder:Hide password
+Save project
+Placeholder:Save project
+Close current project?
+Placeholder:Close current project?
+Delete this project?
+Placeholder:Delete this project?
+Delete empty project %s?
+Placeholder:Delete empty project %s?
+Action not yet implemented
+Placeholder:Action not yet implemented
+Error deleting this project
+Placeholder:Error deleting this project
+Select a rule for the filter
+Placeholder:Select a rule for the filter
+Enter keywords for the filter
+Placeholder:Enter keywords for the filter
+Cancel
+Placeholder:Cancel
+Add this rule
+Placeholder:Add this rule
+Please enter one or several keyword(s) for the rule
+Placeholder:Please enter one or several keyword(s) for the rule
+Add Scan Rule
+Placeholder:Add Scan Rule
+Criterion
+Placeholder:Criterion
+String
+Placeholder:String
+Add
+Placeholder:Add
+Scan Rules
+Placeholder:Scan Rules
+Use wildcards to exclude or include URLs or links.\nYou can put several scan strings on the same line.\nUse spaces as separators.\n\nExample: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
+Placeholder:Use wildcards to exclude or include URLs or links.\nYou can put several scan strings on the same line.\nUse spaces as separators.\n\nExample: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
+Exclude links
+Placeholder:Exclude links
+Include link(s)
+Placeholder:Include link(s)
+Tip: To have ALL GIF files included, use something like +www.someweb.com/*.gif. \n(+*.gif / -*.gif will include/exclude ALL GIFs from ALL sites)
+Placeholder:Tip: To have ALL GIF files included, use something like +www.someweb.com/*.gif. \n(+*.gif / -*.gif will include/exclude ALL GIFs from ALL sites)
+Save prefs
+Placeholder:Save prefs
+Matching links will be excluded:
+Placeholder:Matching links will be excluded:
+Matching links will be included:
+Placeholder:Matching links will be included:
+Example:
+Placeholder:Example:
+gif\r\nWill match all GIF files
+Placeholder:gif\r\nWill match all GIF files
+blue\r\nWill find all files with a matching 'blue' sub-string such as 'bluesky-small.jpeg'
+Placeholder:blue\r\nWill find all files with a matching 'blue' sub-string such as 'bluesky-small.jpeg'
+bigfile.mov\r\nWill match the file 'bigfile.mov', but not 'bigfile2.mov'
+Placeholder:bigfile.mov\r\nWill match the file 'bigfile.mov', but not 'bigfile2.mov'
+cgi\r\nWill find links with folder name matching sub-string 'cgi' such as /cgi-bin/somecgi.cgi
+Placeholder:cgi\r\nWill find links with folder name matching sub-string 'cgi' such as /cgi-bin/somecgi.cgi
+cgi-bin\r\nWill find links with folder name matching whole 'cgi-bin' string (but not cgi-bin-2, for example)
+Placeholder:cgi-bin\r\nWill find links with folder name matching whole 'cgi-bin' string (but not cgi-bin-2, for example)
+someweb.com\r\nWill find links with matching sub-string such as www.someweb.com, private.someweb.com etc.
+Placeholder:someweb.com\r\nWill find links with matching sub-string such as www.someweb.com, private.someweb.com etc.
+someweb\r\nWill find links with matching folder sub-string such as www.someweb.com, www.someweb.edu, private.someweb.otherweb.com etc.
+Placeholder:someweb\r\nWill find links with matching folder sub-string such as www.someweb.com, www.someweb.edu, private.someweb.otherweb.com etc.
+www.someweb.com\r\nWill find links matching whole 'www.someweb.com' sub-string (but not links such as private.someweb.com/..)
+Placeholder:www.someweb.com\r\nWill find links matching whole 'www.someweb.com' sub-string (but not links such as private.someweb.com/..)
+someweb\r\nWill find any links with matching sub-string such as www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html etc.
+Placeholder:someweb\r\nWill find any links with matching sub-string such as www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html etc.
+www.test.com/test/someweb.html\r\nWill only find the 'www.test.com/test/someweb.html' file. Note that you have to type the complete path (URL + site path)
+Placeholder:www.test.com/test/someweb.html\r\nWill only find the 'www.test.com/test/someweb.html' file. Note that you have to type the complete path (URL + site path)
+All links will match
+Placeholder:All links will match
+Add exclusion filter
+Placeholder:Add exclusion filter
+Add inclusion filter
+Placeholder:Add inclusion filter
+Existing filters
+Placeholder:Existing filters
+Cancel changes
+Placeholder:Cancel changes
+Save current preferences as default values
+Placeholder:Save current preferences as default values
+Click to confirm
+Placeholder:Click to confirm
+No log files in %s!
+Placeholder:No log files in %s!
+No 'index.html' file in %s!
+Placeholder:No 'index.html' file in %s!
+Click to quit WinHTTrack Website Copier
+Placeholder:Click to quit WinHTTrack Website Copier
+View log files
+Placeholder:View log files
+Browse HTML start page
+Placeholder:Browse HTML start page
+End of mirror
+Placeholder:End of mirror
+View log files
+Placeholder:View log files
+Browse Mirrored Website
+Placeholder:Browse Mirrored Website
+New project...
+Placeholder:New project...
+View error and warning reports
+Placeholder:View error and warning reports
+View report
+Placeholder:View report
+Close the log file window
+Placeholder:Close the log file window
+Info type:
+Placeholder:Info type:
+Errors
+Placeholder:Errors
+Infos
+Placeholder:Infos
+Find
+Placeholder:Find
+Find a word
+Placeholder:Find a word
+Info log file
+Placeholder:Info log file
+Warning/Errors log file
+Placeholder:Warning/Errors log file
+Unable to initialize the OLE system
+Placeholder:Unable to initialize the OLE system
+WinHTTrack could not find any interrupted download file cache in the specified folder!
+Placeholder:WinHTTrack could not find any interrupted download file cache in the specified folder!
+Could not connect to provider
+Placeholder:Could not connect to provider
+receive
+Placeholder:receive
+request
+Placeholder:request
+connect
+Placeholder:connect
+search
+Placeholder:search
+ready
+Placeholder:ready
+error
+Placeholder:error
+Receiving files..
+Placeholder:Receiving files..
+Parsing HTML file..
+Placeholder:Parsing HTML file..
+Purging files..
+Placeholder:Purging files..
+Loading cache in progress..
+Placeholder:Loading cache in progress..
+Parsing HTML file (testing links)..
+Placeholder:Parsing HTML file (testing links)..
+Pause - Toggle [Mirror]/[Pause download] to resume operation
+Placeholder:Pause - Toggle [Mirror]/[Pause download] to resume operation
+Finishing pending transfers - Select [Cancel] to stop now!
+Placeholder:Finishing pending transfers - Select [Cancel] to stop now!
+scanning
+Placeholder:scanning
+Waiting for scheduled time..
+Placeholder:Waiting for scheduled time..
+Transferring data..
+Placeholder:Transferring data..
+Connecting to provider
+Placeholder:Connecting to provider
+[%d seconds] to go before start of operation
+Placeholder:[%d seconds] to go before start of operation
+Site mirroring in progress [%s, %s bytes]
+Placeholder:Site mirroring in progress [%s, %s bytes]
+Site mirroring finished!
+Placeholder:Site mirroring finished!
+A problem occurred during the mirroring operation\n
+Placeholder:A problem occurred during the mirroring operation\n
+\nDuring:\n
+Placeholder:\nDuring:\n
+\nSee the log file if necessary.\n\nClick FINISH to quit WinHTTrack Website Copier.\n\nThanks for using WinHTTrack!
+Placeholder:\nSee the log file if necessary.\n\nClick FINISH to quit WinHTTrack Website Copier.\n\nThanks for using WinHTTrack!
+Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) if necessary to ensure that everything is OK.\n\nThanks for using WinHTTrack!
+Placeholder:Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) if necessary to ensure that everything is OK.\n\nThanks for using WinHTTrack!
+* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+Placeholder:* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+Mirroring operation stopped before the end.\nThe files already downloaded are kept.\nSee log file(s) if necessary.\n\nThanks for using WinHTTrack!
+Placeholder:Mirroring operation stopped before the end.\nThe files already downloaded are kept.\nSee log file(s) if necessary.\n\nThanks for using WinHTTrack!
+\n\nTip: Click [View log file] to see warning or error messages
+Placeholder:\n\nTip: Click [View log file] to see warning or error messages
+Do you really want to quit WinHTTrack Website Copier?
+Placeholder:Do you really want to quit WinHTTrack Website Copier?
+- Mirroring Mode -\n\nEnter address(es) in URL box
+Placeholder:- Mirroring Mode -\n\nEnter address(es) in URL box
+- Interactive Wizard Mode (questions) -\n\nEnter address(es) in URL box
+Placeholder:- Interactive Wizard Mode (questions) -\n\nEnter address(es) in URL box
+- File Download Mode -\n\nEnter file address(es) in URL box
+Placeholder:- File Download Mode -\n\nEnter file address(es) in URL box
+- Link Testing Mode -\n\nEnter Web address(es) with links to test in URL box
+Placeholder:- Link Testing Mode -\n\nEnter Web address(es) with links to test in URL box
+- Update Mode -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
+Placeholder:- Update Mode -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
+- Resume Mode (Interrupted Operation) -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
+Placeholder:- Resume Mode (Interrupted Operation) -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
+Log files Path
+Placeholder:Log files Path
+Path
+Placeholder:Path
+- Links List Mode -\n\nUse URL box to enter address(es) of page(s) containing links to mirror
+Placeholder:- Links List Mode -\n\nUse URL box to enter address(es) of page(s) containing links to mirror
+New project / Import?
+Placeholder:New project / Import?
+Choose criterion
+Placeholder:Choose criterion
+Maximum link scanning depth
+Placeholder:Maximum link scanning depth
+Enter address(es) here
+Placeholder:Enter address(es) here
+Define additional filtering rules
+Placeholder:Define additional filtering rules
+Proxy Name (if needed)
+Placeholder:Proxy Name (if needed)
+Proxy Port
+Placeholder:Proxy Port
+Define proxy settings
+Placeholder:Define proxy settings
+Use standard HTTP proxy as FTP proxy
+Placeholder:Use standard HTTP proxy as FTP proxy
+Path
+Placeholder:Path
+Select Path
+Placeholder:Select Path
+Path
+Placeholder:Path
+Select Path
+Placeholder:Select Path
+Quit WinHTTrack Website Copier
+Placeholder:Quit WinHTTrack Website Copier
+About WinHTTrack
+Placeholder:About WinHTTrack
+Save current preferences as default values
+Placeholder:Save current preferences as default values
+Click to continue
+Placeholder:Click to continue
+Click to define options
+Placeholder:Click to define options
+Click to add a URL
+Placeholder:Click to add a URL
+Load URL(s) from text file
+Placeholder:Load URL(s) from text file
+WinHTTrack preferences (*.opt)|*.opt||
+Placeholder:WinHTTrack preferences (*.opt)|*.opt||
+Address List text file (*.txt)|*.txt||
+Placeholder:Address List text file (*.txt)|*.txt||
+File not found!
+Placeholder:File not found!
+Do you really want to change the project name/path?
+Placeholder:Do you really want to change the project name/path?
+Load user-default options?
+Placeholder:Load user-default options?
+Save user-default options?
+Placeholder:Save user-default options?
+Reset all default options?
+Placeholder:Reset all default options?
+Welcome to WinHTTrack!
+Placeholder:Welcome to WinHTTrack!
+Action:
+Placeholder:Action:
+Max Depth
+Placeholder:Max Depth
+Maximum external depth:
+Placeholder:Maximum external depth:
+Filters (refuse/accept links) :
+Placeholder:Filters (refuse/accept links):
+Paths
+Placeholder:Paths
+Save prefs
+Placeholder:Save prefs
+Define..
+Placeholder:Define..
+Set options..
+Placeholder:Set options..
+Preferences and mirror options:
+Placeholder:Preferences and mirror options:
+Project name
+Placeholder:Project name
+Add a URL...
+Placeholder:Add a URL...
+Web Addresses: (URL)
+Placeholder:Web Addresses: (URL)
+Stop WinHTTrack?
+Placeholder:Stop WinHTTrack?
+No log files in %s!
+Placeholder:No log files in %s!
+Pause Download?
+Placeholder:Pause Download?
+Stop the mirroring operation
+Placeholder:Stop the mirroring operation
+Minimize to System Tray
+Placeholder:Minimize to System Tray
+Click to skip a link or stop parsing
+Placeholder:Click to skip a link or stop parsing
+Click to skip a link
+Placeholder:Click to skip a link
+Bytes saved
+Placeholder:Bytes saved
+Links scanned
+Placeholder:Links scanned
+Time:
+Placeholder:Time:
+Connections:
+Placeholder:Connections:
+Running:
+Placeholder:Running:
+Hide
+Placeholder:Hide
+Transfer rate
+Placeholder:Transfer rate
+SKIP
+Placeholder:SKIP
+Information
+Placeholder:Information
+Files written:
+Placeholder:Files written:
+Files updated:
+Placeholder:Files updated:
+Errors:
+Placeholder:Errors:
+In progress:
+Placeholder:In progress:
+Follow external links
+Placeholder:Follow external links
+Test all links in pages
+Placeholder:Test all links in pages
+Try to ferret out all links
+Placeholder:Try to ferret out all links
+Download HTML files first (faster)
+Placeholder:Download HTML files first (faster)
+Choose local site structure
+Placeholder:Choose local site structure
+Set user-defined structure on disk
+Placeholder:Set user-defined structure on disk
+Use a cache for updates and retries
+Placeholder:Use a cache for updates and retries
+Do not update zero size or user-erased files
+Placeholder:Do not update zero size or user-erased files
+Create a Start Page
+Placeholder:Create a Start Page
+Create a word database of all html pages
+Placeholder:Create a word database of all html pages
+Build a complete RFC822 mail (MHT/EML) archive of the mirror
+Placeholder:Build a complete RFC822 mail (MHT/EML) archive of the mirror
+Create error logging and report files
+Placeholder:Create error logging and report files
+Generate DOS 8-3 filenames ONLY
+Placeholder:Generate DOS 8-3 filenames ONLY
+Generate ISO9660 filenames ONLY for CDROM medias
+Placeholder:Generate ISO9660 filenames ONLY for CDROM medias
+Do not create HTML error pages
+Placeholder:Do not create HTML error pages
+Select file types to be saved to disk
+Placeholder:Select file types to be saved to disk
+Select parsing direction
+Placeholder:Select parsing direction
+Select global parsing direction
+Placeholder:Select global parsing direction
+Setup URL rewriting rules for internal links (downloaded ones) and external links (not downloaded ones)
+Placeholder:Setup URL rewriting rules for internal links (downloaded ones) and external links (not downloaded ones)
+Max simultaneous connections
+Placeholder:Max simultaneous connections
+File timeout
+Placeholder:File timeout
+Cancel all links from host if timeout occurs
+Placeholder:Cancel all links from host if timeout occurs
+Minimum admissible transfer rate
+Placeholder:Minimum admissible transfer rate
+Cancel all links from host if too slow
+Placeholder:Cancel all links from host if too slow
+Maximum number of retries on non-fatal errors
+Placeholder:Maximum number of retries on non-fatal errors
+Maximum size for any single HTML file
+Placeholder:Maximum size for any single HTML file
+Maximum size for any single non-HTML file
+Placeholder:Maximum size for any single non-HTML file
+Maximum amount of bytes to retrieve from the Web
+Placeholder:Maximum amount of bytes to retrieve from the Web
+Make a pause after downloading this amount of bytes
+Placeholder:Make a pause after downloading this amount of bytes
+Maximum duration time for the mirroring operation
+Placeholder:Maximum duration time for the mirroring operation
+Maximum transfer rate
+Placeholder:Maximum transfer rate
+Maximum connections/seconds (avoid server overload)
+Placeholder:Maximum connections/seconds (avoid server overload)
+Maximum number of links that can be tested (not saved!)
+Placeholder:Maximum number of links that can be tested (not saved!)
+Browser identity
+Placeholder:Browser identity
+Comment to be placed in each HTML file
+Placeholder:Comment to be placed in each HTML file
+Languages accepted by the browser
+Placeholder:Languages accepted by the browser
+Additional HTTP headers to be sent in each requests
+Placeholder:Additional HTTP headers to be sent in each requests
+HTTP referer to be sent for initial URLs
+Placeholder:HTTP referer to be sent for initial URLs
+Back to starting page
+Placeholder:Back to starting page
+Save current preferences as default values
+Placeholder:Save current preferences as default values
+Click to continue
+Placeholder:Click to continue
+Click to cancel changes
+Placeholder:Click to cancel changes
+Follow local robots rules on sites
+Placeholder:Follow local robots rules on sites
+Links to non-localised external pages will produce error pages
+Placeholder:Links to non-localised external pages will produce error pages
+Do not erase obsolete files after update
+Placeholder:Do not erase obsolete files after update
+Accept cookies?
+Placeholder:Accept cookies?
+Check document type when unknown?
+Placeholder:Check document type when unknown?
+Parse java applets to retrieve included files that must be downloaded?
+Placeholder:Parse java applets to retrieve included files that must be downloaded?
+Store all files in cache instead of HTML only
+Placeholder:Store all files in cache instead of HTML only
+Log file type (if generated)
+Placeholder:Log file type (if generated)
+Maximum mirroring depth from root address
+Placeholder:Maximum mirroring depth from root address
+Maximum mirroring depth for external/forbidden addresses (0, that is, none, is the default)
+Placeholder:Maximum mirroring depth for external/forbidden addresses (0, that is, none, is the default)
+Create a debugging file
+Placeholder:Create a debugging file
+Use non-standard requests to get round some server bugs
+Placeholder:Use non-standard requests to get round some server bugs
+Use old HTTP/1.0 requests (limits engine power!)
+Placeholder:Use old HTTP/1.0 requests (limits engine power!)
+Attempt to limit retransfers through several tricks (file size test..)
+Placeholder:Attempt to limit retransfers through several tricks (file size test..)
+Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+Placeholder:Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+Write external links without login/password
+Placeholder:Write external links without login/password
+Write internal links without query string
+Placeholder:Write internal links without query string
+Get non-HTML files related to a link, eg external .ZIP or pictures
+Placeholder:Get non-HTML files related to a link, eg external .ZIP or pictures
+Test all links (even forbidden ones)
+Placeholder:Test all links (even forbidden ones)
+Try to catch all URLs (even in unknown tags/code)
+Placeholder:Try to catch all URLs (even in unknown tags/code)
+Get HTML files first!
+Placeholder:Get HTML files first!
+Structure type (how links are saved)
+Placeholder:Structure type (how links are saved)
+Use a cache for updates
+Placeholder:Use a cache for updates
+Do not re-download locally erased files
+Placeholder:Do not re-download locally erased files
+Make an index
+Placeholder:Make an index
+Make a word database
+Placeholder:Make a word database
+Build a mail archive
+Placeholder:Build a mail archive
+Log files
+Placeholder:Log files
+DOS names (8+3)
+Placeholder:DOS names (8+3)
+ISO9660 names (CDROM)
+Placeholder:ISO9660 names (CDROM)
+No error pages
+Placeholder:No error pages
+Primary Scan Rule
+Placeholder:Primary Scan Rule
+Travel mode
+Placeholder:Travel mode
+Global travel mode
+Placeholder:Global travel mode
+These options should be modified only exceptionally
+Placeholder:These options should be modified only exceptionally
+Activate Debugging Mode (winhttrack.log)
+Placeholder:Activate Debugging Mode (winhttrack.log)
+Rewrite links: internal / external
+Placeholder:Rewrite links: internal / external
+Flow control
+Placeholder:Flow control
+Limits
+Placeholder:Limits
+Identity
+Placeholder:Identity
+HTML footer
+Placeholder:HTML footer
+Languages
+Placeholder:Languages
+Additional HTTP Headers
+Placeholder:Additional HTTP Headers
+Default referer URL
+Placeholder:Default referer URL
+N# connections
+Placeholder:N# connections
+Abandon host if error
+Placeholder:Abandon host if error
+Minimum transfer rate (B/s)
+Placeholder:Minimum transfer rate (B/s)
+Abandon host if too slow
+Placeholder:Abandon host if too slow
+Configure
+Placeholder:Configure
+Use proxy for ftp transfers
+Placeholder:Use proxy for ftp transfers
+TimeOut(s)
+Placeholder:TimeOut(s)
+Persistent connections (Keep-Alive)
+Placeholder:Persistent connections (Keep-Alive)
+Reduce connection time and type lookup time using persistent connections
+Placeholder:Reduce connection time and type lookup time using persistent connections
+Retries
+Placeholder:Retries
+Size limit
+Placeholder:Size limit
+Max size of any HTML file (B)
+Placeholder:Max size of any HTML file (B)
+Max size of any non-HTML file
+Placeholder:Max size of any non-HTML file
+Max site size
+Placeholder:Max site size
+Max time
+Placeholder:Max time
+Save prefs
+Placeholder:Save prefs
+Max transfer rate
+Placeholder:Max transfer rate
+Follow robots.txt
+Placeholder:Follow robots.txt
+No external pages
+Placeholder:No external pages
+Do not purge old files
+Placeholder:Do not purge old files
+Accept cookies
+Placeholder:Accept cookies
+Check document type
+Placeholder:Check document type
+Parse java files
+Placeholder:Parse java files
+Store ALL files in cache
+Placeholder:Store ALL files in cache
+Tolerant requests (for servers)
+Placeholder:Tolerant requests (for servers)
+Update hack (limit re-transfers)
+Placeholder:Update hack (limit re-transfers)
+URL hacks (join similar URLs)
+Placeholder:URL hacks (join similar URLs)
+Force old HTTP/1.0 requests (no 1.1)
+Placeholder:Force old HTTP/1.0 requests (no 1.1)
+Max connections / seconds
+Placeholder:Max connections / seconds
+Maximum number of links
+Placeholder:Maximum number of links
+Pause after downloading..
+Placeholder:Pause after downloading..
+Hide passwords
+Placeholder:Hide passwords
+Hide query strings
+Placeholder:Hide query strings
+Links
+Placeholder:Links
+Build
+Placeholder:Build
+Experts Only
+Placeholder:Experts Only
+Flow Control
+Placeholder:Flow Control
+Limits
+Placeholder:Limits
+Browser ID
+Placeholder:Browser ID
+Scan Rules
+Placeholder:Scan Rules
+Spider
+Placeholder:Spider
+Log, Index, Cache
+Placeholder:Log, Index, Cache
+Proxy
+Placeholder:Proxy
+MIME Types
+Placeholder:MIME Types
+Do you really want to quit WinHTTrack Website Copier?
+Placeholder:Do you really want to quit WinHTTrack Website Copier?
+Do not connect to a provider (already connected)
+Placeholder:Do not connect to a provider (already connected)
+Do not use remote access connection
+Placeholder:Do not use remote access connection
+Schedule the mirroring operation
+Placeholder:Schedule the mirroring operation
+Quit WinHTTrack Website Copier
+Placeholder:Quit WinHTTrack Website Copier
+Back to starting page
+Placeholder:Back to starting page
+Click to start!
+Placeholder:Click to start!
+No saved password for this connection!
+Placeholder:No saved password for this connection!
+Can not get remote connection settings
+Placeholder:Can not get remote connection settings
+Select a connection provider
+Placeholder:Select a connection provider
+Start
+Placeholder:Start
+Please adjust connection parameters if necessary,\nthen press FINISH to launch the mirroring operation.
+Placeholder:Please adjust connection parameters if necessary,\nthen press FINISH to launch the mirroring operation.
+Save settings only, do not launch download now.
+Placeholder:Save settings only, do not launch download now.
+On hold
+Placeholder:On hold
+Transfer scheduled for: (hh/mm/ss)
+Placeholder:Transfer scheduled for: (hh/mm/ss)
+Start
+Placeholder:Start
+Connect to provider (RAS)
+Placeholder:Connect to provider (RAS)
+Connect to this provider
+Placeholder:Connect to this provider
+Disconnect when finished
+Placeholder:Disconnect when finished
+Disconnect modem on completion
+Placeholder:Disconnect modem on completion
+\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nEngine and interfaces: Xavier Roche\r\nCode, documentation and packaging: many contributors\r\n\r\n(C) Xavier Roche and other contributors\r\nMANY THANKS for English translations to:\r\nXavier Roche, Robert Lagadec
+Placeholder:\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nEngine and interfaces: Xavier Roche\r\nCode, documentation and packaging: many contributors\r\n\r\n(C) Xavier Roche and other contributors\r\nMANY THANKS for English translations to:\r\nXavier Roche, Robert Lagadec
+About WinHTTrack Website Copier
+Placeholder:About WinHTTrack Website Copier
+Please visit our Web page
+Placeholder:Please visit our Web page
+Wizard query
+Placeholder:Wizard query
+Your answer:
+Placeholder:Your answer:
+Link detected..
+Placeholder:Link detected..
+Choose a rule
+Placeholder:Choose a rule
+Ignore this link
+Placeholder:Ignore this link
+Ignore directory
+Placeholder:Ignore directory
+Ignore domain
+Placeholder:Ignore domain
+Catch this page only
+Placeholder:Catch this page only
+Mirror site
+Placeholder:Mirror site
+Mirror domain
+Placeholder:Mirror domain
+Ignore all
+Placeholder:Ignore all
+Wizard query
+Placeholder:Wizard query
+NO
+Placeholder:NO
+File
+Placeholder:File
+Options
+Placeholder:Options
+Log
+Placeholder:Log
+Window
+Placeholder:Window
+Help
+Placeholder:Help
+Pause transfer
+Placeholder:Pause transfer
+Exit
+Placeholder:Exit
+Modify options
+Placeholder:Modify options
+View log
+Placeholder:View log
+View error log
+Placeholder:View error log
+View file transfers
+Placeholder:View file transfers
+Hide
+Placeholder:Hide
+About WinHTTrack Website Copier
+Placeholder:About WinHTTrack Website Copier
+Check program updates...
+Placeholder:Check program updates...
+&Toolbar
+Placeholder:&Toolbar
+&Status Bar
+Placeholder:&Status Bar
+S&plit
+Placeholder:S&plit
+File
+Placeholder:File
+Preferences
+Placeholder:Preferences
+Mirror
+Placeholder:Mirror
+Log
+Placeholder:Log
+Window
+Placeholder:Window
+Help
+Placeholder:Help
+Exit
+Placeholder:Exit
+Load default options
+Placeholder:Load default options
+Save default options
+Placeholder:Save default options
+Reset to default options
+Placeholder:Reset to default options
+Load options...
+Placeholder:Load options...
+Save options as...
+Placeholder:Save options as...
+Language preference...
+Placeholder:Language preference...
+Contents...
+Placeholder:Contents...
+About WinHTTrack...
+Placeholder:About WinHTTrack...
+New project\tCtrl+N
+Placeholder:New project\tCtrl+N
+&Open...\tCtrl+O
+Placeholder:&Open...\tCtrl+O
+&Save\tCtrl+S
+Placeholder:&Save\tCtrl+S
+Save &As...
+Placeholder:Save &As...
+&Delete...
+Placeholder:&Delete...
+&Browse sites...
+Placeholder:&Browse sites...
+User-defined structure
+Placeholder:User-defined structure
+%n\tName of file without file type (ex: image)\r\n%N\tName of file including file type (ex: image.gif)\r\n%t\tFile type only (ex: gif)\r\n%p\tPath [without ending /] (ex: /someimages)\r\n%h\tHost name (ex: www.someweb.com)\r\n%M\tMD5 URL (128 bits, 32 ascii bytes)\r\n%Q\tMD5 query string (128 bits, 32 ascii bytes)\r\n%q\tMD5 small query string (16 bits, 4 ascii bytes)\r\n\r\n%s?\tShort name (ex: %sN)
+Placeholder:%n\tName of file without file type (ex: image)\r\n%N\tName of file including file type (ex: image.gif)\r\n%t\tFile type only (ex: gif)\r\n%p\tPath [without ending /] (ex: /someimages)\r\n%h\tHost name (ex: www.someweb.com)\r\n%M\tMD5 URL (128 bits, 32 ascii bytes)\r\n%Q\tMD5 query string (128 bits, 32 ascii bytes)\r\n%q\tMD5 small query string (16 bits, 4 ascii bytes)\r\n\r\n%s?\tShort name (ex: %sN)
+Example:\t%h%p/%n%q.%t\n->\t\tc:\\mirror\\www.someweb.com\\someimages\\image.gif
+Placeholder:Example:\t%h%p/%n%q.%t\n->\t\tc:\\mirror\\www.someweb.com\\someimages\\image.gif
+Proxy settings
+Placeholder:Proxy settings
+Proxy address:
+Placeholder:Proxy address:
+Proxy port:
+Placeholder:Proxy port:
+Authentication (only if needed)
+Placeholder:Authentication (only if needed)
+Login
+Placeholder:Login
+Password
+Placeholder:Password
+Enter proxy address here
+Placeholder:Enter proxy address here
+Enter proxy port here
+Placeholder:Enter proxy port here
+Enter proxy login
+Placeholder:Enter proxy login
+Enter proxy password
+Placeholder:Enter proxy password
+Enter project name here
+Placeholder:Enter project name here
+Enter saving path here
+Placeholder:Enter saving path here
+Select existing project to update
+Placeholder:Select existing project to update
+Click here to select path
+Placeholder:Click here to select path
+Select or create a new category name, to sort your mirrors in categories
+Placeholder:Select or create a new category name, to sort your mirrors in categories
+HTTrack Project Wizard...
+Placeholder:HTTrack Project Wizard...
+New project name:
+Placeholder:New project name:
+Existing project name:
+Placeholder:Existing project name:
+Project name:
+Placeholder:Project name:
+Base path:
+Placeholder:Base path:
+Project category:
+Placeholder:Project category:
+C:\\My Web Sites
+Placeholder:C:\\My Web Sites
+Type a new project name, \r\nor select existing project to update/resume
+Placeholder:Type a new project name, \r\nor select existing project to update/resume
+New project
+Placeholder:New project
+Insert URL
+Placeholder:Insert URL
+URL:
+Placeholder:URL:
+Authentication (only if needed)
+Placeholder:Authentication (only if needed)
+Login
+Placeholder:Login
+Password
+Placeholder:Password
+Forms or complex links:
+Placeholder:Forms or complex links:
+Capture URL...
+Placeholder:Capture URL...
+Enter URL address(es) here
+Placeholder:Enter URL address(es) here
+Enter site login
+Placeholder:Enter site login
+Enter site password
+Placeholder:Enter site password
+Use this capture tool for links that can only be accessed through forms or javascript code
+Placeholder:Use this capture tool for links that can only be accessed through forms or javascript code
+Choose language according to preference
+Placeholder:Choose language according to preference
+Catch URL!
+Placeholder:Catch URL!
+Please set temporary browser proxy settings to the following values (Copy/Paste Proxy Address and Port).\nThen click on the Form SUBMIT button in your browser page, or click on the specific link you want to capture.
+Placeholder:Please set temporary browser proxy settings to the following values (Copy/Paste Proxy Address and Port).\nThen click on the Form SUBMIT button in your browser page, or click on the specific link you want to capture.
+This will send the desired link from your browser to WinHTTrack.
+Placeholder:This will send the desired link from your browser to WinHTTrack.
+ABORT
+Placeholder:ABORT
+Copy/Paste the temporary proxy parameters here
+Placeholder:Copy/Paste the temporary proxy parameters here
+Cancel
+Placeholder:Cancel
+Unable to find Help files!
+Placeholder:Unable to find Help files!
+Unable to save parameters!
+Placeholder:Unable to save parameters!
+Please drag only one folder at a time
+Placeholder:Please drag only one folder at a time
+Please drag only folders, not files
+Placeholder:Please drag only folders, not files
+Please drag folders only
+Placeholder:Please drag folders only
+Select user-defined structure?
+Placeholder:Select user-defined structure?
+Please ensure that the user-defined-string is correct,\notherwise filenames will be bogus!
+Placeholder:Please ensure that the user-defined-string is correct,\notherwise filenames will be bogus!
+Do you really want to use a user-defined structure?
+Placeholder:Do you really want to use a user-defined structure?
+Too manu URLs, cannot handle so many links!!
+Placeholder:Too manu URLs, cannot handle so many links!!
+Not enough memory, fatal internal error..
+Placeholder:Not enough memory, fatal internal error..
+Unknown operation!
+Placeholder:Unknown operation!
+Add this URL?\r\n
+Placeholder:Add this URL?\r\n
+Warning: main process is still not responding, cannot add URL(s)..
+Placeholder:Warning: main process is still not responding, cannot add URL(s)..
+Type/MIME associations
+Placeholder:Type/MIME associations
+File types:
+Placeholder:File types:
+MIME identity:
+Placeholder:MIME identity:
+Select or modify your file type(s) here
+Placeholder:Select or modify your file type(s) here
+Select or modify your MIME type(s) here
+Placeholder:Select or modify your MIME type(s) here
+Go up
+Placeholder:Go up
+Go down
+Placeholder:Go down
+File download information
+Placeholder:File download information
+Freeze Window
+Placeholder:Freeze Window
+More information:
+Placeholder:More information:
+Welcome to WinHTTrack Website Copier!\n\nPlease click on the NEXT button to\n\n- start a new project\n- or resume a partial download
+Placeholder:Welcome to WinHTTrack Website Copier!\n\nPlease click on the NEXT button to\n\n- start a new project\n- or resume a partial download
+File names with extension:\nFile names containing:\nThis file name:\nFolder names containing:\nThis folder name:\nLinks on this domain:\nLinks on domains containing:\nLinks from this host:\nLinks containing:\nThis link:\nALL LINKS
+Placeholder:File names with extension:\nFile names containing:\nThis file name:\nFolder names containing:\nThis folder name:\nLinks on this domain:\nLinks on domains containing:\nLinks from this host:\nLinks containing:\nThis link:\nALL LINKS
+Show all\nHide debug\nHide infos\nHide debug and infos
+Placeholder:Show all\nHide debug\nHide infos\nHide debug and infos
+Site-structure (default)\nHtml in web/,       images/other files in web/images/\nHtml in web/html,   images/other in web/images\nHtml in web/,       images/other in web/\nHtml in web/,       images/other in web/xxx, where xxx is the file extension\nHtml in web/html,   images/other in web/xxx\nSite-structure, without www.domain.xxx/\nHtml in site_name/, images/other files in site_name/images/\nHtml in site_name/html, images/other in site_name/images\nHtml in site_name/, images/other in site_name/\nHtml in site_name/, images/other in site_name/xxx\nHtml in site_name/html, images/other in site_name/xxx\nAll files in web/, with random names (gadget !)\nAll files in site_name/, with random names (gadget !)\nUser-defined structure..
+Placeholder:Site-structure (default)\nHtml in web/,       images/other files in web/images/\nHtml in web/html,   images/other in web/images\nHtml in web/,       images/other in web/\nHtml in web/,       images/other in web/xxx, where xxx is the file extension\nHtml in web/html,   images/other in web/xxx\nSite-structure, without www.domain.xxx/\nHtml in site_name/, images/other files in site_name/images/\nHtml in site_name/html, images/other in site_name/images\nHtml in site_name/, images/other in site_name/\nHtml in site_name/, images/other in site_name/xxx\nHtml in site_name/html, images/other in site_name/xxx\nAll files in web/, with random names (gadget !)\nAll files in site_name/, with random names (gadget !)\nUser-defined structure..
+Just scan\nStore html files\nStore non html files\nStore all files (default)\nStore html files first
+Placeholder:Just scan\nStore html files\nStore non html files\nStore all files (default)\nStore html files first
+Stay in the same directory\nCan go down (default)\nCan go up\nCan both go up & down
+Placeholder:Stay in the same directory\nCan go down (default)\nCan go up\nCan both go up & down
+Stay on the same address (default)\nStay on the same domain\nStay on the same top level domain\nGo everywhere on the web
+Placeholder:Stay on the same address (default)\nStay on the same domain\nStay on the same top level domain\nGo everywhere on the web
+Never\nIf unknown (except /)\nIf unknown
+Placeholder:Never\nIf unknown (except /)\nIf unknown
+no robots.txt rules\nrobots.txt except wizard\nfollow robots.txt rules
+Placeholder:no robots.txt rules\nrobots.txt except wizard\nfollow robots.txt rules
+normal\nextended\ndebug
+Placeholder:normal\nextended\ndebug
+Download web site(s)\nDownload web site(s) + questions\nGet individual files\nDownload all sites in pages (multiple mirror)\nTest links in pages (bookmark test)\n* Continue interrupted download\n* Update existing download
+Placeholder:Download web site(s)\nDownload web site(s) + questions\nGet individual files\nDownload all sites in pages (multiple mirror)\nTest links in pages (bookmark test)\n* Continue interrupted download\n* Update existing download
+Relative URI / Absolute URL (default)\nAbsolute URL / Absolute URL\nAbsolute URI / Absolute URL\nOriginal URL / Original URL
+Placeholder:Relative URI / Absolute URL (default)\nAbsolute URL / Absolute URL\nAbsolute URI / Absolute URL\nOriginal URL / Original URL
+Open Source offline browser
+Placeholder:Open Source offline browser
+Website Copier/Offline Browser. Copy remote websites to your computer. Free.
+Placeholder:Website Copier/Offline Browser. Copy remote websites to your computer. Free.
+httrack, winhttrack, webhttrack, offline browser
+Placeholder:httrack, winhttrack, webhttrack, offline browser
+URL list (.txt)
+Placeholder:URL list (.txt)
+Previous
+Placeholder:Previous
+Next
+Placeholder:Next
+URLs
+Placeholder:URLs
+Warning
+Placeholder:Warning
+Your browser does not currently support javascript. For better results, please use a javascript-aware browser.
+Placeholder:Your browser does not currently support javascript. For better results, please use a javascript-aware browser.
+Thank you
+Placeholder:Thank you
+You can now close this window
+Placeholder:You can now close this window
+Server terminated
+Placeholder:Server terminated
+A fatal error has occurred during this mirror
+Placeholder:A fatal error has occurred during this mirror
+View Documentation
+Placeholder:View Documentation
+Go To HTTrack Website
+Placeholder:Go To HTTrack Website
+Go To HTTrack Forum
+Placeholder:Go To HTTrack Forum
+View License
+Placeholder:View License
+Beware: you local browser might be unable to browse files with embedded filenames
+Placeholder:Beware: you local browser might be unable to browse files with embedded filenames
+Recreated HTTrack internal cached resources
+Placeholder:Recreated HTTrack internal cached resources
+Could not create internal cached resources
+Placeholder:Could not create internal cached resources
+Could not get the system external storage directory
+Placeholder:Could not get the system external storage directory
+Could not write to:
+Placeholder:Could not write to:
+Read-only media (SDCARD)
+Placeholder:Read-only media (SDCARD)
+No storage media (SDCARD)
+Placeholder:No storage media (SDCARD)
+HTTrack may not be able to download websites until this problem is fixed
+Placeholder:HTTrack may not be able to download websites until this problem is fixed
+HTTrack: mirror '%s' stopped!
+Placeholder:HTTrack: mirror '%s' stopped!
+Click on this notification to restart the interrupted mirror
+Placeholder:Click on this notification to restart the interrupted mirror
+HTTrack: could not save profile for '%s'!
+Placeholder:HTTrack: could not save profile for '%s'!
+Proxy type:
+Placeholder:Proxy type:
+Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
+Placeholder:Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
+Load cookies from file:
+Placeholder:Load cookies from file:
+Preload cookies from a Netscape cookies.txt file before crawling.
+Placeholder:Preload cookies from a Netscape cookies.txt file before crawling.
+Pause between files:
+Placeholder:Pause between files:
+Random delay between file downloads, in seconds. Use MIN:MAX for a random range (e.g. 2:8).
+Placeholder:Random delay between file downloads, in seconds. Use MIN:MAX for a random range (e.g. 2:8).
+Keep the www. prefix (do not merge www.host with host)
+Placeholder:Keep the www. prefix (do not merge www.host with host)
+Do not treat www.host and host as the same site.
+Placeholder:Do not treat www.host and host as the same site.
+Keep double slashes in URLs
+Placeholder:Keep double slashes in URLs
+Do not collapse duplicate slashes in URLs.
+Placeholder:Do not collapse duplicate slashes in URLs.
+Keep the original query-string order
+Placeholder:Keep the original query-string order
+Do not reorder query-string parameters when deduplicating URLs.
+Placeholder:Do not reorder query-string parameters when deduplicating URLs.
+Strip query keys:
+Placeholder:Strip query keys:
+Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
+Placeholder:Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
+Write a WARC archive of the crawl
+Placeholder:Write a WARC archive of the crawl
+Also save every fetched response into an ISO-28500 WARC/1.1 archive, next to the mirror.
+Placeholder:Also save every fetched response into an ISO-28500 WARC/1.1 archive, next to the mirror.
+WARC archive name:
+Placeholder:WARC archive name:
+Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
+Placeholder:Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
+Report what changed since the previous mirror
+Placeholder:Report what changed since the previous mirror
+Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
+Placeholder:Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
+Inline assets as data: URIs (self-contained pages)
+Placeholder:Inline assets as data: URIs (self-contained pages)
+Once the mirror is finished, rewrite every saved page with its stylesheets, scripts, images and fonts embedded, so a page can also be opened on its own.
+Placeholder:Once the mirror is finished, rewrite every saved page with its stylesheets, scripts, images and fonts embedded, so a page can also be opened on its own.
+Largest inlined asset (bytes):
+Placeholder:Largest inlined asset (bytes):
+An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
+Placeholder:An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
+Seed the crawl from the site's sitemap
+Placeholder:Seed the crawl from the site's sitemap
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+Placeholder:Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+Sitemap address:
+Placeholder:Sitemap address:
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+Placeholder:Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+Write a CDXJ index of the WARC archive
+Placeholder:Write a CDXJ index of the WARC archive
+Also write a sorted CDXJ index listing every record in the WARC archive, for replay tools.
+Placeholder:Also write a sorted CDXJ index listing every record in the WARC archive, for replay tools.
+Package the crawl as a WACZ file
+Placeholder:Package the crawl as a WACZ file
+Bundle the WARC archive, its CDXJ index and the mirrored pages into a single WACZ file; implies the WARC archive and the CDXJ index.
+Placeholder:Bundle the WARC archive, its CDXJ index and the mirrored pages into a single WACZ file; implies the WARC archive and the CDXJ index.
+WARC segment size limit:
+Placeholder:WARC segment size limit:
+Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
+Placeholder:Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
+Host aliases:
+Placeholder:Host aliases:
+Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
+Placeholder:Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
+Mirror %s and every host below it
+Placeholder:Mirror %s and every host below it
+Ignore %s and every host below it
+Placeholder:Ignore %s and every host below it
+Manual
+Placeholder:Manual

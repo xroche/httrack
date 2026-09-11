@@ -56,6 +56,7 @@ Translations
   Slovenian              Jadran Rudec, iur.
   Spanish                Juan Pablo Barrio Lera (Universidad de León)
   Swedish                Staffan Ström
+  Thai                   Placeholder Name
   Turkish                Arman (Armish) Aksoy, Ümit Solmaz, Mehmet Akif Köeoğlu
   Ukrainian              Andrij Shevchuk
   Uzbek                  Shamsiddinov Zafar
