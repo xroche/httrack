@@ -28,15 +28,25 @@ A few `LANGUAGE_*` entries at the top describe the file itself:
 | Key | Meaning |
 | --- | --- |
 | `LANGUAGE_NAME` | Name shown in the language picker, in its own language (`Deutsch`, not `German`) |
+| `LANGUAGE_FILE` | The filename without `.txt`, in ASCII (`Portugues-Brasil`). It reaches the update endpoint as `Language=` |
 | `LANGUAGE_ISO` | ISO 639 code, with region if needed (`de`, `pt_BR`) |
 | `LANGUAGE_AUTHOR` | Your name and contact |
 | `LANGUAGE_WINDOWSID` | Windows locale name used by WinHTTrack (`German (Standard)`) |
 
-## Adding or updating a language
+## Updating a language
 
-1. Copy `English.txt` to `<Language>.txt`, or edit the existing file.
-2. Translate each second line; leave the English keys untouched.
-3. Fill in the `LANGUAGE_*` header for a new file.
-4. Open a pull request, or attach the file to a GitHub issue.
+Edit `<Language>.txt`: translate each second line and leave the English keys untouched. Then open a pull request, or attach the file to a GitHub issue.
 
 When new strings land in `English.txt` they show up untranslated (as English) until a translator fills them in.
+
+## Adding a language
+
+A translator only has to send the catalog: copy `English.txt` to `<Language>.txt`, translate what you can, and fill in the `LANGUAGE_*` header. A partial file is worth sending, because missing entries fall back to English.
+
+The maintainer then wires the file in, and the suite fails until all of this is done:
+
+- `lang.def`: append the basename and the next `LANGUAGE_<N>`.
+- `lang.indexes`: append `<iso>:<N>` for that same N. webhttrack turns the caller's locale into that number, so a wrong one serves another catalog.
+- `tests/62_lang-untranslated.counts` and `tests/62_lang-linebreaks.counts`: add one row to each.
+- `tests/install-manifest.txt`: add the installed `lang/<Language>.txt` path.
+- `greetings.txt`: add a row under `Translations` for the translator, keyed by the English name of the language. `AUTHORS` ends with that roster and the `<pre>` block in `html/contact.html` holds it verbatim, so both follow.
