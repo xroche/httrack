@@ -301,6 +301,8 @@ jobs:
       # third-party action: the three features are already enabled on the image.
       # It buys a real Linux shell against the same native httrack.exe, and is
       # the only suite leg since MSYS's fork emulation wedged its own (#1273).
+      # Dropping the MSYS leg also took the runner-death rate from 12.5% to
+      # 0.3%, so do not bring one back (#1228).
       - name: Bring up WSL2
         # Still non-gating now that the suite step gates: a failed import
         # reaches that step, which names it and reds there. Failing here too

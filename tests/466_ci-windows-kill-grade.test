@@ -1,0 +1,148 @@
+#!/bin/bash
+#
+# windows-rerun-killed.yml re-runs a failed windows-build run on this grader's
+# say-so, so a wrong yes silently re-runs a genuine test failure (#1228).
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+top=${abs_top_srcdir:-$(cd "$testdir/.." && pwd)}
+grade="$top/tools/windows-kill-grade.sh"
+test -r "$grade" || fail "$grade is missing"
+command -v jq >/dev/null || skip "no jq here, and the grader is written in it"
+
+# A job as the API reports it. Steps are "<conclusion>:<name>", and a conclusion
+# of "null" is the unfinished step a lost runner leaves behind.
+job() { # job <name> <conclusion> [step...]
+    local name=$1 concl=$2 steps='[]'
+    shift 2
+    if test $# -gt 0; then
+        steps=$(printf '%s\n' "$@" | jq -R -s -c '
+            split("\n") | map(select(length > 0)) | map(
+                (split(":")) as $p |
+                {conclusion: (if $p[0] == "null" then null else $p[0] end),
+                 name: $p[1]})')
+    fi
+    jq -n -c --arg n "$name" --arg c "$concl" --argjson s "$steps" \
+        '{name: $n, conclusion: $c, steps: $s}'
+}
+
+payload() { jq -n -c --argjson j "$(jq -s -c '.' <<<"$(cat)")" '{jobs: $j}'; }
+
+verdict() { # verdict <payload>; prints yes/no and the reason
+    local out rc=0
+    out=$(bash "$grade" <<<"$1") || rc=$?
+    test "$rc" -le 1 || fail "the grader died (exit $rc) on: $1"
+    echo "$((rc == 0))|$out"
+}
+
+expect() { # expect <yes|no> <what> <payload> [text the reason must carry]
+    local want=$1 what=$2 got
+    got=$(verdict "$3")
+    case "$want:${got%%|*}" in
+    yes:1 | no:0) ;;
+    *) fail "$what: wanted $want, got ${got#*|}" ;;
+    esac
+    # A verdict nobody can read is a verdict nobody acts on, and an empty reason
+    # is what a missing name looks like in the workflow log.
+    case "${got#*|}" in
+    '' | ' '*) fail "$what: the reason is empty or unnamed: [${got#*|}]" ;;
+    esac
+    test -z "${4:-}" || case "${got#*|}" in
+    *"$4"*) ;;
+    *) fail "$what: the reason does not mention '$4': ${got#*|}" ;;
+    esac
+}
+
+KILLED=(success:Build
+    "null:Run the engine test suite (offline tests, WSL2)"
+    "null:Upload the test logs")
+REALFAIL=(success:Build
+    "failure:Run the engine test suite (offline tests, WSL2)"
+    skipped:Upload)
+
+# The case the workflow exists for.
+expect yes "one lost runner" \
+    "$(job 'libhttrack (x64, Release)' failure "${KILLED[@]}" | payload)"
+
+# Every mutant here must be refused, or a genuine red gets re-run until the
+# attempt cap hides it.
+expect no "a failing test" \
+    "$(job 'libhttrack (x64, Release)' failure "${REALFAIL[@]}" | payload)"
+expect no "a failing test beside a lost runner" \
+    "$({
+        job 'libhttrack (x64, Release)' failure "${REALFAIL[@]}"
+        job 'libhttrack (Win32, Release)' failure "${KILLED[@]}"
+    } | payload)"
+expect no "nothing failed" \
+    "$(job 'libhttrack (x64, Release)' success 'success:Build' | payload)"
+expect no "a cancelled job" \
+    "$(job 'libhttrack (x64, Release)' cancelled "${KILLED[@]}" | payload)"
+# A failed job whose steps all finished is not the wedge signature, whatever
+# left it red, so it is a human's to read.
+expect no "a failure with every step finished" \
+    "$(job 'libhttrack (x64, Release)' failure 'success:Build' | payload)"
+# This case alone reaches the named-step clause, because a step failed and a
+# later one never finished. Without it the mutant dropping that clause survives,
+# since every other refusal here rests on the unfinished-step clause.
+expect no "a failed step beside an unfinished one" \
+    "$(job 'libhttrack (x64, Release)' failure \
+        'success:Build' \
+        'failure:Run the engine test suite (offline tests, WSL2)' \
+        'null:Upload the test logs' | payload)"
+
+# This runner started no step at all, and the job is still red.
+expect yes "a runner that took no step" \
+    "$(job 'libhttrack (x64, Release)' failure | payload)"
+
+# Both legs lost, which is what a bad half-hour on the pool looks like.
+expect yes "both legs lost" \
+    "$({
+        job 'libhttrack (x64, Release)' failure "${KILLED[@]}"
+        job 'libhttrack (Win32, Release)' failure "${KILLED[@]}"
+    } | payload)"
+
+# The ordinary shape: one leg green, the other lost. Without it a grader that
+# compares the kills against every job rather than against the failed ones
+# cannot be told from this one.
+expect yes "one leg green, the other lost" \
+    "$({
+        job 'libhttrack (x64, Release)' success 'success:Build'
+        job 'libhttrack (Win32, Release)' failure "${KILLED[@]}"
+    } | payload)"
+
+# The mirror of the mixed case above. One order alone lets a grader that reads
+# only the x64 leg pass, and that grader re-runs a red Win32 leg.
+expect no "a failing Win32 leg beside a lost x64 one" \
+    "$({
+        job 'libhttrack (x64, Release)' failure "${KILLED[@]}"
+        job 'libhttrack (Win32, Release)' failure "${REALFAIL[@]}"
+    } | payload)" 'Win32'
+
+# A runner lost during Build, so the unfinished step is not the suite step. A
+# grader keyed on the step's name would refuse this one.
+expect yes "a runner lost during Build" \
+    "$(job 'libhttrack (x64, Release)' failure 'null:Build' | payload)"
+
+# skipped is not unfinished. A step GitHub skipped after an earlier failure has
+# a conclusion, so it must not read as the wedge.
+expect no "a failed job whose last step was skipped" \
+    "$(job 'libhttrack (x64, Release)' failure 'success:Build' 'skipped:Upload the test logs' | payload)"
+
+# A job that ended badly some other way. timed_out is the documented one this
+# repo has not yet produced, and a lost sibling must not carry it through.
+expect no "a timed-out job beside a lost runner" \
+    "$({
+        job 'libhttrack (x64, Release)' timed_out 'timed_out:Run the engine test suite'
+        job 'libhttrack (Win32, Release)' failure "${KILLED[@]}"
+    } | payload)" 'timed_out'
+
+# The same one level down: a step that timed out names its step as surely as a
+# failed one does.
+expect no "a step that timed out" \
+    "$(job 'libhttrack (x64, Release)' failure \
+        'success:Build' 'timed_out:Run the engine test suite' 'null:Upload the test logs' | payload)"
+
+echo "windows-kill-grade OK (5 kills accepted, 10 refused)"
