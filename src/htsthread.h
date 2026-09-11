@@ -34,6 +34,7 @@ Please visit our Website: http://www.httrack.com
 #define HTS_DEFTHREAD
 
 #include "htsglobal.h"
+#include "httrack-library.h"
 #ifndef _WIN32
 #include <pthread.h>
 #endif
@@ -67,13 +68,6 @@ HTSEXT_API int hts_newthread(void (*fun) (void *arg), void *arg);
    NULL in either clears the pair, since neither hook is useful alone. */
 HTSEXT_API void hts_set_thread_hooks(void *(*enter)(void),
                                      void (*leave)(void *cookie));
-
-typedef void (*hts_thread_runner)(void (*fun)(void *arg), void *arg);
-
-/* Wraps each worker body in a caller-supplied frame, between 'enter' and
-   'leave'. The runner must call 'fun(arg)' once, and NULL clears it. Returns
-   the previous runner. Set it before spawning, since it is read unlocked. */
-HTSEXT_API hts_thread_runner hts_set_thread_runner(hts_thread_runner runner);
 
 HTSEXT_API void htsthread_wait_n(int n_wait);
 
