@@ -1,0 +1,99 @@
+#!/bin/bash
+#
+# windows-rerun-killed.yml re-runs a failed windows-build run on this grader's
+# say-so, so a wrong yes silently re-runs a genuine test failure (#1228).
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+top=${abs_top_srcdir:-$(cd "$testdir/.." && pwd)}
+grade="$top/tools/windows-kill-grade.sh"
+test -r "$grade" || fail "$grade is missing"
+command -v jq >/dev/null || skip "no jq here, and the grader is written in it"
+
+# A job as the API reports it. Steps are "<conclusion>:<name>", and a conclusion
+# of "null" is the unfinished step a lost runner leaves behind.
+job() { # job <name> <conclusion> [step...]
+    local name=$1 concl=$2 steps='[]'
+    shift 2
+    if test $# -gt 0; then
+        steps=$(printf '%s\n' "$@" | jq -R -s -c '
+            split("\n") | map(select(length > 0)) | map(
+                (split(":")) as $p |
+                {conclusion: (if $p[0] == "null" then null else $p[0] end),
+                 name: $p[1]})')
+    fi
+    jq -n -c --arg n "$name" --arg c "$concl" --argjson s "$steps" \
+        '{name: $n, conclusion: $c, steps: $s}'
+}
+
+payload() { jq -n -c --argjson j "$(jq -s -c '.' <<<"$(cat)")" '{jobs: $j}'; }
+
+verdict() { # verdict <payload>; prints yes/no and the reason
+    local out rc=0
+    out=$(bash "$grade" <<<"$1") || rc=$?
+    test "$rc" -le 1 || fail "the grader died (exit $rc) on: $1"
+    echo "$((rc == 0))|$out"
+}
+
+expect() { # expect <yes|no> <what> <payload>
+    local want=$1 what=$2 got
+    got=$(verdict "$3")
+    case "$want:${got%%|*}" in
+    yes:1 | no:0) ;;
+    *) fail "$what: wanted $want, got ${got#*|}" ;;
+    esac
+}
+
+KILLED=(success:Build
+    "null:Run the engine test suite (offline tests, WSL2)"
+    "null:Upload the test logs")
+REALFAIL=(success:Build
+    "failure:Run the engine test suite (offline tests, WSL2)"
+    skipped:Upload)
+
+# The case the workflow exists for.
+expect yes "one lost runner" \
+    "$(job 'libhttrack (x64, Release)' failure "${KILLED[@]}" | payload)"
+
+# The mutants. Each must be refused, or a genuine red gets re-run until the
+# attempt cap hides it.
+expect no "a failing test" \
+    "$(job 'libhttrack (x64, Release)' failure "${REALFAIL[@]}" | payload)"
+expect no "a failing test beside a lost runner" \
+    "$({
+        job 'libhttrack (x64, Release)' failure "${REALFAIL[@]}"
+        job 'libhttrack (Win32, Release)' failure "${KILLED[@]}"
+    } | payload)"
+expect no "nothing failed" \
+    "$(job 'libhttrack (x64, Release)' success 'success:Build' | payload)"
+expect no "a cancelled job" \
+    "$(job 'libhttrack (x64, Release)' cancelled "${KILLED[@]}" | payload)"
+# A failed job whose steps all finished is not the wedge signature, whatever
+# left it red, so it is a human's to read.
+expect no "a failure with every step finished" \
+    "$(job 'libhttrack (x64, Release)' failure 'success:Build' | payload)"
+# The ambiguous one, and the only case that reaches the named-step clause on its
+# own: a step failed AND a later one never finished. Without it the mutant that
+# drops that clause survives, because every other refusal here is carried by the
+# unfinished-step clause instead.
+expect no "a failed step beside an unfinished one" \
+    "$(job 'libhttrack (x64, Release)' failure \
+        'success:Build' \
+        'failure:Run the engine test suite (offline tests, WSL2)' \
+        'null:Upload the test logs' | payload)"
+
+# The runner that never started a step at all: no step records, and the job red.
+expect yes "a runner that took no step" \
+    "$(job 'libhttrack (x64, Release)' failure | payload)"
+
+# Both legs lost, which is what a bad half-hour on the pool looks like.
+expect yes "both legs lost" \
+    "$({
+        job 'libhttrack (x64, Release)' failure "${KILLED[@]}"
+        job 'libhttrack (Win32, Release)' failure "${KILLED[@]}"
+    } | payload)"
+
+echo "windows-kill-grade OK (3 kills accepted, 6 refused)"
