@@ -84,10 +84,10 @@ test -n "$zombie" || fail "the zombie fixture never started"
 # Graded only where the host will answer for this very pid: with neither /proc nor
 # ps, reap_bounded degrades to the wait it always did and there is nothing here to
 # grade, so asserting would red a host master passes.
+kill -9 "$zombie" 2>/dev/null || true
 if ! pid_state_readable "$zombie"; then
     echo "no readable state for pid $zombie, so the reap probe cannot be graded" >&2
 else
-    kill -9 "$zombie" 2>/dev/null || true
     REAP_GRACE=1 reap_bounded "$zombie" ||
         fail "reap_bounded waited out its grace on a killed process nobody had collected"
     # Named, not assumed: a parent that had already exited would make the arm below
@@ -97,6 +97,84 @@ else
     ok "reap_bounded reads a killed-but-uncollected process as stopped, a live one as running"
 fi
 : >"$tmp/release"
+
+# --- pid_state: what each route answers, and what neither may invent ---------
+#
+# A directory stands in for an entry that is readable but yields nothing, which
+# is what Hurd gives for a task it cannot summarise. That must never count as
+# death: Hurd answers the same way for a live task that is merely suspended.
+# The pids are ones no host allocates, so a seam that failed open would grade a
+# live kernel thread instead of the fixture.
+running=9999992 exited=9999993 unterminated=9999994
+absent=9999996 splitcomm=9999997 unreadable_live=$$
+mkdir -p "$tmp/proc/$running" "$tmp/proc/$exited" "$tmp/proc/$unterminated" \
+    "$tmp/proc/$splitcomm" "$tmp/proc/$unreadable_live/stat"
+printf '%s (sh (weird) name) S 1 1 1 0 -1 0\n' "$running" >"$tmp/proc/$running/stat"
+printf '%s (sh (weird) name) Z 1 1 1 0 -1 0\n' "$exited" >"$tmp/proc/$exited/stat"
+printf '%s (sh) Z 1 1 1 0 -1 0' "$unterminated" >"$tmp/proc/$unterminated/stat"
+# Linux writes comm unescaped, so a process named ") Z<LF>q" splits its own stat
+# file and the first line ends in a state this one is not.
+printf '%s () Z\nq) S 1 1 1 0 -1 0\n' "$splitcomm" >"$tmp/proc/$splitcomm/stat"
+
+TESTLIB_PROC=$tmp/proc
+# Called as a statement, not a condition, so errexit sees the read's own status.
+pid_state "$running"
+test "$PID_STATE" = S || fail "the state field was read as '$PID_STATE', not S"
+pid_is_zombie "$running" && fail "a stat line naming state S was read as exited"
+pid_is_zombie "$exited" || fail "a stat line naming state Z was read as running"
+pid_is_zombie "$unterminated" || fail "a stat line with no trailing newline was read as running"
+pid_is_zombie "$splitcomm" && fail "a process name holding a newline forged state Z"
+# The one the arm this test used to carry got wrong: an entry that answers
+# nothing says nothing, and this shell is running.
+pid_is_zombie "$unreadable_live" && fail "an entry that yields nothing was read as an exit"
+pid_state_readable "$running" || fail "a stat line the host gave was called unreadable"
+# A failed open must stay off the caller's stderr: every macOS poll takes this
+# route, and local_crawl points that stderr at the log its tests grep.
+noise=$(pid_is_zombie "$absent" 2>&1 >/dev/null) || true
+test -z "$noise" || fail "a failed open reached the caller's stderr: $noise"
+
+# The ps route, which no host with a working /proc reaches. Padded, since a
+# column with spaces around it used to read as neither state. Two stubs, because
+# Hurd's ps rejects -p and takes the pid positionally.
+mkdir -p "$tmp/psposix" "$tmp/pshurd" "$tmp/psnone" "$tmp/psmulti"
+cat >"$tmp/psposix/ps" <<'STUB'
+#!/bin/sh
+for a; do test "$a" != -p || { echo " Z+ "; exit 0; }; done
+exit 64
+STUB
+cat >"$tmp/pshurd/ps" <<'STUB'
+#!/bin/sh
+for a; do test "$a" != -p || exit 64; done
+echo " Z+ "
+STUB
+# Two rows, which is what a ps that ignored the empty header would print. The
+# first names a state, and it is not this pid's.
+cat >"$tmp/psmulti/ps" <<'STUB'
+#!/bin/sh
+printf 'Z\nR\n'
+STUB
+chmod +x "$tmp/psposix/ps" "$tmp/pshurd/ps" "$tmp/psmulti/ps"
+path_was=$PATH
+for stub in psposix pshurd; do
+    PATH=$tmp/$stub:$path_was
+    pid_is_zombie "$absent" || fail "$stub ps named state Z and it was read as running"
+done
+PATH=$tmp/psmulti:$path_was
+pid_is_zombie "$unreadable_live" && fail "two ps rows were concatenated into an exit"
+pid_state_readable "$unreadable_live" && fail "an answer naming two pids was called readable"
+PATH=$path_was
+# A build root with no ps at all, which Fedora's is: neither route answers, so
+# the helper must say so rather than guess.
+# shellcheck disable=SC2123 # a PATH holding one empty directory is how ps goes missing
+PATH=$tmp/psnone
+pid_is_zombie "$unreadable_live" && nops_exit=yes || nops_exit=no
+pid_state_readable "$unreadable_live" && nops_read=yes || nops_read=no
+PATH=$path_was
+test "$nops_exit" = no || fail "a live process was read as exited where no ps exists"
+test "$nops_read" = no || fail "a live process with no answer anywhere was called readable"
+pid_state_readable "$absent" && fail "a pid neither route answers for was called readable"
+unset TESTLIB_PROC
+ok "pid_state takes the host's answer, and never reads no answer as an exit"
 
 : >"$tmp/progress"
 : >"$tmp/childpid"
