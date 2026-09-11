@@ -1247,10 +1247,15 @@ REAP_GRACE=${REAP_GRACE:-10}
 # is what ps_snapshot already relies on. Trimmed, since a padded column would
 # read as neither state.
 pid_is_zombie() { # pid_is_zombie PID
-    local st
-    if { read -r st <"/proc/$1/stat"; } 2>/dev/null; then
+    local proc=${TESTLIB_PROC:-/proc} st
+    if { read -r st <"$proc/$1/stat"; } 2>/dev/null; then
         st=${st##*') '}
         st=${st%% *}
+    elif test -r "$proc/$1/stat"; then
+        # Hurd builds this file out of the Mach task and threads that an exited
+        # process no longer has, so the read fails where Linux answers Z. It is
+        # not permission that denied it, so the process has stopped running.
+        return 0
     else
         st=$(ps -o state= -p "$1" 2>/dev/null) || st=
         st=${st//[[:space:]]/}
@@ -1265,7 +1270,8 @@ pid_is_zombie() { # pid_is_zombie PID
 # may have no procps, and a container or a hidepid mount no readable /proc. Asked
 # per pid, since hidepid answers for the caller's own and for nothing else.
 pid_state_readable() { # pid_state_readable PID
-    test -r "/proc/$1/stat" || test -n "$(ps -o state= -p "$1" 2>/dev/null)"
+    test -r "${TESTLIB_PROC:-/proc}/$1/stat" ||
+        test -n "$(ps -o state= -p "$1" 2>/dev/null)"
 }
 
 reap_bounded() {

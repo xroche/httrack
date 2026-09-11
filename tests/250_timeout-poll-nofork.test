@@ -98,6 +98,25 @@ else
 fi
 : >"$tmp/release"
 
+# --- pid_is_zombie where /proc answers with an error ------------------------
+#
+# Hurd builds /proc/PID/stat out of the Mach task and threads that an exited
+# process no longer has, so the read fails instead of reporting Z, and its ps
+# takes no -p to fall back on. Both Hurd buildds failed 3.50.2 on that. A
+# directory stands in for it: readable by permission, unreadable in fact.
+mkdir -p "$tmp/proc/11/stat" "$tmp/proc/12" "$tmp/proc/13"
+printf '12 (sh (weird) name) S 1 12 12 0 -1 0\n' >"$tmp/proc/12/stat"
+printf '13 (sh (weird) name) Z 1 13 13 0 -1 0\n' >"$tmp/proc/13/stat"
+TESTLIB_PROC=$tmp/proc
+pid_is_zombie 11 || fail "a stat file that cannot be read was read as running"
+pid_is_zombie 12 && fail "a stat line naming state S was read as exited"
+pid_is_zombie 13 || fail "a stat line naming state Z was read as running"
+# No entry at all is the host with no readable /proc, and must reach ps rather
+# than the arm above: this shell is alive and is what ps will be asked about.
+pid_is_zombie "$$" && fail "a pid with no stat entry was read as exited"
+unset TESTLIB_PROC
+ok "pid_is_zombie reads an unreadable stat file as an exited process"
+
 : >"$tmp/progress"
 : >"$tmp/childpid"
 began=$SECONDS
