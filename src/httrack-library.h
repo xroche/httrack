@@ -816,10 +816,9 @@ HTSEXT_API hts_boolean hts_findissystem(find_handle find);
 typedef void (*hts_thread_runner)(void (*fun)(void *arg), void *arg);
 #endif
 
-/** Wraps each worker body in a caller-supplied frame, between the 'enter' and
-   'leave' thread hooks. The runner must call 'fun(arg)' once, and NULL clears
-   it. Returns the previous runner. Set it before spawning, since it is read
-   unlocked. */
+/** Wraps each worker body in a caller-supplied frame. The runner must call
+    'fun(arg)' once, and NULL clears it. Returns the previous runner. Set it
+    before spawning, since it is read unlocked. */
 HTSEXT_API hts_thread_runner hts_set_thread_runner(hts_thread_runner runner);
 
 /* UTF-8 aware FILE API */

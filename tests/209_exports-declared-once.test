@@ -1,0 +1,75 @@
+#!/bin/bash
+#
+# An exported call declared in an installed header and again in one that stays
+# behind has two signatures that nothing keeps in step, so an embedder can
+# compile against one while the engine uses the other (#1663). The list below
+# is what is left, and it may only shrink.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+src="${abs_top_srcdir:?not run under make check}/src"
+test -f "$src/Makefile.am" || fail "no $src/Makefile.am"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/exports.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "$work"
+
+# Read the installed set out of DevIncludes_DATA, so installing a header moves
+# this check with it. By basename: htsfeatures.h is listed from the parent dir.
+sed -n '/^DevIncludes_DATA[ \t]*=/,/[^\\]$/p' "$src/Makefile.am" |
+    sed -e 's/\\$//' | tr -s ' \t' '\n' | grep '\.h$' | sed 's|.*/||' |
+    LC_ALL=C sort -u >"$work/installed"
+grep -qx 'httrack-library.h' "$work/installed" ||
+    fail "DevIncludes_DATA did not parse; nothing to call installed"
+
+# One logical declaration per HTSEXT_API, joined up to its ';', so a prototype
+# wrapped after the return type still yields the name it declares.
+awk '
+function flush(  s, t, n) {
+  s = span; t = ""
+  if (match(s, /[A-Za-z_][A-Za-z0-9_]*[ \t]*\(/)) {
+    t = substr(s, RSTART, RLENGTH); sub(/[ \t]*\(/, "", t)
+  } else if (match(s, /[A-Za-z_][A-Za-z0-9_]*[ \t]*;/)) {
+    t = substr(s, RSTART, RLENGTH); sub(/[ \t]*;/, "", t)
+  }
+  if (t != "") { n = FILENAME; sub(/.*\//, "", n); print t "\t" n }
+  span = ""; open = 0
+}
+open { span = span " " $0; if ($0 ~ /;/) flush(); next }
+/^[ \t]*(extern[ \t]+)?HTSEXT_API[ \t]/ {
+  span = $0; sub(/.*HTSEXT_API/, "", span); open = 1
+  if ($0 ~ /;/) flush()
+}' "$src"/*.h | LC_ALL=C sort -u >"$work/decls"
+
+# An empty or one-sided scan yields no pairs at all, which the diff below reds
+# against a non-empty pin, so the pin is its own control.
+awk -F'\t' '
+NR == FNR { installed[$0] = 1; next }
+{ if ($2 in installed) pub[$1] = 1; else priv[$1] = priv[$1] " " $2 }
+END {
+  for (s in priv) {
+    if (!(s in pub)) continue
+    n = split(priv[s], h, " ")
+    for (i = 1; i <= n; i++) print h[i] "\t" s
+  }
+}' "$work/installed" "$work/decls" | LC_ALL=C sort -u >"$work/actual"
+
+# Each survivor is an uninstalled header repeating a call httrack-library.h
+# already declares. Removing one is the point; adding one needs a reason.
+LC_ALL=C sort -u >"$work/expected" <<'EOF'
+htslib.h	hts_fopen_utf8
+htslib.h	hts_mkdir_utf8
+htslib.h	hts_rename_utf8
+htslib.h	hts_stat_utf8
+htslib.h	hts_unlink_utf8
+htslib.h	hts_utime_utf8
+htslib.h	hts_version
+htstools.h	hts_buildtopindex
+EOF
+
+diff -u "$work/expected" "$work/actual" ||
+    fail "an exported call must be declared in one header only. A '+' line is a new duplicate, so drop it from the uninstalled header and include httrack-library.h there instead. A '-' line is one you removed, so delete it from the list in this test"
+
+echo "exported declarations: $(lines_of "$work/decls"), shared with an uninstalled header: $(lines_of "$work/actual")"

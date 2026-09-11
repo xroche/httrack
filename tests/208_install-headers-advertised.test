@@ -1,10 +1,10 @@
 #!/bin/bash
 #
-# The calls the release notes advertise must reach an embedder from the
+# The four calls the release notes advertise must reach an embedder from the
 # installed headers alone (#1663): hts_set_thread_runner(),
-# hts_findgetsize64() and the deprecated hts_findgetsize(). A missing
-# declaration and a missing export are different failures, so compile and link
-# are separate steps here.
+# hts_mirror_completed(), hts_findgetsize64() and the deprecated
+# hts_findgetsize(). A missing declaration and a missing export are different
+# failures, so compile and link are separate steps here.
 
 set -euo pipefail
 
@@ -22,19 +22,6 @@ command -v "${cc_argv[0]}" >/dev/null 2>&1 || skip "no C compiler (${cc_argv[0]}
 make=${MAKE:-make}
 command -v "$make" >/dev/null 2>&1 || skip "no make ($make)"
 
-lib=${HTTRACK_SHLIB:-}
-if [ ! -f "${lib:-/nonexistent}" ]; then
-    # A Darwin build names it .dylib, which HTTRACK_SHLIB does not cover.
-    for cand in "$abs_top_builddir"/src/.libs/libhttrack.dylib \
-        "$abs_top_builddir"/src/.libs/libhttrack.so; do
-        if [ -f "$cand" ]; then
-            lib=$cand
-            break
-        fi
-    done
-fi
-[ -f "${lib:-/nonexistent}" ] || skip "no shared libhttrack to link against"
-
 tmp=$(mktemp -d) || exit 1
 cleanup_push rm -rf "$tmp"
 
@@ -45,14 +32,16 @@ if [ -n "${TEST_CPPFLAGS:-}" ]; then
 fi
 # An embedder never defines this, and a declaration it gates is not installed API.
 cpp_argv+=(-UHTS_INTERNAL_BYTECODE -UHTS_INTERNAL_BUILD)
-# An undeclared call must be an error, not the warning older compilers default to.
-strict_argv=(-Werror=implicit-function-declaration)
+# An undeclared call must be an error, not the warning older compilers default
+# to. One advertised call is deprecated on purpose, so that warning is off here
+# and the assertion further down checks the attribute is still there.
+strict_argv=(-Werror=implicit-function-declaration -Wno-deprecated-declarations)
 
 # Positive control: a box with no multilib libc (CC="gcc -m32") blames our
 # headers for everything otherwise.
 printf '#include <stdio.h>\nint main(void) { return puts("") < 0; }\n' >"$tmp/libc.c"
-"${cc_argv[@]}" "${cpp_argv[@]}" -fsyntax-only "$tmp/libc.c" 2>"$tmp/cc.log" || {
-    head -5 "$tmp/cc.log" >&2
+"${cc_argv[@]}" "${cpp_argv[@]}" -fsyntax-only "$tmp/libc.c" 2>"$tmp/libc.log" || {
+    head -5 "$tmp/libc.log" >&2
     echo "${cc_argv[*]} cannot compile a bare <stdio.h>, skipping" >&2
     exit 77
 }
@@ -69,8 +58,7 @@ run_with_install_lock env MAKEFLAGS= MFLAGS= "$make" -C "$abs_top_builddir/src" 
 [ -f "$tmp/include/httrack/httrack-library.h" ] || fail "httrack-library.h was not installed"
 
 # The consumer declares nothing of its own, so every name below comes from the
-# installed header. -Wno-deprecated-declarations because one call is deprecated
-# on purpose; the assertion further down checks that attribute is still there.
+# installed header, the whole hts_find* family included.
 cat >"$tmp/consumer.c" <<'EOF'
 #include <httrack/httrack-library.h>
 
@@ -81,51 +69,46 @@ static void embedder_runner(void (*fun)(void *arg), void *arg) {
 int main(void) {
   char path[] = ".";
   hts_thread_runner previous = hts_set_thread_runner(embedder_runner);
+  httrackp *opt = hts_create_opt();
   find_handle find = hts_findfirst(path);
+  hts_tristate completed = HTS_DEFAULT;
+  const char *name = NULL;
   LLint size = -1;
   int truncated = -1;
+  int kinds = 0;
 
   if (find != NULL) {
-    size = hts_findgetsize64(find);
-    truncated = hts_findgetsize(find);
+    do {
+      name = hts_findgetname(find);
+      size = hts_findgetsize64(find);
+      truncated = hts_findgetsize(find);
+      kinds += hts_findisdir(find) + hts_findisfile(find)
+        + hts_findissystem(find);
+    } while (hts_findnext(find));
     hts_findclose(find);
   }
+  if (opt != NULL) {
+    completed = hts_mirror_completed(opt);
+    hts_free_opt(opt);
+  }
   (void) hts_set_thread_runner(previous);
-  return size == 0 && truncated == 0;
+  return name != NULL && size == 0 && truncated == 0 && kinds == 0
+    && completed == HTS_TRUE;
 }
 EOF
 
-"${cc_argv[@]}" "${cpp_argv[@]}" "${strict_argv[@]}" -Wno-deprecated-declarations \
-    -c -o "$tmp/consumer.o" "$tmp/consumer.c" 2>"$tmp/cc.log" || {
-    cat "$tmp/cc.log" >&2
+"${cc_argv[@]}" "${cpp_argv[@]}" "${strict_argv[@]}" \
+    -c -o "$tmp/consumer.o" "$tmp/consumer.c" 2>"$tmp/consumer.log" || {
+    cat "$tmp/consumer.log" >&2
     fail "the installed headers do not declare the advertised calls"
-}
-
-"${cc_argv[@]}" -o "$tmp/consumer" "$tmp/consumer.o" "$lib" 2>"$tmp/ld.log" || {
-    cat "$tmp/ld.log" >&2
-    fail "$lib does not export the advertised calls"
 }
 
 # Negative control for the compile: an undeclared call has to be rejected.
 sed 's/hts_findgetsize64(find)/hts_no_such_call_1663(find)/' "$tmp/consumer.c" \
     >"$tmp/undeclared.c"
-! "${cc_argv[@]}" "${cpp_argv[@]}" "${strict_argv[@]}" -Wno-deprecated-declarations \
+! "${cc_argv[@]}" "${cpp_argv[@]}" "${strict_argv[@]}" \
     -c -o "$tmp/undeclared.o" "$tmp/undeclared.c" 2>/dev/null ||
     fail "${cc_argv[*]} accepted an undeclared call, the compile above proved nothing"
-
-# Negative control for the link: a name nothing defines has to be rejected.
-{
-    printf '#include <httrack/httrack-library.h>\n'
-    printf 'extern int hts_no_such_export_1663(void);\n'
-    printf 'int main(void) { return hts_no_such_export_1663(); }\n'
-} >"$tmp/unexported.c"
-"${cc_argv[@]}" "${cpp_argv[@]}" -c -o "$tmp/unexported.o" "$tmp/unexported.c" \
-    2>"$tmp/cc.log" || {
-    head -5 "$tmp/cc.log" >&2
-    fail "the link control does not compile"
-}
-! "${cc_argv[@]}" -o "$tmp/unexported" "$tmp/unexported.o" "$lib" 2>/dev/null ||
-    fail "${cc_argv[*]} linked an undefined symbol, the link above proved nothing"
 
 # hts_findgetsize is advertised as deprecated, so the attribute has to survive
 # the move. Only where this compiler enforces one it wrote itself.
@@ -139,6 +122,44 @@ else
         -c -o "$tmp/dep.o" "$tmp/consumer.c" 2>/dev/null ||
         fail "hts_findgetsize lost its deprecation on the way to the installed header"
 fi
+
+# Gated here rather than at the top, because only the link needs the library
+# and a --disable-shared build still has headers worth checking.
+lib=${HTTRACK_SHLIB:-}
+if [ ! -f "${lib:-/nonexistent}" ]; then
+    # A Darwin build names it .dylib, which HTTRACK_SHLIB does not cover.
+    for cand in "$abs_top_builddir"/src/.libs/libhttrack.dylib \
+        "$abs_top_builddir"/src/.libs/libhttrack.so; do
+        if [ -f "$cand" ]; then
+            lib=$cand
+            break
+        fi
+    done
+fi
+if [ ! -f "${lib:-/nonexistent}" ]; then
+    echo "the installed headers declare the advertised calls" \
+        "(no shared libhttrack, so the link was not checked)"
+    exit 0
+fi
+
+"${cc_argv[@]}" -o "$tmp/consumer" "$tmp/consumer.o" "$lib" 2>"$tmp/ld.log" || {
+    cat "$tmp/ld.log" >&2
+    fail "$lib does not export the advertised calls"
+}
+
+# Negative control for the link: a name nothing defines has to be rejected.
+{
+    printf '#include <httrack/httrack-library.h>\n'
+    printf 'extern int hts_no_such_export_1663(void);\n'
+    printf 'int main(void) { return hts_no_such_export_1663(); }\n'
+} >"$tmp/unexported.c"
+"${cc_argv[@]}" "${cpp_argv[@]}" -c -o "$tmp/unexported.o" "$tmp/unexported.c" \
+    2>"$tmp/unexported.log" || {
+    head -5 "$tmp/unexported.log" >&2
+    fail "the link control does not compile"
+}
+! "${cc_argv[@]}" -o "$tmp/unexported" "$tmp/unexported.o" "$lib" 2>/dev/null ||
+    fail "${cc_argv[*]} linked an undefined symbol, the link above proved nothing"
 
 echo "an embedder compiled and linked the advertised calls from the installed headers"
 
