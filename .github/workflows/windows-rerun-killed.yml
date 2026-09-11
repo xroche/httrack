@@ -8,8 +8,11 @@ on:
     workflows: [windows-build]
     types: [completed]
 
+# Naming any permission sets every other one to none, so the checkout below
+# needs contents spelled out.
 permissions:
   actions: write
+  contents: read
 
 jobs:
   rerun:
