@@ -1248,7 +1248,9 @@ pid_state() { # pid_state PID
     # The whole file and the line it gave, never read's status: comm is unescaped,
     # so a name holding a newline splits the file, and -d '' returns non-zero at
     # end of file anyway. The group keeps a failed open off the caller's stderr.
-    { read -r -d '' st <"$proc/$1/stat"; } 2>/dev/null
+    # || true, because -d '' returns non-zero at end of file on a whole file it
+    # read, and a caller writing this as a statement would abort under errexit.
+    { read -r -d '' st <"$proc/$1/stat"; } 2>/dev/null || true
     if test -n "$st"; then
         st=${st##*') '}
         PID_STATE=${st%% *}
