@@ -172,7 +172,6 @@ pid_state_readable "$unreadable_live" && nops_read=yes || nops_read=no
 PATH=$path_was
 test "$nops_exit" = no || fail "a live process was read as exited where no ps exists"
 test "$nops_read" = no || fail "a live process with no answer anywhere was called readable"
-PATH=$path_was
 pid_state_readable "$absent" && fail "a pid neither route answers for was called readable"
 unset TESTLIB_PROC
 ok "pid_state takes the host's answer, and never reads no answer as an exit"
