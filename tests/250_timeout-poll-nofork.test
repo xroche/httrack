@@ -84,10 +84,10 @@ test -n "$zombie" || fail "the zombie fixture never started"
 # Graded only where the host will answer for this very pid: with neither /proc nor
 # ps, reap_bounded degrades to the wait it always did and there is nothing here to
 # grade, so asserting would red a host master passes.
+kill -9 "$zombie" 2>/dev/null || true
 if ! pid_state_readable "$zombie"; then
     echo "no readable state for pid $zombie, so the reap probe cannot be graded" >&2
 else
-    kill -9 "$zombie" 2>/dev/null || true
     REAP_GRACE=1 reap_bounded "$zombie" ||
         fail "reap_bounded waited out its grace on a killed process nobody had collected"
     # Named, not assumed: a parent that had already exited would make the arm below
@@ -98,24 +98,55 @@ else
 fi
 : >"$tmp/release"
 
-# --- pid_is_zombie where /proc answers with an error ------------------------
+# --- pid_is_zombie against a proc entry it cannot read ----------------------
 #
-# Hurd builds /proc/PID/stat out of the Mach task and threads that an exited
-# process no longer has, so the read fails instead of reporting Z, and its ps
-# takes no -p to fall back on. Both Hurd buildds failed 3.50.2 on that. A
-# directory stands in for it: readable by permission, unreadable in fact.
-mkdir -p "$tmp/proc/11/stat" "$tmp/proc/12" "$tmp/proc/13"
-printf '12 (sh (weird) name) S 1 12 12 0 -1 0\n' >"$tmp/proc/12/stat"
-printf '13 (sh (weird) name) Z 1 13 13 0 -1 0\n' >"$tmp/proc/13/stat"
+# Hurd builds /proc/PID/stat out of a Mach task an exited process no longer has,
+# so the read errors where Linux answers Z, and its ps takes no -p to fall back
+# on. A directory stands in for that file: readable by permission, unreadable in
+# fact. Pids no host allocates, so a seam that failed open would be graded
+# against a live kernel thread rather than against the fixture.
+unreadable=9999991 running=9999992 exited=9999993
+unterminated=9999994 denied=9999995 absent=9999996
+mkdir -p "$tmp/proc/$unreadable/stat" "$tmp/proc/$running" "$tmp/proc/$exited" \
+    "$tmp/proc/$unterminated" "$tmp/proc/$denied" "$tmp/proc/$absent" "$tmp/proc/$$"
+printf '%s (sh (weird) name) S 1 1 1 0 -1 0\n' "$running" >"$tmp/proc/$running/stat"
+printf '%s (sh (weird) name) Z 1 1 1 0 -1 0\n' "$exited" >"$tmp/proc/$exited/stat"
+printf '%s (sh) R 1 1 1 0 -1 0' "$unterminated" >"$tmp/proc/$unterminated/stat"
+printf 'x\n' >"$tmp/proc/$denied/stat"
+chmod 000 "$tmp/proc/$denied/stat"
+# Empty rather than absent, the shape a container's masked stat file has.
+: >"$tmp/proc/$$/stat"
+
 TESTLIB_PROC=$tmp/proc
-pid_is_zombie 11 || fail "a stat file that cannot be read was read as running"
-pid_is_zombie 12 && fail "a stat line naming state S was read as exited"
-pid_is_zombie 13 || fail "a stat line naming state Z was read as running"
-# No entry at all is the host with no readable /proc, and must reach ps rather
-# than the arm above: this shell is alive and is what ps will be asked about.
-pid_is_zombie "$$" && fail "a pid with no stat entry was read as exited"
+hts_os_was=$HTS_OS
+HTS_OS=GNU
+pid_is_zombie "$unreadable" || fail "a stat file that cannot be read was read as running"
+pid_is_zombie "$running" && fail "a stat line naming state S was read as exited"
+pid_is_zombie "$exited" || fail "a stat line naming state Z was read as running"
+pid_is_zombie "$unterminated" && fail "a stat line with no trailing newline was read as exited"
+pid_is_zombie "$absent" && fail "a pid with no stat entry was read as exited"
+# Root reads a mode 000 file, so only an unprivileged run can tell -r from -e.
+if test "$(id -u)" != 0; then
+    pid_is_zombie "$denied" && fail "a stat file the caller may not open was read as exited"
+fi
+HTS_OS=Linux
+pid_is_zombie "$unreadable" && fail "the arm for Hurd's procfs fired off Hurd"
+# This shell is alive, so nothing may read its empty stat file as an exit.
+pid_is_zombie "$$" && fail "an empty stat file was read as an exited process"
+HTS_OS=$hts_os_was
+# The route macOS takes, which no host with a working /proc ever reaches. Padded,
+# since a column with spaces around it used to read as neither state.
+mkdir -p "$tmp/psstub"
+printf '#!/bin/sh\necho " Z "\n' >"$tmp/psstub/ps"
+chmod +x "$tmp/psstub/ps"
+path_was=$PATH
+PATH=$tmp/psstub:$PATH
+pid_is_zombie "$absent" || fail "a ps column naming state Z was read as running"
+PATH=$path_was
+pid_state_readable "$running" || fail "a readable stat file was called unreadable"
+pid_state_readable "$absent" && fail "a pid with no stat entry was called readable"
 unset TESTLIB_PROC
-ok "pid_is_zombie reads an unreadable stat file as an exited process"
+ok "pid_is_zombie reads an unreadable stat entry as exited on Hurd, and a live process never"
 
 : >"$tmp/progress"
 : >"$tmp/childpid"

@@ -1240,21 +1240,23 @@ REAP_GRACE=${REAP_GRACE:-10}
 # until a parent waits on it, and a caller that is not that parent never can: the
 # reap falls to whoever inherits the orphan, prompt on a workstation and not on a
 # Debian buildd, where it reddened 250 twice. The state is the honest question.
-# /proc first, and only then ps: reap_bounded polls this, and one caller polls it
-# with the broken tick of #1038 still on PATH, where the loop spins at full speed
-# and a forked ps would run thousands of times. Linux, which is where the failure
-# is reported, then forks nothing; macOS takes the ps route, whose POSIX keyword
-# is what ps_snapshot already relies on. Trimmed, since a padded column would
-# read as neither state.
+# /proc first, then Hurd, and only then ps: reap_bounded polls this, and one
+# caller polls it with the broken tick of #1038 still on PATH, where the loop
+# spins at full speed and a forked ps would run thousands of times. Linux, which
+# is where the failure is reported, then forks nothing; macOS takes the ps route,
+# whose POSIX keyword is what ps_snapshot already relies on. Trimmed, since a
+# padded column would read as neither state.
 pid_is_zombie() { # pid_is_zombie PID
-    local proc=${TESTLIB_PROC:-/proc} st
-    if { read -r st <"$proc/$1/stat"; } 2>/dev/null; then
+    local proc=${TESTLIB_PROC:-/proc} st=''
+    # Graded on the line, not on read's status, which is non-zero at a stat file
+    # with no trailing newline on a line it took in full.
+    read -r st <"$proc/$1/stat" 2>/dev/null
+    if test -n "$st"; then
         st=${st##*') '}
         st=${st%% *}
-    elif test -r "$proc/$1/stat"; then
-        # Hurd builds this file out of the Mach task and threads that an exited
-        # process no longer has, so the read fails where Linux answers Z. It is
-        # not permission that denied it, so the process has stopped running.
+    elif test "$HTS_OS" = GNU && test -r "$proc/$1/stat"; then
+        # Hurd builds this file out of a Mach task an exited process no longer
+        # has, so the read errors where Linux answers Z.
         return 0
     else
         st=$(ps -o state= -p "$1" 2>/dev/null) || st=
