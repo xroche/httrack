@@ -1248,19 +1248,16 @@ REAP_GRACE=${REAP_GRACE:-10}
 # padded column would read as neither state.
 pid_is_zombie() { # pid_is_zombie PID
     local proc=${TESTLIB_PROC:-/proc} st=''
-    # The whole file, since Linux writes comm unescaped and a process whose name
-    # holds a newline splits it. Reading one line off `sleep) Z<LF>q` yielded Z
-    # for a live process. -d '' also returns non-zero at end of file, so the line
-    # is what is graded, never read's status.
-    read -r -d '' st <"$proc/$1/stat" 2>/dev/null
+    # The whole file and the line it gave, never read's status: comm is unescaped,
+    # so a name holding a newline splits the file, and -d '' returns non-zero at
+    # end of file anyway. The group keeps a failed open off the caller's stderr.
+    { read -r -d '' st <"$proc/$1/stat"; } 2>/dev/null
     if test -n "$st"; then
         st=${st##*') '}
         st=${st%% *}
-    elif test "$HTS_OS" = GNU && test -r "$proc/$1/stat" &&
-        ! cat "$proc/$1/stat" >/dev/null 2>&1; then
-        # Hurd builds this file out of a Mach task an exited process no longer
-        # has, so the read errors where Linux answers Z. cat, because the arm
-        # needs the read to have failed, and an empty file reads fine.
+    elif test "$HTS_OS" = GNU && test -r "$proc/$1/stat"; then
+        # Only Hurd, whose procfs builds this out of a Mach task an exited
+        # process no longer has, so the read fails where Linux answers Z.
         return 0
     else
         st=$(ps -o state= -p "$1" 2>/dev/null) || st=

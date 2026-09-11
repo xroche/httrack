@@ -100,16 +100,15 @@ fi
 
 # --- pid_is_zombie against a proc entry it cannot read ----------------------
 #
-# Hurd builds /proc/PID/stat out of a Mach task an exited process no longer has,
-# so the read errors where Linux answers Z, and its ps takes no -p to fall back
-# on. A directory stands in for that file: readable by permission, unreadable in
-# fact. Pids no host allocates, so a seam that failed open would be graded
-# against a live kernel thread rather than against the fixture.
+# A directory stands in for Hurd's failing read: readable, but no read succeeds.
+# The pids are ones no host allocates, so a seam that failed open would grade a
+# live kernel thread instead of the fixture.
 unreadable=9999991 running=9999992 exited=9999993
 unterminated=9999994 denied=9999995 absent=9999996 splitcomm=9999997
+empty_live=$$
 mkdir -p "$tmp/proc/$unreadable/stat" "$tmp/proc/$running" "$tmp/proc/$exited" \
     "$tmp/proc/$unterminated" "$tmp/proc/$denied" "$tmp/proc/$absent" \
-    "$tmp/proc/$splitcomm" "$tmp/proc/$$"
+    "$tmp/proc/$splitcomm" "$tmp/proc/$empty_live"
 printf '%s (sh (weird) name) S 1 1 1 0 -1 0\n' "$running" >"$tmp/proc/$running/stat"
 printf '%s (sh (weird) name) Z 1 1 1 0 -1 0\n' "$exited" >"$tmp/proc/$exited/stat"
 printf '%s (sh) R 1 1 1 0 -1 0' "$unterminated" >"$tmp/proc/$unterminated/stat"
@@ -119,7 +118,7 @@ printf '%s () Z\nq) S 1 1 1 0 -1 0\n' "$splitcomm" >"$tmp/proc/$splitcomm/stat"
 printf 'x\n' >"$tmp/proc/$denied/stat"
 chmod 000 "$tmp/proc/$denied/stat"
 # Empty rather than absent, the shape a container's masked stat file has.
-: >"$tmp/proc/$$/stat"
+: >"$tmp/proc/$empty_live/stat"
 
 TESTLIB_PROC=$tmp/proc
 hts_os_was=$HTS_OS
@@ -130,18 +129,16 @@ pid_is_zombie "$exited" || fail "a stat line naming state Z was read as running"
 pid_is_zombie "$unterminated" && fail "a stat line with no trailing newline was read as exited"
 pid_is_zombie "$splitcomm" && fail "a process name holding a newline forged state Z"
 pid_is_zombie "$absent" && fail "a pid with no stat entry was read as exited"
-# The pair the arm rests on: a read that errors is an exit, a read that returns
-# nothing is not. Hurd's procfs never yields the second for a live process, but
-# nothing in the arm should need that to be true.
-pid_is_zombie "$$" && fail "an empty stat file was read as exited on Hurd"
-# Root reads a mode 000 file, so only an unprivileged run can tell -r from -e.
-if test "$(id -u)" != 0; then
-    pid_is_zombie "$denied" && fail "a stat file the caller may not open was read as exited"
-fi
+# Root reads a mode 000 file, so only an unprivileged run grades -r against -e.
+pid_is_zombie "$denied" && fail "a stat file the caller may not open was read as exited"
 HTS_OS=Linux
 pid_is_zombie "$unreadable" && fail "the arm for Hurd's procfs fired off Hurd"
 # This shell is alive, so nothing may read its empty stat file as an exit.
-pid_is_zombie "$$" && fail "an empty stat file was read as an exited process"
+pid_is_zombie "$empty_live" && fail "an empty stat file was read as an exited process"
+# A failed open must stay off the caller's stderr: every macOS poll takes this
+# route, and local_crawl points that stderr at the log its tests grep.
+noise=$(pid_is_zombie "$absent" 2>&1 >/dev/null) || true
+test -z "$noise" || fail "a failed open reached the caller's stderr: $noise"
 HTS_OS=$hts_os_was
 # The route macOS takes, which no host with a working /proc ever reaches. Padded,
 # since a column with spaces around it used to read as neither state.
@@ -155,7 +152,7 @@ PATH=$path_was
 pid_state_readable "$running" || fail "a readable stat file was called unreadable"
 pid_state_readable "$absent" && fail "a pid with no stat entry was called readable"
 unset TESTLIB_PROC
-ok "pid_is_zombie reads an unreadable stat entry as exited on Hurd, and a live process never"
+ok "pid_is_zombie reads an unreadable stat entry as exited on Hurd, and nowhere else"
 
 : >"$tmp/progress"
 : >"$tmp/childpid"
