@@ -2,6 +2,8 @@
 
 Interface strings live here, one `.txt` file per language. `English.txt` is the reference: every other file maps each English string to its translation.
 
+**Send a translation only into a language you read natively, and never send machine or LLM output.** Nobody here can check it, and a bad string is worse than the English it would replace.
+
 ## File format
 
 Plain text, entries in consecutive pairs of lines:
@@ -41,12 +43,15 @@ When new strings land in `English.txt` they show up untranslated (as English) un
 
 ## Adding a language
 
-A translator only has to send the catalog: copy `English.txt` to `<Language>.txt`, translate what you can, and fill in the `LANGUAGE_*` header. A partial file is worth sending, because missing entries fall back to English.
+A translator only has to send the catalog: copy `English.txt` to `<Language>.txt`, translate what you can, and fill in the `LANGUAGE_*` header. A partial file is worth sending. A maintainer does the rest.
 
-The maintainer then wires the file in, and the suite fails until all of this is done:
+## Wiring a new catalog into the build
+
+The suite fails until all of this is done:
 
 - `lang.def`: append the basename and the next `LANGUAGE_<N>`.
-- `lang.indexes`: append `<iso>:<N>` for that same N. webhttrack turns the caller's locale into that number, so a wrong one serves another catalog.
+- `lang.indexes`: append `<iso>:<N>` for that same N, with the code lowercased (`pt_br`). webhttrack turns the caller's locale into that number, so a wrong one serves another catalog.
 - `tests/62_lang-untranslated.counts` and `tests/62_lang-linebreaks.counts`: add one row to each.
 - `tests/install-manifest.txt`: add the installed `lang/<Language>.txt` path.
-- `greetings.txt`: add a row under `Translations` for the translator, keyed by the English name of the language. `AUTHORS` ends with that roster and the `<pre>` block in `html/contact.html` holds it verbatim, so both follow.
+- `greetings.txt`: add a row under `Translations` for the translator, keyed by the English name of the language. `AUTHORS` and `html/contact.html` repeat that roster, so the row goes into all three.
+- `tests/373_credits.test`: add a `LABEL` entry when `LANGUAGE_WINDOWSID` is not that English name (`Uzbek Latin`, `FYRO Macedonian`).
