@@ -15,7 +15,8 @@ EXTRA_DIST = INSTALL.Linux \
 		tools/doc-chrome.py \
 		tools/check-includes.py \
 		tools/ci-sanitizer-report.sh \
-		tools/downstream-drift.sh
+		tools/downstream-drift.sh \
+		tools/windows-kill-grade.sh
 
 # The suite's staged installs serialise on this; a killed holder leaves it behind.
 clean-local:
