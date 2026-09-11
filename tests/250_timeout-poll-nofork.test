@@ -106,12 +106,16 @@ fi
 # fact. Pids no host allocates, so a seam that failed open would be graded
 # against a live kernel thread rather than against the fixture.
 unreadable=9999991 running=9999992 exited=9999993
-unterminated=9999994 denied=9999995 absent=9999996
+unterminated=9999994 denied=9999995 absent=9999996 splitcomm=9999997
 mkdir -p "$tmp/proc/$unreadable/stat" "$tmp/proc/$running" "$tmp/proc/$exited" \
-    "$tmp/proc/$unterminated" "$tmp/proc/$denied" "$tmp/proc/$absent" "$tmp/proc/$$"
+    "$tmp/proc/$unterminated" "$tmp/proc/$denied" "$tmp/proc/$absent" \
+    "$tmp/proc/$splitcomm" "$tmp/proc/$$"
 printf '%s (sh (weird) name) S 1 1 1 0 -1 0\n' "$running" >"$tmp/proc/$running/stat"
 printf '%s (sh (weird) name) Z 1 1 1 0 -1 0\n' "$exited" >"$tmp/proc/$exited/stat"
 printf '%s (sh) R 1 1 1 0 -1 0' "$unterminated" >"$tmp/proc/$unterminated/stat"
+# Linux writes comm unescaped, so a process named ") Z<LF>q" splits its own stat
+# file and the first line ends in a state this one is not.
+printf '%s () Z\nq) S 1 1 1 0 -1 0\n' "$splitcomm" >"$tmp/proc/$splitcomm/stat"
 printf 'x\n' >"$tmp/proc/$denied/stat"
 chmod 000 "$tmp/proc/$denied/stat"
 # Empty rather than absent, the shape a container's masked stat file has.
@@ -124,7 +128,12 @@ pid_is_zombie "$unreadable" || fail "a stat file that cannot be read was read as
 pid_is_zombie "$running" && fail "a stat line naming state S was read as exited"
 pid_is_zombie "$exited" || fail "a stat line naming state Z was read as running"
 pid_is_zombie "$unterminated" && fail "a stat line with no trailing newline was read as exited"
+pid_is_zombie "$splitcomm" && fail "a process name holding a newline forged state Z"
 pid_is_zombie "$absent" && fail "a pid with no stat entry was read as exited"
+# The pair the arm rests on: a read that errors is an exit, a read that returns
+# nothing is not. Hurd's procfs never yields the second for a live process, but
+# nothing in the arm should need that to be true.
+pid_is_zombie "$$" && fail "an empty stat file was read as exited on Hurd"
 # Root reads a mode 000 file, so only an unprivileged run can tell -r from -e.
 if test "$(id -u)" != 0; then
     pid_is_zombie "$denied" && fail "a stat file the caller may not open was read as exited"
