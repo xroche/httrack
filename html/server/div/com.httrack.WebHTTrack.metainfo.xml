@@ -53,6 +53,16 @@
   <content_rating type="oars-1.1"/>
   <!-- Newest first; tests/01_engine-version-macros.test enforces it. -->
   <releases>
+    <release version="3.50.2" date="2026-09-10">
+      <description>
+        <ul>
+          <li>Cookies exported from a browser are read correctly, so a mirror of a site that needs a login keeps its session</li>
+          <li>Stopping a mirror keeps what a later resume needs, where Abort and a second Cancel used to throw it away</li>
+          <li>Pages and scripts that a browser refused to run in the mirror are fixed, sites built on a JavaScript framework included</li>
+          <li>Many fixes to how the engine bounds what a hostile page or server sends it</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.50.1" date="2026-09-02">
       <description>
         <ul>

@@ -1,6 +1,6 @@
 AC_PREREQ([2.71])
 
-AC_INIT([httrack], [3.50.1], [roche+packaging@httrack.com], [httrack], [https://www.httrack.com/])
+AC_INIT([httrack], [3.50.2], [roche+packaging@httrack.com], [httrack], [https://www.httrack.com/])
 AC_COPYRIGHT([
 HTTrack Website Copier, Offline Browser for Windows and Unix
 Copyright (C) 1998-2015 Xavier Roche and other contributors
@@ -32,6 +32,10 @@ AC_CONFIG_HEADERS(config.h)
 # header we can install without handing a consumer our PACKAGE_* and HAVE_*.
 AC_CONFIG_HEADERS([htsfeatures.h:src/htsfeatures.h.in])
 AM_INIT_AUTOMAKE([subdir-objects])
+# 3:22:0: revision-only bump. httrackp gained two tail fields
+# (abort_left_partial, mirror_completed) and four exports arrived
+# (hts_file_is_newer, hts_findgetsize64, hts_set_thread_runner,
+# hts_mirror_completed). No installed struct moved and nothing went away.
 # 3:21:0: revision-only bump. hts_findgetsize64() arrived beside hts_findgetsize(),
 # which stays exported with the same signature; no installed struct moved and
 # nothing went away.
@@ -72,7 +76,7 @@ AM_INIT_AUTOMAKE([subdir-objects])
 # moves nothing). Soname stays .so.3: HTTrackQt is the only consumer of the installed
 # headers, so a libhttrack4 rename isn't worth it.
 # (3:0:0 was the htsblk mime-buffer widening, the ABI break that moved .so.2 -> .so.3.)
-VERSION_INFO="3:21:0"
+VERSION_INFO="3:22:0"
 AM_MAINTAINER_MODE
 AC_USE_SYSTEM_EXTENSIONS
 
