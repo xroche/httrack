@@ -646,6 +646,11 @@ turn=''
 # what the 900s budget allows, so the legs are skipped rather than half-run.
 TURN_CAP=6
 
+# Steps one interpreter's body runs, for the projection above: four legs, the
+# leaky control, twelve mutants and the optional full-stdout pair. An upper
+# bound, and the assertion beside `planned` keeps it one.
+PLANNED_STEPS=19
+
 # Three states, not two: held (0), violated (1), could not measure (77). A starved
 # sample is not a verdict, and grading one as a mutant caught is how a real defect
 # gets accepted. The value is testlib's skip sentinel on purpose, but a leg
@@ -1138,6 +1143,16 @@ for psrun in "${psruns[@]}"; do
         skipped+=("the $psrun timing checks and legs: a turn costs ${turn}s, past the ${TURN_CAP}s this test can afford")
         continue
     fi
+    # The cap is per interpreter, but every interpreter that passes it spends the
+    # same budget: a box affording one 4s turn cannot afford two bodies of them.
+    # So project this body against what is left, using the pacer's own per-step
+    # estimate, or the second interpreter meets the guard as a hard 124.
+    body=$((PLANNED_STEPS * (turn * 8 + 10)))
+    left=$(budget_left)
+    if test "$left" -gt 0 && test "$body" -gt "$left"; then
+        skipped+=("the $psrun timing checks and legs: they need about ${body}s at a ${turn}s turn and ${left}s of the budget is left")
+        continue
+    fi
     echo "note: one turn of the $psrun watchdog loop costs ${turn}s here"
 
     # Anchored on the watchdog's own clock, not on a count in a fixed window: a
@@ -1282,6 +1297,8 @@ for psrun in "${psruns[@]}"; do
     # them skips rather than meets the guard. The costliest so far is what the
     # next one will take, since a cheap leg under-projects the slow one after it.
     planned=$((${#legs[@]} + 1 + 12 + devfull))
+    test "$planned" -le "$PLANNED_STEPS" ||
+        fail "the budget projection plans $PLANNED_STEPS steps but the run has $planned"
     ran=0
     # Seeded from a turn rather than from zero: the first leg is then projected
     # off a measurement of this box instead of off nothing.
