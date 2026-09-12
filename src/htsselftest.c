@@ -13440,11 +13440,8 @@ static int threadrunner_seen_after = 0;
 static threadrunner_id threadrunner_body_thread;
 static threadrunner_id threadrunner_runner_thread;
 static int threadrunner_tail = 0;
-/* The body count as the tail read it. */
-static int threadrunner_tail_seen_body = 0;
+static int threadrunner_body_at_tail = 0;
 static threadrunner_id threadrunner_tail_thread;
-/* Armed for the regime where the runner recovers out of the body. */
-static hts_boolean threadrunner_recover = HTS_FALSE;
 static jmp_buf threadrunner_jmp;
 
 static void threadrunner_count(int *what) {
@@ -13460,7 +13457,7 @@ static void threadrunner_reset(void) {
   threadrunner_seen_before = 0;
   threadrunner_seen_after = 0;
   threadrunner_tail = 0;
-  threadrunner_tail_seen_body = 0;
+  threadrunner_body_at_tail = 0;
 }
 
 static void threadrunner_body_fn(void *arg) {
@@ -13473,9 +13470,8 @@ static void threadrunner_body_fn(void *arg) {
   hts_mutexrelease(&threadrunner_lock);
 }
 
-/* Leaves the body where a fault recovery does, so nothing after the jump in
-   the body runs. A real runner gets there through siglongjmp() out of a signal
-   handler; what the engine sees is the same. */
+/* Leaves the body the way a fault recovery does, so nothing after the jump
+   runs. A real runner gets there through siglongjmp(). */
 static void threadrunner_cut_fn(void *arg) {
   (void) arg;
   hts_mutexlock(&threadrunner_lock);
@@ -13488,7 +13484,7 @@ static void threadrunner_cut_fn(void *arg) {
 static void threadrunner_tail_fn(void *arg) {
   (void) arg;
   hts_mutexlock(&threadrunner_lock);
-  threadrunner_tail_seen_body = threadrunner_body;
+  threadrunner_body_at_tail = threadrunner_body;
   threadrunner_tail_thread = threadrunner_self();
   threadrunner_tail++;
   hts_mutexrelease(&threadrunner_lock);
@@ -13497,12 +13493,9 @@ static void threadrunner_tail_fn(void *arg) {
 static void threadrunner_runner(void (*fun)(void *arg), void *arg) {
   threadrunner_runner_thread = threadrunner_self();
   threadrunner_count(&threadrunner_before);
-  if (threadrunner_recover) {
-    if (setjmp(threadrunner_jmp) == 0)
-      fun(arg);
-  } else {
+  /* Stands in for a fault handler's own jump buffer. */
+  if (setjmp(threadrunner_jmp) == 0)
     fun(arg);
-  }
   threadrunner_count(&threadrunner_after);
 }
 
@@ -13597,20 +13590,20 @@ static int st_threadrunner(httrackp *opt, int argc, char **argv) {
             threadrunner_body, threadrunner_tail);
     err = 1;
   }
-  if (threadrunner_tail_seen_body != 1) {
+  if (threadrunner_body_at_tail != 1) {
     fprintf(stderr, "threadrunner: the tail ran before the body\n");
     err = 1;
   }
 
+  /* The body jumps out of threadrunner_cut_fn, so only the tail can reap the
+     worker. */
   threadrunner_reset();
-  threadrunner_recover = HTS_TRUE;
   if (hts_set_thread_runner(threadrunner_runner) != NULL) {
     fprintf(stderr, "threadrunner: a runner was installed already\n");
     return 1;
   }
   spawned = threadrunner_spawn_body(threadrunner_cut_fn, threadrunner_tail_fn);
   hts_set_thread_runner(NULL);
-  threadrunner_recover = HTS_FALSE;
   if (!spawned)
     return 1;
   /* The runner left normally, so the engine saw a worker whose body stopped
@@ -13620,10 +13613,10 @@ static int st_threadrunner(httrackp *opt, int argc, char **argv) {
             threadrunner_body, threadrunner_after);
     err = 1;
   }
-  if (threadrunner_tail != 1 || threadrunner_tail_seen_body != 1) {
+  if (threadrunner_tail != 1 || threadrunner_body_at_tail != 1) {
     fprintf(stderr,
             "threadrunner: a cut-short body ran the tail %d time(s), at %d\n",
-            threadrunner_tail, threadrunner_tail_seen_body);
+            threadrunner_tail, threadrunner_body_at_tail);
     err = 1;
   } else if (!threadrunner_same(threadrunner_tail_thread,
                                 threadrunner_body_thread)) {

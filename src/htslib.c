@@ -5701,9 +5701,8 @@ static void dns_resolve_thread(void *arg) {
   hts_mutexrelease(&job->lock);
 }
 
-/* Runs even where a thread runner recovered from a fault mid-resolve (see
-   hts_newthread_tail), and the caller waits on 'done' alone when it asked for
-   no timeout. A -1 count is what it reads as "no answer to cache". */
+/* Releases the job whatever the body did (see hts_newthread_tail). A -1 count
+   is what the caller reads as "no answer", so it caches nothing. */
 static void dns_resolve_done(void *arg) {
   dns_resolve_job *const job = (dns_resolve_job *) arg;
 

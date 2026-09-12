@@ -63,11 +63,13 @@ struct htsmutex_s {
 /* Library internal definictions */
 HTSEXT_API int hts_newthread(void (*fun) (void *arg), void *arg);
 
-/* Same, plus 'tail(arg)' on the worker once the body is over. A thread runner
-   (see hts_set_thread_runner()) that recovers from a fault returns with the
-   body's own tail skipped, so cleanup the engine needs goes here instead. */
-int hts_newthread_tail(void (*fun)(void *arg), void *arg,
-                       void (*tail)(void *arg));
+/* Also runs 'tail(arg)' on the worker once the body is over, and only when this
+   returns 0. A thread runner (see hts_set_thread_runner()) that recovers from a
+   fault returns without running the rest of the body, so cleanup the engine
+   needs goes here. Not exported, because no caller outside the library spawns a
+   worker. */
+HTS_CHECK_RESULT int hts_newthread_tail(void (*fun)(void *arg), void *arg,
+                                        void (*tail)(void *arg));
 
 /* Extends per-thread state to the workers: 'enter' runs at each one's start,
    'leave' at its end with the cookie 'enter' returned. Set before spawning; a

@@ -140,8 +140,7 @@ static void *hts_entry_point(void *tharg)
     thread_runner(fun, arg);
   else
     fun(arg);
-  /* Here and not at the end of the body: a runner recovering from a fault
-     returns with the rest of the body skipped. */
+  /* Not at the end of the body, because a recovered fault never gets there. */
   if (tail != NULL)
     tail(arg);
   if (thread_leave != NULL)

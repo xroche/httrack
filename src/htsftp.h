@@ -56,7 +56,8 @@ struct FTPDownloadStruct {
   lien_back *pBack;
   httrackp *pOpt;
   FTPDownloadStruct *pNext; /* live-worker list, owned by htsftp.c */
-  hts_boolean completed;    /* Did the worker body run to its end? */
+  /* Did back_launch_ftp() reach its end? launch_ftp() clears it. */
+  hts_boolean body_returned;
 };
 
 /* Library internal definictions */
