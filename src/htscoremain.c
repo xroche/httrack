@@ -981,15 +981,25 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 
       if (a[0] == '-' && a[1] == '#' && a[2] == 'c' &&
           (a[3] == '\0' || a[3] == '=')) {
-        if (!hts_crash_test(a[3] == '=' ? a + 4 : NULL)) {
+        const hts_crash_test_result done =
+            hts_crash_test(a[3] == '=' ? a + 4 : NULL);
+
+        if (done == HTS_CRASH_UNKNOWN) {
           char s[256];
 
           snprintf(s, sizeof(s), "Option #c expects one of: %s",
                    hts_crash_test_kinds());
           HTS_PANIC_PRINTF(s);
+          htsmain_free();
+          return -1;
         }
-        htsmain_free();
-        return -1;
+        if (done == HTS_CRASH_RAN) {
+          htsmain_free();
+          return -1;
+        }
+        /* Armed: the fault waits for a worker, so the mirror has to run. The
+           option parser below takes the argument again, and skips it. */
+        break;
       }
     }
   }
@@ -2366,6 +2376,12 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           case '#':{           // non documenté
               com++;
               switch (*com) {
+#ifdef HTS_CRASH_TEST
+              case 'c': /* read by the -#c pre-pass, which armed a worker */
+                while (com[1] != '\0')
+                  com++;
+                break;
+#endif
               case 'C':        // list cache files : httrack -#C '*spid*.gif' will attempt to find the matching file
                 {
                   int hasFilter = 0;

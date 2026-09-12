@@ -1,0 +1,54 @@
+#!/bin/bash
+#
+# -#c=dnssegv and -#c=ftpsegv fault a worker of a RUNNING mirror, where every
+# other kind faults before one starts. A front end that recovers such a fault
+# (httrack-android, through coffeecatch) can only be tested against that path,
+# and before these kinds it needed patches of its own.
+
+set -eu
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+skip_on_windows "the fatal handler takes another path here"
+require_httrack
+have_feature crashtest || skip "built with --disable-crash-test"
+
+ulimit -c 0 # a deliberate crash must not litter the box with cores
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_livefault.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+
+# The handler ends in abort(), so the shell sees SIGABRT whatever faulted.
+expect_crash() { # expect_crash RC NAME
+    test "$1" -ne 124 || fail "$2 outlasted its deadline"
+    test "$1" -eq 134 || fail "$2 exited $1, expected 134 (0 means nothing faulted)"
+}
+
+# The control, and the whole point of the new kinds: a parse-time kind dies
+# before the engine has a project on disk.
+rc=0
+run_with_timeout 60 httrack -#c=segv "ftp://127.0.0.1:9/" -O "$tmp/parsetime" \
+    >"$tmp/parsetime.out" 2>&1 || rc=$?
+expect_crash "$rc" "-#c=segv"
+test ! -d "$tmp/parsetime" ||
+    fail "-#c=segv reached the mirror, so the control proves nothing"
+
+# Port 9 discards, and the FTP worker faults before it would connect anyway.
+for kind in dnssegv ftpsegv; do
+    case $kind in
+    dnssegv) url="http://doesnotexist.invalid/" ;;
+    ftpsegv) url="ftp://127.0.0.1:9/" ;;
+    esac
+    rc=0
+    run_with_timeout 120 httrack "-#c=$kind" "$url" -O "$tmp/$kind" --timeout 5 \
+        >"$tmp/$kind.out" 2>&1 || rc=$?
+    expect_crash "$rc" "-#c=$kind"
+    grep -q 'faulting a live' "$tmp/$kind.out" ||
+        fail_dump "$kind printed no fault marker:" "$tmp/$kind.out"
+    grep -q '^Caught signal ' "$tmp/$kind.out" ||
+        fail_dump "$kind went uncaught by the fatal handler:" "$tmp/$kind.out"
+    # The mirror was running, which no other kind can say.
+    test -d "$tmp/$kind/hts-cache" ||
+        fail "$kind faulted before the mirror started: no $kind/hts-cache"
+done
