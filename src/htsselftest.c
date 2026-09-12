@@ -13691,6 +13691,24 @@ static int st_threadrunner(httrackp *opt, int argc, char **argv) {
     opt->log = saved_log;
   }
 
+  /* Round 0 is the only round the cases above ran in, and no mirror uses it:
+     each one takes the next round as it starts. */
+  hts_worker_fault_clear();
+  threadrunner_reset();
+  if (hts_set_thread_runner(threadrunner_runner) != NULL) {
+    fprintf(stderr, "threadrunner: a runner was installed already\n");
+    return 1;
+  }
+  spawned = threadrunner_spawn_body(threadrunner_cut_fn, threadrunner_tail_fn);
+  hts_set_thread_runner(NULL);
+  if (!spawned)
+    return 1;
+  if (!hts_worker_faulted()) {
+    fprintf(stderr, "threadrunner: no fault past the first round\n");
+    err = 1;
+  }
+  hts_worker_fault_clear();
+
   /* A fault raised after its own mirror ended aborts nothing. */
   threadrunner_reset();
   if (hts_set_thread_runner(threadrunner_runner) != NULL) {
