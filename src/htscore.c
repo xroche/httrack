@@ -671,6 +671,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
 
   // initialiser exit_xh
   opt->state.exit_xh = 0;       // sortir prématurément (var globale)
+  /* a fault a previous mirror recovered from must not abort this one */
+  hts_worker_fault_clear();
 
   // initialiser usercommand
   usercommand(opt, opt->sys_com_exec, StringBuff(opt->sys_com), "", "", "");

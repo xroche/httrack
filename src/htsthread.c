@@ -99,6 +99,30 @@ typedef struct hts_thread_s {
   void (*tail)(void *arg);
 } hts_thread_s;
 
+/* A body and whether it reached its end. */
+typedef struct hts_body_s {
+  void *arg;
+  void (*fun)(void *arg);
+  hts_boolean returned;
+} hts_body_s;
+
+static void hts_run_body(void *arg) {
+  hts_body_s *const body = (hts_body_s *) arg;
+
+  body->fun(body->arg);
+  body->returned = HTS_TRUE;
+}
+
+/* Set by a worker a fault recovery cut short, read and cleared by the crawl
+   thread. Process-global, like the runner that does the recovering, and a plain
+   flag because a worker thread must not touch opt: the mirror may already have
+   freed it (see dns_resolve_thread). */
+static volatile hts_boolean worker_faulted = HTS_FALSE;
+
+hts_boolean hts_worker_faulted(void) { return worker_faulted; }
+
+void hts_worker_fault_clear(void) { worker_faulted = HTS_FALSE; }
+
 /* Set once before any thread is spawned, hence unlocked. */
 static void *(*thread_enter)(void) = NULL;
 static void (*thread_leave)(void *cookie) = NULL;
@@ -128,18 +152,25 @@ static void *hts_entry_point(void *tharg)
 {
   hts_thread_s *s_args = (hts_thread_s *) tharg;
   void *const arg = s_args->arg;
-  void (*fun) (void *arg) = s_args->fun;
   void (*const tail)(void *arg) = s_args->tail;
+  hts_body_s body;
   void *cookie;
 
+  body.fun = s_args->fun;
+  body.arg = arg;
+  body.returned = HTS_FALSE;
   freet(tharg);
 
   cookie = thread_enter != NULL ? thread_enter() : NULL;
   /* run */
   if (thread_runner != NULL)
-    thread_runner(fun, arg);
+    thread_runner(hts_run_body, &body);
   else
-    fun(arg);
+    hts_run_body(&body);
+  /* Nothing can audit what the fault left behind, so the mirror gives up. The
+     crawl thread performs it, being the one that holds opt. */
+  if (!body.returned)
+    worker_faulted = HTS_TRUE;
   /* Not at the end of the body, because a recovered fault never gets there. */
   if (tail != NULL)
     tail(arg);

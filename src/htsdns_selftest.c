@@ -43,6 +43,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscore.h"
 #include "htslib.h"
 #include "htsnet.h"
+#include "htsthread.h"
 
 #include <setjmp.h>
 #include <stdio.h>
@@ -755,6 +756,9 @@ int dns_timeout_selftests(httrackp *opt) {
                                         0, &cancel, &err);
     CHECK(count == 1);
     CHECK(mock_read_calls("cut.test") == 2);
+    /* and the mirror gives up on it, see back_checkmirror() */
+    CHECK(hts_worker_faulted());
+    hts_worker_fault_clear();
   }
   return failures;
 }

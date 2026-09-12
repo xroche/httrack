@@ -71,6 +71,13 @@ HTSEXT_API int hts_newthread(void (*fun) (void *arg), void *arg);
 HTS_CHECK_RESULT int hts_newthread_tail(void (*fun)(void *arg), void *arg,
                                         void (*tail)(void *arg));
 
+/* HTS_TRUE where a thread runner recovered from a fault since the last clear,
+   so a worker stopped halfway through its body. Read on the crawl thread:
+   back_checkmirror() turns it into a stop, and a mirror clears it at its
+   start. */
+hts_boolean hts_worker_faulted(void);
+void hts_worker_fault_clear(void);
+
 /* Extends per-thread state to the workers: 'enter' runs at each one's start,
    'leave' at its end with the cookie 'enter' returned. Set before spawning; a
    NULL in either clears the pair, since neither hook is useful alone. */

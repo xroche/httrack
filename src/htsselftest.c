@@ -13522,7 +13522,6 @@ static int st_threadrunner(httrackp *opt, int argc, char **argv) {
   hts_boolean spawned;
   int err = 0;
 
-  (void) opt;
   (void) argc;
   (void) argv;
 
@@ -13602,6 +13601,10 @@ static int st_threadrunner(httrackp *opt, int argc, char **argv) {
     fprintf(stderr, "threadrunner: the tail got another worker's arg\n");
     err = 1;
   }
+  if (hts_worker_faulted()) {
+    fprintf(stderr, "threadrunner: a body that finished reads as a fault\n");
+    err = 1;
+  }
 
   /* The body jumps out of threadrunner_cut_fn, so only the tail can reap the
      worker. */
@@ -13635,6 +13638,36 @@ static int st_threadrunner(httrackp *opt, int argc, char **argv) {
     fprintf(stderr,
             "threadrunner: a cut-short body gave the tail another arg\n");
     err = 1;
+  }
+
+  /* The mirror gives up on it, and says so through the exit status rather than
+     reading as a stop the user asked for. */
+  if (!hts_worker_faulted()) {
+    fprintf(stderr, "threadrunner: a cut-short body raised no fault\n");
+    err = 1;
+  }
+  {
+    FILE *const saved_log = opt->log;
+
+    opt->log = NULL; /* the abort logs, and this test's own output is exact */
+    opt->state.stop = 0;
+    opt->state.exit_xh = 0;
+    back_checkmirror(opt);
+    if (opt->state.stop != 1 || opt->state.exit_xh != -1) {
+      fprintf(stderr, "threadrunner: the mirror read the fault as stop %d/%d\n",
+              opt->state.stop, opt->state.exit_xh);
+      err = 1;
+    }
+    opt->state.stop = 0;
+    opt->state.exit_xh = 0;
+    hts_worker_fault_clear();
+    back_checkmirror(opt);
+    if (opt->state.exit_xh != 0) {
+      fprintf(stderr,
+              "threadrunner: a cleared fault still aborted the mirror\n");
+      err = 1;
+    }
+    opt->log = saved_log;
   }
 
   printf("threadrunner self-test: %s\n", err ? "FAIL" : "OK");
