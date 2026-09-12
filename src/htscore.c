@@ -635,6 +635,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
      carry the last run's verdict and never purge again */
   opt->links_unqueued = HTS_FALSE;
   opt->abort_left_partial = HTS_FALSE;
+  opt->transport_failures = 0;
 
   /* before the first bailout below, each of which leaves it false */
   set_mirror_completed(opt, completed_out, HTS_FALSE);
@@ -2337,6 +2338,11 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
     else
       sprintf(finalInfo + strlen(finalInfo),
               "(No errors, %d warnings, %d messages)" LF, warning, info);
+    if (opt->transport_failures > 0)
+      sprintf(finalInfo + strlen(finalInfo),
+              "(%d links got no answer at all, so the mirror is incomplete:"
+              " update it to fetch them)" LF,
+              opt->transport_failures);
 
     // Log
     fprintf(opt->log, LF "%s", finalInfo);
@@ -3387,6 +3393,7 @@ hts_boolean hts_loop_tick(struct_back *sback, httrackp *opt, int b, int ptr) {
   HTS_STAT.stat_errors = fspc(opt, NULL, "error");
   HTS_STAT.stat_warnings = fspc(opt, NULL, "warning");
   HTS_STAT.stat_infos = fspc(opt, NULL, "info");
+  HTS_STAT.stat_transport_failures = opt->transport_failures;
   HTS_STAT.nbk = backlinks_done(sback, opt->liens, opt->lien_tot, ptr);
   HTS_STAT.nb = back_transferred(HTS_STAT.stat_bytes, sback);
   return RUN_CALLBACK7(

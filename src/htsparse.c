@@ -4103,6 +4103,13 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
             }
           }
 
+          /* An unanswered link leaves a hole in the mirror where an answered
+             error does not, and robots.txt carries no content to lose. */
+          if (back_transfer_failed(r->statuscode) && !heap(ptr)->testmode &&
+              strcmp(urlfil(), "/robots.txt") != 0) {
+            opt->transport_failures++;
+          }
+
           /* No response at all, so nothing here says the site dropped the
              links this page carries. Same predicate as the one keeping the
              previous copy (#746), and it must stay so: every file this run
