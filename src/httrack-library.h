@@ -823,7 +823,7 @@ typedef void (*hts_thread_runner)(void (*fun)(void *arg), void *arg);
     A runner that recovers from a fault may return with 'fun(arg)' cut short.
     The engine releases what that worker held, so no other thread waits for it,
     then ends the mirror with HTS_EXIT_MIRROR_ABORTED, because nothing can
-    audit what the fault left behind. Recovering keeps the process alive, and it
+    audit what the fault left behind. Recovering keeps the process alive, but it
     does not make the mirror resumable. */
 HTSEXT_API hts_thread_runner hts_set_thread_runner(hts_thread_runner runner);
 

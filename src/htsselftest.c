@@ -13485,6 +13485,18 @@ static void threadrunner_cut_fn(void *arg) {
   longjmp(threadrunner_jmp, 1);
 }
 
+/* A worker an earlier mirror abandoned: the round moves on before the fault, so
+   the fault belongs to a mirror that is over. */
+static void threadrunner_stale_fn(void *arg) {
+  (void) arg;
+  hts_mutexlock(&threadrunner_lock);
+  threadrunner_body_thread = threadrunner_self();
+  threadrunner_body++;
+  hts_mutexrelease(&threadrunner_lock);
+  hts_worker_fault_clear(); /* as the next mirror does when it starts */
+  longjmp(threadrunner_jmp, 1);
+}
+
 static void threadrunner_tail_fn(void *arg) {
   hts_mutexlock(&threadrunner_lock);
   threadrunner_tail_arg = arg;
@@ -13658,6 +13670,15 @@ static int st_threadrunner(httrackp *opt, int argc, char **argv) {
               opt->state.stop, opt->state.exit_xh);
       err = 1;
     }
+    /* a stop the user asked for exits 0, so the fault's verdict outranks it */
+    opt->state.stop = 1;
+    opt->state.exit_xh = 1;
+    back_check_worker_fault(opt);
+    if (opt->state.exit_xh != -1) {
+      fprintf(stderr, "threadrunner: a user stop swallowed the fault (%d)\n",
+              opt->state.exit_xh);
+      err = 1;
+    }
     opt->state.stop = 0;
     opt->state.exit_xh = 0;
     hts_worker_fault_clear();
@@ -13668,6 +13689,27 @@ static int st_threadrunner(httrackp *opt, int argc, char **argv) {
       err = 1;
     }
     opt->log = saved_log;
+  }
+
+  /* A fault raised after its own mirror ended aborts nothing. */
+  threadrunner_reset();
+  if (hts_set_thread_runner(threadrunner_runner) != NULL) {
+    fprintf(stderr, "threadrunner: a runner was installed already\n");
+    return 1;
+  }
+  spawned =
+      threadrunner_spawn_body(threadrunner_stale_fn, threadrunner_tail_fn);
+  hts_set_thread_runner(NULL);
+  if (!spawned)
+    return 1;
+  if (threadrunner_body != 1 || threadrunner_tail != 1) {
+    fprintf(stderr, "threadrunner: the stale round ran %d body and %d tail\n",
+            threadrunner_body, threadrunner_tail);
+    err = 1;
+  }
+  if (hts_worker_faulted()) {
+    fprintf(stderr, "threadrunner: a fault from a finished mirror was kept\n");
+    err = 1;
   }
 
   printf("threadrunner self-test: %s\n", err ? "FAIL" : "OK");
