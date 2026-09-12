@@ -61,6 +61,7 @@
 @DATADIR@/httrack/lang/Slovak.txt
 @DATADIR@/httrack/lang/Slovenian.txt
 @DATADIR@/httrack/lang/Svenska.txt
+@DATADIR@/httrack/lang/Thai.txt
 @DATADIR@/httrack/lang/Turkish.txt
 @DATADIR@/httrack/lang/Ukrainian.txt
 @DATADIR@/httrack/lang/Uzbek.txt
