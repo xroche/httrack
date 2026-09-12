@@ -46,7 +46,10 @@ expect_segv() { # expect_segv FILE NAME
 
 # Name the frames the handler printed as module+offset: -fvisibility=hidden
 # hides the engine's own, so only addr2line can say which function faulted.
-# Returns 1 when nothing resolved, which is a platform answer and not a verdict.
+# LC_ALL=C because addr2line translates its own "at", which a grep would miss.
+# Returns 1 unless the unwind walked out of the engine, which is the qemu case:
+# there it stops at the signal frame, leaving only the handler's own frames, and
+# that is a platform answer rather than a verdict on where the fault came from.
 name_frames() { # name_frames TRACE OUT
     local mod off
     build_names_frames && command -v addr2line >/dev/null || return 1
@@ -56,9 +59,11 @@ name_frames() { # name_frames TRACE OUT
     while read -r mod off; do
         test -f "$mod" || mod=$(command -v "$mod" 2>/dev/null) || continue
         test -f "$mod" || continue
-        addr2line -Cfip -e "$mod" "$off" 2>/dev/null >>"$2" || true
+        LC_ALL=C addr2line -Cfip -e "$mod" "$off" 2>/dev/null >>"$2" || true
     done <"$1.frames"
-    test -s "$2"
+    # A worker's stack bottoms out in the thread entry, the crawl thread's in
+    # main, so either says the whole stack is in the trace.
+    grep -qE 'hts_entry_point|hts_run_body|hts_main|start_thread' "$2"
 }
 
 # The control, and the whole point of the new kinds: a parse-time kind dies
@@ -93,7 +98,7 @@ for kind in dnssegv ftpsegv; do
         grep -q "$fn" "$tmp/$kind.names" ||
             fail_dump "$kind faulted outside $fn:" "$tmp/$kind.names"
     else
-        echo "note: no frame resolved here, so the $fn frame went unchecked" >&2
+        echo "note: the unwind stopped short here, so the $fn frame went unchecked" >&2
     fi
 done
 
