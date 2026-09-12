@@ -40,16 +40,43 @@ Please visit our Website: http://www.httrack.com
 extern "C" {
 #endif
 
+/* Which worker body an arming kind faults. */
+typedef enum {
+  HTS_CRASH_WORKER_NONE = 0,
+  HTS_CRASH_WORKER_DNS,
+  HTS_CRASH_WORKER_FTP
+} hts_crash_worker;
+
 #ifdef HTS_CRASH_TEST
+
+/* What -#c did. A kind that crashes outright does not return, so HTS_CRASH_RAN
+   means a handler recovered from it. HTS_CRASH_ARMED means nothing has faulted
+   yet and the caller must run the mirror, because the fault waits for a live
+   worker. */
+typedef enum {
+  HTS_CRASH_UNKNOWN = 0,
+  HTS_CRASH_RAN,
+  HTS_CRASH_ARMED
+} hts_crash_test_result;
 
 /* Crash the process on purpose, after announcing it on stderr so the log tells
    a deliberate crash from a real one. 'kind' selects the fault and defaults to
-   "segv" when NULL or empty; hts_crash_test_kinds() lists the accepted names.
-   Returns HTS_FALSE, without crashing, only when 'kind' is unknown. */
-hts_boolean hts_crash_test(const char *kind);
+   "segv" when NULL or empty. hts_crash_test_kinds() lists the names. */
+hts_crash_test_result hts_crash_test(const char *kind);
 
 /* The names hts_crash_test() accepts, comma-separated, for diagnostics. */
 const char *hts_crash_test_kinds(void);
+
+/* Fault this worker where -#c armed that kind, once, and do nothing otherwise.
+   Call it inside a worker body, where a fault meets the engine state a real one
+   would. */
+void hts_crash_test_worker(hts_crash_worker which);
+
+#else
+
+#define hts_crash_test_worker(which)                                           \
+  do {                                                                         \
+  } while (0)
 
 #endif
 

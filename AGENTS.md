@@ -26,6 +26,16 @@ the operational checklist: toolchain, invariants, and how to ship a change.
   against `git ls-files`, so a test you forgot to `git add` fails there instead of
   quietly shrinking CI's suite. Name one outside the pattern and it never runs;
   `tests/check-test-names.sh` (also a CI lint) rejects that.
+- **A test that skips on Windows needs registering twice.** The Windows job
+  compares its skips against the written-out lists in
+  `tests/ci-windows-suite.sh`, so an all-skipped suite cannot report green having
+  tested nothing. A new `skip_on_windows` test reds `libhttrack (x64, Release)`
+  with "skip set changed from expected" until its name is in BOTH the msys and
+  the wsl2 list, with its reason in the comment above them.
+- **`make check` puts a RELATIVE `src/` on `PATH`.** A test that changes
+  directory and then runs `httrack` by name finds the INSTALLED one, which fails
+  in ways that look like the change under test. Resolve the binary to an absolute
+  path before the first `cd`.
 - `make check` prepends the build's `src/` to `PATH`, but a hand-run `.test` does
   not — an installed `/usr/bin/httrack` then shadows your build. Run via `make
   check`, or `PATH="<bld>/src:$PATH"` for a manual run.
