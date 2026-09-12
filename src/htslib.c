@@ -5693,7 +5693,6 @@ static void dns_resolve_thread(void *arg) {
   const int count = hts_dns_resolve_nocache_list(
       job->hostname, resolved, HTS_MAXADDRNUM, &error, &permanent);
 
-  /* where -#c=dnssegv lands, with the answer in hand and not yet published */
   hts_crash_test_worker(HTS_CRASH_WORKER_DNS);
   hts_mutexlock(&job->lock);
   dns_copy_addrs(job->addr, resolved, count, HTS_MAXADDRNUM);

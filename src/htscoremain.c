@@ -2377,9 +2377,14 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               com++;
               switch (*com) {
 #ifdef HTS_CRASH_TEST
-              case 'c': /* read by the -#c pre-pass, which armed a worker */
-                while (com[1] != '\0')
-                  com++;
+              case 'c':
+                /* Read by the -#c pre-pass above, which may have armed a
+                   worker. This exact form only: anything else never reached the
+                   pre-pass, so it keeps the verdict it always had. */
+                if (com == argv[na] + 2 && (com[1] == '\0' || com[1] == '=')) {
+                  while (com[1] != '\0')
+                    com++;
+                }
                 break;
 #endif
               case 'C':        // list cache files : httrack -#C '*spid*.gif' will attempt to find the matching file

@@ -112,7 +112,7 @@ static void crash_arm_ftp(void) { crash_armed = HTS_CRASH_WORKER_FTP; }
 
 /* See htscrashtest.h. */
 void hts_crash_test_worker(hts_crash_worker which) {
-  if (which == HTS_CRASH_WORKER_NONE || crash_armed != which)
+  if (crash_armed == HTS_CRASH_WORKER_NONE || crash_armed != which)
     return;
   /* Once, so a front end that recovers the fault still reaches the end. */
   crash_armed = HTS_CRASH_WORKER_NONE;
