@@ -87,7 +87,7 @@ for kind in dnssegv ftpsegv; do
         --timeout 5) >"$out" 2>&1 || rc=$?
     expect_crash "$rc" "-#c=$kind" "$out"
     expect_segv "$out" "-#c=$kind"
-    # Named, so arming one kind cannot pass by faulting the other worker.
+    # By worker word, not by prefix, so the marker cannot lose which one faulted.
     grep -q "faulting a live $worker worker" "$out" ||
         fail_dump "$kind did not name the $worker worker:" "$out"
     # The mirror was running, which no other kind can say.
