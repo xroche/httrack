@@ -5359,6 +5359,21 @@ static hts_mirror_limit back_mirror_limit(httrackp *opt) {
   return HTS_MIRROR_LIMIT_NONE;
 }
 
+/* See htsback.h. */
+void back_check_worker_fault(httrackp *opt) {
+  /* Already aborted, and -1 outranks the other verdicts: a user stop and a
+     rolled-back session both exit 0, and this mirror must not. */
+  if (!hts_worker_faulted() || opt->state.exit_xh == -1)
+    return;
+  hts_log_print(opt, LOG_ERROR,
+                "Mirror aborted: a worker thread crashed and the front end "
+                "recovered it, so the mirror cannot be trusted");
+  hts_mutexlock(&opt->state.lock);
+  opt->state.stop = 1;
+  opt->state.exit_xh = -1;
+  hts_mutexrelease(&opt->state.lock);
+}
+
 int back_checkmirror(httrackp *opt) {
   /* request a smooth stop the first time each cap is reached */
   if (back_maxsize_reached(opt) && !opt->state.stop) {
@@ -5373,6 +5388,7 @@ int back_checkmirror(httrackp *opt) {
                   opt->maxtime);
     hts_request_stop(opt, 0);
   }
+  back_check_worker_fault(opt);
   /* hard stop once a cap overruns its grace (callers must stop waiting) */
   return back_mirror_limit(opt) == HTS_MIRROR_LIMIT_NONE;
 }

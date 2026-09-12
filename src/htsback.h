@@ -195,6 +195,11 @@ int back_checksize(httrackp * opt, lien_back * eback, int check_only_totalsize);
 /* Enforce -M/-E quotas: smooth-stops when reached; returns 0 once the -M cap
    or -E deadline overruns its grace period (callers must stop waiting). */
 int back_checkmirror(httrackp * opt);
+/* Give up the mirror where a thread runner recovered from a fault, because the
+   worker it cut short left state nothing can audit. Crawl thread only, because
+   it is the one that holds opt. Idempotent, and back_checkmirror() already
+   calls it on every crawl iteration. */
+void back_check_worker_fault(httrackp *opt);
 
 #endif
 

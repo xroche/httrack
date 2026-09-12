@@ -43,7 +43,9 @@ Please visit our Website: http://www.httrack.com
 #include "htscore.h"
 #include "htslib.h"
 #include "htsnet.h"
+#include "htsthread.h"
 
+#include <setjmp.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -116,6 +118,8 @@ static mock_host mock_hosts[] = {
        then stopped: neither case may read the other's cached answer */
     {"slow3.test", 0, 1, {{AF_INET, {127, 0, 0, 11}}}, 0, MOCK_SLOW_MS},
     {"slow4.test", 0, 1, {{AF_INET, {127, 0, 0, 12}}}, 0, MOCK_SLOW_MS},
+    /* answers at once, but the backend below never lets the worker say so */
+    {"cut.test", 0, 1, {{AF_INET, {127, 0, 0, 13}}}, 0},
 };
 
 /* Serializes mock_host bookkeeping: a timed-out resolve is abandoned, so its
@@ -255,6 +259,30 @@ static void HTS_RESOLVER_CALL mock_freeaddrinfo(struct addrinfo *res) {
 
 static const hts_resolver_backend mock_backend = {mock_getaddrinfo,
                                                   mock_freeaddrinfo};
+
+/* Where a front end's fault recovery lands, see hts_set_thread_runner(). */
+static jmp_buf dns_cut_jmp;
+
+/* Counts the call, then leaves the worker body the way a recovered fault does.
+   It frees what it asked for, because nothing downstream will. */
+static int HTS_RESOLVER_CALL cut_getaddrinfo(const char *node,
+                                             const char *service,
+                                             const struct addrinfo *hints,
+                                             struct addrinfo **res) {
+  if (mock_getaddrinfo(node, service, hints, res) == 0)
+    mock_freeaddrinfo(*res);
+  *res = NULL;
+  longjmp(dns_cut_jmp, 1);
+  return EAI_NONAME; /* not reached */
+}
+
+static const hts_resolver_backend cut_backend = {cut_getaddrinfo,
+                                                 mock_freeaddrinfo};
+
+static void dns_cut_runner(void (*fun)(void *arg), void *arg) {
+  if (setjmp(dns_cut_jmp) == 0)
+    fun(arg);
+}
 
 static int failures = 0;
 
@@ -704,6 +732,34 @@ int dns_timeout_selftests(httrackp *opt) {
      workers to leave it before returning. The backend stays installed: an
      abandoned worker still reads it (to free its addrinfo). */
   mock_wait_finished(6);
+
+  /* A worker a recovered fault cut short hands its verdict back at once. Left
+     to the caller, the wait runs to the deadline, and an unbounded one runs
+     until the user stops the mirror. */
+  {
+    hts_boolean cancel = HTS_FALSE;
+
+    mock_reset_calls();
+    hts_dns_set_resolver_backend(&cut_backend);
+    CHECK(hts_set_thread_runner(dns_cut_runner) == NULL);
+    start = mtime_local();
+    count = hts_dns_resolve_all_bounded(opt, "cut.test", addrs, HTS_MAXADDRNUM,
+                                        MOCK_SLOW_MS / 1000, &cancel, &err);
+    elapsed = mtime_local() - start;
+    hts_set_thread_runner(NULL);
+    hts_dns_set_resolver_backend(&mock_backend);
+    CHECK(count == 0);
+    CHECK(elapsed < MOCK_SLOW_MS / 2); /* the tail answered, not the deadline */
+    CHECK(mock_read_calls("cut.test") == 1);
+    /* no answer was had, so nothing may be cached in its place */
+    count = hts_dns_resolve_all_bounded(opt, "cut.test", addrs, HTS_MAXADDRNUM,
+                                        0, &cancel, &err);
+    CHECK(count == 1);
+    CHECK(mock_read_calls("cut.test") == 2);
+    /* and the mirror gives up on it, see back_checkmirror() */
+    CHECK(hts_worker_faulted());
+    hts_worker_fault_clear();
+  }
   return failures;
 }
 

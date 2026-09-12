@@ -112,6 +112,30 @@ void ftp_stop_workers(void) {
   } while (wait);
 }
 
+/* Hand the slot back to the crawl thread, as 'error' where the transfer did not
+   finish. Nobody would ever reap one left in STATUS_FTP_TRANSFER. */
+static void ftp_worker_release(FTPDownloadStruct *worker, const char *error) {
+  if (error != NULL) {
+    strcpybuff(worker->pBack->r.msg, error);
+    worker->pBack->r.statuscode = STATUSCODE_INVALID;
+  }
+  worker->pBack->status = STATUS_FTP_READY;
+
+  /* The status store above was this worker's last read of the slot and of opt,
+     so deregistering lets the engine free both. */
+  ftp_worker_unregister(worker);
+  freet(worker);
+}
+
+/* Runs as every worker's tail, even where a recovered fault cut the body short
+   (see hts_newthread_tail). */
+static void ftp_worker_done(void *pP) {
+  FTPDownloadStruct *const worker = (FTPDownloadStruct *) pP;
+
+  ftp_worker_release(worker,
+                     worker->body_returned ? NULL : "FTP transfer interrupted");
+}
+
 void back_launch_ftp(void *pP) {
   FTPDownloadStruct *pStruct = (FTPDownloadStruct *) pP;
 
@@ -130,19 +154,62 @@ void back_launch_ftp(void *pP) {
   printf("[Launching main ftp routine]\n");
 #endif
   run_launch_ftp(pStruct);
-  // prêt
-  pStruct->pBack->status = STATUS_FTP_READY;
 
   /* Uninitialize */
   hts_uninit();
 
-  /* The status store above was this worker's last read of the slot and of opt;
-     deregistering lets the engine free both. */
-  ftp_worker_unregister(pStruct);
+  pStruct->body_returned = HTS_TRUE;
+}
 
-  /* Delete structure */
-  free(pP);
-  return;
+/* See htsftp.h. The tail is called here as the thread layer calls it, since a
+   worker that faults for real cannot be had on demand. */
+int ftp_worker_selftests(void) {
+  static const char kept[] = "what the transfer said";
+  int err = 0;
+  int round;
+
+  for (round = 0; round < 2; round++) {
+    const hts_boolean returned = (round == 0) ? HTS_FALSE : HTS_TRUE;
+    FTPDownloadStruct *const worker = calloct(1, sizeof(*worker));
+    lien_back back;
+
+    assertf(worker != NULL);
+    memset(&back, 0, sizeof(back));
+    back.status = STATUS_FTP_TRANSFER;
+    back.r.statuscode = 200;
+    strcpybuff(back.r.msg, kept);
+    worker->pBack = &back;
+    worker->body_returned = returned;
+    ftp_worker_register(worker);
+    ftp_worker_done(worker);
+
+    if (ftp_workers != NULL) {
+      fprintf(stderr, "ftp-worker-selftest: the tail left the worker "
+                      "registered, so ftp_stop_workers() would never return\n");
+      err++;
+    }
+    if (back.status != STATUS_FTP_READY) {
+      fprintf(stderr, "ftp-worker-selftest: slot status %d, expected %d\n",
+              back.status, STATUS_FTP_READY);
+      err++;
+    }
+    if (returned) {
+      if (back.r.statuscode != 200 || strcmp(back.r.msg, kept) != 0) {
+        fprintf(stderr,
+                "ftp-worker-selftest: the tail overwrote a finished transfer "
+                "with %d '%s'\n",
+                back.r.statuscode, back.r.msg);
+        err++;
+      }
+    } else if (back.r.statuscode != STATUSCODE_INVALID ||
+               strcmp(back.r.msg, "FTP transfer interrupted") != 0) {
+      fprintf(stderr,
+              "ftp-worker-selftest: a cut-short transfer reads %d '%s'\n",
+              back.r.statuscode, back.r.msg);
+      err++;
+    }
+  }
+  return err;
 }
 
 // lancer en back
@@ -151,15 +218,12 @@ void launch_ftp(FTPDownloadStruct * params) {
 #if FTP_DEBUG
   printf("[Launching main ftp thread]\n");
 #endif
+  params->body_returned = HTS_FALSE;
   ftp_worker_register(params);
-  if (hts_newthread(back_launch_ftp, (void *) params) != 0) {
-    /* Nobody would ever reap a slot left in STATUS_FTP_TRANSFER, and
-       ftp_stop_workers() would never return. */
-    ftp_worker_unregister(params);
-    strcpybuff(params->pBack->r.msg, "Unable to launch FTP thread");
-    params->pBack->r.statuscode = STATUSCODE_INVALID;
-    params->pBack->status = STATUS_FTP_READY;
-    free(params);
+  if (hts_newthread_tail(back_launch_ftp, (void *) params, ftp_worker_done) !=
+      0) {
+    /* ftp_stop_workers() would never return on a slot left registered. */
+    ftp_worker_release(params, "Unable to launch FTP thread");
   }
 }
 

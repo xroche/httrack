@@ -56,6 +56,8 @@ struct FTPDownloadStruct {
   lien_back *pBack;
   httrackp *pOpt;
   FTPDownloadStruct *pNext; /* live-worker list, owned by htsftp.c */
+  /* Did back_launch_ftp() reach its end? launch_ftp() clears it. */
+  hts_boolean body_returned;
 };
 
 /* Library internal definictions */
@@ -69,6 +71,9 @@ void back_launch_ftp(void *pP);
 /* Cancel every live FTP worker and block until each stops touching its backlog
    slot and opt. Call before freeing either. */
 void ftp_stop_workers(void);
+/* Run a worker's tail on a finished and on a cut-short transfer, asserting what
+   the crawl thread reads back. Returns the number of failed checks. */
+int ftp_worker_selftests(void);
 #else
 void launch_ftp(FTPDownloadStruct * params, char *path, char *exec);
 int back_launch_ftp(FTPDownloadStruct * params);

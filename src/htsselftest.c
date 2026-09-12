@@ -91,6 +91,7 @@ Please visit our Website: http://www.httrack.com
 #include <ctype.h>
 #include <errno.h>
 #include <limits.h>
+#include <setjmp.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -13438,6 +13439,13 @@ static int threadrunner_seen_before = 0;
 static int threadrunner_seen_after = 0;
 static threadrunner_id threadrunner_body_thread;
 static threadrunner_id threadrunner_runner_thread;
+static int threadrunner_tail = 0;
+static int threadrunner_body_at_tail = 0;
+static threadrunner_id threadrunner_tail_thread;
+/* Its address is the worker's arg, so a tail handed another pointer shows. */
+static int threadrunner_owner;
+static void *threadrunner_tail_arg = NULL;
+static jmp_buf threadrunner_jmp;
 
 static void threadrunner_count(int *what) {
   hts_mutexlock(&threadrunner_lock);
@@ -13451,6 +13459,9 @@ static void threadrunner_reset(void) {
   threadrunner_body = 0;
   threadrunner_seen_before = 0;
   threadrunner_seen_after = 0;
+  threadrunner_tail = 0;
+  threadrunner_body_at_tail = 0;
+  threadrunner_tail_arg = NULL;
 }
 
 static void threadrunner_body_fn(void *arg) {
@@ -13463,15 +13474,50 @@ static void threadrunner_body_fn(void *arg) {
   hts_mutexrelease(&threadrunner_lock);
 }
 
+/* Leaves the body the way a fault recovery does, so nothing after the jump
+   runs. A real runner gets there through siglongjmp(). */
+static void threadrunner_cut_fn(void *arg) {
+  (void) arg;
+  hts_mutexlock(&threadrunner_lock);
+  threadrunner_body_thread = threadrunner_self();
+  threadrunner_body++;
+  hts_mutexrelease(&threadrunner_lock);
+  longjmp(threadrunner_jmp, 1);
+}
+
+/* A worker an earlier mirror abandoned: the round moves on before the fault, so
+   the fault belongs to a mirror that is over. */
+static void threadrunner_stale_fn(void *arg) {
+  (void) arg;
+  hts_mutexlock(&threadrunner_lock);
+  threadrunner_body_thread = threadrunner_self();
+  threadrunner_body++;
+  hts_mutexrelease(&threadrunner_lock);
+  hts_worker_fault_clear(); /* as the next mirror does when it starts */
+  longjmp(threadrunner_jmp, 1);
+}
+
+static void threadrunner_tail_fn(void *arg) {
+  hts_mutexlock(&threadrunner_lock);
+  threadrunner_tail_arg = arg;
+  threadrunner_body_at_tail = threadrunner_body;
+  threadrunner_tail_thread = threadrunner_self();
+  threadrunner_tail++;
+  hts_mutexrelease(&threadrunner_lock);
+}
+
 static void threadrunner_runner(void (*fun)(void *arg), void *arg) {
   threadrunner_runner_thread = threadrunner_self();
   threadrunner_count(&threadrunner_before);
-  fun(arg);
+  /* Stands in for a fault handler's own jump buffer. */
+  if (setjmp(threadrunner_jmp) == 0)
+    fun(arg);
   threadrunner_count(&threadrunner_after);
 }
 
-static hts_boolean threadrunner_spawn(void) {
-  if (hts_newthread(threadrunner_body_fn, NULL) != 0) {
+static hts_boolean threadrunner_spawn_body(void (*fun)(void *arg),
+                                           void (*tail)(void *arg)) {
+  if (hts_newthread_tail(fun, &threadrunner_owner, tail) != 0) {
     fprintf(stderr, "threadrunner: cannot spawn\n");
     return HTS_FALSE;
   }
@@ -13479,12 +13525,15 @@ static hts_boolean threadrunner_spawn(void) {
   return HTS_TRUE;
 }
 
+static hts_boolean threadrunner_spawn(void) {
+  return threadrunner_spawn_body(threadrunner_body_fn, NULL);
+}
+
 static int st_threadrunner(httrackp *opt, int argc, char **argv) {
   const threadrunner_id caller = threadrunner_self();
   hts_boolean spawned;
   int err = 0;
 
-  (void) opt;
   (void) argc;
   (void) argv;
 
@@ -13546,7 +13595,152 @@ static int st_threadrunner(httrackp *opt, int argc, char **argv) {
     err = 1;
   }
 
+  /* A tail runs on the worker once the body is over, whether or not the body
+     reached its own end. The FTP worker list is released there. */
+  threadrunner_reset();
+  if (!threadrunner_spawn_body(threadrunner_body_fn, threadrunner_tail_fn))
+    return 1;
+  if (threadrunner_body != 1 || threadrunner_tail != 1) {
+    fprintf(stderr, "threadrunner: body %d time(s) and tail %d, expected 1/1\n",
+            threadrunner_body, threadrunner_tail);
+    err = 1;
+  }
+  if (threadrunner_body_at_tail != 1) {
+    fprintf(stderr, "threadrunner: the tail ran before the body\n");
+    err = 1;
+  }
+  if (threadrunner_tail_arg != &threadrunner_owner) {
+    fprintf(stderr, "threadrunner: the tail got another worker's arg\n");
+    err = 1;
+  }
+  if (hts_worker_faulted()) {
+    fprintf(stderr, "threadrunner: a body that finished reads as a fault\n");
+    err = 1;
+  }
+
+  /* The body jumps out of threadrunner_cut_fn, so only the tail can reap the
+     worker. */
+  threadrunner_reset();
+  if (hts_set_thread_runner(threadrunner_runner) != NULL) {
+    fprintf(stderr, "threadrunner: a runner was installed already\n");
+    return 1;
+  }
+  spawned = threadrunner_spawn_body(threadrunner_cut_fn, threadrunner_tail_fn);
+  hts_set_thread_runner(NULL);
+  if (!spawned)
+    return 1;
+  /* The runner left normally, so the engine saw a worker whose body stopped
+     halfway and nothing else. */
+  if (threadrunner_body != 1 || threadrunner_after != 1) {
+    fprintf(stderr, "threadrunner: recovery ran the body %d time(s), left %d\n",
+            threadrunner_body, threadrunner_after);
+    err = 1;
+  }
+  if (threadrunner_tail != 1 || threadrunner_body_at_tail != 1) {
+    fprintf(stderr,
+            "threadrunner: a cut-short body ran the tail %d time(s), at %d\n",
+            threadrunner_tail, threadrunner_body_at_tail);
+    err = 1;
+  } else if (!threadrunner_same(threadrunner_tail_thread,
+                                threadrunner_body_thread)) {
+    fprintf(stderr, "threadrunner: the tail ran off the worker thread\n");
+    err = 1;
+  }
+  if (threadrunner_tail_arg != &threadrunner_owner) {
+    fprintf(stderr,
+            "threadrunner: a cut-short body gave the tail another arg\n");
+    err = 1;
+  }
+
+  /* The mirror gives up on it, and says so through the exit status rather than
+     reading as a stop the user asked for. */
+  if (!hts_worker_faulted()) {
+    fprintf(stderr, "threadrunner: a cut-short body raised no fault\n");
+    err = 1;
+  }
+  {
+    FILE *const saved_log = opt->log;
+
+    opt->log = NULL; /* the abort logs, and this test's own output is exact */
+    opt->state.stop = 0;
+    opt->state.exit_xh = 0;
+    back_checkmirror(opt);
+    if (opt->state.stop != 1 || opt->state.exit_xh != -1) {
+      fprintf(stderr, "threadrunner: the mirror read the fault as stop %d/%d\n",
+              opt->state.stop, opt->state.exit_xh);
+      err = 1;
+    }
+    /* a stop the user asked for exits 0, so the fault's verdict outranks it */
+    opt->state.stop = 1;
+    opt->state.exit_xh = 1;
+    back_check_worker_fault(opt);
+    if (opt->state.exit_xh != -1) {
+      fprintf(stderr, "threadrunner: a user stop swallowed the fault (%d)\n",
+              opt->state.exit_xh);
+      err = 1;
+    }
+    opt->state.stop = 0;
+    opt->state.exit_xh = 0;
+    hts_worker_fault_clear();
+    back_checkmirror(opt);
+    if (opt->state.exit_xh != 0) {
+      fprintf(stderr,
+              "threadrunner: a cleared fault still aborted the mirror\n");
+      err = 1;
+    }
+    opt->log = saved_log;
+  }
+
+  /* Round 0 is the only round the cases above ran in, and no mirror uses it:
+     each one takes the next round as it starts. */
+  hts_worker_fault_clear();
+  threadrunner_reset();
+  if (hts_set_thread_runner(threadrunner_runner) != NULL) {
+    fprintf(stderr, "threadrunner: a runner was installed already\n");
+    return 1;
+  }
+  spawned = threadrunner_spawn_body(threadrunner_cut_fn, threadrunner_tail_fn);
+  hts_set_thread_runner(NULL);
+  if (!spawned)
+    return 1;
+  if (!hts_worker_faulted()) {
+    fprintf(stderr, "threadrunner: no fault past the first round\n");
+    err = 1;
+  }
+  hts_worker_fault_clear();
+
+  /* A fault raised after its own mirror ended aborts nothing. */
+  threadrunner_reset();
+  if (hts_set_thread_runner(threadrunner_runner) != NULL) {
+    fprintf(stderr, "threadrunner: a runner was installed already\n");
+    return 1;
+  }
+  spawned =
+      threadrunner_spawn_body(threadrunner_stale_fn, threadrunner_tail_fn);
+  hts_set_thread_runner(NULL);
+  if (!spawned)
+    return 1;
+  if (threadrunner_body != 1 || threadrunner_tail != 1) {
+    fprintf(stderr, "threadrunner: the stale round ran %d body and %d tail\n",
+            threadrunner_body, threadrunner_tail);
+    err = 1;
+  }
+  if (hts_worker_faulted()) {
+    fprintf(stderr, "threadrunner: a fault from a finished mirror was kept\n");
+    err = 1;
+  }
+
   printf("threadrunner self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
+static int st_ftpworker(httrackp *opt, int argc, char **argv) {
+  const int err = ftp_worker_selftests();
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  printf("ftp-worker-selftest: %s\n", err ? "FAIL" : "OK");
   return err;
 }
 
@@ -15543,6 +15737,8 @@ static const struct selftest_entry {
     {"threadrunner", "",
      "a registered thread runner encloses each worker body exactly once",
      st_threadrunner},
+    {"ftpworker", "", "an FTP worker's tail hands its backlog slot back",
+     st_ftpworker},
     {"charset", "<charset> <hex:..|string>",
      "convert a string to UTF-8 from a charset", st_charset},
     {"syscharset", "", "UTF-8 <-> system codepage conversion (WIN32 only)",

@@ -671,6 +671,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
 
   // initialiser exit_xh
   opt->state.exit_xh = 0;       // sortir prématurément (var globale)
+  /* a fault a previous mirror recovered from must not abort this one */
+  hts_worker_fault_clear();
 
   // initialiser usercommand
   usercommand(opt, opt->sys_com_exec, StringBuff(opt->sys_com), "", "", "");
@@ -2094,6 +2096,10 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
     }
   } while(ptr < opt->lien_tot);
 
+  /* Once more, for a worker that faulted after the loop's last check: the
+     verdict below and the exit status both read exit_xh. */
+  back_check_worker_fault(opt);
+
   /* A stop request cuts the mirror short whether or not the loop ran out of
      links: with one pending, the parser stops queueing the links it finds. */
   aborted = opt->state.stop != 0 || opt->state.exit_xh != 0;
@@ -2123,7 +2129,10 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
                   ": restoring previous one!");
     /* this run replaces nothing, so its archive must not be committed */
     warc_abort_opt(opt);
-    opt->state.exit_xh = 2;     /* interrupted (no connection detected) */
+    /* 2 exits 0, so it must not overwrite an abort the engine already decided,
+       and a crash on the first fetch lands in exactly this state. */
+    if (opt->state.exit_xh != -1)
+      opt->state.exit_xh = 2; /* interrupted (no connection detected) */
     rollback = HTS_TRUE;
     goto cleanup;
   }

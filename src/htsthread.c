@@ -96,7 +96,38 @@ HTSEXT_API void htsthread_uninit(void) {
 typedef struct hts_thread_s {
   void *arg;
   void (*fun) (void *arg);
+  void (*tail)(void *arg);
+  int round;
 } hts_thread_s;
+
+/* A body and whether it reached its end. */
+typedef struct hts_body_s {
+  void *arg;
+  void (*fun)(void *arg);
+  hts_boolean returned;
+} hts_body_s;
+
+static void hts_run_body(void *arg) {
+  hts_body_s *const body = (hts_body_s *) arg;
+
+  body->fun(body->arg);
+  body->returned = HTS_TRUE;
+}
+
+/* Set by a worker a fault recovery cut short. A plain flag rather than a field
+   on opt, because a worker must not touch opt at all: it outlives a timed-out
+   resolve, and the mirror frees opt before the thread wait at exit. */
+static volatile hts_boolean worker_faulted = HTS_FALSE;
+/* Each mirror takes the next round, and a worker keeps the round it was spawned
+   in, so one abandoned by an earlier mirror cannot abort this one. */
+static volatile int mirror_round = 0;
+
+hts_boolean hts_worker_faulted(void) { return worker_faulted; }
+
+void hts_worker_fault_clear(void) {
+  mirror_round++; /* first, so a straggler can no longer raise the flag */
+  worker_faulted = HTS_FALSE;
+}
 
 /* Set once before any thread is spawned, hence unlocked. */
 static void *(*thread_enter)(void) = NULL;
@@ -127,17 +158,28 @@ static void *hts_entry_point(void *tharg)
 {
   hts_thread_s *s_args = (hts_thread_s *) tharg;
   void *const arg = s_args->arg;
-  void (*fun) (void *arg) = s_args->fun;
+  void (*const tail)(void *arg) = s_args->tail;
+  const int round = s_args->round;
+  hts_body_s body;
   void *cookie;
 
+  body.fun = s_args->fun;
+  body.arg = arg;
+  body.returned = HTS_FALSE;
   freet(tharg);
 
   cookie = thread_enter != NULL ? thread_enter() : NULL;
   /* run */
   if (thread_runner != NULL)
-    thread_runner(fun, arg);
+    thread_runner(hts_run_body, &body);
   else
-    fun(arg);
+    hts_run_body(&body);
+  /* back_check_worker_fault() reads this and gives up the mirror. */
+  if (!body.returned && round == mirror_round)
+    worker_faulted = HTS_TRUE;
+  /* Not at the end of the body, because a recovered fault never gets there. */
+  if (tail != NULL)
+    tail(arg);
   if (thread_leave != NULL)
     thread_leave(cookie);
 
@@ -151,11 +193,18 @@ static void *hts_entry_point(void *tharg)
 
 /* create a thread */
 HTSEXT_API int hts_newthread(void (*fun) (void *arg), void *arg) {
+  return hts_newthread_tail(fun, arg, NULL);
+}
+
+int hts_newthread_tail(void (*fun)(void *arg), void *arg,
+                       void (*tail)(void *arg)) {
   hts_thread_s *s_args = malloct(sizeof(hts_thread_s));
 
   assertf(s_args != NULL);
   s_args->arg = arg;
   s_args->fun = fun;
+  s_args->tail = tail;
+  s_args->round = mirror_round;
   process_chain_add(1);
 #ifdef _WIN32
   {

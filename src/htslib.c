@@ -5699,6 +5699,19 @@ static void dns_resolve_thread(void *arg) {
   job->permanent = permanent;
   job->done = HTS_TRUE; /* published last: gates the caller's read of addr[] */
   hts_mutexrelease(&job->lock);
+}
+
+/* Releases the job whatever the body did (see hts_newthread_tail). A -1 count
+   is what the caller reads as "no answer", so it caches nothing. */
+static void dns_resolve_done(void *arg) {
+  dns_resolve_job *const job = (dns_resolve_job *) arg;
+
+  hts_mutexlock(&job->lock);
+  if (!job->done) {
+    job->count = -1;
+    job->done = HTS_TRUE;
+  }
+  hts_mutexrelease(&job->lock);
   dns_job_release(job);
 }
 
@@ -5724,7 +5737,7 @@ static int hts_dns_resolve_nocache_list_bounded(
   hts_mutexinit(&job->lock);
   job->hostname = strdupt(hostname);
   job->refcount = 2; /* this caller + the worker */
-  if (hts_newthread(dns_resolve_thread, job) != 0) {
+  if (hts_newthread_tail(dns_resolve_thread, job, dns_resolve_done) != 0) {
     job->refcount = 1; /* no worker: fall back to resolving inline */
     dns_job_release(job);
     return hts_dns_resolve_nocache_list(hostname, out, max, error, permanent);
