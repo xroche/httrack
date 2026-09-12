@@ -13442,6 +13442,9 @@ static threadrunner_id threadrunner_runner_thread;
 static int threadrunner_tail = 0;
 static int threadrunner_body_at_tail = 0;
 static threadrunner_id threadrunner_tail_thread;
+/* Its address is the worker's arg, so a tail handed another pointer shows. */
+static int threadrunner_owner;
+static void *threadrunner_tail_arg = NULL;
 static jmp_buf threadrunner_jmp;
 
 static void threadrunner_count(int *what) {
@@ -13458,6 +13461,7 @@ static void threadrunner_reset(void) {
   threadrunner_seen_after = 0;
   threadrunner_tail = 0;
   threadrunner_body_at_tail = 0;
+  threadrunner_tail_arg = NULL;
 }
 
 static void threadrunner_body_fn(void *arg) {
@@ -13482,8 +13486,8 @@ static void threadrunner_cut_fn(void *arg) {
 }
 
 static void threadrunner_tail_fn(void *arg) {
-  (void) arg;
   hts_mutexlock(&threadrunner_lock);
+  threadrunner_tail_arg = arg;
   threadrunner_body_at_tail = threadrunner_body;
   threadrunner_tail_thread = threadrunner_self();
   threadrunner_tail++;
@@ -13501,7 +13505,7 @@ static void threadrunner_runner(void (*fun)(void *arg), void *arg) {
 
 static hts_boolean threadrunner_spawn_body(void (*fun)(void *arg),
                                            void (*tail)(void *arg)) {
-  if (hts_newthread_tail(fun, NULL, tail) != 0) {
+  if (hts_newthread_tail(fun, &threadrunner_owner, tail) != 0) {
     fprintf(stderr, "threadrunner: cannot spawn\n");
     return HTS_FALSE;
   }
@@ -13594,6 +13598,10 @@ static int st_threadrunner(httrackp *opt, int argc, char **argv) {
     fprintf(stderr, "threadrunner: the tail ran before the body\n");
     err = 1;
   }
+  if (threadrunner_tail_arg != &threadrunner_owner) {
+    fprintf(stderr, "threadrunner: the tail got another worker's arg\n");
+    err = 1;
+  }
 
   /* The body jumps out of threadrunner_cut_fn, so only the tail can reap the
      worker. */
@@ -13623,8 +13631,23 @@ static int st_threadrunner(httrackp *opt, int argc, char **argv) {
     fprintf(stderr, "threadrunner: the tail ran off the worker thread\n");
     err = 1;
   }
+  if (threadrunner_tail_arg != &threadrunner_owner) {
+    fprintf(stderr,
+            "threadrunner: a cut-short body gave the tail another arg\n");
+    err = 1;
+  }
 
   printf("threadrunner self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
+static int st_ftpworker(httrackp *opt, int argc, char **argv) {
+  const int err = ftp_worker_selftests();
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  printf("ftp-worker-selftest: %s\n", err ? "FAIL" : "OK");
   return err;
 }
 
@@ -15621,6 +15644,8 @@ static const struct selftest_entry {
     {"threadrunner", "",
      "a registered thread runner encloses each worker body exactly once",
      st_threadrunner},
+    {"ftpworker", "", "an FTP worker's tail hands its backlog slot back",
+     st_ftpworker},
     {"charset", "<charset> <hex:..|string>",
      "convert a string to UTF-8 from a charset", st_charset},
     {"syscharset", "", "UTF-8 <-> system codepage conversion (WIN32 only)",

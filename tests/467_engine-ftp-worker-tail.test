@@ -1,0 +1,14 @@
+#!/bin/bash
+#
+# An FTP worker's tail hands its backlog slot back, as an error where the
+# transfer was cut short. A worker left on the live list wedges
+# ftp_stop_workers() forever, so the engine asserts the list drains too.
+
+set -eu
+
+out=$(httrack -#test=ftpworker)
+
+test "$out" = "ftp-worker-selftest: OK" || {
+    echo "expected 'ftp-worker-selftest: OK', got: $out" >&2
+    exit 1
+}

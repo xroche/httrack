@@ -161,6 +161,57 @@ void back_launch_ftp(void *pP) {
   pStruct->body_returned = HTS_TRUE;
 }
 
+/* See htsftp.h. The tail is called here as the thread layer calls it, since a
+   worker that faults for real cannot be had on demand. */
+int ftp_worker_selftests(void) {
+  static const char kept[] = "what the transfer said";
+  int err = 0;
+  int round;
+
+  for (round = 0; round < 2; round++) {
+    const hts_boolean returned = (round == 0) ? HTS_FALSE : HTS_TRUE;
+    FTPDownloadStruct *const worker = calloct(1, sizeof(*worker));
+    lien_back back;
+
+    assertf(worker != NULL);
+    memset(&back, 0, sizeof(back));
+    back.status = STATUS_FTP_TRANSFER;
+    back.r.statuscode = 200;
+    strcpybuff(back.r.msg, kept);
+    worker->pBack = &back;
+    worker->body_returned = returned;
+    ftp_worker_register(worker);
+    ftp_worker_done(worker);
+
+    if (ftp_workers != NULL) {
+      fprintf(stderr, "ftp-worker-selftest: the tail left the worker "
+                      "registered, so ftp_stop_workers() would never return\n");
+      err++;
+    }
+    if (back.status != STATUS_FTP_READY) {
+      fprintf(stderr, "ftp-worker-selftest: slot status %d, expected %d\n",
+              back.status, STATUS_FTP_READY);
+      err++;
+    }
+    if (returned) {
+      if (back.r.statuscode != 200 || strcmp(back.r.msg, kept) != 0) {
+        fprintf(stderr,
+                "ftp-worker-selftest: the tail overwrote a finished transfer "
+                "with %d '%s'\n",
+                back.r.statuscode, back.r.msg);
+        err++;
+      }
+    } else if (back.r.statuscode != STATUSCODE_INVALID ||
+               strcmp(back.r.msg, "FTP transfer interrupted") != 0) {
+      fprintf(stderr,
+              "ftp-worker-selftest: a cut-short transfer reads %d '%s'\n",
+              back.r.statuscode, back.r.msg);
+      err++;
+    }
+  }
+  return err;
+}
+
 // lancer en back
 void launch_ftp(FTPDownloadStruct * params) {
   // DOS
