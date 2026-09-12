@@ -91,6 +91,7 @@ Please visit our Website: http://www.httrack.com
 #include <ctype.h>
 #include <errno.h>
 #include <limits.h>
+#include <setjmp.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -13438,6 +13439,13 @@ static int threadrunner_seen_before = 0;
 static int threadrunner_seen_after = 0;
 static threadrunner_id threadrunner_body_thread;
 static threadrunner_id threadrunner_runner_thread;
+static int threadrunner_tail = 0;
+/* The body count as the tail read it. */
+static int threadrunner_tail_seen_body = 0;
+static threadrunner_id threadrunner_tail_thread;
+/* Armed for the regime where the runner recovers out of the body. */
+static hts_boolean threadrunner_recover = HTS_FALSE;
+static jmp_buf threadrunner_jmp;
 
 static void threadrunner_count(int *what) {
   hts_mutexlock(&threadrunner_lock);
@@ -13451,6 +13459,8 @@ static void threadrunner_reset(void) {
   threadrunner_body = 0;
   threadrunner_seen_before = 0;
   threadrunner_seen_after = 0;
+  threadrunner_tail = 0;
+  threadrunner_tail_seen_body = 0;
 }
 
 static void threadrunner_body_fn(void *arg) {
@@ -13463,20 +13473,51 @@ static void threadrunner_body_fn(void *arg) {
   hts_mutexrelease(&threadrunner_lock);
 }
 
+/* Leaves the body where a fault recovery does, so nothing after the jump in
+   the body runs. A real runner gets there through siglongjmp() out of a signal
+   handler; what the engine sees is the same. */
+static void threadrunner_cut_fn(void *arg) {
+  (void) arg;
+  hts_mutexlock(&threadrunner_lock);
+  threadrunner_body_thread = threadrunner_self();
+  threadrunner_body++;
+  hts_mutexrelease(&threadrunner_lock);
+  longjmp(threadrunner_jmp, 1);
+}
+
+static void threadrunner_tail_fn(void *arg) {
+  (void) arg;
+  hts_mutexlock(&threadrunner_lock);
+  threadrunner_tail_seen_body = threadrunner_body;
+  threadrunner_tail_thread = threadrunner_self();
+  threadrunner_tail++;
+  hts_mutexrelease(&threadrunner_lock);
+}
+
 static void threadrunner_runner(void (*fun)(void *arg), void *arg) {
   threadrunner_runner_thread = threadrunner_self();
   threadrunner_count(&threadrunner_before);
-  fun(arg);
+  if (threadrunner_recover) {
+    if (setjmp(threadrunner_jmp) == 0)
+      fun(arg);
+  } else {
+    fun(arg);
+  }
   threadrunner_count(&threadrunner_after);
 }
 
-static hts_boolean threadrunner_spawn(void) {
-  if (hts_newthread(threadrunner_body_fn, NULL) != 0) {
+static hts_boolean threadrunner_spawn_body(void (*fun)(void *arg),
+                                           void (*tail)(void *arg)) {
+  if (hts_newthread_tail(fun, NULL, tail) != 0) {
     fprintf(stderr, "threadrunner: cannot spawn\n");
     return HTS_FALSE;
   }
   htsthread_wait();
   return HTS_TRUE;
+}
+
+static hts_boolean threadrunner_spawn(void) {
+  return threadrunner_spawn_body(threadrunner_body_fn, NULL);
 }
 
 static int st_threadrunner(httrackp *opt, int argc, char **argv) {
@@ -13543,6 +13584,50 @@ static int st_threadrunner(httrackp *opt, int argc, char **argv) {
   }
   if (threadrunner_same(threadrunner_body_thread, caller)) {
     fprintf(stderr, "threadrunner: the body ran on the caller's thread\n");
+    err = 1;
+  }
+
+  /* A tail runs on the worker once the body is over, whether or not the body
+     reached its own end. The FTP worker list is released there. */
+  threadrunner_reset();
+  if (!threadrunner_spawn_body(threadrunner_body_fn, threadrunner_tail_fn))
+    return 1;
+  if (threadrunner_body != 1 || threadrunner_tail != 1) {
+    fprintf(stderr, "threadrunner: body %d time(s) and tail %d, expected 1/1\n",
+            threadrunner_body, threadrunner_tail);
+    err = 1;
+  }
+  if (threadrunner_tail_seen_body != 1) {
+    fprintf(stderr, "threadrunner: the tail ran before the body\n");
+    err = 1;
+  }
+
+  threadrunner_reset();
+  threadrunner_recover = HTS_TRUE;
+  if (hts_set_thread_runner(threadrunner_runner) != NULL) {
+    fprintf(stderr, "threadrunner: a runner was installed already\n");
+    return 1;
+  }
+  spawned = threadrunner_spawn_body(threadrunner_cut_fn, threadrunner_tail_fn);
+  hts_set_thread_runner(NULL);
+  threadrunner_recover = HTS_FALSE;
+  if (!spawned)
+    return 1;
+  /* The runner left normally, so the engine saw a worker whose body stopped
+     halfway and nothing else. */
+  if (threadrunner_body != 1 || threadrunner_after != 1) {
+    fprintf(stderr, "threadrunner: recovery ran the body %d time(s), left %d\n",
+            threadrunner_body, threadrunner_after);
+    err = 1;
+  }
+  if (threadrunner_tail != 1 || threadrunner_tail_seen_body != 1) {
+    fprintf(stderr,
+            "threadrunner: a cut-short body ran the tail %d time(s), at %d\n",
+            threadrunner_tail, threadrunner_tail_seen_body);
+    err = 1;
+  } else if (!threadrunner_same(threadrunner_tail_thread,
+                                threadrunner_body_thread)) {
+    fprintf(stderr, "threadrunner: the tail ran off the worker thread\n");
     err = 1;
   }
 

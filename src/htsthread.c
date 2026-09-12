@@ -96,6 +96,7 @@ HTSEXT_API void htsthread_uninit(void) {
 typedef struct hts_thread_s {
   void *arg;
   void (*fun) (void *arg);
+  void (*tail)(void *arg);
 } hts_thread_s;
 
 /* Set once before any thread is spawned, hence unlocked. */
@@ -128,6 +129,7 @@ static void *hts_entry_point(void *tharg)
   hts_thread_s *s_args = (hts_thread_s *) tharg;
   void *const arg = s_args->arg;
   void (*fun) (void *arg) = s_args->fun;
+  void (*const tail)(void *arg) = s_args->tail;
   void *cookie;
 
   freet(tharg);
@@ -138,6 +140,10 @@ static void *hts_entry_point(void *tharg)
     thread_runner(fun, arg);
   else
     fun(arg);
+  /* Here and not at the end of the body: a runner recovering from a fault
+     returns with the rest of the body skipped. */
+  if (tail != NULL)
+    tail(arg);
   if (thread_leave != NULL)
     thread_leave(cookie);
 
@@ -151,11 +157,17 @@ static void *hts_entry_point(void *tharg)
 
 /* create a thread */
 HTSEXT_API int hts_newthread(void (*fun) (void *arg), void *arg) {
+  return hts_newthread_tail(fun, arg, NULL);
+}
+
+int hts_newthread_tail(void (*fun)(void *arg), void *arg,
+                       void (*tail)(void *arg)) {
   hts_thread_s *s_args = malloct(sizeof(hts_thread_s));
 
   assertf(s_args != NULL);
   s_args->arg = arg;
   s_args->fun = fun;
+  s_args->tail = tail;
   process_chain_add(1);
 #ifdef _WIN32
   {

@@ -818,7 +818,11 @@ typedef void (*hts_thread_runner)(void (*fun)(void *arg), void *arg);
 
 /** Wraps each worker body in a caller-supplied frame. The runner must call
     'fun(arg)' once, and NULL clears it. Returns the previous runner. Set it
-    before spawning, since it is read unlocked. */
+    before spawning, since it is read unlocked.
+
+    A runner that recovers from a fault may return with 'fun(arg)' cut short.
+    The engine then releases what that worker held, so its work is lost but no
+    other thread waits for it. */
 HTSEXT_API hts_thread_runner hts_set_thread_runner(hts_thread_runner runner);
 
 /* UTF-8 aware FILE API */
