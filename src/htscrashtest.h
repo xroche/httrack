@@ -67,6 +67,11 @@ hts_crash_test_result hts_crash_test(const char *kind);
 /* The names hts_crash_test() accepts, comma-separated, for diagnostics. */
 const char *hts_crash_test_kinds(void);
 
+/* Announce a crash-test step on both channels, because httrack-android recovers
+   the fault and reads only the log. stderr carries a "** " prefix and a
+   newline, the log line carries the message alone. */
+void hts_crash_test_announce(const char *format, ...) HTS_PRINTF_FUN(1, 2);
+
 /* Fault this worker where -#c armed that kind, once, and do nothing otherwise.
    Call it inside a worker body, where a fault meets the engine state a real one
    would. */

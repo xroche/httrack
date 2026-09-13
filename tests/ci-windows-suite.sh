@@ -263,6 +263,8 @@ ci_suite_heartbeat() {
 # crash-symbolize and backtrace-empty need backtrace(), which Windows has no
 # equivalent of;
 # crash-live-worker reads the POSIX fatal handler's own report;
+# crash-announce needs the -#c kinds, and no MSVC project defines HTS_CRASH_TEST,
+# so the whole option compiles out here;
 # string-oom drives a helper binary that only the automake build produces;
 # datadir-ospath copies the unwrapped binary the automake build leaves in .libs,
 # and needs the loader variable libtool picked, neither of which this job has;
@@ -309,6 +311,7 @@ expected_skips_msys="01_engine-footer-overflow.test
 71_local-crange-repaircache.test
 80_engine-crash-symbolize.test
 468_engine-crash-live-worker.test
+01_engine-crash-announce.test
 88_local-proxytrack-badmtime.test
 241_local-single-file-gui.test
 288_testlib-holdport.test
@@ -355,6 +358,7 @@ expected_skips_wsl2="01_engine-footer-overflow.test
 71_local-crange-repaircache.test
 80_engine-crash-symbolize.test
 468_engine-crash-live-worker.test
+01_engine-crash-announce.test
 88_local-proxytrack-badmtime.test
 241_local-single-file-gui.test
 288_testlib-holdport.test
