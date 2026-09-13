@@ -33,6 +33,10 @@ echo "expected [x], got [y]" >realfail.test.log
 # matching only "ERROR" or "init:" calls this an outage and fails here.
 echo '<3>init: (2409) ERROR: CreateProcessEntryCommon:334 execvpe failed 2' \
     >otherinit.test.log
+# The same failure behind a store build's prefix, which is not "init:". The
+# workflow runs wsl --update, so the prefix can move under us.
+echo '<3>WSL (2409) ERROR: UtilAcceptVsock:235: accept4 failed 110' \
+    >storewsl.test.log
 # nolog.test.log is deliberately absent.
 
 verdict='' noise='' rc=0
@@ -65,6 +69,11 @@ run_verdict otherinit.test
 test "$rc" -eq 1 || fail "another init error exited $rc, want 1: $verdict"
 ! grep -q 'interop' <<<"$verdict" ||
     fail "an unrelated init error was read as an outage: $verdict"
+
+# And the same outage behind the other prefix.
+rc=0
+run_verdict storewsl.test
+test "$rc" -eq 3 || fail "the store-build prefix exited $rc, want 3: $verdict"
 
 # A log the worker never opened is not evidence of an outage, and the read must
 # stay quiet: grep prints to stderr on a file that is not there.

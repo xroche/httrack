@@ -113,9 +113,11 @@ ci_report_lost_workers() {
 ci_failure_verdict() { # ci_failure_verdict TEST...
     local t real='' interop=''
     for t in "$@"; do
-        # WSL's own init writes this when it cannot reach the Windows side. Read
-        # from each test's own log, since the console carries unrelated tails.
-        if test -f "$t.log" && grep -q 'init:.*UtilAcceptVsock' "$t.log"; then
+        # WSL writes this when it cannot reach the Windows side. Matched past the
+        # line's prefix, which is "init:" on the imported rootfs and "WSL (pid)"
+        # on a store build. Each test's own log, since the console carries the
+        # tails of unrelated failures.
+        if test -f "$t.log" && grep -q 'ERROR: UtilAcceptVsock' "$t.log"; then
             interop="$interop $t"
         else
             real="$real $t"
