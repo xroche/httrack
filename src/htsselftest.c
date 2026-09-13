@@ -71,6 +71,7 @@ Please visit our Website: http://www.httrack.com
 #include "htssitemap.h"
 #include "htswarc.h"
 #include "htschanges.h"
+#include "htscrashtest.h"
 #include "htssinglefile.h"
 #include "htszlib.h"
 #if HTS_USEZSTD
@@ -4562,6 +4563,50 @@ static int st_logcallback(httrackp *opt, int argc, char **argv) {
     printf("logcallback self-test OK\n");
   return rc;
 }
+
+#ifdef HTS_CRASH_TEST
+static char st_crash_seen[256];
+static int st_crash_level = -1;
+
+static HTS_PRINTF_FUN(3, 0) void st_crash_log(httrackp *opt, int type,
+                                              const char *format,
+                                              va_list args) {
+  (void) opt;
+  st_crash_level = type;
+  (void) vsnprintf(st_crash_seen, sizeof(st_crash_seen), format, args);
+}
+
+/* A crash-test marker must reach the log callback as well as stderr: an
+   Android front end recovering the fault sees no stdout and no stderr. */
+static int st_crashannounce(httrackp *opt, int argc, char **argv) {
+  static const char want[] = "crash announce 42";
+  int rc = 1;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  st_crash_seen[0] = '\0';
+  st_crash_level = -1;
+  hts_set_log_vprint_callback(st_crash_log);
+  /* The engine must not need an opt to reach the front end here. */
+  hts_crash_test_announce("crash announce %d", 42);
+  hts_set_log_vprint_callback(NULL);
+
+  if (strcmp(st_crash_seen, want) != 0)
+    fprintf(stderr, "crashannounce: callback got '%s' want '%s'\n",
+            st_crash_seen, want);
+  else if (st_crash_level != LOG_ERROR)
+    fprintf(stderr, "crashannounce: logged at level %d, want %d (LOG_ERROR)\n",
+            st_crash_level, (int) LOG_ERROR);
+  else
+    rc = 0;
+
+  if (rc == 0)
+    printf("crashannounce self-test OK\n");
+  return rc;
+}
+#endif
 
 /* an empty fil started htsAddLink's codebase walk before the buffer (#730) */
 static int st_addlink(httrackp *opt, int argc, char **argv) {
@@ -15878,6 +15923,10 @@ static const struct selftest_entry {
      st_addlink},
     {"logcallback", "", "log callback must not consume the log file's va_list",
      st_logcallback},
+#ifdef HTS_CRASH_TEST
+    {"crashannounce", "", "a crash-test marker reaches the log callback too",
+     st_crashannounce},
+#endif
     {"cache", "<dir>", "cache read/write round-trip self-test", st_cache},
     {"cacheindex", "", "cache-index (.ndx) parse must stay in bounds",
      st_cacheindex},

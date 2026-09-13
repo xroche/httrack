@@ -1,0 +1,23 @@
+#!/bin/bash
+#
+# A front end that recovers a crash-test fault (httrack-android, through
+# coffeecatch) reads the log callback and nothing else, so the markers have to
+# go there as well as to stderr.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+require_httrack
+have_feature crashtest || skip "built with --disable-crash-test"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_announce.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+
+# The self-test asserts the log channel; stderr is this shell's to check.
+out=$(httrack -O /dev/null -#test=crashannounce 2>"$tmp/err")
+grep -q "crashannounce self-test OK" <<<"$out" ||
+    fail "the marker did not reach the log callback: $out"
+grep -q '^\*\* crash announce 42$' "$tmp/err" ||
+    fail_dump "the marker did not reach stderr:" "$tmp/err"

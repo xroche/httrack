@@ -37,7 +37,9 @@ Please visit our Website: http://www.httrack.com
 
 #include "htssafe.h"
 #include "htsthread.h"
+#include "httrack-library.h"
 
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -102,6 +104,22 @@ static CRASH_NOINLINE char blow_the_stack(size_t depth) {
 /* Faults with no stack left for the handler, unless it runs on an altstack. */
 static CRASH_NOINLINE void crash_stack(void) { (void) blow_the_stack(0); }
 
+/* See htscrashtest.h. */
+void hts_crash_test_announce(const char *format, ...) {
+  va_list args;
+
+  va_start(args, format);
+  fprintf(stderr, "** ");
+  vfprintf(stderr, format, args);
+  fprintf(stderr, "\n");
+  fflush(stderr);
+  va_end(args);
+  /* NULL opt, so a worker reaches the front end's log without touching one. */
+  va_start(args, format);
+  hts_log_vprint(NULL, LOG_ERROR, format, args);
+  va_end(args);
+}
+
 /* Armed by an -#c kind, taken by the first worker of that kind the mirror
    starts. Not on opt: the kinds are process-wide, like the option. */
 static volatile hts_crash_worker crash_armed = HTS_CRASH_WORKER_NONE;
@@ -116,9 +134,8 @@ void hts_crash_test_worker(hts_crash_worker which) {
     return;
   /* Once, so a front end that recovers the fault still reaches the end. */
   crash_armed = HTS_CRASH_WORKER_NONE;
-  fprintf(stderr, "** Crash test: faulting a live %s worker\n",
-          which == HTS_CRASH_WORKER_DNS ? "DNS" : "FTP");
-  fflush(stderr);
+  hts_crash_test_announce("Crash test: faulting a live %s worker",
+                          which == HTS_CRASH_WORKER_DNS ? "DNS" : "FTP");
   crash_segv();
 }
 
@@ -225,10 +242,8 @@ hts_crash_test_result hts_crash_test(const char *kind) {
   }
   for (i = 0; i < CRASH_KINDS_COUNT; i++) {
     if (strcmp(kind, crash_kinds[i].name) == 0) {
-      fprintf(stderr,
-              "** Deliberate '%s' crash requested (-#c): crash handler test\n",
-              kind);
-      fflush(stderr);
+      hts_crash_test_announce(
+          "Deliberate '%s' crash requested (-#c): crash handler test", kind);
       crash_kinds[i].fn();
       if (crash_kinds[i].arms) {
         return HTS_CRASH_ARMED;
