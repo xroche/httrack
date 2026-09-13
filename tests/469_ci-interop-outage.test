@@ -1,0 +1,68 @@
+#!/bin/bash
+#
+# WSL2 drops its interop channel and the Windows leg reports content failures for
+# whichever tests called httrack.exe then (#1672): the exe never launched, so the
+# empty output they read is not a verdict on the code. The driver must say so and
+# end on the status that means repeat this leg, not investigate it.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# Before the driver is sourced: with these set, anything it starts posts a commit
+# status on whatever the surrounding shell was last looking at.
+unset WATCHDOG_TOKEN WATCHDOG_REPO WATCHDOG_SHA WATCHDOG_URL
+# shellcheck source=tests/ci-windows-suite.sh
+. "$testdir/ci-windows-suite.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_interop.XXXXXX")
+cleanup_push rm -rf "$tmp"
+
+# What the runner really logged, quoted from the job that sent this looking for a
+# buffer bug. 110 is ETIMEDOUT.
+outage='<3>init: (2409) ERROR: UtilAcceptVsock:235: accept4 failed 110'
+
+cd "$tmp"
+printf '%s\n++ httrack -O /dev/null -#test=expandhome\n' "$outage" >a.test.log
+printf '%s\n' "$outage" >b.test.log
+echo "expected [x], got [y]" >c.test.log
+# d.test.log is deliberately absent: a worker that logged nothing failed on its
+# own terms until something says otherwise.
+
+verdict='' rc=0
+run_verdict() { # run_verdict TEST...
+    rc=0
+    verdict=$(ci_failure_verdict "$@") || rc=$?
+}
+
+run_verdict a.test b.test
+test "$rc" -eq 3 || fail "an all-interop round exited $rc, want 3: $verdict"
+grep -q '::error::WSL2 lost its interop channel, re-run this leg: a.test b.test' \
+    <<<"$verdict" || fail "the outage was not named: $verdict"
+! grep -q '::error::failing:' <<<"$verdict" ||
+    fail "an outage was reported as a failing test: $verdict"
+
+# The control, or the check above only proves the driver says this on every red.
+run_verdict c.test
+test "$rc" -eq 1 || fail "a real failure exited $rc, want 1: $verdict"
+grep -q '::error::failing: c.test' <<<"$verdict" ||
+    fail "the failing test was not named: $verdict"
+! grep -q 'interop' <<<"$verdict" ||
+    fail "a real failure was blamed on the interop channel: $verdict"
+
+# A log the worker never opened is not evidence of an outage.
+run_verdict d.test
+test "$rc" -eq 1 || fail "a test with no log exited $rc, want 1: $verdict"
+grep -q '::error::failing: d.test' <<<"$verdict" || fail "no log: $verdict"
+
+# Mixed: the real failure decides, or a red ships as a leg to repeat and nobody
+# investigates it.
+run_verdict a.test c.test
+test "$rc" -eq 1 || fail "a failure alongside an outage exited $rc, want 1: $verdict"
+grep -q '::error::failing: c.test' <<<"$verdict" ||
+    fail "the real failure was not named alongside the outage: $verdict"
+grep -q '::error::WSL2 lost its interop channel, re-run this leg: a.test' \
+    <<<"$verdict" || fail "the outage went unmentioned beside a failure: $verdict"
+
+ok "an interop outage is a leg to repeat, and a failure still outranks it"

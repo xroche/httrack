@@ -106,6 +106,28 @@ ci_report_lost_workers() {
     fi
 }
 
+# The verdict on the tests that failed, named in $@: prints the annotations and
+# returns the status the suite must end on. 3 rather than 1 where WSL2 dropped its
+# interop channel under every one of them, because the exe never launched there and
+# the empty output each test read says nothing about the code (#1672). Their own
+# logs, not the console, which also carries the tails of unrelated failures.
+ci_failure_verdict() { # ci_failure_verdict TEST...
+    local t real='' interop=''
+    for t in "$@"; do
+        # WSL's own init writes this when it cannot reach the Windows side.
+        if test -f "$t.log" && grep -q 'UtilAcceptVsock' "$t.log"; then
+            interop="$interop $t"
+        else
+            real="$real $t"
+        fi
+    done
+    test -z "$interop" ||
+        echo "::error::WSL2 lost its interop channel, re-run this leg:$interop"
+    test -n "$real" || return 3
+    echo "::error::failing:$real"
+    return 1
+}
+
 # End a wedged suite before its runner dies: a step that fails on its own terms
 # keeps its log, a lost runner keeps nothing, annotations included (#795). Quiet
 # for $1s, then names the test in flight from $3 every $2s; kills $5 once $3 has
@@ -728,8 +750,10 @@ if [ "$got" != "$want" ]; then
     [ "$lost" -gt 0 ] || exit 1
 fi
 [ "$fail" -eq 0 ] || {
-    echo "::error::failing:$failed"
-    exit 1
+    vrc=0
+    # shellcheck disable=SC2086 # the splitting is what names the tests
+    ci_failure_verdict $failed || vrc=$?
+    exit "$vrc"
 }
 # Last, and 3 rather than 1: nothing failed on its own terms, so this leg is one to
 # repeat rather than a red to investigate (#1228).
