@@ -106,25 +106,25 @@ ci_report_lost_workers() {
     fi
 }
 
-# The verdict on the tests that failed, named in $@: prints the annotations and
-# returns the status the suite must end on. 3 rather than 1 where WSL2 dropped its
-# interop channel under every one of them, because the exe never launched there and
-# the empty output each test read says nothing about the code (#1672). Their own
-# logs, not the console, which also carries the tails of unrelated failures.
+# The verdict on the failing tests named in $@, printed as annotations. Returns 3
+# where every one of their logs carries WSL2's interop error, because the exe never
+# launched under those, and 1 otherwise (#1672). The failures are named either way,
+# so an outage never hides one.
 ci_failure_verdict() { # ci_failure_verdict TEST...
     local t real='' interop=''
     for t in "$@"; do
-        # WSL's own init writes this when it cannot reach the Windows side.
-        if test -f "$t.log" && grep -q 'UtilAcceptVsock' "$t.log"; then
+        # WSL's own init writes this when it cannot reach the Windows side. Read
+        # from each test's own log, since the console carries unrelated tails.
+        if test -f "$t.log" && grep -q 'init:.*UtilAcceptVsock' "$t.log"; then
             interop="$interop $t"
         else
             real="$real $t"
         fi
     done
+    echo "::error::failing: $*"
     test -z "$interop" ||
-        echo "::error::WSL2 lost its interop channel, re-run this leg:$interop"
+        echo "::error::re-run this leg: WSL2 lost its interop channel under:$interop"
     test -n "$real" || return 3
-    echo "::error::failing:$real"
     return 1
 }
 
@@ -750,10 +750,9 @@ if [ "$got" != "$want" ]; then
     [ "$lost" -gt 0 ] || exit 1
 fi
 [ "$fail" -eq 0 ] || {
-    vrc=0
+    # 3 where WSL2's interop dropped under every failure, 1 for a real red.
     # shellcheck disable=SC2086 # the splitting is what names the tests
-    ci_failure_verdict $failed || vrc=$?
-    exit "$vrc"
+    ci_failure_verdict $failed || exit $?
 }
 # Last, and 3 rather than 1: nothing failed on its own terms, so this leg is one to
 # repeat rather than a red to investigate (#1228).

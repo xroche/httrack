@@ -1,17 +1,17 @@
 #!/bin/bash
 #
 # WSL2 drops its interop channel and the Windows leg reports content failures for
-# whichever tests called httrack.exe then (#1672): the exe never launched, so the
-# empty output they read is not a verdict on the code. The driver must say so and
-# end on the status that means repeat this leg, not investigate it.
+# whichever tests called httrack.exe then (#1672). The exe never launched, so the
+# empty output they read says nothing about the code. The driver must name the
+# outage and end on the status that means repeat this leg.
 
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-# Before the driver is sourced: with these set, anything it starts posts a commit
-# status on whatever the surrounding shell was last looking at.
+# Sourcing the driver starts an interpreter that can post a commit status, so
+# scrub first. Test 226 pins this line.
 unset WATCHDOG_TOKEN WATCHDOG_REPO WATCHDOG_SHA WATCHDOG_URL
 # shellcheck source=tests/ci-windows-suite.sh
 . "$testdir/ci-windows-suite.sh"
@@ -24,45 +24,64 @@ cleanup_push rm -rf "$tmp"
 outage='<3>init: (2409) ERROR: UtilAcceptVsock:235: accept4 failed 110'
 
 cd "$tmp"
-printf '%s\n++ httrack -O /dev/null -#test=expandhome\n' "$outage" >a.test.log
-printf '%s\n' "$outage" >b.test.log
-echo "expected [x], got [y]" >c.test.log
-# d.test.log is deliberately absent: a worker that logged nothing failed on its
-# own terms until something says otherwise.
+# Not the last line here, and alone in outage2: a match that read only the tail
+# would take one of the two and miss the other.
+printf '%s\n++ httrack -O /dev/null -#test=expandhome\n' "$outage" >outage1.test.log
+printf '%s\n' "$outage" >outage2.test.log
+echo "expected [x], got [y]" >realfail.test.log
+# The same writer and the same shape without the interop failure, so a predicate
+# matching only "ERROR" or "init:" calls this an outage and fails here.
+echo '<3>init: (2409) ERROR: CreateProcessEntryCommon:334 execvpe failed 2' \
+    >otherinit.test.log
+# nolog.test.log is deliberately absent.
 
-verdict='' rc=0
+verdict='' noise='' rc=0
 run_verdict() { # run_verdict TEST...
-    rc=0
-    verdict=$(ci_failure_verdict "$@") || rc=$?
+    verdict=$(ci_failure_verdict "$@" 2>"$tmp/err") || rc=$?
+    noise=$(cat "$tmp/err")
 }
 
-run_verdict a.test b.test
-test "$rc" -eq 3 || fail "an all-interop round exited $rc, want 3: $verdict"
-grep -q '::error::WSL2 lost its interop channel, re-run this leg: a.test b.test' \
-    <<<"$verdict" || fail "the outage was not named: $verdict"
-! grep -q '::error::failing:' <<<"$verdict" ||
-    fail "an outage was reported as a failing test: $verdict"
+run_verdict outage1.test outage2.test
+test "$rc" -eq 3 || fail "an all-outage round exited $rc, want 3: $verdict"
+grep -q '::error::re-run this leg: WSL2 lost its interop channel under: outage1.test outage2.test' \
+    <<<"$verdict" || fail "the outage did not name both tests: $verdict"
+# Named even so, or an outage buries a test the reader still has to look at.
+grep -q '::error::failing: outage1.test outage2.test' <<<"$verdict" ||
+    fail "the failing tests went unnamed: $verdict"
 
-# The control, or the check above only proves the driver says this on every red.
-run_verdict c.test
+# The control, without which the check above only proves the driver says this on
+# every red.
+rc=0
+run_verdict realfail.test
 test "$rc" -eq 1 || fail "a real failure exited $rc, want 1: $verdict"
-grep -q '::error::failing: c.test' <<<"$verdict" ||
+grep -q '::error::failing: realfail.test' <<<"$verdict" ||
     fail "the failing test was not named: $verdict"
 ! grep -q 'interop' <<<"$verdict" ||
     fail "a real failure was blamed on the interop channel: $verdict"
 
-# A log the worker never opened is not evidence of an outage.
-run_verdict d.test
+# A different init error from the same writer stays a real failure.
+rc=0
+run_verdict otherinit.test
+test "$rc" -eq 1 || fail "another init error exited $rc, want 1: $verdict"
+! grep -q 'interop' <<<"$verdict" ||
+    fail "an unrelated init error was read as an outage: $verdict"
+
+# A log the worker never opened is not evidence of an outage, and the read must
+# stay quiet: grep prints to stderr on a file that is not there.
+rc=0
+run_verdict nolog.test
 test "$rc" -eq 1 || fail "a test with no log exited $rc, want 1: $verdict"
-grep -q '::error::failing: d.test' <<<"$verdict" || fail "no log: $verdict"
+grep -q '::error::failing: nolog.test' <<<"$verdict" || fail "no log: $verdict"
+test -z "$noise" || fail "reading a missing log wrote to stderr: $noise"
 
-# Mixed: the real failure decides, or a red ships as a leg to repeat and nobody
-# investigates it.
-run_verdict a.test c.test
+# Mixed, where the real failure decides, or a red ships as a leg to repeat and
+# nobody investigates it.
+rc=0
+run_verdict outage1.test realfail.test
 test "$rc" -eq 1 || fail "a failure alongside an outage exited $rc, want 1: $verdict"
-grep -q '::error::failing: c.test' <<<"$verdict" ||
-    fail "the real failure was not named alongside the outage: $verdict"
-grep -q '::error::WSL2 lost its interop channel, re-run this leg: a.test' \
-    <<<"$verdict" || fail "the outage went unmentioned beside a failure: $verdict"
+grep -q '::error::failing: outage1.test realfail.test' <<<"$verdict" ||
+    fail "the failures were not named alongside the outage: $verdict"
+grep -q 'interop channel under: outage1.test$' <<<"$verdict" ||
+    fail "the outage named the wrong tests: $verdict"
 
-ok "an interop outage is a leg to repeat, and a failure still outranks it"
+ok "an interop outage is a leg to repeat, and a real failure still outranks it"
