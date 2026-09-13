@@ -4608,6 +4608,11 @@ static int st_crashannounce(httrackp *opt, int argc, char **argv) {
     hts_set_log_vprint_callback(st_crash_file_log);
     (void) hts_crash_test("dnssegv");
     hts_crash_test_worker(HTS_CRASH_WORKER_DNS);
+    /* Only a handler that swallowed the fault gets here, so hand the log
+       channel back rather than funnelling a later case into this file. */
+    hts_set_log_vprint_callback(NULL);
+    fclose(st_crash_fp);
+    st_crash_fp = NULL;
     fprintf(stderr, "crashannounce: the armed fault did not crash\n");
     return 1;
   }
