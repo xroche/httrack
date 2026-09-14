@@ -160,7 +160,7 @@ static _PT_Index_Functions _IndexFuncts[] = {
    PT_LookupCache__Old, NULL},
   {PT_LoadCache__Arc, PT_Index_Delete__Arc, PT_ReadCache__Arc,
    PT_LookupCache__Arc, PT_SaveCache__Arc},
-  {NULL, NULL, NULL, NULL}
+  {NULL, NULL, NULL, NULL, NULL}
 };
 
 #define PT_INDEX_COMMON_STRUCTURE \
