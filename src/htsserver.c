@@ -90,6 +90,10 @@ char *commandReturnMsg = NULL;
 char *commandReturnCmdl = NULL;
 int commandReturnSet = 0;
 
+/* Listen on every interface rather than loopback only (--bind-any).
+   Off by default: see the comment in smallserver_init(). */
+int smallserver_bind_any = 0;
+
 httrackp *global_opt = NULL;
 
 static void (*pingFun)(void*) = NULL;
@@ -254,10 +258,28 @@ T_SOC smallserver_init(int *port, char *adr) {
     free(commandReturnCmdl);
   commandReturnCmdl = NULL;
 
-  if (my_gethostname(h_loc, 256) == 0) {   // host name
+  /* The address the client should be pointed at. When bound to loopback
+     this must not be the machine's hostname: that may resolve to an
+     external address the socket is not listening on. */
+  if (smallserver_bind_any) {
+    if (my_gethostname(h_loc, 256) != 0) {
+      return INVALID_SOCKET;
+    }
+  } else {
+    strcpybuff(h_loc, "localhost");
+  }
+
+  {
     SOCaddr server;
 
-    SOCaddr_initany(server);
+    /* Bind to the loopback interface only. This server can start a mirror
+       with an arbitrary output path, so exposing it on every interface
+       hands remote callers arbitrary file writes. */
+    if (smallserver_bind_any) {
+      SOCaddr_initany(server);
+    } else {
+      SOCaddr_initlocal(server);
+    }
     if ((soc =
          (T_SOC) socket(SOCaddr_sinfamily(server), SOCK_STREAM,
                         0)) != INVALID_SOCKET) {
@@ -394,6 +416,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
     T_SOC soc_c;
     LLint length = 0;
     const char *error_redirect = NULL;
+    int client_sent_sid = 0;
 
     line[0] = '\0';
     buffer[0] = '\0';
@@ -518,6 +541,17 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
           *e = *f = '\0';
           ua = e + 1;
+          /* Posted field names become hashtable keys verbatim, so a client
+             could otherwise overwrite engine-internal state. Names starting
+             with '_' are reserved -- in particular '_sid', which holds the
+             session token the request is about to be checked against. */
+          if (s[0] == '_') {
+            s = f + 1;
+            continue;
+          }
+          if (strcmp(s, "sid") == 0) {
+            client_sent_sid = 1;
+          }
           if (strfield2(ua, "on"))      /* hack : "on" == 1 */
             ua = "1";
           unescapehttp(ua, &sua);
@@ -526,17 +560,21 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
         }
       }
 
-      /* Error check */
-      {
+      /* Session token check.
+         'sid' was reset from '_sid' above, so a request that carries no
+         token of its own trivially compares equal. That is acceptable for a
+         GET, which only renders a page, but POST is what drives commands --
+         so require a POST to actually present a matching token, and treat a
+         missing or unreadable one as a failure rather than as a pass. */
+      if (meth == 2) {
         intptr_t adr = 0;
         intptr_t adr2 = 0;
 
-        if (coucal_readptr(NewLangList, "sid", &adr)) {
-          if (coucal_readptr(NewLangList, "_sid", &adr2)) {
-            if (strcmp((char *) adr, (char *) adr2) != 0) {
-              meth = 0;
-            }
-          }
+        if (!client_sent_sid
+            || !coucal_readptr(NewLangList, "sid", &adr) || adr == 0
+            || !coucal_readptr(NewLangList, "_sid", &adr2) || adr2 == 0
+            || strcmp((char *) adr, (char *) adr2) != 0) {
+          meth = 0;
         }
       }
 
@@ -805,12 +843,17 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
           FILE *fp;
           char *qpos;
 
+          /* note: must be cleared here, not inside the branch below. Both
+             the error_redirect path and the /website/ path can reach the
+             fsfile[0] test without either sprintf() having run, and used to
+             read whatever was on the stack. */
+          fsfile[0] = '\0';
+
           /* get the URL */
           if (error_redirect == NULL) {
             if ((qpos = strchr(url, '?'))) {
               *qpos = '\0';
             }
-            fsfile[0] = '\0';
             if (strcmp(url, "/") == 0) {
               file = "/server/index.html";
               meth = 2;
@@ -899,8 +942,14 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
               {
                 char tmp[256];
 
-                if (strlen(file) < sizeof(tmp) - 32) {
-                  sprintf(tmp, "Location: %s\r\n", newfile);
+                /* note: the bound must be on newfile, the string actually
+                   formatted. Checking strlen(file) here let a client-supplied
+                   "redirect" field of any length overflow tmp[], since posted
+                   field names become hashtable keys verbatim. */
+                if (strlen(newfile) < sizeof(tmp) - 32
+                    && strchr(newfile, '\r') == NULL
+                    && strchr(newfile, '\n') == NULL) {
+                  snprintf(tmp, sizeof(tmp), "Location: %s\r\n", newfile);
                   StringMemcat(headers, tmp, strlen(tmp));
                 }
               }

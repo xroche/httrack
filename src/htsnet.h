@@ -179,6 +179,20 @@ static HTS_INLINE HTS_UNUSED socklen_t SOCaddr_initany_(SOCaddr*const addr,
   SOCaddr_initany_(&(server), __FILE__, __LINE__); \
 } while(0)
 
+/* Bind address restricted to the local machine. */
+static HTS_INLINE HTS_UNUSED socklen_t SOCaddr_initlocal_(SOCaddr*const addr,
+                                                          const char *file, const int line) {
+  assertf_(addr != NULL, file, line);
+  memset(&addr->m_addr.in, 0, sizeof(addr->m_addr.in));
+  addr->m_addr.in.sin_family = AF_INET;
+  addr->m_addr.in.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  return SOCaddr_size_(addr, file, line);
+}
+
+#define SOCaddr_initlocal(server) do { \
+  SOCaddr_initlocal_(&(server), __FILE__, __LINE__); \
+} while(0)
+
 /*
   Copy sockaddr_in/sockaddr_in6/raw IPv4/raw IPv6 to our opaque SOCaddr
 */
