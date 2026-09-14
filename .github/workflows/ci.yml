@@ -56,15 +56,20 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             autoconf automake libtool zlib1g-dev libssl-dev
 
+      - name: Regenerate build files
+        run: autoreconf -fi
+
       - name: Configure
         env:
           CC: ${{ matrix.cc }}
         run: |
-          ./configure \
-            CFLAGS="-O2 -g -Wall -Wextra $HARD_WARNINGS $SOFT_WARNINGS"
+          # Keep warning errors out of configure probes: Autoconf's generic
+          # function declarations are intentionally old-style and trip
+          # -Werror=strict-prototypes. Apply them to the actual build below.
+          ./configure CFLAGS="-O2 -g"
 
       - name: Build
-        run: make -j"$(nproc)"
+        run: make -j"$(nproc)" CFLAGS="-O2 -g -Wall -Wextra $HARD_WARNINGS $SOFT_WARNINGS"
 
       - name: Test
         run: make check ONLINE_UNIT_TESTS=no
@@ -86,6 +91,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             autoconf automake libtool zlib1g-dev libssl-dev
+
+      - name: Regenerate build files
+        run: autoreconf -fi
 
       - name: Configure
         env:
@@ -123,6 +131,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             autoconf automake libtool zlib1g-dev libssl-dev clang-tools
+
+      - name: Regenerate build files
+        run: autoreconf -fi
 
       - name: Configure
         run: scan-build ./configure

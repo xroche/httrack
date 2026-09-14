@@ -33,7 +33,7 @@ AM_LDFLAGS = \
 bin_PROGRAMS = proxytrack httrack htsserver
 
 httrack_LDADD = $(THREADS_LIBS) libhttrack.la
-htsserver_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS) libhttrack.la
+htsserver_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS) $(OPENSSL_LIBS) libhttrack.la
 proxytrack_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS)
 
 httrack_CFLAGS = $(AM_CFLAGS) $(CFLAGS_PIE)

@@ -51,7 +51,7 @@ fi
 if test -n "${ZLIB_HOME}"
 then
         ZLIB_OLD_LDFLAGS=$LDFLAGS
-        ZLIB_OLD_CPPFLAGS=$LDFLAGS
+        ZLIB_OLD_CPPFLAGS=$CPPFLAGS
         LDFLAGS="$LDFLAGS -L${ZLIB_HOME}/lib"
         CPPFLAGS="$CPPFLAGS -I${ZLIB_HOME}/include"
         AC_LANG_SAVE
