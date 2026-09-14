@@ -5200,12 +5200,39 @@ HTSEXT_API int hts_init(void) {
     }
 
     // OpenSSL_add_all_algorithms();
+#if (OPENSSL_VERSION_NUMBER >= 0x10100000L)
+    /* SSLv23_client_method() is the deprecated spelling of this: both
+       negotiate the highest protocol both ends support, but the modern name
+       does not suggest that SSLv2/SSLv3 are on the table. */
+    openssl_ctx = SSL_CTX_new(TLS_client_method());
+#else
     openssl_ctx = SSL_CTX_new(SSLv23_client_method());
+#endif
     if (!openssl_ctx) {
       fprintf(stderr,
-              "fatal: unable to initialize TLS: SSL_CTX_new(SSLv23_client_method)\n");
-      abortLog("unable to initialize TLS: SSL_CTX_new(SSLv23_client_method)");
+              "fatal: unable to initialize TLS: SSL_CTX_new()\n");
+      abortLog("unable to initialize TLS: SSL_CTX_new()");
       assertf("unable to initialize TLS" == NULL);
+    }
+
+#if (OPENSSL_VERSION_NUMBER >= 0x10100000L)
+    /* Without an explicit floor the minimum is whatever the linked OpenSSL
+       happens to default to, which on older builds still includes TLS 1.0. */
+    if (!SSL_CTX_set_min_proto_version(openssl_ctx, TLS1_2_VERSION)) {
+      fprintf(stderr,
+              "warning: unable to require TLS 1.2 or above\n");
+    }
+#endif
+
+    /* Load the system trust store, so that certificates can be verified at
+       all. Without this every certificate fails to verify, and -%g (do not
+       check certificates) would become mandatory rather than a deliberate
+       opt-out. A failure here is not fatal -- report it and let the
+       per-connection verification produce the actual error. */
+    if (!SSL_CTX_set_default_verify_paths(openssl_ctx)) {
+      fprintf(stderr,
+              "warning: unable to load the system certificate store;"
+              " TLS certificates can not be verified\n");
     }
   }
 #endif
@@ -5483,6 +5510,7 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->nokeepalive = 0;         // pas keep-alive
   opt->nocompression = 0;       // pas de compression
   opt->tolerant = 0;            // ne pas accepter content-length incorrect
+  opt->ssl_insecure = 0;        // vérifier les certificats TLS
   opt->parseall = 1;            // tout parser (tags inconnus, par exemple)
   opt->parsedebug = 0;          // pas de mode débuggage
   opt->norecatch = 0;           // ne pas reprendre les fichiers effacés par l'utilisateur

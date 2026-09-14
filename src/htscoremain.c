@@ -1516,6 +1516,13 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   com++;
                 }
                 break;          // HTTP/1.0 notamment
+              case 'g':        // ne pas vérifier les certificats TLS
+                opt->ssl_insecure = 1;
+                if (*(com + 1) == '0') {
+                  opt->ssl_insecure = 0;
+                  com++;
+                }
+                break;
               case 'h':
                 opt->http10 = 1;
                 if (*(com + 1) == '0') {

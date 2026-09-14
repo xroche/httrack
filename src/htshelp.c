@@ -583,6 +583,8 @@ void help(const char *app, int more) {
   infomsg
     (" %B  tolerant requests (accept bogus responses on some servers, but not standard!)");
   infomsg
+    (" %g  do NOT check https certificates (dangerous: anyone on the network path can then choose what is mirrored)");
+  infomsg
     (" %s  update hacks: various hacks to limit re-transfers when updating (identical size, bogus response..)");
   infomsg
     (" %u  url hacks: various hacks to limit duplicate URLs (strip //, www.foo.com==foo.com..)");

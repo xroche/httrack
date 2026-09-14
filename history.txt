@@ -4,6 +4,25 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack
 
+unreleased
++ SECURITY: https certificates are now verified (chain and hostname) against
+  the system trust store, and TLS 1.2 is the minimum protocol version.
+  Previously any certificate was accepted, so anyone on the network path
+  could choose what a https mirror wrote to disk. Use '-%g'
+  (--insecure, --no-check-certificate) to restore the old behaviour for a
+  host whose certificate the local trust store does not know about.
++ Fixed: out-of-bounds read in cookie domain matching: the comparison loop
+  counted down with an unsigned index and never terminated, reading off the
+  front of both buffers. Reachable from any remote Set-Cookie header.
++ Fixed: a cookie scoped to a subdomain (".x.foo.com") was also sent to its
+  parent domain ("foo.com")
++ Fixed: out-of-bounds read in the parser for URLs whose filename part is
+  shorter than 4 characters (max(0, strlen(x) - 4) underflow)
++ Fixed: the stdout header mode always emitted an empty Content-Type
++ New: -#8 test-bench command, checks cookie domain scoping
++ New: continuous integration, with gcc/clang warning gates, an
+  AddressSanitizer/UndefinedBehaviorSanitizer build, and a static analyzer run
+
 3.49-6
 + Fixed: puny_decode CVE-2017-14062
 

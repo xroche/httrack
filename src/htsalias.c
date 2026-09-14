@@ -135,6 +135,8 @@ const char *hts_optalias[][4] = {
   {"build-top-index", "-%i", "single", ""},
   {"disable-compression", "-%z", "single", ""},
   {"tolerant", "-%B", "single", ""},
+  {"insecure", "-%g", "single", ""}, {"no-check-certificate", "-%g",
+                                      "single", ""},
   {"updatehack", "-%s", "single", ""}, {"sizehack", "-%s", "single", ""},
   {"urlhack", "-%u", "single", ""},
   {"user-agent", "-F", "param1", "user-agent identity"},
