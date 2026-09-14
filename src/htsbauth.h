@@ -70,6 +70,7 @@ int cookie_save(t_cookie * cookie, const char *name);
 void cookie_insert(char *s, const char *ins);
 void cookie_delete(char *s, size_t pos);
 const char *cookie_get(char *buffer, const char *cookie_base, int param);
+int cookie_matches_domain(const char *chk_dom, const char *domain);
 char *cookie_find(char *s, const char *cook_name, const char *domain, const char *path);
 char *cookie_nextfield(char *a);
 

@@ -134,18 +134,42 @@ static int cookie_cmp_wildcard_domain(const char *chk_dom, const char *domain) {
   const size_t m = strlen(domain);
   const size_t l = n < m ? n : m;
   size_t i;
-  for (i = l - 1; i >= 0; i--) {
+
+  /* Compare the common trailing part of both domains.
+     Note: 'i' is unsigned, so count up and index from the end ; counting down
+     from (l - 1) never terminates, and underflows when l is 0. */
+  for (i = 0; i < l; i++) {
     if (chk_dom[n - i - 1] != domain[m - i - 1]) {
       return 1;
     }
   }
-  if (m < n && chk_dom[0] == '.') {
+  /* ".foo.com" applies to the bare domain "foo.com", and to that one only:
+     n must be exactly m + 1, so that chk_dom is "." followed by domain.
+     A looser test (m < n) would let a cookie scoped to ".x.foo.com" be sent
+     to "foo.com", widening its scope instead of narrowing it. */
+  if (n == m + 1 && chk_dom[0] == '.') {
     return 0;
   }
   else if (m != n) {
     return 1;
   }
   return 0;
+}
+
+// Does the domain stored in a cookie apply to the queried domain?
+// chk_dom: the domain stored in the cookie (potentially wildcard, ie. ".foo.com")
+// domain: query domain
+// returns !=0 if the cookie applies to this domain
+int cookie_matches_domain(const char *chk_dom, const char *domain) {
+  const size_t n = strlen(chk_dom);
+  const size_t m = strlen(domain);
+
+  /* chk_dom is a trailing part of domain: ".foo.com" applies to "www.foo.com" */
+  if (n <= m && strcmp(chk_dom, domain + m - n) == 0) {
+    return 1;
+  }
+  /* wildcard domain applied to the bare domain: ".foo.com" applies to "foo.com" */
+  return cookie_cmp_wildcard_domain(chk_dom, domain) == 0;
 }
 
 
@@ -168,9 +192,7 @@ char *cookie_find(char *s, const char *cook_name, const char *domain, const char
       //
       const char *chk_dom = cookie_get(buffer, a, 0); // domaine concerné par le cookie
 
-      if ((strlen(chk_dom) <= strlen(domain) &&
-        strcmp(chk_dom, domain + strlen(domain) - strlen(chk_dom)) == 0) ||
-        !cookie_cmp_wildcard_domain(chk_dom, domain)) {  // même domaine
+      if (cookie_matches_domain(chk_dom, domain)) {     // même domaine
           //
         const char *chk_path = cookie_get(buffer, a, 2);    // chemin concerné par le cookie
 

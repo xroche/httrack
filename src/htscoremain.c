@@ -2129,7 +2129,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                                 fprintf(stdout,
                                         "X-Content-Length: " LLintP "\r\n",
                                         (r.size >= 0) ? r.size : (-r.size));
-                                if (r.contenttype >= 0) {
+                                if (r.contenttype[0]) {
                                   fprintf(stdout, "Content-Type: %s\r\n",
                                           r.contenttype);
                                 }
@@ -2621,6 +2621,21 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 }
                 htsmain_free();
                 return 0;
+                break;
+              case '8':  // cookie domain scope: httrack -#8 ".foo.com" "www.foo.com"
+                if (na + 2 >= argc) {
+                  HTS_PANIC_PRINTF
+                    ("Option #8 needs to be followed by a cookie domain and a query domain");
+                  printf("Example: '-#8' \".foo.com\" \"www.foo.com\"\n");
+                  htsmain_free();
+                  return -1;
+                } else {
+                  printf("%s\n",
+                         cookie_matches_domain(argv[na + 1], argv[na + 2])
+                         ? "match" : "nomatch");
+                  htsmain_free();
+                  return 0;
+                }
                 break;
               case '!':
                 HTS_PANIC_PRINTF
