@@ -4,6 +4,43 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack
 
+unreleased
++ SECURITY: webhttrack's control server now listens on the loopback interface
+  only, instead of every interface. This server can start a mirror writing to
+  an arbitrary path, so it was remote arbitrary file write. Pass '--bind-any'
+  to restore the old behaviour.
++ SECURITY: the webhttrack session id was MD5(time(NULL) + rand()) with
+  rand() seeded from the same clock second, so it was guessable from the
+  process start time. It now comes from the system CSPRNG, and webhttrack
+  refuses to start if no such source is available.
++ SECURITY: posted form fields could overwrite '_sid', the server's copy of
+  the session token, so a request could supply both halves of the comparison
+  and defeat the check entirely. Field names starting with '_' are now
+  reserved, and a POST with no valid token is rejected rather than accepted.
++ SECURITY: fixed a stack buffer overflow in webhttrack's redirect handling;
+  the length check covered a different string than the one being formatted.
++ SECURITY: the 'catch URL' proxy now listens on loopback only. The browser
+  request it captures carries that browser's cookies and credentials.
++ Fixed: webhttrack could act on an uninitialised filename buffer on two
+  paths through the request handler
++ SECURITY: https certificates are now verified (chain and hostname) against
+  the system trust store, and TLS 1.2 is the minimum protocol version.
+  Previously any certificate was accepted, so anyone on the network path
+  could choose what a https mirror wrote to disk. Use '-%g'
+  (--insecure, --no-check-certificate) to restore the old behaviour for a
+  host whose certificate the local trust store does not know about.
++ Fixed: out-of-bounds read in cookie domain matching: the comparison loop
+  counted down with an unsigned index and never terminated, reading off the
+  front of both buffers. Reachable from any remote Set-Cookie header.
++ Fixed: a cookie scoped to a subdomain (".x.foo.com") was also sent to its
+  parent domain ("foo.com")
++ Fixed: out-of-bounds read in the parser for URLs whose filename part is
+  shorter than 4 characters (max(0, strlen(x) - 4) underflow)
++ Fixed: the stdout header mode always emitted an empty Content-Type
++ New: -#8 test-bench command, checks cookie domain scoping
++ New: continuous integration, with gcc/clang warning gates, an
+  AddressSanitizer/UndefinedBehaviorSanitizer build, and a static analyzer run
+
 3.49-6
 + Fixed: puny_decode CVE-2017-14062
 

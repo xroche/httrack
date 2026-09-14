@@ -3167,11 +3167,20 @@ typedef struct {
 } t_auto_seq;
 
 // char between a and b
-#define CHAR_BETWEEN(c, a, b)       ( (c) >= 0x##a ) && ( (c) <= 0x##b )
+// note: the whole expression must stay parenthesized -- without the outer
+// parentheses the "&&" binds looser than most operators a caller might use,
+// and only the first half of the range test survives.
+// The range is tested as a single unsigned subtraction so that a lower bound
+// of 0x00 is not a vacuous "unsigned >= 0" comparison.
+#define CHAR_BETWEEN(c, a, b)       \
+  ( (unsigned) ( (unsigned char) (c) - 0x##a ) <= (unsigned) ( 0x##b - 0x##a ) )
 // sequence start
 #define SEQBEG                      ( inseq == 0 )
-// in this block
-#define BLK(n,a, b)                 ( (seq.pos >= n) && ((err = CHAR_BETWEEN(seq.data[n], a, b))) )
+// first byte of the sequence: always present, no need to check seq.pos
+#define BLK0(a, b)                  ( (err = CHAR_BETWEEN(seq.data[0], a, b)) )
+#define ELT0(a)                     BLK0(a,a)
+// continuation byte n (n >= 1), if the sequence got that far
+#define BLK(n,a, b)                 ( (seq.pos >= (unsigned) (n)) && ((err = CHAR_BETWEEN(seq.data[n], a, b))) )
 #define ELT(n,a)                    BLK(n,a,a)
 // end
 #define SEQEND                      ((ok = 1))
@@ -3201,21 +3210,21 @@ int is_unicode_utf8(const char *buffer_, const size_t size) {
     unsigned int err = 0;
 
     seq.data[seq.pos] = buffer[i];
-     /**/ if (SEQBEG && BLK(0, 00, 7F) && IN_SEQ && SEQEND) {
-    } else if (SEQBEG && BLK(0, C2, DF) && IN_SEQ && BLK(1, 80, BF) && SEQEND) {
-    } else if (SEQBEG && ELT(0, E0) && IN_SEQ && BLK(1, A0, BF)
+     /**/ if (SEQBEG && BLK0(00, 7F) && IN_SEQ && SEQEND) {
+    } else if (SEQBEG && BLK0(C2, DF) && IN_SEQ && BLK(1, 80, BF) && SEQEND) {
+    } else if (SEQBEG && ELT0(E0) && IN_SEQ && BLK(1, A0, BF)
                && BLK(2, 80, BF) && SEQEND) {
-    } else if (SEQBEG && BLK(0, E1, EC) && IN_SEQ && BLK(1, 80, BF)
+    } else if (SEQBEG && BLK0(E1, EC) && IN_SEQ && BLK(1, 80, BF)
                && BLK(2, 80, BF) && SEQEND) {
-    } else if (SEQBEG && ELT(0, ED) && IN_SEQ && BLK(1, 80, 9F)
+    } else if (SEQBEG && ELT0(ED) && IN_SEQ && BLK(1, 80, 9F)
                && BLK(2, 80, BF) && SEQEND) {
-    } else if (SEQBEG && BLK(0, EE, EF) && IN_SEQ && BLK(1, 80, BF)
+    } else if (SEQBEG && BLK0(EE, EF) && IN_SEQ && BLK(1, 80, BF)
                && BLK(2, 80, BF) && SEQEND) {
-    } else if (SEQBEG && ELT(0, F0) && IN_SEQ && BLK(1, 90, BF)
+    } else if (SEQBEG && ELT0(F0) && IN_SEQ && BLK(1, 90, BF)
                && BLK(2, 80, BF) && BLK(3, 80, BF) && SEQEND) {
-    } else if (SEQBEG && BLK(0, F1, F3) && IN_SEQ && BLK(1, 80, BF)
+    } else if (SEQBEG && BLK0(F1, F3) && IN_SEQ && BLK(1, 80, BF)
                && BLK(2, 80, BF) && BLK(3, 80, BF) && SEQEND) {
-    } else if (SEQBEG && ELT(0, F4) && IN_SEQ && BLK(1, 80, 8F)
+    } else if (SEQBEG && ELT0(F4) && IN_SEQ && BLK(1, 80, 8F)
                && BLK(2, 80, BF) && BLK(3, 80, BF) && SEQEND) {
     } else if (NO_SEQ) {        // bad, unknown
       return 0;
@@ -5191,12 +5200,39 @@ HTSEXT_API int hts_init(void) {
     }
 
     // OpenSSL_add_all_algorithms();
+#if (OPENSSL_VERSION_NUMBER >= 0x10100000L)
+    /* SSLv23_client_method() is the deprecated spelling of this: both
+       negotiate the highest protocol both ends support, but the modern name
+       does not suggest that SSLv2/SSLv3 are on the table. */
+    openssl_ctx = SSL_CTX_new(TLS_client_method());
+#else
     openssl_ctx = SSL_CTX_new(SSLv23_client_method());
+#endif
     if (!openssl_ctx) {
       fprintf(stderr,
-              "fatal: unable to initialize TLS: SSL_CTX_new(SSLv23_client_method)\n");
-      abortLog("unable to initialize TLS: SSL_CTX_new(SSLv23_client_method)");
+              "fatal: unable to initialize TLS: SSL_CTX_new()\n");
+      abortLog("unable to initialize TLS: SSL_CTX_new()");
       assertf("unable to initialize TLS" == NULL);
+    }
+
+#if (OPENSSL_VERSION_NUMBER >= 0x10100000L)
+    /* Without an explicit floor the minimum is whatever the linked OpenSSL
+       happens to default to, which on older builds still includes TLS 1.0. */
+    if (!SSL_CTX_set_min_proto_version(openssl_ctx, TLS1_2_VERSION)) {
+      fprintf(stderr,
+              "warning: unable to require TLS 1.2 or above\n");
+    }
+#endif
+
+    /* Load the system trust store, so that certificates can be verified at
+       all. Without this every certificate fails to verify, and -%g (do not
+       check certificates) would become mandatory rather than a deliberate
+       opt-out. A failure here is not fatal -- report it and let the
+       per-connection verification produce the actual error. */
+    if (!SSL_CTX_set_default_verify_paths(openssl_ctx)) {
+      fprintf(stderr,
+              "warning: unable to load the system certificate store;"
+              " TLS certificates can not be verified\n");
     }
   }
 #endif
@@ -5474,6 +5510,7 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->nokeepalive = 0;         // pas keep-alive
   opt->nocompression = 0;       // pas de compression
   opt->tolerant = 0;            // ne pas accepter content-length incorrect
+  opt->ssl_insecure = 0;        // vérifier les certificats TLS
   opt->parseall = 1;            // tout parser (tags inconnus, par exemple)
   opt->parsedebug = 0;          // pas de mode débuggage
   opt->norecatch = 0;           // ne pas reprendre les fichiers effacés par l'utilisateur
@@ -5802,7 +5839,12 @@ const t_hts_htmlcheck_callbacks default_callbacks = {
   {htsdefault_sendhead, NULL},
   {htsdefault_receivehead, NULL},
   {htsdefault_detect, NULL},
-  {htsdefault_parse, NULL}
+  {htsdefault_parse, NULL},
+  /* >3.41 ; t_hts_htmlcheck_extsavename is a typedef of
+     t_hts_htmlcheck_savename, so the savename default fits. Leaving this
+     one out gave it a NULL .fun while every sibling has a default, which
+     would fault the first time the callback is actually wired up. */
+  {htsdefault_savename, NULL}
 };
 
 #define CALLBACK_OP(CB, NAME, OPERATION, S, FUN) do {   \

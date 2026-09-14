@@ -362,6 +362,7 @@ struct httrackp {
   int sizehack;                 // forcer réponse "mis à jour" si taille identique
   int urlhack;                  // force "url normalization" to avoid loops
   int tolerant;                 // accepter content-length incorrect
+  int ssl_insecure;             // ne pas vérifier les certificats TLS (dangereux)
   int parseall;                 // essayer de tout parser (tags inconnus contenant des liens, par exemple)
   int parsedebug;               // débugger parser (debug!)
   int norecatch;                // ne pas reprendre les fichiers effacés localement par l'utilisateur

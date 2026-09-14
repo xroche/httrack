@@ -1,0 +1,26 @@
+#!/bin/bash
+#
+
+# cookie domain scoping engine
+# usage: httrack -#8 <cookie-domain> <query-domain>  =>  "match" | "nomatch"
+
+# a wildcard cookie applies to the bare domain and to any subdomain
+test "$(httrack -O /dev/null -#8 .foo.com foo.com)" == "match"		|| exit 1
+test "$(httrack -O /dev/null -#8 .foo.com www.foo.com)" == "match"	|| exit 1
+test "$(httrack -O /dev/null -#8 .foo.com a.b.foo.com)" == "match"	|| exit 1
+test "$(httrack -O /dev/null -#8 foo.com foo.com)" == "match"		|| exit 1
+
+# ... but never to a different domain that merely ends the same way
+test "$(httrack -O /dev/null -#8 .foo.com evilfoo.com)" == "nomatch"	|| exit 1
+test "$(httrack -O /dev/null -#8 .foo.com bar.com)" == "nomatch"	|| exit 1
+test "$(httrack -O /dev/null -#8 foo.com bar.com)" == "nomatch"		|| exit 1
+
+# a cookie scoped to a subdomain must not widen to its parent
+test "$(httrack -O /dev/null -#8 .x.foo.com foo.com)" == "nomatch"	|| exit 1
+
+# degenerate inputs must not read out of bounds (an empty query domain used to
+# underflow the comparison loop and walk off the front of both buffers)
+test "$(httrack -O /dev/null -#8 .foo.com '')" == "nomatch"		|| exit 1
+test "$(httrack -O /dev/null -#8 a '')" == "nomatch"			|| exit 1
+test "$(httrack -O /dev/null -#8 '' a)" == "match"			|| exit 1
+test "$(httrack -O /dev/null -#8 '' '')" == "match"			|| exit 1

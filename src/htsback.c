@@ -2536,10 +2536,89 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               // new session
               back[i].r.ssl_con = SSL_new(openssl_ctx);
               if (back[i].r.ssl_con) {
-                const char* hostname = jump_protocol_const(back[i].url_adr);
-                // some servers expect the hostname on the clienthello (SNI TLS extension)
-                SSL_set_tlsext_host_name(back[i].r.ssl_con, hostname);
+                char hostname[HTS_URLMAXSIZE];
+                const char *hostname_begin =
+                  jump_identification_const(back[i].url_adr);
+                const char *hostname_end =
+                  jump_toport_const(hostname_begin);
+
+                if (hostname_end == NULL) {
+                  hostname_end = strchr(hostname_begin, '/');
+                }
+                if (hostname_end == NULL) {
+                  hostname_end = hostname_begin + strlen(hostname_begin);
+                }
+                /* Strip IPv6 brackets as well as userinfo and port: SNI and
+                   certificate matching take a DNS name or bare IP address,
+                   never an URL authority. */
+                if (*hostname_begin == '['
+                    && hostname_end > hostname_begin + 1
+                    && hostname_end[-1] == ']') {
+                  hostname_begin++;
+                  hostname_end--;
+                }
+                if ((size_t) (hostname_end - hostname_begin)
+                    >= sizeof(hostname)) {
+                  back[i].r.statuscode = STATUSCODE_SSL_HANDSHAKE;
+                  hostname[0] = '\0';
+                } else {
+                  memcpy(hostname, hostname_begin,
+                         (size_t) (hostname_end - hostname_begin));
+                  hostname[hostname_end - hostname_begin] = '\0';
+                }
+
                 SSL_clear(back[i].r.ssl_con);
+                // some servers expect the hostname on the clienthello (SNI TLS extension)
+                if (hostname[0]) {
+                  SSL_set_tlsext_host_name(back[i].r.ssl_con, hostname);
+                }
+
+                /* Verify the peer certificate, and that it was actually
+                   issued for the host we asked for. Without both of these a
+                   https:// mirror accepts any certificate at all, so the
+                   contents written to disk can be chosen by anyone on the
+                   path. Opt out with -%g (--insecure) for hosts using a
+                   certificate the local trust store does not know about. */
+                if (back[i].r.statuscode != STATUSCODE_SSL_HANDSHAKE
+                    && !opt->ssl_insecure) {
+                  SSL_set_verify(back[i].r.ssl_con, SSL_VERIFY_PEER, NULL);
+#if (OPENSSL_VERSION_NUMBER >= 0x10100000L)
+                  /* note: setting the expected host enables hostname
+                     checking as a side effect */
+                  if (!SSL_set1_host(back[i].r.ssl_con, hostname)) {
+                    hts_log_print(opt, LOG_WARNING,
+                                  "unable to enable certificate hostname verification for %s",
+                                  hostname);
+                  }
+#elif (OPENSSL_VERSION_NUMBER >= 0x10002000L)
+                  /* SSL_set1_host() appeared in 1.1.0 ; 1.0.2 has the
+                     underlying X509_VERIFY_PARAM interface */
+                  {
+                    X509_VERIFY_PARAM *const param =
+                      SSL_get0_param(back[i].r.ssl_con);
+
+                    X509_VERIFY_PARAM_set_hostflags(param,
+                                                    X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
+                    if (!X509_VERIFY_PARAM_set1_host(param, hostname, 0)) {
+                      hts_log_print(opt, LOG_WARNING,
+                                    "unable to enable certificate hostname verification for %s",
+                                    hostname);
+                    }
+                  }
+#else
+                  /* Before 1.0.2 there is no built-in hostname check at all.
+                     The chain is still verified, so this is far better than
+                     no verification, but a valid certificate issued for
+                     another host would be accepted. */
+#warning OpenSSL is older than 1.0.2: TLS certificate hostname verification is not available
+                  hts_log_print(opt, LOG_WARNING,
+                                "this build of OpenSSL (%s) can not verify certificate hostnames",
+                                SSLeay_version(SSLEAY_VERSION));
+#endif
+                } else {
+                  SSL_set_verify(back[i].r.ssl_con, SSL_VERIFY_NONE, NULL);
+                }
+
                 if (SSL_set_fd(back[i].r.ssl_con, (int) back[i].r.soc) == 1) {
                   SSL_set_connect_state(back[i].r.ssl_con);
                   back[i].status = STATUS_SSL_WAIT_HANDSHAKE;   /* handshake wait */
@@ -2614,12 +2693,36 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             if ((err_code != SSL_ERROR_WANT_READ)
                 && (err_code != SSL_ERROR_WANT_WRITE)
               ) {
-              char tmp[256];
+              const long verify_result =
+                SSL_get_verify_result(back[i].r.ssl_con);
 
-              tmp[0] = '\0';
-              ERR_error_string(err_code, tmp);
               back[i].r.msg[0] = '\0';
-              strncatbuff(back[i].r.msg, tmp, sizeof(back[i].r.msg) - 2);
+              if (verify_result != X509_V_OK) {
+                /* The certificate was rejected. Say which check failed and
+                   how to override it, rather than a generic handshake
+                   error. */
+                const char *const reason =
+                  X509_verify_cert_error_string(verify_result);
+
+                strncatbuff(back[i].r.msg, reason, sizeof(back[i].r.msg) - 2);
+                hts_log_print(opt, LOG_ERROR,
+                              "TLS certificate check failed for %s: %s"
+                              " (use -%%g to mirror this host without checking certificates)",
+                              back[i].url_adr, reason);
+              } else {
+                /* note: ERR_error_string() decodes an error-queue code, not
+                   the small SSL_get_error() return value that used to be
+                   passed here -- the resulting message was meaningless. */
+                const unsigned long queued = ERR_get_error();
+
+                if (queued != 0) {
+                  char tmp[256];
+
+                  tmp[0] = '\0';
+                  ERR_error_string_n(queued, tmp, sizeof(tmp));
+                  strncatbuff(back[i].r.msg, tmp, sizeof(back[i].r.msg) - 2);
+                }
+              }
               if (!strnotempty(back[i].r.msg)) {
                 sprintf(back[i].r.msg, "SSL/TLS error %d", err_code);
               }

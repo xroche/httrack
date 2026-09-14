@@ -76,6 +76,8 @@ extern "C" {
 #include <openssl/ssl.h>
 #include <openssl/crypto.h>
 #include <openssl/err.h>
+#include <openssl/rand.h>
+#include <openssl/x509v3.h>
 
 /* OpenSSL structure */
 #include <openssl/bio.h>

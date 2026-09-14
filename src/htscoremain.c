@@ -1516,6 +1516,13 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   com++;
                 }
                 break;          // HTTP/1.0 notamment
+              case 'g':        // ne pas vérifier les certificats TLS
+                opt->ssl_insecure = 1;
+                if (*(com + 1) == '0') {
+                  opt->ssl_insecure = 0;
+                  com++;
+                }
+                break;
               case 'h':
                 opt->http10 = 1;
                 if (*(com + 1) == '0') {
@@ -2129,7 +2136,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                                 fprintf(stdout,
                                         "X-Content-Length: " LLintP "\r\n",
                                         (r.size >= 0) ? r.size : (-r.size));
-                                if (r.contenttype >= 0) {
+                                if (r.contenttype[0]) {
                                   fprintf(stdout, "Content-Type: %s\r\n",
                                           r.contenttype);
                                 }
@@ -2496,7 +2503,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                     { DO_DEL, 42, 0 },    /* add 42/0 */
                     { TEST_DEL, 42, 0 },  /* check 42/0 */
                     { TEST_ADD, 42, 2 },  /* check 42/2 */
-                    { DO_END }
+                    { DO_END, 0, 0 }
                   };
                   char *buff = NULL;
                   const char **strings = NULL;
@@ -2555,7 +2562,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                       size_t i;
                       for(i = bench[loop].offset ; i < (size_t) count
                           ; i += bench[loop].modulus) {
-                        int result;
+                        int result = 0;
                         FMT();
                         if (bench[loop].type == DO_ADD
                             || bench[loop].type == DO_DRY_ADD) {
@@ -2621,6 +2628,21 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 }
                 htsmain_free();
                 return 0;
+                break;
+              case '8':  // cookie domain scope: httrack -#8 ".foo.com" "www.foo.com"
+                if (na + 2 >= argc) {
+                  HTS_PANIC_PRINTF
+                    ("Option #8 needs to be followed by a cookie domain and a query domain");
+                  printf("Example: '-#8' \".foo.com\" \"www.foo.com\"\n");
+                  htsmain_free();
+                  return -1;
+                } else {
+                  printf("%s\n",
+                         cookie_matches_domain(argv[na + 1], argv[na + 2])
+                         ? "match" : "nomatch");
+                  htsmain_free();
+                  return 0;
+                }
                 break;
               case '!':
                 HTS_PANIC_PRINTF

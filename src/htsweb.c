@@ -98,6 +98,47 @@ static void htsweb_sig_brpipe(int code) {
   /* ignore */
 }
 
+/* Fill 'buff' with 'size' cryptographically random bytes.
+   Returns 0 on failure -- callers must treat that as fatal rather than
+   falling back to rand(), which is seeded from the clock and leaves the
+   session id guessable by anyone who knows roughly when we started. */
+static int web_random_bytes(unsigned char *buff, size_t size) {
+#if defined(_WIN32)
+  /* advapi32's RtlGenRandom, exposed as SystemFunction036 */
+  HMODULE lib = LoadLibraryA("advapi32.dll");
+
+  if (lib != NULL) {
+    BOOLEAN(WINAPI * rtlGenRandom) (PVOID, ULONG) =
+      (BOOLEAN(WINAPI *) (PVOID, ULONG)) GetProcAddress(lib,
+                                                        "SystemFunction036");
+    if (rtlGenRandom != NULL && rtlGenRandom(buff, (ULONG) size)) {
+      FreeLibrary(lib);
+      return 1;
+    }
+    FreeLibrary(lib);
+  }
+  return 0;
+#else
+  FILE *fp = fopen("/dev/urandom", "rb");
+
+  if (fp != NULL) {
+    const size_t nread = fread(buff, 1, size, fp);
+
+    fclose(fp);
+    if (nread == size) {
+      return 1;
+    }
+  }
+#if HTS_USEOPENSSL
+  /* fall back to OpenSSL, which has its own seeding paths */
+  if (RAND_bytes(buff, (int) size) == 1) {
+    return 1;
+  }
+#endif
+  return 0;
+#endif
+}
+
 /* Number of background threads */
 static int background_threads = 0;
 
@@ -244,31 +285,46 @@ int main(int argc, char *argv[]) {
 
   /* protected session-id */
   {
-    char buff[1024];
+    unsigned char seed[32];
     char digest[32 + 2];
 
-    srand((unsigned int) time(NULL));
-    snprintf(buff, sizeof(buff), "%d-%d", (int) time(NULL), (int) rand());
-    domd5mem(buff, strlen(buff), digest, 1);
+    if (!web_random_bytes(seed, sizeof(seed))) {
+      fprintf(stderr,
+              "** CRITICAL: no source of cryptographic randomness available;"
+              " refusing to start with a guessable session id\n");
+      return -1;
+    }
+    domd5mem((const char *) seed, sizeof(seed), digest, 1);
     smallserver_setkey("sid", digest);
     smallserver_setkey("_sid", digest);
   }
 
   /* set commandline keys */
-  for(i = 2; i < argc; i += 2) {
-    if (strcmp(argv[i], "--port") == 0 && i + 1 < argc) {
+  for(i = 2; i < argc;) {
+    /* note: keys are name/value pairs, but standalone flags advance by one */
+    if (strcmp(argv[i], "--bind-any") == 0) {
+      smallserver_bind_any = 1;
+      fprintf(stderr,
+              "warning: --bind-any: listening on every network interface.\n"
+              "warning: anyone able to reach this port can start a mirror"
+              " writing to any path this user can write to.\n");
+      i++;
+    } else if (strcmp(argv[i], "--port") == 0 && i + 1 < argc) {
       if (sscanf(argv[i + 1], "%d", &defaultPort) != 1 || defaultPort < 0
           || defaultPort >= 65535) {
         fprintf(stderr, "couldn't set the port number to %s\n", argv[i + 1]);
         return -1;
       }
+      i += 2;
     } else if (strcmp(argv[i], "--ppid") == 0 && i + 1 < argc) {
       if (sscanf(argv[i + 1], "%u", &parentPid) != 1) {
         fprintf(stderr, "couldn't set the parent PID to %s\n", argv[i + 1]);
         return -1;
       }
+      i += 2;
     } else if (i + 1 < argc) {
       smallserver_setkey(argv[i], argv[i + 1]);
+      i += 2;
     } else {
       fprintf(stderr, "Error in commandline!\n");
       return -1;

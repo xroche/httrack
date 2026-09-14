@@ -1127,14 +1127,11 @@ char *hts_convertStringIDNAToUTF8(const char *s, size_t size) {
               ADD_BYTE((char) uc);
             } else {
               /* emiter (byte per byte) */
-#define EM(C) do { \
-  if (C != -1) {   \
-    ADD_BYTE(C);   \
-  } else {         \
-    FREE_BUFFER(); \
-    return NULL;   \
-  }                \
-} while(0)
+/* note: EMIT_UNICODE only ever emits unsigned char values, so the
+   (C != -1) error test that used to be here was dead code -- and always
+   true, as the compiler points out with -Wtype-limits. Allocation
+   failures are handled inside ADD_BYTE()/INCREASE_CAPA(). */
+#define EM(C) ADD_BYTE(C)
               /* Emit codepoint */
               EMIT_UNICODE(uc, EM);
 #undef EM
@@ -1228,14 +1225,11 @@ char *hts_convertUCS4StringToUTF8(const hts_UCS4 *s, size_t nChars) {
   for(i = 0 ; i < nChars ; i++) {
     const hts_UCS4 uc = s[i];
     /* emitter (byte per byte) */
-#define EM(C) do { \
-  if (C != -1) {   \
-    ADD_BYTE(C);   \
-  } else {         \
-    FREE_BUFFER(); \
-    return NULL;   \
-  }                \
-} while(0)
+/* note: EMIT_UNICODE only ever emits unsigned char values, so the
+   (C != -1) error test that used to be here was dead code -- and always
+   true, as the compiler points out with -Wtype-limits. Allocation
+   failures are handled inside ADD_BYTE()/INCREASE_CAPA(). */
+#define EM(C) ADD_BYTE(C)
     EMIT_UNICODE(uc, EM);
 #undef EM
   }

@@ -2631,33 +2631,37 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                               break;
                             default:   // inconnu
                               // asp, cgi..
-                              if ((strfield2
-                                   (afs.af.fil + max(0, strlen(afs.af.fil) - 4),
-                                    ".gif"))
-                                  ||
-                                  (strfield2
-                                   (afs.af.fil + max(0, strlen(afs.af.fil) - 4),
-                                    ".jpg"))
-                                  ||
-                                  (strfield2
-                                   (afs.af.fil + max(0, strlen(afs.af.fil) - 4),
-                                    ".xbm"))
-                                  /*|| (ishtml(opt,fil)!=0) */
-                                ) {
-                                patch_it = 1;   // redirect
-                                add_url = 1;    // avec link aussi
-                                cat_name = "external.gif";
-                                cat_nb = 1;
-                                cat_data = HTS_DATA_UNKNOWN_GIF;
-                                cat_data_len = HTS_DATA_UNKNOWN_GIF_LEN;
-                              } else {  /* if (is_dyntype(get_ext(fil))) */
+                              {
+                                /* Last four characters of the name, or the
+                                   whole name if it is shorter. Note: strlen()
+                                   is unsigned, so (strlen(f) - 4) wraps around
+                                   for short names and max(0, ...) does not
+                                   catch it -- that used to walk off the front
+                                   of the buffer for any name below 4 chars. */
+                                const size_t fil_len = strlen(afs.af.fil);
+                                const char *const fil_end =
+                                  afs.af.fil + (fil_len > 4 ? fil_len - 4 : 0);
 
-                                patch_it = 1;   // redirect
-                                add_url = 1;    // avec link?
-                                cat_name = "external.html";
-                                cat_nb = 0;
-                                cat_data = HTS_DATA_UNKNOWN_HTML;
-                                cat_data_len = HTS_DATA_UNKNOWN_HTML_LEN;
+                                if ((strfield2(fil_end, ".gif"))
+                                    || (strfield2(fil_end, ".jpg"))
+                                    || (strfield2(fil_end, ".xbm"))
+                                    /*|| (ishtml(opt,fil)!=0) */
+                                  ) {
+                                  patch_it = 1; // redirect
+                                  add_url = 1;  // avec link aussi
+                                  cat_name = "external.gif";
+                                  cat_nb = 1;
+                                  cat_data = HTS_DATA_UNKNOWN_GIF;
+                                  cat_data_len = HTS_DATA_UNKNOWN_GIF_LEN;
+                                } else {        /* if (is_dyntype(get_ext(fil))) */
+
+                                  patch_it = 1; // redirect
+                                  add_url = 1;  // avec link?
+                                  cat_name = "external.html";
+                                  cat_nb = 0;
+                                  cat_data = HTS_DATA_UNKNOWN_HTML;
+                                  cat_data_len = HTS_DATA_UNKNOWN_HTML_LEN;
+                                }
                               }
                               break;
                             }   // html,gif

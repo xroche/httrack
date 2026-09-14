@@ -41,6 +41,10 @@ Please visit our Website: http://www.httrack.com
 /* String */
 #include "htsstrings.h"
 
+/* Listen on every interface rather than loopback only. Dangerous: this
+   server can start a mirror writing to an arbitrary path. */
+extern int smallserver_bind_any;
+
 // Fonctions
 void socinput(T_SOC soc, char *s, int max);
 T_SOC smallserver_init_std(int *port_prox, char *adr_prox, int defaultPort);

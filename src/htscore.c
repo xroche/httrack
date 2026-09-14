@@ -414,9 +414,10 @@ if (makeindex_fp) { \
     char BIGSTK link_escaped[HTS_URLMAXSIZE*2]; \
     escape_uri_utf(makeindex_firstlink, link_escaped, sizeof(link_escaped)); \
     snprintf(tempo,sizeof(tempo),"<meta HTTP-EQUIV=\"Refresh\" CONTENT=\"0; URL=%s\">"CRLF, link_escaped); \
-  } else \
+  } else { \
     tempo[0]='\0'; \
-    hts_template_format(makeindex_fp,template_footer, \
+  } \
+  hts_template_format(makeindex_fp,template_footer, \
     "<!-- Mirror and index made by HTTrack Website Copier/"HTTRACK_VERSION" "HTTRACK_AFF_AUTHORS" -->", \
     tempo, /* EOF */ NULL \
     ); \
@@ -589,7 +590,7 @@ int httpmirror(char *url1, httrackp * opt) {
 
   // robots.txt
   strcpybuff(robots.adr, "!");  // dummy
-  robots.token[0] = '\0';
+  robots.rules = NULL;
   robots.next = NULL;           // suivant
   opt->robotsptr = &robots;
 
@@ -1791,6 +1792,7 @@ int httpmirror(char *url1, httrackp * opt) {
               char BIGSTK buff[8192];
               char BIGSTK infobuff[8192];
               int record = 0;
+              int group_has_rules = 0;
 
               line[0] = '\0';
               buff[0] = '\0';
@@ -1822,12 +1824,18 @@ int httpmirror(char *url1, httrackp * opt) {
                   while(is_realspace(*a))
                     a++;        // sauter espace(s)
                   if (*a == '*') {
-                    if (record != 2)
+                    if (record == 2 && group_has_rules) {
+                      /* A wildcard group following specific-agent rules is
+                         a fallback, not part of those specific rules. */
+                      record = 0;
+                    } else if (record != 2) {
                       record = 1;       // c pour nous
+                    }
                   } else if (strfield(a, "httrack") || strfield(a, "winhttrack")
                              || strfield(a, "webhttrack")) {
                     buff[0] = '\0';     // re-enregistrer
                     infobuff[0] = '\0';
+                    group_has_rules = 0;
                     record = 2; // locked
 #if DEBUG_ROBOTS
                     printf("explicit disallow for httrack\n");
@@ -1845,9 +1853,11 @@ int httpmirror(char *url1, httrackp * opt) {
                       if (strcmp(a, "/") != 0 || opt->robots >= 3)
 #endif
                       {         /* ignoring disallow: / */
-                        if ((strlen(buff) + strlen(a) + 8) < sizeof(buff)) {
+                        if ((strlen(buff) + strlen(a) + 9) < sizeof(buff)) {
+                          strcatbuff(buff, "D");
                           strcatbuff(buff, a);
                           strcatbuff(buff, "\n");
+                          group_has_rules = 1;
                           if ((strlen(infobuff) + strlen(a) + 8) <
                               sizeof(infobuff)) {
                             if (strnotempty(infobuff))
@@ -1865,16 +1875,34 @@ int httpmirror(char *url1, httrackp * opt) {
 #endif
                     }
                   }
+                  else if (strfield(line, "allow:")) {
+                    char *a = line + 6;
+
+                    while(is_realspace(*a))
+                      a++;
+                    if (strnotempty(a)
+                        && (strlen(buff) + strlen(a) + 9) < sizeof(buff)) {
+                      strcatbuff(buff, "A");
+                      strcatbuff(buff, a);
+                      strcatbuff(buff, "\n");
+                      group_has_rules = 1;
+                    }
+                  }
                 }
               } while((bptr < r.size) && (strlen(buff) < (sizeof(buff) - 32)));
               if (strnotempty(buff)) {
-                checkrobots_set(&robots, urladr(), buff);
-                hts_log_print(opt, LOG_INFO,
-                              "Note: robots.txt forbidden links for %s are: %s",
-                              urladr(), infobuff);
-                hts_log_print(opt, LOG_NOTICE,
-                              "Note: due to %s remote robots.txt rules, links beginning with these path will be forbidden: %s (see in the options to disable this)",
-                              urladr(), infobuff);
+                if (checkrobots_set(&robots, urladr(), buff)) {
+                  hts_log_print(opt, LOG_INFO,
+                                "Note: robots.txt forbidden links for %s are: %s",
+                                urladr(), infobuff);
+                  hts_log_print(opt, LOG_NOTICE,
+                                "Note: due to %s remote robots.txt rules, links beginning with these path will be forbidden: %s (see in the options to disable this)",
+                                urladr(), infobuff);
+                } else {
+                  hts_log_print(opt, LOG_ERROR,
+                                "Error: could not store robots.txt rules for %s; rules were not applied",
+                                urladr());
+                }
               }
             }
           }

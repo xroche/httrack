@@ -583,6 +583,8 @@ void help(const char *app, int more) {
   infomsg
     (" %B  tolerant requests (accept bogus responses on some servers, but not standard!)");
   infomsg
+    (" %g  do NOT check https certificates (dangerous: anyone on the network path can then choose what is mirrored)");
+  infomsg
     (" %s  update hacks: various hacks to limit re-transfers when updating (identical size, bogus response..)");
   infomsg
     (" %u  url hacks: various hacks to limit duplicate URLs (strip //, www.foo.com==foo.com..)");
@@ -648,6 +650,7 @@ void help(const char *app, int more) {
   infomsg(" #0  filter test (-#0 '*.gif' 'www.bar.com/foo.gif')");
   infomsg(" #1  simplify test (-#1 ./foo/bar/../foobar)");
   infomsg(" #2  type test (-#2 /foo/bar.php)");
+  infomsg(" #8  cookie domain scope test (-#8 .foo.com www.foo.com)");
   infomsg(" #C  cache list (-#C '*.com/spider*.gif'");
   infomsg(" #R  cache repair (damaged cache)");
   infomsg(" #d  debug parser");

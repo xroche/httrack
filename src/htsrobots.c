@@ -42,6 +42,101 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsrobots.h"
 
+/* Rules are stored one per line, each prefixed by its kind:
+     "A<pattern>\n"  Allow
+     "D<pattern>\n"  Disallow
+   '<pattern>' is a robots.txt path pattern: '*' matches any sequence of
+   characters, and a trailing '$' anchors the match to the end of the path.
+   See RFC 9309 section 2.2. */
+#define ROBOTS_RULE_ALLOW    'A'
+#define ROBOTS_RULE_DISALLOW 'D'
+
+/* Match 'pat' (pat_len octets, '*' being a wildcard) against 'str'.
+   When 'anchored' the pattern must consume the whole of 'str' ; otherwise
+   matching any prefix of 'str' is enough, which is the implicit trailing
+   '*' every unanchored robots.txt pattern carries.
+   Greedy matcher that backtracks to the last star, so a pathological
+   pattern costs O(pattern * path) rather than blowing up. */
+static int robots_glob(const char *pat, size_t pat_len, const char *str,
+                       int anchored) {
+  const char *const pat_end = pat + pat_len;
+  const char *star = NULL;
+  const char *str_at_star = NULL;
+  const char *p = pat;
+  const char *s = str;
+
+  for(;;) {
+    if (p == pat_end) {
+      if (!anchored || *s == '\0') {
+        return 1;
+      }
+    } else if (*p == '*') {
+      /* remember where to resume if the rest fails to match */
+      star = ++p;
+      str_at_star = s;
+      continue;
+    } else if (*s != '\0' && *p == *s) {
+      p++;
+      s++;
+      continue;
+    }
+    /* no match here: give the last star one more character to swallow */
+    if (star != NULL && *str_at_star != '\0') {
+      p = star;
+      s = ++str_at_star;
+      continue;
+    }
+    return 0;
+  }
+}
+
+/* Does the robots.txt path pattern 'pattern' (pattern_len octets) apply to
+   'path'? A trailing '$' anchors the match to the end of the path. */
+static int robots_pattern_match(const char *pattern, size_t pattern_len,
+                                const char *path) {
+  if (pattern_len > 0 && pattern[pattern_len - 1] == '$') {
+    return robots_glob(pattern, pattern_len - 1, path, 1);
+  }
+  return robots_glob(pattern, pattern_len, path, 0);
+}
+
+/* Is 'fil' forbidden by the rules in 'rules'?
+   Per RFC 9309 section 2.2.2 the most specific rule wins, specificity being
+   the octet length of the pattern, and Allow wins a tie. A path no rule
+   matches is allowed. */
+static int robots_rules_forbid(const char *rules, const char *fil) {
+  const char *line = rules;
+  size_t best_len = 0;
+  int best_is_allow = 0;
+  int found = 0;
+
+  while(line != NULL && *line != '\0') {
+    const char *const eol = strchr(line, '\n');
+    const size_t line_len = eol != NULL
+      ? (size_t) (eol - line) : strlen(line);
+
+    if (line_len > 1) {
+      const char kind = line[0];
+      const char *const pattern = line + 1;
+      const size_t pattern_len = line_len - 1;
+
+      if ((kind == ROBOTS_RULE_ALLOW || kind == ROBOTS_RULE_DISALLOW)
+          && robots_pattern_match(pattern, pattern_len, fil)) {
+        /* longer pattern wins ; on a tie, Allow wins */
+        if (!found || pattern_len > best_len
+            || (pattern_len == best_len && kind == ROBOTS_RULE_ALLOW)) {
+          best_len = pattern_len;
+          best_is_allow = (kind == ROBOTS_RULE_ALLOW);
+          found = 1;
+        }
+      }
+    }
+    line = eol != NULL ? eol + 1 : NULL;
+  }
+
+  return (found && !best_is_allow) ? -1 : 0;
+}
+
 // -- robots --
 
 // fil="" : vérifier si règle déja enregistrée
@@ -49,22 +144,12 @@ int checkrobots(robots_wizard * robots, const char *adr, const char *fil) {
   while(robots) {
     if (strfield2(robots->adr, adr)) {
       if (fil[0]) {
-        int ptr = 0;
-        char line[250];
+        if (robots->rules != NULL && robots->rules[0] != '\0') {
+          const int forbidden = robots_rules_forbid(robots->rules, fil);
 
-        if (strnotempty(robots->token)) {
-          do {
-            ptr += binput(robots->token + ptr, line, 200);
-            if (line[0] == '/') {       // absolu
-              if (strfield(fil, line)) {        // commence avec ligne
-                return -1;      // interdit
-              }
-            } else {            // relatif
-              if (strstrcase(fil, line)) {
-                return -1;
-              }
-            }
-          } while((strnotempty(line)) && (ptr < (int) strlen(robots->token)));
+          if (forbidden != 0) {
+            return forbidden;
+          }
         }
       } else {
         return -1;
@@ -74,43 +159,59 @@ int checkrobots(robots_wizard * robots, const char *adr, const char *fil) {
   }
   return 0;
 }
+
 int checkrobots_set(robots_wizard * robots, const char *adr, const char *data) {
-  if (((int) strlen(adr)) >= sizeof(robots->adr) - 2)
-    return 0;
-  if (((int) strlen(data)) >= sizeof(robots->token) - 2)
+  if (((int) strlen(adr)) >= (int) sizeof(robots->adr) - 2)
     return 0;
   while(robots) {
     if (strfield2(robots->adr, adr)) {  // entrée existe
-      strcpybuff(robots->token, data);
+      char *const copy = strdupt(data);
+
+      if (copy == NULL) {
+        return 0;
+      }
+      freet(robots->rules);
+      robots->rules = copy;
 #if DEBUG_ROBOTS
       printf("robots.txt: set %s to %s\n", adr, data);
 #endif
+      return 1;
       return -1;
     } else if (!robots->next) {
       robots->next = (robots_wizard *) calloct(1, sizeof(robots_wizard));
       if (robots->next) {
         robots->next->next = NULL;
         strcpybuff(robots->next->adr, adr);
-        strcpybuff(robots->next->token, data);
+        robots->next->rules = strdupt(data);
+        if (robots->next->rules == NULL) {
+          freet(robots->next);
+          robots->next = NULL;
+          return 0;
+        }
 #if DEBUG_ROBOTS
         printf("robots.txt: new set %s to %s\n", adr, data);
 #endif
-      }
+        return 1;
+      } else {
 #if DEBUG_ROBOTS
-      else
         printf("malloc error!!\n");
 #endif
+        return 0;
+      }
     }
     robots = robots->next;
   }
   return 0;
 }
+
 void checkrobots_free(robots_wizard * robots) {
   if (robots->next) {
     checkrobots_free(robots->next);
     freet(robots->next);
     robots->next = NULL;
   }
+  /* note: the head node is owned by the caller (it lives on the stack in
+     httpmirror()), but its rules are ours to release. */
+  freet(robots->rules);
+  robots->rules = NULL;
 }
-
-// -- robots --

@@ -179,7 +179,7 @@ am_htsserver_OBJECTS = htsserver-htsserver.$(OBJEXT) \
 	htsserver-htsweb.$(OBJEXT)
 htsserver_OBJECTS = $(am_htsserver_OBJECTS)
 htsserver_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
-	libhttrack.la
+	$(am__DEPENDENCIES_1) libhttrack.la
 htsserver_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(htsserver_CFLAGS) \
 	$(CFLAGS) $(htsserver_LDFLAGS) $(LDFLAGS) -o $@
@@ -484,7 +484,7 @@ AM_LDFLAGS = \
 	@DEFAULT_LDFLAGS@
 
 httrack_LDADD = $(THREADS_LIBS) libhttrack.la
-htsserver_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS) libhttrack.la
+htsserver_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS) $(OPENSSL_LIBS) libhttrack.la
 proxytrack_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS)
 httrack_CFLAGS = $(AM_CFLAGS) $(CFLAGS_PIE)
 proxytrack_CFLAGS = $(AM_CFLAGS) $(CFLAGS_PIE) -DNO_MALLOCT -DZLIB_CONST -DHTS_INTHASH_USES_MD5

@@ -41,7 +41,9 @@ typedef struct robots_wizard robots_wizard;
 #endif
 struct robots_wizard {
   char adr[128];
-  char token[4096];
+  /* Dynamic storage prevents a large, valid robots.txt rule set from being
+     discarded merely because it exceeds a fixed per-host buffer. */
+  char *rules;
   struct robots_wizard *next;
 };
 
