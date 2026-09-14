@@ -590,7 +590,7 @@ int httpmirror(char *url1, httrackp * opt) {
 
   // robots.txt
   strcpybuff(robots.adr, "!");  // dummy
-  robots.token[0] = '\0';
+  robots.rules = NULL;
   robots.next = NULL;           // suivant
   opt->robotsptr = &robots;
 
