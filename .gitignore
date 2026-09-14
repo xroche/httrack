@@ -1,0 +1,30 @@
+# autotools build products
+Makefile
+/config.h
+/config.log
+/config.status
+/libtool
+/stamp-h1
+.deps/
+.libs/
+.dirstamp
+*.o
+*.lo
+*.la
+*.a
+*.so
+*.so.*
+
+# built binaries
+/src/httrack
+/src/htsserver
+/src/proxytrack
+/src/webhttrack
+
+# test artifacts
+/tests/test-suite.log
+/tests/*.trs
+/tests/check-network_sh.cache
+
+# analysis output
+/analyzer-report/

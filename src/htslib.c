@@ -3167,11 +3167,20 @@ typedef struct {
 } t_auto_seq;
 
 // char between a and b
-#define CHAR_BETWEEN(c, a, b)       ( (c) >= 0x##a ) && ( (c) <= 0x##b )
+// note: the whole expression must stay parenthesized -- without the outer
+// parentheses the "&&" binds looser than most operators a caller might use,
+// and only the first half of the range test survives.
+// The range is tested as a single unsigned subtraction so that a lower bound
+// of 0x00 is not a vacuous "unsigned >= 0" comparison.
+#define CHAR_BETWEEN(c, a, b)       \
+  ( (unsigned) ( (unsigned char) (c) - 0x##a ) <= (unsigned) ( 0x##b - 0x##a ) )
 // sequence start
 #define SEQBEG                      ( inseq == 0 )
-// in this block
-#define BLK(n,a, b)                 ( (seq.pos >= n) && ((err = CHAR_BETWEEN(seq.data[n], a, b))) )
+// first byte of the sequence: always present, no need to check seq.pos
+#define BLK0(a, b)                  ( (err = CHAR_BETWEEN(seq.data[0], a, b)) )
+#define ELT0(a)                     BLK0(a,a)
+// continuation byte n (n >= 1), if the sequence got that far
+#define BLK(n,a, b)                 ( (seq.pos >= (unsigned) (n)) && ((err = CHAR_BETWEEN(seq.data[n], a, b))) )
 #define ELT(n,a)                    BLK(n,a,a)
 // end
 #define SEQEND                      ((ok = 1))
@@ -3201,21 +3210,21 @@ int is_unicode_utf8(const char *buffer_, const size_t size) {
     unsigned int err = 0;
 
     seq.data[seq.pos] = buffer[i];
-     /**/ if (SEQBEG && BLK(0, 00, 7F) && IN_SEQ && SEQEND) {
-    } else if (SEQBEG && BLK(0, C2, DF) && IN_SEQ && BLK(1, 80, BF) && SEQEND) {
-    } else if (SEQBEG && ELT(0, E0) && IN_SEQ && BLK(1, A0, BF)
+     /**/ if (SEQBEG && BLK0(00, 7F) && IN_SEQ && SEQEND) {
+    } else if (SEQBEG && BLK0(C2, DF) && IN_SEQ && BLK(1, 80, BF) && SEQEND) {
+    } else if (SEQBEG && ELT0(E0) && IN_SEQ && BLK(1, A0, BF)
                && BLK(2, 80, BF) && SEQEND) {
-    } else if (SEQBEG && BLK(0, E1, EC) && IN_SEQ && BLK(1, 80, BF)
+    } else if (SEQBEG && BLK0(E1, EC) && IN_SEQ && BLK(1, 80, BF)
                && BLK(2, 80, BF) && SEQEND) {
-    } else if (SEQBEG && ELT(0, ED) && IN_SEQ && BLK(1, 80, 9F)
+    } else if (SEQBEG && ELT0(ED) && IN_SEQ && BLK(1, 80, 9F)
                && BLK(2, 80, BF) && SEQEND) {
-    } else if (SEQBEG && BLK(0, EE, EF) && IN_SEQ && BLK(1, 80, BF)
+    } else if (SEQBEG && BLK0(EE, EF) && IN_SEQ && BLK(1, 80, BF)
                && BLK(2, 80, BF) && SEQEND) {
-    } else if (SEQBEG && ELT(0, F0) && IN_SEQ && BLK(1, 90, BF)
+    } else if (SEQBEG && ELT0(F0) && IN_SEQ && BLK(1, 90, BF)
                && BLK(2, 80, BF) && BLK(3, 80, BF) && SEQEND) {
-    } else if (SEQBEG && BLK(0, F1, F3) && IN_SEQ && BLK(1, 80, BF)
+    } else if (SEQBEG && BLK0(F1, F3) && IN_SEQ && BLK(1, 80, BF)
                && BLK(2, 80, BF) && BLK(3, 80, BF) && SEQEND) {
-    } else if (SEQBEG && ELT(0, F4) && IN_SEQ && BLK(1, 80, 8F)
+    } else if (SEQBEG && ELT0(F4) && IN_SEQ && BLK(1, 80, 8F)
                && BLK(2, 80, BF) && BLK(3, 80, BF) && SEQEND) {
     } else if (NO_SEQ) {        // bad, unknown
       return 0;
@@ -5802,7 +5811,12 @@ const t_hts_htmlcheck_callbacks default_callbacks = {
   {htsdefault_sendhead, NULL},
   {htsdefault_receivehead, NULL},
   {htsdefault_detect, NULL},
-  {htsdefault_parse, NULL}
+  {htsdefault_parse, NULL},
+  /* >3.41 ; t_hts_htmlcheck_extsavename is a typedef of
+     t_hts_htmlcheck_savename, so the savename default fits. Leaving this
+     one out gave it a NULL .fun while every sibling has a default, which
+     would fault the first time the callback is actually wired up. */
+  {htsdefault_savename, NULL}
 };
 
 #define CALLBACK_OP(CB, NAME, OPERATION, S, FUN) do {   \

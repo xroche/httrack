@@ -1,0 +1,142 @@
+name: CI
+
+on:
+  push:
+    branches: [ master, 'robustness-*' ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  # Warnings that have each caught a real defect in this tree and are now
+  # clean, so they are hard errors. Grow this list; do not shrink it.
+  #
+  #   type-limits          -- found the unsigned countdown in
+  #                           cookie_cmp_wildcard_domain() (OOB read) and the
+  #                           max(0, strlen(x) - 4) underflow in htsparse.c
+  #   extra                -- found (r.contenttype >= 0), an always-true
+  #                           comparison of a char[64] against 0
+  #   misleading-indentation, missing-field-initializers,
+  #   implicit-function-declaration, return-type, uninitialized,
+  #   strict-prototypes    -- cheap, no false positives here
+  HARD_WARNINGS: >-
+    -Werror=type-limits
+    -Werror=misleading-indentation
+    -Werror=missing-field-initializers
+    -Werror=implicit-function-declaration
+    -Werror=return-type
+    -Werror=uninitialized
+    -Werror=strict-prototypes
+  # Warnings this tree does not satisfy yet. Each line is a debt to pay off;
+  # delete it once the tree is clean and the corresponding -Werror= is added
+  # above.
+  SOFT_WARNINGS: >-
+    -Wno-unused-parameter
+    -Wno-sign-compare
+    -Wno-unused-but-set-variable
+    -Wno-unused-variable
+    -Wno-unused-function
+    -Wno-unused-value
+
+jobs:
+  build:
+    name: build (${{ matrix.cc }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        cc: [gcc, clang]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            autoconf automake libtool zlib1g-dev libssl-dev
+
+      - name: Configure
+        env:
+          CC: ${{ matrix.cc }}
+        run: |
+          ./configure \
+            CFLAGS="-O2 -g -Wall -Wextra $HARD_WARNINGS $SOFT_WARNINGS"
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      - name: Test
+        run: make check ONLINE_UNIT_TESTS=no
+
+      - name: Show test log on failure
+        if: failure()
+        run: cat tests/test-suite.log || true
+
+  sanitizers:
+    name: asan+ubsan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            autoconf automake libtool zlib1g-dev libssl-dev
+
+      - name: Configure
+        env:
+          CC: clang
+        run: |
+          ./configure --disable-shared \
+            CFLAGS="-O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=all" \
+            LDFLAGS="-fsanitize=address,undefined"
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      - name: Test
+        env:
+          # halt_on_error keeps a sanitizer report from being swallowed by a
+          # test that "passes" anyway.
+          ASAN_OPTIONS: detect_leaks=1:abort_on_error=1:halt_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: make check ONLINE_UNIT_TESTS=no
+
+      - name: Show test log on failure
+        if: failure()
+        run: cat tests/test-suite.log || true
+
+  analyze:
+    name: clang static analyzer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            autoconf automake libtool zlib1g-dev libssl-dev clang-tools
+
+      - name: Configure
+        run: scan-build ./configure
+
+      # Reporting only for now: the tree still has known findings (leaks in
+      # htscharset.c, null dereferences in htslib.c / htsparse.c). Once those
+      # are fixed, add --status-bugs to fail the job.
+      - name: Analyze
+        run: scan-build -o analyzer-report make -j"$(nproc)"
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: analyzer-report
+          path: analyzer-report
+          if-no-files-found: ignore

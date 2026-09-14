@@ -414,9 +414,10 @@ if (makeindex_fp) { \
     char BIGSTK link_escaped[HTS_URLMAXSIZE*2]; \
     escape_uri_utf(makeindex_firstlink, link_escaped, sizeof(link_escaped)); \
     snprintf(tempo,sizeof(tempo),"<meta HTTP-EQUIV=\"Refresh\" CONTENT=\"0; URL=%s\">"CRLF, link_escaped); \
-  } else \
+  } else { \
     tempo[0]='\0'; \
-    hts_template_format(makeindex_fp,template_footer, \
+  } \
+  hts_template_format(makeindex_fp,template_footer, \
     "<!-- Mirror and index made by HTTrack Website Copier/"HTTRACK_VERSION" "HTTRACK_AFF_AUTHORS" -->", \
     tempo, /* EOF */ NULL \
     ); \
