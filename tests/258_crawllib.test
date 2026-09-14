@@ -305,8 +305,7 @@ write_lock_request "${tmpdir}/out" hts-stop.lock $$' \
 ok "a refusal that outlasts the retries is reported, not blamed on a removal"
 
 # The retry may not wait out a removal. This directory goes while the loop runs
-# and comes back before the loop would end, which the one-shot walk took for a
-# refusal.
+# and comes back before the loop would end.
 fires 'mkdir -p "${tmpdir}/out/hts-stop.lock"
 (sleep 0.2 && rm -rf "${tmpdir}/out") &
 (sleep 1.5 && mkdir -p "${tmpdir}/out") &
