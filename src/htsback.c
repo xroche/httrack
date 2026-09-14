@@ -2536,11 +2536,42 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               // new session
               back[i].r.ssl_con = SSL_new(openssl_ctx);
               if (back[i].r.ssl_con) {
-                const char* hostname = jump_protocol_const(back[i].url_adr);
+                char hostname[HTS_URLMAXSIZE];
+                const char *hostname_begin =
+                  jump_identification_const(back[i].url_adr);
+                const char *hostname_end =
+                  jump_toport_const(hostname_begin);
+
+                if (hostname_end == NULL) {
+                  hostname_end = strchr(hostname_begin, '/');
+                }
+                if (hostname_end == NULL) {
+                  hostname_end = hostname_begin + strlen(hostname_begin);
+                }
+                /* Strip IPv6 brackets as well as userinfo and port: SNI and
+                   certificate matching take a DNS name or bare IP address,
+                   never an URL authority. */
+                if (*hostname_begin == '['
+                    && hostname_end > hostname_begin + 1
+                    && hostname_end[-1] == ']') {
+                  hostname_begin++;
+                  hostname_end--;
+                }
+                if ((size_t) (hostname_end - hostname_begin)
+                    >= sizeof(hostname)) {
+                  back[i].r.statuscode = STATUSCODE_SSL_HANDSHAKE;
+                  hostname[0] = '\0';
+                } else {
+                  memcpy(hostname, hostname_begin,
+                         (size_t) (hostname_end - hostname_begin));
+                  hostname[hostname_end - hostname_begin] = '\0';
+                }
 
                 SSL_clear(back[i].r.ssl_con);
                 // some servers expect the hostname on the clienthello (SNI TLS extension)
-                SSL_set_tlsext_host_name(back[i].r.ssl_con, hostname);
+                if (hostname[0]) {
+                  SSL_set_tlsext_host_name(back[i].r.ssl_con, hostname);
+                }
 
                 /* Verify the peer certificate, and that it was actually
                    issued for the host we asked for. Without both of these a
@@ -2548,7 +2579,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                    contents written to disk can be chosen by anyone on the
                    path. Opt out with -%g (--insecure) for hosts using a
                    certificate the local trust store does not know about. */
-                if (!opt->ssl_insecure) {
+                if (back[i].r.statuscode != STATUSCODE_SSL_HANDSHAKE
+                    && !opt->ssl_insecure) {
                   SSL_set_verify(back[i].r.ssl_con, SSL_VERIFY_PEER, NULL);
 #if (OPENSSL_VERSION_NUMBER >= 0x10100000L)
                   /* note: setting the expected host enables hostname

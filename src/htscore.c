@@ -1792,6 +1792,7 @@ int httpmirror(char *url1, httrackp * opt) {
               char BIGSTK buff[8192];
               char BIGSTK infobuff[8192];
               int record = 0;
+              int group_has_rules = 0;
 
               line[0] = '\0';
               buff[0] = '\0';
@@ -1823,12 +1824,18 @@ int httpmirror(char *url1, httrackp * opt) {
                   while(is_realspace(*a))
                     a++;        // sauter espace(s)
                   if (*a == '*') {
-                    if (record != 2)
+                    if (record == 2 && group_has_rules) {
+                      /* A wildcard group following specific-agent rules is
+                         a fallback, not part of those specific rules. */
+                      record = 0;
+                    } else if (record != 2) {
                       record = 1;       // c pour nous
+                    }
                   } else if (strfield(a, "httrack") || strfield(a, "winhttrack")
                              || strfield(a, "webhttrack")) {
                     buff[0] = '\0';     // re-enregistrer
                     infobuff[0] = '\0';
+                    group_has_rules = 0;
                     record = 2; // locked
 #if DEBUG_ROBOTS
                     printf("explicit disallow for httrack\n");
@@ -1850,6 +1857,7 @@ int httpmirror(char *url1, httrackp * opt) {
                           strcatbuff(buff, "D");
                           strcatbuff(buff, a);
                           strcatbuff(buff, "\n");
+                          group_has_rules = 1;
                           if ((strlen(infobuff) + strlen(a) + 8) <
                               sizeof(infobuff)) {
                             if (strnotempty(infobuff))
@@ -1877,6 +1885,7 @@ int httpmirror(char *url1, httrackp * opt) {
                       strcatbuff(buff, "A");
                       strcatbuff(buff, a);
                       strcatbuff(buff, "\n");
+                      group_has_rules = 1;
                     }
                   }
                 }
