@@ -1846,7 +1846,8 @@ int httpmirror(char *url1, httrackp * opt) {
                       if (strcmp(a, "/") != 0 || opt->robots >= 3)
 #endif
                       {         /* ignoring disallow: / */
-                        if ((strlen(buff) + strlen(a) + 8) < sizeof(buff)) {
+                        if ((strlen(buff) + strlen(a) + 9) < sizeof(buff)) {
+                          strcatbuff(buff, "D");
                           strcatbuff(buff, a);
                           strcatbuff(buff, "\n");
                           if ((strlen(infobuff) + strlen(a) + 8) <
@@ -1866,16 +1867,33 @@ int httpmirror(char *url1, httrackp * opt) {
 #endif
                     }
                   }
+                  else if (strfield(line, "allow:")) {
+                    char *a = line + 6;
+
+                    while(is_realspace(*a))
+                      a++;
+                    if (strnotempty(a)
+                        && (strlen(buff) + strlen(a) + 9) < sizeof(buff)) {
+                      strcatbuff(buff, "A");
+                      strcatbuff(buff, a);
+                      strcatbuff(buff, "\n");
+                    }
+                  }
                 }
               } while((bptr < r.size) && (strlen(buff) < (sizeof(buff) - 32)));
               if (strnotempty(buff)) {
-                checkrobots_set(&robots, urladr(), buff);
-                hts_log_print(opt, LOG_INFO,
-                              "Note: robots.txt forbidden links for %s are: %s",
-                              urladr(), infobuff);
-                hts_log_print(opt, LOG_NOTICE,
-                              "Note: due to %s remote robots.txt rules, links beginning with these path will be forbidden: %s (see in the options to disable this)",
-                              urladr(), infobuff);
+                if (checkrobots_set(&robots, urladr(), buff)) {
+                  hts_log_print(opt, LOG_INFO,
+                                "Note: robots.txt forbidden links for %s are: %s",
+                                urladr(), infobuff);
+                  hts_log_print(opt, LOG_NOTICE,
+                                "Note: due to %s remote robots.txt rules, links beginning with these path will be forbidden: %s (see in the options to disable this)",
+                                urladr(), infobuff);
+                } else {
+                  hts_log_print(opt, LOG_ERROR,
+                                "Error: could not store robots.txt rules for %s; rules were not applied",
+                                urladr());
+                }
               }
             }
           }
