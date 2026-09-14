@@ -255,7 +255,8 @@ ok "CRAWL_DEADLINE drives the watchdog, which reds a wedged crawl"
 holds 'mkdir -p "${tmpdir}/out"
 write_lock_request "${tmpdir}/out" hts-stop.lock $$
 test -e "${tmpdir}/out/hts-stop.lock"'
-ok "write_lock_request writes the request"
+assert_eq "" "$out" "what the first attempt printed"
+ok "write_lock_request writes the request, silently, on the first attempt"
 
 # A grandparent, since the old helper already named the parent.
 fires 'mkdir -p "${tmpdir}/ht.1/req.AAA/fresh"
@@ -289,18 +290,28 @@ fires 'write_lock_request /no-such-top-level-dir/out hts-stop.lock $$' \
     '/no-such-top-level-dir is gone (/ survives)'
 ok "an absolute path stops the walk at the root"
 
-# A directory where the request goes refuses the write for root too, so both
-# runners reach the arm the walk cannot explain: nothing was removed.
+# A directory sitting where the request goes refuses the write for root too, and
+# the walk finds nothing removed. The helper gives it 29 more tries, 0.1s apart.
 holds 'mkdir -p "${tmpdir}/out/hts-stop.lock"
 (sleep 0.3 && rmdir "${tmpdir}/out/hts-stop.lock") &
 write_lock_request "${tmpdir}/out" hts-stop.lock $$
 test -f "${tmpdir}/out/hts-stop.lock"'
-assert_match 'took [0-9]+ tries to accept hts-stop\.lock' "$out" "the retry names its try"
+assert_match 'took [2-9][0-9]* tries to accept hts-stop\.lock' "$out" "the try that landed"
 ok "a write refused while its directory is there is retried, and says so"
 
 fires 'mkdir -p "${tmpdir}/out/hts-stop.lock"
 write_lock_request "${tmpdir}/out" hts-stop.lock $$' \
-    'which is still there, on 30 tries'
+    'which is still there, after 30 tries'
 ok "a refusal that outlasts the retries is reported, not blamed on a removal"
+
+# The retry may not wait out a removal. This directory goes while the loop runs
+# and comes back before the loop would end, which the one-shot walk took for a
+# refusal.
+fires 'mkdir -p "${tmpdir}/out/hts-stop.lock"
+(sleep 0.2 && rm -rf "${tmpdir}/out") &
+(sleep 1.5 && mkdir -p "${tmpdir}/out") &
+write_lock_request "${tmpdir}/out" hts-stop.lock $$' \
+    '/out is gone'
+ok "a removal during the retries is named, not waited out"
 
 echo "PASS"
