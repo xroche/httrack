@@ -289,4 +289,18 @@ fires 'write_lock_request /no-such-top-level-dir/out hts-stop.lock $$' \
     '/no-such-top-level-dir is gone (/ survives)'
 ok "an absolute path stops the walk at the root"
 
+# A directory where the request goes refuses the write for root too, so both
+# runners reach the arm the walk cannot explain: nothing was removed.
+holds 'mkdir -p "${tmpdir}/out/hts-stop.lock"
+(sleep 0.3 && rmdir "${tmpdir}/out/hts-stop.lock") &
+write_lock_request "${tmpdir}/out" hts-stop.lock $$
+test -f "${tmpdir}/out/hts-stop.lock"'
+assert_match 'took [0-9]+ tries to accept hts-stop\.lock' "$out" "the retry names its try"
+ok "a write refused while its directory is there is retried, and says so"
+
+fires 'mkdir -p "${tmpdir}/out/hts-stop.lock"
+write_lock_request "${tmpdir}/out" hts-stop.lock $$' \
+    'which is still there, on 30 tries'
+ok "a refusal that outlasts the retries is reported, not blamed on a removal"
+
 echo "PASS"
