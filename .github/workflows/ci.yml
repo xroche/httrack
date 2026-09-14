@@ -56,9 +56,6 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             autoconf automake libtool zlib1g-dev libssl-dev
 
-      - name: Regenerate build files
-        run: autoreconf -fi
-
       - name: Configure
         env:
           CC: ${{ matrix.cc }}
@@ -91,9 +88,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             autoconf automake libtool zlib1g-dev libssl-dev
-
-      - name: Regenerate build files
-        run: autoreconf -fi
 
       - name: Configure
         env:
@@ -131,9 +125,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             autoconf automake libtool zlib1g-dev libssl-dev clang-tools
-
-      - name: Regenerate build files
-        run: autoreconf -fi
 
       - name: Configure
         run: scan-build ./configure
