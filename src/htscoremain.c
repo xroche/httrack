@@ -2503,7 +2503,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                     { DO_DEL, 42, 0 },    /* add 42/0 */
                     { TEST_DEL, 42, 0 },  /* check 42/0 */
                     { TEST_ADD, 42, 2 },  /* check 42/2 */
-                    { DO_END }
+                    { DO_END, 0, 0 }
                   };
                   char *buff = NULL;
                   const char **strings = NULL;
@@ -2562,7 +2562,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                       size_t i;
                       for(i = bench[loop].offset ; i < (size_t) count
                           ; i += bench[loop].modulus) {
-                        int result;
+                        int result = 0;
                         FMT();
                         if (bench[loop].type == DO_ADD
                             || bench[loop].type == DO_DRY_ADD) {
