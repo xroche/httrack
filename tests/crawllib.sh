@@ -221,22 +221,28 @@ assert_lockrule_selftest() {
 # A bare redirect there reports ENOENT for three reasons a caller cannot separate.
 write_lock_request() { # write_lock_request DIR NAME PID
     local dir=$1 name=$2 pid=$3 gone='' up=$1
-    local try max_tries=30
+    local try max_tries=30 went=''
     # The shell reports a failing redirect before it applies the 2>/dev/null
     # beside it (#1637).
     { : >"${dir}/${name}"; } 2>/dev/null && return 0
     kill -0 "$pid" 2>/dev/null ||
         fail "the engine exited before it could be asked for ${name}"
     # drvfs refuses a write into a directory it still holds (#1639), so attempt 1
-    # above gets 29 retries. Each re-reads the directory, or a removal that went
-    # and came back inside the window would be waited out instead of named.
+    # above gets 29 retries. A removal that went and came back inside the window
+    # would be waited out instead of named, so each failure re-reads the path.
     for try in $(seq 2 "$max_tries"); do
-        test -d "$dir" || break
         sleep 0.1
-        { : >"${dir}/${name}"; } 2>/dev/null || continue
-        # Loud, so a retried write stays countable in the uploaded test log.
-        echo "write_lock_request: ${dir} took ${try} tries to accept ${name} (#1639)" >&2
-        return 0
+        if { : >"${dir}/${name}"; } 2>/dev/null; then
+            # Loud, so a retried write stays countable in the uploaded test log.
+            echo "write_lock_request: ${dir} took ${try} tries to accept ${name} (#1639)" >&2
+            return 0
+        fi
+        # Read at the failure and latched, because a directory already back by
+        # the time the walk below stats it would read as a refusal.
+        test -d "$dir" || {
+            went=1
+            break
+        }
     done
     # It walks up because the path crosses the driver's TMPDIR, the test's
     # mktemp directory and the crawl output (#1639). The last two arms only
@@ -255,6 +261,8 @@ write_lock_request() { # write_lock_request DIR NAME PID
     done
     test -z "$gone" ||
         fail "${gone} is gone (${up} survives): something removed it under a running test"
+    test -z "$went" ||
+        fail "${dir} went missing under a running test, and was back before the walk"
     fail "${name} could not be written into ${dir}, which is still there, after ${max_tries} tries"
 }
 
