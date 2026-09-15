@@ -2535,6 +2535,12 @@ static int st_logcounters(httrackp *opt, int argc, char **argv) {
   if (stats == NULL || stats->stat_infos != 2)
     err = 1;
 
+  /* A panic is fatal, so it counts as an error rather than as nothing. */
+  hts_log_print(o, LOG_PANIC, "ninth");
+  stats = hts_get_stats(o);
+  if (stats == NULL || stats->stat_errors != 3)
+    err = 1;
+
   hts_free_opt(o);
   printf("log-counters: %s\n", err ? "FAIL" : "OK");
   return err;

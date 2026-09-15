@@ -3274,7 +3274,7 @@ void fspc_count(httrackp *opt, const char *type) {
     return;
   if (strcmp(type, "warning") == 0)
     strc->warning++;
-  else if (strcmp(type, "error") == 0)
+  else if (strcmp(type, "error") == 0 || strcmp(type, "panic") == 0)
     strc->error++;
   else if (strcmp(type, "info") == 0)
     strc->info++;
