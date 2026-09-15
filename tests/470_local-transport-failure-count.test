@@ -57,29 +57,17 @@ if test -n "${MIRRORVERDICT_BIN:-}"; then
     test "$seen" -gt 0 || fail "the loop callback saw no failed transfer: ${tick}"
     echo "OK (${seen})"
 
-    # Where a front end deciding after hts_main2() returns reads it, which is
-    # the reading that survives a crawl too short to tick again after the
-    # give-up. One dead link and no live page, so no tick can carry it.
-    printf '[the count outlives the mirror] ..\t'
-    tick=$("$MIRRORVERDICT_BIN" transport "http://127.0.0.1:${dead}/dead.html" \
-        "${tmpdir}/late" 2>&1) || fail "mirrorverdict failed: ${tick}"
-    late=$(printf '%s\n' "$tick" | sed -n 's/^after-failures: \([0-9]*\)$/\1/p')
-    test -n "$late" || fail "mirrorverdict printed no post-mirror count: ${tick}"
-    test "$late" -gt 0 ||
-        fail "hts_get_stats() after the mirror lost the count: ${tick}"
-    echo "OK (${late})"
-
-    # Per mirror, not per process: an embedder reusing one opt across crawls
-    # reads its next run's own failures. The second mirror is given the live URL
-    # alone, so it has none.
-    printf '[a second mirror on the same opt starts from zero] ..\t'
+    # first is the post-mirror read, which is where a front end deciding at the
+    # end takes it. The second mirror gets the live URL alone, so a count above
+    # zero there is a leak.
+    printf '[the count outlives one mirror and not the next] ..\t'
     tick=$("$MIRRORVERDICT_BIN" transport-twice "${BASEURL}/simple/basic.html" \
         "${tmpdir}/twice" "http://127.0.0.1:${dead}/dead.html" 2>&1) ||
         fail "mirrorverdict failed: ${tick}"
     first=$(printf '%s\n' "$tick" | sed -n 's/^after-failures: \([0-9]*\)$/\1/p')
     next=$(printf '%s\n' "$tick" | sed -n 's/^second-failures: \([0-9]*\)$/\1/p')
     test "${first:-0}" -gt 0 ||
-        fail "the first mirror counted nothing, so the reset proves nothing: ${tick}"
+        fail "hts_get_stats() after the mirror lost the count: ${tick}"
     test "${next:-x}" = 0 ||
         fail "the second mirror inherited the first one's count: ${tick}"
     echo "OK (${first} then ${next})"

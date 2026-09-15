@@ -36,9 +36,8 @@ Please visit our Website: http://www.httrack.com
 
 static int stop_asked = 0;
 
-/* The highest stat_transport_failures the loop callback was handed. A GUI polls
-   here, not through hts_get_stats(), so only this reading covers
-   hts_loop_tick's own refresh. */
+/* The highest stat_transport_failures the loop callback was handed, which is
+   the only reading covering hts_loop_tick's own refresh. */
 static int tick_failures = 0;
 static int tick_count = 0;
 
@@ -166,19 +165,16 @@ int main(int argc, char **argv) {
 
   printf("rc: %d\n", rc);
   if (strncmp(argv[1], "transport", 9) == 0) {
-    /* The count lives on the opt and is zeroed only when the next mirror
-       starts, so a front end that decides after hts_main2() returns still
-       reads it here. */
+    /* The count is zeroed only when the next mirror starts, so it survives
+       past hts_main2()'s return. */
     const hts_stat_struct *after = hts_get_stats(opt);
 
     printf("tick-failures: %d ticks: %d\n", tick_failures, tick_count);
     printf("after-failures: %d\n",
            after != NULL ? after->stat_transport_failures : -1);
   }
-  /* A second mirror on the same opt starts from zero, which is what makes the
-     count per mirror rather than per process. httrack-android reuses one opt
-     across crawls, so this is the reading its next run gets. The URL list is
-     the primary alone, so this mirror has nothing to fail. */
+  /* The URL list is the primary alone, so a count above zero here is a leak
+     from the mirror before it. */
   if (strcmp(argv[1], "transport-twice") == 0) {
     char dir2[1024];
     const hts_stat_struct *again;
