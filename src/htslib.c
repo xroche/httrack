@@ -1067,9 +1067,9 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
             cook = 1;
           } else
             print_buffer(&bstr, "; ");
-          print_buffer(&bstr, "%s", cookie_get(buffer, b, 5));
-          print_buffer(&bstr, "=%s", cookie_get(buffer, b, 6));
-          print_buffer(&bstr, "; $Path=%s", cookie_get(buffer, b, 2));
+          print_buffer(&bstr, "%s", cookie_get(buffer, sizeof(buffer), b, 5));
+          print_buffer(&bstr, "=%s", cookie_get(buffer, sizeof(buffer), b, 6));
+          print_buffer(&bstr, "; $Path=%s", cookie_get(buffer, sizeof(buffer), b, 2));
           b = cookie_nextfield(b);
         }
       } while(b != NULL && max_cookies > 0);
