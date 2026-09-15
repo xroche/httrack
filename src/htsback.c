@@ -668,9 +668,10 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
           char s[256];
           time_t tt;
           struct tm *A;
+          struct tm Abuf;
 
           tt = time(NULL);
-          A = localtime(&tt);
+          A = hts_localtime_r(&tt, &Abuf);
           if (A == NULL) {
             int localtime_returned_null = 0;
 

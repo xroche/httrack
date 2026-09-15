@@ -5,6 +5,11 @@ HTTrack Website Copier release history:
 This file lists all changes and fixes that have been made for HTTrack
 
 unreleased
++ Fixed: thread safety. localtime()/gmtime()/strerror()/gethostbyname() all
+  return pointers into shared static storage, and were being called from
+  crawler worker threads, so concurrent calls corrupted each other's results
+  (wrong timestamps in logs, wrong error messages, corrupted addresses).
+  Replaced with reentrant equivalents throughout.
 + SECURITY: fixed a heap overflow when serializing a backlog entry with
   '--getmode 0': the temporary filename buffer was sized from one string and
   written from another, so a project path longer than the save name

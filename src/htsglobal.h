@@ -234,6 +234,17 @@ Please visit our Website: http://www.httrack.com
 #define HTS_INLINE
 #endif
 
+/* thread-local storage */
+#if defined(_MSC_VER)
+#define HTS_TLS __declspec(thread)
+#elif defined(__GNUC__)
+#define HTS_TLS __thread
+#else
+/* no thread-local storage: the few users of this fall back to being as
+   unsafe as the libc functions they wrap, which is the status quo ante */
+#define HTS_TLS
+#endif
+
 /* function which never returns to its caller.
    Marking the assert helper with this lets the compiler and the static
    analyzer treat assertf() as a real precondition, rather than assuming

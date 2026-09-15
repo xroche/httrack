@@ -1884,7 +1884,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 
                       sprintf(tmp,
                               "option %%W : unable to load the module %s: %s (check the library path ?)",
-                              argv[na], strerror(last_errno));
+                              argv[na], hts_strerror(last_errno));
                       HTS_PANIC_PRINTF(tmp);
                       htsmain_free();
                       return -1;
@@ -3140,7 +3140,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           fclose(fp);
           fp = NULL;
           //} else if (opt->debug>1) {
-          //  printf("! FileOpen error, \"%s\"\n",strerror(errno));
+          //  printf("! FileOpen error, \"%s\"\n",hts_strerror(errno));
         }
       }
       // petit message dans le lock

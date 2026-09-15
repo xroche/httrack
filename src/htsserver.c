@@ -178,23 +178,18 @@ T_SOC smallserver_init_std(int *port_prox, char *adr_prox, int defaultPort) {
 // get hostname. return 1 upon success.
 static int gethost(const char *hostname, SOCaddr * server) {
   if (hostname != NULL && *hostname != '\0') {
-#if HTS_INET6==0
-    /* ipV4 resolver */
-    struct hostent *hp = gethostbyname(hostname);
-
-    if (hp != NULL) {
-      if (hp->h_length) {
-        SOCaddr_copyaddr2(*server, hp->h_addr_list[0], hp->h_length);
-        return 1;
-      }
-    }
-#else
-    /* ipV6 resolver */
+    /* note: getaddrinfo() is used even without IPv6 support -- the
+       gethostbyname() it replaces returns a pointer into shared static
+       storage and is not safe to call from more than one thread. */
     struct addrinfo *res = NULL;
     struct addrinfo hints;
 
     memset(&hints, 0, sizeof(hints));
+#if HTS_INET6==0
+    hints.ai_family = PF_INET;  // no IPv6 support compiled in
+#else
     hints.ai_family = PF_UNSPEC;
+#endif
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;
     if (getaddrinfo(hostname, NULL, &hints, &res) == 0) {
@@ -209,7 +204,6 @@ static int gethost(const char *hostname, SOCaddr * server) {
     if (res) {
       freeaddrinfo(res);
     }
-#endif
   }
   return 0;
 }

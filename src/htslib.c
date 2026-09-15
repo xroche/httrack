@@ -709,11 +709,11 @@ T_SOC http_xfopen(httrackp * opt, int mode, int treat, int waitconnect,
 #ifdef _WIN32
           int last_errno = WSAGetLastError();
 
-          sprintf(retour->msg, "Connect error: %s", strerror(last_errno));
+          sprintf(retour->msg, "Connect error: %s", hts_strerror(last_errno));
 #else
           int last_errno = errno;
 
-          sprintf(retour->msg, "Connect error: %s", strerror(last_errno));
+          sprintf(retour->msg, "Connect error: %s", hts_strerror(last_errno));
 #endif
         }
       }
@@ -2224,12 +2224,12 @@ T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
         int last_errno = WSAGetLastError();
 
         sprintf(retour->msg, "Unable to create a socket: %s",
-                strerror(last_errno));
+                hts_strerror(last_errno));
 #else
         int last_errno = errno;
 
         sprintf(retour->msg, "Unable to create a socket: %s",
-                strerror(last_errno));
+                hts_strerror(last_errno));
 #endif
       }
       return INVALID_SOCKET;    // erreur création socket impossible
@@ -2271,7 +2271,7 @@ T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
       if (ioctlsocket(soc, FIONBIO, &p)) {
         const int last_errno = WSAGetLastError();
         snprintf(retour->msg, sizeof(retour->msg),
-                 "Non-blocking socket failed: %s", strerror(last_errno));
+                 "Non-blocking socket failed: %s", hts_strerror(last_errno));
         deletesoc(soc);
         return INVALID_SOCKET;
       }
@@ -2279,7 +2279,7 @@ T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
       const int flags = fcntl(soc, F_GETFL, 0);
       if (flags == -1 || fcntl(soc, F_SETFL, flags | O_NONBLOCK) == -1) {
         snprintf(retour->msg, sizeof(retour->msg),
-                 "Non-blocking socket failed: %s", strerror(errno));
+                 "Non-blocking socket failed: %s", hts_strerror(errno));
         deletesoc(soc);
         return INVALID_SOCKET;
       }
@@ -2305,12 +2305,12 @@ T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
           const int last_errno = WSAGetLastError();
 
           sprintf(retour->msg, "Unable to connect to the server: %s",
-                  strerror(last_errno));
+                  hts_strerror(last_errno));
 #else
           const int last_errno = errno;
 
           sprintf(retour->msg, "Unable to connect to the server: %s",
-                  strerror(last_errno));
+                  hts_strerror(last_errno));
 #endif
         }
         /* Close the socket and notify the error!!! */
@@ -2569,13 +2569,13 @@ void deletesoc(T_SOC soc) {
     if (closesocket(soc) != 0) {
       int err = WSAGetLastError();
 
-      fprintf(stderr, "* error closing socket %d: %s\n", soc, strerror(err));
+      fprintf(stderr, "* error closing socket %d: %s\n", soc, hts_strerror(err));
     }
 #else
     if (close(soc) != 0) {
       const int err = errno;
 
-      fprintf(stderr, "* error closing socket %d: %s\n", soc, strerror(err));
+      fprintf(stderr, "* error closing socket %d: %s\n", soc, hts_strerror(err));
     }
 #endif
 #if HTS_WIDE_DEBUG
@@ -2667,15 +2667,81 @@ HTSEXT_API void qsec2str(char *st, TStamp t) {
     sprintf(st, "%ds", s);
 }
 
+/* Reentrant hts_strerror(). See htslib.h. */
+const char *hts_strerror(int err) {
+  static HTS_TLS char buffer[256];
+
+  buffer[0] = '\0';
+#if defined(_WIN32)
+  if (strerror_s(buffer, sizeof(buffer), err) == 0 && buffer[0] != '\0') {
+    return buffer;
+  }
+#elif defined(__GLIBC__) && defined(__USE_GNU)
+  /* note: strerror_r() has two incompatible signatures -- XSI returns int,
+     GNU returns char* and need not use the buffer at all. Test __USE_GNU,
+     which is what glibc's own <string.h> keys the declaration off, rather
+     than _GNU_SOURCE: this tree defines _GNU_SOURCE after <string.h> has
+     already been included, so the two do not agree here. */
+  {
+    const char *const msg = strerror_r(err, buffer, sizeof(buffer));
+
+    if (msg != NULL) {
+      return msg;
+    }
+  }
+#else
+  if (strerror_r(err, buffer, sizeof(buffer)) == 0 && buffer[0] != '\0') {
+    return buffer;
+  }
+#endif
+  snprintf(buffer, sizeof(buffer), "error %d", err);
+  return buffer;
+}
+
+/* Reentrant localtime()/gmtime(). See htslib.h. */
+struct tm *hts_localtime_r(const time_t *t, struct tm *buffer) {
+#if defined(_WIN32)
+  return localtime_s(buffer, t) == 0 ? buffer : NULL;
+#elif defined(HAVE_LOCALTIME_R) || defined(_POSIX_THREAD_SAFE_FUNCTIONS) || !defined(_WIN32)
+  return localtime_r(t, buffer);
+#else
+  /* last resort: not reentrant, but better than not building */
+  const struct tm *const tmp = localtime(t);
+
+  if (tmp == NULL) {
+    return NULL;
+  }
+  *buffer = *tmp;
+  return buffer;
+#endif
+}
+
+struct tm *hts_gmtime_r(const time_t *t, struct tm *buffer) {
+#if defined(_WIN32)
+  return gmtime_s(buffer, t) == 0 ? buffer : NULL;
+#elif defined(HAVE_GMTIME_R) || defined(_POSIX_THREAD_SAFE_FUNCTIONS) || !defined(_WIN32)
+  return gmtime_r(t, buffer);
+#else
+  const struct tm *const tmp = gmtime(t);
+
+  if (tmp == NULL) {
+    return NULL;
+  }
+  *buffer = *tmp;
+  return buffer;
+#endif
+}
+
 // heure actuelle, GMT, format rfc (taille buffer 256o)
 void time_gmt_rfc822(char *s) {
   time_t tt;
   struct tm *A;
+  struct tm Abuf;
 
   tt = time(NULL);
-  A = gmtime(&tt);
+  A = hts_gmtime_r(&tt, &Abuf);
   if (A == NULL)
-    A = localtime(&tt);
+    A = hts_localtime_r(&tt, &Abuf);
   time_rfc822(s, A);
 }
 
@@ -2683,9 +2749,10 @@ void time_gmt_rfc822(char *s) {
 void time_local_rfc822(char *s) {
   time_t tt;
   struct tm *A;
+  struct tm Abuf;
 
   tt = time(NULL);
-  A = localtime(&tt);
+  A = hts_localtime_r(&tt, &Abuf);
   time_rfc822_local(s, A);
 }
 
@@ -2826,11 +2893,12 @@ int get_filetime_rfc822(const char *file, char *date) {
   date[0] = '\0';
   if (STAT(file, &buf) == 0) {
     struct tm *A;
+    struct tm Abuf;
     time_t tt = buf.st_mtime;
 
-    A = gmtime(&tt);
+    A = hts_gmtime_r(&tt, &Abuf);
     if (A == NULL)
-      A = localtime(&tt);
+      A = hts_localtime_r(&tt, &Abuf);
     if (A != NULL) {
       time_rfc822(date, A);
       return 1;
@@ -4625,30 +4693,28 @@ static SOCaddr* hts_dns_resolve_nocache2_(const char *const hostname,
                                           SOCaddr *const addr, 
                                           const char **error) {
   {
-#if HTS_INET6==0
-    /* IPv4 resolver */
-    struct hostent *const hp = gethostbyname(hostname);
-
-    if (hp != NULL) {
-      SOCaddr_copyaddr2(addr, hp->h_addr_list[0], hp->h_length);
-      return SOCaddr_is_valid(addr) ? &addr : NULL;
-    } else {
-      SOCaddr_clear(*addr);
-    }
-#else
-    /* IPv6 resolver */
+    /* note: getaddrinfo() is used even without IPv6 support. The
+       gethostbyname() path this replaces was not reentrant -- it returns a
+       pointer into shared static storage, and resolution happens on crawler
+       worker threads -- and it had rotted anyway: it returned '&addr', a
+       SOCaddr**, where a SOCaddr* was expected, so it could not have
+       compiled. */
     struct addrinfo *res = NULL;
     struct addrinfo hints;
     int gerr;
 
     SOCaddr_clear(*addr);
     memset(&hints, 0, sizeof(hints));
+#if HTS_INET6==0
+    hints.ai_family = PF_INET;  // no IPv6 support compiled in
+#else
     if (IPV6_resolver == 1)     // V4 only (for bogus V6 entries)
       hints.ai_family = PF_INET;
     else if (IPV6_resolver == 2)        // V6 only (for testing V6 only)
       hints.ai_family = PF_INET6;
     else                        // V4 + V6
       hints.ai_family = PF_UNSPEC;
+#endif
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;
     if ( ( gerr = getaddrinfo(hostname, NULL, &hints, &res) ) == 0) {
@@ -4665,7 +4731,6 @@ static SOCaddr* hts_dns_resolve_nocache2_(const char *const hostname,
     if (res) {
       freeaddrinfo(res);
     }
-#endif
   }
 
   return SOCaddr_is_valid(*addr) ? addr : NULL;
@@ -5321,7 +5386,7 @@ HTSEXT_API void hts_log_vprint(httrackp * opt, int type, const char *format, va_
     fspc(opt, opt->log, s_type);
     (void) vfprintf(opt->log, format, args);
     if ((type & LOG_ERRNO) != 0) {
-      fprintf(opt->log, ": %s", strerror(save_errno));
+      fprintf(opt->log, ": %s", hts_strerror(save_errno));
     }
     fputs(LF, opt->log);
     if (opt->flush) {
@@ -5378,7 +5443,7 @@ HTSEXT_API int plug_wrapper(httrackp * opt, const char *moduleName,
       int last_errno = errno;
 
       hts_debug_log_print("* note: can't find entry point 'hts_plug' in %s: %s",
-                          moduleName, strerror(last_errno));
+                          moduleName, hts_strerror(last_errno));
     }
     closeFunctionLib(handle);
     return 0;
@@ -5386,7 +5451,7 @@ HTSEXT_API int plug_wrapper(httrackp * opt, const char *moduleName,
     int last_errno = errno;
 
     hts_debug_log_print("* note: can't load %s: %s", moduleName,
-                        strerror(last_errno));
+                        hts_strerror(last_errno));
   }
   return -1;
 }
