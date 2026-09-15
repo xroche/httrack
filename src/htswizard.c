@@ -47,7 +47,7 @@ Please visit our Website: http://www.httrack.com
   int i;\
   if (*opt->filters.filptr > 0) {\
     for(i = (*opt->filters.filptr)-1 ; i>=0 ; i--) {\
-      strcpybuff((*opt->filters.filters)[i+1],(*opt->filters.filters)[i]);\
+      strlcpybuff((*opt->filters.filters)[i+1],(*opt->filters.filters)[i],HTS_FILTER_SIZE);\
     }\
   }\
   (*opt->filters.filters)[0][0]='\0';\
@@ -710,11 +710,11 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
       case 0:                  // interdire les mêmes liens: adr/fil
         forbidden_url = 1;
         HT_INSERT_FILTERS0;     // insérer en 0
-        strcpybuff(_FILTERS[0], "-");
-        strcatbuff(_FILTERS[0], jump_identification_const(adr));
+        strlcpybuff(_FILTERS[0], "-", HTS_FILTER_SIZE);
+        strlcatbuff(_FILTERS[0], jump_identification_const(adr), HTS_FILTER_SIZE);
         if (*fil != '/')
-          strcatbuff(_FILTERS[0], "/");
-        strcatbuff(_FILTERS[0], fil);
+          strlcatbuff(_FILTERS[0], "/", HTS_FILTER_SIZE);
+        strlcatbuff(_FILTERS[0], fil, HTS_FILTER_SIZE);
         break;
 
       case 1:                  // éliminer répertoire entier et sous rép: adr/path/ *
@@ -726,14 +726,14 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
             i--;
           if (fil[i] == '/') {
             HT_INSERT_FILTERS0; // insérer en 0
-            strcpybuff(_FILTERS[0], "-");
-            strcatbuff(_FILTERS[0], jump_identification_const(adr));
+            strlcpybuff(_FILTERS[0], "-", HTS_FILTER_SIZE);
+            strlcatbuff(_FILTERS[0], jump_identification_const(adr), HTS_FILTER_SIZE);
             if (*fil != '/')
-              strcatbuff(_FILTERS[0], "/");
-            strncatbuff(_FILTERS[0], fil, i);
+              strlcatbuff(_FILTERS[0], "/", HTS_FILTER_SIZE);
+            strlncatbuff(_FILTERS[0], fil, HTS_FILTER_SIZE, i);
             if (_FILTERS[0][strlen(_FILTERS[0]) - 1] != '/')
-              strcatbuff(_FILTERS[0], "/");
-            strcatbuff(_FILTERS[0], "*");
+              strlcatbuff(_FILTERS[0], "/", HTS_FILTER_SIZE);
+            strlcatbuff(_FILTERS[0], "*", HTS_FILTER_SIZE);
           }
         }
 
@@ -743,9 +743,9 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
       case 2:                  // adresse adr*
         forbidden_url = 1;
         HT_INSERT_FILTERS0;     // insérer en 0                                
-        strcpybuff(_FILTERS[0], "-");
-        strcatbuff(_FILTERS[0], jump_identification_const(adr));
-        strcatbuff(_FILTERS[0], "*");
+        strlcpybuff(_FILTERS[0], "-", HTS_FILTER_SIZE);
+        strlcatbuff(_FILTERS[0], jump_identification_const(adr), HTS_FILTER_SIZE);
+        strlcatbuff(_FILTERS[0], "*", HTS_FILTER_SIZE);
         break;
 
       case 3:                  // ** A FAIRE
@@ -785,26 +785,26 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
             i--;
           if (fil[i] == '/') {
             HT_INSERT_FILTERS0; // insérer en 0                                
-            strcpybuff(_FILTERS[0], "+");
-            strcatbuff(_FILTERS[0], jump_identification_const(adr));
+            strlcpybuff(_FILTERS[0], "+", HTS_FILTER_SIZE);
+            strlcatbuff(_FILTERS[0], jump_identification_const(adr), HTS_FILTER_SIZE);
             if (*fil != '/')
-              strcatbuff(_FILTERS[0], "/");
-            strncatbuff(_FILTERS[0], fil, i + 1);
-            strcatbuff(_FILTERS[0], "*");
+              strlcatbuff(_FILTERS[0], "/", HTS_FILTER_SIZE);
+            strlncatbuff(_FILTERS[0], fil, HTS_FILTER_SIZE, i + 1);
+            strlcatbuff(_FILTERS[0], "*", HTS_FILTER_SIZE);
           }
         } else {                // autoriser domaine alors!!
           HT_INSERT_FILTERS0;   // insérer en 0                                strcpybuff(filters[filptr],"+");
-          strcpybuff(_FILTERS[0], "+");
-          strcatbuff(_FILTERS[0], jump_identification_const(adr));
-          strcatbuff(_FILTERS[0], "*");
+          strlcpybuff(_FILTERS[0], "+", HTS_FILTER_SIZE);
+          strlcatbuff(_FILTERS[0], jump_identification_const(adr), HTS_FILTER_SIZE);
+          strlcatbuff(_FILTERS[0], "*", HTS_FILTER_SIZE);
         }
         break;
 
       case 6:                  // same domain
         HT_INSERT_FILTERS0;     // insérer en 0                                strcpybuff(filters[filptr],"+");
-        strcpybuff(_FILTERS[0], "+");
-        strcatbuff(_FILTERS[0], jump_identification_const(adr));
-        strcatbuff(_FILTERS[0], "*");
+        strlcpybuff(_FILTERS[0], "+", HTS_FILTER_SIZE);
+        strlcatbuff(_FILTERS[0], jump_identification_const(adr), HTS_FILTER_SIZE);
+        strlcatbuff(_FILTERS[0], "*", HTS_FILTER_SIZE);
         break;
         //
       case 7:                  // autoriser ce répertoire
@@ -815,12 +815,12 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
             i--;
           if (fil[i] == '/') {
             HT_INSERT_FILTERS0; // insérer en 0                                
-            strcpybuff(_FILTERS[0], "+");
-            strcatbuff(_FILTERS[0], jump_identification_const(adr));
+            strlcpybuff(_FILTERS[0], "+", HTS_FILTER_SIZE);
+            strlcatbuff(_FILTERS[0], jump_identification_const(adr), HTS_FILTER_SIZE);
             if (*fil != '/')
-              strcatbuff(_FILTERS[0], "/");
-            strncatbuff(_FILTERS[0], fil, i + 1);
-            strcatbuff(_FILTERS[0], "*[file]");
+              strlcatbuff(_FILTERS[0], "/", HTS_FILTER_SIZE);
+            strlncatbuff(_FILTERS[0], fil, HTS_FILTER_SIZE, i + 1);
+            strlcatbuff(_FILTERS[0], "*[file]", HTS_FILTER_SIZE);
           }
         }
 
