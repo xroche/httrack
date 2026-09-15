@@ -296,6 +296,9 @@ void file_notify(httrackp * opt, const char *adr, const char *fil,
 void usercommand(httrackp * opt, int exe, const char *cmd, const char *file,
                  const char *adr, const char *fil);
 void usercommand_exe(const char *cmd, const char *file);
+/* Capacity of one filter slot: filters_init() carves its block into fixed
+   strides of this size, so every write through filters[n] is bounded by it. */
+#define HTS_FILTER_SIZE (HTS_URLMAXSIZE * 2)
 int filters_init(char ***ptrfilters, int maxfilter, int filterinc);
 
 int fspc(httrackp * opt, FILE * fp, const char *type);

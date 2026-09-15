@@ -22,7 +22,7 @@ set -u
 
 # Ratchet. This records the existing legacy sites in the PR merge tree; lower
 # it as sites are fixed, and do not raise it for new code.
-BASELINE=120
+BASELINE=104
 
 cd "$(dirname "$0")/.." || exit 1
 
