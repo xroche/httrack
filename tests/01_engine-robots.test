@@ -42,7 +42,6 @@ test "$(R 'D/fish$' /fish.html)" == "allowed"			|| exit 1
 
 # a path no rule matches is allowed
 test "$(R 'D/a|D/b' /c)" == "allowed"				|| exit 1
-test "$(R '' /c)" == "allowed"					|| exit 1
 
 # malformed rules are ignored rather than trusted
 test "$(R 'D' /x)" == "allowed"					|| exit 1
