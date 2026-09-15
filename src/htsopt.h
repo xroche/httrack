@@ -601,7 +601,7 @@ struct httrackp {
                                        until a mirror starts. Live state, so
                                        copy_htsopt must leave it alone.
                                        Tail: ABI */
-  int transport_failures;         /**< links given up with no answer at all,
+  int transport_failures;         /**< links given up on a failed transfer,
                                        published as stat_transport_failures.
                                        Live state, so copy_htsopt must leave it
                                        alone. Tail: ABI */
@@ -646,9 +646,11 @@ struct hts_stat_struct {
   //
   TStamp last_connect; /**< time of the last connect() call */
   TStamp last_request; /**< time of the last request issued */
-  int stat_transport_failures; /**< links given up with no answer at all, so
-                                    unlike stat_errors this excludes an answered
-                                    error and survives -Q. Tail: ABI */
+  //
+  int stat_transport_failures; /**< links given up because the transfer failed,
+                                    counted as it happens rather than from the
+                                    log lines stat_errors reads, so an answered
+                                    error is out and -Q leaves it alone */
 };
 
 /* Extra per-request parameters (mirrors httrackp request options). */

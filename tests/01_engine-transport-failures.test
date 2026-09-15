@@ -1,0 +1,11 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# stat_errors counts log lines, so a 404 and a dead host read alike and -Q leaves
+# it at zero. The count of failed transfers is kept apart, per mirror, and
+# copy_htsopt must not carry it onto another opt. 'run' is an ignored placeholder.
+assert_selftest "transport-failures: OK" transportfailures run

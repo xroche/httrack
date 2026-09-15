@@ -2490,8 +2490,8 @@ static int st_mirrorcompleted(httrackp *opt, int argc, char **argv) {
 
 /* stat_errors counts LOG_ERROR log lines, so it reads the same for a 404 as for
    a timeout and sits at zero under -Q. A front end deciding whether a resume is
-   owed needs the transport failures apart, and per mirror, so copy_htsopt()
-   must not carry the count between opts. */
+   owed needs the failed transfers apart, and per mirror, so copy_htsopt() must
+   not carry the count between opts. */
 static int st_transportfailures(httrackp *opt, int argc, char **argv) {
   httrackp *from = hts_create_opt();
   httrackp *to = hts_create_opt();
@@ -15896,7 +15896,7 @@ static const struct selftest_entry {
      "a fresh opt has no mirror verdict, and copy_htsopt carries none",
      st_mirrorcompleted},
     {"transportfailures", "",
-     "an unanswered link is counted apart from an answered error",
+     "a failed transfer is counted apart from an answered error",
      st_transportfailures},
     {"cachedefault", "", "-C default is C1 cache-priority, not C2",
      st_cachedefault},

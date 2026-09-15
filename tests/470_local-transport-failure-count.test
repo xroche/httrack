@@ -1,0 +1,73 @@
+#!/bin/bash
+#
+# stat_errors counts log lines, so a front end cannot tell a page the server
+# refused from one whose transfer failed. Only the second means the mirror has
+# holes and an update is owed, which is what an Android crawl firewalled by Doze
+# hits: every link times out and the run still reports success.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+python=$(find_python) || skip "python3 missing" # hold_port reads it from here
+
+# macOS drops the SYN on a held port where Linux resets it, so the crawl would
+# spend its whole timeout budget per link instead of failing to connect.
+test "$HTS_OS" != Darwin || skip "a held port times out rather than refusing here"
+
+# Held for the whole crawl: a freeport number a neighbour then binds would answer
+# and retire the premise silently (#1218). 288_testlib-holdport pins the refusal.
+hold_port
+dead=$HELD_PORT
+
+# A link the server answers 404 alongside two it cannot answer at all, so a count
+# that took any error would read 3. The image proves the count is not restricted
+# to links that could carry links themselves.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 3 \
+    --log-found '\(2 links failed to transfer' \
+    httrack "BASEURL/simple/basic.html" "BASEURL/simple/no-such-page.html" \
+    "http://127.0.0.1:${dead}/dead.html" \
+    "http://127.0.0.1:${dead}/dead.png" --timeout=3 --retries=0
+
+# robots.txt carries no content, so a host that never answered its robots.txt
+# has lost nothing and the count must not move. The harness disables robots, so
+# this leg repeats the one above with --robots=1 added.
+bash "$top_srcdir/tests/local-crawl.sh" \
+    --log-found '\(2 links failed to transfer' \
+    httrack "BASEURL/simple/basic.html" "http://127.0.0.1:${dead}/dead.html" \
+    "http://127.0.0.1:${dead}/dead.png" --timeout=3 --retries=0 --robots=1
+
+# A GUI polls the count through hts_loop_tick's refresh, not hts_get_stats's, so
+# only an embedder reading the callback's own hts_stat_struct covers that path.
+# The live page is the primary: a crawl that ends at the failure fires no tick
+# after it, and the reading stays 0 however correct the refresh is.
+if test -n "${MIRRORVERDICT_BIN:-}"; then
+    test -r "$MIRRORVERDICT_BIN" || fail "$MIRRORVERDICT_BIN was not built"
+    tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_tfctick.XXXXXX") || exit 1
+    cleanup_push rm -rf "$tmpdir"
+    local_server_start
+    printf '[the loop callback carries the count] ..\t'
+    tick=$("$MIRRORVERDICT_BIN" transport "${BASEURL}/simple/basic.html" \
+        "${tmpdir}/out" "http://127.0.0.1:${dead}/dead.html" \
+        "http://127.0.0.1:${dead}/dead.png" 2>&1) ||
+        fail "mirrorverdict failed: ${tick}"
+    seen=$(printf '%s\n' "$tick" | sed -n 's/^tick-failures: \([0-9]*\).*/\1/p')
+    test -n "$seen" || fail "mirrorverdict printed no count: ${tick}"
+    test "$seen" -gt 0 || fail "the loop callback saw no failed transfer: ${tick}"
+    echo "OK (${seen})"
+fi
+
+# A body cut off after its headers is a hole too, and the server answered 200,
+# so this is the case a predicate reading "no answer at all" would miss.
+# /uptrunc serves both links whole on pass 1 and short on pass 2 (#562).
+bash "$top_srcdir/tests/local-crawl.sh" \
+    --rerun-args '--update' \
+    --log-found '\(2 links failed to transfer' \
+    httrack 'BASEURL/uptrunc/index.html'
+
+# The control in the narrowing direction: with nothing unreachable the line must
+# not appear, or it would fire on any ordinary crawl.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    --log-not-found 'failed to transfer' \
+    httrack "BASEURL/simple/basic.html"

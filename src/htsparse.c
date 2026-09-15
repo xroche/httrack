@@ -4103,8 +4103,9 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
             }
           }
 
-          /* An unanswered link leaves a hole in the mirror where an answered
-             error does not, and robots.txt carries no content to lose. */
+          /* A failed transfer leaves a hole in the mirror where an answered
+             error does not, a body cut off after its headers included, and
+             robots.txt carries no content to lose. */
           if (back_transfer_failed(r->statuscode) && !heap(ptr)->testmode &&
               strcmp(urlfil(), "/robots.txt") != 0) {
             opt->transport_failures++;

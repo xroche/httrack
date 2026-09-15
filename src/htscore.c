@@ -2340,8 +2340,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
               "(No errors, %d warnings, %d messages)" LF, warning, info);
     if (opt->transport_failures > 0)
       sprintf(finalInfo + strlen(finalInfo),
-              "(%d links got no answer at all, so the mirror is incomplete:"
-              " update it to fetch them)" LF,
+              "(%d links failed to transfer, so the mirror is incomplete)" LF,
               opt->transport_failures);
 
     // Log
