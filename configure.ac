@@ -28,6 +28,21 @@ Please visit our Website: http://www.httrack.com
 ])
 
 AC_CONFIG_SRCDIR(src/httrack.c)
+
+dnl The coucal submodule is a build requirement, not an optional extra:
+dnl src/Makefile.am compiles coucal/coucal.c directly. Without it configure
+dnl succeeds and the failure only surfaces as a missing make target, which
+dnl reads like a broken build system rather than an uninitialized checkout.
+AC_MSG_CHECKING([for the coucal submodule])
+AS_IF([test -f "$srcdir/src/coucal/coucal.c"],
+	[AC_MSG_RESULT([yes])],
+	[AC_MSG_RESULT([no])
+	 AC_MSG_ERROR([src/coucal is empty -- this checkout was cloned without its
+submodules. Run:
+
+    git submodule update --init --recursive
+
+from the top of the tree and re-run configure.])])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS(config.h)
 AM_INIT_AUTOMAKE([subdir-objects])
