@@ -407,9 +407,9 @@ void help_catchurl(const char *dest_path) {
   T_SOC soc = catch_url_init_std(&port_prox, adr_prox);
 
   if (soc != INVALID_SOCKET) {
-    char BIGSTK url[HTS_URLMAXSIZE * 2];
-    char method[32];
-    char BIGSTK data[32768];
+    char BIGSTK url[CATCH_URL_URL_SIZE];
+    char method[CATCH_URL_METHOD_SIZE];
+    char BIGSTK data[CATCH_URL_DATA_SIZE];
 
     url[0] = method[0] = data[0] = '\0';
     //

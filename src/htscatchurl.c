@@ -133,10 +133,16 @@ HTSEXT_API T_SOC catch_url_init(int *port, /* 128 bytes */ char *adr) {
 
 // 2 - Wait for URL
 
+/* Upper bound on header lines accepted for one request, so that draining
+   an oversized header block always terminates. */
+#define CATCH_URL_MAX_HEADER_LINES 512
+
 // catch_url
 // returns 0 if error
 // url: buffer where URL must be stored - or ip:port in case of failure
-// data: 32Kb
+//      (CATCH_URL_URL_SIZE bytes)
+// method: CATCH_URL_METHOD_SIZE bytes
+// data: CATCH_URL_DATA_SIZE bytes
 HTSEXT_API int catch_url(T_SOC soc, char *url, char *method, char *data) {
   int retour = 0;
 
@@ -162,7 +168,8 @@ HTSEXT_API int catch_url(T_SOC soc, char *url, char *method, char *data) {
         char dot[256 + 2];
 
         SOCaddr_inetntoa(dot, sizeof(dot), server2);
-        sprintf(url, "%s:%d", dot, ntohs(SOCaddr_sinport(server2)));
+        snprintf(url, CATCH_URL_URL_SIZE, "%s:%d", dot,
+                 ntohs(SOCaddr_sinport(server2)));
       }
     }
     /* INFOS */
@@ -176,7 +183,13 @@ HTSEXT_API int catch_url(T_SOC soc, char *url, char *method, char *data) {
       //
       socinput(soc, line, 1000);
       if (strnotempty(line)) {
-        if (sscanf(line, "%s %s %s", method, url, protocol) == 3) {
+        /* The widths below have to be literals, so fail the build rather
+           than silently overrun if the capacities are ever changed. */
+        typedef char catch_url_width_check_[(CATCH_URL_METHOD_SIZE == 32
+                                             && CATCH_URL_URL_SIZE == 2048
+                                             && sizeof(protocol) == 256)
+                                            ? 1 : -1] HTS_UNUSED;
+        if (sscanf(line, "%31s %2047s %255s", method, url, protocol) == 3) {
           lien_adrfil af;
 
           // méthode en majuscule
@@ -194,37 +207,64 @@ HTSEXT_API int catch_url(T_SOC soc, char *url, char *method, char *data) {
             // Traitement des en-têtes
             char BIGSTK loc[HTS_URLMAXSIZE * 2];
             htsblk blkretour;
+            int headers_too_large = 0;
+            int header_lines = 0;
 
             hts_init_htsblk(&blkretour);
             //memset(&blkretour, 0, sizeof(htsblk));    // effacer
             blkretour.location = loc;   // si non nul, contiendra l'adresse véritable en cas de moved xx
             // Lire en têtes restants
-            sprintf(data, "%s %s %s\r\n", method, af.fil, protocol);
+            snprintf(data, CATCH_URL_DATA_SIZE, "%s %s %s\r\n", method, af.fil,
+                     protocol);
             while(strnotempty(line)) {
               socinput(soc, line, 1000);
               treathead(NULL, NULL, NULL, &blkretour, line);    // traiter
-              strcatbuff(data, line);
-              strcatbuff(data, "\r\n");
+              /* A client can send more header bytes than data holds. Keep
+                 reading to the blank line that ends the block even once we
+                 stop storing: leaving the rest of the headers in the socket
+                 would have the body read below capture them as the body. */
+              if (++header_lines > CATCH_URL_MAX_HEADER_LINES) {
+                /* Nothing obliges a client to ever send the blank line. */
+                headers_too_large = 1;
+                break;
+              }
+              if (headers_too_large
+                  || strlen(data) + strlen(line) + 2 >= CATCH_URL_DATA_SIZE) {
+                headers_too_large = 1;
+                continue;
+              }
+              strlcatbuff(data, line, CATCH_URL_DATA_SIZE);
+              strlcatbuff(data, "\r\n", CATCH_URL_DATA_SIZE);
             }
             // CR/LF final de l'en tête inutile car déja placé via la ligne vide juste au dessus
             //strcatbuff(data,"\r\n");
-            if (blkretour.totalsize > 0) {
-              int len = (int) min(blkretour.totalsize, 32000);
-              int pos = (int) strlen(data);
+            /* Headers we could not store are headers the caller never
+               sees, so the capture would be a quiet lie. Reject instead. */
+            if (!headers_too_large) {
+              if (blkretour.totalsize > 0) {
+                int pos = (int) strlen(data);
+                /* Keep the body within what is left of data, terminator
+                   included: the headers above already consumed part of it. */
+                const int room = (int) CATCH_URL_DATA_SIZE - pos - 1;
+                int len = (int) min(blkretour.totalsize, 32000);
 
-              // Copier le reste (post éventuel)
-              while((len > 0)
-                    && ((r = recv(soc, (char *) data + pos, len, 0)) > 0)) {
-                pos += r;
-                len -= r;
-                data[pos] = '\0';       // terminer par NULL
+                if (len > room)
+                  len = room;
+
+                // Copier le reste (post éventuel)
+                while((len > 0)
+                      && ((r = recv(soc, (char *) data + pos, len, 0)) > 0)) {
+                  pos += r;
+                  len -= r;
+                  data[pos] = '\0';     // terminer par NULL
+                }
               }
+              // Envoyer page
+              sprintf(line, CATCH_RESPONSE);
+              send(soc, line, (int) strlen(line), 0);
+              // OK!
+              retour = 1;
             }
-            // Envoyer page
-            sprintf(line, CATCH_RESPONSE);
-            send(soc, line, (int) strlen(line), 0);
-            // OK!
-            retour = 1;
           }
         }
       }                         // sinon erreur

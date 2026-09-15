@@ -600,13 +600,15 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                   "index.html")) == 0) {
                         detect_title = 1;       // ok détecté pour cette page!
                         makeindex_links++;      // un de plus
-                        strcpybuff(makeindex_firstlink, tempo);
+                        strlcpybuff(makeindex_firstlink, tempo,
+                                    HTSPARSE_URLBUFF_SIZE);
                         //
 
                         /* Hack */
                         if (opt->mimehtml) {
-                          strcpybuff(makeindex_firstlink,
-                                     "cid:primary/primary");
+                          strlcpybuff(makeindex_firstlink,
+                                      "cid:primary/primary",
+                                      HTSPARSE_URLBUFF_SIZE);
                         }
 
                         if ((b == a) || (a == NULL) || (b == NULL)) {   // pas de titre
@@ -2273,12 +2275,13 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       switch (p_type) {
                       case 2:{
                           //if (*lien!='/') strcatbuff(base,"/");
-                          strcpybuff(base, lien);
+                          strlcpybuff(base, lien, HTSPARSE_URLBUFF_SIZE);
                         }
                         break;  // base
                       case -2:{
                           //if (*lien!='/') strcatbuff(codebase,"/");
-                          strcpybuff(codebase, lien);
+                          strlcpybuff(codebase, lien,
+                                      HTSPARSE_URLBUFF_SIZE);
                         }
                         break;  // base
                       }

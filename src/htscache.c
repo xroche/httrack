@@ -624,7 +624,7 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
                                const char *adr, const char *fil,
                                const char *target_save, char *location,
                                char *return_save, int readonly) {
-  char BIGSTK location_default[HTS_URLMAXSIZE * 2];
+  char BIGSTK location_default[CACHE_LOCATION_SIZE];
   char BIGSTK buff[HTS_URLMAXSIZE * 2];
   char BIGSTK previous_save[HTS_URLMAXSIZE * 2];
   char BIGSTK previous_save_[HTS_URLMAXSIZE * 2];
@@ -1011,7 +1011,7 @@ static htsblk cache_readex_old(httrackp * opt, cache_back * cache,
   char *a;
 #endif
   char BIGSTK buff[HTS_URLMAXSIZE * 2];
-  char BIGSTK location_default[HTS_URLMAXSIZE * 2];
+  char BIGSTK location_default[CACHE_LOCATION_SIZE];
   char BIGSTK previous_save[HTS_URLMAXSIZE * 2];
   char catbuff[CATBUFF_SIZE];
   htsblk r;
@@ -1096,20 +1096,20 @@ static htsblk cache_readex_old(httrackp * opt, cache_back * cache,
         //
         cache_rint(cache->olddat, &r.statuscode);
         cache_rLLint(cache->olddat, &r.size);
-        cache_rstr(cache->olddat, r.msg);
-        cache_rstr(cache->olddat, r.contenttype);
+        cache_rstr(cache->olddat, r.msg, sizeof(r.msg));
+        cache_rstr(cache->olddat, r.contenttype, sizeof(r.contenttype));
         if (cache->version >= 3)
-          cache_rstr(cache->olddat, r.charset);
-        cache_rstr(cache->olddat, r.lastmodified);
-        cache_rstr(cache->olddat, r.etag);
-        cache_rstr(cache->olddat, r.location);
+          cache_rstr(cache->olddat, r.charset, sizeof(r.charset));
+        cache_rstr(cache->olddat, r.lastmodified, sizeof(r.lastmodified));
+        cache_rstr(cache->olddat, r.etag, sizeof(r.etag));
+        cache_rstr(cache->olddat, r.location, CACHE_LOCATION_SIZE);
         if (cache->version >= 2)
-          cache_rstr(cache->olddat, r.cdispo);
+          cache_rstr(cache->olddat, r.cdispo, sizeof(r.cdispo));
         if (cache->version >= 4) {
-          cache_rstr(cache->olddat, previous_save);     // adr
-          cache_rstr(cache->olddat, previous_save);     // fil
+          cache_rstr(cache->olddat, previous_save, sizeof(previous_save));     // adr
+          cache_rstr(cache->olddat, previous_save, sizeof(previous_save));     // fil
           previous_save[0] = '\0';
-          cache_rstr(cache->olddat, previous_save);     // save
+          cache_rstr(cache->olddat, previous_save, sizeof(previous_save));     // save
           if (return_save != NULL) {
             strcpybuff(return_save, previous_save);
           }
@@ -1118,7 +1118,7 @@ static htsblk cache_readex_old(httrackp * opt, cache_back * cache,
           r.headers = cache_rstr_addr(cache->olddat);
         }
         //
-        cache_rstr(cache->olddat, check);
+        cache_rstr(cache->olddat, check, sizeof(check));
         if (strcmp(check, "HTS") == 0) {        /* intégrité OK */
           ok = 1;
         }
@@ -2109,22 +2109,37 @@ int cache_wstr(FILE * fp, const char *s) {
     return -1;
   return 0;
 }
-void cache_rstr(FILE * fp, char *s) {
+/* The length is read from the file, so it is only as trustworthy as the
+   cache is: storing it unchecked writes up to 32768 bytes into whatever the
+   caller supplied. Keep what fits, but consume the whole field either way --
+   the records that follow are read from the same stream. */
+void cache_rstr(FILE * fp, char *s, size_t size) {
   INTsys i;
   char buff[256 + 4];
+  size_t keep, skip;
 
+  if (s == NULL || size == 0)
+    return;
   linput(fp, buff, 256);
   sscanf(buff, INTsysP, &i);
   if (i < 0 || i > 32768)       /* error, something nasty happened */
     i = 0;
-  if (i > 0) {
-    if ((int) fread(s, 1, i, fp) != i) {
-      int fread_cache_failed = 0;
+  keep = ((size_t) i < size) ? (size_t) i : size - 1;
+  skip = (size_t) i - keep;
+  if (keep > 0 && fread(s, 1, keep, fp) != keep) {
+    int fread_cache_failed = 0;
 
-      assertf(fread_cache_failed);
-    }
+    assertf(fread_cache_failed);
   }
-  *(s + i) = '\0';
+  while(skip > 0) {
+    char discard[512];
+    const size_t chunk = (skip < sizeof(discard)) ? skip : sizeof(discard);
+
+    if (fread(discard, 1, chunk, fp) != chunk)
+      break;
+    skip -= chunk;
+  }
+  s[keep] = '\0';
 }
 char *cache_rstr_addr(FILE * fp) {
   INTsys i;
@@ -2189,7 +2204,7 @@ int cache_brint(char *adr, int *i) {
 void cache_rint(FILE * fp, int *i) {
   char s[256];
 
-  cache_rstr(fp, s);
+  cache_rstr(fp, s, sizeof(s));
   sscanf(s, "%d", i);
 }
 int cache_wint(FILE * fp, int i) {
@@ -2201,7 +2216,7 @@ int cache_wint(FILE * fp, int i) {
 void cache_rLLint(FILE * fp, LLint * i) {
   char s[256];
 
-  cache_rstr(fp, s);
+  cache_rstr(fp, s, sizeof(s));
   sscanf(s, LLintP, i);
 }
 int cache_wLLint(FILE * fp, LLint i) {

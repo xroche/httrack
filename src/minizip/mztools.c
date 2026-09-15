@@ -33,7 +33,7 @@ extern int ZEXPORT unzRepair(const char* file, const char* fileOut, const char* 
   FILE* fpZip = fopen(file, "rb");
   FILE* fpOut = fopen(fileOut, "wb");
   FILE* fpOutCD = fopen(fileOutTmp, "wb");
-  if (fpZip != NULL &&  fpOut != NULL) {
+  if (fpZip != NULL && fpOut != NULL && fpOutCD != NULL) {
     int entries = 0;
     uLong totalBytes = 0;
     char header[30];
@@ -248,6 +248,7 @@ extern int ZEXPORT unzRepair(const char* file, const char* fileOut, const char* 
 
     /* Final merge (file + central directory) */
     fclose(fpOutCD);
+    fpOutCD = NULL;
     if (err == Z_OK) {
       fpOutCD = fopen(fileOutTmp, "rb");
       if (fpOutCD != NULL) {
@@ -260,6 +261,9 @@ extern int ZEXPORT unzRepair(const char* file, const char* fileOut, const char* 
           }
         }
         fclose(fpOutCD);
+        fpOutCD = NULL;
+      } else {
+        err = Z_ERRNO;
       }
     }
 
@@ -281,6 +285,17 @@ extern int ZEXPORT unzRepair(const char* file, const char* fileOut, const char* 
     }
   } else {
     err = Z_STREAM_ERROR;
+    if (fpZip != NULL) {
+      fclose(fpZip);
+    }
+    if (fpOut != NULL) {
+      fclose(fpOut);
+      (void)remove(fileOut);
+    }
+    if (fpOutCD != NULL) {
+      fclose(fpOutCD);
+    }
+    (void)remove(fileOutTmp);
   }
   return err;
 }

@@ -34,6 +34,11 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h"
 
+/* Capacity of the base / codebase / first-link buffers the caller hands to
+   the parser. They arrive as bare char*, so sizeof() at the write site
+   measures the pointer; name the size once and use it on both sides. */
+#define HTSPARSE_URLBUFF_SIZE (HTS_URLMAXSIZE * 2)
+
 /* Forward definitions */
 #ifndef HTS_DEF_FWSTRUCT_htsblk
 #define HTS_DEF_FWSTRUCT_htsblk

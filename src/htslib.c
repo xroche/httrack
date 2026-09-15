@@ -1067,9 +1067,9 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
             cook = 1;
           } else
             print_buffer(&bstr, "; ");
-          print_buffer(&bstr, "%s", cookie_get(buffer, b, 5));
-          print_buffer(&bstr, "=%s", cookie_get(buffer, b, 6));
-          print_buffer(&bstr, "; $Path=%s", cookie_get(buffer, b, 2));
+          print_buffer(&bstr, "%s", cookie_get(buffer, sizeof(buffer), b, 5));
+          print_buffer(&bstr, "=%s", cookie_get(buffer, sizeof(buffer), b, 6));
+          print_buffer(&bstr, "; $Path=%s", cookie_get(buffer, sizeof(buffer), b, 2));
           b = cookie_nextfield(b);
         }
       } while(b != NULL && max_cookies > 0);
@@ -4040,13 +4040,20 @@ void guess_httptype(httrackp * opt, char *s, const char *fil) {
 // idem
 // flag: 1 si toujours renvoyer un type
 HTSEXT_API void get_httptype(httrackp * opt, char *s, const char *fil, int flag) {
+  /* Every write below is bounded by GET_HTTPTYPE_MIN_SIZE, and
+     htsblk.contenttype is the smallest buffer any caller passes. Fail the
+     build rather than the assert if it is ever made smaller than that. */
+  typedef char get_httptype_size_check_[
+    (sizeof(((htsblk *) 0)->contenttype) >= GET_HTTPTYPE_MIN_SIZE)
+    ? 1 : -1] HTS_UNUSED;
+
   // userdef overrides get_httptype
   if (get_userhttptype(opt, s, fil)) {
     return;
   }
   // regular tests
   if (ishtml(opt, fil) == 1) {
-    strcpybuff(s, "text/html");
+    strlcpybuff(s, "text/html", GET_HTTPTYPE_MIN_SIZE);
   } else {
     /* Check html -> text/html */
     const char *a = fil + strlen(fil) - 1;
@@ -4060,18 +4067,18 @@ HTSEXT_API void get_httptype(httrackp * opt, char *s, const char *fil, int flag)
       while(strnotempty(hts_mime[j][1])) {
         if (strfield2(hts_mime[j][1], a)) {
           if (hts_mime[j][0][0] != '*') {       // Une correspondance existe
-            strcpybuff(s, hts_mime[j][0]);
+            strlcpybuff(s, hts_mime[j][0], GET_HTTPTYPE_MIN_SIZE);
             return;
           }
         }
         j++;
       }
 
-      if (flag)
-        sprintf(s, "application/%s", a);
+      if (flag)                 /* bounded above by strlen(a) < 32 */
+        snprintf(s, GET_HTTPTYPE_MIN_SIZE, "application/%s", a);
     } else {
       if (flag)
-        strcpybuff(s, "application/octet-stream");
+        strlcpybuff(s, "application/octet-stream", GET_HTTPTYPE_MIN_SIZE);
     }
   }
 }
