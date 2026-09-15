@@ -274,7 +274,8 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
       char *const idna = hts_convertStringUTF8ToIDNA(a, strlen(a));
       if (idna != NULL) {
         if (strlen(idna) < HTS_URLMAXSIZE) {
-          strcpybuff(a, idna);
+          strlcpybuff(a, idna,
+                      sizeof(adrfil->adr) - (size_t) (a - adrfil->adr));
         }
         free(idna);
       }
@@ -286,7 +287,8 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
 
 // créer dans s, à partir du chemin courant curr_fil, le lien vers link (absolu)
 // un ident_url_relatif a déja été fait avant, pour que link ne soit pas un chemin relatif
-int lienrelatif(char *s, const char *link, const char *curr_fil) {
+int lienrelatif(char *s, size_t s_size, const char *link,
+                const char *curr_fil) {
   char BIGSTK _curr[HTS_URLMAXSIZE * 2];
   char BIGSTK newcurr_fil[HTS_URLMAXSIZE * 2], newlink[HTS_URLMAXSIZE * 2];
   char *curr;
@@ -316,7 +318,7 @@ int lienrelatif(char *s, const char *link, const char *curr_fil) {
 
   // recopier uniquement le chemin courant
   curr = _curr;
-  strcpybuff(curr, curr_fil);
+  strlcpybuff(curr, curr_fil, sizeof(_curr));
   if ((a = strchr(curr, '?')) == NULL)  // couper au ? (params)
     a = curr + strlen(curr) - 1;        // pas de params: aller à la fin
   while((*a != '/') && (a > curr))
@@ -359,14 +361,14 @@ int lienrelatif(char *s, const char *link, const char *curr_fil) {
     a++;
   while(*a)
     if (*(a++) == '/')
-      strcatbuff(s, "../");
+      strlcatbuff(s, "../", s_size);
   //if (strlen(s)==0) strcatbuff(s,"/");
 
   if (slash)
-    strcatbuff(s, "/");         // garder absolu!!
+    strlcatbuff(s, "/", s_size);        // garder absolu!!
 
   // on est dans le répertoire de départ, copier
-  strcatbuff(s, link + ((*link == '/') ? 1 : 0));
+  strlcatbuff(s, link + ((*link == '/') ? 1 : 0), s_size);
 
   /* Security check */
   if (strlen(s) >= HTS_URLMAXSIZE)
@@ -410,7 +412,7 @@ int link_has_authorization(const char *lien) {
 }
 
 // conversion chemin de fichier/dossier vers 8-3 ou ISO9660
-void long_to_83(int mode, char *n83, char *save) {
+void long_to_83(int mode, char *n83, size_t n83_size, char *save) {
   n83[0] = '\0';
 
   while(*save) {
@@ -425,19 +427,19 @@ void long_to_83(int mode, char *n83, char *save) {
     }
     fnl[j] = '\0';
     // conversion
-    longfile_to_83(mode, fn83, fnl);
-    strcatbuff(n83, fn83);
+    longfile_to_83(mode, fn83, sizeof(fn83), fnl);
+    strlcatbuff(n83, fn83, n83_size);
 
     save += i;
     if (*save == '/') {
-      strcatbuff(n83, "/");
+      strlcatbuff(n83, "/", n83_size);
       save++;
     }
   }
 }
 
 // conversion nom de fichier/dossier isolé vers 8-3 ou ISO9660
-void longfile_to_83(int mode, char *n83, char *save) {
+void longfile_to_83(int mode, char *n83, size_t n83_size, char *save) {
   int j = 0, max = 0;
   int i = 0;
   char nom[256];
@@ -526,10 +528,10 @@ void longfile_to_83(int mode, char *n83, char *save) {
   }
   // corriger vers 8-3
   n83[0] = '\0';
-  strncatbuff(n83, nom, max);
+  strlncatbuff(n83, nom, n83_size, max);
   if (strnotempty(ext)) {
-    strcatbuff(n83, ".");
-    strncatbuff(n83, ext, 3);
+    strlcatbuff(n83, ".", n83_size);
+    strlncatbuff(n83, ext, n83_size, 3);
   }
 }
 

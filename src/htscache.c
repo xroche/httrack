@@ -202,6 +202,14 @@ struct cache_back_zip_entry {
     line[0] = '\0'; \
 	} \
 } while(0)
+/* As above, for a destination that is a pointer rather than an array: the
+   sizeof() inside strcpybuff() would measure the pointer. */
+#define ZIP_READFIELD_LSTRING(line, value, refline, refvalue, refsize) do { \
+  if (line[0] != '\0' && strfield2(line, refline)) { \
+    strlcpybuff(refvalue, value, refsize); \
+    line[0] = '\0'; \
+	} \
+} while(0)
 #define ZIP_READFIELD_INT(line, value, refline, refvalue) do { \
   if (line[0] != '\0' && strfield2(line, refline)) { \
     int intval = 0; \
@@ -643,7 +651,7 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
   } else {
     r.location = location_default;
   }
-  strcpybuff(r.location, "");
+  r.location[0] = '\0';
   strcpybuff(buff, adr);
   strcatbuff(buff, fil);
   hash_pos_return = coucal_read(cache->hashtable, buff, &hash_pos);
@@ -712,7 +720,7 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
               ZIP_READFIELD_STRING(line, value, "X-Charset", r.charset);        // contenttype
               ZIP_READFIELD_STRING(line, value, "Last-Modified", r.lastmodified);       // last-modified
               ZIP_READFIELD_STRING(line, value, "Etag", r.etag);        // Etag
-              ZIP_READFIELD_STRING(line, value, "Location", r.location);        // 'location' pour moved
+              ZIP_READFIELD_LSTRING(line, value, "Location", r.location, CACHE_LOCATION_SIZE);      // 'location' pour moved
               ZIP_READFIELD_STRING(line, value, "Content-Disposition", r.cdispo);       // Content-disposition
               //ZIP_READFIELD_STRING(line, value, "X-Addr", ..);            // Original address
               //ZIP_READFIELD_STRING(line, value, "X-Fil", ..);            // Original URI filename
@@ -733,7 +741,7 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
             }
           }
           if (return_save != NULL) {
-            strcpybuff(return_save, previous_save);
+            strlcpybuff(return_save, previous_save, CACHE_SAVE_SIZE);
           }
 
           /* Complete fields */
@@ -1025,7 +1033,7 @@ static htsblk cache_readex_old(httrackp * opt, cache_back * cache,
   } else {
     r.location = location_default;
   }
-  strcpybuff(r.location, "");
+  r.location[0] = '\0';
 #if HTS_FAST_CACHE
   strcpybuff(buff, adr);
   strcatbuff(buff, fil);
@@ -1111,7 +1119,7 @@ static htsblk cache_readex_old(httrackp * opt, cache_back * cache,
           previous_save[0] = '\0';
           cache_rstr(cache->olddat, previous_save, sizeof(previous_save));     // save
           if (return_save != NULL) {
-            strcpybuff(return_save, previous_save);
+            strlcpybuff(return_save, previous_save, CACHE_SAVE_SIZE);
           }
         }
         if (cache->version >= 5) {
@@ -2085,10 +2093,11 @@ char *readfile_or(const char *fil, const char *defaultdata) {
   if (ret)
     return ret;
   else {
-    char *adr = malloct(strlen(defaultdata) + 1);
+    const size_t size = strlen(defaultdata) + 1;
+    char *adr = malloct(size);
 
     if (adr) {
-      strcpybuff(adr, defaultdata);
+      strlcpybuff(adr, defaultdata, size);
       return adr;
     }
   }
