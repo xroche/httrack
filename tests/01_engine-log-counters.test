@@ -1,0 +1,8 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# The event is counted, not the log line, even with no log file (#1681).
+out=$(httrack -O /dev/null -#test=log-counters)
+grep -q "log-counters: OK" <<<"$out"

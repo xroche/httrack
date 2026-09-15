@@ -433,6 +433,9 @@ void filters_bind(httrackp *opt, char ***ptrfilters, int *filptr);
 hts_boolean filters_insert(httrackp *opt, int pos, const char *pattern);
 
 int fspc(httrackp * opt, FILE * fp, const char *type);
+/* Count one log event into opt's counters that hts_get_stats() publishes,
+   whether or not a log file is open. "panic" counts as an error. */
+void fspc_count(httrackp *opt, const char *type);
 
 char *next_token(char *p, int flag);
 

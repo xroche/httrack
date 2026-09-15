@@ -2488,10 +2488,67 @@ static int st_mirrorcompleted(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
-/* stat_errors counts LOG_ERROR log lines, so it reads the same for a 404 as for
-   a timeout and sits at zero under -Q. A front end deciding whether a resume is
-   owed needs the failed transfers apart, and per mirror, so copy_htsopt() must
-   not carry the count between opts. */
+/* A run with no log file must still count its errors (#1681). */
+static int st_logcounters(httrackp *opt, int argc, char **argv) {
+  httrackp *o = hts_create_opt();
+  const hts_stat_struct *stats;
+  int err = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  /* -Q sets no log file and default verbosity. */
+  o->log = NULL;
+  o->errlog = NULL;
+  o->debug = LOG_NOTICE;
+
+  hts_log_print(o, LOG_ERROR, "first");
+  /* LOG_ERRNO rides in the high bits and must not shift the level. */
+  hts_log_print(o, LOG_ERROR | LOG_ERRNO, "second");
+  hts_log_print(o, LOG_WARNING, "third");
+  hts_log_print(o, LOG_WARNING, "fourth");
+  hts_log_print(o, LOG_WARNING, "fifth");
+  hts_log_print(o, LOG_NOTICE, "sixth");
+
+  /* Three distinct totals, so a swapped counter cannot pass. */
+  stats = hts_get_stats(o);
+  if (stats == NULL || stats->stat_errors != 2 || stats->stat_warnings != 3 ||
+      stats->stat_infos != 1)
+    err = 1;
+
+  /* Polling hts_get_stats() must not increment the count. */
+  stats = hts_get_stats(o);
+  if (stats == NULL || stats->stat_errors != 2)
+    err = 1;
+
+  /* LOG_INFO is above the default verbosity, so it is not counted. */
+  hts_log_print(o, LOG_INFO, "seventh");
+  stats = hts_get_stats(o);
+  if (stats == NULL || stats->stat_infos != 1)
+    err = 1;
+
+  /* Raising the verbosity lets the same level through. */
+  o->debug = LOG_INFO;
+  hts_log_print(o, LOG_INFO, "eighth");
+  stats = hts_get_stats(o);
+  if (stats == NULL || stats->stat_infos != 2)
+    err = 1;
+
+  /* A panic is fatal, so it counts as an error rather than as nothing. */
+  hts_log_print(o, LOG_PANIC, "ninth");
+  stats = hts_get_stats(o);
+  if (stats == NULL || stats->stat_errors != 3)
+    err = 1;
+
+  hts_free_opt(o);
+  printf("log-counters: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
+/* stat_errors reads the same for a 404 as for a timeout. A front end deciding
+   whether a resume is owed needs the failed transfers apart, and per mirror, so
+   copy_htsopt() must not carry the count between opts. */
 static int st_transportfailures(httrackp *opt, int argc, char **argv) {
   httrackp *from = hts_create_opt();
   httrackp *to = hts_create_opt();
@@ -15774,6 +15831,9 @@ static const struct selftest_entry {
      st_filterbounds},
     {"filtercap", "", "an over-long filter rule is refused, not stored dead",
      st_filtercap},
+    {"log-counters", "",
+     "error and warning counts survive a run with no log file (#1681)",
+     st_logcounters},
     {"scantoken", "",
      "option-string token copy is bounded and reports a refusal (#1271)",
      st_scantoken},

@@ -3266,6 +3266,20 @@ static void postprocess_file(httrackp *opt, const char *save, const char *adr,
   }
 }
 
+// Count one log event, whether or not a log file is open (#1681).
+void fspc_count(httrackp *opt, const char *type) {
+  fspc_strc *const strc = (opt != NULL) ? &opt->state.fspc : NULL;
+
+  if (strc == NULL || type == NULL)
+    return;
+  if (strcmp(type, "warning") == 0)
+    strc->warning++;
+  else if (strcmp(type, "error") == 0 || strcmp(type, "panic") == 0)
+    strc->error++;
+  else if (strcmp(type, "info") == 0)
+    strc->info++;
+}
+
 // écrire n espaces dans fp
 int fspc(httrackp * opt, FILE * fp, const char *type) {
   fspc_strc *const strc = (opt != NULL) ? &opt->state.fspc : NULL;
@@ -3286,14 +3300,6 @@ int fspc(httrackp * opt, FILE * fp, const char *type) {
       fprintf(fp, "%s\t%c%s: \t", s, hichar(*type), type + 1);
     else
       fprintf(fp, "%s\t \t", s);
-    if (strc != NULL) {
-      if (strcmp(type, "warning") == 0)
-        strc->warning++;
-      else if (strcmp(type, "error") == 0)
-        strc->error++;
-      else if (strcmp(type, "info") == 0)
-        strc->info++;
-    }
   } else if (strc == NULL) {
     return 0;
   } else if (!type) {
