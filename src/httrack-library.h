@@ -164,6 +164,12 @@ HTSEXT_API char *hts_getcategories(char *path, int type);
 HTSEXT_API char *hts_getcategory(const char *filename);
 
 /* Catch-URL */
+/* Capacities catch_url() assumes for its caller-supplied buffers. They were
+   only ever documented in a comment; the request they hold comes off the
+   socket, so state them here and have both sides use these. */
+#define CATCH_URL_URL_SIZE     (HTS_URLMAXSIZE * 2)
+#define CATCH_URL_METHOD_SIZE  32
+#define CATCH_URL_DATA_SIZE    32768
 HTSEXT_API T_SOC catch_url_init_std(int *port_prox, char *adr_prox);
 HTSEXT_API T_SOC catch_url_init(int *port, char *adr);
 HTSEXT_API int catch_url(T_SOC soc, char *url, char *method, char *data);
