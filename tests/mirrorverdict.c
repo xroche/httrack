@@ -164,8 +164,16 @@ int main(int argc, char **argv) {
   rc = hts_main2(argn, args, opt);
 
   printf("rc: %d\n", rc);
-  if (strcmp(argv[1], "transport") == 0)
+  if (strcmp(argv[1], "transport") == 0) {
+    /* The count lives on the opt and is zeroed only when the next mirror
+       starts, so a front end that decides after hts_main2() returns still
+       reads it here. */
+    const hts_stat_struct *after = hts_get_stats(opt);
+
     printf("tick-failures: %d ticks: %d\n", tick_failures, tick_count);
+    printf("after-failures: %d\n",
+           after != NULL ? after->stat_transport_failures : -1);
+  }
   printf("after: %s\n", verdict_name(hts_mirror_completed(opt)));
   hts_free_opt(opt);
   hts_uninit();

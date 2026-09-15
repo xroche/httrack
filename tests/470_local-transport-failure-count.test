@@ -56,6 +56,18 @@ if test -n "${MIRRORVERDICT_BIN:-}"; then
     test -n "$seen" || fail "mirrorverdict printed no count: ${tick}"
     test "$seen" -gt 0 || fail "the loop callback saw no failed transfer: ${tick}"
     echo "OK (${seen})"
+
+    # Where a front end deciding after hts_main2() returns reads it, which is
+    # the reading that survives a crawl too short to tick again after the
+    # give-up. One dead link and no live page, so no tick can carry it.
+    printf '[the count outlives the mirror] ..\t'
+    tick=$("$MIRRORVERDICT_BIN" transport "http://127.0.0.1:${dead}/dead.html" \
+        "${tmpdir}/late" 2>&1) || fail "mirrorverdict failed: ${tick}"
+    late=$(printf '%s\n' "$tick" | sed -n 's/^after-failures: \([0-9]*\)$/\1/p')
+    test -n "$late" || fail "mirrorverdict printed no post-mirror count: ${tick}"
+    test "$late" -gt 0 ||
+        fail "hts_get_stats() after the mirror lost the count: ${tick}"
+    echo "OK (${late})"
 fi
 
 # A body cut off after its headers is a hole too, and the server answered 200,
