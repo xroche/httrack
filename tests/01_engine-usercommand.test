@@ -1,0 +1,57 @@
+#!/bin/bash
+#
+
+# -V user command expansion
+# usage: httrack -#V <command-template> <filename>  =>  expanded command
+
+# The filename comes from the crawled URL, and the save-name cleanup in
+# htsname.c only rewrites what a filesystem refuses -- ; ` $ & ' ( ) and
+# spaces all survive into it. Expanded raw, a crawled page chose what the
+# shell ran.
+
+expand() { httrack -O /dev/null -\#V "$1" "$2"; }
+
+# The documented templates keep working, unquoted and quoted alike.
+test "$(expand 'rm $0' '/tmp/m/index.html')" \
+	== "rm '/tmp/m/index.html'"			|| exit 1
+test "$(expand 'cat "$0"' '/tmp/m/index.html')" \
+	== 'cat "/tmp/m/index.html"'			|| exit 1
+
+# A filename carrying shell syntax is quoted, not obeyed.
+test "$(expand 'rm $0' '/tmp/m/a;id;.html')" \
+	== "rm '/tmp/m/a;id;.html'"			|| exit 1
+test "$(expand 'rm $0' '/tmp/m/a`id`.html')" \
+	== "rm '/tmp/m/a\`id\`.html'"			|| exit 1
+
+# A quote in the filename must not close the quoting put around it.
+test "$(expand 'rm $0' "/tmp/m/a'id'.html")" \
+	== "rm '/tmp/m/a'\\''id'\\''.html'"		|| exit 1
+
+# Inside "..." the closing quote and the expansions are what need escaping.
+test "$(expand 'cat "$0"' '/tmp/m/a$(id).html')" \
+	== 'cat "/tmp/m/a\$(id).html"'			|| exit 1
+
+# Whatever the surrounding quoting, the shell must read the expansion as one
+# word equal to the filename, and must run nothing else.
+canary="$(mktemp -d)/pwned"
+for f in '/tmp/m/plain.html' '/tmp/m/a b.html' '/tmp/m/a;id;.html' \
+	 '/tmp/m/a`id`.html' '/tmp/m/a$(id).html' "/tmp/m/a'id'.html" \
+	 '/tmp/m/a&b.html' '/tmp/m/a|b.html' '/tmp/m/a$HOME.html' \
+	 '/tmp/m/a*b.html' '/tmp/m/a"b.html' '/tmp/m/a\b.html' \
+	 "/tmp/m/\$(touch $canary).html"; do
+	for tmpl in 'printf %s $0' 'printf %s "$0"' "printf %s '\$0'"; do
+		test "$(eval "$(expand "$tmpl" "$f")" 2>&1)" == "$f"	|| exit 1
+	done
+done
+test ! -e "$canary"						|| exit 1
+rm -rf "$(dirname "$canary")"
+
+# A template that cannot fit is reported, not truncated: a truncated
+# "rm '$0'" is an "rm". Arguments are capped at HTS_CDLMAXSIZE, so the
+# overflow is reached by repeating $0 rather than by one huge name.
+long="/tmp/m/$(printf 'a%.0s' $(seq 1 900)).html"
+test "$(expand 'rm $0 $0 $0 $0 $0 $0 $0 $0 $0 $0' "$long")" == "toolong" || exit 1
+
+# ...while a template that just fits is still expanded.
+test -n "$(expand 'rm $0' "$long")"				|| exit 1
+test "$(expand 'rm $0' "$long")" != "toolong"			|| exit 1

@@ -3077,28 +3077,192 @@ void usercommand(httrackp * opt, int _exe, const char *_cmd, const char *file,
   if (strc->exe) {
     if (file != NULL && strnotempty(file)) {
       if (strnotempty(strc->cmd)) {
-        usercommand_exe(strc->cmd, file);
+        usercommand_exe(opt, strc->cmd, file);
       }
     }
   }
 }
-void usercommand_exe(const char *cmd, const char *file) {
-  char BIGSTK temp[8192];
+/* Shell quoting in force at the point of the template where "$0" appears. */
+typedef enum {
+  SHELL_CTX_PLAIN,              /* not inside quotes */
+  SHELL_CTX_SINGLE,             /* inside '...' */
+  SHELL_CTX_DOUBLE              /* inside "..." */
+} shell_ctx_t;
+
+/*
+ * Append "len" bytes of "src" at "*pos" in "dest", which has capacity "size"
+ * and stays NUL-terminated. Returns 0 and parks *pos at "size" when the result
+ * would not fit, so the caller can drop the command instead of aborting: both
+ * the template and the save name expanded into it can be arbitrarily long.
+ */
+static int usercommand_append(char *dest, size_t size, size_t *pos,
+                              const char *src, size_t len) {
+  if (*pos >= size || len >= size - *pos) {
+    *pos = size;
+    return 0;
+  }
+  memcpy(dest + *pos, src, len);
+  *pos += len;
+  dest[*pos] = '\0';
+  return 1;
+}
+
+static int usercommand_append_char(char *dest, size_t size, size_t *pos,
+                                   char c) {
+  return usercommand_append(dest, size, pos, &c, 1);
+}
+
+/*
+ * Append "value" to the command being built, quoted for the context it lands
+ * in so that the shell reads it as one literal word.
+ *
+ * This is what keeps $0 from being executable. The save name comes from the
+ * crawled URL, and the cleanup in htsname.c only rewrites what a filesystem
+ * refuses -- it leaves ; ` $ & ' ( ) and spaces in place, because they are
+ * legal in a filename. Substituted raw, a crawled page picked what ran.
+ */
+static int usercommand_append_quoted(char *dest, size_t size, size_t *pos,
+                                     const char *value, shell_ctx_t ctx) {
   size_t i;
 
-  temp[0] = '\0';
+#ifdef _WIN32
+  /*
+   * cmd.exe has no single-quote syntax and no escape that works inside a
+   * quoted string, but & | < > ( ) ^ are all inert between double quotes,
+   * which is what removes the injection. A double quote in the value would
+   * end that protection and cannot be escaped portably, so it is replaced --
+   * htsname.c already rewrites it in save names for the same reason.
+   */
+  if (ctx != SHELL_CTX_DOUBLE) {
+    if (!usercommand_append_char(dest, size, pos, '\"'))
+      return 0;
+  }
+  for(i = 0; value[i] != '\0'; i++) {
+    if (!usercommand_append_char(dest, size, pos,
+                                 value[i] == '\"' ? '_' : value[i]))
+      return 0;
+  }
+  if (ctx != SHELL_CTX_DOUBLE) {
+    if (!usercommand_append_char(dest, size, pos, '\"'))
+      return 0;
+  }
+#else
+  switch (ctx) {
+  case SHELL_CTX_PLAIN:
+  case SHELL_CTX_SINGLE:
+    /*
+     * Inside '...' the closing quote is the only character with meaning, so
+     * rewriting ' as '\'' makes the rest literal. PLAIN adds a quote pair of
+     * its own; SINGLE is already inside the template's.
+     */
+    if (ctx == SHELL_CTX_PLAIN
+        && !usercommand_append_char(dest, size, pos, '\''))
+      return 0;
+    for(i = 0; value[i] != '\0'; i++) {
+      if (value[i] == '\'') {
+        if (!usercommand_append(dest, size, pos, "'\\''", 4))
+          return 0;
+      } else if (!usercommand_append_char(dest, size, pos, value[i])) {
+        return 0;
+      }
+    }
+    if (ctx == SHELL_CTX_PLAIN
+        && !usercommand_append_char(dest, size, pos, '\''))
+      return 0;
+    break;
+  case SHELL_CTX_DOUBLE:
+    /*
+     * Inside "..." word splitting and globbing are already off; what is left
+     * is expansion and the closing quote.
+     */
+    for(i = 0; value[i] != '\0'; i++) {
+      const char c = value[i];
+
+      if (c == '$' || c == '`' || c == '\"' || c == '\\') {
+        if (!usercommand_append_char(dest, size, pos, '\\'))
+          return 0;
+      }
+      if (!usercommand_append_char(dest, size, pos, c))
+        return 0;
+    }
+    break;
+  }
+#endif
+  return 1;
+}
+
+/*
+ * Expand the -V template "cmd" into "dest", substituting each "$0" with
+ * "file" quoted for the shell. Returns 0 if the result does not fit, in which
+ * case "dest" holds a truncated prefix that must not be run.
+ */
+int usercommand_expand(char *dest, size_t size, const char *cmd,
+                       const char *file) {
+  shell_ctx_t ctx = SHELL_CTX_PLAIN;
+  int escaped = 0;
+  size_t pos = 0;
+  size_t i;
+
+  if (size == 0)
+    return 0;
+  dest[0] = '\0';
   //
   for(i = 0; cmd[i] != '\0'; i++) {
-    if ((cmd[i] == '$') && (cmd[i + 1] == '0')) {
-      strcatbuff(temp, file);
+    const char c = cmd[i];
+
+    /* Substituted at any position, escaped or not, as it always has been. */
+    if ((c == '$') && (cmd[i + 1] == '0')) {
+      if (!usercommand_append_quoted(dest, size, &pos, file, ctx))
+        return 0;
+      escaped = 0;
       i++;
-    } else {
-      char c[2];
-      c[0] = cmd[i];
-      c[1] = '\0';
-      strcatbuff(temp, c);
+      continue;
     }
+
+    /* A backslash only suppresses the quote transition of the next
+       character; it is still copied through verbatim. */
+    if (!escaped && ctx != SHELL_CTX_SINGLE && c == '\\') {
+      escaped = 1;
+    } else {
+      if (!escaped) {
+        switch (ctx) {
+        case SHELL_CTX_PLAIN:
+          if (c == '\'')
+            ctx = SHELL_CTX_SINGLE;
+          else if (c == '\"')
+            ctx = SHELL_CTX_DOUBLE;
+          break;
+        case SHELL_CTX_SINGLE:
+          if (c == '\'')
+            ctx = SHELL_CTX_PLAIN;
+          break;
+        case SHELL_CTX_DOUBLE:
+          if (c == '\"')
+            ctx = SHELL_CTX_PLAIN;
+          break;
+        }
+      }
+      escaped = 0;
+    }
+
+    if (!usercommand_append_char(dest, size, &pos, c))
+      return 0;
   }
+
+  return 1;
+}
+
+void usercommand_exe(httrackp * opt, const char *cmd, const char *file) {
+  char BIGSTK temp[8192];
+
+  /* Truncating a shell command is how a "rm '$0'" becomes a "rm". */
+  if (!usercommand_expand(temp, sizeof(temp), cmd, file)) {
+    hts_log_print(opt, LOG_ERROR,
+                  "user command not executed: expanded command exceeds %d bytes",
+                  (int) sizeof(temp));
+    return;
+  }
+
   if (system(temp) == -1) {
     assertf(!"can not spawn process");
   }
