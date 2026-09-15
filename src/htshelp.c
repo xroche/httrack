@@ -651,6 +651,8 @@ void help(const char *app, int more) {
   infomsg(" #1  simplify test (-#1 ./foo/bar/../foobar)");
   infomsg(" #2  type test (-#2 /foo/bar.php)");
   infomsg(" #8  cookie domain scope test (-#8 .foo.com www.foo.com)");
+  infomsg
+    (" #9  robots.txt rule test, '|' separating rules (-#9 \"D/|A/public/\" /public/x)");
   infomsg(" #C  cache list (-#C '*.com/spider*.gif'");
   infomsg(" #R  cache repair (damaged cache)");
   infomsg(" #d  debug parser");

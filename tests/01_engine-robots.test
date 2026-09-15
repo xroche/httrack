@@ -1,0 +1,53 @@
+#!/bin/bash
+#
+
+# robots.txt rule matching engine (RFC 9309 section 2.2)
+# usage: httrack -#9 <rules> <path>  =>  "forbidden" | "allowed"
+# in <rules>, '|' separates rules and each rule is "D<pattern>" or "A<pattern>"
+
+R() { httrack -O /dev/null -#9 "$1" "$2"; }
+
+# plain prefix rules
+test "$(R 'D/private' /private/x.html)" == "forbidden"		|| exit 1
+test "$(R 'D/private' /public/x.html)" == "allowed"		|| exit 1
+test "$(R 'D/' /anything)" == "forbidden"			|| exit 1
+
+# Allow overrides a broader Disallow -- the common real-world pattern.
+# This whole directive was previously unimplemented, so such a site was
+# mirrored as entirely blocked.
+test "$(R 'D/|A/public/' /public/x.html)" == "allowed"		|| exit 1
+test "$(R 'D/|A/public/' /private/x)" == "forbidden"		|| exit 1
+# rule order must not matter
+test "$(R 'A/public/|D/' /public/x.html)" == "allowed"		|| exit 1
+
+# the most specific (longest) pattern wins
+test "$(R 'A/foo|D/foo/bar' /foo/bar/x)" == "forbidden"		|| exit 1
+test "$(R 'D/foo|A/foo/bar' /foo/bar/x)" == "allowed"		|| exit 1
+
+# equal-length tie: Allow wins, either way round
+test "$(R 'D/foo|A/foo' /foo/x)" == "allowed"			|| exit 1
+test "$(R 'A/foo|D/foo' /foo/x)" == "allowed"			|| exit 1
+
+# '*' wildcards
+test "$(R 'D/*.gif' /img/logo.gif)" == "forbidden"		|| exit 1
+test "$(R 'D/*.gif' /img/logo.png)" == "allowed"		|| exit 1
+test "$(R 'D/private/*/tmp' /private/a/tmp/x)" == "forbidden"	|| exit 1
+test "$(R 'D/*.gif' /a/b/c/d/e.gif)" == "forbidden"		|| exit 1
+
+# '$' anchors the match to the end of the path
+test "$(R 'D/*.php$' /index.php)" == "forbidden"		|| exit 1
+test "$(R 'D/*.php$' '/index.php?id=1')" == "allowed"		|| exit 1
+test "$(R 'D/fish$' /fish)" == "forbidden"			|| exit 1
+test "$(R 'D/fish$' /fish.html)" == "allowed"			|| exit 1
+
+# a path no rule matches is allowed
+test "$(R 'D/a|D/b' /c)" == "allowed"				|| exit 1
+test "$(R '' /c)" == "allowed"					|| exit 1
+
+# malformed rules are ignored rather than trusted
+test "$(R 'D' /x)" == "allowed"					|| exit 1
+test "$(R 'X/foo' /foo)" == "allowed"				|| exit 1
+test "$(R 'D/private' /private/x)" == "forbidden"		|| exit 1
+
+# must not backtrack exponentially: this returns promptly or the test hangs
+test "$(R 'D/a*a*a*a*a*a*a*a*a*a*a*a*b$' /aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)" == "allowed" || exit 1

@@ -46,6 +46,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscharset.h"
 #include "htsencoding.h"
 #include "htsmd5.h"
+#include "htsrobots.h"
 
 #include <ctype.h>
 #if USE_BEGINTHREAD
@@ -2640,6 +2641,46 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   printf("%s\n",
                          cookie_matches_domain(argv[na + 1], argv[na + 2])
                          ? "match" : "nomatch");
+                  htsmain_free();
+                  return 0;
+                }
+                break;
+              case '9':  // robots.txt rules: httrack -#9 "D/|A/public/" "/public/x"
+                if (na + 2 >= argc) {
+                  HTS_PANIC_PRINTF
+                    ("Option #9 needs to be followed by a rule set and a path");
+                  printf("Example: '-#9' \"D/|A/public/\" \"/public/x.html\"\n");
+                  htsmain_free();
+                  return -1;
+                } else {
+                  robots_wizard robots;
+                  char *rules = strdupt(argv[na + 1]);
+
+                  if (rules == NULL) {
+                    HTS_PANIC_PRINTF("Not enough memory");
+                    htsmain_free();
+                    return -1;
+                  }
+                  /* '|' stands in for a newline, so that a rule set stays
+                     typeable on a command line */
+                  {
+                    char *p;
+
+                    for(p = rules; *p != '\0'; p++) {
+                      if (*p == '|') {
+                        *p = '\n';
+                      }
+                    }
+                  }
+                  memset(&robots, 0, sizeof(robots));
+                  strcpybuff(robots.adr, "example.com");
+                  robots.rules = rules;
+                  robots.next = NULL;
+                  printf("%s\n",
+                         checkrobots(&robots, "example.com",
+                                     argv[na + 2]) == -1
+                         ? "forbidden" : "allowed");
+                  freet(rules);
                   htsmain_free();
                   return 0;
                 }
