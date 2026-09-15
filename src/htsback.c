@@ -288,8 +288,16 @@ int back_cleanup_background(httrackp * opt, cache_back * cache,
 #ifndef HTS_NO_BACK_ON_DISK
       /* temporarily serialize the entry on disk */
       {
-        int fsz = (int) strlen(back[i].url_sav);
-        char *filename = malloc(fsz + 8 + 1);
+        /* note: the two branches below build the name from different
+           strings, but the buffer used to be sized from url_sav for both.
+           With getmode == 0 the name comes from path_html_utf8 instead, so a
+           project path longer than url_sav overflowed the allocation. Size
+           for whichever string is actually used, plus room for
+           "tmpfile" + the counter + ".tmp". */
+        const size_t fsz = opt->getmode != 0
+          ? strlen(back[i].url_sav)
+          : strlen(StringBuff(opt->path_html_utf8));
+        char *filename = malloc(fsz + 32 + 1);
 
         if (filename != NULL) {
           FILE *fp;
@@ -660,9 +668,10 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
           char s[256];
           time_t tt;
           struct tm *A;
+          struct tm Abuf;
 
           tt = time(NULL);
-          A = localtime(&tt);
+          A = hts_localtime_r(&tt, &Abuf);
           if (A == NULL) {
             int localtime_returned_null = 0;
 

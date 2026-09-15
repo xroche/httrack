@@ -876,7 +876,7 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
 
                           r.statuscode = STATUSCODE_INVALID;
                           sprintf(r.msg, "Cache Read Error : Read To Disk: %s",
-                                  strerror(last_errno));
+                                  hts_strerror(last_errno));
                         }
                       }
                     } while((nl > 0) && (size > 0) && (r.statuscode != -1));
@@ -938,7 +938,7 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
 
                         r.statuscode = STATUSCODE_INVALID;
                         sprintf(r.msg, "Read error in cache disk data: %s",
-                                strerror(last_errno));
+                                hts_strerror(last_errno));
                       }
                     } else {
                       r.statuscode = STATUSCODE_INVALID;

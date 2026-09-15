@@ -5,6 +5,31 @@ HTTrack Website Copier release history:
 This file lists all changes and fixes that have been made for HTTrack
 
 unreleased
++ Fixed: thread safety. localtime()/gmtime()/strerror()/gethostbyname() all
+  return pointers into shared static storage, and were being called from
+  crawler worker threads, so concurrent calls corrupted each other's results
+  (wrong timestamps in logs, wrong error messages, corrupted addresses).
+  Replaced with reentrant equivalents throughout.
++ SECURITY: fixed a heap overflow when serializing a backlog entry with
+  '--getmode 0': the temporary filename buffer was sized from one string and
+  written from another, so a project path longer than the save name
+  overflowed it.
++ Fixed: seven memory leaks on allocation-failure paths in the charset
+  converters (realloc() returning NULL does not free the old block). These
+  were driven by remote content, so they were unbounded.
++ Fixed: null dereferences in http_xfopen() and in the HTML parser, an
+  unchecked allocation before a memcpy(), and a leak in the top-index
+  builder
++ Fixed: assert failures are now marked noreturn, so the compiler and the
+  static analyzer treat assertf() as a real precondition
++ SECURITY: fixed an unbounded write in the user-defined save-name formatter
+  ('%h%p/%n%q.%t' and friends, -N). The destination array was aliased through
+  a char* cursor, which disarmed every bounds check in that function, so a
+  long enough remote URL overflowed the 2 KiB name buffer.
++ New: tools/audit-unchecked-buffers.sh counts the call sites where the
+  strcpybuff()/strcatbuff()/strncatbuff() macros silently degrade to an
+  unchecked strcpy()/strcat()/strncat(), and CI fails if the total grows.
++ New: -#9 test-bench command, checks robots.txt rule matching
 + SECURITY: webhttrack's control server now listens on the loopback interface
   only, instead of every interface. This server can start a mirror writing to
   an arbitrary path, so it was remote arbitrary file write. Pass '--bind-any'

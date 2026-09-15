@@ -292,7 +292,13 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       r->size = cSize;
     }
   }
-  if (RUN_CALLBACK4(opt, check_html, r->adr, (int) r->size, urladr(), urlfil())) {
+  /* note: r->adr must be checked here. The preprocess callback above may
+     have replaced it, NULL included, and a response with no body reaches
+     this point too -- while everything below dereferences it without
+     checking (strstr(html, ...), *(r->adr + r->size) = '\0', ...). */
+  if (r->adr != NULL
+      && RUN_CALLBACK4(opt, check_html, r->adr, (int) r->size, urladr(),
+                       urlfil())) {
     FILE *fp = NULL;                  // fichier écrit localement 
     const char *html = r->adr;        // pointeur (on parcours)
     const char *lastsaved;            // adresse du dernier octet sauvé + 1
@@ -4587,7 +4593,11 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
             /* seen as in error */
             in_error = back[b].r.statuscode;
             in_error_msg[0] = 0;
-            strncat(in_error_msg, back[b].r.msg, sizeof(in_error_msg) - 1);
+            /* note: strncat()'s third argument is the number of characters
+               to append, not the size of the destination. This was safe only
+               because of the in_error_msg[0] = 0 above ; use the project's
+               own bounded append instead of relying on that. */
+            strlcatbuff(in_error_msg, back[b].r.msg, sizeof(in_error_msg));
             in_error_size = back[b].r.totalsize;
             /* don't break, even with "don't take error pages" switch, because we need to process the slot anyway (and cache the error) */
           }

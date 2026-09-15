@@ -154,7 +154,7 @@ const char *hts_get_zerror(int err) {
     return "end of list of file";
     break;
   case UNZ_ERRNO:
-    return (const char *) strerror(errno);
+    return (const char *) hts_strerror(errno);
     break;
   case UNZ_PARAMERROR:
     return "parameter error";

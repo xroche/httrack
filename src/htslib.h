@@ -223,6 +223,22 @@ HTS_INLINE TStamp time_local(void);
 
 void sec2str(char *s, TStamp t);
 
+/* Reentrant localtime()/gmtime().
+   The plain versions return a pointer into shared static storage, and these
+   are called from crawler worker threads, so concurrent calls corrupt each
+   other's results. Return NULL on failure, like the originals.
+   'buffer' must be supplied by the caller. */
+struct tm *hts_localtime_r(const time_t *t, struct tm *buffer);
+struct tm *hts_gmtime_r(const time_t *t, struct tm *buffer);
+
+/* Reentrant strerror().
+   POSIX does not require strerror() to be thread-safe, and these messages are
+   formatted from crawler worker threads. Formats into a small per-thread
+   buffer, so the returned pointer stays valid until this thread calls it
+   again -- which makes it a drop-in for strerror() at a call site that uses
+   the result immediately. */
+HTSEXT_API const char *hts_strerror(int err);
+
 void time_gmt_rfc822(char *s);
 void time_local_rfc822(char *s);
 struct tm *convert_time_rfc822(struct tm *buffer, const char *s);

@@ -954,19 +954,26 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
               }
 
               chain = calloc(sizeof(struct topindex_chain), 1);
+              if (chain == NULL) {
+                /* note: 'category' is owned by the entry we failed to
+                   allocate, and chainSize/startchain used to be updated even
+                   on that path -- leaving a NULL startchain and a count one
+                   too high. Give up on the scan instead. */
+                freet(category);
+                chain = oldchain;
+                break;
+              }
               chainSize++;
               if (!startchain) {
                 startchain = chain;
               }
-              if (chain) {
-                if (oldchain) {
-                  oldchain->next = chain;
-                }
-                chain->next = NULL;
-                strcpybuff(chain->name, hts_findgetname(h));
-                chain->category = category;
-                chain->level = level;
+              if (oldchain) {
+                oldchain->next = chain;
               }
+              chain->next = NULL;
+              strcpybuff(chain->name, hts_findgetname(h));
+              chain->category = category;
+              chain->level = level;
             }
 
           }

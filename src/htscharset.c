@@ -417,11 +417,17 @@ static char* hts_codepageToUTF8(const char *codepage, const char *s) {
       const hts_UCS4 uc = table_mappings[i].table[c];
       const size_t max = k + MAX_UTF;
       if (capa < max) {
+        char *newDest;
+
         for(capa = 16 ; capa < max ; capa <<= 1) ;
-        dest = realloc(dest, capa);
-        if (dest == NULL) {
+        /* note: realloc() returns NULL without freeing, so assigning it
+           straight back to 'dest' loses the old block */
+        newDest = realloc(dest, capa);
+        if (newDest == NULL) {
+          free(dest);
           return NULL;
         }
+        dest = newDest;
       }
       if (dest != NULL) {
         const size_t len = hts_writeUTF8(uc, &dest[k], MAX_UTF);
@@ -475,11 +481,16 @@ static char *hts_convertStringCharset(const char *s, size_t size,
           if (errno == E2BIG) {
             const size_t used = outbufCapa - outbytesleft;
 
+            char *newOutbuf;
+
             outbufCapa *= 2;
-            outbuf = realloc(outbuf, outbufCapa);
-            if (outbuf == NULL) {
+            newOutbuf = realloc(outbuf, outbufCapa);
+            if (newOutbuf == NULL) {
+              free(outbuf);
+              outbuf = NULL;
               break;
             }
+            outbuf = newOutbuf;
             outbytesleft = outbufCapa - used;
           } else {
             free(outbuf);
@@ -494,7 +505,12 @@ static char *hts_convertStringCharset(const char *s, size_t size,
 
       /* Terminating \0 */
       if (outbuf != NULL && finalSize + 1 >= outbufCapa) {
-        outbuf = realloc(outbuf, finalSize + 1);
+        char *const newOutbuf = realloc(outbuf, finalSize + 1);
+
+        if (newOutbuf == NULL) {
+          free(outbuf);
+        }
+        outbuf = newOutbuf;
       }
       if (outbuf != NULL)
         outbuf[finalSize] = '\0';
@@ -910,11 +926,15 @@ int main(int argc, char **argv) {
 #undef ADD_BYTE
 #undef INCREASE_CAPA
 #define INCREASE_CAPA() do { \
+  void *newDest_; /* void*, as 'dest' is char* here and hts_UCS4* elsewhere */ \
   capa = capa < 16 ? 16 : ( capa << 1 ); \
-  dest = realloc(dest, capa*sizeof(dest[0])); \
-  if (dest == NULL) { \
+  /* note: realloc() returns NULL without freeing the old block */ \
+  newDest_ = realloc(dest, capa*sizeof(dest[0])); \
+  if (newDest_ == NULL) { \
+    FREE_BUFFER(); \
     return NULL; \
   } \
+  dest = newDest_; \
 } while(0)
 #define ADD_BYTE(C) do { \
   if (capa == destSize) { \
@@ -1107,14 +1127,18 @@ char *hts_convertStringIDNAToUTF8(const char *s, size_t size) {
             &s[startSeg + 4], &output_length, output_dest, NULL))
             == punycode_big_output 
           ; ) {
+          punycode_uint *newOutput;
+
           output_capa <<= 1;
-          output_dest =
+          newOutput =
             (punycode_uint*) realloc(output_dest,
                                      output_capa*sizeof(punycode_uint));
-          if (output_dest == NULL) {
+          if (newOutput == NULL) {
+            free(output_dest);
             FREE_BUFFER();
             return NULL;
           }
+          output_dest = newOutput;
           output_length = output_capa;
         }
 

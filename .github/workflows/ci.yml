@@ -102,15 +102,39 @@ jobs:
 
       - name: Test
         env:
-          # halt_on_error keeps a sanitizer report from being swallowed by a
-          # test that "passes" anyway.
-          ASAN_OPTIONS: detect_leaks=1:abort_on_error=1:halt_on_error=1
+          # The CLI intentionally retains process-lifetime global state; each
+          # test launches a fresh process, so leak reports are not actionable
+          # here. Keep AddressSanitizer's memory-error checks enabled.
+          ASAN_OPTIONS: detect_leaks=0:abort_on_error=1:halt_on_error=1
           UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
         run: make check ONLINE_UNIT_TESTS=no
 
       - name: Show test log on failure
         if: failure()
         run: cat tests/test-suite.log || true
+
+  unchecked-buffers:
+    name: unchecked buffer ratchet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            autoconf automake libtool zlib1g-dev libssl-dev
+
+      - name: Configure
+        run: ./configure CFLAGS="-O2 -g"
+
+      # strcpybuff()/strcatbuff()/strncatbuff() degrade to an unchecked
+      # str*() whenever the destination is a pointer rather than an array.
+      # This counts those sites and fails if the total grows.
+      - name: Count unchecked buffer call sites
+        run: tools/audit-unchecked-buffers.sh --list
 
   analyze:
     name: clang static analyzer

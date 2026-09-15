@@ -576,7 +576,9 @@ int httpmirror(char *url1, httrackp * opt) {
   cache_tests = coucal_new(0);
   if (cache_hashtable == NULL || cache_tests == NULL) {
     printf("PANIC! : Not enough memory [%d]\n", __LINE__);
-    filters[0] = NULL;          // uniquement a cause du warning de XH_extuninit
+    if (filters != NULL) {      // uniquement a cause du warning de XH_extuninit
+      filters[0] = NULL;
+    }
     XH_extuninit;
     return 0;
   }
@@ -893,9 +895,10 @@ int httpmirror(char *url1, httrackp * opt) {
       TStamp tl = 0;
       time_t tt;
       struct tm *A;
+    struct tm Abuf;
 
       tt = time(NULL);
-      A = localtime(&tt);
+      A = hts_localtime_r(&tt, &Abuf);
       tl += A->tm_sec;
       tl += A->tm_min * 60;
       tl += A->tm_hour * 60 * 60;
@@ -909,9 +912,10 @@ int httpmirror(char *url1, httrackp * opt) {
       TStamp tl = 0;
       time_t tt;
       struct tm *A;
+    struct tm Abuf;
 
       tt = time(NULL);
-      A = localtime(&tt);
+      A = hts_localtime_r(&tt, &Abuf);
       tl += A->tm_sec;
       tl += A->tm_min * 60;
       tl += A->tm_hour * 60 * 60;
@@ -1777,8 +1781,12 @@ int httpmirror(char *url1, httrackp * opt) {
                   freet(r.adr);
                   r.adr = NULL;
                 }
-                memcpy(adr, HTS_DATA_UNKNOWN_GIF, HTS_DATA_UNKNOWN_GIF_LEN);
-                r.adr = adr;
+                /* note: the HTML branch above checks its allocation ; this
+                   one used to memcpy() into it unconditionally */
+                if (adr != NULL) {
+                  memcpy(adr, HTS_DATA_UNKNOWN_GIF, HTS_DATA_UNKNOWN_GIF_LEN);
+                  r.adr = adr;
+                }
               }
             }
           }
@@ -3232,9 +3240,10 @@ int fspc(httrackp * opt, FILE * fp, const char *type) {
     char s[256];
     time_t tt;
     struct tm *A;
+    struct tm Abuf;
 
     tt = time(NULL);
-    A = localtime(&tt);
+    A = hts_localtime_r(&tt, &Abuf);
     if (A == NULL) {
       int localtime_returned_null = 0;
 

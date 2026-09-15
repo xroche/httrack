@@ -54,7 +54,7 @@ Please visit our Website: http://www.httrack.com
 #define ADD_STANDARD_NAME(shortname) \
     {  /* ajout nom */\
       char BIGSTK buff[HTS_URLMAXSIZE*2];\
-      standard_name(buff,dot_pos,nom_pos,fil_complete,(shortname));\
+      standard_name(buff,sizeof(buff),dot_pos,nom_pos,fil_complete,(shortname));\
       url_savename_addstr(afs->save, buff);\
     }
 
@@ -769,6 +769,14 @@ int url_savename(lien_adrfilsave *const afs,
     const char *a = StringBuff(opt->savename_userdef);
     char *b = afs->save;
 
+    /* Capacity still available at the cursor.
+       Note: 'b' walks through afs->save, and assigning the array to a char*
+       decays it, so sizeof() inside strcpybuff()/strcatbuff() would measure
+       the pointer rather than the buffer and the macro would degrade to a
+       plain unchecked strcpy()/strcat(). Every append below therefore passes
+       the remaining room explicitly. */
+#define SAVE_LEFT() (sizeof(afs->save) - (size_t) (b - afs->save))
+
     /*char *nom_pos=NULL,*dot_pos=NULL;  // Position nom et point */
     char tok;
 
@@ -834,7 +842,7 @@ int url_savename(lien_adrfilsave *const afs,
               }
               if (cp) {
                 c = cp + strlen(name[0]);       /* jumps "param=" */
-                strcpybuff(b, name[1]); /* prefix */
+                strlcpybuff(b, name[1], SAVE_LEFT()); /* prefix */
                 b += strlen(b);
                 if (*c != '\0' && *c != '&') {
                   char *d = name[0];
@@ -846,43 +854,45 @@ int url_savename(lien_adrfilsave *const afs,
                   *d = '\0';
                   d = unescape_http(catbuff, sizeof(catbuff), name[0]);
                   if (d && *d) {
-                    strcpybuff(b, d);   /* value */
+                    strlcpybuff(b, d, SAVE_LEFT());   /* value */
                     b += strlen(b);
                   } else {
-                    strcpybuff(b, name[3]);     /* empty replacement if any */
+                    strlcpybuff(b, name[3], SAVE_LEFT());     /* empty replacement if any */
                     b += strlen(b);
                   }
                 } else {
-                  strcpybuff(b, name[3]);       /* empty replacement if any */
+                  strlcpybuff(b, name[3], SAVE_LEFT());       /* empty replacement if any */
                   b += strlen(b);
                 }
-                strcpybuff(b, name[2]); /* suffix */
+                strlcpybuff(b, name[2], SAVE_LEFT()); /* suffix */
                 b += strlen(b);
               } else {
-                strcpybuff(b, name[4]); /* not found replacement if any */
+                strlcpybuff(b, name[4], SAVE_LEFT()); /* not found replacement if any */
                 b += strlen(b);
               }
             } else {
-              strcpybuff(b, name[4]);   /* not found replacement if any */
+              strlcpybuff(b, name[4], SAVE_LEFT());   /* not found replacement if any */
               b += strlen(b);
             }
           }
           break;
         case '%':
-          *b++ = '%';
+          if (SAVE_LEFT() > 1) {
+            *b++ = '%';
+          }
           break;
         case 'n':              // nom sans ext
           *b = '\0';
           if (dot_pos) {
             if (!short_ver)     // Noms longs
-              strncatbuff(b, nom_pos, (int) (dot_pos - nom_pos));
+              strlncatbuff(b, nom_pos, SAVE_LEFT(), (int) (dot_pos - nom_pos));
             else
-              strncatbuff(b, nom_pos, min((int) (dot_pos - nom_pos), 8));
+              strlncatbuff(b, nom_pos, SAVE_LEFT(), min((int) (dot_pos - nom_pos), 8));
           } else {
             if (!short_ver)     // Noms longs
-              strcpybuff(b, nom_pos);
+              strlcpybuff(b, nom_pos, SAVE_LEFT());
             else
-              strncatbuff(b, nom_pos, 8);
+              strlncatbuff(b, nom_pos, SAVE_LEFT(), 8);
           }
           b += strlen(b);       // pointer à la fin
           break;
@@ -891,14 +901,14 @@ int url_savename(lien_adrfilsave *const afs,
           *b = '\0';
           if (dot_pos) {
             if (!short_ver)     // Noms longs
-              strncatbuff(b, nom_pos, (int) (dot_pos - nom_pos));
+              strlncatbuff(b, nom_pos, SAVE_LEFT(), (int) (dot_pos - nom_pos));
             else
-              strncatbuff(b, nom_pos, min((int) (dot_pos - nom_pos), 8));
+              strlncatbuff(b, nom_pos, SAVE_LEFT(), min((int) (dot_pos - nom_pos), 8));
           } else {
             if (!short_ver)     // Noms longs
-              strcpybuff(b, nom_pos);
+              strlcpybuff(b, nom_pos, SAVE_LEFT());
             else
-              strncatbuff(b, nom_pos, 8);
+              strlncatbuff(b, nom_pos, SAVE_LEFT(), 8);
           }
           b += strlen(b);       // pointer à la fin
           *b = '.';
@@ -907,14 +917,14 @@ int url_savename(lien_adrfilsave *const afs,
           *b = '\0';
           if (dot_pos) {
             if (!short_ver)     // Noms longs
-              strcpybuff(b, dot_pos + 1);
+              strlcpybuff(b, dot_pos + 1, SAVE_LEFT());
             else
-              strncatbuff(b, dot_pos + 1, 3);
+              strlncatbuff(b, dot_pos + 1, SAVE_LEFT(), 3);
           } else {
             if (!short_ver)     // Noms longs
-              strcpybuff(b, DEFAULT_EXT + 1);   // pas de..
+              strlcpybuff(b, DEFAULT_EXT + 1, SAVE_LEFT());   // pas de..
             else
-              strcpybuff(b, DEFAULT_EXT_SHORT + 1);     // pas de..
+              strlcpybuff(b, DEFAULT_EXT_SHORT + 1, SAVE_LEFT());     // pas de..
           }
           b += strlen(b);       // pointer à la fin
           //
@@ -923,14 +933,14 @@ int url_savename(lien_adrfilsave *const afs,
           *b = '\0';
           if (dot_pos) {
             if (!short_ver)     // Noms longs
-              strcpybuff(b, dot_pos + 1);
+              strlcpybuff(b, dot_pos + 1, SAVE_LEFT());
             else
-              strncatbuff(b, dot_pos + 1, 3);
+              strlncatbuff(b, dot_pos + 1, SAVE_LEFT(), 3);
           } else {
             if (!short_ver)     // Noms longs
-              strcpybuff(b, DEFAULT_EXT + 1);   // pas de..
+              strlcpybuff(b, DEFAULT_EXT + 1, SAVE_LEFT());   // pas de..
             else
-              strcpybuff(b, DEFAULT_EXT_SHORT + 1);     // pas de..
+              strlcpybuff(b, DEFAULT_EXT_SHORT + 1, SAVE_LEFT());     // pas de..
           }
           b += strlen(b);       // pointer à la fin
           break;
@@ -938,7 +948,7 @@ int url_savename(lien_adrfilsave *const afs,
           *b = '\0';
           if (nom_pos != fil + 1) {     // pas: /index.html (chemin nul)
             if (!short_ver) {   // Noms longs
-              strncatbuff(b, fil, (int) (nom_pos - fil) - 1);
+              strlncatbuff(b, fil, SAVE_LEFT(), (int) (nom_pos - fil) - 1);
             } else {
               char BIGSTK pth[HTS_URLMAXSIZE * 2], n83[HTS_URLMAXSIZE * 2];
 
@@ -946,7 +956,7 @@ int url_savename(lien_adrfilsave *const afs,
               //
               strncatbuff(pth, fil, (int) (nom_pos - fil) - 1);
               long_to_83(opt->savename_83, n83, pth);
-              strcpybuff(b, n83);
+              strlcpybuff(b, n83, SAVE_LEFT());
             }
           }
           b += strlen(b);       // pointer à la fin
@@ -959,9 +969,9 @@ int url_savename(lien_adrfilsave *const afs,
             /* Copy address */
             *b = '\0';
             if (!short_ver)
-              strcpybuff(b, final_adr);
+              strlcpybuff(b, final_adr, SAVE_LEFT());
             else
-              strcpybuff(b, final_adr);
+              strlcpybuff(b, final_adr, SAVE_LEFT());
 
             /* release */
             RELEASE_ADR();
@@ -972,14 +982,14 @@ int url_savename(lien_adrfilsave *const afs,
           *b = '\0';
           if (protocol == PROTOCOL_FILE) {
             if (!short_ver)     // Noms longs
-              strcpybuff(b, "localhost");
+              strlcpybuff(b, "localhost", SAVE_LEFT());
             else
-              strcpybuff(b, "local");
+              strlcpybuff(b, "local", SAVE_LEFT());
           } else {
             if (!short_ver)     // Noms longs
-              strcpybuff(b, print_adr);
+              strlcpybuff(b, print_adr, SAVE_LEFT());
             else
-              strncatbuff(b, print_adr, 8);
+              strlncatbuff(b, print_adr, SAVE_LEFT(), 8);
           }
           b += strlen(b);       // pointer à la fin
           break;
@@ -993,7 +1003,7 @@ int url_savename(lien_adrfilsave *const afs,
             strcpybuff(buff, adr);
             strcatbuff(buff, fil_complete);
             domd5mem(buff, strlen(buff), digest, 1);
-            strcpybuff(b, digest);
+            strlcpybuff(b, digest, SAVE_LEFT());
           }
           b += strlen(b);       // pointer à la fin
           break;
@@ -1004,14 +1014,14 @@ int url_savename(lien_adrfilsave *const afs,
             char md5[32 + 2];
 
             *b = '\0';
-            strncatbuff(b, url_md5(md5, fil_complete), (tok == 'Q') ? 32 : 4);
+            strlncatbuff(b, url_md5(md5, fil_complete), SAVE_LEFT(), (tok == 'Q') ? 32 : 4);
             b += strlen(b);     // pointer à la fin
           }
           break;
         case 'r':
         case 'R':              // protocol
           *b = '\0';
-          strcatbuff(b, protocol_str[protocol]);
+          strlcatbuff(b, protocol_str[protocol], SAVE_LEFT());
           b += strlen(b);       // pointer à la fin
           break;
 
@@ -1021,17 +1031,24 @@ int url_savename(lien_adrfilsave *const afs,
             char *d = strchr(fil_complete, '?');
 
             if (d != NULL) {
-              strcatbuff(b, d);
+              strlcatbuff(b, d, SAVE_LEFT());
               b += strlen(b);
             }
           }
           break;
 
         }
-      } else
-        *b++ = *a++;
+      } else {
+        if (SAVE_LEFT() > 1) {
+          *b++ = *a++;
+        } else {
+          a++;                  /* out of room: drop, do not run past the end */
+        }
+      }
     }
+    assertf(SAVE_LEFT() > 0);
     *b++ = '\0';
+#undef SAVE_LEFT
     //
     // Types prédéfinis
     //
@@ -1619,40 +1636,40 @@ int url_savename(lien_adrfilsave *const afs,
 }
 
 /* nom avec md5 urilisé partout */
-void standard_name(char *b, const char *dot_pos, const char *nom_pos, const char *fil,
-                   int short_ver) {
+void standard_name(char *b, size_t b_size, const char *dot_pos,
+                   const char *nom_pos, const char *fil, int short_ver) {
   char md5[32 + 2];
 
   b[0] = '\0';
   /* Nom */
   if (dot_pos) {
     if (!short_ver)             // Noms longs
-      strncatbuff(b, nom_pos, (dot_pos - nom_pos));
+      strlncatbuff(b, nom_pos, b_size, (dot_pos - nom_pos));
     else
-      strncatbuff(b, nom_pos, min(dot_pos - nom_pos, 8));
+      strlncatbuff(b, nom_pos, b_size, min(dot_pos - nom_pos, 8));
   } else {
     if (!short_ver)             // Noms longs
-      strcatbuff(b, nom_pos);
+      strlcatbuff(b, nom_pos, b_size);
     else
-      strncatbuff(b, nom_pos, 8);
+      strlncatbuff(b, nom_pos, b_size, 8);
   }
   /* MD5 - 16 bits */
-  strncatbuff(b, url_md5(md5, fil), 4);
+  strlncatbuff(b, url_md5(md5, fil), b_size, 4);
   /* Ext */
   if (dot_pos) {
-    strcatbuff(b, ".");
+    strlcatbuff(b, ".", b_size);
     if (!short_ver)             // Noms longs
-      strcatbuff(b, dot_pos + 1);
+      strlcatbuff(b, dot_pos + 1, b_size);
     else
-      strncatbuff(b, dot_pos + 1, 3);
+      strlncatbuff(b, dot_pos + 1, b_size, 3);
   }
   // Allow extensionless
 #ifdef DO_NOT_ALLOW_EXTENSIONLESS
   else {
     if (!short_ver)             // Noms longs
-      strcatbuff(b, DEFAULT_EXT);
+      strlcatbuff(b, DEFAULT_EXT, b_size);
     else
-      strcatbuff(b, DEFAULT_EXT_SHORT);
+      strlcatbuff(b, DEFAULT_EXT_SHORT, b_size);
   }
 #endif
 }

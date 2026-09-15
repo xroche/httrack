@@ -46,6 +46,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscharset.h"
 #include "htsencoding.h"
 #include "htsmd5.h"
+#include "htsrobots.h"
 
 #include <ctype.h>
 #if USE_BEGINTHREAD
@@ -328,6 +329,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             } else if (strcmp(tmp_argv[0], "-#h") == 0) {
               printf("HTTrack version " HTTRACK_VERSION "%s\n",
                      hts_get_version_info(opt));
+              htsmain_free();   /* every other early return does this */
               return 0;
             } else {
               if (strncmp(tmp_argv[0], "--", 2)) {      /* pas */
@@ -1882,7 +1884,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 
                       sprintf(tmp,
                               "option %%W : unable to load the module %s: %s (check the library path ?)",
-                              argv[na], strerror(last_errno));
+                              argv[na], hts_strerror(last_errno));
                       HTS_PANIC_PRINTF(tmp);
                       htsmain_free();
                       return -1;
@@ -2644,6 +2646,46 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   return 0;
                 }
                 break;
+              case '9':  // robots.txt rules: httrack -#9 "D/|A/public/" "/public/x"
+                if (na + 2 >= argc) {
+                  HTS_PANIC_PRINTF
+                    ("Option #9 needs to be followed by a rule set and a path");
+                  printf("Example: '-#9' \"D/|A/public/\" \"/public/x.html\"\n");
+                  htsmain_free();
+                  return -1;
+                } else {
+                  robots_wizard robots;
+                  char *rules = strdupt(argv[na + 1]);
+
+                  if (rules == NULL) {
+                    HTS_PANIC_PRINTF("Not enough memory");
+                    htsmain_free();
+                    return -1;
+                  }
+                  /* '|' stands in for a newline, so that a rule set stays
+                     typeable on a command line */
+                  {
+                    char *p;
+
+                    for(p = rules; *p != '\0'; p++) {
+                      if (*p == '|') {
+                        *p = '\n';
+                      }
+                    }
+                  }
+                  memset(&robots, 0, sizeof(robots));
+                  strcpybuff(robots.adr, "example.com");
+                  robots.rules = rules;
+                  robots.next = NULL;
+                  printf("%s\n",
+                         checkrobots(&robots, "example.com",
+                                     argv[na + 2]) == -1
+                         ? "forbidden" : "allowed");
+                  freet(rules);
+                  htsmain_free();
+                  return 0;
+                }
+                break;
               case '!':
                 HTS_PANIC_PRINTF
                   ("Option #! is disabled for security reasons");
@@ -3098,7 +3140,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           fclose(fp);
           fp = NULL;
           //} else if (opt->debug>1) {
-          //  printf("! FileOpen error, \"%s\"\n",strerror(errno));
+          //  printf("! FileOpen error, \"%s\"\n",hts_strerror(errno));
         }
       }
       // petit message dans le lock

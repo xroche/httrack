@@ -507,7 +507,7 @@ static int help_server(char *dest_path, int defaultPort) {
       int last_errno = errno;
 
       fprintf(stderr, "Unable to create the server: %s\n",
-              strerror(last_errno));
+              hts_strerror(last_errno));
 #ifdef _WIN32
       closesocket(soc);
 #else
