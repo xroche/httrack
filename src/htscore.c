@@ -472,7 +472,7 @@ int httpmirror(char *url1, httrackp * opt) {
   int makeindex_done = 0;       // lorsque l'index sera fait
   FILE *makeindex_fp = NULL;
   int makeindex_links = 0;
-  char BIGSTK makeindex_firstlink[HTS_URLMAXSIZE * 2];
+  char BIGSTK makeindex_firstlink[HTSPARSE_URLBUFF_SIZE];
 
   // statistiques (mode #Z)
   FILE *makestat_fp = NULL;     // fichier de stats taux transfert
@@ -482,8 +482,8 @@ int httpmirror(char *url1, httrackp * opt) {
   int makestat_lnk = 0;         // idem, pour le nombre de liens
 
   //
-  char BIGSTK codebase[HTS_URLMAXSIZE * 2];     // base pour applet java
-  char BIGSTK base[HTS_URLMAXSIZE * 2]; // base pour les autres fichiers
+  char BIGSTK codebase[HTSPARSE_URLBUFF_SIZE];  // base pour applet java
+  char BIGSTK base[HTSPARSE_URLBUFF_SIZE];      // base pour les autres fichiers
 
   //
   cache_back BIGSTK cache;
