@@ -121,8 +121,9 @@ int main(int argc, char **argv) {
 
   if (argc < 4) {
     fprintf(stderr,
-            "usage: mirrorverdict finish|stop|why|refuse|transport <url>"
-            " <outdir> [url...]\n");
+            "usage: mirrorverdict"
+            " finish|stop|why|refuse|transport|transport-twice <url> <outdir>"
+            " [url...]\n");
     return 2;
   }
   hts_init();
@@ -138,7 +139,7 @@ int main(int argc, char **argv) {
     CHAIN_FUNCTION(opt, loop, stop_now, NULL);
   if (strcmp(argv[1], "refuse") == 0)
     CHAIN_FUNCTION(opt, start, refuse_start, NULL);
-  if (strcmp(argv[1], "transport") == 0)
+  if (strncmp(argv[1], "transport", 9) == 0)
     CHAIN_FUNCTION(opt, loop, watch_failures, NULL);
 
   args[argn++] = av[0];
@@ -164,7 +165,7 @@ int main(int argc, char **argv) {
   rc = hts_main2(argn, args, opt);
 
   printf("rc: %d\n", rc);
-  if (strcmp(argv[1], "transport") == 0) {
+  if (strncmp(argv[1], "transport", 9) == 0) {
     /* The count lives on the opt and is zeroed only when the next mirror
        starts, so a front end that decides after hts_main2() returns still
        reads it here. */
@@ -174,6 +175,34 @@ int main(int argc, char **argv) {
     printf("after-failures: %d\n",
            after != NULL ? after->stat_transport_failures : -1);
   }
+  /* A second mirror on the same opt starts from zero, which is what makes the
+     count per mirror rather than per process. httrack-android reuses one opt
+     across crawls, so this is the reading its next run gets. The URL list is
+     the primary alone, so this mirror has nothing to fail. */
+  if (strcmp(argv[1], "transport-twice") == 0) {
+    char dir2[1024];
+    const hts_stat_struct *again;
+    int n = 0;
+
+    if (snprintf(dir2, sizeof(dir2), "%s.second", argv[3]) >=
+        (int) sizeof(dir2)) {
+      fprintf(stderr, "outdir too long\n");
+      return 2;
+    }
+    args[n++] = av[0];
+    args[n++] = argv[2];
+    args[n++] = av[1];
+    args[n++] = dir2;
+    for (i = av_loop_from; i < sizeof(av) / sizeof(av[0]); i++)
+      args[n++] = av[i];
+    args[n] = NULL;
+    rc = hts_main2(n, args, opt);
+    again = hts_get_stats(opt);
+    printf("second-rc: %d\n", rc);
+    printf("second-failures: %d\n",
+           again != NULL ? again->stat_transport_failures : -1);
+  }
+
   printf("after: %s\n", verdict_name(hts_mirror_completed(opt)));
   hts_free_opt(opt);
   hts_uninit();

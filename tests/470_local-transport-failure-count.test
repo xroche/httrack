@@ -68,6 +68,21 @@ if test -n "${MIRRORVERDICT_BIN:-}"; then
     test "$late" -gt 0 ||
         fail "hts_get_stats() after the mirror lost the count: ${tick}"
     echo "OK (${late})"
+
+    # Per mirror, not per process: an embedder reusing one opt across crawls
+    # reads its next run's own failures. The second mirror is given the live URL
+    # alone, so it has none.
+    printf '[a second mirror on the same opt starts from zero] ..\t'
+    tick=$("$MIRRORVERDICT_BIN" transport-twice "${BASEURL}/simple/basic.html" \
+        "${tmpdir}/twice" "http://127.0.0.1:${dead}/dead.html" 2>&1) ||
+        fail "mirrorverdict failed: ${tick}"
+    first=$(printf '%s\n' "$tick" | sed -n 's/^after-failures: \([0-9]*\)$/\1/p')
+    next=$(printf '%s\n' "$tick" | sed -n 's/^second-failures: \([0-9]*\)$/\1/p')
+    test "${first:-0}" -gt 0 ||
+        fail "the first mirror counted nothing, so the reset proves nothing: ${tick}"
+    test "${next:-x}" = 0 ||
+        fail "the second mirror inherited the first one's count: ${tick}"
+    echo "OK (${first} then ${next})"
 fi
 
 # A body cut off after its headers is a hole too, and the server answered 200,
