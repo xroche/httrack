@@ -2498,30 +2498,41 @@ static int st_logcounters(httrackp *opt, int argc, char **argv) {
   (void) argc;
   (void) argv;
 
-  /* What -Q leaves behind: no log file, default verbosity. */
+  /* -Q sets no log file and default verbosity. */
   o->log = NULL;
   o->errlog = NULL;
   o->debug = LOG_NOTICE;
 
   hts_log_print(o, LOG_ERROR, "first");
-  hts_log_print(o, LOG_ERROR, "second");
+  /* LOG_ERRNO rides in the high bits and must not shift the level. */
+  hts_log_print(o, LOG_ERROR | LOG_ERRNO, "second");
   hts_log_print(o, LOG_WARNING, "third");
-  hts_log_print(o, LOG_NOTICE, "fourth");
+  hts_log_print(o, LOG_WARNING, "fourth");
+  hts_log_print(o, LOG_WARNING, "fifth");
+  hts_log_print(o, LOG_NOTICE, "sixth");
 
+  /* Three distinct totals, so a swapped counter cannot pass. */
   stats = hts_get_stats(o);
-  if (stats == NULL || stats->stat_errors != 2 || stats->stat_warnings != 1 ||
+  if (stats == NULL || stats->stat_errors != 2 || stats->stat_warnings != 3 ||
       stats->stat_infos != 1)
     err = 1;
 
-  /* Reading is not counting: hts_get_stats() is polled during a mirror. */
+  /* Polling hts_get_stats() must not increment the count. */
   stats = hts_get_stats(o);
   if (stats == NULL || stats->stat_errors != 2)
     err = 1;
 
   /* LOG_INFO is above the default verbosity, so it is not counted. */
-  hts_log_print(o, LOG_INFO, "fifth");
+  hts_log_print(o, LOG_INFO, "seventh");
   stats = hts_get_stats(o);
   if (stats == NULL || stats->stat_infos != 1)
+    err = 1;
+
+  /* Raising the verbosity lets the same level through. */
+  o->debug = LOG_INFO;
+  hts_log_print(o, LOG_INFO, "eighth");
+  stats = hts_get_stats(o);
+  if (stats == NULL || stats->stat_infos != 2)
     err = 1;
 
   hts_free_opt(o);

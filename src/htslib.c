@@ -6408,8 +6408,8 @@ HTSEXT_API void hts_log_vprint(httrackp * opt, int type, const char *format, va_
       s_type = "panic";
       break;
     }
-    /* Count the event, not the line: a run with no log file still reports
-     * errors (#1681). */
+    /* Count the event, not the line, so errors are reported with no log
+     * file (#1681). */
     fspc_count(opt, s_type);
 
     if (opt->log != NULL) {
@@ -6422,8 +6422,8 @@ HTSEXT_API void hts_log_vprint(httrackp * opt, int type, const char *format, va_
       if (opt->flush) {
         fflush(opt->log);
       }
-      errno = save_errno;
     }
+    errno = save_errno;
   }
 }
 

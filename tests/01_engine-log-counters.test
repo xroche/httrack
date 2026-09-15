@@ -3,7 +3,6 @@
 
 set -euo pipefail
 
-# A run with no log file still counts its errors: the counter must follow the
-# event, not the log line (#1681).
+# The event is counted, not the log line, even with no log file (#1681).
 out=$(httrack -O /dev/null -#test=log-counters)
 grep -q "log-counters: OK" <<<"$out"
