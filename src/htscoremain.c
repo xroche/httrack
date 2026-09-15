@@ -69,21 +69,21 @@ Please visit our Website: http://www.httrack.com
 extern int IPV6_resolver;
 
 // Add a command in the argc/argv
-#define cmdl_add(token,argc,argv,buff,ptr) \
+#define cmdl_add(token,argc,argv,buff,bufsize,ptr) \
   argv[argc]=(buff+ptr); \
-  strcpybuff(argv[argc],token); \
+  strlcpybuff(argv[argc],token,(bufsize)-(size_t)(ptr)); \
   ptr += (int) (strlen(argv[argc])+2); \
   argc++
 
 // Insert a command in the argc/argv
-#define cmdl_ins(token,argc,argv,buff,ptr) \
+#define cmdl_ins(token,argc,argv,buff,bufsize,ptr) \
   { \
   int i; \
   for(i=argc;i>0;i--)\
   argv[i]=argv[i-1];\
   } \
   argv[0]=(buff+ptr); \
-  strcpybuff(argv[0],token); \
+  strlcpybuff(argv[0],token,(bufsize)-(size_t)(ptr)); \
   ptr += (int) (strlen(argv[0])+2); \
   argc++
 
@@ -165,6 +165,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
 static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   char **x_argv = NULL;         // Patch pour argv et argc: en cas de récupération de ligne de commande
   char *x_argvblk = NULL;       // (reprise ou update)
+  size_t x_argvblk_size = 0;    // its capacity
   int x_ptr = 0;                // offset
 
   //
@@ -242,7 +243,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         *a = ' ';
       /* equivalent to "empty parameter" */
       if ((strcmp(argv[na], HTS_NOPARAM) == 0) || (strcmp(argv[na], HTS_NOPARAM2) == 0))        // (none)
-        strcpybuff(argv[na], "\"\"");
+        strlcpybuff(argv[na], "\"\"", strlen(argv[na]) + 1);
       if (strncmp(argv[na], "-&", 2) == 0)
         argv[na][1] = '%';
     }
@@ -258,7 +259,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       current_size += (int) (strlen(argv[na]) + 1);
     if ((size = fsize("config")) > 0)
       current_size += size;
-    x_argvblk = (char *) malloct(current_size + 32768);
+    x_argvblk_size = (size_t) current_size + 32768;
+    x_argvblk = (char *) malloct(x_argvblk_size);
     if (x_argvblk == NULL) {
       HTS_PANIC_PRINTF("Error, not enough memory");
       htsmain_free();
@@ -285,7 +287,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     //
     argv_url = 0;               /* pour comptage */
     //
-    cmdl_add(argv[0], x_argc, x_argv, x_argvblk, x_ptr);
+    cmdl_add(argv[0], x_argc, x_argv, x_argvblk, x_argvblk_size, x_ptr);
     na = 1;                     /* commencer après nom_prg */
     while(na < argc) {
       int result = 1;
@@ -298,7 +300,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         /* Vérifier Commande (alias) */
         result =
           optalias_check(argc, (const char *const *) argv, na, &tmp_argc,
-                         (char **) tmp_argv, tmp_error);
+                         (char **) tmp_argv, sizeof(_tmp_argv[0]), tmp_error,
+                         sizeof(tmp_error));
         if (!result) {
           HTS_PANIC_PRINTF(tmp_error);
           htsmain_free();
@@ -306,9 +309,9 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         }
 
         /* Copier */
-        cmdl_add(tmp_argv[0], x_argc, x_argv, x_argvblk, x_ptr);
+        cmdl_add(tmp_argv[0], x_argc, x_argv, x_argvblk, x_argvblk_size, x_ptr);
         if (tmp_argc > 1) {
-          cmdl_add(tmp_argv[1], x_argc, x_argv, x_argvblk, x_ptr);
+          cmdl_add(tmp_argv[1], x_argc, x_argv, x_argvblk, x_argvblk_size, x_ptr);
         }
 
         /* Compter URLs et détecter -i,-q.. */
@@ -390,7 +393,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             return -1;
           }
           tempo[strlen(tempo) - 1] = '\0';
-          strcpybuff(argv[na], tempo);
+          strlcpybuff(argv[na], tempo, strlen(argv[na]) + 1);
         }
 
         if (cmdl_opt(argv[na])) {       // option
@@ -495,14 +498,16 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               (fconcat
                (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                StringBuff(opt->path_log), HTS_HTTRACKRC),
-               &argc, argv, x_argvblk, &x_ptr))
-            if (!optinclude_file(HTS_HTTRACKRC, &argc, argv, x_argvblk, &x_ptr)) {
+               &argc, argv, x_argvblk, x_argvblk_size, &x_ptr))
+            if (!optinclude_file(HTS_HTTRACKRC, &argc, argv, x_argvblk,
+                                 x_argvblk_size, &x_ptr)) {
               if (!optinclude_file
                   (fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                   hts_gethome(), "/" HTS_HTTRACKRC),
-                   &argc, argv, x_argvblk, &x_ptr)) {
+                   &argc, argv, x_argvblk, x_argvblk_size, &x_ptr)) {
 #ifdef HTS_HTTRACKCNF
-                optinclude_file(HTS_HTTRACKCNF, &argc, argv, x_argvblk, &x_ptr);
+                optinclude_file(HTS_HTTRACKCNF, &argc, argv, x_argvblk,
+                                x_argvblk_size, &x_ptr);
 #endif
               }
             }
@@ -554,8 +559,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         if (lastp) {
           if (strnotempty(lastp)) {
             insert_after_argc = argc - insert_after;
-            cmdl_ins(lastp, insert_after_argc, (argv + insert_after), x_argvblk,
-                     x_ptr);
+            cmdl_ins(lastp, insert_after_argc, (argv + insert_after),
+                     x_argvblk, x_argvblk_size, x_ptr);
             argc = insert_after_argc + insert_after;
             insert_after++;
           }
@@ -675,7 +680,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       if (argv[i][0] == '-') {
         if (argv[i][1] == '-') {        // --xxx
           if ((strfield2(argv[i] + 2, "clean")) || (strfield2(argv[i] + 2, "tide"))) {  // nettoyer
-            strcpybuff(argv[i] + 1, "");
+            argv[i][1] = '\0';
             if (fexist
                 (fconcat
                  (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), "hts-log.txt")))
@@ -784,7 +789,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             //
           } else if (strfield2(argv[i] + 2, "catchurl")) {      // capture d'URL via proxy temporaire!
             argv_url = 1;       // forcer a passer les parametres
-            strcpybuff(argv[i] + 1, "#P");
+            strlcpybuff(argv[i] + 1, "#P", strlen(argv[i] + 1) + 1);
             //
           } else if (strfield2(argv[i] + 2, "updatehttrack")) {
 #ifdef _WIN32
@@ -1121,7 +1126,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           return -1;
         }
         tempo[strlen(tempo) - 1] = '\0';
-        strcpybuff(argv[na], tempo);
+        strlcpybuff(argv[na], tempo, strlen(argv[na]) + 1);
       }
 
       if (cmdl_opt(argv[na])) { // option
@@ -2077,9 +2082,9 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                           a += binput(a, afs.af.fil, HTS_URLMAXSIZE);
                           url[0] = '\0';
                           if (!link_has_authority(afs.af.adr))
-                            strcatbuff(url, "http://");
-                          strcatbuff(url, afs.af.adr);
-                          strcatbuff(url, afs.af.fil);
+                            strlcatbuff(url, "http://", url_sz);
+                          strlcatbuff(url, afs.af.adr, url_sz);
+                          strlcatbuff(url, afs.af.fil, url_sz);
                           /* read position */
                           a += binput(a, linepos, 200);
                           sscanf(linepos, "%d", &pos);
@@ -2812,7 +2817,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         if (urlSize < HTS_URLMAXSIZE) {
           ensureUrlCapacity(url, url_sz, capa);
           if (strnotempty(url))
-            strcatbuff(url, " ");       // espace de séparation
+            strlcatbuff(url, " ", url_sz);      // espace de séparation
           append_escape_spc_url(unescape_http_unharm(catbuff, sizeof(catbuff), argv[na], 1), url, url_sz);
         }
       }                         // if argv=- etc. 
