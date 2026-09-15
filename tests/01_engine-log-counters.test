@@ -1,0 +1,9 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# A run with no log file still counts its errors: the counter must follow the
+# event, not the log line (#1681).
+out=$(httrack -O /dev/null -#test=log-counters)
+grep -q "log-counters: OK" <<<"$out"

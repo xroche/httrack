@@ -433,6 +433,9 @@ void filters_bind(httrackp *opt, char ***ptrfilters, int *filptr);
 hts_boolean filters_insert(httrackp *opt, int pos, const char *pattern);
 
 int fspc(httrackp * opt, FILE * fp, const char *type);
+/* Count one log event ("error", "warning", "info") into opt's counters, which
+   hts_get_stats() publishes. Counted whether or not a log file is open. */
+void fspc_count(httrackp *opt, const char *type);
 
 char *next_token(char *p, int flag);
 

@@ -6353,6 +6353,7 @@ HTSEXT_API int hts_uninit_module(void) {
 HTSEXT_API hts_boolean hts_log(httrackp *opt, const char *prefix,
                                const char *msg) {
   if (opt->log != NULL) {
+    fspc_count(opt, prefix);
     fspc(opt, opt->log, prefix);
     fprintf(opt->log, "%s" LF, msg);
     return 0;
@@ -6376,7 +6377,7 @@ HTSEXT_API void hts_log_vprint(httrackp * opt, int type, const char *format, va_
     hts_log_print_callback(opt, type, format, args_copy);
     va_end(args_copy);
   }
-  if (opt != NULL && opt->log != NULL) {
+  if (opt != NULL) {
     const int save_errno = errno;
     const char *s_type = "unknown";
     const int level = type & 0xff;
@@ -6407,16 +6408,22 @@ HTSEXT_API void hts_log_vprint(httrackp * opt, int type, const char *format, va_
       s_type = "panic";
       break;
     }
-    fspc(opt, opt->log, s_type);
-    (void) vfprintf(opt->log, format, args);
-    if ((type & LOG_ERRNO) != 0) {
-      fprintf(opt->log, ": %s", strerror(save_errno));
+    /* Count the event, not the line: a run with no log file still reports
+     * errors (#1681). */
+    fspc_count(opt, s_type);
+
+    if (opt->log != NULL) {
+      fspc(opt, opt->log, s_type);
+      (void) vfprintf(opt->log, format, args);
+      if ((type & LOG_ERRNO) != 0) {
+        fprintf(opt->log, ": %s", strerror(save_errno));
+      }
+      fputs(LF, opt->log);
+      if (opt->flush) {
+        fflush(opt->log);
+      }
+      errno = save_errno;
     }
-    fputs(LF, opt->log);
-    if (opt->flush) {
-      fflush(opt->log);
-    }
-    errno = save_errno;
   }
 }
 
