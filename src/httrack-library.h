@@ -250,9 +250,10 @@ HTSEXT_API char *antislash_unescaped(char *catbuff, const char *s);
 
 HTSEXT_API void escape_remove_control(char *s);
 /* Smallest buffer any caller hands to get_httptype()/guess_httptype() for s.
-   The contract was never written down; state it so the writes that produce a
-   fixed string can be bounded without a signature change. */
-#define GET_HTTPTYPE_MIN_SIZE 64
+   The contract was never written down; state it so every write can be
+   bounded without a signature change. The floor is htsblk.contenttype, which
+   has to hold the longest entry in hts_mime[] (73 characters). */
+#define GET_HTTPTYPE_MIN_SIZE 80
 HTSEXT_API void get_httptype(httrackp * opt, char *s, const char *fil,
                              int flag);
 HTSEXT_API int is_knowntype(httrackp * opt, const char *fil);

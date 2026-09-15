@@ -500,7 +500,9 @@ struct htsblk {
   FILE *out;                    // écriture directe sur disque (si is_write=1)
   LLint size;                   // taille fichier
   char msg[80];                 // message éventuel si échec ("\0"=non précisé)
-  char contenttype[64];         // content-type ("text/html" par exemple)
+  char contenttype[80];         // content-type ("text/html" par exemple)
+                                // 80, not 64: the longest type in hts_mime[]
+                                // is 73 characters (the OOXML ones)
   char charset[64];             // charset ("iso-8859-1" par exemple)
   char contentencoding[64];     // content-encoding ("gzip" par exemple)
   char *location;               // on copie dedans éventuellement la véritable 'location'

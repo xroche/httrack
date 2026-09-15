@@ -4040,6 +4040,13 @@ void guess_httptype(httrackp * opt, char *s, const char *fil) {
 // idem
 // flag: 1 si toujours renvoyer un type
 HTSEXT_API void get_httptype(httrackp * opt, char *s, const char *fil, int flag) {
+  /* Every write below is bounded by GET_HTTPTYPE_MIN_SIZE, and
+     htsblk.contenttype is the smallest buffer any caller passes. Fail the
+     build rather than the assert if it is ever made smaller than that. */
+  typedef char get_httptype_size_check_[
+    (sizeof(((htsblk *) 0)->contenttype) >= GET_HTTPTYPE_MIN_SIZE)
+    ? 1 : -1] HTS_UNUSED;
+
   // userdef overrides get_httptype
   if (get_userhttptype(opt, s, fil)) {
     return;
@@ -4060,7 +4067,7 @@ HTSEXT_API void get_httptype(httrackp * opt, char *s, const char *fil, int flag)
       while(strnotempty(hts_mime[j][1])) {
         if (strfield2(hts_mime[j][1], a)) {
           if (hts_mime[j][0][0] != '*') {       // Une correspondance existe
-            strcpybuff(s, hts_mime[j][0]);
+            strlcpybuff(s, hts_mime[j][0], GET_HTTPTYPE_MIN_SIZE);
             return;
           }
         }
