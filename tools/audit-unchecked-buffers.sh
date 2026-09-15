@@ -22,7 +22,7 @@ set -u
 
 # Ratchet. This records the existing legacy sites in the PR merge tree; lower
 # it as sites are fixed, and do not raise it for new code.
-BASELINE=172
+BASELINE=171
 
 cd "$(dirname "$0")/.." || exit 1
 
@@ -38,13 +38,26 @@ trap 'rm -f "$log"' EXIT
 # warnings individually instead.
 quiet="-Wno-unused-parameter -Wno-sign-compare -Wno-unused-variable"
 
+# A translation unit that fails to compile emits no probe warnings, so its
+# call sites vanish from the count. Left unchecked that reads as progress --
+# an uninitialized src/coucal submodule alone hides 23 of the 25 files -- so
+# treat any compile failure as fatal rather than counting what is left.
+failed=
 for f in src/*.c src/proxy/*.c ; do
 	test -f "$f" || continue
 	gcc -c -o /dev/null \
 		-Isrc -I. -Isrc/proxy -Isrc/coucal -DHAVE_CONFIG_H \
 		-O2 -DHTS_AUDIT_UNCHECKED_BUFFERS $quiet \
-		"$f" 2>>"$log"
+		"$f" 2>>"$log" || failed="$failed $f"
 done
+
+if test -n "$failed" ; then
+	echo "ERROR: probe compile failed, count would be meaningless:" >&2
+	for f in $failed ; do echo "  $f" >&2 ; done
+	grep -E "(fatal )?error:" "$log" | sort -u | head -5 >&2
+	echo "Check that submodules are initialized: git submodule update --init --recursive" >&2
+	exit 1
+fi
 
 sites=$(grep -B4 'destination is a pointer' "$log" \
 	| grep -oE '^[a-zA-Z0-9_/.-]+\.c:[0-9]+:[0-9]+:' \
@@ -64,8 +77,9 @@ if test "$count" -gt "$BASELINE" ; then
 	echo "Pass the destination capacity explicitly; see the header of this script." >&2
 	exit 1
 elif test "$count" -lt "$BASELINE" ; then
-	echo "Good: $((BASELINE - count)) fewer than the baseline." >&2
-	echo "Lower BASELINE in $0 to $count to lock that in." >&2
+	echo "ERROR: $((BASELINE - count)) fewer than the recorded baseline." >&2
+	echo "Lower BASELINE in $0 to $count in the same change to lock that in." >&2
+	exit 1
 fi
 
 exit 0
