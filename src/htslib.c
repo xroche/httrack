@@ -4046,7 +4046,7 @@ HTSEXT_API void get_httptype(httrackp * opt, char *s, const char *fil, int flag)
   }
   // regular tests
   if (ishtml(opt, fil) == 1) {
-    strcpybuff(s, "text/html");
+    strlcpybuff(s, "text/html", GET_HTTPTYPE_MIN_SIZE);
   } else {
     /* Check html -> text/html */
     const char *a = fil + strlen(fil) - 1;
@@ -4067,11 +4067,11 @@ HTSEXT_API void get_httptype(httrackp * opt, char *s, const char *fil, int flag)
         j++;
       }
 
-      if (flag)
-        sprintf(s, "application/%s", a);
+      if (flag)                 /* bounded above by strlen(a) < 32 */
+        snprintf(s, GET_HTTPTYPE_MIN_SIZE, "application/%s", a);
     } else {
       if (flag)
-        strcpybuff(s, "application/octet-stream");
+        strlcpybuff(s, "application/octet-stream", GET_HTTPTYPE_MIN_SIZE);
     }
   }
 }

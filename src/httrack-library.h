@@ -249,6 +249,10 @@ HTSEXT_API char *unescape_http_unharm(char *const catbuff, const size_t size, co
 HTSEXT_API char *antislash_unescaped(char *catbuff, const char *s);
 
 HTSEXT_API void escape_remove_control(char *s);
+/* Smallest buffer any caller hands to get_httptype()/guess_httptype() for s.
+   The contract was never written down; state it so the writes that produce a
+   fixed string can be bounded without a signature change. */
+#define GET_HTTPTYPE_MIN_SIZE 64
 HTSEXT_API void get_httptype(httrackp * opt, char *s, const char *fil,
                              int flag);
 HTSEXT_API int is_knowntype(httrackp * opt, const char *fil);
