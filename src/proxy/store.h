@@ -56,7 +56,9 @@ typedef struct _PT_Element {
   char *headers;                // adresse des en têtes si présents (RFC822 format)
   size_t size;                  // taille fichier
   char msg[1024];               // error message ("\0"=undefined)
-  char contenttype[64];         // content-type ("text/html" par exemple)
+  char contenttype[80];         // content-type ("text/html" par exemple)
+                                // 80, not 64: the longest type the engine
+                                // can store is 73 characters (see htsopt.h)
   char charset[64];             // charset ("iso-8859-1" par exemple)
   char *location;               // on copie dedans éventuellement la véritable 'location'
   char lastmodified[64];        // Last-Modified

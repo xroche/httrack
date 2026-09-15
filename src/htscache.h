@@ -80,7 +80,10 @@ int cache_writedata(FILE * cache_ndx, FILE * cache_dat, const char *str1,
 int cache_readdata(cache_back * cache, const char *str1, const char *str2,
                    char **inbuff, int *len);
 
-void cache_rstr(FILE * fp, char *s);
+/* Capacity assumed for the 'location' buffer callers hand to cache_read()
+   and friends, and for the fallback used when they pass none. */
+#define CACHE_LOCATION_SIZE (HTS_URLMAXSIZE * 2)
+void cache_rstr(FILE * fp, char *s, size_t size);
 char *cache_rstr_addr(FILE * fp);
 int cache_brstr(char *adr, char *s);
 int cache_quickbrstr(char *adr, char *s);
