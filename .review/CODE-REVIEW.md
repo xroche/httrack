@@ -53,7 +53,7 @@ not a separate bug.
 | 1.9 `retour` null deref | fixed, 37b2df52 |
 | 1.10 `strstr` on NULL body | fixed, 37b2df52 |
 | 1.11 unchecked malloc | fixed, 37b2df52 |
-| 1.12 `strcpybuff` degradation | 43 of 199 sites fixed; rest ratcheted in CI, a40aa076 |
+| 1.12 `strcpybuff` degradation | fixed — all 199 sites; ratchet now at 0, b38f9c1c |
 | 1.13 memory leaks | charset leaks fixed, 37b2df52; startup one-shots left |
 | 1.14 non-reentrant libc | fixed, b6c5fae6 |
 | 1.15 macro hygiene | fixed, 91cf964b |
