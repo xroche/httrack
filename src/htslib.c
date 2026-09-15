@@ -2668,7 +2668,7 @@ HTSEXT_API void qsec2str(char *st, TStamp t) {
 }
 
 /* Reentrant hts_strerror(). See htslib.h. */
-const char *hts_strerror(int err) {
+HTSEXT_API const char *hts_strerror(int err) {
   static HTS_TLS char buffer[256];
 
   buffer[0] = '\0';

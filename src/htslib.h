@@ -237,7 +237,7 @@ struct tm *hts_gmtime_r(const time_t *t, struct tm *buffer);
    buffer, so the returned pointer stays valid until this thread calls it
    again -- which makes it a drop-in for strerror() at a call site that uses
    the result immediately. */
-const char *hts_strerror(int err);
+HTSEXT_API const char *hts_strerror(int err);
 
 void time_gmt_rfc822(char *s);
 void time_local_rfc822(char *s);
