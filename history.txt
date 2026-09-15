@@ -5,6 +5,14 @@ HTTrack Website Copier release history:
 This file lists all changes and fixes that have been made for HTTrack
 
 unreleased
++ SECURITY: fixed an unbounded write in the user-defined save-name formatter
+  ('%h%p/%n%q.%t' and friends, -N). The destination array was aliased through
+  a char* cursor, which disarmed every bounds check in that function, so a
+  long enough remote URL overflowed the 2 KiB name buffer.
++ New: tools/audit-unchecked-buffers.sh counts the call sites where the
+  strcpybuff()/strcatbuff()/strncatbuff() macros silently degrade to an
+  unchecked strcpy()/strcat()/strncat(), and CI fails if the total grows.
++ New: -#9 test-bench command, checks robots.txt rule matching
 + SECURITY: webhttrack's control server now listens on the loopback interface
   only, instead of every interface. This server can start a mirror writing to
   an arbitrary path, so it was remote arbitrary file write. Pass '--bind-any'

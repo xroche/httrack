@@ -124,13 +124,46 @@ static HTS_UNUSED void htssafe_compile_time_check_(void) {
 }
 
 /**
+ * Buffer audit mode.
+ *
+ * The *buff macros below silently fall back to an unchecked strcpy() /
+ * strcat() / strncat() whenever the destination is a pointer rather than a
+ * char[] array, because sizeof() then measures the pointer. That is easy to
+ * introduce by accident -- assigning an array to a local char* is enough --
+ * and invisible at the call site, which reads as if it were bounded.
+ *
+ * Building with -DHTS_AUDIT_UNCHECKED_BUFFERS routes that fallback through
+ * functions carrying __attribute__((warning)), so every such call site is
+ * reported. The condition is a compile-time constant, so at -O1 and above
+ * the dead branch is folded away and the checked (array) case stays silent.
+ *
+ * See tools/audit-unchecked-buffers.sh, which counts them and fails if the
+ * total grows.
+ */
+#if defined(HTS_AUDIT_UNCHECKED_BUFFERS) && defined(__GNUC__)
+extern char *hts_unchecked_strcpy_(char *dest, const char *src)
+  __attribute__((warning("unchecked strcpy: destination is a pointer, use strlcpybuff()")));
+extern char *hts_unchecked_strcat_(char *dest, const char *src)
+  __attribute__((warning("unchecked strcat: destination is a pointer, use strlcatbuff()")));
+extern char *hts_unchecked_strncat_(char *dest, const char *src, size_t n)
+  __attribute__((warning("unchecked strncat: destination is a pointer, use strlncatbuff()")));
+#define HTS_UNCHECKED_STRCPY   hts_unchecked_strcpy_
+#define HTS_UNCHECKED_STRCAT   hts_unchecked_strcat_
+#define HTS_UNCHECKED_STRNCAT  hts_unchecked_strncat_
+#else
+#define HTS_UNCHECKED_STRCPY   strcpy
+#define HTS_UNCHECKED_STRCAT   strcat
+#define HTS_UNCHECKED_STRNCAT  strncat
+#endif
+
+/**
  * Append at most N characters from "B" to "A".
  * If "A" is a char[] variable whose size is not sizeof(char*), then the size 
  * is assumed to be the capacity of this array.
  */
 #define strncatbuff(A, B, N) \
   ( HTS_IS_NOT_CHAR_BUFFER(A) \
-  ? strncat(A, B, N) \
+  ? HTS_UNCHECKED_STRNCAT(A, B, N) \
   : strncat_safe_(A, sizeof(A), B, \
   HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), N, \
   "overflow while appending '" #B "' to '"#A"'", __FILE__, __LINE__) )
@@ -142,7 +175,7 @@ static HTS_UNUSED void htssafe_compile_time_check_(void) {
  */
 #define strcatbuff(A, B) \
   ( HTS_IS_NOT_CHAR_BUFFER(A) \
-  ? strcat(A, B) \
+  ? HTS_UNCHECKED_STRCAT(A, B) \
   : strncat_safe_(A, sizeof(A), B, \
   HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), (size_t) -1, \
   "overflow while appending '" #B "' to '"#A"'", __FILE__, __LINE__) )
@@ -154,7 +187,7 @@ static HTS_UNUSED void htssafe_compile_time_check_(void) {
  */
 #define strcpybuff(A, B) \
   ( HTS_IS_NOT_CHAR_BUFFER(A) \
-  ? strcpy(A, B) \
+  ? HTS_UNCHECKED_STRCPY(A, B) \
   : strcpy_safe_(A, sizeof(A), B, \
   HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), \
   "overflow while copying '" #B "' to '"#A"'", __FILE__, __LINE__) )
@@ -165,6 +198,18 @@ static HTS_UNUSED void htssafe_compile_time_check_(void) {
 #define strlcatbuff(A, B, S) \
   strncat_safe_(A, S, B, \
   HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), (size_t) -1, \
+  "overflow while appending '" #B "' to '"#A"'", __FILE__, __LINE__)
+
+/**
+ * Append at most "N" characters of "B" to "A", "A" having a maximum
+ * capacity of "S".
+ * Use this rather than strncatbuff() whenever "A" is a pointer: the
+ * sizeof() in strncatbuff() then measures the pointer, not the buffer, and
+ * the macro silently degrades to a plain unchecked strncat().
+ */
+#define strlncatbuff(A, B, S, N) \
+  strncat_safe_(A, S, B, \
+  HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B), N, \
   "overflow while appending '" #B "' to '"#A"'", __FILE__, __LINE__)
 
 /**
