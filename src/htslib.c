@@ -6621,6 +6621,7 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->singlefile_state = NULL;
   opt->links_unqueued = HTS_FALSE;
   opt->mirror_completed = HTS_DEFAULT;
+  opt->transport_failures = 0;
   opt->abort_left_partial = HTS_FALSE;
   StringCopy(opt->why_url, "");
   opt->pause_min_ms = 0;
@@ -6817,6 +6818,7 @@ const hts_stat_struct* hts_get_stats(httrackp * opt) {
   HTS_STAT.stat_errors = fspc(opt, NULL, "error");
   HTS_STAT.stat_warnings = fspc(opt, NULL, "warning");
   HTS_STAT.stat_infos = fspc(opt, NULL, "info");
+  HTS_STAT.stat_transport_failures = opt->transport_failures;
   HTS_STAT.nbk = 0;
   HTS_STAT.nb = 0;
 

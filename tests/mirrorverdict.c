@@ -36,6 +36,29 @@ Please visit our Website: http://www.httrack.com
 
 static int stop_asked = 0;
 
+/* The highest stat_transport_failures the loop callback was handed, which is
+   the only reading covering hts_loop_tick's own refresh. */
+static int tick_failures = 0;
+static int tick_count = 0;
+
+static int watch_failures(t_hts_callbackarg *carg, httrackp *opt,
+                          lien_back *back, int back_max, int back_index,
+                          int lien_tot, int lien_ntot, int stat_time,
+                          hts_stat_struct *stats) {
+  (void) carg;
+  (void) opt;
+  (void) back;
+  (void) back_max;
+  (void) back_index;
+  (void) lien_tot;
+  (void) lien_ntot;
+  (void) stat_time;
+  tick_count++;
+  if (stats != NULL && stats->stat_transport_failures > tick_failures)
+    tick_failures = stats->stat_transport_failures;
+  return 1;
+}
+
 /* The Stop button, pushed at the engine's first progress tick. */
 static int stop_now(t_hts_callbackarg *carg, httrackp *opt, lien_back *back,
                     int back_max, int back_index, int lien_tot, int lien_ntot,
@@ -95,9 +118,11 @@ int main(int argc, char **argv) {
   int argn = 0;
   int rc;
 
-  if (argc != 4) {
+  if (argc < 4) {
     fprintf(stderr,
-            "usage: mirrorverdict finish|stop|why|refuse <url> <outdir>\n");
+            "usage: mirrorverdict"
+            " finish|stop|why|refuse|transport|transport-twice <url> <outdir>"
+            " [url...]\n");
     return 2;
   }
   hts_init();
@@ -113,6 +138,8 @@ int main(int argc, char **argv) {
     CHAIN_FUNCTION(opt, loop, stop_now, NULL);
   if (strcmp(argv[1], "refuse") == 0)
     CHAIN_FUNCTION(opt, start, refuse_start, NULL);
+  if (strncmp(argv[1], "transport", 9) == 0)
+    CHAIN_FUNCTION(opt, loop, watch_failures, NULL);
 
   args[argn++] = av[0];
   args[argn++] = argv[2];
@@ -124,10 +151,54 @@ int main(int argc, char **argv) {
   }
   for (i = av_loop_from; i < sizeof(av) / sizeof(av[0]); i++)
     args[argn++] = av[i];
+  /* Extra URLs keep a crawl going past the first failure, which is what makes
+     the loop callback fire again afterwards. */
+  for (i = 4; (int) i < argc; i++) {
+    if ((size_t) argn + 1 >= sizeof(args) / sizeof(args[0])) {
+      fprintf(stderr, "too many URLs\n");
+      return 2;
+    }
+    args[argn++] = argv[i];
+  }
   args[argn] = NULL;
   rc = hts_main2(argn, args, opt);
 
   printf("rc: %d\n", rc);
+  if (strncmp(argv[1], "transport", 9) == 0) {
+    /* The count is zeroed only when the next mirror starts, so it survives
+       past hts_main2()'s return. */
+    const hts_stat_struct *after = hts_get_stats(opt);
+
+    printf("tick-failures: %d ticks: %d\n", tick_failures, tick_count);
+    printf("after-failures: %d\n",
+           after != NULL ? after->stat_transport_failures : -1);
+  }
+  /* The URL list is the primary alone, so a count above zero here is a leak
+     from the mirror before it. */
+  if (strcmp(argv[1], "transport-twice") == 0) {
+    char dir2[1024];
+    const hts_stat_struct *again;
+    int n = 0;
+
+    if (snprintf(dir2, sizeof(dir2), "%s.second", argv[3]) >=
+        (int) sizeof(dir2)) {
+      fprintf(stderr, "outdir too long\n");
+      return 2;
+    }
+    args[n++] = av[0];
+    args[n++] = argv[2];
+    args[n++] = av[1];
+    args[n++] = dir2;
+    for (i = av_loop_from; i < sizeof(av) / sizeof(av[0]); i++)
+      args[n++] = av[i];
+    args[n] = NULL;
+    rc = hts_main2(n, args, opt);
+    again = hts_get_stats(opt);
+    printf("second-rc: %d\n", rc);
+    printf("second-failures: %d\n",
+           again != NULL ? again->stat_transport_failures : -1);
+  }
+
   printf("after: %s\n", verdict_name(hts_mirror_completed(opt)));
   hts_free_opt(opt);
   hts_uninit();

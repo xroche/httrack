@@ -2488,6 +2488,42 @@ static int st_mirrorcompleted(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* stat_errors counts LOG_ERROR log lines, so it reads the same for a 404 as for
+   a timeout and sits at zero under -Q. A front end deciding whether a resume is
+   owed needs the failed transfers apart, and per mirror, so copy_htsopt() must
+   not carry the count between opts. */
+static int st_transportfailures(httrackp *opt, int argc, char **argv) {
+  httrackp *from = hts_create_opt();
+  httrackp *to = hts_create_opt();
+  const hts_stat_struct *stats;
+  int err = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  if (from->transport_failures != 0 || to->transport_failures != 0)
+    err = 1;
+
+  /* Published beside stat_errors, which is where a front end reads it. */
+  to->transport_failures = 7;
+  stats = hts_get_stats(to);
+  if (stats == NULL || stats->stat_transport_failures != 7)
+    err = 1;
+
+  /* A count never travels onto another opt. */
+  from->transport_failures = 3;
+  to->transport_failures = 0;
+  copy_htsopt(from, to);
+  if (to->transport_failures != 0)
+    err = 1;
+
+  hts_free_opt(from);
+  hts_free_opt(to);
+  printf("transport-failures: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 /* The handler below pins the enumerator NAME; these pin the NUMBERS, which are
    ABI in the installed htsopt.h and are what -C prints. */
 HTS_STATIC_ASSERT(HTS_CACHE_NONE == 0, cache_none_is_0);
@@ -15859,6 +15895,9 @@ static const struct selftest_entry {
     {"mirrorcompleted", "",
      "a fresh opt has no mirror verdict, and copy_htsopt carries none",
      st_mirrorcompleted},
+    {"transportfailures", "",
+     "a failed transfer is counted apart from an answered error",
+     st_transportfailures},
     {"cachedefault", "", "-C default is C1 cache-priority, not C2",
      st_cachedefault},
     {"lastchar", "",
