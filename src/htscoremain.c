@@ -329,6 +329,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             } else if (strcmp(tmp_argv[0], "-#h") == 0) {
               printf("HTTrack version " HTTRACK_VERSION "%s\n",
                      hts_get_version_info(opt));
+              htsmain_free();   /* every other early return does this */
               return 0;
             } else {
               if (strncmp(tmp_argv[0], "--", 2)) {      /* pas */

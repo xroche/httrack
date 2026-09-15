@@ -92,7 +92,8 @@ static HTS_UNUSED void log_abort_(const char *msg, const char *file, int line) {
   fflush(stderr);
 }
 
-static HTS_UNUSED void abortf_(const char *exp, const char *file, int line) {
+static HTS_UNUSED HTS_NORETURN void abortf_(const char *exp, const char *file,
+                                            int line) {
 #ifdef HTSSAFE_ABORT_FUNCTION
   HTSSAFE_ABORT_FUNCTION(exp, file, line);
 #endif
@@ -257,6 +258,7 @@ static HTS_INLINE HTS_UNUSED char* strncat_safe_(char *const dest, const size_t 
 static HTS_INLINE HTS_UNUSED char* strcpy_safe_(char *const dest, const size_t sizeof_dest,
                                                 const char *const source, const size_t sizeof_source, 
                                                 const char *exp, const char *file, int line) {
+  assertf_(dest != NULL, file, line);
   assertf_(sizeof_dest != 0, file, line);
   dest[0] = '\0';
   return strncat_safe_(dest, sizeof_dest, source, sizeof_source, (size_t) -1, exp, file, line);

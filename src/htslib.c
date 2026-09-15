@@ -657,13 +657,18 @@ T_SOC http_xfopen(httrackp * opt, int mode, int treat, int waitconnect,
 
   //char *p,*q;
 
+  /* 'retour' carries every result this function produces, and it is
+     dereferenced unconditionally from here on -- the scattered "if (retour)"
+     guards below cover only a handful of the 35 accesses, which made the
+     parameter look optional when it is not. Every caller passes a real
+     object ; state that as a precondition rather than faulting later. */
+  assertf(retour != NULL);
+
   // retour prédéfini: erreur
-  if (retour) {
-    retour->adr = NULL;
-    retour->size = 0;
-    retour->msg[0] = '\0';
-    retour->statuscode = STATUSCODE_NON_FATAL;  // a priori erreur non fatale
-  }
+  retour->adr = NULL;
+  retour->size = 0;
+  retour->msg[0] = '\0';
+  retour->statuscode = STATUSCODE_NON_FATAL;    // a priori erreur non fatale
 #if HDEBUG
   printf("adr=%s\nfichier=%s\n", adr, fil);
 #endif

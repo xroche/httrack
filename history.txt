@@ -5,6 +5,18 @@ HTTrack Website Copier release history:
 This file lists all changes and fixes that have been made for HTTrack
 
 unreleased
++ SECURITY: fixed a heap overflow when serializing a backlog entry with
+  '--getmode 0': the temporary filename buffer was sized from one string and
+  written from another, so a project path longer than the save name
+  overflowed it.
++ Fixed: seven memory leaks on allocation-failure paths in the charset
+  converters (realloc() returning NULL does not free the old block). These
+  were driven by remote content, so they were unbounded.
++ Fixed: null dereferences in http_xfopen() and in the HTML parser, an
+  unchecked allocation before a memcpy(), and a leak in the top-index
+  builder
++ Fixed: assert failures are now marked noreturn, so the compiler and the
+  static analyzer treat assertf() as a real precondition
 + SECURITY: fixed an unbounded write in the user-defined save-name formatter
   ('%h%p/%n%q.%t' and friends, -N). The destination array was aliased through
   a char* cursor, which disarmed every bounds check in that function, so a
