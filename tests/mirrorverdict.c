@@ -37,8 +37,8 @@ Please visit our Website: http://www.httrack.com
 static int stop_asked = 0;
 
 /* The highest stat_transport_failures the loop callback was handed. A GUI polls
-   here, not through hts_get_stats(), so only this reading covers hts_loop_tick's
-   own refresh. */
+   here, not through hts_get_stats(), so only this reading covers
+   hts_loop_tick's own refresh. */
 static int tick_failures = 0;
 static int tick_count = 0;
 
