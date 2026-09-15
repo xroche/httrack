@@ -37,7 +37,9 @@ Please visit our Website: http://www.httrack.com
 
 #include "htssafe.h"
 #include "htsthread.h"
+#include "httrack-library.h"
 
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -102,6 +104,41 @@ static CRASH_NOINLINE char blow_the_stack(size_t depth) {
 /* Faults with no stack left for the handler, unless it runs on an altstack. */
 static CRASH_NOINLINE void crash_stack(void) { (void) blow_the_stack(0); }
 
+/* See htscrashtest.h. */
+void hts_crash_test_announce(const char *format, ...) {
+  va_list args;
+
+  va_start(args, format);
+  fprintf(stderr, "** ");
+  vfprintf(stderr, format, args);
+  fprintf(stderr, "\n");
+  fflush(stderr);
+  va_end(args);
+  /* NULL opt, so a worker reaches the front end's log without touching one. */
+  va_start(args, format);
+  hts_log_vprint(NULL, LOG_ERROR, format, args);
+  va_end(args);
+}
+
+/* Armed by an -#c kind, taken by the first worker of that kind the mirror
+   starts. Not on opt: the kinds are process-wide, like the option. */
+static volatile hts_crash_worker crash_armed = HTS_CRASH_WORKER_NONE;
+
+static void crash_arm_dns(void) { crash_armed = HTS_CRASH_WORKER_DNS; }
+
+static void crash_arm_ftp(void) { crash_armed = HTS_CRASH_WORKER_FTP; }
+
+/* See htscrashtest.h. */
+void hts_crash_test_worker(hts_crash_worker which) {
+  if (crash_armed == HTS_CRASH_WORKER_NONE || crash_armed != which)
+    return;
+  /* Once, so a front end that recovers the fault still reaches the end. */
+  crash_armed = HTS_CRASH_WORKER_NONE;
+  hts_crash_test_announce("Crash test: faulting a live %s worker",
+                          which == HTS_CRASH_WORKER_DNS ? "DNS" : "FTP");
+  crash_segv();
+}
+
 typedef void (*crash_fn)(void);
 
 static void crash_worker_thread(void *arg) {
@@ -153,14 +190,21 @@ static CRASH_NOINLINE void crash_atfork(void) {
 static const struct {
   const char *name;
   void (*fn)(void);
+  /* Does fn() only arm the fault, leaving the mirror to take it? */
+  hts_boolean arms;
 } crash_kinds[] = {
-    {"segv", crash_segv},
-    {"abort", crash_abort},
-    {"trap", crash_trap},
-    {"stack", crash_stack},
-    {"threadstack", crash_threadstack},
-    {"threadsegv", crash_threadsegv},
-    {"atfork", crash_atfork},
+    {"segv", crash_segv, HTS_FALSE},
+    {"abort", crash_abort, HTS_FALSE},
+    {"trap", crash_trap, HTS_FALSE},
+    {"stack", crash_stack, HTS_FALSE},
+    {"threadstack", crash_threadstack, HTS_FALSE},
+    {"threadsegv", crash_threadsegv, HTS_FALSE},
+    {"atfork", crash_atfork, HTS_FALSE},
+    /* These two wait for a live worker, so the mirror has to run. The fault
+       lands where a recovered one is worth testing: before the resolver
+       publishes its answer, and with the FTP slot already registered. */
+    {"dnssegv", crash_arm_dns, HTS_TRUE},
+    {"ftpsegv", crash_arm_ftp, HTS_TRUE},
 };
 
 #define CRASH_KINDS_COUNT (sizeof(crash_kinds) / sizeof(crash_kinds[0]))
@@ -190,7 +234,7 @@ const char *hts_crash_test_kinds(void) {
   return list;
 }
 
-hts_boolean hts_crash_test(const char *kind) {
+hts_crash_test_result hts_crash_test(const char *kind) {
   size_t i;
 
   if (kind == NULL || *kind == '\0') {
@@ -198,18 +242,19 @@ hts_boolean hts_crash_test(const char *kind) {
   }
   for (i = 0; i < CRASH_KINDS_COUNT; i++) {
     if (strcmp(kind, crash_kinds[i].name) == 0) {
-      fprintf(stderr,
-              "** Deliberate '%s' crash requested (-#c): crash handler test\n",
-              kind);
-      fflush(stderr);
+      hts_crash_test_announce(
+          "Deliberate '%s' crash requested (-#c): crash handler test", kind);
       crash_kinds[i].fn();
+      if (crash_kinds[i].arms) {
+        return HTS_CRASH_ARMED;
+      }
       /* Reached only if a handler swallowed the fault and resumed. */
       fprintf(stderr, "** Crash test '%s' did not crash the process\n", kind);
       fflush(stderr);
-      return HTS_TRUE;
+      return HTS_CRASH_RAN;
     }
   }
-  return HTS_FALSE;
+  return HTS_CRASH_UNKNOWN;
 }
 
 #endif

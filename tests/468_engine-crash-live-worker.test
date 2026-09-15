@@ -1,0 +1,107 @@
+#!/bin/bash
+#
+# -#c=dnssegv and -#c=ftpsegv fault a worker of a RUNNING mirror, where every
+# other kind faults before one starts. A front end that recovers such a fault
+# (httrack-android, through coffeecatch) can only be tested against that path.
+
+set -eu
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+skip_on_windows "the fatal handler takes another path here"
+require_httrack
+have_feature crashtest || skip "built with --disable-crash-test"
+
+ulimit -c 0 # and the runs below happen in $tmp, so a core would stay there
+
+# By absolute path, because the runs below change directory while the harness
+# puts a RELATIVE src/ on PATH, and a bare name would then find the installed
+# httrack instead of the one under test.
+bin=$(command -v httrack) || fail "no httrack on PATH"
+case $bin in
+/*) ;;
+*) bin="$(cd "$(dirname "$bin")" && pwd)/$(basename "$bin")" ;;
+esac
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_livefault.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+
+# The handler ends in abort(), so the shell sees SIGABRT whatever faulted.
+expect_crash() { # expect_crash RC NAME FILE
+    test "$1" -ne 124 || fail_dump "$2 outlasted its deadline:" "$3"
+    test "$1" -eq 134 ||
+        fail_dump "$2 exited $1, expected 134 (0 means nothing faulted):" "$3"
+}
+
+# Which signal the handler caught, by name: SIGSEGV is 11 almost everywhere and
+# 10 on a few ports, so never compare the number.
+expect_segv() { # expect_segv FILE NAME
+    local num
+    num=$(sed -n 's/^Caught signal \([0-9][0-9]*\).*/\1/p' "$1" | head -1)
+    test -n "$num" || fail_dump "$2 was not caught by the fatal handler:" "$1"
+    test "$(kill -l "$num" 2>/dev/null)" = "SEGV" ||
+        fail "$2 caught signal $num ($(kill -l "$num" 2>/dev/null)), expected SEGV"
+}
+
+# Name the frames the handler printed as module+offset: -fvisibility=hidden
+# hides the engine's own, so only addr2line can say which function faulted.
+# LC_ALL=C because addr2line translates its own "at", which a grep would miss.
+# Returns 1 unless the unwind walked out of the engine, which is the qemu case:
+# there it stops at the signal frame, leaving only the handler's own frames, and
+# that is a platform answer rather than a verdict on where the fault came from.
+name_frames() { # name_frames TRACE OUT
+    local mod off
+    build_names_frames && command -v addr2line >/dev/null || return 1
+    : >"$2"
+    sed -n -e 's/^\([^(]*\)(+\(0x[0-9a-f]*\)).*$/\1 \2/p' \
+        -e 's/^\([^(]*\)() \[\(0x[0-9a-f]*\)\].*$/\1 \2/p' "$1" >"$1.frames"
+    while read -r mod off; do
+        test -f "$mod" || mod=$(command -v "$mod" 2>/dev/null) || continue
+        test -f "$mod" || continue
+        LC_ALL=C addr2line -Cfip -e "$mod" "$off" 2>/dev/null >>"$2" || true
+    done <"$1.frames"
+    # A worker's stack bottoms out in the thread entry, the crawl thread's in
+    # main, so either says the whole stack is in the trace.
+    grep -qE 'hts_entry_point|hts_run_body|hts_main|start_thread' "$2"
+}
+
+# The control, and the whole point of the new kinds: a parse-time kind dies
+# before the engine has a project on disk.
+rc=0
+(cd "$tmp" && run_with_timeout 60 "$bin" -#c=segv "ftp://127.0.0.1:9/" \
+    -O "$tmp/parsetime") >"$tmp/parsetime.out" 2>&1 || rc=$?
+expect_crash "$rc" "-#c=segv" "$tmp/parsetime.out"
+test ! -d "$tmp/parsetime" ||
+    fail "-#c=segv reached the mirror, so the control proves nothing"
+
+# Port 9 discards, and the FTP worker faults before it would connect anyway.
+for kind in dnssegv ftpsegv; do
+    case $kind in
+    dnssegv) url="http://doesnotexist.invalid/" worker=DNS fn=dns_resolve_thread ;;
+    ftpsegv) url="ftp://127.0.0.1:9/" worker=FTP fn=back_launch_ftp ;;
+    esac
+    out="$tmp/$kind.out"
+    rc=0
+    (cd "$tmp" && run_with_timeout 120 "$bin" "-#c=$kind" "$url" -O "$tmp/$kind" \
+        --timeout 5) >"$out" 2>&1 || rc=$?
+    expect_crash "$rc" "-#c=$kind" "$out"
+    expect_segv "$out" "-#c=$kind"
+    # By worker word, not by prefix, so the marker cannot lose which one faulted.
+    grep -q "faulting a live $worker worker" "$out" ||
+        fail_dump "$kind did not name the $worker worker:" "$out"
+    # The mirror was running, which no other kind can say.
+    test -d "$tmp/$kind/hts-cache" ||
+        fail "$kind faulted before the mirror started: no $kind/hts-cache"
+    # And it faulted inside the worker body, not on the crawl thread.
+    if name_frames "$out" "$tmp/$kind.names"; then
+        grep -q "$fn" "$tmp/$kind.names" ||
+            fail_dump "$kind faulted outside $fn:" "$tmp/$kind.names"
+    else
+        echo "note: the unwind stopped short here, so the $fn frame went unchecked" >&2
+    fi
+done
+
+# The crashes ran in $tmp, so nothing litters the build directory.
+test -z "$(find "$tmp" -maxdepth 1 -name 'core*' -print -quit)" ||
+    fail "a deliberate crash left a core file behind"

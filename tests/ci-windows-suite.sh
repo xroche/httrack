@@ -106,6 +106,30 @@ ci_report_lost_workers() {
     fi
 }
 
+# The verdict on the failing tests named in $@, printed as annotations. Returns 3
+# where every one of their logs carries WSL2's interop error, because the exe never
+# launched under those, and 1 otherwise (#1672). The failures are named either way,
+# so an outage never hides one.
+ci_failure_verdict() { # ci_failure_verdict TEST...
+    local t real='' interop=''
+    for t in "$@"; do
+        # WSL writes this when it cannot reach the Windows side. Matched past the
+        # line's prefix, which is "init:" on the imported rootfs and "WSL (pid)"
+        # on a store build. Each test's own log, since the console carries the
+        # tails of unrelated failures.
+        if test -f "$t.log" && grep -q 'ERROR: UtilAcceptVsock' "$t.log"; then
+            interop="$interop $t"
+        else
+            real="$real $t"
+        fi
+    done
+    echo "::error::failing: $*"
+    test -z "$interop" ||
+        echo "::error::re-run this leg: WSL2 lost its interop channel under:$interop"
+    test -n "$real" || return 3
+    return 1
+}
+
 # End a wedged suite before its runner dies: a step that fails on its own terms
 # keeps its log, a lost runner keeps nothing, annotations included (#795). Quiet
 # for $1s, then names the test in flight from $3 every $2s; kills $5 once $3 has
@@ -238,6 +262,9 @@ ci_suite_heartbeat() {
 # equivalent of;
 # crash-symbolize and backtrace-empty need backtrace(), which Windows has no
 # equivalent of;
+# crash-live-worker reads the POSIX fatal handler's own report;
+# crash-announce needs the -#c kinds, and no MSVC project defines HTS_CRASH_TEST,
+# so the whole option compiles out here;
 # string-oom drives a helper binary that only the automake build produces;
 # datadir-ospath copies the unwrapped binary the automake build leaves in .libs,
 # and needs the loader variable libtool picked, neither of which this job has;
@@ -283,6 +310,8 @@ expected_skips_msys="01_engine-footer-overflow.test
 48_local-crange-memresume.test
 71_local-crange-repaircache.test
 80_engine-crash-symbolize.test
+468_engine-crash-live-worker.test
+01_engine-crash-announce.test
 88_local-proxytrack-badmtime.test
 241_local-single-file-gui.test
 288_testlib-holdport.test
@@ -328,6 +357,8 @@ expected_skips_wsl2="01_engine-footer-overflow.test
 48_local-crange-memresume.test
 71_local-crange-repaircache.test
 80_engine-crash-symbolize.test
+468_engine-crash-live-worker.test
+01_engine-crash-announce.test
 88_local-proxytrack-badmtime.test
 241_local-single-file-gui.test
 288_testlib-holdport.test
@@ -725,8 +756,9 @@ if [ "$got" != "$want" ]; then
     [ "$lost" -gt 0 ] || exit 1
 fi
 [ "$fail" -eq 0 ] || {
-    echo "::error::failing:$failed"
-    exit 1
+    # 3 where WSL2's interop dropped under every failure, 1 for a real red.
+    # shellcheck disable=SC2086 # the splitting is what names the tests
+    ci_failure_verdict $failed || exit $?
 }
 # Last, and 3 rather than 1: nothing failed on its own terms, so this leg is one to
 # repeat rather than a red to investigate (#1228).

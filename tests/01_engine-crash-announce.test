@@ -1,0 +1,57 @@
+#!/bin/bash
+#
+# A front end that recovers a crash-test fault (httrack-android, through
+# coffeecatch) reads the log callback and never stderr, so the -#c markers have
+# to reach it too.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+require_httrack
+have_feature crashtest || skip "built with --disable-crash-test"
+
+# By absolute path, because the armed run below changes directory while the
+# harness puts a RELATIVE src/ on PATH, and a bare name would then find the
+# installed httrack instead of the one under test.
+bin=$(command -v httrack) || fail "no httrack on PATH"
+case $bin in
+/*) ;;
+*) bin="$(cd "$(dirname "$bin")" && pwd)/$(basename "$bin")" ;;
+esac
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_announce.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+
+# The self-test checks the log channel. This shell checks stderr.
+rc=0
+out=$(httrack -O /dev/null -#test=crashannounce 2>"$tmp/err") || rc=$?
+test "$rc" -eq 0 || fail_dump "-#test=crashannounce exited $rc:" "$tmp/err"
+test "$out" = "crashannounce self-test OK" ||
+    fail_dump "the log channel said [$out]:" "$tmp/err"
+grep -q '^\*\* crash announce 42$' "$tmp/err" ||
+    fail_dump "the marker did not reach stderr:" "$tmp/err"
+# Terminated, or the marker runs into whatever stderr writes next.
+test -z "$(tail -c 1 "$tmp/err")" ||
+    fail_dump "the stderr marker ends without a newline:" "$tmp/err"
+
+# And now the path httrack-android recovers: a real -#c arms a real fault, and
+# the self-test writes what its log callback received into a file.
+if target_is_windows; then
+    echo "note: the fatal handler takes another path here, so the armed fault went unrun" >&2
+    exit 0
+fi
+ulimit -c 0 # and the run below happens in $tmp, so a core would stay there
+rc=0
+(cd "$tmp" && "$bin" -O /dev/null -#test=crashannounce "$tmp/log") \
+    >"$tmp/crash.out" 2>&1 || rc=$?
+# The handler ends in abort(), so the shell sees SIGABRT whatever faulted.
+test "$rc" -eq 134 ||
+    fail_dump "the armed fault exited $rc, want 134 (0 means nothing faulted):" "$tmp/crash.out"
+grep -q "Deliberate 'dnssegv' crash requested" "$tmp/log" ||
+    fail_dump "the -#c marker did not reach the log callback:" "$tmp/log" "$tmp/crash.out"
+grep -q "faulting a live DNS worker" "$tmp/log" ||
+    fail_dump "the worker marker did not reach the log callback:" "$tmp/log" "$tmp/crash.out"
+test -z "$(find "$tmp" -maxdepth 1 -name 'core*' -print -quit)" ||
+    fail "the deliberate crash left a core file behind"

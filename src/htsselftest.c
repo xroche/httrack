@@ -71,6 +71,7 @@ Please visit our Website: http://www.httrack.com
 #include "htssitemap.h"
 #include "htswarc.h"
 #include "htschanges.h"
+#include "htscrashtest.h"
 #include "htssinglefile.h"
 #include "htszlib.h"
 #if HTS_USEZSTD
@@ -4598,6 +4599,81 @@ static int st_logcallback(httrackp *opt, int argc, char **argv) {
     printf("logcallback self-test OK\n");
   return rc;
 }
+
+#ifdef HTS_CRASH_TEST
+static char st_crash_seen[256];
+static int st_crash_level;
+static hts_boolean st_crash_had_opt;
+
+static HTS_PRINTF_FUN(3, 0) void st_crash_log(httrackp *opt, int type,
+                                              const char *format,
+                                              va_list args) {
+  st_crash_had_opt = opt != NULL ? HTS_TRUE : HTS_FALSE;
+  st_crash_level = type;
+  (void) vsnprintf(st_crash_seen, sizeof(st_crash_seen), format, args);
+}
+
+static FILE *st_crash_fp;
+
+static HTS_PRINTF_FUN(3, 0) void st_crash_file_log(httrackp *opt, int type,
+                                                   const char *format,
+                                                   va_list args) {
+  (void) opt;
+  (void) type;
+  vfprintf(st_crash_fp, format, args);
+  fputc('\n', st_crash_fp);
+  /* Flushed line by line, because the caller below is about to fault. */
+  fflush(st_crash_fp);
+}
+
+/* See htscrashtest.h for why both channels carry the marker. Given a file, arm
+   a real -#c fault and write what the log callback receives there: that run
+   crashes, which is the path httrack-android recovers. */
+static int st_crashannounce(httrackp *opt, int argc, char **argv) {
+  static const char want[] = "crash announce 42";
+  int rc = 1;
+
+  (void) opt;
+
+  if (argc >= 1) {
+    st_crash_fp = fopen(argv[0], "wb");
+    if (st_crash_fp == NULL) {
+      fprintf(stderr, "crashannounce: cannot write %s\n", argv[0]);
+      return 1;
+    }
+    hts_set_log_vprint_callback(st_crash_file_log);
+    (void) hts_crash_test("dnssegv");
+    hts_crash_test_worker(HTS_CRASH_WORKER_DNS);
+    /* Only a handler that swallowed the fault gets here, so hand the log
+       channel back rather than funnelling a later case into this file. */
+    hts_set_log_vprint_callback(NULL);
+    fclose(st_crash_fp);
+    st_crash_fp = NULL;
+    fprintf(stderr, "crashannounce: the armed fault did not crash\n");
+    return 1;
+  }
+
+  hts_set_log_vprint_callback(st_crash_log);
+  /* The engine must not need an opt to reach the front end here. */
+  hts_crash_test_announce("crash announce %d", 42);
+  hts_set_log_vprint_callback(NULL);
+
+  if (strcmp(st_crash_seen, want) != 0)
+    fprintf(stderr, "crashannounce: callback got '%s' want '%s'\n",
+            st_crash_seen, want);
+  else if (st_crash_level != LOG_ERROR)
+    fprintf(stderr, "crashannounce: logged at level %d, want %d (LOG_ERROR)\n",
+            st_crash_level, (int) LOG_ERROR);
+  else if (st_crash_had_opt)
+    fprintf(stderr, "crashannounce: the callback was handed an opt\n");
+  else
+    rc = 0;
+
+  if (rc == 0)
+    printf("crashannounce self-test OK\n");
+  return rc;
+}
+#endif
 
 /* an empty fil started htsAddLink's codebase walk before the buffer (#730) */
 static int st_addlink(httrackp *opt, int argc, char **argv) {
@@ -15917,6 +15993,10 @@ static const struct selftest_entry {
      st_addlink},
     {"logcallback", "", "log callback must not consume the log file's va_list",
      st_logcallback},
+#ifdef HTS_CRASH_TEST
+    {"crashannounce", "[logfile]",
+     "a crash-test marker reaches the log callback too", st_crashannounce},
+#endif
     {"cache", "<dir>", "cache read/write round-trip self-test", st_cache},
     {"cacheindex", "", "cache-index (.ndx) parse must stay in bounds",
      st_cacheindex},

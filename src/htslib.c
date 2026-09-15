@@ -48,6 +48,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsnet.h"
 #include "htsbauth.h"
 #include "htsthread.h"
+#include "htscrashtest.h"
 #include "htsback.h"
 #include "htsftp.h"
 #include "htswrap.h"
@@ -5692,6 +5693,7 @@ static void dns_resolve_thread(void *arg) {
   const int count = hts_dns_resolve_nocache_list(
       job->hostname, resolved, HTS_MAXADDRNUM, &error, &permanent);
 
+  hts_crash_test_worker(HTS_CRASH_WORKER_DNS);
   hts_mutexlock(&job->lock);
   dns_copy_addrs(job->addr, resolved, count, HTS_MAXADDRNUM);
   job->count = count;

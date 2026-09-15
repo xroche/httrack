@@ -41,6 +41,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscore.h"
 #include "htsio.h"
 #include "htsthread.h"
+#include "htscrashtest.h"
 
 #include <limits.h>
 
@@ -145,6 +146,8 @@ void back_launch_ftp(void *pP) {
 #endif
     return;
   }
+
+  hts_crash_test_worker(HTS_CRASH_WORKER_FTP);
 
   /* Initialize */
   hts_init();
