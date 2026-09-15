@@ -268,6 +268,9 @@ int ishtml_ext(const char *a);
 int ishttperror(int err);
 
 int get_userhttptype(httrackp * opt, char *s, const char *fil);
+/* Smallest buffer any caller hands to give_mimext() for s. The longest
+   extension in hts_mime[] is 7 characters. */
+#define GIVE_MIMEXT_MIN_SIZE 16
 void give_mimext(char *s, const char *st);
 
 int may_bogus_multiple(httrackp * opt, const char *mime, const char *filename);
@@ -280,7 +283,7 @@ void code64(unsigned char *a, int size_a, unsigned char *b, int crlf);
 
 #define copychar(catbuff,a) concat(catbuff,(a),NULL)
 
-char *convtolower(char *catbuff, const char *a);
+char *convtolower(char *catbuff, size_t size, const char *a);
 void hts_lowcase(char *s);
 void hts_replace(char *s, char from, char to);
 int multipleStringMatch(const char *s, const char *match);
@@ -292,7 +295,8 @@ void fprintfio(FILE * fp, const char *buff, const char *prefix);
 int sig_ignore_flag(int setflag);  // flag ignore
 #endif
 
-void cut_path(char *fullpath, char *path, char *pname);
+void cut_path(char *fullpath, char *path, size_t path_size, char *pname,
+              size_t pname_size);
 int fexist(const char *s);
 int fexist_utf8(const char *s);
 

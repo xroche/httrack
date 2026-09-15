@@ -198,6 +198,9 @@ HTSEXT_API int hts_has_stopped(httrackp * opt);
 HTSEXT_API int structcheck(const char *path);
 HTSEXT_API int structcheck_utf8(const char *path);
 HTSEXT_API int dir_exists(const char *path);
+/* Smallest buffer any caller hands to infostatuscode() for msg: htsblk.msg,
+   which is 80 bytes. The longest string written is 31 characters. */
+#define INFOSTATUSCODE_MIN_SIZE 80
 HTSEXT_API void infostatuscode(char *msg, int statuscode);
 HTSEXT_API TStamp mtime_local(void);
 HTSEXT_API void qsec2str(char *st, TStamp t);
@@ -212,6 +215,9 @@ HTSEXT_API const char *jump_normalized_const(const char *);
 HTSEXT_API char *jump_toport(char *);
 HTSEXT_API const char *jump_toport_const(const char *);
 HTSEXT_API char *fil_normalized(const char *source, char *dest);
+/* Smallest buffer any caller hands to adr_normalized() for dest. Every one
+   of them is HTS_URLMAXSIZE * 2. */
+#define ADR_NORMALIZED_MIN_SIZE (HTS_URLMAXSIZE * 2)
 HTSEXT_API char *adr_normalized(const char *source, char *dest);
 HTSEXT_API const char *hts_rootdir(char *file);
 
