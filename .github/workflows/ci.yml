@@ -166,3 +166,42 @@ jobs:
           name: analyzer-report
           path: analyzer-report
           if-no-files-found: ignore
+
+  sbom:
+    name: SBOM and third-party notices
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            autoconf automake libtool zlib1g-dev libssl-dev
+
+      # Cheap, and needs no build: fails if source was vendored into the tree
+      # without a matching row in THIRD-PARTY-NOTICES.md.
+      - name: Check notices cover what is vendored
+        run: tools/generate-sbom.sh --check
+
+      - name: Configure
+        run: ./configure CFLAGS="-O2 -g"
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      # Linked library versions are a property of this runner, so the SBOM is
+      # only meaningful next to the build it describes.
+      - name: Generate SBOM
+        run: tools/generate-sbom.sh --output sbom.json
+
+      - name: Show SBOM
+        run: cat sbom.json
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.json
