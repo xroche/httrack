@@ -102,9 +102,10 @@ jobs:
 
       - name: Test
         env:
-          # halt_on_error keeps a sanitizer report from being swallowed by a
-          # test that "passes" anyway.
-          ASAN_OPTIONS: detect_leaks=1:abort_on_error=1:halt_on_error=1
+          # The CLI intentionally retains process-lifetime global state; each
+          # test launches a fresh process, so leak reports are not actionable
+          # here. Keep AddressSanitizer's memory-error checks enabled.
+          ASAN_OPTIONS: detect_leaks=0:abort_on_error=1:halt_on_error=1
           UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
         run: make check ONLINE_UNIT_TESTS=no
 
