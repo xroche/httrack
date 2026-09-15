@@ -2284,28 +2284,47 @@ static int PT_SaveCache__Arc_Fun(void *arg, const char *url, PT_Element element)
   FILE *const fp = st->fp;
   struct tm *tm = convert_time_rfc822(&st->buff, element->lastmodified);
   int size_headers;
+  int written;
+  size_t used;
 
-  sprintf(st->headers,
-          "HTTP/1.0 %d %s" "\r\n" "X-Server: ProxyTrack " PROXYTRACK_VERSION
-          "\r\n" "Content-type: %s%s%s%s" "\r\n" "Last-modified: %s" "\r\n"
-          "Content-length: %d" "\r\n", element->statuscode, element->msg,
-          /**/ element->contenttype,
-          (element->charset[0] ? "; charset=\"" : ""),
-          (element->charset[0] ? element->charset : ""),
-          (element->charset[0] ? "\"" : ""), /**/ element->lastmodified,
-          (int) element->size);
+  written = snprintf(st->headers, sizeof(st->headers),
+                     "HTTP/1.0 %d %s" "\r\n"
+                     "X-Server: ProxyTrack " PROXYTRACK_VERSION "\r\n"
+                     "Content-type: %s%s%s%s" "\r\n"
+                     "Last-modified: %s" "\r\n"
+                     "Content-length: %d" "\r\n",
+                     element->statuscode, element->msg, element->contenttype,
+                     (element->charset[0] ? "; charset=\"" : ""),
+                     (element->charset[0] ? element->charset : ""),
+                     (element->charset[0] ? "\"" : ""), element->lastmodified,
+                     (int) element->size);
+  if (written < 0 || (size_t) written >= sizeof(st->headers)) {
+    return 1;
+  }
+  used = (size_t) written;
   if (element->location != NULL && element->location[0] != '\0') {
-    sprintf(st->headers + strlen(st->headers), "Location: %s" "\r\n",
-            element->location);
+    written = snprintf(st->headers + used, sizeof(st->headers) - used,
+                       "Location: %s" "\r\n", element->location);
+    if (written < 0 || (size_t) written >= sizeof(st->headers) - used) {
+      return 1;
+    }
+    used += (size_t) written;
   }
   if (element->headers != NULL) {
-    if (strlen(element->headers) <
-        sizeof(st->headers) - strlen(element->headers) - 1) {
-      strcat(st->headers, element->headers);
+    const size_t incoming = strlen(element->headers);
+    if (incoming >= sizeof(st->headers) - used) {
+      return 1;
     }
+    memcpy(st->headers + used, element->headers, incoming);
+    used += incoming;
+    st->headers[used] = '\0';
   }
-  strcat(st->headers, "\r\n");
-  size_headers = (int) strlen(st->headers);
+  if (sizeof(st->headers) - used <= 2) {
+    return 1;
+  }
+  memcpy(st->headers + used, "\r\n", 3);
+  used += 2;
+  size_headers = (int) used;
 
   /* doc == <nl><URL-record><nl><network_doc> */
 

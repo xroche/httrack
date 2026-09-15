@@ -2741,7 +2741,11 @@ HTSEXT_API int structcheck(const char *path) {
       if (!S_ISDIR(st.st_mode)) {
 #if HTS_REMOVE_ANNOYING_INDEX
         if (S_ISREG(st.st_mode)) {      /* Regular file in place ; move it and create directory */
-          sprintf(tmpbuf, "%s.txt", file);
+          if (snprintf(tmpbuf, sizeof(tmpbuf), "%s.txt", file) < 0
+              || strlen(tmpbuf) >= sizeof(tmpbuf) - 1) {
+            errno = ENAMETOOLONG;
+            return -1;
+          }
           if (rename(file, tmpbuf) != 0) {      /* Can't rename regular file */
             return -1;
           }
