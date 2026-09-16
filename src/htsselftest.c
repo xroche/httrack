@@ -2488,50 +2488,66 @@ static int st_mirrorcompleted(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
-/* hts_strcatf() truncates instead of running past its buffer (#1685). */
-static int st_strcatf(httrackp *opt, int argc, char **argv) {
-  struct {
-    char buf[8];
-    char canary[8];
-  } s;
+/* A canary behind the buffer, so a stray NUL shows as well as a stray byte. */
+struct st_appendf_probe {
+  char buf[8];
+  char canary[8];
+};
 
+static hts_boolean st_appendf_canary_ok(const struct st_appendf_probe *probe) {
+  size_t i;
+
+  for (i = 0; i < sizeof(probe->canary); i++) {
+    if (probe->canary[i] != 'Z')
+      return HTS_FALSE;
+  }
+  return HTS_TRUE;
+}
+
+/* slcatprintfbuff_clip() keeps what fits and stops at the capacity (#1685). */
+static int st_appendf(httrackp *opt, int argc, char **argv) {
+  struct st_appendf_probe probe;
+  size_t used = 0;
   int err = 0;
 
   (void) opt;
   (void) argc;
   (void) argv;
 
-  memset(s.canary, 'Z', sizeof(s.canary));
-  s.buf[0] = '\0';
+  /* the canary only sits behind buf[] if nothing is padded between them */
+  enum {
+    st_appendf_packed =
+        1 / (offsetof(struct st_appendf_probe, canary) == sizeof(probe.buf))
+  };
 
-  /* Fits. */
-  hts_strcatf(s.buf, sizeof(s.buf), "%s", "abc");
-  if (strcmp(s.buf, "abc") != 0)
+  memset(probe.canary, 'Z', sizeof(probe.canary));
+  probe.buf[0] = '\0';
+
+  /* The detector must see one changed byte, or every check below is vacuous. */
+  probe.canary[0] = 'X';
+  if (st_appendf_canary_ok(&probe))
+    err = 1;
+  probe.canary[0] = 'Z';
+
+  slcatprintfbuff_clip(probe.buf, sizeof(probe.buf), &used, "%s", "ab");
+  slcatprintfbuff_clip(probe.buf, sizeof(probe.buf), &used, "%d", 7);
+  if (strcmp(probe.buf, "ab7") != 0 || used != 3)
     err = 1;
 
-  /* Does not fit, so it is cut at the capacity and stays terminated. */
-  hts_strcatf(s.buf, sizeof(s.buf), "%s", "defghijkl");
-  if (strcmp(s.buf, "abcdefg") != 0)
+  /* Too long, so it is cut at the capacity and stays terminated. */
+  slcatprintfbuff_clip(probe.buf, sizeof(probe.buf), &used, "%s", "cdefghij");
+  if (strcmp(probe.buf, "ab7cdef") != 0 || used != 7)
     err = 1;
 
   /* A full buffer takes nothing more. */
-  hts_strcatf(s.buf, sizeof(s.buf), "%s", "mno");
-  if (strcmp(s.buf, "abcdefg") != 0)
+  slcatprintfbuff_clip(probe.buf, sizeof(probe.buf), &used, "%s", "kl");
+  if (strcmp(probe.buf, "ab7cdef") != 0 || used != 7)
     err = 1;
 
-  /* An understated capacity must not wrap the remainder into a huge one. */
-  hts_strcatf(s.buf, 4, "%s", "pqr");
-  if (strcmp(s.buf, "abcdefg") != 0)
+  if (!st_appendf_canary_ok(&probe))
     err = 1;
 
-  /* The neighbour is poisoned, so a stray NUL shows up as well as a stray byte.
-   */
-  for (size_t i = 0; i < sizeof(s.canary); i++) {
-    if (s.canary[i] != 'Z')
-      err = 1;
-  }
-
-  printf("strcatf: %s\n", err ? "FAIL" : "OK");
+  printf("appendf: %s\n", err ? "FAIL" : "OK");
   return err;
 }
 
@@ -15878,8 +15894,8 @@ static const struct selftest_entry {
      st_filterbounds},
     {"filtercap", "", "an over-long filter rule is refused, not stored dead",
      st_filtercap},
-    {"strcatf", "",
-     "a formatted append truncates instead of overflowing (#1685)", st_strcatf},
+    {"appendf", "",
+     "a formatted append truncates instead of overflowing (#1685)", st_appendf},
     {"log-counters", "",
      "error and warning counts survive a run with no log file (#1681)",
      st_logcounters},

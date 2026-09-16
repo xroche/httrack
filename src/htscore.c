@@ -33,7 +33,6 @@ Please visit our Website: http://www.httrack.com
 /* Internal engine bytecode */
 #define HTS_INTERNAL_BYTECODE
 
-#include <stdarg.h>
 #include <fcntl.h>
 #include <ctype.h>
 #include <stdint.h> /* uint64_t for the pause mixer (already a hard dep via md5.h) */
@@ -2286,6 +2285,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   // afficher résumé dans log
   if (opt->log != NULL) {
     char BIGSTK finalInfo[8192];
+    size_t finalUsed = 0;
     int error = fspc(opt, NULL, "error");
     int warning = fspc(opt, NULL, "warning");
     int info = fspc(opt, NULL, "info");
@@ -2300,28 +2300,30 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
     infoupdated[0] = '\0';
     if (opt->is_update) {
       if (HTS_STAT.stat_updated_files > 0) {
-        snprintf(infoupdated, sizeof(infoupdated), ", %d files updated",
-                 (int) HTS_STAT.stat_updated_files);
+        slprintfbuff_clip(infoupdated, sizeof(infoupdated),
+                          ", %d files updated",
+                          (int) HTS_STAT.stat_updated_files);
       } else {
-        snprintf(infoupdated, sizeof(infoupdated), ", no files updated");
+        slprintfbuff_clip(infoupdated, sizeof(infoupdated),
+                          ", no files updated");
       }
     }
     finalInfo[0] = '\0';
-    hts_strcatf(finalInfo, sizeof(finalInfo),
-                "HTTrack Website Copier/" HTTRACK_VERSION " mirror %s %s : "
-                "%d links scanned, %d files written (" LLintP
-                " bytes overall)%s "
-                "[" LLintP " bytes received at " LLintP " bytes/sec]",
-                aborted ? "aborted after" : "complete in", htstime,
-                (int) opt->lien_tot - 1, (int) HTS_STAT.stat_files,
-                (LLint) HTS_STAT.stat_bytes, infoupdated,
-                (LLint) HTS_STAT.HTS_TOTAL_RECV, (LLint) n);
+    slcatprintfbuff_clip(
+        finalInfo, sizeof(finalInfo), &finalUsed,
+        "HTTrack Website Copier/" HTTRACK_VERSION " mirror %s %s : "
+        "%d links scanned, %d files written (" LLintP " bytes overall)%s "
+        "[" LLintP " bytes received at " LLintP " bytes/sec]",
+        aborted ? "aborted after" : "complete in", htstime,
+        (int) opt->lien_tot - 1, (int) HTS_STAT.stat_files,
+        (LLint) HTS_STAT.stat_bytes, infoupdated,
+        (LLint) HTS_STAT.HTS_TOTAL_RECV, (LLint) n);
 
     if (HTS_STAT.total_packed > 0 && HTS_STAT.total_unpacked > 0) {
       int packed_ratio =
         (int) ((LLint) (HTS_STAT.total_packed * 100) / HTS_STAT.total_unpacked);
-      hts_strcatf(
-          finalInfo, sizeof(finalInfo),
+      slcatprintfbuff_clip(
+          finalInfo, sizeof(finalInfo), &finalUsed,
           ", " LLintP
           " bytes transferred using HTTP compression in %d files, ratio %d%%",
           (LLint) HTS_STAT.total_unpacked, HTS_STAT.total_packedfiles,
@@ -2331,20 +2333,21 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
         && HTS_STAT.stat_nrequests > HTS_STAT.stat_sockid) {
       int rq = (HTS_STAT.stat_nrequests * 10) / HTS_STAT.stat_sockid;
 
-      hts_strcatf(finalInfo, sizeof(finalInfo),
-                  ", %d.%d requests per connection", rq / 10, rq % 10);
+      slcatprintfbuff_clip(finalInfo, sizeof(finalInfo), &finalUsed,
+                           ", %d.%d requests per connection", rq / 10, rq % 10);
     }
-    hts_strcatf(finalInfo, sizeof(finalInfo), LF);
+    slcatprintfbuff_clip(finalInfo, sizeof(finalInfo), &finalUsed, LF);
     if (error)
-      hts_strcatf(finalInfo, sizeof(finalInfo),
-                  "(%d errors, %d warnings, %d messages)" LF, error, warning,
-                  info);
+      slcatprintfbuff_clip(finalInfo, sizeof(finalInfo), &finalUsed,
+                           "(%d errors, %d warnings, %d messages)" LF, error,
+                           warning, info);
     else
-      hts_strcatf(finalInfo, sizeof(finalInfo),
-                  "(No errors, %d warnings, %d messages)" LF, warning, info);
+      slcatprintfbuff_clip(finalInfo, sizeof(finalInfo), &finalUsed,
+                           "(No errors, %d warnings, %d messages)" LF, warning,
+                           info);
     if (opt->transport_failures > 0)
-      hts_strcatf(
-          finalInfo, sizeof(finalInfo),
+      slcatprintfbuff_clip(
+          finalInfo, sizeof(finalInfo), &finalUsed,
           "(%d links failed to transfer, so the mirror is incomplete)" LF,
           opt->transport_failures);
 
@@ -3269,19 +3272,6 @@ static void postprocess_file(httrackp *opt, const char *save, const char *adr,
       }
     }
   }
-}
-
-// Append printf-style to a fixed buffer, truncating rather than overflowing.
-void hts_strcatf(char *dst, size_t size, const char *fmt, ...) {
-  const size_t len = strlen(dst);
-  va_list args;
-
-  /* size - len below would wrap if a caller understated the capacity. */
-  if (len >= size)
-    return;
-  va_start(args, fmt);
-  (void) vsnprintf(dst + len, size - len, fmt, args);
-  va_end(args);
 }
 
 // Count one log event, whether or not a log file is open (#1681).

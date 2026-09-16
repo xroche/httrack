@@ -566,6 +566,22 @@ static HTS_INLINE HTS_UNUSED HTS_PRINTF_FUN(3, 4) void slprintfbuff_clip(
 }
 
 /**
+ * slcatprintfbuff() for text meant to be clipped rather than dropped whole:
+ * keeps what fitted and advances *used past it. Nothing to act on, hence not
+ * HTS_CHECK_RESULT.
+ */
+static HTS_INLINE HTS_UNUSED HTS_PRINTF_FUN(4, 5) void slcatprintfbuff_clip(
+    char *dest, size_t size, size_t *used, const char *fmt, ...) {
+  va_list args;
+
+  assertf(dest != NULL && used != NULL && *used < size);
+  va_start(args, fmt);
+  (void) vslprintfbuff(dest + *used, size - *used, fmt, args);
+  va_end(args);
+  *used += strlen(dest + *used);
+}
+
+/**
  * slprintfbuff() over the in-scope array ARR (capacity = sizeof(ARR)).
  * On GCC/Clang a pointer is a compile error; use slprintfbuff() for those.
  */
