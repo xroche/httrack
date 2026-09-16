@@ -2890,6 +2890,23 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for the coucal submodule" >&5
+printf %s "checking for the coucal submodule... " >&6; }
+if test -f "$srcdir/src/coucal/coucal.c"
+then :
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+printf "%s\n" "yes" >&6; }
+else $as_nop
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+	 as_fn_error $? "src/coucal is empty -- this checkout was cloned without its
+submodules. Run:
+
+    git submodule update --init --recursive
+
+from the top of the tree and re-run configure." "$LINENO" 5
+fi
+
 ac_config_headers="$ac_config_headers config.h"
 
 am__api_version='1.16'
@@ -14073,15 +14090,18 @@ DEFAULT_LDFLAGS=""
 
 
 ### Additional flags (if supported)
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -Wparentheses" >&5
-printf %s "checking whether C compiler accepts -Wparentheses... " >&6; }
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether the C compiler accepts -Wparentheses" >&5
+printf %s "checking whether the C compiler accepts -Wparentheses... " >&6; }
 if test ${ax_cv_check_cflags___Wparentheses+y}
 then :
   printf %s "(cached) " >&6
 else $as_nop
 
   ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -Wparentheses"
+  if test x"$GCC" = xyes ; then
+    add_gnu_werror="-Werror"
+  fi
+  CFLAGS="$CFLAGS  -Wparentheses $add_gnu_werror"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -14111,15 +14131,18 @@ else $as_nop
   :
 fi
 
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -Winit-self" >&5
-printf %s "checking whether C compiler accepts -Winit-self... " >&6; }
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether the C compiler accepts -Winit-self" >&5
+printf %s "checking whether the C compiler accepts -Winit-self... " >&6; }
 if test ${ax_cv_check_cflags___Winit_self+y}
 then :
   printf %s "(cached) " >&6
 else $as_nop
 
   ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -Winit-self"
+  if test x"$GCC" = xyes ; then
+    add_gnu_werror="-Werror"
+  fi
+  CFLAGS="$CFLAGS  -Winit-self $add_gnu_werror"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -14149,15 +14172,18 @@ else $as_nop
   :
 fi
 
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -Wunused-but-set-parameter" >&5
-printf %s "checking whether C compiler accepts -Wunused-but-set-parameter... " >&6; }
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether the C compiler accepts -Wunused-but-set-parameter" >&5
+printf %s "checking whether the C compiler accepts -Wunused-but-set-parameter... " >&6; }
 if test ${ax_cv_check_cflags___Wunused_but_set_parameter+y}
 then :
   printf %s "(cached) " >&6
 else $as_nop
 
   ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -Wunused-but-set-parameter"
+  if test x"$GCC" = xyes ; then
+    add_gnu_werror="-Werror"
+  fi
+  CFLAGS="$CFLAGS  -Wunused-but-set-parameter $add_gnu_werror"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -14187,15 +14213,18 @@ else $as_nop
   :
 fi
 
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -Waddress" >&5
-printf %s "checking whether C compiler accepts -Waddress... " >&6; }
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether the C compiler accepts -Waddress" >&5
+printf %s "checking whether the C compiler accepts -Waddress... " >&6; }
 if test ${ax_cv_check_cflags___Waddress+y}
 then :
   printf %s "(cached) " >&6
 else $as_nop
 
   ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -Waddress"
+  if test x"$GCC" = xyes ; then
+    add_gnu_werror="-Werror"
+  fi
+  CFLAGS="$CFLAGS  -Waddress $add_gnu_werror"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -14225,15 +14254,18 @@ else $as_nop
   :
 fi
 
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -Wuninitialized" >&5
-printf %s "checking whether C compiler accepts -Wuninitialized... " >&6; }
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether the C compiler accepts -Wuninitialized" >&5
+printf %s "checking whether the C compiler accepts -Wuninitialized... " >&6; }
 if test ${ax_cv_check_cflags___Wuninitialized+y}
 then :
   printf %s "(cached) " >&6
 else $as_nop
 
   ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -Wuninitialized"
+  if test x"$GCC" = xyes ; then
+    add_gnu_werror="-Werror"
+  fi
+  CFLAGS="$CFLAGS  -Wuninitialized $add_gnu_werror"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -14263,15 +14295,18 @@ else $as_nop
   :
 fi
 
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -Wformat=2" >&5
-printf %s "checking whether C compiler accepts -Wformat=2... " >&6; }
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether the C compiler accepts -Wformat=2" >&5
+printf %s "checking whether the C compiler accepts -Wformat=2... " >&6; }
 if test ${ax_cv_check_cflags___Wformat_2+y}
 then :
   printf %s "(cached) " >&6
 else $as_nop
 
   ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -Wformat=2"
+  if test x"$GCC" = xyes ; then
+    add_gnu_werror="-Werror"
+  fi
+  CFLAGS="$CFLAGS  -Wformat=2 $add_gnu_werror"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -14301,15 +14336,18 @@ else $as_nop
   :
 fi
 
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -Wformat-nonliteral" >&5
-printf %s "checking whether C compiler accepts -Wformat-nonliteral... " >&6; }
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether the C compiler accepts -Wformat-nonliteral" >&5
+printf %s "checking whether the C compiler accepts -Wformat-nonliteral... " >&6; }
 if test ${ax_cv_check_cflags___Wformat_nonliteral+y}
 then :
   printf %s "(cached) " >&6
 else $as_nop
 
   ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -Wformat-nonliteral"
+  if test x"$GCC" = xyes ; then
+    add_gnu_werror="-Werror"
+  fi
+  CFLAGS="$CFLAGS  -Wformat-nonliteral $add_gnu_werror"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -14339,15 +14377,18 @@ else $as_nop
   :
 fi
 
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -Wmissing-parameter-type" >&5
-printf %s "checking whether C compiler accepts -Wmissing-parameter-type... " >&6; }
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether the C compiler accepts -Wmissing-parameter-type" >&5
+printf %s "checking whether the C compiler accepts -Wmissing-parameter-type... " >&6; }
 if test ${ax_cv_check_cflags___Wmissing_parameter_type+y}
 then :
   printf %s "(cached) " >&6
 else $as_nop
 
   ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -Wmissing-parameter-type"
+  if test x"$GCC" = xyes ; then
+    add_gnu_werror="-Werror"
+  fi
+  CFLAGS="$CFLAGS  -Wmissing-parameter-type $add_gnu_werror"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -14377,15 +14418,18 @@ else $as_nop
   :
 fi
 
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -Wold-style-definition" >&5
-printf %s "checking whether C compiler accepts -Wold-style-definition... " >&6; }
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether the C compiler accepts -Wold-style-definition" >&5
+printf %s "checking whether the C compiler accepts -Wold-style-definition... " >&6; }
 if test ${ax_cv_check_cflags___Wold_style_definition+y}
 then :
   printf %s "(cached) " >&6
 else $as_nop
 
   ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -Wold-style-definition"
+  if test x"$GCC" = xyes ; then
+    add_gnu_werror="-Werror"
+  fi
+  CFLAGS="$CFLAGS  -Wold-style-definition $add_gnu_werror"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -14415,15 +14459,18 @@ else $as_nop
   :
 fi
 
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -Wignored-qualifiers" >&5
-printf %s "checking whether C compiler accepts -Wignored-qualifiers... " >&6; }
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether the C compiler accepts -Wignored-qualifiers" >&5
+printf %s "checking whether the C compiler accepts -Wignored-qualifiers... " >&6; }
 if test ${ax_cv_check_cflags___Wignored_qualifiers+y}
 then :
   printf %s "(cached) " >&6
 else $as_nop
 
   ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -Wignored-qualifiers"
+  if test x"$GCC" = xyes ; then
+    add_gnu_werror="-Werror"
+  fi
+  CFLAGS="$CFLAGS  -Wignored-qualifiers $add_gnu_werror"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -14453,15 +14500,18 @@ else $as_nop
   :
 fi
 
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -fstrict-aliasing -Wstrict-aliasing" >&5
-printf %s "checking whether C compiler accepts -fstrict-aliasing -Wstrict-aliasing... " >&6; }
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether the C compiler accepts -fstrict-aliasing -Wstrict-aliasing" >&5
+printf %s "checking whether the C compiler accepts -fstrict-aliasing -Wstrict-aliasing... " >&6; }
 if test ${ax_cv_check_cflags___fstrict_aliasing__Wstrict_aliasing+y}
 then :
   printf %s "(cached) " >&6
 else $as_nop
 
   ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -fstrict-aliasing -Wstrict-aliasing"
+  if test x"$GCC" = xyes ; then
+    add_gnu_werror="-Werror"
+  fi
+  CFLAGS="$CFLAGS  -fstrict-aliasing -Wstrict-aliasing $add_gnu_werror"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -14491,15 +14541,18 @@ else $as_nop
   :
 fi
 
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -fstack-protector" >&5
-printf %s "checking whether C compiler accepts -fstack-protector... " >&6; }
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether the C compiler accepts -fstack-protector" >&5
+printf %s "checking whether the C compiler accepts -fstack-protector... " >&6; }
 if test ${ax_cv_check_cflags___fstack_protector+y}
 then :
   printf %s "(cached) " >&6
 else $as_nop
 
   ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -fstack-protector"
+  if test x"$GCC" = xyes ; then
+    add_gnu_werror="-Werror"
+  fi
+  CFLAGS="$CFLAGS  -fstack-protector $add_gnu_werror"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -14529,15 +14582,18 @@ else $as_nop
   :
 fi
 
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -fstack-clash-protection" >&5
-printf %s "checking whether C compiler accepts -fstack-clash-protection... " >&6; }
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether the C compiler accepts -fstack-clash-protection" >&5
+printf %s "checking whether the C compiler accepts -fstack-clash-protection... " >&6; }
 if test ${ax_cv_check_cflags___fstack_clash_protection+y}
 then :
   printf %s "(cached) " >&6
 else $as_nop
 
   ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -fstack-clash-protection"
+  if test x"$GCC" = xyes ; then
+    add_gnu_werror="-Werror"
+  fi
+  CFLAGS="$CFLAGS  -fstack-clash-protection $add_gnu_werror"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -14567,15 +14623,18 @@ else $as_nop
   :
 fi
 
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -fcf-protection" >&5
-printf %s "checking whether C compiler accepts -fcf-protection... " >&6; }
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether the C compiler accepts -fcf-protection" >&5
+printf %s "checking whether the C compiler accepts -fcf-protection... " >&6; }
 if test ${ax_cv_check_cflags___fcf_protection+y}
 then :
   printf %s "(cached) " >&6
 else $as_nop
 
   ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -fcf-protection"
+  if test x"$GCC" = xyes ; then
+    add_gnu_werror="-Werror"
+  fi
+  CFLAGS="$CFLAGS  -fcf-protection $add_gnu_werror"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -14765,15 +14824,18 @@ fi
 ### PIE
 CFLAGS_PIE=""
 LDFLAGS_PIE=""
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -fpie -pie" >&5
-printf %s "checking whether C compiler accepts -fpie -pie... " >&6; }
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether the C compiler accepts -fpie -pie" >&5
+printf %s "checking whether the C compiler accepts -fpie -pie... " >&6; }
 if test ${ax_cv_check_cflags___fpie__pie+y}
 then :
   printf %s "(cached) " >&6
 else $as_nop
 
   ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -fpie -pie"
+  if test x"$GCC" = xyes ; then
+    add_gnu_werror="-Werror"
+  fi
+  CFLAGS="$CFLAGS  -fpie -pie $add_gnu_werror"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -14846,15 +14908,18 @@ fi
 
 
 ## Export all symbols for backtraces
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -rdynamic" >&5
-printf %s "checking whether C compiler accepts -rdynamic... " >&6; }
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether the C compiler accepts -rdynamic" >&5
+printf %s "checking whether the C compiler accepts -rdynamic... " >&6; }
 if test ${ax_cv_check_cflags___rdynamic+y}
 then :
   printf %s "(cached) " >&6
 else $as_nop
 
   ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -rdynamic"
+  if test x"$GCC" = xyes ; then
+    add_gnu_werror="-Werror"
+  fi
+  CFLAGS="$CFLAGS  -rdynamic $add_gnu_werror"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -18490,4 +18555,5 @@ if test -n "$ac_unrecognized_opts" && test "$enable_option_checking" != no; then
   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: unrecognized options: $ac_unrecognized_opts" >&5
 printf "%s\n" "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
+
 
