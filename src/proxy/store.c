@@ -994,6 +994,21 @@ int PT_LoadCache__New(PT_Index index_, const char *filename) {
   return 0;
 }
 
+static int PT_BuildCachePath(char *dest, size_t destSize,
+                             const char *base, const char *relative) {
+  int written;
+
+  if (dest == NULL || destSize == 0 || base == NULL || relative == NULL) {
+    return 0;
+  }
+  written = snprintf(dest, destSize, "%s%s", base, relative);
+  if (written < 0 || (size_t) written >= destSize) {
+    dest[0] = '\0';
+    return 0;
+  }
+  return 1;
+}
+
 static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                                       int flags) {
   PT_Index__New index = (PT_Index__New) & index_->slots.formatNew;
@@ -1102,7 +1117,12 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                                           && (!isalpha(previous_save_[0]) || previous_save_[1] != ':')) // c:/home/foo/bar.gif
               ) {
               index->safeCache = 1;
-              sprintf(previous_save, "%s%s", index->path, previous_save_);
+              if (!PT_BuildCachePath(previous_save, sizeof(previous_save),
+                                     index->path, previous_save_)) {
+                snprintf(r->msg, sizeof(r->msg),
+                         "Cached path is too long for %s", url);
+                r->statuscode = STATUSCODE_INVALID;
+              }
             }
             // bogus format (includes buggy absolute path)
             else {
@@ -1110,7 +1130,8 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
               if (index->fixedPath == 0) {
                 const char *start = jump_protocol_and_auth(url);
                 const char *end = start ? strchr(start, '/') : NULL;
-                int len = (int) (end - start);
+                int len = (start != NULL && end != NULL)
+                  ? (int) (end - start) : 0;
 
                 if (start != NULL && end != NULL && len > 0 && len < 128) {
                   char piece[128 + 2];
@@ -1127,15 +1148,25 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                 int saveLen = (int) strlen(previous_save_);
 
                 if (index->fixedPath < saveLen) {
-                  sprintf(previous_save, "%s%s", index->path,
-                          previous_save_ + index->fixedPath);
+                  if (!PT_BuildCachePath(previous_save, sizeof(previous_save),
+                                         index->path,
+                                         previous_save_ + index->fixedPath)) {
+                    snprintf(r->msg, sizeof(r->msg),
+                             "Cached path is too long for %s", url);
+                    r->statuscode = STATUSCODE_INVALID;
+                  }
                 } else {
                   snprintf(r->msg, sizeof(r->msg), "Bogus fixePath prefix for %s (prefixLen=%d)",
                           previous_save_, (int) index->fixedPath);
                   r->statuscode = STATUSCODE_INVALID;
                 }
               } else {
-                sprintf(previous_save, "%s%s", index->path, previous_save_);
+                if (!PT_BuildCachePath(previous_save, sizeof(previous_save),
+                                       index->path, previous_save_)) {
+                  snprintf(r->msg, sizeof(r->msg),
+                           "Cached path is too long for %s", url);
+                  r->statuscode = STATUSCODE_INVALID;
+                }
               }
             }
           }
@@ -1732,7 +1763,12 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
                                         && (!isalpha(previous_save_[0]) || previous_save_[1] != ':'))   // c:/home/foo/bar.gif
             ) {
             index->safeCache = 1;
-            sprintf(previous_save, "%s%s", index->path, previous_save_);
+            if (!PT_BuildCachePath(previous_save, sizeof(previous_save),
+                                   index->path, previous_save_)) {
+              snprintf(r->msg, sizeof(r->msg),
+                       "Cached path is too long for %s", url);
+              r->statuscode = STATUSCODE_INVALID;
+            }
           }
           // bogus format (includes buggy absolute path)
           else {
@@ -1740,7 +1776,8 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
             if (index->fixedPath == 0) {
               const char *start = jump_protocol_and_auth(url);
               const char *end = start ? strchr(start, '/') : NULL;
-              int len = (int) (end - start);
+              int len = (start != NULL && end != NULL)
+                ? (int) (end - start) : 0;
 
               if (start != NULL && end != NULL && len > 0 && len < 128) {
                 char piece[128 + 2];
@@ -1757,15 +1794,25 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
               int saveLen = (int) strlen(previous_save_);
 
               if (index->fixedPath < saveLen) {
-                sprintf(previous_save, "%s%s", index->path,
-                        previous_save_ + index->fixedPath);
+                if (!PT_BuildCachePath(previous_save, sizeof(previous_save),
+                                       index->path,
+                                       previous_save_ + index->fixedPath)) {
+                  snprintf(r->msg, sizeof(r->msg),
+                           "Cached path is too long for %s", url);
+                  r->statuscode = STATUSCODE_INVALID;
+                }
               } else {
                 snprintf(r->msg, sizeof(r->msg), "Bogus fixePath prefix for %s (prefixLen=%d)",
                         previous_save_, (int) index->fixedPath);
                 r->statuscode = STATUSCODE_INVALID;
               }
             } else {
-              sprintf(previous_save, "%s%s", index->path, previous_save_);
+              if (!PT_BuildCachePath(previous_save, sizeof(previous_save),
+                                     index->path, previous_save_)) {
+                snprintf(r->msg, sizeof(r->msg),
+                         "Cached path is too long for %s", url);
+                r->statuscode = STATUSCODE_INVALID;
+              }
             }
           }
         }
@@ -2302,6 +2349,9 @@ static int PT_SaveCache__Arc_Fun(void *arg, const char *url, PT_Element element)
   int written;
   size_t used;
 
+  if (tm == NULL) {
+    return 1;
+  }
   written = snprintf(st->headers, sizeof(st->headers),
                      "HTTP/1.0 %d %s" "\r\n"
                      "X-Server: ProxyTrack " PROXYTRACK_VERSION "\r\n"

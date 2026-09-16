@@ -2808,16 +2808,24 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             FOPEN(fconcat(OPT_GET_BUFF(opt), back[i].location_buffer, ".ok"),
                   "rb");
           if (fp) {
-            int j = 0;
+            size_t j = 0;
+            int c;
 
-            fscanf(fp, "%d ", &(back[i].r.statuscode));
-            while(!feof(fp)) {
-              int c = fgetc(fp);
-
-              if (c != EOF)
-                back[i].r.msg[j++] = c;
+            if (fscanf(fp, "%d ", &(back[i].r.statuscode)) == 1) {
+              while((c = fgetc(fp)) != EOF) {
+                if (j < sizeof(back[i].r.msg) - 1) {
+                  back[i].r.msg[j++] = (char) c;
+                }
+              }
+              back[i].r.msg[j] = '\0';
+              if (ferror(fp)) {
+                strcpybuff(back[i].r.msg, "Unable to read ftp result");
+                back[i].r.statuscode = STATUSCODE_INVALID;
+              }
+            } else {
+              strcpybuff(back[i].r.msg, "Invalid ftp result");
+              back[i].r.statuscode = STATUSCODE_INVALID;
             }
-            back[i].r.msg[j++] = '\0';
             fclose(fp);
             UNLINK(fconcat(OPT_GET_BUFF(opt), back[i].location_buffer, ".ok"));
             strcpybuff(fconcat

@@ -4194,6 +4194,7 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
         if (opt->shell) {       // si shell
           if ((tl - *stre->last_info_shell_) > 0) {     // toute les 1 sec
             FILE *fp = stdout;
+            FILE *alive_fp;
             int a = 0;
 
             *stre->last_info_shell_ = tl;
@@ -4204,21 +4205,26 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
                      (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                      StringBuff(opt->path_log),
                       "hts-autopsy"));
-              fp =
+              alive_fp =
                 fopen(fconcat
                       (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                      StringBuff(opt->path_log),
+                       StringBuff(opt->path_log),
                        "hts-isalive"), "wb");
-              a = 1;
+              if (alive_fp != NULL) {
+                fp = alive_fp;
+                a = 1;
+              }
             }
             if ((*stre->info_shell_) || a) {
               int i, j;
+              const TStamp elapsed = tl - HTS_STAT.stat_timestart;
 
-              fprintf(fp, "TIME %d" LF, (int) (tl - HTS_STAT.stat_timestart));
+              fprintf(fp, "TIME %d" LF, (int) elapsed);
               fprintf(fp, "TOTAL %d" LF, (int) HTS_STAT.stat_bytes);
               fprintf(fp, "RATE %d" LF,
-                      (int) (HTS_STAT.HTS_TOTAL_RECV /
-                             (tl - HTS_STAT.stat_timestart)));
+                      elapsed > 0
+                        ? (int) (HTS_STAT.HTS_TOTAL_RECV / elapsed)
+                        : 0);
               fprintf(fp, "SOCKET %d" LF, back_nsoc(sback));
               fprintf(fp, "LINK %d" LF, opt->lien_tot);
               {
