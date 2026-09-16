@@ -647,6 +647,65 @@ static int string_safety_selftests(void) {
       return 1;
   }
 
+  /* slcatprintfbuff_clip: append, clip, advance the cursor. Same canary shape,
+     and the destination is reset before every case so an implementation that
+     writes nothing cannot pass on the previous one's bytes (#1685). */
+  {
+    struct {
+      char dst[8];
+      char canary[8];
+    } s;
+
+    const char *const big = "0123456789abcdefghijklmnopqrstuvwxyz";
+    size_t used;
+
+    memset(&s, '#', sizeof(s));
+#define RESET_DST()                                                            \
+  do {                                                                         \
+    memset(s.dst, '#', sizeof(s.dst));                                         \
+    s.dst[0] = '\0';                                                           \
+    used = 0;                                                                  \
+  } while (0)
+
+    /* well under capacity: the cursor lands on the new end */
+    RESET_DST();
+    slcatprintfbuff_clip(s.dst, sizeof(s.dst), &used, "%s-%d", "ab", 42);
+    if (strcmp(s.dst, "ab-42") != 0 || used != 5)
+      return 1;
+
+    /* a second append continues where the cursor left it */
+    slcatprintfbuff_clip(s.dst, sizeof(s.dst), &used, "%s", "xy");
+    if (strcmp(s.dst, "ab-42xy") != 0 || used != 7)
+      return 1;
+
+    /* exact fit: capacity - 1 characters plus the NUL */
+    RESET_DST();
+    slcatprintfbuff_clip(s.dst, sizeof(s.dst), &used, "%s", "1234567");
+    if (strcmp(s.dst, "1234567") != 0 || used != 7)
+      return 1;
+
+    /* one over, then far over: clipped to the prefix and terminated. The
+       expected bytes differ between the two, so a write-nothing implementation
+       cannot pass on the leftovers. */
+    RESET_DST();
+    slcatprintfbuff_clip(s.dst, sizeof(s.dst), &used, "%s", "12345678");
+    if (strcmp(s.dst, "1234567") != 0 || used != 7)
+      return 1;
+    RESET_DST();
+    slcatprintfbuff_clip(s.dst, sizeof(s.dst), &used, "%s", big);
+    if (strcmp(s.dst, "0123456") != 0 || used != 7)
+      return 1;
+
+    /* a full destination takes nothing more and the cursor stays put */
+    slcatprintfbuff_clip(s.dst, sizeof(s.dst), &used, "%s", "zz");
+    if (strcmp(s.dst, "0123456") != 0 || used != 7)
+      return 1;
+#undef RESET_DST
+
+    if (memcmp(s.canary, "########", sizeof(s.canary)) != 0)
+      return 1;
+  }
+
   /* strclipbuff: truncate-and-report, never abort. Same canary shape; the
      destination is poisoned before every call so a case cannot pass on the
      previous one's bytes. */
