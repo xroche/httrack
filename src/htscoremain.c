@@ -2686,6 +2686,33 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   return 0;
                 }
                 break;
+              case 'V':  // -V expansion: httrack -#V "rm $0" "a;id.html"
+                if (na + 2 >= argc) {
+                  HTS_PANIC_PRINTF
+                    ("Option #V needs to be followed by a command template and a filename");
+                  printf("Example: '-#V' \"rm $0\" \"a;id.html\"\n");
+                  htsmain_free();
+                  return -1;
+                } else {
+                  char BIGSTK expanded[8192];
+
+                  switch (usercommand_expand
+                          (expanded, sizeof(expanded), argv[na + 1],
+                           argv[na + 2])) {
+                  case USERCOMMAND_EXPAND_OK:
+                    printf("%s\n", expanded);
+                    break;
+                  case USERCOMMAND_EXPAND_TOOLONG:
+                    printf("toolong\n");
+                    break;
+                  default:
+                    printf("refused\n");
+                    break;
+                  }
+                  htsmain_free();
+                  return 0;
+                }
+                break;
               case '!':
                 HTS_PANIC_PRINTF
                   ("Option #! is disabled for security reasons");
