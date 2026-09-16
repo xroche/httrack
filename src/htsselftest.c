@@ -647,6 +647,65 @@ static int string_safety_selftests(void) {
       return 1;
   }
 
+  /* slcatprintfbuff_clip: append, clip, advance the cursor. Same canary shape,
+     and the destination is reset before every case so an implementation that
+     writes nothing cannot pass on the previous one's bytes (#1685). */
+  {
+    struct {
+      char dst[8];
+      char canary[8];
+    } s;
+
+    const char *const big = "0123456789abcdefghijklmnopqrstuvwxyz";
+    size_t used;
+
+    memset(&s, '#', sizeof(s));
+#define RESET_DST()                                                            \
+  do {                                                                         \
+    memset(s.dst, '#', sizeof(s.dst));                                         \
+    s.dst[0] = '\0';                                                           \
+    used = 0;                                                                  \
+  } while (0)
+
+    /* well under capacity: the cursor lands on the new end */
+    RESET_DST();
+    slcatprintfbuff_clip(s.dst, sizeof(s.dst), &used, "%s-%d", "ab", 42);
+    if (strcmp(s.dst, "ab-42") != 0 || used != 5)
+      return 1;
+
+    /* a second append continues where the cursor left it */
+    slcatprintfbuff_clip(s.dst, sizeof(s.dst), &used, "%s", "xy");
+    if (strcmp(s.dst, "ab-42xy") != 0 || used != 7)
+      return 1;
+
+    /* exact fit: capacity - 1 characters plus the NUL */
+    RESET_DST();
+    slcatprintfbuff_clip(s.dst, sizeof(s.dst), &used, "%s", "1234567");
+    if (strcmp(s.dst, "1234567") != 0 || used != 7)
+      return 1;
+
+    /* one over, then far over: clipped to the prefix and terminated. The
+       expected bytes differ between the two, so a write-nothing implementation
+       cannot pass on the leftovers. */
+    RESET_DST();
+    slcatprintfbuff_clip(s.dst, sizeof(s.dst), &used, "%s", "12345678");
+    if (strcmp(s.dst, "1234567") != 0 || used != 7)
+      return 1;
+    RESET_DST();
+    slcatprintfbuff_clip(s.dst, sizeof(s.dst), &used, "%s", big);
+    if (strcmp(s.dst, "0123456") != 0 || used != 7)
+      return 1;
+
+    /* a full destination takes nothing more and the cursor stays put */
+    slcatprintfbuff_clip(s.dst, sizeof(s.dst), &used, "%s", "zz");
+    if (strcmp(s.dst, "0123456") != 0 || used != 7)
+      return 1;
+#undef RESET_DST
+
+    if (memcmp(s.canary, "########", sizeof(s.canary)) != 0)
+      return 1;
+  }
+
   /* strclipbuff: truncate-and-report, never abort. Same canary shape; the
      destination is poisoned before every call so a case cannot pass on the
      previous one's bytes. */
@@ -2485,69 +2544,6 @@ static int st_mirrorcompleted(httrackp *opt, int argc, char **argv) {
   hts_free_opt(from);
   hts_free_opt(to);
   printf("mirror-completed: %s\n", err ? "FAIL" : "OK");
-  return err;
-}
-
-/* A canary behind the buffer, so a stray NUL shows as well as a stray byte. */
-struct st_appendf_probe {
-  char buf[8];
-  char canary[8];
-};
-
-static hts_boolean st_appendf_canary_ok(const struct st_appendf_probe *probe) {
-  size_t i;
-
-  for (i = 0; i < sizeof(probe->canary); i++) {
-    if (probe->canary[i] != 'Z')
-      return HTS_FALSE;
-  }
-  return HTS_TRUE;
-}
-
-/* slcatprintfbuff_clip() keeps what fits and stops at the capacity (#1685). */
-static int st_appendf(httrackp *opt, int argc, char **argv) {
-  struct st_appendf_probe probe;
-  size_t used = 0;
-  int err = 0;
-
-  (void) opt;
-  (void) argc;
-  (void) argv;
-
-  /* the canary only sits behind buf[] if nothing is padded between them */
-  enum {
-    st_appendf_packed =
-        1 / (offsetof(struct st_appendf_probe, canary) == sizeof(probe.buf))
-  };
-
-  memset(probe.canary, 'Z', sizeof(probe.canary));
-  probe.buf[0] = '\0';
-
-  /* The detector must see one changed byte, or every check below is vacuous. */
-  probe.canary[0] = 'X';
-  if (st_appendf_canary_ok(&probe))
-    err = 1;
-  probe.canary[0] = 'Z';
-
-  slcatprintfbuff_clip(probe.buf, sizeof(probe.buf), &used, "%s", "ab");
-  slcatprintfbuff_clip(probe.buf, sizeof(probe.buf), &used, "%d", 7);
-  if (strcmp(probe.buf, "ab7") != 0 || used != 3)
-    err = 1;
-
-  /* Too long, so it is cut at the capacity and stays terminated. */
-  slcatprintfbuff_clip(probe.buf, sizeof(probe.buf), &used, "%s", "cdefghij");
-  if (strcmp(probe.buf, "ab7cdef") != 0 || used != 7)
-    err = 1;
-
-  /* A full buffer takes nothing more. */
-  slcatprintfbuff_clip(probe.buf, sizeof(probe.buf), &used, "%s", "kl");
-  if (strcmp(probe.buf, "ab7cdef") != 0 || used != 7)
-    err = 1;
-
-  if (!st_appendf_canary_ok(&probe))
-    err = 1;
-
-  printf("appendf: %s\n", err ? "FAIL" : "OK");
   return err;
 }
 
@@ -15894,8 +15890,6 @@ static const struct selftest_entry {
      st_filterbounds},
     {"filtercap", "", "an over-long filter rule is refused, not stored dead",
      st_filtercap},
-    {"appendf", "",
-     "a formatted append truncates instead of overflowing (#1685)", st_appendf},
     {"log-counters", "",
      "error and warning counts survive a run with no log file (#1681)",
      st_logcounters},
