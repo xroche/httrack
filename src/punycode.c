@@ -6,6 +6,18 @@ http://www.nicemice.net/amc/
 
 This is ANSI C code (C89) implementing Punycode (RFC 3492).
 
+Disclaimer and license, from RFC 3492 appendix B. The vendored copy in this
+tree had dropped it; the license requires that it be retained.
+
+    Regarding this entire document or any portion of it (including the
+    pseudocode and C code), the author makes no guarantees and is not
+    responsible for any damage resulting from its use.  The author grants
+    irrevocable permission to anyone to use, modify, and distribute it in
+    any way that does not diminish the rights of anyone else to use,
+    modify, and distribute it, provided that redistributed derivative
+    works do not contain misleading author or version information.
+    Derivative works need not be licensed under similar terms.
+
 */
 
 #include "punycode.h"

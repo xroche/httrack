@@ -1,0 +1,90 @@
+#!/bin/bash
+#
+
+# -V user command expansion
+# usage: httrack -#V <command-template> <filename>  =>  expanded command
+
+# The filename comes from the crawled URL, and the save-name cleanup in
+# htsname.c only rewrites what a filesystem refuses -- ; ` $ & ' ( ) and
+# spaces all survive into it. Expanded raw, a crawled page chose what the
+# shell ran.
+
+expand() { httrack -O /dev/null -\#V "$1" "$2"; }
+
+# The documented templates keep working, unquoted and quoted alike.
+test "$(expand 'rm $0' '/tmp/m/index.html')" \
+	== "rm '/tmp/m/index.html'"			|| exit 1
+test "$(expand 'cat "$0"' '/tmp/m/index.html')" \
+	== 'cat "/tmp/m/index.html"'			|| exit 1
+
+# A filename carrying shell syntax is quoted, not obeyed.
+test "$(expand 'rm $0' '/tmp/m/a;id;.html')" \
+	== "rm '/tmp/m/a;id;.html'"			|| exit 1
+test "$(expand 'rm $0' '/tmp/m/a`id`.html')" \
+	== "rm '/tmp/m/a\`id\`.html'"			|| exit 1
+
+# A quote in the filename must not close the quoting put around it.
+test "$(expand 'rm $0' "/tmp/m/a'id'.html")" \
+	== "rm '/tmp/m/a'\\''id'\\''.html'"		|| exit 1
+
+# Inside "..." the closing quote and the expansions are what need escaping.
+test "$(expand 'cat "$0"' '/tmp/m/a$(id).html')" \
+	== 'cat "/tmp/m/a\$(id).html"'			|| exit 1
+
+# A command substitution starts a fresh shell, so the quoting outside it says
+# nothing about the quoting inside: here $0 sits in '...', not in the "..."
+# around the substitution, and it is the apostrophes that have to be escaped.
+test "$(expand 'printf "[%s]" "$(printf %s '"'"'$0'"'"')"' "/tmp/m/a'id'.html")" \
+	== 'printf "[%s]" "$(printf %s '"'"'/tmp/m/a'"'"'\'"'"''"'"'id'"'"'\'"'"''"'"'.html'"'"')"' \
+								|| exit 1
+
+# Back inside the "..." once the substitution closes.
+test "$(expand 'printf "[%s]" "$(:)$0"' '/tmp/m/a$b.html')" \
+	== 'printf "[%s]" "$(:)/tmp/m/a\$b.html"'		|| exit 1
+
+# Whatever the surrounding quoting, the shell must read the expansion as one
+# word equal to the filename, and must run nothing else.
+canary="$(mktemp -d)/pwned"
+for f in '/tmp/m/plain.html' '/tmp/m/a b.html' '/tmp/m/a;id;.html' \
+	 '/tmp/m/a`id`.html' '/tmp/m/a$(id).html' "/tmp/m/a'id'.html" \
+	 '/tmp/m/a&b.html' '/tmp/m/a|b.html' '/tmp/m/a$HOME.html' \
+	 '/tmp/m/a*b.html' '/tmp/m/a"b.html' '/tmp/m/a\b.html' \
+	 "/tmp/m/\$(touch $canary).html" "x'; touch $canary; echo 'y"; do
+	for tmpl in 'printf %s $0' 'printf %s "$0"' "printf %s '\$0'"; do
+		test "$(eval "$(expand "$tmpl" "$f")" 2>&1)" == "$f"	|| exit 1
+	done
+	# ...including when the template nests it in a substitution, in any of
+	# the three quotings that substitution can open.
+	for tmpl in 'printf "[%s]" "$(printf %s $0)"' \
+		    'printf "[%s]" "$(printf %s "$0")"' \
+		    'printf "[%s]" "$(printf %s '"'"'$0'"'"')"' \
+		    'printf "[%s]" "$( (printf %s '"'"'$0'"'"') )"' \
+		    'printf "[%s]" "$(printf %s "$(printf %s '"'"'$0'"'"')")"'; do
+		test "$(eval "$(expand "$tmpl" "$f")" 2>&1)" == "[$f]"	|| exit 1
+	done
+done
+test ! -e "$canary"						|| exit 1
+rm -rf "$(dirname "$canary")"
+
+# Two placings are refused rather than expanded, because no single escaping
+# of the filename survives them: inside `...`, whose outer shell strips a
+# layer of backslashes before the inner one reads the text, and behind a
+# backslash, which eats the first character of the quoting put around it.
+test "$(expand 'printf %s `printf %s "$0"`' '/tmp/m/a.html')" \
+	== "refused"						|| exit 1
+test "$(expand 'echo \$0' '/tmp/m/a.html')" == "refused"	|| exit 1
+test "$(expand 'echo "\$0"' '/tmp/m/a.html')" == "refused"	|| exit 1
+# A backquote elsewhere in the template is none of that: it is copied
+# through and $0 is expanded as usual.
+test "$(expand 'echo `date` $0' '/tmp/m/a.html')" \
+	== "echo \`date\` '/tmp/m/a.html'"			|| exit 1
+
+# A template that cannot fit is reported, not truncated: a truncated
+# "rm '$0'" is an "rm". Arguments are capped at HTS_CDLMAXSIZE, so the
+# overflow is reached by repeating $0 rather than by one huge name.
+long="/tmp/m/$(printf 'a%.0s' $(seq 1 900)).html"
+test "$(expand 'rm $0 $0 $0 $0 $0 $0 $0 $0 $0 $0' "$long")" == "toolong" || exit 1
+
+# ...while a template that just fits is still expanded.
+test -n "$(expand 'rm $0' "$long")"				|| exit 1
+test "$(expand 'rm $0' "$long")" != "toolong"			|| exit 1
