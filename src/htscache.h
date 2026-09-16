@@ -83,6 +83,9 @@ int cache_readdata(cache_back * cache, const char *str1, const char *str2,
 /* Capacity assumed for the 'location' buffer callers hand to cache_read()
    and friends, and for the fallback used when they pass none. */
 #define CACHE_LOCATION_SIZE (HTS_URLMAXSIZE * 2)
+/* Capacity assumed for the 'return_save' buffer cache_readex() writes the
+   entry's previous save name into. */
+#define CACHE_SAVE_SIZE (HTS_URLMAXSIZE * 2)
 void cache_rstr(FILE * fp, char *s, size_t size);
 char *cache_rstr_addr(FILE * fp);
 int cache_brstr(char *adr, char *s);

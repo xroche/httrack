@@ -43,14 +43,14 @@ Please visit our Website: http://www.httrack.com
 
 // COPY OF cmdl_ins in htsmain.c
 // Insert a command in the argc/argv
-#define cmdl_ins(token,argc,argv,buff,ptr) \
+#define cmdl_ins(token,argc,argv,buff,bufsize,ptr) \
   { \
   int i; \
   for(i=argc;i>0;i--)\
   argv[i]=argv[i-1];\
   } \
   argv[0]=(buff+ptr); \
-  strcpybuff(argv[0],token); \
+  strlcpybuff(argv[0],token,(bufsize)-(size_t)(ptr)); \
   ptr += (int) (strlen(argv[0])+1); \
   argc++
 // END OF COPY OF cmdl_ins in htsmain.c
@@ -263,12 +263,16 @@ const char *hts_optalias[][4] = {
   argc,argv     as in main()
   n_arg         argument position
   return_argv   a char[2][] where to put result
+  return_argv_size  capacity of each of those two entries
   return_error  buffer in case of syntax error
+  return_error_size capacity of that buffer
 
   return value: number of arguments treated (0 if error)
 */
 int optalias_check(int argc, const char *const *argv, int n_arg,
-                   int *return_argc, char **return_argv, char *return_error) {
+                   int *return_argc, char **return_argv,
+                   size_t return_argv_size, char *return_error,
+                   size_t return_error_size) {
   return_error[0] = '\0';
   *return_argc = 1;
   if (argv[n_arg][0] == '-')
@@ -322,9 +326,9 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
           /* Copy parameters? */
           if (need_param == 2) {
             if ((n_arg + 1 >= argc) || (argv[n_arg + 1][0] == '-')) {   /* no supplemental parameter */
-              sprintf(return_error,
-                      "Syntax error:\n\tOption %s needs to be followed by a parameter: %s <param>\n\t%s\n",
-                      command, command, _NOT_NULL(optalias_help(command)));
+              snprintf(return_error, return_error_size,
+                       "Syntax error:\n\tOption %s needs to be followed by a parameter: %s <param>\n\t%s\n",
+                       command, command, _NOT_NULL(optalias_help(command)));
               return 0;
             }
             strcpybuff(param, argv[n_arg + 1]);
@@ -337,35 +341,36 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
 
         /* Must be alone (-P /tmp) */
         if (strcmp(hts_optalias[pos][2], "param1") == 0) {
-          strcpybuff(return_argv[0], command);
-          strcpybuff(return_argv[1], param);
+          strlcpybuff(return_argv[0], command, return_argv_size);
+          strlcpybuff(return_argv[1], param, return_argv_size);
           *return_argc = 2;     /* 2 parameters returned */
         }
         /* Alone with parameter (+*.gif) */
         else if (strcmp(hts_optalias[pos][2], "param0") == 0) {
           /* Command */
-          strcpybuff(return_argv[0], command);
-          strcatbuff(return_argv[0], param);
+          strlcpybuff(return_argv[0], command, return_argv_size);
+          strlcatbuff(return_argv[0], param, return_argv_size);
         }
         /* Together (-c8) */
         else {
           /* Command */
-          strcpybuff(return_argv[0], command);
+          strlcpybuff(return_argv[0], command, return_argv_size);
           /* Parameters accepted */
           if (strncmp(hts_optalias[pos][2], "param", 5) == 0) {
             /* --cache=off or --index=on */
             if (strcmp(param, "off") == 0)
-              strcatbuff(return_argv[0], "0");
+              strlcatbuff(return_argv[0], "0", return_argv_size);
             else if (strcmp(param, "on") == 0) {
               // on is the default
               // strcatbuff(return_argv[0],"1");
             } else
-              strcatbuff(return_argv[0], param);
+              strlcatbuff(return_argv[0], param, return_argv_size);
           }
           *return_argc = 1;     /* 1 parameter returned */
         }
       } else {
-        sprintf(return_error, "Unknown option: %s\n", command);
+        snprintf(return_error, return_error_size, "Unknown option: %s\n",
+                 command);
         return 0;
       }
       return need_param;
@@ -379,15 +384,15 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
       if ((strcmp(hts_optalias[pos][2], "param1") == 0)
           || (strcmp(hts_optalias[pos][2], "param0") == 0)) {
         if ((n_arg + 1 >= argc) || (argv[n_arg + 1][0] == '-')) {       /* no supplemental parameter */
-          sprintf(return_error,
-                  "Syntax error:\n\tOption %s needs to be followed by a parameter: %s <param>\n\t%s\n",
-                  argv[n_arg], argv[n_arg],
-                  _NOT_NULL(optalias_help(argv[n_arg])));
+          snprintf(return_error, return_error_size,
+                   "Syntax error:\n\tOption %s needs to be followed by a parameter: %s <param>\n\t%s\n",
+                   argv[n_arg], argv[n_arg],
+                   _NOT_NULL(optalias_help(argv[n_arg])));
           return 0;
         }
         /* Copy parameters */
-        strcpybuff(return_argv[0], argv[n_arg]);
-        strcpybuff(return_argv[1], argv[n_arg + 1]);
+        strlcpybuff(return_argv[0], argv[n_arg], return_argv_size);
+        strlcpybuff(return_argv[1], argv[n_arg + 1], return_argv_size);
         /* And return */
         *return_argc = 2;       /* 2 parameters returned */
         return 2;               /* 2 parameters used */
@@ -396,7 +401,7 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
   }
 
   /* Copy and return other unknown option */
-  strcpybuff(return_argv[0], argv[n_arg]);
+  strlcpybuff(return_argv[0], argv[n_arg], return_argv_size);
   return 1;
 }
 
@@ -462,7 +467,7 @@ const char *optalias_help(const char *token) {
 */
 /* Note: NOT utf-8 */
 int optinclude_file(const char *name, int *argc, char **argv, char *x_argvblk,
-                    int *x_ptr) {
+                    size_t x_argvblk_size, int *x_ptr) {
   FILE *fp;
 
   fp = fopen(name, "rb");
@@ -525,7 +530,8 @@ int optinclude_file(const char *name, int *argc, char **argv, char *x_argvblk,
 
             result =
               optalias_check(2, (const char *const *) tmp_argv, 0, &return_argc,
-                             (tmp_argv + 2), return_error);
+                             (tmp_argv + 2), sizeof(_tmp_argv[0]),
+                             return_error, sizeof(return_error));
             if (!result) {
               printf("%s\n", return_error);
             } else {
@@ -535,14 +541,15 @@ int optinclude_file(const char *name, int *argc, char **argv, char *x_argvblk,
               /* temporary argc: Number of parameters after minus insert_after_argc */
               insert_after_argc = (*argc) - insert_after;
               cmdl_ins((tmp_argv[2]), insert_after_argc, (argv + insert_after),
-                       x_argvblk, (*x_ptr));
+                       x_argvblk, x_argvblk_size, (*x_ptr));
               *argc = insert_after_argc + insert_after;
               insert_after++;
               /* Second one */
               if (return_argc > 1) {
                 insert_after_argc = (*argc) - insert_after;
                 cmdl_ins((tmp_argv[3]), insert_after_argc,
-                         (argv + insert_after), x_argvblk, (*x_ptr));
+                         (argv + insert_after), x_argvblk, x_argvblk_size,
+                         (*x_ptr));
                 *argc = insert_after_argc + insert_after;
                 insert_after++;
               }

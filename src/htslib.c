@@ -1535,7 +1535,7 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
         while(is_realspace(*(rcvd + p)))
           p++;                  // sauter espaces
         if ((int) strlen(rcvd + p) < HTS_URLMAXSIZE)    // pas trop long?
-          strcpybuff(retour->location, rcvd + p);
+          strlcpybuff(retour->location, rcvd + p, HTS_URLMAXSIZE);
         else                    // erreur.. ignorer
           retour->location[0] = '\0';
       }
@@ -1669,132 +1669,132 @@ HTSEXT_API void infostatuscode(char *msg, int statuscode) {
   switch (statuscode) {
     // Erreurs HTTP, selon RFC
   case 100:
-    strcpybuff(msg, "Continue");
+    strlcpybuff(msg, "Continue", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 101:
-    strcpybuff(msg, "Switching Protocols");
+    strlcpybuff(msg, "Switching Protocols", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 200:
-    strcpybuff(msg, "OK");
+    strlcpybuff(msg, "OK", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 201:
-    strcpybuff(msg, "Created");
+    strlcpybuff(msg, "Created", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 202:
-    strcpybuff(msg, "Accepted");
+    strlcpybuff(msg, "Accepted", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 203:
-    strcpybuff(msg, "Non-Authoritative Information");
+    strlcpybuff(msg, "Non-Authoritative Information", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 204:
-    strcpybuff(msg, "No Content");
+    strlcpybuff(msg, "No Content", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 205:
-    strcpybuff(msg, "Reset Content");
+    strlcpybuff(msg, "Reset Content", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 206:
-    strcpybuff(msg, "Partial Content");
+    strlcpybuff(msg, "Partial Content", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 300:
-    strcpybuff(msg, "Multiple Choices");
+    strlcpybuff(msg, "Multiple Choices", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 301:
-    strcpybuff(msg, "Moved Permanently");
+    strlcpybuff(msg, "Moved Permanently", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 302:
-    strcpybuff(msg, "Moved Temporarily");
+    strlcpybuff(msg, "Moved Temporarily", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 303:
-    strcpybuff(msg, "See Other");
+    strlcpybuff(msg, "See Other", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 304:
-    strcpybuff(msg, "Not Modified");
+    strlcpybuff(msg, "Not Modified", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 305:
-    strcpybuff(msg, "Use Proxy");
+    strlcpybuff(msg, "Use Proxy", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 306:
-    strcpybuff(msg, "Undefined 306 error");
+    strlcpybuff(msg, "Undefined 306 error", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 307:
-    strcpybuff(msg, "Temporary Redirect");
+    strlcpybuff(msg, "Temporary Redirect", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 400:
-    strcpybuff(msg, "Bad Request");
+    strlcpybuff(msg, "Bad Request", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 401:
-    strcpybuff(msg, "Unauthorized");
+    strlcpybuff(msg, "Unauthorized", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 402:
-    strcpybuff(msg, "Payment Required");
+    strlcpybuff(msg, "Payment Required", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 403:
-    strcpybuff(msg, "Forbidden");
+    strlcpybuff(msg, "Forbidden", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 404:
-    strcpybuff(msg, "Not Found");
+    strlcpybuff(msg, "Not Found", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 405:
-    strcpybuff(msg, "Method Not Allowed");
+    strlcpybuff(msg, "Method Not Allowed", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 406:
-    strcpybuff(msg, "Not Acceptable");
+    strlcpybuff(msg, "Not Acceptable", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 407:
-    strcpybuff(msg, "Proxy Authentication Required");
+    strlcpybuff(msg, "Proxy Authentication Required", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 408:
-    strcpybuff(msg, "Request Time-out");
+    strlcpybuff(msg, "Request Time-out", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 409:
-    strcpybuff(msg, "Conflict");
+    strlcpybuff(msg, "Conflict", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 410:
-    strcpybuff(msg, "Gone");
+    strlcpybuff(msg, "Gone", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 411:
-    strcpybuff(msg, "Length Required");
+    strlcpybuff(msg, "Length Required", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 412:
-    strcpybuff(msg, "Precondition Failed");
+    strlcpybuff(msg, "Precondition Failed", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 413:
-    strcpybuff(msg, "Request Entity Too Large");
+    strlcpybuff(msg, "Request Entity Too Large", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 414:
-    strcpybuff(msg, "Request-URI Too Large");
+    strlcpybuff(msg, "Request-URI Too Large", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 415:
-    strcpybuff(msg, "Unsupported Media Type");
+    strlcpybuff(msg, "Unsupported Media Type", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 416:
-    strcpybuff(msg, "Requested Range Not Satisfiable");
+    strlcpybuff(msg, "Requested Range Not Satisfiable", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 417:
-    strcpybuff(msg, "Expectation Failed");
+    strlcpybuff(msg, "Expectation Failed", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 500:
-    strcpybuff(msg, "Internal Server Error");
+    strlcpybuff(msg, "Internal Server Error", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 501:
-    strcpybuff(msg, "Not Implemented");
+    strlcpybuff(msg, "Not Implemented", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 502:
-    strcpybuff(msg, "Bad Gateway");
+    strlcpybuff(msg, "Bad Gateway", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 503:
-    strcpybuff(msg, "Service Unavailable");
+    strlcpybuff(msg, "Service Unavailable", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 504:
-    strcpybuff(msg, "Gateway Time-out");
+    strlcpybuff(msg, "Gateway Time-out", INFOSTATUSCODE_MIN_SIZE);
     break;
   case 505:
-    strcpybuff(msg, "HTTP Version Not Supported");
+    strlcpybuff(msg, "HTTP Version Not Supported", INFOSTATUSCODE_MIN_SIZE);
     break;
     //
   default:
     if (strnotempty(msg) == 0)
-      strcpybuff(msg, "Unknown error");
+      strlcpybuff(msg, "Unknown error", INFOSTATUSCODE_MIN_SIZE);
     break;
   }
 }
@@ -3559,13 +3559,13 @@ HTSEXT_API char *fil_normalized(const char *source, char *dest) {
     copyBuff[0] = '\0';
     for(i = 0; i < ampargs; i++) {
       if (i == 0)
-        strcatbuff(copyBuff, "?");
+        strlcatbuff(copyBuff, "?", qLen + 1);
       else
-        strcatbuff(copyBuff, "&");
-      strcatbuff(copyBuff, amps[i] + 1);
+        strlcatbuff(copyBuff, "&", qLen + 1);
+      strlcatbuff(copyBuff, amps[i] + 1, qLen + 1);
     }
     assertf(strlen(copyBuff) == qLen);
-    strcpybuff(query, copyBuff);
+    strlcpybuff(query, copyBuff, qLen + 1);
 
     /* Cleanup */
     freet(amps);
@@ -3578,7 +3578,7 @@ HTSEXT_API char *fil_normalized(const char *source, char *dest) {
 #define endwith(a) ( (len >= (sizeof(a)-1)) ? ( strncmp(dest, a+len-(sizeof(a)-1), sizeof(a)-1) == 0 ) : 0 );
 HTSEXT_API char *adr_normalized(const char *source, char *dest) {
   /* not yet too aggressive (no com<->net<->org checkings) */
-  strcpybuff(dest, jump_normalized_const(source));
+  strlcpybuff(dest, jump_normalized_const(source), ADR_NORMALIZED_MIN_SIZE);
   return dest;
 }
 
@@ -4007,8 +4007,8 @@ HTSEXT_API size_t escape_for_html_print_full(const char *const s, char *const de
 #undef ADD_CHAR
 
 // conversion minuscules, avec buffer
-char *convtolower(char *catbuff, const char *a) {
-  strcpybuff(catbuff, a);
+char *convtolower(char *catbuff, size_t size, const char *a) {
+  strlcpybuff(catbuff, a, size);
   hts_lowcase(catbuff);         // lower case
   return catbuff;
 }
@@ -4200,7 +4200,7 @@ void give_mimext(char *s, const char *st) {
   while((!ok) && (strnotempty(hts_mime[j][1]))) {
     if (strfield2(hts_mime[j][0], st)) {
       if (hts_mime[j][1][0] != '*') {   // Une correspondance existe
-        strcpybuff(s, hts_mime[j][1]);
+        strlcpybuff(s, hts_mime[j][1], GIVE_MIMEXT_MIN_SIZE);
         ok = 1;
       }
     }
@@ -4221,7 +4221,7 @@ void give_mimext(char *s, const char *st) {
     if (a) {
       if ((int) strlen(a) >= 1) {
         if ((int) strlen(a) <= 4) {
-          strcpybuff(s, a);
+          strlcpybuff(s, a, GIVE_MIMEXT_MIN_SIZE);
           ok = 1;
         }
       }
@@ -5046,7 +5046,8 @@ void hts_freeall(void) {
 
 // cut path and project name
 // patch also initial path
-void cut_path(char *fullpath, char *path, char *pname) {
+void cut_path(char *fullpath, char *path, size_t path_size, char *pname,
+              size_t pname_size) {
   path[0] = pname[0] = '\0';
   if (strnotempty(fullpath)) {
     if ((fullpath[strlen(fullpath) - 1] == '/')
@@ -5062,8 +5063,8 @@ void cut_path(char *fullpath, char *path, char *pname) {
         a--;
       if (*a == '/')
         a++;
-      strcpybuff(pname, a);
-      strncatbuff(path, fullpath, (int) (a - fullpath));
+      strlcpybuff(pname, a, pname_size);
+      strlncatbuff(path, fullpath, path_size, (int) (a - fullpath));
     }
   }
 }

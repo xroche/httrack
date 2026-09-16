@@ -691,10 +691,10 @@ int httpmirror(char *url1, httrackp * opt) {
             }
           }
           if (type)
-            strcpybuff(filters[filptr], "+");
+            strlcpybuff(filters[filptr], "+", HTS_FILTER_SIZE);
           else
-            strcpybuff(filters[filptr], "-");
-          strcatbuff(filters[filptr], tempo);
+            strlcpybuff(filters[filptr], "-", HTS_FILTER_SIZE);
+          strlcatbuff(filters[filptr], tempo, HTS_FILTER_SIZE);
           filptr++;
 
           /* sanity check */
@@ -731,10 +731,10 @@ int httpmirror(char *url1, httrackp * opt) {
 
         //strcatbuff(primary,"<PRIMARY=\"");
         if (strstr(url, ":/") == NULL)
-          strcatbuff(primary, "http://");
-        strcatbuff(primary, url);
+          strlcatbuff(primary, "http://", primary_len);
+        strlcatbuff(primary, url, primary_len);
         //strcatbuff(primary,"\">");
-        strcatbuff(primary, "\n");
+        strlcatbuff(primary, "\n", primary_len);
       }
     }                           // while
 
@@ -774,12 +774,15 @@ int httpmirror(char *url1, httrackp * opt) {
           if (count && line[0]) {
             n++;
             if (strstr(line, ":/") == NULL) {
-              strcpybuff(primary_ptr, "http://");
+              strlcpybuff(primary_ptr, "http://",
+                          primary_len - (size_t) (primary_ptr - primary));
               primary_ptr += strlen(primary_ptr);
             }
-            strcpybuff(primary_ptr, line);
+            strlcpybuff(primary_ptr, line,
+                        primary_len - (size_t) (primary_ptr - primary));
             primary_ptr += strlen(primary_ptr);
-            strcpybuff(primary_ptr, "\n");
+            strlcpybuff(primary_ptr, "\n",
+                        primary_len - (size_t) (primary_ptr - primary));
             primary_ptr += 1;
           }
         }
@@ -2486,9 +2489,9 @@ void host_ban(httrackp * opt, int ptr,
   // interdire host
   assertf((*_FILTERS_PTR) < opt->maxfilter);
   if (*_FILTERS_PTR < opt->maxfilter) {
-    strcpybuff(_FILTERS[*_FILTERS_PTR], "-");
-    strcatbuff(_FILTERS[*_FILTERS_PTR], host);
-    strcatbuff(_FILTERS[*_FILTERS_PTR], "/*");  // host/ * interdit
+    strlcpybuff(_FILTERS[*_FILTERS_PTR], "-", HTS_FILTER_SIZE);
+    strlcatbuff(_FILTERS[*_FILTERS_PTR], host, HTS_FILTER_SIZE);
+    strlcatbuff(_FILTERS[*_FILTERS_PTR], "/*", HTS_FILTER_SIZE);        // host/ * interdit
     (*_FILTERS_PTR)++;
   }
   // oups
@@ -2579,15 +2582,13 @@ int filters_init(char ***ptrfilters, int maxfilter, int filterinc) {
   if (filters) {
     if (filters[0] == NULL) {
       filters[0] =
-        (char *) malloct(sizeof(char) * (filter_max + 2) *
-                         (HTS_URLMAXSIZE * 2));
+        (char *) malloct(sizeof(char) * (filter_max + 2) * HTS_FILTER_SIZE);
       memset(filters[0], 0,
-             sizeof(char) * (filter_max + 2) * (HTS_URLMAXSIZE * 2));
+             sizeof(char) * (filter_max + 2) * HTS_FILTER_SIZE);
     } else {
       filters[0] =
         (char *) realloct(filters[0],
-                          sizeof(char) * (filter_max +
-                                          2) * (HTS_URLMAXSIZE * 2));
+                          sizeof(char) * (filter_max + 2) * HTS_FILTER_SIZE);
     }
     if (filters[0] == NULL) {
       freet(filters);
@@ -2603,7 +2604,7 @@ int filters_init(char ***ptrfilters, int maxfilter, int filterinc) {
     else
       from = filter_max - filterinc;
     for(i = 0; i <= filter_max; i++) {  // PLUS UN (sécurité)
-      filters[i] = filters[0] + i * (HTS_URLMAXSIZE * 2);
+      filters[i] = filters[0] + i * HTS_FILTER_SIZE;
     }
     for(i = from; i <= filter_max; i++) {       // PLUS UN (sécurité)
       filters[i][0] = '\0';     // clear
@@ -2741,10 +2742,12 @@ HTSEXT_API int structcheck(const char *path) {
       if (!S_ISDIR(st.st_mode)) {
 #if HTS_REMOVE_ANNOYING_INDEX
         if (S_ISREG(st.st_mode)) {      /* Regular file in place ; move it and create directory */
-          if (snprintf(tmpbuf, sizeof(tmpbuf), "%s.txt", file) < 0
-              || strlen(tmpbuf) >= sizeof(tmpbuf) - 1) {
-            errno = ENAMETOOLONG;
-            return -1;
+          {
+            const int written = snprintf(tmpbuf, sizeof(tmpbuf), "%s.txt", file);
+            if (written < 0 || (size_t) written >= sizeof(tmpbuf)) {
+              errno = ENAMETOOLONG;
+              return -1;
+            }
           }
           if (rename(file, tmpbuf) != 0) {      /* Can't rename regular file */
             return -1;
@@ -2853,7 +2856,13 @@ HTSEXT_API int structcheck_utf8(const char *path) {
       if (!S_ISDIR(st.st_mode)) {
 #if HTS_REMOVE_ANNOYING_INDEX
         if (S_ISREG(st.st_mode)) {      /* Regular file in place ; move it and create directory */
-          sprintf(tmpbuf, "%s.txt", file);
+          {
+            const int written = snprintf(tmpbuf, sizeof(tmpbuf), "%s.txt", file);
+            if (written < 0 || (size_t) written >= sizeof(tmpbuf)) {
+              errno = ENAMETOOLONG;
+              return -1;
+            }
+          }
           if (RENAME(file, tmpbuf) != 0) {      /* Can't rename regular file */
             return -1;
           }
@@ -3826,7 +3835,7 @@ char *next_token(char *p, int flag) {
           tempo[0] = c;
           tempo[1] = '\0';
           strcatbuff(tempo, p + 2);
-          strcpybuff(p, tempo);
+          strlcpybuff(p, tempo, strlen(p) + 1);
         }
       }
     } else if (*p == 34) {      // guillemets (de fin)
@@ -3834,7 +3843,7 @@ char *next_token(char *p, int flag) {
 
       tempo[0] = '\0';
       strcatbuff(tempo, p + 1);
-      strcpybuff(p, tempo);     /* wipe "" */
+      strlcpybuff(p, tempo, strlen(p) + 1);     /* wipe "" */
       p--;
       /* */
       quote = !quote;
@@ -4168,13 +4177,13 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
             opt->savename_83 = b;
             if (r != -1 && !forbidden_url) {
               if (savename()) {
-                if (lienrelatif(tempo, afs.save, savename()) == 0) {
+                if (lienrelatif(tempo, sizeof(tempo), afs.save, savename()) == 0) {
                   hts_log_print(opt, LOG_DEBUG,
                                 "(module): relative link at %s build with %s and %s: %s",
                                 afs.af.adr, afs.save, savename(), tempo);
                   if (str->localLink
                       && str->localLinkSize > (int) strlen(tempo) + 1) {
-                    strcpybuff(str->localLink, tempo);
+                    strlcpybuff(str->localLink, tempo, str->localLinkSize);
                   }
                 }
               }
@@ -4188,9 +4197,9 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
                 && str->localLinkSize > (int) (strlen(afs.af.adr) + strlen(afs.af.fil) + 8)) {
               str->localLink[0] = '\0';
               if (!link_has_authority(afs.af.adr))
-                strcpybuff(str->localLink, "http://");
-              strcatbuff(str->localLink, afs.af.adr);
-              strcatbuff(str->localLink, afs.af.fil);
+                strlcpybuff(str->localLink, "http://", str->localLinkSize);
+              strlcatbuff(str->localLink, afs.af.adr, str->localLinkSize);
+              strlcatbuff(str->localLink, afs.af.fil, str->localLinkSize);
             }
             r = -1;
           }

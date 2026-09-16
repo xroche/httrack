@@ -19,8 +19,25 @@ HTTrack can also update an existing mirrored site, and resume interrupted downlo
 http://www.httrack.com/
 
 ## Compile trunk release
+
+`src/coucal` is a submodule and the build needs it, so clone recursively:
+
 ```sh
-git clone https://github.com/xroche/httrack.git --recurse
-cd httrack
+git clone https://github.com/sparktron/HTTrackClone.git --recurse-submodules
+cd HTTrackClone
 ./configure --prefix=$HOME/usr && make -j8 && make install
+```
+
+If you already have a checkout that was cloned without `--recurse-submodules`,
+`configure` will stop and tell you to run:
+
+```sh
+git submodule update --init --recursive
+```
+
+To run the test suite (the offline tests; drop the argument to include the
+ones that need network access):
+
+```sh
+make check ONLINE_UNIT_TESTS=no
 ```

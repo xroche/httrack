@@ -1527,7 +1527,8 @@ int back_add(struct_back * sback, httrackp * opt, cache_back * cache, const char
             back[p].r.statuscode = code;
             back[p].status = STATUS_READY;      // terminé
             if (lf != NULL && *lf != '\0') {    // got location ?
-              strcpybuff(back[p].r.location, lf + 1);
+              strlcpybuff(back[p].r.location, lf + 1,
+                          sizeof(back[p].location_buffer));
             }
             return 0;
           }
@@ -2807,16 +2808,24 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             FOPEN(fconcat(OPT_GET_BUFF(opt), back[i].location_buffer, ".ok"),
                   "rb");
           if (fp) {
-            int j = 0;
+            size_t j = 0;
+            int c;
 
-            fscanf(fp, "%d ", &(back[i].r.statuscode));
-            while(!feof(fp)) {
-              int c = fgetc(fp);
-
-              if (c != EOF)
-                back[i].r.msg[j++] = c;
+            if (fscanf(fp, "%d ", &(back[i].r.statuscode)) == 1) {
+              while((c = fgetc(fp)) != EOF) {
+                if (j < sizeof(back[i].r.msg) - 1) {
+                  back[i].r.msg[j++] = (char) c;
+                }
+              }
+              back[i].r.msg[j] = '\0';
+              if (ferror(fp)) {
+                strcpybuff(back[i].r.msg, "Unable to read ftp result");
+                back[i].r.statuscode = STATUSCODE_INVALID;
+              }
+            } else {
+              strcpybuff(back[i].r.msg, "Invalid ftp result");
+              back[i].r.statuscode = STATUSCODE_INVALID;
             }
-            back[i].r.msg[j++] = '\0';
             fclose(fp);
             UNLINK(fconcat(OPT_GET_BUFF(opt), back[i].location_buffer, ".ok"));
             strcpybuff(fconcat
@@ -4119,7 +4128,7 @@ void back_info(struct_back * sback, int i, int j, FILE * fp) {
     char BIGSTK s[HTS_URLMAXSIZE * 2 + 1024];
 
     s[0] = '\0';
-    back_infostr(sback, i, j, s);
+    back_infostr(sback, i, j, s, sizeof(s));
     strcatbuff(s, LF);
     fprintf(fp, "%s", s);
   }
@@ -4127,7 +4136,8 @@ void back_info(struct_back * sback, int i, int j, FILE * fp) {
 
 // infos backing
 // j: 1 afficher sockets 2 afficher autres 3 tout afficher
-void back_infostr(struct_back * sback, int i, int j, char *s) {
+void back_infostr(struct_back * sback, int i, int j, char *s,
+                  size_t s_size) {
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
 
@@ -4137,16 +4147,16 @@ void back_infostr(struct_back * sback, int i, int j, char *s) {
 
     if (j & 1) {
       if (back[i].status == STATUS_CONNECTING) {
-        strcatbuff(s, "CONNECT ");
+        strlcatbuff(s, "CONNECT ", s_size);
       } else if (back[i].status == STATUS_WAIT_HEADERS) {
-        strcatbuff(s, "INFOS ");
+        strlcatbuff(s, "INFOS ", s_size);
         aff = 1;
       } else if (back[i].status == STATUS_CHUNK_WAIT
                  || back[i].status == STATUS_CHUNK_CR) {
-        strcatbuff(s, "INFOSC");        // infos chunk
+        strlcatbuff(s, "INFOSC", s_size);        // infos chunk
         aff = 1;
       } else if (back[i].status > 0) {
-        strcatbuff(s, "RECEIVE ");
+        strlcatbuff(s, "RECEIVE ", s_size);
         aff = 1;
       }
     }
@@ -4154,36 +4164,36 @@ void back_infostr(struct_back * sback, int i, int j, char *s) {
       if (back[i].status == STATUS_READY) {
         switch (back[i].r.statuscode) {
         case 200:
-          strcatbuff(s, "READY ");
+          strlcatbuff(s, "READY ", s_size);
           aff = 1;
           break;
         case -1:
-          strcatbuff(s, "ERROR ");
+          strlcatbuff(s, "ERROR ", s_size);
           aff = 1;
           break;
         case -2:
-          strcatbuff(s, "TIMEOUT ");
+          strlcatbuff(s, "TIMEOUT ", s_size);
           aff = 1;
           break;
         case -3:
-          strcatbuff(s, "TOOSLOW ");
+          strlcatbuff(s, "TOOSLOW ", s_size);
           aff = 1;
           break;
         case 400:
-          strcatbuff(s, "BADREQUEST ");
+          strlcatbuff(s, "BADREQUEST ", s_size);
           aff = 1;
           break;
         case 401:
         case 403:
-          strcatbuff(s, "FORBIDDEN ");
+          strlcatbuff(s, "FORBIDDEN ", s_size);
           aff = 1;
           break;
         case 404:
-          strcatbuff(s, "NOT FOUND ");
+          strlcatbuff(s, "NOT FOUND ", s_size);
           aff = 1;
           break;
         case 500:
-          strcatbuff(s, "SERVERROR ");
+          strlcatbuff(s, "SERVERROR ", s_size);
           aff = 1;
           break;
         default:
@@ -4191,7 +4201,7 @@ void back_infostr(struct_back * sback, int i, int j, char *s) {
             char s2[256];
 
             sprintf(s2, "ERROR(%d)", back[i].r.statuscode);
-            strcatbuff(s, s2);
+            strlcatbuff(s, s2, s_size);
           }
           aff = 1;
         }
@@ -4203,15 +4213,16 @@ void back_infostr(struct_back * sback, int i, int j, char *s) {
         char BIGSTK s2[HTS_URLMAXSIZE * 2 + 1024];
 
         sprintf(s2, "\"%s", back[i].url_adr);
-        strcatbuff(s, s2);
+        strlcatbuff(s, s2, s_size);
 
         if (back[i].url_fil[0] != '/')
-          strcatbuff(s, "/");
+          strlcatbuff(s, "/", s_size);
         sprintf(s2, "%s\" ", back[i].url_fil);
-        strcatbuff(s, s2);
-        sprintf(s, LLintP " " LLintP " ", (LLint) back[i].r.size,
-                (LLint) back[i].r.totalsize);
-        strcatbuff(s, s2);
+        strlcatbuff(s, s2, s_size);
+        /* NB: this overwrites s rather than appending to it; kept as-is. */
+        snprintf(s, s_size, LLintP " " LLintP " ", (LLint) back[i].r.size,
+                 (LLint) back[i].r.totalsize);
+        strlcatbuff(s, s2, s_size);
       }
     }
   }
