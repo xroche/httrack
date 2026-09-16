@@ -52,14 +52,21 @@ NOTICES=THIRD-PARTY-NOTICES.md
 # Vendored components. Adding third-party source to this tree means adding a
 # row here and a row in THIRD-PARTY-NOTICES.md; --check enforces the pairing.
 #
+# Some of these carry third-party code of their own under a different
+# licence -- Info-ZIP's decryption in minizip, MurmurHash3 in coucal. Rolling
+# those up into the enclosing component drops a licence from every SBOM this
+# emits, so they get rows of their own and name their host in the last field.
+#
 # Fields: path | name | version | license (SPDX id, or a short phrase where
-# there is no SPDX id) | supplier
+# there is no SPDX id) | supplier | embedded in (empty for a top-level one)
 # ---------------------------------------------------------------------------
 VENDORED="
-src/minizip|minizip|1.1|Zlib|Gilles Vollant
-src/md5.c|md5|1993|LicenseRef-public-domain|Colin Plumb
-src/punycode.c|punycode|RFC3492|LicenseRef-RFC3492|Adam M. Costello
-src/coucal|coucal|@COUCAL_COMMIT@|BSD-3-Clause|Xavier Roche
+src/minizip|minizip|1.1|Zlib|Gilles Vollant|
+src/minizip/crypt.h|infozip-crypt|2000|LicenseRef-Info-ZIP|Info-ZIP|minizip
+src/md5.c|md5|1993|LicenseRef-public-domain|Colin Plumb|
+src/punycode.c|punycode|RFC3492|LicenseRef-RFC3492|Adam M. Costello|
+src/coucal|coucal|@COUCAL_COMMIT@|BSD-3-Clause|Xavier Roche|
+src/coucal/murmurhash3.h|murmurhash3|@COUCAL_COMMIT@|LicenseRef-public-domain|Austin Appleby|coucal
 "
 
 fail=0
@@ -67,10 +74,18 @@ fail=0
 # --- notices drift check ---------------------------------------------------
 # A vendored path that nobody described is the failure mode worth catching:
 # the SBOM would silently under-report it.
-while IFS='|' read -r path name version license supplier ; do
+while IFS='|' read -r path name version license supplier parent ; do
 	test -n "$path" || continue
 	if test ! -e "$path" ; then
 		echo "error: $path is listed as vendored but is not present" >&2
+		echo "       (a submodule? try: git submodule update --init --recursive)" >&2
+		fail=1
+		continue
+	fi
+	# An uninitialized submodule is an empty directory, not a missing one:
+	# the path exists, so the test above says nothing about it.
+	if test -d "$path" && test -z "$(ls -A "$path" 2>/dev/null)" ; then
+		echo "error: $path is empty, so nothing of it is in this build" >&2
 		echo "       (a submodule? try: git submodule update --init --recursive)" >&2
 		fail=1
 		continue
@@ -108,7 +123,27 @@ fi
 VERSION=$(sed -n 's/^AC_INIT(\[httrack\], \[\([^]]*\)\].*/\1/p' configure.ac)
 test -n "$VERSION" || VERSION=unknown
 COMMIT=$(git rev-parse HEAD 2>/dev/null || echo unknown)
-COUCAL_COMMIT=$(git -C src/coucal rev-parse HEAD 2>/dev/null || echo unknown)
+
+# The commit of src/coucal this build contains. "git -C src/coucal rev-parse
+# HEAD" cannot be trusted on its own: in a clone where the submodule was
+# never initialized, src/coucal is an ordinary empty directory, so the
+# command walks up and answers with the *superproject's* commit -- which
+# would then be published as coucal's version and purl. Use the checkout only
+# when src/coucal really is a repository of its own; otherwise read the
+# gitlink recorded in this tree.
+coucal_commit() {
+	local top sub
+	top=$(git rev-parse --show-toplevel 2>/dev/null)
+	sub=$(git -C src/coucal rev-parse --show-toplevel 2>/dev/null)
+	if test -n "$sub" && test "$sub" != "$top" ; then
+		git -C src/coucal rev-parse HEAD 2>/dev/null && return 0
+	fi
+	git ls-tree HEAD src/coucal 2>/dev/null \
+		| awk '$2 == "commit" { print $3 ; found = 1 }
+		       END { exit !found }' && return 0
+	echo unknown
+}
+COUCAL_COMMIT=$(coucal_commit)
 TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 json_escape() {
@@ -175,7 +210,7 @@ fi
 
 # --- vendored components ---------------------------------------------------
 vendored_json=""
-while IFS='|' read -r path name version license supplier ; do
+while IFS='|' read -r path name version license supplier parent ; do
 	test -n "$path" || continue
 	version="${version/@COUCAL_COMMIT@/$COUCAL_COMMIT}"
 	if test "$name" = coucal ; then
@@ -188,6 +223,13 @@ while IFS='|' read -r path name version license supplier ; do
 	LicenseRef-*) lic="{ \"name\": \"$(json_escape "$license")\" }" ;;
 	*)            lic="{ \"id\": \"$(json_escape "$license")\" }" ;;
 	esac
+	# Code carried inside another vendored component says so, so a reader
+	# of the SBOM can see why two rows point into one directory.
+	embedded=
+	if test -n "$parent" ; then
+		embedded="
+        { \"name\": \"httrack:embeddedIn\", \"value\": \"$(json_escape "$parent")\" },"
+	fi
 	vendored_json="$vendored_json
     {
       \"type\": \"library\",
@@ -197,7 +239,7 @@ while IFS='|' read -r path name version license supplier ; do
       \"purl\": \"$(json_escape "$purl")\",
       \"supplier\": { \"name\": \"$(json_escape "$supplier")\" },
       \"licenses\": [ { \"license\": $lic } ],
-      \"properties\": [
+      \"properties\": [$embedded
         { \"name\": \"httrack:vendoredPath\", \"value\": \"$(json_escape "$path")\" }
       ]
     },"

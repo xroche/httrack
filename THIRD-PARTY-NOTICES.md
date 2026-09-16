@@ -27,7 +27,15 @@ Code committed into this repository, compiled into `libhttrack`.
 
 `src/coucal` is a submodule, so what a given build contains is the commit
 recorded in the superproject, not whatever upstream currently is. The SBOM
-records that commit.
+records that commit — read from the gitlink in this tree, so a clone whose
+submodule was never checked out cannot make it report the superproject's own
+commit as coucal's.
+
+Two rows above describe code carried *inside* another component under a
+different licence: the Info-ZIP decryption in minizip, and MurmurHash3 in
+coucal. The SBOM gives each of those its own entry, tagged with the component
+it is embedded in, rather than folding it into the enclosing one — otherwise
+the Info-ZIP licence would appear in no SBOM at all.
 
 The minizip and murmurhash3 copies are patched rather than pristine. Each
 modified file keeps its pre-patch original and the diff beside it
