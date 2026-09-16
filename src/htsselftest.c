@@ -2488,6 +2488,53 @@ static int st_mirrorcompleted(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* hts_strcatf() truncates instead of running past its buffer (#1685). */
+static int st_strcatf(httrackp *opt, int argc, char **argv) {
+  struct {
+    char buf[8];
+    char canary[8];
+  } s;
+
+  int err = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  memset(s.canary, 'Z', sizeof(s.canary));
+  s.buf[0] = '\0';
+
+  /* Fits. */
+  hts_strcatf(s.buf, sizeof(s.buf), "%s", "abc");
+  if (strcmp(s.buf, "abc") != 0)
+    err = 1;
+
+  /* Does not fit, so it is cut at the capacity and stays terminated. */
+  hts_strcatf(s.buf, sizeof(s.buf), "%s", "defghijkl");
+  if (strcmp(s.buf, "abcdefg") != 0)
+    err = 1;
+
+  /* A full buffer takes nothing more. */
+  hts_strcatf(s.buf, sizeof(s.buf), "%s", "mno");
+  if (strcmp(s.buf, "abcdefg") != 0)
+    err = 1;
+
+  /* An understated capacity must not wrap the remainder into a huge one. */
+  hts_strcatf(s.buf, 4, "%s", "pqr");
+  if (strcmp(s.buf, "abcdefg") != 0)
+    err = 1;
+
+  /* The neighbour is poisoned, so a stray NUL shows up as well as a stray byte.
+   */
+  for (size_t i = 0; i < sizeof(s.canary); i++) {
+    if (s.canary[i] != 'Z')
+      err = 1;
+  }
+
+  printf("strcatf: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 /* A run with no log file must still count its errors (#1681). */
 static int st_logcounters(httrackp *opt, int argc, char **argv) {
   httrackp *o = hts_create_opt();
@@ -15831,6 +15878,8 @@ static const struct selftest_entry {
      st_filterbounds},
     {"filtercap", "", "an over-long filter rule is refused, not stored dead",
      st_filtercap},
+    {"strcatf", "",
+     "a formatted append truncates instead of overflowing (#1685)", st_strcatf},
     {"log-counters", "",
      "error and warning counts survive a run with no log file (#1681)",
      st_logcounters},

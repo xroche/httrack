@@ -432,6 +432,11 @@ void filters_bind(httrackp *opt, char ***ptrfilters, int *filptr);
    HTS_FILTER_MAXLEN warns and returns HTS_FALSE, never stored dead (#1270). */
 hts_boolean filters_insert(httrackp *opt, int pos, const char *pattern);
 
+/* Append a printf-style string to dst, whose capacity is size, and truncate
+   rather than overflow. dst must already be NUL-terminated. */
+void hts_strcatf(char *dst, size_t size, const char *fmt, ...)
+    HTS_PRINTF_FUN(3, 4);
+
 int fspc(httrackp * opt, FILE * fp, const char *type);
 /* Count one log event into opt's counters that hts_get_stats() publishes,
    whether or not a log file is open. "panic" counts as an error. */

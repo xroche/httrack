@@ -1,0 +1,8 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# The log footer is assembled by repeated appends into one fixed buffer (#1685).
+out=$(httrack -O /dev/null -#test=strcatf)
+grep -q "strcatf: OK" <<<"$out"
