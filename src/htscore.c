@@ -3090,6 +3090,28 @@ typedef enum {
 } shell_ctx_t;
 
 /*
+ * A command substitution -- $( ) or `` -- starts a fresh shell, so the
+ * quoting outside it says nothing about the quoting inside: in
+ *
+ *   printf "[%s]" "$(printf %s '$0')"
+ *
+ * the $0 sits inside '...', not inside the "..." that encloses the
+ * substitution. Tracking only the outer quote would escape it for "..." and
+ * leave its apostrophes able to close the single quotes around it.
+ *
+ * So the scanner keeps a stack: opening a substitution saves the quoting it
+ * interrupts and restarts at PLAIN, closing it restores what was saved.
+ */
+typedef struct {
+  shell_ctx_t ctx;              /* quoting the substitution interrupted */
+  int backquoted;               /* closed by ` rather than by ) */
+  unsigned int parens;          /* ( still open inside it, including its own */
+} shell_frame_t;
+
+/* A template nested deeper than this is refused rather than mis-tracked. */
+#define SHELL_CTX_MAX_DEPTH 16
+
+/*
  * Append "len" bytes of "src" at "*pos" in "dest", which has capacity "size"
  * and stays NUL-terminated. Returns 0 and parks *pos at "size" when the result
  * would not fit, so the caller can drop the command instead of aborting: both
@@ -3193,28 +3215,53 @@ static int usercommand_append_quoted(char *dest, size_t size, size_t *pos,
 
 /*
  * Expand the -V template "cmd" into "dest", substituting each "$0" with
- * "file" quoted for the shell. Returns 0 if the result does not fit, in which
- * case "dest" holds a truncated prefix that must not be run.
+ * "file" quoted for the shell.
+ *
+ * Returns USERCOMMAND_EXPAND_OK, USERCOMMAND_EXPAND_TOOLONG if the result
+ * does not fit, or USERCOMMAND_EXPAND_REFUSED if the template puts "$0"
+ * somewhere no quoting is known to hold it. Except on OK, "dest" holds a
+ * prefix that must not be run.
  */
 int usercommand_expand(char *dest, size_t size, const char *cmd,
                        const char *file) {
+  shell_frame_t stack[SHELL_CTX_MAX_DEPTH];
+  size_t depth = 0;
+  size_t backquoted = 0;         /* enclosing `...` substitutions */
   shell_ctx_t ctx = SHELL_CTX_PLAIN;
   int escaped = 0;
   size_t pos = 0;
   size_t i;
 
   if (size == 0)
-    return 0;
+    return USERCOMMAND_EXPAND_TOOLONG;
   dest[0] = '\0';
   //
   for(i = 0; cmd[i] != '\0'; i++) {
     const char c = cmd[i];
 
-    /* Substituted at any position, escaped or not, as it always has been. */
+    /* Substituted wherever it appears, as it always has been -- except
+       where the quoting that makes it safe would not survive. */
     if ((c == '$') && (cmd[i + 1] == '0')) {
+      /*
+       * Inside `...` the enclosing shell strips one layer of backslashes
+       * before the inner one ever sees the text, so no single escaping of
+       * the filename survives both. $( ) has no such layer and is the
+       * portable spelling; a template that puts $0 inside backquotes is
+       * refused rather than expanded into something a filename can steer.
+       */
+      if (backquoted != 0)
+        return USERCOMMAND_EXPAND_REFUSED;
+      /*
+       * A backslash immediately before $0 eats the first character of the
+       * quoting put around the filename: outside quotes it turns the opening
+       * ' into a literal one, and inside "..." it pairs with the backslash
+       * that escapes the filename's own $ or `. Either way the value stops
+       * being quoted, which is the whole defence. Refuse instead.
+       */
+      if (escaped)
+        return USERCOMMAND_EXPAND_REFUSED;
       if (!usercommand_append_quoted(dest, size, &pos, file, ctx))
-        return 0;
-      escaped = 0;
+        return USERCOMMAND_EXPAND_TOOLONG;
       i++;
       continue;
     }
@@ -3224,7 +3271,44 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
     if (!escaped && ctx != SHELL_CTX_SINGLE && c == '\\') {
       escaped = 1;
     } else {
-      if (!escaped) {
+      if (!escaped && ctx != SHELL_CTX_SINGLE
+          && (c == '`' || (c == '$' && cmd[i + 1] == '('))) {
+        /* Opening a substitution -- or, for a backquote, closing the one it
+           opened. $(( )) needs no special case: its second ( is counted by
+           the rule below, so it takes both ) to close. */
+        if (c == '`' && depth != 0 && stack[depth - 1].backquoted
+            && ctx == SHELL_CTX_PLAIN) {
+          ctx = stack[--depth].ctx;
+          backquoted--;
+        } else {
+          if (depth == SHELL_CTX_MAX_DEPTH)
+            return USERCOMMAND_EXPAND_REFUSED;
+          stack[depth].ctx = ctx;
+          stack[depth].backquoted = (c == '`');
+          stack[depth].parens = (c == '`') ? 0 : 1;
+          depth++;
+          ctx = SHELL_CTX_PLAIN;
+          if (c == '`') {
+            backquoted++;
+          } else {
+            /* copy the "$", the "(" goes through as the loop's next char */
+            if (!usercommand_append_char(dest, size, &pos, c))
+              return USERCOMMAND_EXPAND_TOOLONG;
+            i++;
+            if (!usercommand_append_char(dest, size, &pos, cmd[i]))
+              return USERCOMMAND_EXPAND_TOOLONG;
+            continue;
+          }
+        }
+      } else if (!escaped && ctx == SHELL_CTX_PLAIN && depth != 0
+                 && !stack[depth - 1].backquoted
+                 && (c == '(' || c == ')')) {
+        if (c == '(') {
+          stack[depth - 1].parens++;
+        } else if (--stack[depth - 1].parens == 0) {
+          ctx = stack[--depth].ctx;
+        }
+      } else if (!escaped) {
         switch (ctx) {
         case SHELL_CTX_PLAIN:
           if (c == '\'')
@@ -3246,20 +3330,28 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
     }
 
     if (!usercommand_append_char(dest, size, &pos, c))
-      return 0;
+      return USERCOMMAND_EXPAND_TOOLONG;
   }
 
-  return 1;
+  return USERCOMMAND_EXPAND_OK;
 }
 
 void usercommand_exe(httrackp * opt, const char *cmd, const char *file) {
   char BIGSTK temp[8192];
 
   /* Truncating a shell command is how a "rm '$0'" becomes a "rm". */
-  if (!usercommand_expand(temp, sizeof(temp), cmd, file)) {
+  switch (usercommand_expand(temp, sizeof(temp), cmd, file)) {
+  case USERCOMMAND_EXPAND_OK:
+    break;
+  case USERCOMMAND_EXPAND_TOOLONG:
     hts_log_print(opt, LOG_ERROR,
                   "user command not executed: expanded command exceeds %d bytes",
                   (int) sizeof(temp));
+    return;
+  default:
+    hts_log_print(opt, LOG_ERROR,
+                  "user command not executed: $0 appears where it cannot be "
+                  "quoted safely (inside `...`, or nested too deeply)");
     return;
   }
 

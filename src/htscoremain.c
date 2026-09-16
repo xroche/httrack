@@ -2696,11 +2696,18 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 } else {
                   char BIGSTK expanded[8192];
 
-                  if (!usercommand_expand
-                      (expanded, sizeof(expanded), argv[na + 1], argv[na + 2])) {
-                    printf("toolong\n");
-                  } else {
+                  switch (usercommand_expand
+                          (expanded, sizeof(expanded), argv[na + 1],
+                           argv[na + 2])) {
+                  case USERCOMMAND_EXPAND_OK:
                     printf("%s\n", expanded);
+                    break;
+                  case USERCOMMAND_EXPAND_TOOLONG:
+                    printf("toolong\n");
+                    break;
+                  default:
+                    printf("refused\n");
+                    break;
                   }
                   htsmain_free();
                   return 0;

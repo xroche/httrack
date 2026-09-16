@@ -295,6 +295,10 @@ void file_notify(httrackp * opt, const char *adr, const char *fil,
                  const char *save, int create, int modify, int wasupdated);
 void usercommand(httrackp * opt, int exe, const char *cmd, const char *file,
                  const char *adr, const char *fil);
+/* usercommand_expand() verdicts; only OK may be run. */
+#define USERCOMMAND_EXPAND_OK       1
+#define USERCOMMAND_EXPAND_TOOLONG  0
+#define USERCOMMAND_EXPAND_REFUSED (-1)
 int usercommand_expand(char *dest, size_t size, const char *cmd,
                        const char *file);
 void usercommand_exe(httrackp * opt, const char *cmd, const char *file);
