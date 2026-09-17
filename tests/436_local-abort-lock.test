@@ -34,13 +34,26 @@ assert_lockrule_selftest abortlock
 
 local_server_start
 common=(--quiet --disable-security-limits --robots=0 --timeout=30 --retries=0 -c1)
-fail_dump_var crawllog
+# The crawl log only ever says "Mirror not completed (see log file)", so the
+# engine log it names is dumped beside it (#1680).
+fail_dump_var crawllog enginelog
+arm_paths() { # arm_paths NAME: leaves the paths in $out, $crawllog, $enginelog
+    out="${tmpdir}/$1"
+    crawllog="${tmpdir}/log-$1"
+    # shellcheck disable=SC2034 # read by fail_dump_var above, by name
+    enginelog="${out}/hts-log.txt"
+}
+
+# The engine creates the page file when its transfer starts. The progress lock
+# appears earlier, while nothing is transferring yet.
+trickle_started() { # trickle_started DIR
+    test -n "$(find "$1" -path '*/trickle/p*.bin' 2>/dev/null)"
+}
 
 # /trickle/ hands out eight .bin pages, two bytes a second for a minute each, so
 # the single socket is busy and only the reading inside that wait can see this.
 printf '[a running engine takes the request] ..\t'
-out="${tmpdir}/running"
-crawllog="${tmpdir}/log-running"
+arm_paths running
 httrack -O "$out" "${common[@]}" "${BASEURL}/trickle/index.html" \
     >"$crawllog" 2>&1 &
 crawlpid=$!
@@ -50,6 +63,8 @@ wait_until_still_running "test -e '${out}/${PROGRESSLOCK}'" "the crawl never got
 : >"${tmpdir}/probe"
 test "$(mtime "${tmpdir}/probe")" -gt "$(mtime "${out}/${PROGRESSLOCK}")" ||
     fail "the engine did not date ${PROGRESSLOCK} back, so a request written the moment it appears can tie it"
+wait_until_still_running "trickle_started '$out'" "the crawl opened no trickle page" \
+    "$crawlpid"
 write_lock_request "$out" "$ABORTLOCK" "$crawlpid"
 wait_until_still_running "test ! -e '${out}/${ABORTLOCK}'" \
     "30s on, a running engine had not read the request" "$crawlpid"
@@ -60,8 +75,7 @@ echo "OK"
 # interactive stop erases it. Both log "Exit requested by shell or user", and so
 # does the -E budget, so only the directory tells them apart.
 printf '[an abort keeps the cut transfers] ..\t'
-out="${tmpdir}/keep"
-crawllog="${tmpdir}/log-keep"
+arm_paths keep
 httrack -O "$out" "${common[@]}" --max-rate=200000 \
     "${BASEURL}/bigfiles/index.html" >"$crawllog" 2>&1 &
 crawlpid=$!
@@ -82,8 +96,7 @@ echo "OK"
 
 # The pause wait watches for it too, or a paused engine is unreachable.
 printf '[a paused engine takes the request] ..\t'
-out="${tmpdir}/paused"
-crawllog="${tmpdir}/log-paused"
+arm_paths paused
 httrack -O "$out" "${common[@]}" --max-rate=200000 \
     "${BASEURL}/bigfiles/index.html" >"$crawllog" 2>&1 &
 crawlpid=$!
@@ -109,10 +122,10 @@ echo "OK"
 # Dated back, because the engine backdates its own progress lock by a second. A
 # file written just before the mirror starts lands inside that second.
 printf '[a request left behind does not stop the next mirror] ..\t'
-out="${tmpdir}/stale"
+arm_paths stale
 mkdir -p "$out"
 touch -t 200001010000 "${out}/${ABORTLOCK}"
-local_crawl --log "${tmpdir}/log-stale" -O "$out" "${common[@]}" \
+local_crawl --log "$crawllog" -O "$out" "${common[@]}" \
     "${BASEURL}/simple/basic.html" || fail "the mirror failed outright"
 test -n "$(find "$out" -name 'basic.html' 2>/dev/null)" ||
     fail "the mirror saved nothing, so the request it inherited stopped it"

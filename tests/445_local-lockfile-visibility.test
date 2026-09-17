@@ -29,7 +29,11 @@ local_server_start
 
 out="${tmpdir}/mirror"
 crawllog="${tmpdir}/log"
-fail_dump_var crawllog
+# The crawl log only ever says "Mirror not completed (see log file)", so the
+# engine log it names is dumped beside it (#1680).
+# shellcheck disable=SC2034 # read by fail_dump_var below, by name
+enginelog="${out}/hts-log.txt"
+fail_dump_var crawllog enginelog
 # Rate-capped /bigfiles/ is the shape that reaches the check: a /trickle/ crawl
 # parks in the wait for its one busy socket and read nothing there for 30s.
 httrack -O "$out" --quiet --disable-security-limits --robots=0 \
