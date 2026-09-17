@@ -34,3 +34,14 @@ for call in SSL_write SSL_connect SSL_shutdown SSL_read; do
     done < <(command grep -n "$call(" "$src"/htslib.c "$src"/htsback.c)
 done
 ok "every OpenSSL call that writes carries the mask"
+
+# Same reasoning for our own writes: the flag is what covers them everywhere
+# but macOS, and the self-test above only exercises the one in sendc().
+for file in htslib.c htsftp.c htscatchurl.c htsproxy.c; do
+    while IFS=: read -r line text; do
+        case $text in *HTS_MSG_NOSIGNAL*) continue ;; esac
+        fail "$src/$file:$line calls send() without HTS_MSG_NOSIGNAL: $text"
+    done < <(command grep -nE '(^|[^_[:alnum:]])send\(' "$src/$file" |
+        command grep -vE ':[[:space:]]*(//|\*|/\*)')
+done
+ok "every send() in the library carries the flag"

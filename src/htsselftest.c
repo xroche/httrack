@@ -9718,6 +9718,9 @@ static int st_sigpipe(httrackp *opt, int argc, char **argv) {
   st_kill_peer(sv[0]);
   memset(&r, 0, sizeof(r));
   r.soc = sv[1];
+  /* What newhttp_addr does to a real one. On macOS this is the whole cover,
+     because HTS_MSG_NOSIGNAL is 0 there. */
+  socket_set_nosigpipe(sv[1]);
   /* Past the first failure, not up to it: a socket that took RST answers with
      ECONNRESET first, and raises EPIPE only on the write after that. */
   for (i = 0, rc = 0; i < 64; i++)
@@ -9728,24 +9731,27 @@ static int st_sigpipe(httrackp *opt, int argc, char **argv) {
 
 #ifdef HAVE_SIGTIMEDWAIT
   /* Darwin has no sigtimedwait, so the mask is a no-op there and the socket
-     option above is what covered the writes. */
+     option is what covers the writes. */
   {
-    sigset_t pipeset, pending, saved;
+    sigset_t pipeset, pending, saved, now;
     sigpipe_mask m;
     int caught;
 
     assertf(sigemptyset(&pipeset) == 0 && sigaddset(&pipeset, SIGPIPE) == 0);
+    /* A second signal the host blocked, so the restore below is caught
+       putting the whole mask back rather than just unblocking SIGPIPE. */
+    assertf(sigemptyset(&now) == 0 && sigaddset(&now, SIGUSR2) == 0);
+    assertf(HTS_SIGMASK(SIG_BLOCK, &now, &saved) == 0);
 
     /* It holds SIGPIPE off this thread and puts the mask back. */
-    assertf(HTS_SIGMASK(SIG_SETMASK, NULL, &saved) == 0);
     sigpipe_hold(&m);
     assertf(m.held == 1 && m.was_pending == 0);
     assertf(raise(SIGPIPE) == 0);
     assertf(sigpending(&pending) == 0 && sigismember(&pending, SIGPIPE) == 1);
     sigpipe_release(&m);
     assertf(sigpending(&pending) == 0 && sigismember(&pending, SIGPIPE) == 0);
-    assertf(HTS_SIGMASK(SIG_SETMASK, NULL, &pending) == 0);
-    assertf(sigismember(&pending, SIGPIPE) == sigismember(&saved, SIGPIPE));
+    assertf(HTS_SIGMASK(SIG_SETMASK, NULL, &now) == 0);
+    assertf(sigismember(&now, SIGPIPE) == 0 && sigismember(&now, SIGUSR2) == 1);
 
     /* One the host queued is the host's, so the mask leaves it alone. */
     assertf(HTS_SIGMASK(SIG_BLOCK, &pipeset, NULL) == 0);
@@ -9759,7 +9765,10 @@ static int st_sigpipe(httrackp *opt, int argc, char **argv) {
   }
 #endif
 
+  /* Read it back, or a sibling self-test inherits whatever we left. */
   assertf(signal(SIGPIPE, inherited) != SIG_ERR);
+  assertf(signal(SIGPIPE, SIG_DFL) == inherited);
+  assertf(signal(SIGPIPE, inherited) == SIG_DFL);
   printf("sigpipe self-test OK\n");
   return 0;
 }
