@@ -103,6 +103,18 @@ def big_blob(name, size):
     return out[:size]
 
 
+# A chunked body declares no length, so the -m ceiling has to be tested against
+# the running total of the chunks the server announces (#1708).
+CHUNKCAP_LIMIT = 5000
+CHUNKCAP_BIN = "application/octet-stream"
+CHUNKCAP_HTML = "text/html; charset=utf-8"
+
+
+def chunkcap_body(marker, size):
+    head = b"CHUNKCAP-" + marker + b"\n"
+    return (head + b"abcdefgh" * (size // 8 + 1))[:size]
+
+
 def big_asset(name):
     ext = name.rsplit(".", 1)[-1]
     size = 200 + int(hashlib.sha256(name.encode()).hexdigest(), 16) % 3800
@@ -2541,6 +2553,79 @@ class Handler(SimpleHTTPRequestHandler):
             "application/octet-stream",
         )
 
+    # A chunked body split into small pieces, so the announced total crosses the
+    # -m ceiling mid-transfer rather than on the first chunk.
+    def send_chunked_pieces(self, body, ctype, piece=512):
+        self.protocol_version = "HTTP/1.1"
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Transfer-Encoding", "chunked")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        if self.command == "HEAD":
+            return
+        try:
+            for off in range(0, len(body), piece):
+                part = body[off : off + piece]
+                self.wfile.write(b"%X\r\n" % len(part) + part + b"\r\n")
+            self.wfile.write(b"0\r\n\r\n")
+            self.wfile.flush()
+        except OSError:
+            pass
+        self.close_connection = True
+
+    def route_chunkcap_index(self):
+        self.send_html(
+            '\t<a href="under.bin">under</a>\n'
+            '\t<a href="exact.bin">exact</a>\n'
+            '\t<a href="over.bin">over</a>\n'
+            '\t<a href="plain.bin">plain</a>\n'
+            '\t<a href="plainover.bin">plainover</a>\n'
+            '\t<a href="flood.bin">flood</a>\n'
+            '\t<a href="under.html">underhtml</a>\n'
+            '\t<a href="over.html">overhtml</a>\n'
+        )
+
+    def route_chunkcap_under(self):
+        self.send_chunked_pieces(
+            chunkcap_body(b"UNDER", CHUNKCAP_LIMIT - 1000), CHUNKCAP_BIN
+        )
+
+    # Control: the same bytes under a Content-Length, to compare byte for byte.
+    def route_chunkcap_plain(self):
+        self.send_raw(chunkcap_body(b"UNDER", CHUNKCAP_LIMIT - 1000), CHUNKCAP_BIN)
+
+    # The ceiling itself is allowed: istoobig() refuses only what exceeds it.
+    def route_chunkcap_exact(self):
+        self.send_chunked_pieces(chunkcap_body(b"EXACT", CHUNKCAP_LIMIT), CHUNKCAP_BIN)
+
+    def route_chunkcap_over(self):
+        self.send_chunked_pieces(
+            chunkcap_body(b"OVER", CHUNKCAP_LIMIT + 1), CHUNKCAP_BIN
+        )
+
+    # Ten times the ceiling: the refusal has to come as the announced total
+    # crosses it, so most of this body is never received.
+    def route_chunkcap_flood(self):
+        self.send_chunked_pieces(
+            chunkcap_body(b"FLOOD", CHUNKCAP_LIMIT * 10), CHUNKCAP_BIN
+        )
+
+    # Control: one byte over under a Content-Length, refused by the header path.
+    def route_chunkcap_plainover(self):
+        self.send_raw(chunkcap_body(b"OVER", CHUNKCAP_LIMIT + 1), CHUNKCAP_BIN)
+
+    # text/html stays in memory, which is the growing realloc the cap bounds.
+    def route_chunkcap_underhtml(self):
+        self.send_chunked_pieces(
+            chunkcap_body(b"UNDERHTML", CHUNKCAP_LIMIT - 1000), CHUNKCAP_HTML
+        )
+
+    def route_chunkcap_overhtml(self):
+        self.send_chunked_pieces(
+            chunkcap_body(b"OVERHTML", CHUNKCAP_LIMIT + 1), CHUNKCAP_HTML
+        )
+
     # Aborts the chunked body with an RST, so the read fails rather than seeing a
     # clean EOF and the transfer is already in error before the framing check.
     def route_chunktrunc_reset(self):
@@ -3623,6 +3708,15 @@ class Handler(SimpleHTTPRequestHandler):
         "/chunktrail/bogus.html": route_chunktrail_bogus,
         "/chunktrail/eof.html": route_chunktrail_eof,
         "/chunktrail/file.bin": route_chunktrail_file,
+        "/chunkcap/index.html": route_chunkcap_index,
+        "/chunkcap/under.bin": route_chunkcap_under,
+        "/chunkcap/plain.bin": route_chunkcap_plain,
+        "/chunkcap/exact.bin": route_chunkcap_exact,
+        "/chunkcap/over.bin": route_chunkcap_over,
+        "/chunkcap/plainover.bin": route_chunkcap_plainover,
+        "/chunkcap/flood.bin": route_chunkcap_flood,
+        "/chunkcap/under.html": route_chunkcap_underhtml,
+        "/chunkcap/over.html": route_chunkcap_overhtml,
         "/errpage/index.html": route_errpage_index,
         "/errpage/good.html": route_errpage_good,
         "/errpage/missing.html": route_errpage_missing,

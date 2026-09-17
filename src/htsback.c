@@ -2210,6 +2210,19 @@ void back_set_finished(httrackp *opt, struct_back *sback, const int p) {
   }
 }
 
+/* Refuse this transfer for its size: STATUSCODE_TOO_BIG is a verdict and not a
+   failure, so back_transfer_failed() keeps it out of the retry queue. */
+static void back_set_too_big(httrackp *opt, struct_back *sback, const int p) {
+  lien_back *const back = sback->lnk;
+
+  back_set_finished(opt, sback, p);
+  back[p].r.statuscode = STATUSCODE_TOO_BIG;
+  deletehttp(&back[p].r);
+  back[p].r.soc = INVALID_SOCKET;
+  strcpybuff(back[p].r.msg,
+             back[p].testmode ? "Test: File too big" : "File too big");
+}
+
 void back_set_locked(struct_back * sback, const int p) {
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
@@ -2723,15 +2736,7 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
             if (!back_checksize(opt, &back[p], 1)) {
               r.statuscode = STATUSCODE_INVALID;
               //
-              back[p].status = STATUS_READY;    // FINI
-              back_set_finished(opt, sback, p);
-              back[p].r.statuscode = STATUSCODE_TOO_BIG;
-              deletehttp(&back[p].r);
-              back[p].r.soc = INVALID_SOCKET;
-              if (!back[p].testmode)
-                strcpybuff(back[p].r.msg, "File too big");
-              else
-                strcpybuff(back[p].r.msg, "Test: File too big");
+              back_set_too_big(opt, sback, p);
               return 0;
             }
             back[p].r.totalsize = save_totalsize;
@@ -4268,7 +4273,13 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                       else if (chunk_size == 0)
                         back[i].chunk_blocksize = -1;   /* ending */
                       back[i].r.totalsize += chunk_size;        // noter taille
-                      if (back[i].r.adr != NULL || !back[i].r.is_write) {       // Not to disk
+                      /* Chunked announces no length, so the -m ceiling the
+                         header path applies never fired on it (#1708). */
+                      if (!back_checksize(opt, &back[i], 1)) {
+                        back_set_too_big(opt, sback, i);
+                        chunk_size = -1;
+                      } else if (back[i].r.adr != NULL ||
+                                 !back[i].r.is_write) { // Not to disk
                         /* A wider bound here buys the realloc that only the
                            next read would refuse; an invalid chunk tears the
                            transfer down. */
@@ -4278,16 +4289,21 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                         back[i].url_adr, back[i].url_fil);
                           chunk_size = -1;
                         } else {
-                          back[i].r.adr = (char *) realloct(
+                          char *const grown = (char *) realloct(
                               back[i].r.adr, (size_t) back[i].r.totalsize + 1);
-                          if (!back[i].r.adr) {
-                            if (cache->log != NULL) {
-                              hts_log_print(opt, LOG_ERROR,
-                                            "not enough memory (" LLintP
-                                            ") for %s%s",
-                                            (LLint) back[i].r.totalsize,
-                                            back[i].url_adr, back[i].url_fil);
-                            }
+
+                          if (grown != NULL) {
+                            back[i].r.adr = grown;
+                          } else {
+                            /* r.totalsize already counts this chunk, so
+                               dropping the buffer we still hold would have the
+                               next read write past one that never grew. */
+                            hts_log_print(opt, LOG_ERROR,
+                                          "not enough memory (" LLintP
+                                          ") for %s%s",
+                                          (LLint) back[i].r.totalsize,
+                                          back[i].url_adr, back[i].url_fil);
+                            chunk_size = -1;
                           }
                         }
                       }
@@ -4790,15 +4806,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                   /* Interdiction taille par le wizard? */
                   if (back[i].r.soc != INVALID_SOCKET) {
                     if (!back_checksize(opt, &back[i], 1)) {
-                      back[i].status = STATUS_READY;    // FINI
-                      back_set_finished(opt, sback, i);
-                      back[i].r.statuscode = STATUSCODE_TOO_BIG;
-                      deletehttp(&back[i].r);
-                      back[i].r.soc = INVALID_SOCKET;
-                      if (!back[i].testmode)
-                        strcpybuff(back[i].r.msg, "File too big");
-                      else
-                        strcpybuff(back[i].r.msg, "Test: File too big");
+                      back_set_too_big(opt, sback, i);
                     }
                   }
 

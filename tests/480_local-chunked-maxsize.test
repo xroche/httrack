@@ -1,0 +1,36 @@
+#!/bin/bash
+#
+# -m caps a file's size, but a chunked response announces no length, so the
+# header check saw -1 and let the body grow unbounded (#1708). The ceiling now
+# tests the running total of the announced chunks. plainover.bin is the control:
+# the same overlong body under a Content-Length, which -m always refused.
+# flood.bin is ten times the cap, and the mirror-size bound is what tells a
+# refusal raised as the body grows from one raised once it all arrived.
+# over.bin leaves its partial bytes on disk, as every torn-down direct-to-disk
+# chunked transfer does (see 130); over.html never reaches the disk at all.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" \
+    --errors-content 4 \
+    --log-found '"File too big".*chunkcap/over\.bin' \
+    --log-found '"File too big".*chunkcap/over\.html' \
+    --log-found '"File too big".*chunkcap/flood\.bin' \
+    --log-found '"File too big".*chunkcap/plainover\.bin' \
+    --log-not-found '"File too big".*chunkcap/(under|exact|plain)\.' \
+    --max-mirror-bytes 35000 \
+    --cache-not-found '/chunkcap/flood.bin' \
+    --cache-not-found '/chunkcap/over.bin' \
+    --cache-not-found '/chunkcap/over.html' \
+    --cache-not-found '/chunkcap/plainover.bin' \
+    --not-found 'chunkcap/over.html' \
+    --not-found 'chunkcap/plainover.bin' \
+    --files-identical 'chunkcap/under.bin' 'chunkcap/plain.bin' \
+    --file-matches 'chunkcap/under.html' 'CHUNKCAP-UNDERHTML' \
+    --file-min-bytes 'chunkcap/exact.bin' 5000 \
+    --file-matches 'chunkcap/exact.bin' 'CHUNKCAP-EXACT' \
+    --cache-found '/chunkcap/under.bin' \
+    --cache-found '/chunkcap/exact.bin' \
+    httrack 'BASEURL/chunkcap/index.html' '-m5000,5000'
