@@ -1,0 +1,46 @@
+#!/bin/bash
+#
+# A chunk whose buffer cannot be allocated must end that one transfer (#1708).
+# The engine used to store NULL over the pointer while r.totalsize already
+# counted the chunk, leaving the slot retrying an allocation it never gets.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+skip_on_windows "RLIMIT_AS is not enforced there"
+
+cap=1048576 # KB; the fixture announces a chunk of 0x70000000
+python=$(find_python) || skip "python3 not found"
+
+# A sanitized build maps a shadow far larger than the cap and dies at startup,
+# and log_path keeps that report whatever the spawn redirects, so detect the
+# build before capping anything. Same probe as 283: help=1 alone, detect_leaks=0
+# with it, or the probe run leaves a leak report of its own.
+probe=$(ASAN_OPTIONS=help=1:detect_leaks=0 httrack -O /dev/null --version 2>&1 || true)
+case "$probe" in
+*AddressSanitizer*) skip "a sanitized build cannot map its shadow under an address-space cap" ;;
+esac
+
+(ulimit -v "$cap" && httrack --version >/dev/null 2>&1) ||
+    skip "httrack does not start under a ${cap}KB address-space cap"
+# And the cap has to bite, or every assertion below passes vacuously.
+(ulimit -v "$cap" && "$python" -c 'import sys
+try:
+    bytearray(0x70000000)
+except MemoryError:
+    sys.exit(0)
+sys.exit(1)') || skip "the address-space cap does not bite"
+
+(ulimit -v "$cap" && bash "$top_srcdir/tests/local-crawl.sh" \
+    --errors-content 2 \
+    --log-found 'not enough memory .*chunkoom/mem\.html' \
+    --log-found '"Invalid chunk".*chunkoom/mem\.html' \
+    --log-not-found 'Incorrect length.*chunkoom/mem\.html' \
+    --log-not-found 'Retry after error.*chunkoom/mem\.html' \
+    --not-found 'chunkoom/mem.html' \
+    --cache-not-found '/chunkoom/mem.html' \
+    --file-matches 'chunkoom/after.html' 'CHUNKOOM-AFTER' \
+    httrack 'BASEURL/chunkoom/index.html')
