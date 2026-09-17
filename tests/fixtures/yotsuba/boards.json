@@ -1,0 +1,4 @@
+{"boards":[
+  {"board":"safe","title":"Synthetic Safe Board","ws_board":1,"is_archived":1},
+  {"board":"plain","title":"Synthetic No-Archive Board","ws_board":1}
+]}

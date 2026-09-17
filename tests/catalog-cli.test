@@ -1,0 +1,17 @@
+#!/bin/sh
+set -eu
+
+fixture_binary="${CATALOG_TOP_BUILDDIR}/tests/catalog-cli-fixture-bin"
+
+"${CATALOG_CC}" ${CATALOG_CPPFLAGS} ${CATALOG_CFLAGS} \
+  -std=c99 -Wall -Wextra -Werror -Wformat=2 -Wformat-nonliteral \
+  -I"${CATALOG_TOP_BUILDDIR}" -I"${CATALOG_TOP_SRCDIR}/src" \
+  "${CATALOG_TOP_SRCDIR}/tests/catalog-cli-fixture.c" \
+  "${CATALOG_TOP_SRCDIR}/src/htscatalog.c" \
+  ${CATALOG_SQLITE_LIBS} -o "${fixture_binary}"
+
+python3 "${CATALOG_TOP_SRCDIR}/tests/catalog-cli-test.py" \
+  "${CATALOG_TOP_BUILDDIR}/src/httrack-catalog" \
+  "${fixture_binary}" \
+  "${CATALOG_TOP_SRCDIR}/tests/fixtures/yotsuba" \
+  "${CATALOG_TOP_BUILDDIR}/src/httrack"

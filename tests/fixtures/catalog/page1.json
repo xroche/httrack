@@ -1,0 +1,11 @@
+{
+  "next": "page-2",
+  "more": 1,
+  "records": [
+    ["board", "b1", "tech", "Technology"],
+    ["collection", "thread", "t1", "b1", "Thread One", "active"],
+    ["post", "p1", "thread", "t1", "first fixture post"],
+    ["media", "m1", "p1", "preview", "https://fixture.invalid/media/m1-preview.jpg", "m1.jpg"],
+    ["member", "thread", "t1", "m1", "preview", 0]
+  ]
+}

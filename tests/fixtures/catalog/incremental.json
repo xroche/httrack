@@ -1,0 +1,10 @@
+{
+  "next": "inc-2",
+  "more": 0,
+  "records": [
+    ["collection", "thread", "t1", "b1", "Thread One", "archived"],
+    ["post", "p3", "thread", "t1", "incremental fixture post"],
+    ["media", "m3", "p3", "preview", "https://fixture.invalid/media/m3-preview.jpg", "m3.jpg"],
+    ["member", "thread", "t1", "m3", "preview", 1]
+  ]
+}

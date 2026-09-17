@@ -273,6 +273,80 @@ AC_FUNC_SNPRINTF()
 AC_CHECK_LIB(c, strnlen, [
 AC_DEFINE(HAVE_STRNLEN, 1,[Check for strnlen])], AC_MSG_RESULT([not found]))
 
+### Optional imageboard catalog persistence (system SQLite)
+AC_MSG_CHECKING(whether to build imageboard catalog support)
+AC_ARG_ENABLE([imageboard-catalog],
+	[AS_HELP_STRING([--enable-imageboard-catalog=@<:@yes/no/auto@:>@],
+	[Build the opt-in SQLite catalog module @<:@default=no@:>@])],
+	[
+	case "${enableval}" in
+	no|yes|auto)
+		imageboard_catalog=$enableval
+		AC_MSG_RESULT($enableval)
+		;;
+	*)
+		AC_MSG_ERROR(bad value for imageboard-catalog, expected yes/no/auto)
+		;;
+	esac
+	],
+	[
+	imageboard_catalog=no
+	AC_MSG_RESULT(no)
+	])
+
+SQLITE_LIBS=""
+CURL_LIBS=""
+ICU_LIBS=""
+catalog_available=no
+if test x"$imageboard_catalog" != x"no"; then
+	AC_CHECK_HEADER([sqlite3.h], [catalog_header=yes], [catalog_header=no])
+	if test x"$catalog_header" = x"yes"; then
+		SAVE_LIBS=$LIBS
+		AC_CHECK_LIB([sqlite3], [sqlite3_open_v2],
+			[SQLITE_LIBS="-lsqlite3"; catalog_available=yes],
+			[catalog_available=no])
+		LIBS=$SAVE_LIBS
+	fi
+	AC_CHECK_HEADER([curl/curl.h], [curl_header=yes], [curl_header=no])
+	if test x"$curl_header" = x"yes"; then
+		SAVE_LIBS=$LIBS
+		AC_CHECK_LIB([curl], [curl_easy_init],
+			[CURL_LIBS="-lcurl"; curl_available=yes],
+			[curl_available=no])
+		LIBS=$SAVE_LIBS
+	fi
+	AC_CHECK_HEADER([unicode/unorm2.h], [icu_header=yes], [icu_header=no])
+	if test x"$icu_header" = x"yes"; then
+		SAVE_LIBS=$LIBS
+		LIBS="$LIBS -licuuc -licudata"
+		AC_LINK_IFELSE(
+			[AC_LANG_PROGRAM(
+				[[#include <unicode/utypes.h>
+#include <unicode/unorm2.h>]],
+				[[UErrorCode status = U_ZERO_ERROR;
+const UNormalizer2 *normalizer = unorm2_getNFKCInstance(&status);
+return normalizer == NULL || U_FAILURE(status);]])],
+			[ICU_LIBS="-licuuc -licudata"; icu_available=yes],
+			[icu_available=no])
+		LIBS=$SAVE_LIBS
+	fi
+	if test x"$curl_available" != x"yes" || test x"$icu_available" != x"yes"; then
+		catalog_available=no
+	fi
+	if test x"$imageboard_catalog" = x"yes" && test x"$catalog_available" != x"yes"; then
+		AC_MSG_ERROR([imageboard catalog requested but SQLite, libcurl, or ICU development files are unavailable])
+	fi
+fi
+if test x"$catalog_available" = x"yes"; then
+	AC_DEFINE([HTS_USE_SQLITE_CATALOG], [1], [Build the imageboard SQLite catalog])
+else
+  AC_MSG_NOTICE([imageboard catalog support disabled])
+fi
+AC_SUBST([SQLITE_LIBS])
+AC_SUBST([CURL_LIBS])
+AC_SUBST([ICU_LIBS])
+AM_CONDITIONAL([BUILD_IMAGEBOARD_CATALOG], [test x"$catalog_available" = x"yes"])
+
 ## Online unit tests
 AC_MSG_CHECKING(whether to enable online unit tests)
 AC_ARG_ENABLE([online-unit-tests],

@@ -87,6 +87,9 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
+@BUILD_IMAGEBOARD_CATALOG_TRUE@am__append_1 = catalog-test.test metadata-runtime-test.test yotsuba-adapter.test \
+@BUILD_IMAGEBOARD_CATALOG_TRUE@	catalog-cli.test
+
 subdir = tests
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps =  \
@@ -346,6 +349,7 @@ CFLAG_VISIBILITY = @CFLAG_VISIBILITY@
 CPPFLAGS = @CPPFLAGS@
 CSCOPE = @CSCOPE@
 CTAGS = @CTAGS@
+CURL_LIBS = @CURL_LIBS@
 CYGPATH_W = @CYGPATH_W@
 DEFAULT_CFLAGS = @DEFAULT_CFLAGS@
 DEFAULT_LDFLAGS = @DEFAULT_LDFLAGS@
@@ -362,11 +366,11 @@ EGREP = @EGREP@
 ETAGS = @ETAGS@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
-FILECMD = @FILECMD@
 GREP = @GREP@
 HAVE_VISIBILITY = @HAVE_VISIBILITY@
 HTTPS_SUPPORT = @HTTPS_SUPPORT@
 ICONV_LIBS = @ICONV_LIBS@
+ICU_LIBS = @ICU_LIBS@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -410,6 +414,7 @@ SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 SHLIBPATH_VAR = @SHLIBPATH_VAR@
 SOCKET_LIBS = @SOCKET_LIBS@
+SQLITE_LIBS = @SQLITE_LIBS@
 STRIP = @STRIP@
 THREADS_CFLAGS = @THREADS_CFLAGS@
 THREADS_LIBS = @THREADS_LIBS@
@@ -469,15 +474,47 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-EXTRA_DIST = $(TESTS) crawl-test.sh run-all-tests.sh check-network.sh
+EXTRA_DIST = $(TESTS) crawl-test.sh run-all-tests.sh check-network.sh \
+	catalog-test.c catalog-test.test metadata-runtime-test.c \
+	metadata-runtime-test.test yotsuba-adapter-test.c \
+	yotsuba-adapter.test yotsuba-live-smoke.py \
+	catalog-cli-fixture.c catalog-cli-test.py catalog-cli.test \
+	fixtures/catalog/page1.json fixtures/catalog/page2.json \
+	fixtures/catalog/incremental.json \
+	fixtures/catalog/rollback.json fixtures/catalog/malformed.json \
+	yotsuba-live-smoke.py fixtures/yotsuba/boards.json \
+	fixtures/yotsuba/boards-discovery.json \
+	fixtures/yotsuba/threads-initial.json \
+	fixtures/yotsuba/threads-empty.json \
+	fixtures/yotsuba/threads-incremental.json \
+	fixtures/yotsuba/threads-steady.json \
+	fixtures/yotsuba/threads-404.json \
+	fixtures/yotsuba/archive-empty.json \
+	fixtures/yotsuba/archive-100.json \
+	fixtures/yotsuba/thread-100.json \
+	fixtures/yotsuba/thread-200.json \
+	fixtures/yotsuba/thread-300.json \
+	fixtures/yotsuba/malformed.json
 # note: libtool should handle that
 ### TESTS_ENVIRONMENT += $(SHLIBPATH_VAR)="$(top_builddir)/src/$(LT_CV_OBJDIR)$${$(SHLIBPATH_VAR):+$(PATH_SEPARATOR)}$$$(SHLIBPATH_VAR)"
 TESTS_ENVIRONMENT = PATH=$(top_builddir)/src$(PATH_SEPARATOR)$$PATH \
 	ONLINE_UNIT_TESTS=$(ONLINE_UNIT_TESTS) \
-	HTTPS_SUPPORT=$(HTTPS_SUPPORT)
+	HTTPS_SUPPORT=$(HTTPS_SUPPORT) CATALOG_CC="$(CC)" \
+	CATALOG_CPPFLAGS="$(CPPFLAGS)" CATALOG_CFLAGS="$(CFLAGS)" \
+	CATALOG_SQLITE_LIBS="$(SQLITE_LIBS)" \
+	CATALOG_TOP_SRCDIR="$(abs_top_srcdir)" \
+	CATALOG_TOP_BUILDDIR="$(abs_top_builddir)"
 TEST_EXTENSIONS = .test
-TESTS = 00_runnable.test 01_engine-charset.test 01_engine-cookies.test 01_engine-entities.test 01_engine-hashtable.test 01_engine-idna.test 01_engine-robots.test 01_engine-simplify.test 01_engine-usercommand.test 10_crawl-simple.test 11_crawl-cookies.test 11_crawl-idna.test 11_crawl-international.test 11_crawl-longurl.test 11_crawl-parsing.test 12_crawl_https.test
-CLEANFILES = check-network_sh.cache
+TESTS = 00_runnable.test 01_engine-charset.test 01_engine-cookies.test \
+	01_engine-entities.test 01_engine-hashtable.test \
+	01_engine-idna.test 01_engine-robots.test \
+	01_engine-simplify.test 01_engine-usercommand.test \
+	10_crawl-simple.test 11_crawl-cookies.test 11_crawl-idna.test \
+	11_crawl-international.test 11_crawl-longurl.test \
+	11_crawl-parsing.test 12_crawl_https.test $(am__append_1)
+CLEANFILES = check-network_sh.cache yotsuba-adapter-test-bin \
+	catalog-cli-fixture-bin
+
 all: all-am
 
 .SUFFIXES:
@@ -834,6 +871,10 @@ uninstall-am:
 
 .PRECIOUS: Makefile
 
+
+.PHONY: check-yotsuba-live
+check-yotsuba-live:
+	python3 $(srcdir)/yotsuba-live-smoke.py
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

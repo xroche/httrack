@@ -1,0 +1,23 @@
+#!/bin/sh
+
+set -eu
+
+metadata_tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/httrack-metadata-test.XXXXXX")
+trap 'rm -rf "$metadata_tmp_dir"' EXIT HUP INT TERM
+
+metadata_cc=${CATALOG_CC:-cc}
+metadata_top_srcdir=${CATALOG_TOP_SRCDIR:?missing source directory}
+metadata_top_builddir=${CATALOG_TOP_BUILDDIR:?missing build directory}
+
+# The fixture adapter and fake transport are compiled only into this offline
+# test.  The production module contains no socket or media-fetch implementation.
+$metadata_cc ${CATALOG_CPPFLAGS:-} ${CATALOG_CFLAGS:-} \
+  -I"$metadata_top_srcdir/src" -I"$metadata_top_builddir" \
+  "$metadata_top_srcdir/tests/metadata-runtime-test.c" \
+  "$metadata_top_srcdir/src/htscatalog.c" \
+  "$metadata_top_srcdir/src/htsmetadata.c" \
+  ${CATALOG_SQLITE_LIBS:--lsqlite3} \
+  -o "$metadata_tmp_dir/metadata-runtime-test"
+
+HTTRACK_FIXTURE_ROOT="$metadata_top_srcdir/tests/fixtures/catalog" \
+  "$metadata_tmp_dir/metadata-runtime-test"

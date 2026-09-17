@@ -73,6 +73,9 @@
 /* Check for OpenSSL */
 #undef HTS_USEOPENSSL
 
+/* Build the imageboard SQLite catalog */
+#undef HTS_USE_SQLITE_CATALOG
+
 /* Check for libiconv */
 #undef LIBICONV
 

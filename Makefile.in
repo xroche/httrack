@@ -226,6 +226,7 @@ CFLAG_VISIBILITY = @CFLAG_VISIBILITY@
 CPPFLAGS = @CPPFLAGS@
 CSCOPE = @CSCOPE@
 CTAGS = @CTAGS@
+CURL_LIBS = @CURL_LIBS@
 CYGPATH_W = @CYGPATH_W@
 DEFAULT_CFLAGS = @DEFAULT_CFLAGS@
 DEFAULT_LDFLAGS = @DEFAULT_LDFLAGS@
@@ -242,11 +243,11 @@ EGREP = @EGREP@
 ETAGS = @ETAGS@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
-FILECMD = @FILECMD@
 GREP = @GREP@
 HAVE_VISIBILITY = @HAVE_VISIBILITY@
 HTTPS_SUPPORT = @HTTPS_SUPPORT@
 ICONV_LIBS = @ICONV_LIBS@
+ICU_LIBS = @ICU_LIBS@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -290,6 +291,7 @@ SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 SHLIBPATH_VAR = @SHLIBPATH_VAR@
 SOCKET_LIBS = @SOCKET_LIBS@
+SQLITE_LIBS = @SQLITE_LIBS@
 STRIP = @STRIP@
 THREADS_CFLAGS = @THREADS_CFLAGS@
 THREADS_LIBS = @THREADS_LIBS@
@@ -353,7 +355,11 @@ SUBDIRS = src man m4 libtest templates lang html tests
 ACLOCAL_AMFLAGS = -I m4
 EXTRA_DIST = INSTALL.Linux \
 		gpl-fr.txt license.txt greetings.txt history.txt \
-		httrack-doc.html lang.def README.md
+		httrack-doc.html lang.def README.md \
+		docs/adr/0001-imageboard-catalog-foundation.md \
+		docs/adr/0002-adapter-metadata-transport.md \
+		docs/adr/0003-yotsuba-read-only-adapter.md \
+		docs/adr/0004-catalog-cli-selection-workflow.md
 
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive

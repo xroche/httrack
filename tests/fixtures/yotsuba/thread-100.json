@@ -1,0 +1,5 @@
+{"posts":[
+  {"no":100,"resto":0,"time":1700000000,"sub":"Synthetic topic","com":"Synthetic fixture only","sticky":1,"tim":1700000000001,"filename":"fixture-a","ext":".jpg","fsize":1234,"w":640,"h":480,"tn_w":160,"tn_h":120,"md5":"AAAAAAAAAAAAAAAAAAAAAA=="},
+  {"no":101,"resto":100,"time":1700000001,"com":"Synthetic reply","tim":1700000000002,"filename":"deleted-fixture","ext":".png","fsize":"malformed optional field","w":320,"h":240,"tn_w":80,"tn_h":60,"md5":"BBBBBBBBBBBBBBBBBBBBBB==","spoiler":1,"filedeleted":1},
+  {"no":102,"resto":100,"time":1700000002,"com":"Text-only synthetic reply"}
+]}

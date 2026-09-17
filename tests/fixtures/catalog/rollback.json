@@ -1,0 +1,8 @@
+{
+  "next": "should-not-commit",
+  "more": 0,
+  "records": [
+    ["board", "rollback-board", "rollback", "Rollback Board"],
+    ["media", "bad-media", "missing-post", "preview", "https://fixture.invalid/media/bad.jpg", "bad.jpg"]
+  ]
+}

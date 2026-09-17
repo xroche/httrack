@@ -1,0 +1,4 @@
+{"posts":[
+  {"no":200,"resto":0,"time":1700000100,"sub":"Second synthetic topic","com":"No live content","tim":1700000000200,"filename":"fixture-b","ext":".webm","fsize":4321,"w":1280,"h":720,"tn_w":160,"tn_h":90,"md5":"CCCCCCCCCCCCCCCCCCCCCC=="},
+  {"no":201,"resto":200,"time":1700000101,"com":"Synthetic response"}
+]}

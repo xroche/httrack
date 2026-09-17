@@ -91,7 +91,13 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-bin_PROGRAMS = proxytrack$(EXEEXT) httrack$(EXEEXT) htsserver$(EXEEXT)
+@BUILD_IMAGEBOARD_CATALOG_TRUE@am__append_1 = htscatalog.h htsmetadata.h htsyotsuba.h htscatalogpath.h
+bin_PROGRAMS = proxytrack$(EXEEXT) httrack$(EXEEXT) htsserver$(EXEEXT) \
+	$(am__EXEEXT_1)
+@BUILD_IMAGEBOARD_CATALOG_TRUE@am__append_2 = htscatalog.c htscatalog.h htsmetadata.c htsmetadata.h \
+@BUILD_IMAGEBOARD_CATALOG_TRUE@	htsyotsuba.c htsyotsuba.h htscatalogpath.c htscatalogpath.h
+
+@BUILD_IMAGEBOARD_CATALOG_TRUE@am__append_3 = httrack-catalog
 subdir = src
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps =  \
@@ -110,6 +116,8 @@ mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
+@BUILD_IMAGEBOARD_CATALOG_TRUE@am__EXEEXT_1 =  \
+@BUILD_IMAGEBOARD_CATALOG_TRUE@	httrack-catalog$(EXEEXT)
 am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(libdir)" \
 	"$(DESTDIR)$(whttrackrundir)" "$(DESTDIR)$(DevIncludesdir)"
 PROGRAMS = $(bin_PROGRAMS)
@@ -149,14 +157,41 @@ libhtsjava_la_OBJECTS = $(am_libhtsjava_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
-am__v_lt_1 = 
+am__v_lt_1 =
 libhtsjava_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(libhtsjava_la_LDFLAGS) $(LDFLAGS) -o $@
 libhttrack_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+am__libhttrack_la_SOURCES_DIST = htscore.c htsparse.c htsback.c \
+	htscache.c htscatchurl.c htsfilters.c htsftp.c htshash.c \
+	coucal/coucal.c htshelp.c htslib.c htscoremain.c htsname.c \
+	htsrobots.c htstools.c htswizard.c htsalias.c htsthread.c \
+	htsindex.c htsbauth.c htsmd5.c htszlib.c htswrap.c htsconcat.c \
+	htsmodules.c htscharset.c punycode.c htsencoding.c md5.c \
+	minizip/ioapi.c minizip/mztools.c minizip/unzip.c \
+	minizip/zip.c hts-indextmpl.h htsalias.h htsback.h htsbase.h \
+	htssafe.h htsbasenet.h htsbauth.h htscache.h htscatchurl.h \
+	htsconfig.h htscore.h htsparse.h htscoremain.h htsdefines.h \
+	htsfilters.h htsftp.h htsglobal.h htshash.h coucal/coucal.h \
+	htshelp.h htsindex.h htslib.h htsmd5.h htsmodules.h htsname.h \
+	htsnet.h htsopt.h htsrobots.h htsthread.h htstools.h \
+	htswizard.h htswrap.h htszlib.h htsstrings.h htsarrays.h \
+	httrack-library.h htscharset.h punycode.h htsencoding.h \
+	htsentities.h htsentities.sh htsbasiccharsets.sh \
+	htscodepages.h md5.h coucal/murmurhash3.h minizip/crypt.h \
+	minizip/ioapi.h minizip/mztools.h minizip/unzip.h \
+	minizip/zip.h htscatalog.c htscatalog.h htsmetadata.c \
+	htsmetadata.h htsyotsuba.c htsyotsuba.h htscatalogpath.c \
+	htscatalogpath.h
 am__dirstamp = $(am__leading_dot)dirstamp
+@BUILD_IMAGEBOARD_CATALOG_TRUE@am__objects_1 =  \
+@BUILD_IMAGEBOARD_CATALOG_TRUE@	libhttrack_la-htscatalog.lo \
+@BUILD_IMAGEBOARD_CATALOG_TRUE@	libhttrack_la-htsmetadata.lo \
+@BUILD_IMAGEBOARD_CATALOG_TRUE@	libhttrack_la-htsyotsuba.lo \
+@BUILD_IMAGEBOARD_CATALOG_TRUE@	libhttrack_la-htscatalogpath.lo
 am_libhttrack_la_OBJECTS = libhttrack_la-htscore.lo \
 	libhttrack_la-htsparse.lo libhttrack_la-htsback.lo \
 	libhttrack_la-htscache.lo libhttrack_la-htscatchurl.lo \
@@ -174,7 +209,8 @@ am_libhttrack_la_OBJECTS = libhttrack_la-htscore.lo \
 	libhttrack_la-htsencoding.lo libhttrack_la-md5.lo \
 	minizip/libhttrack_la-ioapi.lo \
 	minizip/libhttrack_la-mztools.lo \
-	minizip/libhttrack_la-unzip.lo minizip/libhttrack_la-zip.lo
+	minizip/libhttrack_la-unzip.lo minizip/libhttrack_la-zip.lo \
+	$(am__objects_1)
 libhttrack_la_OBJECTS = $(am_libhttrack_la_OBJECTS)
 libhttrack_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(libhttrack_la_CFLAGS) \
@@ -193,6 +229,15 @@ httrack_DEPENDENCIES = $(am__DEPENDENCIES_1) libhttrack.la
 httrack_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(httrack_CFLAGS) \
 	$(CFLAGS) $(httrack_LDFLAGS) $(LDFLAGS) -o $@
+am__httrack_catalog_SOURCES_DIST = httrack-catalog.c
+@BUILD_IMAGEBOARD_CATALOG_TRUE@am_httrack_catalog_OBJECTS =  \
+@BUILD_IMAGEBOARD_CATALOG_TRUE@	httrack-catalog.$(OBJEXT)
+httrack_catalog_OBJECTS = $(am_httrack_catalog_OBJECTS)
+@BUILD_IMAGEBOARD_CATALOG_TRUE@httrack_catalog_DEPENDENCIES =  \
+@BUILD_IMAGEBOARD_CATALOG_TRUE@	libhttrack.la \
+@BUILD_IMAGEBOARD_CATALOG_TRUE@	$(am__DEPENDENCIES_1) \
+@BUILD_IMAGEBOARD_CATALOG_TRUE@	$(am__DEPENDENCIES_1) \
+@BUILD_IMAGEBOARD_CATALOG_TRUE@	$(am__DEPENDENCIES_1)
 am_proxytrack_OBJECTS = proxy/proxytrack-main.$(OBJEXT) \
 	proxy/proxytrack-proxytrack.$(OBJEXT) \
 	proxy/proxytrack-store.$(OBJEXT) \
@@ -214,21 +259,24 @@ am__v_P_1 = :
 AM_V_GEN = $(am__v_GEN_@AM_V@)
 am__v_GEN_ = $(am__v_GEN_@AM_DEFAULT_V@)
 am__v_GEN_0 = @echo "  GEN     " $@;
-am__v_GEN_1 = 
+am__v_GEN_1 =
 AM_V_at = $(am__v_at_@AM_V@)
 am__v_at_ = $(am__v_at_@AM_DEFAULT_V@)
 am__v_at_0 = @
-am__v_at_1 = 
+am__v_at_1 =
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__maybe_remake_depfiles = depfiles
 am__depfiles_remade = ./$(DEPDIR)/htsjava.Plo \
 	./$(DEPDIR)/htsserver-htsserver.Po \
-	./$(DEPDIR)/htsserver-htsweb.Po ./$(DEPDIR)/httrack-httrack.Po \
+	./$(DEPDIR)/htsserver-htsweb.Po ./$(DEPDIR)/httrack-catalog.Po \
+	./$(DEPDIR)/httrack-httrack.Po \
 	./$(DEPDIR)/libhttrack_la-htsalias.Plo \
 	./$(DEPDIR)/libhttrack_la-htsback.Plo \
 	./$(DEPDIR)/libhttrack_la-htsbauth.Plo \
 	./$(DEPDIR)/libhttrack_la-htscache.Plo \
+	./$(DEPDIR)/libhttrack_la-htscatalog.Plo \
+	./$(DEPDIR)/libhttrack_la-htscatalogpath.Plo \
 	./$(DEPDIR)/libhttrack_la-htscatchurl.Plo \
 	./$(DEPDIR)/libhttrack_la-htscharset.Plo \
 	./$(DEPDIR)/libhttrack_la-htsconcat.Plo \
@@ -242,6 +290,7 @@ am__depfiles_remade = ./$(DEPDIR)/htsjava.Plo \
 	./$(DEPDIR)/libhttrack_la-htsindex.Plo \
 	./$(DEPDIR)/libhttrack_la-htslib.Plo \
 	./$(DEPDIR)/libhttrack_la-htsmd5.Plo \
+	./$(DEPDIR)/libhttrack_la-htsmetadata.Plo \
 	./$(DEPDIR)/libhttrack_la-htsmodules.Plo \
 	./$(DEPDIR)/libhttrack_la-htsname.Plo \
 	./$(DEPDIR)/libhttrack_la-htsparse.Plo \
@@ -250,6 +299,7 @@ am__depfiles_remade = ./$(DEPDIR)/htsjava.Plo \
 	./$(DEPDIR)/libhttrack_la-htstools.Plo \
 	./$(DEPDIR)/libhttrack_la-htswizard.Plo \
 	./$(DEPDIR)/libhttrack_la-htswrap.Plo \
+	./$(DEPDIR)/libhttrack_la-htsyotsuba.Plo \
 	./$(DEPDIR)/libhttrack_la-htszlib.Plo \
 	./$(DEPDIR)/libhttrack_la-md5.Plo \
 	./$(DEPDIR)/libhttrack_la-punycode.Plo \
@@ -277,7 +327,7 @@ LTCOMPILE = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 AM_V_CC = $(am__v_CC_@AM_V@)
 am__v_CC_ = $(am__v_CC_@AM_DEFAULT_V@)
 am__v_CC_0 = @echo "  CC      " $@;
-am__v_CC_1 = 
+am__v_CC_1 =
 CCLD = $(CC)
 LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
@@ -285,11 +335,14 @@ LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
-am__v_CCLD_1 = 
+am__v_CCLD_1 =
 SOURCES = $(libhtsjava_la_SOURCES) $(libhttrack_la_SOURCES) \
-	$(htsserver_SOURCES) httrack.c $(proxytrack_SOURCES)
-DIST_SOURCES = $(libhtsjava_la_SOURCES) $(libhttrack_la_SOURCES) \
-	$(htsserver_SOURCES) httrack.c $(proxytrack_SOURCES)
+	$(htsserver_SOURCES) httrack.c $(httrack_catalog_SOURCES) \
+	$(proxytrack_SOURCES)
+DIST_SOURCES = $(libhtsjava_la_SOURCES) \
+	$(am__libhttrack_la_SOURCES_DIST) $(htsserver_SOURCES) \
+	httrack.c $(am__httrack_catalog_SOURCES_DIST) \
+	$(proxytrack_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -332,6 +385,7 @@ CFLAG_VISIBILITY = @CFLAG_VISIBILITY@
 CPPFLAGS = @CPPFLAGS@
 CSCOPE = @CSCOPE@
 CTAGS = @CTAGS@
+CURL_LIBS = @CURL_LIBS@
 CYGPATH_W = @CYGPATH_W@
 DEFAULT_CFLAGS = @DEFAULT_CFLAGS@
 DEFAULT_LDFLAGS = @DEFAULT_LDFLAGS@
@@ -348,11 +402,11 @@ EGREP = @EGREP@
 ETAGS = @ETAGS@
 EXEEXT = @EXEEXT@
 FGREP = @FGREP@
-FILECMD = @FILECMD@
 GREP = @GREP@
 HAVE_VISIBILITY = @HAVE_VISIBILITY@
 HTTPS_SUPPORT = @HTTPS_SUPPORT@
 ICONV_LIBS = @ICONV_LIBS@
+ICU_LIBS = @ICU_LIBS@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -396,6 +450,7 @@ SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 SHLIBPATH_VAR = @SHLIBPATH_VAR@
 SOCKET_LIBS = @SOCKET_LIBS@
+SQLITE_LIBS = @SQLITE_LIBS@
 STRIP = @STRIP@
 THREADS_CFLAGS = @THREADS_CFLAGS@
 THREADS_LIBS = @THREADS_LIBS@
@@ -456,22 +511,10 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 DevIncludesdir = $(includedir)/httrack
-DevIncludes_DATA = \
-	httrack-library.h \
-	htsglobal.h \
-	htsopt.h \
-	htswrap.h \
-	htsconfig.h \
-	../config.h \
-	htsmodules.h \
-	htsbasenet.h \
-	htsnet.h \
-	htsbauth.h \
-	htsdefines.h \
-	htsstrings.h \
-	htsarrays.h \
-	htssafe.h
-
+DevIncludes_DATA = httrack-library.h htsglobal.h htsopt.h htswrap.h \
+	htsconfig.h ../config.h htsmodules.h htsbasenet.h htsnet.h \
+	htsbauth.h htsdefines.h htsstrings.h htsarrays.h htssafe.h \
+	$(am__append_1)
 AM_CPPFLAGS = \
 	@DEFAULT_CFLAGS@ \
 	@THREADS_CFLAGS@ \
@@ -507,30 +550,28 @@ whttrackrundir = $(bindir)
 whttrackrun_SCRIPTS = webhttrack
 libhttrack_la_SOURCES = htscore.c htsparse.c htsback.c htscache.c \
 	htscatchurl.c htsfilters.c htsftp.c htshash.c coucal/coucal.c \
-	htshelp.c htslib.c htscoremain.c \
-	htsname.c htsrobots.c htstools.c htswizard.c \
-	htsalias.c htsthread.c htsindex.c htsbauth.c \
-	htsmd5.c htszlib.c htswrap.c htsconcat.c \
-	htsmodules.c htscharset.c punycode.c htsencoding.c \
-	md5.c \
-	minizip/ioapi.c minizip/mztools.c minizip/unzip.c minizip/zip.c \
-	hts-indextmpl.h htsalias.h htsback.h htsbase.h htssafe.h \
-	htsbasenet.h htsbauth.h htscache.h htscatchurl.h  \
-	htsconfig.h htscore.h htsparse.h htscoremain.h htsdefines.h  \
+	htshelp.c htslib.c htscoremain.c htsname.c htsrobots.c \
+	htstools.c htswizard.c htsalias.c htsthread.c htsindex.c \
+	htsbauth.c htsmd5.c htszlib.c htswrap.c htsconcat.c \
+	htsmodules.c htscharset.c punycode.c htsencoding.c md5.c \
+	minizip/ioapi.c minizip/mztools.c minizip/unzip.c \
+	minizip/zip.c hts-indextmpl.h htsalias.h htsback.h htsbase.h \
+	htssafe.h htsbasenet.h htsbauth.h htscache.h htscatchurl.h \
+	htsconfig.h htscore.h htsparse.h htscoremain.h htsdefines.h \
 	htsfilters.h htsftp.h htsglobal.h htshash.h coucal/coucal.h \
-	htshelp.h htsindex.h htslib.h htsmd5.h \
-	htsmodules.h htsname.h htsnet.h \
-	htsopt.h htsrobots.h htsthread.h  \
-	htstools.h htswizard.h htswrap.h htszlib.h  \
-	htsstrings.h htsarrays.h httrack-library.h \
-	htscharset.h punycode.h htsencoding.h \
-	htsentities.h htsentities.sh htsbasiccharsets.sh htscodepages.h \
-	md5.h coucal/murmurhash3.h \
-	minizip/crypt.h minizip/ioapi.h minizip/mztools.h minizip/unzip.h minizip/zip.h
-
-libhttrack_la_LIBADD = $(THREADS_LIBS) $(ZLIB_LIBS) $(OPENSSL_LIBS) $(DL_LIBS) $(SOCKET_LIBS) $(ICONV_LIBS)
+	htshelp.h htsindex.h htslib.h htsmd5.h htsmodules.h htsname.h \
+	htsnet.h htsopt.h htsrobots.h htsthread.h htstools.h \
+	htswizard.h htswrap.h htszlib.h htsstrings.h htsarrays.h \
+	httrack-library.h htscharset.h punycode.h htsencoding.h \
+	htsentities.h htsentities.sh htsbasiccharsets.sh \
+	htscodepages.h md5.h coucal/murmurhash3.h minizip/crypt.h \
+	minizip/ioapi.h minizip/mztools.h minizip/unzip.h \
+	minizip/zip.h $(am__append_2)
+libhttrack_la_LIBADD = $(THREADS_LIBS) $(ZLIB_LIBS) $(OPENSSL_LIBS) $(DL_LIBS) $(SOCKET_LIBS) $(ICONV_LIBS) $(SQLITE_LIBS) $(ICU_LIBS)
 libhttrack_la_CFLAGS = $(AM_CFLAGS) -DLIBHTTRACK_EXPORTS -DZLIB_CONST
 libhttrack_la_LDFLAGS = $(AM_LDFLAGS) -version-info $(VERSION_INFO)
+@BUILD_IMAGEBOARD_CATALOG_TRUE@httrack_catalog_SOURCES = httrack-catalog.c
+@BUILD_IMAGEBOARD_CATALOG_TRUE@httrack_catalog_LDADD = libhttrack.la $(SQLITE_LIBS) $(CURL_LIBS) $(ICU_LIBS)
 libhtsjava_la_SOURCES = htsjava.c htsjava.h
 libhtsjava_la_LIBADD = $(THREADS_LIBS) $(DL_LIBS) libhttrack.la
 libhtsjava_la_LDFLAGS = $(AM_LDFLAGS) -version-info $(VERSION_INFO)
@@ -679,7 +720,7 @@ clean-libLTLIBRARIES:
 	  rm -f $${locs}; \
 	}
 
-libhtsjava.la: $(libhtsjava_la_OBJECTS) $(libhtsjava_la_DEPENDENCIES) $(EXTRA_libhtsjava_la_DEPENDENCIES) 
+libhtsjava.la: $(libhtsjava_la_OBJECTS) $(libhtsjava_la_DEPENDENCIES) $(EXTRA_libhtsjava_la_DEPENDENCIES)
 	$(AM_V_CCLD)$(libhtsjava_la_LINK) -rpath $(libdir) $(libhtsjava_la_OBJECTS) $(libhtsjava_la_LIBADD) $(LIBS)
 coucal/$(am__dirstamp):
 	@$(MKDIR_P) coucal
@@ -704,16 +745,20 @@ minizip/libhttrack_la-unzip.lo: minizip/$(am__dirstamp) \
 minizip/libhttrack_la-zip.lo: minizip/$(am__dirstamp) \
 	minizip/$(DEPDIR)/$(am__dirstamp)
 
-libhttrack.la: $(libhttrack_la_OBJECTS) $(libhttrack_la_DEPENDENCIES) $(EXTRA_libhttrack_la_DEPENDENCIES) 
+libhttrack.la: $(libhttrack_la_OBJECTS) $(libhttrack_la_DEPENDENCIES) $(EXTRA_libhttrack_la_DEPENDENCIES)
 	$(AM_V_CCLD)$(libhttrack_la_LINK) -rpath $(libdir) $(libhttrack_la_OBJECTS) $(libhttrack_la_LIBADD) $(LIBS)
 
-htsserver$(EXEEXT): $(htsserver_OBJECTS) $(htsserver_DEPENDENCIES) $(EXTRA_htsserver_DEPENDENCIES) 
+htsserver$(EXEEXT): $(htsserver_OBJECTS) $(htsserver_DEPENDENCIES) $(EXTRA_htsserver_DEPENDENCIES)
 	@rm -f htsserver$(EXEEXT)
 	$(AM_V_CCLD)$(htsserver_LINK) $(htsserver_OBJECTS) $(htsserver_LDADD) $(LIBS)
 
-httrack$(EXEEXT): $(httrack_OBJECTS) $(httrack_DEPENDENCIES) $(EXTRA_httrack_DEPENDENCIES) 
+httrack$(EXEEXT): $(httrack_OBJECTS) $(httrack_DEPENDENCIES) $(EXTRA_httrack_DEPENDENCIES)
 	@rm -f httrack$(EXEEXT)
 	$(AM_V_CCLD)$(httrack_LINK) $(httrack_OBJECTS) $(httrack_LDADD) $(LIBS)
+
+httrack-catalog$(EXEEXT): $(httrack_catalog_OBJECTS) $(httrack_catalog_DEPENDENCIES) $(EXTRA_httrack_catalog_DEPENDENCIES)
+	@rm -f httrack-catalog$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(httrack_catalog_OBJECTS) $(httrack_catalog_LDADD) $(LIBS)
 proxy/$(am__dirstamp):
 	@$(MKDIR_P) proxy
 	@: > proxy/$(am__dirstamp)
@@ -737,7 +782,7 @@ minizip/proxytrack-unzip.$(OBJEXT): minizip/$(am__dirstamp) \
 minizip/proxytrack-zip.$(OBJEXT): minizip/$(am__dirstamp) \
 	minizip/$(DEPDIR)/$(am__dirstamp)
 
-proxytrack$(EXEEXT): $(proxytrack_OBJECTS) $(proxytrack_DEPENDENCIES) $(EXTRA_proxytrack_DEPENDENCIES) 
+proxytrack$(EXEEXT): $(proxytrack_OBJECTS) $(proxytrack_DEPENDENCIES) $(EXTRA_proxytrack_DEPENDENCIES)
 	@rm -f proxytrack$(EXEEXT)
 	$(AM_V_CCLD)$(proxytrack_LINK) $(proxytrack_OBJECTS) $(proxytrack_LDADD) $(LIBS)
 install-whttrackrunSCRIPTS: $(whttrackrun_SCRIPTS)
@@ -790,11 +835,14 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsjava.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsserver-htsserver.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/htsserver-htsweb.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/httrack-catalog.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/httrack-httrack.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsalias.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsback.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsbauth.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htscache.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htscatalog.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htscatalogpath.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htscatchurl.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htscharset.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsconcat.Plo@am__quote@ # am--include-marker
@@ -808,6 +856,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsindex.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htslib.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsmd5.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsmetadata.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsmodules.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsname.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsparse.Plo@am__quote@ # am--include-marker
@@ -816,6 +865,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htstools.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htswizard.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htswrap.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htsyotsuba.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-htszlib.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-md5.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libhttrack_la-punycode.Plo@am__quote@ # am--include-marker
@@ -1095,6 +1145,34 @@ minizip/libhttrack_la-zip.lo: minizip/zip.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='minizip/zip.c' object='minizip/libhttrack_la-zip.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o minizip/libhttrack_la-zip.lo `test -f 'minizip/zip.c' || echo '$(srcdir)/'`minizip/zip.c
+
+libhttrack_la-htscatalog.lo: htscatalog.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htscatalog.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htscatalog.Tpo -c -o libhttrack_la-htscatalog.lo `test -f 'htscatalog.c' || echo '$(srcdir)/'`htscatalog.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libhttrack_la-htscatalog.Tpo $(DEPDIR)/libhttrack_la-htscatalog.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='htscatalog.c' object='libhttrack_la-htscatalog.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htscatalog.lo `test -f 'htscatalog.c' || echo '$(srcdir)/'`htscatalog.c
+
+libhttrack_la-htsmetadata.lo: htsmetadata.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htsmetadata.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htsmetadata.Tpo -c -o libhttrack_la-htsmetadata.lo `test -f 'htsmetadata.c' || echo '$(srcdir)/'`htsmetadata.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libhttrack_la-htsmetadata.Tpo $(DEPDIR)/libhttrack_la-htsmetadata.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='htsmetadata.c' object='libhttrack_la-htsmetadata.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htsmetadata.lo `test -f 'htsmetadata.c' || echo '$(srcdir)/'`htsmetadata.c
+
+libhttrack_la-htsyotsuba.lo: htsyotsuba.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htsyotsuba.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htsyotsuba.Tpo -c -o libhttrack_la-htsyotsuba.lo `test -f 'htsyotsuba.c' || echo '$(srcdir)/'`htsyotsuba.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libhttrack_la-htsyotsuba.Tpo $(DEPDIR)/libhttrack_la-htsyotsuba.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='htsyotsuba.c' object='libhttrack_la-htsyotsuba.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htsyotsuba.lo `test -f 'htsyotsuba.c' || echo '$(srcdir)/'`htsyotsuba.c
+
+libhttrack_la-htscatalogpath.lo: htscatalogpath.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -MT libhttrack_la-htscatalogpath.lo -MD -MP -MF $(DEPDIR)/libhttrack_la-htscatalogpath.Tpo -c -o libhttrack_la-htscatalogpath.lo `test -f 'htscatalogpath.c' || echo '$(srcdir)/'`htscatalogpath.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libhttrack_la-htscatalogpath.Tpo $(DEPDIR)/libhttrack_la-htscatalogpath.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='htscatalogpath.c' object='libhttrack_la-htscatalogpath.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libhttrack_la_CFLAGS) $(CFLAGS) -c -o libhttrack_la-htscatalogpath.lo `test -f 'htscatalogpath.c' || echo '$(srcdir)/'`htscatalogpath.c
 
 htsserver-htsserver.o: htsserver.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(htsserver_CFLAGS) $(CFLAGS) -MT htsserver-htsserver.o -MD -MP -MF $(DEPDIR)/htsserver-htsserver.Tpo -c -o htsserver-htsserver.o `test -f 'htsserver.c' || echo '$(srcdir)/'`htsserver.c
@@ -1445,11 +1523,14 @@ distclean: distclean-am
 		-rm -f ./$(DEPDIR)/htsjava.Plo
 	-rm -f ./$(DEPDIR)/htsserver-htsserver.Po
 	-rm -f ./$(DEPDIR)/htsserver-htsweb.Po
+	-rm -f ./$(DEPDIR)/httrack-catalog.Po
 	-rm -f ./$(DEPDIR)/httrack-httrack.Po
 	-rm -f ./$(DEPDIR)/libhttrack_la-htsalias.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-htsback.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-htsbauth.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-htscache.Plo
+	-rm -f ./$(DEPDIR)/libhttrack_la-htscatalog.Plo
+	-rm -f ./$(DEPDIR)/libhttrack_la-htscatalogpath.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-htscatchurl.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-htscharset.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-htsconcat.Plo
@@ -1463,6 +1544,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/libhttrack_la-htsindex.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-htslib.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-htsmd5.Plo
+	-rm -f ./$(DEPDIR)/libhttrack_la-htsmetadata.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-htsmodules.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-htsname.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-htsparse.Plo
@@ -1471,6 +1553,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/libhttrack_la-htstools.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-htswizard.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-htswrap.Plo
+	-rm -f ./$(DEPDIR)/libhttrack_la-htsyotsuba.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-htszlib.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-md5.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-punycode.Plo
@@ -1537,11 +1620,14 @@ maintainer-clean: maintainer-clean-am
 		-rm -f ./$(DEPDIR)/htsjava.Plo
 	-rm -f ./$(DEPDIR)/htsserver-htsserver.Po
 	-rm -f ./$(DEPDIR)/htsserver-htsweb.Po
+	-rm -f ./$(DEPDIR)/httrack-catalog.Po
 	-rm -f ./$(DEPDIR)/httrack-httrack.Po
 	-rm -f ./$(DEPDIR)/libhttrack_la-htsalias.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-htsback.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-htsbauth.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-htscache.Plo
+	-rm -f ./$(DEPDIR)/libhttrack_la-htscatalog.Plo
+	-rm -f ./$(DEPDIR)/libhttrack_la-htscatalogpath.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-htscatchurl.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-htscharset.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-htsconcat.Plo
@@ -1555,6 +1641,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/libhttrack_la-htsindex.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-htslib.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-htsmd5.Plo
+	-rm -f ./$(DEPDIR)/libhttrack_la-htsmetadata.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-htsmodules.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-htsname.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-htsparse.Plo
@@ -1563,6 +1650,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/libhttrack_la-htstools.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-htswizard.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-htswrap.Plo
+	-rm -f ./$(DEPDIR)/libhttrack_la-htsyotsuba.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-htszlib.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-md5.Plo
 	-rm -f ./$(DEPDIR)/libhttrack_la-punycode.Plo
