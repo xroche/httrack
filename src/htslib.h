@@ -201,6 +201,15 @@ static HTS_INLINE HTS_UNUSED hts_boolean hts_localtime(time_t t,
 #endif
 }
 
+/* Longest message any libc here produces, plus room for a translated one. */
+#define HTS_STRERROR_SIZE 128
+
+/* Write the message for errno value err into buf, and return buf. strerror()
+   answers with a buffer the caller does not own, since glibc reuses a
+   per-thread one and frees it at thread exit, and POSIX allows one static
+   shared by every thread. Hidden, because no caller outside the library. */
+const char *hts_strerror(int err, char *buf, size_t size);
+
 /* A modification time at the finest resolution this build can read. Compare it
    only against another value hts_file_mtime() produced, because the epoch is
    the platform's. */

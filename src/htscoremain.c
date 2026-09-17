@@ -2000,13 +2000,15 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                       return -1;
                     } else if (ret == -1) {
                       char BIGSTK tmp[1024 * 2];
-                      int last_errno = errno;
+                      char errbuf[HTS_STRERROR_SIZE];
+                      const int last_errno = errno;
 
                       slprintfbuff_clip(
                           tmp, sizeof(tmp),
                           "option %%W : unable to load the module %s: %s "
                           "(check the library path ?)",
-                          argv[na], strerror(last_errno));
+                          argv[na],
+                          hts_strerror(last_errno, errbuf, sizeof(errbuf)));
                       HTS_PANIC_PRINTF(tmp);
                       htsmain_free();
                       return -1;

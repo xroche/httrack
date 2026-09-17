@@ -14307,6 +14307,105 @@ static int st_localtime(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* #1697: hts_strerror() must own its output. strerror() answers with a buffer
+   the next call in that thread reuses and thread exit frees, and POSIX lets it
+   be one static shared by every thread. */
+#define STRERROR_THREADS 8
+#define STRERROR_ROUNDS 20000
+
+/* Four errno values every libc names, then four codes none of them do: the
+   second group is what a libc formats into that buffer instead of answering
+   with a constant string of its own. */
+static const int strerror_codes[STRERROR_THREADS] = {
+    EACCES, ENOENT, EINVAL, EPERM, 4001, 4002, 4003, 4004};
+
+static char strerror_expected[STRERROR_THREADS][HTS_STRERROR_SIZE];
+static htsmutex strerror_lock = HTSMUTEX_INIT;
+static int strerror_bad = 0;
+
+static void strerror_thread(void *arg) {
+  const int i = *(const int *) arg;
+  int bad = 0, round;
+
+  for (round = 0; round < STRERROR_ROUNDS; round++) {
+    char buf[HTS_STRERROR_SIZE];
+
+    if (strcmp(hts_strerror(strerror_codes[i], buf, sizeof(buf)),
+               strerror_expected[i]) != 0)
+      bad++;
+  }
+  hts_mutexlock(&strerror_lock);
+  strerror_bad += bad;
+  hts_mutexrelease(&strerror_lock);
+}
+
+static int st_strerror(httrackp *opt, int argc, char **argv) {
+  static int idx[STRERROR_THREADS];
+  char first[HTS_STRERROR_SIZE], second[HTS_STRERROR_SIZE];
+  const char *kept;
+  int err = 0, i;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  for (i = 0; i < STRERROR_THREADS; i++) {
+    const char *const msg = hts_strerror(
+        strerror_codes[i], strerror_expected[i], sizeof(strerror_expected[i]));
+
+    if (msg != strerror_expected[i] || *msg == '\0') {
+      fprintf(stderr, "strerror: code %d gave no message of its own\n",
+              strerror_codes[i]);
+      err = 1;
+    }
+  }
+
+  /* A caller can hold two messages at once, where a shared buffer would have
+     lost the first one to the second call. */
+  kept = hts_strerror(strerror_codes[4], first, sizeof(first));
+  (void) hts_strerror(strerror_codes[5], second, sizeof(second));
+  if (strcmp(kept, strerror_expected[4]) != 0) {
+    fprintf(stderr,
+            "strerror: the next call changed an earlier message to "
+            "\"%s\"\n",
+            kept);
+    err = 1;
+  }
+  if (strcmp(first, second) == 0) {
+    fprintf(stderr, "strerror: two different codes gave one message \"%s\"\n",
+            first);
+    err = 1;
+  }
+
+  /* A buffer too small clips and still terminates. */
+  {
+    char small[4];
+
+    if (hts_strerror(strerror_codes[0], small, sizeof(small)) != small ||
+        small[sizeof(small) - 1] != '\0') {
+      fprintf(stderr, "strerror: a short buffer was not terminated\n");
+      err = 1;
+    }
+  }
+
+  for (i = 0; i < STRERROR_THREADS; i++) {
+    idx[i] = i;
+    if (hts_newthread(strerror_thread, &idx[i]) != 0) {
+      fprintf(stderr, "strerror: cannot spawn\n");
+      return 1;
+    }
+  }
+  htsthread_wait();
+  if (strerror_bad != 0) {
+    fprintf(stderr, "strerror: %d/%d concurrent messages were wrong\n",
+            strerror_bad, STRERROR_THREADS * STRERROR_ROUNDS);
+    err = 1;
+  }
+
+  printf("strerror self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 #define CHANGES_RACE_FILES 8
 #define CHANGES_RACE_ROUNDS 400
 
@@ -15979,6 +16078,9 @@ static const struct selftest_entry {
      st_filterbounds},
     {"filtercap", "", "an over-long filter rule is refused, not stored dead",
      st_filtercap},
+    {"strerror", "",
+     "a thread's error message is its own, never another thread's (#1697)",
+     st_strerror},
     {"log-counters", "",
      "error and warning counts survive a run with no log file (#1681)",
      st_logcounters},

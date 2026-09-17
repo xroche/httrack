@@ -1,0 +1,45 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# The messages are compared against each other, not against a wording, but a
+# fixed locale keeps the threads and the reference on one catalogue.
+LC_ALL=C
+export LC_ALL
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_reentrant_st.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmpdir"
+
+# Concurrent failures do not tread on each other the way strerror()'s reused
+# buffer does (#1697).
+expect_ok "strerror self-test" httrack -O "${tmpdir}/o1" -#test=strerror
+
+# gethostbyname() answers into a shared static hostent. Its arm only compiles
+# under --disable-ipv6, which no CI leg builds, so guard it at the source: the
+# call and the copy out of it must stay inside one critical section.
+body=$(awk '/^static int hts_dns_resolve_nocache_list_\(/,/^}/' \
+    "$top_srcdir/src/htslib.c")
+if [ -z "$body" ]; then
+    echo "FAIL: hts_dns_resolve_nocache_list_() not found in src/htslib.c"
+    exit 1
+fi
+# grep -E, because BSD sed has no \| alternation and would match nothing.
+order=$(printf '%s\n' "$body" |
+    grep -Eo 'hts_mutexlock|gethostbyname|hts_mutexrelease' |
+    tr '\n' ' ' || true)
+case "$order" in
+"")
+    echo "OK: no gethostbyname() left to guard"
+    ;;
+"hts_mutexlock gethostbyname hts_mutexrelease "*)
+    echo "OK: gethostbyname() resolves under a lock"
+    ;;
+*)
+    echo "FAIL: hts_dns_resolve_nocache_list_() calls, in order: $order"
+    exit 1
+    ;;
+esac
