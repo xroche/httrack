@@ -588,12 +588,12 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
 
     // créer ("attachement") une socket (point d'accès) internet,en flot
     soc_ctl = (T_SOC) socket(SOCaddr_sinfamily(server), SOCK_STREAM, 0);
-    socket_set_nosigpipe(soc_ctl);
     if (soc_ctl == INVALID_SOCKET) {
       strcpybuff(back->r.msg, "Unable to create a socket");
       back->r.statuscode = STATUSCODE_INVALID;
       _HALT_FTP return 0;
     }
+    socket_set_nosigpipe(soc_ctl);
 
     SOCaddr_initport(server, port);
 

@@ -3761,16 +3761,11 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
         /* SSL mode */
         if (back[i].r.ssl) {
           int conn_code;
-
-#ifndef _WIN32
           sigpipe_mask ssl_m;
 
           sigpipe_hold(&ssl_m);
-#endif
           conn_code = SSL_connect(back[i].r.ssl_con);
-#ifndef _WIN32
           sigpipe_release(&ssl_m);
-#endif
           if (conn_code <= 0) {
             /* non blocking I/O, will retry */
             int err_code = SSL_get_error(back[i].r.ssl_con, conn_code);

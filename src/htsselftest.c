@@ -9702,16 +9702,13 @@ static void st_kill_peer(T_SOC soc) {
    that, every assertion below passes over a broken library. */
 static int st_sigpipe(httrackp *opt, int argc, char **argv) {
   void (*inherited)(int);
-  sigset_t pipeset, pending, saved;
-  sigpipe_mask m;
   T_SOC sv[2];
   htsblk r;
-  int i, rc, caught;
+  int i, rc;
 
   (void) opt;
   (void) argc;
   (void) argv;
-  assertf(sigemptyset(&pipeset) == 0 && sigaddset(&pipeset, SIGPIPE) == 0);
   inherited = signal(SIGPIPE, SIG_DFL);
   assertf(inherited != SIG_ERR);
 
@@ -9721,35 +9718,46 @@ static int st_sigpipe(httrackp *opt, int argc, char **argv) {
   st_kill_peer(sv[0]);
   memset(&r, 0, sizeof(r));
   r.soc = sv[1];
-  /* Past the first failure, not up to it: a socket that took RST answers the
-     next write with ECONNRESET and no signal, and only the one after that with
-     EPIPE. Stopping at the first error never reaches the case under test. */
+  /* Past the first failure, not up to it: a socket that took RST answers with
+     ECONNRESET first, and raises EPIPE only on the write after that. */
   for (i = 0, rc = 0; i < 64; i++)
     if (sendc(&r, "GET / HTTP/1.0\r\n\r\n") < 0)
       rc = -1;
   assertf(rc == -1);
   deletesoc(sv[1]);
 
-  /* The mask: it holds SIGPIPE off this thread and puts the mask back. */
-  assertf(HTS_SIGMASK(SIG_SETMASK, NULL, &saved) == 0);
-  sigpipe_hold(&m);
-  assertf(m.held == 1 && m.inherited == 0);
-  assertf(raise(SIGPIPE) == 0);
-  assertf(sigpending(&pending) == 0 && sigismember(&pending, SIGPIPE) == 1);
-  sigpipe_release(&m);
-  assertf(sigpending(&pending) == 0 && sigismember(&pending, SIGPIPE) == 0);
-  assertf(HTS_SIGMASK(SIG_SETMASK, NULL, &pending) == 0);
-  assertf(sigismember(&pending, SIGPIPE) == sigismember(&saved, SIGPIPE));
+#ifdef HAVE_SIGTIMEDWAIT
+  /* Darwin has no sigtimedwait, so the mask is a no-op there and the socket
+     option above is what covered the writes. */
+  {
+    sigset_t pipeset, pending, saved;
+    sigpipe_mask m;
+    int caught;
 
-  /* A SIGPIPE the host already queued is the host's, so the mask leaves it. */
-  assertf(HTS_SIGMASK(SIG_BLOCK, &pipeset, NULL) == 0);
-  assertf(raise(SIGPIPE) == 0);
-  sigpipe_hold(&m);
-  assertf(m.inherited == 1);
-  sigpipe_release(&m);
-  assertf(sigpending(&pending) == 0 && sigismember(&pending, SIGPIPE) == 1);
-  assertf(sigwait(&pipeset, &caught) == 0 && caught == SIGPIPE);
-  assertf(HTS_SIGMASK(SIG_SETMASK, &saved, NULL) == 0);
+    assertf(sigemptyset(&pipeset) == 0 && sigaddset(&pipeset, SIGPIPE) == 0);
+
+    /* It holds SIGPIPE off this thread and puts the mask back. */
+    assertf(HTS_SIGMASK(SIG_SETMASK, NULL, &saved) == 0);
+    sigpipe_hold(&m);
+    assertf(m.held == 1 && m.was_pending == 0);
+    assertf(raise(SIGPIPE) == 0);
+    assertf(sigpending(&pending) == 0 && sigismember(&pending, SIGPIPE) == 1);
+    sigpipe_release(&m);
+    assertf(sigpending(&pending) == 0 && sigismember(&pending, SIGPIPE) == 0);
+    assertf(HTS_SIGMASK(SIG_SETMASK, NULL, &pending) == 0);
+    assertf(sigismember(&pending, SIGPIPE) == sigismember(&saved, SIGPIPE));
+
+    /* One the host queued is the host's, so the mask leaves it alone. */
+    assertf(HTS_SIGMASK(SIG_BLOCK, &pipeset, NULL) == 0);
+    assertf(raise(SIGPIPE) == 0);
+    sigpipe_hold(&m);
+    assertf(m.was_pending == 1);
+    sigpipe_release(&m);
+    assertf(sigpending(&pending) == 0 && sigismember(&pending, SIGPIPE) == 1);
+    assertf(sigwait(&pipeset, &caught) == 0 && caught == SIGPIPE);
+    assertf(HTS_SIGMASK(SIG_SETMASK, &saved, NULL) == 0);
+  }
+#endif
 
   assertf(signal(SIGPIPE, inherited) != SIG_ERR);
   printf("sigpipe self-test OK\n");

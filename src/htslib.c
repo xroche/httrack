@@ -2359,7 +2359,6 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
     DEBUG_W("socket\n");
 #endif
     soc = (T_SOC) socket(SOCaddr_sinfamily(server), SOCK_STREAM, 0);
-    socket_set_nosigpipe(soc);
     if (retour != NULL) {
       retour->debugid = HTS_STAT.stat_sockid++;
     }
@@ -2382,6 +2381,7 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
       }
       return INVALID_SOCKET;    // erreur création socket impossible
     }
+    socket_set_nosigpipe(soc);
     // bind this address
     if (retour != NULL && strnotempty(retour->req.proxy.bindhost)) {
       const char *error = "unknown error";
@@ -2665,15 +2665,11 @@ void fil_simplifie(char *f) {
 /* close_notify goes to a peer that has usually gone already, so this is the
    write most likely to raise SIGPIPE. */
 static void ssl_shutdown_free(SSL **ssl_con) {
-#ifndef _WIN32
   sigpipe_mask m;
 
   sigpipe_hold(&m);
-#endif
   SSL_shutdown(*ssl_con);
-#ifndef _WIN32
   sigpipe_release(&m);
-#endif
   SSL_free(*ssl_con);
   *ssl_con = NULL;
 }
@@ -3129,15 +3125,11 @@ int sendc(htsblk * r, const char *s) {
 
 #if HTS_USEOPENSSL
   if (r->ssl) {
-#ifndef _WIN32
     sigpipe_mask m;
 
     sigpipe_hold(&m);
-#endif
     n = SSL_write(r->ssl_con, s, ssz);
-#ifndef _WIN32
     sigpipe_release(&m);
-#endif
   } else
 #endif
     n = send(r->soc, s, ssz, HTS_MSG_NOSIGNAL);
@@ -5249,7 +5241,12 @@ int hts_read(htsblk * r, char *buff, int size) {
 #endif
 #if HTS_USEOPENSSL
     if (r->ssl) {
+      /* It writes: the SSL_ERROR_WANT_WRITE arm below is that case. */
+      sigpipe_mask m;
+
+      sigpipe_hold(&m);
       retour = SSL_read(r->ssl_con, buff, size);
+      sigpipe_release(&m);
       if (retour <= 0) {
         int err_code = SSL_get_error(r->ssl_con, retour);
 
