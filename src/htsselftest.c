@@ -15791,28 +15791,16 @@ static int st_catchurl_overlong(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* The request catch_url_init()'s listener captures carries the browser's
-   cookies for the target site, so no other host may reach it. What it
-   advertises is checked too: that is where the user aims the browser. */
-static int st_catchurl_bind(httrackp *opt, int argc, char **argv) {
+/* What one catch_url_init* listener must hold. Consumes srv. */
+static void st_catchurl_check_bind(T_SOC srv, int port, const char *adr) {
   char BIGSTK url[HTS_URLMAXSIZE * 2];
   char method[32];
-  char adr[128];
   char *data = malloct(CATCH_URL_DATA_SIZE);
   struct sockaddr_in sa;
   SOClen len = sizeof(sa);
   st_catchurl_arg arg;
-  T_SOC srv;
-  int port = 0;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   assertf(data != NULL);
-  /* poisoned, so a listener that wrote nothing is not read as "127.0.0.1" */
-  memset(adr, 'x', sizeof(adr) - 1);
-  adr[sizeof(adr) - 1] = '\0';
-  srv = catch_url_init(&port, adr);
   assertf(srv != INVALID_SOCKET);
 
   /* what a peer on the network could reach */
@@ -15836,8 +15824,32 @@ static int st_catchurl_bind(httrackp *opt, int argc, char **argv) {
   deletesoc(srv);
   assertf(strcmp(method, "GET") == 0);
   assertf(strcmp(url, "http://example.com/") == 0);
-  printf("catchurl bind self-test OK (%s, captured %s)\n", adr, url);
   freet(data);
+}
+
+/* Both entry points, because catch_url_init_std() is the one the CLI calls and
+   it asks for 8080 before falling back to an ephemeral port: a bind that is
+   loopback only for the ephemeral case would leave the CLI on the LAN. */
+static int st_catchurl_bind(httrackp *opt, int argc, char **argv) {
+  char adr[128];
+  T_SOC srv;
+  int port = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  /* poisoned, so a listener that wrote nothing is not read as "127.0.0.1" */
+  memset(adr, 'x', sizeof(adr) - 1);
+  adr[sizeof(adr) - 1] = '\0';
+  srv = catch_url_init(&port, adr);
+  st_catchurl_check_bind(srv, port, adr);
+
+  memset(adr, 'x', sizeof(adr) - 1);
+  srv = catch_url_init_std(&port, adr);
+  st_catchurl_check_bind(srv, port, adr);
+
+  printf("catchurl bind self-test OK (%s, both entry points)\n", adr);
   return 0;
 }
 
