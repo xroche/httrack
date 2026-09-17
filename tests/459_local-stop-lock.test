@@ -35,15 +35,22 @@ assert_lockrule_selftest stoplock
 
 local_server_start
 common=(--quiet --disable-security-limits --robots=0 --timeout=30 --retries=0 -c1)
-fail_dump_var crawllog
+# The crawl log only ever says "Mirror not completed (see log file)", so the
+# engine log it names is dumped beside it (#1680).
+fail_dump_var crawllog enginelog
+arm_paths() { # arm_paths NAME
+    out="${tmpdir}/$1"
+    crawllog="${tmpdir}/log-$1"
+    # shellcheck disable=SC2034 # read by fail_dump_var above, by name
+    enginelog="${out}/hts-log.txt"
+}
 
 # Before the staleness rule the engine took any hts-stop.lock it found, so a
 # copy left in a reused output directory paused the next mirror. Dated back,
 # because the engine backdates its own progress lock by a second. A file written
 # just before the mirror starts lands inside that second.
 printf '[a request left behind does not pause the next mirror] ..\t'
-out="${tmpdir}/stale"
-crawllog="${tmpdir}/log-stale"
+arm_paths stale
 mkdir -p "$out"
 touch -t 200001010000 "${out}/${STOPLOCK}"
 httrack -O "$out" "${common[@]}" "${BASEURL}/simple/basic.html" \
@@ -62,8 +69,7 @@ echo "OK"
 # The control for the arm above: the same file, stamped after this run started,
 # still pauses. Rate-capped /bigfiles/ keeps the engine polling long enough.
 printf '[a request aimed at this run pauses it] ..\t'
-out="${tmpdir}/fresh"
-crawllog="${tmpdir}/log-fresh"
+arm_paths fresh
 httrack -O "$out" "${common[@]}" --max-rate=200000 \
     "${BASEURL}/bigfiles/index.html" >"$crawllog" 2>&1 &
 crawlpid=$!
