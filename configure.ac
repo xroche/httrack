@@ -440,6 +440,11 @@ AC_CHECK_MEMBERS([struct stat.st_mtim.tv_nsec, struct stat.st_mtimespec.tv_nsec]
 # self-test places a request inside the second the progress lock was written.
 AC_CHECK_FUNCS([utimensat])
 
+# hts_strerror() copies through strerror_r(). Which of the two variants is in
+# scope is decided in C on __USE_GNU, not here: AC_FUNC_STRERROR_R probes with
+# _GNU_SOURCE, which htsglobal.h's include order never gives the tree.
+AC_CHECK_FUNCS([strerror_r])
+
 ### Where an optional feature's default comes from (meson's auto_features)
 AC_MSG_CHECKING([whether to probe for optional features nobody asked for])
 AC_ARG_ENABLE([auto-features],

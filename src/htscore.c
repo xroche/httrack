@@ -947,14 +947,16 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
       char *filelist_buff = NULL;
       size_t filelist_sz = 0;
       const char *filelist_err = NULL; /* failure reason, NULL on success */
+      char filelist_errbuf[HTS_STRERROR_SIZE];
       const LLint fs = fsize_utf8(StringBuff(opt->filelist));
 
       if (fs < 0) {
         /* fsize() hides the cause; redo stat() for a precise errno (#49) */
         STRUCT_STAT st;
-        filelist_err = STAT(StringBuff(opt->filelist), &st) != 0
-                           ? strerror(errno)
-                           : "not a regular file";
+        filelist_err =
+            STAT(StringBuff(opt->filelist), &st) != 0
+                ? hts_strerror(errno, filelist_errbuf, sizeof(filelist_errbuf))
+                : "not a regular file";
       } else if ((filelist_sz = llint_to_size_t(fs)) == (size_t) -1) {
         filelist_err = "file too large";
         filelist_sz = 0;
@@ -962,7 +964,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
         FILE *fp = FOPEN(StringBuff(opt->filelist), "rb");
 
         if (fp == NULL) {
-          filelist_err = strerror(errno);
+          filelist_err =
+              hts_strerror(errno, filelist_errbuf, sizeof(filelist_errbuf));
         } else {
           filelist_buff = malloct(filelist_sz + 1);
           if (filelist_buff == NULL) {

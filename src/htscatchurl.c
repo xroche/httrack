@@ -80,40 +80,23 @@ HTSEXT_API T_SOC catch_url_init_std(int *port_prox, char *adr_prox) {
 // catch_url_init(&port,&return_host);
 HTSEXT_API T_SOC catch_url_init(int *port, /* 128 bytes */ char *adr) {
   T_SOC soc = INVALID_SOCKET;
-  char h_loc[256];
+  SOCaddr server;
 
-  if (gethostname(h_loc, sizeof(h_loc)) == 0) { // host name
-    SOCaddr server;
-    if (hts_dns_resolve_nocache(h_loc, &server) != NULL) { // notre host
-      if ((soc = (T_SOC) socket(SOCaddr_sinfamily(server), SOCK_STREAM, 0)) !=
-          INVALID_SOCKET) {
-        SOCaddr_initport(server, *port);
-        if (bind(soc, &SOCaddr_sockaddr(server), SOCaddr_size(server)) == 0) {
-          SOCaddr server2;
-          SOClen len = SOCaddr_capacity(server2);
+  /* Loopback only: the request this proxy captures carries the browser's
+     cookies and credentials for the target site. */
+  SOCaddr_initloopback(server);
+  if ((soc = (T_SOC) socket(SOCaddr_sinfamily(server), SOCK_STREAM, 0)) !=
+      INVALID_SOCKET) {
+    SOCaddr_initport(server, *port);
+    if (bind(soc, &SOCaddr_sockaddr(server), SOCaddr_size(server)) == 0) {
+      SOCaddr server2;
+      SOClen len = SOCaddr_capacity(server2);
 
-          if (getsockname(soc, &SOCaddr_sockaddr(server2), &len) == 0) {
-            *port = ntohs(SOCaddr_sinport(server)); // récupérer port
-            if (listen(soc, 1) >= 0) {
-              SOCaddr_inetntoa(adr, 128, server2);
-            } else {
-#ifdef _WIN32
-              closesocket(soc);
-#else
-              close(soc);
-#endif
-              soc = INVALID_SOCKET;
-            }
-
-          } else {
-#ifdef _WIN32
-            closesocket(soc);
-#else
-            close(soc);
-#endif
-            soc = INVALID_SOCKET;
-          }
-
+      if (getsockname(soc, &SOCaddr_sockaddr(server2), &len) == 0) {
+        /* server2, not server: an ephemeral port only appears here */
+        *port = ntohs(SOCaddr_sinport(server2));
+        if (listen(soc, 1) >= 0) {
+          SOCaddr_inetntoa(adr, 128, server2);
         } else {
 #ifdef _WIN32
           closesocket(soc);
@@ -122,7 +105,23 @@ HTSEXT_API T_SOC catch_url_init(int *port, /* 128 bytes */ char *adr) {
 #endif
           soc = INVALID_SOCKET;
         }
+
+      } else {
+#ifdef _WIN32
+        closesocket(soc);
+#else
+        close(soc);
+#endif
+        soc = INVALID_SOCKET;
       }
+
+    } else {
+#ifdef _WIN32
+      closesocket(soc);
+#else
+      close(soc);
+#endif
+      soc = INVALID_SOCKET;
     }
   }
   return soc;

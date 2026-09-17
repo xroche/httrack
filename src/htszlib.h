@@ -53,7 +53,9 @@ extern int hts_zunpack(const char *filename, const char *newfile);
 extern size_t hts_zhead(const void *in, size_t in_len, void *out,
                         size_t out_len);
 extern int hts_extract_meta(const char *path);
-extern const char *hts_get_zerror(int err);
+/* The message for a minizip error code. buf (HTS_STRERROR_SIZE) backs the
+   UNZ_ERRNO case, where the text comes from errno; the rest are literals. */
+extern const char *hts_get_zerror(int err, char *buf, size_t size);
 /* Open a ZIP for reading / writing through the UTF-8 file wrappers: the
    minizip default calls plain fopen, which mangles a non-ASCII path on Windows
    (#630). `append` takes the zipOpen2_64 APPEND_STATUS_* values. */

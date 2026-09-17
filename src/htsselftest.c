@@ -5070,6 +5070,84 @@ static int st_zip_repair_shift(httrackp *opt, int argc, char **argv) {
   return (err == Z_OK && nrec == 1) ? 0 : 1;
 }
 
+#ifdef _WIN32
+#define HTS_FILENO(fp) _fileno(fp)
+#else
+#define HTS_FILENO(fp) fileno(fp)
+#endif
+
+/* Grades one unzRepair call whose `which` file cannot be opened: it must leave
+   neither `out` nor `tmp` behind, and must give back every descriptor it took.
+   fopen hands out the lowest free descriptor, so a leak pushes the probe past
+   `fd0`, the number a fresh open returned before any repair ran. */
+static int zip_repair_openfail_case(const char *which, const char *file,
+                                    const char *fileOut, const char *fileOutTmp,
+                                    const char *out, const char *tmp,
+                                    const char *probe, int fd0) {
+  hts_boolean leaked;
+  FILE *fp;
+
+  unzRepair(file, fileOut, fileOutTmp, NULL, NULL);
+  if (fexist(out) || fexist(tmp)) {
+    printf("zip-repair-openfail: FAIL (%s: output left behind)\n", which);
+    return 1;
+  }
+  fp = fopen(probe, "rb");
+  if (fp == NULL) {
+    printf("zip-repair-openfail: FAIL (%s: cannot probe descriptors)\n", which);
+    return 1;
+  }
+  leaked = HTS_FILENO(fp) != fd0 ? HTS_TRUE : HTS_FALSE;
+  fclose(fp);
+  if (leaked) {
+    printf("zip-repair-openfail: FAIL (%s: descriptor not given back)\n",
+           which);
+    return 1;
+  }
+  return 0;
+}
+
+/* unzRepair must write no output and give back every descriptor it took when
+   any one of its three files fails to open. Before the fix a failed temporary
+   open sent the central-directory writes through a NULL FILE*, and none of the
+   three cases closed the handles that did open. */
+static int st_zip_repair_openfail(httrackp *opt, int argc, char **argv) {
+  char in[HTS_URLMAXSIZE], out[HTS_URLMAXSIZE], tmp[HTS_URLMAXSIZE];
+  char nodir[HTS_URLMAXSIZE];
+  FILE *fp;
+  int fd0;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "zip-repair-openfail: needs a directory\n");
+    return 1;
+  }
+  snprintf(in, sizeof(in), "%s/damaged.zip", argv[0]);
+  snprintf(out, sizeof(out), "%s/repair.zip", argv[0]);
+  snprintf(tmp, sizeof(tmp), "%s/repair.tmp", argv[0]);
+  /* Under a directory that does not exist, so this is the open that fails. */
+  snprintf(nodir, sizeof(nodir), "%s/nodir/unopenable", argv[0]);
+  /* One byte: every case fails an open before anything parses the archive. */
+  fp = fopen(in, "wb");
+  if (fp == NULL || !hts_fwrite_exact("P", 1, fp)) {
+    if (fp != NULL)
+      fclose(fp);
+    fprintf(stderr, "zip-repair-openfail: cannot write %s\n", in);
+    return 1;
+  }
+  fd0 = HTS_FILENO(fp);
+  fclose(fp);
+
+  if (zip_repair_openfail_case("input", nodir, out, tmp, out, tmp, in, fd0) ||
+      zip_repair_openfail_case("output", in, nodir, tmp, out, tmp, in, fd0) ||
+      zip_repair_openfail_case("temporary", in, out, nodir, out, tmp, in,
+                               fd0)) {
+    return 1;
+  }
+  printf("zip-repair-openfail: OK\n");
+  return 0;
+}
+
 /* Members kept on either side of the abandoned one. */
 static const char *const zip_abandon_kept[] = {"before.bin", "after1.bin",
                                                "after2.bin"};
@@ -9292,6 +9370,85 @@ static int st_robots(httrackp *opt, int argc, char **argv) {
     assertf(rb_decide(&robots, txt, "/y") == -1);
   }
 
+  /* RFC 9309 2.2.1: a user-agent line following a rule opens a new group, so
+     the generic group written after ours is a fallback we no longer take. */
+  {
+    const char *txt = "User-agent: httrack\nDisallow: /secret\n\n"
+                      "User-agent: *\nDisallow: /public\n";
+
+    assertf(rb_decide(&robots, txt, "/secret") == -1);
+    assertf(rb_decide(&robots, txt, "/public") == 0);
+
+    /* the blank line is not what ends the group */
+    txt = "User-agent: httrack\nDisallow: /secret\n"
+          "User-agent: *\nDisallow: /public\n";
+    assertf(rb_decide(&robots, txt, "/secret") == -1);
+    assertf(rb_decide(&robots, txt, "/public") == 0);
+  }
+
+  /* Consecutive user-agent lines name one group, whichever comes first. */
+  {
+    assertf(rb_decide(&robots,
+                      "User-agent: httrack\nUser-agent: *\n"
+                      "Disallow: /x\n",
+                      "/x") == -1);
+    assertf(rb_decide(&robots,
+                      "User-agent: httrack\nUser-agent: Googlebot\n"
+                      "Disallow: /x\n",
+                      "/x") == -1);
+    assertf(rb_decide(&robots,
+                      "User-agent: Googlebot\nUser-agent: httrack\n"
+                      "Disallow: /x\n",
+                      "/x") == -1);
+    /* a blank line does not end the list either */
+    assertf(rb_decide(&robots,
+                      "User-agent: httrack\n\nUser-agent: *\n"
+                      "Disallow: /x\n",
+                      "/x") == -1);
+  }
+
+  /* A group naming somebody else stays somebody else's. */
+  {
+    const char *txt = "User-agent: Googlebot\nDisallow: /y\n\n"
+                      "User-agent: httrack\nDisallow: /x\n";
+
+    assertf(rb_decide(&robots, txt, "/y") == 0);
+    assertf(rb_decide(&robots, txt, "/x") == -1);
+  }
+
+  /* Two groups naming us are combined, and the generic one between them is
+     still skipped. */
+  {
+    const char *txt = "User-agent: httrack\nDisallow: /a\n\n"
+                      "User-agent: winhttrack\nDisallow: /b\n";
+
+    assertf(rb_decide(&robots, txt, "/a") == -1);
+    assertf(rb_decide(&robots, txt, "/b") == -1);
+
+    txt = "User-agent: httrack\nDisallow: /a\n"
+          "User-agent: *\nDisallow: /generic\n"
+          "User-agent: httrack\nDisallow: /b\n";
+    assertf(rb_decide(&robots, txt, "/a") == -1);
+    assertf(rb_decide(&robots, txt, "/b") == -1);
+    assertf(rb_decide(&robots, txt, "/generic") == 0);
+  }
+
+  /* With no group naming us, every generic group still counts. */
+  {
+    const char *txt = "User-agent: *\nDisallow: /a\n\n"
+                      "User-agent: *\nDisallow: /b\n";
+
+    assertf(rb_decide(&robots, txt, "/a") == -1);
+    assertf(rb_decide(&robots, txt, "/b") == -1);
+
+    txt = "User-agent: *\nDisallow: /a\n"
+          "User-agent: Googlebot\nDisallow: /b\n"
+          "User-agent: *\nDisallow: /c\n";
+    assertf(rb_decide(&robots, txt, "/a") == -1);
+    assertf(rb_decide(&robots, txt, "/b") == 0);
+    assertf(rb_decide(&robots, txt, "/c") == -1);
+  }
+
   /* No rules: everything is allowed. */
   assertf(rb_decide(&robots, "User-agent: *\nDisallow:\n", "/x") == 0);
 
@@ -9693,7 +9850,9 @@ static void st_kill_peer(T_SOC soc) {
 
   lg.l_onoff = 1;
   lg.l_linger = 0;
-  (void) setsockopt(soc, SOL_SOCKET, SO_LINGER, (const char *) &lg, sizeof(lg));
+  /* Checked, because a plain FIN would leave the next write succeeding. */
+  assertf(setsockopt(soc, SOL_SOCKET, SO_LINGER, (const char *) &lg,
+                     sizeof(lg)) == 0);
   deletesoc(soc);
 }
 
@@ -9704,7 +9863,8 @@ static int st_sigpipe(httrackp *opt, int argc, char **argv) {
   void (*inherited)(int);
   T_SOC sv[2];
   htsblk r;
-  int i, rc;
+  char discard[1];
+  int i;
 
   (void) opt;
   (void) argc;
@@ -9721,12 +9881,14 @@ static int st_sigpipe(httrackp *opt, int argc, char **argv) {
   /* What newhttp_addr does to a real one. On macOS this is the whole cover,
      because HTS_MSG_NOSIGNAL is 0 there. */
   socket_set_nosigpipe(sv[1]);
-  /* Past the first failure, not up to it: a socket that took RST answers with
-     ECONNRESET first, and raises EPIPE only on the write after that. */
-  for (i = 0, rc = 0; i < 64; i++)
-    if (sendc(&r, "GET / HTTP/1.0\r\n\r\n") < 0)
-      rc = -1;
-  assertf(rc == -1);
+  /* Wait for the RST, rather than assume a write count outlasts it: Darwin
+     hands loopback input to another thread. The read takes the ECONNRESET,
+     so the writes below meet EPIPE. */
+  assertf(check_readinput_t(sv[1], 10) == 1);
+  assertf(recv(sv[1], discard, sizeof(discard), 0) == -1);
+  /* Twice, so a platform that re-reports ECONNRESET still owes EPIPE. */
+  for (i = 0; i < 2; i++)
+    assertf(sendc(&r, "GET / HTTP/1.0\r\n\r\n") < 0);
   deletesoc(sv[1]);
 
 #ifdef HAVE_SIGTIMEDWAIT
@@ -14307,6 +14469,130 @@ static int st_localtime(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* #1697: hts_strerror() must own its output. strerror() answers with a buffer
+   the next call in that thread reuses and thread exit frees, and POSIX lets it
+   be one static shared by every thread. */
+#define STRERROR_THREADS 8
+#define STRERROR_ROUNDS 20000
+
+/* Four errno values every libc names, then four codes none of them do: the
+   second group is what a libc formats into that buffer instead of answering
+   with a constant string of its own. */
+static const int strerror_codes[STRERROR_THREADS] = {
+    EACCES, ENOENT, EINVAL, EPERM, 4001, 4002, 4003, 4004};
+
+static char strerror_expected[STRERROR_THREADS][HTS_STRERROR_SIZE];
+static htsmutex strerror_lock = HTSMUTEX_INIT;
+static int strerror_bad = 0;
+
+static void strerror_thread(void *arg) {
+  const int i = *(const int *) arg;
+  int bad = 0, round;
+
+  for (round = 0; round < STRERROR_ROUNDS; round++) {
+    char buf[HTS_STRERROR_SIZE];
+
+    if (strcmp(hts_strerror(strerror_codes[i], buf, sizeof(buf)),
+               strerror_expected[i]) != 0)
+      bad++;
+  }
+  hts_mutexlock(&strerror_lock);
+  strerror_bad += bad;
+  hts_mutexrelease(&strerror_lock);
+}
+
+static int st_strerror(httrackp *opt, int argc, char **argv) {
+  static int idx[STRERROR_THREADS];
+  char first[HTS_STRERROR_SIZE], second[HTS_STRERROR_SIZE];
+  const char *kept;
+  int err = 0, i;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  for (i = 0; i < STRERROR_THREADS; i++) {
+    const char *const msg = hts_strerror(
+        strerror_codes[i], strerror_expected[i], sizeof(strerror_expected[i]));
+
+    if (msg != strerror_expected[i] || *msg == '\0') {
+      fprintf(stderr, "strerror: code %d gave no message of its own\n",
+              strerror_codes[i]);
+      err = 1;
+    }
+  }
+
+  /* A caller can hold two messages at once, where a shared buffer would have
+     lost the first to the second call. Codes 0 and 1 because musl answers
+     every unknown one alike, and strerror_expected[] because kept is first. */
+  kept = hts_strerror(strerror_codes[0], first, sizeof(first));
+  (void) hts_strerror(strerror_codes[1], second, sizeof(second));
+  if (strcmp(kept, strerror_expected[0]) != 0) {
+    fprintf(stderr,
+            "strerror: the next call changed an earlier message to \"%s\"\n",
+            kept);
+    err = 1;
+  }
+  if (strcmp(first, second) == 0) {
+    fprintf(stderr, "strerror: two different codes gave one message \"%s\"\n",
+            first);
+    err = 1;
+  }
+
+  /* Every capacity fills, terminates, and writes nothing past its end. The
+     bytes above it are poisoned non-zero, so a stray NUL shows up too. */
+  {
+    static const size_t sizes[] = {1, 2, 4, 20};
+
+    struct {
+      char dst[20];
+      char tail[8];
+    } s;
+
+    char ref[sizeof(s)];
+    size_t k;
+
+    memset(ref, '#', sizeof(ref));
+    for (k = 0; k < sizeof(sizes) / sizeof(sizes[0]); k++) {
+      const size_t cap = sizes[k];
+
+      memset(&s, '#', sizeof(s));
+      if (hts_strerror(EACCES, s.dst, cap) != s.dst ||
+          memchr(s.dst, '\0', cap) == NULL || (cap > 1 && s.dst[0] == '\0')) {
+        fprintf(stderr, "strerror: capacity %d was not filled and terminated\n",
+                (int) cap);
+        err = 1;
+      }
+      if (memcmp((const char *) &s + cap, ref, sizeof(s) - cap) != 0) {
+        fprintf(stderr, "strerror: capacity %d wrote past its end\n",
+                (int) cap);
+        err = 1;
+      }
+    }
+  }
+
+#if !HTS_STRERROR_REENTRANT
+  printf("strerror: this build kept plain strerror(), so the concurrent phase "
+         "below proves nothing here\n");
+#endif
+  for (i = 0; i < STRERROR_THREADS; i++) {
+    idx[i] = i;
+    if (hts_newthread(strerror_thread, &idx[i]) != 0) {
+      fprintf(stderr, "strerror: cannot spawn\n");
+      return 1;
+    }
+  }
+  htsthread_wait();
+  if (strerror_bad != 0) {
+    fprintf(stderr, "strerror: %d/%d concurrent messages were wrong\n",
+            strerror_bad, STRERROR_THREADS * STRERROR_ROUNDS);
+    err = 1;
+  }
+
+  printf("strerror self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 #define CHANGES_RACE_FILES 8
 #define CHANGES_RACE_ROUNDS 400
 
@@ -15658,10 +15944,9 @@ static void st_catchurl_client(void *varg) {
   deletesoc(cli);
 }
 
-/* catch_url() listens on whatever address gethostname() resolves to, which is
-   not loopback on a host whose name has a LAN or public A record, so the header
-   block below is remote input. The assertions sit on the last block data[]
-   holds and the first it does not, since a bound one byte out is the bug. */
+/* The browser feeds catch_url() a header block of whatever size it likes. The
+   assertions sit on the last block data[] holds and the first it does not,
+   since a bound one byte out is the bug. */
 static int st_catchurl(httrackp *opt, int argc, char **argv) {
   /* the request line, then each header with its CRLF, then the empty line */
   const size_t line = strlen(ST_CATCHURL_LINE);
@@ -15789,6 +16074,68 @@ static int st_catchurl_overlong(httrackp *opt, int argc, char **argv) {
   printf("catchurl over-long header self-test OK (%d bytes refused: %s)\n",
          ST_CATCHURL_LONG, catch_url_strerror(CATCH_URL_ERR_HEADER));
   freet(data);
+  return 0;
+}
+
+/* What one catch_url_init* listener must hold. Consumes srv. */
+static void st_catchurl_check_bind(T_SOC srv, int port, const char *adr) {
+  char BIGSTK url[HTS_URLMAXSIZE * 2];
+  char method[32];
+  char *data = malloct(CATCH_URL_DATA_SIZE);
+  struct sockaddr_in sa;
+  SOClen len = sizeof(sa);
+  st_catchurl_arg arg;
+
+  assertf(data != NULL);
+  assertf(srv != INVALID_SOCKET);
+
+  /* what a peer on the network could reach */
+  memset(&sa, 0, sizeof(sa));
+  assertf(getsockname(srv, (struct sockaddr *) &sa, &len) == 0);
+  assertf(sa.sin_family == AF_INET);
+  assertf(ntohl(sa.sin_addr.s_addr) == INADDR_LOOPBACK);
+
+  /* what the user is told to enter in the browser */
+  assertf(strcmp(adr, "127.0.0.1") == 0);
+  assertf(port != 0 && port == ntohs(sa.sin_port));
+
+  /* and a capture over that very socket still succeeds */
+  arg.port = port;
+  arg.pads = 0;
+  arg.tail = 7;
+  url[0] = method[0] = data[0] = '\0';
+  assertf(hts_newthread(st_catchurl_client, &arg) == 0);
+  assertf(catch_url_capture(srv, url, method, data) == CATCH_URL_OK);
+  htsthread_wait();
+  deletesoc(srv);
+  assertf(strcmp(method, "GET") == 0);
+  assertf(strcmp(url, "http://example.com/") == 0);
+  freet(data);
+}
+
+/* Both entry points, because catch_url_init_std() is the one the CLI calls and
+   it asks for 8080 before falling back to an ephemeral port: a bind that is
+   loopback only for the ephemeral case would leave the CLI on the LAN. */
+static int st_catchurl_bind(httrackp *opt, int argc, char **argv) {
+  char adr[128];
+  T_SOC srv;
+  int port = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  /* poisoned, so a listener that wrote nothing is not read as "127.0.0.1" */
+  memset(adr, 'x', sizeof(adr) - 1);
+  adr[sizeof(adr) - 1] = '\0';
+  srv = catch_url_init(&port, adr);
+  st_catchurl_check_bind(srv, port, adr);
+
+  memset(adr, 'x', sizeof(adr) - 1);
+  srv = catch_url_init_std(&port, adr);
+  st_catchurl_check_bind(srv, port, adr);
+
+  printf("catchurl bind self-test OK (%s, both entry points)\n", adr);
   return 0;
 }
 
@@ -16050,6 +16397,9 @@ static const struct selftest_entry {
      st_filterbounds},
     {"filtercap", "", "an over-long filter rule is refused, not stored dead",
      st_filtercap},
+    {"strerror", "",
+     "a thread's error message is its own, never another thread's (#1697)",
+     st_strerror},
     {"log-counters", "",
      "error and warning counts survive a run with no log file (#1681)",
      st_logcounters},
@@ -16087,6 +16437,9 @@ static const struct selftest_entry {
     {"catchurl-overlong", "",
      "a request header line the line buffer cannot hold fails the capture",
      st_catchurl_overlong},
+    {"catchurl-bind", "",
+     "the capture proxy binds loopback and advertises the address it bound",
+     st_catchurl_bind},
     {"postprocsize", "",
      "a postprocess-html callback cannot claim bytes it was not handed",
      st_postprocsize},
@@ -16311,6 +16664,9 @@ static const struct selftest_entry {
     {"zip-repair-shift", "<dir>",
      "cache zip-repair header read must not overflow a signed shift",
      st_zip_repair_shift},
+    {"zip-repair-openfail", "<dir>",
+     "cache zip-repair must not write through an output it failed to open",
+     st_zip_repair_openfail},
     {"zip-abandon", "<dir>",
      "an abandoned member leaves the archive byte-identical", st_zip_abandon},
     {"zip-abandon-notrunc", "<dir>",

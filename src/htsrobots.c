@@ -154,6 +154,8 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
                   char *sitemaps, size_t sitemapsize) {
   size_t bptr = 0;
   int record = 0;
+  hts_boolean in_agents = HTS_FALSE;     // inside the group's user-agent run
+  hts_boolean have_specific = HTS_FALSE; // a group named us, so no '*' applies
   int ndropped = 0;
   char BIGSTK line[HTS_ROBOTS_LINE_SIZE];
   char dropped[128]; // first rule we could not honour, for the log
@@ -203,52 +205,58 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
 
       while (is_realspace(*a))
         a++;
+      /* RFC 9309 2.2.1: consecutive user-agent lines name one group, and the
+         first one after a rule opens a new group. */
+      if (!in_agents) {
+        record = 0;
+        in_agents = HTS_TRUE;
+      }
       if (*a == '*') {
-        if (record != 2)
-          record = 1; // generic group applies to us
+        if (!have_specific && record == 0)
+          record = 1; // generic group, taken only while none named us
       } else if (strfield(a, "httrack") || strfield(a, "winhttrack") ||
                  strfield(a, "webhttrack")) {
-        StringClear(blob); // explicit group: restart capture
-        ndropped = 0;
-        dropped[0] = '\0';
-        if (info != NULL && infosize > 0)
-          info[0] = '\0';
-        record = 2; // locked to the httrack group
-      } else
-        record = 0;
-    } else if (record) {
-      hts_boolean is_allow = strfield(line, "allow:");
-      hts_boolean is_disallow = !is_allow && strfield(line, "disallow:");
+        if (!have_specific) {
+          StringClear(blob); // the generic rules read so far are not ours
+          ndropped = 0;
+          dropped[0] = '\0';
+          if (info != NULL && infosize > 0)
+            info[0] = '\0';
+          have_specific = HTS_TRUE;
+        }
+        record = 2; // locked to the httrack groups
+      }
+    } else if (strfield(line, "allow:") || strfield(line, "disallow:")) {
+      const hts_boolean is_allow = strfield(line, "allow:");
+      const hts_boolean is_disallow = !is_allow;
+      char *a = line + (is_allow ? 6 : 9);
 
-      if (is_allow || is_disallow) {
-        char *a = line + (is_allow ? 6 : 9);
+      in_agents = HTS_FALSE; // a rule closes the group's user-agent lines
+      while (is_realspace(*a))
+        a++;
+      if (record && strnotempty(a)) {
+        if (is_disallow && !keep_root_disallow && strcmp(a, "/") == 0) {
+          // dropped: site-wide disallow ignored by option
+        } else {
+          /* A cut Allow would permit more than the site wrote, so it goes;
+             a cut Disallow can only forbid more, so it stays. */
+          const hts_boolean kept =
+              (cut && is_allow)
+                  ? HTS_FALSE
+                  : robots_rule_add(&blob, is_allow ? 'A' : 'D', a);
 
-        while (is_realspace(*a))
-          a++;
-        if (strnotempty(a)) {
-          if (is_disallow && !keep_root_disallow && strcmp(a, "/") == 0) {
-            // dropped: site-wide disallow ignored by option
-          } else {
-            /* A cut Allow would permit more than the site wrote, so it goes;
-               a cut Disallow can only forbid more, so it stays. */
-            const hts_boolean kept =
-                (cut && is_allow)
-                    ? HTS_FALSE
-                    : robots_rule_add(&blob, is_allow ? 'A' : 'D', a);
-
-            if (!kept || cut) {
-              if (ndropped++ == 0) {
-                dropped[0] = '\0'; // clip, never abort: this is remote data
-                strlncatbuff(dropped, a, sizeof(dropped), sizeof(dropped) - 1);
-              }
+          if (!kept || cut) {
+            if (ndropped++ == 0) {
+              dropped[0] = '\0'; // clip, never abort: this is remote data
+              strlncatbuff(dropped, a, sizeof(dropped), sizeof(dropped) - 1);
             }
-            /* info reports what we honour, not what we read. */
-            if (kept && is_disallow && info != NULL &&
-                strlen(a) + 2 < infosize - strlen(info)) {
-              if (strnotempty(info))
-                strlcatbuff(info, ", ", infosize);
-              strlcatbuff(info, a, infosize);
-            }
+          }
+          /* info reports what we honour, not what we read. */
+          if (kept && is_disallow && info != NULL &&
+              strlen(a) + 2 < infosize - strlen(info)) {
+            if (strnotempty(info))
+              strlcatbuff(info, ", ", infosize);
+            strlcatbuff(info, a, infosize);
           }
         }
       }

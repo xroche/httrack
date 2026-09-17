@@ -264,7 +264,7 @@ int hts_extract_meta(const char *path) {
   return 0;
 }
 
-const char *hts_get_zerror(int err) {
+const char *hts_get_zerror(int err, char *buf, size_t size) {
   switch (err) {
   case UNZ_OK:
     return "no error";
@@ -273,7 +273,7 @@ const char *hts_get_zerror(int err) {
     return "end of list of file";
     break;
   case UNZ_ERRNO:
-    return (const char *) strerror(errno);
+    return hts_strerror(errno, buf, size);
     break;
   case UNZ_PARAMERROR:
     return "parameter error";
