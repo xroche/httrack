@@ -15,7 +15,15 @@ skip_on_windows "RLIMIT_AS is not enforced there"
 cap=1048576 # KB; the fixture announces a chunk of 0x70000000
 python=$(find_python) || skip "python3 not found"
 
-# ASan maps a shadow far larger than the cap, so the engine would die at start.
+# A sanitized build maps a shadow far larger than the cap and dies at startup,
+# and log_path keeps that report whatever the spawn redirects, so detect the
+# build before capping anything. Same probe as 283: help=1 alone, detect_leaks=0
+# with it, or the probe run leaves a leak report of its own.
+probe=$(ASAN_OPTIONS=help=1:detect_leaks=0 httrack -O /dev/null --version 2>&1 || true)
+case "$probe" in
+*AddressSanitizer*) skip "a sanitized build cannot map its shadow under an address-space cap" ;;
+esac
+
 (ulimit -v "$cap" && httrack --version >/dev/null 2>&1) ||
     skip "httrack does not start under a ${cap}KB address-space cap"
 # And the cap has to bite, or every assertion below passes vacuously.
