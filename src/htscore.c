@@ -3144,7 +3144,7 @@ typedef enum {
   SHELL_CTX_SINGLE, /* inside '...' */
   SHELL_CTX_DOUBLE, /* inside "..." */
   SHELL_CTX_ARITH,  /* arithmetic, where quoting is not a quoting mechanism */
-  SHELL_CTX_BRACE   /* inside ${ }, whose subscript is arithmetic */
+  SHELL_CTX_BRACE   /* inside ${ }, where only a [ ] subscript is arithmetic */
 } shell_ctx_t;
 
 /*
@@ -3230,8 +3230,10 @@ static const char *usercommand_param(shell_ctx_t ctx) {
   case SHELL_CTX_SINGLE:
     /* a parameter is literal inside '...', so close the quote and reopen it */
     return "'\"${1}\"'";
-  case SHELL_CTX_ARITH:
   case SHELL_CTX_BRACE:
+    /* a word inside ${ }, such as the default of ${x:-$0} */
+    return "\"${1}\"";
+  case SHELL_CTX_ARITH:
     /* bash evaluates an array subscript in arithmetic, so $1 holding
        x[$(cmd)] runs cmd even though it arrived as a parameter */
     return NULL;
@@ -3331,15 +3333,10 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
          x[$(cmd)] runs cmd whether it arrives as text or as a parameter.
          Nothing documented uses $0 here. */
       if (ctx == SHELL_CTX_ARITH)
-        return usercommand_refuse(why, "$0 is inside an arithmetic expression, "
-                                       "which evaluates the name instead of "
-                                       "reading it; move it out");
-      /* bash evaluates an array subscript as arithmetic, and the braces are
-         where one can appear. */
-      if (ctx == SHELL_CTX_BRACE)
-        return usercommand_refuse(why, "$0 is inside ${ }, where a subscript "
-                                       "is evaluated as arithmetic; move it "
-                                       "out of the braces");
+        return usercommand_refuse(why, "$0 is inside an arithmetic expression "
+                                       "($(( )), $[ ], (( )) or a [ ] "
+                                       "subscript), which evaluates the name "
+                                       "instead of reading it; move it out");
 #ifndef _WIN32
       /* A backslash here is a shell escape, and it would eat the first
          character of the parameter reference. httrack substitutes $0 escaped
@@ -3411,6 +3408,11 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
         if (!usercommand_append_char(dest, size, &pos, cmd[i]))
           return USERCOMMAND_EXPAND_TOOLONG;
         continue;
+      } else if (!escaped && ctx == SHELL_CTX_BRACE && c == '[') {
+        /* the subscript of ${a[$0]}, which bash evaluates as arithmetic */
+        if (!usercommand_push(stack, &depth, ctx, ']', 1))
+          return usercommand_refuse(why, too_deep);
+        ctx = SHELL_CTX_ARITH;
       } else if (!escaped && ctx == SHELL_CTX_PLAIN && c == '(' &&
                  cmd[i + 1] == '(') {
         /* A bare (( )) is an arithmetic command, which covers "((n=$0))", the

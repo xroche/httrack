@@ -13,6 +13,12 @@ set -euo pipefail
 # and the engine execs sh -c <command> sh <name>. -#test=usercmd prints the
 # verdict and that vector; -#test=usercmdrun runs it for real.
 
+# The round-trip below replays each expansion through a POSIX shell, and a
+# native Windows engine emits the cmd.exe form instead: there a backtick inside
+# "..." is inert, while the bash doing the replay runs it. Checking that form
+# needs a cmd.exe round-trip, which this harness is not.
+skip_on_windows "the expansion is quoted for cmd.exe, which bash cannot replay"
+
 work=$(mktemp -d) || fail "mktemp failed"
 canary="$work/pwned"
 trap 'set +e; rm -rf "$work"' EXIT
@@ -157,15 +163,18 @@ refused_for() { # refused_for TEMPLATE WORD
 # with an operand reach the branch differently, $[ ] is bash's older spelling,
 # a bare (( )) is an arithmetic command, and "$( ((" is the one a lookahead for
 # "$((" reads as an ordinary subshell.
-refused_for 'echo $(($0))' arithmetic
-refused_for 'echo $(( $0 ))' arithmetic
-refused_for 'echo $((1+$0))' arithmetic
-refused_for 'echo $(( ($0) ))' arithmetic
-refused_for 'echo $[$0]' arithmetic
-refused_for 'n=0; ((n=$0)); echo $n' arithmetic
-refused_for 'for ((i=0;i<$0;i++)); do :; done' arithmetic
-refused_for 'printf %s "$( ((printf %s $0)) )"' arithmetic
-refused_for 'a=(1 2 3); echo ${a[$0]}' '${ }'
+refused_for 'echo $(($0))' 'arithmetic'
+refused_for 'echo $(( $0 ))' 'arithmetic'
+refused_for 'echo $((1+$0))' 'arithmetic'
+refused_for 'echo $(( ($0) ))' 'arithmetic'
+refused_for 'echo $[$0]' 'arithmetic'
+refused_for '((n=$0))' 'arithmetic'
+refused_for 'n=0; ((n=$0)); echo $n' 'arithmetic'
+refused_for 'for ((i=0;i<$0;i++)); do :; done' 'arithmetic'
+refused_for 'echo $( ((printf %s $0)) )' 'arithmetic'
+refused_for 'printf %s "$( ((printf %s $0)) )"' 'arithmetic'
+refused_for 'echo ${a[$0]}' 'arithmetic'
+refused_for 'a=(1 2 3); echo ${a[$0]}' 'arithmetic'
 
 # Each of those payloads, run for real against a name carrying the subscript
 # gadget. The canary at the end is what says the refusal held.
@@ -184,6 +193,16 @@ usercmd 'echo $[1+2] $0' 'a b.html'
 assert_eq 'echo $[1+2] "${1}"' "$CMD" '$[ ] closed'
 usercmd 'echo ${HOME} $0' 'a b.html'
 assert_eq 'echo ${HOME} "${1}"' "$CMD" '${ } closed'
+
+# Controls for those five, so a fix cannot pass by refusing the shapes around
+# them: [ is the test command outside ${ }, and ${ } without a subscript is an
+# ordinary parameter expansion.
+roundtrip '[ -n $0 ] && printf %s $0' "a;touch $canary;.html"
+roundtrip 'printf %s ${HOME:+}$0' "a;touch $canary;.html"
+roundtrip 'printf %s ${x:-$0}' "a;touch $canary;.html"
+# The subscript is refused inside "..." too, where a PLAIN-only rule misses it.
+refused_for 'echo "${a[$0]}"' 'arithmetic'
+refused_for 'echo "$[$0]"' 'arithmetic'
 
 # The control for the refusal above: a separated $( ( is an ordinary subshell,
 # where a parameter does hold, so it must still expand. Without this a fix that
@@ -228,6 +247,9 @@ for t in 'cat $0' 'cat \$0' '/bin/echo $0' 'md5 \$0'; do
     *) fail "documented template '$t' lost its quoting: $CMD" ;;
     esac
 done
+
+roundtrip 'printf %s $0' 'hello world.html'
+roundtrip 'printf %s "$0"' 'hello world.html'
 
 printf 'CONTENT\n' >"$work/hello world.html"
 usercmd 'cat $0' "$work/hello world.html"
