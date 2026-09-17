@@ -30,6 +30,8 @@ esac
 # The same starvation against the UCS4 re-encoder (-#test=ucs4-oom), whose
 # growth aborts rather than handing the caller a short buffer.
 ulimit -c 0 # a deliberate abort must not litter the box with cores
+# The flag below is load-bearing: without it the refused mmap is ASan's own
+# fatal error, and the run then hangs instead of aborting.
 rc=0
 out=$(ASAN_OPTIONS="${ASAN_OPTIONS-}${ASAN_OPTIONS:+:}allocator_may_return_null=1" \
     httrack -O /dev/null -#test=ucs4-oom 2>&1) || rc=$?
