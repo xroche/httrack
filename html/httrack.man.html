@@ -1698,29 +1698,39 @@ USE IT WITH EXTREME CARE</p>
        cellspacing="0" cellpadding="0">
 <tr valign="top" align="left">
 <td width="9%"></td>
-<td width="4%">
+<td width="3%">
 
 
 <p style="margin-top: 1em">-V</p></td>
-<td width="5%"></td>
+<td width="6%"></td>
 <td width="82%">
 
 
 <p style="margin-top: 1em">execute system command after
 each files ($0 is the filename: -V &quot;rm \$0&quot;)
 (--userdef-cmd &lt;param&gt;)</p></td></tr>
+</table>
+
+<p style="margin-left:18%;">$0 reaches the shell as a
+parameter, so a command that evaluates its <br>
+argument as an expression (let, declare -i, eval) reads it
+as code</p>
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="4%">
 
 
-<p>-%W</p></td>
+<p style="margin-top: 1em">-%W</p></td>
 <td width="5%"></td>
 <td width="82%">
 
 
-<p>use an external library function as a wrapper (-%W
-myfoo.so[,myparameters]) (--callback &lt;param&gt;)</p></td></tr>
+<p style="margin-top: 1em">use an external library function
+as a wrapper (-%W myfoo.so[,myparameters]) (--callback
+&lt;param&gt;)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="4%">

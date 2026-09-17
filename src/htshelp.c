@@ -701,6 +701,10 @@ void help(const char *app, int more) {
   infomsg("Command-line specific options:");
   infomsg
     ("  V execute system command after each files ($0 is the filename: -V \"rm \\$0\")");
+  infomsg("     $0 reaches the shell as a parameter, so a command that "
+          "evaluates its");
+  infomsg("     argument as an expression (let, declare -i, eval) reads it as "
+          "code");
   infomsg(" %W use an external library function as a wrapper (-%W "
           "myfoo.so[,myparameters])");
   infomsg("  y  go to background when suspended (y0 don't)");
