@@ -5070,6 +5070,84 @@ static int st_zip_repair_shift(httrackp *opt, int argc, char **argv) {
   return (err == Z_OK && nrec == 1) ? 0 : 1;
 }
 
+#ifdef _WIN32
+#define HTS_FILENO(fp) _fileno(fp)
+#else
+#define HTS_FILENO(fp) fileno(fp)
+#endif
+
+/* Grades one unzRepair call whose `which` file cannot be opened: it must leave
+   neither `out` nor `tmp` behind, and must give back every descriptor it took.
+   fopen hands out the lowest free descriptor, so a leak pushes the probe past
+   `fd0`, the number a fresh open returned before any repair ran. */
+static int zip_repair_openfail_case(const char *which, const char *file,
+                                    const char *fileOut, const char *fileOutTmp,
+                                    const char *out, const char *tmp,
+                                    const char *probe, int fd0) {
+  hts_boolean leaked;
+  FILE *fp;
+
+  unzRepair(file, fileOut, fileOutTmp, NULL, NULL);
+  if (fexist(out) || fexist(tmp)) {
+    printf("zip-repair-openfail: FAIL (%s: output left behind)\n", which);
+    return 1;
+  }
+  fp = fopen(probe, "rb");
+  if (fp == NULL) {
+    printf("zip-repair-openfail: FAIL (%s: cannot probe descriptors)\n", which);
+    return 1;
+  }
+  leaked = HTS_FILENO(fp) != fd0 ? HTS_TRUE : HTS_FALSE;
+  fclose(fp);
+  if (leaked) {
+    printf("zip-repair-openfail: FAIL (%s: descriptor not given back)\n",
+           which);
+    return 1;
+  }
+  return 0;
+}
+
+/* unzRepair must write no output and give back every descriptor it took when
+   any one of its three files fails to open. Before the fix a failed temporary
+   open sent the central-directory writes through a NULL FILE*, and none of the
+   three cases closed the handles that did open. */
+static int st_zip_repair_openfail(httrackp *opt, int argc, char **argv) {
+  char in[HTS_URLMAXSIZE], out[HTS_URLMAXSIZE], tmp[HTS_URLMAXSIZE];
+  char nodir[HTS_URLMAXSIZE];
+  FILE *fp;
+  int fd0;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "zip-repair-openfail: needs a directory\n");
+    return 1;
+  }
+  snprintf(in, sizeof(in), "%s/damaged.zip", argv[0]);
+  snprintf(out, sizeof(out), "%s/repair.zip", argv[0]);
+  snprintf(tmp, sizeof(tmp), "%s/repair.tmp", argv[0]);
+  /* Under a directory that does not exist, so this is the open that fails. */
+  snprintf(nodir, sizeof(nodir), "%s/nodir/unopenable", argv[0]);
+  /* One byte: every case fails an open before anything parses the archive. */
+  fp = fopen(in, "wb");
+  if (fp == NULL || !hts_fwrite_exact("P", 1, fp)) {
+    if (fp != NULL)
+      fclose(fp);
+    fprintf(stderr, "zip-repair-openfail: cannot write %s\n", in);
+    return 1;
+  }
+  fd0 = HTS_FILENO(fp);
+  fclose(fp);
+
+  if (zip_repair_openfail_case("input", nodir, out, tmp, out, tmp, in, fd0) ||
+      zip_repair_openfail_case("output", in, nodir, tmp, out, tmp, in, fd0) ||
+      zip_repair_openfail_case("temporary", in, out, nodir, out, tmp, in,
+                               fd0)) {
+    return 1;
+  }
+  printf("zip-repair-openfail: OK\n");
+  return 0;
+}
+
 /* Members kept on either side of the abandoned one. */
 static const char *const zip_abandon_kept[] = {"before.bin", "after1.bin",
                                                "after2.bin"};
@@ -16240,6 +16318,9 @@ static const struct selftest_entry {
     {"zip-repair-shift", "<dir>",
      "cache zip-repair header read must not overflow a signed shift",
      st_zip_repair_shift},
+    {"zip-repair-openfail", "<dir>",
+     "cache zip-repair must not write through an output it failed to open",
+     st_zip_repair_openfail},
     {"zip-abandon", "<dir>",
      "an abandoned member leaves the archive byte-identical", st_zip_abandon},
     {"zip-abandon-notrunc", "<dir>",
