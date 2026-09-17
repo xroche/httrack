@@ -6,7 +6,7 @@
 # version bump, and we hear about it as a bug. This fetches the live recipes we
 # cannot build and reports which of their assumptions our tree no longer meets.
 #
-# Usage: tools/downstream-drift.sh        (needs ./bootstrap first, and network)
+# Usage: tools/downstream-drift.sh        (needs network)
 
 # The recipe patterns matched below are literal third-party text, not shell.
 # shellcheck disable=SC2016
@@ -32,12 +32,6 @@ acknowledged=(
     openbsd-patch-src_htslib_c
     openbsd-patch-src_minizip_ioapi_h
     openbsd-patch-src_webhttrack
-    termux-html-Makefile.in.patch
-    termux-htsglobal.h.patch # the install paths follow --prefix since #1469
-    termux-src-Makefile.in.patch
-    termux-src-htsbacktrace.c.patch
-    termux-src-proxy-proxytrack.h.patch # the sys/timeb.h include went away with #1467
-    termux-store.c.patch
 )
 
 checks=0
@@ -73,6 +67,20 @@ fetch() {
     [ -s "$2" ] || die "$1 came back empty"
 }
 
+# False when the recipe has deleted the patch, so a 404 answers the question
+# rather than ending the run. Any other failure still aborts, because an
+# unreachable host must not read as a dropped patch.
+recipe_carries_patch() {
+    local code
+    code=$(curl -sSL --retry 3 --retry-delay 5 -o "$2" -w '%{http_code}' "$1") ||
+        die "cannot fetch $1"
+    if [ "$code" = 404 ]; then
+        return 1
+    fi
+    [ "$code" = 200 ] || die "$1 answered HTTP $code"
+    [ -s "$2" ] || die "$1 came back empty"
+}
+
 # The recipe must still carry the assumption, then our tree must still meet it.
 # Order matters: a premise that is gone makes the tree test vacuous, so it is a
 # finding of its own rather than a pass.
@@ -98,7 +106,10 @@ expect() {
 # Recipes disagree on strip level, so take the first that applies.
 carried_patch() {
     local id=$1 url=$2 p out off
-    fetch "$url" "$work/patch"
+    if ! recipe_carries_patch "$url" "$work/patch"; then
+        flag "$id" "the recipe no longer carries this patch; prune this check"
+        return
+    fi
     for p in 0 1 2; do
         out=$(patch -d "$top" "-p$p" --dry-run --force <"$work/patch" 2>&1) || continue
         if grep -q 'with fuzz' <<<"$out"; then
@@ -129,12 +140,6 @@ coucal_names_gcc() {
     live=$(grep -v '^[[:space:]]*#' "$top/src/coucal/Makefile")
     grep -qw gcc <<<"$live"
 }
-
-# The Termux patches target generated files, so a checkout that skipped
-# ./bootstrap would report them as drift for our reason, not theirs.
-if [ ! -f "$top/src/Makefile.in" ] || [ ! -f "$top/html/Makefile.in" ]; then
-    die "run ./bootstrap first: the generated files Termux patches are missing"
-fi
 
 # Whoever reads a failed run has none of this context, so state it up front.
 echo "Gentoo, FreeBSD, OpenBSD and Termux each patch this tree to build it. Their"
@@ -197,15 +202,12 @@ expect termux-werror-sed "$work/termux.sh" 's/-Werror/-Wno-error/g' \
 expect termux-with-zlib "$work/termux.sh" --with-zlib \
     "configure no longer offers --with-zlib" \
     grep -qF -- --with-zlib "$top/m4/check_zlib.m4"
-for p in html-Makefile.in.patch htsglobal.h.patch src-Makefile.in.patch \
-    src-htsbacktrace.c.patch src-proxy-proxytrack.h.patch store.c.patch; do
-    carried_patch "termux-$p" "$termux_raw/$p"
-done
+# Termux deleted the six patches it carried, so build.sh is all that is left.
 
 echo
 # A check that stops running reports nothing, which reads exactly like a clean
 # tree. Pin the count against the table above.
-test "$checks" -ge 21 || die "only $checks checks ran; the table lost some"
+test "$checks" -ge 15 || die "only $checks checks ran; the table lost some"
 
 if [ "$drift" -ne 0 ]; then
     echo "A DRIFT line above is a packaging recipe that no longer fits this tree,"
