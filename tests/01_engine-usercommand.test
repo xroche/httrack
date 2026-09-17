@@ -1,0 +1,333 @@
+#!/bin/bash
+#
+# shellcheck disable=SC2016 # the templates are for the engine to expand, not us
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# -V runs a shell command per saved page, with "$0" standing for the save name.
+# That name comes from a URL, so it can hold ; ` $ & ' ( ) and spaces. On POSIX
+# it never enters the command: each "$0" becomes a reference to the shell's $1,
+# and the engine execs sh -c <command> sh <name>. -#test=usercmd prints the
+# verdict and that vector; -#test=usercmdrun runs it for real.
+
+# The round-trip below replays each expansion through a POSIX shell, and a
+# native Windows engine emits the cmd.exe form instead: there a backtick inside
+# "..." is inert, while the bash doing the replay runs it. Checking that form
+# needs a cmd.exe round-trip, which this harness is not.
+skip_on_windows "the expansion is quoted for cmd.exe, which bash cannot replay"
+
+work=$(mktemp -d) || fail "mktemp failed"
+canary="$work/pwned"
+trap 'set +e; rm -rf "$work"' EXIT
+
+# Verdict, command text and the name the engine would hand the shell.
+usercmd() { # usercmd TEMPLATE FILENAME [ROOM]
+    local out line rc=0
+    out=$(httrack -O /dev/null -#test=usercmd "$1" "$2" ${3+"$3"}) || rc=$?
+    test "$rc" -eq 0 || fail "usercmd '$1' '$2': exited $rc"
+    VERDICT=
+    CMD=
+    PARAM=
+    ARGC=0
+    while IFS= read -r line; do
+        case $line in
+        "ARG 2 "*) CMD=${line#ARG 2 } ;;
+        "ARG 4 "*) PARAM=${line#ARG 4 } ;;
+        "ARG "*) ;;
+        *) VERDICT=$line ;;
+        esac
+        case $line in "ARG "*) ARGC=$((ARGC + 1)) ;; esac
+    done <<<"$out"
+}
+
+# Through the engine's own spawn path, not a shell we drove ourselves: what the
+# child printed, and what it exited with.
+run_usercmd() { # run_usercmd TEMPLATE FILENAME
+    local out rc=0
+    out=$(httrack -O /dev/null -#test=usercmdrun "$1" "$2") || rc=$?
+    test "$rc" -eq 0 || fail "usercmdrun '$1' '$2': exited $rc"
+    EXIT=${out##*EXIT }
+    OUTPUT=${out%EXIT *}
+    OUTPUT=${OUTPUT%$'\n'}
+}
+
+# Expand, then run the vector through a real shell the way the engine does. The
+# payloads each carry a "touch $canary" gadget, so a hole fires the canary
+# checked at the end.
+roundtrip() { # roundtrip TEMPLATE FILENAME [EXPECTED]
+    local want=${3-$2} got
+    usercmd "$1" "$2"
+    test "$VERDICT" = OK || fail "expected OK for '$1' '$2', got: $VERDICT"
+    test "$ARGC" -eq 5 || fail "'$1': expected a 5-entry vector, got $ARGC"
+    test "$PARAM" = "$2" || fail "'$1': \$1 is [$PARAM], not the save name"
+    # The claim the whole scheme rests on: the name is not in the command.
+    case $CMD in
+    *"$2"*) fail "'$1': the save name is in the command text: $CMD" ;;
+    esac
+    # dash as well as bash: the two differ on what a stray quote does, and the
+    # engine has no idea which /bin/sh it will exec.
+    for sh in ${ROUNDTRIP_SHELLS:-bash dash}; do
+        command -v "$sh" >/dev/null 2>&1 || continue
+        got=$("$sh" -c "$CMD" sh "$2") || fail "$sh eval of [$CMD] failed"
+        test "$got" = "$want" || fail "roundtrip '$1' '$2' under $sh: read [$got]"
+    done
+}
+
+# Each refusal must name its own cause, or a user cannot tell what to change.
+refused_for() { # refused_for TEMPLATE WORD
+    usercmd "$1" 'x.html'
+    case $VERDICT in
+    REFUSED*) ;;
+    *) fail "expected REFUSED for '$1', got: $VERDICT" ;;
+    esac
+    case $VERDICT in
+    *"$2"*) ;;
+    *) fail "refusal for '$1' does not name $2: $VERDICT" ;;
+    esac
+}
+
+# Arrays are bash-only, and dash rejects the word.
+roundtrip_bash() { ROUNDTRIP_SHELLS=bash roundtrip "$@"; }
+
+# ---------------------------------------------------------------------------
+# The allowlist: a plain word, "..." and '...', and nothing else.
+# ---------------------------------------------------------------------------
+
+templates=(
+    'printf %s $0'
+    'printf %s "$0"'
+    'printf %s '\''$0'\'''
+    # the man page and fcguide print -V "rm \$0"; nothing strips that backslash
+    # when the value comes from a profile, a Makefile or an argument list.
+    'printf %s \$0'
+    'printf %s "\$0"'
+)
+
+# Save names a crawled URL can produce, each with a live shell gadget.
+names=(
+    "a;touch $canary;.html"
+    "a\`touch $canary\`.html"
+    "a\$(touch $canary).html"
+    "x'; touch $canary; echo 'y"
+    "a b|touch $canary"
+    "a&touch $canary"
+    "a>$canary"
+    "a b c.html"
+    "a'b\"c\$d.html"
+    # bash evaluates an array subscript inside arithmetic, on a parameter too
+    "x[\$(touch $canary)]"
+)
+
+for t in "${templates[@]}"; do
+    for n in "${names[@]}"; do
+        roundtrip "$t" "$n"
+    done
+done
+
+# Two substitutions in one template, the first one backslash-escaped. A
+# backslash applies to the $0 it precedes and is spent there; if the scanner
+# carries it past the substitution it suppresses the NEXT character's quote
+# transition, so the second $0 is rewritten for a context the shell is not in.
+pair_templates=(
+    'printf %s \$0$0'
+    'printf %s \$0"$0"'
+    'printf %s \$0'\''$0'\'''
+    'printf %s $0\$0'
+    'printf %s "$0"\$0'
+    # no backslash at all: the control, so a fix that broke pairs outright fails
+    'printf %s $0$0'
+    'printf %s "$0"'\''$0'\'''
+)
+
+for t in "${pair_templates[@]}"; do
+    for n in "${names[@]}"; do
+        roundtrip "$t" "$n" "$n$n"
+    done
+done
+
+# A digit right after $0 must not extend the reference into ${11}.
+usercmd 'printf %s "$01"' 'x.html'
+assert_eq 'printf %s "${1}1"' "$CMD" 'digit after $0'
+
+# ---------------------------------------------------------------------------
+# Everything else refuses, because the shell reads those regions again.
+# ---------------------------------------------------------------------------
+
+# Command substitution, both spellings. A parameter does survive them, which
+# the branch that allowed them proved, but $( ) cannot be told from $(( )) by
+# what it re-reads, so the allowlist keeps neither.
+refused_for 'printf %s "$(printf %s $0)"' 'plain word'
+refused_for 'printf %s "$( (printf %s $0) )"' 'plain word'
+refused_for 'printf %s "`cat $0`"' 'plain word'
+refused_for 'printf %s `cat $0`' 'plain word'
+
+# Arithmetic, in every spelling bash reaches its evaluator through. A name
+# holding x[$(cmd)] runs cmd there even as a parameter.
+refused_for 'echo $(($0))' 'plain word'
+refused_for 'echo $(( $0 ))' 'plain word'
+refused_for 'echo $((1+$0))' 'plain word'
+refused_for 'echo $(( ($0) ))' 'plain word'
+refused_for 'echo $[$0]' 'plain word'
+refused_for '((n=$0))' 'plain word'
+refused_for 'for ((i=0;i<$0;i++)); do :; done' 'plain word'
+refused_for 'echo $( ((printf %s $0)) )' 'plain word'
+
+# A parameter expansion re-reads its own text after quote removal, which is
+# what ${v:offset} does, and an array subscript is arithmetic whether it is
+# read or written. ${ } and any word-attached [ ] are regions of their own.
+refused_for 'v=abcdef; echo ${v:$0}' 'plain word'
+refused_for 'echo ${a[$0]}' 'plain word'
+refused_for 'echo "${a[$0]}"' 'plain word'
+refused_for 'a[$0]=1' 'plain word'
+refused_for 'a[$0]+=1' 'plain word'
+refused_for 'a=([$0]=x)' 'plain word'
+refused_for 'declare -A m; a[$0]=1' 'plain word'
+refused_for 'a=(1); unset a[$0]' 'plain word'
+refused_for 'a=(1 2 3); unset "a[$0]"' 'plain word'
+refused_for 'printf %s a[$0]' 'plain word'
+
+# A subscript inside '...' too. The '"${1}"' emitted there closes the quote and
+# reopens it, so the shell re-forms one word across the break and unset
+# evaluates a[<name>] exactly as it does for the double-quoted spelling.
+refused_for "a=(1); unset 'a[\$0]'" 'plain word'
+refused_for "echo 'a[\$0]'" 'plain word'
+refused_for "echo '[[ \$0 ]]'" 'plain word'
+
+# [[ ]] is not a subscript, but bash re-reads its operands: -eq evaluates
+# arithmetic and =~ takes a regex.
+refused_for '[[ -f $0 ]]' 'plain word'
+refused_for '[[ 1 -eq $0 ]]' 'plain word'
+
+# A ( nested inside a substitution must be counted, or the first ) closes the
+# frame and a $0 after it is taken for a plain word.
+refused_for 'echo $( (true) $0 )' 'plain word'
+refused_for 'echo $( (true) (true) $0 )' 'plain word'
+
+# The other refusal cause: a template nested deeper than the frame stack.
+deep=$(repeat_chars 17 '(')
+refused_for "echo ${deep//(/\$(}$0" 'nests substitutions'
+
+# ${ } without a subscript refuses too. It is inert, and it is the price of one
+# rule over a list of the regions that happen to be dangerous.
+refused_for 'printf %s ${x:-$0}' 'plain word'
+
+# Each refusal is a command that never runs, reported as one. The names carry
+# the subscript gadget, which is the shape that reaches an evaluator once the
+# name is a parameter.
+for t in 'echo $(($0))' 'echo $[$0]' '((n=$0))' 'echo ${a[$0]}' 'a[$0]=1' \
+    'a=([$0]=x)' 'a=(1); unset a[$0]' "a=(1); unset 'a[\$0]'" \
+    'v=abcdef; echo ${v:$0}' '[[ 1 -eq $0 ]]' \
+    'printf %s "$(printf %s $0)"' 'printf %s `cat $0`'; do
+    run_usercmd "$t" "x[\$(touch $canary)]"
+    assert_eq -1 "$EXIT" "refused template not spawned: $t"
+done
+
+# ---------------------------------------------------------------------------
+# Controls: a region that closes before the $0 must not refuse it.
+# ---------------------------------------------------------------------------
+
+usercmd 'echo $((1+2)) $0' 'a b.html'
+assert_eq 'echo $((1+2)) "${1}"' "$CMD" '$(( )) closed'
+usercmd 'n=0; ((n=1+2)); printf %s $0' 'a b.html'
+assert_eq 'n=0; ((n=1+2)); printf %s "${1}"' "$CMD" 'bare (( )) closed'
+usercmd 'echo $[1+2] $0' 'a b.html'
+assert_eq 'echo $[1+2] "${1}"' "$CMD" '$[ ] closed'
+usercmd 'echo ${HOME} $0' 'a b.html'
+assert_eq 'echo ${HOME} "${1}"' "$CMD" '${ } closed'
+# A } between quotes does not close it. If it did, the $0 after would be
+# emitted for a context the shell is not in, and the name would be split.
+usercmd 'echo ${v:-"}"} $0' 'a b.html'
+assert_eq 'echo ${v:-"}"} "${1}"' "$CMD" 'a quoted } does not close ${ }'
+usercmd 'echo "${v:-"x"}" $0' 'a b.html'
+assert_eq 'echo "${v:-"x"}" "${1}"' "$CMD" '${ } nested in "..."'
+usercmd 'a[1]=2; printf %s $0' 'a b.html'
+assert_eq 'a[1]=2; printf %s "${1}"' "$CMD" 'subscript closed'
+usercmd '[[ -f x ]] || printf %s $0' 'a b.html'
+assert_eq '[[ -f x ]] || printf %s "${1}"' "$CMD" '[[ ]] closed'
+usercmd 'echo $(true) $0' 'a b.html'
+assert_eq 'echo $(true) "${1}"' "$CMD" '$( ) closed'
+usercmd 'echo `true` $0' 'a b.html'
+assert_eq 'echo `true` "${1}"' "$CMD" '`...` closed'
+
+# The [ test command is a word of its own, unlike the [ of a subscript.
+roundtrip '[ -n $0 ] && printf %s $0' "a;touch $canary;.html"
+roundtrip 'printf %s ${HOME:+}$0' "a;touch $canary;.html"
+
+# A backslash before $0 is the documented spelling, not a refusal: httrack
+# substitutes $0 escaped or not, so the backslash was meant for an outer shell
+# that never stripped it. Both forms must give the same command.
+usercmd 'rm \$0' '/out/a b.html'
+escaped=$CMD
+usercmd 'rm $0' '/out/a b.html'
+assert_eq "$escaped" "$CMD" 'rm \$0 against rm $0'
+
+# An escaped backslash is a literal one, and the $0 after it still gets a
+# parameter reference.
+usercmd 'echo \\$0' 'a;id;.html'
+assert_eq 'echo \\"${1}"' "$CMD" 'escaped backslash'
+
+# A command that does not fit is refused, never truncated mid-quote (a cut
+# "rm '$0'" would run as "rm"). Only the template can overflow it now, and a -V
+# template stops at HTS_CDLMAXSIZE, so the room is capped here instead.
+usercmd 'rm $0' 'x.html' 9
+assert_eq TOOLONG "$VERDICT" 'over-long command'
+usercmd 'rm $0' 'x.html' 10
+assert_eq OK "$VERDICT" 'the byte below the bound'
+assert_eq 'rm "${1}"' "$CMD" 'the command that just fits'
+
+# ---------------------------------------------------------------------------
+# The documented templates, which the allowlist has to keep whole.
+# ---------------------------------------------------------------------------
+
+printf 'CONTENT\n<TITLE>t</TITLE>\n' >"$work/page.html"
+printf 'CONTENT\n<TITLE>t</TITLE>\n' >"$work/hello world.html"
+
+for f in "$work/page.html" "$work/hello world.html"; do
+    # html/scripting.html and html/fcguide.html, and the man page's rm \$0
+    for t in 'cat $0' 'cat \$0' '/bin/echo $0' 'md5 \$0' \
+        'if grep -iE "TITLE" "$0">/dev/null; then echo "Match found at $0"; fi'; do
+        usercmd "$t" "$f"
+        test "$VERDICT" = OK || fail "documented template '$t': $VERDICT"
+        case $CMD in
+        *"$f"*) fail "documented template '$t' carries the name: $CMD" ;;
+        esac
+    done
+    # one of them run for real, against a name with a space in it
+    run_usercmd 'if grep -iE "TITLE" "$0">/dev/null; then echo "Match found at $0"; fi' "$f"
+    assert_eq "Match found at $f" "$OUTPUT" "grep template on [$f]"
+    assert_eq 0 "$EXIT" "grep template status on [$f]"
+    run_usercmd 'cat $0' "$f"
+    assert_eq "$(cat "$f")" "$OUTPUT" "cat template on [$f]"
+done
+
+# rm removes exactly the spaced name, so "$0" kept one-word semantics.
+run_usercmd 'rm $0' "$work/hello world.html"
+assert_eq 0 "$EXIT" 'rm template status'
+test ! -e "$work/hello world.html" || fail 'rm $0 left the spaced name behind'
+
+# ---------------------------------------------------------------------------
+# The spawn path itself.
+# ---------------------------------------------------------------------------
+
+run_usercmd 'printf "[%s]" $0' "$work/page.html"
+assert_eq "[$work/page.html]" "$OUTPUT" 'spawned child output'
+assert_eq 0 "$EXIT" 'spawned child status'
+
+# The status comes back from the child, so a failing command is reported as one.
+run_usercmd 'exit 42' 'x.html'
+assert_eq 42 "$EXIT" 'spawned child exit status'
+
+# The same gadget names, run for real this time.
+for n in "${names[@]}"; do
+    run_usercmd 'printf %s $0' "$n"
+    assert_eq "$n" "$OUTPUT" "spawned child read back [$n]"
+    assert_eq 0 "$EXIT" "spawned child status for [$n]"
+done
+
+# No gadget in any payload ever ran.
+test ! -e "$canary" || fail "a payload executed: canary $canary exists"
+
+echo "usercommand -V allowlist self-test OK"

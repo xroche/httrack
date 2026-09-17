@@ -16344,6 +16344,72 @@ static int st_urlbounds(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Print the verdict for a -V template, then the exact vector the engine would
+   hand the shell, one "ARG <index> <value>" line each. The save name is a
+   vector entry rather than part of the command, so a caller that wants to
+   replay it has to pass it the same way. */
+static int st_usercmd(httrackp *opt, int argc, char **argv) {
+  char BIGSTK dest[8192];
+  /* An optional third argument caps the room. The command line cannot reach
+     the real cap any more: a -V template stops at HTS_CDLMAXSIZE, and the save
+     name no longer lands in the command. */
+  size_t room = sizeof(dest);
+  const char *why = "unnamed";
+
+  (void) opt;
+  if (argc < 2) {
+    fprintf(stderr, "usercmd: needs a -V template and a filename\n");
+    return 1;
+  }
+  if (argc > 2) {
+    const int asked = atoi(argv[2]);
+
+    if (asked <= 0 || (size_t) asked > sizeof(dest)) {
+      fprintf(stderr, "usercmd: room must be within 1..%d\n",
+              (int) sizeof(dest));
+      return 1;
+    }
+    room = (size_t) asked;
+  }
+  switch (usercommand_expand(dest, room, argv[0], argv[1], &why)) {
+  case USERCOMMAND_EXPAND_OK:
+    break;
+  case USERCOMMAND_EXPAND_REFUSED:
+    printf("REFUSED %s\n", why);
+    return 0;
+  default:
+    printf("TOOLONG\n");
+    return 0;
+  }
+  printf("OK\n");
+#ifndef _WIN32
+  {
+    char *vector[USERCOMMAND_ARGV_MAX];
+    const size_t n = usercommand_argv(vector, dest, argv[1]);
+    size_t i;
+
+    for (i = 0; i < n; i++)
+      printf("ARG %d %s\n", (int) i, vector[i]);
+  }
+#else
+  /* cmd.exe takes no positional parameters, so the name is inside the text */
+  printf("ARG 0 cmd\nARG 1 /c\nARG 2 %s\n", dest);
+#endif
+  return 0;
+}
+
+/* Run a -V template for real, through the engine's own spawn path, and report
+   what the shell exited with. The child's output goes to our stdout. */
+static int st_usercmdrun(httrackp *opt, int argc, char **argv) {
+  if (argc < 2) {
+    fprintf(stderr, "usercmdrun: needs a -V template and a filename\n");
+    return 1;
+  }
+  fflush(stdout);
+  printf("EXIT %d\n", usercommand_exe(opt, argv[0], argv[1]));
+  return 0;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: name -> handler, with a usage hint and a one-line description. */
 /* ------------------------------------------------------------ */
@@ -16358,6 +16424,11 @@ static const struct selftest_entry {
      st_batch},
     {"filter", "<pattern> <string>", "match a string against a wildcard filter",
      st_filter},
+    {"usercmd", "<-V template> <filename> [room]",
+     "rewrite a -V template's $0 and print the shell vector it would run",
+     st_usercmd},
+    {"usercmdrun", "<-V template> <filename>",
+     "run a -V template through the engine's own spawn path", st_usercmdrun},
     {"filtersize", "<size> <string> <filter>...",
      "size-aware filter verdict (negative size = unknown/scan time)",
      st_filtersize},

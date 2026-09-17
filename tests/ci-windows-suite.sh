@@ -294,7 +294,11 @@ ci_suite_heartbeat() {
 # so MIRRORVERDICT_BIN is unset here and the test skips itself.
 # chunked-oom starves the receive buffer with RLIMIT_AS, which Windows does not
 # enforce, so the test skips itself.
-expected_skips_msys="01_engine-footer-overflow.test
+# engine-usercommand replays each -V expansion through a POSIX shell, and a
+# native engine quotes for cmd.exe instead, where a backtick inside "..." is
+# inert but the replaying bash runs it.
+expected_skips_msys="01_engine-usercommand.test
+01_engine-footer-overflow.test
 253_local-ftp-close-once.test
 113_engine-threadattr-leak.test
 100_local-purge-longpath.test
@@ -349,7 +353,11 @@ expected_skips_msys="01_engine-footer-overflow.test
 # so MIRRORVERDICT_BIN is unset here and the test skips itself.
 # chunked-oom starves the receive buffer with RLIMIT_AS, which Windows does not
 # enforce, so the test skips itself.
-expected_skips_wsl2="01_engine-footer-overflow.test
+# engine-usercommand replays each -V expansion through a POSIX shell, and a
+# native engine quotes for cmd.exe instead, where a backtick inside "..." is
+# inert but the replaying bash runs it.
+expected_skips_wsl2="01_engine-usercommand.test
+01_engine-footer-overflow.test
 253_local-ftp-close-once.test
 113_engine-threadattr-leak.test
 100_local-purge-longpath.test
