@@ -27,4 +27,24 @@ case "$out" in
     ;;
 esac
 
+# The same starvation against the UCS4 re-encoder (-#test=ucs4-oom), whose
+# growth aborts rather than handing the caller a short buffer.
+ulimit -c 0 # a deliberate abort must not litter the box with cores
+rc=0
+out=$(httrack -O /dev/null -#test=ucs4-oom 2>&1) || rc=$?
+case "$out" in
+*"failed at"*htscharset.c*)
+    test "$rc" -ne 0 || fail "the assert fired but the run exited 0"
+    ;;
+*"returned instead of aborting"*)
+    fail "$out"
+    ;;
+*skipped*)
+    echo "SKIP: $out" >&2
+    ;;
+*)
+    fail "expected the refused growth to abort, got: $out"
+    ;;
+esac
+
 exit 0

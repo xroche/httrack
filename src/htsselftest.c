@@ -1560,38 +1560,6 @@ static int st_isutf8(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* An encode the allocator refuses must release what it already holds, which
-   only a leak checker sees. */
-static int st_idna_oom(void) {
-  enum { segments = 700 * 1024 };
-
-  const size_t size = (size_t) segments * 3;
-  char *src = (char *) malloct(size);
-  char *out;
-  size_t i;
-
-  if (src == NULL) {
-    printf("idna: cannot allocate the input, skipped\n");
-    return 0;
-  }
-  /* U+0080 is the cheapest code point to encode, and one per label makes the
-     output outgrow the cap while the input still fits under it. */
-  for (i = 0; i < segments; i++) {
-    src[i * 3] = (char) 0xC2;
-    src[i * 3 + 1] = (char) 0x80;
-    src[i * 3 + 2] = '.';
-  }
-  out = hts_convertStringUTF8ToIDNA(src, size);
-  freet(src);
-  if (out != NULL) {
-    freet(out);
-    printf("idna: cap did not bite, skipped\n");
-    return 0;
-  }
-  printf("idna: oom OK\n");
-  return 0;
-}
-
 static int st_idna_encode(httrackp *opt, int argc, char **argv) {
   char buf[512];
   size_t len;
@@ -1601,9 +1569,6 @@ static int st_idna_encode(httrackp *opt, int argc, char **argv) {
   if (argc < 1) {
     fprintf(stderr, "idna-encode: needs a hostname\n");
     return 1;
-  }
-  if (strcmp(argv[0], "oom") == 0) {
-    return st_idna_oom();
   }
   len = st_decode_body(argv[0], buf, sizeof(buf));
   s = hts_convertStringUTF8ToIDNA(buf, len);
@@ -2027,17 +1992,14 @@ static int st_hashtable(httrackp *opt, int argc, char **argv) {
           if (buff[i] == 10 || buff[i] == 0) {
             buff[i] = '\0';
             if (capa == count) {
-              const char **grown;
-
-              capa = capa == 0 ? 16 : capa << 1;
-              grown = (const char **) realloct((void *) strings,
-                                               capa * sizeof(char *));
-              if (grown == NULL) {
-                freet(strings);
-                count = 0;
-                break;
+              if (capa == 0) {
+                capa = 16;
+              } else {
+                capa <<= 1;
               }
-              strings = grown;
+              strings = (const char **) realloct((void *) strings,
+                                                 capa * sizeof(char *));
+              assertf(strings != NULL);
             }
             strings[count++] = &buff[last];
             last = i + 1;
@@ -2291,6 +2253,50 @@ static int ucs2_check(const unsigned short *units, size_t count,
   freet(got);
   freet(src);
   return err;
+}
+
+/* The growth is the UCS4 re-encoder's only allocation, so any return at all
+   from a starved run says the refusal was not caught. */
+static int st_ucs4_oom(httrackp *opt, int argc, char **argv) {
+  (void) opt;
+  (void) argc;
+  (void) argv;
+#ifndef _WIN32
+  {
+    enum { units = 512 * 1024 };
+
+    char *src = (char *) malloct(units);
+    struct rlimit saved, tight;
+    hts_UCS4 *out;
+
+    if (src == NULL || getrlimit(RLIMIT_AS, &saved) != 0) {
+      printf("ucs4: cannot cap memory, skipped\n");
+      freet(src);
+      return 0;
+    }
+    memset(src, 'a', units); /* one UCS4 unit per byte, so the output is 4x */
+    tight = saved;
+    tight.rlim_cur = 1024 * 1024;
+    if (setrlimit(RLIMIT_AS, &tight) != 0) {
+      printf("ucs4: cannot cap memory, skipped\n");
+      freet(src);
+      return 0;
+    }
+    out = hts_convertUTF8StringToUCS4(src, units, NULL);
+    (void) setrlimit(RLIMIT_AS, &saved);
+    freet(src);
+    if (out == NULL) {
+      printf("ucs4: the refused growth returned instead of aborting\n");
+      return 1;
+    }
+    freet(out);
+    printf("ucs4: cap did not bite, skipped\n");
+    return 0;
+  }
+#else
+  printf("ucs4: cannot cap memory, skipped\n");
+  return 0;
+#endif
 }
 
 static int st_ucs2(httrackp *opt, int argc, char **argv) {
@@ -16112,7 +16118,7 @@ static const struct selftest_entry {
     {"metacharset", "<html>", "extract the <meta> charset from an HTML page",
      st_metacharset},
     {"isutf8", "<hex:..|string>", "is the string valid UTF-8 (1/0)", st_isutf8},
-    {"idna-encode", "<host>|oom", "encode a hostname to IDNA/punycode",
+    {"idna-encode", "<host>", "encode a hostname to IDNA/punycode",
      st_idna_encode},
     {"idna-decode", "<host>", "decode an IDNA/punycode hostname",
      st_idna_decode},
@@ -16135,6 +16141,8 @@ static const struct selftest_entry {
     {"arrays", "[overflow-capa|overflow-loop]",
      "htsarrays.h growth reaches the requested room, or reports it failed",
      st_arrays},
+    {"ucs4-oom", "", "a UCS4 re-encode the allocator refuses aborts",
+     st_ucs4_oom},
     {"ucs2", "[oom]", "UCS2 to UTF-8 re-encoding, and its failure return",
      st_ucs2},
     {"backnew", "",
