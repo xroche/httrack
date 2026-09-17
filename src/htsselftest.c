@@ -14361,13 +14361,13 @@ static int st_strerror(httrackp *opt, int argc, char **argv) {
   }
 
   /* A caller can hold two messages at once, where a shared buffer would have
-     lost the first one to the second call. */
-  kept = hts_strerror(strerror_codes[4], first, sizeof(first));
-  (void) hts_strerror(strerror_codes[5], second, sizeof(second));
-  if (strcmp(kept, strerror_expected[4]) != 0) {
+     lost the first to the second call. Codes 0 and 1 because musl answers
+     every unknown one alike, and strerror_expected[] because kept is first. */
+  kept = hts_strerror(strerror_codes[0], first, sizeof(first));
+  (void) hts_strerror(strerror_codes[1], second, sizeof(second));
+  if (strcmp(kept, strerror_expected[0]) != 0) {
     fprintf(stderr,
-            "strerror: the next call changed an earlier message to "
-            "\"%s\"\n",
+            "strerror: the next call changed an earlier message to \"%s\"\n",
             kept);
     err = 1;
   }
@@ -14377,17 +14377,42 @@ static int st_strerror(httrackp *opt, int argc, char **argv) {
     err = 1;
   }
 
-  /* A buffer too small clips and still terminates. */
+  /* Every capacity fills, terminates, and writes nothing past its end. The
+     bytes above it are poisoned non-zero, so a stray NUL shows up too. */
   {
-    char small[4];
+    static const size_t sizes[] = {1, 2, 4, 20};
 
-    if (hts_strerror(strerror_codes[0], small, sizeof(small)) != small ||
-        small[sizeof(small) - 1] != '\0') {
-      fprintf(stderr, "strerror: a short buffer was not terminated\n");
-      err = 1;
+    struct {
+      char dst[20];
+      char tail[8];
+    } s;
+
+    char ref[sizeof(s)];
+    size_t k;
+
+    memset(ref, '#', sizeof(ref));
+    for (k = 0; k < sizeof(sizes) / sizeof(sizes[0]); k++) {
+      const size_t cap = sizes[k];
+
+      memset(&s, '#', sizeof(s));
+      if (hts_strerror(EACCES, s.dst, cap) != s.dst ||
+          memchr(s.dst, '\0', cap) == NULL || (cap > 1 && s.dst[0] == '\0')) {
+        fprintf(stderr, "strerror: capacity %d was not filled and terminated\n",
+                (int) cap);
+        err = 1;
+      }
+      if (memcmp((const char *) &s + cap, ref, sizeof(s) - cap) != 0) {
+        fprintf(stderr, "strerror: capacity %d wrote past its end\n",
+                (int) cap);
+        err = 1;
+      }
     }
   }
 
+#if !HTS_STRERROR_REENTRANT
+  printf("strerror: this build kept plain strerror(), so the concurrent phase "
+         "below proves nothing here\n");
+#endif
   for (i = 0; i < STRERROR_THREADS; i++) {
     idx[i] = i;
     if (hts_newthread(strerror_thread, &idx[i]) != 0) {

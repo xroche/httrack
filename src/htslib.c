@@ -631,13 +631,18 @@ static const char *hts_mime_modern[][2] = {
   (CIS(c, '-') || CIS(c, '_') || CIS(c, '.') || CIS(c, '!') || CIS(c, '~') ||  \
    CIS(c, '*') || CIS(c, '\'') || CIS(c, '(') || CIS(c, ')'))
 
-/* Write the message for errno value err into buf (contract in htslib.h). */
 const char *hts_strerror(int err, char *buf, size_t size) {
   assertf(buf != NULL && size != 0);
   buf[0] = '\0';
-#if defined(_MSC_VER)
+  /* Only the terminator fits, and the libcs disagree on that boundary. */
+  if (size == 1)
+    return buf;
+#if !HTS_STRERROR_REENTRANT
+  /* No reentrant form here, so this build stays as racy as it was. */
+  (void) strclipbuff(buf, size, strerror(err));
+#elif defined(_MSC_VER)
   (void) strerror_s(buf, size, err);
-#elif defined(HAVE_STRERROR_R) && defined(__USE_GNU)
+#elif defined(__USE_GNU)
   {
     /* The GNU variant's return is the message and buf may stay untouched,
        where the XSI one's return is a status. Only __USE_GNU tells them apart
@@ -647,12 +652,9 @@ const char *hts_strerror(int err, char *buf, size_t size) {
     if (msg != NULL && msg != buf)
       (void) strclipbuff(buf, size, msg);
   }
-#elif defined(HAVE_STRERROR_R)
+#else
   /* Nonzero is ERANGE or EINVAL, and buf may still hold a partial message. */
   (void) strerror_r(err, buf, size);
-#else
-  /* No reentrant form here, so this build stays as racy as it was. */
-  (void) strclipbuff(buf, size, strerror(err));
 #endif
   buf[size - 1] = '\0';
   if (buf[0] == '\0')

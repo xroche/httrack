@@ -19,8 +19,9 @@ cleanup_push rm -rf "$tmpdir"
 expect_ok "strerror self-test" httrack -O "${tmpdir}/o1" -#test=strerror
 
 # gethostbyname() answers into a shared static hostent. Its arm only compiles
-# under --disable-ipv6, which no CI leg builds, so guard it at the source: the
-# call and the copy out of it must stay inside one critical section.
+# under --disable-ipv6, which no CI leg builds, so guard it at the source. The
+# lock must still be held at h_addr_list, or the copy reads a hostent another
+# worker has already replaced.
 body=$(awk '/^static int hts_dns_resolve_nocache_list_\(/,/^}/' \
     "$top_srcdir/src/htslib.c")
 if [ -z "$body" ]; then
@@ -29,14 +30,14 @@ if [ -z "$body" ]; then
 fi
 # grep -E, because BSD sed has no \| alternation and would match nothing.
 order=$(printf '%s\n' "$body" |
-    grep -Eo 'hts_mutexlock|gethostbyname|hts_mutexrelease' |
+    grep -Eo 'hts_mutexlock|gethostbyname|h_addr_list|hts_mutexrelease' |
     tr '\n' ' ' || true)
 case "$order" in
 "")
     echo "OK: no gethostbyname() left to guard"
     ;;
-"hts_mutexlock gethostbyname hts_mutexrelease "*)
-    echo "OK: gethostbyname() resolves under a lock"
+"hts_mutexlock gethostbyname h_addr_list hts_mutexrelease "*)
+    echo "OK: gethostbyname() and the copy out of it share one lock"
     ;;
 *)
     echo "FAIL: hts_dns_resolve_nocache_list_() calls, in order: $order"
