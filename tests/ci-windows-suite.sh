@@ -311,6 +311,7 @@ expected_skips_msys="01_engine-footer-overflow.test
 71_local-crange-repaircache.test
 80_engine-crash-symbolize.test
 468_engine-crash-live-worker.test
+471_engine-sigpipe.test
 01_engine-crash-announce.test
 88_local-proxytrack-badmtime.test
 241_local-single-file-gui.test
@@ -358,6 +359,7 @@ expected_skips_wsl2="01_engine-footer-overflow.test
 71_local-crange-repaircache.test
 80_engine-crash-symbolize.test
 468_engine-crash-live-worker.test
+471_engine-sigpipe.test
 01_engine-crash-announce.test
 88_local-proxytrack-badmtime.test
 241_local-single-file-gui.test
