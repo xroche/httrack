@@ -11,6 +11,8 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
+skip_on_windows "Windows raises no SIGPIPE, so none of the three mechanisms exists there"
+
 rc=0
 out=$(httrack -O /dev/null '-#test=sigpipe' 2>&1) || rc=$?
 # Named, because SIGBUS is 7 on x86 and 10 on hppa, and the name is the finding.
