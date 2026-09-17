@@ -37,17 +37,17 @@ common=(--quiet --disable-security-limits --robots=0 --timeout=30 --retries=0 -c
 # The crawl log only ever says "Mirror not completed (see log file)", so the
 # engine log it names is dumped beside it (#1680).
 fail_dump_var crawllog enginelog
-arm_paths() { # arm_paths NAME
+arm_paths() { # arm_paths NAME: leaves the paths in $out, $crawllog, $enginelog
     out="${tmpdir}/$1"
     crawllog="${tmpdir}/log-$1"
     # shellcheck disable=SC2034 # read by fail_dump_var above, by name
     enginelog="${out}/hts-log.txt"
 }
 
-# A trickle page appears empty the moment its transfer starts, which is the
-# busy socket the progress lock alone cannot show.
+# The engine creates the page file when its transfer starts. The progress lock
+# appears earlier, while nothing is transferring yet.
 trickle_started() { # trickle_started DIR
-    test -n "$(find "$1" -name 'p*.bin' 2>/dev/null)"
+    test -n "$(find "$1" -path '*/trickle/p*.bin' 2>/dev/null)"
 }
 
 # /trickle/ hands out eight .bin pages, two bytes a second for a minute each, so
@@ -63,8 +63,7 @@ wait_until_still_running "test -e '${out}/${PROGRESSLOCK}'" "the crawl never got
 : >"${tmpdir}/probe"
 test "$(mtime "${tmpdir}/probe")" -gt "$(mtime "${out}/${PROGRESSLOCK}")" ||
     fail "the engine did not date ${PROGRESSLOCK} back, so a request written the moment it appears can tie it"
-wait_until_still_running "trickle_started '$out'" \
-    "the crawl reached no trickle page, so no transfer was in flight to abort" \
+wait_until_still_running "trickle_started '$out'" "the crawl opened no trickle page" \
     "$crawlpid"
 write_lock_request "$out" "$ABORTLOCK" "$crawlpid"
 wait_until_still_running "test ! -e '${out}/${ABORTLOCK}'" \

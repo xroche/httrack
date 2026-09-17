@@ -38,7 +38,7 @@ common=(--quiet --disable-security-limits --robots=0 --timeout=30 --retries=0 -c
 # The crawl log only ever says "Mirror not completed (see log file)", so the
 # engine log it names is dumped beside it (#1680).
 fail_dump_var crawllog enginelog
-arm_paths() { # arm_paths NAME
+arm_paths() { # arm_paths NAME: leaves the paths in $out, $crawllog, $enginelog
     out="${tmpdir}/$1"
     crawllog="${tmpdir}/log-$1"
     # shellcheck disable=SC2034 # read by fail_dump_var above, by name
