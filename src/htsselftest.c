@@ -9370,6 +9370,85 @@ static int st_robots(httrackp *opt, int argc, char **argv) {
     assertf(rb_decide(&robots, txt, "/y") == -1);
   }
 
+  /* RFC 9309 2.2.1: a user-agent line following a rule opens a new group, so
+     the generic group written after ours is a fallback we no longer take. */
+  {
+    const char *txt = "User-agent: httrack\nDisallow: /secret\n\n"
+                      "User-agent: *\nDisallow: /public\n";
+
+    assertf(rb_decide(&robots, txt, "/secret") == -1);
+    assertf(rb_decide(&robots, txt, "/public") == 0);
+
+    /* the blank line is not what ends the group */
+    txt = "User-agent: httrack\nDisallow: /secret\n"
+          "User-agent: *\nDisallow: /public\n";
+    assertf(rb_decide(&robots, txt, "/secret") == -1);
+    assertf(rb_decide(&robots, txt, "/public") == 0);
+  }
+
+  /* Consecutive user-agent lines name one group, whichever comes first. */
+  {
+    assertf(rb_decide(&robots,
+                      "User-agent: httrack\nUser-agent: *\n"
+                      "Disallow: /x\n",
+                      "/x") == -1);
+    assertf(rb_decide(&robots,
+                      "User-agent: httrack\nUser-agent: Googlebot\n"
+                      "Disallow: /x\n",
+                      "/x") == -1);
+    assertf(rb_decide(&robots,
+                      "User-agent: Googlebot\nUser-agent: httrack\n"
+                      "Disallow: /x\n",
+                      "/x") == -1);
+    /* a blank line does not end the list either */
+    assertf(rb_decide(&robots,
+                      "User-agent: httrack\n\nUser-agent: *\n"
+                      "Disallow: /x\n",
+                      "/x") == -1);
+  }
+
+  /* A group naming somebody else stays somebody else's. */
+  {
+    const char *txt = "User-agent: Googlebot\nDisallow: /y\n\n"
+                      "User-agent: httrack\nDisallow: /x\n";
+
+    assertf(rb_decide(&robots, txt, "/y") == 0);
+    assertf(rb_decide(&robots, txt, "/x") == -1);
+  }
+
+  /* Two groups naming us are combined, and the generic one between them is
+     still skipped. */
+  {
+    const char *txt = "User-agent: httrack\nDisallow: /a\n\n"
+                      "User-agent: winhttrack\nDisallow: /b\n";
+
+    assertf(rb_decide(&robots, txt, "/a") == -1);
+    assertf(rb_decide(&robots, txt, "/b") == -1);
+
+    txt = "User-agent: httrack\nDisallow: /a\n"
+          "User-agent: *\nDisallow: /generic\n"
+          "User-agent: httrack\nDisallow: /b\n";
+    assertf(rb_decide(&robots, txt, "/a") == -1);
+    assertf(rb_decide(&robots, txt, "/b") == -1);
+    assertf(rb_decide(&robots, txt, "/generic") == 0);
+  }
+
+  /* With no group naming us, every generic group still counts. */
+  {
+    const char *txt = "User-agent: *\nDisallow: /a\n\n"
+                      "User-agent: *\nDisallow: /b\n";
+
+    assertf(rb_decide(&robots, txt, "/a") == -1);
+    assertf(rb_decide(&robots, txt, "/b") == -1);
+
+    txt = "User-agent: *\nDisallow: /a\n"
+          "User-agent: Googlebot\nDisallow: /b\n"
+          "User-agent: *\nDisallow: /c\n";
+    assertf(rb_decide(&robots, txt, "/a") == -1);
+    assertf(rb_decide(&robots, txt, "/b") == 0);
+    assertf(rb_decide(&robots, txt, "/c") == -1);
+  }
+
   /* No rules: everything is allowed. */
   assertf(rb_decide(&robots, "User-agent: *\nDisallow:\n", "/x") == 0);
 
