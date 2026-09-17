@@ -67,19 +67,18 @@ fetch() {
     [ -s "$2" ] || die "$1 came back empty"
 }
 
-# Same, but a 404 answers the question instead of ending the run: the packager
-# deleted the patch, which is what we asked them for. Any other failure still
-# aborts, because an unreachable host must not read as a dropped patch.
-fetch_patch() {
+# False when the recipe has deleted the patch, so a 404 answers the question
+# rather than ending the run. Any other failure still aborts, because an
+# unreachable host must not read as a dropped patch.
+recipe_carries_patch() {
     local code
     code=$(curl -sSL --retry 3 --retry-delay 5 -o "$2" -w '%{http_code}' "$1") ||
         die "cannot fetch $1"
-    [ "$code" = 404 ] || {
-        [ "$code" = 200 ] || die "$1 answered HTTP $code"
-        [ -s "$2" ] || die "$1 came back empty"
-        return 0
-    }
-    return 1
+    if [ "$code" = 404 ]; then
+        return 1
+    fi
+    [ "$code" = 200 ] || die "$1 answered HTTP $code"
+    [ -s "$2" ] || die "$1 came back empty"
 }
 
 # The recipe must still carry the assumption, then our tree must still meet it.
@@ -107,7 +106,7 @@ expect() {
 # Recipes disagree on strip level, so take the first that applies.
 carried_patch() {
     local id=$1 url=$2 p out off
-    if ! fetch_patch "$url" "$work/patch"; then
+    if ! recipe_carries_patch "$url" "$work/patch"; then
         flag "$id" "the recipe no longer carries this patch; prune this check"
         return
     fi
@@ -203,8 +202,7 @@ expect termux-werror-sed "$work/termux.sh" 's/-Werror/-Wno-error/g' \
 expect termux-with-zlib "$work/termux.sh" --with-zlib \
     "configure no longer offers --with-zlib" \
     grep -qF -- --with-zlib "$top/m4/check_zlib.m4"
-# Termux carried six patches over this tree and deleted all of them in its
-# 3.50.1 bump, so there is nothing left of theirs to check but build.sh.
+# Termux deleted the six patches it carried, so build.sh is all that is left.
 
 echo
 # A check that stops running reports nothing, which reads exactly like a clean
