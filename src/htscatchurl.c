@@ -82,19 +82,18 @@ HTSEXT_API T_SOC catch_url_init(int *port, /* 128 bytes */ char *adr) {
   T_SOC soc = INVALID_SOCKET;
   char h_loc[256];
 
-  if (gethostname(h_loc, sizeof(h_loc)) == 0) {   // host name
+  if (gethostname(h_loc, sizeof(h_loc)) == 0) { // host name
     SOCaddr server;
-    if (hts_dns_resolve_nocache(h_loc, &server) != NULL) {   // notre host
-      if ((soc =
-           (T_SOC) socket(SOCaddr_sinfamily(server), SOCK_STREAM,
-                          0)) != INVALID_SOCKET) {
+    if (hts_dns_resolve_nocache(h_loc, &server) != NULL) { // notre host
+      if ((soc = (T_SOC) socket(SOCaddr_sinfamily(server), SOCK_STREAM, 0)) !=
+          INVALID_SOCKET) {
         SOCaddr_initport(server, *port);
         if (bind(soc, &SOCaddr_sockaddr(server), SOCaddr_size(server)) == 0) {
           SOCaddr server2;
           SOClen len = SOCaddr_capacity(server2);
 
           if (getsockname(soc, &SOCaddr_sockaddr(server2), &len) == 0) {
-            *port = ntohs(SOCaddr_sinport(server));     // récupérer port
+            *port = ntohs(SOCaddr_sinport(server)); // récupérer port
             if (listen(soc, 1) >= 0) {
               SOCaddr_inetntoa(adr, 128, server2);
             } else {

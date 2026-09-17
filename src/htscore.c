@@ -3143,7 +3143,8 @@ typedef enum {
   SHELL_CTX_PLAIN,  /* not inside quotes */
   SHELL_CTX_SINGLE, /* inside '...' */
   SHELL_CTX_DOUBLE, /* inside "..." */
-  SHELL_CTX_ARITH   /* arithmetic, where quoting is not a quoting mechanism */
+  SHELL_CTX_OPAQUE  /* a region whose text the shell reads again, so quotes are
+                       ordinary characters in it */
 } shell_ctx_t;
 
 /*
@@ -3229,7 +3230,7 @@ static const char *usercommand_param(shell_ctx_t ctx) {
   case SHELL_CTX_SINGLE:
     /* a parameter is literal inside '...', so close the quote and reopen it */
     return "'\"${1}\"'";
-  case SHELL_CTX_ARITH:
+  case SHELL_CTX_OPAQUE:
     /* bash evaluates an array subscript in arithmetic, so $1 holding
        x[$(cmd)] runs cmd even though it arrived as a parameter */
     return NULL;
@@ -3307,32 +3308,18 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
     /* Substituted wherever it appears, as it always has been -- except where
        the quoting that makes it safe would not survive. */
     if ((c == '$') && (cmd[i + 1] == '0')) {
-#ifdef _WIN32
-      /* Inside `...` the enclosing shell strips one backslash layer before the
-         inner one reads the text, so no single escaping survives both. $( )
-         has no such layer and is the portable spelling. POSIX passes the name
-         as a parameter, which needs no escaping, so it allows backquotes. */
-      {
-        size_t d;
-
-        for (d = 0; d < depth; d++) {
-          if (stack[d].closer == '`')
-            return usercommand_refuse(why,
-                                      "$0 is inside `...`, where the inner "
-                                      "shell strips the quoting off it; "
-                                      "write $( ) instead of backquotes");
-        }
-      }
-#endif
-      /* An arithmetic expression is evaluated as if it were in double quotes,
-         and bash evaluates an array subscript inside it, so a name holding
-         x[$(cmd)] runs cmd whether it arrives as text or as a parameter.
-         Nothing documented uses $0 here. */
-      if (ctx == SHELL_CTX_ARITH)
-        return usercommand_refuse(why, "$0 is inside an arithmetic expression "
-                                       "($(( )), $[ ], (( )) or a [ ] "
-                                       "subscript), which evaluates the name "
-                                       "instead of reading it; move it out");
+      /* The allowlist. A parameter is read as data in a plain word, in "..."
+         and in '...', and nowhere else that can be enumerated: bash re-expands
+         text after quote removal in ${v:off:len} and in unset, and evaluates
+         arithmetic in $(( )), $[ ], (( )) and a [ ] subscript. So every
+         region the scanner opens refuses, rather than the scanner deciding
+         which of them is dangerous. */
+      if (depth != 0)
+        return usercommand_refuse(why, "$0 must be a plain word, or inside "
+                                       "\"...\" or '...'; it is inside a "
+                                       "substitution, an expansion, "
+                                       "arithmetic, a subscript or [[ ]], "
+                                       "where the shell reads it again");
 #ifndef _WIN32
       /* A backslash here is a shell escape, and it would eat the first
          character of the parameter reference. httrack substitutes $0 escaped
@@ -3380,16 +3367,18 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
           ctx = SHELL_CTX_PLAIN;
         }
       } else if (!escaped && ctx != SHELL_CTX_SINGLE && c == '$' &&
-                 (cmd[i + 1] == '(' || cmd[i + 1] == '[')) {
-        /* An unseparated "((" after the $ is arithmetic and a separated
-           "$( (" is an ordinary subshell; "$[ ]" is bash's older arithmetic
-           spelling. */
+                 (cmd[i + 1] == '(' || cmd[i + 1] == '[' ||
+                  cmd[i + 1] == '{')) {
+        /* $( ) and `...` start a fresh shell, so quoting is tracked inside
+           them; $(( )), $[ ] and ${ } are read again as text by this one. */
         const char opened = cmd[i + 1];
 
-        if (!usercommand_push(stack, &depth, ctx, opened == '(' ? ')' : ']', 1))
+        if (!usercommand_push(stack, &depth, ctx,
+                              opened == '(' ? ')' : (opened == '[' ? ']' : '}'),
+                              1))
           return usercommand_refuse(why, too_deep);
-        ctx = (opened == '[' || cmd[i + 2] == '(') ? SHELL_CTX_ARITH
-                                                   : SHELL_CTX_PLAIN;
+        ctx = (opened == '(' && cmd[i + 2] != '(') ? SHELL_CTX_PLAIN
+                                                   : SHELL_CTX_OPAQUE;
         /* copy the "$", then the bracket, which for arithmetic is the first of
            two and the second is counted below, so it takes both to close */
         if (!usercommand_append_char(dest, size, &pos, c))
@@ -3407,8 +3396,12 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
         if (i != 0 && strchr(" \t\n;&|", cmd[i - 1]) == NULL) {
           if (!usercommand_push(stack, &depth, ctx, ']', 1))
             return usercommand_refuse(why, too_deep);
-          ctx = SHELL_CTX_ARITH;
+          ctx = SHELL_CTX_OPAQUE;
         } else if (cmd[i + 1] == '[') {
+          /* [[ ]] is not a subscript, but bash re-reads its operands: -eq
+             evaluates arithmetic and =~ takes a regex. Its own region. */
+          if (!usercommand_push(stack, &depth, ctx, ']', 2))
+            return usercommand_refuse(why, too_deep);
           if (!usercommand_append_char(dest, size, &pos, c))
             return USERCOMMAND_EXPAND_TOOLONG;
           i++;
@@ -3423,7 +3416,7 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
            above reads as an ordinary subshell. */
         if (!usercommand_push(stack, &depth, ctx, ')', 2))
           return usercommand_refuse(why, too_deep);
-        ctx = SHELL_CTX_ARITH;
+        ctx = SHELL_CTX_OPAQUE;
         if (!usercommand_append_char(dest, size, &pos, c))
           return USERCOMMAND_EXPAND_TOOLONG;
         i++;
@@ -3431,9 +3424,7 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
           return USERCOMMAND_EXPAND_TOOLONG;
         continue;
       } else if (!escaped && depth != 0 && stack[depth - 1].closer != '`' &&
-                 (ctx == SHELL_CTX_PLAIN || ctx == SHELL_CTX_ARITH ||
-                  (ctx == SHELL_CTX_DOUBLE &&
-                   stack[depth - 1].closer == ']')) &&
+                 (ctx == SHELL_CTX_PLAIN || ctx == SHELL_CTX_OPAQUE) &&
                  (c == stack[depth - 1].closer ||
                   c == usercommand_opener(stack[depth - 1].closer))) {
         if (c == stack[depth - 1].closer) {
@@ -3458,7 +3449,7 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
           if (c == '\"')
             ctx = SHELL_CTX_PLAIN;
           break;
-        case SHELL_CTX_ARITH:
+        case SHELL_CTX_OPAQUE:
           /* a quote here is an ordinary character, so it opens nothing */
           break;
         }

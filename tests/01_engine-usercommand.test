@@ -76,19 +76,30 @@ roundtrip() { # roundtrip TEMPLATE FILENAME [EXPECTED]
     done
 }
 
-# Every template prints its one argument verbatim, in each context a shell word
-# can sit: unquoted, "...", '...', and inside a command substitution.
+# Each refusal must name its own cause, or a user cannot tell what to change.
+refused_for() { # refused_for TEMPLATE WORD
+    usercmd "$1" 'x.html'
+    case $VERDICT in
+    REFUSED*) ;;
+    *) fail "expected REFUSED for '$1', got: $VERDICT" ;;
+    esac
+    case $VERDICT in
+    *"$2"*) ;;
+    *) fail "refusal for '$1' does not name $2: $VERDICT" ;;
+    esac
+}
+
+# Arrays are bash-only, and dash rejects the word.
+roundtrip_bash() { ROUNDTRIP_SHELLS=bash roundtrip "$@"; }
+
+# ---------------------------------------------------------------------------
+# The allowlist: a plain word, "..." and '...', and nothing else.
+# ---------------------------------------------------------------------------
+
 templates=(
     'printf %s $0'
     'printf %s "$0"'
     'printf %s '\''$0'\'''
-    'printf %s "$(printf %s '\''$0'\'')"'
-    'printf %s "$( (printf %s '\''$0'\'') )"'
-    'printf %s "$( (printf %s $0) )"'
-    # a parameter survives `...` where an escaped value could not, so the
-    # backquote spellings run now instead of being refused
-    'printf %s "`printf %s $0`"'
-    'printf %s "`printf %s '\''$0'\''`"'
     # the man page and fcguide print -V "rm \$0"; nothing strips that backslash
     # when the value comes from a profile, a Makefile or an argument list.
     'printf %s \$0'
@@ -106,7 +117,7 @@ names=(
     "a>$canary"
     "a b c.html"
     "a'b\"c\$d.html"
-    # bash evaluates an array subscript inside $(( )), on a parameter too
+    # bash evaluates an array subscript inside arithmetic, on a parameter too
     "x[\$(touch $canary)]"
 )
 
@@ -120,13 +131,10 @@ done
 # backslash applies to the $0 it precedes and is spent there; if the scanner
 # carries it past the substitution it suppresses the NEXT character's quote
 # transition, so the second $0 is rewritten for a context the shell is not in.
-# The second $0 sits in each context in turn, and adjacent to the first, which
-# is where a carried flag instead deletes the closing quote just emitted.
 pair_templates=(
     'printf %s \$0$0'
     'printf %s \$0"$0"'
     'printf %s \$0'\''$0'\'''
-    'printf %s \$0"$(printf %s '\''$0'\'')"'
     'printf %s $0\$0'
     'printf %s "$0"\$0'
     # no backslash at all: the control, so a fix that broke pairs outright fails
@@ -144,118 +152,86 @@ done
 usercmd 'printf %s "$01"' 'x.html'
 assert_eq 'printf %s "${1}1"' "$CMD" 'digit after $0'
 
-# Each refusal must name its own cause, or a user cannot tell what to change.
-refused_for() { # refused_for TEMPLATE WORD
-    usercmd "$1" 'x.html'
-    case $VERDICT in
-    REFUSED*) ;;
-    *) fail "expected REFUSED for '$1', got: $VERDICT" ;;
-    esac
-    case $VERDICT in
-    *"$2"*) ;;
-    *) fail "refusal for '$1' does not name $2: $VERDICT" ;;
-    esac
-}
+# ---------------------------------------------------------------------------
+# Everything else refuses, because the shell reads those regions again.
+# ---------------------------------------------------------------------------
 
-# bash evaluates an array subscript inside arithmetic, so a name holding
-# x[$(cmd)] runs cmd however it arrives, parameter included. Every arithmetic
-# spelling the scanner can see has to refuse, not just $(( )): bare, spaced and
-# with an operand reach the branch differently, $[ ] is bash's older spelling,
-# a bare (( )) is an arithmetic command, and "$( ((" is the one a lookahead for
-# "$((" reads as an ordinary subshell.
-refused_for 'echo $(($0))' 'arithmetic'
-refused_for 'echo $(( $0 ))' 'arithmetic'
-refused_for 'echo $((1+$0))' 'arithmetic'
-refused_for 'echo $(( ($0) ))' 'arithmetic'
-refused_for 'echo $[$0]' 'arithmetic'
-refused_for '((n=$0))' 'arithmetic'
-refused_for 'n=0; ((n=$0)); echo $n' 'arithmetic'
-refused_for 'for ((i=0;i<$0;i++)); do :; done' 'arithmetic'
-refused_for 'echo $( ((printf %s $0)) )' 'arithmetic'
-refused_for 'printf %s "$( ((printf %s $0)) )"' 'arithmetic'
-refused_for 'echo ${a[$0]}' 'arithmetic'
-refused_for 'a=(1 2 3); echo ${a[$0]}' 'arithmetic'
+# Command substitution, both spellings. A parameter does survive them, which
+# the branch that allowed them proved, but $( ) cannot be told from $(( )) by
+# what it re-reads, so the allowlist keeps neither.
+refused_for 'printf %s "$(printf %s $0)"' 'plain word'
+refused_for 'printf %s "$( (printf %s $0) )"' 'plain word'
+refused_for 'printf %s "`cat $0`"' 'plain word'
+refused_for 'printf %s `cat $0`' 'plain word'
 
-# Each of those payloads, run for real against a name carrying the subscript
-# gadget. The canary at the end is what says the refusal held.
-for t in 'echo $[$0]' 'n=0; ((n=$0)); echo $n' \
-    'for ((i=0;i<$0;i++)); do :; done' 'a=(1 2 3); echo ${a[$0]}' \
-    'printf %s "$( ((printf %s $0)) )"'; do
+# Arithmetic, in every spelling bash reaches its evaluator through. A name
+# holding x[$(cmd)] runs cmd there even as a parameter.
+refused_for 'echo $(($0))' 'plain word'
+refused_for 'echo $(( $0 ))' 'plain word'
+refused_for 'echo $((1+$0))' 'plain word'
+refused_for 'echo $(( ($0) ))' 'plain word'
+refused_for 'echo $[$0]' 'plain word'
+refused_for '((n=$0))' 'plain word'
+refused_for 'for ((i=0;i<$0;i++)); do :; done' 'plain word'
+refused_for 'echo $( ((printf %s $0)) )' 'plain word'
+
+# A parameter expansion re-reads its own text after quote removal, which is
+# what ${v:offset} does, and an array subscript is arithmetic whether it is
+# read or written. ${ } and any word-attached [ ] are regions of their own.
+refused_for 'v=abcdef; echo ${v:$0}' 'plain word'
+refused_for 'echo ${a[$0]}' 'plain word'
+refused_for 'echo "${a[$0]}"' 'plain word'
+refused_for 'a[$0]=1' 'plain word'
+refused_for 'a[$0]+=1' 'plain word'
+refused_for 'a=([$0]=x)' 'plain word'
+refused_for 'declare -A m; a[$0]=1' 'plain word'
+refused_for 'a=(1); unset a[$0]' 'plain word'
+refused_for 'a=(1 2 3); unset "a[$0]"' 'plain word'
+refused_for 'printf %s a[$0]' 'plain word'
+
+# [[ ]] is not a subscript, but bash re-reads its operands: -eq evaluates
+# arithmetic and =~ takes a regex.
+refused_for '[[ -f $0 ]]' 'plain word'
+refused_for '[[ 1 -eq $0 ]]' 'plain word'
+
+# ${ } without a subscript refuses too. It is inert, and it is the price of one
+# rule over a list of the regions that happen to be dangerous.
+refused_for 'printf %s ${x:-$0}' 'plain word'
+
+# Each refusal is a command that never runs, reported as one. The names carry
+# the subscript gadget, which is the shape that reaches an evaluator once the
+# name is a parameter.
+for t in 'echo $(($0))' 'echo $[$0]' '((n=$0))' 'echo ${a[$0]}' 'a[$0]=1' \
+    'a=([$0]=x)' 'a=(1); unset a[$0]' 'v=abcdef; echo ${v:$0}' \
+    '[[ 1 -eq $0 ]]' 'printf %s "$(printf %s $0)"' 'printf %s `cat $0`'; do
     run_usercmd "$t" "x[\$(touch $canary)]"
-    assert_eq -1 "$EXIT" "arithmetic template not spawned: $t"
+    assert_eq -1 "$EXIT" "refused template not spawned: $t"
 done
 
-# The controls: an arithmetic region carrying no $0 must close, so a $0 after
-# it still expands. Without these a fix that refused the whole template passes.
+# ---------------------------------------------------------------------------
+# Controls: a region that closes before the $0 must not refuse it.
+# ---------------------------------------------------------------------------
+
+usercmd 'echo $((1+2)) $0' 'a b.html'
+assert_eq 'echo $((1+2)) "${1}"' "$CMD" '$(( )) closed'
 usercmd 'n=0; ((n=1+2)); printf %s $0' 'a b.html'
 assert_eq 'n=0; ((n=1+2)); printf %s "${1}"' "$CMD" 'bare (( )) closed'
 usercmd 'echo $[1+2] $0' 'a b.html'
 assert_eq 'echo $[1+2] "${1}"' "$CMD" '$[ ] closed'
 usercmd 'echo ${HOME} $0' 'a b.html'
 assert_eq 'echo ${HOME} "${1}"' "$CMD" '${ } closed'
+usercmd 'a[1]=2; printf %s $0' 'a b.html'
+assert_eq 'a[1]=2; printf %s "${1}"' "$CMD" 'subscript closed'
+usercmd '[[ -f x ]] || printf %s $0' 'a b.html'
+assert_eq '[[ -f x ]] || printf %s "${1}"' "$CMD" '[[ ]] closed'
+usercmd 'echo $(true) $0' 'a b.html'
+assert_eq 'echo $(true) "${1}"' "$CMD" '$( ) closed'
+usercmd 'echo `true` $0' 'a b.html'
+assert_eq 'echo `true` "${1}"' "$CMD" '`...` closed'
 
-# ${a[$0]} only reads an element. Writing one evaluates the subscript just the
-# same, so the assignment forms are refused too. The last row is why the test
-# cannot be name-blind: a template may declare one associative array and assign
-# into a different, indexed one, and that one does evaluate.
-refused_for 'a[$0]=1' 'arithmetic'
-refused_for 'a[$0]+=1' 'arithmetic'
-refused_for 'a=([$0]=x)' 'arithmetic'
-refused_for 'declare -A m; a[$0]=1' 'arithmetic'
-
-# Arrays are bash-only, and dash rejects the word.
-roundtrip_bash() { ROUNDTRIP_SHELLS=bash roundtrip "$@"; }
-
-# "unset a[$0]" does evaluate its subscript, once a is a declared array:
-# "a=(1 2 3); unset a[$0]" runs the name's own $( ), and so does
-# "declare -a a; unset a[$0]". It reads as safe only while a is still unset,
-# which is why it is refused rather than round-tripped.
-refused_for 'unset a[$0]' 'arithmetic'
-refused_for 'a=(1 2 3); unset a[$0]' 'arithmetic'
-
-# The price of spotting a subscript by its shape: a bracket group stuck to a
-# word is refused even where nothing evaluates it. That costs a template
-# printing a literal a[...], and it buys the unset and assignment forms above.
-refused_for 'printf %s a[$0]' 'arithmetic'
-
-# Controls for those five, so a fix cannot pass by refusing the shapes around
-# them: [ is the test command outside ${ }, and ${ } without a subscript is an
-# ordinary parameter expansion.
+# The [ test command is a word of its own, unlike the [ of a subscript.
 roundtrip '[ -n $0 ] && printf %s $0' "a;touch $canary;.html"
 roundtrip 'printf %s ${HOME:+}$0' "a;touch $canary;.html"
-roundtrip 'printf %s ${x:-$0}' "a;touch $canary;.html"
-refused_for 'echo "$[$0]"' 'arithmetic'
-
-# A subscript is arithmetic when it is written too, not only when it is read,
-# and unset evaluates one as well. All five of these executed before the rule
-# below. A subscript is told from the [ test command by being stuck to a word.
-refused_for 'a[$0]=1' 'arithmetic'
-refused_for 'a[$0]+=1' 'arithmetic'
-refused_for 'a=([$0]=x)' 'arithmetic'
-refused_for 'a=(1 2 3); unset "a[$0]"' 'arithmetic'
-refused_for 'echo "${a[$0]}"' 'arithmetic'
-
-# Run for real against a name that carries the gadget inside its own subscript,
-# which is the shape that reaches the evaluator once the name is a parameter.
-for t in 'a[$0]=1' 'a[$0]+=1' 'a=([$0]=x)' 'a=(1 2 3); unset a[$0]'; do
-    run_usercmd "$t" "x[\$(touch $canary)]"
-    assert_eq -1 "$EXIT" "subscript write not spawned: $t"
-done
-
-# [[ is not a subscript, so a $0 inside the conditional still expands. Checked
-# on the command text, since dash has no [[ to round-trip it through.
-usercmd '[[ -f $0 ]] || printf %s $0' 'a b.html'
-assert_eq '[[ -f "${1}" ]] || printf %s "${1}"' "$CMD" '[[ opens no subscript'
-
-# The control for the refusal above: a separated $( ( is an ordinary subshell,
-# where a parameter does hold, so it must still expand. Without this a fix that
-# refuses both shapes would pass.
-roundtrip 'printf %s "$( (printf %s $0) )"' "a;touch $canary;.html"
-
-# Arithmetic carrying no $0 is copied through, and a $0 after it still expands,
-# which is what proves the arithmetic frame closed where it should.
-usercmd 'echo $((1+2)) $0' 'a b.html'
-assert_eq 'echo $((1+2)) "${1}"' "$CMD" 'arithmetic without $0'
 
 # A backslash before $0 is the documented spelling, not a refusal: httrack
 # substitutes $0 escaped or not, so the backslash was meant for an outer shell
@@ -275,32 +251,46 @@ assert_eq 'echo \\"${1}"' "$CMD" 'escaped backslash'
 # template stops at HTS_CDLMAXSIZE, so the room is capped here instead.
 usercmd 'rm $0' 'x.html' 9
 assert_eq TOOLONG "$VERDICT" 'over-long command'
-# The control: one byte more and the same rewrite fits, so the case above is
-# the bound and not a rejection of everything.
 usercmd 'rm $0' 'x.html' 10
 assert_eq OK "$VERDICT" 'the byte below the bound'
 assert_eq 'rm "${1}"' "$CMD" 'the command that just fits'
 
-# The documented templates keep expanding $0 to one word.
-for t in 'cat $0' 'cat \$0' '/bin/echo $0' 'md5 \$0'; do
-    usercmd "$t" '/out/hello world.html'
-    test "$VERDICT" = OK || fail "documented template '$t': $VERDICT"
-    case $CMD in
-    *'"${1}"'*) ;;
-    *) fail "documented template '$t' lost its quoting: $CMD" ;;
-    esac
+# ---------------------------------------------------------------------------
+# The documented templates, which the allowlist has to keep whole.
+# ---------------------------------------------------------------------------
+
+printf 'CONTENT\n<TITLE>t</TITLE>\n' >"$work/page.html"
+printf 'CONTENT\n<TITLE>t</TITLE>\n' >"$work/hello world.html"
+
+for f in "$work/page.html" "$work/hello world.html"; do
+    # html/scripting.html and html/fcguide.html, and the man page's rm \$0
+    for t in 'cat $0' 'cat \$0' '/bin/echo $0' 'md5 \$0' \
+        'if grep -iE "TITLE" "$0">/dev/null; then echo "Match found at $0"; fi'; do
+        usercmd "$t" "$f"
+        test "$VERDICT" = OK || fail "documented template '$t': $VERDICT"
+        case $CMD in
+        *"$f"*) fail "documented template '$t' carries the name: $CMD" ;;
+        esac
+    done
+    # one of them run for real, against a name with a space in it
+    run_usercmd 'if grep -iE "TITLE" "$0">/dev/null; then echo "Match found at $0"; fi' "$f"
+    assert_eq "Match found at $f" "$OUTPUT" "grep template on [$f]"
+    assert_eq 0 "$EXIT" "grep template status on [$f]"
+    run_usercmd 'cat $0' "$f"
+    assert_eq "$(cat "$f")" "$OUTPUT" "cat template on [$f]"
 done
 
-roundtrip 'printf %s $0' 'hello world.html'
-roundtrip 'printf %s "$0"' 'hello world.html'
+# rm removes exactly the spaced name, so "$0" kept one-word semantics.
+run_usercmd 'rm $0' "$work/hello world.html"
+assert_eq 0 "$EXIT" 'rm template status'
+test ! -e "$work/hello world.html" || fail 'rm $0 left the spaced name behind'
 
-printf 'CONTENT\n' >"$work/hello world.html"
-usercmd 'cat $0' "$work/hello world.html"
-got=$(bash -c "$CMD" sh "$work/hello world.html")
-assert_eq CONTENT "$got" 'a spaced name stays one word'
+# ---------------------------------------------------------------------------
+# The spawn path itself.
+# ---------------------------------------------------------------------------
 
-run_usercmd 'printf "[%s]" $0' "$work/hello world.html"
-assert_eq "[$work/hello world.html]" "$OUTPUT" 'spawned child output'
+run_usercmd 'printf "[%s]" $0' "$work/page.html"
+assert_eq "[$work/page.html]" "$OUTPUT" 'spawned child output'
 assert_eq 0 "$EXIT" 'spawned child status'
 
 # The status comes back from the child, so a failing command is reported as one.
@@ -314,11 +304,7 @@ for n in "${names[@]}"; do
     assert_eq 0 "$EXIT" "spawned child status for [$n]"
 done
 
-# A refused template is not run at all, and reports that it was not.
-run_usercmd 'echo $(($0))' "\$(touch $canary)"
-assert_eq -1 "$EXIT" 'a refused template is not spawned'
-
 # No gadget in any payload ever ran.
 test ! -e "$canary" || fail "a payload executed: canary $canary exists"
 
-echo "usercommand -V positional-parameter self-test OK"
+echo "usercommand -V allowlist self-test OK"
