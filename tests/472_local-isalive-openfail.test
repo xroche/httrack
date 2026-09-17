@@ -5,31 +5,53 @@ set -eu
 # shellcheck source=tests/crawllib.sh
 . "${0%"${0##*/}"}./crawllib.sh"
 
+poker=
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_isalive.XXXXXX") || exit 1
 cleanup() {
+    test -z "$poker" || kill "$poker" 2>/dev/null
     rm -rf "$tmpdir"
 }
 cleanup_push cleanup
 
-out="${tmpdir}/mirror"
-mkdir -p "$out"
-# fopen("wb") on a directory fails on every host, so the dump has nowhere to go
-mkdir "${out}/hts-isalive"
-# the trigger the engine looks for once a second, and deletes when it fires
-: >"${out}/hts-autopsy"
-
 local_server_start
-# /abortpurge/ holds a page the server answers after 5s, so the crawl outlives
-# the one-second telemetry tick
-local_crawl --log "${tmpdir}/crawl.log" -- \
-    -O "$out" -#S --quiet -%v0 --robots=0 --retries=0 \
-    "${BASEURL}/abortpurge/index.html" || rc=$?
-test "${rc:-0}" -eq 0 || fail "the crawl exited ${rc}: $(<"${tmpdir}/crawl.log")"
 
-test ! -e "${out}/hts-autopsy" ||
-    fail "the telemetry tick never fired, so nothing was exercised"
+# crawl LABEL: crawl a page the server answers after five seconds, so the
+# one-second telemetry tick of -#S fires more than once, with hts-autopsy kept
+# present so every one of those ticks is a triggered one. Sets $out and $log.
+crawl() {
+    local rc=0
+    out="${tmpdir}/$1"
+    log="${tmpdir}/$1.log"
+    mkdir -p "$out"
+    (while :; do
+        : >"${out}/hts-autopsy" || exit 0
+        sleep 0.05
+    done) &
+    poker=$!
+    local_crawl --log "$log" -- -O "$out" -#S --quiet -%v0 --robots=0 \
+        --retries=0 -c1 "${BASEURL}/abortpurge/index.html" || rc=$?
+    kill "$poker" 2>/dev/null || true
+    poker=
+    test "$rc" -eq 0 || fail "$1: the crawl exited $rc: $(<"$log")"
+}
+
+# Control: with the file opening, a triggered tick writes nothing to stdout.
+# That is what makes a stdout tick below evidence of the fallback rather than of
+# an ordinary tick, and it also proves the trigger is seen at this path.
+crawl opens
+test -f "${out}/hts-isalive" || fail "the dump did not reach hts-isalive"
+test -s "${out}/hts-isalive" || fail "the dump reached hts-isalive empty"
+test "$(count_matching_lines '^TIME ' "$log")" -eq 0 ||
+    fail "a triggered tick still wrote to stdout: $(<"$log")"
+
+# fopen("wb") on a directory fails on every host the engine builds for
+out="${tmpdir}/fails"
+mkdir -p "$out"
+mkdir "${out}/hts-isalive"
+crawl fails
 test -d "${out}/hts-isalive" ||
     fail "hts-isalive is no longer the directory that makes the open fail"
 test -z "$(ls -A "${out}/hts-isalive")" || fail "the dump was written after all"
-# the dump falls back to stdout, where an untriggered tick writes it anyway
-grep -qE '^RATE ' "${tmpdir}/crawl.log" || fail "no telemetry reached stdout"
+# every tick fell back to stdout, where the control run saw none of them
+test "$(count_matching_lines '^TIME ' "$log")" -ge 2 ||
+    fail "the dump was dropped instead of falling back to stdout: $(<"$log")"

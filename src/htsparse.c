@@ -4636,9 +4636,10 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
 
               fprintf(fp, "TIME %d" LF, (int) (tl - HTS_STAT.stat_timestart));
               fprintf(fp, "TOTAL %d" LF, (int) HTS_STAT.stat_bytes);
+              /* divisor non-zero only via htscore.c's last_info_shell seed */
               fprintf(fp, "RATE %d" LF,
                       (int) (HTS_STAT.HTS_TOTAL_RECV /
-                             (tl - HTS_STAT.stat_timestart)));
+                             max(1, tl - HTS_STAT.stat_timestart)));
               fprintf(fp, "SOCKET %d" LF, back_nsoc(sback));
               fprintf(fp, "LINK %d" LF, opt->lien_tot);
               {
