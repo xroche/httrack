@@ -287,6 +287,9 @@ ci_suite_heartbeat() {
 # has no equivalent for;
 # sigint-keeps-resume sends a real SIGINT, which neither shell can deliver to a
 # native httrack.exe;
+# isalive-openfail holds its trigger file by making a directory read-only,
+# which Windows does not enforce, so the test's own probe declines and it
+# skips itself;
 # mirror-completed drives a helper binary that only the automake build produces,
 # so MIRRORVERDICT_BIN is unset here and the test skips itself.
 expected_skips_msys="01_engine-footer-overflow.test
@@ -312,6 +315,7 @@ expected_skips_msys="01_engine-footer-overflow.test
 80_engine-crash-symbolize.test
 468_engine-crash-live-worker.test
 471_engine-sigpipe.test
+472_local-isalive-openfail.test
 01_engine-crash-announce.test
 88_local-proxytrack-badmtime.test
 241_local-single-file-gui.test
@@ -335,6 +339,9 @@ expected_skips_msys="01_engine-footer-overflow.test
 # owns across interop, so it spins to the watchdog; 296 passes with a real answer
 # file, which places the fault at EOF and closed stdin rather than the wizard.
 # 294 skips itself, in the test.
+# isalive-openfail holds its trigger file by making a directory read-only,
+# which Windows does not enforce, so the test's own probe declines and it
+# skips itself.
 # mirror-completed drives a helper binary that only the automake build produces,
 # so MIRRORVERDICT_BIN is unset here and the test skips itself.
 expected_skips_wsl2="01_engine-footer-overflow.test
@@ -360,6 +367,7 @@ expected_skips_wsl2="01_engine-footer-overflow.test
 80_engine-crash-symbolize.test
 468_engine-crash-live-worker.test
 471_engine-sigpipe.test
+472_local-isalive-openfail.test
 01_engine-crash-announce.test
 88_local-proxytrack-badmtime.test
 241_local-single-file-gui.test

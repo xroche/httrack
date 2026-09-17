@@ -4618,21 +4618,28 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
                                                        // robot est vivant
               // (oui je sais un robot vivant.. mais bon.. il a le droit de vivre lui aussi)
               // (libérons les robots esclaves de l'internet!)
+              FILE *fpa;
+
               UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                              StringBuff(opt->path_log), "hts-autopsy"));
-              fp = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                 StringBuff(opt->path_log), "hts-isalive"),
-                         "wb");
-              a = 1;
+              fpa = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                  StringBuff(opt->path_log), "hts-isalive"),
+                          "wb");
+              /* on failure the dump stays on stdout, as when untriggered */
+              if (fpa != NULL) {
+                fp = fpa;
+                a = 1;
+              }
             }
             if ((*stre->info_shell_) || a) {
               int i, j;
 
               fprintf(fp, "TIME %d" LF, (int) (tl - HTS_STAT.stat_timestart));
               fprintf(fp, "TOTAL %d" LF, (int) HTS_STAT.stat_bytes);
+              /* divisor non-zero only via htscore.c's last_info_shell seed */
               fprintf(fp, "RATE %d" LF,
                       (int) (HTS_STAT.HTS_TOTAL_RECV /
-                             (tl - HTS_STAT.stat_timestart)));
+                             max(1, tl - HTS_STAT.stat_timestart)));
               fprintf(fp, "SOCKET %d" LF, back_nsoc(sback));
               fprintf(fp, "LINK %d" LF, opt->lien_tot);
               {
