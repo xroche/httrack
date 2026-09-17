@@ -9771,7 +9771,9 @@ static void st_kill_peer(T_SOC soc) {
 
   lg.l_onoff = 1;
   lg.l_linger = 0;
-  (void) setsockopt(soc, SOL_SOCKET, SO_LINGER, (const char *) &lg, sizeof(lg));
+  /* Checked, because a plain FIN would leave the next write succeeding. */
+  assertf(setsockopt(soc, SOL_SOCKET, SO_LINGER, (const char *) &lg,
+                     sizeof(lg)) == 0);
   deletesoc(soc);
 }
 
@@ -9782,7 +9784,8 @@ static int st_sigpipe(httrackp *opt, int argc, char **argv) {
   void (*inherited)(int);
   T_SOC sv[2];
   htsblk r;
-  int i, rc;
+  char discard[1];
+  int i;
 
   (void) opt;
   (void) argc;
@@ -9799,12 +9802,14 @@ static int st_sigpipe(httrackp *opt, int argc, char **argv) {
   /* What newhttp_addr does to a real one. On macOS this is the whole cover,
      because HTS_MSG_NOSIGNAL is 0 there. */
   socket_set_nosigpipe(sv[1]);
-  /* Past the first failure, not up to it: a socket that took RST answers with
-     ECONNRESET first, and raises EPIPE only on the write after that. */
-  for (i = 0, rc = 0; i < 64; i++)
-    if (sendc(&r, "GET / HTTP/1.0\r\n\r\n") < 0)
-      rc = -1;
-  assertf(rc == -1);
+  /* Wait for the RST, rather than assume a write count outlasts it: Darwin
+     hands loopback input to another thread. The read takes the ECONNRESET,
+     so the writes below meet EPIPE. */
+  assertf(check_readinput_t(sv[1], 10) == 1);
+  assertf(recv(sv[1], discard, sizeof(discard), 0) == -1);
+  /* Twice, so a platform that re-reports ECONNRESET still owes EPIPE. */
+  for (i = 0; i < 2; i++)
+    assertf(sendc(&r, "GET / HTTP/1.0\r\n\r\n") < 0);
   deletesoc(sv[1]);
 
 #ifdef HAVE_SIGTIMEDWAIT
