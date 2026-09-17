@@ -5070,29 +5070,52 @@ static int st_zip_repair_shift(httrackp *opt, int argc, char **argv) {
   return (err == Z_OK && nrec == 1) ? 0 : 1;
 }
 
-/* Drives unzRepair when the third of its three files cannot be opened: first a
-   temporary path under a missing directory, then the descriptor exhaustion a
-   crawl actually meets. Before the fix the central-directory writes went
-   through a NULL FILE*, and the two handles that did open were never closed. */
-static int st_zip_repair_openfail(httrackp *opt, int argc, char **argv) {
-  static const unsigned char zip[] = {
-      0x50, 0x4b, 0x03, 0x04, /* local file header signature */
-      0x14, 0x00,             /* version needed */
-      0x00, 0x00,             /* general purpose flag */
-      0x00, 0x00,             /* method */
-      0x00, 0x00,             /* time */
-      0x00, 0x00,             /* date */
-      0x00, 0x00, 0x00, 0x00, /* crc */
-      0x00, 0x00, 0x00, 0x00, /* compressed size */
-      0x00, 0x00, 0x00, 0x00, /* uncompressed size */
-      0x01, 0x00,             /* filename length */
-      0x00, 0x00,             /* extra field length */
-      0x61                    /* filename "a" */
-  };
-  char in[HTS_URLMAXSIZE], out[HTS_URLMAXSIZE], tmp[HTS_URLMAXSIZE];
-  uLong nrec = 0, bytes = 0;
+#ifdef _WIN32
+#define HTS_FILENO(fp) _fileno(fp)
+#else
+#define HTS_FILENO(fp) fileno(fp)
+#endif
+
+/* Grades one unzRepair call whose `which` file cannot be opened: it must leave
+   neither `out` nor `tmp` behind, and must give back every descriptor it took.
+   fopen hands out the lowest free descriptor, so a leak pushes the probe past
+   `fd0`, the number a fresh open returned before any repair ran. */
+static int zip_repair_openfail_case(const char *which, const char *file,
+                                    const char *fileOut, const char *fileOutTmp,
+                                    const char *out, const char *tmp,
+                                    const char *probe, int fd0) {
+  hts_boolean leaked;
   FILE *fp;
-  int err;
+
+  unzRepair(file, fileOut, fileOutTmp, NULL, NULL);
+  if (fexist(out) || fexist(tmp)) {
+    printf("zip-repair-openfail: FAIL (%s: output left behind)\n", which);
+    return 1;
+  }
+  fp = fopen(probe, "rb");
+  if (fp == NULL) {
+    printf("zip-repair-openfail: FAIL (%s: cannot probe descriptors)\n", which);
+    return 1;
+  }
+  leaked = HTS_FILENO(fp) != fd0 ? HTS_TRUE : HTS_FALSE;
+  fclose(fp);
+  if (leaked) {
+    printf("zip-repair-openfail: FAIL (%s: descriptor not given back)\n",
+           which);
+    return 1;
+  }
+  return 0;
+}
+
+/* unzRepair must write no output and give back every descriptor it took when
+   any one of its three files fails to open. Before the fix a failed temporary
+   open sent the central-directory writes through a NULL FILE*, and none of the
+   three cases closed the handles that did open. */
+static int st_zip_repair_openfail(httrackp *opt, int argc, char **argv) {
+  char in[HTS_URLMAXSIZE], out[HTS_URLMAXSIZE], tmp[HTS_URLMAXSIZE];
+  char nodir[HTS_URLMAXSIZE];
+  FILE *fp;
+  int fd0;
 
   (void) opt;
   if (argc < 1) {
@@ -5101,80 +5124,26 @@ static int st_zip_repair_openfail(httrackp *opt, int argc, char **argv) {
   }
   snprintf(in, sizeof(in), "%s/damaged.zip", argv[0]);
   snprintf(out, sizeof(out), "%s/repair.zip", argv[0]);
+  snprintf(tmp, sizeof(tmp), "%s/repair.tmp", argv[0]);
+  /* Under a directory that does not exist, so this is the open that fails. */
+  snprintf(nodir, sizeof(nodir), "%s/nodir/unopenable", argv[0]);
+  /* One byte: every case fails an open before anything parses the archive. */
   fp = fopen(in, "wb");
-  if (fp == NULL || !hts_fwrite_exact(zip, sizeof(zip), fp)) {
+  if (fp == NULL || !hts_fwrite_exact("P", 1, fp)) {
     if (fp != NULL)
       fclose(fp);
     fprintf(stderr, "zip-repair-openfail: cannot write %s\n", in);
     return 1;
   }
+  fd0 = HTS_FILENO(fp);
   fclose(fp);
 
-  snprintf(tmp, sizeof(tmp), "%s/nodir/repair.tmp", argv[0]);
-  err = unzRepair(in, out, tmp, &nrec, &bytes);
-  if (err == Z_OK) {
-    printf("zip-repair-openfail: FAIL (repaired through a failed open)\n");
+  if (zip_repair_openfail_case("input", nodir, out, tmp, out, tmp, in, fd0) ||
+      zip_repair_openfail_case("output", in, nodir, tmp, out, tmp, in, fd0) ||
+      zip_repair_openfail_case("temporary", in, out, nodir, out, tmp, in,
+                               fd0)) {
     return 1;
   }
-  if (fexist(out)) {
-    printf("zip-repair-openfail: FAIL (%s left behind)\n", out);
-    return 1;
-  }
-#ifndef _WIN32
-  {
-    enum { burn = 64 };
-
-    FILE *held[burn];
-    FILE *again[2];
-    struct rlimit saved, tight;
-    int leaked, n = 0, i;
-
-    snprintf(tmp, sizeof(tmp), "%s/repair.tmp", argv[0]);
-    if (getrlimit(RLIMIT_NOFILE, &saved) != 0) {
-      printf("zip-repair-openfail: cannot cap descriptors, skipped\n");
-      return 0;
-    }
-    tight = saved;
-    tight.rlim_cur = burn;
-    if (setrlimit(RLIMIT_NOFILE, &tight) != 0) {
-      printf("zip-repair-openfail: cannot cap descriptors, skipped\n");
-      return 0;
-    }
-    while (n < burn && (held[n] = fopen(in, "rb")) != NULL) {
-      n++;
-    }
-    if (n < 2) {
-      for (i = 0; i < n; i++)
-        fclose(held[i]);
-      (void) setrlimit(RLIMIT_NOFILE, &saved);
-      printf("zip-repair-openfail: no descriptor headroom, skipped\n");
-      return 0;
-    }
-    /* Exactly two left, so the input and the output open and the temporary
-       central directory does not. */
-    fclose(held[--n]);
-    fclose(held[--n]);
-    err = unzRepair(in, out, tmp, &nrec, &bytes);
-    again[0] = fopen(in, "rb");
-    again[1] = fopen(in, "rb");
-    leaked = again[0] == NULL || again[1] == NULL;
-    for (i = 0; i < 2; i++) {
-      if (again[i] != NULL)
-        fclose(again[i]);
-    }
-    for (i = 0; i < n; i++)
-      fclose(held[i]);
-    (void) setrlimit(RLIMIT_NOFILE, &saved);
-    if (err == Z_OK) {
-      printf("zip-repair-openfail: FAIL (repaired with no descriptor left)\n");
-      return 1;
-    }
-    if (leaked) {
-      printf("zip-repair-openfail: FAIL (descriptors not given back)\n");
-      return 1;
-    }
-  }
-#endif
   printf("zip-repair-openfail: OK\n");
   return 0;
 }
