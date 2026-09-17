@@ -1,0 +1,21 @@
+#!/bin/bash
+#
+# A library must not kill the process that embedded it. The engine writes to
+# sockets whose peer may already be gone, and only the three front ends ever
+# set a SIGPIPE disposition, so an embedder that installed none died mid-crawl
+# (#1689). The self-test puts the default action back before it writes, which
+# is what lets a regression reach this script as a signal.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+rc=0
+out=$(httrack -O /dev/null '-#test=sigpipe' 2>&1) || rc=$?
+# Named, because SIGBUS is 7 on x86 and 10 on hppa, and the name is the finding.
+test "$rc" -lt 128 ||
+    fail "the engine died on SIG$(kill -l $((rc - 128))): $out"
+test "$rc" = 0 || fail "-#test=sigpipe exited $rc: $out"
+assert_eq "sigpipe self-test OK" "$out" "the self-test's own verdict"
+ok "a write to a vanished peer leaves the process alive"

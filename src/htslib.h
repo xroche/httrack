@@ -70,6 +70,13 @@ typedef struct lien_adrfilsave lien_adrfilsave;
 #include "htsnet.h"
 #include "htsdefines.h"
 
+#ifndef _WIN32
+#include <signal.h>
+#if defined(THREADS)
+#include <pthread.h>
+#endif
+#endif
+
 /* readdir() */
 #ifndef _WIN32
 #include <sys/types.h>
@@ -460,9 +467,65 @@ int multipleStringMatch(const char *s, const char *match);
 
 void fprintfio(FILE * fp, const char *buff, const char *prefix);
 
-#ifdef _WIN32
+/* A write to a socket whose peer is gone raises SIGPIPE, and the default action
+   kills the process. The library must not install a handler, because the
+   process belongs to whoever embedded us, so it takes three steps that leave
+   the host's signals alone: HTS_MSG_NOSIGNAL on every send() we issue,
+   SO_NOSIGPIPE on every socket we create, and the mask below around the calls
+   OpenSSL writes from. Each covers what the others cannot: no socket option
+   suppresses it on Linux, and MSG_NOSIGNAL does not exist on macOS and never
+   reaches OpenSSL, which writes with write(2). */
+#ifdef MSG_NOSIGNAL
+#define HTS_MSG_NOSIGNAL MSG_NOSIGNAL
 #else
-int sig_ignore_flag(int setflag);  // flag ignore
+#define HTS_MSG_NOSIGNAL 0
+#endif
+
+void socket_set_nosigpipe(T_SOC soc);
+
+#ifndef _WIN32
+#if defined(THREADS)
+#define HTS_SIGMASK(how, set, old) pthread_sigmask(how, set, old)
+#else
+#define HTS_SIGMASK(how, set, old) sigprocmask(how, set, old)
+#endif
+
+/* Thread mask only, so the host's handler and disposition are untouched. */
+typedef struct {
+  sigset_t mask; /* what to put back */
+  int held;      /* the mask above is ours to restore */
+  int inherited; /* the host already had one queued, so leave it alone */
+} sigpipe_mask;
+
+static HTS_INLINE HTS_UNUSED int sigpipe_pending_(void) {
+  sigset_t pending;
+
+  return sigpending(&pending) == 0 && sigismember(&pending, SIGPIPE) == 1;
+}
+
+static HTS_INLINE HTS_UNUSED void sigpipe_hold(sigpipe_mask *m) {
+  sigset_t block;
+
+  m->held = 0;
+  m->inherited = sigpipe_pending_();
+  if (sigemptyset(&block) == 0 && sigaddset(&block, SIGPIPE) == 0 &&
+      HTS_SIGMASK(SIG_BLOCK, &block, &m->mask) == 0)
+    m->held = 1;
+}
+
+static HTS_INLINE HTS_UNUSED void sigpipe_release(sigpipe_mask *m) {
+  sigset_t ours;
+  int caught;
+
+  if (!m->held)
+    return;
+  /* Only the one our own write queued: an inherited one is the host's. Pending
+     and blocked, so sigwait() returns at once rather than waiting. */
+  if (!m->inherited && sigpipe_pending_() && sigemptyset(&ours) == 0 &&
+      sigaddset(&ours, SIGPIPE) == 0)
+    (void) sigwait(&ours, &caught);
+  (void) HTS_SIGMASK(SIG_SETMASK, &m->mask, NULL);
+}
 #endif
 
 void cut_path(char *fullpath, char *path, size_t path_size, char *pname,

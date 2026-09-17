@@ -200,6 +200,7 @@ catch_url_status catch_url_capture(T_SOC soc, char *url, char *method,
     T_SOC soc2;
 
     while((soc2 = (T_SOC) accept(soc, NULL, NULL)) == INVALID_SOCKET) ;
+    socket_set_nosigpipe(soc2);
     /*
        #ifdef _WIN32
        closesocket(soc);
@@ -274,7 +275,7 @@ catch_url_status catch_url_capture(T_SOC soc, char *url, char *method,
               }
               // Envoyer page
               sprintf(line, CATCH_RESPONSE);
-              send(soc, line, (int) strlen(line), 0);
+              send(soc, line, (int) strlen(line), HTS_MSG_NOSIGNAL);
             } else {
               data[0] = '\0'; // no prefix handed back
             }

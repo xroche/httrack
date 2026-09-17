@@ -2234,6 +2234,19 @@ hts_boolean socket_set_nonblocking(T_SOC soc, hts_boolean nonblocking) {
 #endif
 }
 
+/* The only mechanism that also covers OpenSSL's own writes, and it exists on
+   macOS and the BSDs alone. */
+void socket_set_nosigpipe(T_SOC soc) {
+#ifdef SO_NOSIGPIPE
+  const int on = 1;
+
+  (void) setsockopt(soc, SOL_SOCKET, SO_NOSIGPIPE, (const char *) &on,
+                    sizeof(on));
+#else
+  (void) soc;
+#endif
+}
+
 int connect_socket_error(T_SOC soc) {
   int soerr = 0;
   socklen_t len = (socklen_t) sizeof(soerr);
@@ -2346,6 +2359,7 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
     DEBUG_W("socket\n");
 #endif
     soc = (T_SOC) socket(SOCaddr_sinfamily(server), SOCK_STREAM, 0);
+    socket_set_nosigpipe(soc);
     if (retour != NULL) {
       retour->debugid = HTS_STAT.stat_sockid++;
     }
@@ -2647,6 +2661,24 @@ void fil_simplifie(char *f) {
   }
 }
 
+#if HTS_USEOPENSSL
+/* close_notify goes to a peer that has usually gone already, so this is the
+   write most likely to raise SIGPIPE. */
+static void ssl_shutdown_free(SSL **ssl_con) {
+#ifndef _WIN32
+  sigpipe_mask m;
+
+  sigpipe_hold(&m);
+#endif
+  SSL_shutdown(*ssl_con);
+#ifndef _WIN32
+  sigpipe_release(&m);
+#endif
+  SSL_free(*ssl_con);
+  *ssl_con = NULL;
+}
+#endif
+
 // fermer liaison fichier ou socket
 void deletehttp(htsblk * r) {
 #if HTS_DEBUG_CLOSESOCK
@@ -2654,11 +2686,8 @@ void deletehttp(htsblk * r) {
 #endif
 #if HTS_USEOPENSSL
   /* Free OpenSSL structures */
-  if (r->ssl_con) {
-    SSL_shutdown(r->ssl_con);
-    SSL_free(r->ssl_con);
-    r->ssl_con = NULL;
-  }
+  if (r->ssl_con)
+    ssl_shutdown_free(&r->ssl_con);
 #endif
   if (r->soc != INVALID_SOCKET) {
     if (r->is_file) {
@@ -2717,11 +2746,8 @@ void deletesoc(T_SOC soc) {
 /* Will also clean other things */
 void deletesoc_r(htsblk * r) {
 #if HTS_USEOPENSSL
-  if (r->ssl_con) {
-    SSL_shutdown(r->ssl_con);
-    SSL_free(r->ssl_con);
-    r->ssl_con = NULL;
-  }
+  if (r->ssl_con)
+    ssl_shutdown_free(&r->ssl_con);
 #endif
   if (r->soc != INVALID_SOCKET) {
     deletesoc(r->soc);
@@ -3093,41 +3119,28 @@ HTSEXT_API char **int2bytes2(strc_int2bytes2 * strc, LLint n) {
   return strc->buffadr;
 }
 
-#ifdef _WIN32
-#else
-// ignore sigpipe?
-int sig_ignore_flag(int setflag) {      // flag ignore
-  static int flag = 0;          /* YES, this one is true static */
-
-  if (setflag >= 0)
-    flag = setflag;
-  return flag;
-}
-#endif
-
 // envoi de texte (en têtes généralement) sur la socket soc
 int sendc(htsblk * r, const char *s) {
   int n, ssz = (int) strlen(s);
 
-#ifdef _WIN32
-#else
-  sig_ignore_flag(1);
-#endif
 #if HDEBUG
   write(0, s, ssz);
 #endif
 
 #if HTS_USEOPENSSL
   if (r->ssl) {
+#ifndef _WIN32
+    sigpipe_mask m;
+
+    sigpipe_hold(&m);
+#endif
     n = SSL_write(r->ssl_con, s, ssz);
+#ifndef _WIN32
+    sigpipe_release(&m);
+#endif
   } else
 #endif
-    n = send(r->soc, s, ssz, 0);
-
-#ifdef _WIN32
-#else
-  sig_ignore_flag(0);
-#endif
+    n = send(r->soc, s, ssz, HTS_MSG_NOSIGNAL);
 
   return (n == ssz) ? n : -1;
 }
