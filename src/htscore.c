@@ -3380,8 +3380,9 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
                               opened == '(' ? ')' : (opened == '[' ? ']' : '}'),
                               1))
           return usercommand_refuse(why, too_deep);
-        ctx = (opened == '(' && cmd[i + 2] != '(') ? SHELL_CTX_PLAIN
-                                                   : SHELL_CTX_OPAQUE;
+        ctx = (opened == '{' || (opened == '(' && cmd[i + 2] != '('))
+                  ? SHELL_CTX_PLAIN
+                  : SHELL_CTX_OPAQUE;
         /* copy the "$", then the bracket, which for arithmetic is the first of
            two and the second is counted below, so it takes both to close */
         if (!usercommand_append_char(dest, size, &pos, c))
@@ -3390,12 +3391,14 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
         if (!usercommand_append_char(dest, size, &pos, cmd[i]))
           return USERCOMMAND_EXPAND_TOOLONG;
         continue;
-      } else if (!escaped && c == '[' &&
-                 (ctx == SHELL_CTX_PLAIN || ctx == SHELL_CTX_DOUBLE)) {
+      } else if (!escaped && c == '[') {
         /* An array subscript is evaluated as arithmetic, whether it is read
            (${a[$0]}) or written (a[$0]=1, a=([$0]=x), unset a[$0]). It is
            told from the [ test command by being stuck to a word: "[ -f $0 ]"
-           starts one, "a[" continues one. "[[" starts no subscript either. */
+           starts one, "a[" continues one. "[[" starts no subscript either.
+           Spotted inside '...' as well, because the '"${1}"' emitted there
+           breaks the quote and the shell re-forms one word across it, so
+           unset 'a[$0]' evaluates the name just as unset "a[$0]" does. */
         if (i != 0 && strchr(" \t\n;&|", cmd[i - 1]) == NULL) {
           if (!usercommand_push(stack, &depth, ctx, ']', 1))
             return usercommand_refuse(why, too_deep);

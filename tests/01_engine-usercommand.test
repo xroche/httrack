@@ -189,10 +189,26 @@ refused_for 'a=(1); unset a[$0]' 'plain word'
 refused_for 'a=(1 2 3); unset "a[$0]"' 'plain word'
 refused_for 'printf %s a[$0]' 'plain word'
 
+# A subscript inside '...' too. The '"${1}"' emitted there closes the quote and
+# reopens it, so the shell re-forms one word across the break and unset
+# evaluates a[<name>] exactly as it does for the double-quoted spelling.
+refused_for "a=(1); unset 'a[\$0]'" 'plain word'
+refused_for "echo 'a[\$0]'" 'plain word'
+refused_for "echo '[[ \$0 ]]'" 'plain word'
+
 # [[ ]] is not a subscript, but bash re-reads its operands: -eq evaluates
 # arithmetic and =~ takes a regex.
 refused_for '[[ -f $0 ]]' 'plain word'
 refused_for '[[ 1 -eq $0 ]]' 'plain word'
+
+# A ( nested inside a substitution must be counted, or the first ) closes the
+# frame and a $0 after it is taken for a plain word.
+refused_for 'echo $( (true) $0 )' 'plain word'
+refused_for 'echo $( (true) (true) $0 )' 'plain word'
+
+# The other refusal cause: a template nested deeper than the frame stack.
+deep=$(repeat_chars 17 '(')
+refused_for "echo ${deep//(/\$(}$0" 'nests substitutions'
 
 # ${ } without a subscript refuses too. It is inert, and it is the price of one
 # rule over a list of the regions that happen to be dangerous.
@@ -202,8 +218,9 @@ refused_for 'printf %s ${x:-$0}' 'plain word'
 # the subscript gadget, which is the shape that reaches an evaluator once the
 # name is a parameter.
 for t in 'echo $(($0))' 'echo $[$0]' '((n=$0))' 'echo ${a[$0]}' 'a[$0]=1' \
-    'a=([$0]=x)' 'a=(1); unset a[$0]' 'v=abcdef; echo ${v:$0}' \
-    '[[ 1 -eq $0 ]]' 'printf %s "$(printf %s $0)"' 'printf %s `cat $0`'; do
+    'a=([$0]=x)' 'a=(1); unset a[$0]' "a=(1); unset 'a[\$0]'" \
+    'v=abcdef; echo ${v:$0}' '[[ 1 -eq $0 ]]' \
+    'printf %s "$(printf %s $0)"' 'printf %s `cat $0`'; do
     run_usercmd "$t" "x[\$(touch $canary)]"
     assert_eq -1 "$EXIT" "refused template not spawned: $t"
 done
@@ -220,6 +237,12 @@ usercmd 'echo $[1+2] $0' 'a b.html'
 assert_eq 'echo $[1+2] "${1}"' "$CMD" '$[ ] closed'
 usercmd 'echo ${HOME} $0' 'a b.html'
 assert_eq 'echo ${HOME} "${1}"' "$CMD" '${ } closed'
+# A } between quotes does not close it. If it did, the $0 after would be
+# emitted for a context the shell is not in, and the name would be split.
+usercmd 'echo ${v:-"}"} $0' 'a b.html'
+assert_eq 'echo ${v:-"}"} "${1}"' "$CMD" 'a quoted } does not close ${ }'
+usercmd 'echo "${v:-"x"}" $0' 'a b.html'
+assert_eq 'echo "${v:-"x"}" "${1}"' "$CMD" '${ } nested in "..."'
 usercmd 'a[1]=2; printf %s $0' 'a b.html'
 assert_eq 'a[1]=2; printf %s "${1}"' "$CMD" 'subscript closed'
 usercmd '[[ -f x ]] || printf %s $0' 'a b.html'
