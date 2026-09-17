@@ -15658,10 +15658,9 @@ static void st_catchurl_client(void *varg) {
   deletesoc(cli);
 }
 
-/* catch_url() listens on whatever address gethostname() resolves to, which is
-   not loopback on a host whose name has a LAN or public A record, so the header
-   block below is remote input. The assertions sit on the last block data[]
-   holds and the first it does not, since a bound one byte out is the bug. */
+/* The browser feeds catch_url() a header block of whatever size it likes. The
+   assertions sit on the last block data[] holds and the first it does not,
+   since a bound one byte out is the bug. */
 static int st_catchurl(httrackp *opt, int argc, char **argv) {
   /* the request line, then each header with its CRLF, then the empty line */
   const size_t line = strlen(ST_CATCHURL_LINE);
@@ -15788,6 +15787,56 @@ static int st_catchurl_overlong(httrackp *opt, int argc, char **argv) {
   assertf(data[0] == '\0');
   printf("catchurl over-long header self-test OK (%d bytes refused: %s)\n",
          ST_CATCHURL_LONG, catch_url_strerror(CATCH_URL_ERR_HEADER));
+  freet(data);
+  return 0;
+}
+
+/* The request catch_url_init()'s listener captures carries the browser's
+   cookies for the target site, so no other host may reach it. What it
+   advertises is checked too: that is where the user aims the browser. */
+static int st_catchurl_bind(httrackp *opt, int argc, char **argv) {
+  char BIGSTK url[HTS_URLMAXSIZE * 2];
+  char method[32];
+  char adr[128];
+  char *data = malloct(CATCH_URL_DATA_SIZE);
+  struct sockaddr_in sa;
+  SOClen len = sizeof(sa);
+  st_catchurl_arg arg;
+  T_SOC srv;
+  int port = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  assertf(data != NULL);
+  /* poisoned, so a listener that wrote nothing is not read as "127.0.0.1" */
+  memset(adr, 'x', sizeof(adr) - 1);
+  adr[sizeof(adr) - 1] = '\0';
+  srv = catch_url_init(&port, adr);
+  assertf(srv != INVALID_SOCKET);
+
+  /* what a peer on the network could reach */
+  memset(&sa, 0, sizeof(sa));
+  assertf(getsockname(srv, (struct sockaddr *) &sa, &len) == 0);
+  assertf(sa.sin_family == AF_INET);
+  assertf(ntohl(sa.sin_addr.s_addr) == INADDR_LOOPBACK);
+
+  /* what the user is told to enter in the browser */
+  assertf(strcmp(adr, "127.0.0.1") == 0);
+  assertf(port != 0 && port == ntohs(sa.sin_port));
+
+  /* and a capture over that very socket still succeeds */
+  arg.port = port;
+  arg.pads = 0;
+  arg.tail = 7;
+  url[0] = method[0] = data[0] = '\0';
+  assertf(hts_newthread(st_catchurl_client, &arg) == 0);
+  assertf(catch_url_capture(srv, url, method, data) == CATCH_URL_OK);
+  htsthread_wait();
+  deletesoc(srv);
+  assertf(strcmp(method, "GET") == 0);
+  assertf(strcmp(url, "http://example.com/") == 0);
+  printf("catchurl bind self-test OK (%s, captured %s)\n", adr, url);
   freet(data);
   return 0;
 }
@@ -16016,6 +16065,9 @@ static const struct selftest_entry {
     {"catchurl-overlong", "",
      "a request header line the line buffer cannot hold fails the capture",
      st_catchurl_overlong},
+    {"catchurl-bind", "",
+     "the capture proxy binds loopback and advertises the address it bound",
+     st_catchurl_bind},
     {"postprocsize", "",
      "a postprocess-html callback cannot claim bytes it was not handed",
      st_postprocsize},

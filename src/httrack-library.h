@@ -327,16 +327,17 @@ HTSEXT_API char *hts_getcategories(char *path, int type);
 HTSEXT_API char *hts_getcategory(const char *filename);
 
 /* Catch-URL */
-/** Open a local capture socket (a mini-proxy), trying a list of standard ports
-    until one binds. Writes the chosen port to *port_prox and the local host
+/** Open a loopback capture socket (a mini-proxy), trying a list of standard
+    ports until one binds. Writes the chosen port to *port_prox and the bound
     address into adr_prox (a caller buffer of at least 128 bytes), and returns
     the listening socket. Returns INVALID_SOCKET if no port could be bound. */
 HTSEXT_API T_SOC catch_url_init_std(int *port_prox, char *adr_prox);
 
-/** Open a local capture socket bound to *port (0 picks a free port). Writes the
-    effective port back to *port and the local dotted address into @p adr (a
-    caller buffer of at least 128 bytes), and returns the listening socket.
-    Returns INVALID_SOCKET on failure. */
+/** Open a capture socket on 127.0.0.1, port *port (0 picks a free port). No
+    other host can reach it, because the request it captures carries the
+    browser's cookies for the target site. Writes the bound port back to *port
+    and its dotted address into @p adr (a caller buffer of at least 128 bytes),
+    and returns the listening socket. Returns INVALID_SOCKET on failure. */
 HTSEXT_API T_SOC catch_url_init(int *port, char *adr);
 
 /** Block on capture socket @p soc, accept one browser connection, and capture
