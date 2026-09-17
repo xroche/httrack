@@ -625,10 +625,17 @@ static char *hts_convertStringCharset(const char *s, size_t size,
         if (ret == (size_t) - 1) {
           if (errno == E2BIG) {
             const size_t used = outbufCapa - outbytesleft;
+            char *grown;
 
             outbufCapa *= 2;
-            outbuf = realloct(outbuf, outbufCapa);
-            assertf(outbuf != NULL);
+            /* Reached from an exported entry point, which answers NULL rather
+               than taking its embedder down. */
+            grown = realloct(outbuf, outbufCapa);
+            if (grown == NULL) {
+              freet(outbuf);
+              break;
+            }
+            outbuf = grown;
             outbytesleft = outbufCapa - used;
           } else {
             free(outbuf);
@@ -643,8 +650,13 @@ static char *hts_convertStringCharset(const char *s, size_t size,
 
       /* Terminating \0 */
       if (outbuf != NULL && finalSize + 1 >= outbufCapa) {
-        outbuf = realloct(outbuf, finalSize + 1);
-        assertf(outbuf != NULL);
+        char *const grown = realloct(outbuf, finalSize + 1);
+
+        if (grown == NULL) {
+          freet(outbuf);
+        } else {
+          outbuf = grown;
+        }
       }
       if (outbuf != NULL)
         outbuf[finalSize] = '\0';
