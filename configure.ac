@@ -426,7 +426,7 @@ AC_CHECK_TYPE(sa_family_t, [], [AC_DEFINE([sa_family_t], [uint16_t], [sa_family_
 AX_CHECK_ALIGNED_ACCESS_REQUIRED
 
 # check for various headers
-AC_CHECK_HEADERS([execinfo.h spawn.h sys/ioctl.h sys/random.h sys/sysctl.h])
+AC_CHECK_HEADERS([execinfo.h paths.h spawn.h sys/ioctl.h sys/random.h sys/sysctl.h])
 
 # Sub-second file modification times, so a stop request created in the second a
 # mirror started can still be ordered against that mirror's progress lock. The

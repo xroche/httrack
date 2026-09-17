@@ -287,9 +287,12 @@ ci_suite_heartbeat() {
 # has no equivalent for;
 # sigint-keeps-resume sends a real SIGINT, which neither shell can deliver to a
 # native httrack.exe;
+# usercommand builds the -V command for cmd.exe here, which is not a string a
+# POSIX shell can be handed back;
 # mirror-completed drives a helper binary that only the automake build produces,
 # so MIRRORVERDICT_BIN is unset here and the test skips itself.
-expected_skips_msys="01_engine-footer-overflow.test
+expected_skips_msys="01_engine-usercommand.test
+01_engine-footer-overflow.test
 253_local-ftp-close-once.test
 113_engine-threadattr-leak.test
 100_local-purge-longpath.test
@@ -335,9 +338,12 @@ expected_skips_msys="01_engine-footer-overflow.test
 # owns across interop, so it spins to the watchdog; 296 passes with a real answer
 # file, which places the fault at EOF and closed stdin rather than the wizard.
 # 294 skips itself, in the test.
+# usercommand builds the -V command for cmd.exe here, which is not a string a
+# POSIX shell can be handed back;
 # mirror-completed drives a helper binary that only the automake build produces,
 # so MIRRORVERDICT_BIN is unset here and the test skips itself.
-expected_skips_wsl2="01_engine-footer-overflow.test
+expected_skips_wsl2="01_engine-usercommand.test
+01_engine-footer-overflow.test
 253_local-ftp-close-once.test
 113_engine-threadattr-leak.test
 100_local-purge-longpath.test
