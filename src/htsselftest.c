@@ -15952,6 +15952,30 @@ static int st_urlbounds(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Expand a -V template against a save name and print the verdict, so the
+   quoting can be round-tripped through a real shell without spawning one. */
+static int st_usercmd(httrackp *opt, int argc, char **argv) {
+  char BIGSTK dest[8192];
+
+  (void) opt;
+  if (argc < 2) {
+    fprintf(stderr, "usercmd: needs a -V template and a filename\n");
+    return 1;
+  }
+  switch (usercommand_expand(dest, sizeof(dest), argv[0], argv[1])) {
+  case USERCOMMAND_EXPAND_OK:
+    printf("OK %s\n", dest);
+    break;
+  case USERCOMMAND_EXPAND_REFUSED:
+    printf("REFUSED\n");
+    break;
+  default:
+    printf("TOOLONG\n");
+    break;
+  }
+  return 0;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: name -> handler, with a usage hint and a one-line description. */
 /* ------------------------------------------------------------ */
@@ -15966,6 +15990,9 @@ static const struct selftest_entry {
      st_batch},
     {"filter", "<pattern> <string>", "match a string against a wildcard filter",
      st_filter},
+    {"usercmd", "<-V template> <filename>",
+     "expand a -V template's $0 with a save name, quoted for the shell",
+     st_usercmd},
     {"filtersize", "<size> <string> <filter>...",
      "size-aware filter verdict (negative size = unknown/scan time)",
      st_filtersize},

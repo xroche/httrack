@@ -382,7 +382,13 @@ void file_notify(httrackp * opt, const char *adr, const char *fil,
 void usercommand(httrackp * opt, int exe, const char *cmd, const char *file,
                  const char *adr, const char *fil);
 
-void usercommand_exe(const char *cmd, const char *file);
+/* usercommand_expand() verdicts; only OK may be run. */
+#define USERCOMMAND_EXPAND_OK 1
+#define USERCOMMAND_EXPAND_TOOLONG 0
+#define USERCOMMAND_EXPAND_REFUSED (-1)
+int usercommand_expand(char *dest, size_t size, const char *cmd,
+                       const char *file);
+void usercommand_exe(httrackp *opt, const char *cmd, const char *file);
 
 // Finish the makeindex index.html (footer + refresh meta), run usercommand.
 // Updates *makeindex_done/*makeindex_fp in place; adr/fil are the mode strings.

@@ -1,0 +1,94 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# -V expands "$0" to the crawled page's save name. The name comes from a URL, so
+# it can hold ; ` $ & ' ( ) and spaces. usercommand_expand() must quote it so
+# the shell reads it as one word and runs nothing else. -#test=usercmd prints
+# the verdict and the expansion without spawning a shell.
+
+work=$(mktemp -d) || fail "mktemp failed"
+canary="$work/pwned"
+trap 'set +e; rm -rf "$work"' EXIT
+
+# Verdict line for one template/filename pair, trailing EOL stripped.
+expand() { # expand TEMPLATE FILENAME
+    local got rc=0
+    got=$(httrack -O /dev/null -#test=usercmd "$1" "$2") || rc=$?
+    test "$rc" -eq 0 || fail "usercmd '$1' '$2': exited $rc"
+    strip_trailing_eol "$got"
+    printf '%s' "$STRIPPED"
+}
+
+# Round-trip: expand, run the expansion in a real bash, and the shell must read
+# back exactly the filename with nothing else run. The payloads each carry a
+# "touch $canary" gadget, so a quoting hole fires the canary checked at the end.
+roundtrip() { # roundtrip TEMPLATE FILENAME
+    local out exp
+    out=$(expand "$1" "$2")
+    case $out in
+    OK\ *) exp=${out#OK } ;;
+    *) fail "expected OK for '$1' '$2', got: $out" ;;
+    esac
+    got=$(bash -c "$exp") || fail "eval of [$exp] failed"
+    test "$got" = "$2" || fail "roundtrip '$1' '$2': shell read [$got]"
+}
+
+# Every template prints its one argument verbatim, in each context a shell word
+# can sit: unquoted, "...", '...', and inside a command substitution.
+templates=(
+    'printf %s $0'
+    'printf %s "$0"'
+    'printf %s '\''$0'\'''
+    'printf %s "$(printf %s '\''$0'\'')"'
+    'printf %s "$( (printf %s '\''$0'\'') )"'
+)
+
+# Save names a crawled URL can produce, each with a live shell gadget.
+names=(
+    "a;touch $canary;.html"
+    "a\`touch $canary\`.html"
+    "a\$(touch $canary).html"
+    "x'; touch $canary; echo 'y"
+    "a b|touch $canary"
+    "a&touch $canary"
+    "a>$canary"
+    "a b c.html"
+    "a'b\"c\$d.html"
+)
+
+for t in "${templates[@]}"; do
+    for n in "${names[@]}"; do
+        roundtrip "$t" "$n"
+    done
+done
+
+# $0 inside `...` is refused: the enclosing shell strips a backslash layer
+# before the inner one reads the text, so no single escaping survives both.
+test "$(expand 'echo `cat $0`' 'x.html')" = REFUSED \
+    || fail "backquoted \$0 not refused"
+
+# $0 right after an unescaped backslash is refused: the backslash eats the
+# first character of the quoting put around the value.
+test "$(expand 'echo \$0' 'x.html')" = REFUSED \
+    || fail "post-backslash \$0 not refused"
+
+# An expansion that does not fit temp[8192] is refused, never truncated
+# mid-quote (a cut "rm '\$0'" would run as "rm"). Repeat $0 against a name near
+# HTS_CDLMAXSIZE, since a single arg cannot itself exceed that limit.
+big=$(printf '$0 %.0s' $(seq 1 12))
+test "$(expand "$big" "$(repeat_chars 1000 A)")" = TOOLONG \
+    || fail "over-long expansion not reported"
+
+# The documented html/scripting.html templates keep expanding $0 to one word.
+roundtrip 'printf %s $0' 'hello world.html'
+roundtrip 'printf %s "$0"' 'hello world.html'
+
+# No gadget in any payload ever ran.
+test ! -e "$canary" || fail "a payload executed: canary $canary exists"
+
+echo "usercommand -V quoting self-test OK"
