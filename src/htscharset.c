@@ -625,12 +625,15 @@ static char *hts_convertStringCharset(const char *s, size_t size,
         if (ret == (size_t) - 1) {
           if (errno == E2BIG) {
             const size_t used = outbufCapa - outbytesleft;
+            char *grown;
 
             outbufCapa *= 2;
-            outbuf = realloc(outbuf, outbufCapa);
-            if (outbuf == NULL) {
+            grown = realloct(outbuf, outbufCapa);
+            if (grown == NULL) {
+              freet(outbuf);
               break;
             }
+            outbuf = grown;
             outbytesleft = outbufCapa - used;
           } else {
             free(outbuf);
@@ -645,7 +648,13 @@ static char *hts_convertStringCharset(const char *s, size_t size,
 
       /* Terminating \0 */
       if (outbuf != NULL && finalSize + 1 >= outbufCapa) {
-        outbuf = realloc(outbuf, finalSize + 1);
+        char *const grown = realloct(outbuf, finalSize + 1);
+
+        if (grown == NULL) {
+          freet(outbuf);
+        } else {
+          outbuf = grown;
+        }
       }
       if (outbuf != NULL)
         outbuf[finalSize] = '\0';
@@ -1018,19 +1027,29 @@ static unsigned int nlz8(unsigned char x) {
 /* IDNA helpers. */
 #undef ADD_BYTE
 #undef INCREASE_CAPA
-#define INCREASE_CAPA() do { \
-  capa = capa < 16 ? 16 : ( capa << 1 ); \
-  dest = realloc(dest, capa*sizeof(dest[0])); \
-  if (dest == NULL) { \
-    return NULL; \
-  } \
-} while(0)
-#define ADD_BYTE(C) do { \
-  if (capa == destSize) { \
-    INCREASE_CAPA(); \
-  } \
-  dest[destSize++] = (C); \
-} while(0)
+/* CLEANUP releases whatever else the call site owns: growing through a
+   temporary keeps the old block when realloc() fails. */
+#define INCREASE_CAPA_CLEANUP(CLEANUP)                                         \
+  do {                                                                         \
+    void *grown; /* dest is char* or hts_UCS4* depending on the caller */      \
+    capa = capa < 16 ? 16 : (capa << 1);                                       \
+    grown = realloct(dest, capa * sizeof(dest[0]));                            \
+    if (grown == NULL) {                                                       \
+      CLEANUP;                                                                 \
+      FREE_BUFFER();                                                           \
+      return NULL;                                                             \
+    }                                                                          \
+    dest = grown;                                                              \
+  } while (0)
+#define INCREASE_CAPA() INCREASE_CAPA_CLEANUP((void) 0)
+#define ADD_BYTE_CLEANUP(C, CLEANUP)                                           \
+  do {                                                                         \
+    if (capa == destSize) {                                                    \
+      INCREASE_CAPA_CLEANUP(CLEANUP);                                          \
+    }                                                                          \
+    dest[destSize++] = (C);                                                    \
+  } while (0)
+#define ADD_BYTE(C) ADD_BYTE_CLEANUP(C, (void) 0)
 #define FREE_BUFFER() do { \
   if (dest != NULL) { \
     free(dest); \
@@ -1127,8 +1146,8 @@ char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
           while((status = punycode_encode((punycode_uint) segOutputSize,
             segInt, NULL, &output_length, &dest[destSize]))
             == punycode_big_output) {
-              INCREASE_CAPA();
-              output_length = (punycode_uint) ( capa - destSize );
+            INCREASE_CAPA_CLEANUP(freet(segInt));
+            output_length = (punycode_uint) (capa - destSize);
           }
 
           /* cleanup */
@@ -1216,14 +1235,17 @@ char *hts_convertStringIDNAToUTF8(const char *s, size_t size) {
             &s[startSeg + 4], &output_length, output_dest, NULL))
             == punycode_big_output 
           ; ) {
+          punycode_uint *grown;
+
           output_capa <<= 1;
-          output_dest =
-            (punycode_uint*) realloc(output_dest,
-                                     output_capa*sizeof(punycode_uint));
-          if (output_dest == NULL) {
+          grown = (punycode_uint *) realloct(
+              output_dest, output_capa * sizeof(punycode_uint));
+          if (grown == NULL) {
+            freet(output_dest);
             FREE_BUFFER();
             return NULL;
           }
+          output_dest = grown;
           output_length = output_capa;
         }
 
@@ -1233,10 +1255,10 @@ char *hts_convertStringIDNAToUTF8(const char *s, size_t size) {
           for(j = 0 ; j < output_length ; j++) {
             const punycode_uint uc = output_dest[j];
             if (uc < 0x80) {
-              ADD_BYTE((char) uc);
+              ADD_BYTE_CLEANUP((char) uc, freet(output_dest));
             } else {
               /* EMIT_UNICODE only ever emits a byte, never an error */
-#define EM(C) ADD_BYTE(C)
+#define EM(C) ADD_BYTE_CLEANUP(C, freet(output_dest))
               EMIT_UNICODE(uc, EM);
 #undef EM
             }
@@ -1431,4 +1453,6 @@ size_t hts_getUTF8SequenceLength(const char lead) {
 }
 
 #undef ADD_BYTE
+#undef ADD_BYTE_CLEANUP
 #undef INCREASE_CAPA
+#undef INCREASE_CAPA_CLEANUP
