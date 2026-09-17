@@ -593,6 +593,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
       back->r.statuscode = STATUSCODE_INVALID;
       _HALT_FTP return 0;
     }
+    socket_set_nosigpipe(soc_ctl);
 
     SOCaddr_initport(server, port);
 
@@ -1217,14 +1218,16 @@ int send_line(T_SOC soc, const char *data) {
   }
 #if FTP_DEBUG
   {
-    int r = (send(soc, line, strlen(line), 0) == (int) strlen(line));
+    int r =
+        (send(soc, line, strlen(line), HTS_MSG_NOSIGNAL) == (int) strlen(line));
 
     printf("%s\x0d\x0a", data);
     fflush(stdout);
     return r;
   }
 #else
-  return (send(soc, line, (int) strlen(line), 0) == (int) strlen(line));
+  return (send(soc, line, (int) strlen(line), HTS_MSG_NOSIGNAL) ==
+          (int) strlen(line));
 #endif
 }
 

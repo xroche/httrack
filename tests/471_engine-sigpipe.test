@@ -1,0 +1,49 @@
+#!/bin/bash
+#
+# A library must not kill the process that embedded it. The engine writes to
+# sockets whose peer may already be gone, and only the three front ends ever
+# set a SIGPIPE disposition, so an embedder that installed none died mid-crawl
+# (#1689). The self-test puts the default action back before it writes, which
+# is what lets a regression reach this script as a signal.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+skip_on_windows "Windows raises no SIGPIPE, so none of the three mechanisms exists there"
+
+rc=0
+out=$(httrack -O /dev/null '-#test=sigpipe' 2>&1) || rc=$?
+# Named, because SIGBUS is 7 on x86 and 10 on hppa, and the name is the finding.
+test "$rc" -lt 128 ||
+    fail "the engine died on SIG$(kill -l $((rc - 128))): $out"
+test "$rc" = 0 || fail "-#test=sigpipe exited $rc: $out"
+assert_eq "sigpipe self-test OK" "$out" "the self-test's own verdict"
+ok "a write to a vanished peer leaves the process alive"
+
+# The self-test above cannot reach the TLS calls, which need a peer that speaks
+# TLS and then vanishes. What it can check is that each of them still carries
+# the mask, which is the regression a new call site would bring.
+src=${top_srcdir:-..}/src
+for call in SSL_write SSL_connect SSL_shutdown SSL_read; do
+    while IFS=: read -r file line _; do
+        test -n "$line" || continue
+        # The hold sits within the three lines above the call.
+        command grep -q sigpipe_hold \
+            <(sed -n "$((line > 3 ? line - 3 : 1)),$((line - 1))p" "$file") ||
+            fail "$file:$line calls $call with no sigpipe_hold above it"
+    done < <(command grep -n "$call(" "$src"/htslib.c "$src"/htsback.c)
+done
+ok "every OpenSSL call that writes carries the mask"
+
+# Same reasoning for our own writes: the flag is what covers them everywhere
+# but macOS, and the self-test above only exercises the one in sendc().
+for file in htslib.c htsftp.c htscatchurl.c htsproxy.c; do
+    while IFS=: read -r line text; do
+        case $text in *HTS_MSG_NOSIGNAL*) continue ;; esac
+        fail "$src/$file:$line calls send() without HTS_MSG_NOSIGNAL: $text"
+    done < <(command grep -nE '(^|[^_[:alnum:]])send\(' "$src/$file" |
+        command grep -vE ':[[:space:]]*(//|\*|/\*)')
+done
+ok "every send() in the library carries the flag"

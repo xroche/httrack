@@ -9685,6 +9685,95 @@ static int st_socketpair(T_SOC sv[2]) {
   return 0;
 }
 
+#ifndef _WIN32
+/* Drop the peer so the next write gets EPIPE: SO_LINGER with a zero timeout
+   sends RST rather than FIN. */
+static void st_kill_peer(T_SOC soc) {
+  struct linger lg;
+
+  lg.l_onoff = 1;
+  lg.l_linger = 0;
+  (void) setsockopt(soc, SOL_SOCKET, SO_LINGER, (const char *) &lg, sizeof(lg));
+  deletesoc(soc);
+}
+
+/* A library must not kill the process that embedded it (#1689). httrack's own
+   main() swallows SIGPIPE, so this puts the default action back first: without
+   that, every assertion below passes over a broken library. */
+static int st_sigpipe(httrackp *opt, int argc, char **argv) {
+  void (*inherited)(int);
+  T_SOC sv[2];
+  htsblk r;
+  int i, rc;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  inherited = signal(SIGPIPE, SIG_DFL);
+  assertf(inherited != SIG_ERR);
+
+  /* The write path: sendc() to a peer that sent RST must report the failure
+     rather than end the process. */
+  assertf(st_socketpair(sv) == 0);
+  st_kill_peer(sv[0]);
+  memset(&r, 0, sizeof(r));
+  r.soc = sv[1];
+  /* What newhttp_addr does to a real one. On macOS this is the whole cover,
+     because HTS_MSG_NOSIGNAL is 0 there. */
+  socket_set_nosigpipe(sv[1]);
+  /* Past the first failure, not up to it: a socket that took RST answers with
+     ECONNRESET first, and raises EPIPE only on the write after that. */
+  for (i = 0, rc = 0; i < 64; i++)
+    if (sendc(&r, "GET / HTTP/1.0\r\n\r\n") < 0)
+      rc = -1;
+  assertf(rc == -1);
+  deletesoc(sv[1]);
+
+#ifdef HAVE_SIGTIMEDWAIT
+  /* Darwin has no sigtimedwait, so the mask is a no-op there and the socket
+     option is what covers the writes. */
+  {
+    sigset_t pipeset, pending, saved, now;
+    sigpipe_mask m;
+    int caught;
+
+    assertf(sigemptyset(&pipeset) == 0 && sigaddset(&pipeset, SIGPIPE) == 0);
+    /* A second signal the host blocked, so the restore below is caught
+       putting the whole mask back rather than just unblocking SIGPIPE. */
+    assertf(sigemptyset(&now) == 0 && sigaddset(&now, SIGUSR2) == 0);
+    assertf(HTS_SIGMASK(SIG_BLOCK, &now, &saved) == 0);
+
+    /* It holds SIGPIPE off this thread and puts the mask back. */
+    sigpipe_hold(&m);
+    assertf(m.held == 1 && m.was_pending == 0);
+    assertf(raise(SIGPIPE) == 0);
+    assertf(sigpending(&pending) == 0 && sigismember(&pending, SIGPIPE) == 1);
+    sigpipe_release(&m);
+    assertf(sigpending(&pending) == 0 && sigismember(&pending, SIGPIPE) == 0);
+    assertf(HTS_SIGMASK(SIG_SETMASK, NULL, &now) == 0);
+    assertf(sigismember(&now, SIGPIPE) == 0 && sigismember(&now, SIGUSR2) == 1);
+
+    /* One the host queued is the host's, so the mask leaves it alone. */
+    assertf(HTS_SIGMASK(SIG_BLOCK, &pipeset, NULL) == 0);
+    assertf(raise(SIGPIPE) == 0);
+    sigpipe_hold(&m);
+    assertf(m.was_pending == 1);
+    sigpipe_release(&m);
+    assertf(sigpending(&pending) == 0 && sigismember(&pending, SIGPIPE) == 1);
+    assertf(sigwait(&pipeset, &caught) == 0 && caught == SIGPIPE);
+    assertf(HTS_SIGMASK(SIG_SETMASK, &saved, NULL) == 0);
+  }
+#endif
+
+  /* Read it back, or a sibling self-test inherits whatever we left. */
+  assertf(signal(SIGPIPE, inherited) != SIG_ERR);
+  assertf(signal(SIGPIPE, SIG_DFL) == inherited);
+  assertf(signal(SIGPIPE, inherited) == SIG_DFL);
+  printf("sigpipe self-test OK\n");
+  return 0;
+}
+#endif
+
 /* get_ftp_line must bound a hostile, CRLF-less reply into its internal
    1024-byte buffer; ASan turns the pre-fix overflow into an abort here. */
 static int st_ftpline(httrackp *opt, int argc, char **argv) {
@@ -15962,6 +16051,10 @@ static const struct selftest_entry {
     {"wizardinsert", "[<adr> <fil> [answer...] [@ filter...]]",
      "where a wizard answer lands in the filter array", st_wizardinsert},
     {"mime", "<filename>", "MIME type for a filename", st_mime},
+#ifndef _WIN32
+    {"sigpipe", "", "a write to a vanished peer must not kill the process",
+     st_sigpipe},
+#endif
     {"assumemime", "[128|256|1024]",
      "--assume value clipped to each MIME destination", st_assumemime},
     {"features", "", "which optional features this build has", st_features},

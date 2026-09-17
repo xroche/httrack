@@ -644,6 +644,9 @@ AC_CHECK_LIB(c, fopen64, [LFS_FLAG="-D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -
 AC_DEFINE(HTS_LFS, 1,[Check for large files support])], AC_MSG_RESULT([not found]))
 AC_SUBST(LFS_FLAG)
 
+# sigtimedwait cannot block, unlike sigwait; the SIGPIPE mask needs that.
+AC_CHECK_FUNCS([sigtimedwait])
+
 ### Check for pthread
 AC_CHECK_LIB(pthread, pthread_create, [THREADS_LIBS=-lpthread
 AC_DEFINE(THREADS, 1,[Check for pthread])], AC_MSG_RESULT([not found]))

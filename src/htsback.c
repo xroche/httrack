@@ -3761,8 +3761,12 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
         /* SSL mode */
         if (back[i].r.ssl) {
           int conn_code;
+          sigpipe_mask ssl_m;
 
-          if ((conn_code = SSL_connect(back[i].r.ssl_con)) <= 0) {
+          sigpipe_hold(&ssl_m);
+          conn_code = SSL_connect(back[i].r.ssl_con);
+          sigpipe_release(&ssl_m);
+          if (conn_code <= 0) {
             /* non blocking I/O, will retry */
             int err_code = SSL_get_error(back[i].r.ssl_con, conn_code);
 
@@ -3784,7 +3788,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               back[i].status = STATUS_READY;
               back_set_finished(opt, sback, i);
             }
-          } else {              /* got it! */
+          } else {                              /* got it! */
             back[i].status = STATUS_CONNECTING; // back to waitconnect
           }
         } else {
