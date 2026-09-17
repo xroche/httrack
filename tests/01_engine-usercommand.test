@@ -12,6 +12,12 @@ set -euo pipefail
 # the shell reads it as one word and runs nothing else. -#test=usercmd prints
 # the verdict and the expansion without spawning a shell.
 
+# The round-trip below replays each expansion through a POSIX shell, and a
+# native Windows engine emits the cmd.exe form instead: there a backtick inside
+# "..." is inert, while the bash doing the replay runs it. Checking that form
+# needs a cmd.exe round-trip, which this harness is not.
+skip_on_windows "the expansion is quoted for cmd.exe, which bash cannot replay"
+
 work=$(mktemp -d) || fail "mktemp failed"
 canary="$work/pwned"
 trap 'set +e; rm -rf "$work"' EXIT
@@ -123,10 +129,28 @@ refused_for 'echo `cat $0`' '`...`'
 # $0 inside $(( )): POSIX evaluates arithmetic as if in double quotes, so the
 # quotes put around the value are inert and a $( ) in the filename still runs.
 # Bare, spaced, and with an operand, since each reaches the branch differently.
-refused_for 'echo $(($0))' '$(( ))'
-refused_for 'echo $(( $0 ))' '$(( ))'
-refused_for 'echo $((1+$0))' '$(( ))'
-refused_for 'echo $(( ($0) ))' '$(( ))'
+refused_for 'echo $(($0))' 'arithmetic'
+refused_for 'echo $(( $0 ))' 'arithmetic'
+refused_for 'echo $((1+$0))' 'arithmetic'
+refused_for 'echo $(( ($0) ))' 'arithmetic'
+
+# $(( )) is one spelling of several. bash reaches the same evaluator through
+# $[ ], through (( )) as a command, through the for (( )) header, and through a
+# [ ] array subscript, and the quoting is inert in all of them. $( (( is the
+# sharp one: the lookahead that keeps a separated $( ( expandable reads only
+# one paren, and (( at command position is arithmetic wherever it appears.
+refused_for 'echo $[$0]' 'arithmetic'
+refused_for '((n=$0))' 'arithmetic'
+refused_for 'for ((i=0;i<$0;i++)); do :; done' 'arithmetic'
+refused_for 'echo ${a[$0]}' 'arithmetic'
+refused_for 'echo $( ((printf %s $0)) )' 'arithmetic'
+
+# Controls for those five, so a fix cannot pass by refusing the shapes around
+# them: [ is the test command outside ${ }, and ${ } without a subscript is an
+# ordinary parameter expansion.
+roundtrip '[ -n $0 ] && printf %s $0' "a;touch $canary;.html"
+roundtrip 'printf %s ${HOME:+}$0' "a;touch $canary;.html"
+roundtrip 'printf %s ${x:-$0}' "a;touch $canary;.html"
 
 # The control for the refusal above: a separated $( ( is an ordinary subshell,
 # where quoting does hold, so it must still expand. Without this a fix that

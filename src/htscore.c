@@ -3265,6 +3265,14 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
   size_t backquoted = 0; /* enclosing `...` substitutions */
   shell_ctx_t ctx = SHELL_CTX_PLAIN;
   hts_boolean escaped = HTS_FALSE;
+  /* bash reaches its arithmetic evaluator through more than $(( )), and there
+     the '...' emitted around the value is inert. These stay set to the end of
+     the template rather than being closed: the close is what the $(( ) frame
+     gets wrong when it gets anything wrong, and over-refusing only costs a
+     template that has to move its $0. */
+  hts_boolean arith_seen = HTS_FALSE;
+  hts_boolean subscript_seen = HTS_FALSE;
+  size_t param_depth = 0; /* open ${ ... }, whose [ ] subscript is arithmetic */
   size_t pos = 0;
   size_t i;
 
@@ -3287,10 +3295,11 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
       /* POSIX evaluates an arithmetic expression as if it were in double
          quotes, so the '...' put around the value is inert there and a $( )
          or ` in the filename still runs. Nothing documented uses $0 here. */
-      if (ctx == SHELL_CTX_ARITH)
-        return usercommand_refuse(why, "$0 is inside $(( )), where arithmetic "
-                                       "ignores quoting; move it out of the "
-                                       "expression");
+      if (ctx == SHELL_CTX_ARITH || arith_seen || subscript_seen)
+        return usercommand_refuse(why, "$0 is inside an arithmetic expression "
+                                       "($(( )), $[ ], (( )) or a [ ] "
+                                       "subscript), where quoting is ignored; "
+                                       "move it out of the expression");
 #ifndef _WIN32
       /* A backslash here is a shell escape, and it would eat the first
          character of the quoting put around the value. httrack substitutes $0
@@ -3313,6 +3322,21 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
       escaped = HTS_FALSE;
       i++;
       continue;
+    }
+
+    if (!escaped && ctx == SHELL_CTX_PLAIN) {
+      if (c == '$' && cmd[i + 1] == '[') {
+        arith_seen = HTS_TRUE; /* the old $[ ] spelling, still live in bash */
+      } else if (c == '(' && cmd[i + 1] == '(') {
+        arith_seen =
+            HTS_TRUE; /* (( )) as a command, and the for (( )) header */
+      } else if (c == '$' && cmd[i + 1] == '{') {
+        param_depth++;
+      } else if (c == '}' && param_depth != 0) {
+        param_depth--;
+      } else if (c == '[' && param_depth != 0) {
+        subscript_seen = HTS_TRUE; /* ${a[expr]} evaluates expr as arithmetic */
+      }
     }
 
     /* A backslash only suppresses the quote transition of the next character;
