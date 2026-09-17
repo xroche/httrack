@@ -69,7 +69,7 @@ roundtrip() { # roundtrip TEMPLATE FILENAME [EXPECTED]
     esac
     # dash as well as bash: the two differ on what a stray quote does, and the
     # engine has no idea which /bin/sh it will exec.
-    for sh in bash dash; do
+    for sh in ${ROUNDTRIP_SHELLS:-bash dash}; do
         command -v "$sh" >/dev/null 2>&1 || continue
         got=$("$sh" -c "$CMD" sh "$2") || fail "$sh eval of [$CMD] failed"
         test "$got" = "$want" || fail "roundtrip '$1' '$2' under $sh: read [$got]"
@@ -194,6 +194,30 @@ assert_eq 'echo $[1+2] "${1}"' "$CMD" '$[ ] closed'
 usercmd 'echo ${HOME} $0' 'a b.html'
 assert_eq 'echo ${HOME} "${1}"' "$CMD" '${ } closed'
 
+# ${a[$0]} only reads an element. Writing one evaluates the subscript just the
+# same, so the assignment forms are refused too. The last row is why the test
+# cannot be name-blind: a template may declare one associative array and assign
+# into a different, indexed one, and that one does evaluate.
+refused_for 'a[$0]=1' 'arithmetic'
+refused_for 'a[$0]+=1' 'arithmetic'
+refused_for 'a=([$0]=x)' 'arithmetic'
+refused_for 'declare -A m; a[$0]=1' 'arithmetic'
+
+# Arrays are bash-only, and dash rejects the word.
+roundtrip_bash() { ROUNDTRIP_SHELLS=bash roundtrip "$@"; }
+
+# "unset a[$0]" does evaluate its subscript, once a is a declared array:
+# "a=(1 2 3); unset a[$0]" runs the name's own $( ), and so does
+# "declare -a a; unset a[$0]". It reads as safe only while a is still unset,
+# which is why it is refused rather than round-tripped.
+refused_for 'unset a[$0]' 'arithmetic'
+refused_for 'a=(1 2 3); unset a[$0]' 'arithmetic'
+
+# The price of spotting a subscript by its shape: a bracket group stuck to a
+# word is refused even where nothing evaluates it. That costs a template
+# printing a literal a[...], and it buys the unset and assignment forms above.
+refused_for 'printf %s a[$0]' 'arithmetic'
+
 # Controls for those five, so a fix cannot pass by refusing the shapes around
 # them: [ is the test command outside ${ }, and ${ } without a subscript is an
 # ordinary parameter expansion.
@@ -208,7 +232,6 @@ refused_for 'echo "$[$0]"' 'arithmetic'
 refused_for 'a[$0]=1' 'arithmetic'
 refused_for 'a[$0]+=1' 'arithmetic'
 refused_for 'a=([$0]=x)' 'arithmetic'
-refused_for 'a=(1 2 3); unset a[$0]' 'arithmetic'
 refused_for 'a=(1 2 3); unset "a[$0]"' 'arithmetic'
 refused_for 'echo "${a[$0]}"' 'arithmetic'
 
