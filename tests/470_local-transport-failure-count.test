@@ -47,11 +47,21 @@ if test -n "${MIRRORVERDICT_BIN:-}"; then
     tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_tfctick.XXXXXX") || exit 1
     cleanup_push rm -rf "$tmpdir"
     local_server_start
+    # Above 128 the status is a signal, named because SIGBUS is 7 on x86 and 10
+    # on hppa, and the name is what says fault rather than refusal.
+    died() { # died STATUS
+        if test "$1" -gt 128; then
+            printf 'on SIG%s' "$(kill -l "$(($1 - 128))" 2>/dev/null || echo '?')"
+        else
+            printf 'with status %s' "$1"
+        fi
+    }
     printf '[the loop callback carries the count] ..\t'
+    rc=0
     tick=$("$MIRRORVERDICT_BIN" transport "${BASEURL}/simple/basic.html" \
         "${tmpdir}/out" "http://127.0.0.1:${dead}/dead.html" \
-        "http://127.0.0.1:${dead}/dead.png" 2>&1) ||
-        fail "mirrorverdict failed: ${tick}"
+        "http://127.0.0.1:${dead}/dead.png" 2>&1) || rc=$?
+    test "$rc" -eq 0 || fail "mirrorverdict died $(died "$rc"): ${tick}"
     seen=$(printf '%s\n' "$tick" | sed -n 's/^tick-failures: \([0-9]*\).*/\1/p')
     test -n "$seen" || fail "mirrorverdict printed no count: ${tick}"
     test "$seen" -gt 0 || fail "the loop callback saw no failed transfer: ${tick}"
@@ -61,9 +71,10 @@ if test -n "${MIRRORVERDICT_BIN:-}"; then
     # end takes it. The second mirror gets the live URL alone, so a count above
     # zero there is a leak.
     printf '[the count outlives one mirror and not the next] ..\t'
+    rc=0
     tick=$("$MIRRORVERDICT_BIN" transport-twice "${BASEURL}/simple/basic.html" \
-        "${tmpdir}/twice" "http://127.0.0.1:${dead}/dead.html" 2>&1) ||
-        fail "mirrorverdict failed: ${tick}"
+        "${tmpdir}/twice" "http://127.0.0.1:${dead}/dead.html" 2>&1) || rc=$?
+    test "$rc" -eq 0 || fail "mirrorverdict died $(died "$rc"): ${tick}"
     first=$(printf '%s\n' "$tick" | sed -n 's/^after-failures: \([0-9]*\)$/\1/p')
     next=$(printf '%s\n' "$tick" | sed -n 's/^second-failures: \([0-9]*\)$/\1/p')
     test "${first:-0}" -gt 0 ||

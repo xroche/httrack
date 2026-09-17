@@ -50,6 +50,11 @@ jobs:
             chown -R builder .
             cat >build.sh <<'SH'
             set -eu
+            # The login PATH puts /usr/bin first, so the gmake symlink above
+            # loses to base make and the whole run used bmake. The port builds
+            # with gmake (USES=gmake), so this must too.
+            PATH=/usr/local/bin:$PATH
+            export PATH
             jobs=$(( $(sysctl -n hw.ncpu) * 2 ))
             ./bootstrap
             ./configure
@@ -72,12 +77,12 @@ jobs:
               exit 1
             fi
             # Gaps this canary found on its first runs, not regressions:
-            # hts_self_path returns NULL here (144, 215), configure emits no
-            # binary-relative rpath (195), and 89, 139, 258 and 349 each turn on
-            # another libc difference. Each must still fail, checked below.
+            # configure emits no binary-relative rpath (195), and 89, 139, 258
+            # and 349 each turn on another libc difference. Each must still
+            # fail, checked below. 144 and 215 were here too until #1507 gave
+            # hts_self_path a BSD arm.
             known="89_webhttrack-error-overflow 139_local-query-charref \
-            144_engine-datadir 195_install-relocate 215_engine-datadir-ospath \
-            258_crawllib 349_sanitizer-stderr-capture"
+            195_install-relocate 258_crawllib 349_sanitizer-stderr-capture"
             # A dead proxy reports a receive error rather than a connect one
             # here, and only sometimes, so this name carries no staleness check.
             flaky="56_local-proxy-noleak"
