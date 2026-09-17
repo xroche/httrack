@@ -387,7 +387,7 @@ void usercommand(httrackp * opt, int exe, const char *cmd, const char *file,
 #define USERCOMMAND_EXPAND_TOOLONG 0
 #define USERCOMMAND_EXPAND_REFUSED (-1)
 int usercommand_expand(char *dest, size_t size, const char *cmd,
-                       const char *file);
+                       const char *file, const char **why);
 void usercommand_exe(httrackp *opt, const char *cmd, const char *file);
 
 // Finish the makeindex index.html (footer + refresh meta), run usercommand.

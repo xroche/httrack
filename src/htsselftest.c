@@ -15956,18 +15956,19 @@ static int st_urlbounds(httrackp *opt, int argc, char **argv) {
    quoting can be round-tripped through a real shell without spawning one. */
 static int st_usercmd(httrackp *opt, int argc, char **argv) {
   char BIGSTK dest[8192];
+  const char *why = "unnamed";
 
   (void) opt;
   if (argc < 2) {
     fprintf(stderr, "usercmd: needs a -V template and a filename\n");
     return 1;
   }
-  switch (usercommand_expand(dest, sizeof(dest), argv[0], argv[1])) {
+  switch (usercommand_expand(dest, sizeof(dest), argv[0], argv[1], &why)) {
   case USERCOMMAND_EXPAND_OK:
     printf("OK %s\n", dest);
     break;
   case USERCOMMAND_EXPAND_REFUSED:
-    printf("REFUSED\n");
+    printf("REFUSED %s\n", why);
     break;
   default:
     printf("TOOLONG\n");

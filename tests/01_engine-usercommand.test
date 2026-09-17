@@ -1,5 +1,6 @@
 #!/bin/bash
 #
+# shellcheck disable=SC2016 # the templates are for the engine to expand, not us
 
 set -euo pipefail
 
@@ -46,6 +47,11 @@ templates=(
     'printf %s '\''$0'\'''
     'printf %s "$(printf %s '\''$0'\'')"'
     'printf %s "$( (printf %s '\''$0'\'') )"'
+    'printf %s "$( (printf %s $0) )"'
+    # the man page and fcguide print -V "rm \$0"; nothing strips that backslash
+    # when the value comes from a profile, a Makefile or an argument list.
+    'printf %s \$0'
+    'printf %s "\$0"'
 )
 
 # Save names a crawled URL can produce, each with a live shell gadget.
@@ -67,22 +73,62 @@ for t in "${templates[@]}"; do
     done
 done
 
-# $0 inside `...` is refused: the enclosing shell strips a backslash layer
-# before the inner one reads the text, so no single escaping survives both.
-test "$(expand 'echo `cat $0`' 'x.html')" = REFUSED \
-    || fail "backquoted \$0 not refused"
+# Each refusal must name its own cause, or a user cannot tell what to change.
+refused_for() { # refused_for TEMPLATE WORD
+    local out
+    out=$(expand "$1" 'x.html')
+    case $out in
+    REFUSED*) ;;
+    *) fail "expected REFUSED for '$1', got: $out" ;;
+    esac
+    case $out in
+    *"$2"*) ;;
+    *) fail "refusal for '$1' does not name $2: $out" ;;
+    esac
+}
 
-# $0 right after an unescaped backslash is refused: the backslash eats the
-# first character of the quoting put around the value.
-test "$(expand 'echo \$0' 'x.html')" = REFUSED \
-    || fail "post-backslash \$0 not refused"
+# $0 inside `...`: the enclosing shell strips a backslash layer before the inner
+# one reads the text, so no single escaping survives both.
+refused_for 'echo `cat $0`' '`...`'
+
+# $0 inside $(( )): POSIX evaluates arithmetic as if in double quotes, so the
+# quotes put around the value are inert and a $( ) in the filename still runs.
+# Bare, spaced, and with an operand, since each reaches the branch differently.
+refused_for 'echo $(($0))' '$(( ))'
+refused_for 'echo $(( $0 ))' '$(( ))'
+refused_for 'echo $((1+$0))' '$(( ))'
+refused_for 'echo $(( ($0) ))' '$(( ))'
+
+# The control for the refusal above: a separated $( ( is an ordinary subshell,
+# where quoting does hold, so it must still expand. Without this a fix that
+# refuses both shapes would pass.
+roundtrip 'printf %s "$( (printf %s $0) )"' "a;touch $canary;.html"
+
+# Arithmetic carrying no $0 is copied through, and a $0 after it still expands,
+# which is what proves the arithmetic frame closed where it should.
+case $(expand 'echo $((1+2)) $0' 'a b.html') in
+"OK echo \$((1+2)) 'a b.html'") ;;
+*) fail "arithmetic without \$0 did not close: $(expand 'echo $((1+2)) $0' 'a b.html')" ;;
+esac
+
+# A backslash before $0 is the documented spelling, not a refusal: httrack
+# substitutes $0 escaped or not, so the backslash was meant for an outer shell
+# that never stripped it. Both forms must give the same quoted expansion.
+test "$(expand 'rm \$0' '/out/a b.html')" = "$(expand 'rm $0' '/out/a b.html')" ||
+    fail "rm \\\$0 and rm \$0 disagree"
+
+# An escaped backslash is a literal one, and the $0 after it still gets quoted.
+case $(expand 'echo \\$0' 'a;id;.html') in
+"OK echo \\\\'a;id;.html'") ;;
+*) fail "escaped backslash mishandled: $(expand 'echo \\$0' 'a;id;.html')" ;;
+esac
 
 # An expansion that does not fit temp[8192] is refused, never truncated
 # mid-quote (a cut "rm '\$0'" would run as "rm"). Repeat $0 against a name near
 # HTS_CDLMAXSIZE, since a single arg cannot itself exceed that limit.
 big=$(printf '$0 %.0s' $(seq 1 12))
-test "$(expand "$big" "$(repeat_chars 1000 A)")" = TOOLONG \
-    || fail "over-long expansion not reported"
+test "$(expand "$big" "$(repeat_chars 1000 A)")" = TOOLONG ||
+    fail "over-long expansion not reported"
 
 # The documented html/scripting.html templates keep expanding $0 to one word.
 roundtrip 'printf %s $0' 'hello world.html'
