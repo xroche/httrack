@@ -43,7 +43,7 @@ roundtrip() { # roundtrip TEMPLATE FILENAME [EXPECTED]
     esac
     # dash as well as bash: the two differ on what a stray quote does, and the
     # engine has no idea which /bin/sh system() will hand the command to.
-    for sh in bash dash; do
+    for sh in ${ROUNDTRIP_SHELLS:-bash dash}; do
         command -v "$sh" >/dev/null 2>&1 || continue
         got=$("$sh" -c "$exp") || fail "$sh eval of [$exp] failed"
         test "$got" = "$want" || fail "roundtrip '$1' '$2' under $sh: read [$got]"
@@ -144,6 +144,21 @@ refused_for '((n=$0))' 'arithmetic'
 refused_for 'for ((i=0;i<$0;i++)); do :; done' 'arithmetic'
 refused_for 'echo ${a[$0]}' 'arithmetic'
 refused_for 'echo $( ((printf %s $0)) )' 'arithmetic'
+
+# ${a[$0]} only reads an element. Writing one evaluates the subscript just the
+# same, so the assignment forms are refused too. The last row is why the test
+# cannot be name-blind: a template may declare one associative array and assign
+# into a different, indexed one, and that one does evaluate.
+refused_for 'a[$0]=1' 'arithmetic'
+refused_for 'a[$0]+=1' 'arithmetic'
+refused_for 'a=([$0]=x)' 'arithmetic'
+refused_for 'declare -A m; a[$0]=1' 'arithmetic'
+
+# Controls: a subscript with no assignment after it evaluates nothing, so
+# neither shape may be refused. Arrays are bash-only, and dash rejects the word.
+roundtrip_bash() { ROUNDTRIP_SHELLS=bash roundtrip "$@"; }
+roundtrip_bash 'unset a[$0]; printf %s $0' "a;touch $canary;.html"
+roundtrip_bash 'printf %s a[$0]' "a;touch $canary;.html" "a[a;touch $canary;.html]"
 
 # Controls for those five, so a fix cannot pass by refusing the shapes around
 # them: [ is the test command outside ${ }, and ${ } without a subscript is an

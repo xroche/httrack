@@ -3244,6 +3244,37 @@ static hts_boolean usercommand_append_quoted(char *dest, size_t size,
   return HTS_TRUE;
 }
 
+/*
+ * Does the bracket group opening at cmd[i] close with "]=" or "]+="? That is an
+ * array element assignment, and bash evaluates the subscript of an indexed one
+ * as arithmetic: a[$0]=1, a[$0]+=1 and the a=([$0]=x) element form all reach
+ * the evaluator, where the quoting put round the value is inert. The read form
+ * ${a[...]} is spotted by the ${ } depth instead, and a bare a[$0] or
+ * unset a[$0] evaluates nothing, so neither is refused.
+ *
+ * An associative array's subscript is a string, not arithmetic, so
+ * "declare -A m; m[$0]=1" is refused without needing to be. Telling the two
+ * apart means knowing which names were declared -A, and a template may declare
+ * one array and assign into another ("declare -A m; a[$0]=1" does evaluate),
+ * so a test that is not per-name would be a hole rather than a nicety.
+ */
+static hts_boolean usercommand_is_subscript_assign(const char *cmd, size_t i) {
+  size_t depth = 0;
+
+  for (; cmd[i] != '\0'; i++) {
+    if (cmd[i] == '[') {
+      depth++;
+    } else if (cmd[i] == ']') {
+      if (--depth == 0) {
+        return (cmd[i + 1] == '=' || (cmd[i + 1] == '+' && cmd[i + 2] == '='))
+                   ? HTS_TRUE
+                   : HTS_FALSE;
+      }
+    }
+  }
+  return HTS_FALSE;
+}
+
 /* Name the cause of a refusal, so the user is told what to change. */
 static int usercommand_refuse(const char **why, const char *reason) {
   if (why != NULL)
@@ -3334,8 +3365,10 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
         param_depth++;
       } else if (c == '}' && param_depth != 0) {
         param_depth--;
-      } else if (c == '[' && param_depth != 0) {
-        subscript_seen = HTS_TRUE; /* ${a[expr]} evaluates expr as arithmetic */
+      } else if (c == '[' && (param_depth != 0 ||
+                              usercommand_is_subscript_assign(cmd, i))) {
+        /* ${a[expr]} reads one, a[expr]= writes one; both evaluate expr */
+        subscript_seen = HTS_TRUE;
       }
     }
 
