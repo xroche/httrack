@@ -3143,7 +3143,8 @@ typedef enum {
   SHELL_CTX_PLAIN,  /* not inside quotes */
   SHELL_CTX_SINGLE, /* inside '...' */
   SHELL_CTX_DOUBLE, /* inside "..." */
-  SHELL_CTX_ARITH /* inside $(( )), where quotes are not a quoting mechanism */
+  SHELL_CTX_ARITH,  /* arithmetic, where quoting is not a quoting mechanism */
+  SHELL_CTX_BRACE   /* inside ${ }, whose subscript is arithmetic */
 } shell_ctx_t;
 
 /*
@@ -3155,13 +3156,39 @@ typedef enum {
  * restarts at PLAIN, closing it restores what was saved.
  */
 typedef struct {
-  shell_ctx_t ctx;        /* quoting the substitution interrupted */
-  hts_boolean backquoted; /* closed by ` rather than by ) */
-  unsigned int parens;    /* ( still open inside it, including its own */
+  shell_ctx_t ctx;   /* quoting the region interrupted */
+  char closer;       /* ')', ']', '}', or '`' for a backquote */
+  unsigned int open; /* openers not yet matched, including this one */
 } shell_frame_t;
 
 /* A template nested deeper than this is refused rather than mis-tracked. */
 #define SHELL_CTX_MAX_DEPTH 16
+
+/* The opener that matches a region's closer. */
+static char usercommand_opener(char closer) {
+  switch (closer) {
+  case ')':
+    return '(';
+  case ']':
+    return '[';
+  case '}':
+    return '{';
+  }
+  return '\0';
+}
+
+/* Open a region ending at "closer"; HTS_FALSE when the stack is full. */
+static hts_boolean usercommand_push(shell_frame_t *stack, size_t *depth,
+                                    shell_ctx_t ctx, char closer,
+                                    unsigned int open) {
+  if (*depth == SHELL_CTX_MAX_DEPTH)
+    return HTS_FALSE;
+  stack[*depth].ctx = ctx;
+  stack[*depth].closer = closer;
+  stack[*depth].open = open;
+  (*depth)++;
+  return HTS_TRUE;
+}
 
 /*
  * Append "len" bytes of "src" at "*pos" in "dest" (capacity "size", kept
@@ -3204,6 +3231,7 @@ static const char *usercommand_param(shell_ctx_t ctx) {
     /* a parameter is literal inside '...', so close the quote and reopen it */
     return "'\"${1}\"'";
   case SHELL_CTX_ARITH:
+  case SHELL_CTX_BRACE:
     /* bash evaluates an array subscript in arithmetic, so $1 holding
        x[$(cmd)] runs cmd even though it arrived as a parameter */
     return NULL;
@@ -3260,6 +3288,8 @@ static int usercommand_refuse(const char **why, const char *reason) {
  */
 int usercommand_expand(char *dest, size_t size, const char *cmd,
                        const char *file, const char **why) {
+  static const char too_deep[] = "the template nests substitutions deeper than "
+                                 "the scanner tracks";
   shell_frame_t stack[SHELL_CTX_MAX_DEPTH];
   size_t depth = 0;
   shell_ctx_t ctx = SHELL_CTX_PLAIN;
@@ -3288,7 +3318,7 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
         size_t d;
 
         for (d = 0; d < depth; d++) {
-          if (stack[d].backquoted)
+          if (stack[d].closer == '`')
             return usercommand_refuse(why,
                                       "$0 is inside `...`, where the inner "
                                       "shell strips the quoting off it; "
@@ -3301,9 +3331,15 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
          x[$(cmd)] runs cmd whether it arrives as text or as a parameter.
          Nothing documented uses $0 here. */
       if (ctx == SHELL_CTX_ARITH)
-        return usercommand_refuse(why, "$0 is inside $(( )), where arithmetic "
-                                       "ignores quoting; move it out of the "
-                                       "expression");
+        return usercommand_refuse(why, "$0 is inside an arithmetic expression, "
+                                       "which evaluates the name instead of "
+                                       "reading it; move it out");
+      /* bash evaluates an array subscript as arithmetic, and the braces are
+         where one can appear. */
+      if (ctx == SHELL_CTX_BRACE)
+        return usercommand_refuse(why, "$0 is inside ${ }, where a subscript "
+                                       "is evaluated as arithmetic; move it "
+                                       "out of the braces");
 #ifndef _WIN32
       /* A backslash here is a shell escape, and it would eat the first
          character of the parameter reference. httrack substitutes $0 escaped
@@ -3340,48 +3376,65 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
     if (!escaped && ctx != SHELL_CTX_SINGLE && c == '\\') {
       escaped = HTS_TRUE;
     } else {
-      if (!escaped && ctx != SHELL_CTX_SINGLE &&
-          (c == '`' || (c == '$' && cmd[i + 1] == '('))) {
-        /* An unseparated "((" after the $ is arithmetic, where quoting does
-           not apply; a separated "$( (" is an ordinary subshell and keeps it.
-         */
-        const hts_boolean arith =
-            (c == '$' && cmd[i + 1] == '(' && cmd[i + 2] == '(');
-
-        /* Open a substitution -- or, for a backquote, close the one it opened.
-         */
-        if (c == '`' && depth != 0 && stack[depth - 1].backquoted &&
+      if (!escaped && ctx != SHELL_CTX_SINGLE && c == '`') {
+        /* A backquote closes the substitution it opened, or opens one. */
+        if (depth != 0 && stack[depth - 1].closer == '`' &&
             ctx == SHELL_CTX_PLAIN) {
           ctx = stack[--depth].ctx;
         } else {
-          if (depth == SHELL_CTX_MAX_DEPTH)
-            return usercommand_refuse(why, "the template nests substitutions "
-                                           "deeper than the scanner tracks");
-          stack[depth].ctx = ctx;
-          stack[depth].backquoted = (c == '`') ? HTS_TRUE : HTS_FALSE;
-          stack[depth].parens = (c == '`') ? 0 : 1;
-          depth++;
-          ctx = arith ? SHELL_CTX_ARITH : SHELL_CTX_PLAIN;
-          if (c != '`') {
-            /* copy the "$", the "(" goes through as the loop's next char (for
-               arithmetic that is the first of two, and the second is counted
-               by the paren branch, so it takes both ) to close) */
-            if (!usercommand_append_char(dest, size, &pos, c))
-              return USERCOMMAND_EXPAND_TOOLONG;
-            i++;
-            if (!usercommand_append_char(dest, size, &pos, cmd[i]))
-              return USERCOMMAND_EXPAND_TOOLONG;
-            continue;
-          }
+          if (!usercommand_push(stack, &depth, ctx, '`', 0))
+            return usercommand_refuse(why, too_deep);
+          ctx = SHELL_CTX_PLAIN;
         }
-      } else if (!escaped &&
-                 (ctx == SHELL_CTX_PLAIN || ctx == SHELL_CTX_ARITH) &&
-                 depth != 0 && !stack[depth - 1].backquoted &&
-                 (c == '(' || c == ')')) {
-        if (c == '(') {
-          stack[depth - 1].parens++;
-        } else if (--stack[depth - 1].parens == 0) {
-          ctx = stack[--depth].ctx;
+      } else if (!escaped && ctx != SHELL_CTX_SINGLE && c == '$' &&
+                 (cmd[i + 1] == '(' || cmd[i + 1] == '[' ||
+                  cmd[i + 1] == '{')) {
+        /* An unseparated "((" after the $ is arithmetic and a separated
+           "$( (" is an ordinary subshell; "$[ ]" is bash's older arithmetic
+           spelling; "${ }" is where an array subscript is evaluated. */
+        const char opened = cmd[i + 1];
+        const shell_ctx_t inner =
+            (opened == '[' || (opened == '(' && cmd[i + 2] == '('))
+                ? SHELL_CTX_ARITH
+                : (opened == '{' ? SHELL_CTX_BRACE : SHELL_CTX_PLAIN);
+
+        if (!usercommand_push(stack, &depth, ctx,
+                              opened == '(' ? ')' : (opened == '[' ? ']' : '}'),
+                              1))
+          return usercommand_refuse(why, too_deep);
+        ctx = inner;
+        /* copy the "$", then the bracket, which for arithmetic is the first of
+           two and the second is counted below, so it takes both to close */
+        if (!usercommand_append_char(dest, size, &pos, c))
+          return USERCOMMAND_EXPAND_TOOLONG;
+        i++;
+        if (!usercommand_append_char(dest, size, &pos, cmd[i]))
+          return USERCOMMAND_EXPAND_TOOLONG;
+        continue;
+      } else if (!escaped && ctx == SHELL_CTX_PLAIN && c == '(' &&
+                 cmd[i + 1] == '(') {
+        /* A bare (( )) is an arithmetic command, which covers "((n=$0))", the
+           arithmetic for loop, and the "$( ((...)) )" that the lookahead
+           above reads as an ordinary subshell. */
+        if (!usercommand_push(stack, &depth, ctx, ')', 2))
+          return usercommand_refuse(why, too_deep);
+        ctx = SHELL_CTX_ARITH;
+        if (!usercommand_append_char(dest, size, &pos, c))
+          return USERCOMMAND_EXPAND_TOOLONG;
+        i++;
+        if (!usercommand_append_char(dest, size, &pos, cmd[i]))
+          return USERCOMMAND_EXPAND_TOOLONG;
+        continue;
+      } else if (!escaped && depth != 0 && stack[depth - 1].closer != '`' &&
+                 (ctx == SHELL_CTX_PLAIN || ctx == SHELL_CTX_ARITH ||
+                  ctx == SHELL_CTX_BRACE) &&
+                 (c == stack[depth - 1].closer ||
+                  c == usercommand_opener(stack[depth - 1].closer))) {
+        if (c == stack[depth - 1].closer) {
+          if (--stack[depth - 1].open == 0)
+            ctx = stack[--depth].ctx;
+        } else {
+          stack[depth - 1].open++;
         }
       } else if (!escaped) {
         switch (ctx) {
@@ -3400,6 +3453,7 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
             ctx = SHELL_CTX_PLAIN;
           break;
         case SHELL_CTX_ARITH:
+        case SHELL_CTX_BRACE:
           /* a quote here is an ordinary character, so it opens nothing */
           break;
         }

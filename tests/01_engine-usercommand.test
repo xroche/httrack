@@ -13,11 +13,6 @@ set -euo pipefail
 # and the engine execs sh -c <command> sh <name>. -#test=usercmd prints the
 # verdict and that vector; -#test=usercmdrun runs it for real.
 
-# cmd.exe takes no positional parameters, so the Windows engine still writes the
-# name into the command, quoted its way. That string is not a POSIX shell's and
-# cannot be replayed through one.
-skip_on_windows "the -V command is built for cmd.exe, not for a POSIX shell"
-
 work=$(mktemp -d) || fail "mktemp failed"
 canary="$work/pwned"
 trap 'set +e; rm -rf "$work"' EXIT
@@ -40,6 +35,17 @@ usercmd() { # usercmd TEMPLATE FILENAME [ROOM]
         esac
         case $line in "ARG "*) ARGC=$((ARGC + 1)) ;; esac
     done <<<"$out"
+}
+
+# Through the engine's own spawn path, not a shell we drove ourselves: what the
+# child printed, and what it exited with.
+run_usercmd() { # run_usercmd TEMPLATE FILENAME
+    local out rc=0
+    out=$(httrack -O /dev/null -#test=usercmdrun "$1" "$2") || rc=$?
+    test "$rc" -eq 0 || fail "usercmdrun '$1' '$2': exited $rc"
+    EXIT=${out##*EXIT }
+    OUTPUT=${out%EXIT *}
+    OUTPUT=${OUTPUT%$'\n'}
 }
 
 # Expand, then run the vector through a real shell the way the engine does. The
@@ -145,14 +151,39 @@ refused_for() { # refused_for TEMPLATE WORD
     esac
 }
 
-# $0 inside $(( )): an arithmetic expression is evaluated as if in double
-# quotes, and bash evaluates an array subscript in it, so a name holding
-# x[$(cmd)] runs cmd however it arrives. Bare, spaced, and with an operand,
-# since each reaches the branch differently.
-refused_for 'echo $(($0))' '$(( ))'
-refused_for 'echo $(( $0 ))' '$(( ))'
-refused_for 'echo $((1+$0))' '$(( ))'
-refused_for 'echo $(( ($0) ))' '$(( ))'
+# bash evaluates an array subscript inside arithmetic, so a name holding
+# x[$(cmd)] runs cmd however it arrives, parameter included. Every arithmetic
+# spelling the scanner can see has to refuse, not just $(( )): bare, spaced and
+# with an operand reach the branch differently, $[ ] is bash's older spelling,
+# a bare (( )) is an arithmetic command, and "$( ((" is the one a lookahead for
+# "$((" reads as an ordinary subshell.
+refused_for 'echo $(($0))' arithmetic
+refused_for 'echo $(( $0 ))' arithmetic
+refused_for 'echo $((1+$0))' arithmetic
+refused_for 'echo $(( ($0) ))' arithmetic
+refused_for 'echo $[$0]' arithmetic
+refused_for 'n=0; ((n=$0)); echo $n' arithmetic
+refused_for 'for ((i=0;i<$0;i++)); do :; done' arithmetic
+refused_for 'printf %s "$( ((printf %s $0)) )"' arithmetic
+refused_for 'a=(1 2 3); echo ${a[$0]}' '${ }'
+
+# Each of those payloads, run for real against a name carrying the subscript
+# gadget. The canary at the end is what says the refusal held.
+for t in 'echo $[$0]' 'n=0; ((n=$0)); echo $n' \
+    'for ((i=0;i<$0;i++)); do :; done' 'a=(1 2 3); echo ${a[$0]}' \
+    'printf %s "$( ((printf %s $0)) )"'; do
+    run_usercmd "$t" "x[\$(touch $canary)]"
+    assert_eq -1 "$EXIT" "arithmetic template not spawned: $t"
+done
+
+# The controls: an arithmetic region carrying no $0 must close, so a $0 after
+# it still expands. Without these a fix that refused the whole template passes.
+usercmd 'n=0; ((n=1+2)); printf %s $0' 'a b.html'
+assert_eq 'n=0; ((n=1+2)); printf %s "${1}"' "$CMD" 'bare (( )) closed'
+usercmd 'echo $[1+2] $0' 'a b.html'
+assert_eq 'echo $[1+2] "${1}"' "$CMD" '$[ ] closed'
+usercmd 'echo ${HOME} $0' 'a b.html'
+assert_eq 'echo ${HOME} "${1}"' "$CMD" '${ } closed'
 
 # The control for the refusal above: a separated $( ( is an ordinary subshell,
 # where a parameter does hold, so it must still expand. Without this a fix that
@@ -202,17 +233,6 @@ printf 'CONTENT\n' >"$work/hello world.html"
 usercmd 'cat $0' "$work/hello world.html"
 got=$(bash -c "$CMD" sh "$work/hello world.html")
 assert_eq CONTENT "$got" 'a spaced name stays one word'
-
-# Through the engine's own spawn path, not a shell we drove ourselves: what the
-# child printed, and what it exited with.
-run_usercmd() { # run_usercmd TEMPLATE FILENAME
-    local out rc=0
-    out=$(httrack -O /dev/null -#test=usercmdrun "$1" "$2") || rc=$?
-    test "$rc" -eq 0 || fail "usercmdrun '$1' '$2': exited $rc"
-    EXIT=${out##*EXIT }
-    OUTPUT=${out%EXIT *}
-    OUTPUT=${OUTPUT%$'\n'}
-}
 
 run_usercmd 'printf "[%s]" $0' "$work/hello world.html"
 assert_eq "[$work/hello world.html]" "$OUTPUT" 'spawned child output'
