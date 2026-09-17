@@ -2555,7 +2555,7 @@ class Handler(SimpleHTTPRequestHandler):
 
     # A chunked body split into small pieces, so the announced total crosses the
     # -m ceiling mid-transfer rather than on the first chunk.
-    def send_chunked_pieces(self, body, ctype, piece=512):
+    def send_chunked_pieces(self, body, ctype, piece=512, cut=False):
         self.protocol_version = "HTTP/1.1"
         self.send_response(200)
         self.send_header("Content-Type", ctype)
@@ -2568,11 +2568,42 @@ class Handler(SimpleHTTPRequestHandler):
             for off in range(0, len(body), piece):
                 part = body[off : off + piece]
                 self.wfile.write(b"%X\r\n" % len(part) + part + b"\r\n")
-            self.wfile.write(b"0\r\n\r\n")
+            if not cut:
+                self.wfile.write(b"0\r\n\r\n")
             self.wfile.flush()
         except OSError:
             pass
         self.close_connection = True
+
+    def route_chunkoom_index(self):
+        self.send_html(
+            '\t<a href="mem.html">mem</a>\n' '\t<a href="after.html">after</a>\n'
+        )
+
+    # A chunk announcing 0x70000000 passes hts_inmem_size_fits() and fails the
+    # allocation under any sane RLIMIT_AS, with no body to send for it. The
+    # first chunk is real, so there is a buffer to lose (#1708).
+    def route_chunkoom_mem(self):
+        self.protocol_version = "HTTP/1.1"
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Transfer-Encoding", "chunked")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        if self.command == "HEAD":
+            return
+        body = b"<html><body><p>CHUNKOOM-MEM</p></body></html>"
+        try:
+            self.wfile.write(b"%X\r\n" % len(body) + body + b"\r\n")
+            self.wfile.write(b"70000000\r\n")
+            self.wfile.flush()
+        except OSError:
+            pass
+        self.close_connection = True
+
+    # Control: the crawl has to carry on past the refused transfer.
+    def route_chunkoom_after(self):
+        self.send_html("<p>CHUNKOOM-AFTER</p>")
 
     def route_chunkcap_index(self):
         self.send_html(
@@ -2604,11 +2635,11 @@ class Handler(SimpleHTTPRequestHandler):
             chunkcap_body(b"OVER", CHUNKCAP_LIMIT + 1), CHUNKCAP_BIN
         )
 
-    # Ten times the ceiling: the refusal has to come as the announced total
-    # crosses it, so most of this body is never received.
+    # Past the ceiling and then cut, with no terminating chunk: only a refusal
+    # raised as the announced total grows ever sees this one.
     def route_chunkcap_flood(self):
         self.send_chunked_pieces(
-            chunkcap_body(b"FLOOD", CHUNKCAP_LIMIT * 10), CHUNKCAP_BIN
+            chunkcap_body(b"FLOOD", CHUNKCAP_LIMIT * 2), CHUNKCAP_BIN, cut=True
         )
 
     # Control: one byte over under a Content-Length, refused by the header path.
@@ -3708,6 +3739,9 @@ class Handler(SimpleHTTPRequestHandler):
         "/chunktrail/bogus.html": route_chunktrail_bogus,
         "/chunktrail/eof.html": route_chunktrail_eof,
         "/chunktrail/file.bin": route_chunktrail_file,
+        "/chunkoom/index.html": route_chunkoom_index,
+        "/chunkoom/mem.html": route_chunkoom_mem,
+        "/chunkoom/after.html": route_chunkoom_after,
         "/chunkcap/index.html": route_chunkcap_index,
         "/chunkcap/under.bin": route_chunkcap_under,
         "/chunkcap/plain.bin": route_chunkcap_plain,

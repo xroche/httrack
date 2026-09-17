@@ -2210,8 +2210,10 @@ void back_set_finished(httrackp *opt, struct_back *sback, const int p) {
   }
 }
 
-/* Refuse this transfer for its size: STATUSCODE_TOO_BIG is a verdict and not a
-   failure, so back_transfer_failed() keeps it out of the retry queue. */
+/* Refuse a transfer for its size: TOO_BIG is a verdict, not a failure, so
+   back_transfer_failed() keeps it out of the retry queue. Close the socket
+   before returning, or the chunk end path relabels the verdict "Invalid
+   chunk". */
 static void back_set_too_big(httrackp *opt, struct_back *sback, const int p) {
   lien_back *const back = sback->lnk;
 
@@ -4273,10 +4275,21 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                       else if (chunk_size == 0)
                         back[i].chunk_blocksize = -1;   /* ending */
                       back[i].r.totalsize += chunk_size;        // noter taille
-                      /* Chunked announces no length, so the -m ceiling the
-                         header path applies never fired on it (#1708). */
-                      if (!back_checksize(opt, &back[i], 1)) {
+                      /* The header path's -m check saw no length and passed
+                         (#1708). istoobig() alone: back_checksize()'s wizard
+                         pass costs a filter match per chunk. */
+                      if (istoobig(
+                              opt, back[i].r.totalsize, back[i].maxfile_html,
+                              back[i].maxfile_nonhtml, back[i].r.contenttype)) {
                         back_set_too_big(opt, sback, i);
+                        /* Drop the partial bytes; a backup, where one was
+                           taken, is restored over them by back_finalize(). */
+                        if (back[i].r.is_write && back[i].tmpfile == NULL &&
+                            back[i].url_sav[0] != '\0') {
+                          url_savename_refname_remove(opt, back[i].url_adr,
+                                                      back[i].url_fil);
+                          (void) UNLINK(back[i].url_sav);
+                        }
                         chunk_size = -1;
                       } else if (back[i].r.adr != NULL ||
                                  !back[i].r.is_write) { // Not to disk
@@ -4296,8 +4309,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                             back[i].r.adr = grown;
                           } else {
                             /* r.totalsize already counts this chunk, so
-                               dropping the buffer we still hold would have the
-                               next read write past one that never grew. */
+                               dropping the buffer would have the next read
+                               write past it. */
                             hts_log_print(opt, LOG_ERROR,
                                           "not enough memory (" LLintP
                                           ") for %s%s",
