@@ -200,9 +200,29 @@ assert_eq 'echo ${HOME} "${1}"' "$CMD" '${ } closed'
 roundtrip '[ -n $0 ] && printf %s $0' "a;touch $canary;.html"
 roundtrip 'printf %s ${HOME:+}$0' "a;touch $canary;.html"
 roundtrip 'printf %s ${x:-$0}' "a;touch $canary;.html"
-# The subscript is refused inside "..." too, where a PLAIN-only rule misses it.
-refused_for 'echo "${a[$0]}"' 'arithmetic'
 refused_for 'echo "$[$0]"' 'arithmetic'
+
+# A subscript is arithmetic when it is written too, not only when it is read,
+# and unset evaluates one as well. All five of these executed before the rule
+# below. A subscript is told from the [ test command by being stuck to a word.
+refused_for 'a[$0]=1' 'arithmetic'
+refused_for 'a[$0]+=1' 'arithmetic'
+refused_for 'a=([$0]=x)' 'arithmetic'
+refused_for 'a=(1 2 3); unset a[$0]' 'arithmetic'
+refused_for 'a=(1 2 3); unset "a[$0]"' 'arithmetic'
+refused_for 'echo "${a[$0]}"' 'arithmetic'
+
+# Run for real against a name that carries the gadget inside its own subscript,
+# which is the shape that reaches the evaluator once the name is a parameter.
+for t in 'a[$0]=1' 'a[$0]+=1' 'a=([$0]=x)' 'a=(1 2 3); unset a[$0]'; do
+    run_usercmd "$t" "x[\$(touch $canary)]"
+    assert_eq -1 "$EXIT" "subscript write not spawned: $t"
+done
+
+# [[ is not a subscript, so a $0 inside the conditional still expands. Checked
+# on the command text, since dash has no [[ to round-trip it through.
+usercmd '[[ -f $0 ]] || printf %s $0' 'a b.html'
+assert_eq '[[ -f "${1}" ]] || printf %s "${1}"' "$CMD" '[[ opens no subscript'
 
 # The control for the refusal above: a separated $( ( is an ordinary subshell,
 # where a parameter does hold, so it must still expand. Without this a fix that

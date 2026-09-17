@@ -3143,8 +3143,7 @@ typedef enum {
   SHELL_CTX_PLAIN,  /* not inside quotes */
   SHELL_CTX_SINGLE, /* inside '...' */
   SHELL_CTX_DOUBLE, /* inside "..." */
-  SHELL_CTX_ARITH,  /* arithmetic, where quoting is not a quoting mechanism */
-  SHELL_CTX_BRACE   /* inside ${ }, where only a [ ] subscript is arithmetic */
+  SHELL_CTX_ARITH   /* arithmetic, where quoting is not a quoting mechanism */
 } shell_ctx_t;
 
 /*
@@ -3230,9 +3229,6 @@ static const char *usercommand_param(shell_ctx_t ctx) {
   case SHELL_CTX_SINGLE:
     /* a parameter is literal inside '...', so close the quote and reopen it */
     return "'\"${1}\"'";
-  case SHELL_CTX_BRACE:
-    /* a word inside ${ }, such as the default of ${x:-$0} */
-    return "\"${1}\"";
   case SHELL_CTX_ARITH:
     /* bash evaluates an array subscript in arithmetic, so $1 holding
        x[$(cmd)] runs cmd even though it arrived as a parameter */
@@ -3384,22 +3380,16 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
           ctx = SHELL_CTX_PLAIN;
         }
       } else if (!escaped && ctx != SHELL_CTX_SINGLE && c == '$' &&
-                 (cmd[i + 1] == '(' || cmd[i + 1] == '[' ||
-                  cmd[i + 1] == '{')) {
+                 (cmd[i + 1] == '(' || cmd[i + 1] == '[')) {
         /* An unseparated "((" after the $ is arithmetic and a separated
            "$( (" is an ordinary subshell; "$[ ]" is bash's older arithmetic
-           spelling; "${ }" is where an array subscript is evaluated. */
+           spelling. */
         const char opened = cmd[i + 1];
-        const shell_ctx_t inner =
-            (opened == '[' || (opened == '(' && cmd[i + 2] == '('))
-                ? SHELL_CTX_ARITH
-                : (opened == '{' ? SHELL_CTX_BRACE : SHELL_CTX_PLAIN);
 
-        if (!usercommand_push(stack, &depth, ctx,
-                              opened == '(' ? ')' : (opened == '[' ? ']' : '}'),
-                              1))
+        if (!usercommand_push(stack, &depth, ctx, opened == '(' ? ')' : ']', 1))
           return usercommand_refuse(why, too_deep);
-        ctx = inner;
+        ctx = (opened == '[' || cmd[i + 2] == '(') ? SHELL_CTX_ARITH
+                                                   : SHELL_CTX_PLAIN;
         /* copy the "$", then the bracket, which for arithmetic is the first of
            two and the second is counted below, so it takes both to close */
         if (!usercommand_append_char(dest, size, &pos, c))
@@ -3408,11 +3398,24 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
         if (!usercommand_append_char(dest, size, &pos, cmd[i]))
           return USERCOMMAND_EXPAND_TOOLONG;
         continue;
-      } else if (!escaped && ctx == SHELL_CTX_BRACE && c == '[') {
-        /* the subscript of ${a[$0]}, which bash evaluates as arithmetic */
-        if (!usercommand_push(stack, &depth, ctx, ']', 1))
-          return usercommand_refuse(why, too_deep);
-        ctx = SHELL_CTX_ARITH;
+      } else if (!escaped && c == '[' &&
+                 (ctx == SHELL_CTX_PLAIN || ctx == SHELL_CTX_DOUBLE)) {
+        /* An array subscript is evaluated as arithmetic, whether it is read
+           (${a[$0]}) or written (a[$0]=1, a=([$0]=x), unset a[$0]). It is
+           told from the [ test command by being stuck to a word: "[ -f $0 ]"
+           starts one, "a[" continues one. "[[" starts no subscript either. */
+        if (i != 0 && strchr(" \t\n;&|", cmd[i - 1]) == NULL) {
+          if (!usercommand_push(stack, &depth, ctx, ']', 1))
+            return usercommand_refuse(why, too_deep);
+          ctx = SHELL_CTX_ARITH;
+        } else if (cmd[i + 1] == '[') {
+          if (!usercommand_append_char(dest, size, &pos, c))
+            return USERCOMMAND_EXPAND_TOOLONG;
+          i++;
+          if (!usercommand_append_char(dest, size, &pos, cmd[i]))
+            return USERCOMMAND_EXPAND_TOOLONG;
+          continue;
+        }
       } else if (!escaped && ctx == SHELL_CTX_PLAIN && c == '(' &&
                  cmd[i + 1] == '(') {
         /* A bare (( )) is an arithmetic command, which covers "((n=$0))", the
@@ -3429,7 +3432,8 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
         continue;
       } else if (!escaped && depth != 0 && stack[depth - 1].closer != '`' &&
                  (ctx == SHELL_CTX_PLAIN || ctx == SHELL_CTX_ARITH ||
-                  ctx == SHELL_CTX_BRACE) &&
+                  (ctx == SHELL_CTX_DOUBLE &&
+                   stack[depth - 1].closer == ']')) &&
                  (c == stack[depth - 1].closer ||
                   c == usercommand_opener(stack[depth - 1].closer))) {
         if (c == stack[depth - 1].closer) {
@@ -3455,7 +3459,6 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
             ctx = SHELL_CTX_PLAIN;
           break;
         case SHELL_CTX_ARITH:
-        case SHELL_CTX_BRACE:
           /* a quote here is an ordinary character, so it opens nothing */
           break;
         }
