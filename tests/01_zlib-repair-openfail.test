@@ -1,0 +1,18 @@
+#!/bin/bash
+#
+# Stick to POSIX tool flags: macOS ships BSD grep/sed, not the GNU ones.
+
+# unzRepair must refuse the repair when one of its three files fails to open
+# (-#test=zip-repair-openfail <dir>), instead of writing the central directory
+# through a NULL FILE* and leaving the other two handles open.
+
+set -eu
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+out=$(httrack -#test=zip-repair-openfail "$dir")
+
+grep -qx "zip-repair-openfail: OK" <<<"$out" || fail "expected 'zip-repair-openfail: OK', got: $out"

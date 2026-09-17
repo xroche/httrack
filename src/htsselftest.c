@@ -5070,6 +5070,115 @@ static int st_zip_repair_shift(httrackp *opt, int argc, char **argv) {
   return (err == Z_OK && nrec == 1) ? 0 : 1;
 }
 
+/* Drives unzRepair when the third of its three files cannot be opened: first a
+   temporary path under a missing directory, then the descriptor exhaustion a
+   crawl actually meets. Before the fix the central-directory writes went
+   through a NULL FILE*, and the two handles that did open were never closed. */
+static int st_zip_repair_openfail(httrackp *opt, int argc, char **argv) {
+  static const unsigned char zip[] = {
+      0x50, 0x4b, 0x03, 0x04, /* local file header signature */
+      0x14, 0x00,             /* version needed */
+      0x00, 0x00,             /* general purpose flag */
+      0x00, 0x00,             /* method */
+      0x00, 0x00,             /* time */
+      0x00, 0x00,             /* date */
+      0x00, 0x00, 0x00, 0x00, /* crc */
+      0x00, 0x00, 0x00, 0x00, /* compressed size */
+      0x00, 0x00, 0x00, 0x00, /* uncompressed size */
+      0x01, 0x00,             /* filename length */
+      0x00, 0x00,             /* extra field length */
+      0x61                    /* filename "a" */
+  };
+  char in[HTS_URLMAXSIZE], out[HTS_URLMAXSIZE], tmp[HTS_URLMAXSIZE];
+  uLong nrec = 0, bytes = 0;
+  FILE *fp;
+  int err;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "zip-repair-openfail: needs a directory\n");
+    return 1;
+  }
+  snprintf(in, sizeof(in), "%s/damaged.zip", argv[0]);
+  snprintf(out, sizeof(out), "%s/repair.zip", argv[0]);
+  fp = fopen(in, "wb");
+  if (fp == NULL || !hts_fwrite_exact(zip, sizeof(zip), fp)) {
+    if (fp != NULL)
+      fclose(fp);
+    fprintf(stderr, "zip-repair-openfail: cannot write %s\n", in);
+    return 1;
+  }
+  fclose(fp);
+
+  snprintf(tmp, sizeof(tmp), "%s/nodir/repair.tmp", argv[0]);
+  err = unzRepair(in, out, tmp, &nrec, &bytes);
+  if (err == Z_OK) {
+    printf("zip-repair-openfail: FAIL (repaired through a failed open)\n");
+    return 1;
+  }
+  if (fexist(out)) {
+    printf("zip-repair-openfail: FAIL (%s left behind)\n", out);
+    return 1;
+  }
+#ifndef _WIN32
+  {
+    enum { burn = 64 };
+
+    FILE *held[burn];
+    FILE *again[2];
+    struct rlimit saved, tight;
+    int leaked, n = 0, i;
+
+    snprintf(tmp, sizeof(tmp), "%s/repair.tmp", argv[0]);
+    if (getrlimit(RLIMIT_NOFILE, &saved) != 0) {
+      printf("zip-repair-openfail: cannot cap descriptors, skipped\n");
+      return 0;
+    }
+    tight = saved;
+    tight.rlim_cur = burn;
+    if (setrlimit(RLIMIT_NOFILE, &tight) != 0) {
+      printf("zip-repair-openfail: cannot cap descriptors, skipped\n");
+      return 0;
+    }
+    while (n < burn && (held[n] = fopen(in, "rb")) != NULL) {
+      n++;
+    }
+    if (n < 2) {
+      for (i = 0; i < n; i++)
+        fclose(held[i]);
+      (void) setrlimit(RLIMIT_NOFILE, &saved);
+      printf("zip-repair-openfail: no descriptor headroom, skipped\n");
+      return 0;
+    }
+    /* Exactly two left, so the input and the output open and the temporary
+       central directory does not. */
+    fclose(held[--n]);
+    fclose(held[--n]);
+    err = unzRepair(in, out, tmp, &nrec, &bytes);
+    again[0] = fopen(in, "rb");
+    again[1] = fopen(in, "rb");
+    leaked = again[0] == NULL || again[1] == NULL;
+    for (i = 0; i < 2; i++) {
+      if (again[i] != NULL)
+        fclose(again[i]);
+    }
+    for (i = 0; i < n; i++)
+      fclose(held[i]);
+    (void) setrlimit(RLIMIT_NOFILE, &saved);
+    if (err == Z_OK) {
+      printf("zip-repair-openfail: FAIL (repaired with no descriptor left)\n");
+      return 1;
+    }
+    if (leaked) {
+      printf("zip-repair-openfail: FAIL (descriptors not given back)\n");
+      return 1;
+    }
+  }
+#endif
+  printf("zip-repair-openfail: OK\n");
+  return 0;
+}
+
 /* Members kept on either side of the abandoned one. */
 static const char *const zip_abandon_kept[] = {"before.bin", "after1.bin",
                                                "after2.bin"};
@@ -16240,6 +16349,9 @@ static const struct selftest_entry {
     {"zip-repair-shift", "<dir>",
      "cache zip-repair header read must not overflow a signed shift",
      st_zip_repair_shift},
+    {"zip-repair-openfail", "<dir>",
+     "cache zip-repair must not write through an output it failed to open",
+     st_zip_repair_openfail},
     {"zip-abandon", "<dir>",
      "an abandoned member leaves the archive byte-identical", st_zip_abandon},
     {"zip-abandon-notrunc", "<dir>",
