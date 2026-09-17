@@ -4618,12 +4618,18 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
                                                        // robot est vivant
               // (oui je sais un robot vivant.. mais bon.. il a le droit de vivre lui aussi)
               // (libérons les robots esclaves de l'internet!)
+              FILE *fpa;
+
               UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                              StringBuff(opt->path_log), "hts-autopsy"));
-              fp = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                 StringBuff(opt->path_log), "hts-isalive"),
-                         "wb");
-              a = 1;
+              fpa = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                  StringBuff(opt->path_log), "hts-isalive"),
+                          "wb");
+              /* on failure the dump stays on stdout, as when untriggered */
+              if (fpa != NULL) {
+                fp = fpa;
+                a = 1;
+              }
             }
             if ((*stre->info_shell_) || a) {
               int i, j;

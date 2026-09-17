@@ -1,0 +1,35 @@
+#!/bin/bash
+# The hts-isalive telemetry dump crashed the crawl when its file would not open.
+set -eu
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_isalive.XXXXXX") || exit 1
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+out="${tmpdir}/mirror"
+mkdir -p "$out"
+# fopen("wb") on a directory fails on every host, so the dump has nowhere to go
+mkdir "${out}/hts-isalive"
+# the trigger the engine looks for once a second, and deletes when it fires
+: >"${out}/hts-autopsy"
+
+local_server_start
+# /abortpurge/ holds a page the server answers after 5s, so the crawl outlives
+# the one-second telemetry tick
+local_crawl --log "${tmpdir}/crawl.log" -- \
+    -O "$out" -#S --quiet -%v0 --robots=0 --retries=0 \
+    "${BASEURL}/abortpurge/index.html" || rc=$?
+test "${rc:-0}" -eq 0 || fail "the crawl exited ${rc}: $(<"${tmpdir}/crawl.log")"
+
+test ! -e "${out}/hts-autopsy" ||
+    fail "the telemetry tick never fired, so nothing was exercised"
+test -d "${out}/hts-isalive" ||
+    fail "hts-isalive is no longer the directory that makes the open fail"
+test -z "$(ls -A "${out}/hts-isalive")" || fail "the dump was written after all"
+# the dump falls back to stdout, where an untriggered tick writes it anyway
+grep -qE '^RATE ' "${tmpdir}/crawl.log" || fail "no telemetry reached stdout"
