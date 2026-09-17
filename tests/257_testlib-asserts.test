@@ -396,7 +396,9 @@ fi
 # Needs a real procfs to read the relay's cmdline from, and a shell that can
 # execute the fake powershell.exe below. MSYS can do neither: it has no /proc
 # entry to read here and it hands anything named .exe to Windows as a binary.
-if test -d /proc && ! shell_is_msys; then
+# The test is the cmdline file rather than the directory, because FreeBSD ships
+# /proc as an empty mount point where every read below fails.
+if test -r "/proc/$$/cmdline" && ! shell_is_msys; then
     cat >"$tmpdir/pathbin/powershell.exe" <<'PSEOF'
 #!/bin/sh
 case ":${WSLENV:-}:" in
@@ -467,7 +469,8 @@ EOF
     esac
     ok "win_capture resolves the Windows pid by marker, passed out of band"
 else
-    echo "no procfs, or a shell that cannot run a script named .exe" >&2
+    echo "no readable /proc/<pid>/cmdline, or a shell that cannot run a script" \
+        "named .exe" >&2
 fi
 
 # Unshimmed: a guard that fires only on the broken path is half a guard. The

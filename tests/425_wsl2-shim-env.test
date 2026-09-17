@@ -18,11 +18,15 @@ cleanup_push rm -rf "$tmp"
 cp "$testdir/wsl2-exe-shim.sh" "$tmp/stub"
 chmod u+wx "$tmp/stub" # distcheck's srcdir is read-only, and cp carries that over
 cat >"$tmp/stub.exe" <<'STUB'
-#!/bin/bash
+#!/bin/sh
 printf 'WSLENV=%s\n' "$WSLENV"
 printf 'ARG=%s\n' "$@"
 STUB
 chmod u+wx "$tmp/stub.exe"
+
+# Run the shim by path, because FreeBSD keeps bash in /usr/local/bin and the
+# env -i below names neither that directory nor any other that holds it.
+bash_bin=$(command -v bash) || fail "no bash on PATH"
 
 # env -i, so the shim bridges a known set and the caller's own environment
 # cannot supply a name the assertions below would read as the shim's doing.
@@ -35,7 +39,7 @@ run_shim() { # run_shim ARG...
         LISTY=/mnt/d/a/one:/mnt/d/a/two \
         SUFFIXED='/mnt/d/a/one extra' \
         PLAIN=hello \
-        bash "$tmp/stub" "$@"
+        "$bash_bin" "$tmp/stub" "$@"
 }
 
 # --- argv: a drvfs path, the URL built from one, and everything else --------

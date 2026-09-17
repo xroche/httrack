@@ -47,11 +47,19 @@ if test -n "${MIRRORVERDICT_BIN:-}"; then
     tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_tfctick.XXXXXX") || exit 1
     cleanup_push rm -rf "$tmpdir"
     local_server_start
+    # Sets $tick. By signal name, so a fault reads as one rather than as a
+    # refusal, and the same shape 435_local-proxytrack-cache-truncated uses.
+    run_verdict() { # run_verdict ARG...
+        local rc=0
+        tick=$("$MIRRORVERDICT_BIN" "$@" 2>&1) || rc=$?
+        test "$rc" -lt 128 ||
+            fail "mirrorverdict died on SIG$(kill -l $((rc - 128))): ${tick}"
+        test "$rc" = 0 || fail "mirrorverdict failed ($rc): ${tick}"
+    }
     printf '[the loop callback carries the count] ..\t'
-    tick=$("$MIRRORVERDICT_BIN" transport "${BASEURL}/simple/basic.html" \
+    run_verdict transport "${BASEURL}/simple/basic.html" \
         "${tmpdir}/out" "http://127.0.0.1:${dead}/dead.html" \
-        "http://127.0.0.1:${dead}/dead.png" 2>&1) ||
-        fail "mirrorverdict failed: ${tick}"
+        "http://127.0.0.1:${dead}/dead.png"
     seen=$(printf '%s\n' "$tick" | sed -n 's/^tick-failures: \([0-9]*\).*/\1/p')
     test -n "$seen" || fail "mirrorverdict printed no count: ${tick}"
     test "$seen" -gt 0 || fail "the loop callback saw no failed transfer: ${tick}"
@@ -61,9 +69,8 @@ if test -n "${MIRRORVERDICT_BIN:-}"; then
     # end takes it. The second mirror gets the live URL alone, so a count above
     # zero there is a leak.
     printf '[the count outlives one mirror and not the next] ..\t'
-    tick=$("$MIRRORVERDICT_BIN" transport-twice "${BASEURL}/simple/basic.html" \
-        "${tmpdir}/twice" "http://127.0.0.1:${dead}/dead.html" 2>&1) ||
-        fail "mirrorverdict failed: ${tick}"
+    run_verdict transport-twice "${BASEURL}/simple/basic.html" \
+        "${tmpdir}/twice" "http://127.0.0.1:${dead}/dead.html"
     first=$(printf '%s\n' "$tick" | sed -n 's/^after-failures: \([0-9]*\)$/\1/p')
     next=$(printf '%s\n' "$tick" | sed -n 's/^second-failures: \([0-9]*\)$/\1/p')
     test "${first:-0}" -gt 0 ||
