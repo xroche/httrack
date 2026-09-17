@@ -1,0 +1,77 @@
+#!/bin/bash
+# The hts-isalive telemetry dump crashed the crawl when its file would not open.
+set -eu
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_isalive.XXXXXX") || exit 1
+cleanup() {
+    chmod -R u+w "$tmpdir" 2>/dev/null || true
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+# The engine deletes hts-autopsy on the tick that fires, which would leave every
+# later tick untriggered. A read-only log directory makes that unlink fail, so
+# every tick is a triggered one and no timing decides which. Deleting there is
+# still allowed for root and on a filesystem that ignores the mode, and the
+# whole fixture rests on it, so measure it rather than assume it.
+unlink_blocked() { # unlink_blocked DIR
+    local kept=0
+    : >"${1}/probe"
+    chmod 555 "$1"
+    rm -f "${1}/probe" 2>/dev/null || true
+    test ! -f "${1}/probe" || kept=1
+    chmod 755 "$1"
+    rm -f "${1}/probe"
+    test "$kept" -eq 1
+}
+
+mkdir -p "${tmpdir}/probe"
+unlink_blocked "${tmpdir}/probe" ||
+    skip "this user deletes inside a read-only directory, so the trigger cannot be held"
+
+local_server_start
+
+# crawl LABEL: crawl a page the server answers after five seconds, so the
+# one-second telemetry tick of -#S fires at least once. -Q and -C0 keep the
+# engine from wanting to write a log or a cache into the read-only $logdir.
+# Sets $log, the crawl's stdout.
+crawl() {
+    local rc=0 out="${tmpdir}/$1"
+    log="${tmpdir}/$1.log"
+    mkdir -p "$out"
+    chmod 555 "$logdir"
+    local_crawl --log "$log" -- -O "${out},${logdir}" -#S --quiet -%v0 \
+        --robots=0 --retries=0 -c1 -Q -C0 \
+        "${BASEURL}/abortpurge/index.html" || rc=$?
+    chmod 755 "$logdir"
+    test "$rc" -eq 0 || fail "$1: the crawl exited $rc: $(<"$log")"
+    test -f "${out}/127.0.0.1_${SRV_PORT}/abortpurge/index.html" ||
+        fail "$1: nothing was mirrored, so the run proves nothing"
+    test -f "${logdir}/hts-autopsy" ||
+        fail "$1: the trigger was deleted, so some ticks were untriggered"
+}
+
+# Control: with the file opening, a triggered tick writes nothing to stdout.
+# That is what makes a stdout tick below a fallback write rather than an
+# ordinary one, and hts-isalive filling proves a tick fired at all.
+logdir="${tmpdir}/opens-log"
+mkdir -p "$logdir"
+: >"${logdir}/hts-autopsy"
+: >"${logdir}/hts-isalive"
+crawl opens
+test -s "${logdir}/hts-isalive" || fail "the dump did not reach hts-isalive"
+test "$(count_matching_lines '^TIME ' "$log")" -eq 0 ||
+    fail "a triggered tick still wrote to stdout: $(<"$log")"
+
+# fopen("wb") on a directory fails on every host the engine builds for
+logdir="${tmpdir}/fails-log"
+mkdir -p "$logdir"
+: >"${logdir}/hts-autopsy"
+mkdir "${logdir}/hts-isalive"
+crawl fails
+test -z "$(ls -A "${logdir}/hts-isalive")" || fail "the dump was written after all"
+test "$(count_matching_lines '^TIME ' "$log")" -ge 1 ||
+    fail "the dump was dropped instead of falling back to stdout: $(<"$log")"

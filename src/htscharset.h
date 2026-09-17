@@ -47,7 +47,7 @@ typedef unsigned int hts_UCS4;
 
 /**
  * Convert the string "s" from charset "charset" to UTF-8.
- * Return NULL upon error.
+ * Return NULL upon error, an allocation failure included.
  **/
 HTSEXT_API char *hts_convertStringToUTF8(const char *s, size_t size,
                                          const char *charset);

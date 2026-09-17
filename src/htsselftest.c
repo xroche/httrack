@@ -1999,6 +1999,7 @@ static int st_hashtable(httrackp *opt, int argc, char **argv) {
               }
               strings = (const char **) realloct((void *) strings,
                                                  capa * sizeof(char *));
+              assertf(strings != NULL);
             }
             strings[count++] = &buff[last];
             last = i + 1;
@@ -2252,6 +2253,50 @@ static int ucs2_check(const unsigned short *units, size_t count,
   freet(got);
   freet(src);
   return err;
+}
+
+/* The growth is the UCS4 re-encoder's only allocation, so any return at all
+   from a starved run says the refusal was not caught. */
+static int st_ucs4_oom(httrackp *opt, int argc, char **argv) {
+  (void) opt;
+  (void) argc;
+  (void) argv;
+#ifndef _WIN32
+  {
+    enum { units = 512 * 1024 };
+
+    char *src = (char *) malloct(units);
+    struct rlimit saved, tight;
+    hts_UCS4 *out;
+
+    if (src == NULL || getrlimit(RLIMIT_AS, &saved) != 0) {
+      printf("ucs4: cannot cap memory, skipped\n");
+      freet(src);
+      return 0;
+    }
+    memset(src, 'a', units); /* one UCS4 unit per byte, so the output is 4x */
+    tight = saved;
+    tight.rlim_cur = 1024 * 1024;
+    if (setrlimit(RLIMIT_AS, &tight) != 0) {
+      printf("ucs4: cannot cap memory, skipped\n");
+      freet(src);
+      return 0;
+    }
+    out = hts_convertUTF8StringToUCS4(src, units, NULL);
+    (void) setrlimit(RLIMIT_AS, &saved);
+    freet(src);
+    if (out == NULL) {
+      printf("ucs4: the refused growth returned instead of aborting\n");
+      return 1;
+    }
+    freet(out);
+    printf("ucs4: cap did not bite, skipped\n");
+    return 0;
+  }
+#else
+  printf("ucs4: cannot cap memory, skipped\n");
+  return 0;
+#endif
 }
 
 static int st_ucs2(httrackp *opt, int argc, char **argv) {
@@ -16520,6 +16565,8 @@ static const struct selftest_entry {
     {"arrays", "[overflow-capa|overflow-loop]",
      "htsarrays.h growth reaches the requested room, or reports it failed",
      st_arrays},
+    {"ucs4-oom", "", "a UCS4 re-encode the allocator refuses aborts",
+     st_ucs4_oom},
     {"ucs2", "[oom]", "UCS2 to UTF-8 re-encoding, and its failure return",
      st_ucs2},
     {"backnew", "",

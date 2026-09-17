@@ -287,8 +287,13 @@ ci_suite_heartbeat() {
 # has no equivalent for;
 # sigint-keeps-resume sends a real SIGINT, which neither shell can deliver to a
 # native httrack.exe;
+# isalive-openfail holds its trigger file by making a directory read-only,
+# which Windows does not enforce, so the test's own probe declines and it
+# skips itself;
 # mirror-completed drives a helper binary that only the automake build produces,
 # so MIRRORVERDICT_BIN is unset here and the test skips itself.
+# chunked-oom starves the receive buffer with RLIMIT_AS, which Windows does not
+# enforce, so the test skips itself.
 # engine-usercommand replays each -V expansion through a POSIX shell, and a
 # native engine quotes for cmd.exe instead, where a backtick inside "..." is
 # inert but the replaying bash runs it.
@@ -316,6 +321,7 @@ expected_skips_msys="01_engine-usercommand.test
 80_engine-crash-symbolize.test
 468_engine-crash-live-worker.test
 471_engine-sigpipe.test
+472_local-isalive-openfail.test
 01_engine-crash-announce.test
 88_local-proxytrack-badmtime.test
 241_local-single-file-gui.test
@@ -328,7 +334,8 @@ expected_skips_msys="01_engine-usercommand.test
 424_engine-wizard-eof.test
 444_local-stop-keeps-resume.test
 451_local-sigint-keeps-resume.test
-465_local-mirror-completed.test"
+465_local-mirror-completed.test
+481_local-chunked-oom.test"
 
 # Measured, not predicted: windows-build run 33927128153, both platforms alike.
 # Written out rather than derived from the msys list above: the two lists are
@@ -339,8 +346,13 @@ expected_skips_msys="01_engine-usercommand.test
 # owns across interop, so it spins to the watchdog; 296 passes with a real answer
 # file, which places the fault at EOF and closed stdin rather than the wizard.
 # 294 skips itself, in the test.
+# isalive-openfail holds its trigger file by making a directory read-only,
+# which Windows does not enforce, so the test's own probe declines and it
+# skips itself.
 # mirror-completed drives a helper binary that only the automake build produces,
 # so MIRRORVERDICT_BIN is unset here and the test skips itself.
+# chunked-oom starves the receive buffer with RLIMIT_AS, which Windows does not
+# enforce, so the test skips itself.
 # engine-usercommand replays each -V expansion through a POSIX shell, and a
 # native engine quotes for cmd.exe instead, where a backtick inside "..." is
 # inert but the replaying bash runs it.
@@ -368,6 +380,7 @@ expected_skips_wsl2="01_engine-usercommand.test
 80_engine-crash-symbolize.test
 468_engine-crash-live-worker.test
 471_engine-sigpipe.test
+472_local-isalive-openfail.test
 01_engine-crash-announce.test
 88_local-proxytrack-badmtime.test
 241_local-single-file-gui.test
@@ -381,7 +394,8 @@ expected_skips_wsl2="01_engine-usercommand.test
 444_local-stop-keeps-resume.test
 451_local-sigint-keeps-resume.test
 465_local-mirror-completed.test
-294_local-wizard-eof.test"
+294_local-wizard-eof.test
+481_local-chunked-oom.test"
 
 # Sets ci_skip_list to the pinned skip set for backend $1, failing loudly if
 # there is none: an unknown backend must never fall back to an empty list,

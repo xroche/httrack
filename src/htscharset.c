@@ -625,12 +625,17 @@ static char *hts_convertStringCharset(const char *s, size_t size,
         if (ret == (size_t) - 1) {
           if (errno == E2BIG) {
             const size_t used = outbufCapa - outbytesleft;
+            char *grown;
 
             outbufCapa *= 2;
-            outbuf = realloc(outbuf, outbufCapa);
-            if (outbuf == NULL) {
+            /* Reached from an exported entry point, which answers NULL rather
+               than taking its embedder down. */
+            grown = realloct(outbuf, outbufCapa);
+            if (grown == NULL) {
+              freet(outbuf);
               break;
             }
+            outbuf = grown;
             outbytesleft = outbufCapa - used;
           } else {
             free(outbuf);
@@ -645,7 +650,13 @@ static char *hts_convertStringCharset(const char *s, size_t size,
 
       /* Terminating \0 */
       if (outbuf != NULL && finalSize + 1 >= outbufCapa) {
-        outbuf = realloc(outbuf, finalSize + 1);
+        char *const grown = realloct(outbuf, finalSize + 1);
+
+        if (grown == NULL) {
+          freet(outbuf);
+        } else {
+          outbuf = grown;
+        }
       }
       if (outbuf != NULL)
         outbuf[finalSize] = '\0';
@@ -1018,13 +1029,12 @@ static unsigned int nlz8(unsigned char x) {
 /* IDNA helpers. */
 #undef ADD_BYTE
 #undef INCREASE_CAPA
-#define INCREASE_CAPA() do { \
-  capa = capa < 16 ? 16 : ( capa << 1 ); \
-  dest = realloc(dest, capa*sizeof(dest[0])); \
-  if (dest == NULL) { \
-    return NULL; \
-  } \
-} while(0)
+#define INCREASE_CAPA()                                                        \
+  do {                                                                         \
+    capa = capa < 16 ? 16 : (capa << 1);                                       \
+    dest = realloct(dest, capa * sizeof(dest[0]));                             \
+    assertf(dest != NULL);                                                     \
+  } while (0)
 #define ADD_BYTE(C) do { \
   if (capa == destSize) { \
     INCREASE_CAPA(); \
@@ -1217,13 +1227,9 @@ char *hts_convertStringIDNAToUTF8(const char *s, size_t size) {
             == punycode_big_output 
           ; ) {
           output_capa <<= 1;
-          output_dest =
-            (punycode_uint*) realloc(output_dest,
-                                     output_capa*sizeof(punycode_uint));
-          if (output_dest == NULL) {
-            FREE_BUFFER();
-            return NULL;
-          }
+          output_dest = (punycode_uint *) realloct(
+              output_dest, output_capa * sizeof(punycode_uint));
+          assertf(output_dest != NULL);
           output_length = output_capa;
         }
 
