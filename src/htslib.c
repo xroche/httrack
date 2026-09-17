@@ -631,6 +631,37 @@ static const char *hts_mime_modern[][2] = {
   (CIS(c, '-') || CIS(c, '_') || CIS(c, '.') || CIS(c, '!') || CIS(c, '~') ||  \
    CIS(c, '*') || CIS(c, '\'') || CIS(c, '(') || CIS(c, ')'))
 
+const char *hts_strerror(int err, char *buf, size_t size) {
+  assertf(buf != NULL && size != 0);
+  buf[0] = '\0';
+  /* Only the terminator fits, and the libcs disagree on that boundary. */
+  if (size == 1)
+    return buf;
+#if !HTS_STRERROR_REENTRANT
+  /* No reentrant form here, so this build stays as racy as it was. */
+  (void) strclipbuff(buf, size, strerror(err));
+#elif defined(_MSC_VER)
+  (void) strerror_s(buf, size, err);
+#elif defined(__USE_GNU)
+  {
+    /* The GNU variant's return is the message and buf may stay untouched,
+       where the XSI one's return is a status. Only __USE_GNU tells them apart
+       here, since configure's probe sets _GNU_SOURCE and this tree does not. */
+    const char *const msg = strerror_r(err, buf, size);
+
+    if (msg != NULL && msg != buf)
+      (void) strclipbuff(buf, size, msg);
+  }
+#else
+  /* Nonzero is ERANGE or EINVAL, and buf may still hold a partial message. */
+  (void) strerror_r(err, buf, size);
+#endif
+  buf[size - 1] = '\0';
+  if (buf[0] == '\0')
+    (void) strclipbuff(buf, size, "unknown error");
+  return buf;
+}
+
 // conversion éventuelle / vers antislash
 #ifdef _WIN32
 char *antislash(char *catbuff, const char *s) {
@@ -707,14 +738,14 @@ T_SOC http_xfopen(httrackp *opt, int mode, int treat, int waitconnect,
     if (retour) {
       if (!strnotempty(retour->msg)) {
 #ifdef _WIN32
-        int last_errno = WSAGetLastError();
-
-        htsblk_failf(retour, "Connect error: %s", strerror(last_errno));
+        const int last_errno = WSAGetLastError();
 #else
-        int last_errno = errno;
-
-        htsblk_failf(retour, "Connect error: %s", strerror(last_errno));
+        const int last_errno = errno;
 #endif
+        char errbuf[HTS_STRERROR_SIZE];
+
+        htsblk_failf(retour, "Connect error: %s",
+                     hts_strerror(last_errno, errbuf, sizeof(errbuf)));
       }
     }
   }
@@ -2368,16 +2399,14 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
     if (soc == INVALID_SOCKET) {
       if (retour != NULL) {
 #ifdef _WIN32
-        int last_errno = WSAGetLastError();
-
-        htsblk_failf(retour, "Unable to create a socket: %s",
-                     strerror(last_errno));
+        const int last_errno = WSAGetLastError();
 #else
-        int last_errno = errno;
+        const int last_errno = errno;
+#endif
+        char errbuf[HTS_STRERROR_SIZE];
 
         htsblk_failf(retour, "Unable to create a socket: %s",
-                     strerror(last_errno));
-#endif
+                     hts_strerror(last_errno, errbuf, sizeof(errbuf)));
       }
       return INVALID_SOCKET;    // erreur création socket impossible
     }
@@ -2411,8 +2440,11 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
 #else
         const int last_errno = errno;
 #endif
+        char errbuf[HTS_STRERROR_SIZE];
+
         snprintf(retour->msg, sizeof(retour->msg),
-                 "Non-blocking socket failed: %s", strerror(last_errno));
+                 "Non-blocking socket failed: %s",
+                 hts_strerror(last_errno, errbuf, sizeof(errbuf)));
         deletesoc(soc);
         return INVALID_SOCKET;
       }
@@ -2435,15 +2467,13 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
         if (retour != NULL) {
 #ifdef _WIN32
           const int last_errno = WSAGetLastError();
-
-          htsblk_failf(retour, "Unable to connect to the server: %s",
-                       strerror(last_errno));
 #else
           const int last_errno = errno;
+#endif
+          char errbuf[HTS_STRERROR_SIZE];
 
           htsblk_failf(retour, "Unable to connect to the server: %s",
-                       strerror(last_errno));
-#endif
+                       hts_strerror(last_errno, errbuf, sizeof(errbuf)));
         }
         /* Close the socket and notify the error!!! */
         deletesoc(soc);
@@ -2720,17 +2750,19 @@ void deletesoc(T_SOC soc) {
 #endif
 #ifdef _WIN32
     if (closesocket(soc) != 0) {
-      int err = WSAGetLastError();
+      const int err = WSAGetLastError();
+      char errbuf[HTS_STRERROR_SIZE];
 
       fprintf(stderr, "* error closing socket " T_SOCP ": %s\n", soc,
-              strerror(err));
+              hts_strerror(err, errbuf, sizeof(errbuf)));
     }
 #else
     if (close(soc) != 0) {
       const int err = errno;
+      char errbuf[HTS_STRERROR_SIZE];
 
       fprintf(stderr, "* error closing socket " T_SOCP ": %s\n", soc,
-              strerror(err));
+              hts_strerror(err, errbuf, sizeof(errbuf)));
     }
 #endif
 #if HTS_WIDE_DEBUG
@@ -5543,6 +5575,14 @@ static void hts_resolver_check_env(void) {
 }
 #endif
 
+#if HTS_INET6 == 0
+/* gethostbyname() answers into a shared static hostent, so the call and the
+   copy out of it are one critical section, or two workers resolving at once
+   read each other's addresses. Not getaddrinfo(), because configure also lands
+   here when libc has none. */
+static htsmutex dns_hostent_lock = HTSMUTEX_INIT;
+#endif
+
 // Resolve hostname into up to max addresses (resolver/RFC 6724 order), no
 // cache. Returns the count copied into out[0..count-1]; 0 = does not resolve.
 /* On a zero count, *permanent tells the two failures apart: the resolver
@@ -5556,12 +5596,14 @@ static int hts_dns_resolve_nocache_list_(const char *const hostname,
 
 #if HTS_INET6==0
   /* IPv4 resolver */
-  struct hostent *const hp = gethostbyname(hostname);
+  const struct hostent *hp;
 
+  hts_mutexlock(&dns_hostent_lock);
+  hp = gethostbyname(hostname);
   if (hp == NULL && h_errno == HOST_NOT_FOUND)
     is_permanent = HTS_TRUE;
   if (hp != NULL) {
-    char **h;
+    char *const *h;
 
     for (h = hp->h_addr_list; count < max && h != NULL && *h != NULL; h++) {
       SOCaddr_clear(out[count]);
@@ -5570,6 +5612,7 @@ static int hts_dns_resolve_nocache_list_(const char *const hostname,
         count++;
     }
   }
+  hts_mutexrelease(&dns_hostent_lock);
 #else
   /* IPv6 resolver */
   struct addrinfo *res = NULL, *cur;
@@ -6426,7 +6469,10 @@ HTSEXT_API void hts_log_vprint(httrackp * opt, int type, const char *format, va_
       fspc(opt, opt->log, s_type);
       (void) vfprintf(opt->log, format, args);
       if ((type & LOG_ERRNO) != 0) {
-        fprintf(opt->log, ": %s", strerror(save_errno));
+        char errbuf[HTS_STRERROR_SIZE];
+
+        fprintf(opt->log, ": %s",
+                hts_strerror(save_errno, errbuf, sizeof(errbuf)));
       }
       fputs(LF, opt->log);
       if (opt->flush) {
@@ -6481,18 +6527,21 @@ HTSEXT_API int plug_wrapper(httrackp * opt, const char *moduleName,
           unplug(opt);
       }
     } else {
-      int last_errno = errno;
+      const int last_errno = errno;
+      char errbuf[HTS_STRERROR_SIZE];
 
       hts_debug_log_print("* note: can't find entry point 'hts_plug' in %s: %s",
-                          moduleName, strerror(last_errno));
+                          moduleName,
+                          hts_strerror(last_errno, errbuf, sizeof(errbuf)));
     }
     closeFunctionLib(handle);
     return 0;
   } else {
-    int last_errno = errno;
+    const int last_errno = errno;
+    char errbuf[HTS_STRERROR_SIZE];
 
     hts_debug_log_print("* note: can't load %s: %s", moduleName,
-                        strerror(last_errno));
+                        hts_strerror(last_errno, errbuf, sizeof(errbuf)));
   }
   return -1;
 }

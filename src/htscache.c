@@ -181,6 +181,7 @@ static void cache_zip_write_failed(httrackp *opt, cache_back *cache,
                                    hts_boolean entry_open, const char *url_adr,
                                    const char *url_fil) {
   const int fatal_errno = zErr == ZIP_ERRNO && check_fatal_io_errno();
+  char errbuf[HTS_STRERROR_SIZE];
 
   /* Roll the partial member back: closing it would commit a short body under
      the X-Size already written into its local header. */
@@ -200,22 +201,24 @@ static void cache_zip_write_failed(httrackp *opt, cache_back *cache,
       } else {
         hts_log_print(opt, LOG_ERROR,
                       "Mirror aborted: cache write failed (%s): %s", what,
-                      hts_get_zerror(zErr));
+                      hts_get_zerror(zErr, errbuf, sizeof(errbuf)));
       }
     }
     opt->state.exit_xh = -1; /* fatal: stop the mirror, exit non-zero */
   } else {
-    hts_log_print(opt, LOG_WARNING,
-                  "cache write failed (%s: %s), entry not cached: %s%s", what,
-                  hts_get_zerror(zErr), url_adr, url_fil);
+    hts_log_print(
+        opt, LOG_WARNING, "cache write failed (%s: %s), entry not cached: %s%s",
+        what, hts_get_zerror(zErr, errbuf, sizeof(errbuf)), url_adr, url_fil);
   }
 }
 
-/* Fail r with "<what>: <strerror(err)>". Bounded, never sprintf: msg is 80
-   bytes inside an installed-header struct, and strerror() is locale-sized. */
+/* Fail r with "<what>: <message for err>". Bounded, never sprintf: msg is 80
+   bytes inside an installed-header struct, and the message is locale-sized. */
 void cache_read_failed(htsblk *r, const char *what, int err) {
+  char errbuf[HTS_STRERROR_SIZE];
+
   r->statuscode = STATUSCODE_INVALID;
-  htsblk_failf(r, "%s: %s", what, strerror(err));
+  htsblk_failf(r, "%s: %s", what, hts_strerror(err, errbuf, sizeof(errbuf)));
 }
 
 /* Stream fp into the cache entry already opened on zf. Z_OK, the zip error, or
@@ -1363,9 +1366,11 @@ void cache_init(cache_back * cache, httrackp * opt) {
           opt->is_update = 1;   // signaler comme update
 
         } else {
+          char errbuf[HTS_STRERROR_SIZE];
+
           hts_log_print(opt, LOG_WARNING,
                         "Cache: error trying to read the cache: %s",
-                        hts_get_zerror(zErr));
+                        hts_get_zerror(zErr, errbuf, sizeof(errbuf)));
         }
 
       } else {

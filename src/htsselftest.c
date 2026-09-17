@@ -14385,6 +14385,130 @@ static int st_localtime(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* #1697: hts_strerror() must own its output. strerror() answers with a buffer
+   the next call in that thread reuses and thread exit frees, and POSIX lets it
+   be one static shared by every thread. */
+#define STRERROR_THREADS 8
+#define STRERROR_ROUNDS 20000
+
+/* Four errno values every libc names, then four codes none of them do: the
+   second group is what a libc formats into that buffer instead of answering
+   with a constant string of its own. */
+static const int strerror_codes[STRERROR_THREADS] = {
+    EACCES, ENOENT, EINVAL, EPERM, 4001, 4002, 4003, 4004};
+
+static char strerror_expected[STRERROR_THREADS][HTS_STRERROR_SIZE];
+static htsmutex strerror_lock = HTSMUTEX_INIT;
+static int strerror_bad = 0;
+
+static void strerror_thread(void *arg) {
+  const int i = *(const int *) arg;
+  int bad = 0, round;
+
+  for (round = 0; round < STRERROR_ROUNDS; round++) {
+    char buf[HTS_STRERROR_SIZE];
+
+    if (strcmp(hts_strerror(strerror_codes[i], buf, sizeof(buf)),
+               strerror_expected[i]) != 0)
+      bad++;
+  }
+  hts_mutexlock(&strerror_lock);
+  strerror_bad += bad;
+  hts_mutexrelease(&strerror_lock);
+}
+
+static int st_strerror(httrackp *opt, int argc, char **argv) {
+  static int idx[STRERROR_THREADS];
+  char first[HTS_STRERROR_SIZE], second[HTS_STRERROR_SIZE];
+  const char *kept;
+  int err = 0, i;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  for (i = 0; i < STRERROR_THREADS; i++) {
+    const char *const msg = hts_strerror(
+        strerror_codes[i], strerror_expected[i], sizeof(strerror_expected[i]));
+
+    if (msg != strerror_expected[i] || *msg == '\0') {
+      fprintf(stderr, "strerror: code %d gave no message of its own\n",
+              strerror_codes[i]);
+      err = 1;
+    }
+  }
+
+  /* A caller can hold two messages at once, where a shared buffer would have
+     lost the first to the second call. Codes 0 and 1 because musl answers
+     every unknown one alike, and strerror_expected[] because kept is first. */
+  kept = hts_strerror(strerror_codes[0], first, sizeof(first));
+  (void) hts_strerror(strerror_codes[1], second, sizeof(second));
+  if (strcmp(kept, strerror_expected[0]) != 0) {
+    fprintf(stderr,
+            "strerror: the next call changed an earlier message to \"%s\"\n",
+            kept);
+    err = 1;
+  }
+  if (strcmp(first, second) == 0) {
+    fprintf(stderr, "strerror: two different codes gave one message \"%s\"\n",
+            first);
+    err = 1;
+  }
+
+  /* Every capacity fills, terminates, and writes nothing past its end. The
+     bytes above it are poisoned non-zero, so a stray NUL shows up too. */
+  {
+    static const size_t sizes[] = {1, 2, 4, 20};
+
+    struct {
+      char dst[20];
+      char tail[8];
+    } s;
+
+    char ref[sizeof(s)];
+    size_t k;
+
+    memset(ref, '#', sizeof(ref));
+    for (k = 0; k < sizeof(sizes) / sizeof(sizes[0]); k++) {
+      const size_t cap = sizes[k];
+
+      memset(&s, '#', sizeof(s));
+      if (hts_strerror(EACCES, s.dst, cap) != s.dst ||
+          memchr(s.dst, '\0', cap) == NULL || (cap > 1 && s.dst[0] == '\0')) {
+        fprintf(stderr, "strerror: capacity %d was not filled and terminated\n",
+                (int) cap);
+        err = 1;
+      }
+      if (memcmp((const char *) &s + cap, ref, sizeof(s) - cap) != 0) {
+        fprintf(stderr, "strerror: capacity %d wrote past its end\n",
+                (int) cap);
+        err = 1;
+      }
+    }
+  }
+
+#if !HTS_STRERROR_REENTRANT
+  printf("strerror: this build kept plain strerror(), so the concurrent phase "
+         "below proves nothing here\n");
+#endif
+  for (i = 0; i < STRERROR_THREADS; i++) {
+    idx[i] = i;
+    if (hts_newthread(strerror_thread, &idx[i]) != 0) {
+      fprintf(stderr, "strerror: cannot spawn\n");
+      return 1;
+    }
+  }
+  htsthread_wait();
+  if (strerror_bad != 0) {
+    fprintf(stderr, "strerror: %d/%d concurrent messages were wrong\n",
+            strerror_bad, STRERROR_THREADS * STRERROR_ROUNDS);
+    err = 1;
+  }
+
+  printf("strerror self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 #define CHANGES_RACE_FILES 8
 #define CHANGES_RACE_ROUNDS 400
 
@@ -16118,6 +16242,9 @@ static const struct selftest_entry {
      st_filterbounds},
     {"filtercap", "", "an over-long filter rule is refused, not stored dead",
      st_filtercap},
+    {"strerror", "",
+     "a thread's error message is its own, never another thread's (#1697)",
+     st_strerror},
     {"log-counters", "",
      "error and warning counts survive a run with no log file (#1681)",
      st_logcounters},
