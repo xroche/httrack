@@ -28,15 +28,20 @@ expand() { # expand TEMPLATE FILENAME
 # Round-trip: expand, run the expansion in a real bash, and the shell must read
 # back exactly the filename with nothing else run. The payloads each carry a
 # "touch $canary" gadget, so a quoting hole fires the canary checked at the end.
-roundtrip() { # roundtrip TEMPLATE FILENAME
-    local out exp
+roundtrip() { # roundtrip TEMPLATE FILENAME [EXPECTED]
+    local out exp want=${3-$2}
     out=$(expand "$1" "$2")
     case $out in
     OK\ *) exp=${out#OK } ;;
     *) fail "expected OK for '$1' '$2', got: $out" ;;
     esac
-    got=$(bash -c "$exp") || fail "eval of [$exp] failed"
-    test "$got" = "$2" || fail "roundtrip '$1' '$2': shell read [$got]"
+    # dash as well as bash: the two differ on what a stray quote does, and the
+    # engine has no idea which /bin/sh system() will hand the command to.
+    for sh in bash dash; do
+        command -v "$sh" >/dev/null 2>&1 || continue
+        got=$("$sh" -c "$exp") || fail "$sh eval of [$exp] failed"
+        test "$got" = "$want" || fail "roundtrip '$1' '$2' under $sh: read [$got]"
+    done
 }
 
 # Every template prints its one argument verbatim, in each context a shell word
@@ -70,6 +75,30 @@ names=(
 for t in "${templates[@]}"; do
     for n in "${names[@]}"; do
         roundtrip "$t" "$n"
+    done
+done
+
+# Two substitutions in one template, the first one backslash-escaped. A
+# backslash applies to the $0 it precedes and is spent there; if the scanner
+# carries it past the substitution it suppresses the NEXT character's quote
+# transition, so the second $0 is quoted for a context the shell is not in.
+# The second $0 sits in each context in turn, and adjacent to the first, which
+# is where a carried flag instead deletes the closing quote just emitted.
+pair_templates=(
+    'printf %s \$0$0'
+    'printf %s \$0"$0"'
+    'printf %s \$0'\''$0'\'''
+    'printf %s \$0"$(printf %s '\''$0'\'')"'
+    'printf %s $0\$0'
+    'printf %s "$0"\$0'
+    # no backslash at all: the control, so a fix that broke pairs outright fails
+    'printf %s $0$0'
+    'printf %s "$0"'\''$0'\'''
+)
+
+for t in "${pair_templates[@]}"; do
+    for n in "${names[@]}"; do
+        roundtrip "$t" "$n" "$n$n"
     done
 done
 

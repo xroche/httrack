@@ -3299,11 +3299,18 @@ int usercommand_expand(char *dest, size_t size, const char *cmd,
          the documented -V "rm \$0" working whether or not a shell got to it
          first. On Windows a backslash is a path separator, and cmd.exe does
          not treat it as an escape, so it stays. */
-      if (escaped && pos > 0)
+      if (escaped) {
+        /* the flag is set only by a backslash this loop just emitted */
+        assertf(pos > 0 && dest[pos - 1] == '\\');
         dest[--pos] = '\0';
+      }
 #endif
       if (!usercommand_append_quoted(dest, size, &pos, file, ctx))
         return USERCOMMAND_EXPAND_TOOLONG;
+      /* the backslash applied to this $0 and is spent; leaving it set would
+         suppress the next character's quote transition, and on the next $0
+         would delete the closing quote just emitted */
+      escaped = HTS_FALSE;
       i++;
       continue;
     }
