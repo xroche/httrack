@@ -662,18 +662,6 @@ const char *hts_strerror(int err, char *buf, size_t size) {
   return buf;
 }
 
-// conversion éventuelle / vers antislash
-#ifdef _WIN32
-char *antislash(char *catbuff, const char *s) {
-  char *a;
-
-  strcpybuff(catbuff, s);
-  while(a = strchr(catbuff, '/'))
-    *a = '\\';
-  return catbuff;
-}
-#endif
-
 // Initialize a htsblk structure
 void hts_init_htsblk(htsblk * r) {
   memset(r, 0, sizeof(htsblk)); // effacer
