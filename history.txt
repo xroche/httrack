@@ -4,6 +4,23 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack
 
+3.50-3
++ Fixed: -V pasted the name of each saved page into the shell command it runs. The name comes from a crawled URL, so a page saved as a;rm -rf ~;.html ran what its name said. The name is an argument now, and $0 expands only in a plain word, inside "..." and inside '...' (#1710)
++ Fixed: --catchurl bound its capture proxy to the address the machine's host name resolves to, so anyone on the network could take the browser's slot and read the cookies it carries. It binds 127.0.0.1 now (#1701)
++ Fixed: -m did not bound a chunked response, whose length the server never announces, so the body grew for as long as the server kept sending. A failed growth then wrote past the end of the buffer (#1709)
++ Changed: the mirror footer is built with bounded writes. Nothing that reaches that buffer today can overflow it, so this is hardening (#1686)
++ Fixed: a site writing a "User-agent: httrack" group and then a "User-agent: *" group had both groups applied to it, so pages the site allows us were skipped and nothing said so. RFC 9309 makes the groups exclusive (#1702)
++ Fixed: a crawl hung forever at teardown when a front end's thread runner cut an FTP worker short (#1671)
++ Fixed: libhttrack killed the program embedding it when a peer went away mid-write, because only httrack itself ever set a SIGPIPE disposition (#1691)
++ Fixed: a run with no log file, which -Q asks for, reported zero errors however many it hit, so a front end announced success over a holed mirror (#1683)
++ Fixed: a corrupt hts-cache was repaired through a file the repair had failed to open, which crashed the crawl (#1699)
++ Fixed: the hts-isalive status dump killed the crawl when its file would not open. It falls back to stdout now (#1704)
++ Fixed: a refused allocation lost the buffer the charset converters were growing (#1703)
++ Fixed: two workers failing at the same time could print each other's error message (#1707)
++ New: a front end can read stat_transport_failures beside stat_errors, to tell a link the server refused from one whose transfer failed (#1676)
++ New: hts_set_thread_runner() is declared in an installed header, so an embedder no longer writes the prototype by hand (#1664)
++ Changed: multiple internal hardening, test and CI improvements
+
 3.50-2
 + New: a running mirror can be stopped or paused by writing hts-abort.lock or hts-stop.lock into the output directory, and a stop keeps the work done so far. The man page documents the four lock files (#1549)
 + New: the lock files work on every platform. They matter most on Windows, which has no signal to send (#1549)

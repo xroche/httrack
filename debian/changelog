@@ -1,3 +1,10 @@
+httrack (3.50.3-1) unstable; urgency=medium
+
+  * New upstream release, security and correctness fixes.  Full list in
+    history.txt.  No packaging change.
+
+ -- Xavier Roche <xavier@debian.org>  Fri, 18 Sep 2026 13:28:45 +0200
+
 httrack (3.50.2-1) unstable; urgency=medium
 
   * New upstream release, mostly security and correctness fixes.  Full list
