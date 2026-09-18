@@ -217,15 +217,16 @@ assert_lockrule_selftest() {
     echo "OK (${coverage#*: }, ${subsecond#*request: })"
 }
 
-# Ask a running engine for something by dropping NAME in its output directory.
-# Is there a request the engine has not taken yet? It takes one stamped after its
-# own hts-in_progress.lock, and a missing stamp errors rather than says no.
-lock_request_pending() { # lock_request_pending DIR NAME
+# Did a request the engine will take reach DIR? It takes one stamped after its
+# own hts-in_progress.lock, and both files have to be there for the comparison
+# to answer rather than error.
+lock_request_landed() { # lock_request_landed DIR NAME
     local request="${1}/${2}" progress="${1}/hts-in_progress.lock"
     test -f "$request" && test -f "$progress" &&
         test "$(mtime "$request")" -gt "$(mtime "$progress")"
 }
 
+# Ask a running engine for something by dropping NAME in its output directory.
 # A bare redirect there reports ENOENT for three reasons a caller cannot separate.
 write_lock_request() { # write_lock_request DIR NAME PID
     local dir=$1 name=$2 pid=$3 gone='' up=$1
@@ -244,19 +245,20 @@ write_lock_request() { # write_lock_request DIR NAME PID
                 echo "write_lock_request: ${dir} took ${try} tries to accept ${name} (#1639)" >&2
             return 0
         fi
-        # drvfs can refuse a write that landed all the same, and a second copy is
-        # a second request the engine takes after it acted on the first (#1680).
-        if lock_request_pending "$dir" "$name"; then return 0; fi
+        # drvfs can refuse a write that landed all the same, and writing again
+        # asks the engine twice (#1680).
+        if lock_request_landed "$dir" "$name"; then return 0; fi
         if test "$try" -eq 1; then
             kill -0 "$pid" 2>/dev/null ||
                 fail "the engine exited before it could be asked for ${name}"
+        else
+            # Read at the failure and latched, because a directory already back
+            # by the time the walk below stats it would read as a refusal.
+            test -d "$dir" || {
+                went=1
+                break
+            }
         fi
-        # Read at the failure and latched, because a directory already back by
-        # the time the walk below stats it would read as a refusal.
-        test -d "$dir" || {
-            went=1
-            break
-        }
     done
     # It walks up because the path crosses the driver's TMPDIR, the test's
     # mktemp directory and the crawl output (#1639). The last two arms only

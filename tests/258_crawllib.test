@@ -304,32 +304,31 @@ write_lock_request "${tmpdir}/out" hts-stop.lock $$' \
     'which is still there, after 30 tries'
 ok "a refusal that outlasts the retries is reported, not blamed on a removal"
 
-# drvfs can refuse a write that landed all the same (#1680), and a read-only
-# file is the nearest local shape: the write fails, the request is there. The
-# background chmod lets a retry succeed, so a helper that retried says so.
+# drvfs can refuse a write that landed all the same (#1680), and a read-only file
+# is the nearest local shape, because the write fails and the request is there.
+# The content is the assertion, since a second write would truncate it.
 if test "$(id -u)" -eq 0; then
     ok "SKIP the refused-but-landed pair, root writes a read-only file regardless"
 else
     holds 'mkdir -p "${tmpdir}/out"
 touch -t 200001010000 "${tmpdir}/out/hts-in_progress.lock"
-: >"${tmpdir}/out/hts-stop.lock"
+echo landed >"${tmpdir}/out/hts-stop.lock"
 chmod 0444 "${tmpdir}/out/hts-stop.lock"
-(sleep 0.05 && chmod 0644 "${tmpdir}/out/hts-stop.lock") &
 write_lock_request "${tmpdir}/out" hts-stop.lock $$
-wait
-test -w "${tmpdir}/out/hts-stop.lock"'
+test "$(cat "${tmpdir}/out/hts-stop.lock")" = landed'
     assert_eq "" "$out" "what the helper printed"
     ok "a request already there ends the retries, so no second one is written"
 
-    # The control, which is 436's third arm: a request an earlier run left is
-    # older than this run's progress lock, so the engine ignores it.
+    # The engine ignores a request no newer than its own progress lock, and the
+    # tie is the edge 436's third arm sits on.
     fires 'mkdir -p "${tmpdir}/out"
 : >"${tmpdir}/out/hts-in_progress.lock"
-touch -t 200001010000 "${tmpdir}/out/hts-stop.lock"
+: >"${tmpdir}/out/hts-stop.lock"
+touch -r "${tmpdir}/out/hts-in_progress.lock" "${tmpdir}/out/hts-stop.lock"
 chmod 0444 "${tmpdir}/out/hts-stop.lock"
 write_lock_request "${tmpdir}/out" hts-stop.lock $$' \
         'which is still there, after 30 tries'
-    ok "an earlier run's request is not taken for this one"
+    ok "a request no newer than the progress lock is not taken for this run"
 fi
 
 # The retry may not wait out a removal. This directory goes while the loop runs
