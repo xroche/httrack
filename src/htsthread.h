@@ -48,7 +48,6 @@ Please visit our Website: http://www.httrack.com
 #define HTS_DEF_FWSTRUCT_htsmutex_s
 typedef struct htsmutex_s htsmutex_s, *htsmutex;
 #endif
-#define HTSMUTEX_INIT NULL
 
 #ifdef _WIN32
 struct htsmutex_s {
@@ -59,9 +58,6 @@ struct htsmutex_s {
   pthread_mutex_t handle;
 };
 #endif /* #ifdef _WIN32 */
-
-/* Library internal definictions */
-HTSEXT_API int hts_newthread(void (*fun) (void *arg), void *arg);
 
 /* Also runs 'tail(arg)' on the worker once the body is over, and only when this
    returns 0. A thread runner (see hts_set_thread_runner()) that recovers from a
@@ -79,19 +75,10 @@ hts_boolean hts_worker_faulted(void);
    abandoned cannot abort this one. Called by a mirror as it starts. */
 void hts_worker_fault_clear(void);
 
-/* Extends per-thread state to the workers: 'enter' runs at each one's start,
-   'leave' at its end with the cookie 'enter' returned. Set before spawning; a
-   NULL in either clears the pair, since neither hook is useful alone. */
-HTSEXT_API void hts_set_thread_hooks(void *(*enter)(void),
-                                     void (*leave)(void *cookie));
-
-HTSEXT_API void htsthread_wait_n(int n_wait);
-
-/* Locking functions */
+/* Locking functions. Only lock and release have callers outside the library,
+   so only those two are declared in httrack-library.h. */
 HTSEXT_API void hts_mutexinit(htsmutex * mutex);
-HTSEXT_API void hts_mutexfree(htsmutex * mutex);
-HTSEXT_API void hts_mutexlock(htsmutex * mutex);
-HTSEXT_API void hts_mutexrelease(htsmutex * mutex);
+HTSEXT_API void hts_mutexfree(htsmutex *mutex);
 
 #ifdef HTS_INTERNAL_BYTECODE
 /* Thread initialization */

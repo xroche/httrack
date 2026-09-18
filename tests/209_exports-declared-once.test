@@ -1,9 +1,12 @@
 #!/bin/bash
 #
-# An exported call declared in an installed header and again in one that stays
-# behind has two signatures that nothing keeps in step, so an embedder can
-# compile against one while the engine uses the other (#1663). The list below
-# is what is left, and it may only shrink.
+# Every exported call must be declared exactly once, in a header an embedder
+# gets. Two ways to break that, one scan for both, and a shrink-only list each.
+# Declared in an installed header and again in one that stays behind: the two
+# signatures are what nothing keeps in step, so an embedder can compile against
+# one while the engine uses the other (#1663). Declared only in a header no
+# install carries: a linker reaches the symbol that a compiler cannot see, so
+# the embedder writes the prototype by hand (#1713).
 
 set -euo pipefail
 
@@ -43,18 +46,24 @@ open { span = span " " $0; if ($0 ~ /;/) flush(); next }
   if ($0 ~ /;/) flush()
 }' "$src"/*.h | LC_ALL=C sort -u >"$work/decls"
 
-# An empty or one-sided scan yields no pairs at all, which the diff below reds
-# against a non-empty pin, so the pin is its own control.
-awk -F'\t' '
+# One pass over the same pairs splits them: a call an installed header also
+# declares is a duplicate, one no installed header declares is unreachable at
+# compile time. An empty or one-sided scan yields no pairs at all, which the
+# diffs below red against non-empty pins, so each pin is its own control.
+awk -F'\t' -v dup="$work/actual" -v solo="$work/actual_uninstalled" '
 NR == FNR { installed[$0] = 1; next }
 { if ($2 in installed) pub[$1] = 1; else priv[$1] = priv[$1] " " $2 }
 END {
   for (s in priv) {
-    if (!(s in pub)) continue
+    out = (s in pub) ? dup : solo
     n = split(priv[s], h, " ")
-    for (i = 1; i <= n; i++) print h[i] "\t" s
+    for (i = 1; i <= n; i++) print h[i] "\t" s > out
   }
-}' "$work/installed" "$work/decls" | LC_ALL=C sort -u >"$work/actual"
+}' "$work/installed" "$work/decls"
+touch "$work/actual" "$work/actual_uninstalled"
+for f in actual actual_uninstalled; do
+    LC_ALL=C sort -u "$work/$f" -o "$work/$f"
+done
 
 # Each survivor is an uninstalled header repeating a call httrack-library.h
 # already declares. Removing one is the point; adding one needs a reason.
@@ -72,4 +81,27 @@ EOF
 diff -u "$work/expected" "$work/actual" ||
     fail "an exported call must be declared in one header only. A '+' line is a new duplicate, so drop it from the uninstalled header and include httrack-library.h there instead. A '-' line is one you removed, so delete it from the list in this test"
 
-echo "exported declarations: $(lines_of "$work/decls"), shared with an uninstalled header: $(lines_of "$work/actual")"
+# Each survivor is an export an embedder can link but cannot declare. Clearing
+# one is a decision, not a patch: publish it in httrack-library.h, or drop
+# HTSEXT_API, which removes a symbol and so bumps the soname (#1713).
+LC_ALL=C sort -u >"$work/expected_uninstalled" <<'EOF'
+htscharset.h	hts_argv_utf8
+htscharset.h	hts_convertStringSystemToUTF8
+htscharset.h	hts_convertStringToUTF8
+htscharset.h	hts_convertStringUTF8ToSystem
+htslib.h	HTS_STAT
+htslib.h	check_hostname_dns
+htslib.h	hts_dns_resolve_nocache
+htslib.h	hts_dns_resolve_nocache2
+htslib.h	hts_uninit_module
+htsthread.h	hts_mutexfree
+htsthread.h	hts_mutexinit
+htsthread.h	htsthread_init
+htsthread.h	htsthread_uninit
+httrack.h	HTS_STAT
+EOF
+
+diff -u "$work/expected_uninstalled" "$work/actual_uninstalled" ||
+    fail "an exported call must be declared in a header the install carries. A '+' line is a new one, so declare it in httrack-library.h or stop exporting it. A '-' line is one you fixed, so delete it from the list in this test"
+
+echo "exported declarations: $(lines_of "$work/decls"), shared with an uninstalled header: $(lines_of "$work/actual"), declared only in one: $(lines_of "$work/actual_uninstalled")"
