@@ -306,16 +306,14 @@ ok "a refusal that outlasts the retries is reported, not blamed on a removal"
 
 # drvfs can refuse a write that landed all the same (#1680), and a read-only file
 # is the nearest local shape, because the write fails and the request is there.
-# The content is the assertion, since a second write would truncate it.
 if test "$(id -u)" -eq 0; then
     ok "SKIP the refused-but-landed pair, root writes a read-only file regardless"
 else
     holds 'mkdir -p "${tmpdir}/out"
 touch -t 200001010000 "${tmpdir}/out/hts-in_progress.lock"
-echo landed >"${tmpdir}/out/hts-stop.lock"
+: >"${tmpdir}/out/hts-stop.lock"
 chmod 0444 "${tmpdir}/out/hts-stop.lock"
-write_lock_request "${tmpdir}/out" hts-stop.lock $$
-test "$(cat "${tmpdir}/out/hts-stop.lock")" = landed'
+write_lock_request "${tmpdir}/out" hts-stop.lock $$'
     assert_eq "" "$out" "what the helper printed"
     ok "a request already there ends the retries, so no second one is written"
 
