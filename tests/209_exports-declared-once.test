@@ -6,7 +6,9 @@
 # compile against one while the engine uses the other (#1663). A call only an
 # uninstalled header declares is a symbol the linker reaches and the compiler
 # cannot see, so the embedder writes the prototype by hand (#1713). Each list
-# below may only shrink.
+# below may only shrink. The scan reads HTSEXT_API and HTSNET_API. It does not
+# read COUCAL_EXTERN, which exports 36 coucal_* calls from an uninstalled
+# header, because that surface belongs to the vendored xroche/coucal.
 
 set -euo pipefail
 
@@ -69,7 +71,7 @@ awk -F'\t' -v two="$work/actual_two_headers" -v hidden="$work/actual_hidden" '
 NR == FNR { installed[$0] = 1; next }
 {
   if (!($1 in seen)) { seen[$1] = 1; order[++n] = $1 }
-  headers[$1] = ($1 in headers) ? headers[$1] "," $2 : $2
+  if ($1 in headers) headers[$1] = headers[$1] "," $2; else headers[$1] = $2
   count[$1]++
   if ($2 in installed) reachable[$1] = 1
 }
