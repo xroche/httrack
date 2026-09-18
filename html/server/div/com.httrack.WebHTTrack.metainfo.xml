@@ -59,7 +59,7 @@
           <li>The capture proxy that takes a URL from your browser listens on this machine only, where any host on your network could reach it before</li>
           <li>A page saved under a name the crawled site chose can no longer run commands of its own through the option that runs a program for each saved file</li>
           <li>A site that writes a rule for HTTrack and then a rule for every crawler is read the way the standard says, so pages it allows are no longer skipped</li>
-          <li>A mirror no longer hangs at the end of a failed transfer, and a run with the log file turned off reports the errors it hit instead of none</li>
+          <li>A crawl no longer stops when the file that reports its progress to the interface cannot be opened, or when a damaged cache is repaired</li>
           <li>More fixes to how the engine bounds what a hostile page or server sends it</li>
         </ul>
       </description>
