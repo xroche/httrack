@@ -45,7 +45,9 @@ grep -qx "$src/httrack-library.h" "$work/headers" ||
 # wrapped after the return type still yields the name it declares. HTSNET_API
 # expands to HTSEXT_API unless proxytrack compiles the file in rather than
 # linking, so it exports too and the scan must see it.
-mapfile -t header_argv <"$work/headers"
+# A read loop rather than mapfile, which the bash 3.2 on macOS does not have.
+header_argv=()
+while IFS= read -r header; do header_argv+=("$header"); done <"$work/headers"
 awk '
 function flush(  s, t, n) {
   s = span; t = ""
@@ -59,7 +61,8 @@ function flush(  s, t, n) {
 }
 FNR == 1 { span = ""; open = 0 }
 open { span = span " " $0; if ($0 ~ /;/) flush(); next }
-/^[ \t]*(extern[ \t]+)?HTS(EXT|NET)_API([ \t]|$)/ {
+/^[ \t]*(extern[ \t]+)?HTS(EXT|NET)_API[ \t]/ ||
+/^[ \t]*(extern[ \t]+)?HTS(EXT|NET)_API$/ {
   span = $0; sub(/.*HTS(EXT|NET)_API/, "", span); open = 1
   if ($0 ~ /;/) flush()
 }' "${header_argv[@]}" | LC_ALL=C sort -u >"$work/decls"
