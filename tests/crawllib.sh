@@ -217,32 +217,47 @@ assert_lockrule_selftest() {
     echo "OK (${coverage#*: }, ${subsecond#*request: })"
 }
 
+# Did a request the engine will take reach DIR? It takes one stamped after its
+# own hts-in_progress.lock.
+lock_request_landed() { # lock_request_landed DIR NAME
+    local request="${1}/${2}" progress="${1}/hts-in_progress.lock"
+    test -f "$request" && test -f "$progress" &&
+        test "$(mtime "$request")" -gt "$(mtime "$progress")"
+}
+
 # Ask a running engine for something by dropping NAME in its output directory.
 # A bare redirect there reports ENOENT for three reasons a caller cannot separate.
 write_lock_request() { # write_lock_request DIR NAME PID
     local dir=$1 name=$2 pid=$3 gone='' up=$1
     local try max_tries=30 went=''
-    # The shell reports a failing redirect before it applies the 2>/dev/null
-    # beside it (#1637).
-    { : >"${dir}/${name}"; } 2>/dev/null && return 0
-    kill -0 "$pid" 2>/dev/null ||
-        fail "the engine exited before it could be asked for ${name}"
-    # drvfs refuses a write into a directory it still holds (#1639), so attempt 1
-    # above gets 29 retries. A removal that went and came back inside the window
-    # would be waited out instead of named, so each failure re-reads the path.
-    for try in $(seq 2 "$max_tries"); do
-        sleep 0.1
+    # drvfs refuses a write into a directory it still holds (#1639), so the first
+    # attempt gets 29 retries. A removal that went and came back inside the
+    # window would be waited out instead of named, so each failure re-reads the
+    # path.
+    for try in $(seq 1 "$max_tries"); do
+        test "$try" -eq 1 || sleep 0.1
+        # The shell reports a failing redirect before it applies the 2>/dev/null
+        # beside it (#1637).
         if { : >"${dir}/${name}"; } 2>/dev/null; then
             # Loud, so a retried write stays countable in the uploaded test log.
-            echo "write_lock_request: ${dir} took ${try} tries to accept ${name} (#1639)" >&2
+            test "$try" -eq 1 ||
+                echo "write_lock_request: ${dir} took ${try} tries to accept ${name} (#1639)" >&2
             return 0
         fi
-        # Read at the failure and latched, because a directory already back by
-        # the time the walk below stats it would read as a refusal.
-        test -d "$dir" || {
-            went=1
-            break
-        }
+        if test "$try" -eq 1; then
+            kill -0 "$pid" 2>/dev/null ||
+                fail "the engine exited before it could be asked for ${name}"
+        else
+            # Read at the failure and latched, because a directory already back
+            # by the time the walk below stats it would read as a refusal.
+            test -d "$dir" || {
+                went=1
+                break
+            }
+        fi
+        # drvfs can refuse a write that landed all the same, and writing again
+        # asks the engine twice (#1680).
+        if lock_request_landed "$dir" "$name"; then return 0; fi
     done
     # It walks up because the path crosses the driver's TMPDIR, the test's
     # mktemp directory and the crawl output (#1639). The last two arms only
