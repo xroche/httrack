@@ -828,37 +828,6 @@ typedef void (*hts_thread_runner)(void (*fun)(void *arg), void *arg);
     does not make the mirror resumable. */
 HTSEXT_API hts_thread_runner hts_set_thread_runner(hts_thread_runner runner);
 
-#ifndef HTS_DEF_FWSTRUCT_htsmutex_s
-#define HTS_DEF_FWSTRUCT_htsmutex_s
-typedef struct htsmutex_s htsmutex_s, *htsmutex;
-#endif
-/* A mutex set to this takes its lock lazily, so an embedder needs no init. */
-#define HTSMUTEX_INIT NULL
-
-/** Spawn a worker running 'fun(arg)'. 0 on success, -1 if it could not be
-    created. */
-HTSEXT_API int hts_newthread(void (*fun)(void *arg), void *arg);
-
-/** Extends per-thread state to the workers: 'enter' runs at each one's start,
-    'leave' at its end with the cookie 'enter' returned. Set before spawning; a
-    NULL in either clears the pair, since neither hook is useful alone. */
-HTSEXT_API void hts_set_thread_hooks(void *(*enter)(void),
-                                     void (*leave)(void *cookie));
-
-/** Block until at most 'n_wait' background mirror threads are left. */
-HTSEXT_API void htsthread_wait_n(int n_wait);
-
-/** Take and release MUTEX. A static one set to HTSMUTEX_INIT needs nothing
-    else, because the first lock creates it. */
-HTSEXT_API void hts_mutexlock(htsmutex *mutex);
-HTSEXT_API void hts_mutexrelease(htsmutex *mutex);
-
-/** Is A a plain file stamped strictly later than B? False unless both can be
-    read. Sub-second where the platform gives it, so a request made in the
-    second a mirror started still sorts after that mirror's
-    hts-in_progress.lock. */
-HTSEXT_API hts_boolean hts_file_is_newer(const char *a, const char *b);
-
 /* UTF-8 aware FILE API */
 /* On non-Windows these macros resolve directly to the POSIX calls. On Windows
    they map to the hts_*_utf8 wrappers below, which convert the UTF-8 path to

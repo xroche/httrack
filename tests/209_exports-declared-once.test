@@ -1,19 +1,20 @@
 #!/bin/bash
 #
-# Every exported call must be declared exactly once, in a header an embedder
-# gets. Two ways to break that, one scan for both, and a shrink-only list each.
-# Declared in an installed header and again in one that stays behind: the two
-# signatures are what nothing keeps in step, so an embedder can compile against
-# one while the engine uses the other (#1663). Declared only in a header no
-# install carries: a linker reaches the symbol that a compiler cannot see, so
-# the embedder writes the prototype by hand (#1713).
+# Every exported call must be declared exactly once, in a header the install
+# carries. Two things break that, and one scan finds both. A call two headers
+# declare has two signatures that nothing keeps in step, so an embedder can
+# compile against one while the engine uses the other (#1663). A call only an
+# uninstalled header declares is a symbol the linker reaches and the compiler
+# cannot see, so the embedder writes the prototype by hand (#1713). Each list
+# below may only shrink.
 
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-src="${abs_top_srcdir:?not run under make check}/src"
+top="${abs_top_srcdir:?not run under make check}"
+src="$top/src"
 test -f "$src/Makefile.am" || fail "no $src/Makefile.am"
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/exports.XXXXXX") || fail "no tmpdir"
@@ -27,8 +28,22 @@ sed -n '/^DevIncludes_DATA[ \t]*=/,/[^\\]$/p' "$src/Makefile.am" |
 grep -qx 'httrack-library.h' "$work/installed" ||
     fail "DevIncludes_DATA did not parse; nothing to call installed"
 
-# One logical declaration per HTSEXT_API, joined up to its ';', so a prototype
-# wrapped after the return type still yields the name it declares.
+# Every header in the tree, because an export can be declared anywhere and a
+# glob of src/*.h alone misses src/minizip. configure writes htsfeatures.h into
+# the build dir, so pick it up there when that is a different directory.
+find "$top" -name '*.h' -print >"$work/headers"
+if [ -f "${abs_top_builddir:-$top}/htsfeatures.h" ] &&
+    ! grep -qx "$top/htsfeatures.h" "$work/headers"; then
+    echo "${abs_top_builddir:-$top}/htsfeatures.h" >>"$work/headers"
+fi
+grep -qx "$src/httrack-library.h" "$work/headers" ||
+    fail "the header scan missed $src/httrack-library.h"
+
+# One logical declaration per export macro, joined up to its ';', so a prototype
+# wrapped after the return type still yields the name it declares. HTSNET_API
+# expands to HTSEXT_API unless proxytrack compiles the file in rather than
+# linking, so it exports too and the scan must see it.
+mapfile -t header_argv <"$work/headers"
 awk '
 function flush(  s, t, n) {
   s = span; t = ""
@@ -40,68 +55,90 @@ function flush(  s, t, n) {
   if (t != "") { n = FILENAME; sub(/.*\//, "", n); print t "\t" n }
   span = ""; open = 0
 }
+FNR == 1 { span = ""; open = 0 }
 open { span = span " " $0; if ($0 ~ /;/) flush(); next }
-/^[ \t]*(extern[ \t]+)?HTSEXT_API[ \t]/ {
-  span = $0; sub(/.*HTSEXT_API/, "", span); open = 1
+/^[ \t]*(extern[ \t]+)?HTS(EXT|NET)_API([ \t]|$)/ {
+  span = $0; sub(/.*HTS(EXT|NET)_API/, "", span); open = 1
   if ($0 ~ /;/) flush()
-}' "$src"/*.h | LC_ALL=C sort -u >"$work/decls"
+}' "${header_argv[@]}" | LC_ALL=C sort -u >"$work/decls"
 
-# One pass over the same pairs splits them: a call an installed header also
-# declares is a duplicate, one no installed header declares is unreachable at
-# compile time. An empty or one-sided scan yields no pairs at all, which the
-# diffs below red against non-empty pins, so each pin is its own control.
-awk -F'\t' -v dup="$work/actual" -v solo="$work/actual_uninstalled" '
+# Sorting above puts each call's headers in order, so joining them with a comma
+# below gives one stable row. An empty or one-sided scan yields no rows at all,
+# which the diffs red against non-empty pins, so each pin is its own control.
+awk -F'\t' -v two="$work/actual_two_headers" -v hidden="$work/actual_hidden" '
 NR == FNR { installed[$0] = 1; next }
-{ if ($2 in installed) pub[$1] = 1; else priv[$1] = priv[$1] " " $2 }
+{
+  if (!($1 in seen)) { seen[$1] = 1; order[++n] = $1 }
+  headers[$1] = ($1 in headers) ? headers[$1] "," $2 : $2
+  count[$1]++
+  if ($2 in installed) reachable[$1] = 1
+}
 END {
-  for (s in priv) {
-    out = (s in pub) ? dup : solo
-    n = split(priv[s], h, " ")
-    for (i = 1; i <= n; i++) print h[i] "\t" s > out
+  for (i = 1; i <= n; i++) {
+    call = order[i]
+    if (count[call] > 1)
+      print call "\t" headers[call] > two
+    if (!(call in reachable))
+      print call "\t" headers[call] > hidden
   }
 }' "$work/installed" "$work/decls"
-touch "$work/actual" "$work/actual_uninstalled"
-for f in actual actual_uninstalled; do
+touch "$work/actual_two_headers" "$work/actual_hidden"
+for f in actual_two_headers actual_hidden; do
     LC_ALL=C sort -u "$work/$f" -o "$work/$f"
 done
 
-# Each survivor is an uninstalled header repeating a call httrack-library.h
-# already declares. Removing one is the point; adding one needs a reason.
-LC_ALL=C sort -u >"$work/expected" <<'EOF'
-htslib.h	hts_fopen_utf8
-htslib.h	hts_mkdir_utf8
-htslib.h	hts_rename_utf8
-htslib.h	hts_stat_utf8
-htslib.h	hts_unlink_utf8
-htslib.h	hts_utime_utf8
-htslib.h	hts_version
-htstools.h	hts_buildtopindex
+# Each row is one call declared by two headers. Drop the copy from whichever
+# header is not installed, or from the more specific one when both are, and let
+# that header include httrack-library.h instead. A call can sit in this list and
+# in the one below, because the two faults are independent.
+LC_ALL=C sort -u >"$work/expected_two_headers" <<'EOF'
+HTS_STAT	htslib.h,httrack.h
+hts_buildtopindex	htstools.h,httrack-library.h
+hts_fopen_utf8	htslib.h,httrack-library.h
+hts_get_error_callback	htssafe.h,httrack-library.h
+hts_get_version_info	htsmodules.h,httrack-library.h
+hts_is_available	htsmodules.h,httrack-library.h
+hts_mkdir_utf8	htslib.h,httrack-library.h
+hts_rename_utf8	htslib.h,httrack-library.h
+hts_stat_utf8	htslib.h,httrack-library.h
+hts_unlink_utf8	htslib.h,httrack-library.h
+hts_utime_utf8	htslib.h,httrack-library.h
+hts_version	htslib.h,httrack-library.h
+htswrap_free	htswrap.h,httrack-library.h
+htswrap_init	htswrap.h,httrack-library.h
 EOF
 
-diff -u "$work/expected" "$work/actual" ||
-    fail "an exported call must be declared in one header only. A '+' line is a new duplicate, so drop it from the uninstalled header and include httrack-library.h there instead. A '-' line is one you removed, so delete it from the list in this test"
+diff -u "$work/expected_two_headers" "$work/actual_two_headers" ||
+    fail "an exported call must be declared in one header only. A '+' line is a new duplicate, so drop it from one header and include httrack-library.h there instead. A '-' line is one you removed, so delete it from the list in this test"
 
-# Each survivor is an export an embedder can link but cannot declare. Clearing
-# one is a decision, not a patch: publish it in httrack-library.h, or drop
-# HTSEXT_API, which removes a symbol and so bumps the soname (#1713).
-LC_ALL=C sort -u >"$work/expected_uninstalled" <<'EOF'
-htscharset.h	hts_argv_utf8
-htscharset.h	hts_convertStringSystemToUTF8
-htscharset.h	hts_convertStringToUTF8
-htscharset.h	hts_convertStringUTF8ToSystem
-htslib.h	HTS_STAT
-htslib.h	check_hostname_dns
-htslib.h	hts_dns_resolve_nocache
-htslib.h	hts_dns_resolve_nocache2
-htslib.h	hts_uninit_module
-htsthread.h	hts_mutexfree
-htsthread.h	hts_mutexinit
-htsthread.h	htsthread_init
-htsthread.h	htsthread_uninit
-httrack.h	HTS_STAT
+# Each row is a call an embedder can link but cannot declare. Clearing one takes
+# a real choice. Publish it in httrack-library.h, or drop the export macro and
+# bump the soname for the symbol that goes (#1713).
+LC_ALL=C sort -u >"$work/expected_hidden" <<'EOF'
+HTS_STAT	htslib.h,httrack.h
+check_hostname_dns	htslib.h
+hts_argv_utf8	htscharset.h
+hts_convertStringSystemToUTF8	htscharset.h
+hts_convertStringToUTF8	htscharset.h
+hts_convertStringUTF8ToSystem	htscharset.h
+hts_dns_resolve_nocache	htslib.h
+hts_dns_resolve_nocache2	htslib.h
+hts_file_is_newer	htslib.h
+hts_mutexfree	htsthread.h
+hts_mutexinit	htsthread.h
+hts_mutexlock	htsthread.h
+hts_mutexrelease	htsthread.h
+hts_newthread	htsthread.h
+hts_set_thread_hooks	htsthread.h
+hts_uninit_module	htslib.h
+htsthread_init	htsthread.h
+htsthread_uninit	htsthread.h
+htsthread_wait_n	htsthread.h
 EOF
 
-diff -u "$work/expected_uninstalled" "$work/actual_uninstalled" ||
+diff -u "$work/expected_hidden" "$work/actual_hidden" ||
     fail "an exported call must be declared in a header the install carries. A '+' line is a new one, so declare it in httrack-library.h or stop exporting it. A '-' line is one you fixed, so delete it from the list in this test"
 
-echo "exported declarations: $(lines_of "$work/decls"), shared with an uninstalled header: $(lines_of "$work/actual"), declared only in one: $(lines_of "$work/actual_uninstalled")"
+echo "exported declarations: $(lines_of "$work/decls")," \
+    "declared by two headers: $(lines_of "$work/actual_two_headers")," \
+    "declared by no installed header: $(lines_of "$work/actual_hidden")"

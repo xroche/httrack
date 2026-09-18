@@ -3,10 +3,8 @@
 # The four calls the release notes advertise must reach an embedder from the
 # installed headers alone (#1663): hts_set_thread_runner(),
 # hts_mirror_completed(), hts_findgetsize64() and the deprecated
-# hts_findgetsize(). The thread and mutex calls htsserver makes are here for the
-# same reason (#1713), HTSMUTEX_INIT included, since a lock nothing can
-# initialise is not usable. A missing declaration and a missing export are
-# different failures, so compile and link are separate steps here.
+# hts_findgetsize(). A missing declaration and a missing export are different
+# failures, so compile and link are separate steps here.
 
 set -euo pipefail
 
@@ -64,14 +62,8 @@ run_with_install_lock env MAKEFLAGS= MFLAGS= "$make" -C "$abs_top_builddir/src" 
 cat >"$tmp/consumer.c" <<'EOF'
 #include <httrack/httrack-library.h>
 
-static htsmutex embedder_mutex = HTSMUTEX_INIT;
-
 static void embedder_runner(void (*fun)(void *arg), void *arg) {
   fun(arg);
-}
-
-static void embedder_worker(void *arg) {
-  (void) arg;
 }
 
 int main(void) {
@@ -84,14 +76,6 @@ int main(void) {
   LLint size = -1;
   int truncated = -1;
   int kinds = 0;
-
-  hts_set_thread_hooks(NULL, NULL);
-  hts_mutexlock(&embedder_mutex);
-  hts_mutexrelease(&embedder_mutex);
-  if (hts_newthread(embedder_worker, NULL) == 0)
-    htsthread_wait_n(0);
-  if (hts_file_is_newer(path, path))
-    return 1;
 
   if (find != NULL) {
     do {
