@@ -85,8 +85,7 @@ int main(void) {
   httrackp *opt = hts_create_opt();
   find_handle find = hts_findfirst(path);
   hts_tristate completed = HTS_DEFAULT;
-  htsmutex lazy = HTSMUTEX_INIT;
-  htsmutex eager = HTSMUTEX_INIT;
+  htsmutex lock = HTSMUTEX_INIT;
   char *utf8 = hts_convertStringToUTF8("a", 1, "iso-8859-1");
   const char *name = NULL;
   LLint size = -1;
@@ -94,11 +93,10 @@ int main(void) {
   int kinds = 0;
 
   hts_set_thread_hooks(embedder_enter, embedder_leave);
-  hts_mutexinit(&eager);
-  hts_mutexfree(&eager);
-  hts_mutexlock(&lazy);
-  hts_mutexrelease(&lazy);
-  hts_mutexfree(&lazy);
+  hts_mutexinit(&lock);
+  hts_mutexlock(&lock);
+  hts_mutexrelease(&lock);
+  hts_mutexfree(&lock);
   if (hts_newthread(embedder_worker, NULL) == 0)
     htsthread_wait_n(0);
 

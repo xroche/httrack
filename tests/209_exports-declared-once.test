@@ -29,6 +29,11 @@ sed -n '/^DevIncludes_DATA[ \t]*=/,/[^\\]$/p' "$src/Makefile.am" |
     LC_ALL=C sort -u >"$work/installed"
 grep -qx 'httrack-library.h' "$work/installed" ||
     fail "DevIncludes_DATA did not parse; nothing to call installed"
+# The other half of the same control: a parse that swept the tree rather than
+# reading DevIncludes_DATA calls every header installed, which would empty the
+# hidden list below whatever the headers say.
+! grep -qx 'htslib.h' "$work/installed" ||
+    fail "the installed set holds htslib.h, which DevIncludes_DATA does not list"
 
 # Every header in the tree, because an export can be declared anywhere and a
 # glob of src/*.h alone misses src/minizip. configure writes htsfeatures.h into
@@ -116,8 +121,9 @@ diff -u "$work/expected_two_headers" "$work/actual_two_headers" ||
     fail "an exported call must be declared in one header only. A '+' line is a new duplicate, so drop it from one header and include httrack-library.h there instead. A '-' line is one you removed, so delete it from the list in this test"
 
 # Every exported call is declared in a header the install carries (#1713), so
-# this list is empty and no longer its own control. The two-header pin above,
-# read off the same $work/decls, still reds and stays the control.
+# this list is empty and no longer its own control. Two others stand in: the
+# two-header pin above reds on a scan that found no declaration at all, and the
+# installed-set assertions red on one that called every header installed.
 LC_ALL=C sort -u >"$work/expected_hidden" <<'EOF'
 EOF
 
