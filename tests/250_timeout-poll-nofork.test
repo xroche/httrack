@@ -93,7 +93,9 @@ else
     # Named, not assumed: a parent that had already exited would make the arm below
     # pass for the wrong reason.
     kill -0 "$live" 2>/dev/null || fail "the live half of the fixture died before it was graded"
-    REAP_GRACE=1 reap_bounded "$live" && fail "reap_bounded called a running process reaped"
+    rc=0
+    REAP_GRACE=1 reap_bounded "$live" || rc=$?
+    test "$rc" -eq 1 || fail "a running process the host answered for graded $rc, not 1"
     ok "reap_bounded reads a killed-but-uncollected process as stopped, a live one as running"
 fi
 : >"$tmp/release"
@@ -175,9 +177,15 @@ PATH=$path_was
 PATH=$tmp/psnone
 pid_is_zombie "$unreadable_live" && nops_exit=yes || nops_exit=no
 pid_state_readable "$unreadable_live" && nops_read=yes || nops_read=no
+# And the reap that rests on them, which is where #1668 left GNU/Hurd. This shell
+# is running, so a host that answered would say 1; one that answers for nothing
+# saw no survivor and must not report one.
+nops_reap=0
+REAP_GRACE=0 reap_bounded "$unreadable_live" || nops_reap=$?
 PATH=$path_was
 test "$nops_exit" = no || fail "a live process was read as exited where no ps exists"
 test "$nops_read" = no || fail "a live process with no answer anywhere was called readable"
+test "$nops_reap" -eq 0 || fail "a host that answers for no pid reported a survivor ($nops_reap)"
 pid_state_readable "$absent" && fail "a pid neither route answers for was called readable"
 unset TESTLIB_PROC
 ok "pid_state takes the host's answer, and never reads no answer as an exit"
