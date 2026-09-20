@@ -178,9 +178,8 @@ PATH=$tmp/psnone
 pid_is_zombie "$unreadable_live" && nops_exit=yes || nops_exit=no
 pid_state_readable "$unreadable_live" && nops_read=yes || nops_read=no
 # And the reap that rests on them. This shell is running, so a host that answers
-# says 1, and one that answers for nothing must report no survivor. Timed with a
-# grace it must not spend: silence is the whole answer, and every GNU/Hurd reap
-# used to wait out the grace for one that never came (#1718).
+# says 1, and one that answers for nothing must report no survivor. The call is
+# timed, because silence must not cost a grace (#1718).
 nops_reap=0
 nops_began=$SECONDS
 REAP_GRACE=3 reap_bounded "$unreadable_live" || nops_reap=$?

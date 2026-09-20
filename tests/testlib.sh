@@ -1246,10 +1246,8 @@ REAP_GRACE=${REAP_GRACE:-10}
 # nothing here, and macOS takes the ps route, whose POSIX keyword ps_snapshot
 # already relies on. Never infer the state from a failed read: Hurd returns EIO
 # for a live task that is merely suspended, so absence of an answer is not death.
-# No route answers for a GNU/Hurd zombie, and none can: proc_getprocinfo looks the
-# pid up with pid_find, which rejects a dead-but-uncollected entry, so the server
-# says ESRCH. ps drops the whole row before printing a field, and procfs is built
-# on the same call. Neither a spelling nor -Q reaches it (#1718).
+# No route answers for a GNU/Hurd zombie, because its proc server says ESRCH for
+# a dead pid nobody has collected. No ps spelling reaches it (#1718).
 pid_state() { # pid_state PID
     local proc=${TESTLIB_PROC:-/proc} st=''
     # The whole file and the line it gave, never read's status: comm is unescaped,
@@ -1327,11 +1325,9 @@ reap_bounded() {
         # pid_is_zombie leaves this poll's answer in PID_STATE, so what the host
         # said costs nothing to read back.
         if pid_is_zombie "$pid"; then break; fi
-        # Silence never turns into an answer, so stop rather than spend the grace
-        # on it: no verdict either way, and GNU/Hurd pays that grace per reap.
+        # Silence never becomes an answer, so stop instead of spending the grace.
         test -n "$PID_STATE" || return 0
-        # Never the wait below, because a host that answers still calls this pid
-        # running, and waiting on it is the wedge this helper exists to avoid.
+        # Never the wait below, because an answering host still calls this running.
         test "$((SECONDS - start))" -le "$REAP_GRACE" || return 1
         poll_wait 1
     done
