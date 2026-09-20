@@ -1,0 +1,30 @@
+#!/bin/bash
+#
+# A command-line user had no way to learn the GUI was installed too (#902):
+# "brew install httrack" lands webhttrack in bin and nothing names it.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+if target_is_windows; then
+    gui=WinHTTrack.exe
+else
+    gui=webhttrack
+fi
+
+printf '[--help names the GUI] ..\t'
+help=$(httrack --quiet --help 2>&1) || fail "httrack --help failed"
+grep -q "^HTTrack version " <<<"$help" || fail "--help did not print its version banner"
+grep -q "'${gui}'" <<<"$help" || fail "--help never names ${gui}"
+echo OK
+
+printf '[the man page points at webhttrack(1)] ..\t'
+page="${top_srcdir:-..}/man/httrack.1"
+test -f "$page" || fail "no $page"
+seealso=$(sed -n '/^\.SH "SEE ALSO"/,$p' "$page")
+test -n "$seealso" || fail "$page has no SEE ALSO section"
+grep -q 'webhttrack (1)' <<<"$seealso" ||
+    fail "$page does not point at webhttrack(1) under SEE ALSO"
+echo OK

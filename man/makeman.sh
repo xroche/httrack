@@ -240,4 +240,7 @@ documentation (available online at
 (available online at
 .B https://www.httrack.com/html/faq.html
 )
+.PP
+The graphical interface is
+.BR webhttrack (1).
 EOF
