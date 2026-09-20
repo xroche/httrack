@@ -1234,6 +1234,9 @@ budget_left() {
 # reap a native Windows descendant -- the very case these watchdogs exist for --
 # and a bare `wait` then blocks the watchdog itself forever, so the timeout it was
 # about to report is never printed and the whole suite wedges silently.
+#
+# Non-zero means a host that answers for this pid called it running. Where no
+# route answers, nothing saw a survivor and none is reported (#1718).
 REAP_GRACE=${REAP_GRACE:-10}
 
 # The state letter for pid $1, in PID_STATE, empty when this host will not say.
@@ -1317,8 +1320,15 @@ pid_state_readable() { # pid_state_readable PID
 reap_bounded() {
     local pid=$1 start=$SECONDS
     while kill -0 "$pid" 2>/dev/null; do
+        # pid_is_zombie leaves this poll's answer in PID_STATE, so what the host
+        # said costs nothing to read back.
         if pid_is_zombie "$pid"; then break; fi
-        test "$((SECONDS - start))" -le "$REAP_GRACE" || return 1
+        if test "$((SECONDS - start))" -gt "$REAP_GRACE"; then
+            # Never the wait below, because the process is still up and waiting
+            # on it is the wedge this helper exists to avoid.
+            if test -n "$PID_STATE"; then return 1; fi
+            return 0
+        fi
         poll_wait 1
     done
     wait "$pid" 2>/dev/null || true
