@@ -78,13 +78,14 @@ static void embedder_leave(void *cookie) {
   (void) cookie;
 }
 
+/* Never run: it only has to compile and link. */
 int main(void) {
   char path[] = ".";
   hts_thread_runner previous = hts_set_thread_runner(embedder_runner);
   httrackp *opt = hts_create_opt();
   find_handle find = hts_findfirst(path);
   hts_tristate completed = HTS_DEFAULT;
-  htsmutex lock = HTSMUTEX_INIT;
+  htsmutex lazy = HTSMUTEX_INIT;
   htsmutex eager = HTSMUTEX_INIT;
   char *utf8 = hts_convertStringToUTF8("a", 1, "iso-8859-1");
   const char *name = NULL;
@@ -95,9 +96,9 @@ int main(void) {
   hts_set_thread_hooks(embedder_enter, embedder_leave);
   hts_mutexinit(&eager);
   hts_mutexfree(&eager);
-  hts_mutexlock(&lock);
-  hts_mutexrelease(&lock);
-  hts_mutexfree(&lock);
+  hts_mutexlock(&lazy);
+  hts_mutexrelease(&lazy);
+  hts_mutexfree(&lazy);
   if (hts_newthread(embedder_worker, NULL) == 0)
     htsthread_wait_n(0);
 

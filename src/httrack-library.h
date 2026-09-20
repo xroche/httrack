@@ -848,8 +848,8 @@ HTSEXT_API void htsthread_wait_n(int n_wait);
 #define HTS_DEF_FWSTRUCT_htsmutex_s
 typedef struct htsmutex_s htsmutex_s, *htsmutex;
 #endif
-/** A lock nobody has built yet: hts_mutexlock() builds it on first use, so
-    hts_mutexinit() is only needed to build one ahead of time. */
+/** Marks a lock nobody has built yet. hts_mutexlock() builds it on first use,
+    so hts_mutexinit() is for building one early. */
 #define HTSMUTEX_INIT NULL
 
 HTSEXT_API void hts_mutexinit(htsmutex *mutex);
@@ -874,18 +874,15 @@ HTSEXT_API char *hts_convertStringSystemToUTF8(const char *s, size_t size);
 HTSEXT_API char *hts_convertStringUTF8ToSystem(const char *s, size_t size);
 
 /** Replace the CRT's ANSI argv by a UTF-8 one decoded from the real UTF-16
-    command line: every char* is UTF-8 on Windows (FOPEN, STAT, ... convert at
-    the syscall boundary). Keeps the CRT's argv on failure; the new array is
-    writable, NULL-terminated, and lives for the process. Windows only. */
+    command line. Keeps the CRT's argv on failure, and the new array is
+    writable, NULL-terminated and lives for the process. Windows only. */
 HTSEXT_API void hts_argv_utf8(int *pargc, char ***pargv);
 #endif
 
 /* Files */
 
 /** Is A a plain file stamped strictly later than B? False unless both can be
-    read. Sub-second where the platform gives it, so a request made in the
-    second a mirror started still sorts after that mirror's
-    hts-in_progress.lock. */
+    read, and the resolution is sub-second where the platform gives it. */
 HTSEXT_API hts_boolean hts_file_is_newer(const char *a, const char *b);
 
 /* UTF-8 aware FILE API */

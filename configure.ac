@@ -32,13 +32,16 @@ AC_CONFIG_HEADERS(config.h)
 # header we can install without handing a consumer our PACKAGE_* and HAVE_*.
 AC_CONFIG_HEADERS([htsfeatures.h:src/htsfeatures.h.in])
 AM_INIT_AUTOMAKE([subdir-objects])
-# 3:24:0: revision-only DESPITE an ABI break. #1713 published thirteen exports in
-# httrack-library.h, which adds no symbol, and dropped HTSEXT_API from six that
-# only the library itself calls: check_hostname_dns, hts_dns_resolve_nocache,
-# hts_dns_resolve_nocache2, hts_uninit_module, htsthread_init and
-# htsthread_uninit. Those six leave libhttrack.so.3. The libtool rules want
-# current++ plus a libhttrack4 rename; declined, see 3:7:0, and a client that
-# linked one of the six gets a link error rather than a silent misbehaviour.
+# 3:24:0: revision-only DESPITE an ABI break. #1713 published thirteen exports
+# in httrack-library.h, which adds no symbol. It also dropped HTSEXT_API from
+# six calls only the library itself makes, so check_hostname_dns,
+# hts_dns_resolve_nocache, hts_dns_resolve_nocache2, hts_uninit_module,
+# htsthread_init and htsthread_uninit leave libhttrack.so.3. The libtool rules
+# want current++ and a libhttrack4 rename, declined as at 3:7:0. Every earlier
+# decline here moved a layout, which only bites a client that rebuilds. A
+# removed symbol also reaches one that never rebuilds, and that one fails at
+# load with a symbol lookup error. Accepted because HTTraQt is the only consumer
+# of the installed headers, and it is rebuilt.
 # 3:23:0: revision-only bump. httrackp gained a tail field (transport_failures)
 # and hts_stat_struct one (stat_transport_failures); no export came or went, and
 # hts_set_thread_runner's declaration only moved into an installed header. HTS_STAT
