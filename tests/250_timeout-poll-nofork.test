@@ -177,9 +177,8 @@ PATH=$path_was
 PATH=$tmp/psnone
 pid_is_zombie "$unreadable_live" && nops_exit=yes || nops_exit=no
 pid_state_readable "$unreadable_live" && nops_read=yes || nops_read=no
-# And the reap that rests on them, which is where #1668 left GNU/Hurd. This shell
-# is running, so a host that answered would say 1; one that answers for nothing
-# saw no survivor and must not report one.
+# And the reap that rests on them. This shell is running, so a host that answers
+# says 1, and one that answers for nothing must report no survivor.
 nops_reap=0
 REAP_GRACE=0 reap_bounded "$unreadable_live" || nops_reap=$?
 PATH=$path_was

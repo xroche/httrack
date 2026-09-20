@@ -1235,10 +1235,8 @@ budget_left() {
 # and a bare `wait` then blocks the watchdog itself forever, so the timeout it was
 # about to report is never printed and the whole suite wedges silently.
 #
-# Non-zero means a host that answered for this pid called it running, so the
-# caller may report a survivor. A host that answers for nothing gave no such
-# verdict. GNU/Hurd answered for no zombie on either buildd, and the 1 that came
-# back became a hang naming a process list that showed none (#1718).
+# Non-zero means a host that answers for this pid called it running. Where no
+# route answers, nothing saw a survivor and none is reported (#1718).
 REAP_GRACE=${REAP_GRACE:-10}
 
 # The state letter for pid $1, in PID_STATE, empty when this host will not say.
@@ -1265,8 +1263,7 @@ pid_state() { # pid_state PID
         PID_STATE=${st%% *}
         return 0
     fi
-    # Hurd's ps rejects -p and takes the pid positionally, so ask both ways. It
-    # answered for no zombie on the Hurd buildds all the same (#1718).
+    # Hurd's ps takes the pid positionally and rejects -p, so ask both ways.
     st=$(ps -o state= -p "$1" 2>/dev/null) ||
         st=$(ps -o state= "$1" 2>/dev/null) || st=
     # One row, or none: a ps that answered for more than one pid, or printed a
@@ -1321,16 +1318,15 @@ pid_state_readable() { # pid_state_readable PID
 }
 
 reap_bounded() {
-    local pid=$1 start=$SECONDS answered=
+    local pid=$1 start=$SECONDS
     while kill -0 "$pid" 2>/dev/null; do
-        # pid_is_zombie leaves the host's answer in PID_STATE, so the record of
-        # whether this host ever answered costs nothing extra.
+        # pid_is_zombie leaves this poll's answer in PID_STATE, so what the host
+        # said costs nothing to read back.
         if pid_is_zombie "$pid"; then break; fi
-        test -z "$PID_STATE" || answered=yes
         if test "$((SECONDS - start))" -gt "$REAP_GRACE"; then
-            # Never the wait below: the process is still up, and waiting on it is
-            # the wedge this helper exists to avoid.
-            if test -n "$answered"; then return 1; fi
+            # Never the wait below, because the process is still up and waiting
+            # on it is the wedge this helper exists to avoid.
+            if test -n "$PID_STATE"; then return 1; fi
             return 0
         fi
         poll_wait 1
