@@ -1250,9 +1250,8 @@ pid_state() { # pid_state PID
     # end of file anyway. The group keeps a failed open off the caller's stderr.
     # || true, because -d '' returns non-zero at end of file on a whole file it
     # read, and a caller writing this as a statement would abort under errexit.
-    # Only a regular file: the Hurd hands back raw directory data for a read of
-    # a directory, where every other host fails that read, so an entry that is
-    # not a file would forge a state out of whatever bytes came back.
+    # The read takes a regular file only, because the Hurd answers a directory
+    # read with bytes where other hosts fail it, and those bytes forge a state.
     if test -f "$proc/$1/stat"; then
         { read -r -d '' st <"$proc/$1/stat"; } 2>/dev/null || true
     fi
@@ -1278,7 +1277,7 @@ pid_state() { # pid_state PID
 # Hurd's crash server writes one whatever the limit says, so a test that
 # asserts the absence of a core would red there for the host's reason and not
 # its own. Graded by crashing a shell in a scratch directory under $1.
-core_limit_honored() { # core_limit_honored DIR
+core_limit_honored() { # core_limit_honored PARENT_DIR
     local probe=$1/.ctl-coredump left
     rm -rf "$probe"
     mkdir -p "$probe" || return 0

@@ -2262,9 +2262,9 @@ static int st_ucs4_oom(httrackp *opt, int argc, char **argv) {
   (void) argc;
   (void) argv;
 #if defined(__GNU__)
-  /* GNU/Hurd does not come back from a starved process: the run below dies on
-     SIGSEGV with the abort it is grading never reached, and not even the
-     assert's own message on stderr. */
+  /* GNU/Hurd does not come back from a starved process. The run dies on
+     SIGSEGV before the abort it grades, and the assert's own message never
+     reaches stderr. */
   printf("ucs4: a capped process does not survive here, skipped\n");
   return 0;
 #elif !defined(_WIN32)
@@ -9894,8 +9894,8 @@ static int st_socketpair(T_SOC sv[2]) {
 }
 
 #ifndef _WIN32
-/* Drop the peer so a write gets EPIPE: SO_LINGER with a zero timeout asks for
-   a RST rather than a FIN. */
+/* Drop the peer so a write gets EPIPE, because SO_LINGER with a zero timeout
+   asks for a RST rather than a FIN. GNU/Hurd's pfinet sends a FIN anyway. */
 static void st_kill_peer(T_SOC soc) {
   struct linger lg;
 
@@ -9933,16 +9933,15 @@ static int st_sigpipe(httrackp *opt, int argc, char **argv) {
   /* What newhttp_addr does to a real one. On macOS this is the whole cover,
      because HTS_MSG_NOSIGNAL is 0 there. */
   socket_set_nosigpipe(sv[1]);
-  /* Wait for the peer to be gone, rather than assume a write count outlasts
-     it: Darwin hands loopback input to another thread. Nothing was ever sent
-     here, so the read takes the ECONNRESET, or end of file on GNU/Hurd, whose
-     pfinet closes with FIN however SO_LINGER was set. */
+  /* Wait for the peer to be gone rather than assume a write count outlasts it,
+     because Darwin hands loopback input to another thread. Nothing was ever
+     sent on this socket, so the read takes the reset, or the end of file. */
   assertf(check_readinput_t(sv[1], 10) == 1);
   assertf(recv(sv[1], discard, sizeof(discard), 0) <= 0);
-  /* A FIN leaves this half of the connection open, so a write still succeeds
-     there and only the peer's answer to it breaks the pipe. Waited for rather
-     than outrun, because the loopback race #1711 fixed would otherwise decide
-     whether the writes below meet it. */
+  /* A FIN leaves this half open, so the first write succeeds and only the
+     peer's answer breaks the pipe. Wait for that answer, because the loopback
+     race fixed in #1711 would otherwise decide whether the writes below meet
+     it. */
   if (sendc(&r, "GET / HTTP/1.0\r\n\r\n") >= 0)
     assertf(check_readinput_t(sv[1], 10) == 1);
   /* Twice, so a platform that re-reports ECONNRESET still owes EPIPE. */

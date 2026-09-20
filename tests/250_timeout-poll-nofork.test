@@ -102,7 +102,7 @@ fi
 #
 # A directory stands in for an entry that is not the file pid_state expects,
 # and for the nothing Hurd yields for a task it cannot summarise. Neither may
-# count as death: Hurd answers the same way for a live task merely suspended.
+# count as death, because Hurd answers the same way for a suspended live task.
 # The pids are ones no host allocates, so a seam that failed open would grade a
 # live kernel thread instead of the fixture.
 running=9999992 exited=9999993 unterminated=9999994 chardev=9999995
@@ -128,8 +128,8 @@ pid_is_zombie "$splitcomm" && fail "a process name holding a newline forged stat
 # nothing says nothing, and this shell is running.
 pid_is_zombie "$unreadable_live" && fail "an entry that yields nothing was read as an exit"
 pid_state_readable "$running" || fail "a stat line the host gave was called unreadable"
-# The other non-file entry, and the one the Hurd answers with bytes rather than
-# with the EISDIR every other host gives for the directory above.
+# A device answers a read with bytes on every host, which is what the Hurd does
+# for the directory above and no other host does. Neither answer is a state.
 ln -s /dev/urandom "$tmp/proc/$chardev/stat" 2>/dev/null || true
 pid_state_readable "$chardev" && fail "bytes read from a device were called a state"
 # A failed open must stay off the caller's stderr: every macOS poll takes this
