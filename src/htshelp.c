@@ -66,6 +66,13 @@ Please visit our Website: http://www.httrack.com
 #endif
 #endif
 
+#ifdef _WIN32
+#define HTS_GUI_HINT "run 'WinHTTrack.exe' to get the GUI version."
+#else
+/* Not "run it": Debian ships webhttrack in its own package. */
+#define HTS_GUI_HINT "the GUI version is 'webhttrack'."
+#endif
+
 #define waitkey if (more) { char s[4]; printf("\nMORE.. q to quit\n"); linput(stdin,s,4); if (strcmp(s,"q")==0) quit=1; else printf("Page %d\n\n",++m); }
 void infomsg(const char *msg) {
   int l = 0;
@@ -192,10 +199,8 @@ void help_wizard(httrackp * opt) {
          "%s\n", hts_get_version_info(opt));
   printf("Copyright (C) 1998-%s Xavier Roche and other contributors\n",
          &__DATE__[7]);
-#ifdef _WIN32
   printf("Note: You are running the commandline version,\n");
-  printf("run 'WinHTTrack.exe' to get the GUI version.\n");
-#endif
+  printf("%s\n", HTS_GUI_HINT);
   printf("[compiled: " HTS_PLATFORM_NAME " - MT]\n");
   printf("To see the option list, enter a blank line or try httrack --help\n");
   //
@@ -832,5 +837,6 @@ void help(const char *app, int more) {
            &__DATE__[7]);
   infomsg(info);
   infomsg("[compiled: " HTS_PLATFORM_NAME "]");
+  infomsg("Note: " HTS_GUI_HINT);
   infomsg(NULL);
 }

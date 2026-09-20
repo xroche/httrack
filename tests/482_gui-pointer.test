@@ -1,0 +1,72 @@
+#!/bin/bash
+#
+# A command-line user had no way to learn the GUI was installed too (#902):
+# "brew install httrack" lands webhttrack in bin and nothing names it.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+if target_is_windows; then
+    gui=WinHTTrack.exe
+else
+    gui=webhttrack
+fi
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_902.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+
+printf '[--help names the GUI] ..\t'
+# --quiet, or help() pages every 20 lines and waits on stdin.
+help=$(httrack --quiet --help 2>&1) || fail "httrack --help failed"
+grep -q "'${gui}'" <<<"$help" || fail "--help never names ${gui}"
+# Debian's httrack package only Suggests webhttrack, so naming it is safe and
+# telling the user to run it is not.
+if ! target_is_windows && grep -q "run '${gui}'" <<<"$help"; then
+    fail "--help tells the user to run ${gui}, which apt install httrack omits"
+fi
+echo OK
+
+printf '[the man page names webhttrack(1)] ..\t'
+roff="$top_srcdir/man/httrack.1"
+rendered="$top_srcdir/html/httrack.man.html"
+for f in "$roff" "$rendered"; do test -f "$f" || fail "no $f"; done
+# Both: the roff alone cannot see a macro the renderer never runs, and the
+# rendered copy alone goes stale when only the roff is edited.
+grep -q 'webhttrack (1)' "$roff" || fail "$roff never names webhttrack(1)"
+text=$(sed -e 's/<[^>]*>//g' "$rendered")
+grep -q 'webhttrack(1)' <<<"$text" || fail "the rendered man page never names webhttrack(1)"
+echo OK
+
+# The banner only prints on a terminal, because htscoremain.c sets opt->quiet
+# otherwise. script(1) hands one over, and its two spellings do not overlap.
+tty_form=
+for form in linux bsd; do
+    rm -f "$tmp/ttyprobe"
+    case $form in
+    linux) script -qec 'test -t 1 && echo TTYOK' "$tmp/ttyprobe" >/dev/null 2>&1 || true ;;
+    bsd) script -q "$tmp/ttyprobe" /bin/sh -c 'test -t 1 && echo TTYOK' >/dev/null 2>&1 || true ;;
+    esac
+    if grep -q TTYOK "$tmp/ttyprobe" 2>/dev/null; then
+        tty_form=$form
+        break
+    fi
+done
+
+if [ -z "$tty_form" ]; then
+    echo "no script(1) hands over a terminal here, skipping the banner case" >&2
+else
+    printf '[the no-URL banner names the GUI] ..\t'
+    mkdir -p "$tmp/empty"
+    cmd="cd '$tmp/empty' && '$(httrack_path)' </dev/null"
+    case $tty_form in
+    linux) script -qec "$cmd" "$tmp/banner" >/dev/null 2>&1 || true ;;
+    bsd) script -q "$tmp/banner" /bin/sh -c "$cmd" >/dev/null 2>&1 || true ;;
+    esac
+    out=$(cat "$tmp/banner")
+    grep -q 'You are running the commandline version' <<<"$out" ||
+        fail "no wizard banner: ${out}"
+    grep -q "'${gui}'" <<<"$out" || fail "the banner never names ${gui}"
+    echo OK
+fi
