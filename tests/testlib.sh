@@ -1250,7 +1250,11 @@ pid_state() { # pid_state PID
     # end of file anyway. The group keeps a failed open off the caller's stderr.
     # || true, because -d '' returns non-zero at end of file on a whole file it
     # read, and a caller writing this as a statement would abort under errexit.
-    { read -r -d '' st <"$proc/$1/stat"; } 2>/dev/null || true
+    # The read takes a regular file only, because the Hurd answers a directory
+    # read with bytes where other hosts fail it, and those bytes forge a state.
+    if test -f "$proc/$1/stat"; then
+        { read -r -d '' st <"$proc/$1/stat"; } 2>/dev/null || true
+    fi
     if test -n "$st"; then
         st=${st##*') '}
         PID_STATE=${st%% *}
@@ -1267,6 +1271,28 @@ pid_state() { # pid_state PID
     esac
     # Trimmed, since a padded column would read as neither state.
     PID_STATE=${st//[[:space:]]/}
+}
+
+# Does `ulimit -c 0` stop a core file landing in the working directory? The
+# Hurd's crash server writes one whatever the limit says, so a test that
+# asserts the absence of a core would red there for the host's reason and not
+# its own. Graded by crashing a shell in a scratch directory under $1.
+core_limit_honored() { # core_limit_honored PARENT_DIR
+    local probe=$1/.ctl-coredump left
+    rm -rf "$probe"
+    mkdir -p "$probe" || return 0
+    # Two shells deep, because the abort notice is printed by the parent of the
+    # killed job, and it would land in the test log from any nearer. The trailing
+    # exit keeps the inner shell from replacing itself with the one that dies.
+    # shellcheck disable=SC2016 # the inner shell is the one that expands these
+    "${BASH:-bash}" -c 'cd "$1" || exit 0
+        ulimit -c 0 2>/dev/null || true
+        "$0" -c "kill -ABRT \$\$"
+        exit 0' \
+        "${BASH:-bash}" "$probe" >/dev/null 2>&1 || true
+    left=$(find "$probe" -maxdepth 1 -name 'core*' -print -quit)
+    rm -rf "$probe"
+    test -z "$left"
 }
 
 # Has pid $1 died and not yet been collected? A killed process answers kill -0
