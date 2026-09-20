@@ -131,6 +131,8 @@ pid_state_readable "$running" || fail "a stat line the host gave was called unre
 # A device answers a read with bytes on every host, which is what the Hurd does
 # for the directory above and no other host does. Neither answer is a state.
 ln -s /dev/urandom "$tmp/proc/$chardev/stat" 2>/dev/null || true
+test -r "$tmp/proc/$chardev/stat" ||
+    echo "note: no /dev/urandom here, so the non-file read went ungraded" >&2
 pid_state_readable "$chardev" && fail "bytes read from a device were called a state"
 # A failed open must stay off the caller's stderr: every macOS poll takes this
 # route, and local_crawl points that stderr at the log its tests grep.

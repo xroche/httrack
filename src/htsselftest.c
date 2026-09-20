@@ -9916,7 +9916,8 @@ static int st_sigpipe(httrackp *opt, int argc, char **argv) {
   T_SOC sv[2];
   htsblk r;
   char discard[1];
-  int i;
+  hts_boolean fin_only;
+  int i, n;
 
   (void) opt;
   (void) argc;
@@ -9937,14 +9938,18 @@ static int st_sigpipe(httrackp *opt, int argc, char **argv) {
      because Darwin hands loopback input to another thread. Nothing was ever
      sent on this socket, so the read takes the reset, or the end of file. */
   assertf(check_readinput_t(sv[1], 10) == 1);
-  assertf(recv(sv[1], discard, sizeof(discard), 0) <= 0);
-  /* A FIN leaves this half open, so the first write succeeds and only the
-     peer's answer breaks the pipe. Wait for that answer, because the loopback
-     race fixed in #1711 would otherwise decide whether the writes below meet
-     it. */
-  if (sendc(&r, "GET / HTTP/1.0\r\n\r\n") >= 0)
-    assertf(check_readinput_t(sv[1], 10) == 1);
-  /* Twice, so a platform that re-reports ECONNRESET still owes EPIPE. */
+  n = (int) recv(sv[1], discard, sizeof(discard), 0);
+  assertf(n <= 0);
+  fin_only = n == 0 ? HTS_TRUE : HTS_FALSE;
+  /* A FIN leaves this half of the connection open, so a write still succeeds
+     and only the peer's answer to it breaks the pipe. Paced, because that
+     answer and these writes race the way #1711 raced on Darwin. */
+  for (i = 0; fin_only && i < 100 && sendc(&r, "GET / HTTP/1.0\r\n\r\n") >= 0;
+       i++)
+    Sleep(100);
+  assertf(!fin_only || i < 100);
+  /* Twice, and both of them where the peer was reset, because a platform that
+     re-reports ECONNRESET still owes EPIPE. */
   for (i = 0; i < 2; i++)
     assertf(sendc(&r, "GET / HTTP/1.0\r\n\r\n") < 0);
   deletesoc(sv[1]);
