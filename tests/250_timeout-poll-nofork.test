@@ -100,15 +100,15 @@ fi
 
 # --- pid_state: what each route answers, and what neither may invent ---------
 #
-# A directory stands in for an entry that is readable but yields nothing, which
-# is what Hurd gives for a task it cannot summarise. That must never count as
-# death: Hurd answers the same way for a live task that is merely suspended.
+# A directory stands in for an entry that is not the file pid_state expects,
+# and for the nothing Hurd yields for a task it cannot summarise. Neither may
+# count as death: Hurd answers the same way for a live task merely suspended.
 # The pids are ones no host allocates, so a seam that failed open would grade a
 # live kernel thread instead of the fixture.
-running=9999992 exited=9999993 unterminated=9999994
+running=9999992 exited=9999993 unterminated=9999994 chardev=9999995
 absent=9999996 splitcomm=9999997 unreadable_live=$$
 mkdir -p "$tmp/proc/$running" "$tmp/proc/$exited" "$tmp/proc/$unterminated" \
-    "$tmp/proc/$splitcomm" "$tmp/proc/$unreadable_live/stat"
+    "$tmp/proc/$splitcomm" "$tmp/proc/$chardev" "$tmp/proc/$unreadable_live/stat"
 printf '%s (sh (weird) name) S 1 1 1 0 -1 0\n' "$running" >"$tmp/proc/$running/stat"
 printf '%s (sh (weird) name) Z 1 1 1 0 -1 0\n' "$exited" >"$tmp/proc/$exited/stat"
 printf '%s (sh) Z 1 1 1 0 -1 0' "$unterminated" >"$tmp/proc/$unterminated/stat"
@@ -128,6 +128,10 @@ pid_is_zombie "$splitcomm" && fail "a process name holding a newline forged stat
 # nothing says nothing, and this shell is running.
 pid_is_zombie "$unreadable_live" && fail "an entry that yields nothing was read as an exit"
 pid_state_readable "$running" || fail "a stat line the host gave was called unreadable"
+# The other non-file entry, and the one the Hurd answers with bytes rather than
+# with the EISDIR every other host gives for the directory above.
+ln -s /dev/urandom "$tmp/proc/$chardev/stat" 2>/dev/null || true
+pid_state_readable "$chardev" && fail "bytes read from a device were called a state"
 # A failed open must stay off the caller's stderr: every macOS poll takes this
 # route, and local_crawl points that stderr at the log its tests grep.
 noise=$(pid_is_zombie "$absent" 2>&1 >/dev/null) || true

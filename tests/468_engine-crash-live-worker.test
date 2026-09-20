@@ -103,5 +103,9 @@ for kind in dnssegv ftpsegv; do
 done
 
 # The crashes ran in $tmp, so nothing litters the build directory.
-test -z "$(find "$tmp" -maxdepth 1 -name 'core*' -print -quit)" ||
-    fail "a deliberate crash left a core file behind"
+if core_limit_honored "$tmp"; then
+    test -z "$(find "$tmp" -maxdepth 1 -name 'core*' -print -quit)" ||
+        fail "a deliberate crash left a core file behind"
+else
+    echo "note: this host writes a core whatever ulimit -c says, so none was graded" >&2
+fi

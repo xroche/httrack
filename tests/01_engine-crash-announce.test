@@ -53,5 +53,9 @@ grep -q "Deliberate 'dnssegv' crash requested" "$tmp/log" ||
     fail_dump "the -#c marker did not reach the log callback:" "$tmp/log" "$tmp/crash.out"
 grep -q "faulting a live DNS worker" "$tmp/log" ||
     fail_dump "the worker marker did not reach the log callback:" "$tmp/log" "$tmp/crash.out"
-test -z "$(find "$tmp" -maxdepth 1 -name 'core*' -print -quit)" ||
-    fail "the deliberate crash left a core file behind"
+if core_limit_honored "$tmp"; then
+    test -z "$(find "$tmp" -maxdepth 1 -name 'core*' -print -quit)" ||
+        fail "the deliberate crash left a core file behind"
+else
+    echo "note: this host writes a core whatever ulimit -c says, so none was graded" >&2
+fi
