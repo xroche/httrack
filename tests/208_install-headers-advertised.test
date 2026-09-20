@@ -1,10 +1,10 @@
 #!/bin/bash
 #
-# The four calls the release notes advertise must reach an embedder from the
-# installed headers alone (#1663): hts_set_thread_runner(),
-# hts_mirror_completed(), hts_findgetsize64() and the deprecated
-# hts_findgetsize(). A missing declaration and a missing export are different
-# failures, so compile and link are separate steps here.
+# A call an embedder can link must also be one it can declare, from the
+# installed headers alone: the four the release notes advertise (#1663) and the
+# threads, locks, charset and stats surface #1713 published. A missing
+# declaration and a missing export are different failures, so compile and link
+# are separate steps here.
 
 set -euo pipefail
 
@@ -66,16 +66,39 @@ static void embedder_runner(void (*fun)(void *arg), void *arg) {
   fun(arg);
 }
 
+static void embedder_worker(void *arg) {
+  (void) arg;
+}
+
+static void *embedder_enter(void) {
+  return NULL;
+}
+
+static void embedder_leave(void *cookie) {
+  (void) cookie;
+}
+
+/* Never run: it only has to compile and link. */
 int main(void) {
   char path[] = ".";
   hts_thread_runner previous = hts_set_thread_runner(embedder_runner);
   httrackp *opt = hts_create_opt();
   find_handle find = hts_findfirst(path);
   hts_tristate completed = HTS_DEFAULT;
+  htsmutex lock = HTSMUTEX_INIT;
+  char *utf8 = hts_convertStringToUTF8("a", 1, "iso-8859-1");
   const char *name = NULL;
   LLint size = -1;
   int truncated = -1;
   int kinds = 0;
+
+  hts_set_thread_hooks(embedder_enter, embedder_leave);
+  hts_mutexinit(&lock);
+  hts_mutexlock(&lock);
+  hts_mutexrelease(&lock);
+  hts_mutexfree(&lock);
+  if (hts_newthread(embedder_worker, NULL) == 0)
+    htsthread_wait_n(0);
 
   if (find != NULL) {
     do {
@@ -93,7 +116,8 @@ int main(void) {
   }
   (void) hts_set_thread_runner(previous);
   return name != NULL && size == 0 && truncated == 0 && kinds == 0
-    && completed == HTS_TRUE;
+    && completed == HTS_TRUE && utf8 != NULL && HTS_STAT.stat_errors == 0
+    && hts_file_is_newer(path, path);
 }
 EOF
 

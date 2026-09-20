@@ -215,6 +215,9 @@ HTSEXT_API size_t hts_sizeof_opt(void);
     out the fields you need. */
 HTSEXT_API const hts_stat_struct *hts_get_stats(httrackp *opt);
 
+/** The process-global that hts_get_stats() refreshes and hands back. */
+extern HTSEXT_API hts_stat_struct HTS_STAT;
+
 /** Legacy no-op retained for API compatibility. */
 HTSEXT_API void set_wrappers(httrackp *opt); /* LEGACY */
 
@@ -827,6 +830,60 @@ typedef void (*hts_thread_runner)(void (*fun)(void *arg), void *arg);
     audit what the fault left behind. Recovering keeps the process alive, but it
     does not make the mirror resumable. */
 HTSEXT_API hts_thread_runner hts_set_thread_runner(hts_thread_runner runner);
+
+/** Spawn a worker running 'fun(arg)'. Returns 0 on success. */
+HTSEXT_API int hts_newthread(void (*fun)(void *arg), void *arg);
+
+/** Extends per-thread state to the workers: 'enter' runs at each one's start,
+    'leave' at its end with the cookie 'enter' returned. Set before spawning; a
+    NULL in either clears the pair, since neither hook is useful alone. */
+HTSEXT_API void hts_set_thread_hooks(void *(*enter)(void),
+                                     void (*leave)(void *cookie));
+
+/** Block until at most 'n_wait' workers are still running. */
+HTSEXT_API void htsthread_wait_n(int n_wait);
+
+/* Locks */
+#ifndef HTS_DEF_FWSTRUCT_htsmutex_s
+#define HTS_DEF_FWSTRUCT_htsmutex_s
+typedef struct htsmutex_s htsmutex_s, *htsmutex;
+#endif
+/** Marks a lock nobody has built yet. hts_mutexlock() builds it on first use,
+    so hts_mutexinit() is for building one early. */
+#define HTSMUTEX_INIT NULL
+
+HTSEXT_API void hts_mutexinit(htsmutex *mutex);
+HTSEXT_API void hts_mutexfree(htsmutex *mutex);
+HTSEXT_API void hts_mutexlock(htsmutex *mutex);
+HTSEXT_API void hts_mutexrelease(htsmutex *mutex);
+
+/* Charset conversion */
+
+/** Convert 's' from 'charset' to UTF-8. Caller frees; NULL upon error, an
+    allocation failure included. */
+HTSEXT_API char *hts_convertStringToUTF8(const char *s, size_t size,
+                                         const char *charset);
+
+#ifdef _WIN32
+/** Convert the current system codepage to UTF-8. Caller frees; NULL upon
+    error. Windows only. */
+HTSEXT_API char *hts_convertStringSystemToUTF8(const char *s, size_t size);
+
+/** Convert UTF-8 to the current system codepage. Caller frees; NULL upon
+    error. Windows only. */
+HTSEXT_API char *hts_convertStringUTF8ToSystem(const char *s, size_t size);
+
+/** Replace the CRT's ANSI argv by a UTF-8 one decoded from the real UTF-16
+    command line. Keeps the CRT's argv on failure, and the new array is
+    writable, NULL-terminated and lives for the process. Windows only. */
+HTSEXT_API void hts_argv_utf8(int *pargc, char ***pargv);
+#endif
+
+/* Files */
+
+/** Is A a plain file stamped strictly later than B? False unless both can be
+    read, and the resolution is sub-second where the platform gives it. */
+HTSEXT_API hts_boolean hts_file_is_newer(const char *a, const char *b);
 
 /* UTF-8 aware FILE API */
 /* On non-Windows these macros resolve directly to the POSIX calls. On Windows

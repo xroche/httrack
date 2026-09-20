@@ -35,6 +35,7 @@ Please visit our Website: http://www.httrack.com
 
 /** Standard includes. **/
 #include "htsglobal.h"
+#include "httrack-library.h"
 #include <stdlib.h>
 #include <string.h>
 #include "htswin32.h"
@@ -44,13 +45,6 @@ typedef unsigned int hts_UCS4;
 
 /** Leading character (ASCII or leading UTF-8 sequence) **/
 #define HTS_IS_LEADING_UTF8(C) ((unsigned char)(C) < 0x80 || (unsigned char)(C) >= 0xc0)
-
-/**
- * Convert the string "s" from charset "charset" to UTF-8.
- * Return NULL upon error, an allocation failure included.
- **/
-HTSEXT_API char *hts_convertStringToUTF8(const char *s, size_t size,
-                                         const char *charset);
 
 /**
  * Convert the string "s" from UTF-8 to charset "charset".
@@ -180,26 +174,6 @@ extern char *hts_convertUCS2StringToUTF8(LPWSTR woutput, int wsize);
  **/
 extern LPWSTR hts_pathToUCS2(const char *path);
 
-/**
- * Convert current system codepage to UTF-8.
- * This function is WIN32 specific.
- **/
-HTSEXT_API char *hts_convertStringSystemToUTF8(const char *s, size_t size);
-
-/**
- * Convert UTF-8 to the current system codepage. Caller frees; NULL upon error.
- * This function is WIN32 specific.
- **/
-HTSEXT_API char *hts_convertStringUTF8ToSystem(const char *s, size_t size);
-
-/**
- * Replace the CRT's ANSI argv by a UTF-8 one decoded from the real UTF-16
- * command line: every char* is UTF-8 on Windows (FOPEN, STAT, ... convert at
- * the syscall boundary). Keeps the CRT's argv on failure; the new array is
- * writable, NULL-terminated, and lives for the process.
- * This function is WIN32 specific.
- **/
-HTSEXT_API void hts_argv_utf8(int *pargc, char ***pargv);
 #endif
 
 #endif
