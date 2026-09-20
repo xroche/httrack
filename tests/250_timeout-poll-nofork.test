@@ -178,13 +178,17 @@ PATH=$tmp/psnone
 pid_is_zombie "$unreadable_live" && nops_exit=yes || nops_exit=no
 pid_state_readable "$unreadable_live" && nops_read=yes || nops_read=no
 # And the reap that rests on them. This shell is running, so a host that answers
-# says 1, and one that answers for nothing must report no survivor.
+# says 1, and one that answers for nothing must report no survivor. The call is
+# timed, because silence must not cost a grace (#1718).
 nops_reap=0
-REAP_GRACE=0 reap_bounded "$unreadable_live" || nops_reap=$?
+nops_began=$SECONDS
+REAP_GRACE=3 reap_bounded "$unreadable_live" || nops_reap=$?
+nops_spent=$((SECONDS - nops_began))
 PATH=$path_was
 test "$nops_exit" = no || fail "a live process was read as exited where no ps exists"
 test "$nops_read" = no || fail "a live process with no answer anywhere was called readable"
 test "$nops_reap" -eq 0 || fail "a host that answers for no pid reported a survivor ($nops_reap)"
+test "$nops_spent" -lt 2 || fail "a reap nothing could answer spent ${nops_spent}s of its grace"
 pid_state_readable "$absent" && fail "a pid neither route answers for was called readable"
 unset TESTLIB_PROC
 ok "pid_state takes the host's answer, and never reads no answer as an exit"
