@@ -65,6 +65,5 @@ struct t_InpInfo {
 int main(int argc, char **argv);
 #endif
 
-extern HTSEXT_API hts_stat_struct HTS_STAT;
 extern int _DEBUG_HEAD;
 extern FILE *ioinfo;

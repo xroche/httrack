@@ -97,7 +97,6 @@ done
 # that header include httrack-library.h instead. A call can sit in this list and
 # in the one below, because the two faults are independent.
 LC_ALL=C sort -u >"$work/expected_two_headers" <<'EOF'
-HTS_STAT	htslib.h,httrack.h
 hts_buildtopindex	htstools.h,httrack-library.h
 hts_fopen_utf8	htslib.h,httrack-library.h
 hts_get_error_callback	htssafe.h,httrack-library.h
@@ -116,29 +115,11 @@ EOF
 diff -u "$work/expected_two_headers" "$work/actual_two_headers" ||
     fail "an exported call must be declared in one header only. A '+' line is a new duplicate, so drop it from one header and include httrack-library.h there instead. A '-' line is one you removed, so delete it from the list in this test"
 
-# Each row is a call an embedder can link but cannot declare. Clearing one takes
-# a real choice. Publish it in httrack-library.h, or drop the export macro and
-# bump the soname for the symbol that goes (#1713).
+# The list is empty: every exported call is declared in a header the install
+# carries (#1713). It is not its own control any more, so a scan that came back
+# empty would pass here; the two-header pin above, off the same $work/decls,
+# still reds.
 LC_ALL=C sort -u >"$work/expected_hidden" <<'EOF'
-HTS_STAT	htslib.h,httrack.h
-check_hostname_dns	htslib.h
-hts_argv_utf8	htscharset.h
-hts_convertStringSystemToUTF8	htscharset.h
-hts_convertStringToUTF8	htscharset.h
-hts_convertStringUTF8ToSystem	htscharset.h
-hts_dns_resolve_nocache	htslib.h
-hts_dns_resolve_nocache2	htslib.h
-hts_file_is_newer	htslib.h
-hts_mutexfree	htsthread.h
-hts_mutexinit	htsthread.h
-hts_mutexlock	htsthread.h
-hts_mutexrelease	htsthread.h
-hts_newthread	htsthread.h
-hts_set_thread_hooks	htsthread.h
-hts_uninit_module	htslib.h
-htsthread_init	htsthread.h
-htsthread_uninit	htsthread.h
-htsthread_wait_n	htsthread.h
 EOF
 
 diff -u "$work/expected_hidden" "$work/actual_hidden" ||

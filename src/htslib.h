@@ -230,13 +230,6 @@ typedef struct hts_filetime_t {
    WHEN is then untouched. */
 hts_boolean hts_file_mtime(const char *file, hts_filetime_t *when);
 
-/* Is A a plain file stamped strictly later than B? False unless both can be
-   read. Sub-second where the platform gives it, so a request made in the second
-   a mirror started still sorts after that mirror's hts-in_progress.lock.
-   Exported because httrack.c links the library and sees only exported
-   symbols. */
-HTSEXT_API hts_boolean hts_file_is_newer(const char *a, const char *b);
-
 /* Move FILE's modification time SECONDS back, keeping the fraction, which the
    utimes fallback rounds down to the microsecond. False if the stamp could not
    be read or written, and FILE then keeps the time it had. */
@@ -259,7 +252,7 @@ int hts_read(htsblk * r, char *buff, int size);
 
 LLint check_downloadable_bytes(int rate);
 
-HTSEXT_API int hts_uninit_module(void);
+int hts_uninit_module(void);
 
 // fonctions principales
 T_SOC http_xfopen(httrackp * opt, int mode, int treat, int waitconnect,
@@ -381,12 +374,11 @@ int hts_dns_resolve_all_bounded(httrackp *opt, const char *iadr, SOCaddr *out,
                                 const char **error);
 HTS_INLINE SOCaddr *hts_dns_resolve2(httrackp *opt, const char *iadr,
                                      SOCaddr *const addr, const char **error);
-HTSEXT_API SOCaddr* hts_dns_resolve_nocache2(const char *const hostname, 
-                                              SOCaddr *const addr,
-                                              const char **error);
-HTSEXT_API SOCaddr* hts_dns_resolve_nocache(const char *const hostname, 
-                                             SOCaddr *const addr);
-HTSEXT_API int check_hostname_dns(const char *const hostname);
+SOCaddr *hts_dns_resolve_nocache2(const char *const hostname,
+                                  SOCaddr *const addr, const char **error);
+SOCaddr *hts_dns_resolve_nocache(const char *const hostname,
+                                 SOCaddr *const addr);
+int check_hostname_dns(const char *const hostname);
 
 int ftp_available(void);
 
@@ -567,7 +559,6 @@ typedef void *(*beginthread_type) (void *);
 /*unsigned long _beginthread( beginthread_type start_address, unsigned stack_size, void *arglist );*/
 
 /* variables globales */
-extern HTSEXT_API hts_stat_struct HTS_STAT;
 extern int _DEBUG_HEAD;
 extern FILE *ioinfo;
 

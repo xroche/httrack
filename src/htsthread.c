@@ -75,7 +75,7 @@ HTSEXT_API void htsthread_wait_n(int n_wait) {
 }
 
 /* ensure initialized */
-HTSEXT_API void htsthread_init(void) {
+void htsthread_init(void) {
 #if USE_BEGINTHREAD
 #if (defined(_DEBUG) || defined(DEBUG))
   assertf(process_chain == 0);
@@ -86,7 +86,7 @@ HTSEXT_API void htsthread_init(void) {
 #endif
 }
 
-HTSEXT_API void htsthread_uninit(void) {
+void htsthread_uninit(void) {
   htsthread_wait();
 #if USE_BEGINTHREAD
   hts_mutexfree(&process_chain_mutex);
