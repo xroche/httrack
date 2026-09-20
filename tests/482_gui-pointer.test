@@ -21,14 +21,22 @@ printf '[--help names the GUI] ..\t'
 # --quiet, or help() pages every 20 lines and waits on stdin.
 help=$(httrack --quiet --help 2>&1) || fail "httrack --help failed"
 grep -q "'${gui}'" <<<"$help" || fail "--help never names ${gui}"
+# Debian's httrack package only Suggests webhttrack, so naming it is safe and
+# telling the user to run it is not.
+if ! target_is_windows && grep -q "run '${gui}'" <<<"$help"; then
+    fail "--help tells the user to run ${gui}, which apt install httrack omits"
+fi
 echo OK
 
 printf '[the man page names webhttrack(1)] ..\t'
-page="$top_srcdir/html/httrack.man.html"
-test -f "$page" || fail "no $page"
-# The rendered page, not the roff: a .BR the renderer never runs still holds the name.
-rendered=$(sed -e 's/<[^>]*>//g' "$page")
-grep -q 'webhttrack(1)' <<<"$rendered" || fail "the man page never names webhttrack(1)"
+roff="$top_srcdir/man/httrack.1"
+rendered="$top_srcdir/html/httrack.man.html"
+for f in "$roff" "$rendered"; do test -f "$f" || fail "no $f"; done
+# Both: the roff alone cannot see a macro the renderer never runs, and the
+# rendered copy alone goes stale when only the roff is edited.
+grep -q 'webhttrack (1)' "$roff" || fail "$roff never names webhttrack(1)"
+text=$(sed -e 's/<[^>]*>//g' "$rendered")
+grep -q 'webhttrack(1)' <<<"$text" || fail "the rendered man page never names webhttrack(1)"
 echo OK
 
 # The banner only prints on a terminal, because htscoremain.c sets opt->quiet
