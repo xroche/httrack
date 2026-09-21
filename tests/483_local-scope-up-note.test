@@ -18,6 +18,10 @@ mkdir -p "$root/sub"
 
 echo 'console.log("root")' >"$root/root.js"
 echo 'console.log("other")' >"$root/other.js"
+echo '<!DOCTYPE html><html><body>p2</body></html>' >"$root/sub/page2.html"
+echo 'console.log("blocked")' >"$root/sub/blocked.js"
+
+# Two links above the start directory.
 cat >"$root/sub/index.html" <<'HTML'
 <!DOCTYPE html><html><body>
 <script src="/root.js"></script>
@@ -25,40 +29,62 @@ cat >"$root/sub/index.html" <<'HTML'
 <a href="page2.html">p</a>
 </body></html>
 HTML
-# no link above the start directory, so only a filter can refuse anything here
+# One, so a rule that takes it leaves nothing refused above the start.
+cat >"$root/sub/one.html" <<'HTML'
+<!DOCTYPE html><html><body>
+<script src="/root.js"></script>
+<a href="page2.html">p</a>
+</body></html>
+HTML
+# None, so only a filter can refuse anything here.
 cat >"$root/sub/filtered.html" <<'HTML'
 <!DOCTYPE html><html><body>
 <script src="blocked.js"></script>
 <a href="page2.html">p</a>
 </body></html>
 HTML
-echo '<!DOCTYPE html><html><body>p2</body></html>' >"$root/sub/page2.html"
-echo 'console.log("blocked")' >"$root/sub/blocked.js"
 
-note='above the start directory .* not mirrored'
-option='[-]B \(--can-go-up-and-down\)'
+note='Some links above the start directory were not mirrored\. Pass -B \(--can-go-up-and-down\) to mirror them\.'
 
-bash "$top_srcdir/tests/local-crawl.sh" --root "$root" --errors 0 \
-    --log-found "2 links $note" --stdout-found "2 links $note" \
-    --log-found "$option" --stdout-found "$option" \
-    --not-found 'root.js' --not-found 'other.js' \
-    httrack BASEURL/sub/ -r3
+# $1 page, $2 "fires" or "silent", then audit arguments, "--", httrack arguments.
+function crawl {
+    local page=$1 expect=$2
+    shift 2
+    local -a assert=()
+    if test "$expect" = fires; then
+        assert=(--log-found "$note" --stdout-found "$note")
+    else
+        assert=(--log-not-found "$note" --stdout-not-found "$note")
+    fi
+    local -a audit=()
+    while test "$#" -gt 0 && test "$1" != --; do
+        audit+=("$1")
+        shift
+    done
+    shift
+    bash "$top_srcdir/tests/local-crawl.sh" --root "$root" --errors 0 \
+        "${assert[@]}" ${audit[@]+"${audit[@]}"} \
+        httrack "BASEURL/sub/$page" -r3 "$@"
+}
 
+crawl index.html fires --not-found 'root.js' --not-found 'other.js' --
 # -B is what the note tells the user to pass, so it must silence the note.
-bash "$top_srcdir/tests/local-crawl.sh" --root "$root" --errors 0 \
-    --log-not-found "$note" --stdout-not-found "$note" \
-    --found 'root.js' --found 'other.js' \
-    httrack BASEURL/sub/ -r3 -B
-
+crawl index.html silent --found 'root.js' --found 'other.js' -- -B
 # An ordinary filter refusal is not a scope refusal.
-bash "$top_srcdir/tests/local-crawl.sh" --root "$root" --errors 0 \
-    --log-not-found "$note" --stdout-not-found "$note" \
-    --not-found 'sub/blocked.js' --found 'sub/page2.html' \
-    httrack BASEURL/sub/filtered.html -r3 '-*blocked.js*'
+crawl filtered.html silent --not-found 'sub/blocked.js' --found 'sub/page2.html' \
+    -- '-*blocked.js*'
+# A near-link takes the upper link and the filter below refuses it, so the
+# refusal is the filter's. -B would not lift it.
+crawl one.html silent -- -n '-*root.js*'
+# A filter refuses it with no acceptance in between, so the scope is no longer
+# the operative reason. robots.txt is the same case in the engine, and is not
+# crawled here because the test server synthesizes its own robots.txt.
+crawl one.html silent -- '-*root.js*'
+# The only upper link is taken by a filter, so nothing is left refused above.
+crawl one.html silent --found 'root.js' -- '+*root.js*'
 
-# A filter that takes one of the two up-links leaves one refused, so the count
-# is read after the filters, not at the refusal.
-bash "$top_srcdir/tests/local-crawl.sh" --root "$root" --errors 0 \
-    --log-found "1 link $note" --stdout-found "1 link $note" \
-    --found 'root.js' --not-found 'other.js' \
-    httrack BASEURL/sub/ -r3 '+*root.js*'
+# Four paths stay unexercised here, each needing something a crawl cannot set
+# up: shell mode (-%W), where stdout carries the front end's protocol; the
+# hard-error bailouts that skip the log summary; -v, which puts the log on
+# stdout and writes no hts-log.txt for the harness to audit; and a plugin's
+# check_link callback, which rules after the scope test has run.

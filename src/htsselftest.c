@@ -2691,6 +2691,43 @@ static int st_transportfailures(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* The note is built twice from one buffer, so a caller reusing it must never
+   read the previous mirror's text back out of a silent run. */
+static int st_upperlinksnote(httrackp *opt, int argc, char **argv) {
+  httrackp *from = hts_create_opt();
+  httrackp *to = hts_create_opt();
+  char note[256];
+  int err = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  strcpybuff(note, "stale");
+  if (hts_upper_links_note(to, note, sizeof(note)) || note[0] != '\0')
+    err = 1; /* a fresh opt refused nothing, and must empty the buffer */
+
+  to->upper_links_refused = HTS_TRUE;
+  if (!hts_upper_links_note(to, note, sizeof(note)) ||
+      strstr(note, "-B") == NULL)
+    err = 1; /* the note must name the option that lifts the refusal */
+
+  to->upper_links_refused = HTS_FALSE;
+  if (hts_upper_links_note(to, note, sizeof(note)) || note[0] != '\0')
+    err = 1;
+
+  /* the flag never travels onto another opt */
+  from->upper_links_refused = HTS_TRUE;
+  copy_htsopt(from, to);
+  if (to->upper_links_refused)
+    err = 1;
+
+  hts_free_opt(from);
+  hts_free_opt(to);
+  printf("upper-links-note: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 /* The handler below pins the enumerator NAME; these pin the NUMBERS, which are
    ABI in the installed htsopt.h and are what -C prints. */
 HTS_STATIC_ASSERT(HTS_CACHE_NONE == 0, cache_none_is_0);
@@ -16599,6 +16636,9 @@ static const struct selftest_entry {
     {"transportfailures", "",
      "a failed transfer is counted apart from an answered error",
      st_transportfailures},
+    {"upperlinksnote", "",
+     "the above-the-start-directory note empties its buffer when silent",
+     st_upperlinksnote},
     {"cachedefault", "", "-C default is C1 cache-priority, not C2",
      st_cachedefault},
     {"lastchar", "",
