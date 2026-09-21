@@ -2872,6 +2872,24 @@ class Handler(SimpleHTTPRequestHandler):
     def route_challenge_plain(self):
         self.send_challenge()
 
+    def route_challenge_invalue(self):
+        # The token inside another header's value must not match.
+        self.send_challenge(extra=[("X-Foo", "cf-mitigated: challenge")])
+
+    def route_challenge_folded(self):
+        # Same, on a folded continuation line, which is not a header start.
+        self.send_challenge(extra=[("X-Bar", "ok\r\n cf-mitigated: challenge")])
+
+    def route_challenge_ok(self):
+        # The header on a 200: nothing was refused, so nothing is said.
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html")
+        self.send_header("Content-Length", str(len(self.CHALLENGE_BODY)))
+        self.send_header("CF-Mitigated", "challenge")
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(self.CHALLENGE_BODY)
+
     # --- delayed-type degenerate paths (issues #5/#107) --------------------
     def route_delayed_index(self):
         self.send_html(
@@ -3878,6 +3896,9 @@ class Handler(SimpleHTTPRequestHandler):
         "/mini304/page.html": route_mini304_page,
         "/challenge/blocked.html": route_challenge_blocked,
         "/challenge/plain.html": route_challenge_plain,
+        "/challenge/invalue.html": route_challenge_invalue,
+        "/challenge/folded.html": route_challenge_folded,
+        "/challenge/ok.html": route_challenge_ok,
         "/errmask/index.html": route_errmask_index,
         "/errmask/keep.dat": route_errmask_keep,
         "/errmask/empty.dat": route_errmask_empty,

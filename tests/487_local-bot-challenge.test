@@ -26,3 +26,12 @@ bash "$top_srcdir/tests/local-crawl.sh" --errors 1 \
     --log-found "${refused} .*/challenge/plain\\.html" \
     httrack 'BASEURL/simple/basic.html' 'BASEURL/challenge/plain.html' \
     --retries=0
+
+# The match is anchored at a line start, so the token inside another header's
+# value, and the same on a folded continuation line, are not the header. The
+# 200 carrying it was refused nothing, so the gate keeps quiet there too.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 2 \
+    --log-not-found 'Bot protection challenge' \
+    --log-not-found 'cookies-file' \
+    httrack 'BASEURL/challenge/invalue.html' 'BASEURL/challenge/folded.html' \
+    'BASEURL/challenge/ok.html' --retries=0

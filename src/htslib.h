@@ -268,8 +268,9 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, const char *xsend
 int http_cookie_header(t_cookie *cookie, const char *domain, const char *path,
                        char *dst, size_t dst_size);
 
-/* True if the raw CRLF-separated custom request-header block starts a line with
-   `field_name`, given without the trailing colon (which is tolerated). */
+/* True if the raw CRLF-separated header block, a request one we build or a
+   response one we received, starts a line with `field_name`, given without the
+   trailing colon (which is tolerated). headers must be NUL-terminated. */
 hts_boolean http_headers_have_field(const char *headers,
                                     const char *field_name);
 
@@ -343,9 +344,6 @@ hts_boolean hts_proxy_is_connect(const char *name);
 void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * retour,
                char *rcvd);
 void treatfirstline(htsblk * retour, const char *rcvd);
-/* The bot-protection challenge header this raw response header block carries,
-   or NULL; a fixed vendor table, never a guess from the status or the body. */
-const char *hts_bot_challenge_header(const char *headers);
 
 // sous-fonctions
 /* Buffer http_xfread1() fills in its line modes, and so the ceiling on any
