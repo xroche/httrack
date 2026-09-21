@@ -623,8 +623,9 @@ int parse_selftest_jsscan(httrackp *opt, hts_boolean dump) {
       {"import x from \"../x.js\";", 9, HTS_FALSE, HTS_FALSE, HTS_TRUE, 6, 7},
       {"from\"/x.js\";", 0, HTS_FALSE, HTS_FALSE, HTS_TRUE, 5, 5},
       {"export{a}from\"./x.js\";", 9, HTS_FALSE, HTS_FALSE, HTS_TRUE, 5, 6},
-      /* an absolute specifier is a URL too, the way a bare import takes it */
+      /* an absolute specifier is a URL too, and both spellings must agree */
       {"from\"https://h/x.js\";", 0, HTS_FALSE, HTS_FALSE, HTS_TRUE, 5, 14},
+      {"import \"https://h/x.js\";", 0, HTS_FALSE, HTS_FALSE, HTS_TRUE, 8, 14},
       /* a query rides along: the rule reads the leading bytes only */
       {"from\"./x.js?v=1\";", 0, HTS_FALSE, HTS_FALSE, HTS_TRUE, 5, 10},
       /* a module id the loader resolves. The ESM grammar wants a slash after
@@ -636,15 +637,15 @@ int parse_selftest_jsscan(httrackp *opt, hts_boolean dump) {
       {"xfrom\"./x.js\";", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
       {"x.from(\"./x.js\")", 2, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
       /* a name ending in "from" is not the keyword, and the assignment it
-         carries is not a link */
-      {"var dateFrom = \"jquery\";", 8, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+         carries is not a link. The sweep's "_" prefix covers that arm of the
+         name set, so one spelling is enough here. */
       {"var copyFrom = \"hello world\";", 8, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0,
        0},
-      {"date_from = \"jquery\";", 5, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
-      /* '$' opens a name, and a byte above 127 opens a Unicode one */
+      /* '$' opens a name, and a byte above 127 opens a Unicode one. UTF-8
+         whitespace does not, so the keyword still stands alone after it. */
       {"$from\"./x.js\";", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
-      {"a$from\"./x.js\";", 2, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
       {"\303\251from\"./x.js\";", 2, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      {"\302\240from\"./x.js\";", 2, HTS_FALSE, HTS_FALSE, HTS_TRUE, 5, 6},
   };
 
   selftest_sweep sw;
@@ -727,6 +728,10 @@ int parse_selftest_jsimport(httrackp *opt) {
       {"", HTS_FALSE},
       /* a keyword cut short by the document's first byte */
       {"mport(", HTS_FALSE},
+      /* UTF-8 whitespace is a boundary, a Unicode name is not */
+      {"\302\240import(", HTS_TRUE},
+      {"\342\200\250import(", HTS_TRUE},
+      {"caf\303\251import(", HTS_FALSE},
       /* The walk sees bytes, not syntax, so a commented-out call reads as one.
          The parser's comment automaton is what never asks here. */
       {"// import(", HTS_TRUE},

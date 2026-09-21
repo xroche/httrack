@@ -423,12 +423,26 @@ hts_boolean hts_dirty_link_is_url(httrackp *opt, const char *str, size_t len,
   return url_ok;
 }
 
-/* Does this byte glue the keyword to a name, or to a string literal? A byte
-   above 127 counts: JavaScript allows Unicode in a name, so refuse rather than
-   read a token boundary that is not there. */
-static hts_boolean js_glues_keyword(char c) {
+/* Does what sits before "at" glue the keyword to a name, or to a string
+   literal? A byte above 127 does, because a JavaScript name may be Unicode,
+   unless it ends the UTF-8 whitespace U+00A0, U+2028 or U+2029, which the
+   language reads as a boundary. */
+static hts_boolean js_glues_keyword(const char *at, const char *buffer) {
+  const char c = html_prevc(at, buffer);
+  const size_t before = (size_t) (at - buffer);
+
+  if ((unsigned char) c >= 0x80) {
+    if (before >= 2 && (unsigned char) at[-2] == 0xC2 &&
+        (unsigned char) c == 0xA0)
+      return HTS_FALSE;
+    if (before >= 3 && (unsigned char) at[-3] == 0xE2 &&
+        (unsigned char) at[-2] == 0x80 &&
+        ((unsigned char) c == 0xA8 || (unsigned char) c == 0xA9))
+      return HTS_FALSE;
+    return HTS_TRUE;
+  }
   return isalnum((unsigned char) c) || c == '_' || c == '$' || c == '.' ||
-         c == '"' || c == '\'' || c == '`' || (unsigned char) c >= 0x80;
+         c == '"' || c == '\'' || c == '`';
 }
 
 /* Contract in htsparse.h; indexed so no pointer leaves the buffer. */
@@ -450,7 +464,7 @@ hts_boolean hts_js_quote_is_import_arg(const char *quote, const char *buffer) {
   if (i < kwlen || memcmp(buffer + i - kwlen, kw, kwlen) != 0)
     return HTS_FALSE;
   i -= kwlen;
-  return i == 0 || !js_glues_keyword(buffer[i - 1]);
+  return !js_glues_keyword(buffer + i, buffer);
 }
 
 /* Is this module specifier a URL, or a module id the loader resolves for
@@ -553,7 +567,7 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
   if (!nc) { // import x from "./mod.js"
     /* The guard has to gate the match: a name merely ending in "from" must
        leave nc at zero, or the default rule takes its assignment as a link. */
-    if (!js_glues_keyword(html_prevc(cursor, buffer)) &&
+    if (!js_glues_keyword(cursor, buffer) &&
         (nc = strfield(cursor, "from")) != 0) {
       expected = 0;
       is_specifier = 1;
