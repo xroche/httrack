@@ -67,12 +67,25 @@
       <WarningLevel>Level3</WarningLevel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <CompileAs>CompileAsC</CompileAs>
+      <!-- Hardening: /guard:cf plus an explicit /GS, so the mitigation set is a
+           contract rather than whatever the toolset happens to default to. -->
+      <ControlFlowGuard>Guard</ControlFlowGuard>
+      <BufferSecurityCheck>true</BufferSecurityCheck>
     </ClCompile>
     <Link>
+      <ControlFlowGuard>Guard</ControlFlowGuard>
+      <DataExecutionPrevention>true</DataExecutionPrevention>
+      <RandomizedBaseAddress>true</RandomizedBaseAddress>
       <!-- vcpkg auto-links libssl/libcrypto/zlib/brotli/zstd; only the OS import
            lib is explicit. -->
       <AdditionalDependencies>Ws2_32.lib;Shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <!-- /CETCOMPAT marks the image for shadow stacks, and is x64 only. -->
+  <ItemDefinitionGroup Condition="'$(Platform)'=='x64'">
+    <Link>
+      <CETCompat>true</CETCompat>
     </Link>
   </ItemDefinitionGroup>
 
