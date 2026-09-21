@@ -266,7 +266,7 @@ jobs:
               if ($hdr -notmatch $want[$k]) { $out += $k }
             }
             $cc = if ($hdr -match "C/C\+\+=(\d+)") { [int]$Matches[1] } else { -1 }
-            $gs = if ($hdr -match "/GS=(\d+)") { [int]$Matches[1] } else { -1 }
+            $gs = if ($hdr -match ",\s*/GS=(\d+)") { [int]$Matches[1] } else { -1 }
             if ($cc -le 0) { $out += "a VC feature record, so /GS cannot be read" }
             elseif ($gs -lt $cc) { $out += "/GS on $($cc - $gs) of $cc objects" }
             ,$out
@@ -279,7 +279,9 @@ jobs:
           $none = "Dynamic base`nSecurity Cookie 0x140001000`n" +
                   "Counts: Pre-VC++ 11.00=0, C/C++=73, /GS=0, /sdl=0"
           $ctl = Missing $none
-          foreach ($k in @("DEP (/NXCOMPAT)", "Control Flow Guard")) {
+          $mustReport = @("DEP (/NXCOMPAT)", "Control Flow Guard")
+          if ("${{ matrix.platform }}" -eq "x64") { $mustReport += "Shadow stacks (/CETCOMPAT)" }
+          foreach ($k in $mustReport) {
             if ($ctl -notcontains $k) { throw "negative control: $k was not reported missing" }
           }
           if (-not ($ctl -like "*/GS on 73 of 73*")) {
