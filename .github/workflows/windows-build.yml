@@ -227,6 +227,57 @@ jobs:
             throw "CRT mismatch across the boundary: libhttrack.dll=$a httrack.exe=$b"
           }
 
+      # The mitigations are per-image opt-ins the projects request; assert them
+      # where they end up, because a property dropped from a .vcxproj still
+      # builds and still passes every other check here.
+      - name: Check the hardening flags reached the binaries
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $dir = "src\${{ matrix.platform }}\${{ matrix.configuration }}"
+          $dumpbin = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
+            -latest -find VC\Tools\MSVC\**\bin\Host*\*\dumpbin.exe | Select-Object -First 1
+          if (-not $dumpbin) { throw "dumpbin not found" }
+
+          # /headers prints the DLL-characteristics bits, /loadconfig the extended
+          # ones that carry CET.
+          function Get-Headers($path) {
+            $out = & $dumpbin /headers /loadconfig $path
+            if ($LASTEXITCODE -ne 0) { throw "dumpbin failed on $path" }
+            $out -join "`n"
+          }
+
+          # Each mitigation, as the pattern that finds it in that dump.
+          $want = [ordered]@{
+            "ASLR (/DYNAMICBASE)"        = "Dynamic base"
+            "DEP (/NXCOMPAT)"            = "NX compatible"
+            "Control Flow Guard"         = "Control Flow Guard"
+          }
+          if ("${{ matrix.platform }}" -eq "x64") {
+            $want["Shadow stacks (/CETCOMPAT)"] = "CET\s*Compat"
+          }
+
+          $bad = 0
+          foreach ($f in @("libhttrack.dll", "httrack.exe", "webhttrack.exe", "proxytrack.exe")) {
+            $hdr = Get-Headers "$dir\$f"
+
+            # Negative control: no image is a WDM driver, so a matcher that finds
+            # this one would find anything and every verdict below is vacuous.
+            if ($hdr -match "WDM Driver") {
+              throw "negative control failed on ${f}: the matcher matches anything"
+            }
+
+            foreach ($k in $want.Keys) {
+              if ($hdr -match $want[$k]) {
+                Write-Host "${f}: $k"
+              } else {
+                Write-Host "::error::${f} is missing $k"
+                $bad++
+              }
+            }
+          }
+          if ($bad -gt 0) { throw "$bad missing mitigation(s)" }
+
       # The DLL build only proves the engine's own fixed include order, the one
       # order a consumer need not use, and 205/206/207/269 all gate on an automake
       # environment this job has not (#1153).
