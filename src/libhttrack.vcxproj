@@ -72,7 +72,6 @@
       <BufferSecurityCheck>true</BufferSecurityCheck>
     </ClCompile>
     <Link>
-      <ControlFlowGuard>Guard</ControlFlowGuard>
       <DataExecutionPrevention>true</DataExecutionPrevention>
       <RandomizedBaseAddress>true</RandomizedBaseAddress>
       <!-- vcpkg auto-links libssl/libcrypto/zlib/brotli/zstd; only the OS import
