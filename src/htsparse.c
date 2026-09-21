@@ -466,6 +466,8 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
   // @import: the quoted token is the URL; a trailing media/supports/layer
   // condition is not part of it
   int is_import = 0;
+  // from "./mod.js": an ES module specifier, which must be a path
+  int is_specifier = 0;
   const char *a;
   int nc;
 
@@ -532,6 +534,12 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
       } else
         nc = 0;
     }
+  if (!nc && (nc = strfield(cursor, "from")) &&
+      (!isalnum(html_prevc(cursor, buffer))) &&
+      html_prevc(cursor, buffer) != '_') { // import x from "./mod.js"
+    expected = 0;
+    is_specifier = 1;
+  }
   if (!nc)
     return HTS_FALSE;
 
@@ -597,6 +605,12 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
     if (a != NULL && ensure_not_method &&
         is_http_method(a, (size_t) (c - a + 1)))
       a = NULL;
+    // a bare specifier such as "jquery" names a module the loader resolves
+    // through its own configuration, so only a path is a URL
+    if (a != NULL && is_specifier &&
+        !(a[0] == '/' ||
+          (a[0] == '.' && (a[1] == '/' || (a[1] == '.' && a[2] == '/')))))
+      a = NULL;
     // Check for bogus links (Vasiliy)
     if (a != NULL) {
       const size_t size = c - a + 1;
@@ -627,7 +641,7 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
     link->length = (int) (c - a + 1);
     link->unquoted_end = can_avoid_quotes ? quotes_replacement : '\0';
     /* CSS @import hits the same keyword, and module_base is inert in CSS. */
-    link->is_module = is_import && !in_css;
+    link->is_module = (is_import || is_specifier) && !in_css;
     return HTS_TRUE;
   }
 }

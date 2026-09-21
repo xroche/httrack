@@ -1,0 +1,57 @@
+#!/bin/bash
+#
+# "import x from './mod.js'" is how a module names a file, and the scanner only
+# knew the bare "import './mod.js'" form. A specifier that is a path is now
+# followed; a bare one such as "jquery" names a module the loader resolves
+# through its own configuration, and following it saves an error page under a
+# real name. The two copies of mod.js tell the script base from the page base
+# apart: the specifier must resolve against assets/app.js, not against the page.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+: "${top_srcdir:=..}"
+
+work=$(mktemp -d)
+trap 'set +e; rm -rf "$work"' EXIT
+
+root="$work/root"
+mkdir -p "$root/assets"
+
+cat >"$root/index.html" <<'HTML'
+<!DOCTYPE html><html><head><title>t</title></head><body>
+<script type="module" src="/assets/app.js"></script>
+</body></html>
+HTML
+
+cat >"$root/assets/app.js" <<'JS'
+import x from "./mod.js";
+import y from "../top.js";
+import $ from "jquery";
+import p from "popper.js";
+export { x, y, $, p };
+JS
+printf 'export default "assets-copy";\n' >"$root/assets/mod.js"
+printf 'export default "root-copy";\n' >"$root/mod.js"
+printf 'export default "top";\n' >"$root/top.js"
+printf 'not-a-module\n' >"$root/jquery"
+printf 'not-a-module\n' >"$root/popper.js"
+
+bash "$top_srcdir/tests/local-crawl.sh" --root "$root" \
+    --errors 0 \
+    --found assets/mod.js \
+    --found top.js \
+    --not-found mod.js \
+    --not-found jquery \
+    --not-found popper.js \
+    --not-found assets/jquery \
+    --not-found assets/popper.js \
+    --log-not-found 'jquery' \
+    --log-not-found 'popper' \
+    --file-matches 'assets/app.js' 'from "mod\.js"' \
+    --file-matches 'assets/app.js' 'from "\.\./top\.js"' \
+    --file-matches 'assets/app.js' 'from "jquery"' \
+    --file-matches 'assets/app.js' 'from "popper\.js"' \
+    httrack BASEURL/index.html -q -%v0 -r4

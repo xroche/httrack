@@ -329,19 +329,22 @@ static const struct jsscan_word {
   const char *ends;      /* what may close it, NULL for the default */
   hts_boolean no_mime;   /* window.open("text/html") is a type, not a URL */
   hts_boolean no_method; /* xhr.open("GET", url): the method is not a URL */
+  hts_boolean path_only; /* from "jquery" names a module, not a file */
   jsscan_guard guard;
 } jsscan_words[] = {
-    {".src", '=', NULL, HTS_FALSE, HTS_FALSE, JSGUARD_NONE},
-    {"src", '=', NULL, HTS_FALSE, HTS_FALSE, JSGUARD_TAG_QUOTE},
-    {".location", '=', NULL, HTS_FALSE, HTS_FALSE, JSGUARD_NONE},
-    {":location", '=', NULL, HTS_FALSE, HTS_FALSE, JSGUARD_NONE},
-    {"location", '=', NULL, HTS_FALSE, HTS_FALSE, JSGUARD_SPACE_BEFORE},
-    {".href", '=', NULL, HTS_FALSE, HTS_FALSE, JSGUARD_NONE},
-    {".open", '(', "),", HTS_TRUE, HTS_TRUE, JSGUARD_NONE},
-    {".replace", '(', ")", HTS_FALSE, HTS_FALSE, JSGUARD_NONE},
-    {".link", '(', ")", HTS_FALSE, HTS_FALSE, JSGUARD_NONE},
-    {"url", '(', ")", HTS_FALSE, HTS_FALSE, JSGUARD_NO_NAME_BYTE},
-    {"import", 0, NULL, HTS_FALSE, HTS_FALSE, JSGUARD_SPACE_AFTER},
+    {".src", '=', NULL, HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_NONE},
+    {"src", '=', NULL, HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_TAG_QUOTE},
+    {".location", '=', NULL, HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_NONE},
+    {":location", '=', NULL, HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_NONE},
+    {"location", '=', NULL, HTS_FALSE, HTS_FALSE, HTS_FALSE,
+     JSGUARD_SPACE_BEFORE},
+    {".href", '=', NULL, HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_NONE},
+    {".open", '(', "),", HTS_TRUE, HTS_TRUE, HTS_FALSE, JSGUARD_NONE},
+    {".replace", '(', ")", HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_NONE},
+    {".link", '(', ")", HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_NONE},
+    {"url", '(', ")", HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_NO_NAME_BYTE},
+    {"import", 0, NULL, HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_SPACE_AFTER},
+    {"from", 0, NULL, HTS_FALSE, HTS_FALSE, HTS_TRUE, JSGUARD_NO_NAME_BYTE},
 };
 
 /* This models what hts_js_scan_link is meant to find: one of the keywords
@@ -461,6 +464,11 @@ matched:
     }
   }
 
+  /* Spelled again as prefixes, not as indexed bytes: only a path is a URL. */
+  if (w->path_only && strncmp(a, "/", 1) != 0 && strncmp(a, "./", 2) != 0 &&
+      strncmp(a, "../", 3) != 0)
+    return HTS_FALSE;
+
   /* a leading ',' or ';' says this is code, and a quote or a control byte says
      the operand never was one string */
   for (n = 0, i = 0; i < (size_t) len; i++) {
@@ -519,11 +527,11 @@ static void jsscan_sweep(httrackp *opt, selftest_sweep *sw) {
   static const char *const word[] = {
       ".src",     "src",    ".SRC",  ".location", ":location",
       "location", ".href",  ".open", ".replace",  ".link",
-      "url",      "import", "foo"};
+      "url",      "import", "from",  "foo"};
   static const char *const sep[] = {"=", "(", ",", "", " ="};
   static const char *const quote[] = {"\"", "'", ""};
   static const char *const operand[] = {"a.gif", "text/html", "GET", ",x",
-                                        "x;y",   "",          "a b"};
+                                        "x;y",   "",          "a b", "./a.js"};
   static const char *const tail[] = {";", ")", ",", "\n", " ;", "", "x"};
   char text[128];
   size_t p, w, s, q, o, t;
@@ -597,6 +605,23 @@ int parse_selftest_jsscan(httrackp *opt, hts_boolean dump) {
       {"x.src=\"\";", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
       /* a script inside a tag ends on the attribute's own quote */
       {"x.src='a.gif'\"", 1, HTS_TRUE, HTS_FALSE, HTS_TRUE, 6, 5},
+      /* a module specifier is followed when it is a path, and export takes
+         the same keyword as import */
+      {"import x from\"./x.js\";", 9, HTS_FALSE, HTS_FALSE, HTS_TRUE, 5, 6},
+      {"import x from \"../x.js\";", 9, HTS_FALSE, HTS_FALSE, HTS_TRUE, 6, 7},
+      {"from\"/x.js\";", 0, HTS_FALSE, HTS_FALSE, HTS_TRUE, 5, 5},
+      {"export{a}from\"./x.js\";", 9, HTS_FALSE, HTS_FALSE, HTS_TRUE, 5, 6},
+      /* a query or a fragment rides along: the rule reads the start only */
+      {"from\"./x.js?v=1\";", 0, HTS_FALSE, HTS_FALSE, HTS_TRUE, 5, 10},
+      {"from\"./x.js#a\";", 0, HTS_FALSE, HTS_FALSE, HTS_TRUE, 5, 8},
+      /* a bare specifier is a module id the loader resolves */
+      {"from\"jquery\";", 0, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      {"from\"popper.js\";", 0, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      {"from\"@scope/pkg\";", 0, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      /* the keyword stands alone, and is not a call */
+      {"xfrom\"./x.js\";", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      {"platform\"./x.js\";", 4, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      {"x.from(\"./x.js\")", 2, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
   };
 
   selftest_sweep sw;
