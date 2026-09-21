@@ -227,9 +227,8 @@ jobs:
             throw "CRT mismatch across the boundary: libhttrack.dll=$a httrack.exe=$b"
           }
 
-      # The mitigations are per-image opt-ins the projects request; assert them
-      # where they end up, because a property dropped from a .vcxproj still
-      # builds and still passes every other check here.
+      # A property dropped from a .vcxproj still builds, so assert the
+      # mitigations where they end up.
       - name: Check the hardening flags reached the binaries
         shell: pwsh
         run: |
@@ -239,8 +238,7 @@ jobs:
             -latest -find VC\Tools\MSVC\**\bin\Host*\*\dumpbin.exe | Select-Object -First 1
           if (-not $dumpbin) { throw "dumpbin not found" }
 
-          # /headers prints the DLL-characteristics bits, /loadconfig the extended
-          # ones that carry CET.
+          # /headers holds the DLL-characteristics bits, /loadconfig carries CET.
           function Get-Headers($path) {
             $out = & $dumpbin /headers /loadconfig $path
             if ($LASTEXITCODE -ne 0) { throw "dumpbin failed on $path" }
@@ -252,6 +250,7 @@ jobs:
             "ASLR (/DYNAMICBASE)"        = "Dynamic base"
             "DEP (/NXCOMPAT)"            = "NX compatible"
             "Control Flow Guard"         = "Control Flow Guard"
+            "Stack cookie (/GS)"         = "Security Cookie"
           }
           if ("${{ matrix.platform }}" -eq "x64") {
             $want["Shadow stacks (/CETCOMPAT)"] = "CET\s*Compat"
@@ -261,8 +260,8 @@ jobs:
           foreach ($f in @("libhttrack.dll", "httrack.exe", "webhttrack.exe", "proxytrack.exe")) {
             $hdr = Get-Headers "$dir\$f"
 
-            # Negative control: no image is a WDM driver, so a matcher that finds
-            # this one would find anything and every verdict below is vacuous.
+            # Negative control: no image is a WDM driver, so a match means the
+            # matcher matches anything.
             if ($hdr -match "WDM Driver") {
               throw "negative control failed on ${f}: the matcher matches anything"
             }

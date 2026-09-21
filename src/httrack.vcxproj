@@ -64,8 +64,7 @@
       <WarningLevel>Level3</WarningLevel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <CompileAs>CompileAsC</CompileAs>
-      <!-- Hardening: /guard:cf plus an explicit /GS, so the mitigation set is a
-           contract rather than whatever the toolset happens to default to. -->
+      <!-- Hardening: /guard:cf and an explicit /GS, so the set is a contract. -->
       <ControlFlowGuard>Guard</ControlFlowGuard>
       <BufferSecurityCheck>true</BufferSecurityCheck>
     </ClCompile>
