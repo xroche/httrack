@@ -1,8 +1,9 @@
 #!/bin/bash
 #
-# The linker ANDs the GNU property note across every input, so one object built
-# without branch protection clears it for the whole image. Assert it in the
-# artifact, the way 331 does for _FORTIFY_SOURCE.
+# Assert pac-ret in the artifact, not the GNU property note: the linker ANDs
+# that note across every input, and Ubuntu's aarch64 crt objects carry none, so
+# it is absent there however the engine was built. The signing instructions are
+# what survive, and they are what actually protects a return address.
 
 set -euo pipefail
 
@@ -14,7 +15,9 @@ set -euo pipefail
 [ -n "${abs_top_builddir:-}" ] || skip "abs_top_builddir unset, no automake environment"
 
 readelf=${READELF:-readelf}
+objdump=${OBJDUMP:-objdump}
 command -v "$readelf" >/dev/null 2>&1 || skip "no readelf ($readelf)"
+command -v "$objdump" >/dev/null 2>&1 || skip "no objdump ($objdump)"
 # CC carries flags on some legs ("gcc -m32", "ccache gcc"), so split it.
 read -r -a cc_argv <<<"${CC:-cc}"
 command -v "${cc_argv[0]}" >/dev/null 2>&1 || skip "no C compiler (${cc_argv[0]})"
@@ -39,73 +42,43 @@ esac
 tmp=$(mktemp -d) || exit 1
 cleanup_push rm -rf "$tmp"
 
-want='BTI PAC'
-
-# Case-insensitive: llvm-readelf spells the line in lower case.
-features() { # features FILE
-    "$readelf" -nW "$1" 2>/dev/null |
-        awk 'tolower($0) ~ /aarch64 feature:/ {
-            sub(/^.*[Ff]eature:[ ]*/, "")
-            gsub(/,/, "\n")
-            gsub(/ /, "")
-            print
-        }' | sort -u || true
+# grep -c exits 1 on no match, which would end the whole run under errexit.
+signed() { # signed FILE -- how many functions sign their return address
+    "$objdump" -d "$1" 2>/dev/null | grep -c paciasp || true
 }
 
-# Captured, not piped: grep -q would SIGPIPE the producer under pipefail.
-has() { # has FILE FEATURE
-    grep -qx "$2" <<<"$(features "$1")"
-}
-
-# Which of $want FILE does not advertise, space-separated, empty when none.
-missing() { # missing FILE
-    local w out=''
-    for w in $want; do
-        has "$1" "$w" || out="$out $w"
-    done
-    printf '%s' "${out# }"
-}
-
-# Non-leaf, so the flag has a call to sign as well as a landing pad to mark.
+# Non-leaf and not inlinable, so pac-ret has a return address to sign: a leaf
+# gets no paciasp however the flag is spelled.
 cat >"$tmp/probe.c" <<'PROBE'
-static int callee(int x) { return x + 1; }
-int main(void) { return callee(0); }
+int callee(int x);
+int caller(int x) { return callee(x) + 1; }
 PROBE
 
 # -Werror, so this accepts exactly what configure's own probe accepted.
 build() { # build OUT FLAGS...
     local out=$1
     shift
-    "${cc_argv[@]}" -Werror "$@" -o "$out" "$tmp/probe.c" >/dev/null 2>&1
+    "${cc_argv[@]}" -Werror "$@" -c -o "$out" "$tmp/probe.c" >/dev/null 2>&1
 }
 
-# Three controls, because the assertion below is vacuous without all of them.
-build "$tmp/asked.o" -c -mbranch-protection=standard ||
+# Two controls, because the assertion below is vacuous without both.
+build "$tmp/asked.o" -mbranch-protection=standard ||
     skip "${CC:-cc} does not accept -mbranch-protection=standard"
-gap=$(missing "$tmp/asked.o")
-if [ -n "$gap" ]; then
-    # A note present but unreadable is a broken probe, not a missing mitigation.
-    sections=$("$readelf" -SW "$tmp/asked.o" 2>/dev/null || true)
-    if grep -q 'note\.gnu\.property' <<<"$sections"; then
-        fail "$readelf prints a property note this test cannot parse"
-    fi
-    skip "${CC:-cc} marks no $gap for -mbranch-protection=standard"
-fi
+[ "$(signed "$tmp/asked.o")" -gt 0 ] ||
+    skip "$objdump shows no paciasp for -mbranch-protection=standard here"
 
 # =none rather than the flag left out: some toolchains default it on.
-build "$tmp/plain.o" -c -mbranch-protection=none ||
+build "$tmp/plain.o" -mbranch-protection=none ||
     skip "${CC:-cc} does not accept -mbranch-protection=none"
-[ "$(missing "$tmp/plain.o")" = "$want" ] ||
-    skip "the unprotected control already carries part of $want"
+[ "$(signed "$tmp/plain.o")" -eq 0 ] ||
+    skip "the unprotected control signs too, so paciasp cannot discriminate"
 
-build "$tmp/asked.elf" -mbranch-protection=standard ||
-    skip "cannot link a probe here"
-gap=$(missing "$tmp/asked.elf")
-[ -z "$gap" ] || skip "a link drops $gap here, so no build could keep it"
+# The note says whether the loader also enforces BTI, which the crt objects
+# decide rather than we do, so report it and assert only what we control.
+echo "$(basename "$subject"): $(signed "$subject") signed function(s), property note:" \
+    "$("$readelf" -nW "$subject" 2>/dev/null | sed -n 's/.*[Ff]eature: *//p' | head -1)"
 
-echo "$(basename "$subject"): AArch64 features: $(features "$subject" | tr '\n' ' ')"
-
-gap=$(missing "$subject")
-[ -z "$gap" ] || fail "$subject carries no $gap, so -mbranch-protection=standard did not reach it"
+[ "$(signed "$subject")" -gt 0 ] ||
+    fail "$subject signs no return address, so -mbranch-protection=standard did not reach it"
 
 exit 0
