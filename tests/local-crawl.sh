@@ -16,6 +16,7 @@
 #       [--rerun-args 'ARGS'] \
 #       --errors N --errors-content N --files N --found PATH ... --directory PATH ... \
 #       --log-found REGEX ... --log-not-found REGEX ... \
+#       --stdout-found REGEX ... --stdout-not-found REGEX ... \
 #       --file-matches PATH REGEX ... --file-not-matches PATH REGEX ... \
 #       --files-identical PATH PATH ... \
 #       --cache-found URLTAIL ... --cache-not-found URLTAIL ... \
@@ -24,6 +25,7 @@
 # --errors counts every "Error:" log line; --errors-content drops transient
 # network failures (codes -2..-6) that flake on busy loopback under -c8.
 # --log-found/--log-not-found grep (ERE) the crawl's hts-log.txt.
+# --stdout-found/--stdout-not-found grep (ERE) what the first pass printed.
 # --max/--min-mirror-bytes bound the mirrored content bytes (host root).
 # --file-matches/--file-not-matches grep (ERE) a mirrored file (PATH under the
 # host root), to assert rewritten link/content survived the crawl. Both fail
@@ -230,7 +232,7 @@ while test "$pos" -lt "$nargs"; do
         audit+=("${args[$pos]}" "${args[$((pos + 1))]}")
         pos=$((pos + 1))
         ;;
-    --found | --not-found | --directory | --log-found | --log-not-found | --max-mirror-bytes | --min-mirror-bytes | --cache-found | --cache-not-found)
+    --found | --not-found | --directory | --log-found | --log-not-found | --stdout-found | --stdout-not-found | --max-mirror-bytes | --min-mirror-bytes | --cache-found | --cache-not-found)
         audit+=("${args[$pos]}" "${args[$((pos + 1))]}")
         pos=$((pos + 1))
         ;;
@@ -686,6 +688,22 @@ while test "$i" -lt "${#audit[@]}"; do
         log_body >"$logbody"
         if grep -aqE "${audit[$i]}" "$logbody"; then
             result "present in log"
+            exit 1
+        else result "OK"; fi
+        ;;
+    --stdout-found)
+        i=$((i + 1))
+        info "checking console output matches ${audit[$i]}"
+        if grep -aqE "${audit[$i]}" "$log"; then result "OK"; else
+            result "not printed"
+            exit 1
+        fi
+        ;;
+    --stdout-not-found)
+        i=$((i + 1))
+        info "checking console output lacks ${audit[$i]}"
+        if grep -aqE "${audit[$i]}" "$log"; then
+            result "printed"
             exit 1
         else result "OK"; fi
         ;;

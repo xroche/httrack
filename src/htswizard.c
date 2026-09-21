@@ -69,6 +69,19 @@ static int hts_acceptlink_(httrackp * opt, int ptr, const char *adr,
                            const char *attribute, int *set_prio_to,
                            int *just_test_it);
 
+hts_boolean hts_upper_links_note(httrackp *opt, char *dst, size_t dstsize) {
+  const int n = opt->upper_links_refused;
+
+  dst[0] = '\0';
+  if (n <= 0)
+    return HTS_FALSE;
+  slprintfbuff_clip(dst, dstsize,
+                    "%d link%s above the start directory %s not mirrored. "
+                    "Pass -B (--can-go-up-and-down) to allow links above it.",
+                    n, n == 1 ? "" : "s", n == 1 ? "was" : "were");
+  return HTS_TRUE;
+}
+
 /*
 httrackp opt	 bloc d'options
 int ptr,int lien_tot,lien_url** liens
@@ -462,6 +475,7 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
   int forbidden_url = -1;
   int meme_adresse;
   int embedded_triggered = 0;
+  int upper_refused = 0;
 
 #define _FILTERS     (*opt->filters.filters)
 #define _FILTERS_PTR (opt->filters.filptr)
@@ -607,6 +621,7 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
           if ((!strncmp(tempo, "../", 3)) && (!strncmp(tempo2, "../", 3))) {    // impossible sans monter
             if ((opt->seeker & HTS_SEEKER_UP) == 0) {
               forbidden_url = 1;
+              upper_refused = 1;
               hts_log_print(opt, LOG_DEBUG, "upper link canceled: %s%s", adr,
                             fil);
             } else {                           // autorisé à monter - NEW
@@ -1020,6 +1035,10 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
   if (may_set_prio_to && forbidden_url == 0) {
     *set_prio_to = may_set_prio_to;
   }
+
+  /* counted at the end because a rule below the refusal can still take it */
+  if (upper_refused && forbidden_url == 1)
+    opt->upper_links_refused++;
 
   return forbidden_url;
 #undef _FILTERS

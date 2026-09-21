@@ -605,6 +605,11 @@ struct httrackp {
                                        published as stat_transport_failures.
                                        Live state, so copy_htsopt must leave it
                                        alone. Tail: ABI */
+  int upper_links_refused;        /**< links refused for sitting above the
+                                       start directory, reported once at the
+                                       end so -B is discoverable. Live state,
+                                       so copy_htsopt must leave it alone.
+                                       Tail: ABI */
 };
 
 /* Running statistics for a mirror. */

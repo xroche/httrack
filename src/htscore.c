@@ -649,6 +649,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   opt->links_unqueued = HTS_FALSE;
   opt->abort_left_partial = HTS_FALSE;
   opt->transport_failures = 0;
+  opt->upper_links_refused = 0;
 
   /* before the first bailout below, each of which leaves it false */
   set_mirror_completed(opt, completed_out, HTS_FALSE);
@@ -2366,6 +2367,13 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
           finalInfo, sizeof(finalInfo), &finalUsed,
           "(%d links failed to transfer, so the mirror is incomplete)" LF,
           opt->transport_failures);
+    {
+      char BIGSTK upperNote[256];
+
+      if (hts_upper_links_note(opt, upperNote, sizeof(upperNote)))
+        slcatprintfbuff_clip(finalInfo, sizeof(finalInfo), &finalUsed,
+                             "(%s)" LF, upperNote);
+    }
 
     // Log
     fprintf(opt->log, LF "%s", finalInfo);

@@ -6676,6 +6676,7 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->links_unqueued = HTS_FALSE;
   opt->mirror_completed = HTS_DEFAULT;
   opt->transport_failures = 0;
+  opt->upper_links_refused = 0;
   opt->abort_left_partial = HTS_FALSE;
   StringCopy(opt->why_url, "");
   opt->pause_min_ms = 0;
