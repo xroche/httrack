@@ -225,6 +225,8 @@ AX_CHECK_COMPILE_FLAG([-fstack-protector-strong], [DEFAULT_CFLAGS="$DEFAULT_CFLA
 AX_CHECK_COMPILE_FLAG([-fstack-clash-protection], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fstack-clash-protection"], [], [-Werror])
 AX_CHECK_COMPILE_FLAG([-fcf-protection], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fcf-protection"], [], [-Werror])
 # -fcf-protection is x86-only, so arm64 needs its own flag to get any at all.
+# Do not pair this with an -march bump: from armv8.3-a the compiler folds the
+# return into retaa, which faults on an ARMv8.0 core where paciasp is a NOP.
 AX_CHECK_COMPILE_FLAG([-mbranch-protection=standard], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -mbranch-protection=standard"], [], [-Werror])
 # backtrace() unwinds through these; armhf, unlike amd64/arm64, defaults them off
 # and printed frameless crash reports.
