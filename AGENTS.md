@@ -179,6 +179,8 @@ Before pushing, and when reviewing others, don't skim for bugs:
   intended: `htsdns_selftest.c` asserted the never-re-resolve bug #1392 fixes,
   and a purge guard firing on any dead link passed all 372 tests. When a fix
   makes you invert an existing assertion, that inversion is the finding.
+- **A sweep's count is a product of its corpus, so floor it in the `.test`.**
+  Use the real count, not a round one, and prove it by deleting a case.
 - **Risk areas need runtime probes.** Touching hostile-input parsing, struct
   layout/ABI, cache/wire format, or a security path? A static or unit check
   isn't enough; exercise the wrong behavior at runtime. Claude Code:
