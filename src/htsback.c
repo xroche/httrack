@@ -4589,10 +4589,29 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     deleteaddr(&back[i].r);
                     back[i].r.headers = block;
                   }
-                  // Stash the raw response headers for WARC (deletehttp frees
-                  // r.headers when the socket closes, before back_finalize)
+                  // Stash the raw response headers for WARC (deleteaddr frees
+                  // r.headers on the next response, before back_finalize)
                   if (StringNotEmpty(opt->warc_file))
                     warc_stash_response(&back[i].r, back[i].r.headers);
+
+                  /* A challenge is a refusal, not a failure. Unsaid, the 4xx
+                     and the rollback both read as our defect (#1732). */
+                  if (!sback->bot_challenge_noted &&
+                      HTTP_IS_ERROR(back[i].r.statuscode) &&
+                      http_headers_have_field(back[i].r.headers,
+                                              "cf-mitigated")) {
+                    sback->bot_challenge_noted = HTS_TRUE;
+                    hts_log_print(opt, LOG_WARNING,
+                                  "Bot protection challenge at %s%s: the "
+                                  "server refused the request (cf-mitigated "
+                                  "header) rather than failing it",
+                                  back[i].url_adr, back[i].url_fil);
+                    hts_log_print(opt, LOG_WARNING,
+                                  "Solve the challenge in a browser, then pass "
+                                  "its cookies with --cookies-file. The "
+                                  "clearance expires, and is tied to that "
+                                  "browser's address and user-agent.");
+                  }
 
                   /* 
                      Status code and header-response hacks

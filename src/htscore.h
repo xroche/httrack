@@ -178,6 +178,8 @@ struct struct_back {
   coucal ready;           /**< index of slots whose transfer completed */
   LLint ready_size_bytes; /**< total bytes buffered in completed slots */
   hts_connect_fallback *connect_fallback; /**< per-slot, count+1 entries */
+  hts_boolean bot_challenge_noted; /**< the bot-protection note is already in
+                                        this mirror's log (#1732) */
 };
 
 /** Open handle to the mirror cache (the read-from-old / write-to-new state

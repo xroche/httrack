@@ -4761,6 +4761,7 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
       if (back[b].r.location)
         strlcpybuff(r->location, back[b].r.location, HTS_LOCATION_SIZE);
       back[b].r.adr = NULL;     // ne pas faire de desalloc ensuite
+      r->headers = NULL;        // back_maydelete() frees the block this aliases
 
       // libérer emplacement backing
       back_maydelete(opt, cache, sback, b);
