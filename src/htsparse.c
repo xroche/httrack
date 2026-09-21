@@ -423,10 +423,12 @@ hts_boolean hts_dirty_link_is_url(httrackp *opt, const char *str, size_t len,
   return url_ok;
 }
 
-/* Does this byte glue the keyword to a name, or to a string literal? */
+/* Does this byte glue the keyword to a name, or to a string literal? A byte
+   above 127 counts: JavaScript allows Unicode in a name, so refuse rather than
+   read a token boundary that is not there. */
 static hts_boolean js_glues_keyword(char c) {
   return isalnum((unsigned char) c) || c == '_' || c == '$' || c == '.' ||
-         c == '"' || c == '\'' || c == '`';
+         c == '"' || c == '\'' || c == '`' || (unsigned char) c >= 0x80;
 }
 
 /* Contract in htsparse.h; indexed so no pointer leaves the buffer. */
@@ -449,6 +451,20 @@ hts_boolean hts_js_quote_is_import_arg(const char *quote, const char *buffer) {
     return HTS_FALSE;
   i -= kwlen;
   return i == 0 || !js_glues_keyword(buffer[i - 1]);
+}
+
+/* Is this module specifier a URL, or a module id the loader resolves for
+   itself? The ESM grammar decides it on the leading bytes: a path begins "/",
+   "./" or "../", so ".config/a.js" and "..x.js" are ids, not paths. */
+static hts_boolean js_specifier_is_url(const char *s) {
+  if (s[0] == '/')
+    return HTS_TRUE;
+  if (s[0] == '.' && (s[1] == '/' || (s[1] == '.' && s[2] == '/')))
+    return HTS_TRUE;
+  /* an absolute URL is one too, the way a bare import already takes it */
+  return strfield(s, "http:") || strfield(s, "https:") || strfield(s, "ftp:")
+             ? HTS_TRUE
+             : HTS_FALSE;
 }
 
 /* Contract in htsparse.h. */
@@ -534,11 +550,14 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
       } else
         nc = 0;
     }
-  if (!nc && (nc = strfield(cursor, "from")) &&
-      (!isalnum(html_prevc(cursor, buffer))) &&
-      html_prevc(cursor, buffer) != '_') { // import x from "./mod.js"
-    expected = 0;
-    is_specifier = 1;
+  if (!nc) { // import x from "./mod.js"
+    /* The guard has to gate the match: a name merely ending in "from" must
+       leave nc at zero, or the default rule takes its assignment as a link. */
+    if (!js_glues_keyword(html_prevc(cursor, buffer)) &&
+        (nc = strfield(cursor, "from")) != 0) {
+      expected = 0;
+      is_specifier = 1;
+    }
   }
   if (!nc)
     return HTS_FALSE;
@@ -605,11 +624,8 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
     if (a != NULL && ensure_not_method &&
         is_http_method(a, (size_t) (c - a + 1)))
       a = NULL;
-    // a bare specifier such as "jquery" names a module the loader resolves
-    // through its own configuration, so only a path is a URL
-    if (a != NULL && is_specifier &&
-        !(a[0] == '/' ||
-          (a[0] == '.' && (a[1] == '/' || (a[1] == '.' && a[2] == '/')))))
+    // "jquery" names a module the loader resolves, never a file
+    if (a != NULL && is_specifier && !js_specifier_is_url(a))
       a = NULL;
     // Check for bogus links (Vasiliy)
     if (a != NULL) {
