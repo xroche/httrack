@@ -41,8 +41,7 @@ cleanup_push rm -rf "$tmp"
 
 want='BTI PAC'
 
-# Case-insensitive because llvm-readelf spells the line in lower case, and a
-# parse this misses reads exactly like a mitigation the build never applied.
+# Case-insensitive: llvm-readelf spells the line in lower case.
 features() { # features FILE
     "$readelf" -nW "$1" 2>/dev/null |
         awk 'tolower($0) ~ /aarch64 feature:/ {
@@ -53,8 +52,7 @@ features() { # features FILE
         }' | sort -u || true
 }
 
-# Captured, not piped: grep -q exits on its first match, and the SIGPIPE that
-# sends back up would become the pipeline's status under pipefail.
+# Captured, not piped: grep -q would SIGPIPE the producer under pipefail.
 has() { # has FILE FEATURE
     grep -qx "$2" <<<"$(features "$1")"
 }
@@ -74,8 +72,7 @@ static int callee(int x) { return x + 1; }
 int main(void) { return callee(0); }
 PROBE
 
-# -Werror and no -w, matching what configure's own probe accepts: a compiler
-# that only warns here is one configure declined, and skipping then is right.
+# -Werror, so this accepts exactly what configure's own probe accepted.
 build() { # build OUT FLAGS...
     local out=$1
     shift
@@ -87,8 +84,7 @@ build "$tmp/asked.o" -c -mbranch-protection=standard ||
     skip "${CC:-cc} does not accept -mbranch-protection=standard"
 gap=$(missing "$tmp/asked.o")
 if [ -n "$gap" ]; then
-    # A note that is present but unreadable is a broken probe, not a missing
-    # mitigation, so it has to fail where the rest of this arm skips.
+    # A note present but unreadable is a broken probe, not a missing mitigation.
     sections=$("$readelf" -SW "$tmp/asked.o" 2>/dev/null || true)
     if grep -q 'note\.gnu\.property' <<<"$sections"; then
         fail "$readelf prints a property note this test cannot parse"
@@ -96,8 +92,7 @@ if [ -n "$gap" ]; then
     skip "${CC:-cc} marks no $gap for -mbranch-protection=standard"
 fi
 
-# =none, not the flag left out: some toolchains turn branch protection on by
-# default, and a control built without the flag then discriminates nothing.
+# =none rather than the flag left out: some toolchains default it on.
 build "$tmp/plain.o" -c -mbranch-protection=none ||
     skip "${CC:-cc} does not accept -mbranch-protection=none"
 [ "$(missing "$tmp/plain.o")" = "$want" ] ||
