@@ -20,10 +20,10 @@ case "$out" in
     ;;
 esac
 
-# A sweep whose corpus collapses still prints OK, so pin the floor here.
+# A sweep whose corpus collapses still prints OK, so floor it at the real count.
 swept=${out#*OK (}
 swept=${swept%% *}
-test "$swept" -ge 380000 || {
-    echo "expected at least 380000 cases swept, got: $out" >&2
+test "$swept" -ge 382215 || {
+    echo "expected at least 382215 cases swept, got: $out" >&2
     exit 1
 }
