@@ -121,6 +121,20 @@ void hts_strip_default_port(char *lien, size_t size);
 hts_boolean hts_dirty_link_is_url(httrackp *opt, const char *str, size_t len,
                                   char lastc, hts_boolean inscript);
 
+/*
+  Does the byte before a quoted string open it as a candidate link for the
+  dirty parser, and does the first non-blank byte after its closing quote end
+  it? "inscript" and "incss" name the context the parser tracks: JavaScript is
+  inscript without incss, and only there is an array literal an operand list,
+  so "[" opens a string and "]" ends one. In every context "/" ends one,
+  covering a value a JavaScript comment follows. Both accept '\0', so a string
+  the buffer ends at has always been read.
+*/
+hts_boolean hts_dirty_string_opener(char prev, hts_boolean inscript,
+                                    hts_boolean incss);
+hts_boolean hts_dirty_string_closer(char next, hts_boolean inscript,
+                                    hts_boolean incss);
+
 /* A link the script scanner found, as an offset and a length from the cursor
    it was given. "unquoted_end" is the byte an unquoted CSS url() operand stops
    at, and '\0' when the operand was quoted. All three fields are zero when the

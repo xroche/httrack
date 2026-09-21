@@ -311,6 +311,92 @@ int parse_selftest_dirtylink(httrackp *opt, hts_boolean dump) {
   return err;
 }
 
+/* The bytes each decision takes, per context the parser tracks. Neither list
+   holds '\0': the sweep pins that byte apart, since the seams inherit it from
+   strchr() rather than choose it. */
+static const struct dirtystring_context {
+  const char *name;
+  hts_boolean inscript;
+  hts_boolean incss;
+  const char *opens;
+  const char *closes;
+} dirtystring_contexts[] = {
+    {"markup", HTS_FALSE, HTS_FALSE, "=(,", "),;>/+\r\n"},
+    {"CSS", HTS_TRUE, HTS_TRUE, "=(,", "),;>/+\r\n"},
+    /* an array literal is an operand list, so its brackets frame a string the
+       way a call's parentheses do */
+    {"JavaScript", HTS_TRUE, HTS_FALSE, "=(,[", "),;>/+]\r\n"},
+};
+
+int parse_selftest_dirtystring(httrackp *opt) {
+  /* The JavaScript shapes the brackets are for, and the neighbours that stay
+     refused. */
+  static const struct {
+    char byte;
+    hts_boolean opens;
+    hts_boolean closes;
+    const char *why;
+  } js_cases[] = {
+      {'[', HTS_TRUE, HTS_FALSE, "an array literal opening an operand list"},
+      {']', HTS_FALSE, HTS_TRUE, "an array literal ending one"},
+      {',', HTS_TRUE, HTS_TRUE, "the comma framing both elements of a pair"},
+      {'=', HTS_TRUE, HTS_FALSE, "an assignment"},
+      {'(', HTS_TRUE, HTS_FALSE, "a call"},
+      {')', HTS_FALSE, HTS_TRUE, "the end of a call"},
+      {'{', HTS_FALSE, HTS_FALSE, "an object literal, which is keyed"},
+      {':', HTS_FALSE, HTS_FALSE, "an object literal's separator"},
+      {'+', HTS_FALSE, HTS_TRUE, "a concatenation"},
+  };
+
+  const size_t nctx =
+      sizeof(dirtystring_contexts) / sizeof(dirtystring_contexts[0]);
+  size_t k, i, pinned = 0;
+  int err = 0;
+
+  (void) opt;
+  for (k = 0; k < nctx; k++) {
+    const struct dirtystring_context *const ctx = &dirtystring_contexts[k];
+    unsigned int c;
+
+    for (c = 0; c < 256; c++) {
+      const char byte = (char) c;
+      const hts_boolean opens =
+          hts_dirty_string_opener(byte, ctx->inscript, ctx->incss);
+      const hts_boolean closes =
+          hts_dirty_string_closer(byte, ctx->inscript, ctx->incss);
+      /* a quoted string the buffer ends at has always been read */
+      const hts_boolean want_opens =
+          (c == 0 || strchr(ctx->opens, byte) != NULL) ? HTS_TRUE : HTS_FALSE;
+      const hts_boolean want_closes =
+          (c == 0 || strchr(ctx->closes, byte) != NULL) ? HTS_TRUE : HTS_FALSE;
+
+      pinned += 2;
+      if (opens != want_opens || closes != want_closes) {
+        fprintf(stderr,
+                "dirtystring byte %d in %s: opens %d closes %d, wanted %d %d\n",
+                (int) c, ctx->name, (int) opens, (int) closes, (int) want_opens,
+                (int) want_closes);
+        err = 1;
+      }
+    }
+  }
+
+  for (i = 0; i < sizeof(js_cases) / sizeof(js_cases[0]); i++) {
+    if (hts_dirty_string_opener(js_cases[i].byte, HTS_TRUE, HTS_FALSE) !=
+            js_cases[i].opens ||
+        hts_dirty_string_closer(js_cases[i].byte, HTS_TRUE, HTS_FALSE) !=
+            js_cases[i].closes) {
+      fprintf(stderr, "dirtystring '%c' in JavaScript: wrong verdict for %s\n",
+              js_cases[i].byte, js_cases[i].why);
+      err = 1;
+    }
+  }
+
+  printf("dirtystring self-test %s (%d verdicts pinned)\n",
+         err ? "FAILED" : "OK", (int) pinned);
+  return err;
+}
+
 /* Keyword a script assignment or call may carry a URL through, with what must
    follow it and what may close the statement. Order matters: the engine takes
    the first that matches. */

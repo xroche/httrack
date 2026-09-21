@@ -48,6 +48,11 @@ typedef struct httrackp httrackp;
    verdict table instead of judging it. Returns 0 when all agree. */
 int parse_selftest_dirtylink(httrackp *opt, hts_boolean dump);
 
+/* Check hts_dirty_string_opener and hts_dirty_string_closer over every byte,
+   in each of the three contexts the parser tracks, against the byte sets each
+   context is meant to take. Returns 0 when all agree. */
+int parse_selftest_dirtystring(httrackp *opt);
+
 /* Sweep hts_js_scan_link over the shapes a script statement takes, one
    representative per class it branches on, against a model of its rules, and
    pin a table of named statements. "dump" prints the verdicts instead.

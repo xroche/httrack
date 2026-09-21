@@ -7400,6 +7400,12 @@ static int st_dirtylink(httrackp *opt, int argc, char **argv) {
       opt, (argc > 0 && strcmp(argv[0], "dump") == 0) ? HTS_TRUE : HTS_FALSE);
 }
 
+static int st_dirtystring(httrackp *opt, int argc, char **argv) {
+  (void) argc;
+  (void) argv;
+  return parse_selftest_dirtystring(opt);
+}
+
 static int st_jsscan(httrackp *opt, int argc, char **argv) {
   return parse_selftest_jsscan(
       opt, (argc > 0 && strcmp(argv[0], "dump") == 0) ? HTS_TRUE : HTS_FALSE);
@@ -16477,6 +16483,10 @@ static const struct selftest_entry {
      "is a quoted string a link? sweeps the parser's alphabet against a model, "
      "or dumps its verdicts",
      st_dirtylink},
+    {"dirtystring", "",
+     "may a quoted string open and close here? an array literal frames one in "
+     "JavaScript, and nowhere else",
+     st_dirtystring},
     {"jsscan", "[dump]",
      "does a script statement hand a URL to .src, .location, .open, url() and "
      "friends? sweeps the shapes against a model",

@@ -1,0 +1,21 @@
+#!/bin/bash
+#
+# Pins the two bytes the dirty scanner reads around a quoted string: the one
+# before the opening quote and the first non-blank one after the closing quote.
+# The engine checks every byte value in each of the three contexts it tracks,
+# so widening JavaScript for array literals cannot widen CSS or markup with it.
+
+set -euo pipefail
+
+out=$(httrack -#test=dirtystring) || {
+    echo "httrack -#test=dirtystring exited non-zero: $out" >&2
+    exit 1
+}
+
+case "$out" in
+"dirtystring self-test OK"*) ;;
+*)
+    echo "expected 'dirtystring self-test OK', got: $out" >&2
+    exit 1
+    ;;
+esac

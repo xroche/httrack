@@ -348,6 +348,23 @@ static int is_http_method(const char *s, size_t len) {
 }
 
 /* Contract in htsparse.h. */
+hts_boolean hts_dirty_string_opener(char prev, hts_boolean inscript,
+                                    hts_boolean incss) {
+  const hts_boolean injs = inscript && !incss;
+
+  return strchr(injs ? "=(,[" : "=(,", prev) != NULL ? HTS_TRUE : HTS_FALSE;
+}
+
+/* Contract in htsparse.h. */
+hts_boolean hts_dirty_string_closer(char next, hts_boolean inscript,
+                                    hts_boolean incss) {
+  const hts_boolean injs = inscript && !incss;
+
+  return strchr(injs ? "),;>/+]\r\n" : "),;>/+\r\n", next) != NULL ? HTS_TRUE
+                                                                   : HTS_FALSE;
+}
+
+/* Contract in htsparse.h. */
 hts_boolean hts_dirty_link_is_url(httrackp *opt, const char *str, size_t len,
                                   char lastc, hts_boolean inscript) {
   char BIGSTK tempo[HTS_URLMAXSIZE * 2];
@@ -1789,7 +1806,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   if (html != r->adr) {  // >1 caractère
                     // scanner les chaines
                     if ((*html == '\"') || (*html == '\'')) {     // "xx.gif" 'xx.gif'
-                      if (strchr("=(,", parseall_lastc)) {      // exemple: a="img.gif.. (handles comments)
+                      // parseall_lastc skips blanks and comment bodies
+                      if (hts_dirty_string_opener(parseall_lastc, inscript,
+                                                  incss)) {
                         const char *a = html;
                         char stop = *html;       // " ou '
                         int count = 0;
@@ -1814,10 +1833,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           c = *a;
                           // in-tag, an attribute value ends at its quote: no
                           // delimiter required after it (mid-tag attrs, #201)
-                          if (strchr("),;>/+\r\n", c) ||
+                          if (hts_dirty_string_closer(c, inscript, incss) ||
                               (intag && !inscript && intag_start_valid &&
                                hts_dirty_attr_detectable(html, intag_start))) {
-                            // '/' covers a value followed by a JS comment
                             int url_ok = hts_dirty_link_is_url(
                                 opt, html + 1, (size_t) count, c, inscript);
 

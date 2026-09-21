@@ -1,0 +1,65 @@
+#!/bin/bash
+#
+# A bundler writes its chunk manifest as an array literal, so the only bytes
+# around each name are "[", "," and "]". The dirty scanner read a quoted string
+# as a link only after "=", "(" or ",", and only when ")", ",", ";", ">", "/",
+# "+" or a newline followed it, so no element of ["a.js","b.js"] was ever
+# followed. The brackets now frame a string in JavaScript, and only there: in
+# CSS an attribute selector such as a[href="x.css"] is written the same way and
+# names no file. The "=" and "(" rows were followed before this change too, so
+# a fix that narrows one of those loses them.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+: "${top_srcdir:=..}"
+
+work=$(mktemp -d)
+trap 'set +e; rm -rf "$work"' EXIT
+
+root="$work/root"
+mkdir -p "$root"
+
+cat >"$root/index.html" <<'EOF'
+<!DOCTYPE html><html><head><link rel="stylesheet" href="s.css">
+<script src="app.js"></script></head><body>x</body></html>
+EOF
+
+# Each string names the byte that decides it. The refused ones sit after the
+# followed ones, so a flag leaking across statements shows up here.
+cat >"$root/app.js" <<'EOF'
+var deps = ["chunk-a.js", "chunk-b.js"];  // '[' then ',' then ']': followed
+var solo = ["solo.js"];                   // '[' and ']' alone: followed
+var eq = "eq.js";                         // '=' then ';': followed before too
+var par = load("par.js");                 // '(' then ')': followed before too
+var obj = {main: "obj.js"};               // ':' opens nothing: kept
+var n = 0;
+"stmt.js";                                // ';' opens nothing: kept
+EOF
+
+# The '=' of an attribute selector opens the string in every context, so only
+# the refused ']' keeps httrack out of it.
+cat >"$root/s.css" <<'EOF'
+a[href="x.css"] { color: red; }
+EOF
+
+for f in chunk-a.js chunk-b.js solo.js eq.js par.js obj.js x.css; do
+    printf '/* %s */\n' "$f" >"$root/$f"
+done
+printf 'var s = 1;\n' >"$root/stmt.js"
+
+bash "$top_srcdir/tests/local-crawl.sh" --root "$root" --errors 0 \
+    --found chunk-a.js \
+    --found chunk-b.js \
+    --found solo.js \
+    --found eq.js \
+    --found par.js \
+    --not-found obj.js \
+    --not-found stmt.js \
+    --not-found x.css \
+    --file-matches 'app.js' '"obj\.js"' \
+    --file-matches 'app.js' '"stmt\.js"' \
+    --file-matches 's.css' 'a\[href="x\.css"\]' \
+    httrack BASEURL/index.html -q -%v0 -r3
