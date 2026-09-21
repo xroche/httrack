@@ -54,6 +54,10 @@ int parse_selftest_dirtylink(httrackp *opt, hts_boolean dump);
    Returns 0 when all agree. */
 int parse_selftest_jsscan(httrackp *opt, hts_boolean dump);
 
+/* Check hts_js_quote_is_import_arg against a table of statements where the
+   keyword is, and is not, a dynamic import call. Returns 0 when all agree. */
+int parse_selftest_jsimport(httrackp *opt);
+
 /* Check hts_dirty_attr_name and hts_dirty_attr_detectable twice: against tags
    built from a known attribute, and against malformed ones where only what the
    walk may claim can be checked. Returns 0 when both hold. */

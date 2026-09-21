@@ -1,0 +1,28 @@
+#!/bin/bash
+#
+# Pins hts_js_quote_is_import_arg, which tells a dynamic import("./x.js") from
+# every other quoted string in a script. Only that operand resolves against the
+# script rather than against the page that loaded it.
+
+set -euo pipefail
+
+out=$(httrack -#test=jsimport) || {
+    echo "httrack -#test=jsimport exited non-zero: $out" >&2
+    exit 1
+}
+
+case "$out" in
+"jsimport self-test OK"*) ;;
+*)
+    echo "expected 'jsimport self-test OK', got: $out" >&2
+    exit 1
+    ;;
+esac
+
+# A table that loses cases still prints OK, so pin the count it holds.
+n=${out#*OK (}
+n=${n%% *}
+test "$n" -ge 20 || {
+    echo "expected at least 20 cases, got: $out" >&2
+    exit 1
+}
