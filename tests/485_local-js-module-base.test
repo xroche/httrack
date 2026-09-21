@@ -48,9 +48,12 @@ common=(
 # Default link mode. "chunk.js" is read relative to the saved assets/app.js, so
 # the rewritten reference names the chunk the crawl saved. A fix that moves the
 # fetch but not the rewrite writes "assets/chunk.js" here and lands nowhere.
+# The legacy.js line is the other half: an ordinary reference in a script keeps
+# the page base when it is rewritten, not only when it is fetched.
 bash "$top_srcdir/tests/local-crawl.sh" --root "$root" "${common[@]}" \
     --file-matches 'assets/app.js' 'import\("chunk\.js"\)' \
     --file-matches 'assets/mod.js' 'import "dep\.js"' \
+    --file-matches 'assets/legacy.js' 'src="img/x\.png"' \
     httrack BASEURL/index.html -q -%v0 -r4
 
 # -K4 keeps the original URLs, so the specifiers must come back untouched.
