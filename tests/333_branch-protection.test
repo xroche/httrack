@@ -1,0 +1,108 @@
+#!/bin/bash
+#
+# BTI and PAC are recorded in a GNU property note that the linker ANDs across
+# every input, so one object built without them clears the note for the whole
+# image. That is not hypothetical: it is what drops x86 CET on Debian, whose crt
+# startup objects carry no such property. Assert the mitigation in the artifact,
+# the way 331 does for _FORTIFY_SOURCE.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# Unset means no automake run (the Windows job runs the scripts directly), so
+# there is nothing configured to inspect.
+[ -n "${abs_top_builddir:-}" ] || skip "abs_top_builddir unset, no automake environment"
+
+readelf=${READELF:-readelf}
+command -v "$readelf" >/dev/null 2>&1 || skip "no readelf ($readelf)"
+# CC carries flags on some legs ("gcc -m32", "ccache gcc"), so split it.
+read -r -a cc_argv <<<"${CC:-cc}"
+command -v "${cc_argv[0]}" >/dev/null 2>&1 || skip "no C compiler (${cc_argv[0]})"
+
+# libtool names the library .dylib on macOS and a static build has none at all,
+# so inspect whichever artifact exists rather than requiring a fixed set.
+subject=''
+for f in "${HTTRACK_SHLIB:-}" "${HTTRACK_BIN:-}"; do
+    if [ -n "$f" ] && [ -f "$f" ]; then
+        subject=$f
+        break
+    fi
+done
+[ -n "$subject" ] || skip "no built binary to inspect"
+
+# Covers Mach-O and every other non-ELF target at once: readelf declines them.
+"$readelf" -hW "$subject" >/dev/null 2>&1 || skip "$(basename "$subject") is not an ELF object"
+case $("$readelf" -hW "$subject" | awk -F: '/Machine:/ { print $2 }') in
+*AArch64*) ;;
+*) skip "not an aarch64 build, where -mbranch-protection=standard does nothing" ;;
+esac
+
+tmp=$(mktemp -d) || exit 1
+cleanup_push rm -rf "$tmp"
+
+# Every AArch64 feature the note advertises, one per line, empty when there is
+# no note at all.
+features() { # features FILE
+    "$readelf" -nW "$1" 2>/dev/null |
+        sed -n 's/.*AArch64 feature: *//p' | tr ',' '\n' | tr -d ' ' | sort -u || true
+}
+
+# Captured, not piped: grep -q exits on the first match and the SIGPIPE that
+# sends back up would become the pipeline's status under pipefail.
+has() { # has FILE FEATURE
+    local got
+    got=$(features "$1")
+    grep -qx "$2" <<<"$got"
+}
+
+cat >"$tmp/probe.c" <<'PROBE'
+int callee(int x);
+int caller(int x) { return callee(x) + 1; }
+PROBE
+cat >"$tmp/main.c" <<'MAIN'
+int main(void) { return 0; }
+MAIN
+
+cflags_argv=()
+if [ -n "${TEST_CFLAGS:-}" ]; then
+    read -r -a cflags_argv <<<"$TEST_CFLAGS"
+fi
+
+build() { # build OUT SRC FLAGS...
+    local out=$1 src=$2
+    shift 2
+    "${cc_argv[@]}" ${cflags_argv[@]+"${cflags_argv[@]}"} "$@" -w -o "$out" "$src" \
+        2>"$tmp/cc.log" || {
+        head -5 "$tmp/cc.log" >&2
+        fail "the probe does not build with $*"
+    }
+}
+
+# Three controls, because the assertion below is vacuous without all of them:
+# the compiler must emit the note when asked, must not emit it when not asked
+# (else the note cannot discriminate), and a link must preserve it (else the
+# startup objects clear it here and no engine build could carry it either).
+build "$tmp/on.o" "$tmp/probe.c" -c -mbranch-protection=standard
+if ! has "$tmp/on.o" BTI; then
+    skip "${CC:-cc} emits no BTI property for -mbranch-protection=standard"
+fi
+build "$tmp/off.o" "$tmp/probe.c" -c
+if has "$tmp/off.o" BTI; then
+    skip "the unprotected control already carries BTI, so the note cannot discriminate"
+fi
+build "$tmp/link" "$tmp/main.c" -mbranch-protection=standard
+if ! has "$tmp/link" BTI; then
+    skip "a link drops the BTI property on this toolchain, so no build could keep it"
+fi
+
+echo "$(basename "$subject"): AArch64 features: $(features "$subject" | tr '\n' ' ')"
+
+for want in BTI PAC; do
+    if ! has "$subject" "$want"; then
+        fail "$subject carries no $want property, so -mbranch-protection=standard did not reach it"
+    fi
+done
+
+exit 0
