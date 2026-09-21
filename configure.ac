@@ -224,8 +224,7 @@ AX_CHECK_COMPILE_FLAG([-fstack-protector-strong], [DEFAULT_CFLAGS="$DEFAULT_CFLA
 	[AX_CHECK_COMPILE_FLAG([-fstack-protector], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fstack-protector"], [], [-Werror])], [-Werror])
 AX_CHECK_COMPILE_FLAG([-fstack-clash-protection], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fstack-clash-protection"], [], [-Werror])
 AX_CHECK_COMPILE_FLAG([-fcf-protection], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fcf-protection"], [], [-Werror])
-# -fcf-protection is x86-only, so arm64 had no branch protection at all; each
-# probe rejects the other architecture's flag, so both lines can stand.
+# -fcf-protection is x86-only, so arm64 needs its own flag to get any at all.
 AX_CHECK_COMPILE_FLAG([-mbranch-protection=standard], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -mbranch-protection=standard"], [], [-Werror])
 # backtrace() unwinds through these; armhf, unlike amd64/arm64, defaults them off
 # and printed frameless crash reports.
