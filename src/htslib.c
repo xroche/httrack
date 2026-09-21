@@ -1500,6 +1500,35 @@ void treatfirstline(htsblk * retour, const char *rcvd) {
   }
 }
 
+/* Headers by which a bot-protection vendor names its own challenge; a second
+   provider joins this table, not a second code path. */
+static const char *const hts_bot_challenge_names[] = {
+    "cf-mitigated", /* Cloudflare managed challenge */
+    NULL,
+};
+
+const char *hts_bot_challenge_header(const char *headers) {
+  const char *line;
+
+  if (headers == NULL)
+    return NULL;
+  for (line = headers; *line != '\0';) {
+    const char *const *name;
+
+    for (name = hts_bot_challenge_names; *name != NULL; name++) {
+      const int p = strfield(line, *name);
+
+      if (p != 0 && line[p] == ':')
+        return *name;
+    }
+    line = strchr(line, '\n');
+    if (line == NULL)
+      break;
+    line++;
+  }
+  return NULL;
+}
+
 // traiter ligne par ligne l'en tête
 // gestion des cookies
 void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * retour,

@@ -343,6 +343,9 @@ hts_boolean hts_proxy_is_connect(const char *name);
 void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * retour,
                char *rcvd);
 void treatfirstline(htsblk * retour, const char *rcvd);
+/* The bot-protection challenge header this raw response header block carries,
+   or NULL; a fixed vendor table, never a guess from the status or the body. */
+const char *hts_bot_challenge_header(const char *headers);
 
 // sous-fonctions
 /* Buffer http_xfread1() fills in its line modes, and so the ceiling on any

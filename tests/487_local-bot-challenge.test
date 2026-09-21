@@ -1,0 +1,28 @@
+#!/bin/bash
+# Issue #1732: a bot-protection challenge answers 403 like any other refusal, so
+# unless the log names the vendor header the user reads the error, and the
+# rollback that follows it, as httrack's own defect.
+
+set -eu
+
+: "${top_srcdir:=..}"
+
+note='Bot protection challenge at .*/challenge/blocked\.html'
+advice='pass its cookies with --cookies-file'
+refused='"Forbidden" \(403\) at link'
+
+# A good page keeps the mirror from rolling back, so the 403 is the only error.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 1 \
+    --log-found "$note" \
+    --log-found "$advice" \
+    --log-found "${refused} .*/challenge/blocked\\.html" \
+    httrack 'BASEURL/simple/basic.html' 'BASEURL/challenge/blocked.html' \
+    --retries=0
+
+# The same 403 without the header: same error line, and no note.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 1 \
+    --log-not-found 'Bot protection challenge' \
+    --log-not-found 'cookies-file' \
+    --log-found "${refused} .*/challenge/plain\\.html" \
+    httrack 'BASEURL/simple/basic.html' 'BASEURL/challenge/plain.html' \
+    --retries=0

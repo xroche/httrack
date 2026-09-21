@@ -2849,6 +2849,29 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
+    # --- /challenge/: issue #1732 — a bot-protection refusal beside a plain
+    # 403, so the note has to key on the vendor header and not on the status.
+    CHALLENGE_BODY = b"<html><body>Checking your browser</body></html>\n"
+
+    def send_challenge(self, extra=()):
+        self.send_response(403, "Forbidden")
+        self.send_header("Content-Type", "text/html")
+        self.send_header("Content-Length", str(len(self.CHALLENGE_BODY)))
+        for name, value in extra:
+            self.send_header(name, value)
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(self.CHALLENGE_BODY)
+
+    def route_challenge_blocked(self):
+        # Header name in mixed case: the match is case-insensitive.
+        self.send_challenge(
+            extra=[("Server", "cloudflare"), ("CF-Mitigated", "challenge")]
+        )
+
+    def route_challenge_plain(self):
+        self.send_challenge()
+
     # --- delayed-type degenerate paths (issues #5/#107) --------------------
     def route_delayed_index(self):
         self.send_html(
@@ -3853,6 +3876,8 @@ class Handler(SimpleHTTPRequestHandler):
         "/tmpspace/hts-tmp /a.bin.bak": route_bakname_sibling,
         "/mini304/index.html": route_mini304_index,
         "/mini304/page.html": route_mini304_page,
+        "/challenge/blocked.html": route_challenge_blocked,
+        "/challenge/plain.html": route_challenge_plain,
         "/errmask/index.html": route_errmask_index,
         "/errmask/keep.dat": route_errmask_keep,
         "/errmask/empty.dat": route_errmask_empty,
