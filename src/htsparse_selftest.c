@@ -263,6 +263,7 @@ int parse_selftest_dirtylink(httrackp *opt, hts_boolean dump) {
         hts_dirty_link_is_url(opt, cases[i].str, strlen(cases[i].str),
                               cases[i].lastc, cases[i].inscript);
 
+    sw.cases++;
     if (got != cases[i].want) {
       fprintf(stderr,
               "dirtylink \"%s\" (next byte '%c', %s): got %d, "
@@ -603,12 +604,15 @@ int parse_selftest_jsscan(httrackp *opt, hts_boolean dump) {
   size_t i;
   int err = 0;
 
+  memset(&sw, 0, sizeof(sw));
+  sw.dump = dump;
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     hts_js_link got;
     const hts_boolean found =
         hts_js_scan_link(opt, cases[i].text + cases[i].at, cases[i].text,
                          cases[i].in_tag, '"', cases[i].in_css, &got);
 
+    sw.cases++;
     if (found != cases[i].want || (found && (got.offset != cases[i].offset ||
                                              got.length != cases[i].length))) {
       fprintf(stderr,
@@ -620,8 +624,6 @@ int parse_selftest_jsscan(httrackp *opt, hts_boolean dump) {
     }
   }
 
-  memset(&sw, 0, sizeof(sw));
-  sw.dump = dump;
   jsscan_sweep(opt, &sw);
   if (sw.dump)
     return 0;
