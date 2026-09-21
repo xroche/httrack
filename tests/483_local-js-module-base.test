@@ -1,0 +1,62 @@
+#!/bin/bash
+#
+# A JavaScript document made every link in it resolve against the page that
+# loaded the script, so import("./chunk.js") inside /assets/app.js was fetched
+# as /chunk.js. A browser fetches /assets/chunk.js. Only a module specifier
+# moved: document.write('<img src="img/x.png">') is inserted into the document
+# and must still take the page's base, which the two copies of x.png tell apart.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+: "${top_srcdir:=..}"
+
+work=$(mktemp -d)
+trap 'set +e; rm -rf "$work"' EXIT
+
+root="$work/root"
+mkdir -p "$root/assets/img" "$root/img"
+
+cat >"$root/index.html" <<'EOF'
+<!DOCTYPE html><html><head><title>t</title></head><body>
+<script type="module" src="/assets/app.js"></script>
+<script type="module" src="/assets/mod.js"></script>
+<script src="/assets/legacy.js"></script>
+</body></html>
+EOF
+
+printf 'import("./chunk.js").then(function(m){document.title=m.v;});\n' >"$root/assets/app.js"
+printf 'export const v = "chunk";\n' >"$root/assets/chunk.js"
+printf 'import "./dep.js";\n' >"$root/assets/mod.js"
+printf 'export const d = 1;\n' >"$root/assets/dep.js"
+printf 'document.write(%s<img src="img/x.png">%s);\n' "'" "'" >"$root/assets/legacy.js"
+printf 'root-copy\n' >"$root/img/x.png"
+printf 'assets-copy\n' >"$root/assets/img/x.png"
+
+# The two x.png copies differ, so a wholesale flip of the base fetches the wrong
+# one instead of failing. chunk.html and dep.html are the names the page base
+# produced, where the server's 404 body was stored.
+common=(
+    --errors 0
+    --found assets/chunk.js
+    --found assets/dep.js
+    --found img/x.png
+    --file-matches 'img/x.png' 'root-copy'
+    --not-found chunk.html
+    --not-found dep.html
+    --not-found assets/img/x.png
+)
+
+# Default link mode. "chunk.js" is read relative to the saved assets/app.js, so
+# the rewritten reference names the chunk the crawl saved.
+bash "$top_srcdir/tests/local-crawl.sh" --root "$root" "${common[@]}" \
+    --file-matches 'assets/app.js' 'import\("chunk\.js"\)' \
+    --file-matches 'assets/mod.js' 'import "dep\.js"' \
+    --file-matches 'assets/legacy.js' 'src="img/x\.png"' \
+    httrack BASEURL/index.html -q -%v0 -r4
+
+# -K4 keeps the original URLs, so only where the files land can be checked.
+bash "$top_srcdir/tests/local-crawl.sh" --root "$root" "${common[@]}" \
+    httrack BASEURL/index.html -q -%v0 -r4 -K4

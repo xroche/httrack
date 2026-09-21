@@ -123,13 +123,23 @@ hts_boolean hts_dirty_link_is_url(httrackp *opt, const char *str, size_t len,
 
 /* A link the script scanner found, as an offset and a length from the cursor
    it was given. "unquoted_end" is the byte an unquoted CSS url() operand stops
-   at, and '\0' when the operand was quoted. All three fields are zero when the
-   scanner found nothing. */
+   at, and '\0' when the operand was quoted. "is_module" marks a JavaScript
+   module specifier, which resolves against the script rather than the page.
+   All four fields are zero when the scanner found nothing. */
 typedef struct hts_js_link {
   int offset;
   int length;
   char unquoted_end;
+  hts_boolean is_module;
 } hts_js_link;
+
+/*
+  Is the quoted string opening at "quote" the operand of a dynamic
+  import(...)? "buffer" is the document's first byte, where the backward walk
+  stops. False when the keyword is the tail of a longer name, a property
+  access, or itself inside a string.
+*/
+hts_boolean hts_js_quote_is_import_arg(const char *quote, const char *buffer);
 
 /*
   Does the script or CSS at "cursor" hand a URL to .src, .location, .href,

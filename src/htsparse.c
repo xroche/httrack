@@ -423,6 +423,36 @@ hts_boolean hts_dirty_link_is_url(httrackp *opt, const char *str, size_t len,
   return url_ok;
 }
 
+/* Does this byte glue the keyword to a name, or to a string literal? */
+static hts_boolean js_glues_keyword(char c) {
+  return (isalnum((unsigned char) c) || c == '_' || c == '$' || c == '.' ||
+          c == '"' || c == '\'' || c == '`')
+             ? HTS_TRUE
+             : HTS_FALSE;
+}
+
+/* Contract in htsparse.h; indexed so no pointer leaves the buffer. */
+hts_boolean hts_js_quote_is_import_arg(const char *quote, const char *buffer) {
+  static const char kw[] = "import";
+  const size_t kwlen = sizeof(kw) - 1;
+  size_t i;
+
+  if (quote == NULL || buffer == NULL || quote <= buffer)
+    return HTS_FALSE;
+  i = (size_t) (quote - buffer);
+  while (i != 0 && is_realspace(buffer[i - 1]))
+    i--;
+  if (i == 0 || buffer[i - 1] != '(')
+    return HTS_FALSE;
+  i--;
+  while (i != 0 && is_realspace(buffer[i - 1]))
+    i--;
+  if (i < kwlen || memcmp(buffer + i - kwlen, kw, kwlen) != 0)
+    return HTS_FALSE;
+  i -= kwlen;
+  return (i == 0 || !js_glues_keyword(buffer[i - 1])) ? HTS_TRUE : HTS_FALSE;
+}
+
 /* Contract in htsparse.h. */
 hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
                              const char *buffer, hts_boolean in_tag,
@@ -444,6 +474,7 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
   link->offset = 0;
   link->length = 0;
   link->unquoted_end = '\0';
+  link->is_module = HTS_FALSE;
 
   /* Can we parse javascript ? */
   if ((opt->parsejava & HTSPARSE_NO_JAVASCRIPT) != 0)
@@ -597,6 +628,8 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
     link->offset = (int) (a - cursor);
     link->length = (int) (c - a + 1);
     link->unquoted_end = can_avoid_quotes ? quotes_replacement : '\0';
+    /* CSS @import matches the same keyword and is not a module. */
+    link->is_module = (is_import && !in_css) ? HTS_TRUE : HTS_FALSE;
     return HTS_TRUE;
   }
 }
@@ -832,7 +865,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
         hts_log_print(opt, LOG_DEBUG, "note: this file is a javascript file");
         // for javascript only
         if (is_javascript_mime(opt, r->contenttype, str->url_file) != 0) {
-          // all links must be checked against parent, not this link
+          // a script's links take the page's base, bar a module specifier
           if (heap(ptr)->precedent != 0) {
             parent_relative = 1;
           }
@@ -893,6 +926,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       do {
         int p = 0;
         int valid_p = 0;        // force to take p even if == 0
+        int module_base = 0;    // module specifier: resolve against the script
         int ending_p = '\0';    // ending quote?
         int archivetag_p = 0;   // avoid multiple-archives with commas
         int srcset_p = 0;       // srcset="url1 480w, url2 2x": list of URLs
@@ -1743,6 +1777,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       }
                       p = jslink.offset; // p non nul: TRAITER CHAINE COMME
                                          // FICHIER
+                      module_base = jslink.is_module;
                       if (jslink.unquoted_end != '\0')
                         ending_p = jslink.unquoted_end;
                     }
@@ -1871,6 +1906,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                               if (url_ok) {
                                 valid_p = 1;
                                 p = 0;
+                                module_base =
+                                    inscript &&
+                                    hts_js_quote_is_import_arg(html, r->adr);
                               }
                             }
                           }

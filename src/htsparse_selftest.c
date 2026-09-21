@@ -635,6 +635,63 @@ int parse_selftest_jsscan(httrackp *opt, hts_boolean dump) {
   return err;
 }
 
+/* "before" is the source up to the operand's opening quote, which the case
+   appends, so the quote the detector is given needs no index. */
+static int jsimport_case(const char *before, hts_boolean want) {
+  char text[128];
+  hts_boolean got;
+
+  text[0] = '\0';
+  strcatbuff(text, before);
+  strcatbuff(text, "\"x\")");
+  got = hts_js_quote_is_import_arg(text + strlen(before), text);
+  if (got != want) {
+    fprintf(stderr, "jsimport \"%s\": got %d, wanted %d\n", text, (int) got,
+            (int) want);
+    return 1;
+  }
+  return 0;
+}
+
+int parse_selftest_jsimport(httrackp *opt) {
+  static const struct {
+    const char *before;
+    hts_boolean want;
+  } cases[] = {
+      {"import(", HTS_TRUE},
+      {"import (", HTS_TRUE},
+      {"import\t(\n", HTS_TRUE},
+      {"await import(", HTS_TRUE},
+      {"e=>import(", HTS_TRUE},
+      {";import(", HTS_TRUE},
+      /* the keyword must stand alone, and must be code rather than text */
+      {"preimport(", HTS_FALSE},
+      {"foo.import(", HTS_FALSE},
+      {"_import(", HTS_FALSE},
+      {"$import(", HTS_FALSE},
+      {"2import(", HTS_FALSE},
+      {"a=\"import(\"", HTS_FALSE},
+      /* neither a keyword nor a call */
+      {"(", HTS_FALSE},
+      {"import", HTS_FALSE},
+      {"importx(", HTS_FALSE},
+      {"import()(", HTS_FALSE},
+      {"", HTS_FALSE},
+      /* a keyword cut short by the document's first byte */
+      {"mport(", HTS_FALSE},
+  };
+
+  size_t i;
+  int err = 0;
+
+  (void) opt;
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++)
+    err |= jsimport_case(cases[i].before, cases[i].want);
+  printf("jsimport self-test %s (%d cases)\n", err ? "FAILED" : "OK",
+         (int) (sizeof(cases) / sizeof(cases[0])));
+  return err;
+}
+
 /* Is this attribute name one that never carries a link? */
 static hts_boolean tagattr_is_nodetect(const char *name, size_t len) {
   size_t i;

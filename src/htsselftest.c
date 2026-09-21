@@ -7405,6 +7405,12 @@ static int st_jsscan(httrackp *opt, int argc, char **argv) {
       opt, (argc > 0 && strcmp(argv[0], "dump") == 0) ? HTS_TRUE : HTS_FALSE);
 }
 
+static int st_jsimport(httrackp *opt, int argc, char **argv) {
+  (void) argc;
+  (void) argv;
+  return parse_selftest_jsimport(opt);
+}
+
 static int st_tagattr(httrackp *opt, int argc, char **argv) {
   (void) argc;
   (void) argv;
@@ -16481,6 +16487,10 @@ static const struct selftest_entry {
      "does a script statement hand a URL to .src, .location, .open, url() and "
      "friends? sweeps the shapes against a model",
      st_jsscan},
+    {"jsimport", "",
+     "is a quoted string the operand of a dynamic import(), whose base is the "
+     "script and not the page?",
+     st_jsimport},
     {"tagattr", "",
      "may the dirty parser read this in-tag quoted value? resolves the owning "
      "attribute and refuses the names that carry no link",
