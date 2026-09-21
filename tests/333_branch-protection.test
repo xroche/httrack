@@ -42,16 +42,28 @@ esac
 tmp=$(mktemp -d) || exit 1
 cleanup_push rm -rf "$tmp"
 
-# grep -c exits 1 on no match, which would end the whole run under errexit.
-signed() { # signed FILE -- how many functions sign their return address
-    "$objdump" -d "$1" 2>/dev/null | grep -c paciasp || true
+# Counted inside hts* functions only. httrack-android measured 40 paciasp in
+# its arm64 libhttrack.so with the engine entirely unprotected, because every
+# one sat in the prebuilt OpenSSL it links; a whole-file count reads as a pass.
+signed() { # signed FILE -- engine functions that sign their return address
+    "$objdump" -d "$1" 2>/dev/null |
+        awk '/^[0-9a-fA-F]+ <hts[^>]*>:/ { ours = 1; next }
+             /^[0-9a-fA-F]+ </ { ours = 0 }
+             ours && /paciasp/ { n++ }
+             END { print n + 0 }'
 }
 
-# Non-leaf and not inlinable, so pac-ret has a return address to sign: a leaf
-# gets no paciasp however the flag is spelled.
+# Engine symbols carry the names signed() looks for, so a stripped subject
+# would read as unprotected rather than as unreadable.
+engine_syms() { # engine_syms FILE
+    "$objdump" -d "$1" 2>/dev/null | grep -c '^[0-9a-fA-F]* <hts' || true
+}
+
+# Named hts* so the controls exercise signed()'s own scoping, and non-leaf and
+# not inlinable, so pac-ret has a return address to sign.
 cat >"$tmp/probe.c" <<'PROBE'
-int callee(int x);
-int caller(int x) { return callee(x) + 1; }
+int hts_callee(int x);
+int hts_probe(int x) { return hts_callee(x) + 1; }
 PROBE
 
 # -Werror, so this accepts exactly what configure's own probe accepted.
@@ -72,6 +84,9 @@ build "$tmp/plain.o" -mbranch-protection=none ||
     skip "${CC:-cc} does not accept -mbranch-protection=none"
 [ "$(signed "$tmp/plain.o")" -eq 0 ] ||
     skip "the unprotected control signs too, so paciasp cannot discriminate"
+
+[ "$(engine_syms "$subject")" -gt 0 ] ||
+    skip "$(basename "$subject") shows no hts* symbols, so it cannot be scoped"
 
 # The note says whether the loader also enforces BTI, which the crt objects
 # decide rather than we do, so report it and assert only what we control.
