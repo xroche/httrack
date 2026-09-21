@@ -117,6 +117,12 @@ hts_boolean hts_cmp_tag_token(const char *tag, const char *cmp);
    referer: its URL does not look like hypertext, and the hosts differ. */
 hts_boolean hts_link_is_foreign_asset(httrackp *opt, int ptr);
 
+/* Writes into `dst` (capacity `dstsize`) the end-of-mirror note saying that
+   links were refused for sitting above the start directory, and what lifts the
+   refusal. Returns HTS_FALSE and empties `dst` when no link was refused above
+   the start directory. */
+hts_boolean hts_upper_links_note(httrackp *opt, char *dst, size_t dstsize);
+
 int hts_acceptlink(httrackp * opt, int ptr,
                    const char *adr, const char *fil,
                    const char *tag, const char *attribute,

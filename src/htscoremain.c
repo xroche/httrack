@@ -3071,6 +3071,13 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         /* The engine's verdict, so every kind of abort reads alike. */
         printf("Mirror not completed (see log file)\n");
       }
+      /* -v and -g put the log on stdout, where a reprint would double it */
+      if (!opt->shell && opt->log != stdout) {
+        char BIGSTK note[256];
+
+        if (hts_upper_links_note(opt, note, sizeof(note)))
+          printf("%s\n", note);
+      }
     }
     opt->state._hts_in_mirror = 0;
     // ------------------------------------------------------------

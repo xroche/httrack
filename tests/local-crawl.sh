@@ -16,6 +16,7 @@
 #       [--rerun-args 'ARGS'] \
 #       --errors N --errors-content N --files N --found PATH ... --directory PATH ... \
 #       --log-found REGEX ... --log-not-found REGEX ... \
+#       --stdout-found REGEX ... --stdout-not-found REGEX ... \
 #       --file-matches PATH REGEX ... --file-not-matches PATH REGEX ... \
 #       --files-identical PATH PATH ... \
 #       --cache-found URLTAIL ... --cache-not-found URLTAIL ... \
@@ -24,6 +25,8 @@
 # --errors counts every "Error:" log line; --errors-content drops transient
 # network failures (codes -2..-6) that flake on busy loopback under -c8.
 # --log-found/--log-not-found grep (ERE) the crawl's hts-log.txt.
+# --stdout-found/--stdout-not-found grep (ERE) what the first pass printed on
+# stdout and stderr, which run_pass captures together.
 # --max/--min-mirror-bytes bound the mirrored content bytes (host root).
 # --file-matches/--file-not-matches grep (ERE) a mirrored file (PATH under the
 # host root), to assert rewritten link/content survived the crawl. Both fail
@@ -230,7 +233,7 @@ while test "$pos" -lt "$nargs"; do
         audit+=("${args[$pos]}" "${args[$((pos + 1))]}")
         pos=$((pos + 1))
         ;;
-    --found | --not-found | --directory | --log-found | --log-not-found | --max-mirror-bytes | --min-mirror-bytes | --cache-found | --cache-not-found)
+    --found | --not-found | --directory | --log-found | --log-not-found | --stdout-found | --stdout-not-found | --max-mirror-bytes | --min-mirror-bytes | --cache-found | --cache-not-found)
         audit+=("${args[$pos]}" "${args[$((pos + 1))]}")
         pos=$((pos + 1))
         ;;
@@ -299,17 +302,18 @@ fi
 # Localhost is fast; disable the rate/bandwidth safety limits but keep the
 # engine cap so a hang cannot wedge the suite.
 declare -a moreargs=(--quiet "--max-time=$CRAWL_MAX_TIME" --timeout=30 --disable-security-limits --robots=0)
-log="${tmpdir}/log"
+console="${tmpdir}/console"
 
-# One pass: $1 its log, $2 its name in the diagnostics, the rest extra httrack
-# arguments. Backgrounded here, not through local_crawl, whose own process group
-# would hide the engine from the suite watchdog's stack dump (105).
+# One pass: $1 where its console output goes, $2 its name in the diagnostics,
+# the rest extra httrack arguments. Backgrounded here, not through local_crawl,
+# whose own process group would hide the engine from the suite watchdog's stack
+# dump (105).
 function run_pass {
-    local passlog=$1 label=$2 deadline rc=0
+    local passout=$1 label=$2 deadline rc=0
     shift 2
     deadline=$(crawl_deadline)
     httrack -O "$odir" --user-agent="httrack $ver local ($(uname -mrs))" \
-        "${moreargs[@]}" "${hts[@]}" "$@" >"$passlog" 2>&1 &
+        "${moreargs[@]}" "${hts[@]}" "$@" >"$passout" 2>&1 &
     crawlpid=$!
     wait_bounded "$crawlpid" "$deadline" || rc=$?
     crawlpid=
@@ -320,11 +324,11 @@ function run_pass {
 # A pass that has to succeed: same arguments, but a failure ends the run with
 # the engine's log, the only record of why it stopped.
 function require_pass {
-    local passlog=$1 label=$2 rc=0
+    local passout=$1 label=$2 rc=0
     run_pass "$@" || rc=$?
     test "$rc" -eq 0 && return 0
     result "$label exited $rc"
-    cat "$passlog" >&2
+    cat "$passout" >&2
     exit 1
 }
 
@@ -332,7 +336,7 @@ cleanup_push kill_crawl
 info "running httrack ${hts[*]}"
 # httrack exits 0 even on hard connect/DNS errors, so this is a backstop only;
 # the real guard is the audit below (--errors 0 plus the host-root existence check).
-require_pass "$log" crawl
+require_pass "$console" crawl
 result "OK"
 grep -iE "^[0-9:]*[[:space:]]Error:" "${logroot}/hts-log.txt" >&2
 
@@ -402,7 +406,7 @@ fi
 # --- optional second pass: re-mirror into the same dir (cache/update path) ----
 if test -n "$rerun"; then
     info "re-running httrack (update pass)"
-    require_pass "${log}.2" "update pass"
+    require_pass "${console}.2" "update pass"
     result "OK (update)"
     # The update summary reports "files updated"; a fresh crawl never does. Assert
     # it so a regression that bypasses the cache (re-crawls fresh) can't pass.
@@ -421,7 +425,7 @@ fi
 if test -n "$rerun_args"; then
     read -ra extra <<<"$rerun_args"
     info "re-running httrack with ${rerun_args}"
-    require_pass "${log}.2" "second pass" "${extra[@]}"
+    require_pass "${console}.2" "second pass" "${extra[@]}"
     result "OK (second pass)"
 fi
 
@@ -464,7 +468,7 @@ if test -n "$rerun_dead"; then
     local_server_stop "$SRV_PID"
     info "re-running httrack against the stopped server"
     # Status ignored: the assertions below are about the rollback, not the pass.
-    run_pass "${log}.dead" "dead pass"
+    run_pass "${console}.dead" "dead pass"
     result "OK (dead pass ran)"
     # The dead pass must have gone through the no-data rollback, not bailed out
     # before the mirror loop (which would leave the cache trivially untouched).
@@ -686,6 +690,22 @@ while test "$i" -lt "${#audit[@]}"; do
         log_body >"$logbody"
         if grep -aqE "${audit[$i]}" "$logbody"; then
             result "present in log"
+            exit 1
+        else result "OK"; fi
+        ;;
+    --stdout-found)
+        i=$((i + 1))
+        info "checking console output matches ${audit[$i]}"
+        if grep -aqE "${audit[$i]}" "$console"; then result "OK"; else
+            result "not printed"
+            exit 1
+        fi
+        ;;
+    --stdout-not-found)
+        i=$((i + 1))
+        info "checking console output lacks ${audit[$i]}"
+        if grep -aqE "${audit[$i]}" "$console"; then
+            result "printed"
             exit 1
         else result "OK"; fi
         ;;

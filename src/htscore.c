@@ -649,6 +649,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   opt->links_unqueued = HTS_FALSE;
   opt->abort_left_partial = HTS_FALSE;
   opt->transport_failures = 0;
+  opt->upper_links_refused = HTS_FALSE;
 
   /* before the first bailout below, each of which leaves it false */
   set_mirror_completed(opt, completed_out, HTS_FALSE);
@@ -2384,6 +2385,13 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
 
 cleanup:
   /* single exit: every bailout jumps here, so the closes below always run */
+  /* the summary above is skipped by every bailout, so the note goes here */
+  if (opt->log != NULL) {
+    char BIGSTK upperNote[256];
+
+    if (hts_upper_links_note(opt, upperNote, sizeof(upperNote)))
+      fprintf(opt->log, "(%s)" LF, upperNote);
+  }
   /* Verdict first: XH_uninit below fires the end callback, and a front end
      woken by it reads the verdict right there. `completed` is already final,
      because nothing below this label assigns it. */

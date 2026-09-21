@@ -1,0 +1,90 @@
+#!/bin/bash
+#
+# The default scope refuses every link above the start directory. An entry URL
+# in a subdirectory then mirrors to a page with no assets, and nothing says why.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+: "${top_srcdir:=..}"
+
+work=$(mktemp -d)
+trap 'set +e; rm -rf "$work"' EXIT
+
+root="$work/root"
+mkdir -p "$root/sub"
+
+echo 'console.log("root")' >"$root/root.js"
+echo 'console.log("other")' >"$root/other.js"
+echo '<!DOCTYPE html><html><body>p2</body></html>' >"$root/sub/page2.html"
+echo 'console.log("blocked")' >"$root/sub/blocked.js"
+
+# Two links above the start directory.
+cat >"$root/sub/index.html" <<'HTML'
+<!DOCTYPE html><html><body>
+<script src="/root.js"></script>
+<script src="/other.js"></script>
+<a href="page2.html">p</a>
+</body></html>
+HTML
+# One, so a rule that takes it leaves nothing refused above the start.
+cat >"$root/sub/one.html" <<'HTML'
+<!DOCTYPE html><html><body>
+<script src="/root.js"></script>
+<a href="page2.html">p</a>
+</body></html>
+HTML
+# None, so only a filter can refuse anything here.
+cat >"$root/sub/filtered.html" <<'HTML'
+<!DOCTYPE html><html><body>
+<script src="blocked.js"></script>
+<a href="page2.html">p</a>
+</body></html>
+HTML
+
+note='Some links above the start directory were not mirrored\. Pass -B \(--can-go-up-and-down\) to mirror them\.'
+
+# $1 page, $2 "fires" or "silent", then audit arguments, "--", httrack arguments.
+function crawl {
+    local page=$1 expect=$2
+    shift 2
+    local -a assert=()
+    if test "$expect" = fires; then
+        assert=(--log-found "$note" --stdout-found "$note")
+    else
+        assert=(--log-not-found "$note" --stdout-not-found "$note")
+    fi
+    local -a audit=()
+    while test "$#" -gt 0 && test "$1" != --; do
+        audit+=("$1")
+        shift
+    done
+    shift
+    bash "$top_srcdir/tests/local-crawl.sh" --root "$root" --errors 0 \
+        "${assert[@]}" ${audit[@]+"${audit[@]}"} \
+        httrack "BASEURL/sub/$page" -r3 "$@"
+}
+
+crawl index.html fires --not-found 'root.js' --not-found 'other.js' --
+# -B is what the note tells the user to pass, so it must silence the note.
+crawl index.html silent --found 'root.js' --found 'other.js' -- -B
+# An ordinary filter refusal is not a scope refusal.
+crawl filtered.html silent --not-found 'sub/blocked.js' --found 'sub/page2.html' \
+    -- '-*blocked.js*'
+# A near-link takes the upper link and the filter below refuses it, so the
+# refusal is the filter's. -B would not lift it.
+crawl one.html silent -- -n '-*root.js*'
+# A filter refuses it with no acceptance in between, so the scope is no longer
+# the operative reason. robots.txt is the same case in the engine, and is not
+# crawled here because the test server synthesizes its own robots.txt.
+crawl one.html silent -- '-*root.js*'
+# The only upper link is taken by a filter, so nothing is left refused above.
+crawl one.html silent --found 'root.js' -- '+*root.js*'
+
+# Four paths stay unexercised here, each needing something a crawl cannot set
+# up: shell mode (-%W), where stdout carries the front end's protocol; the
+# hard-error bailouts that skip the log summary; -v, which puts the log on
+# stdout and writes no hts-log.txt for the harness to audit; and a plugin's
+# check_link callback, which rules after the scope test has run.

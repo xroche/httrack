@@ -1,0 +1,11 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# The end-of-mirror note is built into a caller-owned buffer. A silent run must
+# empty it rather than leave the previous text, and the flag is per mirror, so
+# copy_htsopt must not carry it. 'run' is an ignored placeholder.
+assert_selftest "upper-links-note: OK" upperlinksnote run
