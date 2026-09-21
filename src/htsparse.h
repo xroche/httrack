@@ -137,7 +137,10 @@ typedef struct hts_js_link {
   Is the quoted string opening at "quote" the operand of a dynamic
   import(...)? "buffer" is the document's first byte, where the backward walk
   stops. False when the keyword is the tail of a longer name, a property
-  access, or itself inside a string.
+  access, or preceded by a quote. The walk reads the bytes before the quote
+  and nothing else, so it cannot tell code from a comment. The parser's
+  comment automaton is what keeps the dirty scan out of a line or block
+  comment, so this is never asked there.
 */
 hts_boolean hts_js_quote_is_import_arg(const char *quote, const char *buffer);
 

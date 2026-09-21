@@ -425,10 +425,8 @@ hts_boolean hts_dirty_link_is_url(httrackp *opt, const char *str, size_t len,
 
 /* Does this byte glue the keyword to a name, or to a string literal? */
 static hts_boolean js_glues_keyword(char c) {
-  return (isalnum((unsigned char) c) || c == '_' || c == '$' || c == '.' ||
-          c == '"' || c == '\'' || c == '`')
-             ? HTS_TRUE
-             : HTS_FALSE;
+  return isalnum((unsigned char) c) || c == '_' || c == '$' || c == '.' ||
+         c == '"' || c == '\'' || c == '`';
 }
 
 /* Contract in htsparse.h; indexed so no pointer leaves the buffer. */
@@ -450,7 +448,7 @@ hts_boolean hts_js_quote_is_import_arg(const char *quote, const char *buffer) {
   if (i < kwlen || memcmp(buffer + i - kwlen, kw, kwlen) != 0)
     return HTS_FALSE;
   i -= kwlen;
-  return (i == 0 || !js_glues_keyword(buffer[i - 1])) ? HTS_TRUE : HTS_FALSE;
+  return i == 0 || !js_glues_keyword(buffer[i - 1]);
 }
 
 /* Contract in htsparse.h. */
@@ -628,8 +626,8 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
     link->offset = (int) (a - cursor);
     link->length = (int) (c - a + 1);
     link->unquoted_end = can_avoid_quotes ? quotes_replacement : '\0';
-    /* CSS @import matches the same keyword and is not a module. */
-    link->is_module = (is_import && !in_css) ? HTS_TRUE : HTS_FALSE;
+    /* CSS @import hits the same keyword, and module_base is inert in CSS. */
+    link->is_module = is_import && !in_css;
     return HTS_TRUE;
   }
 }

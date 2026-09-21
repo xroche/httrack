@@ -19,10 +19,10 @@ case "$out" in
     ;;
 esac
 
-# An empty table still prints OK, so pin the floor here.
+# A table that loses cases still prints OK, so pin the count it holds.
 n=${out#*OK (}
 n=${n%% *}
-test "$n" -ge 15 || {
-    echo "expected at least 15 cases, got: $out" >&2
+test "$n" -ge 20 || {
+    echo "expected at least 20 cases, got: $out" >&2
     exit 1
 }

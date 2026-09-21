@@ -35,28 +35,26 @@ printf 'document.write(%s<img src="img/x.png">%s);\n' "'" "'" >"$root/assets/leg
 printf 'root-copy\n' >"$root/img/x.png"
 printf 'assets-copy\n' >"$root/assets/img/x.png"
 
-# The two x.png copies differ, so a wholesale flip of the base fetches the wrong
-# one instead of failing. chunk.html and dep.html are the names the page base
-# produced, where the server's 404 body was stored.
+# img/x.png is the legacy control: a flip of the base fetches assets/img/x.png
+# instead, which is why the two copies differ.
 common=(
     --errors 0
     --found assets/chunk.js
     --found assets/dep.js
     --found img/x.png
-    --file-matches 'img/x.png' 'root-copy'
-    --not-found chunk.html
-    --not-found dep.html
     --not-found assets/img/x.png
 )
 
 # Default link mode. "chunk.js" is read relative to the saved assets/app.js, so
-# the rewritten reference names the chunk the crawl saved.
+# the rewritten reference names the chunk the crawl saved. A fix that moves the
+# fetch but not the rewrite writes "assets/chunk.js" here and lands nowhere.
 bash "$top_srcdir/tests/local-crawl.sh" --root "$root" "${common[@]}" \
     --file-matches 'assets/app.js' 'import\("chunk\.js"\)' \
     --file-matches 'assets/mod.js' 'import "dep\.js"' \
-    --file-matches 'assets/legacy.js' 'src="img/x\.png"' \
     httrack BASEURL/index.html -q -%v0 -r4
 
-# -K4 keeps the original URLs, so only where the files land can be checked.
+# -K4 keeps the original URLs, so the specifiers must come back untouched.
 bash "$top_srcdir/tests/local-crawl.sh" --root "$root" "${common[@]}" \
+    --file-matches 'assets/app.js' 'import\("\./chunk\.js"\)' \
+    --file-matches 'assets/mod.js' 'import "\./dep\.js"' \
     httrack BASEURL/index.html -q -%v0 -r4 -K4

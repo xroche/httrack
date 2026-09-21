@@ -664,7 +664,7 @@ int parse_selftest_jsimport(httrackp *opt) {
       {"await import(", HTS_TRUE},
       {"e=>import(", HTS_TRUE},
       {";import(", HTS_TRUE},
-      /* the keyword must stand alone, and must be code rather than text */
+      /* the keyword must stand alone, and a quote before it opens a string */
       {"preimport(", HTS_FALSE},
       {"foo.import(", HTS_FALSE},
       {"_import(", HTS_FALSE},
@@ -679,6 +679,10 @@ int parse_selftest_jsimport(httrackp *opt) {
       {"", HTS_FALSE},
       /* a keyword cut short by the document's first byte */
       {"mport(", HTS_FALSE},
+      /* The walk sees bytes, not syntax, so a commented-out call reads as one.
+         The parser's comment automaton is what never asks here. */
+      {"// import(", HTS_TRUE},
+      {"/* import(", HTS_TRUE},
   };
 
   size_t i;
