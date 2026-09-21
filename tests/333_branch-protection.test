@@ -1,0 +1,99 @@
+#!/bin/bash
+#
+# Assert pac-ret in the artifact, not the GNU property note: the linker ANDs
+# that note across every input, and Ubuntu's aarch64 crt objects carry none, so
+# it is absent there however the engine was built. The signing instructions are
+# what survive, and they are what actually protects a return address.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# Unset means no automake run (the Windows job runs the scripts directly), so
+# there is nothing configured to inspect.
+[ -n "${abs_top_builddir:-}" ] || skip "abs_top_builddir unset, no automake environment"
+
+readelf=${READELF:-readelf}
+objdump=${OBJDUMP:-objdump}
+command -v "$readelf" >/dev/null 2>&1 || skip "no readelf ($readelf)"
+command -v "$objdump" >/dev/null 2>&1 || skip "no objdump ($objdump)"
+# CC carries flags on some legs ("gcc -m32", "ccache gcc"), so split it.
+read -r -a cc_argv <<<"${CC:-cc}"
+command -v "${cc_argv[0]}" >/dev/null 2>&1 || skip "no C compiler (${cc_argv[0]})"
+
+# The library holds the engine; a static build has none, so take the binary then.
+subject=''
+for f in "${HTTRACK_SHLIB:-}" "${HTTRACK_BIN:-}"; do
+    if [ -n "$f" ] && [ -f "$f" ]; then
+        subject=$f
+        break
+    fi
+done
+[ -n "$subject" ] || skip "no built binary to inspect"
+
+# Catches Mach-O and every other non-ELF target at once: readelf declines them.
+"$readelf" -hW "$subject" >/dev/null 2>&1 || skip "$(basename "$subject") is not an ELF object"
+case $("$readelf" -hW "$subject" | awk -F: '/Machine:/ { print $2 }') in
+*AArch64*) ;;
+*) skip "not an aarch64 build, where -mbranch-protection=standard does nothing" ;;
+esac
+
+tmp=$(mktemp -d) || exit 1
+cleanup_push rm -rf "$tmp"
+
+# Counted inside hts* functions only. httrack-android measured 40 paciasp in
+# its arm64 libhttrack.so with the engine entirely unprotected, because every
+# one sat in the prebuilt OpenSSL it links; a whole-file count reads as a pass.
+signed() { # signed FILE -- engine functions that sign their return address
+    "$objdump" -d "$1" 2>/dev/null |
+        awk '/^[0-9a-fA-F]+ <hts[^>]*>:/ { ours = 1; next }
+             /^[0-9a-fA-F]+ </ { ours = 0 }
+             ours && /paciasp/ { n++ }
+             END { print n + 0 }'
+}
+
+# Engine symbols carry the names signed() looks for, so a stripped subject
+# would read as unprotected rather than as unreadable.
+engine_syms() { # engine_syms FILE
+    "$objdump" -d "$1" 2>/dev/null | grep -c '^[0-9a-fA-F]* <hts' || true
+}
+
+# Named hts* so the controls exercise signed()'s own scoping, and non-leaf and
+# not inlinable, so pac-ret has a return address to sign.
+cat >"$tmp/probe.c" <<'PROBE'
+int hts_callee(int x);
+int hts_probe(int x) { return hts_callee(x) + 1; }
+PROBE
+
+# -Werror, so this accepts exactly what configure's own probe accepted.
+build() { # build OUT FLAGS...
+    local out=$1
+    shift
+    "${cc_argv[@]}" -Werror "$@" -c -o "$out" "$tmp/probe.c" >/dev/null 2>&1
+}
+
+# Two controls, because the assertion below is vacuous without both.
+build "$tmp/asked.o" -mbranch-protection=standard ||
+    skip "${CC:-cc} does not accept -mbranch-protection=standard"
+[ "$(signed "$tmp/asked.o")" -gt 0 ] ||
+    skip "$objdump shows no paciasp for -mbranch-protection=standard here"
+
+# =none rather than the flag left out: some toolchains default it on.
+build "$tmp/plain.o" -mbranch-protection=none ||
+    skip "${CC:-cc} does not accept -mbranch-protection=none"
+[ "$(signed "$tmp/plain.o")" -eq 0 ] ||
+    skip "the unprotected control signs too, so paciasp cannot discriminate"
+
+[ "$(engine_syms "$subject")" -gt 0 ] ||
+    skip "$(basename "$subject") shows no hts* symbols, so it cannot be scoped"
+
+# The note says whether the loader also enforces BTI, which the crt objects
+# decide rather than we do, so report it and assert only what we control.
+echo "$(basename "$subject"): $(signed "$subject") signed function(s), property note:" \
+    "$("$readelf" -nW "$subject" 2>/dev/null | sed -n 's/.*[Ff]eature: *//p' | head -1)"
+
+[ "$(signed "$subject")" -gt 0 ] ||
+    fail "$subject signs no return address, so -mbranch-protection=standard did not reach it"
+
+exit 0
