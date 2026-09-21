@@ -1,10 +1,8 @@
 #!/bin/bash
 #
-# BTI and PAC are recorded in a GNU property note that the linker ANDs across
-# every input, so one object built without them clears the note for the whole
-# image. That is not hypothetical: it is what drops x86 CET on Debian, whose crt
-# startup objects carry no such property. Assert the mitigation in the artifact,
-# the way 331 does for _FORTIFY_SOURCE.
+# The linker ANDs the GNU property note across every input, so one object built
+# without branch protection clears it for the whole image. Assert it in the
+# artifact, the way 331 does for _FORTIFY_SOURCE.
 
 set -euo pipefail
 
@@ -21,8 +19,7 @@ command -v "$readelf" >/dev/null 2>&1 || skip "no readelf ($readelf)"
 read -r -a cc_argv <<<"${CC:-cc}"
 command -v "${cc_argv[0]}" >/dev/null 2>&1 || skip "no C compiler (${cc_argv[0]})"
 
-# libtool names the library .dylib on macOS and a static build has none at all,
-# so inspect whichever artifact exists rather than requiring a fixed set.
+# The library holds the engine; a static build has none, so take the binary then.
 subject=''
 for f in "${HTTRACK_SHLIB:-}" "${HTTRACK_BIN:-}"; do
     if [ -n "$f" ] && [ -f "$f" ]; then
@@ -32,7 +29,7 @@ for f in "${HTTRACK_SHLIB:-}" "${HTTRACK_BIN:-}"; do
 done
 [ -n "$subject" ] || skip "no built binary to inspect"
 
-# Covers Mach-O and every other non-ELF target at once: readelf declines them.
+# Catches Mach-O and every other non-ELF target at once: readelf declines them.
 "$readelf" -hW "$subject" >/dev/null 2>&1 || skip "$(basename "$subject") is not an ELF object"
 case $("$readelf" -hW "$subject" | awk -F: '/Machine:/ { print $2 }') in
 *AArch64*) ;;
@@ -42,67 +39,78 @@ esac
 tmp=$(mktemp -d) || exit 1
 cleanup_push rm -rf "$tmp"
 
-# Every AArch64 feature the note advertises, one per line, empty when there is
-# no note at all.
+want='BTI PAC'
+
+# Case-insensitive because llvm-readelf spells the line in lower case, and a
+# parse this misses reads exactly like a mitigation the build never applied.
 features() { # features FILE
     "$readelf" -nW "$1" 2>/dev/null |
-        sed -n 's/.*AArch64 feature: *//p' | tr ',' '\n' | tr -d ' ' | sort -u || true
+        awk 'tolower($0) ~ /aarch64 feature:/ {
+            sub(/^.*[Ff]eature:[ ]*/, "")
+            gsub(/,/, "\n")
+            gsub(/ /, "")
+            print
+        }' | sort -u || true
 }
 
-# Captured, not piped: grep -q exits on the first match and the SIGPIPE that
+# Captured, not piped: grep -q exits on its first match, and the SIGPIPE that
 # sends back up would become the pipeline's status under pipefail.
 has() { # has FILE FEATURE
-    local got
-    got=$(features "$1")
-    grep -qx "$2" <<<"$got"
+    grep -qx "$2" <<<"$(features "$1")"
 }
 
+# Which of $want FILE does not advertise, space-separated, empty when none.
+missing() { # missing FILE
+    local w out=''
+    for w in $want; do
+        has "$1" "$w" || out="$out $w"
+    done
+    printf '%s' "${out# }"
+}
+
+# Non-leaf, so the flag has a call to sign as well as a landing pad to mark.
 cat >"$tmp/probe.c" <<'PROBE'
-int callee(int x);
-int caller(int x) { return callee(x) + 1; }
+static int callee(int x) { return x + 1; }
+int main(void) { return callee(0); }
 PROBE
-cat >"$tmp/main.c" <<'MAIN'
-int main(void) { return 0; }
-MAIN
 
-cflags_argv=()
-if [ -n "${TEST_CFLAGS:-}" ]; then
-    read -r -a cflags_argv <<<"$TEST_CFLAGS"
-fi
-
-build() { # build OUT SRC FLAGS...
-    local out=$1 src=$2
-    shift 2
-    "${cc_argv[@]}" ${cflags_argv[@]+"${cflags_argv[@]}"} "$@" -w -o "$out" "$src" \
-        2>"$tmp/cc.log" || {
-        head -5 "$tmp/cc.log" >&2
-        fail "the probe does not build with $*"
-    }
+# -Werror and no -w, matching what configure's own probe accepts: a compiler
+# that only warns here is one configure declined, and skipping then is right.
+build() { # build OUT FLAGS...
+    local out=$1
+    shift
+    "${cc_argv[@]}" -Werror "$@" -o "$out" "$tmp/probe.c" >/dev/null 2>&1
 }
 
-# Three controls, because the assertion below is vacuous without all of them:
-# the compiler must emit the note when asked, must not emit it when not asked
-# (else the note cannot discriminate), and a link must preserve it (else the
-# startup objects clear it here and no engine build could carry it either).
-build "$tmp/on.o" "$tmp/probe.c" -c -mbranch-protection=standard
-if ! has "$tmp/on.o" BTI; then
-    skip "${CC:-cc} emits no BTI property for -mbranch-protection=standard"
+# Three controls, because the assertion below is vacuous without all of them.
+build "$tmp/asked.o" -c -mbranch-protection=standard ||
+    skip "${CC:-cc} does not accept -mbranch-protection=standard"
+gap=$(missing "$tmp/asked.o")
+if [ -n "$gap" ]; then
+    # A note that is present but unreadable is a broken probe, not a missing
+    # mitigation, so it has to fail where the rest of this arm skips.
+    sections=$("$readelf" -SW "$tmp/asked.o" 2>/dev/null || true)
+    if grep -q 'note\.gnu\.property' <<<"$sections"; then
+        fail "$readelf prints a property note this test cannot parse"
+    fi
+    skip "${CC:-cc} marks no $gap for -mbranch-protection=standard"
 fi
-build "$tmp/off.o" "$tmp/probe.c" -c
-if has "$tmp/off.o" BTI; then
-    skip "the unprotected control already carries BTI, so the note cannot discriminate"
-fi
-build "$tmp/link" "$tmp/main.c" -mbranch-protection=standard
-if ! has "$tmp/link" BTI; then
-    skip "a link drops the BTI property on this toolchain, so no build could keep it"
-fi
+
+# =none, not the flag left out: some toolchains turn branch protection on by
+# default, and a control built without the flag then discriminates nothing.
+build "$tmp/plain.o" -c -mbranch-protection=none ||
+    skip "${CC:-cc} does not accept -mbranch-protection=none"
+[ "$(missing "$tmp/plain.o")" = "$want" ] ||
+    skip "the unprotected control already carries part of $want"
+
+build "$tmp/asked.elf" -mbranch-protection=standard ||
+    skip "cannot link a probe here"
+gap=$(missing "$tmp/asked.elf")
+[ -z "$gap" ] || skip "a link drops $gap here, so no build could keep it"
 
 echo "$(basename "$subject"): AArch64 features: $(features "$subject" | tr '\n' ' ')"
 
-for want in BTI PAC; do
-    if ! has "$subject" "$want"; then
-        fail "$subject carries no $want property, so -mbranch-protection=standard did not reach it"
-    fi
-done
+gap=$(missing "$subject")
+[ -z "$gap" ] || fail "$subject carries no $gap, so -mbranch-protection=standard did not reach it"
 
 exit 0
