@@ -1,0 +1,90 @@
+#!/bin/bash
+#
+# A 100 Continue is not the response that follows it. When that response has no
+# headers of its own, httrack takes its "bogus server" branch. The engine used
+# to archive the interim block there, so the WARC record described a 100
+# Continue with a body (#1740).
+#
+# /warc100/plain.html is the same reply without the 100. The two records must
+# carry byte-equal header blocks. /warc100/normal.html is a 100 ahead of a real
+# response, and the record must keep that response's own headers.
+#
+# The last two cases probe the validator. A response block with no header
+# terminator must be an error, or its body is read as its headers.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+: "${top_srcdir:=..}"
+
+export WARC_VALIDATE_RESPHDR="interim.html=unknown/unknown normal.html=X-Final-Header"
+export WARC_VALIDATE_NO_RESPHDR="interim.html=X-Interim-Header interim.html=Continue normal.html=X-Interim-Header"
+export WARC_VALIDATE_SAME_RESPHDR="interim.html=plain.html"
+
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --warc-validate \
+    --found 'warc100/interim.html' --found 'warc100/plain.html' \
+    --found 'warc100/normal.html' \
+    httrack 'BASEURL/warc100/index.html' --warc-file warc-out
+
+python=$(find_python) || skip "python3 not found"
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_warc100.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmpdir"
+
+# Two well-formed WARCs differing only in the response block's terminator.
+"$python" - "$tmpdir" <<'PYEOF'
+import sys, os
+
+out = sys.argv[1]
+
+
+def warc(path, block):
+    def rec(rid, wtype, body, extra=b""):
+        hdr = (
+            b"WARC/1.1\r\nWARC-Type: " + wtype + b"\r\n"
+            b"WARC-Record-ID: <urn:uuid:00000000-0000-4000-8000-00000000000" + rid + b">\r\n"
+            b"WARC-Date: 2026-01-01T00:00:00Z\r\n" + extra +
+            b"Content-Length: %d\r\n\r\n" % len(body)
+        )
+        return hdr + body + b"\r\n\r\n"
+
+    with open(os.path.join(out, path), "wb") as f:
+        f.write(rec(b"1", b"warcinfo", b"software: probe\r\n",
+                    b"Content-Type: application/warc-fields\r\n"))
+        f.write(rec(b"2", b"response", block,
+                    b"Content-Type: application/http;msgtype=response\r\n"
+                    b"WARC-Target-URI: http://probe/probe.html\r\n"))
+
+
+head = b"HTTP/1.1 200 OK\r\nContent-Type: text/html"
+body = b"the WITNESS text lives in the body"
+warc("cut.warc", head + b"\r\n" + body)
+warc("whole.warc", head + b"\r\n\r\n" + body)
+PYEOF
+
+expect_reject() {
+    local what="$1" file="$2" want="$3"
+    shift 3
+    printf '[%s] ..\t' "$what"
+    local got=""
+    if got=$("$python" "$(nativepath "${testdir}/warc-validate.py")" \
+        "$(nativepath "$file")" "$@" 2>&1); then
+        echo "FAILED: validator accepted $file"
+        exit 1
+    fi
+    case "$got" in
+    *"$want"*) echo "OK" ;;
+    *)
+        echo "FAILED: wanted '$want', got: $got"
+        exit 1
+        ;;
+    esac
+}
+
+# The guard fires on the unterminated block...
+expect_reject "unterminated response block is rejected" "${tmpdir}/cut.warc" \
+    "no header terminator" --expect-resp-header 'probe.html=Content-Type'
+# ...and with it in place the body can no longer answer for the headers.
+expect_reject "body text does not match as a header" "${tmpdir}/whole.warc" \
+    "lacks" --expect-resp-header 'probe.html=WITNESS'

@@ -15,6 +15,11 @@
 #                             may target an asset containing SUB
 #   --expect-ip SUB=IP        a response or revisit targeting SUB must carry
 #                             WARC-IP-Address: IP exactly
+#   --expect-resp-header SUB=SUBSTR  the response block targeting SUB must have
+#                             SUBSTR in its HTTP header section
+#   --no-resp-header SUB=SUBSTR  the same block must NOT have SUBSTR
+#   --same-resp-header SUBA=SUBB  the response blocks targeting SUBA and SUBB
+#                             must have byte-equal HTTP header sections
 #   --expect-revisit-profile SUB=SUBSTR  a revisit targeting SUB must carry a
 #                             WARC-Profile containing SUBSTR
 #   --revisit-exchange        every server-not-modified revisit carries the 304
@@ -144,6 +149,9 @@ def main():
     no_resp = opt_values(argv, "--no-response-for")
     no_record = opt_values(argv, "--no-record-for")
     ip_specs = [s.split("=", 1) for s in opt_values(argv, "--expect-ip")]
+    hdr_specs = [s.split("=", 1) for s in opt_values(argv, "--expect-resp-header")]
+    nohdr_specs = [s.split("=", 1) for s in opt_values(argv, "--no-resp-header")]
+    same_specs = [s.split("=", 1) for s in opt_values(argv, "--same-resp-header")]
     profile_specs = [
         s.split("=", 1) for s in opt_values(argv, "--expect-revisit-profile")
     ]
@@ -160,6 +168,9 @@ def main():
     body_hits = {sub: False for sub, _ in body_specs}
     revisit_hits = {sub: False for sub in no_resp}
     ip_hits = {sub: False for sub, _ in ip_specs}
+    hdr_hits = {sub: False for sub, _ in hdr_specs}
+    nohdr_hits = {sub: False for sub, _ in nohdr_specs}
+    same_seen = {}  # sub named by --same-resp-header -> its HTTP header section
     profile_hits = {sub: False for sub, _ in profile_specs}
     requests = {}  # WARC-Concurrent-To -> request block
     exchanges = []  # (shown uri, record id) of the server-not-modified revisits
@@ -225,7 +236,33 @@ def main():
                     sys.exit("unexpected full response for %s (want revisit)" % sub)
             block = rec[hdr_end : hdr_end + block_len]
             bsep = block.find(b"\r\n\r\n")
+            # Without this a negative bsep would make http_hdr the whole block
+            # bar its last byte, so a body match would pass as a header match.
+            if bsep < 0:
+                sys.exit(
+                    "response for %s: block has no header terminator"
+                    % uri.decode("utf-8", "replace")
+                )
             http_hdr, body = block[:bsep], block[bsep + 4 :]
+            for sub, want_sub in hdr_specs:
+                if sub.encode() in uri:
+                    if want_sub.encode() not in http_hdr:
+                        sys.exit(
+                            "response for %s: header block %r lacks %r"
+                            % (sub, http_hdr, want_sub)
+                        )
+                    hdr_hits[sub] = True
+            for sub, unwanted in nohdr_specs:
+                if sub.encode() in uri:
+                    if unwanted.encode() in http_hdr:
+                        sys.exit(
+                            "response for %s: header block %r carries %r"
+                            % (sub, http_hdr, unwanted)
+                        )
+                    nohdr_hits[sub] = True
+            for sub in [a for a, _ in same_specs] + [b for _, b in same_specs]:
+                if sub.encode() in uri:
+                    same_seen[sub] = http_hdr
             for sub, hexval in body_specs:
                 if sub.encode() in uri:
                     want = bytes.fromhex(hexval)
@@ -298,6 +335,21 @@ def main():
     for sub, hit in ip_hits.items():
         if not hit:
             sys.exit("no response/revisit record found for --expect-ip %s" % sub)
+    for sub, hit in hdr_hits.items():
+        if not hit:
+            sys.exit("no response record found for --expect-resp-header %s" % sub)
+    for sub, hit in nohdr_hits.items():
+        if not hit:
+            sys.exit("no response record found for --no-resp-header %s" % sub)
+    for a, b in same_specs:
+        for sub in (a, b):
+            if sub not in same_seen:
+                sys.exit("no response record found for --same-resp-header %s" % sub)
+        if same_seen[a] != same_seen[b]:
+            sys.exit(
+                "header blocks differ: %s has %r, %s has %r"
+                % (a, same_seen[a], b, same_seen[b])
+            )
     for sub, hit in profile_hits.items():
         if not hit:
             sys.exit("no revisit record found for --expect-revisit-profile %s" % sub)
