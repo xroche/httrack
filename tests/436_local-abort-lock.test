@@ -118,6 +118,20 @@ wait_until_still_running "test ! -e '${out}/${ABORTLOCK}'" \
 stop_crawl
 echo "OK"
 
+# The lock is written aside and moved onto its real name, so it is dated back
+# before anything can read it. A directory in the way makes that move fail, and
+# the engine has to say so rather than run on with no lock at all.
+printf '[a lock the engine cannot create is named] ..\t'
+arm_paths blocked
+mkdir -p "${out}/${PROGRESSLOCK}"
+local_crawl --log "$crawllog" -O "$out" "${common[@]}" \
+    "${BASEURL}/simple/basic.html" || fail "the mirror failed outright"
+grep -q 'could not create hts-in_progress.lock' "$enginelog" ||
+    fail_dump "the engine did not report the lock it could not create" "$enginelog"
+test ! -e "${out}/hts-in_progress.tmp" ||
+    fail "the engine left the lock it staged behind"
+echo "OK"
+
 # A request older than the mirror that finds it was aimed at an earlier run.
 # Dated back, because the engine backdates its own progress lock by a second. A
 # file written just before the mirror starts lands inside that second.

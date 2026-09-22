@@ -274,6 +274,48 @@ HTSEXT_API int hts_main(int argc, char **argv) {
   return ret;
 }
 
+/* Write the progress lock at PATH, dated one second back so a request written
+   the instant the file appears sorts after it. False when it could not be
+   written at all. */
+static hts_boolean write_progress_lock(httrackp *opt, const char *path,
+                                       const char *t, int argc, char **argv) {
+  FILE *fp = FOPEN(path, "wb");
+  int i;
+
+  if (fp == NULL)
+    return HTS_FALSE;
+  fprintf(fp, "Mirror in progress since %s .. please wait!" LF, t);
+  for (i = 0; i < argc; i++) {
+    if (strchr(argv[i], ' ') == NULL)
+      fprintf(fp, "%s ", argv[i]);
+    else // entre ""
+      fprintf(fp, "\"%s\" ", argv[i]);
+  }
+  fprintf(fp, LF);
+  fprintf(fp, "To pause the engine: create an empty file named "
+              "'" HTS_PAUSE_LOCKNAME "' (an earlier run's copy is"
+              " ignored, so create it again)" LF);
+  fprintf(fp, "To stop it and keep the mirror: create an empty file named "
+              "'" HTS_ABORT_LOCKNAME "' (an earlier run's copy is"
+              " ignored, so create it again)" LF);
+#if USE_BEGINTHREAD
+  fprintf(fp, "PID=%d\n", (int) getpid());
+#ifndef _WIN32
+  fprintf(fp, "UID=%d\n", (int) getuid());
+  fprintf(fp, "GID=%d\n", (int) getuid());
+#endif
+  fprintf(fp, "START=%d\n", (int) time(NULL));
+#endif
+  fclose(fp);
+  /* Whole-second filesystems tie two files written in the same second, and the
+     backdate is what breaks that tie. */
+  if (!hts_file_backdate(path, 1) && opt->log != NULL)
+    hts_log_print(opt, LOG_WARNING,
+                  "engine: could not date hts-in_progress.lock back, so a"
+                  " stop request written in this first second is ignored");
+  return HTS_TRUE;
+}
+
 static int hts_main_internal(int argc, char **argv, httrackp * opt);
 static hts_boolean cmdl_shortopt_has(const char *s, char c);
 
@@ -2742,7 +2784,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
        path produced by fconcat(), even with a long log path (issue #183). */
     char n_lock[OPT_GET_BUFF_SIZE(opt)];
 
-    /* The lock is written here and moved onto n_lock once it is dated back. */
     char n_lock_staged[OPT_GET_BUFF_SIZE(opt)];
 
     // on peut pas avoir un affichage ET un fichier log
@@ -2804,8 +2845,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 
     // un petit lock-file pour indiquer un miroir en cours, ainsi qu'un éventuel fichier log
     {
-      FILE *fp = NULL;
-
       char t[256];
 
       time_local_rfc822(t);     // faut bien que ca serve quelque part l'heure RFC1945 arf'
@@ -2924,52 +2963,18 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       // petit message dans le lock
       strcpybuff(n_lock_staged,
                  fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                         StringBuff(opt->path_log),
-                         "hts-in_progress.lock.tmp"));
-      if ((fp = FOPEN(n_lock_staged, "wb")) != NULL) {
-        int i;
-
-        fprintf(fp, "Mirror in progress since %s .. please wait!" LF, t);
-        for(i = 0; i < argc; i++) {
-          if (strchr(argv[i], ' ') == NULL)
-            fprintf(fp, "%s ", argv[i]);
-          else                  // entre ""
-            fprintf(fp, "\"%s\" ", argv[i]);
-        }
-        fprintf(fp, LF);
-        fprintf(fp, "To pause the engine: create an empty file named "
-                    "'" HTS_PAUSE_LOCKNAME "' (an earlier run's copy is"
-                    " ignored, so create it again)" LF);
-        fprintf(fp,
-                "To stop it and keep the mirror: create an empty file named "
-                "'" HTS_ABORT_LOCKNAME "' (an earlier run's copy is"
-                " ignored, so create it again)" LF);
-#if USE_BEGINTHREAD
-        fprintf(fp, "PID=%d\n", (int) getpid());
-#ifndef _WIN32
-        fprintf(fp, "UID=%d\n", (int) getuid());
-        fprintf(fp, "GID=%d\n", (int) getuid());
-#endif
-        fprintf(fp, "START=%d\n", (int) time(NULL));
-#endif
-        fclose(fp);
-        fp = NULL;
-        /* One second back, so a request written the instant this file appears
-           sorts after it even where the filesystem stamps whole seconds. */
-        if (!hts_file_backdate(n_lock_staged, 1) && opt->log != NULL)
-          hts_log_print(
-              opt, LOG_WARNING,
-              "engine: could not date hts-in_progress.lock back, so a"
-              " stop request written in this first second is ignored");
-        /* Moved into place only now, or a script watching for the lock could
-           read it in the moment it still carried its own write time. */
-        if (!hts_rename_over(opt, n_lock_staged, n_lock)) {
-          UNLINK(n_lock_staged);
-          if (opt->log != NULL)
-            hts_log_print(opt, LOG_WARNING,
-                          "engine: could not create hts-in_progress.lock, so"
-                          " this mirror cannot be stopped or paused by a file");
-        }
+                         StringBuff(opt->path_log), "hts-in_progress.tmp"));
+      /* The lock is written aside and moved on, so it is already dated back
+         when it appears under the name scripts watch. A move that fails falls
+         back to writing it in place, which is what the engine always did. */
+      if (!write_progress_lock(opt, n_lock_staged, t, argc, argv) ||
+          !hts_rename_over(opt, n_lock_staged, n_lock)) {
+        UNLINK(n_lock_staged);
+        if (!write_progress_lock(opt, n_lock, t, argc, argv) &&
+            opt->log != NULL)
+          hts_log_print(opt, LOG_WARNING,
+                        "engine: could not create hts-in_progress.lock, so"
+                        " this mirror cannot be stopped or paused by a file");
       }
       // fichier log        
       if (opt->log) {
