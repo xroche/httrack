@@ -1109,8 +1109,8 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                   back[p].r.statuscode = STATUSCODE_INVALID;
                 }
               } else {
-                htsblk_failf(&back[p].r, "Open error when decompressing (can "
-                                         "not generate a temporary file)");
+                snprintf(back[p].r.msg, sizeof(back[p].r.msg),
+                         "Open error when decompressing (can not generate a temporary file)");
               }
             }
             // fermer fichier sortie
