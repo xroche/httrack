@@ -545,9 +545,10 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
       expected = '(';
       expected_end = ")";
     }
-  if (!nc && (nc = strfield(cursor, "url")) &&
-      (!isalnum(html_prevc(cursor, buffer))) &&
-      html_prevc(cursor, buffer) != '_') { // url(url)
+  /* The guard has to gate the match: a name ending in "url" must leave nc at
+     zero, or the default rule takes its assignment as a link. */
+  if (!nc && !js_glues_keyword(cursor, buffer) &&
+      (nc = strfield(cursor, "url")) != 0) { // url(url)
     expected = '(';
     expected_end = ")";
     /* CSS writes url(foo.png) unquoted, but JavaScript's new URL(x) matches

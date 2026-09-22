@@ -320,7 +320,6 @@ typedef enum {
   JSGUARD_NONE = 0,
   JSGUARD_TAG_QUOTE, /* the quote the enclosing attribute is written with */
   JSGUARD_SPACE_BEFORE,
-  JSGUARD_NO_NAME_BYTE,  /* neither an alphanumeric nor an underscore */
   JSGUARD_NO_IDENT_BYTE, /* nothing JavaScript allows inside a name */
   JSGUARD_SPACE_AFTER
 } jsscan_guard;
@@ -344,7 +343,7 @@ static const struct jsscan_word {
     {".open", '(', "),", HTS_TRUE, HTS_TRUE, HTS_FALSE, JSGUARD_NONE},
     {".replace", '(', ")", HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_NONE},
     {".link", '(', ")", HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_NONE},
-    {"url", '(', ")", HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_NO_NAME_BYTE},
+    {"url", '(', ")", HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_NO_IDENT_BYTE},
     {"import", 0, NULL, HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_SPACE_AFTER},
     {"from", 0, NULL, HTS_FALSE, HTS_FALSE, HTS_TRUE, JSGUARD_NO_IDENT_BYTE},
 };
@@ -382,19 +381,9 @@ static hts_boolean jsscan_model(httrackp *opt, const char *cursor,
       if (!isspace(prev))
         continue;
       break;
-    case JSGUARD_NO_NAME_BYTE:
-      /* The engine leaves its "url" match in place when this guard fails, so
-         "aurl=" and "_url=" go on to match the plain assignment form. Modelled
-         as the engine behaves, not as the guard reads. */
-      if (isalnum(prev) || prev == '_') {
-        w = &jsscan_words[0]; /* borrow the plain "name=" shape */
-        a = cursor + l;
-        goto matched;
-      }
-      break;
     case JSGUARD_NO_IDENT_BYTE:
-      /* Spelled again rather than shared. Unlike the "url" guard this one
-         gates the match, so a failed guard matches nothing at all. */
+      /* Spelled again rather than shared: the guard gates the match, so a
+         failed guard matches nothing at all. */
       if (isalnum((unsigned char) prev) || prev == '_' || prev == '$' ||
           prev == '.' || prev == '"' || prev == '\'' || prev == '`' ||
           (unsigned char) prev >= 0x80)
@@ -535,7 +524,8 @@ static void jsscan_case(httrackp *opt, selftest_sweep *sw, const char *text,
    operand + tail, taking one representative per class the scanner branches on
    rather than every byte. */
 static void jsscan_sweep(httrackp *opt, selftest_sweep *sw) {
-  static const char *const prefix[] = {"", " ", "a", "_", "\""};
+  static const char *const prefix[] = {"",  " ", "a", "_", "\"",
+                                       "$", ".", "`", ":"};
   static const char *const word[] = {
       ".src",     "src",    ".SRC",  ".location", ":location",
       "location", ".href",  ".open", ".replace",  ".link",
@@ -609,10 +599,24 @@ int parse_selftest_jsscan(httrackp *opt, hts_boolean dump) {
       /* a bare location needs a space before it */
       {" location=\"a\";", 1, HTS_FALSE, HTS_FALSE, HTS_TRUE, 10, 1},
       {"alocation=\"a\";", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
-      /* the "url" guard rejects the match and keeps it, so the assignment
-         form still fires: see JSGUARD_NO_NAME_BYTE */
-      {"aurl=\"pic.gif\";", 1, HTS_FALSE, HTS_FALSE, HTS_TRUE, 5, 7},
+      /* a name ending in "url" is one identifier token, so neither its
+         assignment nor its call carries a link (#1739) */
+      {"aurl=\"pic.gif\";", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
       {"myurl(\"pic.gif\")", 2, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      {"var myurl = \"hello world\";", 6, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0,
+       0},
+      {"var baseurl = \"jquery7\";", 8, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      {"var a_url = \"a.gif\";", 6, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      {"$url(\"a.gif\")", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      {"\303\251url(\"a.gif\")", 2, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      /* the spellings CSS writes url() in, which must all still be taken */
+      {":url(a.png)", 1, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      {",url(a.png)", 1, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      {"(url(a.png)", 1, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      {" url(a.png)", 1, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      {"\302\240url(a.png)", 2, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      /* JavaScript's new URL(x) takes the same token, quoted */
+      {"new URL(\"a.gif\")", 4, HTS_FALSE, HTS_FALSE, HTS_TRUE, 5, 5},
       /* an operand holding code is not a URL */
       {"x.src=\",a.gif\";", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
       {"x.src=\"\";", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},

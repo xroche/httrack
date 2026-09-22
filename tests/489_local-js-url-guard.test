@@ -1,0 +1,87 @@
+#!/bin/bash
+#
+# The "url" keyword's guard rejected the match but left it in place, so a name
+# ending in "url" fell through to the plain assignment rule and its string was
+# fetched as a link (#1739). The guard now gates the match. CSS is the risk
+# here: url() is how every stylesheet names an image, a font or a cursor, so
+# each spelling a stylesheet writes it in has its asset mirrored below.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+: "${top_srcdir:=..}"
+
+work=$(mktemp -d)
+trap 'set +e; rm -rf "$work"' EXIT
+
+root="$work/root"
+mkdir -p "$root/css" "$root/img" "$root/fonts" "$root/js"
+
+cat >"$root/index.html" <<'HTML'
+<!DOCTYPE html><html><head><title>t</title>
+<link rel="stylesheet" href="/css/site.css">
+</head><body>
+<script src="/js/app.js"></script>
+</body></html>
+HTML
+
+# Every byte a stylesheet puts before url(): a colon, a space, a comma, an
+# open paren, and the start of a line.
+cat >"$root/css/site.css" <<'CSS'
+@font-face{font-family:F;src:url(/fonts/f1.woff2) format("woff2");}
+@font-face{font-family:G;src:local("G"),url(/fonts/f2.woff2) format("woff2");}
+.a{background:url(/img/a.png)}
+.b{background: url("/img/b.png") no-repeat}
+.c{background-image:url('/img/c.png'),url(/img/d.png)}
+.d{background-image:image-set(url(/img/e.png) 1x,url(/img/f.png) 2x)}
+.e{cursor:url(/img/g.png),auto}
+.f{list-style-image:
+url(/img/h.png)}
+url(/img/i.png)
+.g{background:-webkit-image-set(url(/img/j.png) 1x)}
+CSS
+
+# Each name below ends in "url" and each target exists, so following one would
+# mirror it. "$url" and the Unicode name are one identifier token too.
+cat >"$root/js/app.js" <<'JS'
+var myurl = "hello world";
+var baseurl = "jquery7";
+var a_url = "a_target";
+var $url = "dollar_target";
+var myurl2 = "jquery8";
+var o = new URL("/img/newurl.png");
+var s = url("/img/plain.png");
+JS
+printf 'var \303\251url = "unicode_target";\n' >>"$root/js/app.js"
+
+for n in a b c d e f g h i j; do printf 'png-%s\n' "$n" >"$root/img/$n.png"; done
+printf 'w1\n' >"$root/fonts/f1.woff2"
+printf 'w2\n' >"$root/fonts/f2.woff2"
+printf 'n\n' >"$root/img/newurl.png"
+printf 'p\n' >"$root/img/plain.png"
+for n in "hello world" jquery7 jquery8 a_target dollar_target unicode_target; do
+    printf 'x\n' >"$root/$n"
+done
+
+bash "$top_srcdir/tests/local-crawl.sh" --root "$root" \
+    --errors 0 \
+    --found img/a.png --found img/b.png --found img/c.png \
+    --found img/d.png --found img/e.png --found img/f.png \
+    --found img/g.png --found img/h.png --found img/i.png \
+    --found img/j.png \
+    --found fonts/f1.woff2 --found fonts/f2.woff2 \
+    --found img/newurl.png --found img/plain.png \
+    --not-found 'hello world' \
+    --not-found jquery7 \
+    --not-found jquery8 \
+    --not-found a_target \
+    --not-found dollar_target \
+    --not-found unicode_target \
+    --file-matches 'js/app.js' '^var myurl = "hello world";$' \
+    --file-matches 'js/app.js' '^var baseurl = "jquery7";$' \
+    --file-matches 'js/app.js' '^var a_url = "a_target";$' \
+    --file-matches 'js/app.js' '^var \$url = "dollar_target";$' \
+    --file-matches 'js/app.js' '^var myurl2 = "jquery8";$' \
+    httrack BASEURL/index.html -q -%v0 -r5
