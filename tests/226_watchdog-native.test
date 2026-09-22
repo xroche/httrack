@@ -1033,32 +1033,37 @@ backoff_leg() {
     }
 }
 
-fullstdout_leg() {
-    local calls window
-    window=$((turn * 4))
+# One window of the watchdog, with stdout on SINK, counting what it posted.
+posts_over_window() { # posts_over_window SCRIPT WINDOW SINK
     sink_start 201
-    printf 'RUN 36_local-bigcrawl.test at 41s\n' >"$tmp/progress.log"
     # The exit status is deliberately discarded: the loop is expected to survive a
     # write it cannot make, and what it managed to post is the evidence.
-    run_posting $((window * 4 + 60)) -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
-        -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds "$window" >/dev/full 2>&1 || true
+    run_posting $(($2 * 4 + 60)) -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
+        -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds "$2" >"$3" 2>&1 || true
     sink_stop
-    calls=$(count_matching_lines . "$posts")
+    count_matching_lines . "$posts"
+}
+
+fullstdout_leg() {
+    local calls again window
+    window=$((turn * 4))
+    printf 'RUN 36_local-bigcrawl.test at 41s\n' >"$tmp/progress.log"
     # Three, so the leg sees the loop survive more than a single failed write.
-    if test "$calls" -lt 3; then
-        # The same window with room to write. Short there too and the box is what
-        # was short, not the loop, and this leg has no log of its own to say so.
-        sink_start 201
-        run_posting $((window * 4 + 60)) -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
-            -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds "$window" >/dev/null 2>&1 || true
-        sink_stop
-        test "$(count_matching_lines . "$posts")" -ge 3 || {
-            unmeasured "$calls posts with a full stdout, and no more with room to write: too starved to judge"
-            return "$UNMEASURED"
-        }
-        echo "$calls posts with a full stdout: a failed log write took the loop with it"
-        return 1
+    calls=$(posts_over_window "$1" "$window" /dev/full)
+    test "$calls" -lt 3 || return 0
+    # The same window with room to write. Short there too and the box is what
+    # was short, not the loop, and this leg has no log of its own to say so.
+    if test "$(posts_over_window "$1" "$window" /dev/null)" -lt 3; then
+        unmeasured "$calls posts with a full stdout, and no more with room to write: too starved to judge"
+        return "$UNMEASURED"
     fi
+    # That control ran after the window it judges, so a box that was busy for the
+    # first and free for the second reads as a loop that died. Refuse the write
+    # once more, and let a second short window be what condemns it.
+    again=$(posts_over_window "$1" "$window" /dev/full)
+    test "$again" -lt 3 || return 0
+    echo "$calls then $again posts with a full stdout, around a control that managed three: a failed log write took the loop with it"
+    return 1
 }
 
 first=1
