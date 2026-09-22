@@ -423,8 +423,24 @@ hts_boolean hts_dirty_link_is_url(httrackp *opt, const char *str, size_t len,
   return url_ok;
 }
 
-/* Does this byte glue the keyword to a name, or to a string literal? */
-static hts_boolean js_glues_keyword(char c) {
+/* Does what sits before "at" glue the keyword to a name, or to a string
+   literal? A byte above 127 does, because a JavaScript name may be Unicode,
+   unless it ends the UTF-8 whitespace U+00A0, U+2028 or U+2029, which the
+   language reads as a boundary. */
+static hts_boolean js_glues_keyword(const char *at, const char *buffer) {
+  const char c = html_prevc(at, buffer);
+  const size_t before = (size_t) (at - buffer);
+
+  if ((unsigned char) c >= 0x80) {
+    if (before >= 2 && (unsigned char) at[-2] == 0xC2 &&
+        (unsigned char) c == 0xA0)
+      return HTS_FALSE;
+    if (before >= 3 && (unsigned char) at[-3] == 0xE2 &&
+        (unsigned char) at[-2] == 0x80 &&
+        ((unsigned char) c == 0xA8 || (unsigned char) c == 0xA9))
+      return HTS_FALSE;
+    return HTS_TRUE;
+  }
   return isalnum((unsigned char) c) || c == '_' || c == '$' || c == '.' ||
          c == '"' || c == '\'' || c == '`';
 }
@@ -448,7 +464,21 @@ hts_boolean hts_js_quote_is_import_arg(const char *quote, const char *buffer) {
   if (i < kwlen || memcmp(buffer + i - kwlen, kw, kwlen) != 0)
     return HTS_FALSE;
   i -= kwlen;
-  return i == 0 || !js_glues_keyword(buffer[i - 1]);
+  return !js_glues_keyword(buffer + i, buffer);
+}
+
+/* Is this module specifier a URL, or a module id the loader resolves for
+   itself? The ESM grammar decides it on the leading bytes: a path begins "/",
+   "./" or "../", so ".config/a.js" and "..x.js" are ids, not paths. */
+static hts_boolean js_specifier_is_url(const char *s) {
+  if (s[0] == '/')
+    return HTS_TRUE;
+  if (s[0] == '.' && (s[1] == '/' || (s[1] == '.' && s[2] == '/')))
+    return HTS_TRUE;
+  /* an absolute URL is one too, the way a bare import already takes it */
+  return strfield(s, "http:") || strfield(s, "https:") || strfield(s, "ftp:")
+             ? HTS_TRUE
+             : HTS_FALSE;
 }
 
 /* Contract in htsparse.h. */
@@ -466,6 +496,8 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
   // @import: the quoted token is the URL; a trailing media/supports/layer
   // condition is not part of it
   int is_import = 0;
+  // from "./mod.js": an ES module specifier, which must be a path
+  int is_specifier = 0;
   const char *a;
   int nc;
 
@@ -532,6 +564,15 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
       } else
         nc = 0;
     }
+  if (!nc) { // import x from "./mod.js"
+    /* The guard has to gate the match: a name merely ending in "from" must
+       leave nc at zero, or the default rule takes its assignment as a link. */
+    if (!js_glues_keyword(cursor, buffer) &&
+        (nc = strfield(cursor, "from")) != 0) {
+      expected = 0;
+      is_specifier = 1;
+    }
+  }
   if (!nc)
     return HTS_FALSE;
 
@@ -597,6 +638,9 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
     if (a != NULL && ensure_not_method &&
         is_http_method(a, (size_t) (c - a + 1)))
       a = NULL;
+    // "jquery" names a module the loader resolves, never a file
+    if (a != NULL && is_specifier && !js_specifier_is_url(a))
+      a = NULL;
     // Check for bogus links (Vasiliy)
     if (a != NULL) {
       const size_t size = c - a + 1;
@@ -627,7 +671,7 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
     link->length = (int) (c - a + 1);
     link->unquoted_end = can_avoid_quotes ? quotes_replacement : '\0';
     /* CSS @import hits the same keyword, and module_base is inert in CSS. */
-    link->is_module = is_import && !in_css;
+    link->is_module = (is_import || is_specifier) && !in_css;
     return HTS_TRUE;
   }
 }
