@@ -501,7 +501,8 @@ debug "host root: $hostroot"
 # WARC_VALIDATE_NORECORD="URLSUB..." asserts those assets have no record at all;
 # WARC_VALIDATE_IP="URLSUB=IP..." asserts the exact WARC-IP-Address on the record;
 # WARC_VALIDATE_RESPHDR="URLSUB=SUBSTR..." asserts a response header block holds
-# SUBSTR, WARC_VALIDATE_NO_RESPHDR="URLSUB=SUBSTR..." that it does not;
+# SUBSTR, WARC_VALIDATE_NO_RESPHDR="URLSUB=SUBSTR..." that it does not, and
+# WARC_VALIDATE_SAME_RESPHDR="URLSUBA=URLSUBB..." that two blocks are equal;
 # WARC_VALIDATE_PROFILE="URLSUB=SUBSTR..." asserts a revisit's WARC-Profile;
 # WARC_VALIDATE_NO_REVISIT=1 skips the "at least one revisit" requirement (a
 # no-OpenSSL leg where the only unchanged assets end up with no record at all);
@@ -524,6 +525,9 @@ if test -n "$warc_validate"; then
     done
     for spec in ${WARC_VALIDATE_NO_RESPHDR:-}; do
         bodyargs+=(--no-resp-header "$spec")
+    done
+    for spec in ${WARC_VALIDATE_SAME_RESPHDR:-}; do
+        bodyargs+=(--same-resp-header "$spec")
     done
     # compressed asset: assert the stored (verbatim) body inflates to the served
     # body and keeps Content-Encoding, instead of expecting a decoded body.

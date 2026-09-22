@@ -3584,7 +3584,7 @@ class Handler(SimpleHTTPRequestHandler):
     # The interim block is not the final response's headers, so the WARC record
     # must carry what /warc100/plain.html (the same reply, no 100) produces.
     WARC100_INTERIM_BODY = b"<html><body><p>WARC100-INTERIM</p></body></html>\r\n\r\n"
-    WARC100_PLAIN_BODY = b"<html><body><p>WARC100-PLAIN</p></body></html>\r\n\r\n"
+    WARC100_PLAIN_BODY = b"<html><body><p>WARC100-NOINTER</p></body></html>\r\n\r\n"
 
     def send_bare_body(self, body, interim=False):
         """HTTP/0.9-style reply: no status line and no headers, end-of-body is
