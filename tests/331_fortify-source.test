@@ -72,7 +72,7 @@ clean=$(n_chk "$tmp/clean.o")
 # libtool names the library .dylib on macOS and a static build has none at all,
 # so inspect whichever artifacts exist rather than requiring a fixed set.
 artifacts=()
-for f in "${HTTRACK_BIN:-}" "${HTTRACK_SHLIB:-}" "${HTTRACK_SHLIB%.so}.dylib"; do
+for f in "$(engine_binary)" "${HTTRACK_SHLIB:-}" "${HTTRACK_SHLIB%.so}.dylib"; do
     if [ -n "$f" ] && [ -f "$f" ]; then
         artifacts+=("$f")
     fi

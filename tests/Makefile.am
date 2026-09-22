@@ -106,6 +106,10 @@ TESTS_ENVIRONMENT += MIRRORVERDICT_BIN=$(abs_builddir)/mirrorverdict$(EXEEXT)
 # real binary rather than the libtool wrapper script, plus the loader variable
 # libtool picked for this platform.
 TESTS_ENVIRONMENT += HTTRACK_BIN=$(abs_top_builddir)/src/$(LT_CV_OBJDIR)/httrack$(EXEEXT)
+# Where libtool puts the real binary when no shared library is built, since a
+# --disable-shared tree has no $(LT_CV_OBJDIR) at all (#1744). In a shared tree
+# this path is the wrapper script, so engine_binary() prefers the one above.
+TESTS_ENVIRONMENT += HTTRACK_BIN_STATIC=$(abs_top_builddir)/src/httrack$(EXEEXT)
 TESTS_ENVIRONMENT += HTTRACK_LIBDIR=$(abs_top_builddir)/src/$(LT_CV_OBJDIR)
 TESTS_ENVIRONMENT += SHLIBPATH_VAR=$(SHLIBPATH_VAR)
 # The shim directory test-timeout.sh puts on PATH under a sanitizer.
