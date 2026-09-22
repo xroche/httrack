@@ -564,6 +564,10 @@ static void jsscan_case(httrackp *opt, selftest_sweep *sw, const char *text,
    operand + tail, taking one representative per class the scanner branches on
    rather than every byte. */
 static void jsscan_sweep(httrackp *opt, selftest_sweep *sw) {
+  /* The non-ASCII prefixes are the control on the two decoders agreeing, not
+     on the byte list, which cases[] pins. U+20A0 ends in 0xA0, so an engine
+     reading that byte as a space disagrees with the model here and nowhere
+     else. */
   static const char *const prefix[] = {
       "",  " ", "a", "_",  "\"",       "$",        ".",
       "`", ":", "}", "\n", "\302\240", "\303\251", "\342\202\240"};
@@ -674,6 +678,7 @@ int parse_selftest_jsscan(httrackp *opt, hts_boolean dump) {
       {"\343\200\200url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
       {"\342\200\257url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
       {"\357\273\277url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      {"\341\273\277url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_FALSE, 0, 0},
       {"\240url(a.png)", 1, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
       {"\341\232\200url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
       {"\342\201\237url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
