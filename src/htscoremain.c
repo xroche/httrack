@@ -2742,6 +2742,9 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
        path produced by fconcat(), even with a long log path (issue #183). */
     char n_lock[OPT_GET_BUFF_SIZE(opt)];
 
+    /* The lock is written here and moved onto n_lock once it is dated back. */
+    char n_lock_staged[OPT_GET_BUFF_SIZE(opt)];
+
     // on peut pas avoir un affichage ET un fichier log
     // ca sera pour la version 2
     if (httrack_logmode == 1) {
@@ -2919,7 +2922,11 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         }
       }
       // petit message dans le lock
-      if ((fp = FOPEN(n_lock, "wb")) != NULL) {
+      strcpybuff(n_lock_staged,
+                 fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                         StringBuff(opt->path_log),
+                         "hts-in_progress.lock.tmp"));
+      if ((fp = FOPEN(n_lock_staged, "wb")) != NULL) {
         int i;
 
         fprintf(fp, "Mirror in progress since %s .. please wait!" LF, t);
@@ -2949,11 +2956,20 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         fp = NULL;
         /* One second back, so a request written the instant this file appears
            sorts after it even where the filesystem stamps whole seconds. */
-        if (!hts_file_backdate(n_lock, 1) && opt->log != NULL)
+        if (!hts_file_backdate(n_lock_staged, 1) && opt->log != NULL)
           hts_log_print(
               opt, LOG_WARNING,
               "engine: could not date hts-in_progress.lock back, so a"
               " stop request written in this first second is ignored");
+        /* Moved into place only now, or a script watching for the lock could
+           read it in the moment it still carried its own write time. */
+        if (!hts_rename_over(opt, n_lock_staged, n_lock)) {
+          UNLINK(n_lock_staged);
+          if (opt->log != NULL)
+            hts_log_print(opt, LOG_WARNING,
+                          "engine: could not create hts-in_progress.lock, so"
+                          " this mirror cannot be stopped or paused by a file");
+        }
       }
       // fichier log        
       if (opt->log) {
