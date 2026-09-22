@@ -14,8 +14,8 @@
 
 set -euo pipefail
 
-# shellcheck source=tests/crawllib.sh
-. "${0%"${0##*/}"}./crawllib.sh"
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
 
 : "${top_srcdir:=..}"
 
