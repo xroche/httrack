@@ -2555,6 +2555,17 @@ static int st_copyopt(httrackp *opt, int argc, char **argv) {
   if (to->pause_min_ms != 5000 || to->pause_max_ms != 10000)
     err = 1;
 
+  /* max_retry_after: 0 is a real setting (no wait), so only a negative skips */
+  from->max_retry_after = 0;
+  to->max_retry_after = 60;
+  copy_htsopt(from, to);
+  if (to->max_retry_after != 0)
+    err = 1;
+  from->max_retry_after = -1;
+  copy_htsopt(from, to);
+  if (to->max_retry_after != 0)
+    err = 1;
+
   hts_free_opt(from);
   hts_free_opt(to);
   printf("copy-htsopt: %s\n", err ? "FAIL" : "OK");
@@ -2838,6 +2849,58 @@ static int st_random(httrackp *opt, int argc, char **argv) {
       err = 1;
   }
   printf("random: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
+static int st_retryafter(httrackp *opt, int argc, char **argv) {
+  /* 1994-11-06 08:49:37 GMT, the RFC's own example date */
+  const time_t ref = (time_t) 784111777;
+  int err = 0;
+  size_t i;
+
+  static const struct {
+    const char *value;
+    int expect;
+  } cases[] = {
+      /* delta-seconds */
+      {"120", 120},
+      {" 120", 120},
+      {"120\r\n", 120},
+      {"0", 0},
+      /* clipped, never wrapped negative; INT_MAX itself must survive intact */
+      {"2147483640", 2147483640}, /* just under: clipping it is an off-by-one */
+      {"2147483647", INT_MAX},
+      {"2147483648", INT_MAX},
+      {"4294967296", INT_MAX},
+      {"99999999999999999999", INT_MAX},
+      /* HTTP-date, relative to ref */
+      {"Sun, 06 Nov 1994 08:50:37 GMT", 60},
+      {"Sun, 06 Nov 1994 08:49:37 GMT", 0},
+      {"Sun, 06 Nov 1994 08:48:37 GMT", 0}, /* already past, never negative */
+      /* nothing usable: -1, which is what keeps a bare 503 fatal */
+      {"", -1},
+      {"   ", -1},
+      {"soon", -1},
+      {"12x", -1},
+      {"-5", -1},
+      {"1.5", -1},
+  };
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    const int got = hts_parse_retry_after(cases[i].value, ref);
+
+    if (got != cases[i].expect) {
+      printf("retry-after: \"%s\" gave %d, expected %d\n", cases[i].value, got,
+             cases[i].expect);
+      err = 1;
+    }
+  }
+  if (hts_parse_retry_after(NULL, ref) != -1)
+    err = 1;
+  printf("retry-after: %s\n", err ? "FAIL" : "OK");
   return err;
 }
 
@@ -16672,6 +16735,7 @@ static const struct selftest_entry {
      "a user stop drops the slots still waiting to connect (#1073)",
      st_backstop},
     {"pause", "", "randomized inter-file pause target self-test", st_pause},
+    {"retry-after", "", "Retry-After header parser self-test", st_retryafter},
     {"random", "", "hts_random_bytes() fills exactly the requested length",
      st_random},
     {"relative", "<link> <curr-file>", "relative link between two paths",

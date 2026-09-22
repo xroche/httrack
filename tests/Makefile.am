@@ -11,7 +11,7 @@ EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c nobacktrace.c a
 	proxytestlib.py tls-stall-server.py warc-validate.py wacz-validate.py \
 	header-injection-server.py header-injection-check.py \
 	postfile-server.py \
-	status-line-server.py \
+	status-line-server.py retry-after-server.py \
 	pty-resize.py ttyrun.py test-timeout.sh png-colors.py \
 	local-crawl.sh local-server.py ftp-server.py testlib.sh proclib.sh \
 	webhttracklib.sh httpclient.py webtestlib.py crawllib.sh arclib.sh \

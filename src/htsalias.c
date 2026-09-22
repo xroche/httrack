@@ -151,6 +151,8 @@ const char *hts_optalias[][4] = {
    "explain which filter rule accepts or rejects a URL, then exit"},
   {"pause", "-%G", "param1",
    "random pause of MIN[:MAX] seconds between files"},
+  {"max-retry-after", "-%J", "param",
+   "longest Retry-After delay obeyed, in seconds"},
   {"generate-errors", "-o", "level", ""},
   {"do-not-generate-errors", "-o0", "single", ""},
   {"purge-old", "-X", "onoff", ""},

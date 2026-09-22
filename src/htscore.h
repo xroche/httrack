@@ -180,6 +180,8 @@ struct struct_back {
   hts_connect_fallback *connect_fallback; /**< per-slot, count+1 entries */
   hts_boolean bot_challenge_noted; /**< the bot-protection note is already in
                                         this mirror's log (#1732) */
+  TStamp retry_after_until; /**< Retry-After: no new launch before this local
+                                 ms timestamp; 0 holds nothing */
 };
 
 /** Open handle to the mirror cache (the read-from-old / write-to-new state
@@ -556,6 +558,10 @@ hts_boolean hts_wait_available_socket(struct_back *sback, httrackp *opt,
 /* Randomized inter-file pause target in [min_ms,max_ms] (#185), derived from a
    timestamp seed so it is stable within one gap and rerolls per launch. */
 int hts_pause_target_ms(TStamp seed, int min_ms, int max_ms);
+
+/* Withhold every new launch for `seconds`, clipped to opt->max_retry_after;
+   an already longer hold is kept. */
+void back_set_retry_after(struct_back *sback, httrackp *opt, int seconds);
 
 /* Schedule more links from the heap into free slots. Returns the number queued,
    or <=0 if none could be added (no free slot / paused / stopped). */

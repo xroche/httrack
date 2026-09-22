@@ -58,6 +58,8 @@ Please visit our Website: http://www.httrack.com
 #include "htsencoding.h"
 #include "htscodec.h"
 
+#include <limits.h>
+
 #ifdef _WIN32
 #include <direct.h>
 #else
@@ -669,6 +671,7 @@ void hts_init_htsblk(htsblk * r) {
   r->msg[0] = '\0';
   r->statuscode = STATUSCODE_INVALID;
   r->totalsize = -1;
+  r->retry_after = -1;
 }
 
 // ouverture d'une liaison http, envoi d'une requète
@@ -1725,6 +1728,11 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
          rather than save the coded bytes as the page) */
       if (hts_codec_parse(retour->contentencoding) != HTS_CODEC_IDENTITY)
         retour->compressed = 1;
+    }
+  } else if ((p = strfield(rcvd, "Retry-After:")) != 0) {
+    if (retour) {
+      /* no opt here, so the cap is applied by the caller that has one */
+      retour->retry_after = hts_parse_retry_after(rcvd + p, time(NULL));
     }
   } else if ((p = strfield(rcvd, "Location:")) != 0) {
     if (retour) {
@@ -2896,6 +2904,55 @@ int set_filetime(const char *file, struct tm *tm_time) {
     return UTIME(file, &tim);
   }
   return -1;
+}
+
+/* Both Retry-After forms (RFC 9110 10.2.3). -1 rather than 0 for an unusable
+   value, so a caller can tell it from a server that named zero. */
+int hts_parse_retry_after(const char *value, time_t now) {
+  const char *p = value;
+  const char *end;
+
+  if (value == NULL)
+    return -1;
+  while (is_space(*p))
+    p++;
+  for (end = p; *end != '\0' && !is_space(*end); end++)
+    ;
+
+  /* delta-seconds is 1*DIGIT, so a trailing token means an HTTP-date */
+  if (end > p && (size_t) (end - p) == strspn(p, "0123456789")) {
+    const char *q;
+    int secs = 0;
+
+    for (q = p; q < end; q++) {
+      const int digit = *q - '0';
+
+      /* clip before the multiply: the accumulator must never overflow */
+      if (secs > (INT_MAX - digit) / 10)
+        return INT_MAX;
+      secs = secs * 10 + digit;
+    }
+    return secs;
+  }
+
+  {
+    struct tm buffer;
+    struct tm *tm_s = convert_time_rfc822(&buffer, p);
+    time_t when;
+
+    if (tm_s == NULL)
+      return -1;
+    when = timegm(tm_s);
+    if (when == (time_t) -1)
+      return -1;
+    if (when <= now)
+      return 0;
+    /* widen before subtracting: two time_t values can differ by more than an
+       int holds */
+    if ((LLint) when - (LLint) now > (LLint) INT_MAX)
+      return INT_MAX;
+    return (int) (when - now);
+  }
 }
 
 /* sets file time from RFC822 date+time, -1 if error*/
@@ -6681,6 +6738,7 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   StringCopy(opt->why_url, "");
   opt->pause_min_ms = 0;
   opt->pause_max_ms = 0;
+  opt->max_retry_after = HTS_DEFAULT_MAX_RETRY_AFTER;
   opt->ftp_proxy = HTS_TRUE;
   opt->convert_utf8 = HTS_TRUE;
   StringCopy(opt->filelist, "");

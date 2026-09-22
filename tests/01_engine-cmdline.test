@@ -112,6 +112,20 @@ for bad in nan nan:5 5:nan inf 10:5 99999; do
     refused "#185: invalid --pause '$bad' not refused cleanly"
 done
 
+# --max-retry-after (#1738): the cap is what keeps a server from parking the
+# mirror, so a value it cannot parse must be refused rather than left at 0.
+for good in 0 5 3600 --max-retry-after=7; do
+    case $good in
+    --*) run "$tmp/mra-ok" "$good" ;;
+    *) run "$tmp/mra-ok" "-%J$good" ;;
+    esac
+    accepted "$tmp/mra-ok" "#1738: valid --max-retry-after '$good' rejected"
+done
+for bad in "" x 1.5 -3 3601 99999; do
+    run "$tmp/mra-bad" "-%J$bad"
+    refused "#1738: invalid --max-retry-after '$bad' not refused cleanly"
+done
+
 # An option is not -i (continue) merely because its name contains an 'i' (#615).
 # These used to wipe the URL given before them and exit on the usage screen.
 run "$tmp/ord-bti" --build-top-index

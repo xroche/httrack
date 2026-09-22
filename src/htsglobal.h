@@ -267,6 +267,9 @@ Please visit our Website: http://www.httrack.com
 #define HTS_DEFAULT_USER_AGENT                                                 \
   "Mozilla/5.0 (compatible; HTTrack/" HTTRACK_AFF_VERSION                      \
   "; +https://www.httrack.com/)"
+/* Retry-After is the server's number, so the engine caps it (seconds). */
+#define HTS_DEFAULT_MAX_RETRY_AFTER 60
+#define HTS_MAX_RETRY_AFTER_LIMIT 3600
 #define HTTRACK_WEB "https://www.httrack.com"
 /* Language=%s takes the catalog basename (LANGUAGE_FILE), an ASCII identifier;
    LANGUAGE_NAME is a localized display string in a legacy codepage (#1353). */
