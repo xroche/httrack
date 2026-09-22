@@ -263,6 +263,7 @@ int parse_selftest_dirtylink(httrackp *opt, hts_boolean dump) {
         hts_dirty_link_is_url(opt, cases[i].str, strlen(cases[i].str),
                               cases[i].lastc, cases[i].inscript);
 
+    sw.cases++;
     if (got != cases[i].want) {
       fprintf(stderr,
               "dirtylink \"%s\" (next byte '%c', %s): got %d, "
@@ -652,12 +653,15 @@ int parse_selftest_jsscan(httrackp *opt, hts_boolean dump) {
   size_t i;
   int err = 0;
 
+  memset(&sw, 0, sizeof(sw));
+  sw.dump = dump;
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     hts_js_link got;
     const hts_boolean found =
         hts_js_scan_link(opt, cases[i].text + cases[i].at, cases[i].text,
                          cases[i].in_tag, '"', cases[i].in_css, &got);
 
+    sw.cases++;
     if (found != cases[i].want || (found && (got.offset != cases[i].offset ||
                                              got.length != cases[i].length))) {
       fprintf(stderr,
@@ -669,8 +673,6 @@ int parse_selftest_jsscan(httrackp *opt, hts_boolean dump) {
     }
   }
 
-  memset(&sw, 0, sizeof(sw));
-  sw.dump = dump;
   jsscan_sweep(opt, &sw);
   if (sw.dump)
     return 0;
@@ -764,14 +766,16 @@ static hts_boolean tagattr_is_nodetect(const char *name, size_t len) {
 
 /* A tag whose attribute we built ourselves, so the name the walk must resolve
    is known rather than recomputed. */
-static int tagattr_case(const char *before, const char *name, const char *gap,
-                        char quote, hts_boolean want) {
+static int tagattr_case(selftest_sweep *sw, const char *before,
+                        const char *name, const char *gap, char quote,
+                        hts_boolean want) {
   char text[256];
   const char *nend = NULL;
   const char *quotep, *got;
   size_t at;
   int err = 0;
 
+  sw->cases++;
   text[0] = '\0';
   strcatbuff(text, "<a ");
   strcatbuff(text, before);
@@ -951,19 +955,21 @@ int parse_selftest_tagattr(httrackp *opt) {
         const char quote = q ? '\'' : '"';
 
         for (i = 0; i < sizeof(linky) / sizeof(linky[0]); i++)
-          err |= tagattr_case(before[b], linky[i], gap[g], quote, HTS_TRUE);
+          err |=
+              tagattr_case(&sw, before[b], linky[i], gap[g], quote, HTS_TRUE);
         for (i = 0; i < sizeof(nolink) / sizeof(nolink[0]); i++)
-          err |= tagattr_case(before[b], nolink[i], gap[g], quote, HTS_FALSE);
+          err |=
+              tagattr_case(&sw, before[b], nolink[i], gap[g], quote, HTS_FALSE);
       }
     }
   }
   err |= tagattr_junk_bytes(&sw);
   err |= tagattr_junk_names(&sw);
   if (err) {
-    printf("tagattr self-test FAILED (%d junk tags swept)\n", (int) sw.cases);
+    printf("tagattr self-test FAILED (%d cases swept)\n", (int) sw.cases);
     return 1;
   }
-  printf("tagattr self-test OK (%d junk tags swept, %d readable)\n",
-         (int) sw.cases, (int) sw.accepted);
+  printf("tagattr self-test OK (%d cases swept, %d readable)\n", (int) sw.cases,
+         (int) sw.accepted);
   return 0;
 }

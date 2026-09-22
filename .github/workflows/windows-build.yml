@@ -227,6 +227,79 @@ jobs:
             throw "CRT mismatch across the boundary: libhttrack.dll=$a httrack.exe=$b"
           }
 
+      # A property dropped from a .vcxproj still builds, so assert the
+      # mitigations where they end up.
+      - name: Check the hardening flags reached the binaries
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $dir = "src\${{ matrix.platform }}\${{ matrix.configuration }}"
+          $dumpbin = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
+            -latest -find VC\Tools\MSVC\**\bin\Host*\*\dumpbin.exe | Select-Object -First 1
+          if (-not $dumpbin) { throw "dumpbin not found" }
+
+          # /headers holds the DLL-characteristics bits, /loadconfig carries CET.
+          function Get-Headers($path) {
+            $out = & $dumpbin /headers /loadconfig $path
+            if ($LASTEXITCODE -ne 0) { throw "dumpbin failed on $path" }
+            $out -join "`n"
+          }
+
+          # Each mitigation, as the pattern that finds it in that dump.
+          $want = [ordered]@{
+            "ASLR (/DYNAMICBASE)"        = "Dynamic base"
+            "DEP (/NXCOMPAT)"            = "NX compatible"
+            "Control Flow Guard"         = "Control Flow Guard"
+          }
+          if ("${{ matrix.platform }}" -eq "x64") {
+            $want["Shadow stacks (/CETCOMPAT)"] = "CET\s*Compat"
+          }
+
+          # Everything a dump does not show. /GS is counted rather than matched:
+          # the load-config "Security Cookie" field holds the address of
+          # __security_cookie, which the CRT links into every image whatever /GS
+          # was, so matching it can never fail. The VC feature record counts the
+          # objects actually compiled with it.
+          function Missing($hdr) {
+            $out = @()
+            foreach ($k in $want.Keys) {
+              if ($hdr -notmatch $want[$k]) { $out += $k }
+            }
+            $cc = if ($hdr -match "C/C\+\+=(\d+)") { [int]$Matches[1] } else { -1 }
+            $gs = if ($hdr -match ",\s*/GS=(\d+)") { [int]$Matches[1] } else { -1 }
+            if ($cc -le 0) { $out += "a VC feature record, so /GS cannot be read" }
+            elseif ($gs -lt $cc) { $out += "/GS on $($cc - $gs) of $cc objects" }
+            ,$out
+          }
+
+          # Negative control: the same parse, over a dump that carries ASLR and a
+          # security cookie but neither guard nor a /GS count, must report the
+          # rest missing. A row that cannot fail is worse than no row, and that
+          # is exactly how the first /GS check shipped.
+          $none = "Dynamic base`nSecurity Cookie 0x140001000`n" +
+                  "Counts: Pre-VC++ 11.00=0, C/C++=73, /GS=0, /sdl=0"
+          $ctl = Missing $none
+          $mustReport = @("DEP (/NXCOMPAT)", "Control Flow Guard")
+          if ("${{ matrix.platform }}" -eq "x64") { $mustReport += "Shadow stacks (/CETCOMPAT)" }
+          foreach ($k in $mustReport) {
+            if ($ctl -notcontains $k) { throw "negative control: $k was not reported missing" }
+          }
+          if (-not ($ctl -like "*/GS on 73 of 73*")) {
+            throw "negative control: /GS was not reported missing (got: $($ctl -join ', '))"
+          }
+
+          $bad = 0
+          foreach ($f in @("libhttrack.dll", "httrack.exe", "webhttrack.exe", "proxytrack.exe")) {
+            $gap = Missing (Get-Headers "$dir\$f")
+            if ($gap.Count -gt 0) {
+              Write-Host "::error::${f} is missing $($gap -join '; ')"
+              $bad++
+            } else {
+              Write-Host "${f}: every mitigation present"
+            }
+          }
+          if ($bad -gt 0) { throw "$bad binary/binaries missing a mitigation" }
+
       # The DLL build only proves the engine's own fixed include order, the one
       # order a consumer need not use, and 205/206/207/269 all gate on an automake
       # environment this job has not (#1153).
