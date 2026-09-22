@@ -1,0 +1,83 @@
+#!/bin/bash
+#
+# The scanner knew only the bare "import './mod.js'" form, so it missed
+# "import x from './mod.js'". A path specifier is now followed. A bare one such
+# as "jquery" names a module, not a file, and stays untouched. The two copies of
+# mod.js tell the script base from the page base apart, and plain.js holds the
+# names that merely end in "from".
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+: "${top_srcdir:=..}"
+
+work=$(mktemp -d)
+trap 'set +e; rm -rf "$work"' EXIT
+
+root="$work/root"
+mkdir -p "$root/assets"
+
+cat >"$root/index.html" <<'HTML'
+<!DOCTYPE html><html><head><title>t</title></head><body>
+<script type="module" src="/assets/app.js"></script>
+<script src="/assets/plain.js"></script>
+</body></html>
+HTML
+
+cat >"$root/assets/app.js" <<'JS'
+import x from "./mod.js";
+import y from "../top.js";
+import $ from "jquery";
+import p from "popper.js";
+export { x, y, $, p };
+JS
+
+# Names ending in "from", and "$from", are one identifier token, not the
+# keyword. Each target below exists, so following one would mirror it.
+cat >"$root/assets/plain.js" <<'JS'
+var dateFrom = "jquery3";
+var copyFrom = "hello world";
+var date_from = "jquery4";
+var d6 = $from "/js/c8.js";
+var d7 = xfrom "/js/c9.js";
+JS
+printf 'export default "assets-copy";\n' >"$root/assets/mod.js"
+printf 'export default "root-copy";\n' >"$root/mod.js"
+printf 'export default "top";\n' >"$root/top.js"
+mkdir -p "$root/js"
+printf 'c8\n' >"$root/js/c8.js"
+printf 'c9\n' >"$root/js/c9.js"
+printf 'jq3\n' >"$root/jquery3"
+printf 'jq4\n' >"$root/jquery4"
+printf 'hw\n' >"$root/hello world"
+printf 'not-a-module\n' >"$root/jquery"
+printf 'not-a-module\n' >"$root/popper.js"
+
+bash "$top_srcdir/tests/local-crawl.sh" --root "$root" \
+    --errors 0 \
+    --found assets/mod.js \
+    --found top.js \
+    --not-found mod.js \
+    --not-found jquery \
+    --not-found popper.js \
+    --not-found assets/jquery \
+    --not-found assets/popper.js \
+    --not-found jquery3 \
+    --not-found jquery4 \
+    --not-found 'hello world' \
+    --not-found js/c8.js \
+    --not-found js/c9.js \
+    --log-not-found 'jquery' \
+    --log-not-found 'popper' \
+    --file-matches 'assets/app.js' 'from "mod\.js"' \
+    --file-matches 'assets/app.js' 'from "\.\./top\.js"' \
+    --file-matches 'assets/app.js' 'from "jquery"' \
+    --file-matches 'assets/app.js' 'from "popper\.js"' \
+    --file-matches 'assets/plain.js' '^var dateFrom = "jquery3";$' \
+    --file-matches 'assets/plain.js' '^var copyFrom = "hello world";$' \
+    --file-matches 'assets/plain.js' '^var date_from = "jquery4";$' \
+    --file-matches 'assets/plain.js' '^var d6 = \$from "/js/c8\.js";$' \
+    --file-matches 'assets/plain.js' '^var d7 = xfrom "/js/c9\.js";$' \
+    httrack BASEURL/index.html -q -%v0 -r4

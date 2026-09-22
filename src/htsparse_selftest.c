@@ -320,7 +320,8 @@ typedef enum {
   JSGUARD_NONE = 0,
   JSGUARD_TAG_QUOTE, /* the quote the enclosing attribute is written with */
   JSGUARD_SPACE_BEFORE,
-  JSGUARD_NO_NAME_BYTE, /* neither an alphanumeric nor an underscore */
+  JSGUARD_NO_NAME_BYTE,  /* neither an alphanumeric nor an underscore */
+  JSGUARD_NO_IDENT_BYTE, /* nothing JavaScript allows inside a name */
   JSGUARD_SPACE_AFTER
 } jsscan_guard;
 
@@ -330,19 +331,22 @@ static const struct jsscan_word {
   const char *ends;      /* what may close it, NULL for the default */
   hts_boolean no_mime;   /* window.open("text/html") is a type, not a URL */
   hts_boolean no_method; /* xhr.open("GET", url): the method is not a URL */
+  hts_boolean url_only;  /* from "jquery" names a module, not a file */
   jsscan_guard guard;
 } jsscan_words[] = {
-    {".src", '=', NULL, HTS_FALSE, HTS_FALSE, JSGUARD_NONE},
-    {"src", '=', NULL, HTS_FALSE, HTS_FALSE, JSGUARD_TAG_QUOTE},
-    {".location", '=', NULL, HTS_FALSE, HTS_FALSE, JSGUARD_NONE},
-    {":location", '=', NULL, HTS_FALSE, HTS_FALSE, JSGUARD_NONE},
-    {"location", '=', NULL, HTS_FALSE, HTS_FALSE, JSGUARD_SPACE_BEFORE},
-    {".href", '=', NULL, HTS_FALSE, HTS_FALSE, JSGUARD_NONE},
-    {".open", '(', "),", HTS_TRUE, HTS_TRUE, JSGUARD_NONE},
-    {".replace", '(', ")", HTS_FALSE, HTS_FALSE, JSGUARD_NONE},
-    {".link", '(', ")", HTS_FALSE, HTS_FALSE, JSGUARD_NONE},
-    {"url", '(', ")", HTS_FALSE, HTS_FALSE, JSGUARD_NO_NAME_BYTE},
-    {"import", 0, NULL, HTS_FALSE, HTS_FALSE, JSGUARD_SPACE_AFTER},
+    {".src", '=', NULL, HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_NONE},
+    {"src", '=', NULL, HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_TAG_QUOTE},
+    {".location", '=', NULL, HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_NONE},
+    {":location", '=', NULL, HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_NONE},
+    {"location", '=', NULL, HTS_FALSE, HTS_FALSE, HTS_FALSE,
+     JSGUARD_SPACE_BEFORE},
+    {".href", '=', NULL, HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_NONE},
+    {".open", '(', "),", HTS_TRUE, HTS_TRUE, HTS_FALSE, JSGUARD_NONE},
+    {".replace", '(', ")", HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_NONE},
+    {".link", '(', ")", HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_NONE},
+    {"url", '(', ")", HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_NO_NAME_BYTE},
+    {"import", 0, NULL, HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_SPACE_AFTER},
+    {"from", 0, NULL, HTS_FALSE, HTS_FALSE, HTS_TRUE, JSGUARD_NO_IDENT_BYTE},
 };
 
 /* This models what hts_js_scan_link is meant to find: one of the keywords
@@ -387,6 +391,14 @@ static hts_boolean jsscan_model(httrackp *opt, const char *cursor,
         a = cursor + l;
         goto matched;
       }
+      break;
+    case JSGUARD_NO_IDENT_BYTE:
+      /* Spelled again rather than shared. Unlike the "url" guard this one
+         gates the match, so a failed guard matches nothing at all. */
+      if (isalnum((unsigned char) prev) || prev == '_' || prev == '$' ||
+          prev == '.' || prev == '"' || prev == '\'' || prev == '`' ||
+          (unsigned char) prev >= 0x80)
+        continue;
       break;
     case JSGUARD_SPACE_AFTER:
       if (!is_space(cursor[l]))
@@ -462,6 +474,13 @@ matched:
     }
   }
 
+  /* Spelled again as prefixes, not as indexed bytes: a specifier is a URL
+     when it is a path or carries a scheme. */
+  if (w->url_only && strncmp(a, "/", 1) != 0 && strncmp(a, "./", 2) != 0 &&
+      strncmp(a, "../", 3) != 0 && strfield(a, "http:") == 0 &&
+      strfield(a, "https:") == 0 && strfield(a, "ftp:") == 0)
+    return HTS_FALSE;
+
   /* a leading ',' or ';' says this is code, and a quote or a control byte says
      the operand never was one string */
   for (n = 0, i = 0; i < (size_t) len; i++) {
@@ -520,11 +539,12 @@ static void jsscan_sweep(httrackp *opt, selftest_sweep *sw) {
   static const char *const word[] = {
       ".src",     "src",    ".SRC",  ".location", ":location",
       "location", ".href",  ".open", ".replace",  ".link",
-      "url",      "import", "foo"};
+      "url",      "import", "from",  "foo"};
   static const char *const sep[] = {"=", "(", ",", "", " ="};
   static const char *const quote[] = {"\"", "'", ""};
-  static const char *const operand[] = {"a.gif", "text/html", "GET", ",x",
-                                        "x;y",   "",          "a b"};
+  static const char *const operand[] = {
+      "a.gif", "text/html", "GET",     ",x",    "x;y",    "",
+      "a b",   "./a.js",    "../a.js", "/a.js", "..x.js", "http://h/a.js"};
   static const char *const tail[] = {";", ")", ",", "\n", " ;", "", "x"};
   char text[128];
   size_t p, w, s, q, o, t;
@@ -598,6 +618,35 @@ int parse_selftest_jsscan(httrackp *opt, hts_boolean dump) {
       {"x.src=\"\";", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
       /* a script inside a tag ends on the attribute's own quote */
       {"x.src='a.gif'\"", 1, HTS_TRUE, HTS_FALSE, HTS_TRUE, 6, 5},
+      /* a module specifier is followed when it is a path, and export takes
+         the same keyword as import */
+      {"import x from\"./x.js\";", 9, HTS_FALSE, HTS_FALSE, HTS_TRUE, 5, 6},
+      {"import x from \"../x.js\";", 9, HTS_FALSE, HTS_FALSE, HTS_TRUE, 6, 7},
+      {"from\"/x.js\";", 0, HTS_FALSE, HTS_FALSE, HTS_TRUE, 5, 5},
+      {"export{a}from\"./x.js\";", 9, HTS_FALSE, HTS_FALSE, HTS_TRUE, 5, 6},
+      /* an absolute specifier is a URL too, and both spellings must agree */
+      {"from\"https://h/x.js\";", 0, HTS_FALSE, HTS_FALSE, HTS_TRUE, 5, 14},
+      {"import \"https://h/x.js\";", 0, HTS_FALSE, HTS_FALSE, HTS_TRUE, 8, 14},
+      /* a query rides along: the rule reads the leading bytes only */
+      {"from\"./x.js?v=1\";", 0, HTS_FALSE, HTS_FALSE, HTS_TRUE, 5, 10},
+      /* a module id the loader resolves. The ESM grammar wants a slash after
+         the dots, so "..x.js" and ".config/a.js" are ids and not paths. */
+      {"from\"@scope/pkg\";", 0, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      {"from\"..x.js\";", 0, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      {"from\".config/a.js\";", 0, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      /* the keyword stands alone, and is not a call */
+      {"xfrom\"./x.js\";", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      {"x.from(\"./x.js\")", 2, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      /* a name ending in "from" is not the keyword, and the assignment it
+         carries is not a link. The sweep's "_" prefix covers that arm of the
+         name set, so one spelling is enough here. */
+      {"var copyFrom = \"hello world\";", 8, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0,
+       0},
+      /* '$' opens a name, and a byte above 127 opens a Unicode one. UTF-8
+         whitespace does not, so the keyword still stands alone after it. */
+      {"$from\"./x.js\";", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      {"\303\251from\"./x.js\";", 2, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      {"\302\240from\"./x.js\";", 2, HTS_FALSE, HTS_FALSE, HTS_TRUE, 5, 6},
   };
 
   selftest_sweep sw;
@@ -681,6 +730,10 @@ int parse_selftest_jsimport(httrackp *opt) {
       {"", HTS_FALSE},
       /* a keyword cut short by the document's first byte */
       {"mport(", HTS_FALSE},
+      /* UTF-8 whitespace is a boundary, a Unicode name is not */
+      {"\302\240import(", HTS_TRUE},
+      {"\342\200\250import(", HTS_TRUE},
+      {"caf\303\251import(", HTS_FALSE},
       /* The walk sees bytes, not syntax, so a commented-out call reads as one.
          The parser's comment automaton is what never asks here. */
       {"// import(", HTS_TRUE},

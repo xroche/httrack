@@ -146,11 +146,12 @@ hts_boolean hts_js_quote_is_import_arg(const char *quote, const char *buffer);
 
 /*
   Does the script or CSS at "cursor" hand a URL to .src, .location, .href,
-  .open, .replace, .link, url() or import? "buffer" is the first byte of the
-  document, which the keyword tests read backwards from. "in_tag" says the
-  script is an attribute value such as onclick="...", and "tag_lastc" the quote
-  that attribute is written with. "in_css" lets url() take an unquoted operand.
-  Fills "link" and answers true when a URL was found.
+  .open, .replace, .link, url(), import or a module specifier after "from"?
+  "buffer" is the first byte of the document, which the keyword tests read
+  backwards from. "in_tag" says the script is an attribute value such as
+  onclick="...", and "tag_lastc" the quote that attribute is written with.
+  "in_css" lets url() take an unquoted operand. Fills "link" and answers true
+  when a URL was found.
 */
 hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
                              const char *buffer, hts_boolean in_tag,
