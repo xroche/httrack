@@ -1101,15 +1101,16 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                     strcpybuff(back[p].r.msg, "Empty compressed file");
                   }
                 } else {
-                  snprintf(back[p].r.msg, sizeof(back[p].r.msg),
-                           "Open error when decompressing (can not create temporary file %s)",
-                           back[p].tmpfile);
+                  htsblk_failf(&back[p].r,
+                               "Open error when decompressing (can not create "
+                               "temporary file %s)",
+                               back[p].tmpfile);
                   back[p].tmpfile[0] = '\0';
                   back[p].r.statuscode = STATUSCODE_INVALID;
                 }
               } else {
-                snprintf(back[p].r.msg, sizeof(back[p].r.msg),
-                         "Open error when decompressing (can not generate a temporary file)");
+                htsblk_failf(&back[p].r, "Open error when decompressing (can "
+                                         "not generate a temporary file)");
               }
             }
             // fermer fichier sortie
@@ -1188,11 +1189,11 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                      a local write's errno behind, and 0 for a bad stream. */
                   if (errno != 0)
                     back_report_write_failure(opt, &back[p]);
-                  snprintf(back[p].r.msg, sizeof(back[p].r.msg),
-                           codec == HTS_CODEC_UNSUPPORTED
-                               ? "Unsupported Content-Encoding (%s)"
-                               : "Error when decompressing (%s)",
-                           back[p].r.contentencoding);
+                  htsblk_failf(&back[p].r,
+                               codec == HTS_CODEC_UNSUPPORTED
+                                   ? "Unsupported Content-Encoding (%s)"
+                                   : "Error when decompressing (%s)",
+                               back[p].r.contentencoding);
                   /* Drop the undecoded body so the writer can't commit the
                      coded bytes as the page; url_sav is left untouched. */
                   if (!back[p].r.is_write)

@@ -709,7 +709,7 @@ HTS_STATIC int strcmpnocase(const char *a, const char *b) {
 #ifdef _WIN32
 #define strcasecmp(a,b) stricmp(a,b)
 #define strncasecmp(a,b,n) strnicmp(a,b,n)
-#define snprintf _snprintf
+/* No snprintf alias: _snprintf leaves a truncated string unterminated. */
 #endif
 
 /* MSVC ships these POSIX functions under other names. Kept out of the installed

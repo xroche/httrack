@@ -1,0 +1,43 @@
+#!/bin/bash
+#
+# No header may give a C99 printf call another implementation under its own
+# name. htslib.h used to carry "#define snprintf _snprintf" under _WIN32, and
+# msvcrt's _snprintf writes no terminating NUL when it truncates, so on Windows
+# alone every unchecked snprintf in the engine left its destination NUL-less.
+# That reached a user as an abort reading back an 80-byte htsblk.msg the engine
+# had filled to capacity. Linux CI cannot see the alias, so this scan is the
+# only guard. A bounded wrapper is fine when it has a name of its own, the way
+# htssafe.h's sprintfbuff() does.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+top="${abs_top_srcdir:?not run under make check}"
+test -f "$top/src/htslib.h" || fail "no $top/src/htslib.h"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/printfalias.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "$work"
+
+alias_re='^[[:space:]]*#[[:space:]]*define[[:space:]]+(v?(f|s|sn)?printf|v?asprintf)[[:space:](]'
+
+sources() { # sources DIR -> the .c and .h files under it
+    find "$1" \( -name '*.c' -o -name '*.h' \) -print | LC_ALL=C sort
+}
+
+sources "$top/src" >"$work/files"
+test -s "$work/files" || fail "no sources found under $top/src"
+xargs grep -nHE "$alias_re" <"$work/files" >"$work/found" || true
+
+# Control: the scan must fire on the line this test exists to keep out.
+mkdir -p "$work/ctl"
+printf '#ifdef _WIN32\n#define snprintf _snprintf\n#endif\n' >"$work/ctl/legacy.h"
+sources "$work/ctl" | xargs grep -nHE "$alias_re" >"$work/control" || true
+test -s "$work/control" ||
+    fail "the scan cannot see a legacy alias, so a clean result proves nothing"
+
+test ! -s "$work/found" ||
+    fail_dump "a C99 printf call is aliased to another implementation under its own name. Call the real one, or give the wrapper its own name" "$work/found"
+
+echo "sources scanned: $(lines_of "$work/files"), aliases: 0"
