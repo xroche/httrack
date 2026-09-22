@@ -423,26 +423,34 @@ hts_boolean hts_dirty_link_is_url(httrackp *opt, const char *str, size_t len,
   return url_ok;
 }
 
-/* Does what sits before "at" glue the keyword to a name, or to a string
-   literal? A byte above 127 does, because a JavaScript name may be Unicode,
-   unless it ends the UTF-8 whitespace U+00A0, U+2028 or U+2029, which the
-   language reads as a boundary. */
-static hts_boolean js_glues_keyword(const char *at, const char *buffer) {
-  const char c = html_prevc(at, buffer);
+/* Can the byte before "at" continue a name, so that the keyword is the tail
+   of a longer one rather than one of its own? A dot glues because the keyword
+   is then a property name, which the ".xxx" rows above take when they want
+   it. A quote glues in code, where the keyword is inside a string or a
+   template literal; CSS has neither and juxtaposes its tokens. */
+static hts_boolean js_glues_keyword(const char *at, const char *buffer,
+                                    hts_boolean in_css) {
+  const unsigned char *const p = (const unsigned char *) at;
+  const unsigned char c = (unsigned char) html_prevc(at, buffer);
   const size_t before = (size_t) (at - buffer);
 
-  if ((unsigned char) c >= 0x80) {
-    if (before >= 2 && (unsigned char) at[-2] == 0xC2 &&
-        (unsigned char) c == 0xA0)
-      return HTS_FALSE;
-    if (before >= 3 && (unsigned char) at[-3] == 0xE2 &&
-        (unsigned char) at[-2] == 0x80 &&
-        ((unsigned char) c == 0xA8 || (unsigned char) c == 0xA9))
-      return HTS_FALSE;
-    return HTS_TRUE;
-  }
-  return isalnum((unsigned char) c) || c == '_' || c == '$' || c == '.' ||
-         c == '"' || c == '\'' || c == '`';
+  if (c < 0x80)
+    return isalnum(c) || c == '_' || c == '$' || c == '.' ||
+           (!in_css && (c == '"' || c == '\'' || c == '`'));
+  /* Above 127 a name may be Unicode, so only a space ends one. This is every
+     space the language reads as one: U+00A0 (or a lone 0xA0 where the page is
+     not UTF-8, since no continuation byte follows an ASCII one), U+1680,
+     U+2000..200A, U+2028, U+2029, U+202F, U+205F, U+3000 and U+FEFF. */
+  if (c == 0xA0 && (before < 2 || p[-2] == 0xC2 || p[-2] < 0x80))
+    return HTS_FALSE;
+  if (before >= 3 && ((p[-3] == 0xE2 && p[-2] == 0x80 &&
+                       (c <= 0x8A || c == 0xA8 || c == 0xA9 || c == 0xAF)) ||
+                      (p[-3] == 0xE1 && p[-2] == 0x9A && c == 0x80) ||
+                      (p[-3] == 0xE2 && p[-2] == 0x81 && c == 0x9F) ||
+                      (p[-3] == 0xE3 && p[-2] == 0x80 && c == 0x80) ||
+                      (p[-3] == 0xEF && p[-2] == 0xBB && c == 0xBF)))
+    return HTS_FALSE;
+  return HTS_TRUE;
 }
 
 /* Contract in htsparse.h; indexed so no pointer leaves the buffer. */
@@ -464,7 +472,7 @@ hts_boolean hts_js_quote_is_import_arg(const char *quote, const char *buffer) {
   if (i < kwlen || memcmp(buffer + i - kwlen, kw, kwlen) != 0)
     return HTS_FALSE;
   i -= kwlen;
-  return !js_glues_keyword(buffer + i, buffer);
+  return !js_glues_keyword(buffer + i, buffer, HTS_FALSE);
 }
 
 /* Is this module specifier a URL, or a module id the loader resolves for
@@ -545,9 +553,14 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
       expected = '(';
       expected_end = ")";
     }
+  if (!nc)
+    if ((nc = strfield(cursor, ".url"))) { // obj.url("doc")
+      expected = '(';
+      expected_end = ")";
+    }
   /* The guard has to gate the match: a name ending in "url" must leave nc at
      zero, or the default rule takes its assignment as a link. */
-  if (!nc && !js_glues_keyword(cursor, buffer) &&
+  if (!nc && !js_glues_keyword(cursor, buffer, in_css) &&
       (nc = strfield(cursor, "url")) != 0) { // url(url)
     expected = '(';
     expected_end = ")";
@@ -568,7 +581,7 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
   if (!nc) { // import x from "./mod.js"
     /* The guard has to gate the match: a name merely ending in "from" must
        leave nc at zero, or the default rule takes its assignment as a link. */
-    if (!js_glues_keyword(cursor, buffer) &&
+    if (!js_glues_keyword(cursor, buffer, in_css) &&
         (nc = strfield(cursor, "from")) != 0) {
       expected = 0;
       is_specifier = 1;

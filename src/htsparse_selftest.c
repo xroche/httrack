@@ -343,10 +343,35 @@ static const struct jsscan_word {
     {".open", '(', "),", HTS_TRUE, HTS_TRUE, HTS_FALSE, JSGUARD_NONE},
     {".replace", '(', ")", HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_NONE},
     {".link", '(', ")", HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_NONE},
+    {".url", '(', ")", HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_NONE},
     {"url", '(', ")", HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_NO_IDENT_BYTE},
     {"import", 0, NULL, HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_SPACE_AFTER},
     {"from", 0, NULL, HTS_FALSE, HTS_FALSE, HTS_TRUE, JSGUARD_NO_IDENT_BYTE},
 };
+
+/* The code point ending at cursor[-1], or the byte itself where no UTF-8 lead
+   precedes it, which is how a Latin-1 page spells a non-breaking space. */
+static unsigned int model_prev_codepoint(const char *cursor,
+                                         const char *buffer) {
+  const unsigned char *const p = (const unsigned char *) cursor;
+  const size_t before = (size_t) (cursor - buffer);
+
+  if (before >= 3 && (p[-3] & 0xF0) == 0xE0)
+    return ((unsigned int) (p[-3] & 0x0F) << 12) |
+           ((unsigned int) (p[-2] & 0x3F) << 6) | (p[-1] & 0x3Fu);
+  if (before >= 2 && (p[-2] & 0xE0) == 0xC0)
+    return ((unsigned int) (p[-2] & 0x1F) << 6) | (p[-1] & 0x3Fu);
+  return p[-1];
+}
+
+/* Every ECMAScript WhiteSpace and LineTerminator above 127. */
+static hts_boolean js_space_codepoint(unsigned int cp) {
+  return cp == 0xA0 || cp == 0x1680 || (cp >= 0x2000 && cp <= 0x200A) ||
+                 cp == 0x2028 || cp == 0x2029 || cp == 0x202F || cp == 0x205F ||
+                 cp == 0x3000 || cp == 0xFEFF
+             ? HTS_TRUE
+             : HTS_FALSE;
+}
 
 /* This models what hts_js_scan_link is meant to find: one of the keywords
    above, its separator, a quoted operand, and a byte closing the statement. */
@@ -382,11 +407,14 @@ static hts_boolean jsscan_model(httrackp *opt, const char *cursor,
         continue;
       break;
     case JSGUARD_NO_IDENT_BYTE:
-      /* Spelled again rather than shared: the guard gates the match, so a
-         failed guard matches nothing at all. */
+      /* The engine matches UTF-8 byte triples and this decodes the code point,
+         so the two agree on which characters glue only by accident. Membership
+         itself is pinned by cases[] below, never by the sweep. */
       if (isalnum((unsigned char) prev) || prev == '_' || prev == '$' ||
-          prev == '.' || prev == '"' || prev == '\'' || prev == '`' ||
-          (unsigned char) prev >= 0x80)
+          prev == '.' ||
+          (!in_css && (prev == '"' || prev == '\'' || prev == '`')) ||
+          ((unsigned char) prev >= 0x80 &&
+           !js_space_codepoint(model_prev_codepoint(cursor, buffer))))
         continue;
       break;
     case JSGUARD_SPACE_AFTER:
@@ -524,12 +552,13 @@ static void jsscan_case(httrackp *opt, selftest_sweep *sw, const char *text,
    operand + tail, taking one representative per class the scanner branches on
    rather than every byte. */
 static void jsscan_sweep(httrackp *opt, selftest_sweep *sw) {
-  static const char *const prefix[] = {"",  " ", "a", "_", "\"",
-                                       "$", ".", "`", ":"};
+  static const char *const prefix[] = {
+      "",  " ", "a", "_",  "\"",       "$",        ".",
+      "`", ":", "}", "\n", "\302\240", "\303\251", "\342\202\240"};
   static const char *const word[] = {
-      ".src",     "src",    ".SRC",  ".location", ":location",
-      "location", ".href",  ".open", ".replace",  ".link",
-      "url",      "import", "from",  "foo"};
+      ".src",     "src",   ".SRC",   ".location", ":location",
+      "location", ".href", ".open",  ".replace",  ".link",
+      ".url",     "url",   "import", "from",      "foo"};
   static const char *const sep[] = {"=", "(", ",", "", " ="};
   static const char *const quote[] = {"\"", "'", ""};
   static const char *const operand[] = {
@@ -615,6 +644,31 @@ int parse_selftest_jsscan(httrackp *opt, hts_boolean dump) {
       {"(url(a.png)", 1, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
       {" url(a.png)", 1, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
       {"\302\240url(a.png)", 2, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      /* CSS has no template literal and juxtaposes its tokens, so a quote
+         before url() is a boundary there and a name byte in code */
+      {"content:\"x\"url(a.png)", 11, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      {"`url('${t}')`", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      /* .url() is a method call, and has its own row the way .href has */
+      {"o.url(\"/t/x.gif\")", 1, HTS_FALSE, HTS_FALSE, HTS_TRUE, 6, 8},
+      {"o.myurl(\"/t/x\")", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      {"content:'x'url(a.png)", 11, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      {"'url('a.gif')", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      {"\"url(\"a.gif\")", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      {"a_url(\"a.gif\")", 2, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      /* a name ends on any Unicode space, not only the three once spelled */
+      {"\343\200\200url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      {"\342\200\257url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      {"\357\273\277url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      {"\240url(a.png)", 1, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      {"\341\232\200url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      {"\342\201\237url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      {"\342\200\251url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      /* U+2000..200A are spaces and U+200B is not, so both ends are pinned */
+      {"\342\200\200url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      {"\342\200\212url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      {"\342\200\213url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_FALSE, 0, 0},
+      /* a zero-width joiner is part of a name, so it glues */
+      {"\342\200\214url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_FALSE, 0, 0},
       /* JavaScript's new URL(x) takes the same token, quoted */
       {"new URL(\"a.gif\")", 4, HTS_FALSE, HTS_FALSE, HTS_TRUE, 5, 5},
       /* an operand holding code is not a URL */
