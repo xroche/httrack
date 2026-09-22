@@ -12,7 +12,10 @@ set -euo pipefail
 # Unset means no automake run (the Windows job runs the scripts directly), so
 # there is nothing configured to inspect.
 [ -n "${abs_top_builddir:-}" ] || skip "abs_top_builddir unset, no automake environment"
-[ -n "${FORTIFY_SOURCE_LEVEL:-}" ] || skip "configure added no -D_FORTIFY_SOURCE"
+# No gate on FORTIFY_SOURCE_LEVEL: Ubuntu's gcc predefines _FORTIFY_SOURCE, so
+# configure correctly adds nothing and leaves the level empty while the calls
+# are checked all the same. The two controls below decide instead, and they ask
+# what the build actually compiles rather than where the define came from.
 
 nm=${NM:-nm}
 command -v "$nm" >/dev/null 2>&1 || skip "no nm ($nm)"
@@ -64,7 +67,7 @@ compile "$tmp/clean.o" -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0
 dirty=$(n_chk "$tmp/dirty.o")
 clean=$(n_chk "$tmp/clean.o")
 [ "$dirty" -gt 0 ] ||
-    skip "${CC:-cc} does not fortify at level $FORTIFY_SOURCE_LEVEL, nothing to assert"
+    skip "${CC:-cc} fortifies nothing with the build's flags, so there is nothing to assert"
 [ "$clean" -eq 0 ] ||
     skip "the unfortified control shows $clean checked symbol(s) here, so counting them cannot discriminate"
 
@@ -78,6 +81,7 @@ for f in "${HTTRACK_BIN:-}" "${HTTRACK_SHLIB:-}" "${HTTRACK_SHLIB%.so}.dylib"; d
 done
 [ "${#artifacts[@]}" -gt 0 ] || skip "no built binary to inspect"
 
+echo "fortification level: ${FORTIFY_SOURCE_LEVEL:-set by the compiler, not by configure}"
 for f in "${artifacts[@]}"; do
     echo "$(basename "$f"): $(n_chk "$f") checked libc import(s)"
 done
@@ -88,6 +92,6 @@ done
 # Spelled out because macOS runs the suite under bash 3.2, which has no [-1].
 subject=${artifacts[${#artifacts[@]} - 1]}
 [ "$(n_chk "$subject")" -gt 0 ] ||
-    fail "$subject imports no __*_chk, so -D_FORTIFY_SOURCE=$FORTIFY_SOURCE_LEVEL bought nothing"
+    fail "$subject imports no __*_chk, so the build's fortification did not reach it"
 
 exit 0
