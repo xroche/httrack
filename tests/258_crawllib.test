@@ -304,34 +304,36 @@ write_lock_request "${tmpdir}/out" hts-stop.lock $$' \
     'which is still there, after 30 tries'
 ok "a refusal that outlasts the retries is reported, not blamed on a removal"
 
-# drvfs can refuse a write that landed all the same (#1680), which is why the
-# request is staged under a name the engine never reads: the staging file is
-# moved into place rather than written again, so the engine is never asked
-# twice (#1712). A read-only file is the nearest local shape.
+# A read-only file is the nearest local shape for the drvfs write that is
+# refused and lands all the same (#1680), so root cannot run either case.
 if test "$(id -u)" -eq 0; then
-    ok "SKIP the refused-but-landed case, root writes a read-only file regardless"
+    ok "SKIP the refused-but-landed pair, root writes a read-only file regardless"
 else
+    # The marker is what tells a move from a rewrite: a helper that dropped the
+    # staging file and wrote the request again leaves an empty one.
     holds 'mkdir -p "${tmpdir}/out"
 touch -t 200001010000 "${tmpdir}/out/hts-in_progress.lock"
-: >"${tmpdir}/out/hts-stop.lock.staged"
+printf came-from-staging >"${tmpdir}/out/hts-stop.lock.staged"
 chmod 0444 "${tmpdir}/out/hts-stop.lock.staged"
 write_lock_request "${tmpdir}/out" hts-stop.lock $$
-test -f "${tmpdir}/out/hts-stop.lock"
-test ! -e "${tmpdir}/out/hts-stop.lock.staged"'
+test ! -e "${tmpdir}/out/hts-stop.lock.staged"
+assert_eq came-from-staging "$(cat "${tmpdir}/out/hts-stop.lock")" "the request left behind"'
     assert_eq "" "$out" "what the helper printed"
     ok "a refused write that landed is moved into place, not written again"
-fi
 
-# The engine ignores a request no newer than its own progress lock, so a copy
-# an earlier run left behind has to be replaced rather than left alone. That
-# staleness is the edge 436's third arm sits on.
-holds 'mkdir -p "${tmpdir}/out"
+    # The engine ignores a request no newer than its own progress lock, so a
+    # copy an earlier run left behind has to be replaced. Read-only, or a plain
+    # truncate replaces it too and the case says nothing about the move.
+    holds 'mkdir -p "${tmpdir}/out"
 touch -t 200001010000 "${tmpdir}/out/hts-in_progress.lock"
+: >"${tmpdir}/out/hts-stop.lock"
 touch -t 200001010000 "${tmpdir}/out/hts-stop.lock"
+chmod 0444 "${tmpdir}/out/hts-stop.lock"
 write_lock_request "${tmpdir}/out" hts-stop.lock $$
 test "$(mtime "${tmpdir}/out/hts-stop.lock")" -gt \
     "$(mtime "${tmpdir}/out/hts-in_progress.lock")"'
-ok "a request an earlier run left behind is replaced by one aimed at this run"
+    ok "a request an earlier run left behind is replaced by one aimed at this run"
+fi
 
 # The retry may not wait out a removal. This directory goes while the loop runs
 # and comes back before the loop would end. It goes by rename, because drvfs can

@@ -217,9 +217,6 @@ assert_lockrule_selftest() {
     echo "OK (${coverage#*: }, ${subsecond#*request: })"
 }
 
-# Did a request the engine will take reach DIR? It takes one stamped after its
-# own hts-in_progress.lock.
-
 # Ask a running engine for something by dropping NAME in its output directory.
 # A bare redirect there reports ENOENT for three reasons a caller cannot separate.
 write_lock_request() { # write_lock_request DIR NAME PID
@@ -230,16 +227,15 @@ write_lock_request() { # write_lock_request DIR NAME PID
     # window would be waited out instead of named, so each failure re-reads the
     # path.
     #
-    # drvfs can also refuse a write that landed all the same, and a second
-    # request asks the engine twice (#1712). So the request is written under a
-    # name the engine never reads, then moved into place, and the staging file
-    # going away is what says the move happened. Asking whether the request is
-    # there cannot say it: the engine may have taken and deleted it already.
+    # drvfs can also refuse a write that landed, and a second request asks the
+    # engine twice (#1712). The staging file going away says the move happened.
+    # Asking for the request cannot say it, because the engine may already have
+    # taken it.
     for try in $(seq 1 "$max_tries"); do
         test "$try" -eq 1 || sleep 0.1
         # The shell reports a failing redirect before it applies the 2>/dev/null
         # beside it (#1637).
-        if { : >"$staged"; } 2>/dev/null; then
+        if { : >"$staged"; } 2>/dev/null || test -f "$staged"; then
             # mv puts the staged file INSIDE a directory sitting where the
             # request goes, so that refusal is left to the retry.
             if test ! -d "${dir}/${name}"; then
@@ -264,7 +260,6 @@ write_lock_request() { # write_lock_request DIR NAME PID
             }
         fi
     done
-    rm -f "$staged" 2>/dev/null || true
     # It walks up because the path crosses the driver's TMPDIR, the test's
     # mktemp directory and the crawl output (#1639). The last two arms only
     # bound it, since a relative path ends at the cwd and an absolute one at the
