@@ -728,15 +728,17 @@ target_is_windows() {
     test "$IS_WINDOWS" = yes
 }
 
-# The engine binary a test can inspect, empty when the build has none. A shared
-# tree keeps the real one under libtool's object dir and only a wrapper script
-# beside it, and a --disable-shared tree has no object dir at all (#1744).
+# The engine binary to inspect, empty when there is none. A shared tree puts the
+# real one under libtool's object dir and a wrapper script at the plain path, so
+# the shebang check rejects the wrapper the way 215 does (#1744).
 engine_binary() {
-    if [ -n "${HTTRACK_BIN:-}" ] && [ -f "${HTTRACK_BIN}" ]; then
-        printf '%s\n' "$HTTRACK_BIN"
-    elif [ -n "${HTTRACK_BIN_STATIC:-}" ] && [ -f "${HTTRACK_BIN_STATIC}" ]; then
-        printf '%s\n' "$HTTRACK_BIN_STATIC"
-    fi
+    local f
+    for f in "${HTTRACK_BIN:-}" "${HTTRACK_BIN_STATIC:-}"; do
+        if [ -n "$f" ] && [ -f "$f" ] && [ "$(head -c 2 "$f")" != '#!' ]; then
+            printf '%s\n' "$f"
+            return
+        fi
+    done
 }
 
 # Is this shell MSYS/Git Bash? Ask only about the shell's own quirks, its broken
