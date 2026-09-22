@@ -23,7 +23,7 @@ esac
 # A sweep whose corpus collapses still prints OK, so floor it at the real count.
 swept=${out#*OK (}
 swept=${swept%% *}
-test "$swept" -ge 2116861 || {
-    echo "expected at least 2116861 cases swept, got: $out" >&2
+test "$swept" -ge 2116864 || {
+    echo "expected at least 2116864 cases swept, got: $out" >&2
     exit 1
 }

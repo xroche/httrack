@@ -677,6 +677,7 @@ int parse_selftest_jsscan(httrackp *opt, hts_boolean dump) {
       {"\240url(a.png)", 1, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
       {"\341\232\200url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
       {"\342\201\237url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      {"\342\200\250url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
       {"\342\200\251url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
       /* U+2000..200A are spaces and U+200B is not, so both ends are pinned */
       {"\342\200\200url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
