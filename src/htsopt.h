@@ -610,8 +610,8 @@ struct httrackp {
                                         the end so -B is discoverable. Live
                                         state, so copy_htsopt must leave it
                                         alone. Tail: ABI */
-  int max_retry_after; /**< longest Retry-After obeyed, seconds; 0 retries with
-                            no wait (--max-retry-after). Tail: ABI */
+  int max_retry_after; /**< longest Retry-After obeyed, in seconds. 0 retries
+                            with no wait (--max-retry-after). Tail: ABI */
 };
 
 /* Running statistics for a mirror. */
@@ -751,7 +751,7 @@ struct htsblk {
   /** notmodified came from an engine hack, not a server 304 (#839).
       Tail: ABI */
   hts_boolean warc_forced_notmodified;
-  /** Retry-After in seconds, uncapped; -1 when the header named nothing
+  /** Retry-After in seconds, uncapped. -1 when the header named nothing
       usable, which is what tells a retryable 503 from a fatal one.
       Tail: ABI */
   int retry_after;

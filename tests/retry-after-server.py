@@ -15,10 +15,11 @@ CASES = {
     "rate": (429, "1"),
     "rate-nodelay": (429, None),
     "busy": (503, "1"),
-    "down": (503, None),
+    "busy-nodelay": (503, None),
+    "busy-date": (503, "DATE"),
+    "busy-junk": (503, "soon"),
     "boom": (500, None),
     "huge": (429, "100000"),
-    "datefmt": (429, "DATE"),
     "ok": (200, None),
 }
 
@@ -40,7 +41,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = self.path.split("?")[0]
         with lock:
-            print("HIT %s" % path, flush=True)
+            print("HIT %s %s" % (self.command, path), flush=True)
         if path in ("/", "/index.html"):
             return self.reply(200, INDEX)
         name = path.strip("/")
@@ -62,7 +63,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/html")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
-        self.wfile.write(body)
+        if self.command != "HEAD":
+            self.wfile.write(body)
 
 
 class Server(ThreadingHTTPServer):

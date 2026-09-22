@@ -4123,7 +4123,7 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
       case 504:
         can_retry = 1;
         break;
-      case 429: // rate limited: always worth another try, after a wait
+      case 429: // rate limited, so retry once the wait below is up
         can_retry = 1;
         break;
       case 503:
@@ -4210,8 +4210,8 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
           }
 
         } else { // retry, or a refused-resume restart
-          /* The gate is global, so the links already queued to that host wait
-             too rather than each earning its own 429 */
+          /* The gate is global, so the links already queued wait too rather
+             than each earning its own 429 */
           if (r->retry_after >= 0) {
             back_set_retry_after(sback, opt, r->retry_after);
           }

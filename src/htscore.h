@@ -559,8 +559,8 @@ hts_boolean hts_wait_available_socket(struct_back *sback, httrackp *opt,
    timestamp seed so it is stable within one gap and rerolls per launch. */
 int hts_pause_target_ms(TStamp seed, int min_ms, int max_ms);
 
-/* Withhold every new launch for `seconds`, clipped to opt->max_retry_after;
-   an already longer hold is kept. */
+/* Withhold every new launch for `seconds`, clipped to opt->max_retry_after.
+   A hold already running further out is kept. */
 void back_set_retry_after(struct_back *sback, httrackp *opt, int seconds);
 
 /* Schedule more links from the heap into free slots. Returns the number queued,

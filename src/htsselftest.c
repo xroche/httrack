@@ -2852,6 +2852,71 @@ static int st_random(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* The launch gate: a hold withholds launches, the cap decides how long, and a
+   stop outranks both. 77 to skip when no slot table could be allocated. */
+static int st_retryafter_gate(httrackp *opt) {
+  struct_back *sback = back_new(opt, 1);
+  const hts_log_type quiet = opt->debug;
+  int err = 0;
+
+  if (sback == NULL) {
+    printf("retry-after: SKIP (no slot table)\n");
+    return 77;
+  }
+  /* the arming below logs, and the test driver exact-matches the output */
+  opt->debug = LOG_PANIC;
+  opt->maxsoc = 4;
+  opt->maxconn = 0;
+  opt->pause_max_ms = 0;
+  opt->max_retry_after = 60;
+  opt->state.stop = 0;
+
+#define GATE_CHECK(cond)                                                       \
+  do {                                                                         \
+    if (!(cond)) {                                                             \
+      printf("retry-after: FAIL line %d: %s\n", __LINE__, #cond);              \
+      err = 1;                                                                 \
+    }                                                                          \
+  } while (0)
+
+  GATE_CHECK(back_pluggable_sockets_strict(sback, opt) > 0);
+
+  back_set_retry_after(sback, opt, 30);
+  GATE_CHECK(sback->retry_after_until != 0);
+  GATE_CHECK(back_pluggable_sockets_strict(sback, opt) == 0);
+
+  /* a shorter delay must not cut a hold already running */
+  {
+    const TStamp held = sback->retry_after_until;
+
+    back_set_retry_after(sback, opt, 1);
+    GATE_CHECK(sback->retry_after_until == held);
+  }
+
+  /* the cap, not the server, decides: 100000s clips to opt->max_retry_after */
+  GATE_CHECK(sback->retry_after_until - mtime_local() <= 60 * 1000);
+  back_set_retry_after(sback, opt, 100000);
+  GATE_CHECK(sback->retry_after_until - mtime_local() <= 60 * 1000);
+
+  /* a stop outranks the hold, or the user's Ctrl-C waits out the delay */
+  opt->state.stop = 1;
+  GATE_CHECK(back_pluggable_sockets_strict(sback, opt) > 0);
+  opt->state.stop = 0;
+  GATE_CHECK(back_pluggable_sockets_strict(sback, opt) == 0);
+
+  /* a cap of zero waives the wait entirely */
+  sback->retry_after_until = 0;
+  opt->max_retry_after = 0;
+  back_set_retry_after(sback, opt, 30);
+  GATE_CHECK(sback->retry_after_until == 0);
+  GATE_CHECK(back_pluggable_sockets_strict(sback, opt) > 0);
+
+#undef GATE_CHECK
+  opt->debug = quiet;
+  back_free(&sback);
+  return err;
+}
+
 static int st_retryafter(httrackp *opt, int argc, char **argv) {
   /* 1994-11-06 08:49:37 GMT, the RFC's own example date */
   const time_t ref = (time_t) 784111777;
@@ -2886,7 +2951,6 @@ static int st_retryafter(httrackp *opt, int argc, char **argv) {
       {"1.5", -1},
   };
 
-  (void) opt;
   (void) argc;
   (void) argv;
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
@@ -2900,6 +2964,13 @@ static int st_retryafter(httrackp *opt, int argc, char **argv) {
   }
   if (hts_parse_retry_after(NULL, ref) != -1)
     err = 1;
+  {
+    const int gate = st_retryafter_gate(opt);
+
+    if (gate == 77)
+      return 77;
+    err |= gate;
+  }
   printf("retry-after: %s\n", err ? "FAIL" : "OK");
   return err;
 }

@@ -3806,9 +3806,12 @@ void back_set_retry_after(struct_back *sback, httrackp *opt, int seconds) {
 
 int back_pluggable_sockets_strict(struct_back * sback, httrackp * opt) {
   int n = opt->maxsoc - back_nsoc(sback);
+  /* A stop outranks the delays below, which would otherwise swallow the user's
+     Ctrl-C for as long as the server or --pause asked us to wait. */
+  const hts_boolean may_wait = !opt->state.stop;
 
   // Retry-After: withhold launches until the delay the server asked for is up
-  if (n > 0 && sback->retry_after_until > 0) {
+  if (n > 0 && may_wait && sback->retry_after_until > 0) {
     if (mtime_local() < sback->retry_after_until)
       return 0;
     sback->retry_after_until = 0;
@@ -3832,7 +3835,7 @@ int back_pluggable_sockets_strict(struct_back * sback, httrackp * opt) {
   }
 
   // #185 randomized inter-file pause: non-blocking, one launch per gap
-  if (n > 0 && opt->pause_max_ms > 0 && HTS_STAT.last_connect > 0) {
+  if (n > 0 && may_wait && opt->pause_max_ms > 0 && HTS_STAT.last_connect > 0) {
     TStamp opTime =
         HTS_STAT.last_request ? HTS_STAT.last_request : HTS_STAT.last_connect;
     TStamp lap = mtime_local() - opTime;

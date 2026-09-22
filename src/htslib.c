@@ -1731,7 +1731,7 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
     }
   } else if ((p = strfield(rcvd, "Retry-After:")) != 0) {
     if (retour) {
-      /* no opt here, so the cap is applied by the caller that has one */
+      /* uncapped: treathead() has no opt, so the caller clips it */
       retour->retry_after = hts_parse_retry_after(rcvd + p, time(NULL));
     }
   } else if ((p = strfield(rcvd, "Location:")) != 0) {
@@ -2906,8 +2906,8 @@ int set_filetime(const char *file, struct tm *tm_time) {
   return -1;
 }
 
-/* Both Retry-After forms (RFC 9110 10.2.3). -1 rather than 0 for an unusable
-   value, so a caller can tell it from a server that named zero. */
+/* Both Retry-After forms (RFC 9110 10.2.3). An unusable value gives -1 rather
+   than 0, so a caller can tell it from a server that named zero. */
 int hts_parse_retry_after(const char *value, time_t now) {
   const char *p = value;
   const char *end;

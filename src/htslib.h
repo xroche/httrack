@@ -241,8 +241,8 @@ hts_boolean hts_file_backdate(const char *file, int seconds);
 // initialize an htsblk structure
 void hts_init_htsblk(htsblk * r);
 
-/* Seconds to wait from a Retry-After value, -1 if it names no usable delay;
-   `now` dates the HTTP-date form. Uncapped: the caller clips it. */
+/* How many seconds should we wait, given a Retry-After value? -1 when it names
+   no usable delay. `now` dates the HTTP-date form, and the caller caps. */
 int hts_parse_retry_after(const char *value, time_t now);
 
 // attach specific project log to hachtable logger

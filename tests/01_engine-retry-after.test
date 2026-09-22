@@ -1,18 +1,12 @@
 #!/bin/bash
 #
-# The Retry-After parser (#1738): both RFC 9110 forms, a delay clipped instead
-# of wrapped, and -1 for a header that names nothing usable. That -1 is what
-# keeps a 503 with no Retry-After fatal, so it is graded, not incidental.
+# The Retry-After parser and the launch gate it arms (#1738): both RFC 9110
+# forms, a delay clipped instead of wrapped, -1 for a header naming nothing
+# usable, and a stop request outranking a hold.
 
 set -eu
 
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-# 'run' is an ignored placeholder argument.
-out=$(httrack -#test=retry-after run)
-
-test "$out" = "retry-after: OK" || {
-    echo "expected 'retry-after: OK', got: $out" >&2
-    exit 1
-}
+assert_selftest "retry-after: OK" retry-after
