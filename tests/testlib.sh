@@ -728,6 +728,19 @@ target_is_windows() {
     test "$IS_WINDOWS" = yes
 }
 
+# The engine binary to inspect, empty when there is none. A shared tree puts the
+# real one under libtool's object dir and a wrapper script at the plain path, so
+# the shebang check rejects the wrapper the way 215 does (#1744).
+engine_binary() {
+    local f
+    for f in "${HTTRACK_BIN:-}" "${HTTRACK_BIN_STATIC:-}"; do
+        if [ -n "$f" ] && [ -f "$f" ] && [ "$(head -c 2 "$f")" != '#!' ]; then
+            printf '%s\n' "$f"
+            return
+        fi
+    done
+}
+
 # Is this shell MSYS/Git Bash? Ask only about the shell's own quirks, its broken
 # job control above all. A question about the binary wants target_is_windows.
 shell_is_msys() { test "$(suite_backend)" = msys; }

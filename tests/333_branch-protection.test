@@ -24,7 +24,7 @@ command -v "${cc_argv[0]}" >/dev/null 2>&1 || skip "no C compiler (${cc_argv[0]}
 
 # The library holds the engine; a static build has none, so take the binary then.
 subject=''
-for f in "${HTTRACK_SHLIB:-}" "${HTTRACK_BIN:-}"; do
+for f in "${HTTRACK_SHLIB:-}" "$(engine_binary)"; do
     if [ -n "$f" ] && [ -f "$f" ]; then
         subject=$f
         break

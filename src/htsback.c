@@ -4628,6 +4628,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     back[i].chunk_size = 0;
                     back[i].r.statuscode = STATUSCODE_INVALID;
                     back[i].r.msg[0] = '\0';
+                    /* the interim block is not the final response's headers */
+                    freet(back[i].r.headers);
                     hts_log_print(opt, LOG_DEBUG,
                                   "Status 100 detected for %s%s, continuing headers",
                                   back[i].url_adr, back[i].url_fil);
