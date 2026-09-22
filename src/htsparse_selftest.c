@@ -509,7 +509,10 @@ matched:
     return HTS_FALSE;
 
   /* a leading ',' or ';' says this is code, a quote or a control byte says the
-     operand never was one string, and "${" says it is interpolated */
+     operand never was one string, and "${" says it is interpolated.
+     Near-verbatim with the engine's loop on purpose. The sweep compares the
+     two, so an edit to both would agree; what catches that is cases[] and the
+     crawl in test 490, which never consult this model. */
   for (n = 0, i = 0; i < (size_t) len; i++) {
     if (a[i] == '$' && i + 1 < (size_t) len && a[i + 1] == '{') {
       return HTS_FALSE;
