@@ -12,10 +12,8 @@ set -euo pipefail
 # Unset means no automake run (the Windows job runs the scripts directly), so
 # there is nothing configured to inspect.
 [ -n "${abs_top_builddir:-}" ] || skip "abs_top_builddir unset, no automake environment"
-# No gate on FORTIFY_SOURCE_LEVEL: Ubuntu's gcc predefines _FORTIFY_SOURCE, so
-# configure correctly adds nothing and leaves the level empty while the calls
-# are checked all the same. The two controls below decide instead, and they ask
-# what the build actually compiles rather than where the define came from.
+# Ubuntu's gcc predefines _FORTIFY_SOURCE, so configure adds no define and
+# FORTIFY_SOURCE_LEVEL stays empty. The controls below decide instead.
 
 nm=${NM:-nm}
 command -v "$nm" >/dev/null 2>&1 || skip "no nm ($nm)"
