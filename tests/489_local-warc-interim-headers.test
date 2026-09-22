@@ -1,0 +1,20 @@
+#!/bin/bash
+#
+# A 100 Continue is not the response it precedes. When the reply that follows it
+# carries no headers of its own (the "bogus server" branch), the engine used to
+# archive the interim block, so the WARC record described a 100 Continue with a
+# body (#1740). /warc100/plain.html is that same reply without the 100 and the
+# two records must read alike; /warc100/normal.html is a 100 ahead of a real
+# response, whose own headers the record must still keep.
+
+set -eu
+
+: "${top_srcdir:=..}"
+
+export WARC_VALIDATE_RESPHDR="interim.html=unknown/unknown plain.html=unknown/unknown normal.html=X-Final-Header"
+export WARC_VALIDATE_NO_RESPHDR="interim.html=X-Interim-Header interim.html=Continue normal.html=X-Interim-Header"
+
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --warc-validate \
+    --found 'warc100/interim.html' --found 'warc100/plain.html' \
+    --found 'warc100/normal.html' \
+    httrack 'BASEURL/warc100/index.html' --warc-file warc-out

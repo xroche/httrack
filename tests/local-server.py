@@ -3580,8 +3580,64 @@ class Handler(SimpleHTTPRequestHandler):
             ).encode()
         self.send_raw(body, "text/html")
 
+    # --- a 100 Continue ahead of a header-less response (#1740) -------------
+    # The interim block is not the final response's headers, so the WARC record
+    # must carry what /warc100/plain.html (the same reply, no 100) produces.
+    WARC100_INTERIM_BODY = b"<html><body><p>WARC100-INTERIM</p></body></html>\r\n\r\n"
+    WARC100_PLAIN_BODY = b"<html><body><p>WARC100-PLAIN</p></body></html>\r\n\r\n"
+
+    def send_bare_body(self, body, interim=False):
+        """HTTP/0.9-style reply: no status line and no headers, end-of-body is
+        the close. httrack takes its "bogus server" branch on the leading '<'."""
+        self.close_connection = True
+        try:
+            if interim:
+                self.wfile.write(
+                    b"HTTP/1.1 100 Continue\r\nX-Interim-Header: yes\r\n\r\n"
+                )
+                self.wfile.flush()
+            self.wfile.write(body)
+            self.wfile.flush()
+            self.connection.shutdown(socket.SHUT_WR)  # end-of-body, not a reset
+        except OSError:
+            pass
+
+    def route_warc100_index(self):
+        self.send_html(
+            '\t<a href="interim.html">interim</a>\n'
+            '\t<a href="plain.html">plain</a>\n'
+            '\t<a href="normal.html">normal</a>\n'
+        )
+
+    def route_warc100_interim(self):
+        self.send_bare_body(self.WARC100_INTERIM_BODY, interim=True)
+
+    def route_warc100_plain(self):
+        self.send_bare_body(self.WARC100_PLAIN_BODY)
+
+    def route_warc100_normal(self):
+        """A 100 ahead of a real response: the record keeps the real headers."""
+        body = b"<html><body><p>WARC100-NORMAL</p></body></html>\r\n"
+        self.close_connection = True
+        try:
+            self.wfile.write(b"HTTP/1.1 100 Continue\r\nX-Interim-Header: yes\r\n\r\n")
+            self.wfile.flush()
+            self.wfile.write(
+                b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n"
+                b"X-Final-Header: yes\r\nConnection: close\r\n"
+                b"Content-Length: %d\r\n\r\n" % len(body)
+            )
+            self.wfile.write(body)
+            self.wfile.flush()
+        except OSError:
+            pass
+
     ROUTES = {
         "/sfmark.html": route_singlefile_mark,
+        "/warc100/index.html": route_warc100_index,
+        "/warc100/interim.html": route_warc100_interim,
+        "/warc100/plain.html": route_warc100_plain,
+        "/warc100/normal.html": route_warc100_normal,
         "/cookies/entrance.php": route_entrance,
         "/cookies/second.php": route_second,
         "/cookies/third.php": route_third,
