@@ -320,7 +320,8 @@ typedef enum {
   JSGUARD_NONE = 0,
   JSGUARD_TAG_QUOTE, /* the quote the enclosing attribute is written with */
   JSGUARD_SPACE_BEFORE,
-  JSGUARD_NO_IDENT_BYTE, /* nothing JavaScript allows inside a name */
+  JSGUARD_NO_IDENT_BYTE,  /* nothing JavaScript allows inside a name */
+  JSGUARD_NO_IDENT_QUOTE, /* nor a quote, which ends a string */
   JSGUARD_SPACE_AFTER
 } jsscan_guard;
 
@@ -346,7 +347,7 @@ static const struct jsscan_word {
     {".url", '(', ")", HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_NONE},
     {"url", '(', ")", HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_NO_IDENT_BYTE},
     {"import", 0, NULL, HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_SPACE_AFTER},
-    {"from", 0, NULL, HTS_FALSE, HTS_FALSE, HTS_TRUE, JSGUARD_NO_IDENT_BYTE},
+    {"from", 0, NULL, HTS_FALSE, HTS_FALSE, HTS_TRUE, JSGUARD_NO_IDENT_QUOTE},
 };
 
 /* The code point ending at cursor[-1], or the byte itself where no UTF-8 lead
@@ -412,7 +413,16 @@ static hts_boolean jsscan_model(httrackp *opt, const char *cursor,
          itself is pinned by cases[] below, never by the sweep. */
       if (isalnum((unsigned char) prev) || prev == '_' || prev == '$' ||
           prev == '.' ||
-          (!in_css && (prev == '"' || prev == '\'' || prev == '`')) ||
+          ((unsigned char) prev >= 0x80 &&
+           !js_space_codepoint(model_prev_codepoint(cursor, buffer))))
+        continue;
+      break;
+    case JSGUARD_NO_IDENT_QUOTE:
+      if (prev == '"' || prev == '\'' || prev == '`')
+        continue;
+      /* FALLTHROUGH to the identifier test */
+      if (isalnum((unsigned char) prev) || prev == '_' || prev == '$' ||
+          prev == '.' ||
           ((unsigned char) prev >= 0x80 &&
            !js_space_codepoint(model_prev_codepoint(cursor, buffer))))
         continue;
@@ -498,10 +508,12 @@ matched:
       strfield(a, "https:") == 0 && strfield(a, "ftp:") == 0)
     return HTS_FALSE;
 
-  /* a leading ',' or ';' says this is code, and a quote or a control byte says
-     the operand never was one string */
+  /* a leading ',' or ';' says this is code, a quote or a control byte says the
+     operand never was one string, and "${" says it is interpolated */
   for (n = 0, i = 0; i < (size_t) len; i++) {
-    if (a[i] == ',' || a[i] == ';') {
+    if (a[i] == '$' && i + 1 < (size_t) len && a[i + 1] == '{') {
+      return HTS_FALSE;
+    } else if (a[i] == ',' || a[i] == ';') {
       if (n == 0)
         return HTS_FALSE;
     } else if (a[i] == '"' || a[i] == '\'' || a[i] == '\t' || a[i] == '\r' ||
@@ -648,12 +660,15 @@ int parse_selftest_jsscan(httrackp *opt, hts_boolean dump) {
          before url() is a boundary there and a name byte in code */
       {"content:\"x\"url(a.png)", 11, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
       {"`url('${t}')`", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      {"`url('/r/r1')`", 1, HTS_FALSE, HTS_FALSE, HTS_TRUE, 5, 5},
+      {"`url('/a/${t}.png')`", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
       /* .url() is a method call, and has its own row the way .href has */
       {"o.url(\"/t/x.gif\")", 1, HTS_FALSE, HTS_FALSE, HTS_TRUE, 6, 8},
       {"o.myurl(\"/t/x\")", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
       {"content:'x'url(a.png)", 11, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
-      {"'url('a.gif')", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
-      {"\"url(\"a.gif\")", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      /* a quote ends a string, so the url() right after one is real */
+      {"'url('a.gif')", 1, HTS_FALSE, HTS_FALSE, HTS_TRUE, 5, 5},
+      {"\"url(\"a.gif\")", 1, HTS_FALSE, HTS_FALSE, HTS_TRUE, 5, 5},
       {"a_url(\"a.gif\")", 2, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
       /* a name ends on any Unicode space, not only the three once spelled */
       {"\343\200\200url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
