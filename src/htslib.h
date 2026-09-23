@@ -496,18 +496,31 @@ void fprintfio(FILE * fp, const char *buff, const char *prefix);
 
 void socket_set_nosigpipe(T_SOC soc);
 
+/* Multipath TCP (RFC 8684) opens as a protocol on an ordinary stream socket.
+   configure decides this; a build without it, such as MSVC, has none. macOS
+   needs connectx() on an AF_MULTIPATH socket, which is not wired here. */
+#if !defined(HTS_INET_MPTCP) || defined(_WIN32)
+#undef HTS_INET_MPTCP
+#define HTS_INET_MPTCP 0
+#endif
+
 /* Create a stream socket for an outgoing connection, with SIGPIPE disarmed.
    Uses Multipath TCP when `opt` asks for it and the system has it, and plain
    TCP otherwise. Returns INVALID_SOCKET when no socket could be created. */
-T_SOC hts_socket_client(int family, httrackp *opt);
+T_SOC hts_socket_client(int family, const httrackp *opt);
 
 /* Can this build, on this system, open a Multipath TCP socket at all? */
 hts_boolean hts_mptcp_available(void);
 
+/* Can this build tell a negotiated connection from a fallen-back one? */
+hts_boolean hts_mptcp_reports(void);
+
 /* Did Multipath TCP survive this established connection's handshake? */
 hts_boolean hts_socket_is_mptcp(T_SOC soc);
 
-/* Count an established connection as MPTCP or as fallen back to TCP. */
+/* Count an established connection as MPTCP or as fallen back to TCP. Counts
+   nothing when this run did not ask for MPTCP, and covers the HTTP backend
+   only, because an FTP socket is established on its own worker thread. */
 void hts_mptcp_account(httrackp *opt, T_SOC soc);
 
 /* Windows raises no SIGPIPE. Elsewhere this arm is Darwin, which has no

@@ -31,7 +31,7 @@ for entry in "${srcdir}"/*; do
 done
 test -r "${shadow}/configure" || fail "the shadow source tree has no configure"
 
-features="brotli zstd backtrace iconv"
+features="brotli zstd backtrace iconv mptcp"
 
 # The "checking whether to ..." text configure prints for a feature.
 feature_line() { # feature_line NAME
@@ -40,6 +40,7 @@ feature_line() { # feature_line NAME
     zstd) echo "whether to enable the zstd content coding" ;;
     backtrace) echo "whether to enable symbolic crash traces" ;;
     iconv) echo "whether to convert charsets with iconv" ;;
+    mptcp) echo "whether to open connections with Multipath TCP" ;;
     *) fail "unknown feature $1" ;;
     esac
 }
@@ -50,6 +51,7 @@ feature_flag() { # feature_flag NAME
     zstd) echo "--with-zstd" ;;
     backtrace) echo "--enable-backtrace" ;;
     iconv) echo "--with-iconv" ;;
+    mptcp) echo "--enable-mptcp" ;;
     *) fail "unknown feature $1" ;;
     esac
 }
@@ -60,6 +62,7 @@ feature_macro() { # feature_macro NAME
     zstd) echo "HTS_USEZSTD" ;;
     backtrace) echo "HAVE_BACKTRACE" ;;
     iconv) echo "HTS_USEICONV" ;;
+    mptcp) echo "HTS_INET_MPTCP" ;;
     esac
 }
 # The link variable src/Makefile substitutes, or "" where it adds none.
@@ -460,93 +463,93 @@ elif test -r "${rules}"; then
     }
     reads "" "the shape debian/rules uses today" <<'MUT'
 build:
-	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv --enable-mptcp
 MUT
     reads zstd "a dropped --with-zstd" <<'MUT'
 build:
-	dh_auto_configure -- --disable-auto-features --with-brotli --enable-backtrace --with-iconv
+	dh_auto_configure -- --disable-auto-features --with-brotli --enable-backtrace --with-iconv --enable-mptcp
 MUT
     reads zstd "--with-zstd=no" <<'MUT'
 build:
-	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd=no --enable-backtrace --with-iconv
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd=no --enable-backtrace --with-iconv --enable-mptcp
 MUT
     reads zstd "--with-zstd='no', which the shell unquotes" <<'MUT'
 build:
-	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd='no' --enable-backtrace --with-iconv
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd='no' --enable-backtrace --with-iconv --enable-mptcp
 MUT
     reads zstd '--with-zstd="no", which the shell unquotes too' <<'MUT'
 build:
-	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd="no" --enable-backtrace --with-iconv
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd="no" --enable-backtrace --with-iconv --enable-mptcp
 MUT
     reads zstd "--with-zstd then --without-zstd, where the last one wins" <<'MUT'
 build:
-	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv --without-zstd
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv --enable-mptcp --without-zstd
 MUT
     reads backtrace "--enable-backtrace then --disable-backtrace" <<'MUT'
 build:
-	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv --disable-backtrace
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv --enable-mptcp --disable-backtrace
 MUT
     reads brotli "--with-brotli then --without-brotli" <<'MUT'
 build:
-	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv --without-brotli
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv --enable-mptcp --without-brotli
 MUT
     reads "" "--without-zstd then --with-zstd, where the last one wins too" <<'MUT'
 build:
-	dh_auto_configure -- --without-zstd --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv
+	dh_auto_configure -- --without-zstd --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv --enable-mptcp
 MUT
     reads zstd "--without-zstd" <<'MUT'
 build:
-	dh_auto_configure -- --disable-auto-features --with-brotli --without-zstd --enable-backtrace --with-iconv
+	dh_auto_configure -- --disable-auto-features --with-brotli --without-zstd --enable-backtrace --with-iconv --enable-mptcp
 MUT
     reads zstd "--with-zstd=auto, which hands the choice back to the buildd" <<'MUT'
 build:
-	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd=auto --enable-backtrace --with-iconv
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd=auto --enable-backtrace --with-iconv --enable-mptcp
 MUT
     reads "" "--with-zstd=DIR, which asks for it at a prefix" <<'MUT'
 build:
-	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd=/opt/zstd --enable-backtrace --with-iconv
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd=/opt/zstd --enable-backtrace --with-iconv --enable-mptcp
 MUT
     reads zstd "a value behind a make variable" <<'MUT'
 WITH_ZSTD = no
 build:
-	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd=$(WITH_ZSTD) --enable-backtrace --with-iconv
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd=$(WITH_ZSTD) --enable-backtrace --with-iconv --enable-mptcp
 MUT
     measured "a comment mid-continuation, which ends the line" <<'MUT'
 build:
 	dh_auto_configure -- --disable-auto-features --with-brotli \
 		# --with-zstd \
-		--enable-backtrace --with-iconv
+		--enable-backtrace --with-iconv --enable-mptcp
 MUT
     measured "a backslash make does not read as a continuation" <<'MUT'
 build:
 	dh_auto_configure -- --disable-auto-features --with-brotli \@SP@
-		--with-zstd --enable-backtrace --with-iconv
+		--with-zstd --enable-backtrace --with-iconv --enable-mptcp
 MUT
-    reads "zstd backtrace iconv" "a fallback invocation that never runs" <<'MUT'
+    reads "zstd backtrace iconv mptcp" "a fallback invocation that never runs" <<'MUT'
 build:
 	dh_auto_configure -- --disable-auto-features --with-brotli || \
-		dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv
+		dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv --enable-mptcp
 MUT
-    reads "zstd backtrace iconv" "a second invocation that overrides the first" <<'MUT'
+    reads "zstd backtrace iconv mptcp" "a second invocation that overrides the first" <<'MUT'
 build:
-	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv --enable-mptcp
 	dh_auto_configure -- --disable-auto-features --with-brotli
 MUT
     reads "" "a quoted # in a value, which is not a comment" <<'MUT'
 build:
-	dh_auto_configure -- CPPFLAGS="-DTAG=' #7 '" --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv
+	dh_auto_configure -- CPPFLAGS="-DTAG=' #7 '" --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv --enable-mptcp
 MUT
     reads "" "--enable-auto-features=no, the same switch spelled the other way" <<'MUT'
 build:
-	dh_auto_configure -- --enable-auto-features=no --with-brotli --with-zstd --enable-backtrace --with-iconv
+	dh_auto_configure -- --enable-auto-features=no --with-brotli --with-zstd --enable-backtrace --with-iconv --enable-mptcp
 MUT
     reads no-disable-auto-features "a list that turns neither switch off" <<'MUT'
 build:
-	dh_auto_configure -- --with-brotli --with-zstd --enable-backtrace --with-iconv
+	dh_auto_configure -- --with-brotli --with-zstd --enable-backtrace --with-iconv --enable-mptcp
 MUT
-    reads turns-off:--disable-https "an off switch outside the four features" <<'MUT'
+    reads turns-off:--disable-https "an off switch outside the features" <<'MUT'
 build:
-	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv --disable-https
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv --enable-mptcp --disable-https
 MUT
     reads zstd "a flag behind an architecture conditional" <<'MUT'
 ZSTD = --with-zstd
@@ -554,9 +557,9 @@ ifeq ($(DEB_HOST_ARCH_OS),hurd)
 ZSTD =
 endif
 build:
-	dh_auto_configure -- --disable-auto-features --with-brotli $(ZSTD) --enable-backtrace --with-iconv
+	dh_auto_configure -- --disable-auto-features --with-brotli $(ZSTD) --enable-backtrace --with-iconv --enable-mptcp
 MUT
-    reads "zstd backtrace iconv" "build-arch, which is what a buildd runs" <<'MUT'
+    reads "zstd backtrace iconv mptcp" "build-arch, which is what a buildd runs" <<'MUT'
 build:
 	true
 build-arch:
@@ -564,18 +567,18 @@ build-arch:
 MUT
     reads turns-off:--enable-https=no "an off switch spelled as a value" <<'MUT'
 build:
-	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv --enable-https=no
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv --enable-mptcp --enable-https=no
 MUT
     reads turns-off:--enable-example-libs=no "another feature turned off by value" <<'MUT'
 build:
-	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv --enable-example-libs=no
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv --enable-mptcp --enable-example-libs=no
 MUT
     measured "a configure run that is not dh_auto_configure" <<'MUT'
 build:
-	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv --enable-mptcp
 	./configure --disable-auto-features --with-brotli
 MUT
-    reads "zstd backtrace iconv" "execute_after_dh_auto_configure, which debhelper runs" <<'MUT'
+    reads "zstd backtrace iconv mptcp" "execute_after_dh_auto_configure, which debhelper runs" <<'MUT'
 build:
 	true
 execute_after_dh_auto_configure:
@@ -585,7 +588,7 @@ MUT
 build:
 	dh $@
 override_dh_auto_configure-arch:
-	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv --enable-mptcp
 MUT
     reads no-invocation "a build target that configures nothing" <<'MUT'
 build:
@@ -595,7 +598,7 @@ MUT
 build:
 	dh $@
 override_dh_auto_configure:
-	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv --enable-mptcp
 MUT
     measured "a rules file make cannot run" <<'MUT'
 build:

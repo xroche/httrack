@@ -3613,8 +3613,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             }
             continue; // reconnected (stay connecting) or failed
           }
-          /* Once per connection: a keep-alive slot and the re-entry after a
-             TLS handshake are the same socket coming back through here. */
+          /* A keep-alive slot and the post-TLS re-entry share one socket, so
+             count it once. */
           if (!back[i].r.keep_alive
 #if HTS_USEOPENSSL
               && back[i].r.ssl_con == NULL

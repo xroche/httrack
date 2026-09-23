@@ -61,9 +61,8 @@ Please visit our Website: http://www.httrack.com
 #include <limits.h>
 
 /* MPTCP_INFO tells a negotiated connection from one the kernel fell back to
-   plain TCP. SOL_MPTCP comes from the C library, so an old one costs the
-   reporting, never the feature. */
-#if HTS_INET_MPTCP && defined(HAVE_LINUX_MPTCP_H) && defined(SOL_MPTCP)
+   plain TCP. Without the header the feature still works, unreported. */
+#if HTS_INET_MPTCP && defined(HAVE_LINUX_MPTCP_H)
 #include <linux/mptcp.h>
 #define HTS_INET_MPTCP_INFO 1
 #else
@@ -2284,70 +2283,70 @@ void socket_set_nosigpipe(T_SOC soc) {
 #endif
 }
 
-/* Resolved once, because a kernel that refuses IPPROTO_MPTCP refuses it for
-   every later connection. Probed from hts_init() and from option parsing, both
-   of which run before any crawl thread does. */
-static hts_boolean hts_mptcp_probed = HTS_FALSE;
+/* Resolved by hts_init(), before any crawl thread reads them. */
 static hts_boolean hts_mptcp_usable = HTS_FALSE;
-static hts_boolean hts_mptcp_default = HTS_FALSE;
+static hts_boolean hts_mptcp_on_by_default = HTS_FALSE;
 
 #if HTS_INET_MPTCP
-/* Can we open an MPTCP socket of this family? */
-static hts_boolean hts_mptcp_family_usable(int family) {
-  const T_SOC soc = (T_SOC) socket(family, SOCK_STREAM, IPPROTO_MPTCP);
+/* Read one small integer sysctl, or -1 when the file cannot be read. */
+static long hts_mptcp_sysctl(const char *path) {
+  FILE *fp = fopen(path, "rb");
+  long value = -1;
 
-  if (soc == INVALID_SOCKET)
-    return HTS_FALSE;
-  close(soc);
-  return HTS_TRUE;
+  if (fp == NULL)
+    return -1;
+  if (fscanf(fp, "%ld", &value) != 1)
+    value = -1;
+  fclose(fp);
+  return value;
 }
 
-/* Can the kernel recover on its own from a SYN dropped for carrying the MPTCP
-   option? Without these two it retries with the option until the connect times
-   out, which a middlebox turns into a dead site. */
+/* Can the kernel climb out of a SYN that a middlebox dropped for carrying the
+   MPTCP option? It needs the retry without the option, and blackhole detection
+   left on, or the first connect to every host behind that middlebox waits out
+   the whole timeout. Zero means the detection was turned off, so the file
+   being there is not the answer. */
 static hts_boolean hts_mptcp_kernel_recovers(void) {
-  if (access("/proc/sys/net/mptcp/blackhole_timeout", R_OK) != 0)
+  static const char retrans[] =
+      "/proc/sys/net/mptcp/syn_retrans_before_tcp_fallback";
+
+  if (hts_mptcp_sysctl(retrans) < 0)
     return HTS_FALSE;
-  if (access("/proc/sys/net/mptcp/syn_retrans_before_tcp_fallback", R_OK) != 0)
+  if (hts_mptcp_sysctl("/proc/sys/net/mptcp/blackhole_timeout") <= 0)
     return HTS_FALSE;
   return HTS_TRUE;
 }
 #endif
 
-/* Being able to open an MPTCP socket is not enough to turn it on by default,
-   so the kernel has to be able to climb out of a blackhole as well. */
+/* Being able to open an MPTCP socket is not enough to turn it on by default. */
 static void hts_mptcp_probe(void) {
 #if HTS_INET_MPTCP
-  hts_mptcp_usable = hts_mptcp_family_usable(AF_INET);
-#if HTS_INET6
-  if (!hts_mptcp_usable)
-    hts_mptcp_usable = hts_mptcp_family_usable(AF_INET6);
+  const T_SOC soc = (T_SOC) socket(AF_INET, SOCK_STREAM, IPPROTO_MPTCP);
+
+  if (soc != INVALID_SOCKET) {
+    close(soc);
+    hts_mptcp_usable = HTS_TRUE;
+    hts_mptcp_on_by_default = hts_mptcp_kernel_recovers();
+  }
 #endif
-  if (hts_mptcp_usable)
-    hts_mptcp_default = hts_mptcp_kernel_recovers();
-#endif
-  hts_mptcp_probed = HTS_TRUE;
 }
 
-hts_boolean hts_mptcp_available(void) {
-  if (!hts_mptcp_probed)
-    hts_mptcp_probe();
-  return hts_mptcp_usable;
+hts_boolean hts_mptcp_available(void) { return hts_mptcp_usable; }
+
+hts_boolean hts_mptcp_reports(void) {
+  return HTS_INET_MPTCP_INFO ? HTS_TRUE : HTS_FALSE;
 }
 
-/* Should this connection be opened with MPTCP? Reads the verdict rather than
-   probing for it, because this one runs on the crawl threads. */
-static hts_boolean hts_mptcp_enabled(httrackp *opt) {
-  const hts_tristate wanted = opt != NULL ? opt->mptcp : HTS_DEFAULT;
-
+/* Should this connection be opened with MPTCP? */
+static hts_boolean hts_mptcp_enabled(const httrackp *opt) {
   if (!hts_mptcp_usable)
     return HTS_FALSE;
-  if (wanted == HTS_DEFAULT)
-    return hts_mptcp_default;
-  return wanted == HTS_TRUE ? HTS_TRUE : HTS_FALSE;
+  if (opt->mptcp == HTS_DEFAULT)
+    return hts_mptcp_on_by_default;
+  return opt->mptcp == HTS_TRUE ? HTS_TRUE : HTS_FALSE;
 }
 
-T_SOC hts_socket_client(int family, httrackp *opt) {
+T_SOC hts_socket_client(int family, const httrackp *opt) {
   T_SOC soc = INVALID_SOCKET;
 
 #if HTS_INET_MPTCP
@@ -2382,7 +2381,7 @@ hts_boolean hts_socket_is_mptcp(T_SOC soc) {
 }
 
 void hts_mptcp_account(httrackp *opt, T_SOC soc) {
-  if (opt == NULL || soc == INVALID_SOCKET || !hts_mptcp_enabled(opt))
+  if (!hts_mptcp_enabled(opt))
     return;
   if (hts_socket_is_mptcp(soc))
     opt->mptcp_connections++;

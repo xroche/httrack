@@ -615,11 +615,13 @@ struct httrackp {
   hts_tristate mptcp;  /**< open connections with Multipath TCP (--mptcp).
                             HTS_DEFAULT: on where the kernel recovers from a
                             blackholed SYN by itself. Tail: ABI */
-  int mptcp_connections; /**< connections that negotiated MPTCP. Live state, so
-                              copy_htsopt must leave it alone. Tail: ABI */
-  int mptcp_fallbacks;   /**< connections that asked for MPTCP and were given
-                              plain TCP. Live state, so copy_htsopt must leave it
-                              alone. Tail: ABI */
+  int mptcp_connections; /**< HTTP connections that negotiated MPTCP. FTP opens
+                              its sockets on a worker thread and is left out.
+                              Live state, so copy_htsopt must leave it alone.
+                              Tail: ABI */
+  int mptcp_fallbacks;   /**< HTTP connections that asked for MPTCP and were
+                              given plain TCP. Live state, so copy_htsopt must
+                              leave it alone. Tail: ABI */
 };
 
 /* Running statistics for a mirror. */

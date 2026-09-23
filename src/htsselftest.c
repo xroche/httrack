@@ -1338,8 +1338,9 @@ static int st_features(httrackp *opt, int argc, char **argv) {
 #else
   printf("crashtest 0\n");
 #endif
-  /* Runtime, not build time: the kernel decides whether MPTCP can be opened. */
+  /* The kernel, not the build, decides whether MPTCP can be opened. */
   printf("mptcp %d\n", hts_mptcp_available() ? 1 : 0);
+  printf("mptcpinfo %d\n", hts_mptcp_reports() ? 1 : 0);
   return 0;
 }
 
@@ -16611,7 +16612,7 @@ static int st_usercmdrun(httrackp *opt, int argc, char **argv) {
 // asks the kernel for, and whether a handshake that fell back to plain TCP is
 // counted as a fallback rather than as a multipath connection.
 #if HTS_INET_MPTCP
-/* Loopback listener speaking `proto`, its address written back. */
+/* Open a loopback listener speaking `proto` and write its address back. */
 static T_SOC st_mptcp_listen(int proto, struct sockaddr_in *addr) {
   const T_SOC srv = (T_SOC) socket(AF_INET, SOCK_STREAM, proto);
   socklen_t len = (socklen_t) sizeof(*addr);
@@ -16630,23 +16631,19 @@ static T_SOC st_mptcp_listen(int proto, struct sockaddr_in *addr) {
   return srv;
 }
 
-/* The protocol a socket was created with, or -1 where the system cannot say. */
+/* The protocol a socket was created with. Linux has had SO_PROTOCOL since
+   2.6.32, and this block is Linux-only. */
 static int st_mptcp_protocol(T_SOC soc) {
-#ifdef SO_PROTOCOL
   int proto = -1;
   socklen_t len = (socklen_t) sizeof(proto);
 
   if (getsockopt(soc, SOL_SOCKET, SO_PROTOCOL, (char *) &proto, &len) != 0)
     return -1;
   return proto;
-#else
-  (void) soc;
-  return -1;
-#endif
 }
 
-/* One connection to a listener speaking `server_proto`, run through the
-   accounting the crawler uses. Returns 1 on a setup failure. */
+/* Make one connection to a listener speaking `server_proto` and run it through
+   the accounting the crawler uses. Returns 1 on a setup failure. */
 static int st_mptcp_pair(httrackp *opt, const char *tag, int server_proto,
                          hts_boolean expect_mptcp) {
   struct sockaddr_in addr;
@@ -16699,9 +16696,9 @@ static int st_mptcp(httrackp *opt, int argc, char **argv) {
 
   (void) argc;
   (void) argv;
-  if (!hts_mptcp_available()) {
-    printf("mptcp self-test: SKIP (no Multipath TCP on this system)\n");
-    return 0;
+  if (!hts_mptcp_available() || !hts_mptcp_reports()) {
+    printf("mptcp: SKIP (no Multipath TCP to report on here)\n");
+    return 77;
   }
 
   /* Off means a plain TCP socket, not an MPTCP one that fell back. */
@@ -16736,7 +16733,7 @@ static int st_mptcp(httrackp *opt, int argc, char **argv) {
   } else {
     const int proto = st_mptcp_protocol(soc);
 
-    if (proto != -1 && proto != IPPROTO_MPTCP) {
+    if (proto != IPPROTO_MPTCP) {
       fprintf(stderr,
               "mptcp: the option was on and protocol %d was asked "
               "for\n",
@@ -16748,18 +16745,18 @@ static int st_mptcp(httrackp *opt, int argc, char **argv) {
 
   /* Both directions: a peer that speaks MPTCP, and one that does not. */
   err |= st_mptcp_pair(opt, "mptcp peer", IPPROTO_MPTCP, HTS_TRUE);
-  err |= st_mptcp_pair(opt, "tcp peer", 0, HTS_FALSE);
+  err |= st_mptcp_pair(opt, "tcp peer", IPPROTO_TCP, HTS_FALSE);
 
   opt->mptcp = saved;
   opt->mptcp_connections = opt->mptcp_fallbacks = 0;
-  printf("mptcp self-test: %s\n", err ? "FAIL" : "OK");
+  printf("mptcp: %s\n", err ? "FAIL" : "OK");
   return err;
 #else
   (void) opt;
   (void) argc;
   (void) argv;
-  printf("mptcp self-test: SKIP (not built with Multipath TCP)\n");
-  return 0;
+  printf("mptcp: SKIP (not built with Multipath TCP)\n");
+  return 77;
 #endif
 }
 

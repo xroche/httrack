@@ -2371,8 +2371,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
           opt->transport_failures);
     if (opt->mptcp_connections > 0 || opt->mptcp_fallbacks > 0)
       slcatprintfbuff_clip(finalInfo, sizeof(finalInfo), &finalUsed,
-                           "(Multipath TCP: %d connections negotiated it, %d "
-                           "fell back to TCP)" LF,
+                           "(Multipath TCP: %d HTTP connections negotiated it, "
+                           "%d fell back to TCP)" LF,
                            opt->mptcp_connections, opt->mptcp_fallbacks);
 
     // Log
