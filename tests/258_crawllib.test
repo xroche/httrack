@@ -40,12 +40,10 @@ fires() {
     mkdir -p "${tmpdir}/s${subject}"
     run_subject "${tmpdir}/s${subject}" "$1"
     test "$rc" -eq 1 || fail "[$1] should have failed, exited $rc: $out"
-    for want in "$2" ${3+"$3"}; do
-        case "$out" in
-        *"$want"*) ;;
-        *) fail "[$1] failed without reporting '$want': $out" ;;
-        esac
-    done
+    case "$out" in
+    *"$2"*) ;;
+    *) fail "[$1] failed without reporting '$2': $out" ;;
+    esac
 }
 
 ## local_server_start announces a live server
@@ -337,14 +335,16 @@ test "$(mtime "${tmpdir}/out/hts-stop.lock")" -gt \
     ok "a request an earlier run left behind is replaced by one aimed at this run"
 fi
 
-# The retry may not wait out a removal. It goes by rename, because drvfs can
-# leave "rm -rf" half done (#1639). The count is the assertion: try 1 does not
-# re-read the path, so a loop that re-reads names it on try 2, and one that
-# waits reports 30 instead.
+# The retry may not wait out a removal. It goes by rename (#1639), and a plain
+# file takes its place, so a loop testing -e rather than -d is caught too. Try 1
+# spends its failure arm on the liveness check, so a loop that re-reads the path
+# reports 2 tries and one that waits reports 30. A loop that stats the path once
+# before looping also reports 2, which this case cannot see.
 fires 'mkdir -p "${tmpdir}/out/hts-stop.lock"
 mv "${tmpdir}/out" "${tmpdir}/out.gone"
+: >"${tmpdir}/out"
 write_lock_request "${tmpdir}/out" hts-stop.lock $$' \
-    '/out is gone' 'after 2 tries'
+    'after 2 tries'
 ok "a removal the retries re-read is named, not waited out"
 
 echo "PASS"
