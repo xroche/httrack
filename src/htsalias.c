@@ -69,6 +69,11 @@ Please visit our Website: http://www.httrack.com
   param0 : this option must be alone, but the parameter should be put together (+*.gif)
   paramn : glues a preset or on/off onto -N, detaches a %-carrying template, refuses the rest, a cluster tail (1L0) included
 
+  A glued class shares one HTS_CDLMAXSIZE buffer with its short form, so the
+  value's budget is that size less strlen(short form). Only param1, and paramn
+  where it detaches, give the value the whole buffer. A front end bounding a
+  glued value at HTS_CDLMAXSIZE therefore accepts lengths this refuses.
+
   A name may appear twice; the FIRST row wins, for the expansion and the help
   text. Later rows exist so a reverse lookup by short option finds a name, and
   that lookup takes the first row too, so -N's class is "structure"'s.
