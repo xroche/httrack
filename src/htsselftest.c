@@ -16725,6 +16725,38 @@ static int st_mptcp_protocol(T_SOC soc) {
 }
 #endif
 
+#ifdef IPPROTO_MPTCP
+/* Connect a hand-made MPTCP socket to an MPTCP listener, bypassing the engine.
+   Whether that negotiates is a property of the kernel and not of the diff: an
+   emulated runner falls back between two MPTCP sockets. Returns -1 on a setup
+   failure, otherwise whether it negotiated. */
+static int st_mptcp_reference(void) {
+  struct sockaddr_in addr;
+  const T_SOC srv = st_mptcp_listen(IPPROTO_MPTCP, &addr);
+  T_SOC cli, acc;
+  int verdict = -1;
+
+  if (srv == INVALID_SOCKET)
+    return -1;
+  cli = (T_SOC) socket(AF_INET, SOCK_STREAM, IPPROTO_MPTCP);
+  if (cli == INVALID_SOCKET ||
+      connect(cli, (struct sockaddr *) &addr, sizeof(addr)) != 0) {
+    if (cli != INVALID_SOCKET)
+      close(cli);
+    close(srv);
+    return -1;
+  }
+  acc = accept(srv, NULL, NULL);
+  if (acc != INVALID_SOCKET) {
+    verdict = hts_socket_is_mptcp(cli) ? 1 : 0;
+    close(acc);
+  }
+  close(cli);
+  close(srv);
+  return verdict;
+}
+#endif
+
 /* Make one connection to a listener speaking `server_proto`, through the same
    factory and connect the crawler uses, and prove a byte crosses it. Returns
    -1 when the connection could not be set up, otherwise whether Multipath TCP
@@ -16850,14 +16882,21 @@ static int st_mptcp(httrackp *opt, int argc, char **argv) {
   }
 
 #ifdef IPPROTO_MPTCP
-  /* The other direction needs a peer that speaks it, and a build that can see
-     the difference. */
+  /* The other direction, against a peer that speaks it. Compared with a socket
+     made by hand rather than with 1, because whether two MPTCP sockets actually
+     negotiate is the kernel's business: an emulated runner falls back, and that
+     is not this engine being wrong. */
   if (hts_mptcp_reports()) {
+    const int reference = st_mptcp_reference();
+
     verdict = st_mptcp_pair(opt, "mptcp peer", IPPROTO_MPTCP);
-    if (verdict < 0) {
+    if (verdict < 0 || reference < 0) {
       err = 1;
-    } else if (verdict != 1) {
-      fprintf(stderr, "mptcp: a multipath peer was reported as a fallback\n");
+    } else if (verdict != reference) {
+      fprintf(stderr,
+              "mptcp: the engine's socket negotiated %d where one made by hand "
+              "negotiated %d\n",
+              verdict, reference);
       err = 1;
     }
   }
