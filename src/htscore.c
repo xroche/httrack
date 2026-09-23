@@ -3865,6 +3865,8 @@ hts_boolean hts_loop_tick(struct_back *sback, httrackp *opt, int b, int ptr) {
   HTS_STAT.stat_warnings = fspc(opt, NULL, "warning");
   HTS_STAT.stat_infos = fspc(opt, NULL, "info");
   HTS_STAT.stat_transport_failures = opt->transport_failures;
+  HTS_STAT.stat_mptcp_connections = opt->mptcp_connections;
+  HTS_STAT.stat_mptcp_fallbacks = opt->mptcp_fallbacks;
   HTS_STAT.nbk = backlinks_done(sback, opt->liens, opt->lien_tot, ptr);
   HTS_STAT.nb = back_transferred(HTS_STAT.stat_bytes, sback);
   return RUN_CALLBACK7(

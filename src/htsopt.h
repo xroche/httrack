@@ -668,6 +668,10 @@ struct hts_stat_struct {
                                     counted as it happens rather than from the
                                     log lines stat_errors reads, so an answered
                                     error is out and -Q leaves it alone */
+  int stat_mptcp_connections;  /**< HTTP connections that negotiated Multipath
+                                    TCP, published from opt->mptcp_connections */
+  int stat_mptcp_fallbacks;    /**< HTTP connections that asked for Multipath
+                                    TCP and were given plain TCP */
 };
 
 /* Extra per-request parameters (mirrors httrackp request options). */

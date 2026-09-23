@@ -2705,6 +2705,68 @@ static int st_transportfailures(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* The two counters a front end polls, and the option beside them: published
+   into the stats surface, and never carried onto another opt. Runs everywhere,
+   because none of it needs a kernel that has Multipath TCP. */
+static int st_mptcpstats(httrackp *opt, int argc, char **argv) {
+  httrackp *from = hts_create_opt();
+  httrackp *to = hts_create_opt();
+  const hts_stat_struct *stats;
+  int err = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  if (from->mptcp != HTS_DEFAULT || from->mptcp_connections != 0 ||
+      from->mptcp_fallbacks != 0) {
+    fprintf(stderr, "mptcp-stats: a fresh opt is not unset and at zero\n");
+    err = 1;
+  }
+
+  /* Published beside stat_transport_failures, which is where a front end
+     reads it. */
+  to->mptcp_connections = 7;
+  to->mptcp_fallbacks = 3;
+  stats = hts_get_stats(to);
+  if (stats == NULL || stats->stat_mptcp_connections != 7 ||
+      stats->stat_mptcp_fallbacks != 3) {
+    fprintf(stderr, "mptcp-stats: the counters did not reach the stats\n");
+    err = 1;
+  }
+
+  /* The option travels between opts. The counts are one mirror's own. */
+  from->mptcp = HTS_TRUE;
+  from->mptcp_connections = 5;
+  from->mptcp_fallbacks = 5;
+  to->mptcp = HTS_DEFAULT;
+  to->mptcp_connections = 0;
+  to->mptcp_fallbacks = 0;
+  copy_htsopt(from, to);
+  if (to->mptcp != HTS_TRUE) {
+    fprintf(stderr, "mptcp-stats: the option did not travel\n");
+    err = 1;
+  }
+  if (to->mptcp_connections != 0 || to->mptcp_fallbacks != 0) {
+    fprintf(stderr, "mptcp-stats: a count travelled onto another opt\n");
+    err = 1;
+  }
+
+  /* HTS_DEFAULT is "unspecified", so it must leave a set target alone. */
+  from->mptcp = HTS_DEFAULT;
+  to->mptcp = HTS_FALSE;
+  copy_htsopt(from, to);
+  if (to->mptcp != HTS_FALSE) {
+    fprintf(stderr, "mptcp-stats: an unset option overwrote a set one\n");
+    err = 1;
+  }
+
+  hts_free_opt(from);
+  hts_free_opt(to);
+  printf("mptcp-stats: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 /* The note is built twice from one buffer, so a caller reusing it must never
    read the previous mirror's text back out of a silent run. */
 static int st_upperlinksnote(httrackp *opt, int argc, char **argv) {
@@ -16783,6 +16845,9 @@ static const struct selftest_entry {
      "which protocol an outgoing socket asks for, and whether a "
      "fallback to plain TCP is seen as one",
      st_mptcp},
+    {"mptcpstats", "",
+     "the Multipath TCP counters reach the stats and stay off another opt",
+     st_mptcpstats},
     {"filtersize", "<size> <string> <filter>...",
      "size-aware filter verdict (negative size = unknown/scan time)",
      st_filtersize},

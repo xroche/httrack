@@ -7044,6 +7044,8 @@ const hts_stat_struct* hts_get_stats(httrackp * opt) {
   HTS_STAT.stat_warnings = fspc(opt, NULL, "warning");
   HTS_STAT.stat_infos = fspc(opt, NULL, "info");
   HTS_STAT.stat_transport_failures = opt->transport_failures;
+  HTS_STAT.stat_mptcp_connections = opt->mptcp_connections;
+  HTS_STAT.stat_mptcp_fallbacks = opt->mptcp_fallbacks;
   HTS_STAT.nbk = 0;
   HTS_STAT.nb = 0;
 
