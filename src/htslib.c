@@ -2334,8 +2334,7 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
         // a port filter named; an empty "host:" just means the default (#614)
         if (a[1] != '\0' && !hts_parse_url_port(a + 1, &port)) {
           if (retour != NULL) {
-            snprintf(retour->msg, sizeof(retour->msg), "Invalid port: %s",
-                     a + 1);
+            htsblk_failf(retour, "Invalid port: %s", a + 1);
           }
           return INVALID_SOCKET;
         }
@@ -2363,13 +2362,7 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
       printf("erreur gethostbyname\n");
 #endif
       if (retour != NULL) {
-#ifdef _WIN32
-        snprintf(retour->msg, sizeof(retour->msg),
-                 "Unable to get server's address: %s", error);
-#else
-        snprintf(retour->msg, sizeof(retour->msg),
-                 "Unable to get server's address: %s", error);
-#endif
+        htsblk_failf(retour, "Unable to get server's address: %s", error);
       }
       return INVALID_SOCKET;
     }
@@ -2416,8 +2409,8 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
                              &bind_addr, &error) == NULL
           || bind(soc, &SOCaddr_sockaddr(bind_addr), 
                   SOCaddr_size(bind_addr)) != 0) {
-        snprintf(retour->msg, sizeof(retour->msg),
-                 "Unable to bind the specificied server address: %s", error);
+        htsblk_failf(
+            retour, "Unable to bind the specificied server address: %s", error);
         deletesoc(soc);
         return INVALID_SOCKET;
       }
@@ -2438,9 +2431,8 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
 #endif
         char errbuf[HTS_STRERROR_SIZE];
 
-        snprintf(retour->msg, sizeof(retour->msg),
-                 "Non-blocking socket failed: %s",
-                 hts_strerror(last_errno, errbuf, sizeof(errbuf)));
+        htsblk_failf(retour, "Non-blocking socket failed: %s",
+                     hts_strerror(last_errno, errbuf, sizeof(errbuf)));
         deletesoc(soc);
         return INVALID_SOCKET;
       }

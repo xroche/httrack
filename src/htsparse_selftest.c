@@ -320,8 +320,8 @@ typedef enum {
   JSGUARD_NONE = 0,
   JSGUARD_TAG_QUOTE, /* the quote the enclosing attribute is written with */
   JSGUARD_SPACE_BEFORE,
-  JSGUARD_NO_NAME_BYTE,  /* neither an alphanumeric nor an underscore */
-  JSGUARD_NO_IDENT_BYTE, /* nothing JavaScript allows inside a name */
+  JSGUARD_NO_IDENT_BYTE,  /* nothing JavaScript allows inside a name */
+  JSGUARD_NO_IDENT_QUOTE, /* nor a quote, which ends a string */
   JSGUARD_SPACE_AFTER
 } jsscan_guard;
 
@@ -344,10 +344,35 @@ static const struct jsscan_word {
     {".open", '(', "),", HTS_TRUE, HTS_TRUE, HTS_FALSE, JSGUARD_NONE},
     {".replace", '(', ")", HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_NONE},
     {".link", '(', ")", HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_NONE},
-    {"url", '(', ")", HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_NO_NAME_BYTE},
+    {".url", '(', ")", HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_NONE},
+    {"url", '(', ")", HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_NO_IDENT_BYTE},
     {"import", 0, NULL, HTS_FALSE, HTS_FALSE, HTS_FALSE, JSGUARD_SPACE_AFTER},
-    {"from", 0, NULL, HTS_FALSE, HTS_FALSE, HTS_TRUE, JSGUARD_NO_IDENT_BYTE},
+    {"from", 0, NULL, HTS_FALSE, HTS_FALSE, HTS_TRUE, JSGUARD_NO_IDENT_QUOTE},
 };
+
+/* The code point ending at cursor[-1], or the byte itself where no UTF-8 lead
+   precedes it, which is how a Latin-1 page spells a non-breaking space. */
+static unsigned int model_prev_codepoint(const char *cursor,
+                                         const char *buffer) {
+  const unsigned char *const p = (const unsigned char *) cursor;
+  const size_t before = (size_t) (cursor - buffer);
+
+  if (before >= 3 && (p[-3] & 0xF0) == 0xE0)
+    return ((unsigned int) (p[-3] & 0x0F) << 12) |
+           ((unsigned int) (p[-2] & 0x3F) << 6) | (p[-1] & 0x3Fu);
+  if (before >= 2 && (p[-2] & 0xE0) == 0xC0)
+    return ((unsigned int) (p[-2] & 0x1F) << 6) | (p[-1] & 0x3Fu);
+  return p[-1];
+}
+
+/* Every ECMAScript WhiteSpace and LineTerminator above 127. */
+static hts_boolean js_space_codepoint(unsigned int cp) {
+  return cp == 0xA0 || cp == 0x1680 || (cp >= 0x2000 && cp <= 0x200A) ||
+                 cp == 0x2028 || cp == 0x2029 || cp == 0x202F || cp == 0x205F ||
+                 cp == 0x3000 || cp == 0xFEFF
+             ? HTS_TRUE
+             : HTS_FALSE;
+}
 
 /* This models what hts_js_scan_link is meant to find: one of the keywords
    above, its separator, a quoted operand, and a byte closing the statement. */
@@ -382,22 +407,24 @@ static hts_boolean jsscan_model(httrackp *opt, const char *cursor,
       if (!isspace(prev))
         continue;
       break;
-    case JSGUARD_NO_NAME_BYTE:
-      /* The engine leaves its "url" match in place when this guard fails, so
-         "aurl=" and "_url=" go on to match the plain assignment form. Modelled
-         as the engine behaves, not as the guard reads. */
-      if (isalnum(prev) || prev == '_') {
-        w = &jsscan_words[0]; /* borrow the plain "name=" shape */
-        a = cursor + l;
-        goto matched;
-      }
-      break;
     case JSGUARD_NO_IDENT_BYTE:
-      /* Spelled again rather than shared. Unlike the "url" guard this one
-         gates the match, so a failed guard matches nothing at all. */
+      /* The engine matches UTF-8 byte triples and this decodes the code point,
+         so the two agree on which characters glue only by accident. Membership
+         itself is pinned by cases[] below, never by the sweep. */
       if (isalnum((unsigned char) prev) || prev == '_' || prev == '$' ||
-          prev == '.' || prev == '"' || prev == '\'' || prev == '`' ||
-          (unsigned char) prev >= 0x80)
+          prev == '.' ||
+          ((unsigned char) prev >= 0x80 &&
+           !js_space_codepoint(model_prev_codepoint(cursor, buffer))))
+        continue;
+      break;
+    case JSGUARD_NO_IDENT_QUOTE:
+      if (prev == '"' || prev == '\'' || prev == '`')
+        continue;
+      /* FALLTHROUGH to the identifier test */
+      if (isalnum((unsigned char) prev) || prev == '_' || prev == '$' ||
+          prev == '.' ||
+          ((unsigned char) prev >= 0x80 &&
+           !js_space_codepoint(model_prev_codepoint(cursor, buffer))))
         continue;
       break;
     case JSGUARD_SPACE_AFTER:
@@ -481,10 +508,15 @@ matched:
       strfield(a, "https:") == 0 && strfield(a, "ftp:") == 0)
     return HTS_FALSE;
 
-  /* a leading ',' or ';' says this is code, and a quote or a control byte says
-     the operand never was one string */
+  /* a leading ',' or ';' says this is code, a quote or a control byte says the
+     operand never was one string, and "${" says it is interpolated.
+     Near-verbatim with the engine's loop on purpose. The sweep compares the
+     two, so an edit to both would agree; what catches that is cases[] and the
+     crawl in test 490, which never consult this model. */
   for (n = 0, i = 0; i < (size_t) len; i++) {
-    if (a[i] == ',' || a[i] == ';') {
+    if (a[i] == '$' && i + 1 < (size_t) len && a[i + 1] == '{') {
+      return HTS_FALSE;
+    } else if (a[i] == ',' || a[i] == ';') {
       if (n == 0)
         return HTS_FALSE;
     } else if (a[i] == '"' || a[i] == '\'' || a[i] == '\t' || a[i] == '\r' ||
@@ -535,11 +567,17 @@ static void jsscan_case(httrackp *opt, selftest_sweep *sw, const char *text,
    operand + tail, taking one representative per class the scanner branches on
    rather than every byte. */
 static void jsscan_sweep(httrackp *opt, selftest_sweep *sw) {
-  static const char *const prefix[] = {"", " ", "a", "_", "\""};
+  /* The non-ASCII prefixes are the control on the two decoders agreeing, not
+     on the byte list, which cases[] pins. U+20A0 ends in 0xA0, so an engine
+     reading that byte as a space disagrees with the model here and nowhere
+     else. */
+  static const char *const prefix[] = {
+      "",  " ", "a", "_",  "\"",       "$",        ".",
+      "`", ":", "}", "\n", "\302\240", "\303\251", "\342\202\240"};
   static const char *const word[] = {
-      ".src",     "src",    ".SRC",  ".location", ":location",
-      "location", ".href",  ".open", ".replace",  ".link",
-      "url",      "import", "from",  "foo"};
+      ".src",     "src",   ".SRC",   ".location", ":location",
+      "location", ".href", ".open",  ".replace",  ".link",
+      ".url",     "url",   "import", "from",      "foo"};
   static const char *const sep[] = {"=", "(", ",", "", " ="};
   static const char *const quote[] = {"\"", "'", ""};
   static const char *const operand[] = {
@@ -609,10 +647,54 @@ int parse_selftest_jsscan(httrackp *opt, hts_boolean dump) {
       /* a bare location needs a space before it */
       {" location=\"a\";", 1, HTS_FALSE, HTS_FALSE, HTS_TRUE, 10, 1},
       {"alocation=\"a\";", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
-      /* the "url" guard rejects the match and keeps it, so the assignment
-         form still fires: see JSGUARD_NO_NAME_BYTE */
-      {"aurl=\"pic.gif\";", 1, HTS_FALSE, HTS_FALSE, HTS_TRUE, 5, 7},
+      /* a name ending in "url" is one identifier token, so neither its
+         assignment nor its call carries a link (#1739) */
+      {"aurl=\"pic.gif\";", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
       {"myurl(\"pic.gif\")", 2, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      {"var myurl = \"hello world\";", 6, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0,
+       0},
+      {"var baseurl = \"jquery7\";", 8, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      {"var a_url = \"a.gif\";", 6, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      {"$url(\"a.gif\")", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      {"\303\251url(\"a.gif\")", 2, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      /* the spellings CSS writes url() in, which must all still be taken */
+      {":url(a.png)", 1, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      {",url(a.png)", 1, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      {"(url(a.png)", 1, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      {" url(a.png)", 1, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      {"\302\240url(a.png)", 2, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      /* CSS has no template literal and juxtaposes its tokens, so a quote
+         before url() is a boundary there and a name byte in code */
+      {"content:\"x\"url(a.png)", 11, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      {"`url('${t}')`", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      {"`url('/r/r1')`", 1, HTS_FALSE, HTS_FALSE, HTS_TRUE, 5, 5},
+      {"`url('/a/${t}.png')`", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      /* .url() is a method call, and has its own row the way .href has */
+      {"o.url(\"/t/x.gif\")", 1, HTS_FALSE, HTS_FALSE, HTS_TRUE, 6, 8},
+      {"o.myurl(\"/t/x\")", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      {"content:'x'url(a.png)", 11, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      /* a quote ends a string, so the url() right after one is real */
+      {"'url('a.gif')", 1, HTS_FALSE, HTS_FALSE, HTS_TRUE, 5, 5},
+      {"\"url(\"a.gif\")", 1, HTS_FALSE, HTS_FALSE, HTS_TRUE, 5, 5},
+      {"a_url(\"a.gif\")", 2, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
+      /* a name ends on any Unicode space, not only the three once spelled */
+      {"\343\200\200url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      {"\342\200\257url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      {"\357\273\277url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      {"\341\273\277url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_FALSE, 0, 0},
+      {"\240url(a.png)", 1, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      {"\341\232\200url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      {"\342\201\237url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      {"\342\200\250url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      {"\342\200\251url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      /* U+2000..200A are spaces and U+200B is not, so both ends are pinned */
+      {"\342\200\200url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      {"\342\200\212url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      {"\342\200\213url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_FALSE, 0, 0},
+      /* a zero-width joiner is part of a name, so it glues */
+      {"\342\200\214url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_FALSE, 0, 0},
+      /* JavaScript's new URL(x) takes the same token, quoted */
+      {"new URL(\"a.gif\")", 4, HTS_FALSE, HTS_FALSE, HTS_TRUE, 5, 5},
       /* an operand holding code is not a URL */
       {"x.src=\",a.gif\";", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
       {"x.src=\"\";", 1, HTS_FALSE, HTS_FALSE, HTS_FALSE, 0, 0},
