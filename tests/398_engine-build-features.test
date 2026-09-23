@@ -40,11 +40,35 @@ want_feature() {
     # Absent, or defined to anything but 0, means iconv is compiled in.
     iconv) macro_is "${config}" HTS_USEICONV 0 && echo 0 || echo 1 ;;
     crashtest) macro_is "${config}" HTS_CRASH_TEST 1 && echo 1 || echo 0 ;;
+    # Reported at runtime, so both halves count: what the build was given, and
+    # the kernel switch that decides whether a socket can be opened at all.
+    mptcp)
+        if ! macro_is "${config}" HTS_INET_MPTCP 1; then
+            echo 0
+        elif target_is_linux; then
+            # The kernel can be asked, so both halves are checked.
+            test "$(cat /proc/sys/net/mptcp/enabled 2>/dev/null)" = 1 &&
+                echo 1 || echo 0
+        else
+            # macOS has no switch to read: an AF_MULTIPATH socket is always
+            # there when the build found connectx().
+            echo 1
+        fi
+        ;;
+    # Reporting needs the kernel header MPTCP_INFO lives in, on top of all that.
+    mptcpinfo)
+        if [ "$(want_feature mptcp)" = 1 ] &&
+            macro_is "${config}" HAVE_LINUX_MPTCP_H 1; then
+            echo 1
+        else
+            echo 0
+        fi
+        ;;
     *) fail "unknown feature $1" ;;
     esac
 }
 
-known="brotli zstd backtrace iconv crashtest"
+known="brotli zstd backtrace iconv crashtest mptcp mptcpinfo"
 for f in ${known}; do
     got=$(sed -n "s/^${f} //p" <<<"${report}")
     test -n "${got}" || fail "-#test=features reports nothing for ${f}"

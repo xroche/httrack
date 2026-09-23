@@ -496,6 +496,40 @@ void fprintfio(FILE * fp, const char *buff, const char *prefix);
 
 void socket_set_nosigpipe(T_SOC soc);
 
+/* Multipath TCP (RFC 8684). On Linux it is a protocol on an ordinary stream
+   socket; on macOS it is an AF_MULTIPATH socket connected with connectx().
+   configure decides this, and a build without it, such as MSVC, has none. */
+#if !defined(HTS_INET_MPTCP) || defined(_WIN32)
+#undef HTS_INET_MPTCP
+#define HTS_INET_MPTCP 0
+#endif
+
+/* Create a stream socket for an outgoing connection, with SIGPIPE disarmed.
+   Uses Multipath TCP when `opt` asks for it and the system has it, and plain
+   TCP otherwise. Pass `will_bind` when the caller pins a source address, which
+   rules Multipath TCP out. Returns INVALID_SOCKET on failure. */
+T_SOC hts_socket_client(int family, const httrackp *opt, hts_boolean will_bind);
+
+/* Can this build, on this system, open a Multipath TCP socket at all? */
+hts_boolean hts_mptcp_available(void);
+
+/* Can this build tell a negotiated connection from a fallen-back one? */
+hts_boolean hts_mptcp_reports(void);
+
+/* Connect a socket hts_socket_client() returned. macOS reaches Multipath TCP
+   through connectx() rather than a protocol, so the connect differs there too.
+   Returns 0, or -1 with errno set, exactly as connect() does. */
+int hts_socket_connect(T_SOC soc, const struct sockaddr *addr, SOClen len,
+                       const httrackp *opt);
+
+/* Did Multipath TCP survive this established connection's handshake? */
+hts_boolean hts_socket_is_mptcp(T_SOC soc);
+
+/* Count an established connection as MPTCP or as fallen back to TCP. Counts
+   nothing when this run did not ask for MPTCP, and covers the HTTP backend
+   only, because an FTP socket is established on its own worker thread. */
+void hts_mptcp_account(httrackp *opt, T_SOC soc);
+
 /* Windows raises no SIGPIPE. Elsewhere this arm is Darwin, which has no
    sigtimedwait and does have SO_NOSIGPIPE, so the socket already covers it. */
 #if defined(_WIN32) || !defined(HAVE_SIGTIMEDWAIT)

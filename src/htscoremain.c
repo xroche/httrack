@@ -2419,6 +2419,28 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 #endif
                 break;
 
+              case 'm': { // --mptcp: Multipath TCP where the system has it
+                int on = 1;
+
+                if (isdigit((unsigned char) *(com + 1))) {
+                  sscanf(com + 1, "%d", &on);
+                  while (isdigit((unsigned char) *(com + 1)))
+                    com++;
+                }
+                if (on != 0 && on != 1) {
+                  char s[64];
+
+                  snprintf(s, sizeof(s), "Unknown value for -@m: %d", on);
+                  HTS_PANIC_PRINTF(s);
+                  htsmain_free();
+                  return -1;
+                }
+                opt->mptcp = on != 0 ? HTS_TRUE : HTS_FALSE;
+                if (on != 0 && !hts_mptcp_available())
+                  printf("Warning, option @m has no effect "
+                         "(no Multipath TCP on this system)\n");
+              } break;
+
               default:{
                   char s[HTS_CDLMAXSIZE + 256];
 

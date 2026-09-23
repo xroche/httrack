@@ -649,6 +649,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   opt->links_unqueued = HTS_FALSE;
   opt->abort_left_partial = HTS_FALSE;
   opt->transport_failures = 0;
+  opt->mptcp_connections = 0;
+  opt->mptcp_fallbacks = 0;
   opt->upper_links_refused = HTS_FALSE;
 
   /* before the first bailout below, each of which leaves it false */
@@ -2367,6 +2369,11 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
           finalInfo, sizeof(finalInfo), &finalUsed,
           "(%d links failed to transfer, so the mirror is incomplete)" LF,
           opt->transport_failures);
+    if (opt->mptcp_connections > 0 || opt->mptcp_fallbacks > 0)
+      slcatprintfbuff_clip(finalInfo, sizeof(finalInfo), &finalUsed,
+                           "(Multipath TCP: %d HTTP connections negotiated it, "
+                           "%d fell back to TCP)" LF,
+                           opt->mptcp_connections, opt->mptcp_fallbacks);
 
     // Log
     fprintf(opt->log, LF "%s", finalInfo);
@@ -3858,6 +3865,8 @@ hts_boolean hts_loop_tick(struct_back *sback, httrackp *opt, int b, int ptr) {
   HTS_STAT.stat_warnings = fspc(opt, NULL, "warning");
   HTS_STAT.stat_infos = fspc(opt, NULL, "info");
   HTS_STAT.stat_transport_failures = opt->transport_failures;
+  HTS_STAT.stat_mptcp_connections = opt->mptcp_connections;
+  HTS_STAT.stat_mptcp_fallbacks = opt->mptcp_fallbacks;
   HTS_STAT.nbk = backlinks_done(sback, opt->liens, opt->lien_tot, ptr);
   HTS_STAT.nb = back_transferred(HTS_STAT.stat_bytes, sback);
   return RUN_CALLBACK7(
@@ -4322,6 +4331,9 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
     to->maxconn = from->maxconn;
   if (from->max_retry_after >= 0)
     to->max_retry_after = from->max_retry_after;
+
+  if (from->mptcp > -1)
+    to->mptcp = from->mptcp;
 
   if (StringNotEmpty(from->user_agent))
     StringCopyS(to->user_agent, from->user_agent);

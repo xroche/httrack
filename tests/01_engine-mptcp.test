@@ -1,0 +1,13 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+require_httrack
+# Gated on the feature alone and not on being able to report it. macOS can open
+# a multipath socket and connect it but cannot see a fallback, so this is the
+# only test that reaches its connectx() path. 'run' is an ignored placeholder.
+have_feature mptcp || skip "no Multipath TCP on this system"
+assert_selftest "mptcp: OK" mptcp run

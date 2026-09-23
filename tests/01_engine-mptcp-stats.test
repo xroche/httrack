@@ -1,0 +1,11 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# A front end polls hts_get_stats(), so the Multipath TCP counters have to reach
+# it the way stat_transport_failures does; and being one mirror's own state, they
+# must not travel through copy_htsopt. 'run' is an ignored placeholder.
+assert_selftest "mptcp-stats: OK" mptcpstats run

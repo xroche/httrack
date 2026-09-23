@@ -158,6 +158,8 @@ const char *hts_optalias[][4] = {
    "random pause of MIN[:MAX] seconds between files"},
   {"max-retry-after", "-%J", "param",
    "longest Retry-After delay obeyed, in seconds"},
+  {"mptcp", "-@m", "onoff",
+   "carry connections over Multipath TCP where the system offers it"},
   {"generate-errors", "-o", "level", ""},
   {"do-not-generate-errors", "-o0", "single", ""},
   {"purge-old", "-X", "onoff", ""},

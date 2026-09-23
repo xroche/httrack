@@ -488,6 +488,52 @@ AC_ARG_ENABLE([auto-features],
 AS_IF([test x"$auto_features" = x"no"],
 	[hts_feature_default=no], [hts_feature_default=auto])
 
+## Multipath TCP (RFC 8684). HTS_INET_MPTCP is internal, because it moves no
+## installed struct, so it stays out of htsfeatures.h.
+AC_ARG_ENABLE([mptcp],
+	[AS_HELP_STRING([--enable-mptcp=@<:@yes/no/auto@:>@],[Open connections with Multipath TCP where the kernel offers it @<:@default=auto@:>@])],
+	[
+	case "${enableval}" in
+	no|yes|auto)
+		mptcp_want=$enableval
+		mptcp_asked=yes
+		;;
+	*)
+		AC_MSG_ERROR([bad value for mptcp, expected yes/no/auto])
+		;;
+	esac
+	],
+	[
+	mptcp_want=$hts_feature_default
+	mptcp_asked=no
+	])
+mptcp_have=no
+AS_CASE([$host_os], [linux*|darwin*], [mptcp_platform=yes], [mptcp_platform=no])
+AS_IF([test x"$mptcp_want" != x"no" && test x"$mptcp_platform" = x"yes"],
+	[AS_CASE([$host_os],
+		[darwin*],
+		[dnl macOS has no protocol for it: an AF_MULTIPATH socket, connected
+		dnl with connectx(), is the whole interface. The SDK does not declare
+		dnl AF_MULTIPATH, so connectx() is what is checked here and the domain
+		dnl number is proven at runtime, where a wrong one just fails socket().
+		AC_CHECK_FUNC([connectx], [mptcp_have=yes], [])],
+		[AC_CHECK_DECL([IPPROTO_MPTCP], [mptcp_have=yes], [],
+			[[#include <netinet/in.h>]])])
+	AS_IF([test x"$mptcp_have" = x"no" && test x"$mptcp_want" = x"yes"],
+		[AC_MSG_ERROR([mptcp requested but this platform does not offer it])])])
+AS_IF([test x"$mptcp_have" = x"yes"],
+	[AC_DEFINE([HTS_INET_MPTCP], [1], [Define to 1 to open sockets with Multipath TCP.])],
+	[AC_DEFINE([HTS_INET_MPTCP], [0], [Define to 1 to open sockets with Multipath TCP.])])
+AC_MSG_CHECKING([whether to open connections with Multipath TCP])
+dnl Name who decided, the way the backtrace switch above does.
+AS_IF([test x"$mptcp_platform" = x"no"],
+	[AC_MSG_RESULT([no (not implemented on $host_os)])],
+	[test x"$mptcp_want" = x"auto"], [AC_MSG_RESULT([$mptcp_have (auto)])],
+	[test x"$mptcp_asked" = x"no"], [AC_MSG_RESULT([$mptcp_have (auto-features off)])],
+	[AC_MSG_RESULT([$mptcp_have (requested)])])
+# MPTCP_INFO tells a negotiated connection from one that fell back to plain TCP.
+AC_CHECK_HEADERS([linux/mptcp.h])
+
 ## The header can exist while backtrace() lives in another library (Termux's
 ## libandroid-execinfo); only httrack links it, so keep it out of LIBS.
 AC_ARG_ENABLE([backtrace],

@@ -1338,6 +1338,9 @@ static int st_features(httrackp *opt, int argc, char **argv) {
 #else
   printf("crashtest 0\n");
 #endif
+  /* The kernel, not the build, decides whether MPTCP can be opened. */
+  printf("mptcp %d\n", hts_mptcp_available() ? 1 : 0);
+  printf("mptcpinfo %d\n", hts_mptcp_reports() ? 1 : 0);
   return 0;
 }
 
@@ -2699,6 +2702,77 @@ static int st_transportfailures(httrackp *opt, int argc, char **argv) {
   hts_free_opt(from);
   hts_free_opt(to);
   printf("transport-failures: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
+/* The two counters a front end polls, and the option beside them: published
+   into the stats surface, and never carried onto another opt. Runs everywhere,
+   because none of it needs a kernel that has Multipath TCP. */
+static int st_mptcpstats(httrackp *opt, int argc, char **argv) {
+  httrackp *from = hts_create_opt();
+  httrackp *to = hts_create_opt();
+  const hts_stat_struct *stats;
+  int err = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  if (from->mptcp != HTS_DEFAULT || from->mptcp_connections != 0 ||
+      from->mptcp_fallbacks != 0) {
+    fprintf(stderr, "mptcp-stats: a fresh opt is not unset and at zero\n");
+    err = 1;
+  }
+
+  /* Published beside stat_transport_failures, which is where a front end
+     reads it. */
+  to->mptcp_connections = 7;
+  to->mptcp_fallbacks = 3;
+  stats = hts_get_stats(to);
+  if (stats == NULL || stats->stat_mptcp_connections != 7 ||
+      stats->stat_mptcp_fallbacks != 3) {
+    fprintf(stderr, "mptcp-stats: the counters did not reach the stats\n");
+    err = 1;
+  }
+
+  /* The option travels between opts. The counts are one mirror's own. */
+  from->mptcp = HTS_TRUE;
+  from->mptcp_connections = 5;
+  from->mptcp_fallbacks = 5;
+  to->mptcp = HTS_DEFAULT;
+  to->mptcp_connections = 0;
+  to->mptcp_fallbacks = 0;
+  copy_htsopt(from, to);
+  if (to->mptcp != HTS_TRUE) {
+    fprintf(stderr, "mptcp-stats: the option did not travel\n");
+    err = 1;
+  }
+  if (to->mptcp_connections != 0 || to->mptcp_fallbacks != 0) {
+    fprintf(stderr, "mptcp-stats: a count travelled onto another opt\n");
+    err = 1;
+  }
+
+  /* Off travels too: it is a decision, not the absence of one. */
+  from->mptcp = HTS_FALSE;
+  to->mptcp = HTS_TRUE;
+  copy_htsopt(from, to);
+  if (to->mptcp != HTS_FALSE) {
+    fprintf(stderr, "mptcp-stats: the option off did not travel\n");
+    err = 1;
+  }
+
+  /* HTS_DEFAULT is "unspecified", so it must leave a set target alone. */
+  from->mptcp = HTS_DEFAULT;
+  to->mptcp = HTS_FALSE;
+  copy_htsopt(from, to);
+  if (to->mptcp != HTS_FALSE) {
+    fprintf(stderr, "mptcp-stats: an unset option overwrote a set one\n");
+    err = 1;
+  }
+
+  hts_free_opt(from);
+  hts_free_opt(to);
+  printf("mptcp-stats: %s\n", err ? "FAIL" : "OK");
   return err;
 }
 
@@ -16605,6 +16679,242 @@ static int st_usercmdrun(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+// -#test=mptcp: the Multipath TCP switch - which protocol hts_socket_client()
+// asks the kernel for, and whether a handshake that fell back to plain TCP is
+// counted as a fallback rather than as a multipath connection.
+#if HTS_INET_MPTCP
+/* Open a loopback listener speaking `proto` and write its address back. */
+static T_SOC st_mptcp_listen(int proto, struct sockaddr_in *addr) {
+  const T_SOC srv = (T_SOC) socket(AF_INET, SOCK_STREAM, proto);
+  socklen_t len = (socklen_t) sizeof(*addr);
+
+  if (srv == INVALID_SOCKET)
+    return INVALID_SOCKET;
+  /* Bounded, or a connect that silently never connects wedges accept() until
+     the suite's own watchdog, which reads as a hang and not as a failure. */
+  {
+    struct timeval tv;
+
+    tv.tv_sec = 10;
+    tv.tv_usec = 0;
+    (void) setsockopt(srv, SOL_SOCKET, SO_RCVTIMEO, (const char *) &tv,
+                      sizeof(tv));
+  }
+  memset(addr, 0, sizeof(*addr));
+  addr->sin_family = AF_INET;
+  addr->sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  if (bind(srv, (struct sockaddr *) addr, sizeof(*addr)) != 0 ||
+      listen(srv, 4) != 0 ||
+      getsockname(srv, (struct sockaddr *) addr, &len) != 0) {
+    close(srv);
+    return INVALID_SOCKET;
+  }
+  return srv;
+}
+
+#ifdef IPPROTO_MPTCP
+/* The protocol a socket was created with. SO_PROTOCOL is a Linux name, and so
+   is IPPROTO_MPTCP, so every caller of this sits behind the same guard. */
+static int st_mptcp_protocol(T_SOC soc) {
+  int proto = -1;
+  socklen_t len = (socklen_t) sizeof(proto);
+
+  if (getsockopt(soc, SOL_SOCKET, SO_PROTOCOL, (char *) &proto, &len) != 0)
+    return -1;
+  return proto;
+}
+#endif
+
+#ifdef IPPROTO_MPTCP
+/* Connect a hand-made MPTCP socket to an MPTCP listener, bypassing the engine.
+   Whether that negotiates is a property of the kernel and not of the diff: an
+   emulated runner falls back between two MPTCP sockets. Returns -1 on a setup
+   failure, otherwise whether it negotiated. */
+static int st_mptcp_reference(void) {
+  struct sockaddr_in addr;
+  const T_SOC srv = st_mptcp_listen(IPPROTO_MPTCP, &addr);
+  T_SOC cli, acc;
+  int verdict = -1;
+
+  if (srv == INVALID_SOCKET)
+    return -1;
+  cli = (T_SOC) socket(AF_INET, SOCK_STREAM, IPPROTO_MPTCP);
+  if (cli == INVALID_SOCKET ||
+      connect(cli, (struct sockaddr *) &addr, sizeof(addr)) != 0) {
+    if (cli != INVALID_SOCKET)
+      close(cli);
+    close(srv);
+    return -1;
+  }
+  acc = accept(srv, NULL, NULL);
+  if (acc != INVALID_SOCKET) {
+    verdict = hts_socket_is_mptcp(cli) ? 1 : 0;
+    close(acc);
+  }
+  close(cli);
+  close(srv);
+  return verdict;
+}
+#endif
+
+/* Make one connection to a listener speaking `server_proto`, through the same
+   factory and connect the crawler uses, and prove a byte crosses it. Returns
+   -1 when the connection could not be set up, otherwise whether Multipath TCP
+   survived the handshake (1) or not (0). */
+static int st_mptcp_pair(httrackp *opt, const char *tag, int server_proto) {
+  struct sockaddr_in addr;
+  const T_SOC srv = st_mptcp_listen(server_proto, &addr);
+  T_SOC cli, acc;
+  int verdict = -1;
+  char byte = 0;
+
+  if (srv == INVALID_SOCKET) {
+    fprintf(stderr, "mptcp: cannot listen for %s\n", tag);
+    return -1;
+  }
+  cli = hts_socket_client(AF_INET, opt, HTS_FALSE);
+  if (cli == INVALID_SOCKET ||
+      hts_socket_connect(cli, (struct sockaddr *) &addr, sizeof(addr), opt) !=
+          0) {
+    fprintf(stderr, "mptcp: cannot connect for %s\n", tag);
+    if (cli != INVALID_SOCKET)
+      close(cli);
+    close(srv);
+    return -1;
+  }
+  acc = accept(srv, NULL, NULL);
+  /* A socket that connects but carries nothing is the failure a connect-only
+     check cannot see. */
+  if (acc == INVALID_SOCKET || send(cli, "x", 1, 0) != 1 ||
+      recv(acc, &byte, 1, 0) != 1 || byte != 'x') {
+    fprintf(stderr, "mptcp: %s connected but carried no data\n", tag);
+  } else {
+    verdict = hts_socket_is_mptcp(cli) ? 1 : 0;
+    /* Which counter the crawler would reach for. Swapping the two arms of
+       hts_mptcp_account() is invisible without this. */
+    opt->mptcp_connections = opt->mptcp_fallbacks = 0;
+    hts_mptcp_account(opt, cli);
+    if (hts_mptcp_reports() &&
+        (opt->mptcp_connections != (verdict == 1 ? 1 : 0) ||
+         opt->mptcp_fallbacks != (verdict == 1 ? 0 : 1))) {
+      fprintf(stderr, "mptcp: %s is negotiated=%d but counted %d and %d\n", tag,
+              verdict, opt->mptcp_connections, opt->mptcp_fallbacks);
+      verdict = -1;
+    }
+  }
+  if (acc != INVALID_SOCKET)
+    close(acc);
+  close(cli);
+  close(srv);
+  return verdict;
+}
+#endif
+
+static int st_mptcp(httrackp *opt, int argc, char **argv) {
+#if HTS_INET_MPTCP
+  const hts_tristate saved = opt->mptcp;
+  int err = 0;
+  int verdict;
+  T_SOC soc;
+
+  (void) argc;
+  (void) argv;
+  if (!hts_mptcp_available()) {
+    printf("mptcp: SKIP (no Multipath TCP on this system)\n");
+    return 77;
+  }
+
+  /* Off means a plain socket, and a run that did not ask counts nothing. */
+  opt->mptcp = HTS_FALSE;
+  soc = hts_socket_client(AF_INET, opt, HTS_FALSE);
+  if (soc == INVALID_SOCKET) {
+    fprintf(stderr, "mptcp: no socket with the option off\n");
+    err = 1;
+  } else {
+#ifdef IPPROTO_MPTCP
+    if (st_mptcp_protocol(soc) == IPPROTO_MPTCP) {
+      fprintf(stderr, "mptcp: the option was off and MPTCP was asked for\n");
+      err = 1;
+    }
+#endif
+    if (hts_socket_is_mptcp(soc)) {
+      fprintf(stderr, "mptcp: a plain TCP socket reported multipath\n");
+      err = 1;
+    }
+    opt->mptcp_connections = opt->mptcp_fallbacks = 0;
+    hts_mptcp_account(opt, soc);
+    if (opt->mptcp_connections != 0 || opt->mptcp_fallbacks != 0) {
+      fprintf(stderr, "mptcp: a run that did not ask for MPTCP was counted\n");
+      err = 1;
+    }
+    close(soc);
+  }
+
+  opt->mptcp = HTS_TRUE;
+#ifdef IPPROTO_MPTCP
+  /* Only Linux names a protocol, so only there can the request be read back. */
+  soc = hts_socket_client(AF_INET, opt, HTS_FALSE);
+  if (soc == INVALID_SOCKET) {
+    fprintf(stderr, "mptcp: no socket with the option on\n");
+    err = 1;
+  } else {
+    const int proto = st_mptcp_protocol(soc);
+
+    if (proto != IPPROTO_MPTCP) {
+      fprintf(stderr,
+              "mptcp: the option was on and protocol %d was asked for\n",
+              proto);
+      err = 1;
+    }
+    close(soc);
+  }
+#endif
+
+  /* The factory and the connect seam end to end, against a peer that does not
+     speak it. Runs wherever the feature is built, which is what covers the
+     macOS connectx() path. */
+  verdict = st_mptcp_pair(opt, "tcp peer", IPPROTO_TCP);
+  if (verdict < 0) {
+    err = 1;
+  } else if (hts_mptcp_reports() && verdict != 0) {
+    fprintf(stderr, "mptcp: a plain TCP peer was reported as multipath\n");
+    err = 1;
+  }
+
+#ifdef IPPROTO_MPTCP
+  /* The other direction, against a peer that speaks it. Compared with a socket
+     made by hand rather than with 1, because whether two MPTCP sockets actually
+     negotiate is the kernel's business: an emulated runner falls back, and that
+     is not this engine being wrong. */
+  if (hts_mptcp_reports()) {
+    const int reference = st_mptcp_reference();
+
+    verdict = st_mptcp_pair(opt, "mptcp peer", IPPROTO_MPTCP);
+    if (verdict < 0 || reference < 0) {
+      err = 1;
+    } else if (verdict != reference) {
+      fprintf(stderr,
+              "mptcp: the engine's socket negotiated %d where one made by hand "
+              "negotiated %d\n",
+              verdict, reference);
+      err = 1;
+    }
+  }
+#endif
+
+  opt->mptcp = saved;
+  opt->mptcp_connections = opt->mptcp_fallbacks = 0;
+  printf("mptcp: %s\n", err ? "FAIL" : "OK");
+  return err;
+#else
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  printf("mptcp: SKIP (not built with Multipath TCP)\n");
+  return 77;
+#endif
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: name -> handler, with a usage hint and a one-line description. */
 /* ------------------------------------------------------------ */
@@ -16624,6 +16934,13 @@ static const struct selftest_entry {
      st_usercmd},
     {"usercmdrun", "<-V template> <filename>",
      "run a -V template through the engine's own spawn path", st_usercmdrun},
+    {"mptcp", "",
+     "which protocol an outgoing socket asks for, and whether a "
+     "fallback to plain TCP is seen as one",
+     st_mptcp},
+    {"mptcpstats", "",
+     "the Multipath TCP counters reach the stats and stay off another opt",
+     st_mptcpstats},
     {"filtersize", "<size> <string> <filter>...",
      "size-aware filter verdict (negative size = unknown/scan time)",
      st_filtersize},

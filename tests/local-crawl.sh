@@ -64,6 +64,7 @@ set -u
 root="${LOCAL_SERVER_ROOT:-${testdir}/server-root}"
 
 tlsargs=()
+serverargs=()
 verbose=
 warc_validate=
 wacz_validate=
@@ -199,6 +200,7 @@ while test "$pos" -lt "$nargs"; do
         audit+=("--cache-under-logroot")
         ;;
     --tls) tlsargs=(--tls) ;;
+    --server-mptcp) serverargs=(--mptcp) ;;
     --root)
         pos=$((pos + 1))
         root="${args[$pos]}"
@@ -253,7 +255,8 @@ done
 # --- start the server --------------------------------------------------------
 # local_server_start reaps the server and reports one that never announced its
 # port. 72 and 105 skip on that wording, which discover_server_port writes.
-local_server_start ${tlsargs[@]+"${tlsargs[@]}"} --root "$root"
+local_server_start ${tlsargs[@]+"${tlsargs[@]}"} \
+    ${serverargs[@]+"${serverargs[@]}"} --root "$root"
 port=$SRV_PORT
 baseurl=$BASEURL
 debug "server listening on $baseurl"

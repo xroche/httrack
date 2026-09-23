@@ -60,6 +60,31 @@ Please visit our Website: http://www.httrack.com
 
 #include <limits.h>
 
+/* macOS reaches Multipath TCP through connectx() on an AF_MULTIPATH socket
+   rather than through a protocol, so the two platforms differ at connect time
+   and not only at socket time. */
+#if HTS_INET_MPTCP && defined(__APPLE__)
+#define HTS_INET_MPTCP_DARWIN 1
+#ifndef AF_MULTIPATH
+/* Measured, not assumed: the macOS SDK does not declare this, so a build that
+   required the declaration compiled the whole arm out. hts_mptcp_probe() opens
+   one socket with it at startup, which is what makes the number safe to name
+   here, because a wrong one leaves Multipath TCP off. */
+#define AF_MULTIPATH 39
+#endif
+#else
+#define HTS_INET_MPTCP_DARWIN 0
+#endif
+
+/* Without this header Multipath TCP still works but goes unreported, which is
+   also where macOS stands. */
+#if HTS_INET_MPTCP && defined(HAVE_LINUX_MPTCP_H)
+#include <linux/mptcp.h>
+#define HTS_INET_MPTCP_INFO 1
+#else
+#define HTS_INET_MPTCP_INFO 0
+#endif
+
 #ifdef _WIN32
 #include <direct.h>
 #else
@@ -2274,6 +2299,153 @@ void socket_set_nosigpipe(T_SOC soc) {
 #endif
 }
 
+/* Resolved by hts_init(), before any crawl thread reads them. */
+static hts_boolean hts_mptcp_usable = HTS_FALSE;
+static hts_boolean hts_mptcp_on_by_default = HTS_FALSE;
+
+#if HTS_INET_MPTCP && !HTS_INET_MPTCP_DARWIN
+/* Read one small integer sysctl, or -1 when the file cannot be read. */
+static long hts_mptcp_sysctl(const char *path) {
+  FILE *fp = fopen(path, "rb");
+  long value = -1;
+
+  if (fp == NULL)
+    return -1;
+  if (fscanf(fp, "%ld", &value) != 1)
+    value = -1;
+  fclose(fp);
+  return value;
+}
+
+/* Can the kernel climb out of a SYN that a middlebox dropped for carrying the
+   MPTCP option? It needs the retry enabled and blackhole detection on, or the
+   first connect to any host behind a silent middlebox pays the full timeout.
+   Zero turns the detection off, so the file being there is not the answer. */
+static hts_boolean hts_mptcp_kernel_recovers(void) {
+  static const char retrans[] =
+      "/proc/sys/net/mptcp/syn_retrans_before_tcp_fallback";
+
+  if (hts_mptcp_sysctl(retrans) < 0)
+    return HTS_FALSE;
+  if (hts_mptcp_sysctl("/proc/sys/net/mptcp/blackhole_timeout") <= 0)
+    return HTS_FALSE;
+  return HTS_TRUE;
+}
+#endif
+
+/* Being able to open an MPTCP socket is not enough to turn it on by default. */
+static void hts_mptcp_probe(void) {
+#if HTS_INET_MPTCP_DARWIN
+  /* Left off by default here: macOS offers neither the blackhole sysctls that
+     make the default safe nor a way to see whether a connection negotiated it,
+     so it is the user who asks. */
+  const T_SOC soc = (T_SOC) socket(AF_MULTIPATH, SOCK_STREAM, 0);
+
+  if (soc != INVALID_SOCKET) {
+    close(soc);
+    hts_mptcp_usable = HTS_TRUE;
+  }
+#elif HTS_INET_MPTCP
+  const T_SOC soc = (T_SOC) socket(AF_INET, SOCK_STREAM, IPPROTO_MPTCP);
+
+  if (soc != INVALID_SOCKET) {
+    close(soc);
+    hts_mptcp_usable = HTS_TRUE;
+    hts_mptcp_on_by_default = hts_mptcp_kernel_recovers();
+  }
+#endif
+}
+
+hts_boolean hts_mptcp_available(void) { return hts_mptcp_usable; }
+
+hts_boolean hts_mptcp_reports(void) {
+  return HTS_INET_MPTCP_INFO ? HTS_TRUE : HTS_FALSE;
+}
+
+/* Should this connection be opened with MPTCP? */
+static hts_boolean hts_mptcp_enabled(const httrackp *opt) {
+  if (!hts_mptcp_usable)
+    return HTS_FALSE;
+  if (opt->mptcp == HTS_DEFAULT)
+    return hts_mptcp_on_by_default;
+  return opt->mptcp == HTS_TRUE ? HTS_TRUE : HTS_FALSE;
+}
+
+T_SOC hts_socket_client(int family, const httrackp *opt,
+                        hts_boolean will_bind) {
+  T_SOC soc = INVALID_SOCKET;
+
+#if HTS_INET_MPTCP_DARWIN
+  /* The multipath socket has its own domain, and takes the address family from
+     the address hts_socket_connect() hands connectx(). It also cannot bind:
+     macOS gives AF_MULTIPATH no bind at all, and a pinned source address is
+     the opposite of what multipath is for, so a caller that binds gets TCP. */
+  if (!will_bind && hts_mptcp_enabled(opt))
+    soc = (T_SOC) socket(AF_MULTIPATH, SOCK_STREAM, 0);
+#elif HTS_INET_MPTCP
+  (void) will_bind;
+  /* A refusal here is the kernel declining the protocol. The peer declining it
+     is not visible: the kernel completes the handshake as plain TCP. */
+  if (hts_mptcp_enabled(opt))
+    soc = (T_SOC) socket(family, SOCK_STREAM, IPPROTO_MPTCP);
+#else
+  (void) opt;
+  (void) will_bind;
+#endif
+  if (soc == INVALID_SOCKET)
+    soc = (T_SOC) socket(family, SOCK_STREAM, 0);
+  if (soc != INVALID_SOCKET)
+    socket_set_nosigpipe(soc);
+  return soc;
+}
+
+int hts_socket_connect(T_SOC soc, const struct sockaddr *addr, SOClen len,
+                       const httrackp *opt) {
+#if HTS_INET_MPTCP_DARWIN
+  /* connectx() is how a multipath socket is connected, and it accepts an
+     ordinary socket too, so the fallback needs no second path here. A NULL opt
+     is the caller saying this socket is not a multipath one. */
+  if (opt != NULL && hts_mptcp_enabled(opt)) {
+    sa_endpoints_t ep;
+
+    memset(&ep, 0, sizeof(ep));
+    ep.sae_dstaddr = addr;
+    ep.sae_dstaddrlen = (socklen_t) len;
+    return connectx(soc, &ep, SAE_ASSOCID_ANY, 0, NULL, 0, NULL, NULL);
+  }
+#else
+  (void) opt;
+#endif
+  return connect(soc, addr, len);
+}
+
+hts_boolean hts_socket_is_mptcp(T_SOC soc) {
+#if HTS_INET_MPTCP_INFO
+  struct mptcp_info info;
+  socklen_t len = (socklen_t) sizeof(info);
+
+  /* Refused on a socket the kernel fell back to TCP, where SO_PROTOCOL still
+     reads IPPROTO_MPTCP and so answers nothing. */
+  if (getsockopt(soc, SOL_MPTCP, MPTCP_INFO, (char *) &info, &len) != 0)
+    return HTS_FALSE;
+  return HTS_TRUE;
+#else
+  (void) soc;
+  return HTS_FALSE;
+#endif
+}
+
+void hts_mptcp_account(httrackp *opt, T_SOC soc) {
+  /* Where a fallback cannot be seen, every connection would be counted as one,
+     which is a wrong number rather than a missing one. */
+  if (!hts_mptcp_reports() || !hts_mptcp_enabled(opt))
+    return;
+  if (hts_socket_is_mptcp(soc))
+    opt->mptcp_connections++;
+  else
+    opt->mptcp_fallbacks++;
+}
+
 int connect_socket_error(T_SOC soc) {
   int soerr = 0;
   socklen_t len = (socklen_t) sizeof(soerr);
@@ -2378,7 +2550,12 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
 #if HTS_WIDE_DEBUG
     DEBUG_W("socket\n");
 #endif
-    soc = (T_SOC) socket(SOCaddr_sinfamily(server), SOCK_STREAM, 0);
+    /* -%b pins the source address, and a socket that binds cannot be a
+       multipath one. */
+    const hts_boolean will_bind =
+        retour != NULL && strnotempty(retour->req.proxy.bindhost) ? HTS_TRUE
+                                                                  : HTS_FALSE;
+    soc = hts_socket_client(SOCaddr_sinfamily(server), opt, will_bind);
     if (retour != NULL) {
       retour->debugid = HTS_STAT.stat_sockid++;
     }
@@ -2399,7 +2576,6 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
       }
       return INVALID_SOCKET;    // erreur création socket impossible
     }
-    socket_set_nosigpipe(soc);
     // bind this address
     if (retour != NULL && strnotempty(retour->req.proxy.bindhost)) {
       const char *error = "unknown error";
@@ -2446,7 +2622,8 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
 #if HTS_WIDE_DEBUG
     DEBUG_W("connect\n");
 #endif
-    if (connect(soc, &SOCaddr_sockaddr(server), SOCaddr_size(server)) != 0) {
+    if (hts_socket_connect(soc, &SOCaddr_sockaddr(server), SOCaddr_size(server),
+                           will_bind ? NULL : opt) != 0) {
       // bloquant
       if (waitconnect) {
 #if HDEBUG
@@ -6355,6 +6532,9 @@ HTSEXT_API int hts_init(void) {
   /* Init threads (lazy init) */
   htsthread_init();
 
+  /* Before any thread reads the verdict */
+  hts_mptcp_probe();
+
   /* Ensure external modules are loaded */
   hts_debug_log_print("calling htspe_init()");  /* debug */
   htspe_init();                 /* module load (lazy) */
@@ -6725,6 +6905,9 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->links_unqueued = HTS_FALSE;
   opt->mirror_completed = HTS_DEFAULT;
   opt->transport_failures = 0;
+  opt->mptcp = HTS_DEFAULT;
+  opt->mptcp_connections = 0;
+  opt->mptcp_fallbacks = 0;
   opt->upper_links_refused = 0;
   opt->abort_left_partial = HTS_FALSE;
   StringCopy(opt->why_url, "");
@@ -6924,6 +7107,8 @@ const hts_stat_struct* hts_get_stats(httrackp * opt) {
   HTS_STAT.stat_warnings = fspc(opt, NULL, "warning");
   HTS_STAT.stat_infos = fspc(opt, NULL, "info");
   HTS_STAT.stat_transport_failures = opt->transport_failures;
+  HTS_STAT.stat_mptcp_connections = opt->mptcp_connections;
+  HTS_STAT.stat_mptcp_fallbacks = opt->mptcp_fallbacks;
   HTS_STAT.nbk = 0;
   HTS_STAT.nb = 0;
 

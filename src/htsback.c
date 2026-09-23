@@ -3613,6 +3613,14 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             }
             continue; // reconnected (stay connecting) or failed
           }
+          /* A keep-alive slot and the post-TLS re-entry share one socket, so
+             count it once. */
+          if (!back[i].r.keep_alive
+#if HTS_USEOPENSSL
+              && back[i].r.ssl_con == NULL
+#endif
+          )
+            hts_mptcp_account(opt, back[i].r.soc);
           busy_state = 1;
 
           // socks5: tunnel to the origin before anything is written, for http

@@ -612,6 +612,16 @@ struct httrackp {
                                         alone. Tail: ABI */
   int max_retry_after; /**< longest Retry-After obeyed, in seconds. 0 retries
                             with no wait (--max-retry-after). Tail: ABI */
+  hts_tristate mptcp;  /**< open connections with Multipath TCP (--mptcp).
+                            HTS_DEFAULT: on where the kernel recovers from a
+                            blackholed SYN by itself. Tail: ABI */
+  int mptcp_connections; /**< HTTP connections that negotiated MPTCP. FTP opens
+                              its sockets on a worker thread and is left out.
+                              Live state, so copy_htsopt must leave it alone.
+                              Tail: ABI */
+  int mptcp_fallbacks;   /**< HTTP connections that asked for MPTCP and were
+                              given plain TCP. Live state, so copy_htsopt must
+                              leave it alone. Tail: ABI */
 };
 
 /* Running statistics for a mirror. */
@@ -658,6 +668,10 @@ struct hts_stat_struct {
                                     counted as it happens rather than from the
                                     log lines stat_errors reads, so an answered
                                     error is out and -Q leaves it alone */
+  int stat_mptcp_connections;  /**< HTTP connections that negotiated Multipath
+                                    TCP, published from opt->mptcp_connections */
+  int stat_mptcp_fallbacks;    /**< HTTP connections that asked for Multipath
+                                    TCP and were given plain TCP */
 };
 
 /* Extra per-request parameters (mirrors httrackp request options). */

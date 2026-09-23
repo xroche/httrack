@@ -1,0 +1,75 @@
+#!/bin/bash
+#
+# Multipath TCP: what the engine asks the kernel for, and what it reports back.
+# A peer that speaks MPTCP is counted as negotiated, a peer that does not is
+# counted as a fallback, and --mptcp=0 asks for nothing at all.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+require_httrack
+skip_on_windows "Windows has no Multipath TCP protocol"
+have_feature mptcp || skip "no Multipath TCP on this system"
+have_feature mptcpinfo || skip "this build cannot tell a fallback from a negotiation"
+
+# A value that is neither on nor off is refused rather than read as on. Port 1
+# refuses at once, so a regression that let the option through costs no traffic;
+# the message is what says the option was judged, not the unreachable host.
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_mptcp.XXXXXX")
+cleanup_push rm -rf "$tmp"
+rc=0
+refused=$(httrack -@m2 -O "$tmp" 'http://127.0.0.1:1/' 2>&1) || rc=$?
+grep -q 'Unknown value for -@m' <<<"$refused" ||
+    fail "httrack -@m2 was not refused: $refused"
+test "$rc" -ne 0 || fail "httrack -@m2 was refused but still exited 0"
+
+python=$(find_python) || skip "python3 not found"
+"$python" -c 'import socket; socket.IPPROTO_MPTCP' 2>/dev/null ||
+    skip "this python cannot listen with Multipath TCP"
+
+# Every connection counts, not just the first: without --keep-alive=0 one socket
+# carries every file, and a mirror that accounted once would read the same.
+many='Multipath TCP: [2-9][0-9]* HTTP connections negotiated it, 0 fell back'
+
+# A peer that speaks it.
+bash "$top_srcdir/tests/local-crawl.sh" --server-mptcp --errors 0 --files 5 \
+    --log-found "$many" \
+    httrack 'BASEURL/simple/basic.html' --mptcp --sockets 4 --keep-alive=0
+
+# A peer that does not: the kernel falls back and the crawl still completes.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 5 \
+    --log-found 'Multipath TCP: 0 HTTP connections negotiated it, [2-9][0-9]* fell back' \
+    httrack 'BASEURL/simple/basic.html' --mptcp --sockets 4 --keep-alive=0
+
+# Off means nothing is asked for, so there is nothing to report either.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 5 \
+    --log-not-found 'Multipath TCP' \
+    httrack 'BASEURL/simple/basic.html' --mptcp=0
+
+# With no option the engine decides, and it turns MPTCP on only where the kernel
+# can climb out of a blackholed SYN by itself. Read that from the kernel rather
+# than from the engine, or the check would agree with whatever the code does.
+retrans=$(cat /proc/sys/net/mptcp/syn_retrans_before_tcp_fallback 2>/dev/null || echo -1)
+blackhole=$(cat /proc/sys/net/mptcp/blackhole_timeout 2>/dev/null || echo 0)
+if test "$retrans" -ge 0 && test "$blackhole" -gt 0; then
+    auto=(--log-found 'Multipath TCP: [1-9][0-9]* HTTP connections negotiated it')
+else
+    auto=(--log-not-found 'Multipath TCP')
+fi
+bash "$top_srcdir/tests/local-crawl.sh" --server-mptcp --errors 0 --files 5 \
+    "${auto[@]}" httrack 'BASEURL/simple/basic.html'
+
+# One connection counts once: a TLS handshake sends the slot back through the
+# connect path, which counted the same socket a second time. Needs TLS, so a
+# build without it loses this leg alone rather than the whole test.
+if test "${HTTPS_SUPPORT:-}" = "no"; then
+    echo "no https support compiled, skipping the TLS leg" >&2
+else
+    bash "$top_srcdir/tests/local-crawl.sh" --tls --errors 0 --files 1 \
+        --log-found 'Multipath TCP: 0 HTTP connections negotiated it, 1 fell back' \
+        httrack 'BASEURL/simple/link.html' --mptcp --robots=0 --depth=1
+fi
