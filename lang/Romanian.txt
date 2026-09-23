@@ -1050,3 +1050,7 @@ Ignore %s and every host below it
 Ignoră %s şi toate gazdele de sub el
 Manual
 Manual
+Max Retry-After(s)
+Max. Retry-After (s)
+Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
+Cea mai lungă așteptare respectată când un server trimite un antet Retry-After. Folosiți 0 pentru a reîncerca fără așteptare.

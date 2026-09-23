@@ -1,0 +1,94 @@
+#!/bin/bash
+#
+# The Max Retry-After field caps a wait the server asked for, so an empty box
+# must pass no flag at all: a front end that filled in 60 could not be told
+# apart from a user who typed it.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+distdir=${top_srcdir:-$(cd "${testdir}/.." && pwd)}
+distdir=$(cd "${distdir}" && pwd)
+# shellcheck source=tests/webhttracklib.sh
+. "${testdir}/webhttracklib.sh"
+
+htsserver_require
+
+printf '[the project key stays bound to the field] ..\t'
+grep -q "do:copy:MaxRetryAfter:maxretryafter" "${distdir}/html/server/step2.html" ||
+    fail "step2.html does not restore MaxRetryAfter"
+echo OK
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_maxretryafter.XXXXXX") || fail "no tmpdir"
+cleanup_push htsserver_cleanup_dir "${work}"
+
+printf '[webhttrack emits --max-retry-after] ..\t'
+htsserver_start --home "${work}"
+
+htsserver_python - "${HTS_URL}" "${work}/emitted" <<'PY' || fail "the Max Retry-After field is not wired (see above)"
+import shlex, sys
+
+from webtestlib import Session, field, textarea
+
+s, emitted = Session(sys.argv[1]), sys.argv[2]
+FLAG = "--max-retry-after="
+
+
+def opened():
+    return s.get("option4.html?sid=" + s.sid)
+
+
+# The label and the tooltip, because an unknown ${LANG_*} renders empty and the
+# box would ship with no name on it.
+page = opened()
+for want in ('<input name="maxretryafter"', "Max Retry-After(s)",
+             "Longest delay to obey"):
+    if want not in page:
+        sys.exit("option4.html does not render %r" % want)
+
+
+def emitted_flags(value):
+    page = s.post("step4.html", [("maxretryafter", value)])
+    cmd = [l.strip() for l in textarea(page, "command").split("\n")]
+    ini = [l.strip() for l in textarea(page, "winprofile").split("\n")
+           if l.startswith("MaxRetryAfter=")]
+    return [l for l in cmd if FLAG in l], ini
+
+
+# 0 waives the wait, so it has to survive as a value rather than read as unset.
+for value, want in [("120", ["--max-retry-after=120"]),
+                    ("0", ["--max-retry-after=0"]),
+                    ("", [])]:
+    flags, ini = emitted_flags(value)
+    if flags != want:
+        sys.exit("%r emitted %r, wanted %r" % (value, flags, want))
+    if ini != ["MaxRetryAfter=" + value]:
+        sys.exit("%r wrote %r to winprofile.ini" % (value, ini))
+    # Reopening must show back what was typed, an empty box included: a seeded
+    # default here reaches the file as a value nobody chose.
+    back = field(opened(), "maxretryafter")
+    if back != value:
+        sys.exit("option4.html renders %r back, wanted %r" % (back, value))
+
+# Hand the engine below the flag the template actually emitted, not a literal.
+flags, _ = emitted_flags("120")
+open(emitted, "w").write("\n".join(shlex.split(flags[0])) + "\n")
+PY
+echo OK
+
+printf '[the engine knows the flag] ..\t'
+# macOS runs the suite under bash 3.2, which has no mapfile
+argv=()
+while IFS= read -r arg; do
+    argv+=("${arg}")
+done <"${work}/emitted"
+# Rejected flags exit 255 like a URL-less run, so match the diagnostic.
+out=$(httrack "${argv[@]}" 2>&1) || true
+if grep -q "Unknown option" <<<"${out}"; then
+    fail "the engine rejects ${argv[0]}: ${out}"
+fi
+# Control: the same probe on a flag that does not exist. Derived from what the
+# template emitted, so a renamed option cannot leave the control passing alone.
+out=$(httrack "${argv[0]%%=*}x=${argv[0]#*=}" 2>&1) || true
+grep -q "Unknown option" <<<"${out}" || fail "the unknown-option probe proves nothing"
+echo OK

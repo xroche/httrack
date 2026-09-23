@@ -1050,3 +1050,7 @@ Ignore %s and every host below it
 %s va uning ostidagi barcha xostlarni e'tiborsiz qoldirish
 Manual
 Qo’llanma
+Max Retry-After(s)
+Maks. Retry-After (s)
+Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
+Server Retry-After sarlavhasini yuborganda amal qilinadigan eng uzun kutish. Kutmasdan qayta urinish uchun 0 kiriting.

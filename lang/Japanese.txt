@@ -1050,3 +1050,7 @@ Ignore %s and every host below it
 %s とその配下のすべてのホストを無視
 Manual
 マニュアル
+Max Retry-After(s)
+最大 Retry-After(秒)
+Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
+サーバーが Retry-After ヘッダーを送ったときに従う最長の待ち時間です。0 を指定すると待たずに再試行します。

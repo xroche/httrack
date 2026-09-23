@@ -1050,3 +1050,7 @@ Ignore %s and every host below it
 Αγνόηση του %s και κάθε host κάτω από αυτό
 Manual
 Εγχειρίδιο
+Max Retry-After(s)
+Μέγ. Retry-After (δευτ.)
+Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
+Η μεγαλύτερη αναμονή που τηρείται όταν ένας διακομιστής στέλνει κεφαλίδα Retry-After. Το 0 σημαίνει επανάληψη χωρίς αναμονή.

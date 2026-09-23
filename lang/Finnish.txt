@@ -1050,3 +1050,7 @@ Ignore %s and every host below it
 Sivuuta %s ja kaikki sen alla olevat palvelimet
 Manual
 Käyttöohje
+Max Retry-After(s)
+Enint. Retry-After (s)
+Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
+Pisin odotus, jota noudatetaan, kun palvelin lähettää Retry-After-otsakkeen. Arvo 0 yrittää uudelleen odottamatta.

@@ -1050,3 +1050,7 @@ Ignore %s and every host below it
 %s és minden alatta lévő kiszolgáló kihagyása
 Manual
 Kézikönyv
+Max Retry-After(s)
+Max. Retry-After (mp)
+Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
+A leghosszabb várakozás, amelyet a program betart, ha a kiszolgáló Retry-After fejlécet küld. A 0 azonnali újrapróbálkozást jelent.

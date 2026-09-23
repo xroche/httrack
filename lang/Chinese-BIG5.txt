@@ -1050,3 +1050,7 @@ Ignore %s and every host below it
 忽略 %s 及其下所有主機
 Manual
 手冊
+Max Retry-After(s)
+最長 Retry-After(秒)
+Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
+伺服器送出 Retry-After 標頭時，最長願意等待的秒數。填 0 表示不等待就重試。
