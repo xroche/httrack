@@ -2314,6 +2314,21 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   StringCopy(opt->why_url, argv[na]);
                 }
                 break;
+              case 'J': // --max-retry-after: cap on an obeyed Retry-After
+              {
+                int secs = -1;
+
+                if (sscanf(com + 1, "%d", &secs) != 1 || secs < 0 ||
+                    secs > HTS_MAX_RETRY_AFTER_LIMIT) {
+                  HTS_PANIC_PRINTF("Invalid --max-retry-after (expected a "
+                                   "delay in seconds, at most one hour)");
+                  htsmain_free();
+                  return -1;
+                }
+                opt->max_retry_after = secs;
+                while (isdigit((unsigned char) *(com + 1)))
+                  com++;
+              } break;
               case 'G': // pause: randomized inter-file delay MIN[:MAX] seconds
                 if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
                   HTS_PANIC_PRINTF("Option pause needs a blank space and a "

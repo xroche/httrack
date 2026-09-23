@@ -1,0 +1,102 @@
+#!/bin/bash
+#
+# Which status codes earn a retry, and whether the Retry-After delay is obeyed
+# and capped (#1738). Graded on the requests the server actually received, so a
+# retry that never leaves the engine cannot pass.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+python=$(find_python) || skip "python3 missing"
+
+server=$(nativepath "$top_srcdir/tests/retry-after-server.py")
+tmpdir=$(mktemp -d)
+serverpid=
+log=$tmpdir/crawl.log
+fail_dump_var log
+
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+"$python" "$server" >"$tmpdir/srv.out" 2>"$tmpdir/srv.err" &
+serverpid=$!
+port=$(discover_server_port "$tmpdir/srv.out" "$serverpid") || exit 1
+
+retries=2
+# --max-retry-after, so one wait is one second and the whole run stays short
+cap=1
+crawl() { # crawl NAME [extra httrack args...]
+    local name=$1 rc=0
+    shift
+    mkdir -p "$tmpdir/$name"
+    run_with_timeout 120 httrack "http://127.0.0.1:$port/index.html" \
+        -O "$tmpdir/$name" -c1 --robots=0 --retries="$retries" -%v0 -q "$@" \
+        >>"$log" 2>&1 || rc=$?
+    test "$rc" -ne 124 || fail "$name: crawl hit the deadline"
+    test "$rc" -le 128 || fail "$name: crawl ended abnormally ($rc)"
+}
+
+# GET only: a HEAD for the same link is a type check, not a retry.
+hits() { # hits PATH -- GETs the server logged for it
+    local n
+    n=$(command grep -c "^HIT GET /$1\$" "$tmpdir/srv.out" || true)
+    echo "$n"
+}
+
+assert_hits() { # assert_hits CASE EXPECTED WHY
+    local got
+    got=$(hits "$1.html")
+    test "$got" -eq "$2" ||
+        fail_dump "$1: $got request(s), expected $2 ($3)" "$tmpdir/srv.out"
+}
+
+t0=$(date +%s)
+crawl retried --max-retry-after="$cap"
+retried_seconds=$(($(date +%s) - t0))
+
+# retried: 1 try + $retries. 429 whether or not the server named a delay,
+# and 503 only when it did.
+want=$((retries + 1))
+assert_hits rate "$want" "429 must be retried"
+assert_hits rate-nodelay "$want" "429 with no Retry-After must still be retried"
+assert_hits busy "$want" "503 with Retry-After must be retried"
+assert_hits busy-date "$want" "503 with an HTTP-date Retry-After must be retried"
+assert_hits huge "$want" "429 asking an absurd delay must still be retried"
+assert_hits boom "$want" "500 must still be retried"
+# not retried: a 503 naming no usable delay is as likely a host that is down
+# for good, and an unparsable value names none
+assert_hits busy-nodelay 1 "503 with no Retry-After must not be retried"
+assert_hits busy-junk 1 "503 with an unparsable Retry-After must not be retried"
+assert_hits ok 1 "a 200 is fetched once"
+
+# The cap decides the wait, not the server: /huge asks for 100000s.
+grep -qF "Server asked to retry after 100000s, waiting ${cap}s" \
+    "$tmpdir/retried/hts-log.txt" ||
+    fail_dump "no clip logged for the 100000s Retry-After" \
+        "$tmpdir/retried/hts-log.txt"
+
+# rate, busy and huge each wait on both of their $retries, and -c1 keeps those
+# waits from overlapping. busy-date rounds to 0 or 1 and is left out, so this
+# stays a floor whatever the box does.
+waiting=3
+floor=$((waiting * retries * cap))
+echo "capped crawl: ${retried_seconds}s (floor ${floor}s)"
+test "$retried_seconds" -ge "$floor" ||
+    fail "the crawl obeyed no Retry-After: ${retried_seconds}s, expected ${floor}s or more"
+
+# And the wait is the cap's to waive: --max-retry-after=0 makes the same
+# requests without any of it. Graded on the count, not on a second timing,
+# which a loaded runner decides for us.
+requests() { command grep -c '^HIT GET ' "$tmpdir/srv.out" || true; }
+capped_requests=$(requests)
+crawl nowait --max-retry-after=0
+nowait_requests=$(($(requests) - capped_requests))
+
+test "$nowait_requests" -eq "$capped_requests" ||
+    fail_dump "--max-retry-after=0 made $nowait_requests requests, $capped_requests with the wait" \
+        "$tmpdir/srv.out"

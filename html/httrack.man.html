@@ -82,9 +82,10 @@ offline browser : copy websites to a local directory</p>
 --max-files[=N]</b> ] [ <b>-MN, --max-size[=N]</b> ] [
 <b>-EN, --max-time[=N]</b> ] [ <b>-AN, --max-rate[=N]</b> ]
 [ <b>-%cN, --connection-per-second[=N]</b> ] [ <b>-%G,
---pause</b> ] [ <b>-GN, --max-pause[=N]</b> ] [ <b>-cN,
---sockets[=N]</b> ] [ <b>-TN, --timeout[=N]</b> ] [ <b>-RN,
---retries[=N]</b> ] [ <b>-JN, --min-rate[=N]</b> ] [ <b>-HN,
+--pause</b> ] [ <b>-%JN, --max-retry-after[=N]</b> ] [
+<b>-GN, --max-pause[=N]</b> ] [ <b>-cN, --sockets[=N]</b> ]
+[ <b>-TN, --timeout[=N]</b> ] [ <b>-RN, --retries[=N]</b> ]
+[ <b>-JN, --min-rate[=N]</b> ] [ <b>-HN,
 --host-control[=N]</b> ] [ <b>-%P,
 --extended-parsing[=0]</b> ] [ <b>-n, --near</b> ] [ <b>-t,
 --test</b> ] [ <b>-%L, --list</b> ] [ <b>-%S, --urllist</b>
@@ -429,6 +430,18 @@ hour) (--max-time[=N])</p></td></tr>
 
 <p>random pause of MIN[:MAX] seconds between files (e.g.
 %G5:10) (--pause &lt;param&gt;)</p></td></tr>
+<tr valign="top" align="left">
+<td width="9%"></td>
+<td width="8%">
+
+
+<p>-%JN</p></td>
+<td width="1%"></td>
+<td width="82%">
+
+
+<p>longest Retry-After obeyed, in seconds (*%J60, 0=no
+wait) (--max-retry-after[=N])</p></td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="8%">

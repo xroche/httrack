@@ -1,0 +1,12 @@
+#!/bin/bash
+#
+# The Retry-After parser and the launch gate it arms (#1738): both RFC 9110
+# forms, a delay clipped instead of wrapped, -1 for a header naming nothing
+# usable, and a stop request outranking a hold.
+
+set -eu
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+assert_selftest "retry-after: OK" retry-after

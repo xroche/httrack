@@ -4143,6 +4143,13 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
       case 504:
         can_retry = 1;
         break;
+      case 429: // rate limited, so retry once the wait below is up
+        can_retry = 1;
+        break;
+      case 503:
+        /* A 503 naming no delay is as likely a host that is down for good */
+        can_retry = r->retry_after >= 0;
+        break;
       }
 
       /* Restarting a resume the server refused is not a retry of a failed
@@ -4223,6 +4230,11 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
           }
 
         } else { // retry, or a refused-resume restart
+          /* The gate is global, so the links already queued wait too rather
+             than each earning its own 429 */
+          if (r->retry_after >= 0) {
+            back_set_retry_after(sback, opt, r->retry_after);
+          }
           if (restart_whole) {
             hts_log_print(opt, LOG_NOTICE,
                           "Restarting whole file after error %d (%s) at link "

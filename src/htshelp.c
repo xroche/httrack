@@ -523,6 +523,7 @@ void help(const char *app, int more) {
   infomsg("  AN maximum transfer rate in bytes/seconds (1000=1KB/s max)");
   infomsg(" %cN maximum number of connections/seconds (*%c5)");
   infomsg(" %G  random pause of MIN[:MAX] seconds between files (e.g. %G5:10)");
+  infomsg(" %JN longest Retry-After obeyed, in seconds (*%J60, 0=no wait)");
   infomsg
     ("  GN pause transfer if N bytes reached, and wait until lock file is deleted");
   infomsg("");

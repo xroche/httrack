@@ -3783,8 +3783,39 @@ int hts_pause_target_ms(TStamp seed, int min_ms, int max_ms) {
   return min_ms + (int) (z % (uint64_t) (max_ms - min_ms + 1));
 }
 
+void back_set_retry_after(struct_back *sback, httrackp *opt, int seconds) {
+  const int cap = opt->max_retry_after > 0 ? opt->max_retry_after : 0;
+  TStamp until;
+
+  if (seconds > cap) {
+    hts_log_print(
+        opt, LOG_NOTICE,
+        "Server asked to retry after %ds, waiting %ds (--max-retry-after)",
+        seconds, cap);
+    seconds = cap;
+  } else if (seconds > 0) {
+    hts_log_print(opt, LOG_NOTICE, "Waiting %ds before retrying (Retry-After)",
+                  seconds);
+  }
+  if (seconds <= 0)
+    return;
+  until = mtime_local() + (TStamp) seconds * 1000;
+  if (until > sback->retry_after_until)
+    sback->retry_after_until = until;
+}
+
 int back_pluggable_sockets_strict(struct_back * sback, httrackp * opt) {
   int n = opt->maxsoc - back_nsoc(sback);
+  /* A stop outranks the delays below, which would otherwise swallow the user's
+     Ctrl-C for as long as the server or --pause asked us to wait. */
+  const hts_boolean may_wait = !opt->state.stop;
+
+  // Retry-After: withhold launches until the delay the server asked for is up
+  if (n > 0 && may_wait && sback->retry_after_until > 0) {
+    if (mtime_local() < sback->retry_after_until)
+      return 0;
+    sback->retry_after_until = 0;
+  }
 
   // connect limiter
   if (n > 0 && opt->maxconn > 0 && HTS_STAT.last_connect > 0) {
@@ -3804,7 +3835,7 @@ int back_pluggable_sockets_strict(struct_back * sback, httrackp * opt) {
   }
 
   // #185 randomized inter-file pause: non-blocking, one launch per gap
-  if (n > 0 && opt->pause_max_ms > 0 && HTS_STAT.last_connect > 0) {
+  if (n > 0 && may_wait && opt->pause_max_ms > 0 && HTS_STAT.last_connect > 0) {
     TStamp opTime =
         HTS_STAT.last_request ? HTS_STAT.last_request : HTS_STAT.last_connect;
     TStamp lap = mtime_local() - opTime;
@@ -4289,6 +4320,8 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
 
   if (from->maxconn > 0)
     to->maxconn = from->maxconn;
+  if (from->max_retry_after >= 0)
+    to->max_retry_after = from->max_retry_after;
 
   if (StringNotEmpty(from->user_agent))
     StringCopyS(to->user_agent, from->user_agent);
