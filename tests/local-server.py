@@ -4219,6 +4219,9 @@ def main():
     parser.add_argument("--tls", action="store_true", help="serve HTTPS")
     parser.add_argument("--cert", help="TLS certificate (PEM)")
     parser.add_argument("--key", help="TLS private key (PEM)")
+    parser.add_argument(
+        "--mptcp", action="store_true", help="listen with Multipath TCP"
+    )
     args = parser.parse_args()
 
     root = os.path.abspath(args.root)
@@ -4237,7 +4240,16 @@ def main():
             socketserver.TCPServer.server_bind(self)
             self.server_name, self.server_port = self.server_address[:2]
 
-    httpd = BacklogHTTPServer((args.bind, 0), factory)
+    # An MPTCP listener is what lets a client negotiate multipath instead of
+    # being silently fallen back to TCP, so a test can tell the two apart.
+    httpd = BacklogHTTPServer((args.bind, 0), factory, bind_and_activate=not args.mptcp)
+    if args.mptcp:
+        httpd.socket.close()
+        httpd.socket = socket.socket(
+            httpd.address_family, socket.SOCK_STREAM, socket.IPPROTO_MPTCP
+        )
+        httpd.server_bind()
+        httpd.server_activate()
 
     if args.tls:
         import ssl

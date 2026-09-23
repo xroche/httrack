@@ -587,13 +587,12 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
     SOCaddr_copy_SOCaddr(server_data, server);
 
     // créer ("attachement") une socket (point d'accès) internet,en flot
-    soc_ctl = (T_SOC) socket(SOCaddr_sinfamily(server), SOCK_STREAM, 0);
+    soc_ctl = hts_socket_client(SOCaddr_sinfamily(server), opt);
     if (soc_ctl == INVALID_SOCKET) {
       strcpybuff(back->r.msg, "Unable to create a socket");
       back->r.statuscode = STATUSCODE_INVALID;
       _HALT_FTP return 0;
     }
-    socket_set_nosigpipe(soc_ctl);
 
     SOCaddr_initport(server, port);
 
@@ -865,7 +864,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
 #endif
           if (resolved) {
             // socket
-            soc_dat = (T_SOC) socket(SOCaddr_sinfamily(server), SOCK_STREAM, 0);
+            soc_dat = hts_socket_client(SOCaddr_sinfamily(server), opt);
             if (soc_dat != INVALID_SOCKET) {
               // structure: connexion au domaine internet, port 80 (ou autre)
               SOCaddr_initport(server, port_pasv);

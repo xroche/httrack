@@ -79,6 +79,15 @@ typedef unsigned long in_addr_t;
 #endif
 #endif
 
+/** Multipath TCP (RFC 8684): Linux opens it as a protocol on an ordinary stream
+    socket, and the kernel falls back to plain TCP when the peer does not answer
+    MP_CAPABLE. macOS needs connectx() instead, which is not wired here. */
+#if defined(IPPROTO_MPTCP) && !defined(_WIN32)
+#define HTS_INET_MPTCP 1
+#else
+#define HTS_INET_MPTCP 0
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif

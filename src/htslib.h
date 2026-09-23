@@ -496,6 +496,20 @@ void fprintfio(FILE * fp, const char *buff, const char *prefix);
 
 void socket_set_nosigpipe(T_SOC soc);
 
+/* Create a stream socket for an outgoing connection, with SIGPIPE disarmed.
+   Uses Multipath TCP when `opt` asks for it and the system has it, and plain
+   TCP otherwise. Returns INVALID_SOCKET when no socket could be created. */
+T_SOC hts_socket_client(int family, httrackp *opt);
+
+/* Can this build, on this system, open a Multipath TCP socket at all? */
+hts_boolean hts_mptcp_available(void);
+
+/* Did Multipath TCP survive this established connection's handshake? */
+hts_boolean hts_socket_is_mptcp(T_SOC soc);
+
+/* Count an established connection as MPTCP or as fallen back to TCP. */
+void hts_mptcp_account(httrackp *opt, T_SOC soc);
+
 /* Windows raises no SIGPIPE. Elsewhere this arm is Darwin, which has no
    sigtimedwait and does have SO_NOSIGPIPE, so the socket already covers it. */
 #if defined(_WIN32) || !defined(HAVE_SIGTIMEDWAIT)

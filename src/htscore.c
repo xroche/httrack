@@ -649,6 +649,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   opt->links_unqueued = HTS_FALSE;
   opt->abort_left_partial = HTS_FALSE;
   opt->transport_failures = 0;
+  opt->mptcp_connections = 0;
+  opt->mptcp_fallbacks = 0;
   opt->upper_links_refused = HTS_FALSE;
 
   /* before the first bailout below, each of which leaves it false */
@@ -2367,6 +2369,11 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
           finalInfo, sizeof(finalInfo), &finalUsed,
           "(%d links failed to transfer, so the mirror is incomplete)" LF,
           opt->transport_failures);
+    if (opt->mptcp_connections > 0 || opt->mptcp_fallbacks > 0)
+      slcatprintfbuff_clip(finalInfo, sizeof(finalInfo), &finalUsed,
+                           "(Multipath TCP: %d connections negotiated it, %d "
+                           "fell back to TCP)" LF,
+                           opt->mptcp_connections, opt->mptcp_fallbacks);
 
     // Log
     fprintf(opt->log, LF "%s", finalInfo);
@@ -4322,6 +4329,9 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
     to->maxconn = from->maxconn;
   if (from->max_retry_after >= 0)
     to->max_retry_after = from->max_retry_after;
+
+  if (from->mptcp > -1)
+    to->mptcp = from->mptcp;
 
   if (StringNotEmpty(from->user_agent))
     StringCopyS(to->user_agent, from->user_agent);

@@ -447,6 +447,11 @@ AX_CHECK_ALIGNED_ACCESS_REQUIRED
 # check for various headers
 AC_CHECK_HEADERS([execinfo.h paths.h spawn.h sys/ioctl.h sys/random.h sys/sysctl.h])
 
+# Multipath TCP: the protocol constant is what opens the socket, and MPTCP_INFO
+# is what tells a negotiated connection from one the kernel fell back to TCP.
+AC_CHECK_DECLS([IPPROTO_MPTCP], [], [], [[#include <netinet/in.h>]])
+AC_CHECK_HEADERS([linux/mptcp.h])
+
 # Sub-second file modification times, so a stop request created in the second a
 # mirror started can still be ordered against that mirror's progress lock. The
 # first member is POSIX 2008, the second is macOS and the older BSDs. Without

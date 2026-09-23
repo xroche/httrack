@@ -612,6 +612,14 @@ struct httrackp {
                                         alone. Tail: ABI */
   int max_retry_after; /**< longest Retry-After obeyed, in seconds. 0 retries
                             with no wait (--max-retry-after). Tail: ABI */
+  hts_tristate mptcp;  /**< open connections with Multipath TCP (--mptcp).
+                            HTS_DEFAULT: on where the kernel recovers from a
+                            blackholed SYN by itself. Tail: ABI */
+  int mptcp_connections; /**< connections that negotiated MPTCP. Live state, so
+                              copy_htsopt must leave it alone. Tail: ABI */
+  int mptcp_fallbacks;   /**< connections that asked for MPTCP and were given
+                              plain TCP. Live state, so copy_htsopt must leave it
+                              alone. Tail: ABI */
 };
 
 /* Running statistics for a mirror. */

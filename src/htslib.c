@@ -60,6 +60,16 @@ Please visit our Website: http://www.httrack.com
 
 #include <limits.h>
 
+/* MPTCP_INFO tells a negotiated connection from one the kernel fell back to
+   plain TCP. SOL_MPTCP comes from the C library, so an old one costs the
+   reporting, never the feature. */
+#if HTS_INET_MPTCP && defined(HAVE_LINUX_MPTCP_H) && defined(SOL_MPTCP)
+#include <linux/mptcp.h>
+#define HTS_INET_MPTCP_INFO 1
+#else
+#define HTS_INET_MPTCP_INFO 0
+#endif
+
 #ifdef _WIN32
 #include <direct.h>
 #else
@@ -2274,6 +2284,112 @@ void socket_set_nosigpipe(T_SOC soc) {
 #endif
 }
 
+/* Resolved once, because a kernel that refuses IPPROTO_MPTCP refuses it for
+   every later connection. Probed from hts_init() and from option parsing, both
+   of which run before any crawl thread does. */
+static hts_boolean hts_mptcp_probed = HTS_FALSE;
+static hts_boolean hts_mptcp_usable = HTS_FALSE;
+static hts_boolean hts_mptcp_default = HTS_FALSE;
+
+#if HTS_INET_MPTCP
+/* Can we open an MPTCP socket of this family? */
+static hts_boolean hts_mptcp_family_usable(int family) {
+  const T_SOC soc = (T_SOC) socket(family, SOCK_STREAM, IPPROTO_MPTCP);
+
+  if (soc == INVALID_SOCKET)
+    return HTS_FALSE;
+  close(soc);
+  return HTS_TRUE;
+}
+
+/* Can the kernel recover on its own from a SYN dropped for carrying the MPTCP
+   option? Without these two it retries with the option until the connect times
+   out, which a middlebox turns into a dead site. */
+static hts_boolean hts_mptcp_kernel_recovers(void) {
+  if (access("/proc/sys/net/mptcp/blackhole_timeout", R_OK) != 0)
+    return HTS_FALSE;
+  if (access("/proc/sys/net/mptcp/syn_retrans_before_tcp_fallback", R_OK) != 0)
+    return HTS_FALSE;
+  return HTS_TRUE;
+}
+#endif
+
+/* Being able to open an MPTCP socket is not enough to turn it on by default,
+   so the kernel has to be able to climb out of a blackhole as well. */
+static void hts_mptcp_probe(void) {
+#if HTS_INET_MPTCP
+  hts_mptcp_usable = hts_mptcp_family_usable(AF_INET);
+#if HTS_INET6
+  if (!hts_mptcp_usable)
+    hts_mptcp_usable = hts_mptcp_family_usable(AF_INET6);
+#endif
+  if (hts_mptcp_usable)
+    hts_mptcp_default = hts_mptcp_kernel_recovers();
+#endif
+  hts_mptcp_probed = HTS_TRUE;
+}
+
+hts_boolean hts_mptcp_available(void) {
+  if (!hts_mptcp_probed)
+    hts_mptcp_probe();
+  return hts_mptcp_usable;
+}
+
+/* Should this connection be opened with MPTCP? Reads the verdict rather than
+   probing for it, because this one runs on the crawl threads. */
+static hts_boolean hts_mptcp_enabled(httrackp *opt) {
+  const hts_tristate wanted = opt != NULL ? opt->mptcp : HTS_DEFAULT;
+
+  if (!hts_mptcp_usable)
+    return HTS_FALSE;
+  if (wanted == HTS_DEFAULT)
+    return hts_mptcp_default;
+  return wanted == HTS_TRUE ? HTS_TRUE : HTS_FALSE;
+}
+
+T_SOC hts_socket_client(int family, httrackp *opt) {
+  T_SOC soc = INVALID_SOCKET;
+
+#if HTS_INET_MPTCP
+  /* A refusal here is the kernel declining the protocol. The peer declining it
+     is not visible: the kernel completes the handshake as plain TCP. */
+  if (hts_mptcp_enabled(opt))
+    soc = (T_SOC) socket(family, SOCK_STREAM, IPPROTO_MPTCP);
+#else
+  (void) opt;
+#endif
+  if (soc == INVALID_SOCKET)
+    soc = (T_SOC) socket(family, SOCK_STREAM, 0);
+  if (soc != INVALID_SOCKET)
+    socket_set_nosigpipe(soc);
+  return soc;
+}
+
+hts_boolean hts_socket_is_mptcp(T_SOC soc) {
+#if HTS_INET_MPTCP_INFO
+  struct mptcp_info info;
+  socklen_t len = (socklen_t) sizeof(info);
+
+  /* Refused on a socket the kernel fell back to TCP, where SO_PROTOCOL still
+     reads IPPROTO_MPTCP and so answers nothing. */
+  if (getsockopt(soc, SOL_MPTCP, MPTCP_INFO, (char *) &info, &len) != 0)
+    return HTS_FALSE;
+  return HTS_TRUE;
+#else
+  (void) soc;
+  return HTS_FALSE;
+#endif
+}
+
+void hts_mptcp_account(httrackp *opt, T_SOC soc) {
+  if (opt == NULL || soc == INVALID_SOCKET || !hts_mptcp_enabled(opt))
+    return;
+  if (hts_socket_is_mptcp(soc))
+    opt->mptcp_connections++;
+  else
+    opt->mptcp_fallbacks++;
+}
+
 int connect_socket_error(T_SOC soc) {
   int soerr = 0;
   socklen_t len = (socklen_t) sizeof(soerr);
@@ -2378,7 +2494,7 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
 #if HTS_WIDE_DEBUG
     DEBUG_W("socket\n");
 #endif
-    soc = (T_SOC) socket(SOCaddr_sinfamily(server), SOCK_STREAM, 0);
+    soc = hts_socket_client(SOCaddr_sinfamily(server), opt);
     if (retour != NULL) {
       retour->debugid = HTS_STAT.stat_sockid++;
     }
@@ -2399,7 +2515,6 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
       }
       return INVALID_SOCKET;    // erreur création socket impossible
     }
-    socket_set_nosigpipe(soc);
     // bind this address
     if (retour != NULL && strnotempty(retour->req.proxy.bindhost)) {
       const char *error = "unknown error";
@@ -6355,6 +6470,9 @@ HTSEXT_API int hts_init(void) {
   /* Init threads (lazy init) */
   htsthread_init();
 
+  /* Before any thread reads the verdict */
+  hts_mptcp_probe();
+
   /* Ensure external modules are loaded */
   hts_debug_log_print("calling htspe_init()");  /* debug */
   htspe_init();                 /* module load (lazy) */
@@ -6725,6 +6843,9 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->links_unqueued = HTS_FALSE;
   opt->mirror_completed = HTS_DEFAULT;
   opt->transport_failures = 0;
+  opt->mptcp = HTS_DEFAULT;
+  opt->mptcp_connections = 0;
+  opt->mptcp_fallbacks = 0;
   opt->upper_links_refused = 0;
   opt->abort_left_partial = HTS_FALSE;
   StringCopy(opt->why_url, "");

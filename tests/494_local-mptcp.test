@@ -1,0 +1,54 @@
+#!/bin/bash
+#
+# Multipath TCP: what the engine asks the kernel for, and what it reports back.
+# A peer that speaks MPTCP is counted as negotiated, a peer that does not is
+# counted as a fallback, and --mptcp=0 asks for nothing at all.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+require_httrack
+skip_on_windows "Windows has no Multipath TCP protocol"
+have_feature mptcp || skip "no Multipath TCP on this system"
+
+# The switch itself: which protocol a socket is created with, and whether a
+# handshake the kernel fell back to plain TCP is seen as a fallback.
+httrack -#test=mptcp || fail "the mptcp self-test failed"
+
+# A value that is neither on nor off is refused rather than read as on. Port 1
+# refuses at once, so a regression that let the option through costs no traffic;
+# the message is what says the option was judged, not the unreachable host.
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_mptcp.XXXXXX")
+cleanup_push rm -rf "$tmp"
+refused=$(httrack -@m2 -O "$tmp" 'http://127.0.0.1:1/' 2>&1 || true)
+grep -q 'Unknown value for -@m' <<<"$refused" ||
+    fail "httrack -@m2 was not refused: $refused"
+
+python=$(find_python) || skip "python3 not found"
+"$python" -c 'import socket; socket.IPPROTO_MPTCP' 2>/dev/null ||
+    skip "this python cannot listen with Multipath TCP"
+
+# A peer that speaks it.
+bash "$top_srcdir/tests/local-crawl.sh" --server-mptcp --errors 0 --files 5 \
+    --log-found 'Multipath TCP: [1-9][0-9]* connections negotiated it, 0 fell back' \
+    httrack 'BASEURL/simple/basic.html' --mptcp
+
+# A peer that does not: the kernel falls back and the crawl still completes.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 5 \
+    --log-found 'Multipath TCP: 0 connections negotiated it, [1-9][0-9]* fell back' \
+    httrack 'BASEURL/simple/basic.html' --mptcp
+
+# Off means nothing is asked for, so there is nothing to report either.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 5 \
+    --log-not-found 'Multipath TCP' \
+    httrack 'BASEURL/simple/basic.html' --mptcp=0
+
+# One connection counts once: a TLS handshake sends the slot back through the
+# connect path, which counted the same socket a second time.
+bash "$top_srcdir/tests/local-crawl.sh" --tls --errors 0 --files 1 \
+    --log-found 'Multipath TCP: 0 connections negotiated it, 1 fell back' \
+    httrack 'BASEURL/simple/link.html' --mptcp -s0 -r1

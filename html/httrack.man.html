@@ -107,23 +107,23 @@ offline browser : copy websites to a local directory</p>
 [ <b>-%z, --disable-compression[=0]</b> ] [ <b>-%B,
 --tolerant[=0]</b> ] [ <b>-%s, --updatehack[=0]</b> ] [
 <b>-%u, --urlhack[=0]</b> ] [ <b>-%A, --assume</b> ] [
-<b>-@iN, --protocol[=N]</b> ] [ <b>-%w, --disable-module</b>
-] [ <b>-F, --user-agent</b> ] [ <b>-%R, --referer</b> ] [
-<b>-%E, --from</b> ] [ <b>-%F, --footer</b> ] [ <b>-%l,
---language</b> ] [ <b>-%a, --accept</b> ] [ <b>-%X,
---headers</b> ] [ <b>-C, --cache[=N]</b> ] [ <b>-k,
---store-all-in-cache</b> ] [ <b>-%r, --warc</b> ] [ <b>-%d,
---changes[=0]</b> ] [ <b>-%n, --do-not-recatch[=0]</b> ] [
-<b>-%v, --display[=N]</b> ] [ <b>-Q, --do-not-log</b> ] [
-<b>-q, --quiet</b> ] [ <b>-z, --extra-log</b> ] [ <b>-Z,
---debug-log</b> ] [ <b>-v, --verbose</b> ] [ <b>-f,
---file-log</b> ] [ <b>-f2, --single-log</b> ] [ <b>-I,
---index[=0]</b> ] [ <b>-%i, --build-top-index[=0]</b> ] [
-<b>-%I, --search-index[=N]</b> ] [ <b>-pN,
---priority[=N]</b> ] [ <b>-S, --stay-on-same-dir</b> ] [
-<b>-D, --can-go-down</b> ] [ <b>-U, --can-go-up</b> ] [
-<b>-B, --can-go-up-and-down</b> ] [ <b>-a,
---stay-on-same-address</b> ] [ <b>-d,
+<b>-@iN, --protocol[=N]</b> ] [ <b>-@mN, --mptcp[=0]</b> ] [
+<b>-%w, --disable-module</b> ] [ <b>-F, --user-agent</b> ] [
+<b>-%R, --referer</b> ] [ <b>-%E, --from</b> ] [ <b>-%F,
+--footer</b> ] [ <b>-%l, --language</b> ] [ <b>-%a,
+--accept</b> ] [ <b>-%X, --headers</b> ] [ <b>-C,
+--cache[=N]</b> ] [ <b>-k, --store-all-in-cache</b> ] [
+<b>-%r, --warc</b> ] [ <b>-%d, --changes[=0]</b> ] [ <b>-%n,
+--do-not-recatch[=0]</b> ] [ <b>-%v, --display[=N]</b> ] [
+<b>-Q, --do-not-log</b> ] [ <b>-q, --quiet</b> ] [ <b>-z,
+--extra-log</b> ] [ <b>-Z, --debug-log</b> ] [ <b>-v,
+--verbose</b> ] [ <b>-f, --file-log</b> ] [ <b>-f2,
+--single-log</b> ] [ <b>-I, --index[=0]</b> ] [ <b>-%i,
+--build-top-index[=0]</b> ] [ <b>-%I, --search-index[=N]</b>
+] [ <b>-pN, --priority[=N]</b> ] [ <b>-S,
+--stay-on-same-dir</b> ] [ <b>-D, --can-go-down</b> ] [
+<b>-U, --can-go-up</b> ] [ <b>-B, --can-go-up-and-down</b> ]
+[ <b>-a, --stay-on-same-address</b> ] [ <b>-d,
 --stay-on-same-domain</b> ] [ <b>-l, --stay-on-same-tld</b>
 ] [ <b>-e, --go-everywhere</b> ] [ <b>-%H,
 --debug-headers</b> ] [ <b>-%!,
@@ -1050,6 +1050,18 @@ foo.cgi=text/html</p>
 
 <p style="margin-top: 1em">internet protocol (0=both
 ipv6+ipv4, 4=ipv4 only, 6=ipv6 only) (--protocol[=N])</p></td></tr>
+<tr valign="top" align="left">
+<td width="9%"></td>
+<td width="5%">
+
+
+<p>-@mN</p></td>
+<td width="4%"></td>
+<td width="82%">
+
+
+<p>carry connections over Multipath TCP where the system
+offers it (0=no, 1=yes) (--mptcp[=0])</p></td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="5%">
