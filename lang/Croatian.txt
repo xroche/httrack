@@ -1050,3 +1050,7 @@ Ignore %s and every host below it
 Zanemari %s i sve poslužitelje ispod njega
 Manual
 Priručnik
+Max Retry-After(s)
+Najv. Retry-After (s)
+Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
+Najduže čekanje koje se poštuje kada poslužitelj pošalje zaglavlje Retry-After. Upišite 0 za ponovni pokušaj bez čekanja.

@@ -1050,3 +1050,7 @@ Ignore %s and every host below it
 Ignore %s and every host below it
 Manual
 Manual
+Max Retry-After(s)
+Max Retry-After(s)
+Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
+Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.

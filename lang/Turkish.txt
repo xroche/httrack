@@ -1050,3 +1050,7 @@ Ignore %s and every host below it
 %s ve altındaki tüm sunucuları yoksay
 Manual
 Kılavuz
+Max Retry-After(s)
+En çok Retry-After (sn)
+Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
+Bir sunucu Retry-After başlığı gönderdiğinde uyulacak en uzun bekleme. Beklemeden yeniden denemek için 0 girin.

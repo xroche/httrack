@@ -146,6 +146,7 @@ ${do:end-if}${do:output-mode:html}
 	${test:timeout:--timeout=}${unquoted:timeout}
 	${test:remt:--host-control=1}
 	${test:retry:--retries=}${unquoted:retry}
+	${test:maxretryafter:--max-retry-after=}${unquoted:maxretryafter}
 	${test:rate:--min-rate=}${unquoted:rate}
 	${test:rems:--host-control=2}
 \
@@ -281,6 +282,7 @@ MaxWait=${pausebytes}
 PauseFiles=${pausefiles}
 Sockets=${connexion}
 Retry=${retry}
+MaxRetryAfter=${maxretryafter}
 MaxTime=${maxtime}
 TimeOut=${timeout}
 RateOut=${rate}

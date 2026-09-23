@@ -1,0 +1,112 @@
+#!/bin/bash
+#
+# An empty box must pass no flag, because a filled-in 60 could not be told from
+# one the user typed.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+distdir=${top_srcdir:-$(cd "${testdir}/.." && pwd)}
+distdir=$(cd "${distdir}" && pwd)
+# shellcheck source=tests/webhttracklib.sh
+. "${testdir}/webhttracklib.sh"
+
+htsserver_require
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_maxretryafter.XXXXXX") || fail "no tmpdir"
+cleanup_push htsserver_cleanup_dir "${work}"
+
+mkdir -p "${work}/proj/hts-cache"
+cat >"${work}/proj/hts-cache/winprofile.ini" <<'INI'
+CurrentUrl=http://example.com/
+MaxRetryAfter=120
+INI
+
+printf '[webhttrack carries --max-retry-after] ..\t'
+htsserver_start --home "${work}"
+
+htsserver_python - "${HTS_URL}" "${work}" "${work}/emitted" <<'PY' || fail "the Max Retry-After field is not wired (see above)"
+import shlex, sys
+
+from webtestlib import Session, field, textarea
+
+s, work, emitted = Session(sys.argv[1]), sys.argv[2], sys.argv[3]
+FLAG = "--max-retry-after="
+
+
+def option4():
+    return s.get("option4.html?sid=" + s.sid)
+
+
+def flags_in(page):
+    return [l.strip() for l in textarea(page, "command").split("\n")
+            if FLAG in l]
+
+
+# A session seeded with the engine's 60 would write a value nobody chose into
+# every saved project, so probe before anything is posted.
+rendered = option4()
+for needle in ('<input name="maxretryafter"', "Max Retry-After(s)",
+               "title='Longest delay to obey"):
+    if needle not in rendered:
+        sys.exit("option4.html does not render %r" % needle)
+if field(rendered, "maxretryafter") != "":
+    sys.exit("a new project starts with %r in the box"
+             % field(rendered, "maxretryafter"))
+if flags_in(s.get("step4.html?sid=" + s.sid)):
+    sys.exit("a new project already passes the flag")
+
+
+def posted(value):
+    page = s.post("step4.html", [("maxretryafter", value)])
+    ini = [l.strip() for l in textarea(page, "winprofile").split("\n")
+           if l.startswith("MaxRetryAfter=")]
+    return flags_in(page), ini
+
+
+# 0 waives the wait, so it must survive as a value rather than read as unset.
+for value, want in [("120", ["--max-retry-after=120"]),
+                    ("0", ["--max-retry-after=0"]),
+                    ("", [])]:
+    flags, ini = posted(value)
+    if flags != want:
+        sys.exit("%r emitted %r, wanted %r" % (value, flags, want))
+    if ini != ["MaxRetryAfter=" + value]:
+        sys.exit("%r wrote %r to winprofile.ini" % (value, ini))
+    # field() returns None when the input carries no value= at all.
+    back = field(option4(), "maxretryafter") or ""
+    if back != value:
+        sys.exit("option4.html renders %r back, wanted %r" % (back, value))
+
+# Reopening a saved project is the only path that runs the winprofile.ini
+# reader, and the loop above left the session empty for it to overwrite.
+loaded = s.post("step2.html", [("path", work), ("loadprojname", "proj")])
+if "http://example.com/" not in loaded:
+    sys.exit("step2.html did not load the project\n%s" % loaded[:400])
+back = field(option4(), "maxretryafter") or ""
+if back != "120":
+    sys.exit("the saved MaxRetryAfter comes back as %r" % back)
+
+# Hand the engine below the flag the template emitted, not a literal.
+flags, _ = posted("120")
+open(emitted, "w").write("\n".join(shlex.split(flags[0])) + "\n")
+PY
+echo OK
+
+printf '[the engine knows the flag] ..\t'
+# macOS runs the suite under bash 3.2, which has no mapfile
+argv=()
+while IFS= read -r arg; do
+    argv+=("${arg}")
+done <"${work}/emitted"
+# Rejected flags exit 255 like a URL-less run, so match the diagnostic.
+out=$(httrack "${argv[@]}" 2>&1) || true
+if grep -q "Unknown option" <<<"${out}"; then
+    fail "the engine rejects ${argv[0]}: ${out}"
+fi
+# Control: the same probe on a name the engine has no alias for. It is built from
+# what the template emitted, so a rename cannot leave it passing alone.
+bogus="${argv[0]%%=*}x=${argv[0]#*=}"
+out=$(httrack "${bogus}" 2>&1) || true
+grep -q "Unknown option" <<<"${out}" || fail "the unknown-option probe proves nothing"
+echo OK

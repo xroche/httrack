@@ -1080,3 +1080,7 @@ LANG_SITEMAPURLTIP
 Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
 LANG_MANUAL
 Manual
+LANG_MAXRETRYAFTER
+Max Retry-After(s)
+LANG_MAXRETRYAFTERTIP
+Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
