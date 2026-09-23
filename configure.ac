@@ -464,6 +464,12 @@ AC_CHECK_FUNCS([utimensat])
 # _GNU_SOURCE, which htsglobal.h's include order never gives the tree.
 AC_CHECK_FUNCS([strerror_r])
 
+# The DNS self-test times a cancel against a sleeping resolver. Wall-clock
+# elapsed time is steppable, so it reads CLOCK_MONOTONIC where there is one.
+# Pre-2.17 glibc keeps clock_gettime() in librt.
+AC_SEARCH_LIBS([clock_gettime], [rt])
+AC_CHECK_FUNCS([clock_gettime])
+
 ### Where an optional feature's default comes from (meson's auto_features)
 AC_MSG_CHECKING([whether to probe for optional features nobody asked for])
 AC_ARG_ENABLE([auto-features],
