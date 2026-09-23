@@ -1,0 +1,86 @@
+# The suite proves Multipath TCP negotiates over loopback, where both ends share
+# one kernel. Only a real server can show the handshake surviving a real path,
+# so this asks ut.httrack.com, which speaks it. A red here can equally mean the
+# server's own configuration changed, which is why it is scheduled and never a
+# required check.
+name: mptcp negotiation (networked)
+
+on:
+  schedule:
+    - cron: "37 5 * * 2"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  negotiate:
+    name: Multipath TCP against a live server
+    # Scheduled workflows run per-fork independently; skip anywhere but upstream.
+    if: github.repository == 'xroche/httrack'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
+          sudo apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev
+
+      - name: Build
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          ./configure --enable-mptcp
+          make -j"$(nproc)"
+
+      # A runner whose kernel has no Multipath TCP can say nothing about the
+      # server, so it declines rather than reporting a red.
+      - name: Check the runner can open a Multipath TCP socket
+        id: probe
+        run: |
+          set -euo pipefail
+          if src/httrack -#test=features | grep -qx 'mptcp 1'; then
+            echo "usable=yes" >>"$GITHUB_OUTPUT"
+          else
+            echo "usable=no" >>"$GITHUB_OUTPUT"
+            echo "::notice::this runner has no Multipath TCP, so the server was not asked"
+          fi
+
+      - name: Negotiate against ut.httrack.com, and prove the option decides it
+        if: steps.probe.outputs.usable == 'yes'
+        env:
+          HOST: https://ut.httrack.com/
+        run: |
+          set -euo pipefail
+          # One page, no robots fetch, so the count is the page's own connection.
+          crawl() { # crawl <outdir> <option>
+            rm -rf "$1"
+            timeout 120 src/httrack "$HOST" -O "$1" "$2" -r1 -s0 -q -%v0 \
+              >/dev/null 2>&1 || true
+            test -s "$1/hts-log.txt" ||
+              { echo "no log written for $2" >&2; exit 1; }
+          }
+
+          crawl on --mptcp
+          line=$(grep -o 'Multipath TCP: .*' on/hts-log.txt || true)
+          test -n "$line" ||
+            { echo "the server answered but nothing negotiated: no Multipath line" >&2
+              grep -iE 'error|warning' on/hts-log.txt >&2 || true; exit 1; }
+          echo "with --mptcp: $line"
+          grep -qE 'Multipath TCP: [1-9][0-9]* HTTP connections negotiated it, 0 fell back' \
+            <<<"$line" ||
+            { echo "ut.httrack.com did not negotiate; check the server's own setting" >&2
+              exit 1; }
+
+          # The control: the same host and the same page, with the option off,
+          # must report nothing. Without it a line could mean anything.
+          crawl off --mptcp=0
+          ! grep -q 'Multipath TCP' off/hts-log.txt ||
+            { echo "--mptcp=0 still reported a Multipath line" >&2; exit 1; }
+          echo "with --mptcp=0: no line, as it should be"
