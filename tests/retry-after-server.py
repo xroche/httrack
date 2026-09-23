@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Status codes with and without Retry-After, for 490_local-retry-after.
+"""Status codes with and without Retry-After, for 492_local-retry-after.
 
 Each path answers one case and prints "HIT <path>" so the test can count the
 requests the engine actually made. Prints "PORT <n>" once listening.
