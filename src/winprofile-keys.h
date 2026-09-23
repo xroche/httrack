@@ -76,7 +76,7 @@ static const winprofile_key_t winprofile_keys[WINPROFILE_KEY_COUNT] = {
   {"MaxLinks", "win,web,droid", "setting", "string", "", "", "", "agreed", "", "absent", ""},
   {"MaxOther", "win,web,droid", "setting", "string", "", "", "", "agreed", "", "absent", ""},
   {"MaxRate", "win,web,droid", "setting", "number", "", "", "", "none", "", "absent", ""},
-  {"MaxRetryAfter", "web", "setting", "string", "", "", "", "none", "", "absent", ""},
+  {"MaxRetryAfter", "win,web", "setting", "string", "", "", "", "none", "", "absent", ""},
   {"MaxTime", "win,web,droid", "setting", "string", "", "", "", "agreed", "", "absent", ""},
   {"MaxWait", "win,web", "setting", "string", "", "", "", "agreed", "", "absent", ""},
   {"Near", "win,web,droid", "setting", "checkbox", "--near", "", "", "agreed", "0", "", ""},
