@@ -6,6 +6,7 @@ requests the engine actually made. Prints "PORT <n>" once listening.
 """
 
 import email.utils
+import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -70,6 +71,9 @@ class Handler(BaseHTTPRequestHandler):
 class Server(ThreadingHTTPServer):
     request_queue_size = 32  # BSD/macOS drop connections at Python's default 5
 
+
+# The shell greps these lines anchored, and a native python writes CRLF.
+sys.stdout.reconfigure(newline="\n")
 
 srv = Server(("127.0.0.1", 0), Handler)
 print("PORT %d" % srv.server_address[1], flush=True)
