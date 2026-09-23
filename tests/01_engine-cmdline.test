@@ -121,10 +121,19 @@ for good in 0 5 3600 --max-retry-after=7; do
     esac
     accepted "$tmp/mra-ok" "#1738: valid --max-retry-after '$good' rejected"
 done
-for bad in "" x 1.5 -3 3601 99999; do
+# The message matters: without it a value the generic option parser chokes on
+# passes this table while never reaching the range check.
+for bad in "" x -3 3601 99999; do
     run "$tmp/mra-bad" "-%J$bad"
     refused "#1738: invalid --max-retry-after '$bad' not refused cleanly"
+    grep -q 'Invalid --max-retry-after' "$tmp/mra-bad/.log" ||
+        fail "#1738: '$bad' was refused by something other than the range check"
 done
+# A fractional value takes its integer part and leaves the rest an unknown option
+run "$tmp/mra-bad" "-%J1.5"
+refused "#1738: fractional --max-retry-after not refused cleanly"
+! grep -q 'Invalid --max-retry-after' "$tmp/mra-bad/.log" ||
+    fail "#1738: 1.5 now reaches the range check, so it belongs in the table above"
 
 # An option is not -i (continue) merely because its name contains an 'i' (#615).
 # These used to wipe the URL given before them and exit on the usage screen.
