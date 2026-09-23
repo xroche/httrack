@@ -673,7 +673,10 @@ int dns_timeout_selftests(httrackp *opt) {
      returns well after the clock fires, so it can only speak alone if
      MOCK_SLOW_MS ever stops being the larger of the two. */
   CHECK(finished == 0);
-  CHECK(elapsed < (TStamp) opt->timeout * 1000 + 500);
+  /* halfway to MOCK_SLOW_MS, not a tight margin on the deadline: the engine
+     times that out on the wall clock, so a step moves when it fires even
+     though the measurement above no longer moves. */
+  CHECK(elapsed < ((TStamp) opt->timeout * 1000 + MOCK_SLOW_MS) / 2);
   CHECK(count == 0); /* a timeout is reported as "does not resolve" */
 
   /* state.lock is not held across the resolve; a concurrent stop query, which
