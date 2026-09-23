@@ -716,7 +716,9 @@ AC_SUBST(LFS_FLAG)
 
 # sigtimedwait cannot block, unlike sigwait; the SIGPIPE mask needs that.
 AC_CHECK_FUNCS([sigtimedwait])
-AC_CHECK_FUNCS([clock_gettime])
+AC_SEARCH_LIBS([clock_gettime], [rt],
+	[AC_DEFINE([HAVE_CLOCK_GETTIME], [1],
+		[Define to 1 if you have the `clock_gettime' function.])])
 
 ### Check for pthread
 AC_CHECK_LIB(pthread, pthread_create, [THREADS_LIBS=-lpthread

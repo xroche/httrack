@@ -86,7 +86,6 @@ Please visit our Website: http://www.httrack.com
 #endif
 
 #ifdef _WIN32
-#include "htswin32.h"
 #include <direct.h>
 #else
 #ifdef HAVE_SYS_TYPES_H
@@ -2984,6 +2983,8 @@ TStamp mtime_monotonic(void) {
     return ((TStamp) ts.tv_sec * (TStamp) 1000) +
            ((TStamp) ts.tv_nsec / (TStamp) 1000000);
 #endif
+  /* Reached where clock_gettime needs -lrt to link, so configure did not find
+     it: the stepping clock, but a build rather than no build. */
   return mtime_local();
 #endif
 }

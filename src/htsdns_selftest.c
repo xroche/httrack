@@ -72,10 +72,6 @@ typedef struct mock_host {
 /* Long enough to outlast the 1s --timeout the bounded resolve is checked
    against, short enough to keep the self-test quick. */
 #define MOCK_SLOW_MS 3000
-/* What a loaded sanitized runner may steal from an operation meant to be
-   prompt. Stays well under MOCK_SLOW_MS, which is what every bound here
-   discriminates against. */
-#define SCHED_SLACK_MS 1000
 
 static mock_host mock_hosts[] = {
     {"v4only.test", 0, 1, {{AF_INET, {1, 2, 3, 4}}}, 0},
@@ -394,9 +390,9 @@ int dns_selftests(httrackp *opt) {
     CHECK(mock_read_calls("flaky.test") == 3); /* the answer does not expire */
   }
 
-  /* The stamps are wall-clock, there being no monotonic clock here: a backward
-     step must expire them too, or it delays the retry by the size of the step,
-     which at the ceiling means the rest of the crawl. */
+  /* The stamps are wall-clock, so a backward step must expire them too, or it
+     delays the retry by the size of the step, which at the ceiling means the
+     rest of the crawl. */
   mock_reset_calls();
   {
     SOCaddr a;
@@ -616,7 +612,9 @@ static void lock_probe_thread(void *arg) {
   lock_probe *const p = (lock_probe *) arg;
   TStamp start;
 
-  Sleep(MOCK_SLOW_MS / 10); /* let the resolve get under way first */
+  /* The head start bounds what a held lock can show: the resolve ends at
+     opt->timeout, so only that less this sleep is left to block in. */
+  Sleep(MOCK_SLOW_MS / 10);
   start = mtime_monotonic();
   (void) hts_has_stopped(p->opt);
   hts_mutexlock(&p->lock);
@@ -655,10 +653,10 @@ int dns_timeout_selftests(httrackp *opt) {
      that ignored opt->timeout would still pass under the mock. The finished
      count is a tripwire on the fixture rather than a second bound: the mock
      returns well after the clock fires, so it can only speak alone if
-     MOCK_SLOW_MS ever stops being the larger of the two. The slack is
-     SCHED_SLACK_MS, so it does not come from the mock either. */
+     MOCK_SLOW_MS ever stops being the larger of the two. The second is the
+     slack a loaded runner may steal, and it comes from neither. */
   CHECK(finished == 0);
-  CHECK(elapsed < (TStamp) opt->timeout * 1000 + SCHED_SLACK_MS);
+  CHECK(elapsed < (TStamp) opt->timeout * 1000 + 1000);
   CHECK(count == 0); /* a timeout is reported as "does not resolve" */
 
   /* state.lock is not held across the resolve; a concurrent stop query, which
@@ -672,7 +670,7 @@ int dns_timeout_selftests(httrackp *opt) {
     blocked = probe.blocked_ms;
     hts_mutexrelease(&probe.lock);
     if (done) {
-      CHECK(blocked < SCHED_SLACK_MS);
+      CHECK(blocked < (TStamp) opt->timeout * 1000 / 2);
       break;
     }
     Sleep(20);
