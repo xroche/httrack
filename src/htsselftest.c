@@ -2896,12 +2896,13 @@ static int st_retryafter_gate(httrackp *opt) {
   }
 
   /* the cap, not the server, decides: 100000s clips to opt->max_retry_after.
-     mtime_local() is wall clock, so the upper bounds carry a second of slack
-     against a backward step rather than reading exactly what was armed. */
-  GATE_CHECK(sback->retry_after_until - mtime_local() <= 31 * 1000);
+     The upper bounds sit far above what was armed because mtime_local() is the
+     wall clock: a scale error at least doubles the hold, so slack costs no kill
+     and a backward clock step cannot red them. */
+  GATE_CHECK(sback->retry_after_until - mtime_local() <= 45 * 1000);
   back_set_retry_after(sback, opt, 100000);
   GATE_CHECK(sback->retry_after_until - mtime_local() > 55 * 1000);
-  GATE_CHECK(sback->retry_after_until - mtime_local() <= 61 * 1000);
+  GATE_CHECK(sback->retry_after_until - mtime_local() <= 90 * 1000);
 
   /* a stop outranks the hold, or the user's Ctrl-C waits out the delay */
   opt->state.stop = 1;
