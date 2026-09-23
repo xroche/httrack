@@ -16712,8 +16712,9 @@ static T_SOC st_mptcp_listen(int proto, struct sockaddr_in *addr) {
   return srv;
 }
 
-/* The protocol a socket was created with. Linux has had SO_PROTOCOL since
-   2.6.32, and this block is Linux-only. */
+#ifdef IPPROTO_MPTCP
+/* The protocol a socket was created with. SO_PROTOCOL is a Linux name, and so
+   is IPPROTO_MPTCP, so every caller of this sits behind the same guard. */
 static int st_mptcp_protocol(T_SOC soc) {
   int proto = -1;
   socklen_t len = (socklen_t) sizeof(proto);
@@ -16722,6 +16723,7 @@ static int st_mptcp_protocol(T_SOC soc) {
     return -1;
   return proto;
 }
+#endif
 
 /* Make one connection to a listener speaking `server_proto`, through the same
    factory and connect the crawler uses, and prove a byte crosses it. Returns

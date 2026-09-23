@@ -2303,7 +2303,7 @@ void socket_set_nosigpipe(T_SOC soc) {
 static hts_boolean hts_mptcp_usable = HTS_FALSE;
 static hts_boolean hts_mptcp_on_by_default = HTS_FALSE;
 
-#if HTS_INET_MPTCP
+#if HTS_INET_MPTCP && !HTS_INET_MPTCP_DARWIN
 /* Read one small integer sysctl, or -1 when the file cannot be read. */
 static long hts_mptcp_sysctl(const char *path) {
   FILE *fp = fopen(path, "rb");
