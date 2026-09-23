@@ -2895,11 +2895,13 @@ static int st_retryafter_gate(httrackp *opt) {
     GATE_CHECK(sback->retry_after_until == held);
   }
 
-  /* the cap, not the server, decides: 100000s clips to opt->max_retry_after */
-  GATE_CHECK(sback->retry_after_until - mtime_local() <= 30 * 1000);
+  /* the cap, not the server, decides: 100000s clips to opt->max_retry_after.
+     mtime_local() is wall clock, so the upper bounds carry a second of slack
+     against a backward step rather than reading exactly what was armed. */
+  GATE_CHECK(sback->retry_after_until - mtime_local() <= 31 * 1000);
   back_set_retry_after(sback, opt, 100000);
   GATE_CHECK(sback->retry_after_until - mtime_local() > 55 * 1000);
-  GATE_CHECK(sback->retry_after_until - mtime_local() <= 60 * 1000);
+  GATE_CHECK(sback->retry_after_until - mtime_local() <= 61 * 1000);
 
   /* a stop outranks the hold, or the user's Ctrl-C waits out the delay */
   opt->state.stop = 1;
@@ -2918,6 +2920,7 @@ static int st_retryafter_gate(httrackp *opt) {
   {
     const TStamp connect_was = HTS_STAT.last_connect;
     const TStamp request_was = HTS_STAT.last_request;
+    const int pause_min_was = opt->pause_min_ms;
 
     opt->pause_min_ms = opt->pause_max_ms = 60 * 1000;
     HTS_STAT.last_connect = mtime_local();
@@ -2927,7 +2930,8 @@ static int st_retryafter_gate(httrackp *opt) {
     GATE_CHECK(back_pluggable_sockets_strict(sback, opt) > 0);
     opt->state.stop = 0;
     GATE_CHECK(back_pluggable_sockets_strict(sback, opt) == 0);
-    opt->pause_min_ms = opt->pause_max_ms = 0;
+    opt->pause_min_ms = pause_min_was;
+    opt->pause_max_ms = 0;
     HTS_STAT.last_connect = connect_was;
     HTS_STAT.last_request = request_was;
   }

@@ -132,6 +132,8 @@ done
 # A fractional value takes its integer part and leaves the rest an unknown option
 run "$tmp/mra-bad" "-%J1.5"
 refused "#1738: fractional --max-retry-after not refused cleanly"
+! grep -q 'Invalid --max-retry-after' "$tmp/mra-bad/.log" ||
+    fail "#1738: 1.5 now reaches the range check, so it belongs in the table above"
 
 # An option is not -i (continue) merely because its name contains an 'i' (#615).
 # These used to wipe the URL given before them and exit on the usage screen.
