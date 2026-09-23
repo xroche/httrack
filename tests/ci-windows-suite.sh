@@ -338,7 +338,8 @@ expected_skips_msys="01_engine-usercommand.test
 451_local-sigint-keeps-resume.test
 465_local-mirror-completed.test
 481_local-chunked-oom.test
-494_local-mptcp.test"
+494_local-mptcp.test
+01_engine-mptcp.test"
 
 # Measured, not predicted: windows-build run 33927128153, both platforms alike.
 # Written out rather than derived from the msys list above: the two lists are
@@ -401,7 +402,8 @@ expected_skips_wsl2="01_engine-usercommand.test
 465_local-mirror-completed.test
 294_local-wizard-eof.test
 481_local-chunked-oom.test
-494_local-mptcp.test"
+494_local-mptcp.test
+01_engine-mptcp.test"
 
 # Sets ci_skip_list to the pinned skip set for backend $1, failing loudly if
 # there is none: an unknown backend must never fall back to an empty list,

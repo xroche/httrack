@@ -43,11 +43,16 @@ want_feature() {
     # Reported at runtime, so both halves count: what the build was given, and
     # the kernel switch that decides whether a socket can be opened at all.
     mptcp)
-        if macro_is "${config}" HTS_INET_MPTCP 1 &&
-            test "$(cat /proc/sys/net/mptcp/enabled 2>/dev/null)" = 1; then
-            echo 1
-        else
+        if ! macro_is "${config}" HTS_INET_MPTCP 1; then
             echo 0
+        elif target_is_linux; then
+            # The kernel can be asked, so both halves are checked.
+            test "$(cat /proc/sys/net/mptcp/enabled 2>/dev/null)" = 1 &&
+                echo 1 || echo 0
+        else
+            # macOS has no switch to read: an AF_MULTIPATH socket is always
+            # there when the build found connectx().
+            echo 1
         fi
         ;;
     # Reporting needs the kernel header MPTCP_INFO lives in, on top of all that.

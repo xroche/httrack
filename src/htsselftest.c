@@ -2752,6 +2752,15 @@ static int st_mptcpstats(httrackp *opt, int argc, char **argv) {
     err = 1;
   }
 
+  /* Off travels too: it is a decision, not the absence of one. */
+  from->mptcp = HTS_FALSE;
+  to->mptcp = HTS_TRUE;
+  copy_htsopt(from, to);
+  if (to->mptcp != HTS_FALSE) {
+    fprintf(stderr, "mptcp-stats: the option off did not travel\n");
+    err = 1;
+  }
+
   /* HTS_DEFAULT is "unspecified", so it must leave a set target alone. */
   from->mptcp = HTS_DEFAULT;
   to->mptcp = HTS_FALSE;
@@ -16729,7 +16738,7 @@ static int st_mptcp_pair(httrackp *opt, const char *tag, int server_proto) {
     fprintf(stderr, "mptcp: cannot listen for %s\n", tag);
     return -1;
   }
-  cli = hts_socket_client(AF_INET, opt);
+  cli = hts_socket_client(AF_INET, opt, HTS_FALSE);
   if (cli == INVALID_SOCKET ||
       hts_socket_connect(cli, (struct sockaddr *) &addr, sizeof(addr), opt) !=
           0) {
@@ -16747,6 +16756,17 @@ static int st_mptcp_pair(httrackp *opt, const char *tag, int server_proto) {
     fprintf(stderr, "mptcp: %s connected but carried no data\n", tag);
   } else {
     verdict = hts_socket_is_mptcp(cli) ? 1 : 0;
+    /* Which counter the crawler would reach for. Swapping the two arms of
+       hts_mptcp_account() is invisible without this. */
+    opt->mptcp_connections = opt->mptcp_fallbacks = 0;
+    hts_mptcp_account(opt, cli);
+    if (hts_mptcp_reports() &&
+        (opt->mptcp_connections != (verdict == 1 ? 1 : 0) ||
+         opt->mptcp_fallbacks != (verdict == 1 ? 0 : 1))) {
+      fprintf(stderr, "mptcp: %s is negotiated=%d but counted %d and %d\n", tag,
+              verdict, opt->mptcp_connections, opt->mptcp_fallbacks);
+      verdict = -1;
+    }
   }
   if (acc != INVALID_SOCKET)
     close(acc);
@@ -16772,7 +16792,7 @@ static int st_mptcp(httrackp *opt, int argc, char **argv) {
 
   /* Off means a plain socket, and a run that did not ask counts nothing. */
   opt->mptcp = HTS_FALSE;
-  soc = hts_socket_client(AF_INET, opt);
+  soc = hts_socket_client(AF_INET, opt, HTS_FALSE);
   if (soc == INVALID_SOCKET) {
     fprintf(stderr, "mptcp: no socket with the option off\n");
     err = 1;
@@ -16799,7 +16819,7 @@ static int st_mptcp(httrackp *opt, int argc, char **argv) {
   opt->mptcp = HTS_TRUE;
 #ifdef IPPROTO_MPTCP
   /* Only Linux names a protocol, so only there can the request be read back. */
-  soc = hts_socket_client(AF_INET, opt);
+  soc = hts_socket_client(AF_INET, opt, HTS_FALSE);
   if (soc == INVALID_SOCKET) {
     fprintf(stderr, "mptcp: no socket with the option on\n");
     err = 1;

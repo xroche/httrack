@@ -16,10 +16,6 @@ skip_on_windows "Windows has no Multipath TCP protocol"
 have_feature mptcp || skip "no Multipath TCP on this system"
 have_feature mptcpinfo || skip "this build cannot tell a fallback from a negotiation"
 
-# The switch itself: which protocol a socket is created with, and whether a
-# handshake the kernel fell back to plain TCP is seen as a fallback.
-httrack -#test=mptcp || fail "the mptcp self-test failed"
-
 # A value that is neither on nor off is refused rather than read as on. Port 1
 # refuses at once, so a regression that let the option through costs no traffic;
 # the message is what says the option was judged, not the unreachable host.

@@ -69,9 +69,8 @@ Please visit our Website: http://www.httrack.com
 #define HTS_INET_MPTCP_DARWIN 0
 #endif
 
-/* MPTCP_INFO tells a negotiated connection from one the kernel fell back to
-   plain TCP. Without the header the feature still works, unreported, which is
-   where macOS stands: it has no equivalent. */
+/* Without this header Multipath TCP still works but goes unreported, which is
+   also where macOS stands. */
 #if HTS_INET_MPTCP && defined(HAVE_LINUX_MPTCP_H)
 #include <linux/mptcp.h>
 #define HTS_INET_MPTCP_INFO 1
@@ -2312,10 +2311,9 @@ static long hts_mptcp_sysctl(const char *path) {
 }
 
 /* Can the kernel climb out of a SYN that a middlebox dropped for carrying the
-   MPTCP option? It needs the retry without the option, and blackhole detection
-   left on, or the first connect to every host behind that middlebox waits out
-   the whole timeout. Zero means the detection was turned off, so the file
-   being there is not the answer. */
+   MPTCP option? It needs the retry enabled and blackhole detection on, or the
+   first connect to any host behind a silent middlebox pays the full timeout.
+   Zero turns the detection off, so the file being there is not the answer. */
 static hts_boolean hts_mptcp_kernel_recovers(void) {
   static const char retrans[] =
       "/proc/sys/net/mptcp/syn_retrans_before_tcp_fallback";
@@ -2366,21 +2364,26 @@ static hts_boolean hts_mptcp_enabled(const httrackp *opt) {
   return opt->mptcp == HTS_TRUE ? HTS_TRUE : HTS_FALSE;
 }
 
-T_SOC hts_socket_client(int family, const httrackp *opt) {
+T_SOC hts_socket_client(int family, const httrackp *opt,
+                        hts_boolean will_bind) {
   T_SOC soc = INVALID_SOCKET;
 
 #if HTS_INET_MPTCP_DARWIN
   /* The multipath socket has its own domain, and takes the address family from
-     the address hts_socket_connect() hands connectx(). */
-  if (hts_mptcp_enabled(opt))
+     the address hts_socket_connect() hands connectx(). It also cannot bind:
+     macOS gives AF_MULTIPATH no bind at all, and a pinned source address is
+     the opposite of what multipath is for, so a caller that binds gets TCP. */
+  if (!will_bind && hts_mptcp_enabled(opt))
     soc = (T_SOC) socket(AF_MULTIPATH, SOCK_STREAM, 0);
 #elif HTS_INET_MPTCP
+  (void) will_bind;
   /* A refusal here is the kernel declining the protocol. The peer declining it
      is not visible: the kernel completes the handshake as plain TCP. */
   if (hts_mptcp_enabled(opt))
     soc = (T_SOC) socket(family, SOCK_STREAM, IPPROTO_MPTCP);
 #else
   (void) opt;
+  (void) will_bind;
 #endif
   if (soc == INVALID_SOCKET)
     soc = (T_SOC) socket(family, SOCK_STREAM, 0);
@@ -2393,8 +2396,9 @@ int hts_socket_connect(T_SOC soc, const struct sockaddr *addr, SOClen len,
                        const httrackp *opt) {
 #if HTS_INET_MPTCP_DARWIN
   /* connectx() is how a multipath socket is connected, and it accepts an
-     ordinary socket too, so the fallback needs no second path here. */
-  if (hts_mptcp_enabled(opt)) {
+     ordinary socket too, so the fallback needs no second path here. A NULL opt
+     is the caller saying this socket is not a multipath one. */
+  if (opt != NULL && hts_mptcp_enabled(opt)) {
     sa_endpoints_t ep;
 
     memset(&ep, 0, sizeof(ep));
@@ -2539,7 +2543,12 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
 #if HTS_WIDE_DEBUG
     DEBUG_W("socket\n");
 #endif
-    soc = hts_socket_client(SOCaddr_sinfamily(server), opt);
+    /* -%b pins the source address, and a socket that binds cannot be a
+       multipath one. */
+    const hts_boolean will_bind =
+        retour != NULL && strnotempty(retour->req.proxy.bindhost) ? HTS_TRUE
+                                                                  : HTS_FALSE;
+    soc = hts_socket_client(SOCaddr_sinfamily(server), opt, will_bind);
     if (retour != NULL) {
       retour->debugid = HTS_STAT.stat_sockid++;
     }
@@ -2607,7 +2616,7 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
     DEBUG_W("connect\n");
 #endif
     if (hts_socket_connect(soc, &SOCaddr_sockaddr(server), SOCaddr_size(server),
-                           opt) != 0) {
+                           will_bind ? NULL : opt) != 0) {
       // bloquant
       if (waitconnect) {
 #if HDEBUG

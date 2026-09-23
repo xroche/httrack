@@ -496,9 +496,9 @@ void fprintfio(FILE * fp, const char *buff, const char *prefix);
 
 void socket_set_nosigpipe(T_SOC soc);
 
-/* Multipath TCP (RFC 8684) opens as a protocol on an ordinary stream socket.
-   configure decides this; a build without it, such as MSVC, has none. macOS
-   needs connectx() on an AF_MULTIPATH socket, which is not wired here. */
+/* Multipath TCP (RFC 8684). On Linux it is a protocol on an ordinary stream
+   socket; on macOS it is an AF_MULTIPATH socket connected with connectx().
+   configure decides this, and a build without it, such as MSVC, has none. */
 #if !defined(HTS_INET_MPTCP) || defined(_WIN32)
 #undef HTS_INET_MPTCP
 #define HTS_INET_MPTCP 0
@@ -506,8 +506,9 @@ void socket_set_nosigpipe(T_SOC soc);
 
 /* Create a stream socket for an outgoing connection, with SIGPIPE disarmed.
    Uses Multipath TCP when `opt` asks for it and the system has it, and plain
-   TCP otherwise. Returns INVALID_SOCKET when no socket could be created. */
-T_SOC hts_socket_client(int family, const httrackp *opt);
+   TCP otherwise. Pass `will_bind` when the caller pins a source address, which
+   rules Multipath TCP out. Returns INVALID_SOCKET on failure. */
+T_SOC hts_socket_client(int family, const httrackp *opt, hts_boolean will_bind);
 
 /* Can this build, on this system, open a Multipath TCP socket at all? */
 hts_boolean hts_mptcp_available(void);
