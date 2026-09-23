@@ -397,7 +397,8 @@ static hts_boolean ftp_connect(lien_back *back, T_SOC soc, SOCaddr *server,
   timeout = ftp_wait_left(opt, timeout);
   if (!socket_set_nonblocking(soc, HTS_TRUE))
     return HTS_FALSE;
-  if (connect(soc, &SOCaddr_sockaddr(*server), SOCaddr_size(*server)) != 0) {
+  if (hts_socket_connect(soc, &SOCaddr_sockaddr(*server), SOCaddr_size(*server),
+                         opt) != 0) {
 #ifdef _WIN32
     if (WSAGetLastError() != WSAEWOULDBLOCK)
 #else

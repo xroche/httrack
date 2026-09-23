@@ -508,12 +508,19 @@ AC_ARG_ENABLE([mptcp],
 	mptcp_asked=no
 	])
 mptcp_have=no
-AS_CASE([$host_os], [linux*], [mptcp_platform=yes], [mptcp_platform=no])
+AS_CASE([$host_os], [linux*|darwin*], [mptcp_platform=yes], [mptcp_platform=no])
 AS_IF([test x"$mptcp_want" != x"no" && test x"$mptcp_platform" = x"yes"],
-	[AC_CHECK_DECL([IPPROTO_MPTCP], [mptcp_have=yes], [],
-		[[#include <netinet/in.h>]])
+	[AS_CASE([$host_os],
+		[darwin*],
+		[dnl macOS has no protocol for it: an AF_MULTIPATH socket, connected
+		dnl with connectx(), is the whole interface.
+		AC_CHECK_DECL([AF_MULTIPATH],
+			[AC_CHECK_FUNCS([connectx], [mptcp_have=yes], [])], [],
+			[[#include <sys/socket.h>]])],
+		[AC_CHECK_DECL([IPPROTO_MPTCP], [mptcp_have=yes], [],
+			[[#include <netinet/in.h>]])])
 	AS_IF([test x"$mptcp_have" = x"no" && test x"$mptcp_want" = x"yes"],
-		[AC_MSG_ERROR([mptcp requested but IPPROTO_MPTCP is not declared])])])
+		[AC_MSG_ERROR([mptcp requested but this platform does not offer it])])])
 AS_IF([test x"$mptcp_have" = x"yes"],
 	[AC_DEFINE([HTS_INET_MPTCP], [1], [Define to 1 to open sockets with Multipath TCP.])],
 	[AC_DEFINE([HTS_INET_MPTCP], [0], [Define to 1 to open sockets with Multipath TCP.])])

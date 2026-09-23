@@ -515,6 +515,12 @@ hts_boolean hts_mptcp_available(void);
 /* Can this build tell a negotiated connection from a fallen-back one? */
 hts_boolean hts_mptcp_reports(void);
 
+/* Connect a socket hts_socket_client() returned. macOS reaches Multipath TCP
+   through connectx() rather than a protocol, so the connect differs there too.
+   Returns 0, or -1 with errno set, exactly as connect() does. */
+int hts_socket_connect(T_SOC soc, const struct sockaddr *addr, SOClen len,
+                       const httrackp *opt);
+
 /* Did Multipath TCP survive this established connection's handshake? */
 hts_boolean hts_socket_is_mptcp(T_SOC soc);
 

@@ -60,8 +60,18 @@ Please visit our Website: http://www.httrack.com
 
 #include <limits.h>
 
+/* macOS reaches Multipath TCP through connectx() on an AF_MULTIPATH socket
+   rather than through a protocol, so the two platforms differ at connect time
+   and not only at socket time. */
+#if HTS_INET_MPTCP && defined(__APPLE__)
+#define HTS_INET_MPTCP_DARWIN 1
+#else
+#define HTS_INET_MPTCP_DARWIN 0
+#endif
+
 /* MPTCP_INFO tells a negotiated connection from one the kernel fell back to
-   plain TCP. Without the header the feature still works, unreported. */
+   plain TCP. Without the header the feature still works, unreported, which is
+   where macOS stands: it has no equivalent. */
 #if HTS_INET_MPTCP && defined(HAVE_LINUX_MPTCP_H)
 #include <linux/mptcp.h>
 #define HTS_INET_MPTCP_INFO 1
@@ -2320,7 +2330,17 @@ static hts_boolean hts_mptcp_kernel_recovers(void) {
 
 /* Being able to open an MPTCP socket is not enough to turn it on by default. */
 static void hts_mptcp_probe(void) {
-#if HTS_INET_MPTCP
+#if HTS_INET_MPTCP_DARWIN
+  /* Left off by default here: macOS offers neither the blackhole sysctls that
+     make the default safe nor a way to see whether a connection negotiated it,
+     so it is the user who asks. */
+  const T_SOC soc = (T_SOC) socket(AF_MULTIPATH, SOCK_STREAM, 0);
+
+  if (soc != INVALID_SOCKET) {
+    close(soc);
+    hts_mptcp_usable = HTS_TRUE;
+  }
+#elif HTS_INET_MPTCP
   const T_SOC soc = (T_SOC) socket(AF_INET, SOCK_STREAM, IPPROTO_MPTCP);
 
   if (soc != INVALID_SOCKET) {
@@ -2349,7 +2369,12 @@ static hts_boolean hts_mptcp_enabled(const httrackp *opt) {
 T_SOC hts_socket_client(int family, const httrackp *opt) {
   T_SOC soc = INVALID_SOCKET;
 
-#if HTS_INET_MPTCP
+#if HTS_INET_MPTCP_DARWIN
+  /* The multipath socket has its own domain, and takes the address family from
+     the address hts_socket_connect() hands connectx(). */
+  if (hts_mptcp_enabled(opt))
+    soc = (T_SOC) socket(AF_MULTIPATH, SOCK_STREAM, 0);
+#elif HTS_INET_MPTCP
   /* A refusal here is the kernel declining the protocol. The peer declining it
      is not visible: the kernel completes the handshake as plain TCP. */
   if (hts_mptcp_enabled(opt))
@@ -2362,6 +2387,25 @@ T_SOC hts_socket_client(int family, const httrackp *opt) {
   if (soc != INVALID_SOCKET)
     socket_set_nosigpipe(soc);
   return soc;
+}
+
+int hts_socket_connect(T_SOC soc, const struct sockaddr *addr, SOClen len,
+                       const httrackp *opt) {
+#if HTS_INET_MPTCP_DARWIN
+  /* connectx() is how a multipath socket is connected, and it accepts an
+     ordinary socket too, so the fallback needs no second path here. */
+  if (hts_mptcp_enabled(opt)) {
+    sa_endpoints_t ep;
+
+    memset(&ep, 0, sizeof(ep));
+    ep.sae_dstaddr = addr;
+    ep.sae_dstaddrlen = (socklen_t) len;
+    return connectx(soc, &ep, SAE_ASSOCID_ANY, 0, NULL, 0, NULL, NULL);
+  }
+#else
+  (void) opt;
+#endif
+  return connect(soc, addr, len);
 }
 
 hts_boolean hts_socket_is_mptcp(T_SOC soc) {
@@ -2381,7 +2425,9 @@ hts_boolean hts_socket_is_mptcp(T_SOC soc) {
 }
 
 void hts_mptcp_account(httrackp *opt, T_SOC soc) {
-  if (!hts_mptcp_enabled(opt))
+  /* Where a fallback cannot be seen, every connection would be counted as one,
+     which is a wrong number rather than a missing one. */
+  if (!hts_mptcp_reports() || !hts_mptcp_enabled(opt))
     return;
   if (hts_socket_is_mptcp(soc))
     opt->mptcp_connections++;
@@ -2560,7 +2606,8 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
 #if HTS_WIDE_DEBUG
     DEBUG_W("connect\n");
 #endif
-    if (connect(soc, &SOCaddr_sockaddr(server), SOCaddr_size(server)) != 0) {
+    if (hts_socket_connect(soc, &SOCaddr_sockaddr(server), SOCaddr_size(server),
+                           opt) != 0) {
       // bloquant
       if (waitconnect) {
 #if HDEBUG

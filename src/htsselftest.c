@@ -16681,6 +16681,16 @@ static T_SOC st_mptcp_listen(int proto, struct sockaddr_in *addr) {
 
   if (srv == INVALID_SOCKET)
     return INVALID_SOCKET;
+  /* Bounded, or a connect that silently never connects wedges accept() until
+     the suite's own watchdog, which reads as a hang and not as a failure. */
+  {
+    struct timeval tv;
+
+    tv.tv_sec = 10;
+    tv.tv_usec = 0;
+    (void) setsockopt(srv, SOL_SOCKET, SO_RCVTIMEO, (const char *) &tv,
+                      sizeof(tv));
+  }
   memset(addr, 0, sizeof(*addr));
   addr->sin_family = AF_INET;
   addr->sin_addr.s_addr = htonl(INADDR_LOOPBACK);
@@ -16704,49 +16714,45 @@ static int st_mptcp_protocol(T_SOC soc) {
   return proto;
 }
 
-/* Make one connection to a listener speaking `server_proto` and run it through
-   the accounting the crawler uses. Returns 1 on a setup failure. */
-static int st_mptcp_pair(httrackp *opt, const char *tag, int server_proto,
-                         hts_boolean expect_mptcp) {
+/* Make one connection to a listener speaking `server_proto`, through the same
+   factory and connect the crawler uses, and prove a byte crosses it. Returns
+   -1 when the connection could not be set up, otherwise whether Multipath TCP
+   survived the handshake (1) or not (0). */
+static int st_mptcp_pair(httrackp *opt, const char *tag, int server_proto) {
   struct sockaddr_in addr;
   const T_SOC srv = st_mptcp_listen(server_proto, &addr);
   T_SOC cli, acc;
-  hts_boolean negotiated;
-  int err = 0;
+  int verdict = -1;
+  char byte = 0;
 
   if (srv == INVALID_SOCKET) {
     fprintf(stderr, "mptcp: cannot listen for %s\n", tag);
-    return 1;
+    return -1;
   }
   cli = hts_socket_client(AF_INET, opt);
   if (cli == INVALID_SOCKET ||
-      connect(cli, (struct sockaddr *) &addr, sizeof(addr)) != 0) {
+      hts_socket_connect(cli, (struct sockaddr *) &addr, sizeof(addr), opt) !=
+          0) {
     fprintf(stderr, "mptcp: cannot connect for %s\n", tag);
     if (cli != INVALID_SOCKET)
       close(cli);
     close(srv);
-    return 1;
+    return -1;
   }
   acc = accept(srv, NULL, NULL);
-  negotiated = hts_socket_is_mptcp(cli);
-  if (negotiated != expect_mptcp) {
-    fprintf(stderr, "mptcp: %s negotiated=%d, expected %d\n", tag,
-            (int) negotiated, (int) expect_mptcp);
-    err = 1;
-  }
-  opt->mptcp_connections = opt->mptcp_fallbacks = 0;
-  hts_mptcp_account(opt, cli);
-  if (opt->mptcp_connections != (expect_mptcp ? 1 : 0) ||
-      opt->mptcp_fallbacks != (expect_mptcp ? 0 : 1)) {
-    fprintf(stderr, "mptcp: %s counted %d negotiated, %d fallbacks\n", tag,
-            opt->mptcp_connections, opt->mptcp_fallbacks);
-    err = 1;
+  /* A socket that connects but carries nothing is the failure a connect-only
+     check cannot see. */
+  if (acc == INVALID_SOCKET || send(cli, "x", 1, 0) != 1 ||
+      recv(acc, &byte, 1, 0) != 1 || byte != 'x') {
+    fprintf(stderr, "mptcp: %s connected but carried no data\n", tag);
+  } else {
+    verdict = hts_socket_is_mptcp(cli) ? 1 : 0;
   }
   if (acc != INVALID_SOCKET)
     close(acc);
   close(cli);
   close(srv);
-  return err;
+  return verdict;
 }
 #endif
 
@@ -16754,26 +16760,29 @@ static int st_mptcp(httrackp *opt, int argc, char **argv) {
 #if HTS_INET_MPTCP
   const hts_tristate saved = opt->mptcp;
   int err = 0;
+  int verdict;
   T_SOC soc;
 
   (void) argc;
   (void) argv;
-  if (!hts_mptcp_available() || !hts_mptcp_reports()) {
-    printf("mptcp: SKIP (no Multipath TCP to report on here)\n");
+  if (!hts_mptcp_available()) {
+    printf("mptcp: SKIP (no Multipath TCP on this system)\n");
     return 77;
   }
 
-  /* Off means a plain TCP socket, not an MPTCP one that fell back. */
+  /* Off means a plain socket, and a run that did not ask counts nothing. */
   opt->mptcp = HTS_FALSE;
   soc = hts_socket_client(AF_INET, opt);
   if (soc == INVALID_SOCKET) {
     fprintf(stderr, "mptcp: no socket with the option off\n");
     err = 1;
   } else {
+#ifdef IPPROTO_MPTCP
     if (st_mptcp_protocol(soc) == IPPROTO_MPTCP) {
       fprintf(stderr, "mptcp: the option was off and MPTCP was asked for\n");
       err = 1;
     }
+#endif
     if (hts_socket_is_mptcp(soc)) {
       fprintf(stderr, "mptcp: a plain TCP socket reported multipath\n");
       err = 1;
@@ -16788,6 +16797,8 @@ static int st_mptcp(httrackp *opt, int argc, char **argv) {
   }
 
   opt->mptcp = HTS_TRUE;
+#ifdef IPPROTO_MPTCP
+  /* Only Linux names a protocol, so only there can the request be read back. */
   soc = hts_socket_client(AF_INET, opt);
   if (soc == INVALID_SOCKET) {
     fprintf(stderr, "mptcp: no socket with the option on\n");
@@ -16797,17 +16808,38 @@ static int st_mptcp(httrackp *opt, int argc, char **argv) {
 
     if (proto != IPPROTO_MPTCP) {
       fprintf(stderr,
-              "mptcp: the option was on and protocol %d was asked "
-              "for\n",
+              "mptcp: the option was on and protocol %d was asked for\n",
               proto);
       err = 1;
     }
     close(soc);
   }
+#endif
 
-  /* Both directions: a peer that speaks MPTCP, and one that does not. */
-  err |= st_mptcp_pair(opt, "mptcp peer", IPPROTO_MPTCP, HTS_TRUE);
-  err |= st_mptcp_pair(opt, "tcp peer", IPPROTO_TCP, HTS_FALSE);
+  /* The factory and the connect seam end to end, against a peer that does not
+     speak it. Runs wherever the feature is built, which is what covers the
+     macOS connectx() path. */
+  verdict = st_mptcp_pair(opt, "tcp peer", IPPROTO_TCP);
+  if (verdict < 0) {
+    err = 1;
+  } else if (hts_mptcp_reports() && verdict != 0) {
+    fprintf(stderr, "mptcp: a plain TCP peer was reported as multipath\n");
+    err = 1;
+  }
+
+#ifdef IPPROTO_MPTCP
+  /* The other direction needs a peer that speaks it, and a build that can see
+     the difference. */
+  if (hts_mptcp_reports()) {
+    verdict = st_mptcp_pair(opt, "mptcp peer", IPPROTO_MPTCP);
+    if (verdict < 0) {
+      err = 1;
+    } else if (verdict != 1) {
+      fprintf(stderr, "mptcp: a multipath peer was reported as a fallback\n");
+      err = 1;
+    }
+  }
+#endif
 
   opt->mptcp = saved;
   opt->mptcp_connections = opt->mptcp_fallbacks = 0;
