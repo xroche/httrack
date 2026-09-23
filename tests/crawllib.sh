@@ -276,7 +276,7 @@ write_lock_request() { # write_lock_request DIR NAME PID
         test -n "$up" || up=/
     done
     test -z "$gone" ||
-        fail "${gone} is gone (${up} survives): something removed it under a running test"
+        fail "${gone} is gone (${up} survives) after ${try} tries: something removed it under a running test"
     test -z "$went" ||
         fail "${dir} went missing under a running test, and was back before the walk"
     fail "${name} could not be written into ${dir}, which is still there, after ${max_tries} tries"
