@@ -1053,4 +1053,4 @@ Manual
 Max Retry-After(s)
 Max. Retry-After (s)
 Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
-Cea mai lungă așteptare respectată când un server trimite un antet Retry-After. Folosiți 0 pentru a reîncerca fără așteptare.
+Cea mai lungă aşteptare respectată când un server trimite un antet Retry-After. Folosiţi 0 pentru a reîncerca fără aşteptare.

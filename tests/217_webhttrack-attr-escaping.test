@@ -108,6 +108,9 @@ pages = [
     ("option8.html", {"cookiesfile": "c" + BREAK}, [
         'name="cookiesfile" value="%s"' % escaped("c" + BREAK),
     ]),
+    ("option4.html", {"maxretryafter": "r" + BREAK}, [
+        'name="maxretryafter" value="%s"' % escaped("r" + BREAK),
+    ]),
 ]
 
 for page, fields, wants in pages:

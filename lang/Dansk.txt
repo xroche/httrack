@@ -1053,4 +1053,4 @@ Vejledning
 Max Retry-After(s)
 Maks. Retry-After (s)
 Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
-Længste ventetid der følges, når en server sender et Retry-After-hoved. Brug 0 for at prøve igen uden at vente.
+Længste ventetid, der følges, når en server sender en Retry-After-header. Brug 0 for at prøve igen uden at vente.
