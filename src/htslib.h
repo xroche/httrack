@@ -216,6 +216,11 @@ static HTS_INLINE HTS_UNUSED hts_boolean hts_localtime(time_t t,
    and frees it at thread exit, and POSIX allows one shared static. */
 const char *hts_strerror(int err, char *buf, size_t size);
 
+/* Milliseconds from an origin this function picks. Only the difference of two
+   reads means anything, and unlike mtime_local() a clock step cannot skew it,
+   so an elapsed time measured for a test or a deadline uses this one. */
+TStamp mtime_monotonic(void);
+
 /* A modification time at the finest resolution this build can read. Compare it
    only against another value hts_file_mtime() produced, because the epoch is
    the platform's. */

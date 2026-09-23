@@ -86,6 +86,7 @@ Please visit our Website: http://www.httrack.com
 #endif
 
 #ifdef _WIN32
+#include "htswin32.h"
 #include <direct.h>
 #else
 #ifdef HAVE_SYS_TYPES_H
@@ -2968,6 +2969,22 @@ HTSEXT_API TStamp mtime_local(void) {
   ftime(&B);
   return (TStamp) (((TStamp) B.time * (TStamp) 1000)
                    + ((TStamp) B.millitm));
+#endif
+}
+
+// number of millisec from an arbitrary origin, immune to a clock step
+TStamp mtime_monotonic(void) {
+#ifdef _WIN32
+  return (TStamp) GetTickCount64();
+#else
+#if defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_MONOTONIC)
+  struct timespec ts;
+
+  if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0)
+    return ((TStamp) ts.tv_sec * (TStamp) 1000) +
+           ((TStamp) ts.tv_nsec / (TStamp) 1000000);
+#endif
+  return mtime_local();
 #endif
 }
 
