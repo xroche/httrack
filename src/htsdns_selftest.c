@@ -666,16 +666,11 @@ int dns_timeout_selftests(httrackp *opt) {
   finished = mock_read_finished();
 
   /* the resolve returns on opt->timeout, not when the resolver deigns to
-     answer: this is what lets --max-time and --timeout fire (#606). The bound
-     is derived from opt->timeout, never from the mock's sleep, or a resolve
-     that ignored opt->timeout would still pass under the mock. The finished
-     count is a tripwire on the fixture rather than a second bound: the mock
-     returns well after the clock fires, so it can only speak alone if
-     MOCK_SLOW_MS ever stops being the larger of the two. */
+     answer: this is what lets --max-time and --timeout fire (#606). A backend
+     that had not returned proves it, so the bound below need not be tight. */
   CHECK(finished == 0);
-  /* halfway to MOCK_SLOW_MS, not a tight margin on the deadline: the engine
-     times that out on the wall clock, so a step moves when it fires even
-     though the measurement above no longer moves. */
+  /* midway to MOCK_SLOW_MS: the engine still deadlines on the wall clock, so a
+     step moves when it fires even though the measurement no longer moves. */
   CHECK(elapsed < ((TStamp) opt->timeout * 1000 + MOCK_SLOW_MS) / 2);
   CHECK(count == 0); /* a timeout is reported as "does not resolve" */
 
