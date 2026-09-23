@@ -28,8 +28,10 @@ serverpid=$!
 port=$(discover_server_port "$tmpdir/srv.out" "$serverpid") || exit 1
 
 retries=2
-# --max-retry-after, so one wait is one second and the whole run stays short
-cap=1
+# --max-retry-after. Not 1: httrack's own connect limiter costs this crawl
+# about six seconds whatever we ask, and a cap of 1 puts the floor below that,
+# so the gate could be disabled outright and this test still passed.
+cap=4
 crawl() { # crawl NAME [extra httrack args...]
     local name=$1 rc=0
     shift
@@ -80,11 +82,11 @@ grep -qF "Server asked to retry after 100000s, waiting ${cap}s" \
     fail_dump "no clip logged for the 100000s Retry-After" \
         "$tmpdir/retried/hts-log.txt"
 
-# rate, busy and huge each wait on both of their $retries, and -c1 keeps those
-# waits from overlapping. busy-date rounds to 0 or 1 and is left out, so this
-# stays a floor whatever the box does.
-waiting=3
-floor=$((waiting * retries * cap))
+# rate and busy ask for a second each and huge is the only one the cap clips,
+# so one round of retries costs 2 + $cap seconds. -c1 keeps the waits from
+# overlapping. busy-date rounds to 0 or 1 and is left out, so this stays a
+# floor whatever the box does.
+floor=$((retries * (2 + cap)))
 echo "capped crawl: ${retried_seconds}s (floor ${floor}s)"
 test "$retried_seconds" -ge "$floor" ||
     fail "the crawl obeyed no Retry-After: ${retried_seconds}s, expected ${floor}s or more"

@@ -2883,6 +2883,8 @@ static int st_retryafter_gate(httrackp *opt) {
 
   back_set_retry_after(sback, opt, 30);
   GATE_CHECK(sback->retry_after_until != 0);
+  /* the ask is in seconds: a hold scaled in milliseconds would be up already */
+  GATE_CHECK(sback->retry_after_until - mtime_local() > 25 * 1000);
   GATE_CHECK(back_pluggable_sockets_strict(sback, opt) == 0);
 
   /* a shorter delay must not cut a hold already running */
@@ -2894,8 +2896,9 @@ static int st_retryafter_gate(httrackp *opt) {
   }
 
   /* the cap, not the server, decides: 100000s clips to opt->max_retry_after */
-  GATE_CHECK(sback->retry_after_until - mtime_local() <= 60 * 1000);
+  GATE_CHECK(sback->retry_after_until - mtime_local() <= 30 * 1000);
   back_set_retry_after(sback, opt, 100000);
+  GATE_CHECK(sback->retry_after_until - mtime_local() > 55 * 1000);
   GATE_CHECK(sback->retry_after_until - mtime_local() <= 60 * 1000);
 
   /* a stop outranks the hold, or the user's Ctrl-C waits out the delay */
@@ -2910,6 +2913,24 @@ static int st_retryafter_gate(httrackp *opt) {
   back_set_retry_after(sback, opt, 30);
   GATE_CHECK(sback->retry_after_until == 0);
   GATE_CHECK(back_pluggable_sockets_strict(sback, opt) > 0);
+
+  /* --pause is the gate's other delay, and a stop outranks it the same way */
+  {
+    const TStamp connect_was = HTS_STAT.last_connect;
+    const TStamp request_was = HTS_STAT.last_request;
+
+    opt->pause_min_ms = opt->pause_max_ms = 60 * 1000;
+    HTS_STAT.last_connect = mtime_local();
+    HTS_STAT.last_request = 0;
+    GATE_CHECK(back_pluggable_sockets_strict(sback, opt) == 0);
+    opt->state.stop = 1;
+    GATE_CHECK(back_pluggable_sockets_strict(sback, opt) > 0);
+    opt->state.stop = 0;
+    GATE_CHECK(back_pluggable_sockets_strict(sback, opt) == 0);
+    opt->pause_min_ms = opt->pause_max_ms = 0;
+    HTS_STAT.last_connect = connect_was;
+    HTS_STAT.last_request = request_was;
+  }
 
 #undef GATE_CHECK
   opt->debug = quiet;
