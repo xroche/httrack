@@ -61,7 +61,8 @@ jobs:
             # The suite is judged below; a compile break is judged here.
             make check -j"$jobs" >check.log 2>&1 || true
             SH
-            if ! su -l builder -c "cd '$PWD' && sh build.sh"; then
+            # This script reaches sh on stdin, so the suite would eat its tail.
+            if ! su -l builder -c "cd '$PWD' && sh build.sh" </dev/null; then
               tail -n 40 check.log 2>/dev/null || true
               exit 1
             fi
