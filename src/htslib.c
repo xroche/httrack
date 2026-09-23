@@ -65,6 +65,13 @@ Please visit our Website: http://www.httrack.com
    and not only at socket time. */
 #if HTS_INET_MPTCP && defined(__APPLE__)
 #define HTS_INET_MPTCP_DARWIN 1
+#ifndef AF_MULTIPATH
+/* Measured, not assumed: the macOS SDK does not declare this, so a build that
+   required the declaration compiled the whole arm out. hts_mptcp_probe() opens
+   one socket with it at startup, which is what makes the number safe to name
+   here, because a wrong one leaves Multipath TCP off. */
+#define AF_MULTIPATH 39
+#endif
 #else
 #define HTS_INET_MPTCP_DARWIN 0
 #endif

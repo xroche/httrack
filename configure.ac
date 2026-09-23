@@ -513,10 +513,10 @@ AS_IF([test x"$mptcp_want" != x"no" && test x"$mptcp_platform" = x"yes"],
 	[AS_CASE([$host_os],
 		[darwin*],
 		[dnl macOS has no protocol for it: an AF_MULTIPATH socket, connected
-		dnl with connectx(), is the whole interface.
-		AC_CHECK_DECL([AF_MULTIPATH],
-			[AC_CHECK_FUNC([connectx], [mptcp_have=yes], [])], [],
-			[[#include <sys/socket.h>]])],
+		dnl with connectx(), is the whole interface. The SDK does not declare
+		dnl AF_MULTIPATH, so connectx() is what is checked here and the domain
+		dnl number is proven at runtime, where a wrong one just fails socket().
+		AC_CHECK_FUNC([connectx], [mptcp_have=yes], [])],
 		[AC_CHECK_DECL([IPPROTO_MPTCP], [mptcp_have=yes], [],
 			[[#include <netinet/in.h>]])])
 	AS_IF([test x"$mptcp_have" = x"no" && test x"$mptcp_want" = x"yes"],
