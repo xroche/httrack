@@ -68,7 +68,12 @@ bash "$top_srcdir/tests/local-crawl.sh" --server-mptcp --errors 0 --files 5 \
     "${auto[@]}" httrack 'BASEURL/simple/basic.html'
 
 # One connection counts once: a TLS handshake sends the slot back through the
-# connect path, which counted the same socket a second time.
-bash "$top_srcdir/tests/local-crawl.sh" --tls --errors 0 --files 1 \
-    --log-found 'Multipath TCP: 0 HTTP connections negotiated it, 1 fell back' \
-    httrack 'BASEURL/simple/link.html' --mptcp --robots=0 --depth=1
+# connect path, which counted the same socket a second time. Needs TLS, so a
+# build without it loses this leg alone rather than the whole test.
+if test "${HTTPS_SUPPORT:-}" = "no"; then
+    echo "no https support compiled, skipping the TLS leg" >&2
+else
+    bash "$top_srcdir/tests/local-crawl.sh" --tls --errors 0 --files 1 \
+        --log-found 'Multipath TCP: 0 HTTP connections negotiated it, 1 fell back' \
+        httrack 'BASEURL/simple/link.html' --mptcp --robots=0 --depth=1
+fi
