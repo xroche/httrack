@@ -4,6 +4,25 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack
 
+3.50-4
++ Fixed: a truncated string was left unterminated on Windows, because those builds aliased snprintf to _snprintf, which writes no terminator when it truncates. WinHTTrack 3.50-2 aborted on one (#1752)
++ Fixed: a JavaScript name ending in "url" had its assignment read as a link, where the value carries no file extension. On 3.50.3, var myurl = "hello world" fetched /hello%20world and the saved script was rewritten to point at it (#1743)
++ Fixed: import x from "./setup.js", the form almost all module code uses, was never followed (#1737)
++ Fixed: import("./chunk.js") inside /assets/app.js was fetched as /chunk.js, so the mirror stored the server's 404 page where the browser reads the module. Sites built with SvelteKit, Vite and umi all hit this (#1730)
++ Fixed: a WARC record described the 100 Continue headers instead of the response. It happened when a server answered 100 and then sent a reply carrying no headers of its own (#1742)
++ Fixed: a script polling for hts-in_progress.lock could read the file before the engine backdated it. A stop request written at that instant then lost the race it should win (#1749)
++ Fixed: --pause made the engine sit out the whole gap before it looked at a stop request. A stop is taken at once now (#1755)
++ Fixed: five tests failed on GNU/Hurd, so 3.50.3 did not build there (#1717)
++ New: a 429 or a 503 is retried and Retry-After is obeyed, where both used to end the link on the first answer. --max-retry-after caps what the engine waits for, 60 seconds by default, because the server picks the value. A 503 naming no usable delay stays fatal (#1755)
++ New: the WebHTTrack interface carries a Max Retry-After field on its Flow control page, translated in all 30 catalogs (#1757)
++ New: --mptcp opens every connection with Multipath TCP on Linux and macOS, so a mirror keeps running when one network path goes away. It is on by default only where the kernel escapes a blackholed SYN by itself (#1759)
++ New: the log names a site's bot protection when it refused the crawl. The status line and the rollback warning that followed it read as an httrack defect (#1734)
++ New: the end of a mirror says when links above the start directory were left out, and names -B. A start URL inside a subdirectory lost every asset at the site root and nothing said why. A single-page application does that on every crawl (#1725)
++ New: httrack --help names the WebHTTrack graphical interface installed beside it, and man httrack points at webhttrack(1) (#1722)
++ Changed: thirteen calls libhttrack already exported are declared in httrack-library.h now, so an embedder no longer writes the prototype by hand. Six that only the library itself calls left the library (#1721)
++ Changed: the Windows binaries are built with Control Flow Guard and the arm64 binaries with branch protection (#1724, #1723)
++ Changed: multiple internal hardening, test and CI improvements
+
 3.50-3
 + Fixed: -V pasted the name of each saved page into the shell command it runs. The name comes from a crawled URL, so a page saved as a;rm -rf ~;.html ran what its name said. The name is an argument now, and $0 expands only in a plain word, inside "..." and inside '...' (#1710)
 + Fixed: --catchurl bound its capture proxy to the address the machine's host name resolves to, so anyone on the network could take the browser's slot and read the cookies it carries. It binds 127.0.0.1 now (#1701)

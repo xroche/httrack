@@ -1,3 +1,12 @@
+httrack (3.50.4-1) unstable; urgency=medium
+
+  * New upstream release, mostly parser fixes.  It builds on GNU/Hurd again,
+    where 3.50.3's test suite failed.  Full list in history.txt.
+  * debian/rules: pass --enable-mptcp, which turns Multipath TCP on.  The
+    --disable-auto-features this recipe already passes leaves it off.
+
+ -- Xavier Roche <xavier@debian.org>  Thu, 24 Sep 2026 19:53:25 +0200
+
 httrack (3.50.3-1) unstable; urgency=medium
 
   * New upstream release, security and correctness fixes.  Full list in
