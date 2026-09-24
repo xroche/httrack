@@ -113,12 +113,14 @@ jobs:
             echo "::error::accept() is reachable with FTP_PASV=1; the marker no longer discriminates"
             exit 1
           fi
+          # shellcheck disable=SC2086 # a list of objects, and the splitting is the point
           rm -f $objs
           # Through CC: overriding CPPFLAGS would drop configure's
           # -D_FORTIFY_SOURCE and the object-size warnings that come with it.
           make -C src libhttrack_la-htsftp.lo CC="$CC -DFTP_PASV=0 -Werror"
           syms=$(nm --undefined-only src/.libs/libhttrack_la-htsftp.o)
           grep -qw accept <<<"$syms" || { echo "::error::-DFTP_PASV=0 built no active-mode code"; exit 1; }
+          # shellcheck disable=SC2086 # a list of objects, and the splitting is the point
           rm -f $objs
 
       # A backstop only: tests/test-timeout.sh bounds each test. Without it a stall
@@ -170,7 +172,12 @@ jobs:
           # buildd chroot; masking with /bin/false would still resolve.
           sudo find /usr/bin /usr/local/bin -maxdepth 1 -name 'python3*' \
             -exec mv {} {}.hidden \;
-          ! command -v python3
+          # Not "! command -v python3": errexit is skipped for a command whose
+          # status is inverted, so a python3 that survived would sail past.
+          if command -v python3; then
+            echo "::error::python3 is still on PATH, so this leg would test the wrong thing"
+            exit 1
+          fi
           make check -j"$CHECK_JOBS"
 
       - name: Print the test log on failure
@@ -657,6 +664,7 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/sanitizer-logs" "$GITHUB_WORKSPACE/sanitizer-stderr"
           # 01_engine-* only; zlib-dependent self-tests are named 01_zlib-* and
           # skipped here (uninstrumented libz floods MSan with false positives).
+          # shellcheck disable=SC2012 # our own test names, no exotic bytes
           tests="$(cd tests && ls 01_engine-*.test | tr '\n' ' ')"
           make check -j"$CHECK_JOBS" TESTS="$tests"
 
@@ -1087,6 +1095,17 @@ jobs:
           # version; use it rather than fetching a release binary from github.com.
           sudo apt-get install -y --no-install-recommends shellcheck shfmt appstream \
             appstream-util
+          # actionlint is in no Ubuntu release (checked against Launchpad), so
+          # it comes from its own tarball rather than apt. Pinned and checksummed
+          # instead of piping the project's installer into bash: same 2 MB, and
+          # nothing downloaded gets executed before it is verified.
+          actionlint_sha=023070a287cd8cccd71515fedc843f1985bf96c436b7effaecce67290e7e0757
+          curl -fsSL -o /tmp/actionlint.tar.gz \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.7/actionlint_1.7.7_linux_amd64.tar.gz
+          echo "${actionlint_sha}  /tmp/actionlint.tar.gz" | sha256sum -c -
+          mkdir -p "$HOME/.local/bin"
+          tar -xzf /tmp/actionlint.tar.gz -C "$HOME/.local/bin" actionlint
+          "$HOME/.local/bin/actionlint" --version
           # Pinned to the local dev versions: black's stable style moves across
           # majors, so the runner image's build would reformat on its own schedule.
           pip install --quiet black==25.1.0 flake8==7.1.1
@@ -1113,7 +1132,7 @@ jobs:
               esac
             done
           )
-          # shellcheck given no paths exits 0, checking nothing. A non-zero
+          # ShellCheck given no paths exits 0, checking nothing. A non-zero
           # count is too weak a floor: the shebang scan can drop almost every
           # file and still pass one, so pin the half that cannot shrink and
           # name the extension-less scripts the scan must reach.
@@ -1127,11 +1146,27 @@ jobs:
           echo "${#sh[@]} tracked shell scripts"
           echo "SHELL_SCRIPTS=${sh[*]}" >> "$GITHUB_ENV"
 
+      # The shell inside a workflow reaches no script list: a .yml has no
+      # shebang and no .sh name, so the sweep below cannot see it. ShellCheck
+      # has no rule for a pipe into grep -q, so this would not have caught the
+      # bug that prompted it; what it did catch is one workflow line below.
+      - name: actionlint
+        run: |
+          set -euo pipefail
+          # actionlint skips the shell rules entirely when ShellCheck is absent,
+          # and says nothing about having done so.
+          command -v shellcheck >/dev/null
+          "$HOME/.local/bin/actionlint" -color
+
       - name: shellcheck
-        run: shellcheck $SHELL_SCRIPTS
+        run: |
+          # shellcheck disable=SC2086 # SHELL_SCRIPTS is a space-joined list
+          shellcheck $SHELL_SCRIPTS
 
       - name: shfmt
-        run: shfmt -d -i 4 $SHELL_SCRIPTS
+        run: |
+          # shellcheck disable=SC2086 # SHELL_SCRIPTS is a space-joined list
+          shfmt -d -i 4 $SHELL_SCRIPTS
 
       # Read the list rather than hand-keeping one: a .py added in a new
       # directory then gets checked without anyone widening a glob.
@@ -1144,10 +1179,14 @@ jobs:
           echo "PYTHON_FILES=${py[*]}" >> "$GITHUB_ENV"
 
       - name: black
-        run: black --check --diff $PYTHON_FILES
+        run: |
+          # shellcheck disable=SC2086 # PYTHON_FILES is a space-joined list
+          black --check --diff $PYTHON_FILES
 
       - name: flake8
-        run: flake8 $PYTHON_FILES
+        run: |
+          # shellcheck disable=SC2086 # PYTHON_FILES is a space-joined list
+          flake8 $PYTHON_FILES
 
       # A misnamed test falls outside the glob "make check" runs, so it goes
       # missing without failing anything.

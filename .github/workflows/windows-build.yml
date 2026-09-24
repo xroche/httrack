@@ -508,7 +508,9 @@ jobs:
           }
           export HTS_WS="$ws"
           export HTS_BIN="$ws/src/${{ matrix.platform }}/${{ matrix.configuration }}"
+          # shellcheck disable=SC2016 # exported above for the inner sh to expand
           wsl -d httrack-suite -- sh -c 'echo "ws=[$HTS_WS] bin=[$HTS_BIN]"; test -d "$HTS_WS/tests" || { echo "::error::$HTS_WS/tests is not visible in the distro"; exit 1; }'
+          # shellcheck disable=SC2016 # same: the distro's shell expands these
           wsl -d httrack-suite -- sh -c 'cd "$HTS_WS/tests" && exec bash ./ci-windows-suite.sh "$HTS_BIN"' 2>&1 | tee suite-console-wsl2.log
 
       # Its own step: the watchdog can kill the suite's step before it counts,
