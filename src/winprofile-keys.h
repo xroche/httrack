@@ -1,5 +1,5 @@
-/* Generated from winprofile-keys.tsv by tools/gen-winprofile-keys.py.
- * Do not edit. */
+/* Generated from winprofile-keys.tsv at the top of the source tree, by
+ * tools/gen-winprofile-keys.py. Do not edit. */
 #ifndef WINPROFILE_KEYS_H
 #define WINPROFILE_KEYS_H
 
