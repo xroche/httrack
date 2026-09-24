@@ -99,8 +99,8 @@ def cstr(s):
 
 def emit(rows, tsv, out):
     w = out.write
-    # Say where the table is, not just what it is called: the prose docs for
-    # this feature live under doc/, so a bare filename invites doc/<name>.
+    # The prose docs for this feature live under doc/, so a bare filename
+    # invites doc/<name>.
     w("/* Generated from %s at the top of the source tree, by\n" % tsv)
     w(" * tools/gen-winprofile-keys.py. Do not edit. */\n")
     w("#ifndef WINPROFILE_KEYS_H\n#define WINPROFILE_KEYS_H\n\n")
