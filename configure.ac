@@ -39,7 +39,7 @@ AM_INIT_AUTOMAKE([subdir-objects])
 # warc_forced_notmodified, so lien_back embeds the same layout it did and
 # nothing after it moves. No export came or went. HTS_STAT is an exported
 # variable, so a client linked against the older struct keeps a copy two ints
-# short; HTTraQt is the only such client and is rebuilt.
+# short. HTTraQt is the only such client, and it is rebuilt.
 # 3:24:0: revision-only DESPITE an ABI break. #1713 published thirteen exports
 # in httrack-library.h, which adds no symbol. It also dropped HTSEXT_API from
 # six calls only the library itself makes, so check_hostname_dns,
