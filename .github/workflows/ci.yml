@@ -1087,6 +1087,11 @@ jobs:
           # version; use it rather than fetching a release binary from github.com.
           sudo apt-get install -y --no-install-recommends shellcheck shfmt appstream \
             appstream-util
+          # actionlint is not packaged in noble, and its own installer needs a
+          # version; pin it so the rules cannot move under an unrelated PR.
+          curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.7/scripts/download-actionlint.bash \
+            | bash -s -- 1.7.7 "$HOME/.local/bin"
+          "$HOME/.local/bin/actionlint" --version
           # Pinned to the local dev versions: black's stable style moves across
           # majors, so the runner image's build would reformat on its own schedule.
           pip install --quiet black==25.1.0 flake8==7.1.1
@@ -1113,7 +1118,7 @@ jobs:
               esac
             done
           )
-          # shellcheck given no paths exits 0, checking nothing. A non-zero
+          # ShellCheck given no paths exits 0, checking nothing. A non-zero
           # count is too weak a floor: the shebang scan can drop almost every
           # file and still pass one, so pin the half that cannot shrink and
           # name the extension-less scripts the scan must reach.
@@ -1126,6 +1131,17 @@ jobs:
           done
           echo "${#sh[@]} tracked shell scripts"
           echo "SHELL_SCRIPTS=${sh[*]}" >> "$GITHUB_ENV"
+
+      # The shell inside a workflow reaches no script list: a .yml has no
+      # shebang and no .sh name, so the sweep below cannot see it. The four
+      # ignores are findings this repo already carries; they are info-level and
+      # retiring them is its own change. ShellCheck has no rule for a pipe into
+      # grep -q, so this would not have caught that one.
+      - name: actionlint
+        run: |
+          set -euo pipefail
+          "$HOME/.local/bin/actionlint" -color \
+            -ignore 'SC2016:' -ignore 'SC2086:' -ignore 'SC2012:' -ignore 'SC2251:'
 
       - name: shellcheck
         run: shellcheck $SHELL_SCRIPTS
