@@ -106,6 +106,13 @@ ci_report_lost_workers() {
     fi
 }
 
+# Did test $1's own log catch WSL2 losing its interop channel (#1672)? Matched past
+# the line's prefix, "init:" on the imported rootfs and "WSL (pid)" on a store
+# build. Each test's own log, since the console carries other failures' tails.
+ci_test_lost_interop() { # ci_test_lost_interop TEST
+    test -f "$1.log" && grep -q 'ERROR: UtilAcceptVsock' "$1.log"
+}
+
 # The verdict on the failing tests named in $@, printed as annotations. Returns 3
 # where every one of their logs carries WSL2's interop error, because the exe never
 # launched under those, and 1 otherwise (#1672). The failures are named either way,
@@ -113,11 +120,7 @@ ci_report_lost_workers() {
 ci_failure_verdict() { # ci_failure_verdict TEST...
     local t real='' interop=''
     for t in "$@"; do
-        # WSL writes this when it cannot reach the Windows side. Matched past the
-        # line's prefix, which is "init:" on the imported rootfs and "WSL (pid)"
-        # on a store build. Each test's own log, since the console carries the
-        # tails of unrelated failures.
-        if test -f "$t.log" && grep -q 'ERROR: UtilAcceptVsock' "$t.log"; then
+        if ci_test_lost_interop "$t"; then
             interop="$interop $t"
         else
             real="$real $t"
@@ -611,10 +614,20 @@ results=suite-results
 rm -rf "$results"
 mkdir -p "$results"
 
-# Run test $1 to completion: its verdict on stdout, a failure's 25-line tail into
-# $results/$1.tail, and its status last into $results/$1.rc, which says it got there.
+# Seconds a rerun of one test may take: what is left of the suite deadline, capped
+# at one test's budget, and 0 once that deadline has passed (#1126).
+ci_rerun_budget() {
+    local left=$((suite_deadline - (SECONDS - started)))
+    test "$left" -le "$per_test" || left=$per_test
+    test "$left" -ge 0 || left=0
+    echo "$left"
+}
+
+# Run test $1 to completion, within $2 seconds or $per_test: its verdict on stdout,
+# a failure's 25-line tail into $results/$1.tail, and its status last into
+# $results/$1.rc, which says it got there.
 run_one_test() (
-    local t=$1 rc=0 left ttmp
+    local t=$1 budget=${2:-$per_test} rc=0 left ttmp
     # Its own TMPDIR, since dump_crawl_logs (testlib.sh) globs the whole of it.
     # Windows-shaped like the export above: the tests hand it to a native exe.
     ttmp="$TMPDIR/suite.$t"
@@ -624,7 +637,7 @@ run_one_test() (
     # same way on every platform. It dumps before it kills, which a bare
     # run_with_timeout cannot: by the time that returns, the tree whose
     # stack we wanted is already gone.
-    HTTRACK_TEST_TIMEOUT=$per_test TMPDIR="$ttmp" \
+    HTTRACK_TEST_TIMEOUT=$budget TMPDIR="$ttmp" \
         bash ./test-timeout.sh "$t" >"$t.log" 2>&1 || rc=$?
     case "$rc" in
     0) echo "PASS $t" ;;
@@ -642,11 +655,7 @@ run_one_test() (
         tail -n 25 "$t.log" | sed 's/^/      /' >"$results/$t.tail"
         # These assert with `test "$(...)" == "..." || exit 1`, which
         # says nothing at all on failure. Re-run traced, still bounded.
-        # Charged to the suite deadline rather than given a budget of its
-        # own: a failure just under that deadline would else spend
-        # $per_test twice and land on the workflow's own timeout (#1126).
-        left=$((suite_deadline - (SECONDS - started)))
-        test "$left" -le "$per_test" || left=$per_test
+        left=$(ci_rerun_budget)
         if [ "$left" -gt 0 ]; then
             # Noted first, or a slow trace reads as a wedge to the watchdog,
             # which would then kill the step in the middle of writing it.
@@ -728,6 +737,32 @@ done
 for p in ${pids[@]+"${pids[@]}"}; do
     wait "$p" 2>/dev/null || true
 done
+# An outage can fail several tests and leave WSL2's error line in only one of their
+# logs (#1672), so a run that saw one re-runs every test that failed. That costs
+# those tests, where repeating the leg costs twenty minutes.
+retried="" caught="" fails=""
+for t in ${ran_tests[@]+"${ran_tests[@]}"}; do
+    ci_read_outcome "$t" "$results"
+    test "$ci_outcome" = fail || continue
+    fails="$fails $t"
+    ci_test_lost_interop "$t" && caught="$caught $t"
+done
+if test -n "$caught"; then
+    for t in $fails; do
+        left=$(ci_rerun_budget)
+        test "$left" -gt 0 || break
+        # The first run's log kept under its own name, and uploaded with the
+        # rest, because the retry writes a fresh one and a second failure must
+        # be read on its own output.
+        test ! -f "$t.log" || mv -f "$t.log" "$t.first.log"
+        # Or the first failure's tail is printed under a green tally.
+        rm -f "$results/$t.tail"
+        echo "RETRY $t" >>"$progress"
+        run_one_test "$t" "$left" | sed 's/^/retry: /'
+        retried="$retried $t"
+    done
+fi
+
 # In test order, once nothing is still writing: eight workers interleaving their
 # failure tails is noise.
 for t in ${ran_tests[@]+"${ran_tests[@]}"}; do
@@ -751,6 +786,13 @@ done
 reap_leftover_processes "the suite" | tee -a "$progress"
 echo "ran=$((pass + fail + skip + lost)) pass=$pass fail=$fail skip=$skip lost=$lost" |
     tee -a "$GITHUB_STEP_SUMMARY"
+# A rescued leg is green, so the annotation is what tells a reader an outage
+# happened at all, and which failures were excused by it.
+test -z "$retried" || {
+    echo "interop-retried:$retried" | tee -a "$GITHUB_STEP_SUMMARY"
+    ci_annotate warning "WSL2 lost its interop channel" \
+        "$(printf 'caught by:%s\nretried once:%s\n' "$caught" "$retried")"
+}
 
 # Every gate here exits 77, so an all-skipped suite would report green having
 # tested nothing: pin the skips, and floor the passes in case the glob empties.

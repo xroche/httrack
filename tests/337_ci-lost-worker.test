@@ -6,8 +6,9 @@
 # the step teed, for the runs the watchdog kills before that verdict (#1588). Driven
 # here because the Windows leg, where it happens, keeps no evidence of it.
 #
-# Five staged suite runs of 121 stubs each are real work, not a wedge. That is 112s
-# here and past the 600s guard on a loaded macOS runner, so the arms pace themselves.
+# Four staged suite runs of 121 stubs each are real work, not a wedge. They outlast
+# the 600s guard on a loaded macOS runner, so the arms pace themselves. The interop
+# arms are in 495, which runs beside this test rather than after it.
 # TEST_TIMEOUT_AT_LEAST: 1200
 
 set -euo pipefail
@@ -20,6 +21,8 @@ set -euo pipefail
 unset WATCHDOG_TOKEN WATCHDOG_REPO WATCHDOG_SHA WATCHDOG_URL
 # shellcheck source=tests/ci-windows-suite.sh
 . "$testdir/ci-windows-suite.sh"
+# shellcheck source=tests/ci-suite-stage.sh
+. "$testdir/ci-suite-stage.sh"
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_lostworker.XXXXXX")
 cleanup_push rm -rf "$tmp"
@@ -64,15 +67,6 @@ mkdir -p "$lostdir"
 
 # --- and the same thing end to end, with a worker really killed --------------
 
-bin=$tmp/bin
-mkdir -p "$bin"
-printf '#!/bin/sh\nexit 0\n' >"$bin/httrack"
-# shellcheck disable=SC2016 # $2 is the stub's own expansion
-printf '#!/bin/sh\necho "$2"\n' >"$bin/cygpath"
-chmod +x "$bin/httrack" "$bin/cygpath"
-# Ahead of the driver's own command -v, which asks access(X_OK) and reads false here.
-test -x "$bin/httrack" || skip "${TMPDIR:-/tmp} is noexec, the stub bindir cannot be run"
-
 # The killer stub finds its target by reading argv out of ps, and the emulated
 # leg's rootfs has no procps: a walk that matches nothing there is the missing
 # tool, not a missing worker.
@@ -82,23 +76,7 @@ if test -z "$psargs" || test -z "$psppid"; then
     skip "no ps reporting argv and ppid, so the ancestry walk cannot run"
 fi
 
-share=$tmp/share
-mkdir -p "$share"
-export POOLSHARE=$share
-
-# The 29 the driver pins as msys's expected skips (the default backend here), so
-# a stub run can reach the gates past the skip-set compare instead of stopping on it.
-expected_skips=$(sed -n '/^expected_skips_msys="/,/"$/p' "$testdir/ci-windows-suite.sh" |
-    sed -e 's/^expected_skips_msys="//' -e 's/"$//')
-nskip=$(count_matching_lines . <<<"$expected_skips")
-test "$nskip" -ge 1 || fail "read no expected skips out of the driver"
-# 91 passing stubs clear its floor of 90, and the lost one passes in the control leg.
-ran=$((92 + nskip))
-
-stub() { # stub <path> <exit status> [shell line]
-    # shellcheck disable=SC2016 # the stub's own expansions, not this shell's
-    printf '#!/bin/sh\n%s\nexit %s\n' "${3:-:}" "$2" >"$1"
-}
+ci_stage_init
 
 # Kill the run_one_test subshell where the real one died: after its log was opened,
 # before it could write a status. It is the closest ancestor still carrying the
@@ -124,56 +102,9 @@ if [ "$n" -ge 2 ]; then
 fi
 echo "none ($n ancestors run the driver)" >"$POOLSHARE/killed"'
 
-stage() { # stage <dir> <lost stub body>
-    local d=$1 t i
-    rm -rf "$d"
-    mkdir -p "$d/rt"
-    cp "$testdir/ci-windows-suite.sh" "$testdir/testlib.sh" "$testdir/proclib.sh" \
-        "$testdir/test-timeout.sh" "$d/"
-    chmod u+w "$d"/*.sh
-    # Neutered, or it would kill a sibling's engine under "make check -j".
-    printf 'reap_leftover_processes() { return 0; }\n' >>"$d/proclib.sh"
-    # One per glob the driver enumerates, plus enough passes to clear its floor of 90.
-    for t in 00_runnable 900_zlib-pass 901_watchdog-pass 902_crawllib-pass \
-        903_crawl-harness-pass 904_crawl_proxy_https 905_crawl-log-salvage; do
-        stub "$d/$t.test" 0
-    done
-    i=0
-    while test "$i" -lt 84; do
-        stub "$d/9$((100 + i))_engine-pass.test" 0
-        i=$((i + 1))
-    done
-    # shellcheck disable=SC2086 # one stub per name, so the splitting is the point
-    for t in $expected_skips; do stub "$d/$t" 77; done
-    if test -n "${3:-}"; then
-        # The killer on a pinned skip: the vanished worker cannot record its
-        # skip, so the set gate fires before the lost gate is ever consulted.
-        stub "$d/906_engine-lost.test" 0
-        stub "$d/$3" 77 "$2"
-    else
-        stub "$d/906_engine-lost.test" 0 "$2"
-    fi
-}
-
-# Drive the suite staged in $1 into $tmp/out, its status into $rc and what it cost into
-# $arm_took. Each arm paces after its own assertions, or a skip throws away the run it
-# has already paid for.
-rc=0
-arm_took=0
-run_suite() { # run_suite <dir>
-    local began=$SECONDS
-    rc=0
-    (
-        cd "$1"
-        RUNNER_TEMP="$1/rt" GITHUB_STEP_SUMMARY="$tmp/summary" HTTRACK_SUITE_JOBS=6 \
-            bash ./ci-windows-suite.sh "$bin"
-    ) >"$tmp/out" 2>&1 || rc=$?
-    arm_took=$((SECONDS - began))
-}
-
 # The arms the budget is paced against. The console counts ride on the first two, so
 # they sit after the second and survive a run that paces out.
-cases=5
+cases=4
 n=0
 
 # The control first: the same stubs with nothing killed have to come out green, or
@@ -185,6 +116,7 @@ grep -q "^ran=$ran pass=92 fail=0 skip=$nskip lost=0$" "$tmp/out" ||
     fail "clean tally: $(grep '^ran=' "$tmp/out" || true)"
 # A whole healthy run for the counter below: no LOST line, and a tally saying lost=0.
 cp "$tmp/out" "$tmp/console-clean.log"
+! grep -q 'interop-retried' "$tmp/out" || fail "a green leg retried something"
 n=$((n + 1))
 pace "$((cases - n))" "$arm_took" "the lost tally, the pinned-skip gate and precedence"
 
@@ -351,21 +283,11 @@ grep -q '::error::failing: 900_zlib-pass.test' "$tmp/out" ||
     fail "the failing test was not named: $(<"$tmp/out")"
 test "$rc" -eq 1 ||
     fail "a failure alongside a loss exited $rc, want 1: $(<"$tmp/out")"
+# No outage here, so nothing may be retried: without this the retry gate could
+# drop its interop check and every arm below would still pass.
+! grep -q 'interop-retried' "$tmp/out" ||
+    fail "a plain red was retried as an outage: $(<"$tmp/out")"
 ok "a real failure outranks a lost worker"
-n=$((n + 1))
-pace "$((cases - n))" "$arm_took" "an outage, which must read as a leg to repeat"
-
-# A failure whose log carries WSL2's interop error is not a red: the exe never
-# launched (#1672). Here rather than in 469, which calls the verdict directly and
-# so leaves the driver's own gate untested.
-stage "$tmp/interop" ':'
-stub "$tmp/interop/900_zlib-pass.test" 3 \
-    'echo "<3>init: (2409) ERROR: UtilAcceptVsock:235: accept4 failed 110" >&2'
-run_suite "$tmp/interop"
-grep -q '::error::re-run this leg: WSL2 lost its interop channel under: 900_zlib-pass.test' \
-    "$tmp/out" || fail "the outage was not named: $(<"$tmp/out")"
-test "$rc" -eq 3 || fail "an interop outage exited $rc, want 3: $(<"$tmp/out")"
-ok "an interop outage ends the leg on a status that says re-run"
 n=$((n + 1))
 # Nothing left to pace. It catches an arm counted out of step, not one never counted.
 assert_steps_ran "$cases" "$n"
