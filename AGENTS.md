@@ -209,14 +209,12 @@ Before pushing, and when reviewing others, don't skim for bugs:
 
 ## PR descriptions
 - Plain concise prose; lead with what changed and why. No What/Why/How template.
-- Title says what the change does, in the plainest words that fit: not the
-  problem behind it, and not the implementation. Anyone should understand it
-  without opening the diff. A bug fix is the one case where the problem is the
-  goal, so there the title names the thing being fixed.
+- Title says what the change does, in plain words anyone can follow without
+  opening the diff. Not the problem behind it, and not the implementation.
 - Don't restate the diff — give what it can't show: motivation, context,
   tradeoffs, risk.
-- A couple of sentences: what it does, and the one thing a reviewer would
-  otherwise get wrong. A third sentence needs a reason.
+- Write two sentences: what it does, and what a reviewer would miss. A third
+  needs a reason.
 - Verify claims against the code before you write them; flag drift, don't repeat it.
 - Don't hard-wrap (GitHub reflows). No "Generated with Claude" footer. Run the
   prose through `/humanizer`.

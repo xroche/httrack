@@ -39,17 +39,24 @@ jobs:
           ./configure --enable-mptcp
           make -j"$(nproc)"
 
-      # A runner whose kernel has no Multipath TCP can say nothing about the
-      # server, so it declines rather than reporting a red.
-      - name: Check the runner can open a Multipath TCP socket
+      # A runner that cannot open a Multipath TCP socket, or cannot tell a
+      # negotiated connection from a fallback, can say nothing about the server.
+      # It declines rather than reporting a red.
+      - name: Check the runner can open a Multipath TCP socket and report on it
         id: probe
         run: |
           set -euo pipefail
-          if src/httrack -#test=features | grep -qx 'mptcp 1'; then
+          # Captured, not piped: grep -q SIGPIPEs the producer, and "mptcp" is
+          # not the last line this writes. A failing probe is a red, not a skip.
+          features=$(src/httrack -#test=features) ||
+            { echo "the features probe itself failed" >&2; exit 1; }
+          if grep -qx 'mptcp 1' <<<"$features" &&
+            grep -qx 'mptcpinfo 1' <<<"$features"; then
             echo "usable=yes" >>"$GITHUB_OUTPUT"
           else
             echo "usable=no" >>"$GITHUB_OUTPUT"
-            echo "::notice::this runner has no Multipath TCP, so the server was not asked"
+            printf '%s\n' "$features" >&2
+            echo "::notice::this runner cannot report on Multipath TCP, so the server was not asked"
           fi
 
       - name: Negotiate against ut.httrack.com, and prove the option decides it
@@ -60,11 +67,17 @@ jobs:
           set -euo pipefail
           # One page, no robots fetch, so the count is the page's own connection.
           crawl() { # crawl <outdir> <option>
+            local rc=0
+
             rm -rf "$1"
             timeout 120 src/httrack "$HOST" -O "$1" "$2" -r1 -s0 -q -%v0 \
-              >/dev/null 2>&1 || true
+              >/dev/null 2>&1 || rc=$?
+            test "$rc" -ne 124 || { echo "the crawl with $2 timed out" >&2; exit 1; }
             test -s "$1/hts-log.txt" ||
               { echo "no log written for $2" >&2; exit 1; }
+            # A crawl that fetched nothing satisfies every check below it.
+            test -s "$1/ut.httrack.com/index.html" ||
+              { echo "the crawl with $2 fetched no page" >&2; exit 1; }
           }
 
           crawl on --mptcp
@@ -78,8 +91,10 @@ jobs:
             { echo "ut.httrack.com did not negotiate; check the server's own setting" >&2
               exit 1; }
 
-          # The control: the same host and the same page, with the option off,
-          # must report nothing. Without it a line could mean anything.
+          # The option reaches the engine: the same host and page with it off
+          # reports nothing. This is weaker than it looks, because accounting is
+          # gated on the same predicate that picks the protocol, so it shows the
+          # option was read and not what went on the wire.
           crawl off --mptcp=0
           ! grep -q 'Multipath TCP' off/hts-log.txt ||
             { echo "--mptcp=0 still reported a Multipath line" >&2; exit 1; }
