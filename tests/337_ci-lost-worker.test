@@ -173,7 +173,7 @@ run_suite() { # run_suite <dir>
 
 # The arms the budget is paced against. The console counts ride on the first two, so
 # they sit after the second and survive a run that paces out.
-cases=5
+cases=8
 n=0
 
 # The control first: the same stubs with nothing killed have to come out green, or
@@ -366,6 +366,85 @@ grep -q '::error::re-run this leg: WSL2 lost its interop channel under: 900_zlib
     "$tmp/out" || fail "the outage was not named: $(<"$tmp/out")"
 test "$rc" -eq 3 || fail "an interop outage exited $rc, want 3: $(<"$tmp/out")"
 ok "an interop outage ends the leg on a status that says re-run"
+n=$((n + 1))
+pace "$((cases - n))" "$arm_took" "the retry, and the failure it must not excuse"
+
+# A stub body that fails its first run and behaves after, counting its runs in
+# $POOLSHARE/$1 so a retry that never happened is caught. With $2 it fails the way
+# the outage does, writing WSL2's own error line into its log; without, it is the
+# collateral failure, which looks like any other red.
+fail_once() { # fail_once <counter name> [outage]
+    # shellcheck disable=SC2016 # the stub's own expansions, not this shell's
+    printf 'n=$(cat "$POOLSHARE/%s" 2>/dev/null || echo 0)\n' "$1"
+    # shellcheck disable=SC2016
+    printf 'n=$((n + 1))\necho "$n" >"$POOLSHARE/%s"\n' "$1"
+    # shellcheck disable=SC2016
+    printf 'test "$n" -gt 1 || {\n'
+    test -z "${2:-}" ||
+        printf '    echo "<3>init: (2409) ERROR: UtilAcceptVsock:235: accept4 failed 110" >&2\n'
+    printf '    exit 3\n}\n'
+}
+
+# A test the outage hit is re-run where it costs one test, rather than by
+# repeating the whole twenty-minute leg. Three runs: the first, the trace the
+# driver gives any failure, and the retry.
+stage "$tmp/retried" ':'
+stub "$tmp/retried/900_zlib-pass.test" 0 "$(fail_once retried outage)"
+run_suite "$tmp/retried"
+test "$(<"$share/retried")" = 3 ||
+    fail "the stub ran $(<"$share/retried") time(s), so nothing was retried"
+test "$rc" -eq 0 || fail "a retried outage exited $rc, want 0: $(<"$tmp/out")"
+grep -q "^ran=$ran pass=92 fail=0 skip=$nskip lost=0$" "$tmp/out" ||
+    fail "the recovered test was not counted as a pass: $(grep '^ran=' "$tmp/out" || true)"
+grep -q '^retry: PASS 900_zlib-pass.test$' "$tmp/out" ||
+    fail "the retry did not report its own verdict: $(<"$tmp/out")"
+grep -q '^interop-retried: 900_zlib-pass.test$' "$tmp/out" ||
+    fail "a green leg does not say it hit an outage: $(<"$tmp/out")"
+# Or the run that recovers throws away the only evidence the outage happened.
+grep -q 'UtilAcceptVsock' "$tmp/retried/900_zlib-pass.test.interop.log" ||
+    fail "the outage log was not kept beside the retry"
+ok "a test the outage hit is retried, and a green leg still names it"
+n=$((n + 1))
+pace "$((cases - n))" "$arm_took" "the failure a retry must not excuse"
+
+# The control: the retry is read on its own log, or the outage before it excuses a
+# red and nobody investigates it. Four runs, the second failure being traced too.
+stage "$tmp/retriedred" ':'
+stub "$tmp/retriedred/900_zlib-pass.test" 3 "$(fail_once retriedred outage)"
+run_suite "$tmp/retriedred"
+test "$(<"$share/retriedred")" = 4 ||
+    fail "the stub ran $(<"$share/retriedred") time(s), so nothing was retried"
+grep -q '^interop-retried: 900_zlib-pass.test$' "$tmp/out" ||
+    fail "the outage went unnamed, so this arm proves nothing: $(<"$tmp/out")"
+grep -q '::error::failing: 900_zlib-pass.test' "$tmp/out" ||
+    fail "the failure after the outage was not named: $(<"$tmp/out")"
+! grep -q 'interop channel' "$tmp/out" ||
+    fail "the outage excused the failure that followed it: $(<"$tmp/out")"
+test "$rc" -eq 1 || fail "a real failure after an outage exited $rc, want 1: $(<"$tmp/out")"
+ok "a failure on the retry is a red, not the outage before it"
+n=$((n + 1))
+pace "$((cases - n))" "$arm_took" "the collateral failure, which carries no error line"
+
+# What the runs this exists for really look like: the outage takes the exe out from
+# under several tests at once and only one of their logs catches WSL2's error line
+# (#1672, three failures, one line). So every failure of a run that saw one is
+# retried, not only the test that caught it.
+stage "$tmp/collateral" ':'
+stub "$tmp/collateral/900_zlib-pass.test" 0 "$(fail_once collateral outage)"
+stub "$tmp/collateral/901_watchdog-pass.test" 0 "$(fail_once collateral2)"
+run_suite "$tmp/collateral"
+test -f "$tmp/collateral/901_watchdog-pass.test.interop.log" ||
+    fail "the collateral test kept no first log, so it was never retried"
+! grep -q 'UtilAcceptVsock' "$tmp/collateral/901_watchdog-pass.test.interop.log" ||
+    fail "the collateral stub wrote the error line, so this arm proves nothing"
+test "$(<"$share/collateral2")" = 3 ||
+    fail "the collateral test ran $(<"$share/collateral2") time(s), so it was not retried"
+test "$rc" -eq 0 || fail "an outage hitting two tests exited $rc, want 0: $(<"$tmp/out")"
+grep -q "^ran=$ran pass=92 fail=0 skip=$nskip lost=0$" "$tmp/out" ||
+    fail "both recovered tests were not counted: $(grep '^ran=' "$tmp/out" || true)"
+grep -q '^interop-retried: 900_zlib-pass.test 901_watchdog-pass.test$' "$tmp/out" ||
+    fail "the retried tests were not both named: $(<"$tmp/out")"
+ok "an outage that only one log caught still retries the tests beside it"
 n=$((n + 1))
 # Nothing left to pace. It catches an arm counted out of step, not one never counted.
 assert_steps_ran "$cases" "$n"
