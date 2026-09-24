@@ -1,0 +1,101 @@
+# The suite proves Multipath TCP negotiates over loopback, where both ends share
+# one kernel. Only a real server can show the handshake surviving a real path,
+# so this asks ut.httrack.com, which speaks it. A red here can equally mean the
+# server's own configuration changed, which is why it is scheduled and never a
+# required check.
+name: mptcp negotiation (networked)
+
+on:
+  schedule:
+    - cron: "37 5 * * 2"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  negotiate:
+    name: Multipath TCP against a live server
+    # Scheduled workflows run per-fork independently; skip anywhere but upstream.
+    if: github.repository == 'xroche/httrack'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
+          sudo apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev
+
+      - name: Build
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          ./configure --enable-mptcp
+          make -j"$(nproc)"
+
+      # A runner that cannot open a Multipath TCP socket, or cannot tell a
+      # negotiated connection from a fallback, can say nothing about the server.
+      # It declines rather than reporting a red.
+      - name: Check the runner can open a Multipath TCP socket and report on it
+        id: probe
+        run: |
+          set -euo pipefail
+          # Captured, not piped: grep -q SIGPIPEs the producer, and "mptcp" is
+          # not the last line this writes. A failing probe is a red, not a skip.
+          features=$(src/httrack -#test=features) ||
+            { echo "the features probe itself failed" >&2; exit 1; }
+          if grep -qx 'mptcp 1' <<<"$features" &&
+            grep -qx 'mptcpinfo 1' <<<"$features"; then
+            echo "usable=yes" >>"$GITHUB_OUTPUT"
+          else
+            echo "usable=no" >>"$GITHUB_OUTPUT"
+            printf '%s\n' "$features" >&2
+            echo "::notice::this runner cannot report on Multipath TCP, so the server was not asked"
+          fi
+
+      - name: Negotiate against ut.httrack.com, and prove the option decides it
+        if: steps.probe.outputs.usable == 'yes'
+        env:
+          HOST: https://ut.httrack.com/
+        run: |
+          set -euo pipefail
+          # One page, no robots fetch, so the count is the page's own connection.
+          crawl() { # crawl <outdir> <option>
+            local rc=0
+
+            rm -rf "$1"
+            timeout 120 src/httrack "$HOST" -O "$1" "$2" -r1 -s0 -q -%v0 \
+              >/dev/null 2>&1 || rc=$?
+            test "$rc" -ne 124 || { echo "the crawl with $2 timed out" >&2; exit 1; }
+            test -s "$1/hts-log.txt" ||
+              { echo "no log written for $2" >&2; exit 1; }
+            # A crawl that fetched nothing satisfies every check below it.
+            test -s "$1/ut.httrack.com/index.html" ||
+              { echo "the crawl with $2 fetched no page" >&2; exit 1; }
+          }
+
+          crawl on --mptcp
+          line=$(grep -o 'Multipath TCP: .*' on/hts-log.txt || true)
+          test -n "$line" ||
+            { echo "the server answered but nothing negotiated: no Multipath line" >&2
+              grep -iE 'error|warning' on/hts-log.txt >&2 || true; exit 1; }
+          echo "with --mptcp: $line"
+          grep -qE 'Multipath TCP: [1-9][0-9]* HTTP connections negotiated it, 0 fell back' \
+            <<<"$line" ||
+            { echo "ut.httrack.com did not negotiate; check the server's own setting" >&2
+              exit 1; }
+
+          # The option reaches the engine: the same host and page with it off
+          # reports nothing. This is weaker than it looks, because accounting is
+          # gated on the same predicate that picks the protocol, so it shows the
+          # option was read and not what went on the wire.
+          crawl off --mptcp=0
+          ! grep -q 'Multipath TCP' off/hts-log.txt ||
+            { echo "--mptcp=0 still reported a Multipath line" >&2; exit 1; }
+          echo "with --mptcp=0: no line, as it should be"

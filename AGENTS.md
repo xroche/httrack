@@ -209,10 +209,12 @@ Before pushing, and when reviewing others, don't skim for bugs:
 
 ## PR descriptions
 - Plain concise prose; lead with what changed and why. No What/Why/How template.
-- Title names the problem, not the implementation.
+- Title says what the change does, in plain words anyone can follow without
+  opening the diff. Not the problem behind it, and not the implementation.
 - Don't restate the diff — give what it can't show: motivation, context,
   tradeoffs, risk.
-- Length tracks the change: a typo is one sentence; a security fix earns a writeup.
+- Write two sentences: what it does, and what a reviewer would miss. A third
+  needs a reason.
 - Verify claims against the code before you write them; flag drift, don't repeat it.
 - Don't hard-wrap (GitHub reflows). No "Generated with Claude" footer. Run the
   prose through `/humanizer`.
