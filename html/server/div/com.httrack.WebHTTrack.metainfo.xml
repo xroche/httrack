@@ -53,6 +53,17 @@
   <content_rating type="oars-1.1"/>
   <!-- Newest first; tests/01_engine-version-macros.test enforces it. -->
   <releases>
+    <release version="3.50.4" date="2026-09-24">
+      <description>
+        <ul>
+          <li>Mirrors of sites built on a JavaScript framework keep their modules, where the wrong address was fetched and the server's error page saved in its place</li>
+          <li>A server that asks the crawler to wait and come back is obeyed now, where the page used to be given up on the first answer</li>
+          <li>The log says when a site's bot protection refused the crawl, and when links above the starting page were left out of the mirror</li>
+          <li>A Windows build no longer leaves a shortened message unfinished, which could stop the program</li>
+          <li>Connections can use Multipath TCP on Linux and macOS, so a mirror carries on when one network path goes away</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.50.3" date="2026-09-18">
       <description>
         <ul>

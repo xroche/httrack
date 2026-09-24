@@ -1,3 +1,13 @@
+httrack (3.50.4-1) unstable; urgency=medium
+
+  * New upstream release.  It fixes how JavaScript modules are mirrored and a
+    Windows-only string bug, and its test suite passes on GNU/Hurd again, where
+    3.50.3 failed to build.  Full list in history.txt.
+  * debian/rules: build with --enable-mptcp, so this recipe decides whether
+    Multipath TCP is compiled in rather than the build machine.
+
+ -- Xavier Roche <xavier@debian.org>  Thu, 24 Sep 2026 19:53:25 +0200
+
 httrack (3.50.3-1) unstable; urgency=medium
 
   * New upstream release, security and correctness fixes.  Full list in
