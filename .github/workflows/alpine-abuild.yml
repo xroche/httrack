@@ -47,6 +47,7 @@ jobs:
           # own directory. Pinning the sum here rather than letting abuild
           # checksum regenerate it is what makes abuild verify our bytes, and
           # what reds a source entry naming anything else.
+          # shellcheck disable=SC2016 # $pkgver is the APKBUILD's to expand, not ours
           sed -i -e "s/^pkgver=.*/pkgver=$ver/" \
             -e 's|^source=.*|source="httrack-$pkgver.tar.gz"|' \
             -e "/^sha512sums=\"/,/^\"\$/c\\sha512sums=\"$sha  httrack-$ver.tar.gz\"" \
@@ -54,6 +55,7 @@ jobs:
           # A sed that matched nothing leaves the recipe on the released
           # tarball, and the canary then passes without building this tree.
           grep -qx "pkgver=$ver" APKBUILD
+          # shellcheck disable=SC2016 # the literal the APKBUILD must contain
           grep -qx 'source="httrack-$pkgver.tar.gz"' APKBUILD
           grep -qx "sha512sums=\"$sha  httrack-$ver.tar.gz\"" APKBUILD
 

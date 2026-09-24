@@ -44,12 +44,14 @@ jobs:
           # Their source= brace-expands to the tarball plus its detached
           # signature, and an unreleased tree has neither a URL nor an .asc.
           # The pinned sum is what makes makepkg verify our bytes.
+          # shellcheck disable=SC2016 # the PKGBUILD expands these, not this shell
           sed -i -e "s/^pkgver=.*/pkgver=$ver/" \
             -e 's|^source=(.*|source=(${pkgname}-${pkgver}.tar.gz)|' \
             -e "/^sha256sums=/,/)\$/c\\sha256sums=('$sha')" PKGBUILD
           # A sed that matched nothing leaves the recipe on the released
           # tarball, and the canary then passes without building this tree.
           grep -qx "pkgver=$ver" PKGBUILD
+          # shellcheck disable=SC2016 # the literal the PKGBUILD must contain
           grep -qx 'source=(${pkgname}-${pkgver}.tar.gz)' PKGBUILD
           grep -qx "sha256sums=('$sha')" PKGBUILD
 
