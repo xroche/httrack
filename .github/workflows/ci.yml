@@ -1087,10 +1087,16 @@ jobs:
           # version; use it rather than fetching a release binary from github.com.
           sudo apt-get install -y --no-install-recommends shellcheck shfmt appstream \
             appstream-util
-          # actionlint is not packaged in noble, and its own installer needs a
-          # version; pin it so the rules cannot move under an unrelated PR.
-          curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.7/scripts/download-actionlint.bash \
-            | bash -s -- 1.7.7 "$HOME/.local/bin"
+          # actionlint is in no Ubuntu release (checked against Launchpad), so
+          # it comes from its own tarball rather than apt. Pinned and checksummed
+          # instead of piping the project's installer into bash: same 2 MB, and
+          # nothing downloaded gets executed before it is verified.
+          actionlint_sha=023070a287cd8cccd71515fedc843f1985bf96c436b7effaecce67290e7e0757
+          curl -fsSL -o /tmp/actionlint.tar.gz \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.7/actionlint_1.7.7_linux_amd64.tar.gz
+          echo "${actionlint_sha}  /tmp/actionlint.tar.gz" | sha256sum -c -
+          mkdir -p "$HOME/.local/bin"
+          tar -xzf /tmp/actionlint.tar.gz -C "$HOME/.local/bin" actionlint
           "$HOME/.local/bin/actionlint" --version
           # Pinned to the local dev versions: black's stable style moves across
           # majors, so the runner image's build would reformat on its own schedule.
