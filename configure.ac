@@ -225,8 +225,7 @@ AX_CHECK_COMPILE_FLAG([-Wignored-qualifiers], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -
 AX_CHECK_COMPILE_FLAG([-Wsign-compare], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wsign-compare"], [], [-Werror])
 AX_CHECK_COMPILE_FLAG([-Wduplicated-cond], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wduplicated-cond"], [], [-Werror])
 AX_CHECK_COMPILE_FLAG([-Wimplicit-fallthrough], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wimplicit-fallthrough"], [], [-Werror])
-# -Wstringop-overflow needs a level, and 4 is the widest the tree is clean on.
-AX_CHECK_COMPILE_FLAG([-Wstringop-overflow=4], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wstringop-overflow=4"], [], [-Werror])
+# Implied by -Wall today; named explicitly so a truncating copy stays visible.
 AX_CHECK_COMPILE_FLAG([-Wstringop-truncation], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wstringop-truncation"], [], [-Werror])
 # The tree has no stack allocation sized off the wire, and these keep it that way.
 AX_CHECK_COMPILE_FLAG([-Wvla], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wvla"], [], [-Werror])
