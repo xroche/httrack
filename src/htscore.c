@@ -659,7 +659,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   // noter heure actuelle de départ en secondes
   memset(&HTS_STAT, 0, sizeof(HTS_STAT));
   HTS_STAT.stat_timestart = time_local();
-  HTS_STAT.istat_timestart[0] = HTS_STAT.istat_timestart[1] = mtime_local();
+  HTS_STAT.istat_timestart[0] = HTS_STAT.istat_timestart[1] = mtime_monotonic();
   /* reset stats */
   HTS_STAT.HTS_TOTAL_RECV = 0;
   HTS_STAT.istat_bytes[0] = HTS_STAT.istat_bytes[1] = 0;
@@ -2445,7 +2445,7 @@ int engine_stats(void) {
   HTS_STAT.stat_nsocket = HTS_STAT.stat_errors = HTS_STAT.nbk = 0;
   HTS_STAT.nb = 0;
   if (HTS_STAT.HTS_TOTAL_RECV > 2048) {
-    TStamp cdif = mtime_local();
+    TStamp cdif = mtime_monotonic();
     int i;
 
     for(i = 0; i < 2; i++) {

@@ -404,6 +404,11 @@ void hts_dns_set_negative_ttl_ms(int ms);
 /* Consecutive failed resolves recorded for host, 0 if it is not cached or
    resolves. Test-only: nothing in the engine reads it back. */
 int hts_dns_negative_failures(httrackp *opt, const char *host);
+/* Milliseconds off a clock NTP cannot step, for an elapsed time or a
+   deadline. Its zero is arbitrary, so it measures an interval and never names
+   a date; anything stored or sent still needs mtime_local(). */
+TStamp mtime_monotonic(void);
+
 /* Test-only: move one cached negative record's stamps by ms, so a self-test
    outlasts a wait (positive) or steps behind them (negative), no sleeps. */
 void hts_dns_test_move_clock(httrackp *opt, const char *host, TStamp ms);
