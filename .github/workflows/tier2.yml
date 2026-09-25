@@ -398,7 +398,12 @@ jobs:
   emulated:
     uses: ./.github/workflows/emulated-suite.yml
 
-  # One status to read, so a red leg cannot hide behind thirteen greens.
+  # Runs the suite on a Hurd, where the buildds kept finding failures nothing
+  # else here could.
+  hurd:
+    uses: ./.github/workflows/hurd-suite.yml
+
+  # One status to read, so a red leg cannot hide behind the others.
   # 496_ci-tier2-split.test fails when a job above is missing from needs: below.
   gate:
     name: tier-2 gate
@@ -417,6 +422,7 @@ jobs:
       - termux
       - freebsd
       - emulated
+      - hurd
     runs-on: ubuntu-24.04
     steps:
       - name: Fail unless every leg succeeded

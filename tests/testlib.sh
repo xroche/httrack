@@ -70,6 +70,14 @@ skip_on_windows() { ! target_is_windows || skip "$*"; }
 is_emulated() { [ -n "${EMULATED_ARCH:-}" ]; }
 skip_on_emulated() { ! is_emulated || skip "emulated ${EMULATED_ARCH}: $*"; }
 
+# GNU/Hurd, where uname -s says GNU. A tier-3 platform: a test it cannot pass
+# skips rather than reds the suite, so the hurd leg stays readable.
+is_hurd() {
+    case "$HTS_OS" in GNU | GNU/*) return 0 ;; esac
+    return 1
+}
+skip_on_hurd() { ! is_hurd || skip "GNU/Hurd: $*"; }
+
 # Does RLIMIT_FSIZE actually stop a write here? GNU/Hurd accepts the limit and
 # writes past it anyway, so a test that needs a refused write has to ask rather
 # than assume. Measured on the file, not on the exit status: a host that
