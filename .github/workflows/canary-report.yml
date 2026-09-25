@@ -40,6 +40,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           WF: ${{ github.event.workflow_run.name }}
+          WF_PATH: ${{ github.event.workflow_run.path }}
           EVENT: ${{ github.event.workflow_run.event }}
           RESULT: ${{ github.event.workflow_run.conclusion }}
           RUN_URL: ${{ github.event.workflow_run.html_url }}
@@ -48,17 +49,24 @@ jobs:
         run: |
           set -euo pipefail
           title="CI canary: $WF is failing"
+          # A second label naming the workflow file, because the canary's issue
+          # has to be found by something a maintainer cannot change. Keying on
+          # the title means one retitle orphans the old issue AND files a new
+          # one, and keying on the shared label alone means a long-lived issue
+          # pages away once a hundred have accrued under it.
+          key="canary:${WF_PATH##*/}"
 
           gh label create "$LABEL" --color fbca04 \
             --description "A scheduled canary is failing" || true
+          gh label create "$key" --color ededed \
+            --description "Canary issues for $WF_PATH" || true
 
           # Labelled, not searched: the search index lags minutes behind a fresh
           # issue, which is the window a second delivery would duplicate in.
           # Plain assignment, so a failed list aborts rather than reading as
           # "nothing open yet" and filing a duplicate.
-          issues=$(gh issue list --state all --label "$LABEL" --limit 100 \
-            --json number,title,state --jq '.[] | [.number, .state, .title] | @tsv')
-          mine=$(awk -F'\t' -v t="$title" '$3 == t { print $1 "\t" $2 }' <<<"$issues")
+          mine=$(gh issue list --state all --label "$LABEL" --label "$key" \
+            --limit 100 --json number,state --jq '.[] | [.number, .state] | @tsv')
           open=$(awk -F'\t' '$2 == "OPEN" { print $1; exit }' <<<"$mine")
 
           if [ "$RESULT" = success ]; then
@@ -113,6 +121,6 @@ jobs:
             gh issue comment "$open" --body-file "$RUNNER_TEMP/body.md"
             echo "commented on #$open"
           else
-            gh issue create --label "$LABEL" --title "$title" \
+            gh issue create --label "$LABEL" --label "$key" --title "$title" \
               --body-file "$RUNNER_TEMP/body.md"
           fi
