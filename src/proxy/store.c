@@ -988,7 +988,7 @@ int PT_LoadCache__New(PT_Index index_, const char *filename) {
                                          0) == Z_OK) {
               long int pos = (long int) unzGetOffset(zFile);
 
-              assertf(readSizeHeader < sizeof(comment));
+              assertf((size_t) readSizeHeader < sizeof(comment));
               comment[readSizeHeader] = '\0';
               entries++;
               if (pos > 0) {
@@ -1300,7 +1300,9 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                 if (flags & FETCH_BODY) {
                   r->adr = (char *) malloc(r->size + 1);
                   if (r->adr != NULL) {
-                    if (unzReadCurrentFile(index->zFile, r->adr, (unsigned int) r->size) != r->size) {  // erreur
+                    if ((size_t) unzReadCurrentFile(index->zFile, r->adr,
+                                                    (unsigned int) r->size) !=
+                        r->size) {
                       PT_Element_DropBody(r);
                       r->statuscode = STATUSCODE_INVALID;
                       strcpybuff(r->msg, "Cache Read Error : Read Data");
@@ -2647,10 +2649,9 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
               if (r->statuscode != STATUSCODE_INVALID) {
                 r->adr = (char *) malloc(fetchSize);
                 if (r->adr != NULL) {
-                  if (fetchSize > 0
-                      && (r->size =
-                          (int) fread(r->adr, 1, fetchSize,
-                                      index->file)) != fetchSize) {
+                  if (fetchSize > 0 &&
+                      (r->size = fread(r->adr, 1, fetchSize, index->file)) !=
+                          (size_t) fetchSize) {
                     int last_errno = errno;
 
                     r->statuscode = STATUSCODE_INVALID;
