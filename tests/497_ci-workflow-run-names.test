@@ -1,0 +1,67 @@
+#!/bin/bash
+#
+# A workflow_run trigger names the workflows it watches by their name:, and a
+# name that matches nothing is accepted in silence. The watcher then reports
+# nothing for a canary nobody is watching, which is what it was written to stop.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+top=${abs_top_srcdir:-$(cd "$testdir/.." && pwd)}
+wfdir="$top/.github/workflows"
+
+if ! test -d "$wfdir"; then
+    test -d "$top/.github" && fail "$wfdir is gone but $top/.github is not"
+    skip "no .github under $top (dist tarball), so the audit has nothing to read"
+fi
+
+# Every name: a workflow declares, one per line.
+names=$(command grep -h '^name:' "$wfdir"/*.yml | sed 's/^name: *//')
+test -n "$names" || fail "no workflow names found under $wfdir"
+
+# Every workflow each watcher names under on.workflow_run.workflows.
+watched=$(awk '
+    function clean(x) {
+        gsub(/^[ \t]+|[ \t]+$/, "", x); gsub(/^["]|["]$/, "", x); return x
+    }
+    FNR == 1 { inon = 0; inrun = 0; inlist = 0 }
+    /^on:/ { inon = 1; next }
+    inon && /^[^ #]/ { inon = 0 }
+    inon && /^  workflow_run:/ { inrun = 1; next }
+    inrun && /^  [^ ]/ { inrun = 0; inlist = 0 }
+    # Both spellings, because the one watcher already in the tree uses the
+    # inline form and a parser that saw only the other would skip in silence.
+    inrun && /^    workflows:[ \t]*\[/ {
+        line = $0; sub(/^[^[]*\[/, "", line); sub(/\].*$/, "", line)
+        n = split(line, items, ",")
+        for (i = 1; i <= n; i++) {
+            it = clean(items[i])
+            if (it != "") print FILENAME "\t" it
+        }
+        seen = 1; next
+    }
+    inrun && /^    workflows:[ \t]*$/ { inlist = 1; seen = 1; next }
+    inrun && /^    workflows:/ { print FILENAME "\tERR-unreadable-workflows-list"; seen = 1; next }
+    inlist && /^      - / { print FILENAME "\t" clean(substr($0, 9)); next }
+    inlist && /^    [^ ]/ { inlist = 0 }
+    END { if (!seen) print "\tERR-no-watcher" }
+' "$wfdir"/*.yml)
+
+case $watched in
+*ERR-no-watcher*) fail "no workflow_run watcher parsed at all, so this proves nothing" ;;
+*ERR-unreadable-workflows-list*) fail "a workflows: list this cannot read: $watched" ;;
+esac
+
+missing=
+while IFS=$'\t' read -r wf want; do
+    test -n "$want" || continue
+    command grep -qxF "$want" <<<"$names" || missing="$missing
+  ${wf##*/} watches \"$want\", which is no workflow's name:"
+done <<<"$watched"
+
+test -z "$missing" || fail "a workflow_run watcher names a workflow that does not exist:$missing
+GitHub accepts an unmatched name in silence, so the watcher simply never fires."
+
+echo "workflow_run watch lists OK ($(printf '%s' "$watched" | count_matching_lines .) entries, all resolve)"
