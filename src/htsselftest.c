@@ -10223,8 +10223,8 @@ static int st_sigpipe(httrackp *opt, int argc, char **argv) {
      answers, so end this half ourselves and take the EPIPE locally (#1717). */
   if (fin_only)
     assertf(shutdown(sv[1], SHUT_WR) == 0);
-  /* Twice, and both of them where the peer was reset, because a platform that
-     re-reports ECONNRESET still owes EPIPE. */
+  /* Twice, because a platform that re-reports ECONNRESET on the first still
+     owes EPIPE on the second. */
   for (i = 0; i < 2; i++)
     assertf(sendc(&r, "GET / HTTP/1.0\r\n\r\n") < 0);
   deletesoc(sv[1]);
