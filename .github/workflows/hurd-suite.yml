@@ -1,12 +1,10 @@
-# No runner is a Hurd, and the four package builds that broke there each failed a
-# TEST rather than the compile (#1668, #1717, #1719, #1775), so cross-arch.yml
-# cannot see this class. The Debian buildd was the first machine to run the suite
-# on a Hurd every time, which means it reported after the upload.
+# No runner is a Hurd, and the builds that broke there failed a TEST rather than
+# the compile (#1775), so cross-arch.yml cannot see this class.
 name: Hurd suite
 
 on:
-  # Also on a pull request that touches the machinery itself: a driver nothing
-  # exercises until the weekly run is a driver nobody can fix.
+  # Also on a pull request touching the driver, so a bug in it surfaces here
+  # rather than at the next weekly run.
   pull_request:
     paths:
       - "tools/hurd-vm.sh"
@@ -28,7 +26,7 @@ jobs:
     name: hurd suite (amd64, qemu)
     runs-on: ubuntu-24.04
     # Hurd is slow at I/O and the VM gets one processor, so the suite takes far
-    # longer here than anywhere else. Well under the 6h ceiling all the same.
+    # longer here than anywhere else, though still well under the 6h ceiling.
     timeout-minutes: 120
     steps:
       - name: Install qemu
@@ -45,7 +43,7 @@ jobs:
           submodules: recursive
 
       # Keyed on the pinned image name, so a new pin fetches and an old one does
-      # not. 354 MB, against a 10 GB repository budget.
+      # not. The tarball is 354 MB against a 10 GB repository budget.
       - name: Cache the image tarball
         uses: actions/cache@v4
         with:

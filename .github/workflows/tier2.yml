@@ -400,8 +400,8 @@ jobs:
   emulated:
     uses: ./.github/workflows/emulated-suite.yml
 
-  # The only leg that runs the suite on a Hurd, which is where the buildds kept
-  # finding failures nothing here could.
+  # Runs the suite on a Hurd, where the buildds kept finding failures nothing
+  # else here could.
   hurd:
     uses: ./.github/workflows/hurd-suite.yml
 
