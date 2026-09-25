@@ -1,0 +1,67 @@
+# No runner is a Hurd, and the four package builds that broke there each failed a
+# TEST rather than the compile (#1668, #1717, #1719, #1775), so cross-arch.yml
+# cannot see this class. The Debian buildd was the first machine to run the suite
+# on a Hurd every time, which means it reported after the upload.
+name: Hurd suite
+
+on:
+  # Also on a pull request that touches the machinery itself: a driver nothing
+  # exercises until the weekly run is a driver nobody can fix.
+  pull_request:
+    paths:
+      - "tools/hurd-vm.sh"
+      - ".github/workflows/hurd-suite.yml"
+  # Scheduled by tier2.yml, which owns every leg that builds our own source.
+  workflow_call:
+  workflow_dispatch:
+
+# Least privilege: the workflow only needs to read the repo.
+permissions:
+  contents: read
+
+concurrency:
+  group: hurd-suite-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hurd:
+    name: hurd suite (amd64, qemu)
+    runs-on: ubuntu-24.04
+    # Hurd is slow at I/O and the VM gets one processor, so the suite takes far
+    # longer here than anywhere else. Well under the 6h ceiling all the same.
+    timeout-minutes: 120
+    steps:
+      - name: Install qemu
+        run: |
+          set -euo pipefail
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
+          sudo apt-get install -y --no-install-recommends \
+            qemu-system-x86 qemu-utils parted e2fsprogs socat
+          # KVM or this runs under TCG, where the suite would outlast the job.
+          test -e /dev/kvm || { echo "::error::no /dev/kvm on this runner"; exit 1; }
+
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # Keyed on the pinned image name, so a new pin fetches and an old one does
+      # not. 354 MB, against a 10 GB repository budget.
+      - name: Cache the image tarball
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/hurd/cache
+          key: hurd-image-debian-hurd-amd64-20260314
+
+      - name: Build and run the suite on Hurd
+        run: bash tools/hurd-vm.sh
+
+      - name: Collect the suite log and the console
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: hurd-suite-log
+          path: |
+            ${{ runner.temp }}/hurd/out/test-suite.log
+            ${{ runner.temp }}/hurd/console.log
+            ${{ runner.temp }}/hurd/screen.ppm
+          if-no-files-found: warn
