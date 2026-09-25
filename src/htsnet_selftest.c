@@ -1316,30 +1316,33 @@ static int st_mptcp(httrackp *opt, int argc, char **argv) {
 }
 
 /* The source forms SOCaddr_copyaddr accepts. A 16-byte buffer is a
-   sockaddr_in, never a raw IPv6 address, so a branch that claims 16 for IPv6
-   either sits dead behind this one or breaks the first case here. */
+   sockaddr_in, never a raw IPv6 address, so a branch claiming 16 for IPv6
+   either sits dead behind the sockaddr_in branch or breaks the first case
+   below. */
 static int st_socaddr(httrackp *opt, int argc, char **argv) {
   static const unsigned char raw4[4] = {203, 0, 113, 7};
   char host[SOCADDR_INETNTOA_SIZE];
-  struct sockaddr_in sin;
   SOCaddr addr;
   int len = 0;
 
   (void) opt;
   (void) argc;
   (void) argv;
+  {
+    struct sockaddr_in sin;
 
-  memset(&sin, 0, sizeof(sin));
-  sin.sin_family = AF_INET;
-  sin.sin_port = htons(8080);
-  memcpy(&sin.sin_addr, raw4, sizeof(raw4));
-  SOCaddr_clear(addr);
-  SOCaddr_copyaddr(addr, len, &sin, sizeof(sin));
-  assertf(SOCaddr_sinfamily(addr) == AF_INET);
-  assertf((size_t) len == sizeof(struct sockaddr_in));
-  assertf(ntohs(SOCaddr_sinport(addr)) == 8080);
-  SOCaddr_inetntoa(host, sizeof(host), addr);
-  assertf(strcmp(host, "203.0.113.7") == 0);
+    memset(&sin, 0, sizeof(sin));
+    sin.sin_family = AF_INET;
+    sin.sin_port = htons(8080);
+    memcpy(&sin.sin_addr, raw4, sizeof(raw4));
+    SOCaddr_clear(addr);
+    SOCaddr_copyaddr(addr, len, &sin, sizeof(sin));
+    assertf(SOCaddr_sinfamily(addr) == AF_INET);
+    assertf((size_t) len == sizeof(struct sockaddr_in));
+    assertf(ntohs(SOCaddr_sinport(addr)) == 8080);
+    SOCaddr_inetntoa(host, sizeof(host), addr);
+    assertf(strcmp(host, "203.0.113.7") == 0);
+  }
 
   /* raw IPv4: same host, port zeroed */
   SOCaddr_clear(addr);

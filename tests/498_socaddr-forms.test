@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# SOCaddr_copyaddr picks its source form by byte count, and 16 is both a
-# sockaddr_in and a raw IPv6 address. Pin the form it chooses.
+# What SOCaddr_copyaddr makes of each source form: a sockaddr_in, a raw 4-byte
+# IPv4 address with the port zeroed, a sockaddr_in6, and any other size.
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh

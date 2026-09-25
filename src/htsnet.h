@@ -235,7 +235,7 @@ SOCaddr_initloopback_(SOCaddr *const addr, const char *file, const int line) {
     sockaddr_in / sockaddr_in6, or a raw 4-byte IPv4 address with port zeroed.
     Any other size leaves an AF_INET shell. Returns the resulting sockaddr
     length. There is no raw IPv6 form, because 16 is sizeof(struct sockaddr_in)
-    on every target: pass a sockaddr_in6. */
+    on every target, so pass a sockaddr_in6 instead. */
 static HTS_UNUSED socklen_t SOCaddr_copyaddr_(SOCaddr *const server,
                                               const void *data,
                                               const size_t data_size,
