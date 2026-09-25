@@ -41,6 +41,17 @@ Please visit our Website: http://www.httrack.com
 typedef struct httrackp httrackp;
 #endif
 
+/* One self-test: the name `-#test=` takes, a usage hint and a description for
+   the listing, and the handler that runs it over argv[0..argc-1] and returns
+   the process exit code. A module publishes a table of these, ended by a NULL
+   name. */
+struct selftest_entry {
+  const char *name;
+  const char *args;
+  const char *desc;
+  int (*fn)(httrackp *opt, int argc, char **argv);
+};
+
 /* Run engine self-test `name` over the positional args argv[0..argc-1], or list
    the available tests when name is NULL, empty, or "list". Prints the result;
    returns the process exit code (0 == success). The caller owns option cleanup.
