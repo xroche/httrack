@@ -252,11 +252,8 @@ case "$CFLAGS" in
 *) HTS_ADD_FORTIFY_SOURCE ;;
 esac
 
-# Zero an otherwise-uninitialized stack variable, so a read before the first
-# write returns 0 rather than whatever the last call left. Skipped under a
-# sanitizer for the same reason as the fortification above, and for one more:
-# it would hide from MemorySanitizer exactly what MemorySanitizer is there to
-# find. Measured at +1.4% text and no runtime cost the fuzz corpus can see.
+# Zero an uninitialized stack variable. Skipped under a sanitizer, where it
+# would hide from MemorySanitizer exactly what MemorySanitizer looks for.
 case "$CFLAGS" in
 *-fsanitize=*) ;;
 *)
@@ -266,8 +263,7 @@ case "$CFLAGS" in
 esac
 
 # Only a [] member is a flexible array, so _FORTIFY_SOURCE bounds a trailing
-# char[1] like the fixed-size array it is written as. The tree has no such
-# member, which is what this keeps true.
+# char[1] as written. The tree has none, and this keeps it that way.
 AX_CHECK_COMPILE_FLAG([-fstrict-flex-arrays=3], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fstrict-flex-arrays=3"], [], [-Werror])
 
 # Force libc back into DT_NEEDED for libraries that reach it only through
