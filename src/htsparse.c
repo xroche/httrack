@@ -451,6 +451,22 @@ static hts_boolean js_glues_keyword(const char *at, const char *buffer) {
   return HTS_TRUE;
 }
 
+/* CSS continues an ident across "-", and across U+1680 and U+FEFF, which the
+   language above reads as spaces. So image-url( is a function of its own and
+   its argument is never a url-token (CSS Syntax 3, #1754). */
+static hts_boolean css_glues_keyword(const char *at, const char *buffer) {
+  const unsigned char *const p = (const unsigned char *) at;
+  const size_t before = (size_t) (at - buffer);
+
+  if (html_prevc(at, buffer) == '-')
+    return HTS_TRUE;
+  if (before >= 3 && p[-3] == 0xE1 && p[-2] == 0x9A && p[-1] == 0x80)
+    return HTS_TRUE; /* U+1680 */
+  if (before >= 3 && p[-3] == 0xEF && p[-2] == 0xBB && p[-1] == 0xBF)
+    return HTS_TRUE; /* U+FEFF */
+  return js_glues_keyword(at, buffer);
+}
+
 /* Contract in htsparse.h; indexed so no pointer leaves the buffer. */
 hts_boolean hts_js_quote_is_import_arg(const char *quote, const char *buffer) {
   static const char kw[] = "import";
@@ -558,7 +574,9 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
     }
   /* The guard has to gate the match: a name ending in "url" must leave nc at
      zero, or the default rule takes its assignment as a link. */
-  if (!nc && !js_glues_keyword(cursor, buffer) &&
+  if (!nc &&
+      !(in_css ? css_glues_keyword(cursor, buffer)
+               : js_glues_keyword(cursor, buffer)) &&
       (nc = strfield(cursor, "url")) != 0) { // url(url)
     expected = '(';
     expected_end = ")";

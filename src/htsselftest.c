@@ -10225,8 +10225,16 @@ static int st_sigpipe(httrackp *opt, int argc, char **argv) {
     assertf(shutdown(sv[1], SHUT_WR) == 0);
   /* Twice, because a platform that re-reports ECONNRESET on the first still
      owes EPIPE on the second. */
-  for (i = 0; i < 2; i++)
+  for (i = 0; i < 2; i++) {
+    errno = 0;
     assertf(sendc(&r, "GET / HTTP/1.0\r\n\r\n") < 0);
+#ifndef _WIN32
+    /* The write reports why it failed, and htsproxy.c reads exactly this to
+       tell a dead socket from one that would block. Anything that runs between
+       the send and the caller has to put errno back. */
+    assertf(errno == EPIPE || errno == ECONNRESET || errno == ENOTCONN);
+#endif
+  }
   deletesoc(sv[1]);
 
 #ifdef HAVE_SIGTIMEDWAIT

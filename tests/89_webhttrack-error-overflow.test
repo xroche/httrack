@@ -74,18 +74,23 @@ check_clipped "Unable to create the init file " "${path}/p"
 
 # The init file opens, then the write fails: the profile is past both stdio's
 # buffer, so fwrite() reaches the descriptor, and the server's file-size limit.
-path=$(padpath "${base}/full" 993)
-mkdir -p "${path}/p/hts-cache"
-profile=$(printf '%01024d' 0)
-profile=${profile}${profile}${profile}${profile}
-profile=${profile}${profile}${profile}${profile}
-test "${#profile}" -eq 16384 || fail "built a ${#profile}-byte profile, want 16384"
-save "${path}" "${profile}" p >/dev/null
-htsserver_alive || fail "a short init file write crashed the server: $(<"${HTS_LOG}")"
-written=$(wc -c <"${path}/p/hts-cache/winprofile.ini" | tr -d ' ')
-test "${written}" -lt "${#profile}" ||
-    fail "the file-size limit did not stop the write (${written} bytes landed)"
-check_clipped "Unable to write ${#profile} bytes in the the init file " "${path}/p"
+# That last part is the host's to provide, and GNU/Hurd does not, so ask.
+if ! fsize_limit_binds; then
+    echo "RLIMIT_FSIZE does not stop a write on this host, so the refused-write case cannot be built"
+else
+    path=$(padpath "${base}/full" 993)
+    mkdir -p "${path}/p/hts-cache"
+    profile=$(printf '%01024d' 0)
+    profile=${profile}${profile}${profile}${profile}
+    profile=${profile}${profile}${profile}${profile}
+    test "${#profile}" -eq 16384 || fail "built a ${#profile}-byte profile, want 16384"
+    save "${path}" "${profile}" p >/dev/null
+    htsserver_alive || fail "a short init file write crashed the server: $(<"${HTS_LOG}")"
+    written=$(wc -c <"${path}/p/hts-cache/winprofile.ini" | tr -d ' ')
+    test "${written}" -lt "${#profile}" ||
+        fail "the file-size limit did not stop the write (${written} bytes landed)"
+    check_clipped "Unable to write ${#profile} bytes in the the init file " "${path}/p"
+fi
 
 reply=$(htsserver_get /server/index.html || true)
 grep -q '200 OK' <<<"$reply" ||

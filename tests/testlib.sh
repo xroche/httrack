@@ -70,6 +70,27 @@ skip_on_windows() { ! target_is_windows || skip "$*"; }
 is_emulated() { [ -n "${EMULATED_ARCH:-}" ]; }
 skip_on_emulated() { ! is_emulated || skip "emulated ${EMULATED_ARCH}: $*"; }
 
+# Does RLIMIT_FSIZE actually stop a write here? GNU/Hurd accepts the limit and
+# writes past it anyway, so a test that needs a refused write has to ask rather
+# than assume. Measured on the file, not on the exit status: a host that
+# enforces the cap kills the writer with SIGXFSZ, and one that ignores it does
+# not, so only the bytes on disk answer for both.
+fsize_limit_binds() {
+    local probe got
+    # A failure here must not read as "the host does not enforce it", which
+    # would disable the caller's assertion on a host that does.
+    probe=$(mktemp "${TMPDIR:-/tmp}/httrack_fsz.XXXXXX") ||
+        fail "could not make a probe file to ask whether RLIMIT_FSIZE binds"
+    (
+        trap '' XFSZ
+        ulimit -f 1 || exit 1
+        dd if=/dev/zero of="$probe" bs=1024 count=64
+    ) >/dev/null 2>&1
+    got=$(wc -c <"$probe" 2>/dev/null) || got=0
+    rm -f "$probe"
+    test "${got:-0}" -lt 65536
+}
+
 # Assertions, each printing what it wanted beside what arrived: a bare
 # `|| exit 1` reds a test without naming the value that differed.
 assert_eq() { # assert_eq WANT GOT [LABEL]
