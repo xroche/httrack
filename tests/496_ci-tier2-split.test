@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# Tier-2 holds the slow legs, so a job moved into it stops reporting on pull
-# requests. Move a REQUIRED one and every open PR waits forever on a context
-# that never arrives. Strand a workflow there and it stops running at all.
+# Enforces the tier-2 rule in AGENTS.md: a job moved out of the pull-request
+# path stops reporting there, and a required one then leaves every open PR
+# waiting forever on a context that never arrives.
 
 set -euo pipefail
 
@@ -41,65 +41,117 @@ ci.yml	deb	deb package (lintian)
 windows-build.yml	libhttrack	libhttrack (x64, Release)
 windows-build.yml	libhttrack	libhttrack (Win32, Release)'
 
-# Does this workflow run on a pull request at all? The trigger list ends where
-# the next top-level key starts.
+# Does this workflow run on every pull request? A filter under the key (paths:,
+# branches:, types:) would skip the PRs it does not match, and those PRs then
+# wait on a context nobody will report.
 on_pull_request() { # on_pull_request <workflow>
-    awk '/^on:/ { on = 1; next }
-         on && /^[^ #]/ { exit }
-         on && /^  pull_request:?$/ { found = 1 }
-         END { exit !found }' "$1"
+    awk '
+        /^on:/ { on = 1; next }
+        on && /^[^ #]/ { exit }
+        on && /^  pull_request:?[ \t]*$/ { seen = 1; pending = 1; next }
+        pending && /^[ \t]*(#.*)?$/ { next }
+        pending { if ($0 ~ /^    /) filtered = 1; pending = 0 }
+        END { exit !(seen && !filtered) }
+    ' "$1"
 }
 
-# The job's name: template, or nothing when it carries none, in which case
-# GitHub builds the context from the job id instead.
-job_name() { # job_name <workflow> <job id>
+# The status contexts one job emits, with its matrix expanded. Empty output
+# means the job carries no name:, and GitHub then builds the context from the
+# job id; 437_ci-windows-contexts.test owns that half.
+job_contexts() { # job_contexts <workflow> <job id>
     awk -v want="$2" '
+        function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
+        function unquote(s) {
+            if (s ~ /^".*"$/ || s ~ /^'"'"'.*'"'"'$/) s = substr(s, 2, length(s) - 2)
+            return s
+        }
+        function emit(entry,   out, n, i, kv, k, v, pairs) {
+            out = tpl
+            n = split(entry, pairs, ",")
+            for (i = 1; i <= n; i++) {
+                kv = trim(pairs[i])
+                if (kv == "") continue
+                k = trim(substr(kv, 1, index(kv, ":") - 1))
+                v = unquote(trim(substr(kv, index(kv, ":") + 1)))
+                gsub(/&/, "\\\\&", v)
+                gsub("\\$\\{\\{[ ]*matrix\\." k "[ ]*\\}\\}", v, out)
+            }
+            # An interpolation the entry does not supply expands to nothing.
+            gsub(/\$\{\{[^}]*\}\}/, "", out)
+            print out
+        }
         /^jobs:/ { injobs = 1; next }
         !injobs { next }
-        /^  [A-Za-z0-9_-]+:$/ {
-            id = $0; sub(/:$/, "", id); sub(/^  /, "", id)
+        /^  [A-Za-z0-9_-]+:[ \t]*(#.*)?$/ {
+            id = $0; sub(/[ \t]*(#.*)?$/, "", id); sub(/:$/, "", id); sub(/^  /, "", id)
+            if (injob) exit
             injob = (id == want); found = found || injob; next
         }
-        injob && /^    name: / { sub(/^    name: /, ""); print; exit }
-        END { exit !found }' "$1"
+        !injob { next }
+        /^    name: / { tpl = unquote(trim(substr($0, 11))); next }
+        # The two required jobs that carry one are restricted TO pull requests,
+        # which is the opposite of a hazard. Any other condition can switch the
+        # job off on a PR without changing its name.
+        /^    if:/ {
+            cond = trim(substr($0, index($0, ":") + 1))
+            if (cond != "github.event_name == '"'"'pull_request'"'"'") {
+                print "ERR: unpinned if: " cond; bad = 1; exit
+            }
+            next
+        }
+        /^      matrix:/ { inmatrix = 1; next }
+        inmatrix && /^        include:/ { ininclude = 1; next }
+        inmatrix && !ininclude && /^        [A-Za-z0-9_-]+:/ { plainaxis = 1; next }
+        ininclude && /^          - \{/ {
+            buf = $0; sub(/^ *- \{/, "", buf)
+            while (buf !~ /\}/) {
+                if ((getline line) <= 0) { print "ERR: unterminated matrix entry"; bad = 1; exit }
+                buf = buf " " line
+            }
+            sub(/\}.*$/, "", buf)
+            entries[++nentries] = buf
+            next
+        }
+        ininclude && /^        [A-Za-z0-9_-]+:/ { ininclude = 0; inmatrix = 0 }
+        END {
+            if (bad) exit 1
+            if (!found) { print "ERR: no job " want; exit 1 }
+            if (tpl == "") exit 0
+            if (plainaxis) { print "ERR: a plain matrix axis under a name:"; exit 1 }
+            if (nentries == 0) {
+                if (tpl ~ /\$\{\{/) { print "ERR: an interpolated name with no matrix"; exit 1 }
+                print tpl
+                exit 0
+            }
+            for (i = 1; i <= nentries; i++) emit(entries[i])
+        }
+    ' "$1"
 }
 
 bad=
 while IFS=$'\t' read -r wf id ctx; do
     path="$wfdir/$wf"
-    test -r "$path" || {
+    if ! test -r "$path"; then
         bad="$bad
   $ctx: $wf is gone"
         continue
-    }
-    on_pull_request "$path" || {
+    fi
+    if ! on_pull_request "$path"; then
         bad="$bad
-  $ctx: $wf no longer runs on a pull request"
+  $ctx: $wf no longer runs on every pull request"
+        continue
+    fi
+    # Not piped into grep, because a failing parse would hand its status away.
+    got=$(job_contexts "$path" "$id") || {
+        bad="$bad
+  $ctx: $wf job $id: $got"
         continue
     }
-    name=$(job_name "$path" "$id") || {
-        bad="$bad
-  $ctx: $wf has no job $id any more"
-        continue
-    }
-    if test -n "$name"; then
-        # The interpolations are the only wildcards, so a name carrying a glob
-        # character already would match far more than it should.
-        case $name in
-        *'*'* | *'?'* | *'['*)
-            fail "job name carries a glob metacharacter this matcher misreads: $name"
-            ;;
-        esac
-        pat=$(printf '%s' "$name" | sed 's/\${{[^}]*}}/*/g')
-        # shellcheck disable=SC2254 # pat is meant to glob
-        case $ctx in
-        $pat) ;;
-        *) bad="$bad
-  $ctx: $wf job $id is now named \"$name\"" ;;
-        esac
+    if test -n "$got"; then
+        command grep -qxF "$ctx" <<<"$got" || bad="$bad
+  $ctx: $wf job $id emits $(tr '\n' '|' <<<"$got")"
     else
-        # No name:, so GitHub prefixes the context with the job id. 437 owns the
-        # matrix half of that.
+        # No name:, so GitHub prefixes the context with the job id.
         case $ctx in
         "$id "*) ;;
         *) bad="$bad
@@ -121,7 +173,8 @@ for wf in "$wfdir"/*.yml; do
     # Callable, and with no trigger of its own that would ever fire.
     command grep -q '^  workflow_call:' "$wf" || continue
     command grep -Eq '^  (schedule|push|pull_request|release|workflow_run):' "$wf" && continue
-    command grep -q "\.github/workflows/$base\$" "$wfdir/tier2.yml" ||
+    # A uses: line, not any mention: a commented-out call runs nothing.
+    command grep -Eq "^ *uses: \./\.github/workflows/$base\$" "$wfdir/tier2.yml" ||
         orphans="$orphans $base"
 done
 
@@ -133,9 +186,10 @@ A workflow with neither a trigger nor a caller never runs again, and says nothin
 # no gate, and nothing in the workflow itself notices.
 t2="$wfdir/tier2.yml"
 legs=$(awk '/^jobs:/ { injobs = 1; next }
-            injobs && /^  [A-Za-z0-9_-]+:$/ { sub(/:$/, ""); sub(/^  /, ""); print }' "$t2" |
-    command grep -vx gate | sort)
-needed=$(awk '/^  gate:$/ { ingate = 1; next }
+            injobs && /^  [A-Za-z0-9_-]+:[ \t]*(#.*)?$/ {
+                sub(/[ \t]*(#.*)?$/, ""); sub(/:$/, ""); sub(/^  /, ""); print
+            }' "$t2" | command grep -vx gate | sort)
+needed=$(awk '/^  gate:[ \t]*(#.*)?$/ { ingate = 1; next }
               ingate && /^  [A-Za-z0-9_-]+:/ { exit }
               ingate && /^    needs:$/ { inneeds = 1; next }
               inneeds && /^      - / { sub(/^      - /, ""); print; next }
