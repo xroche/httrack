@@ -2147,7 +2147,7 @@ static int st_strsprintf(httrackp *opt, int argc, char **argv) {
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
 
-const struct selftest_entry selftests_base[] = {
+const struct selftest_entry selftests_lib[] = {
     {"hashtable", "<count|file>", "coucal hashtable stress test", st_hashtable},
     {"strsafe", "[overflow|overflow-buff|overflow-src [str]]",
      "bounded string-op self-test", st_strsafe},

@@ -109,11 +109,12 @@ Please visit our Website: http://www.httrack.com
 #include <winioctl.h> /* FSCTL_SET_SPARSE */
 #endif
 
-#include "htsselftest.h"
 #include "htsselftest_util.h"
 
+/* One per hts<module>_selftest.c. A new module is added here and to
+   selftest_tables[] in htsselftest.c. */
 extern const struct selftest_entry selftests_back[];
-extern const struct selftest_entry selftests_base[];
+extern const struct selftest_entry selftests_lib[];
 extern const struct selftest_entry selftests_cache[];
 extern const struct selftest_entry selftests_charset[];
 extern const struct selftest_entry selftests_cookie[];

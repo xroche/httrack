@@ -48,9 +48,12 @@ size_t st_decode_body(const char *arg, char *buf, size_t size);
 // the longest of which is direnum's "/\xE4\xB8\xAD-deux.bin".
 #define ST_LEAF_ROOM 64
 
-/* The wiring hts_mirror() gives the naming path, and the teardown it owes. */
+/* The wiring hts_mirror() gives the naming path. */
 void st_mirror_wiring(httrackp *opt, struct_back **sback, hash_struct *hash,
                       hts_boolean backing);
+
+/* Frees what st_mirror_wiring took, so a self-test can run under LeakSanitizer.
+ */
 void st_mirror_wiring_free(httrackp *opt, cache_back *cache,
                            struct_back **sback, hash_struct *hash);
 
@@ -63,7 +66,8 @@ hts_boolean st_mkdir_at(const char *path, size_t n, const char *who);
 /* UTF-16 units s[0..n) costs, which is what Windows measures MAX_PATH in. */
 size_t st_utf16_units(const char *s, size_t n);
 
-/* Build a tree under `dir` whose deepest path clears MAX_PATH; 0 on failure. */
+/* Build a tree under `dir` whose deepest path clears MAX_PATH; 0 on failure.
+ *baselen is where teardown must stop, and is written on every path. */
 size_t st_mkdeep(char *buf, size_t bufsize, const char *dir, const char *nseg,
                  const char *who, size_t *baselen);
 

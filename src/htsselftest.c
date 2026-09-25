@@ -218,7 +218,7 @@ static const struct selftest_entry selftests_core[] = {
 
 /* Every module's tests, in the order -#test lists them. */
 static const struct selftest_entry *const selftest_tables[] = {
-    selftests_core,    selftests_back,   selftests_base,  selftests_cache,
+    selftests_core,    selftests_back,   selftests_lib,   selftests_cache,
     selftests_charset, selftests_cookie, selftests_dns,   selftests_filters,
     selftests_header,  selftests_io,     selftests_mime,  selftests_name,
     selftests_net,     selftests_opt,    selftests_parse, selftests_warc,

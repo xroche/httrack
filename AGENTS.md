@@ -172,8 +172,13 @@ more care than its diff size suggests.
 - Strip AI tells from prose (em-dash overuse, rule-of-three, filler, vague
   attributions). Ref: Wikipedia "Signs of AI writing". Claude Code: `/humanizer`.
 - Behavior change → add a test. Fast path: a hidden `httrack -#test=NAME` engine
-  self-test (registry in `htsselftest.c`; `-#test` lists them) driven by a
-  `tests/NN_*.test`, over a slow crawl.
+  self-test driven by a `tests/NN_*.test`, over a slow crawl. `-#test` lists them.
+- **A self-test lives with the module it exercises**, in `hts<module>_selftest.c`.
+  Each publishes its own `selftests_<module>[]` table, declared in
+  `htsselftest_int.h` and walked by `hts_selftest()`. Adding a test therefore
+  touches one file, holding the handler and its row. Fixtures more than one
+  module needs go in `htsselftest_util.c`. A new file must also be listed in
+  `src/Makefile.am` and `src/libhttrack.vcxproj` (test 342).
 - A list of self-test assertions goes through `selftest_queue` +
   `selftest_run_queued`, which run the file's cases in one engine instead of one
   per assertion. Queued args reach the handler verbatim, so a case exercising an
