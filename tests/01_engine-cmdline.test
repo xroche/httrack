@@ -121,9 +121,28 @@ for good in 0 5 3600 --max-retry-after=7; do
     esac
     accepted "$tmp/mra-ok" "#1738: valid --max-retry-after '$good' rejected"
 done
+# Over the limit is clipped with a notice, where it used to abort the run
+# (#1776). Parsing predates the log file, so the notice lands on stdout, and it
+# is the real assertion: storing 99999 unclipped would pass acceptance alone.
+clipped() {
+    grep -q 'is above the limit' "$1/.log" ||
+        fail "$2"
+}
+not_clipped() {
+    ! grep -q 'is above the limit' "$1/.log" ||
+        fail "$2"
+}
+for over in 3601 99999; do
+    run "$tmp/mra-over" "-%J$over"
+    accepted "$tmp/mra-over" "#1776: over-limit --max-retry-after '$over' refused"
+    clipped "$tmp/mra-over" "#1776: over-limit --max-retry-after '$over' not clipped"
+done
+# A value at the limit is left alone, so the notice must stay quiet there.
+run "$tmp/mra-lim" "-%J3600"
+not_clipped "$tmp/mra-lim" "#1776: a value at the limit was clipped"
 # The message matters: without it a value the generic option parser chokes on
 # passes this table while never reaching the range check.
-for bad in "" x -3 3601 99999; do
+for bad in "" x -3; do
     run "$tmp/mra-bad" "-%J$bad"
     refused "#1738: invalid --max-retry-after '$bad' not refused cleanly"
     grep -q 'Invalid --max-retry-after' "$tmp/mra-bad/.log" ||

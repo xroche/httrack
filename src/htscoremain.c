@@ -2318,12 +2318,20 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               {
                 int secs = -1;
 
-                if (sscanf(com + 1, "%d", &secs) != 1 || secs < 0 ||
-                    secs > HTS_MAX_RETRY_AFTER_LIMIT) {
+                if (sscanf(com + 1, "%d", &secs) != 1 || secs < 0) {
                   HTS_PANIC_PRINTF("Invalid --max-retry-after (expected a "
-                                   "delay in seconds, at most one hour)");
+                                   "delay in seconds, zero or more)");
                   htsmain_free();
                   return -1;
+                }
+                /* Clip rather than abort, as back_set_retry_after does for the
+                   server's own value. */
+                if (secs > HTS_MAX_RETRY_AFTER_LIMIT) {
+                  hts_log_print(opt, LOG_NOTICE,
+                                "--max-retry-after %ds is above the limit, "
+                                "using %ds",
+                                secs, HTS_MAX_RETRY_AFTER_LIMIT);
+                  secs = HTS_MAX_RETRY_AFTER_LIMIT;
                 }
                 opt->max_retry_after = secs;
                 while (isdigit((unsigned char) *(com + 1)))
