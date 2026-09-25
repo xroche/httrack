@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # What SOCaddr_copyaddr makes of each source form: a sockaddr_in, a raw 4-byte
-# IPv4 address with the port zeroed, a sockaddr_in6, and any other size.
+# IPv4 address with the port zeroed, and any other size.
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh

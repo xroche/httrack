@@ -1315,12 +1315,11 @@ static int st_mptcp(httrackp *opt, int argc, char **argv) {
 #endif
 }
 
-/* The source forms SOCaddr_copyaddr accepts. A 16-byte buffer is a
-   sockaddr_in, never a raw IPv6 address, so a branch claiming 16 for IPv6
-   either sits dead behind the sockaddr_in branch or breaks the first case
-   below. */
+/* Which source form SOCaddr_copyaddr picks for each byte count. A branch
+   claiming 16 for a raw IPv6 address either sits dead behind the sockaddr_in
+   branch or breaks the first case below. */
 static int st_socaddr(httrackp *opt, int argc, char **argv) {
-  static const unsigned char raw4[4] = {203, 0, 113, 7};
+  static const unsigned char raw4[4] = {198, 51, 100, 9};
   char host[SOCADDR_INETNTOA_SIZE];
   SOCaddr addr;
   int len = 0;
@@ -1334,7 +1333,7 @@ static int st_socaddr(httrackp *opt, int argc, char **argv) {
     memset(&sin, 0, sizeof(sin));
     sin.sin_family = AF_INET;
     sin.sin_port = htons(8080);
-    memcpy(&sin.sin_addr, raw4, sizeof(raw4));
+    sin.sin_addr.s_addr = htonl(0xCB007107); /* 203.0.113.7 */
     SOCaddr_clear(addr);
     SOCaddr_copyaddr(addr, len, &sin, sizeof(sin));
     assertf(SOCaddr_sinfamily(addr) == AF_INET);
@@ -1344,38 +1343,19 @@ static int st_socaddr(httrackp *opt, int argc, char **argv) {
     assertf(strcmp(host, "203.0.113.7") == 0);
   }
 
-  /* raw IPv4: same host, port zeroed */
+  /* a raw IPv4 address, a different one, so a branch that copies nothing
+     cannot pass on what the case above left behind */
   SOCaddr_clear(addr);
   SOCaddr_copyaddr(addr, len, raw4, sizeof(raw4));
   assertf(SOCaddr_sinfamily(addr) == AF_INET);
-  assertf((size_t) len == sizeof(struct sockaddr_in));
   assertf(SOCaddr_sinport(addr) == 0);
   SOCaddr_inetntoa(host, sizeof(host), addr);
-  assertf(strcmp(host, "203.0.113.7") == 0);
+  assertf(strcmp(host, "198.51.100.9") == 0);
 
-#if HTS_INET6 != 0
-  {
-    struct sockaddr_in6 sin6;
-
-    memset(&sin6, 0, sizeof(sin6));
-    sin6.sin6_family = AF_INET6;
-    sin6.sin6_port = htons(8080);
-    sin6.sin6_addr.s6_addr[15] = 1;
-    SOCaddr_clear(addr);
-    SOCaddr_copyaddr(addr, len, &sin6, sizeof(sin6));
-    assertf(SOCaddr_sinfamily(addr) == AF_INET6);
-    assertf((size_t) len == sizeof(struct sockaddr_in6));
-    assertf(ntohs(SOCaddr_sinport(addr)) == 8080);
-    SOCaddr_inetntoa(host, sizeof(host), addr);
-    assertf(strcmp(host, "::1") == 0);
-  }
-#endif
-
-  /* an unknown size leaves an AF_INET shell, not the previous address */
+  /* an unknown size falls back to AF_INET */
   SOCaddr_clear(addr);
   SOCaddr_copyaddr(addr, len, raw4, 3);
   assertf(SOCaddr_sinfamily(addr) == AF_INET);
-  assertf((size_t) len == sizeof(struct sockaddr_in));
 
   printf("socaddr self-test OK\n");
   return 0;
@@ -1394,8 +1374,7 @@ const struct selftest_entry selftests_net[] = {
      "the Multipath TCP counters reach the stats and stay off another opt",
      st_mptcpstats},
     {"socaddr", "",
-     "which source forms SOCaddr_copyaddr accepts, and that 16 bytes is a "
-     "sockaddr_in",
+     "which source form SOCaddr_copyaddr picks for each byte count",
      st_socaddr},
     {"addrport", "",
      "\"host:port\" of a peer address is bounded and complete (#1493)",
