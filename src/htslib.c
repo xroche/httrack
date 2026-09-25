@@ -2971,6 +2971,22 @@ HTSEXT_API TStamp mtime_local(void) {
 #endif
 }
 
+/* Contract in htslib.h. Falls back to the wall clock where the platform has
+   no monotonic one, which is no worse than before. */
+TStamp mtime_monotonic(void) {
+#if defined(_WIN32)
+  return (TStamp) GetTickCount64();
+#elif defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_MONOTONIC)
+  struct timespec ts;
+
+  if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0)
+    return (TStamp) ts.tv_sec * 1000 + (TStamp) (ts.tv_nsec / 1000000);
+  return mtime_local();
+#else
+  return mtime_local();
+#endif
+}
+
 // convertit un nombre de secondes en temps (chaine)
 void sec2str(char *st, TStamp t) {
   int j, h, m, s;
@@ -5446,7 +5462,7 @@ LLint check_downloadable_bytes(int rate) {
     // get the older timer
     int id_timer = (HTS_STAT.istat_idlasttimer + 1) % 2;
 
-    time_now = mtime_local();
+    time_now = mtime_monotonic();
     elapsed_useconds = time_now - HTS_STAT.istat_timestart[id_timer];
     bytes_transferred_during_period =
       (HTS_STAT.HTS_TOTAL_RECV - HTS_STAT.istat_bytes[id_timer]);
@@ -6013,7 +6029,7 @@ static int hts_dns_resolve_nocache_list_bounded(
   }
 
   /* timeout <= 0 got here only for a cancellable resolve: no deadline then */
-  deadline = timeout > 0 ? mtime_local() + (TStamp) timeout * 1000 : 0;
+  deadline = timeout > 0 ? mtime_monotonic() + (TStamp) timeout * 1000 : 0;
   for (;;) {
     hts_boolean done;
 
@@ -6029,7 +6045,7 @@ static int hts_dns_resolve_nocache_list_bounded(
     }
     hts_mutexrelease(&job->lock);
     if (done || (cancel != NULL && *cancel) ||
-        (deadline != 0 && mtime_local() >= deadline))
+        (deadline != 0 && mtime_monotonic() >= deadline))
       break;
     Sleep(poll_ms);
     if (poll_ms < 50) /* short first polls keep a fast resolve fast */

@@ -3,6 +3,11 @@
 
 set -euo pipefail
 
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+: "${top_srcdir:=..}"
+
 # A resolve against a deliberately slow mock getaddrinfo (no network) must
 # return on --timeout, must not hold opt->state.lock meanwhile, and must not
 # cache the timeout as an answer (#606).
@@ -13,3 +18,35 @@ test "$out" = "dns-timeout-selftest: OK" || {
     echo "expected 'dns-timeout-selftest: OK', got: $out" >&2
     exit 1
 }
+
+# That deadline must survive an NTP step (#1769), which no runtime probe can
+# see, because a test may not step the host's clock. The positive arm fails a
+# renamed function, whose empty body the negative arm would pass on.
+body=$(awk '/^static int hts_dns_resolve_nocache_list_bounded\(/,/^}/' \
+    "$top_srcdir/src/htslib.c")
+case "$body" in
+*mtime_monotonic*) ;;
+*)
+    echo "FAIL: the bounded resolve no longer arms its deadline here"
+    exit 1
+    ;;
+esac
+case "$body" in
+*time_local*)
+    echo "FAIL: the resolve deadline is back on a clock NTP can step"
+    exit 1
+    ;;
+esac
+
+# The deadline is only as monotonic as the clock it reads, one function away,
+# so pin that mtime_monotonic() still asks the OS for one.
+clock=$(awk '/^TStamp mtime_monotonic\(void\)/,/^}/' "$top_srcdir/src/htslib.c")
+for sym in clock_gettime GetTickCount64; do
+    case "$clock" in
+    *"$sym"*) ;;
+    *)
+        echo "FAIL: mtime_monotonic() no longer reads $sym"
+        exit 1
+        ;;
+    esac
+done

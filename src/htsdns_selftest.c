@@ -71,27 +71,11 @@ typedef struct mock_host {
 } mock_host;
 
 /* Long enough to outlast the 1s --timeout the bounded resolve is checked
-   against, short enough to keep the self-test quick. */
+   against, short enough to keep the self-test quick. The elapsed bounds below
+   sit halfway between a prompt return and this, so they are measured on
+   mtime_monotonic(), because an NTP correction mid-test would otherwise eat
+   most of that margin. */
 #define MOCK_SLOW_MS 3000
-
-/* Elapsed milliseconds off a clock NTP cannot step. The bounds below sit
-   halfway between a prompt return and MOCK_SLOW_MS, so a one-second correction
-   mid-test would eat most of that margin and red a working build. Falls back to
-   the wall clock where there is no monotonic one, which is no worse than
-   before. */
-static TStamp mono_ms(void) {
-#if defined(_WIN32)
-  return (TStamp) GetTickCount64();
-#elif defined(HAVE_CLOCK_GETTIME) && defined(CLOCK_MONOTONIC)
-  struct timespec ts;
-
-  if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0)
-    return (TStamp) ts.tv_sec * 1000 + (TStamp) (ts.tv_nsec / 1000000);
-  return mtime_local();
-#else
-  return mtime_local();
-#endif
-}
 
 static mock_host mock_hosts[] = {
     {"v4only.test", 0, 1, {{AF_INET, {1, 2, 3, 4}}}, 0},
@@ -633,10 +617,10 @@ static void lock_probe_thread(void *arg) {
   TStamp start;
 
   Sleep(MOCK_SLOW_MS / 10); /* let the resolve get under way first */
-  start = mono_ms();
+  start = mtime_monotonic();
   (void) hts_has_stopped(p->opt);
   hts_mutexlock(&p->lock);
-  p->blocked_ms = mono_ms() - start;
+  p->blocked_ms = mtime_monotonic() - start;
   p->done = HTS_TRUE;
   hts_mutexrelease(&p->lock);
 }
@@ -660,9 +644,9 @@ int dns_timeout_selftests(httrackp *opt) {
   hts_mutexinit(&probe.lock);
   CHECK(hts_newthread(lock_probe_thread, &probe) == 0);
 
-  start = mono_ms();
+  start = mtime_monotonic();
   count = hts_dns_resolve_all(opt, "slow.test", addrs, HTS_MAXADDRNUM, &err);
-  elapsed = mono_ms() - start;
+  elapsed = mtime_monotonic() - start;
   finished = mock_read_finished();
 
   /* the resolve returns on opt->timeout, not when the resolver deigns to
@@ -704,10 +688,10 @@ int dns_timeout_selftests(httrackp *opt) {
   {
     hts_boolean cancel = HTS_TRUE;
 
-    start = mono_ms();
+    start = mtime_monotonic();
     count = hts_dns_resolve_all_bounded(opt, "slow.test", addrs, HTS_MAXADDRNUM,
                                         0, &cancel, &err);
-    elapsed = mono_ms() - start;
+    elapsed = mtime_monotonic() - start;
     CHECK(count == 0);
     CHECK(elapsed < MOCK_SLOW_MS / 2);
   }
@@ -717,10 +701,10 @@ int dns_timeout_selftests(httrackp *opt) {
   {
     hts_boolean cancel = HTS_FALSE;
 
-    start = mono_ms();
+    start = mtime_monotonic();
     count = hts_dns_resolve_all_bounded(opt, "slow2.test", addrs,
                                         HTS_MAXADDRNUM, 0, &cancel, &err);
-    elapsed = mono_ms() - start;
+    elapsed = mtime_monotonic() - start;
     CHECK(count == 1);
     CHECK(elapsed >= MOCK_SLOW_MS / 2);
   }
@@ -731,16 +715,16 @@ int dns_timeout_selftests(httrackp *opt) {
   opt->timeout = 0;
   {
     /* control first: with the mirror running, the same call still waits */
-    start = mono_ms();
+    start = mtime_monotonic();
     count = hts_dns_resolve_all(opt, "slow3.test", addrs, HTS_MAXADDRNUM, &err);
-    elapsed = mono_ms() - start;
+    elapsed = mtime_monotonic() - start;
     CHECK(count == 1);
     CHECK(elapsed >= MOCK_SLOW_MS / 2);
 
     opt->state.stop = 1; /* the flag, not hts_request_stop's log line */
-    start = mono_ms();
+    start = mtime_monotonic();
     count = hts_dns_resolve_all(opt, "slow4.test", addrs, HTS_MAXADDRNUM, &err);
-    elapsed = mono_ms() - start;
+    elapsed = mtime_monotonic() - start;
     opt->state.stop = 0;
     CHECK(count == 0);
     CHECK(elapsed < MOCK_SLOW_MS / 2);
@@ -760,10 +744,10 @@ int dns_timeout_selftests(httrackp *opt) {
     mock_reset_calls();
     hts_dns_set_resolver_backend(&cut_backend);
     CHECK(hts_set_thread_runner(dns_cut_runner) == NULL);
-    start = mono_ms();
+    start = mtime_monotonic();
     count = hts_dns_resolve_all_bounded(opt, "cut.test", addrs, HTS_MAXADDRNUM,
                                         MOCK_SLOW_MS / 1000, &cancel, &err);
-    elapsed = mono_ms() - start;
+    elapsed = mtime_monotonic() - start;
     hts_set_thread_runner(NULL);
     hts_dns_set_resolver_backend(&mock_backend);
     CHECK(count == 0);

@@ -638,8 +638,7 @@ struct hts_stat_struct {
   LLint total_unpacked;  /**< bytes after decompression */
   int total_packedfiles; /**< number of compressed files */
   //
-  TStamp
-      istat_timestart[2]; /**< window start times for the instantaneous rate */
+  TStamp istat_timestart[2]; /**< window start times, on mtime_monotonic() */
   LLint istat_bytes[2];   /**< window byte counts for the instantaneous rate */
   TStamp
       istat_reference01; /**< reference timestamp handed from window #0 to #1 */
