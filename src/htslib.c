@@ -3394,7 +3394,7 @@ int sendc(htsblk * r, const char *s) {
     sigpipe_release(&m);
   } else
 #endif
-    n = send(r->soc, s, ssz, HTS_MSG_NOSIGNAL);
+    n = hts_send_nosignal(r->soc, s, ssz);
 
   return (n == ssz) ? n : -1;
 }

@@ -12,14 +12,25 @@ set -euo pipefail
 
 # First crawl: always.* are cut on every pass, the other three are the control.
 # reset.bin dies on an RST instead of a clean EOF, so the read error must keep
-# its own diagnostic rather than be relabelled by the framing check.
+# its own diagnostic rather than be relabelled by the framing check. That needs
+# the host to tell the two apart, and GNU/Hurd's pfinet hands the RST over as a
+# plain end of file, so the framing label is the right one to expect there.
+reset_label=(--log-found 'Interrupted transfer.*chunktrunc/reset\.bin')
+reset_not_found=(--log-not-found 'runcated chunked transfer.*chunktrunc/(page|stay|file|reset|hostile)')
+case "$HTS_OS" in
+GNU | GNU/*)
+    reset_label=(--log-found 'runcated chunked transfer.*chunktrunc/reset\.bin')
+    reset_not_found=(--log-not-found 'runcated chunked transfer.*chunktrunc/(page|stay|file|hostile)')
+    ;;
+esac
+
 bash "$top_srcdir/tests/local-crawl.sh" \
     --log-found 'truncated chunked transfer.*chunktrunc/always\.html' \
     --log-found 'Truncated chunked transfer.*after 2 retries.*chunktrunc/always\.html' \
-    --log-found 'Interrupted transfer.*chunktrunc/reset\.bin' \
+    "${reset_label[@]}" \
     --log-found 'Chunked resource too large for .*chunktrunc/huge\.html' \
     --not-found 'chunktrunc/huge.html' \
-    --log-not-found 'runcated chunked transfer.*chunktrunc/(page|stay|file|reset|hostile)' \
+    "${reset_not_found[@]}" \
     --not-found 'chunktrunc/always.html' \
     --found 'chunktrunc/always.bin' \
     --cache-not-found '/chunktrunc/always.html' \

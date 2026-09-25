@@ -489,10 +489,11 @@ void fprintfio(FILE * fp, const char *buff, const char *prefix);
    action kills the process. The library must not install a handler, because
    the process belongs to whoever embedded us. Three steps leave the host's
    signals alone, and each covers what the others cannot:
-     - HTS_MSG_NOSIGNAL on every send() we issue. Absent on macOS.
+     - HTS_MSG_NOSIGNAL on every send() we issue. Absent on macOS, and
+       defined but ignored on GNU/Hurd, where the signal still arrives.
      - SO_NOSIGPIPE on every socket we write to. Absent on Linux, and the only
        one that reaches OpenSSL, which writes with write(2).
-     - the mask below, around the OpenSSL calls that write. */
+     - the mask below, around every write the other two may not cover. */
 #ifdef MSG_NOSIGNAL
 #define HTS_MSG_NOSIGNAL MSG_NOSIGNAL
 #else
@@ -585,6 +586,26 @@ static HTS_INLINE HTS_UNUSED void sigpipe_release(sigpipe_mask *m) {
   (void) HTS_SIGMASK(SIG_SETMASK, &m->mask, NULL);
 }
 #endif
+
+/* A send() carrying whatever protection this platform actually applies. The
+   flag alone is not enough: GNU/Hurd defines MSG_NOSIGNAL and still kills the
+   process, which is how a library takes down whoever embedded it (#1689). */
+static HTS_INLINE HTS_UNUSED int hts_send_nosignal(T_SOC soc, const char *s,
+                                                   int len) {
+  sigpipe_mask m;
+  int n, err;
+
+  sigpipe_hold(&m);
+  n = (int) send(soc, s, len, HTS_MSG_NOSIGNAL);
+  /* Saved across the release, whose sigtimedwait() reports EAGAIN whenever
+     nothing was pending. Callers read errno on the next line to tell a would
+     block from a dead socket, and EAGAIN is the answer that means keep going.
+   */
+  err = errno;
+  sigpipe_release(&m);
+  errno = err;
+  return n;
+}
 
 void cut_path(char *fullpath, char *path, size_t path_size, char *pname,
               size_t pname_size);

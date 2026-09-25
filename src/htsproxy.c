@@ -129,14 +129,14 @@ int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
   }
   strlcatbuff(req, H_CRLF, sizeof(req)); // end of request headers
 
-  // raw send(): sendc() would route to TLS when ssl is set (https tunnel)
+  // Not sendc(): it would route to TLS when ssl is set (https tunnel)
   {
     const char *p = req;
     size_t remain = strlen(req);
     int stalls = 0;
 
     while (remain > 0) {
-      const int n = (int) send(soc, p, (int) remain, HTS_MSG_NOSIGNAL);
+      const int n = hts_send_nosignal(soc, p, (int) remain);
 
       if (n > 0) {
         p += n;
@@ -276,9 +276,8 @@ static int socks5_write_all(socks5_stream *st, const unsigned char *buf,
     return 1;
   }
   while (remain > 0) {
-    // raw send: the socket is still plain here, sendc() would route to TLS
-    const int n =
-        (int) send(st->soc, (const char *) buf, (int) remain, HTS_MSG_NOSIGNAL);
+    // Not sendc(): the socket is still plain here, and that would route to TLS
+    const int n = hts_send_nosignal(st->soc, (const char *) buf, (int) remain);
 
     if (n > 0) {
       buf += n;
