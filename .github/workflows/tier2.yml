@@ -1,8 +1,6 @@
 # The slow half of validation, kept off the pull-request path so CI stays short.
 # Every leg here builds our own source, so a dispatch can aim it at a release
-# branch. A canary that watches the outside world (appstream-network,
-# mptcp-network, downstream-drift, httraqt-upstream) must fire when no branch
-# moved, so it keeps its own schedule and stays out.
+# branch. AGENTS.md says which canaries stay out of this and why.
 name: Tier-2
 
 on:
@@ -430,11 +428,21 @@ jobs:
       - name: Fail unless every leg succeeded
         env:
           RESULTS: ${{ join(needs.*.result, ' ') }}
+          NEEDS: ${{ toJSON(needs) }}
         run: |
           set -euo pipefail
           echo "leg results: $RESULTS"
+          # A short or empty RESULTS would run the loop fewer times and report
+          # green having read nothing, so count the legs rather than trust it.
+          want=$(jq -r 'keys | length' <<<"$NEEDS")
+          # shellcheck disable=SC2086 # the results are a closed enum of words
+          set -- $RESULTS
+          test "$#" -eq "$want" || {
+              echo "::error::expected $want leg results, got $#: $RESULTS"
+              exit 1
+          }
           bad=
-          for r in $RESULTS; do
+          for r in "$@"; do
               # A fork skips the guarded canaries, and no leg here has a needs:.
               case $r in
               success | skipped) ;;
