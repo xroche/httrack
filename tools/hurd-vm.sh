@@ -21,6 +21,10 @@ NEED_KB=307200
 VM_CPUS=1
 VM_MEM=2G
 SSH_PORT=2222
+# The unprivileged account the image ships, so the suite runs the way a buildd
+# runs it.
+VM_USER=demo
+VM_HOME=/home/demo
 # Hurd boots slower than Linux and the runner is shared, so this is generous.
 BOOT_TIMEOUT=600
 
@@ -47,6 +51,11 @@ cleanup() {
     test -z "$loop" || sudo losetup -d "$loop"
 }
 trap 'set +e; cleanup' EXIT
+
+# Provisioning runs as root, the build and the suite do not.
+as_user() {
+    ssh_vm "su - $VM_USER -c 'bash -s'" <<<"$1"
+}
 
 ssh_vm() {
     ssh -p "$SSH_PORT" -i "$key" \
@@ -171,33 +180,43 @@ ssh_vm 'set -eu
         zlib1g-dev libssl-dev python3 procps'
 echo "::endgroup::"
 
+# The buildds do not build as root, and the suite notices: httrack warns on
+# every run, the file-size limit does not bind, and a test that needs a write
+# to fail finds that none does. The image ships this account.
+ssh_vm "id -u $VM_USER" >/dev/null ||
+    fail "the image has no $VM_USER account to build as"
+
 echo "::group::Copy the tree in"
 # A build that runs out of room fails somewhere in the middle and reads as a
 # compile error, so say so here instead.
-free=$(ssh_vm "df -k /root | awk 'NR == 2 { print \$4 }'")
+free=$(ssh_vm "df -k $VM_HOME | awk 'NR == 2 { print \$4 }'")
 test "$free" -ge "$NEED_KB" ||
-    fail "only ${free}K free on the VM's root filesystem, need ${NEED_KB}K"
+    fail "only ${free}K free on the VM, need ${NEED_KB}K"
 # The tree is sent over ssh rather than cloned, because the VM has no route to
 # an unpushed ref and a clone would fetch history nobody reads here.
 tar -C "$srcdir" --exclude=.git -cf - . |
-    ssh_vm 'set -eu; rm -rf /root/httrack; mkdir -p /root/httrack; tar -C /root/httrack -xf -'
+    ssh_vm "set -eu
+        rm -rf $VM_HOME/httrack
+        mkdir -p $VM_HOME/httrack
+        tar -C $VM_HOME/httrack -xf -
+        chown -R $VM_USER $VM_HOME/httrack"
 echo "::endgroup::"
 
 echo "::group::Build"
-ssh_vm 'set -eu
-    cd /root/httrack
+as_user "set -eu
+    cd $VM_HOME/httrack
     ./bootstrap
-    mkdir -p /root/bld
-    cd /root/bld
-    bash /root/httrack/configure
-    make -j2'
+    mkdir -p $VM_HOME/bld
+    cd $VM_HOME/bld
+    bash $VM_HOME/httrack/configure
+    make -j2"
 echo "::endgroup::"
 
 echo "::group::Test"
 rc=0
-ssh_vm 'set -eu; cd /root/bld && make check -j4' || rc=$?
+as_user "set -eu; cd $VM_HOME/bld && make check -j4" || rc=$?
 mkdir -p "$work/out"
-ssh_vm 'cat /root/bld/tests/test-suite.log 2>/dev/null' >"$work/out/test-suite.log" || true
+ssh_vm "cat $VM_HOME/bld/tests/test-suite.log 2>/dev/null" >"$work/out/test-suite.log" || true
 echo "::endgroup::"
 
 test "$rc" -eq 0 || {
