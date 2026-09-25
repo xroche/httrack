@@ -17,88 +17,100 @@ if ! test -d "$wfdir"; then
     skip "no .github under $top (dist tarball), so the audit has nothing to read"
 fi
 
-# The contexts the "Protect master" ruleset requires by name, pinned rather than
-# read back from the tree, because one file compared against itself proves
-# nothing. The two Windows legs are 437's job.
-required='build (--disable-auto-features, then iconv alone off)
-build (Ubuntu devel, uutils coreutils)
-build (arm64, clang)
-build (arm64, gcc)
-build (linux i386, gcc -m32)
-build (macOS arm64, clang)
-build (no openssl, --disable-https)
-build (no python3, Debian buildd)
-build (x86-64, clang)
-build (x86-64, gcc -O3 -flto)
-build (x86-64, gcc)
-deb package (lintian)
-distcheck (release tarball)
-fuzz (libFuzzer corpus replay, clang)
-msan (MemorySanitizer, clang)
-sanitize (ASan+UBSan, gcc)
-webhttrack smoke (macOS arm64)'
+# Every context the "Protect master" ruleset requires by name, with the workflow
+# and job that emits it. Pinned rather than read back from the tree, because one
+# file compared against itself proves nothing. Tab-separated.
+required='ci.yml	dco	DCO sign-off
+ci.yml	format	format (clang-format-19, changed lines)
+ci.yml	lint	lint (shellcheck, shfmt)
+ci.yml	build	build (x86-64, gcc)
+ci.yml	build	build (x86-64, clang)
+ci.yml	build	build (arm64, gcc)
+ci.yml	build	build (arm64, clang)
+ci.yml	build	build (x86-64, gcc -O3 -flto)
+ci.yml	macos	build (macOS arm64, clang)
+ci.yml	linux-i386	build (linux i386, gcc -m32)
+ci.yml	no-ssl	build (no openssl, --disable-https)
+ci.yml	buildd-no-python3	build (no python3, Debian buildd)
+ci.yml	sanitize	sanitize (ASan+UBSan, gcc)
+ci.yml	msan	msan (MemorySanitizer, clang)
+ci.yml	distcheck	distcheck (release tarball)
+ci.yml	fuzz	fuzz (libFuzzer corpus replay, clang)
+ci.yml	webhttrack-macos	webhttrack smoke (macOS arm64)
+ci.yml	deb	deb package (lintian)
+windows-build.yml	libhttrack	libhttrack (x64, Release)
+windows-build.yml	libhttrack	libhttrack (Win32, Release)'
 
-# Every job name a pull-request workflow can emit. A name carrying ${{ }} is a
-# template, so it is kept as one and matched as a pattern below.
-pr_job_names() { # pr_job_names <dir>
-    local wf
-    for wf in "$1"/*.yml; do
-        # The trigger list ends where the next top-level key starts.
-        awk '/^on:/ { on = 1; next }
-             on && /^[^ #]/ { exit }
-             on && /^  pull_request:?$/ { found = 1 }
-             END { exit !found }' "$wf" || continue
-        sed -n 's/^    name: *//p' "$wf"
-    done
+# Does this workflow run on a pull request at all? The trigger list ends where
+# the next top-level key starts.
+on_pull_request() { # on_pull_request <workflow>
+    awk '/^on:/ { on = 1; next }
+         on && /^[^ #]/ { exit }
+         on && /^  pull_request:?$/ { found = 1 }
+         END { exit !found }' "$1"
 }
 
-names=$(pr_job_names "$wfdir")
-test -n "$names" || fail "no pull-request job names found at all under $wfdir"
+# The job's name: template, or nothing when it carries none, in which case
+# GitHub builds the context from the job id instead.
+job_name() { # job_name <workflow> <job id>
+    awk -v want="$2" '
+        /^jobs:/ { injobs = 1; next }
+        !injobs { next }
+        /^  [A-Za-z0-9_-]+:$/ {
+            id = $0; sub(/:$/, "", id); sub(/^  /, "", id)
+            injob = (id == want); found = found || injob; next
+        }
+        injob && /^    name: / { sub(/^    name: /, ""); print; exit }
+        END { exit !found }' "$1"
+}
 
-# A required context is covered when some template matches it, with each ${{ }}
-# standing for whatever the matrix substitutes there.
-covered() { # covered <context> <templates>
-    local want=$1 tpl pat
-    while IFS= read -r tpl; do
-        # The interpolations become the only wildcards, so a name carrying one
-        # of these already would match far more than it should.
-        case $tpl in
+bad=
+while IFS=$'\t' read -r wf id ctx; do
+    path="$wfdir/$wf"
+    test -r "$path" || {
+        bad="$bad
+  $ctx: $wf is gone"
+        continue
+    }
+    on_pull_request "$path" || {
+        bad="$bad
+  $ctx: $wf no longer runs on a pull request"
+        continue
+    }
+    name=$(job_name "$path" "$id") || {
+        bad="$bad
+  $ctx: $wf has no job $id any more"
+        continue
+    }
+    if test -n "$name"; then
+        # The interpolations are the only wildcards, so a name carrying a glob
+        # character already would match far more than it should.
+        case $name in
         *'*'* | *'?'* | *'['*)
-            fail "job name carries a glob metacharacter this matcher misreads: $tpl"
+            fail "job name carries a glob metacharacter this matcher misreads: $name"
             ;;
         esac
-        pat=$(printf '%s' "$tpl" | sed 's/\${{[^}]*}}/*/g')
+        pat=$(printf '%s' "$name" | sed 's/\${{[^}]*}}/*/g')
         # shellcheck disable=SC2254 # pat is meant to glob
-        case $want in
-        $pat) return 0 ;;
+        case $ctx in
+        $pat) ;;
+        *) bad="$bad
+  $ctx: $wf job $id is now named \"$name\"" ;;
         esac
-    done <<<"$2"
-    return 1
-}
-
-missing=
-while IFS= read -r ctx; do
-    covered "$ctx" "$names" || missing="$missing
-  $ctx"
+    else
+        # No name:, so GitHub prefixes the context with the job id. 437 owns the
+        # matrix half of that.
+        case $ctx in
+        "$id "*) ;;
+        *) bad="$bad
+  $ctx: $wf job $id has no name: and the context does not start with it" ;;
+        esac
+    fi
 done <<<"$required"
 
-test -z "$missing" || fail "required contexts no pull-request workflow emits:$missing
+test -z "$bad" || fail "required contexts nothing emits on a pull request:$bad
 A required check that never reports blocks every open PR, not only this one.
-Keep the job in ci.yml or windows-build.yml, or drop it from the ruleset first."
-
-# The mutant: take a required job to tier-2, where it no longer runs on a PR.
-mutdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_wf.XXXXXX")
-cleanup_push rm -rf "$mutdir"
-cp "$wfdir"/*.yml "$mutdir/"
-sed -i 's/^    name: sanitize (ASan+UBSan, gcc)$/    name: sanitize (moved)/' \
-    "$mutdir/ci.yml"
-cmp -s "$wfdir/ci.yml" "$mutdir/ci.yml" && fail "the renamed-job mutant changed nothing"
-covered 'sanitize (ASan+UBSan, gcc)' "$(pr_job_names "$mutdir")" &&
-    fail "a renamed required job still read as covered"
-
-# And the control, so the match above is not answering yes to everything.
-covered 'sanitize (ASan+UBSan, gcc)' "$names" ||
-    fail "the unmutated tree reads as uncovered, so the matcher sees nothing"
+Keep the job where it is, or drop the context from the ruleset first."
 
 # Second invariant: tier2.yml owns the schedule for the legs it absorbed, so a
 # workflow reachable only by workflow_call has to be named there.
