@@ -274,13 +274,13 @@ int hts_unescapeUrlSpecial(const char *src, char *dest, const size_t max,
       }
     }
     /* ASCII (and not in %xx) */
-    else if (cUtf < 0x80 && i != lastI + 1) {
+    else if (cUtf < 0x80 && (lastI == (size_t) -1 || i != lastI + 1)) {
       k = 0;  /* cancel any sequence */
       if (c == '?' && !seenQuery) {
         seenQuery = 1;
       }
     }
-    
+
     /* UTF-8 sequence in progress (either a raw or a %xx character) */
     if (cUtf >= 0x80) {
       /* Leading UTF ? */
