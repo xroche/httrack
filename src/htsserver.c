@@ -1719,7 +1719,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
               StringMemcat(headers, ok, sizeof(ok) - 1);
               while (!feof(fp) && !ferror(fp)) {
                 char *str = line;
-                int prevlen = (int) StringLength(output);
+                size_t prevlen = StringLength(output);
                 int nocr = 0;
 
                 if (!linput(fp, line, sizeof(line) - 2)) {
@@ -2028,7 +2028,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                         char dname[32];
                         int n2 = (int) (pos2 - name);
 
-                        if (n2 > 0 && n2 < sizeof(dname) - 2) {
+                        if (n2 > 0 && (size_t) n2 < sizeof(dname) - 2) {
                           intptr_t adr = 0;
 
                           dname[0] = '\0';
@@ -2310,11 +2310,12 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
       }
       StringCat(headers, "\r\n");
       /* a refusal cleared meth, yet the Content-length above promises a body */
-      if ((send(soc_c, StringBuff(headers), (int) StringLength(headers), 0) !=
-           StringLength(headers)) ||
+      if (((size_t) send(soc_c, StringBuff(headers),
+                         (int) StringLength(headers),
+                         0) != StringLength(headers)) ||
           ((meth == 1 || denied != NULL) &&
-           (send(soc_c, StringBuff(output), (int) StringLength(output), 0) !=
-            StringLength(output)))) {
+           ((size_t) send(soc_c, StringBuff(output), (int) StringLength(output),
+                          0) != StringLength(output)))) {
 #ifdef _DEBUG
 #endif
       }

@@ -1315,6 +1315,52 @@ static int st_mptcp(httrackp *opt, int argc, char **argv) {
 #endif
 }
 
+/* Which source form SOCaddr_copyaddr picks for each byte count. A branch
+   claiming 16 for a raw IPv6 address either sits dead behind the sockaddr_in
+   branch or breaks the first case below. */
+static int st_socaddr(httrackp *opt, int argc, char **argv) {
+  static const unsigned char raw4[4] = {198, 51, 100, 9};
+  char host[SOCADDR_INETNTOA_SIZE];
+  SOCaddr addr;
+  int len = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  {
+    struct sockaddr_in sin;
+
+    memset(&sin, 0, sizeof(sin));
+    sin.sin_family = AF_INET;
+    sin.sin_port = htons(8080);
+    sin.sin_addr.s_addr = htonl(0xCB007107); /* 203.0.113.7 */
+    SOCaddr_clear(addr);
+    SOCaddr_copyaddr(addr, len, &sin, sizeof(sin));
+    assertf(SOCaddr_sinfamily(addr) == AF_INET);
+    assertf((size_t) len == sizeof(struct sockaddr_in));
+    assertf(ntohs(SOCaddr_sinport(addr)) == 8080);
+    SOCaddr_inetntoa(host, sizeof(host), addr);
+    assertf(strcmp(host, "203.0.113.7") == 0);
+  }
+
+  /* a raw IPv4 address, a different one, so a branch that copies nothing
+     cannot pass on what the case above left behind */
+  SOCaddr_clear(addr);
+  SOCaddr_copyaddr(addr, len, raw4, sizeof(raw4));
+  assertf(SOCaddr_sinfamily(addr) == AF_INET);
+  assertf(SOCaddr_sinport(addr) == 0);
+  SOCaddr_inetntoa(host, sizeof(host), addr);
+  assertf(strcmp(host, "198.51.100.9") == 0);
+
+  /* an unknown size falls back to AF_INET */
+  SOCaddr_clear(addr);
+  SOCaddr_copyaddr(addr, len, raw4, 3);
+  assertf(SOCaddr_sinfamily(addr) == AF_INET);
+
+  printf("socaddr self-test OK\n");
+  return 0;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
@@ -1327,6 +1373,9 @@ const struct selftest_entry selftests_net[] = {
     {"mptcpstats", "",
      "the Multipath TCP counters reach the stats and stay off another opt",
      st_mptcpstats},
+    {"socaddr", "",
+     "which source form SOCaddr_copyaddr picks for each byte count",
+     st_socaddr},
     {"addrport", "",
      "\"host:port\" of a peer address is bounded and complete (#1493)",
      st_addrport},

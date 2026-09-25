@@ -1,0 +1,8 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# A '?' opens the query at any offset, so a later '+' decodes to a space.
+out=$(httrack -O /dev/null -#test=unescape-plus run)
+grep -q "unescape-plus self-test OK" <<<"$out"

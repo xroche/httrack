@@ -521,7 +521,7 @@ static void changes_serialize(httrackp *opt, String *out) {
   size_t counts[HTS_CHANGE_BUCKETS];
   char date[32];
   char scratch[64];
-  int bucket;
+  hts_change_bucket bucket;
   size_t i;
 
   StringClear(*out);

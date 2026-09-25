@@ -1280,16 +1280,15 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
               "Server: ProxyTrack " PROXYTRACK_VERSION " (HTTrack "
               HTTRACK_VERSIONID ")\r\n");
     StringCat(headers, "\r\n"); /* Headers separator */
-    if (send(soc_c, StringBuff(headers), (int) StringLength(headers), 0) !=
-        StringLength(headers)
-        || (!headRequest && StringLength(output) > 0
-            && send(soc_c, StringBuff(output), (int) StringLength(output),
-                    0) != StringLength(output))
-        || (!headRequest && StringLength(output) == 0 && element != NULL
-            && element->adr != NULL
-            && send(soc_c, element->adr, (int) element->size,
-                    0) != element->size)
-      ) {
+    if ((size_t) send(soc_c, StringBuff(headers), (int) StringLength(headers),
+                      0) != StringLength(headers) ||
+        (!headRequest && StringLength(output) > 0 &&
+         (size_t) send(soc_c, StringBuff(output), (int) StringLength(output),
+                       0) != StringLength(output)) ||
+        (!headRequest && StringLength(output) == 0 && element != NULL &&
+         element->adr != NULL &&
+         (size_t) send(soc_c, element->adr, (int) element->size, 0) !=
+             element->size)) {
       keepAlive = 0;            /* Error, abort connection */
     }
     PT_Element_Delete(&element);
@@ -1484,8 +1483,8 @@ static int ICP_reply(struct sockaddr *clientAddr, int clientAddrLen, T_SOC soc,
     if (Message != NULL && Message_Length > 0) {
       memcpy(buffer + 20, Message, Message_Length);
     }
-    if (sendto(soc, buffer, BufferSize, 0, clientAddr, clientAddrLen) ==
-        BufferSize) {
+    if ((unsigned long int) sendto(soc, buffer, BufferSize, 0, clientAddr,
+                                   clientAddrLen) == BufferSize) {
       ret = 1;
     }
     free(buffer);
