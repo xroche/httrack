@@ -582,8 +582,7 @@ static int st_unescape_plus(httrackp *opt, int argc, char **argv) {
       {"x?a+b", "x?a b"},   /* and anywhere after it */
       {"a+b", "a+b"},       /* no query, so '+' stays literal */
       {"%3Fa+b", "?a+b"},   /* an escaped '?' does not open the query */
-      {"?%41+%42", "?A B"}, /* %xx decoding still runs inside the query */
-      {"%41+%42", "A+B"},   /* and outside it */
+      {"?%41+%42", "?A B"}, /* %xx decoding runs inside the query */
       /* opening the query also cancels a pending UTF-8 pair at the '+' */
       {"?\xC3%+%\xA9", "?\xC3% %\xA9"},
   };

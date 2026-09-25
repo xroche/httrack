@@ -253,7 +253,7 @@ int hts_unescapeUrlSpecial(const char *src, char *dest, const size_t max,
       lastJ = j;
     }
     /* End of sequence seen */
-    else if (lastI != (size_t) -1 && i == lastI + 2) {
+    else if (i >= 2 && i == lastI + 2) {
       const int a1 = hts_ehexh(src[lastI + 1]);
       const int a2 = hts_ehexh(src[lastI + 2]);
       if (a1 != -1 && a2 != -1) {
