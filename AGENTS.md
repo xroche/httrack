@@ -45,7 +45,7 @@ the operational checklist: toolchain, invariants, and how to ship a change.
   `gh workflow run tier2.yml --ref <branch>` before a release. An absorbed
   workflow keeps `workflow_call` and `workflow_dispatch` and has no schedule of
   its own. Drop its `uses:` from `tier2.yml` and nothing runs it again. A canary
-  watching the outside world (`appstream-network`, `mptcp-network`,
+  that watches the outside world (`appstream-network`, `mptcp-network`,
   `downstream-drift`, `httraqt-upstream`) has to fire when no branch moved, so it
   keeps its own cron and stays out of tier-2.
 - `distcheck` is a required context and builds from the dist tarball, which has no
