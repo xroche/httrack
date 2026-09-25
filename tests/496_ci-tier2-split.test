@@ -88,7 +88,14 @@ job_contexts() { # job_contexts <workflow> <job id>
             injob = (id == want); found = found || injob; next
         }
         !injob { next }
+        /^    name: [>|]/ { print "ERR: a folded name:"; bad = 1; exit }
         /^    name: / { tpl = unquote(trim(substr($0, 11))); next }
+        # A required job must run, and must be able to fail. needs: makes it skip
+        # with whatever it waits on, and continue-on-error: reports green always.
+        /^    needs:/ { print "ERR: a needs:, which can skip the job"; bad = 1; exit }
+        /^    continue-on-error:/ {
+            print "ERR: continue-on-error:, so the check cannot fail"; bad = 1; exit
+        }
         # The two required jobs that carry one are restricted TO pull requests,
         # which is the opposite of a hazard. Any other condition can switch the
         # job off on a PR without changing its name.
@@ -100,7 +107,10 @@ job_contexts() { # job_contexts <workflow> <job id>
             next
         }
         /^      matrix:/ { inmatrix = 1; next }
-        inmatrix && /^        include:/ { ininclude = 1; next }
+        # sawinclude is never cleared, unlike ininclude, which any 8-space key
+        # later in the job resets. The run: key of a step would otherwise hide
+        # that the matrix was ever there.
+        inmatrix && /^        include:/ { ininclude = 1; sawinclude = 1; next }
         inmatrix && !ininclude && /^        [A-Za-z0-9_-]+:/ { plainaxis = 1; next }
         ininclude && /^          - \{/ {
             buf = $0; sub(/^ *- \{/, "", buf)
@@ -118,6 +128,9 @@ job_contexts() { # job_contexts <workflow> <job id>
             if (!found) { print "ERR: no job " want; exit 1 }
             if (tpl == "") exit 0
             if (plainaxis) { print "ERR: a plain matrix axis under a name:"; exit 1 }
+            # An include: nothing matched expands to zero jobs, and the template
+            # would otherwise print as though the job still ran.
+            if (sawinclude && nentries == 0) { print "ERR: an include: with no entries"; exit 1 }
             if (nentries == 0) {
                 if (tpl ~ /\$\{\{/) { print "ERR: an interpolated name with no matrix"; exit 1 }
                 print tpl
@@ -167,7 +180,8 @@ Keep the job where it is, or drop the context from the ruleset first."
 # Second invariant: tier2.yml owns the schedule for the legs it absorbed, so a
 # workflow reachable only by workflow_call has to be named there.
 orphans=
-for wf in "$wfdir"/*.yml; do
+for wf in "$wfdir"/*.yml "$wfdir"/*.yaml; do
+    test -r "$wf" || continue # the .yaml glob matches nothing today
     base=${wf##*/}
     test "$base" != tier2.yml || continue
     # Callable, and with no trigger of its own that would ever fire.
@@ -185,15 +199,28 @@ A workflow with neither a trigger nor a caller never runs again, and says nothin
 # does not name can red while the gate reports green, which is worse than having
 # no gate, and nothing in the workflow itself notices.
 t2="$wfdir/tier2.yml"
-legs=$(awk '/^jobs:/ { injobs = 1; next }
-            injobs && /^  [A-Za-z0-9_-]+:[ \t]*(#.*)?$/ {
-                sub(/[ \t]*(#.*)?$/, ""); sub(/:$/, ""); sub(/^  /, ""); print
-            }' "$t2" | command grep -vx gate | sort)
-needed=$(awk '/^  gate:[ \t]*(#.*)?$/ { ingate = 1; next }
-              ingate && /^  [A-Za-z0-9_-]+:/ { exit }
-              ingate && /^    needs:$/ { inneeds = 1; next }
-              inneeds && /^      - / { sub(/^      - /, ""); print; next }
-              inneeds && /^    [A-Za-z0-9_-]+:/ { inneeds = 0 }' "$t2" | sort)
+# A key this cannot read would drop the leg from BOTH lists, and they would
+# still agree while that leg reds unwatched.
+# Not aborted on a non-zero awk: the message below says which key it choked on,
+# where errexit would kill the test silently.
+legs_raw=$(awk '/^jobs:/ { injobs = 1; next }
+                !injobs || /^[ \t]*(#.*)?$/ { next }
+                /^  [^ ]/ {
+                    if ($0 !~ /^  [A-Za-z0-9_-]+:[ \t]*(#.*)?$/) {
+                        print "ERR: unreadable job key: " $0; exit 1
+                    }
+                    sub(/[ \t]*(#.*)?$/, ""); sub(/:$/, ""); sub(/^  /, ""); print
+                }' "$t2") || true
+case $legs_raw in *ERR:*) fail "$t2: $legs_raw" ;; esac
+legs=$(command grep -vx gate <<<"$legs_raw" | sort)
+needed_raw=$(awk '/^  gate:[ \t]*(#.*)?$/ { ingate = 1; next }
+                  ingate && /^  [A-Za-z0-9_-]+:/ { exit }
+                  ingate && /^    needs:[ \t]*\[/ { print "ERR: a flow-style needs:"; exit 1 }
+                  ingate && /^    needs:$/ { inneeds = 1; next }
+                  inneeds && /^      - / { sub(/^      - /, ""); print; next }
+                  inneeds && /^    [A-Za-z0-9_-]+:/ { inneeds = 0 }' "$t2") || true
+case $needed_raw in *ERR:*) fail "$t2: $needed_raw" ;; esac
+needed=$(sort <<<"$needed_raw")
 
 test -n "$legs" || fail "no jobs parsed out of $t2"
 test "$legs" = "$needed" || fail "the tier-2 gate does not need every leg.
