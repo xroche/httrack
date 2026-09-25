@@ -374,6 +374,12 @@ static hts_boolean js_space_codepoint(unsigned int cp) {
              : HTS_FALSE;
 }
 
+/* The CSS ident code points that ECMAScript reads as spaces, so that a name
+   ends in one language and continues in the other. */
+static hts_boolean css_ident_codepoint(unsigned int cp) {
+  return cp == 0x1680 || cp == 0xFEFF ? HTS_TRUE : HTS_FALSE;
+}
+
 /* This models what hts_js_scan_link is meant to find: one of the keywords
    above, its separator, a quoted operand, and a byte closing the statement. */
 static hts_boolean jsscan_model(httrackp *opt, const char *cursor,
@@ -415,6 +421,12 @@ static hts_boolean jsscan_model(httrackp *opt, const char *cursor,
           prev == '.' ||
           ((unsigned char) prev >= 0x80 &&
            !js_space_codepoint(model_prev_codepoint(cursor, buffer))))
+        continue;
+      /* CSS reads a wider name, so url() glues to more there (#1754) */
+      if (in_css &&
+          (prev == '-' ||
+           ((unsigned char) prev >= 0x80 &&
+            css_ident_codepoint(model_prev_codepoint(cursor, buffer)))))
         continue;
       break;
     case JSGUARD_NO_IDENT_QUOTE:
@@ -572,8 +584,8 @@ static void jsscan_sweep(httrackp *opt, selftest_sweep *sw) {
      reading that byte as a space disagrees with the model here and nowhere
      else. */
   static const char *const prefix[] = {
-      "",  " ", "a", "_",  "\"",       "$",        ".",
-      "`", ":", "}", "\n", "\302\240", "\303\251", "\342\202\240"};
+      "",  " ",  "a",        "_",        "\"",           "$", ".", "`", ":",
+      "}", "\n", "\302\240", "\303\251", "\342\202\240", "-"};
   static const char *const word[] = {
       ".src",     "src",   ".SRC",   ".location", ":location",
       "location", ".href", ".open",  ".replace",  ".link",
@@ -680,10 +692,22 @@ int parse_selftest_jsscan(httrackp *opt, hts_boolean dump) {
       /* a name ends on any Unicode space, not only the three once spelled */
       {"\343\200\200url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
       {"\342\200\257url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
-      {"\357\273\277url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
       {"\341\273\277url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_FALSE, 0, 0},
       {"\240url(a.png)", 1, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
-      {"\341\232\200url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
+      /* U+1680 and U+FEFF are spaces to JavaScript and ident code points to
+         CSS, so the same name ends in one language and continues in the
+         other (#1754) */
+      {"\341\232\200url(\"a.png\")", 3, HTS_FALSE, HTS_FALSE, HTS_TRUE, 5, 5},
+      {"\341\232\200url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_FALSE, 0, 0},
+      {"x\341\232\200url(a.png)", 4, HTS_FALSE, HTS_TRUE, HTS_FALSE, 0, 0},
+      {"\357\273\277url(\"a.png\")", 3, HTS_FALSE, HTS_FALSE, HTS_TRUE, 5, 5},
+      {"\357\273\277url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_FALSE, 0, 0},
+      {"x\357\273\277url(a.png)", 4, HTS_FALSE, HTS_TRUE, HTS_FALSE, 0, 0},
+      /* "-" continues a CSS name, so image-url() is a function of its own.
+         JavaScript subtracts there instead, so url() really is called. */
+      {"image-url(a.png)", 6, HTS_FALSE, HTS_TRUE, HTS_FALSE, 0, 0},
+      {"image-url(\"a.png\")", 6, HTS_FALSE, HTS_FALSE, HTS_TRUE, 5, 5},
+      {"-url(a.png)", 1, HTS_FALSE, HTS_TRUE, HTS_FALSE, 0, 0},
       {"\342\201\237url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
       {"\342\200\250url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
       {"\342\200\251url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
