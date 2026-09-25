@@ -1,0 +1,5 @@
+# MD5 and MurmurHash3 mix by wrapping, so unsigned-integer-overflow reports
+# every round of them. Both are third-party, and coucal is a submodule, so the
+# exemption cannot sit at the definition the way htsencoding.c's FNV does.
+src:*/src/md5.c
+src:*/src/coucal/*

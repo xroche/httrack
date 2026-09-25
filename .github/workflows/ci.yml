@@ -507,13 +507,18 @@ jobs:
             build-essential clang autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
 
+      # unsigned-integer-overflow is not in -fsanitize=undefined, because the
+      # wrap is defined behaviour. It is still how a bounds test written as
+      # "controlled + untrusted < limit" passes, which is the form AGENTS.md
+      # bans, so the parsers that read hostile bytes are exactly where to
+      # check it. The ignorelist exempts the two hashes that wrap on purpose.
       - name: Configure (fuzzers, static)
         run: |
           set -euo pipefail
           autoreconf -fi
           ./configure CC=clang \
-            CFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -g -O1 -fno-omit-frame-pointer" \
-            LDFLAGS="-fsanitize=address,undefined" \
+            CFLAGS="-fsanitize=address,undefined,unsigned-integer-overflow -fsanitize-ignorelist=$GITHUB_WORKSPACE/fuzz/ubsan-ignorelist.txt -fno-sanitize-recover=all -g -O1 -fno-omit-frame-pointer" \
+            LDFLAGS="-fsanitize=address,undefined,unsigned-integer-overflow" \
             --enable-fuzzers --disable-shared
 
       - name: Build
