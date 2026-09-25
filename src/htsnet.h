@@ -232,9 +232,10 @@ SOCaddr_initloopback_(SOCaddr *const addr, const char *file, const int line) {
   } while (0)
 
 /** Populate server from data. data_size selects the source form: a full
-    sockaddr_in / sockaddr_in6, or a raw 4-byte (IPv4) / 16-byte (IPv6) address
-    with port zeroed. Any other size leaves an AF_INET shell. Returns the
-    resulting sockaddr length. */
+    sockaddr_in / sockaddr_in6, or a raw 4-byte IPv4 address with port zeroed.
+    Any other size leaves an AF_INET shell. Returns the resulting sockaddr
+    length. There is no raw IPv6 form, because 16 is sizeof(struct sockaddr_in)
+    on every target: pass a sockaddr_in6. */
 static HTS_UNUSED socklen_t SOCaddr_copyaddr_(SOCaddr *const server,
                                               const void *data,
                                               const size_t data_size,
@@ -256,13 +257,6 @@ static HTS_UNUSED socklen_t SOCaddr_copyaddr_(SOCaddr *const server,
     server->m_addr.in.sin_family = AF_INET;
     server->m_addr.in.sin_port = 0;
     memcpy(&server->m_addr.in.sin_addr, data, 4);
-#if HTS_INET6 != 0
-  } else if (data_size == 16) {
-    memset(&server->m_addr.in6, 0, sizeof(server->m_addr.in6));
-    server->m_addr.in6.sin6_family = AF_INET6;
-    server->m_addr.in6.sin6_port = 0;
-    memcpy(&server->m_addr.in6.sin6_addr, data, 16);
-#endif
   } else {
     server->m_addr.in.sin_family = AF_INET;
   }

@@ -1,0 +1,10 @@
+#!/bin/bash
+#
+# SOCaddr_copyaddr picks its source form by byte count, and 16 is both a
+# sockaddr_in and a raw IPv6 address. Pin the form it chooses.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+assert_selftest "socaddr self-test OK" socaddr
