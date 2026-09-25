@@ -588,11 +588,17 @@ static HTS_INLINE HTS_UNUSED void sigpipe_release(sigpipe_mask *m) {
 static HTS_INLINE HTS_UNUSED int hts_send_nosignal(T_SOC soc, const char *s,
                                                    int len) {
   sigpipe_mask m;
-  int n;
+  int n, err;
 
   sigpipe_hold(&m);
   n = (int) send(soc, s, len, HTS_MSG_NOSIGNAL);
+  /* Saved across the release, whose sigtimedwait() reports EAGAIN whenever
+     nothing was pending. Callers read errno on the next line to tell a would
+     block from a dead socket, and EAGAIN is the answer that means keep going.
+   */
+  err = errno;
   sigpipe_release(&m);
+  errno = err;
   return n;
 }
 

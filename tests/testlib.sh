@@ -77,7 +77,10 @@ skip_on_emulated() { ! is_emulated || skip "emulated ${EMULATED_ARCH}: $*"; }
 # not, so only the bytes on disk answer for both.
 fsize_limit_binds() {
     local probe got
-    probe=$(mktemp "${TMPDIR:-/tmp}/httrack_fsz.XXXXXX") || return 1
+    # A failure here must not read as "the host does not enforce it", which
+    # would disable the caller's assertion on a host that does.
+    probe=$(mktemp "${TMPDIR:-/tmp}/httrack_fsz.XXXXXX") ||
+        fail "could not make a probe file to ask whether RLIMIT_FSIZE binds"
     (
         trap '' XFSZ
         ulimit -f 1 || exit 1
