@@ -1,0 +1,138 @@
+#!/bin/bash
+#
+# Tier-2 holds the slow legs, so a job moved into it stops reporting on pull
+# requests. Move a REQUIRED one and every open PR waits forever on a context
+# that never arrives. Strand a workflow there and it stops running at all.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+top=${abs_top_srcdir:-$(cd "$testdir/.." && pwd)}
+wfdir="$top/.github/workflows"
+
+if ! test -d "$wfdir"; then
+    test -d "$top/.github" && fail "$wfdir is gone but $top/.github is not"
+    skip "no .github under $top (dist tarball), so the audit has nothing to read"
+fi
+
+# The contexts the "Protect master" ruleset requires by name, pinned rather than
+# read back from the tree, because one file compared against itself proves
+# nothing. The two Windows legs are 437's job.
+required='build (--disable-auto-features, then iconv alone off)
+build (Ubuntu devel, uutils coreutils)
+build (arm64, clang)
+build (arm64, gcc)
+build (linux i386, gcc -m32)
+build (macOS arm64, clang)
+build (no openssl, --disable-https)
+build (no python3, Debian buildd)
+build (x86-64, clang)
+build (x86-64, gcc -O3 -flto)
+build (x86-64, gcc)
+deb package (lintian)
+distcheck (release tarball)
+fuzz (libFuzzer corpus replay, clang)
+msan (MemorySanitizer, clang)
+sanitize (ASan+UBSan, gcc)
+webhttrack smoke (macOS arm64)'
+
+# Every job name a pull-request workflow can emit. A name carrying ${{ }} is a
+# template, so it is kept as one and matched as a pattern below.
+pr_job_names() { # pr_job_names <dir>
+    local wf
+    for wf in "$1"/*.yml; do
+        # The trigger list ends where the next top-level key starts.
+        awk '/^on:/ { on = 1; next }
+             on && /^[^ #]/ { exit }
+             on && /^  pull_request:?$/ { found = 1 }
+             END { exit !found }' "$wf" || continue
+        sed -n 's/^    name: *//p' "$wf"
+    done
+}
+
+names=$(pr_job_names "$wfdir")
+test -n "$names" || fail "no pull-request job names found at all under $wfdir"
+
+# A required context is covered when some template matches it, with each ${{ }}
+# standing for whatever the matrix substitutes there.
+covered() { # covered <context> <templates>
+    local want=$1 tpl pat
+    while IFS= read -r tpl; do
+        # The interpolations become the only wildcards, so a name carrying one
+        # of these already would match far more than it should.
+        case $tpl in
+        *'*'* | *'?'* | *'['*)
+            fail "job name carries a glob metacharacter this matcher misreads: $tpl"
+            ;;
+        esac
+        pat=$(printf '%s' "$tpl" | sed 's/\${{[^}]*}}/*/g')
+        # shellcheck disable=SC2254 # pat is meant to glob
+        case $want in
+        $pat) return 0 ;;
+        esac
+    done <<<"$2"
+    return 1
+}
+
+missing=
+while IFS= read -r ctx; do
+    covered "$ctx" "$names" || missing="$missing
+  $ctx"
+done <<<"$required"
+
+test -z "$missing" || fail "required contexts no pull-request workflow emits:$missing
+A required check that never reports blocks every open PR, not only this one.
+Keep the job in ci.yml or windows-build.yml, or drop it from the ruleset first."
+
+# The mutant: take a required job to tier-2, where it no longer runs on a PR.
+mutdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_wf.XXXXXX")
+cleanup_push rm -rf "$mutdir"
+cp "$wfdir"/*.yml "$mutdir/"
+sed -i 's/^    name: sanitize (ASan+UBSan, gcc)$/    name: sanitize (moved)/' \
+    "$mutdir/ci.yml"
+cmp -s "$wfdir/ci.yml" "$mutdir/ci.yml" && fail "the renamed-job mutant changed nothing"
+covered 'sanitize (ASan+UBSan, gcc)' "$(pr_job_names "$mutdir")" &&
+    fail "a renamed required job still read as covered"
+
+# And the control, so the match above is not answering yes to everything.
+covered 'sanitize (ASan+UBSan, gcc)' "$names" ||
+    fail "the unmutated tree reads as uncovered, so the matcher sees nothing"
+
+# Second invariant: tier2.yml owns the schedule for the legs it absorbed, so a
+# workflow reachable only by workflow_call has to be named there.
+orphans=
+for wf in "$wfdir"/*.yml; do
+    base=${wf##*/}
+    test "$base" != tier2.yml || continue
+    # Callable, and with no trigger of its own that would ever fire.
+    command grep -q '^  workflow_call:' "$wf" || continue
+    command grep -Eq '^  (schedule|push|pull_request|release|workflow_run):' "$wf" && continue
+    command grep -q "\.github/workflows/$base\$" "$wfdir/tier2.yml" ||
+        orphans="$orphans $base"
+done
+
+test -z "$orphans" || fail "callable workflows nothing schedules and tier2.yml does not call:$orphans
+A workflow with neither a trigger nor a caller never runs again, and says nothing about it."
+
+# Third invariant: the gate has to need every other job in tier2.yml. A leg it
+# does not name can red while the gate reports green, which is worse than having
+# no gate, and nothing in the workflow itself notices.
+t2="$wfdir/tier2.yml"
+legs=$(awk '/^jobs:/ { injobs = 1; next }
+            injobs && /^  [A-Za-z0-9_-]+:$/ { sub(/:$/, ""); sub(/^  /, ""); print }' "$t2" |
+    command grep -vx gate | sort)
+needed=$(awk '/^  gate:$/ { ingate = 1; next }
+              ingate && /^  [A-Za-z0-9_-]+:/ { exit }
+              ingate && /^    needs:$/ { inneeds = 1; next }
+              inneeds && /^      - / { sub(/^      - /, ""); print; next }
+              inneeds && /^    [A-Za-z0-9_-]+:/ { inneeds = 0 }' "$t2" | sort)
+
+test -n "$legs" || fail "no jobs parsed out of $t2"
+test "$legs" = "$needed" || fail "the tier-2 gate does not need every leg.
+jobs:   $(tr '\n' ' ' <<<"$legs")
+needs:  $(tr '\n' ' ' <<<"$needed")
+A leg missing from needs: reds while the gate still reports success."
+
+echo "tier-2 split OK ($(printf '%s' "$required" | count_matching_lines .) required contexts still on the PR path, no orphaned callable workflow, gate needs all $(printf '%s' "$legs" | count_matching_lines .) legs)"

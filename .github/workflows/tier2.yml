@@ -1,0 +1,441 @@
+# The slow half of validation, kept off the pull-request path so CI stays short.
+# Every leg here builds our own source, so a dispatch can aim it at a release
+# branch. A canary that watches the outside world (appstream-network,
+# mptcp-network, downstream-drift, httraqt-upstream) must fire when no branch
+# moved, so it keeps its own schedule and stays out.
+name: Tier-2
+
+on:
+  # Monday, ahead of the working week. A scheduled run only ever takes the
+  # default branch, so workflow_dispatch is what aims this at a release branch.
+  schedule:
+    - cron: "41 5 * * 1"
+  workflow_dispatch:
+
+# Least privilege: the workflow only needs to read the repo.
+permissions:
+  contents: read
+
+concurrency:
+  group: tier2-${{ github.ref }}
+  cancel-in-progress: true
+
+# The suite mostly sleeps on its own servers, so the width is not a core count.
+env:
+  CHECK_JOBS: 16
+
+jobs:
+  # Two networks no runner has: buildds that refuse TEST-NET-1 rather than drop
+  # it (#1108), and an rpm buildroot, where a UDP connect names no source at all
+  # and #1463 read that wildcard as an address. One job, since the build is the
+  # same and neither check is worth a second three-minute compile.
+  hostile-network:
+    name: build (constrained networks)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update || true  # a third-party source in the runner image can fail (#1097)
+          sudo apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev iproute2
+
+      - name: Configure
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          ./configure
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      - name: Test on a network that refuses TEST-NET-1
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          tools/hostile-net.sh make check -j"$CHECK_JOBS"
+          # A refusal landing before connect() returns skips on the older probe
+          # instead, leaving the settle this leg exists to guard unrun.
+          cat tests/246_engine-connect-stop.log
+          grep -q 'within 500 ms' tests/246_engine-connect-stop.log
+
+      - name: Test on the network an rpm buildroot has
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          tools/buildroot-net.sh make check -j"$CHECK_JOBS"
+          # Only the widening half needs an address the namespace lacks, so a
+          # run that never reached the loopback half proves nothing.
+          cat tests/335_webhttrack-bind-loopback.log
+          grep -q 'the default socket answers on 127.0.0.1' \
+            tests/335_webhttrack-bind-loopback.log
+
+      - name: Print the test log on failure
+        if: failure()
+        run: cat tests/test-suite.log 2>/dev/null || true
+
+  # The Ubuntu buildds run a development release every runner above is well behind.
+  # That gap is what shipped 3.49.18 broken on every Ubuntu architecture but
+  # riscv64, when 25.10 made uutils the default coreutils (#1042).
+  ubuntu-devel:
+    name: build (Ubuntu devel, uutils coreutils)
+    runs-on: ubuntu-24.04
+    container: ubuntu:devel
+    timeout-minutes: 40
+    steps:
+      # Before checkout: the container has no git, so submodules would be lost.
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev \
+            git ca-certificates python3 procps
+
+      - name: Assert the coreutils dispatch on argv[0]
+        # The property #1042 broke on, not the version banner, which uutils has
+        # already reworded once. Without it the job quietly becomes a slower copy
+        # of the one above.
+        run: |
+          set -euo pipefail
+          ln -s "$(command -v sleep)" /tmp/not-a-coreutil
+          if /tmp/not-a-coreutil 0; then
+            echo "::error::coreutils here take any argv[0]; this image no longer guards uutils" >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Configure
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          ./configure
+          # A renamed dev package would disable a codec or TLS here, and the tests
+          # that cover them would SKIP rather than fail.
+          grep -q "define HTS_USEBROTLI 1" config.h
+          grep -q "define HTS_USEZSTD 1" config.h
+          grep -q "define HTS_USEOPENSSL 1" config.h
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      - name: Test
+        timeout-minutes: 25
+        run: |
+          set -euo pipefail
+          make check -j"$CHECK_JOBS"
+
+      - name: Print the test log on failure
+        if: failure()
+        run: cat tests/test-suite.log 2>/dev/null || true
+
+  # The macOS app bundle (#886): assemble it, then prove it still works after being
+  # moved, which is the only thing a .app has to survive that a prefix install does not.
+  macos-app:
+    name: macOS app bundle (arm64)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          brew install autoconf automake libtool autoconf-archive brotli zstd
+
+      # --disable-shared keeps libhttrack inside the binaries, so the bundle carries no
+      # absolute dylib path back to the staging prefix.
+      - name: Build and install into a temp prefix
+        run: |
+          set -euo pipefail
+          # openssl@3, matching macos-release.yml: this job is the release path
+          # minus Apple, so it has to bundle what the signed DMG bundles.
+          ssl="$(brew --prefix openssl@3)"
+          brewp="$(brew --prefix)"
+          ./bootstrap
+          ./configure CPPFLAGS="-I${ssl}/include -I${brewp}/include" \
+            LDFLAGS="-L${ssl}/lib -L${brewp}/lib" \
+            --prefix="$RUNNER_TEMP/inst" --disable-shared
+          make -j"$(sysctl -n hw.ncpu)"
+          make install
+
+      - name: Assemble HTTrack.app
+        run: |
+          set -euo pipefail
+          make macos-app APP_FLAGS="--prefix $RUNNER_TEMP/inst --out $RUNNER_TEMP"
+          plutil -lint "$RUNNER_TEMP/HTTrack.app/Contents/Info.plist"
+
+      - name: Run it through the bundle stub
+        run: |
+          set -euo pipefail
+          app="$RUNNER_TEMP/HTTrack.app"
+          bash tests/webhttrack-smoke.sh "$app/Contents/Resources" "$app/Contents/MacOS/HTTrack"
+
+      - name: Run it again after moving it
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/moved"
+          mv "$RUNNER_TEMP/HTTrack.app" "$RUNNER_TEMP/moved/"
+          rm -rf "$RUNNER_TEMP/inst"
+          app="$RUNNER_TEMP/moved/HTTrack.app"
+          bash tests/webhttrack-smoke.sh "$app/Contents/Resources" "$app/Contents/MacOS/HTTrack"
+
+      # The load-command check cannot fail while the loader can still reach Homebrew (#901).
+      - name: Run it with Homebrew's libraries out of reach
+        run: |
+          set -euo pipefail
+          app="$RUNNER_TEMP/moved/HTTrack.app"
+          # Without this the hiding below proves nothing: an empty Frameworks passes it.
+          ls "$app/Contents/Frameworks"/libssl.*.dylib >/dev/null
+          # The kegs, not just the opt symlinks: a source build records the Cellar path.
+          hidden=""
+          for keg in openssl@3 brotli zstd; do
+            for d in "$(brew --prefix)/opt/$keg" "$(brew --prefix)/Cellar/$keg"; do
+              if [ -e "$d" ]; then sudo mv "$d" "$d.hidden"; hidden="$hidden $d"; fi
+            done
+          done
+          trap 'for d in $hidden; do sudo mv "$d.hidden" "$d"; done' EXIT
+          test -n "$hidden"
+          bash tests/webhttrack-smoke.sh "$app/Contents/Resources" "$app/Contents/MacOS/HTTrack"
+
+      # The release path (macos-release.yml) minus Apple, so a bundle that cannot be
+      # signed or packed fails on the PR rather than on release day.
+      - name: Sign and pack the bundle, ad hoc
+        run: |
+          set -euo pipefail
+          bash tools/macos-release.sh --app "$RUNNER_TEMP/moved/HTTrack.app" \
+            --identity - --skip-notarize
+          ls "$RUNNER_TEMP/moved"/HTTrack-*-macos-*.dmg >/dev/null
+
+      # --label names the download for a product channel. The bundle inside keeps the
+      # engine's version, which the step above already asserted against the binary.
+      - name: Pack again under a channel label
+        run: |
+          set -euo pipefail
+          bash tools/macos-release.sh --app "$RUNNER_TEMP/moved/HTTrack.app" \
+            --identity - --skip-notarize --label 3.50-beta-0
+          ls "$RUNNER_TEMP/moved"/HTTrack-3.50-beta-0-macos-*.dmg >/dev/null
+          # Refused before anything is signed, so a typo costs a second, not a submission.
+          ! bash tools/macos-release.sh --app "$RUNNER_TEMP/moved/HTTrack.app" \
+            --identity - --skip-notarize --label 'a b/c'
+
+  # --disable-auto-features is what a distribution recipe passes, and nothing
+  # else builds a tree with an optional feature off. The second configure turns
+  # off iconv alone: with every feature sharing one value, a test reading the
+  # wrong one still agrees with the right one.
+  auto-features:
+    name: build (--disable-auto-features, then iconv alone off)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
+          sudo apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev pkg-config
+
+      - name: Bootstrap
+        run: autoreconf -fi
+
+      - name: Every optional feature off
+        run: |
+          set -euo pipefail
+          mkdir -p ../bld-off
+          cd ../bld-off
+          bash "$GITHUB_WORKSPACE/configure" --disable-auto-features
+          make -j"$(nproc)"
+          # The libraries are installed above, so "off" here is the switch's
+          # doing and not the runner's.
+          got=$(./src/httrack -#test=features | tr '\n' ' ')
+          echo "features: $got"
+          case " $got " in
+          *" brotli 0 "*" iconv 0 "*) ;;
+          *) echo "expected every feature off, got: $got"; exit 1 ;;
+          esac
+
+      - name: Test, every optional feature off
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          make -C ../bld-off check -j"$CHECK_JOBS" ||
+            { cat ../bld-off/tests/test-suite.log 2>/dev/null; exit 1; }
+
+      - name: iconv alone off
+        run: |
+          set -euo pipefail
+          mkdir -p ../bld-mixed
+          cd ../bld-mixed
+          bash "$GITHUB_WORKSPACE/configure" --without-iconv
+          make -j"$(nproc)"
+          got=$(./src/httrack -#test=features | tr '\n' ' ')
+          echo "features: $got"
+          # The point of this configuration: the four values are not all equal.
+          case " $got " in
+          *" brotli 1 "*" iconv 0 "*) ;;
+          *) echo "expected brotli on and iconv off, got: $got"; exit 1 ;;
+          esac
+
+      - name: Test, iconv alone off
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          make -C ../bld-mixed check -j"$CHECK_JOBS" ||
+            { cat ../bld-mixed/tests/test-suite.log 2>/dev/null; exit 1; }
+
+  # The cell of #1139: a libc exporting getrandom() without shipping
+  # <sys/random.h>. Nothing else reaches it, and it is a hard build break when
+  # the call is not gated on the header. It also runs the /dev/urandom fallback.
+  no-getrandom:
+    name: build (getrandom header hidden)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
+          sudo apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
+
+      - name: Configure (sys/random.h hidden from configure)
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          ./configure ac_cv_header_sys_random_h=no
+          # A libc without getrandom() at all would pass this job vacuously.
+          grep -q "define HAVE_GETRANDOM 1" config.h
+          ! grep -q "define HAVE_SYS_RANDOM_H" config.h
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      - name: Test
+        timeout-minutes: 20
+        run: |
+          make check -j"$CHECK_JOBS"
+
+      - name: Print the test log on failure
+        if: failure()
+        run: cat tests/test-suite.log 2>/dev/null || true
+
+  # Termux's cell: bionic before API 28 links backtrace() (libandroid-execinfo)
+  # but ships no <spawn.h>, so the symbolizer the backtrace block pulls in is a
+  # hard build break there. The suite also runs with frame naming compiled out.
+  no-spawn:
+    name: build (spawn.h hidden)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
+          sudo apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
+
+      - name: Configure (spawn.h hidden from configure)
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          ./configure ac_cv_header_spawn_h=no
+          # A build with no backtrace() at all would pass this job vacuously.
+          grep -q "define HAVE_BACKTRACE 1" config.h
+          ! grep -q "define HAVE_SPAWN_H" config.h
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      - name: Test
+        timeout-minutes: 20
+        run: |
+          make check -j"$CHECK_JOBS"
+
+      - name: Print the test log on failure
+        if: failure()
+        run: cat tests/test-suite.log 2>/dev/null || true
+
+  # Other people's packaging recipes, each building our dist tarball. A red here
+  # is often theirs to fix rather than ours.
+  alpine:
+    uses: ./.github/workflows/alpine-abuild.yml
+
+  arch:
+    uses: ./.github/workflows/arch-makepkg.yml
+
+  fedora:
+    uses: ./.github/workflows/fedora-spec.yml
+
+  opensuse:
+    uses: ./.github/workflows/opensuse-spec.yml
+
+  termux:
+    uses: ./.github/workflows/termux-build.yml
+
+  freebsd:
+    uses: ./.github/workflows/freebsd-build.yml
+
+  emulated:
+    uses: ./.github/workflows/emulated-suite.yml
+
+  # One status to read, so a red leg cannot hide behind thirteen greens.
+  # 496_ci-tier2-split.test fails when a job above is missing from needs: below.
+  gate:
+    name: tier-2 gate
+    if: always()
+    needs:
+      - hostile-network
+      - ubuntu-devel
+      - macos-app
+      - auto-features
+      - no-getrandom
+      - no-spawn
+      - alpine
+      - arch
+      - fedora
+      - opensuse
+      - termux
+      - freebsd
+      - emulated
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Fail unless every leg succeeded
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          set -euo pipefail
+          echo "leg results: $RESULTS"
+          bad=
+          for r in $RESULTS; do
+              # A fork skips the guarded canaries, and no leg here has a needs:.
+              case $r in
+              success | skipped) ;;
+              *) bad="$bad $r" ;;
+              esac
+          done
+          test -z "$bad" || {
+              echo "::error::tier-2 legs did not succeed:$bad"
+              exit 1
+          }

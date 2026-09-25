@@ -39,6 +39,15 @@ the operational checklist: toolchain, invariants, and how to ship a change.
 - `make check` prepends the build's `src/` to `PATH`, but a hand-run `.test` does
   not — an installed `/usr/bin/httrack` then shadows your build. Run via `make
   check`, or `PATH="<bld>/src:$PATH"` for a manual run.
+- **Tier-2 holds the slow legs**, in `tier2.yml`: the configure-variant builds,
+  the macOS bundle, the emulated s390x suite, and the distro packaging canaries.
+  It runs weekly on master and on demand, so point it at a branch with
+  `gh workflow run tier2.yml --ref <branch>` before a release. An absorbed
+  workflow keeps `workflow_call` and `workflow_dispatch` and has no schedule of
+  its own. Drop its `uses:` from `tier2.yml` and nothing runs it again. A canary
+  watching the outside world (`appstream-network`, `mptcp-network`,
+  `downstream-drift`, `httraqt-upstream`) has to fire when no branch moved, so it
+  keeps its own cron and stays out of tier-2.
 - `distcheck` is a required context and builds from the dist tarball, which has no
   `.github/`. A test reading a file from there must skip when it is missing, not
   fail. Fail only when the directory is present and the file is not, so a real
@@ -97,6 +106,12 @@ the operational checklist: toolchain, invariants, and how to ship a change.
   one that added the axis. Give a new Windows leg its own job with a pinned
   `name:`, or add a step to the existing job. `437_ci-windows-contexts.test`
   fails on any such rename.
+- **A required status context must stay on a workflow that runs on
+  `pull_request`.** A required check that never reports leaves every open PR
+  waiting for it forever. `tier2.yml` runs on a schedule and on demand, never on
+  a PR, so moving a job there is what makes this happen.
+  `496_ci-tier2-split.test` pins the required list and fails when one stops
+  being emitted.
 
 ## Security (HTTrack parses hostile input off the network)
 - Bounds-check every copy. Overflow-safe form: put the untrusted value alone,
