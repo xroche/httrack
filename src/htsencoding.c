@@ -253,7 +253,7 @@ int hts_unescapeUrlSpecial(const char *src, char *dest, const size_t max,
       lastJ = j;
     }
     /* End of sequence seen */
-    else if (i >= 2 && i == lastI + 2) {
+    else if (lastI != (size_t) -1 && i == lastI + 2) {
       const int a1 = hts_ehexh(src[lastI + 1]);
       const int a2 = hts_ehexh(src[lastI + 2]);
       if (a1 != -1 && a2 != -1) {
@@ -274,13 +274,13 @@ int hts_unescapeUrlSpecial(const char *src, char *dest, const size_t max,
       }
     }
     /* ASCII (and not in %xx) */
-    else if (cUtf < 0x80 && i != lastI + 1) {
+    else if (cUtf < 0x80 && (lastI == (size_t) -1 || i != lastI + 1)) {
       k = 0;  /* cancel any sequence */
       if (c == '?' && !seenQuery) {
         seenQuery = 1;
       }
     }
-    
+
     /* UTF-8 sequence in progress (either a raw or a %xx character) */
     if (cUtf >= 0x80) {
       /* Leading UTF ? */

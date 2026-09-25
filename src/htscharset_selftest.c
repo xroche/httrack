@@ -571,6 +571,36 @@ static int st_escape_room(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* A '?' starts the query wherever it sits, the first byte included, so a '+'
+   after it decodes to a space there too. */
+static int st_unescape_plus(httrackp *opt, int argc, char **argv) {
+  static const struct {
+    const char *src;
+    const char *want;
+  } cases[] = {
+      {"?a+b", "?a b"},     /* the query opens on the first byte */
+      {"x?a+b", "x?a b"},   /* and anywhere after it */
+      {"a+b", "a+b"},       /* no query, so '+' stays literal */
+      {"%3Fa+b", "?a+b"},   /* an escaped '?' does not open the query */
+      {"?%41+%42", "?A B"}, /* %xx decoding still runs inside the query */
+      {"%41+%42", "A+B"},   /* and outside it */
+  };
+
+  size_t i;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    char dst[64];
+
+    assertf(hts_unescapeUrlSpecial(cases[i].src, dst, sizeof(dst), 0) == 0);
+    assertf(strcmp(dst, cases[i].want) == 0);
+  }
+  printf("unescape-plus self-test OK\n");
+  return 0;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
@@ -593,6 +623,9 @@ const struct selftest_entry selftests_charset[] = {
     {"entities", "<string> [encoding]", "unescape HTML entities", st_entities},
     {"unescape-bounds", "", "unescapers reserve the NUL byte (no 1-byte OOB)",
      st_unescape_bounds},
+    {"unescape-plus", "",
+     "a '?' opens the query even as the first byte, so a later '+' is a space",
+     st_unescape_plus},
     {"unescape-form", "", "form/ini percent-decoding keeps a malformed escape",
      st_unescape_form},
     {"escape-append-room", "",
