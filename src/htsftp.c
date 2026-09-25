@@ -1219,15 +1219,15 @@ int send_line(T_SOC soc, const char *data) {
   }
 #if FTP_DEBUG
   {
-    int r =
-        (send(soc, line, strlen(line), HTS_MSG_NOSIGNAL) == (int) strlen(line));
+    int r = (hts_send_nosignal(soc, line, (int) strlen(line)) ==
+             (int) strlen(line));
 
     printf("%s\x0d\x0a", data);
     fflush(stdout);
     return r;
   }
 #else
-  return (send(soc, line, (int) strlen(line), HTS_MSG_NOSIGNAL) ==
+  return (hts_send_nosignal(soc, line, (int) strlen(line)) ==
           (int) strlen(line));
 #endif
 }

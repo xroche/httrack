@@ -273,7 +273,7 @@ catch_url_status catch_url_capture(T_SOC soc, char *url, char *method,
               }
               // Envoyer page
               sprintf(line, CATCH_RESPONSE);
-              send(soc, line, (int) strlen(line), HTS_MSG_NOSIGNAL);
+              hts_send_nosignal(soc, line, (int) strlen(line));
             } else {
               data[0] = '\0'; // no prefix handed back
             }
