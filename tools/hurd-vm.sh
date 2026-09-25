@@ -27,6 +27,9 @@ VM_USER=demo
 VM_HOME=/home/demo
 # Hurd boots slower than Linux and the runner is shared, so this is generous.
 BOOT_TIMEOUT=600
+# A step that hangs must say so while the job can still report it, rather than
+# run to the job's own cap and leave nothing but a cancelled leg.
+STEP_TIMEOUT=2400
 
 work=${HURD_WORK:-${RUNNER_TEMP:-/var/tmp}/hurd}
 cache=${HURD_CACHE:-$work/cache}
@@ -52,13 +55,17 @@ cleanup() {
 }
 trap 'set +e; cleanup' EXIT
 
-# Provisioning runs as root, the build and the suite do not.
+# Provisioning runs as root, the build and the suite do not. A second ssh login
+# rather than su, which wants a terminal the ssh channel does not give it.
 as_user() {
-    ssh_vm "su - $VM_USER -c 'bash -s'" <<<"$1"
+    timeout "$STEP_TIMEOUT" ssh -p "$SSH_PORT" -i "$key" \
+        -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+        -o LogLevel=ERROR -o ConnectTimeout=10 \
+        "$VM_USER@127.0.0.1" "$@"
 }
 
 ssh_vm() {
-    ssh -p "$SSH_PORT" -i "$key" \
+    timeout "$STEP_TIMEOUT" ssh -p "$SSH_PORT" -i "$key" \
         -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
         -o LogLevel=ERROR -o ConnectTimeout=10 \
         root@127.0.0.1 "$@"
@@ -126,6 +133,14 @@ sudo mkdir -p "$mnt/root/.ssh"
 sudo cp "$key.pub" "$mnt/root/.ssh/authorized_keys"
 sudo chmod 700 "$mnt/root/.ssh"
 sudo chmod 600 "$mnt/root/.ssh/authorized_keys"
+# The same key for the unprivileged account the suite runs under, owned by it.
+ids=$(sudo awk -F: -v u="$VM_USER" '$1 == u { print $3 ":" $4 }' "$mnt/etc/passwd")
+test -n "$ids" || fail "the image has no $VM_USER account to build as"
+sudo mkdir -p "$mnt$VM_HOME/.ssh"
+sudo cp "$key.pub" "$mnt$VM_HOME/.ssh/authorized_keys"
+sudo chmod 700 "$mnt$VM_HOME/.ssh"
+sudo chmod 600 "$mnt$VM_HOME/.ssh/authorized_keys"
+sudo chown -R "$ids" "$mnt$VM_HOME/.ssh"
 # A drop-in rather than an append, because sshd keeps the FIRST value it reads
 # and Debian's sshd_config includes this directory on its opening line.
 sudo grep -q '^Include /etc/ssh/sshd_config.d/' "$mnt/etc/ssh/sshd_config" ||
@@ -182,9 +197,8 @@ echo "::endgroup::"
 
 # The buildds do not build as root, and the suite notices: httrack warns on
 # every run, the file-size limit does not bind, and a test that needs a write
-# to fail finds that none does. The image ships this account.
-ssh_vm "id -u $VM_USER" >/dev/null ||
-    fail "the image has no $VM_USER account to build as"
+# to fail finds that none does.
+as_user true || fail "cannot log in as $VM_USER"
 
 echo "::group::Copy the tree in"
 # A build that runs out of room fails somewhere in the middle and reads as a
