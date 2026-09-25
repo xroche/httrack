@@ -73,8 +73,8 @@ typedef struct mock_host {
 /* Long enough to outlast the 1s --timeout the bounded resolve is checked
    against, short enough to keep the self-test quick. The elapsed bounds below
    sit halfway between a prompt return and this, so they are measured on
-   mtime_monotonic(): an NTP correction mid-test would otherwise eat most of
-   that margin. */
+   mtime_monotonic(), because an NTP correction mid-test would otherwise eat
+   most of that margin. */
 #define MOCK_SLOW_MS 3000
 
 static mock_host mock_hosts[] = {

@@ -20,8 +20,8 @@ test "$out" = "dns-timeout-selftest: OK" || {
 }
 
 # That deadline must survive an NTP step (#1769), which no runtime probe can
-# see: a test may not step the host's clock. The positive arm fails a renamed
-# function, whose empty body the negative arm would pass on.
+# see, because a test may not step the host's clock. The positive arm fails a
+# renamed function, whose empty body the negative arm would pass on.
 body=$(awk '/^static int hts_dns_resolve_nocache_list_bounded\(/,/^}/' \
     "$top_srcdir/src/htslib.c")
 case "$body" in
@@ -32,8 +32,21 @@ case "$body" in
     ;;
 esac
 case "$body" in
-*mtime_local*)
+*time_local*)
     echo "FAIL: the resolve deadline is back on a clock NTP can step"
     exit 1
     ;;
 esac
+
+# The deadline is only as monotonic as the clock it reads, one function away,
+# so pin that mtime_monotonic() still asks the OS for one.
+clock=$(awk '/^TStamp mtime_monotonic\(void\)/,/^}/' "$top_srcdir/src/htslib.c")
+for sym in clock_gettime GetTickCount64; do
+    case "$clock" in
+    *"$sym"*) ;;
+    *)
+        echo "FAIL: mtime_monotonic() no longer reads $sym"
+        exit 1
+        ;;
+    esac
+done
