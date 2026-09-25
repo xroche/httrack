@@ -1737,7 +1737,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                   // éventuellement remplire par des espaces pour avoir juste la taille
                                   while(strlen(tempo) < (size_t) (b - html))
                                     strcatbuff(tempo, " ");
-                                  // pas d'erreur?
+                                  // no error?
                                   if (strlen(tempo) == (size_t) (b - html)) {
                                     strncpy(modify, tempo, strlen(tempo)); // PAS d'octet nul à la fin!
                                     p = 0;      // DEVALIDER!!
