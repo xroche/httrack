@@ -36,7 +36,14 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             qemu-system-x86 qemu-utils parted e2fsprogs socat
           # KVM or this runs under TCG, where the suite would outlast the job.
+          # The node exists on the runner but belongs to a group the runner user
+          # is not in, so testing for its presence is not testing for access.
           test -e /dev/kvm || { echo "::error::no /dev/kvm on this runner"; exit 1; }
+          sudo chmod 666 /dev/kvm
+          if ! { test -r /dev/kvm && test -w /dev/kvm; }; then
+            echo "::error::/dev/kvm is present but not usable"
+            exit 1
+          fi
 
       - uses: actions/checkout@v7
         with:
