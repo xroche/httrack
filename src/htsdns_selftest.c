@@ -40,10 +40,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsdns_selftest.h"
 
-#include "htscore.h"
-#include "htslib.h"
-#include "htsnet.h"
-#include "htsthread.h"
+#include "htsselftest_int.h"
 
 #include <setjmp.h>
 #include <stdio.h>
@@ -778,3 +775,32 @@ int dns_timeout_selftests(httrackp *opt) {
 }
 
 #endif
+
+static int st_dns(httrackp *opt, int argc, char **argv) {
+  const int err = dns_selftests(opt);
+
+  (void) argc;
+  (void) argv;
+  printf("dns-selftest: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
+static int st_dnstimeout(httrackp *opt, int argc, char **argv) {
+  const int err = dns_timeout_selftests(opt);
+
+  (void) argc;
+  (void) argv;
+  printf("dns-timeout-selftest: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
+/* ------------------------------------------------------------ */
+/* Registry: this module's tests, in the order -#test lists them. */
+/* ------------------------------------------------------------ */
+
+const struct selftest_entry selftests_dns[] = {
+    {"dns", "", "DNS resolver/cache self-test", st_dns},
+    {"dnstimeout", "", "a slow DNS resolve is bounded and holds no lock",
+     st_dnstimeout},
+    {NULL, NULL, NULL, NULL},
+};

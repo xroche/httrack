@@ -38,10 +38,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsparse_selftest.h"
 
-#include "htscore.h"
-#include "htslib.h"
-#include "htsparse.h"
-#include "htstools.h"
+#include "htsselftest_int.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -1091,3 +1088,668 @@ int parse_selftest_tagattr(httrackp *opt) {
          (int) sw.accepted);
   return 0;
 }
+
+/* Names the string on failure, since a bare line number cannot say which row
+   went red. */
+static void st_linkdir_case(const char *lien, hts_boolean frag_or_query,
+                            hts_boolean multisegment) {
+  const hts_boolean got_frag = link_dir_has_fragment_or_query(lien);
+  const hts_boolean got_multi = link_dir_is_multisegment(lien);
+
+  if (got_frag != frag_or_query || got_multi != multisegment) {
+    fprintf(
+        stderr,
+        "linkdir \"%s\": fragment %d wanted %d, multisegment %d wanted %d\n",
+        lien, got_frag, frag_or_query, got_multi, multisegment);
+    assertf(!"linkdir case failed");
+  }
+}
+
+static int st_linkdir(httrackp *opt, int argc, char **argv) {
+  size_t i;
+
+  /* Each row is one string with the answer from
+     link_dir_has_fragment_or_query, then from link_dir_is_multisegment. Both
+     are asked on the raw string here. The engine asks the first on the raw
+     string too, but the second on what the marker cut left. */
+  static const struct {
+    const char *lien;
+    hts_boolean frag_or_query;
+    hts_boolean multisegment;
+  } cases[] = {
+      /* #1612 refused these, and still must */
+      {"/", HTS_FALSE, HTS_FALSE},
+      {"image/", HTS_FALSE, HTS_FALSE},
+      {"Alt+/", HTS_FALSE, HTS_FALSE},
+      {"$&/", HTS_FALSE, HTS_FALSE},
+      {"////", HTS_FALSE, HTS_FALSE},
+      /* a second segment is evidence on its own */
+      {"a/b/", HTS_FALSE, HTS_TRUE},
+      {"/api/v1/", HTS_FALSE, HTS_TRUE},
+      /* a marker opens a path, from the site root to a deeper one */
+      {"/#top", HTS_TRUE, HTS_FALSE},
+      {"/?q=1", HTS_TRUE, HTS_FALSE},
+      {"img/#x", HTS_TRUE, HTS_FALSE},
+      {"img/?q=1", HTS_TRUE, HTS_FALSE},
+      {"a/b/#x", HTS_TRUE, HTS_TRUE},
+      /* the marker must open a path, not follow a name or nothing */
+      {"page.html#x", HTS_FALSE, HTS_FALSE},
+      {"page.html?q=1", HTS_FALSE, HTS_FALSE},
+      {"#top", HTS_FALSE, HTS_FALSE},
+      {"?q=1", HTS_FALSE, HTS_FALSE},
+      {"", HTS_FALSE, HTS_FALSE},
+      /* a run of slashes carries no name, so the marker buys nothing */
+      {"////#x", HTS_FALSE, HTS_TRUE},
+      {"//#x", HTS_FALSE, HTS_TRUE},
+      /* an entity before the marker decodes into an earlier one */
+      {"//&num;/#x", HTS_FALSE, HTS_TRUE},
+      {"/&#35;", HTS_FALSE, HTS_FALSE},
+      {"a&b/#x", HTS_FALSE, HTS_FALSE},
+      /* an '&' after the marker is part of the query, so it is left alone */
+      {"/?a=1&b=2", HTS_TRUE, HTS_FALSE},
+  };
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    st_linkdir_case(cases[i].lien, cases[i].frag_or_query,
+                    cases[i].multisegment);
+  }
+  printf("linkdir self-test OK\n");
+  return 0;
+}
+
+static int st_dirtylink(httrackp *opt, int argc, char **argv) {
+  return parse_selftest_dirtylink(
+      opt, (argc > 0 && strcmp(argv[0], "dump") == 0) ? HTS_TRUE : HTS_FALSE);
+}
+
+static int st_jsscan(httrackp *opt, int argc, char **argv) {
+  return parse_selftest_jsscan(
+      opt, (argc > 0 && strcmp(argv[0], "dump") == 0) ? HTS_TRUE : HTS_FALSE);
+}
+
+static int st_jsimport(httrackp *opt, int argc, char **argv) {
+  (void) argc;
+  (void) argv;
+  return parse_selftest_jsimport(opt);
+}
+
+static int st_tagattr(httrackp *opt, int argc, char **argv) {
+  (void) argc;
+  (void) argv;
+  return parse_selftest_tagattr(opt);
+}
+
+/* Each call parses `txt` under a fresh host, then checkrobots() for `path`. */
+static int rb_decide(robots_wizard *r, const char *txt, const char *path) {
+  static int n = 0;
+  char host[64];
+
+  snprintf(host, sizeof(host), "h%d.example", n++);
+  robots_parse(NULL, r, host, txt, strlen(txt), NULL, 0, HTS_TRUE, NULL, 0);
+  return checkrobots(r, host, path);
+}
+
+/* The rule store must reach the RFC 9309 §2.5 floor, whatever the macro says.
+ */
+enum { rb_rfc9309_floor = 1 / (HTS_ROBOTS_MAX_TOKEN_SIZE >= 500 * 1024) };
+
+/* robots.txt filling about `blobsize` stored bytes with "/padNNNNN/" rules
+   (12 each: pattern plus marker and LF), then the two rules a caller asserts
+   on: an Allow re-opening /pad00000/open/, and a final Disallow. */
+static char *rb_bulk(size_t blobsize) {
+  const size_t capa = blobsize * 2 + 4096;
+  char *const txt = (char *) malloct(capa);
+  size_t n, blob;
+  int i;
+
+  assertf(txt != NULL);
+  n = (size_t) snprintf(txt, capa, "User-agent: *\n");
+  for (i = 0, blob = 0; blob + 12 <= blobsize; i++, blob += 12) {
+    assertf(i < 100000); // past that "/padNNNNNN/" costs 13, not 12
+    n += (size_t) snprintf(txt + n, capa - n, "Disallow: /pad%05d/\n", i);
+    assertf(n < capa);
+  }
+  n += (size_t) snprintf(txt + n, capa - n, "Allow: /pad00000/open/\n");
+  assertf(n < capa);
+  (void) snprintf(txt + n, capa - n, "Disallow: /secret/\n");
+  return txt;
+}
+
+static int st_robots(httrackp *opt, int argc, char **argv) {
+  robots_wizard robots;
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  memset(&robots, 0, sizeof(robots));
+
+  /* Longer Allow re-opens subtree under Disallow: / (old matcher couldn't). */
+  {
+    const char *txt = "User-agent: *\nDisallow: /\nAllow: /public/\n";
+
+    assertf(rb_decide(&robots, txt, "/public/x") == 0); /* allowed */
+    assertf(rb_decide(&robots, txt, "/private") == -1); /* denied */
+    assertf(rb_decide(&robots, txt, "/") == -1);        /* denied */
+  }
+
+  /* Equal-length match: Allow wins the tie over Disallow. */
+  {
+    const char *txt = "User-agent: *\nDisallow: /foo\nAllow: /foo\n";
+
+    assertf(rb_decide(&robots, txt, "/foo/bar") == 0);
+  }
+
+  /* Longest match wins even when it is not the last rule. */
+  {
+    assertf(rb_decide(&robots, "User-agent: *\nDisallow: /a/b\nAllow: /a\n",
+                      "/a/b/c") == -1);
+    assertf(rb_decide(&robots, "User-agent: *\nAllow: /a/b\nDisallow: /a\n",
+                      "/a/b/c") == 0);
+  }
+
+  /* '*' matches any run of characters. */
+  {
+    const char *txt = "User-agent: *\nDisallow: /*.php\n";
+
+    assertf(rb_decide(&robots, txt, "/a/b/index.php") == -1);
+    assertf(rb_decide(&robots, txt, "/a/b/index.html") == 0);
+  }
+
+  /* Trailing '$' anchors the end of the path. */
+  {
+    const char *txt = "User-agent: *\nDisallow: /a$\n";
+
+    assertf(rb_decide(&robots, txt, "/a") == -1);
+    assertf(rb_decide(&robots, txt, "/ab") == 0);
+    assertf(rb_decide(&robots, txt, "/a/b") == 0);
+  }
+
+  /* The httrack-specific group replaces the generic '*' group entirely. */
+  {
+    const char *txt = "User-agent: *\nDisallow: /everyone\n"
+                      "User-agent: httrack\nDisallow: /\n";
+
+    assertf(rb_decide(&robots, txt, "/anything") == -1);
+  }
+
+  /* Replace, not merge: the generic group does not bind the httrack group. */
+  {
+    const char *txt = "User-agent: *\nDisallow: /x\n"
+                      "User-agent: httrack\nDisallow: /y\n";
+
+    assertf(rb_decide(&robots, txt, "/x") == 0);
+    assertf(rb_decide(&robots, txt, "/y") == -1);
+  }
+
+  /* RFC 9309 2.2.1: a user-agent line following a rule opens a new group, so
+     the generic group written after ours is a fallback we no longer take. */
+  {
+    const char *txt = "User-agent: httrack\nDisallow: /secret\n\n"
+                      "User-agent: *\nDisallow: /public\n";
+
+    assertf(rb_decide(&robots, txt, "/secret") == -1);
+    assertf(rb_decide(&robots, txt, "/public") == 0);
+
+    /* the blank line is not what ends the group */
+    txt = "User-agent: httrack\nDisallow: /secret\n"
+          "User-agent: *\nDisallow: /public\n";
+    assertf(rb_decide(&robots, txt, "/secret") == -1);
+    assertf(rb_decide(&robots, txt, "/public") == 0);
+  }
+
+  /* Consecutive user-agent lines name one group, whichever comes first. */
+  {
+    assertf(rb_decide(&robots,
+                      "User-agent: httrack\nUser-agent: *\n"
+                      "Disallow: /x\n",
+                      "/x") == -1);
+    assertf(rb_decide(&robots,
+                      "User-agent: httrack\nUser-agent: Googlebot\n"
+                      "Disallow: /x\n",
+                      "/x") == -1);
+    assertf(rb_decide(&robots,
+                      "User-agent: Googlebot\nUser-agent: httrack\n"
+                      "Disallow: /x\n",
+                      "/x") == -1);
+    /* a blank line does not end the list either */
+    assertf(rb_decide(&robots,
+                      "User-agent: httrack\n\nUser-agent: *\n"
+                      "Disallow: /x\n",
+                      "/x") == -1);
+  }
+
+  /* A group naming somebody else stays somebody else's. */
+  {
+    const char *txt = "User-agent: Googlebot\nDisallow: /y\n\n"
+                      "User-agent: httrack\nDisallow: /x\n";
+
+    assertf(rb_decide(&robots, txt, "/y") == 0);
+    assertf(rb_decide(&robots, txt, "/x") == -1);
+  }
+
+  /* Two groups naming us are combined, and the generic one between them is
+     still skipped. */
+  {
+    const char *txt = "User-agent: httrack\nDisallow: /a\n\n"
+                      "User-agent: winhttrack\nDisallow: /b\n";
+
+    assertf(rb_decide(&robots, txt, "/a") == -1);
+    assertf(rb_decide(&robots, txt, "/b") == -1);
+
+    txt = "User-agent: httrack\nDisallow: /a\n"
+          "User-agent: *\nDisallow: /generic\n"
+          "User-agent: httrack\nDisallow: /b\n";
+    assertf(rb_decide(&robots, txt, "/a") == -1);
+    assertf(rb_decide(&robots, txt, "/b") == -1);
+    assertf(rb_decide(&robots, txt, "/generic") == 0);
+  }
+
+  /* With no group naming us, every generic group still counts. */
+  {
+    const char *txt = "User-agent: *\nDisallow: /a\n\n"
+                      "User-agent: *\nDisallow: /b\n";
+
+    assertf(rb_decide(&robots, txt, "/a") == -1);
+    assertf(rb_decide(&robots, txt, "/b") == -1);
+
+    txt = "User-agent: *\nDisallow: /a\n"
+          "User-agent: Googlebot\nDisallow: /b\n"
+          "User-agent: *\nDisallow: /c\n";
+    assertf(rb_decide(&robots, txt, "/a") == -1);
+    assertf(rb_decide(&robots, txt, "/b") == 0);
+    assertf(rb_decide(&robots, txt, "/c") == -1);
+  }
+
+  /* No rules: everything is allowed. */
+  assertf(rb_decide(&robots, "User-agent: *\nDisallow:\n", "/x") == 0);
+
+  /* #1286: rules survive to the RFC 9309 floor. Past the old 4 KB store, just
+     under the floor, and past it, where only the tail is left out. */
+  {
+    char *txt = rb_bulk(8192); /* past the old cap, well under the new one */
+
+    assertf(rb_decide(&robots, txt, "/pad00000/x") == -1);
+    assertf(rb_decide(&robots, txt, "/pad00000/open/x") == 0); /* Allow wins */
+    assertf(rb_decide(&robots, txt, "/secret/x") == -1);
+    freet(txt);
+
+    txt = rb_bulk(HTS_ROBOTS_MAX_TOKEN_SIZE - 1024); /* just under the cap */
+    assertf(rb_decide(&robots, txt, "/pad00000/x") == -1);
+    assertf(rb_decide(&robots, txt, "/pad00000/open/x") == 0);
+    assertf(rb_decide(&robots, txt, "/secret/x") == -1);
+    freet(txt);
+
+    /* Past it the tail is lost, which robots_parse reports through the log. */
+    txt = rb_bulk(HTS_ROBOTS_MAX_TOKEN_SIZE + 4096);
+    assertf(rb_decide(&robots, txt, "/pad00000/x") == -1);
+    assertf(rb_decide(&robots, txt, "/pad00000/open/x") == -1);
+    assertf(rb_decide(&robots, txt, "/secret/x") == 0);
+    freet(txt);
+  }
+
+  /* A rule costs marker + pattern + LF, the accounting tests/309 computes. */
+  {
+    const char *const txt = "User-agent: *\nDisallow: /pad00000/\n";
+    robots_wizard rb;
+
+    memset(&rb, 0, sizeof(rb));
+    robots_parse(NULL, &rb, "h.test", txt, strlen(txt), NULL, 0, HTS_TRUE, NULL,
+                 0);
+    assertf(rb.next != NULL && rb.next->token != NULL);
+    assertf(strlen(rb.next->token) == strlen("/pad00000/") + 2);
+    checkrobots_free(&rb);
+  }
+
+  /* A rule longer than the line buffer is read as a prefix of itself. Kept for
+     a Disallow, which can then only forbid more; dropped for an Allow, which
+     would otherwise permit more than the site wrote and beat the Disallow. */
+  {
+    char BIGSTK txt[HTS_ROBOTS_LINE_SIZE * 3];
+    char BIGSTK path[HTS_ROBOTS_LINE_SIZE * 2];
+
+    memset(path, 'a', sizeof(path));
+    path[0] = '/';
+    path[HTS_ROBOTS_LINE_SIZE + 200] = '\0';
+
+    snprintf(txt, sizeof(txt), "User-agent: *\nDisallow: %s\n", path);
+    assertf(rb_decide(&robots, txt, path) == -1);
+
+    snprintf(txt, sizeof(txt), "User-agent: *\nDisallow: /a\nAllow: %s\n",
+             path);
+    assertf(rb_decide(&robots, txt, path) == -1);
+
+    /* The longest line the buffer holds whole is not cut, so this Allow wins;
+       one byte more is cut, and the Disallow it would have beaten stands. */
+    path[HTS_ROBOTS_LINE_SIZE - 2 - strlen("Allow: ")] = '\0';
+    snprintf(txt, sizeof(txt), "User-agent: *\nDisallow: /a\nAllow: %s\n",
+             path);
+    assertf(rb_decide(&robots, txt, path) == 0);
+
+    path[HTS_ROBOTS_LINE_SIZE - 2 - strlen("Allow: ")] = 'a';
+    path[HTS_ROBOTS_LINE_SIZE - 1 - strlen("Allow: ")] = '\0';
+    snprintf(txt, sizeof(txt), "User-agent: *\nDisallow: /a\nAllow: %s\n",
+             path);
+    assertf(rb_decide(&robots, txt, path) == -1);
+  }
+
+  /* #1294: an over-long Disallow must not hand its own tail back as a rule. */
+  {
+    /* one past the HTS_ROBOTS_LINE_SIZE - 2 bytes the old read kept */
+    const size_t resume = HTS_ROBOTS_LINE_SIZE - 1;
+    char BIGSTK txt[HTS_ROBOTS_LINE_SIZE * 3];
+    size_t head = (size_t) snprintf(
+        txt, sizeof(txt), "User-agent: *\nDisallow: /open/\nDisallow: ");
+    const size_t line = head - strlen("Disallow: ");
+
+    memset(txt + head, 'a', line + resume - head);
+    head = line + resume;
+    head += (size_t) snprintf(txt + head, sizeof(txt) - head,
+                              "Allow: /open/\nDisallow: /next/\n");
+    assertf(head < sizeof(txt));
+    assertf(rb_decide(&robots, txt, "/open/x") == -1);
+    /* the line after the cut one is still a rule: consuming it whole must not
+       become discarding the rest of the file */
+    assertf(rb_decide(&robots, txt, "/next/x") == -1);
+
+    /* control: that same text on a line of its own is a rule we do honour, so
+       the refusal above is the tail never being read and not a dead pattern */
+    assertf(rb_decide(&robots,
+                      "User-agent: *\nDisallow: /open/\nAllow: /open/\n",
+                      "/open/x") == 0);
+  }
+
+  checkrobots_free(&robots);
+  printf("robots self-test OK\n");
+  return 0;
+}
+
+/* Collect the URLs a sitemap scan hands out. */
+typedef struct sm_collect {
+  int n;
+  char url[8][HTS_URLMAXSIZE];
+} sm_collect;
+
+static hts_boolean sm_take(void *arg, const char *url) {
+  sm_collect *const c = (sm_collect *) arg;
+
+  if (c->n < (int) (sizeof(c->url) / sizeof(c->url[0])))
+    strcpybuff(c->url[c->n], url);
+  c->n++;
+  return HTS_TRUE;
+}
+
+/* Scan `doc` off a heap buffer with no NUL terminator, so a read past the
+   declared size is an ASan error rather than a silent pass. */
+static int sm_scan(const char *doc, int maxurls, hts_boolean *is_index,
+                   sm_collect *out) {
+  const size_t len = strlen(doc);
+  char *raw = malloct(len);
+  int n;
+
+  memset(out, 0, sizeof(*out));
+  assertf(raw != NULL);
+  memcpy(raw, doc, len);
+  n = hts_sitemap_scan(raw, len, maxurls, is_index, sm_take, out);
+  freet(raw);
+  return n;
+}
+
+static int st_sitemap(httrackp *opt, int argc, char **argv) {
+  sm_collect c;
+  hts_boolean idx;
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  /* A urlset yields its <loc> URLs, in order, unescaped. */
+  assertf(sm_scan("<?xml version=\"1.0\"?><urlset>"
+                  "<url><loc>http://h.test/a.html</loc></url>"
+                  "<url><loc>  https://h.test/b?x=1&amp;y=2\n  </loc></url>"
+                  "</urlset>",
+                  100, &idx, &c) == 2);
+  assertf(!idx);
+  assertf(strcmp(c.url[0], "http://h.test/a.html") == 0);
+  assertf(strcmp(c.url[1], "https://h.test/b?x=1&y=2") == 0);
+
+  /* A sitemapindex is flagged: its URLs are child sitemaps, not pages. */
+  assertf(sm_scan("<sitemapindex><sitemap><loc>http://h.test/s2.xml.gz</loc>"
+                  "</sitemap></sitemapindex>",
+                  100, &idx, &c) == 1);
+  assertf(idx);
+
+  /* Root element decides even when the other name appears later as text. */
+  assertf(sm_scan("<urlset><url><loc>http://h.test/a</loc></url>"
+                  "<!-- sitemapindex --></urlset>",
+                  100, &idx, &c) == 1);
+  assertf(!idx);
+
+  /* Numeric character references, decimal and hex, decode to ASCII. */
+  assertf(sm_scan("<urlset><loc>http://h.test/a&#63;b&#x3D;c</loc></urlset>",
+                  100, &idx, &c) == 1);
+  assertf(strcmp(c.url[0], "http://h.test/a?b=c") == 0);
+
+  /* A reference decoding to a control byte is dropped: the shared decoder
+     writes the real character and the URL check refuses it. A reference the
+     decoder cannot represent (&#0;) stays verbatim, like an unknown entity. */
+  assertf(sm_scan("<urlset><loc>http://h.test/a&#10;b</loc></urlset>", 100,
+                  &idx, &c) == 0);
+  assertf(sm_scan("<urlset><loc>http://h.test/a&#9;b</loc></urlset>", 100, &idx,
+                  &c) == 0);
+  assertf(sm_scan("<urlset><loc>http://h.test/a&#0;b</loc></urlset>", 100, &idx,
+                  &c) == 1);
+  assertf(strcmp(c.url[0], "http://h.test/a&#0;b") == 0);
+
+  /* A comment naming the other root element must not flip the verdict. */
+  assertf(sm_scan("<!-- <sitemapindex> --><urlset><url>"
+                  "<loc>http://h.test/p</loc></url></urlset>",
+                  100, &idx, &c) == 1);
+  assertf(!idx);
+  assertf(sm_scan("<?xml version=\"1.0\"?><!-- <urlset> -->"
+                  "<sitemapindex><loc>http://h.test/s</loc></sitemapindex>",
+                  100, &idx, &c) == 1);
+  assertf(idx);
+
+  /* <location> is not <loc>. */
+  assertf(sm_scan("<urlset><location>http://h.test/a</location></urlset>", 100,
+                  &idx, &c) == 0);
+
+  /* Rejected: relative, non-http scheme, embedded space, empty. */
+  assertf(sm_scan("<urlset><loc>/a.html</loc><loc>ftp://h.test/a</loc>"
+                  "<loc>javascript:alert(1)</loc>"
+                  "<loc>http://h.test/a b</loc><loc></loc></urlset>",
+                  100, &idx, &c) == 0);
+
+  /* The URL length bound: one under fits, exactly at it is dropped rather than
+     truncated into a different URL. */
+  {
+    char BIGSTK doc[HTS_URLMAXSIZE * 2];
+    char BIGSTK url[HTS_URLMAXSIZE + 1];
+    size_t i;
+
+    strcpybuff(url, "http://h.test/");
+    for (i = strlen(url); i < HTS_URLMAXSIZE - 1; i++)
+      url[i] = 'a';
+    url[i] = '\0';
+    snprintf(doc, sizeof(doc), "<urlset><loc>%s</loc></urlset>", url);
+    assertf(sm_scan(doc, 100, &idx, &c) == 1);
+
+    url[i] = 'a';
+    url[i + 1] = '\0';
+    snprintf(doc, sizeof(doc), "<urlset><loc>%s</loc></urlset>", url);
+    assertf(sm_scan(doc, 100, &idx, &c) == 0);
+  }
+
+  /* The URL cap stops the scan. */
+  assertf(sm_scan("<urlset><loc>http://h.test/1</loc><loc>http://h.test/2</loc>"
+                  "<loc>http://h.test/3</loc></urlset>",
+                  2, &idx, &c) == 2);
+
+  /* The per-document cap at the value the engine actually uses. */
+  {
+    const int many = HTS_SITEMAP_MAX_URLS_DOC + 10;
+    const size_t cap = (size_t) many * 40 + 32;
+    char *big = malloct(cap);
+    size_t off;
+    int i;
+
+    assertf(big != NULL);
+    off = (size_t) snprintf(big, cap, "<urlset>");
+    assertf(off < cap);
+    for (i = 0; i < many; i++) {
+      const int len =
+          snprintf(big + off, cap - off, "<loc>http://h.test/%d</loc>", i);
+
+      assertf(len > 0 && (size_t) len < cap - off);
+      off += (size_t) len;
+    }
+    memset(&c, 0, sizeof(c));
+    assertf(hts_sitemap_scan(big, off, HTS_SITEMAP_MAX_URLS_DOC, &idx, sm_take,
+                             &c) == HTS_SITEMAP_MAX_URLS_DOC);
+    /* The handler count, not just the return: a call site hardcoding a smaller
+       cap would still return its own argument. */
+    assertf(c.n == HTS_SITEMAP_MAX_URLS_DOC);
+    freet(big);
+  }
+
+  /* A highly compressible document decodes without running away: the ratio
+     budget cannot bind (deflate tops out near 1032:1), so this pins the
+     decompression path itself rather than the 64 MiB ceiling. */
+  {
+    const char *const one = "<url><loc>http://h.test/bomb</loc></url>";
+    const size_t reps = 40000;
+    size_t xlen = 8 + reps * strlen(one) + 10, i;
+    char *x = malloct(xlen + 1);
+    uLongf zlen;
+    char *z;
+    z_stream zs;
+
+    assertf(x != NULL);
+    {
+      size_t w = (size_t) snprintf(x, xlen, "<urlset>");
+      int len;
+
+      assertf(w < xlen);
+      for (i = 0; i < reps; i++) {
+        len = snprintf(x + w, xlen - w, "%s", one);
+        assertf(len > 0 && (size_t) len < xlen - w);
+        w += (size_t) len;
+      }
+      len = snprintf(x + w, xlen - w, "</urlset>");
+      assertf(len > 0 && (size_t) len < xlen - w);
+      w += (size_t) len;
+      xlen = w;
+    }
+    zlen = compressBound((uLong) xlen) + 32;
+    z = malloct((size_t) zlen);
+    assertf(z != NULL);
+    memset(&zs, 0, sizeof(zs));
+    assertf(deflateInit2(&zs, 9, Z_DEFLATED, 16 + MAX_WBITS, 8,
+                         Z_DEFAULT_STRATEGY) == Z_OK);
+    zs.next_in = (const Bytef *) x;
+    zs.avail_in = (uInt) xlen;
+    zs.next_out = (Bytef *) z;
+    zs.avail_out = (uInt) zlen;
+    assertf(deflate(&zs, Z_FINISH) == Z_STREAM_END);
+    zlen = (uLongf) zs.total_out;
+    deflateEnd(&zs);
+    /* well over the 4096:1 budget's 1 MiB floor, and far under the 64 MiB cap
+     */
+    assertf(xlen > 1024 * 1024 && (size_t) zlen < xlen / 100);
+    memset(&c, 0, sizeof(c));
+    assertf(hts_sitemap_scan(z, (size_t) zlen, 10, &idx, sm_take, &c) == 10);
+    assertf(strcmp(c.url[0], "http://h.test/bomb") == 0);
+    freet(z);
+    freet(x);
+  }
+
+  /* An unterminated <loc> at end of buffer must not read past it. */
+  assertf(sm_scan("<urlset><loc>http://h.test/a", 100, &idx, &c) == 0);
+  assertf(sm_scan("<urlset><lo", 100, &idx, &c) == 0);
+
+  /* A gzip-framed document is decompressed before scanning. */
+  {
+    const char *const xml =
+        "<urlset><url><loc>http://h.test/gz.html</loc></url></urlset>";
+    uLongf zlen = compressBound((uLong) strlen(xml)) + 32;
+    char *z = malloct((size_t) zlen);
+    z_stream zs;
+
+    assertf(z != NULL);
+    memset(&zs, 0, sizeof(zs));
+    assertf(deflateInit2(&zs, 9, Z_DEFLATED, 16 + MAX_WBITS, 8,
+                         Z_DEFAULT_STRATEGY) == Z_OK);
+    zs.next_in = (const Bytef *) xml;
+    zs.avail_in = (uInt) strlen(xml);
+    zs.next_out = (Bytef *) z;
+    zs.avail_out = (uInt) zlen;
+    assertf(deflate(&zs, Z_FINISH) == Z_STREAM_END);
+    zlen = (uLongf) zs.total_out;
+    deflateEnd(&zs);
+
+    memset(&c, 0, sizeof(c));
+    assertf(hts_sitemap_scan(z, (size_t) zlen, 100, &idx, sm_take, &c) == 1);
+    assertf(strcmp(c.url[0], "http://h.test/gz.html") == 0);
+
+    /* Truncated gzip: refused, not scanned as plain text. */
+    memset(&c, 0, sizeof(c));
+    assertf(hts_sitemap_scan(z, 4, 100, &idx, sm_take, &c) == -1);
+    freet(z);
+  }
+
+  /* robots.txt: only Sitemap: records, comments stripped, case-insensitive,
+     and group-independent (no User-agent line needed). */
+  /* robots_parse collects Sitemap: whatever the user-agent group, strips the
+     comment and keeps the rules working alongside it. */
+  {
+    const char *const txt = "User-agent: *\nDisallow: /x\n"
+                            "SITEMAP:  http://h.test/s1.xml  # first\n"
+                            "Sitemapper: http://h.test/no.xml\n"
+                            "Sitemap:\thttps://h.test/s2.xml\n";
+    char BIGSTK maps[1024];
+    robots_wizard rb;
+
+    memset(&rb, 0, sizeof(rb));
+    robots_parse(NULL, &rb, "h.test", txt, strlen(txt), NULL, 0, HTS_TRUE, maps,
+                 sizeof(maps));
+    assertf(strcmp(maps, "http://h.test/s1.xml\nhttps://h.test/s2.xml\n") == 0);
+    assertf(checkrobots(&rb, "h.test", "/x") == -1);
+    checkrobots_free(&rb);
+  }
+
+  printf("sitemap self-test OK\n");
+  return 0;
+}
+
+/* ------------------------------------------------------------ */
+/* Registry: this module's tests, in the order -#test lists them. */
+/* ------------------------------------------------------------ */
+
+const struct selftest_entry selftests_parse[] = {
+    {"linkdir", "",
+     "a quoted directory string is a link only with a second segment, or a "
+     "fragment or query opening right after the path",
+     st_linkdir},
+    {"dirtylink", "[dump]",
+     "is a quoted string a link? sweeps the parser's alphabet against a model, "
+     "or dumps its verdicts",
+     st_dirtylink},
+    {"jsscan", "[dump]",
+     "does a script statement hand a URL to .src, .location, .open, url() and "
+     "friends? sweeps the shapes against a model",
+     st_jsscan},
+    {"jsimport", "",
+     "is a quoted string the operand of a dynamic import(), whose base is the "
+     "script and not the page?",
+     st_jsimport},
+    {"tagattr", "",
+     "may the dirty parser read this in-tag quoted value? resolves the owning "
+     "attribute and refuses the names that carry no link",
+     st_tagattr},
+    {"robots", "", "robots.txt RFC 9309 Allow/Disallow precedence self-test",
+     st_robots},
+    {"sitemap", "",
+     "sitemap <loc> extraction, caps and robots.txt Sitemap:", st_sitemap},
+    {NULL, NULL, NULL, NULL},
+};
