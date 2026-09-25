@@ -1,0 +1,126 @@
+# A scheduled canary reds into a void, so this files an issue and closes it on
+# the next green run. The rule it enforces is in AGENTS.md.
+name: Canary report
+
+on:
+  workflow_run:
+    workflows:
+      - Tier-2
+      - distro packaging recipe canary
+      - appstream metainfo (networked)
+      - mptcp negotiation (networked)
+      - CodeQL
+      - HTTraQt
+    types: [completed]
+
+# Naming any permission sets every other one to none. actions:read is for the
+# job list the failure body names.
+permissions:
+  issues: write
+  actions: read
+
+concurrency:
+  group: canary-report-${{ github.event.workflow_run.name }}
+
+jobs:
+  report:
+    name: report ${{ github.event.workflow_run.name }}
+    # A scheduled run is the one nobody is watching, so only it opens an issue.
+    # A dispatch is let through to CLOSE one, because a green re-run is how
+    # somebody confirms a fix and the issue should not outlive it.
+    if: >-
+      github.repository == 'xroche/httrack' &&
+      (github.event.workflow_run.event == 'schedule' ||
+       github.event.workflow_run.event == 'workflow_dispatch')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Open, update or close the canary issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          WF: ${{ github.event.workflow_run.name }}
+          WF_PATH: ${{ github.event.workflow_run.path }}
+          EVENT: ${{ github.event.workflow_run.event }}
+          RESULT: ${{ github.event.workflow_run.conclusion }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          LABEL: ci-canary
+        run: |
+          set -euo pipefail
+          title="CI canary: $WF is failing"
+          # A second label naming the workflow file, because the canary's issue
+          # has to be found by something a maintainer cannot change. Keying on
+          # the title means one retitle orphans the old issue AND files a new
+          # one, and keying on the shared label alone means a long-lived issue
+          # pages away once a hundred have accrued under it.
+          key="canary:${WF_PATH##*/}"
+
+          gh label create "$LABEL" --color fbca04 \
+            --description "A scheduled canary is failing" || true
+          gh label create "$key" --color ededed \
+            --description "Canary issues for $WF_PATH" || true
+
+          # Labelled, not searched: the search index lags minutes behind a fresh
+          # issue, which is the window a second delivery would duplicate in.
+          # Plain assignment, so a failed list aborts rather than reading as
+          # "nothing open yet" and filing a duplicate.
+          mine=$(gh issue list --state all --label "$LABEL" --label "$key" \
+            --limit 100 --json number,state --jq '.[] | [.number, .state] | @tsv')
+          open=$(awk -F'\t' '$2 == "OPEN" { print $1; exit }' <<<"$mine")
+
+          if [ "$RESULT" = success ]; then
+            test -n "$open" || { echo "$WF is green and nothing was open"; exit 0; }
+            gh issue comment "$open" \
+              --body "\`$WF\` is green again: [that run]($RUN_URL)."
+            gh issue close "$open" --reason completed
+            echo "closed #$open"
+            exit 0
+          fi
+
+          # Only a schedule reports a red. Somebody is reading a dispatch.
+          test "$EVENT" = schedule || { echo "$EVENT run ended as $RESULT, not reporting"; exit 0; }
+
+          # Anything that is not success and not a clean cancel is worth saying.
+          case "$RESULT" in
+          cancelled | skipped) echo "$WF ended as $RESULT, nothing to report"; exit 0 ;;
+          esac
+
+          # Every issue this workflow ever filed for this canary, open or closed.
+          # Scanning only the open ones would file a second issue for a run
+          # somebody had already closed by hand.
+          marker="<!-- canary-report: run=$RUN_ID -->"
+          while IFS=$'\t' read -r n _; do
+            test -n "$n" || continue
+            seen=$(gh issue view "$n" --json body,comments --jq '.body, (.comments[].body)')
+            if grep -qF "$marker" <<<"$seen"; then
+              echo "run $RUN_ID already reported on issue #$n"
+              exit 0
+            fi
+          done <<<"$mine"
+
+          # Tier-2 carries a dozen legs, so the run URL alone leaves the reader
+          # opening each one.
+          legs=$(gh run view "$RUN_ID" --json jobs \
+            --jq '.jobs[] | select(.conclusion != "success" and .conclusion != "skipped") | "- " + .name + " (" + .conclusion + ")"')
+
+          {
+            echo "The scheduled \`$WF\` run ended as \`$RESULT\`: [the run]($RUN_URL)."
+            if [ -n "$legs" ]; then
+              echo
+              echo "Legs that did not succeed:"
+              echo "$legs"
+            fi
+            echo
+            echo "Nothing else reports a red canary, so this issue is the notification."
+            echo "It closes itself on the next green run."
+            echo "$marker"
+          } >"$RUNNER_TEMP/body.md"
+
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --body-file "$RUNNER_TEMP/body.md"
+            echo "commented on #$open"
+          else
+            gh issue create --label "$LABEL" --label "$key" --title "$title" \
+              --body-file "$RUNNER_TEMP/body.md"
+          fi
