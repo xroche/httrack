@@ -403,7 +403,7 @@ jobs:
   hurd:
     uses: ./.github/workflows/hurd-suite.yml
 
-  # One status to read, so a red leg cannot hide behind thirteen greens.
+  # One status to read, so a red leg cannot hide behind the others.
   # 496_ci-tier2-split.test fails when a job above is missing from needs: below.
   gate:
     name: tier-2 gate
