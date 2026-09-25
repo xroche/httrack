@@ -71,6 +71,13 @@ ssh_vm() {
         root@127.0.0.1 "$@"
 }
 
+# The image runs on the VGA console, so the serial log is usually empty and a
+# picture of the screen is the only evidence of where a wedged VM stopped.
+screendump() {
+    printf 'screendump %s\n' "$work/screen.ppm" |
+        timeout 30 socat - "unix-connect:$work/monitor" >/dev/null 2>&1 || true
+}
+
 # The boot probe only. ConnectTimeout covers the TCP connect, and qemu's slirp
 # accepts that immediately, so a guest whose sshd never sends a banner would
 # block here until the job's own cap.
@@ -169,10 +176,7 @@ until ssh_probe 2>/dev/null; do
     kill -0 "$qemu_pid" 2>/dev/null || fail "qemu exited during boot"
     waited=$((SECONDS - start))
     test "$waited" -lt "$BOOT_TIMEOUT" || {
-        # The image boots on the VGA console, so the serial log is usually
-        # empty and a screendump is the only picture of where it stopped.
-        printf 'screendump %s\n' "$work/screen.ppm" |
-            timeout 30 socat - "unix-connect:$work/monitor" >/dev/null 2>&1 || true
+        screendump
         fail "no ssh after ${BOOT_TIMEOUT}s; console tail:
 $(tail -40 "$work/console.log" 2>/dev/null)"
     }
@@ -228,7 +232,10 @@ echo "::endgroup::"
 
 echo "::group::Test"
 rc=0
-as_user "set -eu; cd $VM_HOME/bld && make check -j4" || rc=$?
+# -j2, not the harness default: the VM has one processor and 2G, and at -j4 it
+# stopped answering ssh at a different test on each of two runs.
+as_user "set -eu; cd $VM_HOME/bld && make check -j2" || rc=$?
+test "$rc" -eq 0 || screendump
 mkdir -p "$work/out"
 ssh_vm "cat $VM_HOME/bld/tests/test-suite.log 2>/dev/null" >"$work/out/test-suite.log" || true
 echo "::endgroup::"
