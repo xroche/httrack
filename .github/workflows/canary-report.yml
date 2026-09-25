@@ -1,0 +1,97 @@
+# A scheduled canary reds into a void: nothing reports it and the next person to
+# look is whoever the bug reaches. termux-build failed on 2026-09-24 and the
+# fedora spec twice the week before, and no issue was opened for any of them.
+# This opens one, and closes it when the canary comes back green.
+name: Canary report
+
+on:
+  workflow_run:
+    workflows:
+      - Tier-2
+      - distro packaging recipe canary
+      - appstream metainfo (networked)
+      - mptcp negotiation (networked)
+      - CodeQL
+      - HTTraQt
+    types: [completed]
+
+# Naming any permission sets every other one to none, so the issue writes below
+# need contents spelled out as well.
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: canary-report-${{ github.event.workflow_run.name }}
+
+jobs:
+  report:
+    name: report ${{ github.event.workflow_run.name }}
+    # Only a scheduled run, which is the one nobody is watching. A dispatch has
+    # somebody reading it, and a pull-request run reports on the pull request.
+    if: >-
+      github.repository == 'xroche/httrack' &&
+      github.event.workflow_run.event == 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Open, update or close the canary issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          WF: ${{ github.event.workflow_run.name }}
+          RESULT: ${{ github.event.workflow_run.conclusion }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          LABEL: ci-canary
+        run: |
+          set -euo pipefail
+          title="CI canary: $WF is failing"
+          # What a re-delivery of the same run greps to stay quiet.
+          marker="<!-- canary-report: run=$RUN_ID -->"
+
+          gh label create "$LABEL" --color fbca04 \
+            --description "A scheduled canary is failing" || true
+
+          # Labelled, not searched: the search index lags minutes behind a fresh
+          # issue, which is the window a second delivery would duplicate in.
+          # Plain assignment, so a failed list aborts rather than reading as
+          # "nothing open yet" and filing a duplicate.
+          open=$(gh issue list --state open --label "$LABEL" --limit 100 \
+            --json number,title --jq '.[] | [.number, .title] | @tsv' |
+            awk -F'\t' -v t="$title" '$2 == t { print $1; exit }')
+
+          if [ "$RESULT" = success ]; then
+            test -n "$open" || { echo "$WF is green and nothing was open"; exit 0; }
+            gh issue comment "$open" \
+              --body "\`$WF\` is green again: [that run]($RUN_URL)."
+            gh issue close "$open" --reason completed
+            echo "closed #$open"
+            exit 0
+          fi
+
+          # Anything that is not success and not a clean cancel is worth saying.
+          case "$RESULT" in
+          cancelled | skipped) echo "$WF ended as $RESULT, nothing to report"; exit 0 ;;
+          esac
+
+          {
+            echo "The scheduled \`$WF\` run ended as \`$RESULT\`: [the run]($RUN_URL)."
+            echo
+            echo "Nothing else reports a red canary, so this issue is the notification."
+            echo "It closes itself on the next green run."
+            echo "$marker"
+          } >"$RUNNER_TEMP/body.md"
+
+          if [ -n "$open" ]; then
+            seen=$(gh issue view "$open" --json body,comments --jq '.body, (.comments[].body)')
+            if grep -qF "$marker" <<<"$seen"; then
+              echo "run $RUN_ID already reported on #$open"
+              exit 0
+            fi
+            gh issue comment "$open" --body-file "$RUNNER_TEMP/body.md"
+            echo "commented on #$open"
+          else
+            gh issue create --label "$LABEL" --title "$title" \
+              --body-file "$RUNNER_TEMP/body.md"
+          fi
