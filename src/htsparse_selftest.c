@@ -583,9 +583,23 @@ static void jsscan_sweep(httrackp *opt, selftest_sweep *sw) {
      on the byte list, which cases[] pins. U+20A0 ends in 0xA0, so an engine
      reading that byte as a space disagrees with the model here and nowhere
      else. */
-  static const char *const prefix[] = {
-      "",  " ",  "a",        "_",        "\"",           "$", ".", "`", ":",
-      "}", "\n", "\302\240", "\303\251", "\342\202\240", "-"};
+  static const char *const prefix[] = {"",
+                                       " ",
+                                       "a",
+                                       "_",
+                                       "\"",
+                                       "$",
+                                       ".",
+                                       "`",
+                                       ":",
+                                       "}",
+                                       "\n",
+                                       "\302\240",
+                                       "\303\251",
+                                       "\342\202\240",
+                                       "-",
+                                       "\341\232\200",
+                                       "\357\273\277"};
   static const char *const word[] = {
       ".src",     "src",   ".SRC",   ".location", ":location",
       "location", ".href", ".open",  ".replace",  ".link",
@@ -694,9 +708,7 @@ int parse_selftest_jsscan(httrackp *opt, hts_boolean dump) {
       {"\342\200\257url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
       {"\341\273\277url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_FALSE, 0, 0},
       {"\240url(a.png)", 1, HTS_FALSE, HTS_TRUE, HTS_TRUE, 4, 5},
-      /* U+1680 and U+FEFF are spaces to JavaScript and ident code points to
-         CSS, so the same name ends in one language and continues in the
-         other (#1754) */
+      /* U+1680 and U+FEFF: a JavaScript space, a CSS ident code point */
       {"\341\232\200url(\"a.png\")", 3, HTS_FALSE, HTS_FALSE, HTS_TRUE, 5, 5},
       {"\341\232\200url(a.png)", 3, HTS_FALSE, HTS_TRUE, HTS_FALSE, 0, 0},
       {"x\341\232\200url(a.png)", 4, HTS_FALSE, HTS_TRUE, HTS_FALSE, 0, 0},

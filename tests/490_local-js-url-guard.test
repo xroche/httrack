@@ -49,10 +49,8 @@ url(/img/i.png)
 CSS
 {
     printf '.m{background:\343\200\200url(/img/p.png)}\n'
-    # CSS continues an ident across "-", and across U+1680 and U+FEFF, which
-    # JavaScript reads as spaces, so none of these three is a url() and none of
-    # their arguments is a link (#1754). Compass and the Rails asset pipeline
-    # both ship image-url().
+    # None of these three is a url(), so none of their arguments is a link
+    # (#1754). Compass and the Rails asset pipeline both ship image-url().
     printf '.n{background:image-url(/img/q.png)}\n'
     printf '.o{background:x\341\232\200url(/img/r.png)}\n'
     printf '.p{background:x\357\273\277url(/img/s.png)}\n'
