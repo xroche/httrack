@@ -222,6 +222,16 @@ AX_CHECK_COMPILE_FLAG([-Wformat-nonliteral], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -W
 AX_CHECK_COMPILE_FLAG([-Wmissing-parameter-type], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wmissing-parameter-type"], [], [-Werror])
 AX_CHECK_COMPILE_FLAG([-Wold-style-definition], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wold-style-definition"], [], [-Werror])
 AX_CHECK_COMPILE_FLAG([-Wignored-qualifiers], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wignored-qualifiers"], [], [-Werror])
+AX_CHECK_COMPILE_FLAG([-Wsign-compare], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wsign-compare"], [], [-Werror])
+AX_CHECK_COMPILE_FLAG([-Wduplicated-cond], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wduplicated-cond"], [], [-Werror])
+AX_CHECK_COMPILE_FLAG([-Wimplicit-fallthrough], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wimplicit-fallthrough"], [], [-Werror])
+# Implied by -Wall today; named explicitly so a truncating copy stays visible.
+AX_CHECK_COMPILE_FLAG([-Wstringop-truncation], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wstringop-truncation"], [], [-Werror])
+# The tree has no stack allocation sized off the wire, and these keep it that way.
+AX_CHECK_COMPILE_FLAG([-Wvla], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wvla"], [], [-Werror])
+AX_CHECK_COMPILE_FLAG([-Walloca], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Walloca"], [], [-Werror])
+# A nested function asks for an executable stack.
+AX_CHECK_COMPILE_FLAG([-Wtrampolines], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wtrampolines"], [], [-Werror])
 # Make htssafe.h's pointer-dest 'warning' attribute a hard error in our build
 # (migration is at zero; a new char* dest is a regression). gcc/clang each take
 # only their own spelling; downstream keeps the plain warning, not a build break.
