@@ -10218,15 +10218,13 @@ static int st_sigpipe(httrackp *opt, int argc, char **argv) {
   n = (int) recv(sv[1], discard, sizeof(discard), 0);
   assertf(n <= 0);
   fin_only = n == 0 ? HTS_TRUE : HTS_FALSE;
-  /* A FIN leaves this half of the connection open, so a write still succeeds
-     and only the peer's answer to it breaks the pipe. Paced, because that
-     answer and these writes race the way #1711 raced on Darwin. */
-  for (i = 0; fin_only && i < 100 && sendc(&r, "GET / HTTP/1.0\r\n\r\n") >= 0;
-       i++)
-    Sleep(100);
-  assertf(!fin_only || i < 100);
-  /* Twice, and both of them where the peer was reset, because a platform that
-     re-reports ECONNRESET still owes EPIPE. */
+  /* A FIN leaves this half of the connection open, so the write still succeeds
+     and only the peer's answer breaks the pipe. GNU/Hurd's pfinet never
+     answers, so end this half ourselves and take the EPIPE locally (#1717). */
+  if (fin_only)
+    assertf(shutdown(sv[1], SHUT_WR) == 0);
+  /* Twice, because a platform that re-reports ECONNRESET on the first still
+     owes EPIPE on the second. */
   for (i = 0; i < 2; i++)
     assertf(sendc(&r, "GET / HTTP/1.0\r\n\r\n") < 0);
   deletesoc(sv[1]);
