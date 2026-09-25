@@ -1631,8 +1631,10 @@ int cache_legacy_refused_selftest(httrackp *opt, const char *dir) {
 static char corrupt_body_a[33 + 1];
 static char corrupt_body_b[44 + 1];
 
-/* Write a fresh two-entry cache: /canary.html then /victim.html. */
-static void corrupt_build(httrackp *opt) {
+/* Write a fresh two-entry cache: /canary.html then /victim.html. The victim
+   carries `etag`, whose byte length is what a forged same-length header line
+   overwriting it must match. */
+static void corrupt_build(httrackp *opt, const char *etag) {
   cache_back cache;
 
   memset(corrupt_body_a, 'a', sizeof(corrupt_body_a) - 1);
@@ -1644,50 +1646,14 @@ static void corrupt_build(httrackp *opt) {
               "OK", "text/html", "utf-8", "", "", "", "", corrupt_body_a,
               strlen(corrupt_body_a));
   store_entry(opt, &cache, CORRUPT_ADR, "/victim.html", "victim.html", 200,
-              "OK", "text/html", "utf-8", "", "", "", "", corrupt_body_b,
+              "OK", "text/html", "utf-8", "", etag, "", "", corrupt_body_b,
               strlen(corrupt_body_b));
   selftest_close(&cache);
 }
 
-/* Like corrupt_build, but the victim carries a 100-char Etag placeholder. */
-static void corrupt_build_longetag(httrackp *opt) {
-  cache_back cache;
-
-  memset(corrupt_body_a, 'a', sizeof(corrupt_body_a) - 1);
-  memset(corrupt_body_b, 'b', sizeof(corrupt_body_b) - 1);
-  remove(reconcile_st_path(opt, "hts-cache/new.zip"));
-  remove(reconcile_st_path(opt, "hts-cache/old.zip"));
-  selftest_open_for_write(&cache, opt);
-  store_entry(opt, &cache, CORRUPT_ADR, "/canary.html", "canary.html", 200,
-              "OK", "text/html", "utf-8", "", "", "", "", corrupt_body_a,
-              strlen(corrupt_body_a));
-  store_entry(opt, &cache, CORRUPT_ADR, "/victim.html", "victim.html", 200,
-              "OK", "text/html", "utf-8", "", CORRUPT_LONG_ETAG, "", "",
-              corrupt_body_b, strlen(corrupt_body_b));
-  selftest_close(&cache);
-}
-
-/* Like corrupt_build, but the victim carries a 20-char Etag whose header line
-   is later overwritten with a forged oversized X-Size (same byte length). */
-static void corrupt_build_etag(httrackp *opt) {
-  cache_back cache;
-
-  memset(corrupt_body_a, 'a', sizeof(corrupt_body_a) - 1);
-  memset(corrupt_body_b, 'b', sizeof(corrupt_body_b) - 1);
-  remove(reconcile_st_path(opt, "hts-cache/new.zip"));
-  remove(reconcile_st_path(opt, "hts-cache/old.zip"));
-  selftest_open_for_write(&cache, opt);
-  store_entry(opt, &cache, CORRUPT_ADR, "/canary.html", "canary.html", 200,
-              "OK", "text/html", "utf-8", "", "", "", "", corrupt_body_a,
-              strlen(corrupt_body_a));
-  store_entry(opt, &cache, CORRUPT_ADR, "/victim.html", "victim.html", 200,
-              "OK", "text/html", "utf-8", "", "AAAAAAAAAAAAAAAAAAAA", "", "",
-              corrupt_body_b, strlen(corrupt_body_b));
-  selftest_close(&cache);
-}
-
-/* Like corrupt_build_etag, but the victim is headers-only (X-In-Cache: 0,
-   body on disk): the shape every non-html file is stored with. */
+/* Like corrupt_build with a 20-char Etag, but the victim is headers-only
+   (X-In-Cache: 0, body on disk): the shape every non-html file is stored
+   with. */
 static void corrupt_build_disk(httrackp *opt) {
   cache_back cache;
   htsblk w;
@@ -1930,7 +1896,7 @@ static int corrupt_expect_victim_clipped(httrackp *opt, size_t wantmsg,
 static int corrupt_case_zip(httrackp *opt, const char *pat, const char *rep,
                             size_t nth, size_t total, const char *wantmsg,
                             const char *what) {
-  corrupt_build(opt);
+  corrupt_build(opt, "");
   corrupt_patch(opt, pat, strlen(pat), rep, nth, total);
   return corrupt_expect_victim(opt, wantmsg, what);
 }
@@ -1956,12 +1922,12 @@ int cache_corruption_selftest(httrackp *opt, const char *dir) {
       corrupt_case_zip(opt, "PK\x03\x04", "XK\x03\x04", 2, 2,
                        "File Cache Entry Not Found", "smashed local header");
 
-  corrupt_build(opt);
+  corrupt_build(opt, "");
   corrupt_victim_body(opt);
   failures += corrupt_expect_victim(opt, "Cache Read Error : Read Data",
                                     "garbled deflate stream");
 
-  corrupt_build(opt);
+  corrupt_build(opt, "");
   corrupt_victim_crc(opt);
   failures += corrupt_expect_victim(opt, "Cache Read Error : CRC",
                                     "body inflates, CRC does not match");
@@ -1969,7 +1935,7 @@ int cache_corruption_selftest(httrackp *opt, const char *dir) {
   /* A corrupt cache can hold a field wider than ours. Clipping keeps the
      entry; aborting would take the crawl down. Overwrite the placeholder Etag
      line in place, same byte length, so the zip offsets stay intact. */
-  corrupt_build_longetag(opt);
+  corrupt_build(opt, CORRUPT_LONG_ETAG);
   corrupt_patch(opt, "Etag: " CORRUPT_LONG_ETAG, 106,
                 "X-StatusMessage: " /* 17 + 89 = 106 */
                 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
@@ -1981,7 +1947,7 @@ int cache_corruption_selftest(httrackp *opt, const char *dir) {
 
   /* lastmodified[64] is narrower than msg[80]: one hardcoded clip length
      cannot satisfy both. */
-  corrupt_build_longetag(opt);
+  corrupt_build(opt, CORRUPT_LONG_ETAG);
   corrupt_patch(opt, "Etag: " CORRUPT_LONG_ETAG, 106,
                 "Last-Modified: " /* 15 + 91 = 106 */
                 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
@@ -1997,7 +1963,7 @@ int cache_corruption_selftest(httrackp *opt, const char *dir) {
      from a corrupt/foreign cache; inject it by overwriting the victim's long
      Etag line with a same-length forged X-Size line (the parser keeps the last
      X-Size it sees), keeping the zip byte-length and offsets intact. */
-  corrupt_build_etag(opt);
+  corrupt_build(opt, "AAAAAAAAAAAAAAAAAAAA");
   corrupt_patch(opt, "Etag: AAAAAAAAAAAAAAAAAAAA", 26,
                 "X-Size: 2147483648AAAAAAAA", 1, 1);
   failures += corrupt_expect_victim(opt, "Cache Read Error : Bad Size",
