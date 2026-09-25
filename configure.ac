@@ -252,6 +252,20 @@ case "$CFLAGS" in
 *) HTS_ADD_FORTIFY_SOURCE ;;
 esac
 
+# Zero an uninitialized stack variable. Skipped under a sanitizer, where it
+# would hide from MemorySanitizer exactly what MemorySanitizer looks for.
+case "$CFLAGS" in
+*-fsanitize=*) ;;
+*)
+	AX_CHECK_COMPILE_FLAG([-ftrivial-auto-var-init=zero],
+		[DEFAULT_CFLAGS="$DEFAULT_CFLAGS -ftrivial-auto-var-init=zero"], [], [-Werror])
+	;;
+esac
+
+# Only a [] member is a flexible array, so _FORTIFY_SOURCE bounds a trailing
+# char[1] as written. The tree has none, and this keeps it that way.
+AX_CHECK_COMPILE_FLAG([-fstrict-flex-arrays=3], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fstrict-flex-arrays=3"], [], [-Werror])
+
 # Force libc back into DT_NEEDED for libraries that reach it only through
 # libhttrack (the libtest callbacks), but only with a GNU-style linker; Apple
 # ld rejects these flags and links libSystem unconditionally.
