@@ -111,7 +111,7 @@ enum punycode_status punycode_encode(punycode_uint input_length,
       if (max_out - out < 2)
         return punycode_big_output;
       output[out++] =
-        case_flags ? encode_basic(input[j], case_flags[j]) : input[j];
+          case_flags ? encode_basic(input[j], case_flags[j]) : (char) input[j];
     }
     /* else if (input[j] < n) return punycode_bad_input; */
     /* (not needed for Punycode with unsigned code points) */

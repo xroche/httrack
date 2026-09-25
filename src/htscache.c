@@ -1310,7 +1310,7 @@ void cache_init(cache_back * cache, httrackp * opt) {
                   && zfi.size_filename < sizeof(filename) - 2) {
                 long int pos =
                   (long int) unzGetOffset((unzFile) cache->zipInput);
-                assertf(readSizeHeader < sizeof(comment));
+                assertf((size_t) readSizeHeader < sizeof(comment));
                 comment[readSizeHeader] = '\0';
                 entries++;
                 if (pos > 0) {

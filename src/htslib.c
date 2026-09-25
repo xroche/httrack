@@ -1851,14 +1851,14 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
                    value);
 #endif
             if (strfield2(name, "domain")) {
-              if (value_len < sizeof(domain) - 1) {
+              if ((size_t) value_len < sizeof(domain) - 1) {
                 strcpybuff(domain, value);
               } else {
                 cook_name[0] = 0;
                 break;
               }
             } else if (strfield2(name, "path")) {
-              if (value_len < sizeof(path) - 1) {
+              if ((size_t) value_len < sizeof(path) - 1) {
                 strcpybuff(path, value);
               } else {
                 cook_name[0] = 0;
@@ -1875,8 +1875,8 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
             } else if (strfield2(name, "secure")) {     // ne devrait pas arriver ici
               // ignoré
             } else {
-              if (value_len < sizeof(cook_value) - 1
-                  && name_len < sizeof(cook_name) - 1) {
+              if ((size_t) value_len < sizeof(cook_value) - 1 &&
+                  (size_t) name_len < sizeof(cook_name) - 1) {
                 if (strnotempty(cook_name) == 0) {      // noter premier: nom et valeur cookie
                   strcpybuff(cook_name, name);
                   strcpybuff(cook_value, value);
@@ -6669,7 +6669,7 @@ HTSEXT_API void hts_log_vprint(httrackp * opt, int type, const char *format, va_
     const int level = type & 0xff;
 
     // Check log level
-    if (opt->debug < level) {
+    if ((int) opt->debug < level) {
       return;
     }
 

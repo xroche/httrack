@@ -732,7 +732,7 @@ HTS_INLINE int rech_sampletag(const char *adr, const char *s) {
 // teste si le tag contenu dans from est égal à "tag"
 HTS_INLINE int check_tag(const char *from, const char *tag) {
   const char *a = from + 1;
-  int i = 0;
+  size_t i = 0;
   char s[256];
 
   while(is_space(*a))
