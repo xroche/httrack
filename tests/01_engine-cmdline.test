@@ -113,7 +113,8 @@ for bad in nan nan:5 5:nan inf 10:5 99999; do
 done
 
 # --max-retry-after (#1738): the cap is what keeps a server from parking the
-# mirror, so a value it cannot parse must be refused rather than left at 0.
+# mirror, so a value it cannot parse must be refused rather than left at 0. An
+# over-limit value is clipped instead (#1776).
 for good in 0 5 3600 --max-retry-after=7; do
     case $good in
     --*) run "$tmp/mra-ok" "$good" ;;
@@ -121,9 +122,34 @@ for good in 0 5 3600 --max-retry-after=7; do
     esac
     accepted "$tmp/mra-ok" "#1738: valid --max-retry-after '$good' rejected"
 done
+# Parsing predates the log file, so the notice lands on stdout. Grepping for it
+# is the real assertion, because storing 99999 unclipped passes acceptance alone.
+# 3600 is HTS_MAX_RETRY_AFTER_LIMIT, which the notice reports from the value it
+# stored: matching it is what tells a clip from a bare log line.
+clipped() {
+    grep -q -- "--max-retry-after $2s is above the limit, using 3600s" "$1/.log" ||
+        fail "$3"
+}
+not_clipped() {
+    ! grep -q 'is above the limit' "$1/.log" ||
+        fail "$2"
+}
+# 99999999999999 is the wrap probe: sscanf("%d") read it as 276447231, so the
+# notice naming the typed value is what proves strtoll sees the whole number.
+for over in 3601 99999 99999999999999; do
+    run "$tmp/mra-over" "-%J$over"
+    accepted "$tmp/mra-over" "#1776: over-limit --max-retry-after '$over' refused"
+    clipped "$tmp/mra-over" "$over" "#1776: --max-retry-after '$over' not clipped as typed"
+done
+# A value at the limit is left alone, so the notice must stay quiet there. The
+# accepted call is the floor: absence alone also holds on a run that never ran.
+run "$tmp/mra-lim" "-%J3600"
+accepted "$tmp/mra-lim" "#1776: --max-retry-after at the limit refused"
+not_clipped "$tmp/mra-lim" "#1776: a value at the limit was clipped"
 # The message matters: without it a value the generic option parser chokes on
 # passes this table while never reaching the range check.
-for bad in "" x -3 3601 99999; do
+# A digit string too wide even for LLint is malformed rather than over-limit.
+for bad in "" x -3 999999999999999999999999; do
     run "$tmp/mra-bad" "-%J$bad"
     refused "#1738: invalid --max-retry-after '$bad' not refused cleanly"
     grep -q 'Invalid --max-retry-after' "$tmp/mra-bad/.log" ||

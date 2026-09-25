@@ -2316,16 +2316,31 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 break;
               case 'J': // --max-retry-after: cap on an obeyed Retry-After
               {
-                int secs = -1;
+                char *end;
+                LLint secs;
 
-                if (sscanf(com + 1, "%d", &secs) != 1 || secs < 0 ||
-                    secs > HTS_MAX_RETRY_AFTER_LIMIT) {
+                /* strtoll, not sscanf("%d"): the upper bound used to reject an
+                   overflowed value by accident, and clipping loses that. */
+                errno = 0;
+                secs = strtoll(com + 1, &end, 10);
+                if (end == com + 1 || errno == ERANGE || secs < 0) {
                   HTS_PANIC_PRINTF("Invalid --max-retry-after (expected a "
-                                   "delay in seconds, at most one hour)");
+                                   "non-negative delay in seconds)");
                   htsmain_free();
                   return -1;
                 }
-                opt->max_retry_after = secs;
+                /* Clip rather than abort, as back_set_retry_after does for the
+                   server's own value. */
+                if (secs > HTS_MAX_RETRY_AFTER_LIMIT) {
+                  opt->max_retry_after = HTS_MAX_RETRY_AFTER_LIMIT;
+                  /* Report what was stored, so a test can see the clip. */
+                  hts_log_print(opt, LOG_NOTICE,
+                                "--max-retry-after " LLintP
+                                "s is above the limit, using %ds",
+                                secs, opt->max_retry_after);
+                } else {
+                  opt->max_retry_after = (int) secs;
+                }
                 while (isdigit((unsigned char) *(com + 1)))
                   com++;
               } break;

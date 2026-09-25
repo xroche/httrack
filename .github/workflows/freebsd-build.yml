@@ -8,8 +8,8 @@
 name: freebsd build canary
 
 on:
-  schedule:
-    - cron: "53 4 * * 3"
+  # Scheduled by tier2.yml, which owns every leg that builds our own source.
+  workflow_call:
   workflow_dispatch:
 
 permissions:

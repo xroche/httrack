@@ -6,8 +6,8 @@
 name: fedora spec canary
 
 on:
-  schedule:
-    - cron: "43 5 * * 2"
+  # Scheduled by tier2.yml, which owns every leg that builds our own source.
+  workflow_call:
   workflow_dispatch:
 
 permissions:
