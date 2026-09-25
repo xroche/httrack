@@ -34,7 +34,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
-            qemu-system-x86 qemu-utils parted e2fsprogs socat
+            qemu-system-x86 socat
           # KVM or this runs under TCG, where the suite would outlast the job.
           # The node exists on the runner but belongs to a group the runner user
           # is not in, so testing for its presence is not testing for access.

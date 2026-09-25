@@ -12,8 +12,10 @@ IMG_BASE=https://cdimage.debian.org/cdimage/ports/latest/hurd-amd64
 IMG_NAME=debian-hurd-amd64-20260314.img.tar.xz
 IMG_SHA512=0c6151e7a402c065ef337841a2586e5c6a9799955d4f25d454cb7c6e6d54e7e2d52768aea0874a794aa285089a085c3b99702de475bc2fc4f250a2ce5a9f6cf0
 
-# The root filesystem ships 1.6G free, which a build plus the suite outgrows.
-GROW_BY=8G
+# The image ships 1.6G free on the root filesystem, against about 70M of tree
+# and build plus the packages below. Growing it instead put the filesystem past
+# what Hurd's own ext2fs can read, and the boot stopped at an I/O error.
+NEED_KB=307200
 # Hurd's SMP is young and the image is the tested single-processor setup.
 VM_CPUS=1
 VM_MEM=4G
@@ -80,8 +82,8 @@ test -s "$extracted" || fail "no image came out of $IMG_NAME"
 mv "$extracted" "$img"
 echo "::endgroup::"
 
-echo "::group::Grow the root filesystem and install an ssh key"
-# The image's README resizes partitions 2 and 5, which is the i386 layout. The
+echo "::group::Install an ssh key"
+# The image's README names partitions 2 and 5, which is the i386 layout. The
 # amd64 image has two primaries and no extended partition, so ask the image
 # rather than trust the document.
 root_part=$(sfdisk -J "$img" | python3 -c '
@@ -92,16 +94,11 @@ ext2 = [p for p in parts if str(p.get("type", "")).lower().removeprefix("0x") ==
 if not ext2:
     sys.exit("no type-83 partition")
 last = max(ext2, key=lambda p: p["start"])
-# Growing it to the end of the disk would eat whatever sits after it.
-if any(p["start"] > last["start"] for p in parts):
-    sys.exit("the root filesystem is not the last partition")
 print(re.search(r"([0-9]+)$", last["node"]).group(1))
 ')
-test -n "$root_part" || fail "no ext2 partition to grow in $img"
+test -n "$root_part" || fail "no ext2 partition in $img"
 echo "root filesystem is partition $root_part"
 
-qemu-img resize -f raw "$img" "+$GROW_BY"
-parted -s "$img" resizepart "$root_part" 100%
 loop=$(sudo losetup --find --show --partscan "$img")
 part=${loop}p${root_part}
 # losetup returns before udev has made the partition node.
@@ -110,9 +107,6 @@ for _ in $(seq 50); do
     sleep 0.2
 done
 test -b "$part" || fail "$part never appeared after losetup --partscan"
-# e2fsck reports 1 and 2 for errors it fixed by itself, which is not a failure.
-sudo e2fsck -fp "$part" || test $? -le 2
-sudo resize2fs "$part"
 
 rm -f "$key" "$key.pub"
 ssh-keygen -q -t ed25519 -N '' -C hurd-vm -f "$key"
@@ -143,9 +137,12 @@ qemu-system-x86_64 -enable-kvm -m "$VM_MEM" -smp "$VM_CPUS" \
     -monitor "unix:$work/monitor,server,nowait" &
 qemu_pid=$!
 
-waited=0
+# Elapsed, not a count of sleeps: a probe that hangs to its own timeout would
+# otherwise let the loop run several times the budget.
+start=$SECONDS
 until ssh_probe 2>/dev/null; do
     kill -0 "$qemu_pid" 2>/dev/null || fail "qemu exited during boot"
+    waited=$((SECONDS - start))
     test "$waited" -lt "$BOOT_TIMEOUT" || {
         # The image boots on the VGA console, so the serial log is usually
         # empty and a screendump is the only picture of where it stopped.
@@ -155,9 +152,8 @@ until ssh_probe 2>/dev/null; do
 $(tail -40 "$work/console.log" 2>/dev/null)"
     }
     sleep 5
-    waited=$((waited + 5))
 done
-echo "ssh answered after ${waited}s"
+echo "ssh answered after $((SECONDS - start))s"
 # Otherwise the whole verdict is credited to Hurd on the word of whatever
 # answered port 2222.
 kernel=$(ssh_vm uname -s)
@@ -175,6 +171,11 @@ ssh_vm 'set -eu
 echo "::endgroup::"
 
 echo "::group::Copy the tree in"
+# A build that runs out of room fails somewhere in the middle and reads as a
+# compile error, so say so here instead.
+free=$(ssh_vm "df -k /root | awk 'NR == 2 { print \$4 }'")
+test "$free" -ge "$NEED_KB" ||
+    fail "only ${free}K free on the VM's root filesystem, need ${NEED_KB}K"
 # The tree is sent over ssh rather than cloned, because the VM has no route to
 # an unpushed ref and a clone would fetch history nobody reads here.
 tar -C "$srcdir" --exclude=.git -cf - . |
