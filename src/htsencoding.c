@@ -44,11 +44,21 @@ Please visit our Website: http://www.httrack.com
  */
 #define HASH_INIT 0xcbf29ce484222325ULL
 #define HASH_PRIME 0x100000001b3ULL
-#define HASH_ADD(HASH, C)                                                      \
-  do {                                                                         \
-    (HASH) ^= (unsigned char) (C);                                             \
-    (HASH) *= HASH_PRIME;                                                      \
-  } while (0)
+
+/* FNV multiplies modulo 2^64. gcc has no unsigned-overflow check and warns on
+   the name, so this asks clang only. */
+#if defined(__clang__)
+#define HTS_WRAPS __attribute__((no_sanitize("unsigned-integer-overflow")))
+#else
+#define HTS_WRAPS
+#endif
+
+static HTS_INLINE HTS_UNUSED HTS_WRAPS uint64_t
+hash_add(const uint64_t hash, const unsigned char c) {
+  return (hash ^ c) * HASH_PRIME;
+}
+
+#define HASH_ADD(HASH, C) ((HASH) = hash_add((HASH), (unsigned char) (C)))
 
 int hts_unescapeEntitiesWithCharset(const char *src, char *dest, const size_t max, const char *charset) {
   return hts_unescapeEntitiesWithCharsetSpecial(src, dest, max, charset, 0);
@@ -253,7 +263,7 @@ int hts_unescapeUrlSpecial(const char *src, char *dest, const size_t max,
       lastJ = j;
     }
     /* End of sequence seen */
-    else if (i >= 2 && i == lastI + 2) {
+    else if (lastI != (size_t) -1 && i == lastI + 2) {
       const int a1 = hts_ehexh(src[lastI + 1]);
       const int a2 = hts_ehexh(src[lastI + 2]);
       if (a1 != -1 && a2 != -1) {

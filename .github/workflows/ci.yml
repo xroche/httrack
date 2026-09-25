@@ -507,13 +507,15 @@ jobs:
             build-essential clang autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
 
+      # unsigned-integer-overflow is not in -fsanitize=undefined, and it is how
+      # a bounds test that adds before it compares passes (#1796).
       - name: Configure (fuzzers, static)
         run: |
           set -euo pipefail
           autoreconf -fi
           ./configure CC=clang \
-            CFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -g -O1 -fno-omit-frame-pointer" \
-            LDFLAGS="-fsanitize=address,undefined" \
+            CFLAGS="-fsanitize=address,undefined,unsigned-integer-overflow -fsanitize-ignorelist=$GITHUB_WORKSPACE/fuzz/ubsan-ignorelist.txt -fno-sanitize-recover=all -g -O1 -fno-omit-frame-pointer" \
+            LDFLAGS="-fsanitize=address,undefined,unsigned-integer-overflow" \
             --enable-fuzzers --disable-shared
 
       - name: Build
