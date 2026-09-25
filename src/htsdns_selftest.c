@@ -42,6 +42,11 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsselftest_int.h"
 
+#include <setjmp.h>
+#include <stdio.h>
+#include <string.h>
+#include <time.h>
+
 #if HTS_INET6 != 0
 
 /* IPV6_resolver: 0 = v4+v6, 1 = v4 only, 2 = v6 only (htscoremain -@i). */

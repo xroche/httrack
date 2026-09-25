@@ -33,6 +33,8 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsselftest_int.h"
 
+#include <stdint.h>
+
 /* Slurp a whole file into a malloc'd buffer; sets *len. NULL on error. */
 static unsigned char *warc_slurp(const char *path, size_t *len) {
   char catbuff[CATBUFF_SIZE];

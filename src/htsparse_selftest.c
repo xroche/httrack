@@ -40,6 +40,10 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsselftest_int.h"
 
+#include <ctype.h>
+#include <stdio.h>
+#include <string.h>
+
 /* This models the rules hts_dirty_link_is_url answers, restated from the
    parser's intent rather than its code, so a disagreement is a finding about
    either. It reuses link_dir_has_fragment_or_query, unescape_amp and the mime

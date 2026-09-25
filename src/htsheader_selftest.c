@@ -33,6 +33,9 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsselftest_int.h"
 
+#include <limits.h>
+#include <stdint.h>
+
 /* The launch gate: a hold withholds launches, the cap decides how long, and a
    stop outranks both. 77 to skip when no slot table could be allocated. */
 static int st_retryafter_gate(httrackp *opt) {

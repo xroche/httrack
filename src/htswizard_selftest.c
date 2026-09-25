@@ -33,6 +33,8 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsselftest_int.h"
 
+#include <limits.h>
+
 /* The pattern answer n owes (adr, fil): a second implementation of the builder,
    with no bound of its own, to compare it against. */
 static void wizardfilter_want(htsbuff *w, int n, const char *adr,

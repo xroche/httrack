@@ -44,6 +44,11 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsselftest_int.h"
 
+#include <errno.h>
+#include <limits.h>
+#include <stdio.h>
+#include <string.h>
+
 #define SELFTEST_VOLUME 3000 /* number of small entries in the scale pass */
 
 /* prefix on assertion failures; set per entry point (-#A vs -#B) */

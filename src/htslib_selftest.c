@@ -33,6 +33,8 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsselftest_int.h"
 
+#include <stdint.h>
+
 /* very minimalistic internal tests */
 static void basic_selftests(void) {
   // BUG 756328
