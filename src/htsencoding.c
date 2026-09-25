@@ -45,9 +45,8 @@ Please visit our Website: http://www.httrack.com
 #define HASH_INIT 0xcbf29ce484222325ULL
 #define HASH_PRIME 0x100000001b3ULL
 
-/* FNV multiplies modulo 2^64, so keep it off the fuzz build's
-   unsigned-overflow check. gcc has no such check and warns on the name, so
-   this asks clang only. */
+/* FNV multiplies modulo 2^64. gcc has no unsigned-overflow check and warns on
+   the name, so this asks clang only. */
 #if defined(__clang__)
 #define HTS_WRAPS __attribute__((no_sanitize("unsigned-integer-overflow")))
 #else

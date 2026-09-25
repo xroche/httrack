@@ -1,5 +1,8 @@
-# MD5 and MurmurHash3 mix by wrapping, so unsigned-integer-overflow reports
-# every round of them. Both are third-party, and coucal is a submodule, so the
-# exemption cannot sit at the definition the way htsencoding.c's FNV does.
-src:*/src/md5.c
-src:*/src/coucal/*
+# MD5 and MurmurHash3 mix by wrapping. Both are third-party and coucal is a
+# submodule, so the exemption cannot sit at the definition the way
+# htsencoding.c's FNV does. Two spellings each, because make names a source
+# relatively in an in-tree build and absolutely out of tree.
+src:md5.c
+src:*/md5.c
+src:coucal/*
+src:*/coucal/*

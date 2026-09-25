@@ -507,11 +507,8 @@ jobs:
             build-essential clang autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
 
-      # unsigned-integer-overflow is not in -fsanitize=undefined, because the
-      # wrap is defined behaviour. It is still how a bounds test written as
-      # "controlled + untrusted < limit" passes, which is the form AGENTS.md
-      # bans, so the parsers that read hostile bytes are exactly where to
-      # check it. The ignorelist exempts the two hashes that wrap on purpose.
+      # unsigned-integer-overflow is not in -fsanitize=undefined, and it is how
+      # a bounds test that adds before it compares passes (#1796).
       - name: Configure (fuzzers, static)
         run: |
           set -euo pipefail
