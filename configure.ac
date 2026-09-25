@@ -225,11 +225,10 @@ AX_CHECK_COMPILE_FLAG([-Wignored-qualifiers], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -
 AX_CHECK_COMPILE_FLAG([-Wsign-compare], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wsign-compare"], [], [-Werror])
 AX_CHECK_COMPILE_FLAG([-Wduplicated-cond], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wduplicated-cond"], [], [-Werror])
 AX_CHECK_COMPILE_FLAG([-Wimplicit-fallthrough], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wimplicit-fallthrough"], [], [-Werror])
-# -Wstringop-overflow needs a level: 4 is the widest, and the tree is clean on it.
+# -Wstringop-overflow needs a level, and 4 is the widest the tree is clean on.
 AX_CHECK_COMPILE_FLAG([-Wstringop-overflow=4], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wstringop-overflow=4"], [], [-Werror])
 AX_CHECK_COMPILE_FLAG([-Wstringop-truncation], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wstringop-truncation"], [], [-Werror])
-# A stack allocation sized by a header or a URL is the stack-clash shape, and
-# the tree uses neither construct, so these two keep it that way.
+# The tree has no stack allocation sized off the wire, and these keep it that way.
 AX_CHECK_COMPILE_FLAG([-Wvla], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wvla"], [], [-Werror])
 AX_CHECK_COMPILE_FLAG([-Walloca], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Walloca"], [], [-Werror])
 # A nested function asks for an executable stack.
