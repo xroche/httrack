@@ -16,9 +16,10 @@ IMG_SHA512=0c6151e7a402c065ef337841a2586e5c6a9799955d4f25d454cb7c6e6d54e7e2d5276
 # and build plus the packages below. Growing it instead put the filesystem past
 # what Hurd's own ext2fs can read, and the boot stopped at an I/O error.
 NEED_KB=307200
-# Hurd's SMP is young and the image is the tested single-processor setup.
+# What the image's own README prescribes in every example. Hurd's SMP is young,
+# and gnumach is not happy with more memory than this.
 VM_CPUS=1
-VM_MEM=4G
+VM_MEM=2G
 SSH_PORT=2222
 # Hurd boots slower than Linux and the runner is shared, so this is generous.
 BOOT_TIMEOUT=600
