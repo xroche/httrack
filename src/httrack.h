@@ -30,8 +30,8 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-#ifndef HTSTOOLS_DEFH
-#define HTSTOOLS_DEFH
+#ifndef HTTRACK_DEFH
+#define HTTRACK_DEFH
 
 #include "htsglobal.h"
 #include "htscore.h"
@@ -63,7 +63,8 @@ struct t_InpInfo {
 };
 
 int main(int argc, char **argv);
-#endif
 
 extern int _DEBUG_HEAD;
 extern FILE *ioinfo;
+
+#endif
