@@ -467,7 +467,7 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
      takes the pre-connect slots only and back_abort_limit() ends the rest
      later. */
   if (!err) {
-    const LLint recv_was = HTS_STAT.HTS_TOTAL_RECV;
+    const LLint recv_was = hts_stat_recv_get();
 
     opt->state.stop = 0;
     if (!st_backstop_arm(opt, sback, status, r, SLOTS, SLOT_DNS)) {
@@ -477,7 +477,7 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
     for (i = 0; i < SLOTS; i++)
       swept[i] = r[i].soc;
     /* cap reached, its whole grace still to overrun before the hard stop */
-    HTS_STAT.HTS_TOTAL_RECV = ST_BACKSTOP_CAP;
+    hts_stat_recv_set(ST_BACKSTOP_CAP);
     opt->maxsite = ST_BACKSTOP_CAP;
     /* already false here, but it keeps the check below local to this block */
     opt->abort_left_partial = HTS_FALSE;
@@ -499,7 +499,7 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
       CHECK(strcmp(back[i].r.msg, "untouched") == 0);
     }
     opt->maxsite = 0;
-    HTS_STAT.HTS_TOTAL_RECV = recv_was;
+    hts_stat_recv_set(recv_was);
   }
 
   /* back_abort_stopped() keeps hts-cache/ref for a partial that outlives the
@@ -546,7 +546,7 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
      spared, through the same back_abort_slot(), so the partial it cuts keeps
      its resume data like any other (#1595). */
   if (!err) {
-    const LLint recv_was = HTS_STAT.HTS_TOTAL_RECV;
+    const LLint recv_was = hts_stat_recv_get();
 
     opt->state.stop = 0;
     if (!st_backstop_arm(opt, sback, status, r, SLOTS, SLOT_DNS)) {
@@ -559,7 +559,7 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
     /* well past any grace, so the limit block ends every live slot and tuning
        back_maxsize_grace() cannot quietly put this case back inside it */
     opt->maxsite = ST_BACKSTOP_CAP;
-    HTS_STAT.HTS_TOTAL_RECV = ST_BACKSTOP_CAP * 2;
+    hts_stat_recv_set(ST_BACKSTOP_CAP * 2);
     hts_request_stop(opt, 0);
 
     back_wait(sback, opt, &cache, 0);
@@ -572,7 +572,7 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
     back[SLOT_XFER].r.is_write = 0;
     back[SLOT_XFER].url_sav[0] = '\0';
     opt->maxsite = 0;
-    HTS_STAT.HTS_TOTAL_RECV = recv_was;
+    hts_stat_recv_set(recv_was);
   }
   if (!err) {
     const int rc = st_backstop_check_shutdown(opt);

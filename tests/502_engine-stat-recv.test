@@ -1,0 +1,14 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_statrecv.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmpdir"
+
+# An FTP worker counts its received bytes on its own thread, so a plain += on
+# the shared total loses adds, and -M reads that total.
+expect_ok "statrecv" httrack -O "${tmpdir}/o1" -#test=statrecv
