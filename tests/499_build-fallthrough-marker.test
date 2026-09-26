@@ -1,0 +1,113 @@
+#!/bin/bash
+#
+# -Wimplicit-fallthrough and HTS_FALLTHROUGH are useless apart, so this reads the
+# flag out of the configured src/Makefile and compiles one switch per marker form
+# with it.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# Unset means no automake run (the Windows job runs the scripts directly), so
+# there are no configured flags to read.
+if [ -z "${abs_top_builddir:-}" ]; then
+    echo "abs_top_builddir unset, no automake environment, skipping" >&2
+    exit 77
+fi
+[ -f "$abs_top_builddir/src/Makefile" ] || fail "$abs_top_builddir/src is not configured"
+[ -n "${abs_top_srcdir:-}" ] || fail "abs_top_srcdir unset"
+
+# CC carries flags on some legs ("gcc -m32", "ccache gcc"), so split it first.
+read -r -a cc_argv <<<"${CC:-cc}"
+command -v "${cc_argv[0]}" >/dev/null 2>&1 || skip "no C compiler (${cc_argv[0]})"
+
+flags=$(sed -n 's/^DEFAULT_CFLAGS = *//p' "$abs_top_builddir/src/Makefile")
+[ -n "$flags" ] || fail "src/Makefile carries no DEFAULT_CFLAGS line"
+flag=''
+for w in $flags; do
+    case "$w" in
+    -Wimplicit-fallthrough*) flag=$w ;;
+    esac
+done
+[ -n "$flag" ] ||
+    fail "the build flags carry no -Wimplicit-fallthrough, so HTS_FALLTHROUGH marks nothing: $flags"
+echo "configured as $flag" >&2
+
+tmp=$(mktemp -d) || exit 1
+cleanup_push rm -rf "$tmp"
+
+inc=(-I"$abs_top_srcdir/src" -I"$abs_top_builddir")
+
+# $1 names the case, $2 what goes between the two labels, and the rest are extra
+# compiler flags. Prints clean or warns.
+probe() {
+    local name=$1 marker=$2
+    shift 2
+    {
+        echo '#include "htsglobal.h"'
+        echo "int probe_$name(int x);"
+        echo "int probe_$name(int x) {"
+        echo '  int n = 0;'
+        echo '  switch (x) {'
+        echo '  case 1:'
+        echo '    n++;'
+        [ -z "$marker" ] || echo "    $marker"
+        echo '  case 2:'
+        echo '    n++;'
+        echo '    break;'
+        echo '  default:'
+        echo '    break;'
+        echo '  }'
+        echo '  return n;'
+        echo '}'
+    } >"$tmp/$name.c"
+    if "${cc_argv[@]}" "${inc[@]}" "$@" -Werror -c "$tmp/$name.c" -o "$tmp/$name.o" \
+        2>"$tmp/$name.err"; then
+        echo clean
+    else
+        echo warns
+    fi
+}
+
+# Nothing below means anything if the flag cannot see a bare fallthrough.
+got=$(probe unmarked '' "$flag")
+[ "$got" = warns ] || fail "$flag accepted an unmarked fallthrough, the probes below prove nothing"
+
+# A switch with no fallthrough at all, so every verdict here is the flag reading
+# the marker and not the compiler refusing the probes wholesale.
+got=$(probe nofall 'break;' "$flag")
+[ "$got" = clean ] || fail_dump "$flag rejects a switch that does not fall through" "$tmp/nofall.err"
+
+got=$(probe marked 'HTS_FALLTHROUGH;' "$flag")
+if [ "$got" != clean ]; then
+    printf '#include "htsglobal.h"\nHTS_FALLTHROUGH\n' >"$tmp/expand.c"
+    pp=$("${cc_argv[@]}" "${inc[@]}" -E "$tmp/expand.c") ||
+        fail "cannot preprocess the HTS_FALLTHROUGH probe"
+    grep -q fallthrough <<<"$pp" ||
+        fail "$flag is on but HTS_FALLTHROUGH expands to nothing here, so no fallthrough can be marked"
+    fail_dump "HTS_FALLTHROUGH does not silence $flag" "$tmp/marked.err"
+fi
+
+# The gap this closes: a comment marks the fallthrough at gcc's default level and
+# reds clang.
+got=$(probe commented '/* FALLTHROUGH */' "$flag")
+[ "$got" = warns ] ||
+    fail "$flag accepts a /* FALLTHROUGH */ comment, so gcc and clang disagree again"
+
+# The control for the arm above: on gcc the bare spelling still takes the comment,
+# which is the whole reason configure asks for =5.
+case "$flag" in
+-Wimplicit-fallthrough=*)
+    got=$(probe bare '/* FALLTHROUGH */' -Wimplicit-fallthrough)
+    if [ "$got" = clean ]; then
+        ok "the bare spelling takes the comment here, so $flag is what forbids it"
+    else
+        echo "note: the bare spelling rejects the comment too on ${cc_argv[*]}" >&2
+    fi
+    ;;
+*) echo "note: ${cc_argv[*]} has no level suffix, so the comment arm rests on the compiler" >&2 ;;
+esac
+
+ok "$flag warns unmarked and HTS_FALLTHROUGH silences it"
+exit 0
