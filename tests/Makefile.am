@@ -82,6 +82,10 @@ TESTS_ENVIRONMENT += HTTRACK_SHLIB=$(abs_top_builddir)/src/$(LT_CV_OBJDIR)/libht
 # 449_plugin-postprocess-example.test dlopen()s this shipped example, suffix
 # included by the test since libtool names it .dylib on macOS.
 TESTS_ENVIRONMENT += CHANGECONTENT_LIB=$(abs_top_builddir)/libtest/$(LT_CV_OBJDIR)/libchangecontent
+# 506_example-libs-bounds.test plugs these two to check they refuse arguments
+# that used to overflow their fields.
+TESTS_ENVIRONMENT += FILENAME2_LIB=$(abs_top_builddir)/libtest/$(LT_CV_OBJDIR)/libfilename2
+TESTS_ENVIRONMENT += CONTENTFILTER_LIB=$(abs_top_builddir)/libtest/$(LT_CV_OBJDIR)/libcontentfilter
 TESTS_ENVIRONMENT += RENAMEFAIL_LA=$(abs_builddir)/librenamefail.la
 TESTS_ENVIRONMENT += RENAMEFAIL_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/librenamefail.so
 TESTS_ENVIRONMENT += UNLINKFAIL_LA=$(abs_builddir)/libunlinkfail.la

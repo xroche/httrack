@@ -98,12 +98,13 @@ static int check_detectedlink(t_hts_callbackarg * carg, httrackp * opt,
     }
   }
 
-  /* The incoming (read/write) buffer is at least HTS_URLMAXSIZE bytes long */
+  /* All "link" promises is HTS_URLMAXSIZE bytes, and its real size is not
+     passed in, so refuse a link that would not fit rather than write past it */
   if (strncmp(link, "http://", 7) == 0 || strncmp(link, "https://", 8) == 0) {
-    char temp[HTS_URLMAXSIZE * 2];
+    char temp[HTS_URLMAXSIZE];
 
-    strcpy(temp, base);
-    strcat(temp, link);
+    if (snprintf(temp, sizeof(temp), "%s%s", base, link) >= (int) sizeof(temp))
+      return 0; /* Abort */
     strcpy(link, temp);
   }
 
