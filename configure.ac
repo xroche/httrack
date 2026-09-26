@@ -227,10 +227,9 @@ AC_ARG_ENABLE([werror],
 	AC_MSG_RESULT(no)
 	])
 # DEFAULT_CFLAGS only, never CFLAGS: configure's probes must keep answering on a
-# warning, or every AX_CHECK_COMPILE_FLAG below changes meaning. The exemption is
-# for src/coucal, a pinned submodule clang warns about and this tree does not own.
+# warning, or every AX_CHECK_COMPILE_FLAG below changes meaning.
 AS_IF([test x"$enable_werror" = x"yes"],
-	[DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Werror -Wno-error=format-nonliteral"])
+	[DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Werror"])
 
 ### Additional flags (if supported)
 # -Werror on probes: exit-status-only checks let clang's warn-on-unknown-flag through.
