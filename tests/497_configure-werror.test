@@ -57,8 +57,8 @@ werror_verdict() { # werror_verdict DIR
         "$1/configure.log" | tail -1
 }
 
-# Both files, because two Makefile.am's substitute DEFAULT_CFLAGS for our own
-# code and a switch reaching one of them is not the contract.
+# The two that build our shipped code. fuzz/ and tests/ take DEFAULT_CFLAGS too,
+# but only behind --enable-fuzzers and under "make check".
 assert_state() { # assert_state DIR on|off
     local dir=$1 want=$2 f verdict
     verdict=$(werror_verdict "${dir}")
