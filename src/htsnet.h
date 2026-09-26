@@ -33,27 +33,34 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 /** @file htsnet.h
-    Socket/connection layer. Provides SOCaddr, an opaque IPv4/IPv6
-   socket-address wrapper, plus accessor macros so callers never branch on
-   address family. Builds on htsbasenet.h. */
+    Socket address layer: SOCaddr wraps one IPv4 or IPv6 endpoint, and the
+    SOCaddr_* accessors read and write it without the caller branching on
+    address family. */
 
 #ifndef HTS_DEFNETH
 #define HTS_DEFNETH
 
-/* basic net definitions */
+/* htsglobal.h comes first, because it fixes HTS_INET6, which the SOCaddr
+   layout below reads. htsbasenet.h then brings in the platform socket headers
+   that HTS_INET6 selects. */
 #include "htsglobal.h"
 #include "htsbasenet.h"
 #include "htssafe.h"
 
 #include <string.h>
 #include <ctype.h>
+/* Where the platform declares no in_port_t, sa_family_t or in_addr_t, we
+   supply one: the Winsock types below, or a uint16_t macro out of the generated
+   htsfeatures.h. A consumer sees our spelling, so it must not add its own. */
 #ifdef _WIN32
 // for read
 #include <io.h>
 // for FindFirstFile
 #include <winbase.h>
+/** Port number type, unsigned 16-bit. */
 typedef USHORT in_port_t;
 
+/** Socket address family, as in AF_INET. */
 typedef ADDRESS_FAMILY sa_family_t;
 #else
 #define INVALID_SOCKET -1
@@ -73,8 +80,9 @@ typedef ADDRESS_FAMILY sa_family_t;
 #endif
 /* inet_addr */
 #include <arpa/inet.h>
-/* normally not needed; provide in_addr_t where the platform lacks it */
 #ifndef HTS_DO_NOT_REDEFINE_in_addr_t
+/** IPv4 address for a platform that declares no in_addr_t. Wider than the
+    uint32_t POSIX asks for, so do not assume 32 bits. */
 typedef unsigned long in_addr_t;
 #endif
 #endif
@@ -90,28 +98,30 @@ typedef struct in6_addr INaddr;
 typedef struct in_addr INaddr;
 #endif
 
-/** Opaque socket address holding either an IPv4 or IPv6 endpoint. Use the
-    SOCaddr_* accessors rather than touching m_addr; sa_family selects the
-    active union member. */
+/** One IPv4 or IPv6 endpoint, address and port together. Use the SOCaddr_*
+    accessors rather than m_addr, because sa_family picks the active union
+    member. HTS_INET6 decides whether the IPv6 member exists, so it sets
+    sizeof(SOCaddr) and the layout of every struct holding one, such as htsblk.
+    Build a consumer with the library's HTS_INET6, which the installed
+    htsfeatures.h publishes. */
 #ifndef HTS_DEF_FWSTRUCT_SOCaddr
 #define HTS_DEF_FWSTRUCT_SOCaddr
 typedef struct SOCaddr SOCaddr;
 #endif
 struct SOCaddr {
   union {
-    /* Generic version, for network functions such as getnameinfo() */
-    struct sockaddr sa;
-    /* IPv4 */
-    struct sockaddr_in in;
+    struct sockaddr sa;    /**< generic view, for bind() and getnameinfo() */
+    struct sockaddr_in in; /**< active when sa.sa_family is AF_INET */
 #if HTS_INET6 != 0
-    /* IPv6 */
-    struct sockaddr_in6 in6;
+    struct sockaddr_in6 in6; /**< active when sa.sa_family is AF_INET6 */
 #endif
-  } m_addr;
+  } m_addr; /**< the endpoint, tagged by sa.sa_family */
 };
 
-/** Pointer to the port field (network byte order) for the active family.
-    Asserts on NULL or an unset/unknown family. */
+/** Pointer to the port field of the active family, network byte order.
+    Asserts on NULL or an unset family. Every helper here takes @p file and
+    @p line, the caller's __FILE__ and __LINE__ for that assert, and the
+    matching SOCaddr_* macro passes them. */
 static HTS_INLINE HTS_UNUSED in_port_t *
 SOCaddr_sinport_(SOCaddr *const addr, const char *file, const int line) {
   assertf_(addr != NULL, file, line);
@@ -131,8 +141,8 @@ SOCaddr_sinport_(SOCaddr *const addr, const char *file, const int line) {
   }
 }
 
-/** Length of the active sockaddr (sockaddr_in or sockaddr_in6), or 0 if the
-    family is unset/unknown. The 0 case doubles as the "not valid" test. */
+/** Length of the active sockaddr, or 0 when the family is unset. The 0
+    doubles as the not-valid test. */
 static HTS_INLINE HTS_UNUSED socklen_t SOCaddr_size_(const SOCaddr *const addr,
                                                      const char *file,
                                                      const int line) {
@@ -152,53 +162,62 @@ static HTS_INLINE HTS_UNUSED socklen_t SOCaddr_size_(const SOCaddr *const addr,
   }
 }
 
-/** Reset to the unset state (family AF_UNSPEC), making the address invalid. */
+/** Reset @p addr to the unset state, which makes it invalid. */
 static HTS_INLINE HTS_UNUSED void
 SOCaddr_clear_(SOCaddr *const addr, const char *file, const int line) {
   assertf_(addr != NULL, file, line);
   addr->m_addr.sa.sa_family = AF_UNSPEC;
 }
 
-/* SOCaddr accessors; server is an lvalue SOCaddr, not a pointer. */
-#define SOCaddr_sinfamily(server)                                              \
-  ((server).m_addr.sa.sa_family) /* AF_INET / AF_INET6 */
+/* Every macro below names a member of its server argument or takes its
+   address, so server must be an lvalue SOCaddr and not a pointer. Each
+   evaluates its arguments once unless its own comment says otherwise. */
 
+/** Address family of an endpoint: AF_INET, AF_INET6, or AF_UNSPEC when
+    unset. An lvalue. */
+#define SOCaddr_sinfamily(server) ((server).m_addr.sa.sa_family)
+
+/** Port of the active family, network byte order. An lvalue. Asserts when the
+    family is unset. */
 #define SOCaddr_sinport(server)                                                \
-  (*SOCaddr_sinport_(&(server), __FILE__,                                      \
-                     __LINE__)) /* port lvalue (network order) */
+  (*SOCaddr_sinport_(&(server), __FILE__, __LINE__))
 
-#define SOCaddr_size(server)                                                   \
-  (SOCaddr_size_(&(server), __FILE__, __LINE__)) /* active sockaddr length */
+/** Length of the active sockaddr, to hand to bind() or connect(). 0 when the
+    family is unset. */
+#define SOCaddr_size(server) (SOCaddr_size_(&(server), __FILE__, __LINE__))
 
+/** Does server hold an endpoint? False after SOCaddr_clear(). */
 #define SOCaddr_is_valid(server)                                               \
-  (SOCaddr_size_(&(server), __FILE__, __LINE__) !=                             \
-   0) /* nonzero if family is set */
+  (SOCaddr_size_(&(server), __FILE__, __LINE__) != 0)
 
+/** Reset server to the unset state, which makes it invalid. */
 #define SOCaddr_clear(server) SOCaddr_clear_(&(server), __FILE__, __LINE__)
 
-#define SOCaddr_sockaddr(server)                                               \
-  ((server).m_addr.sa) /* generic struct sockaddr view */
+/** Generic struct sockaddr view of server, an lvalue, so a caller hands
+    &SOCaddr_sockaddr(x) to the socket API. */
+#define SOCaddr_sockaddr(server) ((server).m_addr.sa)
 
-#define SOCaddr_capacity(server)                                               \
-  sizeof((server).m_addr) /* full union size, for recvfrom() etc. */
+/** Size of the whole union, which is the room a recvfrom() or getsockname() may
+    fill. A compile-time constant, and server is never evaluated. */
+#define SOCaddr_capacity(server) sizeof((server).m_addr)
 
-/** Address family to bind/listen with: AF_INET6 when IPv6 is enabled (dual
-    stack), else AF_INET. */
+/** Address family to open a socket with: AF_INET6 when the build has IPv6,
+    else AF_INET. */
 #if HTS_INET6 != 0
 #define AFinet AF_INET6
 #else
 #define AFinet AF_INET
 #endif
 
-/** Set the port (host-order argument, stored network-order) on the active
- * family. */
+/** Set the port of the active family from a host-order @p port. Asserts when
+    the family is unset, so give server an address first. */
 #define SOCaddr_initport(server, port)                                         \
   do {                                                                         \
     SOCaddr_sinport(server) = htons((in_port_t) (port));                       \
   } while (0)
 
-/** Initialize as an all-zero IPv4 wildcard (INADDR_ANY) address; returns its
-    sockaddr length. */
+/** Set @p addr to the IPv4 wildcard address (INADDR_ANY) with port 0, and
+    return its sockaddr length. */
 static HTS_INLINE HTS_UNUSED socklen_t SOCaddr_initany_(SOCaddr *const addr,
                                                         const char *file,
                                                         const int line) {
@@ -208,14 +227,15 @@ static HTS_INLINE HTS_UNUSED socklen_t SOCaddr_initany_(SOCaddr *const addr,
   return SOCaddr_size_(addr, file, line);
 }
 
-/** Initialize server as an IPv4 wildcard (INADDR_ANY) address. */
+/** Set server to the IPv4 wildcard address (INADDR_ANY), port 0. */
 #define SOCaddr_initany(server)                                                \
   do {                                                                         \
     SOCaddr_initany_(&(server), __FILE__, __LINE__);                           \
   } while (0)
 
-/** Initialize as an IPv4 loopback (127.0.0.1) address; returns its sockaddr
-    length. IPv4, so it binds whether or not the host has IPv6. */
+/** Set @p addr to the IPv4 loopback address (127.0.0.1) with port 0, and
+    return its sockaddr length. IPv4, so it binds whether or not the host has
+    IPv6. */
 static HTS_INLINE HTS_UNUSED socklen_t
 SOCaddr_initloopback_(SOCaddr *const addr, const char *file, const int line) {
   assertf_(addr != NULL, file, line);
@@ -225,17 +245,18 @@ SOCaddr_initloopback_(SOCaddr *const addr, const char *file, const int line) {
   return SOCaddr_size_(addr, file, line);
 }
 
-/** Initialize server as an IPv4 loopback (127.0.0.1) address. */
+/** Set server to the IPv4 loopback address (127.0.0.1), port 0. */
 #define SOCaddr_initloopback(server)                                           \
   do {                                                                         \
     SOCaddr_initloopback_(&(server), __FILE__, __LINE__);                      \
   } while (0)
 
-/** Populate server from data. data_size selects the source form: a full
-    sockaddr_in / sockaddr_in6, or a raw 4-byte IPv4 address with port zeroed.
-    Any other size leaves an AF_INET shell. Returns the resulting sockaddr
-    length. There is no raw IPv6 form, because 16 is sizeof(struct sockaddr_in)
-    on every target, so pass a sockaddr_in6 instead. */
+/** Fill @p server from @p data, whose @p data_size picks the source form: a
+    full sockaddr_in, a full sockaddr_in6, or a bare 4-byte IPv4 address with
+    the port zeroed. Any other size only stamps AF_INET on @p server and leaves
+    the address bytes as they were. Returns the resulting sockaddr length. There
+    is no bare IPv6 form, because 16 is already sizeof(struct sockaddr_in) on
+    every target, so pass a sockaddr_in6. */
 static HTS_UNUSED socklen_t SOCaddr_copyaddr_(SOCaddr *const server,
                                               const void *data,
                                               const size_t data_size,
@@ -263,71 +284,78 @@ static HTS_UNUSED socklen_t SOCaddr_copyaddr_(SOCaddr *const server,
   return SOCaddr_size_(server, file, line);
 }
 
-/** Copy hpaddr (length hpsize) into server, writing the result length into the
-    lvalue server_len (int). See SOCaddr_copyaddr_ for accepted forms. */
+/** Copy hpaddr of hpsize bytes into server, and store the result length in
+    the int lvalue server_len. SOCaddr_copyaddr_() lists the accepted forms. */
 #define SOCaddr_copyaddr(server, server_len, hpaddr, hpsize)                   \
   do {                                                                         \
     server_len = (int) SOCaddr_copyaddr_(&(server), hpaddr, hpsize, __FILE__,  \
                                          __LINE__);                            \
   } while (0)
 
-/** Like SOCaddr_copyaddr but discards the result length. */
+/** SOCaddr_copyaddr() without the length output. */
 #define SOCaddr_copyaddr2(server, hpaddr, hpsize)                              \
   do {                                                                         \
     (void) SOCaddr_copyaddr_(&(server), hpaddr, hpsize, __FILE__, __LINE__);   \
   } while (0)
 
-/** Copy one SOCaddr (src) into another (dest), preserving family and port. */
+/** Copy the endpoint src into dest, family and port included. src is
+    evaluated twice. */
 #define SOCaddr_copy_SOCaddr(dest, src)                                        \
   do {                                                                         \
     SOCaddr_copyaddr_(&(dest), &(src).m_addr.sa, SOCaddr_size(src), __FILE__,  \
                       __LINE__);                                               \
   } while (0)
 
-/* proxytrack compiles htsnet.c in rather than linking the library, and MSVC
-   rejects a dllimport definition. */
+/** Export marker for the out-of-line helpers below. Empty under
+    HTS_NO_LIBHTTRACK, which proxytrack sets because it compiles htsnet.c in
+    rather than linking the library, and MSVC rejects a dllimport
+    definition. */
 #ifdef HTS_NO_LIBHTTRACK
 #define HTSNET_API
 #else
 #define HTSNET_API HTSEXT_API
 #endif
 
-/** Write the numeric (dotted/colon) host of ss into namebuf (capacity
-    namebuflen), scope id stripped. On failure namebuf becomes "". Out of line:
-    getnameinfo() isn't declared to a strict-ISO translation unit (#1001). */
+/* Out of line because getnameinfo() is not declared to a strict-ISO
+   translation unit (#1001). */
+
+/** Write the numeric host of @p ss, dotted for IPv4 and colon-separated for
+    IPv6, into @p namebuf of @p namebuflen bytes, with any scope id stripped.
+    @p namebuf becomes "" on failure. SOCADDR_INETNTOA_SIZE always fits. */
 HTSNET_API void SOCaddr_inetntoa_(char *namebuf, size_t namebuflen,
                                   SOCaddr *const ss, const char *file,
                                   const int line);
 
-/** Numeric host of ss into namebuf (capacity namebuflen); "" on failure. */
+/** Numeric host of ss into namebuf of namebuflen bytes, "" on failure. */
 #define SOCaddr_inetntoa(namebuf, namebuflen, ss)                              \
   SOCaddr_inetntoa_(namebuf, namebuflen, &(ss), __FILE__, __LINE__)
 
-/** Capacity for the numeric host of a SOCaddr: the longest IPv6 text, plus the
-    scope id getnameinfo needs room for even though SOCaddr_inetntoa strips
-    it. */
+/** Capacity that always holds the numeric host of a SOCaddr: the longest IPv6
+    text, plus the scope id getnameinfo() needs room for even though
+    SOCaddr_inetntoa() strips it. */
 #define SOCADDR_INETNTOA_SIZE                                                  \
   sizeof("ffff:ffff:ffff:ffff:ffff:ffff:255.255.255.255%4294967295")
 
-/** Capacity for "host:port". The host alone can fill whatever it is given, so
-    the port needs room of its own on top of it. */
+/** Capacity that always holds "host:port". The host alone can fill whatever
+    it is given, so the port needs room of its own on top. */
 #define SOCADDR_INETNTOA_PORT_SIZE                                             \
   (SOCADDR_INETNTOA_SIZE + sizeof(":65535") - 1)
 
-/** Write "host:port" for ss into namebuf (capacity namebuflen), capping the
-    host so the port always fits. Clips instead of aborting, because the address
-    is a peer's. HTS_FALSE when namebuflen had no room for the port; a caller
-    sizing on SOCADDR_INETNTOA_PORT_SIZE cannot see that. Out of line for the
-    same reason SOCaddr_inetntoa_ is. */
+/** Write "host:port" for @p ss into @p namebuf of @p namebuflen bytes,
+    capping the host so the port always fits. Clips rather than aborting,
+    because the address comes from a peer. Returns HTS_FALSE when @p namebuflen
+    left no room for the port, which a caller sizing on
+    SOCADDR_INETNTOA_PORT_SIZE never sees. @p namebuflen must not be 0. */
 HTSNET_API hts_boolean SOCaddr_inetntoa_port_(char *namebuf, size_t namebuflen,
                                               SOCaddr *const ss,
                                               const char *file, const int line);
 
-/** "host:port" of ss into namebuf (capacity namebuflen). */
+/** "host:port" of ss into namebuf of namebuflen bytes. */
 #define SOCaddr_inetntoa_port(namebuf, namebuflen, ss)                         \
   SOCaddr_inetntoa_port_(namebuf, namebuflen, &(ss), __FILE__, __LINE__)
 
-/** Single-char family tag: '1' for IPv4, '2' otherwise (used in the cache). */
+/** FTP address-family number of ss, the one EPRT carries: '1' for IPv4, '2'
+    otherwise. */
 #define SOCaddr_getproto(ss)                                                   \
   (SOCaddr_size(ss) == sizeof(struct sockaddr_in) ? '1' : '2')
 
@@ -337,12 +365,9 @@ typedef socklen_t SOClen;
 #if HTS_INET6 != 0
 /* Engine-only: not exported, and the type is useless without the setter. */
 #ifdef HTS_INTERNAL_BYTECODE
-/** Resolver backend: getaddrinfo/freeaddrinfo as a swappable pair, so the
-    self-test can script DNS answers (families, multiplicity, errors)
-    in-process. The free function must match its getaddrinfo (a fake allocates
-    its own chain), hence the pair. */
-/* Winsock's resolver is __stdcall; a plain pointer only compiles on x64, where
-   there is one convention. Backend implementations must carry this too. */
+/** Calling convention of the resolver entry points. Winsock's resolver is
+    __stdcall, and a plain pointer only compiles on x64, where there is one
+    convention. A backend implementation must carry it too. */
 #ifdef _WIN32
 #define HTS_RESOLVER_CALL WSAAPI
 #else
@@ -353,15 +378,22 @@ typedef socklen_t SOClen;
    wherever <netdb.h> has not already declared it. */
 struct addrinfo;
 
+/** getaddrinfo and freeaddrinfo as a swappable pair, so a self-test can
+    script DNS answers in-process: families, multiplicity and errors. */
 typedef struct hts_resolver_backend {
+  /** Resolves a name, with getaddrinfo()'s arguments and return codes. */
   int(HTS_RESOLVER_CALL *getaddrinfo)(const char *node, const char *service,
                                       const struct addrinfo *hints,
                                       struct addrinfo **res);
+  /** Frees a chain this same backend's getaddrinfo returned, which is why the
+      two travel as a pair. */
   void(HTS_RESOLVER_CALL *freeaddrinfo)(struct addrinfo *res);
 } hts_resolver_backend;
 
-/** Install a resolver backend for the process; NULL restores the libc default.
-    Test-only seam, not thread-safe; callers must serialize against resolves. */
+/** Install a resolver backend for the whole process, or pass NULL to restore
+    the libc pair. The caller keeps @p backend, which must outlive the setting,
+    because only the pointer is stored. Test-only seam, and not thread-safe, so
+    serialize it against resolves. */
 void hts_dns_set_resolver_backend(const hts_resolver_backend *backend);
 #endif
 #endif

@@ -30,7 +30,17 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-/* Safer Strings ; standalone .h library */
+/**
+ * @file htsstrings.h
+ * Growable string (String) that owns its buffer, so a caller never has to size
+ * a destination in advance. Every operation here is a macro or a static
+ * function, so there is nothing to link against. Release a String with
+ * StringFree(), or hand its buffer over with StringAcquire().
+ *
+ * A macro names the String itself, not a pointer to it, and may evaluate that
+ * argument several times. So pass a plain variable, never an expression with
+ * side effects. Every length and capacity counts bytes, not characters.
+ */
 
 #ifndef HTS_STRINGS_DEFSTATIC
 #define HTS_STRINGS_DEFSTATIC
@@ -54,69 +64,75 @@ typedef struct String String;
 #define HTS_DEF_STRUCT_String
 
 /**
- * Growable owned string.
+ * Growable string. The String owns its buffer and frees it in StringFree().
  *
- * Ownership/lifetime: the String owns buffer_ and frees it (StringFree).
- * buffer_ is allocated lazily, so a freshly STRING_EMPTY/StringInit'd String,
- * or one just StringFree'd/StringAcquire'd, has buffer_ == NULL and
- * length_ == capacity_ == 0. Any growing operation may realloc, so a pointer
- * obtained from StringBuff/StringBuffRW is invalidated by the next append,
- * copy, or room request; do not cache it across such calls.
+ * The buffer is allocated on the first write. A String initialized with
+ * STRING_EMPTY or StringInit(), and one just freed or acquired, has no buffer
+ * at all, so StringBuff() returns NULL rather than "". Once a buffer exists,
+ * the content is NUL-terminated at buffer_[length_].
  *
- * Invariants when buffer_ != NULL: length_ < capacity_, and buffer_[length_]
- * is a NUL (the content is always NUL-terminated). length_ excludes that NUL;
- * capacity_ counts it. The empty state (buffer_ == NULL) has no readable NUL,
- * so callers must not treat StringBuff() of an untouched String as "".
+ * Any growing operation may move the buffer. A pointer read through
+ * StringBuff() or StringBuffRW() stops being valid at the next append, copy or
+ * room request.
  *
- * Direct field access is internal (trailing underscore); use the macros below.
+ * The trailing underscore marks the fields as internal, so reach them through
+ * the macros below.
  */
 struct String {
-  char *buffer_;
-  size_t length_;
-  size_t capacity_;
+  char *buffer_;    /**< owned content, NULL until the first write */
+  size_t length_;   /**< bytes before the terminating NUL */
+  size_t capacity_; /**< allocated size in bytes */
 };
 #endif
 
-/** Allocator **/
+/** Allocator hooks. Define BOTH before including this header to replace them,
+    because defining STRING_REALLOC alone also drops the default STRING_FREE.
+    STRING_REALLOC returns NULL when it cannot allocate SIZE bytes. **/
 #ifndef STRING_REALLOC
 #define STRING_REALLOC(BUFF, SIZE) ((char *) realloc(BUFF, SIZE))
 
 #define STRING_FREE(BUFF) free(BUFF)
 #endif
 
-/** Initializer for an empty String (NULL buffer). Use to declare or reset. **/
+/** Initializer for a String with no buffer. It frees nothing, so a String that
+    already owns a buffer needs StringFree() first. **/
 #define STRING_EMPTY {(char *) NULL, 0, 0}
 
-/** Read-only buffer pointer. NULL until the String has been written to.
-    Invalidated by any subsequent growing operation. **/
+/** Read-only content pointer, NULL until the String has been written to. The
+    next growing operation invalidates it. **/
 #define StringBuff(BLK) ((const char *) ((BLK).buffer_))
 
-/** Read/write buffer pointer. Same NULL/invalidation rules as StringBuff. **/
+/** Read/write content pointer, with the same NULL and invalidation rules as
+    StringBuff. **/
 #define StringBuffRW(BLK) ((BLK).buffer_)
 
-/** Current length in bytes, excluding the terminating NUL. **/
+/** Content length in bytes, not counting the terminating NUL. **/
 #define StringLength(BLK) ((BLK).length_)
 
-/** Non-zero if the String holds at least one byte. **/
+/** Does the String hold at least one byte? **/
 #define StringNotEmpty(BLK) (StringLength(BLK) > 0)
 
-/** Allocated capacity in bytes, including room for the terminating NUL. **/
+/** Allocated size in bytes. It covers the terminating NUL, except after
+    StringSetBuffer or StringAttach, which do not count it. **/
 #define StringCapacity(BLK) ((BLK).capacity_)
 
-/** Byte at POS (read). No bounds check; POS must be < StringLength. **/
+/** Byte at POS (read). No bounds check, so POS must be below StringLength. **/
 #define StringSub(BLK, POS) (StringBuff(BLK)[POS])
 
-/** Byte at POS (read/write). No bounds check; POS must be < StringLength. **/
+/** Byte at POS (read/write). No bounds check, so POS must be below
+    StringLength. **/
 #define StringSubRW(BLK, POS) (StringBuffRW(BLK)[POS])
 
-/** Byte POS positions from the end (read). POS==1 is the last byte. **/
+/** Byte POS positions from the end (read). POS==1 is the last byte, and POS
+    must not exceed StringLength. **/
 #define StringRight(BLK, POS) (StringBuff(BLK)[StringLength(BLK) - POS])
 
-/** Byte POS positions from the end (read/write). POS==1 is the last byte. **/
+/** Byte POS positions from the end (read/write). POS==1 is the last byte, and
+    POS must not exceed StringLength. **/
 #define StringRightRW(BLK, POS) (StringBuffRW(BLK)[StringLength(BLK) - POS])
 
-/** Drop the last byte and re-terminate. No-op on an empty String: the length
-    is unsigned, so an unguarded pop would wrap it and write off the end. **/
+/** Drop the last byte and re-terminate. It does nothing to a String that holds
+    no byte. **/
 #define StringPopRight(BLK)                                                    \
   do {                                                                         \
     if (StringLength(BLK) > 0) {                                               \
@@ -124,9 +140,9 @@ struct String {
     }                                                                          \
   } while (0)
 
-/** Terminate on allocation failure. The String API returns void throughout, so
-    there is no channel to report it on, and continuing would hand the caller a
-    NULL buffer to write into. **/
+/** Report a failed allocation of @p size bytes and kill the process. The String
+    operations return no status, so a caller cannot be told about the
+    failure. **/
 HTS_STATIC void StringOom_(size_t size) {
   fprintf(stderr, "String: out of memory allocating %lu bytes\n",
           (unsigned long) size);
@@ -134,13 +150,17 @@ HTS_STATIC void StringOom_(size_t size) {
   abort();
 }
 
-/** What to do when an allocation of SIZE bytes fails; overridable. **/
+/** Handle a failed allocation of SIZE bytes. Define it before including this
+    header to override it. It must not return, because the caller would then
+    write into a NULL buffer. **/
 #ifndef STRING_OOM
 #define STRING_OOM(SIZE) StringOom_(SIZE)
 #endif
 
-/** Grow so capacity_ >= CAPACITY (total bytes, including the NUL). May realloc
-    (invalidating prior buffer pointers); aborts on OOM. Never shrinks. **/
+/** Grow the allocation so it holds at least CAPACITY bytes, the terminating NUL
+    included. It never shrinks, it may move the buffer, and it aborts when the
+    allocation fails. It writes no terminator, so a String with no content yet
+    is still not a readable C string. **/
 #define StringRoomTotal(BLK, CAPACITY)                                         \
   do {                                                                         \
     const size_t capacity_ = (size_t) (CAPACITY);                              \
@@ -163,13 +183,14 @@ HTS_STATIC void StringOom_(size_t size) {
     }                                                                          \
   } while (0)
 
-/** Reserve room for SIZE more bytes beyond the current length (plus the NUL).
-    May realloc, invalidating prior buffer pointers. **/
+/** Reserve room for SIZE more content bytes after the current length, plus the
+    terminating NUL. It may move the buffer. **/
 #define StringRoom(BLK, SIZE)                                                  \
   StringRoomTotal(BLK, StringLength(BLK) + (SIZE) + 1)
 
-/** Reserve room for SIZE more bytes and return the (post-realloc) RW buffer,
-    for appending in place. Does not update length_; the caller must. **/
+/** Reserve room for SIZE more bytes and return the read/write buffer, to append
+    in place. The pointer is the start of the buffer, so write at offset
+    StringLength and then set the new length with StringSetLength. **/
 #define StringBuffN(BLK, SIZE) StringBuffN_(&(BLK), SIZE)
 
 HTS_STATIC char *StringBuffN_(String *blk, int size) {
@@ -177,14 +198,15 @@ HTS_STATIC char *StringBuffN_(String *blk, int size) {
   return StringBuffRW(*blk);
 }
 
-/** Ceiling on the pre-C99 doubling search below; BLK is emptied past it. **/
+/** Largest buffer StringSprintf tries on a libc that does not report the length
+    it needs. It gives up past this size and leaves the String empty. **/
 #define STRING_SPRINTF_MAX ((size_t) 16 * 1024 * 1024)
 
 /** Replace BLK's contents with the formatted output, growing to fit, so no
-    fixed reserve has to bound an argument carrying remote input. An argument
-    may not point into BLK's own buffer, which is reallocated here.
-    Leaves BLK empty if the output cannot be produced (a conversion error, or
-    past STRING_SPRINTF_MAX): callers must not assume a non-empty result. **/
+    fixed reserve has to bound an argument carrying remote input. No argument
+    may point into BLK's own buffer, which this reallocates. The result is
+    NUL-terminated, and is empty when the output cannot be produced (a
+    conversion error, or a length past STRING_SPRINTF_MAX). **/
 #define StringSprintf(BLK, ...) StringSprintf_(&(BLK), __VA_ARGS__)
 
 HTS_STATIC HTS_PRINTF_FUN(2, 3) void StringSprintf_(String *blk,
@@ -217,9 +239,8 @@ HTS_STATIC HTS_PRINTF_FUN(2, 3) void StringSprintf_(String *blk,
   }
 }
 
-/** Zero the fields (NULL buffer, no allocation). Use on an uninitialized
-    String only; does NOT free an existing buffer (use StringFree to reset
-    an owned one), so calling it on a live String leaks. **/
+/** Set BLK to the empty state, with no buffer and no allocation. It frees
+    nothing, so calling it on a String that owns a buffer leaks that buffer. **/
 #define StringInit(BLK)                                                        \
   do {                                                                         \
     (BLK).buffer_ = NULL;                                                      \
@@ -227,8 +248,9 @@ HTS_STATIC HTS_PRINTF_FUN(2, 3) void StringSprintf_(String *blk,
     (BLK).length_ = 0;                                                         \
   } while (0)
 
-/** Truncate to length 0, keeping the allocation. Forces a non-NULL buffer
-    (allocates if empty) and writes the leading NUL, so StringBuff is "". **/
+/** Truncate the content to nothing, keeping the allocation. It allocates a
+    buffer if the String has none, so StringBuff then returns "" and not
+    NULL. **/
 #define StringClear(BLK)                                                       \
   do {                                                                         \
     (BLK).length_ = 0;                                                         \
@@ -236,8 +258,9 @@ HTS_STATIC HTS_PRINTF_FUN(2, 3) void StringSprintf_(String *blk,
     (BLK).buffer_[0] = '\0';                                                   \
   } while (0)
 
-/** Set length_ to SIZE, or to strlen(buffer_) if SIZE is negative. Caller
-    asserts SIZE fits the existing content; does not (re)allocate. **/
+/** Set the content length to SIZE bytes, or to the strlen of the buffer when
+    SIZE is negative, which needs a buffer to exist. It neither reallocates nor
+    writes a terminator, so SIZE must fit the bytes already there. **/
 #define StringSetLength(BLK, SIZE)                                             \
   do {                                                                         \
     const int len__ = (SIZE); /* signed: negative means strlen(buffer_) */     \
@@ -248,8 +271,8 @@ HTS_STATIC HTS_PRINTF_FUN(2, 3) void StringSprintf_(String *blk,
     }                                                                          \
   } while (0)
 
-/** Release the owned buffer and reset to the empty state (NULL buffer).
-    Idempotent; safe on an already-empty String. **/
+/** Free the owned buffer and reset BLK to the empty state. Safe to call on a
+    String that owns nothing, and safe to call twice. **/
 #define StringFree(BLK)                                                        \
   do {                                                                         \
     if ((BLK).buffer_ != NULL) {                                               \
@@ -260,12 +283,11 @@ HTS_STATIC HTS_PRINTF_FUN(2, 3) void StringSprintf_(String *blk,
     (BLK).length_ = 0;                                                         \
   } while (0)
 
-/** Take ownership of a NUL-terminated heap string STR (the String will free
-    it). Frees any current buffer first. STR MUST have been allocated by an
-    allocator compatible with STRING_REALLOC()/STRING_FREE(), and must not be
-    freed or used by the caller afterwards. length_/capacity_ are set to
-    strlen(STR) (capacity_ here excludes the NUL, so the next append reallocs).
-   **/
+/** Take ownership of the NUL-terminated heap string STR, freeing BLK's current
+    buffer first. STR must not be NULL, must come from the STRING_REALLOC
+    allocator, and must not be used by the caller afterwards. STR is evaluated
+    twice. The recorded capacity leaves out the NUL, so the next append
+    reallocates. **/
 #define StringSetBuffer(BLK, STR)                                              \
   do {                                                                         \
     size_t len__ = strlen(STR);                                                \
@@ -275,9 +297,8 @@ HTS_STATIC HTS_PRINTF_FUN(2, 3) void StringSprintf_(String *blk,
     (BLK).length_ = len__;                                                     \
   } while (0)
 
-/** Append SIZE raw bytes from STR (NULs allowed as data). Grows as needed and
-    re-terminates with a NUL after the appended bytes. STR must not alias
-    BLK's buffer (a realloc would invalidate it). **/
+/** Append SIZE bytes from STR, NUL bytes included as data, and re-terminate.
+    STR must not point into BLK's own buffer, which may move. **/
 #define StringMemcat(BLK, STR, SIZE)                                           \
   do {                                                                         \
     const char *str_mc_ = (STR);                                               \
@@ -290,15 +311,15 @@ HTS_STATIC HTS_PRINTF_FUN(2, 3) void StringSprintf_(String *blk,
     *((BLK).buffer_ + (BLK).length_) = '\0';                                   \
   } while (0)
 
-/** Replace content with SIZE raw bytes from STR (NULs allowed as data).
-    Same non-aliasing requirement as StringMemcat. **/
+/** Replace the content with SIZE bytes from STR, NUL bytes included as data.
+    STR must not point into BLK's own buffer. **/
 #define StringMemcpy(BLK, STR, SIZE)                                           \
   do {                                                                         \
     (BLK).length_ = 0;                                                         \
     StringMemcat(BLK, STR, SIZE);                                              \
   } while (0)
 
-/** Append one byte and re-terminate. Grows as needed. **/
+/** Append the byte c and re-terminate. **/
 #define StringAddchar(BLK, c)                                                  \
   do {                                                                         \
     String *const s__ = &(BLK);                                                \
@@ -308,9 +329,10 @@ HTS_STATIC HTS_PRINTF_FUN(2, 3) void StringSprintf_(String *blk,
     StringBuffRW(*s__)[StringLength(*s__)] = 0;                                \
   } while (0)
 
-/** Hand the buffer to the caller and reset the String to empty (NULL buffer).
-    The returned pointer is now owned by the caller, who must STRING_FREE() it.
-    Returns NULL if the String was empty. **/
+/** Hand the buffer over to the caller and reset *blk to the empty state. The
+    caller owns the returned pointer and must release it with STRING_FREE().
+    @return NULL when the String never allocated a buffer, and "" when it held
+    a buffer but no content. **/
 HTS_STATIC char *StringAcquire(String *blk) {
   char *buff = StringBuffRW(*blk);
 
@@ -320,8 +342,9 @@ HTS_STATIC char *StringAcquire(String *blk) {
   return buff;
 }
 
-/** Return an independent deep copy of *src (its own allocation). The caller
-    owns the result and must StringFree it. **/
+/** Return a copy of *src with its own allocation, which the caller releases
+    with StringFree. The copy always owns a buffer, even when @p src owns
+    none. **/
 HTS_STATIC String StringDup(const String *src) {
   String s = STRING_EMPTY;
 
@@ -329,10 +352,10 @@ HTS_STATIC String StringDup(const String *src) {
   return s;
 }
 
-/** Take ownership of *str (a NUL-terminated heap string) and NULL it out, so
-    ownership transfers and the caller keeps no dangling alias. Frees any
-    current buffer first. *str MUST be allocator-compatible (see
-    StringSetBuffer). No-op if str or *str is NULL. **/
+/** Take ownership of *str, a NUL-terminated heap string, and set *str to NULL
+    so the caller keeps no alias to it. It frees blk's current buffer first, so
+    a NULL @p str or *str leaves @p blk empty. *str must come from the
+    STRING_REALLOC allocator. **/
 HTS_STATIC void StringAttach(String *blk, char **str) {
   StringFree(*blk);
   if (str != NULL && *str != NULL) {
@@ -342,8 +365,8 @@ HTS_STATIC void StringAttach(String *blk, char **str) {
   }
 }
 
-/** Append the C string STR (up to its NUL). No-op if STR is NULL. STR must not
-    alias BLK's buffer. **/
+/** Append the C string STR, up to its NUL. It does nothing when STR is NULL.
+    STR must not point into BLK's own buffer. **/
 #define StringCat(BLK, STR)                                                    \
   do {                                                                         \
     const char *const str__ = (STR);                                           \
@@ -353,8 +376,8 @@ HTS_STATIC void StringAttach(String *blk, char **str) {
     }                                                                          \
   } while (0)
 
-/** Append at most SIZE leading bytes of the C string STR. No-op if STR is
-    NULL. STR must not alias BLK's buffer. **/
+/** Append at most SIZE leading bytes of the C string STR. It does nothing when
+    STR is NULL. STR must not point into BLK's own buffer. **/
 #define StringCatN(BLK, STR, SIZE)                                             \
   do {                                                                         \
     const char *str__ = (STR);                                                 \
@@ -368,8 +391,8 @@ HTS_STATIC void StringAttach(String *blk, char **str) {
     }                                                                          \
   } while (0)
 
-/** Replace content with at most SIZE leading bytes of the C string STR.
-    If STR is NULL, clears to "". STR must not alias BLK's buffer. **/
+/** Replace the content with at most SIZE leading bytes of the C string STR, or
+    with "" when STR is NULL. STR must not point into BLK's own buffer. **/
 #define StringCopyN(BLK, STR, SIZE)                                            \
   do {                                                                         \
     const char *str__ = (STR);                                                 \
@@ -386,13 +409,14 @@ HTS_STATIC void StringAttach(String *blk, char **str) {
     }                                                                          \
   } while (0)
 
-/** Replace blk's content with a copy of String blk2. blk and blk2 must be
-    distinct Strings (use StringCopyOverlapped if they may be the same). **/
+/** Replace blk's content with a copy of the String blk2, which must be a
+    different String from blk. The copy stops at the first NUL in blk2, so
+    content holding NUL bytes needs StringMemcpy. blk2 is evaluated twice. **/
 #define StringCopyS(blk, blk2) StringCopyN(blk, (blk2).buffer_, (blk2).length_)
 
-/** Replace content with a copy of the C string STR. If STR is NULL, clears to
-    "". STR must not alias BLK's buffer (use StringCopyOverlapped if it might).
-   **/
+/** Replace the content with a copy of the C string STR, or with "" when STR is
+    NULL. STR must not point into BLK's own buffer (use StringCopyOverlapped
+    when it might). **/
 #define StringCopy(BLK, STR)                                                   \
   do {                                                                         \
     const char *str__ = (STR);                                                 \
@@ -404,8 +428,7 @@ HTS_STATIC void StringAttach(String *blk, char **str) {
     }                                                                          \
   } while (0)
 
-/** Like StringCopy but safe when STR aliases BLK's own buffer: copies via a
-    temporary, so a self-copy or overlap is well-defined. **/
+/** Like StringCopy, but STR may point into BLK's own buffer. **/
 #define StringCopyOverlapped(BLK, STR)                                         \
   do {                                                                         \
     String s__ = STRING_EMPTY;                                                 \

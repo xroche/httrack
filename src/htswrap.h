@@ -32,15 +32,15 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 /** @file htswrap.h
-    Legacy entry points of the callback-wrapper subsystem. The live callback
-    registration API now lives on the httrackp options block (hts_set_callback);
-    only the no-op init/free stubs remain exported here for ABI compatibility.
- */
+    Legacy declarations of the callback-wrapper stubs. The whole header is empty
+    unless HTS_INTERNAL_BYTECODE is defined, which only the engine's own sources
+    do. httrack-library.h declares the same two stubs to consumers, next to
+    htswrap_add() and htswrap_read(), which register and read callbacks. */
 
 #ifndef HTSWRAP_DEFH
 #define HTSWRAP_DEFH
 
-/* Library internal definictions */
+/* Engine-internal declarations: a consumer sees nothing from this header. */
 #ifdef HTS_INTERNAL_BYTECODE
 
 #include "htsglobal.h"
@@ -55,10 +55,10 @@ typedef struct httrackp httrackp;
 extern "C" {
 #endif
 
-/** Legacy no-op retained for ABI compatibility; always returns 1. */
+/** Legacy stub kept for old clients. It does nothing and returns 1. */
 HTSEXT_API int htswrap_init(void); // LEGACY
 
-/** Legacy no-op retained for ABI compatibility; always returns 1. */
+/** Legacy stub kept for old clients. It does nothing and returns 1. */
 HTSEXT_API int htswrap_free(void); // LEGACY
 
 #ifdef __cplusplus
