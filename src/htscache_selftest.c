@@ -1693,9 +1693,12 @@ static void corrupt_build_disk(httrackp *opt) {
   fclose(fp);
 }
 
-/* Patch the nth of total occurrences of pat (same-length rep) in new.zip. */
-static void corrupt_patch(httrackp *opt, const char *pat, size_t patlen,
-                          const char *rep, size_t nth, size_t total) {
+/* Patch the nth of total occurrences of pat in new.zip. `line` demands the
+   match span a whole header line, so a placeholder longer than the forged
+   replacement cannot leave its tail on the value. */
+static void corrupt_patch_bytes(httrackp *opt, const char *pat, size_t patlen,
+                                const char *rep, size_t nth, size_t total,
+                                hts_boolean line) {
   LLint fsz = 0;
   char *data = readfile2(reconcile_st_path(opt, "hts-cache/new.zip"), &fsz);
   const size_t n = (size_t) fsz;
@@ -1711,12 +1714,26 @@ static void corrupt_patch(httrackp *opt, const char *pat, size_t patlen,
     }
   }
   assertf(hits == total);
+  /* either literal short of patlen would be read past its end */
+  assertf(strlen(pat) == patlen);
+  assertf(strlen(rep) == patlen);
+  if (line) {
+    assertf(at > 0 && data[at - 1] == '\n');
+    assertf(at + patlen + 2 <= n);
+    assertf(memcmp(data + at + patlen, "\r\n", 2) == 0);
+  }
   memcpy(data + at, rep, patlen);
   fp = fopen(reconcile_st_path(opt, "hts-cache/new.zip"), "wb");
   assertf(fp != NULL);
   assertf(hts_fwrite_exact(data, n, fp));
   fclose(fp);
   freet(data);
+}
+
+/* Forge one whole header line, same byte length, so the zip offsets hold. */
+static void corrupt_patch(httrackp *opt, const char *pat, size_t patlen,
+                          const char *rep, size_t nth, size_t total) {
+  corrupt_patch_bytes(opt, pat, patlen, rep, nth, total, HTS_TRUE);
 }
 
 /* Garbage the first bytes of the victim's deflated data (2nd local header). */
@@ -1878,7 +1895,9 @@ static int corrupt_expect_victim_clipped(httrackp *opt, size_t wantmsg,
     fail++;
   }
   c = cache_readex(opt, &cache, CORRUPT_ADR, "/canary.html", "", lc, NULL, 1);
-  if (c.statuscode != 200) {
+  if (c.statuscode != 200 || c.adr == NULL ||
+      c.size != (LLint) strlen(corrupt_body_a) ||
+      memcmp(c.adr, corrupt_body_a, strlen(corrupt_body_a)) != 0) {
     fprintf(stderr, "%s: %s: canary tainted (status %d)\n", selftest_tag, what,
             c.statuscode);
     fail++;
@@ -1918,9 +1937,10 @@ int cache_corruption_selftest(httrackp *opt, const char *dir) {
                                "Previous cache file not found (empty filename)",
                                "blanked X-In-Cache");
   /* smashed local file header: the entry is dropped at index load */
-  failures +=
-      corrupt_case_zip(opt, "PK\x03\x04", "XK\x03\x04", 2, 2,
-                       "File Cache Entry Not Found", "smashed local header");
+  corrupt_build(opt, "");
+  corrupt_patch_bytes(opt, "PK\x03\x04", 4, "XK\x03\x04", 2, 2, HTS_FALSE);
+  failures += corrupt_expect_victim(opt, "File Cache Entry Not Found",
+                                    "smashed local header");
 
   corrupt_build(opt, "");
   corrupt_victim_body(opt);
