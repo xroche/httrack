@@ -274,43 +274,89 @@ HTSEXT_API void hts_mutexfree(htsmutex * mutex) {
   }
 }
 
+/* gcc has had __atomic_load_n since 4.7 but __has_builtin only since 10. */
+#if defined(__has_builtin)
+#if __has_builtin(__atomic_load_n)
+#define HTS_HAS_ATOMIC_LOAD 1
+#endif
+#elif defined(__GNUC__) &&                                                     \
+    (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 7))
+#define HTS_HAS_ATOMIC_LOAD 1
+#endif
+
+/* Read a lock pointer another thread may be publishing right now. The
+   compare-and-swap below is a release, so this read has to be the matching
+   acquire, or a thread sees the pointer and still reads stale bytes inside the
+   lock body. x86 never reorders two loads and hides it; arm64 does not. */
+static htsmutex hts_mutexget(htsmutex *mutex) {
+#ifdef _WIN32
+  /* Exchanging HTSMUTEX_INIT for itself reads the slot and changes nothing.
+     MSVC has no cheaper form everywhere: volatile is acquire on x86 only. */
+  return (htsmutex) InterlockedCompareExchangePointer(
+      (PVOID volatile *) mutex, HTSMUTEX_INIT, HTSMUTEX_INIT);
+#elif defined(HTS_HAS_ATOMIC_LOAD)
+  return __atomic_load_n(mutex, __ATOMIC_ACQUIRE);
+#else
+  /* The compare-and-swap below needs the __sync family anyway. */
+  const htsmutex got = *(htsmutex volatile *) mutex;
+
+  __sync_synchronize();
+  return got;
+#endif
+}
+
 HTSEXT_API void hts_mutexlock(htsmutex * mutex) {
+  htsmutex lock;
+
   assertf(mutex != NULL);
-  if (*mutex == HTSMUTEX_INIT) {        /* must be initialized */
+  lock = hts_mutexget(mutex);
+  if (lock == HTSMUTEX_INIT) { /* must be initialized */
     /* Initialize exactly once, even when several threads race to lock the same
        mutex for the first time. Build our own object, then publish it with a
        single atomic compare-and-swap; the threads that lose the race free the
        object they built (issue #297). No static guard is needed, which keeps
        this safe on Windows 2000 (no statically-initializable lock there). */
     htsmutex created = HTSMUTEX_INIT;
+    htsmutex published;
 
     hts_mutexinit(&created);
 #ifdef _WIN32
-    if (InterlockedCompareExchangePointer((PVOID volatile *) mutex, created,
-                                          HTSMUTEX_INIT) != HTSMUTEX_INIT)
+    published = (htsmutex) InterlockedCompareExchangePointer(
+        (PVOID volatile *) mutex, created, HTSMUTEX_INIT);
 #else
-    if (!__sync_bool_compare_and_swap(mutex, HTSMUTEX_INIT, created))
+    published = __sync_val_compare_and_swap(mutex, HTSMUTEX_INIT, created);
 #endif
-    {
+    /* Both forms are full barriers, so the loser's read of the winner's
+       pointer is as ordered as the acquire above. */
+    if (published != HTSMUTEX_INIT) {
       hts_mutexfree(&created);
+      lock = published;
+    } else {
+      lock = created;
     }
   }
-  assertf(*mutex != NULL);
+  assertf(lock != NULL);
 #ifdef _WIN32
-  assertf((*mutex)->handle != NULL);
-  WaitForSingleObject((*mutex)->handle, INFINITE);
+  assertf(lock->handle != NULL);
+  WaitForSingleObject(lock->handle, INFINITE);
 #else
-  pthread_mutex_lock(&(*mutex)->handle);
+  pthread_mutex_lock(&lock->handle);
 #endif
 }
 
 HTSEXT_API void hts_mutexrelease(htsmutex * mutex) {
-  assertf(mutex != NULL && *mutex != NULL);
+  htsmutex lock;
+
+  assertf(mutex != NULL);
+  /* Atomic here too: the compare-and-swap writes the slot whether it wins or
+     loses, so a loser is still writing it while the winner unlocks. */
+  lock = hts_mutexget(mutex);
+  assertf(lock != NULL);
 #ifdef _WIN32
-  assertf((*mutex)->handle != NULL);
-  ReleaseMutex((*mutex)->handle);
+  assertf(lock->handle != NULL);
+  ReleaseMutex(lock->handle);
 #else
-  pthread_mutex_unlock(&(*mutex)->handle);
+  pthread_mutex_unlock(&lock->handle);
 #endif
 }
 

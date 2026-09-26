@@ -1,0 +1,46 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# Eight threads race for 64 locks none of them has built yet, so every lock is
+# published by one thread and taken by the other seven. A count that comes out
+# short means the race handed two threads two different locks.
+assert_selftest "mutexlazyinit self-test: OK" mutexlazyinit
+
+# The run above cannot see a missing acquire on x86, which never reorders two
+# loads: the stale read only happens on arm64, or under ThreadSanitizer. So
+# guard the ordering at the source, where the same run is the trigger.
+src=$top_srcdir/src/htsthread.c
+
+body_of() { awk "/^[A-Za-z_].*[ *]$1\\(/,/^}/" "$src"; }
+
+for fn in hts_mutexlock hts_mutexrelease; do
+    body=$(body_of "$fn")
+    case "$body" in
+    *"hts_mutexget(mutex)"*) ;;
+    *)
+        echo "FAIL: ${fn}() no longer reads the lock through hts_mutexget()"
+        exit 1
+        ;;
+    esac
+    # Past the signature line, which spells the argument the same way.
+    case "$(printf '%s\n' "$body" | tail -n +2)" in
+    *"*mutex"*)
+        echo "FAIL: ${fn}() reads the published lock without the acquire"
+        exit 1
+        ;;
+    esac
+done
+
+body=$(body_of hts_mutexget)
+case "$body" in
+*__ATOMIC_ACQUIRE*) ;;
+*)
+    echo "FAIL: hts_mutexget() no longer loads with acquire ordering"
+    exit 1
+    ;;
+esac
