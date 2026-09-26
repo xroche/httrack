@@ -254,6 +254,8 @@ int hts_newthread_tail(void (*fun)(void *arg), void *arg,
 HTSEXT_API void hts_mutexinit(htsmutex * mutex) {
   htsmutex_s *smutex = malloct(sizeof(htsmutex_s));
 
+  /* void and exported, so abort: hts_mutexlock() asserts this anyway. */
+  assertf(smutex != NULL);
 #ifdef _WIN32
   smutex->handle = CreateMutex(NULL, FALSE, NULL);
 #else

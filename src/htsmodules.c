@@ -143,6 +143,8 @@ void *openFunctionLib(const char *file_) {
   void *handle;
   char *file = malloct(strlen(file_) + 32);
 
+  if (file == NULL)
+    return NULL; /* no module, which the caller already reports */
   strcpy(file, file_);
 #ifdef _WIN32
   handle = LoadLibraryA(file);

@@ -1,0 +1,85 @@
+#!/bin/bash
+#
+# These four build something out of a fresh allocation and use it on the next
+# line. Each one had no NULL check, so an out-of-memory run dereferenced NULL
+# instead of reporting a failure. RLIMIT_AS cannot reach allocations this small,
+# which is why this reads the source instead of starving a run.
+#
+# Named outside every category the Windows CI suite globs, as the other source
+# scans are: it reads the tracked sources, so a second platform tells it nothing.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+top="${abs_top_srcdir:?not run under make check}"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/allocnull.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "$work"
+
+# An allocation is answered for only if one of the next few lines tests THAT
+# variable against NULL, or asserts it. Any nearby "NULL" would otherwise do,
+# and the "if (head == NULL)" two lines below one of these made the scan blind.
+unchecked() { # unchecked FILE -> the allocation lines with no answer after them
+    awk '
+    { line[NR] = $0 }
+    /=[ \t]*(malloct|calloct|realloct|strdupt)[ \t]*\(/ {
+        lv = $0
+        sub(/[ \t]*=.*$/, "", lv)        # drop "= malloct(...)" and after
+        sub(/^.*[ \t*]/, "", lv)         # drop the type and any "*"
+        at[++n] = NR
+        name[n] = lv
+    }
+    END {
+        for (i = 1; i <= n; i++) {
+            ok = 0
+            answer = name[i] "[ \t]*[!=]=[ \t]*NULL"
+            asserted = "assertf\\(" name[i] "[^A-Za-z0-9_]"
+            for (j = 0; j <= 4; j++) {
+                l = line[at[i] + j]
+                if (l ~ answer || l ~ asserted) { ok = 1; break }
+            }
+            if (!ok) print at[i] ": " line[at[i]]
+        }
+        printf "%d\n", n > "/dev/stderr"
+    }' "$1"
+}
+
+# file:function pairs, and the number of allocations each must still contain.
+check() { # check FILE FUNCTION WANT-ALLOCATIONS
+    local file=$1 fn=$2 want=$3 got
+    sed -n "/^[a-zA-Z].*[ *]${fn}(/,/^}/p" "$top/$file" >"$work/body"
+    test -s "$work/body" || fail "$fn is gone from $file, or no longer starts a line"
+    got=$(unchecked "$work/body" 2>"$work/n")
+    test "$(cat "$work/n")" -eq "$want" ||
+        fail "$file:$fn has $(cat "$work/n") allocations, expected $want"
+    test -z "$got" ||
+        fail "$file:$fn uses an allocation without answering for NULL:${TESTLIB_NL}$got"
+}
+
+check src/htslib.c resolver_dup_chain 2
+check src/htslib.c resolver_make_ai 4
+check src/htsmodules.c openFunctionLib 1
+check src/htsthread.c hts_mutexinit 1
+
+# Control: the scan must see an unanswered allocation, and must not flag an
+# answered one.
+printf 'void f(void) {\n  char *p = malloct(8);\n  *p = 0;\n}\n' >"$work/dirty.c"
+test -n "$(unchecked "$work/dirty.c" 2>/dev/null)" ||
+    fail "the scan cannot see an unchecked allocation, so a clean result proves nothing"
+# The blindness this scan was rewritten for: a NULL test on another variable.
+printf 'void f(void) {\n  char *p = malloct(8);\n  if (q == NULL)\n    return;\n}\n' \
+    >"$work/other.c"
+test -n "$(unchecked "$work/other.c" 2>/dev/null)" ||
+    fail "a NULL test on another variable satisfies the scan, so it proves nothing"
+printf 'void f(void) {\n  char *p = malloct(8);\n  if (p == NULL)\n    return;\n}\n' \
+    >"$work/clean.c"
+test -z "$(unchecked "$work/clean.c" 2>/dev/null)" ||
+    fail "the scan flags a checked allocation, so it would fail on the fixed form"
+printf 'void f(void) {\n  char *p = malloct(8);\n  assertf(p != NULL);\n}\n' \
+    >"$work/asserted.c"
+test -z "$(unchecked "$work/asserted.c" 2>/dev/null)" ||
+    fail "the scan flags an asserted allocation, so hts_mutexinit would fail it"
+
+echo "8 allocations across 4 functions, all answered for"
