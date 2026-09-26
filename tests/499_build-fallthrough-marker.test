@@ -11,10 +11,7 @@ set -euo pipefail
 
 # Unset means no automake run (the Windows job runs the scripts directly), so
 # there are no configured flags to read.
-if [ -z "${abs_top_builddir:-}" ]; then
-    echo "abs_top_builddir unset, no automake environment, skipping" >&2
-    exit 77
-fi
+[ -n "${abs_top_builddir:-}" ] || skip "abs_top_builddir unset, no automake environment"
 [ -f "$abs_top_builddir/src/Makefile" ] || fail "$abs_top_builddir/src is not configured"
 [ -n "${abs_top_srcdir:-}" ] || fail "abs_top_srcdir unset"
 
