@@ -1024,7 +1024,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
         }
         StringCopy(url, surl);
       } else {
-        /* Build the archive lookup key, whose scheme PT_ReadIndex() strips again. */
+        /* PT_ReadIndex() strips the scheme off this archive lookup key. */
         if (StringLength(host) > 0) {
           /* Direct hit */
           if (
