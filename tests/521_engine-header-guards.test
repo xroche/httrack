@@ -14,8 +14,8 @@ cleanup_push rm -rf "$tmp"
 
 # Prints "FILE GUARD" per header, or "FILE ! reason". A guard is the first
 # directive, an #ifndef/#define pair, closing on the last line that is not a
-# comment or blank. One file per awk run: ENDFILE is a gawk extension, and
-# mawk is the default awk on the runners.
+# comment or blank. One file per awk run, because ENDFILE is a gawk extension
+# and the runners default to mawk.
 scan() { # scan FILE...
     local f
     for f in "$@"; do
