@@ -1,0 +1,52 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# Eight threads race for 64 locks none of them has built yet, so every lock is
+# published by one thread and taken by the other seven. A count that comes out
+# short means the race handed two threads two different locks.
+assert_selftest "mutexlazyinit self-test: OK" mutexlazyinit
+
+# The run above cannot see a missing acquire on x86, which never reorders two
+# loads: the stale read only happens on arm64, or under ThreadSanitizer. So
+# guard the ordering at the source, where the same run is the trigger. Both the
+# two call sites and the helper they call have to hold, because gutting either
+# one alone brings the race back.
+body_of() { # body_of FUNCTION FILE
+    awk "/^[A-Za-z_].*[ *]$1\\(/,/^}/" "$2"
+}
+
+for fn in hts_mutexlock hts_mutexrelease; do
+    body=$(body_of "$fn" "$top_srcdir/src/htsthread.c")
+    case "$body" in
+    *"hts_load_acquire_mutex(mutex)"*) ;;
+    *)
+        echo "FAIL: ${fn}() no longer reads the lock with an acquire load"
+        exit 1
+        ;;
+    esac
+    # Past the signature line, which spells the argument the same way.
+    case "$(printf '%s\n' "$body" | tail -n +2)" in
+    *"*mutex"*)
+        echo "FAIL: ${fn}() reads the published lock without the acquire"
+        exit 1
+        ;;
+    esac
+done
+
+# The helper itself: an acquire on gcc and clang, and on MSVC a volatile read,
+# which /volatile:ms makes an acquire on the x86 and x64 targets we build.
+body=$(body_of hts_load_acquire_mutex "$top_srcdir/src/htsthread.h")
+for want in __ATOMIC_ACQUIRE "htsmutex volatile"; do
+    case "$body" in
+    *"$want"*) ;;
+    *)
+        echo "FAIL: hts_load_acquire_mutex() no longer loads with acquire ordering"
+        exit 1
+        ;;
+    esac
+done
