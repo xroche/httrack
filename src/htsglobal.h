@@ -384,8 +384,8 @@ typedef int hts_tristate;
 #endif
 
 /* Marks a deliberate switch fallthrough, as a statement before the next case.
-   -Wimplicit-fallthrough=5 rejects a comment as the marker, so this is the only
-   spelling GCC and Clang both read. */
+   Nothing in the engine falls through, so it has no caller yet. Only the
+   attribute satisfies gcc and clang alike, so a comment cannot stand in. */
 #if defined(__has_attribute)
 
 #if __has_attribute(fallthrough)

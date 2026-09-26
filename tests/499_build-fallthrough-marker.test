@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# -Wimplicit-fallthrough and HTS_FALLTHROUGH are useless apart, so this reads the
-# flag out of the configured src/Makefile and compiles one switch per marker form
-# with it.
+# -Wimplicit-fallthrough and HTS_FALLTHROUGH are useless apart, so this compiles
+# one switch per marker form with the flags the build itself uses.
 
 set -euo pipefail
 
@@ -21,90 +20,64 @@ command -v "${cc_argv[0]}" >/dev/null 2>&1 || skip "no C compiler (${cc_argv[0]}
 
 flags=$(sed -n 's/^DEFAULT_CFLAGS = *//p' "$abs_top_builddir/src/Makefile")
 [ -n "$flags" ] || fail "src/Makefile carries no DEFAULT_CFLAGS line"
-flag=''
-for w in $flags; do
-    case "$w" in
-    -Wimplicit-fallthrough*) flag=$w ;;
-    esac
-done
-[ -n "$flag" ] ||
-    fail "the build flags carry no -Wimplicit-fallthrough, so HTS_FALLTHROUGH marks nothing: $flags"
-echo "configured as $flag" >&2
 
 tmp=$(mktemp -d) || exit 1
 cleanup_push rm -rf "$tmp"
-
 inc=(-I"$abs_top_srcdir/src" -I"$abs_top_builddir")
 
-# $1 names the case, $2 what goes between the two labels, and the rest are extra
-# compiler flags. Prints clean or warns.
-probe() {
-    local name=$1 marker=$2
-    shift 2
-    {
-        echo '#include "htsglobal.h"'
-        echo "int probe_$name(int x);"
-        echo "int probe_$name(int x) {"
-        echo '  int n = 0;'
-        echo '  switch (x) {'
-        echo '  case 1:'
-        echo '    n++;'
-        [ -z "$marker" ] || echo "    $marker"
-        echo '  case 2:'
-        echo '    n++;'
-        echo '    break;'
-        echo '  default:'
-        echo '    break;'
-        echo '  }'
-        echo '  return n;'
-        echo '}'
-    } >"$tmp/$name.c"
-    if "${cc_argv[@]}" "${inc[@]}" "$@" -Werror -c "$tmp/$name.c" -o "$tmp/$name.o" \
-        2>"$tmp/$name.err"; then
-        echo clean
-    else
-        echo warns
+# configure drops the flag on a compiler that has neither spelling (gcc 6 and
+# earlier), which tells a missing warning below apart from a lost one.
+printf 'int main(void) { return 0; }\n' >"$tmp/probe.c"
+supported=''
+for spelling in -Wimplicit-fallthrough=5 -Wimplicit-fallthrough; do
+    if "${cc_argv[@]}" "$spelling" -Werror -c "$tmp/probe.c" -o "$tmp/probe.o" 2>/dev/null; then
+        supported=$spelling
+        break
     fi
+done
+echo "${cc_argv[*]} takes ${supported:-no -Wimplicit-fallthrough}, build flags: $flags" >&2
+
+# nofall is the control: whatever the flags reject, it is not every probe.
+while read -r name want marker; do
+    cat >"$tmp/$name.c" <<EOF
+#include "htsglobal.h"
+int probe_$name(int x);
+int probe_$name(int x) {
+  switch (x) {
+  case 1:
+    x++;
+    $marker
+  case 2:
+    x++;
+  }
+  return x;
 }
-
-# Nothing below means anything if the flag cannot see a bare fallthrough.
-got=$(probe unmarked '' "$flag")
-[ "$got" = warns ] || fail "$flag accepted an unmarked fallthrough, the probes below prove nothing"
-
-# A switch with no fallthrough at all, so every verdict here is the flag reading
-# the marker and not the compiler refusing the probes wholesale.
-got=$(probe nofall 'break;' "$flag")
-[ "$got" = clean ] || fail_dump "$flag rejects a switch that does not fall through" "$tmp/nofall.err"
-
-got=$(probe marked 'HTS_FALLTHROUGH;' "$flag")
-if [ "$got" != clean ]; then
-    printf '#include "htsglobal.h"\nHTS_FALLTHROUGH\n' >"$tmp/expand.c"
-    pp=$("${cc_argv[@]}" "${inc[@]}" -E "$tmp/expand.c") ||
-        fail "cannot preprocess the HTS_FALLTHROUGH probe"
-    grep -q fallthrough <<<"$pp" ||
-        fail "$flag is on but HTS_FALLTHROUGH expands to nothing here, so no fallthrough can be marked"
-    fail_dump "HTS_FALLTHROUGH does not silence $flag" "$tmp/marked.err"
-fi
-
-# The gap this closes: a comment marks the fallthrough at gcc's default level and
-# reds clang.
-got=$(probe commented '/* FALLTHROUGH */' "$flag")
-[ "$got" = warns ] ||
-    fail "$flag accepts a /* FALLTHROUGH */ comment, so gcc and clang disagree again"
-
-# The control for the arm above: on gcc the bare spelling still takes the comment,
-# which is the whole reason configure asks for =5.
-case "$flag" in
--Wimplicit-fallthrough=*)
-    got=$(probe bare '/* FALLTHROUGH */' -Wimplicit-fallthrough)
-    if [ "$got" = clean ]; then
-        ok "the bare spelling takes the comment here, so $flag is what forbids it"
+EOF
+    # shellcheck disable=SC2086 # the whole flag list is the point, split as make splits it
+    if "${cc_argv[@]}" "${inc[@]}" $flags -Werror -c "$tmp/$name.c" -o "$tmp/$name.o" \
+        2>"$tmp/$name.err"; then
+        got=clean
     else
-        echo "note: the bare spelling rejects the comment too on ${cc_argv[*]}" >&2
+        got=warns
     fi
-    ;;
-*) echo "note: ${cc_argv[*]} has no level suffix, so the comment arm rests on the compiler" >&2 ;;
-esac
+    [ "$got" != "$want" ] || continue
+    case "$name" in
+    unmarked)
+        [ -n "$supported" ] ||
+            skip "${cc_argv[*]} has no -Wimplicit-fallthrough, so no build flag can carry one"
+        fail "the build flags do not warn on an unmarked fallthrough, though ${cc_argv[*]} takes $supported"
+        ;;
+    commented)
+        fail "the build flags take a /* FALLTHROUGH */ comment, which clang rejects, so the two disagree again"
+        ;;
+    esac
+    fail_dump "$name: wanted $want, got $got" "$tmp/$name.err"
+done <<'CASES'
+nofall clean break;
+unmarked warns
+marked clean HTS_FALLTHROUGH;
+commented warns /* FALLTHROUGH */
+CASES
 
-ok "$flag warns unmarked and HTS_FALLTHROUGH silences it"
+ok "the build flags warn on an unmarked fallthrough and HTS_FALLTHROUGH silences it"
 exit 0
