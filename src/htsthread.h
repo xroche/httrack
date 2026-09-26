@@ -77,17 +77,6 @@ static HTS_INLINE HTS_UNUSED int hts_load_acquire_int(const int *src) {
 #endif
 }
 
-/* Observe an int another thread publishes without taking its ordering. For a
-   reader that only has to not be a data race, where the reader that acts on the
-   published value brings the acquire. */
-static HTS_INLINE HTS_UNUSED int hts_load_relaxed_int(const int *src) {
-#ifdef _MSC_VER
-  return *(const volatile int *) src;
-#else
-  return __atomic_load_n(src, __ATOMIC_RELAXED);
-#endif
-}
-
 /* Read a lock hts_mutexlock() may be publishing right now. It builds the lock
    on first use and publishes it with a compare-and-swap, which is a release, so
    this read has to be the matching acquire, or a thread sees the pointer and

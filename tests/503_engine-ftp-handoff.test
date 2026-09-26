@@ -79,5 +79,3 @@ check_helper() { # check_helper FUNCTION ORDER
 
 check_helper hts_store_release_int __ATOMIC_RELEASE
 check_helper hts_load_acquire_int __ATOMIC_ACQUIRE
-# Relaxed is still atomic: a plain read here is a data race on every slot.
-check_helper hts_load_relaxed_int __ATOMIC_RELAXED
