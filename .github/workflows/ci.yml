@@ -31,11 +31,14 @@ jobs:
       matrix:
         # cflags is spelled out everywhere: an exported empty CFLAGS reads as
         # "set" to configure, which then drops its own -g -O2.
+        # werror is per-leg: these four run pinned images, so a new warning is
+        # our own. The -O3 -flto leg is left out, since a distribution builds
+        # that way and we do not pick its optimizer's warnings.
         include:
-          - { arch: x86-64, runner: ubuntu-24.04, cc: gcc, cflags: -g -O2 }
-          - { arch: x86-64, runner: ubuntu-24.04, cc: clang, cflags: -g -O2 }
-          - { arch: arm64, runner: ubuntu-24.04-arm, cc: gcc, cflags: -g -O2 }
-          - { arch: arm64, runner: ubuntu-24.04-arm, cc: clang, cflags: -g -O2 }
+          - { arch: x86-64, runner: ubuntu-24.04, cc: gcc, cflags: -g -O2, werror: --enable-werror }
+          - { arch: x86-64, runner: ubuntu-24.04, cc: clang, cflags: -g -O2, werror: --enable-werror }
+          - { arch: arm64, runner: ubuntu-24.04-arm, cc: gcc, cflags: -g -O2, werror: --enable-werror }
+          - { arch: arm64, runner: ubuntu-24.04-arm, cc: clang, cflags: -g -O2, werror: --enable-werror }
           # Ubuntu builds httrack this way; no other leg here does.
           - {
               arch: x86-64,
@@ -81,7 +84,7 @@ jobs:
             grep -q "zlib cannot be disabled" "$nozlib/out.log" \
               || { cat "$nozlib/out.log"; exit 1; }
           done
-          ./configure
+          ./configure ${{ matrix.werror }}
           # Same dead end from the compile side. The bare compile is the
           # control: without it a broken probe would pass vacuously.
           hdr='#include "htsglobal.h"'
