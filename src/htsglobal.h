@@ -383,6 +383,20 @@ typedef int hts_tristate;
 #define HTS_NORETURN
 #endif
 
+/* Marks a deliberate switch fallthrough, as a statement before the next case.
+   Nothing in the engine falls through, so it has no caller yet. Only the
+   attribute satisfies gcc and clang alike, so a comment cannot stand in. */
+#if defined(__has_attribute)
+
+#if __has_attribute(fallthrough)
+
+#define HTS_FALLTHROUGH __attribute__((fallthrough))
+#endif
+#endif
+#ifndef HTS_FALLTHROUGH
+#define HTS_FALLTHROUGH
+#endif
+
 /* LLint/TStamp: signed exact-width 64-bit; -1 is a sentinel engine-wide. */
 typedef int64_t LLint;
 typedef int64_t TStamp;

@@ -1,0 +1,83 @@
+#!/bin/bash
+#
+# -Wimplicit-fallthrough and HTS_FALLTHROUGH are useless apart, so this compiles
+# one switch per marker form with the flags the build itself uses.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# Unset means no automake run (the Windows job runs the scripts directly), so
+# there are no configured flags to read.
+[ -n "${abs_top_builddir:-}" ] || skip "abs_top_builddir unset, no automake environment"
+[ -f "$abs_top_builddir/src/Makefile" ] || fail "$abs_top_builddir/src is not configured"
+[ -n "${abs_top_srcdir:-}" ] || fail "abs_top_srcdir unset"
+
+# CC carries flags on some legs ("gcc -m32", "ccache gcc"), so split it first.
+read -r -a cc_argv <<<"${CC:-cc}"
+command -v "${cc_argv[0]}" >/dev/null 2>&1 || skip "no C compiler (${cc_argv[0]})"
+
+flags=$(sed -n 's/^DEFAULT_CFLAGS = *//p' "$abs_top_builddir/src/Makefile")
+[ -n "$flags" ] || fail "src/Makefile carries no DEFAULT_CFLAGS line"
+
+tmp=$(mktemp -d) || exit 1
+cleanup_push rm -rf "$tmp"
+inc=(-I"$abs_top_srcdir/src" -I"$abs_top_builddir")
+
+# configure drops the flag on a compiler that has neither spelling (gcc 6 and
+# earlier), which tells a missing warning below apart from a lost one.
+printf 'int main(void) { return 0; }\n' >"$tmp/probe.c"
+supported=''
+for spelling in -Wimplicit-fallthrough=5 -Wimplicit-fallthrough; do
+    if "${cc_argv[@]}" "$spelling" -Werror -c "$tmp/probe.c" -o "$tmp/probe.o" 2>/dev/null; then
+        supported=$spelling
+        break
+    fi
+done
+echo "${cc_argv[*]} takes ${supported:-no -Wimplicit-fallthrough}, build flags: $flags" >&2
+
+# nofall is the control: whatever the flags reject, it is not every probe.
+while read -r name want marker; do
+    cat >"$tmp/$name.c" <<EOF
+#include "htsglobal.h"
+int probe_$name(int x);
+int probe_$name(int x) {
+  switch (x) {
+  case 1:
+    x++;
+    $marker
+  case 2:
+    x++;
+  }
+  return x;
+}
+EOF
+    # shellcheck disable=SC2086 # the whole flag list is the point, split as make splits it
+    if "${cc_argv[@]}" "${inc[@]}" $flags -Werror -c "$tmp/$name.c" -o "$tmp/$name.o" \
+        2>"$tmp/$name.err"; then
+        got=clean
+    else
+        got=warns
+    fi
+    [ "$got" != "$want" ] || continue
+    case "$name" in
+    unmarked)
+        [ -n "$supported" ] ||
+            skip "${cc_argv[*]} has no -Wimplicit-fallthrough, so no build flag can carry one"
+        fail "the build flags do not warn on an unmarked fallthrough, though ${cc_argv[*]} takes $supported"
+        ;;
+    commented)
+        fail "the build flags take a /* FALLTHROUGH */ comment, which clang rejects, so the two disagree again"
+        ;;
+    esac
+    fail_dump "$name: wanted $want, got $got" "$tmp/$name.err"
+done <<'CASES'
+nofall clean break;
+unmarked warns
+marked clean HTS_FALLTHROUGH;
+commented warns /* FALLTHROUGH */
+CASES
+
+ok "the build flags warn on an unmarked fallthrough and HTS_FALLTHROUGH silences it"
+exit 0

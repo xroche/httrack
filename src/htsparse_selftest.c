@@ -429,7 +429,7 @@ static hts_boolean jsscan_model(httrackp *opt, const char *cursor,
     case JSGUARD_NO_IDENT_QUOTE:
       if (prev == '"' || prev == '\'' || prev == '`')
         continue;
-      /* FALLTHROUGH to the identifier test */
+      /* Quotes aside, the identifier test below applies here too. */
       if (isalnum((unsigned char) prev) || prev == '_' || prev == '$' ||
           prev == '.' ||
           ((unsigned char) prev >= 0x80 &&

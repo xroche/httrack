@@ -224,7 +224,10 @@ AX_CHECK_COMPILE_FLAG([-Wold-style-definition], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS
 AX_CHECK_COMPILE_FLAG([-Wignored-qualifiers], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wignored-qualifiers"], [], [-Werror])
 AX_CHECK_COMPILE_FLAG([-Wsign-compare], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wsign-compare"], [], [-Werror])
 AX_CHECK_COMPILE_FLAG([-Wduplicated-cond], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wduplicated-cond"], [], [-Werror])
-AX_CHECK_COMPILE_FLAG([-Wimplicit-fallthrough], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wimplicit-fallthrough"], [], [-Werror])
+# gcc's default level accepts a comment as the marker and clang only the
+# attribute; =5 drops the comment, so HTS_FALLTHROUGH is the one both read.
+AX_CHECK_COMPILE_FLAG([-Wimplicit-fallthrough=5], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wimplicit-fallthrough=5"],
+	[AX_CHECK_COMPILE_FLAG([-Wimplicit-fallthrough], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wimplicit-fallthrough"], [], [-Werror])], [-Werror])
 # Implied by -Wall today; named explicitly so a truncating copy stays visible.
 AX_CHECK_COMPILE_FLAG([-Wstringop-truncation], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wstringop-truncation"], [], [-Werror])
 # The tree has no stack allocation sized off the wire, and these keep it that way.
