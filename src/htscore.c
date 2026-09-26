@@ -2531,6 +2531,8 @@ void host_ban(httrackp * opt, int ptr,
   // couper connexion
   for(i = 0; i < back_max; i++) {
     if (back[i].status >= 0)    // réception OU prêt
+      /* strfield2() is equality and an FTP url_adr keeps a scheme host lacks,
+         so that alone spares a slot its worker thread is still writing. */
       if (strfield2(back[i].url_adr, host)) {
 #if HTS_DEBUG_CLOSESOCK
         DEBUG_W("host control: deletehttp\n");

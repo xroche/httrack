@@ -5269,7 +5269,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
       for (i_mod = 0; i_mod < (unsigned int) back_max; i_mod++) {
         unsigned int i = (i_mod + mod_random) % (back_max);
 
-        if (back[i].status > 0) {       // réception/connexion/..
+        if (back_is_live(back[i].status)) { // receiving, connecting, ..
           if (back[i].timeout > 0) {
             // a stuck connect with a fallback address: retry the next one well
             // before the full timeout (dead IPv6 on a dual-stack host, ...)
