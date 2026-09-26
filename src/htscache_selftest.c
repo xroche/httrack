@@ -3320,13 +3320,16 @@ int ref_portable_selftest(httrackp *opt, const char *dir) {
     const size_t blit = sizeof(lien_back);
     const size_t size = sizeof(blit) * 3 + blit;
     unsigned char *legacy = calloct(1, size);
-    lien_back *const old = (lien_back *) (legacy + sizeof(blit));
+    /* blitted from its own allocation: the record is not struct-aligned here */
+    lien_back *old = calloct(1, sizeof(lien_back));
 
     memcpy(legacy, &blit, sizeof(blit));
     strcpybuff(old->url_adr, REF_ST_ADR);
     strcpybuff(old->url_fil, REF_ST_FIL);
     strcpybuff(old->url_sav, REF_ST_SAV);
     old->r.statuscode = 206;
+    memcpy(legacy + sizeof(blit), old, sizeof(lien_back));
+    freet(old);
     fail +=
         ref_st_refuse(opt, path, legacy, size, "a legacy host-native record");
     freet(legacy);

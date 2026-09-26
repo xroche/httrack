@@ -205,6 +205,33 @@ AC_SUBST(DEFAULT_CFLAGS)
 DEFAULT_LDFLAGS=""
 AC_SUBST(DEFAULT_LDFLAGS)
 
+### Treat a warning as a build break (our CI only)
+# Opt-in: a distribution toolchain we do not pin must never fail to build over a
+# warning we have never seen.
+AC_MSG_CHECKING([whether to turn warnings into errors])
+AC_ARG_ENABLE([werror],
+	[AS_HELP_STRING([--enable-werror],
+		[Fail the build on any compiler warning @<:@default=no@:>@])],
+	[
+	case "${enableval}" in
+	no|yes)
+		AC_MSG_RESULT($enableval)
+		;;
+	*)
+		AC_MSG_ERROR([bad value for werror, expected yes/no])
+		;;
+	esac
+	],
+	[
+	enable_werror=no
+	AC_MSG_RESULT(no)
+	])
+# DEFAULT_CFLAGS only, never CFLAGS: configure's probes must keep answering on a
+# warning, or every AX_CHECK_COMPILE_FLAG below changes meaning. The exemption is
+# for src/coucal, a pinned submodule clang warns about and this tree does not own.
+AS_IF([test x"$enable_werror" = x"yes"],
+	[DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Werror -Wno-error=format-nonliteral"])
+
 ### Additional flags (if supported)
 # -Werror on probes: exit-status-only checks let clang's warn-on-unknown-flag through.
 AX_CHECK_COMPILE_FLAG([-Wparentheses], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -Wparentheses"], [], [-Werror])
