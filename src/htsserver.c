@@ -223,8 +223,8 @@ HTS_UNUSED static int LANG_LIST(const char *path, char *buffer, size_t size);
 // 0- Init the URL catcher with standard port
 
 // smallserver_init(&port,&return_host);
-T_SOC smallserver_init_std(int *port_prox, char *adr_prox, int defaultPort,
-                           const char *bindAddr) {
+T_SOC smallserver_init_std(int *port_prox, char *adr_prox, size_t adr_size,
+                           int defaultPort, const char *bindAddr) {
   T_SOC soc;
 
   if (defaultPort <= 0) {
@@ -237,12 +237,13 @@ T_SOC smallserver_init_std(int *port_prox, char *adr_prox, int defaultPort,
     int i = 0;
 
     do {
-      soc = smallserver_init(&try_to_listen_to[i], adr_prox, bindAddr);
+      soc =
+          smallserver_init(&try_to_listen_to[i], adr_prox, adr_size, bindAddr);
       *port_prox = try_to_listen_to[i];
       i++;
     } while((soc == INVALID_SOCKET) && (try_to_listen_to[i] >= 0));
   } else {
-    soc = smallserver_init(&defaultPort, adr_prox, bindAddr);
+    soc = smallserver_init(&defaultPort, adr_prox, adr_size, bindAddr);
     *port_prox = defaultPort;
   }
   return soc;
@@ -402,7 +403,8 @@ static void advertised_host(char *dst, size_t size, const char *bound) {
 }
 
 // smallserver_init(&port,&return_host);
-T_SOC smallserver_init(int *port, char *adr, const char *bindAddr) {
+T_SOC smallserver_init(int *port, char *adr, size_t adr_size,
+                       const char *bindAddr) {
   T_SOC soc = INVALID_SOCKET;
   char h_loc[256 + 2];
   SOCaddr server;
@@ -437,7 +439,7 @@ T_SOC smallserver_init(int *port, char *adr, const char *bindAddr) {
         char adv[sizeof(h_loc) + 2]; /* + the brackets of an IPv6 literal */
 
         advertised_host(adv, sizeof(adv), h_loc);
-        strcpy(adr, adv);
+        strclipbuff(adr, adr_size, adv);
       } else {
 #ifdef _WIN32
         closesocket(soc);

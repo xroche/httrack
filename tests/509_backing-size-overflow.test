@@ -1,0 +1,38 @@
+#!/bin/bash
+#
+# -c is only clamped when --bypass-limits (-%!) is off, and the backing count is
+# maxsoc * 32 + 1024. A large -c overflowed that signed multiply, so the engine
+# asked its allocator for a negative number of slots.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/backsize.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "$work"
+
+# Port 1 answers nothing, so nothing is fetched: the backing table is built
+# before any request, which is the whole path under test.
+run() { # run DIR MAXSOC
+    rm -rf "$2"
+    httrack -O "$1" '-%!' "-c$2" 'http://127.0.0.1:1/never' >/dev/null 2>&1 || true
+    test -r "$1/hts-log.txt" || fail "no log for -c$2"
+}
+
+# 2000000000 * 32 wraps; the count it asks for must still be a positive number.
+run "$work/big" 2000000000
+slots=$(sed -n 's/.*allocate \(-*[0-9]*\) backing slots.*/\1/p' \
+    "$work/big/hts-log.txt" | head -1)
+test -n "$slots" ||
+    fail "the engine never reported a backing size, so this proves nothing:$TESTLIB_NL$(cat "$work/big/hts-log.txt")"
+test "$slots" -gt 0 ||
+    fail "the engine asked for $slots backing slots"
+
+# Control: an ordinary -c must still size the table from it, not from the cap.
+run "$work/small" 4
+if command grep -q 'backing slots' "$work/small/hts-log.txt"; then
+    fail "a four-connection crawl could not allocate its backing table"
+fi
+
+echo "a large -c asks for $slots backing slots, and a small one allocates"

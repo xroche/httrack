@@ -47,9 +47,13 @@ Please visit our Website: http://www.httrack.com
 
 // Maximum length for a keyword
 #define KEYW_LEN             50
+/* sscanf width for the char[KEYW_LEN + 32] words below: a format width has to
+   be a literal, so the static assertion next to it is what ties the two. */
+#define KEYW_SCAN_WIDTH "81"
 // Minimum length for a keyword - MUST NOT BE NULL!!!
 #define KEYW_MIN_LEN         3
-// What characters to accept? - MUST NOT BE EMPTY AND MUST NOT CONTAIN THE SPACE (32) CHARACTER!!!
+// What characters to accept? - MUST NOT BE EMPTY AND MUST NOT CONTAIN THE SPACE
+// (32) CHARACTER!!!
 #define KEYW_ACCEPT          "abcdefghijklmnopqrstuvwxyz0123456789-_."
 // Convert A to a, and so on.. to avoid case problems in indexing
 // This can be a generic table, containing characters that are in fact not accepted by KEYW_ACCEPT
@@ -361,6 +365,8 @@ void index_finish(const char *indexpath, int mode) {
             if (fp) {
               char current_word[KEYW_LEN + 32];
               char word[KEYW_LEN + 32];
+
+              HTS_STATIC_ASSERT(sizeof(word) == 82, keyw_scan_width_matches);
               int hit;
               int total_hit = 0;
               int total_line = 0;
@@ -383,7 +389,10 @@ void index_finish(const char *indexpath, int mode) {
               }
 
               for(i = 0; i < index; i++) {
-                if (sscanf(tab[i], "%s %d", word, &hit) == 2) {
+                /* the width is the buffer's, not the keyword cap a hundred
+                   lines up that happens to be smaller today */
+                if (sscanf(tab[i], "%" KEYW_SCAN_WIDTH "s %d", word, &hit) ==
+                    2) {
                   char *a = strchr(tab[i], ' ');
 
                   if (a)

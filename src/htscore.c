@@ -1104,8 +1104,11 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   // backing
   if (opt->maxsoc > 0) {
     /* How many HTML files may sit in memory at once. Sized generously: HTML
-       takes little room and everything else is written straight to disk. */
-    const int back_max = opt->maxsoc * 32 + 1024;
+       takes little room and everything else is written straight to disk.
+       --bypass-limits leaves -cN unclamped, and the multiply is what overflows
+       first, so cap the count rather than the product. */
+    const int back_max =
+        opt->maxsoc < (INT_MAX - 1024) / 32 ? opt->maxsoc * 32 + 1024 : INT_MAX;
 
 #if BDEBUG==2
     _CLRSCR;
