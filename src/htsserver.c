@@ -658,8 +658,6 @@ static hts_boolean body_sid_is_valid(const char *body, const char *expected) {
   return seen;
 }
 
-#define IS_PATH_SEP(c) ((c) == '/' || (c) == '\\')
-
 /** Append src to the NUL-terminated dst of capacity size (NUL included).
     False, leaving dst untouched, if it would not fit: unlike strcatbuff() this
     never aborts, because every piece appended here is client-supplied. */
@@ -673,25 +671,6 @@ static hts_boolean path_append(char *dst, size_t size, const char *src) {
     return HTS_FALSE;
   }
   memcpy(dst + used, src, len + 1);
-  return HTS_TRUE;
-}
-
-/** True if path holds no ".." component, either separator counting. Lexical
-    only, so "a..b" is a name and no symlink is resolved. */
-static hts_boolean hts_path_is_contained(const char *path) {
-  const char *s;
-
-  for (s = path; *s != '\0';) {
-    while (IS_PATH_SEP(*s)) {
-      s++;
-    }
-    if (s[0] == '.' && s[1] == '.' && (s[2] == '\0' || IS_PATH_SEP(s[2]))) {
-      return HTS_FALSE;
-    }
-    while (*s != '\0' && !IS_PATH_SEP(*s)) {
-      s++;
-    }
-  }
   return HTS_TRUE;
 }
 

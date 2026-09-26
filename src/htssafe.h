@@ -492,6 +492,32 @@ static HTS_INLINE HTS_UNUSED hts_boolean strclipbuff(char *dest, size_t size,
   return copy == len ? HTS_TRUE : HTS_FALSE;
 }
 
+#define IS_PATH_SEP(c) ((c) == '/' || (c) == '\\')
+
+/**
+ * True if path holds no ".." component, either separator counting. Lexical
+ * only, so "a..b" is a name and no symlink is resolved. Use it on the
+ * UNTRUSTED half of a path, never on the assembled one: the user's own -O may
+ * legitimately start with "..".
+ */
+static HTS_INLINE HTS_UNUSED hts_boolean
+hts_path_is_contained(const char *path) {
+  const char *s;
+
+  for (s = path; *s != '\0';) {
+    while (IS_PATH_SEP(*s)) {
+      s++;
+    }
+    if (s[0] == '.' && s[1] == '.' && (s[2] == '\0' || IS_PATH_SEP(s[2]))) {
+      return HTS_FALSE;
+    }
+    while (*s != '\0' && !IS_PATH_SEP(*s)) {
+      s++;
+    }
+  }
+  return HTS_TRUE;
+}
+
 /**
  * Callers that deliberately ignore truncation use this instead of
  * slprintfbuff(), so it is not HTS_CHECK_RESULT.

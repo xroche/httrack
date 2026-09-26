@@ -2149,6 +2149,38 @@ static int st_strsprintf(httrackp *opt, int argc, char **argv) {
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
 
+static int st_pathcontained(httrackp *opt, int argc, char **argv) {
+  /* A ".." COMPONENT escapes; ".." inside a name does not. A plain strstr()
+     would reject all of the "contained" rows below. */
+  static const char *const escaping[] = {
+      "..",       "../x",      "a/../b", "a/..",    "/..", "..\\x",
+      "a\\..\\b", "x/../../y", "./../x", "a//../b", NULL};
+  static const char *const contained[] = {"a..b",  "..a",   "a..",    "...",
+                                          "a/b.c", "a/...", "a/b..c", ".",
+                                          "",      "a/./b", NULL};
+  int failures = 0;
+  size_t i;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (i = 0; escaping[i] != NULL; i++) {
+    if (hts_path_is_contained(escaping[i])) {
+      printf("pathcontained: '%s' was accepted\n", escaping[i]);
+      failures++;
+    }
+  }
+  for (i = 0; contained[i] != NULL; i++) {
+    if (!hts_path_is_contained(contained[i])) {
+      printf("pathcontained: '%s' was refused\n", contained[i]);
+      failures++;
+    }
+  }
+  if (failures == 0)
+    printf("pathcontained: OK\n");
+  return failures != 0;
+}
+
 const struct selftest_entry selftests_lib[] = {
     {"hashtable", "<count|file>", "coucal hashtable stress test", st_hashtable},
     {"strsafe", "[overflow|overflow-buff|overflow-src [str]]",
@@ -2156,6 +2188,9 @@ const struct selftest_entry selftests_lib[] = {
     {"strsprintf", "", "StringSprintf grows to fit at every capacity boundary",
      st_strsprintf},
     {"arena", "", "htsarena.h hands out addresses that never move", st_arena},
+    {"pathcontained", "",
+     "a \"..\" path component is refused and a \"..\" inside a name is not",
+     st_pathcontained},
     {"arrays", "[overflow-capa|overflow-loop]",
      "htsarrays.h growth reaches the requested room, or reports it failed",
      st_arrays},

@@ -1174,6 +1174,15 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
           } while (offset < readSizeHeader && !lineEof);
 
           /* Previous entry */
+          if (previous_save_[0] != '\0' &&
+              !hts_path_is_contained(previous_save_)) {
+            /* the archive is someone else's file, and previous_save is opened
+               at :1982 and served to the client */
+            PT_Element_failf(r, "Cache filename leaving the store: %s",
+                             previous_save_);
+            r->statuscode = STATUSCODE_INVALID;
+            previous_save_[0] = '\0';
+          }
           if (previous_save_[0] != '\0') {
             int pathLen = (int) strlen(index->path);
 
@@ -1918,6 +1927,15 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
         PT_Index__Old index = cache;
 
         /* -------------------- COPY OF THE __New() CODE -------------------- */
+        if (previous_save_[0] != '\0' &&
+            !hts_path_is_contained(previous_save_)) {
+          /* same reason as the __New() reader: previous_save is opened and its
+             bytes go to the client */
+          PT_Element_failf(r, "Cache filename leaving the store: %s",
+                           previous_save_);
+          r->statuscode = STATUSCODE_INVALID;
+          previous_save_[0] = '\0';
+        }
         if (previous_save_[0] != '\0') {
           int pathLen = (int) strlen(index->path);
 
