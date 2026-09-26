@@ -2145,6 +2145,144 @@ static int st_strsprintf(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+#ifndef _WIN32
+/* Point both output streams at fd, raise code, and hand back the errno the
+   handler left behind, or 0 if it put the caller's back. */
+static int sig_raise_on(int code, int fd) {
+  static const int sentinel = 0x5167;
+  int saved_out, saved_err, leaked;
+
+  fflush(stdout);
+  fflush(stderr);
+  saved_out = dup(1);
+  saved_err = dup(2);
+  assertf(saved_out != -1 && saved_err != -1);
+  assertf(dup2(fd, 1) != -1 && dup2(fd, 2) != -1);
+  errno = sentinel;
+  assertf(raise(code) == 0);
+  leaked = errno;
+  assertf(dup2(saved_out, 1) != -1 && dup2(saved_err, 2) != -1);
+  close(saved_out);
+  close(saved_err);
+  return leaked == sentinel ? 0 : leaked;
+}
+
+/* httrack.c's own handlers, reached here because main() installs them before
+   any self-test runs. SIGTSTP is left out: sig_back() either suspends the
+   process or forks it into the background. */
+static int st_sighandlers(httrackp *opt, int argc, char **argv) {
+  static const struct {
+    int code;
+    const char *name;
+    const char *says; /* what the user must still be told, NULL if silent */
+    hts_boolean with_code; /* the line ends with the signal number and a ')' */
+  } cases[] = {
+      {SIGCHLD, "SIGCHLD", NULL, HTS_FALSE},
+      {SIGPIPE, "SIGPIPE", NULL, HTS_FALSE},
+      {SIGTERM, "SIGTERM", "Exit requested to engine (signal ", HTS_TRUE},
+      {SIGINT, "SIGINT",
+       "** Finishing pending transfers.. press again ^C to quit.", HTS_FALSE}};
+
+  /* a descriptor no write can succeed on, so a leaked errno shows */
+  const int readonly = open("/dev/null", O_RDONLY);
+  FILE *const capture = tmpfile();
+  int capfd;
+  int err = 0;
+  size_t i;
+
+  (void) argc;
+  (void) argv;
+  assertf(readonly != -1);
+  assertf(capture != NULL);
+  capfd = fileno(capture);
+  assertf(capfd != -1);
+
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    const int code = cases[i].code;
+    int pass;
+
+    /* Twice: on the refusing descriptor, where a leaked errno shows, and on a
+       file, where what the handler wrote can be read back. */
+    for (pass = 0; pass < 2; pass++) {
+      const int fd = pass == 0 ? readonly : capfd;
+      char captured[512];
+      ssize_t got;
+      void (*installed)(int);
+      int leaked;
+
+      /* the control: a disposition main() never touched proves nothing below */
+      installed = signal(code, SIG_DFL);
+      assertf(installed != SIG_ERR);
+      assertf(signal(code, installed) == SIG_DFL);
+      if (installed == SIG_DFL || installed == SIG_IGN) {
+        printf("  FAIL: %s carries no handler to exercise\n", cases[i].name);
+        err = 1;
+        break;
+      }
+      /* sig_leave() only takes its own branch during a mirror; outside one it
+         ends the process, which is what the second ^C is for */
+      if (code == SIGINT)
+        opt->state._hts_in_mirror = 1;
+      /* the handler writes at the shared offset, so rewind as well as empty */
+      assertf(ftruncate(capfd, 0) == 0);
+      assertf(lseek(capfd, 0, SEEK_SET) == 0);
+
+      leaked = sig_raise_on(code, fd);
+      if (leaked != 0) {
+        printf("  FAIL: the %s handler left errno at %d\n", cases[i].name,
+               leaked);
+        err = 1;
+      }
+      /* and it still did its job */
+      if (code == SIGTERM && opt->state.exit_xh != 1) {
+        printf("  FAIL: SIGTERM did not ask the engine to exit\n");
+        err = 1;
+      }
+      if (code == SIGINT && !opt->state.stop) {
+        printf("  FAIL: SIGINT did not ask the mirror to stop\n");
+        err = 1;
+      }
+      opt->state._hts_in_mirror = 0;
+      opt->state.exit_xh = 0;
+      opt->state.stop = 0;
+      /* sig_finish() and sig_leave() re-arm to the terminating handler, so the
+         next raise would end the process instead of testing it */
+      assertf(signal(code, installed) != SIG_ERR);
+
+      if (pass == 0)
+        continue;
+      assertf(lseek(capfd, 0, SEEK_SET) == 0);
+      got = read(capfd, captured, sizeof(captured) - 1);
+      assertf(got >= 0);
+      captured[got] = '\0';
+      if (cases[i].says == NULL) {
+        if (got != 0) {
+          printf("  FAIL: %s is meant to be silent, but wrote \"%s\"\n",
+                 cases[i].name, captured);
+          err = 1;
+        }
+      } else {
+        char want[256];
+
+        if (cases[i].with_code)
+          snprintf(want, sizeof(want), "%s%d)", cases[i].says, code);
+        else
+          snprintf(want, sizeof(want), "%s", cases[i].says);
+        if (strstr(captured, want) == NULL) {
+          printf("  FAIL: %s wrote \"%s\" instead of \"%s\"\n", cases[i].name,
+                 captured, want);
+          err = 1;
+        }
+      }
+    }
+  }
+  close(readonly);
+  fclose(capture);
+  printf("sighandlers self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+#endif
+
 /* ------------------------------------------------------------ */
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
@@ -2177,5 +2315,10 @@ const struct selftest_entry selftests_lib[] = {
     {"structcheck", "<dir>",
      "structcheck path guard and the <name>.txt rename it performs",
      st_structcheck},
+#ifndef _WIN32
+    {"sighandlers", "",
+     "the signal handlers save errno and write with no locking output",
+     st_sighandlers},
+#endif
     {NULL, NULL, NULL, NULL},
 };
