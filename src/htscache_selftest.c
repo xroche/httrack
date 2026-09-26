@@ -1936,6 +1936,11 @@ int cache_corruption_selftest(httrackp *opt, const char *dir) {
   failures += corrupt_case_zip(opt, "X-In-Cache: 1", "X-In-Cache: 0", 2, 2,
                                "Previous cache file not found (empty filename)",
                                "blanked X-In-Cache");
+  /* X-Save is a filename the reader opens and renames, so a ".." in it would
+     reach outside the mirror. Same length, as corrupt_patch requires. */
+  failures += corrupt_case_zip(
+      opt, "X-Save: victim.html", "X-Save: ../vic.html", 1, 1,
+      "Cache Read Error : Bad Filename", "X-Save escaping the mirror");
   /* smashed local file header: the entry is dropped at index load */
   corrupt_build(opt, "");
   corrupt_patch_bytes(opt, "PK\x03\x04", 4, "XK\x03\x04", 2, 2, HTS_FALSE);

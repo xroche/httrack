@@ -1,0 +1,42 @@
+#!/bin/bash
+#
+# X-Save is a filename read back out of a cache the process did not write. It is
+# joined to the mirror root and then opened, renamed, and for ProxyTrack served
+# to a client, so a ".." component in it reaches outside. The truth table guards
+# the check itself: a plain strstr("..") would also reject a name like "a..b".
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+top="${abs_top_srcdir:?not run under make check}"
+
+selftest_queue "pathcontained: OK" pathcontained
+selftest_run_queued
+
+# ProxyTrack links neither htsserver.c nor libhttrack, so its two readers can
+# only share the check through htssafe.h. Nothing else proves they still call
+# it: the archive they read is not built by any self-test.
+work=$(mktemp -d "${TMPDIR:-/tmp}/xsave.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "$work"
+
+readers="$top/src/htscache.c $top/src/proxy/store.c"
+for f in $readers; do
+    test -r "$f" || fail "no $f"
+done
+
+# Every place that joins a cached X-Save to a path must check it first.
+grep -c 'hts_path_is_contained' "$top/src/proxy/store.c" >"$work/n" ||
+    fail "src/proxy/store.c no longer checks a cached filename at all"
+test "$(cat "$work/n")" -eq 2 ||
+    fail "src/proxy/store.c has $(cat "$work/n") checks, expected 2 (__New and __Old)"
+
+grep -q 'hts_path_is_contained' "$top/src/htscache.c" ||
+    fail "src/htscache.c no longer checks the cached X-Save"
+
+# Control: the grep must not match the definition itself, which lives elsewhere.
+grep -q 'hts_path_is_contained' "$top/src/htssafe.h" ||
+    fail "the shared check is gone from htssafe.h, so the greps above are vacuous"
+
+echo "the cached save name is checked in htscache.c and both ProxyTrack readers"

@@ -737,10 +737,22 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
                     : "";
             size_t used = 0;
 
+            /* The cache is a file on disk like any other. A forged X-Save must
+               not steer the read at :977 or the rename at :827 out of the
+               mirror; only the untrusted half is checked, because the user's
+               own -O may legitimately start with "..". */
+            if (!hts_path_is_contained(previous_save_)) {
+              hts_log_print(opt, LOG_WARNING,
+                            "cached filename leaving the mirror, "
+                            "not using the cache entry: %s%s",
+                            adr, fil);
+              r.statuscode = STATUSCODE_INVALID;
+              strcpybuff(r.msg, "Cache Read Error : Bad Filename");
+            }
             /* refuse the entry: a clipped name would point at a file we never
                stored */
-            if (!slcatprintfbuff(previous_save, sizeof(previous_save), &used,
-                                 "%s%s", prefix, previous_save_)) {
+            else if (!slcatprintfbuff(previous_save, sizeof(previous_save),
+                                      &used, "%s%s", prefix, previous_save_)) {
               hts_log_print(opt, LOG_WARNING,
                             "cached filename too long once rebuilt under '%s', "
                             "not using the cache entry: %s%s",
