@@ -4,6 +4,10 @@
 # descriptor. chmod() re-resolves the name, so a local process that swaps it for
 # a symlink in the window makes us chmod the symlink's target instead. The mode
 # itself is already pinned by 51_local-update-codec.test's --file-mode.
+#
+# Named outside every ci-windows-suite.sh category, as the other source scans
+# are: it reads the tracked sources, so a second platform tells it nothing, and
+# that job runs without automake's abs_top_srcdir.
 
 set -euo pipefail
 
