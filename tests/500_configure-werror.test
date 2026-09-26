@@ -1,0 +1,98 @@
+#!/bin/bash
+# --enable-werror puts -Werror in DEFAULT_CFLAGS, and nothing else does: a
+# distribution toolchain we do not pin must never fail to build over a warning.
+
+# TEST_TIMEOUT_AT_LEAST: 900
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+srcdir="${abs_top_srcdir:?not run under make check}"
+test -r "${srcdir}/configure" || skip "no configure in ${srcdir}"
+
+# $CC carries its flags on some hosts, so it is an argv, never one word.
+read -r -a cc_argv <<<"${CC:-cc}"
+command -v "${cc_argv[0]}" >/dev/null 2>&1 || skip "no C compiler (${cc_argv[0]})"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/werror.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${work}"
+
+# automake refuses an out-of-tree configure when srcdir holds a config.status,
+# which an in-tree build leaves there; a symlink farm without that one file is
+# the same tree to configure.
+shadow=${work}/srcdir
+mkdir -p "${shadow}"
+for entry in "${srcdir}"/*; do
+    test "${entry##*/}" = config.status || ln -s "${entry}" "${shadow}/"
+done
+test -r "${shadow}/configure" || fail "the shadow source tree has no configure"
+
+run_configure() { # run_configure DIR ARG...
+    local dir=$1 rc=0
+    shift
+    mkdir -p "${dir}"
+    # A keg-only openssl (brew) makes --enable-https a hard error.
+    (cd "${dir}" && bash "${shadow}/configure" --enable-https=auto "$@") \
+        >"${dir}/configure.log" 2>&1 || rc=$?
+    # autoconf only warns about a flag it does not know, so a run that lost one
+    # would otherwise report the status quo as a pass.
+    if test "${rc}" -eq 0 && grep -q 'unrecognized options' "${dir}/configure.log"; then
+        fail_dump "configure did not recognise every flag it was given" "${dir}/configure.log"
+    fi
+    return "${rc}"
+}
+
+# The bare token only. -Werror=attribute-warning and -Werror=user-defined-warnings
+# are there unconditionally, so a substring match cannot tell this switch from them.
+has_werror() { # has_werror FILE
+    grep -Eq '(^|[[:space:]])-Werror([[:space:]]|$)' "$1"
+}
+
+# What configure answered for the switch, so a Makefile verdict is anchored to
+# the decision that produced it rather than to a grep alone.
+werror_verdict() { # werror_verdict DIR
+    sed -n 's/^checking whether to turn warnings into errors\.\.\. //p' \
+        "$1/configure.log" | tail -1
+}
+
+# The two that build our shipped code. fuzz/ and tests/ take DEFAULT_CFLAGS too,
+# but only behind --enable-fuzzers and under "make check".
+assert_state() { # assert_state DIR on|off
+    local dir=$1 want=$2 f verdict
+    verdict=$(werror_verdict "${dir}")
+    test "${verdict}" = "$(test "${want}" = on && echo yes || echo no)" ||
+        fail_dump "configure said '${verdict}' where ${want} was asked for" "${dir}/configure.log"
+    for f in src/Makefile libtest/Makefile; do
+        test -r "${dir}/${f}" || fail "no ${f} in ${dir}"
+        if test "${want}" = on; then
+            has_werror "${dir}/${f}" || fail_dump "${f} carries no -Werror" "${dir}/${f}"
+        else
+            ! has_werror "${dir}/${f}" || fail_dump "${f} carries -Werror uninvited" "${dir}/${f}"
+        fi
+    done
+}
+
+# Default first: the claim that costs a downstream build is the one about the
+# run nobody configured specially.
+t0=$SECONDS
+run_configure "${work}/off" || fail_dump "configure failed with no werror flag" "${work}/off/configure.log"
+assert_state "${work}/off" off
+pace 2 "$((SECONDS - t0))" "the --enable-werror and bad-value runs"
+
+t0=$SECONDS
+run_configure "${work}/on" --enable-werror ||
+    fail_dump "configure failed with --enable-werror" "${work}/on/configure.log"
+assert_state "${work}/on" on
+pace 1 "$((SECONDS - t0))" "the bad-value run"
+
+# A value that is neither yes nor no must stop configure, not quietly leave the
+# switch off, which reads the same as a plain run.
+if run_configure "${work}/bogus" --enable-werror=sometimes; then
+    fail_dump "configure accepted --enable-werror=sometimes" "${work}/bogus/configure.log"
+fi
+grep -q 'bad value for werror' "${work}/bogus/configure.log" ||
+    fail_dump "configure rejected the bad value for another reason" "${work}/bogus/configure.log"
+
+echo "PASS: -Werror reaches DEFAULT_CFLAGS only when asked for"
