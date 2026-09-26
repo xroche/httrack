@@ -60,10 +60,11 @@ struct htsmutex_s {
    and so hides that, but arm64 does reorder them. */
 static HTS_INLINE HTS_UNUSED htsmutex hts_load_acquire_mutex(htsmutex *src) {
 #ifdef _MSC_VER
-  /* Every lock and unlock runs this, so take the free form: MSVC defaults to
-     /volatile:ms on x86 and x64, where a volatile read already is an acquire.
-     ARM defaults to /volatile:iso and needs the fence, and we build no ARM
-     target, so a full MemoryBarrier() here would be paid for nothing. */
+  /* Every lock and unlock runs this, so take the free form. The caller reads
+     the lock body through the pointer this returns, so that load depends on
+     this one and no compiler or x86 core may hoist it above: the ordering
+     rests on the address dependency, not on /volatile:ms, which no macro can
+     even test for. ARM reorders dependent loads, hence the fence there. */
   htsmutex const value = *(htsmutex volatile *) src;
 
 #if defined(_M_ARM) || defined(_M_ARM64)

@@ -74,15 +74,12 @@ HTSEXT_API void htsthread_wait_n(int n_wait) {
 #endif
 }
 
-/* ensure initialized */
+/* hts_mutexlock() builds process_chain_mutex on first use. */
 void htsthread_init(void) {
 #if USE_BEGINTHREAD
 #if (defined(_DEBUG) || defined(DEBUG))
   assertf(process_chain == 0);
 #endif
-  if (process_chain_mutex == HTSMUTEX_INIT) {
-    hts_mutexinit(&process_chain_mutex);
-  }
 #endif
 }
 
