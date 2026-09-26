@@ -120,12 +120,12 @@ static void ftp_worker_release(FTPDownloadStruct *worker, const char *error) {
     worker->pBack->r.statuscode = STATUSCODE_INVALID;
   }
   /* Publish and leave the list as one step, under the lock ftp_stop_workers()
-     holds, because the crawl thread may recycle the slot as soon as it reads
-     this status and a teardown still holding this worker would then raise
-     stop_ftp through a slot someone else owns. The store is a release, so the
-     payload above is visible to whoever reads that status. This is also the
-     worker's last touch of the slot and of opt, so leaving the list frees
-     both. */
+     holds. Only a second engine in this process can reach that window, because
+     ftp_workers is static while both teardown callers run on the very crawl
+     thread that recycles the slot. There, a teardown still holding this worker
+     would raise stop_ftp through a slot someone else owns. The store is a
+     release, so the payload above is visible to whoever reads the status, and
+     this is the worker's last touch of the slot and of opt. */
   hts_mutexlock(&ftp_workers_mutex);
   hts_store_release_int(&worker->pBack->status, STATUS_FTP_READY);
   ftp_worker_unlink(worker);
