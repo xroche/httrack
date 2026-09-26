@@ -20,30 +20,28 @@ scan() { # scan FILE...
     local f
     for f in "$@"; do
         awk '
-        function strip(s,   i, out) {
+        function strip(s,   i, j, out) {
+            sub(/\r$/, "", s)
             out = ""
             while (1) {
                 if (incomment) {
                     i = index(s, "*/"); if (i == 0) return out
                     s = substr(s, i + 2); incomment = 0; continue
                 }
-                i = index(s, "/*"); if (i == 0) break
+                i = index(s, "/*"); j = index(s, "//")
+                if (j > 0 && (i == 0 || j < i)) return out substr(s, 1, j - 1)
+                if (i == 0) break
                 out = out substr(s, 1, i - 1); s = substr(s, i + 2); incomment = 1
             }
-            sub(/\/\/.*/, "", s)
             return out s
         }
         {
             line = strip($0)
             if (line !~ /[^ \t]/) next
-            if (line !~ /^[ \t]*#/) {
-                if (closed && bad == "") bad = "content after the guard closes"
-                n++
-                next
-            }
             n++
+            isdir = (line ~ /^[ \t]*#/)
             if (n == 1) {
-                if (match(line, /^[ \t]*#[ \t]*ifndef[ \t]+[A-Za-z_][A-Za-z0-9_]*/)) {
+                if (isdir && match(line, /^[ \t]*#[ \t]*ifndef[ \t]+[A-Za-z_][A-Za-z0-9_]*/)) {
                     guard = substr(line, RSTART, RLENGTH)
                     sub(/^.*ifndef[ \t]+/, "", guard)
                 } else
@@ -52,8 +50,9 @@ scan() { # scan FILE...
                 if (line !~ ("^[ \t]*#[ \t]*define[ \t]+" guard "([ \t]|$)"))
                     bad = "#ifndef " guard " is not followed by #define " guard
             } else if (closed && bad == "")
-                bad = "a directive after the guard closes"
-            if (line ~ /^[ \t]*#[ \t]*(if|ifdef|ifndef)([ \t]|$)/) depth++
+                bad = "content after the guard closes"
+            if (!isdir) next
+            if (line ~ /^[ \t]*#[ \t]*(if|ifdef|ifndef)([ \t(!]|$)/) depth++
             else if (line ~ /^[ \t]*#[ \t]*endif([ \t]|$)/) {
                 depth--
                 if (depth == 0) closed = 1
@@ -74,7 +73,9 @@ printf '#ifndef A_H\n#define A_H\nint a(void);\n#endif\nint b(void);\n' >"$tmp/c
 printf '#ifndef A_H\n#define B_H\n#endif\n' >"$tmp/c-mismatch.h"
 printf '#ifndef A_H\n#define A_H\n' >"$tmp/c-open.h"
 printf 'int a(void);\n#ifndef A_H\n#define A_H\n#endif\n' >"$tmp/c-late.h"
-for c in none early mismatch open late; do
+# the #define must follow the #ifndef, with no content line slipped between
+printf '#ifndef A_H\nint a(void);\n#define A_H\n#endif\n' >"$tmp/c-split.h"
+for c in none early mismatch open late split; do
     case $(scan "$tmp/c-$c.h") in
     *' ! '*) ;;
     *) fail "the scan accepts $c, so it cannot see the bug it guards" ;;
@@ -82,9 +83,16 @@ for c in none early mismatch open late; do
 done
 # and the same corpus must accept a sound header, or it rejects everything
 [ "$(scan "$tmp/probe.h")" = "$tmp/probe.h A_H" ] || fail "the scan rejects a sound guard"
+# a // holding a /* must not open a block comment and swallow the #endif
+printf '#ifndef A_H\n#define A_H\n// a/*b\nint c(void);\n#endif\n' >"$tmp/c-slashstar.h"
+[ "$(scan "$tmp/c-slashstar.h")" = "$tmp/c-slashstar.h A_H" ] ||
+    fail "the scan reads a /* inside a // as a block comment"
+# .gitattributes pins no eol for *.h, so a Windows checkout hands us CRLF
+printf '#ifndef A_H\r\n#define A_H\r\n/* c */\r\n#endif\r\n' >"$tmp/c-crlf.h"
+[ "$(scan "$tmp/c-crlf.h")" = "$tmp/c-crlf.h A_H" ] || fail "the scan rejects CRLF line endings"
 
-# A generated table is its generator's business; the glob leaves vendored
-# minizip alone because it does not descend.
+# A generated table is its generator's business. The glob does not descend, so
+# vendored minizip stays out.
 headers=()
 for h in "$top_srcdir"/src/*.h; do
     case $(head -2 "$h") in
