@@ -1147,9 +1147,9 @@ int url_savename(lien_adrfilsave *const afs,
               TMPL_TAILN(dot_pos + 1, 3);
           } else {
             if (!short_ver)
-              TMPL_TAIL(DEFAULT_EXT + 1); // skip the leading dot
+              TMPL_TAIL(&DEFAULT_EXT[1]); // skip the leading dot
             else
-              TMPL_TAIL(DEFAULT_EXT_SHORT + 1); // skip the leading dot
+              TMPL_TAIL(&DEFAULT_EXT_SHORT[1]); // skip the leading dot
           }
           break;
         case 't': // extension
@@ -1160,9 +1160,9 @@ int url_savename(lien_adrfilsave *const afs,
               TMPL_TAILN(dot_pos + 1, 3);
           } else {
             if (!short_ver)
-              TMPL_TAIL(DEFAULT_EXT + 1); // skip the leading dot
+              TMPL_TAIL(&DEFAULT_EXT[1]); // skip the leading dot
             else
-              TMPL_TAIL(DEFAULT_EXT_SHORT + 1); // skip the leading dot
+              TMPL_TAIL(&DEFAULT_EXT_SHORT[1]); // skip the leading dot
           }
           break;
         case 'p': // path without trailing /
