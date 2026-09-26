@@ -1952,10 +1952,10 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
               fprintf(fp,
                       "If you want to get these files, you have to set an upper recurse level, ");
               fprintf(fp, "and to rescan the URL." CRLF);
-              fclose(fp);
 #ifndef _WIN32
-              chmod(tempo, HTS_ACCESS_FILE);
+              (void) fchmod(fileno(fp), HTS_ACCESS_FILE);
 #endif
+              fclose(fp);
               usercommand(opt, 0, NULL, fconv(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), tempo), "",
                           "");
             }
@@ -3032,8 +3032,9 @@ FILE *filecreate(filenote_strc * strc, const char *s) {
     errno = last_errno;
   }
 #ifndef _WIN32
+  /* by descriptor: a name swapped for a symlink would chmod its target */
   if (fp != NULL)
-    chmod(fname, HTS_ACCESS_FILE);
+    (void) fchmod(fileno(fp), HTS_ACCESS_FILE);
 #endif
   return fp;
 }
@@ -3069,7 +3070,7 @@ FILE *fileappend(filenote_strc * strc, const char *s) {
 
 #ifndef _WIN32
   if (fp != NULL)
-    chmod(fname, HTS_ACCESS_FILE);
+    (void) fchmod(fileno(fp), HTS_ACCESS_FILE);
 #endif
 
   return fp;
