@@ -2530,7 +2530,9 @@ void host_ban(httrackp * opt, int ptr,
   }
   // couper connexion
   for(i = 0; i < back_max; i++) {
-    if (back[i].status >= 0)    // réception OU prêt
+    if (back[i].status >= 0) // receiving or ready
+      /* host is a bare name and an FTP url_adr keeps its scheme, so no FTP slot
+         matches here, and none may, because its worker is still writing it. */
       if (strfield2(back[i].url_adr, host)) {
 #if HTS_DEBUG_CLOSESOCK
         DEBUG_W("host control: deletehttp\n");
