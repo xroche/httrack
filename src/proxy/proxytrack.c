@@ -796,6 +796,7 @@ static PT_Element proxytrack_process_HTTP_List(PT_Indexes indexes,
             StringCat(html, "<tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;");
           StringCat(html, "<a href=\"");
           if (isDir) {
+            /* ProxyTrack itself, which serves plaintext HTTP only. */
             StringCat(html, "http://proxytrack/");
           }
           StringCat(html, url);
@@ -1018,6 +1019,8 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
       }
 
       /* Post-process request */
+      /* "http://" below pads an archive lookup key, not a fetch target:
+         PT_ReadIndex() and PT_Enumerate() strip it straight back off. */
       if (link_has_authority(surl)) {
         if (strncasecmp(surl, "http://proxytrack/",
                         sizeof("http://proxytrack/") - 1) == 0) {
