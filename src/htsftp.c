@@ -93,6 +93,17 @@ static void ftp_worker_unlink(FTPDownloadStruct *worker) {
   }
 }
 
+/* Whether any worker is still registered, as ftp_stop_workers() sees it. That
+   walk dereferences every entry, so one left behind is a use-after-free. */
+static hts_boolean ftp_workers_live(void) {
+  hts_boolean live;
+
+  hts_mutexlock(&ftp_workers_mutex);
+  live = ftp_workers != NULL;
+  hts_mutexrelease(&ftp_workers_mutex);
+  return live;
+}
+
 void ftp_stop_workers(void) {
   int wait;
 
@@ -219,18 +230,22 @@ int ftp_worker_selftests(void) {
 
 /* --- The slot handoff, across a real worker thread (see htsftp.h) --- */
 
-#define FTP_HANDOFF_ROUNDS 64
+/* Enough rounds that a publish lands between two back_wait() passes rather
+   than always before the first one. */
+#define FTP_HANDOFF_ROUNDS 32
 /* The settle tells a blocked tail from one the scheduler never ran. */
 #define FTP_HANDOFF_SETTLE 500
-/* A wedge must fail the test rather than hang the suite. */
-#define FTP_HANDOFF_SPINS 10000
+/* Per wait, and at 1ms a spin: the whole test must stay inside the suite's
+   600s guard even when every wait runs out. */
+#define FTP_HANDOFF_SPINS 2000
 
-/* What a worker body leaves behind, so a reader can tell a published slot from
-   one whose status outran its payload. */
-#define FTP_HANDOFF_CODE 226
+/* The payload a worker body leaves behind. Negative, so back_wait()'s reap
+   skips back_finalize(): what this pins is the read, not the cache write after
+   it. A slot nobody published reads 0 and "" instead. */
+#define FTP_HANDOFF_CODE STATUSCODE_INVALID
 static const char ftp_handoff_msg[] = "Transfer complete";
 
-/* Stands in for run_launch_ftp(), writing the payload back_finalize() reads. */
+/* Stands in for run_launch_ftp(), writing the payload back_wait() reads. */
 static void ftp_handoff_body(void *pP) {
   FTPDownloadStruct *const worker = (FTPDownloadStruct *) pP;
 
@@ -242,7 +257,8 @@ static void ftp_handoff_body(void *pP) {
 
 static int ftp_handoff_at_tail = 0;
 
-/* Announce the tail one call before ftp_worker_done() publishes the slot. */
+/* Raise the flag one call before ftp_worker_done() publishes the slot, so a
+   test waiting on it gains no ordering over the publish that follows. */
 static void ftp_handoff_tail(void *pP) {
   hts_store_release_int(&ftp_handoff_at_tail, 1);
   ftp_worker_done(pP);
@@ -270,67 +286,125 @@ static hts_boolean ftp_handoff_await(const int *flag, int value) {
   return HTS_TRUE;
 }
 
+/* Put a fresh worker on the slot and on the live list, not yet running. The
+   caller spawns it, because the second phase takes the list lock in between. */
+static FTPDownloadStruct *ftp_handoff_register(lien_back *slot) {
+  FTPDownloadStruct *const worker = calloct(1, sizeof(*worker));
+
+  assertf(worker != NULL);
+  slot->status = STATUS_FTP_TRANSFER;
+  worker->pBack = slot;
+  ftp_handoff_at_tail = 0;
+  ftp_worker_register(worker);
+  return worker;
+}
+
+/* Drive back_wait() until the worker has left the list, and once more after
+   that. back_wait() is the reader this pins, so the loop must not synchronize
+   with the worker ahead of it: ftp_workers_live() takes the lock the publish
+   happens under, and a lock that still finds the worker listed took it first,
+   so it carries nothing from the publish. */
+static void ftp_handoff_drive(struct_back *sback, httrackp *opt,
+                              cache_back *cache) {
+  int spins;
+
+  for (spins = 0; spins < FTP_HANDOFF_SPINS; spins++) {
+    back_wait(sback, opt, cache, HTS_STAT.stat_timestart);
+    if (!ftp_workers_live())
+      break;
+    Sleep(1);
+  }
+  back_wait(sback, opt, cache, HTS_STAT.stat_timestart);
+}
+
+/* back_wait() reaped the slot, carrying the payload its worker published. */
+static int ftp_handoff_check_reaped(const lien_back *slot, int round) {
+  if (slot->status != STATUS_READY) {
+    fprintf(stderr,
+            "ftp-handoff-selftest: round %d left status %d, so back_wait() "
+            "never reaped the slot\n",
+            round, slot->status);
+    return 1;
+  }
+  if (slot->r.statuscode != FTP_HANDOFF_CODE ||
+      strcmp(slot->r.msg, ftp_handoff_msg) != 0 ||
+      slot->r.size != (LLint) sizeof(ftp_handoff_msg)) {
+    fprintf(stderr,
+            "ftp-handoff-selftest: round %d read %d '%s' " LLintP
+            " behind the status back_wait() reaped\n",
+            round, slot->r.statuscode, slot->r.msg, (LLint) slot->r.size);
+    return 1;
+  }
+  return 0;
+}
+
 /* See htsftp.h. */
-int ftp_handoff_selftests(void) {
+int ftp_handoff_selftests(httrackp *opt) {
+  struct_back *sback = back_new(opt, 1);
+  cache_back cache;
   int err = 0;
   int round;
 
-  /* The payload must be there for whoever reads the status that announces it,
-     which is what back_wait() does on every pass. */
-  for (round = 0; round < FTP_HANDOFF_ROUNDS && err == 0; round++) {
-    FTPDownloadStruct *const worker = calloct(1, sizeof(*worker));
-    lien_back back;
+  if (sback == NULL) {
+    fprintf(stderr, "ftp-handoff-selftest: no backing table\n");
+    return 1;
+  }
+  memset(&cache, 0, sizeof(cache));
 
-    assertf(worker != NULL);
-    memset(&back, 0, sizeof(back));
-    back.status = STATUS_FTP_TRANSFER;
-    worker->pBack = &back;
-    ftp_worker_register(worker);
-    if (!ftp_handoff_spawn(worker, ftp_worker_done)) {
+  /* url_sav stays empty for every round, which keeps back_clean()'s sweeps off
+     the slot: they all want a save name. */
+  for (round = 0; round < FTP_HANDOFF_ROUNDS && err == 0; round++) {
+    lien_back *const slot = &sback->lnk[0];
+
+    FTPDownloadStruct *const worker = ftp_handoff_register(slot);
+
+    if (!ftp_handoff_spawn(worker, ftp_handoff_tail)) {
       ftp_worker_release(worker, "Unable to launch FTP thread");
-      return 1;
+      err++;
+      break;
     }
-    if (!ftp_handoff_await(&back.status, STATUS_FTP_READY)) {
-      fprintf(stderr, "ftp-handoff-selftest: round %d never went ready\n",
+    /* Wait on the tail's flag rather than on the slot, so the wait does not
+       stand in for the acquire back_wait() has to bring itself. */
+    if (!ftp_handoff_await(&ftp_handoff_at_tail, 1)) {
+      fprintf(stderr, "ftp-handoff-selftest: round %d never reached the tail\n",
               round);
       err++;
-    } else if (back.r.statuscode != FTP_HANDOFF_CODE ||
-               strcmp(back.r.msg, ftp_handoff_msg) != 0) {
-      fprintf(stderr,
-              "ftp-handoff-selftest: round %d read %d '%s' behind a ready "
-              "status\n",
-              round, back.r.statuscode, back.r.msg);
-      err++;
     }
-    /* The slot is this frame's, so the worker must be gone before it goes. */
+    ftp_handoff_drive(sback, opt, &cache);
     htsthread_wait();
+    if (ftp_workers_live()) {
+      fprintf(stderr,
+              "ftp-handoff-selftest: round %d left a worker registered, so "
+              "ftp_stop_workers() would walk a freed one\n",
+              round);
+      err++;
+    } else {
+      err += ftp_handoff_check_reaped(slot, round);
+    }
+    back_clear_entry(slot);
   }
 
   /* No worker may hand its slot back while a teardown holds the live-worker
      list, because ftp_stop_workers() raises stop_ftp through a slot the crawl
      thread is free to recycle as soon as its status reads ready. */
   {
-    FTPDownloadStruct *const worker = calloct(1, sizeof(*worker));
-    lien_back back;
+    lien_back *const slot = &sback->lnk[0];
+    FTPDownloadStruct *const worker = ftp_handoff_register(slot);
 
-    assertf(worker != NULL);
-    memset(&back, 0, sizeof(back));
-    back.status = STATUS_FTP_TRANSFER;
-    worker->pBack = &back;
-    ftp_handoff_at_tail = 0;
-    ftp_worker_register(worker);
+    /* Held before the worker exists, so its publish has nowhere to slip in. */
     hts_mutexlock(&ftp_workers_mutex);
     if (!ftp_handoff_spawn(worker, ftp_handoff_tail)) {
       hts_mutexrelease(&ftp_workers_mutex);
       ftp_worker_release(worker, "Unable to launch FTP thread");
-      return 1;
+      back_free(&sback);
+      return err + 1;
     }
     if (!ftp_handoff_await(&ftp_handoff_at_tail, 1)) {
       fprintf(stderr, "ftp-handoff-selftest: the tail never ran\n");
       err++;
     } else {
       Sleep(FTP_HANDOFF_SETTLE);
-      if (hts_load_acquire_int(&back.status) != STATUS_FTP_TRANSFER) {
+      if (hts_load_acquire_int(&slot->status) != STATUS_FTP_TRANSFER) {
         fprintf(stderr, "ftp-handoff-selftest: a worker handed its slot back "
                         "while the live-worker list was held\n");
         err++;
@@ -338,13 +412,20 @@ int ftp_handoff_selftests(void) {
     }
     hts_mutexrelease(&ftp_workers_mutex);
     htsthread_wait();
-    if (back.status != STATUS_FTP_READY) {
-      fprintf(stderr,
-              "ftp-handoff-selftest: the released list left status %d\n",
-              back.status);
+    if (ftp_workers_live()) {
+      fprintf(stderr, "ftp-handoff-selftest: the held round left a worker "
+                      "registered\n");
       err++;
     }
+    if (slot->status != STATUS_FTP_READY) {
+      fprintf(stderr,
+              "ftp-handoff-selftest: the released list left status %d\n",
+              slot->status);
+      err++;
+    }
+    back_clear_entry(slot);
   }
+  back_free(&sback);
   return err;
 }
 

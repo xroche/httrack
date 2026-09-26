@@ -1036,9 +1036,8 @@ static int st_ftpworker(httrackp *opt, int argc, char **argv) {
 }
 
 static int st_ftphandoff(httrackp *opt, int argc, char **argv) {
-  const int err = ftp_handoff_selftests();
+  const int err = ftp_handoff_selftests(opt);
 
-  (void) opt;
   (void) argc;
   (void) argv;
   printf("ftp-handoff-selftest: %s\n", err ? "FAIL" : "OK");

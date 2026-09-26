@@ -77,6 +77,17 @@ static HTS_INLINE HTS_UNUSED int hts_load_acquire_int(const int *src) {
 #endif
 }
 
+/* Observe an int another thread publishes without taking its ordering. For a
+   reader that only has to not be a data race, where the reader that acts on the
+   published value brings the acquire. */
+static HTS_INLINE HTS_UNUSED int hts_load_relaxed_int(const int *src) {
+#ifdef _MSC_VER
+  return *(const volatile int *) src;
+#else
+  return __atomic_load_n(src, __ATOMIC_RELAXED);
+#endif
+}
+
 /* Also runs 'tail(arg)' on the worker once the body is over, and only when this
    returns 0. A thread runner (see hts_set_thread_runner()) that recovers from a
    fault returns without running the rest of the body, so cleanup the engine

@@ -74,10 +74,11 @@ void ftp_stop_workers(void);
 /* Run a worker's tail on a finished and on a cut-short transfer, asserting what
    the crawl thread reads back. Returns the number of failed checks. */
 int ftp_worker_selftests(void);
-/* Hand a slot back from a real worker thread, asserting that the payload is
-   there for whoever reads the status announcing it, and that a held worker list
-   blocks the handoff. Returns the number of failed checks. */
-int ftp_handoff_selftests(void);
+/* Hand a backlog slot back from a real worker thread and reap it with
+   back_wait(), asserting the payload it published, that no worker is left on
+   the live list, and that a held list blocks the handoff. Returns the number of
+   failed checks. */
+int ftp_handoff_selftests(httrackp *opt);
 #else
 void launch_ftp(FTPDownloadStruct * params, char *path, char *exec);
 int back_launch_ftp(FTPDownloadStruct * params);

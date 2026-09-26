@@ -102,6 +102,13 @@ static hts_mirror_limit back_mirror_limit(httrackp *opt);
 static hts_boolean back_mirror_capped(const httrackp *opt);
 static hts_boolean back_is_live(const int status);
 
+/* A slot's status as every crawl-thread reader but one must take it: relaxed,
+   because an FTP worker publishes into that word from its own thread, and only
+   back_ftp_handed_back() acts on what it published. */
+static HTS_INLINE int back_status(const lien_back *back) {
+  return hts_load_relaxed_int(&back->status);
+}
+
 /* NULL when the slot table cannot be allocated, which httpmirror() already
    answers by aborting the mirror with a message. Failing here rather than
    aborting the process: back_max grows with -cN, so the size is the user's. */
@@ -382,9 +389,10 @@ static int slot_can_be_cached_on_disk(const lien_back * back) {
      would unlink it through back_clear_entry() (#771). */
   if (back->tmpfile != NULL && back->tmpfile[0] != '\0')
     return 0;
-  return (back->status == STATUS_READY && back->locked == 0
-          && back->url_sav[0] != '\0'
-          && strcmp(back->url_sav, BACK_ADD_TEST) != 0);
+  /* Relaxed, as in slot_can_be_cleaned(). */
+  return (hts_load_relaxed_int(&back->status) == STATUS_READY &&
+          back->locked == 0 && back->url_sav[0] != '\0' &&
+          strcmp(back->url_sav, BACK_ADD_TEST) != 0);
   /* Note: not checking !IS_DELAYED_EXT(back->url_sav) or it will quickly cause the slots to be filled! */
 }
 
@@ -791,7 +799,7 @@ int back_nsoc(const struct_back * sback) {
   int i;
 
   for(i = 0; i < back_max; i++)
-    if (back[i].status > 0)     // only receive
+    if (back_status(&back[i]) > 0) // only receive
       n++;
 
   return n;
@@ -802,9 +810,12 @@ int back_nsoc_overall(const struct_back * sback) {
   int n = 0;
   int i;
 
-  for(i = 0; i < back_max; i++)
-    if (back[i].status > 0 || back[i].status == STATUS_ALIVE)
+  for (i = 0; i < back_max; i++) {
+    const int status = back_status(&back[i]);
+
+    if (status > 0 || status == STATUS_ALIVE)
       n++;
+  }
 
   return n;
 }
@@ -3138,7 +3149,9 @@ int host_wait(httrackp *opt, lien_back *back) { return 1; }
 // also cleanup keep-alive sockets and ensure that not too many sockets are being opened
 
 static int slot_can_be_cleaned(const lien_back * back) {
-  return (back->status == STATUS_READY) // ready
+  /* Relaxed: an FTP worker publishes into this word from its own thread, and
+     this read only has to not be a data race. */
+  return (hts_load_relaxed_int(&back->status) == STATUS_READY) // ready
          /* Check autoclean */
          && (!back->locked)   // not held by hts_wait_delayed (name pending)
          && (!back->testmode) // not test mode
@@ -3195,7 +3208,7 @@ void back_clean(httrackp * opt, cache_back * cache, struct_back * sback) {
           back_maydeletehttp(opt, cache, sback, i);
         }
       }
-    } else if (back[i].status == STATUS_ALIVE) {        // waiting (keep-alive)
+    } else if (back_status(&back[i]) == STATUS_ALIVE) { // waiting (keep-alive)
       if (!back[i].r.keep_alive || back[i].r.soc == INVALID_SOCKET
           || back[i].r.keep_alive_max < 1
           || time_local() >= back[i].ka_time_start + back[i].r.keep_alive_t) {
@@ -3222,7 +3235,7 @@ void back_clean(httrackp * opt, cache_back * cache, struct_back * sback) {
   }
   /* switch connections to live ones */
   for(i = 0; i < back_max; i++) {
-    if (back[i].status == STATUS_READY) {       // ready
+    if (back_status(&back[i]) == STATUS_READY) { // ready
       if (back[i].r.soc != INVALID_SOCKET) {
         back_maydeletehttp(opt, cache, sback, i);
       }
@@ -3238,7 +3251,7 @@ void back_clean(httrackp * opt, cache_back * cache, struct_back * sback) {
                     curr - max);
     }
     for(i = 0; i < back_max && curr > max; i++) {
-      if (back[i].status == STATUS_ALIVE) {
+      if (back_status(&back[i]) == STATUS_ALIVE) {
         back_delete(opt, cache, sback, i);      // delete backing entry
         curr--;
       }
@@ -3253,6 +3266,14 @@ void back_clean(httrackp * opt, cache_back * cache, struct_back * sback) {
                     "(htsback): %d slots ready moved to background", nxfr);
     }
   }
+}
+
+/* Whether slot 'back' has been handed back by its FTP worker. The engine's one
+   acquire on that word: every other crawl-thread read of it is relaxed, so this
+   is what makes the payload the worker published visible here. */
+static hts_boolean back_ftp_handed_back(const lien_back *back) {
+  return hts_load_acquire_int(&back->status) == STATUS_FTP_READY ? HTS_TRUE
+                                                                 : HTS_FALSE;
 }
 
 /* Slot waiting for a connection to come up: nothing requested on it yet. */
@@ -3313,7 +3334,7 @@ static int back_abort_stopped(httrackp *opt, struct_back *sback) {
   int i;
 
   for (i = 0; i < sback->count; i++) {
-    const int status = sback->lnk[i].status;
+    const int status = back_status(&sback->lnk[i]);
 
     if (!back_is_live(status) || (grace && !back_is_preconnect(status)))
       continue;
@@ -3335,7 +3356,7 @@ static int back_abort_limit(httrackp *opt, struct_back *sback,
   int i;
 
   for (i = 0; i < sback->count; i++) {
-    if (!back_is_live(sback->lnk[i].status))
+    if (!back_is_live(back_status(&sback->lnk[i])))
       continue;
     back_abort_slot(opt, sback, i, STATUSCODE_TIMEOUT,
                     size ? "Mirror Size Limit" : "Mirror Time Out",
@@ -3415,6 +3436,11 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
     max_c = 1;
     for (i_mod = 0; i_mod < (unsigned int) back_max; i_mod++) {
       unsigned int i = (i_mod + mod_random) % (back_max);
+
+      /* An FTP slot is its worker thread's: it holds no socket to poll, and its
+         status is the one word below that another thread writes. */
+      if (back_status(&back[i]) >= STATUS_FTP_TRANSFER)
+        continue;
 
       // en cas de gestion du connect préemptif
 #if HTS_XCONN
@@ -3547,7 +3573,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
       // winsock flags a failed connect in the exception set only: leave a
       // connecting slot to the connect handler, which can still fall back
-      if (back[i].status > 0 && back[i].status != STATUS_CONNECTING) {
+      if (back_status(&back[i]) > 0 &&
+          back_status(&back[i]) != STATUS_CONNECTING) {
         if (!back[i].r.is_file) {       // not file..
           if (back[i].r.soc != INVALID_SOCKET) {        // hey, you never know..
             int err = FD_ISSET(back[i].r.soc, &fds_e);
@@ -3573,7 +3600,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
         }
       }
       // ---- FLAG WRITE MIS A UN?: POUR LE CONNECT
-      if (back[i].status == STATUS_CONNECTING) {        // attendre connect
+      if (back_status(&back[i]) == STATUS_CONNECTING) { // waiting on connect
         hts_connect_fallback *const cf = &sback->connect_fallback[i];
         int dispo = 0;
 
@@ -3768,7 +3795,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
         // attente gethostbyname
       }
 #if HTS_USEOPENSSL
-      else if (back[i].status == STATUS_SSL_WAIT_HANDSHAKE) {       // wait for SSL handshake
+      else if (back_status(&back[i]) ==
+               STATUS_SSL_WAIT_HANDSHAKE) { // wait for SSL handshake
         // a peer that never speaks TLS must be reaped by --timeout too (#607)
         if (!gestion_timeout)
           if (back[i].timeout > 0)
@@ -3819,7 +3847,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
       }
 #endif
 #if HTS_XGETHOST
-      else if (back[i].status == STATUS_WAIT_DNS) {     // attendre gethostbyname
+      else if (back_status(&back[i]) == STATUS_WAIT_DNS) { // waiting on the DNS
 #if DEBUGDNS
 #endif
 
@@ -3889,8 +3917,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
         }
       }
 #endif
-      /* Acquire, so the payload is visible with the status announcing it. */
-      else if (hts_load_acquire_int(&back[i].status) == STATUS_FTP_READY) {
+      else if (back_ftp_handed_back(&back[i])) {
         back[i].status = STATUS_READY;
         back_set_finished(opt, sback, i);
         // finalize transfer
@@ -3898,8 +3925,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
           hts_log_print(opt, LOG_TRACE, "finalizing ftp");
           back_finalize(opt, cache, sback, i);
         }
-      } else if ((back[i].status > 0) &&
-                 (back[i].status < 1000)) { // receiving http
+      } else if ((back_status(&back[i]) > 0) &&
+                 (back_status(&back[i]) < 1000)) { // receiving http
         int dispo = 0;
 
         // vérifier l'existance de timeout-check
