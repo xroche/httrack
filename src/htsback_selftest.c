@@ -1159,6 +1159,71 @@ static int st_strerror(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* hts_mutexlock() builds a lock on first use, so threads meet an empty slot. */
+#define MUTEXLAZY_THREADS 8
+#define MUTEXLAZY_LOCKS 64
+#define MUTEXLAZY_ROUNDS 40
+
+/* Never initialized here: the first pass of every thread is what races. */
+static htsmutex mutexlazy_lock[MUTEXLAZY_LOCKS];
+
+/* Bumped under the lock, so a plain int is what proves the lock excluded. */
+static int mutexlazy_count[MUTEXLAZY_LOCKS];
+
+static void mutexlazy_thread(void *arg) {
+  int round, i;
+
+  (void) arg;
+  for (round = 0; round < MUTEXLAZY_ROUNDS; round++) {
+    for (i = 0; i < MUTEXLAZY_LOCKS; i++) {
+      hts_mutexlock(&mutexlazy_lock[i]);
+      mutexlazy_count[i]++;
+      hts_mutexrelease(&mutexlazy_lock[i]);
+    }
+  }
+}
+
+/* The ordering half only shows where loads are reordered: arm64, or any build
+   under ThreadSanitizer. What it pins everywhere is that the race yields one
+   working lock. */
+static int st_mutexlazyinit(httrackp *opt, int argc, char **argv) {
+  const int want = MUTEXLAZY_THREADS * MUTEXLAZY_ROUNDS;
+  int err = 0;
+  int i;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  for (i = 0; i < MUTEXLAZY_THREADS; i++) {
+    if (hts_newthread(mutexlazy_thread, NULL) != 0) {
+      fprintf(stderr, "mutexlazyinit: cannot spawn\n");
+      return 1;
+    }
+  }
+  htsthread_wait();
+
+  for (i = 0; i < MUTEXLAZY_LOCKS; i++) {
+    if (mutexlazy_lock[i] == HTSMUTEX_INIT) {
+      fprintf(stderr, "mutexlazyinit: lock %d was never built\n", i);
+      err = 1;
+    } else if (mutexlazy_count[i] != want) {
+      fprintf(stderr, "mutexlazyinit: lock %d counted %d of %d\n", i,
+              mutexlazy_count[i], want);
+      err = 1;
+    }
+    hts_mutexfree(&mutexlazy_lock[i]);
+    if (mutexlazy_lock[i] != HTSMUTEX_INIT) {
+      fprintf(stderr, "mutexlazyinit: lock %d survived the free\n", i);
+      err = 1;
+    }
+    mutexlazy_count[i] = 0;
+  }
+
+  printf("mutexlazyinit self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
@@ -1182,6 +1247,9 @@ const struct selftest_entry selftests_back[] = {
      st_transportfailures},
     {"threadwait", "", "htsthread_wait() joins threads spawned just before it",
      st_threadwait},
+    {"mutexlazyinit", "",
+     "a lock built on first use serves every thread that raced for it",
+     st_mutexlazyinit},
     {"backswap", "", "which backlog slots may be swapped to the ready table",
      st_backswap},
     {"backstop", "",

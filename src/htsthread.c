@@ -74,15 +74,12 @@ HTSEXT_API void htsthread_wait_n(int n_wait) {
 #endif
 }
 
-/* ensure initialized */
+/* hts_mutexlock() builds process_chain_mutex on first use. */
 void htsthread_init(void) {
 #if USE_BEGINTHREAD
 #if (defined(_DEBUG) || defined(DEBUG))
   assertf(process_chain == 0);
 #endif
-  if (process_chain_mutex == HTSMUTEX_INIT) {
-    hts_mutexinit(&process_chain_mutex);
-  }
 #endif
 }
 
@@ -275,42 +272,57 @@ HTSEXT_API void hts_mutexfree(htsmutex * mutex) {
 }
 
 HTSEXT_API void hts_mutexlock(htsmutex * mutex) {
+  htsmutex lock;
+
   assertf(mutex != NULL);
-  if (*mutex == HTSMUTEX_INIT) {        /* must be initialized */
+  lock = hts_load_acquire_mutex(mutex);
+  if (lock == HTSMUTEX_INIT) { /* must be initialized */
     /* Initialize exactly once, even when several threads race to lock the same
        mutex for the first time. Build our own object, then publish it with a
        single atomic compare-and-swap; the threads that lose the race free the
        object they built (issue #297). No static guard is needed, which keeps
        this safe on Windows 2000 (no statically-initializable lock there). */
     htsmutex created = HTSMUTEX_INIT;
+    htsmutex published;
 
     hts_mutexinit(&created);
 #ifdef _WIN32
-    if (InterlockedCompareExchangePointer((PVOID volatile *) mutex, created,
-                                          HTSMUTEX_INIT) != HTSMUTEX_INIT)
+    published = (htsmutex) InterlockedCompareExchangePointer(
+        (PVOID volatile *) mutex, created, HTSMUTEX_INIT);
 #else
-    if (!__sync_bool_compare_and_swap(mutex, HTSMUTEX_INIT, created))
+    published = __sync_val_compare_and_swap(mutex, HTSMUTEX_INIT, created);
 #endif
-    {
+    /* Both forms are full barriers, so the loser's read of the winner's
+       pointer is as ordered as the acquire above. */
+    if (published != HTSMUTEX_INIT) {
       hts_mutexfree(&created);
+      lock = published;
+    } else {
+      lock = created;
     }
   }
-  assertf(*mutex != NULL);
+  assertf(lock != NULL);
 #ifdef _WIN32
-  assertf((*mutex)->handle != NULL);
-  WaitForSingleObject((*mutex)->handle, INFINITE);
+  assertf(lock->handle != NULL);
+  WaitForSingleObject(lock->handle, INFINITE);
 #else
-  pthread_mutex_lock(&(*mutex)->handle);
+  pthread_mutex_lock(&lock->handle);
 #endif
 }
 
 HTSEXT_API void hts_mutexrelease(htsmutex * mutex) {
-  assertf(mutex != NULL && *mutex != NULL);
+  htsmutex lock;
+
+  assertf(mutex != NULL);
+  /* Acquire here too: the compare-and-swap writes the slot whether it wins or
+     loses, so a loser is still writing it while the winner unlocks. */
+  lock = hts_load_acquire_mutex(mutex);
+  assertf(lock != NULL);
 #ifdef _WIN32
-  assertf((*mutex)->handle != NULL);
-  ReleaseMutex((*mutex)->handle);
+  assertf(lock->handle != NULL);
+  ReleaseMutex(lock->handle);
 #else
-  pthread_mutex_unlock(&(*mutex)->handle);
+  pthread_mutex_unlock(&lock->handle);
 #endif
 }
 
