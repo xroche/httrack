@@ -63,17 +63,31 @@ EXTERNAL_FUNCTION int hts_plug(httrackp * opt, const char *argv) {
             "example: httrack --wrapper save-name=callback:mysavename,foo,bar\n");
     return 0;                   /* failed */
   } else {
-    char *pos = strchr(arg, ',');
-    t_my_userdef *userdef = (t_my_userdef *) malloc(sizeof(t_my_userdef));
-    char *const string1 = userdef->string1;
-    char *const string2 = userdef->string2;
+    const char *pos = strchr(arg, ',');
+    t_my_userdef *userdef;
+    char *string1, *string2;
+
+    /* An empty string1 would make the rewrite loop below match without ever
+       advancing, and neither half may outgrow its own field. */
+    if (pos == arg || (size_t) (pos - arg) >= sizeof(userdef->string1) ||
+        strlen(pos + 1) >= sizeof(userdef->string2)) {
+      fprintf(stderr,
+              "** callback error: empty or over-long arguments (max %d each)\n",
+              (int) sizeof(userdef->string1) - 1);
+      return 0; /* failed */
+    }
+    userdef = (t_my_userdef *) malloc(sizeof(t_my_userdef));
+    if (userdef == NULL)
+      return 0; /* failed */
+    string1 = userdef->string1;
+    string2 = userdef->string2;
 
     /* Split args */
     fprintf(stderr, "** info: wrapper_init(%s) called!\n", arg);
     fprintf(stderr,
             "** callback example: changing destination filename word by another one\n");
     string1[0] = string1[1] = '\0';
-    strncat(string1, arg, pos - arg);
+    strncat(string1, arg, (size_t) (pos - arg));
     strcpy(string2, pos + 1);
     fprintf(stderr, "** callback info: will replace %s by %s in filenames!\n",
             string1, string2);
@@ -111,8 +125,12 @@ static int mysavename(t_hts_callbackarg * carg, httrackp * opt,
   char *const string1 = userdef->string1;
   char *const string2 = userdef->string2;
 
-  /* */
-  char *buff, *a, *b;
+  /* All "save" promises is HTS_URLMAXSIZE bytes, and its real size is not
+     passed in, so build into a buffer of that size and refuse a name that
+     would not fit: a clipped save name collides with another file. */
+  char out[HTS_URLMAXSIZE];
+  size_t used = 0;
+  char *buff, *a;
 
   /* Call parent functions if multiple callbacks are chained. */
   if (CALLBACKARG_PREV_FUN(carg, savename) != NULL) {
@@ -125,19 +143,31 @@ static int mysavename(t_hts_callbackarg * carg, httrackp * opt,
 
   /* Process */
   buff = strdup(save);
-  a = buff;
-  b = save;
-  *b = '\0';                    /* the "save" variable points to a buffer with "sufficient" space */
-  while(*a) {
-    if (strncmp(a, string1, (int) strlen(string1)) == 0) {
-      strcat(b, string2);
-      b += strlen(b);
+  if (buff == NULL)
+    return 1; /* leave the name as it is */
+  for (a = buff; *a != '\0';) {
+    const char *add;
+    size_t addlen;
+
+    if (strncmp(a, string1, strlen(string1)) == 0) {
+      add = string2;
+      addlen = strlen(string2);
       a += strlen(string1);
     } else {
-      *b++ = *a++;
-      *b = '\0';
+      add = a;
+      addlen = 1;
+      a++;
     }
+    /* overflow-safe: the grown length stands alone, and used < sizeof(out) */
+    if (addlen >= sizeof(out) - used) {
+      free(buff);
+      return 0; /* Abort */
+    }
+    memcpy(out + used, add, addlen);
+    used += addlen;
   }
+  out[used] = '\0';
+  memcpy(save, out, used + 1);
   free(buff);
 
   return 1;                     /* success */

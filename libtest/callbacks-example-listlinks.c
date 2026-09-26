@@ -60,6 +60,8 @@ EXTERNAL_FUNCTION int hts_plug(httrackp * opt, const char *argv) {
 
   /* Create user-defined structure */
   userdef = (t_my_userdef *) malloc(sizeof(t_my_userdef));      /* userdef */
+  if (userdef == NULL)
+    return 0; /* failed */
   userdef->currentURLBeingParsed[0] = '\0';
 
   /* Plug callback functions */
@@ -86,9 +88,11 @@ static int process_file(t_hts_callbackarg * carg, httrackp * opt, char *html,
   }
 
   /* Process */
+  /* Each half can fill this buffer on its own, and the value is only printed,
+     so clip. sizeof() must name the field: the local is a pointer alias. */
   printf("now parsing %s%s..\n", url_address, url_file);
-  strcpy(currentURLBeingParsed, url_address);
-  strcat(currentURLBeingParsed, url_file);
+  snprintf(currentURLBeingParsed, sizeof(userdef->currentURLBeingParsed),
+           "%s%s", url_address, url_file);
 
   return 1;                     /* success */
 }
