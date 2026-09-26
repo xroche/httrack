@@ -53,6 +53,30 @@ struct htsmutex_s {
 };
 #endif /* #ifdef _WIN32 */
 
+/* Publish an int another thread polls, and observe one. A plain store and load
+   carry no ordering. The compiler, or arm64 hardware, may move the payload
+   after the flag and leave a reader with stale data. An aligned 32-bit access
+   never tears, so only the ordering needs saying. */
+static HTS_INLINE HTS_UNUSED void hts_store_release_int(int *dst, int value) {
+#ifdef _MSC_VER
+  MemoryBarrier();
+  *(volatile int *) dst = value;
+#else
+  __atomic_store_n(dst, value, __ATOMIC_RELEASE);
+#endif
+}
+
+static HTS_INLINE HTS_UNUSED int hts_load_acquire_int(const int *src) {
+#ifdef _MSC_VER
+  const int value = *(const volatile int *) src;
+
+  MemoryBarrier();
+  return value;
+#else
+  return __atomic_load_n(src, __ATOMIC_ACQUIRE);
+#endif
+}
+
 /* Read a lock hts_mutexlock() may be publishing right now. It builds the lock
    on first use and publishes it with a compare-and-swap, which is a release, so
    this read has to be the matching acquire, or a thread sees the pointer and
