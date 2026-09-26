@@ -1,0 +1,14 @@
+#!/bin/bash
+#
+# An FTP worker hands its backlog slot back with the payload the crawl thread
+# reads behind that status, and never while a teardown holds the worker list.
+# Under ThreadSanitizer a missing release or acquire becomes a report here.
+
+set -eu
+
+out=$(httrack -#test=ftphandoff)
+
+test "$out" = "ftp-handoff-selftest: OK" || {
+    echo "expected 'ftp-handoff-selftest: OK', got: $out" >&2
+    exit 1
+}

@@ -53,6 +53,31 @@ struct htsmutex_s {
 };
 #endif /* #ifdef _WIN32 */
 
+/* Publish an int another thread polls, and observe one. A plain store and load
+   carry no ordering, so the compiler, and on arm64 the hardware, may move the
+   payload the flag announces after the flag itself and leave a reader with
+   stale data. An aligned 32-bit access never tears, so the ordering is the
+   only part that needs saying. */
+static HTS_INLINE HTS_UNUSED void hts_store_release_int(int *dst, int value) {
+#ifdef _MSC_VER
+  MemoryBarrier();
+  *(volatile int *) dst = value;
+#else
+  __atomic_store_n(dst, value, __ATOMIC_RELEASE);
+#endif
+}
+
+static HTS_INLINE HTS_UNUSED int hts_load_acquire_int(const int *src) {
+#ifdef _MSC_VER
+  const int value = *(const volatile int *) src;
+
+  MemoryBarrier();
+  return value;
+#else
+  return __atomic_load_n(src, __ATOMIC_ACQUIRE);
+#endif
+}
+
 /* Also runs 'tail(arg)' on the worker once the body is over, and only when this
    returns 0. A thread runner (see hts_set_thread_runner()) that recovers from a
    fault returns without running the rest of the body, so cleanup the engine

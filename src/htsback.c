@@ -3889,7 +3889,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
         }
       }
 #endif
-      else if (back[i].status == STATUS_FTP_READY) {    // ftp ready
+      /* Acquire, so the payload is visible with the status announcing it. */
+      else if (hts_load_acquire_int(&back[i].status) == STATUS_FTP_READY) {
         back[i].status = STATUS_READY;
         back_set_finished(opt, sback, i);
         // finalize transfer
@@ -3897,7 +3898,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
           hts_log_print(opt, LOG_TRACE, "finalizing ftp");
           back_finalize(opt, cache, sback, i);
         }
-      } else if ((back[i].status > 0) && (back[i].status < 1000)) {     // en réception http
+      } else if ((back[i].status > 0) &&
+                 (back[i].status < 1000)) { // en réception http
         int dispo = 0;
 
         // vérifier l'existance de timeout-check
@@ -5258,7 +5260,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
           }
         }
 
-      }                         // status>0
+      } // status>0
     } // for
 
     // vérifier timeouts
