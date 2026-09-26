@@ -5447,6 +5447,36 @@ HTSEXT_API const char *hts_rootdir(char *file) {
 
 HTSEXT_API hts_stat_struct HTS_STAT;
 
+/* Where the received-byte total lives (see htslib.h). Its lock guards this and
+   nothing else, so a worker counting bytes waits on nothing else either. */
+static LLint stat_recv_total = 0;
+static htsmutex stat_recv_lock = HTSMUTEX_INIT;
+
+void hts_stat_recv_add(LLint bytes) {
+  hts_mutexlock(&stat_recv_lock);
+  stat_recv_total += bytes;
+  hts_mutexrelease(&stat_recv_lock);
+}
+
+LLint hts_stat_recv_get(void) {
+  LLint bytes;
+
+  hts_mutexlock(&stat_recv_lock);
+  bytes = stat_recv_total;
+  hts_mutexrelease(&stat_recv_lock);
+  return bytes;
+}
+
+void hts_stat_recv_set(LLint bytes) {
+  hts_mutexlock(&stat_recv_lock);
+  stat_recv_total = bytes;
+  hts_mutexrelease(&stat_recv_lock);
+}
+
+void hts_stat_recv_publish(void) {
+  HTS_STAT.HTS_TOTAL_RECV = hts_stat_recv_get();
+}
+
 //
 // return  number of downloadable bytes, depending on rate limiter
 // see engine_stats() routine, too
@@ -5465,7 +5495,7 @@ LLint check_downloadable_bytes(int rate) {
     time_now = mtime_monotonic();
     elapsed_useconds = time_now - HTS_STAT.istat_timestart[id_timer];
     bytes_transferred_during_period =
-      (HTS_STAT.HTS_TOTAL_RECV - HTS_STAT.istat_bytes[id_timer]);
+        (hts_stat_recv_get() - HTS_STAT.istat_bytes[id_timer]);
 
     left = ((rate * elapsed_useconds) / 1000) - bytes_transferred_during_period;
     if (left <= 0)
@@ -5532,7 +5562,7 @@ int hts_read(htsblk * r, char *buff, int size) {
       }
     }
     if (retour > 0)             // compter flux entrant
-      HTS_STAT.HTS_TOTAL_RECV += retour;
+      hts_stat_recv_add(retour);
 #if HTS_USEOPENSSL
   }
 #endif
@@ -7118,6 +7148,7 @@ const hts_stat_struct* hts_get_stats(httrackp * opt) {
     return NULL;
   }
 
+  hts_stat_recv_publish();
   HTS_STAT.stat_nsocket = 0;
   HTS_STAT.stat_errors = fspc(opt, NULL, "error");
   HTS_STAT.stat_warnings = fspc(opt, NULL, "warning");

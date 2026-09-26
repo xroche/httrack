@@ -999,7 +999,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                 len = recv(soc_dat, buff, read_len, 0);
                 if (len > 0) {
                   back->r.size += len;
-                  HTS_STAT.HTS_TOTAL_RECV += len;
+                  hts_stat_recv_add(len);
                   if (back->r.fp) {
                     if (!hts_fwrite_exact(buff, (size_t) len, back->r.fp)) {
                       /*
@@ -1264,7 +1264,7 @@ int get_ftp_line(lien_back *back, T_SOC soc, char *ptrline, size_t line_size,
 
     switch (recv(soc, &b, 1, 0)) {
     case 1:
-      HTS_STAT.HTS_TOTAL_RECV += 1;     // compter flux entrant
+      hts_stat_recv_add(1); // compter flux entrant
       if ((b != 10) && (b != 13) && (i < (int) sizeof(data) - 1))
         data[i++] = b; // truncate hostile over-long reply lines
       break;

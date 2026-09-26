@@ -2145,6 +2145,71 @@ static int st_strsprintf(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* Eight FTP workers and the crawl thread each add STATRECV_ROUNDS times, so a
+   plain += drops some and the total comes up short. -M reads that total. */
+#define STATRECV_THREADS 8
+#define STATRECV_ROUNDS 100000
+
+static void statrecv_thread(void *arg) {
+  int i;
+
+  (void) arg;
+  for (i = 0; i < STATRECV_ROUNDS; i++)
+    hts_stat_recv_add(1);
+}
+
+static int st_statrecv(httrackp *opt, int argc, char **argv) {
+  const LLint expected = (LLint) (STATRECV_THREADS + 1) * STATRECV_ROUNDS;
+  const LLint recv_was = hts_stat_recv_get();
+  LLint total;
+  int err = 0;
+  int i;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  hts_stat_recv_set(0);
+  for (i = 0; i < STATRECV_THREADS; i++) {
+    if (hts_newthread(statrecv_thread, NULL) != 0) {
+      fprintf(stderr, "statrecv: cannot spawn\n");
+      htsthread_wait(); /* a spawned worker would else add to the total below */
+      hts_stat_recv_set(recv_was);
+      return 1;
+    }
+  }
+  statrecv_thread(NULL); /* the crawl thread's own share, as hts_read() adds */
+  htsthread_wait();
+  total = hts_stat_recv_get();
+  if (total != expected) {
+    fprintf(stderr,
+            "statrecv: the counter holds " LLintP " of " LLintP
+            " bytes added, so " LLintP " adds were lost\n",
+            total, expected, expected - total);
+    err = 1;
+  }
+
+  /* the case above trusts the setter to have zeroed the total */
+  hts_stat_recv_set(recv_was + 1);
+  if (hts_stat_recv_get() != recv_was + 1) {
+    fprintf(stderr, "statrecv: the setter did not take\n");
+    err = 1;
+  }
+
+  /* a front end reads the published copy, and nothing else does */
+  hts_stat_recv_publish();
+  if (HTS_STAT.HTS_TOTAL_RECV != recv_was + 1) {
+    fprintf(stderr,
+            "statrecv: the published total is " LLintP ", not " LLintP "\n",
+            (LLint) HTS_STAT.HTS_TOTAL_RECV, recv_was + 1);
+    err = 1;
+  }
+  hts_stat_recv_set(recv_was);
+  hts_stat_recv_publish();
+
+  printf("statrecv: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
@@ -2177,5 +2242,8 @@ const struct selftest_entry selftests_lib[] = {
     {"structcheck", "<dir>",
      "structcheck path guard and the <name>.txt rename it performs",
      st_structcheck},
+    {"statrecv", "",
+     "the received-bytes counter keeps every add from every thread",
+     st_statrecv},
     {NULL, NULL, NULL, NULL},
 };

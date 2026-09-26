@@ -630,7 +630,8 @@ struct httrackp {
 typedef struct hts_stat_struct hts_stat_struct;
 #endif
 struct hts_stat_struct {
-  LLint HTS_TOTAL_RECV; /**< total bytes received from the network */
+  LLint HTS_TOTAL_RECV; /**< total bytes received from the network, published
+                             here by engine_stats() and hts_get_stats() */
   LLint stat_bytes;     /**< total bytes written to disk */
   TStamp stat_timestart; /**< mirror start time */
   //

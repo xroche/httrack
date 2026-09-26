@@ -661,7 +661,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   HTS_STAT.stat_timestart = time_local();
   HTS_STAT.istat_timestart[0] = HTS_STAT.istat_timestart[1] = mtime_monotonic();
   /* reset stats */
-  HTS_STAT.HTS_TOTAL_RECV = 0;
+  hts_stat_recv_set(0);
   HTS_STAT.istat_bytes[0] = HTS_STAT.istat_bytes[1] = 0;
   if (opt->shell) {
     last_info_shell = HTS_STAT.stat_timestart;
@@ -2140,9 +2140,9 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
      we assume that something was bad (no connection)
      just backup old cache and restore everything
    */
-  if ((HTS_STAT.stat_files <= 0)
-      && (HTS_STAT.HTS_TOTAL_RECV < 32768)      /* should be fine */
-    ) {
+  if ((HTS_STAT.stat_files <= 0) &&
+      (hts_stat_recv_get() < 32768) /* should be fine */
+  ) {
     /* not a notice: the session is rolled back and the WARC aborted */
     hts_log_print(opt, LOG_WARNING,
                   "No data seems to have been transferred during this session! "
@@ -2311,9 +2311,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
     char BIGSTK htstime[256];
     char BIGSTK infoupdated[256];
 
-    LLint n =
-      (LLint) (HTS_STAT.HTS_TOTAL_RECV /
-               (max(1, time_local() - HTS_STAT.stat_timestart)));
+    const LLint recv = hts_stat_recv_get();
+    LLint n = (LLint) (recv / (max(1, time_local() - HTS_STAT.stat_timestart)));
 
     sec2str(htstime, time_local() - HTS_STAT.stat_timestart);
     infoupdated[0] = '\0';
@@ -2335,8 +2334,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
         "[" LLintP " bytes received at " LLintP " bytes/sec]",
         aborted ? "aborted after" : "complete in", htstime,
         (int) opt->lien_tot - 1, (int) HTS_STAT.stat_files,
-        (LLint) HTS_STAT.stat_bytes, infoupdated,
-        (LLint) HTS_STAT.HTS_TOTAL_RECV, (LLint) n);
+        (LLint) HTS_STAT.stat_bytes, infoupdated, (LLint) recv, (LLint) n);
 
     if (HTS_STAT.total_packed > 0 && HTS_STAT.total_unpacked > 0) {
       int packed_ratio =
@@ -2442,9 +2440,12 @@ cleanup:
 
 */
 int engine_stats(void) {
+  const LLint recv = hts_stat_recv_get();
+
+  hts_stat_recv_publish();
   HTS_STAT.stat_nsocket = HTS_STAT.stat_errors = HTS_STAT.nbk = 0;
   HTS_STAT.nb = 0;
-  if (HTS_STAT.HTS_TOTAL_RECV > 2048) {
+  if (recv > 2048) {
     TStamp cdif = mtime_monotonic();
     int i;
 
@@ -2454,12 +2455,12 @@ int engine_stats(void) {
 
         dif = cdif - HTS_STAT.istat_timestart[i];
         if ((TStamp) (dif / 1000) > 0) {
-          LLint byt = (HTS_STAT.HTS_TOTAL_RECV - HTS_STAT.istat_bytes[i]);
+          LLint byt = (recv - HTS_STAT.istat_bytes[i]);
 
           HTS_STAT.rate = (LLint) ((TStamp) ((TStamp) byt / (dif / 1000)));
           HTS_STAT.istat_idlasttimer = i;       // this timer recently sets the stats
           //
-          HTS_STAT.istat_bytes[i] = HTS_STAT.HTS_TOTAL_RECV;
+          HTS_STAT.istat_bytes[i] = recv;
           HTS_STAT.istat_timestart[i] = cdif;
         }
         return 1;               /* refreshed */
@@ -2470,12 +2471,11 @@ int engine_stats(void) {
     // timer #0 resync timer #1 when reaching 1 second limit
     if (HTS_STAT.istat_reference01 != HTS_STAT.istat_timestart[0]) {
       if ((cdif - HTS_STAT.istat_timestart[0]) >= 1000) {
-        HTS_STAT.istat_bytes[1] = HTS_STAT.HTS_TOTAL_RECV;
+        HTS_STAT.istat_bytes[1] = recv;
         HTS_STAT.istat_timestart[1] = cdif;
         HTS_STAT.istat_reference01 = HTS_STAT.istat_timestart[0];
       }
     }
-
   }
   return 0;
 }

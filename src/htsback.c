@@ -3363,8 +3363,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
   int busy_state = 0;           // pas de connexions
   int max_loop;                 // nombre de boucles max à parcourir..
   int max_loop_chk = 0;
-  unsigned int mod_random =
-    (unsigned int) (time_local() + HTS_STAT.HTS_TOTAL_RECV);
+  unsigned int mod_random = (unsigned int) (time_local() + hts_stat_recv_get());
 
   // max. number of loops
   max_loop = 8;
@@ -5384,7 +5383,7 @@ static LLint back_maxsize_grace(const LLint maxsite) { return maxsite / 10; }
    -M measures received volume (HTS_TOTAL_RECV), not saved 200-only stat_bytes
    which undercounts redirect/error-heavy crawls (#520). */
 static hts_boolean back_maxsize_reached(const httrackp *opt) {
-  return opt->maxsite > 0 && HTS_STAT.HTS_TOTAL_RECV >= opt->maxsite;
+  return opt->maxsite > 0 && hts_stat_recv_get() >= opt->maxsite;
 }
 
 static hts_boolean back_maxtime_reached(const httrackp *opt) {
@@ -5400,7 +5399,7 @@ static hts_boolean back_mirror_capped(const httrackp *opt) {
 
 static hts_mirror_limit back_mirror_limit(httrackp *opt) {
   if (back_maxsize_reached(opt)) {
-    const LLint over = HTS_STAT.HTS_TOTAL_RECV - opt->maxsite;
+    const LLint over = hts_stat_recv_get() - opt->maxsite;
 
     if (over >= back_maxsize_grace(opt->maxsite))
       return HTS_MIRROR_LIMIT_SIZE;

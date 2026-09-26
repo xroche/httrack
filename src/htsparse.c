@@ -4644,15 +4644,16 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
 
         if ((int) (l - makestat_time) >= 60) {
           if (makestat_fp != NULL) {
+            const LLint recv = hts_stat_recv_get();
+
             fspc(NULL, makestat_fp, "info");
-            fprintf(makestat_fp,
-                    "Rate= %d (/" LLintP ") \11NewLinks= %d (/%d)" LF,
-                    (int) ((HTS_STAT.HTS_TOTAL_RECV -
-                            *stre->makestat_total_) / (l - makestat_time)),
-                    (LLint) HTS_STAT.HTS_TOTAL_RECV,
-                    (int) opt->lien_tot - *stre->makestat_lnk_, (int) opt->lien_tot);
+            fprintf(
+                makestat_fp, "Rate= %d (/" LLintP ") \11NewLinks= %d (/%d)" LF,
+                (int) ((recv - *stre->makestat_total_) / (l - makestat_time)),
+                (LLint) recv, (int) opt->lien_tot - *stre->makestat_lnk_,
+                (int) opt->lien_tot);
             fflush(makestat_fp);
-            *stre->makestat_total_ = HTS_STAT.HTS_TOTAL_RECV;
+            *stre->makestat_total_ = recv;
             *stre->makestat_lnk_ = heap_top_index();
           }
           if (stre->maketrack_fp != NULL) {
@@ -4768,7 +4769,7 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
               fprintf(fp, "TOTAL %d" LF, (int) HTS_STAT.stat_bytes);
               /* divisor non-zero only via htscore.c's last_info_shell seed */
               fprintf(fp, "RATE %d" LF,
-                      (int) (HTS_STAT.HTS_TOTAL_RECV /
+                      (int) (hts_stat_recv_get() /
                              max(1, tl - HTS_STAT.stat_timestart)));
               fprintf(fp, "SOCKET %d" LF, back_nsoc(sback));
               fprintf(fp, "LINK %d" LF, opt->lien_tot);
@@ -4868,7 +4869,7 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
 
       _GOTOXY(1, 1);
       printf("Rate=%d B/sec\n",
-             (int) (HTS_STAT.HTS_TOTAL_RECV /
+             (int) (hts_stat_recv_get() /
                     (time_local() - HTS_STAT.stat_timestart)));
       while(i < minimum(back_max, 160)) {
         if (back[i].status > 0) {
