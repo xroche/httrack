@@ -53,6 +53,28 @@ struct htsmutex_s {
 };
 #endif /* #ifdef _WIN32 */
 
+/* Read a lock hts_mutexlock() may be publishing right now. It builds the lock
+   on first use and publishes it with a compare-and-swap, which is a release, so
+   this read has to be the matching acquire, or a thread sees the pointer and
+   still reads stale bytes inside the lock body. x86 never reorders two loads
+   and so hides that, but arm64 does reorder them. */
+static HTS_INLINE HTS_UNUSED htsmutex hts_load_acquire_mutex(htsmutex *src) {
+#ifdef _MSC_VER
+  /* Every lock and unlock runs this, so take the free form: MSVC defaults to
+     /volatile:ms on x86 and x64, where a volatile read already is an acquire.
+     ARM defaults to /volatile:iso and needs the fence, and we build no ARM
+     target, so a full MemoryBarrier() here would be paid for nothing. */
+  htsmutex const value = *(htsmutex volatile *) src;
+
+#if defined(_M_ARM) || defined(_M_ARM64)
+  MemoryBarrier();
+#endif
+  return value;
+#else
+  return __atomic_load_n(src, __ATOMIC_ACQUIRE);
+#endif
+}
+
 /* Also runs 'tail(arg)' on the worker once the body is over, and only when this
    returns 0. A thread runner (see hts_set_thread_runner()) that recovers from a
    fault returns without running the rest of the body, so cleanup the engine

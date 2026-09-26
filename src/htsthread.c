@@ -274,42 +274,11 @@ HTSEXT_API void hts_mutexfree(htsmutex * mutex) {
   }
 }
 
-/* gcc has had __atomic_load_n since 4.7 but __has_builtin only since 10. */
-#if defined(__has_builtin)
-#if __has_builtin(__atomic_load_n)
-#define HTS_HAS_ATOMIC_LOAD 1
-#endif
-#elif defined(__GNUC__) &&                                                     \
-    (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 7))
-#define HTS_HAS_ATOMIC_LOAD 1
-#endif
-
-/* Read a lock pointer another thread may be publishing right now. The
-   compare-and-swap below is a release, so this read has to be the matching
-   acquire, or a thread sees the pointer and still reads stale bytes inside the
-   lock body. x86 never reorders two loads and hides it; arm64 does not. */
-static htsmutex hts_mutexget(htsmutex *mutex) {
-#ifdef _WIN32
-  /* Exchanging HTSMUTEX_INIT for itself reads the slot and changes nothing.
-     MSVC has no cheaper form everywhere: volatile is acquire on x86 only. */
-  return (htsmutex) InterlockedCompareExchangePointer(
-      (PVOID volatile *) mutex, HTSMUTEX_INIT, HTSMUTEX_INIT);
-#elif defined(HTS_HAS_ATOMIC_LOAD)
-  return __atomic_load_n(mutex, __ATOMIC_ACQUIRE);
-#else
-  /* The compare-and-swap below needs the __sync family anyway. */
-  const htsmutex got = *(htsmutex volatile *) mutex;
-
-  __sync_synchronize();
-  return got;
-#endif
-}
-
 HTSEXT_API void hts_mutexlock(htsmutex * mutex) {
   htsmutex lock;
 
   assertf(mutex != NULL);
-  lock = hts_mutexget(mutex);
+  lock = hts_load_acquire_mutex(mutex);
   if (lock == HTSMUTEX_INIT) { /* must be initialized */
     /* Initialize exactly once, even when several threads race to lock the same
        mutex for the first time. Build our own object, then publish it with a
@@ -348,9 +317,9 @@ HTSEXT_API void hts_mutexrelease(htsmutex * mutex) {
   htsmutex lock;
 
   assertf(mutex != NULL);
-  /* Atomic here too: the compare-and-swap writes the slot whether it wins or
+  /* Acquire here too: the compare-and-swap writes the slot whether it wins or
      loses, so a loser is still writing it while the winner unlocks. */
-  lock = hts_mutexget(mutex);
+  lock = hts_load_acquire_mutex(mutex);
   assertf(lock != NULL);
 #ifdef _WIN32
   assertf(lock->handle != NULL);
