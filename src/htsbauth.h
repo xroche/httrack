@@ -33,7 +33,8 @@ Please visit our Website: http://www.httrack.com
 
 /** @file htsbauth.h
     HTTP Basic authentication storage: a per-session list of (URL-prefix,
-    credentials) pairs, plus the cookie jar that holds it. */
+    credentials) pairs, plus the cookie jar that holds it. The credentials stay
+    in memory, because nothing here writes them to a file or to a log. */
 
 #ifndef HTSBAUTH_DEFH
 #define HTSBAUTH_DEFH
@@ -42,31 +43,36 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h" /* hts_boolean */
 
-/** One stored credential: the longest-prefix match against a request's
-    host+path selects which auth header to send. */
+/** One stored credential. bauth_check() returns the first entry whose prefix
+    starts the request's host and path, in insertion order, so a wider prefix
+    stored first wins over a narrower one stored later. */
 #ifndef HTS_DEF_FWSTRUCT_bauth_chain
 #define HTS_DEF_FWSTRUCT_bauth_chain
 typedef struct bauth_chain bauth_chain;
 #endif
 struct bauth_chain {
-  char prefix[1024]; /* host + path prefix, e.g. www.foo.com/secure/ */
-  char auth[1024];   /* base-64 encoded user:pass (Authorization payload) */
-  struct bauth_chain *next; /* next element, NULL-terminated list */
+  char prefix[1024]; /**< host and path, cut after the last '/', for example
+                          www.foo.com/secure/ */
+  char auth[1024];   /**< base-64 "user:pass", the value sent after
+                          "Authorization: Basic " */
+  struct bauth_chain *next; /**< next entry, NULL at the end of the list */
 };
 
-/** Per-session cookie jar; also holds the basic-auth list head (auth).
-    The head node (auth) is embedded, not heap-allocated. */
+/** Per-session cookie jar, which also carries the head of the basic-auth
+    list. */
 #ifndef HTS_DEF_FWSTRUCT_t_cookie
 #define HTS_DEF_FWSTRUCT_t_cookie
 typedef struct t_cookie t_cookie;
 #endif
 struct t_cookie {
-  size_t max_len;   /* capacity of data[] in use */
-  char data[32768]; /* raw cookie store (NUL-terminated field list) */
-  bauth_chain auth; /* embedded head of the basic-auth list */
+  size_t max_len;   /**< bytes of data[] the jar may fill, set by the owner and
+                         not always sizeof(data) */
+  char data[32768]; /**< Netscape-format records, one tab-separated line each */
+  bauth_chain auth; /**< head of the basic-auth list, embedded so bauth_free()
+                         keeps it */
 };
 
-/* Library internal definictions */
+/* Library internal definitions */
 #ifdef HTS_INTERNAL_BYTECODE
 
 #ifndef HTS_DEF_FWSTRUCT_httrackp
@@ -101,12 +107,22 @@ int cookie_del(t_cookie *cookie, const char *cook_name, const char *domain,
 int cookie_load(httrackp *opt, t_cookie *cookie, const char *path,
                 const char *name);
 
+/** Write the jar's cookies to name in Netscape format, owner-only on Unix
+    because they are live session cookies. The stored basic-auth credentials are
+    not written. Returns 0 when the file was written or the jar was empty, -1 if
+    the file could not be opened. */
 int cookie_save(t_cookie *cookie, const char *name);
 
+/** Insert ins in front of the string at s, whose buffer holds s_size bytes. */
 void cookie_insert(char *s, size_t s_size, const char *ins);
 
+/** Drop the first pos bytes of the string at s, whose buffer holds s_size
+    bytes. */
 void cookie_delete(char *s, size_t s_size, size_t pos);
 
+/** Return tab-separated field param (0-based) of the jar record at
+    cookie_base, copied into buffer, or "" when the record has no such field.
+    buffer must hold 8192 bytes. */
 const char *cookie_get(char *buffer, const char *cookie_base, int param);
 
 /** Does the jar domain JAR_DOM cover the host HOST? RFC 6265 5.1.3 says it
@@ -116,12 +132,15 @@ const char *cookie_get(char *buffer, const char *cookie_base, int param);
     nothing is normalised here, so pass HOST through cookie_host first. */
 hts_boolean cookie_domain_match(const char *jar_dom, const char *host);
 
-/** First jar record at or after S matching cook_name (empty: any name),
-    domain and path, or NULL. The domain match ignores case, the path match
-    does not. */
+/** First jar record at or after s whose name (an empty cook_name accepts any),
+    domain and path match, or NULL. The domain match folds case, and the
+    record's own path must be a byte-exact prefix of path. The result points
+    into s. */
 char *cookie_find(char *s, const char *cook_name, const char *domain,
                   const char *path);
 
+/** Start of the jar record after the one at a, or the trailing NUL when a
+    holds the last one. */
 char *cookie_nextfield(char *a);
 
 /* basic auth */
@@ -133,9 +152,9 @@ char *cookie_nextfield(char *a);
 int bauth_add(t_cookie *cookie, const char *adr, const char *fil,
               const char *auth);
 
-/** Return the stored base-64 credentials whose prefix matches adr+fil, or NULL
-    if none (or cookie is NULL). Returned pointer aliases the jar's bauth_chain;
-    caller must not free it. */
+/** Return the base-64 credentials of the first stored prefix that starts
+    adr+fil, or NULL if none matches (or cookie is NULL). The result points into
+    the jar, so the caller must not free it, and bauth_free() invalidates it. */
 char *bauth_check(t_cookie *cookie, const char *adr, const char *fil);
 
 /** Drop every stored credential, leaving the jar's embedded head empty. Safe on
