@@ -1693,12 +1693,12 @@ static void corrupt_build_disk(httrackp *opt) {
   fclose(fp);
 }
 
-/* Patch the nth of total occurrences of pat (same-length rep) in new.zip.
-   `eol` says pat spans a whole header line: a placeholder longer than the
-   forged line would otherwise leave its tail on the value. */
-static void corrupt_patch(httrackp *opt, const char *pat, size_t patlen,
-                          const char *rep, size_t nth, size_t total,
-                          hts_boolean eol) {
+/* Patch the nth of total occurrences of pat in new.zip. `line` demands the
+   match span a whole header line, so a placeholder longer than the forged
+   replacement cannot leave its tail on the value. */
+static void corrupt_patch_bytes(httrackp *opt, const char *pat, size_t patlen,
+                                const char *rep, size_t nth, size_t total,
+                                hts_boolean line) {
   LLint fsz = 0;
   char *data = readfile2(reconcile_st_path(opt, "hts-cache/new.zip"), &fsz);
   const size_t n = (size_t) fsz;
@@ -1714,7 +1714,11 @@ static void corrupt_patch(httrackp *opt, const char *pat, size_t patlen,
     }
   }
   assertf(hits == total);
-  if (eol) {
+  /* either literal short of patlen would be read past its end */
+  assertf(strlen(pat) == patlen);
+  assertf(strlen(rep) == patlen);
+  if (line) {
+    assertf(at > 0 && data[at - 1] == '\n');
     assertf(at + patlen + 2 <= n);
     assertf(memcmp(data + at + patlen, "\r\n", 2) == 0);
   }
@@ -1724,6 +1728,12 @@ static void corrupt_patch(httrackp *opt, const char *pat, size_t patlen,
   assertf(hts_fwrite_exact(data, n, fp));
   fclose(fp);
   freet(data);
+}
+
+/* Forge one whole header line, same byte length, so the zip offsets hold. */
+static void corrupt_patch(httrackp *opt, const char *pat, size_t patlen,
+                          const char *rep, size_t nth, size_t total) {
+  corrupt_patch_bytes(opt, pat, patlen, rep, nth, total, HTS_TRUE);
 }
 
 /* Garbage the first bytes of the victim's deflated data (2nd local header). */
@@ -1885,7 +1895,9 @@ static int corrupt_expect_victim_clipped(httrackp *opt, size_t wantmsg,
     fail++;
   }
   c = cache_readex(opt, &cache, CORRUPT_ADR, "/canary.html", "", lc, NULL, 1);
-  if (c.statuscode != 200) {
+  if (c.statuscode != 200 || c.adr == NULL ||
+      c.size != (LLint) strlen(corrupt_body_a) ||
+      memcmp(c.adr, corrupt_body_a, strlen(corrupt_body_a)) != 0) {
     fprintf(stderr, "%s: %s: canary tainted (status %d)\n", selftest_tag, what,
             c.statuscode);
     fail++;
@@ -1901,10 +1913,10 @@ static int corrupt_expect_victim_clipped(httrackp *opt, size_t wantmsg,
 /* One zip corruption case: build, patch, then check victim+canary in-session.
  */
 static int corrupt_case_zip(httrackp *opt, const char *pat, const char *rep,
-                            size_t nth, size_t total, hts_boolean eol,
-                            const char *wantmsg, const char *what) {
+                            size_t nth, size_t total, const char *wantmsg,
+                            const char *what) {
   corrupt_build(opt, "");
-  corrupt_patch(opt, pat, strlen(pat), rep, nth, total, eol);
+  corrupt_patch(opt, pat, strlen(pat), rep, nth, total);
   return corrupt_expect_victim(opt, wantmsg, what);
 }
 
@@ -1915,19 +1927,20 @@ int cache_corruption_selftest(httrackp *opt, const char *dir) {
   selftest_setup_dir(opt, dir);
 
   failures +=
-      corrupt_case_zip(opt, "X-Size: 44", "X-Size: 99", 1, 1, HTS_TRUE,
+      corrupt_case_zip(opt, "X-Size: 44", "X-Size: 99", 1, 1,
                        "Cache Read Error : Read Data", "oversized X-Size");
   failures +=
-      corrupt_case_zip(opt, "X-Size: 44", "X-Size: -4", 1, 1, HTS_TRUE,
+      corrupt_case_zip(opt, "X-Size: 44", "X-Size: -4", 1, 1,
                        "Cache Read Error : Bad Size", "negative X-Size");
   /* both entries carry the line; the victim's is the second */
-  failures += corrupt_case_zip(
-      opt, "X-In-Cache: 1", "X-In-Cache: 0", 2, 2, HTS_TRUE,
-      "Previous cache file not found (empty filename)", "blanked X-In-Cache");
+  failures += corrupt_case_zip(opt, "X-In-Cache: 1", "X-In-Cache: 0", 2, 2,
+                               "Previous cache file not found (empty filename)",
+                               "blanked X-In-Cache");
   /* smashed local file header: the entry is dropped at index load */
-  failures +=
-      corrupt_case_zip(opt, "PK\x03\x04", "XK\x03\x04", 2, 2, HTS_FALSE,
-                       "File Cache Entry Not Found", "smashed local header");
+  corrupt_build(opt, "");
+  corrupt_patch_bytes(opt, "PK\x03\x04", 4, "XK\x03\x04", 2, 2, HTS_FALSE);
+  failures += corrupt_expect_victim(opt, "File Cache Entry Not Found",
+                                    "smashed local header");
 
   corrupt_build(opt, "");
   corrupt_victim_body(opt);
@@ -1947,7 +1960,7 @@ int cache_corruption_selftest(httrackp *opt, const char *dir) {
                 "X-StatusMessage: " /* 17 + 89 = 106 */
                 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
                 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-                1, 1, HTS_TRUE);
+                1, 1);
   failures +=
       corrupt_expect_victim_clipped(opt, sizeof(((htsblk *) 0)->msg) - 1,
                                     (size_t) -1, "over-long X-StatusMessage");
@@ -1959,7 +1972,7 @@ int cache_corruption_selftest(httrackp *opt, const char *dir) {
                 "Last-Modified: " /* 15 + 91 = 106 */
                 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
                 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-                1, 1, HTS_TRUE);
+                1, 1);
   failures += corrupt_expect_victim_clipped(
       opt, (size_t) -1, sizeof(((htsblk *) 0)->lastmodified) - 1,
       "over-long Last-Modified");
@@ -1972,7 +1985,7 @@ int cache_corruption_selftest(httrackp *opt, const char *dir) {
      X-Size it sees), keeping the zip byte-length and offsets intact. */
   corrupt_build(opt, "AAAAAAAAAAAAAAAAAAAA");
   corrupt_patch(opt, "Etag: AAAAAAAAAAAAAAAAAAAA", 26,
-                "X-Size: 2147483648AAAAAAAA", 1, 1, HTS_TRUE);
+                "X-Size: 2147483648AAAAAAAA", 1, 1);
   failures += corrupt_expect_victim(opt, "Cache Read Error : Bad Size",
                                     "X-Size above INT_MAX");
 
@@ -1981,7 +1994,7 @@ int cache_corruption_selftest(httrackp *opt, const char *dir) {
      (or every update re-fetches the file); an in-memory read still rejects. */
   corrupt_build_disk(opt);
   corrupt_patch(opt, "Etag: AAAAAAAAAAAAAAAAAAAA", 26,
-                "X-Size: 2147483648AAAAAAAA", 1, 1, HTS_TRUE);
+                "X-Size: 2147483648AAAAAAAA", 1, 1);
   failures += corrupt_expect_disk_header(opt, (LLint) 2147483648LL,
                                          "headers-only X-Size above INT_MAX");
   failures += corrupt_expect_victim_fil(opt, "/victim.bin",
@@ -1991,7 +2004,7 @@ int cache_corruption_selftest(httrackp *opt, const char *dir) {
   /* exactly INT_MAX pins the >= boundary: (int) r.size + 1 would overflow */
   corrupt_build_disk(opt);
   corrupt_patch(opt, "Etag: AAAAAAAAAAAAAAAAAAAA", 26,
-                "X-Size: 2147483647AAAAAAAA", 1, 1, HTS_TRUE);
+                "X-Size: 2147483647AAAAAAAA", 1, 1);
   failures += corrupt_expect_victim_fil(opt, "/victim.bin",
                                         "Cache Read Error : Bad Size",
                                         "in-memory X-Size at INT_MAX");
@@ -1999,7 +2012,7 @@ int cache_corruption_selftest(httrackp *opt, const char *dir) {
   /* the negative check must stay global, headers-only included */
   corrupt_build_disk(opt);
   corrupt_patch(opt, "Etag: AAAAAAAAAAAAAAAAAAAA", 26,
-                "X-Size: -2147483648AAAAAAA", 1, 1, HTS_TRUE);
+                "X-Size: -2147483648AAAAAAA", 1, 1);
   failures += corrupt_expect_victim_fil(opt, "/victim.bin",
                                         "Cache Read Error : Bad Size",
                                         "headers-only negative X-Size");
