@@ -1,0 +1,112 @@
+#!/bin/bash
+#
+# Every engine header needs a whole-file include guard whose macro is its own.
+# httrack.h once reused htstools.h's HTSTOOLS_DEFH, so whichever came first
+# emptied the other, and htsparse.h had no guard at all.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+tmp=$(mktemp -d) || exit 1
+cleanup_push rm -rf "$tmp"
+
+# Prints "FILE GUARD" per header, or "FILE ! reason". A guard is the first
+# directive, an #ifndef/#define pair, closing on the last line that is not a
+# comment or blank. One file per awk run, because ENDFILE is a gawk extension
+# and the runners default to mawk.
+scan() { # scan FILE...
+    local f
+    for f in "$@"; do
+        awk '
+        function strip(s,   i, j, out) {
+            sub(/\r$/, "", s)
+            out = ""
+            while (1) {
+                if (incomment) {
+                    i = index(s, "*/"); if (i == 0) return out
+                    s = substr(s, i + 2); incomment = 0; continue
+                }
+                i = index(s, "/*"); j = index(s, "//")
+                if (j > 0 && (i == 0 || j < i)) return out substr(s, 1, j - 1)
+                if (i == 0) break
+                out = out substr(s, 1, i - 1); s = substr(s, i + 2); incomment = 1
+            }
+            return out s
+        }
+        {
+            line = strip($0)
+            if (line !~ /[^ \t]/) next
+            n++
+            isdir = (line ~ /^[ \t]*#/)
+            if (n == 1) {
+                if (isdir && match(line, /^[ \t]*#[ \t]*ifndef[ \t]+[A-Za-z_][A-Za-z0-9_]*/)) {
+                    guard = substr(line, RSTART, RLENGTH)
+                    sub(/^.*ifndef[ \t]+/, "", guard)
+                } else
+                    bad = "no #ifndef opens the file"
+            } else if (n == 2 && guard != "") {
+                if (line !~ ("^[ \t]*#[ \t]*define[ \t]+" guard "([ \t]|$)"))
+                    bad = "#ifndef " guard " is not followed by #define " guard
+            } else if (closed && bad == "")
+                bad = "content after the guard closes"
+            if (!isdir) next
+            if (line ~ /^[ \t]*#[ \t]*(if|ifdef|ifndef)([ \t(!]|$)/) depth++
+            else if (line ~ /^[ \t]*#[ \t]*endif([ \t]|$)/) {
+                depth--
+                if (depth == 0) closed = 1
+            }
+        }
+        END {
+            if (bad == "" && guard == "") bad = "no #ifndef opens the file"
+            if (bad == "" && !closed) bad = "the guard never closes"
+            print FILENAME, (bad == "" ? guard : "! " bad)
+        }' "$f"
+    done
+}
+
+# The controls: each shape this test exists to reject has to be rejected.
+printf '#ifndef A_H\n#define A_H\n#endif\n' >"$tmp/probe.h"
+printf '#include <stdio.h>\n' >"$tmp/c-none.h"
+printf '#ifndef A_H\n#define A_H\nint a(void);\n#endif\nint b(void);\n' >"$tmp/c-early.h"
+printf '#ifndef A_H\n#define B_H\n#endif\n' >"$tmp/c-mismatch.h"
+printf '#ifndef A_H\n#define A_H\n' >"$tmp/c-open.h"
+printf 'int a(void);\n#ifndef A_H\n#define A_H\n#endif\n' >"$tmp/c-late.h"
+# the #define must follow the #ifndef, with no content line slipped between
+printf '#ifndef A_H\nint a(void);\n#define A_H\n#endif\n' >"$tmp/c-split.h"
+for c in none early mismatch open late split; do
+    case $(scan "$tmp/c-$c.h") in
+    *' ! '*) ;;
+    *) fail "the scan accepts $c, so it cannot see the bug it guards" ;;
+    esac
+done
+# and the same corpus must accept a sound header, or it rejects everything
+[ "$(scan "$tmp/probe.h")" = "$tmp/probe.h A_H" ] || fail "the scan rejects a sound guard"
+# a // holding a /* must not open a block comment and swallow the #endif
+printf '#ifndef A_H\n#define A_H\n// a/*b\nint c(void);\n#endif\n' >"$tmp/c-slashstar.h"
+[ "$(scan "$tmp/c-slashstar.h")" = "$tmp/c-slashstar.h A_H" ] ||
+    fail "the scan reads a /* inside a // as a block comment"
+# .gitattributes pins no eol for *.h, so a Windows checkout hands us CRLF
+printf '#ifndef A_H\r\n#define A_H\r\n/* c */\r\n#endif\r\n' >"$tmp/c-crlf.h"
+[ "$(scan "$tmp/c-crlf.h")" = "$tmp/c-crlf.h A_H" ] || fail "the scan rejects CRLF line endings"
+
+# A generated table is its generator's business. The glob does not descend, so
+# vendored minizip stays out.
+headers=()
+for h in "$top_srcdir"/src/*.h; do
+    case $(head -2 "$h") in
+    *GENERATED*) continue ;;
+    esac
+    headers+=("$h")
+done
+[ "${#headers[@]}" -ge 67 ] || fail "only ${#headers[@]} headers scanned, the corpus shrank"
+
+scan "${headers[@]}" >"$tmp/guards"
+bad=$(grep ' ! ' "$tmp/guards" || true)
+[ -z "$bad" ] || fail_dump "headers without a whole-file include guard" "$tmp/guards"
+
+dupes=$(awk '{print $2}' "$tmp/guards" | sort | uniq -d)
+[ -z "$dupes" ] || fail "two headers share an include guard macro: $(echo "$dupes" | tr '\n' ' ')"
+
+echo "scanned ${#headers[@]} headers, all guarded, all macros distinct"
