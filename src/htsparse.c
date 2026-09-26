@@ -52,6 +52,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsencoding.h"
 #include "htssniff.h"
 #include "htsname.h"
+#include "htsthread.h"
 
 /* external modules */
 #include "htsmodules.h"
@@ -4679,9 +4680,14 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
         while((s = hts_cancel_file_pop(opt)) != NULL) {
           if (strnotempty(s)) { // fichier à canceller
             for(i = 0; i < back_max; i++) {
-              if ((back[i].status > 0)) {
+              /* Once, and with the acquire matching ftp_worker_release(): two
+                 reads can straddle a worker publishing STATUS_FTP_READY and
+                 take the teardown arm for a slot it still owned. */
+              const int status = hts_load_acquire_int(&back[i].status);
+
+              if (status > 0) {
                 if (strcmp(back[i].url_sav, s) == 0) {  // ok trouvé
-                  if (back[i].status != 1000) {
+                  if (status != 1000) {
 #if HTS_DEBUG_CLOSESOCK
                     DEBUG_W("user cancel: deletehttp\n");
 #endif
@@ -4692,7 +4698,7 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
                     strcpybuff(back[i].r.msg, "Cancelled by User");
                     back[i].status = 0; // terminé
                     back_set_finished(opt, sback, i);
-                  } else        // cancel ftp.. flag à 1
+                  } else // cancel ftp, so flag it
                     back[i].stop_ftp = 1;
                 }
               }

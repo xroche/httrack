@@ -54,10 +54,9 @@ struct htsmutex_s {
 #endif /* #ifdef _WIN32 */
 
 /* Publish an int another thread polls, and observe one. A plain store and load
-   carry no ordering, so the compiler, and on arm64 the hardware, may move the
-   payload the flag announces after the flag itself and leave a reader with
-   stale data. An aligned 32-bit access never tears, so the ordering is the
-   only part that needs saying. */
+   carry no ordering. The compiler, or arm64 hardware, may move the payload
+   after the flag and leave a reader with stale data. An aligned 32-bit access
+   never tears, so only the ordering needs saying. */
 static HTS_INLINE HTS_UNUSED void hts_store_release_int(int *dst, int value) {
 #ifdef _MSC_VER
   MemoryBarrier();

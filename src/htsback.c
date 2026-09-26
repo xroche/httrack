@@ -3899,7 +3899,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
           back_finalize(opt, cache, sback, i);
         }
       } else if ((back[i].status > 0) &&
-                 (back[i].status < 1000)) { // en réception http
+                 (back[i].status < 1000)) { // receiving http
         int dispo = 0;
 
         // vérifier l'existance de timeout-check
