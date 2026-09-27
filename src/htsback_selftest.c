@@ -1237,6 +1237,103 @@ static int st_mutexlazyinit(httrackp *opt, int argc, char **argv) {
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
 
+/* host_ban() must never end an FTP slot, which its worker thread is still
+ * writing. */
+#define ST_HOSTBAN_HOST "ftp.example.invalid"
+#define ST_HOSTBAN_POISON 4242
+
+static void st_hostban_slot(struct_back *sback, int p, int status,
+                            const char *adr) {
+  lien_back *const back = &sback->lnk[p];
+
+  back->status = status;
+  back->timeout = -1;
+  back->rateout = -1;
+  back->stop_ftp = HTS_FALSE;
+  back->r.soc = INVALID_SOCKET; /* or host_ban() would deletehttp() fd 0 */
+  /* open, so a wrong teardown is caught by the fclose it performs */
+  back->r.fp = tmpfile();
+  assertf(back->r.fp != NULL);
+  back->r.statuscode = ST_HOSTBAN_POISON;
+  strcpybuff(back->r.msg, "untouched");
+  strcpybuff(back->url_adr, adr);
+  strcpybuff(back->url_fil, "/pub/big.iso");
+}
+
+static int st_hostban(httrackp *opt, int argc, char **argv) {
+  enum { SLOT_FTP = 0, SLOT_HTTP, SLOTS };
+
+  struct_back *sback;
+  char **filters = NULL;
+  int filptr = 0;
+  int err = 0;
+
+  (void) argc;
+  (void) argv;
+  opt->maxfilter = 128;
+  if (filters_init(&filters, opt->maxfilter, 0) == 0) {
+    fprintf(stderr, "hostban: cannot allocate filters\n");
+    return 77;
+  }
+  filters_bind(opt, &filters, &filptr);
+  sback = back_new(opt, SLOTS);
+  if (sback == NULL) {
+    fprintf(stderr, "hostban: cannot allocate the backing table\n");
+    return 77;
+  }
+  /* An FTP slot's url_adr carries its scheme (htsback.c, on "ftp://"), an
+     http one does not, and host_ban() is handed a bare host. */
+  st_hostban_slot(sback, SLOT_FTP, STATUS_FTP_TRANSFER,
+                  "ftp://" ST_HOSTBAN_HOST);
+  st_hostban_slot(sback, SLOT_HTTP, STATUS_TRANSFER, ST_HOSTBAN_HOST);
+
+  host_ban(opt, 0, sback, ST_HOSTBAN_HOST);
+
+  /* The worker's slot, exactly as it was: poison intact, file still open. */
+  if (sback->lnk[SLOT_FTP].status != STATUS_FTP_TRANSFER) {
+    fprintf(stderr, "hostban: the worker's slot went to status %d\n",
+            sback->lnk[SLOT_FTP].status);
+    err++;
+  }
+  if (sback->lnk[SLOT_FTP].r.fp == NULL) {
+    fprintf(stderr, "hostban: the worker's file was closed under it\n");
+    err++;
+  }
+  if (sback->lnk[SLOT_FTP].r.statuscode != ST_HOSTBAN_POISON ||
+      strcmp(sback->lnk[SLOT_FTP].r.msg, "untouched") != 0) {
+    fprintf(stderr, "hostban: the worker's slot was rewritten as %d '%s'\n",
+            sback->lnk[SLOT_FTP].r.statuscode, sback->lnk[SLOT_FTP].r.msg);
+    err++;
+  }
+  /* The control: an http slot of the same host IS ended, so a test that stopped
+     ending anything fails rather than passing quietly. */
+  if (sback->lnk[SLOT_HTTP].status != STATUS_READY) {
+    fprintf(stderr, "hostban: the http slot was left at status %d\n",
+            sback->lnk[SLOT_HTTP].status);
+    err++;
+  }
+  if (sback->lnk[SLOT_HTTP].r.fp != NULL) {
+    fprintf(stderr, "hostban: the http slot's file was left open\n");
+    err++;
+  }
+  if (strcmp(sback->lnk[SLOT_HTTP].r.msg, "Link Cancelled by host control") !=
+      0) {
+    fprintf(stderr, "hostban: the http slot reads '%s'\n",
+            sback->lnk[SLOT_HTTP].r.msg);
+    err++;
+  }
+
+  if (sback->lnk[SLOT_FTP].r.fp != NULL) {
+    fclose(sback->lnk[SLOT_FTP].r.fp);
+    sback->lnk[SLOT_FTP].r.fp = NULL;
+  }
+  back_free(&sback);
+  freet(filters[0]);
+  freet(filters);
+  printf("hostban self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 const struct selftest_entry selftests_back[] = {
     {"strerror", "",
      "a thread's error message is its own, never another thread's (#1697)",
@@ -1268,5 +1365,8 @@ const struct selftest_entry selftests_back[] = {
      "a user stop drops the slots still waiting to connect (#1073)",
      st_backstop},
     {"pause", "", "randomized inter-file pause target self-test", st_pause},
+    {"hostban", "",
+     "a banned host's FTP slot is left to its worker, never ended here",
+     st_hostban},
     {NULL, NULL, NULL, NULL},
 };
