@@ -545,7 +545,8 @@ static int help_server(char *dest_path, int defaultPort, const char *bindAddr) {
   int returncode = 0;
   char adr_prox[HTS_URLMAXSIZE * 2];
   int port_prox;
-  T_SOC soc = smallserver_init_std(&port_prox, adr_prox, defaultPort, bindAddr);
+  T_SOC soc = smallserver_init_std(&port_prox, adr_prox, sizeof(adr_prox),
+                                   defaultPort, bindAddr);
 
   if (soc != INVALID_SOCKET) {
     char url[HTS_URLMAXSIZE * 2];

@@ -31,6 +31,8 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
+#include <limits.h> /* INT_MAX, the backing count back_new() must refuse */
+
 #include "htsselftest_int.h"
 
 /* hts_mirror_completed() answers HTS_DEFAULT until a mirror has run, so a GUI
@@ -623,6 +625,36 @@ static int st_backnew(httrackp *opt, int argc, char **argv) {
   }
   back_free(&sback);
 
+  /* A count whose back_max + 1 is not an int is refused before any allocation:
+     the sum used to be signed UB. */
+  if (back_new(opt, INT_MAX) != NULL || back_new(opt, -1) != NULL) {
+    printf("backnew: FAILED (a count it cannot express was accepted)\n");
+    return 1;
+  }
+
+  /* What -cN is turned into must always be something back_new() can express, so
+     check the clamp itself rather than an allocator's answer to an absurd
+     request: -cN is unclamped under --bypass-limits, maxsoc * 32 + 1024 used to
+     overflow, and how a platform refuses a 37 TB table is its own business. */
+  {
+    static const int maxsocs[] = {
+        -1, 0, 1, 8, 67108830, 67108831, 67108832, 2000000000, INT_MAX};
+    size_t i;
+
+    for (i = 0; i < sizeof(maxsocs) / sizeof(maxsocs[0]); i++) {
+      const int slots = back_max_slots(maxsocs[i]);
+
+      if (slots <= 0 || slots == INT_MAX) {
+        printf("backnew: FAILED (-c%d yields %d slots)\n", maxsocs[i], slots);
+        return 1;
+      }
+    }
+    /* Narrowing control: an ordinary -c is still sized from it, not capped. */
+    if (back_max_slots(8) != 8 * 32 + 1024) {
+      printf("backnew: FAILED (-c8 is capped: %d)\n", back_max_slots(8));
+      return 1;
+    }
+  }
 #ifndef _WIN32
   {
     struct rlimit saved, tight;

@@ -102,13 +102,31 @@ static hts_mirror_limit back_mirror_limit(httrackp *opt);
 static hts_boolean back_mirror_capped(const httrackp *opt);
 static hts_boolean back_is_live(const int status);
 
+/* Slots for maxsoc connections, clamped to what back_new() can size: it builds
+   two tables of back_max + 1, so INT_MAX itself is one too many. Total on
+   purpose, so a self-test can check it without allocating anything: -cN is
+   unclamped under --bypass-limits, and maxsoc * 32 used to overflow. */
+int back_max_slots(int maxsoc) {
+  if (maxsoc <= 0)
+    return 1024;
+  if (maxsoc >= (INT_MAX - 1024) / 32)
+    return INT_MAX - 1;
+  return maxsoc * 32 + 1024;
+}
+
 /* NULL when the slot table cannot be allocated, which httpmirror() already
    answers by aborting the mirror with a message. Failing here rather than
    aborting the process: back_max grows with -cN, so the size is the user's. */
 struct_back *back_new(httrackp *opt, int back_max) {
   int i;
-  struct_back *sback = calloct(1, sizeof(struct_back));
+  struct_back *sback;
 
+  /* Both tables below are sized back_max + 1, so a count this side of INT_MAX
+     is the most that sum can express. Refuse the rest rather than overflow it.
+   */
+  if (back_max < 0 || back_max == INT_MAX)
+    return NULL;
+  sback = calloct(1, sizeof(struct_back));
   if (sback == NULL)
     return NULL;
   sback->count = back_max;
@@ -2754,18 +2772,23 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
                    cache-conditional requests. This allows both HTTP/1.0 and
                    HTTP/1.1 caches to respond appropriately.
                  */
+                /* etag and lastmodified come back out of the cache, so name
+                   the capacity here rather than rely on their reader's clip */
                 if (strnotempty(r.lastmodified))
-                  sprintf(back[p].send_too,
-                          "If-None-Match: %s\r\nIf-Modified-Since: %s\r\n",
-                          r.etag, r.lastmodified);
+                  slprintfbuff_clip(back[p].send_too, sizeof(back[p].send_too),
+                                    "If-None-Match: %s\r\nIf-Modified-Since: "
+                                    "%s\r\n",
+                                    r.etag, r.lastmodified);
                 else
-                  sprintf(back[p].send_too, "If-None-Match: %s\r\n", r.etag);
+                  slprintfbuff_clip(back[p].send_too, sizeof(back[p].send_too),
+                                    "If-None-Match: %s\r\n", r.etag);
               } else if (strnotempty(r.lastmodified))
-                sprintf(back[p].send_too, "If-Modified-Since: %s\r\n",
-                        r.lastmodified);
+                slprintfbuff_clip(back[p].send_too, sizeof(back[p].send_too),
+                                  "If-Modified-Since: %s\r\n", r.lastmodified);
               else if (strnotempty(cache->lastmodified))
-                sprintf(back[p].send_too, "If-Modified-Since: %s\r\n",
-                        cache->lastmodified);
+                slprintfbuff_clip(back[p].send_too, sizeof(back[p].send_too),
+                                  "If-Modified-Since: %s\r\n",
+                                  cache->lastmodified);
 
               /* this is an update of a file */
               if (strnotempty(back[p].send_too))
@@ -2787,20 +2810,24 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
 
         /* Found file on disk */
         if (file_size > 0) {
-          char *send_too = back[p].send_too;
+          char *const send_too = back[p].send_too;
+          const size_t send_size = sizeof(back[p].send_too);
+          size_t used = 0;
 
-          sprintf(send_too, "Range: bytes=" LLintP "-\r\n", (LLint) file_size);
-          send_too += strlen(send_too);
+          send_too[0] = '\0';
+          slcatprintfbuff_clip(send_too, send_size, &used,
+                               "Range: bytes=" LLintP "-\r\n",
+                               (LLint) file_size);
           /* add etag information */
           if (strnotempty(itemback->r.etag)) {
-            sprintf(send_too, "If-Match: %s\r\n", itemback->r.etag);
-            send_too += strlen(send_too);
+            slcatprintfbuff_clip(send_too, send_size, &used, "If-Match: %s\r\n",
+                                 itemback->r.etag);
           }
           /* add date information */
           if (strnotempty(itemback->r.lastmodified)) {
-            sprintf(send_too, "If-Unmodified-Since: %s\r\n",
-                    itemback->r.lastmodified);
-            send_too += strlen(send_too);
+            slcatprintfbuff_clip(send_too, send_size, &used,
+                                 "If-Unmodified-Since: %s\r\n",
+                                 itemback->r.lastmodified);
           }
           back[p].http11 = 1;   /* 1.1 */
           back[p].range_req_size = (LLint) file_size;
@@ -2849,9 +2876,10 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
                  } else 
                */
               if (strlen(lastmodified)) {
-                sprintf(back[p].send_too,
-                        "If-Unmodified-Since: %s\r\nRange: bytes=" LLintP
-                        "-\r\n", lastmodified, (LLint) sz);
+                slprintfbuff_clip(
+                    back[p].send_too, sizeof(back[p].send_too),
+                    "If-Unmodified-Since: %s\r\nRange: bytes=" LLintP "-\r\n",
+                    lastmodified, (LLint) sz);
                 back[p].http11 = 1;     // En tête 1.1
                 back[p].is_update = 1;  /* this is an update of a file */
                 back[p].range_req_size = sz;
