@@ -489,6 +489,87 @@ jobs:
             tests/*.log
           if-no-files-found: ignore
 
+  # ThreadSanitizer is the only thing in CI that can see a missing release/acquire
+  # pair: on x86-64 the plain-access code and the synchronized code behave the
+  # same, so no runtime test can tell them apart. Static because clang's runtime
+  # clashes with the -Wl,--no-undefined on libhttrack.so, the same clash
+  # configure.ac refuses --enable-fuzzers over. HTTPS stays on, unlike under msan:
+  # TSan reports nothing inside openssl, zlib, brotli or zstd, so turning it off
+  # would only cost coverage. Not a required check.
+  tsan:
+    name: tsan (ThreadSanitizer, clang)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
+          sudo apt-get install -y --no-install-recommends \
+            build-essential clang autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
+
+      - name: Configure (TSan, static)
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          ./configure CC=clang \
+            CFLAGS="-fsanitize=thread -fno-sanitize-recover=all -g -O1 -fno-omit-frame-pointer" \
+            LDFLAGS="-fsanitize=thread" \
+            --disable-shared --enable-static
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      - name: Test (offline self-tests under TSan)
+        # TSan exits 66 on a report by itself, so the leg reds without halt_on_error.
+        env:
+          TSAN_OPTIONS: allocator_may_return_null=1:suppressions=${{ github.workspace }}/tools/tsan-suppressions.txt:log_path=${{ github.workspace }}/sanitizer-logs/tsan
+          HTTRACK_STDERR_CAPTURE_DIR: ${{ github.workspace }}/sanitizer-stderr
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/sanitizer-logs" "$GITHUB_WORKSPACE/sanitizer-stderr"
+          # The engine self-tests, where the FTP, DNS and lazy-lock worker threads
+          # run, because a crawl test spends its time in the single-threaded select
+          # loop. Do not widen this to the allocation-failure self-tests:
+          # allocator_may_return_null lets 439_engine-ucs2 through, but TSan's
+          # allocator still aborts on 237_engine-arrays and 446_engine-backnew.
+          #
+          # 467 and 503 are named because they are the purpose-built FTP thread tests
+          # and do not match the glob, so the leg would otherwise never run the two
+          # tests it exists to guard.
+          tests="467_engine-ftp-worker-tail.test 503_engine-ftp-handoff.test"
+          for t in tests/01_engine-*.test; do
+            tests="$tests ${t##*/}"
+          done
+          make check -j"$CHECK_JOBS" TESTS="$tests"
+
+      - name: Print the test log on failure
+        if: failure()
+        run: cat tests/test-suite.log 2>/dev/null || true
+
+      - name: Collect sanitizer findings
+        if: always()
+        run: |
+          set -euo pipefail
+          sh tools/ci-sanitizer-report.sh -s "$GITHUB_WORKSPACE/sanitizer-stderr" \
+            "$GITHUB_WORKSPACE/sanitizer-logs" tests
+
+      - name: Upload the sanitizer and per-test logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: tsan-logs
+          path: |
+            sanitizer-logs/
+            sanitizer-stderr/
+            tests/*.log
+          if-no-files-found: ignore
+
   # libFuzzer smoke: build the fuzz/ harnesses over the pure hostile-input
   # parsers and replay each seed corpus under ASan+UBSan+LeakSanitizer. Replay
   # (not open-ended mutation) keeps CI deterministic -- it can't hit strjoker's
