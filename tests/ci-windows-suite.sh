@@ -304,6 +304,8 @@ ci_suite_heartbeat() {
 # inert but the replaying bash runs it.
 # signal-handlers raises SIGCHLD, SIGPIPE, SIGTERM and SIGINT at the engine,
 # and Windows has a disposition for none of that set.
+# engine-sigterm-noatexit forks a child per case and raises SIGINT at it, and
+# Windows has neither fork() nor that disposition.
 expected_skips_msys="01_engine-usercommand.test
 01_engine-footer-overflow.test
 253_local-ftp-close-once.test
@@ -329,6 +331,7 @@ expected_skips_msys="01_engine-usercommand.test
 468_engine-crash-live-worker.test
 471_engine-sigpipe.test
 504_engine-signal-handlers.test
+517_engine-sigterm-noatexit.test
 472_local-isalive-openfail.test
 01_engine-crash-announce.test
 88_local-proxytrack-badmtime.test
@@ -368,6 +371,8 @@ expected_skips_msys="01_engine-usercommand.test
 # engine-usercommand replays each -V expansion through a POSIX shell, and a
 # native engine quotes for cmd.exe instead, where a backtick inside "..." is
 # inert but the replaying bash runs it.
+# engine-sigterm-noatexit forks a child per case and raises SIGINT at it, and
+# Windows has neither fork() nor that disposition.
 expected_skips_wsl2="01_engine-usercommand.test
 01_engine-footer-overflow.test
 253_local-ftp-close-once.test
@@ -393,6 +398,7 @@ expected_skips_wsl2="01_engine-usercommand.test
 468_engine-crash-live-worker.test
 471_engine-sigpipe.test
 504_engine-signal-handlers.test
+517_engine-sigterm-noatexit.test
 472_local-isalive-openfail.test
 01_engine-crash-announce.test
 88_local-proxytrack-badmtime.test

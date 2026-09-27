@@ -34,6 +34,9 @@ Please visit our Website: http://www.httrack.com
 #include "htsselftest_int.h"
 
 #include <stdint.h>
+#ifndef _WIN32
+#include <sys/wait.h> /* the forking sigterm self-test reaps its children */
+#endif
 
 /* very minimalistic internal tests */
 static void basic_selftests(void) {
@@ -2283,6 +2286,99 @@ static int st_sighandlers(httrackp *opt, int argc, char **argv) {
 }
 #endif
 
+#ifndef _WIN32
+/* Raised by the child's atexit hook below. */
+static int sigterm_atexit_fd = -1;
+
+static void sigterm_atexit_marker(void) {
+  const char c = 'A';
+
+  (void) (write(sigterm_atexit_fd, &c, 1) == 1);
+}
+
+/* The ^C that terminates must not run the atexit chain: OpenSSL registers its
+   teardown there, and freeing thousands of objects in handler context can
+   deadlock on the malloc lock the interrupted thread holds. Each case forks,
+   because the handler it exercises ends the process. */
+static int st_sigterm(httrackp *opt, int argc, char **argv) {
+  static const struct {
+    const char *name;
+    int in_mirror; /* sig_leave() only defers while a mirror runs */
+    int raises;
+  } cases[] = {{"a ^C outside a mirror", 0, 1},
+               {"the second ^C during a mirror", 1, 2}};
+
+  int err = 0;
+  size_t i;
+
+  (void) argc;
+  (void) argv;
+
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    FILE *const errs = tmpfile();
+    char marker[8], said[512];
+    int fds[2], status = -1;
+    ssize_t got;
+    pid_t pid;
+
+    assertf(errs != NULL);
+    assertf(pipe(fds) == 0);
+    fflush(NULL); /* nothing buffered for the child to flush or to drop */
+    pid = fork();
+    assertf(pid != -1);
+    if (pid == 0) {
+      int n;
+
+      close(fds[0]);
+      sigterm_atexit_fd = fds[1];
+      /* an unarmed hook would make every exit() look like _exit() */
+      if (atexit(sigterm_atexit_marker) != 0)
+        _exit(71);
+      if (dup2(fileno(errs), 2) == -1)
+        _exit(72);
+      opt->state._hts_in_mirror = cases[i].in_mirror;
+      for (n = 0; n < cases[i].raises; n++) {
+        if (raise(SIGINT) != 0)
+          _exit(73);
+      }
+      _exit(74); /* the handler returned, so it terminated nothing */
+    }
+    close(fds[1]);
+    got = read(fds[0], marker, sizeof(marker));
+    assertf(got >= 0);
+    close(fds[0]);
+    assertf(waitpid(pid, &status, 0) == pid);
+
+    if (!WIFEXITED(status)) {
+      /* SIG_DFL would land here, and then the case below proves nothing */
+      printf("  FAIL: %s killed the child by signal %d instead of exiting\n",
+             cases[i].name, WIFSIGNALED(status) ? WTERMSIG(status) : -1);
+      err = 1;
+    } else if (WEXITSTATUS(status) != 0) {
+      printf("  FAIL: %s left the child at exit code %d\n", cases[i].name,
+             WEXITSTATUS(status));
+      err = 1;
+    } else if (got != 0) {
+      printf("  FAIL: %s ran the atexit chain\n", cases[i].name);
+      err = 1;
+    }
+    /* and the user is still told, so safety was not bought with silence */
+    rewind(errs);
+    got = (ssize_t) fread(said, 1, sizeof(said) - 1, errs);
+    assertf(got >= 0);
+    said[got] = '\0';
+    if (strstr(said, "Program terminated") == NULL) {
+      printf("  FAIL: %s said \"%s\" instead of naming the termination\n",
+             cases[i].name, said);
+      err = 1;
+    }
+    fclose(errs);
+  }
+  printf("sigterm self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+#endif
+
 /* ------------------------------------------------------------ */
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
@@ -2319,6 +2415,8 @@ const struct selftest_entry selftests_lib[] = {
     {"sighandlers", "",
      "the signal handlers save errno and write with no locking output",
      st_sighandlers},
+    {"sigterm", "", "the terminating ^C handler runs no atexit hook",
+     st_sigterm},
 #endif
     {NULL, NULL, NULL, NULL},
 };

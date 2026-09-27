@@ -1,0 +1,38 @@
+#!/bin/bash
+#
+# The second ^C is the user's only way out of a mirror that will not stop: a
+# paused one polls no flag, and a live FTP transfer is not abortable. Its
+# handler called exit(), which runs the atexit chain in handler context, and
+# OpenSSL registers its teardown there: 7903 ThreadSanitizer reports, every one
+# an allocator call that can deadlock on the lock the interrupted thread holds.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+skip_on_windows "the self-test forks a child per case, and raises a POSIX SIGINT at it"
+
+rc=0
+out=$(httrack -O /dev/null '-#test=sigterm' 2>&1) || rc=$?
+# Named, because SIGBUS is 7 on x86 and 10 on hppa, and the name is the finding.
+test "$rc" -lt 128 ||
+    fail "the engine died on SIG$(kill -l $((rc - 128))): $out"
+test "$rc" = 0 || fail "-#test=sigterm exited $rc: $out"
+grep -q 'sigterm self-test: OK' <<<"$out" ||
+    fail "the self-test's own verdict is missing: $out"
+ok "the terminating ^C handler runs no atexit hook, and still names itself"
+
+# _exit() drops whatever stdio still holds, and exit() used to be the only thing
+# flushing the closing verdict: the teardown's own flush sits behind
+# back_delete_all(), which is exactly where a second ^C lands. Measured at 322
+# bytes of hts-log.txt lost, so the write has to flush itself.
+src=${top_srcdir:-..}/src
+region=$(sed -n '/afficher.*sum.*dans log/,/Close ZIP/p' "$src/htscore.c")
+test -n "$region" || fail "the closing-summary block is gone from $src/htscore.c"
+grep -q 'fprintf(opt->log' <<<"$region" ||
+    fail "the sweep read a region that writes no summary, so it saw nothing"
+grep -q 'fflush(opt->log)' <<<"$region" ||
+    fail "the closing summary is written unflushed, so a second ^C drops it: $region"
+ok "the log's closing verdict is flushed where it is written"
+exit 0

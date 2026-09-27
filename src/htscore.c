@@ -2377,6 +2377,9 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
 
     // Log
     fprintf(opt->log, LF "%s", finalInfo);
+    /* on disk now: the teardown below holds the only other flush, and a ^C or
+       a kill arriving in it would drop this verdict. */
+    fflush(opt->log);
 
     // Close ZIP
     if (cache.zipOutput) {
