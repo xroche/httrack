@@ -16,10 +16,20 @@ out=$(httrack -O "${tmpdir}/st" "-#test=ftp-userpass" run 2>&1) ||
 grep -q "ftp-userpass self-test OK" <<<"${out}" || fail "unexpected output: ${out}"
 
 # The reachable half: a URL carries the userinfo straight into user[256]/pass[256].
+# 66 is the sanitizer runtimes' own exit code and httrack never returns it, so a
+# finding is named as one rather than as a crash, because the two differ in fix.
 probe() {
+    local rc=0 err="${tmpdir}/probe.err"
     rm -rf "${tmpdir}/mir"
-    httrack "ftp://$1@127.0.0.1:1/f.txt" -O "${tmpdir}/mir" -q >/dev/null 2>&1 ||
-        fail "an FTP URL with ${#1}-byte userinfo crashed the engine"
+    httrack "ftp://$1@127.0.0.1:1/f.txt" -O "${tmpdir}/mir" -q >/dev/null 2>"$err" || rc=$?
+    if test "$rc" -eq 66 ||
+        grep -Eq 'ERROR: [A-Za-z]+Sanitizer|WARNING: [A-Za-z]+Sanitizer|runtime error:|DEADLYSIGNAL' "$err"; then
+        fail "${#1}-byte userinfo: a sanitizer reported (exit ${rc}): $(cat "$err")"
+    elif test "$rc" -gt 128; then
+        fail "${#1}-byte userinfo: the engine died on SIG$(kill -l "$((rc - 128))")"
+    elif test "$rc" -ne 0; then
+        fail "an FTP URL with ${#1}-byte userinfo failed the engine (exit ${rc})"
+    fi
     cat "${tmpdir}/mir/hts-log.txt"
 }
 

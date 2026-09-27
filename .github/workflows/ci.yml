@@ -527,19 +527,25 @@ jobs:
       - name: Test (offline self-tests under TSan)
         # TSan exits 66 on a report by itself, so the leg reds without halt_on_error.
         env:
-          TSAN_OPTIONS: allocator_may_return_null=1:log_path=${{ github.workspace }}/sanitizer-logs/tsan
+          TSAN_OPTIONS: allocator_may_return_null=1:suppressions=${{ github.workspace }}/tools/tsan-suppressions.txt:log_path=${{ github.workspace }}/sanitizer-logs/tsan
           HTTRACK_STDERR_CAPTURE_DIR: ${{ github.workspace }}/sanitizer-stderr
         timeout-minutes: 20
         run: |
           set -euo pipefail
           mkdir -p "$GITHUB_WORKSPACE/sanitizer-logs" "$GITHUB_WORKSPACE/sanitizer-stderr"
-          # 01_engine-* only, the set where the FTP, DNS and lazy-lock worker threads
+          # The engine self-tests, where the FTP, DNS and lazy-lock worker threads
           # run, because a crawl test spends its time in the single-threaded select
-          # loop. Do not widen it to the allocation-failure self-tests:
+          # loop. Do not widen this to the allocation-failure self-tests:
           # allocator_may_return_null lets 439_engine-ucs2 through, but TSan's
           # allocator still aborts on 237_engine-arrays and 446_engine-backnew.
-          # shellcheck disable=SC2012 # our own test names, no exotic bytes
-          tests="$(cd tests && ls 01_engine-*.test | tr '\n' ' ')"
+          #
+          # 467 and 503 are named because they are the purpose-built FTP thread tests
+          # and do not match the glob, so the leg would otherwise never run the two
+          # tests it exists to guard.
+          tests="467_engine-ftp-worker-tail.test 503_engine-ftp-handoff.test"
+          for t in tests/01_engine-*.test; do
+            tests="$tests ${t##*/}"
+          done
           make check -j"$CHECK_JOBS" TESTS="$tests"
 
       - name: Print the test log on failure
