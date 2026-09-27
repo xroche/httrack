@@ -927,11 +927,11 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
                     }
                   }
 
+#ifndef _WIN32
+                  (void) fchmod(fileno(r.out), HTS_ACCESS_FILE);
+#endif
                   fclose(r.out);
                   r.out = NULL;
-#ifndef _WIN32
-                  chmod(target_save, HTS_ACCESS_FILE);
-#endif
                 } else {
                   r.statuscode = STATUSCODE_INVALID;
                   strcpybuff(r.msg,
