@@ -3267,6 +3267,13 @@ static hts_boolean back_is_live(const int status) {
   return status > 0 && status < STATUS_FTP_TRANSFER;
 }
 
+/* Has the FTP worker handed this slot back? Acquire, so the payload it wrote
+   before publishing the status is visible to us once we see it. */
+static hts_boolean back_ftp_handed_back(const lien_back *back) {
+  return hts_load_acquire_int(&back->status) == STATUS_FTP_READY ? HTS_TRUE
+                                                                 : HTS_FALSE;
+}
+
 /* Tear down live slot p, reported as statuscode/msg. trunc is the
    WARC-Truncated reason to archive its partial body under, WARC_TRUNC_NONE to
    leave the body unarchived. */
@@ -3888,7 +3895,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
         }
       }
 #endif
-      else if (back[i].status == STATUS_FTP_READY) {    // ftp ready
+      else if (back_ftp_handed_back(&back[i])) {
         back[i].status = STATUS_READY;
         back_set_finished(opt, sback, i);
         // finalize transfer
@@ -3896,7 +3903,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
           hts_log_print(opt, LOG_TRACE, "finalizing ftp");
           back_finalize(opt, cache, sback, i);
         }
-      } else if ((back[i].status > 0) && (back[i].status < 1000)) {     // en réception http
+      } else if ((back[i].status > 0) &&
+                 (back[i].status < 1000)) { // receiving http
         int dispo = 0;
 
         // vérifier l'existance de timeout-check
@@ -5257,7 +5265,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
           }
         }
 
-      }                         // status>0
+      } // status>0
     } // for
 
     // vérifier timeouts
@@ -5268,7 +5276,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
       for (i_mod = 0; i_mod < (unsigned int) back_max; i_mod++) {
         unsigned int i = (i_mod + mod_random) % (back_max);
 
-        if (back[i].status > 0) {       // réception/connexion/..
+        if (back_is_live(back[i].status)) { // receiving, connecting, ..
           if (back[i].timeout > 0) {
             // a stuck connect with a fallback address: retry the next one well
             // before the full timeout (dead IPv6 on a dual-stack host, ...)

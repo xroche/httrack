@@ -1952,10 +1952,10 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
               fprintf(fp,
                       "If you want to get these files, you have to set an upper recurse level, ");
               fprintf(fp, "and to rescan the URL." CRLF);
-              fclose(fp);
 #ifndef _WIN32
-              chmod(tempo, HTS_ACCESS_FILE);
+              (void) fchmod(fileno(fp), HTS_ACCESS_FILE);
 #endif
+              fclose(fp);
               usercommand(opt, 0, NULL, fconv(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), tempo), "",
                           "");
             }
@@ -2375,6 +2375,9 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
 
     // Log
     fprintf(opt->log, LF "%s", finalInfo);
+    /* on disk now: the teardown below holds the only other flush, and a ^C or
+       a kill arriving in it would drop this verdict. */
+    fflush(opt->log);
 
     // Close ZIP
     if (cache.zipOutput) {
@@ -2530,7 +2533,9 @@ void host_ban(httrackp * opt, int ptr,
   }
   // couper connexion
   for(i = 0; i < back_max; i++) {
-    if (back[i].status >= 0)    // réception OU prêt
+    if (back[i].status >= 0) // receiving or ready
+      /* host is a bare name and an FTP url_adr keeps its scheme, so no FTP slot
+         matches here, and none may, because its worker is still writing it. */
       if (strfield2(back[i].url_adr, host)) {
 #if HTS_DEBUG_CLOSESOCK
         DEBUG_W("host control: deletehttp\n");
@@ -3032,8 +3037,9 @@ FILE *filecreate(filenote_strc * strc, const char *s) {
     errno = last_errno;
   }
 #ifndef _WIN32
+  /* by descriptor: a name swapped for a symlink would chmod its target */
   if (fp != NULL)
-    chmod(fname, HTS_ACCESS_FILE);
+    (void) fchmod(fileno(fp), HTS_ACCESS_FILE);
 #endif
   return fp;
 }
@@ -3069,7 +3075,7 @@ FILE *fileappend(filenote_strc * strc, const char *s) {
 
 #ifndef _WIN32
   if (fp != NULL)
-    chmod(fname, HTS_ACCESS_FILE);
+    (void) fchmod(fileno(fp), HTS_ACCESS_FILE);
 #endif
 
   return fp;
