@@ -900,6 +900,41 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* hts_getcategories() is what a front end lists for a projects directory: the
+   distinct categories (type 1), or the project names (type 0). One tagged line
+   per entry, so the caller asserts on the exact set (#1821). */
+static int st_categories(httrackp *opt, int argc, char **argv) {
+  static const int types[] = {1, 0};
+  unsigned int i;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "categories: needs a directory\n");
+    return 1;
+  }
+  for (i = 0; i < sizeof(types) / sizeof(types[0]); i++) {
+    const char *const tag = types[i] == 1 ? "categ" : "profile";
+    char *path = strdupt(argv[0]); /* it strips a trailing '/' in place */
+    char *list, *pos;
+
+    assertf(path != NULL);
+    list = hts_getcategories(path, types[i]);
+    freet(path);
+    /* an empty list comes back as a NULL buffer, not an empty string */
+    for (pos = list; pos != NULL && *pos != '\0';) {
+      char *const eol = strstr(pos, "\r\n");
+
+      if (eol != NULL)
+        *eol = '\0';
+      printf("%s:%s\n", tag, pos);
+      pos = eol != NULL ? eol + 2 : NULL;
+    }
+    freet(list);
+  }
+  printf("categories self-test OK\n");
+  return 0;
+}
+
 /* filesave() reports a write failure only through its close, and its one crawl
    caller is unreachable: <doomed> is a save name that cannot take the bytes. */
 static int st_filesave(httrackp *opt, int argc, char **argv) {
@@ -1643,6 +1678,9 @@ const struct selftest_entry selftests_io[] = {
     {"topindex", "[dir]",
      "hts_buildtopindex charset handling of a non-ASCII project dir",
      st_topindex},
+    {"categories", "<dir>",
+     "hts_getcategories() lists only the categories the projects carry",
+     st_categories},
     {"datadir", "<dir>",
      "data directory resolution: compiled-in path, then the executable's tree",
      st_datadir},

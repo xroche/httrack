@@ -1,0 +1,55 @@
+#!/bin/bash
+#
+# hts_getcategories() feeds the category list every front end shows, so a name
+# in it that no project carries is a name the user cannot act on (#1821).
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+# A directory is a project only once it holds hts-cache/winprofile.ini, and its
+# category is the category= line there.
+mkproject() { # mkproject NAME [CATEGORY]
+    mkdir -p "$dir/$1/hts-cache"
+    : >"$dir/$1/hts-cache/winprofile.ini"
+    if test $# -ge 2; then
+        printf 'category=%s\n' "$2" >"$dir/$1/hts-cache/winprofile.ini"
+    fi
+}
+
+mkproject alpha Music
+mkproject beta Photos
+mkproject gamma Music
+mkproject delta
+mkproject "Test category 1" "Test category 1"
+mkdir -p "$dir/epsilon"
+
+# LC_ALL=C: hts_findfirst enumerates in filesystem order, and a locale collation
+# would order the expected list by another rule than the sort below.
+list() { # list TAG
+    local got
+    got=$(httrack -O /dev/null -#test=categories "$dir") ||
+        fail "categories: exited $?"
+    assert_match 'categories self-test OK' "$got" 'the handler ran to its end'
+    LC_ALL=C sort <<<"$(grep "^$1:" <<<"$got")"
+}
+
+# gamma repeats alpha's category, delta has no category= line and epsilon is not
+# a project, so three categories over five projects.
+assert_eq 'categ:Music
+categ:Photos
+categ:Test category 1' "$(list categ)" 'the categories a front end lists'
+assert_eq 'profile:Test category 1
+profile:alpha
+profile:beta
+profile:delta
+profile:gamma' "$(list profile)" 'the projects a front end lists'
+
+# Deleting the one project that carries it must take the name away: #1821 wrote
+# "Test category 1" in unconditionally, so it survived this.
+rm -rf "$dir/Test category 1"
+assert_eq 'categ:Music
+categ:Photos' "$(list categ)" 'the categories left after dropping a project'

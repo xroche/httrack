@@ -1302,8 +1302,6 @@ HTSEXT_API char *hts_getcategories(char *path, int type) {
     if (type == 1) {
       hashCateg = coucal_new(0);
       coucal_set_name(hashCateg, "hashCateg");
-      StringCat(categ, "Test category 1");
-      StringCat(categ, "\r\nTest category 2");
     }
     do {
       if (hts_findisdir(h)) {

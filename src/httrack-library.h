@@ -319,11 +319,10 @@ HTSEXT_API int hts_buildtopindex(httrackp *opt, const char *path,
 
 /** Scan every mirror project under @p path and return a CRLF-separated list:
     @p type==1 gives the distinct category names, any other value gives the
-    project directory names, and a @p type==1 list is led by the placeholders
-    "Test category 1" and "Test category 2". The caller frees the result with
-    freet(), and it may be NULL. @p path loses a trailing '/' in place. The
-    bytes are UTF-8, except on Windows, where winprofile.ini and the directory
-    names are in the local ANSI codepage. */
+    project directory names. The caller frees the result with freet(), and it
+    may be NULL. @p path loses a trailing '/' in place. The bytes are UTF-8,
+    except on Windows, where winprofile.ini and the directory names are in the
+    local ANSI codepage. */
 HTSEXT_API char *hts_getcategories(char *path, int type);
 
 /** Read the percent-decoded `category=` value from a winprofile.ini file. The
