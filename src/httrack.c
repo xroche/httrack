@@ -251,6 +251,18 @@ static hts_boolean vt_size_refresh(void) {
 static int use_show;
 static httrackp *global_opt = NULL;
 
+/* Raised by sig_leave(), drained from the engine's own thread: the log line it
+   stands for goes through hts_log_print(), which allocates and takes locks. */
+static volatile sig_atomic_t stop_log_pending = 0;
+
+/* Write out what the ^C handler could only flag. */
+static void sig_drain_pending(httrackp *opt) {
+  if (stop_log_pending) {
+    stop_log_pending = 0;
+    hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
+  }
+}
+
 static void signal_handlers(void);
 
 #ifdef _WIN32
@@ -369,6 +381,7 @@ static int __cdecl htsshow_chopt(t_hts_callbackarg * carg, httrackp * opt) {
   return htsshow_start(carg, opt);
 }
 static int __cdecl htsshow_end(t_hts_callbackarg * carg, httrackp * opt) {
+  sig_drain_pending(opt);
   return 1;
 }
 static int __cdecl htsshow_preprocesshtml(t_hts_callbackarg * carg,
@@ -409,6 +422,8 @@ static int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_b
   LLint stat_bytes = -1;
   LLint stat_bytes_recv = -1;
   int irate = -1;
+
+  sig_drain_pending(opt);
 
   if (stats) {
     stat_written = stats->stat_files;
@@ -871,46 +886,89 @@ static int linput(FILE * fp, char *s, int max) {
   return j;
 }
 
-// routines de détournement de SIGHUP & co (Unix)
+// Signal handlers (SIGHUP & co, Unix)
 //
-static void sig_ignore(int code) {      // ignorer signal
+/* A handler may only write(), and may only touch a volatile sig_atomic_t: both
+   printf and hts_log_print take a lock and allocate, so a signal arriving
+   while the interrupted thread holds the stdout lock deadlocks. Each one also
+   puts errno back, because the interrupted code was about to read it. */
+#define SIG_FD_OUT 1
+#define SIG_FD_ERR 2
+
+static void sig_print(int fd, const char *msg, size_t len) {
+  /* MSVC's write() counts in unsigned int and answers in int */
+  (void) (write(fd, msg, (unsigned int) len) == (int) len);
 }
-static void sig_term(int code) {        // quitter brutalement
-  fprintf(stderr, "\nProgram terminated (signal %d)\n", code);
+
+#define SIG_PRINT(fd, lit) sig_print((fd), (lit), sizeof(lit) - 1)
+
+/* "<prefix><code>)\n", the shape the two handlers below used to printf. */
+static void sig_print_code(int fd, const char *prefix, size_t len, int code) {
+  char buffer[256];
+  unsigned int size;
+
+  if (len > sizeof(buffer) - 16)
+    len = sizeof(buffer) - 16;
+  memcpy(buffer, prefix, len);
+  size = (unsigned int) len;
+  size += hts_print_num(&buffer[size], code);
+  buffer[size++] = ')';
+  buffer[size++] = '\n';
+  sig_print(fd, buffer, size);
+}
+
+#define SIG_PRINT_CODE(fd, lit, code)                                          \
+  sig_print_code((fd), (lit), sizeof(lit) - 1, (code))
+
+static void sig_ignore(int code) { // ignore the signal
+}
+
+static void sig_term(int code) { // quit at once (never returns)
+  SIG_PRINT_CODE(SIG_FD_ERR, "\nProgram terminated (signal ", code);
   exit(0);
 }
-static void sig_finish(int code) {      // finir et quitter
-  signal(code, sig_term);       // quitter si encore
+
+static void sig_finish(int code) { // finish the mirror, then quit
+  const int saved = errno;
+
+  signal(code, sig_term); // quit at once if asked again
   if (global_opt != NULL) {
     global_opt->state.exit_xh = 1;
   }
-  fprintf(stderr, "\nExit requested to engine (signal %d)\n", code);
+  SIG_PRINT_CODE(SIG_FD_ERR, "\nExit requested to engine (signal ", code);
+  errno = saved;
 }
 
 #ifndef _WIN32
 static void sig_doback(int blind);
-static void sig_back(int code) {        // ignorer et mettre en backing 
+
+static void sig_back(int code) { // ^Z: suspend, or go to the background
+  const int saved = errno;
+
   if (global_opt != NULL && !global_opt->background_on_suspend) {
     signal(SIGTSTP, SIG_DFL);   // ^Z
-    printf("\nInterrupting the program.\n");
-    fflush(stdout);
+    SIG_PRINT(SIG_FD_OUT, "\nInterrupting the program.\n");
     kill(getpid(), SIGTSTP);
   } else {
     // Background the process.
     signal(code, sig_ignore);
     sig_doback(0);
   }
+  errno = saved;
 }
 
 static void sig_brpipe(int code) {      // treat if necessary
+  const int saved = errno;
+
   signal(code, sig_brpipe);
+  errno = saved;
 }
-static void sig_doback(int blind) {     // mettre en backing 
+
+static void sig_doback(int blind) { // go to the background
   int out = -1;
 
   //
-  printf("\nMoving into background to complete the mirror...\n");
-  fflush(stdout);
+  SIG_PRINT(SIG_FD_OUT, "\nMoving into background to complete the mirror...\n");
 
   if (global_opt != NULL) {
     // suppress logging and asking lousy questions
@@ -930,7 +988,7 @@ static void sig_doback(int blind) {     // mettre en backing
   case 0:
     break;
   case -1:
-    fprintf(stderr, "Error: can not fork process\n");
+    SIG_PRINT(SIG_FD_ERR, "Error: can not fork process\n");
     break;
   default:                     // pere
     _exit(0);
@@ -939,15 +997,11 @@ static void sig_doback(int blind) {     // mettre en backing
 }
 #endif
 
-#undef FD_ERR
-#define FD_ERR 2
-
 static void sig_fatal(int code) {
   const char msg[] = "\nCaught signal ";
   const char msgreport[] =
     "\nPlease report the problem at http://forum.httrack.com\n";
   char buffer[256];
-  /* MSVC's write() counts in unsigned int; this stays under buffer[256] */
   unsigned int size;
 
   signal(code, SIG_DFL);
@@ -957,26 +1011,25 @@ static void sig_fatal(int code) {
   size = sizeof(msg) - 1;
   size += hts_print_num(&buffer[size], code);
   buffer[size++] = '\n';
-  (void) (write(FD_ERR, buffer, size) == size);
+  sig_print(SIG_FD_ERR, buffer, size);
   hts_print_backtrace();
-  (void) (write(FD_ERR, msgreport, sizeof(msgreport) - 1)
-    == sizeof(msgreport) - 1);
+  SIG_PRINT(SIG_FD_ERR, msgreport);
   abort();
 }
 
-#undef FD_ERR
-
 static void sig_leave(int code) {
+  const int saved = errno;
+
   if (global_opt != NULL && global_opt->state._hts_in_mirror) {
-    signal(code, sig_term);     // quitter si encore
-    printf("\n** Finishing pending transfers.. press again ^C to quit.\n");
-    if (global_opt != NULL) {
-      // ask for stop
-      hts_log_print(global_opt, LOG_ERROR, "Exit requested by shell or user");
-      global_opt->state.stop = 1;
-    }
+    signal(code, sig_term); // quit at once if asked again
+    SIG_PRINT(SIG_FD_OUT,
+              "\n** Finishing pending transfers.. press again ^C to quit.\n");
+    // ask for stop, and leave the log line to sig_drain_pending()
+    stop_log_pending = 1;
+    global_opt->state.stop = 1;
+    errno = saved;
   } else {
-    sig_term(code);
+    sig_term(code); /* never returns */
   }
 }
 

@@ -1,0 +1,48 @@
+#!/bin/bash
+#
+# A file whose descriptor is still open gets its mode set through that
+# descriptor. chmod() re-resolves the name, so a local process that swaps it for
+# a symlink in the window makes us chmod the symlink's target instead. The mode
+# itself is already pinned by 51_local-update-codec.test's --file-mode.
+#
+# Named outside every category the Windows CI suite globs, as the other source
+# scans are: it reads the tracked sources, so a second platform tells it nothing,
+# and that job runs without automake's abs_top_srcdir.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+top="${abs_top_srcdir:?not run under make check}"
+test -f "$top/src/htscore.c" || fail "no $top/src/htscore.c"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/chmodfd.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "$work"
+
+# The two survivors chmod after hts_rename_over(), which leaves no descriptor.
+allowed='chmod\(back\[[a-z]+\]\.url_sav,'
+
+find "$top/src" -name '*.c' ! -name '*_selftest.c' -print |
+    LC_ALL=C sort >"$work/files"
+# A find that silently narrowed would report a clean tree, so floor the count.
+test "$(lines_of "$work/files")" -ge 40 ||
+    fail "only $(lines_of "$work/files") sources found under $top/src"
+
+xargs grep -nHE '(^|[^_[:alnum:]])chmod[[:space:]]*\(' <"$work/files" |
+    grep -vE "$allowed" >"$work/found" || true
+
+# Control: the scan must fire on the line this test exists to keep out, and must
+# not fire on the fchmod that replaced it.
+printf '  chmod(fname, HTS_ACCESS_FILE);\n' >"$work/dirty.c"
+printf '  (void) fchmod(fileno(fp), HTS_ACCESS_FILE);\n' >"$work/clean.c"
+grep -qE '(^|[^_[:alnum:]])chmod[[:space:]]*\(' "$work/dirty.c" ||
+    fail "the scan cannot see a chmod by path, so a clean result proves nothing"
+if grep -qE '(^|[^_[:alnum:]])chmod[[:space:]]*\(' "$work/clean.c"; then
+    fail "the scan reads fchmod as chmod, so it would fail on the fixed form"
+fi
+
+test ! -s "$work/found" ||
+    fail_dump "this file's mode is set by path while its descriptor is open. Use fchmod(fileno(fp), ...) before the fclose" "$work/found"
+
+echo "scanned $(lines_of "$work/files") sources, chmod-by-path outside the allowlist: 0"

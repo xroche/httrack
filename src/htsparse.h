@@ -32,6 +32,9 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
+#ifndef HTSPARSE_DEFH
+#define HTSPARSE_DEFH
+
 #include "htsglobal.h"
 
 /* Forward definitions */
@@ -272,5 +275,7 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
 #define ENGINE_SAVE_CONTEXT_BASE() \
   /* Apply changes */ \
   * str->ptr_ = ptr
+
+#endif
 
 #endif
