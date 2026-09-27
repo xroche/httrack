@@ -33,8 +33,8 @@ Please visit our Website: http://www.httrack.com
 
 /** @file htsbauth.h
     HTTP Basic authentication storage: a per-session list of (URL-prefix,
-    credentials) pairs, plus the cookie jar that holds it. The credentials stay
-    in memory, because nothing here writes them to a file or to a log. */
+    credentials) pairs, plus the cookie jar that holds it. Nothing here writes a
+    credential to a file or to a log. */
 
 #ifndef HTSBAUTH_DEFH
 #define HTSBAUTH_DEFH
@@ -43,9 +43,8 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h" /* hts_boolean */
 
-/** One stored credential. bauth_check() returns the first entry whose prefix
-    starts the request's host and path, in insertion order, so a wider prefix
-    stored first wins over a narrower one stored later. */
+/** One stored credential. bauth_check() takes the first stored prefix that
+    starts the request key, not the longest, so insertion order decides. */
 #ifndef HTS_DEF_FWSTRUCT_bauth_chain
 #define HTS_DEF_FWSTRUCT_bauth_chain
 typedef struct bauth_chain bauth_chain;
@@ -55,11 +54,10 @@ struct bauth_chain {
                           www.foo.com/secure/ */
   char auth[1024];   /**< base-64 "user:pass", the value sent after
                           "Authorization: Basic " */
-  struct bauth_chain *next; /**< next entry, NULL at the end of the list */
+  struct bauth_chain *next; /**< next entry, NULL at the end */
 };
 
-/** Per-session cookie jar, which also carries the head of the basic-auth
-    list. */
+/** Per-session cookie jar, which also carries the basic-auth list head. */
 #ifndef HTS_DEF_FWSTRUCT_t_cookie
 #define HTS_DEF_FWSTRUCT_t_cookie
 typedef struct t_cookie t_cookie;
@@ -107,10 +105,9 @@ int cookie_del(t_cookie *cookie, const char *cook_name, const char *domain,
 int cookie_load(httrackp *opt, t_cookie *cookie, const char *path,
                 const char *name);
 
-/** Write the jar's cookies to name in Netscape format, owner-only on Unix
-    because they are live session cookies. The stored basic-auth credentials are
-    not written. Returns 0 when the file was written or the jar was empty, -1 if
-    the file could not be opened. */
+/** Write the jar's cookies to name in Netscape format, owner-only on Unix.
+    Returns 0 when the file was written or the jar was empty, and -1 when the
+    file could not be opened. */
 int cookie_save(t_cookie *cookie, const char *name);
 
 /** Insert ins in front of the string at s, whose buffer holds s_size bytes. */
@@ -153,8 +150,8 @@ int bauth_add(t_cookie *cookie, const char *adr, const char *fil,
               const char *auth);
 
 /** Return the base-64 credentials of the first stored prefix that starts
-    adr+fil, or NULL if none matches (or cookie is NULL). The result points into
-    the jar, so the caller must not free it, and bauth_free() invalidates it. */
+    adr+fil, or NULL when none does or cookie is NULL. The result points into
+    the jar, so never free it, and bauth_free() invalidates it. */
 char *bauth_check(t_cookie *cookie, const char *adr, const char *fil);
 
 /** Drop every stored credential, leaving the jar's embedded head empty. Safe on

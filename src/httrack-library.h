@@ -48,9 +48,8 @@ Please visit our Website: http://www.httrack.com
  * hts_has_stopped() are safe to call for the same opt from another thread while
  * the mirror runs. hts_free_opt() must not run until hts_has_stopped() is true.
  *
- * Most of what follows is not the mirror driver but the utility surface the
- * engine and its front ends share: URL escaping and normalization, MIME typing,
- * directory iteration, locks, worker threads, and a UTF-8 file API.
+ * Most of the rest is shared utility code: URL escaping and normalization,
+ * MIME typing, directory iteration, locks, worker threads and a UTF-8 file API.
  */
 
 #ifndef HTTRACK_DEFLIB
@@ -133,8 +132,7 @@ typedef void (*htsErrorCallback)(const char *msg, const char *file, int line);
   } while (0)
 
 /* The helpers below matter only when a callback was already installed before
-   CHAIN_FUNCTION(). A fresh hts_create_opt() has none, so a front end that
-   installs all of its callbacks right after it can ignore them. */
+   CHAIN_FUNCTION(), which a plugin loaded by hts_create_opt() may have done. */
 
 /** Inside a chained callback, return the ARGUMENT pointer originally passed to
     CHAIN_FUNCTION(), or NULL when CARG is NULL. */
@@ -167,10 +165,9 @@ HTSEXT_API void htsthread_wait(void);
 
 /* Main functions */
 /** hts_main()/hts_main2() exit code for a mirror that started and then gave up,
-    on a write it cannot retry (a full disk, a cache write failure) or on a link
-    table it cannot grow past -#L. A command line refused before any mirror
-    starts returns -1 or 1 instead, and a mirror that met --max-time or
-    --max-size returns 0, because that is the outcome that was asked for. */
+    for example on a write it cannot retry or on a link table it cannot grow
+    past -#L. A failure before any mirror starts returns -1 or 1 instead, and a
+    mirror that met --max-time or --max-size returns 0. */
 #define HTS_EXIT_MIRROR_ABORTED 3
 
 /** Run a full mirror from a command-line argv (argv[0] is ignored, as in
@@ -206,16 +203,14 @@ HTSEXT_API void hts_free_opt(httrackp *opt);
     hts_create_opt() allocates. */
 HTSEXT_API size_t hts_sizeof_opt(void);
 
-/** Refresh HTS_STAT's error, warning, info, transport-failure and Multipath
-    TCP counters from @p opt and return &HTS_STAT, or NULL if @p opt is NULL.
-    Copy out what you need, because the next call overwrites the block. The call
+/** Refresh HTS_STAT's error, warning, info, transport-failure and Multipath TCP
+    counters from @p opt and return &HTS_STAT, or NULL if @p opt is NULL. It
     also zeroes HTS_STAT.stat_nsocket, .nbk and .nb, so read those first. */
 HTSEXT_API const hts_stat_struct *hts_get_stats(httrackp *opt);
 
-/** Running statistics of the mirror, one block for the whole process, so two
-    mirrors at once overwrite each other's numbers. The engine's threads update
-    it without a lock, so a front end may read it while a mirror runs but can
-    see fields that disagree. Read it through hts_get_stats(). */
+/** Running mirror statistics, one block per process, so two mirrors at once
+    overwrite each other's numbers. The engine's threads write it with no lock,
+    so a front end reading it during a mirror can see fields that disagree. */
 extern HTSEXT_API hts_stat_struct HTS_STAT;
 
 /** Does nothing, kept for ABI compatibility. Install callbacks with
@@ -323,12 +318,11 @@ HTSEXT_API int hts_buildtopindex(httrackp *opt, const char *path,
 
 /** Scan every mirror project under @p path and return a CRLF-separated list:
     @p type==1 gives the distinct category names, any other value gives the
-    project directory names. A @p type==1 list always opens with the two
-    placeholder names "Test category 1" and "Test category 2". The result is
-    heap-allocated and owned by the caller (free with freet()), and may be NULL.
-    @p path is modified in place, because a trailing '/' is stripped. The bytes
-    are UTF-8, except on Windows, where winprofile.ini and the directory names
-    are in the local ANSI codepage. */
+    project directory names, and a @p type==1 list is led by the placeholders
+    "Test category 1" and "Test category 2". The caller frees the result with
+    freet(), and it may be NULL. @p path loses a trailing '/' in place. The
+    bytes are UTF-8, except on Windows, where winprofile.ini and the directory
+    names are in the local ANSI codepage. */
 HTSEXT_API char *hts_getcategories(char *path, int type);
 
 /** Read the percent-decoded `category=` value from a winprofile.ini file. The
@@ -356,12 +350,10 @@ HTSEXT_API T_SOC catch_url_init(int *port, char *adr);
     the proxied HTTP request: write the absolute URL to @p url, the upper-cased
     method to @p method, and the rebuilt request (request line, headers, and any
     POST body) to @p data, then send a canned response and close.
-    @return 1 on success, 0 on error. A header line, or a whole header block,
-    too large for the capture are two such errors. On error @p data is left
-    empty and @p url holds the peer's "ip:port", unless the request line had
-    already parsed into it. The three buffers are caller-allocated: @p data must
-    be 32768 bytes, @p url at least HTS_URLMAXSIZE*2, and @p method at least
-    32. */
+    @return 1 on success, 0 on error. On error @p data holds no usable request,
+    and @p url holds the peer's "ip:port" unless the request line had already
+    parsed into it. The caller allocates all three: at least 32768 bytes for
+    @p data, HTS_URLMAXSIZE*2 for @p url and 32 for @p method. */
 HTSEXT_API hts_boolean catch_url(T_SOC soc, char *url, char *method,
                                  char *data);
 
@@ -372,9 +364,9 @@ HTSEXT_API hts_boolean catch_url(T_SOC soc, char *url, char *method,
     value to query without side effects. */
 HTSEXT_API int hts_is_parsing(httrackp *opt, int flag);
 
-/** Current background phase: 0 none, 1 testing links, 2 purging deleted files,
-    3 opening the cache, 4 waiting for the scheduled start time, 5 waiting for a
-    free connection slot. */
+/** Current background phase: 0 none, 1 testing links, 2 purging or reporting
+    deleted files, 3 opening the cache, 4 waiting for the scheduled start time,
+    5 waiting for a free connection slot. */
 HTSEXT_API int hts_is_testing(httrackp *opt);
 
 /** Nonzero once the engine has begun its exit sequence. */
@@ -392,10 +384,10 @@ HTSEXT_API hts_boolean hts_addurl(httrackp *opt, char **url);
 HTSEXT_API hts_boolean hts_resetaddurl(httrackp *opt);
 
 /** Apply the runtime-tunable options from @p from onto @p to, to adjust a live
-    mirror. Most fields are copied only when @p from carries a non-default
-    value, so @p to keeps its own. The WARC and single-file options are copied
-    every time. String options are deep-copied, so @p from may be released
-    afterward. @return 0. */
+    mirror. A field @p from leaves at its default is not copied, so @p to keeps
+    its own, apart from warc_max_size, warc_cdx, warc_wacz, changes and
+    single_file, which are copied every time. Strings are deep-copied, so
+    @p from may be released afterward. @return 0. */
 HTSEXT_API int copy_htsopt(const httrackp *from, httrackp *to);
 
 /** Whether @p rule is one well-formed "[scheme://]alias[,...]=[scheme://]host",
@@ -513,7 +505,6 @@ HTSEXT_API char **int2bytes2(strc_int2bytes2 *strc, LLint n);
     the input string. */
 HTSEXT_API char *jump_identification(char *);
 
-/** Behaves like jump_identification(), on a const string. */
 HTSEXT_API const char *jump_identification_const(const char *);
 
 /** Write into dst the k-th domain scope the wizard can offer for the string
@@ -533,18 +524,16 @@ HTSEXT_API const char *jump_identification_const(const char *);
 HTSEXT_API hts_boolean hts_wizard_host_scope(const char *question, int k,
                                              char *dst, size_t dstsize);
 
-/** Like jump_identification() and also strip a leading "www." or "www-<n>."
+/** Like jump_identification() and also strip a leading "www." or "www-4."-style
     host prefix, returning a pointer into the input to the normalized host. */
 HTSEXT_API char *jump_normalized(char *);
 
-/** Behaves like jump_normalized(), on a const string. */
 HTSEXT_API const char *jump_normalized_const(const char *);
 
 /** Return a pointer (into the input) to the ":port" part of a URL host, or NULL
     if there is no explicit port. Handles bracketed IPv6 literals. */
 HTSEXT_API char *jump_toport(char *);
 
-/** Behaves like jump_toport(), on a const string. */
 HTSEXT_API const char *jump_toport_const(const char *);
 
 /** Canonicalize a URL path into @p dest: collapse duplicate '/' and sort the
@@ -602,8 +591,8 @@ HTSEXT_API size_t escape_in_url(const char *const src, char *const dest,
 HTSEXT_API size_t escape_uri(const char *const src, char *const dest,
                              const size_t size);
 
-/** Like escape_uri() and also escapes the reserved, delimiter and unwise
-    characters, '/' excepted. */
+/** Percent-escape as escape_uri() does, plus the reserved, delimiter and
+    unwise characters other than '/'. */
 HTSEXT_API size_t escape_uri_utf(const char *const src, char *const dest,
                                  const size_t size);
 
@@ -693,12 +682,11 @@ HTSEXT_API size_t escape_for_html_print_full(const char *const s,
 HTSEXT_API char *unescape_http(char *const catbuff, const size_t size,
                                const char *const s);
 
-/** Percent-decode @p s into @p catbuff, but only the escapes that are safe to
-    decode while keeping a valid URI. The reserved, delimiter, unwise, control
-    and must-avoid escapes are kept encoded, so %25 never decodes, and %2B is
-    the one reserved escape that does. @p no_high & 1 keeps the high (>= 128)
-    bytes encoded as well, and @p no_high & 2 decodes an escaped space. Returns
-    @p catbuff. */
+/** Percent-decode @p s into @p catbuff, but only the escapes that keep the URI
+    valid: the reserved, delimiter, unwise, control and must-avoid escapes stay
+    encoded, so %25 never decodes and %2B is the one reserved escape that does.
+    @p no_high & 1 keeps the bytes >= 127 encoded too, and @p no_high & 2
+    decodes an escaped space. Returns @p catbuff. */
 HTSEXT_API char *unescape_http_unharm(char *const catbuff, const size_t size,
                                       const char *s, const hts_boolean no_high);
 
@@ -793,8 +781,7 @@ typedef struct topindex_chain topindex_chain;
 #endif
 /** Holds one mirror project row of the top index listing. */
 struct topindex_chain {
-  int level;       /**< sort rank, raised to 1 for a project with no category
-                        so that it sorts last */
+  int level;       /**< 0 with a category, 1 without, so those sort last */
   char *category;  /**< category name, or "No categories" (heap string) */
   char name[2048]; /**< mirror project directory name, UTF-8 */
   struct topindex_chain *next; /**< next element */
@@ -871,7 +858,7 @@ HTSEXT_API void htsthread_wait_n(int n_wait);
 /* Locks */
 #ifndef HTS_DEF_FWSTRUCT_htsmutex_s
 #define HTS_DEF_FWSTRUCT_htsmutex_s
-/** Points to a lock. A variable of this type starts at HTSMUTEX_INIT. */
+/** htsmutex points to a lock, and such a variable starts at HTSMUTEX_INIT. */
 typedef struct htsmutex_s htsmutex_s, *htsmutex;
 #endif
 /** Marks a lock nobody has built yet. hts_mutexlock() builds it on first use,
@@ -885,9 +872,8 @@ HTSEXT_API void hts_mutexinit(htsmutex *mutex);
     HTSMUTEX_INIT. A NULL pointer and an unbuilt lock are both accepted. */
 HTSEXT_API void hts_mutexfree(htsmutex *mutex);
 
-/** Take the lock, building it first if it is still HTSMUTEX_INIT, which is
-    safe when several threads race on that first use. It is not recursive, so a
-    thread must not take a lock it already holds. */
+/** Take the lock, building it first if needed, which is safe even when threads
+    race on that first use. A thread must not take a lock it already holds. */
 HTSEXT_API void hts_mutexlock(htsmutex *mutex);
 
 /** Release a lock this thread took with hts_mutexlock(). */
@@ -934,8 +920,7 @@ HTSEXT_API hts_boolean hts_file_is_newer(const char *a, const char *b);
 HTSEXT_API FILE *hts_fopen_utf8(const char *path, const char *mode);
 
 #define STAT hts_stat_utf8
-/** STAT() fills this structure. It is _stat64, because _stat's st_size is a
-    32-bit long even in an x64 build. */
+/** STAT() fills this. _stat's st_size is a 32-bit long even in an x64 build. */
 typedef struct _stat64 STRUCT_STAT;
 
 /** stat() taking a UTF-8 @p path. Windows only. */
@@ -960,7 +945,6 @@ HTSEXT_API int hts_rmdir_utf8(const char *pathname);
 
 #define UTIME(A, B) hts_utime_utf8(A, B)
 
-/** UTIME() reads its timestamps from this structure. */
 typedef struct _utimbuf STRUCT_UTIMBUF;
 
 /** utime() taking a UTF-8 @p filename. Windows only. */
@@ -969,7 +953,6 @@ HTSEXT_API int hts_utime_utf8(const char *filename,
 #else
 #define FOPEN fopen
 #define STAT stat
-/** STAT() fills this structure. */
 typedef struct stat STRUCT_STAT;
 
 #define UNLINK unlink
@@ -977,7 +960,6 @@ typedef struct stat STRUCT_STAT;
 #define MKDIR(F) mkdir(F, HTS_ACCESS_FOLDER)
 #define RMDIR rmdir
 
-/** UTIME() reads its timestamps from this structure. */
 typedef struct utimbuf STRUCT_UTIMBUF;
 
 #define UTIME(A, B) utime(A, B)
@@ -996,8 +978,7 @@ typedef struct utimbuf STRUCT_UTIMBUF;
 #undef RUNTIME_TIME_CHECK_SIZE
 #define RUNTIME_TIME_CHECK_SIZE(A) assertf((A) != sizeof(void *))
 
-/* Each of the four wrappers below adds COMPILE_TIME_CHECK_SIZE() to the call,
-   so the capacity has to be an array sizeof and not a pointer. */
+/* The four wrappers below check their capacity at compile time. */
 #define fconv(A, B, C) (COMPILE_TIME_CHECK_SIZE(B), fconv(A, B, C))
 
 #define concat(A, B, C, D) (COMPILE_TIME_CHECK_SIZE(B), concat(A, B, C, D))

@@ -33,13 +33,13 @@ Please visit our Website: http://www.httrack.com
 /** @file htsarrays.h
  *  Header-only typed dynamic array. Every operation is a macro taking the
  *  array lvalue A, and the element type is fixed by the struct TypedArray(T)
- *  declares. Sizes, capacities and counts are in elements, never bytes. The
- *  array owns its store, so grow it with the Add, Append and EnsureRoom macros
- *  and release it with TypedArrayFree.
+ *  declares. Counts and capacities are in elements, not bytes. The array owns
+ *  its store, so grow it with the Add, Append and EnsureRoom macros and release
+ *  it with TypedArrayFree.
  *
- *  Only six macros evaluate A once: TypedArraySize, TypedArrayCapa,
- *  TypedArrayElts, TypedArrayPtr, TypedArrayWidth and TypedArrayNth. Every
- *  other macro evaluates A several times, so A must be a plain lvalue with no
+ *  A is evaluated once only by TypedArraySize, TypedArrayCapa, TypedArrayElts,
+ *  TypedArrayPtr and TypedArrayNth, and not at all by TypedArrayWidth. Every
+ *  other macro evaluates it several times, so A must be a plain lvalue with no
  *  side effect. The other arguments are evaluated once. */
 #ifndef HTS_ARRAYS_DEFSTATIC
 #define HTS_ARRAYS_DEFSTATIC
@@ -51,8 +51,8 @@ Please visit our Website: http://www.httrack.com
 #include "htssafe.h"
 
 /** Report a failed allocation of @p size bytes and abort. Call it where the
-    caller has no way to fail gracefully. The array macros below do not: they
-    leave the array as it was and let the caller notice. */
+    caller has no way to fail gracefully. The array macros below never call it,
+    because they leave the array as it was and let the caller notice. */
 static HTS_UNUSED void hts_record_assert_memory_failed(const size_t size) {
   fprintf(stderr, "memory allocation failed (%lu bytes)", (long int) size);
   assertf(!"memory allocation failed");
@@ -100,11 +100,9 @@ static HTS_UNUSED void hts_record_assert_memory_failed(const size_t size) {
     < TypedArraySize(A). **/
 #define TypedArrayNth(A, N) (TypedArrayElts(A)[N])
 
-/**
- * First free slot past the end, as an lvalue of the element type.
- * It starts a run of TypedArrayRoom(A) free elements, so it is only usable
- * when that room is not 0.
- **/
+/** First free slot past the end, as an lvalue of the element type. It starts a
+    run of TypedArrayRoom(A) free elements, so it is unusable when that room is
+    0. **/
 #define TypedArrayTail(A) (TypedArrayNth(A, TypedArraySize(A)))
 
 /**
@@ -177,8 +175,7 @@ static HTS_UNUSED void hts_record_assert_memory_failed(const size_t size) {
     }                                                                          \
   } while (0)
 
-/** Free the store and set size and capacity back to 0. The array is empty
-    again and ready to be reused. **/
+/** Free the store and set size and capacity back to 0. **/
 #define TypedArrayFree(A)                                                      \
   do {                                                                         \
     if (TypedArrayPtr(A) != NULL) {                                            \

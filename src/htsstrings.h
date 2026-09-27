@@ -68,15 +68,16 @@ typedef struct String String;
  *
  * The buffer is allocated on the first write. A String initialized with
  * STRING_EMPTY or StringInit(), and one just freed or acquired, has no buffer
- * at all, so StringBuff() returns NULL rather than "". Once a buffer exists,
- * the content is NUL-terminated at buffer_[length_].
+ * at all, so StringBuff() returns NULL rather than "". An operation that writes
+ * content leaves it NUL-terminated at buffer_[length_], but StringRoomTotal()
+ * and StringSetLength() write no terminator, so neither leaves a readable C
+ * string behind.
  *
- * Any growing operation may move the buffer. A pointer read through
+ * Any growing operation may move the buffer, so a pointer read through
  * StringBuff() or StringBuffRW() stops being valid at the next append, copy or
  * room request.
  *
- * The trailing underscore marks the fields as internal, so reach them through
- * the macros below.
+ * Reach the fields through the macros below, never directly.
  */
 struct String {
   char *buffer_;    /**< owned content, NULL until the first write */
@@ -158,9 +159,8 @@ HTS_STATIC void StringOom_(size_t size) {
 #endif
 
 /** Grow the allocation so it holds at least CAPACITY bytes, the terminating NUL
-    included. It never shrinks, it may move the buffer, and it aborts when the
-    allocation fails. It writes no terminator, so a String with no content yet
-    is still not a readable C string. **/
+    included. It never shrinks, it may move the buffer, it writes no terminator,
+    and it aborts when the allocation fails. **/
 #define StringRoomTotal(BLK, CAPACITY)                                         \
   do {                                                                         \
     const size_t capacity_ = (size_t) (CAPACITY);                              \
@@ -188,9 +188,8 @@ HTS_STATIC void StringOom_(size_t size) {
 #define StringRoom(BLK, SIZE)                                                  \
   StringRoomTotal(BLK, StringLength(BLK) + (SIZE) + 1)
 
-/** Reserve room for SIZE more bytes and return the read/write buffer, to append
-    in place. The pointer is the start of the buffer, so write at offset
-    StringLength and then set the new length with StringSetLength. **/
+/** Reserve room for SIZE more bytes and return the buffer start, so write at
+    offset StringLength and then set the new length with StringSetLength. **/
 #define StringBuffN(BLK, SIZE) StringBuffN_(&(BLK), SIZE)
 
 HTS_STATIC char *StringBuffN_(String *blk, int size) {
@@ -199,7 +198,7 @@ HTS_STATIC char *StringBuffN_(String *blk, int size) {
 }
 
 /** Largest buffer StringSprintf tries on a libc that does not report the length
-    it needs. It gives up past this size and leaves the String empty. **/
+    it needs. Once it reaches that size it gives up and empties the String. **/
 #define STRING_SPRINTF_MAX ((size_t) 16 * 1024 * 1024)
 
 /** Replace BLK's contents with the formatted output, growing to fit, so no
@@ -331,8 +330,7 @@ HTS_STATIC HTS_PRINTF_FUN(2, 3) void StringSprintf_(String *blk,
 
 /** Hand the buffer over to the caller and reset *blk to the empty state. The
     caller owns the returned pointer and must release it with STRING_FREE().
-    @return NULL when the String never allocated a buffer, and "" when it held
-    a buffer but no content. **/
+    @return NULL when the String holds no buffer. **/
 HTS_STATIC char *StringAcquire(String *blk) {
   char *buff = StringBuffRW(*blk);
 

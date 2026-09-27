@@ -64,7 +64,8 @@ Please visit our Website: http://www.httrack.com
 #include <stdint.h>
 #include <inttypes.h>
 
-/* Type widths, in bytes. MSVC has no configure to probe them. */
+/* Type widths for a build with no configure. Nothing in the engine reads
+   them any more. */
 #ifdef _WIN32
 #ifndef SIZEOF_LONG
 #define SIZEOF_LONG 4
@@ -72,13 +73,12 @@ Please visit our Website: http://www.httrack.com
 #endif
 #endif
 
-/* Four compiler-attribute markers, each expanding to nothing where the
-   compiler has no such attribute. HTS_UNUSED says a symbol may go unused, and
-   HTS_STATIC declares a static that may. HTS_PRINTF_FUN(fmt, arg) asks the
-   compiler to check the format string at argument index @p fmt against the
-   varargs starting at @p arg. HTS_CHECK_RESULT says the return value is the
-   only error signal, so a caller must read it, and a (void) cast does not
-   silence the warning. */
+/* Compiler-attribute markers, each expanding to nothing where the compiler has
+   no such attribute. HTS_UNUSED says a symbol may go unused, and HTS_STATIC is
+   a static that may. HTS_PRINTF_FUN(fmt, arg) checks the format string at
+   argument index @p fmt against the varargs starting at @p arg.
+   HTS_CHECK_RESULT says a caller must read the return value, and a (void) cast
+   does not silence the warning. */
 #ifndef HTS_UNUSED
 #ifdef __GNUC__
 #define HTS_UNUSED __attribute__((unused))
@@ -96,8 +96,8 @@ Please visit our Website: http://www.httrack.com
 #endif
 #endif
 
-/* Where the build switches come from. Windows hard-codes them, because MSVC
-   runs no configure; every other build reads the generated header below. */
+/* Where the build switches come from. Windows hard-codes them because MSVC
+   runs no configure, and every other build reads the generated header below. */
 #ifdef _WIN32
 
 /*
@@ -105,11 +105,10 @@ Please visit our Website: http://www.httrack.com
 #define HAVE_SYS_TYPES_H 1
 #define HAVE_SYS_STAT_H 1
 */
-/* dlopen() and friends are available. */
+/* Windows can always load a shared library at run time. */
 #ifndef DLLIB
 #define DLLIB 1
 #endif
-/* Windows defaults to IPv6. */
 #ifndef HTS_INET6
 #define HTS_INET6 1
 #endif
@@ -138,8 +137,8 @@ Please visit our Website: http://www.httrack.com
 #define HTS_DO_NOT_USE_UID
 #endif
 
-/* 1 when the build can load a shared library at run time, so the external
-   module hooks work (htsmodules.h); 0 when it cannot. */
+/* 1 when the platform can load a shared library at run time. It does not gate
+   the module hooks, which compile either way (htsmodules.c). */
 #ifdef DLLIB
 #define HTS_DLOPEN 1
 #else
@@ -148,22 +147,21 @@ Please visit our Website: http://www.httrack.com
 
 #endif
 
-/* Marks a local array large enough to matter for stack use. It expands to
-   nothing, so it only tells a reader. */
+/* Marks a local array big enough to matter for stack use. It expands to
+   nothing. */
 #ifndef BIGSTK
 #define BIGSTK
 #endif
 
-/* 1 when local paths follow DOS rules, so the engine writes a backslash as
-   the separator and avoids the reserved DOS names. 1 on Windows, 0 else. */
+/* 1 when local paths use a backslash separator, so the engine rewrites the
+   '/' in a save name. 1 on Windows, 0 else. */
 #ifdef _WIN32
 #define HTS_DOSNAME 1
 #else
 #define HTS_DOSNAME 0
 #endif
 
-/* Always 1: zlib is mandatory, because the cache is a zip file. A build
-   setting it to 0 is rejected below. */
+/* Always 1: zlib is mandatory, because the cache is a zip file. */
 #ifndef HTS_USEZLIB
 #define HTS_USEZLIB 1
 #elif !HTS_USEZLIB
@@ -202,8 +200,8 @@ Please visit our Website: http://www.httrack.com
 #define HTS_USESWF 1
 #endif
 
-/* The MSVC calling-convention keyword the exported callback declarations
-   carry (htsweb.h). Defined away elsewhere, so they compile everywhere. */
+/* The MSVC calling-convention keyword the engine's callback declarations
+   carry. Defined away elsewhere, so they compile everywhere. */
 #ifdef _WIN32
 #else
 #define __cdecl
@@ -215,7 +213,6 @@ Please visit our Website: http://www.httrack.com
    the fallback for a build that passes none. Only HTS_HTTRACKRC exists on
    Windows, so test the others with #ifdef before you use them. */
 #ifdef _WIN32
-/* Per-user rc file, read from the current directory. */
 #define HTS_HTTRACKRC "httrackrc"
 #else
 
@@ -248,13 +245,11 @@ Please visit our Website: http://www.httrack.com
 #endif
 #endif
 
-/* Per-user rc file, read from the home directory. */
 #define HTS_HTTRACKRC ".httrackrc"
-/* System-wide config file, read after the per-user one. */
+/* System-wide config file, read only when no HTS_HTTRACKRC was found. */
 #define HTS_HTTRACKCNF HTS_ETCPATH "/httrack.conf"
 
-/* Shared data directory (the WebHTTrack pages and the language files), with a
-   trailing slash. */
+/* Data directory holding the HTML templates and the language files. */
 #ifdef DATADIR
 #define HTS_HTTRACKDIR DATADIR "/httrack/"
 #else
@@ -308,8 +303,8 @@ Please visit our Website: http://www.httrack.com
   "update.php3?Product=HTTrack&Version=" HTTRACK_VERSIONID                     \
   "&VersionStr=" HTTRACK_VERSION "&Platform=%d&Language=%s"
 
-/* CR LF, the line terminator HTTP requires. H_CRLF ends a header line, CRLF
-   the same two bytes for anything else on the wire. */
+/* CR LF. H_CRLF ends an HTTP header line, and CRLF the lines of the HTML pages
+   the engine writes itself. */
 #define H_CRLF "\x0d\x0a"
 #define CRLF "\x0d\x0a"
 /* The local text-file and console line terminator, despite the name: CR LF on
@@ -343,7 +338,8 @@ typedef int hts_tristate;
 #define HTS_DEFAULT (-1)
 #endif
 
-/* Larger and smaller of two values. Both arguments are evaluated twice. */
+/* Larger and smaller of two values. One argument is evaluated twice, so pass
+   no side effect. */
 #define maximum(A, B) ((A) > (B) ? (A) : (B))
 
 #define minimum(A, B) ((A) < (B) ? (A) : (B))
@@ -360,7 +356,7 @@ typedef int hts_tristate;
   enum { hts_static_assert_##name = 1 / !!(cond) }
 
 /* Expands to `inline` when the header is compiled as C++, and to nothing in
-   plain C. The function keeps external linkage either way. */
+   plain C. */
 #ifdef __cplusplus
 #define HTS_INLINE inline
 #else
@@ -440,9 +436,8 @@ typedef int64_t TStamp;
    none: "X: " LLintP. */
 #define LLintP "%" PRId64
 
-/* The widest plain integer the build's C library takes for a file offset: 64
-   bits where the build has large-file support (HTS_LFS) or under MSVC, and a
-   plain int otherwise, so a consumer must not assume a width. INTsysP is its
+/* 64 bits where the build has large-file support (HTS_LFS) or under MSVC, and
+   a plain int otherwise, so a consumer must not assume a width. INTsysP is its
    printf conversion, '%' included. */
 #if defined(HTS_LFS) || defined(_MSC_VER)
 typedef LLint INTsys;
@@ -515,7 +510,8 @@ typedef int T_SOC;
 #define HTS_ACCESS 1
 #endif
 
-/* Flushes stdout and stdin. Takes no semicolon. */
+/* Flushes stdout and stdin. It expands to a brace block, so an `if` around it
+   needs braces. */
 #define io_flush                                                               \
   {                                                                            \
     fflush(stdout);                                                            \
@@ -533,39 +529,34 @@ typedef int T_SOC;
 // Per-connection transfer buffer size, in bytes
 #define TAILLE_BUFFER 65536
 
-/* Threads are mandatory, so a build without them is rejected. */
 #ifdef HTS_DO_NOT_USE_PTHREAD
 #error needs threads support
 #endif
-/* Always 1: the engine runs its transfers in threads. */
 #define USE_BEGINTHREAD 1
 
 #ifdef _DEBUG
 // trace mallocs
 // #define HTS_TRACE_MALLOC
 #ifdef HTS_TRACE_MALLOC
-/* Guard word written around a traced allocation. */
+/* Type of the guard word written on both sides of a traced block. */
 typedef unsigned long int t_htsboundary;
 
 #ifndef HTS_DEF_FWSTRUCT_mlink
 #define HTS_DEF_FWSTRUCT_mlink
 typedef struct mlink mlink;
 #endif
-/* One traced allocation, in a list of them. */
 struct mlink {
-  char *adr; /**< the allocated block */
-  int len;   /**< its size in bytes */
-  int id;    /**< serial number of the allocation */
+  char *adr;
+  int len;
+  int id; /**< serial number of the allocation */
   struct mlink *next;
 };
 
-/* The value a guard word must still hold. */
 static const t_htsboundary htsboundary = 0xDEADBEEF;
 #endif
 #endif
 
-/* Bounds-checking in the string helpers, on unless the build defines
-   NOSTRDEBUG. */
+/* Nothing reads this any more. */
 #ifndef NOSTRDEBUG
 #define STRDEBUG 1
 #endif
@@ -621,7 +612,6 @@ static const t_htsboundary htsboundary = 0xDEADBEEF;
 #define _HTS_WIDE 1
 #endif
 #if _HTS_WIDE
-/* The wide-debug trace file, opened on first use. */
 extern FILE *DEBUG_fp;
 
 #define DEBUG_W(A)                                                             \
@@ -631,8 +621,8 @@ extern FILE *DEBUG_fp;
     fprintf(DEBUG_fp, ":>" A);                                                 \
     fflush(DEBUG_fp);                                                          \
   }
-/* Lets DEBUG_W("a" _ b) pass several fprintf arguments. It redefines the
-   identifier _, so this arm is for debug builds only. */
+/* Lets DEBUG_W("a" _ b) pass several fprintf arguments, by redefining the
+   identifier _. Debug builds only. */
 #undef _
 #define _ ,
 #endif

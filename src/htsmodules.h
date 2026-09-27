@@ -30,11 +30,10 @@ Please visit our Website: http://www.httrack.com
 /*       external modules (parsers)                             */
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
-
 /** @file htsmodules.h
-    Loadable-parser (external module) interface. The engine hands one downloaded
-    object to a module as a htsmoduleStruct, and the module reports the links it
-    found by calling the addLink callback that structure carries. */
+    Loadable-parser (external module) interface. The engine describes one
+    downloaded object in a htsmoduleStruct, and the module reports the links it
+    finds through that structure's addLink callback. */
 
 #ifndef HTS_MODULES
 #define HTS_MODULES
@@ -66,54 +65,39 @@ typedef struct hash_struct hash_struct;
 typedef struct htsmoduleStruct htsmoduleStruct;
 #endif
 /** Reports one link the module found. @p str must be the structure the engine
-    passed to the module, and the call is only valid while that module call is
-    still running. The engine copies @p link, absolute or relative, and keeps no
-    pointer into it.
-    @return nonzero once the engine has queued the link, and 0 when its filters
+    gave the module, and the call is valid only while that module call runs. The
+    engine copies @p link, absolute or relative.
+    @return nonzero when the engine accepted the link, and 0 when a filter
     refused it, when it is HTS_URLMAXSIZE bytes or longer, or when the engine
-    ran out of room. */
+    had no room left for it. */
 typedef int (*t_htsAddLink)(htsmoduleStruct *str, char *link);
 
-/** Everything a parser module gets for one downloaded object. Each field says
-    whether the engine fills it in before the call or the module writes it back.
-    The engine owns every buffer here except localLink. */
+/** Everything a parser module gets for one downloaded object. Each field names
+    its writer, the engine before the call or the module during it. */
 struct htsmoduleStruct {
-  /* Filled in by the engine before the module is called */
-  const char *filename; /**< local file the engine saved the object to */
-  int size;             /**< object body size in bytes, truncated to int */
-  const char *mime;     /**< MIME type the server declared */
-  const char *url_host; /**< source host, carrying a "https://" or "ftp://"
-                             prefix when the scheme is not plain HTTP */
-  const char *url_file; /**< remote path of the object (/bar/bar.gny) */
+  const char *filename; /**< engine: local file the object was saved to */
+  int size;             /**< engine: body size in bytes, truncated to int */
+  const char *mime;     /**< engine: MIME type, declared by the server or
+                             guessed from the URL */
+  const char *url_host; /**< engine: source host, with a scheme prefix
+                             ("https://", "ftp://") unless plain HTTP */
+  const char *url_file; /**< engine: remote path of the object (/bar/bar.gny) */
 
-  /* Written back by the module */
-  const char *wrapper_name; /**< name the module reports itself under, put in
-                                 the log and matched against -%w. The engine
-                                 presets it, so store a string that outlives
-                                 the call. */
-  char *err_msg;            /**< 1KB engine buffer the module writes its error
-                                 message into */
-
-  /* Read/Write */
-  int relativeToHtmlLink; /**< set to 1 when the links passed to addLink are
-                               relative to the HTML page that referenced this
-                               object rather than to the object itself */
-
-  /* Callbacks */
-  t_htsAddLink addLink; /**< engine entry point the module calls for each link
-                             it finds */
-
-  /* Optional */
-  char *localLink;   /**< buffer the module supplies and owns. addLink writes
-                          an accepted link's local relative file name there, or
-                          a refused link's absolute URL, and leaves it alone if
-                          it is too small. */
-  int localLinkSize; /**< bytes available in localLink */
-
-  /* User-defined */
-  void *userdef; /**< free for the module to use. The engine never reads it. */
-
-  httrackp *opt; /**< options of the mirror in progress, free to read */
+  const char *wrapper_name; /**< module: the name it reports itself under, used
+                                 by the log and the -%w blacklist. The engine
+                                 presets it, so store a lasting string. */
+  char *err_msg;            /**< module: writes its error message into this 1KB
+                                 engine buffer */
+  int relativeToHtmlLink;   /**< module: 1 when the links it passes to addLink
+                                 are relative to the HTML page that referenced
+                                 this object, not to the object itself */
+  t_htsAddLink addLink;     /**< engine: link collector the module calls */
+  char *localLink;   /**< module: optional buffer addLink fills with an accepted
+                          link's local relative name, or a refused link's
+                          absolute URL, and leaves alone when too small */
+  int localLinkSize; /**< module: bytes available in localLink */
+  void *userdef;     /**< module: free for its own use */
+  httrackp *opt;     /**< engine: options of the mirror in progress */
 
   /* Internal use - please don't touch */
   struct_back *sback;
@@ -131,8 +115,8 @@ extern "C" {
 #endif
 
 /** Entry-point types for a module's init, exit and plug-in hooks. Nothing in
-    the engine calls them. A plug-in is installed through hts_plug() and
-    hts_unplug() instead, declared in htsdefines.h. */
+    the tree uses them, because a plug-in is installed through the hts_plug()
+    and hts_unplug() entry points declared in htsdefines.h. */
 typedef int (*t_htsWrapperInit)(char *fn, char *args);
 
 typedef int (*t_htsWrapperExit)(void);
@@ -145,33 +129,29 @@ typedef int (*t_htsWrapperPlugInit)(char *args);
 #include "htsglobal.h"
 
 /** Capabilities string of the build ("-noV6", "-nossl", ...) followed by
-    "+name" for each module loaded into @p opt. The returned pointer is a
-    scratch buffer inside @p opt, so never free it, and read it before the next
-    call overwrites it. */
+    "+name" for each module loaded into @p opt. The result is a scratch buffer
+    inside @p opt, so never free it and read it before the next call. */
 HTSEXT_API const char *hts_get_version_info(httrackp *opt);
 
-/** Capabilities string of the build, without the loaded-module list. The
-    engine owns it and it lives as long as the process, but it stays empty until
-    htspe_init() has run. */
+/** Capabilities string of the build, without the loaded-module list. The engine
+    owns it for the life of the process, and it stays empty until htspe_init()
+    has run. */
 HTSEXT_API const char *hts_is_available(void);
 
-/** Prepares the module subsystem, and must run before hts_is_available() or
-    before any module is loaded. Calling it again does nothing. On Windows it
-    also drops the current directory from the DLL search path
-    (CVE-2010-5252). */
+/** Prepares the module subsystem, which must happen before hts_is_available()
+    or any module load. Calling it again does nothing. */
 extern void htspe_init(void);
 
 /** Tear-down counterpart of htspe_init(). */
 extern void htspe_uninit(void);
 
 /** Offers the object described by @p str to the loaded parser modules.
-    @return 1 when a module parsed it, 0 when a module claimed it but failed and
-    left the reason in @p str's err_msg, and -1 when no module claimed it or the
-    one that did is blacklisted by -%w. */
+    @return 1 when a module parsed it, 0 when the module that claimed it failed
+    and left the reason in err_msg, and -1 when none claimed it or -%w
+    blacklists the one that did. */
 extern int hts_parse_externals(htsmoduleStruct *str);
 
-/** Nonzero when the library was built with IPv6 support. It holds the
-    HTS_INET6 value the library itself was compiled with. */
+/** The HTS_INET6 value the library itself was built with. */
 extern int V6_is_available;
 #endif
 

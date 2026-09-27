@@ -34,7 +34,8 @@ Please visit our Website: http://www.httrack.com
 /** @file htsbasenet.h
     Base networking definitions: the platform socket headers, the process-wide
     OpenSSL context, and the codes held by htsblk.statuscode and
-    lien_back.status. A consumer that reads either field needs this header. */
+    lien_back.status. A consumer that interprets either field needs the names
+    here. */
 
 #ifndef HTS_DEFBASENETH
 #define HTS_DEFBASENETH
@@ -68,8 +69,8 @@ Please visit our Website: http://www.httrack.com
 /** Defined on the POSIX build and cleared on the Windows IPv6 build, but
     nothing in the tree reads it. */
 #define HTS_USESCOPEID
-/** Winsock's failed-socket value, defined here on POSIX too so a socket test
-    reads the same on both platforms. */
+/** POSIX's invalid socket, spelled with Winsock's name so one test serves
+    both platforms. */
 #define INVALID_SOCKET -1
 #endif
 
@@ -77,9 +78,8 @@ Please visit our Website: http://www.httrack.com
 extern "C" {
 #endif
 
-/* HTS_USEOPENSSL adds two fields to htsblk, and htsglobal.h defaults it to 1.
-   A consumer must compile with the same value the library was built with, and
-   needs the OpenSSL headers on its include path. */
+/* HTS_USEOPENSSL adds two fields to htsblk, so a consumer must compile with
+   the value the library was built with, and needs the OpenSSL headers too. */
 #if HTS_USEOPENSSL
 /*
    OpensSSL crypto routines by Eric Young (eay@cryptsoft.com)
@@ -100,16 +100,14 @@ extern "C" {
 /* Engine-only: not exported, so the installed header must not offer it. */
 #ifdef HTS_INTERNAL_BYTECODE
 /** Process-wide OpenSSL client context, shared by every TLS connection.
-    hts_init() creates it, so it is NULL before the first hts_init() call, and
-    nothing frees it. */
+    hts_init() creates it, so it is NULL until then, and nothing frees it. */
 extern SSL_CTX *openssl_ctx;
 #endif
 
 #endif
 #endif
 
-/** HTTP status codes as read off the wire, stored in htsblk.statuscode.
-    HTTP_IS_OK() and its siblings in htslib.h classify them. */
+/** HTTP status codes as read off the wire, stored in htsblk.statuscode. */
 typedef enum HTTPStatusCode {
   HTTP_CONTINUE = 100,
   HTTP_SWITCHING_PROTOCOLS = 101,
@@ -178,11 +176,12 @@ static HTS_INLINE HTS_UNUSED hts_boolean statuscode_is_write_error(int code) {
                                                                     : HTS_FALSE;
 }
 
-/** Connection state of a backing slot, the 'status' member of lien_back. Any
-    value above zero means the slot is busy. Every transfer ends at
-    STATUS_READY, and the slot returns to STATUS_FREE once the crawler has taken
-    the result. An HTTPS slot passes through STATUS_CONNECTING twice, once for
-    connect() and once more after the handshake. */
+/** Connection state of a backing slot, the 'status' member of lien_back. The
+    numbers are ordered on purpose, because the engine tests ranges: above zero
+    is a slot in flight, and 1000 or more an FTP one. A transfer ends at
+    STATUS_READY, then the slot returns to STATUS_FREE once the crawler has
+    taken the result. An HTTPS slot reaches STATUS_CONNECTING twice, once for
+    connect() and once after the handshake, so that branch runs twice. */
 typedef enum HTTrackStatus {
   STATUS_ALIVE = -103,             /**< keep-alive socket, no request on it */
   STATUS_FREE = -1,                /**< slot unused, and free to take */

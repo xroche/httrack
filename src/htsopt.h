@@ -33,8 +33,7 @@ Please visit our Website: http://www.httrack.com
 
 /** @file htsopt.h
     The httrackp options block: every tunable of one mirror, the live engine
-    state embedded beside it, and the enumerations its fields take. A consumer
-    creates one with hts_create_opt() and runs it with hts_main2(). */
+    state embedded beside it, and the enumerations its fields take. */
 
 #ifndef HTTRACK_DEFOPT
 #define HTTRACK_DEFOPT
@@ -78,13 +77,14 @@ typedef struct String String;
 #ifndef HTS_DEF_STRUCT_String
 #define HTS_DEF_STRUCT_String
 
-/** A growable string, handled through the htsstrings.h macros: read it with
-    StringBuff() and never write these fields yourself. The String owns
-    buffer_ and StringFree() releases it. */
+/** A growable string, owned by the String and released by StringFree(). Read
+    it with StringBuff() and never write these fields yourself. htsstrings.h
+    defines the same struct and carries the field contract, so it is the one to
+    read. */
 struct String {
-  char *buffer_;    /**< the bytes, NUL-terminated, or NULL while empty */
-  size_t length_;   /**< bytes before the NUL */
-  size_t capacity_; /**< bytes allocated, the NUL included */
+  char *buffer_;
+  size_t length_;
+  size_t capacity_;
 };
 #endif
 
@@ -92,7 +92,7 @@ struct String {
 /** Size in bytes of a concat()/fconcat() scratch buffer. */
 #define CATBUFF_SIZE (STRING_SIZE * 2 * 2)
 
-/** Unit in bytes of the engine's fixed path and URL buffers. */
+/** Base size in bytes of the fixed path buffers below. */
 #define STRING_SIZE 2048
 
 /** Proxy the engine sends its requests through (-P). */
@@ -140,15 +140,14 @@ struct filenote_strc {
   char path[STRING_SIZE * 2]; /**< root stripped from the listed names */
 };
 
-/** Rotating scratch buffers the concat() helpers write into. */
 #ifndef HTS_DEF_FWSTRUCT_concat_strc
 #define HTS_DEF_FWSTRUCT_concat_strc
 typedef struct concat_strc concat_strc;
 #endif
 struct concat_strc {
-  int index; /**< buffer handed out last */
-  /** They are reused in turn, so only the last 16 results stay valid. */
-  char buff[16][STRING_SIZE * 2 * 2];
+  int index;                          /**< buffer handed out last */
+  char buff[16][STRING_SIZE * 2 * 2]; /**< handed out in turn, so only the
+                                           last 16 results stay valid */
 };
 
 /** Caller-owned scratch for int2bytes() and its variants: they format into
@@ -174,7 +173,6 @@ struct usercommand_strc {
   char cmd[2048]; /**< the command, where $0 stands for the file name */
 };
 
-/** How many log events one mirror has produced. */
 #ifndef HTS_DEF_FWSTRUCT_fspc_strc
 #define HTS_DEF_FWSTRUCT_fspc_strc
 typedef struct fspc_strc fspc_strc;
@@ -282,7 +280,8 @@ struct htsoptstate {
                    sentinel (htswarc.c) */
 };
 
-/** One external module the engine has loaded (-%W). */
+/** One module the engine has loaded, either from -%W (--callback) or from the
+    set it preloads itself. */
 #ifndef HTS_DEF_FWSTRUCT_htslibhandles
 #define HTS_DEF_FWSTRUCT_htslibhandles
 typedef struct htslibhandles htslibhandles;
@@ -296,7 +295,6 @@ struct htslibhandle {
   void *handle;     /**< dlopen() handle for it */
 };
 
-/** Every external module loaded so far. */
 struct htslibhandles {
   int count;             /**< number of loaded module handles */
   htslibhandle *handles; /**< array of loaded module handles */
@@ -304,11 +302,11 @@ struct htslibhandles {
 
 /** Script-parsing switches OR'd into opt->parsejava (-jN). */
 typedef enum htsparsejava_flags {
-  HTSPARSE_NONE = 0,     /**< parse no script at all (-j0) */
-  HTSPARSE_DEFAULT = 1,  /**< parse everything (the default) */
-  HTSPARSE_NO_CLASS = 2, /**< skip the external parser modules (Java, Flash) */
-  HTSPARSE_NO_JAVASCRIPT = 4, /**< skip .js files */
-  HTSPARSE_NO_AGGRESSIVE = 8  /**< do not parse .js or .java aggressively */
+  HTSPARSE_NONE = 0,     /**< -j0, which only stops the parser modules */
+  HTSPARSE_DEFAULT = 1,  /**< the default, and all the flags below cleared */
+  HTSPARSE_NO_CLASS = 2, /**< run no external parser module */
+  HTSPARSE_NO_JAVASCRIPT = 4, /**< scan no script for links */
+  HTSPARSE_NO_AGGRESSIVE = 8  /**< cancel the -%P raw scan */
 } htsparsejava_flags;
 
 /** How a saved page's links are rewritten (opt->urlmode, -KN). */
@@ -388,7 +386,7 @@ typedef enum hts_travel_scope {
 
 /** Text progress display detail (opt->verbosedisplay, -%vN). */
 typedef enum hts_verbosedisplay {
-  HTS_VERBOSE_NONE = 0,   /**< no progress display, the default */
+  HTS_VERBOSE_NONE = 0,   /**< no progress display (-%v0) */
   HTS_VERBOSE_SIMPLE = 1, /**< one progress line (-%v1) */
   HTS_VERBOSE_FULL = 2    /**< full animation (bare -%v, or -%v2) */
 } hts_verbosedisplay;
@@ -413,27 +411,24 @@ typedef enum hts_hostcontrol {
   HTS_HOSTCONTROL_BAN_SLOW = 1 << 1     /**< ban a too-slow host (-H2) */
 } hts_hostcontrol;
 
-/** Opaque backing store for opt->liens. */
 #ifndef HTS_DEF_FWSTRUCT_lien_buffers
 #define HTS_DEF_FWSTRUCT_lien_buffers
 typedef struct lien_buffers lien_buffers;
 #endif
 
-/** Per-mirror options and live state. hts_create_opt() builds one, it holds
-    every tunable of one mirror, and hts_main2() runs it.
-
-    Callers normally configure it through the command-line argv vector rather
-    than by writing fields, and the only fields real consumers set themselves
-    are log and errlog. An hts_tristate option left at HTS_DEFAULT is
-    unspecified, so copy_htsopt() leaves such a field alone. */
+/** Per-mirror options and live state: hts_create_opt() builds one and
+    hts_main2() runs it. Callers normally configure it through the command-line
+    argv vector rather than by writing fields, and the only fields real
+    consumers set themselves are log and errlog. An hts_tristate option left at
+    HTS_DEFAULT is unspecified, so copy_htsopt() leaves such a field alone. */
 #ifndef HTS_DEF_FWSTRUCT_httrackp
 #define HTS_DEF_FWSTRUCT_httrackp
 typedef struct httrackp httrackp;
 #endif
 struct httrackp {
-  /** Size hts_create_opt() gave this block. A consumer whose own
-      sizeof(httrackp) is bigger than hts_sizeof_opt() must refuse to run,
-      because its extra fields sit past the end of the block. */
+  /** Size hts_create_opt() gave this block. A consumer must refuse to run when
+      its own sizeof(httrackp) is bigger, because its extra fields then sit past
+      the end of the block. */
   size_t size_httrackp;
   /* */
   hts_wizard wizard; /**< interactive wizard level (-W asks, -w does not) */
@@ -445,8 +440,8 @@ struct httrackp {
   int depth;         /**< maximum recursion depth (-rN) */
   int extdepth;      /**< recursion depth outside the start domain (-%eN) */
   hts_urlmode urlmode; /**< how a saved page's links are rewritten (-KN) */
-  hts_boolean no_type_change; /**< keep a saved name's extension instead of
-                                   taking it from the MIME type (-%t) */
+  hts_boolean no_type_change; /**< keep the saved name's own extension, not the
+                                   MIME type's (-%t) */
   hts_log_type debug;         /**< most verbose level still logged (-z, -Z) */
   int getmode;                /**< what to fetch, from hts_getmode (-pN) */
   FILE *log;                  /**< informational log stream, NULL to mute it */
@@ -484,8 +479,8 @@ struct httrackp {
   int savename_type;
   String savename_userdef; /**< name template, e.g. %h%p/%n%q.%t (-N) */
   hts_savename_delayed savename_delayed; /**< delayed type-check policy (-%N) */
-  hts_boolean delayed_cached;  /**< on an update, take a delayed type check
-                                    from the cache, not the server (-%D) */
+  hts_boolean delayed_cached;  /**< on an update, take the delayed type check
+                                    from the cache (-%D) */
   hts_boolean mimehtml;        /**< produce a single MIME/MHTML archive (-%M) */
   hts_boolean user_agent_send; /**< send a User-Agent header (-F) */
   String user_agent;           /**< User-Agent value (-F) */
@@ -500,10 +495,10 @@ struct httrackp {
   hts_boolean maketrack; /**< maintain an operations-statistics log (-#T) */
   int parsejava;         /**< script parsing, from htsparsejava_flags (-jN) */
   int hostcontrol;       /**< when to ban a host, from hts_hostcontrol (-HN) */
-  hts_tristate errpage;  /**< save the server's own error pages, 404 and the
-                              like (-oN) */
-  hts_boolean check_type;   /**< test a link whose type is unknown, a cgi or asp
-                                 page for example (-uN) */
+  hts_tristate errpage;  /**< save the server's own error pages, 404 and such
+                              (-oN) */
+  hts_boolean check_type;   /**< test a link of unknown type, a cgi for example
+                                 (-uN) */
   hts_boolean all_in_cache; /**< keep every file in the cache too (-k) */
   hts_robots robots;        /**< robots.txt obedience level (-sN) */
   hts_tristate external;    /**< show external links as error pages (-x) */
@@ -550,9 +545,8 @@ struct httrackp {
   hts_boolean quiet;                 /**< never ask the user a question (-q) */
   hts_boolean keyboard;              /**< poll stdin for keyboard input (-#K) */
   hts_boolean bypass_limits;         /**< lift the built-in bandwidth and
-                                          connection limits (-%!) */
-  hts_boolean background_on_suspend; /**< go to the background when the
-                                          process is suspended (-y) */
+                                          connection caps (-%!) */
+  hts_boolean background_on_suspend; /**< background on a suspend signal (-y) */
   //
   hts_boolean is_update;    /**< this run updates a previous mirror */
   hts_boolean dir_topindex; /**< rebuild the project-folder top index (-%i) */
@@ -717,7 +711,7 @@ struct htsrequest {
   short int nokeepalive;   /**< disable keep-alive */
   short int range_used;    /**< a Range header is in use */
   short int nocompression; /**< disable compression */
-  short int flush_garbage; /**< unused */
+  short int flush_garbage; /**< set, and read by nothing */
   const char *user_agent;  /**< User-Agent value */
   const char *referer;     /**< Referer value */
   const char *from;        /**< From value */
@@ -727,8 +721,8 @@ struct htsrequest {
   htsrequest_proxy proxy;  /**< proxy for this request */
 };
 
-/** Result of one transfer: the response headers, and the body or the file
-    it went to. */
+/** Result of one transfer: its response headers, plus its body or output
+    file. */
 #ifndef HTS_DEF_FWSTRUCT_htsblk
 #define HTS_DEF_FWSTRUCT_htsblk
 typedef struct htsblk htsblk;

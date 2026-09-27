@@ -32,15 +32,14 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 /** @file htswrap.h
-    Legacy declarations of the callback-wrapper stubs. The whole header is empty
-    unless HTS_INTERNAL_BYTECODE is defined, which only the engine's own sources
-    do. httrack-library.h declares the same two stubs to consumers, next to
-    htswrap_add() and htswrap_read(), which register and read callbacks. */
+    Engine-only copy of the htswrap_init() and htswrap_free() declarations.
+    Everything below sits behind HTS_INTERNAL_BYTECODE, so a consumer reads them
+    from httrack-library.h instead, next to htswrap_add() and htswrap_read(). */
 
 #ifndef HTSWRAP_DEFH
 #define HTSWRAP_DEFH
 
-/* Engine-internal declarations: a consumer sees nothing from this header. */
+/* Engine-internal declarations */
 #ifdef HTS_INTERNAL_BYTECODE
 
 #include "htsglobal.h"
@@ -55,10 +54,10 @@ typedef struct httrackp httrackp;
 extern "C" {
 #endif
 
-/** Legacy stub kept for old clients. It does nothing and returns 1. */
+/** Does nothing and returns 1, kept for old clients. */
 HTSEXT_API int htswrap_init(void); // LEGACY
 
-/** Legacy stub kept for old clients. It does nothing and returns 1. */
+/** Does nothing and returns 1, kept for old clients. */
 HTSEXT_API int htswrap_free(void); // LEGACY
 
 #ifdef __cplusplus

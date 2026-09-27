@@ -29,25 +29,20 @@ Please visit our Website: http://www.httrack.com
 /* File: Global engine definition file                          */
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
-
 /** @file htsconfig.h
-    Compile-time tuning constants and on/off switches of the crawler engine.
-    Configure probes none of them, so they only tell a consumer how the library
-    it links against behaves. */
+    Fixed compile-time tuning constants of the crawler engine. Configure probes
+    none of them, so a consumer reads the values the library was built with. */
 
 #ifndef HTTRACK_GLOBAL_ENGINE_DEFH
 #define HTTRACK_GLOBAL_ENGINE_DEFH
 
-// ------------------------------------------------------------
-// Crawler definitions
-
-/** Should a mirror be readable by other users? 1 adds group and other read
-    permission to the HTS_ACCESS_* modes in htsglobal.h. */
+/** Should a mirror be readable by other users? 1 makes the HTS_ACCESS_* modes
+    in htsglobal.h grant group and other access. */
 #define HTS_ACCESS 1
 
 /** Seconds the engine waits for socket activity in one poll. */
 #define HTS_SOCK_SEC 0
-/** Microseconds of the same wait, despite the name. The pair makes 1/10s. */
+/** Microseconds of that same wait, despite the name. The pair makes 1/10s. */
 #define HTS_SOCK_MS 100000
 
 /** Name given to a URL that ends with a slash. */
@@ -56,24 +51,24 @@ Please visit our Website: http://www.httrack.com
 /** Name given to an FTP URL that ends with a slash. */
 #define DEFAULT_FTP "index.txt"
 
-/** Extension given to a saved file that has none. */
+/** Extension the -N name template gives a URL that carries none. */
 #define DEFAULT_EXT ".html"
 /** Its 8.3 form, used when the mirror saves short names. */
 #define DEFAULT_EXT_SHORT ".htm"
 
 /** Should DOS device names (nul, con, ...) and a trailing dot or space be
-    escaped out of save paths? Windows cannot hold such a name. */
+    escaped out of save paths? */
 #define HTS_OVERRIDE_DOS_FOLDERS 1
 
 /** Should the keyword indexer be built in? */
 #define HTS_MAKE_KEYWORD_INDEX 1
 
-/** Should the engine watch the keyboard, so a key press can toggle the progress
+/** Should the engine read stdin, so pressing ENTER toggles the progress
     display? */
 #define HTS_POLL 1
 
-/** A URL ending with a slash is HTML (example/ is always HTML). No engine code
-    reads this any more. */
+/** A URL ending with a slash is HTML (example/ is always HTML). Nothing in the
+    tree reads this. */
 #define HTS_SLASH_ISHTML 1
 
 /** Should a plain file be renamed to "<name>.txt" when the mirror needs a
@@ -83,7 +78,7 @@ Please visit our Website: http://www.httrack.com
 /** Should non-HTML data go straight to disk instead of being held in memory? */
 #define HTS_DIRECTDISK 1
 
-/** Always write straight to disk. No engine code reads this any more. */
+/** Always write straight to disk. Nothing in the tree reads this. */
 #define HTS_DIRECTDISK_ALWAYS 1
 
 /** Should a bare ">" end an HTML comment when no "-->" follows anywhere, the
@@ -93,8 +88,7 @@ Please visit our Website: http://www.httrack.com
 /** Should a path holding a "~" gain a trailing slash (/~smith -> /~smith/)? */
 #define HTS_TILDE_SLASH 0
 
-/** Should "//" inside a link collapse to "/" when URL normalization
-    (--urlhack) is on? */
+/** Should "//" inside a link collapse to "/" when --urlhack is on? */
 #define HTS_STRIP_DOUBLE_SLASH 0
 
 /** Should a failed download delete the partial file? Off, because a retry would
@@ -114,7 +108,5 @@ Please visit our Website: http://www.httrack.com
 /** Seconds a transfer must run before the engine compares its rate against the
     minimum the user asked for. */
 #define HTS_WATCHRATE 15
-
-// ------------------------------------------------------------
 
 #endif
