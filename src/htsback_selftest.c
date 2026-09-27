@@ -31,6 +31,8 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
+#include <limits.h> /* INT_MAX, the backing count back_new() must refuse */
+
 #include "htsselftest_int.h"
 
 /* hts_mirror_completed() answers HTS_DEFAULT until a mirror has run, so a GUI
