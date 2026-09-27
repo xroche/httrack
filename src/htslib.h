@@ -254,6 +254,18 @@ HTSEXT_API const char* hts_version(void);
 // fonctions unix/winsock
 int hts_read(htsblk * r, char *buff, int size);
 
+/* Add to, read and reset the received-byte total, which an FTP worker counts on
+   its own thread while the crawl thread counts the HTTP bytes: a lost += reads
+   low, and -M gives up on that total (back_maxsize_reached()). A lock, not a
+   64-bit atomic add, which needs libatomic where the target has no 8-byte
+   compare-and-swap. hts_stat_recv_publish() copies the total to the
+   HTS_STAT.HTS_TOTAL_RECV a front end reads, on the crawl thread beside every
+   other field engine_stats() refreshes there. */
+void hts_stat_recv_add(LLint bytes);
+LLint hts_stat_recv_get(void);
+void hts_stat_recv_set(LLint bytes);
+void hts_stat_recv_publish(void);
+
 LLint check_downloadable_bytes(int rate);
 
 int hts_uninit_module(void);
