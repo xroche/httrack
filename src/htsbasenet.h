@@ -32,9 +32,10 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 /** @file htsbasenet.h
-    Base networking definitions: platform socket headers, the optional global
-    OpenSSL context, and the status-code/connection-state enumerations stored in
-    htsblk and lien_back. Pulled in by htsnet.h. */
+    Base networking definitions: the platform socket headers, the process-wide
+    OpenSSL context, and the codes held by htsblk.statuscode and
+    lien_back.status. A consumer that interprets either field needs the names
+    here. */
 
 #ifndef HTS_DEFBASENETH
 #define HTS_DEFBASENETH
@@ -43,6 +44,8 @@ Please visit our Website: http://www.httrack.com
    HTS_DEFBASENETH lets only the first include reach. */
 #include "htsglobal.h"
 
+/* Windows needs its socket headers here, for hostent and SOCKET. On POSIX they
+   come from htsnet.h and only INVALID_SOCKET is defined below. */
 #ifdef _WIN32
 
 #if HTS_INET6 == 0
@@ -63,7 +66,11 @@ Please visit our Website: http://www.httrack.com
 #endif
 
 #else
+/** Defined on the POSIX build and cleared on the Windows IPv6 build, but
+    nothing in the tree reads it. */
 #define HTS_USESCOPEID
+/** POSIX's invalid socket, spelled with Winsock's name so one test serves
+    both platforms. */
 #define INVALID_SOCKET -1
 #endif
 
@@ -71,6 +78,8 @@ Please visit our Website: http://www.httrack.com
 extern "C" {
 #endif
 
+/* HTS_USEOPENSSL adds two fields to htsblk, so a consumer must compile with
+   the value the library was built with, and needs the OpenSSL headers too. */
 #if HTS_USEOPENSSL
 /*
    OpensSSL crypto routines by Eric Young (eay@cryptsoft.com)
@@ -90,15 +99,15 @@ extern "C" {
 
 /* Engine-only: not exported, so the installed header must not offer it. */
 #ifdef HTS_INTERNAL_BYTECODE
-/** Process-wide OpenSSL client context, created lazily on first TLS use;
-    shared by all connections. NULL until initialized. */
+/** Process-wide OpenSSL client context, shared by every TLS connection.
+    hts_init() creates it, so it is NULL until then, and nothing frees it. */
 extern SSL_CTX *openssl_ctx;
 #endif
 
 #endif
 #endif
 
-/** RFC2616 status-codes ('statuscode' member of htsblk) **/
+/** HTTP status codes as read off the wire, stored in htsblk.statuscode. */
 typedef enum HTTPStatusCode {
   HTTP_CONTINUE = 100,
   HTTP_SWITCHING_PROTOCOLS = 101,
@@ -144,42 +153,48 @@ typedef enum HTTPStatusCode {
   HTTP_HTTP_VERSION_NOT_SUPPORTED = 505
 } HTTPStatusCode;
 
-/** Internal HTTrack status-codes ('statuscode' member of htsblk) **/
+/** HTTrack's own status codes, stored in htsblk.statuscode beside the HTTP
+    ones. A fresh htsblk starts at STATUSCODE_INVALID. */
 typedef enum BackStatusCode {
-  STATUSCODE_INVALID = -1,
-  STATUSCODE_TIMEOUT = -2,
-  STATUSCODE_SLOW = -3,
-  STATUSCODE_CONNERROR = -4,
-  STATUSCODE_NON_FATAL = -5,
-  STATUSCODE_SSL_HANDSHAKE = -6,
-  STATUSCODE_TOO_BIG = -7,
-  STATUSCODE_TEST_OK = -10,
-  STATUSCODE_EXCLUDED = -11, /* aborted: MIME excluded by a -mime: filter */
-  STATUSCODE_IO_FATAL = -12, /* the body write hit a fatal I/O errno */
-  STATUSCODE_IO_ERROR = -13  /* the body write failed, but not fatally */
+  STATUSCODE_INVALID = -1,       /**< no usable response, and no retry */
+  STATUSCODE_TIMEOUT = -2,       /**< the slot ran out of --timeout */
+  STATUSCODE_SLOW = -3,          /**< the transfer stayed under --min-rate */
+  STATUSCODE_CONNERROR = -4,     /**< the connection failed, or died later */
+  STATUSCODE_NON_FATAL = -5,     /**< another error, and a retry may follow */
+  STATUSCODE_SSL_HANDSHAKE = -6, /**< the TLS handshake failed */
+  STATUSCODE_TOO_BIG = -7,       /**< the body was too big, and no retry */
+  STATUSCODE_TEST_OK = -10,      /**< --test found the link alive */
+  STATUSCODE_EXCLUDED = -11,     /**< a -mime: filter refused the type */
+  STATUSCODE_IO_FATAL = -12,     /**< a write failed, and the mirror stops */
+  STATUSCODE_IO_ERROR = -13      /**< a write failed, but the mirror goes on */
 } BackStatusCode;
 
-/** Either write-error class: r.size counts bytes read, so a size-based
-    completion test reads a body a failed write cut short as a clean end. **/
+/** Is code one of the two write-error classes? r.size counts bytes read, so it
+    cannot tell a complete body from one a failed write cut short. */
 static HTS_INLINE HTS_UNUSED hts_boolean statuscode_is_write_error(int code) {
   return code == STATUSCODE_IO_FATAL || code == STATUSCODE_IO_ERROR ? HTS_TRUE
                                                                     : HTS_FALSE;
 }
 
-/** HTTrack status ('status' member of of 'lien_back') **/
+/** Connection state of a backing slot, the 'status' member of lien_back. The
+    numbers are ordered on purpose, because the engine tests ranges: above zero
+    is a slot in flight, and 1000 or more an FTP one. A transfer ends at
+    STATUS_READY, then the slot returns to STATUS_FREE once the crawler has
+    taken the result. An HTTPS slot reaches STATUS_CONNECTING twice, once for
+    connect() and once after the handshake, so that branch runs twice. */
 typedef enum HTTrackStatus {
-  STATUS_ALIVE = -103,
-  STATUS_FREE = -1,
-  STATUS_READY = 0,
-  STATUS_TRANSFER = 1,
-  STATUS_CHUNK_CR = 97,
-  STATUS_CHUNK_WAIT = 98,
-  STATUS_WAIT_HEADERS = 99,
-  STATUS_CONNECTING = 100,
-  STATUS_WAIT_DNS = 101,
-  STATUS_SSL_WAIT_HANDSHAKE = 102,
-  STATUS_FTP_TRANSFER = 1000,
-  STATUS_FTP_READY = 1001
+  STATUS_ALIVE = -103,             /**< keep-alive socket, no request on it */
+  STATUS_FREE = -1,                /**< slot unused, and free to take */
+  STATUS_READY = 0,                /**< transfer over, result not taken yet */
+  STATUS_TRANSFER = 1,             /**< reading the body, or a local file */
+  STATUS_CHUNK_CR = 97,            /**< reading the CRLF ending a chunk */
+  STATUS_CHUNK_WAIT = 98,          /**< reading the next chunk's hex size */
+  STATUS_WAIT_HEADERS = 99,        /**< request sent, headers still coming */
+  STATUS_CONNECTING = 100,         /**< waiting for connect() to finish */
+  STATUS_WAIT_DNS = 101,           /**< resolving the host name */
+  STATUS_SSL_WAIT_HANDSHAKE = 102, /**< running the TLS handshake */
+  STATUS_FTP_TRANSFER = 1000,      /**< an FTP worker owns slot and socket */
+  STATUS_FTP_READY = 1001          /**< the FTP worker is done, so reap it */
 } HTTrackStatus;
 
 #ifdef __cplusplus

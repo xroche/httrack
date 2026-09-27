@@ -31,36 +31,41 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 /** @file htsglobal.h
- *  Foundational portability layer included by every other public header:
- *  version strings, platform/feature switches, the HTSEXT_API export marker,
- *  the integer/time/socket typedefs (LLint, TStamp, INTsys, T_SOC), printf
- *  format helpers, and the file-access mode constants. */
+ *  The portability layer nearly every other installed header includes: the
+ *  version strings, the build switches that shape the exported structs, the
+ *  HTSEXT_API export marker, the integer, time and socket typedefs with their
+ *  printf formats, and the file-access mode constants. */
 
 #ifndef HTTRACK_GLOBAL_DEFH
 #define HTTRACK_GLOBAL_DEFH
 
-/* Package version strings (the library ABI version is VERSION_INFO in
-   configure.ac, decoupled from these). VERSION is the display form, VERSIONID
-   the dotted numeric form, AFF_VERSION the short form shown in footers,
-   LIB_VERSION the data/cache format generation. */
+/* Package version strings. VERSION is the dashed display form, VERSIONID the
+   dotted numeric form hts_version() returns, AFF_VERSION a deliberately
+   shape-free short form used in the User-Agent and the mirrored-page footer.
+   None of them is the library ABI version, which is VERSION_INFO in
+   configure.ac. */
 #define HTTRACK_VERSION "3.50-4"
 #define HTTRACK_VERSIONID "3.50.4"
 #define HTTRACK_AFF_VERSION "3.x"
+/* Nothing in the engine reads this one. */
 #define HTTRACK_LIB_VERSION "2.0"
 
+/* A consumer that defines HTS_NOINCLUDES includes <stdio.h> and <stdlib.h>
+   itself, before this header. */
 #ifndef HTS_NOINCLUDES
 #include <stdio.h>
 #include <stdlib.h>
 #endif
 
-// Platform detection (sizes, feature macros)
+/* Engine tuning constants: HTS_ACCESS, poll timings, default filenames. */
 #include "htsconfig.h"
 
 // Fixed-width integer types + PRI* format macros for the LLint/TStamp typedefs
 #include <stdint.h>
 #include <inttypes.h>
 
-// WIN32 types
+/* Type widths for a build with no configure. Nothing in the engine reads
+   them any more. */
 #ifdef _WIN32
 #ifndef SIZEOF_LONG
 #define SIZEOF_LONG 4
@@ -68,12 +73,12 @@ Please visit our Website: http://www.httrack.com
 #endif
 #endif
 
-/* Compiler-attribute helpers, no-ops where unsupported.
-   HTS_UNUSED: suppress unused-symbol warnings. HTS_STATIC: an unused-safe
-   static. HTS_PRINTF_FUN(fmt, arg): mark a printf-like function so the
-   compiler type-checks the format string at argument index fmt against the
-   varargs starting at arg. HTS_CHECK_RESULT: the return value carries the only
-   error signal, so dropping it is a bug; a (void) cast does not silence it. */
+/* Compiler-attribute markers, each expanding to nothing where the compiler has
+   no such attribute. HTS_UNUSED says a symbol may go unused, and HTS_STATIC is
+   a static that may. HTS_PRINTF_FUN(fmt, arg) checks the format string at
+   argument index @p fmt against the varargs starting at @p arg.
+   HTS_CHECK_RESULT says a caller must read the return value, and a (void) cast
+   does not silence the warning. */
 #ifndef HTS_UNUSED
 #ifdef __GNUC__
 #define HTS_UNUSED __attribute__((unused))
@@ -91,7 +96,8 @@ Please visit our Website: http://www.httrack.com
 #endif
 #endif
 
-// config.h
+/* Where the build switches come from. Windows hard-codes them because MSVC
+   runs no configure, and every other build reads the generated header below. */
 #ifdef _WIN32
 
 /*
@@ -99,12 +105,15 @@ Please visit our Website: http://www.httrack.com
 #define HAVE_SYS_TYPES_H 1
 #define HAVE_SYS_STAT_H 1
 */
+/* Windows can always load a shared library at run time. */
 #ifndef DLLIB
 #define DLLIB 1
 #endif
 #ifndef HTS_INET6
 #define HTS_INET6 1
 #endif
+/* Stand-ins for the POSIX macros MSVC does not declare. Each answers non-zero
+   for a match, not 1, so test them for truth and never against 1. */
 #ifndef S_ISREG
 #define S_ISREG(m) ((m) & _S_IFREG)
 
@@ -122,10 +131,14 @@ Please visit our Website: http://www.httrack.com
 #include "htsfeatures.h"
 #endif
 
+/* Defined when the platform has no setuid(), and the engine then skips its
+   "do not run as root" check. */
 #ifndef SETUID
 #define HTS_DO_NOT_USE_UID
 #endif
 
+/* 1 when the platform can load a shared library at run time. It does not gate
+   the module hooks, which compile either way (htsmodules.c). */
 #ifdef DLLIB
 #define HTS_DLOPEN 1
 #else
@@ -134,26 +147,29 @@ Please visit our Website: http://www.httrack.com
 
 #endif
 
+/* Marks a local array big enough to matter for stack use. It expands to
+   nothing. */
 #ifndef BIGSTK
 #define BIGSTK
 #endif
 
-// DOS-style 8.3 filenames? 1 on Windows, 0 elsewhere
+/* 1 when local paths use a backslash separator, so the engine rewrites the
+   '/' in a save name. 1 on Windows, 0 else. */
 #ifdef _WIN32
 #define HTS_DOSNAME 1
 #else
 #define HTS_DOSNAME 0
 #endif
 
-// zlib is mandatory: the cache is a zip and minizip calls it regardless
+/* Always 1: zlib is mandatory, because the cache is a zip file. */
 #ifndef HTS_USEZLIB
 #define HTS_USEZLIB 1
 #elif !HTS_USEZLIB
 #error HTS_USEZLIB=0 is not a supported configuration
 #endif
 
-// brotli and zstd content codings; off unless the build opted in (configure,
-// or the Visual Studio projects, which link the vcpkg libraries)
+/* 1 when the engine can decode the br and zstd content codings, so it offers
+   them in Accept-Encoding. Each defaults to off. */
 #ifndef HTS_USEBROTLI
 #define HTS_USEBROTLI 0
 #endif
@@ -161,13 +177,16 @@ Please visit our Website: http://www.httrack.com
 #define HTS_USEZSTD 0
 #endif
 
+/* 1 when the build has IPv6. It picks the sockaddr_in6 arm of SOCaddr
+   (htsnet.h), so it changes the layout of every struct holding one: a consumer
+   must take the value from htsfeatures.h and never guess it. */
 #ifndef HTS_INET6
 #define HTS_INET6 0
 #endif
 
-// utiliser openssl?
+/* 1 when the build speaks https. It adds the ssl fields to htsblk (htsopt.h),
+   so it too changes struct layout and must come from htsfeatures.h. */
 #ifndef HTS_USEOPENSSL
-// autoload
 #define HTS_USEOPENSSL 1
 #endif
 
@@ -175,20 +194,24 @@ Please visit our Website: http://www.httrack.com
 #define HTS_DLOPEN 1
 #endif
 
+/* 1 when the build advertises Flash (.swf) link support. Only the WebHTTrack
+   feature list reads it. */
 #ifndef HTS_USESWF
 #define HTS_USESWF 1
 #endif
 
+/* The MSVC calling-convention keyword the engine's callback declarations
+   carry. Defined away elsewhere, so they compile everywhere. */
 #ifdef _WIN32
 #else
 #define __cdecl
 #endif
 
-/* Install paths and config-file names. HTTRACKRC is the per-user rc filename,
-   HTTRACKCNF the system-wide config, HTTRACKDIR the shared data directory; the
-   ETC/BIN/LIB/PREFIX paths follow the directories configure was given. A build
-   that defines none (MSVC, or a consumer including this header standalone)
-   falls back to the literals. */
+/* Install paths and config-file names, all string literals with no trailing
+   slash except HTS_HTTRACKDIR, which has one. configure passes the directories
+   in (PREFIX, SYSCONFDIR, BINDIR, LIBDIR, DATADIR), and the literals here are
+   the fallback for a build that passes none. Only HTS_HTTRACKRC exists on
+   Windows, so test the others with #ifdef before you use them. */
 #ifdef _WIN32
 #define HTS_HTTRACKRC "httrackrc"
 #else
@@ -223,8 +246,10 @@ Please visit our Website: http://www.httrack.com
 #endif
 
 #define HTS_HTTRACKRC ".httrackrc"
+/* System-wide config file, read only when no HTS_HTTRACKRC was found. */
 #define HTS_HTTRACKCNF HTS_ETCPATH "/httrack.conf"
 
+/* Data directory holding the HTML templates and the language files. */
 #ifdef DATADIR
 #define HTS_HTTRACKDIR DATADIR "/httrack/"
 #else
@@ -278,21 +303,25 @@ Please visit our Website: http://www.httrack.com
   "update.php3?Product=HTTrack&Version=" HTTRACK_VERSIONID                     \
   "&VersionStr=" HTTRACK_VERSION "&Platform=%d&Language=%s"
 
+/* CR LF. H_CRLF ends an HTTP header line, and CRLF the lines of the HTML pages
+   the engine writes itself. */
 #define H_CRLF "\x0d\x0a"
 #define CRLF "\x0d\x0a"
+/* The local text-file and console line terminator, despite the name: CR LF on
+   Windows and LF elsewhere. */
 #ifdef _WIN32
 #define LF "\x0d\x0a"
 #else
 #define LF "\x0a"
 #endif
 
-/* Sentinel meaning "empty parameter", e.g. -F (none) */
+/* Sentinel meaning "empty parameter", for example -F (none). HTS_NOPARAM2 is
+   the same word with the quote characters still around it. */
 #define HTS_NOPARAM "(none)"
 #define HTS_NOPARAM2 "\"(none)\""
 
-/* Boolean flag for option fields and API yes/no returns. Int-backed, not an
-   enum: an enum makes C++ reject `field = 1` / `f(0)` on the exported fields
-   and params. Int-sized, so the httrackp layout and the ABI are unchanged. */
+/* Boolean for option fields and yes/no returns. Assign HTS_FALSE or HTS_TRUE.
+   It is an int rather than an enum, so C++ still accepts `field = 1`. */
 #ifndef HTS_DEF_DEFSTRUCT_hts_boolean
 #define HTS_DEF_DEFSTRUCT_hts_boolean
 
@@ -309,12 +338,13 @@ typedef int hts_tristate;
 #define HTS_DEFAULT (-1)
 #endif
 
-/* Larger/smaller of two values. Macros: arguments are evaluated twice. */
+/* Larger and smaller of two values. One argument is evaluated twice, so pass
+   no side effect. */
 #define maximum(A, B) ((A) > (B) ? (A) : (B))
 
 #define minimum(A, B) ((A) < (B) ? (A) : (B))
 
-/* True when A is a non-NULL, non-empty string. */
+/* True when @p A is a non-NULL, non-empty string. @p A is evaluated twice. */
 #define strnotempty(A) (((A) != NULL && (A)[0] != '\0'))
 
 /* Compile-time check, usable as an expression. */
@@ -325,18 +355,17 @@ typedef int hts_tristate;
 #define HTS_STATIC_ASSERT(cond, name)                                          \
   enum { hts_static_assert_##name = 1 / !!(cond) }
 
-/* 'inline' where the dialect supports it (C++), nothing in plain C. */
+/* Expands to `inline` when the header is compiled as C++, and to nothing in
+   plain C. */
 #ifdef __cplusplus
 #define HTS_INLINE inline
 #else
 #define HTS_INLINE
 #endif
 
-/* Marks a symbol as part of the library's public ABI: exported from
-   libhttrack and visible to callers. Symbols without it stay internal (hidden
-   under -fvisibility=hidden). Expands to dllexport when building the library,
-   dllimport when consuming it, and the visibility("default") attribute on
-   ELF. */
+/* Marks a symbol as part of the library's public ABI, so a consumer may link
+   against it. A symbol without it is internal and may change or vanish. It
+   expands to nothing on a compiler with no way to say this. */
 #ifdef _WIN32
 #ifdef LIBHTTRACK_EXPORTS
 #define HTSEXT_API __declspec(dllexport)
@@ -354,11 +383,9 @@ typedef int hts_tristate;
 #endif
 #endif
 
-/**
- * Mark a function deprecated, with a message pointing at the replacement.
- * Placed before the declaration so both the GCC/Clang attribute and the MSVC
- * __declspec sit in a position both accept. Degrades to nothing elsewhere.
- */
+/** Marks a function deprecated, and @p msg names the replacement. It goes
+ *  before the declaration, and expands to nothing where the compiler cannot
+ *  warn. */
 #if defined(__GNUC__) &&                                                       \
     (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 5))
 
@@ -373,8 +400,8 @@ typedef int hts_tristate;
 #define HTS_DEPRECATED(msg)
 #endif
 
-/* Never returns; placed before the declaration, where GCC/Clang and MSVC both
-   accept it. */
+/* Says the function never returns. It goes before the declaration, and
+   expands to nothing where the compiler has no such attribute. */
 #if defined(__GNUC__)
 #define HTS_NORETURN __attribute__((noreturn))
 #elif defined(_MSC_VER)
@@ -383,9 +410,9 @@ typedef int hts_tristate;
 #define HTS_NORETURN
 #endif
 
-/* Marks a deliberate switch fallthrough, as a statement before the next case.
-   Nothing in the engine falls through, so it has no caller yet. Only the
-   attribute satisfies gcc and clang alike, so a comment cannot stand in. */
+/* Marks a deliberate switch fallthrough. Write it as a statement before the
+   next case label. It expands to nothing where the compiler has no such
+   attribute. */
 #if defined(__has_attribute)
 
 #if __has_attribute(fallthrough)
@@ -397,15 +424,21 @@ typedef int hts_tristate;
 #define HTS_FALLTHROUGH
 #endif
 
-/* LLint/TStamp: signed exact-width 64-bit; -1 is a sentinel engine-wide. */
+/* Byte counts, file sizes and offsets, exactly 64 bits and signed. -1 means
+   "unknown" or "no limit" in the fields and returns that accept it. */
 typedef int64_t LLint;
+/* A time value, exactly 64 bits and signed. The producer fixes the unit: some
+   fields hold seconds since the Unix epoch, mtime_local() milliseconds since
+   it, and mtime_monotonic() milliseconds from an unspecified origin, comparable
+   only against itself. */
 typedef int64_t TStamp;
-/* Full printf conversion, '%' included (PRId64 has none): "X: " LLintP. */
+/* printf conversion for an LLint or a TStamp, '%' included, because PRId64 has
+   none: "X: " LLintP. */
 #define LLintP "%" PRId64
 
-/* Integer type for file offsets/sizes passed to the C library; INTsysP is its
-   printf conversion. HTS_LFS is the large-file macro: LFS_FLAG is a configure
-   make variable carrying the -D flags, never itself defined. */
+/* 64 bits where the build has large-file support (HTS_LFS) or under MSVC, and
+   a plain int otherwise, so a consumer must not assume a width. INTsysP is its
+   printf conversion, '%' included. */
 #if defined(HTS_LFS) || defined(_MSC_VER)
 typedef LLint INTsys;
 
@@ -416,9 +449,9 @@ typedef int INTsys;
 #define INTsysP "%d"
 #endif
 
-/* Socket-handle type. An unsigned integer wide enough for a Windows SOCKET;
-   a plain int file descriptor on POSIX. T_SOCP is its printf conversion,
-   '%' included: unsigned __int64 on Win64 must not be printed with "%d". */
+/* Socket handle: an unsigned integer as wide as a Windows SOCKET (64 bits on
+   Win64, 32 on Win32), and a plain int file descriptor on POSIX. T_SOCP is its
+   printf conversion, '%' included, so never print a T_SOC with "%d". */
 #ifdef _WIN32
 #if defined(_WIN64)
 
@@ -440,12 +473,13 @@ typedef int T_SOC;
  */
 #define HTS_MAXADDRNUM 4
 
+/* See __cdecl above. */
 #ifdef _WIN32
 #else
 #define __cdecl
 #endif
 
-/* Permission bits for created folders and files (mkdir and chmod).
+/* POSIX permission bits for created folders and files (mkdir and chmod).
    PROTECT_FOLDER/FILE are owner-only. With HTS_ACCESS set (the default) the
    ACCESS_ modes also grant group/other read; otherwise they stay owner-only. */
 #define HTS_PROTECT_FOLDER (S_IRUSR | S_IWUSR | S_IXUSR)
@@ -476,7 +510,8 @@ typedef int T_SOC;
 #define HTS_ACCESS 1
 #endif
 
-/* fflush sur stdout */
+/* Flushes stdout and stdin. It expands to a brace block, so an `if` around it
+   needs braces. */
 #define io_flush                                                               \
   {                                                                            \
     fflush(stdout);                                                            \
@@ -503,6 +538,7 @@ typedef int T_SOC;
 // trace mallocs
 // #define HTS_TRACE_MALLOC
 #ifdef HTS_TRACE_MALLOC
+/* Type of the guard word written on both sides of a traced block. */
 typedef unsigned long int t_htsboundary;
 
 #ifndef HTS_DEF_FWSTRUCT_mlink
@@ -512,7 +548,7 @@ typedef struct mlink mlink;
 struct mlink {
   char *adr;
   int len;
-  int id;
+  int id; /**< serial number of the allocation */
   struct mlink *next;
 };
 
@@ -520,7 +556,7 @@ static const t_htsboundary htsboundary = 0xDEADBEEF;
 #endif
 #endif
 
-/* strxxx debugging */
+/* Nothing reads this any more. */
 #ifndef NOSTRDEBUG
 #define STRDEBUG 1
 #endif
@@ -554,13 +590,13 @@ static const t_htsboundary htsboundary = 0xDEADBEEF;
 
 // HTSLib debug
 #define HDEBUG 0
-// surveillance de la connexion
+// connection monitoring debug
 #define CNXDEBUG 0
-// debuggage cookies
+// cookie debug
 #define DEBUG_COOK 0
 // heavy/low-level debug
 #define HTS_WIDE_DEBUG 0
-// debuggage deletehttp et cie
+// socket close debug
 #define HTS_DEBUG_CLOSESOCK 0
 // memory-tracing debug
 #define MEMDEBUG 0
@@ -585,6 +621,8 @@ extern FILE *DEBUG_fp;
     fprintf(DEBUG_fp, ":>" A);                                                 \
     fflush(DEBUG_fp);                                                          \
   }
+/* Lets DEBUG_W("a" _ b) pass several fprintf arguments, by redefining the
+   identifier _. Debug builds only. */
 #undef _
 #define _ ,
 #endif

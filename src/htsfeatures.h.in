@@ -31,8 +31,10 @@ Please visit our Website: http://www.httrack.com
 
 /** @file htsfeatures.h
  *  The subset of config.h the installed headers need. HTS_INET6 and
- *  HTS_USEOPENSSL fix SOCaddr/htsblk layout: a consumer that guesses them wrong
- *  desyncs from the library it links against. */
+ *  HTS_USEOPENSSL decide the layout of SOCaddr and htsblk, so a consumer that
+ *  guesses either one wrong disagrees with the library it links against. They,
+ *  HTS_USEBROTLI, HTS_USEZSTD and HAVE_VISIBILITY always carry 0 or 1, and
+ *  every other name here is defined or absent. */
 
 #ifndef HTTRACK_FEATURES_DEFH
 #define HTTRACK_FEATURES_DEFH
@@ -50,10 +52,10 @@ Please visit our Website: http://www.httrack.com
 /* Large-file support: widens INTsys to 64 bits (htsglobal.h). */
 #undef HTS_LFS
 
-/* Set when the platform declares in_addr_t, which htsnet.h then leaves alone. */
+/* Defined when the platform declares in_addr_t, so htsnet.h leaves it alone. */
 #undef HTS_DO_NOT_REDEFINE_in_addr_t
 
-/* Replacements for the socket types a platform may not declare; htsnet.h uses
+/* Replacements for the socket types a platform may not declare. htsnet.h uses
    in_port_t in the SOCaddr accessors. */
 #undef in_port_t
 #undef sa_family_t
@@ -67,8 +69,8 @@ Please visit our Website: http://www.httrack.com
 /* strnlen() available; picks htssafe.h's own implementation when absent. */
 #undef HAVE_STRNLEN
 
-/* Compiler honours visibility attributes; marks HTSEXT_API and
-   EXTERNAL_FUNCTION default-visible on a non-GNU compiler. */
+/* 1 when the compiler honours visibility attributes, which then marks
+   HTSEXT_API and EXTERNAL_FUNCTION default-visible on a non-GNU compiler. */
 #undef HAVE_VISIBILITY
 
 #endif

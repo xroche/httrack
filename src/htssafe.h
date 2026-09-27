@@ -30,6 +30,22 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
+/**
+ * @file htssafe.h
+ * Safe string helpers, the fatal-assert machinery, and the "t" allocator
+ * wrappers the engine uses instead of raw libc.
+ *
+ * Pick a helper by its overflow behaviour. The buff() family ABORTS the process
+ * on overflow, though only when the destination is an array and not a bare
+ * char*, for the reason the size contract below gives. The htsbuff builder
+ * aborts either way. Aborting is right for data we built ourselves and wrong
+ * for a value read off the wire, out of a cache or out of a header, because it
+ * turns a memory smash into a crash on malformed input. Clip such a value
+ * instead, with strclipbuff() or slprintfbuff(), or from the buff() family with
+ * dest[0] = '\0'; strlncatbuff(dest, src, size, size - 1). The clip helpers
+ * still abort on a NULL buffer or a zero size, so check a computed size first.
+ */
+
 #ifndef HTSSAFE_DEFH
 #define HTSSAFE_DEFH
 
@@ -41,18 +57,21 @@ Please visit our Website: http://www.httrack.com
 #include "htsglobal.h"
 
 /**
- * Emergency logging.
- * Default is to use libhttrack one.
+ * HTSSAFE_ABORT_FUNCTION(msg, file, line) reports a failed assert just before
+ * the process aborts. Inside libhttrack it hands the message to the callback
+ * installed by hts_set_error_callback(). Another consumer may define its own
+ * before including this header, and gets only the stderr line if it does not.
  */
 #if (!defined(HTSSAFE_ABORT_FUNCTION) && defined(LIBHTTRACK_EXPORTS))
 
-/** Assert error callback. **/
 #ifndef HTS_DEF_FWSTRUCT_htsErrorCallback
 #define HTS_DEF_FWSTRUCT_htsErrorCallback
+/** A handler receives a failed assert's message, source file and line. */
 typedef void (*htsErrorCallback)(const char *msg, const char *file, int line);
 #ifdef __cplusplus
 extern "C" {
 #endif
+/** Returns the callback installed by hts_set_error_callback(), or NULL. */
 HTSEXT_API htsErrorCallback hts_get_error_callback(void);
 #ifdef __cplusplus
 }
@@ -69,32 +88,30 @@ HTSEXT_API htsErrorCallback hts_get_error_callback(void);
 
 #endif
 
-/**
- * Log an abort condition, and calls abort().
- */
+/** Report message a with this call site's location, then abort. */
 #define abortLog(a) abortf_(a, __FILE__, __LINE__)
 
-/**
- * Fatal assertion check.
- */
+/** Abort unless exp holds, reporting sexp instead of exp's own source text. */
 #define assertf__(exp, sexp, file, line)                                       \
   (void) ((exp) || (abortf_(sexp, file, line), 0))
 
-/**
- * Fatal assertion check.
- */
+/** Abort unless exp holds, reporting file and line instead of this call
+    site's. */
 #define assertf_(exp, file, line) assertf__(exp, #exp, file, line)
 
 /**
- * Fatal assertion check.
+ * Abort the process unless exp holds. NDEBUG does not disable it, so it guards
+ * release builds too.
  */
 #define assertf(exp) assertf_(exp, __FILE__, __LINE__)
 
+/** Print msg and its source location to stderr. */
 static HTS_UNUSED void log_abort_(const char *msg, const char *file, int line) {
   fprintf(stderr, "%s failed at %s:%d\n", msg, file, line);
   fflush(stderr);
 }
 
+/** Report exp at file:line through the abort hook and stderr, then abort. */
 static HTS_NORETURN HTS_UNUSED void abortf_(const char *exp, const char *file,
                                             int line) {
 #ifdef HTSSAFE_ABORT_FUNCTION
@@ -105,7 +122,8 @@ static HTS_NORETURN HTS_UNUSED void abortf_(const char *exp, const char *file,
 }
 
 /**
- * Check whether 'VAR' is of type char[].
+ * Is VAR a sized char[] array rather than a char* pointer? VAR is not
+ * evaluated.
  */
 #if (defined(__GNUC__) && !defined(__cplusplus))
 
@@ -128,7 +146,8 @@ static HTS_NORETURN HTS_UNUSED void abortf_(const char *exp, const char *file,
 #define HTS_SIZEOF_SRC_(B) (HTS_IS_NOT_CHAR_BUFFER(B) ? (size_t) -1 : sizeof(B))
 #endif
 
-/* Compile-time checks. */
+/** This function does not compile if HTS_IS_CHAR_BUFFER() confuses an array
+    with a pointer. */
 static HTS_UNUSED void htssafe_compile_time_check_(void) {
   char array[32];
   char *pointer = array;
@@ -140,19 +159,10 @@ static HTS_UNUSED void htssafe_compile_time_check_(void) {
 }
 
 /*
- * Pointer-destination diagnostics for the buff() macros (GCC/Clang, C only).
- *
- * strcpybuff()/strcatbuff()/strncatbuff() bounds-check only when the
- * destination is a sized char[] array (HTS_IS_CHAR_BUFFER). For a bare char*
- * the capacity is unknown, so the macro silently falls back to plain
- * strcpy()/strcat()/strncat() while still looking like a checked call.
- *
- * These stubs route that pointer case through __builtin_choose_expr() so the
- * 'warning' attribute fires only at pointer-destination sites; array sites use
- * the bounded *_safe_ helpers and stay quiet. The warning names the
- * explicit-size replacement (strlcpybuff/strlcatbuff). Diagnostic only: no
- * runtime or ABI change, built only on GCC/Clang in C mode. Other compilers
- * (MSVC, ...) keep the previous behavior via the #else branches.
+ * Stubs standing in for the buff() macros when the destination is a bare
+ * char* of unknown capacity, so the copy is NOT bounds-checked and cannot
+ * abort. On GCC/Clang in C mode such a call site is a compile-time warning
+ * naming the explicit-size replacement, and other compilers stay silent.
  */
 #if (defined(__GNUC__) && !defined(__cplusplus))
 
@@ -164,8 +174,8 @@ static HTS_UNUSED void htssafe_compile_time_check_(void) {
 #endif
 #endif
 #ifndef HTS_BUFF_PTR_ATTR
-/* 'warning' attribute unavailable: keep noinline so the migration can still
-   grep for these symbols, but no compile-time diagnostic is emitted. */
+/* 'warning' attribute unavailable, so no diagnostic is emitted. noinline
+   keeps these stubs visible as symbols. */
 #define HTS_BUFF_PTR_ATTR(msg) __attribute__((unused, noinline))
 #endif
 
@@ -196,7 +206,9 @@ static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
  * family): the destination bound is taken from sizeof(A), so A MUST be a real
  * char[] array in scope. The bound is the full array size in bytes, INCLUDING
  * the terminating NUL. On overflow the *_safe_ helpers do NOT truncate: they
- * abort() (assertf). On success the result is always NUL-terminated.
+ * abort() (assertf). The destination must already be NUL-terminated inside its
+ * capacity, because its length is measured first, and an unterminated one
+ * aborts too. On success the result is always NUL-terminated.
  *
  * CRITICAL CAVEAT: if A is a bare char* pointer (not an array), sizeof(A) is
  * the pointer size, not the buffer capacity. There is no way to recover the
@@ -210,9 +222,9 @@ static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
  */
 
 /**
- * Append at most N characters from "B" to "A".
- * If "A" is a char[] variable whose size is not sizeof(char*), then the size
- * is assumed to be the capacity of this array.
+ * Append at most N bytes of B to A, and ABORT if the result does not fit. B
+ * must still be NUL-terminated, because its whole length is measured before N
+ * caps it. A's capacity comes from the size contract above.
  */
 #if (defined(__GNUC__) && !defined(__cplusplus))
 
@@ -232,11 +244,8 @@ static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
                        __FILE__, __LINE__))
 #endif
 
-/**
- * Append characters of "B" to "A".
- * If "A" is a char[] variable whose size is not sizeof(char*), then the size
- * is assumed to be the capacity of this array.
- */
+/** Append all of B to A, and ABORT if the result does not fit. A's capacity
+    comes from the size contract above. */
 #if (defined(__GNUC__) && !defined(__cplusplus))
 
 #define strcatbuff(A, B)                                                       \
@@ -255,11 +264,8 @@ static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
                        __FILE__, __LINE__))
 #endif
 
-/**
- * Copy characters from "B" to "A".
- * If "A" is a char[] variable whose size is not sizeof(char*), then the size
- * is assumed to be the capacity of this array.
- */
+/** Copy B over A, and ABORT if it does not fit. A's capacity comes from the
+    size contract above. */
 #if (defined(__GNUC__) && !defined(__cplusplus))
 
 #define strcpybuff(A, B)                                                       \
@@ -286,33 +292,29 @@ static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
  * silent pointer degradation since the bound is passed in.
  */
 
-/**
- * Append characters of "B" to "A", "A" having a maximum capacity of "S".
- */
+/** Append all of B to A, whose capacity is S bytes including the NUL. ABORTS
+    if the result does not fit. */
 #define strlcatbuff(A, B, S)                                                   \
   strncat_safe_(A, S, B, HTS_SIZEOF_SRC_(B), (size_t) -1,                      \
                 "overflow while appending '" #B "' to '" #A "'", __FILE__,     \
                 __LINE__)
 
-/**
- * Append at most "N" characters of "B" to "A", "A" having a maximum capacity
- * of "S".
- */
+/** Append at most N bytes of B to A, whose capacity is S bytes including the
+    NUL. ABORTS if the result does not fit. */
 #define strlncatbuff(A, B, S, N)                                               \
   strncat_safe_(A, S, B, HTS_SIZEOF_SRC_(B), N,                                \
                 "overflow while appending '" #B "' to '" #A "'", __FILE__,     \
                 __LINE__)
 
-/**
- * Copy characters of "B" to "A", "A" having a maximum capacity of "S".
- */
+/** Copy B over A, whose capacity is S bytes including the NUL. ABORTS if B
+    does not fit. */
 #define strlcpybuff(A, B, S)                                                   \
   strcpy_safe_(A, S, B, HTS_SIZEOF_SRC_(B),                                    \
                "overflow while copying '" #B "' to '" #A "'", __FILE__,        \
                __LINE__)
 
-/* POSIX strnlen is hidden from a strict-ISO consumer (__STRICT_ANSI__) and
-   absent on a few targets, so the inline helpers below use this instead. */
+/** strlen of s, capped at maxlen. POSIX strnlen is hidden from a strict-ISO
+    consumer (__STRICT_ANSI__) and absent on a few targets, so call this. */
 static HTS_INLINE HTS_UNUSED size_t htssafe_strnlen_(const char *s,
                                                      size_t maxlen) {
 #if (defined(_WIN32) || (defined(HAVE_STRNLEN) && !defined(__STRICT_ANSI__)))
@@ -325,7 +327,7 @@ static HTS_INLINE HTS_UNUSED size_t htssafe_strnlen_(const char *s,
 #endif
 }
 
-/** strnlen replacement (autotools), for the engine sources that call it. **/
+/** strnlen() for the targets that lack it, so engine sources may call it. */
 #if (!defined(_WIN32) && !defined(HAVE_STRNLEN))
 
 static HTS_UNUSED size_t strnlen(const char *s, size_t maxlen) {
@@ -333,10 +335,10 @@ static HTS_UNUSED size_t strnlen(const char *s, size_t maxlen) {
 }
 #endif
 
-/* strlen of source, but bounded by sizeof_source (its capacity, NUL included).
-   Aborts if source is NULL or has no NUL within that capacity. The sentinel
-   sizeof_source == (size_t)-1 means "capacity unknown", and falls back to the
-   unbounded strlen (used when the source is a pointer rather than an array). */
+/** strlen of source, bounded by sizeof_source (its capacity, NUL included).
+    Aborts if source is NULL or has no NUL within that capacity. The sentinel
+    sizeof_source == (size_t)-1 means "capacity unknown", and falls back to the
+    unbounded strlen (used when the source is a pointer, not an array). */
 static HTS_INLINE HTS_UNUSED size_t strlen_safe_(const char *source,
                                                  const size_t sizeof_source,
                                                  const char *file, int line) {
@@ -348,11 +350,11 @@ static HTS_INLINE HTS_UNUSED size_t strlen_safe_(const char *source,
   return size;
 }
 
-/* Core bounded append. Appends min(strlen(source), n) bytes of source onto
-   dest. sizeof_dest is dest's total capacity (NUL included); sizeof_source is
-   source's capacity or (size_t)-1 if unknown. Aborts if the result (existing
-   dest length + appended bytes + NUL) would not fit sizeof_dest: this NEVER
-   truncates. Always NUL-terminates on success. */
+/** Core bounded append behind the buff() family. Appends min(strlen(source),
+    n) bytes of source onto dest. sizeof_dest is dest's total capacity (NUL
+    included), and sizeof_source is source's capacity or (size_t)-1 if unknown.
+    Aborts if the result plus its NUL would not fit sizeof_dest, so this NEVER
+    truncates. Always NUL-terminates on success, and returns dest. */
 static HTS_INLINE HTS_UNUSED char *
 strncat_safe_(char *const dest, const size_t sizeof_dest,
               const char *const source, const size_t sizeof_source,
@@ -368,9 +370,9 @@ strncat_safe_(char *const dest, const size_t sizeof_dest,
   return dest;
 }
 
-/* Core bounded copy: empties dest then appends all of source via
-   strncat_safe_. sizeof_dest is dest's total capacity (NUL included). Aborts
-   (no truncation) if source plus its NUL would not fit. */
+/** Core bounded copy behind the buff() family. sizeof_dest is dest's total
+    capacity (NUL included). Aborts rather than truncating if source plus its
+    NUL would not fit, and returns dest. */
 static HTS_INLINE HTS_UNUSED char *
 strcpy_safe_(char *const dest, const size_t sizeof_dest,
              const char *const source, const size_t sizeof_source,
@@ -384,23 +386,21 @@ strcpy_safe_(char *const dest, const size_t sizeof_dest,
 /**
  * htsbuff: a non-owning bounded string builder over a fixed buffer.
  *
- * Companion to the strcpybuff()/strcatbuff() macros for the common case of a
- * cursor walking a buffer of known capacity (building a name into a fixed
- * array, assembling a status line, etc.). It tracks the write position, bounds
- * every write against the real capacity, and aborts on overflow (same contract
- * as the *_safe_ helpers), so the error-prone manual "p += strlen(p)" dance
- * goes away.
- *
- * Build one from an in-scope array with htsbuff_array() (capacity via sizeof,
- * so pass an array, not a pointer), or from a pointer of known capacity with
- * htsbuff_ptr(). The buffer is kept NUL-terminated; htsbuff_str() returns it.
+ * Use it instead of a hand-rolled cursor when appending repeatedly to a buffer
+ * of known capacity. It does not own the buffer, which must outlive it. Every
+ * append ABORTS on overflow like the *_safe_ helpers, so do not build remote
+ * text with it. Create one with htsbuff_array() for an in-scope array or
+ * htsbuff_ptr() for a pointer of known capacity, and read the result back with
+ * htsbuff_str().
  */
 typedef struct {
-  char *buf;  /* backing buffer (kept NUL-terminated) */
-  size_t cap; /* total capacity of buf, including the NUL */
-  size_t len; /* current length, excluding the NUL */
+  char *buf;  /**< backing buffer, kept NUL-terminated */
+  size_t cap; /**< total capacity of buf, including the NUL */
+  size_t len; /**< current length, excluding the NUL */
 } htsbuff;
 
+/** Builder over buf, whose capacity is cap bytes including the NUL. Empties
+    buf, and aborts if cap is 0. */
 static HTS_INLINE HTS_UNUSED htsbuff htsbuff_ptr_(char *buf, size_t cap) {
   htsbuff b;
   b.buf = buf;
@@ -419,7 +419,7 @@ static HTS_INLINE HTS_UNUSED htsbuff htsbuff_ptr_(char *buf, size_t cap) {
  */
 #if (defined(__GNUC__) && !defined(__cplusplus))
 
-/* 0 for an array, a -1 array-size compile error for a pointer. */
+/** It evaluates to 0 for an array, and fails to compile for a pointer. */
 #define htsbuff_must_be_array_(A)                                              \
   (sizeof(char[1 - 2 * !!__builtin_types_compatible_p(__typeof__(A),           \
                                                       __typeof__(&(A)[0]))]) - \
@@ -475,10 +475,11 @@ static HTS_INLINE HTS_UNUSED const char *htsbuff_str(const htsbuff *b) {
 
 /**
  * Copy src into dest (capacity size, NUL included), truncating to fit and
- * always NUL-terminating. Unlike strlcpybuff() it never aborts, so it suits a
- * value read back from a cache, a header or the wire, where refusing the whole
- * record is worse than keeping a clipped one. Returns HTS_TRUE if it all fit;
- * callers that clip on purpose ignore that, so it is not HTS_CHECK_RESULT.
+ * always NUL-terminating. Unlike strlcpybuff() it does not abort on overflow,
+ * so it suits a value read back from a cache, a header or the wire, where
+ * refusing the whole record is worse than keeping a clipped one. Returns
+ * HTS_TRUE if it all fit; callers that clip on purpose ignore that, so it is
+ * not HTS_CHECK_RESULT.
  */
 static HTS_INLINE HTS_UNUSED hts_boolean strclipbuff(char *dest, size_t size,
                                                      const char *src) {
@@ -563,7 +564,8 @@ static HTS_INLINE HTS_UNUSED HTS_PRINTF_FUN(3, 0) hts_boolean
  * Formatted print into dest (capacity size, NUL included), truncating to fit
  * and always NUL-terminating. Returns HTS_TRUE if the whole output fit; the
  * result is the only truncation signal, so it must be acted on. Unlike
- * strcpybuff() it never aborts, so it suits text built from remote input.
+ * strcpybuff() it does not abort on overflow, so it suits text built from
+ * remote input.
  */
 static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT HTS_PRINTF_FUN(3, 4) hts_boolean
     slprintfbuff(char *dest, size_t size, const char *fmt, ...) {
@@ -580,7 +582,7 @@ static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT HTS_PRINTF_FUN(3, 4) hts_boolean
  * Append formatted text at dest[*used] (dest capacity size, NUL included),
  * advancing *used past it. All-or-nothing: on overflow dest is left as it was
  * and HTS_FALSE returned, so a record parsed back field by field never carries
- * a half-written one.
+ * a half-written one. *used must be below size.
  */
 static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT HTS_PRINTF_FUN(4, 5) hts_boolean
     slcatprintfbuff(char *dest, size_t size, size_t *used, const char *fmt,
@@ -641,15 +643,15 @@ static HTS_INLINE HTS_UNUSED HTS_PRINTF_FUN(4, 5) void slcatprintfbuff_clip(
 #define sprintfbuff(ARR, ...) slprintfbuff((ARR), sizeof(ARR), __VA_ARGS__)
 #endif
 
-/* Last character of s, or '\0' when s is empty. Replaces s[strlen(s) - 1],
-   which indexes one byte before the buffer on an empty string. */
+/** Last character of s, or '\0' when s is empty. Replaces s[strlen(s) - 1],
+    which indexes one byte before the buffer on an empty string. */
 static HTS_INLINE HTS_UNUSED char hts_lastchar(const char *s) {
   const size_t len = strlen(s);
 
   return len != 0 ? s[len - 1] : '\0';
 }
 
-/* Drop a trailing c from s if present; HTS_TRUE if one was dropped. */
+/** Drop a trailing c from s if present. HTS_TRUE if one was dropped. */
 static HTS_INLINE HTS_UNUSED hts_boolean hts_striplastchar(char *s, char c) {
   const size_t len = strlen(s);
 
@@ -660,7 +662,8 @@ static HTS_INLINE HTS_UNUSED hts_boolean hts_striplastchar(char *s, char c) {
   return HTS_FALSE;
 }
 
-/* Drop the last character of s whatever it is; HTS_TRUE if s was not empty. */
+/** Drop the last character of s whatever it is. HTS_TRUE if s was not
+    empty. */
 static HTS_INLINE HTS_UNUSED hts_boolean hts_choplastchar(char *s) {
   const size_t len = strlen(s);
 
@@ -671,13 +674,13 @@ static HTS_INLINE HTS_UNUSED hts_boolean hts_choplastchar(char *s) {
   return HTS_FALSE;
 }
 
-/* htslib.h's is_space() and is_realspace() as hts_rtrim() sets; -#test=rtrim
-   keeps them in sync. */
+/** The character sets matching htslib.h's is_space() and is_realspace(), for
+    hts_rtrim(). The -#test=rtrim self-test keeps them in sync. */
 #define HTS_SPACES " \"\n\r\t\f\v'"
 #define HTS_REALSPACES " \n\r\t\f\v"
 
-/* Length of s once its trailing bytes from set are dropped; 0 if they all are.
-   Counts down from the end, so it stops at s rather than below the buffer. */
+/** Length of s with its trailing bytes from set dropped, so 0 when every byte
+    of s is in set. */
 static HTS_INLINE HTS_UNUSED size_t hts_rtrimlen(const char *s,
                                                  const char *set) {
   size_t len = strlen(s);
@@ -687,30 +690,37 @@ static HTS_INLINE HTS_UNUSED size_t hts_rtrimlen(const char *s,
   return len;
 }
 
-/* Drop the trailing bytes of s that occur in set. */
+/** Drop the trailing bytes of s that occur in set. */
 static HTS_INLINE HTS_UNUSED void hts_rtrim(char *s, const char *set) {
   s[hts_rtrimlen(s, set)] = '\0';
 }
 
-/* Offset of the last character of s, or 0 when s is empty. */
+/** Offset of the last character of s, or 0 when s is empty. */
 static HTS_INLINE HTS_UNUSED size_t hts_lastcharoffset(const char *s) {
   const size_t len = strlen(s);
 
   return len != 0 ? len - 1 : 0;
 }
 
-/* Address of the last character of S, or of its terminating NUL when S is
-   empty. S is evaluated twice, so pass an lvalue. */
+/** Address of the last character of S, or of its terminating NUL when S is
+    empty. S is evaluated twice, so pass a plain lvalue. */
 #define hts_lastcharptr(S) ((S) + hts_lastcharoffset(S))
 
-/* Thin aliases over the libc allocator/memcpy (historical "t" suffix); no
-   added bounds checking. freet() also NULLs the freed pointer and tolerates
-   NULL. memcpybuff() despite the name is a raw memcpy: the caller owns the
-   bounds. */
+/* The "t" suffix is historical. These are aliases over libc and add no bounds
+   checking. Engine sources call them rather than libc directly, test and
+   selftest code included. */
+
+/** Allocate A bytes, uninitialised. Returns NULL when out of memory. */
 #define malloct(A) malloc(A)
 
+/** Allocate A elements of B bytes, zeroed, keeping calloc's argument order.
+    Returns NULL when out of memory. */
 #define calloct(A, B) calloc((A), (B))
 
+/**
+ * Free A and set it to NULL, doing nothing when A is already NULL. A must be a
+ * plain lvalue, because the macro reads it twice and then assigns to it.
+ */
 #define freet(A)                                                               \
   do {                                                                         \
     if ((A) != NULL) {                                                         \
@@ -719,10 +729,15 @@ static HTS_INLINE HTS_UNUSED size_t hts_lastcharoffset(const char *s) {
     }                                                                          \
   } while (0)
 
+/** Copy string A onto the heap. The caller owns the copy and releases it with
+    freet(). Returns NULL when out of memory. */
 #define strdupt(A) strdup(A)
 
+/** Resize A to B bytes. Returns NULL when out of memory and A then stays
+    allocated, so test the result before overwriting A with it. */
 #define realloct(A, B) realloc(A, B)
 
+/** Raw memcpy despite the name, and the caller owns the bounds. */
 #define memcpybuff(A, B, N) memcpy((A), (B), (N))
 
 #endif

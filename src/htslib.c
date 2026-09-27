@@ -4628,7 +4628,7 @@ HTSEXT_API char *unescape_http(char *const catbuff, const size_t size, const cha
 
 // unescape in URL/URI ONLY what has to be escaped, to form a standard URL/URI
 // DOES NOT DECODE %25 (part of CHAR_DELIM)
-// no_high & 1: decode high chars
+// no_high & 1: keep high chars (>= 127) escaped
 // no_high & 2: decode space
 HTSEXT_API char *unescape_http_unharm(char *const catbuff, const size_t size,
                                       const char *s,
