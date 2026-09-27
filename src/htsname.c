@@ -1565,8 +1565,26 @@ int url_savename(lien_adrfilsave *const afs,
   /* convert name to UTF-8 ? Note: already done while parsing. */
 
   /* callback */
-  RUN_CALLBACK5(opt, savename, adr_complete, fil_complete, referer_adr,
-                referer_fil, afs->save);
+  {
+    /* The hook rewrites afs->save where it is and nothing sanitizes it after,
+       so keep the engine's own name when the hook's would leave the mirror.
+       Refused rather than collapsed, because an absolute name has no "../" to
+       drop. was_contained spares a user's own -N template, which may be
+       absolute. */
+    char BIGSTK contained_save[HTS_URLMAXSIZE * 2];
+    const hts_boolean was_contained = hts_path_is_relative_contained(afs->save);
+
+    strcpybuff(contained_save, afs->save);
+    RUN_CALLBACK5(opt, savename, adr_complete, fil_complete, referer_adr,
+                  referer_fil, afs->save);
+    if (was_contained && !hts_path_is_relative_contained(afs->save)) {
+      hts_log_print(opt, LOG_WARNING,
+                    "engine: save-name: the hook returned \"%s\", which leaves "
+                    "the mirror, so the engine keeps \"%s\"",
+                    afs->save, contained_save);
+      strcpybuff(afs->save, contained_save);
+    }
+  }
 
   hts_log_print(opt, LOG_DEBUG, "engine: save-name: local name: %s%s -> %s",
                 adr, fil, afs->save);

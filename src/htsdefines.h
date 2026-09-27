@@ -270,9 +270,9 @@ typedef int (*t_hts_htmlcheck_xfrstatus)(t_hts_callbackarg *carg, httrackp *opt,
 /** Fires with the local path the engine computed for a URL. @p save holds that
     path and may be rewritten in place, within HTS_URLMAXSIZE*2 bytes and
     leaving 64 for the collision suffix and the ".delayed" marker the engine may
-    still append. The engine strips "../" before this hook and not after, so a
-    path written here can leave the mirror directory. The return value is
-    ignored. */
+    still append. A path written here that would leave the mirror directory is
+    discarded and the engine's own name is used instead, whether it leaves by a
+    ".." component or by being absolute. The return value is ignored. */
 typedef int (*t_hts_htmlcheck_savename)(t_hts_callbackarg *carg, httrackp *opt,
                                         const char *adr_complete,
                                         const char *fil_complete,
