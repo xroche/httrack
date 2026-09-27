@@ -62,13 +62,23 @@ EXTERNAL_FUNCTION int hts_plug(httrackp * opt, const char *argv) {
     fprintf(stderr, "example: httrack --wrapper callback,apple,orange,lemon\n");
     return 0;
   } else {
-    t_my_userdef *userdef = (t_my_userdef *) malloc(sizeof(t_my_userdef));      /* userdef */
-    char *const stringfilter = userdef->stringfilter;
-    char **const stringfilters = userdef->stringfilters;
+    t_my_userdef *userdef;
+    const size_t maxfilters =
+        sizeof(userdef->stringfilters) / sizeof(userdef->stringfilters[0]);
+    char *stringfilter, **stringfilters, *a;
+    size_t i = 0;
 
-    /* */
-    char *a = stringfilter;
-    int i = 0;
+    if (strlen(arg) >= sizeof(userdef->stringfilter)) {
+      fprintf(stderr, "** callback error: keyword list too long (max %d)\n",
+              (int) sizeof(userdef->stringfilter) - 1);
+      return 0;
+    }
+    userdef = (t_my_userdef *) malloc(sizeof(t_my_userdef)); /* userdef */
+    if (userdef == NULL)
+      return 0;
+    stringfilter = userdef->stringfilter;
+    stringfilters = userdef->stringfilters;
+    a = stringfilter;
 
     fprintf(stderr, "** info: wrapper_init(%s) called!\n", arg);
     fprintf(stderr,
@@ -76,7 +86,8 @@ EXTERNAL_FUNCTION int hts_plug(httrackp * opt, const char *argv) {
 
     /* stringfilters = split(arg, ','); */
     strcpy(stringfilter, arg);
-    while(a != NULL) {
+    /* one slot stays free for the NULL the list ends with */
+    while (a != NULL && i + 1 < maxfilters) {
       stringfilters[i] = a;
       a = strchr(a, ',');
       if (a != NULL) {
