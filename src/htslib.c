@@ -5670,18 +5670,30 @@ void hts_dns_set_resolver_backend(const hts_resolver_backend *backend) {
    its chain (its own freeaddrinfo), so a synthesized and a delegated result
    free the same way. */
 
-/* Deep-copy a libc addrinfo chain into our own allocations. */
+static void HTS_RESOLVER_CALL override_freeaddrinfo(struct addrinfo *res);
+
+/* Deep-copy a libc addrinfo chain into our own allocations, or NULL if one of
+   them failed: the caller cannot hand a half-copied chain back as success. */
 static struct addrinfo *resolver_dup_chain(const struct addrinfo *src) {
   struct addrinfo *head = NULL, *tail = NULL;
 
   for (; src != NULL; src = src->ai_next) {
-    struct addrinfo *const ai = calloct(1, sizeof(*ai));
+    struct addrinfo *ai = calloct(1, sizeof(*ai)); /* freet() needs an lvalue */
 
+    if (ai == NULL) {
+      override_freeaddrinfo(head);
+      return NULL;
+    }
     ai->ai_family = src->ai_family;
     ai->ai_socktype = src->ai_socktype;
     ai->ai_protocol = src->ai_protocol;
     ai->ai_addrlen = src->ai_addrlen;
     ai->ai_addr = malloct(src->ai_addrlen);
+    if (ai->ai_addr == NULL) {
+      freet(ai);
+      override_freeaddrinfo(head);
+      return NULL;
+    }
     memcpy(ai->ai_addr, src->ai_addr, src->ai_addrlen);
     if (head == NULL)
       head = ai;
@@ -5707,9 +5719,15 @@ static struct addrinfo *resolver_make_ai(const char *ip, int want_family) {
       return NULL;
     sa6.sin6_family = AF_INET6;
     ai = calloct(1, sizeof(*ai));
+    if (ai == NULL)
+      return NULL;
     ai->ai_family = AF_INET6;
     ai->ai_addrlen = sizeof(sa6);
     ai->ai_addr = malloct(sizeof(sa6));
+    if (ai->ai_addr == NULL) {
+      freet(ai);
+      return NULL;
+    }
     memcpy(ai->ai_addr, &sa6, sizeof(sa6));
   } else { // IPv4 literal
     struct sockaddr_in sa;
@@ -5721,9 +5739,15 @@ static struct addrinfo *resolver_make_ai(const char *ip, int want_family) {
       return NULL;
     sa.sin_family = AF_INET;
     ai = calloct(1, sizeof(*ai));
+    if (ai == NULL)
+      return NULL;
     ai->ai_family = AF_INET;
     ai->ai_addrlen = sizeof(sa);
     ai->ai_addr = malloct(sizeof(sa));
+    if (ai->ai_addr == NULL) {
+      freet(ai);
+      return NULL;
+    }
     memcpy(ai->ai_addr, &sa, sizeof(sa));
   }
   return ai;
@@ -5783,7 +5807,7 @@ static int HTS_RESOLVER_CALL override_getaddrinfo(const char *node,
       return gerr;
     *res = resolver_dup_chain(sys);
     freeaddrinfo(sys);
-    return 0;
+    return *res != NULL ? 0 : EAI_MEMORY;
   }
 }
 

@@ -730,17 +730,33 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
             const char *const path_html = StringBuff(opt->path_html_utf8);
             const size_t pathLen = strlen(path_html);
             /* an X-Save that already carries the path is taken as-is */
-            const char *const prefix =
-                (pathLen != 0 &&
-                 strncmp(previous_save_, path_html, pathLen) != 0)
-                    ? path_html
-                    : "";
+            const hts_boolean carries_path =
+                pathLen != 0 &&
+                strncmp(previous_save_, path_html, pathLen) == 0;
+            const char *const prefix = carries_path ? "" : path_html;
             size_t used = 0;
 
+            /* The cache is a file on disk like any other, so a forged X-Save
+               must not steer the fexist at :799, the read at :989 or the rename
+               at :846 out of the mirror. An absolute name is only the pre-3.40
+               shape when it already lies under the root, and there only what
+               follows the root is untrusted; anything else has to be relative,
+               because with no -O the root is "" (htsback.c:77) and an absolute
+               name would then be used verbatim. */
+            if (carries_path
+                    ? !hts_path_is_contained(previous_save_ + pathLen)
+                    : !hts_path_is_relative_contained(previous_save_)) {
+              hts_log_print(opt, LOG_WARNING,
+                            "cached filename leaving the mirror, "
+                            "not using the cache entry: %s%s",
+                            adr, fil);
+              r.statuscode = STATUSCODE_INVALID;
+              strcpybuff(r.msg, "Cache Read Error : Bad Filename");
+            }
             /* refuse the entry: a clipped name would point at a file we never
                stored */
-            if (!slcatprintfbuff(previous_save, sizeof(previous_save), &used,
-                                 "%s%s", prefix, previous_save_)) {
+            else if (!slcatprintfbuff(previous_save, sizeof(previous_save),
+                                      &used, "%s%s", prefix, previous_save_)) {
               hts_log_print(opt, LOG_WARNING,
                             "cached filename too long once rebuilt under '%s', "
                             "not using the cache entry: %s%s",
@@ -927,11 +943,11 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
                     }
                   }
 
+#ifndef _WIN32
+                  (void) fchmod(fileno(r.out), HTS_ACCESS_FILE);
+#endif
                   fclose(r.out);
                   r.out = NULL;
-#ifndef _WIN32
-                  chmod(target_save, HTS_ACCESS_FILE);
-#endif
                 } else {
                   r.statuscode = STATUSCODE_INVALID;
                   strcpybuff(r.msg,

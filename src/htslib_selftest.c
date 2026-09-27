@@ -34,6 +34,9 @@ Please visit our Website: http://www.httrack.com
 #include "htsselftest_int.h"
 
 #include <stdint.h>
+#ifndef _WIN32
+#include <sys/wait.h> /* the forking sigterm self-test reaps its children */
+#endif
 
 /* very minimalistic internal tests */
 static void basic_selftests(void) {
@@ -2145,9 +2148,272 @@ static int st_strsprintf(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+#ifndef _WIN32
+/* Point both output streams at fd, raise code, and hand back the errno the
+   handler left behind, or 0 if it put the caller's back. */
+static int sig_raise_on(int code, int fd) {
+  static const int sentinel = 0x5167;
+  int saved_out, saved_err, leaked;
+
+  fflush(stdout);
+  fflush(stderr);
+  saved_out = dup(1);
+  saved_err = dup(2);
+  assertf(saved_out != -1 && saved_err != -1);
+  assertf(dup2(fd, 1) != -1 && dup2(fd, 2) != -1);
+  errno = sentinel;
+  assertf(raise(code) == 0);
+  leaked = errno;
+  assertf(dup2(saved_out, 1) != -1 && dup2(saved_err, 2) != -1);
+  close(saved_out);
+  close(saved_err);
+  return leaked == sentinel ? 0 : leaked;
+}
+
+/* httrack.c's own handlers, reached here because main() installs them before
+   any self-test runs. SIGTSTP is left out: sig_back() either suspends the
+   process or forks it into the background. */
+static int st_sighandlers(httrackp *opt, int argc, char **argv) {
+  static const struct {
+    int code;
+    const char *name;
+    const char *says; /* what the user must still be told, NULL if silent */
+    hts_boolean with_code; /* the line ends with the signal number and a ')' */
+  } cases[] = {
+      {SIGCHLD, "SIGCHLD", NULL, HTS_FALSE},
+      {SIGPIPE, "SIGPIPE", NULL, HTS_FALSE},
+      {SIGTERM, "SIGTERM", "Exit requested to engine (signal ", HTS_TRUE},
+      {SIGINT, "SIGINT",
+       "** Finishing pending transfers.. press again ^C to quit.", HTS_FALSE}};
+
+  /* a descriptor no write can succeed on, so a leaked errno shows */
+  const int readonly = open("/dev/null", O_RDONLY);
+  FILE *const capture = tmpfile();
+  int capfd;
+  int err = 0;
+  size_t i;
+
+  (void) argc;
+  (void) argv;
+  assertf(readonly != -1);
+  assertf(capture != NULL);
+  capfd = fileno(capture);
+  assertf(capfd != -1);
+
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    const int code = cases[i].code;
+    int pass;
+
+    /* Twice: on the refusing descriptor, where a leaked errno shows, and on a
+       file, where what the handler wrote can be read back. */
+    for (pass = 0; pass < 2; pass++) {
+      const int fd = pass == 0 ? readonly : capfd;
+      char captured[512];
+      ssize_t got;
+      void (*installed)(int);
+      int leaked;
+
+      /* the control: a disposition main() never touched proves nothing below */
+      installed = signal(code, SIG_DFL);
+      assertf(installed != SIG_ERR);
+      assertf(signal(code, installed) == SIG_DFL);
+      if (installed == SIG_DFL || installed == SIG_IGN) {
+        printf("  FAIL: %s carries no handler to exercise\n", cases[i].name);
+        err = 1;
+        break;
+      }
+      /* sig_leave() only takes its own branch during a mirror; outside one it
+         ends the process, which is what the second ^C is for */
+      if (code == SIGINT)
+        opt->state._hts_in_mirror = 1;
+      /* the handler writes at the shared offset, so rewind as well as empty */
+      assertf(ftruncate(capfd, 0) == 0);
+      assertf(lseek(capfd, 0, SEEK_SET) == 0);
+
+      leaked = sig_raise_on(code, fd);
+      if (leaked != 0) {
+        printf("  FAIL: the %s handler left errno at %d\n", cases[i].name,
+               leaked);
+        err = 1;
+      }
+      /* and it still did its job */
+      if (code == SIGTERM && opt->state.exit_xh != 1) {
+        printf("  FAIL: SIGTERM did not ask the engine to exit\n");
+        err = 1;
+      }
+      if (code == SIGINT && !opt->state.stop) {
+        printf("  FAIL: SIGINT did not ask the mirror to stop\n");
+        err = 1;
+      }
+      opt->state._hts_in_mirror = 0;
+      opt->state.exit_xh = 0;
+      opt->state.stop = 0;
+      /* sig_finish() and sig_leave() re-arm to the terminating handler, so the
+         next raise would end the process instead of testing it */
+      assertf(signal(code, installed) != SIG_ERR);
+
+      if (pass == 0)
+        continue;
+      assertf(lseek(capfd, 0, SEEK_SET) == 0);
+      got = read(capfd, captured, sizeof(captured) - 1);
+      assertf(got >= 0);
+      captured[got] = '\0';
+      if (cases[i].says == NULL) {
+        if (got != 0) {
+          printf("  FAIL: %s is meant to be silent, but wrote \"%s\"\n",
+                 cases[i].name, captured);
+          err = 1;
+        }
+      } else {
+        char want[256];
+
+        if (cases[i].with_code)
+          snprintf(want, sizeof(want), "%s%d)", cases[i].says, code);
+        else
+          snprintf(want, sizeof(want), "%s", cases[i].says);
+        if (strstr(captured, want) == NULL) {
+          printf("  FAIL: %s wrote \"%s\" instead of \"%s\"\n", cases[i].name,
+                 captured, want);
+          err = 1;
+        }
+      }
+    }
+  }
+  close(readonly);
+  fclose(capture);
+  printf("sighandlers self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+#endif
+
+#ifndef _WIN32
+/* Raised by the child's atexit hook below. */
+static int sigterm_atexit_fd = -1;
+
+static void sigterm_atexit_marker(void) {
+  const char c = 'A';
+
+  (void) (write(sigterm_atexit_fd, &c, 1) == 1);
+}
+
+/* The ^C that terminates must not run the atexit chain: OpenSSL registers its
+   teardown there, and freeing thousands of objects in handler context can
+   deadlock on the malloc lock the interrupted thread holds. Each case forks,
+   because the handler it exercises ends the process. */
+static int st_sigterm(httrackp *opt, int argc, char **argv) {
+  static const struct {
+    const char *name;
+    int in_mirror; /* sig_leave() only defers while a mirror runs */
+    int raises;
+  } cases[] = {{"a ^C outside a mirror", 0, 1},
+               {"the second ^C during a mirror", 1, 2}};
+
+  int err = 0;
+  size_t i;
+
+  (void) argc;
+  (void) argv;
+
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    FILE *const errs = tmpfile();
+    char marker[8], said[512];
+    int fds[2], status = -1;
+    ssize_t got;
+    pid_t pid;
+
+    assertf(errs != NULL);
+    assertf(pipe(fds) == 0);
+    fflush(NULL); /* nothing buffered for the child to flush or to drop */
+    pid = fork();
+    assertf(pid != -1);
+    if (pid == 0) {
+      int n;
+
+      close(fds[0]);
+      sigterm_atexit_fd = fds[1];
+      /* an unarmed hook would make every exit() look like _exit() */
+      if (atexit(sigterm_atexit_marker) != 0)
+        _exit(71);
+      if (dup2(fileno(errs), 2) == -1)
+        _exit(72);
+      opt->state._hts_in_mirror = cases[i].in_mirror;
+      for (n = 0; n < cases[i].raises; n++) {
+        if (raise(SIGINT) != 0)
+          _exit(73);
+      }
+      _exit(74); /* the handler returned, so it terminated nothing */
+    }
+    close(fds[1]);
+    got = read(fds[0], marker, sizeof(marker));
+    assertf(got >= 0);
+    close(fds[0]);
+    assertf(waitpid(pid, &status, 0) == pid);
+
+    if (!WIFEXITED(status)) {
+      /* SIG_DFL would land here, and then the case below proves nothing */
+      printf("  FAIL: %s killed the child by signal %d instead of exiting\n",
+             cases[i].name, WIFSIGNALED(status) ? WTERMSIG(status) : -1);
+      err = 1;
+    } else if (WEXITSTATUS(status) != 0) {
+      printf("  FAIL: %s left the child at exit code %d\n", cases[i].name,
+             WEXITSTATUS(status));
+      err = 1;
+    } else if (got != 0) {
+      printf("  FAIL: %s ran the atexit chain\n", cases[i].name);
+      err = 1;
+    }
+    /* and the user is still told, so safety was not bought with silence */
+    rewind(errs);
+    got = (ssize_t) fread(said, 1, sizeof(said) - 1, errs);
+    assertf(got >= 0);
+    said[got] = '\0';
+    if (strstr(said, "Program terminated") == NULL) {
+      printf("  FAIL: %s said \"%s\" instead of naming the termination\n",
+             cases[i].name, said);
+      err = 1;
+    }
+    fclose(errs);
+  }
+  printf("sigterm self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+#endif
+
 /* ------------------------------------------------------------ */
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
+
+static int st_pathcontained(httrackp *opt, int argc, char **argv) {
+  /* A ".." COMPONENT escapes; ".." inside a name does not. A plain strstr()
+     would reject all of the "contained" rows below. */
+  static const char *const escaping[] = {
+      "..",       "../x",      "a/../b", "a/..",    "/..", "..\\x",
+      "a\\..\\b", "x/../../y", "./../x", "a//../b", NULL};
+  static const char *const contained[] = {"a..b",  "..a",   "a..",    "...",
+                                          "a/b.c", "a/...", "a/b..c", ".",
+                                          "",      "a/./b", NULL};
+  int failures = 0;
+  size_t i;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (i = 0; escaping[i] != NULL; i++) {
+    if (hts_path_is_contained(escaping[i])) {
+      printf("pathcontained: '%s' was accepted\n", escaping[i]);
+      failures++;
+    }
+  }
+  for (i = 0; contained[i] != NULL; i++) {
+    if (!hts_path_is_contained(contained[i])) {
+      printf("pathcontained: '%s' was refused\n", contained[i]);
+      failures++;
+    }
+  }
+  if (failures == 0)
+    printf("pathcontained: OK\n");
+  return failures != 0;
+}
 
 const struct selftest_entry selftests_lib[] = {
     {"hashtable", "<count|file>", "coucal hashtable stress test", st_hashtable},
@@ -2156,6 +2422,9 @@ const struct selftest_entry selftests_lib[] = {
     {"strsprintf", "", "StringSprintf grows to fit at every capacity boundary",
      st_strsprintf},
     {"arena", "", "htsarena.h hands out addresses that never move", st_arena},
+    {"pathcontained", "",
+     "a \"..\" path component is refused and a \"..\" inside a name is not",
+     st_pathcontained},
     {"arrays", "[overflow-capa|overflow-loop]",
      "htsarrays.h growth reaches the requested room, or reports it failed",
      st_arrays},
@@ -2177,5 +2446,12 @@ const struct selftest_entry selftests_lib[] = {
     {"structcheck", "<dir>",
      "structcheck path guard and the <name>.txt rename it performs",
      st_structcheck},
+#ifndef _WIN32
+    {"sighandlers", "",
+     "the signal handlers save errno and write with no locking output",
+     st_sighandlers},
+    {"sigterm", "", "the terminating ^C handler runs no atexit hook",
+     st_sigterm},
+#endif
     {NULL, NULL, NULL, NULL},
 };

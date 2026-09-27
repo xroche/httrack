@@ -1,0 +1,48 @@
+#!/bin/bash
+#
+# A signal handler may only write() and put errno back. httrack's handlers did
+# neither: printf takes a lock on stdout, so a ^C arriving while the mirror held
+# that lock deadlocked, and hts_log_print allocated on top of it.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+skip_on_windows "the handlers this drives are the POSIX set, and neither shell can raise them in a native httrack.exe"
+
+rc=0
+out=$(httrack -O /dev/null '-#test=sighandlers' 2>&1) || rc=$?
+# Named, because SIGBUS is 7 on x86 and 10 on hppa, and the name is the finding.
+test "$rc" -lt 128 ||
+    fail "the engine died on SIG$(kill -l $((rc - 128))): $out"
+test "$rc" = 0 || fail "-#test=sighandlers exited $rc: $out"
+grep -q 'sighandlers self-test: OK' <<<"$out" ||
+    fail "the self-test's own verdict is missing: $out"
+ok "the signal handlers keep errno and write with no locking output"
+
+# The self-test raises the signals, so it cannot see a handler that never gets
+# installed. Read the installation back instead, and pair it with the two
+# SIG_DFL/SIG_IGN dispositions the file also sets, so a sweep matching
+# everything proves nothing.
+src=${top_srcdir:-..}/src
+handlers=$(sed -n '/^static void signal_handlers/,/^}/p' "$src/httrack.c")
+test -n "$handlers" || fail "signal_handlers() is gone from $src/httrack.c"
+for pair in SIGINT:sig_leave SIGTERM:sig_finish SIGPIPE:sig_brpipe \
+    SIGCHLD:sig_ignore SIGTSTP:sig_back; do
+    command grep -q "signal(${pair%%:*}, ${pair##*:})" <<<"$handlers" ||
+        fail "${pair%%:*} no longer reaches ${pair##*:}, so the self-test raises nothing"
+done
+
+# And no handler may print through a stream: one lock away from a deadlock.
+region=$(sed -n '/^\/\/ Signal handlers/,/^static void signal_handlers/p' "$src/httrack.c")
+test -n "$region" || fail "the handler block is gone from $src/httrack.c"
+bad=$(command grep -cE '\b(printf|fprintf|fputs|fwrite|fflush|puts|hts_log_print)\s*\(' \
+    <<<"$region" || true)
+test "$bad" = 0 ||
+    fail "$bad stream call(s) left in the handlers: $(command grep -nE '\b(printf|fprintf|fputs|fwrite|fflush|puts|hts_log_print)\s*\(' <<<"$region")"
+# the control: the sweep does see a call in that region
+command grep -q 'sig_print(' <<<"$region" ||
+    fail "the sweep read a region with no sig_print() in it, so it saw nothing"
+ok "no handler writes through a FILE stream"
+exit 0
