@@ -14,9 +14,13 @@ cleanup_push rm -rf "$work"
 
 # Port 1 answers nothing, so nothing is fetched: the backing table is built
 # before any request, which is the whole path under test.
+# The capped table is far larger than any allocator will serve, and ASan aborts
+# on a request that big rather than failing it, so it needs telling (446 does the
+# same). The engine's own answer to a refused table is the log line read below.
 run() { # run DIR MAXSOC
     rm -rf "$2"
-    httrack -O "$1" '-%!' "-c$2" 'http://127.0.0.1:1/never' >/dev/null 2>&1 || true
+    ASAN_OPTIONS="${ASAN_OPTIONS-}${ASAN_OPTIONS:+:}allocator_may_return_null=1" \
+        httrack -O "$1" '-%!' "-c$2" 'http://127.0.0.1:1/never' >/dev/null 2>&1 || true
     test -r "$1/hts-log.txt" || fail "no log for -c$2"
 }
 

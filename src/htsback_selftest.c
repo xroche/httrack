@@ -623,6 +623,12 @@ static int st_backnew(httrackp *opt, int argc, char **argv) {
   }
   back_free(&sback);
 
+  /* A count whose back_max + 1 is not an int is refused before any allocation:
+     htscore.c caps -cN for exactly this, and the sum used to be signed UB. */
+  if (back_new(opt, INT_MAX) != NULL || back_new(opt, -1) != NULL) {
+    printf("backnew: FAILED (a count it cannot express was accepted)\n");
+    return 1;
+  }
 #ifndef _WIN32
   {
     struct rlimit saved, tight;

@@ -35,6 +35,7 @@ Please visit our Website: http://www.httrack.com
 
 #include <fcntl.h>
 #include <ctype.h>
+#include <limits.h> /* INT_MAX, capping the backing table's size */
 #include <stdint.h> /* uint64_t for the pause mixer (already a hard dep via md5.h) */
 
 /* File defs */
@@ -1106,9 +1107,11 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
     /* How many HTML files may sit in memory at once. Sized generously: HTML
        takes little room and everything else is written straight to disk.
        --bypass-limits leaves -cN unclamped, and the multiply is what overflows
-       first, so cap the count rather than the product. */
-    const int back_max =
-        opt->maxsoc < (INT_MAX - 1024) / 32 ? opt->maxsoc * 32 + 1024 : INT_MAX;
+       first, so cap the count rather than the product. back_new() sizes its
+       tables back_max + 1, hence INT_MAX - 1 and not INT_MAX. */
+    const int back_max = opt->maxsoc < (INT_MAX - 1024) / 32
+                             ? opt->maxsoc * 32 + 1024
+                             : INT_MAX - 1;
 
 #if BDEBUG==2
     _CLRSCR;

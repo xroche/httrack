@@ -107,8 +107,14 @@ static hts_boolean back_is_live(const int status);
    aborting the process: back_max grows with -cN, so the size is the user's. */
 struct_back *back_new(httrackp *opt, int back_max) {
   int i;
-  struct_back *sback = calloct(1, sizeof(struct_back));
+  struct_back *sback;
 
+  /* Both tables below are sized back_max + 1, so a count this side of INT_MAX
+     is the most that sum can express. Refuse the rest rather than overflow it.
+   */
+  if (back_max < 0 || back_max == INT_MAX)
+    return NULL;
+  sback = calloct(1, sizeof(struct_back));
   if (sback == NULL)
     return NULL;
   sback->count = back_max;
