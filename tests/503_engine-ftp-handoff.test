@@ -14,8 +14,8 @@ set -euo pipefail
 assert_selftest "ftp-handoff-selftest: OK" ftphandoff
 
 # The run cannot see a missing release or acquire on x86, which never reorders
-# these two accesses, and no CI leg builds ThreadSanitizer, which would. So
-# guard the ordering in the source text instead. Both the call sites and the
+# these two accesses. So guard the ordering in the source text, which holds on
+# every leg and not only the ThreadSanitizer one. Both the call sites and the
 # helpers they call have to hold, because gutting either alone brings the race
 # back.
 body_of() { # body_of FUNCTION FILE
