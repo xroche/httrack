@@ -68,6 +68,8 @@ typedef struct htsblk htsblk;
 #ifdef HTS_INTERNAL_BYTECODE
 
 // create/destroy
+/* Slots for maxsoc connections, clamped to what back_new() can size. */
+int back_max_slots(int maxsoc);
 struct_back *back_new(httrackp *opt, int back_max);
 void back_free(struct_back ** sback);
 

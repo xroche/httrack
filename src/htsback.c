@@ -102,6 +102,18 @@ static hts_mirror_limit back_mirror_limit(httrackp *opt);
 static hts_boolean back_mirror_capped(const httrackp *opt);
 static hts_boolean back_is_live(const int status);
 
+/* Slots for maxsoc connections, clamped to what back_new() can size: it builds
+   two tables of back_max + 1, so INT_MAX itself is one too many. Total on
+   purpose, so a self-test can check it without allocating anything: -cN is
+   unclamped under --bypass-limits, and maxsoc * 32 used to overflow. */
+int back_max_slots(int maxsoc) {
+  if (maxsoc <= 0)
+    return 1024;
+  if (maxsoc >= (INT_MAX - 1024) / 32)
+    return INT_MAX - 1;
+  return maxsoc * 32 + 1024;
+}
+
 /* NULL when the slot table cannot be allocated, which httpmirror() already
    answers by aborting the mirror with a message. Failing here rather than
    aborting the process: back_max grows with -cN, so the size is the user's. */
