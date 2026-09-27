@@ -1,0 +1,81 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+: "${top_srcdir:=..}"
+
+# A real worker thread hands its backlog slot back and back_wait() reaps it. The
+# run catches the lifetime failures: a worker left on the live list, a slot never
+# handed back, and a handoff that slipped past a held list.
+assert_selftest "ftp-handoff-selftest: OK" ftphandoff
+
+# The run cannot see a missing release or acquire on x86, which never reorders
+# these two accesses, and no CI leg builds ThreadSanitizer, which would. So
+# guard the ordering in the source text instead. Both the call sites and the
+# helpers they call have to hold, because gutting either alone brings the race
+# back.
+body_of() { # body_of FUNCTION FILE
+    awk "/^[A-Za-z_].*[ *]$1\\(/,/^}/" "$2"
+}
+
+# The consumer: one acquire read, and no plain read of the same word beside it.
+body=$(body_of back_ftp_handed_back "$top_srcdir/src/htsback.c")
+case "$body" in
+*"hts_load_acquire_int(&back->status)"*) ;;
+*)
+    echo "FAIL: back_ftp_handed_back() no longer reads the status with an acquire"
+    exit 1
+    ;;
+esac
+case "${body//hts_load_acquire_int(&back->status)/}" in
+*"back->status"*)
+    echo "FAIL: back_ftp_handed_back() also reads the status plainly"
+    exit 1
+    ;;
+esac
+
+# The producer: a release store, under the worker-list lock, never a plain one.
+body=$(body_of ftp_worker_release "$top_srcdir/src/htsftp.c")
+case "$body" in
+*"hts_store_release_int(&worker->pBack->status, STATUS_FTP_READY)"*) ;;
+*)
+    echo "FAIL: ftp_worker_release() no longer publishes with a release store"
+    exit 1
+    ;;
+esac
+case "$body" in
+*"pBack->status ="*)
+    echo "FAIL: ftp_worker_release() publishes the status plainly"
+    exit 1
+    ;;
+esac
+case "${body%%hts_store_release_int*}" in
+*"hts_mutexlock(&ftp_workers_mutex)"*) ;;
+*)
+    echo "FAIL: ftp_worker_release() publishes before taking the worker list"
+    exit 1
+    ;;
+esac
+
+# The helpers themselves: the ordering on gcc and clang, and on MSVC the
+# volatile access MemoryBarrier() fences.
+check_helper() { # check_helper FUNCTION ORDER
+    local body
+    body=$(body_of "$1" "$top_srcdir/src/htsthread.h")
+    for want in "$2" "volatile int"; do
+        case "$body" in
+        *"$want"*) ;;
+        *)
+            echo "FAIL: $1() no longer carries $want"
+            exit 1
+            ;;
+        esac
+    done
+}
+
+check_helper hts_store_release_int __ATOMIC_RELEASE
+check_helper hts_load_acquire_int __ATOMIC_ACQUIRE
