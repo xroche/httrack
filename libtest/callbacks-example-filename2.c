@@ -125,10 +125,10 @@ static int mysavename(t_hts_callbackarg * carg, httrackp * opt,
   char *const string1 = userdef->string1;
   char *const string2 = userdef->string2;
 
-  /* All "save" promises is HTS_URLMAXSIZE bytes, and its real size is not
-     passed in, so build into a buffer of that size and refuse a name that
-     would not fit: a clipped save name collides with another file. */
-  char out[HTS_URLMAXSIZE];
+  /* "save" is lien_adrfilsave's own field, HTS_URLMAXSIZE * 2 (htscore.h), and
+     its size is not passed in. Build into that same width and refuse a name
+     that would not fit, because a clipped save name collides with another. */
+  char out[HTS_URLMAXSIZE * 2];
   size_t used = 0;
   char *buff, *a;
 

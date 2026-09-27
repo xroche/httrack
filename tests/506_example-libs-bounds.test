@@ -87,4 +87,85 @@ bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
     --found 'plain/basic.html' \
     httrack 'BASEURL/simple/basic.html' --wrapper "${f2},simple,plain"
 
-echo "example wrappers refuse over-long arguments, and the rename still works"
+# ---------------------------------------------------------------------------
+# Runtime probes. The argument checks above cannot reach the copies that take
+# the ENGINE's buffers, and those are what a crawled page fills. No crawl can
+# overflow them: the engine caps a link at HTS_URLMAXSIZE and both destinations
+# are twice that. So these assert what is left to get wrong, which is the engine
+# surviving the rewrite and the join coming back whole.
+# ---------------------------------------------------------------------------
+
+bl=$(resolve "${BASELINKS_LIB}") || skip "nothing built at ${BASELINKS_LIB}.so"
+ll=$(resolve "${LISTLINKS_LIB}") || skip "nothing built at ${LISTLINKS_LIB}.so"
+
+# A relative href, so no BASEURL substitution is needed inside the fixture, and
+# 200 bytes, which the filesystem can still store as a name. The engine drops any
+# link past HTS_URLMAXSIZE before a wrapper sees it anyway (measured: 926 arrives,
+# 1000 does not), and both destinations here are HTS_URLMAXSIZE * 2, so no crawl
+# can drive these copies past their buffers. What a probe can still catch is the
+# join coming back truncated.
+longseg=$(printf 'L%.0s' $(seq 200))
+probe="$work/site"
+mkdir -p "$probe"
+cat >"$probe/index.html" <<HTML
+<html><body>
+<a href="plain.html">plain</a>
+<a href="${longseg}.html">long</a>
+</body></html>
+HTML
+printf '<html><body>plain</body></html>\n' >"$probe/plain.html"
+# The long-named file is itself a page with a link, because what listlinks
+# stores is the URL of the page it is PARSING, printed later next to each link
+# that page yielded. A short page would never put the long name in that field.
+printf '<html><body><a href="plain.html">p</a></body></html>\n' \
+    >"$probe/${longseg}.html"
+
+# baselinks rewrites every absolute link, the seed included, so nothing mirrors
+# and local-crawl.sh would have no host root to check. Run it directly and assert
+# the engine still exits normally with a 488-byte base prepended to every link.
+longbase="http://$(printf 'b%.0s' $(seq 480))/"
+real_python=$(find_python) || skip "python3 missing"
+python=$real_python # freeport reads it from here
+port=$(freeport) || fail "no free port"
+"$real_python" -m http.server "$port" --bind 127.0.0.1 \
+    --directory "$probe" >/dev/null 2>&1 &
+srv=$!
+cleanup_push stop_server "$srv"
+up=
+for _ in $(seq 100); do
+    if "$real_python" -c "import socket,sys
+s = socket.socket()
+s.settimeout(0.2)
+sys.exit(0 if s.connect_ex(('127.0.0.1', $port)) == 0 else 1)"; then
+        up=1
+        break
+    fi
+    poll_wait 0.1
+done
+test -n "$up" || fail "the fixture server never came up on port $port"
+
+rc=0
+httrack "http://127.0.0.1:$port/index.html" -O "$work/bl" \
+    --wrapper "${bl},${longbase}" -r2 >"$work/bl.out" 2>&1 || rc=$?
+# Over 128 means a signal: an abort or a smashed stack, which is the regression.
+test "$rc" -lt 128 ||
+    fail "baselinks died on signal $((rc - 128)) ($(kill -l $((rc - 128)) 2>/dev/null)) rewriting a long link"
+grep -q 'Thanks for using HTTrack' "$work/bl.out" ||
+    fail "the engine did not finish its run: $(tail -3 "$work/bl.out")"
+
+# listlinks joins url_address and url_file into one field and prints the result,
+# so its own output is what shows the join surviving whole. sizeof() there has to
+# name the field, because the local is a pointer alias and would clip to 7 bytes.
+bash "$top_srcdir/tests/local-crawl.sh" --root "$probe" \
+    --stdout-found "${longseg:0:150}[^]]*\] ->" \
+    --found 'plain.html' \
+    httrack 'BASEURL/index.html' --wrapper "${ll}," -r2
+
+# filename2 rewrote the save name in place and grew it on every match, so a
+# one-byte search string and a 200-byte replacement multiply over a long path.
+longrepl=$(printf 'R%.0s' $(seq 200))
+bash "$top_srcdir/tests/local-crawl.sh" --root "$probe" \
+    --found 'plain.html' \
+    httrack 'BASEURL/index.html' --wrapper "${f2},q,${longrepl}" -r2
+
+echo "example wrappers refuse over-long arguments, survive a long crawled link, and the rename still works"

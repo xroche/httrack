@@ -86,6 +86,8 @@ TESTS_ENVIRONMENT += CHANGECONTENT_LIB=$(abs_top_builddir)/libtest/$(LT_CV_OBJDI
 # that used to overflow their fields.
 TESTS_ENVIRONMENT += FILENAME2_LIB=$(abs_top_builddir)/libtest/$(LT_CV_OBJDIR)/libfilename2
 TESTS_ENVIRONMENT += CONTENTFILTER_LIB=$(abs_top_builddir)/libtest/$(LT_CV_OBJDIR)/libcontentfilter
+TESTS_ENVIRONMENT += BASELINKS_LIB=$(abs_top_builddir)/libtest/$(LT_CV_OBJDIR)/libbaselinks
+TESTS_ENVIRONMENT += LISTLINKS_LIB=$(abs_top_builddir)/libtest/$(LT_CV_OBJDIR)/liblistlinks
 TESTS_ENVIRONMENT += RENAMEFAIL_LA=$(abs_builddir)/librenamefail.la
 TESTS_ENVIRONMENT += RENAMEFAIL_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/librenamefail.so
 TESTS_ENVIRONMENT += UNLINKFAIL_LA=$(abs_builddir)/libunlinkfail.la
