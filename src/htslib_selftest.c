@@ -2286,8 +2286,7 @@ static int st_sighandlers(httrackp *opt, int argc, char **argv) {
 }
 #endif
 
-/* ------------------------------------------------------------ */
-/* Registry: this module's tests, in the order -#test lists them. */
+#ifndef _WIN32
 /* Raised by the child's atexit hook below. */
 static int sigterm_atexit_fd = -1;
 
@@ -2378,7 +2377,10 @@ static int st_sigterm(httrackp *opt, int argc, char **argv) {
   printf("sigterm self-test: %s\n", err ? "FAIL" : "OK");
   return err;
 }
+#endif
 
+/* ------------------------------------------------------------ */
+/* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
 
 const struct selftest_entry selftests_lib[] = {
