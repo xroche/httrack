@@ -29,6 +29,7 @@ Please visit our Website: http://www.httrack.com
 /* File: Global engine definition file                          */
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
+
 /** @file htsconfig.h
     Fixed compile-time tuning constants of the crawler engine. Configure probes
     none of them, so a consumer reads the values the library was built with. */

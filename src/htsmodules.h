@@ -30,6 +30,7 @@ Please visit our Website: http://www.httrack.com
 /*       external modules (parsers)                             */
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
+
 /** @file htsmodules.h
     Loadable-parser (external module) interface. The engine describes one
     downloaded object in a htsmoduleStruct, and the module reports the links it

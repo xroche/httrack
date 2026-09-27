@@ -64,20 +64,12 @@ typedef struct String String;
 #define HTS_DEF_STRUCT_String
 
 /**
- * Growable string. The String owns its buffer and frees it in StringFree().
- *
- * The buffer is allocated on the first write. A String initialized with
- * STRING_EMPTY or StringInit(), and one just freed or acquired, has no buffer
- * at all, so StringBuff() returns NULL rather than "". An operation that writes
- * content leaves it NUL-terminated at buffer_[length_], but StringRoomTotal()
- * and StringSetLength() write no terminator, so neither leaves a readable C
- * string behind.
- *
- * Any growing operation may move the buffer, so a pointer read through
- * StringBuff() or StringBuffRW() stops being valid at the next append, copy or
- * room request.
- *
- * Reach the fields through the macros below, never directly.
+ * Growable string, whose buffer is allocated on the first write. A String
+ * initialized with STRING_EMPTY or StringInit(), and one just freed or
+ * acquired, has no buffer at all, so StringBuff() returns NULL rather than "".
+ * An operation that writes content leaves it NUL-terminated at
+ * buffer_[length_], but StringRoomTotal() and StringSetLength() write no
+ * terminator, so neither leaves a readable C string behind.
  */
 struct String {
   char *buffer_;    /**< owned content, NULL until the first write */

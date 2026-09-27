@@ -427,10 +427,10 @@ typedef int hts_tristate;
 /* Byte counts, file sizes and offsets, exactly 64 bits and signed. -1 means
    "unknown" or "no limit" in the fields and returns that accept it. */
 typedef int64_t LLint;
-/* A time value, exactly 64 bits and signed. The producer fixes the unit:
-   time_local() gives seconds since the Unix epoch, mtime_local()
-   milliseconds since it, and mtime_monotonic() milliseconds from an
-   unspecified origin, comparable only against itself. */
+/* A time value, exactly 64 bits and signed. The producer fixes the unit: some
+   fields hold seconds since the Unix epoch, mtime_local() milliseconds since
+   it, and mtime_monotonic() milliseconds from an unspecified origin, comparable
+   only against itself. */
 typedef int64_t TStamp;
 /* printf conversion for an LLint or a TStamp, '%' included, because PRId64 has
    none: "X: " LLintP. */

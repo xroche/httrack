@@ -163,20 +163,22 @@ typedef const char *(*t_hts_htmlcheck_query)(t_hts_callbackarg *carg,
     is the text to show. Answer "N", "NO" or "NON" in any case and hts_main2()
     returns 0 without mirroring. Any other answer, an empty one, or NULL
     continues. The engine asks nothing when opt->quiet is set, which -q
-    (--quiet) does, and which is the default when stdout is not a terminal. */
+    (--quiet) does, and which on POSIX also defaults on when stdout is not a
+    terminal. */
 typedef const char *(*t_hts_htmlcheck_query2)(t_hts_callbackarg *carg,
                                               httrackp *opt,
                                               const char *question);
 
 /** Asks the user what to do with a link that falls outside the mirror scope,
     while -W (--mirror-wizard) is on. @p question is that link, as "host/path".
-    The answer is read as a number. These drop the link and add a filter that
-    also drops what the number names: 0 the link alone, 1 its directory and
-    below, 2 its whole host. These take the link: 4 takes the page but follows
-    no link inside it, 5 its directory and below (its whole host when the mirror
-    may go up), 6 its whole host, 7 the files of its directory. An empty answer
-    counts as 0, and "*" drops the link and stops the questions. Anything the
-    engine cannot read drops the link and records the refusal. */
+    The answer is read as a number. Answers 0 to 3 drop the link, and all but 3
+    also add a filter: 0 drops the link alone, 1 its directory and below, 2 its
+    whole host. Answers 4 to 7 take the link: 4 the page but no link inside it,
+    5 its directory and below (its whole host when the mirror may go up), 6 its
+    whole host, 7 the files of its directory. An empty answer counts as 0, "*"
+    drops the link and stops the questions, and 50 does nothing. A non-numeric
+    answer drops the link and records the refusal, while a number this list does
+    not name leaves the engine's own verdict alone. */
 typedef const char *(*t_hts_htmlcheck_query3)(t_hts_callbackarg *carg,
                                               httrackp *opt,
                                               const char *question);
@@ -192,7 +194,8 @@ typedef const char *(*t_hts_htmlcheck_query3)(t_hts_callbackarg *carg,
     array of @p back_max transfer slots and @p back_index the slot this tick is
     about, or -1 for none. Despite their names, @p lien_tot carries the index of
     the link the engine is working on and @p lien_ntot the number of links
-    queued. @p stat_time is the seconds since the mirror started. Both @p back
+    queued. @p stat_time is the seconds since the mirror started, or the seconds
+    still to wait during a -#u scheduled start. Both @p back
     and @p stats can be NULL on the ticks fired before the mirror is under way.
     Return 0 to stop the mirror. */
 typedef int (*t_hts_htmlcheck_loop)(t_hts_callbackarg *carg, httrackp *opt,
@@ -203,8 +206,8 @@ typedef int (*t_hts_htmlcheck_loop)(t_hts_callbackarg *carg, httrackp *opt,
 /** Decides whether a link may be fetched, as the engine picks it up from a page
     or follows a redirect, before any transfer. @p adr is the host, @p fil the
     path, and @p status the engine's own verdict so far, where 0 accepts,
-    1 refuses and -1 means undecided. Return the verdict the engine should
-    keep, in that same encoding, or -1 to leave the engine's own alone. */
+    1 refuses and -1 means undecided. Return the verdict to use, in that
+    encoding, or -1 to leave the engine's own alone. */
 typedef int (*t_hts_htmlcheck_check_link)(t_hts_callbackarg *carg,
                                           httrackp *opt, const char *adr,
                                           const char *fil, int status);
@@ -221,9 +224,9 @@ typedef int (*t_hts_htmlcheck_check_mime)(t_hts_callbackarg *carg,
                                           int status);
 
 /** Fires when the mirror pauses, either because an hts-stop.lock appeared in
-    the output directory or because -G (--max-pause) capped the bytes fetched.
-    The engine has written @p lockfile and does not wait by itself, so block
-    here until that file is gone. */
+    the output directory or because the mirror reached the -G (--max-pause) byte
+    count. The engine has written @p lockfile and does not wait by itself, so
+    block here until that file is gone. */
 typedef void (*t_hts_htmlcheck_pause)(t_hts_callbackarg *carg, httrackp *opt,
                                       const char *lockfile);
 
@@ -257,9 +260,10 @@ typedef int (*t_hts_htmlcheck_linkdetected2)(t_hts_callbackarg *carg,
                                              httrackp *opt, char *link,
                                              const char *tag_start);
 
-/** Fires once per finished transfer, whether it succeeded or failed, but not
-    for the engine's own type-test requests. @p back holds that slot's result.
-    The return value is ignored. */
+/** Fires once per transfer that carried an HTTP status, so a 404 and a 500
+    reach it. A transfer that failed in transport does not, because those carry
+    a negative HTTrack status code, and nor do the engine's own type-test
+    requests. @p back holds that slot's result. The return value is ignored. */
 typedef int (*t_hts_htmlcheck_xfrstatus)(t_hts_callbackarg *carg, httrackp *opt,
                                          lien_back *back);
 

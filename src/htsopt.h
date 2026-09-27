@@ -468,14 +468,16 @@ struct httrackp {
   t_proxy proxy;       /**< proxy configuration (-P, -%b) */
   hts_savename_83 savename_83; /**< saved-name length layout (-LN) */
   /** Saved-name layout preset (-N), or -1 for the savename_userdef template.
-      `% 100` picks the tree: 0 site structure, 1 and 2 split off images/ and
-      html/, 4 and 5 split by extension, 99 gives random names, and every
-      other value keeps the file name alone. An odd hundreds digit names the
-      top directory after the host rather than "web", and an odd thousands
-      digit drops that top directory. Site structure has no "web", so it
-      reads no hundreds digit beyond the literal 100, which drops the host
-      directory. -1 is also the only value spared the forced ".html" on an
-      extensionless name. */
+      `% 100` picks the tree: 0 site structure, 1 splits off images/, 2 splits
+      off both images/ and html/, 4 and 5 split by extension, 99 gives random
+      names, and every other value keeps the file name alone. An odd hundreds
+      digit names the top directory after the host rather than "web", and an
+      odd thousands digit drops that top directory. Site structure has no
+      "web", so it reads no hundreds digit beyond the literal 100, which drops
+      the host directory. An extensionless name is forced to ".html" for every
+      preset but -1, and only while savename_delayed is not
+      HTS_SAVENAME_DELAYED_HARD, which is the default, so a default run forces
+      nothing. */
   int savename_type;
   String savename_userdef; /**< name template, e.g. %h%p/%n%q.%t (-N) */
   hts_savename_delayed savename_delayed; /**< delayed type-check policy (-%N) */
@@ -523,7 +525,7 @@ struct httrackp {
   int maxcache;             /**< max bytes of transfers held in memory */
   hts_boolean ftp_proxy;    /**< use the HTTP proxy for FTP too (-%f) */
   String filelist;          /**< file holding extra URLs, one per line (-%L) */
-  String urllist;           /**< unused */
+  String urllist;           /**< never filled */
   htsfilters filters;       /**< the +/- filter rules in force */
   hash_struct *hash;        /**< URL lookup tables, live while a mirror runs */
   lien_url **liens;         /**< the links, NULL-terminated */

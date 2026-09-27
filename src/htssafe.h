@@ -35,14 +35,15 @@ Please visit our Website: http://www.httrack.com
  * Safe string helpers, the fatal-assert machinery, and the "t" allocator
  * wrappers the engine uses instead of raw libc.
  *
- * Pick a helper by its overflow behaviour. The buff() family and the htsbuff
- * builder ABORT the process on overflow, but only when the destination is an
- * array rather than a bare char*, for the reason the size contract below gives.
- * Aborting is right for data we built ourselves and wrong for a value read off
- * the wire, out of a cache or out of a header, because it turns a memory smash
- * into a crash on malformed input. Clip such a value instead, with
- * strclipbuff() or slprintfbuff(), or from the buff() family with
- * dest[0] = '\0'; strlncatbuff(dest, src, size, size - 1).
+ * Pick a helper by its overflow behaviour. The buff() family ABORTS the process
+ * on overflow, though only when the destination is an array and not a bare
+ * char*, for the reason the size contract below gives. The htsbuff builder
+ * aborts either way. Aborting is right for data we built ourselves and wrong
+ * for a value read off the wire, out of a cache or out of a header, because it
+ * turns a memory smash into a crash on malformed input. Clip such a value
+ * instead, with strclipbuff() or slprintfbuff(), or from the buff() family with
+ * dest[0] = '\0'; strlncatbuff(dest, src, size, size - 1). The clip helpers
+ * still abort on a NULL buffer or a zero size, so check a computed size first.
  */
 
 #ifndef HTSSAFE_DEFH
@@ -205,7 +206,9 @@ static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
  * family): the destination bound is taken from sizeof(A), so A MUST be a real
  * char[] array in scope. The bound is the full array size in bytes, INCLUDING
  * the terminating NUL. On overflow the *_safe_ helpers do NOT truncate: they
- * abort() (assertf). On success the result is always NUL-terminated.
+ * abort() (assertf). The destination must already be NUL-terminated inside its
+ * capacity, because its length is measured first, and an unterminated one
+ * aborts too. On success the result is always NUL-terminated.
  *
  * CRITICAL CAVEAT: if A is a bare char* pointer (not an array), sizeof(A) is
  * the pointer size, not the buffer capacity. There is no way to recover the
@@ -472,10 +475,11 @@ static HTS_INLINE HTS_UNUSED const char *htsbuff_str(const htsbuff *b) {
 
 /**
  * Copy src into dest (capacity size, NUL included), truncating to fit and
- * always NUL-terminating. Unlike strlcpybuff() it never aborts, so it suits a
- * value read back from a cache, a header or the wire, where refusing the whole
- * record is worse than keeping a clipped one. Returns HTS_TRUE if it all fit;
- * callers that clip on purpose ignore that, so it is not HTS_CHECK_RESULT.
+ * always NUL-terminating. Unlike strlcpybuff() it does not abort on overflow,
+ * so it suits a value read back from a cache, a header or the wire, where
+ * refusing the whole record is worse than keeping a clipped one. Returns
+ * HTS_TRUE if it all fit; callers that clip on purpose ignore that, so it is
+ * not HTS_CHECK_RESULT.
  */
 static HTS_INLINE HTS_UNUSED hts_boolean strclipbuff(char *dest, size_t size,
                                                      const char *src) {
@@ -511,7 +515,8 @@ static HTS_INLINE HTS_UNUSED HTS_PRINTF_FUN(3, 0) hts_boolean
  * Formatted print into dest (capacity size, NUL included), truncating to fit
  * and always NUL-terminating. Returns HTS_TRUE if the whole output fit; the
  * result is the only truncation signal, so it must be acted on. Unlike
- * strcpybuff() it never aborts, so it suits text built from remote input.
+ * strcpybuff() it does not abort on overflow, so it suits text built from
+ * remote input.
  */
 static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT HTS_PRINTF_FUN(3, 4) hts_boolean
     slprintfbuff(char *dest, size_t size, const char *fmt, ...) {
@@ -528,7 +533,7 @@ static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT HTS_PRINTF_FUN(3, 4) hts_boolean
  * Append formatted text at dest[*used] (dest capacity size, NUL included),
  * advancing *used past it. All-or-nothing: on overflow dest is left as it was
  * and HTS_FALSE returned, so a record parsed back field by field never carries
- * a half-written one.
+ * a half-written one. *used must be below size.
  */
 static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT HTS_PRINTF_FUN(4, 5) hts_boolean
     slcatprintfbuff(char *dest, size_t size, size_t *used, const char *fmt,

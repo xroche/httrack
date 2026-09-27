@@ -167,7 +167,8 @@ HTSEXT_API void htsthread_wait(void);
 /** hts_main()/hts_main2() exit code for a mirror that started and then gave up,
     for example on a write it cannot retry or on a link table it cannot grow
     past -#L. A failure before any mirror starts returns -1 or 1 instead, and a
-    mirror that met --max-time or --max-size returns 0. */
+    mirror that met --max-time or --max-size returns 0. The value is 3 to stay
+    clear of the 2 hts_is_exiting() reports for a run that saw no connection. */
 #define HTS_EXIT_MIRROR_ABORTED 3
 
 /** Run a full mirror from a command-line argv (argv[0] is ignored, as in
@@ -477,8 +478,8 @@ HTSEXT_API const char *infostatuscode_const(int statuscode);
 HTSEXT_API TStamp mtime_local(void);
 
 /** Format a duration @p t (in seconds) into a compact string in @p st, for
-    example "3d,02h,04min05s". @p st is caller-allocated and not bounds-checked.
- */
+    example "3d,02h,04min05s". @p st is caller-allocated and not bounds-checked,
+    and that example is not the worst case, so give it 32 bytes. */
 HTSEXT_API void qsec2str(char *st, TStamp t);
 
 /* The int2* helpers below write into the caller-supplied strc and return

@@ -139,8 +139,8 @@ SOCaddr_sinport_(SOCaddr *const addr, const char *file, const int line) {
   }
 }
 
-/** Length of the active sockaddr, or 0 for any other family. The 0 doubles as
-    the not-valid test. */
+/** Returns the active sockaddr's length, 0 for any other family. That 0
+    doubles as the not-valid test. */
 static HTS_INLINE HTS_UNUSED socklen_t SOCaddr_size_(const SOCaddr *const addr,
                                                      const char *file,
                                                      const int line) {
