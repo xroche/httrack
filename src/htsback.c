@@ -3752,24 +3752,35 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             if (back[i].rateout > 0) {  // le taux de transfert de base sur le début de la connexion
               back[i].rateout_time = back[i].ka_time_start;
             }
+            int sent;
+
             // envoyer header
             HTS_STAT.stat_nrequests++;
             if (!back[i].head_request)
-              http_sendhead(opt, opt->cookie, 0, back[i].send_too,
-                            back[i].url_adr, back[i].url_fil,
-                            back[i].referer_adr, back[i].referer_fil,
-                            &back[i].r);
+              sent = http_sendhead(opt, opt->cookie, 0, back[i].send_too,
+                                   back[i].url_adr, back[i].url_fil,
+                                   back[i].referer_adr, back[i].referer_fil,
+                                   &back[i].r);
             else if (back[i].head_request == 2) // test en GET!
-              http_sendhead(opt, opt->cookie, 0, back[i].send_too,
-                            back[i].url_adr, back[i].url_fil,
-                            back[i].referer_adr, back[i].referer_fil,
-                            &back[i].r);
+              sent = http_sendhead(opt, opt->cookie, 0, back[i].send_too,
+                                   back[i].url_adr, back[i].url_fil,
+                                   back[i].referer_adr, back[i].referer_fil,
+                                   &back[i].r);
             else                // test!
-              http_sendhead(opt, opt->cookie, 1, back[i].send_too,
-                            back[i].url_adr, back[i].url_fil,
-                            back[i].referer_adr, back[i].referer_fil,
-                            &back[i].r);
-            back[i].status = STATUS_WAIT_HEADERS;        // attendre en tête maintenant
+              sent = http_sendhead(opt, opt->cookie, 1, back[i].send_too,
+                                   back[i].url_adr, back[i].url_fil,
+                                   back[i].referer_adr, back[i].referer_fil,
+                                   &back[i].r);
+            /* Nothing went out and the socket is already closed, so polling it
+               would only replace the reason http_sendhead() gave with a generic
+               "Receive Error" (#1822). */
+            if (sent < 0) {
+              back[i].r.statuscode = STATUSCODE_CONNERROR;
+              back[i].status = STATUS_READY;
+              back_set_finished(opt, sback, i);
+            } else {
+              back[i].status = STATUS_WAIT_HEADERS; // now wait for the headers
+            }
           }
         }
         // attente gethostbyname
