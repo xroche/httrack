@@ -877,7 +877,9 @@ static void sig_ignore(int code) {      // ignorer signal
 }
 static void sig_term(int code) {        // quitter brutalement
   fprintf(stderr, "\nProgram terminated (signal %d)\n", code);
-  exit(0);
+  /* _exit, not exit: exit() runs OpenSSL's atexit teardown here, whose free()
+     can deadlock on the malloc lock the interrupted thread holds. */
+  _exit(0);
 }
 static void sig_finish(int code) {      // finir et quitter
   signal(code, sig_term);       // quitter si encore
