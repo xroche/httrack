@@ -1,0 +1,95 @@
+#!/bin/bash
+#
+# X-Save is a filename read back out of a cache the process did not write. It is
+# joined to a root and then opened, renamed, and for ProxyTrack served to a
+# client, so a name that walks out of that root reaches other files. The engine
+# half is driven by htscache_selftest.c's cache-corrupt cases; this file covers
+# ProxyTrack, whose archive no self-test builds.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+# shellcheck source=tests/arclib.sh
+. "${0%"${0##*/}"}./arclib.sh"
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+refused='leaving the store' # the reader's verdict on a name it refuses
+
+BODY='<html>hi</html>'
+# A forged line must keep the block's byte length, which the zip's extra-field
+# header declares, so give the writer a long Etag to overwrite.
+etag=$(printf '%0.sE' $(seq 1 60))
+etagline="Etag: \"$etag\""
+printf 'HTTP/1.0 200 OK\r\nContent-type: text/html\r\nEtag: "%s"\r\nContent-length: %d\r\n\r\n' \
+    "$etag" ${#BODY} >"$dir/hdr"
+printf '%s' "$BODY" >"$dir/body"
+{
+    arc_filedesc
+    arc_record http://example.com/p.html text/html 200 "$dir/hdr" "$dir/body"
+} >"$dir/in.arc"
+
+proxytrack --convert "$dir/good.zip" "$dir/in.arc" >/dev/null 2>&1 ||
+    fail "proxytrack died writing the cache"
+
+# overwrite a literal in place; same length, so every zip offset still holds
+poke() {
+    local file=$1 needle=$2 repl=$3 offs
+    test ${#needle} -eq ${#repl} ||
+        fail "poke: '$needle' and the replacement differ in length"
+    offs=$(grep -abo -F -- "$needle" "$file") || fail "poke: '$needle' not in $file"
+    test "$(printf '%s\n' "$offs" | wc -l)" -eq 1 ||
+        fail "poke: '$needle' is not unique in $file"
+    printf '%s' "$repl" |
+        dd of="$file" bs=1 seek="${offs%%:*}" conv=notrunc 2>/dev/null
+}
+
+# The parser keeps the last X-Save seen, so the forged line replaces the Etag;
+# the colon-free pad after it is skipped, restoring the block's length.
+forge_save() {
+    local out=$1 value=$2 line pad
+    cp "$dir/good.zip" "$out"
+    line="X-Save: $value"$'\r\n'
+    test "${#line}" -le "${#etagline}" ||
+        fail "forge_save: '$value' does not fit the line it replaces"
+    pad=$(printf "%$((${#etagline} - ${#line}))s" '' | tr ' ' 'E')
+    poke "$out" "$etagline" "$line$pad"
+}
+
+read_back() {
+    proxytrack --convert "$dir/out.arc" "$1" >/dev/null 2>&1 ||
+        fail "proxytrack died reading $1"
+}
+
+# Control: without it, a guard that refused every entry would pass the rest.
+read_back "$dir/good.zip"
+grep -qF "$BODY" "$dir/out.arc" || fail "an untouched cache lost its body"
+if grep -q "$refused" "$dir/out.arc"; then
+    fail "an untouched cache was refused, so a refusal below proves nothing"
+fi
+
+# An ordinary relative name is what the engine stores, and it must still pass.
+forge_save "$dir/plain.zip" 'example.com/p.html'
+read_back "$dir/plain.zip"
+if grep -q "$refused" "$dir/out.arc"; then
+    fail "a relative cached name was refused"
+fi
+
+# A ".." component walks out of the store the name is joined to.
+for value in '../outside.html' 'a/../../outside' '..'; do
+    forge_save "$dir/esc.zip" "$value"
+    read_back "$dir/esc.zip"
+    grep -q "$refused" "$dir/out.arc" ||
+        fail "a cached name of '$value' was accepted"
+done
+
+# Narrowing control: ".." inside a name is a name, not an escape.
+forge_save "$dir/dots.zip" 'a..b/p.html'
+read_back "$dir/dots.zip"
+if grep -q "$refused" "$dir/out.arc"; then
+    fail "'a..b/p.html' was refused, so the guard rejects ordinary names"
+fi
+
+echo "ProxyTrack refuses a cached name that leaves the store, and keeps the rest"
