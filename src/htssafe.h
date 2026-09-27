@@ -492,7 +492,8 @@ static HTS_INLINE HTS_UNUSED hts_boolean strclipbuff(char *dest, size_t size,
   return copy == len ? HTS_TRUE : HTS_FALSE;
 }
 
-#define IS_PATH_SEP(c) ((c) == '/' || (c) == '\\')
+/* This header is installed, so the name carries the project prefix. */
+#define HTS_IS_PATH_SEP(c) ((c) == '/' || (c) == '\\')
 
 /**
  * True if path holds no ".." component, either separator counting. Lexical
@@ -505,17 +506,39 @@ hts_path_is_contained(const char *path) {
   const char *s;
 
   for (s = path; *s != '\0';) {
-    while (IS_PATH_SEP(*s)) {
+    while (HTS_IS_PATH_SEP(*s)) {
       s++;
     }
-    if (s[0] == '.' && s[1] == '.' && (s[2] == '\0' || IS_PATH_SEP(s[2]))) {
+    if (s[0] == '.' && s[1] == '.' && (s[2] == '\0' || HTS_IS_PATH_SEP(s[2]))) {
       return HTS_FALSE;
     }
-    while (*s != '\0' && !IS_PATH_SEP(*s)) {
+    while (*s != '\0' && !HTS_IS_PATH_SEP(*s)) {
       s++;
     }
   }
   return HTS_TRUE;
+}
+
+/**
+ * True if path is a relative name that no ".." component can walk out of: what
+ * a filename read back out of a cache has to be before it is joined to a root.
+ * Refusing ".." alone is not enough, because with no -O that root is "" and an
+ * absolute cached name is then used verbatim. Spelled as ProxyTrack's own
+ * readers already spell it, plus the backslash Windows also takes. Letters are
+ * ranged rather than isalpha() so this header needs no <ctype.h>.
+ */
+static HTS_INLINE HTS_UNUSED hts_boolean
+hts_path_is_relative_contained(const char *path) {
+  if (HTS_IS_PATH_SEP(path[0])) {
+    return HTS_FALSE;
+  }
+  /* a drive prefix names its own root, "c:rel" included */
+  if (((path[0] >= 'A' && path[0] <= 'Z') ||
+       (path[0] >= 'a' && path[0] <= 'z')) &&
+      path[1] == ':') {
+    return HTS_FALSE;
+  }
+  return hts_path_is_contained(path);
 }
 
 /**

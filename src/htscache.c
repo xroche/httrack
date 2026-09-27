@@ -730,18 +730,22 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
             const char *const path_html = StringBuff(opt->path_html_utf8);
             const size_t pathLen = strlen(path_html);
             /* an X-Save that already carries the path is taken as-is */
-            const char *const prefix =
-                (pathLen != 0 &&
-                 strncmp(previous_save_, path_html, pathLen) != 0)
-                    ? path_html
-                    : "";
+            const hts_boolean carries_path =
+                pathLen != 0 &&
+                strncmp(previous_save_, path_html, pathLen) == 0;
+            const char *const prefix = carries_path ? "" : path_html;
             size_t used = 0;
 
-            /* The cache is a file on disk like any other. A forged X-Save must
-               not steer the read at :977 or the rename at :827 out of the
-               mirror; only the untrusted half is checked, because the user's
-               own -O may legitimately start with "..". */
-            if (!hts_path_is_contained(previous_save_)) {
+            /* The cache is a file on disk like any other, so a forged X-Save
+               must not steer the fexist at :799, the read at :989 or the rename
+               at :846 out of the mirror. An absolute name is only the pre-3.40
+               shape when it already lies under the root, and there only what
+               follows the root is untrusted; anything else has to be relative,
+               because with no -O the root is "" (htsback.c:77) and an absolute
+               name would then be used verbatim. */
+            if (carries_path
+                    ? !hts_path_is_contained(previous_save_ + pathLen)
+                    : !hts_path_is_relative_contained(previous_save_)) {
               hts_log_print(opt, LOG_WARNING,
                             "cached filename leaving the mirror, "
                             "not using the cache entry: %s%s",

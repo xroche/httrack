@@ -1941,6 +1941,12 @@ int cache_corruption_selftest(httrackp *opt, const char *dir) {
   failures += corrupt_case_zip(
       opt, "X-Save: victim.html", "X-Save: ../vic.html", 1, 1,
       "Cache Read Error : Bad Filename", "X-Save escaping the mirror");
+  /* An ABSOLUTE name needs refusing too, and ".." is not how it escapes: with
+     no -O the root is "" and the cached name would be used verbatim. Eleven
+     bytes either way, which is what lets corrupt_patch swap them. */
+  failures += corrupt_case_zip(
+      opt, "X-Save: victim.html", "X-Save: /etc/passwd", 1, 1,
+      "Cache Read Error : Bad Filename", "X-Save naming an absolute path");
   /* smashed local file header: the entry is dropped at index load */
   corrupt_build(opt, "");
   corrupt_patch_bytes(opt, "PK\x03\x04", 4, "XK\x03\x04", 2, 2, HTS_FALSE);

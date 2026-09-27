@@ -1219,7 +1219,17 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
               if (index->fixedPath > 0) {
                 int saveLen = (int) strlen(previous_save_);
 
-                if (index->fixedPath < saveLen) {
+                /* The suffix is what gets joined, so it is what must be
+                   checked: the guard above saw the whole string, and "/a../b"
+                   hides a
+                   "../b" behind a first component that is not "..". */
+                if (index->fixedPath < saveLen &&
+                    !hts_path_is_relative_contained(previous_save_ +
+                                                    index->fixedPath)) {
+                  PT_Element_failf(r, "Cache filename leaving the store: %s",
+                                   previous_save_);
+                  r->statuscode = STATUSCODE_INVALID;
+                } else if (index->fixedPath < saveLen) {
                   snprintf(previous_save, sizeof(previous_save), "%s%s",
                            index->path, previous_save_ + index->fixedPath);
                 } else {
@@ -1972,7 +1982,16 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
             if (index->fixedPath > 0) {
               int saveLen = (int) strlen(previous_save_);
 
-              if (index->fixedPath < saveLen) {
+              /* The suffix is what gets joined, so it is what must be checked:
+                 the guard above saw the whole string, and "/a../b" hides a
+                 "../b" behind a first component that is not "..". */
+              if (index->fixedPath < saveLen &&
+                  !hts_path_is_relative_contained(previous_save_ +
+                                                  index->fixedPath)) {
+                PT_Element_failf(r, "Cache filename leaving the store: %s",
+                                 previous_save_);
+                r->statuscode = STATUSCODE_INVALID;
+              } else if (index->fixedPath < saveLen) {
                 snprintf(previous_save, sizeof(previous_save), "%s%s",
                          index->path, previous_save_ + index->fixedPath);
               } else {
