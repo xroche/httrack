@@ -127,6 +127,10 @@ static mock_host mock_hosts[] = {
    worker is still inside the backend while the test reads the counters. */
 static htsmutex mock_lock = HTSMUTEX_INIT;
 static int mock_finished = 0; /* backend calls that have returned */
+/* Uses of the backend that can no longer read hts_resolver: a worker reads it
+   again to free its answer, long after getaddrinfo() returned, so that is what
+   a swap has to wait for. */
+static int mock_released = 0;
 
 static mock_host *mock_find(const char *name) {
   for (size_t i = 0; i < sizeof(mock_hosts) / sizeof(mock_hosts[0]); i++) {
@@ -141,6 +145,7 @@ static void mock_reset_calls(void) {
   for (size_t i = 0; i < sizeof(mock_hosts) / sizeof(mock_hosts[0]); i++)
     mock_hosts[i].calls = 0;
   mock_finished = 0;
+  mock_released = 0;
   hts_mutexrelease(&mock_lock);
 }
 
@@ -163,13 +168,14 @@ static int mock_read_finished(void) {
   return n;
 }
 
-/* Wait for n backend calls to return, ordering their writes against ours. */
-static void mock_wait_finished(int n) {
+/* Wait for n uses of the backend to be over, ordering their writes against
+   ours: what makes installing another backend safe. */
+static void mock_wait_released(int n) {
   for (;;) {
     hts_boolean done;
 
     hts_mutexlock(&mock_lock);
-    done = (mock_finished >= n) ? HTS_TRUE : HTS_FALSE;
+    done = (mock_released >= n) ? HTS_TRUE : HTS_FALSE;
     hts_mutexrelease(&mock_lock);
     if (done)
       break;
@@ -244,11 +250,16 @@ static int HTS_RESOLVER_CALL mock_getaddrinfo(const char *node,
 
   hts_mutexlock(&mock_lock);
   mock_finished++;
+  if (*res == NULL) /* nothing to free, so this caller is done with us */
+    mock_released++;
   hts_mutexrelease(&mock_lock);
   return ret;
 }
 
 static void HTS_RESOLVER_CALL mock_freeaddrinfo(struct addrinfo *res) {
+  hts_mutexlock(&mock_lock);
+  mock_released++;
+  hts_mutexrelease(&mock_lock);
   while (res != NULL) {
     struct addrinfo *const next = res->ai_next;
 
@@ -728,9 +739,8 @@ int dns_timeout_selftests(httrackp *opt) {
   }
 
   /* Four of the six resolves were abandoned mid-backend; wait for their
-     workers to leave it before returning. The backend stays installed: an
-     abandoned worker still reads it (to free its addrinfo). */
-  mock_wait_finished(6);
+     workers to be out of it, freed answer included, before swapping it. */
+  mock_wait_released(6);
 
   /* A worker a recovered fault cut short hands its verdict back at once. Left
      to the caller, the wait runs to the deadline, and an unbounded one runs
@@ -746,6 +756,9 @@ int dns_timeout_selftests(httrackp *opt) {
                                         MOCK_SLOW_MS / 1000, &cancel, &err);
     elapsed = mtime_monotonic() - start;
     hts_set_thread_runner(NULL);
+    /* the cut worker longjmps out of the backend after freeing its answer, so
+       it too has to be out before the swap below */
+    mock_wait_released(1);
     hts_dns_set_resolver_backend(&mock_backend);
     CHECK(count == 0);
     CHECK(elapsed < MOCK_SLOW_MS / 2); /* the tail answered, not the deadline */

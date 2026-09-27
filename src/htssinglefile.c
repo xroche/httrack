@@ -833,15 +833,14 @@ static hts_boolean sf_replace_file(httrackp *opt, const char *path,
   }
   if (len > 0 && !hts_fwrite_exact(body, len, fp))
     ok = HTS_FALSE;
-  if (fclose(fp) != 0)
-    ok = HTS_FALSE;
 #ifndef _WIN32
   /* The spool bypassed filecreate(), which is what chmods every other mirrored
      file; without this the file keeps the umask's mode. */
   if (ok)
-    (void) chmod(fconv(catbuff, sizeof(catbuff), StringBuff(tmp)),
-                 HTS_ACCESS_FILE);
+    (void) fchmod(fileno(fp), HTS_ACCESS_FILE);
 #endif
+  if (fclose(fp) != 0)
+    ok = HTS_FALSE;
   if (ok)
     ok = hts_rename_over(opt, StringBuff(tmp), path);
   if (!ok) {
