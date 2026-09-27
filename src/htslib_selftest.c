@@ -34,6 +34,9 @@ Please visit our Website: http://www.httrack.com
 #include "htsselftest_int.h"
 
 #include <stdint.h>
+#ifndef _WIN32
+#include <sys/wait.h> /* the forking sigterm self-test reaps its children */
+#endif
 
 /* very minimalistic internal tests */
 static void basic_selftests(void) {
