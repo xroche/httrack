@@ -15,10 +15,20 @@
 # stale read costs nothing. #1809 says fixing the class properly needs a lock
 # rather than a barrier.
 #
-# This list is what the suite actually reaches, not every benign reader in the
-# file, so slower hardware can surface one more. Check a new report against the
+# race_top, not race: race matches either stack at ANY frame, so it would hide
+# a race on any field anywhere in the function or its callees. race_top matches
+# the top frame only, which is the tightest the tool offers: TSan has no field
+# or location suppression, and ANNOTATE_BENIGN_RACE_SIZED is reader-blind and so
+# would whitelist back_wait too.
+#
+# This list is what the suite actually reaches, not every benign reader: 35
+# functions in htsback.c hold 148 plain reads of .status or .r.size. back_available
+# is the expected fifth, called unconditionally two lines from back_incache, so
+# only scheduling separates them. back_abort_stopped and back_abort_limit read
+# lnk[i].status plainly too, but only on a user stop or a --max-time or
+# --max-size overrun, which this leg never sets. Check a new report against the
 # predicate rule above before adding it here.
-race:back_nsoc
-race:back_transferred
-race:slot_can_be_cleaned
-race:back_incache
+race_top:back_nsoc
+race_top:back_transferred
+race_top:slot_can_be_cleaned
+race_top:back_incache
