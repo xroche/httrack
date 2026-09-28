@@ -562,11 +562,14 @@ run_wd() {
 sink="$tmp/sink.py"
 cat >"$sink" <<'PY'
 import http.server
+import os
 import socketserver
 import sys
+import threading
 
 codes = [int(c) for c in sys.argv[1].split(",")]
 rec = sys.argv[2]
+watch_stdin = len(sys.argv) > 3
 seen = []
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -593,19 +596,83 @@ srv = Sink(("127.0.0.1", 0), Handler)
 # LF, since discover_server_port parses this line: Windows would emit \r\n.
 sys.stdout.reconfigure(newline="\n")
 print("PORT %d" % srv.server_port, flush=True)
+
+# A SIGKILLed test runs no trap, so nothing out there reaps this sink. The parent
+# holds the write end of the pipe on stdin and writes nothing, so this read ends
+# only once the parent is gone. os.getppid() cannot serve: a native Windows
+# CPython reads the creator pid from a startup snapshot that never changes.
+def exit_once_orphaned():
+    sys.stdin.buffer.read(1)
+    os._exit(0)
+
+# Only where the caller proved this interpreter can wait on that pipe. Elsewhere
+# stdin reads EOF at once and the sink would exit before serving anything.
+if watch_stdin:
+    threading.Thread(target=exit_once_orphaned, daemon=True).start()
 srv.serve_forever()
 PY
 
 posts="$tmp/posts"
 sinklog="$tmp/sink.log"
+sinkfifo="$tmp/sink.fifo"
 legout="$tmp/leg.out"
 port='' sinkpid=''
+# Set by sink_pipe_probe, and empty where the sink gets no pipe at all.
+sinkeof='' sinkeof_why='the fifo probe did not run'
+
+# Can $py wait on a fifo this shell holds open? MSYS builds one out of the Cygwin
+# layer and runs a native Windows interpreter, which reads EOF from it at once
+# and would kill the sink the moment it started. The interpreter decides that,
+# not the OS name, so ask it rather than read uname.
+sink_pipe_probe() {
+    # Not f, which proclib.sh declares as an array: the lint reads every tracked
+    # script at once and answers SC2128 on a name it has seen as one.
+    local pfifo=$tmp/probe.fifo out=$tmp/probe.out rc=0
+    rm -f "$pfifo"
+    mkfifo "$pfifo" 2>/dev/null || {
+        sinkeof_why="this host has no mkfifo"
+        return 0
+    }
+    exec 8<>"$pfifo"
+    run_with_timeout --stdin "$pfifo" 10 "$py" -c \
+        'import sys
+sys.stdout.write("up\n")
+sys.stdout.flush()
+sys.stdin.buffer.read(1)' >"$out" 2>&1 || rc=$?
+    exec 8<&-
+    rm -f "$pfifo"
+    # The marker first: an interpreter that never started also never returns.
+    if ! grep -q '^up' "$out"; then
+        sinkeof_why="the fifo probe never reported in: $(cat "$out")"
+    elif test "$rc" -ne 124; then
+        sinkeof_why="$py reads EOF from a fifo at once, so a sink given one would die on the spot"
+    else
+        sinkeof=eof
+    fi
+}
 sink_start() {
     : >"$posts"
     : >"$sinklog"
     # Its own log: a leg's command substitution would else wait on the pipe the
     # sink inherited for as long as the sink lives.
-    "$py" "$(nativepath "$sink")" "$1" "$(nativepath "$posts")" >"$sinklog" 2>&1 &
+    if test -z "$sinkeof"; then
+        # No pipe this interpreter can wait on, so the sink runs as it did
+        # before there was one. A sink that outlives a killed test is the bug
+        # being fixed, but a sink that dies on the spot breaks every leg.
+        "$py" "$(nativepath "$sink")" "$1" "$(nativepath "$posts")" >"$sinklog" 2>&1 &
+    else
+        # This shell keeps the only write end of the sink's stdin, and that pipe
+        # closing is what tells the sink its test is gone. A plain background job
+        # would be handed /dev/null instead (#1258). A fifo rather than coproc,
+        # because macOS runs the suite under bash 3.2, and fd 8 because testlib's
+        # poll timer owns 9. Read-write so the open waits for no reader, and 8<&-
+        # so the sink holds no write end of its own.
+        rm -f "$sinkfifo"
+        mkfifo "$sinkfifo"
+        exec 8<>"$sinkfifo"
+        "$py" "$(nativepath "$sink")" "$1" "$(nativepath "$posts")" eof \
+            <"$sinkfifo" 8<&- >"$sinklog" 2>&1 &
+    fi
     sinkpid=$!
     # Where the teardown can find it: sink_start runs in a subshell of its own.
     echo "$sinkpid" >"$sinkpidfile"
@@ -617,6 +684,94 @@ sink_stop() {
     : >"$sinkpidfile"
     sinkpid=''
 }
+
+# The descriptor, never kill -0, which succeeds on a zombie, and SIGKILL leaves
+# one wherever the orphan's reaper is not an init. A zombie has released the log,
+# which is the damage; a sink still serving holds it, so this cannot pass on one.
+sink_serving() { test "/proc/$1/fd/1" -ef "$2"; }
+
+# Alive and not a zombie: kill -0 says yes to both.
+sink_alive() {
+    local state
+    state=$(awk '/^State:/ { print $2; exit }' "/proc/$1/status" 2>/dev/null) || return 1
+    test -n "$state" && test "$state" != Z
+}
+
+# Both traps at the top reap the sink, and SIGKILL runs neither. sink.py has to
+# exit on its own once orphaned: without that one outlived its test by weeks,
+# reparented to 1, still holding descriptors in a directory long unlinked.
+orphan_sink_leg() {
+    local dir=$tmp/orphan-sink log ready osink n
+    log=$dir/sink.log
+    mkdir -p "$dir"
+    # Grouped, or bash announces the SIGKILL it reaped and that reads as a
+    # failure in a log that passed.
+    {
+        (
+            # Its own pipe, held here and nowhere else, so the kill below is
+            # the only thing that can end it. See sink_start above.
+            mkfifo "$dir/alive"
+            exec 8<>"$dir/alive"
+            "$py" "$(nativepath "$sink")" 201 "$(nativepath "$dir/posts")" eof \
+                <"$dir/alive" 8<&- >"$log" 2>&1 &
+            sp=$!
+            # Where the teardown can find it, so a leg that fails still reaps it.
+            echo "$sp" >"$sinkpidfile"
+            discover_server_port "$log" "$sp" >/dev/null || exit 1
+            # Read while the parent still lives: a poll that starts on a sink
+            # already gone would pass having proved nothing.
+            if test "/proc/$sp/fd/1" -ef "$log"; then
+                echo serving >"$dir/ready"
+            elif sink_alive "$sp"; then
+                echo opaque >"$dir/ready" # a wsl2 interop pid names no fd here
+            else
+                echo dead >"$dir/ready"
+            fi
+            # $BASHPID, not $$, which inside a subshell still names the test.
+            kill -9 "$BASHPID"
+        ) || true
+    } 2>"$dir/kill.err"
+    ready=$(cat "$dir/ready" 2>/dev/null || true)
+    osink=$(cat "$sinkpidfile")
+    case $ready in
+    serving)
+        n=0
+        while test "$n" -lt 75 && sink_serving "$osink" "$log"; do
+            sleep 0.2
+            n=$((n + 1))
+        done
+        sink_serving "$osink" "$log" &&
+            fail "the sink $osink outlived the parent it was orphaned by"
+        ;;
+    opaque)
+        # /proc is here, so only an interop pid hides the descriptor of a sink
+        # this shell just saw answer.
+        # note_coverage, not an append to the skipped list: shellcheck answers
+        # SC2031 on one from this block and the lint is a required check, so
+        # the three notes this section owes are all reported as they happen.
+        note_coverage "not exercised: the orphaned sink's own exit: /proc names no descriptor of this sink"
+        stop_server "$osink"
+        ;;
+    dead)
+        fail_dump "the sink died before anything orphaned it, so its own exit is untested" \
+            "$log" "$dir/kill.err"
+        ;;
+    *)
+        fail_dump "the orphan leg never got the sink to bind a port" "$log" "$dir/kill.err"
+        ;;
+    esac
+    : >"$sinkpidfile"
+}
+test -z "$py" || sink_pipe_probe
+if test -z "$py"; then
+    note_coverage "not exercised: the orphaned sink's own exit: no python3 here"
+elif ! test -d /proc/self/fd; then
+    note_coverage "not exercised: the orphaned sink's own exit: no /proc here to tell a zombie from a live sink"
+elif test -z "$sinkeof"; then
+    note_coverage "not exercised: the orphaned sink's own exit: $sinkeof_why"
+else
+    orphan_sink_leg
+fi
 # Ours, so a leg that lost its -ApiBase reaches GitHub with a credential it
 # refuses. Distinctive, since the legs grade the log on never carrying it.
 export WATCHDOG_TOKEN=n0tat0ken WATCHDOG_REPO=octo/nowhere WATCHDOG_SHA=0000000

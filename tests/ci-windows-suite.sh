@@ -176,6 +176,10 @@ ci_start_native_watchdog() {
         -ProgressLog "$(nativepath "$progress")" \
         >>watchdog.log 2>&1 &
     ci_watchdog_pid=$!
+    # Beside the log it holds open: a caller in another subshell has no other way
+    # to reap this process, and one that outlives its parent writes forever into
+    # a log the teardown has already unlinked.
+    echo "$ci_watchdog_pid" >watchdog.pid
     # $! comes from the fork, not the exec: wait for it to actually speak.
     while test "$waited" -lt "$ci_watchdog_wait"; do
         ci_watchdog_spoke && return 0
@@ -185,9 +189,23 @@ ci_start_native_watchdog() {
     done
     # A child that spoke and exited mid-poll still launched (#1321).
     ci_watchdog_spoke && return 0
-    kill_pid "$ci_watchdog_pid"
+    ci_reap_recorded_watchdog "$PWD"
     ci_watchdog_pid=''
     return 1
+}
+
+# Kill the watchdog recorded under $1 (default: here) and forget it. The only
+# killer, so that a record left behind cannot name a pid the host has since
+# handed to a stranger.
+ci_reap_recorded_watchdog() {
+    local dir=${1:-.} pid=''
+    test -r "$dir/watchdog.pid" || return 0
+    read -r pid <"$dir/watchdog.pid" || pid=''
+    rm -f "$dir/watchdog.pid"
+    # 0 and 1 rejected too: kill -9 0 signals the caller's own process group,
+    # and a torn write can leave a digit prefix of the real pid.
+    case $pid in '' | 0 | 1 | *[!0-9]*) return 0 ;; esac
+    kill_pid "$pid"
 }
 
 # End the step, announcing $2 first: the kill runs no EXIT trap, so an unexplained
@@ -197,7 +215,7 @@ ci_heartbeat_kill() {
     ci_annotate error "suite watchdog" "$2"
     # Ahead of the kill, which runs no EXIT trap: an orphan would outlive the
     # step and overwrite its last status with a frozen tail.
-    test -z "${watchdog:-}" || kill_pid "$watchdog"
+    ci_reap_recorded_watchdog "$PWD"
     # Read before the two kills below, which would leave the winpid naming
     # whoever Windows hands the number to next (#1228).
     win_capture "$main"
@@ -586,7 +604,7 @@ ci_start_native_watchdog "$PWD/$progress" && watchdog=$ci_watchdog_pid
 test -n "$watchdog" || echo "no off-box watchdog: no usable PowerShell"
 ci_suite_heartbeat 960 360 "$progress" "$stuck" $$ "$hard_deadline" &
 heartbeat=$!
-trap 'set +e; kill "$heartbeat" 2>/dev/null; test -z "$watchdog" || kill_pid "$watchdog"' EXIT
+trap 'set +e; kill "$heartbeat" 2>/dev/null; ci_reap_recorded_watchdog "$PWD"' EXIT
 
 pass=0 fail=0 skip=0 lost=0 failed="" skipped="" vanished="" deadline=0
 # Tests in flight at once, min(2*nproc, 16), unless the caller pins it

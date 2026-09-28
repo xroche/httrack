@@ -182,7 +182,8 @@ ticks=0
 printf 'RUN 96_wedged.test at 0s\n' >"$progress"
 rc=0
 (
-    watchdog=777
+    # Where the driver records its reporter, and where the kill path reads it.
+    printf '777\n' >watchdog.pid
     # Both are reached from the heartbeat's kill path, which shellcheck cannot see.
     # shellcheck disable=SC2317
     kill_pid() { echo "DIRECT $1" >>"$rec"; }
