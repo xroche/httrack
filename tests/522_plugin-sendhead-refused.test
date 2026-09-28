@@ -15,10 +15,11 @@ set -euo pipefail
 [ -n "${SENDHEADREFUSE_LIB:-}" ] || skip "SENDHEADREFUSE_LIB unset, no automake environment"
 [ -r "${SENDHEADREFUSE_LIB}" ] || skip "nothing built at ${SENDHEADREFUSE_LIB}"
 
-# One seed and no robots fetch, so the refused request is the only error.
+# One seed and no robots fetch, so the refused request is the only error. The
+# hook's own reason must survive with STATUSCODE_CONNERROR (-4) beside it; the
+# pre-loop relabels an unfinished slot "Unexpected socket error" and loses both.
 bash "$top_srcdir/tests/local-crawl.sh" --errors 1 \
     --stdout-found 'sendheadrefuse: refusing' \
-    --log-found 'Header refused by external wrapper' \
-    --log-not-found 'Write error' \
+    --log-found '"Header refused by external wrapper" \(-4\)' \
     --log-not-found 'Unexpected socket error' \
     httrack 'BASEURL/simple/basic.html' --wrapper "${SENDHEADREFUSE_LIB}"

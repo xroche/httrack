@@ -8,21 +8,17 @@
 static int refuse(t_hts_callbackarg *carg, httrackp *opt, char *buff,
                   const char *adr, const char *fil, const char *referer_adr,
                   const char *referer_fil, htsblk *outgoing) {
-  if (CALLBACKARG_PREV_FUN(carg, sendhead) != NULL) {
-    if (!CALLBACKARG_PREV_FUN(carg, sendhead)(CALLBACKARG_PREV_CARG(carg), opt,
-                                              buff, adr, fil, referer_adr,
-                                              referer_fil, outgoing)) {
-      return 0;
-    }
-  }
+  (void) carg;
+  (void) opt;
+  (void) buff;
+  (void) referer_adr;
+  (void) referer_fil;
+  (void) outgoing;
   /* The test reads this back: the log assertions all hold on a build that never
    * called the hook. */
   fprintf(stderr, "sendheadrefuse: refusing %s%s\n", adr, fil);
   return 0;
 }
-
-EXTERNAL_FUNCTION int hts_plug(httrackp *opt, const char *argv);
-EXTERNAL_FUNCTION int hts_unplug(httrackp *opt);
 
 EXTERNAL_FUNCTION int hts_plug(httrackp *opt, const char *argv) {
   (void) argv;
