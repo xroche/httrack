@@ -90,11 +90,14 @@ run() { # run NAME WANT-RC WANT-WEDGE(y|n)
         fail_dump "$name: got rc=${rc:-unset} wedged=$got_wedge, want rc=$want_rc wedged=$want_wedge" \
             "$work/out.txt"
     fi
-    # The flag is internal; this is the line a maintainer reads at 6am. Run in
-    # its own shell, because the verdict ends in exit and a subshell of ours
-    # would take the EXIT trap with it.
-    local said
-    said=$(rc=$rc wedged=$wedged work=$work bash "$verdict" 2>&1) || true
+    # The flag is internal, so assert the line a maintainer reads and the status
+    # the job reports. Its own shell, because a subshell of ours would run our
+    # EXIT trap on the verdict's exit.
+    local said vrc=0
+    said=$(rc=$rc wedged=$wedged work=$work bash "$verdict" 2>&1) || vrc=$?
+    test "$vrc" = "$want_rc" ||
+        fail_dump "$name: the verdict exited $vrc, so the job would report that" \
+            "$work/out.txt"
     case "$want_wedge$(command grep -qF 'went down' <<<"$said" && echo y || echo n)" in
     yy | nn) ;;
     *) fail_dump "$name: the verdict did not match wedged=$want_wedge" "$work/out.txt" ;;
@@ -119,9 +122,8 @@ run "a wedged VM" 124 y
 stub_sleep=6 stub_rc=0 stub_misses=0
 run "quiet while ssh answers" 0 n
 
-# The debounce, at the production SUITE_PROBES. One processor under -j2 can
-# miss a probe without being gone, so only a RUN of them counts. Alternating
-# also proves the counter resets, which consecutive misses cannot show.
+# One processor under -j2 can miss a probe without being gone, so only a run of
+# them counts. Alternating also proves the counter resets.
 stub_sleep=12 stub_rc=0 stub_misses=0 stub_every=2
 run "ssh misses probes, but not in a row" 0 n
 stub_every=0

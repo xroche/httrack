@@ -275,9 +275,8 @@ misses=0
 while ! test -e "$status_file"; do
     sleep "$SUITE_TICK"
     test -e "$status_file" && break
-    # A subshell killed before it wrote the status file would otherwise spin
-    # this loop for as long as the VM keeps answering. Same guard the boot
-    # loop puts on qemu.
+    # A subshell killed before writing the status file would spin this loop
+    # for as long as the VM answers. The boot loop guards qemu the same way.
     kill -0 "$suite_pid" 2>/dev/null || break
     # BSD stat spells it -f %m, and the macOS leg runs this test.
     quiet=$(($(date +%s) - $(stat -c %Y "$check_log" 2>/dev/null ||
@@ -309,7 +308,13 @@ else
 fi
 test "$rc" -eq 0 || screendump
 mkdir -p "$work/out"
-ssh_vm "cat $VM_HOME/bld/tests/test-suite.log 2>/dev/null" >"$work/out/test-suite.log" || true
+if test -n "$wedged"; then
+    # The log went down with the filesystem, so asking for it only waits out
+    # ssh's own banner timeout.
+    : >"$work/out/test-suite.log"
+else
+    ssh_vm "cat $VM_HOME/bld/tests/test-suite.log 2>/dev/null" >"$work/out/test-suite.log" || true
+fi
 echo "::endgroup::"
 
 test "$rc" -eq 0 || {
