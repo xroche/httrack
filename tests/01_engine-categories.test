@@ -27,8 +27,8 @@ mkproject delta
 mkproject "Test category 1" "Test category 1"
 mkdir -p "$dir/epsilon"
 
-# LC_ALL=C: hts_findfirst enumerates in filesystem order, and a locale collation
-# would order the expected list by another rule than the sort below.
+# The handler tags each line it prints: categ: is type 1, profile: is type 0.
+# LC_ALL=C so the sort does not depend on the host locale.
 list() { # list TAG
     local got
     got=$(httrack -O /dev/null -#test=categories "$dir") ||
@@ -48,8 +48,8 @@ profile:beta
 profile:delta
 profile:gamma' "$(list profile)" 'the projects a front end lists'
 
-# Deleting the one project that carries it must take the name away: #1821 wrote
-# "Test category 1" in unconditionally, so it survived this.
+# Deleting the one project that carries it must take the name away. Before the
+# fix this name was written in unconditionally, so it survived.
 rm -rf "$dir/Test category 1"
 assert_eq 'categ:Music
 categ:Photos' "$(list categ)" 'the categories left after dropping a project'
