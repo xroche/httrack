@@ -15,7 +15,10 @@ test -r "$src" || fail "$src is missing (it is in EXTRA_DIST, so a tarball has i
 
 work=$(mktemp -d)
 # shellcheck disable=SC2317 # called through the trap
-cleanup() { rm -rf "$work"; }
+cleanup() {
+    test "$BASH_SUBSHELL" -eq 0 || return 0
+    rm -rf "$work"
+}
 trap 'set +e; cleanup' EXIT
 trap 'exit 1' HUP INT TERM
 
@@ -87,14 +90,11 @@ run() { # run NAME WANT-RC WANT-WEDGE(y|n)
         fail_dump "$name: got rc=${rc:-unset} wedged=$got_wedge, want rc=$want_rc wedged=$want_wedge" \
             "$work/out.txt"
     fi
-    # The flag is internal; this is the line a maintainer reads at 6am.
+    # The flag is internal; this is the line a maintainer reads at 6am. Run in
+    # its own shell, because the verdict ends in exit and a subshell of ours
+    # would take the EXIT trap with it.
     local said
-    # shellcheck disable=SC1090 # cut out of the script under test, above
-    # The verdict ends in exit "$rc", so it is expected to come back non-zero.
-    said=$( (
-        set +e
-        . "$verdict"
-    ) 2>&1) || true
+    said=$(rc=$rc wedged=$wedged work=$work bash "$verdict" 2>&1) || true
     case "$want_wedge$(command grep -qF 'went down' <<<"$said" && echo y || echo n)" in
     yy | nn) ;;
     *) fail_dump "$name: the verdict did not match wedged=$want_wedge" "$work/out.txt" ;;

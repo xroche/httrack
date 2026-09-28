@@ -57,6 +57,9 @@ fail() {
 
 cleanup() {
     set +e
+    # A subshell that exits runs this inherited trap too, and killing qemu or
+    # unmounting from one would tear the run down mid-suite.
+    test "$BASH_SUBSHELL" -eq 0 || return 0
     test -z "$qemu_pid" || kill "$qemu_pid" 2>/dev/null
     # Before the detach: a failure between the mount and the umount below
     # leaves the filesystem mounted, and losetup then refuses with EBUSY.
