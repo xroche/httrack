@@ -10,6 +10,7 @@ set -euo pipefail
 . "${0%"${0##*/}"}./testlib.sh"
 
 require_httrack
+skip_crash_on_hurd
 have_feature crashtest || skip "built with --disable-crash-test"
 
 # By absolute path, because the armed run below changes directory while the

@@ -4,6 +4,7 @@
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
+skip_crash_on_hurd
 
 # htssafe.h bounded string operations (driven by 'httrack -#test=strsafe').
 

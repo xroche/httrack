@@ -77,6 +77,9 @@ is_hurd() {
     return 1
 }
 skip_on_hurd() { ! is_hurd || skip "GNU/Hurd: $*"; }
+# Hurd's ext2fs has wedged the VM twice right after a deliberate crash, though
+# the cause is unproven.
+skip_crash_on_hurd() { skip_on_hurd "a deliberate crash has been followed by an ext2fs wedge"; }
 
 # Does RLIMIT_FSIZE actually stop a write here? GNU/Hurd accepts the limit and
 # writes past it anyway, so a test that needs a refused write has to ask rather
