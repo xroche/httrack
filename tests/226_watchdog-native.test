@@ -569,6 +569,7 @@ import threading
 
 codes = [int(c) for c in sys.argv[1].split(",")]
 rec = sys.argv[2]
+watch_stdin = len(sys.argv) > 3
 seen = []
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -604,7 +605,10 @@ def exit_once_orphaned():
     sys.stdin.buffer.read(1)
     os._exit(0)
 
-threading.Thread(target=exit_once_orphaned, daemon=True).start()
+# Only where the caller proved this interpreter can wait on that pipe. Elsewhere
+# stdin reads EOF at once and the sink would exit before serving anything.
+if watch_stdin:
+    threading.Thread(target=exit_once_orphaned, daemon=True).start()
 srv.serve_forever()
 PY
 
@@ -613,22 +617,62 @@ sinklog="$tmp/sink.log"
 sinkfifo="$tmp/sink.fifo"
 legout="$tmp/leg.out"
 port='' sinkpid=''
+# Set by sink_pipe_probe, and empty where the sink gets no pipe at all.
+sinkeof='' sinkeof_why='the fifo probe did not run'
+
+# Can $py wait on a fifo this shell holds open? MSYS builds one out of the Cygwin
+# layer and runs a native Windows interpreter, which reads EOF from it at once
+# and would kill the sink the moment it started. The interpreter decides that,
+# not the OS name, so ask it rather than read uname.
+sink_pipe_probe() {
+    # Not f, which proclib.sh declares as an array: the lint reads every tracked
+    # script at once and answers SC2128 on a name it has seen as one.
+    local pfifo=$tmp/probe.fifo out=$tmp/probe.out rc=0
+    rm -f "$pfifo"
+    mkfifo "$pfifo" 2>/dev/null || {
+        sinkeof_why="this host has no mkfifo"
+        return 0
+    }
+    exec 8<>"$pfifo"
+    run_with_timeout --stdin "$pfifo" 10 "$py" -c \
+        'import sys
+sys.stdout.write("up\n")
+sys.stdout.flush()
+sys.stdin.buffer.read(1)' >"$out" 2>&1 || rc=$?
+    exec 8<&-
+    rm -f "$pfifo"
+    # The marker first: an interpreter that never started also never returns.
+    if ! grep -q '^up' "$out"; then
+        sinkeof_why="the fifo probe never reported in: $(cat "$out")"
+    elif test "$rc" -ne 124; then
+        sinkeof_why="$py reads EOF from a fifo at once, so a sink given one would die on the spot"
+    else
+        sinkeof=eof
+    fi
+}
 sink_start() {
     : >"$posts"
     : >"$sinklog"
     # Its own log: a leg's command substitution would else wait on the pipe the
     # sink inherited for as long as the sink lives.
-    # This shell keeps the only write end of the sink's stdin, and that pipe
-    # closing is what tells the sink its test is gone. A plain background job
-    # would be handed /dev/null instead (#1258). A fifo rather than coproc,
-    # because macOS runs the suite under bash 3.2, and fd 8 because testlib's
-    # poll timer owns 9. Read-write so the open waits for no reader, and 8<&-
-    # so the sink holds no write end of its own.
-    rm -f "$sinkfifo"
-    mkfifo "$sinkfifo"
-    exec 8<>"$sinkfifo"
-    "$py" "$(nativepath "$sink")" "$1" "$(nativepath "$posts")" \
-        <"$sinkfifo" 8<&- >"$sinklog" 2>&1 &
+    if test -z "$sinkeof"; then
+        # No pipe this interpreter can wait on, so the sink runs as it did
+        # before there was one. A sink that outlives a killed test is the bug
+        # being fixed, but a sink that dies on the spot breaks every leg.
+        "$py" "$(nativepath "$sink")" "$1" "$(nativepath "$posts")" >"$sinklog" 2>&1 &
+    else
+        # This shell keeps the only write end of the sink's stdin, and that pipe
+        # closing is what tells the sink its test is gone. A plain background job
+        # would be handed /dev/null instead (#1258). A fifo rather than coproc,
+        # because macOS runs the suite under bash 3.2, and fd 8 because testlib's
+        # poll timer owns 9. Read-write so the open waits for no reader, and 8<&-
+        # so the sink holds no write end of its own.
+        rm -f "$sinkfifo"
+        mkfifo "$sinkfifo"
+        exec 8<>"$sinkfifo"
+        "$py" "$(nativepath "$sink")" "$1" "$(nativepath "$posts")" eof \
+            <"$sinkfifo" 8<&- >"$sinklog" 2>&1 &
+    fi
     sinkpid=$!
     # Where the teardown can find it: sink_start runs in a subshell of its own.
     echo "$sinkpid" >"$sinkpidfile"
@@ -668,7 +712,7 @@ orphan_sink_leg() {
             # the only thing that can end it. See sink_start above.
             mkfifo "$dir/alive"
             exec 8<>"$dir/alive"
-            "$py" "$(nativepath "$sink")" 201 "$(nativepath "$dir/posts")" \
+            "$py" "$(nativepath "$sink")" 201 "$(nativepath "$dir/posts")" eof \
                 <"$dir/alive" 8<&- >"$log" 2>&1 &
             sp=$!
             # Where the teardown can find it, so a leg that fails still reaps it.
@@ -718,10 +762,13 @@ orphan_sink_leg() {
     esac
     : >"$sinkpidfile"
 }
+test -z "$py" || sink_pipe_probe
 if test -z "$py"; then
     note_coverage "not exercised: the orphaned sink's own exit: no python3 here"
 elif ! test -d /proc/self/fd; then
     note_coverage "not exercised: the orphaned sink's own exit: no /proc here to tell a zombie from a live sink"
+elif test -z "$sinkeof"; then
+    note_coverage "not exercised: the orphaned sink's own exit: $sinkeof_why"
 else
     orphan_sink_leg
 fi
