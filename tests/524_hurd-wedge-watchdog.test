@@ -1,0 +1,79 @@
+#!/bin/bash
+#
+# Drives the wedge watchdog in tools/hurd-vm.sh with a stubbed VM. Hurd's ext2fs
+# translator can assert under the suite and take the VM down, and the watchdog
+# has to tell that apart from a test failure and from a merely slow test.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+top=${abs_top_srcdir:-$(cd "$testdir/.." && pwd)}
+src=$top/tools/hurd-vm.sh
+test -r "$src" || fail "$src is missing (it is in EXTRA_DIST, so a tarball has it too)"
+
+work=$(mktemp -d)
+# shellcheck disable=SC2317 # called through the trap
+cleanup() { rm -rf "$work"; }
+trap 'set +e; cleanup' EXIT
+trap 'exit 1' HUP INT TERM
+
+block=$work/block.sh
+sed -n '/^echo "::group::Test"$/,/^echo "::endgroup::"$/p' "$src" >"$block"
+# A sed that matched nothing would leave every case below passing vacuously.
+for marker in SUITE_PROBES SUITE_TICK 'wedged=' ssh_probe status_file; do
+    command grep -q -- "$marker" "$block" ||
+        fail "no $marker in the block cut out of $src, so this test reads the wrong code"
+done
+
+# The real clock is a 900s silence read every 30s. Shrunk, or each case below
+# would outlast the suite's own budget. The block reads these, and the defaults
+# in the script are what the VM runs with.
+# shellcheck disable=SC2034 # every one of these is read by the sourced block
+{
+    SUITE_SILENCE=1
+    SUITE_PROBES=2
+    SUITE_TICK=1
+    STEP_TIMEOUT=60
+    VM_HOME=/home/demo
+}
+
+# The VM, stubbed. Driven by the stub_* variables rather than by an eval of a
+# body, which 232 would have to pin as one more site hiding its operand.
+as_user() {
+    test "$stub_sleep" -eq 0 || sleep "$stub_sleep"
+    test -z "$stub_out" || echo "$stub_out"
+    return "$stub_rc"
+}
+ssh_probe() { return "$stub_probe"; }
+ssh_vm() { echo '# TOTAL: 0'; }
+screendump() { :; }
+
+run() { # run NAME SLEEP OUTPUT SUITE-RC PROBE-RC WANT-RC WANT-WEDGE(y|n)
+    local name=$1 want_rc=$6 want_wedge=$7 got_wedge=n
+    stub_sleep=$2 stub_out=$3 stub_rc=$4 stub_probe=$5
+    rm -f "$work/check.status" "$work/check.log"
+    # shellcheck disable=SC1090
+    source "$block" >"$work/out.txt" 2>&1
+    test -z "${wedged:-}" || got_wedge=y
+    # rc comes out of the sourced block.
+    if test "${rc:-unset}" != "$want_rc" || test "$got_wedge" != "$want_wedge"; then
+        fail_dump "$name: got rc=${rc:-unset} wedged=$got_wedge, want rc=$want_rc wedged=$want_wedge" \
+            "$work/out.txt"
+    fi
+}
+
+#     name                    sleep  output  suite-rc  probe-rc  want-rc  wedge
+run "a passing suite" 0 "PASS: a.test" 0 0 0 n
+# A failing test must stay a test failure: the watchdog may not launder it into
+# a VM fault, which is the reading that gets a real regression shrugged off.
+run "a failing test" 0 "FAIL: a.test" 2 0 2 n
+# The wedge. The stub has to outlive the watchdog, or it returns on its own and
+# the case proves nothing.
+run "a wedged VM" 30 "" 0 1 124 y
+# The control. Quiet for more looks than the wedge needed, but ssh answers, so
+# this must NOT read as a wedge: a test may legitimately run 1200s silent.
+run "quiet while ssh answers" 6 "PASS: a.test" 0 0 0 n
+
+echo "PASS: the watchdog separates a wedged VM from a failing test"
