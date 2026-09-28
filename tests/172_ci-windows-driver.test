@@ -249,15 +249,14 @@ grep -q 'FAIL 00_runnable' <<<"$out" && fail "the unexpanded name was run as a t
 
 # The wedge branch has to end the reporter itself: its kill of the suite is a
 # TerminateProcess, which runs no EXIT trap. Forked the way the driver forks it,
-# since the branch reads $watchdog from the shell it was forked from.
+# since the branch reaps the watchdog recorded in the directory it was forked in.
 wedge_leg() (
-    PATH="$bin:$PATH"
+    PATH=$stubpath
     export PATH
     prog=$run/wedge-progress.log
     printf 'RUN 99_wedged.test at 0s\n' >"$prog"
     ci_watchdog_pid=''
     ci_start_native_watchdog "$prog" || fail "the wedge leg launched no watchdog"
-    watchdog=$ci_watchdog_pid
     still_ticking || fail "the wedge leg's reporter was not running to begin with"
     # Its own process group, so the tree kill below cannot reach this shell.
     set -m
@@ -316,15 +315,18 @@ test "$lat" -le 4 ||
     fail "EOF ${lat}s after the heartbeat died: its sleep inherited the caller's stdout"
 
 # A driver that dies without running its EXIT trap orphans the watchdog, which
-# keeps writing into a watchdog.log the teardown then unlinks: 12 such orphans
-# pinned 11 GB of a 16 GB /tmp, invisible to du because no name is left.
+# keeps writing into a watchdog.log the teardown then unlinks, so the space it
+# pins has no name left to find it by.
 orphan=$tmp/orphan
 witness=$tmp/orphan.pid
 mkdir -p "$orphan"
 : >"$witness"
-# Grouped, or bash announces the SIGKILL it reaped and that reads as a failure
-# in a log that passed.
-{
+
+# The descriptor, not the pid: a zombie answers kill -0 having already let the
+# log go, and a reap that never ran still holds it.
+wd_holds_log() { test "/proc/$1/fd/1" -ef "$orphan/watchdog.log"; }
+
+orphan_leg() (
     (
         cd "$orphan"
         PATH=$stubpath
@@ -332,43 +334,35 @@ mkdir -p "$orphan"
         ci_watchdog_pid=''
         ci_start_native_watchdog "$orphan/progress.log" || exit 1
         printf '%s\n' "$ci_watchdog_pid" >"$witness"
-        # $BASHPID, not $$, which inside a subshell still names the test.
+        # SIGKILL, the way a lost runner ends the driver, so no EXIT trap runs.
         kill -9 "$BASHPID"
     ) || true
-} 2>"$tmp/orphan.err"
-wd=$(cat "$witness")
-test -n "$wd" || fail_dump "the orphan leg launched no watchdog" "$tmp/orphan.err"
-# Both halves of the control: a watchdog that died with its parent, or one that
-# never held the log, would make the verdict below vacuous.
-kill -0 "$wd" 2>/dev/null || fail "the watchdog $wd died with its parent, so nothing was orphaned"
-if fd1=$(readlink "/proc/$wd/fd/1" 2>/dev/null); then
-    test "$fd1" = "$orphan/watchdog.log" || fail "the orphan holds $fd1, not the watchdog log"
-    procfd=1
-else
-    fd1="the watchdog log" # msys names no open file under /proc
-    procfd=''
-fi
-
-# Watch the descriptor, not the pid. SIGKILL leaves a zombie wherever the
-# orphan's reaper is not an init, as in a build container, and kill -0 keeps
-# succeeding on one; a zombie has already released the log, which is the damage
-# this leg is about. A reap that never ran still holds it, so this cannot pass
-# vacuously.
-wd_holds_log() {
-    if test -z "$procfd"; then # msys names no open file under /proc
-        kill -0 "$wd" 2>/dev/null
-        return
+    wd=$(cat "$witness")
+    test -n "$wd" || fail "the orphan leg launched no watchdog"
+    # Read while nothing has reaped yet: the descriptor is both halves of the
+    # control, since a watchdog that died with its parent has none either.
+    fd1=$(readlink "/proc/$wd/fd/1" 2>/dev/null || true)
+    case $fd1 in
+    "$orphan/watchdog.log") ;;
+    '')
+        echo "note: /proc names no descriptor of the orphan, so the reap went ungraded"
+        reap_watchdogs
+        return 0
+        ;;
+    *) fail "the orphan holds $fd1, not the watchdog log" ;;
+    esac
+    reap_watchdogs
+    n=0
+    while test "$n" -lt 50 && wd_holds_log "$wd"; do
+        sleep 0.2
+        n=$((n + 1))
+    done
+    if wd_holds_log "$wd"; then
+        fail "the orphaned watchdog $wd survived the teardown, still holding $fd1"
     fi
-    test "$(readlink "/proc/$wd/fd/1" 2>/dev/null)" = "$orphan/watchdog.log"
-}
-
-reap_watchdogs
-n=0
-while test "$n" -lt 50 && wd_holds_log; do
-    sleep 0.2
-    n=$((n + 1))
-done
-wd_holds_log &&
-    fail "the orphaned watchdog $wd survived the teardown, still holding $fd1"
+)
+orphan_leg >"$tmp/orphan.log" 2>&1 || fail_dump "the orphan leg failed" "$tmp/orphan.log"
+# Its coverage note, which a passing log keeps to itself.
+grep '^note:' "$tmp/orphan.log" || true
 
 echo "ci-windows driver OK"

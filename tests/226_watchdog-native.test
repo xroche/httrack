@@ -638,8 +638,15 @@ sink_stop() {
 # which is the damage; a sink still serving holds it, so this cannot pass on one.
 sink_serving() { test "/proc/$1/fd/1" -ef "$2"; }
 
+# Alive and not a zombie: kill -0 says yes to both.
+sink_alive() {
+    local state
+    state=$(awk '/^State:/ { print $2; exit }' "/proc/$1/status" 2>/dev/null) || return 1
+    test -n "$state" && test "$state" != Z
+}
+
 # Both traps at the top reap the sink, and SIGKILL runs neither. sink.py has to
-# exit on its own once orphaned: without that one was found alive 21 days on,
+# exit on its own once orphaned: without that one outlived its test by weeks,
 # reparented to 1, still holding descriptors in a directory long unlinked.
 orphan_sink_leg() {
     local dir=$tmp/orphan-sink log ready osink n
@@ -658,8 +665,10 @@ orphan_sink_leg() {
             # already gone would pass having proved nothing.
             if test "/proc/$sp/fd/1" -ef "$log"; then
                 echo serving >"$dir/ready"
-            else
+            elif sink_alive "$sp"; then
                 echo opaque >"$dir/ready" # a wsl2 interop pid names no fd here
+            else
+                echo dead >"$dir/ready"
             fi
             # $BASHPID, not $$, which inside a subshell still names the test.
             kill -9 "$BASHPID"
@@ -667,12 +676,8 @@ orphan_sink_leg() {
     } 2>"$dir/kill.err"
     ready=$(cat "$dir/ready" 2>/dev/null || true)
     osink=$(cat "$sinkpidfile")
-    test -n "$ready" ||
-        fail_dump "the orphan leg never got the sink to bind a port" "$log" "$dir/kill.err"
-    if test "$ready" != serving; then
-        note_coverage "the orphaned sink's own exit did not run: /proc names no descriptor of this sink"
-        stop_server "$osink"
-    else
+    case $ready in
+    serving)
         n=0
         while test "$n" -lt 75 && sink_serving "$osink" "$log"; do
             sleep 0.2
@@ -680,13 +685,27 @@ orphan_sink_leg() {
         done
         sink_serving "$osink" "$log" &&
             fail "the sink $osink outlived the parent it was orphaned by"
-    fi
+        ;;
+    opaque)
+        # /proc is here, so only an interop pid hides the descriptor of a sink
+        # this shell just saw answer.
+        skipped+=("the orphaned sink's own exit: /proc names no descriptor of this sink")
+        stop_server "$osink"
+        ;;
+    dead)
+        fail_dump "the sink died before anything orphaned it, so its own exit is untested" \
+            "$log" "$dir/kill.err"
+        ;;
+    *)
+        fail_dump "the orphan leg never got the sink to bind a port" "$log" "$dir/kill.err"
+        ;;
+    esac
     : >"$sinkpidfile"
 }
 if test -z "$py"; then
-    note_coverage "the orphaned sink's own exit did not run: no python3 here"
+    skipped+=("the orphaned sink's own exit: no python3 here")
 elif ! test -d /proc/self/fd; then
-    note_coverage "the orphaned sink's own exit did not run: no /proc here to tell a zombie from a live sink"
+    skipped+=("the orphaned sink's own exit: no /proc here to tell a zombie from a live sink")
 else
     orphan_sink_leg
 fi
