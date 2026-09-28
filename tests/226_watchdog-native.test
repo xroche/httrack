@@ -562,8 +562,11 @@ run_wd() {
 sink="$tmp/sink.py"
 cat >"$sink" <<'PY'
 import http.server
+import os
 import socketserver
 import sys
+import threading
+import time
 
 codes = [int(c) for c in sys.argv[1].split(",")]
 rec = sys.argv[2]
@@ -593,6 +596,18 @@ srv = Sink(("127.0.0.1", 0), Handler)
 # LF, since discover_server_port parses this line: Windows would emit \r\n.
 sys.stdout.reconfigure(newline="\n")
 print("PORT %d" % srv.server_port, flush=True)
+
+# A SIGKILLed test runs no trap, so nothing out there reaps this sink. Against
+# the pid we started under rather than 1, because a reparent lands on whatever
+# subreaper the container set.
+start_ppid = os.getppid()
+
+def exit_once_orphaned():
+    while os.getppid() == start_ppid:
+        time.sleep(1)
+    os._exit(0)
+
+threading.Thread(target=exit_once_orphaned, daemon=True).start()
 srv.serve_forever()
 PY
 
@@ -617,6 +632,64 @@ sink_stop() {
     : >"$sinkpidfile"
     sinkpid=''
 }
+
+# The descriptor, never kill -0, which succeeds on a zombie, and SIGKILL leaves
+# one wherever the orphan's reaper is not an init. A zombie has released the log,
+# which is the damage; a sink still serving holds it, so this cannot pass on one.
+sink_serving() { test "/proc/$1/fd/1" -ef "$2"; }
+
+# Both traps at the top reap the sink, and SIGKILL runs neither. sink.py has to
+# exit on its own once orphaned: without that one was found alive 21 days on,
+# reparented to 1, still holding descriptors in a directory long unlinked.
+orphan_sink_leg() {
+    local dir=$tmp/orphan-sink log ready osink n
+    log=$dir/sink.log
+    mkdir -p "$dir"
+    # Grouped, or bash announces the SIGKILL it reaped and that reads as a
+    # failure in a log that passed.
+    {
+        (
+            "$py" "$(nativepath "$sink")" 201 "$(nativepath "$dir/posts")" >"$log" 2>&1 &
+            sp=$!
+            # Where the teardown can find it, so a leg that fails still reaps it.
+            echo "$sp" >"$sinkpidfile"
+            discover_server_port "$log" "$sp" >/dev/null || exit 1
+            # Read while the parent still lives: a poll that starts on a sink
+            # already gone would pass having proved nothing.
+            if test "/proc/$sp/fd/1" -ef "$log"; then
+                echo serving >"$dir/ready"
+            else
+                echo opaque >"$dir/ready" # a wsl2 interop pid names no fd here
+            fi
+            # $BASHPID, not $$, which inside a subshell still names the test.
+            kill -9 "$BASHPID"
+        ) || true
+    } 2>"$dir/kill.err"
+    ready=$(cat "$dir/ready" 2>/dev/null || true)
+    osink=$(cat "$sinkpidfile")
+    test -n "$ready" ||
+        fail_dump "the orphan leg never got the sink to bind a port" "$log" "$dir/kill.err"
+    if test "$ready" != serving; then
+        note_coverage "the orphaned sink's own exit did not run: /proc names no descriptor of this sink"
+        stop_server "$osink"
+    else
+        n=0
+        while test "$n" -lt 75 && sink_serving "$osink" "$log"; do
+            sleep 0.2
+            n=$((n + 1))
+        done
+        sink_serving "$osink" "$log" &&
+            fail "the sink $osink outlived the parent it was orphaned by"
+    fi
+    : >"$sinkpidfile"
+}
+if test -z "$py"; then
+    note_coverage "the orphaned sink's own exit did not run: no python3 here"
+elif ! test -d /proc/self/fd; then
+    note_coverage "the orphaned sink's own exit did not run: no /proc here to tell a zombie from a live sink"
+else
+    orphan_sink_leg
+fi
 # Ours, so a leg that lost its -ApiBase reaches GitHub with a credential it
 # refuses. Distinctive, since the legs grade the log on never carrying it.
 export WATCHDOG_TOKEN=n0tat0ken WATCHDOG_REPO=octo/nowhere WATCHDOG_SHA=0000000
