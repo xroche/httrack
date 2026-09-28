@@ -262,7 +262,7 @@ rm -f "$status_file"
 ) >"$check_log" 2>&1 &
 suite_pid=$!
 # Keeps the per-test lines reaching the job log, as the foreground call did.
-tail -f --pid="$suite_pid" "$check_log" &
+tail -f --pid="$suite_pid" "$check_log" 2>/dev/null &
 tail_pid=$!
 
 # Hurd's ext2fs translator can assert under the suite and take the VM with it.
@@ -272,7 +272,13 @@ misses=0
 while ! test -e "$status_file"; do
     sleep "$SUITE_TICK"
     test -e "$status_file" && break
-    quiet=$(($(date +%s) - $(stat -c %Y "$check_log")))
+    # A subshell killed before it wrote the status file would otherwise spin
+    # this loop for as long as the VM keeps answering. Same guard the boot
+    # loop puts on qemu.
+    kill -0 "$suite_pid" 2>/dev/null || break
+    # BSD stat spells it -f %m, and the macOS leg runs this test.
+    quiet=$(($(date +%s) - $(stat -c %Y "$check_log" 2>/dev/null ||
+        stat -f %m "$check_log")))
     if test "$quiet" -lt "$SUITE_SILENCE"; then
         misses=0
         continue
