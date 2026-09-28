@@ -7,7 +7,6 @@ set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
-skip_crash_on_hurd
 
 ulimit -c 0 # a deliberate crash must not litter the box with cores
 
@@ -22,6 +21,7 @@ Linux) traced=1 ;;
 *) traced=0 ;;
 esac
 require_httrack
+skip_crash_on_hurd
 have_feature crashtest || {
     echo "built with --disable-crash-test, skipping" >&2
     exit 77
