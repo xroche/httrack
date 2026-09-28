@@ -20,6 +20,11 @@ static int refuse(t_hts_callbackarg *carg, httrackp *opt, char *buff,
   return 0;
 }
 
+/* Prototypes first: the tree builds with -Wmissing-prototypes as an error, and
+   no installed header declares a plugin's own entry points. */
+EXTERNAL_FUNCTION int hts_plug(httrackp *opt, const char *argv);
+EXTERNAL_FUNCTION int hts_unplug(httrackp *opt);
+
 EXTERNAL_FUNCTION int hts_plug(httrackp *opt, const char *argv) {
   (void) argv;
   CHAIN_FUNCTION(opt, sendhead, refuse, NULL);
