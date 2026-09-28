@@ -1,0 +1,147 @@
+#!/bin/bash
+#
+# Drives the wedge watchdog in tools/hurd-vm.sh with a stubbed VM. Hurd's ext2fs
+# translator can assert under the suite and take the VM down, and the watchdog
+# has to tell that apart from a test failure and from a merely slow test.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+top=${abs_top_srcdir:-$(cd "$testdir/.." && pwd)}
+src=$top/tools/hurd-vm.sh
+test -r "$src" || fail "$src is missing (it is in EXTRA_DIST, so a tarball has it too)"
+
+work=$(mktemp -d)
+# shellcheck disable=SC2317 # called through the trap
+cleanup() {
+    test "$BASH_SUBSHELL" -eq 0 || return 0
+    rm -rf "$work"
+}
+trap 'set +e; cleanup' EXIT
+trap 'exit 1' HUP INT TERM
+
+block=$work/block.sh
+sed -n '/^echo "::group::Test"$/,/^echo "::endgroup::"$/p' "$src" >"$block"
+# The verdict the reader actually sees sits after the group, so cut it too.
+verdict=$work/verdict.sh
+# shellcheck disable=SC2016 # $rc is the script's text, not ours to expand
+sed -n '/^test "$rc" -eq 0 || {$/,/^}$/p' "$src" >"$verdict"
+# A sed that matched nothing would leave every case below passing vacuously.
+for marker in ssh_probe status_file; do
+    command grep -q -- "$marker" "$block" ||
+        fail "no $marker in the block cut out of $src, so this test reads the wrong code"
+done
+command grep -q 'went down' "$verdict" ||
+    fail "no wedge message in the verdict cut out of $src"
+
+# The real clock is a 900s silence read every 30s. Only those two shrink, so
+# the debounce below is tested at the value the VM runs with.
+# shellcheck disable=SC2034 # every one of these is read by the sourced block
+{
+    SUITE_SILENCE=3
+    SUITE_TICK=1
+    SUITE_PROBES=3
+    VM_HOME=/home/demo
+}
+
+# The VM, stubbed. Driven by the stub_* variables rather than by an eval of a
+# body, which 232 would have to pin as one more site hiding its operand.
+as_user() {
+    test "$stub_die" -eq 0 || kill -9 $BASHPID
+    # Trickles when $stub_stream is set, so a case can keep the log moving
+    # while the probes fail.
+    if test "$stub_stream" -eq 0; then
+        test "$stub_sleep" -eq 0 || sleep "$stub_sleep"
+    else
+        for _ in $(seq "$stub_sleep"); do
+            echo "PASS: stream.test"
+            sleep 1
+        done
+    fi
+    echo "PASS: stub.test"
+    return "$stub_rc"
+}
+# Fails its first $stub_misses probes, then answers every $stub_every-th one, so
+# a case can make the VM miss probes without ever being gone.
+ssh_probe() {
+    if test "$stub_misses" -gt 0; then
+        stub_misses=$((stub_misses - 1))
+        return 1
+    fi
+    stub_probes=$((stub_probes + 1))
+    test "$stub_every" -eq 0 && return 0
+    test $((stub_probes % stub_every)) -eq 0
+}
+ssh_vm() { :; }
+screendump() { :; }
+
+# Each case sets stub_sleep, stub_rc and stub_misses by name first, so the
+# values are readable here rather than counted out against this signature.
+run() { # run NAME WANT-RC WANT-WEDGE(y|n)
+    local name=$1 want_rc=$2 want_wedge=$3 got_wedge=n
+    stub_probes=0
+    # shellcheck disable=SC1090
+    source "$block" >"$work/out.txt" 2>&1
+    test -z "${wedged:-}" || got_wedge=y
+    # rc comes out of the sourced block.
+    if test "${rc:-unset}" != "$want_rc" || test "$got_wedge" != "$want_wedge"; then
+        fail_dump "$name: got rc=${rc:-unset} wedged=$got_wedge, want rc=$want_rc wedged=$want_wedge" \
+            "$work/out.txt"
+    fi
+    # The flag is internal, so assert the line a maintainer reads and the status
+    # the job reports. Its own shell, because a subshell of ours would run our
+    # EXIT trap on the verdict's exit.
+    local said vrc=0
+    said=$(rc=$rc wedged=$wedged work=$work bash "$verdict" 2>&1) || vrc=$?
+    test "$vrc" = "$want_rc" ||
+        fail_dump "$name: the verdict exited $vrc, so the job would report that" \
+            "$work/out.txt"
+    case "$want_wedge$(command grep -qF 'went down' <<<"$said" && echo y || echo n)" in
+    yy | nn) ;;
+    *) fail_dump "$name: the verdict did not match wedged=$want_wedge" "$work/out.txt" ;;
+    esac
+}
+
+stub_sleep=0 stub_rc=0 stub_misses=0 stub_every=0 stub_stream=0 stub_die=0
+run "a passing suite" 0 n
+
+# A failing test must stay a test failure: the watchdog may not launder it into
+# a VM fault, which is the reading that gets a real regression shrugged off.
+stub_sleep=0 stub_rc=2 stub_misses=0
+run "a failing test" 2 n
+
+# The wedge. The stub has to outlive the watchdog, or it returns on its own and
+# the case proves nothing.
+stub_sleep=30 stub_rc=0 stub_misses=99
+run "a wedged VM" 124 y
+
+# A test may legitimately run 1200s silent, so silence on a VM that answers is
+# not a wedge.
+stub_sleep=6 stub_rc=0 stub_misses=0
+run "quiet while ssh answers" 0 n
+
+# One processor under -j2 can miss a probe without being gone, so only a run of
+# them counts. Alternating also proves the counter resets.
+stub_sleep=12 stub_rc=0 stub_misses=0 stub_every=2
+run "ssh misses probes, but not in a row" 0 n
+stub_every=0
+
+# The suite's own timeout also exits 124, so the watchdog must not relabel it.
+stub_sleep=0 stub_rc=124 stub_misses=0
+run "the suite times out on its own" 124 n
+
+# A VM that keeps finishing tests is alive whatever ssh does, so the clock has
+# to gate the probe rather than the probe deciding alone.
+stub_sleep=8 stub_rc=0 stub_misses=99 stub_stream=1
+run "tests keep finishing while ssh misses" 0 n
+stub_stream=0 stub_misses=0
+
+# The suite dying without reporting leaves no status file. Nothing else ends
+# the wait, so without the liveness guard this loops for as long as ssh answers.
+stub_die=1
+run "the suite dies without reporting" 124 n
+stub_die=0
+
+echo "PASS: the watchdog separates a wedged VM from a failing test"

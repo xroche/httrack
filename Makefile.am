@@ -17,7 +17,8 @@ EXTRA_DIST = INSTALL.Linux \
 		tools/ci-sanitizer-report.sh \
 		tools/tsan-suppressions.txt \
 		tools/downstream-drift.sh \
-		tools/windows-kill-grade.sh
+		tools/windows-kill-grade.sh \
+		tools/hurd-vm.sh
 
 # The suite's staged installs serialise on this; a killed holder leaves it behind.
 clean-local:

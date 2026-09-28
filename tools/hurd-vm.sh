@@ -30,6 +30,16 @@ BOOT_TIMEOUT=600
 # A step that hangs must say so while the job can still report it, rather than
 # run to the job's own cap and leave nothing but a cancelled leg.
 STEP_TIMEOUT=2400
+# Silence that has the watchdog ask whether the VM is still there. A test may
+# legitimately run this quiet (budgets in tests/ reach 1200s), so the probe
+# decides and not the clock.
+SUITE_SILENCE=${HURD_SUITE_SILENCE:-900}
+# One unanswered probe is not death: a probe can time out under the suite's own
+# load on this single-processor VM.
+SUITE_PROBES=${HURD_SUITE_PROBES:-3}
+# How often the watchdog looks. Overridable so 524 can drive it without waiting
+# out the real clock.
+SUITE_TICK=${HURD_SUITE_TICK:-30}
 
 work=${HURD_WORK:-${RUNNER_TEMP:-/var/tmp}/hurd}
 cache=${HURD_CACHE:-$work/cache}
@@ -47,6 +57,9 @@ fail() {
 
 cleanup() {
     set +e
+    # A subshell that exits runs this inherited trap too, and killing qemu or
+    # unmounting from one would tear the run down mid-suite.
+    test "$BASH_SUBSHELL" -eq 0 || return 0
     test -z "$qemu_pid" || kill "$qemu_pid" 2>/dev/null
     # Before the detach: a failure between the mount and the umount below
     # leaves the filesystem mounted, and losetup then refuses with EBUSY.
@@ -232,16 +245,85 @@ echo "::endgroup::"
 
 echo "::group::Test"
 rc=0
+wedged=
+check_log=$work/check.log
+status_file=$work/check.status
+: >"$check_log"
+rm -f "$status_file"
 # -j2, not the harness default: the VM has one processor and 2G, and at -j4 it
 # stopped answering ssh at a different test on each of two runs.
-as_user "set -eu; cd $VM_HOME/bld && make check -j2" || rc=$?
+# Backgrounded so the watchdog can end it, and redirected rather than piped
+# because a kill reaches only the reader and a wedged ssh never writes again.
+# The status goes through a file, because a killed subshell leaves none.
+(
+    # Not a bare "as_user; echo $?": errexit would end the subshell on the
+    # first failing test, leaving no status file and the watchdog looping on a
+    # VM that is answering.
+    suite_rc=0
+    as_user "set -eu; cd $VM_HOME/bld && make check -j2" || suite_rc=$?
+    echo "$suite_rc" >"$status_file"
+) >"$check_log" 2>&1 &
+suite_pid=$!
+# Keeps the per-test lines reaching the job log, as the foreground call did.
+tail -f --pid="$suite_pid" "$check_log" 2>/dev/null &
+tail_pid=$!
+
+# Hurd's ext2fs translator can assert under the suite and take the VM with it.
+# Waiting STEP_TIMEOUT out then burns half an hour on a VM already gone, and
+# calls it a test failure when no test failed.
+misses=0
+while ! test -e "$status_file"; do
+    sleep "$SUITE_TICK"
+    test -e "$status_file" && break
+    # A subshell killed before writing the status file would spin this loop
+    # for as long as the VM answers. The boot loop guards qemu the same way.
+    kill -0 "$suite_pid" 2>/dev/null || break
+    # BSD stat spells it -f %m, and the macOS leg runs this test.
+    quiet=$(($(date +%s) - $(stat -c %Y "$check_log" 2>/dev/null ||
+        stat -f %m "$check_log")))
+    if test "$quiet" -lt "$SUITE_SILENCE"; then
+        misses=0
+        continue
+    fi
+    if ssh_probe 2>/dev/null; then
+        misses=0
+        continue
+    fi
+    misses=$((misses + 1))
+    echo "hurd-vm: quiet for ${quiet}s, ssh unanswered ($misses/$SUITE_PROBES)"
+    test "$misses" -ge "$SUITE_PROBES" || continue
+    wedged="quiet for ${quiet}s, then $misses unanswered ssh probes"
+    kill "$suite_pid" 2>/dev/null || true
+    break
+done
+wait "$suite_pid" 2>/dev/null || true
+kill "$tail_pid" 2>/dev/null || true
+if test -s "$status_file"; then
+    # It answered after all, so whatever the watchdog thought does not stand.
+    rc=$(cat "$status_file")
+    wedged=
+else
+    # Watchdog-killed, so no status: the code the timeout would have given.
+    rc=124
+fi
 test "$rc" -eq 0 || screendump
 mkdir -p "$work/out"
-ssh_vm "cat $VM_HOME/bld/tests/test-suite.log 2>/dev/null" >"$work/out/test-suite.log" || true
+if test -n "$wedged"; then
+    # The log went down with the filesystem, so asking for it only waits out
+    # ssh's own banner timeout.
+    : >"$work/out/test-suite.log"
+else
+    ssh_vm "cat $VM_HOME/bld/tests/test-suite.log 2>/dev/null" >"$work/out/test-suite.log" || true
+fi
 echo "::endgroup::"
 
 test "$rc" -eq 0 || {
-    echo "::error::the suite failed on GNU/Hurd (exit $rc)"
+    # The suite log is empty on a wedge, having gone down with the filesystem.
+    if test -n "$wedged"; then
+        echo "::error::the VM went down under the suite on GNU/Hurd ($wedged); screen.ppm holds what it printed last"
+    else
+        echo "::error::the suite failed on GNU/Hurd (exit $rc)"
+    fi
     tail -200 "$work/out/test-suite.log" || true
     exit "$rc"
 }
