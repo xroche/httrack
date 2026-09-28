@@ -46,6 +46,15 @@ want 'dir/page.html' 3000 //dir/page.html text/html
 selftest_queue 'savename: /dev/null/x/www.example.com/dir/page.html' savename \
     /dir/page.html text/html type=-1 'userdef=//x/%h%p/%n.%t'
 
+# cleanEndingSpaceOrDot() empties a component made only of dots or spaces, which
+# put the leading slash back after it had been stripped. Only a LEADING slash
+# goes, so the hole the emptied component leaves mid-name stays as master left it.
+want 'x.html' 100 '/.../x.html' text/html
+want 'z.html' 100 '/ /z.html' text/html
+want 'y.html' 100 '/../../y.html' text/html
+want 'www.example.com//x.html' 0 '/.../x.html' text/html
+want 'www.example.com///y.html' 0 '/../../y.html' text/html
+
 # An extensionless name gets .html forced on, except under the -N template.
 want 'web/noext.html' 3 /dir/noext text/html
 selftest_queue 'savename: /dev/null/www.example.com/dir/noext' savename \

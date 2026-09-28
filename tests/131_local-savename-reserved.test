@@ -25,6 +25,11 @@ tail_is '/hts-cache/new.zip' 'hts-cache_/new.zip' type=100
 tail_is '/hts-tmp/a.bin' 'hts-tmp_/a.bin' type=100
 # Wider than the engine directories: the DOS devices share the table.
 tail_is '/nul/x.bin' 'nul_/x.bin' type=100
+# That first component is also the relaxed one: a '.' behind the name leaves it
+# alone there, because renaming it would rename aux.example.com. This is what
+# the leading-slash strip in url_savename() decides, so it pins that strip too.
+tail_is '/hts-cache.bin' 'hts-cache.bin' type=100
+tail_is '/d/hts-cache.bin' 'd/hts-cache_.bin' type=100
 
 # A single-label hostname sits in that same first component.
 tail_is '/a.bin.bak' 'hts-tmp_/a.bin.bak' adr=hts-tmp

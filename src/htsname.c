@@ -157,6 +157,17 @@ static void cleanDoubleSlash(char *s) {
   }
 }
 
+/* Drop every leading '/': the name is joined to the output directory, so one
+   left behind makes it absolute. */
+static void stripLeadingSlashes(char *s) {
+  const char *start = s;
+
+  while (*start == '/')
+    start++;
+  if (start != s)
+    memmove(s, start, strlen(start) + 1);
+}
+
 /* Strip all ending . or ' ' (windows-forbidden) */
 static void cleanEndingSpaceOrDot(char *s) {
   int i, j, lastWriteEnd;
@@ -1473,16 +1484,11 @@ int url_savename(lien_adrfilsave *const afs,
   }
 */
 
-  /* Drop EVERY leading slash, not just one: the name is joined to the output
-     directory below, so one left behind makes it absolute (-N100 on a "//path"
-     URL, or a -N template starting with "//"). */
+  // éviter les / au début (cause: N100)
   if (afs->save[0] == '/') {
     char BIGSTK tempo[HTS_URLMAXSIZE * 2];
-    const char *start = afs->save;
 
-    while (*start == '/')
-      start++;
-    strcpybuff(tempo, start);
+    strcpybuff(tempo, afs->save + 1);
     strcpybuff(afs->save, tempo);
   }
 
@@ -1569,13 +1575,21 @@ int url_savename(lien_adrfilsave *const afs,
 
   /* convert name to UTF-8 ? Note: already done while parsing. */
 
+  /* The strip above takes one slash, and cleanEndingSpaceOrDot() puts one back
+     by emptying a component made only of dots or spaces ("/.../x.html" ->
+     "/x.html"), which fil_simplifie() then keeps. Stripped here rather than up
+     there, so the reserved-name and 8.3 passes see the name master gave them:
+     the check below only needs it relative at this point. */
+  stripLeadingSlashes(afs->save);
+
   /* callback */
   {
     /* Nothing sanitizes what the hook writes here, and the name is joined to
        the output directory below, so it has to come back relative and
        ".."-free. Checked whatever the engine handed in, because the engine's
-       own name already qualifies and only a hook can break it. Refused rather
-       than collapsed, because an absolute name has no "../" to drop. */
+       own name is relative by the line above, and only a hook can break it.
+       Refused rather than collapsed, because an absolute name has no "../" to
+       drop. */
     char BIGSTK engine_save[HTS_URLMAXSIZE * 2];
 
     strcpybuff(engine_save, afs->save);
