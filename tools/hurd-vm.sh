@@ -205,7 +205,7 @@ echo "::endgroup::"
 as_user true || fail "cannot log in as $VM_USER"
 
 echo "::group::Send the reproducer in"
-tar -C "$srcdir" -cf - tools/hurd-crashrepro.sh |
+tar -C "$srcdir" -cf - tools/hurd-crashrepro2.sh |
     ssh_vm "set -eu
         rm -rf $VM_HOME/repro-src
         mkdir -p $VM_HOME/repro-src
@@ -230,7 +230,7 @@ rm -f "$status_file"
     # first failing test, leaving no status file and the watchdog looping on a
     # VM that is answering.
     suite_rc=0
-    as_user "bash $VM_HOME/repro-src/tools/hurd-crashrepro.sh" || suite_rc=$?
+    as_user "bash $VM_HOME/repro-src/tools/hurd-crashrepro2.sh" || suite_rc=$?
     echo "$suite_rc" >"$status_file"
 ) >"$check_log" 2>&1 &
 suite_pid=$!
