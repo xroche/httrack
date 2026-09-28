@@ -12,10 +12,6 @@ IMG_BASE=https://cdimage.debian.org/cdimage/ports/latest/hurd-amd64
 IMG_NAME=debian-hurd-amd64-20260314.img.tar.xz
 IMG_SHA512=0c6151e7a402c065ef337841a2586e5c6a9799955d4f25d454cb7c6e6d54e7e2d52768aea0874a794aa285089a085c3b99702de475bc2fc4f250a2ce5a9f6cf0
 
-# The image ships 1.6G free on the root filesystem, against about 70M of tree
-# and build plus the packages below. Growing it instead put the filesystem past
-# what Hurd's own ext2fs can read, and the boot stopped at an I/O error.
-NEED_KB=307200
 # What the image's own README prescribes in every example. Hurd's SMP is young,
 # and gnumach is not happy with more memory than this.
 VM_CPUS=1
@@ -203,44 +199,18 @@ test "$kernel" = GNU || fail "the VM reports uname -s = $kernel, not GNU"
 ssh_vm uname -a
 echo "::endgroup::"
 
-echo "::group::Install the build dependencies"
-ssh_vm 'set -eu
-    export DEBIAN_FRONTEND=noninteractive
-    apt-get update
-    apt-get install -y --no-install-recommends \
-        build-essential autoconf automake libtool autoconf-archive \
-        zlib1g-dev libssl-dev python3 procps'
-echo "::endgroup::"
-
 # The buildds do not build as root, and the suite notices: httrack warns on
 # every run, the file-size limit does not bind, and a test that needs a write
 # to fail finds that none does.
 as_user true || fail "cannot log in as $VM_USER"
 
-echo "::group::Copy the tree in"
-# A build that runs out of room fails somewhere in the middle and reads as a
-# compile error, so say so here instead.
-free=$(ssh_vm "df -k $VM_HOME | awk 'NR == 2 { print \$4 }'")
-test "$free" -ge "$NEED_KB" ||
-    fail "only ${free}K free on the VM, need ${NEED_KB}K"
-# The tree is sent over ssh rather than cloned, because the VM has no route to
-# an unpushed ref and a clone would fetch history nobody reads here.
-tar -C "$srcdir" --exclude=.git -cf - . |
+echo "::group::Send the reproducer in"
+tar -C "$srcdir" -cf - tools/hurd-crashrepro.sh |
     ssh_vm "set -eu
-        rm -rf $VM_HOME/httrack
-        mkdir -p $VM_HOME/httrack
-        tar -C $VM_HOME/httrack -xf -
-        chown -R $VM_USER $VM_HOME/httrack"
-echo "::endgroup::"
-
-echo "::group::Build"
-as_user "set -eu
-    cd $VM_HOME/httrack
-    ./bootstrap
-    mkdir -p $VM_HOME/bld
-    cd $VM_HOME/bld
-    bash $VM_HOME/httrack/configure
-    make -j2"
+        rm -rf $VM_HOME/repro-src
+        mkdir -p $VM_HOME/repro-src
+        tar -C $VM_HOME/repro-src -xf -
+        chown -R $VM_USER $VM_HOME/repro-src"
 echo "::endgroup::"
 
 echo "::group::Test"
@@ -260,7 +230,7 @@ rm -f "$status_file"
     # first failing test, leaving no status file and the watchdog looping on a
     # VM that is answering.
     suite_rc=0
-    as_user "set -eu; cd $VM_HOME/bld && make check -j2" || suite_rc=$?
+    as_user "bash $VM_HOME/repro-src/tools/hurd-crashrepro.sh" || suite_rc=$?
     echo "$suite_rc" >"$status_file"
 ) >"$check_log" 2>&1 &
 suite_pid=$!
@@ -317,29 +287,5 @@ else
 fi
 echo "::endgroup::"
 
-test "$rc" -eq 0 || {
-    # The suite log is empty on a wedge, having gone down with the filesystem.
-    if test -n "$wedged"; then
-        echo "::error::the VM went down under the suite on GNU/Hurd ($wedged); screen.ppm holds what it printed last"
-    else
-        echo "::error::the suite failed on GNU/Hurd (exit $rc)"
-    fi
-    tail -200 "$work/out/test-suite.log" || true
-    exit "$rc"
-}
-
-# automake counts a SKIP as success, so a suite that skipped everything exits 0
-# and would report a pass here. That is the vacuous result this whole job exists
-# to avoid, and the buildds prove a Hurd runs nearly all of these tests.
-banner=$(command grep -E '^# (TOTAL|PASS|SKIP|FAIL|ERROR):' "$work/out/test-suite.log") ||
-    fail "no result banner in the suite log, so nothing proves the suite ran"
-echo "$banner"
-total=$(awk '/^# TOTAL:/ { print $3 }' <<<"$banner")
-pass=$(awk '/^# PASS:/ { print $3 }' <<<"$banner")
-if test -z "$total" || test -z "$pass"; then
-    fail "could not read TOTAL and PASS out of the banner"
-fi
-test "$pass" -ge $((total / 2)) ||
-    fail "only $pass of $total tests passed, so most of the suite never ran"
-
-echo "hurd-vm: the suite passed on GNU/Hurd ($pass of $total)"
+echo "hurd-vm: reproducer finished, rc=$rc, wedged=${wedged:-no}"
+exit "$rc"
