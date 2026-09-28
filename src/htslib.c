@@ -1435,6 +1435,7 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
       deletesoc_r(retour);
       strcpybuff(retour->msg, "Header refused by external wrapper");
       retour->soc = INVALID_SOCKET;
+      return -1;
     }
   }
 

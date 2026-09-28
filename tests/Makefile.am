@@ -6,7 +6,7 @@ TESTS = @TESTS_LIST@
 # Committed binary fixture read by 01_zlib-cache-golden.test. List it
 # explicitly: automake does not expand wildcards in EXTRA_DIST, so a glob would
 # silently drop it from the dist tarball and break "make distcheck".
-EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c nobacktrace.c altstackprobe.c nopieprobe.c printnumprobe.c closetrack.c ftpcancel.c stopresume.c seekfail.c pubheaderlayout.c chainplug.c mirrorverdict.c crawl-test.sh run-all-tests.sh check-network.sh check-test-names.sh \
+EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c nobacktrace.c altstackprobe.c nopieprobe.c printnumprobe.c closetrack.c ftpcancel.c stopresume.c seekfail.c pubheaderlayout.c chainplug.c sendheadrefuse.c mirrorverdict.c crawl-test.sh run-all-tests.sh check-network.sh check-test-names.sh \
 	proxy-https-server.py socks5-server.py proxy-connect-server.py \
 	proxytestlib.py tls-stall-server.py warc-validate.py wacz-validate.py \
 	header-injection-server.py header-injection-check.py \
@@ -102,6 +102,8 @@ TESTS_ENVIRONMENT += CLOSETRACK_LA=$(abs_builddir)/libclosetrack.la
 TESTS_ENVIRONMENT += CLOSETRACK_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/libclosetrack.so
 TESTS_ENVIRONMENT += FTPCANCEL_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/libftpcancel.so
 TESTS_ENVIRONMENT += STOPRESUME_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/libstopresume.so
+# 522_plugin-sendhead-refused.test loads this through --wrapper.
+TESTS_ENVIRONMENT += SENDHEADREFUSE_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/libsendheadrefuse.so
 TESTS_ENVIRONMENT += SEEKFAIL_LA=$(abs_builddir)/libseekfail.la
 TESTS_ENVIRONMENT += SEEKFAIL_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/libseekfail.so
 TESTS_ENVIRONMENT += STRINGOOM_BIN=$(abs_builddir)/stringoom$(EXEEXT)
@@ -127,7 +129,7 @@ TESTS_ENVIRONMENT += HTTRACK_STDERR_WRAP_EXE=$(abs_builddir)/stderrwrap$(EXEEXT)
 check_LTLIBRARIES = librenamefail.la libunlinkfail.la libthreadattrfail.la \
 	libnobacktrace.la libaltstackprobe.la libclosetrack.la libftpcancel.la \
 	libstopresume.la \
-	libseekfail.la
+	libseekfail.la libsendheadrefuse.la
 librenamefail_la_SOURCES = renamefail.c
 librenamefail_la_LDFLAGS = -module -avoid-version -rpath $(abs_builddir)
 librenamefail_la_LIBADD = $(DL_LIBS)
@@ -170,6 +172,16 @@ libstopresume_la_LIBADD = $(DL_LIBS) -lpthread
 libseekfail_la_SOURCES = seekfail.c
 libseekfail_la_LDFLAGS = -module -avoid-version -rpath $(abs_builddir)
 libseekfail_la_LIBADD = $(DL_LIBS)
+
+# sendhead hook that refuses the request, for
+# 522_plugin-sendhead-refused.test. A plugin, not an interposer, so it needs
+# the engine headers and hts_malloc() out of libhttrack.
+libsendheadrefuse_la_SOURCES = sendheadrefuse.c
+libsendheadrefuse_la_CPPFLAGS = -I$(top_srcdir)/src @DEFAULT_CFLAGS@ \
+	@THREADS_CFLAGS@ @V6_FLAG@ @LFS_FLAG@
+libsendheadrefuse_la_LDFLAGS = -module -avoid-version -rpath $(abs_builddir)
+libsendheadrefuse_la_LIBADD = $(top_builddir)/src/libhttrack.la \
+	$(THREADS_LIBS) $(SOCKET_LIBS)
 
 # realloc stub for 152_engine-string-oom.test; links nothing, so it stays a
 # plain binary rather than a libtool wrapper script.
