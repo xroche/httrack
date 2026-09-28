@@ -343,17 +343,32 @@ test -n "$wd" || fail_dump "the orphan leg launched no watchdog" "$tmp/orphan.er
 kill -0 "$wd" 2>/dev/null || fail "the watchdog $wd died with its parent, so nothing was orphaned"
 if fd1=$(readlink "/proc/$wd/fd/1" 2>/dev/null); then
     test "$fd1" = "$orphan/watchdog.log" || fail "the orphan holds $fd1, not the watchdog log"
+    procfd=1
 else
     fd1="the watchdog log" # msys names no open file under /proc
+    procfd=''
 fi
+
+# Watch the descriptor, not the pid. SIGKILL leaves a zombie wherever the
+# orphan's reaper is not an init, as in a build container, and kill -0 keeps
+# succeeding on one; a zombie has already released the log, which is the damage
+# this leg is about. A reap that never ran still holds it, so this cannot pass
+# vacuously.
+wd_holds_log() {
+    if test -z "$procfd"; then # msys names no open file under /proc
+        kill -0 "$wd" 2>/dev/null
+        return
+    fi
+    test "$(readlink "/proc/$wd/fd/1" 2>/dev/null)" = "$orphan/watchdog.log"
+}
 
 reap_watchdogs
 n=0
-while test "$n" -lt 50 && kill -0 "$wd" 2>/dev/null; do
+while test "$n" -lt 50 && wd_holds_log; do
     sleep 0.2
     n=$((n + 1))
 done
-kill -0 "$wd" 2>/dev/null &&
+wd_holds_log &&
     fail "the orphaned watchdog $wd survived the teardown, still holding $fd1"
 
 echo "ci-windows driver OK"
