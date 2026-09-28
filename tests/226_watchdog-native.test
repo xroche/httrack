@@ -610,6 +610,7 @@ PY
 
 posts="$tmp/posts"
 sinklog="$tmp/sink.log"
+sinkfifo="$tmp/sink.fifo"
 legout="$tmp/leg.out"
 port='' sinkpid=''
 sink_start() {
@@ -617,14 +618,18 @@ sink_start() {
     : >"$sinklog"
     # Its own log: a leg's command substitution would else wait on the pipe the
     # sink inherited for as long as the sink lives.
-    # coproc, because this shell has to hold the write end of the sink's stdin:
-    # that pipe closing is what tells the sink its test is gone. A plain
-    # background job would be handed /dev/null instead (#1258).
-    # shellcheck disable=SC2034 # the array IS the use: this shell holding its fds
-    coproc SINK {
-        exec "$py" "$(nativepath "$sink")" "$1" "$(nativepath "$posts")" >"$sinklog" 2>&1
-    }
-    sinkpid=$SINK_PID
+    # This shell keeps the only write end of the sink's stdin, and that pipe
+    # closing is what tells the sink its test is gone. A plain background job
+    # would be handed /dev/null instead (#1258). A fifo rather than coproc,
+    # because macOS runs the suite under bash 3.2, and fd 8 because testlib's
+    # poll timer owns 9. Read-write so the open waits for no reader, and 8<&-
+    # so the sink holds no write end of its own.
+    rm -f "$sinkfifo"
+    mkfifo "$sinkfifo"
+    exec 8<>"$sinkfifo"
+    "$py" "$(nativepath "$sink")" "$1" "$(nativepath "$posts")" \
+        <"$sinkfifo" 8<&- >"$sinklog" 2>&1 &
+    sinkpid=$!
     # Where the teardown can find it: sink_start runs in a subshell of its own.
     echo "$sinkpid" >"$sinkpidfile"
     port=$(discover_server_port "$sinklog" "$sinkpid") ||
@@ -659,11 +664,13 @@ orphan_sink_leg() {
     # failure in a log that passed.
     {
         (
-            # shellcheck disable=SC2034 # held, not read: see sink_start above
-            coproc OSINK {
-                exec "$py" "$(nativepath "$sink")" 201 "$(nativepath "$dir/posts")" >"$log" 2>&1
-            }
-            sp=$OSINK_PID
+            # Its own pipe, held here and nowhere else, so the kill below is
+            # the only thing that can end it. See sink_start above.
+            mkfifo "$dir/alive"
+            exec 8<>"$dir/alive"
+            "$py" "$(nativepath "$sink")" 201 "$(nativepath "$dir/posts")" \
+                <"$dir/alive" 8<&- >"$log" 2>&1 &
+            sp=$!
             # Where the teardown can find it, so a leg that fails still reaps it.
             echo "$sp" >"$sinkpidfile"
             discover_server_port "$log" "$sp" >/dev/null || exit 1
