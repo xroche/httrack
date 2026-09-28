@@ -1,10 +1,12 @@
 #!/bin/bash
 #
-# url_savename() collapsed "../" and then handed the name to the savename hook,
+# url_savename() collapses "../" and then hands the name to the savename hook,
 # which rewrites it where it is, so whatever the hook wrote reached the open()
 # unchecked. Measured before the fix: "../../X" put a file one directory above
 # the mirror root, and with no -O, where the root a name joins to is empty, an
-# absolute name was used verbatim.
+# absolute name was used verbatim. The first fix then only looked at the name
+# when the engine's own was already relative, which -N100 on a "//path" URL is
+# not, so that whole family walked straight past it.
 
 set -e
 # shellcheck source=tests/crawllib.sh
@@ -43,80 +45,102 @@ local_server_start --root "$site"
 
 host="127.0.0.1_${SRV_PORT}" # the directory the engine names a mirror after
 
-common=(--quiet --robots=0 --timeout=30 --retries=0 -r2)
+common=(--quiet --robots=0 --timeout=30 --retries=0)
 
-# Every file under $1 that the mirror root $1/mirror does not hold.
-outside_files() { # outside_files JAIL
-    find "$1" -mindepth 1 -type f -not -path "$1/mirror/*" | LC_ALL=C sort
+refused='which leaves the mirror' # the LOG_WARNING url_savename() prints
+
+# Each case gets its own jail holding the mirror root and one planted file. The
+# planted file is what an escape-free run must leave behind, so a find that
+# cannot see a stray reports nothing here and fails too.
+jail() { # jail NAME
+    mkdir -p "$tmpdir/$1/mirror"
+    : >"$tmpdir/$1/planted"
+    echo "$tmpdir/$1"
 }
 
-# Control for that scan: an empty result below has to mean the engine wrote
-# nothing there, not that the scan cannot see a file.
-seen="$tmpdir/seen"
-mkdir -p "$seen/mirror"
-: >"$seen/planted"
-test "$(outside_files "$seen")" = "$seen/planted" ||
-    fail "the outside-the-mirror scan missed a planted file, so a clean result proves nothing"
+assert_no_stray() { # assert_no_stray JAIL WHAT
+    local got
+    got=$(find "$1" -mindepth 1 -type f -not -path "$1/mirror/*" | LC_ALL=C sort)
+    test "$got" = "$1/planted" || fail "$2: wrote outside the mirror: $got"
+}
+
+# A refusal is loud, and lands in the mirror's own log even under --quiet. It
+# fires twice per file: once for the ".delayed" name, once for the final one.
+assert_refused() { # assert_refused JAIL WHAT
+    local log="$1/mirror/hts-log.txt" n=0
+    test -f "$log" || fail "$2: no log written at $log"
+    n=$(grep -c "$refused" "$log") || n=0
+    test "$n" -ge 1 || fail "$2: the refusal was not logged"
+}
 
 # The page the hook renames, under the name the engine itself built for it.
-assert_kept() { # assert_kept JAIL WHAT
-    local saved="$1/mirror/$host/sub/page.html"
-    test -f "$saved" || fail "$2: nothing saved at $saved"
-    grep -q SUBPAGE <"$saved" || fail "$2: $saved is not the page we served"
+assert_kept() { # assert_kept SAVED WHAT
+    test -f "$1" || fail "$2: nothing saved at $1"
+    grep -q SUBPAGE <"$1" || fail "$2: $1 is not the page we served"
 }
 
 # ---------------------------------------------------------------------------
 # A ".." component walks out of the mirror root the name is joined to.
 # ---------------------------------------------------------------------------
-esc="$tmpdir/esc"
-mkdir -p "$esc/mirror"
+esc=$(jail esc)
 rc=0
-local_crawl --log "$tmpdir/esc.log" -O "$esc/mirror" "${common[@]}" \
+local_crawl --log "$tmpdir/esc.log" -O "$esc/mirror" "${common[@]}" -r2 \
     --wrapper "${lib},sub,../../ESCAPED" \
     "http://127.0.0.1:${SRV_PORT}/index.html" || rc=$?
 test "$rc" -eq 0 || fail_dump "httrack exited $rc" "$tmpdir/esc.log"
 
-stray=$(outside_files "$esc")
-test -z "$stray" || fail "a savename hook writing \"../../\" left the mirror: $stray"
-assert_kept "$esc" 'the "../" name was refused'
+assert_no_stray "$esc" 'a savename hook writing "../../"'
+assert_refused "$esc" 'the "../" name'
+assert_kept "$esc/mirror/$host/sub/page.html" 'the "../" name was refused'
+
+# ---------------------------------------------------------------------------
+# The engine's own name is absolute under -N100 on a URL whose path starts with
+# "//", so a guard that only watches names that started out relative never runs.
+# ---------------------------------------------------------------------------
+dbl=$(jail dbl)
+rc=0
+local_crawl --log "$tmpdir/dbl.log" -O "$dbl/mirror" "${common[@]}" -r1 -N100 \
+    --wrapper "${lib},page,../../ESCAPED" \
+    "http://127.0.0.1:${SRV_PORT}//sub/page.html" || rc=$?
+test "$rc" -eq 0 || fail_dump "httrack exited $rc" "$tmpdir/dbl.log"
+
+assert_no_stray "$dbl" 'a savename hook under -N100 on a "//" URL'
+assert_refused "$dbl" 'the -N100 name'
+# -N100 drops the host directory, and the engine keeps its own name.
+assert_kept "$dbl/mirror/sub/page.html" 'the -N100 name was refused'
 
 # ---------------------------------------------------------------------------
 # An absolute name, which only escapes with no -O. The hook replaces the host
 # directory too, so the whole name is absolute rather than rooted under it.
 # ---------------------------------------------------------------------------
-abs="$tmpdir/abs"
-mkdir -p "$abs/mirror"
+abs=$(jail abs)
 rc=0
 (
     cd "$abs/mirror" &&
         run_with_timeout "$(crawl_deadline)" "$httrack_bin" \
             "http://127.0.0.1:${SRV_PORT}/index.html" \
-            "--max-time=$CRAWL_MAX_TIME" "${common[@]}" \
+            "--max-time=$CRAWL_MAX_TIME" "${common[@]}" -r2 \
             --wrapper "${lib},${host}/sub,${abs}/ABSOLUTE"
 ) >"$tmpdir/abs.log" 2>&1 || rc=$?
-test "$rc" -ne 124 || fail "crawl watchdog fired on the absolute-name case"
 test "$rc" -eq 0 || fail_dump "httrack exited $rc" "$tmpdir/abs.log"
 
-test ! -e "$abs/ABSOLUTE" ||
-    fail "a savename hook writing an absolute path left the mirror: $(outside_files "$abs")"
-assert_kept "$abs" 'the absolute name was refused'
+assert_no_stray "$abs" 'a savename hook writing an absolute path'
+assert_refused "$abs" 'the absolute name'
 
 # ---------------------------------------------------------------------------
-# Control: an ordinary rename still reaches the filesystem, so the two checks
-# above cannot pass by breaking every savename hook.
+# Control: an ordinary rename still reaches the filesystem and is not logged as
+# a refusal, so the checks above cannot pass by refusing every savename hook.
 # ---------------------------------------------------------------------------
-ok="$tmpdir/ok"
-mkdir -p "$ok/mirror"
+ok=$(jail ok)
 rc=0
-local_crawl --log "$tmpdir/ok.log" -O "$ok/mirror" "${common[@]}" \
+local_crawl --log "$tmpdir/ok.log" -O "$ok/mirror" "${common[@]}" -r2 \
     --wrapper "${lib},sub,renamed" \
     "http://127.0.0.1:${SRV_PORT}/index.html" || rc=$?
 test "$rc" -eq 0 || fail_dump "httrack exited $rc" "$tmpdir/ok.log"
 
-renamed="$ok/mirror/$host/renamed/page.html"
-test -f "$renamed" || fail "an ordinary savename hook no longer renames: nothing at $renamed"
-grep -q SUBPAGE <"$renamed" || fail "$renamed is not the page we served"
-stray=$(outside_files "$ok")
-test -z "$stray" || fail "an ordinary rename wrote outside the mirror: $stray"
+assert_kept "$ok/mirror/$host/renamed/page.html" 'an ordinary savename hook'
+if grep -q "$refused" <"$ok/mirror/hts-log.txt"; then
+    fail "an ordinary rename was logged as leaving the mirror"
+fi
 
 ok "a savename hook cannot leave the mirror, and an ordinary rename still works"

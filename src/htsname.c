@@ -1473,11 +1473,16 @@ int url_savename(lien_adrfilsave *const afs,
   }
 */
 
-  // éviter les / au début (cause: N100)
+  /* Drop EVERY leading slash, not just one: the name is joined to the output
+     directory below, so one left behind makes it absolute (-N100 on a "//path"
+     URL, or a -N template starting with "//"). */
   if (afs->save[0] == '/') {
     char BIGSTK tempo[HTS_URLMAXSIZE * 2];
+    const char *start = afs->save;
 
-    strcpybuff(tempo, afs->save + 1);
+    while (*start == '/')
+      start++;
+    strcpybuff(tempo, start);
     strcpybuff(afs->save, tempo);
   }
 
@@ -1566,23 +1571,22 @@ int url_savename(lien_adrfilsave *const afs,
 
   /* callback */
   {
-    /* The hook rewrites afs->save where it is and nothing sanitizes it after,
-       so keep the engine's own name when the hook's would leave the mirror.
-       Refused rather than collapsed, because an absolute name has no "../" to
-       drop. was_contained spares a user's own -N template, which may be
-       absolute. */
-    char BIGSTK contained_save[HTS_URLMAXSIZE * 2];
-    const hts_boolean was_contained = hts_path_is_relative_contained(afs->save);
+    /* Nothing sanitizes what the hook writes here, and the name is joined to
+       the output directory below, so it has to come back relative and
+       ".."-free. Checked whatever the engine handed in, because the engine's
+       own name already qualifies and only a hook can break it. Refused rather
+       than collapsed, because an absolute name has no "../" to drop. */
+    char BIGSTK engine_save[HTS_URLMAXSIZE * 2];
 
-    strcpybuff(contained_save, afs->save);
+    strcpybuff(engine_save, afs->save);
     RUN_CALLBACK5(opt, savename, adr_complete, fil_complete, referer_adr,
                   referer_fil, afs->save);
-    if (was_contained && !hts_path_is_relative_contained(afs->save)) {
+    if (!hts_path_is_relative_contained(afs->save)) {
       hts_log_print(opt, LOG_WARNING,
                     "engine: save-name: the hook returned \"%s\", which leaves "
                     "the mirror, so the engine keeps \"%s\"",
-                    afs->save, contained_save);
-      strcpybuff(afs->save, contained_save);
+                    afs->save, engine_save);
+      strcpybuff(afs->save, engine_save);
     }
   }
 

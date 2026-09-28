@@ -37,6 +37,15 @@ want 'web/pic.gif' 42 /dir/pic.gif image/gif
 # 10 also pins the selector's modulus: under `% 10` it would be a site structure.
 want 'web/pic.gif' 10 /dir/pic.gif image/gif
 
+# A URL path opening on "//", and a -N template doing the same: the name has to
+# come back relative to the mirror root under every type, because url_savename()
+# refuses a name that is not, hook or no hook.
+want 'www.example.com/dir/page.html' 0 //dir/page.html text/html
+want 'dir/page.html' 100 //dir/page.html text/html
+want 'dir/page.html' 3000 //dir/page.html text/html
+selftest_queue 'savename: /dev/null/x/www.example.com/dir/page.html' savename \
+    /dir/page.html text/html type=-1 'userdef=//x/%h%p/%n.%t'
+
 # An extensionless name gets .html forced on, except under the -N template.
 want 'web/noext.html' 3 /dir/noext text/html
 selftest_queue 'savename: /dev/null/www.example.com/dir/noext' savename \

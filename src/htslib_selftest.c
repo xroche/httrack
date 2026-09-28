@@ -2392,6 +2392,11 @@ static int st_pathcontained(httrackp *opt, int argc, char **argv) {
   static const char *const contained[] = {"a..b",  "..a",   "a..",    "...",
                                           "a/b.c", "a/...", "a/b..c", ".",
                                           "",      "a/./b", NULL};
+  /* hts_path_is_relative_contained() also refuses a name carrying its own
+     root, which url_savename() leans on to keep a hook inside the mirror. */
+  static const char *const rooted[] = {
+      "/x", "\\x", "\\\\srv\\share", "C:\\x", "c:rel", "z:/x", NULL};
+  static const char *const relative[] = {"x", "a/b", "a..b", "c_/x", "", NULL};
   int failures = 0;
   size_t i;
 
@@ -2410,6 +2415,24 @@ static int st_pathcontained(httrackp *opt, int argc, char **argv) {
       failures++;
     }
   }
+  for (i = 0; escaping[i] != NULL; i++) {
+    if (hts_path_is_relative_contained(escaping[i])) {
+      printf("pathcontained: relative '%s' was accepted\n", escaping[i]);
+      failures++;
+    }
+  }
+  for (i = 0; rooted[i] != NULL; i++) {
+    if (hts_path_is_relative_contained(rooted[i])) {
+      printf("pathcontained: rooted '%s' was accepted\n", rooted[i]);
+      failures++;
+    }
+  }
+  for (i = 0; relative[i] != NULL; i++) {
+    if (!hts_path_is_relative_contained(relative[i])) {
+      printf("pathcontained: relative '%s' was refused\n", relative[i]);
+      failures++;
+    }
+  }
   if (failures == 0)
     printf("pathcontained: OK\n");
   return failures != 0;
@@ -2423,7 +2446,8 @@ const struct selftest_entry selftests_lib[] = {
      st_strsprintf},
     {"arena", "", "htsarena.h hands out addresses that never move", st_arena},
     {"pathcontained", "",
-     "a \"..\" path component is refused and a \"..\" inside a name is not",
+     "a \"..\" component, and a name carrying its own root, are refused; a "
+     "\"..\" inside a name is not",
      st_pathcontained},
     {"arrays", "[overflow-capa|overflow-loop]",
      "htsarrays.h growth reaches the requested room, or reports it failed",

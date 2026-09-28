@@ -61,3 +61,7 @@ case "$err" in
     exit 1
     ;;
 esac
+
+# htssafe.h's path guards, which url_savename() and the cache reader both use
+# to refuse a filename that would leave the mirror.
+assert_selftest "pathcontained: OK" pathcontained
