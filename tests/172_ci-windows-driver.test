@@ -18,6 +18,18 @@ driver="$testdir/ci-windows-suite.sh"
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ciwin.XXXXXX")
 cleanup_push rm -rf "$tmp"
 
+# Every watchdog started under $tmp, killed before the rm -rf above unlinks the
+# log it holds open: the stack runs LIFO, so this has to be pushed after it.
+# ci_reap_recorded_watchdog comes with the driver sourced below.
+reap_watchdogs() {
+    local f
+    for f in "$tmp"/watchdog.pid "$tmp"/*/watchdog.pid; do
+        test -r "$f" || continue
+        ci_reap_recorded_watchdog "${f%/*}"
+    done
+}
+cleanup_push reap_watchdogs
+
 cd "$tmp"
 
 path_before=$PATH
@@ -91,6 +103,9 @@ while :; do
 done
 EOF
 chmod +x "$bin/pwsh"
+# Joined here, before the first subshell puts it on PATH: a later read of $PATH
+# is what SC2031 flags.
+stubpath=$bin:$PATH
 # Ahead of any command -v, which asks access(X_OK) and so reads false here.
 test -x "$bin/pwsh" || skip "${TMPDIR:-/tmp} is noexec, the stub bindir cannot be run"
 test "$(PATH="$bin:$PATH" command -v pwsh)" = "$bin/pwsh" ||
@@ -299,5 +314,46 @@ test ! -e "$tmp/fd-dead" ||
     fail "the heartbeat was already dead at the kill, so a prompt EOF proves nothing"
 test "$lat" -le 4 ||
     fail "EOF ${lat}s after the heartbeat died: its sleep inherited the caller's stdout"
+
+# A driver that dies without running its EXIT trap orphans the watchdog, which
+# keeps writing into a watchdog.log the teardown then unlinks: 12 such orphans
+# pinned 11 GB of a 16 GB /tmp, invisible to du because no name is left.
+orphan=$tmp/orphan
+witness=$tmp/orphan.pid
+mkdir -p "$orphan"
+: >"$witness"
+# Grouped, or bash announces the SIGKILL it reaped and that reads as a failure
+# in a log that passed.
+{
+    (
+        cd "$orphan"
+        PATH=$stubpath
+        export PATH
+        ci_watchdog_pid=''
+        ci_start_native_watchdog "$orphan/progress.log" || exit 1
+        printf '%s\n' "$ci_watchdog_pid" >"$witness"
+        # $BASHPID, not $$, which inside a subshell still names the test.
+        kill -9 "$BASHPID"
+    ) || true
+} 2>"$tmp/orphan.err"
+wd=$(cat "$witness")
+test -n "$wd" || fail_dump "the orphan leg launched no watchdog" "$tmp/orphan.err"
+# Both halves of the control: a watchdog that died with its parent, or one that
+# never held the log, would make the verdict below vacuous.
+kill -0 "$wd" 2>/dev/null || fail "the watchdog $wd died with its parent, so nothing was orphaned"
+if fd1=$(readlink "/proc/$wd/fd/1" 2>/dev/null); then
+    test "$fd1" = "$orphan/watchdog.log" || fail "the orphan holds $fd1, not the watchdog log"
+else
+    fd1="the watchdog log" # msys names no open file under /proc
+fi
+
+reap_watchdogs
+n=0
+while test "$n" -lt 50 && kill -0 "$wd" 2>/dev/null; do
+    sleep 0.2
+    n=$((n + 1))
+done
+kill -0 "$wd" 2>/dev/null &&
+    fail "the orphaned watchdog $wd survived the teardown, still holding $fd1"
 
 echo "ci-windows driver OK"

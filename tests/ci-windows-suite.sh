@@ -176,6 +176,10 @@ ci_start_native_watchdog() {
         -ProgressLog "$(nativepath "$progress")" \
         >>watchdog.log 2>&1 &
     ci_watchdog_pid=$!
+    # Beside the log it holds open: a caller in another subshell has no other way
+    # to reap this process, and one that outlives its parent writes forever into
+    # a log the teardown has already unlinked.
+    echo "$ci_watchdog_pid" >watchdog.pid
     # $! comes from the fork, not the exec: wait for it to actually speak.
     while test "$waited" -lt "$ci_watchdog_wait"; do
         ci_watchdog_spoke && return 0
@@ -187,7 +191,20 @@ ci_start_native_watchdog() {
     ci_watchdog_spoke && return 0
     kill_pid "$ci_watchdog_pid"
     ci_watchdog_pid=''
+    rm -f watchdog.pid
     return 1
+}
+
+# Kill the watchdog recorded under $1 (default: here) and forget it. Only a
+# record with no live process behind it is stale, so every path that kills the
+# watchdog drops it too.
+ci_reap_recorded_watchdog() {
+    local dir=${1:-.} pid=''
+    test -r "$dir/watchdog.pid" || return 0
+    read -r pid <"$dir/watchdog.pid" || pid=''
+    rm -f "$dir/watchdog.pid"
+    case $pid in '' | *[!0-9]*) return 0 ;; esac
+    kill_pid "$pid"
 }
 
 # End the step, announcing $2 first: the kill runs no EXIT trap, so an unexplained
@@ -586,7 +603,7 @@ ci_start_native_watchdog "$PWD/$progress" && watchdog=$ci_watchdog_pid
 test -n "$watchdog" || echo "no off-box watchdog: no usable PowerShell"
 ci_suite_heartbeat 960 360 "$progress" "$stuck" $$ "$hard_deadline" &
 heartbeat=$!
-trap 'set +e; kill "$heartbeat" 2>/dev/null; test -z "$watchdog" || kill_pid "$watchdog"' EXIT
+trap 'set +e; kill "$heartbeat" 2>/dev/null; test -z "$watchdog" || kill_pid "$watchdog"; ci_reap_recorded_watchdog' EXIT
 
 pass=0 fail=0 skip=0 lost=0 failed="" skipped="" vanished="" deadline=0
 # Tests in flight at once, min(2*nproc, 16), unless the caller pins it
