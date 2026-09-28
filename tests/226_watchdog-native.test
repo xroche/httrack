@@ -566,7 +566,6 @@ import os
 import socketserver
 import sys
 import threading
-import time
 
 codes = [int(c) for c in sys.argv[1].split(",")]
 rec = sys.argv[2]
@@ -597,14 +596,12 @@ srv = Sink(("127.0.0.1", 0), Handler)
 sys.stdout.reconfigure(newline="\n")
 print("PORT %d" % srv.server_port, flush=True)
 
-# A SIGKILLed test runs no trap, so nothing out there reaps this sink. Against
-# the pid we started under rather than 1, because a reparent lands on whatever
-# subreaper the container set.
-start_ppid = os.getppid()
-
+# A SIGKILLed test runs no trap, so nothing out there reaps this sink. The parent
+# holds the write end of the pipe on stdin and writes nothing, so this read ends
+# only once the parent is gone. os.getppid() cannot serve: a native Windows
+# CPython reads the creator pid from a startup snapshot that never changes.
 def exit_once_orphaned():
-    while os.getppid() == start_ppid:
-        time.sleep(1)
+    sys.stdin.buffer.read(1)
     os._exit(0)
 
 threading.Thread(target=exit_once_orphaned, daemon=True).start()
@@ -620,8 +617,14 @@ sink_start() {
     : >"$sinklog"
     # Its own log: a leg's command substitution would else wait on the pipe the
     # sink inherited for as long as the sink lives.
-    "$py" "$(nativepath "$sink")" "$1" "$(nativepath "$posts")" >"$sinklog" 2>&1 &
-    sinkpid=$!
+    # coproc, because this shell has to hold the write end of the sink's stdin:
+    # that pipe closing is what tells the sink its test is gone. A plain
+    # background job would be handed /dev/null instead (#1258).
+    # shellcheck disable=SC2034 # the array IS the use: this shell holding its fds
+    coproc SINK {
+        exec "$py" "$(nativepath "$sink")" "$1" "$(nativepath "$posts")" >"$sinklog" 2>&1
+    }
+    sinkpid=$SINK_PID
     # Where the teardown can find it: sink_start runs in a subshell of its own.
     echo "$sinkpid" >"$sinkpidfile"
     port=$(discover_server_port "$sinklog" "$sinkpid") ||
@@ -656,8 +659,11 @@ orphan_sink_leg() {
     # failure in a log that passed.
     {
         (
-            "$py" "$(nativepath "$sink")" 201 "$(nativepath "$dir/posts")" >"$log" 2>&1 &
-            sp=$!
+            # shellcheck disable=SC2034 # held, not read: see sink_start above
+            coproc OSINK {
+                exec "$py" "$(nativepath "$sink")" 201 "$(nativepath "$dir/posts")" >"$log" 2>&1
+            }
+            sp=$OSINK_PID
             # Where the teardown can find it, so a leg that fails still reaps it.
             echo "$sp" >"$sinkpidfile"
             discover_server_port "$log" "$sp" >/dev/null || exit 1
@@ -689,7 +695,10 @@ orphan_sink_leg() {
     opaque)
         # /proc is here, so only an interop pid hides the descriptor of a sink
         # this shell just saw answer.
-        skipped+=("the orphaned sink's own exit: /proc names no descriptor of this sink")
+        # note_coverage, not an append to the skipped list: shellcheck answers
+        # SC2031 on one from this block and the lint is a required check, so
+        # the three notes this section owes are all reported as they happen.
+        note_coverage "not exercised: the orphaned sink's own exit: /proc names no descriptor of this sink"
         stop_server "$osink"
         ;;
     dead)
@@ -703,9 +712,9 @@ orphan_sink_leg() {
     : >"$sinkpidfile"
 }
 if test -z "$py"; then
-    skipped+=("the orphaned sink's own exit: no python3 here")
+    note_coverage "not exercised: the orphaned sink's own exit: no python3 here"
 elif ! test -d /proc/self/fd; then
-    skipped+=("the orphaned sink's own exit: no /proc here to tell a zombie from a live sink")
+    note_coverage "not exercised: the orphaned sink's own exit: no /proc here to tell a zombie from a live sink"
 else
     orphan_sink_leg
 fi
