@@ -11,6 +11,7 @@ set -eu
 . "${0%"${0##*/}"}./testlib.sh"
 
 require_httrack
+skip_crash_on_hurd
 have_feature crashtest || {
     echo "built with --disable-crash-test, skipping" >&2
     exit 77

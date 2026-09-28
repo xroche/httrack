@@ -11,6 +11,7 @@ set -eu
 
 skip_on_windows "the fatal handler takes another path here"
 require_httrack
+skip_crash_on_hurd
 have_feature crashtest || skip "built with --disable-crash-test"
 
 ulimit -c 0 # and the runs below happen in $tmp, so a core would stay there

@@ -8,6 +8,7 @@ set -eu
 
 skip_on_windows "no backtrace() on Windows"
 require_httrack
+skip_crash_on_hurd
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_symbolize.XXXXXX") || exit 1
 cleanup_push rm -rf "$tmpdir"
