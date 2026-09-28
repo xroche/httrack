@@ -1,0 +1,146 @@
+#!/bin/bash
+#
+# url_savename() collapses "../" and then hands the name to the savename hook,
+# which rewrites it where it is, so whatever the hook wrote reached the open()
+# unchecked. Measured before the fix: "../../X" put a file one directory above
+# the mirror root, and with no -O, where the root a name joins to is empty, an
+# absolute name was used verbatim. The first fix then only looked at the name
+# when the engine's own was already relative, which -N100 on a "//path" URL is
+# not, so that whole family walked straight past it.
+
+set -e
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+[ "${EXAMPLE_LIBS:-yes}" = yes ] || skip "--disable-example-libs builds no plugin"
+[ -n "${FILENAME2_LIB:-}" ] || skip "FILENAME2_LIB unset, no automake environment"
+
+lib=
+for suffix in so dylib; do
+    if [ -r "${FILENAME2_LIB}.${suffix}" ]; then
+        lib="${FILENAME2_LIB}.${suffix}"
+        break
+    fi
+done
+[ -n "$lib" ] || skip "nothing built at ${FILENAME2_LIB}.so"
+
+require_httrack
+# Resolved now: the no-O case below runs from inside its own mirror directory.
+httrack_bin=$(httrack_path)
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_savesc.XXXXXX") || exit 1
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+site="$tmpdir/site"
+mkdir -p "$site/sub"
+cat >"$site/index.html" <<'HTML'
+<html><body><a href="sub/page.html">p</a></body></html>
+HTML
+printf '<html><body>SUBPAGE</body></html>\n' >"$site/sub/page.html"
+
+local_server_start --root "$site"
+
+host="127.0.0.1_${SRV_PORT}" # the directory the engine names a mirror after
+
+common=(--quiet --robots=0 --timeout=30 --retries=0)
+
+refused='which leaves the mirror' # the LOG_WARNING url_savename() prints
+
+# Each case gets its own jail holding the mirror root and one planted file. The
+# planted file is what an escape-free run must leave behind, so a find that
+# cannot see a stray reports nothing here and fails too.
+jail() { # jail NAME
+    mkdir -p "$tmpdir/$1/mirror"
+    : >"$tmpdir/$1/planted"
+    echo "$tmpdir/$1"
+}
+
+assert_no_stray() { # assert_no_stray JAIL WHAT
+    local got
+    got=$(find "$1" -mindepth 1 -type f -not -path "$1/mirror/*" | LC_ALL=C sort)
+    test "$got" = "$1/planted" || fail "$2: wrote outside the mirror: $got"
+}
+
+# A refusal is loud, and lands in the mirror's own log even under --quiet. It
+# fires twice per file: once for the ".delayed" name, once for the final one.
+assert_refused() { # assert_refused JAIL WHAT
+    local log="$1/mirror/hts-log.txt" n=0
+    test -f "$log" || fail "$2: no log written at $log"
+    n=$(grep -c "$refused" "$log") || n=0
+    test "$n" -ge 1 || fail "$2: the refusal was not logged"
+}
+
+# The page the hook renames, under the name the engine itself built for it.
+assert_kept() { # assert_kept SAVED WHAT
+    test -f "$1" || fail "$2: nothing saved at $1"
+    grep -q SUBPAGE <"$1" || fail "$2: $1 is not the page we served"
+}
+
+# ---------------------------------------------------------------------------
+# A ".." component walks out of the mirror root the name is joined to.
+# ---------------------------------------------------------------------------
+esc=$(jail esc)
+rc=0
+local_crawl --log "$tmpdir/esc.log" -O "$esc/mirror" "${common[@]}" -r2 \
+    --wrapper "${lib},sub,../../ESCAPED" \
+    "http://127.0.0.1:${SRV_PORT}/index.html" || rc=$?
+test "$rc" -eq 0 || fail_dump "httrack exited $rc" "$tmpdir/esc.log"
+
+assert_no_stray "$esc" 'a savename hook writing "../../"'
+assert_refused "$esc" 'the "../" name'
+assert_kept "$esc/mirror/$host/sub/page.html" 'the "../" name was refused'
+
+# ---------------------------------------------------------------------------
+# The engine's own name is absolute under -N100 on a URL whose path starts with
+# "//", so a guard that only watches names that started out relative never runs.
+# ---------------------------------------------------------------------------
+dbl=$(jail dbl)
+rc=0
+local_crawl --log "$tmpdir/dbl.log" -O "$dbl/mirror" "${common[@]}" -r1 -N100 \
+    --wrapper "${lib},page,../../ESCAPED" \
+    "http://127.0.0.1:${SRV_PORT}//sub/page.html" || rc=$?
+test "$rc" -eq 0 || fail_dump "httrack exited $rc" "$tmpdir/dbl.log"
+
+assert_no_stray "$dbl" 'a savename hook under -N100 on a "//" URL'
+assert_refused "$dbl" 'the -N100 name'
+# -N100 drops the host directory, and the engine keeps its own name.
+assert_kept "$dbl/mirror/sub/page.html" 'the -N100 name was refused'
+
+# ---------------------------------------------------------------------------
+# An absolute name, which only escapes with no -O. The hook replaces the host
+# directory too, so the whole name is absolute rather than rooted under it.
+# ---------------------------------------------------------------------------
+abs=$(jail abs)
+rc=0
+(
+    cd "$abs/mirror" &&
+        run_with_timeout "$(crawl_deadline)" "$httrack_bin" \
+            "http://127.0.0.1:${SRV_PORT}/index.html" \
+            "--max-time=$CRAWL_MAX_TIME" "${common[@]}" -r2 \
+            --wrapper "${lib},${host}/sub,${abs}/ABSOLUTE"
+) >"$tmpdir/abs.log" 2>&1 || rc=$?
+test "$rc" -eq 0 || fail_dump "httrack exited $rc" "$tmpdir/abs.log"
+
+assert_no_stray "$abs" 'a savename hook writing an absolute path'
+assert_refused "$abs" 'the absolute name'
+
+# ---------------------------------------------------------------------------
+# Control: an ordinary rename still reaches the filesystem and is not logged as
+# a refusal, so the checks above cannot pass by refusing every savename hook.
+# ---------------------------------------------------------------------------
+ok=$(jail ok)
+rc=0
+local_crawl --log "$tmpdir/ok.log" -O "$ok/mirror" "${common[@]}" -r2 \
+    --wrapper "${lib},sub,renamed" \
+    "http://127.0.0.1:${SRV_PORT}/index.html" || rc=$?
+test "$rc" -eq 0 || fail_dump "httrack exited $rc" "$tmpdir/ok.log"
+
+assert_kept "$ok/mirror/$host/renamed/page.html" 'an ordinary savename hook'
+if grep -q "$refused" <"$ok/mirror/hts-log.txt"; then
+    fail "an ordinary rename was logged as leaving the mirror"
+fi
+
+ok "a savename hook cannot leave the mirror, and an ordinary rename still works"

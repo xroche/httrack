@@ -157,6 +157,17 @@ static void cleanDoubleSlash(char *s) {
   }
 }
 
+/* Drop every leading '/': the name is joined to the output directory, so one
+   left behind makes it absolute. */
+static void stripLeadingSlashes(char *s) {
+  const char *start = s;
+
+  while (*start == '/')
+    start++;
+  if (start != s)
+    memmove(s, start, strlen(start) + 1);
+}
+
 /* Strip all ending . or ' ' (windows-forbidden) */
 static void cleanEndingSpaceOrDot(char *s) {
   int i, j, lastWriteEnd;
@@ -1564,9 +1575,34 @@ int url_savename(lien_adrfilsave *const afs,
 
   /* convert name to UTF-8 ? Note: already done while parsing. */
 
+  /* The strip above takes one slash, and cleanEndingSpaceOrDot() puts one back
+     by emptying a component made only of dots or spaces ("/.../x.html" ->
+     "/x.html"), which fil_simplifie() then keeps. Stripped here rather than up
+     there, so the reserved-name and 8.3 passes see the name master gave them:
+     the check below only needs it relative at this point. */
+  stripLeadingSlashes(afs->save);
+
   /* callback */
-  RUN_CALLBACK5(opt, savename, adr_complete, fil_complete, referer_adr,
-                referer_fil, afs->save);
+  {
+    /* Nothing sanitizes what the hook writes here, and the name is joined to
+       the output directory below, so it has to come back relative and
+       ".."-free. Checked whatever the engine handed in, because the engine's
+       own name is relative by the line above, and only a hook can break it.
+       Refused rather than collapsed, because an absolute name has no "../" to
+       drop. */
+    char BIGSTK engine_save[HTS_URLMAXSIZE * 2];
+
+    strcpybuff(engine_save, afs->save);
+    RUN_CALLBACK5(opt, savename, adr_complete, fil_complete, referer_adr,
+                  referer_fil, afs->save);
+    if (!hts_path_is_relative_contained(afs->save)) {
+      hts_log_print(opt, LOG_WARNING,
+                    "engine: save-name: the hook returned \"%s\", which leaves "
+                    "the mirror, so the engine keeps \"%s\"",
+                    afs->save, engine_save);
+      strcpybuff(afs->save, engine_save);
+    }
+  }
 
   hts_log_print(opt, LOG_DEBUG, "engine: save-name: local name: %s%s -> %s",
                 adr, fil, afs->save);
