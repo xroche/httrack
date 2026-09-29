@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# windows-build.yml's job names generate the two status contexts the branch
-# ruleset requires by name, so any edit that renames them stops both from
-# reporting on every open PR, not just the one that made the edit.
+# windows-build.yml's job names must keep generating the status contexts the
+# branch ruleset requires by name, or they stop reporting on every open PR.
 
 set -euo pipefail
 

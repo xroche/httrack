@@ -456,7 +456,7 @@ jobs:
           key: wsl-rootfs-jammy-amd64-v1
 
       - name: Save the WSL kernel package
-        if: env.RUNNABLE == 'true' && steps.wslkernel.outputs.cache-hit != 'true' && steps.wslkernelfetch.outcome == 'success'
+        if: steps.wslkernel.outputs.cache-hit != 'true' && steps.wslkernelfetch.outcome == 'success'
         uses: actions/cache/save@v6
         with:
           path: ${{ runner.temp }}\wsl_update_x64.msi
