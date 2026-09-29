@@ -1,0 +1,93 @@
+#!/bin/bash
+#
+# Every test that faults a process on purpose must skip on GNU/Hurd, where
+# ext2fs has taken the VM down under one (#1831). A new one that forgets only
+# shows up as a tier-2 leg that died with no test having failed.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# Linux-only already, so the Hurd never reaches their faults. Named rather than
+# matched, because the four of them spell the gate three different ways and a
+# fourth spelling would read as a guard this check never agreed to.
+exempt="143_engine-backtrace-empty.test
+181_altstack-honoured.test
+182_crash-fork-safety.test
+218_crash-nopie-frames.test"
+
+# Does this file make the fatal-signal handler run? `-#c=bogus` is refused
+# before anything faults, so it goes before the scan rather than exempting its
+# file by name. The bare `-#c` counts only on a line that runs httrack, or the
+# option named in a message would read as a crash.
+faults() { # faults FILE
+    local line
+    while IFS= read -r line; do
+        line=${line//-#c=bogus/}
+        case $line in
+        *-#c=* | *-#test=strsafe* | *-#test=crashannounce*) return 0 ;;
+        *httrack*-#c) return 0 ;;
+        *httrack*-#c[\ \"\']*) return 0 ;;
+        esac
+    done <"$1"
+    return 1
+}
+
+unguarded() { # unguarded DIR -> the names, and the counts on stderr
+    local dir=$1 f name crashers=0 guarded=0
+    for f in "$dir"/*.test; do
+        test -f "$f" || continue
+        name=${f##*/}
+        # This file runs nothing: its crash options are the probe strings below.
+        test "$name" != "${0##*/}" || continue
+        faults "$f" || continue
+        # Counted before the exemptions, so the floor below measures what the
+        # scan still reaches and not what it is allowed to ignore.
+        crashers=$((crashers + 1))
+        grep -qxF "$name" <<<"$exempt" && continue
+        if grep -q '^skip_crash_on_hurd$' "$f"; then
+            guarded=$((guarded + 1))
+        else
+            echo "$name"
+        fi
+    done
+    echo "$crashers $guarded" >&2
+}
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/crash_guard.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "$work"
+
+counts=$(unguarded "$testdir" 2>&1 >"$work/left")
+read -r crashers guarded <<<"$counts"
+test -s "$work/left" &&
+    fail "these fault a process but do not call skip_crash_on_hurd: $(tr '\n' ' ' <"$work/left")"
+
+# Floors, at the counts the tree holds. Without them a scan that matched
+# nothing would report every file clean.
+test "$crashers" -ge 11 || fail "only $crashers faulting tests found, expected 11; the scan has gone blind"
+test "$guarded" -ge 8 || fail "only $guarded of them carry the guard, expected 8"
+
+# The scan still sees each way it can break, on a tree built for the purpose.
+probe() { # probe NAME BODY WANT
+    local dir="$work/$1" got
+    mkdir -p "$dir"
+    printf '%s\n' "$2" >"$dir/99_probe.test"
+    got=$(unguarded "$dir" 2>/dev/null)
+    test "$got" = "$3" || fail "$1: the scan said '${got:-nothing}', expected '${3:-nothing}'"
+}
+
+probe faults 'httrack -#c=segv' 99_probe.test
+probe guarded 'skip_crash_on_hurd
+httrack -#c=segv' ''
+probe bare 'httrack -#c' 99_probe.test
+probe strsafe 'httrack -#test=strsafe overflow x' 99_probe.test
+# The narrowing direction: a refused kind must not read as a fault, or every
+# file naming the option would be dragged in and the check would say nothing.
+probe refused 'httrack -#c=bogus' ''
+# The option named in a message, and the cache lister, whose letter differs
+# from the crash option only in case.
+probe message 'echo "ok: -#c answers"' ''
+probe lister 'httrack -#C' ''
+
+echo "OK: $crashers tests fault a process on purpose, $guarded of them skip on the Hurd"
