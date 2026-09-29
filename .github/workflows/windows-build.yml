@@ -544,9 +544,7 @@ jobs:
           path: msbuild-*.log
           if-no-files-found: ignore
 
-  # Build-only: WinHTTrack's ARM64 build links what this produces, and no
-  # hosted x64 runner can run it. A job of its own, so the two required
-  # libhttrack contexts keep their names.
+  # A separate job, because a matrix axis would rename the required contexts.
   arm64:
     name: ARM64 cross-build (Release)
     runs-on: windows-2022
@@ -592,18 +590,17 @@ jobs:
           git -C $root fetch --no-tags origin $baseline
           if ($LASTEXITCODE -ne 0) { throw "could not fetch vcpkg baseline $baseline" }
 
-      # Only libhttrack and the CLI carry ARM64 configurations.
+      # Only libhttrack and the CLI carry ARM64 configurations, and the CLI
+      # builds libhttrack through its ProjectReference.
       - name: Build
         shell: pwsh
         run: |
           $before = @(Get-ChildItem -Recurse -File -Filter *.zip $env:VCPKG_DEFAULT_BINARY_CACHE).Count
-          foreach ($proj in @("libhttrack", "httrack")) {
-            & $env:MSBUILD "src\$proj.vcxproj" /m /p:Configuration=Release /p:Platform=ARM64 `
-              /p:VcpkgEnableManifest=true
-            if ($LASTEXITCODE -ne 0) { throw "$proj failed" }
-          }
+          & $env:MSBUILD src\httrack.vcxproj /m /p:Configuration=Release /p:Platform=ARM64 `
+            /p:VcpkgEnableManifest=true
+          if ($LASTEXITCODE -ne 0) { throw "build failed" }
           $after = @(Get-ChildItem -Recurse -File -Filter *.zip $env:VCPKG_DEFAULT_BINARY_CACHE).Count
-          "VCPKG_GREW=$($after -gt $before)".ToLower() | Out-File -FilePath $env:GITHUB_ENV -Append
+          "VCPKG_GREW=$(([string]($after -gt $before)).ToLower())" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Save the vcpkg binary archives
         if: ${{ env.VCPKG_GREW == 'true' }}
@@ -617,9 +614,8 @@ jobs:
         shell: pwsh
         run: |
           $dir = "src\ARM64\Release"
-          foreach ($f in @("libhttrack.dll", "libhttrack.lib", "httrack.exe")) {
-            if (-not (Test-Path "$dir\$f")) { throw "missing $dir\$f" }
-          }
+          # WinHTTrack links the import lib.
+          if (-not (Test-Path "$dir\libhttrack.lib")) { throw "missing $dir\libhttrack.lib" }
           foreach ($f in @("libhttrack.dll", "httrack.exe")) {
             $hdr = & $env:DUMPBIN /headers "$dir\$f"
             if ($LASTEXITCODE -ne 0) { throw "dumpbin failed on $f" }
