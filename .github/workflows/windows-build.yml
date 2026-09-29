@@ -543,3 +543,82 @@ jobs:
           name: msbuild-${{ matrix.platform }}-${{ matrix.configuration }}
           path: msbuild-*.log
           if-no-files-found: ignore
+
+  # A separate job, because a matrix axis would rename the required contexts.
+  arm64:
+    name: ARM64 cross-build (Release)
+    runs-on: windows-2022
+    env:
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\vcpkg_cache
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Find MSBuild and dumpbin
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $msbuild = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild `
+            -find MSBuild\**\Bin\MSBuild.exe | Select-Object -First 1
+          $dumpbin = & $vswhere -latest -find VC\Tools\MSVC\**\bin\Host*\*\dumpbin.exe |
+            Select-Object -First 1
+          if (-not $msbuild) { throw "MSBuild not found" }
+          if (-not $dumpbin) { throw "dumpbin not found" }
+          "MSBUILD=$msbuild" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "DUMPBIN=$dumpbin" | Out-File -FilePath $env:GITHUB_ENV -Append
+          vcpkg integrate install
+          New-Item -ItemType Directory -Force -Path $env:VCPKG_DEFAULT_BINARY_CACHE | Out-Null
+
+      - name: Restore the vcpkg binary archives
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ github.workspace }}\vcpkg_cache
+          key: vcpkg-ARM64-${{ hashFiles('src/vcpkg.json') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            vcpkg-ARM64-${{ hashFiles('src/vcpkg.json') }}-
+            vcpkg-ARM64-
+
+      - name: Fetch the pinned vcpkg baseline
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $root = if ($env:VCPKG_INSTALLATION_ROOT) { $env:VCPKG_INSTALLATION_ROOT } else { "C:\vcpkg" }
+          $baseline = (Get-Content src/vcpkg.json -Raw | ConvertFrom-Json).'builtin-baseline'
+          if (-not $baseline) { throw "no builtin-baseline in src/vcpkg.json" }
+          git -C $root fetch --no-tags origin $baseline
+          if ($LASTEXITCODE -ne 0) { throw "could not fetch vcpkg baseline $baseline" }
+
+      # Only libhttrack and the CLI carry ARM64 configurations, and the CLI
+      # builds libhttrack through its ProjectReference.
+      - name: Build
+        shell: pwsh
+        run: |
+          $before = @(Get-ChildItem -Recurse -File -Filter *.zip $env:VCPKG_DEFAULT_BINARY_CACHE).Count
+          & $env:MSBUILD src\httrack.vcxproj /m /p:Configuration=Release /p:Platform=ARM64 `
+            /p:VcpkgEnableManifest=true
+          if ($LASTEXITCODE -ne 0) { throw "build failed" }
+          $after = @(Get-ChildItem -Recurse -File -Filter *.zip $env:VCPKG_DEFAULT_BINARY_CACHE).Count
+          "VCPKG_GREW=$(([string]($after -gt $before)).ToLower())" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Save the vcpkg binary archives
+        if: ${{ env.VCPKG_GREW == 'true' }}
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ github.workspace }}\vcpkg_cache
+          key: vcpkg-ARM64-${{ hashFiles('src/vcpkg.json') }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+      # An x64 binary in the ARM64 output dir would pass a bare existence check.
+      - name: Check the binaries are ARM64
+        shell: pwsh
+        run: |
+          $dir = "src\ARM64\Release"
+          # WinHTTrack links the import lib.
+          if (-not (Test-Path "$dir\libhttrack.lib")) { throw "missing $dir\libhttrack.lib" }
+          foreach ($f in @("libhttrack.dll", "httrack.exe")) {
+            $hdr = & $env:DUMPBIN /headers "$dir\$f"
+            if ($LASTEXITCODE -ne 0) { throw "dumpbin failed on $f" }
+            if (-not ($hdr | Select-String -SimpleMatch "machine (ARM64)")) { throw "$f is not ARM64" }
+            Write-Host "${f}: ARM64"
+          }
