@@ -1061,3 +1061,40 @@ jobs:
             exit 1
           fi
           echo "man/html sync OK."
+
+  # 496_ci-tier2-split.test fails when a job above is missing from needs: below.
+  gate:
+    name: ci gate
+    if: always()
+    needs:
+      - build
+      - buildd-no-python3
+      - macos
+      - webhttrack-macos
+      - webhttrack-linux
+      - linux-i386
+      - sanitize
+      - msan
+      - tsan
+      - fuzz
+      - fuzz-no-sanitizer
+      - no-ssl
+      - openssl-no-deprecated
+      - deb
+      - distcheck
+      - dco
+      - lint
+      - format
+      - docs
+      - man-page-sync
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/actions
+          persist-credentials: false
+      # dco, format and man-page-sync run on pull requests only.
+      - uses: ./.github/actions/gate
+        with:
+          needs: ${{ toJSON(needs) }}
+          allow-skipped: ${{ github.event_name != 'pull_request' }}

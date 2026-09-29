@@ -195,37 +195,54 @@ done
 test -z "$orphans" || fail "callable workflows nothing schedules and tier2.yml does not call:$orphans
 A workflow with neither a trigger nor a caller never runs again, and says nothing about it."
 
-# Third invariant: the gate has to need every other job in tier2.yml. A leg it
-# does not name can red while the gate reports green, which is worse than having
-# no gate, and nothing in the workflow itself notices.
-t2="$wfdir/tier2.yml"
-# A key this cannot read would drop the leg from BOTH lists, and they would
-# still agree while that leg reds unwatched.
-# Not aborted on a non-zero awk: the message below says which key it choked on,
-# where errexit would kill the test silently.
-legs_raw=$(awk '/^jobs:/ { injobs = 1; next }
-                !injobs || /^[ \t]*(#.*)?$/ { next }
-                /^  [^ ]/ {
-                    if ($0 !~ /^  [A-Za-z0-9_-]+:[ \t]*(#.*)?$/) {
-                        print "ERR: unreadable job key: " $0; exit 1
-                    }
-                    sub(/[ \t]*(#.*)?$/, ""); sub(/:$/, ""); sub(/^  /, ""); print
-                }' "$t2") || true
-case $legs_raw in *ERR:*) fail "$t2: $legs_raw" ;; esac
-legs=$(command grep -vx gate <<<"$legs_raw" | sort)
-needed_raw=$(awk '/^  gate:[ \t]*(#.*)?$/ { ingate = 1; next }
-                  ingate && /^  [A-Za-z0-9_-]+:/ { exit }
-                  ingate && /^    needs:[ \t]*\[/ { print "ERR: a flow-style needs:"; exit 1 }
-                  ingate && /^    needs:$/ { inneeds = 1; next }
-                  inneeds && /^      - / { sub(/^      - /, ""); print; next }
-                  inneeds && /^    [A-Za-z0-9_-]+:/ { inneeds = 0 }' "$t2") || true
-case $needed_raw in *ERR:*) fail "$t2: $needed_raw" ;; esac
-needed=$(sort <<<"$needed_raw")
-
-test -n "$legs" || fail "no jobs parsed out of $t2"
-test "$legs" = "$needed" || fail "the tier-2 gate does not need every leg.
+# Third invariant: each gate has to need every other job in its workflow. A job
+# it does not name can red while the gate reports green, which is worse than
+# having no gate, and nothing in the workflow itself notices.
+gate_gaps() { # gate_gaps <workflow>: prints the gap, or the job count
+    local wf=$1 legs_raw legs needed_raw needed
+    # A key this cannot read would drop the job from BOTH lists, and they would
+    # still agree while that job reds unwatched.
+    legs_raw=$(awk '/^jobs:/ { injobs = 1; next }
+                    !injobs || /^[ \t]*(#.*)?$/ { next }
+                    /^  [^ ]/ {
+                        if ($0 !~ /^  [A-Za-z0-9_-]+:[ \t]*(#.*)?$/) {
+                            print "ERR: unreadable job key: " $0; exit 1
+                        }
+                        sub(/[ \t]*(#.*)?$/, ""); sub(/:$/, ""); sub(/^  /, ""); print
+                    }' "$wf") || true
+    case $legs_raw in *ERR:*) echo "$legs_raw" && return 1 ;; esac
+    command grep -qx gate <<<"$legs_raw" || { echo "no gate job" && return 1; }
+    legs=$(command grep -vx gate <<<"$legs_raw" | sort)
+    needed_raw=$(awk '/^  gate:[ \t]*(#.*)?$/ { ingate = 1; next }
+                      ingate && /^  [A-Za-z0-9_-]+:/ { exit }
+                      ingate && /^    needs:[ \t]*\[/ { print "ERR: a flow-style needs:"; exit 1 }
+                      ingate && /^    needs:$/ { inneeds = 1; next }
+                      inneeds && /^      - / { sub(/^      - /, ""); print; next }
+                      inneeds && /^    [A-Za-z0-9_-]+:/ { inneeds = 0 }' "$wf") || true
+    case $needed_raw in *ERR:*) echo "$needed_raw" && return 1 ;; esac
+    needed=$(sort <<<"$needed_raw")
+    test -n "$legs" || { echo "no jobs parsed" && return 1; }
+    test "$legs" = "$needed" || {
+        echo "the gate does not need every job.
 jobs:   $(tr '\n' ' ' <<<"$legs")
 needs:  $(tr '\n' ' ' <<<"$needed")
-A leg missing from needs: reds while the gate still reports success."
+A job missing from needs: reds while the gate still reports success."
+        return 1
+    }
+    printf '%s' "$legs" | count_matching_lines .
+}
 
-echo "tier-2 split OK ($(printf '%s' "$required" | count_matching_lines .) required contexts still on the PR path, no orphaned callable workflow, gate needs all $(printf '%s' "$legs" | count_matching_lines .) legs)"
+gates=
+for wf in tier2.yml ci.yml windows-build.yml; do
+    n=$(gate_gaps "$wfdir/$wf") || fail "$wf: $n"
+    gates="$gates $wf:$n"
+done
+
+# The mutant this exists to catch: a job dropped from a gate's needs:.
+mut=$(mktemp "${TMPDIR:-/tmp}/httrack_gate.XXXXXX")
+cleanup_push rm -f "$mut"
+sed '/^  gate:/,$ { /^      - lint$/d; }' "$wfdir/ci.yml" >"$mut"
+cmp -s "$wfdir/ci.yml" "$mut" && fail "the dropped-need mutant changed nothing, so it proves nothing"
+gate_gaps "$mut" >/dev/null && fail "a job dropped from the ci gate's needs: went unreported"
+
+echo "tier-2 split OK ($(printf '%s' "$required" | count_matching_lines .) required contexts still on the PR path, no orphaned callable workflow, gates need every job:$gates)"

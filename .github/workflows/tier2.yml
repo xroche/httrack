@@ -403,7 +403,6 @@ jobs:
   hurd:
     uses: ./.github/workflows/hurd-suite.yml
 
-  # One status to read, so a red leg cannot hide behind the others.
   # 496_ci-tier2-split.test fails when a job above is missing from needs: below.
   gate:
     name: tier-2 gate
@@ -425,31 +424,12 @@ jobs:
       - hurd
     runs-on: ubuntu-24.04
     steps:
-      - name: Fail unless every leg succeeded
-        env:
-          RESULTS: ${{ join(needs.*.result, ' ') }}
-          NEEDS: ${{ toJSON(needs) }}
-        run: |
-          set -euo pipefail
-          echo "leg results: $RESULTS"
-          # A short or empty RESULTS would run the loop fewer times and report
-          # green having read nothing, so count the legs rather than trust it.
-          want=$(jq -r 'keys | length' <<<"$NEEDS")
-          # shellcheck disable=SC2086 # the results are a closed enum of words
-          set -- $RESULTS
-          test "$#" -eq "$want" || {
-              echo "::error::expected $want leg results, got $#: $RESULTS"
-              exit 1
-          }
-          bad=
-          for r in "$@"; do
-              # A fork skips the guarded canaries, and no leg here has a needs:.
-              case $r in
-              success | skipped) ;;
-              *) bad="$bad $r" ;;
-              esac
-          done
-          test -z "$bad" || {
-              echo "::error::tier-2 legs did not succeed:$bad"
-              exit 1
-          }
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/actions
+          persist-credentials: false
+      # A fork skips the guarded canaries, and no leg here has a needs:.
+      - uses: ./.github/actions/gate
+        with:
+          needs: ${{ toJSON(needs) }}
+          allow-skipped: true

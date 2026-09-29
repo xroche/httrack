@@ -1,0 +1,42 @@
+# One status to read, so a red job cannot hide behind the others.
+name: gate
+description: Fail unless every job the calling job needs succeeded.
+
+inputs:
+  needs:
+    description: The caller's toJSON(needs)
+    required: true
+  allow-skipped:
+    description: Accept a skipped job as well as a successful one
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Fail unless every job succeeded
+      shell: bash
+      env:
+        NEEDS: ${{ inputs.needs }}
+        ALLOW_SKIPPED: ${{ inputs.allow-skipped }}
+      run: |
+        set -euo pipefail
+        # An empty needs would pass having read nothing.
+        n=$(jq 'length' <<<"$NEEDS")
+        test "$n" -gt 0 || {
+            echo "::error::the gate needs no job"
+            exit 1
+        }
+        bad=
+        while read -r job result; do
+            echo "$job: $result"
+            case $result in
+            success) ;;
+            skipped) test "$ALLOW_SKIPPED" = true || bad="$bad $job($result)" ;;
+            *) bad="$bad $job($result)" ;;
+            esac
+        done < <(jq -r 'to_entries[] | "\(.key) \(.value.result)"' <<<"$NEEDS")
+        test -z "$bad" || {
+            echo "::error::jobs did not succeed:$bad"
+            exit 1
+        }
