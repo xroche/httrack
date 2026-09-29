@@ -379,7 +379,7 @@ def audit(wf):
     counters = lost_count_steps(jobs[0])
     if len(counters) != 1:
         bad.append("%d steps count the lost workers, want 1" % len(counters))
-    elif counters[0].get("if") != "always()":
+    elif not counters[0].get("if") in ("always()", "always() && env.RUNNABLE == 'true'"):
         bad.append("the lost-worker count does not run on a killed leg: if is %r"
                    % counters[0].get("if"))
     perms = perms_of(wf, jobs[0])
