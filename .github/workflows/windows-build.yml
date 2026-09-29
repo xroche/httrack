@@ -551,3 +551,19 @@ jobs:
           name: msbuild-${{ matrix.platform }}-${{ matrix.configuration }}
           path: msbuild-*.log
           if-no-files-found: ignore
+
+  # 496_ci-tier2-split.test fails when a job above is missing from needs: below.
+  gate:
+    name: windows gate
+    if: always()
+    needs:
+      - libhttrack
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/actions
+          persist-credentials: false
+      - uses: ./.github/actions/gate
+        with:
+          needs: ${{ toJSON(needs) }}

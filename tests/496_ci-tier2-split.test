@@ -233,7 +233,7 @@ A job missing from needs: reds while the gate still reports success."
 }
 
 gates=
-for wf in tier2.yml ci.yml; do
+for wf in tier2.yml ci.yml windows-build.yml; do
     n=$(gate_gaps "$wfdir/$wf") || fail "$wf: $n"
     gates="$gates $wf:$n"
 done
