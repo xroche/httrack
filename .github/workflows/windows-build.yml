@@ -29,7 +29,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [x64, Win32]
+        platform: [x64, Win32, ARM64]
         configuration: [Release]
     # No repo-wide cap: #1213 added one against runner starvation, which #1228
     # later measured out. The step timeouts stay as they are, sized by 226
@@ -39,6 +39,10 @@ jobs:
     # source otherwise, several minutes every run.
     env:
       VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\vcpkg_cache
+      # The platform as dumpbin and the VS dev shell name it.
+      MACHINE: ${{ matrix.platform == 'Win32' && 'x86' || matrix.platform }}
+      # No hosted x64 runner can execute an ARM64 binary.
+      RUNNABLE: ${{ matrix.platform != 'ARM64' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -192,7 +196,7 @@ jobs:
           $dumpbin = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
             -latest -find VC\Tools\MSVC\**\bin\Host*\*\dumpbin.exe | Select-Object -First 1
           if (-not $dumpbin) { throw "dumpbin not found" }
-          $wantMachine = if ("${{ matrix.platform }}" -eq "x64") { "x64" } else { "x86" }
+          $wantMachine = $env:MACHINE
 
           function Get-Crt($path) {
             $out = & $dumpbin /dependents /headers $path
@@ -227,12 +231,78 @@ jobs:
             throw "CRT mismatch across the boundary: libhttrack.dll=$a httrack.exe=$b"
           }
 
+      # A property dropped from a .vcxproj still builds, so assert the
+      # mitigations where they end up.
       - name: Check the hardening flags reached the binaries
-        uses: ./.github/actions/pe-hardening
-        with:
-          dir: src\${{ matrix.platform }}\${{ matrix.configuration }}
-          files: libhttrack.dll httrack.exe webhttrack.exe proxytrack.exe
-          cet: ${{ matrix.platform == 'x64' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $dir = "src\${{ matrix.platform }}\${{ matrix.configuration }}"
+          $dumpbin = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
+            -latest -find VC\Tools\MSVC\**\bin\Host*\*\dumpbin.exe | Select-Object -First 1
+          if (-not $dumpbin) { throw "dumpbin not found" }
+
+          # /headers holds the DLL-characteristics bits, /loadconfig carries CET.
+          function Get-Headers($path) {
+            $out = & $dumpbin /headers /loadconfig $path
+            if ($LASTEXITCODE -ne 0) { throw "dumpbin failed on $path" }
+            $out -join "`n"
+          }
+
+          # Each mitigation, as the pattern that finds it in that dump.
+          $want = [ordered]@{
+            "ASLR (/DYNAMICBASE)"        = "Dynamic base"
+            "DEP (/NXCOMPAT)"            = "NX compatible"
+            "Control Flow Guard"         = "Control Flow Guard"
+          }
+          if ("${{ matrix.platform }}" -eq "x64") {
+            $want["Shadow stacks (/CETCOMPAT)"] = "CET\s*Compat"
+          }
+
+          # Everything a dump does not show. /GS is counted rather than matched:
+          # the load-config "Security Cookie" field holds the address of
+          # __security_cookie, which the CRT links into every image whatever /GS
+          # was, so matching it can never fail. The VC feature record counts the
+          # objects actually compiled with it.
+          function Missing($hdr) {
+            $out = @()
+            foreach ($k in $want.Keys) {
+              if ($hdr -notmatch $want[$k]) { $out += $k }
+            }
+            $cc = if ($hdr -match "C/C\+\+=(\d+)") { [int]$Matches[1] } else { -1 }
+            $gs = if ($hdr -match ",\s*/GS=(\d+)") { [int]$Matches[1] } else { -1 }
+            if ($cc -le 0) { $out += "a VC feature record, so /GS cannot be read" }
+            elseif ($gs -lt $cc) { $out += "/GS on $($cc - $gs) of $cc objects" }
+            ,$out
+          }
+
+          # Negative control: the same parse, over a dump that carries ASLR and a
+          # security cookie but neither guard nor a /GS count, must report the
+          # rest missing. A row that cannot fail is worse than no row, and that
+          # is exactly how the first /GS check shipped.
+          $none = "Dynamic base`nSecurity Cookie 0x140001000`n" +
+                  "Counts: Pre-VC++ 11.00=0, C/C++=73, /GS=0, /sdl=0"
+          $ctl = Missing $none
+          $mustReport = @("DEP (/NXCOMPAT)", "Control Flow Guard")
+          if ("${{ matrix.platform }}" -eq "x64") { $mustReport += "Shadow stacks (/CETCOMPAT)" }
+          foreach ($k in $mustReport) {
+            if ($ctl -notcontains $k) { throw "negative control: $k was not reported missing" }
+          }
+          if (-not ($ctl -like "*/GS on 73 of 73*")) {
+            throw "negative control: /GS was not reported missing (got: $($ctl -join ', '))"
+          }
+
+          $bad = 0
+          foreach ($f in @("libhttrack.dll", "httrack.exe", "webhttrack.exe", "proxytrack.exe")) {
+            $gap = Missing (Get-Headers "$dir\$f")
+            if ($gap.Count -gt 0) {
+              Write-Host "::error::${f} is missing $($gap -join '; ')"
+              $bad++
+            } else {
+              Write-Host "${f}: every mitigation present"
+            }
+          }
+          if ($bad -gt 0) { throw "$bad binary/binaries missing a mitigation" }
 
       # The DLL build only proves the engine's own fixed include order, the one
       # order a consumer need not use, and 205/206/207/269 all gate on an automake
@@ -246,7 +316,7 @@ jobs:
           $vs = & $vswhere -latest -products * -property installationPath | Select-Object -First 1
           if (-not $vs) { throw "Visual Studio not found" }
           Import-Module "$vs\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
-          $arch = if ("${{ matrix.platform }}" -eq "x64") { "x64" } else { "x86" }
+          $arch = $env:MACHINE.ToLower()
           Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation `
             -DevCmdArguments "-arch=$arch -host_arch=x64"
           # htsbasenet.h reaches for <openssl/ssl.h> unless a consumer turns it
@@ -262,6 +332,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "the installed headers do not compile standalone and pairwise" }
 
       - name: Restore the WSL rootfs
+        if: env.RUNNABLE == 'true'
         id: wslrootfs
         uses: actions/cache/restore@v6
         with:
@@ -269,6 +340,7 @@ jobs:
           key: wsl-rootfs-jammy-amd64-v1
 
       - name: Restore the WSL kernel package
+        if: env.RUNNABLE == 'true'
         id: wslkernel
         uses: actions/cache/restore@v6
         with:
@@ -277,7 +349,7 @@ jobs:
 
       # A healthy run fetches it for the run that needs it.
       - name: Fetch the WSL kernel package
-        if: steps.wslkernel.outputs.cache-hit != 'true'
+        if: env.RUNNABLE == 'true' && steps.wslkernel.outputs.cache-hit != 'true'
         id: wslkernelfetch
         continue-on-error: true
         shell: pwsh
@@ -311,6 +383,7 @@ jobs:
       # Dropping the MSYS leg also took the runner-death rate from 12.5% to
       # 0.3%, so do not bring one back (#1228).
       - name: Bring up WSL2
+        if: env.RUNNABLE == 'true'
         # Still non-gating now that the suite step gates: a failed import
         # reaches that step, which names it and reds there. Failing here too
         # would report one cause twice, and less clearly.
@@ -376,20 +449,21 @@ jobs:
           wsl -d httrack-suite -- sh -c 'echo mounts:; ls -d /mnt/*'
 
       - name: Save the WSL rootfs
-        if: steps.wslrootfs.outputs.cache-hit != 'true'
+        if: env.RUNNABLE == 'true' && steps.wslrootfs.outputs.cache-hit != 'true'
         uses: actions/cache/save@v6
         with:
           path: ${{ runner.temp }}\wsl-rootfs.tar.gz
           key: wsl-rootfs-jammy-amd64-v1
 
       - name: Save the WSL kernel package
-        if: steps.wslkernel.outputs.cache-hit != 'true' && steps.wslkernelfetch.outcome == 'success'
+        if: env.RUNNABLE == 'true' && steps.wslkernel.outputs.cache-hit != 'true' && steps.wslkernelfetch.outcome == 'success'
         uses: actions/cache/save@v6
         with:
           path: ${{ runner.temp }}\wsl_update_x64.msi
           key: wsl-kernel-msi-v1
 
       - name: Run the engine test suite (offline tests, WSL2)
+        if: env.RUNNABLE == 'true'
         shell: bash
         working-directory: tests
         # 226_watchdog-native.test enforces this: the suite's own 1500s deadline
@@ -450,7 +524,7 @@ jobs:
       # Its own step: the watchdog can kill the suite's step before it counts,
       # which is exactly when the count is worth having (#1588).
       - name: Count the workers the suite lost
-        if: always()
+        if: always() && env.RUNNABLE == 'true'
         shell: bash
         working-directory: tests
         run: |
@@ -463,7 +537,7 @@ jobs:
       # loopback: the real TLS handshake, cache and file writer, which nothing
       # else on Windows covers.
       - name: Upload the test logs
-        if: always()
+        if: always() && env.RUNNABLE == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: engine-tests-${{ matrix.platform }}-${{ matrix.configuration }}
@@ -477,88 +551,3 @@ jobs:
           name: msbuild-${{ matrix.platform }}-${{ matrix.configuration }}
           path: msbuild-*.log
           if-no-files-found: ignore
-
-  # Build-only, because the x64 runner cannot run the matrix job's suite on ARM64.
-  arm64:
-    name: ARM64 cross-build (Release)
-    runs-on: windows-2022
-    env:
-      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\vcpkg_cache
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          submodules: recursive
-          persist-credentials: false
-
-      - name: Find MSBuild and dumpbin
-        shell: pwsh
-        run: |
-          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-          $msbuild = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild `
-            -find MSBuild\**\Bin\MSBuild.exe | Select-Object -First 1
-          $dumpbin = & $vswhere -latest -find VC\Tools\MSVC\**\bin\Host*\*\dumpbin.exe |
-            Select-Object -First 1
-          if (-not $msbuild) { throw "MSBuild not found" }
-          if (-not $dumpbin) { throw "dumpbin not found" }
-          "MSBUILD=$msbuild" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "DUMPBIN=$dumpbin" | Out-File -FilePath $env:GITHUB_ENV -Append
-          vcpkg integrate install
-          New-Item -ItemType Directory -Force -Path $env:VCPKG_DEFAULT_BINARY_CACHE | Out-Null
-
-      - name: Restore the vcpkg binary archives
-        uses: actions/cache/restore@v6
-        with:
-          path: ${{ github.workspace }}\vcpkg_cache
-          key: vcpkg-ARM64-${{ hashFiles('src/vcpkg.json') }}-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: |
-            vcpkg-ARM64-${{ hashFiles('src/vcpkg.json') }}-
-            vcpkg-ARM64-
-
-      - name: Fetch the pinned vcpkg baseline
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          $root = if ($env:VCPKG_INSTALLATION_ROOT) { $env:VCPKG_INSTALLATION_ROOT } else { "C:\vcpkg" }
-          $baseline = (Get-Content src/vcpkg.json -Raw | ConvertFrom-Json).'builtin-baseline'
-          if (-not $baseline) { throw "no builtin-baseline in src/vcpkg.json" }
-          git -C $root fetch --no-tags origin $baseline
-          if ($LASTEXITCODE -ne 0) { throw "could not fetch vcpkg baseline $baseline" }
-
-      # Only libhttrack and the CLI carry ARM64 configurations, and the CLI
-      # builds libhttrack through its ProjectReference.
-      - name: Build
-        shell: pwsh
-        run: |
-          $before = @(Get-ChildItem -Recurse -File -Filter *.zip $env:VCPKG_DEFAULT_BINARY_CACHE).Count
-          & $env:MSBUILD src\httrack.vcxproj /m /p:Configuration=Release /p:Platform=ARM64 `
-            /p:VcpkgEnableManifest=true
-          if ($LASTEXITCODE -ne 0) { throw "build failed" }
-          $after = @(Get-ChildItem -Recurse -File -Filter *.zip $env:VCPKG_DEFAULT_BINARY_CACHE).Count
-          "VCPKG_GREW=$(([string]($after -gt $before)).ToLower())" | Out-File -FilePath $env:GITHUB_ENV -Append
-
-      - name: Save the vcpkg binary archives
-        if: ${{ env.VCPKG_GREW == 'true' }}
-        uses: actions/cache/save@v6
-        with:
-          path: ${{ github.workspace }}\vcpkg_cache
-          key: vcpkg-ARM64-${{ hashFiles('src/vcpkg.json') }}-${{ github.run_id }}-${{ github.run_attempt }}
-
-      # An x64 binary in the ARM64 output dir would pass a bare existence check.
-      - name: Check the binaries are ARM64
-        shell: pwsh
-        run: |
-          $dir = "src\ARM64\Release"
-          # WinHTTrack links the import lib.
-          if (-not (Test-Path "$dir\libhttrack.lib")) { throw "missing $dir\libhttrack.lib" }
-          foreach ($f in @("libhttrack.dll", "httrack.exe")) {
-            $hdr = & $env:DUMPBIN /headers "$dir\$f"
-            if ($LASTEXITCODE -ne 0) { throw "dumpbin failed on $f" }
-            if (-not ($hdr | Select-String -SimpleMatch "machine (ARM64)")) { throw "$f is not ARM64" }
-            Write-Host "${f}: ARM64"
-          }
-
-      - name: Check the hardening flags reached the binaries
-        uses: ./.github/actions/pe-hardening
-        with:
-          dir: src\ARM64\Release
-          files: libhttrack.dll httrack.exe
