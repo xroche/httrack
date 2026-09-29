@@ -52,7 +52,7 @@ jobs:
       # Keyed on the pinned image name, so a new pin fetches and an old one does
       # not. The tarball is 354 MB against a 10 GB repository budget.
       - name: Cache the image tarball
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/hurd/cache
           key: hurd-image-debian-hurd-amd64-20260314
