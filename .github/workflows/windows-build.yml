@@ -478,7 +478,7 @@ jobs:
           path: msbuild-*.log
           if-no-files-found: ignore
 
-  # A separate job, because a matrix axis would rename the required contexts.
+  # Build-only, because the x64 runner cannot run the matrix job's suite on ARM64.
   arm64:
     name: ARM64 cross-build (Release)
     runs-on: windows-2022
