@@ -1,0 +1,46 @@
+#!/bin/bash
+#
+# Issue #1840: a getaddrinfo() that never returns held the engine past
+# --max-time, because the exit waited for its abandoned DNS worker.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+if ! target_is_linux; then
+    skip "maxtime-dns-stall: LD_PRELOAD interposition is Linux-only here"
+fi
+# A --disable-shared build has nothing to preload; anything else missing is a
+# build problem, not a skip, or the leg would pass vacuously.
+if [ ! -r "${GAISTALL_LA:-}" ]; then
+    echo "maxtime-dns-stall: ${GAISTALL_LA:-\$GAISTALL_LA} was not built" >&2
+    exit 1
+fi
+if grep -q "^dlname=''" "$GAISTALL_LA"; then
+    skip "maxtime-dns-stall: static-only build, nothing to preload"
+fi
+if [ ! -r "${GAISTALL_LIB:-}" ]; then
+    echo "maxtime-dns-stall: ${GAISTALL_LIB:-\$GAISTALL_LIB} was not built" >&2
+    exit 1
+fi
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+# The shim allocates nothing, so loading it ahead of libasan is harmless.
+export ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS:}verify_asan_link_order=0"
+
+# The lookup stalls for 120s; --max-time=2 plus the 5s exit grace ends it.
+start=$SECONDS
+rc=0
+GAISTALL=120 LD_PRELOAD="$GAISTALL_LIB" \
+    httrack --quiet --timeout=1 --max-time=2 -O "$dir/o" \
+    "http://127.0.0.1:1/" >"$dir/out" 2>&1 || rc=$?
+elapsed=$((SECONDS - start))
+
+# Teeth: this line is printed only when a worker was still stuck at exit.
+grep -q "engine threads still running past --max-time" "$dir/out" ||
+    fail_dump "maxtime-dns-stall: no stuck worker at exit, nothing was tested (rc=$rc)" "$dir/out"
+test "$elapsed" -lt 60 ||
+    fail_dump "maxtime-dns-stall: exited after ${elapsed}s, past --max-time=2" "$dir/out"
+echo "OK: a stuck getaddrinfo() no longer holds the exit past --max-time (${elapsed}s)"
