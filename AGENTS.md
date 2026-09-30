@@ -51,7 +51,7 @@ the operational checklist: toolchain, invariants, and how to ship a change.
 - `distcheck` is a required context and builds from the dist tarball, which has no
   `.github/`. A test reading a file from there must skip when it is missing, not
   fail. Fail only when the directory is present and the file is not, so a real
-  deletion is still caught. Tests 226, 278, 399, 432 and 437 carry the pattern.
+  deletion is still caught. Tests 226, 278, 399 and 432 carry the pattern.
 - Give new `.test` scripts `set -e`: the older ones predate the rule, so several
   `local-crawl.sh` calls with no `set -e` report PASS on any non-last failure.
 - Each test runs under a 600s wall-clock guard that reports a wedge as 124. A test
@@ -98,14 +98,11 @@ the operational checklist: toolchain, invariants, and how to ship a change.
   byte-wise (`perl -0pi`, `sed`), not through a tool that re-encodes to UTF-8
   and corrupts them. The rest of the tree, including `lang/*.txt` and
   `html/contact.html`, is UTF-8 and safe to edit normally.
-- **Never add a matrix axis to `windows-build.yml`.** The `libhttrack` job has no
-  `name:`, so GitHub builds each status context from the job id plus the matrix
-  values. That yields `libhttrack (x64, Release)` and `libhttrack (Win32,
-  Release)`, and the `Protect master` ruleset requires both by name. A third axis
-  renames them, so both stop reporting on every open PR in the repo, not only the
-  one that added the axis. Give a new Windows leg its own job with a pinned
-  `name:`, or add a step to the existing job. `437_ci-windows-contexts.test`
-  fails on any such rename.
+- **The `Protect master` ruleset requires three checks: `ci gate`, `windows
+  gate` and `DCO sign-off`.** Each gate fails unless every job in its workflow
+  succeeded, or skipped on purpose, so a new job goes into its gate's `needs:`, and
+  `496_ci-tier2-split.test` fails when one is missing. A matrix change or a job
+  rename no longer touches the ruleset.
 - **A required status context must stay on a workflow that runs on
   `pull_request`.** A required check that never reports leaves every open PR
   waiting for it forever. `tier2.yml` runs on a schedule and on demand, never on
