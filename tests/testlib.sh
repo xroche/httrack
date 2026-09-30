@@ -1238,12 +1238,21 @@ budget_secs() {
     echo "$((10#$budget))"
 }
 
-skip_if_out_of_budget() { # skip_if_out_of_budget <steps left> <seconds the last took> [what they cover]
+# Would the next of $1 steps, at 1.5x $2 seconds, outrun the budget? For a caller
+# that skips part of its work rather than all of it.
+out_of_budget() { # out_of_budget <steps left> <seconds the last took>
     local budget need=$(($2 + $2 / 2))
 
     budget=$(budget_secs)
-    test "$1" -gt 0 && test "$budget" -gt 0 || return 0
-    test "$((SECONDS + need))" -ge "$budget" || return 0
+    test "$1" -gt 0 && test "$budget" -gt 0 || return 1
+    test "$((SECONDS + need))" -ge "$budget"
+}
+
+skip_if_out_of_budget() { # skip_if_out_of_budget <steps left> <seconds the last took> [what they cover]
+    local budget
+
+    out_of_budget "$1" "$2" || return 0
+    budget=$(budget_secs)
     # $3 names what goes unchecked, or the log says a count and the reader guesses.
     echo "$1 steps left, the last took ${2}s and the budget is ${budget}s; skipping${3:+ $3}" >&2
     exit 77
