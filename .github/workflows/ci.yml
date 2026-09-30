@@ -1093,8 +1093,8 @@ jobs:
         with:
           sparse-checkout: .github/actions
           persist-credentials: false
-      # dco, format and man-page-sync run on pull requests only.
       - uses: ./.github/actions/gate
         with:
           needs: ${{ toJSON(needs) }}
-          allow-skipped: ${{ github.event_name != 'pull_request' }}
+          # These run on pull requests only, so only a push may skip them.
+          allow-skipped: ${{ github.event_name != 'pull_request' && 'dco format man-page-sync' || '' }}

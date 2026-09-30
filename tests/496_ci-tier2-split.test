@@ -39,7 +39,9 @@ ci.yml	fuzz	fuzz (libFuzzer corpus replay, clang)
 ci.yml	webhttrack-macos	webhttrack smoke (macOS arm64)
 ci.yml	deb	deb package (lintian)
 windows-build.yml	libhttrack	libhttrack (x64, Release)
-windows-build.yml	libhttrack	libhttrack (Win32, Release)'
+windows-build.yml	libhttrack	libhttrack (Win32, Release)
+ci.yml	gate	ci gate
+windows-build.yml	gate	windows gate'
 
 # Does this workflow run on every pull request? A filter under the key (paths:,
 # branches:, types:) would skip the PRs it does not match, and those PRs then
@@ -92,6 +94,8 @@ job_contexts() { # job_contexts <workflow> <job id>
         /^    name: / { tpl = unquote(trim(substr($0, 11))); next }
         # A required job must run, and must be able to fail. needs: makes it skip
         # with whatever it waits on, and continue-on-error: reports green always.
+        # A gate needs every job, and always() keeps it from skipping with them.
+        /^    needs:/ && want == "gate" { next }
         /^    needs:/ { print "ERR: a needs:, which can skip the job"; bad = 1; exit }
         /^    continue-on-error:/ {
             print "ERR: continue-on-error:, so the check cannot fail"; bad = 1; exit
@@ -101,7 +105,7 @@ job_contexts() { # job_contexts <workflow> <job id>
         # job off on a PR without changing its name.
         /^    if:/ {
             cond = trim(substr($0, index($0, ":") + 1))
-            if (cond != "github.event_name == '"'"'pull_request'"'"'") {
+            if (cond != "github.event_name == '"'"'pull_request'"'"'" && !(want == "gate" && cond == "always()")) {
                 print "ERR: unpinned if: " cond; bad = 1; exit
             }
             next
