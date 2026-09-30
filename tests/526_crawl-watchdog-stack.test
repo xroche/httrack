@@ -1,0 +1,32 @@
+#!/bin/bash
+#
+# local_crawl shows the engine's stack and its log when the watchdog kills a
+# wedged crawl, and leaves no temp log behind.
+
+set -e
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+python=$(find_python) || skip "python3 not found"
+require_httrack
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_526.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmpdir"
+local_server_start --root "$testdir/server-root"
+
+# A private TMPDIR, so a leaked log is ours to see and nobody else's to count.
+rc=0
+out=$(TMPDIR=$tmpdir CRAWL_DEADLINE=3 local_crawl -O "$tmpdir/crawl" --quiet \
+    --timeout=30 "${BASEURL}/watchdog/stall" 2>&1) || rc=$?
+test "$rc" -ne 0 || fail "stalled crawl reported success"
+grep -q "crawl watchdog fired" <<<"$out" || fail "crawl failed but not via the watchdog: $out"
+grep -q "^--- $tmpdir/httrack_crawl" <<<"$out" || fail "the crawl log was not shown: $out"
+assert_wedge_stack "$out"
+# Or the loop below checks nothing, if a cleanup ran inside the subshell.
+test -d "$tmpdir" || fail "$tmpdir vanished before the leak check"
+for f in "$tmpdir"/httrack_crawl.*; do
+    test ! -e "$f" || fail "local_crawl left its log behind: $f"
+done
+
+echo "crawl watchdog stack OK"
