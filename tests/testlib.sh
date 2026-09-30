@@ -1380,6 +1380,34 @@ reap_bounded() {
     return 0
 }
 
+# assert_wedge_stack OUTPUT: the watchdog dumped the engine's stack before the
+# kill, because the kill destroys it.
+assert_wedge_stack() {
+    grep -q "===== TIMEOUT:" <<<"$1" || fail "no diagnostics before the kill: $1"
+    # WSL2 answers Linux to uname but dumps through cdb, which is opt-in.
+    ! target_is_windows || return 0
+    case $(uname -s) in
+    Linux) grep -q "Caught signal 6" <<<"$1" || fail "the engine printed no stack: $1" ;;
+    Darwin) grep -q "Call graph" <<<"$1" || fail "sample(1) printed no stack: $1" ;;
+    *) return 0 ;;
+    esac
+    grep -q "hts_main" <<<"$1" || fail "the stack names no engine frame: $1"
+}
+
+# Print an overrun's process tree and stacks on stderr before the watchdog kills
+# it, because nothing survives the kill. It never fails the caller.
+# OVERRUN_DUMP=0 turns it off for a caller that times out on purpose.
+dump_overrun() { # dump_overrun <pid> <secs> <label>
+    local pgid
+    # Also stops the recursion when the dump's own debugger overruns.
+    test "${OVERRUN_DUMP:-1}" != 0 || return 0
+    local OVERRUN_DUMP=0
+    pgid=$(ps -o pgid= -p "$1" 2>/dev/null | tr -d ' ')
+    # shellcheck source=/dev/null # sourced lazily, and its arrays would shadow test locals
+    declare -F dump_hang_diagnostics >/dev/null || . "$testdir/proclib.sh" || return 0
+    dump_hang_diagnostics "${pgid:-$1}" "$3" "$2" >&2 || true
+}
+
 # Run "$@" under a wall-clock deadline of $1 seconds; return its exit status, or
 # 124 if it overran and was killed. timeout(1) is unusable here: it's absent on
 # macOS and its signals can't reap httrack.exe on Windows. We poll and kill_tree.
@@ -1419,6 +1447,7 @@ run_with_timeout() {
     local start=$SECONDS
     while kill -0 "$pid" 2>/dev/null; do
         if test "$((SECONDS - start))" -gt "$secs"; then
+            dump_overrun "$pid" "$secs" "$*"
             kill_tree "$pid" "$winpid"
             reap_bounded "$pid" || true
             return 124
@@ -1434,6 +1463,7 @@ wait_bounded() {
     local pid=$1 secs=$2 start=$SECONDS
     while kill -0 "$pid" 2>/dev/null; do
         if test "$((SECONDS - start))" -gt "$secs"; then
+            dump_overrun "$pid" "$secs" "pid $pid"
             kill_tree "$pid"
             reap_bounded "$pid" || true
             return 124

@@ -116,13 +116,13 @@ local_server_start() {
 # sets its own) and a watchdog above it, so a wedge outliving the engine limit
 # reds the test instead of the 45-minute CI timeout.
 # Options, ahead of any httrack argument; -- ends them:
-#   --log FILE     crawl output (default: discarded)
+#   --log FILE     crawl output (default: a temp file, shown only on a wedge)
 #   --stdin FILE   what the engine reads on stdin, for a test answering an
 #                  interactive prompt; the word "closed" hands it no descriptor
 #                  at all. Redirecting the local_crawl call instead does not
 #                  reach the engine (#1258).
 local_crawl() {
-    local deadline log=/dev/null stdin=() arg rc=0
+    local deadline log='' stdin=() arg rc=0
     deadline=$(crawl_deadline)
     while test $# -gt 0; do
         case $1 in
@@ -148,8 +148,16 @@ local_crawl() {
     done
     args+=("$@")
 
+    # Keep a log even without --log, because a wedge's stack lands there.
+    local own=''
+    if test -z "$log"; then
+        log=/dev/null
+        own=$(mktemp "${TMPDIR:-/tmp}/httrack_crawl.XXXXXX") && log=$own || own=
+    fi
     run_with_timeout ${stdin[@]+"${stdin[@]}"} "$deadline" httrack "${args[@]}" \
         >"$log" 2>&1 || rc=$?
+    test "$rc" -ne 124 || dump_file "$log"
+    test -z "$own" || rm -f "$log"
     test "$rc" -ne 124 || fail "crawl watchdog fired after ${deadline}s"
     return "$rc"
 }

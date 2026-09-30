@@ -22,5 +22,6 @@ test "$rc" -ne 0 || fail "stalled crawl reported success"
 test "$elapsed" -lt 25 || fail "watchdog fired late (${elapsed}s)"
 grep -q "watchdog fired" <<<"$out" ||
     fail "crawl failed but not via the watchdog: $out"
+assert_wedge_stack "$out"
 
 echo "crawl watchdog OK (reaped in ${elapsed}s)"
