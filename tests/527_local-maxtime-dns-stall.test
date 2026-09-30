@@ -39,8 +39,21 @@ GAISTALL=120 LD_PRELOAD="$GAISTALL_LIB" \
 elapsed=$((SECONDS - start))
 
 # Teeth: this line is printed only when a worker was still stuck at exit.
-grep -q "engine threads still running past --max-time" "$dir/out" ||
+grep -q "Exiting without waiting for engine threads" "$dir/out" ||
     fail_dump "maxtime-dns-stall: no stuck worker at exit, nothing was tested (rc=$rc)" "$dir/out"
+test "$rc" -eq 0 || fail_dump "maxtime-dns-stall: exit status $rc" "$dir/out"
 test "$elapsed" -lt 60 ||
     fail_dump "maxtime-dns-stall: exited after ${elapsed}s, past --max-time=2" "$dir/out"
-echo "OK: a stuck getaddrinfo() no longer holds the exit past --max-time (${elapsed}s)"
+
+# Control: without --max-time the exit still waits for the worker.
+start=$SECONDS
+GAISTALL=12 LD_PRELOAD="$GAISTALL_LIB" \
+    httrack --quiet --timeout=1 -O "$dir/o2" \
+    "http://127.0.0.1:1/" >"$dir/out2" 2>&1
+elapsed2=$((SECONDS - start))
+if grep -q "Exiting without waiting" "$dir/out2"; then
+    fail_dump "maxtime-dns-stall: abandoned threads with no --max-time" "$dir/out2"
+fi
+test "$elapsed2" -ge 12 ||
+    fail_dump "maxtime-dns-stall: no --max-time, yet exited after ${elapsed2}s" "$dir/out2"
+echo "OK: a stuck getaddrinfo() holds the exit ${elapsed}s under --max-time=2, ${elapsed2}s without"

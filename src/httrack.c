@@ -283,9 +283,8 @@ static void exit_wait_thread(void *arg) {
   hts_mutexrelease(&exit_wait_lock);
 }
 
-/* Wait for the engine's threads, but under --max-time no longer than its
-   budget plus a grace, because a stuck getaddrinfo() never returns (#1840).
-   HTS_FALSE when threads were left running, so opt must not be freed. */
+/* Bounded by --max-time plus a grace, because a stuck getaddrinfo() never
+   returns. HTS_FALSE when threads were left running, so opt must stay. */
 static hts_boolean exit_wait_threads(const httrackp *opt) {
   TStamp left, deadline;
 
@@ -400,15 +399,14 @@ int main(int argc, char **argv) {
   if (exit_wait_threads(opt)) {
     hts_free_opt(opt);
     hts_uninit();
+#ifdef _WIN32
+    WSACleanup();
+#endif
   } else {
     exit_abandoned_opt = opt;
-    fprintf(stderr, "* engine threads still running past --max-time, "
-                    "exiting without them\n");
+    fprintf(stderr, "* Exiting without waiting for engine threads still "
+                    "running after --max-time\n");
   }
-
-#ifdef _WIN32
-  WSACleanup();
-#endif
 
   return ret;
 }
