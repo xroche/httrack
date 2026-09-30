@@ -288,8 +288,7 @@ if ! target_is_windows && test -r /proc/self/stat; then
     # Read-write, so the open does not block and the timeout can bound it: the
     # fakes then fork nothing for the SIGABRT to orphan, and a test killed
     # outright leaks no process named httrack onto the runner.
-    # The trap proves delivery: an untrapped SIGABRT dumps core, which a loaded
-    # runner's systemd-coredump took over 5s to finish (#1841).
+    # The trap records delivery, because an untrapped SIGABRT dumps core slowly (#1841).
     mkfifo "$tmp/hold"
     hold="trap ': >\"$tmp/abrt.\$\$\"; exit' ABRT; read -t 60 _ <>'$tmp/hold'"
     # Started from a subshell so ppid and pgid differ: swapping those two columns
@@ -369,6 +368,7 @@ if ! target_is_windows && test -r /proc/self/stat; then
         chmod +x "$tmp/nops/uname"
         grep -q "no stack mechanism known for GNU" <<<"$(request_engine_backtraces "$pgid")" ||
             fail "a platform with no stack mechanism reported nothing"
+        sleep 0.5 # a trap runs in milliseconds, so a stray signal has left its marker
         ! test -e "$tmp/abrt.$fake" || fail "the no-mechanism branch signalled pid $fake"
         rm -f "$tmp/nops/uname"
 
@@ -380,6 +380,9 @@ if ! target_is_windows && test -r /proc/self/stat; then
         # owes the reader its no-mechanism report instead of silence.
         if test "$(uname -s)" = Linux; then
             wait_until "test -e '$tmp/abrt.$fake'" "the SIGABRT never reached pid $fake"
+            wait_until "test -e '$tmp/abrt.$emul'" "the SIGABRT never reached emulated pid $emul"
+            ! test -e "$tmp/abrt.$outside" ||
+                fail "the SIGABRT reached pid $outside, outside the group"
         else
             grep -q 'no stack mechanism known' <<<"$stacks" ||
                 fail "no stack mechanism was reported on $(uname -s): $stacks"
