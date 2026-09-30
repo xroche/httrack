@@ -122,7 +122,7 @@ local_server_start() {
 #                  at all. Redirecting the local_crawl call instead does not
 #                  reach the engine (#1258).
 local_crawl() {
-    local deadline log=/dev/null stdin=() arg rc=0
+    local deadline log='' stdin=() arg rc=0
     deadline=$(crawl_deadline)
     while test $# -gt 0; do
         case $1 in
@@ -148,8 +148,16 @@ local_crawl() {
     done
     args+=("$@")
 
+    # Kept even without --log, because a wedge's stack lands in it.
+    local own=''
+    if test -z "$log"; then
+        log=$(mktemp "${TMPDIR:-/tmp}/httrack_crawl.XXXXXX") || log=/dev/null
+        own=1
+    fi
     run_with_timeout ${stdin[@]+"${stdin[@]}"} "$deadline" httrack "${args[@]}" \
         >"$log" 2>&1 || rc=$?
+    test "$rc" -ne 124 || dump_file "$log"
+    test -z "$own" || rm -f "$log"
     test "$rc" -ne 124 || fail "crawl watchdog fired after ${deadline}s"
     return "$rc"
 }

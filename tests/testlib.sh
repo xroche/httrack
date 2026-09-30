@@ -1380,6 +1380,16 @@ reap_bounded() {
     return 0
 }
 
+# Print an overrun's process tree and stacks on stderr before the watchdog kills
+# it, because nothing survives the kill. It never fails the caller.
+dump_overrun() { # dump_overrun <pid> <secs> <label>
+    local pgid
+    pgid=$(ps -o pgid= -p "$1" 2>/dev/null | tr -d ' ') || pgid=
+    # shellcheck source=tests/proclib.sh
+    declare -F dump_hang_diagnostics >/dev/null || . "$testdir/proclib.sh" || return 0
+    dump_hang_diagnostics "${pgid:-$1}" "$3" "$2" >&2 || true
+}
+
 # Run "$@" under a wall-clock deadline of $1 seconds; return its exit status, or
 # 124 if it overran and was killed. timeout(1) is unusable here: it's absent on
 # macOS and its signals can't reap httrack.exe on Windows. We poll and kill_tree.
@@ -1419,6 +1429,7 @@ run_with_timeout() {
     local start=$SECONDS
     while kill -0 "$pid" 2>/dev/null; do
         if test "$((SECONDS - start))" -gt "$secs"; then
+            dump_overrun "$pid" "$secs" "$*"
             kill_tree "$pid" "$winpid"
             reap_bounded "$pid" || true
             return 124
@@ -1434,6 +1445,7 @@ wait_bounded() {
     local pid=$1 secs=$2 start=$SECONDS
     while kill -0 "$pid" 2>/dev/null; do
         if test "$((SECONDS - start))" -gt "$secs"; then
+            dump_overrun "$pid" "$secs" "pid $pid"
             kill_tree "$pid"
             reap_bounded "$pid" || true
             return 124

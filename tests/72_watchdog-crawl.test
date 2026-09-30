@@ -22,5 +22,11 @@ test "$rc" -ne 0 || fail "stalled crawl reported success"
 test "$elapsed" -lt 25 || fail "watchdog fired late (${elapsed}s)"
 grep -q "watchdog fired" <<<"$out" ||
     fail "crawl failed but not via the watchdog: $out"
+# The wedge is reported before the kill, since nothing survives it.
+grep -q "===== TIMEOUT:" <<<"$out" || fail "no diagnostics before the kill: $out"
+case $(uname -s) in
+Linux) grep -q "Caught signal 6" <<<"$out" || fail "the engine printed no stack: $out" ;;
+Darwin) grep -q "Call graph" <<<"$out" || fail "sample(1) printed no stack: $out" ;;
+esac
 
 echo "crawl watchdog OK (reaped in ${elapsed}s)"
