@@ -272,7 +272,7 @@ static void signal_handlers(void);
 static htsmutex exit_wait_lock = HTSMUTEX_INIT;
 static hts_boolean exit_wait_done = HTS_FALSE;
 /* Kept reachable once abandoned, so a leak checker at exit does not flag it. */
-static httrackp *exit_abandoned_opt = NULL;
+static httrackp *volatile exit_abandoned_opt = NULL;
 
 /* Runs on its own worker, so it waits for every thread but itself. */
 static void exit_wait_thread(void *arg) {
