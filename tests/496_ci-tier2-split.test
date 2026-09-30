@@ -17,9 +17,9 @@ if ! test -d "$wfdir"; then
     skip "no .github under $top (dist tarball), so the audit has nothing to read"
 fi
 
-# Every context the "Protect master" ruleset requires by name, with the workflow
-# and job that emits it. Pinned rather than read back from the tree, because one
-# file compared against itself proves nothing. Tab-separated.
+# Every context the "Protect master" ruleset requires by name, or is about to,
+# with the workflow and job that emits it. Pinned rather than read back from the
+# tree, because one file compared against itself proves nothing. Tab-separated.
 required='ci.yml	dco	DCO sign-off
 ci.yml	format	format (clang-format-19, changed lines)
 ci.yml	lint	lint (shellcheck, shfmt)
@@ -105,7 +105,8 @@ job_contexts() { # job_contexts <workflow> <job id>
         # job off on a PR without changing its name.
         /^    if:/ {
             cond = trim(substr($0, index($0, ":") + 1))
-            if (cond != "github.event_name == '"'"'pull_request'"'"'" && !(want == "gate" && cond == "always()")) {
+            if (want == "gate" && cond == "always()") { always = 1; next }
+            if (cond != "github.event_name == '"'"'pull_request'"'"'") {
                 print "ERR: unpinned if: " cond; bad = 1; exit
             }
             next
@@ -130,6 +131,9 @@ job_contexts() { # job_contexts <workflow> <job id>
         END {
             if (bad) exit 1
             if (!found) { print "ERR: no job " want; exit 1 }
+            # Without always() the gate skips when a job fails, and a skipped
+            # required check counts as passing.
+            if (want == "gate" && !always) { print "ERR: a gate without if: always()"; exit 1 }
             if (tpl == "") exit 0
             if (plainaxis) { print "ERR: a plain matrix axis under a name:"; exit 1 }
             # An include: nothing matched expands to zero jobs, and the template
