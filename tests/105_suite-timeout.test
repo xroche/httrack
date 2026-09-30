@@ -288,8 +288,10 @@ if ! target_is_windows && test -r /proc/self/stat; then
     # Read-write, so the open does not block and the timeout can bound it: the
     # fakes then fork nothing for the SIGABRT to orphan, and a test killed
     # outright leaks no process named httrack onto the runner.
+    # The trap proves delivery: an untrapped SIGABRT dumps core, which a loaded
+    # runner's systemd-coredump took over 5s to finish (#1841).
     mkfifo "$tmp/hold"
-    hold="read -t 60 _ <>'$tmp/hold'"
+    hold="trap ': >\"$tmp/abrt.\$\$\"; exit' ABRT; read -t 60 _ <>'$tmp/hold'"
     # Started from a subshell so ppid and pgid differ: swapping those two columns
     # is invisible whenever the test shell happens to lead its own group.
     (
@@ -335,7 +337,6 @@ if ! target_is_windows && test -r /proc/self/stat; then
     running "$emul" || fail "an engine behind its binfmt interpreter never started"
     # ppid and pgid of $1: the oracle the listing is checked against.
     procfields() { awk '{ sub(/.*\) /, ""); print $2, $3 }' "/proc/$1/stat"; }
-    procstate() { awk '{ sub(/.*\) /, ""); print $1 }' "/proc/$1/stat" 2>/dev/null || echo gone; }
     read -r fppid pgid _ <<<"$(procfields "$fake")"
     read -r _ opgid _ <<<"$(procfields "$outside")"
     test "$fppid" != "$pgid" || fail "the fake shares ppid and pgid ($pgid)"
@@ -368,9 +369,7 @@ if ! target_is_windows && test -r /proc/self/stat; then
         chmod +x "$tmp/nops/uname"
         grep -q "no stack mechanism known for GNU" <<<"$(request_engine_backtraces "$pgid")" ||
             fail "a platform with no stack mechanism reported nothing"
-        case "$(procstate "$fake")" in
-        Z | gone) fail "the no-mechanism branch signalled pid $fake" ;;
-        esac
+        ! test -e "$tmp/abrt.$fake" || fail "the no-mechanism branch signalled pid $fake"
         rm -f "$tmp/nops/uname"
 
         # The chain, not just its input: this is what reported nothing on Fedora.
@@ -380,12 +379,7 @@ if ! target_is_windows && test -r /proc/self/stat; then
         # Only Linux signals; elsewhere (Hurd's uname reports "GNU") the chain
         # owes the reader its no-mechanism report instead of silence.
         if test "$(uname -s)" = Linux; then
-            # Gone, or a zombie: the fake is reparented, and a container's pid 1
-            # does not always reap. kill -0 succeeds on a zombie, proving nothing.
-            case "$(procstate "$fake")" in
-            Z | gone) ;;
-            *) fail "the SIGABRT never reached pid $fake" ;;
-            esac
+            wait_until "test -e '$tmp/abrt.$fake'" "the SIGABRT never reached pid $fake"
         else
             grep -q 'no stack mechanism known' <<<"$stacks" ||
                 fail "no stack mechanism was reported on $(uname -s): $stacks"
