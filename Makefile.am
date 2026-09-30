@@ -14,6 +14,8 @@ EXTRA_DIST = INSTALL.Linux \
 		tools/gen-winprofile-keys.py \
 		tools/doc-chrome.py \
 		tools/check-includes.py \
+		tools/check-native-deps.py \
+		tools/native-deps-accepted.txt \
 		tools/ci-sanitizer-report.sh \
 		tools/tsan-suppressions.txt \
 		tools/downstream-drift.sh \

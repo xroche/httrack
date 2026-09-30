@@ -1,0 +1,12 @@
+# CVEs accepted for the OpenSSL that src/vcpkg.json's pinned baseline resolves to.
+# One id per line. Every entry says why it cannot reach the shipped binaries, and
+# what removes it again, because an entry with no exit condition outlives its reason.
+#
+# Accepting one is a decision for the maintainer, not for whoever hit the red.
+
+# DTLS handshake retransmission reads past the message buffer. HTTrack speaks HTTP
+# over TLS and never creates a DTLS object: one client-side SSL_CTX built from
+# TLS_client_method() in htslib.c, SSL_connect only, no SSL_accept and no datagram
+# BIO anywhere in the tree. Fixed upstream in OpenSSL 3.6.5, which vcpkg did not
+# carry yet; remove this line once the pinned baseline resolves to 3.6.5 or newer.
+CVE-2026-84782

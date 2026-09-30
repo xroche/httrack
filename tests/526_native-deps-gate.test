@@ -1,0 +1,89 @@
+#!/bin/bash
+#
+# The Windows job is the only place that sees which OpenSSL the vcpkg pin ships, so
+# a rename that unwires the advisory gate, or an accept entry with no exit condition,
+# has to red here rather than at the next release.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+tmp=$(mktemp -d) || exit 1
+cleanup_push rm -rf "$tmp"
+
+top=${abs_top_srcdir:-$(cd "$testdir/.." && pwd)}
+scanner=$top/tools/check-native-deps.py
+accept=$top/tools/native-deps-accepted.txt
+
+assert_file "$scanner"
+assert_file "$accept"
+
+# Every entry is a CVE id, listed once, under a comment block that says what takes it
+# away again. An entry nobody can retire is a permanent hole with a temporary excuse.
+awk '
+    /^[[:space:]]*#/ { comment = comment $0 " "; next }
+    /^[[:space:]]*$/ { comment = ""; next }
+    {
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+        if ($0 !~ /^CVE-[0-9][0-9][0-9][0-9]-[0-9]+$/) {
+            print "ERR: " FILENAME ":" NR ": not a CVE id: " $0; bad = 1; next
+        }
+        if (seen[$0]++) { print "ERR: " FILENAME ":" NR ": listed twice: " $0; bad = 1 }
+        if (comment == "") {
+            print "ERR: " FILENAME ":" NR ": " $0 " carries no reason"; bad = 1
+        } else if (comment !~ /remove|drop/) {
+            print "ERR: " FILENAME ":" NR ": " $0 " names no way out"; bad = 1
+        }
+        n++
+        # Cleared, or the next entry inherits the reason above and a bare id passes.
+        comment = ""
+    }
+    END {
+        if (bad) exit 1
+        print "entries: " n
+    }
+' "$accept" >"$tmp/accept.txt" || fail_dump "the accept list is malformed" "$tmp/accept.txt"
+cat "$tmp/accept.txt"
+
+wf=$top/.github/workflows/windows-build.yml
+if ! test -r "$wf"; then
+    test -d "$top/.github" && fail "$wf is gone but $top/.github is not"
+    skip "no .github under $top (dist tarball), so the wiring has nothing to read"
+fi
+
+# The step, and the two paths it names. A moved file that nothing calls is the
+# failure this guards: the job stays green having checked nothing.
+step=$(awk '
+    /^      - name: / { instep = ($0 ~ /advisories/) }
+    instep { print }
+' "$wf")
+test -n "$step" || fail "$wf has no step checking native dependencies for advisories"
+printf '%s\n' "$step" >"$tmp/step.txt"
+
+# The threshold is pinned: raised to critical, the step stays green through exactly
+# the severity this gate exists for.
+for want in tools/check-native-deps.py tools/native-deps-accepted.txt \
+    "--min-severity moderate" --expect-openssl; do
+    command grep -qF -- "$want" "$tmp/step.txt" ||
+        fail_dump "the advisory step does not name $want" "$tmp/step.txt"
+done
+
+# Fatal off a pull request, or master learns about a vulnerable OpenSSL from a
+# release instead of from CI.
+coe=$(printf '%s\n' "$step" | sed -n 's/^        continue-on-error: *//p')
+assert_eq "\${{ github.event_name == 'pull_request' }}" "$coe" "continue-on-error"
+
+# The matcher's own cases, where a python3 can read the scanner. Not a skip when it
+# cannot: the wiring above must hold everywhere, buildd-no-python3 builds a host with
+# no interpreter at all, and under wsl2 python3 may be the Windows one, which cannot
+# open the path this side names. Proving it can open the file separates that from a
+# real failure, which must still red.
+if py=$(command -v python3 2>/dev/null) &&
+    "$py" -c 'open(__import__("sys").argv[1]).close()' "$scanner" 2>/dev/null; then
+    "$py" "$scanner" --selftest >"$tmp/selftest.txt" 2>&1 ||
+        fail_dump "the advisory matcher's selftest fails" "$tmp/selftest.txt"
+    tail -1 "$tmp/selftest.txt"
+else
+    echo "no python3 that can read $scanner: checked the wiring only"
+fi

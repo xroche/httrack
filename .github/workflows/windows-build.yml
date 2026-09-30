@@ -331,6 +331,35 @@ jobs:
           bash tests/install-headers-sweep.sh --backend cl --srcdir . -- @inc
           if ($LASTEXITCODE -ne 0) { throw "the installed headers do not compile standalone and pairwise" }
 
+      # vcpkg is invisible to Dependabot, CodeQL and the dependency graph, so nothing
+      # else in this repo would notice that the DLLs we publish carry a vulnerable
+      # OpenSSL. Advisory on a pull request and fatal elsewhere: a CVE published
+      # upstream is not the PR's doing, and reding every open PR for it is how a gate
+      # gets ignored.
+      - name: Check shipped native dependencies for advisories
+        shell: pwsh
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          # What the pin promised, cross-checked against what vcpkg installed: a
+          # mismatch means the binaries are not built from src/vcpkg.json's baseline.
+          $baseline = (Get-Content src/vcpkg.json -Raw | ConvertFrom-Json).'builtin-baseline'
+          if (-not $baseline) { throw "no builtin-baseline in src/vcpkg.json" }
+          $url = "https://raw.githubusercontent.com/microsoft/vcpkg/$baseline/versions/baseline.json"
+          # Retried, because this step reds master and a 503 is not a finding.
+          for ($i = 1; $i -le 3; $i++) {
+            try { $expect = (Invoke-RestMethod $url).default.openssl.baseline; break }
+            catch {
+              Write-Host "baseline fetch attempt ${i}: $($_.Exception.Message)"
+              if ($i -lt 3) { Start-Sleep -Seconds (2 * $i) }
+            }
+          }
+          if (-not $expect) { throw "could not resolve openssl from the pinned baseline" }
+          Write-Host "the pin resolves openssl to $expect"
+          python tools/check-native-deps.py --installed src/vcpkg_installed `
+            --min-severity moderate --expect-openssl $expect `
+            --accept-file tools/native-deps-accepted.txt
+          if ($LASTEXITCODE -ne 0) { throw "the shipped native dependencies are not clean" }
       - name: Restore the WSL rootfs
         if: env.RUNNABLE == 'true'
         id: wslrootfs
