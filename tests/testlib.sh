@@ -1238,8 +1238,7 @@ budget_secs() {
     echo "$((10#$budget))"
 }
 
-# Would the next of $1 steps, at 1.5x $2 seconds, outrun the budget? For a caller
-# that skips part of its work rather than all of it.
+# Would the next of $1 steps, at 1.5x $2 seconds, outrun the budget? It never exits.
 out_of_budget() { # out_of_budget <steps left> <seconds the last took>
     local budget need=$(($2 + $2 / 2))
 
