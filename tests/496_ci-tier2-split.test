@@ -17,9 +17,9 @@ if ! test -d "$wfdir"; then
     skip "no .github under $top (dist tarball), so the audit has nothing to read"
 fi
 
-# Every context the "Protect master" ruleset requires by name, with the workflow
-# and job that emits it. Pinned rather than read back from the tree, because one
-# file compared against itself proves nothing. Tab-separated.
+# Every context the "Protect master" ruleset requires by name, or is about to,
+# with the workflow and job that emits it. Pinned rather than read back from the
+# tree, because one file compared against itself proves nothing. Tab-separated.
 required='ci.yml	dco	DCO sign-off
 ci.yml	format	format (clang-format-19, changed lines)
 ci.yml	lint	lint (shellcheck, shfmt)
@@ -39,7 +39,9 @@ ci.yml	fuzz	fuzz (libFuzzer corpus replay, clang)
 ci.yml	webhttrack-macos	webhttrack smoke (macOS arm64)
 ci.yml	deb	deb package (lintian)
 windows-build.yml	libhttrack	libhttrack (x64, Release)
-windows-build.yml	libhttrack	libhttrack (Win32, Release)'
+windows-build.yml	libhttrack	libhttrack (Win32, Release)
+ci.yml	gate	ci gate
+windows-build.yml	gate	windows gate'
 
 # Does this workflow run on every pull request? A filter under the key (paths:,
 # branches:, types:) would skip the PRs it does not match, and those PRs then
@@ -92,6 +94,8 @@ job_contexts() { # job_contexts <workflow> <job id>
         /^    name: / { tpl = unquote(trim(substr($0, 11))); next }
         # A required job must run, and must be able to fail. needs: makes it skip
         # with whatever it waits on, and continue-on-error: reports green always.
+        # A gate needs every job, and always() keeps it from skipping with them.
+        /^    needs:/ && want == "gate" { next }
         /^    needs:/ { print "ERR: a needs:, which can skip the job"; bad = 1; exit }
         /^    continue-on-error:/ {
             print "ERR: continue-on-error:, so the check cannot fail"; bad = 1; exit
@@ -101,6 +105,7 @@ job_contexts() { # job_contexts <workflow> <job id>
         # job off on a PR without changing its name.
         /^    if:/ {
             cond = trim(substr($0, index($0, ":") + 1))
+            if (want == "gate" && cond == "always()") { always = 1; next }
             if (cond != "github.event_name == '"'"'pull_request'"'"'") {
                 print "ERR: unpinned if: " cond; bad = 1; exit
             }
@@ -126,6 +131,9 @@ job_contexts() { # job_contexts <workflow> <job id>
         END {
             if (bad) exit 1
             if (!found) { print "ERR: no job " want; exit 1 }
+            # Without always() the gate skips when a job fails, and a skipped
+            # required check counts as passing.
+            if (want == "gate" && !always) { print "ERR: a gate without if: always()"; exit 1 }
             if (tpl == "") exit 0
             if (plainaxis) { print "ERR: a plain matrix axis under a name:"; exit 1 }
             # An include: nothing matched expands to zero jobs, and the template

@@ -7,7 +7,7 @@ inputs:
     description: The caller's toJSON(needs)
     required: true
   allow-skipped:
-    description: Accept a skipped job as well as a successful one
+    description: The ids of the jobs that may skip, or true for every job
     required: false
     default: "false"
 
@@ -32,7 +32,12 @@ runs:
             echo "$job: $result"
             case $result in
             success) ;;
-            skipped) test "$ALLOW_SKIPPED" = true || bad="$bad $job($result)" ;;
+            skipped)
+                case " $ALLOW_SKIPPED " in
+                " true " | *" $job "*) ;;
+                *) bad="$bad $job($result)" ;;
+                esac
+                ;;
             *) bad="$bad $job($result)" ;;
             esac
         done < <(jq -r 'to_entries[] | "\(.key) \(.value.result)"' <<<"$NEEDS")
