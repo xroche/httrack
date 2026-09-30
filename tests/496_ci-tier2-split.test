@@ -17,29 +17,10 @@ if ! test -d "$wfdir"; then
     skip "no .github under $top (dist tarball), so the audit has nothing to read"
 fi
 
-# Every context the "Protect master" ruleset requires by name, or is about to,
-# with the workflow and job that emits it. Pinned rather than read back from the
+# Every context the "Protect master" ruleset requires by name, with the
+# workflow and job that emits it. Pinned rather than read back from the
 # tree, because one file compared against itself proves nothing. Tab-separated.
 required='ci.yml	dco	DCO sign-off
-ci.yml	format	format (clang-format-19, changed lines)
-ci.yml	lint	lint (shellcheck, shfmt)
-ci.yml	build	build (x86-64, gcc)
-ci.yml	build	build (x86-64, clang)
-ci.yml	build	build (arm64, gcc)
-ci.yml	build	build (arm64, clang)
-ci.yml	build	build (x86-64, gcc -O3 -flto)
-ci.yml	macos	build (macOS arm64, clang)
-ci.yml	linux-i386	build (linux i386, gcc -m32)
-ci.yml	no-ssl	build (no openssl, --disable-https)
-ci.yml	buildd-no-python3	build (no python3, Debian buildd)
-ci.yml	sanitize	sanitize (ASan+UBSan, gcc)
-ci.yml	msan	msan (MemorySanitizer, clang)
-ci.yml	distcheck	distcheck (release tarball)
-ci.yml	fuzz	fuzz (libFuzzer corpus replay, clang)
-ci.yml	webhttrack-macos	webhttrack smoke (macOS arm64)
-ci.yml	deb	deb package (lintian)
-windows-build.yml	libhttrack	libhttrack (x64, Release)
-windows-build.yml	libhttrack	libhttrack (Win32, Release)
 ci.yml	gate	ci gate
 windows-build.yml	gate	windows gate'
 
@@ -59,7 +40,7 @@ on_pull_request() { # on_pull_request <workflow>
 
 # The status contexts one job emits, with its matrix expanded. Empty output
 # means the job carries no name:, and GitHub then builds the context from the
-# job id; 437_ci-windows-contexts.test owns that half.
+# job id.
 job_contexts() { # job_contexts <workflow> <job id>
     awk -v want="$2" '
         function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
