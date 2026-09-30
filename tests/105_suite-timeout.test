@@ -264,10 +264,11 @@ test "$rc" -eq 0 || fail "a 60s step under a 600s budget reported $rc, want 0"
 grep -q 'the pacer let it through' "$out" || fail "the pacer skipped a test that fits"
 
 # The reserve is half a step over the last one, and only a budget between the two
-# sizes proves it: 100s alone would fit under 140, 150s does not.
+# sizes proves it: 100s alone would fit under 140, 150s does not. A budget of 0
+# is the guard off, which never skips.
 printf '. "%s"\nskip_if_out_of_budget 5 100\n' "${testdir}/testlib.sh" \
     >"$tmp/96_margin.test"
-for want in 140:77 200:0; do
+for want in 140:77 200:0 0:0; do
     rc=0
     HTTRACK_TEST_TIMEOUT=${want%%:*} bash "$driver" "$tmp/96_margin.test" >"$out" 2>&1 || rc=$?
     test "$rc" -eq "${want##*:}" ||

@@ -1223,7 +1223,17 @@ fullstdout_leg() {
 
 first=1
 
+# The body before the legs is unpaced and runs once per interpreter, so a later
+# one is skipped when it cannot fit. body_done records what that body cost.
+bodycost='' bodyof=''
+body_done() { bodycost=$((SECONDS - body_at)) bodyof=$psrun; }
 for psrun in "${psruns[@]}"; do
+    if test -n "$bodycost" && out_of_budget 1 "$bodycost"; then
+        # shellcheck disable=SC2031 # only fires under -x, and this is the main shell
+        skipped+=("the whole $psrun body, because the $bodyof body took ${bodycost}s and $(budget_left)s of the budget remain")
+        continue
+    fi
+    body_at=$SECONDS
     psargs=(-NoProfile -NonInteractive)
     case $psrun in
     powershell*) psargs+=(-ExecutionPolicy Bypass) ;;
@@ -1290,12 +1300,14 @@ for psrun in "${psruns[@]}"; do
         fi
         # shellcheck disable=SC2031 # only fires under -x, and this is the main shell
         skipped+=("the whole $psrun body: ten 1s sleeps took ${box:-over 120}s, so the box could not be calibrated")
+        body_done
         continue
     fi
     # Past this a single window outruns what the budget can pay for, and the
     # pacer only skips between steps, never inside one.
     if test "$turn" -gt "$TURN_CAP"; then
         skipped+=("the $psrun timing checks and legs: a turn costs ${turn}s, past the ${TURN_CAP}s this test can afford")
+        body_done
         continue
     fi
     echo "note: one turn of the $psrun watchdog loop costs ${turn}s here"
@@ -1395,6 +1407,7 @@ for psrun in "${psruns[@]}"; do
     # decisions rather than the interpreter's: one flavour is enough.
     test "$first" -eq 1 || continue
     first=0
+    body_done
     if test -z "$py"; then
         note_coverage "no python3 here, the posting legs did not run"
         continue
