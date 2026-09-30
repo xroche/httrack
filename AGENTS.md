@@ -100,7 +100,7 @@ the operational checklist: toolchain, invariants, and how to ship a change.
   `html/contact.html`, is UTF-8 and safe to edit normally.
 - **The `Protect master` ruleset requires three checks: `ci gate`, `windows
   gate` and `DCO sign-off`.** Each gate fails unless every job in its workflow
-  succeeded, so a new job goes into its gate's `needs:`, and
+  succeeded, or skipped on purpose, so a new job goes into its gate's `needs:`, and
   `496_ci-tier2-split.test` fails when one is missing. A matrix change or a job
   rename no longer touches the ruleset.
 - **A required status context must stay on a workflow that runs on

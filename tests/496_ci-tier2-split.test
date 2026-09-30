@@ -81,8 +81,8 @@ job_contexts() { # job_contexts <workflow> <job id>
         /^    continue-on-error:/ {
             print "ERR: continue-on-error:, so the check cannot fail"; bad = 1; exit
         }
-        # The two required jobs that carry one are restricted TO pull requests,
-        # which is the opposite of a hazard. Any other condition can switch the
+        # dco carries one that restricts it TO pull requests, which is the
+        # opposite of a hazard. Any other condition can switch the
         # job off on a PR without changing its name.
         /^    if:/ {
             cond = trim(substr($0, index($0, ":") + 1))
@@ -188,7 +188,7 @@ A workflow with neither a trigger nor a caller never runs again, and says nothin
 # it does not name can red while the gate reports green, which is worse than
 # having no gate, and nothing in the workflow itself notices.
 gate_gaps() { # gate_gaps <workflow>: prints the gap, or the job count
-    local wf=$1 legs_raw legs needed_raw needed
+    local wf=$1 legs_raw legs needed_raw needed coe
     # A key this cannot read would drop the job from BOTH lists, and they would
     # still agree while that job reds unwatched.
     legs_raw=$(awk '/^jobs:/ { injobs = 1; next }
@@ -201,6 +201,11 @@ gate_gaps() { # gate_gaps <workflow>: prints the gap, or the job count
                     }' "$wf") || true
     case $legs_raw in *ERR:*) echo "$legs_raw" && return 1 ;; esac
     command grep -qx gate <<<"$legs_raw" || { echo "no gate job" && return 1; }
+    # A job that cannot fail reports success to the gate whatever it found.
+    coe=$(awk '/^jobs:/ { injobs = 1; next }
+               injobs && /^  [A-Za-z0-9_-]+:/ { id = $0; sub(/:.*/, "", id); sub(/^  /, "", id) }
+               injobs && /^    continue-on-error:/ { print id }' "$wf")
+    test -z "$coe" || { echo "continue-on-error: on $(paste -sd ' ' - <<<"$coe"), so the gate cannot see it fail" && return 1; }
     legs=$(command grep -vx gate <<<"$legs_raw" | sort)
     needed_raw=$(awk '/^  gate:[ \t]*(#.*)?$/ { ingate = 1; next }
                       ingate && /^  [A-Za-z0-9_-]+:/ { exit }

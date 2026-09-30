@@ -495,7 +495,7 @@ jobs:
   # clashes with the -Wl,--no-undefined on libhttrack.so, the same clash
   # configure.ac refuses --enable-fuzzers over. HTTPS stays on, unlike under msan:
   # TSan reports nothing inside openssl, zlib, brotli or zstd, so turning it off
-  # would only cost coverage. Not a required check.
+  # would only cost coverage. Required through ci gate, like every job here.
   tsan:
     name: tsan (ThreadSanitizer, clang)
     runs-on: ubuntu-24.04
