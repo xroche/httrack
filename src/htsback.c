@@ -504,6 +504,7 @@ static int slot_can_be_cached_on_disk(const lien_back * back) {
      would unlink it through back_clear_entry() (#771). */
   if (back->tmpfile != NULL && back->tmpfile[0] != '\0')
     return 0;
+  /* locked == 0: neither locked nor pinned */
   return (back->status == STATUS_READY && back->locked == 0
           && back->url_sav[0] != '\0'
           && strcmp(back->url_sav, BACK_ADD_TEST) != 0);
@@ -538,6 +539,8 @@ int back_selftest_slot_swap(void) {
   back.tmpfile = NULL;
   back.locked = 1;
   CHECK(0, "a locked slot");
+  back.locked = BACK_PINNED;
+  CHECK(0, "a pinned slot");
   back.locked = 0;
 
   back.status = STATUS_TRANSFER;
@@ -2340,6 +2343,13 @@ void back_set_locked(struct_back * sback, const int p) {
   }
 }
 
+/* See htsback.h. back_set_unlocked() releases it. */
+void back_set_pinned(struct_back *sback, const int p) {
+  assertf(p >= 0 && p < sback->count);
+  if (p >= 0 && p < sback->count)
+    sback->lnk[p].locked = BACK_PINNED;
+}
+
 void back_set_unlocked(struct_back * sback, const int p) {
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
@@ -3253,7 +3263,7 @@ int host_wait(httrackp *opt, lien_back *back) { return 1; }
 static int slot_can_be_cleaned(const lien_back * back) {
   return (back->status == STATUS_READY) // ready
          /* Check autoclean */
-         && (!back->locked)   // not held by hts_wait_delayed (name pending)
+         && (!back->locked)   // not locked or pinned by hts_wait_delayed
          && (!back->testmode) // not test mode
          && (strnotempty(back->url_sav))     // filename exists
          && (HTTP_IS_OK(back->r.statuscode)) // HTTP "OK"
@@ -4050,8 +4060,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 #if HTS_DIRECTDISK
           // Shortcut: store the file directly on disk when possible,
           // sparing memory
+          // (a locked slot keeps its body in memory, a pinned one need not)
           if (back[i].status &&
-              !back[i].locked) { // name still pending when locked
+              (back[i].locked == 0 || back[i].locked == BACK_PINNED)) {
             if (back[i].r.is_write == 0) {      // mode mémoire
               if (back[i].r.adr == NULL) {      // rien n'a été écrit
                 if (!back[i].testmode) {        // pas mode test
@@ -5290,8 +5301,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                               && (back[i].r.adr = (char *) malloct(2))) {
                             back[i].r.adr[0] = 0;
                           }
-                          /* locked = name pending; the waiter finalizes after
-                             patching url_sav (else: cached as .delayed, #5) */
+                          /* locked or pinned = name pending; the waiter
+                             finalizes after patching url_sav (else: cached as
+                             .delayed, #5) */
                           if (!back[i].locked) {
                             hts_log_print(opt, LOG_TRACE, "finalizing empty");
                             back_finalize(opt, cache, sback, i);
@@ -5506,7 +5518,7 @@ static hts_boolean back_maxsize_reached(const httrackp *opt) {
 
 static hts_boolean back_maxtime_reached(const httrackp *opt) {
   return opt->maxtime > 0 &&
-         (time_local() - HTS_STAT.stat_timestart) >= opt->maxtime;
+         hts_mirror_elapsed_ms() >= (TStamp) opt->maxtime * 1000;
 }
 
 /* A cap has been reached, so back_checkmirror() below is what raised the stop
@@ -5523,9 +5535,9 @@ static hts_mirror_limit back_mirror_limit(httrackp *opt) {
       return HTS_MIRROR_LIMIT_SIZE;
   }
   if (back_maxtime_reached(opt)) {
-    const TStamp elapsed = time_local() - HTS_STAT.stat_timestart;
+    const TStamp over = hts_mirror_elapsed_ms() - (TStamp) opt->maxtime * 1000;
 
-    if (elapsed - opt->maxtime >= back_maxtime_grace(opt->maxtime))
+    if (over >= (TStamp) back_maxtime_grace(opt->maxtime) * 1000)
       return HTS_MIRROR_LIMIT_TIME;
   }
   return HTS_MIRROR_LIMIT_NONE;

@@ -1,13 +1,14 @@
 #!/bin/bash
 #
 # Cancelled delayed-type-checks must not orphan .delayed placeholders (#483).
-# Timing-dependent (hence two tries); -A keeps the window reachable.
+# The server sizes the index 60 bytes under -M, so the first page's headers
+# cross the cap while the engine waits for that page's type. -c1 then makes the
+# namer pump sockets until that page is written to its placeholder. -Z logs the
+# "moved placeholder" line that proves the window was reached.
 
 set -euo pipefail
 
 : "${top_srcdir:=..}"
 
-for _ in 1 2; do
-    bash "$top_srcdir/tests/local-crawl.sh" \
-        httrack 'BASEURL/dcancel/index.html' -E1 -c4 -A25000
-done
+bash "$top_srcdir/tests/local-crawl.sh" --log-found 'moved placeholder' \
+    httrack 'BASEURL/dcap/index.html' -M50000 -c1 -Z

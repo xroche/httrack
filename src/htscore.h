@@ -346,6 +346,13 @@ void hts_record_free(httrackp *opt);
    short, however it arrived (state.stop or exit_xh). */
 int httpmirror(char *url1, httrackp *opt, hts_boolean *completed);
 
+/* Start the stats clock HTS_STAT.stat_timestart (seconds) and the --max-time
+   clock hts_mirror_elapsed_ms(). */
+void hts_mirror_clock_start(void);
+
+/* Return the time since hts_mirror_clock_start(), in monotonic ms. */
+TStamp hts_mirror_elapsed_ms(void);
+
 /* Write len bytes of adr to local path s. url_adr/url_fil (may be NULL) name
    the source URL for logging/notification. */
 int filesave(httrackp * opt, const char *adr, int len, const char *s,

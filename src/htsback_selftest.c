@@ -1589,10 +1589,57 @@ static int st_hostban(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* The clock starts just before a wall-clock second ends, so a whole-second
+   -E count would stop 200ms in. */
+static int st_maxtime(httrackp *opt, int argc, char **argv) {
+  FILE *const saved_log = opt->log;
+  int err = 0;
+  int tries;
+  TStamp t0 = 0, elapsed = 0;
+
+  (void) argc;
+  (void) argv;
+  opt->log = NULL; /* the stop logs, and this test's own output is exact */
+  opt->maxtime = 1;
+  /* A starved host can oversleep past the cap, so retry. The window is timed
+     here, never through the clock under test. */
+  for (tries = 0; tries < 5; tries++) {
+    while (mtime_local() % 1000 < 850 || mtime_local() % 1000 >= 900)
+      Sleep(5);
+    hts_mirror_clock_start();
+    t0 = mtime_monotonic();
+    Sleep(200);
+    opt->state.stop = 0;
+    back_checkmirror(opt);
+    elapsed = mtime_monotonic() - t0;
+    if (elapsed < 1000)
+      break;
+  }
+  if (opt->state.stop && elapsed < 1000) {
+    fprintf(stderr, "maxtime: -E1 stopped %d ms in\n", (int) elapsed);
+    err = 1;
+  }
+  while (mtime_monotonic() - t0 < 1000)
+    Sleep(10);
+  back_checkmirror(opt);
+  if (!opt->state.stop) {
+    fprintf(stderr, "maxtime: -E1 had not stopped %d ms in\n",
+            (int) (mtime_monotonic() - t0));
+    err = 1;
+  }
+  opt->state.stop = 0;
+  opt->maxtime = 0;
+  opt->log = saved_log;
+  printf("maxtime self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 const struct selftest_entry selftests_back[] = {
     {"strerror", "",
      "a thread's error message is its own, never another thread's (#1697)",
      st_strerror},
+    {"maxtime", "",
+     "-E stops at its cap to the millisecond, not up to 1s early", st_maxtime},
     {"threadrunner", "",
      "a registered thread runner encloses each worker body exactly once",
      st_threadrunner},
