@@ -49,11 +49,13 @@ fail_dump() { # fail_dump MSG FILE...
 }
 
 # Write `subshell_ok $?` on the line after a ( ... ) statement. bash 3.2's set -e
-# does not stop on a failing subshell, and `( ... ) || fail` turns set -e off inside.
+# ignores a failing subshell, and `( ... ) || fail` turns set -e off inside it.
 subshell_ok() { # subshell_ok STATUS [MSG]
-    test "$1" -ne 0 || return 0
-    test "$1" -ne 77 || exit 77
-    fail "${2:-a subshell exited with $1}"
+    case $1 in
+    0) return 0 ;;
+    77) exit 77 ;;
+    esac
+    fail "${2:-a subshell exited with [$1]}"
 }
 
 # Cache uname -s once: every skip gate asks for it, and each call is a fork the

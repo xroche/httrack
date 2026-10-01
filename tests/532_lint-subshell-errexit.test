@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Lint the tests for statements whose failure set -e misses on bash 3.2 (macOS).
+# Check that no test has a statement whose failure bash 3.2 (macOS) lets through.
 
 set -euo pipefail
 
@@ -18,7 +18,7 @@ lint() { "$python" "$checker" "$@" 2>"$work/lint.err"; }
 
 cd "$testdir"
 files=(*.sh)
-# Written as files=(*.sh [0-9]*_*.test), shfmt would read [0-9] as an array index.
+# One files=(*.sh [0-9]*_*.test) fails, because shfmt reads [0-9] as an index.
 for f in [0-9]*_*.test; do files+=("$f"); done
 test "${#files[@]}" -ge 500 || fail "the lint found only ${#files[@]} files to scan"
 out=$(lint "${files[@]}") || fail_dump "a test lets bash 3.2 miss a failure:
@@ -27,7 +27,7 @@ $out" "$work/lint.err"
 grep -qx "${#files[@]} files, 0 hits" "$work/lint.err" ||
     fail_dump "the lint did not scan every file" "$work/lint.err"
 
-# Mutant: each line marked "# hit: REASON" must be reported, and no other.
+# Each line marked "# hit: REASON" must be reported, and no other.
 cat >"$work/bad.test" <<'EOF'
 set -o errexit
 ( false ) # hit: subshell
@@ -60,6 +60,19 @@ true && ( false ) # hit: subshell
 ( false; echo ) || fail x # hit: set -e is off inside a subshell left of && or ||
 echo | while read -r _; do false; done # hit: pipeline ending in a WhileClause
 echo | { false; } # hit: pipeline ending in a Block
+echo | { # hit: pipeline ending in a Block
+    ( false ) # hit: subshell
+    echo
+}
+time ( false ) # hit: subshell
+(
+    ( false ) # hit: subshell
+    echo
+) &
+wait $! || true
+( false; true ) # hit: subshell
+subshell_ok oops
+( false; true ) || ok=1 # hit: set -e is off inside a subshell left of && or ||
 echo |& ( false ) # hit: pipeline ending in a Subshell
 echo | # hit: pipeline ending in a Subshell
     ( false )
@@ -71,7 +84,7 @@ lint "$work/bad.test" >"$work/bad.out" && fail "the lint passed the mutant"
 want=$(grep -n '# hit: ' "$work/bad.test" | sed "s|^\([0-9]*\):.*# hit: \(.*\)$|$work/bad.test:\1: \2|")
 assert_eq "$want" "$(<"$work/bad.out")" "mutant hits"
 
-# 58 with the subshell_ok taken off its one guarded subshell.
+# Mutant: test 58 with its subshell_ok removed.
 sed '/^subshell_ok \$?$/d' 58_watchdog.test >"$work/58.test"
 cmp -s 58_watchdog.test "$work/58.test" && fail "the 58 mutant changed nothing"
 # Relative, like the tree scan above.
@@ -89,7 +102,7 @@ lint "$work/broken.test" >/dev/null && fail "the lint passed a file shfmt cannot
 grep -qx '0 files, 1 hits' "$work/lint.err" ||
     fail "an unparsed file was counted as scanned: $(<"$work/lint.err")"
 
-# Control: none of these lose a failure on bash 3.2.
+# Control: bash 3.2 loses no failure in these.
 cat >"$work/good.test" <<'EOF'
 set -euo pipefail
 ( false ) || exit 1 # one statement, handled
@@ -100,6 +113,7 @@ subshell_ok $? # status read on the next line
 ( false; echo ) || true # status dropped
 ( false; echo ) || rc=$? # status kept
 if ( false ); then :; fi # condition
+while ( false ); do :; done # condition
 ! ( true ) # negated
 ( false ) & # job
 wait $! || true
