@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# The mirror must not keep spool files: a failed write removes its own, and a
-# run removes those a killed run left behind, but never a live run's.
+# A failed write must remove its own spool file. A run must remove the spool
+# files of a killed run, and never those of a live run.
 
 set -euo pipefail
 # shellcheck source=tests/crawllib.sh
@@ -22,6 +22,11 @@ require_httrack
 
 out=$(httrack -#test=spoolwrite "${tmpdir}/write")
 grep -q "spoolwrite: OK" <<<"$out" || fail "spoolwrite: $out"
+# only Windows has no file size limit to fail a write with
+if ! target_is_windows; then
+    grep -q "failed write cleaned up" <<<"$out" ||
+        fail "spoolwrite never failed a write: $out"
+fi
 out=$(httrack -#test=spoolsweep "${tmpdir}/sweep")
 grep -q "spoolsweep: OK" <<<"$out" || fail "spoolsweep: $out"
 

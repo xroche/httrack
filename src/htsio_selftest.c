@@ -1397,12 +1397,7 @@ static int st_spoolname(httrackp *opt, int argc, char **argv) {
   char BIGSTK got[HTS_URLMAXSIZE * 2 + 32];
   char BIGSTK want[HTS_URLMAXSIZE * 2 + 32];
   char BIGSTK base[HTS_URLMAXSIZE * 2];
-  /* the name carries the owner's pid, for the startup sweep */
-#ifdef _WIN32
-  const unsigned long pid = (unsigned long) GetCurrentProcessId();
-#else
-  const unsigned long pid = (unsigned long) getpid();
-#endif
+  const unsigned long pid = back_self_pid();
   int getmode;
   int err = 0;
 

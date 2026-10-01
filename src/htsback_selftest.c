@@ -260,7 +260,7 @@ static int st_spoolwrite(httrackp *opt, int argc, char **argv) {
         } else if (fexist_utf8(name)) {
           fprintf(stderr, "spoolwrite: failed write left %s\n", name);
           err++;
-        } else if (dir_exists(name)) {
+        } else if (dir_exists(name)) { /* tests the directory of name */
           fprintf(stderr, "spoolwrite: failed write left %s\n", tmpdir);
           err++;
         } else {
@@ -297,12 +297,21 @@ static hts_boolean st_spool_plant(const char *path) {
 
 // -#test=spoolsweep <dir>: startup removes the spool of a dead process only.
 static int st_spoolsweep(httrackp *opt, int argc, char **argv) {
-  /* the first is a dead pid on every platform; the rest must stay */
+  /* no process has this pid on any platform */
   static const char *const dead = "tmpfile2147483646-3.tmp";
+  /* each must stay */
   static const char *const keep[] = {
-      "tmpfile2147483646-3.tmpx", "tmpfile7.tmp",
-      "tmp2147483646-1.tmp",      "tmpfile2147483646-.tmp",
-      "tmpfile-2147483646-3.tmp", "tmpfile99999999999999999999999-1.tmp"};
+      "tmpfile2147483646-3.tmpx",             /* suffix */
+      "tmpfile7.tmp",                         /* no pid */
+      "tmp2147483646-1.tmp",                  /* prefix */
+      "tmpfile2147483646-.tmp",               /* no counter */
+      "tmpfile-2147483646-3.tmp",             /* sign */
+      "tmpfile99999999999999999999999-1.tmp", /* pid overflows */
+#ifndef _WIN32
+      "tmpfile1-0.tmp",          /* init: alive, and EPERM unless root */
+      "tmpfile3000000000-1.tmp", /* a negative pid_t */
+#endif
+  };
   char base[HTS_URLMAXSIZE];
   char path[HTS_URLMAXSIZE * 2];
   char live[HTS_URLMAXSIZE * 2];
@@ -316,7 +325,7 @@ static int st_spoolsweep(httrackp *opt, int argc, char **argv) {
   }
   snprintf(base, sizeof(base), "%s/", argv[0]);
   StringCopy(opt->path_html_utf8, base);
-  /* our own spool name: a live pid */
+  /* a spool file of our own, live, pid */
   memset(&back, 0, sizeof(back));
   back.status = STATUS_READY;
   if (!back_spoolname(opt, live, sizeof(live)) ||

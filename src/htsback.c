@@ -75,7 +75,7 @@ Please visit our Website: http://www.httrack.com
 static hts_boolean back_tmpname(char *dest, size_t size, const char *save,
                                 const char *ext);
 
-static unsigned long back_self_pid(void) {
+unsigned long back_self_pid(void) {
 #ifdef _WIN32
   return (unsigned long) GetCurrentProcessId();
 #else
@@ -83,13 +83,14 @@ static unsigned long back_self_pid(void) {
 #endif
 }
 
-/* Unsure counts as alive, so a live run's spool is never removed. */
+/* An unsure answer is "alive". A pid from another host or pid namespace
+   sharing the mirror reads as dead. */
 static hts_boolean back_pid_is_alive(unsigned long pid) {
 #ifdef _WIN32
   HANDLE h;
   hts_boolean alive;
 
-  if (pid == 0 || pid > 0xfffffffful)
+  if (pid == 0)
     return HTS_TRUE;
   h = OpenProcess(SYNCHRONIZE, FALSE, (DWORD) pid);
   if (h == NULL)
@@ -98,7 +99,7 @@ static hts_boolean back_pid_is_alive(unsigned long pid) {
   CloseHandle(h);
   return alive;
 #else
-  /* 0 and a negative pid_t would signal a whole process group */
+  /* pid 0 or a negative pid_t would signal a process group */
   if (pid == 0 || pid > (unsigned long) INT_MAX)
     return HTS_TRUE;
   return kill((pid_t) pid, 0) == 0 || errno == EPERM ? HTS_TRUE : HTS_FALSE;
@@ -117,7 +118,7 @@ hts_boolean back_spoolname(httrackp *opt, char *dest, size_t size) {
   return HTS_TRUE;
 }
 
-/* The pid in a back_spoolname() name, or 0 if the name is not one. */
+/* Returns the pid in a back_spoolname() name, or 0 if the name is not one. */
 static unsigned long back_spool_owner(const char *name) {
   static const char prefix[] = "tmpfile";
   const char *p = name;
@@ -159,7 +160,7 @@ void back_spool_sweep(httrackp *opt) {
       hts_log_print(opt, LOG_DEBUG, "removed stale spool file %s", path);
   }
   closedir(d);
-  (void) RMDIR(dir);
+  (void) RMDIR(dir); /* refused while a live run still has files */
 }
 
 hts_boolean back_spool_write(httrackp *opt, const char *filename,
@@ -175,7 +176,7 @@ hts_boolean back_spool_write(httrackp *opt, const char *filename,
         back->url_adr, back->url_fil, filename,
         dir_exists(filename) ? "directory exists" : "directory does NOT exist!",
         fexist_utf8(filename) ? "file already exists!" : "file does not exist");
-    back_tmpdir_drop(filename); /* filecreate() may have made it */
+    back_tmpdir_drop(filename); /* filecreate() may have made the directory */
     return HTS_FALSE;
   }
   written = back_serialize(fp, back) == 0 ? HTS_TRUE : HTS_FALSE;
@@ -770,8 +771,8 @@ int back_cleanup_background(httrackp * opt, cache_back * cache,
 #ifndef HTS_NO_BACK_ON_DISK
       /* temporarily serialize the entry on disk */
       {
-        /* +64: room for ~hts-tmp/tmpfile<pid>-<N>.tmp */
-        char BIGSTK tmpname[HTS_URLMAXSIZE * 2 + 64];
+        /* filecreate() aborts on a longer name */
+        char BIGSTK tmpname[HTS_URLMAXSIZE * 2];
         char *filename;
         const hts_boolean named = back_spoolname(opt, tmpname, sizeof(tmpname));
         filename = named ? strdupt(tmpname) : NULL;
@@ -786,9 +787,9 @@ int back_cleanup_background(httrackp * opt, cache_back * cache,
           if (back_spool_write(opt, filename, &back[i])) {
             coucal_add_pvoid(sback->ready, back[i].url_sav, filename);
             filename = NULL;
-            sback->ready_size_bytes += back[i].r.size; /* add for stats */
+            sback->ready_size_bytes += back[i].r.size;
             nclean++;
-            back_clear_entry(&back[i]); /* entry is now recycled */
+            back_clear_entry(&back[i]);
           }
           if (filename != NULL)
             freet(filename);

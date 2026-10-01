@@ -180,9 +180,12 @@ hts_boolean back_finalize_backup(httrackp *opt, lien_back *const back,
 void back_tmpdir_drop(const char *tmp);
 /* Name the spool file of a frozen backlog slot, in ~hts-tmp at the mirror
    root, carrying this process's pid. Consumes an opt->state.tmpnameid.
-   HTS_FALSE (dest emptied) if it would not fit. Note: utf-8. */
+   Returns HTS_FALSE (dest emptied) if the name does not fit. Note: utf-8. */
 hts_boolean back_spoolname(httrackp *opt, char *dest, size_t size);
-/* Write a slot to its spool file. HTS_FALSE, with no file left, on failure. */
+/* Process id, as back_spoolname() writes it. */
+unsigned long back_self_pid(void);
+/* Write a slot to its spool file. Returns HTS_FALSE, leaving no file, on
+   failure. */
 hts_boolean back_spool_write(httrackp *opt, const char *filename,
                              const lien_back *back);
 /* Remove spool files left by a process that is gone. Call before spooling. */
