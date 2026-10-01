@@ -299,7 +299,7 @@ static hts_boolean st_spool_plant(const char *path) {
 static int st_spoolsweep(httrackp *opt, int argc, char **argv) {
   /* no process has this pid on any platform */
   static const char *const dead = "tmpfile2147483646-3.tmp";
-  /* each must stay */
+  /* the sweep must keep each of these */
   static const char *const keep[] = {
       "tmpfile2147483646-3.tmpx",             /* suffix */
       "tmpfile7.tmp",                         /* no pid */
@@ -325,7 +325,7 @@ static int st_spoolsweep(httrackp *opt, int argc, char **argv) {
   }
   snprintf(base, sizeof(base), "%s/", argv[0]);
   StringCopy(opt->path_html_utf8, base);
-  /* a spool file of our own, live, pid */
+  /* our own spool file, carrying a live pid */
   memset(&back, 0, sizeof(back));
   back.status = STATUS_READY;
   if (!back_spoolname(opt, live, sizeof(live)) ||

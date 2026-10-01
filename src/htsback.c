@@ -83,8 +83,8 @@ unsigned long back_self_pid(void) {
 #endif
 }
 
-/* An unsure answer is "alive". A pid from another host or pid namespace
-   sharing the mirror reads as dead. */
+/* An unsure answer is "alive". A pid from another host or pid namespace is
+   checked against this host's processes. */
 static hts_boolean back_pid_is_alive(unsigned long pid) {
 #ifdef _WIN32
   HANDLE h;
@@ -160,7 +160,7 @@ void back_spool_sweep(httrackp *opt) {
       hts_log_print(opt, LOG_DEBUG, "removed stale spool file %s", path);
   }
   closedir(d);
-  (void) RMDIR(dir); /* refused while a live run still has files */
+  (void) RMDIR(dir); /* refused while the directory is not empty */
 }
 
 hts_boolean back_spool_write(httrackp *opt, const char *filename,

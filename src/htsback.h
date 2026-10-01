@@ -182,7 +182,7 @@ void back_tmpdir_drop(const char *tmp);
    root, carrying this process's pid. Consumes an opt->state.tmpnameid.
    Returns HTS_FALSE (dest emptied) if the name does not fit. Note: utf-8. */
 hts_boolean back_spoolname(httrackp *opt, char *dest, size_t size);
-/* Process id, as back_spoolname() writes it. */
+/* Returns this process's id, as back_spoolname() writes it. */
 unsigned long back_self_pid(void);
 /* Write a slot to its spool file. Returns HTS_FALSE, leaving no file, on
    failure. */

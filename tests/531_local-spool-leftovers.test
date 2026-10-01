@@ -22,8 +22,7 @@ require_httrack
 
 out=$(httrack -#test=spoolwrite "${tmpdir}/write")
 grep -q "spoolwrite: OK" <<<"$out" || fail "spoolwrite: $out"
-# only Windows has no file size limit to fail a write with
-if ! target_is_windows; then
+if ! target_is_windows && fsize_limit_binds; then
     grep -q "failed write cleaned up" <<<"$out" ||
         fail "spoolwrite never failed a write: $out"
 fi
