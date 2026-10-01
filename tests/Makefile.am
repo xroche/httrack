@@ -15,7 +15,7 @@ EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c gaistall.c noba
 	pty-resize.py ttyrun.py test-timeout.sh png-colors.py \
 	local-crawl.sh local-server.py ftp-server.py testlib.sh proclib.sh \
 	webhttracklib.sh httpclient.py webtestlib.py crawllib.sh arclib.sh \
-	guide-image-check.py \
+	guide-image-check.py check-subshell-errexit.py \
 	ci-windows-suite.sh ci-suite-stage.sh ci-windows-watchdog.ps1 install-headers-sweep.sh \
 	wsl2-exe-shim.sh \
 	server.crt server.key \

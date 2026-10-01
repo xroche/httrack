@@ -249,6 +249,7 @@ if test -x "$bin/pwsh"; then
             fail "a watchdog that spoke and exited before the poll looked again was reported as never launched"
         test -n "$raced" || fail "the window never opened: the stub outlived the poll's first read"
     )
+    subshell_ok $?
     for _ in $(seq 1 100); do
         test -r "$posixtmp/argv" && break
         sleep 0.1

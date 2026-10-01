@@ -48,6 +48,17 @@ fail_dump() { # fail_dump MSG FILE...
     exit 1
 }
 
+# Write `subshell_ok $?` after a `( ... )`, because bash 3.2 ignores a failing
+# subshell and `|| fail` turns set -e off inside it. Only bash 3.2 prints MSG,
+# because bash 5 stops at the subshell itself.
+subshell_ok() { # subshell_ok STATUS [MSG]
+    case $1 in
+    0) return 0 ;;
+    77) exit 77 ;;
+    esac
+    fail "${2:-a subshell exited with [$1]}"
+}
+
 # Cache uname -s once: every skip gate asks for it, and each call is a fork the
 # MSYS runtime emulates (#1273). Fatal when it says nothing, never guessed: the
 # guess read as not-Windows, so a test excluded there ran on a Windows runner.
@@ -96,7 +107,7 @@ fsize_limit_binds() {
         trap '' XFSZ
         ulimit -f 1 || exit 1
         dd if=/dev/zero of="$probe" bs=1024 count=64
-    ) >/dev/null 2>&1
+    ) >/dev/null 2>&1 || true
     got=$(wc -c <"$probe" 2>/dev/null) || got=0
     rm -f "$probe"
     test "${got:-0}" -lt 65536

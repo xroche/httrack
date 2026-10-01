@@ -48,6 +48,7 @@ ok "run_with_timeout resolves the backend outside the job-control window"
     pid=$!
     test -n "$had_m" || shell_is_msys || set +m
     wait "$pid"
-) || fail "the control shape failed on a trivial job"
+)
+subshell_ok $? "the control shape failed on a trivial job"
 test -s "$flag" || fail "the probe missed a backend call made under job control"
 ok "the probe still sees a backend call inside the window"

@@ -43,7 +43,8 @@ control() {
     local name=$1 want=$2 mutate=$3 dir="${work}/$1" out=""
     mkdir -p "$dir"
     : >"${dir}/00_kept.test"
-    (cd "$dir" && eval "$mutate")
+    # set -e is off inside, so the checker run below catches a half-applied mutation.
+    (cd "$dir" && eval "$mutate") || fail "$name: the mutation did not apply"
     if out=$(bash "$checker" "$dir" 2>&1); then
         fail "$name: the checker accepted a name make check would not run"
     fi

@@ -1,0 +1,142 @@
+#!/bin/bash
+#
+# Check that no test has a statement whose failure bash 3.2 (macOS) lets through.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+command -v shfmt >/dev/null 2>&1 || skip "no shfmt to parse the tests with"
+python=$(find_python) || skip "no python3 to run the lint"
+checker="${testdir}/check-subshell-errexit.py"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/subshell_errexit.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "$work"
+
+lint() { "$python" "$checker" "$@" 2>"$work/lint.err"; }
+
+cd "$testdir"
+files=(*.sh)
+# One files=(*.sh [0-9]*_*.test) fails, because shfmt reads [0-9] as an index.
+for f in [0-9]*_*.test; do files+=("$f"); done
+test "${#files[@]}" -ge 500 || fail "the lint found only ${#files[@]} files to scan"
+out=$(lint "${files[@]}") || fail_dump "a test lets bash 3.2 miss a failure:
+$out" "$work/lint.err"
+# The checker's summary counts the files shfmt parsed, not the ones it was given.
+grep -qx "${#files[@]} files, 0 hits" "$work/lint.err" ||
+    fail_dump "the lint did not scan every file" "$work/lint.err"
+
+# Each line marked "# hit: REASON" must be reported, and no other.
+cat >"$work/bad.test" <<'EOF'
+set -o errexit
+( false ) # hit: subshell
+f() {
+    ( false ) # hit: subshell
+    echo after
+}
+if true; then
+    ( false ) # hit: subshell
+elif false; then
+    :
+else
+    ( false ) # hit: subshell
+fi
+case x in
+x) ( false ) ;; # hit: subshell
+esac
+for i in 1; do
+    ( false ) # hit: subshell
+done
+g() { for i in 1; do ( false ); done; } # hit: subshell
+h() {
+    (
+        ( false ) # hit: subshell
+        echo
+    )
+}
+false || ( false ) # hit: subshell
+true && ( false ) # hit: subshell
+( false; echo ) || fail x # hit: set -e is off inside a subshell left of && or ||
+echo | while read -r _; do false; done # hit: pipeline ending in a WhileClause
+echo | { false; } # hit: pipeline ending in a Block
+echo | { # hit: pipeline ending in a Block
+    ( false ) # hit: subshell
+    echo
+}
+time ( false ) # hit: subshell
+(
+    ( false ) # hit: subshell
+    echo
+) &
+wait $! || true
+( false; true ) # hit: subshell
+subshell_ok oops
+( false; true ) || ok=1 # hit: set -e is off inside a subshell left of && or ||
+( false; true ) || rc=$? other=1 # hit: set -e is off inside a subshell left of && or ||
+( false; true ) || rc=$? echo # hit: set -e is off inside a subshell left of && or ||
+echo |& ( false ) # hit: pipeline ending in a Subshell
+echo | # hit: pipeline ending in a Subshell
+    ( false )
+[[ a == b ]] # hit: [[ ]]
+(( 0 )) # hit: (( ))
+echo end
+EOF
+lint "$work/bad.test" >"$work/bad.out" && fail "the lint passed the mutant"
+want=$(grep -n '# hit: ' "$work/bad.test" | sed "s|^\([0-9]*\):.*# hit: \(.*\)$|$work/bad.test:\1: \2|")
+assert_eq "$want" "$(<"$work/bad.out")" "mutant hits"
+
+# Mutant: test 58 with its subshell_ok removed.
+sed '/^subshell_ok \$?$/d' 58_watchdog.test >"$work/58.test"
+cmp -s 58_watchdog.test "$work/58.test" && fail "the 58 mutant changed nothing"
+# Relative, like the tree scan above.
+(cd "$work" && lint 58.test) >"$work/58.out" && fail "the lint passed 58 with its guard removed"
+grep -q '^[^:]*:[0-9]*: subshell$' "$work/58.out" ||
+    fail "the 58 mutant was not reported as a subshell: $(<"$work/58.out")"
+
+# A library has no set -e of its own, so it is linted as its callers run it.
+printf '( false )\necho\n' >"$work/lib.sh"
+lint "$work/lib.sh" >/dev/null && fail "the lint passed a library's lost subshell"
+printf '#!/bin/bash\n( false )\n( false )\necho end\n' >"$work/no-e.test"
+lint "$work/no-e.test" >/dev/null || fail "the lint flagged a test with no set -e"
+# errexit named in any -o position, inside a block or after a set +e.
+printf 'if :; then\n    set -o pipefail -o errexit\nfi\n( false )\necho\n' >"$work/opt.test"
+lint "$work/opt.test" >/dev/null && fail "the lint missed set -o errexit in a block"
+printf 'set -e\nset +e\nset -o pipefail -o errexit\n( false )\necho\n' >"$work/opt.test"
+lint "$work/opt.test" >/dev/null && fail "the lint missed set -o errexit after set +e"
+printf 'set -e\nif (\n' >"$work/broken.test"
+lint "$work/broken.test" >/dev/null && fail "the lint passed a file shfmt cannot parse"
+grep -qx '0 files, 1 hits' "$work/lint.err" ||
+    fail "an unparsed file was counted as scanned: $(<"$work/lint.err")"
+
+# Control: bash 3.2 loses no failure in these.
+cat >"$work/good.test" <<'EOF'
+set -euo pipefail
+( false ) || exit 1 # one statement, handled
+(
+    false
+)
+subshell_ok $? # status read on the next line
+( false; echo ) || true # status dropped
+( false; echo ) || rc=$? # status kept
+if ( false ); then :; fi # condition
+while ( false ); do :; done # condition
+! ( true ) # negated
+( false ) & # job
+wait $! || true
+false | cat # pipefail
+f() {
+    echo before
+    ( false ) # function tail
+}
+g() { if true; then ( false ); fi; } # tail through an if
+h() { case x in x) ( false ) ;; esac; } # tail through a case arm
+set +o errexit
+( false ) # set -e off
+set -e
+( false ) # script tail
+EOF
+lint "$work/good.test" >"$work/good.out" ||
+    fail "the lint flagged a form bash 3.2 handles: $(<"$work/good.out")"
+
+echo "subshell errexit lint OK"

@@ -142,7 +142,7 @@ reap_leftover_processes() {
         taskkill_engines
     else
         printf '%s\n' "$left" | awk '{ print $1 }' |
-            while read -r p; do kill -9 "$p" 2>/dev/null || true; done
+            while read -r p; do kill -9 "$p" 2>/dev/null || true; done || true
     fi
     return 0
 }

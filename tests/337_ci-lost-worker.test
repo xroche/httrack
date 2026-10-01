@@ -64,6 +64,7 @@ mkdir -p "$lostdir"
         esac
     done
 )
+subshell_ok $?
 
 # --- and the same thing end to end, with a worker really killed --------------
 

@@ -126,5 +126,6 @@ fi
     test "$elapsed" -lt 12 ||
         fail "deadline counted polls, not seconds: ${elapsed}s for a 3s budget"
 )
+subshell_ok $?
 
 echo "watchdog OK"
