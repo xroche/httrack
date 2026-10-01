@@ -1,0 +1,88 @@
+#!/bin/bash
+#
+# macOS runs the suite with /bin/bash 3.2, whose set -e misses a failing ( ... )
+# statement, so a test can fail there and still pass. Lint the tests for it.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+command -v shfmt >/dev/null 2>&1 || skip "no shfmt to parse the tests with"
+python=$(find_python) || skip "no python3 to run the lint"
+checker="${testdir}/check-subshell-errexit.py"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/subshell_errexit.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "$work"
+
+lint() { "$python" "$checker" "$@" 2>"$work/lint.err"; }
+
+cd "$testdir"
+files=(*.sh)
+# shfmt reads a leading [0-9] glob as an array index, so add it after.
+for f in [0-9]*_*.test; do files+=("$f"); done
+test "${#files[@]}" -ge 500 || fail "the lint found only ${#files[@]} files to scan"
+out=$(lint "${files[@]}") || fail_dump "a test lets bash 3.2 miss a failure:
+$out" "$work/lint.err"
+grep -qx "${#files[@]} files, 0 hits" "$work/lint.err" ||
+    fail_dump "the lint did not scan every file" "$work/lint.err"
+
+# Mutant: each form bash 3.2 lets through must be named, on its own line.
+cat >"$work/bad.test" <<'EOF'
+set -e
+( false )
+f() {
+    ( false )
+    echo after
+}
+if true; then
+    ( false )
+fi
+echo | while read -r _; do false; done
+echo | ( false )
+true && ( false )
+echo end
+EOF
+lint "$work/bad.test" >"$work/bad.out" && fail "the lint passed the mutant"
+assert_eq "$work/bad.test:2: subshell
+$work/bad.test:4: subshell
+$work/bad.test:8: subshell
+$work/bad.test:10: pipeline ending in a WhileClause
+$work/bad.test:11: pipeline ending in a Subshell
+$work/bad.test:12: subshell" "$(<"$work/bad.out")" "mutant hits"
+
+# The same lint on a real test, with the guard it carries taken off.
+sed 's/^) || exit 1$/)/' 58_watchdog.test >"$work/58.test"
+cmp -s 58_watchdog.test "$work/58.test" && fail "the 58 mutant changed nothing"
+lint "$work/58.test" >"$work/58.out" && fail "the lint passed 58 with its guard removed"
+grep -q '^[^:]*:[0-9]*: subshell$' "$work/58.out" ||
+    fail "the 58 mutant was not reported as a subshell: $(<"$work/58.out")"
+
+# Control: a handled status, a condition, a tail, a job and a script without
+# set -e are all fine on bash 3.2.
+cat >"$work/good.test" <<'EOF'
+set -e
+( false ) || exit 1
+( false ) >/dev/null || fail "x"
+if ( false ); then :; fi
+! ( true )
+( false ) &
+wait $! || true
+x=$( (false) || true)
+false | cat
+f() {
+    echo before
+    ( false )
+}
+g() { if true; then ( false ); fi; }
+set +e
+( false )
+set -e
+( false )
+EOF
+lint "$work/good.test" >"$work/good.out" ||
+    fail "the lint flagged a handled form: $(<"$work/good.out")"
+printf '#!/bin/bash\n( false )\n( false )\necho end\n' >"$work/no-e.test"
+lint "$work/no-e.test" >/dev/null || fail "the lint flagged a test with no set -e"
+
+echo "subshell errexit lint OK"

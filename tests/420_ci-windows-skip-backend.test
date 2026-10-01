@@ -121,7 +121,7 @@ mv "$tmp/reuse-mutant.sh" "$tmp/ci-windows-suite.sh"
     ci_skip_list=''
     ci_expected_skips_for_backend wsl2
     printf '%s' "$ci_skip_list"
-) >"$tmp/reuse-mutant.out"
+) >"$tmp/reuse-mutant.out" || fail "the wsl2-reuses-msys mutant failed to list its skips"
 test "$(<"$tmp/reuse-mutant.out")" != "99_sentinel-only.test" ||
     fail "the wsl2-reuses-msys mutant still picked the diverged wsl2 list: undetected"
 
@@ -138,7 +138,7 @@ cmp -s "$testdir/ci-windows-suite.sh" "$tmp/empty-mutant.sh" &&
     ci_skip_list=''
     if ci_expected_skips_for_backend bogus; then rc=0; else rc=1; fi
     printf 'rc=%s list=[%s]' "$rc" "$ci_skip_list"
-) >"$tmp/empty-mutant.out"
+) >"$tmp/empty-mutant.out" || fail "the empty-fallback mutant failed to run"
 grep -q '^rc=0 list=\[\]$' "$tmp/empty-mutant.out" ||
     fail "the empty-fallback mutant did not silently accept an unknown backend: $(<"$tmp/empty-mutant.out")"
 

@@ -124,7 +124,7 @@ sleep 1
     # 10 stretched polls would be 40s; a handful of them is the whole margin here.
     test "$fired" -lt 25 ||
         fail "budget counted polls, not seconds: ${fired}s for a 1s budget"
-)
+) || exit 1
 
 # --- exit status and output of a healthy test pass straight through ----------
 # 77 is automake's SKIP and 99 its hard error, so both have to survive the wrapper.
@@ -154,7 +154,8 @@ saw_budget() { # saw_budget <want> <label>
 }
 # shellcheck disable=SC2016 # the fixture has to read the variable, not us
 printf 'echo "budget=${HTTRACK_TEST_TIMEOUT-unset}"\n' >"$tmp/95_budget.test"
-(unset HTTRACK_TEST_TIMEOUT && bash "$driver" "$tmp/95_budget.test") >"$out" 2>&1
+(unset HTTRACK_TEST_TIMEOUT && bash "$driver" "$tmp/95_budget.test") >"$out" 2>&1 ||
+    fail_dump "the driver failed on an unset budget" "$out"
 saw_budget 600 "an unset budget"
 HTTRACK_TEST_TIMEOUT=garbage bash "$driver" "$tmp/95_budget.test" >"$out" 2>&1
 saw_budget 600 "a non-numeric budget"
@@ -296,13 +297,13 @@ if ! target_is_windows && test -r /proc/self/stat; then
     (
         "$tmp/httrack" -c "$hold" &
         echo $! >"$tmp/fake.pid"
-    )
+    ) || fail "could not start the fake engine"
     # Its own group, to prove the filter keeps an outsider out.
     (
         set -m
         "$tmp/httrack" -c "$hold" &
         echo $! >"$tmp/outside.pid"
-    )
+    ) || fail "could not start the outsider"
     # A third, as binfmt_misc's P flag hands it over: the interpreter in argv[0]
     # and the engine one place right. "exec -a" stands in for the qemu no runner
     # here has.
@@ -312,7 +313,7 @@ if ! target_is_windows && test -r /proc/self/stat; then
         exec -a /usr/libexec/qemu-binfmt/hppa-binfmt-P \
             "$tmp/httrack" "$tmp/emul/httrack" &
         echo $! >"$tmp/emul.pid"
-    )
+    ) || fail "could not start the emulated engine"
     fake=$(cat "$tmp/fake.pid")
     outside=$(cat "$tmp/outside.pid")
     emul=$(cat "$tmp/emul.pid")
@@ -392,7 +393,7 @@ if ! target_is_windows && test -r /proc/self/stat; then
         proc_snapshot() { return 1; }
         grep -q 'no process list' <<<"$(list_stray_processes "$pgid" group)" ||
             fail "a host with no ps and no /proc produced no notice"
-    )
+    ) || exit 1
     kill "$fake" "$outside" "$emul" 2>/dev/null || true
 fi
 
@@ -422,7 +423,7 @@ EOF
         named=$(list_stray_processes 0 named | awk 'NR > 1 { print $1 }')
         test "$named" = $'11\n12\n13' ||
             fail "emulated stray list is '$named', want pids 11, 12 and 13"
-    )
+    ) || exit 1
 fi
 
 # --- a wedged crawl yields a symbolized engine stack ------------------------

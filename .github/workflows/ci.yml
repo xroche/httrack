@@ -902,6 +902,10 @@ jobs:
           # shellcheck disable=SC2086 # SHELL_SCRIPTS is a space-joined list
           shfmt -d -i 4 $SHELL_SCRIPTS
 
+      # The make check legs have no shfmt, so 532 skips there and runs here.
+      - name: subshell errexit lint
+        run: bash tests/532_lint-subshell-errexit.test
+
       # Read the list rather than hand-keeping one: a .py added in a new
       # directory then gets checked without anyone widening a glob.
       - name: List the tracked Python files

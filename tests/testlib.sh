@@ -96,7 +96,7 @@ fsize_limit_binds() {
         trap '' XFSZ
         ulimit -f 1 || exit 1
         dd if=/dev/zero of="$probe" bs=1024 count=64
-    ) >/dev/null 2>&1
+    ) >/dev/null 2>&1 || true
     got=$(wc -c <"$probe" 2>/dev/null) || got=0
     rm -f "$probe"
     test "${got:-0}" -lt 65536

@@ -63,7 +63,7 @@ mkdir -p "$lostdir"
         *) fail "${c%:*}.test: reason is [$ci_reason], want [${c#*:}...]" ;;
         esac
     done
-)
+) || exit 1
 
 # --- and the same thing end to end, with a worker really killed --------------
 
