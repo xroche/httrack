@@ -3074,7 +3074,7 @@ class Handler(SimpleHTTPRequestHandler):
     def route_dcancel_index(self):
         links = "".join('<a href="p%d.bin">p%d</a>\n' % (i, i) for i in range(8))
         pad = 0
-        for _ in range(4):  # the Content-Length digits settle in two rounds
+        for _ in range(4):  # two corrections settle the Content-Length digits
             body = ("<html><!--%s-->\n%s</html>\n" % ("x" * pad, links)).encode()
             head = (
                 "HTTP/1.0 200 OK\r\nContent-Type: text/html\r\n"
