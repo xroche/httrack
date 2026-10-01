@@ -202,6 +202,171 @@ static int st_backswap(httrackp *opt, int argc, char **argv) {
   return back_selftest_slot_swap();
 }
 
+// -#test=spoolwrite <dir>: a spool write that fails leaves no partial file.
+static int st_spoolwrite(httrackp *opt, int argc, char **argv) {
+  char base[HTS_URLMAXSIZE];
+  char name[HTS_URLMAXSIZE * 2];
+  char tmpdir[HTS_URLMAXSIZE * 2];
+  const size_t bodysize = 256 * 1024;
+  lien_back back;
+  int err = 0;
+
+  if (argc < 1) {
+    fprintf(stderr, "spoolwrite: needs a writable base dir\n");
+    return 1;
+  }
+  snprintf(base, sizeof(base), "%s/", argv[0]);
+  snprintf(tmpdir, sizeof(tmpdir), "%s/~hts-tmp", argv[0]);
+  StringCopy(opt->path_html_utf8, base);
+  memset(&back, 0, sizeof(back));
+  back.status = STATUS_READY;
+  strcpybuff(back.url_adr, "example.com");
+  strcpybuff(back.url_fil, "/spool.html");
+  back.r.adr = calloct(1, bodysize);
+  back.r.size = (LLint) bodysize;
+  if (back.r.adr == NULL) {
+    fprintf(stderr, "spoolwrite: no memory\n");
+    return 1;
+  }
+
+#ifdef _WIN32
+  printf("spoolwrite: no file size limit here, failure case skipped\n");
+#else
+  {
+    struct rlimit saved, tight;
+    void (*oldxfsz)(int);
+    hts_boolean written;
+
+    if (getrlimit(RLIMIT_FSIZE, &saved) != 0) {
+      printf("spoolwrite: cannot cap file size, failure case skipped\n");
+    } else {
+      tight = saved;
+      tight.rlim_cur = 4096;
+      /* a capped write then fails with EFBIG instead of killing us */
+      oldxfsz = signal(SIGXFSZ, SIG_IGN);
+      if (setrlimit(RLIMIT_FSIZE, &tight) != 0) {
+        printf("spoolwrite: cannot cap file size, failure case skipped\n");
+      } else if (!back_spoolname(opt, name, sizeof(name))) {
+        (void) setrlimit(RLIMIT_FSIZE, &saved);
+        fprintf(stderr, "spoolwrite: naming failed\n");
+        err++;
+      } else {
+        written = back_spool_write(opt, name, &back);
+        (void) setrlimit(RLIMIT_FSIZE, &saved);
+        if (written) {
+          printf("spoolwrite: cap did not bite, failure case skipped\n");
+          (void) UNLINK(name);
+          back_tmpdir_drop(name);
+        } else if (fexist_utf8(name)) {
+          fprintf(stderr, "spoolwrite: failed write left %s\n", name);
+          err++;
+        } else if (dir_exists(name)) {
+          fprintf(stderr, "spoolwrite: failed write left %s\n", tmpdir);
+          err++;
+        } else {
+          printf("spoolwrite: failed write cleaned up\n");
+        }
+      }
+      signal(SIGXFSZ, oldxfsz);
+    }
+  }
+#endif
+
+  /* control: an unhindered write keeps its file */
+  if (!back_spoolname(opt, name, sizeof(name)) ||
+      !back_spool_write(opt, name, &back) || !fexist_utf8(name)) {
+    fprintf(stderr, "spoolwrite: a good write did not keep %s\n", name);
+    err++;
+  }
+  (void) UNLINK(name);
+  back_tmpdir_drop(name);
+  freet(back.r.adr);
+  printf("spoolwrite: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
+static hts_boolean st_spool_plant(const char *path) {
+  FILE *const fp = filecreate(NULL, path);
+
+  if (fp == NULL) {
+    fprintf(stderr, "spoolsweep: could not plant %s\n", path);
+    return HTS_FALSE;
+  }
+  return fclose(fp) == 0 ? HTS_TRUE : HTS_FALSE;
+}
+
+// -#test=spoolsweep <dir>: startup removes the spool of a dead process only.
+static int st_spoolsweep(httrackp *opt, int argc, char **argv) {
+  /* the first is a dead pid on every platform; the rest must stay */
+  static const char *const dead = "tmpfile2147483646-3.tmp";
+  static const char *const keep[] = {
+      "tmpfile2147483646-3.tmpx", "tmpfile7.tmp",
+      "tmp2147483646-1.tmp",      "tmpfile2147483646-.tmp",
+      "tmpfile-2147483646-3.tmp", "tmpfile99999999999999999999999-1.tmp"};
+  char base[HTS_URLMAXSIZE];
+  char path[HTS_URLMAXSIZE * 2];
+  char live[HTS_URLMAXSIZE * 2];
+  lien_back back;
+  size_t i;
+  int err = 0;
+
+  if (argc < 1) {
+    fprintf(stderr, "spoolsweep: needs a writable base dir\n");
+    return 1;
+  }
+  snprintf(base, sizeof(base), "%s/", argv[0]);
+  StringCopy(opt->path_html_utf8, base);
+  /* our own spool name: a live pid */
+  memset(&back, 0, sizeof(back));
+  back.status = STATUS_READY;
+  if (!back_spoolname(opt, live, sizeof(live)) ||
+      !back_spool_write(opt, live, &back)) {
+    fprintf(stderr, "spoolsweep: could not plant %s\n", live);
+    return 1;
+  }
+  snprintf(path, sizeof(path), "%s~hts-tmp/%s", base, dead);
+  if (!st_spool_plant(path))
+    return 1;
+  for (i = 0; i < sizeof(keep) / sizeof(keep[0]); i++) {
+    snprintf(path, sizeof(path), "%s~hts-tmp/%s", base, keep[i]);
+    if (!st_spool_plant(path))
+      return 1;
+  }
+
+  back_spool_sweep(opt);
+
+  snprintf(path, sizeof(path), "%s~hts-tmp/%s", base, dead);
+  if (fexist_utf8(path)) {
+    fprintf(stderr, "spoolsweep: dead process's %s survived\n", dead);
+    err++;
+  }
+  if (!fexist_utf8(live)) {
+    fprintf(stderr, "spoolsweep: live process's %s was removed\n", live);
+    err++;
+  }
+  for (i = 0; i < sizeof(keep) / sizeof(keep[0]); i++) {
+    snprintf(path, sizeof(path), "%s~hts-tmp/%s", base, keep[i]);
+    if (!fexist_utf8(path)) {
+      fprintf(stderr, "spoolsweep: unrelated %s was removed\n", keep[i]);
+      err++;
+    }
+    (void) UNLINK(path);
+  }
+  (void) UNLINK(live);
+
+  /* the empty directory goes too */
+  snprintf(path, sizeof(path), "%s~hts-tmp/%s", base, dead);
+  if (!st_spool_plant(path))
+    return 1;
+  back_spool_sweep(opt);
+  if (dir_exists(path)) {
+    fprintf(stderr, "spoolsweep: emptied ~hts-tmp was kept\n");
+    err++;
+  }
+  printf("spoolsweep: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 /* TEST-NET-1: routed nowhere, so a connect to it stays pending. */
 #define ST_BACKSTOP_DEADHOST "192.0.2.1"
 
@@ -1393,6 +1558,10 @@ const struct selftest_entry selftests_back[] = {
      st_mutexlazyinit},
     {"backswap", "", "which backlog slots may be swapped to the ready table",
      st_backswap},
+    {"spoolwrite", "<dir>", "a failed spool write leaves no partial file",
+     st_spoolwrite},
+    {"spoolsweep", "<dir>", "startup removes the spool of a dead process only",
+     st_spoolsweep},
     {"backstop", "",
      "a user stop drops the slots still waiting to connect (#1073)",
      st_backstop},

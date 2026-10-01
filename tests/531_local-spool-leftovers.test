@@ -1,0 +1,63 @@
+#!/bin/bash
+#
+# The mirror must not keep spool files: a failed write removes its own, and a
+# run removes those a killed run left behind, but never a live run's.
+
+set -euo pipefail
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_spoolleft.XXXXXX") || exit 1
+sleeper=
+cleanup() {
+    if [ -n "$sleeper" ]; then
+        kill "$sleeper" 2>/dev/null
+        wait "$sleeper" 2>/dev/null
+    fi
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+require_httrack
+
+out=$(httrack -#test=spoolwrite "${tmpdir}/write")
+grep -q "spoolwrite: OK" <<<"$out" || fail "spoolwrite: $out"
+out=$(httrack -#test=spoolsweep "${tmpdir}/sweep")
+grep -q "spoolsweep: OK" <<<"$out" || fail "spoolsweep: $out"
+
+local_server_start
+
+spool="${tmpdir}/out/~hts-tmp"
+mkdir -p "$spool"
+# no process has this pid on any platform
+dead="${spool}/tmpfile2147483646-0.tmp"
+: >"$dead"
+live=
+if ! target_is_windows; then
+    sleep 300 &
+    sleeper=$!
+    live="${spool}/tmpfile${sleeper}-0.tmp"
+    : >"$live"
+fi
+
+crawl() {
+    local rc=0
+    local_crawl --log "${tmpdir}/log" -O "${tmpdir}/out" --quiet --disable-security-limits --robots=0 --timeout=30 --retries=0 -Z -p0 -N '%n' -c4 "http://127.0.0.1:${SRV_PORT}/bakname/index.html" || rc=$?
+    test "$rc" -eq 0 || fail_dump "httrack exited $rc" "${tmpdir}/log"
+}
+
+crawl
+moved=$(count_matching_lines 'slots ready moved to background' "${tmpdir}/out/hts-log.txt")
+test "$moved" -gt 0 || fail "no slot was spooled, so the run never used ~hts-tmp"
+test ! -e "$dead" || fail "a dead run's spool file survived"
+if [ -n "$live" ]; then
+    test -e "$live" || fail "a live run's spool file was removed"
+    left=$(find "$spool" -type f ! -path "$live" | wc -l)
+    test "$left" -eq 0 || fail "the run left $left spool files of its own"
+    kill "$sleeper"
+    wait "$sleeper" 2>/dev/null || true
+    sleeper=
+    crawl
+    test ! -e "$live" || fail "a run that has since died kept its spool file"
+fi
+test ! -e "$spool" || fail "an empty ~hts-tmp was left in the mirror"

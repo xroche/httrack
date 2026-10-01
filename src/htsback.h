@@ -179,9 +179,14 @@ hts_boolean back_finalize_backup(httrackp *opt, lien_back *const back,
    it is done; a non-empty one just refuses. No-op outside that directory. */
 void back_tmpdir_drop(const char *tmp);
 /* Name the spool file of a frozen backlog slot, in ~hts-tmp at the mirror
-   root. Consumes an opt->state.tmpnameid. HTS_FALSE (dest emptied) if it would
-   not fit. Note: utf-8. */
+   root, carrying this process's pid. Consumes an opt->state.tmpnameid.
+   HTS_FALSE (dest emptied) if it would not fit. Note: utf-8. */
 hts_boolean back_spoolname(httrackp *opt, char *dest, size_t size);
+/* Write a slot to its spool file. HTS_FALSE, with no file left, on failure. */
+hts_boolean back_spool_write(httrackp *opt, const char *filename,
+                             const lien_back *back);
+/* Remove spool files left by a process that is gone. Call before spooling. */
+void back_spool_sweep(httrackp *opt);
 /* -#test=backswap: slots eligible for the on-disk ready table. */
 int back_selftest_slot_swap(void);
 void back_info(struct_back * sback, int i, int j, FILE * fp);
