@@ -83,24 +83,22 @@ unsigned long back_self_pid(void) {
 #endif
 }
 
-/* An unsure answer is "alive". A pid from another host or pid namespace is
-   checked against this host's processes. */
+/* An unsure answer is "alive". A run on another host or in another pid
+   namespace sharing the mirror can lose a spooled page; that is accepted. */
 static hts_boolean back_pid_is_alive(unsigned long pid) {
 #ifdef _WIN32
   HANDLE h;
   hts_boolean alive;
 
-  if (pid == 0)
-    return HTS_TRUE;
   h = OpenProcess(SYNCHRONIZE, FALSE, (DWORD) pid);
   if (h == NULL)
-    return GetLastError() == ERROR_ACCESS_DENIED ? HTS_TRUE : HTS_FALSE;
+    return GetLastError() != ERROR_INVALID_PARAMETER ? HTS_TRUE : HTS_FALSE;
   alive = WaitForSingleObject(h, 0) == WAIT_TIMEOUT ? HTS_TRUE : HTS_FALSE;
   CloseHandle(h);
   return alive;
 #else
-  /* pid 0 or a negative pid_t would signal a process group */
-  if (pid == 0 || pid > (unsigned long) INT_MAX)
+  /* a negative pid_t would signal a process group */
+  if (pid > (unsigned long) INT_MAX)
     return HTS_TRUE;
   return kill((pid_t) pid, 0) == 0 || errno == EPERM ? HTS_TRUE : HTS_FALSE;
 #endif
@@ -127,8 +125,6 @@ static unsigned long back_spool_owner(const char *name) {
   if (strncmp(p, prefix, sizeof(prefix) - 1) != 0)
     return 0;
   p += sizeof(prefix) - 1;
-  if (!isdigit((unsigned char) *p))
-    return 0;
   for (; isdigit((unsigned char) *p); p++) {
     if (pid > (ULONG_MAX - 9) / 10)
       return 0;
@@ -146,6 +142,7 @@ void back_spool_sweep(httrackp *opt) {
   char BIGSTK path[HTS_URLMAXSIZE * 2 + 64];
   DIR *d;
   struct dirent *entry;
+  const unsigned long self = back_self_pid();
 
   if (!slprintfbuff(dir, sizeof(dir), "%s" HTS_TMPDIR,
                     StringBuff(opt->path_html_utf8)) ||
@@ -154,7 +151,8 @@ void back_spool_sweep(httrackp *opt) {
   while ((entry = readdir(d)) != NULL) {
     const unsigned long pid = back_spool_owner(entry->d_name);
 
-    if (pid != 0 && !back_pid_is_alive(pid) &&
+    /* nothing is spooled yet, so a file of our own pid is a previous run's */
+    if (pid != 0 && (pid == self || !back_pid_is_alive(pid)) &&
         slprintfbuff(path, sizeof(path), "%s/%s", dir, entry->d_name) &&
         UNLINK(path) == 0)
       hts_log_print(opt, LOG_DEBUG, "removed stale spool file %s", path);

@@ -188,7 +188,8 @@ unsigned long back_self_pid(void);
    failure. */
 hts_boolean back_spool_write(httrackp *opt, const char *filename,
                              const lien_back *back);
-/* Remove spool files left by a process that is gone. Call before spooling. */
+/* Remove spool files whose process is gone or is this one. Call before this
+   run spools anything. */
 void back_spool_sweep(httrackp *opt);
 /* -#test=backswap: slots eligible for the on-disk ready table. */
 int back_selftest_slot_swap(void);

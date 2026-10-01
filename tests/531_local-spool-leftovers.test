@@ -36,13 +36,15 @@ mkdir -p "$spool"
 # no process has this pid on any platform
 dead="${spool}/tmpfile2147483646-0.tmp"
 : >"$dead"
-live=
-if ! target_is_windows; then
+if target_is_windows; then
+    # System, always running
+    live="${spool}/tmpfile4-0.tmp"
+else
     sleep 300 &
     sleeper=$!
     live="${spool}/tmpfile${sleeper}-0.tmp"
-    : >"$live"
 fi
+: >"$live"
 
 crawl() {
     local rc=0
@@ -54,14 +56,16 @@ crawl
 moved=$(count_matching_lines 'slots ready moved to background' "${tmpdir}/out/hts-log.txt")
 test "$moved" -gt 0 || fail "no slot was spooled, so the run never used ~hts-tmp"
 test ! -e "$dead" || fail "a dead run's spool file survived"
-if [ -n "$live" ]; then
-    test -e "$live" || fail "a live run's spool file was removed"
-    left=$(find "$spool" -type f ! -path "$live" | wc -l)
-    test "$left" -eq 0 || fail "the run left $left spool files of its own"
+test -e "$live" || fail "a live run's spool file was removed"
+left=$(find "$spool" -type f ! -path "$live" | wc -l)
+test "$left" -eq 0 || fail "the run left $left spool files of its own"
+if [ -n "$sleeper" ]; then
     kill "$sleeper"
     wait "$sleeper" 2>/dev/null || true
     sleeper=
-    crawl
-    test ! -e "$live" || fail "a run that has since died kept its spool file"
+else
+    rm -f "$live"
 fi
+crawl
+test ! -e "$live" || fail "a run that has since died kept its spool file"
 test ! -e "$spool" || fail "an empty ~hts-tmp was left in the mirror"
