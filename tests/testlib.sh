@@ -48,8 +48,9 @@ fail_dump() { # fail_dump MSG FILE...
     exit 1
 }
 
-# Write `subshell_ok $?` on the line after a ( ... ) statement. bash 3.2's set -e
-# ignores a failing subshell, and `( ... ) || fail` turns set -e off inside it.
+# Write `subshell_ok $?` after a `( ... )`, because bash 3.2 ignores a failing
+# subshell and `|| fail` turns set -e off inside it. Only bash 3.2 prints MSG,
+# because bash 5 stops at the subshell itself.
 subshell_ok() { # subshell_ok STATUS [MSG]
     case $1 in
     0) return 0 ;;

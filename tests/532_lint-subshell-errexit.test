@@ -99,6 +99,11 @@ printf '( false )\necho\n' >"$work/lib.sh"
 lint "$work/lib.sh" >/dev/null && fail "the lint passed a library's lost subshell"
 printf '#!/bin/bash\n( false )\n( false )\necho end\n' >"$work/no-e.test"
 lint "$work/no-e.test" >/dev/null || fail "the lint flagged a test with no set -e"
+# errexit named in any -o position, inside a block or after a set +e.
+printf 'if :; then\n    set -o pipefail -o errexit\nfi\n( false )\necho\n' >"$work/opt.test"
+lint "$work/opt.test" >/dev/null && fail "the lint missed set -o errexit in a block"
+printf 'set -e\nset +e\nset -o pipefail -o errexit\n( false )\necho\n' >"$work/opt.test"
+lint "$work/opt.test" >/dev/null && fail "the lint missed set -o errexit after set +e"
 printf 'set -e\nif (\n' >"$work/broken.test"
 lint "$work/broken.test" >/dev/null && fail "the lint passed a file shfmt cannot parse"
 grep -qx '0 files, 1 hits' "$work/lint.err" ||
@@ -125,6 +130,7 @@ f() {
     ( false ) # function tail
 }
 g() { if true; then ( false ); fi; } # tail through an if
+h() { case x in x) ( false ) ;; esac; } # tail through a case arm
 set +o errexit
 ( false ) # set -e off
 set -e

@@ -3,9 +3,9 @@
 
 bash 3.2 exits only on a failing simple command. It runs on past a failing
 `( ... )`, `[[ ]]` or `(( ))` statement, and past a pipeline ending in one.
-`( ... ) || fail` is no fix, because set -e is off inside a list's left side.
+`( ... ) || fail` is no fix, because set -e is off on the left of ||.
 These are safe: a status read by `subshell_ok $?`, a condition, and the last
-statement of a function or script. It needs shfmt.
+statement of a function or script. This script needs shfmt.
 """
 
 import json
@@ -17,7 +17,7 @@ import sys
 LOST = {"Subshell": "subshell", "TestClause": "[[ ]]", "ArithmCmd": "(( ))"}
 # shfmt's syntax.BinCmdOperator values.
 AND, OR, PIPE, PIPEALL = 10, 11, 12, 13
-SET_ERREXIT = re.compile(r"([-+])([a-zA-Z]*e[a-zA-Z]*|o errexit)")
+SHORT_E = re.compile(r"[-+][a-zA-Z]*e[a-zA-Z]*")
 
 
 def text(part):
@@ -58,11 +58,7 @@ def pipeline_elems(stmt):
 
 
 class Scan:
-    """Walk a shfmt AST."""
-
-    # errexit means set -e is in force here.
-    # checked means a failure here would end the script.
-    # reaches_caller means this status is also the parent's, so a caller sees it.
+    """Walk a shfmt AST. A checked statement is one whose failure ends the script."""
 
     def __init__(self, path):
         self.path = path
@@ -90,10 +86,13 @@ class Scan:
         if kind == "CallExpr":
             argv = words(cmd)
             if argv[:1] == ["set"]:
-                for flag in (" ".join(argv[1:3]), argv[1] if len(argv) > 1 else ""):
-                    m = SET_ERREXIT.fullmatch(flag)
-                    if m:
-                        return m.group(1) == "-"
+                for i, a in enumerate(argv[1:], 1):
+                    if a == "--":
+                        break
+                    if SHORT_E.fullmatch(a) or (
+                        a in ("-o", "+o") and argv[i + 1 : i + 2] == ["errexit"]
+                    ):
+                        errexit = a[0] == "-"
         elif kind == "Subshell":
             # A background job's status still decides what wait reports.
             self.stmts(cmd["Stmts"], checked or bool(s.get("Background")), True)
@@ -158,7 +157,7 @@ def scan(path):
     sc = Scan(path)
     # A sourced library runs under its caller's set -e.
     errexit = not path.endswith(".test") or re.search(
-        rb"^\s*set (-[a-z]*e|-o errexit)", src, re.M
+        rb"^\s*set\b[^#\n]*\s(-[a-z]*e[a-z]*|-o errexit)\b", src, re.M
     )
     sc.stmts(json.loads(out)["Stmts"], bool(errexit), True)
     return sc.hits, 1
