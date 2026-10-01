@@ -56,7 +56,8 @@
 # --plant-file/--plant-dir drop a regular file (holding $plant_poison) or a
 # directory at PATH under the host root between the passes, to hand the second
 # pass leftovers a killed run would have left (#758).
-# --no-host-root asserts the crawl created no host root directory.
+# --no-host-root asserts the crawl created no host root directory, and
+# --host-root-optional also accepts a crawl that saved nothing.
 
 set -u
 
@@ -75,6 +76,7 @@ rerun=
 rerun_args=
 rerun_dead=
 no_hostroot=
+hostroot_optional=
 archive_kept=
 archive_replaced=
 archive_min_files=0
@@ -111,7 +113,7 @@ function purge_tmpdir {
 }
 
 hostroot=
-function find_hostroot {
+function lookup_hostroot {
     local cand
     for cand in "${mirrorroot}/127.0.0.1_${port}" "${mirrorroot}/127.0.0.1"; do
         if test -d "$cand"; then
@@ -119,7 +121,10 @@ function find_hostroot {
             return 0
         fi
     done
-    die "could not find host root under $out"
+    return 1
+}
+function find_hostroot {
+    lookup_hostroot || die "could not find host root under $out"
 }
 
 # Does the cache hold an entry whose URL ends with $1? An unreadable index is a
@@ -184,6 +189,7 @@ while test "$pos" -lt "$nargs"; do
     --rerun) rerun=1 ;;           # run httrack a second time (update pass) before auditing
     --rerun-dead) rerun_dead=1 ;; # re-run with the server stopped (cache rollback)
     --no-host-root) no_hostroot=1 ;;
+    --host-root-optional) hostroot_optional=1 ;;
     # the second pass must leave the first pass's archive files untouched
     --archive-kept-on-rerun) archive_kept=1 ;;
     --archive-replaced-on-rerun) archive_replaced=1 ;; # ...or rewrite all of them
@@ -506,6 +512,9 @@ if test -n "$no_hostroot"; then
             exit 1
         }
     done
+    result "OK"
+elif test -n "$hostroot_optional" && ! lookup_hostroot; then
+    info "no host root: the crawl saved nothing"
     result "OK"
 else
     find_hostroot
