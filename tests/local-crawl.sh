@@ -56,6 +56,7 @@
 # --plant-file/--plant-dir drop a regular file (holding $plant_poison) or a
 # directory at PATH under the host root between the passes, to hand the second
 # pass leftovers a killed run would have left (#758).
+# --no-host-root asserts the crawl created no host root directory.
 
 set -u
 
@@ -73,6 +74,7 @@ outdir_intl=
 rerun=
 rerun_args=
 rerun_dead=
+no_hostroot=
 archive_kept=
 archive_replaced=
 archive_min_files=0
@@ -181,6 +183,7 @@ while test "$pos" -lt "$nargs"; do
     --debug) verbose=1 ;;
     --rerun) rerun=1 ;;           # run httrack a second time (update pass) before auditing
     --rerun-dead) rerun_dead=1 ;; # re-run with the server stopped (cache rollback)
+    --no-host-root) no_hostroot=1 ;;
     # the second pass must leave the first pass's archive files untouched
     --archive-kept-on-rerun) archive_kept=1 ;;
     --archive-replaced-on-rerun) archive_replaced=1 ;; # ...or rewrite all of them
@@ -495,8 +498,19 @@ if test -n "$rerun_dead"; then
 fi
 
 # --- discover the single host root (127.0.0.1_<port> or 127.0.0.1) -----------
-find_hostroot
-debug "host root: $hostroot"
+if test -n "$no_hostroot"; then
+    info "checking no host root was created"
+    for cand in "${mirrorroot}/127.0.0.1_${port}" "${mirrorroot}/127.0.0.1"; do
+        test ! -e "$cand" || {
+            result "found $cand"
+            exit 1
+        }
+    done
+    result "OK"
+else
+    find_hostroot
+    debug "host root: $hostroot"
+fi
 
 # --- optional WARC validation (stdlib validator, no warcio) ------------------
 # WARC_VALIDATE_BODY="URLSUB=HEX" byte-checks a fresh-crawl response body;
@@ -621,6 +635,12 @@ fi
 # --- audit -------------------------------------------------------------------
 i=0
 while test "$i" -lt "${#audit[@]}"; do
+    case "${audit[$i]}" in
+    --found | --not-found | --directory | --max-mirror-bytes | --min-mirror-bytes | \
+        --file-matches | --file-not-matches | --files-identical | --file-min-bytes | --file-mode)
+        test -n "$hostroot" || find_hostroot
+        ;;
+    esac
     case "${audit[$i]}" in
     --errors)
         i=$((i + 1))

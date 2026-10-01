@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# A frozen backlog slot must spool outside the mirror namespace, or a site
-# serving <path>.tmp has its own copy truncated and then unlinked (#859).
+# A frozen backlog slot must spool into the mirror root's ~hts-tmp. Beside its
+# save name, it clobbered a site's <path>.tmp (#859) and left empty dirs.
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
