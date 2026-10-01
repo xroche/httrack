@@ -3,7 +3,7 @@
 # Cancelled delayed-type-checks must not orphan .delayed placeholders (#483).
 # The first page's headers push the crawl past -M (see the dcancel routes), so
 # the stop lands while it waits for its type. -c1 then makes the namer pump
-# sockets while that page streams to its placeholder.
+# sockets until that page is written to its placeholder.
 
 set -euo pipefail
 
