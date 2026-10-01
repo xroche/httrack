@@ -1397,6 +1397,7 @@ static int st_spoolname(httrackp *opt, int argc, char **argv) {
   char BIGSTK got[HTS_URLMAXSIZE * 2 + 32];
   char BIGSTK want[HTS_URLMAXSIZE * 2 + 32];
   char BIGSTK base[HTS_URLMAXSIZE * 2];
+  const unsigned long pid = back_self_pid();
   int getmode;
   int err = 0;
 
@@ -1410,7 +1411,7 @@ static int st_spoolname(httrackp *opt, int argc, char **argv) {
   for (getmode = 0; getmode <= 1; getmode++) {
     opt->getmode = getmode;
     opt->state.tmpnameid = 7;
-    snprintf(want, sizeof(want), "%s/~hts-tmp/tmpfile7.tmp", argv[0]);
+    snprintf(want, sizeof(want), "%s/~hts-tmp/tmpfile%lu-7.tmp", argv[0], pid);
     if (!back_spoolname(opt, got, sizeof(got))) {
       fprintf(stderr, "spoolname: naming failed with -p%d\n", getmode);
       err++;
@@ -1428,12 +1429,12 @@ static int st_spoolname(httrackp *opt, int argc, char **argv) {
      the working directory; a separator of our own would put it in / */
   StringCopy(opt->path_html_utf8, "");
   opt->state.tmpnameid = 0;
+  snprintf(want, sizeof(want), "~hts-tmp/tmpfile%lu-0.tmp", pid);
   if (!back_spoolname(opt, got, sizeof(got))) {
     fprintf(stderr, "spoolname: naming failed with no output directory\n");
     err++;
-  } else if (strcmp(got, "~hts-tmp/tmpfile0.tmp") != 0) {
-    fprintf(stderr, "spoolname: no -O gave %s, want ~hts-tmp/tmpfile0.tmp\n",
-            got);
+  } else if (strcmp(got, want) != 0) {
+    fprintf(stderr, "spoolname: no -O gave %s, want %s\n", got, want);
     err++;
   }
 

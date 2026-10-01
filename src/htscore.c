@@ -1132,6 +1132,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
       XH_extuninit;
       return 0;
     }
+    /* a killed run cannot clean up its own spool */
+    back_spool_sweep(opt);
   }
   // statistiques
   if (opt->makestat) {

@@ -41,9 +41,13 @@ Please visit our Website: http://www.httrack.com
 #include "htswarc.h"
 #include "htschanges.h"
 #include "htsthread.h"
+#include <ctype.h>
 #include <limits.h>
 #include <stdint.h>
 #include <time.h>
+#ifndef _WIN32
+#include <signal.h>
+#endif
 /* END specific definitions */
 
 #include "htsback.h"
@@ -71,16 +75,122 @@ Please visit our Website: http://www.httrack.com
 static hts_boolean back_tmpname(char *dest, size_t size, const char *save,
                                 const char *ext);
 
+unsigned long back_self_pid(void) {
+#ifdef _WIN32
+  return (unsigned long) GetCurrentProcessId();
+#else
+  return (unsigned long) getpid();
+#endif
+}
+
+/* An unsure answer is "alive". A run on another host or in another pid
+   namespace sharing the mirror can lose a spooled page; that is accepted. */
+static hts_boolean back_pid_is_alive(unsigned long pid) {
+#ifdef _WIN32
+  HANDLE h;
+  hts_boolean alive;
+
+  h = OpenProcess(SYNCHRONIZE, FALSE, (DWORD) pid);
+  if (h == NULL)
+    return GetLastError() != ERROR_INVALID_PARAMETER ? HTS_TRUE : HTS_FALSE;
+  alive = WaitForSingleObject(h, 0) == WAIT_TIMEOUT ? HTS_TRUE : HTS_FALSE;
+  CloseHandle(h);
+  return alive;
+#else
+  /* a negative pid_t would signal a process group */
+  if (pid > (unsigned long) INT_MAX)
+    return HTS_TRUE;
+  return kill((pid_t) pid, 0) == 0 || errno == EPERM ? HTS_TRUE : HTS_FALSE;
+#endif
+}
+
 hts_boolean back_spoolname(httrackp *opt, char *dest, size_t size) {
   /* At the mirror root, so a reply never saved leaves no empty directory.
      path_html_utf8 brings its own separator, and is "" with no -O. */
-  if (!slprintfbuff(dest, size, "%s" HTS_TMPDIR "/tmpfile%d.tmp",
-                    StringBuff(opt->path_html_utf8), opt->state.tmpnameid++)) {
+  if (!slprintfbuff(dest, size, "%s" HTS_TMPDIR "/tmpfile%lu-%u.tmp",
+                    StringBuff(opt->path_html_utf8), back_self_pid(),
+                    opt->state.tmpnameid++)) {
     dest[0] = '\0';
     return HTS_FALSE;
   }
   return HTS_TRUE;
 }
+
+/* Returns the pid in a back_spoolname() name, or 0 if the name is not one. */
+static unsigned long back_spool_owner(const char *name) {
+  static const char prefix[] = "tmpfile";
+  const char *p = name;
+  unsigned long pid = 0;
+
+  if (strncmp(p, prefix, sizeof(prefix) - 1) != 0)
+    return 0;
+  p += sizeof(prefix) - 1;
+  for (; isdigit((unsigned char) *p); p++) {
+    if (pid > (ULONG_MAX - 9) / 10)
+      return 0;
+    pid = pid * 10 + (unsigned long) (*p - '0');
+  }
+  if (*p++ != '-' || !isdigit((unsigned char) *p))
+    return 0;
+  while (isdigit((unsigned char) *p))
+    p++;
+  return strcmp(p, ".tmp") == 0 ? pid : 0;
+}
+
+void back_spool_sweep(httrackp *opt) {
+  char BIGSTK dir[HTS_URLMAXSIZE * 2];
+  char BIGSTK path[HTS_URLMAXSIZE * 2 + 64];
+  DIR *d;
+  struct dirent *entry;
+  const unsigned long self = back_self_pid();
+
+  if (!slprintfbuff(dir, sizeof(dir), "%s" HTS_TMPDIR,
+                    StringBuff(opt->path_html_utf8)) ||
+      (d = opendir(dir)) == NULL)
+    return;
+  while ((entry = readdir(d)) != NULL) {
+    const unsigned long pid = back_spool_owner(entry->d_name);
+
+    /* nothing is spooled yet, so a file of our own pid is a previous run's */
+    if (pid != 0 && (pid == self || !back_pid_is_alive(pid)) &&
+        slprintfbuff(path, sizeof(path), "%s/%s", dir, entry->d_name) &&
+        UNLINK(path) == 0)
+      hts_log_print(opt, LOG_DEBUG, "removed stale spool file %s", path);
+  }
+  closedir(d);
+  (void) RMDIR(dir); /* refused while the directory is not empty */
+}
+
+hts_boolean back_spool_write(httrackp *opt, const char *filename,
+                             const lien_back *back) {
+  FILE *const fp = filecreate(NULL, filename);
+  hts_boolean written;
+
+  if (fp == NULL) {
+    hts_log_print(
+        opt, LOG_WARNING | LOG_ERRNO,
+        "engine: warning: serialize error for %s%s to %s: open "
+        "error (%s, %s)",
+        back->url_adr, back->url_fil, filename,
+        dir_exists(filename) ? "directory exists" : "directory does NOT exist!",
+        fexist_utf8(filename) ? "file already exists!" : "file does not exist");
+    back_tmpdir_drop(filename); /* filecreate() may have made the directory */
+    return HTS_FALSE;
+  }
+  written = back_serialize(fp, back) == 0 ? HTS_TRUE : HTS_FALSE;
+  if (fclose(fp) != 0)
+    written = HTS_FALSE;
+  if (!written) {
+    hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
+                  "engine: warning: serialize error for %s%s to %s: write "
+                  "error",
+                  back->url_adr, back->url_fil, filename);
+    (void) UNLINK(filename);
+    back_tmpdir_drop(filename);
+  }
+  return written;
+}
+
 static int slot_can_be_cached_on_disk(const lien_back * back);
 static int slot_can_be_cleaned(const lien_back * back);
 static int slot_can_be_finalized(httrackp * opt, const lien_back * back);
@@ -662,43 +772,25 @@ int back_cleanup_background(httrackp * opt, cache_back * cache,
 #ifndef HTS_NO_BACK_ON_DISK
       /* temporarily serialize the entry on disk */
       {
-        /* +32: room for ~hts-tmp/tmpfileN.tmp */
-        char BIGSTK tmpname[HTS_URLMAXSIZE * 2 + 32];
+        /* filecreate() aborts on a longer name */
+        char BIGSTK tmpname[HTS_URLMAXSIZE * 2];
         char *filename;
         const hts_boolean named = back_spoolname(opt, tmpname, sizeof(tmpname));
         filename = named ? strdupt(tmpname) : NULL;
 
         if (filename != NULL) {
-          FILE *fp;
-
           /* Security check */
           if (fexist_utf8(filename)) {
             hts_log_print(opt, LOG_WARNING,
                           "engine: warning: temporary file %s already exists",
                           filename);
           }
-          /* Create file and serialize slot */
-          if ((fp = filecreate(NULL, filename)) != NULL) {
-            if (back_serialize(fp, &back[i]) == 0) {
-              coucal_add_pvoid(sback->ready, back[i].url_sav, filename);
-              filename = NULL;
-              sback->ready_size_bytes += back[i].r.size;        /* add for stats */
-              nclean++;
-              back_clear_entry(&back[i]);       /* entry is now recycled */
-            } else {
-              hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
-                            "engine: warning: serialize error for %s%s to %s: write error",
-                            back[i].url_adr, back[i].url_fil, filename);
-            }
-            fclose(fp);
-          } else {
-            hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
-                          "engine: warning: serialize error for %s%s to %s: open error (%s, %s)",
-                          back[i].url_adr, back[i].url_fil, filename,
-                          dir_exists(filename) ? "directory exists" :
-                          "directory does NOT exist!",
-                          fexist_utf8(filename) ? "file already exists!" :
-                          "file does not exist");
+          if (back_spool_write(opt, filename, &back[i])) {
+            coucal_add_pvoid(sback->ready, back[i].url_sav, filename);
+            filename = NULL;
+            sback->ready_size_bytes += back[i].r.size;
+            nclean++;
+            back_clear_entry(&back[i]);
           }
           if (filename != NULL)
             freet(filename);

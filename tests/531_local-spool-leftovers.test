@@ -1,0 +1,71 @@
+#!/bin/bash
+#
+# A failed write must remove its own spool file. A run must remove the spool
+# files of a killed run, and never those of a live run.
+
+set -euo pipefail
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_spoolleft.XXXXXX") || exit 1
+sleeper=
+cleanup() {
+    if [ -n "$sleeper" ]; then
+        kill "$sleeper" 2>/dev/null
+        wait "$sleeper" 2>/dev/null
+    fi
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+require_httrack
+
+out=$(httrack -#test=spoolwrite "${tmpdir}/write")
+grep -q "spoolwrite: OK" <<<"$out" || fail "spoolwrite: $out"
+if ! target_is_windows && fsize_limit_binds; then
+    grep -q "failed write cleaned up" <<<"$out" ||
+        fail "spoolwrite never failed a write: $out"
+fi
+out=$(httrack -#test=spoolsweep "${tmpdir}/sweep")
+grep -q "spoolsweep: OK" <<<"$out" || fail "spoolsweep: $out"
+
+local_server_start
+
+spool="${tmpdir}/out/~hts-tmp"
+mkdir -p "$spool"
+# no process has this pid on any platform
+dead="${spool}/tmpfile2147483646-0.tmp"
+: >"$dead"
+if target_is_windows; then
+    # System, always running
+    live="${spool}/tmpfile4-0.tmp"
+else
+    sleep 300 &
+    sleeper=$!
+    live="${spool}/tmpfile${sleeper}-0.tmp"
+fi
+: >"$live"
+
+crawl() {
+    local rc=0
+    local_crawl --log "${tmpdir}/log" -O "${tmpdir}/out" --quiet --disable-security-limits --robots=0 --timeout=30 --retries=0 -Z -p0 -N '%n' -c4 "http://127.0.0.1:${SRV_PORT}/bakname/index.html" || rc=$?
+    test "$rc" -eq 0 || fail_dump "httrack exited $rc" "${tmpdir}/log"
+}
+
+crawl
+moved=$(count_matching_lines 'slots ready moved to background' "${tmpdir}/out/hts-log.txt")
+test "$moved" -gt 0 || fail "no slot was spooled, so the run never used ~hts-tmp"
+test ! -e "$dead" || fail "a dead run's spool file survived"
+test -e "$live" || fail "a live run's spool file was removed"
+left=$(find "$spool" -type f ! -path "$live" | wc -l)
+test "$left" -eq 0 || fail "the run left $left spool files of its own"
+if [ -n "$sleeper" ]; then
+    kill "$sleeper"
+    wait "$sleeper" 2>/dev/null || true
+    sleeper=
+else
+    rm -f "$live"
+fi
+crawl
+test ! -e "$live" || fail "a run that has since died kept its spool file"
+test ! -e "$spool" || fail "an empty ~hts-tmp was left in the mirror"

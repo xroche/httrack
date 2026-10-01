@@ -202,6 +202,229 @@ static int st_backswap(httrackp *opt, int argc, char **argv) {
   return back_selftest_slot_swap();
 }
 
+typedef enum { ST_CAP_FAIL, ST_CAP_OK, ST_CAP_SKIPPED } st_cap_result;
+
+/* Fail one spool write at a 4 KB file size cap, and check it left nothing. */
+static st_cap_result st_spool_capped_write(httrackp *opt,
+                                           const lien_back *back) {
+#ifdef _WIN32
+  (void) opt;
+  (void) back;
+  return ST_CAP_SKIPPED;
+#else
+  char name[HTS_URLMAXSIZE * 2];
+  struct rlimit saved, tight;
+  void (*oldxfsz)(int);
+  hts_boolean written;
+
+  if (!back_spoolname(opt, name, sizeof(name))) {
+    fprintf(stderr, "spoolwrite: naming failed\n");
+    return ST_CAP_FAIL;
+  }
+  if (getrlimit(RLIMIT_FSIZE, &saved) != 0)
+    return ST_CAP_SKIPPED;
+  tight = saved;
+  tight.rlim_cur = 4096;
+  /* a capped write then fails with EFBIG instead of killing us */
+  oldxfsz = signal(SIGXFSZ, SIG_IGN);
+  if (setrlimit(RLIMIT_FSIZE, &tight) != 0) {
+    signal(SIGXFSZ, oldxfsz);
+    return ST_CAP_SKIPPED;
+  }
+  written = back_spool_write(opt, name, back);
+  (void) setrlimit(RLIMIT_FSIZE, &saved);
+  signal(SIGXFSZ, oldxfsz);
+  if (written) { /* the cap did not bite */
+    (void) UNLINK(name);
+    back_tmpdir_drop(name);
+    return ST_CAP_SKIPPED;
+  }
+  if (fexist_utf8(name)) {
+    fprintf(stderr, "spoolwrite: failed write left %s\n", name);
+    return ST_CAP_FAIL;
+  }
+  if (dir_exists(name)) { /* checks name's parent directory */
+    fprintf(stderr, "spoolwrite: failed write left the directory of %s\n",
+            name);
+    return ST_CAP_FAIL;
+  }
+  return ST_CAP_OK;
+#endif
+}
+
+// -#test=spoolwrite <dir>: a spool write that fails leaves no partial file.
+static int st_spoolwrite(httrackp *opt, int argc, char **argv) {
+  char base[HTS_URLMAXSIZE];
+  char name[HTS_URLMAXSIZE * 2];
+  const size_t bodysize = 256 * 1024;
+  lien_back back;
+  int err = 0;
+
+  if (argc < 1) {
+    fprintf(stderr, "spoolwrite: needs a writable base dir\n");
+    return 1;
+  }
+  snprintf(base, sizeof(base), "%s/", argv[0]);
+  StringCopy(opt->path_html_utf8, base);
+  memset(&back, 0, sizeof(back));
+  back.status = STATUS_READY;
+  strcpybuff(back.url_adr, "example.com");
+  strcpybuff(back.url_fil, "/spool.html");
+  back.r.adr = calloct(1, bodysize);
+  back.r.size = (LLint) bodysize;
+  if (back.r.adr == NULL) {
+    fprintf(stderr, "spoolwrite: no memory\n");
+    return 1;
+  }
+
+  switch (st_spool_capped_write(opt, &back)) {
+  case ST_CAP_FAIL:
+    err++;
+    break;
+  case ST_CAP_OK:
+    printf("spoolwrite: failed write cleaned up\n");
+    break;
+  case ST_CAP_SKIPPED:
+    printf("spoolwrite: no file size cap here, failure case skipped\n");
+    break;
+  }
+
+  /* control: an unhindered write keeps its file */
+  if (!back_spoolname(opt, name, sizeof(name)) ||
+      !back_spool_write(opt, name, &back) || !fexist_utf8(name)) {
+    fprintf(stderr, "spoolwrite: a good write did not keep %s\n", name);
+    err++;
+  }
+  (void) UNLINK(name);
+  back_tmpdir_drop(name);
+  freet(back.r.adr);
+  printf("spoolwrite: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
+static hts_boolean st_spool_plant(const char *path) {
+  FILE *const fp = filecreate(NULL, path);
+
+  if (fp == NULL) {
+    fprintf(stderr, "spoolsweep: could not plant %s\n", path);
+    return HTS_FALSE;
+  }
+  return fclose(fp) == 0 ? HTS_TRUE : HTS_FALSE;
+}
+
+/* As pid 1, init's file is our own, so the sweep rightly removes it. */
+static hts_boolean st_spool_keep_applies(const char *name) {
+#ifndef _WIN32
+  if (getpid() == 1 && strcmp(name, "tmpfile1-0.tmp") == 0)
+    return HTS_FALSE;
+#endif
+  (void) name;
+  return HTS_TRUE;
+}
+
+// -#test=spoolsweep <dir>: startup removes the spool of a dead process only.
+static int st_spoolsweep(httrackp *opt, int argc, char **argv) {
+  /* no process has this pid on any platform */
+  static const char *const dead = "tmpfile2147483646-3.tmp";
+  /* the sweep must keep each of these */
+  static const char *const keep[] = {
+      "tmpfile2147483646-3.tmpx", /* suffix */
+      "tmpfile7.tmp",             /* no pid */
+      "tmp2147483646-1.tmp",      /* prefix */
+      "tmpfile2147483646-.tmp",   /* no counter */
+#if ULONG_MAX == 0xfffffffful
+      "tmpfile6442450942-1.tmp", /* would wrap to 2147483646 */
+#else
+      "tmpfile18446744075857035262-1.tmp", /* would wrap to 2147483646 */
+#endif
+#ifdef _WIN32
+      "tmpfile4-0.tmp", /* System: always running */
+#else
+      "tmpfile1-0.tmp",          /* init: alive, and EPERM unless root */
+      "tmpfile3000000000-1.tmp", /* a negative pid_t */
+#endif
+  };
+  char base[HTS_URLMAXSIZE];
+  char path[HTS_URLMAXSIZE * 2];
+  char own[HTS_URLMAXSIZE * 2];
+  char live[HTS_URLMAXSIZE * 2];
+  lien_back back;
+  size_t i;
+  int err = 0;
+
+  if (argc < 1) {
+    fprintf(stderr, "spoolsweep: needs a writable base dir\n");
+    return 1;
+  }
+  snprintf(base, sizeof(base), "%s/", argv[0]);
+  StringCopy(opt->path_html_utf8, base);
+  /* a file of our own pid predates this run, so it is stale */
+  memset(&back, 0, sizeof(back));
+  back.status = STATUS_READY;
+  if (!back_spoolname(opt, own, sizeof(own)) ||
+      !back_spool_write(opt, own, &back)) {
+    fprintf(stderr, "spoolsweep: could not plant %s\n", own);
+    return 1;
+  }
+  live[0] = '\0';
+#ifndef _WIN32
+  snprintf(live, sizeof(live), "%s~hts-tmp/tmpfile%lu-0.tmp", base,
+           (unsigned long) getppid());
+  if (!st_spool_plant(live))
+    return 1;
+#endif
+  snprintf(path, sizeof(path), "%s~hts-tmp/%s", base, dead);
+  if (!st_spool_plant(path))
+    return 1;
+  for (i = 0; i < sizeof(keep) / sizeof(keep[0]); i++) {
+    if (!st_spool_keep_applies(keep[i]))
+      continue;
+    snprintf(path, sizeof(path), "%s~hts-tmp/%s", base, keep[i]);
+    if (!st_spool_plant(path))
+      return 1;
+  }
+
+  back_spool_sweep(opt);
+
+  snprintf(path, sizeof(path), "%s~hts-tmp/%s", base, dead);
+  if (fexist_utf8(path)) {
+    fprintf(stderr, "spoolsweep: dead process's %s survived\n", dead);
+    err++;
+  }
+  if (fexist_utf8(own)) {
+    fprintf(stderr, "spoolsweep: earlier run's %s survived\n", own);
+    err++;
+  }
+  if (live[0] != '\0' && !fexist_utf8(live)) {
+    fprintf(stderr, "spoolsweep: live parent's %s was removed\n", live);
+    err++;
+  }
+  for (i = 0; i < sizeof(keep) / sizeof(keep[0]); i++) {
+    if (!st_spool_keep_applies(keep[i]))
+      continue;
+    snprintf(path, sizeof(path), "%s~hts-tmp/%s", base, keep[i]);
+    if (!fexist_utf8(path)) {
+      fprintf(stderr, "spoolsweep: %s was removed\n", keep[i]);
+      err++;
+    }
+    (void) UNLINK(path);
+  }
+  if (live[0] != '\0')
+    (void) UNLINK(live);
+
+  /* the empty directory goes too */
+  snprintf(path, sizeof(path), "%s~hts-tmp/%s", base, dead);
+  if (!st_spool_plant(path))
+    return 1;
+  back_spool_sweep(opt);
+  if (dir_exists(path)) {
+    fprintf(stderr, "spoolsweep: emptied ~hts-tmp was kept\n");
+    err++;
+  }
+  printf("spoolsweep: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 /* TEST-NET-1: routed nowhere, so a connect to it stays pending. */
 #define ST_BACKSTOP_DEADHOST "192.0.2.1"
 
@@ -1440,6 +1663,10 @@ const struct selftest_entry selftests_back[] = {
      st_mutexlazyinit},
     {"backswap", "", "which backlog slots may be swapped to the ready table",
      st_backswap},
+    {"spoolwrite", "<dir>", "a failed spool write leaves no partial file",
+     st_spoolwrite},
+    {"spoolsweep", "<dir>", "startup removes the spool of a dead process only",
+     st_spoolsweep},
     {"backstop", "",
      "a user stop drops the slots still waiting to connect (#1073)",
      st_backstop},
