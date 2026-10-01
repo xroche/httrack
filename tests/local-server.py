@@ -3068,15 +3068,13 @@ class Handler(SimpleHTTPRequestHandler):
     def route_xssjob_index(self):
         self.send_html('\t<a href="%s/%s">job</a>\n' % (self.XSS_DIR, self.XSS_NAME))
 
-    # #483: trickled .bin pages, and an index DCANCEL_INDEX_BYTES long on the
-    # wire, so the first page's headers carry the crawl past -M400000 in the
-    # poll that ends the type waiter's wait.
+    # #483: an index 60 bytes under -M400000, so p0's headers cross the cap.
     DCANCEL_INDEX_BYTES = 400000 - 60
 
     def route_dcancel_index(self):
         links = "".join('<a href="p%d.bin">p%d</a>\n' % (i, i) for i in range(8))
         pad = 0
-        while True:
+        for _ in range(4):  # the Content-Length digits settle in two rounds
             body = ("<html><!--%s-->\n%s</html>\n" % ("x" * pad, links)).encode()
             head = (
                 "HTTP/1.0 200 OK\r\nContent-Type: text/html\r\n"
@@ -3086,6 +3084,7 @@ class Handler(SimpleHTTPRequestHandler):
             if missing == 0:
                 break
             pad += missing
+        assert missing == 0, "the dcancel index cannot be sized exactly"
         self.log_request(200)
         self.wfile.write(head + body)
 

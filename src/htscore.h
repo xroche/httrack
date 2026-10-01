@@ -346,8 +346,8 @@ void hts_record_free(httrackp *opt);
    short, however it arrived (state.stop or exit_xh). */
 int httpmirror(char *url1, httrackp *opt, hts_boolean *completed);
 
-/* Start the clocks that HTS_STAT.stat_timestart and hts_mirror_elapsed_ms()
-   count from. */
+/* Start the --max-time clocks: HTS_STAT.stat_timestart (seconds) and
+   hts_mirror_elapsed_ms(). */
 void hts_mirror_clock_start(void);
 
 /* Return the time since hts_mirror_clock_start(), in monotonic ms. */

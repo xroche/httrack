@@ -394,6 +394,7 @@ static int slot_can_be_cached_on_disk(const lien_back * back) {
      would unlink it through back_clear_entry() (#771). */
   if (back->tmpfile != NULL && back->tmpfile[0] != '\0')
     return 0;
+  /* locked == 0: neither locked nor pinned */
   return (back->status == STATUS_READY && back->locked == 0
           && back->url_sav[0] != '\0'
           && strcmp(back->url_sav, BACK_ADD_TEST) != 0);
@@ -428,6 +429,8 @@ int back_selftest_slot_swap(void) {
   back.tmpfile = NULL;
   back.locked = 1;
   CHECK(0, "a locked slot");
+  back.locked = BACK_PINNED;
+  CHECK(0, "a pinned slot");
   back.locked = 0;
 
   back.status = STATUS_TRANSFER;
@@ -3168,7 +3171,7 @@ int host_wait(httrackp *opt, lien_back *back) { return 1; }
 static int slot_can_be_cleaned(const lien_back * back) {
   return (back->status == STATUS_READY) // ready
          /* Check autoclean */
-         && (!back->locked)   // not held by hts_wait_delayed (name pending)
+         && (!back->locked)   // not locked or pinned by hts_wait_delayed
          && (!back->testmode) // not test mode
          && (strnotempty(back->url_sav))     // filename exists
          && (HTTP_IS_OK(back->r.statuscode)) // HTTP "OK"
@@ -5206,8 +5209,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                               && (back[i].r.adr = (char *) malloct(2))) {
                             back[i].r.adr[0] = 0;
                           }
-                          /* locked = name pending; the waiter finalizes after
-                             patching url_sav (else: cached as .delayed, #5) */
+                          /* locked or pinned = name pending; the waiter
+                             finalizes after patching url_sav (else: cached as
+                             .delayed, #5) */
                           if (!back[i].locked) {
                             hts_log_print(opt, LOG_TRACE, "finalizing empty");
                             back_finalize(opt, cache, sback, i);

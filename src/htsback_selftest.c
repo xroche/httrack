@@ -1372,21 +1372,23 @@ static int st_maxtime(httrackp *opt, int argc, char **argv) {
   FILE *const saved_log = opt->log;
   int err = 0;
   int tries;
-  TStamp elapsed = 0;
+  TStamp t0 = 0, elapsed = 0;
 
   (void) argc;
   (void) argv;
   opt->log = NULL; /* the stop logs, and this test's own output is exact */
   opt->maxtime = 1;
-  /* a starved host can oversleep past the cap, so retry */
+  /* A starved host can oversleep past the cap, so retry. The window is timed
+     here, never through the clock under test. */
   for (tries = 0; tries < 5; tries++) {
     while (mtime_local() % 1000 < 850 || mtime_local() % 1000 >= 900)
       Sleep(5);
     hts_mirror_clock_start();
+    t0 = mtime_monotonic();
     Sleep(200);
     opt->state.stop = 0;
     back_checkmirror(opt);
-    elapsed = hts_mirror_elapsed_ms();
+    elapsed = mtime_monotonic() - t0;
     if (elapsed < 1000)
       break;
   }
@@ -1394,12 +1396,12 @@ static int st_maxtime(httrackp *opt, int argc, char **argv) {
     fprintf(stderr, "maxtime: -E1 stopped %d ms in\n", (int) elapsed);
     err = 1;
   }
-  while (hts_mirror_elapsed_ms() < 1000)
+  while (mtime_monotonic() - t0 < 1000)
     Sleep(10);
   back_checkmirror(opt);
   if (!opt->state.stop) {
     fprintf(stderr, "maxtime: -E1 had not stopped %d ms in\n",
-            (int) hts_mirror_elapsed_ms());
+            (int) (mtime_monotonic() - t0));
     err = 1;
   }
   opt->state.stop = 0;

@@ -5239,8 +5239,8 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
 
           /* If we are done, do additional checks with final type and authorizations */
           if (!continue_loop) {
-            /* Recompute filename with MIME type. After a stop url_savename
-               pumps sockets, so pin the slot or the rename below misses it. */
+            /* Recompute filename with MIME type. After a stop, url_savename()
+               pumps sockets and could move this slot out, so pin it. */
             const hts_boolean pin = b >= 0 && back[b].status != STATUS_FREE;
 
             afs->save[0] = '\0';

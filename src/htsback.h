@@ -131,13 +131,13 @@ int back_serialize_ref(httrackp * opt, const lien_back * src);
 int back_unserialize_ref(httrackp * opt, const char *adr, const char *fil,
                          lien_back ** dst);
 void back_set_finished(httrackp *opt, struct_back *sback, const int p);
-void back_set_locked(struct_back * sback, const int p);
-void back_set_unlocked(struct_back * sback, const int p);
-/* A pinned slot (lien_back.locked) stays in the backlog table but may write
-   to disk. A locked one (1) also stays in memory. */
+/* lien_back.locked: 1 keeps a slot in the table with its body in memory, and
+   BACK_PINNED keeps it in the table but lets it write to disk.
+   back_set_unlocked() releases both. */
 #define BACK_PINNED 2
-
+void back_set_locked(struct_back * sback, const int p);
 void back_set_pinned(struct_back *sback, const int p);
+void back_set_unlocked(struct_back * sback, const int p);
 int back_delete(httrackp * opt, cache_back * cache, struct_back * sback,
                 const int p);
 /* Discard back's on-disk .delayed placeholder and its refname. */

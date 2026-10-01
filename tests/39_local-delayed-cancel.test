@@ -1,9 +1,10 @@
 #!/bin/bash
 #
 # Cancelled delayed-type-checks must not orphan .delayed placeholders (#483).
-# The first page's headers push the crawl past -M (see the dcancel routes), so
-# the stop lands while it waits for its type. -c1 then makes the namer pump
-# sockets until that page is written to its placeholder.
+# The server sizes the index 60 bytes under -M, so the first page's headers
+# cross the cap while the engine waits for that page's type. -c1 then makes the
+# namer pump sockets until that page is written to its placeholder. -Z logs the
+# "moved placeholder" line that proves the window was reached.
 
 set -euo pipefail
 
