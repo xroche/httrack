@@ -1366,25 +1366,32 @@ static int st_hostban(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
-/* -E counts milliseconds from the mirror start. The clock starts 100-150ms
-   before a wall-clock second ends, so a whole-second count stops 200ms in. */
+/* The clock starts just before a wall-clock second ends, so a whole-second
+   -E count would stop 200ms in. */
 static int st_maxtime(httrackp *opt, int argc, char **argv) {
   FILE *const saved_log = opt->log;
   int err = 0;
+  int tries;
+  TStamp elapsed = 0;
 
   (void) argc;
   (void) argv;
   opt->log = NULL; /* the stop logs, and this test's own output is exact */
   opt->maxtime = 1;
-  opt->state.stop = 0;
-  while (mtime_local() % 1000 < 850 || mtime_local() % 1000 >= 900)
-    Sleep(5);
-  hts_mirror_clock_start();
-  Sleep(200);
-  back_checkmirror(opt);
-  if (opt->state.stop) {
-    fprintf(stderr, "maxtime: -E1 stopped %d ms in\n",
-            (int) hts_mirror_elapsed_ms());
+  /* a starved host can oversleep past the cap, so retry */
+  for (tries = 0; tries < 5; tries++) {
+    while (mtime_local() % 1000 < 850 || mtime_local() % 1000 >= 900)
+      Sleep(5);
+    hts_mirror_clock_start();
+    Sleep(200);
+    opt->state.stop = 0;
+    back_checkmirror(opt);
+    elapsed = hts_mirror_elapsed_ms();
+    if (elapsed < 1000)
+      break;
+  }
+  if (opt->state.stop && elapsed < 1000) {
+    fprintf(stderr, "maxtime: -E1 stopped %d ms in\n", (int) elapsed);
     err = 1;
   }
   while (hts_mirror_elapsed_ms() < 1000)

@@ -346,11 +346,11 @@ void hts_record_free(httrackp *opt);
    short, however it arrived (state.stop or exit_xh). */
 int httpmirror(char *url1, httrackp *opt, hts_boolean *completed);
 
-/* Start the mirror clock: HTS_STAT.stat_timestart in seconds, and the
-   monotonic millisecond start hts_mirror_elapsed_ms() counts from. */
+/* Start the clocks that HTS_STAT.stat_timestart and hts_mirror_elapsed_ms()
+   count from. */
 void hts_mirror_clock_start(void);
 
-/* Milliseconds since hts_mirror_clock_start(), on a monotonic clock. */
+/* Return the time since hts_mirror_clock_start(), in monotonic ms. */
 TStamp hts_mirror_elapsed_ms(void);
 
 /* Write len bytes of adr to local path s. url_adr/url_fil (may be NULL) name

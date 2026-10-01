@@ -2248,6 +2248,13 @@ void back_set_locked(struct_back * sback, const int p) {
   }
 }
 
+/* See htsback.h. back_set_unlocked() releases it. */
+void back_set_pinned(struct_back *sback, const int p) {
+  assertf(p >= 0 && p < sback->count);
+  if (p >= 0 && p < sback->count)
+    sback->lnk[p].locked = BACK_PINNED;
+}
+
 void back_set_unlocked(struct_back * sback, const int p) {
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
@@ -3959,7 +3966,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
           // Shortcut: store the file directly on disk when possible,
           // sparing memory
           if (back[i].status &&
-              !back[i].locked) { // name still pending when locked
+              (back[i].locked == 0 ||
+               back[i].locked == BACK_PINNED)) { // name pending when locked
             if (back[i].r.is_write == 0) {      // mode mémoire
               if (back[i].r.adr == NULL) {      // rien n'a été écrit
                 if (!back[i].testmode) {        // pas mode test

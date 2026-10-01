@@ -1,15 +1,13 @@
 #!/bin/bash
 #
 # Cancelled delayed-type-checks must not orphan .delayed placeholders (#483).
-# The server holds the headers until -E1 fires, and -c1 keeps the only
-# connection busy, so the type waiter pumps sockets past the stop. Two tries,
-# because the stop can still miss the poll that receives the headers.
+# The first page's headers push the crawl past -M (see the dcancel routes), so
+# the stop lands while it waits for its type. -c1 then makes the namer pump
+# sockets while that page streams to its placeholder.
 
 set -euo pipefail
 
 : "${top_srcdir:=..}"
 
-for _ in 1 2; do
-    bash "$top_srcdir/tests/local-crawl.sh" \
-        httrack 'BASEURL/dcancel/index.html' -E1 -c1 -A25000
-done
+bash "$top_srcdir/tests/local-crawl.sh" --log-found 'moved placeholder' \
+    httrack 'BASEURL/dcancel/index.html' -M400000 -c1 -Z

@@ -565,7 +565,7 @@ static int look_like_xml(const char *s) {
     ;
 }
 
-/* mtime_monotonic() when the mirror started, which --max-time counts from. */
+/* --max-time counts from this mtime_monotonic() reading. */
 static TStamp mirror_start_ms;
 
 void hts_mirror_clock_start(void) {

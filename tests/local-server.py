@@ -3068,22 +3068,28 @@ class Handler(SimpleHTTPRequestHandler):
     def route_xssjob_index(self):
         self.send_html('\t<a href="%s/%s">job</a>\n' % (self.XSS_DIR, self.XSS_NAME))
 
-    # #483: trickled .bin pages so the -E stop lands in the type waiter's
-    # unlock-to-patch window with body bytes pending. The headers go out just
-    # past -E1, counted from the index request, so they reach the engine in the
-    # same poll that crosses the cap.
-    DCANCEL_HEADERS_AT = 1.005
-    dcancel_index_at = None
+    # #483: trickled .bin pages, and an index DCANCEL_INDEX_BYTES long on the
+    # wire, so the first page's headers carry the crawl past -M400000 in the
+    # poll that ends the type waiter's wait.
+    DCANCEL_INDEX_BYTES = 400000 - 60
 
     def route_dcancel_index(self):
-        type(self).dcancel_index_at = time.monotonic()
-        self.send_bin_index()
+        links = "".join('<a href="p%d.bin">p%d</a>\n' % (i, i) for i in range(8))
+        pad = 0
+        while True:
+            body = ("<html><!--%s-->\n%s</html>\n" % ("x" * pad, links)).encode()
+            head = (
+                "HTTP/1.0 200 OK\r\nContent-Type: text/html\r\n"
+                "Content-Length: %d\r\n\r\n" % len(body)
+            ).encode()
+            missing = self.DCANCEL_INDEX_BYTES - len(head) - len(body)
+            if missing == 0:
+                break
+            pad += missing
+        self.log_request(200)
+        self.wfile.write(head + body)
 
     def route_dcancel_page(self):
-        if self.dcancel_index_at is not None:
-            wait = self.dcancel_index_at + self.DCANCEL_HEADERS_AT - time.monotonic()
-            if wait > 0:
-                time.sleep(wait)
         self.send_response(200)
         self.send_header("Content-Type", "application/octet-stream")
         self.send_header("Content-Length", "4096")
