@@ -42,7 +42,7 @@ elapsed=$((SECONDS - start))
 grep -q "Exiting without waiting for engine threads" "$dir/out" ||
     fail_dump "maxtime-dns-stall: no stuck worker at exit, nothing was tested (rc=$rc)" "$dir/out"
 test "$rc" -eq 0 || fail_dump "maxtime-dns-stall: exit status $rc" "$dir/out"
-test "$elapsed" -lt 60 ||
+test "$elapsed" -lt 30 ||
     fail_dump "maxtime-dns-stall: exited after ${elapsed}s, past --max-time=2" "$dir/out"
 
 # Control: without --max-time the exit still waits for the worker.
