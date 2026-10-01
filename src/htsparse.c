@@ -5239,11 +5239,18 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
 
           /* If we are done, do additional checks with final type and authorizations */
           if (!continue_loop) {
-            /* Recompute filename with MIME type */
+            /* Recompute filename with MIME type. After a stop, url_savename()
+               pumps sockets and could move this slot out, so pin it. */
+            const hts_boolean pin = b >= 0 && back[b].status != STATUS_FREE;
+
             afs->save[0] = '\0';
+            if (pin)
+              back_set_pinned(sback, b);
             url_savename(afs, former,
                          heap(ptr)->adr, heap(ptr)->fil, opt,
                          sback, cache, hash, ptr, numero_passe, &delayed_back);
+            if (pin)
+              back_set_unlocked(sback, b);
 
             /* Recompute authorization with MIME type */
             {
