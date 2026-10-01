@@ -125,6 +125,7 @@ fi
     # One poll plus one reap, both stretched fourfold, is 8s; counting polls is 16s.
     test "$elapsed" -lt 12 ||
         fail "deadline counted polls, not seconds: ${elapsed}s for a 3s budget"
-) || exit 1
+)
+subshell_ok $?
 
 echo "watchdog OK"

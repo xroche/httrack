@@ -80,7 +80,8 @@ bash_at_least 4 3 || canfifo=
     poll_wait 1 2>/dev/null
     test -s "$tmp/sleeps" || fail "a dead timer fd did not fall back to sleep"
     test "$POLL_STATE" = forked || fail "a dead timer fd was kept ($POLL_STATE)"
-) || exit 1 # bash 3.2 errexit ignores a failing subshell
+)
+subshell_ok $?
 
 # --- the port wait outlasts a slow announcement ------------------------------
 # A cold Python start lags seconds on a loaded runner, so falling through early

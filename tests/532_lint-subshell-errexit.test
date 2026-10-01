@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# macOS runs the suite with /bin/bash 3.2, whose set -e misses a failing ( ... )
-# statement, so a test can fail there and still pass. Lint the tests for it.
+# Lint the tests for statements whose failure set -e misses on bash 3.2 (macOS).
 
 set -euo pipefail
 
@@ -19,70 +18,103 @@ lint() { "$python" "$checker" "$@" 2>"$work/lint.err"; }
 
 cd "$testdir"
 files=(*.sh)
-# shfmt reads a leading [0-9] glob as an array index, so add it after.
+# Written as files=(*.sh [0-9]*_*.test), shfmt would read [0-9] as an array index.
 for f in [0-9]*_*.test; do files+=("$f"); done
 test "${#files[@]}" -ge 500 || fail "the lint found only ${#files[@]} files to scan"
 out=$(lint "${files[@]}") || fail_dump "a test lets bash 3.2 miss a failure:
 $out" "$work/lint.err"
+# The checker's summary counts the files shfmt parsed, not the ones it was given.
 grep -qx "${#files[@]} files, 0 hits" "$work/lint.err" ||
     fail_dump "the lint did not scan every file" "$work/lint.err"
 
-# Mutant: each form bash 3.2 lets through must be named, on its own line.
+# Mutant: each line marked "# hit: REASON" must be reported, and no other.
 cat >"$work/bad.test" <<'EOF'
-set -e
-( false )
+set -o errexit
+( false ) # hit: subshell
 f() {
-    ( false )
+    ( false ) # hit: subshell
     echo after
 }
 if true; then
-    ( false )
+    ( false ) # hit: subshell
+elif false; then
+    :
+else
+    ( false ) # hit: subshell
 fi
-echo | while read -r _; do false; done
-echo | ( false )
-true && ( false )
+case x in
+x) ( false ) ;; # hit: subshell
+esac
+for i in 1; do
+    ( false ) # hit: subshell
+done
+g() { for i in 1; do ( false ); done; } # hit: subshell
+h() {
+    (
+        ( false ) # hit: subshell
+        echo
+    )
+}
+false || ( false ) # hit: subshell
+true && ( false ) # hit: subshell
+( false; echo ) || fail x # hit: set -e is off inside a subshell left of && or ||
+echo | while read -r _; do false; done # hit: pipeline ending in a WhileClause
+echo | { false; } # hit: pipeline ending in a Block
+echo |& ( false ) # hit: pipeline ending in a Subshell
+echo | # hit: pipeline ending in a Subshell
+    ( false )
+[[ a == b ]] # hit: [[ ]]
+(( 0 )) # hit: (( ))
 echo end
 EOF
 lint "$work/bad.test" >"$work/bad.out" && fail "the lint passed the mutant"
-assert_eq "$work/bad.test:2: subshell
-$work/bad.test:4: subshell
-$work/bad.test:8: subshell
-$work/bad.test:10: pipeline ending in a WhileClause
-$work/bad.test:11: pipeline ending in a Subshell
-$work/bad.test:12: subshell" "$(<"$work/bad.out")" "mutant hits"
+want=$(grep -n '# hit: ' "$work/bad.test" | sed "s|^\([0-9]*\):.*# hit: \(.*\)$|$work/bad.test:\1: \2|")
+assert_eq "$want" "$(<"$work/bad.out")" "mutant hits"
 
-# The same lint on a real test, with the guard it carries taken off.
-sed 's/^) || exit 1$/)/' 58_watchdog.test >"$work/58.test"
+# 58 with the subshell_ok taken off its one guarded subshell.
+sed '/^subshell_ok \$?$/d' 58_watchdog.test >"$work/58.test"
 cmp -s 58_watchdog.test "$work/58.test" && fail "the 58 mutant changed nothing"
-lint "$work/58.test" >"$work/58.out" && fail "the lint passed 58 with its guard removed"
+# Relative, like the tree scan above.
+(cd "$work" && lint 58.test) >"$work/58.out" && fail "the lint passed 58 with its guard removed"
 grep -q '^[^:]*:[0-9]*: subshell$' "$work/58.out" ||
     fail "the 58 mutant was not reported as a subshell: $(<"$work/58.out")"
 
-# Control: a handled status, a condition, a tail, a job and a script without
-# set -e are all fine on bash 3.2.
-cat >"$work/good.test" <<'EOF'
-set -e
-( false ) || exit 1
-( false ) >/dev/null || fail "x"
-if ( false ); then :; fi
-! ( true )
-( false ) &
-wait $! || true
-x=$( (false) || true)
-false | cat
-f() {
-    echo before
-    ( false )
-}
-g() { if true; then ( false ); fi; }
-set +e
-( false )
-set -e
-( false )
-EOF
-lint "$work/good.test" >"$work/good.out" ||
-    fail "the lint flagged a handled form: $(<"$work/good.out")"
+# A library has no set -e of its own, so it is linted as its callers run it.
+printf '( false )\necho\n' >"$work/lib.sh"
+lint "$work/lib.sh" >/dev/null && fail "the lint passed a library's lost subshell"
 printf '#!/bin/bash\n( false )\n( false )\necho end\n' >"$work/no-e.test"
 lint "$work/no-e.test" >/dev/null || fail "the lint flagged a test with no set -e"
+printf 'set -e\nif (\n' >"$work/broken.test"
+lint "$work/broken.test" >/dev/null && fail "the lint passed a file shfmt cannot parse"
+grep -qx '0 files, 1 hits' "$work/lint.err" ||
+    fail "an unparsed file was counted as scanned: $(<"$work/lint.err")"
+
+# Control: none of these lose a failure on bash 3.2.
+cat >"$work/good.test" <<'EOF'
+set -euo pipefail
+( false ) || exit 1 # one statement, handled
+(
+    false
+)
+subshell_ok $? # status read on the next line
+( false; echo ) || true # status dropped
+( false; echo ) || rc=$? # status kept
+if ( false ); then :; fi # condition
+! ( true ) # negated
+( false ) & # job
+wait $! || true
+false | cat # pipefail
+f() {
+    echo before
+    ( false ) # function tail
+}
+g() { if true; then ( false ); fi; } # tail through an if
+set +o errexit
+( false ) # set -e off
+set -e
+( false ) # script tail
+EOF
+lint "$work/good.test" >"$work/good.out" ||
+    fail "the lint flagged a form bash 3.2 handles: $(<"$work/good.out")"
 
 echo "subshell errexit lint OK"

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""List the statements whose failure bash 3.2 (macOS /bin/bash) lets set -e miss.
+"""List the statements whose failure set -e misses on bash 3.2 (macOS /bin/bash).
 
-bash 3.2 only exits on a failing simple command, so a `( ... )` statement, or a
-pipeline ending in a compound command such as `| while`, fails and execution goes
-on. Exempt: a handled status (`|| fail`), a condition, and the last statement of a
-function or script, whose status still reaches the caller. Needs shfmt.
+bash 3.2 exits only on a failing simple command. So it goes on past a failing
+`( ... )`, `[[ ]]` or `(( ))` statement, and past a pipeline ending in one.
+`( ... ) || fail` is no fix, because set -e is off inside a list's left side.
+Fine: a status read by `subshell_ok $?`, a condition, and the last statement of a
+function or script. Needs shfmt.
 """
 
 import json
@@ -12,91 +13,120 @@ import re
 import subprocess
 import sys
 
-SIMPLE = {"CallExpr", "DeclClause", "TestClause", "ArithmCmd", "LetClause"}
+# Statement kinds bash 3.2 lets fail, and the label each hit carries.
+LOST = {"Subshell": "subshell", "TestClause": "[[ ]]", "ArithmCmd": "(( ))"}
+# shfmt's syntax.BinCmdOperator values.
 AND, OR, PIPE, PIPEALL = 10, 11, 12, 13
-SET_E = re.compile(r"-[a-zA-Z]*e[a-zA-Z]*")
-SET_NO_E = re.compile(r"\+[a-zA-Z]*e[a-zA-Z]*")
+SET_ERREXIT = re.compile(r"([-+])([a-zA-Z]*e[a-zA-Z]*|o errexit)")
+
+
+def text(part):
+    if part.get("Type") == "ParamExp" and part.get("Short"):
+        return "$" + part["Param"]["Value"]
+    return part.get("Value", "?")
+
+
+def words(cmd):
+    return ["".join(map(text, w.get("Parts", []))) for w in cmd.get("Args") or []]
+
+
+def is_call(stmt, *argv):
+    cmd = (stmt or {}).get("Cmd") or {}
+    return cmd.get("Type") == "CallExpr" and words(cmd)[: len(argv)] == list(argv)
+
+
+def pipeline_elems(stmt):
+    cmd = stmt["Cmd"]
+    if cmd["Type"] == "BinaryCmd" and cmd["Op"] in (PIPE, PIPEALL):
+        yield from pipeline_elems(cmd["X"])
+        yield from pipeline_elems(cmd["Y"])
+    else:
+        yield stmt
 
 
 class Scan:
+    """Walk a shfmt AST.
+
+    errexit: set -e is in force here. checked: a failure here would end the
+    script. escapes: this statement's status is also its parent's, so a caller
+    still sees it.
+    """
+
     def __init__(self, path):
         self.path = path
         self.hits = []
 
-    def hit(self, stmt, kind):
-        self.hits.append(f"{self.path}:{stmt['Pos']['Line']}: {kind}")
+    def hit(self, stmt, reason):
+        self.hits.append(f"{self.path}:{stmt['Pos']['Line']}: {reason}")
 
-    def stmts(self, lst, active, tail):
+    def stmts(self, lst, errexit, escapes):
         lst = lst or []
         for i, s in enumerate(lst):
-            active = self.stmt(s, active, tail and i == len(lst) - 1)
+            last = i == len(lst) - 1
+            read = not last and is_call(lst[i + 1], "subshell_ok", "$?")
+            errexit = self.stmt(s, errexit, (escapes and last) or read)
 
-    def stmt(self, s, active, tail):
-        """Walk one statement; return errexit for the next one, after set -e/+e."""
+    def stmt(self, s, errexit, escapes):
+        """Return whether set -e is on after s, which only a set command changes."""
         cmd = s.get("Cmd")
         if cmd is None:
-            return active
-        on = active and not s.get("Negated")
-        bg = bool(s.get("Background"))
+            return errexit
+        checked = errexit and not s.get("Negated") and not s.get("Background")
         kind = cmd["Type"]
+        if kind in LOST and checked and not escapes:
+            self.hit(s, LOST[kind])
         if kind == "CallExpr":
-            args = [
-                "".join(p.get("Value", "?") for p in w.get("Parts", []))
-                for w in cmd.get("Args") or []
-            ]
-            if args[:1] == ["set"]:
-                for a in args[1:]:
-                    if SET_E.fullmatch(a):
-                        return True
-                    if SET_NO_E.fullmatch(a):
-                        return False
+            argv = words(cmd)
+            if argv[:1] == ["set"]:
+                for flag in (" ".join(argv[1:3]), argv[1] if len(argv) > 1 else ""):
+                    m = SET_ERREXIT.fullmatch(flag)
+                    if m:
+                        return m.group(1) == "-"
         elif kind == "Subshell":
-            if on and not tail and not bg:
-                self.hit(s, "subshell")
-            # A background job's own status still decides what wait reports.
-            self.stmts(cmd["Stmts"], on or bg, True)
+            # A background job's status still decides what wait reports.
+            self.stmts(cmd["Stmts"], checked or bool(s.get("Background")), True)
         elif kind == "Block":
-            self.stmts(cmd["Stmts"], on, tail)
+            self.stmts(cmd["Stmts"], checked, escapes)
         elif kind == "IfClause":
             self.stmts(cmd.get("Cond"), False, False)
-            self.stmts(cmd.get("Then"), on, tail)
+            self.stmts(cmd.get("Then"), checked, escapes)
             if cmd.get("Else"):
                 # shfmt leaves the type off an elif/else node.
-                self.stmt({"Cmd": dict(cmd["Else"], Type="IfClause")}, on, tail)
+                else_ = {"Cmd": dict(cmd["Else"], Type="IfClause")}
+                self.stmt(else_, checked, escapes)
         elif kind in ("WhileClause", "ForClause"):
             self.stmts(cmd.get("Cond"), False, False)
-            self.stmts(cmd.get("Do"), on, tail)
+            # The loop runs on after its body's last statement.
+            self.stmts(cmd.get("Do"), checked, False)
         elif kind == "CaseClause":
             for item in cmd.get("Items") or []:
-                self.stmts(item.get("Stmts"), on, tail)
+                self.stmts(item.get("Stmts"), checked, escapes)
         elif kind == "TimeClause" and cmd.get("Stmt"):
-            self.stmt(cmd["Stmt"], on, tail)
+            self.stmt(cmd["Stmt"], checked, escapes)
         elif kind == "FuncDecl":
             self.stmt(cmd["Body"], True, True)
         elif kind == "BinaryCmd" and cmd["Op"] in (AND, OR):
-            self.stmt(cmd["X"], False, False)
-            self.stmt(cmd["Y"], on, tail)
+            left = cmd["X"]
+            body = (left.get("Cmd") or {}).get("Stmts") or []
+            # `|| rc=$?` and `|| true` keep or drop the status on purpose.
+            right = words(cmd["Y"]["Cmd"]) if is_call(cmd["Y"]) else ["?"]
+            kept = right in ([], ["true"], [":"])
+            if left["Cmd"]["Type"] == "Subshell" and len(body) > 1 and not kept:
+                self.hit(left, "set -e is off inside a subshell left of && or ||")
+            self.stmt(left, False, False)
+            self.stmt(cmd["Y"], checked, escapes)
         elif kind == "BinaryCmd" and cmd["Op"] in (PIPE, PIPEALL):
-            elems = []
-
-            def flatten(x):
-                c = x["Cmd"]
-                if c["Type"] == "BinaryCmd" and c["Op"] in (PIPE, PIPEALL):
-                    flatten(c["X"])
-                    flatten(c["Y"])
-                else:
-                    elems.append(x)
-
-            flatten(s)
+            elems = list(pipeline_elems(s))
             last = elems[-1]["Cmd"]["Type"]
-            if on and not tail and not bg and last not in SIMPLE:
+            if checked and not escapes and last not in ("CallExpr", "DeclClause"):
                 self.hit(s, f"pipeline ending in a {last}")
             for e in elems:
-                self.stmt(e, on, True)
-        return active
+                self.stmt(e, checked, True)
+        return errexit
 
 
 def scan(path):
+    """Return (hits, parsed) for one file. A file shfmt cannot parse is a hit."""
     with open(path, "rb") as f:
         src = f.read()
     try:
@@ -107,19 +137,25 @@ def scan(path):
             check=True,
         ).stdout
     except subprocess.CalledProcessError as e:
-        return [f"{path}: shfmt could not parse it: {e.stderr.decode().strip()}"]
+        return [f"{path}: shfmt could not parse it: {e.stderr.decode().strip()}"], 0
     sc = Scan(path)
     # A sourced library runs under its caller's set -e.
-    on = not path.endswith(".test") or re.search(rb"^\s*set -[a-z]*e", src, re.M)
-    sc.stmts(json.loads(out)["Stmts"], bool(on), True)
-    return sc.hits
+    errexit = not path.endswith(".test") or re.search(
+        rb"^\s*set (-[a-z]*e|-o errexit)", src, re.M
+    )
+    sc.stmts(json.loads(out)["Stmts"], bool(errexit), True)
+    return sc.hits, 1
 
 
 def main():
-    hits = [h for path in sys.argv[1:] for h in scan(path)]
+    hits, parsed = [], 0
+    for path in sys.argv[1:]:
+        h, ok = scan(path)
+        hits += h
+        parsed += ok
     for h in hits:
         print(h)
-    print(f"{len(sys.argv) - 1} files, {len(hits)} hits", file=sys.stderr)
+    print(f"{parsed} files, {len(hits)} hits", file=sys.stderr)
     return 1 if hits else 0
 
 
