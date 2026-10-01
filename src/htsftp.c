@@ -593,11 +593,13 @@ static hts_boolean ftp_may_resume(httrackp *opt, const lien_back *back,
    the way it aborts an HTTP one. */
 static int ftp_wait_left(const httrackp *opt, int timeout) {
   if (opt != NULL && opt->maxtime > 0) {
-    const TStamp left =
-        (TStamp) opt->maxtime - (time_local() - HTS_STAT.stat_timestart);
+    /* rounded up, so the wait ends at the cap rather than before it */
+    const TStamp left_ms =
+        (TStamp) opt->maxtime * 1000 - hts_mirror_elapsed_ms();
+    const TStamp left = left_ms > 0 ? (left_ms + 999) / 1000 : 0;
 
     if (left < (TStamp) timeout)
-      timeout = left > 0 ? (int) left : 0;
+      timeout = (int) left;
   }
   return timeout;
 }

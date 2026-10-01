@@ -5414,7 +5414,7 @@ static hts_boolean back_maxsize_reached(const httrackp *opt) {
 
 static hts_boolean back_maxtime_reached(const httrackp *opt) {
   return opt->maxtime > 0 &&
-         (time_local() - HTS_STAT.stat_timestart) >= opt->maxtime;
+         hts_mirror_elapsed_ms() >= (TStamp) opt->maxtime * 1000;
 }
 
 /* A cap has been reached, so back_checkmirror() below is what raised the stop
@@ -5431,9 +5431,9 @@ static hts_mirror_limit back_mirror_limit(httrackp *opt) {
       return HTS_MIRROR_LIMIT_SIZE;
   }
   if (back_maxtime_reached(opt)) {
-    const TStamp elapsed = time_local() - HTS_STAT.stat_timestart;
+    const TStamp over = hts_mirror_elapsed_ms() - (TStamp) opt->maxtime * 1000;
 
-    if (elapsed - opt->maxtime >= back_maxtime_grace(opt->maxtime))
+    if (over >= (TStamp) back_maxtime_grace(opt->maxtime) * 1000)
       return HTS_MIRROR_LIMIT_TIME;
   }
   return HTS_MIRROR_LIMIT_NONE;

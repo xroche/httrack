@@ -1,0 +1,11 @@
+#!/bin/bash
+#
+# -E counts milliseconds from the mirror start, so -E1 never stops early.
+
+set -eu
+
+out=$(httrack -#test=maxtime)
+test "$out" = "maxtime self-test: OK" || {
+    echo "expected 'maxtime self-test: OK', got: $out" >&2
+    exit 1
+}
