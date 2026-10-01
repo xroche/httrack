@@ -3068,25 +3068,10 @@ class Handler(SimpleHTTPRequestHandler):
     def route_xssjob_index(self):
         self.send_html('\t<a href="%s/%s">job</a>\n' % (self.XSS_DIR, self.XSS_NAME))
 
-    # #483: an index 60 bytes under -M400000, so p0's headers cross the cap.
-    DCANCEL_INDEX_BYTES = 400000 - 60
-
+    # #483: trickled .bin pages so the -E stop lands in the type waiter's
+    # unlock-to-patch window with body bytes pending.
     def route_dcancel_index(self):
-        links = "".join('<a href="p%d.bin">p%d</a>\n' % (i, i) for i in range(8))
-        pad = 0
-        for _ in range(4):  # two corrections settle the Content-Length digits
-            body = ("<html><!--%s-->\n%s</html>\n" % ("x" * pad, links)).encode()
-            head = (
-                "HTTP/1.0 200 OK\r\nContent-Type: text/html\r\n"
-                "Content-Length: %d\r\n\r\n" % len(body)
-            ).encode()
-            missing = self.DCANCEL_INDEX_BYTES - len(head) - len(body)
-            if missing == 0:
-                break
-            pad += missing
-        assert missing == 0, "the dcancel index cannot be sized exactly"
-        self.log_request(200)
-        self.wfile.write(head + body)
+        self.send_bin_index()
 
     def route_dcancel_page(self):
         self.send_response(200)
@@ -3102,6 +3087,27 @@ class Handler(SimpleHTTPRequestHandler):
                 time.sleep(0.05)
         except OSError:
             pass
+
+    # #483 via -M: an index 60 bytes under -M50000, so p0's headers cross the
+    # cap, and its 4096-byte body stays within the 5000-byte grace.
+    DCAP_INDEX_BYTES = 50000 - 60
+
+    def route_dcap_index(self):
+        links = "".join('<a href="p%d.bin">p%d</a>\n' % (i, i) for i in range(8))
+        pad = 0
+        for _ in range(4):  # two corrections settle the Content-Length digits
+            body = ("<html><!--%s-->\n%s</html>\n" % ("x" * pad, links)).encode()
+            head = (
+                "HTTP/1.0 200 OK\r\nContent-Type: text/html\r\n"
+                "Content-Length: %d\r\n\r\n" % len(body)
+            ).encode()
+            missing = self.DCAP_INDEX_BYTES - len(head) - len(body)
+            if missing == 0:
+                break
+            pad += missing
+        assert missing == 0, "the dcap index cannot be sized exactly"
+        self.log_request(200)
+        self.wfile.write(head + body)
 
     # -M byte cap (#77): large fast files so a crawl overruns -M immediately.
     BIGFILE_BYTES = 640 * 1024
@@ -3900,6 +3906,15 @@ class Handler(SimpleHTTPRequestHandler):
         DEEPDIR + "/p0.bin": route_trickle_page,
         DEEPDIR + "/p1.bin": route_trickle_page,
         "/dcancel/index.html": route_dcancel_index,
+        "/dcap/index.html": route_dcap_index,
+        "/dcap/p0.bin": route_dcancel_page,
+        "/dcap/p1.bin": route_dcancel_page,
+        "/dcap/p2.bin": route_dcancel_page,
+        "/dcap/p3.bin": route_dcancel_page,
+        "/dcap/p4.bin": route_dcancel_page,
+        "/dcap/p5.bin": route_dcancel_page,
+        "/dcap/p6.bin": route_dcancel_page,
+        "/dcap/p7.bin": route_dcancel_page,
         "/dcancel/p0.bin": route_dcancel_page,
         "/dcancel/p1.bin": route_dcancel_page,
         "/dcancel/p2.bin": route_dcancel_page,

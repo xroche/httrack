@@ -11,4 +11,4 @@ set -euo pipefail
 : "${top_srcdir:=..}"
 
 bash "$top_srcdir/tests/local-crawl.sh" --log-found 'moved placeholder' \
-    httrack 'BASEURL/dcancel/index.html' -M400000 -c1 -Z
+    httrack 'BASEURL/dcap/index.html' -M50000 -c1 -Z
