@@ -8,7 +8,6 @@ set -euo pipefail
 : "${top_srcdir:=..}"
 
 for _ in 1 2; do
-    # -E1 counts whole seconds, so it can stop before index.html is saved
-    bash "$top_srcdir/tests/local-crawl.sh" --host-root-optional \
+    bash "$top_srcdir/tests/local-crawl.sh" \
         httrack 'BASEURL/dcancel/index.html' -E1 -c4 -A25000
 done

@@ -75,7 +75,6 @@ rerun=
 rerun_args=
 rerun_dead=
 no_hostroot=
-hostroot_optional=
 archive_kept=
 archive_replaced=
 archive_min_files=0
@@ -185,8 +184,6 @@ while test "$pos" -lt "$nargs"; do
     --rerun) rerun=1 ;;           # run httrack a second time (update pass) before auditing
     --rerun-dead) rerun_dead=1 ;; # re-run with the server stopped (cache rollback)
     --no-host-root) no_hostroot=1 ;;
-    # the crawl may be stopped before it saves anything
-    --host-root-optional) hostroot_optional=1 ;;
     # the second pass must leave the first pass's archive files untouched
     --archive-kept-on-rerun) archive_kept=1 ;;
     --archive-replaced-on-rerun) archive_replaced=1 ;; # ...or rewrite all of them
@@ -510,7 +507,7 @@ if test -n "$no_hostroot"; then
         }
     done
     result "OK"
-elif test -z "$hostroot_optional"; then
+else
     find_hostroot
     debug "host root: $hostroot"
 fi
