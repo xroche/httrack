@@ -565,6 +565,18 @@ static int look_like_xml(const char *s) {
     ;
 }
 
+/* --max-time counts from this mtime_monotonic() reading. */
+static TStamp mirror_start_ms;
+
+void hts_mirror_clock_start(void) {
+  HTS_STAT.stat_timestart = time_local();
+  mirror_start_ms = mtime_monotonic();
+}
+
+TStamp hts_mirror_elapsed_ms(void) {
+  return mtime_monotonic() - mirror_start_ms;
+}
+
 // Début de httpmirror, robot
 // url1 peut être multiple
 /* Write httpmirror()'s verdict to both the caller's out-parameter and the opt,
@@ -659,7 +671,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
 
   // noter heure actuelle de départ en secondes
   memset(&HTS_STAT, 0, sizeof(HTS_STAT));
-  HTS_STAT.stat_timestart = time_local();
+  hts_mirror_clock_start();
   HTS_STAT.istat_timestart[0] = HTS_STAT.istat_timestart[1] = mtime_monotonic();
   /* reset stats */
   hts_stat_recv_set(0);
@@ -1215,7 +1227,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
 
     // note: recopie de plus haut
     // noter heure actuelle de départ en secondes
-    HTS_STAT.stat_timestart = time_local();
+    hts_mirror_clock_start();
     if (opt->shell) {
       last_info_shell = HTS_STAT.stat_timestart;
     }

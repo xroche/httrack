@@ -836,7 +836,7 @@ struct lien_back {
   char tmpfile_buffer[HTS_URLMAXSIZE * 2]; /**< storage for tmpfile */
   char send_too[1024];    /**< data to send together with the header */
   int status;             /**< -1=unused, 0=ready, >0=operation in progress */
-  int locked;             /**< locked (reserved) */
+  int locked; /**< 0 free to move, 1 locked in memory, 2 pinned (may write) */
   int testmode;           /**< test mode */
   int timeout;            /**< timeout in seconds (0=none) */
   TStamp timeout_refresh; /**< last activity time, for timeout tracking */
