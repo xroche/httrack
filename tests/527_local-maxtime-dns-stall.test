@@ -1,0 +1,59 @@
+#!/bin/bash
+#
+# Issue #1840: a getaddrinfo() that never returns held the engine past
+# --max-time, because the exit waited for its abandoned DNS worker.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+if ! target_is_linux; then
+    skip "maxtime-dns-stall: LD_PRELOAD interposition is Linux-only here"
+fi
+# A --disable-shared build has nothing to preload; anything else missing is a
+# build problem, not a skip, or the leg would pass vacuously.
+if [ ! -r "${GAISTALL_LA:-}" ]; then
+    echo "maxtime-dns-stall: ${GAISTALL_LA:-\$GAISTALL_LA} was not built" >&2
+    exit 1
+fi
+if grep -q "^dlname=''" "$GAISTALL_LA"; then
+    skip "maxtime-dns-stall: static-only build, nothing to preload"
+fi
+if [ ! -r "${GAISTALL_LIB:-}" ]; then
+    echo "maxtime-dns-stall: ${GAISTALL_LIB:-\$GAISTALL_LIB} was not built" >&2
+    exit 1
+fi
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+# The shim allocates nothing, so loading it ahead of libasan is harmless.
+export ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS:}verify_asan_link_order=0"
+
+# The lookup stalls for 120s; --max-time=2 plus the 5s exit grace ends it.
+start=$SECONDS
+rc=0
+GAISTALL=120 LD_PRELOAD="$GAISTALL_LIB" \
+    httrack --quiet --timeout=1 --max-time=2 -O "$dir/o" \
+    "http://127.0.0.1:1/" >"$dir/out" 2>&1 || rc=$?
+elapsed=$((SECONDS - start))
+
+# Teeth: this line is printed only when a worker was still stuck at exit.
+grep -q "Exiting without waiting for engine threads" "$dir/out" ||
+    fail_dump "maxtime-dns-stall: no stuck worker at exit, nothing was tested (rc=$rc)" "$dir/out"
+test "$rc" -eq 0 || fail_dump "maxtime-dns-stall: exit status $rc" "$dir/out"
+test "$elapsed" -lt 30 ||
+    fail_dump "maxtime-dns-stall: exited after ${elapsed}s, past --max-time=2" "$dir/out"
+
+# Control: without --max-time the exit still waits for the worker.
+start=$SECONDS
+GAISTALL=12 LD_PRELOAD="$GAISTALL_LIB" \
+    httrack --quiet --timeout=1 -O "$dir/o2" \
+    "http://127.0.0.1:1/" >"$dir/out2" 2>&1
+elapsed2=$((SECONDS - start))
+if grep -q "Exiting without waiting" "$dir/out2"; then
+    fail_dump "maxtime-dns-stall: abandoned threads with no --max-time" "$dir/out2"
+fi
+test "$elapsed2" -ge 12 ||
+    fail_dump "maxtime-dns-stall: no --max-time, yet exited after ${elapsed2}s" "$dir/out2"
+echo "OK: a stuck getaddrinfo() holds the exit ${elapsed}s under --max-time=2, ${elapsed2}s without"

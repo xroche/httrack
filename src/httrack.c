@@ -61,6 +61,7 @@ static int linput(FILE * fp, char *s, int max);
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
+#include <time.h>
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
 #endif
@@ -265,6 +266,51 @@ static void sig_drain_pending(httrackp *opt) {
 
 static void signal_handlers(void);
 
+/* Seconds the exit wait may outlast what is left of --max-time. */
+#define EXIT_WAIT_GRACE 5
+
+static htsmutex exit_wait_lock = HTSMUTEX_INIT;
+static hts_boolean exit_wait_done = HTS_FALSE;
+/* Kept reachable once abandoned, so a leak checker at exit does not flag it. */
+static httrackp *volatile exit_abandoned_opt = NULL;
+
+/* Runs on its own worker, so it waits for every thread but itself. */
+static void exit_wait_thread(void *arg) {
+  (void) arg;
+  htsthread_wait_n(1);
+  hts_mutexlock(&exit_wait_lock);
+  exit_wait_done = HTS_TRUE;
+  hts_mutexrelease(&exit_wait_lock);
+}
+
+/* Bounded by --max-time plus a grace, because a stuck getaddrinfo() never
+   returns. HTS_FALSE when threads were left running, so opt must stay. */
+static hts_boolean exit_wait_threads(const httrackp *opt) {
+  TStamp left, deadline;
+
+  if (opt->maxtime <= 0 || hts_newthread(exit_wait_thread, NULL) != 0) {
+    htsthread_wait();
+    return HTS_TRUE;
+  }
+  left =
+      (TStamp) opt->maxtime - ((TStamp) time(NULL) - HTS_STAT.stat_timestart);
+  if (left < 0)
+    left = 0;
+  deadline = mtime_local() + (left + EXIT_WAIT_GRACE) * 1000;
+  for (;;) {
+    hts_boolean done;
+
+    hts_mutexlock(&exit_wait_lock);
+    done = exit_wait_done;
+    hts_mutexrelease(&exit_wait_lock);
+    if (done)
+      return HTS_TRUE;
+    if (mtime_local() >= deadline)
+      return HTS_FALSE;
+    Sleep(50);
+  }
+}
+
 #ifdef _WIN32
 /* Windows opens stdout in text mode, so every \n leaves as \r\n. A shell
    reading that pipe sees the CR: MSYS folds it away, a Linux one under WSL2
@@ -349,13 +395,18 @@ int main(int argc, char **argv) {
     fprintf(stderr, "* %s\n", hts_errmsg(opt));
   }
   global_opt = NULL;
-  htsthread_wait(); /* pending threads still read opt */
-  hts_free_opt(opt);
-  hts_uninit();
-
+  /* pending threads still read opt */
+  if (exit_wait_threads(opt)) {
+    hts_free_opt(opt);
+    hts_uninit();
 #ifdef _WIN32
-  WSACleanup();
+    WSACleanup();
 #endif
+  } else {
+    exit_abandoned_opt = opt;
+    fprintf(stderr, "* Exiting without waiting for engine threads still "
+                    "running after --max-time\n");
+  }
 
   return ret;
 }

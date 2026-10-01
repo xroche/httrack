@@ -6,7 +6,7 @@ TESTS = @TESTS_LIST@
 # Committed binary fixture read by 01_zlib-cache-golden.test. List it
 # explicitly: automake does not expand wildcards in EXTRA_DIST, so a glob would
 # silently drop it from the dist tarball and break "make distcheck".
-EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c nobacktrace.c altstackprobe.c nopieprobe.c printnumprobe.c closetrack.c ftpcancel.c stopresume.c seekfail.c pubheaderlayout.c chainplug.c sendheadrefuse.c mirrorverdict.c crawl-test.sh run-all-tests.sh check-network.sh check-test-names.sh \
+EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c gaistall.c nobacktrace.c altstackprobe.c nopieprobe.c printnumprobe.c closetrack.c ftpcancel.c stopresume.c seekfail.c pubheaderlayout.c chainplug.c sendheadrefuse.c mirrorverdict.c crawl-test.sh run-all-tests.sh check-network.sh check-test-names.sh \
 	proxy-https-server.py socks5-server.py proxy-connect-server.py \
 	proxytestlib.py tls-stall-server.py warc-validate.py wacz-validate.py \
 	header-injection-server.py header-injection-check.py \
@@ -94,6 +94,8 @@ TESTS_ENVIRONMENT += UNLINKFAIL_LA=$(abs_builddir)/libunlinkfail.la
 TESTS_ENVIRONMENT += UNLINKFAIL_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/libunlinkfail.so
 TESTS_ENVIRONMENT += THREADATTRFAIL_LA=$(abs_builddir)/libthreadattrfail.la
 TESTS_ENVIRONMENT += THREADATTRFAIL_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/libthreadattrfail.so
+TESTS_ENVIRONMENT += GAISTALL_LA=$(abs_builddir)/libgaistall.la
+TESTS_ENVIRONMENT += GAISTALL_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/libgaistall.so
 TESTS_ENVIRONMENT += NOBACKTRACE_LA=$(abs_builddir)/libnobacktrace.la
 TESTS_ENVIRONMENT += NOBACKTRACE_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/libnobacktrace.so
 TESTS_ENVIRONMENT += ALTSTACKPROBE_LA=$(abs_builddir)/libaltstackprobe.la
@@ -129,7 +131,7 @@ TESTS_ENVIRONMENT += HTTRACK_STDERR_WRAP_EXE=$(abs_builddir)/stderrwrap$(EXEEXT)
 check_LTLIBRARIES = librenamefail.la libunlinkfail.la libthreadattrfail.la \
 	libnobacktrace.la libaltstackprobe.la libclosetrack.la libftpcancel.la \
 	libstopresume.la \
-	libseekfail.la libsendheadrefuse.la
+	libseekfail.la libsendheadrefuse.la libgaistall.la
 librenamefail_la_SOURCES = renamefail.c
 librenamefail_la_LDFLAGS = -module -avoid-version -rpath $(abs_builddir)
 librenamefail_la_LIBADD = $(DL_LIBS)
@@ -143,6 +145,11 @@ libunlinkfail_la_LIBADD = $(DL_LIBS)
 libthreadattrfail_la_SOURCES = threadattrfail.c
 libthreadattrfail_la_LDFLAGS = -module -avoid-version -rpath $(abs_builddir)
 libthreadattrfail_la_LIBADD = $(DL_LIBS)
+
+# getaddrinfo() staller for 527_local-maxtime-dns-stall.test
+libgaistall_la_SOURCES = gaistall.c
+libgaistall_la_LDFLAGS = -module -avoid-version -rpath $(abs_builddir)
+libgaistall_la_LIBADD = $(DL_LIBS)
 
 # backtrace() interposer for 143_engine-backtrace-empty.test
 libnobacktrace_la_SOURCES = nobacktrace.c

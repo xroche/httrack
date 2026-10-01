@@ -6021,8 +6021,8 @@ static void dns_job_release(dns_resolve_job *job) {
   }
 }
 
-/* Outlives a timed-out resolve, so it writes only the job: never opt (freed
-   before the thread wait at exit) nor the DNS cache. */
+/* Outlives a timed-out resolve, so it writes only the job: never opt nor the
+   DNS cache, which the crawl keeps using without it. */
 static void dns_resolve_thread(void *arg) {
   dns_resolve_job *const job = (dns_resolve_job *) arg;
   SOCaddr resolved[HTS_MAXADDRNUM];
