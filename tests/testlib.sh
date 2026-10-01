@@ -781,6 +781,12 @@ shell_is_msys() { test "$(suite_backend)" = msys; }
 # enough, because the wsl2 backend drives a Windows exe from a Linux shell.
 target_is_linux() { test "$HTS_OS" = Linux && ! target_is_windows; }
 
+# Is this bash at least $1.$2?
+bash_at_least() {
+    test "${BASH_VERSINFO[0]}" -gt "$1" ||
+        { test "${BASH_VERSINFO[0]}" -eq "$1" && test "${BASH_VERSINFO[1]}" -ge "$2"; }
+}
+
 # Open the timer fd poll_wait reads from: a fifo held open read-write, so there is
 # always a writer and a read blocks to its own timeout instead of seeing EOF. fd 9
 # is the harness's from here on; no test may hold it open across a poll.
@@ -793,6 +799,8 @@ poll_open() {
     # about is no place to discover how its select() behaves. That tick is a whole
     # second anyway, so there is little to win.
     shell_is_msys && return 0
+    # Below bash 4.3, read -t can lose a child's exit (#1840), so poll_wait forks sleep.
+    bash_at_least 4 3 || return 0
     # Unique: $$ is the same in every subshell, and the loser of a race on one name
     # opens a path that is gone.
     f=$(mktemp -u "${TMPDIR:-/tmp}/.httrack-poll.XXXXXX" 2>/dev/null) || return 0
@@ -817,25 +825,12 @@ poll_open() {
 # HTTRACK_POLL_SLEEP=1 forces the forked tick back, re-read per tick so a test can
 # starve the poll mid-run.
 poll_wait() {
-    local secs=$1 rc=0
+    local rc=0
     test -n "$POLL_STATE" || poll_open
     if test "$POLL_STATE" = fifo && test -z "${HTTRACK_POLL_SLEEP:-}"; then
-        # bash 4.0 is where -t took a fraction; below it, hand a caller asking for
-        # one the sleep it asked for rather than rounding its tick up to a second.
-        if test "${BASH_VERSINFO[0]}" -ge 4; then
-            secs=0.1
-        else
-            case "$secs" in *.*)
-                sleep "$secs"
-                return 0
-                ;;
-            esac
-        fi
-        read -t "$secs" -r -u 9 _ || rc=$?
+        read -t 0.1 -r -u 9 _ || rc=$?
         test "$rc" -le 128 || return 0 # >128 is the timeout we asked for
-        # bash 4.0 is also where a timeout started reporting >128; 3.2 says 1, which is
-        # what a closed fd says everywhere. Ask the fd itself rather than the status,
-        # or macOS retires its timer on the first tick and forks for the whole run.
+        # Anything else is data, EOF or an error, so ask the fd whether it still works.
         # `true`, not `:`: a redirection error on a POSIX special builtin exits the
         # shell, which POSIXLY_CORRECT in the environment is enough to turn on.
         if { true >&9; } 2>/dev/null; then return 0; fi
