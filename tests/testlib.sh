@@ -782,7 +782,7 @@ shell_is_msys() { test "$(suite_backend)" = msys; }
 target_is_linux() { test "$HTS_OS" = Linux && ! target_is_windows; }
 
 # Is this bash at least $1.$2?
-bash_at_least() { # bash_at_least MAJOR MINOR
+bash_at_least() {
     test "${BASH_VERSINFO[0]}" -gt "$1" ||
         { test "${BASH_VERSINFO[0]}" -eq "$1" && test "${BASH_VERSINFO[1]}" -ge "$2"; }
 }
@@ -799,8 +799,7 @@ poll_open() {
     # about is no place to discover how its select() behaves. That tick is a whole
     # second anyway, so there is little to win.
     shell_is_msys && return 0
-    # Below bash 4.3, read -t longjmps out of its alarm handler, which can land
-    # mid-reap and lose a child's exit (#1840): a crawl then looks wedged or never ends.
+    # Below bash 4.3, read -t can lose a child's exit (#1840), so poll_wait forks sleep.
     bash_at_least 4 3 || return 0
     # Unique: $$ is the same in every subshell, and the loser of a race on one name
     # opens a path that is gone.

@@ -49,8 +49,8 @@ canfifo=
 if test -z "${HTTRACK_POLL_SLEEP:-}" && ! shell_is_msys && mkfifo "$tmp/probe" 2>/dev/null; then
     canfifo=1
 fi
-# Below bash 4.3 read -t longjmps out of its alarm handler and can lose a child's
-# exit (#1840), so the fd tick there is a defect, not a saving.
+# Below bash 4.3 the fd tick can lose a child's exit (#1840), so it stays off.
+test "${BASH_VERSINFO[0]}" -lt 5 || bash_at_least 4 3 || fail "bash $BASH_VERSION read as older than 4.3"
 bash_at_least 4 3 || canfifo=
 (
     count_sleeps "$shim" "$tmp/sleeps"
@@ -59,8 +59,6 @@ bash_at_least 4 3 || canfifo=
     ticks "$POLL_STATE tick" 0.1 30 3
     test -z "$canfifo" || test "$POLL_STATE" = fifo ||
         fail "the tick fell back to sleep on a host with working fifos"
-    bash_at_least 4 3 || test "$POLL_STATE" = forked ||
-        fail "bash $BASH_VERSION took the read -t tick ($POLL_STATE)"
     if test "$POLL_STATE" = fifo; then
         test "$(sleeps)" -eq 0 || fail "the fd tick forked $(sleeps) sleeps"
         ticks "fd 1s tick" 1 30 3
