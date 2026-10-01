@@ -63,8 +63,9 @@ Please visit our Website: http://www.httrack.com
 #define HTS_FTRUNCATE(fp, sz) ftruncate(fileno(fp), (sz))
 #endif
 
-/* Subdirectory holding a mirrored file's temporaries, beside it. url_savename()
-   maps '~' to '_', so no URL can ever be mirrored inside it (#774, #842). */
+/* Subdirectory for temporaries, beside a mirrored file or at the mirror root.
+   url_savename() maps '~' to '_', so no URL can be mirrored inside it (#774).
+ */
 #define HTS_TMPDIR "~hts-tmp"
 
 /* Slot operations */
@@ -72,9 +73,8 @@ static hts_boolean back_tmpname(char *dest, size_t size, const char *save,
                                 const char *ext);
 
 hts_boolean back_spoolname(httrackp *opt, char *dest, size_t size) {
-  /* One directory at the mirror root, so a reply that is never saved leaves no
-     empty directory for its URL. No separator: path_html_utf8 brings its own,
-     and is "" with no -O, where an added one would spool into the root. */
+  /* At the mirror root, so a reply never saved leaves no empty directory.
+     path_html_utf8 brings its own separator, and is "" with no -O. */
   if (!slprintfbuff(dest, size, "%s" HTS_TMPDIR "/tmpfile%d.tmp",
                     StringBuff(opt->path_html_utf8), opt->state.tmpnameid++)) {
     dest[0] = '\0';
@@ -660,7 +660,7 @@ int back_cleanup_background(httrackp * opt, cache_back * cache,
 #ifndef HTS_NO_BACK_ON_DISK
       /* temporarily serialize the entry on disk */
       {
-        /* +32: room for the directory and extension back_spoolname() inserts */
+        /* +32: room for ~hts-tmp/tmpfileN.tmp */
         char BIGSTK tmpname[HTS_URLMAXSIZE * 2 + 32];
         char *filename;
         const hts_boolean named = back_spoolname(opt, tmpname, sizeof(tmpname));

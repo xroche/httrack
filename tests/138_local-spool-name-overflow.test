@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# A frozen backlog slot spools to disk under a path_html-derived name when -p0
-# is in force, into a buffer sized from the save name instead; -N '%n' shortens
-# the save name enough to overrun it. -Z pins that a slot really was spooled,
+# A frozen backlog slot spools to disk under a path_html-derived name, into a
+# buffer once sized from the save name. -N '%n' shortens the save name enough
+# to overrun it. -Z pins that a slot really was spooled,
 # so a build with neither fortify nor ASan still tests something.
 
 set -e

@@ -178,10 +178,9 @@ hts_boolean back_finalize_backup(httrackp *opt, lien_back *const back,
 /* Remove the reserved directory a temporary sat in, once the last slot sharing
    it is done; a non-empty one just refuses. No-op outside that directory. */
 void back_tmpdir_drop(const char *tmp);
-/* Name the spool file of a frozen backlog slot, in the reserved directory at
-   the mirror root that no save name can spell. Consumes an
-   opt->state.tmpnameid. HTS_FALSE (dest emptied) if it would not fit.
-   Note: utf-8. */
+/* Name the spool file of a frozen backlog slot, in ~hts-tmp at the mirror
+   root. Consumes an opt->state.tmpnameid. HTS_FALSE (dest emptied) if it would
+   not fit. Note: utf-8. */
 hts_boolean back_spoolname(httrackp *opt, char *dest, size_t size);
 /* -#test=backswap: slots eligible for the on-disk ready table. */
 int back_selftest_slot_swap(void);

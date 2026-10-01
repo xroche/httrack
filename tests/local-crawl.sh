@@ -56,7 +56,7 @@
 # --plant-file/--plant-dir drop a regular file (holding $plant_poison) or a
 # directory at PATH under the host root between the passes, to hand the second
 # pass leftovers a killed run would have left (#758).
-# --no-host-root asserts the crawl saved nothing, not even an empty host root.
+# --no-host-root asserts the crawl created no host root directory.
 
 set -u
 

@@ -1392,8 +1392,7 @@ static int st_refetchbackup(httrackp *opt, int argc, char **argv) {
 }
 
 // -#test=spoolname <dir>: a frozen backlog slot spools into the mirror root's
-// ~hts-tmp, never beside its save name, where a site serving <path>.tmp
-// collides (#859) and a reply never saved leaves an empty directory behind.
+// ~hts-tmp, never beside its save name where a <path>.tmp collides (#859).
 static int st_spoolname(httrackp *opt, int argc, char **argv) {
   char BIGSTK got[HTS_URLMAXSIZE * 2 + 32];
   char BIGSTK want[HTS_URLMAXSIZE * 2 + 32];
