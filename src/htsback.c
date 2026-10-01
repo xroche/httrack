@@ -3965,10 +3965,10 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 #if HTS_DIRECTDISK
           // Shortcut: store the file directly on disk when possible,
           // sparing memory
+          // (a locked slot keeps its body in memory, a pinned one may stream
+          // it)
           if (back[i].status &&
-              (back[i].locked == 0 ||
-               back[i].locked ==
-                   BACK_PINNED)) {              // a locked body stays in memory
+              (back[i].locked == 0 || back[i].locked == BACK_PINNED)) {
             if (back[i].r.is_write == 0) {      // mode mémoire
               if (back[i].r.adr == NULL) {      // rien n'a été écrit
                 if (!back[i].testmode) {        // pas mode test
