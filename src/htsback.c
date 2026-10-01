@@ -3967,7 +3967,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
           // sparing memory
           if (back[i].status &&
               (back[i].locked == 0 ||
-               back[i].locked == BACK_PINNED)) { // name pending when locked
+               back[i].locked ==
+                   BACK_PINNED)) {              // a locked body stays in memory
             if (back[i].r.is_write == 0) {      // mode mémoire
               if (back[i].r.adr == NULL) {      // rien n'a été écrit
                 if (!back[i].testmode) {        // pas mode test
