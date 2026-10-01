@@ -1,14 +1,23 @@
 #!/bin/bash
 #
 # Cancelled delayed-type-checks must not orphan .delayed placeholders (#483).
-# Timing-dependent (hence two tries); -A keeps the window reachable. The
-# window sits just after the index is parsed, and -E1 can stop before that.
+# Timing-dependent (hence two crawls); -A keeps the window reachable.
+# -E1 can stop before the index is saved, so such a crawl does not count.
 
 set -euo pipefail
 
 : "${top_srcdir:=..}"
 
-for _ in 1 2; do
-    bash "$top_srcdir/tests/local-crawl.sh" --host-root-optional \
-        httrack 'BASEURL/dcancel/index.html' -E1 -c4 -A25000
+saved=0
+for _ in 1 2 3 4 5 6; do
+    out=$(bash "$top_srcdir/tests/local-crawl.sh" --host-root-optional \
+        httrack 'BASEURL/dcancel/index.html' -E1 -c4 -A25000 2>&1) || {
+        printf '%s\n' "$out"
+        exit 1
+    }
+    printf '%s\n' "$out"
+    grep -q 'no host root' <<<"$out" || saved=$((saved + 1))
+    test "$saved" -lt 2 || exit 0
 done
+echo "only ${saved} of 6 crawls saved anything" >&2
+exit 1

@@ -115,6 +115,7 @@ function purge_tmpdir {
 hostroot=
 function lookup_hostroot {
     local cand
+    hostroot=
     for cand in "${mirrorroot}/127.0.0.1_${port}" "${mirrorroot}/127.0.0.1"; do
         if test -d "$cand"; then
             hostroot="$cand"
