@@ -312,6 +312,16 @@ static hts_boolean st_spool_plant(const char *path) {
   return fclose(fp) == 0 ? HTS_TRUE : HTS_FALSE;
 }
 
+/* As pid 1, init's file is our own, so the sweep rightly removes it. */
+static hts_boolean st_spool_keep_applies(const char *name) {
+#ifndef _WIN32
+  if (getpid() == 1 && strcmp(name, "tmpfile1-0.tmp") == 0)
+    return HTS_FALSE;
+#endif
+  (void) name;
+  return HTS_TRUE;
+}
+
 // -#test=spoolsweep <dir>: startup removes the spool of a dead process only.
 static int st_spoolsweep(httrackp *opt, int argc, char **argv) {
   /* no process has this pid on any platform */
@@ -324,6 +334,8 @@ static int st_spoolsweep(httrackp *opt, int argc, char **argv) {
       "tmpfile2147483646-.tmp",   /* no counter */
 #if ULONG_MAX == 0xfffffffful
       "tmpfile6442450942-1.tmp", /* would wrap to 2147483646 */
+#else
+      "tmpfile18446744075857035262-1.tmp", /* would wrap to 2147483646 */
 #endif
 #ifdef _WIN32
       "tmpfile4-0.tmp", /* System: always running */
@@ -365,6 +377,8 @@ static int st_spoolsweep(httrackp *opt, int argc, char **argv) {
   if (!st_spool_plant(path))
     return 1;
   for (i = 0; i < sizeof(keep) / sizeof(keep[0]); i++) {
+    if (!st_spool_keep_applies(keep[i]))
+      continue;
     snprintf(path, sizeof(path), "%s~hts-tmp/%s", base, keep[i]);
     if (!st_spool_plant(path))
       return 1;
@@ -386,6 +400,8 @@ static int st_spoolsweep(httrackp *opt, int argc, char **argv) {
     err++;
   }
   for (i = 0; i < sizeof(keep) / sizeof(keep[0]); i++) {
+    if (!st_spool_keep_applies(keep[i]))
+      continue;
     snprintf(path, sizeof(path), "%s~hts-tmp/%s", base, keep[i]);
     if (!fexist_utf8(path)) {
       fprintf(stderr, "spoolsweep: %s was removed\n", keep[i]);
