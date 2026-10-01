@@ -56,6 +56,8 @@
 # --plant-file/--plant-dir drop a regular file (holding $plant_poison) or a
 # directory at PATH under the host root between the passes, to hand the second
 # pass leftovers a killed run would have left (#758).
+# --host-root-optional: the crawl saves nothing, so the host root may not exist.
+# Only the checks that read the host root then require it.
 
 set -u
 
@@ -73,6 +75,7 @@ outdir_intl=
 rerun=
 rerun_args=
 rerun_dead=
+hostroot_optional=
 archive_kept=
 archive_replaced=
 archive_min_files=0
@@ -181,6 +184,7 @@ while test "$pos" -lt "$nargs"; do
     --debug) verbose=1 ;;
     --rerun) rerun=1 ;;           # run httrack a second time (update pass) before auditing
     --rerun-dead) rerun_dead=1 ;; # re-run with the server stopped (cache rollback)
+    --host-root-optional) hostroot_optional=1 ;;
     # the second pass must leave the first pass's archive files untouched
     --archive-kept-on-rerun) archive_kept=1 ;;
     --archive-replaced-on-rerun) archive_replaced=1 ;; # ...or rewrite all of them
@@ -495,7 +499,7 @@ if test -n "$rerun_dead"; then
 fi
 
 # --- discover the single host root (127.0.0.1_<port> or 127.0.0.1) -----------
-find_hostroot
+test -n "$hostroot_optional" || find_hostroot
 debug "host root: $hostroot"
 
 # --- optional WARC validation (stdlib validator, no warcio) ------------------
@@ -621,6 +625,12 @@ fi
 # --- audit -------------------------------------------------------------------
 i=0
 while test "$i" -lt "${#audit[@]}"; do
+    case "${audit[$i]}" in
+    --found | --not-found | --directory | --max-mirror-bytes | --min-mirror-bytes | \
+        --file-matches | --file-not-matches | --files-identical | --file-min-bytes | --file-mode)
+        test -n "$hostroot" || find_hostroot
+        ;;
+    esac
     case "${audit[$i]}" in
     --errors)
         i=$((i + 1))
