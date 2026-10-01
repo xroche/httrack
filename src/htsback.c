@@ -64,8 +64,7 @@ Please visit our Website: http://www.httrack.com
 #endif
 
 /* Subdirectory for temporaries, beside a mirrored file or at the mirror root.
-   url_savename() maps '~' to '_', so no URL can be mirrored inside it (#774).
- */
+   url_savename() maps '~' to '_', so no URL lands inside it (#774). */
 #define HTS_TMPDIR "~hts-tmp"
 
 /* Slot operations */
