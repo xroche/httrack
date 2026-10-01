@@ -5239,11 +5239,17 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
 
           /* If we are done, do additional checks with final type and authorizations */
           if (!continue_loop) {
-            /* Recompute filename with MIME type */
+            /* Recompute filename with MIME type. Hold the slot: after a stop
+               url_savename pumps sockets, which must not write or store it
+               under the placeholder name (#483). */
             afs->save[0] = '\0';
+            if (b >= 0)
+              back_set_locked(sback, b);
             url_savename(afs, former,
                          heap(ptr)->adr, heap(ptr)->fil, opt,
                          sback, cache, hash, ptr, numero_passe, &delayed_back);
+            if (b >= 0)
+              back_set_unlocked(sback, b);
 
             /* Recompute authorization with MIME type */
             {

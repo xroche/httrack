@@ -3069,11 +3069,21 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_html('\t<a href="%s/%s">job</a>\n' % (self.XSS_DIR, self.XSS_NAME))
 
     # #483: trickled .bin pages so the -E stop lands in the type waiter's
-    # unlock-to-patch window with body bytes pending.
+    # unlock-to-patch window with body bytes pending. The headers go out just
+    # past -E1, counted from the index request, so they reach the engine in the
+    # same poll that crosses the cap.
+    DCANCEL_HEADERS_AT = 1.005
+    dcancel_index_at = None
+
     def route_dcancel_index(self):
+        type(self).dcancel_index_at = time.monotonic()
         self.send_bin_index()
 
     def route_dcancel_page(self):
+        if self.dcancel_index_at is not None:
+            wait = self.dcancel_index_at + self.DCANCEL_HEADERS_AT - time.monotonic()
+            if wait > 0:
+                time.sleep(wait)
         self.send_response(200)
         self.send_header("Content-Type", "application/octet-stream")
         self.send_header("Content-Length", "4096")
