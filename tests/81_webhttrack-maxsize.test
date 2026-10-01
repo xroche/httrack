@@ -75,9 +75,9 @@ htsserver_cleanup_dir "${work}"
 crawl() {
     bash "${HTS_DISTDIR}/tests/local-crawl.sh" "$@"
 }
-crawl --errors 1 --log-found 'File too big' \
+crawl --errors 1 --no-host-root --log-found 'File too big' \
     httrack 'BASEURL/simple/basic.html' '--max-files=,10'
-crawl --errors 1 --log-found 'File too big' \
+crawl --errors 1 --no-host-root --log-found 'File too big' \
     httrack 'BASEURL/simple/basic.html' '--max-files=500000' '--max-files=,10'
 crawl --errors 0 --found 'simple/basic.html' --log-not-found 'File too big' \
     httrack 'BASEURL/simple/basic.html' '--max-files=,10' '--max-files=500000'

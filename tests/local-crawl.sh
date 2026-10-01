@@ -56,8 +56,7 @@
 # --plant-file/--plant-dir drop a regular file (holding $plant_poison) or a
 # directory at PATH under the host root between the passes, to hand the second
 # pass leftovers a killed run would have left (#758).
-# --host-root-optional: the crawl saves nothing, so the host root may not exist.
-# Only the checks that read the host root then require it.
+# --no-host-root asserts the crawl saved nothing, not even an empty host root.
 
 set -u
 
@@ -75,7 +74,7 @@ outdir_intl=
 rerun=
 rerun_args=
 rerun_dead=
-hostroot_optional=
+no_hostroot=
 archive_kept=
 archive_replaced=
 archive_min_files=0
@@ -184,7 +183,7 @@ while test "$pos" -lt "$nargs"; do
     --debug) verbose=1 ;;
     --rerun) rerun=1 ;;           # run httrack a second time (update pass) before auditing
     --rerun-dead) rerun_dead=1 ;; # re-run with the server stopped (cache rollback)
-    --host-root-optional) hostroot_optional=1 ;;
+    --no-host-root) no_hostroot=1 ;;
     # the second pass must leave the first pass's archive files untouched
     --archive-kept-on-rerun) archive_kept=1 ;;
     --archive-replaced-on-rerun) archive_replaced=1 ;; # ...or rewrite all of them
@@ -499,8 +498,19 @@ if test -n "$rerun_dead"; then
 fi
 
 # --- discover the single host root (127.0.0.1_<port> or 127.0.0.1) -----------
-test -n "$hostroot_optional" || find_hostroot
-debug "host root: $hostroot"
+if test -n "$no_hostroot"; then
+    info "checking no host root was created"
+    for cand in "${mirrorroot}/127.0.0.1_${port}" "${mirrorroot}/127.0.0.1"; do
+        test ! -e "$cand" || {
+            result "found $cand"
+            exit 1
+        }
+    done
+    result "OK"
+else
+    find_hostroot
+    debug "host root: $hostroot"
+fi
 
 # --- optional WARC validation (stdlib validator, no warcio) ------------------
 # WARC_VALIDATE_BODY="URLSUB=HEX" byte-checks a fresh-crawl response body;

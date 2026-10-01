@@ -1391,12 +1391,14 @@ static int st_refetchbackup(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
-// -#test=spoolname <dir>: a frozen backlog slot must spool inside ~hts-tmp, not
-// beside the mirrored file where a site serving <path>.tmp collides (#859).
+// -#test=spoolname <dir>: a frozen backlog slot spools into the mirror root's
+// ~hts-tmp, never beside its save name, where a site serving <path>.tmp
+// collides (#859) and a reply never saved leaves an empty directory behind.
 static int st_spoolname(httrackp *opt, int argc, char **argv) {
   char BIGSTK got[HTS_URLMAXSIZE * 2 + 32];
   char BIGSTK want[HTS_URLMAXSIZE * 2 + 32];
-  char BIGSTK save[HTS_URLMAXSIZE * 2];
+  char BIGSTK base[HTS_URLMAXSIZE * 2];
+  int getmode;
   int err = 0;
 
   if (argc < 1) {
@@ -1404,45 +1406,21 @@ static int st_spoolname(httrackp *opt, int argc, char **argv) {
     return 1;
   }
 
-  /* named: the spool lands in the save name's own ~hts-tmp, which no URL can
-     spell since url_savename() maps '~' to '_' */
-  snprintf(save, sizeof(save), "%s/sub/page.html", argv[0]);
-  snprintf(want, sizeof(want), "%s/sub/~hts-tmp/page.html.tmp", argv[0]);
-  opt->getmode = 1;
-  if (!back_spoolname(opt, save, got, sizeof(got))) {
-    fprintf(stderr, "spoolname: naming failed for %s\n", save);
-    err++;
-  } else if (strcmp(got, want) != 0) {
-    fprintf(stderr, "spoolname: got %s, want %s\n", got, want);
-    err++;
-  }
-
-  /* pin the pre-#859 name as forbidden too: a site serving sub/page.html.tmp
-     was mirrored straight onto it */
-  snprintf(want, sizeof(want), "%s.tmp", save);
-  if (strcmp(got, want) == 0) {
-    fprintf(stderr, "spoolname: still spooling into the mirror namespace\n");
-    err++;
-  }
-
-  /* -p0 keeps no save name, so the spool counts inside path_html's ~hts-tmp */
-  {
-    char BIGSTK base[HTS_URLMAXSIZE * 2];
-
-    snprintf(base, sizeof(base), "%s/", argv[0]);
-    StringCopy(opt->path_html_utf8, base);
-    opt->getmode = 0;
+  snprintf(base, sizeof(base), "%s/", argv[0]);
+  StringCopy(opt->path_html_utf8, base);
+  for (getmode = 0; getmode <= 1; getmode++) {
+    opt->getmode = getmode;
     opt->state.tmpnameid = 7;
     snprintf(want, sizeof(want), "%s/~hts-tmp/tmpfile7.tmp", argv[0]);
-    if (!back_spoolname(opt, "", got, sizeof(got))) {
-      fprintf(stderr, "spoolname: naming failed under -p0\n");
+    if (!back_spoolname(opt, got, sizeof(got))) {
+      fprintf(stderr, "spoolname: naming failed with -p%d\n", getmode);
       err++;
     } else if (strcmp(got, want) != 0) {
-      fprintf(stderr, "spoolname: -p0 got %s, want %s\n", got, want);
+      fprintf(stderr, "spoolname: -p%d got %s, want %s\n", getmode, got, want);
       err++;
     }
     if (opt->state.tmpnameid != 8) {
-      fprintf(stderr, "spoolname: -p0 did not consume a tmpnameid\n");
+      fprintf(stderr, "spoolname: -p%d did not consume a tmpnameid\n", getmode);
       err++;
     }
   }
@@ -1450,9 +1428,8 @@ static int st_spoolname(httrackp *opt, int argc, char **argv) {
   /* with no -O, path_html_utf8 is empty and the spool must stay relative to
      the working directory; a separator of our own would put it in / */
   StringCopy(opt->path_html_utf8, "");
-  opt->getmode = 0;
   opt->state.tmpnameid = 0;
-  if (!back_spoolname(opt, "", got, sizeof(got))) {
+  if (!back_spoolname(opt, got, sizeof(got))) {
     fprintf(stderr, "spoolname: naming failed with no output directory\n");
     err++;
   } else if (strcmp(got, "~hts-tmp/tmpfile0.tmp") != 0) {
@@ -1463,8 +1440,7 @@ static int st_spoolname(httrackp *opt, int argc, char **argv) {
 
   /* too long must empty dest, not hand back a truncated name landing
      somewhere real */
-  opt->getmode = 1;
-  if (back_spoolname(opt, save, got, 8) || got[0] != '\0') {
+  if (back_spoolname(opt, got, 8) || got[0] != '\0') {
     fprintf(stderr, "spoolname: an overlong name was not rejected\n");
     err++;
   }
@@ -1705,7 +1681,8 @@ const struct selftest_entry selftests_io[] = {
      "the re-fetch backup always leaves a copy, and stays out of the mirror",
      st_refetchbackup},
     {"spoolname", "<dir>",
-     "a frozen backlog slot spools outside the mirror namespace", st_spoolname},
+     "a frozen backlog slot spools into the mirror root's ~hts-tmp",
+     st_spoolname},
     {"direnum", "<dir>",
      "enumerate a long+non-ASCII directory through opendir/readdir",
      st_direnum},

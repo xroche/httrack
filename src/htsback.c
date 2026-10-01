@@ -71,21 +71,16 @@ Please visit our Website: http://www.httrack.com
 static hts_boolean back_tmpname(char *dest, size_t size, const char *save,
                                 const char *ext);
 
-hts_boolean back_spoolname(httrackp *opt, const char *save, char *dest,
-                           size_t size) {
-  /* -p0 keeps no save name to derive from, so it counts instead. No separator:
-     path_html_utf8 brings its own, and is "" with no -O, where an added one
-     would make this absolute and spool into the filesystem root. */
-  if (opt->getmode == 0) {
-    if (!slprintfbuff(dest, size, "%s" HTS_TMPDIR "/tmpfile%d.tmp",
-                      StringBuff(opt->path_html_utf8),
-                      opt->state.tmpnameid++)) {
-      dest[0] = '\0';
-      return HTS_FALSE;
-    }
-    return HTS_TRUE;
+hts_boolean back_spoolname(httrackp *opt, char *dest, size_t size) {
+  /* One directory at the mirror root, so a reply that is never saved leaves no
+     empty directory for its URL. No separator: path_html_utf8 brings its own,
+     and is "" with no -O, where an added one would spool into the root. */
+  if (!slprintfbuff(dest, size, "%s" HTS_TMPDIR "/tmpfile%d.tmp",
+                    StringBuff(opt->path_html_utf8), opt->state.tmpnameid++)) {
+    dest[0] = '\0';
+    return HTS_FALSE;
   }
-  return back_tmpname(dest, size, save, "tmp");
+  return HTS_TRUE;
 }
 static int slot_can_be_cached_on_disk(const lien_back * back);
 static int slot_can_be_cleaned(const lien_back * back);
@@ -668,8 +663,7 @@ int back_cleanup_background(httrackp * opt, cache_back * cache,
         /* +32: room for the directory and extension back_spoolname() inserts */
         char BIGSTK tmpname[HTS_URLMAXSIZE * 2 + 32];
         char *filename;
-        const hts_boolean named =
-            back_spoolname(opt, back[i].url_sav, tmpname, sizeof(tmpname));
+        const hts_boolean named = back_spoolname(opt, tmpname, sizeof(tmpname));
         filename = named ? strdupt(tmpname) : NULL;
 
         if (filename != NULL) {

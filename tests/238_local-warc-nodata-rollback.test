@@ -8,6 +8,6 @@ set -eu
 
 : "${top_srcdir:=..}"
 
-bash "$top_srcdir/tests/local-crawl.sh" --errors 1 --host-root-optional --archive-kept-on-rerun \
+bash "$top_srcdir/tests/local-crawl.sh" --errors 1 --no-host-root --archive-kept-on-rerun \
     --archive-min-files 2 --rerun-args '-C0' \
     httrack 'BASEURL/nosuch/page.html' --warc-file warc-out --warc-cdx

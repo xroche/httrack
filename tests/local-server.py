@@ -3155,12 +3155,6 @@ class Handler(SimpleHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(body)
 
-    # A 404 that reaches httrack only after its parser is done, so the engine
-    # never spools it to disk and creates no host directory (530).
-    def route_late_404(self):
-        time.sleep(1)
-        self.send_html("\tlate 404", status=404, extra_status="Not Found")
-
     # --changes (#714). Every route answers 200 with no validators, so the
     # transfer signal alone would call the whole site changed on pass 2; only a
     # payload comparison can tell stable.html and stable.bin from moved.*.
@@ -3965,7 +3959,6 @@ class Handler(SimpleHTTPRequestHandler):
         "/errmask/keep.dat": route_errmask_keep,
         "/errmask/empty.dat": route_errmask_empty,
         "/maxrecv/index.html": route_maxrecv_index,
-        "/late404/page.html": route_late_404,
         "/maxrecv/r0.bin": route_maxrecv_404,
         "/maxrecv/r1.bin": route_maxrecv_404,
         "/maxrecv/r2.bin": route_maxrecv_404,
