@@ -73,6 +73,8 @@ wait $! || true
 ( false; true ) # hit: subshell
 subshell_ok oops
 ( false; true ) || ok=1 # hit: set -e is off inside a subshell left of && or ||
+( false; true ) || rc=$? other=1 # hit: set -e is off inside a subshell left of && or ||
+( false; true ) || echo rc=$? # hit: set -e is off inside a subshell left of && or ||
 echo |& ( false ) # hit: pipeline ending in a Subshell
 echo | # hit: pipeline ending in a Subshell
     ( false )
