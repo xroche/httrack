@@ -49,26 +49,24 @@ canfifo=
 if test -z "${HTTRACK_POLL_SLEEP:-}" && ! shell_is_msys && mkfifo "$tmp/probe" 2>/dev/null; then
     canfifo=1
 fi
+# Below bash 4.3 read -t longjmps out of its alarm handler and can lose a child's
+# exit (#1840), so the fd tick there is a defect, not a saving.
+bash_at_least 4 3 || canfifo=
 (
     count_sleeps "$shim" "$tmp/sleeps"
     poll_wait 0.1 # settles POLL_STATE before the count
-    echo "poll tick: $POLL_STATE"
+    echo "poll tick: $POLL_STATE (bash $BASH_VERSION)"
     ticks "$POLL_STATE tick" 0.1 30 3
     test -z "$canfifo" || test "$POLL_STATE" = fifo ||
         fail "the tick fell back to sleep on a host with working fifos"
+    bash_at_least 4 3 || test "$POLL_STATE" = forked ||
+        fail "bash $BASH_VERSION took the read -t tick ($POLL_STATE)"
     if test "$POLL_STATE" = fifo; then
-        if test "${BASH_VERSINFO[0]}" -ge 4; then
-            test "$(sleeps)" -eq 0 || fail "the fd tick forked $(sleeps) sleeps"
-        else
-            # No fractional read -t below bash 4, so the documented fallback is the sleep asked for.
-            test "$(sleeps)" -eq 30 || fail "bash ${BASH_VERSINFO[0]} forked $(sleeps) of 30 fractional ticks"
-        fi
-        # The whole-second tick every watchdog runs on must take the fd on every bash:
-        # where a fraction cannot, it is the only win left. Sized for ~3s either way,
-        # bash 4 shortening its own wait to 0.1s.
-        if test "${BASH_VERSINFO[0]}" -ge 4; then n=30; else n=3; fi
-        ticks "fd 1s tick" 1 "$n" 3
+        test "$(sleeps)" -eq 0 || fail "the fd tick forked $(sleeps) sleeps"
+        ticks "fd 1s tick" 1 30 3
         test "$(sleeps)" -eq 0 || fail "the 1s fd tick forked $(sleeps) sleeps"
+    else
+        test "$(sleeps)" -eq 30 || fail "the forked tick forked $(sleeps) of 30 sleeps"
     fi
     # Forced back to sleep(1), which is the only tick a shimmed sleep can reach.
     # POLL_STATE is left as it settled: a run already on the fd must give it up
@@ -76,8 +74,7 @@ fi
     export HTTRACK_POLL_SLEEP=1
     ticks "forced sleep tick" 0.1 30 3
     test "$(sleeps)" -eq 30 || fail "HTTRACK_POLL_SLEEP did not fork a sleep per tick"
-    # A timer fd that stops timing out must fall back, not spin. Whole seconds: a
-    # fraction never reaches the fd below bash 4.
+    # A timer fd that stops timing out must fall back, not spin.
     unset HTTRACK_POLL_SLEEP # the fd is what is under test here, not the override
     POLL_STATE=fifo
     exec 9<&-
@@ -85,7 +82,7 @@ fi
     poll_wait 1 2>/dev/null
     test -s "$tmp/sleeps" || fail "a dead timer fd did not fall back to sleep"
     test "$POLL_STATE" = forked || fail "a dead timer fd was kept ($POLL_STATE)"
-)
+) || exit 1 # bash 3.2 errexit ignores a failing subshell
 
 # --- the port wait outlasts a slow announcement ------------------------------
 # A cold Python start lags seconds on a loaded runner, so falling through early

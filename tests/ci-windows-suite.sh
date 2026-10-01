@@ -625,10 +625,7 @@ esac
 # wait -n is bash 4.3, and macOS drives this script under 3.2
 # (172_ci-windows-driver.test): with no way to wait for a free slot, run serially.
 pool=
-if test "${BASH_VERSINFO[0]}" -gt 4 ||
-    { test "${BASH_VERSINFO[0]}" -eq 4 && test "${BASH_VERSINFO[1]}" -ge 3; }; then
-    pool=1
-fi
+! bash_at_least 4 3 || pool=1
 test -n "$pool" || jobs=1
 # kill_tree's last-resort sweep (testlib.sh) kills every engine and every python
 # on the host, so it is sound only while one test is in flight.
