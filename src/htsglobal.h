@@ -44,8 +44,8 @@ Please visit our Website: http://www.httrack.com
    shape-free short form used in the User-Agent and the mirrored-page footer.
    None of them is the library ABI version, which is VERSION_INFO in
    configure.ac. */
-#define HTTRACK_VERSION "3.50-4"
-#define HTTRACK_VERSIONID "3.50.4"
+#define HTTRACK_VERSION "3.50-5"
+#define HTTRACK_VERSIONID "3.50.5"
 #define HTTRACK_AFF_VERSION "3.x"
 /* Nothing in the engine reads this one. */
 #define HTTRACK_LIB_VERSION "2.0"
