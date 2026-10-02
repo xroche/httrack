@@ -58,9 +58,9 @@
         <ul>
           <li>Pages are no longer saved outside the mirror folder, whatever name a plugin or a cache file gives them</li>
           <li>Stopping a mirror is more reliable: Ctrl+C no longer hangs, and the time limit is kept even when a host name lookup is stuck</li>
-          <li>A mirror no longer gains empty folders for pages that failed, or temporary files from a run that was stopped</li>
+          <li>A mirror no longer gains empty folders for pages that failed, and the next run removes temporary files that a stopped run left</li>
           <li>The size limit holds when several FTP downloads run at once</li>
-          <li>Stylesheets that use image-url() keep working in the mirror</li>
+          <li>Stylesheets that use image-url() no longer make httrack download files the browser never loads</li>
         </ul>
       </description>
     </release>
