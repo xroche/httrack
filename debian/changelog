@@ -1,3 +1,12 @@
+httrack (3.50.5-1) unstable; urgency=medium
+
+  * New upstream release, with security and robustness fixes.  Full list in
+    history.txt.
+  * It builds on hurd-amd64 and hurd-i386 again.  3.50.4's SIGPIPE self-test
+    failed there, because it waited for an answer that pfinet never sends.
+
+ -- Xavier Roche <xavier@debian.org>  Fri, 02 Oct 2026 12:41:29 +0200
+
 httrack (3.50.4-1) unstable; urgency=medium
 
   * New upstream release, mostly parser fixes.  It builds on GNU/Hurd again,

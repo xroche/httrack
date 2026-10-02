@@ -4,6 +4,30 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack
 
+3.50-5
++ Fixed: a savename hook could put a page outside the mirror by returning a name that is absolute or carries "..". The engine keeps its own name then, and logs a warning (#1826)
++ Fixed: a save name read back from the cache could point outside the mirror. ProxyTrack then served any file the process could read to its client. Such a name is refused now (#1813)
++ Fixed: a request that a sendhead hook refused was sent anyway, over HTTPS through a connection already freed. It is not sent now, and the log keeps the refusal (#1825)
++ Fixed: hts_getcategories() added two categories that do not exist, "Test category 1" and "Test category 2", so WinHTTrack's category menu listed them (#1824)
++ Fixed: Ctrl+C could hang httrack rather than stop it. The signal handlers printed and logged, and the second Ctrl+C ran the exit handlers from inside the signal (#1811, #1817)
++ Fixed: -M could let a crawl run past its size limit, because parallel FTP transfers lost some of the bytes they counted (#1812)
++ Fixed: on arm64, a thread could read a lock or a finished FTP transfer before another thread had written all of it (#1808, #1809)
++ Fixed: --max-time could not end httrack while a thread was stuck resolving a host name. It now stops within the limit plus 5 seconds (#1848)
++ Fixed: -E counted whole seconds, so -E1 stopped anywhere from 0 to 1 second in. A crawl stopped at the wrong moment could also leave .delayed files in the mirror (#1853)
++ Fixed: a hard stop during a type check wrote into a slot that another download could own. The link it stopped now keeps its absolute URL, rather than pointing at a local file that was never downloaded (#1855)
++ Fixed: a reply that is never saved, such as a 404, could leave an empty directory in the mirror. Replies are spooled under ~hts-tmp at the mirror root now. A failed write or a killed run no longer leaves spool files there (#1850, #1851)
++ Fixed: a relative link starting with "?", such as ?q=a+b, kept its "+" signs where a "?" anywhere else turns them into spaces (#1792)
++ Fixed: a stylesheet's image-url(x), font-url(x) or asset-url(x) was read as url(x), so x was fetched and the declaration rewritten (#1781)
++ Fixed: a clock stepped backward, by NTP for example, stretched a DNS lookup past --timeout by the size of the step (#1782)
++ Fixed: on GNU/Hurd, a peer closing the connection killed httrack with SIGPIPE, and 3.50.4's test suite failed there (#1783, #1775)
++ Fixed: a --max-retry-after above one hour stopped the crawl from starting. It is cut to the limit with a notice now (#1777)
++ Fixed: the contentfilter example wrapper wrote past its keyword table when given more than 128 keywords (#1810)
++ Fixed: a local process could swap a file for a symlink just before httrack set its permissions, and so redirect the change. The permissions are set through the open file now (#1807)
++ New: libhttrack and the httrack command line build for Windows ARM64 (#1836, #1837)
++ Changed: every function, structure and macro in the installed headers is documented. The old comments for check_link and check_mime gave their return values backwards (#1820)
++ Changed: the build zeroes stack variables that have no initializer, and bounds a trailing one-byte array as written (#1800)
++ Changed: multiple internal hardening, test and CI improvements
+
 3.50-4
 + Fixed: a truncated string was left unterminated on Windows, because those builds aliased snprintf to _snprintf, which writes no terminator when it truncates. WinHTTrack 3.50-2 aborted on one (#1752)
 + Fixed: a JavaScript name ending in "url" had its assignment read as a link, where the value carries no file extension. On 3.50.3, var myurl = "hello world" fetched /hello%20world and the saved script was rewritten to point at it (#1743)
