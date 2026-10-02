@@ -8,5 +8,6 @@ set -euo pipefail
 
 bash "$top_srcdir/tests/local-crawl.sh" \
     --log-found 'link cancelled, type unknown, left online: .*/dhard/p0\.bin' \
+    --log-not-found 'probably looping' \
     --file-matches dhard/index.html 'href="http://[^"]*/dhard/p0\.bin"' \
     httrack 'BASEURL/dhard/index.html' -M5000 -c1 -Z
