@@ -3095,8 +3095,7 @@ class Handler(SimpleHTTPRequestHandler):
     def route_dcap_index(self):
         self.send_sized_bin_index(self.DCAP_INDEX_BYTES)
 
-    # #1854: headers alone overrun -M5000's 500-byte grace, so the hard stop
-    # cancels the type wait before p0's headers are complete.
+    # 5000 bytes on the wire, so -M5000 trips while p0's headers trickle (#1854).
     DHARD_INDEX_BYTES = 5000 - 60
 
     def route_dhard_index(self):
@@ -3934,13 +3933,6 @@ class Handler(SimpleHTTPRequestHandler):
         "/dcap/index.html": route_dcap_index,
         "/dhard/index.html": route_dhard_index,
         "/dhard/p0.bin": route_dhard_page,
-        "/dhard/p1.bin": route_dhard_page,
-        "/dhard/p2.bin": route_dhard_page,
-        "/dhard/p3.bin": route_dhard_page,
-        "/dhard/p4.bin": route_dhard_page,
-        "/dhard/p5.bin": route_dhard_page,
-        "/dhard/p6.bin": route_dhard_page,
-        "/dhard/p7.bin": route_dhard_page,
         "/dcap/p0.bin": route_dcancel_page,
         "/dcap/p1.bin": route_dcancel_page,
         "/dcap/p2.bin": route_dcancel_page,

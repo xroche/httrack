@@ -5322,7 +5322,7 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
       *forbidden_url = 1;
       if (cancelled) {
         hts_log_print(opt, LOG_DEBUG,
-                      "mirror cancelled, type unknown, link left online: %s%s",
+                      "link cancelled, type unknown, left online: %s%s",
                       afs->af.adr, afs->af.fil);
       } else if (in_error) {
         hts_log_print(opt, LOG_WARNING,
