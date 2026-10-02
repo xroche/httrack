@@ -1401,7 +1401,11 @@ assert_wedge_stack() {
     # WSL2 answers Linux to uname but dumps through cdb, which is opt-in.
     ! target_is_windows || return 0
     case $(uname -s) in
-    Linux) grep -q "Caught signal 6" <<<"$1" || fail "the engine printed no stack: $1" ;;
+    Linux)
+        grep -q "Caught signal 6" <<<"$1" || fail "the engine printed no stack: $1"
+        # A build without backtrace(), --disable-auto-features for one, has no frame to name.
+        ! grep -q "No stack trace available on this OS" <<<"$1" || return 0
+        ;;
     Darwin) grep -q "Call graph" <<<"$1" || fail "sample(1) printed no stack: $1" ;;
     *) return 0 ;;
     esac
