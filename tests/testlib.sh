@@ -1416,7 +1416,9 @@ dump_overrun() { # dump_overrun <pid> <secs> <label>
     # Also stops the recursion when the dump's own debugger overruns.
     test "${OVERRUN_DUMP:-1}" != 0 || return 0
     local OVERRUN_DUMP=0
-    pgid=$(ps -o pgid= -p "$1" 2>/dev/null | tr -d ' ')
+    pgid=$(ps -o pgid= -p "$1" 2>/dev/null | tr -d ' ' || true)
+    # A Fedora build root has no ps. The fields after "comm) " are state, ppid, pgrp.
+    test -n "$pgid" || pgid=$(awk '{ sub(/.*\) /, ""); } END { print $3 }' "/proc/$1/stat" 2>/dev/null || true)
     # shellcheck source=/dev/null # sourced lazily, and its arrays would shadow test locals
     declare -F dump_hang_diagnostics >/dev/null || . "$testdir/proclib.sh" || return 0
     dump_hang_diagnostics "${pgid:-$1}" "$3" "$2" >&2 || true
