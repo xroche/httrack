@@ -4912,6 +4912,7 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
   hash_struct *const hash = hashptr;
 
   int in_error = 0;
+  hts_boolean cancelled = HTS_FALSE;
   LLint in_error_size = 0;
   char in_error_msg[32];
 
@@ -5095,6 +5096,8 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
                      !back_checkmirror(
                          opt)) { // cancel level 2 or 1 (cancel parsing)
             back_delete(opt, cache, sback, b); // cancel test
+            b = -1;
+            cancelled = HTS_TRUE;
             break;
           }
         } while (
@@ -5317,7 +5320,11 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
     // error
     if (*forbidden_url != 1 && IS_DELAYED_EXT(afs->save)) {
       *forbidden_url = 1;
-      if (in_error) {
+      if (cancelled) {
+        hts_log_print(opt, LOG_DEBUG,
+                      "mirror cancelled, type unknown, link left online: %s%s",
+                      afs->af.adr, afs->af.fil);
+      } else if (in_error) {
         hts_log_print(opt, LOG_WARNING,
                       "link in error (%d '%s'), type unknown, aborting: %s%s",
                       in_error, in_error_msg, afs->af.adr, afs->af.fil);
