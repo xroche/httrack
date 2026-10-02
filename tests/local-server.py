@@ -3095,7 +3095,7 @@ class Handler(SimpleHTTPRequestHandler):
     def route_dcap_index(self):
         self.send_sized_bin_index(self.DCAP_INDEX_BYTES)
 
-    # 5000 bytes on the wire, so -M5000 trips while p0's headers trickle (#1854).
+    # 60 bytes under -M5000, so the cap trips while p0's headers trickle (#1854).
     DHARD_INDEX_BYTES = 5000 - 60
 
     def route_dhard_index(self):
