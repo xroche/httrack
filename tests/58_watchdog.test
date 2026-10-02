@@ -10,7 +10,6 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-# Failed before #1843 too (run 36393199893), often after an EIEIO opening /dev/null.
 skip_on_hurd "a killed orphan answers kill -0 for minutes with no /proc entry, so its reap cannot be seen (wontfix)"
 
 # Every timeout here is on purpose, and the hang dump would run inside the timed window.
