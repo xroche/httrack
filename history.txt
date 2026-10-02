@@ -11,7 +11,7 @@ This file lists all changes and fixes that have been made for HTTrack
 + Fixed: hts_getcategories() added two categories that do not exist, "Test category 1" and "Test category 2", so WinHTTrack's category menu listed them (#1824)
 + Fixed: Ctrl+C could hang httrack rather than stop it. A second Ctrl+C now quits at once (#1811, #1817)
 + Fixed: -M could let a crawl run past its size limit, because parallel FTP transfers lost some of the bytes they counted (#1812)
-+ Fixed: on arm64 and other CPUs that reorder memory accesses, a thread could see a lock or a finished FTP transfer only half written (#1808, #1809)
++ Fixed: on arm64 and other CPUs that reorder memory, a thread could see a lock or a finished FTP transfer half written (#1808, #1809)
 + Fixed: --max-time could not end httrack while a thread was stuck resolving a host name. It now stops within the limit plus 5 seconds (#1848)
 + Fixed: -E counted whole seconds, so -E1 stopped anywhere from 0 to 1 second in (#1853)
 + Fixed: a crawl stopped at the wrong moment could leave .delayed files in the mirror (#1853)
