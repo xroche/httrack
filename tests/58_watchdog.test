@@ -10,6 +10,9 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
+# Every timeout here is on purpose, and the hang dump would run inside the timed window.
+export OVERRUN_DUMP=0
+
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_wd.XXXXXX")
 # A colon-free root for the PATH shim below: MSYS hands out a drive-letter TMPDIR
 # and a PATH entry carrying a colon is read as two, which leaves it unreachable.
