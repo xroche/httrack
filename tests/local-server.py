@@ -3093,6 +3093,30 @@ class Handler(SimpleHTTPRequestHandler):
     DCAP_INDEX_BYTES = 50000 - 60
 
     def route_dcap_index(self):
+        self.send_sized_bin_index(self.DCAP_INDEX_BYTES)
+
+    # 5000 bytes on the wire, so -M5000 trips while p0's headers trickle (#1854).
+    DHARD_INDEX_BYTES = 5000 - 60
+
+    def route_dhard_index(self):
+        self.send_sized_bin_index(self.DHARD_INDEX_BYTES)
+
+    def route_dhard_page(self):
+        self.log_request(200)
+        try:
+            self.wfile.write(
+                b"HTTP/1.0 200 OK\r\nContent-Type: application/octet-stream\r\n"
+            )
+            for i in range(40):
+                self.wfile.write(b"X-Pad-%02d: %s\r\n" % (i, b"p" * 64))
+                self.wfile.flush()
+                time.sleep(0.05)
+            self.wfile.write(b"Content-Length: 16\r\n\r\n" + b"z" * 16)
+        except OSError:
+            pass
+
+    # An HTML page of 8 .bin links, padded to exactly total bytes on the wire.
+    def send_sized_bin_index(self, total):
         links = "".join('<a href="p%d.bin">p%d</a>\n' % (i, i) for i in range(8))
         pad = 0
         for _ in range(4):  # two corrections settle the Content-Length digits
@@ -3101,11 +3125,11 @@ class Handler(SimpleHTTPRequestHandler):
                 "HTTP/1.0 200 OK\r\nContent-Type: text/html\r\n"
                 "Content-Length: %d\r\n\r\n" % len(body)
             ).encode()
-            missing = self.DCAP_INDEX_BYTES - len(head) - len(body)
+            missing = total - len(head) - len(body)
             if missing == 0:
                 break
             pad += missing
-        assert missing == 0, "the dcap index cannot be sized exactly"
+        assert missing == 0, "the index cannot be sized exactly"
         self.log_request(200)
         self.wfile.write(head + body)
 
@@ -3907,6 +3931,8 @@ class Handler(SimpleHTTPRequestHandler):
         DEEPDIR + "/p1.bin": route_trickle_page,
         "/dcancel/index.html": route_dcancel_index,
         "/dcap/index.html": route_dcap_index,
+        "/dhard/index.html": route_dhard_index,
+        "/dhard/p0.bin": route_dhard_page,
         "/dcap/p0.bin": route_dcancel_page,
         "/dcap/p1.bin": route_dcancel_page,
         "/dcap/p2.bin": route_dcancel_page,

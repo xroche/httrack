@@ -1,0 +1,12 @@
+#!/bin/bash
+#
+# A hard stop during a type wait must not rewrite the link to p0.bin.html (#1854).
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" \
+    --log-found 'link cancelled, type unknown, left online: .*/dhard/p0\.bin' \
+    --file-matches dhard/index.html 'href="http://[^"]*/dhard/p0\.bin"' \
+    httrack 'BASEURL/dhard/index.html' -M5000 -c1 -Z
