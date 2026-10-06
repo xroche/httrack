@@ -391,9 +391,10 @@ HTSEXT_API hts_boolean hts_resetaddurl(httrackp *opt);
     hts_filter_rule_ok() refuses it or memory ran out. */
 HTSEXT_API hts_boolean hts_addfilter(httrackp *opt, const char *rule);
 
-/** Would hts_addfilter() accept @p rule? It must be signed, non-empty, within
-    the filter length cap and free of control characters, so a front end can
-    refuse it while the user can still edit it. @return HTS_TRUE if valid. */
+/** Would hts_addfilter() accept @p rule? It must be a + or - sign and a
+    pattern, within the filter length cap and free of control characters, so a
+    front end can refuse it while the user can still edit it. @return HTS_TRUE
+    if valid, HTS_FALSE for NULL or an invalid rule. */
 HTSEXT_API hts_boolean hts_filter_rule_ok(const char *rule);
 
 /** Apply the runtime-tunable options from @p from onto @p to, to adjust a live
