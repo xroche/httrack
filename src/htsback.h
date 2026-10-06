@@ -36,11 +36,8 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h"
 
-#if HTS_XGETHOST
-#if USE_BEGINTHREAD
+#include "htsopt.h"
 #include "htsthread.h"
-#endif
-#endif
 
 /* Forward definitions */
 #ifndef HTS_DEF_FWSTRUCT_httrackp
@@ -63,6 +60,11 @@ typedef struct lien_back lien_back;
 #define HTS_DEF_FWSTRUCT_htsblk
 typedef struct htsblk htsblk;
 #endif
+
+/* An FTP worker publishes a slot's status, so read it with an acquire load. */
+static HTS_INLINE HTS_UNUSED int back_status(const lien_back *b) {
+  return hts_load_acquire_int(&b->status);
+}
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
