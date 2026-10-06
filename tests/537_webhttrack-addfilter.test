@@ -17,11 +17,13 @@ cleanup_push htsserver_reap_vars csrv
 
 export HOME="${work}" # no ~/.httrack.ini of the developer's in the store
 
-# short.bin trickles for six seconds and holds the only socket (-c1). The pages
-# are fetched first and wait unsaved, while z.bin waits unfetched behind it.
+# short.bin and short2.bin trickle for eight seconds and hold both sockets
+# (-c2). The pages are fetched first and wait unsaved, and z.bin waits unfetched
+# behind them.
 mkdir -p "${work}/docroot/junk" "${work}/docroot/keep"
 {
     printf '<html><body><a href="/trickle/short.bin">slow</a>\n'
+    printf '<a href="/trickle/short2.bin">slow</a>\n'
     for i in 1 2 3 4 5; do
         printf '<a href="junk/j%d.html">j</a>\n' "${i}"
         printf '<html><body>junk</body></html>\n' >"${work}/docroot/junk/j${i}.html"
@@ -45,21 +47,21 @@ test "${#sid}" -eq 32 || fail "no session id in the panel (got '${sid}')"
 out="${work}/crawl"
 site="${out}/127.0.0.1_${cport}"
 log="${out}/hts-log.txt"
-# -%A types .bin up front, so the parser queues every link before short.bin.
+# -%A types .bin up front, so the parser queues every link before the slow files.
 htsserver_client --path /step4.html --field "sid=${sid}" --field "path=${work}" \
     --field projname=crawl --field winprofile=x --field command_do=start \
-    --field "command=httrack --robots=0 -c1 -%A bin=application/octet-stream http://127.0.0.1:${cport}/index.html +* -O ${out}" \
+    --field "command=httrack --robots=0 -c2 -%A bin=application/octet-stream http://127.0.0.1:${cport}/index.html +* -O ${out}" \
     >/dev/null
 
 start=$SECONDS
-while ! grep -q "GET /trickle/short.bin HTTP" "${clog}"; do
+while ! grep -q "GET /trickle/short2.bin HTTP" "${clog}"; do
     htsserver_alive || fail "htsserver died: $(tail -n 20 "${log}" 2>/dev/null)"
     test "$((SECONDS - start))" -lt 60 || fail "the slow file was never requested"
     poll_wait 0.2
 done
 
-# add_rule RULE COUNT: send RULE and wait for its log line, which must report
-# COUNT queued links dropped.
+# add_rule RULE COUNT: send RULE, then wait for its log line reporting COUNT
+# dropped links.
 add_rule() {
     local before
     before=$(grep -c "queued link(s) dropped" "${log}" || true)
@@ -76,7 +78,9 @@ add_rule() {
 }
 
 add_rule "+*/keep/*" 0
-# five pages fetched ahead and z.bin, but not keep/k1.html
+# Both slow files are mid-transfer, so they finish.
+add_rule "-*/trickle/*" 0
+# The 5 pages fetched ahead and z.bin drop, and keep/k1.html stays.
 add_rule "-*/junk/*" 6
 
 start=$SECONDS
@@ -85,6 +89,8 @@ while ! grep -q "HTTrack Website Copier/" "${log}"; do
     poll_wait 0.2
 done
 assert_file "${site}/keep/k1.html" "a link the rule does not match was dropped"
+assert_file "${site}/trickle/short.bin" "a running transfer was dropped"
+assert_file "${site}/trickle/short2.bin" "a running transfer was dropped"
 test ! -e "${site}/junk" || fail "a dropped link was saved: $(ls "${site}/junk")"
 
 echo "PASS"

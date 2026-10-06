@@ -2613,10 +2613,8 @@ static hts_boolean live_rules_refuse_(httrackp *opt, int lpos, int first,
 
   /* robots.txt is never filtered, as at startup */
   return link->pass2 != -1 && strcmp(link->fil, "/robots.txt") != 0 &&
-                 filters_match_url(*opt->filters.filters + first, count,
-                                   link->adr, link->fil, NULL) == -1
-             ? HTS_TRUE
-             : HTS_FALSE;
+         filters_match_url(*opt->filters.filters + first, count, link->adr,
+                           link->fil, NULL) == -1;
 }
 
 void hts_apply_live_filters(httrackp *opt, struct_back *sback, int ptr) {
@@ -2640,7 +2638,7 @@ void hts_apply_live_filters(httrackp *opt, struct_back *sback, int ptr) {
       int b =
           back_index_peek(opt, sback, heap(i)->adr, heap(i)->fil, heap(i)->sav);
 
-      /* a result stored on disk is loaded to be dropped, given a free slot */
+      /* load a stored result only if a slot is free */
       if (b == sback->count) {
         if (back_search_quick(sback) < 0)
           continue;
@@ -2649,8 +2647,7 @@ void hts_apply_live_filters(httrackp *opt, struct_back *sback, int ptr) {
       if (b >= 0) {
         const lien_back *const slot = &sback->lnk[b];
 
-        /* Only a result fetched but not yet saved is dropped. The sav test
-           guards the lookup matching on adr and fil alone. */
+        /* the sav test rejects a slot matched on adr and fil alone */
         if (slot->status != STATUS_READY || slot->r.is_write ||
             slot->testmode || strcmp(slot->url_sav, heap(i)->sav) != 0)
           continue;
@@ -4394,6 +4391,11 @@ HTSEXT_API hts_boolean hts_addfilter(httrackp *opt, const char *rule) {
   if (opt == NULL || rule == NULL || (rule[0] != '+' && rule[0] != '-') ||
       rule[1] == '\0' || strlen(rule) > HTS_FILTER_MAXLEN)
     return HTS_FALSE;
+  for (n = 0; rule[n] != '\0'; n++) {
+    if ((unsigned char) rule[n] < ' ')
+      return HTS_FALSE;
+  }
+  n = 0;
   if ((copy = strdupt(rule)) == NULL)
     return HTS_FALSE;
   hts_mutexlock(&opt->state.lock);

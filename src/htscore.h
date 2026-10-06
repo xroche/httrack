@@ -320,7 +320,7 @@ char **hts_addurl_take(httrackp *opt);
 /* Free a list taken with hts_addurl_take(), strings included. */
 void hts_addurl_free(char **url);
 
-/* Detach the queued rules, or return NULL if none. The caller frees the list
+/* Detach the queued rules. Returns NULL if none. The caller frees the list
    with hts_addurl_free(). */
 char **hts_addfilter_take(httrackp *opt);
 
@@ -470,8 +470,8 @@ hts_boolean filters_insert(httrackp *opt, int pos, const char *pattern);
 /* Grow the filter array so n more rules fit. Aborts when it cannot. */
 void filters_make_room(httrackp *opt, int n);
 
-/* fa_strjoker_dual() verdict of the nfil filters on link adr+fil, in both
-   forms the wizard tests. */
+/* Returns the fa_strjoker_dual() verdict of the nfil filters on adr+fil, in
+   both forms the wizard tests, and sets *depth when depth is not NULL. */
 int filters_match_url(char **filters, int nfil, const char *adr,
                       const char *fil, int *depth);
 

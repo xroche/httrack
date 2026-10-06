@@ -3061,7 +3061,7 @@ class Handler(SimpleHTTPRequestHandler):
 
     # #128: holds the only socket while the test adds a scan rule.
     def route_short_trickle(self):
-        self.route_trickle_page(6)
+        self.route_trickle_page(8)
 
     # #973: quoted, so the link parser keeps the < and > (only an unquoted > ends
     # a link) and the whole run reaches the progress panel.
@@ -3925,6 +3925,7 @@ class Handler(SimpleHTTPRequestHandler):
         "/xssjob/index.html": route_xssjob_index,
         "/trickle/p0.bin": route_trickle_page,
         "/trickle/short.bin": route_short_trickle,
+        "/trickle/short2.bin": route_short_trickle,
         "/trickle/p1.bin": route_trickle_page,
         "/trickle/p2.bin": route_trickle_page,
         "/trickle/p3.bin": route_trickle_page,

@@ -376,9 +376,7 @@ static int st_filtercap(httrackp *opt, int argc, char **argv) {
 #undef POISON
 
 /* ------------------------------------------------------------ */
-/* Registry: this module's tests, in the order -#test lists them. */
-/* hts_addfilter() queues a signed rule up to HTS_FILTER_MAXLEN, and nothing
-   else. */
+/* hts_addfilter() queues only signed rules within HTS_FILTER_MAXLEN. */
 static int st_addfilter(httrackp *opt, int argc, char **argv) {
   static const struct {
     const char *label;
@@ -389,7 +387,9 @@ static int st_addfilter(httrackp *opt, int argc, char **argv) {
       {"minus", "-*/junk/*", 0, HTS_TRUE},
       {"plus", "+*.gif", 0, HTS_TRUE},
       {"unsigned", "*.gif", 0, HTS_FALSE},
-      {"sign only", "-", 0, HTS_FALSE},
+      {"minus only", "-", 0, HTS_FALSE},
+      {"plus only", "+", 0, HTS_FALSE},
+      {"newline", "-a\nb", 0, HTS_FALSE},
       {"empty", "", 0, HTS_FALSE},
       {"at the cap", NULL, HTS_FILTER_MAXLEN, HTS_TRUE},
       {"past the cap", NULL, HTS_FILTER_MAXLEN + 1, HTS_FALSE},
@@ -438,6 +438,7 @@ static int st_addfilter(httrackp *opt, int argc, char **argv) {
   return failed;
 }
 
+/* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
 
 const struct selftest_entry selftests_filters[] = {

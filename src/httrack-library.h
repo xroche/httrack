@@ -388,7 +388,8 @@ HTSEXT_API hts_boolean hts_resetaddurl(httrackp *opt);
     engine thread at its next pass. A "-" rule also drops the matching links
     that are queued, or fetched and not yet saved. A "+" rule only affects links
     found from then on. @return nonzero if the rule was queued, zero if it is
-    malformed or memory ran out. */
+    malformed (unsigned, empty, too long, or holding a control character) or
+    memory ran out. */
 HTSEXT_API hts_boolean hts_addfilter(httrackp *opt, const char *rule);
 
 /** Apply the runtime-tunable options from @p from onto @p to, to adjust a live
