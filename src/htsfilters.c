@@ -132,7 +132,7 @@ int fa_strjoker_dual(int type, char **filters, int nfil, const char *nom1,
    pair keeps star-heavy patterns polynomial instead of exponential (#501). */
 typedef struct strjoker_memo {
   const char *chaine0, *joker0; /* offsets are relative to these bases */
-  size_t len0;   /* strlen(chaine0). chaine is always a suffix of it. */
+  size_t len0; /* strlen(chaine0). chaine is always a suffix of it. */
   size_t stride;                /* strlen(joker0) + 1 */
   unsigned char *failed;        /* failed-pair bitmap; NULL: no memo */
   size_t *nsteps; /* shared work counter; NULL: unbounded (oracle) */
