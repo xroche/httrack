@@ -542,6 +542,8 @@ static int st_filterlayout(httrackp *opt, int argc, char **argv) {
 /* A live rule drops only the queued links its own change refuses, never one
    the crawl queued although the rules already refused it. */
 static int st_filterkeep(httrackp *opt, int argc, char **argv) {
+  static const char *const box[] = {"+*", "-*/pic/*", "+*/keep/*", "-*/junk/*",
+                                    NULL};
   const htsfilters saved = opt->filters;
   const int savedwizard = opt->wizard_filters;
   const int saveduser = opt->user_filters;
@@ -560,25 +562,31 @@ static int st_filterkeep(httrackp *opt, int argc, char **argv) {
   opt->filters.filptr = &filptr;
   filters_insert(opt, 0, "+*");
   filters_insert(opt, 1, "-*/pic/*");
+  filters_insert(opt, 2, "-banned.example/*"); /* an engine host ban */
   opt->wizard_filters = 0;
   opt->user_filters = 2;
-  /* a start URL the rules refuse, and a link they allow */
+  /* a start URL the rules refuse, a link they allow, one on a banned host */
   assertf(hts_record_link(opt, "www.example.com", "/pic/s.gif", "/p/s.gif", "",
                           "", ""));
   assertf(hts_record_link(opt, "www.example.com", "/junk/j.html", "/p/j.html",
                           "", "", ""));
+  assertf(hts_record_link(opt, "banned.example", "/b.html", "/p/b.html", "", "",
+                          ""));
   hts_addfilter(opt, "+*/keep/*");
   hts_apply_live_filters(opt, sback, -1);
-  ok = opt->liens[0]->pass2 != -1 && opt->liens[1]->pass2 != -1;
-  printf("unrelated rule keeps both: ok=%d\n", ok);
-  hts_addfilter(opt, "-*/junk/*");
+  ok = opt->liens[0]->pass2 != -1 && opt->liens[1]->pass2 != -1 &&
+       opt->liens[2]->pass2 != -1;
+  printf("unrelated rule keeps all: ok=%d\n", ok);
+  /* the box resent with one new rule */
+  hts_setfilters(opt, box);
   hts_apply_live_filters(opt, sback, -1);
-  ok = opt->liens[0]->pass2 != -1 && opt->liens[1]->pass2 == -1;
-  printf("junk rule drops only junk: ok=%d\n", ok);
+  ok = opt->liens[0]->pass2 != -1 && opt->liens[1]->pass2 == -1 &&
+       opt->liens[2]->pass2 != -1;
+  printf("resent box drops only junk: ok=%d\n", ok);
   /* a new rule aimed at the link drops it, refused before or not */
   hts_addfilter(opt, "-*s.gif");
   hts_apply_live_filters(opt, sback, -1);
-  ok = opt->liens[0]->pass2 == -1;
+  ok = opt->liens[0]->pass2 == -1 && opt->liens[2]->pass2 != -1;
   printf("rule aimed at it drops it: ok=%d\n", ok);
   opt->filters = saved;
   opt->wizard_filters = savedwizard;

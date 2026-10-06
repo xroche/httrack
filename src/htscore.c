@@ -2662,11 +2662,30 @@ static hts_boolean live_cancel_link_(httrackp *opt, struct_back *sback, int i) {
   return HTS_TRUE;
 }
 
+/* Is rule index r one this change brought in? A rule of a set that the old
+   user rules already held is not, so resending it drops nothing. */
+static hts_boolean live_rule_is_new_(httrackp *opt, int r, int first_new,
+                                     int first_add, char **old) {
+  const char *const rule = (*opt->filters.filters)[r];
+  size_t k;
+
+  if (r < first_new || r >= opt->wizard_filters + opt->user_filters)
+    return HTS_FALSE;
+  if (r >= first_add)
+    return HTS_TRUE;
+  /* without the old rules, keep the link rather than guess */
+  for (k = 0; old != NULL && old[k] != NULL; k++) {
+    if (strcmp(old[k], rule) == 0)
+      return HTS_FALSE;
+  }
+  return old != NULL;
+}
+
 void hts_apply_live_filters(httrackp *opt, struct_back *sback, int ptr) {
-  char **set, **rules;
+  char **set, **rules, **old = NULL;
   hts_boolean *was_refused = NULL;
   const int queued = opt->lien_tot - (ptr + 1);
-  int added = 0, dropped = 0, first_new, i;
+  int added = 0, dropped = 0, first_new, first_add, i;
   size_t k;
 
   /* one take, so a set always lands before the adds queued after it */
@@ -2691,11 +2710,21 @@ void hts_apply_live_filters(httrackp *opt, struct_back *sback, int ptr) {
   /* the rules this change inserts end the user's rules */
   first_new = opt->wizard_filters + (set != NULL ? 0 : opt->user_filters);
   if (set != NULL) {
+    /* the old user rules, to tell a resent rule from a new one */
+    old = (char **) calloct(opt->user_filters + 1, sizeof(char *));
+    for (i = 0; old != NULL && i < opt->user_filters; i++) {
+      old[i] = strdupt((*opt->filters.filters)[opt->wizard_filters + i]);
+      if (old[i] == NULL) {
+        hts_addurl_free(old); /* NULL-terminated, as calloct zeroed it */
+        old = NULL;
+      }
+    }
     filters_remove(opt, opt->wizard_filters, opt->user_filters);
     opt->user_filters = 0;
     for (k = 0; set[k] != NULL; k++)
       filters_append_user_(opt, set[k]);
   }
+  first_add = opt->wizard_filters + opt->user_filters;
   for (k = 0; rules != NULL && rules[k] != NULL; k++) {
     if (filters_append_user_(opt, rules[k])) {
       hts_log_print(opt, LOG_NOTICE, "Scan rule added by user: %s", rules[k]);
@@ -2708,12 +2737,13 @@ void hts_apply_live_filters(httrackp *opt, struct_back *sback, int ptr) {
     int rule = 0;
 
     if (queued_link_refused_(opt, ptr + 1 + i, &rule) &&
-        (!was_refused[i] || (rule >= first_new &&
-                             rule < opt->wizard_filters + opt->user_filters)) &&
+        (!was_refused[i] ||
+         live_rule_is_new_(opt, rule, first_new, first_add, old)) &&
         live_cancel_link_(opt, sback, ptr + 1 + i))
       dropped++;
   }
   freet(was_refused);
+  hts_addurl_free(old);
   if (set != NULL)
     hts_log_print(opt, LOG_NOTICE,
                   "%d scan rule(s) set and %d added by user, %d queued link(s) "
