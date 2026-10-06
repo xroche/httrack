@@ -98,10 +98,9 @@ jobs:
           $a.FullName | Out-File -FilePath vcpkg-restored.txt
           "VCPKG_ARCHIVES_BEFORE=$($a.Count)" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-      # The runner image's vcpkg checkout is pinned to some commit; our manifest's
-      # builtin-baseline is usually newer, so `git show <baseline>:versions/...`
-      # fails until that commit is local. Fetch exactly the pinned baseline (read
-      # from the manifest, so Dependabot bumps need no workflow edit).
+      # The runner image's vcpkg checkout is older than our builtin-baseline, and
+      # vcpkg reads the version database from its working tree, so fetch the
+      # baseline (read from the manifest) and check out its versions/ too.
       - name: Fetch the pinned vcpkg baseline
         shell: pwsh
         run: |
@@ -111,6 +110,8 @@ jobs:
           if (-not $baseline) { throw "no builtin-baseline in src/vcpkg.json" }
           git -C $root fetch --no-tags origin $baseline
           if ($LASTEXITCODE -ne 0) { throw "could not fetch vcpkg baseline $baseline" }
+          git -C $root checkout $baseline -- versions
+          if ($LASTEXITCODE -ne 0) { throw "could not check out versions/ at $baseline" }
 
       # httrack and webhttrack carry a ProjectReference to libhttrack, so building
       # them builds it first; proxytrack is standalone.
