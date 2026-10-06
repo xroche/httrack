@@ -575,6 +575,11 @@ static int st_filterkeep(httrackp *opt, int argc, char **argv) {
   hts_apply_live_filters(opt, sback, -1);
   ok = opt->liens[0]->pass2 != -1 && opt->liens[1]->pass2 == -1;
   printf("junk rule drops only junk: ok=%d\n", ok);
+  /* a new rule aimed at the link drops it, refused before or not */
+  hts_addfilter(opt, "-*s.gif");
+  hts_apply_live_filters(opt, sback, -1);
+  ok = opt->liens[0]->pass2 == -1;
+  printf("rule aimed at it drops it: ok=%d\n", ok);
   opt->filters = saved;
   opt->wizard_filters = savedwizard;
   opt->user_filters = saveduser;

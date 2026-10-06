@@ -2614,14 +2614,15 @@ int filters_match_url(char **filters, int nfil, const char *adr,
   return fa_strjoker_dual(0, filters, nfil, lfull, l, NULL, NULL, depth);
 }
 
-/* Does the whole rule array refuse queued link lpos? */
-static hts_boolean queued_link_refused_(httrackp *opt, int lpos) {
+/* Does the whole rule array refuse queued link lpos? Sets *rule, if not NULL,
+   to the index of the rule that decides. */
+static hts_boolean queued_link_refused_(httrackp *opt, int lpos, int *rule) {
   const lien_url *const link = heap(lpos);
 
   /* robots.txt is never filtered, as at startup */
   return link->pass2 != -1 && strcmp(link->fil, "/robots.txt") != 0 &&
          filters_match_url(*opt->filters.filters, *opt->filters.filptr,
-                           link->adr, link->fil, NULL) == -1;
+                           link->adr, link->fil, rule) == -1;
 }
 
 /* Insert rule at the end of the user's rules. */
@@ -2665,7 +2666,7 @@ void hts_apply_live_filters(httrackp *opt, struct_back *sback, int ptr) {
   char **set, **rules;
   hts_boolean *was_refused = NULL;
   const int queued = opt->lien_tot - (ptr + 1);
-  int added = 0, dropped = 0, i;
+  int added = 0, dropped = 0, first_new, i;
   size_t k;
 
   /* one take, so a set always lands before the adds queued after it */
@@ -2677,16 +2678,18 @@ void hts_apply_live_filters(httrackp *opt, struct_back *sback, int ptr) {
   hts_mutexrelease(&opt->state.lock);
   if (set == NULL && rules == NULL)
     return;
-  /* A link can be queued although the rules refuse it, as a near link, a
-     start URL or an added URL, and only the change may drop it. ptr is being
-     fetched or parsed. */
+  /* A link can be queued although the rules refuse it, as a start URL, an
+     added URL or a +mime: accept, and only a new rule may drop it. ptr is
+     being fetched or parsed. */
   if (queued > 0) {
     was_refused = calloct(queued, sizeof(*was_refused));
     if (was_refused == NULL)
       hts_log_print(opt, LOG_WARNING, "No memory to drop queued links");
     for (i = 0; was_refused != NULL && i < queued; i++)
-      was_refused[i] = queued_link_refused_(opt, ptr + 1 + i);
+      was_refused[i] = queued_link_refused_(opt, ptr + 1 + i, NULL);
   }
+  /* the rules this change inserts end the user's rules */
+  first_new = opt->wizard_filters + (set != NULL ? 0 : opt->user_filters);
   if (set != NULL) {
     filters_remove(opt, opt->wizard_filters, opt->user_filters);
     opt->user_filters = 0;
@@ -2702,7 +2705,11 @@ void hts_apply_live_filters(httrackp *opt, struct_back *sback, int ptr) {
   hts_addurl_free(set); /* frees any NULL-terminated string list */
   hts_addurl_free(rules);
   for (i = 0; was_refused != NULL && i < queued; i++) {
-    if (!was_refused[i] && queued_link_refused_(opt, ptr + 1 + i) &&
+    int rule = 0;
+
+    if (queued_link_refused_(opt, ptr + 1 + i, &rule) &&
+        (!was_refused[i] || (rule >= first_new &&
+                             rule < opt->wizard_filters + opt->user_filters)) &&
         live_cancel_link_(opt, sback, ptr + 1 + i))
       dropped++;
   }
