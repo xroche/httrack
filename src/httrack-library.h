@@ -397,10 +397,9 @@ HTSEXT_API hts_boolean hts_addfilter(httrackp *opt, const char *rule);
     supersedes any hts_addfilter() rule not yet applied. A queued link is
     dropped when the rules now refuse it and did not before, or when the rule
     deciding it was added or is absent from the old list. A removed rule stops
-    applying to links
-    found from then on. @return nonzero
-    if the list was queued, zero if hts_filter_rule_ok() refuses any rule in
-    it or memory ran out, in which case nothing changes. */
+    applying to links found from then on. @return nonzero if the list was
+    queued, zero if hts_filter_rule_ok() refuses any rule in it or memory ran
+    out, in which case nothing changes. */
 HTSEXT_API hts_boolean hts_setfilters(httrackp *opt, const char *const *rules);
 
 /** Would hts_addfilter() accept @p rule? It must be a + or - sign and a
