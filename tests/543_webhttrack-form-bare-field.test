@@ -1,0 +1,37 @@
+#!/bin/bash
+#
+# A POSTed field without '=' is skipped and the fields after it still reach the
+# server (#1877).
+
+set -euo pipefail
+
+# shellcheck source=tests/webhttracklib.sh
+. "${0%"${0##*/}"}./webhttracklib.sh"
+
+htsserver_require
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_bare.XXXXXX") || fail "no tmpdir"
+cleanup_push htsserver_cleanup_dir "${work}"
+
+htsserver_start --home "${work}"
+sid=$(htsserver_sid)
+test "${#sid}" -eq 32 || fail "no session id in the panel (got '${sid}')"
+
+# title BODY NAME: the posted fields land in the key store, and step 3 echoes
+# projname in its title.
+title() {
+    local reply
+    htsserver_post "$1" >/dev/null 2>&1 || true
+    reply=$(htsserver_get /server/step3.html)
+    grep -q "<title>'$2' - HTTrack" <<<"${reply}" ||
+        fail "projname $2 did not reach the page for body '$1'"
+}
+
+# Control: a body without a bare field already works.
+title "sid=${sid}&projname=plain" plain
+title "sid=${sid}&bare&projname=afterbare" afterbare
+title "sid=${sid}&bare1&bare2&projname=afterbare2" afterbare2
+# A bare key must not overwrite the stored value with the next field's text.
+title "sid=${sid}&projname=kept&projname&path=${work}/x" kept
+
+echo "PASS"
