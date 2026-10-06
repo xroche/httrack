@@ -92,6 +92,7 @@ char *commandReturnMsg = NULL;
 char *commandReturnCmdl = NULL;
 int commandReturnSet = 0;
 
+/* Written under webhttrack_lock(), and freed by the crawl thread. */
 httrackp *global_opt = NULL;
 
 /* Address the listening socket was bound to, as given: an authority we

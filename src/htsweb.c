@@ -424,10 +424,9 @@ int main(int argc, char *argv[]) {
   return ret;
 }
 
-static int webhttrack_runmain(httrackp *opt, int argc, char **argv);
+static int webhttrack_runmain(httrackp * opt, int argc, char **argv);
 
-/* Unpublish opt before freeing it: the server thread reads global_opt under
-   this lock (#1863). */
+/* The server thread reads global_opt under this lock (#1863). */
 static void back_launch_end(httrackp *opt) {
   webhttrack_lock();
   global_opt = NULL;
@@ -440,7 +439,7 @@ static void back_launch_cmd(void *pP) {
   char *cmd = (char *) pP;
   char **argv;
   int argc = 0;
-  /* set by webhttrack_main() before this thread started */
+  /* webhttrack_main() sets it before starting this thread. */
   httrackp *const opt = global_opt;
 
   /* copy commandline */
@@ -490,8 +489,7 @@ static void back_launch_cmd(void *pP) {
 
 void webhttrack_main(char *cmd) {
   hts_init();
-  /* Published before the flag, so a command never finds it NULL. The caller
-     holds webhttrack_lock(). */
+  /* The caller holds webhttrack_lock(). */
   global_opt = hts_create_opt();
   assert(global_opt->size_httrackp >= sizeof(httrackp));
   commandRunning = 1;
@@ -499,6 +497,7 @@ void webhttrack_main(char *cmd) {
   if (hts_newthread(back_launch_cmd, (void *) strdup(cmd)) != 0) {
     httrackp *const opt = global_opt;
 
+    /* back_launch_end() would retake the lock the caller holds */
     global_opt = NULL;
     hts_free_opt(opt);
     hts_uninit();
