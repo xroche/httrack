@@ -1548,6 +1548,16 @@ void treatfirstline(htsblk * retour, const char *rcvd) {
   }
 }
 
+/* Read a Keep-Alive "timeout=" or "max=" value. A signed or oversized one
+   reads as 0, which turns keep-alive off as the old negative reading did. */
+static void keep_alive_param(const char *s, int *value) {
+  LLint v;
+  const int got = hts_scan_llint(&s, 0, INT_MAX, &v);
+
+  if (got != 0)
+    *value = got == 1 ? (int) v : 0;
+}
+
 // traiter ligne par ligne l'en tête
 // gestion des cookies
 void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * retour,
@@ -1558,7 +1568,11 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
 #if HDEBUG
     printf("ok, Content-length: détecté\n");
 #endif
-    if (sscanf(rcvd + p, LLintP, &(retour->totalsize)) == 1) {
+    const char *a = rcvd + p;
+    LLint size;
+
+    if (hts_scan_llint(&a, 0, INT64_MAX, &size) == 1) {
+      retour->totalsize = size;
       if (retour->totalsize == 0) {
         retour->empty = 1;
       }
@@ -1677,30 +1691,46 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
 
     for(a = rcvd + p; is_space(*a); a++) ;
     if (strncasecmp(a, "bytes ", 6) == 0) {
+      LLint start = 0, end = 0, total = 0;
+      int got;
+      hts_boolean refused;
+
       for(a += 6; is_space(*a); a++) ;
-      if (sscanf
-          (a, LLintP "-" LLintP "/" LLintP, &retour->crange_start,
-           &retour->crange_end, &retour->crange) != 3) {
-        retour->crange_start = 0;
-        retour->crange_end = 0;
-        retour->crange = 0;
+      got = hts_scan_llint(&a, 0, INT64_MAX, &start);
+      refused = got < 0;
+
+      // A signed or oversized field in "start-end/total" refuses the header.
+      if (got != 0 && *a == '-') {
+        a++;
+        got = hts_scan_llint(&a, 0, INT64_MAX, &end);
+        refused = refused || got < 0;
+        if (got != 0 && *a == '/') {
+          a++;
+          got = hts_scan_llint(&a, 0, INT64_MAX, &total);
+          refused = refused || got < 0;
+        } else {
+          got = 0;
+        }
+      } else {
+        got = 0;
+      }
+      if (got == 0) { // Only the total after the first '/' counts, as in "*/N".
+        start = end = total = 0;
         a = strchr(rcvd + p, '/');
         if (a != NULL) {
           a++;
-          if (sscanf(a, LLintP, &retour->crange) == 1 && retour->crange >= 0) {
-            retour->crange_start = 0;
-            retour->crange_end = retour->crange - 1;
+          if (hts_scan_llint(&a, 1, INT64_MAX, &total) == 1) {
+            end = total - 1;
           } else {
-            retour->crange = 0;
+            total = 0;
           }
         }
+      } else if (refused) {
+        start = end = total = 0;
       }
-      // A valid Content-Range has no negative field; reject hostile values so
-      // the crange +/- 1 arithmetic downstream cannot sign-overflow (UB).
-      if (retour->crange_start < 0 || retour->crange_end < 0 ||
-          retour->crange < 0) {
-        retour->crange_start = retour->crange_end = retour->crange = 0;
-      }
+      retour->crange_start = start;
+      retour->crange_end = end;
+      retour->crange = total;
     }
   } else if ((p = strfield(rcvd, "Connection:")) != 0) {
     char *a = rcvd + p;
@@ -1731,11 +1761,11 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
       retour->keep_alive_t = 15;
       if ((p = strstr(a, "timeout="))) {
         p += strlen("timeout=");
-        sscanf(p, "%d", &retour->keep_alive_t);
+        keep_alive_param(p, &retour->keep_alive_t);
       }
       if ((p = strstr(a, "max="))) {
         p += strlen("max=");
-        sscanf(p, "%d", &retour->keep_alive_max);
+        keep_alive_param(p, &retour->keep_alive_max);
       }
       if (retour->keep_alive_max <= 1 || retour->keep_alive_t < 1) {
         retour->keep_alive = 0;
@@ -3126,18 +3156,10 @@ int hts_parse_retry_after(const char *value, time_t now) {
 
   /* delta-seconds is 1*DIGIT, so a trailing token means an HTTP-date */
   if (end > p && (size_t) (end - p) == strspn(p, "0123456789")) {
-    const char *q;
-    int secs = 0;
+    LLint secs;
 
-    for (q = p; q < end; q++) {
-      const int digit = *q - '0';
-
-      /* clip before the multiply: the accumulator must never overflow */
-      if (secs > (INT_MAX - digit) / 10)
-        return INT_MAX;
-      secs = secs * 10 + digit;
-    }
-    return secs;
+    // Every byte is a digit, so a refusal means too big, which clips.
+    return hts_parse_llint(p, NULL, 0, INT_MAX, &secs) ? (int) secs : INT_MAX;
   }
 
   {

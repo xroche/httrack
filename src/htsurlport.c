@@ -26,24 +26,65 @@ Please visit our Website: http://www.httrack.com
 */
 
 /* ------------------------------------------------------------ */
-/* File: TCP port parser, shared by the engine, htsserver and    */
-/*       proxytrack                                              */
+/* File: bounded decimal and TCP port parsers, shared by the    */
+/*       engine, htsserver and proxytrack                        */
 /* Author: Xavier Roche                                          */
 /* ------------------------------------------------------------ */
 
 #include "htsurlport.h"
 
 #include <ctype.h>
-#include <stdlib.h>
+
+static hts_boolean is_decimal_digit(char c) { return c >= '0' && c <= '9'; }
+
+hts_boolean hts_parse_llint(const char *s, const char **end, LLint min,
+                            LLint max, LLint *out) {
+  const char *p;
+  LLint value = 0;
+  hts_boolean fits = HTS_TRUE;
+
+  for (p = s; is_decimal_digit(*p); p++) {
+    const int digit = *p - '0';
+
+    // Checked before the multiply, so value * 10 + digit never passes max.
+    if (!fits || digit > max || value > (max - digit) / 10)
+      fits = HTS_FALSE;
+    else
+      value = value * 10 + digit;
+  }
+  if (end != NULL)
+    *end = p;
+  if (p == s || !fits || value < min)
+    return HTS_FALSE;
+  *out = value;
+  return HTS_TRUE;
+}
+
+int hts_scan_llint(const char **s, LLint min, LLint max, LLint *out) {
+  const char *p = *s;
+  const char *end;
+  LLint ignored;
+
+  while (isspace((unsigned char) *p))
+    p++;
+  if (hts_parse_llint(p, &end, min, max, out)) {
+    *s = end;
+    return 1;
+  }
+  if ((*p == '-' || *p == '+') && is_decimal_digit(p[1]))
+    (void) hts_parse_llint(p + 1, &end, min, max,
+                           &ignored); // only to skip the refused digits
+  if (end == p)
+    return 0;
+  *s = end;
+  return -1;
+}
 
 hts_boolean hts_parse_url_port(const char *a, int *port) {
-  char *end;
-  long p;
+  const char *end;
+  LLint p;
 
-  if (!isdigit((unsigned char) *a)) // strtol would eat a sign or leading space
-    return HTS_FALSE;
-  p = strtol(a, &end, 10);
-  if (*end != '\0' || p < 1 || p > 65535) // ERANGE lands out of range too
+  if (!hts_parse_llint(a, &end, 1, 65535, &p) || *end != '\0')
     return HTS_FALSE;
   *port = (int) p;
   return HTS_TRUE;

@@ -1,0 +1,60 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# The bounded decimal parser, then every site converted to it against a frozen
+# copy of its old sscanf parse (-#test=int-parse-diff in htsheader_selftest.c).
+
+max64=9223372036854775807
+
+parse() {
+    local want=$1
+    shift
+    selftest_queue "$want" int-parse parse "$@"
+}
+
+scan() {
+    local want=$1
+    shift
+    selftest_queue "$want" int-parse scan "$@"
+}
+
+parse 'refused value=-1 end=0' '' 0 100
+parse 'ok value=0 end=1' 0 0 100
+parse 'ok value=42 end=6' 000042 0 100
+parse 'ok value=12 end=2' 12ab 0 100
+parse 'ok value=100 end=3' 100 0 100
+parse 'refused value=-1 end=3' 101 0 100
+parse 'refused value=-1 end=1' 0 1 100
+parse 'ok value=5 end=1' 5 0 5
+parse 'refused value=-1 end=1' 6 0 5
+parse 'ok value=0 end=1' 0 0 0
+parse 'refused value=-1 end=1' 1 0 0
+parse 'ok value=65535 end=5' 65535 1 65535
+parse 'refused value=-1 end=5' 65536 1 65535
+parse "ok value=$max64 end=19" "$max64" 0 "$max64"
+parse 'refused value=-1 end=19' 9223372036854775808 0 "$max64"
+parse 'refused value=-1 end=20' 99999999999999999999 0 "$max64"
+# 2^64 + 10: an unchecked accumulator wraps it to 10.
+parse 'refused value=-1 end=20' 18446744073709551626 0 "$max64"
+parse 'refused value=-1 end=0' -5 0 100
+parse 'refused value=-1 end=0' +5 0 100
+parse 'refused value=-1 end=0' ' 5' 0 100
+
+scan 'got=1 value=42 end=4' " $(printf '\t')42z" 0 100
+scan 'got=-1 value=-1 end=4' ' -42z' 0 100
+scan 'got=-1 value=-1 end=2' +7 0 100
+scan 'got=-1 value=-1 end=4' ' 101' 0 100
+scan 'got=0 value=-1 end=0' ' abc' 0 100
+scan 'got=0 value=-1 end=0' -x 0 100
+scan 'got=0 value=-1 end=0' '' 0 100
+
+# The counts pin the corpus, so a sweep that silently shrinks goes red.
+selftest_queue 'int-parse-diff: 5851 compared, 9542 intended changes, 0 failures' \
+    int-parse-diff
+
+selftest_run_queued

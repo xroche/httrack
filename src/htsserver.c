@@ -1198,7 +1198,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
           int p;
 
           if ((p = strfield(line, "Content-length:")) != 0) {
-            sscanf(line + p, LLintP, &(length));
+            const char *a = line + p;
+
+            // A signed or oversized length reads no body.
+            if (hts_scan_llint(&a, 0, INT64_MAX, &length) < 0)
+              length = 0;
           } else if ((p = strfield(line, "Accept-language:")) != 0) {
             char tmp[32];
             char *s = line + p;

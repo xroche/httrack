@@ -909,7 +909,12 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
         int p;
 
         if ((p = strfield(line, "Content-length:")) != 0) {
-          if (sscanf(line + p, "%d", &length) != 1) {
+          const char *a = line + p;
+          LLint value;
+
+          if (hts_scan_llint(&a, 0, INT_MAX, &value) == 1) {
+            length = (int) value;
+          } else {
             msgCode = 500;
             msgError = "Bad HTTP Content-Length Field";
             keepAlive = 0;

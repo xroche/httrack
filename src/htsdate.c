@@ -34,7 +34,9 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h"
 #include "htssafe.h"
+#include "htsurlport.h"
 
+#include <limits.h>
 #include <string.h>
 
 /* hts_lowcase() lives in the library proxytrack does not link. */
@@ -92,9 +94,13 @@ struct tm *convert_time_rfc822(struct tm *result, const char *s) {
       if ((pos = strstr(months, tok))) { /* month always in letters */
         result_mm = ((int) (pos - months)) / 4;
       } else {
-        int number;
+        const char *digits = tok;
+        LLint value;
 
-        if (sscanf(tok, "%d", &number) == 1) { /* number token */
+        /* A signed or oversized number is noise, as other tokens are. */
+        if (hts_scan_llint(&digits, 0, INT_MAX, &value) == 1) {
+          const int number = (int) value;
+
           if (result_dd < 0)                   /* day always first number */
             result_dd = number;
           else if (result_n1 < 0)
