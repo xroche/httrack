@@ -454,6 +454,9 @@ void hts_finish_html_file(httrackp *opt, cache_back *cache, htsblk *r,
   (1 + (HTS_URLMAXSIZE * 2 - 1) + 1 + (HTS_URLMAXSIZE * 2 - 1) +               \
    HTS_FILTER_SUFFIX_MAX)
 
+/* Largest -#F whose slots, and one growth step past them, an int can index. */
+#define HTS_FILTERS_MAX (INT_MAX / HTS_FILTER_SLOT_SIZE - HTS_FILTERSINC - 2)
+
 int filters_init(char ***ptrfilters, int maxfilter, int filterinc);
 
 /* Binds this crawl's filter array to `opt`, and empties the wizard block with

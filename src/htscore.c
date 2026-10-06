@@ -2808,17 +2808,13 @@ int filters_init(char ***ptrfilters, int maxfilter, int filterinc) {
   int filter_max = maximum(maxfilter, 128);
 
   if (filters == NULL) {
-    filters = (char **) malloct(sizeof(char *) * (filter_max + 2));
-    memset(filters, 0, sizeof(char *) * (filter_max + 2));      // filters[0] == 0
+    filters = (char **) calloct(filter_max + 2, sizeof(char *));
   } else {
     filters = (char **) realloct(filters, sizeof(char *) * (filter_max + 2));
   }
   if (filters) {
     if (filters[0] == NULL) {
-      filters[0] = (char *) malloct(sizeof(char) * (filter_max + 2) *
-                                    HTS_FILTER_SLOT_SIZE);
-      memset(filters[0], 0,
-             sizeof(char) * (filter_max + 2) * HTS_FILTER_SLOT_SIZE);
+      filters[0] = (char *) calloct(filter_max + 2, HTS_FILTER_SLOT_SIZE);
     } else {
       filters[0] = (char *) realloct(
           filters[0], sizeof(char) * (filter_max + 2) * HTS_FILTER_SLOT_SIZE);

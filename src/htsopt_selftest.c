@@ -1675,11 +1675,147 @@ static int st_usercmdrun(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* What no digit run can produce, so an untouched field shows. */
+#define ST_GLUED_UNSET (-7)
+
+/* Read text as the glued digits of an option: "got=G value=V adv=N", where N
+   is how far the option pointer moved. */
+static void st_glued_read(hts_boolean wide, LLint min, LLint max,
+                          const char *text, char *out, size_t size) {
+  char buf[256];
+  char *com = buf;
+  LLint value = ST_GLUED_UNSET;
+  int narrow = ST_GLUED_UNSET;
+  hts_scan_result got;
+
+  buf[0] = 'X';
+  buf[1] = '\0';
+  strlncatbuff(buf, text, sizeof(buf), sizeof(buf) - 1);
+  if (wide) {
+    got = cmdl_glued_llint(&com, min, max, &value);
+  } else {
+    got = cmdl_glued_int(&com, (int) min, (int) max, &narrow);
+    value = narrow;
+  }
+  snprintf(out, size, "got=%d value=" LLintP " adv=%d", (int) got, value,
+           (int) (com - buf));
+}
+
+/* The same text through the frozen sscanf() and isdigit() loop it replaced. */
+static void st_glued_legacy(hts_boolean wide, const char *text, LLint *value,
+                            int *adv) {
+  if (wide) {
+    *value = ST_GLUED_UNSET;
+    (void) sscanf(text, LLintP, value);
+  } else {
+    int narrow = ST_GLUED_UNSET;
+
+    (void) sscanf(text, "%d", &narrow);
+    *value = narrow;
+  }
+  for (*adv = 0; isdigit((unsigned char) text[*adv]); (*adv)++)
+    ;
+}
+
+/* <int|llint> <min> <max> <text>: one glued read. With no argument, every
+   converted option against its legacy parse over a generated corpus. */
+static int st_gluedint(httrackp *opt, int argc, char **argv) {
+  /* Each glued option htscoremain.c reads, with the bounds it passes. */
+  static const struct {
+    const char *name;
+    hts_boolean wide;
+    LLint max;
+  } sites[] = {
+      {"-r", HTS_FALSE, INT_MAX},   {"-c", HTS_FALSE, INT_MAX},
+      {"-p", HTS_FALSE, INT_MAX},   {"-G", HTS_TRUE, INT64_MAX},
+      {"-M", HTS_TRUE, INT64_MAX},  {"-m", HTS_TRUE, INT64_MAX},
+      {"-m,", HTS_TRUE, INT64_MAX}, {"-T", HTS_FALSE, INT_MAX},
+      {"-J", HTS_FALSE, INT_MAX},   {"-R", HTS_FALSE, INT_MAX},
+      {"-E", HTS_FALSE, INT_MAX},   {"-H", HTS_FALSE, INT_MAX},
+      {"-A", HTS_FALSE, INT_MAX},   {"-j", HTS_FALSE, INT_MAX},
+      {"-%e", HTS_FALSE, INT_MAX},  {"-@i", HTS_FALSE, INT_MAX},
+      {"-@m", HTS_FALSE, INT_MAX},  {"-#C", HTS_FALSE, INT_MAX},
+      {"-#L", HTS_FALSE, INT_MAX},  {"-#F", HTS_FALSE, HTS_FILTERS_MAX},
+      {"-#u", HTS_FALSE, INT_MAX}};
+
+  static const char *const spaces[] = {"", " ", "\t"};
+  static const char *const signs[] = {"", "+", "-"};
+  static const char *const digits[] = {"",
+                                       "0",
+                                       "00",
+                                       "7",
+                                       "42",
+                                       "0042",
+                                       "65535",
+                                       "2147483647",
+                                       "2147483648",
+                                       "4294967295",
+                                       "4294967297",
+                                       "9223372036854775807",
+                                       "9223372036854775808",
+                                       "99999999999999999999"};
+  static const char *const suffixes[] = {"", "x", ".5", ",3", "-1"};
+  size_t s, w, g, d, x;
+  int compared = 0, unsigned_only = 0, too_large = 0, failures = 0;
+  char in[128], cur[128], want[128];
+
+  (void) opt;
+  if (argc == 4) {
+    st_glued_read(strcmp(argv[0], "llint") == 0, strtoll(argv[1], NULL, 10),
+                  strtoll(argv[2], NULL, 10), argv[3], cur, sizeof(cur));
+    printf("%s\n", cur);
+    return 0;
+  }
+  for (s = 0; s < sizeof(sites) / sizeof(sites[0]); s++)
+    for (w = 0; w < sizeof(spaces) / sizeof(spaces[0]); w++)
+      for (g = 0; g < sizeof(signs) / sizeof(signs[0]); g++)
+        for (d = 0; d < sizeof(digits) / sizeof(digits[0]); d++)
+          for (x = 0; x < sizeof(suffixes) / sizeof(suffixes[0]); x++) {
+            LLint old, fits;
+            int adv;
+            hts_scan_result expect = HTS_SCAN_OK;
+
+            snprintf(in, sizeof(in), "%s%s%s%s", spaces[w], signs[g], digits[d],
+                     suffixes[x]);
+            st_glued_legacy(sites[s].wide, in, &old, &adv);
+            /* Only the digits at the start are read now: sscanf() also took
+               a space or a sign, then wrapped what was too large. */
+            if (adv == 0) {
+              expect = HTS_SCAN_NONE;
+            } else if (!hts_parse_llint(in, NULL, 0, sites[s].max, &fits)) {
+              expect = HTS_SCAN_REFUSED;
+            }
+            if (expect != HTS_SCAN_OK && old != ST_GLUED_UNSET) {
+              old = ST_GLUED_UNSET;
+              if (expect == HTS_SCAN_NONE)
+                unsigned_only++;
+              else
+                too_large++;
+            }
+            snprintf(want, sizeof(want), "got=%d value=" LLintP " adv=%d",
+                     (int) expect, old, adv);
+            st_glued_read(sites[s].wide, 0, sites[s].max, in, cur, sizeof(cur));
+            compared++;
+            if (strcmp(cur, want) != 0) {
+              printf("FAIL %s \"%s\": want \"%s\" now \"%s\"\n", sites[s].name,
+                     in, want, cur);
+              failures++;
+            }
+          }
+  printf("glued-int: %d compared, %d signed or spaced now unread, %d too "
+         "large now refused, %d failures\n",
+         compared, unsigned_only, too_large, failures);
+  return failures != 0;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
 
 const struct selftest_entry selftests_opt[] = {
+    {"glued-int", "[<int|llint> <min> <max> <text>]",
+     "glued numeric options (-c8) read as before, out-of-range refused",
+     st_gluedint},
     {"usercmd", "<-V template> <filename> [room]",
      "rewrite a -V template's $0 and print the shell vector it would run",
      st_usercmd},
