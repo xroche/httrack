@@ -19,21 +19,17 @@ hdr() {
 
 hdr 'contenttype=application/pdf cdispo=' 'Content-Type: application/pdf'
 
-# The status code of a status line: exactly three digits, as the proxy CONNECT
-# reply and treatfirstline() read it.
-status() {
-    local got
-    got=$(httrack -O /dev/null -#test=statusline "$2")
-    assert_eq "code=$1" "$got" "$2"
-}
-status 200 'HTTP/1.1 200 Connection established'
-status 204 '  HTTP/1.0 204'
-status 407 'http/1.1 407 Proxy Authentication Required'
-status -1 'HTTP/1.1 4294967496 Connection established'
-status -1 'HTTP/1.1 2000 OK'
-status -1 'HTTP/1.1 20 OK'
-status -1 'HTTP/1.1'
-status -1 'ICY 200 OK'
+# A status line must carry exactly three digits after the HTTP/ token.
+selftest_queue 'code=200' statusline 'HTTP/1.1 200 Connection established'
+selftest_queue 'code=204' statusline '  HTTP/1.0 204'
+selftest_queue 'code=407' statusline 'http/1.1 407 Proxy Authentication Required'
+selftest_queue 'code=-1' statusline 'HTTP/1.1 4294967496 Connection established'
+selftest_queue 'code=-1' statusline 'HTTP/1.1 2000 OK'
+selftest_queue 'code=-1' statusline 'HTTP/1.1 0200 OK'
+selftest_queue 'code=-1' statusline 'HTTP/1.1 +200 OK'
+selftest_queue 'code=-1' statusline 'HTTP/1.1 20 OK'
+selftest_queue 'code=-1' statusline 'HTTP/1.1'
+selftest_queue 'code=-1' statusline 'ICY 200 OK'
 
 # filename= is honored quoted or bare.
 hdr 'contenttype= cdispo=report.pdf' \

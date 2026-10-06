@@ -1494,9 +1494,8 @@ void treatfirstline(htsblk * retour, const char *rcvd) {
       if (*a != '\0') {
         while((*a == ' ') || (*a == 10) || (*a == 13) || (*a == 9))
           a++;                  // épurer espaces
-        if (hts_status_code(a) >= 0) {
-          retour->statuscode = hts_status_code(a);
-          // sauter 200
+        if ((retour->statuscode = hts_status_code(a)) >= 0) {
+          // skip the code
           while((*a != ' ') && (*a != '\0') && (*a != 10) && (*a != 13)
                 && (*a != 9))
             a++;

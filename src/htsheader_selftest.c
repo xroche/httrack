@@ -210,7 +210,7 @@ static int st_header(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* The status code hts_status_line_code() reads from one status line. */
+/* Prints the code hts_status_line_code() reads from argv[0]. */
 static int st_statusline(httrackp *opt, int argc, char **argv) {
   (void) opt;
   if (argc != 1) {

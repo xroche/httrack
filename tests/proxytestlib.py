@@ -122,7 +122,7 @@ def handle_client(conn, logdir, mode, default_port):
         conn.close()
         return
     if mode == "wrap":
-        # a status code past INT_MAX, which a %d parse wraps to 200
+        # 2^32 + 200, which a %d parse wraps to 200
         conn.sendall(b"HTTP/1.1 4294967496 Connection established\r\n\r\n")
     else:
         conn.sendall(b"HTTP/1.0 200 Connection established\r\n\r\n")
