@@ -543,6 +543,10 @@ jobs:
           # and do not match the glob, so the leg would otherwise never run the two
           # tests it exists to guard.
           tests="467_engine-ftp-worker-tail.test 503_engine-ftp-handoff.test"
+          # FTP crawls, which run worker threads against the stop and abort paths
+          tests="$tests 110_local-ftp-parallel.test 121_local-ftp-nocache-splice.test"
+          tests="$tests 234_local-ftp-maxtime.test 243_local-ftp-deadhost-interrupt.test"
+          tests="$tests 255_local-ftp-sigterm.test 263_local-ftp-stop-window.test"
           for t in tests/01_engine-*.test; do
             tests="$tests ${t##*/}"
           done

@@ -115,7 +115,7 @@ void ftp_stop_workers(void) {
        not missed. A registered worker's slot is still live by construction:
        back_delete_all() drains before back_free(). */
     for (worker = ftp_workers; worker != NULL; worker = worker->pNext)
-      worker->pBack->stop_ftp = HTS_TRUE;
+      hts_store_release_int(&worker->pBack->stop_ftp, HTS_TRUE);
     wait = ftp_workers != NULL;
     hts_mutexrelease(&ftp_workers_mutex);
     if (wait)
@@ -624,7 +624,8 @@ static hts_boolean ftp_connect(lien_back *back, T_SOC soc, SOCaddr *server,
     /* state.stop counts here, unlike in the waits below: a mirror the user
        stopped has nothing to finish on a connection never established. */
     while (check_socket_connect(soc) == 0) {
-      if (back->stop_ftp || (opt != NULL && opt->state.stop) ||
+      if (hts_load_acquire_int(&back->stop_ftp) ||
+          (opt != NULL && hts_load_acquire_int(&opt->state.stop)) ||
           (int) (time_local() - started) >= timeout)
         return HTS_FALSE;
       Sleep(100);
@@ -649,7 +650,8 @@ static T_SOC ftp_accept(lien_back *back, T_SOC soc, int timeout,
     return INVALID_SOCKET;
   /* state.stop counts as in ftp_connect: nothing is established yet */
   while (check_socket(soc) == 0) {
-    if (back->stop_ftp || (opt != NULL && opt->state.stop) ||
+    if (hts_load_acquire_int(&back->stop_ftp) ||
+        (opt != NULL && hts_load_acquire_int(&opt->state.stop)) ||
         (int) (time_local() - started) >= timeout)
       return INVALID_SOCKET;
     Sleep(100);
@@ -1221,7 +1223,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                       /*
                          int fcheck;
                          if ((fcheck=check_fatal_io_errno())) {
-                         opt->state.exit_xh=-1;
+                         hts_store_release_int(&opt->state.exit_xh, -1);
                          }
                        */
                       strcpybuff(back->r.msg, "Write error");
@@ -1288,7 +1290,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
     send_line(soc_ctl, "QUIT"); // bye bye
     /* A stopped mirror skips the second --timeout window this courtesy reply
        costs on a silent server; its text is discarded anyway (#1096). */
-    if (!opt->state.stop)
+    if (!hts_load_acquire_int(&opt->state.stop))
       get_ftp_line(back, soc_ctl, NULL, 0, timeout, opt);
 #ifdef _WIN32
     closesocket(soc_ctl);
@@ -1590,7 +1592,8 @@ int wait_socket_receive(lien_back *back, T_SOC soc, int timeout,
 #endif
   /* A stop raised by the engine ends the wait on the next 100ms tick instead of
      after the full timeout, so teardown does not sit on a silent server. */
-  while ((!(r = check_socket(soc))) && (back == NULL || !back->stop_ftp) &&
+  while ((!(r = check_socket(soc))) &&
+         (back == NULL || !hts_load_acquire_int(&back->stop_ftp)) &&
          (((int) ((TStamp) (time_local() - ltime))) < timeout)) {
     Sleep(100);
 #if FTP_DEBUG
@@ -1607,7 +1610,7 @@ int wait_socket_receive(lien_back *back, T_SOC soc, int timeout,
 
 // cancel reçu?
 int stop_ftp(lien_back * back) {
-  if (back->stop_ftp) {
+  if (hts_load_acquire_int(&back->stop_ftp)) {
     strcpybuff(back->r.msg, "Cancelled by User");
     back->r.statuscode = STATUSCODE_INVALID;
     return 1;

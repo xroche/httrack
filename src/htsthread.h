@@ -57,7 +57,8 @@ struct htsmutex_s {
    carry no ordering. The compiler, or arm64 hardware, may move the payload
    after the flag and leave a reader with stale data. An aligned 32-bit access
    never tears, so only the ordering needs saying. */
-static HTS_INLINE HTS_UNUSED void hts_store_release_int(int *dst, int value) {
+static HTS_INLINE HTS_UNUSED void hts_store_release_int(volatile int *dst,
+                                                        int value) {
 #ifdef _MSC_VER
   MemoryBarrier();
   *(volatile int *) dst = value;
@@ -66,7 +67,7 @@ static HTS_INLINE HTS_UNUSED void hts_store_release_int(int *dst, int value) {
 #endif
 }
 
-static HTS_INLINE HTS_UNUSED int hts_load_acquire_int(const int *src) {
+static HTS_INLINE HTS_UNUSED int hts_load_acquire_int(const volatile int *src) {
 #ifdef _MSC_VER
   const int value = *(const volatile int *) src;
 
@@ -74,6 +75,15 @@ static HTS_INLINE HTS_UNUSED int hts_load_acquire_int(const int *src) {
   return value;
 #else
   return __atomic_load_n(src, __ATOMIC_ACQUIRE);
+#endif
+}
+
+/* Count an event that several threads may log at once. */
+static HTS_INLINE HTS_UNUSED void hts_increment_int(volatile int *dst) {
+#ifdef _MSC_VER
+  InterlockedIncrement((volatile LONG *) dst);
+#else
+  __atomic_fetch_add(dst, 1, __ATOMIC_RELAXED);
 #endif
 }
 

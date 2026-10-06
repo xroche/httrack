@@ -3174,13 +3174,15 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     /* Only the exit status tells a wrapper the engine gave up mid-mirror. The
        fault flag is read too, because a dozen sites write exit_xh = 1 for a
        stop the user asked for and any of them can land after the abort. */
-    if (opt->state.exit_xh == -1 || hts_worker_faulted()) {
+    if (hts_load_acquire_int(&opt->state.exit_xh) == -1 ||
+        hts_worker_faulted()) {
       exit_code = HTS_EXIT_MIRROR_ABORTED;
       HTS_PANIC_PRINTF("mirror aborted before completion, see the log file");
     }
 
     /* Not after a fault: that mirror is not resumable. */
-    if (opt->state.exit_xh == 1 && !hts_worker_faulted()) {
+    if (hts_load_acquire_int(&opt->state.exit_xh) == 1 &&
+        !hts_worker_faulted()) {
       if (opt->log) {
         fprintf(opt->log,
                 "* * MIRROR ABORTED! * *\nThe mirror stopped before the end. "
@@ -3198,7 +3200,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     /* Not or cleanly interrupted; erase hts-cache/ref temporary directory.
        A ^C or a cap leaves exit_xh at 0, so keep the ref when either cut a
        transfer mid-body (#1595). */
-    if (opt->state.exit_xh == 0 && !opt->abort_left_partial) {
+    if (hts_load_acquire_int(&opt->state.exit_xh) == 0 &&
+        !opt->abort_left_partial) {
       // erase ref files if not interrupted
       DIR *dir;
       struct dirent *entry;
