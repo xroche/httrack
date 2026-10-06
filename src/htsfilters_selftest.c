@@ -262,23 +262,24 @@ static int st_filterbounds(httrackp *opt, int argc, char **argv) {
     assertf(strjoker_bounds(subj, pat, &steps, &maxsteps, NULL, NULL) != NULL);
     assertf(steps < maxsteps);
   }
-  /* An unclosed class rescans its whole length per call, so the slope across
-     two lengths pins it, not a single length (OSS-Fuzz 5279208050589696). */
+  /* An unclosed class rescans its whole length on every call that reaches it,
+     so the slope across two class lengths pins it. The leading *[a-z] makes
+     the subject length the decode count, which a charge levied once per match
+     cannot fake (OSS-Fuzz 5279208050589696). */
   {
-    const size_t shortlen = 512, longlen = 1536;
+    const size_t shortlen = 256, longlen = 768, decodes = 32;
     size_t steps2 = 0;
 
-    memset(subj, '*', 1024);
-    subj[1024] = '\0';
-    pat[0] = '*';
-    pat[1] = '(';
-    memset(pat + 2, '*', longlen - 2);
-    pat[shortlen] = '\0';
-    assertf(strjoker_bounds(subj, pat, &steps, &maxsteps, NULL, NULL) == NULL);
-    pat[shortlen] = '*';
-    pat[longlen] = '\0';
-    assertf(strjoker_bounds(subj, pat, &steps2, &maxsteps, NULL, NULL) == NULL);
-    assertf(steps2 - steps >= longlen - shortlen);
+    memcpy(pat, "*[a-z]*(", 8);
+    memset(pat + 8, '*', longlen);
+    memset(subj, 'a', decodes);
+    subj[decodes] = '\0';
+    pat[8 + shortlen] = '\0';
+    assertf(strjoker_bounds(subj, pat, &steps, &maxsteps, NULL, NULL) != NULL);
+    pat[8 + shortlen] = '*';
+    pat[8 + longlen] = '\0';
+    assertf(strjoker_bounds(subj, pat, &steps2, &maxsteps, NULL, NULL) != NULL);
+    assertf(steps2 - steps >= 8 * (longlen - shortlen));
   }
   /* Reserved-name classes cost ~512 bytes per call, so a long real URL must
      not exhaust the budget early. */
