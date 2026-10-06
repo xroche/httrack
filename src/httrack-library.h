@@ -395,8 +395,9 @@ HTSEXT_API hts_boolean hts_addfilter(httrackp *opt, const char *rule);
     NULL-terminated list of single rules applied in the order given. Split
     rules typed as text on whitespace first, as the command line does. It
     supersedes any hts_addfilter() rule not yet applied. A queued link is
-    dropped when the rules now refuse it and did not before, or when a rule
-    the old list lacked refuses it. A removed rule stops applying to links
+    dropped when the rules now refuse it and did not before, or when the rule
+    deciding it was added or is absent from the old list. A removed rule stops
+    applying to links
     found from then on. @return nonzero
     if the list was queued, zero if hts_filter_rule_ok() refuses any rule in
     it or memory ran out, in which case nothing changes. */
