@@ -123,6 +123,14 @@ hts_boolean ftp_command(char *line, size_t line_size, const char *verb,
 #define ftp_command_line(line, verb, path)                                     \
   (HTS_COMPILE_ASSERT(sizeof(line) == FTP_LINE_SIZE),                          \
    ftp_command((line), sizeof(line), (verb), (path)))
+/* Parse a PASV reply's "(h1,h2,h3,h4,p1,p2)" into ip[ip_size] as a dotted
+   address and *port. Each field must be 1 to 3 digits in 0..255. Returns
+   HTS_FALSE and leaves *port alone for any other reply, or a zero port. */
+hts_boolean ftp_parse_pasv(const char *line, char *ip, size_t ip_size,
+                           int *port);
+/* Parse an EPSV reply's "(|||port|)" into *port, which must be 1..65535.
+   Returns HTS_FALSE and leaves *port alone for any other reply. */
+hts_boolean ftp_parse_epsv(const char *line, int *port);
 T_SOC get_datasocket(char *to_send, size_t to_send_size);
 int stop_ftp(lien_back * back);
 char *linejmp(char *line);

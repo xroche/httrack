@@ -544,6 +544,67 @@ hts_boolean ftp_command(char *line, size_t line_size, const char *verb,
   return HTS_TRUE;
 }
 
+/* Read 1..max_digits decimal digits at s into *value, if it is at most max.
+   Returns the first byte past them, or NULL for a sign, a space or more. */
+static const char *ftp_parse_decimal(const char *s, int max_digits, int max,
+                                     int *value) {
+  int n = 0, digits = 0;
+
+  while (isdigit((unsigned char) *s) && digits < max_digits) {
+    n = n * 10 + (*s - '0');
+    s++;
+    digits++;
+  }
+  if (digits == 0 || isdigit((unsigned char) *s) || n > max)
+    return NULL;
+  *value = n;
+  return s;
+}
+
+/* Parse a PASV reply (see htsftp.h). */
+hts_boolean ftp_parse_pasv(const char *line, char *ip, size_t ip_size,
+                           int *port) {
+  const char *s = strchr(line, '(');
+  int n[6];
+  int i, len;
+
+  if (s == NULL)
+    return HTS_FALSE;
+  s++;
+  for (i = 0; i < 6; i++) {
+    s = ftp_parse_decimal(s, 3, 255, &n[i]);
+    if (s == NULL || *s != (i < 5 ? ',' : ')'))
+      return HTS_FALSE;
+    s++;
+  }
+  if ((n[4] | n[5]) == 0) // port 0 means no data connection
+    return HTS_FALSE;
+  len = snprintf(ip, ip_size, "%d.%d.%d.%d", n[0], n[1], n[2], n[3]);
+  if (len < 0 || (size_t) len >= ip_size) {
+    ip[0] = '\0';
+    return HTS_FALSE;
+  }
+  *port = (n[4] << 8) + n[5];
+  return HTS_TRUE;
+}
+
+/* Parse an EPSV reply (see htsftp.h). */
+hts_boolean ftp_parse_epsv(const char *line, int *port) {
+  const char *s = strchr(line, '(');
+  char delim;
+  int p;
+
+  // RFC 2428: "(<d><d><d><port><d>)", with any printable delimiter
+  if (s == NULL || s[1] < 33 || s[1] > 126 || s[2] != s[1] || s[3] != s[1])
+    return HTS_FALSE;
+  delim = s[1];
+  s = ftp_parse_decimal(s + 4, 5, 65535, &p);
+  if (s == NULL || s[0] != delim || s[1] != ')' || p == 0)
+    return HTS_FALSE;
+  *port = p;
+  return HTS_TRUE;
+}
+
 /* MDTM reply "213 YYYYMMDDHHMMSS[.frac]" (RFC 3659, UTC) into tm_time. */
 static hts_boolean ftp_parse_mdtm(const char *line, struct tm *tm_time) {
   int year, mon, mday, hour, min, sec;
@@ -893,55 +954,11 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
         }
         _CHECK_HALT_FTP;
         if (line[0] == '2') {
-          char *a, *b, *c;
-
-          a = strchr(line, '(');        // exemple: 227 Entering Passive Mode (123,45,67,89,177,27)
-          if (a) {
-
-            // -- analyse de l'adresse IP et du port --
-            a++;
-            b = strchr(a, ',');
-            if (b)
-              b = strchr(b + 1, ',');
-            if (b)
-              b = strchr(b + 1, ',');
-            if (b)
-              b = strchr(b + 1, ',');
-            c = a;
-            while((c = strchr(c, ',')))
-              *c = '.';         // remplacer , par .
-            if (b)
-              *b = '\0';
-            //
-            strcpybuff(adr_ip, a);      // copier adresse ip
-            //
-            if (b) {
-              a = b + 1;        // début du port
-              b = strchr(a, '.');
-              if (b) {
-                int n1, n2;
-
-                //
-                *b = '\0';
-                b++;
-                c = strchr(b, ')');
-                if (c) {
-                  *c = '\0';
-                  if ((sscanf(a, "%d", &n1) == 1) && (sscanf(b, "%d", &n2) == 1)
-                      && (strlen(adr_ip) <= 16)) {
-                    port_pasv = n2 + (n1 << 8);
-                  }
-                } else {
-                  deletesoc(soc_dat);
-                  soc_dat = INVALID_SOCKET;
-                }               // sinon on est prêts
-              }
-            }
-            // -- fin analyse de l'adresse IP et du port --
-          } else {
+          // e.g. 227 Entering Passive Mode (123,45,67,89,177,27)
+          if (!ftp_parse_pasv(line, adr_ip, sizeof(adr_ip), &port_pasv)) {
             htsblk_failf(&back->r, "PASV incorrect: %s", linejmp(line));
             back->r.statuscode = STATUSCODE_INVALID;
-          }                     // sinon on est prêts
+          }
         } else {
           /*
            * try epsv (ipv6) *
@@ -952,24 +969,8 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
           get_ftp_line(back, soc_ctl, line, sizeof(line), timeout, opt);
           _CHECK_HALT_FTP;
           if (line[0] == '2') { /* got it */
-            char *a;
-
-            a = strchr(line, '(');      // exemple: 229 Entering Extended Passive Mode (|||6446|)
-            if ((a != NULL)
-                && (*a == '(')
-                && (*(a + 1))
-                && (*(a + 1) == *(a + 2)) && (*(a + 1) == *(a + 3))
-                && (isdigit(*(a + 4)))
-                && (*(a + 5))
-              ) {
-              unsigned int n1 = 0;
-
-              if (sscanf(a + 4, "%d", &n1) == 1) {
-                if ((n1 < 65535) && (n1 > 0)) {
-                  port_pasv = n1;
-                }
-              }
-            } else {
+            // e.g. 229 Entering Extended Passive Mode (|||6446|)
+            if (!ftp_parse_epsv(line, &port_pasv)) {
               htsblk_failf(&back->r, "EPSV incorrect: %s", linejmp(line));
               back->r.statuscode = STATUSCODE_INVALID;
             }
