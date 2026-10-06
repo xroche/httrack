@@ -45,32 +45,24 @@ extern void hts_unescapehttp(const char *s, String *tempo);
    line separators so an escaped CRLF cannot forge an .ini line break. */
 extern void hts_unescapeini(const char *s, String *tempo);
 
-/* Next '&'-separated "key[=value]" field at *cur, empty fields included.
-   key and val point into the query and are not NUL-terminated.
-   val is NULL, and vallen 0, when the field has no '='; the key ends at the
-   first '='. *cur moves to the next field, and is NULL after the last one.
-   Returns HTS_FALSE, setting nothing, once *cur is NULL. */
-extern hts_boolean hts_query_next(const char **cur, const char **key,
-                                  size_t *keylen, const char **val,
-                                  size_t *vallen);
+/* One "key[=value]" field of an '&'-separated query. The spans point into the
+   query and are not NUL-terminated. */
+typedef struct hts_query_field {
+  const char *key;
+  size_t keylen;
+  const char *val; /* NULL when the field has no '=' */
+  size_t vallen;   /* 0 when val is NULL */
+  size_t len;      /* the whole field: key, '=' and value */
+} hts_query_field;
 
-/* First field of query that has an '=' and whose key is exactly name. */
+/* Reads the next '&'-separated field at *cur, empty fields included. The key
+   ends at the first '='. *cur then moves to the next field, and becomes NULL
+   after the last one. Returns HTS_FALSE, leaving *field alone, once *cur is
+   NULL. */
+extern hts_boolean hts_query_next(const char **cur, hts_query_field *field);
+
+/* Finds the first field of query with an '=' whose key is exactly name. */
 extern hts_boolean hts_query_find(const char *query, const char *name,
-                                  const char **val, size_t *vallen);
-
-/* Copy name's alphanumeric value into dst of capacity size. True when a
-   non-empty one fit whole; dst is left empty otherwise. */
-extern hts_boolean hts_query_alnum_value(char *dst, size_t size,
-                                         const char *query, const char *name);
-
-/* True when name appears at least once, and every occurrence is shorter than
-   maxlen and decodes to expected. */
-extern hts_boolean hts_query_all_match(const char *query, const char *name,
-                                       const char *expected, size_t maxlen);
-
-/* Split query in place: for each field with an '=', NUL-terminate its key and
-   value and pass them to emit. Fields without '=' are skipped. */
-typedef void (*hts_query_emit)(void *arg, char *key, char *value);
-extern void hts_query_split(char *query, hts_query_emit emit, void *arg);
+                                  hts_query_field *field);
 
 #endif

@@ -2446,11 +2446,10 @@ static int st_statrecv(httrackp *opt, int argc, char **argv) {
 }
 
 /* ------------------------------------------------------------ */
-/* querydiff: the pre-iterator query parsers, kept to prove the shared one */
-/* matches them. A follow-up removes these legacy copies.               */
+/* querydiff: the old query parsers of fil_normalized and %[param], */
+/* run next to the shared iterator.                              */
+/* TODO(#1878): delete with the legacy parsers.                  */
 /* ------------------------------------------------------------ */
-
-#define LEGACY_SID_VALUE_MAX 64
 
 static int legacy_sortNormFnc(const void *a_, const void *b_) {
   const char *const *const a = (const char *const *) a_;
@@ -2605,80 +2604,7 @@ static char *legacy_fil_normalized_filtered_ex(const char *source, char *dest,
   return legacy_fil_normalized_ex(tmp, dest, do_slash, do_query);
 }
 
-static hts_boolean legacy_query_alnum_value(char *dst, size_t size,
-                                            const char *query,
-                                            const char *name) {
-  const size_t namelen = strlen(name);
-  const char *s = query;
-
-  dst[0] = '\0';
-  while (*s != '\0') {
-    const char *const amp = strchr(s, '&');
-
-    if (strncmp(s, name, namelen) == 0 && s[namelen] == '=') {
-      const char *v = s + namelen + 1;
-      size_t n = 0;
-
-      while (*v != '\0' && *v != '&' && n + 1 < size &&
-             isalnum((unsigned char) *v)) {
-        dst[n++] = *v++;
-      }
-      dst[n] = '\0';
-      /* Truncated, or not alphanumeric to its end, is no value at all: it must
-         not reach a caller that trusted the return. */
-      if (n > 0 && (*v == '\0' || *v == '&')) {
-        return HTS_TRUE;
-      }
-      dst[0] = '\0';
-      return HTS_FALSE;
-    }
-    if (amp == NULL) {
-      break;
-    }
-    s = amp + 1;
-  }
-  return HTS_FALSE;
-}
-
-static hts_boolean legacy_body_sid_is_valid(const char *body,
-                                            const char *expected) {
-  const char *s = body;
-  hts_boolean seen = HTS_FALSE;
-
-  while (s != NULL && *s != '\0') {
-    const char *const amp = strchr(s, '&');
-    const char *const eq = strchr(s, '=');
-
-    if (eq != NULL && (amp == NULL || eq < amp) && (size_t) (eq - s) == 3 &&
-        strncmp(s, "sid", 3) == 0) {
-      const size_t len = amp != NULL ? (size_t) (amp - eq - 1) : strlen(eq + 1);
-      hts_boolean match = HTS_FALSE;
-
-      if (len < LEGACY_SID_VALUE_MAX) {
-        char raw[LEGACY_SID_VALUE_MAX];
-        String value = STRING_EMPTY;
-
-        memcpy(raw, eq + 1, len);
-        raw[len] = '\0';
-        hts_unescapehttp(raw, &value);
-        /* StringBuff is NULL until written, so an empty value lands here. */
-        if (StringBuff(value) != NULL &&
-            strcmp(StringBuff(value), expected) == 0) {
-          match = HTS_TRUE;
-        }
-        StringFree(value);
-      }
-      if (!match) {
-        return HTS_FALSE;
-      }
-      seen = HTS_TRUE;
-    }
-    s = amp != NULL ? amp + 1 : NULL;
-  }
-  return seen;
-}
-
-/* Old E3: %[name] template lookup in url_savename(). */
+/* The old %[param] lookup of url_savename(). */
 static hts_boolean legacy_url_query_value(const char *fil_complete,
                                           const char *token, char *value,
                                           size_t size) {
@@ -2711,94 +2637,11 @@ static hts_boolean legacy_url_query_value(const char *fil_complete,
   return HTS_FALSE;
 }
 
-/* Old E6: htsserver's form body split, recording each key and raw value. */
-static void legacy_form_split(const char *body, String *out) {
-  const size_t len = strlen(body);
-  char *buffer = malloct(len + 2);
-  char *s = buffer;
-  char *e, *f;
-
-  assertf(buffer != NULL);
-  memcpy(buffer, body, len + 1);
-  strlcatbuff(buffer, "&", len + 2);
-  while (s && (e = strchr(s, '=')) && (f = strchr(s, '&'))) {
-    *e = *f = '\0';
-    StringCat(*out, s);
-    StringAddchar(*out, '\001');
-    StringCat(*out, e + 1);
-    StringAddchar(*out, '\002');
-    s = f + 1;
-  }
-  freet(buffer);
-}
-
-/* A String's text, "" while it has no buffer. */
-static const char *qd_str(const String *s) {
-  return StringBuff(*s) != NULL ? StringBuff(*s) : "";
-}
-
-static void querydiff_emit(void *arg, char *key, char *value) {
-  String *const out = (String *) arg;
-
-  StringCat(*out, key);
-  StringAddchar(*out, '\001');
-  StringCat(*out, value);
-  StringAddchar(*out, '\002');
-}
-
-static void new_form_split(const char *body, String *out) {
-  char *buffer = strdupt(body);
-
-  assertf(buffer != NULL);
-  hts_query_split(buffer, querydiff_emit, out);
-  freet(buffer);
-}
-
-/* Does some '&'-separated field of q lack an '='? Written apart from the
-   iterator so the allowlist does not trust it. */
-static hts_boolean querydiff_has_bare_field(const char *q) {
-  for (;;) {
-    const char *const amp = strchr(q, '&');
-    const char *const eq = strchr(q, '=');
-
-    if (eq == NULL || (amp != NULL && amp < eq))
-      return HTS_TRUE;
-    if (amp == NULL)
-      return HTS_FALSE;
-    q = amp + 1;
-  }
-}
-
-/* q minus its fields that lack an '=' (bug 4's trigger). */
-static char *querydiff_drop_bare_fields(const char *q) {
-  char *const out = malloct(strlen(q) + 1);
-  size_t n = 0;
-
-  assertf(out != NULL);
-  for (;;) {
-    const char *const amp = strchr(q, '&');
-    const size_t len = amp != NULL ? (size_t) (amp - q) : strlen(q);
-    const char *const eq = memchr(q, '=', len);
-
-    if (eq != NULL) {
-      if (n != 0)
-        out[n++] = '&';
-      memcpy(out + n, q, len);
-      n += len;
-    }
-    if (amp == NULL)
-      break;
-    q = amp + 1;
-  }
-  out[n] = '\0';
-  return out;
-}
-
 typedef struct {
   unsigned long cases;
   unsigned long failures;
-  unsigned long allowed_e3;
-  unsigned long allowed_e6;
+  unsigned long allowed_qmark; /* a second '?' no longer starts a field */
+  unsigned long allowed_name;  /* a name with '=' or '&' is never a key */
 } querydiff_stats;
 
 static void querydiff_fail(querydiff_stats *st, const char *site,
@@ -2813,7 +2656,7 @@ static void querydiff_fail(querydiff_stats *st, const char *site,
   }
 }
 
-/* E1 and E2, through fil_normalized_filtered_ex(). */
+/* fil_normalized: the --strip-query filter and the query sort. */
 static void querydiff_normalize(querydiff_stats *st, const char *url) {
   static const char *const strips[] = {NULL,    "",   "*", "a",  "a, sid",
                                        " x ,y", "id", "=", ",,", NULL};
@@ -2840,8 +2683,27 @@ static void querydiff_normalize(querydiff_stats *st, const char *url) {
   freet(n);
 }
 
-/* E3: allowed to differ only for a later '?' in the query, or a name holding
-   '=' or '&'. */
+/* url with every '?' after the first one replaced by '\001', which cannot
+   start a field. */
+static char *querydiff_hide_later_qmarks(const char *url) {
+  char *s = strdupt(url);
+  char *const q = s != NULL ? strchr(s, '?') : NULL;
+
+  assertf(s != NULL);
+  if (q != NULL) {
+    char *p;
+
+    for (p = q + 1; *p != '\0'; p++) {
+      if (*p == '?')
+        *p = '\001';
+    }
+  }
+  return s;
+}
+
+/* %[param]. A difference is allowed when name holds '=' or '&' and the new
+   lookup finds nothing, or when the old lookup with every later '?' hidden
+   gives the new result. */
 static void querydiff_template(querydiff_stats *st, const char *url,
                                const char *name) {
   static const size_t sizes[] = {1, 2, 4, 256};
@@ -2853,79 +2715,40 @@ static void querydiff_template(querydiff_stats *st, const char *url,
     const hts_boolean fn = url_query_value(url, name, n, sizes[i]);
 
     st->cases++;
-    if (fo != fn || (fo && strcmp(o, n) != 0)) {
-      const char *const q = strchr(url, '?');
+    if (fo == fn && (!fo || strcmp(o, n) == 0))
+      continue;
+    if (strpbrk(name, "=&") != NULL) {
+      if (!fn) {
+        st->allowed_name++;
+        continue;
+      }
+    } else {
+      char *hidden = querydiff_hide_later_qmarks(url);
+      char h[256];
+      const hts_boolean fh = legacy_url_query_value(hidden, name, h, sizes[i]);
+      char *p;
 
-      if ((q != NULL && strchr(q + 1, '?') != NULL) ||
-          strpbrk(name, "=&") != NULL) {
-        st->allowed_e3++;
-      } else {
-        querydiff_fail(st, "%[param]", url, name, fo ? o : "(none)",
-                       fn ? n : "(none)");
+      freet(hidden);
+      for (p = h; *p != '\0'; p++) {
+        if (*p == '\001')
+          *p = '?';
+      }
+      if (fh == fn && (!fh || strcmp(h, n) == 0)) {
+        st->allowed_qmark++;
+        continue;
       }
     }
-  }
-}
-
-/* E4, E5 and E6. Names hold no '=' or '&', as at every call site. */
-static void querydiff_server(querydiff_stats *st, const char *q) {
-  static const char *const names[] = {"w", "e", "sid", "a", "id", ""};
-  static const char *const expected[] = {"abc", "a b", "A", "1", ""};
-  static const size_t sizes[] = {1, 2, 3, 4, 33, 64, 300};
-  size_t i, j;
-
-  for (i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
-    for (j = 0; j < sizeof(sizes) / sizeof(sizes[0]); j++) {
-      char o[300], n[300];
-      const hts_boolean ro = legacy_query_alnum_value(o, sizes[j], q, names[i]);
-      const hts_boolean rn = hts_query_alnum_value(n, sizes[j], q, names[i]);
-
-      st->cases++;
-      if (ro != rn || strcmp(o, n) != 0)
-        querydiff_fail(st, "query_alnum_value", q, names[i], o, n);
-    }
-  }
-  for (i = 0; i < sizeof(expected) / sizeof(expected[0]); i++) {
-    const hts_boolean ro = legacy_body_sid_is_valid(q, expected[i]);
-    const hts_boolean rn =
-        hts_query_all_match(q, "sid", expected[i], LEGACY_SID_VALUE_MAX);
-
-    st->cases++;
-    if (ro != rn)
-      querydiff_fail(st, "body_sid_is_valid", q, expected[i],
-                     ro ? "true" : "false", rn ? "true" : "false");
-  }
-  {
-    String o = STRING_EMPTY, n = STRING_EMPTY;
-
-    st->cases++;
-    legacy_form_split(q, &o);
-    new_form_split(q, &n);
-    if (strcmp(qd_str(&o), qd_str(&n)) != 0) {
-      /* Bug 4: a field with no '=' mis-paired; the fix drops such fields. */
-      char *dropped = querydiff_drop_bare_fields(q);
-      String d = STRING_EMPTY;
-
-      legacy_form_split(dropped, &d);
-      if (querydiff_has_bare_field(q) && strcmp(qd_str(&d), qd_str(&n)) == 0) {
-        st->allowed_e6++;
-      } else {
-        querydiff_fail(st, "form split", q, "", qd_str(&o), qd_str(&n));
-      }
-      StringFree(d);
-      freet(dropped);
-    }
-    StringFree(o);
-    StringFree(n);
+    querydiff_fail(st, "%[param]", url, name, fo ? o : "(none)",
+                   fn ? n : "(none)");
   }
 }
 
 static void querydiff_one(querydiff_stats *st, const char *q) {
-  static const char *const names[] = {"id", "a", "sid", "", "a=b", "a&b", "?"};
+  static const char *const names[] = {"id",  "a",   "sid", "",
+                                      "a=b", "a&b", "?",   "x?id"};
   String url = STRING_EMPTY;
   size_t i;
 
-  querydiff_server(st, q);
   StringCat(url, "/d//p?");
   StringCat(url, q);
   querydiff_normalize(st, StringBuff(url));
@@ -2936,7 +2759,7 @@ static void querydiff_one(querydiff_stats *st, const char *q) {
 
 /* A run of n copies of c. */
 static char *querydiff_run(char c, size_t n) {
-  char *const s = malloct(n + 1);
+  char *s = malloct(n + 1);
 
   assertf(s != NULL);
   memset(s, c, n);
@@ -2945,61 +2768,25 @@ static char *querydiff_run(char c, size_t n) {
 }
 
 static int st_querydiff(httrackp *opt, int argc, char **argv) {
-  static const char *const hand[] = {"",
-                                     "&",
-                                     "&&",
-                                     "a",
-                                     "a&",
-                                     "&a",
-                                     "a&&b",
-                                     "a=",
-                                     "=",
-                                     "=v",
-                                     "a=b=c",
-                                     "a=1&b=2&a=3",
-                                     "b=2&a=1",
-                                     "a=1&&",
-                                     "&&a=1",
-                                     "w=abc",
-                                     "w=ab-c",
-                                     "w=",
-                                     "w&w=1",
-                                     "w=1&w=2",
-                                     "e=x&w=y",
-                                     "sid=abc",
-                                     "sid=abc&sid=abd",
-                                     "sid=abc&sid=abc",
-                                     "sid=",
-                                     "sid",
-                                     "x&sid=abc",
-                                     "sid=%41",
-                                     "sid=a+b",
-                                     "sid=a%20b",
-                                     "sid=%4",
-                                     "sid=%%",
-                                     "a&b=c&d=e",
-                                     "a=1&b&c=2",
-                                     "id=5?id=6",
-                                     "x=1?id=5",
-                                     "xid=5&id=6",
-                                     "id=a%2",
-                                     "id=%41%42",
-                                     "id==5",
-                                     "id",
-                                     "id&id=7",
-                                     "?id=1",
-                                     "a=on&b=ON",
-                                     "#a=1&b",
-                                     ";a=1;b=2",
-                                     "+=+&+",
-                                     "a b=c d&e",
-                                     NULL};
-  /* Long fields at and over the buffers: 33 (window id), 64 (sid), 255 and
-     256 (template value), 254 (template name). */
-  static const size_t lengths[] = {31, 32, 33, 63, 64, 65, 254, 255, 256, 300};
-  static const char *const alphabet[] = {"a", "=", "&",   "%",   "?",  ";",
-                                         "#", "+", " ",   "sid", "w",  "id",
-                                         "/", "1", "%41", "abc", "on", "e"};
+  static const char *const hand[] = {
+      "",          "&",          "&&",
+      "a",         "a&",         "&a",
+      "a&&b",      "a=",         "=",
+      "=v",        "a=b=c",      "a=1&b=2&a=3",
+      "b=2&a=1",   "a=1&&",      "&&a=1",
+      "a&b=c&d=e", "a=1&b&c=2",  "id=5?id=6",
+      "x=1?id=5",  "xid=5&id=6", "id=a%2",
+      "id=%41%42", "id==5",      "id",
+      "id&id=7",   "?id=1",      "a=b=5",
+      "a&b=3",     "#a=1&b",     ";a=1;b=2",
+      "+=+&+",     "a b=c d&e",  "sid=a+b&sid=%41",
+      NULL};
+  /* Long fields at and around the template's 255-byte value and 254-byte
+     name. */
+  static const size_t lengths[] = {63, 64, 65, 254, 255, 256, 300};
+  static const char *const alphabet[] = {"a", "=",   "&",   "%",   "?",  ";",
+                                         "#", "+",   " ",   "sid", "id", "/",
+                                         "1", "%41", "abc", "x"};
   querydiff_stats st = {0, 0, 0, 0};
   uint32_t seed = 1872;
   size_t i;
@@ -3011,18 +2798,17 @@ static int st_querydiff(httrackp *opt, int argc, char **argv) {
   /* The two intended changes, pinned. */
   {
     char v[256];
-    String f = STRING_EMPTY;
 
     if (url_query_value("/p?x=1?id=5", "id", v, sizeof(v)) ||
         !url_query_value("/p?id=5?id=6", "id", v, sizeof(v)) ||
         strcmp(v, "5?id=6") != 0) {
-      querydiff_fail(&st, "%[param] exact key", "?id=5?id=6", "id", "", v);
+      querydiff_fail(&st, "%[param] second '?'", "?id=5?id=6", "id", "", v);
     }
-    new_form_split("a&b=c&&d=e&", &f);
-    if (strcmp(qd_str(&f), "b\001c\002d\001e\002") != 0)
-      querydiff_fail(&st, "form split pairing", "a&b=c&&d=e&", "", "",
-                     qd_str(&f));
-    StringFree(f);
+    if (url_query_value("/p?a=b=5", "a=b", v, sizeof(v)) ||
+        url_query_value("/p?a&b=3", "a&b", v, sizeof(v))) {
+      querydiff_fail(&st, "%[param] name with '=' or '&'", "?a=b=5", "a=b",
+                     "(none)", v);
+    }
   }
   for (i = 0; hand[i] != NULL; i++)
     querydiff_one(&st, hand[i]);
@@ -3032,11 +2818,7 @@ static int st_querydiff(httrackp *opt, int argc, char **argv) {
 
     StringCat(q, "a=1&");
     StringCat(q, run);
-    StringCat(q, "=v&w=");
-    StringCat(q, run);
-    StringCat(q, "&sid=");
-    StringCat(q, run);
-    StringCat(q, "&id=");
+    StringCat(q, "=v&id=");
     StringCat(q, run);
     querydiff_one(&st, StringBuff(q));
     if (lengths[i] <= 254) { /* the template's name cap */
@@ -3060,15 +2842,44 @@ static int st_querydiff(httrackp *opt, int argc, char **argv) {
       StringCat(
           q, alphabet[(seed >> 16) % (sizeof(alphabet) / sizeof(alphabet[0]))]);
     }
-    querydiff_one(&st, qd_str(&q));
+    querydiff_one(&st, StringBuff(q) != NULL ? StringBuff(q) : "");
     StringFree(q);
   }
-  printf("querydiff: %lu cases, %lu failures, allowed: %lu %%[param], %lu "
-         "form split\n",
-         st.cases, st.failures, st.allowed_e3, st.allowed_e6);
+  printf("querydiff: %lu cases, %lu failures, allowed: %lu second '?', %lu "
+         "name with '=' or '&'\n",
+         st.cases, st.failures, st.allowed_qmark, st.allowed_name);
   if (st.failures == 0)
     printf("querydiff: OK\n");
   return st.failures != 0;
+}
+
+/* Prints each field of argv[0] as [key] or [key=value]. */
+static int st_querynext(httrackp *opt, int argc, char **argv) {
+  const char *cur;
+  hts_query_field f;
+  String out = STRING_EMPTY;
+  int bad = 0;
+
+  (void) opt;
+  if (argc > 1) {
+    fprintf(stderr, "querynext: takes one query\n");
+    return 1;
+  }
+  for (cur = argc == 1 ? argv[0] : ""; hts_query_next(&cur, &f);) {
+    StringAddchar(out, '[');
+    StringMemcat(out, f.key, f.keylen);
+    if (f.val != NULL) {
+      StringAddchar(out, '=');
+      StringMemcat(out, f.val, f.vallen);
+      bad |= f.len != f.keylen + 1 + f.vallen || f.val != f.key + f.keylen + 1;
+    } else {
+      bad |= f.len != f.keylen || f.vallen != 0;
+    }
+    StringAddchar(out, ']');
+  }
+  printf("%s%s\n", StringBuff(out), bad ? " BADLEN" : "");
+  StringFree(out);
+  return bad;
 }
 
 /* ------------------------------------------------------------ */
@@ -3155,6 +2966,8 @@ const struct selftest_entry selftests_lib[] = {
     {"querydiff", "",
      "the shared query iterator matches the six parsers it replaced",
      st_querydiff},
+    {"querynext", "<query>", "the fields the shared query iterator reads",
+     st_querynext},
     {"gmtime", "",
      "hts_gmtime() fills the caller's buffer, not a static (#794)", st_gmtime},
     {"localtime", "<dir>",

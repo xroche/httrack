@@ -413,19 +413,17 @@ static void tmpl_catc(char *d, size_t dsize, char c) {
 hts_boolean url_query_value(const char *url, const char *name, char *dst,
                             size_t size) {
   const char *const query = strchr(url, '?');
-  const char *val;
-  size_t vallen;
+  hts_query_field f;
+  size_t len;
 
   dst[0] = '\0';
-  if (query == NULL || !hts_query_find(query + 1, name, &val, &vallen)) {
+  if (query == NULL || !hts_query_find(query + 1, name, &f)) {
     return HTS_FALSE;
   }
   /* crawled query text: clip it */
-  if (vallen > size - 1) {
-    vallen = size - 1;
-  }
-  memcpy(dst, val, vallen);
-  dst[vallen] = '\0';
+  len = f.vallen < size - 1 ? f.vallen : size - 1;
+  memcpy(dst, f.val, len);
+  dst[len] = '\0';
   return HTS_TRUE;
 }
 
@@ -1091,7 +1089,6 @@ int url_savename(lien_adrfilsave *const afs,
               name[pos][0] = '\0';
             }
             pos = 0;
-            /* tokens keep one spare byte, as when name[0] got an '=' */
             while(*a != '\0' && *a != ']') {
               if (*a == ':') { // next token; past the fifth they are dropped
                 c = pos + 1 < 5 ? name[++pos] : NULL;

@@ -1,19 +1,26 @@
 #!/bin/bash
 #
-# The shared '&'-query iterator matches the six parsers it replaced, byte for
-# byte, except the two named fixes: %[param] matches its key exactly, and the
-# WebHTTrack form split no longer mis-pairs a field without '='.
+# The shared query iterator matches the parsers it replaced, except in %[param].
 
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-out=$(httrack -O /dev/null -#test=querydiff)
+# Exact counts, so a shrinking corpus or a growing allowlist shows. The allowed
+# %[param] changes: a second '?' no longer starts a field, and a name holding
+# '=' or '&' never matches, because no key can hold either.
+selftest_queue_lines "querydiff: 274752 cases, 0 failures, allowed: 662 second '?', 16 name with '=' or '&'
+querydiff: OK" querydiff
 
-# Exact counts: a corpus that shrinks, or an allowlist that grows, must show.
-want="querydiff: 454552 cases, 0 failures, allowed: 623 %[param], 516 form split"
-grep -qxF "$want" <<<"$out" || fail "expected '$want' in: $out"
-grep -qxF "querydiff: OK" <<<"$out" || fail "no OK line in: $out"
+# Every field is read, empty ones too, and the key ends at the first '='.
+selftest_queue "[a]" querynext a
+selftest_queue "[a][]" querynext "a&"
+selftest_queue "[][]" querynext "&"
+selftest_queue "[a][b=c][][d=e=f]" querynext "a&b=c&&d=e=f"
+selftest_queue "[=v]" querynext "=v"
+selftest_queue "[k=]" querynext "k="
+selftest_queue "[x=1?id=5]" querynext "x=1?id=5"
+selftest_queue "[%41=%26][+]" querynext "%41=%26&+"
 
-echo "PASS"
+selftest_run_queued

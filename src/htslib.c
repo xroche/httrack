@@ -3757,12 +3757,6 @@ int ishttperror(int err) {
   return 0;
 }
 
-/* One query field, as a span into the normalized URL. */
-typedef struct {
-  const char *p;
-  size_t len;
-} norm_field;
-
 /* Declare a non-const version of FUN */
 #define DECLARE_NON_CONST_VERSION(FUN) \
 char *FUN(char *source) { \
@@ -3809,10 +3803,10 @@ HTSEXT_API const char *jump_normalized_const(const char *source) {
 HTSEXT_API DECLARE_NON_CONST_VERSION(jump_normalized)
 
 static int sortNormFnc(const void *a_, const void *b_) {
-  const norm_field *const a = (const norm_field *) a_;
-  const norm_field *const b = (const norm_field *) b_;
+  const hts_query_field *const a = (const hts_query_field *) a_;
+  const hts_query_field *const b = (const hts_query_field *) b_;
   const size_t n = a->len < b->len ? a->len : b->len;
-  const int c = memcmp(a->p, b->p, n);
+  const int c = memcmp(a->key, b->key, n);
 
   if (c != 0)
     return c;
@@ -3844,14 +3838,13 @@ static char *fil_normalized_ex(const char *source, char *dest, int do_slash,
   /* Sort arguments (&foo=1&bar=2 == &bar=2&foo=1) */
   if (do_query && (query = strchr(dest, '?')) != NULL) {
     const char *cur = query + 1;
-    const char *key, *val;
-    size_t keylen, vallen;
+    hts_query_field f;
     size_t nfields = 0;
 
-    while (hts_query_next(&cur, &key, &keylen, &val, &vallen))
+    while (hts_query_next(&cur, &f))
       nfields++;
     if (nfields > 1) {
-      norm_field *fields = malloct(nfields * sizeof(*fields));
+      hts_query_field *fields = malloct(nfields * sizeof(*fields));
       const size_t qLen = strlen(query);
       char *copyBuff = malloct(qLen + 1);
       htsbuff cb;
@@ -3859,10 +3852,9 @@ static char *fil_normalized_ex(const char *source, char *dest, int do_slash,
       assertf(fields != NULL);
       assertf(copyBuff != NULL);
       cur = query + 1;
-      for (i = 0; hts_query_next(&cur, &key, &keylen, &val, &vallen); i++) {
+      for (i = 0; hts_query_next(&cur, &f); i++) {
         assertf(i < nfields);
-        fields[i].p = key;
-        fields[i].len = val != NULL ? (size_t) (val + vallen - key) : keylen;
+        fields[i] = f;
       }
       assertf(i == nfields);
 
@@ -3872,7 +3864,7 @@ static char *fil_normalized_ex(const char *source, char *dest, int do_slash,
       cb = htsbuff_ptr(copyBuff, qLen + 1);
       for (i = 0; i < nfields; i++) {
         htsbuff_catc(&cb, i == 0 ? '?' : '&');
-        htsbuff_catn(&cb, fields[i].p, fields[i].len);
+        htsbuff_catn(&cb, fields[i].key, fields[i].len);
       }
       assertf(cb.len == qLen);
       strlcpybuff(query, copyBuff, qLen + 1);
@@ -3922,8 +3914,8 @@ static int hts_query_key_stripped(const char *arg, size_t keylen,
 char *fil_normalized_filtered_ex(const char *source, char *dest,
                                  const char *strip, int do_slash,
                                  int do_query) {
-  const char *query, *cur, *key, *val;
-  size_t keylen, vallen;
+  const char *query, *cur;
+  hts_query_field f;
   char BIGSTK tmp[HTS_URLMAXSIZE * 2];
   htsbuff cb;
   int wrote = 0;
@@ -3939,11 +3931,10 @@ char *fil_normalized_filtered_ex(const char *source, char *dest,
      (the read re-normalizes it; a dropped empty arg would miss dedup). */
   cb = htsbuff_ptr(tmp, sizeof(tmp));
   htsbuff_catn(&cb, source, (size_t) (query - source));
-  for (cur = query + 1; hts_query_next(&cur, &key, &keylen, &val, &vallen);) {
-    if (!hts_query_key_stripped(key, keylen, strip)) {
+  for (cur = query + 1; hts_query_next(&cur, &f);) {
+    if (!hts_query_key_stripped(f.key, f.keylen, strip)) {
       htsbuff_catc(&cb, wrote ? '&' : '?');
-      htsbuff_catn(&cb, key,
-                   val != NULL ? (size_t) (val + vallen - key) : keylen);
+      htsbuff_catn(&cb, f.key, f.len);
       wrote = 1;
     }
   }
