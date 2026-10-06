@@ -30,4 +30,9 @@ done
 out=$(httrack -O /dev/null -#test=filterlayout)
 grep -qxF "layout after set and add: ok=1" <<<"$out" || fail "layout: $out"
 
+out=$(httrack -O /dev/null -#test=filterkeep)
+for want in "unrelated rule keeps both: ok=1" "junk rule drops only junk: ok=1"; do
+    grep -qxF "$want" <<<"$out" || fail "missing '$want' in: $out"
+done
+
 echo "PASS"

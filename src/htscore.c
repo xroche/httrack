@@ -2663,6 +2663,8 @@ static hts_boolean live_cancel_link_(httrackp *opt, struct_back *sback, int i) {
 
 void hts_apply_live_filters(httrackp *opt, struct_back *sback, int ptr) {
   char **set, **rules;
+  hts_boolean *was_refused = NULL;
+  const int queued = opt->lien_tot - (ptr + 1);
   int added = 0, dropped = 0, i;
   size_t k;
 
@@ -2675,6 +2677,16 @@ void hts_apply_live_filters(httrackp *opt, struct_back *sback, int ptr) {
   hts_mutexrelease(&opt->state.lock);
   if (set == NULL && rules == NULL)
     return;
+  /* A link can be queued although the rules refuse it, as a near link, a
+     start URL or an added URL, and only the change may drop it. ptr is being
+     fetched or parsed. */
+  if (queued > 0) {
+    was_refused = calloct(queued, sizeof(*was_refused));
+    if (was_refused == NULL)
+      hts_log_print(opt, LOG_WARNING, "No memory to drop queued links");
+    for (i = 0; was_refused != NULL && i < queued; i++)
+      was_refused[i] = queued_link_refused_(opt, ptr + 1 + i);
+  }
   if (set != NULL) {
     filters_remove(opt, opt->wizard_filters, opt->user_filters);
     opt->user_filters = 0;
@@ -2689,11 +2701,12 @@ void hts_apply_live_filters(httrackp *opt, struct_back *sback, int ptr) {
   }
   hts_addurl_free(set); /* frees any NULL-terminated string list */
   hts_addurl_free(rules);
-  /* ptr is being fetched or parsed */
-  for (i = ptr + 1; i < opt->lien_tot; i++) {
-    if (queued_link_refused_(opt, i) && live_cancel_link_(opt, sback, i))
+  for (i = 0; was_refused != NULL && i < queued; i++) {
+    if (!was_refused[i] && queued_link_refused_(opt, ptr + 1 + i) &&
+        live_cancel_link_(opt, sback, ptr + 1 + i))
       dropped++;
   }
+  freet(was_refused);
   if (set != NULL)
     hts_log_print(opt, LOG_NOTICE,
                   "%d scan rule(s) set and %d added by user, %d queued link(s) "

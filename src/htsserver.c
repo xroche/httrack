@@ -173,7 +173,8 @@ static void setfilters_from_text(httrackp *opt, const char *text) {
   int argc = 0, i, k = 0;
 
   if (copy != NULL && (argv = hts_split_cmdline(copy, &argc)) != NULL) {
-    /* consecutive separators leave empty fields */
+    /* consecutive separators leave empty fields, and a quoted rule keeps its
+       quotes, so hts_setfilters() refuses it */
     for (i = 0; i < argc; i++) {
       if (argv[i][0] != '\0')
         argv[k++] = argv[i];

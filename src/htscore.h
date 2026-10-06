@@ -482,8 +482,8 @@ int filters_match_url(char **filters, int nfil, const char *adr,
                       const char *fil, int *depth);
 
 /* Apply the queued list and rules to the user's rules, then drop the queued
-   links after ptr that the rules now refuse. Crawl thread only, as it alone
-   reads the filters. */
+   links after ptr that the change makes them refuse. Crawl thread only, as it
+   alone reads the filters. */
 void hts_apply_live_filters(httrackp *opt, struct_back *sback, int ptr);
 
 int fspc(httrackp * opt, FILE * fp, const char *type);

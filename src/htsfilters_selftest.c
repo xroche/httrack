@@ -539,6 +539,51 @@ static int st_filterlayout(httrackp *opt, int argc, char **argv) {
   return ok ? 0 : 1;
 }
 
+/* A live rule drops only the queued links its own change refuses, never one
+   the crawl queued although the rules already refused it. */
+static int st_filterkeep(httrackp *opt, int argc, char **argv) {
+  const htsfilters saved = opt->filters;
+  const int savedwizard = opt->wizard_filters;
+  const int saveduser = opt->user_filters;
+  struct_back *sback = NULL;
+  hash_struct hash;
+  cache_back cache;
+  char **filters = NULL;
+  int filptr = 0, ok;
+
+  (void) argc;
+  (void) argv;
+  memset(&cache, 0, sizeof(cache));
+  st_mirror_wiring(opt, &sback, &hash, HTS_TRUE);
+  assertf(filters_init(&filters, opt->maxfilter, 0) != 0);
+  opt->filters.filters = &filters;
+  opt->filters.filptr = &filptr;
+  filters_insert(opt, 0, "+*");
+  filters_insert(opt, 1, "-*/pic/*");
+  opt->wizard_filters = 0;
+  opt->user_filters = 2;
+  /* a start URL the rules refuse, and a link they allow */
+  assertf(hts_record_link(opt, "www.example.com", "/pic/s.gif", "/p/s.gif", "",
+                          "", ""));
+  assertf(hts_record_link(opt, "www.example.com", "/junk/j.html", "/p/j.html",
+                          "", "", ""));
+  hts_addfilter(opt, "+*/keep/*");
+  hts_apply_live_filters(opt, sback, -1);
+  ok = opt->liens[0]->pass2 != -1 && opt->liens[1]->pass2 != -1;
+  printf("unrelated rule keeps both: ok=%d\n", ok);
+  hts_addfilter(opt, "-*/junk/*");
+  hts_apply_live_filters(opt, sback, -1);
+  ok = opt->liens[0]->pass2 != -1 && opt->liens[1]->pass2 == -1;
+  printf("junk rule drops only junk: ok=%d\n", ok);
+  opt->filters = saved;
+  opt->wizard_filters = savedwizard;
+  opt->user_filters = saveduser;
+  freet(filters[0]);
+  freet(filters);
+  st_mirror_wiring_free(opt, &cache, &sback, &hash);
+  return 0;
+}
+
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
 
@@ -564,5 +609,7 @@ const struct selftest_entry selftests_filters[] = {
      st_filterremove},
     {"filterlayout", "", "a live set replaces only the user's rules",
      st_filterlayout},
+    {"filterkeep", "", "a live rule drops only what its change refuses",
+     st_filterkeep},
     {NULL, NULL, NULL, NULL},
 };
