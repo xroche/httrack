@@ -262,20 +262,41 @@ static int st_filterbounds(httrackp *opt, int argc, char **argv) {
     assertf(strjoker_bounds(subj, pat, &steps, &maxsteps, NULL, NULL) != NULL);
     assertf(steps < maxsteps);
   }
-  /* A class the pattern never closes is re-read in full on every call, so the
-     budget has to count those bytes: counting calls alone let a strjokerfind
-     sweep read 1.5GB under a 2M-call cap (OSS-Fuzz 5279208050589696). */
+  /* An unclosed class is rescanned on every call, so the budget must count
+     bytes (OSS-Fuzz 5279208050589696). Measured at two pattern lengths: a flat
+     per-call charge satisfies either one alone, so only the slope pins it. */
   {
-    const size_t patlen = 1024;
+    const size_t shortlen = 512, longlen = 1536;
+    size_t steps2 = 0;
 
-    pat[0] = '*';
-    pat[1] = '(';
-    memset(pat + 2, '*', patlen - 2);
-    pat[patlen] = '\0';
     memset(subj, '*', 1024);
     subj[1024] = '\0';
+    pat[0] = '*';
+    pat[1] = '(';
+    memset(pat + 2, '*', longlen - 2);
+    pat[shortlen] = '\0';
     assertf(strjoker_bounds(subj, pat, &steps, &maxsteps, NULL, NULL) == NULL);
-    assertf(steps >= patlen);
+    pat[shortlen] = '*';
+    pat[longlen] = '\0';
+    assertf(strjoker_bounds(subj, pat, &steps2, &maxsteps, NULL, NULL) == NULL);
+    assertf(steps2 - steps >= longlen - shortlen);
+  }
+  /* The budget is denominated in bytes, so a long URL must not exhaust it. The
+     reserved-name classes cost ~512 per call, which once made this rule fail
+     and silently stopped a user's -*[path]*[file] from excluding anything. */
+  {
+    const char *seg = "segment-name/";
+    const size_t seglen = strlen(seg);
+    size_t n = 0;
+
+    while (n + seglen < 2000) {
+      memcpy(subj + n, seg, seglen);
+      n += seglen;
+    }
+    memcpy(subj + n, "index.html", 11);
+    assertf(strjoker_bounds(subj, "*[path]*[file]", &steps, &maxsteps, NULL,
+                            NULL) != NULL);
+    assertf(steps < maxsteps / 4);
   }
   freet(pat);
   freet(subj);
