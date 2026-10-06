@@ -267,11 +267,11 @@ static void cmdl_print_args(httrackp *opt, const cmdl_argv *cmd) {
   } while (0)
 
 /* Read the glued digits of the option at com into field, or refuse the
-   command line when they are out of [min, max]. With no digits, nothing
-   changes. */
-#define readGluedOpt(reader, field, min, max)                                  \
+   command line when they are above max. With no digits, nothing changes.
+   A refusal panics and returns -1 from hts_main_internal. */
+#define readGluedOpt_(reader, field, max)                                      \
   do {                                                                         \
-    if (reader(&com, (min), (max), &(field)) == HTS_SCAN_REFUSED) {            \
+    if (reader(&com, 0, (max), &(field)) == HTS_SCAN_REFUSED) {                \
       char s_[256];                                                            \
                                                                                \
       snprintf(s_, sizeof(s_), "Value out of range in option %s", argv[na]);   \
@@ -280,6 +280,8 @@ static void cmdl_print_args(httrackp *opt, const cmdl_argv *cmd) {
       return -1;                                                               \
     }                                                                          \
   } while (0)
+#define readGluedInt(field, max) readGluedOpt_(cmdl_glued_int, field, max)
+#define readGluedLLint(field, max) readGluedOpt_(cmdl_glued_llint, field, max)
 
 hts_scan_result cmdl_glued_llint(char **com, LLint min, LLint max, LLint *out) {
   const char *const digits = *com + 1;
@@ -1309,7 +1311,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             break;
           case 'r':            // n'est plus le recurse get bestial mais wizard itou!
             if (isdigit((unsigned char) *(com + 1))) {
-              readGluedOpt(cmdl_glued_int, opt->depth, 0, INT_MAX);
+              // One short of INT_MAX, as the seed is queued at depth + 1.
+              readGluedInt(opt->depth, INT_MAX - 1);
             } else
               opt->depth = 3;
             break;
@@ -1400,7 +1403,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             break;
           case 'c':
             if (isdigit((unsigned char) *(com + 1))) {
-              readGluedOpt(cmdl_glued_int, opt->maxsoc, 0, INT_MAX);
+              readGluedInt(opt->maxsoc, INT_MAX);
               opt->maxsoc = max(opt->maxsoc, 1); // At least one socket.
             } else
               opt->maxsoc = 4;
@@ -1408,52 +1411,49 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             break;
             //
           case 'p':
-            readGluedOpt(cmdl_glued_int, opt->getmode, 0, INT_MAX);
+            readGluedInt(opt->getmode, INT_MAX);
             break;
             //        
           case 'G':
-            readGluedOpt(cmdl_glued_llint, opt->fragment, 0, INT64_MAX);
+            readGluedLLint(opt->fragment, INT64_MAX);
             break;
           case 'M':
-            readGluedOpt(cmdl_glued_llint, opt->maxsite, 0, INT64_MAX);
+            readGluedLLint(opt->maxsite, INT64_MAX);
             break;
           case 'm':
             // -m,10000 variant
             if (*(com + 1) != ',') {
-              readGluedOpt(cmdl_glued_llint, opt->maxfile_nonhtml, 0,
-                           INT64_MAX);
+              readGluedLLint(opt->maxfile_nonhtml, INT64_MAX);
             }
             if (*(com + 1) == ',' && isdigit((unsigned char) *(com + 2))) {
               com++;
-              readGluedOpt(cmdl_glued_llint, opt->maxfile_html, 0, INT64_MAX);
+              readGluedLLint(opt->maxfile_html, INT64_MAX);
             } else
               opt->maxfile_html = -1;
             break;
             //
           case 'T':
-            readGluedOpt(cmdl_glued_int, opt->timeout, 0, INT_MAX);
+            readGluedInt(opt->timeout, INT_MAX);
             break;
           case 'J':
-            readGluedOpt(cmdl_glued_int, opt->rateout, 0, INT_MAX);
+            readGluedInt(opt->rateout, INT_MAX);
             break;
           case 'R':
-            readGluedOpt(cmdl_glued_int, opt->retry, 0, INT_MAX);
+            readGluedInt(opt->retry, INT_MAX);
             break;
           case 'E':
-            readGluedOpt(cmdl_glued_int, opt->maxtime, 0, INT_MAX);
+            readGluedInt(opt->maxtime, INT_MAX);
             break;
           case 'H':
-            readGluedOpt(cmdl_glued_int, opt->hostcontrol, 0, INT_MAX);
+            readGluedInt(opt->hostcontrol, INT_MAX);
             break;
           case 'A':
-            readGluedOpt(cmdl_glued_int, opt->maxrate, 0, INT_MAX);
+            readGluedInt(opt->maxrate, INT_MAX);
             break;
 
           case 'j':
             opt->parsejava = HTSPARSE_DEFAULT;
-            if (isdigit((unsigned char) *(com + 1))) {
-              readGluedOpt(cmdl_glued_int, opt->parsejava, 0, INT_MAX);
-            }
+            readGluedInt(opt->parsejava, INT_MAX);
             break;
             //
           case 'I':
@@ -1648,7 +1648,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   com++;
                 break;
               case 'e':
-                readGluedOpt(cmdl_glued_int, opt->extdepth, 0, INT_MAX);
+                readGluedInt(opt->extdepth, INT_MAX);
                 break;
               case 'B':
                 opt->tolerant = 1;
@@ -2410,9 +2410,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 {
                   int res = 0;
 
-                  if (isdigit((unsigned char) *(com + 1))) {
-                    readGluedOpt(cmdl_glued_int, res, 0, INT_MAX);
-                  }
+                  readGluedInt(res, INT_MAX);
                   switch (res) {
                   case 1:
                   case 4:
@@ -2441,9 +2439,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               case 'm': { // --mptcp: Multipath TCP where the system has it
                 int on = 1;
 
-                if (isdigit((unsigned char) *(com + 1))) {
-                  readGluedOpt(cmdl_glued_int, on, 0, INT_MAX);
-                }
+                readGluedInt(on, INT_MAX);
                 if (on != 0 && on != 1) {
                   char s[64];
 
@@ -2494,10 +2490,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   coucal cache_hashtable = coucal_new(0);
                   int sendb = 0;
 
-                  if (isdigit((unsigned char) *(com + 1))) {
-                    readGluedOpt(cmdl_glued_int, sendb, 0, INT_MAX);
-                  } else
-                    sendb = 0;
+                  readGluedInt(sendb, INT_MAX);
                   if (!((na + 1 >= argc) || (argv[na + 1][0] == '-'))) {
                     na++;
                     hasFilter = 1;
@@ -2642,11 +2635,10 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 break;          // vérifier stdin
                 //
               case 'L':
-                readGluedOpt(cmdl_glued_int, opt->maxlink, 0, INT_MAX);
+                readGluedInt(opt->maxlink, INT_MAX);
                 break;
               case 'F':
-                readGluedOpt(cmdl_glued_int, opt->maxfilter, 0,
-                             HTS_FILTERS_MAX);
+                readGluedInt(opt->maxfilter, HTS_FILTERS_MAX);
                 break;
               case 'Z':
                 opt->makestat = 1;
@@ -2655,7 +2647,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 opt->maketrack = 1;
                 break;
               case 'u':
-                readGluedOpt(cmdl_glued_int, opt->waittime, 0, INT_MAX);
+                readGluedInt(opt->waittime, INT_MAX);
                 break;
 
                 /*case 'R':    // ohh ftp, catch->ftpget

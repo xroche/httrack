@@ -1678,8 +1678,8 @@ static int st_usercmdrun(httrackp *opt, int argc, char **argv) {
 /* What no digit run can produce, so an untouched field shows. */
 #define ST_GLUED_UNSET (-7)
 
-/* Read text as the glued digits of an option: "got=G value=V adv=N", where N
-   is how far the option pointer moved. */
+/* Read text as the glued digits of an option and print "got=G value=V adv=N".
+   N is the number of bytes the option pointer moved. */
 static void st_glued_read(hts_boolean wide, LLint min, LLint max,
                           const char *text, char *out, size_t size) {
   char buf[256];
@@ -1726,16 +1726,16 @@ static int st_gluedint(httrackp *opt, int argc, char **argv) {
     hts_boolean wide;
     LLint max;
   } sites[] = {
-      {"-r", HTS_FALSE, INT_MAX},   {"-c", HTS_FALSE, INT_MAX},
-      {"-p", HTS_FALSE, INT_MAX},   {"-G", HTS_TRUE, INT64_MAX},
-      {"-M", HTS_TRUE, INT64_MAX},  {"-m", HTS_TRUE, INT64_MAX},
-      {"-m,", HTS_TRUE, INT64_MAX}, {"-T", HTS_FALSE, INT_MAX},
-      {"-J", HTS_FALSE, INT_MAX},   {"-R", HTS_FALSE, INT_MAX},
-      {"-E", HTS_FALSE, INT_MAX},   {"-H", HTS_FALSE, INT_MAX},
-      {"-A", HTS_FALSE, INT_MAX},   {"-j", HTS_FALSE, INT_MAX},
-      {"-%e", HTS_FALSE, INT_MAX},  {"-@i", HTS_FALSE, INT_MAX},
-      {"-@m", HTS_FALSE, INT_MAX},  {"-#C", HTS_FALSE, INT_MAX},
-      {"-#L", HTS_FALSE, INT_MAX},  {"-#F", HTS_FALSE, HTS_FILTERS_MAX},
+      {"-r", HTS_FALSE, INT_MAX - 1}, {"-c", HTS_FALSE, INT_MAX},
+      {"-p", HTS_FALSE, INT_MAX},     {"-G", HTS_TRUE, INT64_MAX},
+      {"-M", HTS_TRUE, INT64_MAX},    {"-m", HTS_TRUE, INT64_MAX},
+      {"-m,", HTS_TRUE, INT64_MAX},   {"-T", HTS_FALSE, INT_MAX},
+      {"-J", HTS_FALSE, INT_MAX},     {"-R", HTS_FALSE, INT_MAX},
+      {"-E", HTS_FALSE, INT_MAX},     {"-H", HTS_FALSE, INT_MAX},
+      {"-A", HTS_FALSE, INT_MAX},     {"-j", HTS_FALSE, INT_MAX},
+      {"-%e", HTS_FALSE, INT_MAX},    {"-@i", HTS_FALSE, INT_MAX},
+      {"-@m", HTS_FALSE, INT_MAX},    {"-#C", HTS_FALSE, INT_MAX},
+      {"-#L", HTS_FALSE, INT_MAX},    {"-#F", HTS_FALSE, HTS_FILTERS_MAX},
       {"-#u", HTS_FALSE, INT_MAX}};
 
   static const char *const spaces[] = {"", " ", "\t"};

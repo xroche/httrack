@@ -1,7 +1,8 @@
 #!/bin/bash
 #
 # hts_addfilter() and hts_setfilters() queue signed scan rules within the length
-# cap, in call order, and refuse the rest (#128).
+# cap, in call order, and refuse the rest (#128). The filter list stops growing
+# at its bound.
 
 set -euo pipefail
 
@@ -24,6 +25,12 @@ done
 out=$(httrack -O /dev/null -#test=filterremove)
 for want in "remove none: ok=1" "remove one: ok=1" "remove all: ok=1" \
     "filterremove self-test OK"; do
+    grep -qxF "$want" <<<"$out" || fail "missing '$want' in: $out"
+done
+
+out=$(httrack -O /dev/null -#test=filtergrow)
+for want in "growth bound: ok=1" "full list drops a rule: ok=1" \
+    "no growth past the bound: ok=1" "filtergrow self-test OK"; do
     grep -qxF "$want" <<<"$out" || fail "missing '$want' in: $out"
 done
 

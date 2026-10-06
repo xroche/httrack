@@ -35,7 +35,7 @@ glued 'got=-1 value=-7 adv=19' llint 0 "$max64" 9223372036854775808
 glued 'got=-1 value=-7 adv=20' llint 0 "$max64" 99999999999999999999
 
 # The counts pin the corpus, so a sweep that silently shrinks goes red.
-glued 'glued-int: 13230 compared, 10668 signed or spaced now unread, 555 too large now refused, 0 failures'
+glued 'glued-int: 13230 compared, 10668 signed or spaced now unread, 560 too large now refused, 0 failures'
 
 selftest_run_queued
 
@@ -65,20 +65,24 @@ run 0 -c0 >/dev/null
 grep -q "$limited" "$tmp/$n/hts-log.txt" && fail "-c0 was not read as 1"
 
 # Each option takes the largest value its field holds, and leaves no digit over
-# to be read as an unknown option.
+# to be read as an unknown option. A trailing -T-5 fails the parse, so nothing
+# runs at these values. -r stops one short, for the seed's depth + 1.
 int_max=2147483647
-run 0 -r$int_max -p$int_max -T$int_max -J$int_max -R$int_max -E$int_max \
-    -H$int_max -A$int_max -j$int_max -%e$int_max -#L$int_max -#F1000 \
-    -G$max64 -M$max64 -m$max64,$max64 >/dev/null
+out=$(run 255 -r$((int_max - 1)) -p$int_max -T$int_max -J$int_max -R$int_max \
+    -E$int_max -H$int_max -A$int_max -j$int_max -%e$int_max -#L$int_max \
+    -#u$int_max -G$max64 -M$max64 -m$max64,$max64 -T-5)
+grep -q 'invalid option 5' <<<"$out" || fail "a largest value was refused: $out"
 # -#F stops where its slots stop fitting an int offset.
-out=$(run 255 -#F522264)
+out=$(run 255 -#F522263 -T-5)
+grep -q 'invalid option 5' <<<"$out" || fail "-#F522263 was refused: $out"
+out=$(run 255 -#F522264 -T-5)
 grep -q 'Value out of range in option -#F522264' <<<"$out" ||
     fail "-#F522264 was not refused: $out"
 out=$(run 255 -@m$int_max)
 grep -q "Unknown value for -@m: $int_max" <<<"$out" ||
     fail "-@m$int_max read as: $out"
 
-for opt in -T2147483648 -M99999999999999999999 -%e4294967297 -@m99999999999; do
+for opt in -r$int_max -T2147483648 -M99999999999999999999 -%e4294967297 -@m99999999999; do
     out=$(run 255 "$opt")
     grep -q "Value out of range in option $opt" <<<"$out" ||
         fail "$opt was not refused: $out"

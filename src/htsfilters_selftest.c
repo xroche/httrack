@@ -503,6 +503,48 @@ static int st_filterremove(httrackp *opt, int argc, char **argv) {
   return ok ? 0 : 1;
 }
 
+/* The filter list stops growing at HTS_FILTERS_MAX, and a full list drops a
+   rule rather than writing past its end. */
+static int st_filtergrow(httrackp *opt, int argc, char **argv) {
+  const htsfilters saved = opt->filters;
+  const int savedmax = opt->maxfilter;
+  char **filters = NULL;
+  int filptr, ok, all;
+
+  (void) argc;
+  (void) argv;
+  ok = filters_may_grow(HTS_FILTERS_MAX) &&
+       !filters_may_grow(HTS_FILTERS_MAX + 1);
+  printf("growth bound: ok=%d\n", ok);
+  all = ok;
+
+  opt->maxfilter = 128;
+  assertf(filters_init(&filters, opt->maxfilter, 0) != 0);
+  opt->filters.filters = &filters;
+  opt->filters.filptr = &filptr;
+  filptr = opt->maxfilter - 1;
+  ok = !filters_insert(opt, filptr, "+full*") && filptr == opt->maxfilter - 1 &&
+       filters[filptr][0] == '\0';
+  printf("full list drops a rule: ok=%d\n", ok);
+  all = all && ok;
+
+  /* Neither call reads the array here, so it need not be this large. */
+  opt->maxfilter = HTS_FILTERS_MAX + 1;
+  filptr = opt->maxfilter - 1;
+  filters_make_room(opt, 1);
+  ok = opt->maxfilter == HTS_FILTERS_MAX + 1 &&
+       !filters_insert(opt, filptr, "+past*") && filptr == HTS_FILTERS_MAX;
+  printf("no growth past the bound: ok=%d\n", ok);
+  all = all && ok;
+
+  opt->filters = saved;
+  opt->maxfilter = savedmax;
+  freet(filters[0]);
+  freet(filters);
+  printf("filtergrow self-test %s\n", all ? "OK" : "FAILED");
+  return all ? 0 : 1;
+}
+
 /* A live set replaces only the user's rules, and lands before the adds queued
    after it, between the wizard's rules and the engine's bans. */
 static int st_filterlayout(httrackp *opt, int argc, char **argv) {
@@ -620,6 +662,8 @@ const struct selftest_entry selftests_filters[] = {
      st_addfilter},
     {"filterremove", "", "filters_remove() closes the gap it leaves",
      st_filterremove},
+    {"filtergrow", "", "the filter list stops growing at HTS_FILTERS_MAX",
+     st_filtergrow},
     {"filterlayout", "", "a live set replaces only the user's rules",
      st_filterlayout},
     {"filterkeep", "", "a live rule drops only what its change refuses",

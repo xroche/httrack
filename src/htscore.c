@@ -874,7 +874,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
           }
 
           /* sanity check */
-          if (filptr + 1 >= opt->maxfilter) {
+          if (filptr + 1 >= opt->maxfilter &&
+              filters_may_grow(opt->maxfilter)) {
             opt->maxfilter += HTS_FILTERSINC;
             if (filters_init(&filters, opt->maxfilter, HTS_FILTERSINC) == 0) {
               printf("PANIC! : Too many filters : >%d [%d]\n", filptr,
@@ -887,7 +888,6 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
               return 0;
             }
           }
-
         }
 
       } else { // a plain URL
@@ -2578,8 +2578,13 @@ void host_ban(httrackp * opt, int ptr,
   }
 }
 
+hts_boolean filters_may_grow(int maxfilter) {
+  return maxfilter <= HTS_FILTERS_MAX;
+}
+
 void filters_make_room(httrackp *opt, int n) {
-  if (*opt->filters.filptr + n >= opt->maxfilter) {
+  if (*opt->filters.filptr + n >= opt->maxfilter &&
+      filters_may_grow(opt->maxfilter)) {
     opt->maxfilter += HTS_FILTERSINC;
     if (filters_init(opt->filters.filters, opt->maxfilter, HTS_FILTERSINC) ==
         0) {
@@ -2782,6 +2787,13 @@ hts_boolean filters_insert(httrackp *opt, int pos, const char *pattern) {
                   (int) len, (int) HTS_FILTER_MAXLEN, pattern);
     return HTS_FALSE;
   }
+  if (*opt->filters.filptr + 1 >= opt->maxfilter) {
+    hts_log_print(
+        opt, LOG_WARNING,
+        "Filter rule dropped: the filter list is full at %d rules: %s",
+        *opt->filters.filptr, pattern);
+    return HTS_FALSE;
+  }
   for (i = *opt->filters.filptr; i > pos; i--)
     strlcpybuff(filters[i], filters[i - 1], HTS_FILTER_SLOT_SIZE);
   strlcpybuff(filters[pos], pattern, HTS_FILTER_SLOT_SIZE);
@@ -2833,7 +2845,7 @@ int filters_init(char ***ptrfilters, int maxfilter, int filterinc) {
     else
       from = filter_max - filterinc;
     for(i = 0; i <= filter_max; i++) {  // PLUS UN (sécurité)
-      filters[i] = filters[0] + i * HTS_FILTER_SLOT_SIZE;
+      filters[i] = filters[0] + (size_t) i * HTS_FILTER_SLOT_SIZE;
     }
     for(i = from; i <= filter_max; i++) {       // PLUS UN (sécurité)
       filters[i][0] = '\0';     // clear
