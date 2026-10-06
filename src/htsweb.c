@@ -885,17 +885,20 @@ int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_back * b
                              s + l - MAX_LEN_INPROGRESS / 2 + 2);
                 }
 
-                if (back[i].r.totalsize > 0) {  // taille prédéfinie
+                /* An FTP worker may be writing the size right now. */
+                const LLint size = hts_load_relaxed_llint(&back[i].r.size);
+
+                if (back[i].r.totalsize > 0) { // known size
                   StatsBuffer[index].sizetot = back[i].r.totalsize;
-                  StatsBuffer[index].size = back[i].r.size;
-                } else {        // pas de taille prédéfinie
+                  StatsBuffer[index].size = size;
+                } else { // unknown size
                   if (hts_load_acquire_int(&back[i].status) ==
-                      STATUS_READY) { // prêt
-                    StatsBuffer[index].sizetot = back[i].r.size;
-                    StatsBuffer[index].size = back[i].r.size;
+                      STATUS_READY) { // ready
+                    StatsBuffer[index].sizetot = size;
+                    StatsBuffer[index].size = size;
                   } else {
                     StatsBuffer[index].sizetot = 8192;
-                    StatsBuffer[index].size = (back[i].r.size % 8192);
+                    StatsBuffer[index].size = (size % 8192);
                   }
                 }
                 index++;

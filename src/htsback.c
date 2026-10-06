@@ -5637,7 +5637,7 @@ LLint back_transferred(LLint nb, struct_back * sback) {
     if ((hts_load_acquire_int(&back[i].status) > 0) &&
         (hts_load_acquire_int(&back[i].status) < 99 ||
          hts_load_acquire_int(&back[i].status) >= 1000))
-      nb += back[i].r.size;
+      nb += hts_load_relaxed_llint(&back[i].r.size);
   // stored (ready) slots
   if (sback->ready != NULL) {
 #ifndef HTS_NO_BACK_ON_DISK
