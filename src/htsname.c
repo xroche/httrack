@@ -41,6 +41,7 @@ Please visit our Website: http://www.httrack.com
 #include "htstools.h"
 #include "htscharset.h"
 #include "htsencoding.h"
+#include "htsescape.h"
 #include "htssniff.h"
 #include "htscodec.h"
 #include "htszlib.h"
@@ -408,6 +409,23 @@ static void tmpl_catc(char *d, size_t dsize, char c) {
   tmpl_catn(tmpltail, sizeof(tmpltail), (S), (size_t) (N))
 #define TMPL_TAIL(S) TMPL_TAILN((S), (size_t) -1)
 #define TMPL_TAILC(C) tmpl_catc(tmpltail, sizeof(tmpltail), (C))
+
+hts_boolean url_query_value(const char *url, const char *name, char *dst,
+                            size_t size) {
+  const char *const query = strchr(url, '?');
+  hts_query_field f;
+  size_t len;
+
+  dst[0] = '\0';
+  if (query == NULL || !hts_query_find(query + 1, name, &f)) {
+    return HTS_FALSE;
+  }
+  /* crawled query text: clip it */
+  len = f.vallen < size - 1 ? f.vallen : size - 1;
+  memcpy(dst, f.val, len);
+  dst[len] = '\0';
+  return HTS_TRUE;
+}
 
 // Build the local save name (save) from adr/fil; renames on collision
 // (e.g. INDEX.HTML vs index.html).
@@ -1062,13 +1080,16 @@ int url_savename(lien_adrfilsave *const afs,
           if (strchr(a, ']')) {
             int pos = 0;
             char name[5][256];
+            char value[256];
             char *c = name[0];
+            const char *d;
 
             for(pos = 0; pos < 5; pos++) {
               name[pos][0] = '\0';
             }
             pos = 0;
-            /* one byte spare in each token for the '=' name[0] gets below */
+            // The + 2 cap once left room for an appended '=', and it stays so
+            // the same names fit.
             while(*a != '\0' && *a != ']') {
               if (*a == ':') { // next token; past the fifth they are dropped
                 c = pos + 1 < 5 ? name[++pos] : NULL;
@@ -1082,40 +1103,17 @@ int url_savename(lien_adrfilsave *const afs,
             if (*a == ']') {
               a++;
             }
-            strcatbuff(name[0], "=");   /* param=.. */
-            c = strchr(fil_complete, '?');
-            /* parameters exists */
-            if (c) {
-              char *cp;
-
-              while((cp = strstr(c + 1, name[0])) && *(cp - 1) != '?' && *(cp - 1) != '&') {    /* finds [?&]param= */
-                c = cp;
-              }
-              if (cp) {
-                c = cp + strlen(name[0]);       /* jumps "param=" */
-                TMPL_TAIL(name[1]);             /* prefix */
-                if (*c != '\0' && *c != '&') {
-                  char *d = name[0];
-
-                  /* crawled query text: clip it into the token buffer */
-                  while (*c != '\0' && *c != '&' &&
-                         d + 1 < name[0] + sizeof(name[0])) {
-                    *d++ = *c++;
-                  }
-                  *d = '\0';
-                  d = unescape_http(catbuff, sizeof(catbuff), name[0]);
-                  if (d && *d) {
-                    TMPL_CAT(d); /* value */
-                  } else {
-                    TMPL_TAIL(name[3]); /* empty replacement if any */
-                  }
-                } else {
-                  TMPL_TAIL(name[3]); /* empty replacement if any */
-                }
-                TMPL_TAIL(name[2]); /* suffix */
+            if (url_query_value(fil_complete, name[0], value, sizeof(value))) {
+              TMPL_TAIL(name[1]); /* prefix */
+              d = value[0] != '\0'
+                      ? unescape_http(catbuff, sizeof(catbuff), value)
+                      : NULL;
+              if (d && *d) {
+                TMPL_CAT(d); /* value */
               } else {
-                TMPL_TAIL(name[4]); /* not found replacement if any */
+                TMPL_TAIL(name[3]); /* empty replacement if any */
               }
+              TMPL_TAIL(name[2]); /* suffix */
             } else {
               TMPL_TAIL(name[4]); /* not found replacement if any */
             }

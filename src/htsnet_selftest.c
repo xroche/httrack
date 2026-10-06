@@ -129,6 +129,27 @@ static int st_ftpaddr(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Print what a PASV or EPSV reply parses into, or "refused". */
+static int st_ftppasv(httrackp *opt, int argc, char **argv) {
+  char ip[64];
+  int port = -1;
+
+  (void) opt;
+  if (argc != 2 ||
+      (strcmp(argv[0], "pasv") != 0 && strcmp(argv[0], "epsv") != 0)) {
+    fprintf(stderr, "ftp-pasv: needs pasv|epsv and a reply line\n");
+    return 1;
+  }
+  strcpybuff(ip, "-");
+  if (strcmp(argv[0], "pasv") == 0
+          ? ftp_parse_pasv(argv[1], ip, sizeof(ip), &port)
+          : ftp_parse_epsv(argv[1], &port))
+    printf("ip=%s port=%d\n", ip, port);
+  else
+    printf("refused port=%d\n", port);
+  return 0;
+}
+
 static int st_proxyurl(httrackp *opt, int argc, char **argv) {
   char BIGSTK name[HTS_URLMAXSIZE * 2];
   int port = -1;
@@ -1394,6 +1415,8 @@ const struct selftest_entry selftests_net[] = {
 #endif
     {"ftpaddr", "<url-address>...", "host/port the FTP path splits out",
      st_ftpaddr},
+    {"ftp-pasv", "pasv|epsv <reply>",
+     "the address and port a PASV or EPSV reply parses into", st_ftppasv},
     {"proxyurl", "<proxy-arg>", "parse a -P proxy URL into host/port",
      st_proxyurl},
     {"socks5", "", "SOCKS5 handshake framing and credential self-test",

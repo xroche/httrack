@@ -26,8 +26,8 @@ Please visit our Website: http://www.httrack.com
 */
 
 /* ------------------------------------------------------------ */
-/* File: percent-escape decoding, shared by the engine and       */
-/*       htsserver                                              */
+/* File: percent-escape decoding and '&'-separated queries,     */
+/*       shared by the engine and htsserver                     */
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
@@ -44,5 +44,25 @@ extern void hts_unescapehttp(const char *s, String *tempo);
 /* As hts_unescapehttp(), minus the '+' rule, and collapsing a decoded run of
    line separators so an escaped CRLF cannot forge an .ini line break. */
 extern void hts_unescapeini(const char *s, String *tempo);
+
+/* This holds one "key[=value]" field of an '&'-separated query. The spans
+   point into the query and are not NUL-terminated. */
+typedef struct hts_query_field {
+  const char *key;
+  size_t keylen;
+  const char *val; /* NULL when the field has no '=' */
+  size_t vallen;   /* 0 when val is NULL */
+  size_t len;      /* the whole field: key, '=' and value */
+} hts_query_field;
+
+/* Reads the next '&'-separated field at *cur, empty fields included. The key
+   ends at the first '='. *cur then moves to the next field, and becomes NULL
+   after the last one. Returns HTS_FALSE, leaving *field alone, once *cur is
+   NULL. */
+extern hts_boolean hts_query_next(const char **cur, hts_query_field *field);
+
+/* Finds the first field of query with an '=' whose key is exactly name. */
+extern hts_boolean hts_query_find(const char *query, const char *name,
+                                  hts_query_field *field);
 
 #endif
