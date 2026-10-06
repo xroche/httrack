@@ -1,17 +1,15 @@
 #!/bin/bash
 #
-# The shared query iterator matches the parsers it replaced, except in %[param].
+# The shared query iterator and the %[param] lookup read keys exactly.
 
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-# The counts are exact, so a shrinking corpus or a growing allowlist shows. In
-# %[param], a second '?' no longer starts a field, and a name holding '=' or '&'
+# In %[param], a second '?' does not start a field, and a name holding '=' or '&'
 # never matches, because no key can hold either.
-selftest_queue_lines "querydiff: 291200 cases, 0 failures, allowed: 674 second '?', 16 name with '=' or '&'
-querydiff: OK" querydiff
+selftest_queue_lines "queryparam: OK" queryparam
 
 # Every field is read, empty ones too, and the key ends at the first '='. A '|'
 # marks the end of the key.
