@@ -1056,3 +1056,5 @@ Longest delay to obey when a server sends a Retry-After header. Use 0 to retry w
 Cea mai lungă aşteptare respectată când un server trimite un antet Retry-After. Folosiţi 0 pentru a reîncerca fără aşteptare.
 A rule you add here applies to the mirror now running, and wins over the rules above it. A rule you remove applies to the next one.
 O regulă adăugată aici se aplică clonării aflate în desfăşurare şi are prioritate faţă de regulile de deasupra ei. Eliminarea unei reguli se aplică abia la următoarea clonare.
+This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
+Această regulă de scanare nu poate fi folosită. O regulă începe cu + sau -, continuă cu un tipar şi trebuie să încapă pe un singur rând scurt.

@@ -1056,3 +1056,5 @@ Longest delay to obey when a server sends a Retry-After header. Use 0 to retry w
 伺服器送出 Retry-After 標頭時，最長願意等待的秒數。填 0 表示不等待就重試。
 A rule you add here applies to the mirror now running, and wins over the rules above it. A rule you remove applies to the next one.
 在此新增的規則會套用到目前正在執行的鏡像，並優先於上方的規則。移除規則要到下一次鏡像才會生效。
+This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
+無法使用此掃描規則。規則以 + 或 - 開頭，後接比對模式，且必須是一行簡短文字。

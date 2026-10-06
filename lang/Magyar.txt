@@ -1056,3 +1056,5 @@ Longest delay to obey when a server sends a Retry-After header. Use 0 to retry w
 A leghosszabb várakozás, amelyet a program betart, ha a kiszolgáló Retry-After fejlécet küld. A 0 azonnali újrapróbálkozást jelent.
 A rule you add here applies to the mirror now running, and wins over the rules above it. A rule you remove applies to the next one.
 Az itt hozzáadott szabály az éppen futó tükrözésre vonatkozik, és elsőbbséget élvez a fölötte lévő szabályokkal szemben. Egy szabály törlése csak a következő tükrözéstől érvényes.
+This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
+Ez a szűrő nem használható. A szűrő + vagy - jellel kezdődik, ezt egy minta követi, és egyetlen rövid sorba kell férnie.

@@ -1056,3 +1056,5 @@ Longest delay to obey when a server sends a Retry-After header. Use 0 to retry w
 Attesa massima rispettata quando un server invia un'intestazione Retry-After. Usare 0 per riprovare senza attendere.
 A rule you add here applies to the mirror now running, and wins over the rules above it. A rule you remove applies to the next one.
 Una regola aggiunta qui vale per la copia in corso e prevale sulle regole sopra di essa. La rimozione di una regola ha effetto solo dalla copia successiva.
+This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
+Questo filtro non può essere usato. Un filtro inizia con + o -, seguito da un modello, e deve stare su una sola riga breve.

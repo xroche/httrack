@@ -1056,3 +1056,5 @@ Longest delay to obey when a server sends a Retry-After header. Use 0 to retry w
 Længste ventetid, der følges, når en server sender en Retry-After-header. Brug 0 for at prøve igen uden at vente.
 A rule you add here applies to the mirror now running, and wins over the rules above it. A rule you remove applies to the next one.
 En regel, du tilføjer her, gælder for den spejlkopiering, der kører nu, og har forrang for reglerne ovenfor. Fjernelse af en regel får først virkning ved den næste spejlkopiering.
+This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
+Denne skanningsregel kan ikke bruges. En regel starter med + eller -, efterfulgt af et mønster, og skal stå på én kort linje.
