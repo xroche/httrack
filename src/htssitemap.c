@@ -279,9 +279,6 @@ static sitemap_doc *sitemap_find(httrackp *opt, const char *adr,
 static hts_boolean sitemap_fetch_allowed(httrackp *opt, const char *adr,
                                          const char *fil,
                                          hts_sitemap_source src) {
-  /* adr and fil are each capped just under HTS_URLMAXSIZE, and lfull prefixes
-     a scheme and a slash on top of both: 2 * HTS_URLMAXSIZE does not fit. */
-  char BIGSTK l[HTS_URLMAXSIZE * 2 + 16], lfull[HTS_URLMAXSIZE * 2 + 16];
   int jokdepth = 0, jok;
 
   hts_boolean refused;
@@ -290,17 +287,8 @@ static hts_boolean sitemap_fetch_allowed(httrackp *opt, const char *adr,
      the wizard admits unconditionally. */
   if (src == HTS_SITEMAP_SRC_USER)
     return HTS_TRUE;
-  strcpybuff(l, jump_identification_const(adr));
-  if (*fil != '/')
-    strcatbuff(l, "/");
-  strcatbuff(l, fil);
-  strcpybuff(lfull, link_has_authority(adr) ? "" : "http://");
-  strcatbuff(lfull, adr);
-  if (*fil != '/')
-    strcatbuff(lfull, "/");
-  strcatbuff(lfull, fil);
-  jok = fa_strjoker_dual(0, *opt->filters.filters, *opt->filters.filptr, lfull,
-                         l, NULL, NULL, &jokdepth);
+  jok = filters_match_url(*opt->filters.filters, *opt->filters.filptr, adr, fil,
+                          &jokdepth);
   refused = (jok == -1) ? HTS_TRUE : HTS_FALSE;
   if (refused) {
     hts_log_print(opt, LOG_NOTICE, "Sitemap: filter rule #%d refuses %s%s",

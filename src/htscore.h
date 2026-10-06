@@ -320,8 +320,8 @@ char **hts_addurl_take(httrackp *opt);
 /* Free a list taken with hts_addurl_take(), strings included. */
 void hts_addurl_free(char **url);
 
-/* Detach the rules hts_addfilter() queued and give the caller ownership; NULL
-   when none. Free it with hts_addurl_free(). */
+/* Detach the queued rules, or return NULL if none. The caller frees the list
+   with hts_addurl_free(). */
 char **hts_addfilter_take(httrackp *opt);
 
 #endif
@@ -470,9 +470,14 @@ hts_boolean filters_insert(httrackp *opt, int pos, const char *pattern);
 /* Grow the filter array so n more rules fit. Aborts when it cannot. */
 void filters_make_room(httrackp *opt, int n);
 
-/* Append the rules hts_addfilter() queued, so they outrank every other rule,
-   then drop the queued links after ptr that a new rule refuses. Crawl thread
-   only, since it alone reads the filters. */
+/* fa_strjoker_dual() verdict of the nfil filters on link adr+fil, in both
+   forms the wizard tests. */
+int filters_match_url(char **filters, int nfil, const char *adr,
+                      const char *fil, int *depth);
+
+/* Append the queued rules so they outrank all others, then drop the queued
+   links after ptr that they refuse. Crawl thread only, as it alone reads the
+   filters. */
 void hts_apply_live_filters(httrackp *opt, struct_back *sback, int ptr);
 
 int fspc(httrackp * opt, FILE * fp, const char *type);

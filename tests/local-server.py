@@ -3059,8 +3059,7 @@ class Handler(SimpleHTTPRequestHandler):
         except OSError:
             pass
 
-    # #128: holds the only socket while a scan rule is added, then lets the
-    # crawl reach the links it queued.
+    # #128: holds the only socket while the test adds a scan rule.
     def route_short_trickle(self):
         self.route_trickle_page(6)
 

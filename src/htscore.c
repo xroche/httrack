@@ -665,6 +665,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   opt->mptcp_connections = 0;
   opt->mptcp_fallbacks = 0;
   opt->upper_links_refused = HTS_FALSE;
+  hts_addurl_free(hts_addfilter_take(opt)); /* left over from a previous run */
 
   /* before the first bailout below, each of which leaves it false */
   set_mirror_completed(opt, completed_out, HTS_FALSE);
@@ -920,24 +921,10 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
       if (ident_url_absolute(url, &af) < 0) {
         printf("--why: unable to parse URL %s" LF, StringBuff(opt->why_url));
       } else {
-        char BIGSTK l[HTS_URLMAXSIZE * 2], lfull[HTS_URLMAXSIZE * 2];
-        int jok, jokDepth = 0;
+        int jokDepth = 0;
+        const int jok =
+            filters_match_url(filters, filptr, af.adr, af.fil, &jokDepth);
 
-        /* the two forms the wizard tests */
-        strcpybuff(l, jump_identification_const(af.adr));
-        if (*af.fil != '/')
-          strcatbuff(l, "/");
-        strcatbuff(l, af.fil);
-        if (!link_has_authority(af.adr))
-          strcpybuff(lfull, "http://");
-        else
-          lfull[0] = '\0';
-        strcatbuff(lfull, af.adr);
-        if (*af.fil != '/')
-          strcatbuff(lfull, "/");
-        strcatbuff(lfull, af.fil);
-        jok = fa_strjoker_dual(/*url */ 0, filters, filptr, lfull, l, NULL,
-                               NULL, &jokDepth);
         if (jok > 0)
           printf("%s: accepted by rule #%d (%s)" LF, url, jokDepth + 1,
                  filters[jokDepth]);
@@ -2498,7 +2485,7 @@ void host_ban(httrackp * opt, int ptr,
     return;                     // erreur.. déja cancellé.. bizarre.. devrait pas arriver
 
   filters_make_room(opt, 1);
-  // interdire host
+  // ban the host
   assertf((*_FILTERS_PTR) < opt->maxfilter);
   if (*_FILTERS_PTR < opt->maxfilter) {
     char BIGSTK rule[HTS_FILTER_SLOT_SIZE + 4];
@@ -2601,14 +2588,11 @@ void filters_make_room(httrackp *opt, int n) {
   }
 }
 
-/* Is link i refused by the n rules starting at index first? */
-static hts_boolean filters_refuse_link_(httrackp *opt, int first, int n,
-                                        int i) {
+int filters_match_url(char **filters, int nfil, const char *adr,
+                      const char *fil, int *depth) {
   /* adr and fil each come from a HTS_URLMAXSIZE * 2 array */
   char BIGSTK l[HTS_URLMAXSIZE * 4 + 16], lfull[HTS_URLMAXSIZE * 4 + 16];
   htsbuff lb = htsbuff_array(l), fb = htsbuff_array(lfull);
-  const char *const adr = heap(i)->adr;
-  const char *const fil = heap(i)->fil;
 
   htsbuff_cpy(&lb, jump_identification_const(adr));
   if (*fil != '/')
@@ -2619,8 +2603,18 @@ static hts_boolean filters_refuse_link_(httrackp *opt, int first, int n,
   if (*fil != '/')
     htsbuff_cat(&fb, "/");
   htsbuff_cat(&fb, fil);
-  return fa_strjoker_dual(0, *opt->filters.filters + first, n, lfull, l, NULL,
-                          NULL, NULL) == -1
+  return fa_strjoker_dual(0, filters, nfil, lfull, l, NULL, NULL, depth);
+}
+
+/* Is queued link lpos refused by the count rules starting at first? */
+static hts_boolean live_rules_refuse_(httrackp *opt, int lpos, int first,
+                                      int count) {
+  const lien_url *const link = heap(lpos);
+
+  /* robots.txt is never filtered, as at startup */
+  return link->pass2 != -1 && strcmp(link->fil, "/robots.txt") != 0 &&
+                 filters_match_url(*opt->filters.filters + first, count,
+                                   link->adr, link->fil, NULL) == -1
              ? HTS_TRUE
              : HTS_FALSE;
 }
@@ -2628,7 +2622,7 @@ static hts_boolean filters_refuse_link_(httrackp *opt, int first, int n,
 void hts_apply_live_filters(httrackp *opt, struct_back *sback, int ptr) {
   char **const rules = hts_addfilter_take(opt);
   const int first = *opt->filters.filptr;
-  int added, dropped = 0, i;
+  int count, dropped = 0, i;
   size_t k;
 
   if (rules == NULL)
@@ -2638,34 +2632,41 @@ void hts_apply_live_filters(httrackp *opt, struct_back *sback, int ptr) {
     if (filters_insert(opt, *opt->filters.filptr, rules[k]))
       hts_log_print(opt, LOG_NOTICE, "Scan rule added by user: %s", rules[k]);
   }
-  hts_addurl_free(rules);
-  added = *opt->filters.filptr - first;
-  /* ptr is being fetched or parsed. A transfer still running, or one already
-     writing to disk, is left to finish too. */
-  for (i = ptr + 1; added > 0 && i < opt->lien_tot; i++) {
-    if (heap(i) != NULL && heap(i)->pass2 != -1 && heap(i)->adr != NULL &&
-        heap(i)->fil != NULL && heap(i)->adr[0] != '!' &&
-        heap(i)->fil[0] != '\0' && filters_refuse_link_(opt, first, added, i)) {
-      const int b =
-          back_index(opt, sback, heap(i)->adr, heap(i)->fil, heap(i)->sav);
+  hts_addurl_free(rules); /* frees any NULL-terminated string list */
+  count = *opt->filters.filptr - first;
+  /* ptr is being fetched or parsed */
+  for (i = ptr + 1; i < opt->lien_tot; i++) {
+    if (live_rules_refuse_(opt, i, first, count)) {
+      int b =
+          back_index_peek(opt, sback, heap(i)->adr, heap(i)->fil, heap(i)->sav);
 
+      /* a result stored on disk is loaded to be dropped, given a free slot */
+      if (b == sback->count) {
+        if (back_search_quick(sback) < 0)
+          continue;
+        b = back_index(opt, sback, heap(i)->adr, heap(i)->fil, heap(i)->sav);
+      }
       if (b >= 0) {
         const lien_back *const slot = &sback->lnk[b];
 
-        if (slot->status != STATUS_READY || slot->r.is_write || slot->testmode)
+        /* Only a result fetched but not yet saved is dropped. The sav test
+           guards the lookup matching on adr and fil alone. */
+        if (slot->status != STATUS_READY || slot->r.is_write ||
+            slot->testmode || strcmp(slot->url_sav, heap(i)->sav) != 0)
           continue;
         /* no cache: a dropped page must not be recorded as fetched */
         back_delete(opt, NULL, sback, b);
       }
       hts_log_print(opt, LOG_DEBUG, "Cancel: %s%s", heap(i)->adr, heap(i)->fil);
       hts_invalidate_link(opt, i);
+      /* the main loop takes every cancelled link out of this count */
+      HTS_STAT.stat_background++;
       dropped++;
     }
   }
-  if (added > 0)
-    hts_log_print(opt, LOG_NOTICE,
-                  "%d scan rule(s) added by user, %d queued link(s) dropped",
-                  added, dropped);
+  hts_log_print(opt, LOG_NOTICE,
+                "%d scan rule(s) added by user, %d queued link(s) dropped",
+                count, dropped);
 }
 
 void filters_bind(httrackp *opt, char ***ptrfilters, int *filptr) {

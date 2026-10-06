@@ -405,6 +405,11 @@ int back_index(httrackp * opt, struct_back * sback, const char *adr, const char 
   return back_index_fetch(opt, sback, adr, fil, sav, 1);
 }
 
+int back_index_peek(httrackp *opt, struct_back *sback, const char *adr,
+                    const char *fil, const char *sav) {
+  return back_index_fetch(opt, sback, adr, fil, sav, 0);
+}
+
 static int back_index_fetch(httrackp * opt, struct_back * sback, const char *adr,
                             const char *fil, const char *sav, int getIndex) {
   lien_back *const back = sback->lnk;
