@@ -121,7 +121,11 @@ def handle_client(conn, logdir, mode, default_port):
         conn.sendall(b"HTTP/1.0 502 Bad Gateway\r\n\r\n")
         conn.close()
         return
-    conn.sendall(b"HTTP/1.0 200 Connection established\r\n\r\n")
+    if mode == "wrap":
+        # a status code past INT_MAX, which a %d parse wraps to 200
+        conn.sendall(b"HTTP/1.1 4294967496 Connection established\r\n\r\n")
+    else:
+        conn.sendall(b"HTTP/1.0 200 Connection established\r\n\r\n")
     threading.Thread(target=pipe, args=(conn, upstream), daemon=True).start()
     pipe(upstream, conn)
 

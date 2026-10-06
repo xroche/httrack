@@ -361,6 +361,13 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
                char *rcvd);
 void treatfirstline(htsblk * retour, const char *rcvd);
 
+/* The three-digit HTTP status code at s, or -1 when s does not start with
+   exactly three digits. */
+int hts_status_code(const char *s);
+
+/* The status code of an "HTTP/x.y NNN reason" line, or -1. */
+int hts_status_line_code(const char *line);
+
 // sous-fonctions
 /* Buffer http_xfread1() fills in its line modes, and so the ceiling on any
    blank-line-terminated block it reads: a header section or a chunk trailer
