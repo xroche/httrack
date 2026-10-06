@@ -665,7 +665,9 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   opt->mptcp_connections = 0;
   opt->mptcp_fallbacks = 0;
   opt->upper_links_refused = HTS_FALSE;
-  hts_addurl_free(hts_addfilter_take(opt)); /* left over from a previous run */
+  /* left over from a previous run */
+  hts_addurl_free(hts_addfilter_take(opt));
+  hts_addurl_free(hts_setfilters_take(opt));
 
   /* before the first bailout below, each of which leaves it false */
   set_mirror_completed(opt, completed_out, HTS_FALSE);
@@ -907,6 +909,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
         htsbuff_cat(&primarybuff, "\n");
       }
     } // while
+    opt->user_filters = filptr; /* everything so far came from the user */
 
     /* --why: print which filter rule decides for this URL, then stop */
     if (StringNotEmpty(opt->why_url)) {
@@ -2611,70 +2614,152 @@ int filters_match_url(char **filters, int nfil, const char *adr,
   return fa_strjoker_dual(0, filters, nfil, lfull, l, NULL, NULL, depth);
 }
 
-/* Is queued link lpos refused by the count rules starting at first? */
-static hts_boolean live_rules_refuse_(httrackp *opt, int lpos, int first,
-                                      int count) {
+/* Does the whole rule array refuse queued link lpos? Sets *rule, if not NULL,
+   to the index of the rule that decides. */
+static hts_boolean queued_link_refused_(httrackp *opt, int lpos, int *rule) {
   const lien_url *const link = heap(lpos);
 
   /* robots.txt is never filtered, as at startup */
   return link->pass2 != -1 && strcmp(link->fil, "/robots.txt") != 0 &&
-         filters_match_url(*opt->filters.filters + first, count, link->adr,
-                           link->fil, NULL) == -1;
+         filters_match_url(*opt->filters.filters, *opt->filters.filptr,
+                           link->adr, link->fil, rule) == -1;
+}
+
+/* Insert rule at the end of the user's rules. */
+static hts_boolean filters_append_user_(httrackp *opt, const char *rule) {
+  filters_make_room(opt, 1);
+  if (!filters_insert(opt, opt->wizard_filters + opt->user_filters, rule))
+    return HTS_FALSE;
+  opt->user_filters++;
+  return HTS_TRUE;
+}
+
+/* Cancel queued link i, unless its transfer has started or it is written to
+   disk already. Returns HTS_TRUE if it was cancelled. */
+static hts_boolean live_cancel_link_(httrackp *opt, struct_back *sback, int i) {
+  int b = back_index_peek(opt, sback, heap(i)->adr, heap(i)->fil, heap(i)->sav);
+
+  /* load a stored result only if a slot is free */
+  if (b == sback->count) {
+    if (back_search_quick(sback) < 0)
+      return HTS_FALSE;
+    b = back_index(opt, sback, heap(i)->adr, heap(i)->fil, heap(i)->sav);
+  }
+  if (b >= 0) {
+    const lien_back *const slot = &sback->lnk[b];
+
+    /* the sav test rejects a slot matched on adr and fil alone */
+    if (slot->status != STATUS_READY || slot->r.is_write || slot->testmode ||
+        strcmp(slot->url_sav, heap(i)->sav) != 0)
+      return HTS_FALSE;
+    /* no cache: a dropped page must not be recorded as fetched */
+    back_delete(opt, NULL, sback, b);
+  }
+  hts_log_print(opt, LOG_DEBUG, "Cancel: %s%s", heap(i)->adr, heap(i)->fil);
+  hts_invalidate_link(opt, i);
+  /* the main loop takes every cancelled link out of this count */
+  HTS_STAT.stat_background++;
+  return HTS_TRUE;
+}
+
+/* Is rule index r one this change brought in? A rule of a set that the old
+   user rules already held is not, so resending it drops nothing. */
+static hts_boolean live_rule_is_new_(httrackp *opt, int r, int first_new,
+                                     int first_add, char **old) {
+  const char *const rule = (*opt->filters.filters)[r];
+  size_t k;
+
+  if (r < first_new || r >= opt->wizard_filters + opt->user_filters)
+    return HTS_FALSE;
+  if (r >= first_add)
+    return HTS_TRUE;
+  /* without the old rules, keep the link rather than guess */
+  for (k = 0; old != NULL && old[k] != NULL; k++) {
+    if (strcmp(old[k], rule) == 0)
+      return HTS_FALSE;
+  }
+  return old != NULL;
 }
 
 void hts_apply_live_filters(httrackp *opt, struct_back *sback, int ptr) {
-  char **const rules = hts_addfilter_take(opt);
-  const int first = *opt->filters.filptr;
-  int count, dropped = 0, i;
+  char **set, **rules, **old = NULL;
+  hts_boolean *was_refused = NULL;
+  const int queued = opt->lien_tot - (ptr + 1);
+  int added = 0, dropped = 0, first_new, first_add, i;
   size_t k;
 
-  if (rules == NULL)
+  /* one take, so a set always lands before the adds queued after it */
+  hts_mutexlock(&opt->state.lock);
+  set = opt->live_filters_set;
+  opt->live_filters_set = NULL;
+  rules = opt->live_filters;
+  opt->live_filters = NULL;
+  hts_mutexrelease(&opt->state.lock);
+  if (set == NULL && rules == NULL)
     return;
-  for (k = 0; rules[k] != NULL; k++) {
-    filters_make_room(opt, 1);
-    if (filters_insert(opt, *opt->filters.filptr, rules[k]))
-      hts_log_print(opt, LOG_NOTICE, "Scan rule added by user: %s", rules[k]);
+  /* A link can be queued although the rules refuse it, as a start URL, an
+     added URL or a +mime: accept, and only a new rule may drop it. ptr is
+     being fetched or parsed. */
+  if (queued > 0) {
+    was_refused = calloct(queued, sizeof(*was_refused));
+    if (was_refused == NULL)
+      hts_log_print(opt, LOG_WARNING, "No memory to drop queued links");
+    for (i = 0; was_refused != NULL && i < queued; i++)
+      was_refused[i] = queued_link_refused_(opt, ptr + 1 + i, NULL);
   }
-  hts_addurl_free(rules); /* frees any NULL-terminated string list */
-  count = *opt->filters.filptr - first;
-  /* ptr is being fetched or parsed */
-  for (i = ptr + 1; i < opt->lien_tot; i++) {
-    if (live_rules_refuse_(opt, i, first, count)) {
-      int b =
-          back_index_peek(opt, sback, heap(i)->adr, heap(i)->fil, heap(i)->sav);
-
-      /* load a stored result only if a slot is free */
-      if (b == sback->count) {
-        if (back_search_quick(sback) < 0)
-          continue;
-        b = back_index(opt, sback, heap(i)->adr, heap(i)->fil, heap(i)->sav);
+  /* the rules this change inserts end the user's rules */
+  first_new = opt->wizard_filters + (set != NULL ? 0 : opt->user_filters);
+  if (set != NULL) {
+    /* the old user rules, to tell a resent rule from a new one */
+    old = (char **) calloct(opt->user_filters + 1, sizeof(char *));
+    for (i = 0; old != NULL && i < opt->user_filters; i++) {
+      old[i] = strdupt((*opt->filters.filters)[opt->wizard_filters + i]);
+      if (old[i] == NULL) {
+        hts_addurl_free(old); /* NULL-terminated, as calloct zeroed it */
+        old = NULL;
       }
-      if (b >= 0) {
-        const lien_back *const slot = &sback->lnk[b];
-
-        /* the sav test rejects a slot matched on adr and fil alone */
-        if (slot->status != STATUS_READY || slot->r.is_write ||
-            slot->testmode || strcmp(slot->url_sav, heap(i)->sav) != 0)
-          continue;
-        /* no cache: a dropped page must not be recorded as fetched */
-        back_delete(opt, NULL, sback, b);
-      }
-      hts_log_print(opt, LOG_DEBUG, "Cancel: %s%s", heap(i)->adr, heap(i)->fil);
-      hts_invalidate_link(opt, i);
-      /* the main loop takes every cancelled link out of this count */
-      HTS_STAT.stat_background++;
-      dropped++;
+    }
+    filters_remove(opt, opt->wizard_filters, opt->user_filters);
+    opt->user_filters = 0;
+    for (k = 0; set[k] != NULL; k++)
+      filters_append_user_(opt, set[k]);
+  }
+  first_add = opt->wizard_filters + opt->user_filters;
+  for (k = 0; rules != NULL && rules[k] != NULL; k++) {
+    if (filters_append_user_(opt, rules[k])) {
+      hts_log_print(opt, LOG_NOTICE, "Scan rule added by user: %s", rules[k]);
+      added++;
     }
   }
-  hts_log_print(opt, LOG_NOTICE,
-                "%d scan rule(s) added by user, %d queued link(s) dropped",
-                count, dropped);
+  hts_addurl_free(set); /* frees any NULL-terminated string list */
+  hts_addurl_free(rules);
+  for (i = 0; was_refused != NULL && i < queued; i++) {
+    int rule = 0;
+
+    if (queued_link_refused_(opt, ptr + 1 + i, &rule) &&
+        (!was_refused[i] ||
+         live_rule_is_new_(opt, rule, first_new, first_add, old)) &&
+        live_cancel_link_(opt, sback, ptr + 1 + i))
+      dropped++;
+  }
+  freet(was_refused);
+  hts_addurl_free(old);
+  if (set != NULL)
+    hts_log_print(opt, LOG_NOTICE,
+                  "%d scan rule(s) set and %d added by user, %d queued link(s) "
+                  "dropped",
+                  opt->user_filters - added, added, dropped);
+  else
+    hts_log_print(opt, LOG_NOTICE,
+                  "%d scan rule(s) added by user, %d queued link(s) dropped",
+                  added, dropped);
 }
 
 void filters_bind(httrackp *opt, char ***ptrfilters, int *filptr) {
   opt->filters.filters = ptrfilters;
   opt->filters.filptr = filptr;
   opt->wizard_filters = 0;
+  opt->user_filters = 0;
 }
 
 /* A rule the array takes is one strjoker() reads and one a slot holds, whatever
@@ -2703,6 +2788,19 @@ hts_boolean filters_insert(httrackp *opt, int pos, const char *pattern) {
   (*opt->filters.filptr)++;
   assertf((*opt->filters.filptr) < opt->maxfilter);
   return HTS_TRUE;
+}
+
+void filters_remove(httrackp *opt, int pos, int n) {
+  char **const filters = *opt->filters.filters;
+  int i;
+
+  assertf(pos >= 0 && n >= 0 && n <= *opt->filters.filptr - pos);
+  /* copying a slot onto itself would empty it */
+  if (n == 0)
+    return;
+  for (i = pos; i + n < *opt->filters.filptr; i++)
+    strlcpybuff(filters[i], filters[i + n], HTS_FILTER_SLOT_SIZE);
+  *opt->filters.filptr -= n;
 }
 
 int filters_init(char ***ptrfilters, int maxfilter, int filterinc) {
@@ -4401,6 +4499,46 @@ HTSEXT_API hts_boolean hts_filter_rule_ok(const char *rule) {
     if ((unsigned char) rule[i] < ' ')
       return HTS_FALSE;
   }
+  return HTS_TRUE;
+}
+
+char **hts_setfilters_take(httrackp *opt) {
+  char **old;
+
+  hts_mutexlock(&opt->state.lock);
+  old = opt->live_filters_set;
+  opt->live_filters_set = NULL;
+  hts_mutexrelease(&opt->state.lock);
+  return old;
+}
+
+HTSEXT_API hts_boolean hts_setfilters(httrackp *opt, const char *const *rules) {
+  char **copy, **old_set, **old_adds;
+  size_t n, i;
+
+  if (opt == NULL || rules == NULL)
+    return HTS_FALSE;
+  for (n = 0; rules[n] != NULL; n++) {
+    if (!hts_filter_rule_ok(rules[n]))
+      return HTS_FALSE;
+  }
+  if ((copy = (char **) calloct(n + 1, sizeof(char *))) == NULL)
+    return HTS_FALSE;
+  for (i = 0; i < n; i++) {
+    if ((copy[i] = strdupt(rules[i])) == NULL) {
+      hts_addurl_free(copy);
+      return HTS_FALSE;
+    }
+  }
+  /* the new list supersedes rules added before it */
+  hts_mutexlock(&opt->state.lock);
+  old_set = opt->live_filters_set;
+  old_adds = opt->live_filters;
+  opt->live_filters_set = copy;
+  opt->live_filters = NULL;
+  hts_mutexrelease(&opt->state.lock);
+  hts_addurl_free(old_set);
+  hts_addurl_free(old_adds);
   return HTS_TRUE;
 }
 

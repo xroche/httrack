@@ -643,6 +643,13 @@ struct httrackp {
   char **live_filters;   /**< rules queued by hts_addfilter(), NULL-terminated,
                               under state.lock. Live state, so copy_htsopt must
                               leave it alone. Tail: ABI */
+  char **live_filters_set; /**< list queued by hts_setfilters(),
+                              NULL-terminated, or NULL when none, under
+                              state.lock. Live state, so copy_htsopt must leave
+                              it alone. Tail: ABI */
+  int user_filters;        /**< count of the user's rules, held right after the
+                                wizard's block. Live state, so copy_htsopt must leave
+                                it alone. Tail: ABI */
 };
 
 /** Running statistics for a mirror. */

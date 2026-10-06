@@ -82,6 +82,7 @@ coucal NewLangList = NULL;
 /* Language files */
 
 #include "htsserver.h"
+#include "htscmdline.h"
 #include "htsthread.h"
 
 const char *gethomedir(void);
@@ -163,6 +164,26 @@ static const char *server_content_type(const char *file) {
     }
   }
   return NULL;
+}
+
+/* Calls hts_setfilters() with the whitespace-separated rules in text. */
+static void setfilters_from_text(httrackp *opt, const char *text) {
+  char *copy = strdupt(text);
+  char **argv = NULL;
+  int argc = 0, i, k = 0;
+
+  if (copy != NULL && (argv = hts_split_cmdline(copy, &argc)) != NULL) {
+    /* consecutive separators leave empty fields, and a quoted rule keeps its
+       quotes, so hts_setfilters() refuses it */
+    for (i = 0; i < argc; i++) {
+      if (argv[i][0] != '\0')
+        argv[k++] = argv[i];
+    }
+    argv[k] = NULL;
+    hts_setfilters(opt, (const char *const *) argv);
+  }
+  freet(argv);
+  freet(copy);
 }
 
 static int is_html(const char *file) {
@@ -1484,6 +1505,10 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
               ptraddr[0] = (char *) adr + p;
               ptraddr[1] = NULL;
               hts_addurl(global_opt, ptraddr);
+            }
+          } else if ((p = strfield((char *) adr, "set-filters="))) {
+            if (global_opt != NULL) {
+              setfilters_from_text(global_opt, (char *) adr + p);
             }
           } else if ((p = strfield((char *) adr, "add-filter="))) {
             if (global_opt != NULL) {

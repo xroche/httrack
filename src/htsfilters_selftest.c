@@ -435,8 +435,166 @@ static int st_addfilter(httrackp *opt, int argc, char **argv) {
     if (!ordered)
       failed = 1;
   }
+  /* a list with one bad rule queues nothing */
+  {
+    static const char *const bad[] = {"+*", "junk", NULL};
+    static const char *const good[] = {"+*", "-*/junk/*", NULL};
+    static const char *const none[] = {NULL};
+    char **set, **adds;
+    hts_boolean ok;
+
+    ok = !hts_setfilters(opt, bad) && hts_setfilters_take(opt) == NULL;
+    printf("set with a bad rule: refused=%d\n", ok);
+    failed |= !ok;
+    /* a list supersedes rules added before it, not after */
+    hts_addfilter(opt, "-early*");
+    ok = hts_setfilters(opt, good);
+    hts_addfilter(opt, "-late*");
+    set = hts_setfilters_take(opt);
+    adds = hts_addfilter_take(opt);
+    ok = ok && set != NULL && set[0] != NULL && strcmp(set[0], "+*") == 0 &&
+         set[1] != NULL && strcmp(set[1], "-*/junk/*") == 0 && set[2] == NULL &&
+         adds != NULL && adds[0] != NULL && strcmp(adds[0], "-late*") == 0 &&
+         adds[1] == NULL;
+    hts_addurl_free(set);
+    hts_addurl_free(adds);
+    printf("set supersedes earlier adds: ok=%d\n", ok);
+    failed |= !ok;
+    /* an empty list clears the user's rules */
+    ok = hts_setfilters(opt, none) &&
+         (set = hts_setfilters_take(opt)) != NULL && set[0] == NULL;
+    hts_addurl_free(set);
+    printf("empty set: ok=%d\n", ok);
+    failed |= !ok;
+  }
   printf("addfilter self-test %s\n", failed ? "FAILED" : "OK");
   return failed;
+}
+
+/* filters_remove() closes the gap it leaves, and removing nothing keeps all. */
+static int st_filterremove(httrackp *opt, int argc, char **argv) {
+  const htsfilters saved = opt->filters;
+  char **filters = NULL;
+  int filptr = 0, ok;
+
+  (void) argc;
+  (void) argv;
+  assertf(filters_init(&filters, opt->maxfilter, 0) != 0);
+  opt->filters.filters = &filters;
+  opt->filters.filptr = &filptr;
+  filters_insert(opt, 0, "-a*");
+  filters_insert(opt, 1, "-b*");
+  filters_insert(opt, 2, "-c*");
+  filters_remove(opt, 1, 0);
+  ok = filptr == 3 && strcmp(filters[0], "-a*") == 0 &&
+       strcmp(filters[1], "-b*") == 0 && strcmp(filters[2], "-c*") == 0;
+  printf("remove none: ok=%d\n", ok);
+  filters_remove(opt, 1, 1);
+  ok = ok && filptr == 2 && strcmp(filters[0], "-a*") == 0 &&
+       strcmp(filters[1], "-c*") == 0;
+  printf("remove one: ok=%d\n", ok);
+  filters_remove(opt, 0, 2);
+  ok = ok && filptr == 0;
+  printf("remove all: ok=%d\n", ok);
+  opt->filters = saved;
+  freet(filters[0]);
+  freet(filters);
+  printf("filterremove self-test %s\n", ok ? "OK" : "FAILED");
+  return ok ? 0 : 1;
+}
+
+/* A live set replaces only the user's rules, and lands before the adds queued
+   after it, between the wizard's rules and the engine's bans. */
+static int st_filterlayout(httrackp *opt, int argc, char **argv) {
+  static const char *const set[] = {"+s1*", NULL};
+  const htsfilters saved = opt->filters;
+  const int savedwizard = opt->wizard_filters;
+  const int saveduser = opt->user_filters;
+  char **filters = NULL;
+  int filptr = 0, ok;
+
+  (void) argc;
+  (void) argv;
+  assertf(filters_init(&filters, opt->maxfilter, 0) != 0);
+  opt->filters.filters = &filters;
+  opt->filters.filptr = &filptr;
+  filters_insert(opt, 0, "-wiz*");
+  filters_insert(opt, 1, "-user*");
+  filters_insert(opt, 2, "-ban*");
+  opt->wizard_filters = 1;
+  opt->user_filters = 1;
+  hts_setfilters(opt, set);
+  hts_addfilter(opt, "-a*");
+  /* no link is queued past ptr, so no backing pool is needed */
+  hts_apply_live_filters(opt, NULL, opt->lien_tot - 1);
+  ok = filptr == 4 && strcmp(filters[0], "-wiz*") == 0 &&
+       strcmp(filters[1], "+s1*") == 0 && strcmp(filters[2], "-a*") == 0 &&
+       strcmp(filters[3], "-ban*") == 0 && opt->user_filters == 2;
+  printf("layout after set and add: ok=%d\n", ok);
+  opt->filters = saved;
+  opt->wizard_filters = savedwizard;
+  opt->user_filters = saveduser;
+  freet(filters[0]);
+  freet(filters);
+  return ok ? 0 : 1;
+}
+
+/* A live rule drops only the queued links its own change refuses, never one
+   the crawl queued although the rules already refused it. */
+static int st_filterkeep(httrackp *opt, int argc, char **argv) {
+  static const char *const box[] = {"+*", "-*/pic/*", "+*/keep/*", "-*/junk/*",
+                                    NULL};
+  const htsfilters saved = opt->filters;
+  const int savedwizard = opt->wizard_filters;
+  const int saveduser = opt->user_filters;
+  struct_back *sback = NULL;
+  hash_struct hash;
+  cache_back cache;
+  char **filters = NULL;
+  int filptr = 0, ok;
+
+  (void) argc;
+  (void) argv;
+  memset(&cache, 0, sizeof(cache));
+  st_mirror_wiring(opt, &sback, &hash, HTS_TRUE);
+  assertf(filters_init(&filters, opt->maxfilter, 0) != 0);
+  opt->filters.filters = &filters;
+  opt->filters.filptr = &filptr;
+  filters_insert(opt, 0, "+*");
+  filters_insert(opt, 1, "-*/pic/*");
+  filters_insert(opt, 2, "-banned.example/*"); /* an engine host ban */
+  opt->wizard_filters = 0;
+  opt->user_filters = 2;
+  /* a start URL the rules refuse, a link they allow, one on a banned host */
+  assertf(hts_record_link(opt, "www.example.com", "/pic/s.gif", "/p/s.gif", "",
+                          "", ""));
+  assertf(hts_record_link(opt, "www.example.com", "/junk/j.html", "/p/j.html",
+                          "", "", ""));
+  assertf(hts_record_link(opt, "banned.example", "/b.html", "/p/b.html", "", "",
+                          ""));
+  hts_addfilter(opt, "+*/keep/*");
+  hts_apply_live_filters(opt, sback, -1);
+  ok = opt->liens[0]->pass2 != -1 && opt->liens[1]->pass2 != -1 &&
+       opt->liens[2]->pass2 != -1;
+  printf("unrelated rule keeps all: ok=%d\n", ok);
+  /* the box resent with one new rule */
+  hts_setfilters(opt, box);
+  hts_apply_live_filters(opt, sback, -1);
+  ok = opt->liens[0]->pass2 != -1 && opt->liens[1]->pass2 == -1 &&
+       opt->liens[2]->pass2 != -1;
+  printf("resent box drops only junk: ok=%d\n", ok);
+  /* a new rule aimed at the link drops it, refused before or not */
+  hts_addfilter(opt, "-*s.gif");
+  hts_apply_live_filters(opt, sback, -1);
+  ok = opt->liens[0]->pass2 == -1 && opt->liens[2]->pass2 != -1;
+  printf("rule aimed at it drops it: ok=%d\n", ok);
+  opt->filters = saved;
+  opt->wizard_filters = savedwizard;
+  opt->user_filters = saveduser;
+  freet(filters[0]);
+  freet(filters);
+  st_mirror_wiring_free(opt, &cache, &sback, &hash);
+  return 0;
 }
 
 /* Registry: this module's tests, in the order -#test lists them. */
@@ -460,5 +618,11 @@ const struct selftest_entry selftests_filters[] = {
      st_filtercap},
     {"addfilter", "", "hts_addfilter() queues a signed rule within the cap",
      st_addfilter},
+    {"filterremove", "", "filters_remove() closes the gap it leaves",
+     st_filterremove},
+    {"filterlayout", "", "a live set replaces only the user's rules",
+     st_filterlayout},
+    {"filterkeep", "", "a live rule drops only what its change refuses",
+     st_filterkeep},
     {NULL, NULL, NULL, NULL},
 };

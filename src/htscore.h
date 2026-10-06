@@ -324,6 +324,9 @@ void hts_addurl_free(char **url);
    with hts_addurl_free(). */
 char **hts_addfilter_take(httrackp *opt);
 
+/* Takes the list hts_setfilters() queued, like hts_addfilter_take(). */
+char **hts_setfilters_take(httrackp *opt);
+
 #endif
 
 /* Record a link on the heap. All strings are copied (caller keeps ownership).
@@ -467,6 +470,9 @@ void filters_bind(httrackp *opt, char ***ptrfilters, int *filptr);
    HTS_FILTER_MAXLEN warns and returns HTS_FALSE, never stored dead (#1270). */
 hts_boolean filters_insert(httrackp *opt, int pos, const char *pattern);
 
+/* Remove the n rules starting at pos, shifting the rest down. */
+void filters_remove(httrackp *opt, int pos, int n);
+
 /* Grow the filter array so n more rules fit. Aborts when it cannot. */
 void filters_make_room(httrackp *opt, int n);
 
@@ -475,9 +481,9 @@ void filters_make_room(httrackp *opt, int n);
 int filters_match_url(char **filters, int nfil, const char *adr,
                       const char *fil, int *depth);
 
-/* Append the queued rules so they outrank all others, then drop the queued
-   links after ptr that they refuse. Crawl thread only, as it alone reads the
-   filters. */
+/* Apply the queued list and rules to the user's rules, then drop the queued
+   links after ptr that the change makes them refuse. Crawl thread only, as it
+   alone reads the filters. */
 void hts_apply_live_filters(httrackp *opt, struct_back *sback, int ptr);
 
 int fspc(httrackp * opt, FILE * fp, const char *type);

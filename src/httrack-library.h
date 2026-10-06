@@ -384,12 +384,23 @@ HTSEXT_API hts_boolean hts_addurl(httrackp *opt, char **url);
 HTSEXT_API hts_boolean hts_resetaddurl(httrackp *opt);
 
 /** Queue a scan rule ("+pattern" or "-pattern") for a running mirror. The rule
-    is copied, appended after every other rule so it wins, and applied by the
-    engine thread at its next pass. A "-" rule also drops the matching links
-    that are queued, or fetched and not yet saved. A "+" rule only affects links
-    found from then on. @return nonzero if the rule was queued, zero if
-    hts_filter_rule_ok() refuses it or memory ran out. */
+    is copied, appended after the user's other rules so it wins over them, and
+    applied by the engine thread at its next pass. A "-" rule also drops the
+    matching links that are queued, or fetched and not yet saved. A "+" rule
+    only affects links found from then on. @return nonzero if the rule was
+    queued, zero if hts_filter_rule_ok() refuses it or memory ran out. */
 HTSEXT_API hts_boolean hts_addfilter(httrackp *opt, const char *rule);
+
+/** Replace the user's scan rules of a running mirror with @p rules, a
+    NULL-terminated list of single rules applied in the order given. Split
+    rules typed as text on whitespace first, as the command line does. It
+    supersedes any hts_addfilter() rule not yet applied. A queued link is
+    dropped when the rules now refuse it and did not before, or when the rule
+    deciding it was added or is absent from the old list. A removed rule stops
+    applying to links found from then on. @return nonzero if the list was
+    queued, zero if hts_filter_rule_ok() refuses any rule in it or memory ran
+    out, in which case nothing changes. */
+HTSEXT_API hts_boolean hts_setfilters(httrackp *opt, const char *const *rules);
 
 /** Would hts_addfilter() accept @p rule? It must be a + or - sign and a
     pattern, within the filter length cap and free of control characters, so a
