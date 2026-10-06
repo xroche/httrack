@@ -47,6 +47,8 @@ Please visit our Website: http://www.httrack.com
 #include "htsbauth.h"
 #include "htswrap.h"
 #include "htsmodules.h"
+#include <limits.h>
+#include <stdint.h>
 #include "htszlib.h"
 #include "htscharset.h"
 #include "htsselftest.h"

@@ -41,6 +41,7 @@ Please visit our Website: http://www.httrack.com
 /* specific definitions */
 #include "htsbase.h"
 /* Includes and definitions */
+#include <limits.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #ifdef _WIN32

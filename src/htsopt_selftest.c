@@ -32,6 +32,8 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 #include "htsselftest_int.h"
+#include <limits.h>
+#include <stdint.h>
 
 /* What the build's optional features came out as, so a test gates on the binary
    rather than on the platform it guessed from. */
