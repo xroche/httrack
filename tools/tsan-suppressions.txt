@@ -1,17 +1,17 @@
 # Races ThreadSanitizer reports that are deliberate, so the leg stays green and
-# a new report means a new bug. Delete an entry once its reader stops racing.
+# a new report means a new bug. Delete an entry once its reader no longer races.
 #
-# Every entry names a READER, never the writer. Suppressing the FTP worker
-# instead would also hide its release store to lien_back.status going missing,
-# and that is the regression this leg exists to catch.
-#
-# Every read of lien_back.status is an acquire load, so it needs no entry here.
-# lien_back.r.size does: an FTP worker adds to it while back_transferred sums it
-# for the progress display, so a stale read costs nothing. #1809 says fixing
-# that properly needs a lock rather than a barrier.
+# Every entry names a READER, never the writer. Suppressing the FTP worker would
+# also hide a missing release store to lien_back.status, which is the regression
+# this leg catches.
 #
 # race_top, not race: race matches either stack at ANY frame, so it would hide
 # a race on any field anywhere in the function or its callees. race_top matches
 # the top frame only, which is the tightest the tool offers: TSan has no field
 # or location suppression, and ANNOTATE_BENIGN_RACE_SIZED is reader-blind.
+#
+# Every read of lien_back.status is an acquire load, so it needs no entry here.
+# lien_back.r.size does: an FTP worker adds to it while back_transferred sums it
+# for the progress display, so a stale read costs nothing. #1809 says fixing
+# that properly needs a lock rather than a barrier.
 race_top:back_transferred
