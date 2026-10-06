@@ -204,7 +204,8 @@ static void cache_zip_write_failed(httrackp *opt, cache_back *cache,
                       hts_get_zerror(zErr, errbuf, sizeof(errbuf)));
       }
     }
-    opt->state.exit_xh = -1; /* fatal: stop the mirror, exit non-zero */
+    /* fatal: stop the mirror, exit non-zero */
+    hts_store_release_int(&opt->state.exit_xh, -1);
   } else {
     hts_log_print(
         opt, LOG_WARNING, "cache write failed (%s: %s), entry not cached: %s%s",

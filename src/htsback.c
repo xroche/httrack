@@ -418,9 +418,9 @@ static int back_index_fetch(httrackp * opt, struct_back * sback, const char *adr
   int i;
 
   for(i = 0; i < back_max; i++) {
-    if (back[i].status >= 0     /* not free or alive */
-        && strfield2(back[i].url_adr, adr)
-        && strcmp(back[i].url_fil, fil) == 0) {
+    if (hts_load_acquire_int(&back[i].status) >= 0 /* not free or alive */
+        && strfield2(back[i].url_adr, adr) &&
+        strcmp(back[i].url_fil, fil) == 0) {
       if (index == -1)          /* first time we meet, store it */
         index = i;
       else if (sav != NULL && strcmp(back[i].url_sav, sav) == 0) {      /* oops, check sav too */
@@ -505,14 +505,16 @@ static int back_index_ready(httrackp * opt, struct_back * sback, const char *adr
 }
 
 static int slot_can_be_cached_on_disk(const lien_back * back) {
+  /* status first, because an FTP worker still writes tmpfile in its slot */
+  if (hts_load_acquire_int(&back->status) != STATUS_READY)
+    return 0;
   /* A pending backup or spool means the slot is not finalized, and the swap
      would unlink it through back_clear_entry() (#771). */
   if (back->tmpfile != NULL && back->tmpfile[0] != '\0')
     return 0;
   /* locked == 0: neither locked nor pinned */
-  return (back->status == STATUS_READY && back->locked == 0
-          && back->url_sav[0] != '\0'
-          && strcmp(back->url_sav, BACK_ADD_TEST) != 0);
+  return (back->locked == 0 && back->url_sav[0] != '\0' &&
+          strcmp(back->url_sav, BACK_ADD_TEST) != 0);
   /* Note: not checking !IS_DELAYED_EXT(back->url_sav) or it will quickly cause the slots to be filled! */
 }
 
@@ -1105,10 +1107,10 @@ static void back_report_write_failure(httrackp *opt, lien_back *const back) {
       strcpybuff(back->r.msg, "Write error on disk");
     }
   }
-  if (fatal && opt->state.exit_xh == 0) {
+  if (fatal && hts_load_acquire_int(&opt->state.exit_xh) == 0) {
     hts_log_print(opt, LOG_ERROR,
                   "Mirror aborted: disk full or filesystem problems");
-    opt->state.exit_xh = -1;
+    hts_store_release_int(&opt->state.exit_xh, -1);
   }
 }
 
@@ -2649,7 +2651,7 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
 
     /* Stop requested - abort backing */
     /* For update mode: second check after cache lookup not to lose all previous cache data ! */
-    if (opt->state.stop && !opt->is_update) {
+    if (hts_load_acquire_int(&opt->state.stop) && !opt->is_update) {
       back[p].r.statuscode = STATUSCODE_INVALID;        // fatal
       strcpybuff(back[p].r.msg, "mirror stopped by user");
       back[p].status = STATUS_READY;    // terminé
@@ -2783,8 +2785,8 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
       }
 
       if (hash_pos_return) { // in cache, with data
-        const int cache_is_prioritary = cache->type == 1
-          || opt->state.stop != 0;
+        const int cache_is_prioritary =
+            cache->type == 1 || hts_load_acquire_int(&opt->state.stop) != 0;
         if (cache_is_prioritary) {      // cache prioritaire (pas de test if-modified..)
           // dans ce cas on peut également lire des réponses cachées comme 404,302...
           // lire dans le cache
@@ -3022,7 +3024,7 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
     }
 
     /* Stop requested - abort backing */
-    if (opt->state.stop) {
+    if (hts_load_acquire_int(&opt->state.stop)) {
       back[p].r.statuscode = STATUSCODE_INVALID;        // fatal
       strcpybuff(back[p].r.msg, "mirror stopped by user");
       back[p].status = STATUS_READY;    // terminé
@@ -3508,7 +3510,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
   back_clean(opt, cache, sback);
 #endif
 
-  if (opt->state.stop) {
+  if (hts_load_acquire_int(&opt->state.stop)) {
     const int aborted = back_abort_stopped(opt, sback);
 
     if (aborted > 0)
@@ -4113,7 +4115,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                               if ((fcheck = check_fatal_io_errno())) {
                                 hts_log_print(opt, LOG_ERROR,
                                               "Mirror aborted: disk full or filesystem problems");
-                                opt->state.exit_xh = -1;        /* fatal error */
+                                /* fatal error */
+                                hts_store_release_int(&opt->state.exit_xh, -1);
                               }
                             }
 #if HDEBUG
@@ -4272,7 +4275,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                   hts_log_print(
                       opt, LOG_ERROR,
                       "Mirror aborted: disk full or filesystem problems");
-                  opt->state.exit_xh = -1;
+                  hts_store_release_int(&opt->state.exit_xh, -1);
                 }
               } else {
                 if (back[i].r.size > 0)
@@ -5552,27 +5555,27 @@ static hts_mirror_limit back_mirror_limit(httrackp *opt) {
 void back_check_worker_fault(httrackp *opt) {
   /* Already aborted, and -1 outranks the other verdicts: a user stop and a
      rolled-back session both exit 0, and this mirror must not. */
-  if (!hts_worker_faulted() || opt->state.exit_xh == -1)
+  if (!hts_worker_faulted() || hts_load_acquire_int(&opt->state.exit_xh) == -1)
     return;
   hts_log_print(opt, LOG_ERROR,
                 "Mirror aborted: a worker thread crashed and the front end "
                 "recovered it, so the mirror cannot be trusted");
   hts_mutexlock(&opt->state.lock);
-  opt->state.stop = 1;
-  opt->state.exit_xh = -1;
+  hts_store_release_int(&opt->state.stop, 1);
+  hts_store_release_int(&opt->state.exit_xh, -1);
   hts_mutexrelease(&opt->state.lock);
 }
 
 int back_checkmirror(httrackp *opt) {
   /* request a smooth stop the first time each cap is reached */
-  if (back_maxsize_reached(opt) && !opt->state.stop) {
+  if (back_maxsize_reached(opt) && !hts_load_acquire_int(&opt->state.stop)) {
     hts_log_print(opt, LOG_ERROR,
                   "More than " LLintP
                   " bytes have been transferred.. giving up",
                   (LLint) opt->maxsite);
     hts_request_stop(opt, 0);
   }
-  if (back_maxtime_reached(opt) && !opt->state.stop) {
+  if (back_maxtime_reached(opt) && !hts_load_acquire_int(&opt->state.stop)) {
     hts_log_print(opt, LOG_ERROR, "More than %d seconds passed.. giving up",
                   opt->maxtime);
     hts_request_stop(opt, 0);

@@ -82,6 +82,7 @@ coucal NewLangList = NULL;
 /* Language files */
 
 #include "htsserver.h"
+#include "htsthread.h"
 
 const char *gethomedir(void);
 int commandRunning = 0;
@@ -410,8 +411,9 @@ T_SOC smallserver_init(int *port, char *adr, size_t adr_size,
   char h_loc[256 + 2];
   SOCaddr server;
 
-  commandRunning = commandEnd = commandReturn = commandReturnSet =
-    commandEndRequested = 0;
+  /* the watchdog thread may be polling it */
+  hts_store_release_int(&commandRunning, 0);
+  commandEnd = commandReturn = commandReturnSet = commandEndRequested = 0;
   if (commandReturnMsg)
     free(commandReturnMsg);
   commandReturnMsg = NULL;
@@ -1234,10 +1236,14 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
           sprintf(tmp, "%d", commandReturn);
           coucal_write(NewLangList, "commandReturn", (intptr_t) strdup(tmp));
-          coucal_write(NewLangList, "commandReturnMsg",
-                        (intptr_t) commandReturnMsg);
+          /* copies: the table frees its values, the crawl thread the originals
+           */
+          coucal_write(
+              NewLangList, "commandReturnMsg",
+              (intptr_t) (commandReturnMsg ? strdup(commandReturnMsg) : NULL));
           coucal_write(NewLangList, "commandReturnCmdl",
-                        (intptr_t) commandReturnCmdl);
+                       (intptr_t) (commandReturnCmdl ? strdup(commandReturnCmdl)
+                                                     : NULL));
         } else {
           coucal_write(NewLangList, "commandReturn", (intptr_t) NULL);
           coucal_write(NewLangList, "commandReturnMsg", (intptr_t) NULL);
@@ -1562,7 +1568,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                              already the utf-8 argv the engine wants (#629). */
                           webhttrack_main((char *) adr + p);
                         } else {
-                          commandRunning = 0;
+                          hts_store_release_int(&commandRunning, 0);
                           commandEnd = 1;
                         }
                       } else {

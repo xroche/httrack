@@ -986,7 +986,7 @@ static void sig_finish(int code) { // finish the mirror, then quit
 
   signal(code, sig_term); // quit at once if asked again
   if (global_opt != NULL) {
-    global_opt->state.exit_xh = 1;
+    hts_store_release_int(&global_opt->state.exit_xh, 1);
   }
   SIG_PRINT_CODE(SIG_FD_ERR, "\nExit requested to engine (signal ", code);
   errno = saved;
@@ -1079,7 +1079,7 @@ static void sig_leave(int code) {
               "\n** Finishing pending transfers.. press again ^C to quit.\n");
     // ask for stop, and leave the log line to sig_drain_pending()
     stop_log_pending = 1;
-    global_opt->state.stop = 1;
+    hts_store_release_int(&global_opt->state.stop, 1);
     errno = saved;
   } else {
     sig_term(code); /* never returns */

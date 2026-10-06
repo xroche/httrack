@@ -2030,11 +2030,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             const int sf_tagless_body = inscript_locked;
 
             // si nofollow ou un stop a été déclenché, réécrire tous les liens en externe
-            if ((nofollow)
-                || (opt->state.stop
-                    && /* force follow not to lose previous cache data */
-                    !opt->is_update)
-              )
+            /* an update keeps following, so the cache keeps its data */
+            if ((nofollow) ||
+                (hts_load_acquire_int(&opt->state.stop) && !opt->is_update))
               p_nocatch = 1;
 
             // écrire codebase avant, flusher avant code
@@ -3394,7 +3392,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         hts_log_print(opt, LOG_INFO,
                                       "To avoid that: use #L option for more links (example: -#L1000000)");
                         /* same limit as htsAddLink's: report the same abort */
-                        *stre->exit_xh_ = -1;
+                        hts_store_release_int(stre->exit_xh_, -1);
                         if ((opt->getmode & HTS_GETMODE_HTML) && (ptr > 0)) {
                           if (fp) {
                             fclose(fp);
@@ -3686,7 +3684,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
           if (!hts_loop_tick(sback, opt, 0, ptr)) {
             hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
-            *stre->exit_xh_ = 1;        // exit requested
+            hts_store_release_int(stre->exit_xh_, 1); // exit requested
             TypedArrayFree(output_buffer);
             XH_uninit;
             return -1;
@@ -4349,7 +4347,7 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
   /* Windows has no cross-process SIGTERM: a stop request arrives as a file. */
   if (hts_take_lock_request(opt, HTS_ABORT_LOCKNAME)) {
     hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
-    *stre->exit_xh_ = 1;
+    hts_store_release_int(stre->exit_xh_, 1);
     XH_uninit;
     return;
   }
@@ -4379,7 +4377,7 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
           b = 0;
           if (!hts_loop_tick(sback, opt, b, ptr) || !back_checkmirror(opt)) {
             hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
-            *stre->exit_xh_ = 1;        // exit requested
+            hts_store_release_int(stre->exit_xh_, 1); // exit requested
             XH_uninit;
             return;
           }
@@ -4504,7 +4502,7 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
 
       if (!hts_loop_tick(sback, opt, b, ptr)) {
         hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
-        *stre->exit_xh_ = 1;    // exit requested
+        hts_store_release_int(stre->exit_xh_, 1); // exit requested
         XH_uninit;
         return;
       }
@@ -4512,11 +4510,11 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
          request until the transfer it waits on has ended. */
       if (hts_take_lock_request(opt, HTS_ABORT_LOCKNAME)) {
         hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
-        *stre->exit_xh_ = 1;
+        hts_store_release_int(stre->exit_xh_, 1);
       }
       /* Same omission as the wait for the current link: with every slot busy
          the mirror parks here instead, and the exit never lands (#1096). */
-      if (*stre->exit_xh_) {
+      if (hts_load_acquire_int(stre->exit_xh_)) {
         XH_uninit;
         return;
       }
@@ -4623,18 +4621,18 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
       // Stop the mirror
       if (!back_checkmirror(opt)) {
         hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
-        *stre->exit_xh_ = 1;    // exit requested
+        hts_store_release_int(stre->exit_xh_, 1); // exit requested
         XH_uninit;
         return 0;
       }
       /* An exit asked of the engine must leave this wait too: only teardown
          stops a live FTP worker, so waiting on its slot never ends (#1096). */
-      if (*stre->exit_xh_) {
+      if (hts_load_acquire_int(stre->exit_xh_)) {
         XH_uninit;
         return 0;
       }
       // And fill the backing stack
-      if (back[b].status > 0)
+      if (hts_load_acquire_int(&back[b].status) > 0)
         back_fillmax(sback, opt, cache, ptr, numero_passe);
 
       // Continue to the loop if link still present
@@ -4703,7 +4701,7 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
                     back[i].status = 0; // terminé
                     back_set_finished(opt, sback, i);
                   } else // cancel ftp, so flag it
-                    back[i].stop_ftp = 1;
+                    hts_store_release_int(&back[i].stop_ftp, 1);
                 }
               }
             }
@@ -4714,7 +4712,7 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
 
         if (!hts_loop_tick(sback, opt, b, ptr)) {
           hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
-          *stre->exit_xh_ = 1;  // exit requested
+          hts_store_release_int(stre->exit_xh_, 1); // exit requested
           XH_uninit;
           return 0;
         }
@@ -4921,7 +4919,8 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
 
   // resolve unresolved type
   if (opt->savename_delayed != HTS_SAVENAME_DELAYED_NONE &&
-      *forbidden_url == 0 && IS_DELAYED_EXT(afs->save) && !opt->state.stop) {
+      *forbidden_url == 0 && IS_DELAYED_EXT(afs->save) &&
+      !hts_load_acquire_int(&opt->state.stop)) {
     int loops;
     int continue_loop;
     char BIGSTK

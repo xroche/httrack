@@ -699,7 +699,7 @@ int url_savename(lien_adrfilsave *const afs,
           // note: if we are about to stop (opt->state.stop), back_add() will
           // fail later
           else if (opt->savename_delayed != HTS_SAVENAME_DELAYED_NONE &&
-                   !opt->state.stop) {
+                   !hts_load_acquire_int(&opt->state.stop)) {
             // Check if the file is ready in backing.
             if (headers != NULL && headers->status >= 0 && !is_redirect) {
               const sniff_src src = {sback, headers, adr, fil, NULL};

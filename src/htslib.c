@@ -6099,7 +6099,7 @@ static int hts_dns_resolve_nocache_list_bounded(
         *permanent = job->permanent;
     }
     hts_mutexrelease(&job->lock);
-    if (done || (cancel != NULL && *cancel) ||
+    if (done || (cancel != NULL && hts_load_acquire_int(cancel)) ||
         (deadline != 0 && mtime_monotonic() >= deadline))
       break;
     Sleep(poll_ms);
@@ -7019,8 +7019,8 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->dir_topindex = HTS_FALSE;
   //
   opt->bypass_limits = HTS_FALSE;
-  opt->state.stop = 0;          // stopper
-  opt->state.exit_xh = 0;       // abort
+  hts_store_release_int(&opt->state.stop, 0);
+  hts_store_release_int(&opt->state.exit_xh, 0);
   //
   opt->state.is_ended = 0;
 

@@ -94,6 +94,7 @@ static int help_server(char *dest_path, int defaultPort, const char *bindAddr);
 extern int commandRunning;
 extern int commandEnd;
 extern int commandReturn;
+extern int commandReturnSet;
 extern int commandEndRequested;
 extern char *commandReturnMsg;
 extern char *commandReturnCmdl;
@@ -200,7 +201,7 @@ static void client_ping(void *pP) {
     Sleep(1000);
     /* A mirror in flight outranks every rule below: it may have hours of
        crawling behind it, and the user can always come back to its page. */
-    if (commandRunning) {
+    if (hts_load_acquire_int(&commandRunning)) {
       continue;
     }
     hts_mutexlock(&pingMutex);
@@ -225,7 +226,7 @@ static void client_ping(void *pP) {
     hts_mutexrelease(&pingMutex);
     /* Re-read after the decision: a mirror may have started while it was made,
        and exiting now would lose it. */
-    if (commandRunning) {
+    if (hts_load_acquire_int(&commandRunning)) {
       why = NULL;
     }
   }
@@ -435,6 +436,15 @@ static void back_launch_end(httrackp *opt) {
   hts_uninit();
 }
 
+/* The server thread reads both flags under the lock, and the watchdog reads
+   commandRunning without it. */
+static void back_launch_finished(void) {
+  webhttrack_lock();
+  hts_store_release_int(&commandRunning, 0);
+  commandEnd = 1;
+  webhttrack_release();
+}
+
 static void back_launch_cmd(void *pP) {
   char *cmd = (char *) pP;
   char **argv;
@@ -455,8 +465,7 @@ static void back_launch_cmd(void *pP) {
     commandReturnMsg = strdup("could not parse the command line");
     commandReturn = -1;
     back_launch_end(opt);
-    commandRunning = 0;
-    commandEnd = 1;
+    back_launch_finished();
     free(cmd);
     return;
   }
@@ -472,12 +481,7 @@ static void back_launch_cmd(void *pP) {
   }
 
   back_launch_end(opt);
-
-  /* okay */
-  commandRunning = 0;
-
-  /* finished */
-  commandEnd = 1;
+  back_launch_finished();
   DEBUG(fprintf(stderr, "commandEnd=1\n"));
 
   /* free */
@@ -492,7 +496,9 @@ void webhttrack_main(char *cmd) {
   /* The caller holds webhttrack_lock(). */
   global_opt = hts_create_opt();
   assert(global_opt->size_httrackp >= sizeof(httrackp));
-  commandRunning = 1;
+  /* a previous run's flags would stop this one, or show its result */
+  commandEnd = commandReturn = commandReturnSet = commandEndRequested = 0;
+  hts_store_release_int(&commandRunning, 1);
   DEBUG(fprintf(stderr, "commandRunning=1\n"));
   if (hts_newthread(back_launch_cmd, (void *) strdup(cmd)) != 0) {
     httrackp *const opt = global_opt;
@@ -503,7 +509,7 @@ void webhttrack_main(char *cmd) {
     hts_uninit();
     /* Nothing else clears the flag, and while it is set the watchdog holds the
        server open for a mirror that never started. */
-    commandRunning = 0;
+    hts_store_release_int(&commandRunning, 0);
     commandEnd = 1;
     commandReturn = -1;
   }
@@ -662,12 +668,14 @@ int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_back * b
   //
   char st[256];
 
-  /* Exit now */
-  if (commandEndRequested == 2)
-    return 0;
-
   /* Lock */
   webhttrack_lock();
+
+  /* Exit now. The server thread sets this under the lock. */
+  if (commandEndRequested == 2) {
+    webhttrack_release();
+    return 0;
+  }
 
   if (stats) {
     stat_written = stats->stat_files;

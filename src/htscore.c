@@ -448,7 +448,7 @@ void hts_finish_html_file(httrackp *opt, cache_back *cache, htsblk *r,
         fcheck = check_fatal_io_errno();
 
         if (fcheck)
-          opt->state.exit_xh = -1;
+          hts_store_release_int(&opt->state.exit_xh, -1);
         if (opt->log) {
           hts_log_print(opt, LOG_ERROR | LOG_ERRNO,
                         "Unable to write HTML file %s", save);
@@ -465,7 +465,7 @@ void hts_finish_html_file(httrackp *opt, cache_back *cache, htsblk *r,
       if (fcheck) {
         hts_log_print(opt, LOG_ERROR,
                       "Mirror aborted: disk full or filesystem problems");
-        opt->state.exit_xh = -1;
+        hts_store_release_int(&opt->state.exit_xh, -1);
       }
       hts_log_print(opt, LOG_ERROR | LOG_ERRNO, "Unable to save file %s", save);
       if (fcheck)
@@ -700,8 +700,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   } else
     opt->cookie = NULL;
 
-  // initialiser exit_xh
-  opt->state.exit_xh = 0;       // sortir prématurément (var globale)
+  hts_store_release_int(&opt->state.exit_xh, 0);
   /* a fault a previous mirror recovered from must not abort this one */
   hts_worker_fault_clear();
 
@@ -1080,7 +1079,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
     {
       opt->state._hts_in_html_parsing = 4;
       if (!RUN_CALLBACK7(opt, loop, NULL, 0, 0, 0, opt->lien_tot, 0, NULL)) {
-        opt->state.exit_xh = 1; // exit requested
+        hts_store_release_int(&opt->state.exit_xh, 1); // exit requested
       }
       cache_init(&cache, opt);
       opt->state._hts_in_html_parsing = 0;
@@ -1205,7 +1204,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
             RUN_CALLBACK7(opt, loop, sback->lnk, sback->count, 0, 0, opt->lien_tot,
                           (int) (opt->waittime - tl), NULL);
         if (!r) {
-          opt->state.exit_xh = 1;       // exit requested
+          hts_store_release_int(&opt->state.exit_xh, 1); // exit requested
           ok = 1;
         } else
           Sleep(100);
@@ -1976,7 +1975,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
               if ((fcheck = check_fatal_io_errno())) {
                 hts_log_print(opt, LOG_ERROR,
                               "Mirror aborted: disk full or filesystem problems");
-                opt->state.exit_xh = -1;        /* fatal error */
+                /* fatal error */
+                hts_store_release_int(&opt->state.exit_xh, -1);
               }
               hts_log_print(opt, LOG_ERROR | LOG_ERRNO,
                             "Unable to save file %s", savename());
@@ -2092,13 +2092,15 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
     // a-t-on dépassé le quota?
     if (!back_checkmirror(opt)) {
       ptr = opt->lien_tot;
-    } else if (opt->state.exit_xh) {    // sortir
-      if (opt->state.exit_xh == 1) {
-        hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
-      } else {
-        hts_log_print(opt, LOG_ERROR, "Exit requested by engine");
+    } else {
+      const int exit_xh = hts_load_acquire_int(&opt->state.exit_xh);
+
+      if (exit_xh != 0) {
+        hts_log_print(opt, LOG_ERROR,
+                      exit_xh == 1 ? "Exit requested by shell or user"
+                                   : "Exit requested by engine");
+        ptr = opt->lien_tot;
       }
-      ptr = opt->lien_tot;
     }
   } while(ptr < opt->lien_tot);
 
@@ -2108,7 +2110,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
 
   /* A stop request cuts the mirror short whether or not the loop ran out of
      links: with one pending, the parser stops queueing the links it finds. */
-  aborted = opt->state.stop != 0 || opt->state.exit_xh != 0;
+  aborted = hts_load_acquire_int(&opt->state.stop) != 0 ||
+            hts_load_acquire_int(&opt->state.exit_xh) != 0;
   //
   //
   //
@@ -2137,8 +2140,10 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
     warc_abort_opt(opt);
     /* 2 exits 0, so it must not overwrite an abort the engine already decided,
        and a crash on the first fetch lands in exactly this state. */
-    if (opt->state.exit_xh != -1)
-      opt->state.exit_xh = 2; /* interrupted (no connection detected) */
+    if (hts_load_acquire_int(&opt->state.exit_xh) != -1) {
+      /* interrupted (no connection detected) */
+      hts_store_release_int(&opt->state.exit_xh, 2);
+    }
     rollback = HTS_TRUE;
     goto cleanup;
   }
@@ -3784,12 +3789,13 @@ void fspc_count(httrackp *opt, const char *type) {
 
   if (strc == NULL || type == NULL)
     return;
+  /* any thread may log, while the crawl thread reads the counts */
   if (strcmp(type, "warning") == 0)
-    strc->warning++;
+    hts_increment_int(&strc->warning);
   else if (strcmp(type, "error") == 0 || strcmp(type, "panic") == 0)
-    strc->error++;
+    hts_increment_int(&strc->error);
   else if (strcmp(type, "info") == 0)
-    strc->info++;
+    hts_increment_int(&strc->info);
 }
 
 // écrire n espaces dans fp
@@ -3815,13 +3821,15 @@ int fspc(httrackp * opt, FILE * fp, const char *type) {
   } else if (strc == NULL) {
     return 0;
   } else if (!type) {
-    strc->error = strc->warning = strc->info = 0;       // reset
+    hts_store_release_int(&strc->error, 0);
+    hts_store_release_int(&strc->warning, 0);
+    hts_store_release_int(&strc->info, 0);
   } else if (strcmp(type, "warning") == 0)
-    return strc->warning;
+    return hts_load_acquire_int(&strc->warning);
   else if (strcmp(type, "error") == 0)
-    return strc->error;
+    return hts_load_acquire_int(&strc->error);
   else if (strcmp(type, "info") == 0)
-    return strc->info;
+    return hts_load_acquire_int(&strc->info);
   return 0;
 }
 
@@ -3844,7 +3852,7 @@ int backlinks_done(const struct_back * sback,
 HTS_INLINE int back_fillmax(struct_back * sback, httrackp * opt,
                             cache_back * cache, int ptr,
                             int numero_passe) {
-  if (!opt->state.stop) {
+  if (!hts_load_acquire_int(&opt->state.stop)) {
     if (back_incache(sback) < opt->maxcache) {  // pas trop en mémoire?
       return back_fill(sback, opt, cache, ptr, numero_passe);
     }
@@ -3892,7 +3900,7 @@ int back_pluggable_sockets_strict(struct_back * sback, httrackp * opt) {
   int n = opt->maxsoc - back_nsoc(sback);
   /* A stop outranks the delays below, which would otherwise swallow the user's
      Ctrl-C for as long as the server or --pause asked us to wait. */
-  const hts_boolean may_wait = !opt->state.stop;
+  const hts_boolean may_wait = !hts_load_acquire_int(&opt->state.stop);
 
   // Retry-After: withhold launches until the delay the server asked for is up
   if (n > 0 && may_wait && sback->retry_after_until > 0) {
@@ -4263,7 +4271,7 @@ HTSEXT_API int hts_is_testing(httrackp * opt) { // 0 non 1 test 2 purge
   return 0;
 }
 HTSEXT_API int hts_is_exiting(httrackp * opt) {
-  return opt->state.exit_xh;
+  return hts_load_acquire_int(&opt->state.exit_xh);
 }
 
 // message d'erreur?
@@ -4283,10 +4291,10 @@ HTSEXT_API int hts_request_stop(httrackp *opt, hts_boolean keep_resume) {
   if (opt != NULL) {
     hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
     hts_mutexlock(&opt->state.lock);
-    opt->state.stop = 1;
+    hts_store_release_int(&opt->state.stop, 1);
     /* 1, as SIGTERM writes, spares hts-cache/ref for a later --continue */
     if (keep_resume)
-      opt->state.exit_xh = 1;
+      hts_store_release_int(&opt->state.exit_xh, 1);
     hts_mutexrelease(&opt->state.lock);
   }
   return 0;
@@ -4680,7 +4688,8 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
 
               // enregistrer fichier (MACRO)
               if (!hts_record_link(opt, afs.af.adr, afs.af.fil, afs.save, "", "", "")) {    // erreur, pas de place réservée
-                opt->state.exit_xh = -1;        /* fatal error -> exit */
+                /* fatal error -> exit */
+                hts_store_release_int(&opt->state.exit_xh, -1);
                 return 0;
               }
               // mode test?                          
