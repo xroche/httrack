@@ -1479,7 +1479,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
               hts_addurl(global_opt, ptraddr);
             }
           } else if ((p = strfield((char *) adr, "add-filter="))) {
-            if (commandRunning) {
+            if (global_opt != NULL) {
               hts_addfilter(global_opt, (char *) adr + p);
             }
           } else if ((p = strfield((char *) adr, "httrack"))) {
