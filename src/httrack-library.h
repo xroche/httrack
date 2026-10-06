@@ -392,12 +392,13 @@ HTSEXT_API hts_boolean hts_resetaddurl(httrackp *opt);
 HTSEXT_API hts_boolean hts_addfilter(httrackp *opt, const char *rule);
 
 /** Replace the user's scan rules of a running mirror with @p rules, a
-    NULL-terminated list kept in order, as if the mirror had started with them.
-    It supersedes any hts_addfilter() rule not yet applied. A queued link the
-    new list refuses is dropped as with hts_addfilter(), and a removed rule
-    stops applying to links found from then on. @return nonzero if the list
-    was queued, zero if hts_filter_rule_ok() refuses any rule in it or memory
-    ran out, in which case nothing changes. */
+    NULL-terminated list of single rules applied in the order given. Split a
+    box of rules on whitespace first, as the command line does. It supersedes
+    any hts_addfilter() rule not yet applied. A queued link the rules then
+    refuse is dropped as with hts_addfilter(), and a removed rule stops
+    applying to links found from then on. @return nonzero if the list was
+    queued, zero if hts_filter_rule_ok() refuses any rule in it or memory ran
+    out, in which case nothing changes. */
 HTSEXT_API hts_boolean hts_setfilters(httrackp *opt, const char *const *rules);
 
 /** Would hts_addfilter() accept @p rule? It must be a + or - sign and a

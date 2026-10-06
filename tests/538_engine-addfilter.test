@@ -27,4 +27,7 @@ for want in "remove none: ok=1" "remove one: ok=1" "remove all: ok=1" \
     grep -qxF "$want" <<<"$out" || fail "missing '$want' in: $out"
 done
 
+out=$(httrack -O /dev/null -#test=filterlayout)
+grep -qxF "layout after set and add: ok=1" <<<"$out" || fail "layout: $out"
+
 echo "PASS"

@@ -324,7 +324,7 @@ void hts_addurl_free(char **url);
    with hts_addurl_free(). */
 char **hts_addfilter_take(httrackp *opt);
 
-/* Same for the list hts_setfilters() queued. */
+/* Takes the list hts_setfilters() queued, like hts_addfilter_take(). */
 char **hts_setfilters_take(httrackp *opt);
 
 #endif
@@ -482,7 +482,7 @@ int filters_match_url(char **filters, int nfil, const char *adr,
                       const char *fil, int *depth);
 
 /* Apply the queued list and rules to the user's rules, then drop the queued
-   links after ptr that the change refuses. Crawl thread only, as it alone
+   links after ptr that the rules now refuse. Crawl thread only, as it alone
    reads the filters. */
 void hts_apply_live_filters(httrackp *opt, struct_back *sback, int ptr);
 

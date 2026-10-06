@@ -73,10 +73,8 @@ while ! grep -q "queued link(s) dropped" "${log}"; do
         fail_dump "the list was never applied" "${log}" "${clog}"
     poll_wait 0.2
 done
-grep -q "Scan rules set by user: 3 rule(s)" "${log}" ||
-    fail_dump "the list did not replace the user's rules" "${log}"
 # j2 to j5 and z.bin drop, while j1 and keep/k1.html stay.
-grep -q "0 scan rule(s) added by user, 5 queued link(s) dropped" "${log}" ||
+grep -q "3 scan rule(s) set and 0 added by user, 5 queued link(s) dropped" "${log}" ||
     fail_dump "the queued links were not dropped as the list says" "${log}"
 
 start=$SECONDS

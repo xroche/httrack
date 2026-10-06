@@ -503,6 +503,42 @@ static int st_filterremove(httrackp *opt, int argc, char **argv) {
   return ok ? 0 : 1;
 }
 
+/* A live set replaces only the user's rules, and lands before the adds queued
+   after it, between the wizard's rules and the engine's bans. */
+static int st_filterlayout(httrackp *opt, int argc, char **argv) {
+  static const char *const set[] = {"+s1*", NULL};
+  const htsfilters saved = opt->filters;
+  const int savedwizard = opt->wizard_filters;
+  const int saveduser = opt->user_filters;
+  char **filters = NULL;
+  int filptr = 0, ok;
+
+  (void) argc;
+  (void) argv;
+  assertf(filters_init(&filters, opt->maxfilter, 0) != 0);
+  opt->filters.filters = &filters;
+  opt->filters.filptr = &filptr;
+  filters_insert(opt, 0, "-wiz*");
+  filters_insert(opt, 1, "-user*");
+  filters_insert(opt, 2, "-ban*");
+  opt->wizard_filters = 1;
+  opt->user_filters = 1;
+  hts_setfilters(opt, set);
+  hts_addfilter(opt, "-a*");
+  /* no link is queued past ptr, so no backing pool is needed */
+  hts_apply_live_filters(opt, NULL, opt->lien_tot - 1);
+  ok = filptr == 4 && strcmp(filters[0], "-wiz*") == 0 &&
+       strcmp(filters[1], "+s1*") == 0 && strcmp(filters[2], "-a*") == 0 &&
+       strcmp(filters[3], "-ban*") == 0 && opt->user_filters == 2;
+  printf("layout after set and add: ok=%d\n", ok);
+  opt->filters = saved;
+  opt->wizard_filters = savedwizard;
+  opt->user_filters = saveduser;
+  freet(filters[0]);
+  freet(filters);
+  return ok ? 0 : 1;
+}
+
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
 
@@ -526,5 +562,7 @@ const struct selftest_entry selftests_filters[] = {
      st_addfilter},
     {"filterremove", "", "filters_remove() closes the gap it leaves",
      st_filterremove},
+    {"filterlayout", "", "a live set replaces only the user's rules",
+     st_filterlayout},
     {NULL, NULL, NULL, NULL},
 };

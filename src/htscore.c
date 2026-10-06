@@ -2663,8 +2663,6 @@ static hts_boolean live_cancel_link_(httrackp *opt, struct_back *sback, int i) {
 
 void hts_apply_live_filters(httrackp *opt, struct_back *sback, int ptr) {
   char **set, **rules;
-  hts_boolean *was_refused = NULL;
-  const int queued = opt->lien_tot - (ptr + 1);
   int added = 0, dropped = 0, i;
   size_t k;
 
@@ -2677,19 +2675,11 @@ void hts_apply_live_filters(httrackp *opt, struct_back *sback, int ptr) {
   hts_mutexrelease(&opt->state.lock);
   if (set == NULL && rules == NULL)
     return;
-  /* ptr is being fetched or parsed */
-  if (queued > 0 &&
-      (was_refused = calloct(queued, sizeof(*was_refused))) != NULL) {
-    for (i = 0; i < queued; i++)
-      was_refused[i] = queued_link_refused_(opt, ptr + 1 + i);
-  }
   if (set != NULL) {
     filters_remove(opt, opt->wizard_filters, opt->user_filters);
     opt->user_filters = 0;
     for (k = 0; set[k] != NULL; k++)
       filters_append_user_(opt, set[k]);
-    hts_log_print(opt, LOG_NOTICE, "Scan rules set by user: %d rule(s)",
-                  opt->user_filters);
   }
   for (k = 0; rules != NULL && rules[k] != NULL; k++) {
     if (filters_append_user_(opt, rules[k])) {
@@ -2699,16 +2689,20 @@ void hts_apply_live_filters(httrackp *opt, struct_back *sback, int ptr) {
   }
   hts_addurl_free(set); /* frees any NULL-terminated string list */
   hts_addurl_free(rules);
-  /* only a link the change itself refuses is dropped */
-  for (i = 0; was_refused != NULL && i < queued; i++) {
-    if (!was_refused[i] && queued_link_refused_(opt, ptr + 1 + i) &&
-        live_cancel_link_(opt, sback, ptr + 1 + i))
+  /* ptr is being fetched or parsed */
+  for (i = ptr + 1; i < opt->lien_tot; i++) {
+    if (queued_link_refused_(opt, i) && live_cancel_link_(opt, sback, i))
       dropped++;
   }
-  freet(was_refused);
-  hts_log_print(opt, LOG_NOTICE,
-                "%d scan rule(s) added by user, %d queued link(s) dropped",
-                added, dropped);
+  if (set != NULL)
+    hts_log_print(opt, LOG_NOTICE,
+                  "%d scan rule(s) set and %d added by user, %d queued link(s) "
+                  "dropped",
+                  opt->user_filters - added, added, dropped);
+  else
+    hts_log_print(opt, LOG_NOTICE,
+                  "%d scan rule(s) added by user, %d queued link(s) dropped",
+                  added, dropped);
 }
 
 void filters_bind(httrackp *opt, char ***ptrfilters, int *filptr) {
