@@ -1,0 +1,55 @@
+#!/bin/bash
+#
+# A PASV or EPSV reply is hostile input: every field must be a bare decimal in
+# range, or the reply is refused (#1876).
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+refused="refused port=-1"
+
+pasv() { # pasv WANT REPLY-FIELDS
+    selftest_queue "$1" ftp-pasv pasv "227 Entering Passive Mode ($2)"
+}
+
+pasv "ip=10.0.0.1 port=1025" "10,0,0,1,4,1"
+pasv "ip=0.0.0.0 port=1" "0,0,0,0,0,1"
+pasv "ip=255.255.255.255 port=65535" "255,255,255,255,255,255"
+pasv "ip=1.2.3.4 port=2561" "001,2,3,4,010,001"
+# Decimal, never octal: getaddrinfo would read "010" as 8.
+pasv "ip=10.0.0.1 port=1025" "010,0,0,1,4,1"
+
+# Each bad value goes in both port bytes and in an address byte.
+for bad in 256 -1 +1 " 1" 1x 0001 4294967296 ""; do
+    pasv "$refused" "$bad,2,3,4,5,6"
+    pasv "$refused" "1,2,3,4,$bad,6"
+    pasv "$refused" "1,2,3,4,5,$bad"
+done
+pasv "$refused" "1,2,3,4,0,0"
+pasv "$refused" "1,2,3,4,5"
+pasv "$refused" "1,2,3,4,5,6,7"
+selftest_queue "$refused" ftp-pasv pasv "227 Entering Passive Mode 1,2,3,4,5,6"
+selftest_queue "$refused" ftp-pasv pasv "227 Entering Passive Mode (1,2,3,4,5,6"
+
+epsv() { # epsv WANT REPLY-FIELDS
+    selftest_queue "$1" ftp-pasv epsv "229 Entering Extended Passive Mode ($2)"
+}
+
+epsv "ip=- port=6446" "|||6446|"
+epsv "ip=- port=65535" "|||65535|"
+epsv "ip=- port=1" "!!!1!"
+for bad in 0 65536 -1 +1 " 1" 1x 000001 4294967296 ""; do
+    epsv "$refused" "|||$bad|"
+done
+epsv "$refused" "||6446|"
+epsv "$refused" "|||6446"
+epsv "$refused" "|||6446!"
+epsv "$refused" "|x|6446|"
+epsv "$refused" "   6446 "
+epsv "$refused" "|||6446|x"
+epsv "$refused" "111234561"
+selftest_queue "$refused" ftp-pasv epsv "229 Entering Extended Passive Mode |||6446|"
+
+selftest_run_queued
