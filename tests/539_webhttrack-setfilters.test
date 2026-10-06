@@ -1,0 +1,93 @@
+#!/bin/bash
+#
+# WebHTTrack's set-filters replaces a running crawl's scan rules in order, drops
+# the queued links the new list refuses, and stops a removed rule (#128).
+
+set -euo pipefail
+
+# shellcheck source=tests/webhttracklib.sh
+. "${0%"${0##*/}"}./webhttracklib.sh"
+
+htsserver_require
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_setfilters.XXXXXX") || fail "no tmpdir"
+csrv=
+cleanup_push htsserver_cleanup_dir "${work}"
+cleanup_push htsserver_reap_vars csrv
+
+export HOME="${work}" # no ~/.httrack.ini of the developer's in the store
+
+# short.bin trickles for eight seconds and holds the only socket (-c1). The pages
+# are fetched first and wait unsaved, and z.bin waits unfetched behind it.
+# keep/k1.html is parsed only after the change, so more/m.html is found then.
+mkdir -p "${work}/docroot/junk" "${work}/docroot/keep" "${work}/docroot/more"
+{
+    printf '<html><body><a href="/trickle/short.bin">slow</a>\n'
+    for i in 1 2 3 4 5; do
+        printf '<a href="junk/j%d.html">j</a>\n' "${i}"
+        printf '<html><body>junk</body></html>\n' >"${work}/docroot/junk/j${i}.html"
+    done
+    printf '<a href="junk/z.bin">z</a>\n'
+    printf '<a href="keep/k1.html">k</a></body></html>\n'
+} >"${work}/docroot/index.html"
+printf '<html><body><a href="../more/m.html">m</a></body></html>\n' \
+    >"${work}/docroot/keep/k1.html"
+printf '<html><body>more</body></html>\n' >"${work}/docroot/more/m.html"
+printf 'z' >"${work}/docroot/junk/z.bin"
+
+clog="${work}/content.log"
+LOCAL_SERVER_VERBOSE=1 "${HTS_PYTHON}" "${testdir}/local-server.py" --root "${work}/docroot" \
+    >"${clog}" 2>&1 &
+csrv=$!
+cport=$(discover_server_port "${clog}" "${csrv}") || fail "no content server"
+
+htsserver_start
+sid=$(htsserver_sid)
+test "${#sid}" -eq 32 || fail "no session id in the panel (got '${sid}')"
+
+out="${work}/crawl"
+site="${out}/127.0.0.1_${cport}"
+log="${out}/hts-log.txt"
+# -%A types .bin up front, so the parser queues every link before short.bin.
+htsserver_client --path /step4.html --field "sid=${sid}" --field "path=${work}" \
+    --field projname=crawl --field winprofile=x --field command_do=start \
+    --field "command=httrack --robots=0 -c1 -%A bin=application/octet-stream http://127.0.0.1:${cport}/index.html +* -*/more/* -O ${out}" \
+    >/dev/null
+
+start=$SECONDS
+while ! grep -q "GET /trickle/short.bin HTTP" "${clog}"; do
+    htsserver_alive || fail "htsserver died: $(tail -n 20 "${log}" 2>/dev/null)"
+    test "$((SECONDS - start))" -lt 60 || fail "the slow file was never requested"
+    poll_wait 0.2
+done
+
+# -*/more/* is gone, and the j1 rule outranks the junk rule before it.
+htsserver_client --path /step4.html --field "sid=${sid}" \
+    --field "command=set-filters=+*
+-*/junk/*
++*/junk/j1.html" >/dev/null
+
+start=$SECONDS
+while ! grep -q "queued link(s) dropped" "${log}"; do
+    test "$((SECONDS - start))" -lt 30 ||
+        fail_dump "the list was never applied" "${log}" "${clog}"
+    poll_wait 0.2
+done
+grep -q "Scan rules set by user: 3 rule(s)" "${log}" ||
+    fail_dump "the list did not replace the user's rules" "${log}"
+# j2 to j5 and z.bin drop, while j1 and keep/k1.html stay.
+grep -q "0 scan rule(s) added by user, 5 queued link(s) dropped" "${log}" ||
+    fail_dump "the queued links were not dropped as the list says" "${log}"
+
+start=$SECONDS
+while ! grep -q "HTTrack Website Copier/" "${log}"; do
+    test "$((SECONDS - start))" -lt 60 || fail "the crawl did not end"
+    poll_wait 0.2
+done
+assert_file "${site}/junk/j1.html" "the later + rule lost to the - rule before it"
+assert_file "${site}/keep/k1.html" "a link the list allows was dropped"
+assert_file "${site}/more/m.html" "a removed rule still refused a new link"
+test ! -e "${site}/junk/j2.html" || fail "a dropped link was saved"
+test ! -e "${site}/junk/z.bin" || fail "a dropped link was saved"
+
+echo "PASS"

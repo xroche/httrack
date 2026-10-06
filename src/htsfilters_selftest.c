@@ -435,8 +435,72 @@ static int st_addfilter(httrackp *opt, int argc, char **argv) {
     if (!ordered)
       failed = 1;
   }
+  /* a list with one bad rule queues nothing */
+  {
+    static const char *const bad[] = {"+*", "junk", NULL};
+    static const char *const good[] = {"+*", "-*/junk/*", NULL};
+    static const char *const none[] = {NULL};
+    char **set, **adds;
+    hts_boolean ok;
+
+    ok = !hts_setfilters(opt, bad) && hts_setfilters_take(opt) == NULL;
+    printf("set with a bad rule: refused=%d\n", ok);
+    failed |= !ok;
+    /* a list supersedes rules added before it, not after */
+    hts_addfilter(opt, "-early*");
+    ok = hts_setfilters(opt, good);
+    hts_addfilter(opt, "-late*");
+    set = hts_setfilters_take(opt);
+    adds = hts_addfilter_take(opt);
+    ok = ok && set != NULL && set[0] != NULL && strcmp(set[0], "+*") == 0 &&
+         set[1] != NULL && strcmp(set[1], "-*/junk/*") == 0 && set[2] == NULL &&
+         adds != NULL && adds[0] != NULL && strcmp(adds[0], "-late*") == 0 &&
+         adds[1] == NULL;
+    hts_addurl_free(set);
+    hts_addurl_free(adds);
+    printf("set supersedes earlier adds: ok=%d\n", ok);
+    failed |= !ok;
+    /* an empty list clears the user's rules */
+    ok = hts_setfilters(opt, none) &&
+         (set = hts_setfilters_take(opt)) != NULL && set[0] == NULL;
+    hts_addurl_free(set);
+    printf("empty set: ok=%d\n", ok);
+    failed |= !ok;
+  }
   printf("addfilter self-test %s\n", failed ? "FAILED" : "OK");
   return failed;
+}
+
+/* filters_remove() closes the gap it leaves, and removing nothing keeps all. */
+static int st_filterremove(httrackp *opt, int argc, char **argv) {
+  const htsfilters saved = opt->filters;
+  char **filters = NULL;
+  int filptr = 0, ok;
+
+  (void) argc;
+  (void) argv;
+  assertf(filters_init(&filters, opt->maxfilter, 0) != 0);
+  opt->filters.filters = &filters;
+  opt->filters.filptr = &filptr;
+  filters_insert(opt, 0, "-a*");
+  filters_insert(opt, 1, "-b*");
+  filters_insert(opt, 2, "-c*");
+  filters_remove(opt, 1, 0);
+  ok = filptr == 3 && strcmp(filters[0], "-a*") == 0 &&
+       strcmp(filters[1], "-b*") == 0 && strcmp(filters[2], "-c*") == 0;
+  printf("remove none: ok=%d\n", ok);
+  filters_remove(opt, 1, 1);
+  ok = ok && filptr == 2 && strcmp(filters[0], "-a*") == 0 &&
+       strcmp(filters[1], "-c*") == 0;
+  printf("remove one: ok=%d\n", ok);
+  filters_remove(opt, 0, 2);
+  ok = ok && filptr == 0;
+  printf("remove all: ok=%d\n", ok);
+  opt->filters = saved;
+  freet(filters[0]);
+  freet(filters);
+  printf("filterremove self-test %s\n", ok ? "OK" : "FAILED");
+  return ok ? 0 : 1;
 }
 
 /* Registry: this module's tests, in the order -#test lists them. */
@@ -460,5 +524,7 @@ const struct selftest_entry selftests_filters[] = {
      st_filtercap},
     {"addfilter", "", "hts_addfilter() queues a signed rule within the cap",
      st_addfilter},
+    {"filterremove", "", "filters_remove() closes the gap it leaves",
+     st_filterremove},
     {NULL, NULL, NULL, NULL},
 };

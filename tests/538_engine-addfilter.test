@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# hts_addfilter() queues a signed scan rule within the length cap, in call
-# order, and refuses the rest (#128).
+# hts_addfilter() and hts_setfilters() queue signed scan rules within the length
+# cap, in call order, and refuse the rest (#128).
 
 set -euo pipefail
 
@@ -15,7 +15,15 @@ for want in "minus: queued=1 kept=1" "plus: queued=1 kept=1" \
     "plus only: queued=0 kept=0" "newline: queued=0 kept=0" \
     "empty: queued=0 kept=0" "at the cap: queued=1 kept=1" \
     "past the cap: queued=0 kept=0" "two rules: ordered=1" \
+    "set with a bad rule: refused=1" "set supersedes earlier adds: ok=1" \
+    "empty set: ok=1" \
     "addfilter self-test OK"; do
+    grep -qxF "$want" <<<"$out" || fail "missing '$want' in: $out"
+done
+
+out=$(httrack -O /dev/null -#test=filterremove)
+for want in "remove none: ok=1" "remove one: ok=1" "remove all: ok=1" \
+    "filterremove self-test OK"; do
     grep -qxF "$want" <<<"$out" || fail "missing '$want' in: $out"
 done
 

@@ -165,6 +165,37 @@ static const char *server_content_type(const char *file) {
   return NULL;
 }
 
+/* hts_setfilters() on newline-separated rules, blank lines skipped */
+static void setfilters_from_text(httrackp *opt, const char *text) {
+  char *copy = strdupt(text);
+  char **list;
+  char *line;
+  size_t n = 1, k = 0;
+
+  if (copy == NULL)
+    return;
+  for (line = copy; *line != '\0'; line++)
+    n += *line == '\n';
+  list = (char **) calloct(n + 1, sizeof(char *));
+  for (line = copy; list != NULL && line != NULL;) {
+    char *const nl = strchr(line, '\n');
+    size_t len;
+
+    if (nl != NULL)
+      *nl = '\0';
+    len = strlen(line);
+    if (len > 0 && line[len - 1] == '\r')
+      line[--len] = '\0';
+    if (len > 0)
+      list[k++] = line;
+    line = nl != NULL ? nl + 1 : NULL;
+  }
+  if (list != NULL)
+    hts_setfilters(opt, (const char *const *) list);
+  freet(list);
+  freet(copy);
+}
+
 static int is_html(const char *file) {
   const char *const type = server_content_type(file);
 
@@ -1484,6 +1515,10 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
               ptraddr[0] = (char *) adr + p;
               ptraddr[1] = NULL;
               hts_addurl(global_opt, ptraddr);
+            }
+          } else if ((p = strfield((char *) adr, "set-filters="))) {
+            if (global_opt != NULL) {
+              setfilters_from_text(global_opt, (char *) adr + p);
             }
           } else if ((p = strfield((char *) adr, "add-filter="))) {
             if (global_opt != NULL) {
