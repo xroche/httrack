@@ -18,6 +18,8 @@ pasv "ip=10.0.0.1 port=1025" "10,0,0,1,4,1"
 pasv "ip=0.0.0.0 port=1" "0,0,0,0,0,1"
 pasv "ip=255.255.255.255 port=65535" "255,255,255,255,255,255"
 pasv "ip=1.2.3.4 port=2561" "001,2,3,4,010,001"
+# Decimal, never octal: getaddrinfo would read "010" as 8.
+pasv "ip=10.0.0.1 port=1025" "010,0,0,1,4,1"
 
 # Each bad value goes in both port bytes and in an address byte.
 for bad in 256 -1 +1 " 1" 1x 0001 4294967296 ""; do
@@ -44,5 +46,10 @@ done
 epsv "$refused" "||6446|"
 epsv "$refused" "|||6446"
 epsv "$refused" "|||6446!"
+epsv "$refused" "|x|6446|"
+epsv "$refused" "   6446 "
+epsv "$refused" "|||6446|x"
+epsv "$refused" "111234561"
+selftest_queue "$refused" ftp-pasv epsv "229 Entering Extended Passive Mode |||6446|"
 
 selftest_run_queued

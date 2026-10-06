@@ -545,7 +545,8 @@ hts_boolean ftp_command(char *line, size_t line_size, const char *verb,
 }
 
 /* Read 1..max_digits decimal digits at s into *value, if it is at most max.
-   Returns the first byte past them, or NULL for a sign, a space or more. */
+   Returns the first byte past them, or NULL if it is empty, too long or over
+   max. */
 static const char *ftp_parse_decimal(const char *s, int max_digits, int max,
                                      int *value) {
   int n = 0, digits = 0;
@@ -561,7 +562,6 @@ static const char *ftp_parse_decimal(const char *s, int max_digits, int max,
   return s;
 }
 
-/* Parse a PASV reply (see htsftp.h). */
 hts_boolean ftp_parse_pasv(const char *line, char *ip, size_t ip_size,
                            int *port) {
   const char *s = strchr(line, '(');
@@ -588,16 +588,18 @@ hts_boolean ftp_parse_pasv(const char *line, char *ip, size_t ip_size,
   return HTS_TRUE;
 }
 
-/* Parse an EPSV reply (see htsftp.h). */
 hts_boolean ftp_parse_epsv(const char *line, int *port) {
   const char *s = strchr(line, '(');
   char delim;
   int p;
 
-  // RFC 2428: "(<d><d><d><port><d>)", with any printable delimiter
-  if (s == NULL || s[1] < 33 || s[1] > 126 || s[2] != s[1] || s[3] != s[1])
+  if (s == NULL)
     return HTS_FALSE;
+  // RFC 2428: "(<d><d><d><port><d>)", d a printable non-digit
   delim = s[1];
+  if (delim < 33 || delim > 126 || isdigit((unsigned char) delim) ||
+      s[2] != delim || s[3] != delim)
+    return HTS_FALSE;
   s = ftp_parse_decimal(s + 4, 5, 65535, &p);
   if (s == NULL || s[0] != delim || s[1] != ')' || p == 0)
     return HTS_FALSE;
