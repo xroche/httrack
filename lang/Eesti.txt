@@ -1055,4 +1055,4 @@ Maks. Retry-After (s)
 Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
 Pikim ooteaeg, mida järgitakse, kui server saadab Retry-After päise. Väärtus 0 proovib uuesti ilma ootamiseta.
 A rule you add here applies to the mirror now running, and wins over the rules above it. A rule you remove applies to the next one.
-Siia lisatud reegel kehtib praegu käimasolevale saidikopeerimisele ja on ülalpool olevatest reeglitest tähtsam. Reegli eemaldamine jõustub alles järgmisel kopeerimisel.
+Siia lisatud reegel kehtib praegu käimasoleva saidikopeerimise kohta ja on ülimuslik ülalpool olevate reeglite suhtes. Reegli eemaldamine jõustub alles järgmisel saidikopeerimisel.
