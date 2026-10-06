@@ -1057,4 +1057,4 @@ Longest delay to obey when a server sends a Retry-After header. Use 0 to retry w
 A rule you add here applies to the mirror now running, and wins over the rules above it. A rule you remove applies to the next one.
 Правило што ќе го додадете тука важи за копирањето на сајтот што е во тек и има предност пред правилата над него. Отстранувањето на правило важи дури при следното копирање.
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
-Ова Scan правило не може да се користи. Правилото започнува со + или -, по што следи шаблон, и мора да се собере во еден краток ред.
+Ова правило за филтрирање не може да се користи. Правилото започнува со + или -, потоа следи шаблон, и мора да се смести во еден краток ред.
