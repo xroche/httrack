@@ -606,40 +606,29 @@ static void copy_header_value(char *dst, size_t size, const char *value) {
   strlncatbuff(dst, value, size, size - 1);
 }
 
-/** Copy query parameter "name"'s alphanumeric value into dst; true when a
-    non-empty one fit, and dst is left empty otherwise. Query-string counterpart
-    to the POST-body checker below. */
+/** Copy query parameter "name"'s alphanumeric value into dst, of size >= 1;
+    true when a non-empty one fit, and dst is left empty otherwise.
+    Query-string counterpart to the POST-body checker below. */
 static hts_boolean query_alnum_value(char *dst, size_t size, const char *query,
                                      const char *name) {
-  const size_t namelen = strlen(name);
-  const char *s = query;
+  hts_query_field f;
+  size_t n = 0;
 
   dst[0] = '\0';
-  while (*s != '\0') {
-    const char *const amp = strchr(s, '&');
-
-    if (strncmp(s, name, namelen) == 0 && s[namelen] == '=') {
-      const char *v = s + namelen + 1;
-      size_t n = 0;
-
-      while (*v != '\0' && *v != '&' && n + 1 < size &&
-             isalnum((unsigned char) *v)) {
-        dst[n++] = *v++;
-      }
-      dst[n] = '\0';
-      /* Truncated, or not alphanumeric to its end, is no value at all: it must
-         not reach a caller that trusted the return. */
-      if (n > 0 && (*v == '\0' || *v == '&')) {
-        return HTS_TRUE;
-      }
-      dst[0] = '\0';
-      return HTS_FALSE;
-    }
-    if (amp == NULL) {
-      break;
-    }
-    s = amp + 1;
+  if (!hts_query_find(query, name, &f)) {
+    return HTS_FALSE;
   }
+  while (n < f.vallen && n + 1 < size && isalnum((unsigned char) f.val[n])) {
+    dst[n] = f.val[n];
+    n++;
+  }
+  dst[n] = '\0';
+  /* Truncated, or not alphanumeric to its end, is no value at all: it must
+     not reach a caller that trusted the return. */
+  if (n > 0 && n == f.vallen) {
+    return HTS_TRUE;
+  }
+  dst[0] = '\0';
   return HTS_FALSE;
 }
 
@@ -648,24 +637,20 @@ static hts_boolean query_alnum_value(char *dst, size_t size, const char *query,
     matches, so it holds whichever one a later last-write-wins parse keeps.
     Non-destructive: it runs before the body is tokenized in place. */
 static hts_boolean body_sid_is_valid(const char *body, const char *expected) {
-  const char *s = body;
+  const char *cur = body;
+  hts_query_field f;
   hts_boolean seen = HTS_FALSE;
 
-  while (s != NULL && *s != '\0') {
-    const char *const amp = strchr(s, '&');
-    const char *const eq = strchr(s, '=');
-
-    if (eq != NULL && (amp == NULL || eq < amp) && (size_t) (eq - s) == 3 &&
-        strncmp(s, "sid", 3) == 0) {
-      const size_t len = amp != NULL ? (size_t) (amp - eq - 1) : strlen(eq + 1);
+  while (hts_query_next(&cur, &f)) {
+    if (f.val != NULL && f.keylen == 3 && strncmp(f.key, "sid", 3) == 0) {
       hts_boolean match = HTS_FALSE;
 
-      if (len < SID_VALUE_MAX) {
+      if (f.vallen < SID_VALUE_MAX) {
         char raw[SID_VALUE_MAX];
         String value = STRING_EMPTY;
 
-        memcpy(raw, eq + 1, len);
-        raw[len] = '\0';
+        memcpy(raw, f.val, f.vallen);
+        raw[f.vallen] = '\0';
         hts_unescapehttp(raw, &value);
         /* StringBuff is NULL until written, so an empty value lands here. */
         if (StringBuff(value) != NULL &&
@@ -679,7 +664,6 @@ static hts_boolean body_sid_is_valid(const char *body, const char *expected) {
       }
       seen = HTS_TRUE;
     }
-    s = amp != NULL ? amp + 1 : NULL;
   }
   return seen;
 }
@@ -1321,21 +1305,24 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
       /* check variables */
       if (meth && buffer[0]) {
-        char *s = buffer;
-        char *e, *f;
+        const char *cur = buffer;
+        hts_query_field f;
 
-        strlcatbuff(buffer, "&", buffer_size);
-        while(s && (e = strchr(s, '=')) && (f = strchr(s, '&'))) {
-          const char *ua;
-          String sua = STRING_EMPTY;
+        /* A field without '=' has no value to store, so it is skipped. */
+        while (hts_query_next(&cur, &f)) {
+          if (f.val != NULL) {
+            char *const key = buffer + (f.key - buffer);
+            const char *ua = key + f.keylen + 1;
+            String sua = STRING_EMPTY;
 
-          *e = *f = '\0';
-          ua = e + 1;
-          if (strfield2(ua, "on"))      /* hack : "on" == 1 */
-            ua = "1";
-          hts_unescapehttp(ua, &sua);
-          coucal_write(NewLangList, s, (intptr_t) StringAcquire(&sua));
-          s = f + 1;
+            /* Both ends are a separator or the NUL, already walked past. */
+            key[f.keylen] = '\0';
+            key[f.len] = '\0';
+            if (strfield2(ua, "on")) /* hack : "on" == 1 */
+              ua = "1";
+            hts_unescapehttp(ua, &sua);
+            coucal_write(NewLangList, key, (intptr_t) StringAcquire(&sua));
+          }
         }
       }
 

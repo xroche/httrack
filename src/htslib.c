@@ -56,6 +56,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsmodules.h"
 #include "htscharset.h"
 #include "htsencoding.h"
+#include "htsescape.h"
 #include "htscodec.h"
 
 #include <limits.h>
@@ -3820,10 +3821,14 @@ HTSEXT_API const char *jump_normalized_const(const char *source) {
 HTSEXT_API DECLARE_NON_CONST_VERSION(jump_normalized)
 
 static int sortNormFnc(const void *a_, const void *b_) {
-  const char *const*const a = (const char *const*) a_;
-  const char *const*const b = (const char *const*) b_;
+  const hts_query_field *const a = (const hts_query_field *) a_;
+  const hts_query_field *const b = (const hts_query_field *) b_;
+  const size_t n = a->len < b->len ? a->len : b->len;
+  const int c = memcmp(a->key, b->key, n);
 
-  return strcmp(*a + 1, *b + 1);
+  if (c != 0)
+    return c;
+  return a->len < b->len ? -1 : a->len > b->len ? 1 : 0;
 }
 
 /* Path normalizer core: optionally collapse redundant '//' (DO_SLASH) and/or
@@ -3832,21 +3837,16 @@ static char *fil_normalized_ex(const char *source, char *dest, int do_slash,
                                int do_query) {
   char lastc = 0;
   int gotquery = 0;
-  size_t ampargs = 0;
   size_t i, j;
-  char *query = NULL;
+  char *query;
 
   for(i = j = 0; source[i] != '\0'; i++) {
     if (!gotquery && source[i] == '?') {
       gotquery = 1;
-      ampargs = 1;
     }
     if (do_slash && !gotquery && lastc == '/' && source[i] == '/') {
       // foo//bar -> foo/bar
     } else {
-      if (gotquery && source[i] == '&') {
-        ampargs++;
-      }
       dest[j++] = source[i];
     }
     lastc = source[i];
@@ -3854,49 +3854,42 @@ static char *fil_normalized_ex(const char *source, char *dest, int do_slash,
   dest[j++] = '\0';
 
   /* Sort arguments (&foo=1&bar=2 == &bar=2&foo=1) */
-  if (do_query && ampargs > 1) {
-    char **amps = malloct(ampargs * sizeof(char *));
-    char *copyBuff = NULL;
-    size_t qLen = 0;
+  if (do_query && (query = strchr(dest, '?')) != NULL) {
+    const char *cur = query + 1;
+    hts_query_field f;
+    size_t nfields = 0;
 
-    assertf(amps != NULL);
-    gotquery = 0;
-    for(i = j = 0; dest[i] != '\0'; i++) {
-      if ((gotquery && dest[i] == '&') || (!gotquery && dest[i] == '?')) {
-        if (!gotquery) {
-          gotquery = 1;
-          query = &dest[i];
-          qLen = strlen(query);
-        }
-        assertf(j < ampargs);
-        amps[j++] = &dest[i];
-        dest[i] = '\0';
+    while (hts_query_next(&cur, &f))
+      nfields++;
+    if (nfields > 1) {
+      hts_query_field *fields = malloct(nfields * sizeof(*fields));
+      const size_t qLen = strlen(query);
+      char *copyBuff = malloct(qLen + 1);
+      htsbuff cb;
+
+      assertf(fields != NULL);
+      assertf(copyBuff != NULL);
+      cur = query + 1;
+      for (i = 0; hts_query_next(&cur, &f); i++) {
+        assertf(i < nfields);
+        fields[i] = f;
       }
-    }
-    assertf(gotquery);
-    assertf(j == ampargs);
+      assertf(i == nfields);
 
-    /* Sort 'em all */
-    qsort(amps, ampargs, sizeof(char *), sortNormFnc);
+      qsort(fields, nfields, sizeof(*fields), sortNormFnc);
 
-    /* Replace query by sorted query */
-    copyBuff = malloct(qLen + 1);
-    assertf(copyBuff != NULL);
-    {
-      htsbuff cb = htsbuff_ptr(copyBuff, qLen + 1);
-
-      for (i = 0; i < ampargs; i++) {
-        htsbuff_cat(&cb, i == 0 ? "?" : "&");
-        htsbuff_cat(&cb, amps[i] + 1);
+      /* Replace query by sorted query, of the same length */
+      cb = htsbuff_ptr(copyBuff, qLen + 1);
+      for (i = 0; i < nfields; i++) {
+        htsbuff_catc(&cb, i == 0 ? '?' : '&');
+        htsbuff_catn(&cb, fields[i].key, fields[i].len);
       }
       assertf(cb.len == qLen);
-    }
-    /* query points into dest where the original qLen-byte query was */
-    strlcpybuff(query, copyBuff, qLen + 1);
+      strlcpybuff(query, copyBuff, qLen + 1);
 
-    /* Cleanup */
-    freet(amps);
-    freet(copyBuff);
+      freet(fields);
+      freet(copyBuff);
+    }
   }
 
   return dest;
@@ -3939,7 +3932,8 @@ static int hts_query_key_stripped(const char *arg, size_t keylen,
 char *fil_normalized_filtered_ex(const char *source, char *dest,
                                  const char *strip, int do_slash,
                                  int do_query) {
-  const char *query;
+  const char *query, *cur;
+  hts_query_field f;
   char BIGSTK tmp[HTS_URLMAXSIZE * 2];
   htsbuff cb;
   int wrote = 0;
@@ -3955,26 +3949,12 @@ char *fil_normalized_filtered_ex(const char *source, char *dest,
      (the read re-normalizes it; a dropped empty arg would miss dedup). */
   cb = htsbuff_ptr(tmp, sizeof(tmp));
   htsbuff_catn(&cb, source, (size_t) (query - source));
-  for (query++;;) {
-    const char *const arg = query;
-    const char *eq = NULL;
-    size_t keylen, arglen;
-
-    while (*query != '\0' && *query != '&') {
-      if (eq == NULL && *query == '=')
-        eq = query;
-      query++;
-    }
-    arglen = (size_t) (query - arg);
-    keylen = eq != NULL ? (size_t) (eq - arg) : arglen;
-    if (!hts_query_key_stripped(arg, keylen, strip)) {
+  for (cur = query + 1; hts_query_next(&cur, &f);) {
+    if (!hts_query_key_stripped(f.key, f.keylen, strip)) {
       htsbuff_catc(&cb, wrote ? '&' : '?');
-      htsbuff_catn(&cb, arg, arglen);
+      htsbuff_catn(&cb, f.key, f.len);
       wrote = 1;
     }
-    if (*query == '\0')
-      break;
-    query++;
   }
   return fil_normalized_ex(tmp, dest, do_slash, do_query);
 }

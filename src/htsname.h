@@ -100,6 +100,10 @@ int url_savename(lien_adrfilsave *const afs,
 void standard_name(char *b, size_t bsize, const char *dot_pos,
                    const char *nom_pos, const char *fil_complete,
                    int short_ver);
+/* Does url's query have a field with an '=' whose key is exactly name? Its
+   value, clipped to size - 1 bytes, goes to dst, of size >= 1. */
+hts_boolean url_query_value(const char *url, const char *name, char *dst,
+                            size_t size);
 /* Append s to d (mapping '\' to '/'), clipped to dsize bytes including the NUL.
    Clips rather than aborts: s is a crawled link, hostile by construction. */
 void url_savename_addstr(char *d, size_t dsize, const char *s);

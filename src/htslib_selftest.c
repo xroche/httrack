@@ -32,6 +32,7 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 #include "htsselftest_int.h"
+#include "htsname.h"
 
 #include <stdint.h>
 #ifndef _WIN32
@@ -2445,6 +2446,445 @@ static int st_statrecv(httrackp *opt, int argc, char **argv) {
 }
 
 /* ------------------------------------------------------------ */
+/* querydiff: the old query parsers of fil_normalized and %[param], */
+/* run next to the shared iterator.                              */
+/* TODO(#1878): delete with the legacy parsers.                  */
+/* ------------------------------------------------------------ */
+
+static int legacy_sortNormFnc(const void *a_, const void *b_) {
+  const char *const *const a = (const char *const *) a_;
+  const char *const *const b = (const char *const *) b_;
+
+  return strcmp(*a + 1, *b + 1);
+}
+
+/* Path normalizer core: optionally collapse redundant '//' (DO_SLASH) and/or
+   sort query arguments (DO_QUERY) so equivalent URLs dedupe. */
+static char *legacy_fil_normalized_ex(const char *source, char *dest,
+                                      int do_slash, int do_query) {
+  char lastc = 0;
+  int gotquery = 0;
+  size_t ampargs = 0;
+  size_t i, j;
+  char *query = NULL;
+
+  for (i = j = 0; source[i] != '\0'; i++) {
+    if (!gotquery && source[i] == '?') {
+      gotquery = 1;
+      ampargs = 1;
+    }
+    if (do_slash && !gotquery && lastc == '/' && source[i] == '/') {
+      // foo//bar -> foo/bar
+    } else {
+      if (gotquery && source[i] == '&') {
+        ampargs++;
+      }
+      dest[j++] = source[i];
+    }
+    lastc = source[i];
+  }
+  dest[j++] = '\0';
+
+  /* Sort arguments (&foo=1&bar=2 == &bar=2&foo=1) */
+  if (do_query && ampargs > 1) {
+    char **amps = malloct(ampargs * sizeof(char *));
+    char *copyBuff = NULL;
+    size_t qLen = 0;
+
+    assertf(amps != NULL);
+    gotquery = 0;
+    for (i = j = 0; dest[i] != '\0'; i++) {
+      if ((gotquery && dest[i] == '&') || (!gotquery && dest[i] == '?')) {
+        if (!gotquery) {
+          gotquery = 1;
+          query = &dest[i];
+          qLen = strlen(query);
+        }
+        assertf(j < ampargs);
+        amps[j++] = &dest[i];
+        dest[i] = '\0';
+      }
+    }
+    assertf(gotquery);
+    assertf(j == ampargs);
+
+    /* Sort 'em all */
+    qsort(amps, ampargs, sizeof(char *), legacy_sortNormFnc);
+
+    /* Replace query by sorted query */
+    copyBuff = malloct(qLen + 1);
+    assertf(copyBuff != NULL);
+    {
+      htsbuff cb = htsbuff_ptr(copyBuff, qLen + 1);
+
+      for (i = 0; i < ampargs; i++) {
+        htsbuff_cat(&cb, i == 0 ? "?" : "&");
+        htsbuff_cat(&cb, amps[i] + 1);
+      }
+      assertf(cb.len == qLen);
+    }
+    /* query points into dest where the original qLen-byte query was */
+    strlcpybuff(query, copyBuff, qLen + 1);
+
+    /* Cleanup */
+    freet(amps);
+    freet(copyBuff);
+  }
+
+  return dest;
+}
+
+static int legacy_hts_query_key_stripped(const char *arg, size_t keylen,
+                                         const char *strip) {
+  const char *p = strip;
+
+  while (*p != '\0') {
+    const char *start = p;
+    size_t toklen;
+
+    while (*p != '\0' && *p != ',')
+      p++;
+    toklen = (size_t) (p - start);
+    while (toklen > 0 && *start == ' ') {
+      start++;
+      toklen--;
+    }
+    while (toklen > 0 && start[toklen - 1] == ' ')
+      toklen--;
+    if (toklen == 1 && start[0] == '*')
+      return 1;
+    if (toklen == keylen && strncmp(start, arg, keylen) == 0)
+      return 1;
+    if (*p == ',')
+      p++;
+  }
+  return 0;
+}
+
+static char *legacy_fil_normalized_filtered_ex(const char *source, char *dest,
+                                               const char *strip, int do_slash,
+                                               int do_query) {
+  const char *query;
+  char BIGSTK tmp[HTS_URLMAXSIZE * 2];
+  htsbuff cb;
+  int wrote = 0;
+
+  /* No strip list, or no query: plain normalization. */
+  if (strip == NULL || *strip == '\0' ||
+      (query = strchr(source, '?')) == NULL) {
+    return legacy_fil_normalized_ex(source, dest, do_slash, do_query);
+  }
+
+  /* Copy the path, re-emit kept query args, let fil_normalized() sort. Walk
+     every field incl. empty/trailing ("a&","?&&") so the result is a fixpoint
+     (the read re-normalizes it; a dropped empty arg would miss dedup). */
+  cb = htsbuff_ptr(tmp, sizeof(tmp));
+  htsbuff_catn(&cb, source, (size_t) (query - source));
+  for (query++;;) {
+    const char *const arg = query;
+    const char *eq = NULL;
+    size_t keylen, arglen;
+
+    while (*query != '\0' && *query != '&') {
+      if (eq == NULL && *query == '=')
+        eq = query;
+      query++;
+    }
+    arglen = (size_t) (query - arg);
+    keylen = eq != NULL ? (size_t) (eq - arg) : arglen;
+    if (!legacy_hts_query_key_stripped(arg, keylen, strip)) {
+      htsbuff_catc(&cb, wrote ? '&' : '?');
+      htsbuff_catn(&cb, arg, arglen);
+      wrote = 1;
+    }
+    if (*query == '\0')
+      break;
+    query++;
+  }
+  return legacy_fil_normalized_ex(tmp, dest, do_slash, do_query);
+}
+
+/* This is the old %[param] lookup of url_savename(). */
+static hts_boolean legacy_url_query_value(const char *fil_complete,
+                                          const char *token, char *value,
+                                          size_t size) {
+  char name[256];
+  char *c;
+
+  assertf(strlen(token) + 2 <= sizeof(name));
+  strcpybuff(name, token);
+  strcatbuff(name, "="); /* param=.. */
+  value[0] = '\0';
+  c = strchr(fil_complete, '?');
+  if (c) {
+    char *cp;
+
+    while ((cp = strstr(c + 1, name)) && *(cp - 1) != '?' &&
+           *(cp - 1) != '&') { /* finds [?&]param= */
+      c = cp;
+    }
+    if (cp) {
+      char *d = value;
+
+      c = cp + strlen(name); /* jumps "param=" */
+      while (*c != '\0' && *c != '&' && d + 1 < value + size) {
+        *d++ = *c++;
+      }
+      *d = '\0';
+      return HTS_TRUE;
+    }
+  }
+  return HTS_FALSE;
+}
+
+typedef struct {
+  unsigned long cases;
+  unsigned long failures;
+  unsigned long allowed_qmark; /* a second '?' no longer starts a field */
+  unsigned long allowed_name;  /* a name with '=' or '&' is never a key */
+} querydiff_stats;
+
+static void querydiff_fail(querydiff_stats *st, const char *site,
+                           const char *in, const char *arg, const char *old,
+                           const char *new) {
+  st->failures++;
+  if (st->failures <= 20) {
+    printf("querydiff: %s differs on '%.80s' (%zu bytes) arg '%.40s': old "
+           "'%.80s' new '%.80s'\n",
+           site, in, strlen(in), arg, old, new);
+    fflush(stdout); /* a later abort must not swallow it */
+  }
+}
+
+/* This compares fil_normalized, which runs the --strip-query filter and the
+   query sort. */
+static void querydiff_normalize(querydiff_stats *st, const char *url) {
+  static const char *const strips[] = {NULL,    "",   "*", "a",  "a, sid",
+                                       " x ,y", "id", "=", ",,", NULL};
+  const size_t size = strlen(url) + 1;
+  char *o = malloct(size);
+  char *n = malloct(size);
+  size_t i;
+  int flags;
+
+  assertf(o != NULL && n != NULL);
+  for (i = 0; i == 0 || strips[i] != NULL; i++) {
+    for (flags = 0; flags < 4; flags++) {
+      st->cases++;
+      legacy_fil_normalized_filtered_ex(url, o, strips[i], flags & 1,
+                                        (flags >> 1) & 1);
+      fil_normalized_filtered_ex(url, n, strips[i], flags & 1,
+                                 (flags >> 1) & 1);
+      if (strcmp(o, n) != 0)
+        querydiff_fail(st, "fil_normalized", url,
+                       strips[i] != NULL ? strips[i] : "(null)", o, n);
+    }
+  }
+  freet(o);
+  freet(n);
+}
+
+/* This returns a copy of s with each '?' after the first skip ones replaced by
+   '\001', which cannot start a field. */
+static char *querydiff_hide_qmarks(const char *s, int skip) {
+  char *const copy = strdupt(s);
+  char *p;
+
+  assertf(copy != NULL);
+  for (p = copy; *p != '\0'; p++) {
+    if (*p == '?' && skip-- <= 0)
+      *p = '\001';
+  }
+  return copy;
+}
+
+/* This compares %[param]. A name holding '=' or '&' may now find nothing. A
+   URL with a second '?' may differ when the old lookup gives the new result
+   once every '?' past the first is hidden, in the name too. */
+static void querydiff_template(querydiff_stats *st, const char *url,
+                               const char *name) {
+  static const size_t sizes[] = {1, 2, 4, 256};
+  size_t i;
+
+  for (i = 0; i < sizeof(sizes) / sizeof(sizes[0]); i++) {
+    char o[256], n[256];
+    const hts_boolean fo = legacy_url_query_value(url, name, o, sizes[i]);
+    const hts_boolean fn = url_query_value(url, name, n, sizes[i]);
+
+    st->cases++;
+    if (fo == fn && (!fo || strcmp(o, n) == 0))
+      continue;
+    if (strpbrk(name, "=&") != NULL) {
+      if (!fn) {
+        st->allowed_name++;
+        continue;
+      }
+    } else if (strchr(url, '?') != NULL &&
+               strchr(strchr(url, '?') + 1, '?') != NULL) {
+      char *hurl = querydiff_hide_qmarks(url, 1);
+      char *hname = querydiff_hide_qmarks(name, 0);
+      char h[256];
+      const hts_boolean fh = legacy_url_query_value(hurl, hname, h, sizes[i]);
+      char *p;
+
+      freet(hurl);
+      freet(hname);
+      for (p = h; *p != '\0'; p++) {
+        if (*p == '\001')
+          *p = '?';
+      }
+      if (fh == fn && (!fh || strcmp(h, n) == 0)) {
+        st->allowed_qmark++;
+        continue;
+      }
+    }
+    querydiff_fail(st, "%[param]", url, name, fo ? o : "(none)",
+                   fn ? n : "(none)");
+  }
+}
+
+static void querydiff_one(querydiff_stats *st, const char *q) {
+  static const char *const names[] = {"id",  "a",   "sid", "",    "ID",
+                                      "a=b", "a&b", "?",   "x?id"};
+  String url = STRING_EMPTY;
+  size_t i;
+
+  StringCat(url, "/d//p?");
+  StringCat(url, q);
+  querydiff_normalize(st, StringBuff(url));
+  for (i = 0; i < sizeof(names) / sizeof(names[0]); i++)
+    querydiff_template(st, StringBuff(url), names[i]);
+  StringFree(url);
+}
+
+/* This returns a run of n copies of c. */
+static char *querydiff_run(char c, size_t n) {
+  char *s = malloct(n + 1);
+
+  assertf(s != NULL);
+  memset(s, c, n);
+  s[n] = '\0';
+  return s;
+}
+
+static int st_querydiff(httrackp *opt, int argc, char **argv) {
+  static const char *const hand[] = {
+      "",           "&",          "&&",
+      "a",          "a&",         "&a",
+      "a&&b",       "a=",         "=",
+      "=v",         "a=b=c",      "a=1&b=2&a=3",
+      "b=2&a=1",    "a=1&&",      "&&a=1",
+      "a&b=c&d=e",  "a=1&b&c=2",  "id=5?id=6",
+      "x=1?id=5",   "xid=5&id=6", "id=a%2",
+      "id=%41%42",  "id==5",      "id",
+      "id&id=7",    "?id=1",      "a=b=5",
+      "a&b=3",      "#a=1&b",     ";a=1;b=2",
+      "+=+&+",      "a b=c d&e",  "sid=a+b&sid=%41",
+      "a=1?x?id=7", "x?id=7",     "ID=5&id=6",
+      "Id=5",       NULL};
+  /* Long fields at and around the template's 255-byte value and 254-byte
+     name. */
+  static const size_t lengths[] = {63, 64, 65, 254, 255, 256, 300};
+  static const char *const alphabet[] = {"a", "=",   "&",   "%",   "?",  ";",
+                                         "#", "+",   " ",   "sid", "id", "/",
+                                         "1", "%41", "abc", "x"};
+  querydiff_stats st = {0, 0, 0, 0};
+  uint32_t seed = 1872;
+  size_t i;
+  int r;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  /* These checks pin the two intended changes. */
+  {
+    char v[256];
+
+    if (url_query_value("/p?x=1?id=5", "id", v, sizeof(v)) ||
+        !url_query_value("/p?id=5?id=6", "id", v, sizeof(v)) ||
+        strcmp(v, "5?id=6") != 0) {
+      querydiff_fail(&st, "%[param] second '?'", "?id=5?id=6", "id", "", v);
+    }
+    if (url_query_value("/p?a=b=5", "a=b", v, sizeof(v)) ||
+        url_query_value("/p?a&b=3", "a&b", v, sizeof(v))) {
+      querydiff_fail(&st, "%[param] name with '=' or '&'", "?a=b=5", "a=b",
+                     "(none)", v);
+    }
+  }
+  for (i = 0; hand[i] != NULL; i++)
+    querydiff_one(&st, hand[i]);
+  for (i = 0; i < sizeof(lengths) / sizeof(lengths[0]); i++) {
+    char *run = querydiff_run('x', lengths[i]);
+    String q = STRING_EMPTY;
+
+    StringCat(q, "a=1&");
+    StringCat(q, run);
+    StringCat(q, "=v&id=");
+    StringCat(q, run);
+    querydiff_one(&st, StringBuff(q));
+    if (lengths[i] <= 254) { /* the template's name cap */
+      querydiff_template(&st, "/p?x=1&", run);
+      StringClear(q);
+      StringCat(q, "/p?a=1&");
+      StringCat(q, run);
+      StringCat(q, "=v");
+      querydiff_template(&st, StringBuff(q), run);
+    }
+    StringFree(q);
+    freet(run);
+  }
+  for (r = 0; r < 4000; r++) {
+    String q = STRING_EMPTY;
+    const int ntok = (int) ((seed = seed * 1103515245u + 12345u) >> 16) % 24;
+    int t;
+
+    for (t = 0; t < ntok; t++) {
+      seed = seed * 1103515245u + 12345u;
+      StringCat(
+          q, alphabet[(seed >> 16) % (sizeof(alphabet) / sizeof(alphabet[0]))]);
+    }
+    querydiff_one(&st, StringBuff(q) != NULL ? StringBuff(q) : "");
+    StringFree(q);
+  }
+  printf("querydiff: %lu cases, %lu failures, allowed: %lu second '?', %lu "
+         "name with '=' or '&'\n",
+         st.cases, st.failures, st.allowed_qmark, st.allowed_name);
+  if (st.failures == 0)
+    printf("querydiff: OK\n");
+  return st.failures != 0;
+}
+
+/* Prints each field of argv[0] as [key] or [key|value], because '|' shows
+   where the key ends. */
+static int st_querynext(httrackp *opt, int argc, char **argv) {
+  const char *cur;
+  hts_query_field f;
+  String out = STRING_EMPTY;
+  int bad = 0;
+
+  (void) opt;
+  if (argc > 1) {
+    fprintf(stderr, "querynext: takes one query\n");
+    return 1;
+  }
+  for (cur = argc == 1 ? argv[0] : ""; hts_query_next(&cur, &f);) {
+    StringAddchar(out, '[');
+    StringMemcat(out, f.key, f.keylen);
+    if (f.val != NULL) {
+      StringAddchar(out, '|');
+      StringMemcat(out, f.val, f.vallen);
+      bad |= f.len != f.keylen + 1 + f.vallen || f.val != f.key + f.keylen + 1;
+    } else {
+      bad |= f.len != f.keylen || f.vallen != 0;
+    }
+    StringAddchar(out, ']');
+  }
+  printf("%s%s\n", StringBuff(out), bad ? " BADLEN" : "");
+  StringFree(out);
+  return bad;
+}
+
+/* ------------------------------------------------------------ */
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
 
@@ -2525,6 +2965,11 @@ const struct selftest_entry selftests_lib[] = {
      "last-char helpers never index before the buffer (#770, #781, #821)",
      st_lastchar},
     {"rtrim", "", "hts_rtrim never walks below the buffer", st_rtrim},
+    {"querydiff", "",
+     "the shared query iterator matches the six parsers it replaced",
+     st_querydiff},
+    {"querynext", "<query>", "the fields the shared query iterator reads",
+     st_querynext},
     {"gmtime", "",
      "hts_gmtime() fills the caller's buffer, not a static (#794)", st_gmtime},
     {"localtime", "<dir>",
