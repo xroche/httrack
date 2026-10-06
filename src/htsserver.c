@@ -92,6 +92,7 @@ char *commandReturnMsg = NULL;
 char *commandReturnCmdl = NULL;
 int commandReturnSet = 0;
 
+/* Written under webhttrack_lock(), and freed by the crawl thread. */
 httrackp *global_opt = NULL;
 
 /* Address the listening socket was bound to, as given: an authority we
@@ -1439,7 +1440,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
         if (coucal_readptr(NewLangList, "command", &adr)) {
           if (strcmp((char *) adr, "cancel") == 0) {
-            if (commandRunning) {
+            if (global_opt != NULL) {
               if (!commandEndRequested) {
                 commandEndRequested = 1;
                 hts_request_stop(global_opt, 0);
@@ -1450,28 +1451,28 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
               }
             }
           } else if ((p = strfield((char *) adr, "cancel-file="))) {
-            if (commandRunning) {
+            if (global_opt != NULL) {
               hts_cancel_file_push(global_opt, (char *) adr + p);
             }
           } else if (strcmp((char *) adr, "cancel-parsing") == 0) {
-            if (commandRunning) {
+            if (global_opt != NULL) {
               hts_cancel_parsing(global_opt);
             }
           } else if ((p = strfield((char *) adr, "pause="))) {
-            if (commandRunning) {
+            if (global_opt != NULL) {
               hts_setpause(global_opt, 1);
             }
           } else if ((p = strfield((char *) adr, "unpause"))) {
-            if (commandRunning) {
+            if (global_opt != NULL) {
               hts_setpause(global_opt, 0);
             }
           } else if (strcmp((char *) adr, "abort") == 0) {
-            if (commandRunning) {
+            if (global_opt != NULL) {
               hts_request_stop(global_opt, 1);
               commandEndRequested = 2;  /* will break the loop() callback */
             }
           } else if ((p = strfield((char *) adr, "add-url="))) {
-            if (commandRunning) {
+            if (global_opt != NULL) {
               char *ptraddr[2];
 
               ptraddr[0] = (char *) adr + p;

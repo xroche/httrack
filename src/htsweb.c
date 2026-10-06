@@ -425,13 +425,22 @@ int main(int argc, char *argv[]) {
 }
 
 static int webhttrack_runmain(httrackp * opt, int argc, char **argv);
+
+/* The server thread reads global_opt under this lock (#1863). */
+static void back_launch_end(httrackp *opt) {
+  webhttrack_lock();
+  global_opt = NULL;
+  webhttrack_release();
+  hts_free_opt(opt);
+  hts_uninit();
+}
+
 static void back_launch_cmd(void *pP) {
   char *cmd = (char *) pP;
   char **argv;
   int argc = 0;
-
-  //
-  httrackp *opt;
+  /* webhttrack_main() sets it before starting this thread. */
+  httrackp *const opt = global_opt;
 
   /* copy commandline */
   if (commandReturnCmdl)
@@ -445,6 +454,7 @@ static void back_launch_cmd(void *pP) {
       free(commandReturnMsg);
     commandReturnMsg = strdup("could not parse the command line");
     commandReturn = -1;
+    back_launch_end(opt);
     commandRunning = 0;
     commandEnd = 1;
     free(cmd);
@@ -452,11 +462,6 @@ static void back_launch_cmd(void *pP) {
   }
   /* drop the program name the posted command line carries */
   argv[0] = strdupt("webhttrack");
-
-  /* init */
-  hts_init();
-  global_opt = opt = hts_create_opt();
-  assert(opt->size_httrackp >= sizeof(httrackp));
 
   /* run */
   commandReturn = webhttrack_runmain(opt, argc, argv);
@@ -466,10 +471,7 @@ static void back_launch_cmd(void *pP) {
     commandReturnMsg = strdup(hts_errmsg(opt));
   }
 
-  /* free */
-  global_opt = NULL;
-  hts_free_opt(opt);
-  hts_uninit();
+  back_launch_end(opt);
 
   /* okay */
   commandRunning = 0;
@@ -486,9 +488,19 @@ static void back_launch_cmd(void *pP) {
 }
 
 void webhttrack_main(char *cmd) {
+  hts_init();
+  /* The caller holds webhttrack_lock(). */
+  global_opt = hts_create_opt();
+  assert(global_opt->size_httrackp >= sizeof(httrackp));
   commandRunning = 1;
   DEBUG(fprintf(stderr, "commandRunning=1\n"));
   if (hts_newthread(back_launch_cmd, (void *) strdup(cmd)) != 0) {
+    httrackp *const opt = global_opt;
+
+    /* back_launch_end() would retake the lock the caller holds */
+    global_opt = NULL;
+    hts_free_opt(opt);
+    hts_uninit();
     /* Nothing else clears the flag, and while it is set the watchdog holds the
        server open for a mirror that never started. */
     commandRunning = 0;
