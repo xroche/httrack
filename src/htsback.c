@@ -5737,8 +5737,9 @@ void back_infostr(struct_back *sback, int i, int j, char *s, size_t size) {
         strlcatbuff(s, s2, size);
         // size/totalsize trailer: build in s2, then append (the old code wrote
         // straight into s here, clobbering the URL it had just assembled).
-        snprintf(s2, sizeof(s2), LLintP " " LLintP " ", (LLint) back[i].r.size,
-                 (LLint) back[i].r.totalsize);
+        snprintf(s2, sizeof(s2), LLintP " " LLintP " ",
+                 hts_load_relaxed_llint(&back[i].r.size),
+                 hts_load_relaxed_llint(&back[i].r.totalsize));
         strlcatbuff(s, s2, size);
       }
     }

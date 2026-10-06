@@ -1004,7 +1004,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
 
                   szstr++;
                   if (sscanf(szstr, LLintP, &size) == 1) {
-                    back->r.totalsize = size;
+                    hts_store_relaxed_llint(&back->r.totalsize, size);
                   }
                 }
 
@@ -1216,7 +1216,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
               if (len) {
                 len = recv(soc_dat, buff, read_len, 0);
                 if (len > 0) {
-                  /* back_transferred() reads it while this thread writes it. */
+                  /* This worker is the only writer, so its read is safe. */
                   hts_store_relaxed_llint(&back->r.size, back->r.size + len);
                   hts_stat_recv_add(len);
                   if (back->r.fp) {

@@ -686,13 +686,15 @@ static int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_b
                   strcatbuff(StatsBuffer[index].name, s + l - maxurl / 2 + 2);
                 }
 
-                /* An FTP worker may be writing the size right now. */
+                /* An FTP worker may be writing the sizes right now. */
                 const LLint size = hts_load_relaxed_llint(&back[i].r.size);
+                const LLint totalsize =
+                    hts_load_relaxed_llint(&back[i].r.totalsize);
 
-                if (back[i].r.totalsize >= 0) { // known size
-                  StatsBuffer[index].sizetot = back[i].r.totalsize;
+                if (totalsize >= 0) { // known size
+                  StatsBuffer[index].sizetot = totalsize;
                   StatsBuffer[index].size = size;
-                } else { // unknown size
+                } else {                             // unknown size
                   if (slot_status == STATUS_READY) { // ready
                     StatsBuffer[index].sizetot = size;
                     StatsBuffer[index].size = size;
