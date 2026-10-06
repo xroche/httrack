@@ -1548,14 +1548,13 @@ void treatfirstline(htsblk * retour, const char *rcvd) {
   }
 }
 
-/* Read a Keep-Alive "timeout=" or "max=" value. A signed or oversized one
-   reads as 0, which turns keep-alive off as the old negative reading did. */
+/* A signed or oversized value reads as 0, which turns keep-alive off. */
 static void keep_alive_param(const char *s, int *value) {
   LLint v;
-  const int got = hts_scan_llint(&s, 0, INT_MAX, &v);
+  const hts_scan_result got = hts_scan_llint(&s, 0, INT_MAX, &v);
 
-  if (got != 0)
-    *value = got == 1 ? (int) v : 0;
+  if (got != HTS_SCAN_NONE)
+    *value = got == HTS_SCAN_OK ? (int) v : 0;
 }
 
 // traiter ligne par ligne l'en tête
@@ -1571,7 +1570,7 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
     const char *a = rcvd + p;
     LLint size;
 
-    if (hts_scan_llint(&a, 0, INT64_MAX, &size) == 1) {
+    if (hts_scan_llint(&a, 0, INT64_MAX, &size) == HTS_SCAN_OK) {
       retour->totalsize = size;
       if (retour->totalsize == 0) {
         retour->empty = 1;
@@ -1692,34 +1691,35 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
     for(a = rcvd + p; is_space(*a); a++) ;
     if (strncasecmp(a, "bytes ", 6) == 0) {
       LLint start = 0, end = 0, total = 0;
-      int got;
+      hts_scan_result got;
       hts_boolean refused;
 
       for(a += 6; is_space(*a); a++) ;
       got = hts_scan_llint(&a, 0, INT64_MAX, &start);
-      refused = got < 0;
+      refused = got == HTS_SCAN_REFUSED;
 
       // A signed or oversized field in "start-end/total" refuses the header.
-      if (got != 0 && *a == '-') {
+      if (got != HTS_SCAN_NONE && *a == '-') {
         a++;
         got = hts_scan_llint(&a, 0, INT64_MAX, &end);
-        refused = refused || got < 0;
-        if (got != 0 && *a == '/') {
+        refused = refused || got == HTS_SCAN_REFUSED;
+        if (got != HTS_SCAN_NONE && *a == '/') {
           a++;
           got = hts_scan_llint(&a, 0, INT64_MAX, &total);
-          refused = refused || got < 0;
+          refused = refused || got == HTS_SCAN_REFUSED;
         } else {
-          got = 0;
+          got = HTS_SCAN_NONE;
         }
       } else {
-        got = 0;
+        got = HTS_SCAN_NONE;
       }
-      if (got == 0) { // Only the total after the first '/' counts, as in "*/N".
+      // Only the total after the first '/' counts, as in "*/N".
+      if (got == HTS_SCAN_NONE) {
         start = end = total = 0;
         a = strchr(rcvd + p, '/');
         if (a != NULL) {
           a++;
-          if (hts_scan_llint(&a, 1, INT64_MAX, &total) == 1) {
+          if (hts_scan_llint(&a, 1, INT64_MAX, &total) == HTS_SCAN_OK) {
             end = total - 1;
           } else {
             total = 0;

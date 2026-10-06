@@ -605,7 +605,7 @@ hts_boolean ftp_parse_epsv(const char *line, int *port) {
 hts_boolean ftp_parse_size(const char *line, LLint *size) {
   const char *s = strchr(line, ' ');
 
-  return s != NULL && hts_scan_llint(&s, 0, INT64_MAX, size) == 1;
+  return s != NULL && hts_scan_llint(&s, 0, INT64_MAX, size) == HTS_SCAN_OK;
 }
 
 /* MDTM reply "213 YYYYMMDDHHMMSS[.frac]" (RFC 3659, UTC) into tm_time. */

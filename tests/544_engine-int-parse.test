@@ -53,8 +53,16 @@ scan 'got=0 value=-1 end=0' ' abc' 0 100
 scan 'got=0 value=-1 end=0' -x 0 100
 scan 'got=0 value=-1 end=0' '' 0 100
 
+# Refusals the sweep counts as intended changes without checking them.
+selftest_queue '0 0 0' int-parse-diff content-range ' bytes 0-+5/10'
+selftest_queue '0 0 0' int-parse-diff content-range \
+    ' bytes 0-9223372036854775808/10'
+selftest_queue 'keep_alive=0 timeout=15 max=0' int-parse-diff keep-alive ' max=+5'
+selftest_queue 'keep_alive=0 timeout=15 max=0' int-parse-diff keep-alive \
+    ' max=4294967311'
+
 # The counts pin the corpus, so a sweep that silently shrinks goes red.
-selftest_queue 'int-parse-diff: 5851 compared, 9542 intended changes, 0 failures' \
+selftest_queue 'int-parse-diff: 6495 compared, 8901 intended changes, 0 failures' \
     int-parse-diff
 
 selftest_run_queued

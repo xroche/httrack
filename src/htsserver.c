@@ -1201,7 +1201,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             const char *a = line + p;
 
             // A signed or oversized length reads no body.
-            if (hts_scan_llint(&a, 0, INT64_MAX, &length) < 0)
+            if (hts_scan_llint(&a, 0, INT64_MAX, &length) == HTS_SCAN_REFUSED)
               length = 0;
           } else if ((p = strfield(line, "Accept-language:")) != 0) {
             char tmp[32];

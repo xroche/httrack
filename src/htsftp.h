@@ -131,9 +131,8 @@ hts_boolean ftp_parse_pasv(const char *line, char *ip, size_t ip_size,
 /* Parse an EPSV reply's "(|||port|)" into *port, which must be 1..65535.
    Returns HTS_FALSE and leaves *port alone for any other reply. */
 hts_boolean ftp_parse_epsv(const char *line, int *port);
-/* Parse a SIZE reply's byte count, after its first space, into *size. Returns
-   HTS_FALSE and leaves *size alone if there is none, or it is signed or too
-   big. */
+/* Parse the byte count after a SIZE reply's first space into *size. A missing,
+   signed or too big count returns HTS_FALSE and leaves *size alone. */
 hts_boolean ftp_parse_size(const char *line, LLint *size);
 T_SOC get_datasocket(char *to_send, size_t to_send_size);
 int stop_ftp(lien_back * back);

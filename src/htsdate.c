@@ -36,6 +36,7 @@ Please visit our Website: http://www.httrack.com
 #include "htssafe.h"
 #include "htsurlport.h"
 
+#include <ctype.h>
 #include <limits.h>
 #include <string.h>
 
@@ -97,8 +98,12 @@ struct tm *convert_time_rfc822(struct tm *result, const char *s) {
         const char *digits = tok;
         LLint value;
 
-        /* A signed or oversized number is noise, as other tokens are. */
-        if (hts_scan_llint(&digits, 0, INT_MAX, &value) == 1) {
+        /* A '+' zone such as "+0100" reads as its digits. */
+        while (isspace((unsigned char) *digits))
+          digits++;
+        if (digits[0] == '+' && isdigit((unsigned char) digits[1]))
+          digits++;
+        if (hts_scan_llint(&digits, 0, INT_MAX, &value) == HTS_SCAN_OK) {
           const int number = (int) value;
 
           if (result_dd < 0)                   /* day always first number */

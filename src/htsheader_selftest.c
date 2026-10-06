@@ -1147,9 +1147,9 @@ static int st_intparse(httrackp *opt, int argc, char **argv) {
     printf("%s value=" LLintP " end=%d\n", ok ? "ok" : "refused", value,
            (int) (end - argv[1]));
   } else {
-    const int got = hts_scan_llint(&end, min, max, &value);
+    const hts_scan_result got = hts_scan_llint(&end, min, max, &value);
 
-    printf("got=%d value=" LLintP " end=%d\n", got, value,
+    printf("got=%d value=" LLintP " end=%d\n", (int) got, value,
            (int) (end - argv[1]));
   }
   return 0;
@@ -1266,7 +1266,7 @@ static void legacy_ftpsize(const char *in, char *out, size_t size) {
   const char *szstr = strchr(in, ' ');
   LLint value = 0;
 
-  if (szstr != NULL && sscanf(szstr + 1, LLintP, &value) == 1)
+  if (szstr != NULL && sscanf(szstr + 1, LLintP, &value) == HTS_SCAN_OK)
     snprintf(out, size, "size=" LLintP, value);
   else
     snprintf(out, size, "none");
@@ -1402,7 +1402,7 @@ static void current_server(const char *in, char *out, size_t size) {
   const char *a = in;
   LLint length = 1000;
 
-  if (hts_scan_llint(&a, 0, INT64_MAX, &length) < 0)
+  if (hts_scan_llint(&a, 0, INT64_MAX, &length) == HTS_SCAN_REFUSED)
     length = 0;
   st_int_server_read(length, out, size);
 }
@@ -1420,7 +1420,7 @@ static void current_proxytrack(const char *in, char *out, size_t size) {
   const char *a = in;
   LLint value;
 
-  if (hts_scan_llint(&a, 0, INT_MAX, &value) == 1)
+  if (hts_scan_llint(&a, 0, INT_MAX, &value) == HTS_SCAN_OK)
     snprintf(out, size, "length=%d", (int) value);
   else
     snprintf(out, size, "error");
@@ -1450,7 +1450,7 @@ struct st_int_site {
   const char *name;
   st_int_site_fn legacy, current;
   LLint max;                // the site's bound, for the generated allowlist
-  hts_boolean dash_spaces;  // '-' never reaches the number (the date parser)
+  hts_boolean sign_read;    // the date parser reads either sign as no sign
   hts_boolean exact;        // no intended change at all
   const char *templates[5]; // generated inputs: one "%s" for the number
 };
@@ -1571,7 +1571,11 @@ static const struct {
     {"date", "Sun, 06 Nov 1994 08:49:37 +0100", NULL},
     {"date", "\t06 Nov 1994 08:49:37", NULL},
     {"date", "garbage", NULL},
-    {"date", "06 Nov 94 08:49 +0100", "none"},
+    {"date", "06 Nov 94 08:49 +0000", NULL},
+    {"date", "Sun, 06 Nov 1994 08:49 +0100", NULL},
+    {"date", "Sun, 06 Nov 1994 08:49:37 GMT+1", NULL},
+    {"date", "Sun, 06 Nov 1994 08:49:37 \t+1", NULL},
+    {"date", "Sun, 06 Nov 1994 08:49:37 ++1", NULL},
     {"date", "4294967302 Nov 1994 08:49:37", "none"},
     {"server-length", " 50", NULL},
     {"server-length", " abc", NULL},
@@ -1638,8 +1642,16 @@ static int st_intparsediff(httrackp *opt, int argc, char **argv) {
   char in[256], old[256], cur[256], gen[128];
 
   (void) opt;
-  (void) argc;
-  (void) argv;
+  if (argc == 2) { // One input through one site, as it parses now.
+    for (s = 0; s < sizeof(st_int_sites) / sizeof(st_int_sites[0]); s++)
+      if (strcmp(st_int_sites[s].name, argv[0]) == 0) {
+        st_int_sites[s].current(argv[1], cur, sizeof(cur));
+        printf("%s\n", cur);
+        return 0;
+      }
+    fprintf(stderr, "int-parse-diff: no site \"%s\"\n", argv[0]);
+    return 1;
+  }
   for (i = 0; i < sizeof(st_int_cases) / sizeof(st_int_cases[0]); i++) {
     for (s = 0; strcmp(st_int_sites[s].name, st_int_cases[i].site) != 0; s++)
       ;
@@ -1665,8 +1677,7 @@ static int st_intparsediff(httrackp *opt, int argc, char **argv) {
           for (d = 0; d < sizeof(digits) / sizeof(digits[0]); d++)
             for (x = 0; x < sizeof(suffixes) / sizeof(suffixes[0]); x++) {
               const hts_boolean is_signed =
-                  *signs[g] != '\0' && *digits[d] != '\0' &&
-                  !(site->dash_spaces && *signs[g] == '-');
+                  *signs[g] != '\0' && *digits[d] != '\0' && !site->sign_read;
 
               snprintf(gen, sizeof(gen), "%s%s%s%s", spaces[w], signs[g],
                        digits[d], suffixes[x]);
@@ -1720,7 +1731,7 @@ const struct selftest_entry selftests_header[] = {
      "Content-Range parse integer safety", st_crange},
     {"int-parse", "parse|scan <text> <min> <max>",
      "bounded decimal parse: value and end offset", st_intparse},
-    {"int-parse-diff", "",
+    {"int-parse-diff", "[<site> <input>]",
      "integer header and reply fields parse as before, out-of-range refused",
      st_intparsediff},
     {"xfread-limit", "[oversized-file small-file]",

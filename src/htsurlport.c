@@ -60,7 +60,8 @@ hts_boolean hts_parse_llint(const char *s, const char **end, LLint min,
   return HTS_TRUE;
 }
 
-int hts_scan_llint(const char **s, LLint min, LLint max, LLint *out) {
+hts_scan_result hts_scan_llint(const char **s, LLint min, LLint max,
+                               LLint *out) {
   const char *p = *s;
   const char *end;
   LLint ignored;
@@ -69,15 +70,15 @@ int hts_scan_llint(const char **s, LLint min, LLint max, LLint *out) {
     p++;
   if (hts_parse_llint(p, &end, min, max, out)) {
     *s = end;
-    return 1;
+    return HTS_SCAN_OK;
   }
   if ((*p == '-' || *p == '+') && is_decimal_digit(p[1]))
     (void) hts_parse_llint(p + 1, &end, min, max,
                            &ignored); // only to skip the refused digits
   if (end == p)
-    return 0;
+    return HTS_SCAN_NONE;
   *s = end;
-  return -1;
+  return HTS_SCAN_REFUSED;
 }
 
 hts_boolean hts_parse_url_port(const char *a, int *port) {

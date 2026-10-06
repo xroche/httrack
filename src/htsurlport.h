@@ -36,18 +36,24 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h"
 
-/* Read the decimal digits at s (no sign, no leading space, at least one digit)
-   into *out if the value is in [min, max], with 0 <= min <= max: TRUE, else
-   FALSE and *out left alone. *end (if not NULL) is set past the digits read, so
-   it equals s when there are none. Overflow is refused before it can happen. */
+/* Read the unsigned decimal digits at s into *out if the value is in [min, max]
+   and return TRUE, or return FALSE and leave *out alone. *end (if not NULL) is
+   set past the digits, and overflow is refused before it can happen. */
 hts_boolean hts_parse_llint(const char *s, const char **end, LLint min,
                             LLint max, LLint *out);
 
-/* The sscanf("%d")-like scan of hostile number fields: skip leading white
-   space, then hts_parse_llint(). Returns 1 if it read *out, -1 if the number
-   there is signed or outside [min, max], 0 (*s unchanged) if there is none.
-   On 1 and -1, *s is past the number, so a caller can go on matching. */
-int hts_scan_llint(const char **s, LLint min, LLint max, LLint *out);
+/* What hts_scan_llint() found. */
+typedef enum {
+  HTS_SCAN_REFUSED = -1, /* The number is signed or outside [min, max]. */
+  HTS_SCAN_NONE = 0,     /* There is no number. */
+  HTS_SCAN_OK = 1        /* The number is in *out. */
+} hts_scan_result;
+
+/* Skip white space, then hts_parse_llint() the number there. On HTS_SCAN_OK
+   and HTS_SCAN_REFUSED, *s is moved past the number, so a caller can go on
+   matching. On HTS_SCAN_NONE, *s is unchanged. */
+hts_scan_result hts_scan_llint(const char **s, LLint min, LLint max,
+                               LLint *out);
 
 /* Parse the port text "a" (after the ':', up to the end of the string): TRUE
    and *port set for a bare decimal in 1..65535, else FALSE and *port left
