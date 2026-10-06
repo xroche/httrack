@@ -210,6 +210,17 @@ static int st_header(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Prints the code hts_status_line_code() reads from argv[0]. */
+static int st_statusline(httrackp *opt, int argc, char **argv) {
+  (void) opt;
+  if (argc != 1) {
+    fprintf(stderr, "statusline: needs one status line\n");
+    return 1;
+  }
+  printf("code=%d\n", hts_status_line_code(argv[0]));
+  return 0;
+}
+
 /* A header line that does not fit must be reported as cut and skipped whole,
    so the line after it is the server's next header and not its own tail. The
    block defaults to two headers and the blank line; \n and \r arrive escaped,
@@ -1124,6 +1135,8 @@ const struct selftest_entry selftests_header[] = {
     {"retry-after", "", "Retry-After header parser self-test", st_retryafter},
     {"header", "<raw-header-line> ...", "response header-line parsing",
      st_header},
+    {"statusline", "<status-line>", "status code of an HTTP status line",
+     st_statusline},
     {"headerfield", "<headers> <field>",
      "is <field> already present in the custom request-header block",
      st_headerfield},

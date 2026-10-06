@@ -1453,6 +1453,29 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
   return 0;
 }
 
+int hts_status_code(const char *s) {
+  /* RFC 9110 15: exactly three digits. sscanf("%d") range-checks nothing and
+     glibc wraps, so "4294967496" would read as a 200. */
+  if (s[0] >= '0' && s[0] <= '9' && s[1] >= '0' && s[1] <= '9' && s[2] >= '0' &&
+      s[2] <= '9' && (s[3] < '0' || s[3] > '9'))
+    return (s[0] - '0') * 100 + (s[1] - '0') * 10 + (s[2] - '0');
+  return -1;
+}
+
+int hts_status_line_code(const char *line) {
+  const char *a = line;
+
+  while (*a == ' ' || *a == '\t' || *a == '\r' || *a == '\n')
+    a++;
+  if (!strfield(a, "HTTP/"))
+    return -1;
+  while (*a != '\0' && *a != ' ' && *a != '\t' && *a != '\r' && *a != '\n')
+    a++;
+  while (*a == ' ' || *a == '\t' || *a == '\r' || *a == '\n')
+    a++;
+  return hts_status_code(a);
+}
+
 // traiter 1ere ligne d'en tête
 void treatfirstline(htsblk * retour, const char *rcvd) {
   const char *a = rcvd;
@@ -1471,13 +1494,8 @@ void treatfirstline(htsblk * retour, const char *rcvd) {
       if (*a != '\0') {
         while((*a == ' ') || (*a == 10) || (*a == 13) || (*a == 9))
           a++;                  // épurer espaces
-        /* RFC 9110 15: exactly three digits. sscanf("%d") range-checks
-           nothing and glibc wraps, so "4294967496" would read as a 200. */
-        if (a[0] >= '0' && a[0] <= '9' && a[1] >= '0' && a[1] <= '9' &&
-            a[2] >= '0' && a[2] <= '9' && (a[3] < '0' || a[3] > '9')) {
-          retour->statuscode =
-              (a[0] - '0') * 100 + (a[1] - '0') * 10 + (a[2] - '0');
-          // sauter 200
+        if ((retour->statuscode = hts_status_code(a)) >= 0) {
+          // skip the code
           while((*a != ' ') && (*a != '\0') && (*a != 10) && (*a != 13)
                 && (*a != 9))
             a++;

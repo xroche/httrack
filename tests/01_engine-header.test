@@ -19,6 +19,18 @@ hdr() {
 
 hdr 'contenttype=application/pdf cdispo=' 'Content-Type: application/pdf'
 
+# A status line must carry exactly three digits after the HTTP/ token.
+selftest_queue 'code=200' statusline 'HTTP/1.1 200 Connection established'
+selftest_queue 'code=204' statusline '  HTTP/1.0 204'
+selftest_queue 'code=407' statusline 'http/1.1 407 Proxy Authentication Required'
+selftest_queue 'code=-1' statusline 'HTTP/1.1 4294967496 Connection established'
+selftest_queue 'code=-1' statusline 'HTTP/1.1 2000 OK'
+selftest_queue 'code=-1' statusline 'HTTP/1.1 0200 OK'
+selftest_queue 'code=-1' statusline 'HTTP/1.1 +200 OK'
+selftest_queue 'code=-1' statusline 'HTTP/1.1 20 OK'
+selftest_queue 'code=-1' statusline 'HTTP/1.1'
+selftest_queue 'code=-1' statusline 'ICY 200 OK'
+
 # filename= is honored quoted or bare.
 hdr 'contenttype= cdispo=report.pdf' \
     'Content-Disposition: attachment; filename="report.pdf"'

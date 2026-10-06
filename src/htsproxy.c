@@ -164,8 +164,7 @@ int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
     strcpybuff(retour->msg, "proxy CONNECT: no response");
     return 0;
   }
-  if (sscanf(line, "HTTP/%*d.%*d %d", &code) < 1)
-    code = 0;
+  code = hts_status_line_code(line);
   if (code < 200 || code >= 300) {
     htsblk_failf(retour, "proxy CONNECT refused: %s",
                  strnotempty(line) ? line : "(no status)");
