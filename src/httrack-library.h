@@ -387,10 +387,15 @@ HTSEXT_API hts_boolean hts_resetaddurl(httrackp *opt);
     is copied, appended after every other rule so it wins, and applied by the
     engine thread at its next pass. A "-" rule also drops the matching links
     that are queued, or fetched and not yet saved. A "+" rule only affects links
-    found from then on. @return nonzero if the rule was queued, zero if it is
-    malformed (unsigned, empty, too long, or holding a control character) or
-    memory ran out. */
+    found from then on. @return nonzero if the rule was queued, zero if
+    hts_filter_rule_ok() refuses it or memory ran out. */
 HTSEXT_API hts_boolean hts_addfilter(httrackp *opt, const char *rule);
+
+/** Would hts_addfilter() accept @p rule? It must be a + or - sign and a
+    pattern, within the filter length cap and free of control characters, so a
+    front end can refuse it while the user can still edit it. @return HTS_TRUE
+    if valid, HTS_FALSE for NULL or an invalid rule. */
+HTSEXT_API hts_boolean hts_filter_rule_ok(const char *rule);
 
 /** Apply the runtime-tunable options from @p from onto @p to, to adjust a live
     mirror. A field @p from leaves at its default is not copied, so @p to keeps

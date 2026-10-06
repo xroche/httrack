@@ -417,7 +417,8 @@ static int st_addfilter(httrackp *opt, int argc, char **argv) {
            taken[1] == NULL;
     hts_addurl_free(taken);
     printf("%s: queued=%d kept=%d\n", cases[k].label, queued, kept);
-    if (queued != cases[k].want || kept != queued)
+    if (queued != cases[k].want || kept != queued ||
+        hts_filter_rule_ok(r) != cases[k].want)
       failed = 1;
   }
   /* two calls append in order */

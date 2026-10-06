@@ -4391,19 +4391,26 @@ char **hts_addfilter_take(httrackp *opt) {
   return old;
 }
 
+HTSEXT_API hts_boolean hts_filter_rule_ok(const char *rule) {
+  size_t i;
+
+  if (rule == NULL || (rule[0] != '+' && rule[0] != '-') || rule[1] == '\0' ||
+      strlen(rule) > HTS_FILTER_MAXLEN)
+    return HTS_FALSE;
+  for (i = 0; rule[i] != '\0'; i++) {
+    if ((unsigned char) rule[i] < ' ')
+      return HTS_FALSE;
+  }
+  return HTS_TRUE;
+}
+
 HTSEXT_API hts_boolean hts_addfilter(httrackp *opt, const char *rule) {
   char *copy;
   char **list;
   size_t n = 0;
 
-  if (opt == NULL || rule == NULL || (rule[0] != '+' && rule[0] != '-') ||
-      rule[1] == '\0' || strlen(rule) > HTS_FILTER_MAXLEN)
+  if (opt == NULL || !hts_filter_rule_ok(rule))
     return HTS_FALSE;
-  for (n = 0; rule[n] != '\0'; n++) {
-    if ((unsigned char) rule[n] < ' ')
-      return HTS_FALSE;
-  }
-  n = 0;
   if ((copy = strdupt(rule)) == NULL)
     return HTS_FALSE;
   hts_mutexlock(&opt->state.lock);
