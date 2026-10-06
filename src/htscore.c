@@ -2516,7 +2516,7 @@ void host_ban(httrackp * opt, int ptr,
   }
   // couper connexion
   for(i = 0; i < back_max; i++) {
-    if (back[i].status >= 0) // receiving or ready
+    if (hts_load_acquire_int(&back[i].status) >= 0) // receiving or ready
       /* host is a bare name and an FTP url_adr keeps its scheme, so no FTP slot
          matches here, and none may, because its worker is still writing it. */
       if (strfield2(back[i].url_adr, host)) {
@@ -2649,7 +2649,8 @@ static hts_boolean live_cancel_link_(httrackp *opt, struct_back *sback, int i) {
     const lien_back *const slot = &sback->lnk[b];
 
     /* the sav test rejects a slot matched on adr and fil alone */
-    if (slot->status != STATUS_READY || slot->r.is_write || slot->testmode ||
+    if (hts_load_acquire_int(&slot->status) != STATUS_READY ||
+        slot->r.is_write || slot->testmode ||
         strcmp(slot->url_sav, heap(i)->sav) != 0)
       return HTS_FALSE;
     /* no cache: a dropped page must not be recorded as fetched */

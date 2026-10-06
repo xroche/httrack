@@ -4610,7 +4610,7 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
         break;
 
       // Receive data
-      if (back[b].status > 0)
+      if (hts_load_acquire_int(&back[b].status) > 0)
         back_wait(sback, opt, cache, HTS_STAT.stat_timestart);
 
       // Continue to the loop if link still present
@@ -4804,7 +4804,7 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
       }                         // si shell ou keyboard (option)
       //
 #endif
-    } while((b >= 0) && (back[max(b, 0)].status > 0));
+    } while ((b >= 0) && (hts_load_acquire_int(&back[max(b, 0)].status) > 0));
 
     // If link not found on the stack, it's because it has already been downloaded
     // in background
@@ -4879,9 +4879,9 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
              (int) (hts_stat_recv_get() /
                     (time_local() - HTS_STAT.stat_timestart)));
       while(i < minimum(back_max, 160)) {
-        if (back[i].status > 0) {
+        if (hts_load_acquire_int(&back[i].status) > 0) {
           sprintf(s, "%d", back[i].r.size);
-        } else if (back[i].status == STATUS_READY) {
+        } else if (hts_load_acquire_int(&back[i].status) == STATUS_READY) {
           strcpybuff(s, "ENDED");
         } else
           strcpybuff(s, "   -   ");
@@ -5085,7 +5085,7 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
             break;
 
           // temps à attendre, et remplir autant que l'on peut le cache (backing)
-          if (back[b].status > 0) {
+          if (hts_load_acquire_int(&back[b].status) > 0) {
             back_wait(sback, opt, cache, 0);
           }
           if (ptr >= 0) {
@@ -5104,13 +5104,17 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
           }
         } while (
             /* dns/connect/request */
-            (back[b].status >= 99 && back[b].status <= 101) ||
+            (hts_load_acquire_int(&back[b].status) >= 99 &&
+             hts_load_acquire_int(&back[b].status) <= 101) ||
             /* For redirects, wait for request to be terminated */
-            (HTTP_IS_REDIRECT(back[b].r.statuscode) && back[b].status > 0) ||
+            (HTTP_IS_REDIRECT(back[b].r.statuscode) &&
+             hts_load_acquire_int(&back[b].status) > 0) ||
             /* Same for errors */
-            (HTTP_IS_ERROR(back[b].r.statuscode) && back[b].status > 0) ||
+            (HTTP_IS_ERROR(back[b].r.statuscode) &&
+             hts_load_acquire_int(&back[b].status) > 0) ||
             /* Contested type: wait for a sniffable body head (or EOF) */
-            (back[b].r.statuscode == HTTP_OK && back[b].status > 0 &&
+            (back[b].r.statuscode == HTTP_OK &&
+             hts_load_acquire_int(&back[b].status) > 0 &&
              strnotempty(back[b].r.cdispo) == 0 &&
              back[b].r.size < HTS_SNIFF_LEN &&
              hts_ext_sniff_wanted(opt, back[b].r.contenttype,
@@ -5158,9 +5162,9 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
             UNLINK(fconv(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), back[b].url_sav));
 
             /* Remove slot! */
-            if (back[b].status == STATUS_READY) {
+            if (hts_load_acquire_int(&back[b].status) == STATUS_READY) {
               back_maydelete(opt, cache, sback, b);
-            } else {            /* should not happend */
+            } else { /* should not happend */
               back_delete(opt, cache, sback, b);
             }
             b = -1;
@@ -5246,7 +5250,8 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
           if (!continue_loop) {
             /* Recompute filename with MIME type. After a stop, url_savename()
                pumps sockets and could move this slot out, so pin it. */
-            const hts_boolean pin = b >= 0 && back[b].status != STATUS_FREE;
+            const hts_boolean pin =
+                b >= 0 && hts_load_acquire_int(&back[b].status) != STATUS_FREE;
 
             afs->save[0] = '\0';
             if (pin)
@@ -5284,7 +5289,7 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
              */
             strcpybuff(back[b].url_sav, afs->save);
             /* Finalize now as we have the type */
-            if (back[b].status == STATUS_READY) {
+            if (hts_load_acquire_int(&back[b].status) == STATUS_READY) {
               if (!back[b].finalized) {
                 hts_log_print(opt, LOG_TRACE, "finalizing as we have the type");
                 back_finalize(opt, cache, sback, b);

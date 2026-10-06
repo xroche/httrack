@@ -778,26 +778,32 @@ int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_back * b
           for(_i = 0 + k; (_i < max(back_max * k, 1)) && (index < NStatsBuffer); _i++) {        // no lien
             int i = (back_index + _i) % back_max;       // commencer par le "premier" (l'actuel)
 
-            if (back[i].status >= 0) { // signifie "lien actif"
+            if (hts_load_acquire_int(&back[i].status) >=
+                0) { // signifie "lien actif"
               ok = 0;
               switch (j) {
               case 0:          // prioritaire
-                if ((back[i].status > 0) && (back[i].status < 99)) {
+                if ((hts_load_acquire_int(&back[i].status) > 0) &&
+                    (hts_load_acquire_int(&back[i].status) < 99)) {
                   strcpybuff(StatsBuffer[index].state, "receive");
                   ok = 1;
                 }
                 break;
               case 1:
-                if (back[i].status == STATUS_WAIT_HEADERS) {
+                if (hts_load_acquire_int(&back[i].status) ==
+                    STATUS_WAIT_HEADERS) {
                   strcpybuff(StatsBuffer[index].state, "request");
                   ok = 1;
-                } else if (back[i].status == STATUS_CONNECTING) {
+                } else if (hts_load_acquire_int(&back[i].status) ==
+                           STATUS_CONNECTING) {
                   strcpybuff(StatsBuffer[index].state, "connect");
                   ok = 1;
-                } else if (back[i].status == STATUS_WAIT_DNS) {
+                } else if (hts_load_acquire_int(&back[i].status) ==
+                           STATUS_WAIT_DNS) {
                   strcpybuff(StatsBuffer[index].state, "search");
                   ok = 1;
-                } else if (back[i].status == STATUS_FTP_TRANSFER) {     // ohh le beau ftp
+                } else if (hts_load_acquire_int(&back[i].status) ==
+                           STATUS_FTP_TRANSFER) { // ohh le beau ftp
                   char proto[8] = "ftp";
 
                   if (back[i].url_adr[0]) {
@@ -817,7 +823,8 @@ int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_back * b
                 }
                 break;
               default:
-                if (back[i].status == STATUS_READY) {   // prêt
+                if (hts_load_acquire_int(&back[i].status) ==
+                    STATUS_READY) { // prêt
                   if (back[i].r.statuscode == HTTP_OK) {
                     strcpybuff(StatsBuffer[index].state, "ready");
                     ok = 1;
@@ -882,7 +889,8 @@ int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_back * b
                   StatsBuffer[index].sizetot = back[i].r.totalsize;
                   StatsBuffer[index].size = back[i].r.size;
                 } else {        // pas de taille prédéfinie
-                  if (back[i].status == STATUS_READY) { // prêt
+                  if (hts_load_acquire_int(&back[i].status) ==
+                      STATUS_READY) { // prêt
                     StatsBuffer[index].sizetot = back[i].r.size;
                     StatsBuffer[index].size = back[i].r.size;
                   } else {

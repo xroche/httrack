@@ -845,6 +845,7 @@ struct lien_back {
   char *tmpfile; /**< temporary save name (compressed) */
   char tmpfile_buffer[HTS_URLMAXSIZE * 2]; /**< storage for tmpfile */
   char send_too[1024];    /**< data to send together with the header */
+  /* Read it with an acquire load, because an FTP worker publishes it. */
   int status;             /**< -1=unused, 0=ready, >0=operation in progress */
   int locked; /**< 0 free to move, 1 locked in memory, 2 pinned (may write) */
   int testmode;           /**< test mode */
