@@ -1086,3 +1086,5 @@ LANG_MAXRETRYAFTERTIP
 Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
 LANG_LIVERULES
 A rule you add here applies to the mirror now running, and wins over the rules above it. A rule you remove applies to the next one.
+LANG_LIVERULESBAD
+This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.

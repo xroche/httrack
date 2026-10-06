@@ -1056,3 +1056,5 @@ Longest delay to obey when a server sends a Retry-After header. Use 0 to retry w
 Najdaljše čakanje, ki se upošteva, ko strežnik pošlje glavo Retry-After. Vnesite 0 za ponovni poskus brez čakanja.
 A rule you add here applies to the mirror now running, and wins over the rules above it. A rule you remove applies to the next one.
 Pravilo, ki ga dodate tukaj, velja za zrcaljenje, ki trenutno poteka, in ima prednost pred pravili nad njim. Odstranitev pravila začne veljati šele pri naslednjem zrcaljenju.
+This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
+Tega pravila iskanja ni mogoče uporabiti. Pravilo se začne z znakom + ali -, nato sledi vzorec, celotno pa mora biti v eni kratki vrstici.

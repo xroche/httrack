@@ -1056,3 +1056,5 @@ Longest delay to obey when a server sends a Retry-After header. Use 0 to retry w
 Наибольшее ожидание, которое соблюдается, когда сервер присылает заголовок Retry-After. Значение 0 означает повтор без ожидания.
 A rule you add here applies to the mirror now running, and wins over the rules above it. A rule you remove applies to the next one.
 Правило, добавленное здесь, действует для текущего зеркалирования и имеет приоритет над правилами выше. Удаление правила вступит в силу только при следующем зеркалировании.
+This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
+Этот фильтр нельзя использовать. Фильтр начинается с + или -, затем идёт шаблон, и он должен умещаться в одной короткой строке.

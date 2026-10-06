@@ -1056,3 +1056,5 @@ Longest delay to obey when a server sends a Retry-After header. Use 0 to retry w
 サーバーが Retry-After ヘッダーを送ったときに従う最長の待ち時間です。0 を指定すると待たずに再試行します。
 A rule you add here applies to the mirror now running, and wins over the rules above it. A rule you remove applies to the next one.
 ここで追加したルールは実行中のミラーに適用され、上にあるルールより優先されます。ルールの削除は次回のミラーから反映されます。
+This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
+このスキャンルールは使用できません。ルールは + または - で始まり、その後にパターンが続く、短い 1 行でなければなりません。

@@ -1056,3 +1056,5 @@ Longest delay to obey when a server sends a Retry-After header. Use 0 to retry w
 Nejdelší čekání, které se dodrží, když server pošle hlavičku Retry-After. Zadejte 0 pro opakování bez čekání.
 A rule you add here applies to the mirror now running, and wins over the rules above it. A rule you remove applies to the next one.
 Pravidlo, které zde přidáte, platí pro právě probíhající stahování a má přednost před pravidly nad ním. Odebrání pravidla se projeví až při dalším stahování.
+This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
+Tento filtr nelze použít. Filtr začíná znakem + nebo -, za ním následuje vzor a musí se vejít na jeden krátký řádek.
