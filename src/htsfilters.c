@@ -125,8 +125,11 @@ int fa_strjoker_dual(int type, char **filters, int nfil, const char *nom1,
 /* STRJOKER_MAXLEN alone still allows ~2000 frames, ~900KB of stack, which
    overflows the 1MB a Windows thread gets (#574). */
 #define STRJOKER_MAXDEPTH 256u
-/* Bytes scanned, not calls, because one call can rescan its whole class. */
+/* Work quanta, not calls, because one call can rescan its whole class. A
+   scanned byte costs one; a call costs far more than that, so it is weighed
+   against the same budget rather than counted. */
 #define STRJOKER_MAXSTEPS 24000000u
+#define STRJOKER_CALLCOST 16u
 
 /* Failure memo for the recursive matcher: one bit per (chaine, joker) offset
    pair keeps star-heavy patterns polynomial instead of exponential (#501). */
@@ -163,7 +166,8 @@ static const char *strjoker_rec(strjoker_memo *memo, const char *chaine,
     memo->maxdepth = depth;
   /* Charge the budget before the depth cap: cut disables the memo, so uncounted
      deep calls would let the sub-cap search explode (OSS-Fuzz 535114376). */
-  if (memo->nsteps != NULL && ++*memo->nsteps > STRJOKER_MAXSTEPS)
+  if (memo->nsteps != NULL &&
+      (*memo->nsteps += STRJOKER_CALLCOST) > STRJOKER_MAXSTEPS)
     return NULL; /* work budget spent: fail the match safely */
   if (depth >= STRJOKER_MAXDEPTH) {
     memo->cut = HTS_TRUE;
