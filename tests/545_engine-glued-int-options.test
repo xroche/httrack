@@ -1,0 +1,104 @@
+#!/bin/bash
+#
+# A number glued to a short option (-c8, -%e2) is read with the bounded parser:
+# every value that fit its field reads as before, and one too large for it is
+# refused instead of wrapping (-#test=glued-int in htsopt_selftest.c).
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+require_httrack
+
+max64=9223372036854775807
+
+glued() {
+    local want=$1
+    shift
+    selftest_queue "$want" glued-int "$@"
+}
+
+glued 'got=1 value=8 adv=1' int 0 2147483647 8
+glued 'got=1 value=42 adv=4' int 0 2147483647 0042,3
+glued 'got=1 value=2147483647 adv=10' int 0 2147483647 2147483647x
+glued 'got=-1 value=-7 adv=10' int 0 2147483647 2147483648
+glued 'got=0 value=-7 adv=0' int 0 2147483647 ''
+glued 'got=0 value=-7 adv=0' int 0 2147483647 x
+glued 'got=0 value=-7 adv=0' int 0 2147483647 -5
+glued 'got=0 value=-7 adv=0' int 0 2147483647 +5
+glued 'got=0 value=-7 adv=0' int 0 2147483647 ' 5'
+glued "got=1 value=$max64 adv=19" llint 0 "$max64" "$max64"
+glued 'got=-1 value=-7 adv=19' llint 0 "$max64" 9223372036854775808
+glued 'got=-1 value=-7 adv=20' llint 0 "$max64" 99999999999999999999
+
+# The counts pin the corpus, so a sweep that silently shrinks goes red.
+glued 'glued-int: 13230 compared, 10668 signed or spaced now unread, 560 too large now refused, 0 failures'
+
+selftest_run_queued
+
+# The same options on a real command line. Port 1 refuses at once, so each run
+# ends before any transfer.
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_glued.XXXXXX")
+cleanup_push rm -rf "$tmp"
+n=0
+
+run() { # run WANT_RC OPTION...: the output of one run, its exit status checked
+    local want_rc=$1 rc=0 out
+    shift
+    n=$((n + 1))
+    out=$(httrack -q -O "$tmp/$n" 'http://127.0.0.1:1/' "$@" 2>&1) || rc=$?
+    test "$rc" -eq "$want_rc" || fail "httrack $* exited $rc, not $want_rc: $out"
+    printf '%s\n' "$out"
+}
+
+# Above 8 sockets is clamped with a warning, so -c8 and -c9 tell the value read.
+limited='simultaneous connections limited to 8'
+run 0 -c8 >/dev/null
+grep -q "$limited" "$tmp/$n/hts-log.txt" && fail "-c8 was not read as 8"
+run 0 -c9 >/dev/null
+grep -q "$limited" "$tmp/$n/hts-log.txt" || fail "-c9 was not read as 9"
+# -c0 still means one socket.
+run 0 -c0 >/dev/null
+grep -q "$limited" "$tmp/$n/hts-log.txt" && fail "-c0 was not read as 1"
+
+# Each option takes the largest value its field holds, and leaves no digit over
+# to be read as an unknown option. A trailing -T-5 fails the parse, so nothing
+# runs at these values. -r stops one short, for the seed's depth + 1.
+int_max=2147483647
+out=$(run 255 -r$((int_max - 1)) -p$int_max -T$int_max -J$int_max -R$int_max \
+    -E$int_max -H$int_max -A$int_max -j$int_max -%e$int_max -#L$int_max \
+    -#u$int_max -G$max64 -M$max64 -m$max64,$max64 -T-5)
+grep -q 'invalid option 5' <<<"$out" || fail "a largest value was refused: $out"
+# -#F stops where its slots stop fitting an int offset.
+out=$(run 255 -#F522263 -T-5)
+grep -q 'invalid option 5' <<<"$out" || fail "-#F522263 was refused: $out"
+out=$(run 255 -#F522264 -T-5)
+grep -q 'Value out of range in option -#F522264' <<<"$out" ||
+    fail "-#F522264 was not refused: $out"
+out=$(run 255 -@m$int_max)
+grep -q "Unknown value for -@m: $int_max" <<<"$out" ||
+    fail "-@m$int_max read as: $out"
+
+for opt in -r$int_max -T2147483648 -M99999999999999999999 -%e4294967297 -@m99999999999; do
+    out=$(run 255 "$opt")
+    grep -q "Value out of range in option $opt" <<<"$out" ||
+        fail "$opt was not refused: $out"
+done
+
+# A sign was never read either: it ends as an unknown option, as it did.
+out=$(run 255 -T-5)
+grep -q 'invalid option 5' <<<"$out" || fail "-T-5 read as: $out"
+
+# -r3 reaches the third page of a chain and stops there.
+root="$tmp/chain"
+mkdir -p "$root"
+echo '<a href="a.html">a</a>' >"$root/index.html"
+echo '<a href="b.html">b</a>' >"$root/a.html"
+echo '<a href="c.html">c</a>' >"$root/b.html"
+echo c >"$root/c.html"
+bash "$top_srcdir/tests/local-crawl.sh" --root "$root" --errors 0 \
+    --found b.html --not-found c.html \
+    httrack BASEURL/index.html -q -r3

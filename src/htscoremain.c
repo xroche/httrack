@@ -47,6 +47,8 @@ Please visit our Website: http://www.httrack.com
 #include "htsbauth.h"
 #include "htswrap.h"
 #include "htsmodules.h"
+#include <limits.h>
+#include <stdint.h>
 #include "htszlib.h"
 #include "htscharset.h"
 #include "htsselftest.h"
@@ -265,6 +267,43 @@ static void cmdl_print_args(httrackp *opt, const cmdl_argv *cmd) {
     if (sscanf((arg), "%d", &value_) == 1)                                     \
       (field) = value_;                                                        \
   } while (0)
+
+/* Read the glued digits of the option at com into field, or refuse the
+   command line when they are above max. With no digits, nothing changes.
+   A refusal panics and returns -1 from hts_main_internal. */
+#define readGluedOpt_(reader, field, max)                                      \
+  do {                                                                         \
+    if (reader(&com, 0, (max), &(field)) == HTS_SCAN_REFUSED) {                \
+      char s_[256];                                                            \
+                                                                               \
+      snprintf(s_, sizeof(s_), "Value out of range in option %s", argv[na]);   \
+      HTS_PANIC_PRINTF(s_);                                                    \
+      htsmain_free();                                                          \
+      return -1;                                                               \
+    }                                                                          \
+  } while (0)
+#define readGluedInt(field, max) readGluedOpt_(cmdl_glued_int, field, max)
+#define readGluedLLint(field, max) readGluedOpt_(cmdl_glued_llint, field, max)
+
+hts_scan_result cmdl_glued_llint(char **com, LLint min, LLint max, LLint *out) {
+  const char *const digits = *com + 1;
+  const char *end;
+  const hts_boolean ok = hts_parse_llint(digits, &end, min, max, out);
+
+  if (end == digits)
+    return HTS_SCAN_NONE;
+  *com += end - digits; // Onto the last digit, which the caller steps past.
+  return ok ? HTS_SCAN_OK : HTS_SCAN_REFUSED;
+}
+
+hts_scan_result cmdl_glued_int(char **com, int min, int max, int *out) {
+  LLint value;
+  const hts_scan_result got = cmdl_glued_llint(com, min, max, &value);
+
+  if (got == HTS_SCAN_OK)
+    *out = (int) value;
+  return got;
+}
 
 HTSEXT_API int hts_main(int argc, char **argv) {
   httrackp *opt = hts_create_opt();
@@ -1274,9 +1313,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             break;
           case 'r':            // n'est plus le recurse get bestial mais wizard itou!
             if (isdigit((unsigned char) *(com + 1))) {
-              sscanf(com + 1, "%d", &opt->depth);
-              while(isdigit((unsigned char) *(com + 1)))
-                com++;
+              // One short of INT_MAX, as the seed is queued at depth + 1.
+              readGluedInt(opt->depth, INT_MAX - 1);
             } else
               opt->depth = 3;
             break;
@@ -1367,85 +1405,57 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             break;
           case 'c':
             if (isdigit((unsigned char) *(com + 1))) {
-              sscanf(com + 1, "%d", &opt->maxsoc);
-              while(isdigit((unsigned char) *(com + 1)))
-                com++;
-              opt->maxsoc = max(opt->maxsoc, 1);        // FORCER A 1
+              readGluedInt(opt->maxsoc, INT_MAX);
+              opt->maxsoc = max(opt->maxsoc, 1); // At least one socket.
             } else
               opt->maxsoc = 4;
 
             break;
             //
           case 'p':
-            sscanf(com + 1, "%d", &opt->getmode);
-            while(isdigit((unsigned char) *(com + 1)))
-              com++;
+            readGluedInt(opt->getmode, INT_MAX);
             break;
             //        
           case 'G':
-            sscanf(com + 1, LLintP, &opt->fragment);
-            while(isdigit((unsigned char) *(com + 1)))
-              com++;
+            readGluedLLint(opt->fragment, INT64_MAX);
             break;
           case 'M':
-            sscanf(com + 1, LLintP, &opt->maxsite);
-            while(isdigit((unsigned char) *(com + 1)))
-              com++;
+            readGluedLLint(opt->maxsite, INT64_MAX);
             break;
           case 'm':
             // -m,10000 variant
             if (*(com + 1) != ',') {
-              sscanf(com + 1, LLintP, &opt->maxfile_nonhtml);
-              while(isdigit((unsigned char) *(com + 1)))
-                com++;
+              readGluedLLint(opt->maxfile_nonhtml, INT64_MAX);
             }
             if (*(com + 1) == ',' && isdigit((unsigned char) *(com + 2))) {
               com++;
-              sscanf(com + 1, LLintP, &opt->maxfile_html);
-              while(isdigit((unsigned char) *(com + 1)))
-                com++;
+              readGluedLLint(opt->maxfile_html, INT64_MAX);
             } else
               opt->maxfile_html = -1;
             break;
             //
           case 'T':
-            sscanf(com + 1, "%d", &opt->timeout);
-            while(isdigit((unsigned char) *(com + 1)))
-              com++;
+            readGluedInt(opt->timeout, INT_MAX);
             break;
           case 'J':
-            sscanf(com + 1, "%d", &opt->rateout);
-            while(isdigit((unsigned char) *(com + 1)))
-              com++;
+            readGluedInt(opt->rateout, INT_MAX);
             break;
           case 'R':
-            sscanf(com + 1, "%d", &opt->retry);
-            while(isdigit((unsigned char) *(com + 1)))
-              com++;
+            readGluedInt(opt->retry, INT_MAX);
             break;
           case 'E':
-            sscanf(com + 1, "%d", &opt->maxtime);
-            while(isdigit((unsigned char) *(com + 1)))
-              com++;
+            readGluedInt(opt->maxtime, INT_MAX);
             break;
           case 'H':
-            sscanf(com + 1, "%d", &opt->hostcontrol);
-            while(isdigit((unsigned char) *(com + 1)))
-              com++;
+            readGluedInt(opt->hostcontrol, INT_MAX);
             break;
           case 'A':
-            sscanf(com + 1, "%d", &opt->maxrate);
-            while(isdigit((unsigned char) *(com + 1)))
-              com++;
+            readGluedInt(opt->maxrate, INT_MAX);
             break;
 
           case 'j':
             opt->parsejava = HTSPARSE_DEFAULT;
-            if (isdigit((unsigned char) *(com + 1))) {
-              sscanf(com + 1, "%d", &opt->parsejava);
-              while(isdigit((unsigned char) *(com + 1)))
-                com++;
-            }
+            readGluedInt(opt->parsejava, INT_MAX);
             break;
             //
           case 'I':
@@ -1640,9 +1650,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   com++;
                 break;
               case 'e':
-                sscanf(com + 1, "%d", &opt->extdepth);
-                while(isdigit((unsigned char) *(com + 1)))
-                  com++;
+                readGluedInt(opt->extdepth, INT_MAX);
                 break;
               case 'B':
                 opt->tolerant = 1;
@@ -2404,11 +2412,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 {
                   int res = 0;
 
-                  if (isdigit((unsigned char) *(com + 1))) {
-                    sscanf(com + 1, "%d", &res);
-                    while(isdigit((unsigned char) *(com + 1)))
-                      com++;
-                  }
+                  readGluedInt(res, INT_MAX);
                   switch (res) {
                   case 1:
                   case 4:
@@ -2437,11 +2441,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               case 'm': { // --mptcp: Multipath TCP where the system has it
                 int on = 1;
 
-                if (isdigit((unsigned char) *(com + 1))) {
-                  sscanf(com + 1, "%d", &on);
-                  while (isdigit((unsigned char) *(com + 1)))
-                    com++;
-                }
+                readGluedInt(on, INT_MAX);
                 if (on != 0 && on != 1) {
                   char s[64];
 
@@ -2492,12 +2492,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   coucal cache_hashtable = coucal_new(0);
                   int sendb = 0;
 
-                  if (isdigit((unsigned char) *(com + 1))) {
-                    sscanf(com + 1, "%d", &sendb);
-                    while(isdigit((unsigned char) *(com + 1)))
-                      com++;
-                  } else
-                    sendb = 0;
+                  readGluedInt(sendb, INT_MAX);
                   if (!((na + 1 >= argc) || (argv[na + 1][0] == '-'))) {
                     na++;
                     hasFilter = 1;
@@ -2642,14 +2637,10 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 break;          // vérifier stdin
                 //
               case 'L':
-                sscanf(com + 1, "%d", &opt->maxlink);
-                while(isdigit((unsigned char) *(com + 1)))
-                  com++;
+                readGluedInt(opt->maxlink, INT_MAX);
                 break;
               case 'F':
-                sscanf(com + 1, "%d", &opt->maxfilter);
-                while(isdigit((unsigned char) *(com + 1)))
-                  com++;
+                readGluedInt(opt->maxfilter, HTS_FILTERS_MAX);
                 break;
               case 'Z':
                 opt->makestat = 1;
@@ -2658,9 +2649,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 opt->maketrack = 1;
                 break;
               case 'u':
-                sscanf(com + 1, "%d", &opt->waittime);
-                while(isdigit((unsigned char) *(com + 1)))
-                  com++;
+                readGluedInt(opt->waittime, INT_MAX);
                 break;
 
                 /*case 'R':    // ohh ftp, catch->ftpget

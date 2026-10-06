@@ -44,7 +44,17 @@ Please visit our Website: http://www.httrack.com
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 
+#include "htsurlport.h"
+
 int cmdl_opt(char *s);
+
+/* Read the digits glued after the option letter at *com (as in -c8) into *out
+   if in [min, max], and move *com onto the last digit, refused or not. Unlike
+   hts_scan_llint(), it skips no white space and stops on the last digit, not
+   past it. On HTS_SCAN_NONE (no digit) neither *com nor *out changes. */
+hts_scan_result cmdl_glued_llint(char **com, LLint min, LLint max, LLint *out);
+hts_scan_result cmdl_glued_int(char **com, int min, int max, int *out);
+
 int check_path(String * s, char *defaultname);
 
 /* Absolute path of the running executable, or NULL where the OS will not say

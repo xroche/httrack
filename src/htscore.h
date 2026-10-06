@@ -41,6 +41,7 @@ Please visit our Website: http://www.httrack.com
 /* specific definitions */
 #include "htsbase.h"
 /* Includes and definitions */
+#include <limits.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #ifdef _WIN32
@@ -454,6 +455,10 @@ void hts_finish_html_file(httrackp *opt, cache_back *cache, htsblk *r,
   (1 + (HTS_URLMAXSIZE * 2 - 1) + 1 + (HTS_URLMAXSIZE * 2 - 1) +               \
    HTS_FILTER_SUFFIX_MAX)
 
+/* Largest -#F, and the largest filter list that may still grow by
+   HTS_FILTERSINC, because the list's byte size must fit an int. */
+#define HTS_FILTERS_MAX (INT_MAX / HTS_FILTER_SLOT_SIZE - HTS_FILTERSINC - 2)
+
 int filters_init(char ***ptrfilters, int maxfilter, int filterinc);
 
 /* Binds this crawl's filter array to `opt`, and empties the wizard block with
@@ -465,15 +470,20 @@ void filters_bind(httrackp *opt, char ***ptrfilters, int *filptr);
   (HTS_FILTER_SLOT_SIZE - 1 < STRJOKER_MAXLEN ? HTS_FILTER_SLOT_SIZE - 1       \
                                               : STRJOKER_MAXLEN)
 
-/* Stores `pattern` at `pos`, shifting the rules from there up a slot; the
-   caller has ensured there is room. The one door into the array: a rule past
-   HTS_FILTER_MAXLEN warns and returns HTS_FALSE, never stored dead (#1270). */
+/* Stores `pattern` at `pos`, shifting the rules from there up a slot. The one
+   door into the array: a rule past HTS_FILTER_MAXLEN, or one that finds the
+   array full, warns and returns HTS_FALSE, never stored dead (#1270). */
 hts_boolean filters_insert(httrackp *opt, int pos, const char *pattern);
 
 /* Remove the n rules starting at pos, shifting the rest down. */
 void filters_remove(httrackp *opt, int pos, int n);
 
-/* Grow the filter array so n more rules fit. Aborts when it cannot. */
+/* Can a filter array of maxfilter rules grow by HTS_FILTERSINC? */
+hts_boolean filters_may_grow(int maxfilter);
+
+/* Grow the filter array so n more rules fit, unless filters_may_grow() says
+   no, in which case filters_insert() drops the rules that do not fit. Aborts
+   when memory runs out. */
 void filters_make_room(httrackp *opt, int n);
 
 /* Returns the fa_strjoker_dual() verdict of the nfil filters on adr+fil, in
