@@ -719,14 +719,13 @@ int url_savename(lien_adrfilsave *const afs,
           else if (opt->savename_delayed != HTS_SAVENAME_DELAYED_NONE &&
                    !hts_load_acquire_int(&opt->state.stop)) {
             // Check if the file is ready in backing.
-            if (headers != NULL && headers->status >= 0 && !is_redirect) {
+            if (headers != NULL && back_status(headers) >= 0 && !is_redirect) {
               const sniff_src src = {sback, headers, adr, fil, NULL};
 
               ext_chg = resolve_extension(opt, &src, headers->r.cdispo,
                                           headers->r.contenttype,
                                           headers->url_fil, ext, sizeof(ext));
-            }
-            else if (mime_type != NULL) {
+            } else if (mime_type != NULL) {
               ext[0] = '\0';
               if (*mime_type) {
                 give_mimext(ext, sizeof(ext), mime_type);
@@ -789,7 +788,7 @@ int url_savename(lien_adrfilsave *const afs,
 
                 do {
                   // temps à attendre, et remplir autant que l'on peut le cache (backing)
-                  if (back[b].status > 0) {
+                  if (back_status(&back[b]) > 0) {
                     back_wait(sback, opt, cache, 0);
                   }
                   if (ptr >= 0) {
@@ -804,7 +803,7 @@ int url_savename(lien_adrfilsave *const afs,
                     stop_looping = 1;
                   }
                   // traitement des 304,303..
-                  if (back[b].status <= 0) {
+                  if (back_status(&back[b]) <= 0) {
                     if (HTTP_IS_REDIRECT(back[b].r.statuscode)) {       // agh moved.. un tit tour de plus
                       if ((petits_tours < 5) && former != NULL) { // on va pas tourner en rond non plus!
                         if (strnotempty(back[b].r.location)) {    // location existe!
@@ -911,8 +910,8 @@ int url_savename(lien_adrfilsave *const afs,
                       }
                     }           // ok, leaving
                   }
-                } while(!stop_looping && back[b].status > 0
-                        && back[b].status < 1000);
+                } while (!stop_looping && back_status(&back[b]) > 0 &&
+                         back_status(&back[b]) < 1000);
 
                 // Si non déplacé, forcer type?
                 if (!has_been_moved) {

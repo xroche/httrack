@@ -204,9 +204,9 @@ int ftp_worker_selftests(void) {
                       "registered, so ftp_stop_workers() would never return\n");
       err++;
     }
-    if (back.status != STATUS_FTP_READY) {
+    if (back_status(&back) != STATUS_FTP_READY) {
       fprintf(stderr, "ftp-worker-selftest: slot status %d, expected %d\n",
-              back.status, STATUS_FTP_READY);
+              back_status(&back), STATUS_FTP_READY);
       err++;
     }
     if (returned) {
@@ -319,11 +319,11 @@ static void ftp_handoff_drive(struct_back *sback, httrackp *opt,
 
 /* back_wait() reaped the slot, carrying the payload its worker published. */
 static int ftp_handoff_check_reaped(const lien_back *slot, int round) {
-  if (slot->status != STATUS_READY) {
+  if (back_status(slot) != STATUS_READY) {
     fprintf(stderr,
             "ftp-handoff-selftest: round %d left status %d, so back_wait() "
             "never reaped the slot\n",
-            round, slot->status);
+            round, back_status(slot));
     return 1;
   }
   if (slot->r.statuscode != FTP_HANDOFF_CODE ||
@@ -417,10 +417,10 @@ int ftp_handoff_selftests(httrackp *opt) {
                       "registered\n");
       err++;
     }
-    if (slot->status != STATUS_FTP_READY) {
+    if (back_status(slot) != STATUS_FTP_READY) {
       fprintf(stderr,
               "ftp-handoff-selftest: the released list left status %d\n",
-              slot->status);
+              back_status(slot));
       err++;
     }
     back_clear_entry(slot);

@@ -356,7 +356,7 @@ void back_delete_all(httrackp * opt, cache_back * cache, struct_back * sback) {
     for (i = 0; i < sback->count; i++) {
       const lien_back *const back = &sback->lnk[i];
 
-      if (back_is_live(back->status) && back->r.is_write &&
+      if (back_is_live(back_status(back)) && back->r.is_write &&
           !IS_DELAYED_EXT(back->url_sav))
         opt->abort_left_partial = HTS_TRUE;
     }
@@ -827,7 +827,7 @@ int back_available(const struct_back * sback) {
   int nb = 0;
 
   for(i = 0; i < back_max; i++)
-    if (back[i].status == STATUS_FREE)  /* libre */
+    if (back_status(&back[i]) == STATUS_FREE) /* free */
       nb++;
   return nb;
 }
@@ -840,7 +840,7 @@ LLint back_incache(const struct_back * sback) {
   LLint sum = 0;
 
   for(i = 0; i < back_max; i++)
-    if (back[i].status != -1)
+    if (back_status(&back[i]) != -1)
       if (back[i].r.adr)        // ne comptabilier que les blocs en mémoire
         sum += max(back[i].r.size, back[i].r.totalsize);
   // stored (ready) slots
@@ -852,7 +852,7 @@ LLint back_incache(const struct_back * sback) {
     while((item = coucal_enum_next(&e))) {
       lien_back *ritem = (lien_back *) item->value.ptr;
 
-      if (ritem->status != -1)
+      if (back_status(ritem) != -1)
         if (ritem->r.adr)       // ne comptabilier que les blocs en mémoire
           sum += max(ritem->r.size, ritem->r.totalsize);
     }
@@ -869,7 +869,7 @@ int back_done_incache(const struct_back * sback) {
   int n = 0;
 
   for(i = 0; i < back_max; i++)
-    if (back[i].status == STATUS_READY)
+    if (back_status(&back[i]) == STATUS_READY)
       n++;
   // stored (ready) slots
   if (sback->ready != NULL) {
@@ -882,7 +882,7 @@ int back_done_incache(const struct_back * sback) {
     while((item = coucal_enum_next(&e))) {
       lien_back *ritem = (lien_back *) item->value.ptr;
 
-      if (ritem->status == STATUS_READY)
+      if (back_status(ritem) == STATUS_READY)
         n++;
     }
 #endif
@@ -904,7 +904,7 @@ int back_nsoc(const struct_back * sback) {
   int i;
 
   for(i = 0; i < back_max; i++)
-    if (back[i].status > 0)     // only receive
+    if (back_status(&back[i]) > 0) // only receive
       n++;
 
   return n;
@@ -916,7 +916,7 @@ int back_nsoc_overall(const struct_back * sback) {
   int i;
 
   for(i = 0; i < back_max; i++)
-    if (back[i].status > 0 || back[i].status == STATUS_ALIVE)
+    if (back_status(&back[i]) > 0 || back_status(&back[i]) == STATUS_ALIVE)
       n++;
 
   return n;
@@ -1086,7 +1086,7 @@ static hts_boolean back_chunked_unterminated(const lien_back *const back) {
 /* Past the terminating chunk, the line still owed is the optional trailer
    section (RFC 9112 7.1.2), read and discarded like a header block. */
 static hts_boolean back_in_chunk_trailers(const lien_back *const back) {
-  return back->status == STATUS_CHUNK_CR && back->chunk_blocksize == -1
+  return back_status(back) == STATUS_CHUNK_CR && back->chunk_blocksize == -1
              ? HTS_TRUE
              : HTS_FALSE;
 }
@@ -1159,7 +1159,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
             " bytes): file not cached, will be retried on the next"
             " update (use -%%B to cache anyway): %s%s",
             back[p].r.size, back[p].url_adr, back[p].url_fil);
-      } else if (back[p].status == STATUS_READY) {
+      } else if (back_status(&back[p]) == STATUS_READY) {
         hts_log_print(opt, LOG_WARNING,
                       "incomplete transfer (expected " LLintP
                       " bytes, got " LLintP
@@ -1181,9 +1181,9 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
       return -1;
     }
 
-    if ((back[p].status == STATUS_READY)        // ready
-        && (back[p].r.statuscode > 0)   // not internal error
-      ) {
+    if ((back_status(&back[p]) == STATUS_READY) // ready
+        && (back[p].r.statuscode > 0)           // not internal error
+    ) {
       if (!back[p].testmode) {  // not test mode
         const char *state = "unknown";
 
@@ -2226,7 +2226,7 @@ int back_trylive(httrackp * opt, cache_back * cache, struct_back * sback,
   const int back_max = sback->count;
 
   assertf(p >= 0 && p < back_max);
-  if (p >= 0 && back[p].status != STATUS_ALIVE) {       // we never know..
+  if (p >= 0 && back_status(&back[p]) != STATUS_ALIVE) { // we never know..
     int i = back_searchlive(opt, sback, back[p].url_adr);       // search slot
 
     if (i >= 0 && i != p) {
@@ -2249,7 +2249,7 @@ int back_searchlive(httrackp * opt, struct_back * sback, const char *search_addr
 
   /* search for a live socket */
   for(i = 0; i < back_max; i++) {
-    if (back[i].status == STATUS_ALIVE) {
+    if (back_status(&back[i]) == STATUS_ALIVE) {
       if (strfield2(back[i].url_adr, search_addr)) {    /* same location (xxc: check also virtual hosts?) */
         if (time_local() < back[i].ka_time_start + back[i].r.keep_alive_t) {
           return i;
@@ -2267,7 +2267,7 @@ int back_search_quick(struct_back * sback) {
 
   /* try to find an empty place */
   for(i = 0; i < back_max; i++) {
-    if (back[i].status == STATUS_FREE) {
+    if (back_status(&back[i]) == STATUS_FREE) {
       return i;
     }
   }
@@ -2287,7 +2287,7 @@ int back_search(httrackp * opt, struct_back * sback) {
 
   /* couldn't find an empty place, try to requisition a keep-alive place */
   for(i = 0; i < back_max; i++) {
-    if (back[i].status == STATUS_ALIVE) {
+    if (back_status(&back[i]) == STATUS_ALIVE) {
       lien_back *const back = sback->lnk;
 
       /* close this place */
@@ -2419,7 +2419,7 @@ hts_boolean back_delayed_rename(httrackp *opt, lien_back *back,
     back->r.out = NULL;
   }
   renamed = RENAME(back->url_sav, newname) == 0 ? HTS_TRUE : HTS_FALSE;
-  if (renamed && (back->status == STATUS_READY ||
+  if (renamed && (back_status(back) == STATUS_READY ||
                   (back->r.out = FOPEN(newname, "ab")) != NULL)) {
     filenote(&opt->state.strc, newname, NULL);
     hts_log_print(opt, LOG_DEBUG, "moved placeholder %s to %s", back->url_sav,
@@ -2459,7 +2459,7 @@ int back_delete(httrackp * opt, cache_back * cache, struct_back * sback,
     /* mid-write cancel: drop a .delayed placeholder; real-named partials
        survive for resume (--continue) */
     if (back[p].r.is_write && IS_DELAYED_EXT(back[p].url_sav) &&
-        (back[p].status != STATUS_READY || back[p].r.statuscode <= 0)) {
+        (back_status(&back[p]) != STATUS_READY || back[p].r.statuscode <= 0)) {
       back_delayed_discard(opt, &back[p]);
     }
     // Vérificateur d'intégrité
@@ -2472,10 +2472,10 @@ int back_delete(httrackp * opt, cache_back * cache, struct_back * sback,
 
     // Finalize
     if (!back[p].finalized) {
-      if ((back[p].status == STATUS_READY)      // ready
-          && (!back[p].testmode)        // not test mode
-          && (back[p].r.statuscode > 0) // not internal error
-        ) {
+      if ((back_status(&back[p]) == STATUS_READY) // ready
+          && (!back[p].testmode)                  // not test mode
+          && (back[p].r.statuscode > 0)           // not internal error
+      ) {
         hts_log_print(opt, LOG_DEBUG,
                       "File '%s%s' -> %s not yet saved in cache - saving now",
                       back[p].url_adr, back[p].url_fil, back[p].url_sav);
@@ -2546,7 +2546,7 @@ int back_stack_available(struct_back * sback) {
   int p = 0, n = 0;
 
   for(; p < back_max; p++)
-    if (back[p].status == STATUS_FREE)
+    if (back_status(&back[p]) == STATUS_FREE)
       n++;
   return n;
 }
@@ -3179,7 +3179,7 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
 
 #if HTS_XGETHOST
       if (soc != INVALID_SOCKET)
-        if (back[p].status == STATUS_WAIT_DNS) {        // pas d'erreur
+        if (back_status(&back[p]) == STATUS_WAIT_DNS) { // no error
           if (!back[p].r.is_file)
             back[p].status = STATUS_CONNECTING; // connexion en cours
           else
@@ -3223,7 +3223,7 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
         /* OUTPUT FULL DEBUG INFORMATION THE FIRST TIME WE SEE THIS VERY ANNOYING BUG,
            HOPING THAT SOME USER REPORT WILL QUICKLY SOLVE THIS PROBLEM :p */
         for(i = 0; i < back_max; i++) {
-          if (back[i].status != -1) {
+          if (back_status(&back[i]) != -1) {
             int may_clean = slot_can_be_cleaned(&back[i]);
             int may_finalize = may_clean
               && slot_can_be_finalized(opt, &back[i]);
@@ -3239,9 +3239,9 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
                 "\t"
                 "contenttype(%s), url(%s%s), save(%s)",
                 i, may_clean, may_finalize, may_serialize, back[i].finalized,
-                back[i].status, back[i].locked, IS_DELAYED_EXT(back[i].url_sav),
-                back[i].testmode, back[i].r.statuscode, (int) back[i].r.size,
-                back[i].r.is_write,
+                back_status(&back[i]), back[i].locked,
+                IS_DELAYED_EXT(back[i].url_sav), back[i].testmode,
+                back[i].r.statuscode, (int) back[i].r.size, back[i].r.is_write,
                 may_be_hypertext_mime(opt, back[i].r.contenttype,
                                       back[i].url_fil),
                 /* */
@@ -3268,7 +3268,7 @@ int host_wait(httrackp *opt, lien_back *back) { return 1; }
 // also cleanup keep-alive sockets and ensure that not too many sockets are being opened
 
 static int slot_can_be_cleaned(const lien_back * back) {
-  return (back->status == STATUS_READY) // ready
+  return (back_status(back) == STATUS_READY) // ready
          /* Check autoclean */
          && (!back->locked)   // not locked or pinned by hts_wait_delayed
          && (!back->testmode) // not test mode
@@ -3325,7 +3325,7 @@ void back_clean(httrackp * opt, cache_back * cache, struct_back * sback) {
           back_maydeletehttp(opt, cache, sback, i);
         }
       }
-    } else if (back[i].status == STATUS_ALIVE) {        // waiting (keep-alive)
+    } else if (back_status(&back[i]) == STATUS_ALIVE) { // waiting (keep-alive)
       if (!back[i].r.keep_alive || back[i].r.soc == INVALID_SOCKET
           || back[i].r.keep_alive_max < 1
           || time_local() >= back[i].ka_time_start + back[i].r.keep_alive_t) {
@@ -3352,7 +3352,7 @@ void back_clean(httrackp * opt, cache_back * cache, struct_back * sback) {
   }
   /* switch connections to live ones */
   for(i = 0; i < back_max; i++) {
-    if (back[i].status == STATUS_READY) {       // ready
+    if (back_status(&back[i]) == STATUS_READY) { // ready
       if (back[i].r.soc != INVALID_SOCKET) {
         back_maydeletehttp(opt, cache, sback, i);
       }
@@ -3368,7 +3368,7 @@ void back_clean(httrackp * opt, cache_back * cache, struct_back * sback) {
                     curr - max);
     }
     for(i = 0; i < back_max && curr > max; i++) {
-      if (back[i].status == STATUS_ALIVE) {
+      if (back_status(&back[i]) == STATUS_ALIVE) {
         back_delete(opt, cache, sback, i);      // delete backing entry
         curr--;
       }
@@ -3450,7 +3450,7 @@ static int back_abort_stopped(httrackp *opt, struct_back *sback) {
   int i;
 
   for (i = 0; i < sback->count; i++) {
-    const int status = sback->lnk[i].status;
+    const int status = back_status(&sback->lnk[i]);
 
     if (!back_is_live(status) || (grace && !back_is_preconnect(status)))
       continue;
@@ -3472,7 +3472,7 @@ static int back_abort_limit(httrackp *opt, struct_back *sback,
   int i;
 
   for (i = 0; i < sback->count; i++) {
-    if (!back_is_live(sback->lnk[i].status))
+    if (!back_is_live(back_status(&sback->lnk[i])))
       continue;
     back_abort_slot(opt, sback, i, STATUSCODE_TIMEOUT,
                     size ? "Mirror Size Limit" : "Mirror Time Out",
@@ -3551,10 +3551,14 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
     max_c = 1;
     for (i_mod = 0; i_mod < (unsigned int) back_max; i_mod++) {
       unsigned int i = (i_mod + mod_random) % (back_max);
+      // One status read serves every branch below.
+      const int st = back_status(&back[i]);
 
+      /* clang-format off: an edit reindents this whole #if-split chain. */
+      /* clang-format off */
       // en cas de gestion du connect préemptif
 #if HTS_XCONN
-      if (back[i].status == STATUS_CONNECTING) {        // connexion
+      if (st == STATUS_CONNECTING) {        // connecting
         // a connecting slot always carries a live socket; guard anyway so a
         // stray INVALID_SOCKET can never reach FD_SET (mirrors the recv branch)
         if (back[i].r.soc != INVALID_SOCKET) {
@@ -3579,12 +3583,12 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
       } else
 #endif
 #if HTS_XGETHOST
-      if (back[i].status == STATUS_WAIT_DNS) {  // attente
+      if (st == STATUS_WAIT_DNS) {  // waiting for DNS
         // rien à faire..
       } else
 #endif
         // poll pour la lecture sur les sockets
-      if ((back[i].status > 0) && (back[i].status < 100)) {     // en réception http
+      if ((st > 0) && (st < 100)) {     // receiving http
 
 #if BDEBUG == 1
 #endif
@@ -3599,7 +3603,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 #if HTS_USEOPENSSL
                 !back[i].r.ssl && 
 #endif
-                back[i].status > 0 && back[i].status < 1000) {
+                st > 0 && st < 1000) {
               do_wait = 1;
 
               // noter socket read
@@ -3622,7 +3626,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             }
           } else {
             back[i].r.statuscode = STATUSCODE_CONNERROR;
-            if (back[i].status == STATUS_CONNECTING)
+            if (back_status(&back[i]) == STATUS_CONNECTING)
               strcpybuff(back[i].r.msg, "Connect Error");
             else
               strcpybuff(back[i].r.msg, "Receive Error");
@@ -3634,6 +3638,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
         }
 
       }
+      /* clang-format on */
     }
     nfds++;
 
@@ -3683,7 +3688,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
       // winsock flags a failed connect in the exception set only: leave a
       // connecting slot to the connect handler, which can still fall back
-      if (back[i].status > 0 && back[i].status != STATUS_CONNECTING) {
+      if (back_status(&back[i]) > 0 &&
+          back_status(&back[i]) != STATUS_CONNECTING) {
         if (!back[i].r.is_file) {       // not file..
           if (back[i].r.soc != INVALID_SOCKET) {        // hey, you never know..
             int err = FD_ISSET(back[i].r.soc, &fds_e);
@@ -3698,7 +3704,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               back[i].r.soc = INVALID_SOCKET;
               back[i].r.statuscode = STATUSCODE_CONNERROR;
               strcpybuff(back[i].r.msg, "Receive Error");
-              if (back[i].status == STATUS_ALIVE) {     /* Keep-alive socket */
+              if (back_status(&back[i]) == STATUS_ALIVE) { /* keep-alive */
                 back_delete(opt, cache, sback, i);
               } else {
                 back[i].status = STATUS_READY;  // terminé
@@ -3709,7 +3715,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
         }
       }
       // ---- FLAG WRITE MIS A UN?: POUR LE CONNECT
-      if (back[i].status == STATUS_CONNECTING) {        // attendre connect
+      // One status read serves every branch below.
+      const int st = back_status(&back[i]);
+      if (st == STATUS_CONNECTING) { // waiting for connect
         hts_connect_fallback *const cf = &sback->connect_fallback[i];
         int dispo = 0;
 
@@ -3867,8 +3875,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
           printf("..connect ok on socket %d\n", back[i].r.soc);
 #endif
 
-          if ((back[i].r.soc != INVALID_SOCKET)
-              && (back[i].status == STATUS_CONNECTING)) {
+          if ((back[i].r.soc != INVALID_SOCKET) &&
+              (back_status(&back[i]) == STATUS_CONNECTING)) {
             /* limit nb. connections/seconds to avoid server overload */
             /*if (opt->maxconn>0) {
                Sleep(1000/opt->maxconn);
@@ -3901,7 +3909,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
         // attente gethostbyname
       }
 #if HTS_USEOPENSSL
-      else if (back[i].status == STATUS_SSL_WAIT_HANDSHAKE) {       // wait for SSL handshake
+      else if (st == STATUS_SSL_WAIT_HANDSHAKE) { // wait for SSL handshake
         // a peer that never speaks TLS must be reaped by --timeout too (#607)
         if (!gestion_timeout)
           if (back[i].timeout > 0)
@@ -3952,7 +3960,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
       }
 #endif
 #if HTS_XGETHOST
-      else if (back[i].status == STATUS_WAIT_DNS) {     // attendre gethostbyname
+      else if (st == STATUS_WAIT_DNS) { // waiting for DNS
 #if DEBUGDNS
 #endif
 
@@ -3994,7 +4002,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 #if USE_BEGINTHREAD
       // ..rien à faire, c'est magic les threads
 #else
-      else if (back[i].status == STATUS_FTP_TRANSFER) { // en réception ftp
+      else if (st == STATUS_FTP_TRANSFER) {     // receiving ftp
         if (!fexist(back[i].location_buffer)) { // terminé
           FILE *fp;
 
@@ -4030,8 +4038,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
           hts_log_print(opt, LOG_TRACE, "finalizing ftp");
           back_finalize(opt, cache, sback, i);
         }
-      } else if ((back[i].status > 0) &&
-                 (back[i].status < 1000)) { // receiving http
+      } else if ((st > 0) && (st < 1000)) { // receiving http
         int dispo = 0;
 
         // vérifier l'existance de timeout-check
@@ -4068,7 +4075,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
           // Shortcut: store the file directly on disk when possible,
           // sparing memory
           // (a locked slot keeps its body in memory, a pinned one need not)
-          if (back[i].status &&
+          if (back_status(&back[i]) &&
               (back[i].locked == 0 || back[i].locked == BACK_PINNED)) {
             if (back[i].r.is_write == 0) {      // mode mémoire
               if (back[i].r.adr == NULL) {      // rien n'a été écrit
@@ -4184,10 +4191,11 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 #endif
 
           // réception de données depuis socket ou fichier
-          if (back[i].status) {
-            if (back[i].status == STATUS_WAIT_HEADERS)
+          if (back_status(&back[i])) {
+            if (back_status(&back[i]) == STATUS_WAIT_HEADERS)
               retour_fread = http_xfread1(&(back[i].r), HTS_XFREAD_LINE_BLOCK);
-            else if (back[i].status == STATUS_CHUNK_WAIT || back[i].status == STATUS_CHUNK_CR) {        // recevoir longueur chunk en hexa caractère par caractère
+            else if (back_status(&back[i]) == STATUS_CHUNK_WAIT ||
+                     back_status(&back[i]) == STATUS_CHUNK_CR) {
               // backuper pour lire dans le buffer chunk
               htsblk r;
               /* Block mode bounds the trailer section, which declares no length
@@ -4210,7 +4218,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               back[i].chunk_adr = back[i].r.adr;        // adresse
               back[i].chunk_size = back[i].r.size;      // taille taille chunk
               memcpy(&(back[i].r), &r, sizeof(htsblk)); // restaurer véritable r
-            } else if (back[i].is_chunk) {      // attention chunk, limiter taille à lire
+            } else if (back[i].is_chunk) { // chunked: cap the read size
 #if CHUNKDEBUG==1
               printf("[%d] read %d bytes\n", (int) back[i].r.soc,
                      (int) min(back[i].r.totalsize - back[i].r.size,
@@ -4229,7 +4237,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
           // Si réception chunk, tester si on est pas à la fin!
           /* Skipped on a write error: these completion tests read r.size,
              which counts bytes read, and would relaunder the error into EOF. */
-          if (back[i].status == 1 &&
+          if (back_status(&back[i]) == 1 &&
               !statuscode_is_write_error(back[i].r.statuscode)) {
             if (back[i].is_chunk) {     // attendre prochain chunk
               if (back[i].r.size == back[i].r.totalsize) { // fin chunk!
@@ -4363,7 +4371,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               back[i].timeout_refresh = time_local();
             }
             // Traitement des en têtes chunks ou en têtes
-            if (back[i].status == STATUS_CHUNK_WAIT || back[i].status == STATUS_CHUNK_CR) {     // réception taille chunk en hexa (  après les en têtes, peut ne pas
+            if (back_status(&back[i]) == STATUS_CHUNK_WAIT ||
+                back_status(&back[i]) == STATUS_CHUNK_CR) {
               const hts_boolean in_trailers = back_in_chunk_trailers(&back[i]);
 
               /* A chunk-size or chunk-CRLF line closes on its first LF, the
@@ -4401,7 +4410,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 #endif
                   if (back[i].r.totalsize < 0)
                     back[i].r.totalsize = 0;    // initialiser à 0 (-1 == unknown)
-                  if (back[i].status == STATUS_CHUNK_WAIT) {    // "real" chunk
+                  if (back_status(&back[i]) == STATUS_CHUNK_WAIT) {
                     /* The chunk-size line is hostile input, so parse it wide
                        and unsigned and drop anything an int cannot hold: sscanf
                        "%x" lands 80000000 on INT_MIN, which sign-extends into a
@@ -4476,7 +4485,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                     back[i].chunk_adr, back[i].url_adr,
                                     back[i].url_fil);
                     }
-                  } else {      /* back[i].status==STATUS_CHUNK_CR : just receiving ending CRLF after data */
+                  } else { /* STATUS_CHUNK_CR: the CRLF after the data */
                     if (chunk_data[0] == '\0') {
                       if (back[i].chunk_blocksize > 0)
                         chunk_size = (int) back[i].chunk_blocksize;     /* recent data chunk size */
@@ -4508,24 +4517,27 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                 // ok, continuer sur le body
 
                 // si chunk non nul continuer (ou commencer)
-                if (back[i].status == STATUS_CHUNK_CR && chunk_size > 0) {
+                if (back_status(&back[i]) == STATUS_CHUNK_CR &&
+                    chunk_size > 0) {
                   back[i].status = STATUS_CHUNK_WAIT;   /* waiting for next chunk (NN\r\n<data>\r\nNN\r\n<data>..\r\n0\r\n\r\n) */
 #if CHUNKDEBUG==1
                   printf("[%d] waiting for next chunk\n", (int) back[i].r.soc);
 #endif
-                } else if (back[i].status == STATUS_CHUNK_WAIT && chunk_size == 0) {    /* final chunk */
+                } else if (back_status(&back[i]) == STATUS_CHUNK_WAIT &&
+                           chunk_size == 0) {           /* final chunk */
                   back[i].status = STATUS_CHUNK_CR;     /* final CRLF */
 #if CHUNKDEBUG==1
                   printf("[%d] waiting for final CRLF (chunk)\n",
                          (int) back[i].r.soc);
 #endif
-                } else if (back[i].status == STATUS_CHUNK_WAIT && chunk_size >= 0) {    /* will fetch data now */
+                } else if (back_status(&back[i]) == STATUS_CHUNK_WAIT &&
+                           chunk_size >= 0) { /* will fetch data now */
                   back[i].status = 1;   // continuer body    
 #if CHUNKDEBUG==1
                   printf("[%d] waiting for body (chunk)\n",
                          (int) back[i].r.soc);
 #endif
-                } else {        /* zero-size-chunk-CRLF (end) or error */
+                } else { /* zero-size-chunk-CRLF (end) or error */
 #if CHUNKDEBUG==1
                   printf("[%d] chunk end, total: %d\n", (int) back[i].r.soc,
                          back[i].r.size);
@@ -4599,7 +4611,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
               } // chunk buffer holds a complete line
               //
-            } else if (back[i].status == STATUS_WAIT_HEADERS) { // en têtes (avant le chunk si il est présent)
+            } else if (back_status(&back[i]) == STATUS_WAIT_HEADERS) {
               //
               if (back[i].r.size >= 2) {
                 // double LF
@@ -4617,7 +4629,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 #endif
 
                   /* Hack for zero-length headers */
-                  if (back[i].status != 0 && back[i].r.adr[0] != '<') {
+                  if (back_status(&back[i]) != 0 && back[i].r.adr[0] != '<') {
 
                     // ----------------------------------------
                     // traiter en-tête!
@@ -4694,7 +4706,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                         }
 
                     } while(strnotempty(rcvd));
-                    // ----------------------------------------                    
+                    // ----------------------------------------
 
                   } else {
                     // assume text/html, OK
@@ -5277,7 +5289,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                         strcpybuff(back[i].r.msg, "Can not find partial file");
                       }
                       // Erreur?
-                      if (back[i].status == STATUS_READY) {
+                      if (back_status(&back[i]) == STATUS_READY) {
                         if (back[i].r.soc != INVALID_SOCKET) {
 #if HTS_DEBUG_CLOSESOCK
                           DEBUG_W
@@ -5296,7 +5308,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                       }
                     }
 
-                    if (back[i].status != 0) {  // non terminé (erreur)
+                    if (back_status(&back[i]) != 0) { // not finished (error)
                       if (!back[i].testmode) {  // fichier normal
 
                         if (back[i].r.empty /* ?? && back[i].r.statuscode==HTTP_OK */ ) {       // empty response
@@ -5364,7 +5376,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
                 }               // si LF
               }                 // r.size>2
-            }                   // si == 99
+            } // status 99
 
           }                     // si pas d'erreurs
 #if BDEBUG==1
@@ -5374,7 +5386,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
         // en cas d'erreur cl, supprimer éventuel fichier sur disque
 #if HTS_REMOVE_BAD_FILES
-        if (back[i].status < 0) {
+        if (back_status(&back[i]) < 0) {
           if (!back[i].testmode) {      // pas en test
             UNLINK(back[i].url_sav);    // éliminer fichier (endommagé)
           }
@@ -5383,7 +5395,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
         /* funny log for commandline users */
         if (opt->verbosedisplay == HTS_VERBOSE_SIMPLE) {
-          if (back[i].status == STATUS_READY) {
+          if (back_status(&back[i]) == STATUS_READY) {
             if (back[i].r.statuscode == HTTP_OK)
               printf("* %s%s (" LLintP " bytes) - OK\n", back[i].url_adr,
                      back[i].url_fil, (LLint) back[i].r.size);
@@ -5406,11 +5418,11 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
       for (i_mod = 0; i_mod < (unsigned int) back_max; i_mod++) {
         unsigned int i = (i_mod + mod_random) % (back_max);
 
-        if (back_is_live(back[i].status)) { // receiving, connecting, ..
+        if (back_is_live(back_status(&back[i]))) { // receiving, connecting, ..
           if (back[i].timeout > 0) {
             // a stuck connect with a fallback address: retry the next one well
             // before the full timeout (dead IPv6 on a dual-stack host, ...)
-            if (back[i].status == STATUS_CONNECTING) {
+            if (back_status(&back[i]) == STATUS_CONNECTING) {
               const hts_connect_fallback *const cf =
                   &sback->connect_fallback[i];
 
@@ -5442,17 +5454,17 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               }
               back[i].r.soc = INVALID_SOCKET;
               back[i].r.statuscode = STATUSCODE_TIMEOUT;
-              if (back[i].status == STATUS_CONNECTING)
+              if (back_status(&back[i]) == STATUS_CONNECTING)
                 strcpybuff(back[i].r.msg, "Connect Time Out");
-              else if (back[i].status == STATUS_WAIT_DNS)
+              else if (back_status(&back[i]) == STATUS_WAIT_DNS)
                 strcpybuff(back[i].r.msg, "DNS Time Out");
-              else if (back[i].status == STATUS_SSL_WAIT_HANDSHAKE)
+              else if (back_status(&back[i]) == STATUS_SSL_WAIT_HANDSHAKE)
                 strcpybuff(back[i].r.msg, "SSL/TLS Handshake Time Out");
               else
                 strcpybuff(back[i].r.msg, "Receive Time Out");
               back[i].status = STATUS_READY;    // terminé
               back_set_finished(opt, sback, i);
-            } else if ((back[i].rateout > 0) && (back[i].status < 99)) {
+            } else if ((back[i].rateout > 0) && (back_status(&back[i]) < 99)) {
               if (((int) (act - back[i].rateout_time)) >= HTS_WATCHRATE) {      // checker au bout de 15s
                 if ((int) ((back[i].r.size) / (act - back[i].rateout_time)) < back[i].rateout) {        // trop lent
                   back[i].status = STATUS_READY;        // terminé
@@ -5592,9 +5604,12 @@ LLint back_transferred(LLint nb, struct_back * sback) {
   int i;
 
   // ajouter octets en instance
-  for(i = 0; i < back_max; i++)
-    if ((back[i].status > 0) && (back[i].status < 99 || back[i].status >= 1000))
+  for (i = 0; i < back_max; i++) {
+    const int st = back_status(&back[i]);
+
+    if ((st > 0) && (st < 99 || st >= 1000))
       nb += back[i].r.size;
+  }
   // stored (ready) slots
   if (sback->ready != NULL) {
 #ifndef HTS_NO_BACK_ON_DISK
@@ -5605,8 +5620,9 @@ LLint back_transferred(LLint nb, struct_back * sback) {
 
     while((item = coucal_enum_next(&e))) {
       lien_back *ritem = (lien_back *) item->value.ptr;
+      const int st = back_status(ritem);
 
-      if ((ritem->status > 0) && (ritem->status < 99 || ritem->status >= 1000))
+      if ((st > 0) && (st < 99 || st >= 1000))
         nb += ritem->r.size;
     }
 #endif
@@ -5621,7 +5637,7 @@ void back_info(struct_back * sback, int i, int j, FILE * fp) {
   const int back_max = sback->count;
 
   assertf(i >= 0 && i < back_max);
-  if (back[i].status >= 0) {
+  if (back_status(&back[i]) >= 0) {
     // Holds the status tag plus the full URL: url_adr and url_fil are each
     // HTS_URLMAXSIZE*2, so reserve room for both (*4) plus framing/trailer.
     // Undersizing would make back_infostr's bounded appends abort on a long
@@ -5642,26 +5658,26 @@ void back_infostr(struct_back *sback, int i, int j, char *s, size_t size) {
   const int back_max = sback->count;
 
   assertf(i >= 0 && i < back_max);
-  if (back[i].status >= 0) {
+  if (back_status(&back[i]) >= 0) {
     int aff = 0;
 
     if (j & 1) {
-      if (back[i].status == STATUS_CONNECTING) {
+      if (back_status(&back[i]) == STATUS_CONNECTING) {
         strlcatbuff(s, "CONNECT ", size);
-      } else if (back[i].status == STATUS_WAIT_HEADERS) {
+      } else if (back_status(&back[i]) == STATUS_WAIT_HEADERS) {
         strlcatbuff(s, "INFOS ", size);
         aff = 1;
-      } else if (back[i].status == STATUS_CHUNK_WAIT
-                 || back[i].status == STATUS_CHUNK_CR) {
+      } else if (back_status(&back[i]) == STATUS_CHUNK_WAIT ||
+                 back_status(&back[i]) == STATUS_CHUNK_CR) {
         strlcatbuff(s, "INFOSC", size); // chunk info
         aff = 1;
-      } else if (back[i].status > 0) {
+      } else if (back_status(&back[i]) > 0) {
         strlcatbuff(s, "RECEIVE ", size);
         aff = 1;
       }
     }
     if (j & 2) {
-      if (back[i].status == STATUS_READY) {
+      if (back_status(&back[i]) == STATUS_READY) {
         switch (back[i].r.statuscode) {
         case 200:
           strlcatbuff(s, "READY ", size);
