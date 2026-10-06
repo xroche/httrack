@@ -505,7 +505,7 @@ static int back_index_ready(httrackp * opt, struct_back * sback, const char *adr
 }
 
 static int slot_can_be_cached_on_disk(const lien_back * back) {
-  /* first, as an FTP worker still writes tmpfile in a slot it owns */
+  /* status first, because an FTP worker still writes tmpfile in its slot */
   if (hts_load_acquire_int(&back->status) != STATUS_READY)
     return 0;
   /* A pending backup or spool means the slot is not finalized, and the swap
@@ -4115,8 +4115,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                               if ((fcheck = check_fatal_io_errno())) {
                                 hts_log_print(opt, LOG_ERROR,
                                               "Mirror aborted: disk full or filesystem problems");
-                                hts_store_release_int(&opt->state.exit_xh,
-                                                      -1); /* fatal error */
+                                /* fatal error */
+                                hts_store_release_int(&opt->state.exit_xh, -1);
                               }
                             }
 #if HDEBUG

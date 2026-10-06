@@ -2030,11 +2030,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             const int sf_tagless_body = inscript_locked;
 
             // si nofollow ou un stop a été déclenché, réécrire tous les liens en externe
+            /* an update keeps following, so the cache keeps its data */
             if ((nofollow) ||
-                (hts_load_acquire_int(
-                     &opt->state.stop) && /* force follow not to lose previous
-                                             cache data */
-                 !opt->is_update))
+                (hts_load_acquire_int(&opt->state.stop) && !opt->is_update))
               p_nocatch = 1;
 
             // écrire codebase avant, flusher avant code
@@ -4634,7 +4632,7 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
         return 0;
       }
       // And fill the backing stack
-      if (back[b].status > 0)
+      if (hts_load_acquire_int(&back[b].status) > 0)
         back_fillmax(sback, opt, cache, ptr, numero_passe);
 
       // Continue to the loop if link still present

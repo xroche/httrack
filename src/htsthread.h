@@ -78,7 +78,7 @@ static HTS_INLINE HTS_UNUSED int hts_load_acquire_int(const volatile int *src) {
 #endif
 }
 
-/* Count an event that several threads may log at once. */
+/* Add one to a counter other threads also update. */
 static HTS_INLINE HTS_UNUSED void hts_increment_int(volatile int *dst) {
 #ifdef _MSC_VER
   InterlockedIncrement((volatile LONG *) dst);

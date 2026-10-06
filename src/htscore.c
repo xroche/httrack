@@ -700,9 +700,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   } else
     opt->cookie = NULL;
 
-  // initialiser exit_xh
-  hts_store_release_int(&opt->state.exit_xh,
-                        0); // sortir prématurément (var globale)
+  hts_store_release_int(&opt->state.exit_xh, 0);
   /* a fault a previous mirror recovered from must not abort this one */
   hts_worker_fault_clear();
 
@@ -1977,8 +1975,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
               if ((fcheck = check_fatal_io_errno())) {
                 hts_log_print(opt, LOG_ERROR,
                               "Mirror aborted: disk full or filesystem problems");
-                hts_store_release_int(&opt->state.exit_xh,
-                                      -1); /* fatal error */
+                /* fatal error */
+                hts_store_release_int(&opt->state.exit_xh, -1);
               }
               hts_log_print(opt, LOG_ERROR | LOG_ERRNO,
                             "Unable to save file %s", savename());
@@ -2094,13 +2092,15 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
     // a-t-on dépassé le quota?
     if (!back_checkmirror(opt)) {
       ptr = opt->lien_tot;
-    } else if (hts_load_acquire_int(&opt->state.exit_xh)) { // sortir
-      if (hts_load_acquire_int(&opt->state.exit_xh) == 1) {
-        hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
-      } else {
-        hts_log_print(opt, LOG_ERROR, "Exit requested by engine");
+    } else {
+      const int exit_xh = hts_load_acquire_int(&opt->state.exit_xh);
+
+      if (exit_xh != 0) {
+        hts_log_print(opt, LOG_ERROR,
+                      exit_xh == 1 ? "Exit requested by shell or user"
+                                   : "Exit requested by engine");
+        ptr = opt->lien_tot;
       }
-      ptr = opt->lien_tot;
     }
   } while(ptr < opt->lien_tot);
 
@@ -2141,8 +2141,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
     /* 2 exits 0, so it must not overwrite an abort the engine already decided,
        and a crash on the first fetch lands in exactly this state. */
     if (hts_load_acquire_int(&opt->state.exit_xh) != -1)
-      hts_store_release_int(&opt->state.exit_xh,
-                            2); /* interrupted (no connection detected) */
+      /* interrupted (no connection detected) */
+      hts_store_release_int(&opt->state.exit_xh, 2);
     rollback = HTS_TRUE;
     goto cleanup;
   }
@@ -4687,8 +4687,8 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
 
               // enregistrer fichier (MACRO)
               if (!hts_record_link(opt, afs.af.adr, afs.af.fil, afs.save, "", "", "")) {    // erreur, pas de place réservée
-                hts_store_release_int(&opt->state.exit_xh,
-                                      -1); /* fatal error -> exit */
+                /* fatal error -> exit */
+                hts_store_release_int(&opt->state.exit_xh, -1);
                 return 0;
               }
               // mode test?                          

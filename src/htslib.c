@@ -7019,8 +7019,8 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->dir_topindex = HTS_FALSE;
   //
   opt->bypass_limits = HTS_FALSE;
-  hts_store_release_int(&opt->state.stop, 0);    // stopper
-  hts_store_release_int(&opt->state.exit_xh, 0); // abort
+  hts_store_release_int(&opt->state.stop, 0);
+  hts_store_release_int(&opt->state.exit_xh, 0);
   //
   opt->state.is_ended = 0;
 

@@ -1223,7 +1223,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                       /*
                          int fcheck;
                          if ((fcheck=check_fatal_io_errno())) {
-                         hts_store_release_int(&opt->state.exit_xh, -1);
+                         opt->state.exit_xh=-1;
                          }
                        */
                       strcpybuff(back->r.msg, "Write error");

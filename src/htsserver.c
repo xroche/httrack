@@ -411,7 +411,7 @@ T_SOC smallserver_init(int *port, char *adr, size_t adr_size,
   char h_loc[256 + 2];
   SOCaddr server;
 
-  /* the watchdog thread already polls it */
+  /* the watchdog thread may be polling it */
   hts_store_release_int(&commandRunning, 0);
   commandEnd = commandReturn = commandReturnSet = commandEndRequested = 0;
   if (commandReturnMsg)
@@ -1236,10 +1236,14 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
           sprintf(tmp, "%d", commandReturn);
           coucal_write(NewLangList, "commandReturn", (intptr_t) strdup(tmp));
-          coucal_write(NewLangList, "commandReturnMsg",
-                        (intptr_t) commandReturnMsg);
+          /* copies, as the table frees its values and the crawl thread
+             frees the originals */
+          coucal_write(
+              NewLangList, "commandReturnMsg",
+              (intptr_t) (commandReturnMsg ? strdup(commandReturnMsg) : NULL));
           coucal_write(NewLangList, "commandReturnCmdl",
-                        (intptr_t) commandReturnCmdl);
+                       (intptr_t) (commandReturnCmdl ? strdup(commandReturnCmdl)
+                                                     : NULL));
         } else {
           coucal_write(NewLangList, "commandReturn", (intptr_t) NULL);
           coucal_write(NewLangList, "commandReturnMsg", (intptr_t) NULL);

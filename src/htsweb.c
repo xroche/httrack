@@ -495,6 +495,8 @@ void webhttrack_main(char *cmd) {
   /* The caller holds webhttrack_lock(). */
   global_opt = hts_create_opt();
   assert(global_opt->size_httrackp >= sizeof(httrackp));
+  /* a "cancel now" from a previous run would stop this one at once */
+  commandEndRequested = 0;
   hts_store_release_int(&commandRunning, 1);
   DEBUG(fprintf(stderr, "commandRunning=1\n"));
   if (hts_newthread(back_launch_cmd, (void *) strdup(cmd)) != 0) {

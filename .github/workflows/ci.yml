@@ -534,8 +534,7 @@ jobs:
           set -euo pipefail
           mkdir -p "$GITHUB_WORKSPACE/sanitizer-logs" "$GITHUB_WORKSPACE/sanitizer-stderr"
           # The engine self-tests, where the FTP, DNS and lazy-lock worker threads
-          # run, because a crawl test spends its time in the single-threaded select
-          # loop. Do not widen this to the allocation-failure self-tests:
+          # run, plus the crawls that run FTP and WebHTTrack threads. Do not widen this to the allocation-failure self-tests:
           # allocator_may_return_null lets 439_engine-ucs2 through, but TSan's
           # allocator still aborts on 237_engine-arrays and 446_engine-backnew.
           #
