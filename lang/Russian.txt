@@ -1054,7 +1054,7 @@ Max Retry-After(s)
 Макс. Retry-After (с)
 Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
 Наибольшее ожидание, которое соблюдается, когда сервер присылает заголовок Retry-After. Значение 0 означает повтор без ожидания.
-A rule you add here applies to the mirror now running, and wins over the rules above it. A rule you remove applies to the next one.
-Правило, добавленное здесь, действует для текущего зеркалирования и имеет приоритет над правилами выше. Удаление правила вступит в силу только при следующем зеркалировании.
+The rules you set here apply to the mirror now running. Removing a rule lets new links through again, but a link it already refused will not come back in this run.
+Правила, заданные здесь, действуют для текущего зеркалирования. Удаление правила снова пропускает новые ссылки, но ссылка, которую оно уже отклонило, в этом зеркалировании не вернётся.
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Этот фильтр нельзя использовать. Фильтр начинается с + или -, затем идёт шаблон, и он должен умещаться в одной короткой строке.

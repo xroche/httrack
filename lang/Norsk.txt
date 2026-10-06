@@ -1054,7 +1054,7 @@ Max Retry-After(s)
 Maks. Retry-After (s)
 Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
 Lengste ventetid som følges når en tjener sender et Retry-After-hode. Bruk 0 for å prøve på nytt uten å vente.
-A rule you add here applies to the mirror now running, and wins over the rules above it. A rule you remove applies to the next one.
-En regel du legger til her, gjelder for kopieringen som pågår nå, og går foran reglene over den. Fjerning av en regel får først virkning ved neste kopiering.
+The rules you set here apply to the mirror now running. Removing a rule lets new links through again, but a link it already refused will not come back in this run.
+Reglene du angir her, gjelder for kopieringen som pågår nå. Fjerner du en regel, slipper nye lenker gjennom igjen, men en lenke regelen allerede har avvist, kommer ikke tilbake i denne kopieringen.
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Denne søkeregelen kan ikke brukes. En regel begynner med + eller -, etterfulgt av et mønster, og må få plass på én kort linje.

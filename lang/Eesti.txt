@@ -1054,7 +1054,7 @@ Max Retry-After(s)
 Maks. Retry-After (s)
 Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
 Pikim ooteaeg, mida järgitakse, kui server saadab Retry-After päise. Väärtus 0 proovib uuesti ilma ootamiseta.
-A rule you add here applies to the mirror now running, and wins over the rules above it. A rule you remove applies to the next one.
-Siia lisatud reegel kehtib praegu käimasoleva saidikopeerimise kohta ja on ülimuslik ülalpool olevate reeglite suhtes. Reegli eemaldamine jõustub alles järgmisel saidikopeerimisel.
+The rules you set here apply to the mirror now running. Removing a rule lets new links through again, but a link it already refused will not come back in this run.
+Siin määratud reeglid kehtivad praegu käimasoleva saidikopeerimise kohta. Reegli eemaldamine laseb uued lingid jälle läbi, kuid link, mille reegel on juba tagasi lükanud, sellel kopeerimisel enam tagasi ei tule.
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Seda filtreerimisreeglit ei saa kasutada. Reegel algab märgiga + või -, millele järgneb muster, ning peab mahtuma ühele lühikesele reale.

@@ -1054,7 +1054,7 @@ Max Retry-After(s)
 Máx. Retry-After (s)
 Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
 Maior espera respeitada quando um servidor envia um cabeçalho Retry-After. Utilize 0 para tentar de novo sem esperar.
-A rule you add here applies to the mirror now running, and wins over the rules above it. A rule you remove applies to the next one.
-Uma regra adicionada aqui aplica-se à cópia em curso e tem prioridade sobre as regras acima dela. A remoção de uma regra só se aplica à cópia seguinte.
+The rules you set here apply to the mirror now running. Removing a rule lets new links through again, but a link it already refused will not come back in this run.
+As regras definidas aqui aplicam-se à cópia em curso. Remover uma regra volta a deixar passar as novas ligações, mas uma ligação que ela já recusou não voltará nesta cópia.
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Este filtro não pode ser utilizado. Um filtro começa por + ou -, seguido de um padrão, e tem de caber numa única linha curta.

@@ -1054,7 +1054,7 @@ Max Retry-After(s)
 Najv. Retry-After (s)
 Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
 Najduže čekanje koje se poštuje kada poslužitelj pošalje zaglavlje Retry-After. Upišite 0 za ponovni pokušaj bez čekanja.
-A rule you add here applies to the mirror now running, and wins over the rules above it. A rule you remove applies to the next one.
-Pravilo koje ovdje dodate primjenjuje se na zrcaljenje koje je u tijeku i ima prednost pred pravilima iznad njega. Uklanjanje pravila djeluje tek na sljedeće zrcaljenje.
+The rules you set here apply to the mirror now running. Removing a rule lets new links through again, but a link it already refused will not come back in this run.
+Pravila koja ovdje postavite primjenjuju se na zrcaljenje koje je u tijeku. Uklanjanje pravila ponovno propušta nove poveznice, ali poveznica koju je pravilo već odbilo neće se vratiti u ovom zrcaljenju.
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Ovo pravilo filtriranja ne može se upotrijebiti. Pravilo počinje znakom + ili -, nakon čega slijedi uzorak, i mora stati u jedan kratki redak.
