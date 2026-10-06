@@ -383,6 +383,14 @@ HTSEXT_API hts_boolean hts_addurl(httrackp *opt, char **url);
 /** Clear any pending add-URL list set by hts_addurl(). Always returns 0. */
 HTSEXT_API hts_boolean hts_resetaddurl(httrackp *opt);
 
+/** Queue a scan rule ("+pattern" or "-pattern") for a running mirror. The rule
+    is copied, appended after every other rule so it wins, and applied by the
+    engine thread at its next pass. A "-" rule also drops the matching links
+    that are queued, or fetched and not yet saved. A "+" rule only affects links
+    found from then on. @return nonzero if the rule was queued, zero if it is
+    malformed or memory ran out. */
+HTSEXT_API hts_boolean hts_addfilter(httrackp *opt, const char *rule);
+
 /** Apply the runtime-tunable options from @p from onto @p to, to adjust a live
     mirror. A field @p from leaves at its default is not copied, so @p to keeps
     its own, apart from warc_max_size, warc_cdx, warc_wacz, changes and

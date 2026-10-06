@@ -2497,18 +2497,7 @@ void host_ban(httrackp * opt, int ptr,
   if (host[0] == '!')
     return;                     // erreur.. déja cancellé.. bizarre.. devrait pas arriver
 
-  /* sanity check */
-  if (*_FILTERS_PTR + 1 >= opt->maxfilter) {
-    opt->maxfilter += HTS_FILTERSINC;
-    if (filters_init(&_FILTERS, opt->maxfilter, HTS_FILTERSINC) == 0) {
-      printf("PANIC! : Too many filters : >%d [%d]\n", *_FILTERS_PTR, __LINE__);
-      hts_log_print(opt, LOG_PANIC, "Too many filters, giving up..(>%d)",
-                    *_FILTERS_PTR);
-      hts_log_print(opt, LOG_INFO,
-                    "To avoid that: use #F option for more filters (example: -#F5000)");
-      assertf("too many filters - giving up" == NULL);
-    }
-  }
+  filters_make_room(opt, 1);
   // interdire host
   assertf((*_FILTERS_PTR) < opt->maxfilter);
   if (*_FILTERS_PTR < opt->maxfilter) {
@@ -2592,6 +2581,91 @@ void host_ban(httrackp * opt, int ptr,
                     i);
     }
   }
+}
+
+void filters_make_room(httrackp *opt, int n) {
+  if (*opt->filters.filptr + n >= opt->maxfilter) {
+    opt->maxfilter += HTS_FILTERSINC;
+    if (filters_init(opt->filters.filters, opt->maxfilter, HTS_FILTERSINC) ==
+        0) {
+      printf("PANIC! : Too many filters : >%d [%d]\n", *opt->filters.filptr,
+             __LINE__);
+      fflush(stdout);
+      hts_log_print(opt, LOG_PANIC, "Too many filters, giving up..(>%d)",
+                    *opt->filters.filptr);
+      hts_log_print(
+          opt, LOG_INFO,
+          "To avoid that: use #F option for more filters (example: -#F5000)");
+      assertf("too many filters - giving up" == NULL);
+    }
+  }
+}
+
+/* Is link i refused by the n rules starting at index first? */
+static hts_boolean filters_refuse_link_(httrackp *opt, int first, int n,
+                                        int i) {
+  /* adr and fil each come from a HTS_URLMAXSIZE * 2 array */
+  char BIGSTK l[HTS_URLMAXSIZE * 4 + 16], lfull[HTS_URLMAXSIZE * 4 + 16];
+  htsbuff lb = htsbuff_array(l), fb = htsbuff_array(lfull);
+  const char *const adr = heap(i)->adr;
+  const char *const fil = heap(i)->fil;
+
+  htsbuff_cpy(&lb, jump_identification_const(adr));
+  if (*fil != '/')
+    htsbuff_cat(&lb, "/");
+  htsbuff_cat(&lb, fil);
+  htsbuff_cpy(&fb, link_has_authority(adr) ? "" : "http://");
+  htsbuff_cat(&fb, adr);
+  if (*fil != '/')
+    htsbuff_cat(&fb, "/");
+  htsbuff_cat(&fb, fil);
+  return fa_strjoker_dual(0, *opt->filters.filters + first, n, lfull, l, NULL,
+                          NULL, NULL) == -1
+             ? HTS_TRUE
+             : HTS_FALSE;
+}
+
+void hts_apply_live_filters(httrackp *opt, struct_back *sback, int ptr) {
+  char **const rules = hts_addfilter_take(opt);
+  const int first = *opt->filters.filptr;
+  int added, dropped = 0, i;
+  size_t k;
+
+  if (rules == NULL)
+    return;
+  for (k = 0; rules[k] != NULL; k++) {
+    filters_make_room(opt, 1);
+    if (filters_insert(opt, *opt->filters.filptr, rules[k]))
+      hts_log_print(opt, LOG_NOTICE, "Scan rule added by user: %s", rules[k]);
+  }
+  hts_addurl_free(rules);
+  added = *opt->filters.filptr - first;
+  /* ptr is being fetched or parsed. A transfer still running, or one already
+     writing to disk, is left to finish too. */
+  for (i = ptr + 1; added > 0 && i < opt->lien_tot; i++) {
+    if (heap(i) != NULL && heap(i)->pass2 != -1 && heap(i)->adr != NULL &&
+        heap(i)->fil != NULL && heap(i)->adr[0] != '!' &&
+        heap(i)->fil[0] != '\0' && filters_refuse_link_(opt, first, added, i)) {
+      const int b =
+          back_index(opt, sback, heap(i)->adr, heap(i)->fil, heap(i)->sav);
+
+      if (b >= 0) {
+        const lien_back *const slot = &sback->lnk[b];
+
+        if (slot->status != STATUS_READY || slot->r.is_write || slot->testmode)
+          continue;
+        /* no cache: a dropped page must not be recorded as fetched */
+        back_delete(opt, NULL, sback, b);
+      }
+      hts_log_print(opt, LOG_DEBUG, "Cancel: %s%s", heap(i)->adr, heap(i)->fil);
+      hts_invalidate_link(opt, i);
+      dropped++;
+    }
+  }
+  if (added > 0)
+    hts_log_print(opt, LOG_NOTICE,
+                  "%d scan rule(s) added by user, %d queued link(s) dropped",
+                  added, dropped);
 }
 
 void filters_bind(httrackp *opt, char ***ptrfilters, int *filptr) {
@@ -4299,6 +4373,43 @@ HTSEXT_API hts_boolean hts_addurl(httrackp *opt, char **url) {
 HTSEXT_API hts_boolean hts_resetaddurl(httrackp *opt) {
   hts_addurl_free(hts_addurl_take(opt));
   return HTS_FALSE;
+}
+
+char **hts_addfilter_take(httrackp *opt) {
+  char **old;
+
+  hts_mutexlock(&opt->state.lock);
+  old = opt->live_filters;
+  opt->live_filters = NULL;
+  hts_mutexrelease(&opt->state.lock);
+  return old;
+}
+
+HTSEXT_API hts_boolean hts_addfilter(httrackp *opt, const char *rule) {
+  char *copy;
+  char **list;
+  size_t n = 0;
+
+  if (opt == NULL || rule == NULL || (rule[0] != '+' && rule[0] != '-') ||
+      rule[1] == '\0' || strlen(rule) > HTS_FILTER_MAXLEN)
+    return HTS_FALSE;
+  if ((copy = strdupt(rule)) == NULL)
+    return HTS_FALSE;
+  hts_mutexlock(&opt->state.lock);
+  while (opt->live_filters != NULL && opt->live_filters[n] != NULL)
+    n++;
+  list = (char **) realloct(opt->live_filters, (n + 2) * sizeof(char *));
+  if (list != NULL) {
+    list[n] = copy;
+    list[n + 1] = NULL;
+    opt->live_filters = list;
+  }
+  hts_mutexrelease(&opt->state.lock);
+  if (list == NULL) {
+    freet(copy);
+    return HTS_FALSE;
+  }
+  return HTS_TRUE;
 }
 
 // copier nouveaux paramètres si besoin

@@ -4483,6 +4483,7 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
     }
     hts_addurl_free(addurl);
   }
+  hts_apply_live_filters(opt, sback, ptr);
   // si une pause a été demandée
   if (opt->state._hts_setpause
       || back_pluggable_sockets_strict(sback, opt) <= 0) {
@@ -4494,6 +4495,8 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
       b = 0;                    // forcer pour les stats
     while(opt->state._hts_setpause || back_pluggable_sockets_strict(sback, opt) <= 0) { // on fait la pause..
       opt->state._hts_in_html_parsing = 6;
+      /* a rule sent during a pause applies now, not on resume */
+      hts_apply_live_filters(opt, sback, ptr);
       back_wait(sback, opt, cache, HTS_STAT.stat_timestart);
       /* time limit (-E) exceeded: stop waiting for a socket (#481) */
       if (!back_checkmirror(opt))
