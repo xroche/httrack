@@ -10,7 +10,7 @@ set -euo pipefail
 # The counts are exact, so a shrinking corpus or a growing allowlist shows. In
 # %[param], a second '?' no longer starts a field, and a name holding '=' or '&'
 # never matches, because no key can hold either.
-selftest_queue_lines "querydiff: 274752 cases, 0 failures, allowed: 662 second '?', 16 name with '=' or '&'
+selftest_queue_lines "querydiff: 291200 cases, 0 failures, allowed: 674 second '?', 16 name with '=' or '&'
 querydiff: OK" querydiff
 
 # Every field is read, empty ones too, and the key ends at the first '='. A '|'

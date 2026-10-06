@@ -2744,7 +2744,7 @@ static void querydiff_template(querydiff_stats *st, const char *url,
 }
 
 static void querydiff_one(querydiff_stats *st, const char *q) {
-  static const char *const names[] = {"id",  "a",   "sid", "",
+  static const char *const names[] = {"id",  "a",   "sid", "",    "ID",
                                       "a=b", "a&b", "?",   "x?id"};
   String url = STRING_EMPTY;
   size_t i;
@@ -2769,18 +2769,19 @@ static char *querydiff_run(char c, size_t n) {
 
 static int st_querydiff(httrackp *opt, int argc, char **argv) {
   static const char *const hand[] = {
-      "",          "&",          "&&",
-      "a",         "a&",         "&a",
-      "a&&b",      "a=",         "=",
-      "=v",        "a=b=c",      "a=1&b=2&a=3",
-      "b=2&a=1",   "a=1&&",      "&&a=1",
-      "a&b=c&d=e", "a=1&b&c=2",  "id=5?id=6",
-      "x=1?id=5",  "xid=5&id=6", "id=a%2",
-      "id=%41%42", "id==5",      "id",
-      "id&id=7",   "?id=1",      "a=b=5",
-      "a&b=3",     "#a=1&b",     ";a=1;b=2",
-      "+=+&+",     "a b=c d&e",  "sid=a+b&sid=%41",
-      NULL};
+      "",           "&",          "&&",
+      "a",          "a&",         "&a",
+      "a&&b",       "a=",         "=",
+      "=v",         "a=b=c",      "a=1&b=2&a=3",
+      "b=2&a=1",    "a=1&&",      "&&a=1",
+      "a&b=c&d=e",  "a=1&b&c=2",  "id=5?id=6",
+      "x=1?id=5",   "xid=5&id=6", "id=a%2",
+      "id=%41%42",  "id==5",      "id",
+      "id&id=7",    "?id=1",      "a=b=5",
+      "a&b=3",      "#a=1&b",     ";a=1;b=2",
+      "+=+&+",      "a b=c d&e",  "sid=a+b&sid=%41",
+      "a=1?x?id=7", "x?id=7",     "ID=5&id=6",
+      "Id=5",       NULL};
   /* Long fields at and around the template's 255-byte value and 254-byte
      name. */
   static const size_t lengths[] = {63, 64, 65, 254, 255, 256, 300};
