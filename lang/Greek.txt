@@ -1055,6 +1055,6 @@ Max Retry-After(s)
 Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
 Η μεγαλύτερη αναμονή που τηρείται όταν ένας διακομιστής στέλνει κεφαλίδα Retry-After. Το 0 σημαίνει επανάληψη χωρίς αναμονή.
 The rules you set here apply to the mirror now running. Removing a rule lets new links through again, but a link it already refused will not come back in this run.
-Οι κανόνες που ορίζετε εδώ ισχύουν για την αντιγραφή που εκτελείται τώρα. Η αφαίρεση ενός κανόνα επιτρέπει ξανά τους νέους συνδέσμους, αλλά ένας σύνδεσμος που έχει ήδη απορρίψει δεν θα επιστρέψει σε αυτή την αντιγραφή.
+Οι κανόνες που ορίζετε εδώ ισχύουν για την αντιγραφή που εκτελείται τώρα. Η αφαίρεση ενός κανόνα επιτρέπει ξανά τους νέους συνδέσμους, αλλά ένας σύνδεσμος που ο κανόνας έχει ήδη απορρίψει δεν θα επιστρέψει σε αυτή την αντιγραφή.
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Αυτός ο κανόνας αναζήτησης δεν μπορεί να χρησιμοποιηθεί. Ένας κανόνας ξεκινά με + ή -, ακολουθεί ένα μοτίβο, και πρέπει να χωρά σε μία σύντομη γραμμή.
