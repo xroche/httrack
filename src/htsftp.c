@@ -597,8 +597,7 @@ hts_boolean ftp_parse_epsv(const char *line, int *port) {
     return HTS_FALSE;
   // RFC 2428: "(<d><d><d><port><d>)", d a printable non-digit
   delim = s[1];
-  if (delim < 33 || delim > 126 || isdigit((unsigned char) delim) ||
-      s[2] != delim || s[3] != delim)
+  if (delim < 33 || delim > 126 || s[2] != delim || s[3] != delim)
     return HTS_FALSE;
   s = ftp_parse_decimal(s + 4, 5, 65535, &p);
   if (s == NULL || s[0] != delim || s[1] != ')' || p == 0)
