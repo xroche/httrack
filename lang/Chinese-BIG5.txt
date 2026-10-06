@@ -1054,3 +1054,5 @@ Max Retry-After(s)
 最長 Retry-After(秒)
 Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
 伺服器送出 Retry-After 標頭時，最長願意等待的秒數。填 0 表示不等待就重試。
+A rule you add here applies to the mirror now running, and wins over the rules above it. A rule you remove applies to the next one.
+在此新增的規則會套用到目前正在執行的鏡像，並優先於上方的規則。移除規則要到下一次鏡像才會生效。

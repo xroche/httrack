@@ -1054,3 +1054,5 @@ Max Retry-After(s)
 En çok Retry-After (sn)
 Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
 Bir sunucu Retry-After başlığı gönderdiğinde uyulacak en uzun bekleme. Beklemeden yeniden denemek için 0 girin.
+A rule you add here applies to the mirror now running, and wins over the rules above it. A rule you remove applies to the next one.
+Buraya eklediğiniz kural şu anda çalışan yansıya uygulanır ve üstündeki kurallardan önceliklidir. Bir kuralı kaldırmak ise ancak bir sonraki yansıda geçerli olur.

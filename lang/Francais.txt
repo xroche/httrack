@@ -1054,3 +1054,5 @@ Max Retry-After(s)
 Retry-After max (s)
 Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
 Délai maximal respecté lorsqu'un serveur envoie un en-tête Retry-After. Indiquez 0 pour réessayer sans attendre.
+A rule you add here applies to the mirror now running, and wins over the rules above it. A rule you remove applies to the next one.
+Une règle ajoutée ici s'applique à la copie en cours et l'emporte sur les règles situées au-dessus. Le retrait d'une règle ne prend effet qu'à la copie suivante.

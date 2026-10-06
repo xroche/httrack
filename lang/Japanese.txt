@@ -1054,3 +1054,5 @@ Max Retry-After(s)
 最大 Retry-After(秒)
 Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
 サーバーが Retry-After ヘッダーを送ったときに従う最長の待ち時間です。0 を指定すると待たずに再試行します。
+A rule you add here applies to the mirror now running, and wins over the rules above it. A rule you remove applies to the next one.
+ここで追加したルールは実行中のミラーに適用され、上にあるルールより優先されます。ルールの削除は次回のミラーから反映されます。

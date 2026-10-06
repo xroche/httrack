@@ -1054,3 +1054,5 @@ Max Retry-After(s)
 Макс. Retry-After (с)
 Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
 Найдовше очікування, якого дотримується програма, коли сервер надсилає заголовок Retry-After. Значення 0 означає повтор без очікування.
+A rule you add here applies to the mirror now running, and wins over the rules above it. A rule you remove applies to the next one.
+Правило, додане тут, діє для поточного дзеркалювання і має пріоритет над правилами вище. Вилучення правила набуде чинності лише під час наступного дзеркалювання.
