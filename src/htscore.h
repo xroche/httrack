@@ -454,8 +454,8 @@ void hts_finish_html_file(httrackp *opt, cache_back *cache, htsblk *r,
   (1 + (HTS_URLMAXSIZE * 2 - 1) + 1 + (HTS_URLMAXSIZE * 2 - 1) +               \
    HTS_FILTER_SUFFIX_MAX)
 
-/* Largest -#F, and largest filter list that may still grow by HTS_FILTERSINC
-   rules: past it, the list's byte size would overflow an int. */
+/* Largest -#F, and the largest filter list that may still grow by
+   HTS_FILTERSINC, because the list's byte size must fit an int. */
 #define HTS_FILTERS_MAX (INT_MAX / HTS_FILTER_SLOT_SIZE - HTS_FILTERSINC - 2)
 
 int filters_init(char ***ptrfilters, int maxfilter, int filterinc);
