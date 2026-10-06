@@ -262,6 +262,21 @@ static int st_filterbounds(httrackp *opt, int argc, char **argv) {
     assertf(strjoker_bounds(subj, pat, &steps, &maxsteps, NULL, NULL) != NULL);
     assertf(steps < maxsteps);
   }
+  /* A class the pattern never closes is re-read in full on every call, so the
+     budget has to count those bytes: counting calls alone let a strjokerfind
+     sweep read 1.5GB under a 2M-call cap (OSS-Fuzz 5279208050589696). */
+  {
+    const size_t patlen = 1024;
+
+    pat[0] = '*';
+    pat[1] = '(';
+    memset(pat + 2, '*', patlen - 2);
+    pat[patlen] = '\0';
+    memset(subj, '*', 1024);
+    subj[1024] = '\0';
+    assertf(strjoker_bounds(subj, pat, &steps, &maxsteps, NULL, NULL) == NULL);
+    assertf(steps >= patlen);
+  }
   freet(pat);
   freet(subj);
   printf("filterbounds: OK\n");

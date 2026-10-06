@@ -142,6 +142,13 @@ static const char *strjoker_impl(strjoker_memo *memo, const char *chaine,
                                  const char *joker, LLint *size, int *size_flag,
                                  size_t depth);
 
+/* Charge n bytes of scanning: one call reads its whole class, so counting
+   calls alone bounds no real work (OSS-Fuzz 5279208050589696). */
+static void strjoker_charge(strjoker_memo *memo, size_t n) {
+  if (memo->nsteps != NULL)
+    *memo->nsteps += n;
+}
+
 /* A pair that failed once fails forever (*size is only written on the success
    path), so record NULL results and cut the re-exploration. */
 static const char *strjoker_rec(strjoker_memo *memo, const char *chaine,
@@ -302,6 +309,7 @@ static const char *strjoker_impl(strjoker_memo *memo, const char *chaine,
 
       for(i = 0; i < 256; i++)
         pass[i] = 0;
+      strjoker_charge(memo, sizeof(pass));
 
       // noms réservés
       if ((strfield(joker + 2, "file")) || (strfield(joker + 2, "name"))) {
@@ -311,18 +319,21 @@ static const char *strjoker_impl(strjoker_memo *memo, const char *chaine,
         //pass[(int) ';'] = 0;
         pass[(int) '/'] = 0;
         i = joker_class_end(joker, RIGHT);
+        strjoker_charge(memo, sizeof(pass) + (size_t) i);
       } else if (strfield(joker + 2, "path")) {
         for(i = 0; i < 256; i++)
           pass[i] = 1;
         pass[(int) '?'] = 0;
         //pass[(int) ';'] = 0;
         i = joker_class_end(joker, RIGHT);
+        strjoker_charge(memo, sizeof(pass) + (size_t) i);
       } else if (strfield(joker + 2, "param")) {
         if (chaine[0] == '?') { // il y a un paramètre juste là
           for(i = 0; i < 256; i++)
             pass[i] = 1;
         }                       // sinon synonyme de 'rien'
         i = joker_class_end(joker, RIGHT);
+        strjoker_charge(memo, sizeof(pass) + (size_t) i);
       } else {
         // décode les directives comme *[A-Z,âêîôû,0-9]
         i = 2;
@@ -330,6 +341,8 @@ static const char *strjoker_impl(strjoker_memo *memo, const char *chaine,
           cut = 1;              // caractère supplémentaire interdit
         } else {
           int len = (int) strlen(joker);
+
+          strjoker_charge(memo, (size_t) len);
           int nbounds = 0;  // size bounds read so far, all satisfied
           LLint slimit = 0; // last of them, reported back as the limit
 
@@ -374,6 +387,8 @@ static const char *strjoker_impl(strjoker_memo *memo, const char *chaine,
                 for(j = (int) (unsigned char) joker[i];
                     j <= (int) (unsigned char) joker[i + 2]; j++)
                   pass[j] = 1;
+                strjoker_charge(memo,
+                                (size_t) (j - (int) (unsigned char) joker[i]));
               }
               i += 3;
             } else { // 1 car, ex: *[ ]
@@ -403,6 +418,7 @@ static const char *strjoker_impl(strjoker_memo *memo, const char *chaine,
 
       for(i = 0; i < 256; i++)
         pass[i] = 1;            // tout autoriser
+      strjoker_charge(memo, sizeof(pass));
       jmp = 1;
     }
 
@@ -433,6 +449,7 @@ static const char *strjoker_impl(strjoker_memo *memo, const char *chaine,
         max = (int) strlen(chaine);
       else                      /* *(a) only match a (not aaaaa) */
         max = strnotempty(chaine) ? 1 : 0; /* empty chaine: no char to eat */
+      strjoker_charge(memo, (size_t) max);
       while(i < (int) max) {
         if (pass[(int) (unsigned char) chaine[i]]) {    // caractère autorisé
           if ((adr = strjoker_rec(memo, chaine + i + 1, joker + jmp, size,
