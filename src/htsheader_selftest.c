@@ -1128,6 +1128,580 @@ static int st_pubheaders(httrackp *opt, int argc, char **argv) {
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
 
+/* <parse|scan> <text> <min> <max>: what hts_parse_llint() or hts_scan_llint()
+   reads from text, and how many bytes it moves past. */
+static int st_intparse(httrackp *opt, int argc, char **argv) {
+  const char *end = argv[1];
+  LLint min, max, value = -1;
+
+  (void) opt;
+  if (argc != 4) {
+    fprintf(stderr, "int-parse: needs parse|scan <text> <min> <max>\n");
+    return 1;
+  }
+  min = (LLint) strtoll(argv[2], NULL, 10);
+  max = (LLint) strtoll(argv[3], NULL, 10);
+  if (strcmp(argv[0], "parse") == 0) {
+    const hts_boolean ok = hts_parse_llint(argv[1], &end, min, max, &value);
+
+    printf("%s value=" LLintP " end=%d\n", ok ? "ok" : "refused", value,
+           (int) (end - argv[1]));
+  } else {
+    const hts_scan_result got = hts_scan_llint(&end, min, max, &value);
+
+    printf("got=%d value=" LLintP " end=%d\n", (int) got, value,
+           (int) (end - argv[1]));
+  }
+  return 0;
+}
+
+/* The differential below: each converted site, as it parsed before (legacy_*,
+   a frozen copy using sscanf) and as it parses now, rendered into out. */
+typedef void (*st_int_site_fn)(const char *in, char *out, size_t size);
+
+static void st_int_treathead(const char *field, const char *in, htsblk *r) {
+  char BIGSTK line[HTS_URLMAXSIZE * 2];
+
+  memset(r, 0, sizeof(*r));
+  r->totalsize = -1;
+  line[0] = '\0';
+  strlncatbuff(line, field, sizeof(line), sizeof(line) - 1);
+  strlncatbuff(line, in, sizeof(line), sizeof(line) - 1);
+  treathead(NULL, "www.example.com", "/", r, line);
+}
+
+static void legacy_clen(const char *in, char *out, size_t size) {
+  LLint totalsize = -1;
+  int empty = 0;
+
+  if (sscanf(in, LLintP, &totalsize) == 1 && totalsize == 0)
+    empty = 1;
+  snprintf(out, size, "totalsize=" LLintP " empty=%d", totalsize, empty);
+}
+
+static void current_clen(const char *in, char *out, size_t size) {
+  htsblk r;
+
+  st_int_treathead("Content-Length:", in, &r);
+  snprintf(out, size, "totalsize=" LLintP " empty=%d", (LLint) r.totalsize,
+           (int) r.empty);
+}
+
+static void legacy_crange(const char *in, char *out, size_t size) {
+  LLint crange_start = 0, crange_end = 0, crange = 0;
+  const char *a;
+
+  for (a = in; is_space(*a); a++)
+    ;
+  if (strncasecmp(a, "bytes ", 6) == 0) {
+    for (a += 6; is_space(*a); a++)
+      ;
+    if (sscanf(a, LLintP "-" LLintP "/" LLintP, &crange_start, &crange_end,
+               &crange) != 3) {
+      crange_start = 0;
+      crange_end = 0;
+      crange = 0;
+      a = strchr(in, '/');
+      if (a != NULL) {
+        a++;
+        if (sscanf(a, LLintP, &crange) == 1 && crange >= 0) {
+          crange_start = 0;
+          crange_end = crange - 1;
+        } else {
+          crange = 0;
+        }
+      }
+    }
+    if (crange_start < 0 || crange_end < 0 || crange < 0)
+      crange_start = crange_end = crange = 0;
+  }
+  snprintf(out, size, LLintP " " LLintP " " LLintP, crange_start, crange_end,
+           crange);
+}
+
+static void current_crange(const char *in, char *out, size_t size) {
+  htsblk r;
+
+  st_int_treathead("Content-Range:", in, &r);
+  snprintf(out, size, LLintP " " LLintP " " LLintP, (LLint) r.crange_start,
+           (LLint) r.crange_end, (LLint) r.crange);
+}
+
+static void legacy_keepalive(const char *in, char *out, size_t size) {
+  int keep_alive = 0, keep_alive_t = 0, keep_alive_max = 0;
+  const char *a = in;
+
+  while (is_space(*a))
+    a++;
+  if (*a) {
+    const char *p;
+
+    keep_alive = 1;
+    keep_alive_max = 10;
+    keep_alive_t = 15;
+    if ((p = strstr(a, "timeout="))) {
+      p += strlen("timeout=");
+      sscanf(p, "%d", &keep_alive_t);
+    }
+    if ((p = strstr(a, "max="))) {
+      p += strlen("max=");
+      sscanf(p, "%d", &keep_alive_max);
+    }
+    if (keep_alive_max <= 1 || keep_alive_t < 1)
+      keep_alive = 0;
+  }
+  snprintf(out, size, "keep_alive=%d timeout=%d max=%d", keep_alive,
+           keep_alive_t, keep_alive_max);
+}
+
+static void current_keepalive(const char *in, char *out, size_t size) {
+  htsblk r;
+
+  st_int_treathead("Keep-Alive:", in, &r);
+  snprintf(out, size, "keep_alive=%d timeout=%d max=%d", r.keep_alive,
+           r.keep_alive_t, r.keep_alive_max);
+}
+
+static void legacy_ftpsize(const char *in, char *out, size_t size) {
+  const char *szstr = strchr(in, ' ');
+  LLint value = 0;
+
+  if (szstr != NULL && sscanf(szstr + 1, LLintP, &value) == HTS_SCAN_OK)
+    snprintf(out, size, "size=" LLintP, value);
+  else
+    snprintf(out, size, "none");
+}
+
+static void current_ftpsize(const char *in, char *out, size_t size) {
+  LLint value = 0;
+
+  if (ftp_parse_size(in, &value))
+    snprintf(out, size, "size=" LLintP, value);
+  else
+    snprintf(out, size, "none");
+}
+
+static struct tm *legacy_convert_time_rfc822(struct tm *result, const char *s) {
+  char months[] = "jan feb mar apr may jun jul aug sep oct nov dec";
+  char str[256];
+  char *a;
+  int result_mm = -1, result_dd = -1, result_n1 = -1, result_n2 = -1;
+  int result_n3 = -1, result_n4 = -1;
+
+  if ((int) strlen(s) > 200)
+    return NULL;
+  strcpybuff(str, s);
+  hts_lowcase(str);
+  while ((a = strchr(str, '-')))
+    *a = ' ';
+  while ((a = strchr(str, ':')))
+    *a = ' ';
+  while ((a = strchr(str, ',')))
+    *a = ' ';
+  a = str;
+  while (*a) {
+    char *first, *last;
+    char tok[256];
+
+    while (*a == ' ')
+      a++;
+    first = a;
+    while ((*a) && (*a != ' '))
+      a++;
+    last = a;
+    tok[0] = '\0';
+    if (first != last) {
+      char *pos;
+
+      strncatbuff(tok, first, (int) (last - first));
+      if ((pos = strstr(months, tok))) {
+        result_mm = ((int) (pos - months)) / 4;
+      } else {
+        int number;
+
+        if (sscanf(tok, "%d", &number) == 1) {
+          if (result_dd < 0)
+            result_dd = number;
+          else if (result_n1 < 0)
+            result_n1 = number;
+          else if (result_n2 < 0)
+            result_n2 = number;
+          else if (result_n3 < 0)
+            result_n3 = number;
+          else if (result_n4 < 0)
+            result_n4 = number;
+        }
+      }
+    }
+  }
+  if ((result_n1 >= 0) && (result_mm >= 0) && (result_dd >= 0) &&
+      (result_n2 >= 0) && (result_n3 >= 0) && (result_n4 >= 0)) {
+    memset(result, 0, sizeof(*result));
+    if (result_n4 >= 1000) {
+      result->tm_year = result_n4 - 1900;
+      result->tm_hour = result_n1;
+      result->tm_min = result_n2;
+      result->tm_sec = result_n3 > 0 ? result_n3 : 0;
+    } else {
+      result->tm_hour = result_n2;
+      result->tm_min = result_n3;
+      result->tm_sec = result_n4 > 0 ? result_n4 : 0;
+      if (result_n1 <= 50)
+        result->tm_year = result_n1 + 100;
+      else if (result_n1 < 1000)
+        result->tm_year = result_n1;
+      else
+        result->tm_year = result_n1 - 1900;
+    }
+    result->tm_mon = result_mm;
+    result->tm_mday = result_dd;
+    return result;
+  }
+  return NULL;
+}
+
+static void st_int_print_tm(const struct tm *tm, char *out, size_t size) {
+  if (tm == NULL)
+    snprintf(out, size, "none");
+  else
+    snprintf(out, size, "y=%d m=%d d=%d %d:%d:%d", tm->tm_year, tm->tm_mon,
+             tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
+}
+
+static void legacy_date(const char *in, char *out, size_t size) {
+  struct tm tm;
+
+  st_int_print_tm(legacy_convert_time_rfc822(&tm, in), out, size);
+}
+
+static void current_date(const char *in, char *out, size_t size) {
+  struct tm tm;
+
+  st_int_print_tm(convert_time_rfc822(&tm, in), out, size);
+}
+
+/* htsserver's and proxytrack's Content-length, which live outside the
+   library: their parse, then what it decides, copied from each program. */
+static void st_int_server_read(LLint length, char *out, size_t size) {
+  const LLint buffer = 1000; // stands for buffer_size - 2
+
+  snprintf(out, size, "read=" LLintP,
+           length > buffer ? buffer
+           : length > 0    ? length
+                           : 0);
+}
+
+static void legacy_server(const char *in, char *out, size_t size) {
+  LLint length = 1000;
+
+  sscanf(in, LLintP, &length);
+  st_int_server_read(length, out, size);
+}
+
+static void current_server(const char *in, char *out, size_t size) {
+  const char *a = in;
+  LLint length = 1000;
+
+  if (hts_scan_llint(&a, 0, INT64_MAX, &length) == HTS_SCAN_REFUSED)
+    length = 0;
+  st_int_server_read(length, out, size);
+}
+
+static void legacy_proxytrack(const char *in, char *out, size_t size) {
+  int length = 0;
+
+  if (sscanf(in, "%d", &length) != 1)
+    snprintf(out, size, "error");
+  else
+    snprintf(out, size, "length=%d", length);
+}
+
+static void current_proxytrack(const char *in, char *out, size_t size) {
+  const char *a = in;
+  LLint value;
+
+  if (hts_scan_llint(&a, 0, INT_MAX, &value) == HTS_SCAN_OK)
+    snprintf(out, size, "length=%d", (int) value);
+  else
+    snprintf(out, size, "error");
+}
+
+static void legacy_port(const char *in, char *out, size_t size) {
+  char *end;
+  long p;
+
+  if (!isdigit((unsigned char) *in) ||
+      (p = strtol(in, &end, 10), *end != '\0') || p < 1 || p > 65535)
+    snprintf(out, size, "refused");
+  else
+    snprintf(out, size, "port=%ld", p);
+}
+
+static void current_port(const char *in, char *out, size_t size) {
+  int port = -1;
+
+  if (hts_parse_url_port(in, &port))
+    snprintf(out, size, "port=%d", port);
+  else
+    snprintf(out, size, "refused");
+}
+
+struct st_int_site {
+  const char *name;
+  st_int_site_fn legacy, current;
+  LLint max;                // the site's bound, for the generated allowlist
+  hts_boolean sign_read;    // the date parser reads either sign as no sign
+  hts_boolean exact;        // no intended change at all
+  const char *templates[5]; // generated inputs: one "%s" for the number
+};
+
+static const struct st_int_site st_int_sites[] = {
+    {"content-length",
+     legacy_clen,
+     current_clen,
+     INT64_MAX,
+     HTS_FALSE,
+     HTS_FALSE,
+     {"%s", " %s", NULL}},
+    {"content-range",
+     legacy_crange,
+     current_crange,
+     INT64_MAX,
+     HTS_FALSE,
+     HTS_FALSE,
+     {" bytes %s-9/10", " bytes 0-%s/10", " bytes 0-9/%s", " bytes */%s",
+      NULL}},
+    {"keep-alive",
+     legacy_keepalive,
+     current_keepalive,
+     INT_MAX,
+     HTS_FALSE,
+     HTS_FALSE,
+     {" timeout=%s, max=100", " timeout=5, max=%s", NULL}},
+    {"ftp-size",
+     legacy_ftpsize,
+     current_ftpsize,
+     INT64_MAX,
+     HTS_FALSE,
+     HTS_FALSE,
+     {"213 %s", "213%s", NULL}},
+    {"date",
+     legacy_date,
+     current_date,
+     INT_MAX,
+     HTS_TRUE,
+     HTS_FALSE,
+     {"Sun, 06 Nov 1994 08:49:%s GMT", "%s Nov 1994 08:49:37 GMT",
+      "Sun Nov  6 08:49:37 %s", "06 Nov 94 08:49 %s", NULL}},
+    {"server-length",
+     legacy_server,
+     current_server,
+     INT64_MAX,
+     HTS_FALSE,
+     HTS_FALSE,
+     {" %s", NULL}},
+    {"proxytrack-length",
+     legacy_proxytrack,
+     current_proxytrack,
+     INT_MAX,
+     HTS_FALSE,
+     HTS_FALSE,
+     {" %s", NULL}},
+    {"url-port",
+     legacy_port,
+     current_port,
+     65535,
+     HTS_FALSE,
+     HTS_TRUE,
+     {"%s", NULL}},
+};
+
+/* A NULL want means the case parses as before, and a want names a change. */
+static const struct {
+  const char *site, *in, *want;
+} st_int_cases[] = {
+    {"content-length", " 0", NULL},
+    {"content-length", " 00123x", NULL},
+    {"content-length", "\t123 456", NULL},
+    {"content-length", " abc", NULL},
+    {"content-length", "", NULL},
+    {"content-length", " 9223372036854775807", NULL},
+    {"content-length", " -5", "totalsize=-1 empty=0"},
+    {"content-length", " +5", "totalsize=-1 empty=0"},
+    {"content-length", " -0", "totalsize=-1 empty=0"},
+    {"content-length", " 9223372036854775808", "totalsize=-1 empty=0"},
+    {"content-range", " bytes 0-70870/70871", NULL},
+    {"content-range", " bytes */70871", NULL},
+    {"content-range", " bytes 0 - 5/10", NULL},
+    {"content-range", " bytes 0- 5/ 10", NULL},
+    {"content-range", " bytes -5/10", NULL},
+    {"content-range", " bytes -5-10/20", NULL},
+    {"content-range", " bytes 0-5", NULL},
+    {"content-range", " bytes */0", NULL},
+    {"content-range", " bytes */-3", NULL},
+    {"content-range", " items 1-2/3", NULL},
+    {"content-range", " bytes 0-9223372036854775807/9223372036854775807", NULL},
+    {"content-range", " bytes +0-5/10", "0 0 0"},
+    {"content-range", " bytes 0-5/9223372036854775808", "0 0 0"},
+    {"content-range", " bytes */+10", "0 0 0"},
+    {"content-range", " bytes */9223372036854775808", "0 0 0"},
+    {"keep-alive", " timeout=5, max=100", NULL},
+    {"keep-alive", " timeout=0", NULL},
+    {"keep-alive", " max=1", NULL},
+    {"keep-alive", " timeout=abc", NULL},
+    {"keep-alive", " timeout= 7", NULL},
+    {"keep-alive", " xmax=50", NULL},
+    {"keep-alive", " timeout=007x", NULL},
+    {"keep-alive", " timeout=-1", "keep_alive=0 timeout=0 max=10"},
+    {"keep-alive", " timeout=+30", "keep_alive=0 timeout=0 max=10"},
+    {"keep-alive", " timeout=4294967311", "keep_alive=0 timeout=0 max=10"},
+    {"keep-alive", " max=-1", "keep_alive=0 timeout=15 max=0"},
+    {"ftp-size", "213 1234", NULL},
+    {"ftp-size", "213  1234", NULL},
+    {"ftp-size", "213 12ab", NULL},
+    {"ftp-size", "213", NULL},
+    {"ftp-size", "213 x", NULL},
+    {"ftp-size", "213 9223372036854775807", NULL},
+    {"ftp-size", "213 -1", "none"},
+    {"ftp-size", "213 +1", "none"},
+    {"ftp-size", "213 99999999999999999999", "none"},
+    {"date", "Sun, 06 Nov 1994 08:49:37 GMT", NULL},
+    {"date", "Sunday, 06-Nov-94 08:49:37 GMT", NULL},
+    {"date", "Sun Nov  6 08:49:37 1994", NULL},
+    {"date", "Sun, 06 Nov 1994 08:49:37 +0100", NULL},
+    {"date", "\t06 Nov 1994 08:49:37", NULL},
+    {"date", "garbage", NULL},
+    {"date", "06 Nov 94 08:49 +0000", NULL},
+    {"date", "Sun, 06 Nov 1994 08:49 +0100", NULL},
+    {"date", "Sun, 06 Nov 1994 08:49:37 GMT+1", NULL},
+    {"date", "Sun, 06 Nov 1994 08:49:37 \t+1", NULL},
+    {"date", "Sun, 06 Nov 1994 08:49:37 ++1", NULL},
+    {"date", "4294967302 Nov 1994 08:49:37", "none"},
+    {"server-length", " 50", NULL},
+    {"server-length", " abc", NULL},
+    {"server-length", " -5", NULL},
+    {"server-length", " +5", "read=0"},
+    {"server-length", " 9223372036854775808", "read=0"},
+    {"proxytrack-length", " 50", NULL},
+    {"proxytrack-length", " abc", NULL},
+    {"proxytrack-length", " -5", "error"},
+    {"proxytrack-length", " +5", "error"},
+    {"proxytrack-length", " 2147483648", "error"},
+    {"url-port", "80", NULL},
+    {"url-port", "00080", NULL},
+    {"url-port", "65536", NULL},
+    {"url-port", "+80", NULL},
+    {"url-port", " 80", NULL},
+    {"url-port", "80x", NULL},
+    {"url-port", "", NULL},
+    {"url-port", "99999999999999999999", NULL},
+};
+
+/* Copy pattern into out with its one "%s" replaced by value. */
+static void st_int_fill(char *out, size_t size, const char *pattern,
+                        const char *value) {
+  const char *hole = strstr(pattern, "%s");
+
+  out[0] = '\0';
+  strlncatbuff(out, pattern, size, (size_t) (hole - pattern));
+  strlncatbuff(out, value, size, size - 1);
+  strlncatbuff(out, hole + 2, size, size - 1);
+}
+
+/* Is the digit run at s larger than max? */
+static hts_boolean st_int_oversized(const char *s, LLint max) {
+  LLint v;
+
+  return *s != '\0' && !hts_parse_llint(s, NULL, 0, max, &v);
+}
+
+/* Every converted site against its legacy copy: the hand cases, then each
+   template filled with every space x sign x digits x suffix combination. Only
+   a signed or out-of-range number may differ, and the hand cases pin how. */
+static int st_intparsediff(httrackp *opt, int argc, char **argv) {
+  static const char *const spaces[] = {"", " ", "\t", "  "};
+  static const char *const signs[] = {"", "+", "-"};
+  static const char *const digits[] = {"",
+                                       "0",
+                                       "00",
+                                       "7",
+                                       "42",
+                                       "0042",
+                                       "65535",
+                                       "65536",
+                                       "2147483647",
+                                       "2147483648",
+                                       "4294967295",
+                                       "4294967311",
+                                       "9223372036854775807",
+                                       "9223372036854775808",
+                                       "99999999999999999999"};
+  static const char *const suffixes[] = {"", "x", " 7", ".5", "/3"};
+  size_t i, s, t, w, g, d, x;
+  int compared = 0, changed = 0, failures = 0;
+  char in[256], old[256], cur[256], gen[128];
+
+  (void) opt;
+  if (argc == 2) { // One input through one site, as it parses now.
+    for (s = 0; s < sizeof(st_int_sites) / sizeof(st_int_sites[0]); s++)
+      if (strcmp(st_int_sites[s].name, argv[0]) == 0) {
+        st_int_sites[s].current(argv[1], cur, sizeof(cur));
+        printf("%s\n", cur);
+        return 0;
+      }
+    fprintf(stderr, "int-parse-diff: no site \"%s\"\n", argv[0]);
+    return 1;
+  }
+  for (i = 0; i < sizeof(st_int_cases) / sizeof(st_int_cases[0]); i++) {
+    for (s = 0; strcmp(st_int_sites[s].name, st_int_cases[i].site) != 0; s++)
+      ;
+    st_int_sites[s].legacy(st_int_cases[i].in, old, sizeof(old));
+    st_int_sites[s].current(st_int_cases[i].in, cur, sizeof(cur));
+    // An overflow's legacy result is up to the libc, so a want pins only ours.
+    if (strcmp(cur, st_int_cases[i].want != NULL ? st_int_cases[i].want
+                                                 : old) != 0) {
+      printf("FAIL %s \"%s\": legacy \"%s\" now \"%s\" want \"%s\"\n",
+             st_int_sites[s].name, st_int_cases[i].in, old, cur,
+             st_int_cases[i].want != NULL ? st_int_cases[i].want : old);
+      failures++;
+    }
+    compared++;
+    changed += st_int_cases[i].want != NULL;
+  }
+  for (s = 0; s < sizeof(st_int_sites) / sizeof(st_int_sites[0]); s++) {
+    const struct st_int_site *site = &st_int_sites[s];
+
+    for (t = 0; site->templates[t] != NULL; t++)
+      for (w = 0; w < sizeof(spaces) / sizeof(spaces[0]); w++)
+        for (g = 0; g < sizeof(signs) / sizeof(signs[0]); g++)
+          for (d = 0; d < sizeof(digits) / sizeof(digits[0]); d++)
+            for (x = 0; x < sizeof(suffixes) / sizeof(suffixes[0]); x++) {
+              const hts_boolean is_signed =
+                  *signs[g] != '\0' && *digits[d] != '\0' && !site->sign_read;
+
+              snprintf(gen, sizeof(gen), "%s%s%s%s", spaces[w], signs[g],
+                       digits[d], suffixes[x]);
+              st_int_fill(in, sizeof(in), site->templates[t], gen);
+              if (!site->exact &&
+                  (is_signed || st_int_oversized(digits[d], site->max))) {
+                changed++;
+                continue;
+              }
+              site->legacy(in, old, sizeof(old));
+              site->current(in, cur, sizeof(cur));
+              compared++;
+              if (strcmp(old, cur) != 0) {
+                printf("FAIL %s \"%s\": legacy \"%s\" now \"%s\"\n", site->name,
+                       in, old, cur);
+                failures++;
+              }
+            }
+  }
+  printf("int-parse-diff: %d compared, %d intended changes, %d failures\n",
+         compared, changed, failures);
+  return failures != 0;
+}
+
 const struct selftest_entry selftests_header[] = {
     {"pubheaders", "",
      "layout of the installed structs configure's switches decide",
@@ -1155,6 +1729,11 @@ const struct selftest_entry selftests_header[] = {
      "binput() consumes a clipped line whole (#1294)", st_binputline},
     {"crange", "<raw-content-range-line> ...",
      "Content-Range parse integer safety", st_crange},
+    {"int-parse", "parse|scan <text> <min> <max>",
+     "bounded decimal parse: value and end offset", st_intparse},
+    {"int-parse-diff", "[<site> <input>]",
+     "integer header and reply fields parse as before, out-of-range refused",
+     st_intparsediff},
     {"xfread-limit", "[oversized-file small-file]",
      "in-memory receive buffer size bound", st_xfread_limit},
     {"useragent", "", "default User-Agent self-test", st_useragent},

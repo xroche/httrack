@@ -44,6 +44,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscrashtest.h"
 
 #include <limits.h>
+#include <stdint.h>
 
 #ifdef _WIN32
 #else
@@ -549,17 +550,13 @@ hts_boolean ftp_command(char *line, size_t line_size, const char *verb,
    max. */
 static const char *ftp_parse_decimal(const char *s, int max_digits, int max,
                                      int *value) {
-  int n = 0, digits = 0;
+  const char *end;
+  LLint n;
 
-  while (isdigit((unsigned char) *s) && digits < max_digits) {
-    n = n * 10 + (*s - '0');
-    s++;
-    digits++;
-  }
-  if (digits == 0 || isdigit((unsigned char) *s) || n > max)
+  if (!hts_parse_llint(s, &end, 0, max, &n) || end - s > max_digits)
     return NULL;
-  *value = n;
-  return s;
+  *value = (int) n;
+  return end;
 }
 
 hts_boolean ftp_parse_pasv(const char *line, char *ip, size_t ip_size,
@@ -604,6 +601,12 @@ hts_boolean ftp_parse_epsv(const char *line, int *port) {
     return HTS_FALSE;
   *port = p;
   return HTS_TRUE;
+}
+
+hts_boolean ftp_parse_size(const char *line, LLint *size) {
+  const char *s = strchr(line, ' ');
+
+  return s != NULL && hts_scan_llint(&s, 0, INT64_MAX, size) == HTS_SCAN_OK;
 }
 
 /* MDTM reply "213 YYYYMMDDHHMMSS[.frac]" (RFC 3659, UTC) into tm_time. */
@@ -997,17 +1000,12 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
               get_ftp_line(back, soc_ctl, line, sizeof(line), timeout, opt);
               _CHECK_HALT_FTP;
               if (line[0] == '2') {     // SIZE compris, ALORS tester REST (sinon pas tester: cf probleme des txt.gz decompresses a la volee)
-                char *szstr = strchr(line, ' ');
+                LLint size;
                 time_t remote_mtime = (time_t) -1;
                 struct tm remote_tm;
 
-                if (szstr) {
-                  LLint size = 0;
-
-                  szstr++;
-                  if (sscanf(szstr, LLintP, &size) == 1) {
-                    hts_store_relaxed_llint(&back->r.totalsize, size);
-                  }
+                if (ftp_parse_size(line, &size)) {
+                  hts_store_relaxed_llint(&back->r.totalsize, size);
                 }
 
                 // MDTM?

@@ -42,6 +42,7 @@ Please visit our Website: http://www.httrack.com
 #include "htslib.h"
 #include "htsio.h"
 #include <limits.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1198,7 +1199,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
           int p;
 
           if ((p = strfield(line, "Content-length:")) != 0) {
-            sscanf(line + p, LLintP, &(length));
+            const char *a = line + p;
+
+            // A signed or oversized length reads no body.
+            if (hts_scan_llint(&a, 0, INT64_MAX, &length) == HTS_SCAN_REFUSED)
+              length = 0;
           } else if ((p = strfield(line, "Accept-language:")) != 0) {
             char tmp[32];
             char *s = line + p;

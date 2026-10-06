@@ -26,8 +26,8 @@ Please visit our Website: http://www.httrack.com
 */
 
 /* ------------------------------------------------------------ */
-/* File: TCP port parser, shared by the engine, htsserver and    */
-/*       proxytrack                                              */
+/* File: bounded decimal and TCP port parsers, shared by the    */
+/*       engine, htsserver and proxytrack                        */
 /* Author: Xavier Roche                                          */
 /* ------------------------------------------------------------ */
 
@@ -35,6 +35,25 @@ Please visit our Website: http://www.httrack.com
 #define HTSURLPORT_DEFH
 
 #include "htsglobal.h"
+
+/* Read the unsigned decimal digits at s into *out if the value is in [min, max]
+   and return TRUE, or return FALSE and leave *out alone. *end (if not NULL) is
+   set past the digits, and overflow is refused before it can happen. */
+hts_boolean hts_parse_llint(const char *s, const char **end, LLint min,
+                            LLint max, LLint *out);
+
+/* What hts_scan_llint() found. */
+typedef enum {
+  HTS_SCAN_REFUSED = -1, /* The number is signed or outside [min, max]. */
+  HTS_SCAN_NONE = 0,     /* There is no number. */
+  HTS_SCAN_OK = 1        /* The number is in *out. */
+} hts_scan_result;
+
+/* Skip white space, then hts_parse_llint() the number there. On HTS_SCAN_OK
+   and HTS_SCAN_REFUSED, *s is moved past the number, so a caller can go on
+   matching. On HTS_SCAN_NONE, *s is unchanged. */
+hts_scan_result hts_scan_llint(const char **s, LLint min, LLint max,
+                               LLint *out);
 
 /* Parse the port text "a" (after the ':', up to the end of the string): TRUE
    and *port set for a bare decimal in 1..65535, else FALSE and *port left

@@ -85,6 +85,31 @@ responses=$(count_matching_lines '<response ' <<<"$resp")
 test "$responses" -eq 3 ||
     fail "expected the root, the file and the directory, got $responses responses: $resp"
 
+# A signed Content-length is refused with a 500. The unsigned one is the control.
+status_with_length() {
+    "$python" -c 'import socket, sys
+sock = socket.create_connection(("127.0.0.1", int(sys.argv[1])), 30)
+sock.sendall(b"PROPFIND /webdav/x/ HTTP/1.0\r\nHost: 127.0.0.1\r\nDepth: 0\r\n"
+             b"Content-length: " + sys.argv[2].encode() + b"\r\n\r\nhello")
+reply = b""
+while b"\r\n" not in reply:
+    data = sock.recv(4096)
+    if not data:
+        break
+    reply += data
+print(reply.split(b"\r\n")[0].decode("latin-1"))' "$proxyport" "$1"
+}
+for length in 5 +5; do
+    status=$(status_with_length "$length") ||
+        fail_dump "proxytrack died on Content-length: $length" "$ptlog"
+    case $length in
+    5) want=207 ;;
+    *) want=500 ;;
+    esac
+    grep -q "^HTTP/1\.[01] $want " <<<"$status" ||
+        fail "Content-length: $length answered '$status', wanted $want"
+done
+
 # The overflow killed the listener, so a later request is the liveness proof.
 resp=$(propfind "") ||
     fail_dump "proxytrack died before the follow-up listing" "$ptlog"
