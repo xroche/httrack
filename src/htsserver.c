@@ -606,82 +606,23 @@ static void copy_header_value(char *dst, size_t size, const char *value) {
   strlncatbuff(dst, value, size, size - 1);
 }
 
-/** Copy query parameter "name"'s alphanumeric value into dst; true when a
-    non-empty one fit, and dst is left empty otherwise. Query-string counterpart
-    to the POST-body checker below. */
-static hts_boolean query_alnum_value(char *dst, size_t size, const char *query,
-                                     const char *name) {
-  const size_t namelen = strlen(name);
-  const char *s = query;
-
-  dst[0] = '\0';
-  while (*s != '\0') {
-    const char *const amp = strchr(s, '&');
-
-    if (strncmp(s, name, namelen) == 0 && s[namelen] == '=') {
-      const char *v = s + namelen + 1;
-      size_t n = 0;
-
-      while (*v != '\0' && *v != '&' && n + 1 < size &&
-             isalnum((unsigned char) *v)) {
-        dst[n++] = *v++;
-      }
-      dst[n] = '\0';
-      /* Truncated, or not alphanumeric to its end, is no value at all: it must
-         not reach a caller that trusted the return. */
-      if (n > 0 && (*v == '\0' || *v == '&')) {
-        return HTS_TRUE;
-      }
-      dst[0] = '\0';
-      return HTS_FALSE;
-    }
-    if (amp == NULL) {
-      break;
-    }
-    s = amp + 1;
-  }
-  return HTS_FALSE;
-}
-
 /** Does the urlencoded request body present the expected session id?
     True only if at least one "sid" field is present and every occurrence
     matches, so it holds whichever one a later last-write-wins parse keeps.
     Non-destructive: it runs before the body is tokenized in place. */
 static hts_boolean body_sid_is_valid(const char *body, const char *expected) {
-  const char *s = body;
-  hts_boolean seen = HTS_FALSE;
+  return hts_query_all_match(body, "sid", expected, SID_VALUE_MAX);
+}
 
-  while (s != NULL && *s != '\0') {
-    const char *const amp = strchr(s, '&');
-    const char *const eq = strchr(s, '=');
+/** Store one form field in the key store; "on" (a checkbox) reads as "1". */
+static void store_form_field(void *arg, char *key, char *value) {
+  const char *ua = value;
+  String sua = STRING_EMPTY;
 
-    if (eq != NULL && (amp == NULL || eq < amp) && (size_t) (eq - s) == 3 &&
-        strncmp(s, "sid", 3) == 0) {
-      const size_t len = amp != NULL ? (size_t) (amp - eq - 1) : strlen(eq + 1);
-      hts_boolean match = HTS_FALSE;
-
-      if (len < SID_VALUE_MAX) {
-        char raw[SID_VALUE_MAX];
-        String value = STRING_EMPTY;
-
-        memcpy(raw, eq + 1, len);
-        raw[len] = '\0';
-        hts_unescapehttp(raw, &value);
-        /* StringBuff is NULL until written, so an empty value lands here. */
-        if (StringBuff(value) != NULL &&
-            strcmp(StringBuff(value), expected) == 0) {
-          match = HTS_TRUE;
-        }
-        StringFree(value);
-      }
-      if (!match) {
-        return HTS_FALSE;
-      }
-      seen = HTS_TRUE;
-    }
-    s = amp != NULL ? amp + 1 : NULL;
-  }
-  return seen;
+  if (strfield2(ua, "on"))
+    ua = "1";
+  hts_unescapehttp(ua, &sua);
+  coucal_write((coucal) arg, key, (intptr_t) StringAcquire(&sua));
 }
 
 /** Append src to the NUL-terminated dst of capacity size (NUL included).
@@ -1321,22 +1262,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
       /* check variables */
       if (meth && buffer[0]) {
-        char *s = buffer;
-        char *e, *f;
-
-        strlcatbuff(buffer, "&", buffer_size);
-        while(s && (e = strchr(s, '=')) && (f = strchr(s, '&'))) {
-          const char *ua;
-          String sua = STRING_EMPTY;
-
-          *e = *f = '\0';
-          ua = e + 1;
-          if (strfield2(ua, "on"))      /* hack : "on" == 1 */
-            ua = "1";
-          hts_unescapehttp(ua, &sua);
-          coucal_write(NewLangList, s, (intptr_t) StringAcquire(&sua));
-          s = f + 1;
-        }
+        hts_query_split(buffer, store_form_field, NewLangList);
       }
 
       /* Check variables (internal) */
@@ -2279,18 +2205,19 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             char window[SMALLSERVER_WINDOW_ID_MAX + 1];
 
             StringCat(headers, error_hdr);
-            if (query_alnum_value(window, sizeof(window), query, "w")) {
+            if (hts_query_alnum_value(window, sizeof(window), query, "w")) {
               char verb[SMALLSERVER_WINDOW_ID_MAX + 1];
 
               /* Ending a session is a command, so it carries the session id
                  like every other one. A heartbeat can only extend a life, and
                  any local peer or visited page can send one of those. */
-              client_event(
-                  authed && query_alnum_value(verb, sizeof(verb), query, "e") &&
-                          strcmp(verb, "bye") == 0
-                      ? SMALLSERVER_CLIENT_LEAVING
-                      : SMALLSERVER_CLIENT_PING,
-                  window);
+              client_event(authed &&
+                                   hts_query_alnum_value(verb, sizeof(verb),
+                                                         query, "e") &&
+                                   strcmp(verb, "bye") == 0
+                               ? SMALLSERVER_CLIENT_LEAVING
+                               : SMALLSERVER_CLIENT_PING,
+                           window);
             }
           } else {
             char error_hdr[] =

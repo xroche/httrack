@@ -26,12 +26,15 @@ Please visit our Website: http://www.httrack.com
 */
 
 /* ------------------------------------------------------------ */
-/* File: percent-escape decoding, shared by the engine and       */
-/*       htsserver                                              */
+/* File: percent-escape decoding and '&'-separated queries,     */
+/*       shared by the engine and htsserver                     */
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
 #include "htsescape.h"
+
+#include <ctype.h>
+#include <string.h>
 
 /* CR, LF or TAB, as htslib.h's is_retorsep(). */
 static HTS_INLINE int hts_is_retorsep(const char c) {
@@ -81,6 +84,127 @@ void hts_unescapeini(const char *s, String *tempo) {
       i += 2;
     } else {
       StringAddchar(*tempo, lastc = s[i]);
+    }
+  }
+}
+
+hts_boolean hts_query_next(const char **cur, const char **key, size_t *keylen,
+                           const char **val, size_t *vallen) {
+  const char *p = *cur;
+  const char *eq = NULL;
+
+  if (p == NULL) {
+    return HTS_FALSE;
+  }
+  *key = p;
+  while (*p != '\0' && *p != '&') {
+    if (eq == NULL && *p == '=') {
+      eq = p;
+    }
+    p++;
+  }
+  if (eq != NULL) {
+    *keylen = (size_t) (eq - *key);
+    *val = eq + 1;
+    *vallen = (size_t) (p - *val);
+  } else {
+    *keylen = (size_t) (p - *key);
+    *val = NULL;
+    *vallen = 0;
+  }
+  *cur = *p == '&' ? p + 1 : NULL;
+  return HTS_TRUE;
+}
+
+hts_boolean hts_query_find(const char *query, const char *name,
+                           const char **val, size_t *vallen) {
+  const size_t namelen = strlen(name);
+  const char *cur = query;
+  const char *key;
+  size_t keylen;
+
+  while (hts_query_next(&cur, &key, &keylen, val, vallen)) {
+    if (*val != NULL && keylen == namelen && strncmp(key, name, namelen) == 0) {
+      return HTS_TRUE;
+    }
+  }
+  return HTS_FALSE;
+}
+
+hts_boolean hts_query_alnum_value(char *dst, size_t size, const char *query,
+                                  const char *name) {
+  const char *v;
+  size_t vlen;
+  size_t n = 0;
+
+  dst[0] = '\0';
+  if (!hts_query_find(query, name, &v, &vlen)) {
+    return HTS_FALSE;
+  }
+  while (n < vlen && n + 1 < size && isalnum((unsigned char) v[n])) {
+    dst[n] = v[n];
+    n++;
+  }
+  dst[n] = '\0';
+  /* Truncated, or not alphanumeric to its end, is no value at all. */
+  if (n > 0 && n == vlen) {
+    return HTS_TRUE;
+  }
+  dst[0] = '\0';
+  return HTS_FALSE;
+}
+
+hts_boolean hts_query_all_match(const char *query, const char *name,
+                                const char *expected, size_t maxlen) {
+  const size_t namelen = strlen(name);
+  const char *cur = query;
+  const char *key;
+  const char *val;
+  size_t keylen, vallen;
+  hts_boolean seen = HTS_FALSE;
+
+  while (hts_query_next(&cur, &key, &keylen, &val, &vallen)) {
+    if (val != NULL && keylen == namelen && strncmp(key, name, namelen) == 0) {
+      hts_boolean match = HTS_FALSE;
+
+      /* An empty value decodes to nothing, so it never matches. */
+      if (vallen != 0 && vallen < maxlen) {
+        String raw = STRING_EMPTY;
+        String value = STRING_EMPTY;
+
+        StringMemcat(raw, val, vallen);
+        hts_unescapehttp(StringBuff(raw), &value);
+        if (StringBuff(value) != NULL &&
+            strcmp(StringBuff(value), expected) == 0) {
+          match = HTS_TRUE;
+        }
+        StringFree(raw);
+        StringFree(value);
+      }
+      if (!match) {
+        return HTS_FALSE;
+      }
+      seen = HTS_TRUE;
+    }
+  }
+  return seen;
+}
+
+void hts_query_split(char *query, hts_query_emit emit, void *arg) {
+  const char *cur = query;
+  const char *key;
+  const char *val;
+  size_t keylen, vallen;
+
+  while (hts_query_next(&cur, &key, &keylen, &val, &vallen)) {
+    if (val != NULL) {
+      char *const k = query + (key - query);
+      char *const v = k + keylen + 1;
+
+      /* Both ends are a separator or the final NUL, already walked past. */
+      k[keylen] = '\0';
+      v[vallen] = '\0';
+      emit(arg, k, v);
     }
   }
 }

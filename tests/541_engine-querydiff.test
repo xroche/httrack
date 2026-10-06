@@ -1,0 +1,19 @@
+#!/bin/bash
+#
+# The shared '&'-query iterator matches the six parsers it replaced, byte for
+# byte, except the two named fixes: %[param] matches its key exactly, and the
+# WebHTTrack form split no longer mis-pairs a field without '='.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+out=$(httrack -O /dev/null -#test=querydiff)
+
+# Exact counts: a corpus that shrinks, or an allowlist that grows, must show.
+want="querydiff: 454552 cases, 0 failures, allowed: 623 %[param], 516 form split"
+grep -qxF "$want" <<<"$out" || fail "expected '$want' in: $out"
+grep -qxF "querydiff: OK" <<<"$out" || fail "no OK line in: $out"
+
+echo "PASS"
