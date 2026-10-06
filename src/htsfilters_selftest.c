@@ -376,6 +376,68 @@ static int st_filtercap(httrackp *opt, int argc, char **argv) {
 #undef POISON
 
 /* ------------------------------------------------------------ */
+/* hts_addfilter() queues only signed rules within HTS_FILTER_MAXLEN. */
+static int st_addfilter(httrackp *opt, int argc, char **argv) {
+  static const struct {
+    const char *label;
+    const char *rule; /* NULL: built at the length given below */
+    size_t len;
+    hts_boolean want;
+  } cases[] = {
+      {"minus", "-*/junk/*", 0, HTS_TRUE},
+      {"plus", "+*.gif", 0, HTS_TRUE},
+      {"unsigned", "*.gif", 0, HTS_FALSE},
+      {"minus only", "-", 0, HTS_FALSE},
+      {"plus only", "+", 0, HTS_FALSE},
+      {"newline", "-a\nb", 0, HTS_FALSE},
+      {"empty", "", 0, HTS_FALSE},
+      {"at the cap", NULL, HTS_FILTER_MAXLEN, HTS_TRUE},
+      {"past the cap", NULL, HTS_FILTER_MAXLEN + 1, HTS_FALSE},
+  };
+
+  char rule[HTS_FILTER_MAXLEN + 2];
+  size_t k;
+  int failed = 0;
+
+  (void) argc;
+  (void) argv;
+  for (k = 0; k < sizeof(cases) / sizeof(cases[0]); k++) {
+    const char *const r = cases[k].rule != NULL ? cases[k].rule : rule;
+    char **taken;
+    hts_boolean queued, kept;
+
+    if (cases[k].rule == NULL) {
+      memset(rule, 'x', cases[k].len);
+      rule[0] = '-';
+      rule[cases[k].len] = '\0';
+    }
+    queued = hts_addfilter(opt, r);
+    taken = hts_addfilter_take(opt);
+    kept = taken != NULL && taken[0] != NULL && strcmp(taken[0], r) == 0 &&
+           taken[1] == NULL;
+    hts_addurl_free(taken);
+    printf("%s: queued=%d kept=%d\n", cases[k].label, queued, kept);
+    if (queued != cases[k].want || kept != queued)
+      failed = 1;
+  }
+  /* two calls append in order */
+  hts_addfilter(opt, "-a*");
+  hts_addfilter(opt, "+b*");
+  {
+    char **const taken = hts_addfilter_take(opt);
+    const hts_boolean ordered =
+        taken != NULL && taken[0] != NULL && strcmp(taken[0], "-a*") == 0 &&
+        taken[1] != NULL && strcmp(taken[1], "+b*") == 0 && taken[2] == NULL;
+
+    hts_addurl_free(taken);
+    printf("two rules: ordered=%d\n", ordered);
+    if (!ordered)
+      failed = 1;
+  }
+  printf("addfilter self-test %s\n", failed ? "FAILED" : "OK");
+  return failed;
+}
+
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
 
@@ -395,5 +457,7 @@ const struct selftest_entry selftests_filters[] = {
      st_filterbounds},
     {"filtercap", "", "an over-long filter rule is refused, not stored dead",
      st_filtercap},
+    {"addfilter", "", "hts_addfilter() queues a signed rule within the cap",
+     st_addfilter},
     {NULL, NULL, NULL, NULL},
 };

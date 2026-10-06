@@ -361,21 +361,7 @@ int hts_wizard_insert_filters(httrackp *opt, int n, const char *adr,
   int slot, inserted = 0;
 
   /* grow first: a host-scope answer emits two filters */
-  if ((*opt->filters.filptr) + 2 >= opt->maxfilter) {
-    opt->maxfilter += HTS_FILTERSINC;
-    if (filters_init(opt->filters.filters, opt->maxfilter, HTS_FILTERSINC) ==
-        0) {
-      printf("PANIC! : Too many filters : >%d [%d]\n", *opt->filters.filptr,
-             __LINE__);
-      fflush(stdout);
-      hts_log_print(opt, LOG_PANIC, "Too many filters, giving up..(>%d)",
-                    *opt->filters.filptr);
-      hts_log_print(
-          opt, LOG_INFO,
-          "To avoid that: use #F option for more filters (example: -#F5000)");
-      assertf("too many filters - giving up" == NULL); // wild..
-    }
-  }
+  filters_make_room(opt, 2);
   /* a counter outliving its array (an opt reused for a second crawl) would
      index past the end */
   if (opt->wizard_filters > *opt->filters.filptr)

@@ -3043,20 +3043,25 @@ class Handler(SimpleHTTPRequestHandler):
     def route_deeptrickle_index(self):
         self.send_html('\t<a href="p0.bin">p0</a>\n\t<a href="p1.bin">p1</a>\n')
 
-    def route_trickle_page(self):
+    def route_trickle_page(self, seconds=None):
+        seconds = seconds or self.TRICKLE_SECONDS
         self.send_response(200)
         self.send_header("Content-Type", "application/octet-stream")
-        self.send_header("Content-Length", str(2 * self.TRICKLE_SECONDS))
+        self.send_header("Content-Length", str(2 * seconds))
         self.end_headers()
         if self.command == "HEAD":
             return
         try:
-            for _ in range(self.TRICKLE_SECONDS):
+            for _ in range(seconds):
                 self.wfile.write(b"xy")
                 self.wfile.flush()
                 time.sleep(1.0)
         except OSError:
             pass
+
+    # #128: holds the only socket while the test adds a scan rule.
+    def route_short_trickle(self):
+        self.route_trickle_page(8)
 
     # #973: quoted, so the link parser keeps the < and > (only an unquoted > ends
     # a link) and the whole run reaches the progress panel.
@@ -3919,6 +3924,8 @@ class Handler(SimpleHTTPRequestHandler):
         "/xssjob/": route_xssjob_index,
         "/xssjob/index.html": route_xssjob_index,
         "/trickle/p0.bin": route_trickle_page,
+        "/trickle/short.bin": route_short_trickle,
+        "/trickle/short2.bin": route_short_trickle,
         "/trickle/p1.bin": route_trickle_page,
         "/trickle/p2.bin": route_trickle_page,
         "/trickle/p3.bin": route_trickle_page,

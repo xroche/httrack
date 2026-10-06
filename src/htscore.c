@@ -665,6 +665,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   opt->mptcp_connections = 0;
   opt->mptcp_fallbacks = 0;
   opt->upper_links_refused = HTS_FALSE;
+  hts_addurl_free(hts_addfilter_take(opt)); /* left over from a previous run */
 
   /* before the first bailout below, each of which leaves it false */
   set_mirror_completed(opt, completed_out, HTS_FALSE);
@@ -920,24 +921,10 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
       if (ident_url_absolute(url, &af) < 0) {
         printf("--why: unable to parse URL %s" LF, StringBuff(opt->why_url));
       } else {
-        char BIGSTK l[HTS_URLMAXSIZE * 2], lfull[HTS_URLMAXSIZE * 2];
-        int jok, jokDepth = 0;
+        int jokDepth = 0;
+        const int jok =
+            filters_match_url(filters, filptr, af.adr, af.fil, &jokDepth);
 
-        /* the two forms the wizard tests */
-        strcpybuff(l, jump_identification_const(af.adr));
-        if (*af.fil != '/')
-          strcatbuff(l, "/");
-        strcatbuff(l, af.fil);
-        if (!link_has_authority(af.adr))
-          strcpybuff(lfull, "http://");
-        else
-          lfull[0] = '\0';
-        strcatbuff(lfull, af.adr);
-        if (*af.fil != '/')
-          strcatbuff(lfull, "/");
-        strcatbuff(lfull, af.fil);
-        jok = fa_strjoker_dual(/*url */ 0, filters, filptr, lfull, l, NULL,
-                               NULL, &jokDepth);
         if (jok > 0)
           printf("%s: accepted by rule #%d (%s)" LF, url, jokDepth + 1,
                  filters[jokDepth]);
@@ -2497,19 +2484,8 @@ void host_ban(httrackp * opt, int ptr,
   if (host[0] == '!')
     return;                     // erreur.. déja cancellé.. bizarre.. devrait pas arriver
 
-  /* sanity check */
-  if (*_FILTERS_PTR + 1 >= opt->maxfilter) {
-    opt->maxfilter += HTS_FILTERSINC;
-    if (filters_init(&_FILTERS, opt->maxfilter, HTS_FILTERSINC) == 0) {
-      printf("PANIC! : Too many filters : >%d [%d]\n", *_FILTERS_PTR, __LINE__);
-      hts_log_print(opt, LOG_PANIC, "Too many filters, giving up..(>%d)",
-                    *_FILTERS_PTR);
-      hts_log_print(opt, LOG_INFO,
-                    "To avoid that: use #F option for more filters (example: -#F5000)");
-      assertf("too many filters - giving up" == NULL);
-    }
-  }
-  // interdire host
+  filters_make_room(opt, 1);
+  // ban the host
   assertf((*_FILTERS_PTR) < opt->maxfilter);
   if (*_FILTERS_PTR < opt->maxfilter) {
     char BIGSTK rule[HTS_FILTER_SLOT_SIZE + 4];
@@ -2592,6 +2568,102 @@ void host_ban(httrackp * opt, int ptr,
                     i);
     }
   }
+}
+
+void filters_make_room(httrackp *opt, int n) {
+  if (*opt->filters.filptr + n >= opt->maxfilter) {
+    opt->maxfilter += HTS_FILTERSINC;
+    if (filters_init(opt->filters.filters, opt->maxfilter, HTS_FILTERSINC) ==
+        0) {
+      printf("PANIC! : Too many filters : >%d [%d]\n", *opt->filters.filptr,
+             __LINE__);
+      fflush(stdout);
+      hts_log_print(opt, LOG_PANIC, "Too many filters, giving up..(>%d)",
+                    *opt->filters.filptr);
+      hts_log_print(
+          opt, LOG_INFO,
+          "To avoid that: use #F option for more filters (example: -#F5000)");
+      assertf("too many filters - giving up" == NULL);
+    }
+  }
+}
+
+int filters_match_url(char **filters, int nfil, const char *adr,
+                      const char *fil, int *depth) {
+  /* adr and fil each come from a HTS_URLMAXSIZE * 2 array */
+  char BIGSTK l[HTS_URLMAXSIZE * 4 + 16], lfull[HTS_URLMAXSIZE * 4 + 16];
+  htsbuff lb = htsbuff_array(l), fb = htsbuff_array(lfull);
+
+  htsbuff_cpy(&lb, jump_identification_const(adr));
+  if (*fil != '/')
+    htsbuff_cat(&lb, "/");
+  htsbuff_cat(&lb, fil);
+  htsbuff_cpy(&fb, link_has_authority(adr) ? "" : "http://");
+  htsbuff_cat(&fb, adr);
+  if (*fil != '/')
+    htsbuff_cat(&fb, "/");
+  htsbuff_cat(&fb, fil);
+  return fa_strjoker_dual(0, filters, nfil, lfull, l, NULL, NULL, depth);
+}
+
+/* Is queued link lpos refused by the count rules starting at first? */
+static hts_boolean live_rules_refuse_(httrackp *opt, int lpos, int first,
+                                      int count) {
+  const lien_url *const link = heap(lpos);
+
+  /* robots.txt is never filtered, as at startup */
+  return link->pass2 != -1 && strcmp(link->fil, "/robots.txt") != 0 &&
+         filters_match_url(*opt->filters.filters + first, count, link->adr,
+                           link->fil, NULL) == -1;
+}
+
+void hts_apply_live_filters(httrackp *opt, struct_back *sback, int ptr) {
+  char **const rules = hts_addfilter_take(opt);
+  const int first = *opt->filters.filptr;
+  int count, dropped = 0, i;
+  size_t k;
+
+  if (rules == NULL)
+    return;
+  for (k = 0; rules[k] != NULL; k++) {
+    filters_make_room(opt, 1);
+    if (filters_insert(opt, *opt->filters.filptr, rules[k]))
+      hts_log_print(opt, LOG_NOTICE, "Scan rule added by user: %s", rules[k]);
+  }
+  hts_addurl_free(rules); /* frees any NULL-terminated string list */
+  count = *opt->filters.filptr - first;
+  /* ptr is being fetched or parsed */
+  for (i = ptr + 1; i < opt->lien_tot; i++) {
+    if (live_rules_refuse_(opt, i, first, count)) {
+      int b =
+          back_index_peek(opt, sback, heap(i)->adr, heap(i)->fil, heap(i)->sav);
+
+      /* load a stored result only if a slot is free */
+      if (b == sback->count) {
+        if (back_search_quick(sback) < 0)
+          continue;
+        b = back_index(opt, sback, heap(i)->adr, heap(i)->fil, heap(i)->sav);
+      }
+      if (b >= 0) {
+        const lien_back *const slot = &sback->lnk[b];
+
+        /* the sav test rejects a slot matched on adr and fil alone */
+        if (slot->status != STATUS_READY || slot->r.is_write ||
+            slot->testmode || strcmp(slot->url_sav, heap(i)->sav) != 0)
+          continue;
+        /* no cache: a dropped page must not be recorded as fetched */
+        back_delete(opt, NULL, sback, b);
+      }
+      hts_log_print(opt, LOG_DEBUG, "Cancel: %s%s", heap(i)->adr, heap(i)->fil);
+      hts_invalidate_link(opt, i);
+      /* the main loop takes every cancelled link out of this count */
+      HTS_STAT.stat_background++;
+      dropped++;
+    }
+  }
+  hts_log_print(opt, LOG_NOTICE,
+                "%d scan rule(s) added by user, %d queued link(s) dropped",
+                count, dropped);
 }
 
 void filters_bind(httrackp *opt, char ***ptrfilters, int *filptr) {
@@ -4299,6 +4371,48 @@ HTSEXT_API hts_boolean hts_addurl(httrackp *opt, char **url) {
 HTSEXT_API hts_boolean hts_resetaddurl(httrackp *opt) {
   hts_addurl_free(hts_addurl_take(opt));
   return HTS_FALSE;
+}
+
+char **hts_addfilter_take(httrackp *opt) {
+  char **old;
+
+  hts_mutexlock(&opt->state.lock);
+  old = opt->live_filters;
+  opt->live_filters = NULL;
+  hts_mutexrelease(&opt->state.lock);
+  return old;
+}
+
+HTSEXT_API hts_boolean hts_addfilter(httrackp *opt, const char *rule) {
+  char *copy;
+  char **list;
+  size_t n = 0;
+
+  if (opt == NULL || rule == NULL || (rule[0] != '+' && rule[0] != '-') ||
+      rule[1] == '\0' || strlen(rule) > HTS_FILTER_MAXLEN)
+    return HTS_FALSE;
+  for (n = 0; rule[n] != '\0'; n++) {
+    if ((unsigned char) rule[n] < ' ')
+      return HTS_FALSE;
+  }
+  n = 0;
+  if ((copy = strdupt(rule)) == NULL)
+    return HTS_FALSE;
+  hts_mutexlock(&opt->state.lock);
+  while (opt->live_filters != NULL && opt->live_filters[n] != NULL)
+    n++;
+  list = (char **) realloct(opt->live_filters, (n + 2) * sizeof(char *));
+  if (list != NULL) {
+    list[n] = copy;
+    list[n + 1] = NULL;
+    opt->live_filters = list;
+  }
+  hts_mutexrelease(&opt->state.lock);
+  if (list == NULL) {
+    freet(copy);
+    return HTS_FALSE;
+  }
+  return HTS_TRUE;
 }
 
 // copier nouveaux paramètres si besoin

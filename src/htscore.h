@@ -320,6 +320,10 @@ char **hts_addurl_take(httrackp *opt);
 /* Free a list taken with hts_addurl_take(), strings included. */
 void hts_addurl_free(char **url);
 
+/* Detach the queued rules. Returns NULL if none. The caller frees the list
+   with hts_addurl_free(). */
+char **hts_addfilter_take(httrackp *opt);
+
 #endif
 
 /* Record a link on the heap. All strings are copied (caller keeps ownership).
@@ -462,6 +466,19 @@ void filters_bind(httrackp *opt, char ***ptrfilters, int *filptr);
    caller has ensured there is room. The one door into the array: a rule past
    HTS_FILTER_MAXLEN warns and returns HTS_FALSE, never stored dead (#1270). */
 hts_boolean filters_insert(httrackp *opt, int pos, const char *pattern);
+
+/* Grow the filter array so n more rules fit. Aborts when it cannot. */
+void filters_make_room(httrackp *opt, int n);
+
+/* Returns the fa_strjoker_dual() verdict of the nfil filters on adr+fil, in
+   both forms the wizard tests, and sets *depth when depth is not NULL. */
+int filters_match_url(char **filters, int nfil, const char *adr,
+                      const char *fil, int *depth);
+
+/* Append the queued rules so they outrank all others, then drop the queued
+   links after ptr that they refuse. Crawl thread only, as it alone reads the
+   filters. */
+void hts_apply_live_filters(httrackp *opt, struct_back *sback, int ptr);
 
 int fspc(httrackp * opt, FILE * fp, const char *type);
 /* Count one log event into opt's counters that hts_get_stats() publishes,

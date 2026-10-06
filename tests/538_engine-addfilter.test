@@ -1,0 +1,22 @@
+#!/bin/bash
+#
+# hts_addfilter() queues a signed scan rule within the length cap, in call
+# order, and refuses the rest (#128).
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+out=$(httrack -O /dev/null -#test=addfilter)
+
+for want in "minus: queued=1 kept=1" "plus: queued=1 kept=1" \
+    "unsigned: queued=0 kept=0" "minus only: queued=0 kept=0" \
+    "plus only: queued=0 kept=0" "newline: queued=0 kept=0" \
+    "empty: queued=0 kept=0" "at the cap: queued=1 kept=1" \
+    "past the cap: queued=0 kept=0" "two rules: ordered=1" \
+    "addfilter self-test OK"; do
+    grep -qxF "$want" <<<"$out" || fail "missing '$want' in: $out"
+done
+
+echo "PASS"

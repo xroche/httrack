@@ -85,6 +85,10 @@ int back_index(httrackp * opt, struct_back * sback, const char *adr, const char 
 int back_available(const struct_back * sback);
 LLint back_incache(const struct_back * sback);
 int back_done_incache(const struct_back * sback);
+/* Like back_index(), but never loads a stored result into a slot. Returns
+   sback->count for one. */
+int back_index_peek(httrackp *opt, struct_back *sback, const char *adr,
+                    const char *fil, const char *sav);
 HTS_INLINE int back_exist(struct_back * sback, httrackp * opt, const char *adr,
                           const char *fil, const char *sav);
 int back_nsoc(const struct_back * sback);

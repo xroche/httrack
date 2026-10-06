@@ -1,0 +1,96 @@
+#!/bin/bash
+#
+# A scan rule added to a running crawl through WebHTTrack's add-filter drops
+# the queued links it refuses, and keeps the others (#128).
+
+set -euo pipefail
+
+# shellcheck source=tests/webhttracklib.sh
+. "${0%"${0##*/}"}./webhttracklib.sh"
+
+htsserver_require
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_addfilter.XXXXXX") || fail "no tmpdir"
+csrv=
+cleanup_push htsserver_cleanup_dir "${work}"
+cleanup_push htsserver_reap_vars csrv
+
+export HOME="${work}" # no ~/.httrack.ini of the developer's in the store
+
+# short.bin and short2.bin trickle for eight seconds and hold both sockets
+# (-c2). The pages are fetched first and wait unsaved, and z.bin waits unfetched
+# behind them.
+mkdir -p "${work}/docroot/junk" "${work}/docroot/keep"
+{
+    printf '<html><body><a href="/trickle/short.bin">slow</a>\n'
+    printf '<a href="/trickle/short2.bin">slow</a>\n'
+    for i in 1 2 3 4 5; do
+        printf '<a href="junk/j%d.html">j</a>\n' "${i}"
+        printf '<html><body>junk</body></html>\n' >"${work}/docroot/junk/j${i}.html"
+    done
+    printf '<a href="junk/z.bin">z</a>\n'
+    printf '<a href="keep/k1.html">k</a></body></html>\n'
+} >"${work}/docroot/index.html"
+printf '<html><body>keep</body></html>\n' >"${work}/docroot/keep/k1.html"
+printf 'z' >"${work}/docroot/junk/z.bin"
+
+clog="${work}/content.log"
+LOCAL_SERVER_VERBOSE=1 "${HTS_PYTHON}" "${testdir}/local-server.py" --root "${work}/docroot" \
+    >"${clog}" 2>&1 &
+csrv=$!
+cport=$(discover_server_port "${clog}" "${csrv}") || fail "no content server"
+
+htsserver_start
+sid=$(htsserver_sid)
+test "${#sid}" -eq 32 || fail "no session id in the panel (got '${sid}')"
+
+out="${work}/crawl"
+site="${out}/127.0.0.1_${cport}"
+log="${out}/hts-log.txt"
+# -%A types .bin up front, so the parser queues every link before the slow files.
+htsserver_client --path /step4.html --field "sid=${sid}" --field "path=${work}" \
+    --field projname=crawl --field winprofile=x --field command_do=start \
+    --field "command=httrack --robots=0 -c2 -%A bin=application/octet-stream http://127.0.0.1:${cport}/index.html +* -O ${out}" \
+    >/dev/null
+
+start=$SECONDS
+while ! grep -q "GET /trickle/short2.bin HTTP" "${clog}"; do
+    htsserver_alive || fail "htsserver died: $(tail -n 20 "${log}" 2>/dev/null)"
+    test "$((SECONDS - start))" -lt 60 || fail "the slow file was never requested"
+    poll_wait 0.2
+done
+
+# add_rule RULE COUNT: send RULE, then wait for its log line reporting COUNT
+# dropped links.
+add_rule() {
+    local before
+    before=$(grep -c "queued link(s) dropped" "${log}" || true)
+    htsserver_client --path /step4.html --field "sid=${sid}" \
+        --field "command=add-filter=$1" >/dev/null
+    start=$SECONDS
+    while test "$(grep -c "queued link(s) dropped" "${log}" || true)" -le "${before}"; do
+        test "$((SECONDS - start))" -lt 30 ||
+            fail_dump "rule $1 was never applied" "${log}" "${clog}"
+        poll_wait 0.2
+    done
+    grep -q "1 scan rule(s) added by user, $2 queued link(s) dropped" "${log}" ||
+        fail_dump "rule $1 did not drop $2 links" "${log}"
+}
+
+add_rule "+*/keep/*" 0
+# Both slow files are mid-transfer, so they finish.
+add_rule "-*/trickle/*" 0
+# The 5 pages fetched ahead and z.bin drop, and keep/k1.html stays.
+add_rule "-*/junk/*" 6
+
+start=$SECONDS
+while ! grep -q "HTTrack Website Copier/" "${log}"; do
+    test "$((SECONDS - start))" -lt 60 || fail "the crawl did not end"
+    poll_wait 0.2
+done
+assert_file "${site}/keep/k1.html" "a link the rule does not match was dropped"
+assert_file "${site}/trickle/short.bin" "a running transfer was dropped"
+assert_file "${site}/trickle/short2.bin" "a running transfer was dropped"
+test ! -e "${site}/junk" || fail "a dropped link was saved: $(ls "${site}/junk")"
+
+echo "PASS"

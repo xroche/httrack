@@ -640,6 +640,9 @@ struct httrackp {
   int mptcp_fallbacks;   /**< HTTP connections that asked for MPTCP and were
                               given plain TCP. Live state, so copy_htsopt must
                               leave it alone. Tail: ABI */
+  char **live_filters;   /**< rules queued by hts_addfilter(), NULL-terminated,
+                              under state.lock. Live state, so copy_htsopt must
+                              leave it alone. Tail: ABI */
 };
 
 /** Running statistics for a mirror. */
