@@ -1054,3 +1054,5 @@ Max Retry-After(s)
 Max. Retry-After (s)
 Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
 Cea mai lungă aşteptare respectată când un server trimite un antet Retry-After. Folosiţi 0 pentru a reîncerca fără aşteptare.
+A rule you add here applies to the mirror now running, and wins over the rules above it. A rule you remove applies to the next one.
+O regulă adăugată aici se aplică clonării aflate în desfăşurare şi are prioritate faţă de regulile de deasupra ei. Eliminarea unei reguli se aplică abia la următoarea clonare.

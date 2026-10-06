@@ -1054,3 +1054,5 @@ Max Retry-After(s)
 Max Retry-After(s)
 Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
 Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
+A rule you add here applies to the mirror now running, and wins over the rules above it. A rule you remove applies to the next one.
+A rule you add here applies to the mirror now running, and wins over the rules above it. A rule you remove applies to the next one.

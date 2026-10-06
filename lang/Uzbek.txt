@@ -1054,3 +1054,5 @@ Max Retry-After(s)
 Maks. Retry-After (s)
 Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
 Server Retry-After sarlavhasini yuborganda amal qilinadigan eng uzun kutish. Kutmasdan qayta urinish uchun 0 kiriting.
+A rule you add here applies to the mirror now running, and wins over the rules above it. A rule you remove applies to the next one.
+Bu yerda qo’shgan qoidangiz hozir bajarilayotgan ko’zgu yaratish jarayoniga qo’llanadi va yuqoridagi qoidalardan ustun turadi. Qoidani olib tashlash faqat keyingi ko’zgu yaratishda kuchga kiradi.

@@ -1054,3 +1054,5 @@ Max Retry-After(s)
 Μέγ. Retry-After (δευτ.)
 Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
 Η μεγαλύτερη αναμονή που τηρείται όταν ένας διακομιστής στέλνει κεφαλίδα Retry-After. Το 0 σημαίνει επανάληψη χωρίς αναμονή.
+A rule you add here applies to the mirror now running, and wins over the rules above it. A rule you remove applies to the next one.
+Ένας κανόνας που προσθέτετε εδώ ισχύει για την αντιγραφή που εκτελείται τώρα και υπερισχύει των κανόνων πάνω από αυτόν. Η αφαίρεση ενός κανόνα ισχύει από την επόμενη αντιγραφή.

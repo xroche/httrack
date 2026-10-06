@@ -1054,3 +1054,5 @@ Max Retry-After(s)
 Макс. Retry-After (с)
 Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
 Най-дългото изчакване, което се спазва, когато сървърът изпрати заглавка Retry-After. Използвайте 0 за повторен опит без изчакване.
+A rule you add here applies to the mirror now running, and wins over the rules above it. A rule you remove applies to the next one.
+Правило, което добавите тук, важи за огледалото, което се изпълнява в момента, и има предимство пред правилата над него. Премахването на правило се отразява едва при следващото огледало.
