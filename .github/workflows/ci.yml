@@ -547,6 +547,10 @@ jobs:
           tests="$tests 110_local-ftp-parallel.test 121_local-ftp-nocache-splice.test"
           tests="$tests 234_local-ftp-maxtime.test 243_local-ftp-deadhost-interrupt.test"
           tests="$tests 255_local-ftp-sigterm.test 263_local-ftp-stop-window.test"
+          # WebHTTrack, whose server, crawl and watchdog threads share its flags
+          tests="$tests 65_port-siblings.test 289_webhttrack-lifetime.test"
+          tests="$tests 319_webhttrack-addurl.test 371_webhttrack-help-reachable.test"
+          tests="$tests 537_webhttrack-addfilter.test"
           for t in tests/01_engine-*.test; do
             tests="$tests ${t##*/}"
           done
