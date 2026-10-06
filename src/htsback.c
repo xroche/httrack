@@ -841,8 +841,9 @@ LLint back_incache(const struct_back * sback) {
 
   for(i = 0; i < back_max; i++)
     if (back_status(&back[i]) != -1)
-      if (back[i].r.adr)        // ne comptabilier que les blocs en mémoire
-        sum += max(back[i].r.size, back[i].r.totalsize);
+      if (back[i].r.adr) // count only blocks held in memory
+        sum += max(hts_load_relaxed_llint(&back[i].r.size),
+                   hts_load_relaxed_llint(&back[i].r.totalsize));
   // stored (ready) slots
 #ifdef HTS_NO_BACK_ON_DISK
   if (sback->ready != NULL) {
@@ -3241,7 +3242,9 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
                 i, may_clean, may_finalize, may_serialize, back[i].finalized,
                 back_status(&back[i]), back[i].locked,
                 IS_DELAYED_EXT(back[i].url_sav), back[i].testmode,
-                back[i].r.statuscode, (int) back[i].r.size, back[i].r.is_write,
+                back[i].r.statuscode,
+                (int) hts_load_relaxed_llint(&back[i].r.size),
+                back[i].r.is_write,
                 may_be_hypertext_mime(opt, back[i].r.contenttype,
                                       back[i].url_fil),
                 /* */
@@ -5608,7 +5611,7 @@ LLint back_transferred(LLint nb, struct_back * sback) {
     const int st = back_status(&back[i]);
 
     if ((st > 0) && (st < 99 || st >= 1000))
-      nb += back[i].r.size;
+      nb += hts_load_relaxed_llint(&back[i].r.size);
   }
   // stored (ready) slots
   if (sback->ready != NULL) {
@@ -5737,8 +5740,9 @@ void back_infostr(struct_back *sback, int i, int j, char *s, size_t size) {
         strlcatbuff(s, s2, size);
         // size/totalsize trailer: build in s2, then append (the old code wrote
         // straight into s here, clobbering the URL it had just assembled).
-        snprintf(s2, sizeof(s2), LLintP " " LLintP " ", (LLint) back[i].r.size,
-                 (LLint) back[i].r.totalsize);
+        snprintf(s2, sizeof(s2), LLintP " " LLintP " ",
+                 hts_load_relaxed_llint(&back[i].r.size),
+                 hts_load_relaxed_llint(&back[i].r.totalsize));
         strlcatbuff(s, s2, size);
       }
     }

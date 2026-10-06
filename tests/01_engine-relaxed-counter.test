@@ -1,0 +1,8 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# The TSan leg runs this, so a plain access to the counter shows as a race.
+out=$(httrack -O /dev/null -#test=relaxedcounter)
+grep -q "relaxedcounter self-test: OK" <<<"$out"

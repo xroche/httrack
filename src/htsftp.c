@@ -783,7 +783,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
   // effacer
   strcpybuff(back->r.msg, "");
   back->r.statuscode = 0;
-  back->r.size = 0;
+  hts_store_relaxed_llint(&back->r.size, 0);
   back->r.lastmodified[0] = '\0'; // a retry must not stamp the previous MDTM
 
   real_adr = ftp_jump_authority(back->url_adr);
@@ -1006,7 +1006,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
 
                   szstr++;
                   if (sscanf(szstr, LLintP, &size) == 1) {
-                    back->r.totalsize = size;
+                    hts_store_relaxed_llint(&back->r.totalsize, size);
                   }
                 }
 
@@ -1179,7 +1179,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                         0);
             /* The bytes already on disk count too, or the completeness check
                below rejects every resumed transfer (#798). */
-            back->r.size = back->range_req_size;
+            hts_store_relaxed_llint(&back->r.size, back->range_req_size);
             back->r.fp = fileappend(&opt->state.strc, back->url_sav);
           } else {
             file_notify(opt, back->url_adr, back->url_fil, back->url_sav, 1, 1,
@@ -1218,7 +1218,8 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
               if (len) {
                 len = recv(soc_dat, buff, read_len, 0);
                 if (len > 0) {
-                  back->r.size += len;
+                  /* This worker is the only writer, so its read is safe. */
+                  hts_store_relaxed_llint(&back->r.size, back->r.size + len);
                   hts_stat_recv_add(len);
                   if (back->r.fp) {
                     if (!hts_fwrite_exact(buff, (size_t) len, back->r.fp)) {

@@ -87,6 +87,36 @@ static HTS_INLINE HTS_UNUSED void hts_increment_int(volatile int *dst) {
 #endif
 }
 
+/* Relaxed atomic access to a 64-bit counter that another thread updates, such
+   as an FTP slot's byte count. 32-bit non-MSVC hosts get a plain access, which
+   can tear, because a 64-bit atomic there may need libatomic. */
+#if defined(_MSC_VER) ||                                                       \
+    (defined(__SIZEOF_POINTER__) && __SIZEOF_POINTER__ >= 8)
+#define HTS_LLINT_ATOMIC 1
+#endif
+
+static HTS_INLINE HTS_UNUSED LLint
+hts_load_relaxed_llint(const volatile LLint *src) {
+#ifdef _MSC_VER
+  return InterlockedCompareExchange64((volatile LONG64 *) src, 0, 0);
+#elif defined(HTS_LLINT_ATOMIC)
+  return __atomic_load_n(src, __ATOMIC_RELAXED);
+#else
+  return *src;
+#endif
+}
+
+static HTS_INLINE HTS_UNUSED void hts_store_relaxed_llint(volatile LLint *dst,
+                                                          LLint value) {
+#ifdef _MSC_VER
+  InterlockedExchange64((volatile LONG64 *) dst, value);
+#elif defined(HTS_LLINT_ATOMIC)
+  __atomic_store_n(dst, value, __ATOMIC_RELAXED);
+#else
+  *dst = value;
+#endif
+}
+
 /* Read a lock hts_mutexlock() may be publishing right now. It builds the lock
    on first use and publishes it with a compare-and-swap, which is a release, so
    this read has to be the matching acquire, or a thread sees the pointer and

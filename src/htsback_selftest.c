@@ -909,6 +909,64 @@ static int st_backnew(httrackp *opt, int argc, char **argv) {
 #endif
 }
 
+/* Both 32-bit halves carry the step, so a torn read has unequal halves. */
+#define RELAXED_STEPS 100000
+#define RELAXED_VALUE(i) ((LLint) (i) * (LLint) 0x100000001)
+
+static volatile LLint relaxed_counter = 0;
+
+static void relaxed_writer(void *arg) {
+  int i;
+
+  (void) arg;
+  for (i = 1; i <= RELAXED_STEPS; i++)
+    hts_store_relaxed_llint(&relaxed_counter, RELAXED_VALUE(i));
+}
+
+static int st_relaxedcounter(httrackp *opt, int argc, char **argv) {
+  LLint last = 0;
+  long spins;
+  int err = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  hts_store_relaxed_llint(&relaxed_counter, 0);
+  if (hts_newthread(relaxed_writer, NULL) != 0) {
+    fprintf(stderr, "relaxedcounter: cannot spawn\n");
+    return 1;
+  }
+  /* Read while the writer runs, as the progress display reads an FTP slot. */
+  for (spins = 0; last != RELAXED_VALUE(RELAXED_STEPS) && spins < 100000000L;
+       spins++) {
+    const LLint v = hts_load_relaxed_llint(&relaxed_counter);
+
+#ifdef HTS_LLINT_ATOMIC
+    const hts_boolean bad = v < last || (v >> 32) != (v & 0xffffffff);
+#else
+    const hts_boolean bad = HTS_FALSE; /* This host's plain access may tear. */
+#endif
+
+    if (bad) {
+      fprintf(stderr, "relaxedcounter: read " LLintP " after " LLintP "\n", v,
+              last);
+      err = 1;
+      break;
+    }
+    last = v;
+  }
+  htsthread_wait();
+  if (hts_load_relaxed_llint(&relaxed_counter) !=
+      RELAXED_VALUE(RELAXED_STEPS)) {
+    fprintf(stderr, "relaxedcounter: final value " LLintP "\n",
+            hts_load_relaxed_llint(&relaxed_counter));
+    err = 1;
+  }
+  printf("relaxedcounter self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 static int st_threadwait(httrackp *opt, int argc, char **argv) {
   int err = 0;
   int i, round;
@@ -1658,6 +1716,9 @@ const struct selftest_entry selftests_back[] = {
      st_transportfailures},
     {"threadwait", "", "htsthread_wait() joins threads spawned just before it",
      st_threadwait},
+    {"relaxedcounter", "",
+     "a 64-bit counter another thread writes reads back whole and in order",
+     st_relaxedcounter},
     {"mutexlazyinit", "",
      "a lock built on first use serves every thread that raced for it",
      st_mutexlazyinit},
