@@ -42,6 +42,7 @@ Please visit our Website: http://www.httrack.com
 #include "htslib.h"
 #include "htsio.h"
 #include <limits.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

@@ -44,6 +44,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscrashtest.h"
 
 #include <limits.h>
+#include <stdint.h>
 
 #ifdef _WIN32
 #else
