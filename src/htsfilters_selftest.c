@@ -262,9 +262,8 @@ static int st_filterbounds(httrackp *opt, int argc, char **argv) {
     assertf(strjoker_bounds(subj, pat, &steps, &maxsteps, NULL, NULL) != NULL);
     assertf(steps < maxsteps);
   }
-  /* An unclosed class is rescanned on every call, so the budget must count
-     bytes (OSS-Fuzz 5279208050589696). Measured at two pattern lengths: a flat
-     per-call charge satisfies either one alone, so only the slope pins it. */
+  /* An unclosed class rescans its whole length per call, so the slope across
+     two lengths pins it, not a single length (OSS-Fuzz 5279208050589696). */
   {
     const size_t shortlen = 512, longlen = 1536;
     size_t steps2 = 0;
@@ -281,9 +280,8 @@ static int st_filterbounds(httrackp *opt, int argc, char **argv) {
     assertf(strjoker_bounds(subj, pat, &steps2, &maxsteps, NULL, NULL) == NULL);
     assertf(steps2 - steps >= longlen - shortlen);
   }
-  /* The budget is denominated in bytes, so a long URL must not exhaust it. The
-     reserved-name classes cost ~512 per call, which once made this rule fail
-     and silently stopped a user's -*[path]*[file] from excluding anything. */
+  /* Reserved-name classes cost ~512 bytes per call, so a long real URL must
+     not exhaust the budget early. */
   {
     const char *seg = "segment-name/";
     const size_t seglen = strlen(seg);

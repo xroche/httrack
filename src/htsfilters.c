@@ -125,16 +125,14 @@ int fa_strjoker_dual(int type, char **filters, int nfil, const char *nom1,
 /* STRJOKER_MAXLEN alone still allows ~2000 frames, ~900KB of stack, which
    overflows the 1MB a Windows thread gets (#574). */
 #define STRJOKER_MAXDEPTH 256u
-/* Bytes of scanning, not calls: the heaviest filter measured (*[path]*[file]
-   *[param] on a 2KB URL) spends 2.1M, and a hostile pattern that spends the
-   whole budget takes ~1.7s under ASan, inside OSS-Fuzz's 25s. */
+/* Bytes scanned, not calls, because one call can rescan its whole class. */
 #define STRJOKER_MAXSTEPS 24000000u
 
 /* Failure memo for the recursive matcher: one bit per (chaine, joker) offset
    pair keeps star-heavy patterns polynomial instead of exponential (#501). */
 typedef struct strjoker_memo {
   const char *chaine0, *joker0; /* offsets are relative to these bases */
-  size_t len0;                  /* strlen(chaine0); chaine is always a suffix */
+  size_t len0;   /* strlen(chaine0). chaine is always a suffix of it. */
   size_t stride;                /* strlen(joker0) + 1 */
   unsigned char *failed;        /* failed-pair bitmap; NULL: no memo */
   size_t *nsteps; /* shared work counter; NULL: unbounded (oracle) */
