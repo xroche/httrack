@@ -1236,8 +1236,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
           sprintf(tmp, "%d", commandReturn);
           coucal_write(NewLangList, "commandReturn", (intptr_t) strdup(tmp));
-          /* copies, as the table frees its values and the crawl thread
-             frees the originals */
+          /* copies: the table frees its values, the crawl thread the originals
+           */
           coucal_write(
               NewLangList, "commandReturnMsg",
               (intptr_t) (commandReturnMsg ? strdup(commandReturnMsg) : NULL));

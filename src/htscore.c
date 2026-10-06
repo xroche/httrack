@@ -2140,9 +2140,10 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
     warc_abort_opt(opt);
     /* 2 exits 0, so it must not overwrite an abort the engine already decided,
        and a crash on the first fetch lands in exactly this state. */
-    if (hts_load_acquire_int(&opt->state.exit_xh) != -1)
+    if (hts_load_acquire_int(&opt->state.exit_xh) != -1) {
       /* interrupted (no connection detected) */
       hts_store_release_int(&opt->state.exit_xh, 2);
+    }
     rollback = HTS_TRUE;
     goto cleanup;
   }
