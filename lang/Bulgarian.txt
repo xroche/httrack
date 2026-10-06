@@ -1054,7 +1054,7 @@ Max Retry-After(s)
 Макс. Retry-After (с)
 Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
 Най-дългото изчакване, което се спазва, когато сървърът изпрати заглавка Retry-After. Използвайте 0 за повторен опит без изчакване.
-A rule you add here applies to the mirror now running, and wins over the rules above it. A rule you remove applies to the next one.
-Правило, което добавите тук, важи за огледалото, което се изпълнява в момента, и има предимство пред правилата над него. Премахването на правило се отразява едва при следващото огледало.
+The rules you set here apply to the mirror now running. Removing a rule lets new links through again, but a link it already refused will not come back in this run.
+Правилата, които задавате тук, важат за огледалото, което се изпълнява в момента. Премахването на правило отново пропуска новите връзки, но връзка, която то вече е отхвърлило, няма да се върне при това изпълнение.
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Това правило за сканиране не може да се използва. Правилото започва с + или -, следвано от шаблон, и трябва да се побира на един кратък ред.

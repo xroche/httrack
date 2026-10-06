@@ -1054,7 +1054,7 @@ Max Retry-After(s)
 En çok Retry-After (sn)
 Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
 Bir sunucu Retry-After başlığı gönderdiğinde uyulacak en uzun bekleme. Beklemeden yeniden denemek için 0 girin.
-A rule you add here applies to the mirror now running, and wins over the rules above it. A rule you remove applies to the next one.
-Buraya eklediğiniz kural şu anda çalışan yansıya uygulanır ve üstündeki kurallardan önceliklidir. Bir kuralı kaldırmak ise ancak bir sonraki yansıda geçerli olur.
+The rules you set here apply to the mirror now running. Removing a rule lets new links through again, but a link it already refused will not come back in this run.
+Burada belirlediğiniz kurallar şu anda çalışan yansıya uygulanır. Bir kuralı kaldırmak yeni bağlantıların yeniden geçmesine izin verir, ancak kuralın daha önce reddettiği bir bağlantı bu yansıda geri gelmez.
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Bu tarama kuralı kullanılamaz. Bir kural + veya - ile başlar, ardından bir desen gelir ve tek bir kısa satıra sığmalıdır.

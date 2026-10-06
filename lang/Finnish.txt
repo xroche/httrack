@@ -1054,7 +1054,7 @@ Max Retry-After(s)
 Enint. Retry-After (s)
 Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
 Pisin odotus, jota noudatetaan, kun palvelin lähettää Retry-After-otsakkeen. Arvo 0 yrittää uudelleen odottamatta.
-A rule you add here applies to the mirror now running, and wins over the rules above it. A rule you remove applies to the next one.
-Tähän lisäämäsi sääntö koskee parhaillaan käynnissä olevaa peilausta ja menee yläpuolella olevien sääntöjen edelle. Säännön poistaminen vaikuttaa vasta seuraavaan peilaukseen.
+The rules you set here apply to the mirror now running. Removing a rule lets new links through again, but a link it already refused will not come back in this run.
+Tähän asettamasi säännöt koskevat parhaillaan käynnissä olevaa peilausta. Säännön poistaminen päästää uudet linkit taas läpi, mutta linkki, jonka sääntö on jo hylännyt, ei palaa tämän peilauksen aikana.
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Tätä lukusääntöä ei voi käyttää. Sääntö alkaa merkillä + tai -, jota seuraa hakukuvio, ja sen on mahduttava yhdelle lyhyelle riville.

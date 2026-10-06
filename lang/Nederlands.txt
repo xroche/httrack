@@ -1054,7 +1054,7 @@ Max Retry-After(s)
 Max. Retry-After (s)
 Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
 Langste wachttijd die wordt opgevolgd wanneer een server een Retry-After-header stuurt. Gebruik 0 om opnieuw te proberen zonder te wachten.
-A rule you add here applies to the mirror now running, and wins over the rules above it. A rule you remove applies to the next one.
-Een regel die u hier toevoegt, geldt voor de spiegeling die nu loopt en gaat voor de regels erboven. Het verwijderen van een regel geldt pas voor de volgende spiegeling.
+The rules you set here apply to the mirror now running. Removing a rule lets new links through again, but a link it already refused will not come back in this run.
+De regels die u hier instelt, gelden voor de spiegeling die nu loopt. Het verwijderen van een regel laat nieuwe links weer door, maar een link die de regel al heeft geweigerd, komt in deze spiegeling niet terug.
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Dit filter kan niet worden gebruikt. Een filter begint met + of -, gevolgd door een patroon, en moet op één korte regel passen.
