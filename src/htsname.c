@@ -1089,6 +1089,8 @@ int url_savename(lien_adrfilsave *const afs,
               name[pos][0] = '\0';
             }
             pos = 0;
+            // The + 2 cap below stays, because changing it changes which names
+            // fit.
             while(*a != '\0' && *a != ']') {
               if (*a == ':') { // next token; past the fifth they are dropped
                 c = pos + 1 < 5 ? name[++pos] : NULL;

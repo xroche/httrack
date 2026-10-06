@@ -45,8 +45,8 @@ extern void hts_unescapehttp(const char *s, String *tempo);
    line separators so an escaped CRLF cannot forge an .ini line break. */
 extern void hts_unescapeini(const char *s, String *tempo);
 
-/* One "key[=value]" field of an '&'-separated query. The spans point into the
-   query and are not NUL-terminated. */
+/* This holds one "key[=value]" field of an '&'-separated query. The spans
+   point into the query and are not NUL-terminated. */
 typedef struct hts_query_field {
   const char *key;
   size_t keylen;

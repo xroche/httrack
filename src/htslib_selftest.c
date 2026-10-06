@@ -2604,7 +2604,7 @@ static char *legacy_fil_normalized_filtered_ex(const char *source, char *dest,
   return legacy_fil_normalized_ex(tmp, dest, do_slash, do_query);
 }
 
-/* The old %[param] lookup of url_savename(). */
+/* This is the old %[param] lookup of url_savename(). */
 static hts_boolean legacy_url_query_value(const char *fil_complete,
                                           const char *token, char *value,
                                           size_t size) {
@@ -2656,7 +2656,8 @@ static void querydiff_fail(querydiff_stats *st, const char *site,
   }
 }
 
-/* fil_normalized: the --strip-query filter and the query sort. */
+/* This compares fil_normalized, which runs the --strip-query filter and the
+   query sort. */
 static void querydiff_normalize(querydiff_stats *st, const char *url) {
   static const char *const strips[] = {NULL,    "",   "*", "a",  "a, sid",
                                        " x ,y", "id", "=", ",,", NULL};
@@ -2683,27 +2684,23 @@ static void querydiff_normalize(querydiff_stats *st, const char *url) {
   freet(n);
 }
 
-/* url with every '?' after the first one replaced by '\001', which cannot
-   start a field. */
-static char *querydiff_hide_later_qmarks(const char *url) {
-  char *s = strdupt(url);
-  char *const q = s != NULL ? strchr(s, '?') : NULL;
+/* This returns a copy of s with each '?' after the first skip ones replaced by
+   '\001', which cannot start a field. */
+static char *querydiff_hide_qmarks(const char *s, int skip) {
+  char *const copy = strdupt(s);
+  char *p;
 
-  assertf(s != NULL);
-  if (q != NULL) {
-    char *p;
-
-    for (p = q + 1; *p != '\0'; p++) {
-      if (*p == '?')
-        *p = '\001';
-    }
+  assertf(copy != NULL);
+  for (p = copy; *p != '\0'; p++) {
+    if (*p == '?' && skip-- <= 0)
+      *p = '\001';
   }
-  return s;
+  return copy;
 }
 
-/* %[param]. A difference is allowed when name holds '=' or '&' and the new
-   lookup finds nothing, or when the old lookup with every later '?' hidden
-   gives the new result. */
+/* This compares %[param]. A name holding '=' or '&' may now find nothing. A
+   URL with a second '?' may differ when the old lookup gives the new result
+   once every '?' past the first is hidden, in the name too. */
 static void querydiff_template(querydiff_stats *st, const char *url,
                                const char *name) {
   static const size_t sizes[] = {1, 2, 4, 256};
@@ -2722,13 +2719,16 @@ static void querydiff_template(querydiff_stats *st, const char *url,
         st->allowed_name++;
         continue;
       }
-    } else {
-      char *hidden = querydiff_hide_later_qmarks(url);
+    } else if (strchr(url, '?') != NULL &&
+               strchr(strchr(url, '?') + 1, '?') != NULL) {
+      char *hurl = querydiff_hide_qmarks(url, 1);
+      char *hname = querydiff_hide_qmarks(name, 0);
       char h[256];
-      const hts_boolean fh = legacy_url_query_value(hidden, name, h, sizes[i]);
+      const hts_boolean fh = legacy_url_query_value(hurl, hname, h, sizes[i]);
       char *p;
 
-      freet(hidden);
+      freet(hurl);
+      freet(hname);
       for (p = h; *p != '\0'; p++) {
         if (*p == '\001')
           *p = '?';
@@ -2757,7 +2757,7 @@ static void querydiff_one(querydiff_stats *st, const char *q) {
   StringFree(url);
 }
 
-/* A run of n copies of c. */
+/* This returns a run of n copies of c. */
 static char *querydiff_run(char c, size_t n) {
   char *s = malloct(n + 1);
 
@@ -2795,7 +2795,7 @@ static int st_querydiff(httrackp *opt, int argc, char **argv) {
   (void) opt;
   (void) argc;
   (void) argv;
-  /* The two intended changes, pinned. */
+  /* These checks pin the two intended changes. */
   {
     char v[256];
 
@@ -2853,7 +2853,8 @@ static int st_querydiff(httrackp *opt, int argc, char **argv) {
   return st.failures != 0;
 }
 
-/* Prints each field of argv[0] as [key] or [key=value]. */
+/* Prints each field of argv[0] as [key] or [key|value], because '|' shows
+   where the key ends. */
 static int st_querynext(httrackp *opt, int argc, char **argv) {
   const char *cur;
   hts_query_field f;
@@ -2869,7 +2870,7 @@ static int st_querynext(httrackp *opt, int argc, char **argv) {
     StringAddchar(out, '[');
     StringMemcat(out, f.key, f.keylen);
     if (f.val != NULL) {
-      StringAddchar(out, '=');
+      StringAddchar(out, '|');
       StringMemcat(out, f.val, f.vallen);
       bad |= f.len != f.keylen + 1 + f.vallen || f.val != f.key + f.keylen + 1;
     } else {
