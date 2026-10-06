@@ -110,6 +110,7 @@ Remark: If no cache newer than the added one is found, all entries can be added 
 #include "htsnet.h"
 #include "htslib.h"
 #include "htsglobal.h"
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
