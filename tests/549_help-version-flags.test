@@ -15,9 +15,9 @@ cleanup_push rm -rf "$dir"
 srv=htsserver
 ! target_is_windows || srv=webhttrack
 
-version=$(httrack --version | tr -d '\r')
-version=${version#HTTrack version }
-test -n "$version" || fail "httrack --version printed no version"
+# Not httrack --version, which appends build flavours such as -nossl.
+version=$(sed -n 's/^#define HTTRACK_VERSION "\(.*\)"$/\1/p' "$top_srcdir/src/htsglobal.h")
+test -n "$version" || fail "no HTTRACK_VERSION in htsglobal.h"
 
 # run CMD ARGS..: capture stdout, stderr and the exit status of one call.
 run() {
