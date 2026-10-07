@@ -59,12 +59,16 @@ extern "C" {
 const char *warc_truncated_reason(int code);
 
 /* Copy the media type of header NAME, up to a ';' or a space, from the raw
-   block HDR into OUT, which is "" when the header is absent. */
+   block HDR into OUT, which is "" when the header is absent. OUT is clipped to
+   OUTSZ bytes and left alone when OUTSZ is 0. Exposed for the
+   -#test=warcspandiff test. */
 void warc_http_header_value(const char *hdr, const char *name, char *out,
                             size_t outsz);
 
 /* Return the header block a response record stores for RESP_HDR, as a string
-   the caller frees with freet, or NULL. It exists for the self-tests. */
+   the caller frees with freet. A SET_CL of 0 or more replaces Content-Length
+   with that value, and -1 keeps it. Return NULL when RESP_HDR is NULL or memory
+   runs out. Exposed for the -#test=warcspandiff test. */
 char *warc_normalized_headers(const char *resp_hdr, long long set_cl);
 
 typedef struct warc_writer warc_writer;

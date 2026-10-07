@@ -544,8 +544,9 @@ const char *hts_host_alias(const char *rules, const char *adr,
                            hts_boolean collapse_www, char *dest,
                            size_t destsize);
 
-/* hts_host_alias(), reporting through SETTLED (may be NULL) whether the chain
-   ended within the hop limit. */
+/* Resolve like hts_host_alias, and set *SETTLED, when SETTLED is not NULL, to
+   whether the chain ended within the hop limit. Exposed for the -#test=spandiff
+   test. */
 const char *hts_host_alias_resolve(const char *rules, const char *adr,
                                    hts_boolean collapse_www, char *dest,
                                    size_t destsize, hts_boolean *settled);

@@ -4331,7 +4331,7 @@ const char *hts_host_alias_looping(const char *rules, hts_boolean collapse_www,
                                   &settled);
     if (!settled) {
       if (strlen(canon) >= destsize)
-        continue; /* cannot name it in full: keep looking */
+        continue; /* Skip a name that does not fit. */
       strlcpybuff(dest, canon, destsize);
       return dest;
     }

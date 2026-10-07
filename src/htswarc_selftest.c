@@ -2365,8 +2365,7 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
   return sf_err;
 }
 
-/* warcspandiff compares the WARC header walks with frozen copies of the ones
-   the span iterator replaced. */
+/* Compare the WARC header walks with frozen copies. */
 
 static int legacy_header_is(const char *line, size_t line_len,
                             const char *name) {
@@ -2460,15 +2459,16 @@ static void warcdiff_one(querydiff_stats *st, const char *hdr) {
   for (i = 0; i < sizeof(cls) / sizeof(cls[0]); i++) {
     String o = STRING_EMPTY;
     const hts_boolean fo = legacy_normalize_http_headers(hdr, cls[i], &o) == 0;
+    /* An output that stayed empty has no buffer, and reads as "". */
+    const char *const ob = StringBuff(o) != NULL ? StringBuff(o) : "";
     char *n = warc_normalized_headers(hdr, cls[i]);
 
     st->cases++;
     if (fo != (n != NULL) ||
-        (n != NULL && (strlen(n) != StringLength(o) ||
-                       memcmp(n, StringBuff(o), StringLength(o)) != 0)))
+        (n != NULL &&
+         (strlen(n) != StringLength(o) || memcmp(n, ob, StringLength(o)) != 0)))
       querydiff_fail(st, "normalize_http_headers", hdr != NULL ? hdr : "(null)",
-                     "", StringBuff(o) != NULL ? StringBuff(o) : "",
-                     n != NULL ? n : "(null)");
+                     "", ob, n != NULL ? n : "(null)");
     StringFree(o);
     freet(n);
   }
@@ -2537,6 +2537,15 @@ static int st_warcspandiff(httrackp *opt, int argc, char **argv) {
   (void) opt;
   (void) argc;
   (void) argv;
+  /* An empty OUT is left alone. */
+  {
+    char z = 'Z';
+
+    warc_http_header_value("HTTP/1.1 200 OK\r\nContent-Type: a\r\n",
+                           "Content-Type", &z, 0);
+    warc_http_header_value(NULL, "Content-Type", &z, 0);
+    assertf(z == 'Z');
+  }
   warcdiff_one(&st, NULL);
   for (i = 0; hand[i] != NULL; i++)
     warcdiff_one(&st, hand[i]);
@@ -2604,7 +2613,7 @@ const struct selftest_entry selftests_warc[] = {
      "--single-file: what is inlined, the per-asset cap, idempotence",
      st_singlefile},
     {"warcspandiff", "",
-     "the WARC header walks match the ones the span iterator replaced",
+     "the WARC header walks match frozen copies of the old ones",
      st_warcspandiff},
     {NULL, NULL, NULL, NULL},
 };

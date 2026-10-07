@@ -2125,14 +2125,16 @@ static int PT_LookupCache__Old_u(PT_Index index_, const char *url) {
 
 #define ARC_SP ' '
 
-/* Return LINE from field POS on, which is "" when a trailing space ends it. */
 static const char *getArcField(const char *line, int pos) {
-  hts_span field;
+  int i;
 
-  return pos >= 0 &&
-                 hts_span_field(hts_span_of(line), ARC_SP, (size_t) pos, &field)
-             ? field.p
-             : NULL;
+  for(i = 0; line[i] != '\0' && pos > 0; i++) {
+    if (line[i] == ARC_SP)
+      pos--;
+  }
+  if (pos == 0)
+    return &line[i];
+  return NULL;
 }
 
 static char *copyArcField(const char *line, int npos, char *dest, int destMax) {

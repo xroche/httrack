@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# The cookie and WARC header walks moved onto the span iterator, against frozen
-# copies of the old ones, and the two span rules they rely on.
+# The cookie and WARC header walks match frozen copies of the old ones.
 
 set -euo pipefail
 
@@ -13,19 +12,6 @@ selftest_queue_lines "cookiespandiff: 44286 cases, 0 failures
 cookiespandiff: OK" cookiespandiff
 selftest_queue_lines "warcspandiff: 138575 cases, 0 failures
 warcspandiff: OK" warcspandiff
-
-# A trailing separator leaves one empty last field, and none past it.
-selftest_queue "[a]" span field , 0 "a,b"
-selftest_queue "[b]" span field , 1 "a,b"
-selftest_queue "none" span field , 2 "a,b"
-selftest_queue "[]" span field , 1 "a,"
-selftest_queue "none" span field , 2 "a,"
-selftest_queue "[]" span field , 1 "a,,b"
-selftest_queue "[b]" span field , 2 "a,,b"
-selftest_queue "[]" span field , 0 ""
-selftest_queue "none" span field , 1 ""
-selftest_queue "[b]" span field " " 0 "b c"
-selftest_queue "[c]" span field " " 1 "b c"
 
 # The separator a field ended on stays with it, and the last one has none.
 selftest_queue "[a,][b]" span nextsep , "a,b"

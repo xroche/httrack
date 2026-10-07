@@ -229,8 +229,7 @@ PY
 
 echo OK
 
-# The rebase rewrites the posted profile line by line. Each line keeps its own
-# CRs and newline, and only a list key with a plain id moves.
+# Only a list key with a plain id moves, and every other byte stays.
 htsserver_stop
 printf '[the rebase keeps every other byte] ..\t'
 htsserver_start --home "${work}"
@@ -241,15 +240,15 @@ import sys
 from webtestlib import Session, textarea
 
 s, work = Session(sys.argv[1]), sys.argv[2]
-long_key = "K" * 64
 posted = ("Build=3\r\nDepth=3\r\nTravel=2\r\r\n\n=5\nNoEquals\n"
-          + long_key + "=3\n" + long_key[1:] + "=3\n"
-          + "CheckType=1=2\nLogType=\nPrimaryScan=0\nRewriteLinks=11\r"
+          + "CheckType=1=2\nLogType=\nPrimaryScan=0\nFollowRobotsTxt=\r3\n"
+          + "CurrentAction=\r000000000000003\nRewriteLinks=11\r"
           + "\nGlobalTravel=4")
-want = ("Build=2\r\nDepth=3\r\nTravel=1\r\r\n\n=5\nNoEquals\n"
-        + long_key + "=3\n" + long_key[1:] + "=3\n"
-        + "CheckType=1=2\nLogType=\nPrimaryScan=0\nRewriteLinks=10\r"
-        + "\nGlobalTravel=3")
+want = (posted.replace("Build=3", "Build=2")
+        .replace("Travel=2", "Travel=1")
+        .replace("FollowRobotsTxt=\r3", "FollowRobotsTxt=2")
+        .replace("RewriteLinks=11", "RewriteLinks=10")
+        .replace("GlobalTravel=4", "GlobalTravel=3"))
 step4 = s.get("step4.html?sid=" + s.sid)
 s.post("step4.html", [("path", work), ("projname", "raw"),
                       ("command", textarea(step4, "command")),

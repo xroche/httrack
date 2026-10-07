@@ -1013,7 +1013,7 @@ static void ini_rebase_lists(const char *ini, int delta, String *out) {
     int id = -1;
 
     if (hts_span_split(line, '=', &key, &value)) {
-      /* Trim the CRLF a textarea posts, which the file keeps. */
+      /* Trim the CRs a textarea posts. */
       value = hts_span_trim(value, "", "\r");
       if (hts_span_copy(key, name, sizeof(name)) && ini_key_is_list(name))
         id = ini_list_shift(value.p, value.len, delta);

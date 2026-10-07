@@ -36,7 +36,6 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h"
 #include "htscore.h"
-
 #include <stdint.h>
 
 #ifdef HTS_INTERNAL_BYTECODE
@@ -74,7 +73,7 @@ size_t st_mkdeep(char *buf, size_t bufsize, const char *dir, const char *nseg,
                  const char *who, size_t *baselen);
 
 /* These are the tallies of a self-test that compares a parser with a frozen
-   copy of the one it replaced. */
+   copy. Only the query diff uses the allowed_* tallies. */
 typedef struct {
   unsigned long cases;
   unsigned long failures;
@@ -84,7 +83,7 @@ typedef struct {
 
 /* Count a mismatch on IN, and print the first 20 of them. */
 void querydiff_fail(querydiff_stats *st, const char *site, const char *in,
-                    const char *arg, const char *old, const char *new);
+                    const char *arg, const char *old, const char *cur);
 
 /* Return a malloct'd run of N copies of C, which the caller frees. */
 char *querydiff_run(char c, size_t n);

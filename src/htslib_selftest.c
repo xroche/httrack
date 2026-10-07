@@ -3069,29 +3069,6 @@ static const char *legacy_hts_host_alias_looping(const char *rules,
   return NULL;
 }
 
-/* This is the old ARC field getter of proxy/store.c, out of self-test reach. */
-static const char *legacy_getArcField(const char *line, int pos) {
-  int i;
-
-  for (i = 0; line[i] != '\0' && pos > 0; i++) {
-    if (line[i] == ' ')
-      pos--;
-  }
-  if (pos == 0)
-    return &line[i];
-  return NULL;
-}
-
-/* This is the expression getArcField now returns. */
-static const char *span_arc_field(const char *line, int pos) {
-  hts_span field;
-
-  return pos >= 0 &&
-                 hts_span_field(hts_span_of(line), ' ', (size_t) pos, &field)
-             ? field.p
-             : NULL;
-}
-
 static void spandiff_one(querydiff_stats *st, const char *rules,
                          const char *longhost, const char *longfil) {
   static const char *const keys[] = {"",      "a",         "sid",    "*",
@@ -3172,16 +3149,6 @@ static void spandiff_one(querydiff_stats *st, const char *rules,
                        ro != NULL ? o : "(none)", rn != NULL ? n : "(none)");
     }
   }
-  for (j = 0; j <= 9; j++) {
-    const int pos = (int) j - 1;
-    const char *const fo = legacy_getArcField(rules, pos);
-    const char *const fn = span_arc_field(rules, pos);
-
-    st->cases++;
-    if (fo != fn)
-      querydiff_fail(st, "getArcField", rules, "", fo != NULL ? fo : "(none)",
-                     fn != NULL ? fn : "(none)");
-  }
   /* each line alone, which is what --host-alias hands the validator */
   for (cur = all.p; hts_span_next(&cur, all.p + all.len, '\n', &line);) {
     char *one = malloct(line.len + 1);
@@ -3246,6 +3213,9 @@ static int st_spandiff(httrackp *opt, int argc, char **argv) {
                                      "=sid",
                                      "a.com=b\r",
                                      "a.com\r=b",
+                                     "a=",
+                                     "=",
+                                     "a=\n=b",
                                      "a.com=b.com\nb.com=a.com",
                                      "x=a.com\na.com=b.com\nb.com=a.com",
                                      "=a\na=b\nb=a",
@@ -3357,14 +3327,15 @@ static int st_spandiff(httrackp *opt, int argc, char **argv) {
     }
     /* A loop that a clipped copy of the too-long first target would join. */
     {
+      const size_t scheme = strlen("http://");
       String rules = STRING_EMPTY;
 
       StringCat(rules, "a=http://");
-      StringMemcat(rules, run, lengths[i] - 7);
+      StringMemcat(rules, run, lengths[i] - scheme);
       StringCat(rules, "\nhttp://");
-      StringMemcat(rules, run, lengths[i] - 8);
+      StringMemcat(rules, run, lengths[i] - scheme - 1);
       StringCat(rules, "=b\nb=http://");
-      StringMemcat(rules, run, lengths[i] - 8);
+      StringMemcat(rules, run, lengths[i] - scheme - 1);
       spandiff_one(&st, StringBuff(rules), longhost, StringBuff(longfil));
       StringFree(rules);
     }
@@ -3388,16 +3359,14 @@ static int st_spandiff(httrackp *opt, int argc, char **argv) {
 }
 
 /* Print what a span primitive reads as [bytes], for next|nextsep|split C TEXT,
-   field C N TEXT, trim L R TEXT or copy SIZE TEXT. */
+   trim L R TEXT or copy SIZE TEXT. */
 static int st_span(httrackp *opt, int argc, char **argv) {
   String out = STRING_EMPTY;
   hts_span s, a, b;
   int ret = 0;
 
   (void) opt;
-  if (argc < 3 ||
-      ((strcmp(argv[0], "trim") == 0 || strcmp(argv[0], "field") == 0) &&
-       argc < 4)) {
+  if (argc < 3 || (strcmp(argv[0], "trim") == 0 && argc < 4)) {
     fprintf(stderr, "span: bad arguments\n");
     return 1;
   }
@@ -3421,21 +3390,6 @@ static int st_span(httrackp *opt, int argc, char **argv) {
       StringAddchar(out, '[');
       StringMemcat(out, a.p, (size_t) (cur - a.p));
       StringAddchar(out, ']');
-    }
-  } else if (strcmp(argv[0], "field") == 0) {
-    LLint n;
-
-    if (!hts_parse_llint(argv[2], NULL, 0, 1000, &n)) {
-      fprintf(stderr, "span: field index must be 0 to 1000\n");
-      StringFree(out);
-      return 1;
-    }
-    if (hts_span_field(s, argv[1][0], (size_t) n, &a)) {
-      StringAddchar(out, '[');
-      StringMemcat(out, a.p, a.len);
-      StringAddchar(out, ']');
-    } else {
-      StringCat(out, "none");
     }
   } else if (strcmp(argv[0], "split") == 0) {
     if (hts_span_split(s, argv[1][0], &a, &b)) {
@@ -3577,7 +3531,7 @@ const struct selftest_entry selftests_lib[] = {
     {"spandiff", "",
      "the span iterator matches the rule-list parsers it replaced",
      st_spandiff},
-    {"span", "<next|nextsep|field|split|trim|copy> <args> <text>",
+    {"span", "<next|nextsep|split|trim|copy> <args> <text>",
      "the fields and copies the span primitive makes", st_span},
     {"gmtime", "",
      "hts_gmtime() fills the caller's buffer, not a static (#794)", st_gmtime},

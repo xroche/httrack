@@ -184,12 +184,12 @@ too_long:
 }
 
 void querydiff_fail(querydiff_stats *st, const char *site, const char *in,
-                    const char *arg, const char *old, const char *new) {
+                    const char *arg, const char *old, const char *cur) {
   st->failures++;
   if (st->failures <= 20) {
     printf("%s differs on '%.80s' (%zu bytes) arg '%.40s': old "
            "'%.80s' new '%.80s'\n",
-           site, in, strlen(in), arg, old, new);
+           site, in, strlen(in), arg, old, cur);
     fflush(stdout); /* a later abort must not swallow it */
   }
 }
