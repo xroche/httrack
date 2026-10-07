@@ -39,9 +39,8 @@ Please visit our Website: http://www.httrack.com
 
 /* Is c one of the bytes flags drop? */
 static hts_boolean line_drops(int c, int flags) {
-  return c == '\r' ||
-                 ((flags & HTS_LINE_DROP_TAB) != 0 &&
-                  (c == '\t' || c == '\f')) ||
+  return c == '\r' || ((flags & HTS_LINE_DROP_TAB) != 0 && c == '\t') ||
+                 ((flags & HTS_LINE_DROP_FF) != 0 && c == '\f') ||
                  ((flags & HTS_LINE_DROP_NUL) != 0 && c == '\0')
              ? HTS_TRUE
              : HTS_FALSE;

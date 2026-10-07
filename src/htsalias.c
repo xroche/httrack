@@ -1007,9 +1007,8 @@ cmdl_file_result optinclude_file(const char *name, cmdl_argv *cmd) {
       char *a, *b;
       int result;
 
-      /* a clipped option can mean something else, so it is not applied */
-      /* TAB separates like a space: it is kept, and is_realspace() splits */
-      if (hts_readline(fp, line, 250, 0)) {
+      /* a clipped option can mean something else, so it is skipped */
+      if (hts_readline(fp, line, 250, HTS_LINE_DROP_FF)) {
         fprintf(stderr, "* %s: line too long, ignored\n", name);
         continue;
       }

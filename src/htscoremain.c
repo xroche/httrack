@@ -831,8 +831,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       int i;
       hts_boolean ok;
       /* a TAB is argument data, since the writer leaves it unquoted */
-      const hts_boolean cut =
-          hts_readline_alloc(fp, &buff, HTS_READLINE_ALLOC_MAX, 0);
+      const hts_boolean cut = hts_readline_alloc(
+          fp, &buff, HTS_READLINE_ALLOC_MAX, HTS_LINE_DROP_FF);
 
       fclose(fp);
       fp = NULL;
