@@ -41,32 +41,23 @@ Please visit our Website: http://www.httrack.com
 #include <stddef.h>
 #include <stdio.h>
 
-/* Flags for the readers below. CR is always dropped. */
-/* Drop TAB and form feed. */
-#define HTS_LINE_DROP_TAB 1
-/* Drop NUL. */
+/* Flags for the readers below, which always drop CR. */
+#define HTS_LINE_DROP_TAB 1 /* TAB and form feed */
 #define HTS_LINE_DROP_NUL 2
 
-/* Read one line from fp into s, which holds max >= 1 bytes with the NUL. The
-   rest of a line too long for s is consumed, so its tail is never read back as
-   the next line. Returns HTS_TRUE when a byte other than whitespace was
-   dropped, and a cut line's content is unspecified. EOF is not reported:
-   callers loop on feof(), and a read at EOF gives an empty line. */
+/* Read a line into s, max bytes with the NUL, and consume its rest. HTS_TRUE
+   when a non-space byte was dropped. At EOF it reads an empty line. */
 hts_boolean hts_readline(FILE *fp, char *s, size_t max, int flags);
 
-/* hts_readline() with whitespace trimmed at the end, spaces and TABs at the
-   start, and a line ending with a backslash joined to the next one. Which
-   lines are joined does not depend on max. Returns HTS_TRUE when any joined
-   line was cut. */
+/* hts_readline() trimmed and joined after a trailing backslash. Leading spaces
+   and backslashes count against max, so "abc\\\n\n" at 4 is cut. */
 hts_boolean hts_readline_cpp(FILE *fp, char *s, size_t max, int flags);
 
-/* The limit for files httrack writes itself. A command line or a URL list is
-   far smaller, and a corrupt file still cannot claim unbounded memory. */
+/* The limit for files httrack writes itself. */
 #define HTS_READLINE_ALLOC_MAX ((size_t) 1 << 20)
 
-/* hts_readline() into line, which grows to hold up to limit bytes. Returns
-   HTS_TRUE when the line was longer, whitespace included, and then line holds
-   only its start. */
+/* hts_readline() into a line growing to limit bytes. HTS_TRUE when the line
+   was longer, whitespace included, and then line holds its start. */
 hts_boolean hts_readline_alloc(FILE *fp, String *line, size_t limit, int flags);
 
 #endif

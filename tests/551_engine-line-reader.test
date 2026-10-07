@@ -32,6 +32,15 @@ selftest_queue "![jk]" readline 4 tn 'abcdef \\ \nghi\njk' cpp
 # The old reader's double-backslash join, kept at every cap.
 selftest_queue "[ab]" readline 8 tn 'a\\\\\n\nb' cpp
 selftest_queue "![jk]" readline 4 tn 'abcdef\\\\\n\nghi\njk' cpp
+# The growing reader keeps CAP bytes, and counts whitespace as a cut.
+selftest_queue "[abcd][e]" readline 4 - 'abcd\ne' alloc
+selftest_queue "![abcd][e]" readline 4 - 'abcde\ne' alloc
+selftest_queue "![abcd][e]" readline 4 - 'abcd \ne' alloc
+selftest_queue "[abcd][e]" readline 4 - 'abcd\r\ne' alloc
+selftest_queue "[ab][]" readline 4 t 'a\tb\n' alloc
+selftest_queue "[a\\x09b]" readline 4 - 'a\tb' alloc
+selftest_queue "[ab]" readline 4 n 'a\0b' alloc
+selftest_queue "[a\\x00b]" readline 4 - 'a\0b' alloc
 
 # Against frozen copies of the old readers, and the same line boundaries at
 # every cap. The counts are exact, so a shrinking corpus shows.
@@ -92,10 +101,10 @@ rc=0
 test "$rc" -eq 0 || fail "initial mirror exited $rc"
 recorded=$(sed -n '1p' "$out/hts-cache/doit.log" | tr -d '\r')
 test -n "$recorded" || fail "the initial mirror recorded no command line"
-reprise() { # reprise: resume the mirror, leaving its status in rc
+reprise() { # reprise [ARG...]: resume the mirror, leaving its status in rc
     rm -f "$out/hts-log.txt"
     rc=0
-    "$bin" -O "$out" --quiet >"$d2/.log" 2>&1 || rc=$?
+    "$bin" -O "$out" --quiet "$@" >"$d2/.log" 2>&1 || rc=$?
 }
 log_fail() { # log_fail MSG: fail with what the run said
     cat "$d2/.log" "$out/hts-log.txt" 2>/dev/null || true
@@ -110,12 +119,26 @@ test -n "$(find "$out" -name a.html -print -quit)" || log_fail "the reprise mirr
 doit=$(sed -n '1p' "$out/hts-cache/doit.log")
 grep -qF -- "-F $ua " <<<"$doit" || log_fail "the long user agent did not come back whole"
 grep -qF -- " -r2" <<<"$doit" || log_fail "the argument after the long one was lost"
-# Over the cap, the mirror is not resumed with a part of its command line.
-{
-    printf '%s -F ' "$recorded"
-    repeat_chars $((1024 * 1024)) v
-    echo
-} >"$out/hts-cache/doit.log"
+# Each update repeats -O, -q and -iC2, and must not add them to the line again.
+reprise --update
+first=$(sed -n '1p' "$out/hts-cache/doit.log")
+reprise --update
+reprise --update
+doit=$(sed -n '1p' "$out/hts-cache/doit.log")
+test "$doit" = "$first" || log_fail "doit.log grew on update: $doit"
+# A line of exactly 1 MiB resumes. One byte over, the mirror is not resumed
+# with a part of its command line.
+doit_of_size() { # doit_of_size BYTES: a doit.log whose line is that long
+    {
+        printf '%s -F ' "$recorded"
+        repeat_chars $(($1 - $(printf %s "$recorded" | wc -c) - 4)) v
+        echo
+    } >"$out/hts-cache/doit.log"
+}
+doit_of_size $((1024 * 1024))
+reprise
+test "$rc" -eq 0 || log_fail "a doit.log of exactly the cap was refused"
+doit_of_size $((1024 * 1024 + 1))
 reprise
 test "$rc" -ne 0 || log_fail "a doit.log over the cap was resumed"
 grep -q "doit.log is too long" "$d2/.log" || log_fail "no error for the doit.log over the cap"

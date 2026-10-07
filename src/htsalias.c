@@ -893,6 +893,7 @@ const char *optalias_help(const char *token) {
 static hts_boolean cmdl_reserve(cmdl_argv *cmd, int count) {
   char **slots;
   hts_boolean *flags;
+  int *spans;
   int capacity;
 
   if (count <= cmd->capacity)
@@ -919,6 +920,10 @@ static hts_boolean cmdl_reserve(cmdl_argv *cmd, int count) {
   if (flags == NULL)
     return HTS_FALSE;
   cmd->param = flags;
+  spans = (int *) realloct(cmd->span, sizeof(int) * (size_t) capacity);
+  if (spans == NULL)
+    return HTS_FALSE;
+  cmd->span = spans;
   cmd->capacity = capacity;
   return HTS_TRUE;
 }
@@ -937,6 +942,7 @@ void cmdl_free(cmdl_argv *cmd) {
   freet(cmd->argv);
   freet(cmd->unquoted);
   freet(cmd->param);
+  freet(cmd->span);
   memset(cmd, 0, sizeof(*cmd));
 }
 
@@ -955,10 +961,12 @@ hts_boolean cmdl_ins(cmdl_argv *cmd, const char *token, int pos) {
     cmd->argv[i] = cmd->argv[i - 1];
     cmd->unquoted[i] = cmd->unquoted[i - 1];
     cmd->param[i] = cmd->param[i - 1];
+    cmd->span[i] = cmd->span[i - 1];
   }
   cmd->argv[pos] = copy;
   cmd->unquoted[pos] = HTS_FALSE;
   cmd->param[pos] = HTS_FALSE;
+  cmd->span[pos] = 0;
   cmd->argc++;
   return HTS_TRUE;
 }

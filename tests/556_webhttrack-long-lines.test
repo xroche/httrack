@@ -14,7 +14,8 @@ work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_lines.XXXXXX") || fail "no tmpdir"
 cleanup_push htsserver_cleanup_dir "${work}"
 
 # The served tree, with pairs ahead of English.txt's own. The catalog reader
-# keeps 7999 bytes, and the first definition of a key wins. Split at that
+# keeps 7999 bytes, so of the 8000- and 7999-byte values only the second
+# applies, and the first definition of a key wins. Split at that
 # size, the long key would be three lines and shift every later pair.
 htsserver_distroot
 root="${work}/root"
@@ -29,7 +30,8 @@ done
     repeat_chars 17000 K
     printf '\nx\n'
     printf 'Open Source offline browser\nWRONG%s\n' "$(repeat_chars 9000 w)"
-    printf 'Open Source offline browser\nMARKERA\n'
+    printf 'Open Source offline browser\nCUT%s\n' "$(repeat_chars 7997 c)"
+    printf 'Open Source offline browser\nMARKERA%s\n' "$(repeat_chars 7992 a)"
     printf 'Man\\\nual\nMARKERM\n'
     cat "${HTS_DISTDIR}/lang/English.txt"
 } >"${root}/lang/English.txt"
@@ -54,9 +56,9 @@ from webtestlib import Session
 s, work, longurl = Session(sys.argv[1]), sys.argv[2], sys.argv[3]
 
 page = s.get("index.html")
-if "WRONG" in page:
+if "WRONG" in page or "CUT" in page:
     sys.exit("a cut catalog value was applied")
-for want in ["MARKERA", "MARKERM"]:
+for want in ["MARKERA" + "a" * 7992, "MARKERM"]:
     if want not in page:
         sys.exit("%s missing: the pairs after the long lines are off" % want)
 

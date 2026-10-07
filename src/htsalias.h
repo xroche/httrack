@@ -74,6 +74,8 @@ typedef struct {
      with '-' (#1425). Set by cmdl_mark_param() at the three places that know:
      optalias_check()'s callers, and the doit.log a previous run accepted. */
   hts_boolean *param;
+  /* per slot: 1 + the parameter count of an option the parser read, or 0 */
+  int *span;
   int argc;
   int capacity;
   hts_arena tokens;

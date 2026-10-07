@@ -2481,8 +2481,9 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
       char key[8192];
 
       while(!feof(fp)) {
-        if (lang_read_pair(fp, intkey, key, 8000) && strnotempty(intkey) &&
-            strnotempty(key)) {
+        if (!lang_read_pair(fp, intkey, key, 8000))
+          continue;
+        if (strnotempty(intkey) && strnotempty(key)) {
           const char *test = LANGINTKEY(key);
 
           /* Increment for multiple definitions */
@@ -2506,7 +2507,7 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
               coucal_add(NewLangStrKeys, key, (intptr_t) buff);
             }
           }
-        } // if
+        }                       // if
       }                         // while
       fclose(fp);
     } else {
@@ -2588,8 +2589,9 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
         char value[8192];
 
         while(!feof(fp)) {
-          if (lang_read_pair(fp, extkey, value, 8000) && strnotempty(extkey) &&
-              strnotempty(value)) {
+          if (!lang_read_pair(fp, extkey, value, 8000))
+            continue;
+          if (strnotempty(extkey) && strnotempty(value)) {
             const char *intkey;
 
             intkey = LANGINTKEY(extkey);
@@ -2633,7 +2635,7 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
               }
 
             }
-          } // if
+          }                     // if
         }                       // while
         fclose(fp);
       } else {

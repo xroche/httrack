@@ -95,8 +95,8 @@ static void st_lines_print(const char *s, size_t len) {
   }
 }
 
-/* readline CAP FLAGS TEXT [cpp]: every line a caller's feof() loop gets, as
-   [line], or "!" for a cut one, whose content is unspecified. */
+/* readline CAP FLAGS TEXT [cpp|alloc]: every line a caller's feof() loop gets,
+   as [line], or "!" for a cut one. alloc keeps CAP bytes and shows them. */
 static int st_readline(httrackp *opt, int argc, char **argv) {
   char data[4096];
   char line[ST_LINE_MAXCAP + ST_LINE_SLACK];
@@ -104,11 +104,12 @@ static int st_readline(httrackp *opt, int argc, char **argv) {
   /* an empty TEXT reaches us as no argument at all */
   const char *const text = argc >= 3 ? argv[2] : "";
   const hts_boolean cpp = argc >= 4 && strcmp(argv[3], "cpp") == 0;
+  const hts_boolean alloc = argc >= 4 && strcmp(argv[3], "alloc") == 0;
   FILE *fp;
 
   (void) opt;
   if (cap < 1 || cap > ST_LINE_MAXCAP) {
-    fprintf(stderr, "readline: needs CAP (1..%d) FLAGS TEXT [cpp]\n",
+    fprintf(stderr, "readline: needs CAP (1..%d) FLAGS TEXT [cpp|alloc]\n",
             ST_LINE_MAXCAP);
     return 1;
   }
@@ -118,6 +119,16 @@ static int st_readline(httrackp *opt, int argc, char **argv) {
     hts_boolean cut;
     size_t n = (size_t) cap;
 
+    if (alloc) {
+      String sline = STRING_EMPTY;
+
+      cut = hts_readline_alloc(fp, &sline, (size_t) cap, flags);
+      printf("%s[", cut ? "!" : "");
+      st_lines_print(StringBuff(sline), StringLength(sline));
+      printf("]");
+      StringFree(sline);
+      continue;
+    }
     memset(line, '#', sizeof(line));
     if (cpp) {
       cut = hts_readline_cpp(fp, line, (size_t) cap, flags);
@@ -390,7 +401,7 @@ static int st_linediff(httrackp *opt, int argc, char **argv) {
 /* ------------------------------------------------------------ */
 
 const struct selftest_entry selftests_lines[] = {
-    {"readline", "<cap> <t|n|tn|-> <text> [cpp]",
+    {"readline", "<cap> <t|n|tn|-> <text> [cpp|alloc]",
      "config-file line reader: [line] per read, ! when cut", st_readline},
     {"linediff", "", "line readers against the legacy ones they replaced",
      st_linediff},
