@@ -476,8 +476,11 @@ void filters_remove(httrackp *opt, int pos, int n);
 hts_boolean filters_may_grow(int maxfilter);
 
 /* Grow the filter array so n more rules fit, unless filters_may_grow() says
-   no, in which case filters_insert() drops the rules that do not fit. Aborts
-   when memory runs out. */
+   no, in which case filters_insert() drops the rules that do not fit. Returns
+   HTS_FALSE only when memory runs out. */
+hts_boolean filters_grow(httrackp *opt, int n);
+
+/* filters_grow(), aborting when memory runs out. */
 void filters_make_room(httrackp *opt, int n);
 
 /* Returns the fa_strjoker_dual() verdict of the nfil filters on adr+fil, in
