@@ -28,6 +28,9 @@ param 'yes [good]' 'text/html; charsets=bad; charset=good' ';' charset 64
 param 'yes [good]' 'text/html; xcharset=bad; charset=good' ';' charset 64
 param 'no []' 'text/html; foo="charset=bad"' ';' charset 64
 param 'yes [good]' 'text/html; q="a; charset=bad"; charset=good' ';' charset 64
+param 'yes [good]' 'text/html; q="x"=";charset=bad"; charset=good' ';' charset 64
+param 'yes [good]' 'text/html; q="x"charset=bad; charset=good' ';' charset 64
+param 'yes [good]' 'text/html; q="x"="a\";charset=bad"; charset=good' ';' charset 64
 param 'no []' 'text/html; charset' ';' charset 64
 param 'no []' 'text/html' ';' charset 64
 param 'no []' '' ';' charset 64
@@ -35,6 +38,7 @@ param 'no []' '' ';' charset 64
 param 'yes [a.txt]' 'attachment; filename="a.txt"; size=3' ';' filename 64
 param 'yes [a;b.txt]' 'attachment; filename="a;b.txt"' ';' filename 64
 param 'yes [a"b\c]' 'attachment; filename="a\"b\\c"' ';' filename 64
+param 'yes [C:\dir\a.txt]' 'attachment; filename="C:\dir\a.txt"' ';' filename 64
 param 'yes [abc]' 'attachment; filename="abc' ';' filename 64
 param 'yes [abc\]' "attachment; filename=\"abc\\" ';' filename 64
 param 'yes [a]' 'attachment; filename="a"junk; size=3' ';' filename 64
@@ -58,13 +62,13 @@ param 'yes [abcd]' 'filename=abcd' ';' filename 5
 param 'no []' 'filename=abcd' ';' filename 4
 param 'yes [abcd]' 'filename="abcd"' ';' filename 5
 param 'no []' 'filename="abcd"' ';' filename 4
-param 'no []' 'filename="ab\cd"' ';' filename 4
+param 'no []' 'filename="ab\cd"' ';' filename 5
 param 'yes []' 'filename=' ';' filename 1
 param 'no []' 'filename=a' ';' filename 1
 param 'no [-]' 'filename=a' ';' filename 0
 
 # The counts pin the corpus, so a sweep that silently shrinks goes red.
-selftest_queue 'header-param-diff: 5437 compared, 0 failures, changed by later=1029 trail=1320 suffix=984 quote=315 space=174 case=3' \
+selftest_queue 'header-param-diff: 5446 compared, 0 failures, changed by later=1029 trail=1320 suffix=984 quote=315 space=174 case=3' \
     header-param-diff
 
 selftest_run_queued

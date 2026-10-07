@@ -1725,8 +1725,7 @@ static int st_headerparam(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* The header-parameter differential: each converted treathead site as it
-   parsed before (legacy_*, frozen) and as it parses now. */
+/* Each converted treathead site as it parsed before (frozen) and now. */
 static void legacy_ctype(const char *in, char *out, size_t size) {
   char line[1024], tempo[1100];
   char contenttype[HTS_MIMETYPE_SIZE] = "", charset[HTS_MIMETYPE_SIZE] = "";
@@ -1820,7 +1819,7 @@ static void legacy_ka_param(const char *s, int *value) {
     *value = got == HTS_SCAN_OK ? (int) v : 0;
 }
 
-static void legacy_keepalive2(const char *in, char *out, size_t size) {
+static void legacy_keepalive_scan(const char *in, char *out, size_t size) {
   int keep_alive = 0, keep_alive_t = 0, keep_alive_max = 0;
   const char *a = in;
 
@@ -1864,8 +1863,9 @@ struct st_hp_item {
   int why;
 };
 
+/* Prefix is what the site prints before the value, or NULL for Keep-Alive. */
 struct st_hp_site {
-  const char *name, *head, *param;
+  const char *name, *head, *param, *prefix;
   st_int_site_fn legacy, current;
   const char *seps[4];
   struct st_hp_item items[10];
@@ -1875,6 +1875,7 @@ static const struct st_hp_site st_hp_sites[] = {
     {"content-type",
      " text/html",
      "charset",
+     "contenttype=text/html charset=",
      legacy_ctype,
      current_ctype,
      {";", "; ", " ; ", NULL},
@@ -1889,6 +1890,7 @@ static const struct st_hp_site st_hp_sites[] = {
     {"content-disposition",
      " attachment",
      "filename",
+     "cdispo=",
      legacy_cdispo,
      current_cdispo,
      {";", "; ", " ; ", NULL},
@@ -1905,7 +1907,8 @@ static const struct st_hp_site st_hp_sites[] = {
     {"keep-alive",
      "",
      NULL,
-     legacy_keepalive2,
+     NULL,
+     legacy_keepalive_scan,
      current_keepalive,
      {",", ", ", ";", NULL},
      {{"timeout=5", "timeout", "5", 0},
@@ -1943,7 +1946,7 @@ static void st_hp_expect(const struct st_hp_site *site,
   *why = 0;
   for (i = 0; i < n; i++)
     *why |= seq[i]->why;
-  if (site->param == NULL) {
+  if (site->prefix == NULL) {
     const struct st_hp_item *t = st_hp_first(seq, n, "timeout", &at);
     const struct st_hp_item *m = st_hp_first(seq, n, "max", &at);
     const int timeout = t != NULL ? atoi(t->want) : 15;
@@ -1958,11 +1961,7 @@ static void st_hp_expect(const struct st_hp_site *site,
     *why |= HP_LATER;
   if (hit != NULL && at + 1 < n)
     *why |= HP_TRAIL;
-  if (site->legacy == legacy_ctype)
-    snprintf(out, size, "contenttype=text/html charset=%s",
-             hit != NULL ? hit->want : "");
-  else
-    snprintf(out, size, "cdispo=%s", hit != NULL ? hit->want : "");
+  snprintf(out, size, "%s%s", site->prefix, hit != NULL ? hit->want : "");
 }
 
 /* Hand cases: a NULL want means the input parses as before. */
@@ -1979,14 +1978,6 @@ static const struct {
     {"content-type", " text/html; charset=\"utf-8", NULL},
     {"content-type", " charset=utf-8",
      "contenttype=charset=utf-8 charset=utf-8"},
-    {"content-type",
-     " text/html; charset=\"utf-8 "
-     "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-     "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-     "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-     "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-     "xxxxxxxxxxxxxxxxxxxxxxxxxx\"",
-     "contenttype=text/html charset="},
     {"content-disposition", " attachment", NULL},
     {"content-disposition", " attachment; filename=a.txt", NULL},
     {"content-disposition", " attachment; filename='a.txt'", NULL},
@@ -1997,10 +1988,10 @@ static const struct {
     {"content-disposition", " filename=a.txt", NULL},
     {"content-disposition", " attachment; filename=\"a.txt\"; size=3",
      "cdispo=a.txt"},
-    {"content-disposition", " attachment; filename=\"a;b.txt\"",
-     "cdispo=a;b.txt"},
-    {"content-disposition", " attachment; filename=\"a\\\\b.txt\"",
-     "cdispo=a\\b.txt"},
+    {"content-disposition", " attachment; filename=\"a;b.txt\"", NULL},
+    {"content-disposition", " attachment; filename=\"C:\\dir\\a.txt\"", NULL},
+    {"content-disposition", " attachment; filename=\"C:\\\\dir\\\\a.txt\"",
+     "cdispo=C:\\dir\\a.txt"},
     {"content-disposition", " attachment; filename = a.txt", "cdispo=a.txt"},
     {"keep-alive", " timeout=5, max=100", NULL},
     {"keep-alive", " timeout=5; max=100", NULL},
@@ -2013,29 +2004,76 @@ static const struct {
     {"keep-alive", " max=\"50\"", "keep_alive=1 timeout=15 max=50"},
 };
 
-/* Every converted site against its legacy copy: the hand cases, then each
-   sequence of one to three items under each separator. A changed result must
-   carry a reason, and every result must match what the items say. */
+/* Hand cases whose input is HEAD, then N copies of FILL. */
+static const struct {
+  const char *site, *head;
+  char fill;
+  size_t n;
+  const char *want;
+} st_hp_runs[] = {
+    {"content-type", " text/html; charset=\"utf-8 ", 'x', 300,
+     "contenttype=text/html charset="},
+    {"content-type", " text/html; charset=", 'x', 100, NULL},
+    {"content-type", " text/html; charset=", 'x', 125, NULL},
+    {"content-type", " text/html; charset=", 'x', 126, NULL},
+    {"content-disposition", " attachment; filename=", 'x', 150, NULL},
+    {"content-disposition", " attachment; filename=", 'x', 199, NULL},
+    {"content-disposition", " attachment; filename=", 'x', 200, NULL},
+    {"content-disposition", " attachment; filename=a.txt; filename*=UTF-8''",
+     'x', 240, "cdispo=a.txt"},
+    {"keep-alive", " timeout=5, max=", '0', 64,
+     "keep_alive=1 timeout=5 max=10"},
+};
+
+/* One hand case against the legacy copy of its site. */
+static int st_hp_case(const char *name, const char *in, const char *want) {
+  const struct st_hp_site *site = st_hp_sites;
+  char old[512], cur[512];
+
+  while (strcmp(site->name, name) != 0)
+    site++;
+  site->legacy(in, old, sizeof(old));
+  site->current(in, cur, sizeof(cur));
+  if (strcmp(cur, want != NULL ? want : old) == 0)
+    return 0;
+  printf("FAIL %s \"%s\": legacy \"%s\" now \"%s\"\n", name, in, old, cur);
+  return 1;
+}
+
+/* Generated input number I: N items under one separator, also put in seq. */
+static void st_hp_build(const struct st_hp_site *site, size_t items,
+                        const char *sep, size_t n, size_t i,
+                        const struct st_hp_item **seq, char *in, size_t size) {
+  size_t k;
+
+  snprintf(in, size, "%s", site->head);
+  for (k = 0; k < n; k++, i /= items) {
+    seq[k] = &site->items[i % items];
+    strlncatbuff(in, k != 0 || *site->head != '\0' ? sep : " ", size, size - 1);
+    strlncatbuff(in, seq[k]->text, size, size - 1);
+  }
+}
+
+/* Hand cases, then every 1-3 item sequence: a change needs a reason. */
 static int st_headerparamdiff(httrackp *opt, int argc, char **argv) {
-  size_t i, s, k, n, idx[3];
+  size_t i, s, k, n;
   int compared = 0, failures = 0, by[HP_COUNT] = {0};
   char in[512], old[512], cur[512], want[512];
 
   (void) opt;
   (void) argc;
   (void) argv;
-  for (i = 0; i < sizeof(st_hp_cases) / sizeof(st_hp_cases[0]); i++) {
-    for (s = 0; strcmp(st_hp_sites[s].name, st_hp_cases[i].site) != 0; s++)
-      ;
-    st_hp_sites[s].legacy(st_hp_cases[i].in, old, sizeof(old));
-    st_hp_sites[s].current(st_hp_cases[i].in, cur, sizeof(cur));
-    if (strcmp(cur, st_hp_cases[i].want != NULL ? st_hp_cases[i].want : old) !=
-        0) {
-      printf("FAIL %s \"%s\": legacy \"%s\" now \"%s\"\n", st_hp_sites[s].name,
-             st_hp_cases[i].in, old, cur);
-      failures++;
-    }
-    compared++;
+  for (i = 0; i < sizeof(st_hp_cases) / sizeof(st_hp_cases[0]); i++, compared++)
+    failures +=
+        st_hp_case(st_hp_cases[i].site, st_hp_cases[i].in, st_hp_cases[i].want);
+  for (i = 0; i < sizeof(st_hp_runs) / sizeof(st_hp_runs[0]); i++, compared++) {
+    const size_t head = strlen(st_hp_runs[i].head);
+
+    assertf(head + st_hp_runs[i].n < sizeof(in));
+    memcpy(in, st_hp_runs[i].head, head);
+    memset(in + head, st_hp_runs[i].fill, st_hp_runs[i].n);
+    in[head + st_hp_runs[i].n] = '\0';
+    failures += st_hp_case(st_hp_runs[i].site, in, st_hp_runs[i].want);
   }
   for (s = 0; s < sizeof(st_hp_sites) / sizeof(st_hp_sites[0]); s++) {
     const struct st_hp_site *site = &st_hp_sites[s];
@@ -2051,19 +2089,9 @@ static int st_headerparamdiff(httrackp *opt, int argc, char **argv) {
           total *= items;
         for (i = 0; i < total; i++) {
           const struct st_hp_item *seq[3];
-          size_t rest = i;
           int why, r;
 
-          snprintf(in, sizeof(in), "%s", site->head);
-          for (k = 0; k < n; k++) {
-            idx[k] = rest % items;
-            rest /= items;
-            seq[k] = &site->items[idx[k]];
-            strlncatbuff(in,
-                         k != 0 || *site->head != '\0' ? site->seps[sep] : " ",
-                         sizeof(in), sizeof(in) - 1);
-            strlncatbuff(in, seq[k]->text, sizeof(in), sizeof(in) - 1);
-          }
+          st_hp_build(site, items, site->seps[sep], n, i, seq, in, sizeof(in));
           site->legacy(in, old, sizeof(old));
           site->current(in, cur, sizeof(cur));
           st_hp_expect(site, seq, n, want, sizeof(want), &why);

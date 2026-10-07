@@ -1635,7 +1635,7 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
         const char *const c = chs + strspn(chs, HTS_SPACES);
         const size_t n = strcspn(c, HTS_SPACES);
 
-        // A charset is one token: the old parser stopped where this does.
+        // A charset is one token.
         if (n != 0 && n < sizeof(retour->charset) - 2) {
           retour->charset[0] = '\0';
           strlncatbuff(retour->charset, c, sizeof(retour->charset), n);
