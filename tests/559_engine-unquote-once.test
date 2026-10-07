@@ -26,7 +26,8 @@ doit() {
     local line
     assert_file "$1/hts-cache/doit.log"
     IFS= read -r line <"$1/hts-cache/doit.log"
-    printf '%s\n' "$line"
+    # Windows writes doit.log with CR LF.
+    printf '%s\n' "${line%$'\r'}"
 }
 has() { # has WANT LINE LABEL: WANT is whole words of LINE
     [[ " $2 " == *" $1 "* ]] || fail "$3: want '$1' in: $2"
