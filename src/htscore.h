@@ -330,8 +330,14 @@ char **hts_setfilters_take(httrackp *opt);
 
 #endif
 
+/* Is the -#L cap reached, so no new link may be discovered? One link early,
+   see the definition. */
+hts_boolean hts_maxlinks_reached(const httrackp *opt);
+
 /* Record a link on the heap. All strings are copied (caller keeps ownership).
-   Returns 1 on success, 0 if the link limit (opt->maxlink) is reached. */
+   Returns 1 on success, 0 if the link limit (opt->maxlink) is reached or the
+   heap could not grow. Either way the engine's verdict is already recorded:
+   the cap asks for a smooth stop, a failed allocation aborts the mirror. */
 int hts_record_link(httrackp * opt,
                     const char *address, const char *file, const char *save,
                     const char *ref_address, const char *ref_file,

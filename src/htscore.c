@@ -359,6 +359,13 @@ static int hts_record_link_(httrackp * opt,
   return 1;
 }
 
+/* See htscore.h. */
+hts_boolean hts_maxlinks_reached(const httrackp *opt) {
+  /* +1: one parser step records robots.txt and then the link, and the second
+     must not be the one refused. */
+  return opt->maxlink > 0 && opt->lien_tot + 1 >= opt->maxlink;
+}
+
 int hts_record_link(httrackp * opt,
                     const char *address, const char *file, const char *save,
                     const char *ref_address, const char *ref_file,
@@ -366,10 +373,20 @@ int hts_record_link(httrackp * opt,
   const int success = 
     hts_record_link_(opt, address, file, save, ref_address, ref_file, codebase);
   if (!success) {
-    hts_log_print(opt, LOG_PANIC, "Too many links (links=%ld, limit=%ld)", 
-                  (long int) heap_top_index(), (long int) opt->maxlink);
-    hts_log_print(opt, LOG_INFO,
-      "To avoid that: use #L option for more links (example: -#L1000000, or -#L0 to disable)");
+    if (hts_maxlinks_reached(opt)) {
+      /* back_checkmirror() raises the stop and says so once, so a caller here
+         only has to drop the link. */
+      hts_log_print(opt, LOG_DEBUG, "Link not recorded, -#L reached: %s%s",
+                    address, file);
+    } else {
+      hts_log_print(opt, LOG_PANIC,
+                    "Not enough memory to record a link (links=%ld)",
+                    (long int) opt->lien_tot);
+      hts_mutexlock(&opt->state.lock);
+      hts_store_release_int(&opt->state.stop, 1);
+      hts_store_release_int(&opt->state.exit_xh, -1);
+      hts_mutexrelease(&opt->state.lock);
+    }
   }
   return success;
 }
@@ -4818,9 +4835,9 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
               // >>>> CREER LE LIEN JAVA <<<<
 
               // enregistrer fichier (MACRO)
-              if (!hts_record_link(opt, afs.af.adr, afs.af.fil, afs.save, "", "", "")) {    // erreur, pas de place réservée
-                /* fatal error -> exit */
-                hts_store_release_int(&opt->state.exit_xh, -1);
+              if (!hts_record_link(opt, afs.af.adr, afs.af.fil, afs.save, "",
+                                   "", "")) {
+                /* hts_record_link() owns the engine's verdict. */
                 return 0;
               }
               // mode test?                          

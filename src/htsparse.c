@@ -2030,9 +2030,11 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             const int sf_tagless_body = inscript_locked;
 
             // si nofollow ou un stop a été déclenché, réécrire tous les liens en externe
-            /* an update keeps following, so the cache keeps its data */
+            /* an update keeps following, so the cache keeps its data; the
+               -#L cap has no such exemption, the heap being as finite */
             if ((nofollow) ||
-                (hts_load_acquire_int(&opt->state.stop) && !opt->is_update))
+                (hts_load_acquire_int(&opt->state.stop) && !opt->is_update) ||
+                hts_maxlinks_reached(opt))
               p_nocatch = 1;
 
             // écrire codebase avant, flusher avant code
@@ -3382,27 +3384,18 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                     afs.save);
                     }
 
-                    if ((afs.af.adr[0] != '\0') && (p_type != 2) && (p_type != -2) && (forbidden_url != 1)) {  // si le fichier n'existe pas, ajouter à la liste                            
-                      // n'y a-t-il pas trop de liens?
-                      if (opt->maxlink > 0 && opt->lien_tot + 1 >= opt->maxlink) {       // trop de liens!
-                        printf("PANIC! : Too many URLs : >%d [%d]\n", opt->lien_tot,
-                               __LINE__);
-                        hts_log_print(opt, LOG_PANIC, "Too many URLs, giving up..(>%d)",
-                                      opt->maxlink);
-                        hts_log_print(opt, LOG_INFO,
-                                      "To avoid that: use #L option for more links (example: -#L1000000)");
-                        /* same limit as htsAddLink's: report the same abort */
-                        hts_store_release_int(stre->exit_xh_, -1);
-                        if ((opt->getmode & HTS_GETMODE_HTML) && (ptr > 0)) {
-                          if (fp) {
-                            fclose(fp);
-                            fp = NULL;
-                          }
-                        }
-                        TypedArrayFree(output_buffer);
-                        XH_uninit;      // désallocation mémoire & buffers
-                        return -1;
-                      } else {  // noter le lien sur la listes des liens à charger
+                    if ((afs.af.adr[0] != '\0') && (p_type != 2) &&
+                        (p_type != -2) &&
+                        (forbidden_url !=
+                         1)) { // si le fichier n'existe pas, ajouter à la liste
+                      /* Backstop: the nocatch gate above turns a link external
+                         before it reaches here, so this warns of a path that
+                         got round it and left the page pointing at nothing. */
+                      if (hts_maxlinks_reached(opt)) {
+                        hts_log_print(opt, LOG_WARNING,
+                                      "Link dropped past the -#L cap: %s%s",
+                                      afs.af.adr, afs.af.fil);
+                      } else { // room for it
                         int pass_fix, dejafait = 0;
 
                         // Calculer la priorité de ce lien
@@ -3565,8 +3558,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                         }
 
-                      }         // si pas trop de liens
-                    }           // si adr[0]!='\0'
+                      } // room for it
+                    } // si adr[0]!='\0'
 
                   }             // if adr[0]!='\0' 
 
@@ -3983,9 +3976,10 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
                     heap_top()->refetch_whole = heap(ptr)->refetch_whole;
                     heap_top()->premier = heap(ptr)->premier;
                     heap_top()->precedent = heap(ptr)->precedent;
-                  } else {      // oups erreur, plus de mémoire!!
-                    XH_uninit;  // désallocation mémoire & buffers
-                    return 0;
+                  } else {
+                    hts_log_print(opt, LOG_WARNING,
+                                  "Moved link not recorded: %s%s", moved->adr,
+                                  moved->fil);
                   }
                 } else {
                   hts_log_print(opt, LOG_INFO,
@@ -4092,9 +4086,11 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
           heap_top()->precedent = ptr;
           error = 1;
           hts_invalidate_link(opt, ptr); // invalidate hashtable entry
-        } else {                         // out of memory
-          XH_uninit;
-          return 0;
+        } else {
+          hts_log_print(opt, LOG_WARNING,
+                        "Partial file reget not recorded for %s%s", urladr(),
+                        urlfil());
+          error = 1;
         }
       } else {
         hts_log_print(opt, LOG_WARNING,
@@ -4278,8 +4274,9 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
             heap_top()->precedent = heap(ptr)->precedent;
             // refetch whole with no Range, and latch out a second free restart
             heap_top()->refetch_whole = r->refetch_wholefile;
-          } else {              // oups erreur, plus de mémoire!!
-            return 0;
+          } else {
+            hts_log_print(opt, LOG_WARNING, "Link not re-requested: %s%s",
+                          urladr(), urlfil());
           }
         }
       } else {
@@ -4462,10 +4459,10 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
               hts_log_print(opt, LOG_INFO, "Link added by user: %s%s", add.af.adr,
                             add.af.fil);
               //
-            } else { // out of memory
-              hts_addurl_free(addurl);
-              XH_uninit;        // désallocation mémoire & buffers
-              return;
+            } else {
+              hts_log_print(opt, LOG_WARNING,
+                            "Link added by user not recorded: %s%s", add.af.adr,
+                            add.af.fil);
             }
           } else {
             hts_log_print(opt, LOG_NOTICE,

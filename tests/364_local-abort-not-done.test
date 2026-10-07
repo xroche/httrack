@@ -72,7 +72,7 @@ ok "a mirror that finishes still says Done."
 
 # --- the link cap: httpmirror() returns -1, which the == 0 test never saw ----
 crawl linkcap changes/index.html -\#L4
-grep -q 'Too many URLs' <<<"$log" ||
+grep -q 'link limit' <<<"$log" ||
     fail "the link cap did not stop the crawl, so nothing here was aborted: ${log}"
 assert_says aborted "a mirror the link cap stopped still claimed to be done"
 ok "a mirror the link cap stopped does not claim to be done"
@@ -159,7 +159,7 @@ ok "--why still reports Done."
 crawl shell-complete changes/index.html -\#S
 assert_shell_silent "shell mode gained an end-of-mirror token (completed)"
 crawl shell-linkcap changes/index.html -\#S -\#L4
-grep -q 'Too many URLs' <<<"$log" ||
+grep -q 'link limit' <<<"$log" ||
     fail "the shell-mode crawl was not aborted, so its silence proves nothing: ${log}"
 assert_shell_silent "shell mode gained an end-of-mirror token (aborted)"
 ok "shell mode still ends silently, aborted or not"

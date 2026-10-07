@@ -1,0 +1,98 @@
+#!/bin/bash
+#
+# The -#L cap used to abort the mirror: a crawl that reached it exited 3 and
+# lost even the entry page, where the size and time budgets stop cleanly. The
+# cap now stops discovery the way they do.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+require_httrack
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_maxlink.XXXXXX") || exit 1
+cleanup() { rm -rf "$tmpdir"; }
+cleanup_push cleanup
+
+# A hub and 12 leaves, so a cap can sit strictly inside the crawl.
+PAGES=12
+doc="${tmpdir}/doc"
+mkdir -p "$doc"
+{
+    printf '<html><body>\n'
+    for i in $(seq -w 1 "$PAGES"); do
+        printf '<a href="page%s.html">p%s</a>\n' "$i" "$i"
+    done
+    printf '</body></html>\n'
+} >"${doc}/index.html"
+for i in $(seq -w 1 "$PAGES"); do
+    printf '<html><body>page %s</body></html>\n' "$i" >"${doc}/page${i}.html"
+done
+
+local_server_start --root "$doc"
+
+common=(--quiet --robots=0 -c1 --timeout=20)
+
+# Crawl into $tmpdir/$1 with the extra arguments, leaving the status in $rc and
+# the mirror's log in $log. Not a subshell: the status is the point.
+crawl() {
+    local name=$1
+    shift
+    dir="${tmpdir}/${name}"
+    site="${dir}/127.0.0.1_${SRV_PORT}"
+    rc=0
+    local_crawl --log "${tmpdir}/out-${name}" "${common[@]}" -O "$dir" \
+        "${BASEURL}/index.html" "$@" || rc=$?
+    log=$(<"${dir}/hts-log.txt")
+}
+
+# Links the mirrored hub still points at the live server, rather than at a
+# local copy: what the engine writes for a link it decided not to follow.
+external_links() { grep -c "href=\"${BASEURL}/page" "${site}/index.html" || true; }
+
+# --- control: a cap above the crawl changes nothing --------------------------
+crawl room -\#L100
+test "$rc" -eq 0 || fail "a crawl inside the cap exited $rc: ${log}"
+grep -q 'mirror complete in' <<<"$log" ||
+    fail "the control crawl did not finish, so its exit 0 proves nothing: ${log}"
+assert_eq "$((PAGES + 1))" "$(find "$site" -name '*.html' | wc -l)" \
+    "pages the control mirrored"
+assert_eq 0 "$(external_links)" "links the control left external"
+if grep -q 'link limit' <<<"$log"; then
+    fail "the control crawl reached the cap, so nothing below is about it: ${log}"
+fi
+ok "a crawl that fits under the cap mirrors every page and exits 0"
+
+# --- the cap is reached mid-crawl -------------------------------------------
+# 6 is the real count: the primary link, the hub, and three leaves fit, which
+# the page and link assertions below pin exactly.
+crawl cap -\#L6
+test "$rc" -eq 0 || fail "the capped crawl exited $rc, wanted 0: ${log}"
+grep -q 'The link limit (6) has been reached.. giving up' <<<"$log" ||
+    fail "the cap was not reached, so nothing here is about it: ${log}"
+if grep -q 'Panic' <<<"$log"; then
+    fail "the cap still panics: ${log}"
+fi
+ok "a crawl that reaches the cap exits 0 and reports a budget, not a panic"
+
+# The entry page is the one master lost: it aborted while still parsing it.
+assert_file "${site}/index.html" "the capped mirror kept no entry page"
+assert_eq 4 "$(find "$site" -name '*.html' | wc -l)" "pages the cap let through"
+ok "and keeps the entry page plus the leaves that fit"
+
+# The uncaught links point at the live site, so no page references a file the
+# cap stopped the engine from fetching. The control above proves these same
+# links are local when the cap is not in the way.
+assert_eq 9 "$(external_links)" "links the cap left external"
+for i in 04 12; do
+    test ! -e "${site}/page${i}.html" ||
+        fail "page${i}.html was mirrored, so the cap let more through than counted"
+done
+ok "links past the cap are rewritten external rather than left dangling"
+
+# --- the mirror says it stopped early ---------------------------------------
+# Exit 0 must not read as "finished": --continue and the purge both key off it.
+grep -q 'Mirror aborted: keeping all previously mirrored files' <<<"$log" ||
+    fail "the capped mirror claimed to be complete: ${log}"
+ok "the capped mirror is still reported as not completed"

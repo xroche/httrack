@@ -5547,7 +5547,8 @@ static hts_boolean back_maxtime_reached(const httrackp *opt) {
 /* A cap has been reached, so back_checkmirror() below is what raised the stop
    flag: the stop the mirror is under is the engine's, not the user's. */
 static hts_boolean back_mirror_capped(const httrackp *opt) {
-  return back_maxsize_reached(opt) || back_maxtime_reached(opt);
+  return back_maxsize_reached(opt) || back_maxtime_reached(opt) ||
+         hts_maxlinks_reached(opt);
 }
 
 static hts_mirror_limit back_mirror_limit(httrackp *opt) {
@@ -5593,6 +5594,17 @@ int back_checkmirror(httrackp *opt) {
   if (back_maxtime_reached(opt) && !hts_load_acquire_int(&opt->state.stop)) {
     hts_log_print(opt, LOG_ERROR, "More than %d seconds passed.. giving up",
                   opt->maxtime);
+    hts_request_stop(opt, 0);
+  }
+  /* No grace clause in back_mirror_limit() for this one: once the parser
+     stops queueing the count cannot overrun, so the drain ends by itself. */
+  if (hts_maxlinks_reached(opt) && !hts_load_acquire_int(&opt->state.stop)) {
+    hts_log_print(opt, LOG_ERROR,
+                  "The link limit (%d) has been reached.. giving up",
+                  opt->maxlink);
+    hts_log_print(opt, LOG_INFO,
+                  "To avoid that: use #L option for more links (example: "
+                  "-#L1000000, or -#L0 to disable)");
     hts_request_stop(opt, 0);
   }
   back_check_worker_fault(opt);
