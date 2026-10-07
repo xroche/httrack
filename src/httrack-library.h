@@ -408,6 +408,15 @@ HTSEXT_API hts_boolean hts_setfilters(httrackp *opt, const char *const *rules);
     if valid, HTS_FALSE for NULL or an invalid rule. */
 HTSEXT_API hts_boolean hts_filter_rule_ok(const char *rule);
 
+/** Copy the token at *@p ptr into @p dest (@p destsize bytes, NUL included,
+    destsize nonzero) and advance *@p ptr past it and the whitespace after it.
+    Tokens are separated by the bytes isspace() accepts, which in the C locale
+    are space, \t, \n, \v, \f and \r. Leading whitespace is not skipped, so
+    it yields an empty token. This is how the engine splits typed scan rules.
+    @return HTS_FALSE when the token did not fit, @p dest then holding a
+    truncated copy that a caller reading a filter must refuse. */
+HTSEXT_API hts_boolean hts_scan_token(char **ptr, char *dest, size_t destsize);
+
 /** Apply the runtime-tunable options from @p from onto @p to, to adjust a live
     mirror. A field @p from leaves at its default is not copied, so @p to keeps
     its own, apart from warc_max_size, warc_cdx, warc_wacz, changes and
