@@ -13,12 +13,16 @@ tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_fgrow.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "$tmp"
 
 mkdir "$tmp/site"
-printf '<a href="kept.html">k</a> <a href="gone.html">g</a>\n' >"$tmp/site/index.html"
-echo kept >"$tmp/site/kept.html"
-echo gone >"$tmp/site/gone.html"
+for f in kept early gone; do
+    printf '<a href="%s.html">%s</a>\n' "$f" "$f"
+    echo "$f" >"$tmp/site/$f.html"
+done >"$tmp/site/index.html"
 
-# -#F128 holds 127 rules, so 1200 more cross two growth steps; the last one counts.
+# -#F128 holds 127 rules, so 1200 more cross two growth steps. The first rule,
+# -*early.html, must survive them, and the last rule, -*gone.html, must still
+# apply.
 {
+    echo '-*early.html'
     for i in $(seq 1 1200); do echo "+r$i.example/*"; done
     echo '-*gone.html'
 } >"$tmp/rules.txt"
@@ -34,7 +38,10 @@ if grep -q 'Filter rule dropped' "$log"; then
     fail_dump "a rule was dropped" "$log"
 fi
 mirror_has_name "$tmp/out" kept.html || fail "kept.html not mirrored"
+if mirror_has_name "$tmp/out" early.html; then
+    fail "the first rule was lost: early.html mirrored"
+fi
 if mirror_has_name "$tmp/out" gone.html; then
     fail "the last rule was lost: gone.html mirrored"
 fi
-ok "1201 scan rules kept at -#F128"
+ok "1202 scan rules kept at -#F128"
