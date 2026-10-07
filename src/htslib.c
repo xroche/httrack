@@ -3921,33 +3921,21 @@ HTSEXT_API char *fil_normalized(const char *source, char *dest) {
   return fil_normalized_ex(source, dest, 1, 1);
 }
 
-/* Is query key ARG[0..keylen) in the comma-separated STRIP list? "*" = all;
-   case-sensitive, space-trimmed tokens. */
-static int hts_query_key_stripped(const char *arg, size_t keylen,
-                                  const char *strip) {
-  const char *p = strip;
+/* see htscore.h */
+hts_boolean hts_query_key_stripped(const char *arg, size_t keylen,
+                                   const char *strip) {
+  const char *cur = strip;
+  const char *const end = strip + strlen(strip);
+  hts_span tok;
 
-  while (*p != '\0') {
-    const char *start = p;
-    size_t toklen;
-
-    while (*p != '\0' && *p != ',')
-      p++;
-    toklen = (size_t) (p - start);
-    while (toklen > 0 && *start == ' ') {
-      start++;
-      toklen--;
-    }
-    while (toklen > 0 && start[toklen - 1] == ' ')
-      toklen--;
-    if (toklen == 1 && start[0] == '*')
-      return 1;
-    if (toklen == keylen && strncmp(start, arg, keylen) == 0)
-      return 1;
-    if (*p == ',')
-      p++;
+  while (hts_span_next(&cur, end, ',', &tok)) {
+    tok = hts_span_trim(tok, " ", " ");
+    if (tok.len == 1 && tok.p[0] == '*')
+      return HTS_TRUE;
+    if (tok.len == keylen && strncmp(tok.p, arg, keylen) == 0)
+      return HTS_TRUE;
   }
-  return 0;
+  return HTS_FALSE;
 }
 
 /* see htscore.h */
@@ -3990,8 +3978,9 @@ char *fil_normalized_filtered(const char *source, char *dest,
 /* see htscore.h */
 const char *hts_query_strip_keys(const char *rules, const char *adr,
                                  const char *fil, char *dest, size_t destsize) {
-  const char *p, *q;
+  const char *cur, *q, *rules_end;
   const char *result = NULL;
+  hts_span line;
   /* holds a host and a path, each up to HTS_URLMAXSIZE * 2 */
   char BIGSTK url[HTS_URLMAXSIZE * 4];
 
@@ -4014,41 +4003,24 @@ const char *hts_query_strip_keys(const char *rules, const char *adr,
     strlncatbuff(url, fil, sizeof(url), fillen < room ? fillen : room);
   }
 
+  rules_end = rules + strlen(rules);
   /* Walk the '\n' entries; last match wins (like the +/- filter eval). Each is
      "pattern=keys"; no '=' is the bare form, pattern "*". */
-  for (p = rules; *p != '\0';) {
-    const char *const line = p;
-    const char *eol, *eq, *keys;
+  for (cur = rules; hts_span_next(&cur, rules_end, '\n', &line);) {
+    hts_span pattern, keys;
     char BIGSTK pat[HTS_URLMAXSIZE * 2];
 
-    while (*p != '\0' && *p != '\n')
-      p++;
-    eol = p;
-    if (*p == '\n')
-      p++;
-    if (eol == line)
+    if (line.len == 0)
       continue;
-    eq = memchr(line, '=', (size_t) (eol - line));
-    if (eq != NULL) {
-      size_t patlen = (size_t) (eq - line);
-
-      if (patlen >= sizeof(pat))
-        patlen = sizeof(pat) - 1;
-      memcpy(pat, line, patlen);
-      pat[patlen] = '\0';
-      keys = eq + 1;
+    if (hts_span_split(line, '=', &pattern, &keys)) {
+      /* clipped, where a too-long alias is skipped */
+      (void) hts_span_copy(pattern, pat, sizeof(pat));
     } else {
-      pat[0] = '*';
-      pat[1] = '\0';
+      strcpybuff(pat, "*");
       keys = line;
     }
     if (strjoker(url, pat, NULL, NULL) != NULL) {
-      size_t klen = (size_t) (eol - keys);
-
-      if (klen >= destsize)
-        klen = destsize - 1;
-      memcpy(dest, keys, klen);
-      dest[klen] = '\0';
+      (void) hts_span_copy(keys, dest, destsize);
       result = dest;
     }
   }
@@ -4060,49 +4032,39 @@ const char *hts_host_alias_rules(httrackp *opt) {
   return StringNotEmpty(opt->host_alias) ? StringBuff(opt->host_alias) : NULL;
 }
 
-/* Last rule of RULES whose alias list matches HOST (strjoker, last wins as in
-   the +/- filter list): its canonical host, of length *CANONLEN, or NULL. FULL
-   is the scheme://host form a scheme-qualified pattern matches; NOWWW collapses
-   the www. prefix of both the pattern and the host. */
-static const char *hts_host_alias_match(const char *rules, const char *host,
-                                        const char *full,
-                                        hts_boolean collapse_www,
-                                        size_t *canonlen) {
-  const char *p;
+/* Split RULE "alias[,alias...]=canonical" at its first '=', both sides
+   untrimmed. The matcher and the validator share it so they agree on what a
+   rule is. HTS_FALSE when either side is empty. */
+static hts_boolean hts_host_alias_split(hts_span rule, hts_span *aliases,
+                                        hts_span *canon) {
+  return hts_span_split(rule, '=', aliases, canon) && aliases->len != 0 &&
+         canon->len != 0;
+}
+
+/* see htscore.h */
+const char *hts_host_alias_match(const char *rules, const char *host,
+                                 const char *full, hts_boolean collapse_www,
+                                 size_t *canonlen) {
+  const char *const end = rules + strlen(rules);
+  const char *cur;
   const char *canon = NULL;
+  hts_span line;
 
-  /* Walk the '\n' entries "alias[,alias...]=canonical" */
-  for (p = rules; *p != '\0';) {
-    const char *const line = p;
-    const char *eol, *eq, *pat;
+  for (cur = rules; hts_span_next(&cur, end, '\n', &line);) {
+    hts_span aliases, target, alias;
+    const char *next;
 
-    while (*p != '\0' && *p != '\n')
-      p++;
-    eol = p;
-    if (*p == '\n')
-      p++;
-    eq = memchr(line, '=', (size_t) (eol - line));
-    if (eq == NULL || eq == line || eq + 1 == eol)
-      continue; /* not "alias=canonical" */
-    for (pat = line; pat < eq;) {
-      const char *const sep = memchr(pat, ',', (size_t) (eq - pat));
-      const char *const end = sep != NULL ? sep : eq;
-      const char *start = pat;
-      size_t len = (size_t) (end - pat);
+    if (!hts_host_alias_split(line, &aliases, &target))
+      continue;
+    for (next = aliases.p;
+         hts_span_next(&next, aliases.p + aliases.len, ',', &alias);) {
       char BIGSTK glob[HTS_URLMAXSIZE * 2];
 
-      while (len > 0 && (*start == ' ' || *start == '\t')) {
-        start++; /* "a.com, b.com=c.com" */
-        len--;
-      }
-      while (len > 0 && (start[len - 1] == ' ' || start[len - 1] == '\t' ||
-                         start[len - 1] == '/'))
-        len--; /* a trailing slash is not a path */
-      if (len != 0 && len < sizeof(glob)) {
+      /* "a.com, b.com=c.com", and a trailing slash is not a path */
+      alias = hts_span_trim(alias, " \t", " \t/");
+      if (alias.len != 0 && hts_span_copy(alias, glob, sizeof(glob))) {
         char *ghost;
 
-        memcpy(glob, start, len);
-        glob[len] = '\0';
         /* the collapse applies to the pattern too, so a rule may spell either
            www.example.com or example.com under -%u */
         ghost = glob + (jump_protocol_const(glob) - glob);
@@ -4116,22 +4078,15 @@ static const char *hts_host_alias_match(const char *rules, const char *host,
         if (strjoker(strstr(glob, "://") != NULL ? full : host,
                      strstr(glob, "://") != NULL ? glob : ghost, NULL,
                      NULL) != NULL) {
-          const char *end = eol;
-
-          canon = eq + 1;
           /* Trim here, where the canonical is produced: the resolver compares
              one match against the next to see a chain settle, and an untrimmed
              one never equals the trimmed bytes it emits. */
-          while (canon < end && (*canon == ' ' || *canon == '\t'))
-            canon++;
-          while (end > canon &&
-                 (end[-1] == ' ' || end[-1] == '\t' || end[-1] == '/'))
-            end--;
-          *canonlen = (size_t) (end - canon);
+          target = hts_span_trim(target, " \t", " \t/");
+          canon = target.p;
+          *canonlen = target.len;
           break;
         }
       }
-      pat = end + 1;
     }
   }
   return canon;
@@ -4305,24 +4260,18 @@ hts_boolean hts_host_same_alias(const char *rules, const char *adra,
              : HTS_FALSE;
 }
 
-/* HTS_TRUE if TOKEN[0..LEN) is a host, optionally behind the scheme it speaks
+/* HTS_TRUE if TOKEN is a host, optionally behind the scheme it speaks
    and with a trailing slash. GLOB keeps the filter metacharacters legal, which
    only the alias side of a rule may use. */
-static hts_boolean hts_host_alias_token_ok(const char *token, size_t len,
-                                           hts_boolean glob) {
+static hts_boolean hts_host_alias_token_ok(hts_span token, hts_boolean glob) {
   char BIGSTK buff[HTS_URLMAXSIZE * 2];
   const char *host;
+  size_t len;
 
-  while (len > 0 && (*token == ' ' || *token == '\t')) {
-    token++;
-    len--;
-  }
-  while (len > 0 && (token[len - 1] == ' ' || token[len - 1] == '\t'))
-    len--;
-  if (len == 0 || len >= sizeof(buff))
+  token = hts_span_trim(token, " \t", " \t");
+  if (token.len == 0 || !hts_span_copy(token, buff, sizeof(buff)))
     return HTS_FALSE;
-  memcpy(buff, token, len);
-  buff[len] = '\0';
+  len = token.len;
   while (len > 0 && buff[len - 1] == '/')
     buff[--len] = '\0'; /* the matcher strips the whole run */
   /* an alias may glob its scheme; an unknown canonical one lands in the host */
@@ -4347,20 +4296,20 @@ static hts_boolean hts_host_alias_token_ok(const char *token, size_t len,
 
 /* see httrack-library.h */
 HTSEXT_API hts_boolean hts_host_alias_rule_ok(const char *rule) {
-  const char *const eq = rule != NULL ? strchr(rule, '=') : NULL;
-  const char *pat;
+  hts_span whole, aliases, canon, alias;
+  const char *cur;
 
-  if (eq == NULL || eq == rule || eq[1] == '\0')
+  if (rule == NULL)
     return HTS_FALSE;
-  if (!hts_host_alias_token_ok(eq + 1, strlen(eq + 1), HTS_FALSE))
+  whole.p = rule;
+  whole.len = strlen(rule);
+  if (!hts_host_alias_split(whole, &aliases, &canon) ||
+      !hts_host_alias_token_ok(canon, HTS_FALSE))
     return HTS_FALSE;
-  for (pat = rule; pat < eq;) {
-    const char *const sep = memchr(pat, ',', (size_t) (eq - pat));
-    const char *const end = sep != NULL ? sep : eq;
-
-    if (!hts_host_alias_token_ok(pat, (size_t) (end - pat), HTS_TRUE))
+  for (cur = aliases.p;
+       hts_span_next(&cur, aliases.p + aliases.len, ',', &alias);) {
+    if (!hts_host_alias_token_ok(alias, HTS_TRUE))
       return HTS_FALSE;
-    pat = end + 1;
   }
   return HTS_TRUE;
 }

@@ -26,14 +26,15 @@ Please visit our Website: http://www.httrack.com
 */
 
 /* ------------------------------------------------------------ */
-/* File: bounded decimal and TCP port parsers, shared by the    */
-/*       engine, htsserver and proxytrack                        */
+/* File: bounded decimal, TCP port and separated-field parsers, */
+/*       shared by the engine, htsserver and proxytrack          */
 /* Author: Xavier Roche                                          */
 /* ------------------------------------------------------------ */
 
 #include "htsurlport.h"
 
 #include <ctype.h>
+#include <string.h>
 
 static hts_boolean is_decimal_digit(char c) { return c >= '0' && c <= '9'; }
 
@@ -89,4 +90,60 @@ hts_boolean hts_parse_url_port(const char *a, int *port) {
     return HTS_FALSE;
   *port = (int) p;
   return HTS_TRUE;
+}
+
+hts_boolean hts_span_next(const char **cur, const char *end, char sep,
+                          hts_span *out) {
+  const char *const start = *cur;
+  const char *stop;
+
+  if (start >= end)
+    return HTS_FALSE;
+  stop = memchr(start, sep, (size_t) (end - start));
+  out->p = start;
+  out->len = (size_t) ((stop != NULL ? stop : end) - start);
+  *cur = stop != NULL ? stop + 1 : end;
+  return HTS_TRUE;
+}
+
+static hts_boolean span_in_set(const char *set, char c) {
+  return set != NULL && c != '\0' && strchr(set, c) != NULL;
+}
+
+hts_span hts_span_trim(hts_span s, const char *left, const char *right) {
+  while (s.len > 0 && span_in_set(left, s.p[0])) {
+    s.p++;
+    s.len--;
+  }
+  while (s.len > 0 && span_in_set(right, s.p[s.len - 1]))
+    s.len--;
+  return s;
+}
+
+const char *hts_span_chr(hts_span s, char c) {
+  return s.len != 0 ? memchr(s.p, c, s.len) : NULL;
+}
+
+hts_boolean hts_span_split(hts_span s, char c, hts_span *head, hts_span *tail) {
+  const char *const at = hts_span_chr(s, c);
+
+  if (at == NULL)
+    return HTS_FALSE;
+  head->p = s.p;
+  head->len = (size_t) (at - s.p);
+  tail->p = at + 1;
+  tail->len = s.len - head->len - 1;
+  return HTS_TRUE;
+}
+
+hts_boolean hts_span_copy(hts_span s, char *dst, size_t size) {
+  size_t n;
+
+  if (size == 0)
+    return HTS_FALSE;
+  n = s.len < size ? s.len : size - 1;
+  if (n != 0)
+    memcpy(dst, s.p, n);
+  dst[n] = '\0';
+  return n == s.len;
 }

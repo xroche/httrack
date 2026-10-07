@@ -26,8 +26,8 @@ Please visit our Website: http://www.httrack.com
 */
 
 /* ------------------------------------------------------------ */
-/* File: bounded decimal and TCP port parsers, shared by the    */
-/*       engine, htsserver and proxytrack                        */
+/* File: bounded decimal, TCP port and separated-field parsers, */
+/*       shared by the engine, htsserver and proxytrack          */
 /* Author: Xavier Roche                                          */
 /* ------------------------------------------------------------ */
 
@@ -60,5 +60,32 @@ hts_scan_result hts_scan_llint(const char **s, LLint min, LLint max,
    alone. Not sscanf("%d"), which range-checks nothing and wraps past INT_MAX.
    Its own file so proxytrack, which does not link the library, can share it. */
 hts_boolean hts_parse_url_port(const char *a, int *port);
+
+/* A read-only view of LEN bytes at P. It may hold NULs and is not terminated.
+ */
+typedef struct {
+  const char *p;
+  size_t len;
+} hts_span;
+
+/* Read the next field of [*cur, end) up to SEP into *out, and move *cur past
+   SEP. FALSE once *cur reaches END, so a trailing SEP yields no empty field. */
+hts_boolean hts_span_next(const char **cur, const char *end, char sep,
+                          hts_span *out);
+
+/* S without the leading bytes found in LEFT and the trailing ones found in
+   RIGHT. Either set may be NULL or empty, and a set never matches a NUL. */
+hts_span hts_span_trim(hts_span s, const char *left, const char *right);
+
+/* The first C in S, or NULL. */
+const char *hts_span_chr(hts_span s, char c);
+
+/* Split S at its first C into *HEAD and *TAIL, C in neither. FALSE, with both
+   left alone, when S holds no C. */
+hts_boolean hts_span_split(hts_span s, char c, hts_span *head, hts_span *tail);
+
+/* Copy S into DST as a terminated string, clipped to SIZE - 1 bytes. FALSE if
+   it was clipped, or if SIZE is 0 (and then nothing is written). */
+hts_boolean hts_span_copy(hts_span s, char *dst, size_t size);
 
 #endif

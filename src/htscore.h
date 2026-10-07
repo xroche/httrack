@@ -519,6 +519,21 @@ char *fil_normalized_filtered_ex(const char *source, char *dest,
 const char *hts_query_strip_keys(const char *rules, const char *adr,
                                  const char *fil, char *dest, size_t destsize);
 
+/* HTS_TRUE if query key ARG[0..KEYLEN) is in the comma-separated STRIP list,
+   whose space-trimmed tokens match case-sensitively and where "*" is any key.
+   Exposed for the -#test=spandiff self-test. */
+hts_boolean hts_query_key_stripped(const char *arg, size_t keylen,
+                                   const char *strip);
+
+/* Last rule of RULES whose alias list matches HOST (strjoker, last wins as in
+   the +/- filter list): its canonical host, of length *CANONLEN, or NULL. FULL
+   is the scheme://host form a scheme-qualified pattern matches; COLLAPSE_WWW
+   collapses the www. prefix of both the pattern and the host. Exposed for the
+   -#test=spandiff self-test. */
+const char *hts_host_alias_match(const char *rules, const char *host,
+                                 const char *full, hts_boolean collapse_www,
+                                 size_t *canonlen);
+
 /* The --host-alias rules of OPT, or NULL when the option was not given. */
 const char *hts_host_alias_rules(httrackp *opt);
 
