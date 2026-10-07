@@ -23,9 +23,10 @@ command -v httrack >/dev/null 2>&1 || {
 dir=$(mktemp -d) || exit 1
 cleanup_push rm -rf "$dir"
 
-# Ignore the two intentionally date-dependent lines (page date, copyright year).
-# Temp files, not process substitution, so this works under a POSIX /bin/sh.
-strip_volatile() { grep -vE '^\.TH [a-z]+ 1 |^Copyright \(C\) 1998-'; }
+# Mask the two date-dependent values (page date, copyright year), keeping the rest
+# of their lines. Temp files, not process substitution, so this works under a
+# POSIX /bin/sh.
+strip_volatile() { sed -E 's/^(\.TH [a-z]+ 1 )"[^"]*"/\1"DATE"/; s/^(Copyright \(C\) 1998-)[0-9]+/\1YEAR/'; }
 
 stale=
 for page in httrack htsserver proxytrack webhttrack; do

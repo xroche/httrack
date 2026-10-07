@@ -1,8 +1,10 @@
 
 man_MANS = httrack.1 webhttrack.1 htsserver.1 proxytrack.1
 
-EXTRA_DIST = $(man_MANS) makeman.sh footer.tmpl httrack.tmpl webhttrack.tmpl \
-	htsserver.tmpl proxytrack.tmpl
+MAN_TMPLS = footer.tmpl httrack.tmpl webhttrack.tmpl htsserver.tmpl \
+	proxytrack.tmpl
+
+EXTRA_DIST = $(man_MANS) makeman.sh $(MAN_TMPLS)
 
 # Regenerate every page from its program's --help and its template (httrack.1
 # also reads the top-level README). Run by hand after changing options or help
@@ -10,8 +12,7 @@ EXTRA_DIST = $(man_MANS) makeman.sh footer.tmpl httrack.tmpl webhttrack.tmpl \
 #   make -C man regen-man
 # The generated pages are committed; this target only refreshes them. Honors
 # SOURCE_DATE_EPOCH for a reproducible date.
-regen-man: makeman.sh footer.tmpl httrack.tmpl webhttrack.tmpl htsserver.tmpl \
-		proxytrack.tmpl $(top_builddir)/src/httrack$(EXEEXT) \
+regen-man: makeman.sh $(MAN_TMPLS) $(top_builddir)/src/httrack$(EXEEXT) \
 		$(top_builddir)/src/htsserver$(EXEEXT) \
 		$(top_builddir)/src/proxytrack$(EXEEXT) $(top_builddir)/src/webhttrack
 	for p in httrack htsserver proxytrack; do \

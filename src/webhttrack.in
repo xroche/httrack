@@ -16,11 +16,11 @@ Starts htsserver and opens the WebHTTrack interface in a browser.
   -h, --help             print this help and exit
   --version              print the version and exit
 example: webhttrack
-means: open the interface, in the language of the current locale
+means: open the interface
 example: webhttrack browse
 means: open the mirrored projects without starting the interface
-The browser is $BROWSER if set, else the first known browser found.
-The interface language follows LC_ALL, LC_MESSAGES or LANG.
+With $BROWSER set, xdg-open or sensible-browser opens the page, else the first known browser.
+The interface language follows LC_ALL, LC_MESSAGES or LANG until the interface saves its own.
 EOF
     exit 0
     ;;

@@ -241,25 +241,22 @@ static void usage(FILE *fp, const char *argv0) {
           "usage: %s <path-to-html-root-dir> [option value ..] "
           "[key value ..]\n",
           argv0);
-  fprintf(fp, "Serves the WebHTTrack interface; webhttrack starts it for "
-              "you.\n");
+  fprintf(fp, "Serves the WebHTTrack interface. Most users start it through "
+              "webhttrack.\n");
   fprintf(fp, "  --port <port>          listen on this port (default: the "
               "first free port from 8080)\n");
   fprintf(fp, "  --bind <address>       listen on this address (default: "
               "127.0.0.1)\n");
-  fprintf(fp, "  --ppid <pid>           exit once the interface is closed; "
-              "pid is the launcher's\n");
-  fprintf(fp, "  --ping-timeout <secs>  with --ppid, how long a silent browser "
-              "window counts as open (default: 120)\n");
+  fprintf(fp, "  --ppid <pid>           exit when the interface started by "
+              "this launcher process is closed\n");
+  fprintf(fp, "  --ping-timeout <secs>  with --ppid, how long a browser window "
+              "that stops answering counts as open (default: 120)\n");
   fprintf(fp, "  key value              any other pair sets a value the "
-              "interface reads, such as path or lang\n");
+              "interface reads, such as lang\n");
   fprintf(fp, "  -h, --help             print this help and exit\n");
   fprintf(fp, "  --version              print the version and exit\n");
-  fprintf(fp,
-          "example: %s /usr/share/httrack/ path \"$HOME/websites\" lang 1\n",
-          argv0);
-  fprintf(fp, "means: serve the interface in English, and keep projects in "
-              "~/websites\n");
+  fprintf(fp, "example: %s /usr/share/httrack/ lang 1\n", argv0);
+  fprintf(fp, "means: serve the interface in English\n");
 }
 
 int main(int argc, char *argv[]) {

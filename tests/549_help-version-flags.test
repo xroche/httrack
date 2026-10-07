@@ -97,7 +97,7 @@ if ! target_is_windows; then
     run bash "$script" --help
     launcher_help=$out
     run htsserver --help
-    opts=$(sed -n 's/^  \(--[a-z-]*\) .*/\1/p' <<<"$out")
+    opts=$(sed -n 's/^  \(--[A-Za-z0-9-]*\).*/\1/p' <<<"$out")
     test -n "$opts" || fail "no options in htsserver --help"
     for opt in $opts; do
         test "$opt" != --ppid || continue

@@ -50,6 +50,13 @@ else
 fi
 year=${date_str##* }
 
+# Shared by the awk programs below: roff-escape backslashes and hyphens, and
+# guard body text whose leading "." or "'" roff would read as a request.
+ROFF_AWK='
+  function esc(s) { gsub(/\\/, "\\\\", s); gsub(/-/, "\\-", s); return s }
+  function emit(s) { s = esc(s); if (substr(s, 1, 1) == "." || substr(s, 1, 1) == "\x27") s = "\\&" s; print s }'
+
+# httrack: options classified by indentation, plus LIMITS from the README.
 if [ "$page" = httrack ]; then
     help=$("$bin" --quiet --help 2>/dev/null)
 
@@ -70,17 +77,7 @@ if [ "$page" = httrack ]; then
       }')
 
     # OPTIONS: indentation-driven classifier (see header comment).
-    options=$(printf '%s\n' "$help" | sed -n "${st},$((en - 2))p" | awk '
-      function esc(s) {
-        gsub(/\\/, "\\\\", s)
-        gsub(/-/, "\\-", s)
-        return s
-      }
-      function emit(s) {                       # body text: escape + guard ./%apostrophe leaders
-        s = esc(s)
-        if (substr(s, 1, 1) == "." || substr(s, 1, 1) == "\x27") s = "\\&" s
-        print s
-      }
+    options=$(printf '%s\n' "$help" | sed -n "${st},$((en - 2))p" | awk "$ROFF_AWK"'
       /^[ \t]*$/ { next }
       {
         match($0, /^ */); ind = RLENGTH
@@ -105,8 +102,7 @@ if [ "$page" = httrack ]; then
       }')
 
     # LIMITS: the "Engine limits" block from the README.
-    limits=$(awk '
-      function esc(s) { gsub(/\\/, "\\\\", s); gsub(/-/, "\\-", s); return s }
+    limits=$(awk "$ROFF_AWK"'
       /^Engine limits/ { grab = 1; next }
       /^Advanced options/ { grab = 0 }
       grab {
@@ -115,31 +111,31 @@ if [ "$page" = httrack ]; then
       }' "$readme")
     example_lines=$(printf '%s\n' "$help" | sed -n "${en},$((en2 - 1))p")
 else
+    # The other programs: one "  option  description" row per line.
     case $page in
+    # A script, run through bash because the tree may be mounted noexec.
     webhttrack) help=$(bash "$bin" --help) ;;
     *) help=$("$bin" --help) ;;
     esac
     # The programs print argv[0], which may be a build-tree path.
     help=$(printf '%s\n' "$help" | sed -E "s#^(usage|example): [^ ]*#\\1: $page#")
 
-    synopsis=$(printf '%s\n' "$help" | awk '
-      function esc(s) { gsub(/\\/, "\\\\", s); gsub(/-/, "\\-", s); return s }
+    synopsis=$(printf '%s\n' "$help" | awk "$ROFF_AWK"'
       /^usage: / { sub(/^usage: /, ""); if (n++) print ".br"; printf ".B %s\n", esc($0) }')
 
-    options=$(printf '%s\n' "$help" | awk '
-      function esc(s) { gsub(/\\/, "\\\\", s); gsub(/-/, "\\-", s); return s }
+    options=$(printf '%s\n' "$help" | awk "$ROFF_AWK"'
       /^  [^ ]/ {
         line = substr($0, 3); desc = ""
         if (match(line, /   */)) { desc = substr(line, RSTART + RLENGTH); line = substr(line, 1, RSTART - 1) }
-        printf ".TP\n.B %s\n%s\n", esc(line), esc(desc)
+        printf ".TP\n.B %s\n", esc(line)
+        if (desc != "") emit(desc)
       }')
     example_lines=$help
     limits=
 fi
 
 # EXAMPLES: "example: <cmd>" / "means: <text>" pairs.
-examples=$(printf '%s\n' "$example_lines" | awk '
-  function esc(s) { gsub(/\\/, "\\\\", s); gsub(/-/, "\\-", s); return s }
+examples=$(printf '%s\n' "$example_lines" | awk "$ROFF_AWK"'
   /^example:/ { sub(/^example:[ \t]*/, ""); s = esc($0); gsub(/"/, "\\(dq", s); printf ".TP\n.B %s\n", s; next }
   /^means:/   { sub(/^means:[ \t]*/, "");   if ($0 != "") print esc($0); next }
 ')
