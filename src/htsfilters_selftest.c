@@ -262,6 +262,41 @@ static int st_filterbounds(httrackp *opt, int argc, char **argv) {
     assertf(strjoker_bounds(subj, pat, &steps, &maxsteps, NULL, NULL) != NULL);
     assertf(steps < maxsteps);
   }
+  /* An unclosed class rescans its whole length on every call that reaches it,
+     so the slope across two class lengths pins it. The leading *[a-z] makes
+     the subject length the decode count, which a charge levied once per match
+     cannot fake (OSS-Fuzz 5279208050589696). */
+  {
+    const size_t shortlen = 256, longlen = 768, decodes = 32;
+    size_t steps2 = 0;
+
+    memcpy(pat, "*[a-z]*(", 8);
+    memset(pat + 8, '*', longlen);
+    memset(subj, 'a', decodes);
+    subj[decodes] = '\0';
+    pat[8 + shortlen] = '\0';
+    assertf(strjoker_bounds(subj, pat, &steps, &maxsteps, NULL, NULL) != NULL);
+    pat[8 + shortlen] = '*';
+    pat[8 + longlen] = '\0';
+    assertf(strjoker_bounds(subj, pat, &steps2, &maxsteps, NULL, NULL) != NULL);
+    assertf(steps2 - steps >= 8 * (longlen - shortlen));
+  }
+  /* Reserved-name classes cost ~512 bytes per call, so a long real URL must
+     not exhaust the budget early. */
+  {
+    const char *seg = "segment-name/";
+    const size_t seglen = strlen(seg);
+    size_t n = 0;
+
+    while (n + seglen < 2000) {
+      memcpy(subj + n, seg, seglen);
+      n += seglen;
+    }
+    memcpy(subj + n, "index.html", 11);
+    assertf(strjoker_bounds(subj, "*[path]*[file]", &steps, &maxsteps, NULL,
+                            NULL) != NULL);
+    assertf(steps < maxsteps / 4);
+  }
   freet(pat);
   freet(subj);
   printf("filterbounds: OK\n");

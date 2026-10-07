@@ -125,12 +125,17 @@ int fa_strjoker_dual(int type, char **filters, int nfil, const char *nom1,
 /* STRJOKER_MAXLEN alone still allows ~2000 frames, ~900KB of stack, which
    overflows the 1MB a Windows thread gets (#574). */
 #define STRJOKER_MAXDEPTH 256u
-#define STRJOKER_MAXSTEPS 2000000u
+/* Work quanta, not calls, because one call can rescan its whole class. A
+   scanned byte costs one; a call costs far more than that, so it is weighed
+   against the same budget rather than counted. */
+#define STRJOKER_MAXSTEPS 24000000u
+#define STRJOKER_CALLCOST 16u
 
 /* Failure memo for the recursive matcher: one bit per (chaine, joker) offset
    pair keeps star-heavy patterns polynomial instead of exponential (#501). */
 typedef struct strjoker_memo {
   const char *chaine0, *joker0; /* offsets are relative to these bases */
+  size_t len0; /* strlen(chaine0). chaine is always a suffix of it. */
   size_t stride;                /* strlen(joker0) + 1 */
   unsigned char *failed;        /* failed-pair bitmap; NULL: no memo */
   size_t *nsteps; /* shared work counter; NULL: unbounded (oracle) */
@@ -141,6 +146,13 @@ typedef struct strjoker_memo {
 static const char *strjoker_impl(strjoker_memo *memo, const char *chaine,
                                  const char *joker, LLint *size, int *size_flag,
                                  size_t depth);
+
+/* One call reads its whole class, so counting calls alone bounds no real work
+   (OSS-Fuzz 5279208050589696). */
+static void strjoker_charge(strjoker_memo *memo, size_t n) {
+  if (memo->nsteps != NULL)
+    *memo->nsteps += n;
+}
 
 /* A pair that failed once fails forever (*size is only written on the success
    path), so record NULL results and cut the re-exploration. */
@@ -154,7 +166,8 @@ static const char *strjoker_rec(strjoker_memo *memo, const char *chaine,
     memo->maxdepth = depth;
   /* Charge the budget before the depth cap: cut disables the memo, so uncounted
      deep calls would let the sub-cap search explode (OSS-Fuzz 535114376). */
-  if (memo->nsteps != NULL && ++*memo->nsteps > STRJOKER_MAXSTEPS)
+  if (memo->nsteps != NULL &&
+      (*memo->nsteps += STRJOKER_CALLCOST) > STRJOKER_MAXSTEPS)
     return NULL; /* work budget spent: fail the match safely */
   if (depth >= STRJOKER_MAXDEPTH) {
     memo->cut = HTS_TRUE;
@@ -178,7 +191,9 @@ static const char *strjoker_rec(strjoker_memo *memo, const char *chaine,
 static const char *strjoker_bounded(const char *chaine, const char *joker,
                                     LLint *size, int *size_flag, size_t *nsteps,
                                     size_t *maxdepth) {
-  strjoker_memo memo = {chaine, joker, 0, NULL, nsteps, 0, HTS_FALSE};
+  strjoker_memo memo = {chaine, joker,    chaine != NULL ? strlen(chaine) : 0,
+                        0,      NULL,     nsteps,
+                        0,      HTS_FALSE};
   unsigned char stackbits[2048];
   hts_boolean onheap = HTS_FALSE;
   const char *adr;
@@ -224,7 +239,9 @@ HTS_INLINE const char *strjoker(const char *chaine, const char *joker,
 /* Test-only oracle: the same matcher without the failure memo. */
 const char *strjoker_nomemo(const char *chaine, const char *joker, LLint *size,
                             int *size_flag) {
-  strjoker_memo memo = {chaine, joker, 0, NULL, NULL, 0, HTS_FALSE};
+  strjoker_memo memo = {chaine, joker,    chaine != NULL ? strlen(chaine) : 0,
+                        0,      NULL,     NULL,
+                        0,      HTS_FALSE};
 
   return strjoker_rec(&memo, chaine, joker, size, size_flag, 0);
 }
@@ -302,6 +319,7 @@ static const char *strjoker_impl(strjoker_memo *memo, const char *chaine,
 
       for(i = 0; i < 256; i++)
         pass[i] = 0;
+      strjoker_charge(memo, sizeof(pass));
 
       // noms réservés
       if ((strfield(joker + 2, "file")) || (strfield(joker + 2, "name"))) {
@@ -311,18 +329,21 @@ static const char *strjoker_impl(strjoker_memo *memo, const char *chaine,
         //pass[(int) ';'] = 0;
         pass[(int) '/'] = 0;
         i = joker_class_end(joker, RIGHT);
+        strjoker_charge(memo, sizeof(pass) + (size_t) i);
       } else if (strfield(joker + 2, "path")) {
         for(i = 0; i < 256; i++)
           pass[i] = 1;
         pass[(int) '?'] = 0;
         //pass[(int) ';'] = 0;
         i = joker_class_end(joker, RIGHT);
+        strjoker_charge(memo, sizeof(pass) + (size_t) i);
       } else if (strfield(joker + 2, "param")) {
         if (chaine[0] == '?') { // il y a un paramètre juste là
           for(i = 0; i < 256; i++)
             pass[i] = 1;
         }                       // sinon synonyme de 'rien'
         i = joker_class_end(joker, RIGHT);
+        strjoker_charge(memo, sizeof(pass) + (size_t) i);
       } else {
         // décode les directives comme *[A-Z,âêîôû,0-9]
         i = 2;
@@ -330,6 +351,8 @@ static const char *strjoker_impl(strjoker_memo *memo, const char *chaine,
           cut = 1;              // caractère supplémentaire interdit
         } else {
           int len = (int) strlen(joker);
+
+          strjoker_charge(memo, (size_t) len);
           int nbounds = 0;  // size bounds read so far, all satisfied
           LLint slimit = 0; // last of them, reported back as the limit
 
@@ -374,6 +397,8 @@ static const char *strjoker_impl(strjoker_memo *memo, const char *chaine,
                 for(j = (int) (unsigned char) joker[i];
                     j <= (int) (unsigned char) joker[i + 2]; j++)
                   pass[j] = 1;
+                strjoker_charge(memo,
+                                (size_t) (j - (int) (unsigned char) joker[i]));
               }
               i += 3;
             } else { // 1 car, ex: *[ ]
@@ -403,6 +428,7 @@ static const char *strjoker_impl(strjoker_memo *memo, const char *chaine,
 
       for(i = 0; i < 256; i++)
         pass[i] = 1;            // tout autoriser
+      strjoker_charge(memo, sizeof(pass));
       jmp = 1;
     }
 
@@ -430,7 +456,7 @@ static const char *strjoker_impl(strjoker_memo *memo, const char *chaine,
       // tester
       i = 0;
       if (!unique)
-        max = (int) strlen(chaine);
+        max = (int) (memo->len0 - (size_t) (chaine - memo->chaine0));
       else                      /* *(a) only match a (not aaaaa) */
         max = strnotempty(chaine) ? 1 : 0; /* empty chaine: no char to eat */
       while(i < (int) max) {
@@ -465,6 +491,7 @@ static const char *strjoker_impl(strjoker_memo *memo, const char *chaine,
         }
         jmp++;
       }
+      strjoker_charge(memo, (size_t) jmp);
 
       // comparaison ok?
       if (ok) {
