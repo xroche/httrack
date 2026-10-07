@@ -918,20 +918,9 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
             filters_insert(opt, filptr, rule); /* bumps filptr when stored */
           }
 
-          /* sanity check */
-          if (filptr + 1 >= opt->maxfilter &&
-              filters_may_grow(opt->maxfilter)) {
-            opt->maxfilter += HTS_FILTERSINC;
-            if (filters_init(&filters, opt->maxfilter, HTS_FILTERSINC) == 0) {
-              printf("PANIC! : Too many filters : >%d [%d]\n", filptr,
-                     __LINE__);
-              hts_log_print(opt, LOG_PANIC,
-                            "Too many filters, giving up..(>%d)", filptr);
-              hts_log_print(opt, LOG_NOTICE,
-                            "To avoid that: use #F option for more filters (example: -#F5000)");
-              XH_extuninit;
-              return 0;
-            }
+          if (!filters_grow(opt, 1)) {
+            XH_extuninit;
+            return 0;
           }
         }
 
@@ -2603,7 +2592,7 @@ hts_boolean filters_may_grow(int maxfilter) {
   return maxfilter <= HTS_FILTERS_MAX;
 }
 
-void filters_make_room(httrackp *opt, int n) {
+hts_boolean filters_grow(httrackp *opt, int n) {
   if (*opt->filters.filptr + n >= opt->maxfilter &&
       filters_may_grow(opt->maxfilter)) {
     opt->maxfilter += HTS_FILTERSINC;
@@ -2617,9 +2606,15 @@ void filters_make_room(httrackp *opt, int n) {
       hts_log_print(
           opt, LOG_INFO,
           "To avoid that: use #F option for more filters (example: -#F5000)");
-      assertf("too many filters - giving up" == NULL);
+      return HTS_FALSE;
     }
   }
+  return HTS_TRUE;
+}
+
+void filters_make_room(httrackp *opt, int n) {
+  if (!filters_grow(opt, n))
+    assertf("too many filters - giving up" == NULL);
 }
 
 int filters_match_url(char **filters, int nfil, const char *adr,

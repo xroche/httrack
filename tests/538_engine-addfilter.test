@@ -30,7 +30,7 @@ done
 
 out=$(httrack -O /dev/null -#test=filtergrow)
 for want in "growth bound: ok=1" "full list drops a rule: ok=1" \
-    "no growth past the bound: ok=1" "filtergrow self-test OK"; do
+    "a full list grows: ok=1" "no growth past the bound: ok=1" "filtergrow self-test OK"; do
     grep -qxF "$want" <<<"$out" || fail "missing '$want' in: $out"
 done
 

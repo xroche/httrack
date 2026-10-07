@@ -475,9 +475,12 @@ void filters_remove(httrackp *opt, int pos, int n);
 /* Can a filter array of maxfilter rules grow by HTS_FILTERSINC? */
 hts_boolean filters_may_grow(int maxfilter);
 
-/* Grow the filter array so n more rules fit, unless filters_may_grow() says
-   no, in which case filters_insert() drops the rules that do not fit. Aborts
-   when memory runs out. */
+/* Makes room for n more rules. Returns HTS_FALSE, having logged it, only when
+   memory runs out. At the HTS_FILTERS_MAX cap it returns HTS_TRUE and
+   filters_insert() drops what does not fit. */
+hts_boolean filters_grow(httrackp *opt, int n);
+
+/* Same as filters_grow(), but aborts when memory runs out. */
 void filters_make_room(httrackp *opt, int n);
 
 /* Returns the fa_strjoker_dual() verdict of the nfil filters on adr+fil, in

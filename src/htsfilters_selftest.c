@@ -563,6 +563,14 @@ static int st_filtergrow(httrackp *opt, int argc, char **argv) {
   printf("full list drops a rule: ok=%d\n", ok);
   all = all && ok;
 
+  strlcpybuff(filters[0], "+first*", HTS_FILTER_SLOT_SIZE);
+  filters_make_room(opt, 1);
+  ok = opt->maxfilter == 128 + HTS_FILTERSINC &&
+       strcmp(filters[0], "+first*") == 0 &&
+       filters_insert(opt, filptr, "+grown*") && filptr == 128;
+  printf("a full list grows: ok=%d\n", ok);
+  all = all && ok;
+
   /* Neither call reads the array here, so it need not be this large. */
   opt->maxfilter = HTS_FILTERS_MAX + 1;
   filptr = opt->maxfilter - 1;

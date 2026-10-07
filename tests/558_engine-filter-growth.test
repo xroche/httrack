@@ -1,0 +1,47 @@
+#!/bin/bash
+#
+# Scan rules read at mirror start grow the filter list past -#F, so none of
+# them is dropped. The bound on that growth is checked by 538's filtergrow.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+httrack_bin=$(httrack_path)
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_fgrow.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "$tmp"
+
+mkdir "$tmp/site"
+for f in kept early gone; do
+    printf '<a href="%s.html">%s</a>\n' "$f" "$f"
+    echo "$f" >"$tmp/site/$f.html"
+done >"$tmp/site/index.html"
+
+# -#F128 holds 127 rules, so 1200 more cross two growth steps. The first rule,
+# -*early.html, must survive them, and the last rule, -*gone.html, must still
+# apply.
+{
+    echo '-*early.html'
+    for i in $(seq 1 1200); do echo "+r$i.example/*"; done
+    echo '-*gone.html'
+} >"$tmp/rules.txt"
+
+"$httrack_bin" "file://$tmp/site/index.html" -O "$tmp/out" -#F128 \
+    -%S "$tmp/rules.txt" -q >"$tmp/stdout" 2>&1 ||
+    fail_dump "httrack failed" "$tmp/stdout" "$tmp/out/hts-log.txt"
+
+log="$tmp/out/hts-log.txt"
+assert_file "$log"
+grep -q 'launched on' "$log" || fail_dump "no launch line" "$log"
+if grep -q 'Filter rule dropped' "$log"; then
+    fail_dump "a rule was dropped" "$log"
+fi
+mirror_has_name "$tmp/out" kept.html || fail "kept.html not mirrored"
+if mirror_has_name "$tmp/out" early.html; then
+    fail "the first rule was lost: early.html mirrored"
+fi
+if mirror_has_name "$tmp/out" gone.html; then
+    fail "the last rule was lost: gone.html mirrored"
+fi
+ok "1202 scan rules kept at -#F128"
