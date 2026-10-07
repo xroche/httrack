@@ -1467,6 +1467,8 @@ run_with_timeout() {
     local start=$SECONDS
     while kill -0 "$pid" 2>/dev/null; do
         if test "$((SECONDS - start))" -gt "$secs"; then
+            # Seconds from launch to the kill decision, so a test can time it apart from the reap.
+            WATCHDOG_FIRED_AT=$((SECONDS - start))
             dump_overrun "$pid" "$secs" "$*"
             kill_tree "$pid" "$winpid"
             reap_bounded "$pid" || true

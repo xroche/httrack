@@ -117,7 +117,7 @@ fi
     test "$rc" -eq 0 || fail "starved watchdog killed a healthy command ($rc)"
 
     start=$SECONDS
-    rc=0
+    rc=0 WATCHDOG_FIRED_AT=
     if target_is_windows; then
         run_with_timeout 3 ping -n 60 127.0.0.1 || rc=$?
     else
@@ -127,9 +127,10 @@ fi
     test "$rc" -eq 124 || fail "starved watchdog reported $rc, want 124"
     # Never under budget, or a guard that kills everything on sight would pass.
     test "$elapsed" -ge 3 || fail "the watchdog fired early (${elapsed}s of 3s)"
-    # One poll and up to two reap polls take 12s at 4s each, but counting polls takes 16s.
-    test "$elapsed" -lt 14 ||
-        fail "deadline counted polls, not seconds: ${elapsed}s for a 3s budget"
+    # The first 4s poll is past 3s, so it fires at 4-5s, while counting three polls takes 12s.
+    test -n "$WATCHDOG_FIRED_AT" || fail "the watchdog never recorded when it fired"
+    test "$WATCHDOG_FIRED_AT" -lt 12 ||
+        fail "deadline counted polls, not seconds: fired after ${WATCHDOG_FIRED_AT}s for a 3s budget"
 )
 subshell_ok $?
 
