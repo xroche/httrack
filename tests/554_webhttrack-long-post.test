@@ -1,0 +1,130 @@
+#!/bin/bash
+#
+# A form post longer than 32 KiB reaches the saved profile whole, and a body
+# over the server's cap is refused rather than cut.
+
+set -euo pipefail
+
+# shellcheck source=tests/webhttracklib.sh
+. "${0%"${0##*/}"}./webhttracklib.sh"
+
+htsserver_require
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_longpost.XXXXXX") || fail "no tmpdir"
+cleanup_push htsserver_cleanup_dir "${work}"
+
+htsserver_start --home "${work}"
+
+htsserver_python - "${HTS_URL}" "${HTS_PORT}" "${work}" <<'PY' || fail "see above"
+import os
+import socket
+import sys
+from urllib.parse import quote
+
+from webtestlib import Session, textarea
+
+s, port, work = Session(sys.argv[1]), int(sys.argv[2]), sys.argv[3]
+
+
+def raw(head, body, page="step3.html"):
+    """Send HEAD and BODY as one raw POST to PAGE, and return the status code."""
+    c = socket.create_connection(("127.0.0.1", port), 10)
+    c.settimeout(60)
+    c.sendall(("POST /server/%s HTTP/1.0\r\nHost: 127.0.0.1\r\n"
+               "Content-type: application/x-www-form-urlencoded\r\n%s\r\n"
+               % (page, head)).encode() + body.encode())
+    c.shutdown(socket.SHUT_WR)
+    out = b""
+    while True:
+        chunk = c.recv(65536)
+        if not chunk:
+            break
+        out += chunk
+    c.close()
+    return out.split(b"\r\n", 1)[0].decode("latin-1").split(" ")[1:2]
+
+
+def projname():
+    page = s.get("step3.html?sid=" + s.sid)
+    start = page.index("<title>'") + len("<title>'")
+    return page[start:page.index("'", start)]
+
+
+def padded(head, tail, size):
+    """Return HEAD, a filler field and TAIL, as a body of exactly SIZE bytes."""
+    body = "%s&filler=&%s" % (head, tail)
+    return body.replace("filler=", "filler=" + "x" * (size - len(body)), 1)
+
+
+CAP = 8 * 1024 * 1024
+s.post("step3.html", [("projname", "start")])
+sid = "sid=" + s.sid
+
+# A body of exactly the cap is read whole, so its last field lands.
+status = raw("Content-length: %d\r\n" % CAP, padded(sid, "projname=atcap", CAP))
+if status != ["302"] or projname() != "atcap":
+    sys.exit("a body of exactly the cap got %r and projname %r"
+             % (status, projname()))
+
+# A refused launch writes no profile, which the engine start comes after.
+launch = "&".join("%s=%s" % (k, quote(v)) for k, v in [
+    ("path", work), ("projname", "refused"), ("winprofile", "x"),
+    ("command_do", "start"),
+    ("command", "httrack --quiet http://127.0.0.1:1/ -O %s/refused" % work)])
+status = raw("", padded(sid + "&" + launch, "end=1", CAP + 1), "step4.html")
+if os.path.exists(work + "/refused"):
+    sys.exit("a refused step 4 post started a mirror")
+if status != ["413"]:
+    sys.exit("a step 4 post over the cap got %r" % status)
+
+over = padded(sid, "projname=overcap", CAP + 1)
+status = raw("Content-length: %d\r\n" % len(over), over)
+if status != ["413"]:
+    sys.exit("a body one byte over the cap got %r" % status)
+status = raw("", over)
+if status != ["413"]:
+    sys.exit("a body one byte over the cap without Content-length got %r"
+             % status)
+
+wrong = []
+for bad in ("-5", "abc", "", "+5", "9" * 20):
+    status = raw("Content-length: %s\r\n" % bad, sid + "&projname=badlength")
+    if status != ["400"]:
+        wrong.append((bad, status))
+if wrong:
+    sys.exit("unreadable Content-length values got %r" % wrong)
+
+if projname() != "atcap":
+    sys.exit("a refused post changed projname to %r" % projname())
+
+# Without Content-length, the server reads to EOF and the field past 32 KiB lands.
+status = raw("", "%s&filler=%s&projname=nolength" % (sid, "x" * 40000))
+if status != ["302"]:
+    sys.exit("a post without Content-length got %r" % status)
+if projname() != "nolength":
+    sys.exit("a 40 KiB post without Content-length lost its tail: %r"
+             % projname())
+
+# A save ends the wizard, so it goes last. About 110 KiB of URLs makes the
+# step 4 post over 200 KiB.
+count = 3300
+urls = "\r\n".join("http://example.com/page-%05d.html" % i for i in range(count))
+s.post("step3.html", [("path", work), ("projname", "long"), ("urls", urls)])
+step4 = s.get("step4.html?sid=" + s.sid)
+command = textarea(step4, "command")
+if command.count("/page-") != count:
+    sys.exit("step 4 renders %d of %d URLs" % (command.count("/page-"), count))
+s.post("step4.html", [("path", work), ("projname", "long"),
+                      ("command", command), ("command_do", "save"),
+                      ("winprofile", textarea(step4, "winprofile"))])
+
+with open(work + "/long/hts-cache/winprofile.ini", newline="") as fp:
+    saved = [line for line in fp if line.startswith("CurrentUrl=")]
+# The profile escapes each CRLF between URLs as %0d%0a and ends lines in CRLF.
+want = "CurrentUrl=" + urls.replace("\r\n", "%0d%0a") + "\r\n"
+if saved != [want]:
+    sys.exit("the saved CurrentUrl differs from the step 3 urls: %d lines, "
+             "tail %r" % (len(saved), saved[0][-40:] if saved else None))
+PY
+
+echo PASS
