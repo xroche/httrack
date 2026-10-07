@@ -158,7 +158,7 @@ cmp -s "$tmp/doit4.before" "$tmp/doit4.after" || {
     exit 1
 }
 
-# --- 6. the reader's split: a double space adds no token, quotes go ----------
+# --- 6. the reader's split: extra spaces add no token, quotes go ----------
 # A crafted line over a real cache. The TAB never reaches the splitter, because
 # linput() drops it.
 out5="$tmp/out5"
@@ -166,7 +166,7 @@ rc=0
 "$bin" "$url" -O "$out5" --quiet -n -%v0 -r2 >/dev/null 2>&1 || rc=$?
 test "$rc" -eq 0 || fail "initial mirror for the crafted line exited $rc"
 {
-    printf '%s -O %s -q -n  -%%v0 -%%F "x\ty z" -r2\n' "$url" "$out5"
+    printf '%s -O %s -q -n  -%%v0 -%%F "x\ty z" -r2 \n' "$url" "$out5"
     tail -n +2 "$out5/hts-cache/doit.log"
 } >"$tmp/doit5"
 mv "$tmp/doit5" "$out5/hts-cache/doit.log"
