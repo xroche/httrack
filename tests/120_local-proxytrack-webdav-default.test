@@ -91,8 +91,7 @@ grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" ||
 # Leftover traces echoed the client's body and the generated response (#911).
 # The padding spills the canary past any stdio buffer, newline or not.
 sentinel=PT911-DAV-BODY-CANARY
-pad=$(printf '%8192s' '')
-resp=$(propfind "" -H 'Expect:' --data-binary "$sentinel${pad// /x}") ||
+resp=$(propfind "" -H 'Expect:' --data-binary "$sentinel$(repeat_chars 8192 x)") ||
     fail_dump "proxytrack died serving a PROPFIND carrying a body" "$ptlog"
 grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" ||
     fail "expected 207 Multi-Status on the canary listing: $resp"
