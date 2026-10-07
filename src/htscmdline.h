@@ -35,11 +35,39 @@ Please visit our Website: http://www.httrack.com
 #define HTSCMDLINE_DEFH
 
 #include "htsglobal.h"
+#include "htsstrings.h"
 
-/* Split "cmd" in place into a NULL-terminated argv vector of *nargs entries,
-   argv[0] being the program name and quotes left for the engine to strip.
-   Returns a malloct'ed vector of pointers into cmd (freet the vector, never its
-   entries), or NULL when it cannot be sized or allocated. */
+/* The argument grammar: a space separates arguments, '"' toggles quoting, and
+   inside quotes \\ and \" are the only escapes. */
+
+/* hts_split_args() flags. */
+/* TAB, CR and LF separate arguments too. */
+#define HTS_SPLIT_FOLD_WS 1
+/* Drop the quote characters, wherever they are in the argument. */
+#define HTS_SPLIT_STRIP_QUOTES 2
+/* Drop an empty argument, but keep a quoted "" (#106). */
+#define HTS_SPLIT_DROP_EMPTY 4
+
+/* Split "cmd" in place into a NULL-terminated vector of *nargs arguments, under
+   the HTS_SPLIT_* flags. Returns a malloct'ed vector of pointers into cmd
+   (freet the vector, never its entries), or NULL when it cannot be sized or
+   allocated. */
+char **hts_split_args(char *cmd, int *nargs, int flags);
+
+/* hts_split_args() under HTS_SPLIT_FOLD_WS: the WebHTTrack command line. */
 char **hts_split_cmdline(char *cmd, int *nargs);
+
+/* Append len bytes of arg to out with \\ and \" escaped, the body of a quoted
+   argument without its quotes. */
+void hts_escape_arg(String *out, const char *arg, size_t len);
+
+/* Append arg to out as one argument: quoted when it holds a space, a quote or a
+   backslash, "" when empty, verbatim otherwise. hts_split_args() with
+   HTS_SPLIT_STRIP_QUOTES reads it back. */
+void hts_quote_arg(String *out, const char *arg);
+
+/* Strip one surrounding quote pair from arg in place, if it starts with a
+   quote. HTS_FALSE when that quote is not closed at its end. */
+hts_boolean hts_unquote_arg(char *arg);
 
 #endif

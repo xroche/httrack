@@ -67,7 +67,7 @@ void expand_home(String * str);
 typedef struct {
   char **argv; /* argc slots used out of capacity allocated */
   /* per slot: the token arrived already unquoted, so the parser must not strip
-     a quote pair off it again (doit.log tokens, unquoted by next_token) */
+     a quote pair off it again (doit.log tokens, unquoted by hts_split_args) */
   hts_boolean *unquoted;
   /* per slot: the token was put here as an option's parameter by something that
      checked the pair, so the parser takes it as a value even where it begins

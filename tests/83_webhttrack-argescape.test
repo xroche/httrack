@@ -22,7 +22,7 @@ test "${#sid}" -eq 32 || fail "did not scrape a 32-hex sid from the page (got '$
 # Fill the wizard fields with what would break each position, then read back the
 # generated command line; the project name stays plain as a control.
 htsserver_client --field "sid=${sid}" \
-    --field 'user=Moz" -V "touch /tmp/pwn' --field 'footer=a\b"c' \
+    --field 'user=Moz" -V "touch /tmp/pwn' --field "footer=a\\b\"c<&'d" \
     --field 'path=/tmp/p' --field 'projname=plain proj' \
     --field 'urls=http://x/a"b' --field 'url2=+*.png"</textarea>' \
     --field 'sitemap=1' --field 'sitemapurl=http://x/s.xml"b' >/dev/null
@@ -48,9 +48,9 @@ grep -qF -- '--user-agent "Moz" -V "touch' <<<"${cmdline}" &&
     fail "the user-agent still closes its argument early: ${cmdline}"
 
 # A backslash is escaped too, or the split would eat it along with the quote
-# that follows.
-grep -qF -- '--footer "a\\b\"c"' <<<"${cmdline}" ||
-    fail "the backslash in the footer was not escaped: ${cmdline}"
+# that follows. The HTML escape then runs over the argument escape's output.
+grep -qF -- '--footer "a\\b\"c&lt;&amp;&#39;d"' <<<"${cmdline}" ||
+    fail "the footer was not argument- then HTML-escaped: ${cmdline}"
 
 # The url and filter fields sit outside quotes, where a backslash cannot escape
 # anything: one quote there flips the parity of every quote after it, so the

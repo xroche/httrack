@@ -37,21 +37,27 @@ Please visit our Website: http://www.httrack.com
 
 #include <limits.h>
 #include <stdint.h>
+#include <string.h>
 
-char **hts_split_cmdline(char *cmd, int *nargs) {
+char **hts_split_args(char *cmd, int *nargs, int flags) {
+  const hts_boolean fold = (flags & HTS_SPLIT_FOLD_WS) != 0;
+  const hts_boolean strip = (flags & HTS_SPLIT_STRIP_QUOTES) != 0;
+  const hts_boolean drop_empty = (flags & HTS_SPLIT_DROP_EMPTY) != 0;
   size_t nsep = 0;
   size_t capacity;
   size_t r;
   size_t w;
+  size_t start = 0;
+  hts_boolean has_input = HTS_FALSE; /* any byte since the last separator */
   int argc = 0;
   hts_boolean quoted = HTS_FALSE;
   char **argv;
 
   *nargs = 0;
 
-  /* fold the other separators, so counting them sizes the vector exactly */
+  /* fold TAB, CR and LF to spaces when asked, so the space count sizes argv */
   for (r = 0; cmd[r] != '\0'; r++) {
-    if (cmd[r] == '\t' || cmd[r] == '\r' || cmd[r] == '\n') {
+    if (fold && (cmd[r] == '\t' || cmd[r] == '\r' || cmd[r] == '\n')) {
       cmd[r] = ' ';
     }
     if (cmd[r] == ' ') {
@@ -69,7 +75,6 @@ char **hts_split_cmdline(char *cmd, int *nargs) {
     return NULL;
   }
 
-  argv[argc++] = cmd;
   for (r = 0, w = 0; cmd[r] != '\0';) {
     if (quoted && cmd[r] == '\\' &&
         (cmd[r + 1] == '\\' || cmd[r + 1] == '\"')) {
@@ -77,19 +82,75 @@ char **hts_split_cmdline(char *cmd, int *nargs) {
       cmd[w++] = cmd[r++];
     } else if (cmd[r] == '\"') {
       quoted = !quoted;
-      cmd[w++] = cmd[r++];
+      if (!strip) {
+        cmd[w++] = cmd[r];
+      }
+      r++;
+      has_input = HTS_TRUE;
     } else if (cmd[r] == ' ' && !quoted) {
       cmd[w++] = '\0';
-      assertf((size_t) argc < capacity - 1); /* the last slot holds the NULL */
-      argv[argc++] = cmd + w;
+      if (has_input || !drop_empty) {
+        /* the last slot holds the NULL */
+        assertf((size_t) argc < capacity - 1);
+        argv[argc++] = cmd + start;
+      }
+      start = w;
+      has_input = HTS_FALSE;
       r++;
     } else {
       cmd[w++] = cmd[r++];
+      has_input = HTS_TRUE;
     }
   }
   cmd[w] = '\0';
+  if (has_input || !drop_empty) {
+    /* the loop stored at most one per counted space, so this slot is free */
+    assertf((size_t) argc < capacity - 1);
+    argv[argc++] = cmd + start;
+  }
   argv[argc] = NULL; /* callers may rely on argv[argc] == NULL */
 
   *nargs = argc;
   return argv;
+}
+
+char **hts_split_cmdline(char *cmd, int *nargs) {
+  return hts_split_args(cmd, nargs, HTS_SPLIT_FOLD_WS);
+}
+
+void hts_escape_arg(String *out, const char *arg, size_t len) {
+  size_t i;
+
+  for (i = 0; i < len; i++) {
+    if (arg[i] == '\\' || arg[i] == '\"') {
+      StringAddchar(*out, '\\');
+    }
+    StringAddchar(*out, arg[i]);
+  }
+}
+
+void hts_quote_arg(String *out, const char *arg) {
+  if (arg[0] == '\0') {
+    StringCat(*out, "\"\"");
+  } else if (strpbrk(arg, " \"\\") != NULL) {
+    StringAddchar(*out, '\"');
+    hts_escape_arg(out, arg, strlen(arg));
+    StringAddchar(*out, '\"');
+  } else {
+    StringCat(*out, arg);
+  }
+}
+
+hts_boolean hts_unquote_arg(char *arg) {
+  const size_t len = strlen(arg);
+
+  if (arg[0] != '\"') {
+    return HTS_TRUE;
+  }
+  if (len < 2 || arg[len - 1] != '\"') {
+    return HTS_FALSE;
+  }
+  memmove(arg, arg + 1, len - 2);
+  arg[len - 2] = '\0';
+  return HTS_TRUE;
 }

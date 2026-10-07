@@ -4244,49 +4244,6 @@ int nombre_digit(int n) {
   return i;
 }
 
-// renvoi adresse de la fin du token dans p
-// renvoi NULL si la chaine est un token unique
-// (PATCHE également la chaine)
-// ex: "test" "test2" renvoi adresse sur espace
-// flag==1 si chaine comporte des echappements comme \"
-char *next_token(char *p, int flag) {
-  int detect = 0;
-  int quote = 0;
-
-  p--;
-  do {
-    p++;
-    if (flag && (*p == '\\')) { // skip \x or \"
-      if (quote) {
-        char c = '\0';
-
-        if (*(p + 1) == '\\')
-          c = '\\';
-        else if (*(p + 1) == '"')
-          c = '"';
-        if (c) {
-          /* unescape the 2 chars to one, shifting left in place */
-          *p = c;
-          memmove(p + 1, p + 2, strlen(p + 2) + 1);
-        }
-      }
-    } else if (*p == 34) { // closing quote
-      /* drop the quote, shifting the rest left in place */
-      memmove(p, p + 1, strlen(p + 1) + 1);
-      p--;
-      /* */
-      quote = !quote;
-    } else if (*p == 32) {
-      if (!quote)
-        detect = 1;
-    } else if (*p == '\0') {
-      p = NULL;
-      detect = 1;
-    }
-  } while(!detect);
-  return p;
-}
-
 static int hts_cancel_file_push_(httrackp * opt, const char *url) {
   if (url != NULL && url[0] != '\0') {
     htsoptstatecancel **cancel;
