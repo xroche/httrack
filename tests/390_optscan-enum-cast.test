@@ -2,7 +2,7 @@
 #
 # "%d" writes an int, and an enum-typed option field is one byte wide under
 # -fshort-enums, so a scan aimed at the field through a cast writes past it.
-# scanOptInt() scans its own int. htscoremain.c holds every option scan today.
+# readGluedLevel() reads into its own int. htscoremain.c holds every option scan today.
 
 set -euo pipefail
 
@@ -29,9 +29,9 @@ for bad in 'sscanf(com + 1, "%d", (int *) &opt->urlmode);' \
 done
 
 # And a pattern matching everything would be just as silent, so pin the two
-# forms that must stay clear: the direct scan and scanOptInt().
+# forms that must stay clear: the direct scan and readGluedLevel().
 for good in 'sscanf(com + 1, "%d", &opt->urlmode);' \
-    'scanOptInt(com + 1, &opt->urlmode);'; do
+    'readGluedLevel(opt->urlmode, HTS_URLMODE_TRANSPARENT_PROXY);'; do
     grep -qE "$pattern" <<<"$good" && fail "the pattern matches a good line: $good"
 done
 
@@ -39,6 +39,6 @@ found=$(grep -nE "$pattern" "$src" || true)
 [ -z "$found" ] || fail "option scan writing through a cast pointer in $src:
 $found"
 
-grep -q 'scanOptInt' "$src" || fail "scanOptInt() has left $src"
+grep -q 'readGluedLevel' "$src" || fail "readGluedLevel() has left $src"
 
 echo "optscan: no option scan in htscoremain.c writes through a cast pointer"
