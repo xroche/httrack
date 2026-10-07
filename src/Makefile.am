@@ -60,6 +60,7 @@ lib_LTLIBRARIES = libhttrack.la
 htsserver_SOURCES = htsserver.c htsserver.h htsweb.c htsweb.h htsstats.h \
 	htsrandom.c htsrandom.h \
 	htscmdline.c htscmdline.h \
+	htslines.c htslines.h \
 	htsurlport.c htsurlport.h htsescape.c htsescape.h
 proxytrack_SOURCES = proxy/main.c \
 	proxy/proxytrack.c proxy/store.c \
@@ -86,11 +87,12 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	htscmdline_selftest.c \
 	htscookie_selftest.c htsdns_selftest.c htsfilters_selftest.c \
 	htsheader_selftest.c htsio_selftest.c htslib_selftest.c \
+	htslines_selftest.c \
 	htsmime_selftest.c htsname_selftest.c htsnet_selftest.c \
 	htsopt_selftest.c htsparse_selftest.c htswarc_selftest.c \
 	htswizard_selftest.c \
 	htscatchurl.c htsfilters.c htsftp.c htshash.c coucal/coucal.c \
-	htscmdline.c htshelp.c htslib.c htsurlport.c htsdate.c htscoremain.c \
+	htscmdline.c htshelp.c htslib.c htslines.c htsurlport.c htsdate.c htscoremain.c \
 	htsname.c htsrobots.c htstools.c htsrandom.c htswizard.c \
 	htsalias.c htsthread.c htsindex.c htsbauth.c \
 	htscrashtest.c \
@@ -103,7 +105,7 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	htsselftest.h htsselftest_int.h htsselftest_util.h htscatchurl.h  \
 	htscmdline.h htsconfig.h htscore.h htsparse.h htscoremain.h htsdefines.h  \
 	htsfilters.h htsftp.h htsglobal.h htshash.h coucal/coucal.h \
-	htshelp.h htsindex.h htsio.h htslib.h htsurlport.h htsmd5.h \
+	htshelp.h htsindex.h htsio.h htslib.h htslines.h htsurlport.h htsmd5.h \
 	htsmodules.h htsname.h htsnet.h htssniff.h \
 	htsopt.h htsrobots.h htsthread.h htswin32.h  \
 	htscrashtest.h htstools.h htsrandom.h htswizard.h htswrap.h htscodec.h htswarc.h htschanges.h htssinglefile.h htssitemap.h htsproxy.h htszlib.h  \

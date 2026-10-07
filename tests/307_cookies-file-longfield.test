@@ -43,7 +43,7 @@ jar="$tmp/jar.txt"
     # from below: neither of these may be refused for its value
     rec www.example.com / BIGVAL "$(repeat_chars 500 v)"
     rec www.example.com / BIGVAL7900 "$(repeat_chars 7900 v)"
-    # 8049 bytes: over the line gate, under what rawlinput() reads in one go
+    # 8049 bytes: over the line gate, under what the line reader keeps
     rec www.example.com / LONGLINE "$(repeat_chars 8000 L)"
     rec www.example.com / GOODLAST v2
 } >"$jar"

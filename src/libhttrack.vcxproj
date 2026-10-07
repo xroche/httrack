@@ -143,6 +143,7 @@
     <ClCompile Include="htsheader_selftest.c" />
     <ClCompile Include="htsio_selftest.c" />
     <ClCompile Include="htslib_selftest.c" />
+    <ClCompile Include="htslines_selftest.c" />
     <ClCompile Include="htsmime_selftest.c" />
     <ClCompile Include="htsname_selftest.c" />
     <ClCompile Include="htsnet_selftest.c" />
@@ -157,6 +158,7 @@
     <ClCompile Include="htsindex.c" />
     <ClCompile Include="htslib.c" />
     <ClCompile Include="htscmdline.c" />
+    <ClCompile Include="htslines.c" />
     <ClCompile Include="htscmdline_selftest.c" />
     <ClCompile Include="htsselftest_util.c" />
     <ClCompile Include="htsurlport.c" />

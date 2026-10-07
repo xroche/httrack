@@ -3501,16 +3501,19 @@ static int st_cacheindex(httrackp *opt, int argc, char **argv) {
     freet(buf);
   }
 
-  /* cache_binput reads a field while in bounds, but refuses one starting at
+  /* binput_line reads a field while in bounds, but refuses one starting at
      or past end-of-buffer. */
   {
     char buf[8] = "ab\ncd";
     const char *const end = buf + 5;
     char s[16];
+    int adv;
 
-    if (cache_binput(buf, end, s, sizeof(s)) != 3 || strcmp(s, "ab") != 0)
+    (void) binput_line(buf, end, s, sizeof(s), &adv);
+    if (adv != 3 || strcmp(s, "ab") != 0)
       fail = 1; /* normal read: "ab" then the '\n', 3 bytes consumed */
-    if (cache_binput(end, end, s, sizeof(s)) != 0 || s[0] != '\0')
+    (void) binput_line(end, end, s, sizeof(s), &adv);
+    if (adv != 0 || s[0] != '\0')
       fail = 1;
   }
 
@@ -3529,11 +3532,14 @@ static int st_cacheindex(httrackp *opt, int argc, char **argv) {
     a += cache_brstr(a, line, sizeof(line));
     a += cache_brstr(a, line, sizeof(line));
     while (a != NULL && a < end) {
+      int adv;
+
       a = strchr(a + 1, '\n');
       if (a == NULL)
         break;
       a++;
-      a += cache_binput(a, end, line, sizeof(line));
+      (void) binput_line(a, end, line, sizeof(line), &adv);
+      a += adv;
     }
     freet(buf);
   }

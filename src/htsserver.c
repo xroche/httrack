@@ -84,7 +84,11 @@ coucal NewLangList = NULL;
 
 #include "htsserver.h"
 #include "htscmdline.h"
+#include "htslines.h"
 #include "htsthread.h"
+
+/* This server's line readers drop TAB, form feed and NUL. */
+#define HTS_LINES_SERVER (HTS_LINE_DROP_TAB | HTS_LINE_DROP_NUL)
 
 const char *gethomedir(void);
 int commandRunning = 0;
@@ -1453,15 +1457,22 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             fp = NULL;
           }
           if (fp) {
+            String sline = STRING_EMPTY;
+
             /* Read file */
             while (!feof(fp) && !ferror(fp)) {
-              char *str = line;
+              char *entry;
               char *pos;
 
-              if (!linput(fp, line, sizeof(line) - 2)) {
-                *str = '\0';
+              /* a clipped value is not the saved one: keep the default */
+              if (hts_readline_alloc(fp, &sline, HTS_READLINE_ALLOC_MAX,
+                                     HTS_LINES_SERVER)) {
+                fprintf(stderr, "%s: line too long, ignored\n",
+                        StringBuff(fspath));
+                continue;
               }
-              pos = strchr(line, '=');
+              entry = StringBuffRW(sline);
+              pos = strchr(entry, '=');
               if (pos) {
                 String escline = STRING_EMPTY;
                 char listid[16];
@@ -1469,14 +1480,14 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                 *pos++ = '\0';
                 /* Keep the command-line path over the saved one. */
                 if (doLoad == 2 && path_from_cmdline &&
-                    strcmp(line, "path") == 0)
+                    strcmp(entry, "path") == 0)
                   continue;
                 /* Only a checkbox: elsewhere zero is the user's value, and
                    emptying it silently restores the wizard default (#1177). */
                 if (pos[0] == '0' && pos[1] == '\0' &&
-                    ini_key_is_checkbox(line))
+                    ini_key_is_checkbox(entry))
                   *pos = '\0';
-                if (ini_key_is_list(line)) {
+                if (ini_key_is_list(entry)) {
                   const int id = ini_list_shift(pos, strlen(pos), 1);
 
                   if (id >= 0) {
@@ -1488,11 +1499,12 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                    empty, and an acquired NULL reads back as absent (#1186). */
                 StringClear(escline);
                 hts_unescapeini(pos, &escline);
-                coucal_write(NewLangList, line,
-                              (intptr_t) StringAcquire(&escline));
+                coucal_write(NewLangList, entry,
+                             (intptr_t) StringAcquire(&escline));
               }
             }
 
+            StringFree(sline);
             fclose(fp);
           }
         }
@@ -2487,6 +2499,22 @@ int smallserver_setkeyarr(const char *key, int id, const char *key2, const char 
   return coucal_write(NewLangList, tmp, (intptr_t) strdup(value));
 }
 
+/* Read one key and value pair of a lang file into key and value, each of size
+   bytes. Returns HTS_FALSE when either line was cut, so the caller skips the
+   pair, and the next pair still lines up. */
+static hts_boolean lang_read_pair(FILE *fp, char *key, char *value,
+                                  size_t size) {
+  const hts_boolean key_cut = hts_readline_cpp(fp, key, size, HTS_LINES_SERVER);
+  const hts_boolean value_cut =
+      hts_readline_cpp(fp, value, size, HTS_LINES_SERVER);
+
+  if (key_cut || value_cut) {
+    fprintf(stderr, "lang: line too long, ignored\n");
+    return HTS_FALSE;
+  }
+  return HTS_TRUE;
+}
+
 static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
   const char *hashname;
   char catbuff[CATBUFF_SIZE];
@@ -2519,8 +2547,8 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
       char key[8192];
 
       while(!feof(fp)) {
-        linput_cpp(fp, intkey, 8000);
-        linput_cpp(fp, key, 8000);
+        if (!lang_read_pair(fp, intkey, key, 8000))
+          continue;
         if (strnotempty(intkey) && strnotempty(key)) {
           const char *test = LANGINTKEY(key);
 
@@ -2588,9 +2616,8 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
         hts_boolean found = HTS_FALSE;
 
         while (!found && !feof(fp)) {
-          linput_cpp(fp, extkey, 8000);
-          linput_cpp(fp, value, 8000);
-          if (strcmp(extkey, wanted) == 0 && value[0] != '\0') {
+          if (lang_read_pair(fp, extkey, value, 8000) &&
+              strcmp(extkey, wanted) == 0 && value[0] != '\0') {
             limit_to[0] = '\0';
             strlncatbuff(limit_to, value, limit_size, limit_size - 1);
             found = HTS_TRUE;
@@ -2628,8 +2655,8 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
         char value[8192];
 
         while(!feof(fp)) {
-          linput_cpp(fp, extkey, 8000);
-          linput_cpp(fp, value, 8000);
+          if (!lang_read_pair(fp, extkey, value, 8000))
+            continue;
           if (strnotempty(extkey) && strnotempty(value)) {
             const char *intkey;
 
