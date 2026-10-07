@@ -175,6 +175,7 @@ rc=0
 test "$rc" -eq 0 || fail "crafted-line reprise exited $rc"
 want="$url -O $out5 -q -n -%v0 -%F \"xy z\" -r2"
 got=$(head -1 "$out5/hts-cache/doit.log")
+got=${got%"$SELFTEST_CR"} # LF is CR LF on Windows
 test "$got" = "$want" || fail "crafted line read back as [$got], want [$want]"
 
 exit 0
