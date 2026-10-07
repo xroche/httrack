@@ -163,7 +163,7 @@ fi
 TMPSRVFILE="$(mktemp "${TMPDIR:-/tmp}/.webhttrack.XXXXXXXX")" || ! log "Could not create the temporary file ${TMPSRVFILE}" || exit 1
 # Launch htsserver binary and setup the server
 (
-    "${BINPATH}/htsserver" "${DISTPATH}/" --ppid "$$" path "${HOME}/websites" lang "${LANGN}" "$@"
+    "${BINPATH}/htsserver" "${DISTPATH}/" --ppid "$$" lang "${LANGN}" "$@"
     echo SRVURL=error
 ) >"${TMPSRVFILE}" &
 # Find the generated SRVURL

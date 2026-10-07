@@ -1,0 +1,54 @@
+#!/bin/bash
+#
+# A path given to htsserver must win over the default and over the path= saved
+# in ~/.httrack.ini; without one, the saved path still wins over the default.
+
+set -euo pipefail
+
+# shellcheck source=tests/webhttracklib.sh
+. "${0%"${0##*/}"}./webhttracklib.sh"
+
+htsserver_require
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_path.XXXXXX") || fail "no tmpdir"
+cleanup_push htsserver_cleanup_dir "${work}"
+
+# Prints the value of step2.html's path field. The index page comes first
+# because the first request is the one that loads ~/.httrack.ini.
+shown_path() {
+    "${HTS_PYTHON}" - "${HTS_URL}" <<'PY'
+import html, re, sys, urllib.request
+
+url = sys.argv[1].rstrip("/")
+index = urllib.request.urlopen(url + "/server/index.html", timeout=20).read()
+if not re.search(rb'name="sid" value="[0-9a-f]+"', index):
+    sys.exit("no session id in server/index.html")
+page = urllib.request.urlopen(url + "/server/step2.html", timeout=20).read()
+m = re.search(rb'<input name="path" value="([^"]*)"', page)
+if m is None:
+    sys.exit("no path field in step2.html")
+print(html.unescape(m.group(1).decode("latin-1")))
+PY
+}
+
+check() { # $1 = tag, $2 = expected path, $3 = path= saved in the ini or "", $4.. = htsserver args
+    local tag=$1 want=$2 saved=$3 got
+    shift 3
+    mkdir -p "${work}/h${tag}"
+    if test -n "${saved}"; then
+        printf 'path=%s\n' "${saved}" >"${work}/h${tag}/.httrack.ini"
+    fi
+    printf '[%s] ..\t' "${tag}"
+    htsserver_start --home "${work}/h${tag}" --log "${work}/srv${tag}.log" "$@"
+    got=$(shown_path) || fail "${tag}: could not read the path field"
+    test "${got}" = "${want}" || fail "${tag}: path is '${got}', wanted '${want}'"
+    echo "ok"
+}
+
+check cmdline /cmd/mirrors "" path /cmd/mirrors
+check cmdline-over-ini /cmd/mirrors /ini/mirrors path /cmd/mirrors
+# Controls: the ini still overrides the default, and the default is HOME's.
+check ini-over-default /ini/mirrors /ini/mirrors
+check default "${work}/hdefault/websites" ""
+
+echo "PASS"

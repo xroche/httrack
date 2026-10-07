@@ -252,11 +252,13 @@ static void usage(FILE *fp, const char *argv0) {
   fprintf(fp, "  --ping-timeout <secs>  with --ppid, how long a browser window "
               "that stops answering counts as open (default: 120)\n");
   fprintf(fp, "  key value              any other pair sets a value the "
-              "interface reads, such as lang\n");
+              "interface reads, such as path or lang\n");
   fprintf(fp, "  -h, --help             print this help and exit\n");
   fprintf(fp, "  --version              print the version and exit\n");
   fprintf(fp, "example: %s /usr/share/httrack/ lang 1\n", argv0);
   fprintf(fp, "means: serve the interface in English\n");
+  fprintf(fp, "example: %s /usr/share/httrack/ path /tmp/mirrors\n", argv0);
+  fprintf(fp, "means: keep the projects in /tmp/mirrors\n");
 }
 
 int main(int argc, char *argv[]) {

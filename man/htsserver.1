@@ -37,7 +37,7 @@ exit when the interface started by this launcher process is closed
 with \-\-ppid, how long a browser window that stops answering counts as open (default: 120)
 .TP
 .B key value
-any other pair sets a value the interface reads, such as lang
+any other pair sets a value the interface reads, such as path or lang
 .TP
 .B \-h, \-\-help
 print this help and exit
@@ -48,6 +48,9 @@ print the version and exit
 .TP
 .B htsserver /usr/share/httrack/ lang 1
 serve the interface in English
+.TP
+.B htsserver /usr/share/httrack/ path /tmp/mirrors
+keep the projects in /tmp/mirrors
 .SH DIAGNOSTICS
 Each mirror started from the interface writes its errors and warnings to
 .I hts\-log.txt
