@@ -346,7 +346,7 @@ int proxytrack_main(char *proxyAddr, int proxyPort, char *icpAddr, int icpPort,
   int returncode = 0;
   int tcpErr = 0, udpErr = 0;
   T_SOC soc = smallserver_init(proxyAddr, proxyPort, SOCK_STREAM, &tcpErr);
-  T_SOC socICP = smallserver_init(proxyAddr, icpPort, SOCK_DGRAM, &udpErr);
+  T_SOC socICP = smallserver_init(icpAddr, icpPort, SOCK_DGRAM, &udpErr);
 
   if (soc != INVALID_SOCKET && socICP != INVALID_SOCKET) {
 
@@ -385,13 +385,14 @@ int proxytrack_main(char *proxyAddr, int proxyPort, char *icpAddr, int icpPort,
     if (err == SMALLSERVER_ERR_RESOLVE) {
       fprintf(stderr,
               "Unable to initialize a temporary server : cannot resolve %s\n",
-              proxyAddr);
+              icpFailed ? icpAddr : proxyAddr);
     } else {
       fprintf(stderr,
               "Unable to initialize a temporary server : cannot bind %s port %d"
               " on %s: %s (%d)\n",
               icpFailed ? "udp" : "tcp", icpFailed ? icpPort : proxyPort,
-              proxyAddr, socket_error_string(err, errbuf, sizeof(errbuf)), err);
+              icpFailed ? icpAddr : proxyAddr,
+              socket_error_string(err, errbuf, sizeof(errbuf)), err);
     }
     returncode = 1;
   }
