@@ -2537,7 +2537,7 @@ static int st_warcspandiff(httrackp *opt, int argc, char **argv) {
   (void) opt;
   (void) argc;
   (void) argv;
-  /* An empty OUT is left alone. */
+  /* An OUTSZ of 0 leaves OUT alone. */
   {
     char z = 'Z';
 

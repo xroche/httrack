@@ -229,7 +229,7 @@ PY
 
 echo OK
 
-# Only a list key with a plain id moves, and every other byte stays.
+# Only a list key's id moves, and a CR before the id is lost.
 htsserver_stop
 printf '[the rebase keeps every other byte] ..\t'
 htsserver_start --home "${work}"
