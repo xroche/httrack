@@ -42,6 +42,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsio.h"
 #include "htsdefines.h"
 #include "htsalias.h"
+#include "htscmdline.h"
 #include "htswarc.h"
 #include "htschanges.h"
 #include "htsbauth.h"
@@ -690,23 +691,14 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 
       for(na = 1; na < argc; na++) {
 
-        if (argv[na][0] == '"') {
-          char BIGSTK tempo[HTS_CDLMAXSIZE];
+        if (!hts_unquote_arg(argv[na])) {
+          /* +256 holds the prefix around a max-length argument. */
+          char BIGSTK s[HTS_CDLMAXSIZE + 256];
 
-          strcpybuff(tempo, argv[na] + 1);
-          if (hts_lastchar(tempo) != '"') {
-            /* +256 holds the prefix around a max-length argument. */
-            char BIGSTK s[HTS_CDLMAXSIZE + 256];
-
-            snprintf(s, sizeof(s), "Missing quote in %s", argv[na]);
-            HTS_PANIC_PRINTF(s);
-            htsmain_free();
-            return -1;
-          }
-          hts_choplastchar(tempo);
-          /* tempo is argv[na] minus its surrounding quotes, so it fits in place
-           */
-          strlcpybuff(argv[na], tempo, strlen(argv[na]) + 1);
+          snprintf(s, sizeof(s), "Missing quote in %s", argv[na]);
+          HTS_PANIC_PRINTF(s);
+          htsmain_free();
+          return -1;
         }
 
         if (cmdl_opt(argv[na])) {       // option
@@ -833,41 +825,33 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 
       //
       char BIGSTK buff[8192];
-      char *p, *lastp;
+      char **tokens;
+      int ntokens = 0;
+      int i;
+      hts_boolean ok;
 
       linput(fp, buff, 8000);
       fclose(fp);
       fp = NULL;
-      p = buff;
-      do {
-        int quoted; /* "" unquotes to empty but is still a real token (#106) */
-
-        // read next
-        lastp = p;
-        quoted = (p != NULL && *p == '"');
-        if (p) {
-          p = next_token(p, 1);
-          if (p) {
-            *p = 0;             // null
-            p++;
-          }
-        }
-
-        /* Insert parameters BUT so that they can be in the same order */
-        if (lastp) {
-          if (strnotempty(lastp) || quoted) {
-            if (!cmdl_ins_unquoted(&x_cmd, lastp, insert_after)) {
-              cmdl_free(&x_cmd);
-              HTS_PANIC_PRINTF("Error, not enough memory");
-              htsmain_free();
-              return -1;
-            }
-            /* this engine wrote the line and parsed it once already */
-            cmdl_mark_param(&x_cmd, insert_after);
-            insert_after++;
-          }
-        }
-      } while (lastp != NULL);
+      /* "" unquotes to empty but is still a real token (#106) */
+      tokens = hts_split_args(buff, &ntokens,
+                              HTS_SPLIT_STRIP_QUOTES | HTS_SPLIT_DROP_EMPTY);
+      for (i = 0; tokens != NULL && i < ntokens; i++) {
+        /* inserted in order, after the program name */
+        if (!cmdl_ins_unquoted(&x_cmd, tokens[i], insert_after))
+          break;
+        /* this engine wrote the line and parsed it once already */
+        cmdl_mark_param(&x_cmd, insert_after);
+        insert_after++;
+      }
+      ok = tokens != NULL && i == ntokens;
+      freet(tokens);
+      if (!ok) {
+        cmdl_free(&x_cmd);
+        HTS_PANIC_PRINTF("Error, not enough memory");
+        htsmain_free();
+        return -1;
+      }
       /* the array may have been grown and moved */
       argv = x_cmd.argv;
       argc = x_cmd.argc;
@@ -1257,22 +1241,13 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 
     for(na = 1; na < argc; na++) {
 
-      if (argv[na][0] == '"' && !x_cmd.unquoted[na]) {
-        char BIGSTK tempo[HTS_CDLMAXSIZE + 256];
+      if (!x_cmd.unquoted[na] && !hts_unquote_arg(argv[na])) {
+        char s[HTS_CDLMAXSIZE + 256];
 
-        strcpybuff(tempo, argv[na] + 1);
-        if (hts_lastchar(tempo) != '"') {
-          char s[HTS_CDLMAXSIZE + 256];
-
-          snprintf(s, sizeof(s), "Missing quote in %s", argv[na]);
-          HTS_PANIC_PRINTF(s);
-          htsmain_free();
-          return -1;
-        }
-        hts_choplastchar(tempo);
-        /* tempo is argv[na] minus its surrounding quotes, so it fits in place
-         */
-        strlcpybuff(argv[na], tempo, strlen(argv[na]) + 1);
+        snprintf(s, sizeof(s), "Missing quote in %s", argv[na]);
+        HTS_PANIC_PRINTF(s);
+        htsmain_free();
+        return -1;
       }
 
       if (cmdl_opt(argv[na])) { // option
@@ -2958,31 +2933,17 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                            StringBuff(opt->path_log), "hts-cache/doit.log"),
                    "wb");
         if (fp) {
+          String line = STRING_EMPTY;
+
           for(i = 0 + 1; i < argc; i++) {
             /* argv[] is already unquoted here, so a leading quote is data */
-            if ((strchr(argv[i], ' ') != NULL) ||
-                (strchr(argv[i], '"') != NULL) ||
-                (strchr(argv[i], '\\') != NULL)) {
-              size_t j;
-
-              fprintf(fp, "\"");
-              for(j = 0; argv[i][j] != '\0'; j++) {
-                if (argv[i][j] == 34)
-                  fprintf(fp, "\\\"");
-                else if (argv[i][j] == '\\')
-                  fprintf(fp, "\\\\");
-                else
-                  fprintf(fp, "%c", argv[i][j]);
-              }
-              fprintf(fp, "\"");
-            } else if (strnotempty(argv[i]) == 0) { // ""
-              fprintf(fp, "\"\"");
-            } else { // nothing to escape
-              fprintf(fp, "%s", argv[i]);
-            }
+            hts_quote_arg(&line, argv[i]);
             if (i < argc - 1)
-              fprintf(fp, " ");
+              StringAddchar(line, ' ');
           }
+          if (StringLength(line) != 0)
+            fwrite(StringBuff(line), 1, StringLength(line), fp);
+          StringFree(line);
           fprintf(fp, LF);
           fprintf(fp, "File generated automatically on %s, do NOT edit" LF, t);
           fprintf(fp, LF);

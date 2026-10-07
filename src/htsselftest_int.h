@@ -116,6 +116,7 @@ Please visit our Website: http://www.httrack.com
 extern const struct selftest_entry selftests_back[];
 extern const struct selftest_entry selftests_lib[];
 extern const struct selftest_entry selftests_cache[];
+extern const struct selftest_entry selftests_cmdline[];
 extern const struct selftest_entry selftests_charset[];
 extern const struct selftest_entry selftests_cookie[];
 extern const struct selftest_entry selftests_dns[];

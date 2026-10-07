@@ -495,8 +495,6 @@ int fspc(httrackp * opt, FILE * fp, const char *type);
    whether or not a log file is open. "panic" counts as an error. */
 void fspc_count(httrackp *opt, const char *type);
 
-char *next_token(char *p, int flag);
-
 /* Like fil_normalized(), but first drops query keys in STRIP (comma-separated,
    "*" = all); STRIP NULL/empty behaves exactly like fil_normalized(). */
 char *fil_normalized_filtered(const char *source, char *dest,

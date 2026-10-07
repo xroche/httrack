@@ -80,6 +80,7 @@ CLEANFILES = webhttrack
 libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	htsselftest.c htsselftest_util.c \
 	htsback_selftest.c htscache_selftest.c htscharset_selftest.c \
+	htscmdline_selftest.c \
 	htscookie_selftest.c htsdns_selftest.c htsfilters_selftest.c \
 	htsheader_selftest.c htsio_selftest.c htslib_selftest.c \
 	htsmime_selftest.c htsname_selftest.c htsnet_selftest.c \

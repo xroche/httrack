@@ -798,16 +798,19 @@ static void cat_js_escaped(String *dst, const char *value) {
    escaped for HTML, which the browser undoes when it posts the command line
    back, and for the argv splitter, which does not. */
 static void cat_cmdline_argn(String *output, const char *value, size_t len) {
+  String escaped = STRING_EMPTY;
   size_t i;
 
-  for (i = 0; i < len; i++) {
-    if (value[i] == '\\' || value[i] == '\"') {
-      StringCat(*output, "\\");
-    }
-    if (!cat_html_escaped(output, value[i])) {
-      StringMemcat(*output, &value[i], 1);
+  /* the HTML escape leaves the argument escapes alone, so they compose */
+  hts_escape_arg(&escaped, value, len);
+  for (i = 0; i < StringLength(escaped); i++) {
+    const char c = StringBuff(escaped)[i];
+
+    if (!cat_html_escaped(output, c)) {
+      StringMemcat(*output, &c, 1);
     }
   }
+  StringFree(escaped);
 }
 
 /* see cat_cmdline_argn() */
