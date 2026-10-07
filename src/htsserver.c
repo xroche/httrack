@@ -1064,9 +1064,13 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
   /* Load strings */
   htslang_init();
-  /* A path given on the command line outranks the saved httrack.ini one. */
-  path_from_cmdline =
-      coucal_read(NewLangList, "path", NULL) ? HTS_TRUE : HTS_FALSE;
+  /* A non-empty command-line path outranks the default and httrack.ini's. */
+  {
+    intptr_t adr = 0;
+
+    path_from_cmdline = coucal_readptr(NewLangList, "path", &adr) &&
+                        strnotempty((const char *) adr);
+  }
   if (!htslang_load(NULL, 0, path)) {
     fprintf(stderr, "unable to find lang.def and/or lang/ strings in %s\n",
             path);
@@ -1424,6 +1428,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                 char listid[16];
 
                 *pos++ = '\0';
+                /* Keep the command-line path over the saved one. */
                 if (doLoad == 2 && path_from_cmdline &&
                     strcmp(line, "path") == 0)
                   continue;
