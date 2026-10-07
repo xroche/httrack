@@ -92,6 +92,14 @@ hts_boolean hts_parse_url_port(const char *a, int *port) {
   return HTS_TRUE;
 }
 
+hts_span hts_span_of(const char *s) {
+  hts_span r;
+
+  r.p = s != NULL ? s : "";
+  r.len = strlen(r.p);
+  return r;
+}
+
 hts_boolean hts_span_next(const char **cur, const char *end, char sep,
                           hts_span *out) {
   const char *const start = *cur;
@@ -107,7 +115,7 @@ hts_boolean hts_span_next(const char **cur, const char *end, char sep,
 }
 
 static hts_boolean span_in_set(const char *set, char c) {
-  return set != NULL && c != '\0' && strchr(set, c) != NULL;
+  return c != '\0' && strchr(set, c) != NULL;
 }
 
 hts_span hts_span_trim(hts_span s, const char *left, const char *right) {
@@ -120,12 +128,8 @@ hts_span hts_span_trim(hts_span s, const char *left, const char *right) {
   return s;
 }
 
-const char *hts_span_chr(hts_span s, char c) {
-  return s.len != 0 ? memchr(s.p, c, s.len) : NULL;
-}
-
 hts_boolean hts_span_split(hts_span s, char c, hts_span *head, hts_span *tail) {
-  const char *const at = hts_span_chr(s, c);
+  const char *const at = s.len != 0 ? memchr(s.p, c, s.len) : NULL;
 
   if (at == NULL)
     return HTS_FALSE;
@@ -142,8 +146,7 @@ hts_boolean hts_span_copy(hts_span s, char *dst, size_t size) {
   if (size == 0)
     return HTS_FALSE;
   n = s.len < size ? s.len : size - 1;
-  if (n != 0)
-    memcpy(dst, s.p, n);
+  memcpy(dst, s.p, n);
   dst[n] = '\0';
   return n == s.len;
 }

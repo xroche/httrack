@@ -27,11 +27,6 @@ selftest_queue "[|x]" span split = "=x"
 selftest_queue "none" span split = "abc"
 selftest_queue "none" span split = ""
 
-selftest_queue "1" span chr = "a=b=c"
-selftest_queue "0" span chr = "=a"
-selftest_queue "-1" span chr = "abc"
-selftest_queue "-1" span chr = ""
-
 # Each side has its own set, and a run of mixed members goes whole.
 selftest_queue "[a]" span trim " " " /" "  a/ /"
 selftest_queue "[/a]" span trim " " " /" " /a/"
@@ -41,10 +36,11 @@ selftest_queue "[]" span trim " " " " "   "
 selftest_queue "[x]" span trim $' \t' $' \t' $'\t x \t'
 selftest_queue "[a]" span trim "b" "c" "bbacc"
 
-# The byte after the copy shows whether the terminator landed where it should.
+# "0" is the terminator, "#" the untouched byte after it.
 selftest_queue "clipped [#]" span copy 0 "abc"
 selftest_queue "clipped [0#]" span copy 1 "abc"
 selftest_queue "clipped [ab0#]" span copy 3 "abcdef"
+selftest_queue "clipped [ab0#]" span copy 3 "abc"
 selftest_queue "fit [abc0#]" span copy 4 "abc"
 selftest_queue "fit [abc0##]" span copy 5 "abc"
 selftest_queue "fit [0#]" span copy 1 ""

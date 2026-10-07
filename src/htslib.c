@@ -3924,8 +3924,9 @@ HTSEXT_API char *fil_normalized(const char *source, char *dest) {
 /* see htscore.h */
 hts_boolean hts_query_key_stripped(const char *arg, size_t keylen,
                                    const char *strip) {
-  const char *cur = strip;
-  const char *const end = strip + strlen(strip);
+  const hts_span list = hts_span_of(strip);
+  const char *const end = list.p + list.len;
+  const char *cur = list.p;
   hts_span tok;
 
   while (hts_span_next(&cur, end, ',', &tok)) {
@@ -3978,9 +3979,9 @@ char *fil_normalized_filtered(const char *source, char *dest,
 /* see htscore.h */
 const char *hts_query_strip_keys(const char *rules, const char *adr,
                                  const char *fil, char *dest, size_t destsize) {
-  const char *cur, *q, *rules_end;
+  const char *cur, *end, *q;
   const char *result = NULL;
-  hts_span line;
+  hts_span all, line;
   /* holds a host and a path, each up to HTS_URLMAXSIZE * 2 */
   char BIGSTK url[HTS_URLMAXSIZE * 4];
 
@@ -4003,17 +4004,18 @@ const char *hts_query_strip_keys(const char *rules, const char *adr,
     strlncatbuff(url, fil, sizeof(url), fillen < room ? fillen : room);
   }
 
-  rules_end = rules + strlen(rules);
+  all = hts_span_of(rules);
+  end = all.p + all.len;
   /* Walk the '\n' entries; last match wins (like the +/- filter eval). Each is
      "pattern=keys"; no '=' is the bare form, pattern "*". */
-  for (cur = rules; hts_span_next(&cur, rules_end, '\n', &line);) {
+  for (cur = all.p; hts_span_next(&cur, end, '\n', &line);) {
     hts_span pattern, keys;
     char BIGSTK pat[HTS_URLMAXSIZE * 2];
 
     if (line.len == 0)
       continue;
     if (hts_span_split(line, '=', &pattern, &keys)) {
-      /* clipped, where a too-long alias is skipped */
+      /* A too-long pattern is clipped, not skipped. */
       (void) hts_span_copy(pattern, pat, sizeof(pat));
     } else {
       strcpybuff(pat, "*");
@@ -4034,7 +4036,8 @@ const char *hts_host_alias_rules(httrackp *opt) {
 
 /* Split RULE "alias[,alias...]=canonical" at its first '=', both sides
    untrimmed. The matcher and the validator share it so they agree on what a
-   rule is. HTS_FALSE when either side is empty. */
+   rule is. HTS_FALSE when either side is empty, and the outputs are then
+   unspecified. */
 static hts_boolean hts_host_alias_split(hts_span rule, hts_span *aliases,
                                         hts_span *canon) {
   return hts_span_split(rule, '=', aliases, canon) && aliases->len != 0 &&
@@ -4045,22 +4048,23 @@ static hts_boolean hts_host_alias_split(hts_span rule, hts_span *aliases,
 const char *hts_host_alias_match(const char *rules, const char *host,
                                  const char *full, hts_boolean collapse_www,
                                  size_t *canonlen) {
-  const char *const end = rules + strlen(rules);
-  const char *cur;
-  const char *canon = NULL;
+  const hts_span all = hts_span_of(rules);
+  const char *const rules_end = all.p + all.len;
+  const char *rest;
+  const char *found = NULL;
   hts_span line;
 
-  for (cur = rules; hts_span_next(&cur, end, '\n', &line);) {
-    hts_span aliases, target, alias;
-    const char *next;
+  for (rest = all.p; hts_span_next(&rest, rules_end, '\n', &line);) {
+    hts_span aliases, canon, alias;
+    const char *cur, *end;
 
-    if (!hts_host_alias_split(line, &aliases, &target))
+    if (!hts_host_alias_split(line, &aliases, &canon))
       continue;
-    for (next = aliases.p;
-         hts_span_next(&next, aliases.p + aliases.len, ',', &alias);) {
+    end = aliases.p + aliases.len;
+    for (cur = aliases.p; hts_span_next(&cur, end, ',', &alias);) {
       char BIGSTK glob[HTS_URLMAXSIZE * 2];
 
-      /* "a.com, b.com=c.com", and a trailing slash is not a path */
+      /* Trim spaces and a trailing slash, which is not part of a path. */
       alias = hts_span_trim(alias, " \t", " \t/");
       if (alias.len != 0 && hts_span_copy(alias, glob, sizeof(glob))) {
         char *ghost;
@@ -4081,15 +4085,15 @@ const char *hts_host_alias_match(const char *rules, const char *host,
           /* Trim here, where the canonical is produced: the resolver compares
              one match against the next to see a chain settle, and an untrimmed
              one never equals the trimmed bytes it emits. */
-          target = hts_span_trim(target, " \t", " \t/");
-          canon = target.p;
-          *canonlen = target.len;
+          canon = hts_span_trim(canon, " \t", " \t/");
+          found = canon.p;
+          *canonlen = canon.len;
           break;
         }
       }
     }
   }
-  return canon;
+  return found;
 }
 
 /* Build "scheme://host" from URL's scheme and HOST, for the rules that name a
@@ -4296,18 +4300,14 @@ static hts_boolean hts_host_alias_token_ok(hts_span token, hts_boolean glob) {
 
 /* see httrack-library.h */
 HTSEXT_API hts_boolean hts_host_alias_rule_ok(const char *rule) {
-  hts_span whole, aliases, canon, alias;
-  const char *cur;
+  hts_span aliases, canon, alias;
+  const char *cur, *end;
 
-  if (rule == NULL)
-    return HTS_FALSE;
-  whole.p = rule;
-  whole.len = strlen(rule);
-  if (!hts_host_alias_split(whole, &aliases, &canon) ||
+  if (!hts_host_alias_split(hts_span_of(rule), &aliases, &canon) ||
       !hts_host_alias_token_ok(canon, HTS_FALSE))
     return HTS_FALSE;
-  for (cur = aliases.p;
-       hts_span_next(&cur, aliases.p + aliases.len, ',', &alias);) {
+  end = aliases.p + aliases.len;
+  for (cur = aliases.p; hts_span_next(&cur, end, ',', &alias);) {
     if (!hts_host_alias_token_ok(alias, HTS_TRUE))
       return HTS_FALSE;
   }
