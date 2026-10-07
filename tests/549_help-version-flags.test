@@ -92,4 +92,15 @@ if ! target_is_windows; then
     PATH="$dir/bin:$PATH" BROWSER="$dir/bin/firefox" \
         expect_version "webhttrack --version" "WebHTTrack version $version" \
         bash "$script" --version
+
+    # The launcher passes htsserver's options on, and sets --ppid itself.
+    run bash "$script" --help
+    launcher_help=$out
+    run htsserver --help
+    opts=$(sed -n 's/^  \(--[a-z-]*\) .*/\1/p' <<<"$out")
+    test -n "$opts" || fail "no options in htsserver --help"
+    for opt in $opts; do
+        test "$opt" != --ppid || continue
+        grep -q -- "^  $opt " <<<"$launcher_help" || fail "webhttrack --help does not list $opt"
+    done
 fi
