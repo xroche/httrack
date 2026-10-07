@@ -3,6 +3,7 @@
 # The update purge read old.lst in 999-byte chunks, so the tail of a longer line
 # came back as an entry of its own and named a file the site chose. Here that
 # tail is "Znotes.txt]", which made --update delete the user's notes.txt.
+# The empty-directory clean-up after it must stay inside the mirror.
 
 set -euo pipefail
 
@@ -12,9 +13,6 @@ set -euo pipefail
 require_httrack
 # Resolved before the cd below, or PATH's relative src/ finds an installed copy.
 PATH="$(dirname "$(httrack_path)"):$PATH"
-
-out=$(httrack -#test=linputline) || fail "linputline self-test failed: $out"
-test "$out" = "linputline self-test: OK" || fail "unexpected: $out"
 
 skip_on_windows "Win32 MAX_PATH cannot hold a 1000-byte save path"
 
@@ -56,7 +54,7 @@ cd "$out"
 common=(--quiet --robots=0 --retries=1 -c1 --timeout=20)
 local_crawl --log "${tmpdir}/log1" "${common[@]}" "${BASEURL}/index.html"
 test -s "${out}/${prefix}${urlpath}" || fail "pass 1 did not mirror the long path"
-# Arms the test: the split must leave exactly "Znotes.txt]" as a tail.
+# The split must leave exactly "Znotes.txt]" as a tail.
 awk -v t="${prefix}${urlpath}" '$0 == "[" t "]" && substr($0, 1000) == "Znotes.txt]" { f = 1 }
     END { exit !f }' "${out}/hts-cache/new.lst" ||
     fail "no new.lst line splits into the Znotes.txt tail"
@@ -69,4 +67,27 @@ local_crawl --log "${tmpdir}/log2" "${common[@]}" --update "${BASEURL}/index.htm
 assert_alive "${out}/notes.txt" mine
 test ! -e "${out}/${prefix}${urlpath}" ||
     fail "the long path left the site and the purge kept it"
-ok "the purge kept notes.txt and removed the long path"
+
+# A dropped file's emptied directories go up to the mirror root and no
+# further, with or without a log. Nothing else lands in the mirror, because
+# -I0 writes no top index, the cache lives apart and pass 2 saves nothing.
+mkdir -p "${root}/a/b"
+printf 'x\n' >"${root}/a/b/f.txt"
+printf '<html>hi</html>\n' >"${root}/other.html"
+for logopt in -q -Q; do
+    parent="${tmpdir}/empty-parent${logopt}"
+    mirror="${parent}/mirror"
+    mkdir -p "$parent"
+    dirs_opts=(--robots=0 --retries=1 -c1 --timeout=20 -I0 "$logopt"
+        -O "${mirror},${tmpdir}/cache${logopt}")
+    local_crawl --log "${tmpdir}/dirs1${logopt}" "${dirs_opts[@]}" \
+        "${BASEURL}/a/b/f.txt"
+    test -s "${mirror}/${prefix}a/b/f.txt" || fail "pass 1 did not mirror f.txt"
+    local_crawl --log "${tmpdir}/dirs2${logopt}" "${dirs_opts[@]}" --update -p0 \
+        "${BASEURL}/other.html"
+    test ! -e "${mirror}/${prefix}" ||
+        fail "$logopt: the purge left emptied directories in the mirror"
+    test -d "$mirror" || fail "$logopt: the purge removed the mirror root"
+    test -d "$parent" || fail "$logopt: the purge removed a directory above the mirror"
+done
+ok "the purge kept notes.txt, removed the long path, and stayed in the mirror"

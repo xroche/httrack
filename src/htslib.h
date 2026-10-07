@@ -462,8 +462,6 @@ int binput(const char *buff, char *s, int max);
 hts_boolean binput_line(const char *buff, const char *end, char *s, int max,
                         int *offset);
 hts_boolean finput_line(T_SOC fd, char *s, int max);
-/* finput_line() over a FILE: reads the line whole, HTS_TRUE when it was cut. */
-hts_boolean linput_line(FILE *fp, char *s, int max);
 int linput(FILE * fp, char *s, int max);
 int linputsoc(T_SOC soc, char *s, int max);
 int linputsoc_t(T_SOC soc, char *s, int max, int timeout);
