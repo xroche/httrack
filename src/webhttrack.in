@@ -3,6 +3,29 @@
 # WebHTTrack launcher script
 # Initializes the htsserver GUI frontend and launch the default browser
 
+case "${1-}" in
+-h | --help)
+    cat <<'EOF'
+usage: webhttrack [browse] [htsserver option value ..] [key value ..]
+Starts htsserver and opens the WebHTTrack interface in a browser.
+  browse                 open the project index (~/websites/index.html) instead
+  --port <port>          passed to htsserver (default: the first free port from 8080)
+  --bind <address>       passed to htsserver (default: 127.0.0.1)
+  --ping-timeout <secs>  passed to htsserver
+  key value              any other pair is passed to htsserver
+  -h, --help             print this help and exit
+  --version              print the version and exit
+The browser is $BROWSER if set, else the first one found in the PATH.
+The interface language follows LC_ALL, LC_MESSAGES or LANG.
+EOF
+    exit 0
+    ;;
+--version)
+    echo "WebHTTrack version @HTTRACK_VERSION@"
+    exit 0
+    ;;
+esac
+
 BROWSEREXE=
 SRCHBROWSEREXE=(x-www-browser www-browser iceape mozilla firefox-developer-edition firefox icecat iceweasel abrowser firebird galeon konqueror midori opera google-chrome chrome chromium chromium-browser netscape firefox-developer-edition)
 # shellcheck disable=SC2153 # BROWSER is the standard freedesktop env var, not a typo

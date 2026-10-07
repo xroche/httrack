@@ -1,0 +1,95 @@
+#!/bin/bash
+#
+# Every installed program answers -h, --help and --version on stdout with exit 0,
+# without starting a server or a browser.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+# The Windows build names the server webhttrack.exe and ships no launcher script.
+srv=htsserver
+! target_is_windows || srv=webhttrack
+
+# Not httrack --version, which appends build flavours such as -nossl.
+version=$(sed -n 's/^#define HTTRACK_VERSION "\(.*\)"$/\1/p' "$top_srcdir/src/htsglobal.h")
+test -n "$version" || fail "no HTTRACK_VERSION in htsglobal.h"
+
+# run CMD ARGS..: capture stdout, stderr and the exit status of one call.
+run() {
+    set +e
+    "$@" >"$dir/out" 2>"$dir/err" </dev/null
+    rc=$?
+    set -e
+    out=$(tr -d '\r' <"$dir/out")
+    err=$(tr -d '\r' <"$dir/err")
+}
+
+# expect_help LABEL CMD..: usage on stdout, nothing on stderr, exit 0.
+expect_help() {
+    local label=$1
+    shift
+    run "$@"
+    test ! -e "$dir/started" || fail "$label: started a program"
+    test "$rc" -eq 0 || fail "$label: exit $rc, stderr: $err"
+    test -z "$err" || fail "$label: wrote to stderr: $err"
+    grep -q '^usage: ' <<<"$out" || fail "$label: no usage line in: $out"
+    grep -q -- '--version' <<<"$out" || fail "$label: help does not list --version"
+    case "$out" in
+    *Initializing*) fail "$label: started a server: $out" ;;
+    esac
+}
+
+# expect_version LABEL EXPECTED CMD..
+expect_version() {
+    local label=$1 expected=$2
+    shift 2
+    run "$@"
+    test "$rc" -eq 0 || fail "$label: exit $rc"
+    test -z "$err" || fail "$label: wrote to stderr: $err"
+    test "$out" = "$expected" || fail "$label: printed '$out', want '$expected'"
+}
+
+for flag in -h --help; do
+    expect_help "$srv $flag" "$srv" "$flag"
+    expect_help "proxytrack $flag" proxytrack "$flag"
+done
+expect_version "$srv --version" "HTSServer version $version" "$srv" --version
+proxy_version=$(sed -n 's/^#define PROXYTRACK_VERSION "\(.*\)"$/\1/p' \
+    "$top_srcdir/src/proxy/proxytrack.h")
+test -n "$proxy_version" || fail "no PROXYTRACK_VERSION in proxytrack.h"
+expect_version "proxytrack --version" \
+    "ProxyTrack version $proxy_version (HTTrack $version)" proxytrack --version
+
+# A bad command line still fails, with the usage on stderr.
+for prog in "$srv" proxytrack; do
+    run "$prog"
+    test "$rc" -ne 0 || fail "$prog with no arguments exited 0"
+    grep -q '^usage: ' <<<"$err" || fail "$prog with no arguments: no usage on stderr"
+done
+
+if ! target_is_windows; then
+    script="${abs_top_builddir:?not run under make check}/src/webhttrack"
+    test -r "$script" || fail "no $script"
+    # The launcher searches its own directory first, so a copy beside the stubs
+    # and a minimal data tree let a launcher that ignores the flag reach them.
+    mkdir -p "$dir/bin" "$dir/share/httrack/lang" "$dir/share/httrack/html"
+    touch "$dir/share/httrack/lang.def" "$dir/share/httrack/lang.indexes"
+    cp "$script" "$dir/bin/webhttrack"
+    script="$dir/bin/webhttrack"
+    for stub in htsserver xdg-open x-www-browser firefox; do
+        printf '#!/bin/sh\ntouch "%s/started"\n' "$dir" >"$dir/bin/$stub"
+        chmod +x "$dir/bin/$stub"
+    done
+    for flag in -h --help; do
+        PATH="$dir/bin:$PATH" BROWSER="$dir/bin/firefox" \
+            expect_help "webhttrack $flag" bash "$script" "$flag"
+    done
+    PATH="$dir/bin:$PATH" BROWSER="$dir/bin/firefox" \
+        expect_version "webhttrack --version" "WebHTTrack version $version" \
+        bash "$script" --version
+fi

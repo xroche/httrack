@@ -235,6 +235,19 @@ static void client_ping(void *pP) {
   exit(EXIT_SUCCESS);
 }
 
+/* --help prints this to stdout, a bad command line to stderr. */
+static void usage(FILE *fp, const char *argv0) {
+  fprintf(fp,
+          "usage: %s <path-to-html-root-dir> [--port <port>] "
+          "[--bind <address>: default 127.0.0.1] [--ppid parent-pid] "
+          "[--ping-timeout <seconds>] [key value [key value]..]\n",
+          argv0);
+  fprintf(fp, "example: %s /usr/share/httrack/\n", argv0);
+  fprintf(fp, "other options:\n");
+  fprintf(fp, "  -h, --help     print this help and exit\n");
+  fprintf(fp, "  --version      print the version and exit\n");
+}
+
 int main(int argc, char *argv[]) {
   int i;
   int ret = 0;
@@ -242,6 +255,16 @@ int main(int argc, char *argv[]) {
   int parentPid = 0;
   /* NULL leaves smallserver_init on its loopback default; --bind widens it */
   const char *bindAddr = NULL;
+
+  if (argc >= 2 &&
+      (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0)) {
+    usage(stdout, argv[0]);
+    return 0;
+  }
+  if (argc >= 2 && strcmp(argv[1], "--version") == 0) {
+    printf("HTSServer version %s\n", HTTRACK_VERSION);
+    return 0;
+  }
 
   printf("Initializing the server..\n");
 
@@ -267,13 +290,7 @@ int main(int argc, char *argv[]) {
 
   if (argc < 2 || (argc % 2) != 0) {
     fprintf(stderr, "** Warning: use the webhttrack frontend if available\n");
-    fprintf(stderr,
-            "usage: %s [--port <port>] [--bind <address>: default 127.0.0.1] "
-            "[--ppid parent-pid] "
-            "[--ping-timeout <seconds>] "
-            "<path-to-html-root-dir> [key value [key value]..]\n",
-            argv[0]);
-    fprintf(stderr, "example: %s /usr/share/httrack/\n", argv[0]);
+    usage(stderr, argv[0]);
     return 1;
   }
 
