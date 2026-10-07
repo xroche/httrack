@@ -589,6 +589,26 @@ static void set_mirror_completed(httrackp *opt, hts_boolean *completed_out,
   hts_mutexrelease(&opt->state.lock);
 }
 
+/* Read old.lst's next "[path]" line into line, and path_html + path into file.
+   HTS_FALSE for a line that is empty, cut, malformed or too long for file. */
+static hts_boolean old_lst_entry(httrackp *opt, FILE *fp, char *line,
+                                 size_t linesize, char *file, size_t filesize) {
+  const size_t root = StringLength(opt->path_html);
+  size_t len;
+
+  if (linput_line(fp, line, (int) linesize))
+    return HTS_FALSE;
+  len = strlen(line);
+  if (len < 2 || line[0] != '[' || line[len - 1] != ']')
+    return HTS_FALSE;
+  if (root >= filesize || len - 2 >= filesize - root)
+    return HTS_FALSE;
+  memcpy(file, StringBuff(opt->path_html), root);
+  memcpy(file + root, line + 1, len - 2);
+  file[root + len - 2] = '\0';
+  return HTS_TRUE;
+}
+
 int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   char *primary = NULL;         // première page, contenant les liens à scanner
   hash_struct hash;             // système de hachage, accélère la recherche dans les liens
@@ -2203,20 +2223,17 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
           if (adr) {
             if (hts_fread_exact(adr, (size_t) sz, new_lst)) {
               adr[sz] = '\0';
-              char line[1100];
+              /* fits filenote()'s longest line: "[", savelst, "]" */
+              char BIGSTK line[HTS_URLMAXSIZE * 2 + 2];
               int purge = 0;
 
               while(!feof(old_lst)) {
                 char BIGSTK file[HTS_URLMAXSIZE * 2];
 
-                linput(old_lst, line, 1000);
-                if (!strnotempty(line))
+                /* a cut line's head or tail names some other file */
+                if (!old_lst_entry(opt, old_lst, line, sizeof(line), file,
+                                   sizeof(file)))
                   continue;
-                strcpybuff(file, StringBuff(opt->path_html));
-                strcatbuff(file, line + 1);
-                /* strip filenote()'s ']', absent when linput() truncated the
-                   line */
-                hts_striplastchar(file, ']');
                 hts_changes_previous(opt, file + StringLength(opt->path_html));
                 if (!strstr(adr, line)) { // not found in the new list?
                   if (fexist_utf8(file)) { // still on disk
@@ -2241,20 +2258,22 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
               if (purge_files) { // emptied directories go with the files
                 fseek(old_lst, 0, SEEK_SET);
                 while(!feof(old_lst)) {
-                  linput(old_lst, line, 1000);
+                  char BIGSTK file[HTS_URLMAXSIZE * 2];
+
+                  if (!old_lst_entry(opt, old_lst, line, sizeof(line), file,
+                                     sizeof(file)))
+                    continue;
                   while (strnotempty(line) && (hts_lastchar(line) != '/') &&
                          (hts_lastchar(line) != '\\')) {
                     hts_choplastchar(line);
                   }
                   hts_choplastchar(line);
                   if (strnotempty(line))
-                    if (!strstr(adr, line)) {   // non trouvé?
-                      char BIGSTK file[HTS_URLMAXSIZE * 2];
-
+                    if (!strstr(adr, line)) { // not in new.lst
                       strcpybuff(file, StringBuff(opt->path_html));
                       strcatbuff(file, line + 1);
                       while ((strnotempty(file)) &&
-                             (RMDIR(file) == 0)) { // ok, éliminé (existait)
+                             (RMDIR(file) == 0)) { // it existed and was empty
                         purge = 1;
                         if (opt->log) {
                           hts_log_print(opt, LOG_INFO, "Purging directory %s/",

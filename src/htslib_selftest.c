@@ -1875,6 +1875,30 @@ static int st_lastchar(httrackp *opt, int argc, char **argv) {
 /* hts_rtrim() and the sets it is called with. The string starts mid-arena, and
    the byte below it is poisoned with '#' rather than 0, or the stray NUL the
    old loop wrote there would read as untouched. */
+static int st_linputline(httrackp *opt, int argc, char **argv) {
+  static const char data[] = "abcdef\r\nxy\n\nlast";
+  FILE *const fp = tmpfile();
+  char s[8];
+  int err = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  if (fp == NULL || fwrite(data, 1, sizeof(data) - 1, fp) != sizeof(data) - 1) {
+    printf("linputline self-test: no temporary file\n");
+    return 1;
+  }
+  rewind(fp);
+  /* the cut line's tail "def" must not come back as the next line */
+  err |= !(linput_line(fp, s, 4) && strcmp(s, "abc") == 0);
+  err |= !(!linput_line(fp, s, 4) && strcmp(s, "xy") == 0);
+  err |= !(!linput_line(fp, s, 4) && strcmp(s, "") == 0);
+  err |= !(!linput_line(fp, s, 5) && strcmp(s, "last") == 0 && feof(fp));
+  fclose(fp);
+  printf("linputline self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 static int st_rtrim(httrackp *opt, int argc, char **argv) {
   enum { off = 8 };
 
@@ -3488,6 +3512,8 @@ const struct selftest_entry selftests_lib[] = {
      "last-char helpers never index before the buffer (#770, #781, #821)",
      st_lastchar},
     {"rtrim", "", "hts_rtrim never walks below the buffer", st_rtrim},
+    {"linputline", "", "linput_line() reads a line whole and reports a cut",
+     st_linputline},
     {"querydiff", "",
      "the shared query iterator matches the six parsers it replaced",
      st_querydiff},

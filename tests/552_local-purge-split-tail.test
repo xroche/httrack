@@ -1,0 +1,72 @@
+#!/bin/bash
+#
+# The update purge read old.lst in 999-byte chunks, so the tail of a longer line
+# came back as an entry of its own and named a file the site chose. Here that
+# tail is "Znotes.txt]", which made --update delete the user's notes.txt.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+require_httrack
+# Resolved before the cd below, or PATH's relative src/ finds an installed copy.
+PATH="$(dirname "$(httrack_path)"):$PATH"
+
+out=$(httrack -#test=linputline) || fail "linputline self-test failed: $out"
+test "$out" = "linputline self-test: OK" || fail "unexpected: $out"
+
+skip_on_windows "Win32 MAX_PATH cannot hold a 1000-byte save path"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_splittail.XXXXXX")
+cleanup() { rm -rf "$tmpdir"; }
+cleanup_push cleanup
+
+# macOS caps PATH_MAX at 1024, too short for the docroot or the mirror.
+pathmax=$(getconf PATH_MAX / 2>/dev/null || echo 4096)
+test "$pathmax" -ge $((1000 + ${#tmpdir} + 128)) ||
+    skip "PATH_MAX $pathmax too small for a 1000-byte path"
+
+root="${tmpdir}/root"
+out="${tmpdir}/crawl"
+mkdir -p "$root" "$out"
+local_server_start --root "$root" --log "${tmpdir}/server.log"
+
+# new.lst holds "[127.0.0.1_<port>/<urlpath>]": put the Z at byte 999.
+prefix="127.0.0.1_${SRV_PORT}/"
+need=$((998 - ${#prefix}))
+dirs=""
+while test $((need - ${#dirs})) -gt 100; do
+    dirs="${dirs}$(printf 'd%02d' $((${#dirs} % 100)))$(printf 'a%.0s' $(seq 1 46))/"
+done
+dirs="${dirs}$(printf 'b%.0s' $(seq 1 $((need - ${#dirs} - 1))))/"
+test ${#dirs} -eq "$need"
+urlpath="${dirs}Znotes.txt"
+
+mkdir -p "${root}/${dirs}"
+printf 'stale\n' >"${root}/${urlpath}"
+printf '<html><body><a href="/%s">x</a></body></html>\n' "$urlpath" \
+    >"${root}/index.html"
+# Dated in the past, or pass 2 within the same second gets a 304 for the edit.
+touch -t 202001010000 "${root}/index.html"
+printf 'mine\n' >"${out}/notes.txt"
+
+# No -O: an empty path_html keeps the absolute save path under HTS_URLMAXSIZE.
+cd "$out"
+common=(--quiet --robots=0 --retries=1 -c1 --timeout=20)
+local_crawl --log "${tmpdir}/log1" "${common[@]}" "${BASEURL}/index.html"
+test -s "${out}/${prefix}${urlpath}" || fail "pass 1 did not mirror the long path"
+# Arms the test: the split must leave exactly "Znotes.txt]" as a tail.
+awk -v t="${prefix}${urlpath}" '$0 == "[" t "]" && substr($0, 1000) == "Znotes.txt]" { f = 1 }
+    END { exit !f }' "${out}/hts-cache/new.lst" ||
+    fail "no new.lst line splits into the Znotes.txt tail"
+
+printf '<html><body>no links</body></html>\n' >"${root}/index.html"
+local_crawl --log "${tmpdir}/log2" "${common[@]}" --update "${BASEURL}/index.html"
+
+! grep -qF Znotes.txt "${out}/hts-cache/new.lst" ||
+    fail "pass 2 still lists the long path, so the purge had nothing to drop"
+assert_alive "${out}/notes.txt" mine
+test ! -e "${out}/${prefix}${urlpath}" ||
+    fail "the long path left the site and the purge kept it"
+ok "the purge kept notes.txt and removed the long path"

@@ -3467,6 +3467,23 @@ hts_boolean finput_line(T_SOC fd, char *s, int max) {
   return cut;
 }
 
+hts_boolean linput_line(FILE *fp, char *s, int max) {
+  hts_boolean cut = HTS_FALSE;
+  int j = 0;
+  int c;
+
+  while ((c = fgetc(fp)) != EOF && c != 10) {
+    if (c == 13)
+      continue;
+    if (j < max - 1)
+      s[j++] = (char) c;
+    else
+      cut = HTS_TRUE; /* keep draining: the tail must not become another line */
+  }
+  s[j] = '\0';
+  return cut;
+}
+
 // Lecture d'une ligne (peut être unicode à priori)
 int linput(FILE * fp, char *s, int max) {
   int c;

@@ -274,7 +274,8 @@ ci_suite_heartbeat() {
 # One name per line, so two branches each appending one don't collide on the
 # same line; compared as a sorted set below, so glob discovery order can't
 # cause a false mismatch either.
-# footer-overflow and purge-longpath skip on Windows (need a path past MAX_PATH);
+# footer-overflow, purge-longpath and purge-split-tail skip on Windows (need a
+# path past MAX_PATH);
 # webdav-default and proxytrack-quiet read proxytrack's console through a pty,
 # which Windows Python does not build;
 # badmtime needs a filesystem that stores an mtime past gmtime's range;
@@ -330,6 +331,7 @@ expected_skips_msys="01_engine-usercommand.test
 113_engine-threadattr-leak.test
 527_local-maxtime-dns-stall.test
 100_local-purge-longpath.test
+552_local-purge-split-tail.test
 158_local-link-control-bytes.test
 114_local-update-304-leak.test
 283_engine-cmdline-leak.test
@@ -398,6 +400,7 @@ expected_skips_wsl2="01_engine-usercommand.test
 113_engine-threadattr-leak.test
 527_local-maxtime-dns-stall.test
 100_local-purge-longpath.test
+552_local-purge-split-tail.test
 158_local-link-control-bytes.test
 114_local-update-304-leak.test
 283_engine-cmdline-leak.test
