@@ -55,7 +55,7 @@ check cmdline-over-ini /cmd/mirrors /ini/mirrors path /cmd/mirrors
 # Controls: the ini still overrides the default, and the default is HOME's.
 check ini-over-default /ini/mirrors /ini/mirrors
 check default "${work}/hdefault/websites" ""
-# An empty path counts as none.
-check empty "${work}/hempty/websites" "" path ""
+# An empty path counts as none, so the saved one still applies.
+check empty /ini/mirrors /ini/mirrors path ""
 
 echo "PASS"
