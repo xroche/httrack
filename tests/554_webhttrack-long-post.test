@@ -1,0 +1,95 @@
+#!/bin/bash
+#
+# A form post longer than 32 KiB reaches the saved profile whole, and a body
+# over the server's cap is refused rather than cut.
+
+set -euo pipefail
+
+# shellcheck source=tests/webhttracklib.sh
+. "${0%"${0##*/}"}./webhttracklib.sh"
+
+htsserver_require
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_longpost.XXXXXX") || fail "no tmpdir"
+cleanup_push htsserver_cleanup_dir "${work}"
+
+htsserver_start --home "${work}"
+
+htsserver_python - "${HTS_URL}" "${HTS_PORT}" "${work}" <<'PY' || fail "see above"
+import socket
+import sys
+
+from webtestlib import Session, textarea
+
+s, port, work = Session(sys.argv[1]), int(sys.argv[2]), sys.argv[3]
+
+
+def raw(head, body):
+    """Send a raw POST, close our side, and return the status code in a list."""
+    c = socket.create_connection(("127.0.0.1", port), 10)
+    c.settimeout(30)
+    c.sendall(("POST /server/step3.html HTTP/1.0\r\nHost: 127.0.0.1\r\n"
+               "Content-type: application/x-www-form-urlencoded\r\n%s\r\n%s"
+               % (head, body)).encode())
+    c.shutdown(socket.SHUT_WR)
+    out = b""
+    while True:
+        chunk = c.recv(65536)
+        if not chunk:
+            break
+        out += chunk
+    c.close()
+    return out.split(b"\r\n", 1)[0].decode("latin-1").split(" ")[1:2]
+
+
+def projname():
+    page = s.get("step3.html?sid=" + s.sid)
+    start = page.index("<title>'") + len("<title>'")
+    return page[start:page.index("'", start)]
+
+
+s.post("step3.html", [("projname", "start")])
+body = "sid=%s&projname=%%s" % s.sid
+# Content-length one byte over the 8 MiB cap: refused before any byte is read.
+status = raw("Content-length: %d\r\n" % (8 * 1024 * 1024 + 1), body % "overcap")
+if status != ["413"]:
+    sys.exit("an over-cap Content-length got %r" % status)
+status = raw("Content-length: -5\r\n", body % "negative")
+if status != ["400"]:
+    sys.exit("a negative Content-length got %r" % status)
+if projname() != "start":
+    sys.exit("a refused post changed projname to %r" % projname())
+
+# Control: no Content-length, read to EOF, and the field past 32 KiB lands.
+filler = "x" * 40000
+status = raw("", "sid=%s&filler=%s&projname=nolength" % (s.sid, filler))
+if status != ["302"]:
+    sys.exit("a post without Content-length got %r" % status)
+if projname() != "nolength":
+    sys.exit("a 40 KiB post without Content-length lost its tail: %r"
+             % projname())
+
+# A save ends the wizard, so it goes last. About 110 KiB of URLs makes the
+# step 4 post over 200 KiB.
+count = 3300
+urls = "\r\n".join("http://example.com/page-%05d.html" % i for i in range(count))
+s.post("step3.html", [("path", work), ("projname", "long"), ("urls", urls)])
+step4 = s.get("step4.html?sid=" + s.sid)
+command = textarea(step4, "command")
+if command.count("/page-") != count:
+    sys.exit("step 4 renders %d of %d URLs" % (command.count("/page-"), count))
+s.post("step4.html", [("path", work), ("projname", "long"),
+                      ("command", command), ("command_do", "save"),
+                      ("winprofile", textarea(step4, "winprofile"))])
+
+with open(work + "/long/hts-cache/winprofile.ini") as fp:
+    saved = [line for line in fp if line.startswith("CurrentUrl=")]
+if len(saved) != 1:
+    sys.exit("the saved profile has %d CurrentUrl lines" % len(saved))
+last = "page-%05d.html" % (count - 1)
+if saved[0].count("/page-") != count or last not in saved[0]:
+    sys.exit("the saved CurrentUrl holds %d of %d URLs"
+             % (saved[0].count("/page-"), count))
+PY
+
+echo PASS

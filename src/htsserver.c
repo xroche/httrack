@@ -109,6 +109,10 @@ static char server_bound_addr[256 + 2] = "";
 static char server_self_names[SELF_NAMES_MAX][256];
 static size_t server_self_names_count = 0;
 
+/* The largest request body we take: room for a 1 MiB profile line, which the
+   step 4 form posts twice (command line and profile), percent-encoded. */
+#define SMALLSERVER_BODY_MAX ((size_t) 8 * 1024 * 1024)
+
 static void (*pingFun)(void *, smallserver_client_event, const char *) = NULL;
 static void* pingFunArg = NULL;
 
@@ -1040,11 +1044,26 @@ static hts_boolean tm_year_is_printable(const struct tm *tm) {
   return tm->tm_year >= -1900 && tm->tm_year <= 8099 ? HTS_TRUE : HTS_FALSE;
 }
 
+/* Make *buf, of *size bytes, hold len bytes and a NUL. len is at most
+   SMALLSERVER_BODY_MAX + 1, so len + 1 cannot wrap. */
+static hts_boolean grow_buffer(char **buf, size_t *size, size_t len) {
+  char *grown;
+
+  if (len < *size)
+    return HTS_TRUE;
+  grown = (char *) realloct(*buf, len + 1);
+  if (grown == NULL)
+    return HTS_FALSE;
+  *buf = grown;
+  *size = len + 1;
+  return HTS_TRUE;
+}
+
 int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
   int timeout = 30;
   int retour = 0;
   int willexit = 0;
-  int buffer_size = 32768;
+  size_t buffer_size = 32768;
   char *buffer = (char *) malloct(buffer_size);
   String headers = STRING_EMPTY;
   String output = STRING_EMPTY;
@@ -1144,8 +1163,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
     T_SOC soc_c;
     LLint length = 0;
     const char *error_redirect = NULL;
-    /* Why the request was refused, shown on the 403 page; NULL until it is. */
+    /* Why the request was refused, for the error page; NULL until it is. */
     const char *denied = NULL;
+    const char *denied_status = "403 Forbidden";
+    /* A Content-length we cannot read as a size refuses the body. */
+    hts_boolean bad_length = HTS_FALSE;
     /* The request proved it holds the session id. */
     hts_boolean authed = HTS_FALSE;
     char origin[256];
@@ -1198,16 +1220,17 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
       }
       if (meth) {
         /* Flush headers */
-        length = buffer_size - 2;
+        length = -1;
         while(linputsoc_t(soc_c, line, sizeof(line) - 2, timeout) > 0) {
           int p;
 
           if ((p = strfield(line, "Content-length:")) != 0) {
             const char *a = line + p;
 
-            // A signed or oversized length reads no body.
-            if (hts_scan_llint(&a, 0, INT64_MAX, &length) == HTS_SCAN_REFUSED)
-              length = 0;
+            if (hts_scan_llint(&a, 0, INT64_MAX, &length) != HTS_SCAN_OK) {
+              length = -1;
+              bad_length = HTS_TRUE;
+            }
           } else if ((p = strfield(line, "Accept-language:")) != 0) {
             char tmp[32];
             char *s = line + p;
@@ -1228,16 +1251,34 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
           }
         }
         if (meth == 2) {
+          /* Without a length, read to EOF, and one byte past the cap to see
+             an overrun. A clipped form would be saved and crawled as is. */
+          const size_t want =
+              length < 0 ? SMALLSERVER_BODY_MAX + 1 : (size_t) length;
           int sz = 0;
+          hts_boolean too_large = length > (LLint) SMALLSERVER_BODY_MAX;
 
-          if (length > buffer_size - 2) {
-            length = buffer_size - 2;
-          }
-          if (length > 0
-              && (sz = recv_bl(soc_c, buffer, (int) length, timeout)) < 0) {
+          if (bad_length) {
             meth = 0;
+            denied_status = "400 Bad Request";
+            denied = "Invalid Content-length.";
+          } else if (too_large || !grow_buffer(&buffer, &buffer_size, want)) {
+            too_large = HTS_TRUE;
+          } else if (want > 0 &&
+                     (sz = recv_bl(soc_c, buffer, want, timeout)) < 0) {
+            meth = 0;
+          } else if ((size_t) sz > SMALLSERVER_BODY_MAX) {
+            too_large = HTS_TRUE;
           } else {
             buffer[sz] = '\0';
+          }
+          if (too_large) {
+            meth = 0;
+            denied_status = "413 Payload Too Large";
+            denied = "Request body too large.";
+          }
+          if (meth != 2) {
+            buffer[0] = '\0';
           }
         }
       }
@@ -2303,7 +2344,9 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
           }
         }
       } else if (denied != NULL) {
-        StringCat(headers, "HTTP/1.0 403 Forbidden\r\n"
+        StringCat(headers, "HTTP/1.0 ");
+        StringCat(headers, denied_status);
+        StringCat(headers, "\r\n"
                            "Server: httrack small server\r\n"
                            "Content-type: text/html\r\n");
         StringCat(output, denied);
@@ -2343,15 +2386,16 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
     /* Shutdown (FIN) and wait until confirmed */
     {
-      char c;
+      char c[1024];
 
 #ifdef _WIN32
       shutdown(soc_c, SD_SEND);
 #else
       shutdown(soc_c, 1);
 #endif
-      /* This is necessary as IE sometimes (!) sends an additional CRLF after POST data */
-      while(recv(soc_c, ((char *) &c), 1, 0) > 0) ;
+      /* IE may send a CRLF after the POST data, and a refused body is unread */
+      while (recv(soc_c, c, sizeof(c), 0) > 0)
+        ;
     }
 
 #ifdef _WIN32
