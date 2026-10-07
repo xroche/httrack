@@ -3358,6 +3358,20 @@ static int st_spandiff(httrackp *opt, int argc, char **argv) {
   return st.failures != 0;
 }
 
+/* CR and LF print as \r and \n, which Windows text-mode stdout leaves alone. */
+static void span_add_visible(String *out, const char *p, size_t len) {
+  size_t i;
+
+  for (i = 0; i < len; i++) {
+    if (p[i] == '\r')
+      StringCat(*out, "\\r");
+    else if (p[i] == '\n')
+      StringCat(*out, "\\n");
+    else
+      StringAddchar(*out, p[i]);
+  }
+}
+
 /* Print what a span primitive reads as [bytes], for next|nextsep|split C TEXT,
    trim L R TEXT or copy SIZE TEXT. */
 static int st_span(httrackp *opt, int argc, char **argv) {
@@ -3388,7 +3402,7 @@ static int st_span(httrackp *opt, int argc, char **argv) {
     /* Each field shows with the separator it ended on. */
     while (hts_span_next(&cur, s.p + s.len, argv[1][0], &a)) {
       StringAddchar(out, '[');
-      StringMemcat(out, a.p, (size_t) (cur - a.p));
+      span_add_visible(&out, a.p, (size_t) (cur - a.p));
       StringAddchar(out, ']');
     }
   } else if (strcmp(argv[0], "split") == 0) {
