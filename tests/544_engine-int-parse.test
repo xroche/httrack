@@ -62,7 +62,7 @@ selftest_queue 'keep_alive=0 timeout=15 max=0' int-parse-diff keep-alive \
     ' max=4294967311'
 
 # The counts pin the corpus, so a sweep that silently shrinks goes red.
-selftest_queue 'int-parse-diff: 6495 compared, 8901 intended changes, 0 failures' \
+selftest_queue 'int-parse-diff: 6495 compared, 8902 intended changes, 0 failures' \
     int-parse-diff
 
 selftest_run_queued

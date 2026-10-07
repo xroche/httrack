@@ -88,4 +88,13 @@ hts_boolean hts_span_split(hts_span s, char c, hts_span *head, hts_span *tail);
    FALSE if it was clipped, or if SIZE is 0, which writes nothing. */
 hts_boolean hts_span_copy(hts_span s, char *dst, size_t size);
 
+/* Find parameter NAME (exact, any case) in a header VALUE whose fields are
+   split by any byte of SEPS, as in "type; a=1; NAME=\"v\"". The first NAME
+   wins, and a quoted value is unescaped, with an unterminated quote running to
+   the end. Return TRUE with the value in OUT, or FALSE with OUT empty when NAME
+   is absent or its value does not fit SIZE - 1 bytes: a clipped value would
+   name another charset or file. */
+hts_boolean hts_header_param(const char *value, const char *seps,
+                             const char *name, char *out, size_t size);
+
 #endif
