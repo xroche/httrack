@@ -2649,7 +2649,7 @@ static void querydiff_fail(querydiff_stats *st, const char *site,
                            const char *new) {
   st->failures++;
   if (st->failures <= 20) {
-    printf("querydiff: %s differs on '%.80s' (%zu bytes) arg '%.40s': old "
+    printf("%s differs on '%.80s' (%zu bytes) arg '%.40s': old "
            "'%.80s' new '%.80s'\n",
            site, in, strlen(in), arg, old, new);
     fflush(stdout); /* a later abort must not swallow it */
