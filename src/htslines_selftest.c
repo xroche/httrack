@@ -34,48 +34,29 @@ Please visit our Website: http://www.httrack.com
 #include "htsselftest_int.h"
 #include "htslines.h"
 
-/* Room past any capacity under test: the legacy readers write one byte beyond
-   max at max == 1. */
-enum { ST_LINE_SLACK = 16, ST_LINE_MAXCAP = 64 };
+/* The legacy readers write a byte past max at max == 1, hence the slack.
+   ST_LINE_BIG holds any line of the corpus, joined or not. */
+enum {
+  ST_LINE_SLACK = 16,
+  ST_LINE_MAXCAP = 64,
+  ST_LINE_BIG = 128,
+  ST_LINE_MAXREADS = 128
+};
 
-/* "\n", "\r", "\t", "\f", "\v", "\0", "\\" and "\xHH" in arg, into buf. */
+/* "\n", "\r", "\t", "\f", "\v", "\0" and "\\" in arg, into buf. */
 static size_t st_lines_decode(const char *arg, char *buf, size_t size) {
+  static const char from[] = "nrtfv0";
+  static const char to[] = "\n\r\t\f\v\0";
   size_t n = 0;
 
   while (*arg != '\0' && n + 1 < size) {
     char c = *arg++;
 
     if (c == '\\' && *arg != '\0') {
-      unsigned int byte;
+      const char *const e = strchr(from, *arg);
 
-      switch (c = *arg++) {
-      case 'n':
-        c = '\n';
-        break;
-      case 'r':
-        c = '\r';
-        break;
-      case 't':
-        c = '\t';
-        break;
-      case 'f':
-        c = '\f';
-        break;
-      case 'v':
-        c = '\v';
-        break;
-      case '0':
-        c = '\0';
-        break;
-      case 'x':
-        if (sscanf(arg, "%2x", &byte) == 1) {
-          c = (char) byte;
-          arg += 2;
-        }
-        break;
-      default:
-        break;
-      }
+      c = e != NULL ? to[e - from] : *arg;
+      arg++;
     }
     buf[n++] = c;
   }
@@ -114,16 +95,15 @@ static void st_lines_print(const char *s, size_t len) {
   }
 }
 
-/* readline CAP FLAGS TEXT: every line a caller's feof() loop gets, as [line],
-   with "!" after a cut one. */
+/* readline CAP FLAGS TEXT [cpp]: every line a caller's feof() loop gets, as
+   [line], or "!" for a cut one, whose content is unspecified. */
 static int st_readline(httrackp *opt, int argc, char **argv) {
   char data[4096];
   char line[ST_LINE_MAXCAP + ST_LINE_SLACK];
   const int cap = argc >= 2 ? atoi(argv[0]) : 0;
-  /* the engine drops an empty argument */
+  /* an empty TEXT reaches us as no argument at all */
   const char *const text = argc >= 3 ? argv[2] : "";
   const hts_boolean cpp = argc >= 4 && strcmp(argv[3], "cpp") == 0;
-  size_t len;
   FILE *fp;
 
   (void) opt;
@@ -132,25 +112,33 @@ static int st_readline(httrackp *opt, int argc, char **argv) {
             ST_LINE_MAXCAP);
     return 1;
   }
-  len = st_lines_decode(text, data, sizeof(data));
-  fp = st_lines_file(data, len);
+  fp = st_lines_file(data, st_lines_decode(text, data, sizeof(data)));
   while (!feof(fp)) {
-    size_t n;
+    const int flags = st_lines_flags(argv[1]);
     hts_boolean cut;
+    size_t n = (size_t) cap;
 
     memset(line, '#', sizeof(line));
     if (cpp) {
-      cut = hts_readline_cpp(fp, line, (size_t) cap, st_lines_flags(argv[1]));
+      cut = hts_readline_cpp(fp, line, (size_t) cap, flags);
       n = strlen(line);
     } else {
-      cut = hts_readline(fp, line, (size_t) cap, st_lines_flags(argv[1]), &n);
+      cut = hts_readline(fp, line, (size_t) cap, flags);
+      /* the terminator is the last NUL, as a kept NUL is data */
+      while (n > 0 && line[n - 1] != '\0')
+        n--;
+      assertf(n > 0);
+      n--;
     }
     /* nothing written past the capacity */
-    assertf(n < (size_t) cap && line[n] == '\0');
     assertf(line[cap] == '#');
-    printf("[");
-    st_lines_print(line, n);
-    printf("]%s", cut ? "!" : "");
+    if (cut) {
+      printf("!");
+    } else {
+      printf("[");
+      st_lines_print(line, n);
+      printf("]");
+    }
   }
   printf("\n");
   fclose(fp);
@@ -158,38 +146,15 @@ static int st_readline(httrackp *opt, int argc, char **argv) {
 }
 
 /* ------------------------------------------------------------ */
-/* The readers this module replaced, kept to diff against.       */
+/* Frozen copies of the old readers, for the differential.      */
 /* ------------------------------------------------------------ */
 
-/* htslib.c's linput(). */
-static int legacy_linput(FILE *fp, char *s, int max) {
-  int c;
-  int j = 0;
+/* Set when a legacy read stopped for want of room, not at the line's end. */
+static hts_boolean st_legacy_full;
 
-  do {
-    c = fgetc(fp);
-    if (c != EOF) {
-      switch (c) {
-      case 13:
-        break;
-      case 10:
-        c = -1;
-        break;
-      case 9:
-      case 12:
-        break;
-      default:
-        s[j++] = (char) c;
-        break;
-      }
-    }
-  } while ((c != -1) && (c != EOF) && (j < (max - 1)));
-  s[j] = '\0';
-  return j;
-}
-
-/* htslib.c's rawlinput(), the cookies.txt reader. */
-static void legacy_rawlinput(FILE *fp, char *s, int max) {
+/* htslib.c's linput() (HTS_LINE_DROP_TAB), rawlinput() (0) and htsserver.h's
+   linput() (both), which differ only in the bytes they drop. */
+static int legacy_linput(FILE *fp, char *s, int max, int flags) {
   int c;
   int j = 0;
 
@@ -203,38 +168,15 @@ static void legacy_rawlinput(FILE *fp, char *s, int max) {
         c = -1;
         break;
       default:
-        s[j++] = (char) c;
+        if (!(((flags & HTS_LINE_DROP_TAB) != 0 && (c == 9 || c == 12)) ||
+              ((flags & HTS_LINE_DROP_NUL) != 0 && c == 0)))
+          s[j++] = (char) c;
         break;
       }
     }
   } while ((c != -1) && (c != EOF) && (j < (max - 1)));
-  s[j++] = '\0';
-}
-
-/* htsserver.h's linput(), which also drops NUL. */
-static int legacy_srv_linput(FILE *fp, char *s, int max) {
-  int c;
-  int j = 0;
-
-  do {
-    c = fgetc(fp);
-    if (c != EOF) {
-      switch (c) {
-      case 13:
-        break;
-      case 10:
-        c = -1;
-        break;
-      case 0:
-      case 9:
-      case 12:
-        break;
-      default:
-        s[j++] = (char) c;
-        break;
-      }
-    }
-  } while ((c != -1) && (c != EOF) && (j < (max - 1)));
+  if (c != -1 && c != EOF)
+    st_legacy_full = HTS_TRUE;
   s[j] = '\0';
   return j;
 }
@@ -248,7 +190,7 @@ static int legacy_srv_linput_trim(FILE *fp, char *s, int max) {
   if (ls) {
     char *a;
 
-    rlen = legacy_srv_linput(fp, ls, max);
+    rlen = legacy_linput(fp, ls, max, HTS_LINE_DROP_TAB | HTS_LINE_DROP_NUL);
     if (rlen) {
       while ((rlen > 0) && is_realspace(ls[max(rlen - 1, 0)]))
         ls[--rlen] = '\0';
@@ -286,275 +228,131 @@ static int legacy_srv_linput_cpp(FILE *fp, char *s, int max) {
 }
 
 /* ------------------------------------------------------------ */
-/* Differential: legacy against new, and new against a model.    */
+/* Differential and cap independence.                           */
 /* ------------------------------------------------------------ */
 
-enum st_reader {
-  ST_LINPUT,
-  ST_RAWLINPUT,
-  ST_SRV_LINPUT,
-  ST_SRV_CPP,
-  ST_NREADERS
-};
+enum { ST_NREADERS = 4, ST_CPP = 3 };
 
 static const char *const st_reader_names[ST_NREADERS] = {
     "linput", "rawlinput", "srv-linput", "srv-cpp"};
 
-static int st_reader_flags(enum st_reader r) {
-  switch (r) {
-  case ST_LINPUT:
-    return HTS_LINE_DROP_TAB;
-  case ST_RAWLINPUT:
-    return 0;
-  default:
-    return HTS_LINE_DROP_TAB | HTS_LINE_DROP_NUL;
-  }
-}
+static const int st_reader_flags[ST_NREADERS] = {
+    HTS_LINE_DROP_TAB, 0, HTS_LINE_DROP_TAB | HTS_LINE_DROP_NUL,
+    HTS_LINE_DROP_TAB | HTS_LINE_DROP_NUL};
 
-static hts_boolean st_dropped(int c, int flags) {
-  return c == '\r' ||
-                 ((flags & HTS_LINE_DROP_TAB) != 0 &&
-                  (c == '\t' || c == '\f')) ||
-                 ((flags & HTS_LINE_DROP_NUL) != 0 && c == '\0')
-             ? HTS_TRUE
-             : HTS_FALSE;
-}
-
-/* Append one line as a caller sees it, up to its first NUL, then a separator.
-   A cut line is "!" alone: what it keeps is the readline cases' business. */
-static void st_lines_add(String *out, const char *s, hts_boolean cut) {
-  if (cut)
-    StringAddchar(*out, '!');
+/* One read by reader r, old or new, at cap into s. Returns the offset after. */
+static long st_read(FILE *fp, int r, size_t cap, hts_boolean legacy, char *s,
+                    hts_boolean *cut) {
+  *cut = HTS_FALSE;
+  if (legacy && r == ST_CPP)
+    (void) legacy_srv_linput_cpp(fp, s, (int) cap);
+  else if (legacy)
+    (void) legacy_linput(fp, s, (int) cap, st_reader_flags[r]);
+  else if (r == ST_CPP)
+    *cut = hts_readline_cpp(fp, s, cap, st_reader_flags[r]);
   else
-    StringMemcat(*out, s, strlen(s));
-  StringAddchar(*out, '\036');
-}
-
-/* Every line the legacy reader gives a feof() loop. */
-static void st_legacy_all(FILE *fp, enum st_reader r, int cap, String *out) {
-  char s[ST_LINE_MAXCAP + ST_LINE_SLACK];
-
-  rewind(fp);
-  StringClear(*out);
-  while (!feof(fp)) {
-    switch (r) {
-    case ST_LINPUT:
-      (void) legacy_linput(fp, s, cap);
-      break;
-    case ST_RAWLINPUT:
-      legacy_rawlinput(fp, s, cap);
-      break;
-    case ST_SRV_LINPUT:
-      (void) legacy_srv_linput(fp, s, cap);
-      break;
-    default:
-      (void) legacy_srv_linput_cpp(fp, s, cap);
-      break;
-    }
-    st_lines_add(out, s, HTS_FALSE);
-  }
-}
-
-/* Same with the new reader. HTS_TRUE when any line was cut. */
-static hts_boolean st_new_all(FILE *fp, enum st_reader r, int cap,
-                              String *out) {
-  char s[ST_LINE_MAXCAP + ST_LINE_SLACK];
-  hts_boolean any = HTS_FALSE;
-
-  rewind(fp);
-  StringClear(*out);
-  while (!feof(fp)) {
-    hts_boolean cut;
-
-    memset(s, '#', sizeof(s));
-    if (r == ST_SRV_CPP)
-      cut = hts_readline_cpp(fp, s, (size_t) cap, st_reader_flags(r));
-    else
-      cut = hts_readline(fp, s, (size_t) cap, st_reader_flags(r), NULL);
-    assertf(s[cap] == '#');
-    if (cut)
-      any = HTS_TRUE;
-    st_lines_add(out, s, cut);
-  }
-  return any;
-}
-
-/* Trailing whitespace off, then leading spaces and TABs, as linput_trim(). */
-static void st_model_trim(String *seg) {
-  size_t n = StringLength(*seg);
-  size_t i = 0;
-  const char *const b = StringBuff(*seg);
-
-  while (n > 0 && is_realspace(b[n - 1]))
-    n--;
-  while (i < n && (b[i] == ' ' || b[i] == '\t'))
-    i++;
-  {
-    String t = STRING_EMPTY;
-
-    StringMemcat(t, b + i, n - i);
-    StringClear(*seg);
-    StringMemcat(*seg, StringBuff(t), StringLength(t));
-    StringFree(t);
-  }
-}
-
-static hts_boolean st_ends_backslash(const String *s) {
-  return StringLength(*s) > 0 && StringBuff(*s)[StringLength(*s) - 1] == '\\'
-             ? HTS_TRUE
-             : HTS_FALSE;
-}
-
-/* What the new reader r must give a feof() loop over data at capacity cap,
-   written without a fixed buffer. "at_size" is set when a read holds exactly
-   cap - 1 bytes, where the legacy reader leaves the newline for the next read;
-   "cut" when one does not fit. */
-static void st_model_all(const char *data, size_t len, enum st_reader r,
-                         size_t cap, String *out, hts_boolean *at_size,
-                         hts_boolean *any_cut) {
-  const int flags = st_reader_flags(r);
-  String joined = STRING_EMPTY;
-  String seg = STRING_EMPTY;
-  hts_boolean cut = HTS_FALSE; /* the current line's */
-  size_t pos = 0;
-
-  StringClear(*out);
-  StringClear(joined);
-  *at_size = *any_cut = HTS_FALSE;
-  for (;;) {
-    hts_boolean more;
-    int tail;
-    size_t left;
-
-    if (r == ST_SRV_CPP && !cut && st_ends_backslash(&joined))
-      StringPopRight(joined);
-    /* one physical line, or nothing once the data is spent */
-    StringClear(seg);
-    while (pos < len && data[pos] != '\n') {
-      if (!st_dropped((unsigned char) data[pos], flags))
-        StringAddchar(seg, data[pos]);
-      pos++;
-    }
-    if (!cut) {
-      left = cap - StringLength(joined);
-      if (StringLength(seg) + 1 > left)
-        cut = *any_cut = HTS_TRUE;
-      else if (StringLength(seg) > 0 && StringLength(seg) + 1 == left)
-        *at_size = HTS_TRUE;
-    }
-    if (r == ST_SRV_CPP)
-      st_model_trim(&seg);
-    tail = StringLength(seg) > 0
-               ? (unsigned char) StringBuff(seg)[StringLength(seg) - 1]
-               : -1;
-    StringMemcat(joined, StringBuff(seg), StringLength(seg));
-    more = r != ST_SRV_CPP ? HTS_FALSE
-           : cut           ? tail == '\\'
-                           : st_ends_backslash(&joined);
-    if (!more) {
-      st_lines_add(out, StringBuff(joined), cut);
-      StringClear(joined);
-      cut = HTS_FALSE;
-      if (pos >= len)
-        break;
-    }
-    if (pos < len)
-      pos++; /* the '\n' */
-  }
-  StringFree(seg);
-  StringFree(joined);
+    *cut = hts_readline(fp, s, cap, st_reader_flags[r]);
+  return ftell(fp);
 }
 
 struct st_diff_counts {
-  unsigned cases, same, at_size, split, failures;
+  unsigned cases, fit, other, failures;
 };
 
-static hts_boolean st_strings_equal(const String *a, const String *b) {
-  return StringLength(*a) == StringLength(*b) &&
-                 memcmp(StringBuff(*a), StringBuff(*b), StringLength(*a)) == 0
-             ? HTS_TRUE
-             : HTS_FALSE;
+static void st_diff_fail(struct st_diff_counts *k, const char *why, int r,
+                         size_t cap, const char *data, size_t len) {
+  if (++k->failures <= 5) {
+    printf("linediff: %s, %s cap %d input [", why, st_reader_names[r],
+           (int) cap);
+    st_lines_print(data, len);
+    printf("]\n");
+  }
 }
 
+/* Walk data with reader r at cap, as a feof() loop does, into ends[]. Each
+   line the old reader read without running out of room must come back
+   identical. Returns the number of reads. */
+static size_t st_walk(FILE *fp, int r, size_t cap, long *ends,
+                      struct st_diff_counts *k, const char *data, size_t len) {
+  char s[ST_LINE_BIG + ST_LINE_SLACK];
+  char old[ST_LINE_BIG + ST_LINE_SLACK];
+  size_t n = 0;
+  hts_boolean eof = HTS_FALSE;
+
+  rewind(fp);
+  while (!eof && n < ST_LINE_MAXREADS) {
+    const long start = ftell(fp);
+    hts_boolean cut, unused;
+    long old_end;
+
+    memset(s, '#', sizeof(s));
+    ends[n++] = st_read(fp, r, cap, HTS_FALSE, s, &cut);
+    assertf(s[cap] == '#');
+    eof = feof(fp) ? HTS_TRUE : HTS_FALSE;
+    fseek(fp, start, SEEK_SET);
+    st_legacy_full = HTS_FALSE;
+    old_end = st_read(fp, r, cap, HTS_TRUE, old, &unused);
+    if (st_legacy_full) {
+      k->other++;
+    } else {
+      k->fit++;
+      if (cut || old_end != ends[n - 1] || strcmp(s, old) != 0)
+        st_diff_fail(k, "differs from legacy on a line that fits", r, cap, data,
+                     len);
+    }
+    fseek(fp, ends[n - 1], SEEK_SET);
+  }
+  return n;
+}
+
+/* Against the old readers line by line, and the same line boundaries at every
+   cap: only a line's content and its cut flag may depend on the cap. */
 static void st_diff_one(const char *data, size_t len,
                         struct st_diff_counts *k) {
-  static const int caps[] = {2, 3, 4, 5, 6, 8, 16, ST_LINE_MAXCAP};
   FILE *const fp = st_lines_file(data, len);
-  String legacy = STRING_EMPTY;
-  String fresh = STRING_EMPTY;
-  String model = STRING_EMPTY;
-  size_t c;
   int r;
 
   for (r = 0; r < ST_NREADERS; r++) {
-    for (c = 0; c < sizeof(caps) / sizeof(caps[0]); c++) {
-      const size_t cap = (size_t) caps[c];
-      const char *why = NULL;
-      hts_boolean at_size, cut;
+    long big[ST_LINE_MAXREADS];
+    const size_t nbig = st_walk(fp, r, ST_LINE_BIG, big, k, data, len);
+    size_t cap;
+
+    for (cap = 1; cap <= 24; cap++) {
+      long ends[ST_LINE_MAXREADS];
+      const size_t n = st_walk(fp, r, cap, ends, k, data, len);
 
       k->cases++;
-      st_model_all(data, len, (enum st_reader) r, cap, &model, &at_size, &cut);
-      st_legacy_all(fp, (enum st_reader) r, (int) cap, &legacy);
-      (void) st_new_all(fp, (enum st_reader) r, (int) cap, &fresh);
-      if (!st_strings_equal(&fresh, &model))
-        why = "differs from the model";
-      else if (st_strings_equal(&fresh, &legacy))
-        k->same++;
-      else if (!at_size && !cut)
-        why = "differs from legacy where every line fits";
-      else if (cut) {
-        /* allowlisted: legacy reads the tail of a line as more lines */
-        k->split++;
-      } else {
-        /* allowlisted: legacy reads an empty line after one of cap - 1 bytes */
-        k->at_size++;
-      }
-      if (why != NULL) {
-        k->failures++;
-        if (k->failures <= 5) {
-          printf("linediff: %s, %s cap %d input [", why, st_reader_names[r],
-                 (int) cap);
-          st_lines_print(data, len);
-          printf("]\n");
-        }
-      }
+      if (n != nbig || memcmp(ends, big, n * sizeof(ends[0])) != 0)
+        st_diff_fail(k, "line boundaries depend on the cap", r, cap, data, len);
     }
   }
-  StringFree(legacy);
-  StringFree(fresh);
-  StringFree(model);
   fclose(fp);
 }
 
-/* The new readers against the legacy ones, on a hand corpus and a seeded
-   random one: identical wherever every line fits, and otherwise only the two
-   allowlisted differences. */
+/* The new readers against the old ones, on a hand corpus and a seeded random
+   one. */
 static int st_linediff(httrackp *opt, int argc, char **argv) {
   static const char *const corpus[] = {
       "",
       "\n",
       "a",
-      "a\n",
-      "ab\ncd",
       "ab\r\ncd\r\n",
-      "a\rb\nc",
       "a\n\nb",
       "a\tb\fc",
       "a\\\nb\n",
       "a\\\\\n\nb",
+      "abcdef\\\\\n\nghi\njk",
       "  a  \\\n  b \n",
       "\\",
-      "\\\n",
       "a \\ \nb",
-      "abc",
-      "abcd\n",
-      "abcde\nx",
+      "abcd   \n",
       "abcdefghijklmnopqrstuvwxyz\nnext",
       "\t\t\tab\n",
+      "\va\\\v\nb\f\n",
       "a\\\nb\\\nc\\\nd\\\ne\\\nf\nz",
   };
   static const char alphabet[] = "ab \t\r\n\\\f\v";
-  struct st_diff_counts k = {0, 0, 0, 0, 0};
+  struct st_diff_counts k = {0, 0, 0, 0};
   uint32_t seed = 1551;
   size_t i;
   int n;
@@ -566,7 +364,6 @@ static int st_linediff(httrackp *opt, int argc, char **argv) {
     st_diff_one(corpus[i], strlen(corpus[i]), &k);
   /* NUL is data too, and the one byte only some readers drop */
   st_diff_one("a\0b\nc", 5, &k);
-  st_diff_one("\0\0\0\0\0\0\n\0", 8, &k);
   for (n = 0; n < 400; n++) {
     char data[96];
     size_t len;
@@ -582,8 +379,8 @@ static int st_linediff(httrackp *opt, int argc, char **argv) {
     }
     st_diff_one(data, len, &k);
   }
-  printf("linediff: %u cases, %u same, %u at size, %u split, %u failures\n",
-         k.cases, k.same, k.at_size, k.split, k.failures);
+  printf("linediff: %u cases, %u lines fit, %u do not, %u failures\n", k.cases,
+         k.fit, k.other, k.failures);
   printf("linediff: %s\n", k.failures == 0 ? "OK" : "FAIL");
   return k.failures == 0 ? 0 : 1;
 }

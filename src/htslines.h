@@ -36,25 +36,37 @@ Please visit our Website: http://www.httrack.com
 #define HTSLINES_DEFH
 
 #include "htsglobal.h"
+#include "htsstrings.h"
 
 #include <stddef.h>
 #include <stdio.h>
 
-/* hts_readline() flags: bytes dropped besides CR. */
-/* TAB and form feed, as linput() does. */
+/* Flags for the readers below. CR is always dropped. */
+/* Drop TAB and form feed. */
 #define HTS_LINE_DROP_TAB 1
-/* NUL, as htsserver's linput() does. */
+/* Drop NUL. */
 #define HTS_LINE_DROP_NUL 2
 
-/* Read one line from fp into s, which holds max >= 1 bytes with the NUL. A line
-   too long for s is clipped and the rest of it consumed, so its tail is never
-   read back as the next line. Returns HTS_TRUE when the line was cut. "len",
-   when not NULL, receives the number of bytes stored. */
-hts_boolean hts_readline(FILE *fp, char *s, size_t max, int flags, size_t *len);
+/* Read one line from fp into s, which holds max >= 1 bytes with the NUL. The
+   rest of a line too long for s is consumed, so its tail is never read back as
+   the next line. Returns HTS_TRUE when a byte other than whitespace was
+   dropped, and a cut line's content is unspecified. EOF is not reported:
+   callers loop on feof(), and a read at EOF gives an empty line. */
+hts_boolean hts_readline(FILE *fp, char *s, size_t max, int flags);
 
-/* hts_readline() with spaces and TABs trimmed at both ends, and a line ending
-   with a backslash joined to the next one. Returns HTS_TRUE when any joined
+/* hts_readline() with whitespace trimmed at the end, spaces and TABs at the
+   start, and a line ending with a backslash joined to the next one. Which
+   lines are joined does not depend on max. Returns HTS_TRUE when any joined
    line was cut. */
 hts_boolean hts_readline_cpp(FILE *fp, char *s, size_t max, int flags);
+
+/* The limit for files httrack writes itself. A command line or a URL list is
+   far smaller, and a corrupt file still cannot claim unbounded memory. */
+#define HTS_READLINE_ALLOC_MAX ((size_t) 1 << 20)
+
+/* hts_readline() into line, which grows to hold up to limit bytes. Returns
+   HTS_TRUE when the line was longer, whitespace included, and then line holds
+   only its start. */
+hts_boolean hts_readline_alloc(FILE *fp, String *line, size_t limit, int flags);
 
 #endif

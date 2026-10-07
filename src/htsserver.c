@@ -87,7 +87,7 @@ coucal NewLangList = NULL;
 #include "htslines.h"
 #include "htsthread.h"
 
-/* Bytes this server's line readers drop, as its own linput() does. */
+/* This server's line readers drop TAB, form feed and NUL. */
 #define HTS_LINES_SERVER (HTS_LINE_DROP_TAB | HTS_LINE_DROP_NUL)
 
 const char *gethomedir(void);
@@ -1408,18 +1408,22 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             fp = NULL;
           }
           if (fp) {
+            String sline = STRING_EMPTY;
+
             /* Read file */
             while (!feof(fp) && !ferror(fp)) {
+              char *entry;
               char *pos;
 
               /* a clipped value is not the saved one: keep the default */
-              if (hts_readline(fp, line, sizeof(line) - 2, HTS_LINES_SERVER,
-                               NULL)) {
+              if (hts_readline_alloc(fp, &sline, HTS_READLINE_ALLOC_MAX,
+                                     HTS_LINES_SERVER)) {
                 fprintf(stderr, "%s: line too long, ignored\n",
                         StringBuff(fspath));
                 continue;
               }
-              pos = strchr(line, '=');
+              entry = StringBuffRW(sline);
+              pos = strchr(entry, '=');
               if (pos) {
                 String escline = STRING_EMPTY;
                 char listid[16];
@@ -1428,9 +1432,9 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                 /* Only a checkbox: elsewhere zero is the user's value, and
                    emptying it silently restores the wizard default (#1177). */
                 if (pos[0] == '0' && pos[1] == '\0' &&
-                    ini_key_is_checkbox(line))
+                    ini_key_is_checkbox(entry))
                   *pos = '\0';
-                if (ini_key_is_list(line)) {
+                if (ini_key_is_list(entry)) {
                   const int id = ini_list_shift(pos, strlen(pos), 1);
 
                   if (id >= 0) {
@@ -1442,11 +1446,12 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                    empty, and an acquired NULL reads back as absent (#1186). */
                 StringClear(escline);
                 hts_unescapeini(pos, &escline);
-                coucal_write(NewLangList, line,
-                              (intptr_t) StringAcquire(&escline));
+                coucal_write(NewLangList, entry,
+                             (intptr_t) StringAcquire(&escline));
               }
             }
 
+            StringFree(sline);
             fclose(fp);
           }
         }
@@ -2429,8 +2434,8 @@ int smallserver_setkeyarr(const char *key, int id, const char *key2, const char 
 }
 
 /* Read one key and value pair of a lang file into key and value, each of size
-   bytes. HTS_FALSE when either was cut: the pair is skipped, the next one
-   still pairs. */
+   bytes. Returns HTS_FALSE when either line was cut, so the caller skips the
+   pair, and the next pair still lines up. */
 static hts_boolean lang_read_pair(FILE *fp, char *key, char *value,
                                   size_t size) {
   const hts_boolean key_cut = hts_readline_cpp(fp, key, size, HTS_LINES_SERVER);

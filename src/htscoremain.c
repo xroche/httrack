@@ -824,26 +824,28 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     if (fp) {
       int insert_after = 1;     /* insérer après nom au début */
 
-      //
-      char BIGSTK buff[8192];
+      String buff = STRING_EMPTY;
       char **tokens;
       int ntokens = 0;
       int i;
       hts_boolean ok;
-      const hts_boolean cut =
-          hts_readline(fp, buff, 8000, HTS_LINE_DROP_TAB, NULL);
+      const hts_boolean cut = hts_readline_alloc(
+          fp, &buff, HTS_READLINE_ALLOC_MAX, HTS_LINE_DROP_TAB);
 
       fclose(fp);
       fp = NULL;
-      /* "" unquotes to empty but is still a real token (#106) */
-      tokens = hts_split_args(buff, &ntokens,
-                              HTS_SPLIT_STRIP_QUOTES | HTS_SPLIT_DROP_EMPTY);
-      /* the clip may have cut the last argument, which then means another */
-      if (cut && tokens != NULL && ntokens > 0) {
-        fprintf(stderr, "* hts-cache/doit.log: line too long, last argument "
-                        "ignored\n");
-        ntokens--;
+      /* any argument dropped would resume a different mirror */
+      if (cut) {
+        StringFree(buff);
+        cmdl_free(&x_cmd);
+        HTS_PANIC_PRINTF("Error, hts-cache/doit.log is too long to resume "
+                         "the mirror");
+        htsmain_free();
+        return -1;
       }
+      /* "" unquotes to empty but is still a real token (#106) */
+      tokens = hts_split_args(StringBuffRW(buff), &ntokens,
+                              HTS_SPLIT_STRIP_QUOTES | HTS_SPLIT_DROP_EMPTY);
       for (i = 0; tokens != NULL && i < ntokens; i++) {
         /* inserted in order, after the program name */
         if (!cmdl_ins_unquoted(&x_cmd, tokens[i], insert_after))
@@ -854,6 +856,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       }
       ok = tokens != NULL && i == ntokens;
       freet(tokens);
+      StringFree(buff);
       if (!ok) {
         cmdl_free(&x_cmd);
         HTS_PANIC_PRINTF("Error, not enough memory");

@@ -383,8 +383,8 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
       const size_t line_max = 8000;
 
       while ((!feof(fp)) && (strlen(cookie->data) < cookie->max_len)) {
-        /* the TABs separate fields; a cut line's tail is no cookie */
-        const hts_boolean cut = hts_readline(fp, line, 8100, 0, NULL);
+        /* TABs separate the fields, so the reader keeps them */
+        const hts_boolean cut = hts_readline(fp, line, 8100, 0);
 
         if (strnotempty(line)) {
           if (!cut && strlen(line) < line_max) {

@@ -33,59 +33,84 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 #include "htslines.h"
+#include "htslib.h"
 
 #include <string.h>
 
-/* is_realspace(), which lives in htslib.h, out of htsserver's reach. */
-static hts_boolean line_is_space(int c) {
-  return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' ||
-                 c == '\r'
+/* Is c one of the bytes flags drop? */
+static hts_boolean line_drops(int c, int flags) {
+  return c == '\r' ||
+                 ((flags & HTS_LINE_DROP_TAB) != 0 &&
+                  (c == '\t' || c == '\f')) ||
+                 ((flags & HTS_LINE_DROP_NUL) != 0 && c == '\0')
              ? HTS_TRUE
              : HTS_FALSE;
 }
 
-/* hts_readline(), also giving the line's last non-space byte, stored or not,
-   or -1: a clipped line's continuation is decided by the byte the clip hid. */
-static hts_boolean readline_tail(FILE *fp, char *s, size_t max, int flags,
-                                 size_t *len, int *tail) {
+/* How a line ends once trimmed, which decides whether it continues. */
+typedef struct line_end {
+  size_t run;        /* trailing backslashes */
+  hts_boolean other; /* holds a byte besides those backslashes */
+} line_end;
+
+/* hts_readline(), also giving the number of bytes stored and how the whole
+   line ends once trimmed, from every byte read, stored or not. */
+static hts_boolean readline_end(FILE *fp, char *s, size_t max, int flags,
+                                size_t *len, line_end *end) {
   hts_boolean cut = HTS_FALSE;
+  hts_boolean lead = HTS_TRUE; /* only spaces and TABs so far */
+  hts_boolean gap = HTS_FALSE; /* whitespace kept if a byte follows */
   size_t j = 0;
   int c;
 
-  *tail = -1;
+  end->run = 0;
+  end->other = HTS_FALSE;
   while ((c = fgetc(fp)) != EOF && c != '\n') {
-    if (c == '\r' ||
-        ((flags & HTS_LINE_DROP_TAB) != 0 && (c == '\t' || c == '\f')) ||
-        ((flags & HTS_LINE_DROP_NUL) != 0 && c == '\0'))
+    if (line_drops(c, flags))
       continue;
-    if (!line_is_space(c))
-      *tail = c;
+    if (is_realspace(c)) {
+      if (!lead || (c != ' ' && c != '\t')) {
+        lead = HTS_FALSE;
+        gap = HTS_TRUE;
+      }
+    } else {
+      if (gap) {
+        end->other = HTS_TRUE;
+        end->run = 0;
+      }
+      lead = gap = HTS_FALSE;
+      if (c == '\\') {
+        end->run++;
+      } else {
+        end->other = HTS_TRUE;
+        end->run = 0;
+      }
+    }
     if (j + 1 < max)
       s[j++] = (char) c;
-    else
+    else if (!is_realspace(c))
       cut = HTS_TRUE;
   }
   s[j] = '\0';
-  if (len != NULL)
-    *len = j;
+  *len = j;
   return cut;
 }
 
-hts_boolean hts_readline(FILE *fp, char *s, size_t max, int flags,
-                         size_t *len) {
-  int tail;
+hts_boolean hts_readline(FILE *fp, char *s, size_t max, int flags) {
+  size_t len;
+  line_end end;
 
-  return readline_tail(fp, s, max, flags, len, &tail);
+  return readline_end(fp, s, max, flags, &len, &end);
 }
 
-/* hts_readline() trimmed: trailing whitespace, then leading spaces and TABs. */
+/* readline_end(), then the trim hts_readline_cpp() does on each line. */
 static hts_boolean readline_trim(FILE *fp, char *s, size_t max, int flags,
-                                 size_t *len, int *tail) {
-  const hts_boolean cut = readline_tail(fp, s, max, flags, len, tail);
+                                 size_t *len, line_end *end) {
+  const hts_boolean cut = readline_end(fp, s, max, flags, len, end);
   size_t n = *len;
   size_t i = 0;
 
-  while (n > 0 && line_is_space((unsigned char) s[n - 1]))
+  while (n > 0 && is_realspace(s[n - 1]))
     s[--n] = '\0';
   while (i < n && (s[i] == ' ' || s[i] == '\t'))
     i++;
@@ -100,21 +125,41 @@ static hts_boolean readline_trim(FILE *fp, char *s, size_t max, int flags,
 
 hts_boolean hts_readline_cpp(FILE *fp, char *s, size_t max, int flags) {
   hts_boolean cut = HTS_FALSE;
-  hts_boolean more;
   size_t rlen = 0;
+  /* trailing backslashes of the whole joined line, stored or not */
+  size_t run = 0;
 
   s[0] = '\0';
   do {
     size_t n;
-    int tail;
+    line_end end;
 
-    if (!cut && rlen > 0 && s[rlen - 1] == '\\')
-      s[--rlen] = '\0';
-    if (readline_trim(fp, s + rlen, max - rlen, flags, &n, &tail))
+    if (run > 0) {
+      run--;
+      if (rlen > 0)
+        s[--rlen] = '\0';
+    }
+    if (readline_trim(fp, s + rlen, max - rlen, flags, &n, &end))
       cut = HTS_TRUE;
     rlen += n;
-    /* once clipped, s no longer ends where the line does */
-    more = cut ? tail == '\\' : rlen > 0 && s[rlen - 1] == '\\';
-  } while (more);
+    run = end.other ? end.run : run + end.run;
+  } while (run > 0);
+  return cut;
+}
+
+hts_boolean hts_readline_alloc(FILE *fp, String *line, size_t limit,
+                               int flags) {
+  hts_boolean cut = HTS_FALSE;
+  int c;
+
+  StringClear(*line);
+  while ((c = fgetc(fp)) != EOF && c != '\n') {
+    if (line_drops(c, flags))
+      continue;
+    if (StringLength(*line) < limit)
+      StringAddchar(*line, (char) c);
+    else
+      cut = HTS_TRUE;
+  }
   return cut;
 }

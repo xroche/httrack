@@ -1,0 +1,77 @@
+#!/bin/bash
+#
+# WebHTTrack's line readers: a lang catalog line too long for the buffer drops
+# its pair and the next pair still lines up, and a saved project value of any
+# real length is read whole.
+
+set -euo pipefail
+# shellcheck source=tests/webhttracklib.sh
+. "${0%"${0##*/}"}./webhttracklib.sh"
+
+htsserver_require
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_lines.XXXXXX") || fail "no tmpdir"
+cleanup_push htsserver_cleanup_dir "${work}"
+
+# The served tree, with pairs ahead of English.txt's own. The catalog reader
+# keeps 7999 bytes, and the first definition of a key wins. Split at that
+# size, the long key would be three lines and shift every later pair.
+htsserver_distroot
+root="${work}/root"
+mkdir -p "${root}/lang"
+for entry in "${HTS_DISTROOT}"/*; do
+    test "${entry##*/}" = lang || ln -s "${entry}" "${root}/${entry##*/}"
+done
+for entry in "${HTS_DISTDIR}"/lang/*; do
+    test "${entry##*/}" = English.txt || ln -s "${entry}" "${root}/lang/"
+done
+{
+    repeat_chars 17000 K
+    printf '\nx\n'
+    printf 'Open Source offline browser\nWRONG%s\n' "$(repeat_chars 9000 w)"
+    printf 'Open Source offline browser\nMARKERA\n'
+    printf 'Man\\\nual\nMARKERM\n'
+    cat "${HTS_DISTDIR}/lang/English.txt"
+} >"${root}/lang/English.txt"
+
+mkdir -p "${work}/home" "${work}/proj/hts-cache"
+longurl="http://example.com/$(repeat_chars 9000 p)"
+{
+    echo "CurrentUrl=${longurl}"
+    printf 'UserID=HUGE'
+    repeat_chars $((1024 * 1024)) h
+    echo
+    echo "Depth=7"
+} >"${work}/proj/hts-cache/winprofile.ini"
+
+htsserver_start --root "${root}" --home "${work}/home"
+
+htsserver_python - "${HTS_URL}" "${work}" "${longurl}" <<'PY' || fail "see above"
+import sys
+
+from webtestlib import Session
+
+s, work, longurl = Session(sys.argv[1]), sys.argv[2], sys.argv[3]
+
+page = s.get("index.html")
+if "WRONG" in page:
+    sys.exit("a cut catalog value was applied")
+for want in ["MARKERA", "MARKERM"]:
+    if want not in page:
+        sys.exit("%s missing: the pairs after the long lines are off" % want)
+
+loaded = s.post("step2.html", [("path", work), ("loadprojname", "proj")])
+if longurl not in loaded:
+    sys.exit("the long CurrentUrl did not load whole")
+step4 = s.get("step4.html?sid=" + s.sid)
+if "HUGE" in step4:
+    sys.exit("a profile line over the cap was applied")
+if "--depth=7" not in step4:
+    sys.exit("the profile line after the one over the cap was lost")
+PY
+
+grep -q "lang: line too long" "${HTS_LOG}" || fail "no warning for the long catalog lines"
+grep -q "winprofile.ini: line too long" "${HTS_LOG}" ||
+    fail "no warning for the profile line over the cap"
+
+exit 0

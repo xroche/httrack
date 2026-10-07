@@ -4,7 +4,7 @@
 # blank or a drifted msgid silently unhooks every translation that follows,
 # rather than failing, so assert the pairing and the join against English.txt.
 # Pairs are physical lines here; a msgid ending in \ continues onto the next one
-# for the engine (linput_cpp) but not for us. None do today.
+# for the engine (hts_readline_cpp) but not for us. None do today.
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
