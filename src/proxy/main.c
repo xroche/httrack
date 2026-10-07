@@ -107,30 +107,35 @@ static void hts_binary_stdio(void) {
 
 /* --help prints this to stdout, a bad command line to stderr. */
 static void usage(FILE *fp, const char *argv0) {
-  fprintf(fp, "proxy mode:\n");
   fprintf(fp,
           "usage: %s <proxy-addr:proxy-port> <ICP-addr:ICP-port> "
-          "[ ( <new.zip path> | <new.ndx path> | <archive.arc path> | "
-          "--list <file-list> ) ..]\n",
+          "[archive ..] [--list <file-list>]\n",
           argv0);
   fprintf(fp,
-          "\texample: %s proxy:8080 localhost:3130 "
-          "/home/archives/www-archive-01.zip "
-          "/home/old-archives/www-archive-02.ndx\n",
+          "usage: %s --convert <output> [archive ..] [--list <file-list>]\n",
           argv0);
-  fprintf(fp, "convert mode:\n");
+  fprintf(fp, "Serves httrack archives as an HTTP proxy with ICP, or merges "
+              "them into one.\n");
+  fprintf(fp, "  archive                an httrack cache (new.zip, or new.ndx "
+              "with new.dat) or an .arc file\n");
+  fprintf(fp, "  --list <file-list>     read more archive paths from this "
+              "file, one per line\n");
+  fprintf(fp, "  --convert <output>     merge the archives into one .zip or "
+              ".arc file, then exit\n");
+  fprintf(fp, "  -h, --help             print this help and exit\n");
+  fprintf(fp, "  --version              print the version and exit\n");
   fprintf(fp,
-          "usage: %s --convert <archive-output-path> [ ( <new.zip path> | "
-          "<new.ndx path> | <archive.arc path> | --list <file-list> ) ..]\n",
+          "example: %s localhost:8080 localhost:3130 "
+          "/home/archives/example.com/hts-cache/new.zip\n",
           argv0);
+  fprintf(fp, "means: serve that mirror as a proxy on port 8080, and answer "
+              "ICP queries on port 3130\n");
   fprintf(fp,
-          "\texample: %s --convert /home/archives/merged.zip "
-          "/home/archives/www-archive-01.zip "
-          "/home/old-archives/www-archive-02.ndx\n",
+          "example: %s --convert /home/archives/merged.zip "
+          "/home/archives/a/hts-cache/new.zip "
+          "/home/archives/b/hts-cache/new.zip\n",
           argv0);
-  fprintf(fp, "other options:\n");
-  fprintf(fp, "  -h, --help     print this help and exit\n");
-  fprintf(fp, "  --version      print the version and exit\n");
+  fprintf(fp, "means: merge two mirrors into merged.zip\n");
 }
 
 int main(int argc, char *argv[]) {
