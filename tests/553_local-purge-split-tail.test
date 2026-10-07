@@ -83,11 +83,12 @@ for logopt in -q -Q; do
     local_crawl --log "${tmpdir}/dirs1${logopt}" "${dirs_opts[@]}" \
         "${BASEURL}/a/b/f.txt"
     test -s "${mirror}/${prefix}a/b/f.txt" || fail "pass 1 did not mirror f.txt"
+    # Leading separators must not reduce an entry to the mirror root itself.
+    printf '[//x]\n' >>"${tmpdir}/cache${logopt}/hts-cache/new.lst"
     local_crawl --log "${tmpdir}/dirs2${logopt}" "${dirs_opts[@]}" --update -p0 \
         "${BASEURL}/other.html"
     test ! -e "${mirror}/${prefix}" ||
         fail "$logopt: the purge left emptied directories in the mirror"
     test -d "$mirror" || fail "$logopt: the purge removed the mirror root"
-    test -d "$parent" || fail "$logopt: the purge removed a directory above the mirror"
 done
 ok "the purge kept notes.txt, removed the long path, and stayed in the mirror"

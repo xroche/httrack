@@ -590,8 +590,8 @@ static void set_mirror_completed(httrackp *opt, hts_boolean *completed_out,
 }
 
 /* Reads old.lst's next "[path]" line. Returns HTS_FALSE when it is cut,
-   malformed or too long. A cut only comes from a corrupt or foreign old.lst,
-   because filenote() cannot write a longer line. */
+   malformed, absolute or too long. Only a corrupt or foreign old.lst holds such
+   a line, because filenote() writes relative paths that fit. */
 static hts_boolean old_lst_entry(httrackp *opt, const char *lst,
                                  const char *end, size_t *pos, char *line,
                                  size_t linesize, char *file, size_t filesize) {
@@ -601,9 +601,14 @@ static hts_boolean old_lst_entry(httrackp *opt, const char *lst,
       binput_line(lst + *pos, end, line, (int) linesize, &adv);
   size_t len;
 
+  if (adv <= 0) { // a line past INT_MAX bytes: stop walking
+    *pos = (size_t) (end - lst);
+    return HTS_FALSE;
+  }
   *pos += (size_t) adv;
   len = strlen(line);
-  if (cut || len < 2 || line[0] != '[' || line[len - 1] != ']')
+  if (cut || len < 3 || line[0] != '[' || line[len - 1] != ']' ||
+      line[1] == '/' || line[1] == '\\')
     return HTS_FALSE;
   if (root >= filesize || len - 2 >= filesize - root)
     return HTS_FALSE;
@@ -620,9 +625,11 @@ static hts_boolean chop_to_parent(char *file, size_t root, size_t *len) {
 
   while (n > root && file[n - 1] != '/' && file[n - 1] != '\\')
     n--;
-  if (n <= root + 1)
+  while (n > root && (file[n - 1] == '/' || file[n - 1] == '\\'))
+    n--; // a run of separators, as in "a//b", is one
+  if (n <= root)
     return HTS_FALSE;
-  file[--n] = '\0';
+  file[n] = '\0';
   *len = n;
   return HTS_TRUE;
 }
