@@ -1725,7 +1725,7 @@ static int st_headerparam(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* Each converted treathead site as it parsed before (frozen) and now. */
+/* Each converted treathead site has a frozen legacy parse and a current one. */
 static void legacy_ctype(const char *in, char *out, size_t size) {
   char line[1024], tempo[1100];
   char contenttype[HTS_MIMETYPE_SIZE] = "", charset[HTS_MIMETYPE_SIZE] = "";
@@ -2004,7 +2004,7 @@ static const struct {
     {"keep-alive", " max=\"50\"", "keep_alive=1 timeout=15 max=50"},
 };
 
-/* Hand cases whose input is HEAD, then N copies of FILL. */
+/* Each hand case below takes HEAD, then N copies of FILL, as input. */
 static const struct {
   const char *site, *head;
   char fill;
@@ -2021,11 +2021,12 @@ static const struct {
     {"content-disposition", " attachment; filename=", 'x', 200, NULL},
     {"content-disposition", " attachment; filename=a.txt; filename*=UTF-8''",
      'x', 240, "cdispo=a.txt"},
+    {"keep-alive", " timeout=5, max=", '0', 63, NULL},
     {"keep-alive", " timeout=5, max=", '0', 64,
      "keep_alive=1 timeout=5 max=10"},
 };
 
-/* One hand case against the legacy copy of its site. */
+/* Compare one hand case against the legacy copy of its site. */
 static int st_hp_case(const char *name, const char *in, const char *want) {
   const struct st_hp_site *site = st_hp_sites;
   char old[512], cur[512];
@@ -2040,7 +2041,7 @@ static int st_hp_case(const char *name, const char *in, const char *want) {
   return 1;
 }
 
-/* Generated input number I: N items under one separator, also put in seq. */
+/* Build generated input I from N items under SEP, and record them in seq. */
 static void st_hp_build(const struct st_hp_site *site, size_t items,
                         const char *sep, size_t n, size_t i,
                         const struct st_hp_item **seq, char *in, size_t size) {
@@ -2054,7 +2055,7 @@ static void st_hp_build(const struct st_hp_site *site, size_t items,
   }
 }
 
-/* Hand cases, then every 1-3 item sequence: a change needs a reason. */
+/* Run hand cases and all 1-3 item runs, and require a reason per change. */
 static int st_headerparamdiff(httrackp *opt, int argc, char **argv) {
   size_t i, s, k, n;
   int compared = 0, failures = 0, by[HP_COUNT] = {0};

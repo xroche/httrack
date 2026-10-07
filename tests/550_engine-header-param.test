@@ -68,7 +68,7 @@ param 'no []' 'filename=a' ';' filename 1
 param 'no [-]' 'filename=a' ';' filename 0
 
 # The counts pin the corpus, so a sweep that silently shrinks goes red.
-selftest_queue 'header-param-diff: 5446 compared, 0 failures, changed by later=1029 trail=1320 suffix=984 quote=315 space=174 case=3' \
+selftest_queue 'header-param-diff: 5447 compared, 0 failures, changed by later=1029 trail=1320 suffix=984 quote=315 space=174 case=3' \
     header-param-diff
 
 selftest_run_queued
