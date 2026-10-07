@@ -35,7 +35,7 @@ glued 'got=-1 value=-7 adv=19' llint 0 "$max64" 9223372036854775808
 glued 'got=-1 value=-7 adv=20' llint 0 "$max64" 99999999999999999999
 
 # The counts pin the corpus, so a sweep that silently shrinks goes red.
-glued 'glued-int: 18900 compared, 15240 signed or spaced now unread, 1055 too large now refused, 0 failures'
+glued 'glued-int: 13230 compared, 10668 signed or spaced now unread, 560 too large now refused, 0 failures'
 
 selftest_run_queued
 

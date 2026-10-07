@@ -2,7 +2,8 @@
 #
 # "%d" writes an int, and an enum-typed option field is one byte wide under
 # -fshort-enums, so a scan aimed at the field through a cast writes past it.
-# readGluedLevel() reads into its own int. htscoremain.c holds every option scan today.
+# readGluedEnum() reads into its own int. htscoremain.c holds every option
+# scan today.
 
 set -euo pipefail
 
@@ -15,7 +16,7 @@ test -r "$src" || fail "no $src"
 
 # The type name carries digits (uint8_t, int32_t) as readily as it carries
 # letters, and a class without them silently exempts the fixed-width spellings.
-pattern='sscanf[^;]*\([[:alpha:]_][[:alnum:]_ ]*\*\)[ 	]*&opt->'
+pattern='(sscanf|readGlued[[:alnum:]_]*)[^;]*\([[:alpha:]_][[:alnum:]_ ]*\*\)[ 	]*&opt->'
 
 # The pattern's silence means nothing until it has matched a known-bad line.
 # Every spelling a cast is likely to be written in, the fixed-width ones
@@ -24,21 +25,17 @@ for bad in 'sscanf(com + 1, "%d", (int *) &opt->urlmode);' \
     'sscanf(com + 1, "%d", (hts_urlmode *) &opt->urlmode);' \
     'sscanf(com + 1, "%d", (uint8_t *) &opt->urlmode);' \
     'sscanf(com + 1, "%d", (int32_t *) &opt->urlmode);' \
-    'sscanf(com + 1, "%d", (unsigned int *) &opt->urlmode);'; do
+    'sscanf(com + 1, "%d", (unsigned int *) &opt->urlmode);' \
+    'readGluedInt(*(int *) &opt->robots, 3);'; do
     grep -qE "$pattern" <<<"$bad" || fail "the pattern cannot match: $bad"
 done
 
-# And a pattern matching everything would be just as silent, so pin the two
-# forms that must stay clear: the direct scan and readGluedLevel().
-for good in 'sscanf(com + 1, "%d", &opt->urlmode);' \
-    'readGluedLevel(opt->urlmode, HTS_URLMODE_TRANSPARENT_PROXY);'; do
-    grep -qE "$pattern" <<<"$good" && fail "the pattern matches a good line: $good"
-done
+# And a pattern matching everything would be just as silent.
+good='sscanf(com + 1, "%d", &opt->urlmode);'
+grep -qE "$pattern" <<<"$good" && fail "the pattern matches a good line: $good"
 
 found=$(grep -nE "$pattern" "$src" || true)
 [ -z "$found" ] || fail "option scan writing through a cast pointer in $src:
 $found"
-
-grep -q 'readGluedLevel' "$src" || fail "readGluedLevel() has left $src"
 
 echo "optscan: no option scan in htscoremain.c writes through a cast pointer"

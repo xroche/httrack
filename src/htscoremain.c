@@ -277,11 +277,10 @@ static void cmdl_print_args(httrackp *opt, const cmdl_argv *cmd) {
   } while (0)
 #define readGluedInt(field, max) readGluedOpt_(cmdl_glued_int, field, max)
 #define readGluedLLint(field, max) readGluedOpt_(cmdl_glued_llint, field, max)
-/* readGluedInt() into an enum or level field, which may be narrower than an
-   int under -fshort-enums. */
-#define readGluedLevel(field, max)                                             \
+/* readGluedInt() for an enum, narrower than an int under -fshort-enums. */
+#define readGluedEnum(field, max)                                              \
   do {                                                                         \
-    int level_ = (int) (field);                                                \
+    int level_ = (field);                                                      \
                                                                                \
     readGluedInt(level_, max);                                                 \
     (field) = level_;                                                          \
@@ -1386,7 +1385,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           case 'K':
             opt->urlmode = HTS_URLMODE_ABSOLUTE;
             if (isdigit((unsigned char) *(com + 1))) {
-              readGluedLevel(opt->urlmode, HTS_URLMODE_TRANSPARENT_PROXY);
+              readGluedEnum(opt->urlmode, HTS_URLMODE_TRANSPARENT_PROXY);
               if (opt->urlmode == HTS_URLMODE_ABSOLUTE) { // in fact K0 ==> K2
                 // and K ==> K0
                 opt->urlmode = HTS_URLMODE_RELATIVE;
@@ -1473,7 +1472,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             break;
             //
           case 'b':
-            readGluedLevel(opt->accept_cookie, 1);
+            readGluedInt(opt->accept_cookie, HTS_TRUE);
             break;
             //
           case 'N':
@@ -1535,7 +1534,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           } break;
           case 's':
             if (isdigit((unsigned char) *(com + 1))) {
-              readGluedLevel(opt->robots, HTS_ROBOTS_ALWAYS_STRICT);
+              readGluedEnum(opt->robots, HTS_ROBOTS_ALWAYS_STRICT);
             } else
               opt->robots = HTS_ROBOTS_SOMETIMES;
 #if DEBUG_ROBOTS
@@ -1543,15 +1542,15 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 #endif
             break;
           case 'o':
-            readGluedLevel(opt->errpage, 1);
+            readGluedInt(opt->errpage, HTS_TRUE);
             break;
           case 'u':
-            readGluedLevel(opt->check_type, 2);
+            readGluedInt(opt->check_type, 2);
             break;
             //
           case 'C':
             if (isdigit((unsigned char) *(com + 1))) {
-              readGluedLevel(opt->cache, HTS_CACHE_TEST_UPDATE);
+              readGluedEnum(opt->cache, HTS_CACHE_TEST_UPDATE);
             } else
               opt->cache = HTS_CACHE_PRIORITY;
             break;
@@ -1619,7 +1618,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               case 'I':
                 opt->kindex = 1;
                 if (isdigit((unsigned char) *(com + 1))) {
-                  readGluedLevel(opt->kindex, 2);
+                  readGluedInt(opt->kindex, 2);
                 }
                 break;          // Keyword Index
               case 'c':
@@ -1713,7 +1712,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               case 'v':
                 opt->verbosedisplay = HTS_VERBOSE_FULL;
                 if (isdigit((unsigned char) *(com + 1))) {
-                  readGluedLevel(opt->verbosedisplay, HTS_VERBOSE_FULL);
+                  readGluedEnum(opt->verbosedisplay, HTS_VERBOSE_FULL);
                 }
                 break;
               case 'i':
@@ -1726,8 +1725,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               case 'N':
                 opt->savename_delayed = HTS_SAVENAME_DELAYED_HARD;
                 if (isdigit((unsigned char) *(com + 1))) {
-                  readGluedLevel(opt->savename_delayed,
-                                 HTS_SAVENAME_DELAYED_HARD);
+                  readGluedEnum(opt->savename_delayed,
+                                HTS_SAVENAME_DELAYED_HARD);
                 }
                 break;
               case 'D':

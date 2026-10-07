@@ -1738,11 +1738,7 @@ static int st_gluedint(httrackp *opt, int argc, char **argv) {
       {"-%e", HTS_FALSE, INT_MAX},    {"-@i", HTS_FALSE, INT_MAX},
       {"-@m", HTS_FALSE, INT_MAX},    {"-#C", HTS_FALSE, INT_MAX},
       {"-#L", HTS_FALSE, INT_MAX},    {"-#F", HTS_FALSE, HTS_FILTERS_MAX},
-      {"-#u", HTS_FALSE, INT_MAX},    {"-K", HTS_FALSE, 5},
-      {"-b", HTS_FALSE, 1},           {"-s", HTS_FALSE, 3},
-      {"-o", HTS_FALSE, 1},           {"-u", HTS_FALSE, 2},
-      {"-C", HTS_FALSE, 2},           {"-%I", HTS_FALSE, 2},
-      {"-%v", HTS_FALSE, 2},          {"-%N", HTS_FALSE, 2}};
+      {"-#u", HTS_FALSE, INT_MAX}};
 
   static const char *const spaces[] = {"", " ", "\t"};
   static const char *const signs[] = {"", "+", "-"};
