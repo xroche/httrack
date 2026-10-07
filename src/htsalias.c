@@ -38,6 +38,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsalias.h"
 #include "htsglobal.h"
 #include "htslib.h"
+#include "htslines.h"
 
 #include <errno.h>
 #include <limits.h>
@@ -998,8 +999,11 @@ cmdl_file_result optinclude_file(const char *name, cmdl_argv *cmd) {
       char *a, *b;
       int result;
 
-      /* read line */
-      linput(fp, line, 250);
+      /* a clipped option can mean something else, so it is not applied */
+      if (hts_readline(fp, line, 250, HTS_LINE_DROP_TAB, NULL)) {
+        fprintf(stderr, "* %s: line too long, ignored\n", name);
+        continue;
+      }
       hts_lowcase(line);
       /* trim first: a blank line is skipped, not parsed as an option */
       hts_rtrim(line, HTS_REALSPACES);

@@ -115,6 +115,7 @@ Please visit our Website: http://www.httrack.com
    selftest_tables[] in htsselftest.c. */
 extern const struct selftest_entry selftests_back[];
 extern const struct selftest_entry selftests_lib[];
+extern const struct selftest_entry selftests_lines[];
 extern const struct selftest_entry selftests_cache[];
 extern const struct selftest_entry selftests_cmdline[];
 extern const struct selftest_entry selftests_charset[];

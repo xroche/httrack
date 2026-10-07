@@ -1,0 +1,99 @@
+#!/bin/bash
+#
+# Config-file line readers (htslines.c): a line too long for the buffer is
+# clipped and reported, and its tail is never read as the next line.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# readline CAP FLAGS TEXT [cpp] prints [line] per read of a feof() loop, "!"
+# after a cut one. CAP counts the NUL; t drops TAB and FF, n drops NUL.
+selftest_queue "[abc][d]" readline 4 t 'abc\nd'
+selftest_queue "[abc]![x]" readline 4 t 'abcd\nx'
+selftest_queue "[aaa]![x]" readline 4 t "$(repeat_chars 300 a)"'\nx'
+selftest_queue "[ab][c][]" readline 4 t 'ab\r\nc\r\n'
+selftest_queue "[ab][c]" readline 4 t 'a\rb\nc'
+selftest_queue "[ab][cd]" readline 8 t 'ab\ncd'
+selftest_queue "[a][][b]" readline 8 t 'a\n\nb'
+selftest_queue "[]" readline 8 t
+selftest_queue "[ab]" readline 8 t 'a\tb\f'
+selftest_queue "[a\\x09b]" readline 8 - 'a\tb'
+selftest_queue "[ab]" readline 8 tn 'a\0b'
+selftest_queue "[a\\x00b]" readline 8 t 'a\0b'
+selftest_queue "[]![]!" readline 1 t 'ab\nc'
+# Trimmed, and a line ending with a backslash joins the next one.
+selftest_queue "[ab][]" readline 8 tn 'a\\\nb\n' cpp
+selftest_queue "[a b][]" readline 16 tn '  a b  \n' cpp
+# A clipped line still swallows its continuation, so "ghi" is no entry.
+selftest_queue "[abc]![jk]" readline 4 tn 'abcdef\\\nghi\njk' cpp
+selftest_queue "[abc]![jk]" readline 4 tn 'abcdef \\ \nghi\njk' cpp
+# The old reader's double-backslash join, kept.
+selftest_queue "[ab]" readline 8 tn 'a\\\\\n\nb' cpp
+
+# Against frozen copies of the old readers. The counts are exact, so a
+# shrinking corpus shows.
+selftest_queue_lines "linediff: 13536 cases, 4010 same, 453 at size, 9073 split, 0 failures
+linediff: OK" linediff
+
+selftest_run_queued
+
+bin=$(httrack_path)
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_lines.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+
+# --- the httrackrc reader ----------------------------------------------------
+# The first line holds 249 bytes, all the old reader took, and then a second
+# user-agent the old reader applied as a line of its own.
+d1="$tmp/rc"
+mkdir -p "$d1"
+echo '<html><body>hello</body></html>' >"$d1/index.html"
+head='user-agent='
+line1=$head$(repeat_chars $((249 - ${#head})) a)'user-agent=zzztail'
+printf '%s\nuser-agent=zzzmarker\n' "$line1" >"$d1/.httrackrc"
+cp "$d1/.httrackrc" "$d1/httrackrc"
+rc=0
+(cd "$d1" && "$bin" "file://$d1/index.html" --quiet -n >.log 2>&1) || rc=$?
+test "$rc" -eq 0 || fail "rc-file crawl exited $rc"
+doit=$(sed -n '1p' "$d1/hts-cache/doit.log")
+grep -q -- "-F zzzmarker" <<<"$doit" || fail "the line after the long one was lost: $doit"
+if grep -q zzztail <<<"$doit"; then
+    fail "the tail of a long rc line was read as an option"
+fi
+if grep -q aaaaaaaaaa <<<"$doit"; then
+    fail "a clipped rc line was applied"
+fi
+grep -q "line too long" "$d1/.log" || fail "no warning for the long rc line"
+
+# --- the doit.log reader -----------------------------------------------------
+# The line is cut right after " -*", the start of "-*.nomatch": applied, that
+# prefix denies every link, so a.html would not come back.
+d2="$tmp/doit"
+site="$d2/site"
+out="$d2/out"
+mkdir -p "$site"
+printf '<a href="a.html">a</a>' >"$site/index.html"
+echo 'A' >"$site/a.html"
+url="file://$site/index.html"
+rc=0
+"$bin" "$url" -O "$out" --quiet -n -%v0 >/dev/null 2>&1 || rc=$?
+test "$rc" -eq 0 || fail "initial mirror exited $rc"
+a_html=$(find "$out" -name a.html -print -quit)
+test -n "$a_html" || fail "the initial mirror has no a.html"
+rm -f "$a_html"
+# hts_readline(..., 8000) keeps 7999 bytes. A filter over 1023 bytes is fatal,
+# so the padding is several.
+line="$url -n -%v0"
+while test $((7999 - ${#line} - 3)) -gt 900; do
+    line="$line +$(repeat_chars 700 z)"
+done
+line="$line +$(repeat_chars $((7999 - ${#line} - 5)) z) -*"
+test "${#line}" -eq 7999 || fail "the doit.log line is ${#line} bytes"
+printf '%s.nomatch\n' "$line" >"$out/hts-cache/doit.log"
+rc=0
+"$bin" -O "$out" --quiet >"$d2/.log" 2>&1 || rc=$?
+test "$rc" -eq 0 || fail "doit.log reprise exited $rc"
+grep -q "last argument ignored" "$d2/.log" || fail "no warning for the long doit.log line"
+test -n "$(find "$out" -name a.html -print -quit)" || fail "the clipped last argument of doit.log was applied"
+
+exit 0

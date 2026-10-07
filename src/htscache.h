@@ -122,8 +122,6 @@ void hts_cache_reconcile(httrackp *opt, hts_cache_reconcile_mode mode);
 #define CACHE_ENTRYNAME_SIZE (CACHE_KEY_SIZE + 8)
 
 int cache_brstr(char *adr, char *s, size_t s_size);
-/* binput over a NUL-terminated buffer, bounded: no read starts at/past end. */
-int cache_binput(const char *adr, const char *end, char *s, int max);
 
 /* Consecutive entry write failures before the cache stream is declared dead. */
 #define CACHE_MAX_WRITE_FAILURES 8

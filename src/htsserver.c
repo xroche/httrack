@@ -84,7 +84,11 @@ coucal NewLangList = NULL;
 
 #include "htsserver.h"
 #include "htscmdline.h"
+#include "htslines.h"
 #include "htsthread.h"
+
+/* Bytes this server's line readers drop, as its own linput() does. */
+#define HTS_LINES_SERVER (HTS_LINE_DROP_TAB | HTS_LINE_DROP_NUL)
 
 const char *gethomedir(void);
 int commandRunning = 0;
@@ -1406,11 +1410,14 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
           if (fp) {
             /* Read file */
             while (!feof(fp) && !ferror(fp)) {
-              char *str = line;
               char *pos;
 
-              if (!linput(fp, line, sizeof(line) - 2)) {
-                *str = '\0';
+              /* a clipped value is not the saved one: keep the default */
+              if (hts_readline(fp, line, sizeof(line) - 2, HTS_LINES_SERVER,
+                               NULL)) {
+                fprintf(stderr, "%s: line too long, ignored\n",
+                        StringBuff(fspath));
+                continue;
               }
               pos = strchr(line, '=');
               if (pos) {
@@ -2421,6 +2428,22 @@ int smallserver_setkeyarr(const char *key, int id, const char *key2, const char 
   return coucal_write(NewLangList, tmp, (intptr_t) strdup(value));
 }
 
+/* Read one key and value pair of a lang file into key and value, each of size
+   bytes. HTS_FALSE when either was cut: the pair is skipped, the next one
+   still pairs. */
+static hts_boolean lang_read_pair(FILE *fp, char *key, char *value,
+                                  size_t size) {
+  const hts_boolean key_cut = hts_readline_cpp(fp, key, size, HTS_LINES_SERVER);
+  const hts_boolean value_cut =
+      hts_readline_cpp(fp, value, size, HTS_LINES_SERVER);
+
+  if (key_cut || value_cut) {
+    fprintf(stderr, "lang: line too long, ignored\n");
+    return HTS_FALSE;
+  }
+  return HTS_TRUE;
+}
+
 static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
   const char *hashname;
   char catbuff[CATBUFF_SIZE];
@@ -2453,9 +2476,8 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
       char key[8192];
 
       while(!feof(fp)) {
-        linput_cpp(fp, intkey, 8000);
-        linput_cpp(fp, key, 8000);
-        if (strnotempty(intkey) && strnotempty(key)) {
+        if (lang_read_pair(fp, intkey, key, 8000) && strnotempty(intkey) &&
+            strnotempty(key)) {
           const char *test = LANGINTKEY(key);
 
           /* Increment for multiple definitions */
@@ -2479,7 +2501,7 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
               coucal_add(NewLangStrKeys, key, (intptr_t) buff);
             }
           }
-        }                       // if
+        } // if
       }                         // while
       fclose(fp);
     } else {
@@ -2522,9 +2544,8 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
         hts_boolean found = HTS_FALSE;
 
         while (!found && !feof(fp)) {
-          linput_cpp(fp, extkey, 8000);
-          linput_cpp(fp, value, 8000);
-          if (strcmp(extkey, wanted) == 0 && value[0] != '\0') {
+          if (lang_read_pair(fp, extkey, value, 8000) &&
+              strcmp(extkey, wanted) == 0 && value[0] != '\0') {
             limit_to[0] = '\0';
             strlncatbuff(limit_to, value, limit_size, limit_size - 1);
             found = HTS_TRUE;
@@ -2562,9 +2583,8 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
         char value[8192];
 
         while(!feof(fp)) {
-          linput_cpp(fp, extkey, 8000);
-          linput_cpp(fp, value, 8000);
-          if (strnotempty(extkey) && strnotempty(value)) {
+          if (lang_read_pair(fp, extkey, value, 8000) && strnotempty(extkey) &&
+              strnotempty(value)) {
             const char *intkey;
 
             intkey = LANGINTKEY(extkey);
@@ -2608,7 +2628,7 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
               }
 
             }
-          }                     // if
+          } // if
         }                       // while
         fclose(fp);
       } else {

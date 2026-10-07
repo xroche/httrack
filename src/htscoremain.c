@@ -43,6 +43,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsdefines.h"
 #include "htsalias.h"
 #include "htscmdline.h"
+#include "htslines.h"
 #include "htswarc.h"
 #include "htschanges.h"
 #include "htsbauth.h"
@@ -829,13 +830,20 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       int ntokens = 0;
       int i;
       hts_boolean ok;
+      const hts_boolean cut =
+          hts_readline(fp, buff, 8000, HTS_LINE_DROP_TAB, NULL);
 
-      linput(fp, buff, 8000);
       fclose(fp);
       fp = NULL;
       /* "" unquotes to empty but is still a real token (#106) */
       tokens = hts_split_args(buff, &ntokens,
                               HTS_SPLIT_STRIP_QUOTES | HTS_SPLIT_DROP_EMPTY);
+      /* the clip may have cut the last argument, which then means another */
+      if (cut && tokens != NULL && ntokens > 0) {
+        fprintf(stderr, "* hts-cache/doit.log: line too long, last argument "
+                        "ignored\n");
+        ntokens--;
+      }
       for (i = 0; tokens != NULL && i < ntokens; i++) {
         /* inserted in order, after the program name */
         if (!cmdl_ins_unquoted(&x_cmd, tokens[i], insert_after))

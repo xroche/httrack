@@ -38,6 +38,7 @@ Please visit our Website: http://www.httrack.com
 /* specific definitions */
 #include "htsglobal.h"
 #include "htslib.h"
+#include "htslines.h"
 #include "htscore.h"
 #ifdef _WIN32
 #include "htscharset.h" /* hts_pathToUCS2, hts_convertUCS2StringToUTF8 */
@@ -382,9 +383,11 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
       const size_t line_max = 8000;
 
       while ((!feof(fp)) && (strlen(cookie->data) < cookie->max_len)) {
-        rawlinput(fp, line, 8100);
+        /* the TABs separate fields; a cut line's tail is no cookie */
+        const hts_boolean cut = hts_readline(fp, line, 8100, 0, NULL);
+
         if (strnotempty(line)) {
-          if (strlen(line) < line_max) {
+          if (!cut && strlen(line) < line_max) {
             if (line[0] != '#') {
               char domain[256];             // cookie domain (.netscape.com)
               char path[256];               // path (/)
