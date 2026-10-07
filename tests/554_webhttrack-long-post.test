@@ -16,21 +16,23 @@ cleanup_push htsserver_cleanup_dir "${work}"
 htsserver_start --home "${work}"
 
 htsserver_python - "${HTS_URL}" "${HTS_PORT}" "${work}" <<'PY' || fail "see above"
+import os
 import socket
 import sys
+from urllib.parse import quote
 
 from webtestlib import Session, textarea
 
 s, port, work = Session(sys.argv[1]), int(sys.argv[2]), sys.argv[3]
 
 
-def raw(head, body):
-    """Send a raw POST, close our side, and return the status code in a list."""
+def raw(head, body, page="step3.html"):
+    """Send HEAD and BODY as one raw POST to PAGE, and return the status code."""
     c = socket.create_connection(("127.0.0.1", port), 10)
-    c.settimeout(30)
-    c.sendall(("POST /server/step3.html HTTP/1.0\r\nHost: 127.0.0.1\r\n"
-               "Content-type: application/x-www-form-urlencoded\r\n%s\r\n%s"
-               % (head, body)).encode())
+    c.settimeout(60)
+    c.sendall(("POST /server/%s HTTP/1.0\r\nHost: 127.0.0.1\r\n"
+               "Content-type: application/x-www-form-urlencoded\r\n%s\r\n"
+               % (page, head)).encode() + body.encode())
     c.shutdown(socket.SHUT_WR)
     out = b""
     while True:
@@ -48,21 +50,55 @@ def projname():
     return page[start:page.index("'", start)]
 
 
+def padded(head, tail, size):
+    """Return HEAD, a filler field and TAIL, as a body of exactly SIZE bytes."""
+    body = "%s&filler=&%s" % (head, tail)
+    return body.replace("filler=", "filler=" + "x" * (size - len(body)), 1)
+
+
+CAP = 8 * 1024 * 1024
 s.post("step3.html", [("projname", "start")])
-body = "sid=%s&projname=%%s" % s.sid
-# Content-length one byte over the 8 MiB cap: refused before any byte is read.
-status = raw("Content-length: %d\r\n" % (8 * 1024 * 1024 + 1), body % "overcap")
+sid = "sid=" + s.sid
+
+# A body of exactly the cap is read whole, so its last field lands.
+status = raw("Content-length: %d\r\n" % CAP, padded(sid, "projname=atcap", CAP))
+if status != ["302"] or projname() != "atcap":
+    sys.exit("a body of exactly the cap got %r and projname %r"
+             % (status, projname()))
+
+# A refused launch writes no profile, which the engine start comes after.
+launch = "&".join("%s=%s" % (k, quote(v)) for k, v in [
+    ("path", work), ("projname", "refused"), ("winprofile", "x"),
+    ("command_do", "start"),
+    ("command", "httrack --quiet http://127.0.0.1:1/ -O %s/refused" % work)])
+status = raw("", padded(sid + "&" + launch, "end=1", CAP + 1), "step4.html")
+if os.path.exists(work + "/refused"):
+    sys.exit("a refused step 4 post started a mirror")
 if status != ["413"]:
-    sys.exit("an over-cap Content-length got %r" % status)
-status = raw("Content-length: -5\r\n", body % "negative")
-if status != ["400"]:
-    sys.exit("a negative Content-length got %r" % status)
-if projname() != "start":
+    sys.exit("a step 4 post over the cap got %r" % status)
+
+over = padded(sid, "projname=overcap", CAP + 1)
+status = raw("Content-length: %d\r\n" % len(over), over)
+if status != ["413"]:
+    sys.exit("a body one byte over the cap got %r" % status)
+status = raw("", over)
+if status != ["413"]:
+    sys.exit("a body one byte over the cap without Content-length got %r"
+             % status)
+
+wrong = []
+for bad in ("-5", "abc", "", "+5", "9" * 20):
+    status = raw("Content-length: %s\r\n" % bad, sid + "&projname=badlength")
+    if status != ["400"]:
+        wrong.append((bad, status))
+if wrong:
+    sys.exit("unreadable Content-length values got %r" % wrong)
+
+if projname() != "atcap":
     sys.exit("a refused post changed projname to %r" % projname())
 
-# Control: no Content-length, read to EOF, and the field past 32 KiB lands.
-filler = "x" * 40000
-status = raw("", "sid=%s&filler=%s&projname=nolength" % (s.sid, filler))
+# Without Content-length, the server reads to EOF and the field past 32 KiB lands.
+status = raw("", "%s&filler=%s&projname=nolength" % (sid, "x" * 40000))
 if status != ["302"]:
     sys.exit("a post without Content-length got %r" % status)
 if projname() != "nolength":
@@ -82,14 +118,13 @@ s.post("step4.html", [("path", work), ("projname", "long"),
                       ("command", command), ("command_do", "save"),
                       ("winprofile", textarea(step4, "winprofile"))])
 
-with open(work + "/long/hts-cache/winprofile.ini") as fp:
+with open(work + "/long/hts-cache/winprofile.ini", newline="") as fp:
     saved = [line for line in fp if line.startswith("CurrentUrl=")]
-if len(saved) != 1:
-    sys.exit("the saved profile has %d CurrentUrl lines" % len(saved))
-last = "page-%05d.html" % (count - 1)
-if saved[0].count("/page-") != count or last not in saved[0]:
-    sys.exit("the saved CurrentUrl holds %d of %d URLs"
-             % (saved[0].count("/page-"), count))
+# The profile escapes each CRLF between URLs as %0d%0a and ends lines in CRLF.
+want = "CurrentUrl=" + urls.replace("\r\n", "%0d%0a") + "\r\n"
+if saved != [want]:
+    sys.exit("the saved CurrentUrl differs from the step 3 urls: %d lines, "
+             "tail %r" % (len(saved), saved[0][-40:] if saved else None))
 PY
 
 echo PASS

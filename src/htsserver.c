@@ -109,8 +109,10 @@ static char server_bound_addr[256 + 2] = "";
 static char server_self_names[SELF_NAMES_MAX][256];
 static size_t server_self_names_count = 0;
 
-/* The largest request body we take: room for a 1 MiB profile line, which the
-   step 4 form posts twice (command line and profile), percent-encoded. */
+/* The request buffer starts at this size and shrinks back to it. */
+#define SMALLSERVER_BUFFER_SIZE ((size_t) 32768)
+
+/* This fits a 1 MiB profile line posted twice and tripled by encoding. */
 #define SMALLSERVER_BODY_MAX ((size_t) 8 * 1024 * 1024)
 
 static void (*pingFun)(void *, smallserver_client_event, const char *) = NULL;
@@ -1063,7 +1065,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
   int timeout = 30;
   int retour = 0;
   int willexit = 0;
-  size_t buffer_size = 32768;
+  size_t buffer_size = SMALLSERVER_BUFFER_SIZE;
   char *buffer = (char *) malloct(buffer_size);
   String headers = STRING_EMPTY;
   String output = STRING_EMPTY;
@@ -1251,8 +1253,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
           }
         }
         if (meth == 2) {
-          /* Without a length, read to EOF, and one byte past the cap to see
-             an overrun. A clipped form would be saved and crawled as is. */
+          /* With no length, one byte read past the cap shows an overrun. */
           const size_t want =
               length < 0 ? SMALLSERVER_BODY_MAX + 1 : (size_t) length;
           int sz = 0;
@@ -1276,9 +1277,6 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             meth = 0;
             denied_status = "413 Payload Too Large";
             denied = "Request body too large.";
-          }
-          if (meth != 2) {
-            buffer[0] = '\0';
           }
         }
       }
@@ -2403,6 +2401,16 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 #else
     close(soc_c);
 #endif
+
+    /* One large post must not pin its buffer for the life of the server. */
+    if (buffer_size > SMALLSERVER_BUFFER_SIZE) {
+      char *const small = (char *) realloct(buffer, SMALLSERVER_BUFFER_SIZE);
+
+      if (small != NULL) {
+        buffer = small;
+        buffer_size = SMALLSERVER_BUFFER_SIZE;
+      }
+    }
   }
 
   if (soc != INVALID_SOCKET) {
