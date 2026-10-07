@@ -686,6 +686,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   // Option O and includerc
   {
     int loops = 0;
+    /* slots [1, fresh) have not lost their quote pair yet */
+    int fresh = argc;
 
     while(loops < 2) {
       char *com;
@@ -693,7 +695,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 
       for(na = 1; na < argc; na++) {
 
-        if (!hts_unquote_arg(argv[na])) {
+        if (na < fresh && !hts_unquote_arg(argv[na])) {
           /* +256 holds the prefix around a max-length argument. */
           char BIGSTK s[HTS_CDLMAXSIZE + 256];
 
@@ -776,10 +778,13 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           || (strnotempty(StringBuff(opt->path_html))))
         loops++;                // do not loop once again and do not include rc file (O option exists)
       else {
-        if ((!fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                  StringBuff(opt->path_log),
-                                  "hts-cache/doit.log"))) ||
-            (argv_url > 0)) {
+        /* only once: the second pass is for the tokens it inserted */
+        if (loops == 0 &&
+            ((!fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                   StringBuff(opt->path_log),
+                                   "hts-cache/doit.log"))) ||
+             (argv_url > 0))) {
+          const int argc_before = x_cmd.argc;
           /* first rc file that exists wins */
           cmdl_file_result res =
               optinclude_file(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
@@ -806,6 +811,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           /* the array may have been grown and moved */
           argv = x_cmd.argv;
           argc = x_cmd.argc;
+          /* the rc file's tokens went in after the program name */
+          fresh = 1 + argc - argc_before;
         } else
           loops++;              // do not loop once again
       }

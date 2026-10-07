@@ -1,0 +1,53 @@
+#!/bin/bash
+#
+
+# An option's value loses exactly one quote pair, with or without -O, and an rc
+# file's value too. doit.log line 1 shows the argv the engine kept.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+bin=$(httrack_path)
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_unquote.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+url="file://$tmp/none.html"
+
+# run DIR [ARGS...]: mirror from DIR
+run() {
+    local dir=$1 rc=0
+    shift
+    mkdir -p "$dir"
+    (cd "$dir" && "$bin" "$url" -q -r1 "$@" >/dev/null 2>&1) || rc=$?
+    test "$rc" -eq 0 || fail "httrack $* exited $rc"
+}
+doit() {
+    local line
+    assert_file "$1/hts-cache/doit.log"
+    IFS= read -r line <"$1/hts-cache/doit.log" || true
+    printf '%s\n' "$line"
+}
+has() { # has WANT LINE LABEL: WANT is whole words of LINE
+    [[ " $2 " == *" $1 "* ]] || fail "$3: want '$1' in: $2"
+}
+
+# without -O the option loop runs twice
+run "$tmp/a" -F '""ua""' -%F '"ft"'
+line=$(doit "$tmp/a")
+has '-F "\"ua\""' "$line" "no -O"
+has '-%F ft' "$line" "no -O"
+
+run "$tmp/b" -F '""ua""' -%F '"ft"' -O "$tmp/b/out"
+line=$(doit "$tmp/b/out")
+has '-F "\"ua\""' "$line" "-O"
+has '-%F ft' "$line" "-O"
+
+# the rc file is read once, and its values are stripped once
+mkdir -p "$tmp/c"
+printf 'set footer ""ft""\nuser-agent "ua"\n' >"$tmp/c/.httrackrc"
+cp "$tmp/c/.httrackrc" "$tmp/c/httrackrc"
+run "$tmp/c"
+line=$(doit "$tmp/c")
+has '-%F "\"ft\"" -F ua' "$line" "rc file"
+test "$(grep -o -- '-%F' <<<"$line" | wc -l)" -eq 1 || fail "rc file read twice: $line"
