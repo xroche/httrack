@@ -524,8 +524,9 @@ const char *hts_query_strip_keys(const char *rules, const char *adr,
 hts_boolean hts_query_key_stripped(const char *arg, size_t keylen,
                                    const char *strip);
 
-/* The canonical host (length *CANONLEN) of the last RULES entry whose aliases
-   match HOST, or NULL. FULL is "scheme://host". */
+/* Return the canonical host (length *CANONLEN) of the last RULES entry whose
+   aliases match HOST or FULL ("scheme://host"), or NULL. COLLAPSE_WWW ignores
+   a "www." prefix on both sides. */
 const char *hts_host_alias_match(const char *rules, const char *host,
                                  const char *full, hts_boolean collapse_www,
                                  size_t *canonlen);

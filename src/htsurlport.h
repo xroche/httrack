@@ -61,7 +61,7 @@ hts_scan_result hts_scan_llint(const char **s, LLint min, LLint max,
    Its own file so proxytrack, which does not link the library, can share it. */
 hts_boolean hts_parse_url_port(const char *a, int *port);
 
-/* A read-only view of LEN bytes at P, which is not NUL-terminated. */
+/* P points at LEN read-only bytes, which may hold NULs and lack an end NUL. */
 typedef struct {
   const char *p;
   size_t len;

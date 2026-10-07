@@ -2884,7 +2884,7 @@ static int st_querynext(httrackp *opt, int argc, char **argv) {
   return bad;
 }
 
-/* spandiff: the frozen old rule parsers, compared with the span-based ones. */
+/* spandiff compares the frozen old rule parsers with the span-based ones. */
 
 static const char *legacy_hts_query_strip_keys(const char *rules,
                                                const char *adr, const char *fil,
@@ -3067,12 +3067,11 @@ static void spandiff_one(querydiff_stats *st, const char *rules,
   static const char *const keys[] = {"",      "a",         "sid",    "*",
                                      "a.com", " ",         "x",      "utm",
                                      "b",     "www.a.com", "a.com/", NULL};
-  /* {adr, fil} pairs, where NULL stands for longhost or longfil, not the end.
-   */
+  /* NULL in an {adr, fil} pair means longhost or longfil. */
   static const char *const adrs[] = {
       "a.com", "/p?sid=1&a=2", "www.a.com", "x",     "http://b", "/x/y?z", "",
       "",      NULL,           "/p?utm=1",  "a.com", NULL};
-  /* {host, full} pairs, where NULL stands for longhost, not the end. */
+  /* NULL in a {host, full} pair means longhost. */
   static const char *const hosts[] = {
       "a.com", "http://a.com", "www.a.com", "https://www.a.com",
       "b",     "ftp://b",      "",          "http://",
@@ -3314,8 +3313,8 @@ static int st_spandiff(httrackp *opt, int argc, char **argv) {
   return st.failures != 0;
 }
 
-/* Print what a span primitive reads, as [bytes]. Args: next|split C TEXT,
-   trim L R TEXT, copy SIZE TEXT. */
+/* Print what a span primitive reads as [bytes], for next|split C TEXT,
+   trim L R TEXT or copy SIZE TEXT. */
 static int st_span(httrackp *opt, int argc, char **argv) {
   String out = STRING_EMPTY;
   hts_span s, a, b;

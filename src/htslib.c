@@ -4015,7 +4015,7 @@ const char *hts_query_strip_keys(const char *rules, const char *adr,
     if (line.len == 0)
       continue;
     if (hts_span_split(line, '=', &pattern, &keys)) {
-      /* A too-long pattern is clipped, not skipped. */
+      /* Clip a too-long pattern, never skip it. */
       (void) hts_span_copy(pattern, pat, sizeof(pat));
     } else {
       strcpybuff(pat, "*");
@@ -4036,8 +4036,7 @@ const char *hts_host_alias_rules(httrackp *opt) {
 
 /* Split RULE "alias[,alias...]=canonical" at its first '=', both sides
    untrimmed. The matcher and the validator share it so they agree on what a
-   rule is. HTS_FALSE when either side is empty, and the outputs are then
-   unspecified. */
+   rule is. HTS_FALSE when either side is empty. */
 static hts_boolean hts_host_alias_split(hts_span rule, hts_span *aliases,
                                         hts_span *canon) {
   return hts_span_split(rule, '=', aliases, canon) && aliases->len != 0 &&
@@ -4064,7 +4063,7 @@ const char *hts_host_alias_match(const char *rules, const char *host,
     for (cur = aliases.p; hts_span_next(&cur, end, ',', &alias);) {
       char BIGSTK glob[HTS_URLMAXSIZE * 2];
 
-      /* Trim spaces and a trailing slash, which is not part of a path. */
+      /* A trailing slash is not part of a path. */
       alias = hts_span_trim(alias, " \t", " \t/");
       if (alias.len != 0 && hts_span_copy(alias, glob, sizeof(glob))) {
         char *ghost;
