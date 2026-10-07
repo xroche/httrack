@@ -384,6 +384,7 @@ jobs:
       # Dropping the MSYS leg also took the runner-death rate from 12.5% to
       # 0.3%, so do not bring one back (#1228).
       - name: Bring up WSL2
+        id: wslup
         if: env.RUNNABLE == 'true'
         # Still non-gating now that the suite step gates: a failed import
         # reaches that step, which names it and reds there. Failing here too
@@ -407,6 +408,7 @@ jobs:
               if ($i -lt 3) { Start-Sleep -Seconds (5 * $i) }
             }
           }
+          "updated=$($updated.ToString().ToLower())" >> $env:GITHUB_OUTPUT
           # wsl --update installs the kernel component, so a 403 there breaks the
           # import with "requires an update to its kernel component".
           if (-not $updated) {
@@ -462,6 +464,18 @@ jobs:
         with:
           path: ${{ runner.temp }}\wsl_update_x64.msi
           key: wsl-kernel-msi-v1
+
+      # Gating, so a kernel the suite cannot pass on reds in seconds rather than
+      # after 25 minutes. windows-rerun-killed.yml re-runs a leg failing here.
+      - name: Check the WSL2 kernel
+        if: env.RUNNABLE == 'true'
+        shell: bash
+        env:
+          WSL_UPDATED: ${{ steps.wslup.outputs.updated }}
+        run: |
+          set -euo pipefail
+          release=$(wsl -d httrack-suite -- uname -r | tr -d '\r') || release=
+          bash tools/wsl-kernel-check.sh "$release" "$WSL_UPDATED"
 
       - name: Run the engine test suite (offline tests, WSL2)
         if: env.RUNNABLE == 'true'

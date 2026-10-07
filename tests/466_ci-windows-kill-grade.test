@@ -145,4 +145,26 @@ expect no "a step that timed out" \
     "$(job 'libhttrack (x64, Release)' failure \
         'success:Build' 'timed_out:Run the engine test suite' 'null:Upload the test logs' | payload)"
 
-echo "windows-kill-grade OK (5 kills accepted, 10 refused)"
+# The old WSL2 kernel fails its own step and skips the suite. It is the runner
+# VM's doing, so it is re-run like a lost runner.
+OLDKERNEL=(success:Build "failure:Check the WSL2 kernel"
+    "skipped:Run the engine test suite (offline tests, WSL2)")
+expect yes "an old WSL2 kernel" \
+    "$(job 'libhttrack (x64, Release)' failure "${OLDKERNEL[@]}" | payload)" 'old WSL2 kernel'
+expect yes "an old kernel beside a lost runner" \
+    "$({
+        job 'libhttrack (x64, Release)' failure "${OLDKERNEL[@]}"
+        job 'libhttrack (Win32, Release)' failure "${KILLED[@]}"
+    } | payload)"
+expect no "an old kernel beside a failing test" \
+    "$({
+        job 'libhttrack (x64, Release)' failure "${OLDKERNEL[@]}"
+        job 'libhttrack (Win32, Release)' failure "${REALFAIL[@]}"
+    } | payload)" 'Win32'
+# Any other failed step in the same job is a human's to read.
+expect no "an old kernel and a failing test in one job" \
+    "$(job 'libhttrack (x64, Release)' failure \
+        'success:Build' 'failure:Check the WSL2 kernel' \
+        'failure:Run the engine test suite (offline tests, WSL2)' | payload)"
+
+echo "windows-kill-grade OK (7 kills accepted, 12 refused)"
