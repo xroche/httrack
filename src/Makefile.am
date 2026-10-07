@@ -71,9 +71,12 @@ whttrackrundir = $(bindir)
 whttrackrun_SCRIPTS = webhttrack
 
 # $(datadir) only expands at make time, so substitute here rather than through
-# AC_CONFIG_FILES (#887).
-webhttrack: webhttrack.in Makefile
-	$(AM_V_GEN)$(SED) -e 's|@datadir[@]|$(datadir)|g' $(srcdir)/webhttrack.in >$@.tmp \
+# AC_CONFIG_FILES (#887). The version is the dashed one --version prints.
+webhttrack: webhttrack.in htsglobal.h Makefile
+	$(AM_V_GEN)v=`$(SED) -n 's/^#define HTTRACK_VERSION "\(.*\)"$$/\1/p' $(srcdir)/htsglobal.h` \
+		&& test -n "$$v" \
+		&& $(SED) -e 's|@datadir[@]|$(datadir)|g' -e "s|@HTTRACK_VERSION[@]|$$v|g" \
+		$(srcdir)/webhttrack.in >$@.tmp \
 		&& chmod +x $@.tmp && mv -f $@.tmp $@
 CLEANFILES = webhttrack
 

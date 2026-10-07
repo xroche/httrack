@@ -105,12 +105,51 @@ static void hts_binary_stdio(void) {
 }
 #endif
 
+/* --help prints this to stdout, a bad command line to stderr. */
+static void usage(FILE *fp, const char *argv0) {
+  fprintf(fp, "proxy mode:\n");
+  fprintf(fp,
+          "usage: %s <proxy-addr:proxy-port> <ICP-addr:ICP-port> "
+          "[ ( <new.zip path> | <new.ndx path> | <archive.arc path> | "
+          "--list <file-list> ) ..]\n",
+          argv0);
+  fprintf(fp,
+          "\texample:%s proxy:8080 localhost:3130 "
+          "/home/archives/www-archive-01.zip "
+          "/home/old-archives/www-archive-02.ndx\n",
+          argv0);
+  fprintf(fp, "convert mode:\n");
+  fprintf(fp,
+          "usage: %s --convert <archive-output-path> [ ( <new.zip path> | "
+          "<new.ndx path> | <archive.arc path> | --list <file-list> ) ..]\n",
+          argv0);
+  fprintf(fp,
+          "\texample:%s --convert /home/archives/merged.zip "
+          "/home/archives/www-archive-01.zip "
+          "/home/old-archives/www-archive-02.ndx\n",
+          argv0);
+  fprintf(fp, "other options:\n");
+  fprintf(fp, "  -h, --help     print this help and exit\n");
+  fprintf(fp, "  --version      print the version and exit\n");
+}
+
 int main(int argc, char *argv[]) {
   int i;
   int ret = 0;
   int proxyPort = 0, icpPort = 0;
   char proxyAddr[256 + 1], icpAddr[256 + 1];
   PT_Indexes index;
+
+  if (argc >= 2 &&
+      (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0)) {
+    usage(stdout, argv[0]);
+    return 0;
+  }
+  if (argc >= 2 && strcmp(argv[1], "--version") == 0) {
+    printf("ProxyTrack version %s (HTTrack %s)\n", PROXYTRACK_VERSION,
+           HTTRACK_VERSION);
+    return 0;
+  }
 
 #ifdef _WIN32
   hts_binary_stdio();
@@ -163,20 +202,7 @@ int main(int argc, char *argv[]) {
           )
       )
     ) {
-    fprintf(stderr, "proxy mode:\n");
-    fprintf(stderr,
-            "usage: %s <proxy-addr:proxy-port> <ICP-addr:ICP-port> [ ( <new.zip path> | <new.ndx path> | <archive.arc path> | --list <file-list> ) ..]\n",
-            argv[0]);
-    fprintf(stderr,
-            "\texample:%s proxy:8080 localhost:3130 /home/archives/www-archive-01.zip /home/old-archives/www-archive-02.ndx\n",
-            argv[0]);
-    fprintf(stderr, "convert mode:\n");
-    fprintf(stderr,
-            "usage: %s --convert <archive-output-path> [ ( <new.zip path> | <new.ndx path> | <archive.arc path> | --list <file-list> ) ..]\n",
-            argv[0]);
-    fprintf(stderr,
-            "\texample:%s proxy:8080 localhost:3130 /home/archives/www-archive-01.zip /home/old-archives/www-archive-02.ndx\n",
-            argv[0]);
+    usage(stderr, argv[0]);
     return 1;
   }
   index = PT_New();
