@@ -3530,80 +3530,8 @@ int linputsoc_t(T_SOC soc, char *s, int max, int timeout) {
   }
   return -1;
 }
-int linput_trim(FILE * fp, char *s, int max) {
-  int rlen = 0;
-  char *ls = (char *) malloct(max + 1);
 
-  s[0] = '\0';
-  if (ls) {
-    char *a;
-
-    // lire ligne
-    rlen = linput(fp, ls, max);
-    if (rlen) {
-      // sauter espaces et tabs en fin
-      while((rlen > 0)
-            && ((ls[max(rlen - 1, 0)] == ' ')
-                || (ls[max(rlen - 1, 0)] == '\t')))
-        ls[--rlen] = '\0';
-      // sauter espaces en début
-      a = ls;
-      while((rlen > 0) && ((*a == ' ') || (*a == '\t'))) {
-        a++;
-        rlen--;
-      }
-      if (rlen > 0) {
-        memcpy(s, a, rlen);     // can copy \0 chars
-        s[rlen] = '\0';
-      }
-    }
-    //
-    freet(ls);
-  }
-  return rlen;
-}
-int linput_cpp(FILE * fp, char *s, int max) {
-  int rlen = 0;
-
-  s[0] = '\0';
-  do {
-    int ret;
-
-    if (rlen > 0)
-      if (s[rlen - 1] == '\\')
-        s[--rlen] = '\0';       // couper \ final
-    // lire ligne
-    ret = linput_trim(fp, s + rlen, max - rlen);
-    if (ret > 0)
-      rlen += ret;
-  } while((s[max(rlen - 1, 0)] == '\\') && (rlen < max));
-  return rlen;
-}
-
-// idem avec les car spéciaux
-void rawlinput(FILE * fp, char *s, int max) {
-  int c;
-  int j = 0;
-
-  do {
-    c = fgetc(fp);
-    if (c != EOF) {
-      switch (c) {
-      case 13:
-        break;                  // sauter CR
-      case 10:
-        c = -1;
-        break;
-      default:
-        s[j++] = (char) c;
-        break;
-      }
-    }
-  } while((c != -1) && (c != EOF) && (j < (max - 1)));
-  s[j++] = '\0';
-}
-
-//cherche chaine, case insensitive
+// case-insensitive strstr()
 const char *strstrcase(const char *s, const char *o) {
   while(*s && strfield(s, o) == 0)
     s++;

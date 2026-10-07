@@ -1,0 +1,175 @@
+#!/bin/bash
+#
+# Config-file line readers (htslines.c): a line too long for the buffer is
+# reported as cut, and its tail is never read as the next line.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# readline CAP FLAGS TEXT [cpp] prints [line] per read of a feof() loop, or "!"
+# for a cut one. CAP counts the NUL; t drops TAB and FF, n drops NUL.
+selftest_queue "[abc][d]" readline 4 t 'abc\nd'
+selftest_queue "[abc][d]" readline 4 t 'abc\r\nd'
+selftest_queue "![x]" readline 4 t 'abcd\nx'
+selftest_queue "[ab][c][]" readline 4 t 'ab\r\nc\r\n'
+selftest_queue "[a][][b]" readline 8 t 'a\n\nb'
+selftest_queue "[]" readline 8 t
+selftest_queue "[ab]" readline 8 t 'a\tb\f'
+selftest_queue "[a\\x09b]" readline 8 - 'a\tb'
+selftest_queue "[ab]" readline 8 tn 'a\0b'
+selftest_queue "[a\\x00b]" readline 8 t 'a\0b'
+selftest_queue "!!" readline 1 t 'ab\nc'
+# Whitespace alone past the cap is no cut.
+selftest_queue "[abc][d]" readline 4 - 'abc  \t \nd'
+# Trimmed, and a line ending with a backslash joins the next one.
+selftest_queue "[ab][]" readline 8 tn 'a\\\nb\n' cpp
+selftest_queue "[a b][]" readline 16 tn '  a b  \n' cpp
+selftest_queue "[a][b]" readline 8 n 'a\f\v\nb' cpp
+selftest_queue "[\\x0ba]" readline 8 tn '\va' cpp
+# A cut line still swallows its continuation, so "ghi" is no entry.
+selftest_queue "![jk]" readline 4 tn 'abcdef \\ \nghi\njk' cpp
+# The old reader's double-backslash join, kept at every cap.
+selftest_queue "[ab]" readline 8 tn 'a\\\\\n\nb' cpp
+selftest_queue "![jk]" readline 4 tn 'abcdef\\\\\n\nghi\njk' cpp
+# The growing reader keeps CAP bytes, and counts whitespace as a cut.
+selftest_queue "[abcd][e]" readline 4 - 'abcd\ne' alloc
+selftest_queue "![abcd][e]" readline 4 - 'abcde\ne' alloc
+selftest_queue "![abcd][e]" readline 4 - 'abcd \ne' alloc
+selftest_queue "[abcd][e]" readline 4 - 'abcd\r\ne' alloc
+selftest_queue "[ab][]" readline 4 t 'a\tb\n' alloc
+selftest_queue "[a\\x09b]" readline 4 - 'a\tb' alloc
+selftest_queue "[ab]" readline 4 n 'a\0b' alloc
+selftest_queue "[a\\x00b]" readline 4 - 'a\0b' alloc
+
+# Against frozen copies of the old readers, and the same line boundaries at
+# every cap. The counts are exact, so a shrinking corpus shows.
+selftest_queue_lines "linediff: 40128 cases, 172997 lines fit, 52378 do not, 0 failures
+linediff: OK" linediff
+
+selftest_run_queued
+
+bin=$(httrack_path)
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_lines.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+
+# --- the httrackrc reader ----------------------------------------------------
+# It keeps 249 bytes. A long line's tail is a valid option whether a split
+# falls at 249 or 250, and two lines sit at the limit itself.
+d1="$tmp/rc"
+mkdir -p "$d1"
+echo '<html><body>hello</body></html>' >"$d1/index.html"
+head='user-agent='
+{
+    echo "$head$(repeat_chars $((249 - ${#head})) x)"
+    echo "$head$(repeat_chars $((250 - ${#head})) y)"
+    echo "$head$(repeat_chars $((249 - ${#head})) a) user-agent=zzztail"
+    echo "${head}wmark$(repeat_chars 300 ' ')"
+    echo "${head}zzzmarker"
+} >"$d1/.httrackrc"
+# Windows reads httrackrc, the others .httrackrc.
+cp "$d1/.httrackrc" "$d1/httrackrc"
+rc=0
+# The rc file is read from the working directory.
+cd "$d1"
+"$bin" "file://$d1/index.html" --quiet -n >.log 2>&1 || rc=$?
+cd "$tmp"
+test "$rc" -eq 0 || fail "rc-file crawl exited $rc"
+doit=$(sed -n '1p' "$d1/hts-cache/doit.log")
+for want in "-F $(repeat_chars 238 x) " "-F wmark " "-F zzzmarker "; do
+    grep -qF -- "$want" <<<"$doit" || fail "missing ${want:0:20}: $doit"
+done
+for gone in yyyyyyyyyy zzztail aaaaaaaaaa; do
+    if grep -q "$gone" <<<"$doit"; then
+        fail "$gone came from a line too long to apply: $doit"
+    fi
+done
+grep -q "line too long" "$d1/.log" || fail "no warning for the long rc lines"
+
+# --- the doit.log reader -----------------------------------------------------
+# httrack wrote the file, so it comes back whole, far past the old 8000 bytes.
+# The line extends the one httrack recorded, whose URL is in the form the
+# binary takes on every platform.
+d2="$tmp/doit"
+site="$d2/site"
+out="$d2/out"
+mkdir -p "$site"
+printf '<a href="a.html">a</a>' >"$site/index.html"
+echo 'A' >"$site/a.html"
+rc=0
+"$bin" "file://$site/index.html" -O "$out" --quiet -n >/dev/null 2>&1 || rc=$?
+test "$rc" -eq 0 || fail "initial mirror exited $rc"
+recorded=$(sed -n '1p' "$out/hts-cache/doit.log" | tr -d '\r')
+test -n "$recorded" || fail "the initial mirror recorded no command line"
+reprise() { # reprise [ARG...]: resume the mirror, leaving its status in rc
+    rm -f "$out/hts-log.txt"
+    rc=0
+    "$bin" -O "$out" --quiet "$@" >"$d2/.log" 2>&1 || rc=$?
+}
+log_fail() { # log_fail MSG: fail with what the run said
+    cat "$d2/.log" "$out/hts-log.txt" 2>/dev/null || true
+    fail "$1"
+}
+ua=$(repeat_chars 9000 u)
+printf '%s -F "%s" -r2\n' "$recorded" "$ua" >"$out/hts-cache/doit.log"
+find "$out" -name a.html -exec rm -f {} +
+reprise
+test "$rc" -eq 0 || log_fail "doit.log reprise exited $rc"
+test -n "$(find "$out" -name a.html -print -quit)" || log_fail "the reprise mirrored nothing"
+doit=$(sed -n '1p' "$out/hts-cache/doit.log")
+grep -qF -- "-F $ua " <<<"$doit" || log_fail "the long user agent did not come back whole"
+grep -qF -- " -r2" <<<"$doit" || log_fail "the argument after the long one was lost"
+# Each update repeats -O, -q and -iC2, and must not add them to the line again.
+reprise --update
+first=$(sed -n '1p' "$out/hts-cache/doit.log")
+reprise --update
+reprise --update
+doit=$(sed -n '1p' "$out/hts-cache/doit.log")
+test "$doit" = "$first" || log_fail "doit.log grew on update: $doit"
+# A line of exactly 1 MiB resumes. One byte over, the mirror is not resumed
+# with a part of its command line.
+doit_of_size() { # doit_of_size BYTES: a doit.log whose line is that long
+    {
+        printf '%s -F ' "$recorded"
+        repeat_chars $(($1 - $(printf %s "$recorded" | wc -c) - 4)) v
+        echo
+    } >"$out/hts-cache/doit.log"
+}
+doit_of_size $((1024 * 1024))
+reprise
+test "$rc" -eq 0 || log_fail "a doit.log of exactly the cap was refused"
+doit_of_size $((1024 * 1024 + 1))
+reprise
+test "$rc" -ne 0 || log_fail "a doit.log over the cap was resumed"
+grep -q "doit.log is too long" "$d2/.log" || log_fail "no error for the doit.log over the cap"
+
+# --- the cookies.txt reader --------------------------------------------------
+# It keeps 8099 bytes. The first line's tail is a cookie, and the second line
+# hides its cut behind a NUL.
+d3="$tmp/cookies"
+mkdir -p "$d3"
+echo '<html>hello</html>' >"$d3/index.html"
+rec() { # rec NAME VALUE
+    printf 'www.example.com\tTRUE\t/\tFALSE\t1999999999\t%s\t%s\n' "$1" "$2"
+}
+jar="$d3/jar.txt"
+{
+    printf '#%s' "$(repeat_chars 8098 p)"
+    rec TAILCOOKIE v
+    printf 'www.example.com\tTRUE\t/\tFALSE\t1999999999\tNULCUT\tv\0%s\n' \
+        "$(repeat_chars 8200 L)"
+    rec GOODNEXT v2
+} >"$jar"
+rc=0
+"$bin" "file://$d3/index.html" -O "$d3/out" --cookies-file "$jar" --quiet \
+    >/dev/null 2>&1 || rc=$?
+test "$rc" -eq 0 || fail "cookie crawl exited $rc"
+loaded=$(tr -d '\r' <"$d3/out/cookies.txt")
+grep -qxF "$(rec GOODNEXT v2)" <<<"$loaded" || fail "the cookie after the long lines was lost"
+for gone in TAILCOOKIE NULCUT; do
+    if grep -q "$gone" <<<"$loaded"; then
+        fail "$gone came from a line too long to load"
+    fi
+done
+
+exit 0

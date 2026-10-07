@@ -43,6 +43,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsdefines.h"
 #include "htsalias.h"
 #include "htscmdline.h"
+#include "htslines.h"
 #include "htswarc.h"
 #include "htschanges.h"
 #include "htsbauth.h"
@@ -358,6 +359,7 @@ static hts_boolean write_progress_lock(httrackp *opt, const char *path,
 
 static int hts_main_internal(int argc, char **argv, httrackp * opt);
 static hts_boolean cmdl_shortopt_has(const char *s, char c);
+static void cmdl_doit_line(String *line, const cmdl_argv *cmd);
 
 // Main, récupère les paramètres et appelle le robot
 HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
@@ -476,7 +478,7 @@ static void cmdl_print_cache_entry(httrackp *opt, cache_back *cache,
 
 static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   /* command line rebuilt from argv, config files and doit.log */
-  cmdl_argv x_cmd = {NULL, NULL, NULL, 0, 0, {NULL, 0, 0}};
+  cmdl_argv x_cmd = {NULL, NULL, NULL, NULL, 0, 0, {NULL, 0, 0}};
 
   //
   int argv_url = -1;            // ==0 : utiliser cache et doit.log
@@ -823,18 +825,27 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     if (fp) {
       int insert_after = 1;     /* insérer après nom au début */
 
-      //
-      char BIGSTK buff[8192];
+      String buff = STRING_EMPTY;
       char **tokens;
       int ntokens = 0;
       int i;
       hts_boolean ok;
+      const hts_boolean cut = hts_readline_alloc(
+          fp, &buff, HTS_READLINE_ALLOC_MAX, HTS_LINE_DROP_TAB);
 
-      linput(fp, buff, 8000);
       fclose(fp);
       fp = NULL;
+      /* any argument dropped would resume a different mirror */
+      if (cut) {
+        StringFree(buff);
+        cmdl_free(&x_cmd);
+        HTS_PANIC_PRINTF("Error, hts-cache/doit.log is too long to resume "
+                         "the mirror");
+        htsmain_free();
+        return -1;
+      }
       /* "" unquotes to empty but is still a real token (#106) */
-      tokens = hts_split_args(buff, &ntokens,
+      tokens = hts_split_args(StringBuffRW(buff), &ntokens,
                               HTS_SPLIT_STRIP_QUOTES | HTS_SPLIT_DROP_EMPTY);
       for (i = 0; tokens != NULL && i < ntokens; i++) {
         /* inserted in order, after the program name */
@@ -846,6 +857,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       }
       ok = tokens != NULL && i == ntokens;
       freet(tokens);
+      StringFree(buff);
       if (!ok) {
         cmdl_free(&x_cmd);
         HTS_PANIC_PRINTF("Error, not enough memory");
@@ -1235,11 +1247,16 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   {
     char *com;
     int na;
+    int prev_opt = 0;
 
     /* the flags below are indexed with argv, which still aliases x_cmd */
     assertf(argv == x_cmd.argv && argc == x_cmd.argc);
 
     for(na = 1; na < argc; na++) {
+      /* the tokens the loop stepped over were the previous option's */
+      if (prev_opt != 0)
+        x_cmd.span[prev_opt] = na - prev_opt;
+      prev_opt = cmdl_opt(argv[na]) ? na : 0;
 
       if (!x_cmd.unquoted[na] && !hts_unquote_arg(argv[na])) {
         char s[HTS_CDLMAXSIZE + 256];
@@ -2754,6 +2771,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       }                         // if argv=- etc. 
 
     }                           // for
+    if (prev_opt != 0)
+      x_cmd.span[prev_opt] = na - prev_opt;
   }
 
 #if BDEBUG==3
@@ -2919,7 +2938,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       // reprise/update
       if (opt->cache) {
         FILE *fp;
-        int i;
 
 #ifdef _WIN32
         hts_mkdir_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
@@ -2935,12 +2953,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         if (fp) {
           String line = STRING_EMPTY;
 
-          for(i = 0 + 1; i < argc; i++) {
-            /* argv[] is already unquoted here, so a leading quote is data */
-            hts_quote_arg(&line, argv[i]);
-            if (i < argc - 1)
-              StringAddchar(line, ' ');
-          }
+          cmdl_doit_line(&line, &x_cmd);
           if (StringLength(line) != 0)
             fwrite(StringBuff(line), 1, StringLength(line), fp);
           StringFree(line);
@@ -3256,6 +3269,50 @@ int check_path(String * s, char *defaultname) {
     StringCat(*s, "/");
 
   return return_value;
+}
+
+/* Append the token at i, with its parameters, quoted as doit.log holds it. */
+static void cmdl_quote_unit(String *out, const cmdl_argv *cmd, int i) {
+  const int span = cmd->span[i] > 1 ? cmd->span[i] : 1;
+  const int end = span < cmd->argc - i ? i + span : cmd->argc;
+
+  for (; i < end; i++) {
+    if (StringLength(*out) != 0)
+      StringAddchar(*out, ' ');
+    /* argv[] is already unquoted here, so a leading quote is data */
+    hts_quote_arg(out, cmd->argv[i]);
+  }
+}
+
+/* Append cmd's arguments as doit.log's line, leaving out an option an
+   identical later one repeats, so each resume's -iC2 does not pile up. */
+static void cmdl_doit_line(String *line, const cmdl_argv *cmd) {
+  hts_boolean *drop =
+      (hts_boolean *) calloct((size_t) cmd->argc, sizeof(hts_boolean));
+  coucal seen = drop != NULL ? coucal_new(0) : NULL;
+  String unit = STRING_EMPTY;
+  int i;
+
+  for (i = cmd->argc - 1; seen != NULL && i > 0; i--) {
+    if (cmd->span[i] == 0)
+      continue;
+    StringClear(unit);
+    cmdl_quote_unit(&unit, cmd, i);
+    if (coucal_exists(seen, StringBuff(unit)))
+      drop[i] = HTS_TRUE;
+    else
+      coucal_write(seen, StringBuff(unit), 0);
+  }
+  for (i = 1; i < cmd->argc; i++) {
+    if (seen == NULL || !drop[i])
+      cmdl_quote_unit(line, cmd, i);
+    if (cmd->span[i] > 1)
+      i += cmd->span[i] - 1;
+  }
+  StringFree(unit);
+  if (seen != NULL)
+    coucal_delete(&seen);
+  freet(drop);
 }
 
 /* Does the short-option cluster s carry c from the main option set (-i, -iC2,

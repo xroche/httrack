@@ -27,7 +27,7 @@ Please visit our Website: http://www.httrack.com
 
 /* Fuzz the legacy .ndx/.dat cache reader, which is proxytrack's (store.c) and
    is now the only one left: #1551 moved -#C off the .ndx onto the ZIP index,
-   and htscache.c's cache_brstr/cache_binput have had no caller since. The
+   and htscache.c's cache_brstr has had no caller since. The
    loader walks length-prefixed index entries and seeks the .dat on offsets read
    out of them, so both files come from the input:
 

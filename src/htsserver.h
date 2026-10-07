@@ -120,8 +120,6 @@ int htslang_init(void);
 /* Static definitions */
 
 HTS_UNUSED static const char *gethomedir(void);
-HTS_UNUSED static int linput_cpp(FILE * fp, char *s, int max);
-HTS_UNUSED static int linput_trim(FILE * fp, char *s, int max);
 HTS_UNUSED static int fexist(const char *s);
 HTS_UNUSED static int linput(FILE * fp, char *s, int max);
 
@@ -189,23 +187,6 @@ static const char *gethomedir(void) {
   /* An empty $HOME would put the base path and httrack.ini at the root */
   return strnotempty(home) ? home : ".";
 }
-static int linput_cpp(FILE * fp, char *s, int max) {
-  int rlen = 0;
-
-  s[0] = '\0';
-  do {
-    int ret;
-
-    if (rlen > 0)
-      if (s[rlen - 1] == '\\')
-        s[--rlen] = '\0';       // couper \ final
-    // lire ligne
-    ret = linput_trim(fp, s + rlen, max - rlen);
-    if (ret > 0)
-      rlen += ret;
-  } while((s[max(rlen - 1, 0)] == '\\') && (rlen < max));
-  return rlen;
-}
 
 static int fexist(const char *s) {
   struct stat st;
@@ -243,36 +224,6 @@ static int linput(FILE * fp, char *s, int max) {
   } while((c != -1) && (c != EOF) && (j < (max - 1)));
   s[j] = '\0';
   return j;
-}
-static int linput_trim(FILE * fp, char *s, int max) {
-  int rlen = 0;
-  char *ls = (char *) malloc(max + 1);
-
-  s[0] = '\0';
-  if (ls) {
-    char *a;
-
-    // lire ligne
-    rlen = linput(fp, ls, max);
-    if (rlen) {
-      // sauter espaces et tabs en fin
-      while((rlen > 0) && is_realspace(ls[max(rlen - 1, 0)]))
-        ls[--rlen] = '\0';
-      // sauter espaces en début
-      a = ls;
-      while((rlen > 0) && ((*a == ' ') || (*a == '\t'))) {
-        a++;
-        rlen--;
-      }
-      if (rlen > 0) {
-        memcpy(s, a, rlen);     // can copy \0 chars
-        s[rlen] = '\0';
-      }
-    }
-    //
-    free(ls);
-  }
-  return rlen;
 }
 
 #endif

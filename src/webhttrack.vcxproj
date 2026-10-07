@@ -119,6 +119,7 @@
     <ClCompile Include="htsweb.c" />
     <ClCompile Include="htsrandom.c" />
     <ClCompile Include="htscmdline.c" />
+    <ClCompile Include="htslines.c" />
     <ClCompile Include="htsurlport.c" />
     <ClCompile Include="htsescape.c" />
   </ItemGroup>
