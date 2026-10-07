@@ -331,7 +331,7 @@ expected_skips_msys="01_engine-usercommand.test
 113_engine-threadattr-leak.test
 527_local-maxtime-dns-stall.test
 100_local-purge-longpath.test
-552_local-purge-split-tail.test
+553_local-purge-split-tail.test
 158_local-link-control-bytes.test
 114_local-update-304-leak.test
 283_engine-cmdline-leak.test
@@ -400,7 +400,7 @@ expected_skips_wsl2="01_engine-usercommand.test
 113_engine-threadattr-leak.test
 527_local-maxtime-dns-stall.test
 100_local-purge-longpath.test
-552_local-purge-split-tail.test
+553_local-purge-split-tail.test
 158_local-link-control-bytes.test
 114_local-update-304-leak.test
 283_engine-cmdline-leak.test
