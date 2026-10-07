@@ -42,20 +42,20 @@ Please visit our Website: http://www.httrack.com
 char **hts_split_args(char *cmd, int *nargs, int flags) {
   const hts_boolean fold = (flags & HTS_SPLIT_FOLD_WS) != 0;
   const hts_boolean strip = (flags & HTS_SPLIT_STRIP_QUOTES) != 0;
-  const hts_boolean drop = (flags & HTS_SPLIT_DROP_EMPTY) != 0;
+  const hts_boolean drop_empty = (flags & HTS_SPLIT_DROP_EMPTY) != 0;
   size_t nsep = 0;
   size_t capacity;
   size_t r;
   size_t w;
   size_t start = 0;
-  hts_boolean seen = HTS_FALSE; /* any input byte since the last separator */
+  hts_boolean has_input = HTS_FALSE; /* any byte since the last separator */
   int argc = 0;
   hts_boolean quoted = HTS_FALSE;
   char **argv;
 
   *nargs = 0;
 
-  /* fold the other separators, so counting them sizes the vector exactly */
+  /* fold TAB, CR and LF to spaces when asked, so the space count sizes argv */
   for (r = 0; cmd[r] != '\0'; r++) {
     if (fold && (cmd[r] == '\t' || cmd[r] == '\r' || cmd[r] == '\n')) {
       cmd[r] = ' ';
@@ -80,31 +80,31 @@ char **hts_split_args(char *cmd, int *nargs, int flags) {
         (cmd[r + 1] == '\\' || cmd[r + 1] == '\"')) {
       r++;
       cmd[w++] = cmd[r++];
-      seen = HTS_TRUE;
     } else if (cmd[r] == '\"') {
       quoted = !quoted;
       if (!strip) {
         cmd[w++] = cmd[r];
       }
       r++;
-      seen = HTS_TRUE;
+      has_input = HTS_TRUE;
     } else if (cmd[r] == ' ' && !quoted) {
       cmd[w++] = '\0';
-      if (seen || !drop) {
+      if (has_input || !drop_empty) {
         /* the last slot holds the NULL */
         assertf((size_t) argc < capacity - 1);
         argv[argc++] = cmd + start;
       }
       start = w;
-      seen = HTS_FALSE;
+      has_input = HTS_FALSE;
       r++;
     } else {
       cmd[w++] = cmd[r++];
-      seen = HTS_TRUE;
+      has_input = HTS_TRUE;
     }
   }
   cmd[w] = '\0';
-  if (seen || !drop) {
+  if (has_input || !drop_empty) {
+    /* the loop stored at most one per counted space, so this slot is free */
     assertf((size_t) argc < capacity - 1);
     argv[argc++] = cmd + start;
   }

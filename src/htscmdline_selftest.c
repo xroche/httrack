@@ -38,10 +38,10 @@ Please visit our Website: http://www.httrack.com
 #include <stdint.h>
 
 /* ------------------------------------------------------------ */
-/* Frozen copies of the code hts_split_args() and hts_quote_arg() replaced. */
+/* Frozen copies of the code the shared helpers replaced. */
 /* ------------------------------------------------------------ */
 
-/* hts_split_cmdline() before it became a hts_split_args() flag set. */
+/* The old hts_split_cmdline(). */
 static char **legacy_split_cmdline(char *cmd, int *nargs) {
   size_t nsep = 0;
   size_t capacity;
@@ -367,7 +367,7 @@ static void quotediff_one(quote_stats *st, const char *in) {
 /* Self-tests */
 /* ------------------------------------------------------------ */
 
-/* No difference is intended: the shared grammar keeps each site's behavior. */
+/* Any difference is a bug. */
 static int st_quotediff(httrackp *opt, int argc, char **argv) {
   static const char *const hand[] = {"",
                                      " ",
@@ -416,7 +416,7 @@ static int st_quotediff(httrackp *opt, int argc, char **argv) {
   (void) argv;
   for (i = 0; hand[i] != NULL; i++)
     quotediff_one(&st, hand[i]);
-  /* a run past the argv strip's stack buffer is skipped by that check only */
+  /* Longer than HTS_CDLMAXSIZE: every site runs it except the argv unquote. */
   {
     String big = STRING_EMPTY;
 
@@ -453,15 +453,16 @@ static int st_quoteprop(httrackp *opt, int argc, char **argv) {
   for (r = 0; r < 20000; r++) {
     const int n = (int) (quote_rand(&seed) % 6);
     String args[6];
-    String want = STRING_EMPTY, wantweb = STRING_EMPTY;
-    String line = STRING_EMPTY, web = STRING_EMPTY, got = STRING_EMPTY;
+    String want_doitlog = STRING_EMPTY, want_cmdline = STRING_EMPTY;
+    String doitlog = STRING_EMPTY, cmdline = STRING_EMPTY, got = STRING_EMPTY;
+    char *in;
     char **v;
     int i, nv = 0;
 
-    StringClear(want);
-    StringClear(wantweb);
-    StringClear(line);
-    StringClear(web);
+    StringClear(want_doitlog);
+    StringClear(want_cmdline);
+    StringClear(doitlog);
+    StringClear(cmdline);
     StringClear(got);
 
     /* doit.log: hts_quote_arg() joined by spaces */
@@ -472,30 +473,34 @@ static int st_quoteprop(httrackp *opt, int argc, char **argv) {
       StringClear(args[i]);
       quote_random(&args[i], &seed, 10);
       if (i != 0)
-        StringAddchar(line, ' ');
-      hts_quote_arg(&line, StringBuff(args[i]));
-      StringCat(want, StringBuff(args[i]));
-      StringAddchar(want, '\n');
+        StringAddchar(doitlog, ' ');
+      hts_quote_arg(&doitlog, StringBuff(args[i]));
+      StringCat(want_doitlog, StringBuff(args[i]));
+      StringAddchar(want_doitlog, '\n');
+      StringCat(cmdline, " \"");
+      hts_escape_arg(&cmdline, StringBuff(args[i]), StringLength(args[i]));
+      StringAddchar(cmdline, '\"');
       /* the command line folds TAB, CR and LF to a space, even quoted */
-      StringCat(web, " \"");
-      hts_escape_arg(&web, StringBuff(args[i]), StringLength(args[i]));
-      StringAddchar(web, '\"');
       for (k = 0; k < StringLength(args[i]); k++) {
         const char c = StringBuff(args[i])[k];
 
-        StringAddchar(wantweb, c == '\t' || c == '\r' || c == '\n' ? ' ' : c);
+        StringAddchar(want_cmdline,
+                      c == '\t' || c == '\r' || c == '\n' ? ' ' : c);
       }
-      StringAddchar(wantweb, '\n');
+      StringAddchar(want_cmdline, '\n');
     }
-    v = hts_split_args(StringBuffRW(line), &nv,
+    in = strdupt(StringBuff(doitlog));
+    assertf(in != NULL);
+    v = hts_split_args(StringBuffRW(doitlog), &nv,
                        HTS_SPLIT_STRIP_QUOTES | HTS_SPLIT_DROP_EMPTY);
     assertf(v != NULL);
     cat_vector(&got, v, nv);
     freet(v);
     st.cases++;
-    if (nv != n || strcmp(StringBuff(got), StringBuff(want)) != 0)
-      quote_fail(&st, "doit.log round trip", StringBuff(want), StringBuff(want),
+    if (nv != n || strcmp(StringBuff(got), StringBuff(want_doitlog)) != 0)
+      quote_fail(&st, "doit.log round trip", in, StringBuff(want_doitlog),
                  StringBuff(got));
+    freet(in);
 
     /* WebHTTrack: "prog" then each argument quoted, unquoted by the engine */
     StringClear(got);
@@ -503,7 +508,9 @@ static int st_quoteprop(httrackp *opt, int argc, char **argv) {
       String cmd = STRING_EMPTY;
 
       StringCat(cmd, "prog");
-      StringCat(cmd, StringBuff(web));
+      StringCat(cmd, StringBuff(cmdline));
+      in = strdupt(StringBuff(cmd));
+      assertf(in != NULL);
       v = hts_split_cmdline(StringBuffRW(cmd), &nv);
       assertf(v != NULL);
       for (i = 1; i < nv; i++) {
@@ -516,16 +523,17 @@ static int st_quoteprop(httrackp *opt, int argc, char **argv) {
       StringFree(cmd);
     }
     st.cases++;
-    if (nv != n + 1 || strcmp(StringBuff(got), StringBuff(wantweb)) != 0)
-      quote_fail(&st, "command line round trip", StringBuff(wantweb),
-                 StringBuff(wantweb), StringBuff(got));
+    if (nv != n + 1 || strcmp(StringBuff(got), StringBuff(want_cmdline)) != 0)
+      quote_fail(&st, "command line round trip", in, StringBuff(want_cmdline),
+                 StringBuff(got));
+    freet(in);
 
     for (i = 0; i < n; i++)
       StringFree(args[i]);
-    StringFree(want);
-    StringFree(wantweb);
-    StringFree(line);
-    StringFree(web);
+    StringFree(want_doitlog);
+    StringFree(want_cmdline);
+    StringFree(doitlog);
+    StringFree(cmdline);
     StringFree(got);
   }
   printf("quoteprop: %lu cases, %lu failures\n", st.cases, st.failures);
@@ -535,8 +543,8 @@ static int st_quoteprop(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* Print hts_split_args(<line>) under FLAGS, a mix of f(old), s(trip) and
-   d(rop), or "-" for none. */
+/* Print hts_split_args(<line>) as [arg] items. FLAGS: f fold, s strip, d drop,
+   or - for none. */
 static int st_splitargs(httrackp *opt, int argc, char **argv) {
   String out = STRING_EMPTY;
   char *line;

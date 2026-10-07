@@ -14,6 +14,7 @@ quotediff: OK" quotediff
 selftest_queue_lines "quoteprop: 40000 cases, 0 failures
 quoteprop: OK" quoteprop
 
+# splitargs FLAGS LINE prints COUNT:[arg]...; f fold whitespace, s strip quotes, d drop empty, - none
 # The WebHTTrack command line: every separator splits, quotes stay for argv.
 selftest_queue "4:[a][][\"b c\"][d]" splitargs f $'a  "b c"\td'
 # The escape goes, the outer quotes stay for the engine to strip.
