@@ -1,0 +1,67 @@
+#!/bin/bash
+#
+# proxytrack bound its ICP socket to the proxy address and ignored the ICP one.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+# shellcheck source=tests/arclib.sh
+. "${0%"${0##*/}"}./arclib.sh"
+
+python=$(find_python) || skip "python3 missing"
+
+# Linux routes all of 127/8 to loopback, macOS only 127.0.0.1.
+"$python" -c 'import socket; socket.socket(socket.AF_INET, socket.SOCK_DGRAM).bind(("127.0.0.2", 0))' 2>/dev/null ||
+    skip "127.0.0.2 cannot be bound on this host"
+
+dir=$(mktemp -d)
+ptpid=
+cleanup() {
+    stop_server "$ptpid"
+    rm -rf "$dir"
+}
+cleanup_push cleanup
+
+printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 5\r\n\r\n' >"$dir/hdr"
+printf 'hello' >"$dir/body"
+{
+    arc_filedesc
+    arc_record http://example.com/page.html text/html 200 "$dir/hdr" "$dir/body"
+} >"$dir/in.arc"
+
+launch_proxytrack() {
+    proxytrack "127.0.0.1:$proxyport" "127.0.0.2:$icpport" "$dir/in.arc" >"$ptlog" 2>&1 &
+    ptpid=$!
+}
+start_proxytrack "$dir/pt" launch_proxytrack
+
+"$python" - "$icpport" <<'PY' || fail_dump "the ICP socket is not bound to the ICP address" "$ptlog"
+import socket, struct, sys
+
+port = int(sys.argv[1])
+url = b"http://example.com/page.html"
+payload = b"\x00" * 4 + url + b"\x00"
+query = struct.pack("!BBHI", 1, 2, 20 + len(payload), 0x1234) + b"\x00" * 12 + payload
+
+
+def ask(addr, timeout):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.settimeout(timeout)
+    sock.sendto(query, (addr, port))
+    try:
+        return sock.recvfrom(65535)[0]
+    except (socket.timeout, OSError):  # Windows reports a closed port as a reset
+        return None
+    finally:
+        sock.close()
+
+
+reply = ask("127.0.0.2", 10)
+if reply is None or reply[20:].split(b"\x00")[0] != url:
+    sys.exit("no ICP reply on 127.0.0.2: %r" % reply)
+if ask("127.0.0.1", 1) is not None:
+    sys.exit("ICP answered on the proxy address 127.0.0.1")
+PY
+
+echo "OK: proxytrack answers ICP on the ICP address only"
