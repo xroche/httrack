@@ -1441,7 +1441,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                 *pos++ = '\0';
                 /* Keep the command-line path over the saved one. */
                 if (doLoad == 2 && path_from_cmdline &&
-                    strcmp(line, "path") == 0)
+                    strcmp(entry, "path") == 0)
                   continue;
                 /* Only a checkbox: elsewhere zero is the user's value, and
                    emptying it silently restores the wizard default (#1177). */
