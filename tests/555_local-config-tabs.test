@@ -1,0 +1,103 @@
+#!/bin/bash
+#
+# TAB in the config readers: .httrackrc splits on it like a space and skips an
+# indented comment, doit.log keeps it as argument data, and a >postfile:
+# request line may be TAB-separated.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+python=$(find_python) || skip "python3 missing"
+require_httrack
+
+# absolute before any cd, or a relative PATH entry finds the installed one
+bin=$(command -v httrack)
+case "$bin" in
+/*) ;;
+*) bin="$(cd "$(dirname "$bin")" && pwd)/$(basename "$bin")" ;;
+esac
+
+TAB=$'\t'
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_tabs.XXXXXX") || exit 1
+serverpid=
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmp"
+}
+cleanup_push cleanup
+
+wire=$tmp/wire
+srverr=$tmp/server.err
+fail_dump_var wire srverr
+"$python" "$(nativepath "$testdir/postfile-server.py")" "$(nativepath "$wire")" \
+    unused >"$tmp/server.out" 2>"$srverr" &
+serverpid=$!
+port=$(discover_server_port "$tmp/server.out" "$serverpid") || exit 1
+
+# --- 1. .httrackrc: TAB separates, indented comments are skipped -------------
+d1=$tmp/rc
+mkdir -p "$d1"
+{
+    printf 'set\tsockets\t7\r\n'
+    printf '\t# zzcomment tab\n'
+    printf '    # zzcomment space\r\n'
+    printf '  ; zzcomment semi\n'
+    printf 'user-agent\tua-rc\tb\n'
+} >"$d1/.httrackrc"
+cp "$d1/.httrackrc" "$d1/httrackrc" # the Windows name
+
+# no -O, or the rc files are not read
+log1=$tmp/rc.log
+fail_dump_var log1
+rc=0
+(cd "$d1" && run_with_timeout 120 "$bin" "http://127.0.0.1:$port/rc.html" \
+    --robots=0 --retries=0 --quiet -%v0 >"$log1" 2>&1) || rc=$?
+test "$rc" -eq 0 || fail ".httrackrc crawl exited $rc"
+assert_eq 0 "$(count_matching_lines 'Unknown option' "$log1")" \
+    "options the engine rejected from .httrackrc"
+line=$(head -1 "$d1/hts-cache/doit.log")
+case " $line " in
+*" -c7 "*) ;;
+*) fail "set<TAB>sockets<TAB>7 not applied: [$line]" ;;
+esac
+case "$line" in
+*"-F ua-rc${TAB}b "*) ;;
+*) fail "the TAB inside the user-agent value was not kept: [$line]" ;;
+esac
+test "$(count_matching_lines "^User-Agent: ua-rc${TAB}b" "$wire")" -ne 0 ||
+    fail "the user-agent from .httrackrc was not sent with its TAB"
+
+# --- 2. doit.log: a TAB inside a value survives a resume ---------------------
+out=$tmp/doit
+url="http://127.0.0.1:$port/doit.html"
+rc=0
+run_with_timeout 120 "$bin" "$url" -O "$out" --quiet -n -%v0 --robots=0 \
+    --retries=0 -r1 >/dev/null 2>&1 || rc=$?
+test "$rc" -eq 0 || fail "initial mirror exited $rc"
+want="$url -O $out -q -n -%v0 -F ua${TAB}tab +*x${TAB}y* \"+*p q${TAB}r*\" -r1"
+{
+    printf '%s\n' "$want"
+    tail -n +2 "$out/hts-cache/doit.log"
+} >"$tmp/doit.new"
+mv "$tmp/doit.new" "$out/hts-cache/doit.log"
+rc=0
+(cd "$out" && run_with_timeout 120 "$bin" >/dev/null 2>&1) || rc=$?
+test "$rc" -eq 0 || fail "resume exited $rc"
+got=$(head -1 "$out/hts-cache/doit.log")
+got=${got%"$SELFTEST_CR"} # LF is CR LF on Windows
+test "$got" = "$want" || fail "resume rewrote [$want] as [$got]"
+test "$(count_matching_lines "^User-Agent: ua${TAB}tab" "$wire")" -ne 0 ||
+    fail "the resumed crawl did not send the user-agent with its TAB"
+
+# --- 3. >postfile: a TAB-separated request line is sent ----------------------
+post=$tmp/post.txt
+printf 'GET\t/tabbed\tHTTP/1.0\r\nX-Tabs: 1\r\n\r\n' >"$post"
+rc=0
+run_with_timeout 120 "$bin" "http://127.0.0.1:$port/pf.html?>postfile:$(nativepath "$post")" \
+    -O "$tmp/pf" --robots=0 --retries=0 -c1 --quiet -%v0 >/dev/null 2>&1 || rc=$?
+test "$rc" -ne 124 || fail "the postfile crawl watchdog fired"
+test "$rc" -le 128 || fail "the postfile crawl ended abnormally ($rc)"
+test "$(count_matching_lines '^GET /tabbed HTTP/1.0' "$wire")" -ne 0 ||
+    fail "the TAB-separated postfile request line was not sent"
