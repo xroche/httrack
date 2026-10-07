@@ -114,7 +114,7 @@ static void usage(FILE *fp, const char *argv0) {
           "--list <file-list> ) ..]\n",
           argv0);
   fprintf(fp,
-          "\texample:%s proxy:8080 localhost:3130 "
+          "\texample: %s proxy:8080 localhost:3130 "
           "/home/archives/www-archive-01.zip "
           "/home/old-archives/www-archive-02.ndx\n",
           argv0);
@@ -124,7 +124,7 @@ static void usage(FILE *fp, const char *argv0) {
           "<new.ndx path> | <archive.arc path> | --list <file-list> ) ..]\n",
           argv0);
   fprintf(fp,
-          "\texample:%s --convert /home/archives/merged.zip "
+          "\texample: %s --convert /home/archives/merged.zip "
           "/home/archives/www-archive-01.zip "
           "/home/old-archives/www-archive-02.ndx\n",
           argv0);
