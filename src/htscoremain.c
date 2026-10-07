@@ -261,15 +261,6 @@ static void cmdl_print_args(httrackp *opt, const cmdl_argv *cmd) {
   } \
 } while(0)
 
-/* Scan a decimal option argument into an option field. "%d" writes an int,
-   and an enum field is one byte under -fshort-enums, so never aim it there. */
-#define scanOptInt(arg, field)                                                 \
-  do {                                                                         \
-    int value_;                                                                \
-    if (sscanf((arg), "%d", &value_) == 1)                                     \
-      (field) = value_;                                                        \
-  } while (0)
-
 /* Read the glued digits of the option at com into field, or refuse the
    command line when they are above max. With no digits, nothing changes.
    A refusal panics and returns -1 from hts_main_internal. */
@@ -286,6 +277,14 @@ static void cmdl_print_args(httrackp *opt, const cmdl_argv *cmd) {
   } while (0)
 #define readGluedInt(field, max) readGluedOpt_(cmdl_glued_int, field, max)
 #define readGluedLLint(field, max) readGluedOpt_(cmdl_glued_llint, field, max)
+/* readGluedInt() for an enum, narrower than an int under -fshort-enums. */
+#define readGluedEnum(field, max)                                              \
+  do {                                                                         \
+    int level_ = (field);                                                      \
+                                                                               \
+    readGluedInt(level_, max);                                                 \
+    (field) = level_;                                                          \
+  } while (0)
 
 hts_scan_result cmdl_glued_llint(char **com, LLint min, LLint max, LLint *out) {
   const char *const digits = *com + 1;
@@ -1386,13 +1385,11 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           case 'K':
             opt->urlmode = HTS_URLMODE_ABSOLUTE;
             if (isdigit((unsigned char) *(com + 1))) {
-              scanOptInt(com + 1, opt->urlmode);
+              readGluedEnum(opt->urlmode, HTS_URLMODE_TRANSPARENT_PROXY);
               if (opt->urlmode == HTS_URLMODE_ABSOLUTE) { // in fact K0 ==> K2
                 // and K ==> K0
                 opt->urlmode = HTS_URLMODE_RELATIVE;
               }
-              while(isdigit((unsigned char) *(com + 1)))
-                com++;
             }
             break;
           case 'c':
@@ -1475,9 +1472,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             break;
             //
           case 'b':
-            scanOptInt(com + 1, opt->accept_cookie);
-            while(isdigit((unsigned char) *(com + 1)))
-              com++;
+            readGluedInt(opt->accept_cookie, HTS_TRUE);
             break;
             //
           case 'N':
@@ -1539,9 +1534,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           } break;
           case 's':
             if (isdigit((unsigned char) *(com + 1))) {
-              scanOptInt(com + 1, opt->robots);
-              while(isdigit((unsigned char) *(com + 1)))
-                com++;
+              readGluedEnum(opt->robots, HTS_ROBOTS_ALWAYS_STRICT);
             } else
               opt->robots = HTS_ROBOTS_SOMETIMES;
 #if DEBUG_ROBOTS
@@ -1549,21 +1542,15 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 #endif
             break;
           case 'o':
-            scanOptInt(com + 1, opt->errpage);
-            while(isdigit((unsigned char) *(com + 1)))
-              com++;
+            readGluedInt(opt->errpage, HTS_TRUE);
             break;
           case 'u':
-            scanOptInt(com + 1, opt->check_type);
-            while(isdigit((unsigned char) *(com + 1)))
-              com++;
+            readGluedInt(opt->check_type, 2);
             break;
             //
           case 'C':
             if (isdigit((unsigned char) *(com + 1))) {
-              scanOptInt(com + 1, opt->cache);
-              while(isdigit((unsigned char) *(com + 1)))
-                com++;
+              readGluedEnum(opt->cache, HTS_CACHE_TEST_UPDATE);
             } else
               opt->cache = HTS_CACHE_PRIORITY;
             break;
@@ -1631,9 +1618,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               case 'I':
                 opt->kindex = 1;
                 if (isdigit((unsigned char) *(com + 1))) {
-                  scanOptInt(com + 1, opt->kindex);
-                  while(isdigit((unsigned char) *(com + 1)))
-                    com++;
+                  readGluedInt(opt->kindex, 2);
                 }
                 break;          // Keyword Index
               case 'c':
@@ -1727,9 +1712,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               case 'v':
                 opt->verbosedisplay = HTS_VERBOSE_FULL;
                 if (isdigit((unsigned char) *(com + 1))) {
-                  scanOptInt(com + 1, opt->verbosedisplay);
-                  while(isdigit((unsigned char) *(com + 1)))
-                    com++;
+                  readGluedEnum(opt->verbosedisplay, HTS_VERBOSE_FULL);
                 }
                 break;
               case 'i':
@@ -1742,9 +1725,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               case 'N':
                 opt->savename_delayed = HTS_SAVENAME_DELAYED_HARD;
                 if (isdigit((unsigned char) *(com + 1))) {
-                  scanOptInt(com + 1, opt->savename_delayed);
-                  while(isdigit((unsigned char) *(com + 1)))
-                    com++;
+                  readGluedEnum(opt->savename_delayed,
+                                HTS_SAVENAME_DELAYED_HARD);
                 }
                 break;
               case 'D':
