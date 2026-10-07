@@ -1,0 +1,61 @@
+#!/bin/bash
+#
+# A path given to htsserver must win over the default and over the path= saved
+# in ~/.httrack.ini; without one, the saved path still wins over the default.
+
+set -euo pipefail
+
+# shellcheck source=tests/webhttracklib.sh
+. "${0%"${0##*/}"}./webhttracklib.sh"
+
+htsserver_require
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_path.XXXXXX") || fail "no tmpdir"
+cleanup_push htsserver_cleanup_dir "${work}"
+
+# Prints the value of step2.html's path field. With "ini" as $1, also requires
+# the ini's user= key, so skipping path does not skip the rest of the file.
+shown_path() {
+    "${HTS_PYTHON}" - "${HTS_URL}" "${1-}" <<'PY'
+import html, re, sys, urllib.request
+
+url = sys.argv[1].rstrip("/")
+index = urllib.request.urlopen(url + "/server/index.html", timeout=20).read()
+if not re.search(rb'name="sid" value="[0-9a-f]+"', index):
+    sys.exit("no session id in server/index.html")
+page = urllib.request.urlopen(url + "/server/step2.html", timeout=20).read()
+m = re.search(rb'<input name="path" value="([^"]*)"', page)
+if m is None:
+    sys.exit("no path field in step2.html")
+if sys.argv[2] == "ini":
+    agent = urllib.request.urlopen(url + "/server/option6.html", timeout=20).read()
+    if b"IniAgent" not in agent:
+        sys.exit("the ini's user= key was not loaded")
+print(html.unescape(m.group(1).decode("latin-1")))
+PY
+}
+
+check() { # $1 = tag, $2 = expected path, $3 = path= saved in the ini or "", $4.. = htsserver args
+    local tag=$1 want=$2 saved=$3 got ini=
+    shift 3
+    mkdir -p "${work}/h${tag}"
+    if test -n "${saved}"; then
+        printf 'path=%s\nuser=IniAgent\n' "${saved}" >"${work}/h${tag}/.httrack.ini"
+        ini=ini
+    fi
+    printf '[%s] ..\t' "${tag}"
+    htsserver_start --home "${work}/h${tag}" --log "${work}/srv${tag}.log" "$@"
+    got=$(shown_path "${ini}") || fail "${tag}: could not read the server's settings"
+    test "${got}" = "${want}" || fail "${tag}: path is '${got}', wanted '${want}'"
+    echo "ok"
+}
+
+check cmdline /cmd/mirrors "" path /cmd/mirrors
+check cmdline-over-ini /cmd/mirrors /ini/mirrors path /cmd/mirrors
+# Controls: the ini still overrides the default, and the default is HOME's.
+check ini-over-default /ini/mirrors /ini/mirrors
+check default "${work}/hdefault/websites" ""
+# An empty path counts as none, so the saved one still applies.
+check empty /ini/mirrors /ini/mirrors path ""
+
+echo "PASS"

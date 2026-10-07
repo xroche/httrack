@@ -589,6 +589,51 @@ static void set_mirror_completed(httrackp *opt, hts_boolean *completed_out,
   hts_mutexrelease(&opt->state.lock);
 }
 
+/* Reads old.lst's next "[path]" line. Returns HTS_FALSE when it is cut,
+   malformed, absolute or too long. Only a corrupt or foreign old.lst holds such
+   a line, because filenote() writes relative paths that fit. */
+static hts_boolean old_lst_entry(httrackp *opt, const char *lst,
+                                 const char *end, size_t *pos, char *line,
+                                 size_t linesize, char *file, size_t filesize) {
+  const size_t root = StringLength(opt->path_html);
+  int adv;
+  const hts_boolean cut =
+      binput_line(lst + *pos, end, line, (int) linesize, &adv);
+  size_t len;
+
+  if (adv <= 0) { // a line past INT_MAX bytes: stop walking
+    *pos = (size_t) (end - lst);
+    return HTS_FALSE;
+  }
+  *pos += (size_t) adv;
+  len = strlen(line);
+  if (cut || len < 3 || line[0] != '[' || line[len - 1] != ']' ||
+      line[1] == '/' || line[1] == '\\')
+    return HTS_FALSE;
+  if (root >= filesize || len - 2 >= filesize - root)
+    return HTS_FALSE;
+  memcpy(file, StringBuff(opt->path_html), root);
+  memcpy(file + root, line + 1, len - 2);
+  file[root + len - 2] = '\0';
+  return HTS_TRUE;
+}
+
+/* Cuts file, of length *len, to its parent directory. Returns HTS_FALSE when
+   that parent is not strictly inside the first root bytes, path_html. */
+static hts_boolean chop_to_parent(char *file, size_t root, size_t *len) {
+  size_t n = *len;
+
+  while (n > root && file[n - 1] != '/' && file[n - 1] != '\\')
+    n--;
+  while (n > root && (file[n - 1] == '/' || file[n - 1] == '\\'))
+    n--; // a run of separators, as in "a//b", is one
+  if (n <= root)
+    return HTS_FALSE;
+  file[n] = '\0';
+  *len = n;
+  return HTS_TRUE;
+}
+
 int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   char *primary = NULL;         // première page, contenant les liens à scanner
   hash_struct hash;             // système de hachage, accélère la recherche dans les liens
@@ -2168,7 +2213,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
                       "Mirror aborted: keeping all previously mirrored files");
       }
     } else if (opt->delete_old || opt->changes) {
-      FILE *old_lst, *new_lst;
+      char *old_lst, *new_lst;
+      LLint old_sz = 0;
 
       /* A page that gave up before parsing keeps its own links out of
          new.lst, so their absence says nothing about the site. */
@@ -2178,108 +2224,83 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
       //
       opt->state._hts_in_html_parsing = 3;
       //
-      old_lst = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                              StringBuff(opt->path_log), "hts-cache/old.lst"),
-                      "rb");
-      if (old_lst) {
-        const size_t sz = llint_to_size_t(fsize_utf8(
-            fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                    StringBuff(opt->path_log), "hts-cache/new.lst")));
-
+      old_lst = readfile2_utf8(
+          fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                  StringBuff(opt->path_log), "hts-cache/old.lst"),
+          &old_sz);
+      if (old_lst != NULL) {
         if (opt->delete_old && !purge_files) {
           hts_log_print(opt, LOG_WARNING,
                         "A page could not be fetched and the links it carries "
                         "were never scanned: keeping all previously mirrored "
                         "files");
         }
-        new_lst = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                StringBuff(opt->path_log), "hts-cache/new.lst"),
-                        "rb");
-        if (new_lst != NULL && sz != (size_t) -1) {
-          /* +1 for the NUL below: new.lst is read raw, and the strstr()
-             that follows needs a terminated C string. */
-          char *adr = (char *) malloct(sz + 1);
+        /* new.lst is NUL-terminated for the strstr() lookups below. */
+        new_lst = readfile2_utf8(
+            fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                    StringBuff(opt->path_log), "hts-cache/new.lst"),
+            NULL);
+        if (new_lst != NULL) {
+          const size_t root = StringLength(opt->path_html);
+          const char *const old_end = old_lst + (size_t) old_sz;
+          /* This holds filenote()'s longest line, "[" + savelst + "]". */
+          char BIGSTK line[HTS_URLMAXSIZE * 2 + 2];
+          char BIGSTK file[HTS_URLMAXSIZE * 2];
+          size_t pos;
+          int purge = 0;
 
-          if (adr) {
-            if (hts_fread_exact(adr, (size_t) sz, new_lst)) {
-              adr[sz] = '\0';
-              char line[1100];
-              int purge = 0;
+          for (pos = 0; pos < (size_t) old_sz;) {
+            if (!old_lst_entry(opt, old_lst, old_end, &pos, line, sizeof(line),
+                               file, sizeof(file)))
+              continue;
+            hts_changes_previous(opt, file + root);
+            if (!strstr(new_lst, line)) { // not found in the new list?
+              if (fexist_utf8(file)) {    // still on disk
+                /* A link this crawl did try but never wrote (a transfer
+                   killed mid-flight) also drops out of new.lst. Unless it
+                   is about to be purged, its previous copy stands and the
+                   file is not gone. */
+                const hts_boolean kept =
+                    !purge_files &&
+                    hash_read(opt->hash, file, NULL, HASH_STRUCT_FILENAME) >= 0;
 
-              while(!feof(old_lst)) {
-                char BIGSTK file[HTS_URLMAXSIZE * 2];
-
-                linput(old_lst, line, 1000);
-                if (!strnotempty(line))
-                  continue;
-                strcpybuff(file, StringBuff(opt->path_html));
-                strcatbuff(file, line + 1);
-                /* strip filenote()'s ']', absent when linput() truncated the
-                   line */
-                hts_striplastchar(file, ']');
-                hts_changes_previous(opt, file + StringLength(opt->path_html));
-                if (!strstr(adr, line)) { // not found in the new list?
-                  if (fexist_utf8(file)) { // still on disk
-                    /* A link this crawl did try but never wrote (a transfer
-                       killed mid-flight) also drops out of new.lst. Unless it
-                       is about to be purged, its previous copy stands and the
-                       file is not gone. */
-                    const hts_boolean kept =
-                        !purge_files && hash_read(opt->hash, file, NULL,
-                                                  HASH_STRUCT_FILENAME) >= 0;
-
-                    hts_changes_dropped(
-                        opt, file + StringLength(opt->path_html), kept);
-                    if (purge_files) {
-                      hts_log_print(opt, LOG_INFO, "Purging %s", file);
-                      UNLINK(file);
-                      purge = 1;
-                    }
-                  }
+                hts_changes_dropped(opt, file + root, kept);
+                if (purge_files) {
+                  hts_log_print(opt, LOG_INFO, "Purging %s", file);
+                  UNLINK(file);
+                  purge = 1;
                 }
-              }
-              if (purge_files) { // emptied directories go with the files
-                fseek(old_lst, 0, SEEK_SET);
-                while(!feof(old_lst)) {
-                  linput(old_lst, line, 1000);
-                  while (strnotempty(line) && (hts_lastchar(line) != '/') &&
-                         (hts_lastchar(line) != '\\')) {
-                    hts_choplastchar(line);
-                  }
-                  hts_choplastchar(line);
-                  if (strnotempty(line))
-                    if (!strstr(adr, line)) {   // non trouvé?
-                      char BIGSTK file[HTS_URLMAXSIZE * 2];
-
-                      strcpybuff(file, StringBuff(opt->path_html));
-                      strcatbuff(file, line + 1);
-                      while ((strnotempty(file)) &&
-                             (RMDIR(file) == 0)) { // ok, éliminé (existait)
-                        purge = 1;
-                        if (opt->log) {
-                          hts_log_print(opt, LOG_INFO, "Purging directory %s/",
-                                        file);
-                          while (strnotempty(file) &&
-                                 (hts_lastchar(file) != '/') &&
-                                 (hts_lastchar(file) != '\\')) {
-                            hts_choplastchar(file);
-                          }
-                          hts_choplastchar(file);
-                        }
-                      }
-                    }
-                }
-              }
-              //
-              if (purge_files && !purge) {
-                hts_log_print(opt, LOG_INFO, "No files purged");
               }
             }
-            freet(adr);
           }
-          fclose(new_lst);
+          if (purge_files) { // emptied directories go with the files
+            for (pos = 0; pos < (size_t) old_sz;) {
+              size_t dir;
+
+              if (!old_lst_entry(opt, old_lst, old_end, &pos, line,
+                                 sizeof(line), file, sizeof(file)))
+                continue;
+              dir = strlen(file);
+              if (!chop_to_parent(file, root, &dir))
+                continue;
+              line[dir - root + 1] = '\0';
+              if (strstr(new_lst, line)) // still in new.lst
+                continue;
+              while (RMDIR(file) == 0) { // it existed and was empty
+                purge = 1;
+                hts_log_print(opt, LOG_INFO, "Purging directory %s/", file);
+                if (!chop_to_parent(file, root, &dir))
+                  break;
+              }
+            }
+          }
+          //
+          if (purge_files && !purge) {
+            hts_log_print(opt, LOG_INFO, "No files purged");
+          }
+          freet(new_lst);
         }
-        fclose(old_lst);
+        freet(old_lst);
       }
       //
       opt->state._hts_in_html_parsing = 0;

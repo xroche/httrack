@@ -1,29 +1,45 @@
 #!/bin/sh
 #
-# Regenerate man/httrack.1 from "httrack --help" and the top-level README.
+# Regenerate a man page from the program's --help and its template.
 #
 # Usage:
-#   man/makeman.sh [HTTRACK_BINARY] > man/httrack.1
+#   man/makeman.sh [-p PAGE] [BINARY] > man/PAGE.1
 #
-# HTTRACK_BINARY defaults to "httrack" (looked up in $PATH). Set SOURCE_DATE_EPOCH
-# for a reproducible page date.
+# PAGE is httrack (the default), htsserver, proxytrack or webhttrack, and
+# man/PAGE.tmpl holds its fixed prose. BINARY defaults to PAGE in $PATH. Set
+# SOURCE_DATE_EPOCH for a reproducible page date.
 #
-# The OPTIONS section is derived from --help by indentation, which is what makes
-# it robust (no more prose turning into bogus options, see Debian #1061053):
+# A template line holding only @SYNOPSIS@, @OPTIONS@, @EXAMPLES@, @LIMITS@ or
+# @FOOTER@ becomes that block (the footer is man/footer.tmpl); @DATE@ and @YEAR@
+# are replaced inline.
+#
+# httrack's OPTIONS section is derived from --help by indentation, which is what
+# makes it robust (no more prose turning into bogus options, see Debian #1061053):
 #   column 0 starting with "--"  -> long option    (.IP)
 #   column 0 otherwise           -> section header  (.SS)
 #   1-2 leading spaces           -> option          (.IP)
 #   3+ leading spaces            -> continuation / sub-value (description text)
 #
-# This replaces the previous out-of-tree script that grepped the first token of
-# every indented line and mislabelled continuations as options.
+# The other programs print one option per line, two spaces in, then the option
+# and its description separated by two or more spaces. Their other column-0
+# lines are prose for the terminal and are skipped.
 
 set -eu
 
-httrack=${1:-httrack}
+page=httrack
+if [ "${1:-}" = -p ]; then
+    page=$2
+    shift 2
+fi
+bin=${1:-$page}
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 topdir=${TOPDIR:-$(CDPATH='' cd -- "$script_dir/.." && pwd)}
 readme=${README:-$topdir/README}
+tmpl=$script_dir/$page.tmpl
+if [ ! -r "$tmpl" ]; then
+    echo "makeman.sh: no template $tmpl" >&2
+    exit 1
+fi
 
 # Reproducible date when SOURCE_DATE_EPOCH is set, otherwise today.
 if [ -n "${SOURCE_DATE_EPOCH:-}" ]; then
@@ -34,213 +50,109 @@ else
 fi
 year=${date_str##* }
 
-help=$("$httrack" --quiet --help 2>/dev/null)
-
-st=$(printf '%s\n' "$help" | grep -n 'General options' | head -1 | cut -d: -f1)
-en=$(printf '%s\n' "$help" | grep -nE '^example' | head -1 | cut -d: -f1)
-en2=$(printf '%s\n' "$help" | grep -nE '^HTTrack version' | tail -1 | cut -d: -f1)
-
-# SYNOPSIS: one "[ -x, --long ]" per option carrying a long name (skip "#" guru
-# options, as the original did).
-synopsis=$(printf '%s\n' "$help" | awk '
-  $0 ~ /\(--/ && $0 !~ / #/ {
-    short = $1
-    if (match($0, /\(--[^ )]+/)) {
-      lng = substr($0, RSTART + 3, RLENGTH - 3)
-      gsub(/-/, "\\-", short); gsub(/-/, "\\-", lng)
-      printf "[ \\fB\\-%s, \\-\\-%s\\fR ]\n", short, lng
-    }
-  }')
-
-# OPTIONS: indentation-driven classifier (see header comment).
-options=$(printf '%s\n' "$help" | sed -n "${st},$((en - 2))p" | awk '
-  function esc(s) {
-    gsub(/\\/, "\\\\", s)
-    gsub(/-/, "\\-", s)
-    return s
-  }
-  function emit(s) {                       # body text: escape + guard ./%apostrophe leaders
-    s = esc(s)
-    if (substr(s, 1, 1) == "." || substr(s, 1, 1) == "\x27") s = "\\&" s
-    print s
-  }
-  /^[ \t]*$/ { next }
-  {
-    match($0, /^ */); ind = RLENGTH
-    if (ind == 0 && substr($0, 1, 2) == "--") {        # long option
-      opt = $1
-      rest = $0; sub(/^[^ \t]+[ \t]+/, "", rest)
-      printf ".IP %s\n", esc(opt)
-      emit(rest)
-    } else if (ind == 0) {                             # section header
-      printf ".SS %s\n", esc($0)
-    } else if (ind <= 2) {                             # option
-      opt = $1
-      gsub(/^\x27|\x27$/, "", opt)                     # drop quotes around tokens like %t
-      rest = $0; sub(/^[ \t]+[^ \t]+[ \t]*/, "", rest)
-      printf ".IP \\-%s\n", esc(opt)
-      if (rest != "") emit(rest)
-    } else {                                           # continuation / sub-value
-      line = $0; sub(/^[ \t]+/, "", line)
-      print ".br"
-      emit(line)
-    }
-  }')
-
-# EXAMPLES: "example: <cmd>" / "means: <text>" pairs after the options block.
-examples=$(printf '%s\n' "$help" | sed -n "${en},$((en2 - 1))p" | awk '
+# Shared by the awk programs below: roff-escape backslashes and hyphens, and
+# guard body text whose leading "." or "'" roff would read as a request.
+ROFF_AWK='
   function esc(s) { gsub(/\\/, "\\\\", s); gsub(/-/, "\\-", s); return s }
-  /^example:/ { sub(/^example:[ \t]*/, ""); printf ".TP\n.B %s\n", esc($0); next }
+  function emit(s) { s = esc(s); if (substr(s, 1, 1) == "." || substr(s, 1, 1) == "\x27") s = "\\&" s; print s }'
+
+# httrack: options classified by indentation, plus LIMITS from the README.
+if [ "$page" = httrack ]; then
+    help=$("$bin" --quiet --help 2>/dev/null)
+
+    st=$(printf '%s\n' "$help" | grep -n 'General options' | head -1 | cut -d: -f1)
+    en=$(printf '%s\n' "$help" | grep -nE '^example' | head -1 | cut -d: -f1)
+    en2=$(printf '%s\n' "$help" | grep -nE '^HTTrack version' | tail -1 | cut -d: -f1)
+
+    # SYNOPSIS: one "[ -x, --long ]" per option carrying a long name (skip "#" guru
+    # options, as the original did).
+    synopsis=$(printf '%s\n' "$help" | awk '
+      $0 ~ /\(--/ && $0 !~ / #/ {
+        short = $1
+        if (match($0, /\(--[^ )]+/)) {
+          lng = substr($0, RSTART + 3, RLENGTH - 3)
+          gsub(/-/, "\\-", short); gsub(/-/, "\\-", lng)
+          printf "[ \\fB\\-%s, \\-\\-%s\\fR ]\n", short, lng
+        }
+      }')
+
+    # OPTIONS: indentation-driven classifier (see header comment).
+    options=$(printf '%s\n' "$help" | sed -n "${st},$((en - 2))p" | awk "$ROFF_AWK"'
+      /^[ \t]*$/ { next }
+      {
+        match($0, /^ */); ind = RLENGTH
+        if (ind == 0 && substr($0, 1, 2) == "--") {        # long option
+          opt = $1
+          rest = $0; sub(/^[^ \t]+[ \t]+/, "", rest)
+          printf ".IP %s\n", esc(opt)
+          emit(rest)
+        } else if (ind == 0) {                             # section header
+          printf ".SS %s\n", esc($0)
+        } else if (ind <= 2) {                             # option
+          opt = $1
+          gsub(/^\x27|\x27$/, "", opt)                     # drop quotes around tokens like %t
+          rest = $0; sub(/^[ \t]+[^ \t]+[ \t]*/, "", rest)
+          printf ".IP \\-%s\n", esc(opt)
+          if (rest != "") emit(rest)
+        } else {                                           # continuation / sub-value
+          line = $0; sub(/^[ \t]+/, "", line)
+          print ".br"
+          emit(line)
+        }
+      }')
+
+    # LIMITS: the "Engine limits" block from the README.
+    limits=$(awk "$ROFF_AWK"'
+      /^Engine limits/ { grab = 1; next }
+      /^Advanced options/ { grab = 0 }
+      grab {
+        if ($0 ~ /^-/) { print ".SM"; print esc($0) }
+        else if ($0 !~ /^[ \t]*$/) print esc($0)
+      }' "$readme")
+    example_lines=$(printf '%s\n' "$help" | sed -n "${en},$((en2 - 1))p")
+else
+    # The other programs: one "  option  description" row per line.
+    case $page in
+    # A script, run through bash because the tree may be mounted noexec.
+    webhttrack) help=$(bash "$bin" --help) ;;
+    *) help=$("$bin" --help) ;;
+    esac
+    # The programs print argv[0], which may be a build-tree path.
+    help=$(printf '%s\n' "$help" | sed -E "s#^(usage|example): [^ ]*#\\1: $page#")
+
+    synopsis=$(printf '%s\n' "$help" | awk "$ROFF_AWK"'
+      /^usage: / { sub(/^usage: /, ""); if (n++) print ".br"; printf ".B %s\n", esc($0) }')
+
+    options=$(printf '%s\n' "$help" | awk "$ROFF_AWK"'
+      /^  [^ ]/ {
+        line = substr($0, 3); desc = ""
+        if (match(line, /   */)) { desc = substr(line, RSTART + RLENGTH); line = substr(line, 1, RSTART - 1) }
+        printf ".TP\n.B %s\n", esc(line)
+        if (desc != "") emit(desc)
+      }')
+    example_lines=$help
+    limits=
+fi
+
+# EXAMPLES: "example: <cmd>" / "means: <text>" pairs.
+examples=$(printf '%s\n' "$example_lines" | awk "$ROFF_AWK"'
+  /^example:/ { sub(/^example:[ \t]*/, ""); s = esc($0); gsub(/"/, "\\(dq", s); printf ".TP\n.B %s\n", s; next }
   /^means:/   { sub(/^means:[ \t]*/, "");   if ($0 != "") print esc($0); next }
 ')
 
-# LIMITS: the "Engine limits" block from the README.
-limits=$(awk '
-  function esc(s) { gsub(/\\/, "\\\\", s); gsub(/-/, "\\-", s); return s }
-  /^Engine limits/ { grab = 1; next }
-  /^Advanced options/ { grab = 0 }
-  grab {
-    if ($0 ~ /^-/) { print ".SM"; print esc($0) }
-    else if ($0 !~ /^[ \t]*$/) print esc($0)
-  }' "$readme")
+# Expand the placeholders of template $1 from the MM_* environment.
+render() {
+    awk '
+      $0 == "@SYNOPSIS@" { print ENVIRON["MM_SYNOPSIS"]; next }
+      $0 == "@OPTIONS@"  { print ENVIRON["MM_OPTIONS"]; next }
+      $0 == "@EXAMPLES@" { print ENVIRON["MM_EXAMPLES"]; next }
+      $0 == "@LIMITS@"   { print ENVIRON["MM_LIMITS"]; next }
+      $0 == "@FOOTER@"   { print ENVIRON["MM_FOOTER"]; next }
+      { gsub(/@DATE@/, ENVIRON["MM_DATE"]); gsub(/@YEAR@/, ENVIRON["MM_YEAR"]); print }' "$1"
+}
 
-# --- assemble the page: static prose in quoted heredocs, dynamic parts printf'd ---
-cat <<'EOF'
-.\" Process this file with
-.\" groff -man -Tascii httrack.1
-.\"
-.\" This file is generated by man/makeman.sh; do not edit by hand.
-.\" SPDX-License-Identifier: GPL-3.0-or-later
-EOF
-printf '.TH httrack 1 "%s" "httrack website copier"\n' "$date_str"
-cat <<'EOF'
-.SH NAME
-httrack \- offline browser : copy websites to a local directory
-.SH SYNOPSIS
-.B httrack [ url ]... [ \-filter ]... [ +filter ]...
-EOF
-printf '%s\n' "$synopsis"
-cat <<'EOF'
-.SH DESCRIPTION
-.B httrack
-allows you to download a World Wide Web site from the Internet to a local directory, building recursively all directories, getting HTML, images, and other files from the server to your computer. HTTrack arranges the original site's relative link-structure. Simply open a page of the "mirrored" website in your browser, and you can browse the site from link to link, as if you were viewing it online. HTTrack can also update an existing mirrored site, and resume interrupted downloads.
-.SH EXAMPLES
-EOF
-printf '%s\n' "$examples"
-cat <<'EOF'
-.SH OPTIONS
-EOF
-printf '%s\n' "$options"
-cat <<'EOF'
-.SH EXIT STATUS
-.IP 0
-The mirror ran to the end, or stopped because it was asked to: a signal, the
-interactive shell, or a transfer budget set with
-.I \-\-max\-time
-or
-.IR \-\-max\-size .
-Meeting a budget is the outcome that was asked for, not a failure, so it is not
-an abort even though the log file calls it one.
-.IP 3
-A mirror started and the engine gave up before the end: a full disk, a cache
-write failure, or a link table that hit the
-.I \-#L
-cap. Unlike a time or size budget, that cap cuts short work that was asked for
-rather than granting it, which is why the two kinds of user-set limit report
-differently. The reason is in the log file, and what was mirrored before the
-abort is kept. This is the process exit status; the engine's own
-.I exit_xh
-is a separate channel with its own values, and the two are kept apart so that
-neither can be read as the other.
-.IP "1, 255"
-.B httrack
-refused the command line, or a cache operation it asked for failed. No mirror ran.
-.SH FILES
-.I /etc/httrack.conf
-.RS
-The system wide configuration file.
-.RE
-.PP
-A running mirror also watches its own output directory for these. Creating one
-is how a script drives an engine it has no other handle on. On Windows, which
-has no cross\-process
-.BR kill (1),
-it is the only way.
-.TP
-.I hts\-in_progress.lock
-Written when the mirror starts and deleted when it ends. It records the command
-line, and names the two request files below.
-.TP
-.I hts\-stop.lock
-Create it to pause the mirror. The engine deletes it, lets the transfers already
-in flight finish, writes
-.I hts\-paused.lock
-and waits. Delete that one to carry on.
-.TP
-.I hts\-abort.lock
-Create it to stop the mirror and keep what it has downloaded, so that a later
-.I \-\-continue
-resumes from there rather than starting over. The engine deletes it and stops.
-.PP
-The engine acts on either request only when the file is stamped later than
-.IR hts\-in_progress.lock ,
-which the mirror dates one second back when it starts. A request created after
-the mirror started is therefore heard at once, on every filesystem. One left
-behind by an earlier run is ignored.
-A request the engine cannot delete is ignored too, because it would otherwise
-fire on every later poll.
-.SH ENVIRONMENT
-.IP HOME
-Is being used if you defined in /etc/httrack.conf the line
-.I path ~/websites/#
-.SH DIAGNOSTICS
-Errors/Warnings are reported to
-.I hts\-log.txt
-by default, or to stderr if the
-.I \-v
-option was specified.
-.SH LIMITS
-EOF
-printf '%s\n' "$limits"
-cat <<'EOF'
-.SH BUGS
-Please reports bugs to
-.B <bugs@httrack.com>.
-Include a complete, self-contained example that will allow the bug to be reproduced, and say which version of httrack you are using. Do not forget to detail options used, OS version, and any other information you deem necessary.
-.SH COPYRIGHT
-EOF
-printf 'Copyright (C) 1998-%s Xavier Roche and other contributors\n' "$year"
-cat <<'EOF'
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-.SH AVAILABILITY
-The  most  recent released version of httrack can be found at:
-.B https://www.httrack.com
-.SH AUTHOR
-Xavier Roche <roche@httrack.com>
-.SH "SEE ALSO"
-The
-.B HTML
-documentation (available online at
-.B https://www.httrack.com/html/
-) contains more detailed information. Please also refer to the
-.B httrack FAQ
-(available online at
-.B https://www.httrack.com/html/faq.html
-)
-.PP
-The graphical interface is
-.BR webhttrack (1).
-EOF
+export MM_DATE="$date_str" MM_YEAR="$year"
+MM_FOOTER=$(render "$script_dir/footer.tmpl")
+export MM_FOOTER MM_SYNOPSIS="$synopsis" MM_OPTIONS="$options" \
+    MM_EXAMPLES="$examples" MM_LIMITS="$limits"
+render "$tmpl"

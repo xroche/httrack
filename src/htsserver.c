@@ -1059,6 +1059,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
   /* Project directory this server set up; the only root /website/ serves from,
      and deliberately not cleared between requests. */
   String website = STRING_EMPTY;
+  hts_boolean path_from_cmdline;
   char catbuff[CATBUFF_SIZE];
 
   /* Not at bind time: the launcher prints the URL the moment smallserver_init
@@ -1067,6 +1068,13 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
   /* Load strings */
   htslang_init();
+  /* A non-empty command-line path outranks the default and httrack.ini's. */
+  {
+    intptr_t adr = 0;
+
+    path_from_cmdline = coucal_readptr(NewLangList, "path", &adr) &&
+                        strnotempty((const char *) adr);
+  }
   if (!htslang_load(NULL, 0, path)) {
     fprintf(stderr, "unable to find lang.def and/or lang/ strings in %s\n",
             path);
@@ -1122,9 +1130,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
       coucal_write(NewLangList, initStr[i].name,
                     (intptr_t) strdup(initStr[i].value));
     }
-    strcpybuff(pth, gethomedir());
-    strcatbuff(pth, "/websites");
-    coucal_write(NewLangList, "path", (intptr_t) strdup(pth));
+    if (!path_from_cmdline) {
+      strcpybuff(pth, gethomedir());
+      strcatbuff(pth, "/websites");
+      coucal_write(NewLangList, "path", (intptr_t) strdup(pth));
+    }
   }
 
   /* Lock */
@@ -1429,6 +1439,10 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                 char listid[16];
 
                 *pos++ = '\0';
+                /* Keep the command-line path over the saved one. */
+                if (doLoad == 2 && path_from_cmdline &&
+                    strcmp(line, "path") == 0)
+                  continue;
                 /* Only a checkbox: elsewhere zero is the user's value, and
                    emptying it silently restores the wizard default (#1177). */
                 if (pos[0] == '0' && pos[1] == '\0' &&
