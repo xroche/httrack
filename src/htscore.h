@@ -519,6 +519,18 @@ char *fil_normalized_filtered_ex(const char *source, char *dest,
 const char *hts_query_strip_keys(const char *rules, const char *adr,
                                  const char *fil, char *dest, size_t destsize);
 
+/* Is the key ARG[0..KEYLEN) in the comma list STRIP? Tokens are space-trimmed
+   and case-sensitive, and "*" matches any key. */
+hts_boolean hts_query_key_stripped(const char *arg, size_t keylen,
+                                   const char *strip);
+
+/* Return the canonical host (length *CANONLEN) of the last RULES entry whose
+   aliases match HOST or FULL ("scheme://host"), or NULL. COLLAPSE_WWW ignores
+   a "www." prefix on both sides. */
+const char *hts_host_alias_match(const char *rules, const char *host,
+                                 const char *full, hts_boolean collapse_www,
+                                 size_t *canonlen);
+
 /* The --host-alias rules of OPT, or NULL when the option was not given. */
 const char *hts_host_alias_rules(httrackp *opt);
 

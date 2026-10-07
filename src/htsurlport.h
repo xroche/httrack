@@ -26,8 +26,8 @@ Please visit our Website: http://www.httrack.com
 */
 
 /* ------------------------------------------------------------ */
-/* File: bounded decimal and TCP port parsers, shared by the    */
-/*       engine, htsserver and proxytrack                        */
+/* File: bounded decimal, TCP port and separated-field parsers, */
+/*       shared by the engine, htsserver and proxytrack          */
 /* Author: Xavier Roche                                          */
 /* ------------------------------------------------------------ */
 
@@ -60,5 +60,31 @@ hts_scan_result hts_scan_llint(const char **s, LLint min, LLint max,
    alone. Not sscanf("%d"), which range-checks nothing and wraps past INT_MAX.
    Its own file so proxytrack, which does not link the library, can share it. */
 hts_boolean hts_parse_url_port(const char *a, int *port);
+
+/* P points at LEN read-only bytes, which may hold NULs and lack an end NUL. */
+typedef struct {
+  const char *p;
+  size_t len;
+} hts_span;
+
+/* Return the span over the C string S, or an empty span when S is NULL. */
+hts_span hts_span_of(const char *s);
+
+/* Read the next field of [*cur, end) up to SEP into *out, and move *cur past
+   SEP. Return FALSE once *cur reaches END, so "a," yields only "a". */
+hts_boolean hts_span_next(const char **cur, const char *end, char sep,
+                          hts_span *out);
+
+/* Return S without the leading bytes found in LEFT and the trailing ones found
+   in RIGHT. A set may be empty, and it never matches a NUL. */
+hts_span hts_span_trim(hts_span s, const char *left, const char *right);
+
+/* Split S at its first C into *HEAD and *TAIL, C in neither. Return HTS_FALSE
+   and leave both unchanged when S holds no C. */
+hts_boolean hts_span_split(hts_span s, char c, hts_span *head, hts_span *tail);
+
+/* Copy S into DST as a terminated string, clipped to SIZE - 1 bytes. Return
+   FALSE if it was clipped, or if SIZE is 0, which writes nothing. */
+hts_boolean hts_span_copy(hts_span s, char *dst, size_t size);
 
 #endif

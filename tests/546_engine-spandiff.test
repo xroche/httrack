@@ -1,0 +1,48 @@
+#!/bin/bash
+#
+# The span iterator, and the rule-list parsers moved onto it against frozen
+# copies of the old ones (-#test=spandiff in htslib_selftest.c).
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# The count is exact, so a shrinking corpus shows.
+selftest_queue_lines "spandiff: 300862 cases, 0 failures
+spandiff: OK" spandiff
+
+# A trailing separator ends the walk, an inner empty field does not.
+selftest_queue "[a][][b]" span next , "a,,b,"
+selftest_queue "" span next , ""
+selftest_queue "[]" span next , ","
+selftest_queue "[][]" span next , ",,"
+selftest_queue "[a b]" span next , "a b"
+selftest_queue "[a][b]" span next $'\n' $'a\nb\n'
+selftest_queue "[a=b][c]" span next "|" "a=b|c"
+
+selftest_queue "[a|b=c]" span split = "a=b=c"
+selftest_queue "[|]" span split = "="
+selftest_queue "[|x]" span split = "=x"
+selftest_queue "none" span split = "abc"
+selftest_queue "none" span split = ""
+
+# Each side has its own set, and a run of mixed members goes whole.
+selftest_queue "[a]" span trim " " " /" "  a/ /"
+selftest_queue "[/a]" span trim " " " /" " /a/"
+selftest_queue "[a /]" span trim " " "" " a /"
+selftest_queue "[ a]" span trim "" " " " a "
+selftest_queue "[]" span trim " " " " "   "
+selftest_queue "[x]" span trim $' \t' $' \t' $'\t x \t'
+selftest_queue "[a]" span trim "b" "c" "bbacc"
+
+# "0" is the terminator, "#" the untouched byte after it.
+selftest_queue "clipped [#]" span copy 0 "abc"
+selftest_queue "clipped [0#]" span copy 1 "abc"
+selftest_queue "clipped [ab0#]" span copy 3 "abcdef"
+selftest_queue "clipped [ab0#]" span copy 3 "abc"
+selftest_queue "fit [abc0#]" span copy 4 "abc"
+selftest_queue "fit [abc0##]" span copy 5 "abc"
+selftest_queue "fit [0#]" span copy 1 ""
+
+selftest_run_queued

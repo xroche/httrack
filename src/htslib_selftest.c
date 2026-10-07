@@ -2649,7 +2649,7 @@ static void querydiff_fail(querydiff_stats *st, const char *site,
                            const char *new) {
   st->failures++;
   if (st->failures <= 20) {
-    printf("querydiff: %s differs on '%.80s' (%zu bytes) arg '%.40s': old "
+    printf("%s differs on '%.80s' (%zu bytes) arg '%.40s': old "
            "'%.80s' new '%.80s'\n",
            site, in, strlen(in), arg, old, new);
     fflush(stdout); /* a later abort must not swallow it */
@@ -2884,6 +2884,510 @@ static int st_querynext(httrackp *opt, int argc, char **argv) {
   return bad;
 }
 
+/* spandiff compares the frozen old rule parsers with the span-based ones. */
+
+static const char *legacy_hts_query_strip_keys(const char *rules,
+                                               const char *adr, const char *fil,
+                                               char *dest, size_t destsize) {
+  const char *p, *q;
+  const char *result = NULL;
+  char BIGSTK url[HTS_URLMAXSIZE * 4];
+
+  if (rules == NULL || *rules == '\0' || destsize == 0)
+    return NULL;
+  (void) strclipbuff(url, sizeof(url), jump_normalized_const(adr));
+  if (fil[0] != '/')
+    (void) strclipbuff(&url[strlen(url)], sizeof(url) - strlen(url), "/");
+  q = strchr(fil, '?');
+  {
+    const size_t room = sizeof(url) - strlen(url) - 1;
+    const size_t fillen = q != NULL ? (size_t) (q - fil) : strlen(fil);
+
+    strlncatbuff(url, fil, sizeof(url), fillen < room ? fillen : room);
+  }
+  for (p = rules; *p != '\0';) {
+    const char *const line = p;
+    const char *eol, *eq, *keys;
+    char BIGSTK pat[HTS_URLMAXSIZE * 2];
+
+    while (*p != '\0' && *p != '\n')
+      p++;
+    eol = p;
+    if (*p == '\n')
+      p++;
+    if (eol == line)
+      continue;
+    eq = memchr(line, '=', (size_t) (eol - line));
+    if (eq != NULL) {
+      size_t patlen = (size_t) (eq - line);
+
+      if (patlen >= sizeof(pat))
+        patlen = sizeof(pat) - 1;
+      memcpy(pat, line, patlen);
+      pat[patlen] = '\0';
+      keys = eq + 1;
+    } else {
+      pat[0] = '*';
+      pat[1] = '\0';
+      keys = line;
+    }
+    if (strjoker(url, pat, NULL, NULL) != NULL) {
+      size_t klen = (size_t) (eol - keys);
+
+      if (klen >= destsize)
+        klen = destsize - 1;
+      memcpy(dest, keys, klen);
+      dest[klen] = '\0';
+      result = dest;
+    }
+  }
+  return result;
+}
+
+static const char *legacy_hts_host_alias_match(const char *rules,
+                                               const char *host,
+                                               const char *full,
+                                               hts_boolean collapse_www,
+                                               size_t *canonlen) {
+  const char *p;
+  const char *canon = NULL;
+
+  for (p = rules; *p != '\0';) {
+    const char *const line = p;
+    const char *eol, *eq, *pat;
+
+    while (*p != '\0' && *p != '\n')
+      p++;
+    eol = p;
+    if (*p == '\n')
+      p++;
+    eq = memchr(line, '=', (size_t) (eol - line));
+    if (eq == NULL || eq == line || eq + 1 == eol)
+      continue;
+    for (pat = line; pat < eq;) {
+      const char *const sep = memchr(pat, ',', (size_t) (eq - pat));
+      const char *const end = sep != NULL ? sep : eq;
+      const char *start = pat;
+      size_t len = (size_t) (end - pat);
+      char BIGSTK glob[HTS_URLMAXSIZE * 2];
+
+      while (len > 0 && (*start == ' ' || *start == '\t')) {
+        start++;
+        len--;
+      }
+      while (len > 0 && (start[len - 1] == ' ' || start[len - 1] == '\t' ||
+                         start[len - 1] == '/'))
+        len--;
+      if (len != 0 && len < sizeof(glob)) {
+        char *ghost;
+
+        memcpy(glob, start, len);
+        glob[len] = '\0';
+        ghost = glob + (jump_protocol_const(glob) - glob);
+        if (collapse_www) {
+          const char *const bare = jump_normalized_const(ghost);
+
+          if (bare != ghost)
+            memmove(ghost, bare, strlen(bare) + 1);
+        }
+        if (strjoker(strstr(glob, "://") != NULL ? full : host,
+                     strstr(glob, "://") != NULL ? glob : ghost, NULL,
+                     NULL) != NULL) {
+          const char *end = eol;
+
+          canon = eq + 1;
+          while (canon < end && (*canon == ' ' || *canon == '\t'))
+            canon++;
+          while (end > canon &&
+                 (end[-1] == ' ' || end[-1] == '\t' || end[-1] == '/'))
+            end--;
+          *canonlen = (size_t) (end - canon);
+          break;
+        }
+      }
+      pat = end + 1;
+    }
+  }
+  return canon;
+}
+
+static hts_boolean legacy_hts_host_alias_token_ok(const char *token, size_t len,
+                                                  hts_boolean glob) {
+  char BIGSTK buff[HTS_URLMAXSIZE * 2];
+  const char *host;
+
+  while (len > 0 && (*token == ' ' || *token == '\t')) {
+    token++;
+    len--;
+  }
+  while (len > 0 && (token[len - 1] == ' ' || token[len - 1] == '\t'))
+    len--;
+  if (len == 0 || len >= sizeof(buff))
+    return HTS_FALSE;
+  memcpy(buff, token, len);
+  buff[len] = '\0';
+  while (len > 0 && buff[len - 1] == '/')
+    buff[--len] = '\0';
+  host = glob && strstr(buff, "://") != NULL ? strstr(buff, "://") + 3
+                                             : jump_protocol_const(buff);
+  if (*host == '\0' || strcmp(host, "primary") == 0)
+    return HTS_FALSE;
+  if (strchr(host, '/') != NULL)
+    return HTS_FALSE;
+  for (; *host != '\0'; host++) {
+    if ((unsigned char) *host < ' ' || *host == '\x7f')
+      return HTS_FALSE;
+    if (strchr(glob ? "=# " : "=,*?();\\#@ ", *host) != NULL)
+      return HTS_FALSE;
+  }
+  return HTS_TRUE;
+}
+
+static hts_boolean legacy_hts_host_alias_rule_ok(const char *rule) {
+  const char *const eq = rule != NULL ? strchr(rule, '=') : NULL;
+  const char *pat;
+
+  if (eq == NULL || eq == rule || eq[1] == '\0')
+    return HTS_FALSE;
+  if (!legacy_hts_host_alias_token_ok(eq + 1, strlen(eq + 1), HTS_FALSE))
+    return HTS_FALSE;
+  for (pat = rule; pat < eq;) {
+    const char *const sep = memchr(pat, ',', (size_t) (eq - pat));
+    const char *const end = sep != NULL ? sep : eq;
+
+    if (!legacy_hts_host_alias_token_ok(pat, (size_t) (end - pat), HTS_TRUE))
+      return HTS_FALSE;
+    pat = end + 1;
+  }
+  return HTS_TRUE;
+}
+
+static void spandiff_one(querydiff_stats *st, const char *rules,
+                         const char *longhost, const char *longfil) {
+  static const char *const keys[] = {"",      "a",         "sid",    "*",
+                                     "a.com", " ",         "x",      "utm",
+                                     "b",     "www.a.com", "a.com/", NULL};
+  /* NULL in an {adr, fil} pair means longhost or longfil. */
+  static const char *const adrs[] = {
+      "a.com", "/p?sid=1&a=2", "www.a.com", "x",     "http://b", "/x/y?z", "",
+      "",      NULL,           "/p?utm=1",  "a.com", NULL};
+  /* NULL in a {host, full} pair means longhost. */
+  static const char *const hosts[] = {
+      "a.com", "http://a.com", "www.a.com", "https://www.a.com",
+      "b",     "ftp://b",      "",          "http://",
+      "x.com", "http://x.com", NULL,        NULL};
+  static const size_t sizes[] = {1, 2, 8, 4096};
+  size_t i, j;
+  int www;
+  const hts_span all = hts_span_of(rules);
+  const char *cur;
+  hts_span line;
+
+  for (i = 0; keys[i] != NULL; i++) {
+    st->cases++;
+    if (hts_query_key_stripped(keys[i], strlen(keys[i]), rules) !=
+        (legacy_hts_query_key_stripped(keys[i], strlen(keys[i]), rules) != 0))
+      querydiff_fail(st, "hts_query_key_stripped", rules, keys[i], "", "");
+  }
+  for (i = 0; i < sizeof(adrs) / sizeof(adrs[0]); i += 2) {
+    const char *const adr = adrs[i] != NULL ? adrs[i] : longhost;
+    const char *const fil = adrs[i + 1] != NULL ? adrs[i + 1] : longfil;
+
+    for (j = 0; j < sizeof(sizes) / sizeof(sizes[0]); j++) {
+      char o[4096], n[4096];
+      const char *ro, *rn;
+
+      memset(o, 'O', sizeof(o));
+      memset(n, 'O', sizeof(n));
+      st->cases++;
+      ro = legacy_hts_query_strip_keys(rules, adr, fil, o, sizes[j]);
+      rn = hts_query_strip_keys(rules, adr, fil, n, sizes[j]);
+      if ((ro == NULL) != (rn == NULL) ||
+          (ro != NULL && (rn != n || strcmp(o, n) != 0)))
+        querydiff_fail(st, "hts_query_strip_keys", rules, adr,
+                       ro != NULL ? o : "(none)", rn != NULL ? n : "(none)");
+    }
+  }
+  for (i = 0; i < sizeof(hosts) / sizeof(hosts[0]); i += 2) {
+    const char *const host = hosts[i] != NULL ? hosts[i] : longhost;
+    const char *const full = hosts[i + 1] != NULL ? hosts[i + 1] : longhost;
+
+    for (www = 0; www < 2; www++) {
+      size_t lo = 0, ln = 0;
+      const char *const co =
+          legacy_hts_host_alias_match(rules, host, full, www, &lo);
+      const char *const cn = hts_host_alias_match(rules, host, full, www, &ln);
+
+      st->cases++;
+      if (co != cn || (co != NULL && lo != ln))
+        querydiff_fail(st, "hts_host_alias_match", rules, host, "", "");
+    }
+  }
+  st->cases++;
+  if (hts_host_alias_rule_ok(rules) != legacy_hts_host_alias_rule_ok(rules))
+    querydiff_fail(st, "hts_host_alias_rule_ok", rules, "", "", "");
+  /* each line alone, which is what --host-alias hands the validator */
+  for (cur = all.p; hts_span_next(&cur, all.p + all.len, '\n', &line);) {
+    char *one = malloct(line.len + 1);
+
+    assertf(one != NULL);
+    (void) hts_span_copy(line, one, line.len + 1);
+    st->cases++;
+    if (hts_host_alias_rule_ok(one) != legacy_hts_host_alias_rule_ok(one))
+      querydiff_fail(st, "hts_host_alias_rule_ok", one, "line", "", "");
+    freet(one);
+  }
+}
+
+static int st_spandiff(httrackp *opt, int argc, char **argv) {
+  static const char *const hand[] = {"",
+                                     "\n",
+                                     "\n\n",
+                                     "=",
+                                     "==",
+                                     ",",
+                                     ",=a.com",
+                                     "a.com,=b",
+                                     "a.com=",
+                                     "=a.com",
+                                     "a.com=b.com",
+                                     " a.com = b.com ",
+                                     "\ta.com\t=\tb.com/\t",
+                                     "a.com/=b.com//",
+                                     "a.com/ /=b.com/ /",
+                                     "a.com /=b.com",
+                                     "www.a.com=b",
+                                     "a.com=www.b",
+                                     "http://a.com=b",
+                                     "*://a.com=b",
+                                     "https://*=b",
+                                     "a.com,b,x.com=c",
+                                     "x,,a.com=c",
+                                     "a.com=b=c",
+                                     "a.com=b,c",
+                                     "a.com=b\na.com=c",
+                                     "a.com=b\n\na.com=",
+                                     "a.com=b\n",
+                                     "\na.com=b",
+                                     "a.com=primary",
+                                     "a.com=b/c",
+                                     "a.com=user@b",
+                                     "*=b",
+                                     "*.com=b",
+                                     "sid",
+                                     "sid,utm",
+                                     " sid , utm ",
+                                     "*",
+                                     " * ",
+                                     "a,,b",
+                                     "a,",
+                                     ",a",
+                                     " ",
+                                     "*=sid",
+                                     "a.com/*=sid\n*=utm",
+                                     "*a.com*=sid,a\nx*=",
+                                     "x/y*=z",
+                                     "=sid",
+                                     "a.com=b\r",
+                                     "a.com\r=b",
+                                     NULL};
+  /* Runs around the 2048-byte pattern and glob buffers. */
+  static const size_t lengths[] = {2045, 2046, 2047, 2048, 2049};
+  static const char *const alphabet[] = {
+      "a.com", "b",  "x",     "*",       "=",   ",",   "\n",  " ",
+      "\t",    "/",  "www.",  "http://", "sid", "utm", "a",   "?",
+      "*.com", "//", "x.com", "primary", "@",   "\r",  "://", ""};
+  querydiff_stats st = {0, 0, 0, 0};
+  uint32_t seed = 546;
+  size_t i;
+  int r;
+  char *longhost = querydiff_run('x', 2047);
+  String longfil = STRING_EMPTY;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  /* Only a clipped pattern, a.com/ followed by *x..x, matches this path,
+     because strjoker refuses a longer pattern. */
+  StringCat(longfil, "/");
+  StringMemcat(longfil, longhost, 2040);
+  /* A span may hold a NUL, and no trim set matches one. */
+  {
+    static const char nul[] = " a\0b ";
+    const hts_span s = {nul, sizeof(nul) - 1};
+    const char *cur = nul;
+    hts_span f, t;
+    char d[8];
+
+    t = hts_span_trim(s, " ab", " ab");
+    if (t.p != nul + 2 || t.len != 1)
+      querydiff_fail(&st, "hts_span_trim NUL", "' a\\0b '", "", "", "");
+    if (!hts_span_next(&cur, nul + s.len, '\0', &f) || f.len != 2 ||
+        !hts_span_next(&cur, nul + s.len, '\0', &f) || f.p != nul + 3 ||
+        f.len != 2 || hts_span_next(&cur, nul + s.len, '\0', &f))
+      querydiff_fail(&st, "hts_span_next NUL", "' a\\0b '", "", "", "");
+    if (!hts_span_copy(s, d, sizeof(d)) || memcmp(d, nul, sizeof(nul)) != 0)
+      querydiff_fail(&st, "hts_span_copy NUL", "' a\\0b '", "", "", "");
+  }
+  /* No NUL follows these bytes, so an over-read shows under ASan. */
+  {
+    static const char text[] = " a,b=c/";
+    const size_t len = sizeof(text) - 1;
+    char *buf = malloct(len);
+    const char *cur;
+    hts_span s, f, h, t;
+    char d[sizeof(text)];
+    size_t n = 0;
+
+    assertf(buf != NULL);
+    memcpy(buf, text, len);
+    s.p = buf;
+    s.len = len;
+    for (cur = buf; hts_span_next(&cur, buf + len, ',', &f);)
+      n++;
+    if (n != 2 || f.p != buf + 3 || f.len != len - 3)
+      querydiff_fail(&st, "hts_span_next unterminated", text, "", "", "");
+    if (hts_span_split(f, ';', &h, &t) || !hts_span_split(f, '=', &h, &t) ||
+        t.p != buf + 5 || t.len != 2)
+      querydiff_fail(&st, "hts_span_split unterminated", text, "", "", "");
+    t = hts_span_trim(s, " ", "/");
+    if (t.p != buf + 1 || t.len != len - 2)
+      querydiff_fail(&st, "hts_span_trim unterminated", text, "", "", "");
+    if (!hts_span_copy(s, d, sizeof(d)) || strcmp(d, text) != 0)
+      querydiff_fail(&st, "hts_span_copy unterminated", text, "", "", "");
+    freet(buf);
+  }
+  for (i = 0; hand[i] != NULL; i++)
+    spandiff_one(&st, hand[i], longhost, StringBuff(longfil));
+  for (i = 0; i < sizeof(lengths) / sizeof(lengths[0]); i++) {
+    static const char *const shapes[] = {
+        "%s=b.com",  "%s/=b.com",    "%s =b.com",    " %s=b.com", "a.com=%s",
+        "a.com=%s/", "%s*=sid",      "%s=sid",       "sid,%s",    "*=%s",
+        "%s",        "b,%s,c=a.com", "a.com/*%s=sid"};
+    char *run = querydiff_run('x', lengths[i]);
+    size_t k;
+
+    for (k = 0; k < sizeof(shapes) / sizeof(shapes[0]); k++) {
+      const char *const at = strstr(shapes[k], "%s");
+      String rules = STRING_EMPTY;
+
+      StringMemcat(rules, shapes[k], (size_t) (at - shapes[k]));
+      StringCat(rules, run);
+      StringCat(rules, at + 2);
+      spandiff_one(&st, StringBuff(rules), longhost, StringBuff(longfil));
+      if (strncmp(shapes[k], "a.com/*", 7) == 0) {
+        char o[8], n[8];
+
+        if (legacy_hts_query_strip_keys(StringBuff(rules), "a.com",
+                                        StringBuff(longfil), o,
+                                        sizeof(o)) == NULL ||
+            hts_query_strip_keys(StringBuff(rules), "a.com",
+                                 StringBuff(longfil), n, sizeof(n)) == NULL)
+          querydiff_fail(&st, "clipped pattern matches", StringBuff(rules),
+                         "a.com", "", "");
+      }
+      StringFree(rules);
+    }
+    freet(run);
+  }
+  for (r = 0; r < 6000; r++) {
+    String rules = STRING_EMPTY;
+    const int ntok = (int) ((seed = seed * 1103515245u + 12345u) >> 16) % 16;
+    int t;
+
+    for (t = 0; t < ntok; t++) {
+      seed = seed * 1103515245u + 12345u;
+      StringCat(
+          rules,
+          alphabet[(seed >> 16) % (sizeof(alphabet) / sizeof(alphabet[0]))]);
+    }
+    spandiff_one(&st, StringBuff(rules) != NULL ? StringBuff(rules) : "",
+                 longhost, StringBuff(longfil));
+    StringFree(rules);
+  }
+  freet(longhost);
+  StringFree(longfil);
+  printf("spandiff: %lu cases, %lu failures\n", st.cases, st.failures);
+  if (st.failures == 0)
+    printf("spandiff: OK\n");
+  return st.failures != 0;
+}
+
+/* Print what a span primitive reads as [bytes], for next|split C TEXT,
+   trim L R TEXT or copy SIZE TEXT. */
+static int st_span(httrackp *opt, int argc, char **argv) {
+  String out = STRING_EMPTY;
+  hts_span s, a, b;
+  int ret = 0;
+
+  (void) opt;
+  if (argc < 3 || (strcmp(argv[0], "trim") == 0 && argc < 4)) {
+    fprintf(stderr, "span: bad arguments\n");
+    return 1;
+  }
+  s.p = argv[argc - 1];
+  s.len = strlen(s.p);
+  if (strcmp(argv[0], "next") == 0) {
+    const char *cur = s.p;
+
+    while (hts_span_next(&cur, s.p + s.len, argv[1][0], &a)) {
+      StringAddchar(out, '[');
+      StringMemcat(out, a.p, a.len);
+      StringAddchar(out, ']');
+    }
+    if (cur != s.p + s.len)
+      StringCat(out, " BADEND");
+  } else if (strcmp(argv[0], "split") == 0) {
+    if (hts_span_split(s, argv[1][0], &a, &b)) {
+      StringAddchar(out, '[');
+      StringMemcat(out, a.p, a.len);
+      StringAddchar(out, '|');
+      StringMemcat(out, b.p, b.len);
+      StringAddchar(out, ']');
+    } else {
+      StringCat(out, "none");
+    }
+  } else if (strcmp(argv[0], "trim") == 0) {
+    a = hts_span_trim(s, argv[1], argv[2]);
+    StringAddchar(out, '[');
+    StringMemcat(out, a.p, a.len);
+    StringAddchar(out, ']');
+  } else if (strcmp(argv[0], "copy") == 0) {
+    LLint size;
+    char dst[64];
+    hts_boolean fit;
+
+    if (!hts_parse_llint(argv[1], NULL, 0, (LLint) sizeof(dst) - 1, &size)) {
+      fprintf(stderr, "span: size must be below %d\n", (int) sizeof(dst));
+      StringFree(out);
+      return 1;
+    }
+    memset(dst, '#', sizeof(dst));
+    dst[sizeof(dst) - 1] = '\0';
+    fit = hts_span_copy(s, dst, (size_t) size);
+    StringCat(out, fit ? "fit [" : "clipped [");
+    /* the '#' past the terminator shows nothing more was written */
+    StringMemcat(out, dst,
+                 (size_t) size < sizeof(dst) - 1 ? (size_t) size + 1
+                                                 : sizeof(dst) - 1);
+    StringAddchar(out, ']');
+  } else {
+    fprintf(stderr, "span: unknown mode %s\n", argv[0]);
+    ret = 1;
+  }
+  if (ret == 0) {
+    const char *p;
+
+    /* a NUL from copy shows as '0' */
+    for (p = StringBuff(out);
+         StringLength(out) != 0 && p < StringBuff(out) + StringLength(out); p++)
+      putchar(*p != '\0' ? *p : '0');
+    putchar('\n');
+  }
+  StringFree(out);
+  return ret;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
@@ -2970,6 +3474,11 @@ const struct selftest_entry selftests_lib[] = {
      st_querydiff},
     {"querynext", "<query>", "the fields the shared query iterator reads",
      st_querynext},
+    {"spandiff", "",
+     "the span iterator matches the rule-list parsers it replaced",
+     st_spandiff},
+    {"span", "<next|split|trim|copy> <args> <text>",
+     "the fields and copies the span primitive makes", st_span},
     {"gmtime", "",
      "hts_gmtime() fills the caller's buffer, not a static (#794)", st_gmtime},
     {"localtime", "<dir>",
