@@ -1,0 +1,22 @@
+#!/bin/bash
+#
+# The cookie and WARC header walks match frozen copies of the old ones.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# The counts are exact, so a shrinking corpus shows.
+selftest_queue_lines "cookiespandiff: 44286 cases, 0 failures
+cookiespandiff: OK" cookiespandiff
+selftest_queue_lines "warcspandiff: 138575 cases, 0 failures
+warcspandiff: OK" warcspandiff
+
+# The separator a field ended on stays with it, and the last one has none.
+selftest_queue "[a,][b]" span nextsep , "a,b"
+selftest_queue "[a,][,][b,]" span nextsep , "a,,b,"
+selftest_queue "[a]" span nextsep , "a"
+selftest_queue '[a\r,][b]' span nextsep , $'a\r,b'
+
+selftest_run_queued

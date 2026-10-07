@@ -1002,41 +1002,32 @@ static int ini_list_shift(const char *value, size_t len, int delta) {
 /* Copy INI to OUT with the ids of ini_list_keys shifted by DELTA, so what
    reaches the file is the 0-based index WinHTTrack reads (#1314). */
 static void ini_rebase_lists(const char *ini, int delta, String *out) {
-  const char *line;
+  const hts_span all = hts_span_of(ini);
+  const char *cur;
+  hts_span line, key, value;
 
   StringClear(*out);
-  for (line = ini; *line != '\0';) {
-    const char *const nl = strchr(line, '\n');
-    const size_t len = nl != NULL ? (size_t) (nl - line) + 1 : strlen(line);
-    const char *const eq = (const char *) memchr(line, '=', len);
-    char key[64];
+  for (cur = all.p; hts_span_next(&cur, all.p + all.len, '\n', &line);) {
+    char name[64];
     char shifted[16];
-    size_t klen = 0;
-    size_t vlen = 0;
     int id = -1;
 
-    if (eq != NULL) {
-      klen = (size_t) (eq - line);
-      vlen = len - klen - 1;
-      /* Trim the CRLF a textarea posts, which the file keeps. */
-      while (vlen != 0 && (eq[vlen] == '\r' || eq[vlen] == '\n'))
-        vlen--;
-      if (klen < sizeof(key)) {
-        memcpy(key, line, klen);
-        key[klen] = '\0';
-        if (ini_key_is_list(key))
-          id = ini_list_shift(eq + 1, vlen, delta);
-      }
+    if (hts_span_split(line, '=', &key, &value)) {
+      /* Trim the CRs a textarea posts. */
+      value = hts_span_trim(value, "", "\r");
+      if (hts_span_copy(key, name, sizeof(name)) && ini_key_is_list(name))
+        id = ini_list_shift(value.p, value.len, delta);
     }
+    /* Each line keeps its own CRs and newline, which [line.p, cur) holds. */
     if (id >= 0) {
       snprintf(shifted, sizeof(shifted), "%d", id);
-      StringMemcat(*out, line, klen + 1);
+      StringMemcat(*out, line.p, key.len + 1);
       StringCat(*out, shifted);
-      StringMemcat(*out, eq + 1 + vlen, len - klen - 1 - vlen);
+      StringMemcat(*out, value.p + value.len,
+                   (size_t) (cur - (value.p + value.len)));
     } else {
-      StringMemcat(*out, line, len);
+      StringMemcat(*out, line.p, (size_t) (cur - line.p));
     }
-    line += len;
   }
 }
 

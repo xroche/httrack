@@ -9,7 +9,7 @@ set -euo pipefail
 . "${0%"${0##*/}"}./testlib.sh"
 
 # The count is exact, so a shrinking corpus shows.
-selftest_queue_lines "spandiff: 300862 cases, 0 failures
+selftest_queue_lines "spandiff: 350785 cases, 0 failures
 spandiff: OK" spandiff
 
 # A trailing separator ends the walk, an inner empty field does not.

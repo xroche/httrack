@@ -503,40 +503,26 @@ void cookie_delete(char *s, size_t s_size, size_t pos) {
 // char[8192]).
 #define COOKIE_FIELD_BUFFER_SIZE 8192
 const char *cookie_get(char *buffer, const char *cookie_base, int param) {
-  const char *limit;
+  const char *limit, *cur;
+  hts_span field;
+  int i;
 
   while(*cookie_base == '\n')
     cookie_base++;
   limit = strchr(cookie_base, '\n');
-  if (!limit)
+  if (limit == NULL)
     limit = cookie_base + strlen(cookie_base);
-  if (limit) {
-    if (param) {
-      int i;
+  /* A negative PARAM reads field 0, and a missing field leaves BUFFER alone. */
+  for (cur = cookie_base, i = 0; hts_span_next(&cur, limit, '\t', &field);
+       i++) {
+    if (i >= param) {
+      htsbuff b = htsbuff_ptr(buffer, COOKIE_FIELD_BUFFER_SIZE);
 
-      for(i = 0; i < param; i++) {
-        if (cookie_base) {
-          cookie_base = strchr(cookie_base, '\t');      // prochain tab
-          if (cookie_base)
-            cookie_base++;
-        }
-      }
+      htsbuff_catn(&b, field.p, field.len);
+      return buffer;
     }
-    if (cookie_base) {
-      if (cookie_base < limit) {
-        const char *a = cookie_base;
-        htsbuff b = htsbuff_ptr(buffer, COOKIE_FIELD_BUFFER_SIZE);
-
-        while((*a) && (*a != '\t') && (*a != '\n'))
-          a++;
-        htsbuff_catn(&b, cookie_base, (size_t) (a - cookie_base));
-        return buffer;
-      } else
-        return "";
-    } else
-      return "";
-  } else
-    return "";
+  }
+  return "";
 }
 
 // fin cookies

@@ -755,6 +755,138 @@ static int st_cookieimport(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Compare cookie_get with a frozen copy. */
+
+#define COOKIEDIFF_SIZE 8192
+
+static const char *legacy_cookie_get(char *buffer, const char *cookie_base,
+                                     int param) {
+  const char *limit;
+
+  while (*cookie_base == '\n')
+    cookie_base++;
+  limit = strchr(cookie_base, '\n');
+  if (!limit)
+    limit = cookie_base + strlen(cookie_base);
+  if (limit) {
+    if (param) {
+      int i;
+
+      for (i = 0; i < param; i++) {
+        if (cookie_base) {
+          cookie_base = strchr(cookie_base, '\t');
+          if (cookie_base)
+            cookie_base++;
+        }
+      }
+    }
+    if (cookie_base) {
+      if (cookie_base < limit) {
+        const char *a = cookie_base;
+        htsbuff b = htsbuff_ptr(buffer, COOKIEDIFF_SIZE);
+
+        while ((*a) && (*a != '\t') && (*a != '\n'))
+          a++;
+        htsbuff_catn(&b, cookie_base, (size_t) (a - cookie_base));
+        return buffer;
+      } else
+        return "";
+    } else
+      return "";
+  } else
+    return "";
+}
+
+/* Both getters run on canary-filled buffers, which must come out equal. */
+static void cookiediff_one(querydiff_stats *st, const char *line, char *o,
+                           char *n) {
+  int param;
+
+  for (param = -2; param <= 8; param++) {
+    const char *ro, *rn;
+    char arg[16];
+
+    memset(o, 'O', COOKIEDIFF_SIZE);
+    memset(n, 'O', COOKIEDIFF_SIZE);
+    st->cases++;
+    ro = legacy_cookie_get(o, line, param);
+    rn = cookie_get(n, line, param);
+    if ((ro == o) != (rn == n) || memcmp(o, n, COOKIEDIFF_SIZE) != 0) {
+      snprintf(arg, sizeof(arg), "%d", param);
+      querydiff_fail(st, "cookie_get", line, arg, ro, rn);
+    }
+  }
+}
+
+static int st_cookiespandiff(httrackp *opt, int argc, char **argv) {
+  static const char *const hand[] = {"",
+                                     "\n",
+                                     "\n\n",
+                                     "a",
+                                     "\t",
+                                     "\t\t",
+                                     "a\t",
+                                     "\ta",
+                                     "a\tb\tc",
+                                     "a\t\tc",
+                                     "a\tb\t",
+                                     "a\tb\nc\td",
+                                     "a\nb\tc\td",
+                                     "\na\tb",
+                                     "\n\na\tb\n",
+                                     "a\tb\n",
+                                     "a\r\n\tb",
+                                     "a\t\n\tb",
+                                     "\t\n\t",
+                                     "a b\tc d",
+                                     "h\tTRUE\t/\tFALSE\t0\tn\tv",
+                                     "h\tTRUE\t/\tFALSE\t0\tn\tv\n",
+                                     NULL};
+  static const char *const alphabet[] = {"a", "\t",   "\n", "\r", "bc",
+                                         " ", "\t\t", "/",  "x"};
+  /* A field one byte under the 8192-byte buffer still fits. */
+  static const size_t lengths[] = {8190, 8191};
+  querydiff_stats st = {0, 0, 0, 0};
+  char *o = malloct(COOKIEDIFF_SIZE);
+  char *n = malloct(COOKIEDIFF_SIZE);
+  uint32_t seed = 547;
+  size_t i;
+  int r;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  assertf(o != NULL && n != NULL);
+  for (i = 0; hand[i] != NULL; i++)
+    cookiediff_one(&st, hand[i], o, n);
+  for (i = 0; i < sizeof(lengths) / sizeof(lengths[0]); i++) {
+    char *run = querydiff_run('x', lengths[i]);
+    String line = STRING_EMPTY;
+
+    cookiediff_one(&st, run, o, n);
+    StringCat(line, "a\t");
+    StringCat(line, run);
+    StringCat(line, "\tb\nc");
+    cookiediff_one(&st, StringBuff(line), o, n);
+    StringFree(line);
+    freet(run);
+  }
+  for (r = 0; r < 4000; r++) {
+    String line = STRING_EMPTY;
+
+    querydiff_random(&line, &seed, alphabet,
+                     sizeof(alphabet) / sizeof(alphabet[0]), 16);
+    cookiediff_one(&st, StringBuff(line) != NULL ? StringBuff(line) : "", o, n);
+    StringFree(line);
+  }
+  freet(o);
+  freet(n);
+  printf("cookiespandiff: %lu cases, %lu failures\n", st.cases, st.failures);
+  if (st.failures == 0)
+    printf("cookiespandiff: OK\n");
+  return st.failures != 0;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
@@ -771,5 +903,8 @@ const struct selftest_entry selftests_cookie[] = {
     {"cookieimport", "<dir>",
      "load a jar (and Windows IE cookies) from a long+non-ASCII folder",
      st_cookieimport},
+    {"cookiespandiff", "",
+     "the cookie field getter matches a frozen copy of the old one",
+     st_cookiespandiff},
     {NULL, NULL, NULL, NULL},
 };

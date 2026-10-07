@@ -522,30 +522,26 @@ static int header_is(const char *line, size_t line_len, const char *name) {
    sent. Returns 0. */
 static int normalize_http_headers(const char *resp_hdr, long long set_cl,
                                   wbuf *out) {
-  const char *p = resp_hdr;
+  hts_span all, line;
+  const char *cur;
   int first = 1;
   if (resp_hdr == NULL)
     return -1;
-  while (*p != '\0') {
-    const char *eol = strchr(p, '\n');
-    size_t len = (eol != NULL) ? (size_t) (eol - p) : strlen(p);
-    if (len > 0 && p[len - 1] == '\r')
-      len--; /* strip CR; re-added as CRLF below */
-    if (len == 0)
+  all = hts_span_of(resp_hdr);
+  for (cur = all.p; hts_span_next(&cur, all.p + all.len, '\n', &line);) {
+    if (line.len > 0 && line.p[line.len - 1] == '\r')
+      line.len--; /* Strip the CR, which is re-added below. */
+    if (line.len == 0)
       break; /* blank line: end of headers */
     if (first) {
       first = 0; /* status line: keep verbatim */
-    } else if (header_is(p, len, "Transfer-Encoding")) {
-      goto next;
-    } else if (set_cl >= 0 && header_is(p, len, "Content-Length")) {
-      goto next;
+    } else if (header_is(line.p, line.len, "Transfer-Encoding")) {
+      continue;
+    } else if (set_cl >= 0 && header_is(line.p, line.len, "Content-Length")) {
+      continue;
     }
-    if (wbuf_add(out, p, len) != 0 || wbuf_add(out, "\r\n", 2) != 0)
+    if (wbuf_add(out, line.p, line.len) != 0 || wbuf_add(out, "\r\n", 2) != 0)
       return -1;
-  next:
-    if (eol == NULL)
-      break;
-    p = eol + 1;
   }
   if (set_cl >= 0 && wbuf_printf(out, "Content-Length: %lld\r\n", set_cl) != 0)
     return -1;
@@ -728,18 +724,21 @@ static int cdx_json_str(wbuf *b, const char *s) {
   return wbuf_add(b, "\"", 1);
 }
 
-/* Copy the media type of header "name" (up to ';'/space) from a raw HTTP header
-   block into out; out is "" if absent. */
-static void http_header_value(const char *hdr, const char *name, char *out,
-                              size_t outsz) {
+/* see htswarc.h */
+void warc_http_header_value(const char *hdr, const char *name, char *out,
+                            size_t outsz) {
   size_t nl = strlen(name);
-  const char *p = hdr;
+  hts_span all, line;
+  const char *cur;
+  if (outsz == 0)
+    return;
   out[0] = '\0';
   if (hdr == NULL)
     return;
-  while (*p != '\0') {
-    const char *eol = strchr(p, '\n');
-    size_t len = (eol != NULL) ? (size_t) (eol - p) : strlen(p);
+  all = hts_span_of(hdr);
+  for (cur = all.p; hts_span_next(&cur, all.p + all.len, '\n', &line);) {
+    const char *const p = line.p;
+    size_t len = line.len;
     if (len > 0 && p[len - 1] == '\r')
       len--;
     if (len == 0)
@@ -761,10 +760,19 @@ static void http_header_value(const char *hdr, const char *name, char *out,
       out[vlen] = '\0';
       return;
     }
-    if (eol == NULL)
-      break;
-    p = eol + 1;
   }
+}
+
+/* see htswarc.h */
+char *warc_normalized_headers(const char *resp_hdr, long long set_cl) {
+  wbuf b = {NULL, 0, 0};
+
+  if (normalize_http_headers(resp_hdr, set_cl, &b) != 0 ||
+      wbuf_add(&b, "", 1) != 0) {
+    wbuf_free(&b);
+    return NULL;
+  }
+  return b.data;
 }
 
 /* Take ownership of a CDXJ line; frees it and returns -1 on OOM. */
@@ -1745,7 +1753,7 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
   /* CDXJ status/mime (from the caller's status and the response Content-Type).
    */
   snprintf(statusbuf, sizeof(statusbuf), "%d", statuscode);
-  http_header_value(resp_hdr, "Content-Type", mimebuf, sizeof(mimebuf));
+  warc_http_header_value(resp_hdr, "Content-Type", mimebuf, sizeof(mimebuf));
   /* a 304 declares no type, so index the one only the caller knows */
   if (mimebuf[0] == '\0' && content_type != NULL)
     strlncatbuff(mimebuf, content_type, sizeof(mimebuf), sizeof(mimebuf) - 1);

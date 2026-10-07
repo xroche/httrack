@@ -71,7 +71,8 @@ typedef struct {
 hts_span hts_span_of(const char *s);
 
 /* Read the next field of [*cur, end) up to SEP into *out, and move *cur past
-   SEP. Return FALSE once *cur reaches END, so "a," yields only "a". */
+   SEP. Return FALSE once *cur reaches END, so "a," yields only "a". After a
+   TRUE return, [out->p, *cur) is the field plus the SEP it ended on, if any. */
 hts_boolean hts_span_next(const char **cur, const char *end, char sep,
                           hts_span *out);
 

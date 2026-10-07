@@ -228,3 +228,35 @@ for key, want in keys_of(work + "/seeded.ini").items():
 PY
 
 echo OK
+
+# Only a list key's id moves, and a CR before the id is lost.
+htsserver_stop
+printf '[the rebase keeps every other byte] ..\t'
+htsserver_start --home "${work}"
+
+htsserver_python - "${HTS_URL}" "${work}" <<'PY' || fail "see above"
+import sys
+
+from webtestlib import Session, textarea
+
+s, work = Session(sys.argv[1]), sys.argv[2]
+posted = ("Build=3\r\nDepth=3\r\nTravel=2\r\r\n\n=5\nNoEquals\n"
+          + "CheckType=1=2\nLogType=\nPrimaryScan=0\nFollowRobotsTxt=\r3\n"
+          + "CurrentAction=\r000000000000003\nRewriteLinks=11\r"
+          + "\nGlobalTravel=4")
+want = (posted.replace("Build=3", "Build=2")
+        .replace("Travel=2", "Travel=1")
+        .replace("FollowRobotsTxt=\r3", "FollowRobotsTxt=2")
+        .replace("RewriteLinks=11", "RewriteLinks=10")
+        .replace("GlobalTravel=4", "GlobalTravel=3"))
+step4 = s.get("step4.html?sid=" + s.sid)
+s.post("step4.html", [("path", work), ("projname", "raw"),
+                      ("command", textarea(step4, "command")),
+                      ("command_do", "save"), ("winprofile", posted)])
+with open("%s/raw/hts-cache/winprofile.ini" % work, "rb") as fp:
+    got = fp.read().decode("latin-1")
+if got != want:
+    sys.exit("saved %r\nwanted %r" % (got, want))
+PY
+
+echo OK

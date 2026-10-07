@@ -2637,25 +2637,6 @@ static hts_boolean legacy_url_query_value(const char *fil_complete,
   return HTS_FALSE;
 }
 
-typedef struct {
-  unsigned long cases;
-  unsigned long failures;
-  unsigned long allowed_qmark; /* a second '?' no longer starts a field */
-  unsigned long allowed_name;  /* a name with '=' or '&' is never a key */
-} querydiff_stats;
-
-static void querydiff_fail(querydiff_stats *st, const char *site,
-                           const char *in, const char *arg, const char *old,
-                           const char *new) {
-  st->failures++;
-  if (st->failures <= 20) {
-    printf("%s differs on '%.80s' (%zu bytes) arg '%.40s': old "
-           "'%.80s' new '%.80s'\n",
-           site, in, strlen(in), arg, old, new);
-    fflush(stdout); /* a later abort must not swallow it */
-  }
-}
-
 /* This compares fil_normalized, which runs the --strip-query filter and the
    query sort. */
 static void querydiff_normalize(querydiff_stats *st, const char *url) {
@@ -2757,16 +2738,6 @@ static void querydiff_one(querydiff_stats *st, const char *q) {
   StringFree(url);
 }
 
-/* This returns a run of n copies of c. */
-static char *querydiff_run(char c, size_t n) {
-  char *s = malloct(n + 1);
-
-  assertf(s != NULL);
-  memset(s, c, n);
-  s[n] = '\0';
-  return s;
-}
-
 static int st_querydiff(httrackp *opt, int argc, char **argv) {
   static const char *const hand[] = {
       "",           "&",          "&&",
@@ -2835,14 +2806,9 @@ static int st_querydiff(httrackp *opt, int argc, char **argv) {
   }
   for (r = 0; r < 4000; r++) {
     String q = STRING_EMPTY;
-    const int ntok = (int) ((seed = seed * 1103515245u + 12345u) >> 16) % 24;
-    int t;
 
-    for (t = 0; t < ntok; t++) {
-      seed = seed * 1103515245u + 12345u;
-      StringCat(
-          q, alphabet[(seed >> 16) % (sizeof(alphabet) / sizeof(alphabet[0]))]);
-    }
+    querydiff_random(&q, &seed, alphabet,
+                     sizeof(alphabet) / sizeof(alphabet[0]), 24);
     querydiff_one(&st, StringBuff(q) != NULL ? StringBuff(q) : "");
     StringFree(q);
   }
@@ -3062,6 +3028,47 @@ static hts_boolean legacy_hts_host_alias_rule_ok(const char *rule) {
   return HTS_TRUE;
 }
 
+static const char *legacy_hts_host_alias_looping(const char *rules,
+                                                 hts_boolean collapse_www,
+                                                 char *dest, size_t destsize) {
+  const char *p;
+
+  if (rules == NULL || destsize == 0)
+    return NULL;
+  for (p = rules; *p != '\0';) {
+    const char *const line = p;
+    const char *eol, *eq;
+
+    while (*p != '\0' && *p != '\n')
+      p++;
+    eol = p;
+    if (*p == '\n')
+      p++;
+    eq = memchr(line, '=', (size_t) (eol - line));
+    if (eq == NULL || eq + 1 == eol)
+      continue;
+    {
+      const size_t len = (size_t) (eol - eq - 1);
+      char BIGSTK canon[HTS_URLMAXSIZE * 2], tmp[HTS_URLMAXSIZE * 2];
+      hts_boolean settled;
+
+      if (len >= sizeof(canon))
+        continue;
+      memcpy(canon, eq + 1, len);
+      canon[len] = '\0';
+      (void) hts_host_alias_resolve(rules, canon, collapse_www, tmp,
+                                    sizeof(tmp), &settled);
+      if (!settled) {
+        if (strlen(canon) >= destsize)
+          continue;
+        strlcpybuff(dest, canon, destsize);
+        return dest;
+      }
+    }
+  }
+  return NULL;
+}
+
 static void spandiff_one(querydiff_stats *st, const char *rules,
                          const char *longhost, const char *longfil) {
   static const char *const keys[] = {"",      "a",         "sid",    "*",
@@ -3126,6 +3133,22 @@ static void spandiff_one(querydiff_stats *st, const char *rules,
   st->cases++;
   if (hts_host_alias_rule_ok(rules) != legacy_hts_host_alias_rule_ok(rules))
     querydiff_fail(st, "hts_host_alias_rule_ok", rules, "", "", "");
+  for (www = 0; www < 2; www++) {
+    for (j = 0; j < sizeof(sizes) / sizeof(sizes[0]); j++) {
+      char o[4096], n[4096];
+      const char *ro, *rn;
+
+      memset(o, 'O', sizeof(o));
+      memset(n, 'O', sizeof(n));
+      st->cases++;
+      ro = legacy_hts_host_alias_looping(rules, www, o, sizes[j]);
+      rn = hts_host_alias_looping(rules, www, n, sizes[j]);
+      if ((ro == NULL) != (rn == NULL) || (rn != NULL && rn != n) ||
+          memcmp(o, n, sizeof(o)) != 0)
+        querydiff_fail(st, "hts_host_alias_looping", rules, "",
+                       ro != NULL ? o : "(none)", rn != NULL ? n : "(none)");
+    }
+  }
   /* each line alone, which is what --host-alias hands the validator */
   for (cur = all.p; hts_span_next(&cur, all.p + all.len, '\n', &line);) {
     char *one = malloct(line.len + 1);
@@ -3190,6 +3213,20 @@ static int st_spandiff(httrackp *opt, int argc, char **argv) {
                                      "=sid",
                                      "a.com=b\r",
                                      "a.com\r=b",
+                                     "a=",
+                                     "=",
+                                     "a=\n=b",
+                                     "a.com=b.com\nb.com=a.com",
+                                     "x=a.com\na.com=b.com\nb.com=a.com",
+                                     "=a\na=b\nb=a",
+                                     "a=b\nb=c\nc=d\nd=e\ne=f\nf=g\ng=h\nh="
+                                     "i\ni=j\nj=k",
+                                     "a=b\nb=c\nc=d\nd=e\ne=f\nf=g\ng=h\nh="
+                                     "i\ni=j",
+                                     "a=b\r\nb=a\r\n",
+                                     "a b c",
+                                     "a  b ",
+                                     "  ",
                                      NULL};
   /* Runs around the 2048-byte pattern and glob buffers. */
   static const size_t lengths[] = {2045, 2046, 2047, 2048, 2049};
@@ -3288,19 +3325,27 @@ static int st_spandiff(httrackp *opt, int argc, char **argv) {
       }
       StringFree(rules);
     }
+    /* A loop that a clipped copy of the too-long first target would join. */
+    {
+      const size_t scheme = strlen("http://");
+      String rules = STRING_EMPTY;
+
+      StringCat(rules, "a=http://");
+      StringMemcat(rules, run, lengths[i] - scheme);
+      StringCat(rules, "\nhttp://");
+      StringMemcat(rules, run, lengths[i] - scheme - 1);
+      StringCat(rules, "=b\nb=http://");
+      StringMemcat(rules, run, lengths[i] - scheme - 1);
+      spandiff_one(&st, StringBuff(rules), longhost, StringBuff(longfil));
+      StringFree(rules);
+    }
     freet(run);
   }
   for (r = 0; r < 6000; r++) {
     String rules = STRING_EMPTY;
-    const int ntok = (int) ((seed = seed * 1103515245u + 12345u) >> 16) % 16;
-    int t;
 
-    for (t = 0; t < ntok; t++) {
-      seed = seed * 1103515245u + 12345u;
-      StringCat(
-          rules,
-          alphabet[(seed >> 16) % (sizeof(alphabet) / sizeof(alphabet[0]))]);
-    }
+    querydiff_random(&rules, &seed, alphabet,
+                     sizeof(alphabet) / sizeof(alphabet[0]), 16);
     spandiff_one(&st, StringBuff(rules) != NULL ? StringBuff(rules) : "",
                  longhost, StringBuff(longfil));
     StringFree(rules);
@@ -3313,7 +3358,21 @@ static int st_spandiff(httrackp *opt, int argc, char **argv) {
   return st.failures != 0;
 }
 
-/* Print what a span primitive reads as [bytes], for next|split C TEXT,
+/* CR and LF print as \r and \n, which Windows text-mode stdout leaves alone. */
+static void span_add_visible(String *out, const char *p, size_t len) {
+  size_t i;
+
+  for (i = 0; i < len; i++) {
+    if (p[i] == '\r')
+      StringCat(*out, "\\r");
+    else if (p[i] == '\n')
+      StringCat(*out, "\\n");
+    else
+      StringAddchar(*out, p[i]);
+  }
+}
+
+/* Print what a span primitive reads as [bytes], for next|nextsep|split C TEXT,
    trim L R TEXT or copy SIZE TEXT. */
 static int st_span(httrackp *opt, int argc, char **argv) {
   String out = STRING_EMPTY;
@@ -3337,6 +3396,15 @@ static int st_span(httrackp *opt, int argc, char **argv) {
     }
     if (cur != s.p + s.len)
       StringCat(out, " BADEND");
+  } else if (strcmp(argv[0], "nextsep") == 0) {
+    const char *cur = s.p;
+
+    /* Each field shows with the separator it ended on. */
+    while (hts_span_next(&cur, s.p + s.len, argv[1][0], &a)) {
+      StringAddchar(out, '[');
+      span_add_visible(&out, a.p, (size_t) (cur - a.p));
+      StringAddchar(out, ']');
+    }
   } else if (strcmp(argv[0], "split") == 0) {
     if (hts_span_split(s, argv[1][0], &a, &b)) {
       StringAddchar(out, '[');
@@ -3477,7 +3545,7 @@ const struct selftest_entry selftests_lib[] = {
     {"spandiff", "",
      "the span iterator matches the rule-list parsers it replaced",
      st_spandiff},
-    {"span", "<next|split|trim|copy> <args> <text>",
+    {"span", "<next|nextsep|split|trim|copy> <args> <text>",
      "the fields and copies the span primitive makes", st_span},
     {"gmtime", "",
      "hts_gmtime() fills the caller's buffer, not a static (#794)", st_gmtime},

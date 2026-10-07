@@ -2365,6 +2365,216 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
   return sf_err;
 }
 
+/* Compare the WARC header walks with frozen copies. */
+
+static int legacy_header_is(const char *line, size_t line_len,
+                            const char *name) {
+  size_t nl = strlen(name), i;
+  if (line_len < nl || strncasecmp(line, name, nl) != 0)
+    return 0;
+  for (i = nl; i < line_len && (line[i] == ' ' || line[i] == '\t'); i++)
+    ;
+  return i < line_len && line[i] == ':';
+}
+
+static int legacy_normalize_http_headers(const char *resp_hdr, long long set_cl,
+                                         String *out) {
+  const char *p = resp_hdr;
+  int first = 1;
+  char cl[64];
+  if (resp_hdr == NULL)
+    return -1;
+  while (*p != '\0') {
+    const char *eol = strchr(p, '\n');
+    size_t len = (eol != NULL) ? (size_t) (eol - p) : strlen(p);
+    if (len > 0 && p[len - 1] == '\r')
+      len--;
+    if (len == 0)
+      break;
+    if (first) {
+      first = 0;
+    } else if (legacy_header_is(p, len, "Transfer-Encoding")) {
+      goto next;
+    } else if (set_cl >= 0 && legacy_header_is(p, len, "Content-Length")) {
+      goto next;
+    }
+    StringMemcat(*out, p, len);
+    StringCat(*out, "\r\n");
+  next:
+    if (eol == NULL)
+      break;
+    p = eol + 1;
+  }
+  if (set_cl >= 0) {
+    snprintf(cl, sizeof(cl), "Content-Length: %lld\r\n", set_cl);
+    StringCat(*out, cl);
+  }
+  return 0;
+}
+
+static void legacy_http_header_value(const char *hdr, const char *name,
+                                     char *out, size_t outsz) {
+  size_t nl = strlen(name);
+  const char *p = hdr;
+  out[0] = '\0';
+  if (hdr == NULL)
+    return;
+  while (*p != '\0') {
+    const char *eol = strchr(p, '\n');
+    size_t len = (eol != NULL) ? (size_t) (eol - p) : strlen(p);
+    if (len > 0 && p[len - 1] == '\r')
+      len--;
+    if (len == 0)
+      break;
+    if (len > nl && strncasecmp(p, name, nl) == 0 && p[nl] == ':') {
+      const char *v = p + nl + 1;
+      size_t vlen, k;
+      while (v < p + len && (*v == ' ' || *v == '\t'))
+        v++;
+      vlen = (size_t) (p + len - v);
+      for (k = 0; k < vlen; k++)
+        if (v[k] == ';' || v[k] == ' ' || v[k] == '\t') {
+          vlen = k;
+          break;
+        }
+      if (vlen >= outsz)
+        vlen = outsz - 1;
+      memcpy(out, v, vlen);
+      out[vlen] = '\0';
+      return;
+    }
+    if (eol == NULL)
+      break;
+    p = eol + 1;
+  }
+}
+
+static void warcdiff_one(querydiff_stats *st, const char *hdr) {
+  static const long long cls[] = {-1, 0, 42};
+  static const char *const names[] = {"Content-Type", "content-type",
+                                      "Content-Length", "X", ""};
+  static const size_t sizes[] = {1, 2, 8, 256};
+  size_t i, j;
+
+  for (i = 0; i < sizeof(cls) / sizeof(cls[0]); i++) {
+    String o = STRING_EMPTY;
+    const hts_boolean fo = legacy_normalize_http_headers(hdr, cls[i], &o) == 0;
+    /* An output that stayed empty has no buffer, and reads as "". */
+    const char *const ob = StringBuff(o) != NULL ? StringBuff(o) : "";
+    char *n = warc_normalized_headers(hdr, cls[i]);
+
+    st->cases++;
+    if (fo != (n != NULL) ||
+        (n != NULL &&
+         (strlen(n) != StringLength(o) || memcmp(n, ob, StringLength(o)) != 0)))
+      querydiff_fail(st, "normalize_http_headers", hdr != NULL ? hdr : "(null)",
+                     "", ob, n != NULL ? n : "(null)");
+    StringFree(o);
+    freet(n);
+  }
+  for (i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
+    for (j = 0; j < sizeof(sizes) / sizeof(sizes[0]); j++) {
+      char o[256], n[256];
+
+      memset(o, 'O', sizeof(o));
+      memset(n, 'O', sizeof(n));
+      st->cases++;
+      legacy_http_header_value(hdr, names[i], o, sizes[j]);
+      warc_http_header_value(hdr, names[i], n, sizes[j]);
+      if (memcmp(o, n, sizeof(o)) != 0)
+        querydiff_fail(st, "http_header_value", hdr != NULL ? hdr : "(null)",
+                       names[i], o, n);
+    }
+  }
+}
+
+static int st_warcspandiff(httrackp *opt, int argc, char **argv) {
+  static const char *const hand[] = {
+      "",
+      "\n",
+      "\r\n",
+      "\r",
+      "\r\r\n",
+      "HTTP/1.1 200 OK",
+      "HTTP/1.1 200 OK\r\n",
+      "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\nbody",
+      "HTTP/1.1 200 OK\nContent-Type: text/html; charset=x\nX: y\n",
+      "HTTP/1.1 200 OK\r\nContent-Type:text/html\r\r\nX: y",
+      "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nContent-Length: 5\r\n",
+      "HTTP/1.1 200 OK\r\nContent-Length : 5\r\ntransfer-encoding\t: x\r\n",
+      "HTTP/1.1 200 OK\r\n\r\nContent-Type: late\r\n",
+      "\nContent-Type: text/html\n",
+      "HTTP/1.1 200 OK\r\nContent-Type:\r\n",
+      "HTTP/1.1 200 OK\r\nContent-Type: \t \r\n",
+      "HTTP/1.1 200 OK\r\nContent-Type: a\rb\r\n",
+      "HTTP/1.1 200 OK\r\nContent-Typex: a\r\nContent-Type: b\r\n",
+      "HTTP/1.1 200 OK\r\nContent-Type : a\r\nContent-Type: b\r\n",
+      "HTTP/1.1 200 OK\r\n:\r\n\r\n",
+      NULL};
+  static const char *const alphabet[] = {"HTTP/1.1 200 OK",
+                                         "\r",
+                                         "\n",
+                                         "\r\n",
+                                         "Content-Type",
+                                         ":",
+                                         "Content-Length",
+                                         "Transfer-Encoding",
+                                         " ",
+                                         "\t",
+                                         "text/html",
+                                         ";",
+                                         "x",
+                                         "chunked",
+                                         "5",
+                                         "content-type"};
+  /* These header values sit around the 256-byte output buffer. */
+  static const size_t lengths[] = {254, 255, 256, 257};
+  querydiff_stats st = {0, 0, 0, 0};
+  uint32_t seed = 547;
+  size_t i;
+  int r;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  /* An OUTSZ of 0 leaves OUT alone. */
+  {
+    char z = 'Z';
+
+    warc_http_header_value("HTTP/1.1 200 OK\r\nContent-Type: a\r\n",
+                           "Content-Type", &z, 0);
+    warc_http_header_value(NULL, "Content-Type", &z, 0);
+    assertf(z == 'Z');
+  }
+  warcdiff_one(&st, NULL);
+  for (i = 0; hand[i] != NULL; i++)
+    warcdiff_one(&st, hand[i]);
+  for (i = 0; i < sizeof(lengths) / sizeof(lengths[0]); i++) {
+    char *run = querydiff_run('x', lengths[i]);
+    String hdr = STRING_EMPTY;
+
+    StringCat(hdr, "HTTP/1.1 200 OK\r\nContent-Type: ");
+    StringCat(hdr, run);
+    StringCat(hdr, "\r\nX: ");
+    StringCat(hdr, run);
+    warcdiff_one(&st, StringBuff(hdr));
+    StringFree(hdr);
+    freet(run);
+  }
+  for (r = 0; r < 6000; r++) {
+    String hdr = STRING_EMPTY;
+
+    querydiff_random(&hdr, &seed, alphabet,
+                     sizeof(alphabet) / sizeof(alphabet[0]), 20);
+    warcdiff_one(&st, StringBuff(hdr) != NULL ? StringBuff(hdr) : "");
+    StringFree(hdr);
+  }
+  printf("warcspandiff: %lu cases, %lu failures\n", st.cases, st.failures);
+  if (st.failures == 0)
+    printf("warcspandiff: OK\n");
+  return st.failures != 0;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
@@ -2402,5 +2612,8 @@ const struct selftest_entry selftests_warc[] = {
     {"singlefile", "<dir>",
      "--single-file: what is inlined, the per-asset cap, idempotence",
      st_singlefile},
+    {"warcspandiff", "",
+     "the WARC header walks match frozen copies of the old ones",
+     st_warcspandiff},
     {NULL, NULL, NULL, NULL},
 };
