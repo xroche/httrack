@@ -37,6 +37,8 @@ Please visit our Website: http://www.httrack.com
 #include "htsglobal.h"
 #include "htscore.h"
 
+#include <stdint.h>
+
 #ifdef HTS_INTERNAL_BYTECODE
 
 size_t st_decode_body(const char *arg, char *buf, size_t size);
@@ -70,6 +72,26 @@ size_t st_utf16_units(const char *s, size_t n);
  *baselen is where teardown must stop, and is written on every path. */
 size_t st_mkdeep(char *buf, size_t bufsize, const char *dir, const char *nseg,
                  const char *who, size_t *baselen);
+
+/* These are the tallies of a self-test that compares a parser with a frozen
+   copy of the one it replaced. */
+typedef struct {
+  unsigned long cases;
+  unsigned long failures;
+  unsigned long allowed_qmark; /* a second '?' no longer starts a field */
+  unsigned long allowed_name;  /* a name with '=' or '&' is never a key */
+} querydiff_stats;
+
+/* Count a mismatch on IN, and print the first 20 of them. */
+void querydiff_fail(querydiff_stats *st, const char *site, const char *in,
+                    const char *arg, const char *old, const char *new);
+
+/* Return a malloct'd run of N copies of C, which the caller frees. */
+char *querydiff_run(char c, size_t n);
+
+/* Append to OUT up to MAXTOK - 1 tokens drawn from ALPHABET by the LCG SEED. */
+void querydiff_random(String *out, uint32_t *seed, const char *const *alphabet,
+                      size_t nalpha, int maxtok);
 
 #endif
 

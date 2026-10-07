@@ -182,3 +182,35 @@ too_long:
   fprintf(stderr, "%s: base dir too long (%u chars)\n", who, (unsigned) n);
   return 0;
 }
+
+void querydiff_fail(querydiff_stats *st, const char *site, const char *in,
+                    const char *arg, const char *old, const char *new) {
+  st->failures++;
+  if (st->failures <= 20) {
+    printf("%s differs on '%.80s' (%zu bytes) arg '%.40s': old "
+           "'%.80s' new '%.80s'\n",
+           site, in, strlen(in), arg, old, new);
+    fflush(stdout); /* a later abort must not swallow it */
+  }
+}
+
+char *querydiff_run(char c, size_t n) {
+  char *s = malloct(n + 1);
+
+  assertf(s != NULL);
+  memset(s, c, n);
+  s[n] = '\0';
+  return s;
+}
+
+void querydiff_random(String *out, uint32_t *seed, const char *const *alphabet,
+                      size_t nalpha, int maxtok) {
+  const int ntok =
+      (int) ((*seed = *seed * 1103515245u + 12345u) >> 16) % maxtok;
+  int t;
+
+  for (t = 0; t < ntok; t++) {
+    *seed = *seed * 1103515245u + 12345u;
+    StringCat(*out, alphabet[(*seed >> 16) % nalpha]);
+  }
+}

@@ -71,9 +71,14 @@ typedef struct {
 hts_span hts_span_of(const char *s);
 
 /* Read the next field of [*cur, end) up to SEP into *out, and move *cur past
-   SEP. Return FALSE once *cur reaches END, so "a," yields only "a". */
+   SEP. Return FALSE once *cur reaches END, so "a," yields only "a". The bytes
+   [out->p, *cur) are then the field with its SEP, when it ended on one. */
 hts_boolean hts_span_next(const char **cur, const char *end, char sep,
                           hts_span *out);
+
+/* Read field N of S, counting from 0, into *OUT. Return FALSE when S holds
+   fewer than N SEPs, so "a," has an empty field 1 and no field 2. */
+hts_boolean hts_span_field(hts_span s, char sep, size_t n, hts_span *out);
 
 /* Return S without the leading bytes found in LEFT and the trailing ones found
    in RIGHT. A set may be empty, and it never matches a NUL. */

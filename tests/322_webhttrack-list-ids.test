@@ -228,3 +228,36 @@ for key, want in keys_of(work + "/seeded.ini").items():
 PY
 
 echo OK
+
+# The rebase rewrites the posted profile line by line. Each line keeps its own
+# CRs and newline, and only a list key with a plain id moves.
+htsserver_stop
+printf '[the rebase keeps every other byte] ..\t'
+htsserver_start --home "${work}"
+
+htsserver_python - "${HTS_URL}" "${work}" <<'PY' || fail "see above"
+import sys
+
+from webtestlib import Session, textarea
+
+s, work = Session(sys.argv[1]), sys.argv[2]
+long_key = "K" * 64
+posted = ("Build=3\r\nDepth=3\r\nTravel=2\r\r\n\n=5\nNoEquals\n"
+          + long_key + "=3\n" + long_key[1:] + "=3\n"
+          + "CheckType=1=2\nLogType=\nPrimaryScan=0\nRewriteLinks=11\r"
+          + "\nGlobalTravel=4")
+want = ("Build=2\r\nDepth=3\r\nTravel=1\r\r\n\n=5\nNoEquals\n"
+        + long_key + "=3\n" + long_key[1:] + "=3\n"
+        + "CheckType=1=2\nLogType=\nPrimaryScan=0\nRewriteLinks=10\r"
+        + "\nGlobalTravel=3")
+step4 = s.get("step4.html?sid=" + s.sid)
+s.post("step4.html", [("path", work), ("projname", "raw"),
+                      ("command", textarea(step4, "command")),
+                      ("command_do", "save"), ("winprofile", posted)])
+with open("%s/raw/hts-cache/winprofile.ini" % work, "rb") as fp:
+    got = fp.read().decode("latin-1")
+if got != want:
+    sys.exit("saved %r\nwanted %r" % (got, want))
+PY
+
+echo OK

@@ -114,6 +114,24 @@ hts_boolean hts_span_next(const char **cur, const char *end, char sep,
   return HTS_TRUE;
 }
 
+hts_boolean hts_span_field(hts_span s, char sep, size_t n, hts_span *out) {
+  const char *const end = s.p + s.len;
+  const char *p = s.p;
+  const char *stop;
+
+  for (; n > 0; n--) {
+    const char *const at = memchr(p, sep, (size_t) (end - p));
+
+    if (at == NULL)
+      return HTS_FALSE;
+    p = at + 1;
+  }
+  stop = memchr(p, sep, (size_t) (end - p));
+  out->p = p;
+  out->len = (size_t) ((stop != NULL ? stop : end) - p);
+  return HTS_TRUE;
+}
+
 static hts_boolean span_in_set(const char *set, char c) {
   return c != '\0' && strchr(set, c) != NULL;
 }

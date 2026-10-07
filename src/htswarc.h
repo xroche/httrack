@@ -58,6 +58,15 @@ extern "C" {
 /* WARC-Truncated token for a warc_truncated code, or NULL for none. */
 const char *warc_truncated_reason(int code);
 
+/* Copy the media type of header NAME, up to a ';' or a space, from the raw
+   block HDR into OUT, which is "" when the header is absent. */
+void warc_http_header_value(const char *hdr, const char *name, char *out,
+                            size_t outsz);
+
+/* Return the header block a response record stores for RESP_HDR, as a string
+   the caller frees with freet, or NULL. It exists for the self-tests. */
+char *warc_normalized_headers(const char *resp_hdr, long long set_cl);
+
 typedef struct warc_writer warc_writer;
 
 /* Stash the raw request header block (bstr.buffer) on r for the later WARC

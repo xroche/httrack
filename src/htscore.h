@@ -544,6 +544,12 @@ const char *hts_host_alias(const char *rules, const char *adr,
                            hts_boolean collapse_www, char *dest,
                            size_t destsize);
 
+/* hts_host_alias(), reporting through SETTLED (may be NULL) whether the chain
+   ended within the hop limit. */
+const char *hts_host_alias_resolve(const char *rules, const char *adr,
+                                   hts_boolean collapse_www, char *dest,
+                                   size_t destsize, hts_boolean *settled);
+
 /* HTS_TRUE when OPT's url hacks collapse www.host onto host. */
 hts_boolean hts_host_alias_collapse_www(httrackp *opt);
 

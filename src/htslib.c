@@ -4121,12 +4121,10 @@ static hts_boolean hts_host_alias_subject(const char *url, const char *host,
    arbitrary hop, which would depend on how often a link is named. */
 enum { HTS_HOST_ALIAS_MAXHOPS = 8 };
 
-/* hts_host_alias(), reporting through SETTLED (may be NULL) whether the chain
-   ended within HTS_HOST_ALIAS_MAXHOPS. */
-static const char *hts_host_alias_resolve(const char *rules, const char *adr,
-                                          hts_boolean collapse_www, char *dest,
-                                          size_t destsize,
-                                          hts_boolean *settled) {
+/* see htscore.h */
+const char *hts_host_alias_resolve(const char *rules, const char *adr,
+                                   hts_boolean collapse_www, char *dest,
+                                   size_t destsize, hts_boolean *settled) {
   const char *proto, *host, *hostsubj, *canon;
   char BIGSTK fullsubj[HTS_URLMAXSIZE * 2];
   char schemebuf[32]; /* longest jump_protocol_const knows is "socks5h://" */
@@ -4316,39 +4314,26 @@ HTSEXT_API hts_boolean hts_host_alias_rule_ok(const char *rule) {
 /* see htscore.h */
 const char *hts_host_alias_looping(const char *rules, hts_boolean collapse_www,
                                    char *dest, size_t destsize) {
-  const char *p;
+  hts_span all, line, aliases, target;
+  const char *cur;
 
   if (rules == NULL || destsize == 0)
     return NULL;
-  for (p = rules; *p != '\0';) {
-    const char *const line = p;
-    const char *eol, *eq;
+  all = hts_span_of(rules);
+  for (cur = all.p; hts_span_next(&cur, all.p + all.len, '\n', &line);) {
+    char BIGSTK canon[HTS_URLMAXSIZE * 2], tmp[HTS_URLMAXSIZE * 2];
+    hts_boolean settled;
 
-    while (*p != '\0' && *p != '\n')
-      p++;
-    eol = p;
-    if (*p == '\n')
-      p++;
-    eq = memchr(line, '=', (size_t) (eol - line));
-    if (eq == NULL || eq + 1 == eol)
+    if (!hts_span_split(line, '=', &aliases, &target) || target.len == 0 ||
+        !hts_span_copy(target, canon, sizeof(canon)))
       continue;
-    {
-      const size_t len = (size_t) (eol - eq - 1);
-      char BIGSTK canon[HTS_URLMAXSIZE * 2], tmp[HTS_URLMAXSIZE * 2];
-      hts_boolean settled;
-
-      if (len >= sizeof(canon))
-        continue;
-      memcpy(canon, eq + 1, len);
-      canon[len] = '\0';
-      (void) hts_host_alias_resolve(rules, canon, collapse_www, tmp,
-                                    sizeof(tmp), &settled);
-      if (!settled) {
-        if (strlen(canon) >= destsize)
-          continue; /* cannot name it in full: keep looking */
-        strlcpybuff(dest, canon, destsize);
-        return dest;
-      }
+    (void) hts_host_alias_resolve(rules, canon, collapse_www, tmp, sizeof(tmp),
+                                  &settled);
+    if (!settled) {
+      if (strlen(canon) >= destsize)
+        continue; /* cannot name it in full: keep looking */
+      strlcpybuff(dest, canon, destsize);
+      return dest;
     }
   }
   return NULL;
