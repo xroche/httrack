@@ -1,0 +1,74 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# hts_header_param(), then treathead's charset, filename and Keep-Alive sites
+# against a frozen copy of their old parse (-#test=header-param-diff).
+
+param() {
+    local want=$1
+    shift
+    selftest_queue "$want" header-param "$@"
+}
+
+tab=$(printf '\t')
+
+param 'yes [utf-8]' 'text/html; charset=utf-8' ';' charset 64
+param 'yes [utf-8]' 'text/html; foo=1; charset=utf-8' ';' charset 64
+param 'yes [utf-8]' 'text/html;charset=utf-8' ';' charset 64
+param 'yes [utf-8]' 'text/html; CharSet=utf-8' ';' charset 64
+param 'yes [utf-8]' "text/html;${tab}charset =${tab}utf-8 ; x=1" ';' charset 64
+param 'no []' 'text/html; xcharset=bad' ';' charset 64
+param 'yes [good]' 'text/html; char=bad; charset=good' ';' charset 64
+param 'yes [good]' 'text/html; charsets=bad; charset=good' ';' charset 64
+param 'yes [good]' 'text/html; xcharset=bad; charset=good' ';' charset 64
+param 'no []' 'text/html; foo="charset=bad"' ';' charset 64
+param 'yes [good]' 'text/html; q="a; charset=bad"; charset=good' ';' charset 64
+param 'yes [good]' 'text/html; q="x"=";charset=bad"; charset=good' ';' charset 64
+param 'yes [good]' 'text/html; q="x"charset=bad; charset=good' ';' charset 64
+param 'yes [good]' 'text/html; q="x"="a\";charset=bad"; charset=good' ';' charset 64
+param 'no []' 'text/html; charset' ';' charset 64
+param 'no []' 'text/html' ';' charset 64
+param 'no []' '' ';' charset 64
+
+param 'yes [a.txt]' 'attachment; filename="a.txt"; size=3' ';' filename 64
+param 'yes [a;b.txt]' 'attachment; filename="a;b.txt"' ';' filename 64
+param 'yes [a"b\c]' 'attachment; filename="a\"b\\c"' ';' filename 64
+param 'yes [C:\dir\a.txt]' 'attachment; filename="C:\dir\a.txt"' ';' filename 64
+param 'yes [abc]' 'attachment; filename="abc' ';' filename 64
+param 'yes [abc\]' "attachment; filename=\"abc\\" ';' filename 64
+param 'yes [a]' 'attachment; filename="a"junk; size=3' ';' filename 64
+param 'yes [a b]' 'attachment; filename=a b  ; size=3' ';' filename 64
+param 'yes [a=b]' 'attachment; filename=a=b' ';' filename 64
+param 'yes []' 'attachment; filename=' ';' filename 64
+param 'yes []' 'attachment; filename=""' ';' filename 64
+param 'yes [a]' 'filename=a; filename=b' ';' filename 64
+param 'no []' "attachment; filename*=UTF-8''x.txt" ';' filename 64
+param 'yes [y.txt]' "attachment; filename*=UTF-8''x.txt; filename=y.txt" \
+    ';' filename 64
+param 'no []' 'attachment; xfilename=x.txt' ';' filename 64
+
+param 'yes [100]' 'timeout=5, max=100' ',;' max 64
+param 'yes [5]' 'timeout=5; max=100' ',;' timeout 64
+param 'yes [3]' 'xmax=50, max=3' ',;' max 64
+param 'yes [3]' 'a="x,y", max=3' ',;' max 64
+
+# A value that does not fit is refused rather than clipped.
+param 'yes [abcd]' 'filename=abcd' ';' filename 5
+param 'no []' 'filename=abcd' ';' filename 4
+param 'yes [abcd]' 'filename="abcd"' ';' filename 5
+param 'no []' 'filename="abcd"' ';' filename 4
+param 'no []' 'filename="ab\cd"' ';' filename 5
+param 'yes []' 'filename=' ';' filename 1
+param 'no []' 'filename=a' ';' filename 1
+param 'no [-]' 'filename=a' ';' filename 0
+
+# The counts pin the corpus, so a sweep that silently shrinks goes red.
+selftest_queue 'header-param-diff: 5447 compared, 0 failures, changed by later=1029 trail=1320 suffix=984 quote=315 space=174 case=3' \
+    header-param-diff
+
+selftest_run_queued

@@ -32,6 +32,25 @@ Please visit our Website: http://www.httrack.com
 #include "fuzz.h"
 #include "htslib.h"
 #include "htsbauth.h"
+#include "htsurlport.h"
+
+/* A small out makes long values hit the too-long path. */
+static void fuzz_header_param(const char *value) {
+  static const struct {
+    const char *name, *seps;
+  } params[] = {{"charset", ";"}, {"filename", ";"}, {"max", ",;"}};
+
+  char out[16];
+  size_t i;
+
+  for (i = 0; i < sizeof(params) / sizeof(params[0]); i++) {
+    const hts_boolean found = hts_header_param(
+        value, params[i].seps, params[i].name, out, sizeof(out));
+
+    if (strlen(out) >= sizeof(out) || (!found && out[0] != '\0'))
+      abort();
+  }
+}
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   char *buf = fuzz_strdup(data, size);
@@ -66,6 +85,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     p = (nl != NULL) ? nl + 1 : NULL;
   }
 
+  fuzz_header_param(buf);
   freet(r.location);
   freet(line);
   freet(cookie);

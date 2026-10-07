@@ -1577,28 +1577,19 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
       }
     }
   } else if ((p = strfield(rcvd, "Content-Disposition:")) != 0) {
-    while(is_realspace(*(rcvd + p)))
-      p++;                      // sauter espaces
-    if ((int) strlen(rcvd + p) < 250) { // pas trop long?
-      char tmp[256];
-      char *a = NULL;
+    char tmp[256];
 
-      strcpybuff(tmp, rcvd + p);
-      a = strstr(tmp, "filename=");
-      if (a) {
-        a += strlen("filename=");
-        while(is_space(*a))
-          a++;
-        if (a) {
-          char *c = NULL;
+    if (hts_header_param(rcvd + p, ";", "filename", tmp, sizeof(tmp))) {
+      const char *a = tmp;
+      const char *c;
 
-          while((c = strchr(a, '/')))   /* skip all / (see RFC2616) */
-            a = c + 1;
-          hts_rtrim(a, HTS_SPACES);
-          if ((int) strlen(a) < 200) { // pas trop long?
-            strcpybuff(retour->cdispo, a);
-          }
-        }
+      while (is_space(*a))
+        a++;
+      while ((c = strchr(a, '/')) != NULL) /* skip all / (see RFC2616) */
+        a = c + 1;
+      hts_rtrim(tmp, HTS_SPACES);
+      if (strlen(a) < 200) {
+        strcpybuff(retour->cdispo, a);
       }
     }
   } else if ((p = strfield(rcvd, "Last-Modified:")) != 0) {
@@ -1637,43 +1628,21 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
     if (retour) {
       char tempo[1100];
 
-      // éviter les text/html; charset=foo
-      {
-        char *a = strchr(rcvd + p, ';');
+      char chs[256];
+      char *const semi = strchr(rcvd + p, ';');
 
-        if (a) {                // extended information
-          *a = '\0';
-          a++;
-          while(is_space(*a))
-            a++;
-          if (strfield(a, "charset")) {
-            a += 7;
-            while(is_space(*a))
-              a++;
-            if (*a == '=') {
-              a++;
-              while(is_space(*a))
-                a++;
-              if (*a == '\"')
-                a++;
-              while(is_space(*a))
-                a++;
-              if (*a) {
-                char *chs = a;
+      if (hts_header_param(rcvd + p, ";", "charset", chs, sizeof(chs))) {
+        const char *const c = chs + strspn(chs, HTS_SPACES);
+        const size_t n = strcspn(c, HTS_SPACES);
 
-                while(*a && !is_space(*a) && *a != '\"' && *a != ';')
-                  a++;
-                *a = '\0';
-                if (*chs) {
-                  if (strlen(chs) < sizeof(retour->charset) - 2) {
-                    strcpybuff(retour->charset, chs);
-                  }
-                }
-              }
-            }
-          }
+        // A charset is one token.
+        if (n != 0 && n < sizeof(retour->charset) - 2) {
+          retour->charset[0] = '\0';
+          strlncatbuff(retour->charset, c, sizeof(retour->charset), n);
         }
       }
+      if (semi != NULL)
+        *semi = '\0';
       // An empty/whitespace Content-Type value yields no token: keep the
       // sentinel default rather than reading an uninitialized tempo.
       if (sscanf(rcvd + p, "%1099s", tempo) == 1) { // tempo[1100], server data
@@ -1754,19 +1723,15 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
     while(is_space(*a))
       a++;
     if (*a) {
-      char *p;
+      char v[64];
 
       retour->keep_alive = 1;
       retour->keep_alive_max = 10;
       retour->keep_alive_t = 15;
-      if ((p = strstr(a, "timeout="))) {
-        p += strlen("timeout=");
-        keep_alive_param(p, &retour->keep_alive_t);
-      }
-      if ((p = strstr(a, "max="))) {
-        p += strlen("max=");
-        keep_alive_param(p, &retour->keep_alive_max);
-      }
+      if (hts_header_param(a, ",;", "timeout", v, sizeof(v)))
+        keep_alive_param(v, &retour->keep_alive_t);
+      if (hts_header_param(a, ",;", "max", v, sizeof(v)))
+        keep_alive_param(v, &retour->keep_alive_max);
       if (retour->keep_alive_max <= 1 || retour->keep_alive_t < 1) {
         retour->keep_alive = 0;
       }

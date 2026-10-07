@@ -1550,7 +1550,8 @@ static const struct {
     {"keep-alive", " max=1", NULL},
     {"keep-alive", " timeout=abc", NULL},
     {"keep-alive", " timeout= 7", NULL},
-    {"keep-alive", " xmax=50", NULL},
+    {"keep-alive", " xmax=50",
+     "keep_alive=1 timeout=15 max=10"}, // whole names only
     {"keep-alive", " timeout=007x", NULL},
     {"keep-alive", " timeout=-1", "keep_alive=0 timeout=0 max=10"},
     {"keep-alive", " timeout=+30", "keep_alive=0 timeout=0 max=10"},
@@ -1702,6 +1703,427 @@ static int st_intparsediff(httrackp *opt, int argc, char **argv) {
   return failures != 0;
 }
 
+/* hts_header_param() on one value: found or not, and what it copied. */
+static int st_headerparam(httrackp *opt, int argc, char **argv) {
+  char out[256];
+  int size;
+  hts_boolean found;
+
+  (void) opt;
+  if (argc != 4) {
+    fprintf(stderr, "header-param: needs <value> <seps> <name> <size>\n");
+    return 1;
+  }
+  size = atoi(argv[3]);
+  if (size < 0 || (size_t) size > sizeof(out)) {
+    fprintf(stderr, "header-param: size out of probe range\n");
+    return 1;
+  }
+  memset(out, 'X', sizeof(out));
+  found = hts_header_param(argv[0], argv[1], argv[2], out, (size_t) size);
+  printf("%s [%s]\n", found ? "yes" : "no", size != 0 ? out : "-");
+  return 0;
+}
+
+/* Each converted treathead site has a frozen legacy parse and a current one. */
+static void legacy_ctype(const char *in, char *out, size_t size) {
+  char line[1024], tempo[1100];
+  char contenttype[HTS_MIMETYPE_SIZE] = "", charset[HTS_MIMETYPE_SIZE] = "";
+  char *a;
+
+  line[0] = '\0';
+  strlncatbuff(line, in, sizeof(line), sizeof(line) - 1);
+  a = strchr(line, ';');
+  if (a) {
+    *a = '\0';
+    a++;
+    while (is_space(*a))
+      a++;
+    if (strfield(a, "charset")) {
+      a += 7;
+      while (is_space(*a))
+        a++;
+      if (*a == '=') {
+        a++;
+        while (is_space(*a))
+          a++;
+        if (*a == '\"')
+          a++;
+        while (is_space(*a))
+          a++;
+        if (*a) {
+          char *chs = a;
+
+          while (*a && !is_space(*a) && *a != '\"' && *a != ';')
+            a++;
+          *a = '\0';
+          if (*chs && strlen(chs) < sizeof(charset) - 2)
+            strcpybuff(charset, chs);
+        }
+      }
+    }
+  }
+  if (sscanf(line, "%1099s", tempo) == 1 &&
+      strlen(tempo) < sizeof(contenttype) - 2)
+    strcpybuff(contenttype, tempo);
+  snprintf(out, size, "contenttype=%s charset=%s", contenttype, charset);
+}
+
+static void current_ctype(const char *in, char *out, size_t size) {
+  htsblk r;
+
+  st_int_treathead("Content-Type:", in, &r);
+  snprintf(out, size, "contenttype=%s charset=%s", r.contenttype, r.charset);
+}
+
+static void legacy_cdispo(const char *in, char *out, size_t size) {
+  char cdispo[256] = "";
+  const char *v = in;
+
+  while (is_realspace(*v))
+    v++;
+  if (strlen(v) < 250) {
+    char tmp[256];
+    char *a;
+
+    strcpybuff(tmp, v);
+    a = strstr(tmp, "filename=");
+    if (a) {
+      char *c;
+
+      a += strlen("filename=");
+      while (is_space(*a))
+        a++;
+      while ((c = strchr(a, '/')))
+        a = c + 1;
+      hts_rtrim(a, HTS_SPACES);
+      if (strlen(a) < 200)
+        strcpybuff(cdispo, a);
+    }
+  }
+  snprintf(out, size, "cdispo=%s", cdispo);
+}
+
+static void current_cdispo(const char *in, char *out, size_t size) {
+  htsblk r;
+
+  st_int_treathead("Content-Disposition:", in, &r);
+  snprintf(out, size, "cdispo=%s", r.cdispo);
+}
+
+static void legacy_ka_param(const char *s, int *value) {
+  LLint v;
+  const hts_scan_result got = hts_scan_llint(&s, 0, INT_MAX, &v);
+
+  if (got != HTS_SCAN_NONE)
+    *value = got == HTS_SCAN_OK ? (int) v : 0;
+}
+
+static void legacy_keepalive_scan(const char *in, char *out, size_t size) {
+  int keep_alive = 0, keep_alive_t = 0, keep_alive_max = 0;
+  const char *a = in;
+
+  while (is_space(*a))
+    a++;
+  if (*a) {
+    const char *p;
+
+    keep_alive = 1;
+    keep_alive_max = 10;
+    keep_alive_t = 15;
+    if ((p = strstr(a, "timeout=")))
+      legacy_ka_param(p + strlen("timeout="), &keep_alive_t);
+    if ((p = strstr(a, "max=")))
+      legacy_ka_param(p + strlen("max="), &keep_alive_max);
+    if (keep_alive_max <= 1 || keep_alive_t < 1)
+      keep_alive = 0;
+  }
+  snprintf(out, size, "keep_alive=%d timeout=%d max=%d", keep_alive,
+           keep_alive_t, keep_alive_max);
+}
+
+/* Why a generated input may parse differently from before. */
+enum {
+  HP_LATER = 1,  // the parameter is not the first one
+  HP_TRAIL = 2,  // more parameters follow the file name
+  HP_SUFFIX = 4, // a longer name ends with the wanted one
+  HP_QUOTE = 8,  // a quoted value holds a ';' or a '\' escape
+  HP_SPACE = 16, // white space around the '='
+  HP_CASE = 32,  // the name is not in lower case
+  HP_COUNT = 6
+};
+
+static const char *const st_hp_reasons[HP_COUNT] = {"later", "trail", "suffix",
+                                                    "quote", "space", "case"};
+
+/* One parameter of the generated corpus. Key is the name it must match as, and
+   want what the site then reports, or NULL for a parameter it must skip. */
+struct st_hp_item {
+  const char *text, *key, *want;
+  int why;
+};
+
+/* Prefix is what the site prints before the value, or NULL for Keep-Alive. */
+struct st_hp_site {
+  const char *name, *head, *param, *prefix;
+  st_int_site_fn legacy, current;
+  const char *seps[4];
+  struct st_hp_item items[10];
+};
+
+static const struct st_hp_site st_hp_sites[] = {
+    {"content-type",
+     " text/html",
+     "charset",
+     "contenttype=text/html charset=",
+     legacy_ctype,
+     current_ctype,
+     {";", "; ", " ; ", NULL},
+     {{"charset=utf-8", "charset", "utf-8", 0},
+      {"charset=\"iso-8859-1\"", "charset", "iso-8859-1", 0},
+      {"CharSet = koi8-r", "charset", "koi8-r", 0},
+      {"charset=", "charset", "", 0},
+      {"xcharset=bad", NULL, NULL, 0},
+      {"q=\"a;charset=bad\"", NULL, NULL, HP_QUOTE},
+      {"format=flowed", NULL, NULL, 0},
+      {NULL, NULL, NULL, 0}}},
+    {"content-disposition",
+     " attachment",
+     "filename",
+     "cdispo=",
+     legacy_cdispo,
+     current_cdispo,
+     {";", "; ", " ; ", NULL},
+     {{"filename=a.txt", "filename", "a.txt", 0},
+      {"filename=\"b c.txt\"", "filename", "b c.txt", 0},
+      {"filename=\"dir/d.txt\"", "filename", "d.txt", 0},
+      {"FILENAME=e.txt", "filename", "e.txt", HP_CASE},
+      {"filename=\"g\\\"h.txt\"", "filename", "g\"h.txt", HP_QUOTE},
+      {"filename*=UTF-8''f.txt", NULL, NULL, 0},
+      {"xfilename=x.txt", NULL, NULL, HP_SUFFIX},
+      {"name=\"q;filename=bad\"", NULL, NULL, HP_QUOTE},
+      {"size=3", NULL, NULL, 0},
+      {NULL, NULL, NULL, 0}}},
+    {"keep-alive",
+     "",
+     NULL,
+     NULL,
+     legacy_keepalive_scan,
+     current_keepalive,
+     {",", ", ", ";", NULL},
+     {{"timeout=5", "timeout", "5", 0},
+      {"max=100", "max", "100", 0},
+      {"max=1", "max", "1", 0},
+      {"timeout = 7", "timeout", "7", HP_SPACE},
+      {"max=\"20\"", "max", "20", HP_QUOTE},
+      {"xmax=50", NULL, NULL, HP_SUFFIX},
+      {"xtimeout=9", NULL, NULL, HP_SUFFIX},
+      {"foo=bar", NULL, NULL, 0},
+      {NULL, NULL, NULL, 0}}},
+};
+
+/* First item of seq whose key is key, or NULL. */
+static const struct st_hp_item *st_hp_first(const struct st_hp_item *const *seq,
+                                            size_t n, const char *key,
+                                            size_t *at) {
+  size_t i;
+
+  for (i = 0; i < n; i++)
+    if (seq[i]->key != NULL && strcmp(seq[i]->key, key) == 0) {
+      *at = i;
+      return seq[i];
+    }
+  return NULL;
+}
+
+/* What the site must report now for the parameters in seq. */
+static void st_hp_expect(const struct st_hp_site *site,
+                         const struct st_hp_item *const *seq, size_t n,
+                         char *out, size_t size, int *why) {
+  size_t at = 0, i;
+  const struct st_hp_item *hit;
+
+  *why = 0;
+  for (i = 0; i < n; i++)
+    *why |= seq[i]->why;
+  if (site->prefix == NULL) {
+    const struct st_hp_item *t = st_hp_first(seq, n, "timeout", &at);
+    const struct st_hp_item *m = st_hp_first(seq, n, "max", &at);
+    const int timeout = t != NULL ? atoi(t->want) : 15;
+    const int max = m != NULL ? atoi(m->want) : 10;
+
+    snprintf(out, size, "keep_alive=%d timeout=%d max=%d",
+             !(max <= 1 || timeout < 1), timeout, max);
+    return;
+  }
+  hit = st_hp_first(seq, n, site->param, &at);
+  if (hit != NULL && at != 0)
+    *why |= HP_LATER;
+  if (hit != NULL && at + 1 < n)
+    *why |= HP_TRAIL;
+  snprintf(out, size, "%s%s", site->prefix, hit != NULL ? hit->want : "");
+}
+
+/* Hand cases: a NULL want means the input parses as before. */
+static const struct {
+  const char *site, *in, *want;
+} st_hp_cases[] = {
+    {"content-type", " text/html", NULL},
+    {"content-type", " text/html;charset=utf-8", NULL},
+    {"content-type", " text/html; charset='utf-8'", NULL},
+    {"content-type", " text/html; charset=\" utf-8 \"", NULL},
+    {"content-type", " text/html; charset=utf-8 junk", NULL},
+    {"content-type", " text/html; charset=utf-8\"", NULL},
+    {"content-type", " text/html; charset", NULL},
+    {"content-type", " text/html; charset=\"utf-8", NULL},
+    {"content-type", " charset=utf-8",
+     "contenttype=charset=utf-8 charset=utf-8"},
+    {"content-disposition", " attachment", NULL},
+    {"content-disposition", " attachment; filename=a.txt", NULL},
+    {"content-disposition", " attachment; filename='a.txt'", NULL},
+    {"content-disposition", " attachment; filename= a.txt ", NULL},
+    {"content-disposition", " attachment; filename=\"a.txt", NULL},
+    {"content-disposition", " attachment; filename=../../etc/passwd", NULL},
+    {"content-disposition", " attachment; filename=", NULL},
+    {"content-disposition", " filename=a.txt", NULL},
+    {"content-disposition", " attachment; filename=\"a.txt\"; size=3",
+     "cdispo=a.txt"},
+    {"content-disposition", " attachment; filename=\"a;b.txt\"", NULL},
+    {"content-disposition", " attachment; filename=\"C:\\dir\\a.txt\"", NULL},
+    {"content-disposition", " attachment; filename=\"C:\\\\dir\\\\a.txt\"",
+     "cdispo=C:\\dir\\a.txt"},
+    {"content-disposition", " attachment; filename = a.txt", "cdispo=a.txt"},
+    {"keep-alive", " timeout=5, max=100", NULL},
+    {"keep-alive", " timeout=5; max=100", NULL},
+    {"keep-alive", " timeout=5,max=100", NULL},
+    {"keep-alive", " timeout= 7", NULL},
+    {"keep-alive", " timeout=007x", NULL},
+    {"keep-alive", " timeout=-1", NULL},
+    {"keep-alive", " max", NULL},
+    {"keep-alive", " xmax=50", "keep_alive=1 timeout=15 max=10"},
+    {"keep-alive", " max=\"50\"", "keep_alive=1 timeout=15 max=50"},
+};
+
+/* Each hand case below takes HEAD, then N copies of FILL, as input. */
+static const struct {
+  const char *site, *head;
+  char fill;
+  size_t n;
+  const char *want;
+} st_hp_runs[] = {
+    {"content-type", " text/html; charset=\"utf-8 ", 'x', 300,
+     "contenttype=text/html charset="},
+    {"content-type", " text/html; charset=", 'x', 100, NULL},
+    {"content-type", " text/html; charset=", 'x', 125, NULL},
+    {"content-type", " text/html; charset=", 'x', 126, NULL},
+    {"content-disposition", " attachment; filename=", 'x', 150, NULL},
+    {"content-disposition", " attachment; filename=", 'x', 199, NULL},
+    {"content-disposition", " attachment; filename=", 'x', 200, NULL},
+    {"content-disposition", " attachment; filename=a.txt; filename*=UTF-8''",
+     'x', 240, "cdispo=a.txt"},
+    {"keep-alive", " timeout=5, max=", '0', 63, NULL},
+    {"keep-alive", " timeout=5, max=", '0', 64,
+     "keep_alive=1 timeout=5 max=10"},
+};
+
+/* Compare one hand case against the legacy copy of its site. */
+static int st_hp_case(const char *name, const char *in, const char *want) {
+  const struct st_hp_site *site = st_hp_sites;
+  char old[512], cur[512];
+
+  while (strcmp(site->name, name) != 0)
+    site++;
+  site->legacy(in, old, sizeof(old));
+  site->current(in, cur, sizeof(cur));
+  if (strcmp(cur, want != NULL ? want : old) == 0)
+    return 0;
+  printf("FAIL %s \"%s\": legacy \"%s\" now \"%s\"\n", name, in, old, cur);
+  return 1;
+}
+
+/* Build generated input I from N items under SEP, and record them in seq. */
+static void st_hp_build(const struct st_hp_site *site, size_t items,
+                        const char *sep, size_t n, size_t i,
+                        const struct st_hp_item **seq, char *in, size_t size) {
+  size_t k;
+
+  snprintf(in, size, "%s", site->head);
+  for (k = 0; k < n; k++, i /= items) {
+    seq[k] = &site->items[i % items];
+    strlncatbuff(in, k != 0 || *site->head != '\0' ? sep : " ", size, size - 1);
+    strlncatbuff(in, seq[k]->text, size, size - 1);
+  }
+}
+
+/* Run hand cases and all 1-3 item runs, and require a reason per change. */
+static int st_headerparamdiff(httrackp *opt, int argc, char **argv) {
+  size_t i, s, k, n;
+  int compared = 0, failures = 0, by[HP_COUNT] = {0};
+  char in[512], old[512], cur[512], want[512];
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (i = 0; i < sizeof(st_hp_cases) / sizeof(st_hp_cases[0]); i++, compared++)
+    failures +=
+        st_hp_case(st_hp_cases[i].site, st_hp_cases[i].in, st_hp_cases[i].want);
+  for (i = 0; i < sizeof(st_hp_runs) / sizeof(st_hp_runs[0]); i++, compared++) {
+    const size_t head = strlen(st_hp_runs[i].head);
+
+    assertf(head + st_hp_runs[i].n < sizeof(in));
+    memcpy(in, st_hp_runs[i].head, head);
+    memset(in + head, st_hp_runs[i].fill, st_hp_runs[i].n);
+    in[head + st_hp_runs[i].n] = '\0';
+    failures += st_hp_case(st_hp_runs[i].site, in, st_hp_runs[i].want);
+  }
+  for (s = 0; s < sizeof(st_hp_sites) / sizeof(st_hp_sites[0]); s++) {
+    const struct st_hp_site *site = &st_hp_sites[s];
+    size_t items, sep;
+
+    for (items = 0; site->items[items].text != NULL; items++)
+      ;
+    for (sep = 0; site->seps[sep] != NULL; sep++)
+      for (n = 1; n <= 3; n++) {
+        size_t total = 1;
+
+        for (k = 0; k < n; k++)
+          total *= items;
+        for (i = 0; i < total; i++) {
+          const struct st_hp_item *seq[3];
+          int why, r;
+
+          st_hp_build(site, items, site->seps[sep], n, i, seq, in, sizeof(in));
+          site->legacy(in, old, sizeof(old));
+          site->current(in, cur, sizeof(cur));
+          st_hp_expect(site, seq, n, want, sizeof(want), &why);
+          compared++;
+          if (strcmp(cur, want) != 0) {
+            printf("FAIL %s \"%s\": now \"%s\" want \"%s\"\n", site->name, in,
+                   cur, want);
+            failures++;
+          } else if (strcmp(cur, old) != 0) {
+            if (why == 0) {
+              printf("FAIL %s \"%s\": legacy \"%s\" now \"%s\", no reason\n",
+                     site->name, in, old, cur);
+              failures++;
+            }
+            for (r = 0; r < HP_COUNT; r++)
+              if ((why & (1 << r)) != 0) {
+                by[r]++;
+                break;
+              }
+          }
+        }
+      }
+  }
+  printf("header-param-diff: %d compared, %d failures, changed by", compared,
+         failures);
+  for (i = 0; i < HP_COUNT; i++)
+    printf(" %s=%d", st_hp_reasons[i], by[i]);
+  printf("\n");
+  return failures != 0;
+}
+
 const struct selftest_entry selftests_header[] = {
     {"pubheaders", "",
      "layout of the installed structs configure's switches decide",
@@ -1734,6 +2156,12 @@ const struct selftest_entry selftests_header[] = {
     {"int-parse-diff", "[<site> <input>]",
      "integer header and reply fields parse as before, out-of-range refused",
      st_intparsediff},
+    {"header-param", "<value> <seps> <name> <size>",
+     "one parameter of a header value, unquoted, refused if too long",
+     st_headerparam},
+    {"header-param-diff", "",
+     "header parameters parse as before, but for the named changes",
+     st_headerparamdiff},
     {"xfread-limit", "[oversized-file small-file]",
      "in-memory receive buffer size bound", st_xfread_limit},
     {"useragent", "", "default User-Agent self-test", st_useragent},

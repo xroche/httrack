@@ -150,3 +150,91 @@ hts_boolean hts_span_copy(hts_span s, char *dst, size_t size) {
   dst[n] = '\0';
   return n == s.len;
 }
+
+// Not strncasecmp, which MSVC lacks and this file has no shim for.
+static hts_boolean param_name_is(const char *key, size_t len,
+                                 const char *name) {
+  size_t i;
+
+  for (i = 0; i < len; i++)
+    if (tolower((unsigned char) key[i]) != tolower((unsigned char) name[i]))
+      return HTS_FALSE;
+  return name[len] == '\0';
+}
+
+// Only these two are escapes, so a raw Windows path keeps its backslashes.
+static hts_boolean param_escape(const char *p) {
+  return p[0] == '\\' && (p[1] == '"' || p[1] == '\\');
+}
+
+// Skip to the next separator outside a quoted string.
+static const char *param_skip(const char *p, const char *seps) {
+  hts_boolean quoted = HTS_FALSE;
+
+  for (; *p != '\0' && (quoted || !span_in_set(seps, *p)); p++) {
+    if (*p == '"')
+      quoted = !quoted;
+    else if (quoted && param_escape(p))
+      p++;
+  }
+  return p;
+}
+
+hts_boolean hts_header_param(const char *value, const char *seps,
+                             const char *name, char *out, size_t size) {
+  const char *p = value;
+
+  if (size == 0)
+    return HTS_FALSE;
+  out[0] = '\0';
+  while (*p != '\0') {
+    const char *key, *v;
+    size_t key_len, n = 0;
+    hts_boolean match;
+
+    while (span_in_set(" \t", *p) || span_in_set(seps, *p))
+      p++;
+    for (key = p; *p != '\0' && *p != '=' && !span_in_set(seps, *p); p++)
+      ;
+    for (key_len = (size_t) (p - key);
+         key_len != 0 && span_in_set(" \t", key[key_len - 1]); key_len--)
+      ;
+    if (*p != '=')
+      continue; // a field with no value, such as the media type
+    match = param_name_is(key, key_len, name);
+    for (p++; span_in_set(" \t", *p); p++)
+      ;
+    if (*p == '"') {
+      for (p++; *p != '\0' && *p != '"'; p++) {
+        if (param_escape(p))
+          p++;
+        if (match) {
+          if (n >= size - 1) {
+            out[0] = '\0';
+            return HTS_FALSE;
+          }
+          out[n++] = *p;
+        }
+      }
+      if (match) {
+        out[n] = '\0';
+        return HTS_TRUE;
+      }
+      if (*p == '"')
+        p = param_skip(p + 1, seps); // junk after the closing quote
+    } else {
+      for (v = p; *p != '\0' && !span_in_set(seps, *p); p++)
+        ;
+      for (n = (size_t) (p - v); n != 0 && span_in_set(" \t", v[n - 1]); n--)
+        ;
+      if (match) {
+        if (n > size - 1)
+          return HTS_FALSE;
+        memcpy(out, v, n);
+        out[n] = '\0';
+        return HTS_TRUE;
+      }
+    }
+  }
+  return HTS_FALSE;
+}
