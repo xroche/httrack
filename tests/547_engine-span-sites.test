@@ -17,6 +17,6 @@ warcspandiff: OK" warcspandiff
 selftest_queue "[a,][b]" span nextsep , "a,b"
 selftest_queue "[a,][,][b,]" span nextsep , "a,,b,"
 selftest_queue "[a]" span nextsep , "a"
-selftest_queue '[a\r\n][b]' span nextsep $'\n' $'a\r\nb'
+selftest_queue '[a\r,][b]' span nextsep , $'a\r,b'
 
 selftest_run_queued
