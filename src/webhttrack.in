@@ -8,15 +8,19 @@ case "${1-}" in
     cat <<'EOF'
 usage: webhttrack [browse] [htsserver option value ..] [key value ..]
 Starts htsserver and opens the WebHTTrack interface in a browser.
-  browse                 open the project index (~/websites/index.html) instead
+  browse                 open the mirrored projects (~/websites/index.html) instead
   --port <port>          passed to htsserver (default: the first free port from 8080)
   --bind <address>       passed to htsserver (default: 127.0.0.1)
   --ping-timeout <secs>  passed to htsserver
   key value              any other pair is passed to htsserver
   -h, --help             print this help and exit
   --version              print the version and exit
-The browser is $BROWSER if set, else the first one found in the PATH.
-The interface language follows LC_ALL, LC_MESSAGES or LANG.
+example: webhttrack
+means: open the interface
+example: webhttrack browse
+means: open the mirrored projects without starting the interface
+With $BROWSER set, xdg-open or sensible-browser opens the page, else the first known browser.
+The interface language follows LC_ALL, LC_MESSAGES or LANG until the interface saves its own.
 EOF
     exit 0
     ;;

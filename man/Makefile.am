@@ -1,17 +1,26 @@
 
-# man_MANS = httrack.1
 man_MANS = httrack.1 webhttrack.1 htsserver.1 proxytrack.1
 
-EXTRA_DIST = $(man_MANS) makeman.sh
+MAN_TMPLS = footer.tmpl httrack.tmpl webhttrack.tmpl htsserver.tmpl \
+	proxytrack.tmpl
 
-# Regenerate httrack.1 from the "httrack --help" output and the top-level
-# README. Run by hand after changing options or help text:
+EXTRA_DIST = $(man_MANS) makeman.sh $(MAN_TMPLS)
+
+# Regenerate every page from its program's --help and its template (httrack.1
+# also reads the top-level README). Run by hand after changing options or help
+# text:
 #   make -C man regen-man
-# The generated page is committed; this target only refreshes it. Honors
+# The generated pages are committed; this target only refreshes them. Honors
 # SOURCE_DATE_EPOCH for a reproducible date.
-regen-man: makeman.sh $(top_builddir)/src/httrack$(EXEEXT)
-	README='$(top_srcdir)/README' $(SHELL) $(srcdir)/makeman.sh \
-		'$(top_builddir)/src/httrack$(EXEEXT)' > $(srcdir)/httrack.1
+regen-man: makeman.sh $(MAN_TMPLS) $(top_builddir)/src/httrack$(EXEEXT) \
+		$(top_builddir)/src/htsserver$(EXEEXT) \
+		$(top_builddir)/src/proxytrack$(EXEEXT) $(top_builddir)/src/webhttrack
+	for p in httrack htsserver proxytrack; do \
+		README='$(top_srcdir)/README' $(SHELL) $(srcdir)/makeman.sh -p $$p \
+			"$(top_builddir)/src/$$p$(EXEEXT)" > $(srcdir)/$$p.1 || exit 1; \
+	done
+	$(SHELL) $(srcdir)/makeman.sh -p webhttrack \
+		'$(top_builddir)/src/webhttrack' > $(srcdir)/webhttrack.1
 .PHONY: regen-man
 
 # Render html/httrack.man.html from httrack.1. Needs the groff html device
