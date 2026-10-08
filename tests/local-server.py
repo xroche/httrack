@@ -582,6 +582,11 @@ class Handler(SimpleHTTPRequestHandler):
     # rule is one the engine acts on, so a refusal is the tail going unread.
     TAIL_ONLINE_UA = "tailonline"
     TAIL_RESUME = 1023  # where the old reader resumed: HTS_ROBOTS_LINE_SIZE - 1
+    # ... and one whose rule values start on the bytes that separate the
+    # engine's character classes: a VT the rule parser skips as whitespace, and
+    # a quote it keeps because is_realspace() does not take one.
+    CLASS_ROBOTS_UA = "classrobots"
+    CLASS_ROBOTS_BODY = b'User-agent: *\nDisallow:\v/vtab/\nDisallow: "/quoted/\n'
 
     def tail_robots_body(self, own_line):
         phantom = "Allow: /secret/"
@@ -630,6 +635,9 @@ class Handler(SimpleHTTPRequestHandler):
         blob = self.BLOB_ROBOTS_RE.search(ua)
         if blob:
             self.send_raw(self.robots_blob_body(int(blob.group(1))), "text/plain")
+            return
+        if self.CLASS_ROBOTS_UA in ua:
+            self.send_raw(self.CLASS_ROBOTS_BODY, "text/plain")
             return
         if self.TAIL_ROBOTS_UA in ua or self.TAIL_ONLINE_UA in ua:
             self.send_raw(

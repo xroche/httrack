@@ -171,7 +171,6 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
 #endif
   while (bptr < bodysize) {
     char *comm;
-    int llen;
     int adv;
     hts_boolean cut;
 
@@ -183,17 +182,12 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
       *comm = '\0';
       cut = HTS_FALSE; // the comment ended the value inside the buffer
     }
-    llen = (int) strlen(line); // strip trailing spaces
-    while (llen > 0 && is_realspace(line[llen - 1])) {
-      line[llen - 1] = '\0';
-      llen--;
-    }
+    hts_rtrim(line, HTS_REALSPACES);
     if (sitemaps != NULL && strfield(line, "sitemap:")) {
       // group-independent record (RFC 9309): collected whatever the group
-      char *a = line + 8;
+      char *a = line + strfield(line, "sitemap:");
 
-      while (is_realspace(*a))
-        a++;
+      a += strspn(a, HTS_REALSPACES);
       /* A line at the buffer limit was truncated: a half URL is not one. */
       if (strnotempty(a) && !cut &&
           strlen(a) + 2 < sitemapsize - strlen(sitemaps)) {
@@ -201,10 +195,9 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
         strlcatbuff(sitemaps, "\n", sitemapsize);
       }
     } else if (strfield(line, "user-agent:")) {
-      char *a = line + 11;
+      char *a = line + strfield(line, "user-agent:");
 
-      while (is_realspace(*a))
-        a++;
+      a += strspn(a, HTS_REALSPACES);
       /* RFC 9309 2.2.1: consecutive user-agent lines name one group, and the
          first one after a rule opens a new group. */
       if (!in_agents) {
@@ -227,13 +220,12 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
         record = 2; // locked to the httrack groups
       }
     } else if (strfield(line, "allow:") || strfield(line, "disallow:")) {
-      const hts_boolean is_allow = strfield(line, "allow:");
+      const hts_boolean is_allow = strfield(line, "allow:") != 0;
       const hts_boolean is_disallow = !is_allow;
-      char *a = line + (is_allow ? 6 : 9);
+      char *a = line + strfield(line, is_allow ? "allow:" : "disallow:");
 
       in_agents = HTS_FALSE; // a rule closes the group's user-agent lines
-      while (is_realspace(*a))
-        a++;
+      a += strspn(a, HTS_REALSPACES);
       if (record && strnotempty(a)) {
         if (is_disallow && !keep_root_disallow && strcmp(a, "/") == 0) {
           // dropped: site-wide disallow ignored by option

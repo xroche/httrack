@@ -1872,6 +1872,49 @@ static int st_lastchar(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* The character classes htslib.h defines, paired with the htssafe.h set string
+   a strspn()/strcspn() skip names them by. A macro cannot be a table entry, so
+   each gets a wrapper. */
+static hts_boolean cc_space(unsigned char c) { return is_space((char) c) != 0; }
+
+static hts_boolean cc_realspace(unsigned char c) {
+  return is_realspace((char) c) != 0;
+}
+
+static hts_boolean cc_taborspace(unsigned char c) {
+  return is_taborspace((char) c) != 0;
+}
+
+static hts_boolean cc_retorsep(unsigned char c) {
+  return is_retorsep((char) c) != 0;
+}
+
+static const struct {
+  const char *set;
+  hts_boolean (*pred)(unsigned char);
+} cc_classes[] = {
+    {HTS_SPACES, cc_space},
+    {HTS_REALSPACES, cc_realspace},
+    {HTS_TABORSPACES, cc_taborspace},
+    {HTS_RETORSEP, cc_retorsep},
+};
+
+/* Do strspn() and strcspn() over class CLS land where the loops they replaced
+   would have landed in S? */
+static hts_boolean cc_span_agrees(size_t cls, const char *s) {
+  const char *const set = cc_classes[cls].set;
+  hts_boolean (*const pred)(unsigned char) = cc_classes[cls].pred;
+  size_t span, cspan;
+
+  /* the span loop needs no terminator guard, because no class holds byte 0 */
+  for (span = 0; pred((unsigned char) s[span]) != 0; span++)
+    ;
+  for (cspan = 0; s[cspan] != '\0' && pred((unsigned char) s[cspan]) == 0;
+       cspan++)
+    ;
+  return strspn(s, set) == span && strcspn(s, set) == cspan;
+}
+
 /* hts_rtrim() and the sets it is called with. The string starts mid-arena, and
    the byte below it is poisoned with '#' rather than 0, or the stray NUL the
    old loop wrote there would read as untouched. */
@@ -1883,6 +1926,7 @@ static int st_rtrim(httrackp *opt, int argc, char **argv) {
   const int guard = off - 1;
   int err = 0;
   int c;
+  size_t cls;
 
   (void) opt;
   (void) argc;
@@ -1937,12 +1981,40 @@ static int st_rtrim(httrackp *opt, int argc, char **argv) {
   hts_rtrim(s, HTS_SPACES);
   CHECK(strcmp(s, "v") == 0);
 
-  /* the sets must stay the macros they stand for */
-  for (c = 1; c < 256; c++) {
-    const char b = (char) c;
+  /* Each set string must hold exactly the bytes its macro accepts, or a
+     strspn()/strcspn() skip stops somewhere the old loop did not. */
+  for (cls = 0; cls < sizeof(cc_classes) / sizeof(cc_classes[0]); cls++) {
+    for (c = 0; c < 256; c++) {
+      const char b = (char) c;
+      /* strchr() answers yes for the terminator, so byte 0 (member of no
+         class) is spelled out. */
+      const hts_boolean in_set =
+          c != 0 && strchr(cc_classes[cls].set, b) != NULL;
 
-    CHECK((strchr(HTS_SPACES, b) != NULL) == (is_space(b) != 0));
-    CHECK((strchr(HTS_REALSPACES, b) != NULL) == (is_realspace(b) != 0));
+      CHECK(in_set == cc_classes[cls].pred((unsigned char) c));
+    }
+  }
+
+  /* A skip lands where its loop did. Three bytes covers every shorter string
+     too, because the terminator is one of the three letters, and the first
+     letter runs over every byte so no disagreement can hide outside the set. */
+  for (cls = 0; cls < sizeof(cc_classes) / sizeof(cc_classes[0]); cls++) {
+    /* 'x' is in no class, so the alphabet always holds a non-member */
+    CHECK(!cc_classes[cls].pred((unsigned char) 'x'));
+    for (c = 1; c < 256; c++) {
+      const char alpha[3] = {(char) c, 'x', '\0'};
+      int i, j, k;
+
+      for (i = 0; i < 3; i++) {
+        for (j = 0; j < 3; j++) {
+          for (k = 0; k < 3; k++) {
+            const char word[4] = {alpha[i], alpha[j], alpha[k], '\0'};
+
+            CHECK(cc_span_agrees(cls, word));
+          }
+        }
+      }
+    }
   }
 
   /* control: the canary must be able to fail */

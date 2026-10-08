@@ -737,10 +737,12 @@ void *hts_get_callback(t_hts_htmlcheck_callbacks * callbacks,
 #define PATH_SEPARATOR '/'
 #endif
 
+     /* clang-format off */
+/* One byte per column, so the four classes read side by side. Nothing down
+   to the next marker survives clang-format either. */
 #define  is_space(c)      ( ((c)==' ') || ((c)=='\"') || ((c)==10) || ((c)==13) || ((c)==9) || ((c)==12) || ((c)==11) || ((c)=='\'') )
 #define  is_realspace(c)  ( ((c)==' ')                || ((c)==10) || ((c)==13) || ((c)==9) || ((c)==12) || ((c)==11)                )
 #define  is_taborspace(c) ( ((c)==' ')                                          || ((c)==9)                             )
-#define  is_quote(c)      (               ((c)=='\"')                                                    || ((c)=='\'') )
 #define  is_retorsep(c)   (                              ((c)==10) || ((c)==13) || ((c)==9)                                          )
 //HTS_INLINE int is_space(char);
 //HTS_INLINE int is_realspace(char);
@@ -758,8 +760,8 @@ void *hts_get_callback(t_hts_htmlcheck_callbacks * callbacks,
 #define HTTP_IS_OK(code) ( ( (code) / 100 ) == 2 )
 #define HTTP_IS_ERROR(code) ( !HTTP_IS_OK(code) && !HTTP_IS_REDIRECT(code) && !HTTP_IS_NOTMODIFIED(code) )
 
-// compare le début de f avec s et retourne la position de la fin
-// 'A=a' (case insensitive)
+// 0 when f does not start with s, else the index in f just past the match.
+// Compares without regard to case.
 HTS_STATIC int strfield(const char *f, const char *s) {
   int r = 0;
 
@@ -773,6 +775,8 @@ HTS_STATIC int strfield(const char *f, const char *s) {
   else
     return 0;
 }
+
+/* clang-format on */
 
 HTS_STATIC int strcmpnocase(const char *a, const char *b) {
   while(*a) {

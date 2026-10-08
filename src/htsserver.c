@@ -611,9 +611,7 @@ static hts_boolean host_is_self(const char *host, const char *bound) {
 
 /** Header value with leading blanks dropped, clipped to fit dst. */
 static void copy_header_value(char *dst, size_t size, const char *value) {
-  while (*value == ' ' || *value == '\t') {
-    value++;
-  }
+  value += strspn(value, HTS_TABORSPACES);
   dst[0] = '\0';
   strlncatbuff(dst, value, size, size - 1);
 }
@@ -1243,8 +1241,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             char *s = line + p;
 
             /*int l; */
-            while(*s == ' ')
-              s++;
+            s += strspn(s, " ");
             tmp[0] = '\0';
             strncatbuff(tmp, s, 2);
             /*l = LANG_SEARCH(path, tmp); */

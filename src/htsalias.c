@@ -1086,32 +1086,26 @@ cmdl_file_result optinclude_file(const char *name, cmdl_argv *cmd) {
       /* trim first: a blank line is skipped, not parsed as an option */
       hts_rtrim(line, HTS_REALSPACES);
       a = line;
-      while (is_realspace(*a))
-        a++;
+      a += strspn(a, HTS_REALSPACES);
       if (*a != '\0') {
         /* no comment line: # // ; even indented */
         if (strchr("#/;", *a) == NULL) {
           /* jump "set " and spaces */
           if (strncasecmp(a, "set", 3) == 0 && is_realspace(a[3]))
             a += 4;
-          while(is_realspace(*a))
-            a++;
+          a += strspn(a, HTS_REALSPACES);
 
           /* the option ends at a space or '=', so a '=' in the value stays */
-          b = a;
-          while (*b != '\0' && !is_realspace(*b) && *b != '=')
-            b++;
+          b = a + strcspn(a, HTS_REALSPACES "=");
           if (*b) {
             const hts_boolean equal = *b == '=';
 
             *b++ = '\0';
-            while (is_realspace(*b))
-              b++;
+            b += strspn(b, HTS_REALSPACES);
             /* skip the '=' of "key = value" */
             if (!equal && *b == '=') {
               b++;
-              while (is_realspace(*b))
-                b++;
+              b += strspn(b, HTS_REALSPACES);
             }
           }
           /* a is now the option, b the parameter */

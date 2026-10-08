@@ -482,18 +482,16 @@ void hts_finish_html_file(httrackp *opt, cache_back *cache, htsblk *r,
 
 hts_boolean hts_scan_token(char **ptr, char *dest, size_t destsize) {
   char *a = *ptr;
-  size_t len = 0; /* the token's real length, which may exceed the room */
+  /* the token's real length, which may exceed the room */
+  const size_t len = strcspn(a, HTS_REALSPACES);
+  size_t kept;
 
   assertf(destsize != 0);
-  while (*a != '\0' && !isspace((unsigned char) *a)) {
-    if (len < destsize - 1)
-      dest[len] = *a;
-    len++;
-    a++;
-  }
-  dest[len < destsize ? len : destsize - 1] = '\0';
-  while (isspace((unsigned char) *a))
-    a++;
+  kept = len < destsize ? len : destsize - 1;
+  memcpy(dest, a, kept);
+  dest[kept] = '\0';
+  a += len;
+  a += strspn(a, HTS_REALSPACES);
   *ptr = a;
   return len < destsize ? HTS_TRUE : HTS_FALSE;
 }
