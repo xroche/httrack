@@ -640,18 +640,25 @@ static hts_boolean chop_to_parent(char *file, size_t root, size_t *len) {
   return HTS_TRUE;
 }
 
-/* Decodes a rule into dest as a crawled link is decoded, so "%41" and "%20"
-   match the "A" and space a link holds. HTS_FALSE if it does not fit. */
+/* Decodes a rule into dest as the parser decodes a crawled link: the part
+   before any '?', so "%41" and "%20" match the "A" and space a link holds.
+   Returns HTS_FALSE if it does not fit in size bytes. */
 static hts_boolean filter_rule_decode_(const char *rule, char *dest,
                                        size_t size) {
-  /* a truncated decode is still too long to fit */
-  char BIGSTK dec[HTS_FILTER_MAXLEN * 3 + 1];
-  const size_t len =
-      strlen(unescape_http_unharm(dec, sizeof(dec), rule, 1 | 2));
+  char BIGSTK path[HTS_FILTER_MAXLEN * 3 + 1], dec[sizeof(path)];
+  const char *const query = rule + strcspn(rule, "?");
+  const size_t plen = (size_t) (query - rule);
+  size_t len;
 
-  if (len >= size)
+  if (plen >= sizeof(path))
     return HTS_FALSE;
-  memcpy(dest, dec, len + 1);
+  memcpy(path, rule, plen);
+  path[plen] = '\0';
+  len = strlen(unescape_http_unharm(dec, sizeof(dec), path, 1 | 2));
+  if (strlen(query) >= size || len >= size - strlen(query))
+    return HTS_FALSE;
+  memcpy(dest, dec, len);
+  memcpy(dest + len, query, strlen(query) + 1);
   return HTS_TRUE;
 }
 
@@ -891,7 +898,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
         joker = 1;
 
       if (joker) { // a filter rule
-        /* sized off the rule cap, so the parser refuses exactly what the array
+        /* sized off the rule cap, so the decode refuses exactly what the array
            and the matcher would (#1288) */
         char BIGSTK tempo[HTS_FILTER_MAXLEN + 1];
         char BIGSTK raw[HTS_FILTER_MAXLEN * 3 + 1];
@@ -980,17 +987,17 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
       if (ident_url_absolute(url, &af) < 0) {
         printf("--why: unable to parse URL %s" LF, StringBuff(opt->why_url));
       } else {
-        char *const query = strchr(af.fil, '?');
-        char BIGSTK path[sizeof(af.fil)], q[sizeof(af.fil)];
+        char *const query = af.fil + strcspn(af.fil, "?");
+        char BIGSTK path[sizeof(af.fil)];
         int jokDepth = 0;
 
         /* decode the path as the parser decodes a crawled link */
-        strcpybuff(q, query != NULL ? query : "");
-        if (query != NULL)
-          *query = '\0';
+        const char c = *query;
+        *query = '\0';
         unescape_http_unharm(path, sizeof(path), af.fil, 1 | 2);
+        *query = c;
+        strcatbuff(path, query);
         strcpybuff(af.fil, path);
-        strcatbuff(af.fil, q);
         const int jok =
             filters_match_url(filters, filptr, af.adr, af.fil, &jokDepth);
 
@@ -4509,8 +4516,8 @@ char **hts_addfilter_take(httrackp *opt) {
   return old;
 }
 
-/* Writes rule to norm (HTS_FILTER_MAXLEN + 1 bytes) as the command line
-   stores it. Returns HTS_FALSE if the rule is refused. */
+/* Writes rule, decoded, to norm (HTS_FILTER_MAXLEN + 1 bytes). Returns
+   HTS_FALSE if the rule is refused. */
 static hts_boolean filter_rule_normalize_(const char *rule, char *norm) {
   size_t i;
 

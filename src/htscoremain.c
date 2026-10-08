@@ -2826,12 +2826,11 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           if (strnotempty(url))
             strlcatbuff(url, " ", url_sz); // separator space
           /* a rule is decoded once, where the engine splits the rules */
-          if (argv[na][0] == '+' || argv[na][0] == '-')
-            append_escape_spc_url(argv[na], url, url_sz);
-          else
-            append_escape_spc_url(
-                unescape_http_unharm(catbuff, sizeof(catbuff), argv[na], 1),
-                url, url_sz);
+          append_escape_spc_url(
+              argv[na][0] == '+' || argv[na][0] == '-'
+                  ? argv[na]
+                  : unescape_http_unharm(catbuff, sizeof(catbuff), argv[na], 1),
+              url, url_sz);
         }
       }                         // if argv=- etc. 
 

@@ -411,8 +411,8 @@ static int st_filtercap(httrackp *opt, int argc, char **argv) {
 #undef POISON
 
 /* ------------------------------------------------------------ */
-/* hts_addfilter() queues only signed rules within HTS_FILTER_MAXLEN, stored as
-   the command line stores them. */
+/* hts_addfilter() queues only signed rules within HTS_FILTER_MAXLEN, stored
+   decoded. */
 static int st_addfilter(httrackp *opt, int argc, char **argv) {
   static const struct {
     const char *label;
@@ -435,6 +435,7 @@ static int st_addfilter(httrackp *opt, int argc, char **argv) {
       {"space", "-*a b*", 0, HTS_TRUE},
       {"star escape", "-*%2a*", 0, HTS_TRUE},
       {"high escape", "-*%e9*", 0, HTS_TRUE},
+      {"query", "+*%41?q=%41*", 0, HTS_TRUE, "+*A?q=%41*"},
   };
 
   char rule[HTS_FILTER_MAXLEN + 2];
