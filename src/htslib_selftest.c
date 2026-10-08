@@ -1872,6 +1872,29 @@ static int st_lastchar(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* The character classes htslib.h defines, paired with the htssafe.h set string
+   a strspn()/strcspn() skip names them by. A macro cannot be a table entry, so
+   each gets a wrapper. */
+static int cc_space(unsigned char c) { return is_space((char) c) != 0; }
+
+static int cc_realspace(unsigned char c) { return is_realspace((char) c) != 0; }
+
+static int cc_taborspace(unsigned char c) {
+  return is_taborspace((char) c) != 0;
+}
+
+static int cc_retorsep(unsigned char c) { return is_retorsep((char) c) != 0; }
+
+static const struct {
+  const char *set;
+  int (*pred)(unsigned char);
+} cc_classes[] = {
+    {HTS_SPACES, cc_space},
+    {HTS_REALSPACES, cc_realspace},
+    {HTS_TABORSPACES, cc_taborspace},
+    {HTS_RETORSEP, cc_retorsep},
+};
+
 /* hts_rtrim() and the sets it is called with. The string starts mid-arena, and
    the byte below it is poisoned with '#' rather than 0, or the stray NUL the
    old loop wrote there would read as untouched. */
@@ -1883,6 +1906,7 @@ static int st_rtrim(httrackp *opt, int argc, char **argv) {
   const int guard = off - 1;
   int err = 0;
   int c;
+  size_t cls;
 
   (void) opt;
   (void) argc;
@@ -1937,12 +1961,58 @@ static int st_rtrim(httrackp *opt, int argc, char **argv) {
   hts_rtrim(s, HTS_SPACES);
   CHECK(strcmp(s, "v") == 0);
 
-  /* the sets must stay the macros they stand for */
-  for (c = 1; c < 256; c++) {
-    const char b = (char) c;
+  /* Each set string must hold exactly the bytes its macro accepts, or a
+     strspn()/strcspn() skip stops somewhere the old loop did not. */
+  for (cls = 0; cls < sizeof(cc_classes) / sizeof(cc_classes[0]); cls++) {
+    for (c = 0; c < 256; c++) {
+      const char b = (char) c;
+      /* strchr() answers yes for the terminator, so byte 0 is spelled out: it
+         belongs to no class. */
+      const int in_set = c != 0 && strchr(cc_classes[cls].set, b) != NULL;
 
-    CHECK((strchr(HTS_SPACES, b) != NULL) == (is_space(b) != 0));
-    CHECK((strchr(HTS_REALSPACES, b) != NULL) == (is_realspace(b) != 0));
+      CHECK(in_set == cc_classes[cls].pred((unsigned char) c));
+    }
+  }
+
+  /* strspn() and strcspn() advance over exactly what the hand-written loops
+     advanced over. Length 3 is enough because each loop decides from the byte
+     under the cursor alone, so a longer run repeats a case already here. */
+  for (cls = 0; cls < sizeof(cc_classes) / sizeof(cc_classes[0]); cls++) {
+    static const size_t pow3[4] = {1, 3, 9, 27};
+    const char *const set = cc_classes[cls].set;
+    int (*const pred)(unsigned char) = cc_classes[cls].pred;
+    /* a class member, a byte in no class, and the terminator */
+    const char alpha[3] = {set[0], 'x', '\0'};
+    size_t len;
+
+    CHECK(pred((unsigned char) alpha[0]) != 0);
+    CHECK(pred((unsigned char) alpha[1]) == 0);
+
+    for (len = 0; len < sizeof(pow3) / sizeof(pow3[0]); len++) {
+      size_t word;
+
+      for (word = 0; word < pow3[len]; word++) {
+        char buf[4];
+        size_t k, rest = word, want;
+
+        for (k = 0; k < len; k++) {
+          buf[k] = alpha[rest % 3];
+          rest /= 3;
+        }
+        buf[len] = '\0';
+
+        /* while (pred(*p)) p++ needs no terminator guard, because pred() turns
+           byte 0 down above. */
+        for (want = 0; pred((unsigned char) buf[want]) != 0; want++)
+          ;
+        CHECK(strspn(buf, set) == want);
+
+        for (want = 0;
+             buf[want] != '\0' && pred((unsigned char) buf[want]) == 0; want++)
+          ;
+        CHECK(strcspn(buf, set) == want);
+      }
+    }
   }
 
   /* control: the canary must be able to fail */

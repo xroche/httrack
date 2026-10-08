@@ -674,10 +674,14 @@ static HTS_INLINE HTS_UNUSED hts_boolean hts_choplastchar(char *s) {
   return HTS_FALSE;
 }
 
-/** The character sets matching htslib.h's is_space() and is_realspace(), for
-    hts_rtrim(). The -#test=rtrim self-test keeps them in sync. */
+/** The character sets matching htslib.h's is_space(), is_realspace(),
+    is_taborspace() and is_retorsep(), for hts_rtrim() and for the strspn() and
+    strcspn() skips that replaced the hand-written loops. The -#test=rtrim
+    self-test keeps each set and its macro in sync. */
 #define HTS_SPACES " \"\n\r\t\f\v'"
 #define HTS_REALSPACES " \n\r\t\f\v"
+#define HTS_TABORSPACES " \t"
+#define HTS_RETORSEP "\n\r\t"
 
 /** Length of s with its trailing bytes from set dropped, so 0 when every byte
     of s is in set. */

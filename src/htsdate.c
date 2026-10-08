@@ -80,11 +80,9 @@ struct tm *convert_time_rfc822(struct tm *result, const char *s) {
     char *first, *last;
     char tok[256];
 
-    while (*a == ' ')
-      a++;
+    a += strspn(a, " ");
     first = a;
-    while ((*a) && (*a != ' '))
-      a++;
+    a += strcspn(a, " ");
     last = a;
     tok[0] = '\0';
     if (first != last) {
@@ -99,8 +97,7 @@ struct tm *convert_time_rfc822(struct tm *result, const char *s) {
         LLint value;
 
         /* A '+' zone such as "+0100" reads as its digits. */
-        while (isspace((unsigned char) *digits))
-          digits++;
+        digits += strspn(digits, HTS_REALSPACES);
         if (digits[0] == '+' && isdigit((unsigned char) digits[1]))
           digits++;
         if (hts_scan_llint(&digits, 0, INT_MAX, &value) == HTS_SCAN_OK) {

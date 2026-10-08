@@ -137,8 +137,7 @@ int cookie_add(t_cookie * cookie, const char *cook_name, const char *cook_value,
         a = cookie->data + strlen(cookie->data);        // fin
       else
         a++;
-      while(*a == '\n')
-        a++;
+      a += strspn(a, "\n");
       insert = a;               // insérer ici
     }
   }
@@ -269,8 +268,7 @@ char *cookie_nextfield(char *a) {
     a = b + strlen(b);          // fin
   else
     a++;
-  while(*a == '\n')
-    a++;
+  a += strspn(a, "\n");
   return a;
 }
 
@@ -510,8 +508,7 @@ const char *cookie_get(char *buffer, const char *cookie_base, int param) {
   hts_span field;
   int i;
 
-  while(*cookie_base == '\n')
-    cookie_base++;
+  cookie_base += strspn(cookie_base, "\n");
   limit = strchr(cookie_base, '\n');
   if (limit == NULL)
     limit = cookie_base + strlen(cookie_base);

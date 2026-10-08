@@ -1,0 +1,64 @@
+#!/bin/bash
+# The parsers skip whitespace with strspn()/strcspn() over the htssafe.h set
+# strings. A set narrower or wider than the is_*() macro it stands for shifts
+# where a value starts, so each probe sits on a byte one class holds and its
+# neighbour does not: VT is whitespace to is_realspace() but not to
+# is_taborspace(), and a quote is whitespace to is_space() but not to
+# is_realspace().
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+# Resolve httrack before any cd: PATH may carry a build-relative entry.
+bin=$(command -v httrack) || fail "httrack not found on PATH"
+case "$bin" in
+/*) ;;
+*) bin="$(cd "$(dirname "$bin")" && pwd)/$(basename "$bin")" ;;
+esac
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_charclass.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmpdir"
+
+# --- 1. the config-file option parser (htsalias.c) --------------------------
+# One unknown option per line, each naming itself back in the log, so what the
+# parser took as the option name is readable without a crawl.
+rcdir="$tmpdir/rc"
+mkdir -p "$rcdir"
+echo '<html><body>hi</body></html>' >"$rcdir/index.html"
+printf '"zzz-quoted\n\vyyy-vtab\nwww-opt\vvalue\n' >"$rcdir/.httrackrc"
+# HTS_HTTRACKRC is ".httrackrc" on POSIX and "httrackrc" on Windows.
+cp "$rcdir/.httrackrc" "$rcdir/httrackrc"
+
+rc=0
+log=$( (cd "$rcdir" && "$bin" "file://$rcdir/index.html" --quiet -n 2>&1)) || rc=$?
+test "$rc" -eq 0 || fail "rc-file crawl exited $rc: $log"
+log=${log//$'\r'/}
+
+# A quote is not whitespace here, so it stays in the option name.
+grep -q 'Unknown option: "zzz-quoted' <<<"$log" ||
+    fail "a leading quote was eaten as whitespace by the rc parser: $log"
+# A VT is, so the name starts after it.
+grep -q 'Unknown option: yyy-vtab$' <<<"$log" ||
+    fail "a leading VT was not skipped by the rc parser: $log"
+# And the name ends at one.
+grep -q 'Unknown option: www-opt$' <<<"$log" ||
+    fail "the option name did not end at a VT: $log"
+
+# --- 2. the robots.txt rule parser (htsrobots.c) ----------------------------
+# The server's "classrobots" body Disallows "\v/vtab/" and '"/quoted/'. The
+# first rule only bites if the VT is skipped; the second only if the quote is
+# not, which would be the engine honouring a rule the site did not write.
+doc="$tmpdir/doc"
+mkdir -p "$doc/vtab" "$doc/quoted"
+printf '<html><body><a href="vtab/page.html">v</a>\n<a href="quoted/page.html">q</a></body></html>\n' \
+    >"$doc/index.html"
+for d in vtab quoted; do
+    printf '<html><body>body of %s</body></html>\n' "$d" >"$doc/$d/page.html"
+done
+
+bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$doc")" \
+    --errors 0 --found 'quoted/page.html' --not-found 'vtab/page.html' \
+    httrack 'BASEURL/index.html' -r3 -s2 -F 'classrobots-agent'
+
+exit 0

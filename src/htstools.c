@@ -636,8 +636,7 @@ HTS_INLINE int __rech_tageq(const char *adr, const char *s) {
 
   p = strfield(adr, s);
   if (p) {
-    while(is_space(adr[p]))
-      p++;
+    p += (int) strspn(&adr[p], HTS_SPACES);
     if (adr[p] == '=') {
       return p + 1;
     }
@@ -667,7 +666,8 @@ HTS_INLINE int rech_tageq_all(const char *adr, const char *s) {
           if (strncasecmp(&adr[p], s, s_len) == 0
               && (is_realspace(adr[p + s_len]) || adr[p + s_len] == '=')
             ) {
-            for(p += s_len; is_realspace(adr[p]) || adr[p] == '='; p++) ;
+            p += s_len;
+            p += (int) strspn(&adr[p], HTS_REALSPACES "=");
             return p;
           }
           token = &adr[p];
@@ -684,8 +684,7 @@ HTS_INLINE int rech_endtoken(const char *adr, const char **start) {
   char quote = '\0';
   int length = 0;
 
-  while(is_space(*adr))
-    adr++;
+  adr += strspn(adr, HTS_SPACES);
   if (*adr == '"' || *adr == '\'')
     quote = *adr++;
   *start = adr;
@@ -704,8 +703,7 @@ HTS_INLINE int __rech_tageqbegdigits(const char *adr, const char *s) {
   if (p) {
     while(isdigit((unsigned char) adr[p]))
       p++;                      // jump digits
-    while(is_space(adr[p]))
-      p++;
+    p += (int) strspn(&adr[p], HTS_SPACES);
     if (adr[p] == '=') {
       return p + 1;
     }
@@ -735,8 +733,7 @@ HTS_INLINE int check_tag(const char *from, const char *tag) {
   size_t i = 0;
   char s[256];
 
-  while(is_space(*a))
-    a++;
+  a += strspn(a, HTS_SPACES);
   for( ; (isalnum((unsigned char) *a) || (*a == '/')) && i + 1 < sizeof(s) ; i++, a++) {
     s[i] = *a;
   }

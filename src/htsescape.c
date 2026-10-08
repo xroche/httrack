@@ -33,12 +33,9 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsescape.h"
 
-#include <string.h>
+#include "htslib.h"
 
-/* CR, LF or TAB, as htslib.h's is_retorsep(). */
-static HTS_INLINE int hts_is_retorsep(const char c) {
-  return c == 10 || c == 13 || c == 9;
-}
+#include <string.h>
 
 /* The bounds check must run before hts_ehex(), or a truncated escape is read
    past the terminator. */
@@ -77,7 +74,7 @@ void hts_unescapeini(const char *s, String *tempo) {
                (h = hts_ehex(&s[i + 1])) >= 0) {
       const char hc = (char) h;
 
-      if (!hts_is_retorsep(hc) || !hts_is_retorsep(lastc)) {
+      if (!is_retorsep(hc) || !is_retorsep(lastc)) {
         StringAddchar(*tempo, lastc = hc);
       }
       i += 2;
