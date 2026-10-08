@@ -36,6 +36,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsbase.h"
 #include "htsalias.h"
+#include "htscmdline.h"
 #include "htsglobal.h"
 #include "htslib.h"
 #include "htslines.h"
@@ -576,6 +577,25 @@ static void optparam_error(optparam_state state, const char *spelling,
                       spelling, next, help);
 }
 
+/* Report that --name refuses param, and ask to remove its quotes if it has
+   any. */
+static void optvalue_error(const char *name, const char *param,
+                           char *return_error, size_t return_error_size) {
+  char help[256];
+
+  optalias_help_line(help, sizeof(help), name);
+  if (hts_is_quoted(param, strlen(param)))
+    slprintfbuff_clip(return_error, return_error_size,
+                      "Syntax error:\n\tOption --%s: %s " HTS_QUOTED_HINT
+                      "\n%s",
+                      name, param, help);
+  else
+    slprintfbuff_clip(
+        return_error, return_error_size,
+        "Syntax error:\n\tOption --%s does not take the value %s\n%s", name,
+        param, help);
+}
+
 /*
   Check for alias in command-line
   argc,argv     as in main()
@@ -599,7 +619,6 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
       char command[HTS_CDLMAXSIZE];
       char param[HTS_CDLMAXSIZE];
       char addcommand[256];
-      char help[256];
 
       /* */
       char *position;
@@ -699,11 +718,8 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
             !optalias_paramn_glues(param) &&
             (optalias_paramn_cluster_tail(param) ||
              strchr(param, '%') == NULL)) {
-          slprintfbuff_clip(
-              return_error, return_error_size,
-              "Syntax error:\n\tOption --%s does not take the value %s\n%s",
-              hts_optalias[pos][0], param,
-              optalias_help_line(help, sizeof(help), hts_optalias[pos][0]));
+          optvalue_error(hts_optalias[pos][0], param, return_error,
+                         return_error_size);
           return 0;
         }
 
@@ -717,11 +733,8 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
         /* Every other class glues the value onto the short form in one
            buffer, where strlcatbuff aborts rather than clips. */
         if (!detached && strlen(param) >= return_argv_size - strlen(command)) {
-          slprintfbuff_clip(
-              return_error, return_error_size,
-              "Syntax error:\n\tOption --%s does not take the value %s\n%s",
-              hts_optalias[pos][0], param,
-              optalias_help_line(help, sizeof(help), hts_optalias[pos][0]));
+          optvalue_error(hts_optalias[pos][0], param, return_error,
+                         return_error_size);
           return 0;
         }
 
@@ -747,12 +760,8 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
                own values out above */
             if (strcmp(hts_optalias[pos][2], "param") == 0 &&
                 param[0] != '\0' && !optalias_param_takes(command, param)) {
-              slprintfbuff_clip(
-                  return_error, return_error_size,
-                  "Syntax error:\n\tOption --%s does not take the "
-                  "value %s\n%s",
-                  hts_optalias[pos][0], param,
-                  optalias_help_line(help, sizeof(help), hts_optalias[pos][0]));
+              optvalue_error(hts_optalias[pos][0], param, return_error,
+                             return_error_size);
               return 0;
             }
             /* --cache=off or --index=on */
@@ -776,13 +785,8 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
                 slprintfbuff_clip(return_error, return_error_size,
                                   "Unknown option: %s\n", argv[n_arg] + 2);
               else
-                slprintfbuff_clip(
-                    return_error, return_error_size,
-                    "Syntax error:\n\tOption --%s does not take the value "
-                    "%s\n%s",
-                    hts_optalias[pos][0], param,
-                    optalias_help_line(help, sizeof(help),
-                                       hts_optalias[pos][0]));
+                optvalue_error(hts_optalias[pos][0], param, return_error,
+                               return_error_size);
               return 0;
             }
             strlcatbuff(return_argv[0], suffix, return_argv_size);
@@ -856,6 +860,10 @@ int optalias_find(const char *token) {
 
 /* Finds the <token> real option and returns the index, or -1 if failed */
 int optreal_find(const char *token) {
+  /* -O followed by digits (-O1) is -O, and still takes the path after it */
+  if (strncmp(token, "-O", 2) == 0 && token[2] != '\0' &&
+      strspn(token + 2, "0123456789") == strlen(token + 2))
+    token = "-O";
   if (token[0] != '\0') {
     int i = 0;
 
@@ -910,14 +918,9 @@ static hts_boolean cmdl_reserve(cmdl_argv *cmd, int count) {
     return HTS_FALSE;
   cmd->argv = slots;
   /* hts_boolean is no wider than a pointer, so this cannot wrap either */
-  flags = (hts_boolean *) realloct(cmd->unquoted,
-                                   sizeof(hts_boolean) * (size_t) capacity);
-  if (flags == NULL) /* argv stays grown; capacity does not, so it is retried */
-    return HTS_FALSE;
-  cmd->unquoted = flags;
   flags = (hts_boolean *) realloct(cmd->param,
                                    sizeof(hts_boolean) * (size_t) capacity);
-  if (flags == NULL)
+  if (flags == NULL) /* argv stays grown; capacity does not, so it is retried */
     return HTS_FALSE;
   cmd->param = flags;
   spans = (int *) realloct(cmd->span, sizeof(int) * (size_t) capacity);
@@ -940,7 +943,6 @@ hts_boolean cmdl_init(cmdl_argv *cmd, int slots) {
 void cmdl_free(cmdl_argv *cmd) {
   hts_arena_free(&cmd->tokens);
   freet(cmd->argv);
-  freet(cmd->unquoted);
   freet(cmd->param);
   freet(cmd->span);
   memset(cmd, 0, sizeof(*cmd));
@@ -959,22 +961,13 @@ hts_boolean cmdl_ins(cmdl_argv *cmd, const char *token, int pos) {
     return HTS_FALSE;
   for (i = cmd->argc; i > pos; i--) {
     cmd->argv[i] = cmd->argv[i - 1];
-    cmd->unquoted[i] = cmd->unquoted[i - 1];
     cmd->param[i] = cmd->param[i - 1];
     cmd->span[i] = cmd->span[i - 1];
   }
   cmd->argv[pos] = copy;
-  cmd->unquoted[pos] = HTS_FALSE;
   cmd->param[pos] = HTS_FALSE;
   cmd->span[pos] = 0;
   cmd->argc++;
-  return HTS_TRUE;
-}
-
-hts_boolean cmdl_ins_unquoted(cmdl_argv *cmd, const char *token, int pos) {
-  if (!cmdl_ins(cmd, token, pos))
-    return HTS_FALSE;
-  cmd->unquoted[pos] = HTS_TRUE;
   return HTS_TRUE;
 }
 
@@ -1048,6 +1041,7 @@ cmdl_file_result optinclude_file(const char *name, cmdl_argv *cmd) {
             char return_error[256];
             char _tmp_argv[4][HTS_CDLMAXSIZE];
             char *tmp_argv[4];
+            hts_boolean quote_ok = HTS_TRUE;
 
             tmp_argv[0] = _tmp_argv[0];
             tmp_argv[1] = _tmp_argv[1];
@@ -1061,8 +1055,14 @@ cmdl_file_result optinclude_file(const char *name, cmdl_argv *cmd) {
                                     &return_argc, (tmp_argv + 2),
                                     sizeof(_tmp_argv[0]), return_error,
                                     sizeof(return_error));
+            /* strip a value's quote pair, but -O decodes its own quotes */
+            if (result && return_argc > 1 && strncmp(tmp_argv[2], "-O", 2) != 0)
+              quote_ok = hts_unquote_arg(tmp_argv[3]);
             if (!result) {
               printf("%s\n", return_error);
+            } else if (!quote_ok) {
+              fprintf(stderr, "* %s: missing quote in %s, ignored\n", name,
+                      tmp_argv[3]);
             } else {
               if (return_error[0] != '\0')
                 fprintf(stderr, "* %s\n", return_error);

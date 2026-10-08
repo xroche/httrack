@@ -113,7 +113,7 @@ httrack \
 	${test:todo:--mirror:--mirror:--mirror:--get:--mirrorlinks:--testlinks:--continue:--update}
 	${unquoted:urls}
 	${test:filelist:-%L "}${arg:filelist}${test:filelist:"}
-	--path "${arg:path}/${arg:projname}" 
+	-O1 "${arg:path}/${arg:projname}" 
 \
 	${test:parseall:--near}
 	${test:link:--test}

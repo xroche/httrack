@@ -54,8 +54,13 @@ Please visit our Website: http://www.httrack.com
    allocated. */
 char **hts_split_args(char *cmd, int *nargs, int flags);
 
-/* hts_split_args() under HTS_SPLIT_FOLD_WS: the WebHTTrack command line. */
+/* Split the WebHTTrack filter list with hts_split_args() under
+   HTS_SPLIT_FOLD_WS. */
 char **hts_split_cmdline(char *cmd, int *nargs);
+
+/* hts_split_args() for the command line a WebHTTrack page posts, whose values
+   are quoted as hts_quote_arg() does. */
+char **hts_split_webcmd(char *cmd, int *nargs);
 
 /* Append len bytes of arg to out with \\ and \" escaped, the body of a quoted
    argument without its quotes. */
@@ -65,6 +70,12 @@ void hts_escape_arg(String *out, const char *arg, size_t len);
    backslash, "" when empty, verbatim otherwise. hts_split_args() with
    HTS_SPLIT_STRIP_QUOTES reads it back. */
 void hts_quote_arg(String *out, const char *arg);
+
+/* Do the first len bytes of arg start and end with a quote? */
+hts_boolean hts_is_quoted(const char *arg, size_t len);
+
+/* This hint follows "<where>: <value> " when hts_is_quoted(value). */
+#define HTS_QUOTED_HINT "is quoted, remove the quotes"
 
 /* Strip one surrounding quote pair from arg in place, if it starts with a
    quote. HTS_FALSE when that quote is not closed at its end. */

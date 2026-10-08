@@ -502,7 +502,7 @@ static int st_quoteprop(httrackp *opt, int argc, char **argv) {
                  StringBuff(got));
     freet(in);
 
-    /* WebHTTrack: "prog" then each argument quoted, unquoted by the engine */
+    /* WebHTTrack posts "prog" and each argument quoted, for htsweb.c */
     StringClear(got);
     {
       String cmd = STRING_EMPTY;
@@ -511,11 +511,9 @@ static int st_quoteprop(httrackp *opt, int argc, char **argv) {
       StringCat(cmd, StringBuff(cmdline));
       in = strdupt(StringBuff(cmd));
       assertf(in != NULL);
-      v = hts_split_cmdline(StringBuffRW(cmd), &nv);
+      v = hts_split_webcmd(StringBuffRW(cmd), &nv);
       assertf(v != NULL);
       for (i = 1; i < nv; i++) {
-        if (!hts_unquote_arg(v[i]))
-          StringCat(got, "(missing quote)");
         StringCat(got, v[i]);
         StringAddchar(got, '\n');
       }

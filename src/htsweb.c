@@ -487,8 +487,7 @@ static void back_launch_cmd(void *pP) {
     free(commandReturnCmdl);
   commandReturnCmdl = strdup(cmd);
 
-  /* split */
-  argv = hts_split_cmdline(cmd, &argc);
+  argv = hts_split_webcmd(cmd, &argc);
   if (argv == NULL) {
     if (commandReturnMsg)
       free(commandReturnMsg);

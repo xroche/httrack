@@ -84,6 +84,7 @@ Please visit our Website: http://www.httrack.com
 /* Dynamic typed arrays */
 #include "htsarrays.h"
 #include "htsarena.h"
+#include "htscmdline.h"
 
 /* END specific definitions */
 
@@ -1061,6 +1062,12 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
                   "\"%s\", line %d: URL longer than %d bytes, ignored",
                   StringBuff(opt->filelist), lineno, HTS_URLMAXSIZE);
             }
+            continue;
+          }
+          if (hts_is_quoted(line, strlen(line))) {
+            hts_log_print(opt, LOG_ERROR,
+                          "\"%s\", line %d: %s is quoted, ignored",
+                          StringBuff(opt->filelist), lineno, line);
             continue;
           }
           if (line[0]) {

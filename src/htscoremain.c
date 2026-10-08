@@ -306,6 +306,32 @@ hts_scan_result cmdl_glued_int(char **com, int min, int max, int *out) {
   return got;
 }
 
+/* Panic with msg, and ask to remove the quotes of value if it has any. */
+static void cmdl_panic_value(httrackp *opt, const char *msg,
+                             const char *value) {
+  char s[HTS_CDLMAXSIZE * 2 + 256];
+
+  if (hts_is_quoted(value, strlen(value)))
+    snprintf(s, sizeof(s), "%s: %s " HTS_QUOTED_HINT, msg, value);
+  else
+    snprintf(s, sizeof(s), "%s", msg);
+  HTS_PANIC_PRINTF(s);
+}
+
+/* Panic on com, the end of option arg that no option takes. When com is
+   quoted, the message names the option before it. */
+static void cmdl_bad_option(httrackp *opt, const char *arg, const char *prefix,
+                            const char *com) {
+  char s[HTS_CDLMAXSIZE * 2 + 256];
+
+  if (hts_is_quoted(com, strlen(com)))
+    snprintf(s, sizeof(s), "Option %.*s: %s " HTS_QUOTED_HINT,
+             (int) (com - arg), arg, com);
+  else
+    snprintf(s, sizeof(s), "invalid option %s%c\n", prefix, *com);
+  HTS_PANIC_PRINTF(s);
+}
+
 HTSEXT_API int hts_main(int argc, char **argv) {
   httrackp *opt = hts_create_opt();
   int ret = hts_main2(argc, argv, opt);
@@ -477,7 +503,7 @@ static void cmdl_print_cache_entry(httrackp *opt, cache_back *cache,
 
 static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   /* command line rebuilt from argv, config files and doit.log */
-  cmdl_argv x_cmd = {NULL, NULL, NULL, NULL, 0, 0, {NULL, 0, 0}};
+  cmdl_argv x_cmd = {NULL, NULL, NULL, 0, 0, {NULL, 0, 0}};
 
   //
   int argv_url = -1;            // ==0 : utiliser cache et doit.log
@@ -685,24 +711,12 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   // Option O and includerc
   {
     int loops = 0;
-    /* Pass 1 strips every slot and pass 2 only the rc tokens at [1, fresh). */
-    int fresh = argc;
 
     while(loops < 2) {
       char *com;
       int na;
 
       for(na = 1; na < argc; na++) {
-
-        if (na < fresh && !hts_unquote_arg(argv[na])) {
-          /* +256 holds the prefix around a max-length argument. */
-          char BIGSTK s[HTS_CDLMAXSIZE + 256];
-
-          snprintf(s, sizeof(s), "Missing quote in %s", argv[na]);
-          HTS_PANIC_PRINTF(s);
-          htsmain_free();
-          return -1;
-        }
 
         if (cmdl_opt(argv[na])) {       // option
           com = argv[na] + 1;
@@ -721,23 +735,21 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 int i /*, j */ ;
                 int inQuote;
                 String *path;
-                int noDbl = 0;
+                hts_boolean one_path = HTS_FALSE;
 
                 if (com[1] == '1') {    /* only 1 arg */
                   com++;
-                  noDbl = 1;
+                  one_path = HTS_TRUE;
                 }
                 na++;
                 StringClear(opt->path_html);
                 StringClear(opt->path_log);
                 for(i = 0 /*, j = 0 */ , inQuote = 0, path = &opt->path_html;
                     argv[na][i] != 0; i++) {
-                  if (argv[na][i] == '"') {
-                    if (inQuote)
-                      inQuote = 0;
-                    else
-                      inQuote = 1;
-                  } else if (!inQuote && !noDbl && argv[na][i] == ',') {
+                  /* a plain -O strips quotes, which group a comma */
+                  if (!one_path && argv[na][i] == '"') {
+                    inQuote = !inQuote;
+                  } else if (!inQuote && !one_path && argv[na][i] == ',') {
                     path = &opt->path_log;
                   } else {
                     StringAddchar(*path, argv[na][i]);
@@ -777,7 +789,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           || (strnotempty(StringBuff(opt->path_html))))
         loops++;                // do not loop once again and do not include rc file (O option exists)
       else {
-        /* Read the rc file once, because pass 2 only strips its tokens. */
+        /* Pass 2 only looks for an -O the rc file gave, so read it once. */
         if (loops == 0 &&
             ((!fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                                    StringBuff(opt->path_log),
@@ -806,7 +818,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             htsmain_free();
             return -1;
           }
-          fresh = 1 + x_cmd.argc - argc;
           /* the array may have been grown and moved */
           argv = x_cmd.argv;
           argc = x_cmd.argc;
@@ -854,7 +865,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                               HTS_SPLIT_STRIP_QUOTES | HTS_SPLIT_DROP_EMPTY);
       for (i = 0; tokens != NULL && i < ntokens; i++) {
         /* inserted in order, after the program name */
-        if (!cmdl_ins_unquoted(&x_cmd, tokens[i], insert_after))
+        if (!cmdl_ins(&x_cmd, tokens[i], insert_after))
           break;
         /* this engine wrote the line and parsed it once already */
         cmdl_mark_param(&x_cmd, insert_after);
@@ -1262,15 +1273,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       if (prev_opt != 0)
         x_cmd.span[prev_opt] = na - prev_opt;
       prev_opt = cmdl_opt(argv[na]) ? na : 0;
-
-      if (!x_cmd.unquoted[na] && !hts_unquote_arg(argv[na])) {
-        char s[HTS_CDLMAXSIZE + 256];
-
-        snprintf(s, sizeof(s), "Missing quote in %s", argv[na]);
-        HTS_PANIC_PRINTF(s);
-        htsmain_free();
-        return -1;
-      }
 
       if (cmdl_opt(argv[na])) { // option
         com = argv[na] + 1;
@@ -2197,6 +2199,12 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                     return -1;
                   }
                   na++;
+                  if (hts_is_quoted(argv[na], strlen(argv[na]))) {
+                    cmdl_panic_value(opt, "Option warc-max-size needs a size",
+                                     argv[na]);
+                    htsmain_free();
+                    return -1;
+                  }
                   { // reject non-numeric/negative/overflow; keep default 0
                     // (single file)
                     char *end;
@@ -2239,8 +2247,10 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                     v = strtoll(argv[na], &end, 10);
                     if (!isdigit((unsigned char) argv[na][0]) || *end != '\0' ||
                         errno == ERANGE || v <= 0) {
-                      HTS_PANIC_PRINTF(
-                          "Option single-file-max-size needs a positive size");
+                      cmdl_panic_value(
+                          opt,
+                          "Option single-file-max-size needs a positive size",
+                          argv[na]);
                       htsmain_free();
                       return -1;
                     }
@@ -2312,8 +2322,10 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 errno = 0;
                 secs = strtoll(com + 1, &end, 10);
                 if (end == com + 1 || errno == ERANGE || secs < 0) {
-                  HTS_PANIC_PRINTF("Invalid --max-retry-after (expected a "
-                                   "non-negative delay in seconds)");
+                  cmdl_panic_value(opt,
+                                   "Invalid --max-retry-after (expected a "
+                                   "non-negative delay in seconds)",
+                                   com + 1);
                   htsmain_free();
                   return -1;
                 }
@@ -2350,8 +2362,10 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   /* positive-form bounds: NaN fails every comparison, so this
                      rejects it before the undefined (int)(NaN*1000) cast */
                   if (nf < 1 || !(pmin >= 0 && pmax >= pmin && pmax <= 86400)) {
-                    HTS_PANIC_PRINTF("Invalid --pause range (expected "
-                                     "MIN[:MAX] seconds, 0<=MIN<=MAX<=86400)");
+                    cmdl_panic_value(opt,
+                                     "Invalid --pause range (expected "
+                                     "MIN[:MAX] seconds, 0<=MIN<=MAX<=86400)",
+                                     argv[na]);
                     htsmain_free();
                     return -1;
                   }
@@ -2365,12 +2379,9 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 break;
 
               default:{
-                  char s[HTS_CDLMAXSIZE + 256];
-
-                  sprintf(s, "invalid option %%%c\n", *com);
-                  HTS_PANIC_PRINTF(s);
-                  htsmain_free();
-                  return -1;
+                cmdl_bad_option(opt, argv[na], "%", com);
+                htsmain_free();
+                return -1;
                 }
                 break;
 
@@ -2437,12 +2448,9 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               } break;
 
               default:{
-                  char s[HTS_CDLMAXSIZE + 256];
-
-                  sprintf(s, "invalid option @%c\n", *com);
-                  HTS_PANIC_PRINTF(s);
-                  htsmain_free();
-                  return -1;
+                cmdl_bad_option(opt, argv[na], "@", com);
+                htsmain_free();
+                return -1;
               } break;
               }
             }
@@ -2732,12 +2740,9 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             break;
             //
           default:{
-              char s[HTS_CDLMAXSIZE + 256];
-
-              sprintf(s, "invalid option %c\n", *com);
-              HTS_PANIC_PRINTF(s);
-              htsmain_free();
-              return -1;
+            cmdl_bad_option(opt, argv[na], "", com);
+            htsmain_free();
+            return -1;
             }
             break;
           }                     // switch
@@ -2749,6 +2754,16 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         const size_t urlSize = strlen(argv[na]);
         const size_t capa = strlen(url) + urlSize + 32;
 
+        if (hts_is_quoted(argv[na], urlSize)) {
+          cmdl_panic_value(opt, "Argument refused", argv[na]);
+          htsmain_free();
+          return -1;
+        }
+        /* a filter may hold a quote on purpose, but usually it is a leftover */
+        if ((argv[na][0] == '+' || argv[na][0] == '-') &&
+            strchr(argv[na], '"') != NULL)
+          fprintf(stderr, "* Warning: filter %s holds a quote, kept as is\n",
+                  argv[na]);
         assertf(urlSize < HTS_URLMAXSIZE);
         if (urlSize < HTS_URLMAXSIZE) {
           ensureUrlCapacity(url, url_sz, capa);
@@ -3267,7 +3282,7 @@ static void cmdl_quote_unit(String *out, const cmdl_argv *cmd, int i) {
   for (; i < end; i++) {
     if (StringLength(*out) != 0)
       StringAddchar(*out, ' ');
-    /* argv[] is already unquoted here, so a leading quote is data */
+    /* argv[] is final, so a leading quote is data */
     hts_quote_arg(out, cmd->argv[i]);
   }
 }
