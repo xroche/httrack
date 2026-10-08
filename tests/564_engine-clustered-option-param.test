@@ -69,3 +69,25 @@ if ! target_is_windows; then # # expands to a name holding a colon
         assert_eq "$want" "$(ls "$tmp/h$name")" "$name expanded #"
     done
 fi
+
+# -O takes the word after the ones the options before it take
+mkdir -p "$tmp/po" "$tmp/lo"
+rc=0
+(cd "$tmp/po" && "$bin" -PO 127.0.0.1:1 OUT "$url" -r1 -R0 </dev/null >"$tmp/po.out" 2>&1) || rc=$?
+test "$rc" -eq 0 || fail "-PO exited $rc: $(<"$tmp/po.out")"
+test -f "$tmp/po/OUT/hts-log.txt" || fail "-PO PROXY OUT: no mirror in OUT: $(ls "$tmp/po")"
+rc=0
+(cd "$tmp/lo" && "$bin" -q%LO "$tmp/list.txt" OUT -r1 -R0 -P 127.0.0.1:1 </dev/null >"$tmp/lo.out" 2>&1) || rc=$?
+test "$rc" -eq 0 || fail "-q%LO exited $rc: $(<"$tmp/lo.out")"
+test -n "$(find "$tmp/lo/OUT" -name listed.html)" || fail "-q%LO LIST OUT: list not mirrored into OUT: $(<"$tmp/lo.out")"
+
+# another option's value is not an -O, and a glued -N number is no value
+for o in "--user-agent -Oz ZZ" -qN4; do
+    name=${o// /_}
+    mkdir -p "$tmp/v$name"
+    rc=0
+    # shellcheck disable=SC2086 # $o is one to three words
+    (cd "$tmp/v$name" && "$bin" $o "$url" -r1 -R0 -P 127.0.0.1:1 </dev/null >"$tmp/v$name.out" 2>&1) || rc=$?
+    test "$rc" -eq 0 || fail "$o URL exited $rc: $(<"$tmp/v$name.out")"
+    test -f "$tmp/v$name/hts-log.txt" || fail "$o URL: no mirror in the current directory: $(ls "$tmp/v$name")"
+done

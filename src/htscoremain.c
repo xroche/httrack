@@ -412,28 +412,44 @@ static void cmdl_count_url(int *count) {
   (*count)++;
 }
 
-/* Copies to CMD the words from ARGV[FIRST] on that the options of the cluster
-   WORD read (-qO <path>), as the parse loop below takes them, counting a list's
-   (-q%L) as URLs. Returns how many, or -1 out of memory. */
+/* Steps *AT through cluster WORD as optcluster_next() does, setting *VALUE to
+   the index of the word the option takes from *NEXT on (-qO <path>), or -1. */
+static hts_boolean cmdl_cluster_step(const char *word, size_t *at, char *name,
+                                     size_t name_size, int argc,
+                                     char *const *argv, int *next, int *value) {
+  int pos;
+
+  if (!optcluster_next(word, at, name, name_size))
+    return HTS_FALSE;
+  pos = optreal_find(name);
+  *value = -1;
+  /* -N is the paramn row, found first; this guards a table reorder */
+  if (pos < 0 || strcmp(opttype_value(pos), "param1") != 0 ||
+      strcmp(name, "-N") == 0 || *next >= argc || argv[*next][0] == '-')
+    return HTS_TRUE;
+  *value = (*next)++;
+  return HTS_TRUE;
+}
+
+/* Copies to CMD each word, from ARGV[FIRST] on, that an option of cluster WORD
+   takes as its value (-qO <path>), counting a list's (-q%L) as URLs. Returns
+   how many, or -1 out of memory. */
 static int cmdl_cluster_params(cmdl_argv *cmd, const char *word, int argc,
                                char **argv, int first, int *argv_url) {
   char name[8];
   size_t at = 1;
   int next = first;
+  int value;
 
-  while (optcluster_next(word, &at, name, sizeof(name))) {
-    const int pos = optreal_find(name);
-
-    /* only a lone -N reads the next word: a clustered one reads its digits */
-    if (pos < 0 || strcmp(opttype_value(pos), "param1") != 0 ||
-        strcmp(name, "-N") == 0 || next >= argc || argv[next][0] == '-')
+  while (cmdl_cluster_step(word, &at, name, sizeof(name), argc, argv, &next,
+                           &value)) {
+    if (value < 0)
       continue;
-    if (!cmdl_add(cmd, argv[next]))
+    if (!cmdl_add(cmd, argv[value]))
       return -1;
     cmdl_mark_param(cmd, cmd->argc - 1);
     if (strcmp(name, "-%L") == 0)
       cmdl_count_url(argv_url);
-    next++;
   }
   return next - first;
 }
@@ -755,16 +771,19 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 
       for(na = 1; na < argc; na++) {
 
-        if (cmdl_opt(argv[na])) {       // option
+        /* another option's value is not an option (--user-agent -Oz) */
+        if (cmdl_opt(argv[na]) && !x_cmd.param[na]) { // option
           const char *const word = argv[na];
           char name[8];
           size_t at = 1;
-          size_t start = at;
+          int next = na + 1;
+          int value;
 
-          /* walked as the parse loop does, so -%O is not -O */
-          for (; optcluster_next(word, &at, name, sizeof(name)); start = at) {
+          /* the word the parse loop gives -O, past -P's in -PO */
+          while (cmdl_cluster_step(word, &at, name, sizeof(name), argc, argv,
+                                   &next, &value)) {
             if (strcmp(name, "-O") == 0) {
-              if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
+              if (value < 0) {
                 HTS_PANIC_PRINTF
                   ("Option O needs to be followed by a blank space, and a path (or path,path)");
                 printf("Example: -O /binary/\n");
@@ -777,20 +796,19 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 String *path;
                 hts_boolean one_path = HTS_FALSE;
 
-                if (word[start + 1] == '1') /* only 1 arg */
+                if (word[at] == '1') /* only 1 arg */
                   one_path = HTS_TRUE;
-                na++;
                 StringClear(opt->path_html);
                 StringClear(opt->path_log);
-                for(i = 0 /*, j = 0 */ , inQuote = 0, path = &opt->path_html;
-                    argv[na][i] != 0; i++) {
+                for (i = 0 /*, j = 0 */, inQuote = 0, path = &opt->path_html;
+                     argv[value][i] != 0; i++) {
                   /* a plain -O strips quotes, which group a comma */
-                  if (!one_path && argv[na][i] == '"') {
+                  if (!one_path && argv[value][i] == '"') {
                     inQuote = !inQuote;
-                  } else if (!inQuote && !one_path && argv[na][i] == ',') {
+                  } else if (!inQuote && !one_path && argv[value][i] == ',') {
                     path = &opt->path_log;
                   } else {
-                    StringAddchar(*path, argv[na][i]);
+                    StringAddchar(*path, argv[value][i]);
                   }
                 }
                 if (StringLength(opt->path_log) == 0) {
@@ -805,7 +823,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             }
           }
 
-        }                       // arg
+        } // arg
 
       }                         // for
 
