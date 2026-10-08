@@ -66,7 +66,9 @@ rc_check 'index ON' -I
 rc_check 'index "OFF"' -I0
 rc_check 'httpproxy-ftp "OFF"' -%f0
 rc_check 'sockets OFF' -c0
-# a quoted keyword is unquoted for a switch only
+rc_check 'generate-errors off' -o0
+rc_check 'generate-errors "OFF"' -o0
+# a quoted keyword is unquoted for a switch or a level only
 rc_check 'sockets "OFF"' '' 'Option --sockets: "OFF" is quoted, remove the quotes'
 rc_check 'bogus X' '' 'Unknown option: bogus'
 rc_check 'assume Standard' '-%A standard'

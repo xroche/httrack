@@ -982,7 +982,8 @@ void cmdl_mark_param(cmdl_argv *cmd, int pos) {
 
 /* Fold an rc VALUE for option KEY: -%A and -%w values are lowercased; a
    free-text (param1) "(none)" is read in any case, quoted or not; any other
-   option reads on/off in any case, and unquotes them only for a switch. */
+   option reads on/off in any case, and unquotes them only for a switch or
+   a level. */
 static void optinclude_fold(const char *key, char *value) {
   static const char *const onoff[] = {"on", "off", NULL};
   static const char *const none[] = {HTS_NOPARAM, NULL};
@@ -1005,7 +1006,8 @@ static void optinclude_fold(const char *key, char *value) {
   if (strcmp(type, "param0") == 0)
     return;
   keywords = strcmp(type, "param1") == 0 ? none : onoff;
-  unquote = keywords == none || strcmp(type, "onoff") == 0;
+  unquote = keywords == none || strcmp(type, "onoff") == 0 ||
+            strcmp(type, "level") == 0;
   if (unquote && len >= 2 && value[0] == '"' && value[len - 1] == '"') {
     word++;
     len -= 2;
