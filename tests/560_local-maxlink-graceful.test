@@ -58,7 +58,8 @@ crawl() { # crawl NAME ENTRY [httrack argument...]
 # writes for a link it has decided not to follow.
 external_links() { grep -c "href=\"${BASEURL}/page" "${site}/index.html" || true; }
 
-mirrored_pages() { find "$site" -name '*.html' | wc -l; }
+# tr, because BSD wc pads the count and assert_eq compares strings.
+mirrored_pages() { find "$site" -name '*.html' | wc -l | tr -d ' '; }
 
 # --- control: a cap the crawl never reaches changes nothing -----------------
 crawl room index.html "-#L$((PAGES * 10))"
