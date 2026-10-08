@@ -677,7 +677,8 @@ static HTS_INLINE HTS_UNUSED hts_boolean hts_choplastchar(char *s) {
 /** The character sets matching htslib.h's is_space(), is_realspace(),
     is_taborspace() and is_retorsep(), for hts_rtrim() and for the strspn() and
     strcspn() skips that replaced the hand-written loops. The -#test=rtrim
-    self-test keeps each set and its macro in sync. */
+    self-test keeps each set and its macro in sync. HTS_RETORSEP has no skip
+    caller yet, and is here so each class has one spelling as a set. */
 #define HTS_SPACES " \"\n\r\t\f\v'"
 #define HTS_REALSPACES " \n\r\t\f\v"
 #define HTS_TABORSPACES " \t"

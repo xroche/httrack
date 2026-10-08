@@ -1895,6 +1895,22 @@ static const struct {
     {HTS_RETORSEP, cc_retorsep},
 };
 
+/* Do strspn() and strcspn() over class CLS land where the loops they replaced
+   would have landed in S? */
+static int cc_span_agrees(size_t cls, const char *s) {
+  const char *const set = cc_classes[cls].set;
+  int (*const pred)(unsigned char) = cc_classes[cls].pred;
+  size_t span, cspan;
+
+  /* the span loop needs no terminator guard, because no class holds byte 0 */
+  for (span = 0; pred((unsigned char) s[span]) != 0; span++)
+    ;
+  for (cspan = 0; s[cspan] != '\0' && pred((unsigned char) s[cspan]) == 0;
+       cspan++)
+    ;
+  return strspn(s, set) == span && strcspn(s, set) == cspan;
+}
+
 /* hts_rtrim() and the sets it is called with. The string starts mid-arena, and
    the byte below it is poisoned with '#' rather than 0, or the stray NUL the
    old loop wrote there would read as untouched. */
@@ -1974,43 +1990,24 @@ static int st_rtrim(httrackp *opt, int argc, char **argv) {
     }
   }
 
-  /* strspn() and strcspn() advance over exactly what the hand-written loops
-     advanced over. Length 3 is enough because each loop decides from the byte
-     under the cursor alone, so a longer run repeats a case already here. */
+  /* The loop above already makes these two equal for a conforming strspn(),
+     so this is here to catch a libc that disagrees. Three bytes covers every
+     shorter string too, because the terminator is one of the three letters. */
   for (cls = 0; cls < sizeof(cc_classes) / sizeof(cc_classes[0]); cls++) {
-    static const size_t pow3[4] = {1, 3, 9, 27};
-    const char *const set = cc_classes[cls].set;
-    int (*const pred)(unsigned char) = cc_classes[cls].pred;
     /* a class member, a byte in no class, and the terminator */
-    const char alpha[3] = {set[0], 'x', '\0'};
-    size_t len;
+    const char alpha[3] = {cc_classes[cls].set[0], 'x', '\0'};
+    int i, j, k;
 
-    CHECK(pred((unsigned char) alpha[0]) != 0);
-    CHECK(pred((unsigned char) alpha[1]) == 0);
+    /* the alphabet keeps a non-member even if someone adds 'x' to both the set
+       and its macro, which the loop above would not notice */
+    CHECK(cc_classes[cls].pred((unsigned char) alpha[1]) == 0);
+    for (i = 0; i < 3; i++) {
+      for (j = 0; j < 3; j++) {
+        for (k = 0; k < 3; k++) {
+          const char word[4] = {alpha[i], alpha[j], alpha[k], '\0'};
 
-    for (len = 0; len < sizeof(pow3) / sizeof(pow3[0]); len++) {
-      size_t word;
-
-      for (word = 0; word < pow3[len]; word++) {
-        char buf[4];
-        size_t k, rest = word, want;
-
-        for (k = 0; k < len; k++) {
-          buf[k] = alpha[rest % 3];
-          rest /= 3;
+          CHECK(cc_span_agrees(cls, word));
         }
-        buf[len] = '\0';
-
-        /* while (pred(*p)) p++ needs no terminator guard, because pred() turns
-           byte 0 down above. */
-        for (want = 0; pred((unsigned char) buf[want]) != 0; want++)
-          ;
-        CHECK(strspn(buf, set) == want);
-
-        for (want = 0;
-             buf[want] != '\0' && pred((unsigned char) buf[want]) == 0; want++)
-          ;
-        CHECK(strcspn(buf, set) == want);
       }
     }
   }
