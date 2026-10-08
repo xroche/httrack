@@ -3409,7 +3409,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       /* The gate above misses a cap that fills mid-page,
                          which the queued hts_addurl() records in
                          hts_mirror_process_user_interaction() can do after it.
-                         Skipping keeps room for the two records below. */
+                         Skipping keeps room for the two records below. Only a
+                         front end queues those, so no .test reaches this. */
                       if (hts_maxlinks_no_room(opt)) {
                         maxlinks_give_up(opt, stre->exit_xh_);
                       } else { // room for it: record the link

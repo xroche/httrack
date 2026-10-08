@@ -44,13 +44,13 @@ common=(--quiet --robots=0 -c1 --timeout=20)
 
 # Crawl into $tmpdir/$1, leaving the status in $rc and the mirror's log in $log.
 # Not a subshell: the status is what the first arm asserts.
-crawl() {
-    local name=$1
-    shift
+crawl() { # crawl NAME ENTRY [httrack argument...]
+    local name=$1 entry=$2
+    shift 2
     site="${tmpdir}/${name}/127.0.0.1_${SRV_PORT}"
     rc=0
     local_crawl --log "${tmpdir}/out-${name}" "${common[@]}" \
-        -O "${tmpdir}/${name}" "${BASEURL}/index.html" "$@" || rc=$?
+        -O "${tmpdir}/${name}" "${BASEURL}/${entry}" "$@" || rc=$?
     log=$(<"${tmpdir}/${name}/hts-log.txt")
 }
 
@@ -61,7 +61,7 @@ external_links() { grep -c "href=\"${BASEURL}/page" "${site}/index.html" || true
 mirrored_pages() { find "$site" -name '*.html' | wc -l; }
 
 # --- control: a cap the crawl never reaches changes nothing -----------------
-crawl room "-#L$((PAGES * 10))"
+crawl room index.html "-#L$((PAGES * 10))"
 test "$rc" -eq 0 || fail "a crawl inside the cap exited $rc: ${log}"
 grep -q 'mirror complete in' <<<"$log" ||
     fail "the control crawl did not finish, so its exit 0 proves nothing: ${log}"
@@ -72,8 +72,14 @@ if grep -q 'Too many URLs' <<<"$log"; then
 fi
 ok "a crawl that fits under the cap mirrors every page and exits 0"
 
+# --- -#L0 is documented as no limit, so nothing may hold it back ------------
+crawl nolimit index.html "-#L0"
+test "$rc" -eq 0 || fail "-#L0 exited $rc, so the cap fired without one: ${log}"
+assert_eq "$((PAGES + 1))" "$(mirrored_pages)" "pages -#L0 mirrored"
+ok "-#L0 keeps meaning no limit"
+
 # --- the cap is reached while the hub is being rewritten --------------------
-crawl cap "-#L${CAP}"
+crawl cap index.html "-#L${CAP}"
 grep -q "Too many URLs, giving up..(>${CAP})" <<<"$log" ||
     fail "the cap was not reached, so nothing here is about it: ${log}"
 test "$rc" -eq "$ABORTED" ||
@@ -82,8 +88,11 @@ ok "a crawl that reaches the cap still reports the abort #1419 gave it"
 
 # The regression: the parser used to unwind here and take this page with it.
 assert_file "${site}/index.html" "the capped mirror kept no entry page"
-test "$(mirrored_pages)" -lt "$((PAGES + 1))" ||
-    fail "the capped mirror kept every page, so the cap stopped nothing"
+# The abort ends the run before the leaves it did catch are fetched, so the
+# kept page keeps CAUGHT local links to files that are not there. That is what
+# any aborted mirror leaves; only the links past the cap become external.
+test ! -e "${site}/page01.html" ||
+    fail "a leaf caught before the cap was fetched, so the cap stopped nothing"
 ok "and keeps the page it had already rewritten"
 
 # Links past the cap address the live server, so the kept page references no
@@ -96,3 +105,39 @@ ok "links past the cap are rewritten external rather than left dangling"
 # Once, not once per link: every later link in the hub reaches the same guard.
 assert_eq 1 "$(grep -c 'Too many URLs' <<<"$log")" "times the cap reported itself"
 ok "and the cap reports itself once however many links follow it"
+
+# --- the reserve: robots.txt and its link are recorded in one parser step ---
+# The hub names a second host, so the engine must record that host's robots.txt
+# and then the link itself. Both have to fit, which is why
+# hts_maxlinks_no_room() holds back two slots. With one, the engine records the
+# robots.txt, has no slot left for the link, and unwinds: the page under
+# rewrite is lost and the run exits 0.
+{
+    printf '<html><body>\n'
+    for i in $(seq -w 1 "$PAGES"); do
+        printf '<a href="http://localhost:%s/page%s.html">p%s</a>\n' \
+            "$SRV_PORT" "$i" "$i"
+    done
+    printf '</body></html>\n'
+} >"${doc}/hub.html"
+printf 'User-agent: *\nAllow: /\n' >"${doc}/robots.txt"
+
+# This arm spells its own flags: robots stays on, unlike every arm above, and
+# --debug-log is what records which hosts were answered for. 4 is the cap that
+# leaves one free slot exactly when the pair comes due, and +localhost* is what
+# makes the engine follow the second host at all.
+rc=0
+site="${tmpdir}/pair/127.0.0.1_${SRV_PORT}"
+local_crawl --log "${tmpdir}/out-pair" --quiet -c1 --timeout=20 --debug-log \
+    -O "${tmpdir}/pair" "${BASEURL}/hub.html" "-#L4" "+localhost*" || rc=$?
+log=$(<"${tmpdir}/pair/hts-log.txt")
+
+# The entry host's own robots.txt is the third record, so this says the crawl
+# reached the boundary where the next step needs two slots and has one.
+grep -q 'robots.txt added at 127.0.0.1' <<<"$log" ||
+    fail "the crawl never reached the pair, so this arm proves nothing: ${log}"
+grep -q 'Too many URLs, giving up..(>4)' <<<"$log" ||
+    fail "the cap did not report itself, so the engine unwound instead: ${log}"
+test "$rc" -eq "$ABORTED" || fail "the two-host arm exited $rc: ${log}"
+assert_file "${site}/hub.html" "the reserve did not keep the page under rewrite"
+ok "the reserve keeps the page when robots.txt and its link are one step"
