@@ -405,6 +405,55 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
   return code;
 }
 
+/* Counts one more URL; a -1 count (-i, --continue) restarts from zero. */
+static void cmdl_count_url(int *count) {
+  if (*count < 0)
+    *count = 0;
+  (*count)++;
+}
+
+/* Steps *AT through cluster WORD as optcluster_next() does, setting *VALUE to
+   the index of the word the option takes from *NEXT on (-qO <path>), or -1. */
+static hts_boolean cmdl_cluster_step(const char *word, size_t *at, char *name,
+                                     size_t name_size, int argc,
+                                     char *const *argv, int *next, int *value) {
+  int pos;
+
+  if (!optcluster_next(word, at, name, name_size))
+    return HTS_FALSE;
+  pos = optreal_find(name);
+  *value = -1;
+  /* only a lone -N reads the next word; a clustered one reads its digits */
+  if (pos < 0 || strcmp(opttype_value(pos), "param1") != 0 ||
+      strcmp(name, "-N") == 0 || *next >= argc || argv[*next][0] == '-')
+    return HTS_TRUE;
+  *value = (*next)++;
+  return HTS_TRUE;
+}
+
+/* Copies to CMD each word, from ARGV[FIRST] on, that an option of cluster WORD
+   takes as its value (-qO <path>), counting a list's (-q%L) as URLs. Returns
+   how many, or -1 out of memory. */
+static int cmdl_cluster_params(cmdl_argv *cmd, const char *word, int argc,
+                               char **argv, int first, int *argv_url) {
+  char name[8];
+  size_t at = 1;
+  int next = first;
+  int value;
+
+  while (cmdl_cluster_step(word, &at, name, sizeof(name), argc, argv, &next,
+                           &value)) {
+    if (value < 0)
+      continue;
+    if (!cmdl_add(cmd, argv[value]))
+      return -1;
+    cmdl_mark_param(cmd, cmd->argc - 1);
+    if (strcmp(name, "-%L") == 0)
+      cmdl_count_url(argv_url);
+  }
+  return next - first;
+}
+
 /* Whether the option at NA may take the word after it though it begins with
    '-': only where that word was put there as an option's parameter, which
    optalias_check() emits having refused an option name in that position itself.
@@ -656,10 +705,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         /* Compter URLs et détecter -i,-q.. */
         if (tmp_argc == 1) {    /* pas -P & co */
           if (!cmdl_opt(tmp_argv[0])) { /* pas -c0 & co */
-            if (argv_url < 0)
-              argv_url = 0; // -1==force -> 1=one url already detected, wipe all
-                            // previous options
-            argv_url++;
+            cmdl_count_url(&argv_url);
             if (!argv_firsturl)
               argv_firsturl = x_cmd.argv[x_cmd.argc - 1];
           } else {
@@ -680,6 +726,18 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   argv_url = -1;
                   opt->quiet = HTS_TRUE;
                 }
+                if (optreal_find(tmp_argv[0]) < 0) {
+                  const int taken = cmdl_cluster_params(
+                      &x_cmd, tmp_argv[0], argc, argv, na + result, &argv_url);
+
+                  if (taken < 0) {
+                    cmdl_free(&x_cmd);
+                    HTS_PANIC_PRINTF("Error, not enough memory");
+                    htsmain_free();
+                    return -1;
+                  }
+                  result += taken;
+                }
               } else if (strcmp(tmp_argv[0] + 2, "quiet") == 0) {
                 opt->quiet = 1; // ne pas poser de questions! (nohup par exemple)
               } else if (strcmp(tmp_argv[0] + 2, "continue") == 0) {
@@ -689,12 +747,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             }
           }
         } else if (tmp_argc == 2) {
-          if ((strcmp(tmp_argv[0], "-%L") == 0)) {      // liste d'URLs
-            if (argv_url < 0)
-              argv_url = 0; // -1==force -> 1=one url already detected, wipe all
-                            // previous options
-            argv_url++;         /* forcer */
-          }
+          if ((strcmp(tmp_argv[0], "-%L") == 0)) // URL list
+            cmdl_count_url(&argv_url);
         }
       }
 
@@ -712,19 +766,24 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   {
     int loops = 0;
 
-    while(loops < 2) {
-      char *com;
+    while (loops < 2) {
       int na;
 
       for(na = 1; na < argc; na++) {
 
-        if (cmdl_opt(argv[na])) {       // option
-          com = argv[na] + 1;
+        /* another option's value is not an option (--user-agent -Oz) */
+        if (cmdl_opt(argv[na]) && !x_cmd.param[na]) { // option
+          const char *const word = argv[na];
+          char name[8];
+          size_t at = 1;
+          int next = na + 1;
+          int value;
 
-          while(*com) {
-            switch (*com) {
-            case 'O':          // output path
-              if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
+          /* the word the parse loop gives -O, past -P's in -PO */
+          while (cmdl_cluster_step(word, &at, name, sizeof(name), argc, argv,
+                                   &next, &value)) {
+            if (strcmp(name, "-O") == 0) {
+              if (value < 0) {
                 HTS_PANIC_PRINTF
                   ("Option O needs to be followed by a blank space, and a path (or path,path)");
                 printf("Example: -O /binary/\n");
@@ -737,22 +796,19 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 String *path;
                 hts_boolean one_path = HTS_FALSE;
 
-                if (com[1] == '1') {    /* only 1 arg */
-                  com++;
+                if (word[at] == '1') /* only 1 arg */
                   one_path = HTS_TRUE;
-                }
-                na++;
                 StringClear(opt->path_html);
                 StringClear(opt->path_log);
-                for(i = 0 /*, j = 0 */ , inQuote = 0, path = &opt->path_html;
-                    argv[na][i] != 0; i++) {
+                for (i = 0 /*, j = 0 */, inQuote = 0, path = &opt->path_html;
+                     argv[value][i] != 0; i++) {
                   /* a plain -O strips quotes, which group a comma */
-                  if (!one_path && argv[na][i] == '"') {
+                  if (!one_path && argv[value][i] == '"') {
                     inQuote = !inQuote;
-                  } else if (!inQuote && !one_path && argv[na][i] == ',') {
+                  } else if (!inQuote && !one_path && argv[value][i] == ',') {
                     path = &opt->path_log;
                   } else {
-                    StringAddchar(*path, argv[na][i]);
+                    StringAddchar(*path, argv[value][i]);
                   }
                 }
                 if (StringLength(opt->path_log) == 0) {
@@ -764,12 +820,10 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   opt->dir_topindex = 1;        // rebuilt top index
                 }
               }
-              break;
-            }                   // switch
-            com++;
-          }                     // while
+            }
+          }
 
-        }                       // arg
+        } // arg
 
       }                         // for
 
@@ -826,7 +880,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       }
 
       loops++;
-    }                           // while
+    } // while
 
   }                             // traiter -O
 
@@ -2102,8 +2156,9 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 break;
 
               case 'g': // strip-query: accumulate "[pattern=]keys" entries
-                /* a key may begin with '-' (#1179) */
-                if (na + 1 >= argc) {
+                /* a vetted pair's key may begin with '-' (#1179) */
+                if ((na + 1 >= argc) ||
+                    (argv[na + 1][0] == '-' && !optparam_dash_ok(&x_cmd, na))) {
                   HTS_PANIC_PRINTF("Option strip-query needs a blank space and "
                                    "[host/pattern=]key1,key2,...");
                   printf("Example: --strip-query "
@@ -2119,8 +2174,9 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 break;
 
               case 'C': // host-alias: accumulate "alias[,alias...]=host" rules
-                /* an alias may begin with '-' (#1179) */
-                if (na + 1 >= argc) {
+                /* a vetted pair's alias may begin with '-' (#1179) */
+                if ((na + 1 >= argc) ||
+                    (argv[na + 1][0] == '-' && !optparam_dash_ok(&x_cmd, na))) {
                   HTS_PANIC_PRINTF("Option host-alias needs a blank space and "
                                    "alias[,alias...]=canonical-host");
                   printf("Example: --host-alias "
@@ -3319,28 +3375,16 @@ static void cmdl_doit_line(String *line, const cmdl_argv *cmd) {
 }
 
 /* Does the short-option cluster s carry c from the main option set (-i, -iC2,
-   -%Mi)? Walked as the parser does below: %, &, @ and # each take the letter
-   after them into another set, so the i of -%i is not the main-set -i. */
+   -%Mi)? The i of -%i belongs to another set. */
 static hts_boolean cmdl_shortopt_has(const char *s, char c) {
-  const char *com;
+  char name[8];
+  size_t at = 1;
 
   if (s[0] != '-' || s[1] == '-')
     return HTS_FALSE;
-  for (com = s + 1; *com != '\0'; com++) {
-    switch (*com) {
-    case '%':
-    case '&':
-    case '@':
-    case '#':
-      if (*(com + 1) != '\0')
-        com++; /* skip the other set's letter */
-      break;
-    default:
-      if (*com == c)
-        return HTS_TRUE;
-      break;
-    }
-  }
+  while (optcluster_next(s, &at, name, sizeof(name)))
+    if (name[1] == c && name[2] == '\0')
+      return HTS_TRUE;
   return HTS_FALSE;
 }
 

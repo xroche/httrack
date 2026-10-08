@@ -1,0 +1,98 @@
+#!/bin/bash
+#
+# An option that reads the next word takes it inside a cluster too (-qO PATH):
+# that word is never counted as a URL.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+bin=$(httrack_path)
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_clusterparam.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+export HOME="$tmp"
+url="file://$tmp/none.html"
+
+# with no URL, the cluster refuses with usage, like its spelled-out control
+for o in "-q -O" -qO -qO1 -%PO "-q -%rf" -q%rf -q\&rf "-q -#C" -q#C; do
+    name=${o// /_}
+    rc=0
+    # shellcheck disable=SC2086 # $o is one or two options
+    (cd "$tmp" && "$bin" $o "$tmp/nourl$name" -r1 </dev/null >"$tmp/nourl$name.out" 2>&1) || rc=$?
+    test "$rc" -ne 0 || fail "$o PATH with no URL was accepted: $(<"$tmp/nourl$name.out")"
+    # without -q, Windows runs the wizard, which refuses with its own message
+    grep -qE "usage:|No URL to mirror" "$tmp/nourl$name.out" ||
+        fail "$o PATH: no refusal: $(<"$tmp/nourl$name.out")"
+done
+
+# an option that takes no value leaves the next word a URL, & spelling % too
+for o in "-q -%P" -q%P -q\&P "-q -%O" -q%O -q\&O; do
+    name=${o// /_}
+    mkdir -p "$tmp/u$name"
+    rc=0
+    # shellcheck disable=SC2086 # $o is one or two options
+    (cd "$tmp/u$name" && "$bin" $o "$url" -r1 -R0 -P 127.0.0.1:1 </dev/null >"$tmp/u$name.out" 2>&1) || rc=$?
+    test "$rc" -eq 0 || fail "$o URL exited $rc: $(<"$tmp/u$name.out")"
+    test -f "$tmp/u$name/hts-log.txt" || fail "$o URL: no mirror in the current directory"
+done
+
+# a word beginning with - is the next option, not the cluster's value
+for o in -qO -q%rf -q%g -q%C; do
+    rc=0
+    (cd "$tmp" && "$bin" "$o" -r1 "$url" </dev/null >"$tmp/dash$o.out" 2>&1) || rc=$?
+    test "$rc" -ne 0 || fail "$o -r1 was accepted: $(<"$tmp/dash$o.out")"
+    grep -qF " needs " "$tmp/dash$o.out" || fail "$o -r1: $(<"$tmp/dash$o.out")"
+done
+
+# a URL list read through a cluster still counts as the URLs
+printf '<html>listed</html>\n' >"$tmp/listed.html"
+# the harness maps argv for httrack.exe, but not a URL inside a file
+listed="$tmp/listed.html"
+if target_is_windows; then listed=$(drvfs_path -m "$listed"); fi
+printf '%s\n' "file://$listed" >"$tmp/list.txt"
+for o in -q%L -q\&L; do
+    name=${o//&/a}
+    rc=0
+    (cd "$tmp" && "$bin" "$o" "$tmp/list.txt" -O "$tmp/l$name" -r1 -R0 -P 127.0.0.1:1 </dev/null >"$tmp/l$name.out" 2>&1) || rc=$?
+    test "$rc" -eq 0 || fail "$o LIST exited $rc: $(<"$tmp/l$name.out")"
+    test -n "$(find "$tmp/l$name" -name listed.html)" || fail "$o LIST mirrored nothing: $(<"$tmp/l$name.out")"
+done
+
+# # in the path expands from the real URL, as with the spelled-out control
+if ! target_is_windows; then # # expands to a name holding a colon
+    for o in "-q -O" -qO -qO1; do
+        name=${o// /_}
+        mkdir -p "$tmp/h$name"
+        rc=0
+        # shellcheck disable=SC2086 # $o is one or two options
+        (cd "$tmp/h$name" && "$bin" -r1 $o "$tmp/h$name/x#" "$url" -R0 -P 127.0.0.1:1 >"$tmp/h$name.out" 2>&1) || rc=$?
+        test "$rc" -eq 0 || fail "$o with # exited $rc: $(<"$tmp/h$name.out")"
+    done
+    want=$(ls "$tmp/h-q_-O")
+    for name in -qO -qO1; do
+        assert_eq "$want" "$(ls "$tmp/h$name")" "$name expanded #"
+    done
+fi
+
+# -O takes the word after the ones the options before it take
+mkdir -p "$tmp/po" "$tmp/lo"
+rc=0
+(cd "$tmp/po" && "$bin" -PO 127.0.0.1:1 OUT "$url" -r1 -R0 </dev/null >"$tmp/po.out" 2>&1) || rc=$?
+test "$rc" -eq 0 || fail "-PO exited $rc: $(<"$tmp/po.out")"
+test -f "$tmp/po/OUT/hts-log.txt" || fail "-PO PROXY OUT: no mirror in OUT: $(ls "$tmp/po")"
+rc=0
+(cd "$tmp/lo" && "$bin" -q%LO "$tmp/list.txt" OUT -r1 -R0 -P 127.0.0.1:1 </dev/null >"$tmp/lo.out" 2>&1) || rc=$?
+test "$rc" -eq 0 || fail "-q%LO exited $rc: $(<"$tmp/lo.out")"
+test -n "$(find "$tmp/lo/OUT" -name listed.html)" || fail "-q%LO LIST OUT: list not mirrored into OUT: $(<"$tmp/lo.out")"
+
+# another option's value is not an -O, and a glued -N number is no value
+for o in "--user-agent -Oz ZZ" -qN4; do
+    name=${o// /_}
+    mkdir -p "$tmp/v$name"
+    rc=0
+    # shellcheck disable=SC2086 # $o is one to three words
+    (cd "$tmp/v$name" && "$bin" $o "$url" -r1 -R0 -P 127.0.0.1:1 </dev/null >"$tmp/v$name.out" 2>&1) || rc=$?
+    test "$rc" -eq 0 || fail "$o URL exited $rc: $(<"$tmp/v$name.out")"
+    test -f "$tmp/v$name/hts-log.txt" || fail "$o URL: no mirror in the current directory: $(ls "$tmp/v$name")"
+done
