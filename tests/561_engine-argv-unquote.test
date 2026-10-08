@@ -101,11 +101,15 @@ for o in -O -O1; do
     rc=0
     (cd "$tmp" && "$bin" "$o" "$tmp/nourl$o" -q </dev/null >"$tmp/nourl$o.out" 2>&1) || rc=$?
     test "$rc" -ne 0 || fail "$o with no URL was accepted: $(<"$tmp/nourl$o.out")"
+    # # expands to a name holding a colon, which Windows forbids
+    target_is_windows && continue
     mkdir -p "$tmp/h$o"
     (cd "$tmp/h$o" && "$bin" "$o" "$tmp/h$o/x#" "$url" -q -r1 -R0 -P 127.0.0.1:1 >/dev/null 2>&1) ||
         fail "$o with # failed"
 done
-test "$(ls "$tmp/h-O")" = "$(ls "$tmp/h-O1")" || fail "-O1 expanded # as $(ls "$tmp/h-O1")"
+if ! target_is_windows; then
+    test "$(ls "$tmp/h-O")" = "$(ls "$tmp/h-O1")" || fail "-O1 expanded # as $(ls "$tmp/h-O1")"
+fi
 
 # doit.log reads back what it wrote, across two resumes
 for i in 1 2; do
