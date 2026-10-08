@@ -94,18 +94,14 @@ test -L "${tmpdir}/cache/hts-cache/new.zip" ||
 test "$rc" -eq "$ABORTED" || fail "the cache arm exited $rc, wanted $ABORTED"
 ok "a cache write failure aborts with the same status"
 
-# --- a limit that is not an abort at all -------------------------------------
-# -#L caps the link table. It used to abort the mirror, so a crawl that merely
-# ran out of room reported the same failure as a full disk. It now stops the
-# way --max-size and --max-time do, which is what keeps exit 3 meaning abort.
-crawl_status linklimit index.html "-#L3"
-grep -q 'The link limit (3) has been reached.. giving up' <<<"$log" ||
+# --- a producer that has nothing to do with the disk -------------------------
+# -#L caps the link table. The parser reached that cap and returned quietly
+# while htsAddLink's identical refusal aborted, so one limit gave two statuses.
+crawl_status linklimit index.html "-#L1"
+grep -q 'Too many URLs, giving up' <<<"$log" ||
     fail "the link cap was not reached, so the status proves nothing: ${log}"
-test "$rc" -eq 0 || fail "the link-cap arm exited $rc, wanted 0: ${log}"
-# The entry page is what the old abort threw away: it fired mid-parse.
-assert_file "${tmpdir}/linklimit/127.0.0.1_${SRV_PORT}/diskfull/index.html" \
-    "the capped mirror kept no entry page"
-ok "the link cap stops the mirror cleanly instead of aborting it"
+test "$rc" -eq "$ABORTED" || fail "the link-cap arm exited $rc, wanted $ABORTED"
+ok "the link cap aborts with the same status, disk or no disk"
 
 # Same crawl with room to finish, so the arm above is about the cap, not -#L.
 crawl_status linkroom index.html "-#L100"

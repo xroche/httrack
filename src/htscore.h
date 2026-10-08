@@ -330,14 +330,13 @@ char **hts_setfilters_take(httrackp *opt);
 
 #endif
 
-/* Is the -#L cap reached, so no new link may be discovered? One link early,
-   see the definition. */
-hts_boolean hts_maxlinks_reached(const httrackp *opt);
+/* Is the -#L cap close enough that no new link may be discovered? One parser
+   step records robots.txt and then the link itself, so it answers yes while
+   two free slots are not left, and discovery therefore stops one link early. */
+hts_boolean hts_maxlinks_no_room(const httrackp *opt);
 
 /* Record a link on the heap. All strings are copied (caller keeps ownership).
-   Returns 1 on success, 0 if the link limit (opt->maxlink) is reached or the
-   heap could not grow. Either way the engine's verdict is already recorded:
-   the cap asks for a smooth stop, a failed allocation aborts the mirror. */
+   Returns 1 on success, 0 if the link limit (opt->maxlink) is reached. */
 int hts_record_link(httrackp * opt,
                     const char *address, const char *file, const char *save,
                     const char *ref_address, const char *ref_file,
@@ -481,9 +480,12 @@ void filters_remove(httrackp *opt, int pos, int n);
 /* Can a filter array of maxfilter rules grow by HTS_FILTERSINC? */
 hts_boolean filters_may_grow(int maxfilter);
 
-/* Grow the filter array so n more rules fit, unless filters_may_grow() says
-   no, in which case filters_insert() drops the rules that do not fit. Aborts
-   when memory runs out. */
+/* Makes room for n more rules. Returns HTS_FALSE, having logged it, only when
+   memory runs out. At the HTS_FILTERS_MAX cap it returns HTS_TRUE and
+   filters_insert() drops what does not fit. */
+hts_boolean filters_grow(httrackp *opt, int n);
+
+/* Same as filters_grow(), but aborts when memory runs out. */
 void filters_make_room(httrackp *opt, int n);
 
 /* Returns the fa_strjoker_dual() verdict of the nfil filters on adr+fil, in

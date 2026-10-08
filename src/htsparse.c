@@ -784,6 +784,20 @@ void hts_strip_default_port(char *lien, size_t size) {
 }
 
 /* Main parser */
+/* Say once that the -#L cap is full, and record the abort #1419 gave it. The
+   mirror ends after the page being rewritten is finished, so what was already
+   mirrored is kept. */
+static void maxlinks_give_up(httrackp *opt, volatile int *exit_xh) {
+  if (hts_load_acquire_int(exit_xh) == -1)
+    return;
+  hts_log_print(opt, LOG_PANIC, "Too many URLs, giving up..(>%d)",
+                opt->maxlink);
+  hts_log_print(opt, LOG_INFO,
+                "To avoid that: use #L option for more links "
+                "(example: -#L1000000)");
+  hts_store_release_int(exit_xh, -1);
+}
+
 int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
   char catbuff[CATBUFF_SIZE];
 
@@ -2030,11 +2044,15 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             const int sf_tagless_body = inscript_locked;
 
             // si nofollow ou un stop a été déclenché, réécrire tous les liens en externe
-            /* an update keeps following, so the cache keeps its data; the
-               -#L cap has no such exemption, the heap being as finite */
+            /* an update keeps following, so the cache keeps its data; the -#L
+               cap has no such exemption, because the heap is finite either way
+             */
+            if (hts_maxlinks_no_room(opt)) {
+              p_nocatch = 1;
+              maxlinks_give_up(opt, stre->exit_xh_);
+            }
             if ((nofollow) ||
-                (hts_load_acquire_int(&opt->state.stop) && !opt->is_update) ||
-                hts_maxlinks_reached(opt))
+                (hts_load_acquire_int(&opt->state.stop) && !opt->is_update))
               p_nocatch = 1;
 
             // écrire codebase avant, flusher avant code
@@ -3388,14 +3406,15 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         (p_type != -2) &&
                         (forbidden_url !=
                          1)) { // si le fichier n'existe pas, ajouter à la liste
-                      /* Backstop: the nocatch gate above turns a link external
-                         before it reaches here, so this warns of a path that
-                         got round it and left the page pointing at nothing. */
-                      if (hts_maxlinks_reached(opt)) {
-                        hts_log_print(opt, LOG_WARNING,
-                                      "Link dropped past the -#L cap: %s%s",
-                                      afs.af.adr, afs.af.fil);
-                      } else { // room for it
+                      /* The gate above stops the links of a page the parser
+                         ENTERS with the cap full. This is the other order:
+                         hts_mirror_process_user_interaction() records a link
+                         per hts_addurl() the front end queued, and runs after
+                         that gate, so the cap can fill mid-page. Dropping the
+                         link keeps the two records below inside the reserve. */
+                      if (hts_maxlinks_no_room(opt)) {
+                        maxlinks_give_up(opt, stre->exit_xh_);
+                      } else { // room for it: record the link
                         int pass_fix, dejafait = 0;
 
                         // Calculer la priorité de ce lien
@@ -3558,7 +3577,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                         }
 
-                      } // room for it
+                      } // si pas trop de liens
                     } // si adr[0]!='\0'
 
                   }             // if adr[0]!='\0' 
@@ -3976,10 +3995,9 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
                     heap_top()->refetch_whole = heap(ptr)->refetch_whole;
                     heap_top()->premier = heap(ptr)->premier;
                     heap_top()->precedent = heap(ptr)->precedent;
-                  } else {
-                    hts_log_print(opt, LOG_WARNING,
-                                  "Moved link not recorded: %s%s", moved->adr,
-                                  moved->fil);
+                  } else {      // oups erreur, plus de mémoire!!
+                    XH_uninit;  // désallocation mémoire & buffers
+                    return 0;
                   }
                 } else {
                   hts_log_print(opt, LOG_INFO,
@@ -4086,11 +4104,9 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
           heap_top()->precedent = ptr;
           error = 1;
           hts_invalidate_link(opt, ptr); // invalidate hashtable entry
-        } else {
-          hts_log_print(opt, LOG_WARNING,
-                        "Partial file reget not recorded for %s%s", urladr(),
-                        urlfil());
-          error = 1;
+        } else {                         // out of memory
+          XH_uninit;
+          return 0;
         }
       } else {
         hts_log_print(opt, LOG_WARNING,
@@ -4274,9 +4290,8 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
             heap_top()->precedent = heap(ptr)->precedent;
             // refetch whole with no Range, and latch out a second free restart
             heap_top()->refetch_whole = r->refetch_wholefile;
-          } else {
-            hts_log_print(opt, LOG_WARNING, "Link not re-requested: %s%s",
-                          urladr(), urlfil());
+          } else {              // oups erreur, plus de mémoire!!
+            return 0;
           }
         }
       } else {
@@ -4459,10 +4474,10 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
               hts_log_print(opt, LOG_INFO, "Link added by user: %s%s", add.af.adr,
                             add.af.fil);
               //
-            } else {
-              hts_log_print(opt, LOG_WARNING,
-                            "Link added by user not recorded: %s%s", add.af.adr,
-                            add.af.fil);
+            } else { // out of memory
+              hts_addurl_free(addurl);
+              XH_uninit;        // désallocation mémoire & buffers
+              return;
             }
           } else {
             hts_log_print(opt, LOG_NOTICE,

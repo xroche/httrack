@@ -1,8 +1,7 @@
 #!/bin/bash
-# A mirror that stops before the end (-#L limit, then a dead server) must still
-# commit its WARC and rewrite the .cdx, and must leave the previous change
-# report alone: it never ran the index pass, so any report it wrote would be
-# false (#1061).
+# An aborted mirror (-#L limit, then a dead server) must still commit its WARC
+# and rewrite the .cdx, and must leave the previous change report alone: it
+# never ran the index pass, so any report it wrote would be false (#1061).
 set -euo pipefail
 
 # shellcheck source=tests/crawllib.sh
@@ -49,16 +48,15 @@ done
 rc2=0
 local_crawl --log "${tmpdir}/log2" "${common[@]}" -O "$out" -C0 -\#L4 \
     "${BASEURL}/changes/index.html" || rc2=$?
-expect "the link limit stopped the crawl" \
-    grep -aq "link limit" "${out}/hts-log.txt"
-# The cap stops the mirror the way -M and -E do, so it keeps exit 0; only a
-# real abort reports HTS_EXIT_MIRROR_ABORTED, which pass 3 below covers.
-expect "the capped stop kept its exit status" test "$rc2" -eq 0
-expect "the stop still committed the archive" \
+expect "the link limit aborted the crawl" \
+    grep -aq "Too many URLs" "${out}/hts-log.txt"
+# 3 is HTS_EXIT_MIRROR_ABORTED; hts_is_exiting() owns 2 and means the opposite.
+expect "the abort reported itself in the exit status" test "$rc2" -eq 3
+expect "the abort still committed the archive" \
     unpoisoned "${out}/warc-out.warc.gz"
-expect "the stop still rewrote the .cdx" unpoisoned "${out}/warc-out.cdx"
-expect "the stop left no in-progress archive" no_tmp
-expect "the stop kept the previous change report" \
+expect "the abort still rewrote the .cdx" unpoisoned "${out}/warc-out.cdx"
+expect "the abort left no in-progress archive" no_tmp
+expect "the abort kept the previous change report" \
     cmp -s "${tmpdir}/report1.json" "$report"
 
 cp "${out}/warc-out.warc.gz" "${tmpdir}/warc2.gz"
@@ -72,7 +70,7 @@ local_crawl --log "${tmpdir}/log3" "${common[@]}" -O "$out" --retries=1 --update
 expect "the dead pass rolled the session back" \
     grep -aq "restoring previous one" "${out}/hts-log.txt"
 # A rollback restores the last good session rather than leaving a half mirror,
-# so it is not the stop pass 2 reports, even though both end the run early.
+# so it is not the abort pass 2 reports, even though both set exit_xh.
 expect "the rollback is not reported as an abort" test "$rc3" -eq 0
 expect "the rollback kept the previous change report" \
     cmp -s "${tmpdir}/report1.json" "$report"

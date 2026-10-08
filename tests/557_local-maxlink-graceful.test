@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# The -#L cap used to abort the mirror: a crawl that reached it exited 3 and
-# lost even the entry page, where the size and time budgets stop cleanly. The
-# cap now stops discovery the way they do.
+# Reaching the -#L cap unwound the parser mid-page, so the entry page it had
+# just rewritten was thrown away with it and a crawl could keep nothing at all.
+# The cap still aborts the mirror, as #1419 decided and the man page documents.
 
 set -euo pipefail
 
@@ -11,12 +11,20 @@ set -euo pipefail
 
 require_httrack
 
+# Keep in step with HTS_EXIT_MIRROR_ABORTED, as test 360 does.
+ABORTED=3
+
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_maxlink.XXXXXX") || exit 1
 cleanup() { rm -rf "$tmpdir"; }
 cleanup_push cleanup
 
-# A hub and 12 leaves, so a cap can sit strictly inside the crawl.
+# A hub and its leaves, so a cap can land inside the hub's own link list.
 PAGES=12
+# Leaves whose links still fit under CAP below: the primary link, the hub and
+# these, after which hts_maxlinks_no_room() holds back the last two slots.
+CAUGHT=3
+CAP=$((CAUGHT + 3))
+
 doc="${tmpdir}/doc"
 mkdir -p "$doc"
 {
@@ -34,65 +42,57 @@ local_server_start --root "$doc"
 
 common=(--quiet --robots=0 -c1 --timeout=20)
 
-# Crawl into $tmpdir/$1 with the extra arguments, leaving the status in $rc and
-# the mirror's log in $log. Not a subshell: the status is the point.
+# Crawl into $tmpdir/$1, leaving the status in $rc and the mirror's log in $log.
+# Not a subshell: the status is what the first arm asserts.
 crawl() {
     local name=$1
     shift
-    dir="${tmpdir}/${name}"
-    site="${dir}/127.0.0.1_${SRV_PORT}"
+    site="${tmpdir}/${name}/127.0.0.1_${SRV_PORT}"
     rc=0
-    local_crawl --log "${tmpdir}/out-${name}" "${common[@]}" -O "$dir" \
-        "${BASEURL}/index.html" "$@" || rc=$?
-    log=$(<"${dir}/hts-log.txt")
+    local_crawl --log "${tmpdir}/out-${name}" "${common[@]}" \
+        -O "${tmpdir}/${name}" "${BASEURL}/index.html" "$@" || rc=$?
+    log=$(<"${tmpdir}/${name}/hts-log.txt")
 }
 
-# Links the mirrored hub still points at the live server, rather than at a
-# local copy: what the engine writes for a link it decided not to follow.
+# Leaf links the mirrored hub still points at the live server: what the engine
+# writes for a link it has decided not to follow.
 external_links() { grep -c "href=\"${BASEURL}/page" "${site}/index.html" || true; }
 
-# --- control: a cap above the crawl changes nothing --------------------------
-crawl room -\#L100
+mirrored_pages() { find "$site" -name '*.html' | wc -l; }
+
+# --- control: a cap the crawl never reaches changes nothing -----------------
+crawl room "-#L$((PAGES * 10))"
 test "$rc" -eq 0 || fail "a crawl inside the cap exited $rc: ${log}"
 grep -q 'mirror complete in' <<<"$log" ||
     fail "the control crawl did not finish, so its exit 0 proves nothing: ${log}"
-assert_eq "$((PAGES + 1))" "$(find "$site" -name '*.html' | wc -l)" \
-    "pages the control mirrored"
-assert_eq 0 "$(external_links)" "links the control left external"
-if grep -q 'link limit' <<<"$log"; then
+assert_eq "$((PAGES + 1))" "$(mirrored_pages)" "pages the control mirrored"
+assert_eq 0 "$(external_links)" "leaf links the control left external"
+if grep -q 'Too many URLs' <<<"$log"; then
     fail "the control crawl reached the cap, so nothing below is about it: ${log}"
 fi
 ok "a crawl that fits under the cap mirrors every page and exits 0"
 
-# --- the cap is reached mid-crawl -------------------------------------------
-# 6 is the real count: the primary link, the hub, and three leaves fit, which
-# the page and link assertions below pin exactly.
-crawl cap -\#L6
-test "$rc" -eq 0 || fail "the capped crawl exited $rc, wanted 0: ${log}"
-grep -q 'The link limit (6) has been reached.. giving up' <<<"$log" ||
+# --- the cap is reached while the hub is being rewritten --------------------
+crawl cap "-#L${CAP}"
+grep -q "Too many URLs, giving up..(>${CAP})" <<<"$log" ||
     fail "the cap was not reached, so nothing here is about it: ${log}"
-if grep -q 'Panic' <<<"$log"; then
-    fail "the cap still panics: ${log}"
-fi
-ok "a crawl that reaches the cap exits 0 and reports a budget, not a panic"
+test "$rc" -eq "$ABORTED" ||
+    fail "the capped crawl exited $rc, wanted $ABORTED: ${log}"
+ok "a crawl that reaches the cap still reports the abort #1419 gave it"
 
-# The entry page is the one master lost: it aborted while still parsing it.
+# The regression: the parser used to unwind here and take this page with it.
 assert_file "${site}/index.html" "the capped mirror kept no entry page"
-assert_eq 4 "$(find "$site" -name '*.html' | wc -l)" "pages the cap let through"
-ok "and keeps the entry page plus the leaves that fit"
+test "$(mirrored_pages)" -lt "$((PAGES + 1))" ||
+    fail "the capped mirror kept every page, so the cap stopped nothing"
+ok "and keeps the page it had already rewritten"
 
-# The uncaught links point at the live site, so no page references a file the
-# cap stopped the engine from fetching. The control above proves these same
-# links are local when the cap is not in the way.
-assert_eq 9 "$(external_links)" "links the cap left external"
-for i in 04 12; do
-    test ! -e "${site}/page${i}.html" ||
-        fail "page${i}.html was mirrored, so the cap let more through than counted"
-done
+# Links past the cap address the live server, so the kept page references no
+# file the abort stopped the engine from fetching. The control above proves
+# these same links are local when the cap is not in the way.
+assert_eq "$((PAGES - CAUGHT))" "$(external_links)" \
+    "leaf links the cap left external"
 ok "links past the cap are rewritten external rather than left dangling"
 
-# --- the mirror says it stopped early ---------------------------------------
-# Exit 0 must not read as "finished": --continue and the purge both key off it.
-grep -q 'Mirror aborted: keeping all previously mirrored files' <<<"$log" ||
-    fail "the capped mirror claimed to be complete: ${log}"
-ok "the capped mirror is still reported as not completed"
+# Once, not once per link: every later link in the hub reaches the same guard.
+assert_eq 1 "$(grep -c 'Too many URLs' <<<"$log")" "times the cap reported itself"
+ok "and the cap reports itself once however many links follow it"

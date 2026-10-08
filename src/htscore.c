@@ -360,10 +360,8 @@ static int hts_record_link_(httrackp * opt,
 }
 
 /* See htscore.h. */
-hts_boolean hts_maxlinks_reached(const httrackp *opt) {
-  /* +1: one parser step records robots.txt and then the link, and the second
-     must not be the one refused. */
-  return opt->maxlink > 0 && opt->lien_tot + 1 >= opt->maxlink;
+hts_boolean hts_maxlinks_no_room(const httrackp *opt) {
+  return opt->maxlink > 0 && opt->lien_tot + 2 > opt->maxlink;
 }
 
 int hts_record_link(httrackp * opt,
@@ -373,20 +371,10 @@ int hts_record_link(httrackp * opt,
   const int success = 
     hts_record_link_(opt, address, file, save, ref_address, ref_file, codebase);
   if (!success) {
-    if (hts_maxlinks_reached(opt)) {
-      /* back_checkmirror() raises the stop and says so once, so a caller here
-         only has to drop the link. */
-      hts_log_print(opt, LOG_DEBUG, "Link not recorded, -#L reached: %s%s",
-                    address, file);
-    } else {
-      hts_log_print(opt, LOG_PANIC,
-                    "Not enough memory to record a link (links=%ld)",
-                    (long int) opt->lien_tot);
-      hts_mutexlock(&opt->state.lock);
-      hts_store_release_int(&opt->state.stop, 1);
-      hts_store_release_int(&opt->state.exit_xh, -1);
-      hts_mutexrelease(&opt->state.lock);
-    }
+    hts_log_print(opt, LOG_PANIC, "Too many links (links=%ld, limit=%ld)", 
+                  (long int) heap_top_index(), (long int) opt->maxlink);
+    hts_log_print(opt, LOG_INFO,
+      "To avoid that: use #L option for more links (example: -#L1000000, or -#L0 to disable)");
   }
   return success;
 }
@@ -935,20 +923,9 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
             filters_insert(opt, filptr, rule); /* bumps filptr when stored */
           }
 
-          /* sanity check */
-          if (filptr + 1 >= opt->maxfilter &&
-              filters_may_grow(opt->maxfilter)) {
-            opt->maxfilter += HTS_FILTERSINC;
-            if (filters_init(&filters, opt->maxfilter, HTS_FILTERSINC) == 0) {
-              printf("PANIC! : Too many filters : >%d [%d]\n", filptr,
-                     __LINE__);
-              hts_log_print(opt, LOG_PANIC,
-                            "Too many filters, giving up..(>%d)", filptr);
-              hts_log_print(opt, LOG_NOTICE,
-                            "To avoid that: use #F option for more filters (example: -#F5000)");
-              XH_extuninit;
-              return 0;
-            }
+          if (!filters_grow(opt, 1)) {
+            XH_extuninit;
+            return 0;
           }
         }
 
@@ -2620,7 +2597,7 @@ hts_boolean filters_may_grow(int maxfilter) {
   return maxfilter <= HTS_FILTERS_MAX;
 }
 
-void filters_make_room(httrackp *opt, int n) {
+hts_boolean filters_grow(httrackp *opt, int n) {
   if (*opt->filters.filptr + n >= opt->maxfilter &&
       filters_may_grow(opt->maxfilter)) {
     opt->maxfilter += HTS_FILTERSINC;
@@ -2634,9 +2611,15 @@ void filters_make_room(httrackp *opt, int n) {
       hts_log_print(
           opt, LOG_INFO,
           "To avoid that: use #F option for more filters (example: -#F5000)");
-      assertf("too many filters - giving up" == NULL);
+      return HTS_FALSE;
     }
   }
+  return HTS_TRUE;
+}
+
+void filters_make_room(httrackp *opt, int n) {
+  if (!filters_grow(opt, n))
+    assertf("too many filters - giving up" == NULL);
 }
 
 int filters_match_url(char **filters, int nfil, const char *adr,
@@ -4835,9 +4818,9 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
               // >>>> CREER LE LIEN JAVA <<<<
 
               // enregistrer fichier (MACRO)
-              if (!hts_record_link(opt, afs.af.adr, afs.af.fil, afs.save, "",
-                                   "", "")) {
-                /* hts_record_link() owns the engine's verdict. */
+              if (!hts_record_link(opt, afs.af.adr, afs.af.fil, afs.save, "", "", "")) {    // erreur, pas de place réservée
+                /* fatal error -> exit */
+                hts_store_release_int(&opt->state.exit_xh, -1);
                 return 0;
               }
               // mode test?                          
