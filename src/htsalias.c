@@ -980,25 +980,40 @@ void cmdl_mark_param(cmdl_argv *cmd, int pos) {
   cmd->param[pos] = HTS_TRUE;
 }
 
-/* Values the engine compares in lowercase, read in any case from an rc file */
-static const char *const optinclude_keywords[] = {"on", "off", "standard",
-                                                  HTS_NOPARAM, NULL};
-
-/* Is VALUE, alone or in one pair of double quotes, a keyword? */
-static hts_boolean optinclude_is_keyword(const char *value) {
+/* Fold an rc VALUE for option KEY: a keyword it can take (on/off, or "(none)"
+   for a free-text value) is read in any case, quoted or not. */
+static void optinclude_fold(const char *key, char *value) {
+  static const char *const onoff[] = {"on", "off", NULL};
+  static const char *const none[] = {HTS_NOPARAM, NULL};
+  const char *const *keywords;
+  const char *word = value;
   size_t len = strlen(value);
-  int i;
+  const char *type;
+  int pos = optalias_find(key), i;
 
+  if (pos < 0)
+    return;
+  /* matched case-sensitively in lowercase, as every rc value used to be */
+  if (strcmp(hts_optalias[pos][1], "-%A") == 0 ||
+      strcmp(hts_optalias[pos][1], "-%w") == 0) {
+    hts_lowcase(value);
+    return;
+  }
+  type = hts_optalias[pos][2];
+  /* free text (param1, param0) */
+  keywords =
+      strcmp(type, "param1") == 0 || strcmp(type, "param0") == 0 ? none : onoff;
   if (len >= 2 && value[0] == '"' && value[len - 1] == '"') {
-    value++;
+    word++;
     len -= 2;
   }
-  for (i = 0; optinclude_keywords[i] != NULL; i++) {
-    if (strlen(optinclude_keywords[i]) == len &&
-        strncasecmp(value, optinclude_keywords[i], len) == 0)
-      return HTS_TRUE;
+  for (i = 0; keywords[i] != NULL; i++) {
+    if (strlen(keywords[i]) == len &&
+        strncasecmp(word, keywords[i], len) == 0) {
+      memcpy(value, keywords[i], len + 1);
+      return;
+    }
   }
-  return HTS_FALSE;
 }
 
 /* Include a file to the current command line */
@@ -1050,6 +1065,7 @@ cmdl_file_result optinclude_file(const char *name, cmdl_argv *cmd) {
             *b++ = '\0';
             while (is_realspace(*b))
               b++;
+            /* "key = value" */
             if (!equal && *b == '=') {
               b++;
               while (is_realspace(*b))
@@ -1058,8 +1074,7 @@ cmdl_file_result optinclude_file(const char *name, cmdl_argv *cmd) {
           }
           /* a is now the option, b the parameter */
           hts_lowcase(a);
-          if (optinclude_is_keyword(b))
-            hts_lowcase(b);
+          optinclude_fold(a, b);
 
           {
             int return_argc;

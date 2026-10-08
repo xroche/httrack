@@ -39,7 +39,7 @@ d1="$tmp/intact"
 mkdir -p "$d1"
 echo '<html><body>hello</body></html>' >"$d1/index.html"
 
-marker='zzz_rcfile_marker_0123456789_abcdefghijklmnopqrstuvwxyz_intact'
+marker='zzz_RcFile_Marker_0123456789_abcdefghijklmnopqrstuvwxyz_intact'
 printf 'user-agent=%s\n' "$marker" | write_rc "$d1"
 
 # Run with no -O so the working-directory .httrackrc is loaded (an -O path makes

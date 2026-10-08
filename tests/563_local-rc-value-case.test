@@ -1,8 +1,8 @@
 #!/bin/bash
 #
 # .httrackrc keys are case-insensitive, but values keep their case: a path, a
-# user-agent, a footer or a filter reaches doit.log as written. A keyword the
-# engine compares (on, off, standard) is still read in any case.
+# user-agent, a footer or a filter reaches doit.log as written. The on/off and
+# (none) keywords are read in any case, and -%A/-%w values in lowercase.
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
@@ -21,36 +21,58 @@ tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_rccase.XXXXXX") || exit 1
 cleanup_push rm -rf "$tmp"
 
 d=$tmp/rc
-out=$tmp/MixedDir
 mkdir -p "$d"
 echo '<html><body>hi</body></html>' >"$d/index.html"
-{
-    printf '%s\n' 'User-Agent "Mixed Case UA"'
-    printf '%s\n' 'SET Footer "<!-- Kept=Case -->"'
-    printf 'path %s\n' "$(nativepath "$out")"
-    printf '%s\n' 'allow *Keep.HTML*'
-    printf '%s\n' 'Sockets=3'
-    printf '%s\n' 'index OFF'
-    printf '%s\n' 'assume Standard'
-} >"$d/.httrackrc"
-cp "$d/.httrackrc" "$d/httrackrc" # the Windows name
-
-# no -O, or the rc files are not read; HOME keeps the user's own rc out
 log=$tmp/run.log
 fail_dump_var log
-rc=0
-(cd "$d" && HOME=$tmp run_with_timeout 120 "$bin" "file://$d/index.html" \
-    --quiet -n >"$log" 2>&1) || rc=$?
-test "$rc" -eq 0 || fail ".httrackrc crawl exited $rc"
-assert_file "$out/hts-cache/doit.log" "the rc path was not used as written"
-line=$(head -1 "$out/hts-cache/doit.log")
-line=${line%"$SELFTEST_CR"}
-for opt in '-F "Mixed Case UA"' '-%F "<!-- Kept=Case -->"' \
-    "-O $(nativepath "$out")" '+*Keep.HTML*' -c3 -I0 '-%A standard'; do
-    case " $line " in
-    *" $opt "*) ;;
-    *) fail ".httrackrc option [$opt] not applied: [$line]" ;;
+n=0
+
+# rc_check RC-LINE EXPECTED: the options doit.log shows for that one line
+rc_check() {
+    local out line want
+    n=$((n + 1))
+    out=$(nativepath "$tmp/MixedDir$n")
+    {
+        printf 'path %s\n' "$out"
+        printf '%s\n' "$1"
+    } >"$d/.httrackrc"
+    cp "$d/.httrackrc" "$d/httrackrc" # the Windows name
+    # no -O, or the rc files are not read; HOME keeps the user's own rc out
+    rc=0
+    (cd "$d" && HOME=$tmp run_with_timeout 120 "$bin" "file://$d/index.html" \
+        --quiet -n >"$log" 2>&1) || rc=$?
+    test "$rc" -eq 0 || fail "[$1]: crawl exited $rc"
+    assert_file "$tmp/MixedDir$n/hts-cache/doit.log" "[$1]: rc path not used as written"
+    line=$(head -1 "$tmp/MixedDir$n/hts-cache/doit.log")
+    line=${line%"$SELFTEST_CR"}
+    want="-O $out $2 file://"
+    case "$line" in
+    "$want"*) ;;
+    *) fail "[$1] gave [$line], expected [$want...]" ;;
     esac
-done
+}
+
+rc_check 'User-Agent "Mixed Case UA"' '-F "Mixed Case UA"'
+rc_check 'SET Footer "<!-- Kept=Case -->"' '-%F "<!-- Kept=Case -->"'
+rc_check 'allow *Keep.HTML*' '+*Keep.HTML*'
+rc_check 'Sockets=3' -c3
+rc_check 'index OFF' -I0
+rc_check 'index ON' -I
+rc_check 'index "OFF"' -I0
+rc_check 'assume Standard' '-%A standard'
+# matched in lowercase, as every rc value used to be
+rc_check 'assume PHP=text/html' '-%A php=text/html'
+rc_check 'disable-module WRAPPER-LIB' '-%w wrapper-lib'
+# a keyword is a whole value, and only for an option that takes it
+rc_check 'user-agent OFF' '-F OFF'
+rc_check 'allow OFF' +OFF
+rc_check 'user-agent Standard Browser' '-F "Standard Browser"'
+rc_check 'user-agent (NONE) Bot' '-F "(NONE) Bot"'
+rc_check 'footer "(NONE)"' '-%F (none)'
+# the key ends at '=', and spaces around a separating '=' are skipped
+rc_check 'User-Agent=Mixed' '-F Mixed'
+rc_check 'sockets = 8' -c8
+rc_check 'user-agent  lead' '-F lead'
+rc_check 'footer= =x' '-%F =x'
 
 exit 0
