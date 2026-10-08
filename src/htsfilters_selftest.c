@@ -411,13 +411,15 @@ static int st_filtercap(httrackp *opt, int argc, char **argv) {
 #undef POISON
 
 /* ------------------------------------------------------------ */
-/* hts_addfilter() queues only signed rules within HTS_FILTER_MAXLEN. */
+/* hts_addfilter() queues only signed rules within HTS_FILTER_MAXLEN, stored as
+   the command line stores them. */
 static int st_addfilter(httrackp *opt, int argc, char **argv) {
   static const struct {
     const char *label;
     const char *rule; /* NULL: built at the length given below */
     size_t len;
     hts_boolean want;
+    const char *stored; /* NULL: the rule as given */
   } cases[] = {
       {"minus", "-*/junk/*", 0, HTS_TRUE},
       {"plus", "+*.gif", 0, HTS_TRUE},
@@ -428,6 +430,11 @@ static int st_addfilter(httrackp *opt, int argc, char **argv) {
       {"empty", "", 0, HTS_FALSE},
       {"at the cap", NULL, HTS_FILTER_MAXLEN, HTS_TRUE},
       {"past the cap", NULL, HTS_FILTER_MAXLEN + 1, HTS_FALSE},
+      {"harmless escape", "+*%41*", 0, HTS_TRUE, "+*A*"},
+      {"space escape", "-*%20*", 0, HTS_TRUE},
+      {"star escape", "-*%2a*", 0, HTS_TRUE},
+      {"percent escape", "-*%25*", 0, HTS_TRUE},
+      {"space", "-*a b*", 0, HTS_TRUE, "-*a%20b*"},
   };
 
   char rule[HTS_FILTER_MAXLEN + 2];
@@ -438,6 +445,7 @@ static int st_addfilter(httrackp *opt, int argc, char **argv) {
   (void) argv;
   for (k = 0; k < sizeof(cases) / sizeof(cases[0]); k++) {
     const char *const r = cases[k].rule != NULL ? cases[k].rule : rule;
+    const char *const want = cases[k].stored != NULL ? cases[k].stored : r;
     char **taken;
     hts_boolean queued, kept;
 
@@ -448,13 +456,41 @@ static int st_addfilter(httrackp *opt, int argc, char **argv) {
     }
     queued = hts_addfilter(opt, r);
     taken = hts_addfilter_take(opt);
-    kept = taken != NULL && taken[0] != NULL && strcmp(taken[0], r) == 0 &&
+    kept = taken != NULL && taken[0] != NULL && strcmp(taken[0], want) == 0 &&
            taken[1] == NULL;
     hts_addurl_free(taken);
     printf("%s: queued=%d kept=%d\n", cases[k].label, queued, kept);
     if (queued != cases[k].want || kept != queued ||
         hts_filter_rule_ok(r) != cases[k].want)
       failed = 1;
+  }
+  /* the cap applies to the stored rule, not to the rule as given */
+  {
+    char *big = malloct(3 * HTS_FILTER_MAXLEN + 1);
+    char **taken = NULL;
+    hts_boolean ok = big != NULL;
+    size_t i;
+
+    if (ok) {
+      big[0] = '-';
+      for (i = 1; i < HTS_FILTER_MAXLEN; i++)
+        memcpy(big + 3 * i - 2, "%41", 4);
+      ok = hts_addfilter(opt, big) && (taken = hts_addfilter_take(opt)) &&
+           strlen(taken[0]) == HTS_FILTER_MAXLEN && taken[0][1] == 'A';
+      hts_addurl_free(taken);
+      /* one byte longer once decoded */
+      memmove(big + 2, big + 1, strlen(big + 1) + 1);
+      big[1] = 'x';
+      ok = ok && !hts_addfilter(opt, big);
+      memset(big, 'x', HTS_FILTER_MAXLEN);
+      big[0] = '-';
+      big[HTS_FILTER_MAXLEN - 1] = ' ';
+      big[HTS_FILTER_MAXLEN] = '\0';
+      ok = ok && !hts_addfilter(opt, big) && hts_addfilter_take(opt) == NULL;
+    }
+    freet(big);
+    printf("cap after decoding: ok=%d\n", ok);
+    failed |= !ok;
   }
   /* two calls append in order */
   hts_addfilter(opt, "-a*");
@@ -473,7 +509,7 @@ static int st_addfilter(httrackp *opt, int argc, char **argv) {
   /* a list with one bad rule queues nothing */
   {
     static const char *const bad[] = {"+*", "junk", NULL};
-    static const char *const good[] = {"+*", "-*/junk/*", NULL};
+    static const char *const good[] = {"+*%41", "-*/junk/*", NULL};
     static const char *const none[] = {NULL};
     char **set, **adds;
     hts_boolean ok;
@@ -487,7 +523,7 @@ static int st_addfilter(httrackp *opt, int argc, char **argv) {
     hts_addfilter(opt, "-late*");
     set = hts_setfilters_take(opt);
     adds = hts_addfilter_take(opt);
-    ok = ok && set != NULL && set[0] != NULL && strcmp(set[0], "+*") == 0 &&
+    ok = ok && set != NULL && set[0] != NULL && strcmp(set[0], "+*A") == 0 &&
          set[1] != NULL && strcmp(set[1], "-*/junk/*") == 0 && set[2] == NULL &&
          adds != NULL && adds[0] != NULL && strcmp(adds[0], "-late*") == 0 &&
          adds[1] == NULL;

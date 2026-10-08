@@ -4482,17 +4482,36 @@ char **hts_addfilter_take(httrackp *opt) {
   return old;
 }
 
-HTSEXT_API hts_boolean hts_filter_rule_ok(const char *rule) {
+/* Checks rule and writes it to norm (HTS_FILTER_MAXLEN + 1 bytes) as a
+   command-line argument is stored: harmless escapes decoded, spaces escaped. */
+static hts_boolean filter_rule_normalize_(const char *rule, char *norm) {
+  char BIGSTK dec[HTS_FILTER_MAXLEN * 3 + 1];
   size_t i;
 
-  if (rule == NULL || (rule[0] != '+' && rule[0] != '-') || rule[1] == '\0' ||
-      strlen(rule) > HTS_FILTER_MAXLEN)
+  if (rule == NULL || (rule[0] != '+' && rule[0] != '-') || rule[1] == '\0')
     return HTS_FALSE;
   for (i = 0; rule[i] != '\0'; i++) {
     if ((unsigned char) rule[i] < ' ')
       return HTS_FALSE;
   }
-  return HTS_TRUE;
+  /* an escape decodes to one byte, so a longer rule cannot fit */
+  if (i >= sizeof(dec))
+    return HTS_FALSE;
+  unescape_http_unharm(dec, sizeof(dec), rule, 1);
+  return escape_spc_url(dec, norm, HTS_FILTER_MAXLEN + 1) <= HTS_FILTER_MAXLEN;
+}
+
+/* A copy of rule as normalized, or NULL if refused or out of memory. */
+static char *filter_rule_dup_(const char *rule) {
+  char BIGSTK norm[HTS_FILTER_MAXLEN + 1];
+
+  return filter_rule_normalize_(rule, norm) ? strdupt(norm) : NULL;
+}
+
+HTSEXT_API hts_boolean hts_filter_rule_ok(const char *rule) {
+  char BIGSTK norm[HTS_FILTER_MAXLEN + 1];
+
+  return filter_rule_normalize_(rule, norm);
 }
 
 char **hts_setfilters_take(httrackp *opt) {
@@ -4511,14 +4530,12 @@ HTSEXT_API hts_boolean hts_setfilters(httrackp *opt, const char *const *rules) {
 
   if (opt == NULL || rules == NULL)
     return HTS_FALSE;
-  for (n = 0; rules[n] != NULL; n++) {
-    if (!hts_filter_rule_ok(rules[n]))
-      return HTS_FALSE;
-  }
+  for (n = 0; rules[n] != NULL; n++)
+    ;
   if ((copy = (char **) calloct(n + 1, sizeof(char *))) == NULL)
     return HTS_FALSE;
   for (i = 0; i < n; i++) {
-    if ((copy[i] = strdupt(rules[i])) == NULL) {
+    if ((copy[i] = filter_rule_dup_(rules[i])) == NULL) {
       hts_addurl_free(copy);
       return HTS_FALSE;
     }
@@ -4540,9 +4557,7 @@ HTSEXT_API hts_boolean hts_addfilter(httrackp *opt, const char *rule) {
   char **list;
   size_t n = 0;
 
-  if (opt == NULL || !hts_filter_rule_ok(rule))
-    return HTS_FALSE;
-  if ((copy = strdupt(rule)) == NULL)
+  if (opt == NULL || (copy = filter_rule_dup_(rule)) == NULL)
     return HTS_FALSE;
   hts_mutexlock(&opt->state.lock);
   while (opt->live_filters != NULL && opt->live_filters[n] != NULL)
