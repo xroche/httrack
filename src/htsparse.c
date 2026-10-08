@@ -785,8 +785,7 @@ void hts_strip_default_port(char *lien, size_t size) {
 
 /* Main parser */
 /* Say once that the -#L cap is full, and record the abort #1419 gave it. The
-   mirror ends after the page being rewritten is finished, so what was already
-   mirrored is kept. */
+   parse then finishes, so the page it has rewritten is kept. */
 static void maxlinks_give_up(httrackp *opt, volatile int *exit_xh) {
   if (hts_load_acquire_int(exit_xh) == -1)
     return;
@@ -2043,14 +2042,15 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             const char *const sf_tag = intag_start_valid ? intag_name : NULL;
             const int sf_tagless_body = inscript_locked;
 
-            // si nofollow ou un stop a été déclenché, réécrire tous les liens en externe
-            /* an update keeps following, so the cache keeps its data; the -#L
-               cap has no such exemption, because the heap is finite either way
+            /* The cap stops discovery here, so the rest of the page is
+               written external rather than pointing at files nothing fetches.
              */
             if (hts_maxlinks_no_room(opt)) {
               p_nocatch = 1;
               maxlinks_give_up(opt, stre->exit_xh_);
             }
+            // si nofollow ou un stop a été déclenché, réécrire tous les liens en externe
+            /* an update keeps following, so the cache keeps its data */
             if ((nofollow) ||
                 (hts_load_acquire_int(&opt->state.stop) && !opt->is_update))
               p_nocatch = 1;
@@ -3406,12 +3406,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         (p_type != -2) &&
                         (forbidden_url !=
                          1)) { // si le fichier n'existe pas, ajouter à la liste
-                      /* The gate above stops the links of a page the parser
-                         ENTERS with the cap full. This is the other order:
-                         hts_mirror_process_user_interaction() records a link
-                         per hts_addurl() the front end queued, and runs after
-                         that gate, so the cap can fill mid-page. Dropping the
-                         link keeps the two records below inside the reserve. */
+                      /* The gate above misses a cap that fills mid-page,
+                         which the queued hts_addurl() records in
+                         hts_mirror_process_user_interaction() can do after it.
+                         Skipping keeps room for the two records below. */
                       if (hts_maxlinks_no_room(opt)) {
                         maxlinks_give_up(opt, stre->exit_xh_);
                       } else { // room for it: record the link
@@ -3577,7 +3575,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                         }
 
-                      } // si pas trop de liens
+                      } // room for it
                     } // si adr[0]!='\0'
 
                   }             // if adr[0]!='\0' 

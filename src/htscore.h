@@ -330,9 +330,8 @@ char **hts_setfilters_take(httrackp *opt);
 
 #endif
 
-/* Is the -#L cap close enough that no new link may be discovered? One parser
-   step records robots.txt and then the link itself, so it answers yes while
-   two free slots are not left, and discovery therefore stops one link early. */
+/* Has the -#L cap left fewer than two free slots? One parser step records
+   robots.txt and then the link itself, so both must still fit. */
 hts_boolean hts_maxlinks_no_room(const httrackp *opt);
 
 /* Record a link on the heap. All strings are copied (caller keeps ownership).
