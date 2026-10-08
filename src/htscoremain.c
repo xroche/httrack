@@ -423,7 +423,7 @@ static hts_boolean cmdl_cluster_step(const char *word, size_t *at, char *name,
     return HTS_FALSE;
   pos = optreal_find(name);
   *value = -1;
-  /* -N is the paramn row, found first; this guards a table reorder */
+  /* only a lone -N reads the next word; a clustered one reads its digits */
   if (pos < 0 || strcmp(opttype_value(pos), "param1") != 0 ||
       strcmp(name, "-N") == 0 || *next >= argc || argv[*next][0] == '-')
     return HTS_TRUE;
