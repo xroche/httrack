@@ -84,9 +84,10 @@ grep -qF '1 links added' "$tmp/l/hts-log.txt" ||
     fail "the other list line was lost: $(<"$tmp/l/hts-log.txt")"
 
 # -O decodes its own quotes, where one groups a comma, and doit.log keeps them
-run "$tmp/o" -O "\"$tmp/o/a,b\""
+# relative, because the Windows harness maps only a bare /mnt path
+run "$tmp/o" -O '"a,b"'
 test -d "$tmp/o/a,b" || fail "-O split a quoted comma: $(ls "$tmp/o")"
-want="-O \"\\\"$tmp/o/a,b\\\"\""
+want='-O "\"a,b\""'
 has "$want" "$(doit "$tmp/o/a,b")" "-O with a comma"
 
 # -O1 takes one path, where a quote is data (Windows forbids one in a name)
