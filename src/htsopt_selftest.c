@@ -912,6 +912,9 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   assertf(used == 2);
   EXPANDS("-N 1L0", "-N", "1L0");
   assertf(used == 2);
+  /* an empty word is still the template, not a URL */
+  EXPANDS("-N ", "-N", "");
+  assertf(used == 2);
   /* the parse loop takes no template opening with '-', nor a missing one */
   EXPANDS("-N", "-N", "-r1");
   assertf(used == 1);
