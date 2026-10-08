@@ -330,6 +330,10 @@ char **hts_setfilters_take(httrackp *opt);
 
 #endif
 
+/* Has the -#L cap left fewer than two free slots? One parser step records
+   robots.txt and then the link itself, so both must still fit. */
+hts_boolean hts_maxlinks_no_room(const httrackp *opt);
+
 /* Record a link on the heap. All strings are copied (caller keeps ownership).
    Returns 1 on success, 0 if the link limit (opt->maxlink) is reached. */
 int hts_record_link(httrackp * opt,

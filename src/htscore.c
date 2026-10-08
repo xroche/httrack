@@ -359,6 +359,11 @@ static int hts_record_link_(httrackp * opt,
   return 1;
 }
 
+/* See htscore.h. */
+hts_boolean hts_maxlinks_no_room(const httrackp *opt) {
+  return opt->maxlink > 0 && opt->lien_tot + 2 > opt->maxlink;
+}
+
 int hts_record_link(httrackp * opt,
                     const char *address, const char *file, const char *save,
                     const char *ref_address, const char *ref_file,

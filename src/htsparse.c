@@ -784,6 +784,19 @@ void hts_strip_default_port(char *lien, size_t size) {
 }
 
 /* Main parser */
+/* Say once that the -#L cap is full, and record the abort #1419 gave it. The
+   parse then finishes, so the page it has rewritten is kept. */
+static void maxlinks_give_up(httrackp *opt, volatile int *exit_xh) {
+  if (hts_load_acquire_int(exit_xh) == -1)
+    return;
+  hts_log_print(opt, LOG_PANIC, "Too many URLs, giving up..(>%d)",
+                opt->maxlink);
+  hts_log_print(opt, LOG_INFO,
+                "To avoid that: use #L option for more links "
+                "(example: -#L1000000)");
+  hts_store_release_int(exit_xh, -1);
+}
+
 int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
   char catbuff[CATBUFF_SIZE];
 
@@ -2029,6 +2042,13 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             const char *const sf_tag = intag_start_valid ? intag_name : NULL;
             const int sf_tagless_body = inscript_locked;
 
+            /* The cap stops discovery here, so the rest of the page is
+               written external rather than pointing at files nothing fetches.
+             */
+            if (hts_maxlinks_no_room(opt)) {
+              p_nocatch = 1;
+              maxlinks_give_up(opt, stre->exit_xh_);
+            }
             // si nofollow ou un stop a été déclenché, réécrire tous les liens en externe
             /* an update keeps following, so the cache keeps its data */
             if ((nofollow) ||
@@ -3382,27 +3402,18 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                     afs.save);
                     }
 
-                    if ((afs.af.adr[0] != '\0') && (p_type != 2) && (p_type != -2) && (forbidden_url != 1)) {  // si le fichier n'existe pas, ajouter à la liste                            
-                      // n'y a-t-il pas trop de liens?
-                      if (opt->maxlink > 0 && opt->lien_tot + 1 >= opt->maxlink) {       // trop de liens!
-                        printf("PANIC! : Too many URLs : >%d [%d]\n", opt->lien_tot,
-                               __LINE__);
-                        hts_log_print(opt, LOG_PANIC, "Too many URLs, giving up..(>%d)",
-                                      opt->maxlink);
-                        hts_log_print(opt, LOG_INFO,
-                                      "To avoid that: use #L option for more links (example: -#L1000000)");
-                        /* same limit as htsAddLink's: report the same abort */
-                        hts_store_release_int(stre->exit_xh_, -1);
-                        if ((opt->getmode & HTS_GETMODE_HTML) && (ptr > 0)) {
-                          if (fp) {
-                            fclose(fp);
-                            fp = NULL;
-                          }
-                        }
-                        TypedArrayFree(output_buffer);
-                        XH_uninit;      // désallocation mémoire & buffers
-                        return -1;
-                      } else {  // noter le lien sur la listes des liens à charger
+                    if ((afs.af.adr[0] != '\0') && (p_type != 2) &&
+                        (p_type != -2) &&
+                        (forbidden_url !=
+                         1)) { // si le fichier n'existe pas, ajouter à la liste
+                      /* The gate above misses a cap that fills mid-page,
+                         which the queued hts_addurl() records in
+                         hts_mirror_process_user_interaction() can do after it.
+                         Skipping keeps room for the two records below. Only a
+                         front end queues those, so no .test reaches this. */
+                      if (hts_maxlinks_no_room(opt)) {
+                        maxlinks_give_up(opt, stre->exit_xh_);
+                      } else { // room for it: record the link
                         int pass_fix, dejafait = 0;
 
                         // Calculer la priorité de ce lien
@@ -3565,8 +3576,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                         }
 
-                      }         // si pas trop de liens
-                    }           // si adr[0]!='\0'
+                      } // room for it
+                    } // si adr[0]!='\0'
 
                   }             // if adr[0]!='\0' 
 
@@ -4462,6 +4473,11 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
               hts_log_print(opt, LOG_INFO, "Link added by user: %s%s", add.af.adr,
                             add.af.fil);
               //
+            } else if (hts_maxlinks_no_room(opt)) {
+              /* Give the parser's verdict rather than dropping the rest of
+                 the user's URLs in silence. */
+              maxlinks_give_up(opt, stre->exit_xh_);
+              break;
             } else { // out of memory
               hts_addurl_free(addurl);
               XH_uninit;        // désallocation mémoire & buffers
