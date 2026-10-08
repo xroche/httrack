@@ -340,43 +340,6 @@ jobs:
           path: ${{ runner.temp }}\wsl-rootfs.tar.gz
           key: wsl-rootfs-jammy-amd64-v1
 
-      - name: Restore the WSL kernel package
-        if: env.RUNNABLE == 'true'
-        id: wslkernel
-        uses: actions/cache/restore@v6
-        with:
-          path: ${{ runner.temp }}\wsl_update_x64.msi
-          key: wsl-kernel-msi-v1
-
-      # A healthy run fetches it for the run that needs it.
-      - name: Fetch the WSL kernel package
-        if: env.RUNNABLE == 'true' && steps.wslkernel.outputs.cache-hit != 'true'
-        id: wslkernelfetch
-        continue-on-error: true
-        shell: pwsh
-        run: |
-          $msi = "$env:RUNNER_TEMP\wsl_update_x64.msi"
-          $part = "$msi.part"
-          $url = "https://wslstorestorage.blob.core.windows.net/wslblob/wsl_update_x64.msi"
-          for ($i = 1; $i -le 3; $i++) {
-            try {
-              Invoke-WebRequest -UseBasicParsing -OutFile $part $url
-              # Cache keys are immutable, so a half-written file would be
-              # restored for ever and disable this fallback for good.
-              $n = (Get-Item $part).Length
-              if ($n -lt 8MB) { throw "short file, $n bytes" }
-              Move-Item -Force $part $msi
-              break
-            }
-            catch {
-              Write-Host "kernel package download attempt $i failed: $($_.Exception.Message)"
-              Remove-Item -Force -ErrorAction SilentlyContinue $part
-              if ($i -lt 3) { Start-Sleep -Seconds (5 * $i) }
-            }
-          }
-          if (-not (Test-Path $msi)) { exit 1 }
-          Write-Host "kernel package fetched, $((Get-Item $msi).Length) bytes"
-
       # WSL2 brings up in ~35s on a hosted runner with no reboot and no
       # third-party action: the three features are already enabled on the image.
       # It buys a real Linux shell against the same native httrack.exe, and is
@@ -384,6 +347,7 @@ jobs:
       # Dropping the MSYS leg also took the runner-death rate from 12.5% to
       # 0.3%, so do not bring one back (#1228).
       - name: Bring up WSL2
+        id: wslup
         if: env.RUNNABLE == 'true'
         # Still non-gating now that the suite step gates: a failed import
         # reaches that step, which names it and reds there. Failing here too
@@ -392,8 +356,8 @@ jobs:
         shell: pwsh
         timeout-minutes: 15
         run: |
-          # Three tries, then fall back to the cached package below, because this
-          # endpoint 403s per runner VM and waiting longer cannot help.
+          # Three tries, because this endpoint 403s per runner VM and waiting
+          # longer cannot help. A later step stops the leg when all three fail.
           $updated = $false
           for ($i = 1; $i -le 3; $i++) {
             try {
@@ -407,41 +371,39 @@ jobs:
               if ($i -lt 3) { Start-Sleep -Seconds (5 * $i) }
             }
           }
-          # wsl --update installs the kernel component, so a 403 there breaks the
-          # import with "requires an update to its kernel component".
-          if (-not $updated) {
-            $msi = "$env:RUNNER_TEMP\wsl_update_x64.msi"
-            if (Test-Path $msi) {
-              $p = Start-Process msiexec.exe -Wait -PassThru -ArgumentList '/i', "`"$msi`"", '/quiet', '/norestart'
-              Write-Host "installed the kernel package by hand, msiexec exit $($p.ExitCode)"
-            }
-            else { Write-Host "no kernel package here, so the import below decides" }
-          }
+          "updated=$($updated.ToString().ToLower())" >> $env:GITHUB_OUTPUT
           wsl --set-default-version 2
-          $root = "$env:RUNNER_TEMP\wsl-rootfs.tar.gz"
-          # jammy, not noble: the noble rootfs asset 404s as of 2026-09. The
-          # jammy asset is named after its release, not "wsl.rootfs".
-          # Cached above, because this host has answered 403 on a good URL and
-          # a whole leg then rests on one third-party request. Three tries with
-          # a pause, so a transient does not cost the round either.
-          if (Test-Path $root) {
-            Write-Host "rootfs restored from cache, $((Get-Item $root).Length) bytes"
-          } else {
-            $url = "https://cloud-images.ubuntu.com/wsl/jammy/current/ubuntu-jammy-wsl-amd64-ubuntu22.04lts.rootfs.tar.gz"
-            for ($i = 1; $i -le 3; $i++) {
-              try { Invoke-WebRequest -UseBasicParsing -OutFile $root $url; break }
-              catch {
-                Write-Host "rootfs download attempt $i failed: $($_.Exception.Message)"
-                if ($i -eq 3) { throw }
-                Start-Sleep -Seconds (5 * $i)
+          # The Stop step reads this, so a leg whose import worked still runs.
+          $imported = $false
+          try {
+            $root = "$env:RUNNER_TEMP\wsl-rootfs.tar.gz"
+            # jammy, not noble: the noble rootfs asset 404s as of 2026-09. The
+            # jammy asset is named after its release, not "wsl.rootfs".
+            # Cached above, because this host has answered 403 on a good URL and
+            # a whole leg then rests on one third-party request. Three tries with
+            # a pause, so a transient does not cost the round either.
+            if (Test-Path $root) {
+              Write-Host "rootfs restored from cache, $((Get-Item $root).Length) bytes"
+            } else {
+              $url = "https://cloud-images.ubuntu.com/wsl/jammy/current/ubuntu-jammy-wsl-amd64-ubuntu22.04lts.rootfs.tar.gz"
+              for ($i = 1; $i -le 3; $i++) {
+                try { Invoke-WebRequest -UseBasicParsing -OutFile $root $url; break }
+                catch {
+                  Write-Host "rootfs download attempt $i failed: $($_.Exception.Message)"
+                  if ($i -eq 3) { throw }
+                  Start-Sleep -Seconds (5 * $i)
+                }
               }
             }
+            wsl --import httrack-suite "$env:RUNNER_TEMP\wsl-distro" $root --version 2
+            if ($LASTEXITCODE -ne 0) { throw "wsl --import failed" }
+            # A distro that answers is the only proof the import is usable.
+            wsl -d httrack-suite -- uname -a
+            if ($LASTEXITCODE -ne 0) { throw "the imported distro does not run" }
+            $imported = $true
+          } finally {
+            "imported=$($imported.ToString().ToLower())" >> $env:GITHUB_OUTPUT
           }
-          wsl --import httrack-suite "$env:RUNNER_TEMP\wsl-distro" $root --version 2
-          if ($LASTEXITCODE -ne 0) { throw "wsl --import failed" }
-          # A distro that answers is the only proof the import is usable.
-          wsl -d httrack-suite -- uname -a
-          if ($LASTEXITCODE -ne 0) { throw "the imported distro does not run" }
           # For the record when a path stops converting: this rootfs has no
           # wslpath, which is why nothing in the suite calls one.
           wsl -d httrack-suite -- sh -c 'command -v wslpath || echo "no wslpath"'
@@ -456,12 +418,13 @@ jobs:
           path: ${{ runner.temp }}\wsl-rootfs.tar.gz
           key: wsl-rootfs-jammy-amd64-v1
 
-      - name: Save the WSL kernel package
-        if: steps.wslkernel.outputs.cache-hit != 'true' && steps.wslkernelfetch.outcome == 'success'
-        uses: actions/cache/save@v6
-        with:
-          path: ${{ runner.temp }}\wsl_update_x64.msi
-          key: wsl-kernel-msi-v1
+      # Do not restore the cached kernel package: it never passed the suite (#1656).
+      - name: Stop when wsl --update failed
+        if: steps.wslup.outputs.updated == 'false' && steps.wslup.outputs.imported != 'true'
+        shell: bash
+        run: |
+          echo "::error::wsl --update failed and the distro did not import: re-run this leg"
+          exit 1
 
       - name: Run the engine test suite (offline tests, WSL2)
         if: env.RUNNABLE == 'true'
