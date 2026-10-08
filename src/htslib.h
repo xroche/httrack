@@ -738,7 +738,8 @@ void *hts_get_callback(t_hts_htmlcheck_callbacks * callbacks,
 #endif
 
      /* clang-format off */
-/* One byte per column, so the four classes read side by side. */
+/* One byte per column, so the four classes read side by side. Nothing down
+   to the next marker survives clang-format either. */
 #define  is_space(c)      ( ((c)==' ') || ((c)=='\"') || ((c)==10) || ((c)==13) || ((c)==9) || ((c)==12) || ((c)==11) || ((c)=='\'') )
 #define  is_realspace(c)  ( ((c)==' ')                || ((c)==10) || ((c)==13) || ((c)==9) || ((c)==12) || ((c)==11)                )
 #define  is_taborspace(c) ( ((c)==' ')                                          || ((c)==9)                             )

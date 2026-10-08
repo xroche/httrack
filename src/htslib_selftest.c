@@ -1875,19 +1875,23 @@ static int st_lastchar(httrackp *opt, int argc, char **argv) {
 /* The character classes htslib.h defines, paired with the htssafe.h set string
    a strspn()/strcspn() skip names them by. A macro cannot be a table entry, so
    each gets a wrapper. */
-static int cc_space(unsigned char c) { return is_space((char) c) != 0; }
+static hts_boolean cc_space(unsigned char c) { return is_space((char) c) != 0; }
 
-static int cc_realspace(unsigned char c) { return is_realspace((char) c) != 0; }
+static hts_boolean cc_realspace(unsigned char c) {
+  return is_realspace((char) c) != 0;
+}
 
-static int cc_taborspace(unsigned char c) {
+static hts_boolean cc_taborspace(unsigned char c) {
   return is_taborspace((char) c) != 0;
 }
 
-static int cc_retorsep(unsigned char c) { return is_retorsep((char) c) != 0; }
+static hts_boolean cc_retorsep(unsigned char c) {
+  return is_retorsep((char) c) != 0;
+}
 
 static const struct {
   const char *set;
-  int (*pred)(unsigned char);
+  hts_boolean (*pred)(unsigned char);
 } cc_classes[] = {
     {HTS_SPACES, cc_space},
     {HTS_REALSPACES, cc_realspace},
@@ -1897,9 +1901,9 @@ static const struct {
 
 /* Do strspn() and strcspn() over class CLS land where the loops they replaced
    would have landed in S? */
-static int cc_span_agrees(size_t cls, const char *s) {
+static hts_boolean cc_span_agrees(size_t cls, const char *s) {
   const char *const set = cc_classes[cls].set;
-  int (*const pred)(unsigned char) = cc_classes[cls].pred;
+  hts_boolean (*const pred)(unsigned char) = cc_classes[cls].pred;
   size_t span, cspan;
 
   /* the span loop needs no terminator guard, because no class holds byte 0 */
@@ -1982,9 +1986,10 @@ static int st_rtrim(httrackp *opt, int argc, char **argv) {
   for (cls = 0; cls < sizeof(cc_classes) / sizeof(cc_classes[0]); cls++) {
     for (c = 0; c < 256; c++) {
       const char b = (char) c;
-      /* strchr() answers yes for the terminator, so byte 0 is spelled out: it
-         belongs to no class. */
-      const int in_set = c != 0 && strchr(cc_classes[cls].set, b) != NULL;
+      /* strchr() answers yes for the terminator, so byte 0 (member of no
+         class) is spelled out. */
+      const hts_boolean in_set =
+          c != 0 && strchr(cc_classes[cls].set, b) != NULL;
 
       CHECK(in_set == cc_classes[cls].pred((unsigned char) c));
     }
@@ -2000,7 +2005,7 @@ static int st_rtrim(httrackp *opt, int argc, char **argv) {
 
     /* the alphabet keeps a non-member even if someone adds 'x' to both the set
        and its macro, which the loop above would not notice */
-    CHECK(cc_classes[cls].pred((unsigned char) alpha[1]) == 0);
+    CHECK(!cc_classes[cls].pred((unsigned char) alpha[1]));
     for (i = 0; i < 3; i++) {
       for (j = 0; j < 3; j++) {
         for (k = 0; k < 3; k++) {

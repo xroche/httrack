@@ -1,10 +1,7 @@
 #!/bin/bash
-# The parsers skip whitespace with strspn()/strcspn() over the htssafe.h set
-# strings. A set narrower or wider than the is_*() macro it stands for shifts
-# where a value starts, so each probe sits on a byte one class holds and its
-# neighbour does not: VT is whitespace to is_realspace() but not to
-# is_taborspace(), and a quote is whitespace to is_space() but not to
-# is_realspace().
+# A strspn()/strcspn() skip must match the is_*() macro its set stands for, or
+# a value starts on the wrong byte. VT is whitespace to is_realspace() but not
+# to is_taborspace(); a quote is whitespace to is_space() but not is_realspace().
 set -euo pipefail
 
 # shellcheck source=tests/crawllib.sh
