@@ -15,12 +15,35 @@ for want in "minus: queued=1 kept=1" "plus: queued=1 kept=1" \
     "unsigned: queued=0 kept=0" "minus only: queued=0 kept=0" \
     "plus only: queued=0 kept=0" "newline: queued=0 kept=0" \
     "empty: queued=0 kept=0" "at the cap: queued=1 kept=1" \
-    "past the cap: queued=0 kept=0" "two rules: ordered=1" \
+    "past the cap: queued=0 kept=0" "harmless escape: queued=1 kept=1" \
+    "space escape: queued=1 kept=1" "star escape: queued=1 kept=1" \
+    "high escape: queued=1 kept=1" "space: queued=1 kept=1" \
+    "query: queued=1 kept=1" \
+    "cap after decoding: ok=1" "two rules: ordered=1" \
     "set with a bad rule: refused=1" "set supersedes earlier adds: ok=1" \
     "empty set: ok=1" \
     "addfilter self-test OK"; do
     grep -qxF "$want" <<<"$out" || fail "missing '$want' in: $out"
 done
+
+# the command line and -%S decode rules as hts_addfilter() does
+tmpdir=$(mktemp -d)
+cleanup_push rm -rf "$tmpdir"
+long=$(printf '%%41%.0s' $(seq 700))
+for pair in 'http://example.com/A|+*%41*|accepted by rule #1 (+*A*)' \
+    'http://example.com/a%20b|-*a b*|rejected by rule #1 (-*a b*)' \
+    'http://example.com/x?q=a%20b|-*?q=a%20b*|rejected by rule #1 (-*?q=a%20b*)' \
+    'http://example.com/x?a%20b|-*a b*|no filter rule matches' \
+    'http://example.com/A|+*%%341*|no filter rule matches'; do
+    IFS='|' read -r url rule want <<<"$pair"
+    out=$(httrack -O "$tmpdir/p" -q --why "$url" "$rule" http://example.com/)
+    grep -qF "$url: $want" <<<"$out" || fail "argv '$rule': $out"
+done
+# a -%S rule longer than the cap that decodes under it
+printf -- '-*%s\n' "$long" >"$tmpdir/rules"
+url="http://example.com/$(printf 'A%.0s' $(seq 700))"
+out=$(httrack -O "$tmpdir/p" -q --why "$url" -%S "$tmpdir/rules" http://example.com/)
+grep -qF "$url: rejected by rule #1" <<<"$out" || fail "-%S long rule: $out"
 
 out=$(httrack -O /dev/null -#test=filterremove)
 for want in "remove none: ok=1" "remove one: ok=1" "remove all: ok=1" \

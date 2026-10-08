@@ -384,7 +384,8 @@ HTSEXT_API hts_boolean hts_addurl(httrackp *opt, char **url);
 HTSEXT_API hts_boolean hts_resetaddurl(httrackp *opt);
 
 /** Queue a scan rule ("+pattern" or "-pattern") for a running mirror. The rule
-    is copied, appended after the user's other rules so it wins over them, and
+    is copied decoded (see hts_filter_rule_ok()),
+    appended after the user's other rules so it wins over them, and
     applied by the engine thread at its next pass. A "-" rule also drops the
     matching links that are queued, or fetched and not yet saved. A "+" rule
     only affects links found from then on. @return nonzero if the rule was
@@ -393,8 +394,9 @@ HTSEXT_API hts_boolean hts_addfilter(httrackp *opt, const char *rule);
 
 /** Replace the user's scan rules of a running mirror with @p rules, a
     NULL-terminated list of single rules applied in the order given. Split
-    rules typed as text on whitespace first, as the command line does. It
-    supersedes any hts_addfilter() rule not yet applied. A queued link is
+    rules typed as text on whitespace first, as the command line does. Each
+    rule is stored as hts_addfilter() stores it. The list supersedes any
+    hts_addfilter() rule not yet applied. A queued link is
     dropped when the rules now refuse it and did not before, or when the rule
     deciding it was added or is absent from the old list. A removed rule stops
     applying to links found from then on. @return nonzero if the list was
@@ -404,8 +406,10 @@ HTSEXT_API hts_boolean hts_setfilters(httrackp *opt, const char *const *rules);
 
 /** Would hts_addfilter() accept @p rule? It must be a + or - sign and a
     pattern, within the filter length cap and free of control characters, so a
-    front end can refuse it while the user can still edit it. @return HTS_TRUE
-    if valid, HTS_FALSE for NULL or an invalid rule. */
+    front end can refuse it while the user can still edit it. The cap applies
+    to the stored form, decoded before any '?' as a crawled link is: "%41"
+    becomes "A" and "%20" a space. @return HTS_TRUE if valid, HTS_FALSE for
+    NULL or an invalid rule. */
 HTSEXT_API hts_boolean hts_filter_rule_ok(const char *rule);
 
 /** Copy the token at *@p ptr into @p dest (@p destsize bytes, NUL included)

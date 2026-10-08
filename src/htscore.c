@@ -640,6 +640,28 @@ static hts_boolean chop_to_parent(char *file, size_t root, size_t *len) {
   return HTS_TRUE;
 }
 
+/* Decodes a rule into dest as the parser decodes a crawled link: the part
+   before any '?', so "%41" and "%20" match the "A" and space a link holds.
+   Returns HTS_FALSE if it does not fit in size bytes. */
+static hts_boolean filter_rule_decode_(const char *rule, char *dest,
+                                       size_t size) {
+  char BIGSTK path[HTS_FILTER_MAXLEN * 3 + 1], dec[sizeof(path)];
+  const char *const query = rule + strcspn(rule, "?");
+  const size_t plen = (size_t) (query - rule);
+  size_t len;
+
+  if (plen >= sizeof(path))
+    return HTS_FALSE;
+  memcpy(path, rule, plen);
+  path[plen] = '\0';
+  len = strlen(unescape_http_unharm(dec, sizeof(dec), path, 1 | 2));
+  if (strlen(query) >= size || len >= size - strlen(query))
+    return HTS_FALSE;
+  memcpy(dest, dec, len);
+  memcpy(dest + len, query, strlen(query) + 1);
+  return HTS_TRUE;
+}
+
 int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   char *primary = NULL;         // première page, contenant les liens à scanner
   hash_struct hash;             // système de hachage, accélère la recherche dans les liens
@@ -876,9 +898,10 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
         joker = 1;
 
       if (joker) { // a filter rule
-        /* sized off the rule cap, so the parser refuses exactly what the array
+        /* sized off the rule cap, so the decode refuses exactly what the array
            and the matcher would (#1288) */
         char BIGSTK tempo[HTS_FILTER_MAXLEN + 1];
+        char BIGSTK raw[HTS_FILTER_MAXLEN * 3 + 1];
         int type;
         int plus = 0;
 
@@ -897,13 +920,14 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
            spare byte is the dead branch's trailing '*' */
         const size_t room = sizeof(tempo) - 1;
 
-        if (!hts_scan_token(&a, tempo, room)) {
+        if (!hts_scan_token(&a, raw, sizeof(raw)) ||
+            !filter_rule_decode_(raw, tempo, room)) {
           /* on the console too: the user who typed it may have no log open */
           printf("Filter rule longer than %d bytes, ignored: %c%.64s...\n",
-                 (int) HTS_FILTER_MAXLEN, type ? '+' : '-', tempo);
+                 (int) HTS_FILTER_MAXLEN, type ? '+' : '-', raw);
           hts_log_print(opt, LOG_WARNING,
                         "Filter rule longer than %d bytes, ignored: %c%.64s...",
-                        (int) HTS_FILTER_MAXLEN, type ? '+' : '-', tempo);
+                        (int) HTS_FILTER_MAXLEN, type ? '+' : '-', raw);
           continue;
         }
 
@@ -963,7 +987,17 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
       if (ident_url_absolute(url, &af) < 0) {
         printf("--why: unable to parse URL %s" LF, StringBuff(opt->why_url));
       } else {
+        char *const query = af.fil + strcspn(af.fil, "?");
+        char BIGSTK path[sizeof(af.fil)];
         int jokDepth = 0;
+
+        /* decode the path as the parser decodes a crawled link */
+        const char c = *query;
+        *query = '\0';
+        unescape_http_unharm(path, sizeof(path), af.fil, 1 | 2);
+        *query = c;
+        strcatbuff(path, query);
+        strcpybuff(af.fil, path);
         const int jok =
             filters_match_url(filters, filptr, af.adr, af.fil, &jokDepth);
 
@@ -4482,17 +4516,31 @@ char **hts_addfilter_take(httrackp *opt) {
   return old;
 }
 
-HTSEXT_API hts_boolean hts_filter_rule_ok(const char *rule) {
+/* Writes rule, decoded, to norm (HTS_FILTER_MAXLEN + 1 bytes). Returns
+   HTS_FALSE if the rule is refused. */
+static hts_boolean filter_rule_normalize_(const char *rule, char *norm) {
   size_t i;
 
-  if (rule == NULL || (rule[0] != '+' && rule[0] != '-') || rule[1] == '\0' ||
-      strlen(rule) > HTS_FILTER_MAXLEN)
+  if (rule == NULL || (rule[0] != '+' && rule[0] != '-') || rule[1] == '\0')
     return HTS_FALSE;
   for (i = 0; rule[i] != '\0'; i++) {
     if ((unsigned char) rule[i] < ' ')
       return HTS_FALSE;
   }
-  return HTS_TRUE;
+  return filter_rule_decode_(rule, norm, HTS_FILTER_MAXLEN + 1);
+}
+
+/* Returns a normalized copy, or NULL if refused or out of memory. */
+static char *filter_rule_dup_(const char *rule) {
+  char BIGSTK norm[HTS_FILTER_MAXLEN + 1];
+
+  return filter_rule_normalize_(rule, norm) ? strdupt(norm) : NULL;
+}
+
+HTSEXT_API hts_boolean hts_filter_rule_ok(const char *rule) {
+  char BIGSTK norm[HTS_FILTER_MAXLEN + 1];
+
+  return filter_rule_normalize_(rule, norm);
 }
 
 char **hts_setfilters_take(httrackp *opt) {
@@ -4511,14 +4559,13 @@ HTSEXT_API hts_boolean hts_setfilters(httrackp *opt, const char *const *rules) {
 
   if (opt == NULL || rules == NULL)
     return HTS_FALSE;
-  for (n = 0; rules[n] != NULL; n++) {
-    if (!hts_filter_rule_ok(rules[n]))
-      return HTS_FALSE;
-  }
+  n = 0;
+  while (rules[n] != NULL)
+    n++;
   if ((copy = (char **) calloct(n + 1, sizeof(char *))) == NULL)
     return HTS_FALSE;
   for (i = 0; i < n; i++) {
-    if ((copy[i] = strdupt(rules[i])) == NULL) {
+    if ((copy[i] = filter_rule_dup_(rules[i])) == NULL) {
       hts_addurl_free(copy);
       return HTS_FALSE;
     }
@@ -4540,9 +4587,7 @@ HTSEXT_API hts_boolean hts_addfilter(httrackp *opt, const char *rule) {
   char **list;
   size_t n = 0;
 
-  if (opt == NULL || !hts_filter_rule_ok(rule))
-    return HTS_FALSE;
-  if ((copy = strdupt(rule)) == NULL)
+  if (opt == NULL || (copy = filter_rule_dup_(rule)) == NULL)
     return HTS_FALSE;
   hts_mutexlock(&opt->state.lock);
   while (opt->live_filters != NULL && opt->live_filters[n] != NULL)
