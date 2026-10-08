@@ -1,9 +1,9 @@
 #!/bin/bash
 #
 
-# An .httrackrc value loses exactly one quote pair, except the path, which -O
-# decodes itself. The file is read once. doit.log line 1 shows the argv the
-# engine kept.
+# An .httrackrc value has exactly one quote pair stripped, except the path,
+# which -O decodes itself. The file is read once. doit.log line 1 shows the
+# argv the engine kept.
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh

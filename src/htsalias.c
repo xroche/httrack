@@ -860,6 +860,10 @@ int optalias_find(const char *token) {
 
 /* Finds the <token> real option and returns the index, or -1 if failed */
 int optreal_find(const char *token) {
+  /* -O1 is -O with a flag glued on, and still takes the path after it */
+  if (strncmp(token, "-O", 2) == 0 && token[2] != '\0' &&
+      strspn(token + 2, "0123456789") == strlen(token + 2))
+    token = "-O";
   if (token[0] != '\0') {
     int i = 0;
 
@@ -1051,7 +1055,7 @@ cmdl_file_result optinclude_file(const char *name, cmdl_argv *cmd) {
                                     &return_argc, (tmp_argv + 2),
                                     sizeof(_tmp_argv[0]), return_error,
                                     sizeof(return_error));
-            /* a value loses one quote pair, but -O decodes its own quotes */
+            /* strip a value's quote pair, but -O decodes its own quotes */
             if (result && return_argc > 1 && strncmp(tmp_argv[2], "-O", 2) != 0)
               quote_ok = hts_unquote_arg(tmp_argv[3]);
             if (!result) {

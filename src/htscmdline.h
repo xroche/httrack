@@ -54,7 +54,8 @@ Please visit our Website: http://www.httrack.com
    allocated. */
 char **hts_split_args(char *cmd, int *nargs, int flags);
 
-/* hts_split_args() under HTS_SPLIT_FOLD_WS: the WebHTTrack filter list. */
+/* Split the WebHTTrack filter list with hts_split_args() under
+   HTS_SPLIT_FOLD_WS. */
 char **hts_split_cmdline(char *cmd, int *nargs);
 
 /* hts_split_args() for the command line a WebHTTrack page posts, whose values
@@ -73,10 +74,10 @@ void hts_quote_arg(String *out, const char *arg);
 /* Do the first len bytes of arg start and end with a quote? */
 hts_boolean hts_is_quoted(const char *arg, size_t len);
 
-/* The hint after "<where>: <value> ", for a value that hts_is_quoted(). */
+/* This hint follows "<where>: <value> " when hts_is_quoted(value). */
 #define HTS_QUOTED_HINT "is quoted, remove the quotes"
 
-/* Remove one surrounding quote pair from arg in place, if it starts with a
+/* Strip one surrounding quote pair from arg in place, if it starts with a
    quote. HTS_FALSE when that quote is not closed at its end. */
 hts_boolean hts_unquote_arg(char *arg);
 

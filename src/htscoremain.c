@@ -318,16 +318,18 @@ static void cmdl_panic_value(httrackp *opt, const char *msg,
   HTS_PANIC_PRINTF(s);
 }
 
-/* Panic on com, the rest of option arg, which no option takes. */
+/* Panic on com, the end of option arg that no option takes. When com is
+   quoted, the message names the option before it. */
 static void cmdl_bad_option(httrackp *opt, const char *arg, const char *prefix,
                             const char *com) {
-  char s[HTS_CDLMAXSIZE + 256];
+  char s[HTS_CDLMAXSIZE * 2 + 256];
 
   if (hts_is_quoted(com, strlen(com)))
-    snprintf(s, sizeof(s), "Option %.*s", (int) (com - arg), arg);
+    snprintf(s, sizeof(s), "Option %.*s: %s " HTS_QUOTED_HINT,
+             (int) (com - arg), arg, com);
   else
     snprintf(s, sizeof(s), "invalid option %s%c\n", prefix, *com);
-  cmdl_panic_value(opt, s, com);
+  HTS_PANIC_PRINTF(s);
 }
 
 HTSEXT_API int hts_main(int argc, char **argv) {
@@ -733,24 +735,21 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 int i /*, j */ ;
                 int inQuote;
                 String *path;
-                int noDbl = 0;
+                hts_boolean one_path = HTS_FALSE;
 
                 if (com[1] == '1') {    /* only 1 arg */
                   com++;
-                  noDbl = 1;
+                  one_path = HTS_TRUE;
                 }
                 na++;
                 StringClear(opt->path_html);
                 StringClear(opt->path_log);
                 for(i = 0 /*, j = 0 */ , inQuote = 0, path = &opt->path_html;
                     argv[na][i] != 0; i++) {
-                  /* only a plain -O groups a comma with quotes */
-                  if (!noDbl && argv[na][i] == '"') {
-                    if (inQuote)
-                      inQuote = 0;
-                    else
-                      inQuote = 1;
-                  } else if (!inQuote && !noDbl && argv[na][i] == ',') {
+                  /* a plain -O drops its quotes, which group a comma */
+                  if (!one_path && argv[na][i] == '"') {
+                    inQuote = !inQuote;
+                  } else if (!inQuote && !one_path && argv[na][i] == ',') {
                     path = &opt->path_log;
                   } else {
                     StringAddchar(*path, argv[na][i]);
@@ -2323,8 +2322,10 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 errno = 0;
                 secs = strtoll(com + 1, &end, 10);
                 if (end == com + 1 || errno == ERANGE || secs < 0) {
-                  HTS_PANIC_PRINTF("Invalid --max-retry-after (expected a "
-                                   "non-negative delay in seconds)");
+                  cmdl_panic_value(opt,
+                                   "Invalid --max-retry-after (expected a "
+                                   "non-negative delay in seconds)",
+                                   com + 1);
                   htsmain_free();
                   return -1;
                 }

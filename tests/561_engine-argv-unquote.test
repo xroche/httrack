@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # argv reaches the engine final: a quote on the command line is data, except
-# around a whole argument or a number, where it is refused. -O, doit.log and
+# around a whole URL, filter or number, where it is refused. -O, doit.log and
 # the WebHTTrack command line each decode their own quotes. doit.log line 1
 # shows the argv the engine kept.
 
@@ -67,11 +67,12 @@ refused "$tmp/r4" 'Option -R: "5" is quoted, remove the quotes' '-R"5"'
 refused "$tmp/r5" 'MIN<=MAX<=86400): "1" is quoted, remove the quotes' --pause '"1"'
 refused "$tmp/r6" 'positive size: "5" is quoted, remove the quotes' --single-file-max-size '"5"'
 refused "$tmp/r7" 'needs a size: "2" is quoted, remove the quotes' --warc-max-size '"2"'
+refused "$tmp/r8" 'seconds): "2" is quoted, remove the quotes' '-%J"2"'
 
 # a quoted line of a URL list is refused, and the others are kept
 printf '"http://a.invalid/"\nhttp://b.invalid/\n' >"$tmp/list.txt"
 run "$tmp/l" -%L "$tmp/list.txt"
-grep -qF 'line 1: "http://a.invalid/" is quoted, remove the quotes, ignored' "$tmp/l/hts-log.txt" ||
+grep -qF 'line 1: "http://a.invalid/" is quoted, ignored' "$tmp/l/hts-log.txt" ||
     fail "no refusal of the quoted list line: $(<"$tmp/l/hts-log.txt")"
 grep -qF '1 links added' "$tmp/l/hts-log.txt" ||
     fail "the other list line was lost: $(<"$tmp/l/hts-log.txt")"
@@ -87,6 +88,17 @@ if ! target_is_windows; then
     run "$tmp/o1" -O1 "$tmp/o1/a\"b,c"
     assert_file "$tmp/o1/a\"b,c/hts-log.txt"
 fi
+
+# -O1 takes its path like -O: never a URL, and # expands from the real URL
+for o in -O -O1; do
+    rc=0
+    (cd "$tmp" && "$bin" "$o" "$tmp/nourl$o" -q </dev/null >"$tmp/nourl$o.out" 2>&1) || rc=$?
+    test "$rc" -ne 0 || fail "$o with no URL was accepted: $(<"$tmp/nourl$o.out")"
+    mkdir -p "$tmp/h$o"
+    (cd "$tmp/h$o" && "$bin" "$o" "$tmp/h$o/x#" "$url" -q -r1 -R0 -P 127.0.0.1:1 >/dev/null 2>&1) ||
+        fail "$o with # failed"
+done
+test "$(ls "$tmp/h-O")" = "$(ls "$tmp/h-O1")" || fail "-O1 expanded # as $(ls "$tmp/h-O1")"
 
 # doit.log reads back what it wrote, across two resumes
 for i in 1 2; do

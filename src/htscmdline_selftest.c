@@ -502,7 +502,7 @@ static int st_quoteprop(httrackp *opt, int argc, char **argv) {
                  StringBuff(got));
     freet(in);
 
-    /* WebHTTrack: "prog" then each argument quoted, as htsweb.c splits it */
+    /* WebHTTrack posts "prog" and each argument quoted, for htsweb.c */
     StringClear(got);
     {
       String cmd = STRING_EMPTY;
