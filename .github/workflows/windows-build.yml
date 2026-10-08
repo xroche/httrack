@@ -340,43 +340,6 @@ jobs:
           path: ${{ runner.temp }}\wsl-rootfs.tar.gz
           key: wsl-rootfs-jammy-amd64-v1
 
-      - name: Restore the WSL kernel package
-        if: env.RUNNABLE == 'true'
-        id: wslkernel
-        uses: actions/cache/restore@v6
-        with:
-          path: ${{ runner.temp }}\wsl_update_x64.msi
-          key: wsl-kernel-msi-v1
-
-      # A healthy run fetches it for the run that needs it.
-      - name: Fetch the WSL kernel package
-        if: env.RUNNABLE == 'true' && steps.wslkernel.outputs.cache-hit != 'true'
-        id: wslkernelfetch
-        continue-on-error: true
-        shell: pwsh
-        run: |
-          $msi = "$env:RUNNER_TEMP\wsl_update_x64.msi"
-          $part = "$msi.part"
-          $url = "https://wslstorestorage.blob.core.windows.net/wslblob/wsl_update_x64.msi"
-          for ($i = 1; $i -le 3; $i++) {
-            try {
-              Invoke-WebRequest -UseBasicParsing -OutFile $part $url
-              # Cache keys are immutable, so a half-written file would be
-              # restored for ever and disable this fallback for good.
-              $n = (Get-Item $part).Length
-              if ($n -lt 8MB) { throw "short file, $n bytes" }
-              Move-Item -Force $part $msi
-              break
-            }
-            catch {
-              Write-Host "kernel package download attempt $i failed: $($_.Exception.Message)"
-              Remove-Item -Force -ErrorAction SilentlyContinue $part
-              if ($i -lt 3) { Start-Sleep -Seconds (5 * $i) }
-            }
-          }
-          if (-not (Test-Path $msi)) { exit 1 }
-          Write-Host "kernel package fetched, $((Get-Item $msi).Length) bytes"
-
       # WSL2 brings up in ~35s on a hosted runner with no reboot and no
       # third-party action: the three features are already enabled on the image.
       # It buys a real Linux shell against the same native httrack.exe, and is
@@ -393,8 +356,8 @@ jobs:
         shell: pwsh
         timeout-minutes: 15
         run: |
-          # Three tries, then fall back to the cached package below, because this
-          # endpoint 403s per runner VM and waiting longer cannot help.
+          # Three tries, because this endpoint 403s per runner VM and waiting
+          # longer cannot help. A later step stops the leg when all three fail.
           $updated = $false
           for ($i = 1; $i -le 3; $i++) {
             try {
@@ -409,16 +372,6 @@ jobs:
             }
           }
           "updated=$($updated.ToString().ToLower())" >> $env:GITHUB_OUTPUT
-          # wsl --update installs the kernel component, so a 403 there breaks the
-          # import with "requires an update to its kernel component".
-          if (-not $updated) {
-            $msi = "$env:RUNNER_TEMP\wsl_update_x64.msi"
-            if (Test-Path $msi) {
-              $p = Start-Process msiexec.exe -Wait -PassThru -ArgumentList '/i', "`"$msi`"", '/quiet', '/norestart'
-              Write-Host "installed the kernel package by hand, msiexec exit $($p.ExitCode)"
-            }
-            else { Write-Host "no kernel package here, so the import below decides" }
-          }
           wsl --set-default-version 2
           $root = "$env:RUNNER_TEMP\wsl-rootfs.tar.gz"
           # jammy, not noble: the noble rootfs asset 404s as of 2026-09. The
@@ -458,24 +411,14 @@ jobs:
           path: ${{ runner.temp }}\wsl-rootfs.tar.gz
           key: wsl-rootfs-jammy-amd64-v1
 
-      - name: Save the WSL kernel package
-        if: steps.wslkernel.outputs.cache-hit != 'true' && steps.wslkernelfetch.outcome == 'success'
-        uses: actions/cache/save@v6
-        with:
-          path: ${{ runner.temp }}\wsl_update_x64.msi
-          key: wsl-kernel-msi-v1
-
-      # Gating, so a kernel the suite cannot pass on reds in seconds rather than
-      # after 25 minutes. windows-rerun-killed.yml re-runs a leg failing here.
-      - name: Check the WSL2 kernel
-        if: env.RUNNABLE == 'true'
+      # No fallback, because the 5.10 kernel a cached package gives failed the
+      # suite every time (#1656). windows-rerun-killed.yml re-runs this leg.
+      - name: Stop when wsl --update failed
+        if: env.RUNNABLE == 'true' && steps.wslup.outputs.updated == 'false'
         shell: bash
-        env:
-          WSL_UPDATED: ${{ steps.wslup.outputs.updated }}
         run: |
-          set -euo pipefail
-          release=$(wsl -d httrack-suite -- uname -r | tr -d '\r') || release=
-          bash tools/wsl-kernel-check.sh "$release" "$WSL_UPDATED"
+          echo "::error::wsl --update failed: re-run this leg"
+          exit 1
 
       - name: Run the engine test suite (offline tests, WSL2)
         if: env.RUNNABLE == 'true'

@@ -31,6 +31,15 @@ job() { # job <name> <conclusion> [step...]
 
 payload() { jq -n -c --argjson j "$(jq -s -c '.' <<<"$(cat)")" '{jobs: $j}'; }
 
+# Since #1838 the gate job fails whenever a leg does, so every red run has it.
+GATE=(success:"Set up job" "failure:Run ./.github/actions/gate")
+gated() { # gated: payload with the failed gate job added, as a real red run has
+    {
+        cat
+        job 'windows gate' failure "${GATE[@]}"
+    } | payload
+}
+
 verdict() { # verdict <payload>; prints yes/no and the reason
     local out rc=0
     out=$(bash "$grade" <<<"$1") || rc=$?
@@ -38,7 +47,7 @@ verdict() { # verdict <payload>; prints yes/no and the reason
     echo "$((rc == 0))|$out"
 }
 
-expect() { # expect <yes|no> <what> <payload> [text the reason must carry]
+expect() { # expect <yes|no> <what> <payload> [text the reason must carry] [text it must not]
     local want=$1 what=$2 got
     got=$(verdict "$3")
     case "$want:${got%%|*}" in
@@ -54,6 +63,9 @@ expect() { # expect <yes|no> <what> <payload> [text the reason must carry]
     *"$4"*) ;;
     *) fail "$what: the reason does not mention '$4': ${got#*|}" ;;
     esac
+    test -z "${5:-}" || case "${got#*|}" in
+    *"$5"*) fail "$what: the reason wrongly names '$5': ${got#*|}" ;;
+    esac
 }
 
 KILLED=(success:Build
@@ -65,25 +77,25 @@ REALFAIL=(success:Build
 
 # The case the workflow exists for.
 expect yes "one lost runner" \
-    "$(job 'libhttrack (x64, Release)' failure "${KILLED[@]}" | payload)"
+    "$(job 'libhttrack (x64, Release)' failure "${KILLED[@]}" | gated)"
 
 # Every mutant here must be refused, or a genuine red gets re-run until the
-# attempt cap hides it.
+# attempt cap hides it. This one also proves the gate is ignored, not passed.
 expect no "a failing test" \
-    "$(job 'libhttrack (x64, Release)' failure "${REALFAIL[@]}" | payload)"
+    "$(job 'libhttrack (x64, Release)' failure "${REALFAIL[@]}" | gated)"
 expect no "a failing test beside a lost runner" \
     "$({
         job 'libhttrack (x64, Release)' failure "${REALFAIL[@]}"
         job 'libhttrack (Win32, Release)' failure "${KILLED[@]}"
-    } | payload)"
+    } | gated)"
 expect no "nothing failed" \
     "$(job 'libhttrack (x64, Release)' success 'success:Build' | payload)"
 expect no "a cancelled job" \
-    "$(job 'libhttrack (x64, Release)' cancelled "${KILLED[@]}" | payload)"
+    "$(job 'libhttrack (x64, Release)' cancelled "${KILLED[@]}" | gated)"
 # A failed job whose steps all finished is not the wedge signature, whatever
 # left it red, so it is a human's to read.
 expect no "a failure with every step finished" \
-    "$(job 'libhttrack (x64, Release)' failure 'success:Build' | payload)"
+    "$(job 'libhttrack (x64, Release)' failure 'success:Build' | gated)"
 # This case alone reaches the named-step clause, because a step failed and a
 # later one never finished. Without it the mutant dropping that clause survives,
 # since every other refusal here rests on the unfinished-step clause.
@@ -91,18 +103,18 @@ expect no "a failed step beside an unfinished one" \
     "$(job 'libhttrack (x64, Release)' failure \
         'success:Build' \
         'failure:Run the engine test suite (offline tests, WSL2)' \
-        'null:Upload the test logs' | payload)"
+        'null:Upload the test logs' | gated)"
 
 # This runner started no step at all, and the job is still red.
 expect yes "a runner that took no step" \
-    "$(job 'libhttrack (x64, Release)' failure | payload)"
+    "$(job 'libhttrack (x64, Release)' failure | gated)"
 
 # Both legs lost, which is what a bad half-hour on the pool looks like.
 expect yes "both legs lost" \
     "$({
         job 'libhttrack (x64, Release)' failure "${KILLED[@]}"
         job 'libhttrack (Win32, Release)' failure "${KILLED[@]}"
-    } | payload)"
+    } | gated)"
 
 # The ordinary shape: one leg green, the other lost. Without it a grader that
 # compares the kills against every job rather than against the failed ones
@@ -111,7 +123,7 @@ expect yes "one leg green, the other lost" \
     "$({
         job 'libhttrack (x64, Release)' success 'success:Build'
         job 'libhttrack (Win32, Release)' failure "${KILLED[@]}"
-    } | payload)"
+    } | gated)"
 
 # The mirror of the mixed case above. One order alone lets a grader that reads
 # only the x64 leg pass, and that grader re-runs a red Win32 leg.
@@ -119,17 +131,17 @@ expect no "a failing Win32 leg beside a lost x64 one" \
     "$({
         job 'libhttrack (x64, Release)' failure "${KILLED[@]}"
         job 'libhttrack (Win32, Release)' failure "${REALFAIL[@]}"
-    } | payload)" 'Win32'
+    } | gated)" 'Win32'
 
 # A runner lost during Build, so the unfinished step is not the suite step. A
 # grader keyed on the step's name would refuse this one.
 expect yes "a runner lost during Build" \
-    "$(job 'libhttrack (x64, Release)' failure 'null:Build' | payload)"
+    "$(job 'libhttrack (x64, Release)' failure 'null:Build' | gated)"
 
 # skipped is not unfinished. A step GitHub skipped after an earlier failure has
 # a conclusion, so it must not read as the wedge.
 expect no "a failed job whose last step was skipped" \
-    "$(job 'libhttrack (x64, Release)' failure 'success:Build' 'skipped:Upload the test logs' | payload)"
+    "$(job 'libhttrack (x64, Release)' failure 'success:Build' 'skipped:Upload the test logs' | gated)"
 
 # A job that ended badly some other way. timed_out is the documented one this
 # repo has not yet produced, and a lost sibling must not carry it through.
@@ -137,34 +149,49 @@ expect no "a timed-out job beside a lost runner" \
     "$({
         job 'libhttrack (x64, Release)' timed_out 'timed_out:Run the engine test suite'
         job 'libhttrack (Win32, Release)' failure "${KILLED[@]}"
-    } | payload)" 'timed_out'
+    } | gated)" 'timed_out'
 
 # The same one level down: a step that timed out names its step as surely as a
 # failed one does.
 expect no "a step that timed out" \
     "$(job 'libhttrack (x64, Release)' failure \
-        'success:Build' 'timed_out:Run the engine test suite' 'null:Upload the test logs' | payload)"
+        'success:Build' 'timed_out:Run the engine test suite' 'null:Upload the test logs' | gated)"
 
-# The old WSL2 kernel fails its own step and skips the suite. It is the runner
-# VM's doing, so it is re-run like a lost runner.
-OLDKERNEL=(success:Build "failure:Check the WSL2 kernel"
+# A failed wsl --update stops the leg at its own step. It is the runner VM's
+# doing, so it is re-run like a lost runner.
+NOUPDATE=(success:Build "failure:Stop when wsl --update failed"
     "skipped:Run the engine test suite (offline tests, WSL2)")
-expect yes "an old WSL2 kernel" \
-    "$(job 'libhttrack (x64, Release)' failure "${OLDKERNEL[@]}" | payload)" 'old WSL2 kernel'
-expect yes "an old kernel beside a lost runner" \
+expect yes "a failed wsl --update" \
+    "$(job 'libhttrack (x64, Release)' failure "${NOUPDATE[@]}" | gated)" 'wsl --update failed'
+expect yes "a failed wsl --update beside a lost runner" \
     "$({
-        job 'libhttrack (x64, Release)' failure "${OLDKERNEL[@]}"
+        job 'libhttrack (x64, Release)' failure "${NOUPDATE[@]}"
         job 'libhttrack (Win32, Release)' failure "${KILLED[@]}"
-    } | payload)"
-expect no "an old kernel beside a failing test" \
+    } | gated)"
+expect no "a failed wsl --update beside a failing test" \
     "$({
-        job 'libhttrack (x64, Release)' failure "${OLDKERNEL[@]}"
+        job 'libhttrack (x64, Release)' failure "${NOUPDATE[@]}"
         job 'libhttrack (Win32, Release)' failure "${REALFAIL[@]}"
-    } | payload)" 'Win32'
+    } | gated)" 'Win32' 'x64'
 # Any other failed step in the same job is a human's to read.
-expect no "an old kernel and a failing test in one job" \
+expect no "a failed wsl --update and a failing test in one job" \
     "$(job 'libhttrack (x64, Release)' failure \
-        'success:Build' 'failure:Check the WSL2 kernel' \
-        'failure:Run the engine test suite (offline tests, WSL2)' | payload)"
+        'success:Build' 'failure:Stop when wsl --update failed' \
+        'failure:Run the engine test suite (offline tests, WSL2)' | gated)"
 
-echo "windows-kill-grade OK (7 kills accepted, 12 refused)"
+# That step timing out is not that step failing, so a human reads it.
+expect no "the wsl --update step timing out" \
+    "$(job 'libhttrack (x64, Release)' failure success:Build \
+        'timed_out:Stop when wsl --update failed' | gated)" 'x64'
+
+# The grader keys on names the workflow must still carry.
+workflow="$top/.github/workflows/windows-build.yml"
+if test -r "$workflow"; then
+    for name in 'name: windows gate' '- name: Stop when wsl --update failed'; do
+        grep -qF -- "$name" "$workflow" || fail "windows-build.yml has no '$name'"
+    done
+elif test -d "$top/.github"; then
+    fail "$workflow is missing"
+fi
+
+echo "windows-kill-grade OK (7 kills accepted, 13 refused)"

@@ -2,7 +2,7 @@
 #
 # Tell a lost runner (#1228) from a real failure, for the jobs of one
 # windows-build run. Reads the `actions/runs/<id>/jobs` payload on stdin and
-# exits 0 when every failed job is a runner death or an old WSL2 kernel, so the
+# exits 0 when every failed job is a runner death or a failed wsl --update, so the
 # run is safe to re-run.
 #
 # This is stricter than tools/windows-kill-census.sh, which has to count an
@@ -22,16 +22,19 @@ verdict=$(jq -r '
     def failed_steps: [(.steps // [])[]
         | select(.conclusion == "failure" or .conclusion == "timed_out")];
     def names_a_step: failed_steps | length > 0;
-    # This step fails only on a kernel the runner VM gave us, never on our code.
-    def old_kernel: failed_steps
-        | length > 0 and all(.name == "Check the WSL2 kernel");
-    [.jobs[]? | select(ended_badly)] as $bad
+    # This step fails only when the runner VM cannot update WSL, never on our code.
+    def no_update: failed_steps
+        | length > 0 and all(.name == "Stop when wsl --update failed"
+                              and .conclusion == "failure");
+    # The gate fails whenever a leg does, so it carries no verdict of its own.
+    def is_gate: .name == "windows gate";
+    [.jobs[]? | select(is_gate | not) | select(ended_badly)] as $bad
     | [$bad[] | select(.conclusion == "failure")] as $failed
     | [$failed[] | select(names_a_step | not)
       | select(
         ((.steps // []) | length) == 0
         or ((.steps // []) | any(.conclusion == null)))] as $killed
-    | [$failed[] | select(old_kernel)] as $oldkernel
+    | [$failed[] | select(no_update)] as $noupdate
     | if ($bad | length) == 0 then
         "no\tno failed job"
       elif ($bad | length) != ($failed | length) then
@@ -39,11 +42,11 @@ verdict=$(jq -r '
                    | .name + " ended " + .conclusion] | join(", "))
       elif ($killed | length) == ($failed | length) then
         "yes\t" + (($failed | length) | tostring) + " failed job(s), none naming a step"
-      elif ($killed | length) + ($oldkernel | length) == ($failed | length) then
-        "yes\t" + (($oldkernel | length) | tostring) + " failed job(s) on an old WSL2 kernel, "
+      elif ($killed | length) + ($noupdate | length) == ($failed | length) then
+        "yes\t" + (($noupdate | length) | tostring) + " failed job(s) where wsl --update failed, "
             + (($killed | length) | tostring) + " lost"
       else
-        "no\t" + ([$failed[] | select(old_kernel | not) | select((names_a_step) or
+        "no\t" + ([$failed[] | select(no_update | not) | select((names_a_step) or
                      (((.steps // []) | length) > 0
                       and ((.steps // []) | any(.conclusion == null) | not)))
                    | .name] | join(", ")) + " is not the wedge signature"
