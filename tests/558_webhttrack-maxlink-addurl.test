@@ -1,0 +1,87 @@
+#!/bin/bash
+#
+# The -#L cap can fill between parses, so a URL a front end injects then finds
+# no room. The drain must report the cap instead of dropping the user's URL in
+# silence.
+
+set -euo pipefail
+
+# shellcheck source=tests/webhttracklib.sh
+. "${0%"${0##*/}"}./webhttracklib.sh"
+
+htsserver_require
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_maxlink.XXXXXX") || fail "no tmpdir"
+csrv=
+cleanup_push htsserver_cleanup_dir "${work}"
+cleanup_push htsserver_reap_vars csrv
+
+export HOME="${work}" # no ~/.httrack.ini of the developer's in the store
+
+# Link-free pages: the parser's own cap gate only runs on a link candidate, so
+# these leave the drain as the first and only place the cap can be seen.
+CAP=8
+INJECT=$((CAP + 3))
+mkdir -p "${work}/docroot/u"
+for i in $(seq 1 "${INJECT}"); do
+    printf '<html><body>u%s</body></html>\n' "${i}" >"${work}/docroot/u/${i}.html"
+done
+
+clog="${work}/content.log"
+"${HTS_PYTHON}" "${testdir}/local-server.py" --root "${work}/docroot" \
+    >"${clog}" 2>&1 &
+csrv=$!
+cport=$(discover_server_port "${clog}" "${csrv}") || fail "no content server"
+
+htsserver_start
+sid=$(htsserver_sid)
+test "${#sid}" -eq 32 || fail "no session id in the panel (got '${sid}')"
+
+# p0.bin trickles for a minute, so the crawl is still running while the URLs
+# are injected one at a time.
+out="${work}/crawl"
+htsserver_client --path /step4.html --field "sid=${sid}" --field "path=${work}" \
+    --field projname=crawl --field winprofile=x --field command_do=start \
+    --field "command=httrack --robots=0 --debug-log -#L${CAP} http://127.0.0.1:${cport}/trickle/p0.bin +* -O ${out}" \
+    >/dev/null
+
+log="${out}/hts-log.txt"
+start=$SECONDS
+while test ! -f "${log}"; do
+    test "$((SECONDS - start))" -lt 60 || fail "the crawl never started"
+    poll_wait 0.2
+done
+
+# One URL per request, because hts_addurl() replaces the pending list rather
+# than appending to it. Each is drained before the next is installed.
+added=0
+reported=0
+for i in $(seq 1 "${INJECT}"); do
+    htsserver_client --path /step4.html --field "sid=${sid}" \
+        --field "command=add-url=http://127.0.0.1:${cport}/u/${i}.html" \
+        >/dev/null
+    start=$SECONDS
+    while :; do
+        htsserver_alive || fail "htsserver died: $(tail -n 20 "${log}")"
+        if grep -q "Too many URLs, giving up" "${log}"; then
+            reported=1
+            break
+        fi
+        n=$(command grep -c "Link added by user" "${log}" || true)
+        test "${n}" -le "${added}" || break
+        test "$((SECONDS - start))" -lt 60 ||
+            fail "URL ${i} was neither added nor refused: $(tail -n 5 "${log}")"
+        poll_wait 0.2
+    done
+    test "${reported}" -eq 0 || break
+    added=$((added + 1))
+done
+
+# A run that added nothing would pass the check below for the wrong reason.
+test "${added}" -ge 2 || fail "no URL was ever added (added=${added})"
+test "${reported}" -eq 1 ||
+    fail "the cap was never reported after ${INJECT} injections: $(tail -n 10 "${log}")"
+grep -q "Too many URLs, giving up..(>${CAP})" "${log}" ||
+    fail "the cap was reported without its limit: $(grep 'Too many URLs' "${log}")"
+
+echo "PASS"

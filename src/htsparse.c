@@ -4474,9 +4474,8 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
                             add.af.fil);
               //
             } else if (hts_maxlinks_no_room(opt)) {
-              /* Give the parser's verdict rather than dropping the rest of the
-                 user's URLs in silence. Only a front end reaches this, so no
-                 .test covers it. */
+              /* Give the parser's verdict rather than dropping the rest of
+                 the user's URLs in silence. */
               maxlinks_give_up(opt, stre->exit_xh_);
               break;
             } else { // out of memory
