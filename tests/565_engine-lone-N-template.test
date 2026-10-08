@@ -1,0 +1,64 @@
+#!/bin/bash
+#
+# A lone -N takes the next word as its template in every argv pass, so that
+# word is never counted as a URL, nor names the mirror (-O #).
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+bin=$(httrack_path)
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_loneN.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+export HOME="$tmp"
+printf '<html>page</html>\n' >"$tmp/page.html"
+url="file://$tmp/page.html"
+
+# run NAME ARGS...: httrack in a fresh $tmp/NAME, output in $tmp/NAME.out
+run() {
+    local name=$1
+    shift
+    mkdir -p "$tmp/$name"
+    rc=0
+    (cd "$tmp/$name" && "$bin" "$@" </dev/null >"$tmp/$name.out" 2>&1) || rc=$?
+}
+
+# # in -O expands from the URL, as with no -N (a host name, so no colon)
+run hctl -O 'o#' nohost.invalid/ -r1 -R0 -P 127.0.0.1:1
+test "$rc" -eq 0 || fail "control exited $rc: $(<"$tmp/hctl.out")"
+run hN -N 'x#' -O 'o#' nohost.invalid/ -r1 -R0 -P 127.0.0.1:1
+test "$rc" -eq 0 || fail "-N T -O # exited $rc: $(<"$tmp/hN.out")"
+assert_eq "onohost.invalid" "$(ls "$tmp/hctl")" "control expanded #"
+assert_eq "$(ls "$tmp/hctl")" "$(ls "$tmp/hN")" "-N T -O # expanded #"
+
+# with no URL, the template is no URL either
+run nourl -N '%n.%t' -r1
+test "$rc" -ne 0 || fail "-N T with no URL was accepted: $(<"$tmp/nourl.out")"
+# Windows runs the wizard, which refuses with its own message
+grep -qE "usage:|No URL to mirror" "$tmp/nourl.out" ||
+    fail "-N T with no URL: no refusal: $(<"$tmp/nourl.out")"
+
+# the template is applied, and a preset or a clustered -N still reads digits
+run tpl -N '%n.%t' "$url" -r1 -R0 -P 127.0.0.1:1
+test "$rc" -eq 0 || fail "-N T URL exited $rc: $(<"$tmp/tpl.out")"
+test -f "$tmp/tpl/page.html" || fail "-N T URL: template not applied: $(ls -R "$tmp/tpl")"
+for o in -N4 "-N 4" -qN4; do
+    name=p${o// /_}
+    # shellcheck disable=SC2086 # $o is one or two words
+    run "$name" $o "$url" -r1 -R0 -P 127.0.0.1:1
+    test "$rc" -eq 0 || fail "$o URL exited $rc: $(<"$tmp/$name.out")"
+    test -n "$(find "$tmp/$name" -name page.html)" || fail "$o URL: read as a template: $(ls -R "$tmp/$name")"
+done
+
+# an empty template is the default structure, and still no URL
+if ! target_is_windows; then # an empty word through the WSL2 bridge
+    run empty -N '' "$url" -r1 -R0 -P 127.0.0.1:1
+    test "$rc" -eq 0 || fail "-N '' URL exited $rc: $(<"$tmp/empty.out")"
+    test -n "$(find "$tmp/empty" -name page.html)" || fail "-N '' URL mirrored nothing: $(<"$tmp/empty.out")"
+fi
+
+# a word beginning with - is the next option, not a template
+run dash -N -r1 "$url"
+test "$rc" -ne 0 || fail "-N -r1 was accepted: $(<"$tmp/dash.out")"
+grep -qF "Option N needs" "$tmp/dash.out" || fail "-N -r1: $(<"$tmp/dash.out")"

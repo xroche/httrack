@@ -817,6 +817,14 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
         *return_argc = 1;
         return 2;
       }
+      /* the template, where the parse loop takes one, so it is never a URL */
+      if (strcmp(hts_optalias[pos][2], "paramn") == 0 && n_arg + 1 < argc &&
+          argv[n_arg + 1][0] != '-') {
+        strlcpybuff(return_argv[0], argv[n_arg], return_argv_size);
+        strlcpybuff(return_argv[1], argv[n_arg + 1], return_argv_size);
+        *return_argc = 2;
+        return 2;
+      }
       if ((strcmp(hts_optalias[pos][2], "param1") == 0)
           || (strcmp(hts_optalias[pos][2], "param0") == 0)) {
         const optparam_state state =
