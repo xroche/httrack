@@ -980,6 +980,47 @@ void cmdl_mark_param(cmdl_argv *cmd, int pos) {
   cmd->param[pos] = HTS_TRUE;
 }
 
+/* Fold an rc VALUE for option KEY: -%A and -%w values are lowercased; a
+   free-text (param1) "(none)" is read in any case, quoted or not; any other
+   option reads on/off in any case, and unquotes them only for a switch or
+   a level. */
+static void optinclude_fold(const char *key, char *value) {
+  static const char *const onoff[] = {"on", "off", NULL};
+  static const char *const none[] = {HTS_NOPARAM, NULL};
+  const char *const *keywords;
+  const char *word = value;
+  size_t len = strlen(value);
+  const char *type;
+  hts_boolean unquote;
+  int pos = optalias_find(key), i;
+
+  if (pos < 0)
+    return;
+  /* these options match their value case-sensitively in lowercase */
+  if (strcmp(hts_optalias[pos][1], "-%A") == 0 ||
+      strcmp(hts_optalias[pos][1], "-%w") == 0) {
+    hts_lowcase(value);
+    return;
+  }
+  type = hts_optalias[pos][2];
+  if (strcmp(type, "param0") == 0)
+    return;
+  keywords = strcmp(type, "param1") == 0 ? none : onoff;
+  unquote = keywords == none || strcmp(type, "onoff") == 0 ||
+            strcmp(type, "level") == 0;
+  if (unquote && len >= 2 && value[0] == '"' && value[len - 1] == '"') {
+    word++;
+    len -= 2;
+  }
+  for (i = 0; keywords[i] != NULL; i++) {
+    if (strlen(keywords[i]) == len &&
+        strncasecmp(word, keywords[i], len) == 0) {
+      memcpy(value, keywords[i], len + 1);
+      return;
+    }
+  }
+}
+
 /* Include a file to the current command line */
 /* example:
   set sockets 8
@@ -1005,7 +1046,6 @@ cmdl_file_result optinclude_file(const char *name, cmdl_argv *cmd) {
         fprintf(stderr, "* %s: line too long, ignored\n", name);
         continue;
       }
-      hts_lowcase(line);
       /* trim first: a blank line is skipped, not parsed as an option */
       hts_rtrim(line, HTS_REALSPACES);
       a = line;
@@ -1015,26 +1055,31 @@ cmdl_file_result optinclude_file(const char *name, cmdl_argv *cmd) {
         /* no comment line: # // ; even indented */
         if (strchr("#/;", *a) == NULL) {
           /* jump "set " and spaces */
-          if (strncmp(a, "set", 3) == 0) {
-            if (is_realspace(*(a + 3))) {
-              a += 4;
-            }
-          }
+          if (strncasecmp(a, "set", 3) == 0 && is_realspace(a[3]))
+            a += 4;
           while(is_realspace(*a))
             a++;
-          /* delete = ("sockets=8") */
-          if ((b = strchr(a, '=')))
-            *b = ' ';
 
-          /* isolate option and parameter */
+          /* the option ends at a space or '=', so a '=' in the value stays */
           b = a;
-          while((!is_realspace(*b)) && (*b))
+          while (*b != '\0' && !is_realspace(*b) && *b != '=')
             b++;
           if (*b) {
-            *b = '\0';
-            b++;
+            const hts_boolean equal = *b == '=';
+
+            *b++ = '\0';
+            while (is_realspace(*b))
+              b++;
+            /* skip the '=' of "key = value" */
+            if (!equal && *b == '=') {
+              b++;
+              while (is_realspace(*b))
+                b++;
+            }
           }
           /* a is now the option, b the parameter */
+          hts_lowcase(a);
+          optinclude_fold(a, b);
 
           {
             int return_argc;
