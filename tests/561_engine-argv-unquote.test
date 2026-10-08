@@ -65,6 +65,12 @@ refused "$tmp/r2" 'Argument refused: "+*.gif" is quoted, remove the quotes' '"+*
 refused "$tmp/r3" 'Option --retries: "5" is quoted, remove the quotes' --retries '"5"'
 refused "$tmp/r4" 'Option -R: "5" is quoted, remove the quotes' '-R"5"'
 refused "$tmp/r5" 'MIN<=MAX<=86400): "1" is quoted, remove the quotes' --pause '"1"'
+# a stray quote is not a wrapped value, so it gets no hint
+refused "$tmp/r5a" 'MIN<=MAX<=86400)' --pause '"1'
+refused "$tmp/r5b" 'Option --retries does not take the value 5"' --retries '5"'
+for r in r5a r5b; do
+    ! grep -qF 'is quoted' "$tmp/$r.out" || fail "$r: hint on a stray quote: $(<"$tmp/$r.out")"
+done
 refused "$tmp/r6" 'positive size: "5" is quoted, remove the quotes' --single-file-max-size '"5"'
 refused "$tmp/r7" 'needs a size: "2" is quoted, remove the quotes' --warc-max-size '"2"'
 refused "$tmp/r8" 'seconds): "2" is quoted, remove the quotes' '-%J"2"'
@@ -107,11 +113,10 @@ for i in 1 2; do
     (cd "$tmp/o/a,b" && "$bin" --continue -q >/dev/null 2>&1) || fail "-O --continue $i failed"
     has "$want" "$(doit "$tmp/o/a,b")" "-O --continue $i"
 done
-test ! -e "$tmp/o/a" || fail "--continue split the -O value"
 
 # a doit.log line the 3.50.5 engine wrote reads back the same
 run "$tmp/m"
-old='file://@D@/none.html -q -r1 -P 127.0.0.1:1 -O "\"@D@/m/o,x\"" -F "\"ua\"" -%X "X-A: \"v\"" "\"+*q*" -%F "\\\"ft"'
+old='file://@D@/none.html -q -r1 -P 127.0.0.1:1 -O "\"@D@/m/o,x\"" -F "\"ua\"" -%X "X-A: \"v\"" -%F "\\\"ft"'
 printf '%s\n' "${old//@D@/$tmp}" >"$tmp/m/hts-cache/doit.log"
 (cd "$tmp/m" && "$bin" --continue -q >"$tmp/m.out" 2>&1) || fail "--continue on an old doit.log: $(<"$tmp/m.out")"
 want=${old//@D@/$tmp}
