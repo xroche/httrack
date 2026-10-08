@@ -879,14 +879,18 @@ int optreal_find(const char *token) {
 
 hts_boolean optcluster_next(const char *token, size_t *at, char *name,
                             size_t name_size) {
-  size_t i = *at, len;
+  const size_t i = *at;
+  size_t len;
 
   if (name_size < 5 || token[i] == '\0')
     return HTS_FALSE;
-  len = strchr("%#@", token[i]) != NULL && token[i + 1] != '\0' ? 2 : 1;
+  len = strchr("%&@#", token[i]) != NULL && token[i + 1] != '\0' ? 2 : 1;
   name[0] = '-';
   memcpy(name + 1, token + i, len);
   name[len + 1] = '\0';
+  /* -&P is -%P */
+  if (name[1] == '&' && len == 2)
+    name[1] = '%';
   /* a sub-letter naming an option of its own: -%rf, -%Zs */
   if (len == 2 && isalpha((unsigned char) token[i + 2])) {
     name[3] = token[i + 2];
@@ -896,13 +900,7 @@ hts_boolean optcluster_next(const char *token, size_t *at, char *name,
     else
       name[3] = '\0';
   }
-  i += len;
-  /* a glued value: -c8, -O1, -m100,200, -%c1.5 */
-  while (isdigit((unsigned char) token[i]) ||
-         ((token[i] == ',' || token[i] == '.') &&
-          isdigit((unsigned char) token[i + 1])))
-    i++;
-  *at = i;
+  *at = i + len;
   return HTS_TRUE;
 }
 

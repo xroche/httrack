@@ -56,8 +56,9 @@ int optalias_find(const char *token);
 const char *optalias_help(const char *token);
 int optreal_find(const char *token);
 /* Steps *AT (start at 1) through the short-option cluster TOKEN (-qO1, -%vO)
-   as htscoremain.c's cluster loop splits it, copying each option's name (-O)
-   to NAME, at least 5 bytes. Returns HTS_FALSE past the last option. */
+   as htscoremain.c's cluster loop splits it, copying each option's name (-O,
+   -%P for -&P) to NAME, at least 5 bytes. A glued digit comes back as an
+   option of its own (-1), which names none. Returns HTS_FALSE past the end. */
 hts_boolean optcluster_next(const char *token, size_t *at, char *name,
                             size_t name_size);
 const char *optreal_value(int p);

@@ -15,7 +15,7 @@ export HOME="$tmp"
 url="file://$tmp/none.html"
 
 # with no URL, the cluster refuses with usage, like its spelled-out control
-for o in "-q -O" -qO -qO1 -%vO "-q -%rf" -q%rf; do
+for o in "-q -O" -qO -qO1 -%vO "-q -%rf" -q%rf -q\&rf "-q -#C" -q#C; do
     name=${o// /_}
     rc=0
     # shellcheck disable=SC2086 # $o is one or two options
@@ -24,11 +24,35 @@ for o in "-q -O" -qO -qO1 -%vO "-q -%rf" -q%rf; do
     grep -qF "usage:" "$tmp/nourl$name.out" || fail "$o PATH: no usage: $(<"$tmp/nourl$name.out")"
 done
 
+# an option that takes no value leaves the next word a URL, & spelling % too
+for o in "-q -%P" -q%P -q\&P "-q -%O" -q%O -q\&O; do
+    name=${o// /_}
+    mkdir -p "$tmp/u$name"
+    rc=0
+    # shellcheck disable=SC2086 # $o is one or two options
+    (cd "$tmp/u$name" && "$bin" $o "$url" -r1 -R0 -P 127.0.0.1:1 </dev/null >"$tmp/u$name.out" 2>&1) || rc=$?
+    test "$rc" -eq 0 || fail "$o URL exited $rc: $(<"$tmp/u$name.out")"
+    test -f "$tmp/u$name/hts-log.txt" || fail "$o URL: no mirror in the current directory"
+done
+
+# a word beginning with - is the next option, not the cluster's value
+for o in -qO -q%rf -q%g -q%C; do
+    rc=0
+    (cd "$tmp" && "$bin" "$o" -r1 "$url" </dev/null >"$tmp/dash$o.out" 2>&1) || rc=$?
+    test "$rc" -ne 0 || fail "$o -r1 was accepted: $(<"$tmp/dash$o.out")"
+    grep -qF " needs " "$tmp/dash$o.out" || fail "$o -r1: $(<"$tmp/dash$o.out")"
+done
+
 # a URL list read through a cluster still counts as the URLs
-printf '%s\n' "$url" >"$tmp/list.txt"
-rc=0
-(cd "$tmp" && "$bin" -q%L "$tmp/list.txt" -O "$tmp/list" -r1 -R0 -P 127.0.0.1:1 >"$tmp/list.out" 2>&1) || rc=$?
-test "$rc" -eq 0 || fail "-q%L LIST exited $rc: $(<"$tmp/list.out")"
+printf '<html>listed</html>\n' >"$tmp/listed.html"
+printf '%s\n' "file://$tmp/listed.html" >"$tmp/list.txt"
+for o in -q%L -q\&L; do
+    name=${o//&/a}
+    rc=0
+    (cd "$tmp" && "$bin" "$o" "$tmp/list.txt" -O "$tmp/l$name" -r1 -R0 -P 127.0.0.1:1 </dev/null >"$tmp/l$name.out" 2>&1) || rc=$?
+    test "$rc" -eq 0 || fail "$o LIST exited $rc: $(<"$tmp/l$name.out")"
+    test -n "$(find "$tmp/l$name" -name listed.html)" || fail "$o LIST mirrored nothing: $(<"$tmp/l$name.out")"
+done
 
 # # in the path expands from the real URL, as with the spelled-out control
 if ! target_is_windows; then # # expands to a name holding a colon
