@@ -184,14 +184,33 @@ expect no "the wsl --update step timing out" \
     "$(job 'libhttrack (x64, Release)' failure success:Build \
         'timed_out:Stop when wsl --update failed' | gated)" 'x64'
 
-# The grader keys on names the workflow must still carry.
+# A gate job whose runner was lost is the wedge, even with both legs green.
+expect yes "a lost runner on the gate job" \
+    "$({
+        job 'libhttrack (x64, Release)' success 'success:Build'
+        job 'windows gate' failure success:'Set up job' 'null:Run ./.github/actions/gate'
+    } | payload)"
+# Only the gate itself is ignored, not a job whose name merely starts the same.
+expect no "a failing job named like the gate" \
+    "$(job 'windows gate (extra)' failure "${GATE[@]}" | gated)" 'windows gate (extra)'
+# Only the Stop step marks a failed update, not any step naming wsl.
+expect no "a failed step naming wsl" \
+    "$(job 'libhttrack (x64, Release)' failure success:Build \
+        'failure:Check the wsl --update log' | gated)" 'x64'
+
+# The grader keys on names the workflow must still carry, and the Stop step
+# must fire only when the update failed and the import did not happen.
 workflow="$top/.github/workflows/windows-build.yml"
 if test -r "$workflow"; then
-    for name in 'name: windows gate' '- name: Stop when wsl --update failed'; do
+    # shellcheck disable=SC2016 # PowerShell text, matched literally
+    for name in 'name: windows gate' '- name: Stop when wsl --update failed' \
+        'id: wslup' '"updated=$($updated.ToString().ToLower())" >> $env:GITHUB_OUTPUT' \
+        '"imported=$($imported.ToString().ToLower())" >> $env:GITHUB_OUTPUT' \
+        "if: steps.wslup.outputs.updated == 'false' && steps.wslup.outputs.imported != 'true'"; do
         grep -qF -- "$name" "$workflow" || fail "windows-build.yml has no '$name'"
     done
 elif test -d "$top/.github"; then
     fail "$workflow is missing"
 fi
 
-echo "windows-kill-grade OK (7 kills accepted, 13 refused)"
+echo "windows-kill-grade OK (8 kills accepted, 15 refused)"

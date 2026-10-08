@@ -373,30 +373,37 @@ jobs:
           }
           "updated=$($updated.ToString().ToLower())" >> $env:GITHUB_OUTPUT
           wsl --set-default-version 2
-          $root = "$env:RUNNER_TEMP\wsl-rootfs.tar.gz"
-          # jammy, not noble: the noble rootfs asset 404s as of 2026-09. The
-          # jammy asset is named after its release, not "wsl.rootfs".
-          # Cached above, because this host has answered 403 on a good URL and
-          # a whole leg then rests on one third-party request. Three tries with
-          # a pause, so a transient does not cost the round either.
-          if (Test-Path $root) {
-            Write-Host "rootfs restored from cache, $((Get-Item $root).Length) bytes"
-          } else {
-            $url = "https://cloud-images.ubuntu.com/wsl/jammy/current/ubuntu-jammy-wsl-amd64-ubuntu22.04lts.rootfs.tar.gz"
-            for ($i = 1; $i -le 3; $i++) {
-              try { Invoke-WebRequest -UseBasicParsing -OutFile $root $url; break }
-              catch {
-                Write-Host "rootfs download attempt $i failed: $($_.Exception.Message)"
-                if ($i -eq 3) { throw }
-                Start-Sleep -Seconds (5 * $i)
+          # The Stop step reads this, so a leg whose import worked still runs.
+          $imported = $false
+          try {
+            $root = "$env:RUNNER_TEMP\wsl-rootfs.tar.gz"
+            # jammy, not noble: the noble rootfs asset 404s as of 2026-09. The
+            # jammy asset is named after its release, not "wsl.rootfs".
+            # Cached above, because this host has answered 403 on a good URL and
+            # a whole leg then rests on one third-party request. Three tries with
+            # a pause, so a transient does not cost the round either.
+            if (Test-Path $root) {
+              Write-Host "rootfs restored from cache, $((Get-Item $root).Length) bytes"
+            } else {
+              $url = "https://cloud-images.ubuntu.com/wsl/jammy/current/ubuntu-jammy-wsl-amd64-ubuntu22.04lts.rootfs.tar.gz"
+              for ($i = 1; $i -le 3; $i++) {
+                try { Invoke-WebRequest -UseBasicParsing -OutFile $root $url; break }
+                catch {
+                  Write-Host "rootfs download attempt $i failed: $($_.Exception.Message)"
+                  if ($i -eq 3) { throw }
+                  Start-Sleep -Seconds (5 * $i)
+                }
               }
             }
+            wsl --import httrack-suite "$env:RUNNER_TEMP\wsl-distro" $root --version 2
+            if ($LASTEXITCODE -ne 0) { throw "wsl --import failed" }
+            # A distro that answers is the only proof the import is usable.
+            wsl -d httrack-suite -- uname -a
+            if ($LASTEXITCODE -ne 0) { throw "the imported distro does not run" }
+            $imported = $true
+          } finally {
+            "imported=$($imported.ToString().ToLower())" >> $env:GITHUB_OUTPUT
           }
-          wsl --import httrack-suite "$env:RUNNER_TEMP\wsl-distro" $root --version 2
-          if ($LASTEXITCODE -ne 0) { throw "wsl --import failed" }
-          # A distro that answers is the only proof the import is usable.
-          wsl -d httrack-suite -- uname -a
-          if ($LASTEXITCODE -ne 0) { throw "the imported distro does not run" }
           # For the record when a path stops converting: this rootfs has no
           # wslpath, which is why nothing in the suite calls one.
           wsl -d httrack-suite -- sh -c 'command -v wslpath || echo "no wslpath"'
@@ -411,13 +418,12 @@ jobs:
           path: ${{ runner.temp }}\wsl-rootfs.tar.gz
           key: wsl-rootfs-jammy-amd64-v1
 
-      # No fallback, because the 5.10 kernel a cached package gives failed the
-      # suite every time (#1656). windows-rerun-killed.yml re-runs this leg.
+      # Do not restore the cached kernel package: it never passed the suite (#1656).
       - name: Stop when wsl --update failed
-        if: env.RUNNABLE == 'true' && steps.wslup.outputs.updated == 'false'
+        if: steps.wslup.outputs.updated == 'false' && steps.wslup.outputs.imported != 'true'
         shell: bash
         run: |
-          echo "::error::wsl --update failed: re-run this leg"
+          echo "::error::wsl --update failed and the distro did not import: re-run this leg"
           exit 1
 
       - name: Run the engine test suite (offline tests, WSL2)

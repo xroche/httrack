@@ -27,7 +27,9 @@ verdict=$(jq -r '
         | length > 0 and all(.name == "Stop when wsl --update failed"
                               and .conclusion == "failure");
     # The gate fails whenever a leg does, so it carries no verdict of its own.
-    def is_gate: .name == "windows gate";
+    # A gate job whose runner was lost is still the wedge.
+    def is_gate: .name == "windows gate" and (failed_steps
+        | length > 0 and all(.name == "Run ./.github/actions/gate"));
     [.jobs[]? | select(is_gate | not) | select(ended_badly)] as $bad
     | [$bad[] | select(.conclusion == "failure")] as $failed
     | [$failed[] | select(names_a_step | not)
