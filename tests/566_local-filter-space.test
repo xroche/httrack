@@ -1,0 +1,21 @@
+#!/bin/bash
+#
+# A scan rule holding a space, typed raw or as %20, excludes a crawled link
+# whose name holds one, because both are decoded alike (#1889).
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+root=$(mktemp -d)
+cleanup_push rm -rf "$root"
+printf '<a href="a%%20b.html">x</a> <a href="keep.html">k</a>\n' >"$root/index.html"
+echo x >"$root/a b.html"
+echo k >"$root/keep.html"
+
+for rule in '-*a b*' '-*a%20b*'; do
+    bash "$top_srcdir/tests/local-crawl.sh" --root "$root" --errors 0 \
+        --found keep.html --not-found 'a b.html' \
+        httrack BASEURL/index.html "$rule"
+done

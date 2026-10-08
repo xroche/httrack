@@ -431,10 +431,10 @@ static int st_addfilter(httrackp *opt, int argc, char **argv) {
       {"at the cap", NULL, HTS_FILTER_MAXLEN, HTS_TRUE},
       {"past the cap", NULL, HTS_FILTER_MAXLEN + 1, HTS_FALSE},
       {"harmless escape", "+*%41*", 0, HTS_TRUE, "+*A*"},
-      {"space escape", "-*%20*", 0, HTS_TRUE},
+      {"space escape", "-*a%20b*", 0, HTS_TRUE, "-*a b*"},
+      {"space", "-*a b*", 0, HTS_TRUE},
       {"star escape", "-*%2a*", 0, HTS_TRUE},
-      {"percent escape", "-*%25*", 0, HTS_TRUE},
-      {"space", "-*a b*", 0, HTS_TRUE, "-*a%20b*"},
+      {"high escape", "-*%e9*", 0, HTS_TRUE},
   };
 
   char rule[HTS_FILTER_MAXLEN + 2];
@@ -475,18 +475,15 @@ static int st_addfilter(httrackp *opt, int argc, char **argv) {
       big[0] = '-';
       for (i = 1; i < HTS_FILTER_MAXLEN; i++)
         memcpy(big + 3 * i - 2, "%41", 4);
-      ok = hts_addfilter(opt, big) && (taken = hts_addfilter_take(opt)) &&
+      ok = hts_filter_rule_ok(big) && hts_addfilter(opt, big) &&
+           (taken = hts_addfilter_take(opt)) != NULL &&
            strlen(taken[0]) == HTS_FILTER_MAXLEN && taken[0][1] == 'A';
       hts_addurl_free(taken);
-      /* one byte longer once decoded */
+      /* this one decodes one byte past the cap */
       memmove(big + 2, big + 1, strlen(big + 1) + 1);
       big[1] = 'x';
-      ok = ok && !hts_addfilter(opt, big);
-      memset(big, 'x', HTS_FILTER_MAXLEN);
-      big[0] = '-';
-      big[HTS_FILTER_MAXLEN - 1] = ' ';
-      big[HTS_FILTER_MAXLEN] = '\0';
-      ok = ok && !hts_addfilter(opt, big) && hts_addfilter_take(opt) == NULL;
+      ok = ok && !hts_filter_rule_ok(big) && !hts_addfilter(opt, big) &&
+           hts_addfilter_take(opt) == NULL;
     }
     freet(big);
     printf("cap after decoding: ok=%d\n", ok);

@@ -407,9 +407,8 @@ HTSEXT_API hts_boolean hts_setfilters(httrackp *opt, const char *const *rules);
 /** Would hts_addfilter() accept @p rule? It must be a + or - sign and a
     pattern, within the filter length cap and free of control characters, so a
     front end can refuse it while the user can still edit it. The cap applies
-    to the rule as the command line stores it: escapes that
-    unescape_http_unharm() finds harmless decoded ("%41" becomes "A"), and
-    spaces escaped. @return HTS_TRUE
+    to the stored form, where harmless escapes such as "%41" and "%20" are
+    decoded, as in a crawled link. @return HTS_TRUE
     if valid, HTS_FALSE for NULL or an invalid rule. */
 HTSEXT_API hts_boolean hts_filter_rule_ok(const char *rule);
 

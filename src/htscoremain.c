@@ -2825,7 +2825,13 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           ensureUrlCapacity(url, url_sz, capa);
           if (strnotempty(url))
             strlcatbuff(url, " ", url_sz); // separator space
-          append_escape_spc_url(unescape_http_unharm(catbuff, sizeof(catbuff), argv[na], 1), url, url_sz);
+          /* a rule is decoded once, where the engine splits the rules */
+          if (argv[na][0] == '+' || argv[na][0] == '-')
+            append_escape_spc_url(argv[na], url, url_sz);
+          else
+            append_escape_spc_url(
+                unescape_http_unharm(catbuff, sizeof(catbuff), argv[na], 1),
+                url, url_sz);
         }
       }                         // if argv=- etc. 
 
