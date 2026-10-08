@@ -860,7 +860,7 @@ int optalias_find(const char *token) {
 
 /* Finds the <token> real option and returns the index, or -1 if failed */
 int optreal_find(const char *token) {
-  /* -O1 is -O with a flag glued on, and still takes the path after it */
+  /* -O followed by digits (-O1) is -O, and still takes the path after it */
   if (strncmp(token, "-O", 2) == 0 && token[2] != '\0' &&
       strspn(token + 2, "0123456789") == strlen(token + 2))
     token = "-O";

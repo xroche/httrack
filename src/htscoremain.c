@@ -746,7 +746,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 StringClear(opt->path_log);
                 for(i = 0 /*, j = 0 */ , inQuote = 0, path = &opt->path_html;
                     argv[na][i] != 0; i++) {
-                  /* a plain -O drops its quotes, which group a comma */
+                  /* a plain -O strips quotes, which group a comma */
                   if (!one_path && argv[na][i] == '"') {
                     inQuote = !inQuote;
                   } else if (!inQuote && !one_path && argv[na][i] == ',') {
