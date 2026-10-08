@@ -2,7 +2,8 @@
 #
 # .httrackrc keys are case-insensitive, but values keep their case: a path, a
 # user-agent, a footer or a filter reaches doit.log as written. The on/off and
-# (none) keywords are read in any case, and -%A/-%w values in lowercase.
+# (none) keywords are read in any case, and -%A/-%w values match case-sensitively
+# in lowercase.
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
@@ -27,7 +28,8 @@ log=$tmp/run.log
 fail_dump_var log
 n=0
 
-# rc_check RC-LINE EXPECTED: the options doit.log shows for that one line
+# rc_check RC-LINE EXPECTED [MESSAGE]: the options doit.log shows for that one
+# line, and a message the run must print
 rc_check() {
     local out line want
     n=$((n + 1))
@@ -45,11 +47,14 @@ rc_check() {
     assert_file "$tmp/MixedDir$n/hts-cache/doit.log" "[$1]: rc path not used as written"
     line=$(head -1 "$tmp/MixedDir$n/hts-cache/doit.log")
     line=${line%"$SELFTEST_CR"}
-    want="-O $out $2 file://"
+    want="-O $out ${2:+$2 }file://"
     case "$line" in
     "$want"*) ;;
     *) fail "[$1] gave [$line], expected [$want...]" ;;
     esac
+    if test -n "${3:-}"; then
+        grep -qF -- "$3" "$log" || fail "[$1]: no [$3] in the output"
+    fi
 }
 
 rc_check 'User-Agent "Mixed Case UA"' '-F "Mixed Case UA"'
@@ -59,13 +64,20 @@ rc_check 'Sockets=3' -c3
 rc_check 'index OFF' -I0
 rc_check 'index ON' -I
 rc_check 'index "OFF"' -I0
+rc_check 'httpproxy-ftp "OFF"' -%f0
+rc_check 'sockets OFF' -c0
+# a quoted keyword is unquoted for a switch only
+rc_check 'sockets "OFF"' '' 'Option --sockets: "OFF" is quoted, remove the quotes'
+rc_check 'bogus X' '' 'Unknown option: bogus'
 rc_check 'assume Standard' '-%A standard'
-# matched in lowercase, as every rc value used to be
+# these options match their value case-sensitively in lowercase
 rc_check 'assume PHP=text/html' '-%A php=text/html'
 rc_check 'disable-module WRAPPER-LIB' '-%w wrapper-lib'
 # a keyword is a whole value, and only for an option that takes it
 rc_check 'user-agent OFF' '-F OFF'
 rc_check 'allow OFF' +OFF
+rc_check 'allow (NONE)' '+(NONE)'
+rc_check 'allow "(NONE)"' '"+\"(NONE)\""' 'holds a quote, kept as is'
 rc_check 'user-agent Standard Browser' '-F "Standard Browser"'
 rc_check 'user-agent (NONE) Bot' '-F "(NONE) Bot"'
 rc_check 'footer "(NONE)"' '-%F (none)'

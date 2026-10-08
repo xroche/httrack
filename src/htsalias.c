@@ -980,8 +980,9 @@ void cmdl_mark_param(cmdl_argv *cmd, int pos) {
   cmd->param[pos] = HTS_TRUE;
 }
 
-/* Fold an rc VALUE for option KEY: a keyword it can take (on/off, or "(none)"
-   for a free-text value) is read in any case, quoted or not. */
+/* Fold an rc VALUE for option KEY: -%A and -%w values are lowercased; a
+   free-text (param1) "(none)" is read in any case, quoted or not; any other
+   option reads on/off in any case, and unquotes them only for a switch. */
 static void optinclude_fold(const char *key, char *value) {
   static const char *const onoff[] = {"on", "off", NULL};
   static const char *const none[] = {HTS_NOPARAM, NULL};
@@ -989,21 +990,23 @@ static void optinclude_fold(const char *key, char *value) {
   const char *word = value;
   size_t len = strlen(value);
   const char *type;
+  hts_boolean unquote;
   int pos = optalias_find(key), i;
 
   if (pos < 0)
     return;
-  /* matched case-sensitively in lowercase, as every rc value used to be */
+  /* these options match their value case-sensitively in lowercase */
   if (strcmp(hts_optalias[pos][1], "-%A") == 0 ||
       strcmp(hts_optalias[pos][1], "-%w") == 0) {
     hts_lowcase(value);
     return;
   }
   type = hts_optalias[pos][2];
-  /* free text (param1, param0) */
-  keywords =
-      strcmp(type, "param1") == 0 || strcmp(type, "param0") == 0 ? none : onoff;
-  if (len >= 2 && value[0] == '"' && value[len - 1] == '"') {
+  if (strcmp(type, "param0") == 0)
+    return;
+  keywords = strcmp(type, "param1") == 0 ? none : onoff;
+  unquote = keywords == none || strcmp(type, "onoff") == 0;
+  if (unquote && len >= 2 && value[0] == '"' && value[len - 1] == '"') {
     word++;
     len -= 2;
   }
@@ -1065,7 +1068,7 @@ cmdl_file_result optinclude_file(const char *name, cmdl_argv *cmd) {
             *b++ = '\0';
             while (is_realspace(*b))
               b++;
-            /* "key = value" */
+            /* skip the '=' of "key = value" */
             if (!equal && *b == '=') {
               b++;
               while (is_realspace(*b))
