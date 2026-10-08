@@ -980,6 +980,27 @@ void cmdl_mark_param(cmdl_argv *cmd, int pos) {
   cmd->param[pos] = HTS_TRUE;
 }
 
+/* Values the engine compares in lowercase, read in any case from an rc file */
+static const char *const optinclude_keywords[] = {"on", "off", "standard",
+                                                  HTS_NOPARAM, NULL};
+
+/* Is VALUE, alone or in one pair of double quotes, a keyword? */
+static hts_boolean optinclude_is_keyword(const char *value) {
+  size_t len = strlen(value);
+  int i;
+
+  if (len >= 2 && value[0] == '"' && value[len - 1] == '"') {
+    value++;
+    len -= 2;
+  }
+  for (i = 0; optinclude_keywords[i] != NULL; i++) {
+    if (strlen(optinclude_keywords[i]) == len &&
+        strncasecmp(value, optinclude_keywords[i], len) == 0)
+      return HTS_TRUE;
+  }
+  return HTS_FALSE;
+}
+
 /* Include a file to the current command line */
 /* example:
   set sockets 8
@@ -1005,7 +1026,6 @@ cmdl_file_result optinclude_file(const char *name, cmdl_argv *cmd) {
         fprintf(stderr, "* %s: line too long, ignored\n", name);
         continue;
       }
-      hts_lowcase(line);
       /* trim first: a blank line is skipped, not parsed as an option */
       hts_rtrim(line, HTS_REALSPACES);
       a = line;
@@ -1015,26 +1035,31 @@ cmdl_file_result optinclude_file(const char *name, cmdl_argv *cmd) {
         /* no comment line: # // ; even indented */
         if (strchr("#/;", *a) == NULL) {
           /* jump "set " and spaces */
-          if (strncmp(a, "set", 3) == 0) {
-            if (is_realspace(*(a + 3))) {
-              a += 4;
-            }
-          }
+          if (strncasecmp(a, "set", 3) == 0 && is_realspace(a[3]))
+            a += 4;
           while(is_realspace(*a))
             a++;
-          /* delete = ("sockets=8") */
-          if ((b = strchr(a, '=')))
-            *b = ' ';
 
-          /* isolate option and parameter */
+          /* the option ends at a space or '=', so a '=' in the value stays */
           b = a;
-          while((!is_realspace(*b)) && (*b))
+          while (*b != '\0' && !is_realspace(*b) && *b != '=')
             b++;
           if (*b) {
-            *b = '\0';
-            b++;
+            const hts_boolean equal = *b == '=';
+
+            *b++ = '\0';
+            while (is_realspace(*b))
+              b++;
+            if (!equal && *b == '=') {
+              b++;
+              while (is_realspace(*b))
+                b++;
+            }
           }
           /* a is now the option, b the parameter */
+          hts_lowcase(a);
+          if (optinclude_is_keyword(b))
+            hts_lowcase(b);
 
           {
             int return_argc;

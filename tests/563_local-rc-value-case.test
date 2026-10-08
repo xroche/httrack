@@ -1,0 +1,56 @@
+#!/bin/bash
+#
+# .httrackrc keys are case-insensitive, but values keep their case: a path, a
+# user-agent, a footer or a filter reaches doit.log as written. A keyword the
+# engine compares (on, off, standard) is still read in any case.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+require_httrack
+
+# absolute before any cd, or a relative PATH entry finds the installed one
+bin=$(command -v httrack)
+case "$bin" in
+/*) ;;
+*) bin="$(cd "$(dirname "$bin")" && pwd)/$(basename "$bin")" ;;
+esac
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_rccase.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+
+d=$tmp/rc
+out=$tmp/MixedDir
+mkdir -p "$d"
+echo '<html><body>hi</body></html>' >"$d/index.html"
+{
+    printf '%s\n' 'User-Agent "Mixed Case UA"'
+    printf '%s\n' 'SET Footer "<!-- Kept=Case -->"'
+    printf 'path %s\n' "$(nativepath "$out")"
+    printf '%s\n' 'allow *Keep.HTML*'
+    printf '%s\n' 'Sockets=3'
+    printf '%s\n' 'index OFF'
+    printf '%s\n' 'assume Standard'
+} >"$d/.httrackrc"
+cp "$d/.httrackrc" "$d/httrackrc" # the Windows name
+
+# no -O, or the rc files are not read; HOME keeps the user's own rc out
+log=$tmp/run.log
+fail_dump_var log
+rc=0
+(cd "$d" && HOME=$tmp run_with_timeout 120 "$bin" "file://$d/index.html" \
+    --quiet -n >"$log" 2>&1) || rc=$?
+test "$rc" -eq 0 || fail ".httrackrc crawl exited $rc"
+assert_file "$out/hts-cache/doit.log" "the rc path was not used as written"
+line=$(head -1 "$out/hts-cache/doit.log")
+line=${line%"$SELFTEST_CR"}
+for opt in '-F "Mixed Case UA"' '-%F "<!-- Kept=Case -->"' \
+    "-O $(nativepath "$out")" '+*Keep.HTML*' -c3 -I0 '-%A standard'; do
+    case " $line " in
+    *" $opt "*) ;;
+    *) fail ".httrackrc option [$opt] not applied: [$line]" ;;
+    esac
+done
+
+exit 0
