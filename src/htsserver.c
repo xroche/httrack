@@ -88,7 +88,8 @@ coucal NewLangList = NULL;
 #include "htsthread.h"
 
 /* This server's line readers drop TAB, form feed and NUL. */
-#define HTS_LINES_SERVER (HTS_LINE_DROP_TAB | HTS_LINE_DROP_NUL)
+#define HTS_LINES_SERVER                                                       \
+  (HTS_LINE_DROP_TAB | HTS_LINE_DROP_FF | HTS_LINE_DROP_NUL)
 
 const char *gethomedir(void);
 int commandRunning = 0;

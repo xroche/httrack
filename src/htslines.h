@@ -42,8 +42,9 @@ Please visit our Website: http://www.httrack.com
 #include <stdio.h>
 
 /* Flags for the readers below, which always drop CR. */
-#define HTS_LINE_DROP_TAB 1 /* TAB and form feed */
-#define HTS_LINE_DROP_NUL 2
+#define HTS_LINE_DROP_TAB 1 /* TAB */
+#define HTS_LINE_DROP_NUL 2 /* NUL */
+#define HTS_LINE_DROP_FF 4  /* form feed */
 
 /* Read a line into s, max bytes with the NUL, and consume its rest. HTS_TRUE
    when a non-space byte was dropped. At EOF it reads an empty line. */

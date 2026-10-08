@@ -827,15 +827,16 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                              StringBuff(opt->path_log), "hts-cache/doit.log"),
                      "rb");
     if (fp) {
-      int insert_after = 1;     /* insérer après nom au début */
+      int insert_after = 1; /* insert after the program name */
 
       String buff = STRING_EMPTY;
       char **tokens;
       int ntokens = 0;
       int i;
       hts_boolean ok;
+      /* a TAB is argument data, since the writer leaves it unquoted */
       const hts_boolean cut = hts_readline_alloc(
-          fp, &buff, HTS_READLINE_ALLOC_MAX, HTS_LINE_DROP_TAB);
+          fp, &buff, HTS_READLINE_ALLOC_MAX, HTS_LINE_DROP_FF);
 
       fclose(fp);
       fp = NULL;
