@@ -47,7 +47,10 @@ done
 
 # a URL list read through a cluster still counts as the URLs
 printf '<html>listed</html>\n' >"$tmp/listed.html"
-printf '%s\n' "file://$tmp/listed.html" >"$tmp/list.txt"
+# the harness maps argv for httrack.exe, but not a URL inside a file
+listed="$tmp/listed.html"
+if target_is_windows; then listed=$(drvfs_path -m "$listed"); fi
+printf '%s\n' "file://$listed" >"$tmp/list.txt"
 for o in -q%L -q\&L; do
     name=${o//&/a}
     rc=0
