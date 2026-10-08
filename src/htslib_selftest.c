@@ -1995,23 +1995,23 @@ static int st_rtrim(httrackp *opt, int argc, char **argv) {
     }
   }
 
-  /* The loop above already makes these two equal for a conforming strspn(),
-     so this is here to catch a libc that disagrees. Three bytes covers every
-     shorter string too, because the terminator is one of the three letters. */
+  /* A skip lands where its loop did. Three bytes covers every shorter string
+     too, because the terminator is one of the three letters, and the first
+     letter runs over every byte so no disagreement can hide outside the set. */
   for (cls = 0; cls < sizeof(cc_classes) / sizeof(cc_classes[0]); cls++) {
-    /* a class member, a byte in no class, and the terminator */
-    const char alpha[3] = {cc_classes[cls].set[0], 'x', '\0'};
-    int i, j, k;
+    /* 'x' is in no class, so the alphabet always holds a non-member */
+    CHECK(!cc_classes[cls].pred((unsigned char) 'x'));
+    for (c = 1; c < 256; c++) {
+      const char alpha[3] = {(char) c, 'x', '\0'};
+      int i, j, k;
 
-    /* the alphabet keeps a non-member even if someone adds 'x' to both the set
-       and its macro, which the loop above would not notice */
-    CHECK(!cc_classes[cls].pred((unsigned char) alpha[1]));
-    for (i = 0; i < 3; i++) {
-      for (j = 0; j < 3; j++) {
-        for (k = 0; k < 3; k++) {
-          const char word[4] = {alpha[i], alpha[j], alpha[k], '\0'};
+      for (i = 0; i < 3; i++) {
+        for (j = 0; j < 3; j++) {
+          for (k = 0; k < 3; k++) {
+            const char word[4] = {alpha[i], alpha[j], alpha[k], '\0'};
 
-          CHECK(cc_span_agrees(cls, word));
+            CHECK(cc_span_agrees(cls, word));
+          }
         }
       }
     }
