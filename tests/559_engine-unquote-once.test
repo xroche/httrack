@@ -1,8 +1,8 @@
 #!/bin/bash
 #
 
-# An option's value loses exactly one quote pair, with or without -O, and an rc
-# file's value too. doit.log line 1 shows the argv the engine kept.
+# An option's value keeps its quotes, with or without -O, and an rc file's
+# value loses exactly one pair. doit.log line 1 shows the argv the engine kept.
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
@@ -36,34 +36,34 @@ has() { # has WANT LINE LABEL: WANT is whole words of LINE
 # without -O the option loop runs twice
 run "$tmp/a" -F '""ua""' -%F '"ft"'
 line=$(doit "$tmp/a")
-has '-F "\"ua\""' "$line" "no -O"
-has '-%F ft' "$line" "no -O"
+has '-F "\"\"ua\"\""' "$line" "no -O"
+has '-%F "\"ft\""' "$line" "no -O"
 
-# --continue rereads doit.log, which must not lose another pair
+# --continue rereads doit.log, which must not lose a pair
 for i in 1 2; do
     (cd "$tmp/a" && "$bin" --continue -q >/dev/null 2>&1) || fail "--continue $i failed"
     subshell_ok $?
     line=$(doit "$tmp/a")
-    has '-F "\"ua\""' "$line" "--continue $i"
-    has '-%F ft' "$line" "--continue $i"
+    has '-F "\"\"ua\"\""' "$line" "--continue $i"
+    has '-%F "\"ft\""' "$line" "--continue $i"
 done
 
 run "$tmp/b" -F '""ua""' -%F '"ft"' -O "$tmp/b/out"
 line=$(doit "$tmp/b/out")
-has '-F "\"ua\""' "$line" "-O"
-has '-%F ft' "$line" "-O"
+has '-F "\"\"ua\"\""' "$line" "-O"
+has '-%F "\"ft\""' "$line" "-O"
 
-# the rc file is read once, and its values are stripped once
+# the rc file is read once, and its values are stripped once, but not argv
 mkdir -p "$tmp/c"
 printf 'set footer ""ft""\nuser-agent "ua"\nretries 7\n' >"$tmp/c/.httrackrc"
 # Windows reads HTS_HTTRACKRC as httrackrc
 cp "$tmp/c/.httrackrc" "$tmp/c/httrackrc"
-# only pass 1 strips the token after the rc ones, and the proxy avoids DNS
-(cd "$tmp/c" && "$bin" '"""x"""' "$url" -q -r1 -R0 -P 127.0.0.1:1 >/dev/null 2>&1) ||
+# the proxy avoids DNS
+(cd "$tmp/c" && "$bin" '+*"x"*' "$url" -q -r1 -R0 -P 127.0.0.1:1 >/dev/null 2>&1) ||
     fail "rc file run failed"
 subshell_ok $?
 line=$(doit "$tmp/c")
-has '-%F "\"ft\"" -F ua -R7 "\"x\""' "$line" "rc file"
+has '-%F "\"ft\"" -F ua -R7 "+*\"x\"*"' "$line" "rc file"
 test "$(grep -o -- ' -%F' <<<" $line" | wc -l)" -eq 1 || fail "rc file read twice: $line"
 # doit.log merges identical copies, so count -R7 in the log's argv line
 argv=$(grep -m1 '^(' "$tmp/c/hts-log.txt") || fail "no argv line in hts-log.txt"

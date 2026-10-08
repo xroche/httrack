@@ -1,0 +1,127 @@
+#!/bin/bash
+#
+# argv reaches the engine final: a quote on the command line is data, except
+# around a URL or a path, where it is refused. Each text format decodes its own
+# quotes: .httrackrc, doit.log and the WebHTTrack command line. doit.log line 1
+# shows the argv the engine kept.
+
+set -euo pipefail
+# shellcheck source=tests/webhttracklib.sh
+. "${0%"${0##*/}"}./webhttracklib.sh"
+
+bin=$(httrack_path)
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_argvquote.XXXXXX") || exit 1
+cleanup_push htsserver_cleanup_dir "$tmp"
+url="file://$tmp/none.html"
+
+# run DIR [ARGS...]: mirror from DIR, through a proxy that avoids DNS
+run() {
+    local dir=$1 rc=0
+    shift
+    mkdir -p "$dir"
+    (cd "$dir" && "$bin" "$url" -q -r1 -R0 -P 127.0.0.1:1 "$@" >"$dir.out" 2>&1) || rc=$?
+    test "$rc" -eq 0 || fail "httrack $* exited $rc: $(<"$dir.out")"
+}
+doit() {
+    local line
+    assert_file "$1/hts-cache/doit.log"
+    IFS= read -r line <"$1/hts-cache/doit.log"
+    # Windows writes doit.log with CR LF.
+    printf '%s\n' "${line%$'\r'}"
+}
+has() { # has WANT LINE LABEL: WANT is whole words of LINE
+    [[ " $2 " == *" $1 "* ]] || fail "$3: want '$1' in: $2"
+}
+
+refused() { # refused DIR MESSAGE [ARGS...]: the run fails, saying MESSAGE
+    local dir=$1 want=$2 rc=0
+    shift 2
+    mkdir -p "$dir"
+    (cd "$dir" && "$bin" "$url" -q -r1 -R0 -P 127.0.0.1:1 "$@" >"$dir.out" 2>&1) || rc=$?
+    test "$rc" -ne 0 || fail "httrack $* was accepted"
+    grep -qF -- "$want" "$dir.out" || fail "httrack $*: want '$want' in: $(<"$dir.out")"
+}
+
+# an option value and a filter keep their quotes, with -O too; a free-text value
+# may hold one anywhere
+run "$tmp/a" '+*"q"*' -F '"ua"' -%X 'X-A: "v"'
+line=$(doit "$tmp/a")
+has '"+*\"q\"*" -F "\"ua\"" -%X "X-A: \"v\""' "$line" "argv"
+grep -qF 'filter +*"q"* holds a quote' "$tmp/a.out" || fail "no filter warning: $(<"$tmp/a.out")"
+run "$tmp/b" '+*"q"*' -F 'a "b" c' -O "$tmp/b/out"
+has '"+*\"q\"*" -F "a \"b\" c"' "$(doit "$tmp/b/out")" "argv with -O"
+# a quote that does not wrap the whole URL is data
+run "$tmp/c" '"z'
+has '"\"z"' "$(doit "$tmp/c")" "unbalanced quote"
+
+# a quote around a URL or a path part is a leftover, so it is refused
+refused "$tmp/r1" 'URL "http://x.invalid/" is quoted' '"http://x.invalid/"'
+refused "$tmp/r2" 'path "' -O "\"$tmp/r2/o\""
+refused "$tmp/r3" 'is quoted' -O "$tmp/r3/o,\"$tmp/r3/l\""
+test ! -e "$tmp/r3/o" || fail "a refused -O still created its path"
+# a number never parsed with quotes, and the refusal now says why
+refused "$tmp/r4" 'which is quoted: remove the quotes' --retries '"5"'
+refused "$tmp/r5" 'has a quoted value' '-R"5"'
+
+# a quoted line of a URL list is refused, and the others are kept
+printf '"http://a.invalid/"\nhttp://b.invalid/\n' >"$tmp/list.txt"
+run "$tmp/l" -%L "$tmp/list.txt"
+grep -qF 'URL "http://a.invalid/" is quoted' "$tmp/l/hts-log.txt" ||
+    fail "no refusal of the quoted list line: $(<"$tmp/l/hts-log.txt")"
+grep -qF '1 links added' "$tmp/l/hts-log.txt" ||
+    fail "the other list line was lost: $(<"$tmp/l/hts-log.txt")"
+
+# doit.log reads back what it wrote, across two resumes
+for i in 1 2; do
+    (cd "$tmp/a" && "$bin" --continue -q >/dev/null 2>&1) || fail "--continue $i failed"
+    subshell_ok $?
+    has '"+*\"q\"*" -F "\"ua\"" -%X "X-A: \"v\""' "$(doit "$tmp/a")" "--continue $i"
+done
+
+# an .httrackrc value loses one quote pair, and an unclosed one is skipped
+mkdir -p "$tmp/d"
+printf 'footer ""ft""\nfrom "a b"\nreferer "ref\nretries 7\n' >"$tmp/d/.httrackrc"
+# Windows reads HTS_HTTRACKRC as httrackrc
+cp "$tmp/d/.httrackrc" "$tmp/d/httrackrc"
+run "$tmp/d"
+line=$(doit "$tmp/d")
+has '-%F "\"ft\"" -%E "a b" -R7' "$line" "rc file"
+[[ $line != *-%R* ]] || fail "rc file: an unclosed quote was kept: $line"
+grep -qF 'missing quote' "$tmp/d.out" || fail "rc file: no warning: $(<"$tmp/d.out")"
+
+# WebHTTrack: the step 4 command line, decoded as the browser posts it
+if target_is_windows; then
+    echo "PASS (no htsserver on Windows)"
+    exit 0
+fi
+htsserver_require
+export HOME="$tmp" # no ~/.httrack.ini of the developer's in the store
+htsserver_start
+proj="my proj"
+htsserver_python - "${HTS_URL}" "$tmp" "$proj" "$url" <<'PY' || fail "see above"
+import html
+import sys
+
+from webtestlib import Session, textarea
+
+s, work, proj, url = Session(sys.argv[1]), sys.argv[2], sys.argv[3], sys.argv[4]
+s.post("step2.html", [("path", work), ("projname", proj)])
+s.post("step3.html", [("urls", url)])
+s.post("option6.html", [("user", 'Probe "x" 1.0')])
+page = s.get("step4.html")
+s.post("step4.html", [("command", html.unescape(textarea(page, "command"))),
+                      ("winprofile", html.unescape(textarea(page, "winprofile"))),
+                      ("command_do", "start"), ("path", work), ("projname", proj)])
+PY
+out="$tmp/$proj"
+start=$SECONDS
+while ! grep -q "HTTrack Website Copier/" "$out/hts-log.txt" 2>/dev/null; do
+    htsserver_alive || fail "htsserver died: $(<"${HTS_LOG}")"
+    test "$((SECONDS - start))" -lt 60 || fail "the WebHTTrack mirror did not end"
+    poll_wait 0.2
+done
+line=$(doit "$out")
+has '-F "Probe \"x\" 1.0"' "$line" "WebHTTrack user agent"
+has "-O \"$out\"" "$line" "WebHTTrack path"
+echo PASS

@@ -54,7 +54,7 @@ Please visit our Website: http://www.httrack.com
    allocated. */
 char **hts_split_args(char *cmd, int *nargs, int flags);
 
-/* hts_split_args() under HTS_SPLIT_FOLD_WS: the WebHTTrack command line. */
+/* hts_split_args() under HTS_SPLIT_FOLD_WS: the WebHTTrack filter list. */
 char **hts_split_cmdline(char *cmd, int *nargs);
 
 /* Append len bytes of arg to out with \\ and \" escaped, the body of a quoted
@@ -65,6 +65,10 @@ void hts_escape_arg(String *out, const char *arg, size_t len);
    backslash, "" when empty, verbatim otherwise. hts_split_args() with
    HTS_SPLIT_STRIP_QUOTES reads it back. */
 void hts_quote_arg(String *out, const char *arg);
+
+/* Does the len bytes at arg start and end with a quote? A URL or a path in
+   that shape was quoted by mistake, since argv reaches the engine final. */
+hts_boolean hts_is_quoted(const char *arg, size_t len);
 
 /* Strip one surrounding quote pair from arg in place, if it starts with a
    quote. HTS_FALSE when that quote is not closed at its end. */

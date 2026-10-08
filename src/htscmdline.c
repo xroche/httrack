@@ -141,6 +141,10 @@ void hts_quote_arg(String *out, const char *arg) {
   }
 }
 
+hts_boolean hts_is_quoted(const char *arg, size_t len) {
+  return len >= 2 && arg[0] == '\"' && arg[len - 1] == '\"';
+}
+
 hts_boolean hts_unquote_arg(char *arg) {
   const size_t len = strlen(arg);
 

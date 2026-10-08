@@ -85,20 +85,18 @@ run "$tmp/ov-l" --user-agent "$over"
 refused "#152: over-cap --user-agent not refused cleanly"
 
 # Quote handling on the sole URL (run_only, so the quoted arg is the only URL and
-# can't be masked by an implicit one). A fully "-quoted URL has its surrounding
-# quotes stripped in place and is mirrored; a dangling opening quote, and a lone
-# quote (empty after the opening "), are refused cleanly and never crash.
+# can't be masked by an implicit one). A fully "-quoted URL is refused cleanly.
+# A dangling opening quote and a lone quote are data, and never crash.
 # nativepath: the shim converts an argument that IS a URL, not one inside quotes.
 run_only "$tmp/q-ok" "\"file://$(nativepath "$tmp")/index.html\""
-accepted "$tmp/q-ok" "quoted URL not stripped/mirrored"
+refused "quoted URL not refused cleanly"
 run_only "$tmp/q-bad" '"foo'
-refused "dangling-quote argument not refused cleanly"
+test "$RC" -lt 128 || fail "dangling-quote argument crashed (exit $RC)"
 run_only "$tmp/q-lone" '"'
-refused "lone-quote argument not refused cleanly"
-# A dangling quote on an argument at the cap must not overflow the "Missing
-# quote in %s" panic buffer: the prefix plus a 1023-byte argument overran it.
+test "$RC" -lt 128 || fail "lone-quote argument crashed (exit $RC)"
+# A dangling quote on an argument at the cap must not overflow a buffer.
 run_only "$tmp/q-long" "\"$(repeat_chars 1022 A)"
-refused "near-cap dangling-quote argument overflowed the panic buffer"
+test "$RC" -lt 128 || fail "near-cap dangling-quote argument crashed (exit $RC)"
 
 # --pause (#185): valid MIN[:MAX] accepted; malformed, reversed, over-range and
 # non-finite values refused cleanly. NaN defeats naive `<`/`>` checks (it

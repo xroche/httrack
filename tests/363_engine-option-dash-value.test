@@ -117,7 +117,7 @@ for opt in %A %F %K %L %S %rf F; do
         parse "-q${opt}" "$word"
         refused "-q${opt} ${word}" 'needs'
         parse "\"-${opt}\"" "$word"
-        refused "\"-${opt}\" ${word}" 'needs'
+        refused "\"-${opt}\" ${word}" 'is quoted'
     done
 done
 echo OK

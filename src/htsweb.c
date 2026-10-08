@@ -487,8 +487,8 @@ static void back_launch_cmd(void *pP) {
     free(commandReturnCmdl);
   commandReturnCmdl = strdup(cmd);
 
-  /* split */
-  argv = hts_split_cmdline(cmd, &argc);
+  /* the pages quote each value as hts_quote_arg() does */
+  argv = hts_split_args(cmd, &argc, HTS_SPLIT_FOLD_WS | HTS_SPLIT_STRIP_QUOTES);
   if (argv == NULL) {
     if (commandReturnMsg)
       free(commandReturnMsg);
