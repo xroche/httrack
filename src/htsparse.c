@@ -4473,6 +4473,12 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
               hts_log_print(opt, LOG_INFO, "Link added by user: %s%s", add.af.adr,
                             add.af.fil);
               //
+            } else if (hts_maxlinks_no_room(opt)) {
+              /* Give the parser's verdict rather than dropping the rest of the
+                 user's URLs in silence. Only a front end reaches this, so no
+                 .test covers it. */
+              maxlinks_give_up(opt, stre->exit_xh_);
+              break;
             } else { // out of memory
               hts_addurl_free(addurl);
               XH_uninit;        // désallocation mémoire & buffers
