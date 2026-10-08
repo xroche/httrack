@@ -902,15 +902,23 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   /* the short form agrees, rather than reading -N 1 as a template named 1 */
   EXPANDS("-N1", "-N", "1");
   assertf(used == 2);
-  EXPANDS("-N", "-N", "%h%p/%n%q.%t");
-  assertf(used == 1);
-  /* and there a bare digit run is the only thing it takes: 1L0 and an overlong
+  EXPANDS("-N %h%p/%n%q.%t", "-N", "%h%p/%n%q.%t");
+  assertf(used == 2);
+  /* and there a bare digit run is the only thing it glues: 1L0 and an overlong
      run stay templates, as they were before the class existed */
-  EXPANDS("-N", "-N", "2col/%n.%t");
+  EXPANDS("-N 2col/%n.%t", "-N", "2col/%n.%t");
+  assertf(used == 2);
+  EXPANDS("-N 4294967295", "-N", "4294967295");
+  assertf(used == 2);
+  EXPANDS("-N 1L0", "-N", "1L0");
+  assertf(used == 2);
+  /* an empty word is still the template, not a URL */
+  EXPANDS("-N ", "-N", "");
+  assertf(used == 2);
+  /* the parse loop takes no template opening with '-', nor a missing one */
+  EXPANDS("-N", "-N", "-r1");
   assertf(used == 1);
-  EXPANDS("-N", "-N", "4294967295");
-  assertf(used == 1);
-  EXPANDS("-N", "-N", "1L0");
+  EXPANDS("-N", "-N", NULL);
   assertf(used == 1);
 
   /* a -# row means the arm its name and help name, not a neighbour: -#C lists
