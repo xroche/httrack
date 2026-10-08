@@ -405,6 +405,13 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
   return code;
 }
 
+/* Counts one more URL; a -1 count (-i, --continue) restarts from zero. */
+static void cmdl_count_url(int *count) {
+  if (*count < 0)
+    *count = 0;
+  (*count)++;
+}
+
 /* Whether the option at NA may take the word after it though it begins with
    '-': only where that word was put there as an option's parameter, which
    optalias_check() emits having refused an option name in that position itself.
@@ -656,10 +663,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         /* Compter URLs et détecter -i,-q.. */
         if (tmp_argc == 1) {    /* pas -P & co */
           if (!cmdl_opt(tmp_argv[0])) { /* pas -c0 & co */
-            if (argv_url < 0)
-              argv_url = 0; // -1==force -> 1=one url already detected, wipe all
-                            // previous options
-            argv_url++;
+            cmdl_count_url(&argv_url);
             if (!argv_firsturl)
               argv_firsturl = x_cmd.argv[x_cmd.argc - 1];
           } else {
@@ -680,6 +684,31 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   argv_url = -1;
                   opt->quiet = HTS_TRUE;
                 }
+                /* the words a cluster's options read (-qO <path>), as the
+                   parse loop below takes them */
+                if (optreal_find(tmp_argv[0]) < 0) {
+                  char name[8];
+                  size_t at = 1;
+
+                  while (
+                      optcluster_next(tmp_argv[0], &at, name, sizeof(name))) {
+                    const int pos = optreal_find(name);
+
+                    if (pos < 0 || strcmp(opttype_value(pos), "param1") != 0 ||
+                        na + result >= argc || argv[na + result][0] == '-')
+                      continue;
+                    if (!cmdl_add(&x_cmd, argv[na + result])) {
+                      cmdl_free(&x_cmd);
+                      HTS_PANIC_PRINTF("Error, not enough memory");
+                      htsmain_free();
+                      return -1;
+                    }
+                    cmdl_mark_param(&x_cmd, x_cmd.argc - 1);
+                    if (strcmp(name, "-%L") == 0)
+                      cmdl_count_url(&argv_url);
+                    result++;
+                  }
+                }
               } else if (strcmp(tmp_argv[0] + 2, "quiet") == 0) {
                 opt->quiet = 1; // ne pas poser de questions! (nohup par exemple)
               } else if (strcmp(tmp_argv[0] + 2, "continue") == 0) {
@@ -689,12 +718,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             }
           }
         } else if (tmp_argc == 2) {
-          if ((strcmp(tmp_argv[0], "-%L") == 0)) {      // liste d'URLs
-            if (argv_url < 0)
-              argv_url = 0; // -1==force -> 1=one url already detected, wipe all
-                            // previous options
-            argv_url++;         /* forcer */
-          }
+          if ((strcmp(tmp_argv[0], "-%L") == 0)) // URL list
+            cmdl_count_url(&argv_url);
         }
       }
 

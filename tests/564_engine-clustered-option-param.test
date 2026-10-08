@@ -1,0 +1,47 @@
+#!/bin/bash
+#
+# An option that reads the next word takes it inside a cluster too (-qO PATH):
+# that word is never counted as a URL.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+bin=$(httrack_path)
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_clusterparam.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+export HOME="$tmp"
+url="file://$tmp/none.html"
+
+# with no URL, the cluster refuses with usage, like its spelled-out control
+for o in "-q -O" -qO -qO1 -%vO "-q -%rf" -q%rf; do
+    name=${o// /_}
+    rc=0
+    # shellcheck disable=SC2086 # $o is one or two options
+    (cd "$tmp" && "$bin" $o "$tmp/nourl$name" -r1 </dev/null >"$tmp/nourl$name.out" 2>&1) || rc=$?
+    test "$rc" -ne 0 || fail "$o PATH with no URL was accepted: $(<"$tmp/nourl$name.out")"
+    grep -qF "usage:" "$tmp/nourl$name.out" || fail "$o PATH: no usage: $(<"$tmp/nourl$name.out")"
+done
+
+# a URL list read through a cluster still counts as the URLs
+printf '%s\n' "$url" >"$tmp/list.txt"
+rc=0
+(cd "$tmp" && "$bin" -q%L "$tmp/list.txt" -O "$tmp/list" -r1 -R0 -P 127.0.0.1:1 >"$tmp/list.out" 2>&1) || rc=$?
+test "$rc" -eq 0 || fail "-q%L LIST exited $rc: $(<"$tmp/list.out")"
+
+# # in the path expands from the real URL, as with the spelled-out control
+if ! target_is_windows; then # # expands to a name holding a colon
+    for o in "-q -O" -qO -qO1; do
+        name=${o// /_}
+        mkdir -p "$tmp/h$name"
+        rc=0
+        # shellcheck disable=SC2086 # $o is one or two options
+        (cd "$tmp/h$name" && "$bin" -r1 $o "$tmp/h$name/x#" "$url" -R0 -P 127.0.0.1:1 >"$tmp/h$name.out" 2>&1) || rc=$?
+        test "$rc" -eq 0 || fail "$o with # exited $rc: $(<"$tmp/h$name.out")"
+    done
+    want=$(ls "$tmp/h-q_-O")
+    for name in -qO -qO1; do
+        assert_eq "$want" "$(ls "$tmp/h$name")" "$name expanded #"
+    done
+fi

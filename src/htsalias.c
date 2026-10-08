@@ -877,6 +877,35 @@ int optreal_find(const char *token) {
   return -1;
 }
 
+hts_boolean optcluster_next(const char *token, size_t *at, char *name,
+                            size_t name_size) {
+  size_t i = *at, len;
+
+  if (name_size < 5 || token[i] == '\0')
+    return HTS_FALSE;
+  len = strchr("%#@", token[i]) != NULL && token[i + 1] != '\0' ? 2 : 1;
+  name[0] = '-';
+  memcpy(name + 1, token + i, len);
+  name[len + 1] = '\0';
+  /* a sub-letter naming an option of its own: -%rf, -%Zs */
+  if (len == 2 && isalpha((unsigned char) token[i + 2])) {
+    name[3] = token[i + 2];
+    name[4] = '\0';
+    if (optreal_find(name) >= 0)
+      len = 3;
+    else
+      name[3] = '\0';
+  }
+  i += len;
+  /* a glued value: -c8, -O1, -m100,200, -%c1.5 */
+  while (isdigit((unsigned char) token[i]) ||
+         ((token[i] == ',' || token[i] == '.') &&
+          isdigit((unsigned char) token[i + 1])))
+    i++;
+  *at = i;
+  return HTS_TRUE;
+}
+
 const char *optreal_value(int p) { return hts_optalias[p][1]; }
 
 const char *optalias_value(int p) { return hts_optalias[p][0]; }
