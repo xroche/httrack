@@ -118,6 +118,10 @@ char **hts_split_cmdline(char *cmd, int *nargs) {
   return hts_split_args(cmd, nargs, HTS_SPLIT_FOLD_WS);
 }
 
+char **hts_split_webcmd(char *cmd, int *nargs) {
+  return hts_split_args(cmd, nargs, HTS_SPLIT_FOLD_WS | HTS_SPLIT_STRIP_QUOTES);
+}
+
 void hts_escape_arg(String *out, const char *arg, size_t len) {
   size_t i;
 
@@ -151,7 +155,7 @@ hts_boolean hts_unquote_arg(char *arg) {
   if (arg[0] != '\"') {
     return HTS_TRUE;
   }
-  if (len < 2 || arg[len - 1] != '\"') {
+  if (!hts_is_quoted(arg, len)) {
     return HTS_FALSE;
   }
   memmove(arg, arg + 1, len - 2);

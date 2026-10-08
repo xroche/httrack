@@ -35,7 +35,7 @@ grep -q -- '--user-agent' <<<"${cmdline}" ||
 
 # A plain value is passed through untouched: the escaping must not mangle the
 # ordinary case.
-grep -qF -- '--path "/tmp/p/plain proj"' <<<"${cmdline}" ||
+grep -qF -- '-O1 "/tmp/p/plain proj"' <<<"${cmdline}" ||
     fail "a plain quoted value was not passed through: ${cmdline}"
 
 # The quote is escaped, so the split keeps it inside the value...

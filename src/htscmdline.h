@@ -57,6 +57,10 @@ char **hts_split_args(char *cmd, int *nargs, int flags);
 /* hts_split_args() under HTS_SPLIT_FOLD_WS: the WebHTTrack filter list. */
 char **hts_split_cmdline(char *cmd, int *nargs);
 
+/* hts_split_args() for the command line a WebHTTrack page posts, whose values
+   are quoted as hts_quote_arg() does. */
+char **hts_split_webcmd(char *cmd, int *nargs);
+
 /* Append len bytes of arg to out with \\ and \" escaped, the body of a quoted
    argument without its quotes. */
 void hts_escape_arg(String *out, const char *arg, size_t len);
@@ -66,11 +70,13 @@ void hts_escape_arg(String *out, const char *arg, size_t len);
    HTS_SPLIT_STRIP_QUOTES reads it back. */
 void hts_quote_arg(String *out, const char *arg);
 
-/* Does the len bytes at arg start and end with a quote? A URL or a path in
-   that shape was quoted by mistake, since argv reaches the engine final. */
+/* Do the first len bytes of arg start and end with a quote? */
 hts_boolean hts_is_quoted(const char *arg, size_t len);
 
-/* Strip one surrounding quote pair from arg in place, if it starts with a
+/* The hint after "<where>: <value> ", for a value that hts_is_quoted(). */
+#define HTS_QUOTED_HINT "is quoted, remove the quotes"
+
+/* Remove one surrounding quote pair from arg in place, if it starts with a
    quote. HTS_FALSE when that quote is not closed at its end. */
 hts_boolean hts_unquote_arg(char *arg);
 

@@ -577,19 +577,23 @@ static void optparam_error(optparam_state state, const char *spelling,
                       spelling, next, help);
 }
 
-/* The syntax error for a value option --name refuses, saying so when the value
-   is quoted. */
+/* Report that --name refuses param, and ask to remove its quotes if it has
+   any. */
 static void optvalue_error(const char *name, const char *param,
                            char *return_error, size_t return_error_size) {
   char help[256];
 
   optalias_help_line(help, sizeof(help), name);
-  slprintfbuff_clip(
-      return_error, return_error_size,
-      "Syntax error:\n\tOption --%s does not take the value %s%s\n%s", name,
-      param,
-      strchr(param, '"') != NULL ? ", which is quoted: remove the quotes" : "",
-      help);
+  if (hts_is_quoted(param, strlen(param)))
+    slprintfbuff_clip(return_error, return_error_size,
+                      "Syntax error:\n\tOption --%s: %s " HTS_QUOTED_HINT
+                      "\n%s",
+                      name, param, help);
+  else
+    slprintfbuff_clip(
+        return_error, return_error_size,
+        "Syntax error:\n\tOption --%s does not take the value %s\n%s", name,
+        param, help);
 }
 
 /*
@@ -1033,6 +1037,7 @@ cmdl_file_result optinclude_file(const char *name, cmdl_argv *cmd) {
             char return_error[256];
             char _tmp_argv[4][HTS_CDLMAXSIZE];
             char *tmp_argv[4];
+            hts_boolean quote_ok = HTS_TRUE;
 
             tmp_argv[0] = _tmp_argv[0];
             tmp_argv[1] = _tmp_argv[1];
@@ -1046,10 +1051,12 @@ cmdl_file_result optinclude_file(const char *name, cmdl_argv *cmd) {
                                     &return_argc, (tmp_argv + 2),
                                     sizeof(_tmp_argv[0]), return_error,
                                     sizeof(return_error));
-            /* a value loses one surrounding quote pair */
+            /* a value loses one quote pair, but -O decodes its own quotes */
+            if (result && return_argc > 1 && strncmp(tmp_argv[2], "-O", 2) != 0)
+              quote_ok = hts_unquote_arg(tmp_argv[3]);
             if (!result) {
               printf("%s\n", return_error);
-            } else if (return_argc > 1 && !hts_unquote_arg(tmp_argv[3])) {
+            } else if (!quote_ok) {
               fprintf(stderr, "* %s: missing quote in %s, ignored\n", name,
                       tmp_argv[3]);
             } else {

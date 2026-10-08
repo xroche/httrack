@@ -487,8 +487,7 @@ static void back_launch_cmd(void *pP) {
     free(commandReturnCmdl);
   commandReturnCmdl = strdup(cmd);
 
-  /* the pages quote each value as hts_quote_arg() does */
-  argv = hts_split_args(cmd, &argc, HTS_SPLIT_FOLD_WS | HTS_SPLIT_STRIP_QUOTES);
+  argv = hts_split_webcmd(cmd, &argc);
   if (argv == NULL) {
     if (commandReturnMsg)
       free(commandReturnMsg);

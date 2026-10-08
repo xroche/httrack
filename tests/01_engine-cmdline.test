@@ -84,12 +84,8 @@ refused "#152: over-cap -F not refused cleanly"
 run "$tmp/ov-l" --user-agent "$over"
 refused "#152: over-cap --user-agent not refused cleanly"
 
-# Quote handling on the sole URL (run_only, so the quoted arg is the only URL and
-# can't be masked by an implicit one). A fully "-quoted URL is refused cleanly.
-# A dangling opening quote and a lone quote are data, and never crash.
-# nativepath: the shim converts an argument that IS a URL, not one inside quotes.
-run_only "$tmp/q-ok" "\"file://$(nativepath "$tmp")/index.html\""
-refused "quoted URL not refused cleanly"
+# A dangling opening quote and a lone quote on the sole URL are data, and never
+# crash (561 covers a fully quoted one).
 run_only "$tmp/q-bad" '"foo'
 test "$RC" -lt 128 || fail "dangling-quote argument crashed (exit $RC)"
 run_only "$tmp/q-lone" '"'

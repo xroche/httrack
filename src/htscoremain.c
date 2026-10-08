@@ -306,30 +306,28 @@ hts_scan_result cmdl_glued_int(char **com, int min, int max, int *out) {
   return got;
 }
 
-/* Panic with msg about value, saying so when the value is quoted. */
+/* Panic with msg, and ask to remove the quotes of value if it has any. */
 static void cmdl_panic_value(httrackp *opt, const char *msg,
                              const char *value) {
-  char s[HTS_CDLMAXSIZE + 256];
+  char s[HTS_CDLMAXSIZE * 2 + 256];
 
-  if (strchr(value, '"') != NULL)
-    snprintf(s, sizeof(s), "%s: the value %s is quoted, remove the quotes", msg,
-             value);
+  if (hts_is_quoted(value, strlen(value)))
+    snprintf(s, sizeof(s), "%s: %s " HTS_QUOTED_HINT, msg, value);
   else
     snprintf(s, sizeof(s), "%s", msg);
   HTS_PANIC_PRINTF(s);
 }
 
-/* Panic on the byte c of option arg, which no option takes. */
+/* Panic on com, the rest of option arg, which no option takes. */
 static void cmdl_bad_option(httrackp *opt, const char *arg, const char *prefix,
-                            char c) {
+                            const char *com) {
   char s[HTS_CDLMAXSIZE + 256];
 
-  if (c == '"')
-    snprintf(s, sizeof(s), "Option %s has a quoted value, remove the quotes",
-             arg);
+  if (hts_is_quoted(com, strlen(com)))
+    snprintf(s, sizeof(s), "Option %.*s", (int) (com - arg), arg);
   else
-    snprintf(s, sizeof(s), "invalid option %s%c\n", prefix, c);
-  HTS_PANIC_PRINTF(s);
+    snprintf(s, sizeof(s), "invalid option %s%c\n", prefix, *com);
+  cmdl_panic_value(opt, s, com);
 }
 
 HTSEXT_API int hts_main(int argc, char **argv) {
@@ -732,7 +730,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 htsmain_free();
                 return -1;
               } else {
-                int i, start;
+                int i /*, j */ ;
                 int inQuote;
                 String *path;
                 int noDbl = 0;
@@ -744,30 +742,18 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 na++;
                 StringClear(opt->path_html);
                 StringClear(opt->path_log);
-                for (i = 0, start = 0, inQuote = 0, path = &opt->path_html;;
-                     i++) {
-                  const char c = argv[na][i];
-
-                  if (c == '\0' || (!inQuote && !noDbl && c == ',')) {
-                    /* a quote around a whole part can only be a leftover */
-                    if (hts_is_quoted(argv[na] + start, (size_t) (i - start))) {
-                      char BIGSTK s[HTS_CDLMAXSIZE + 256];
-
-                      snprintf(s, sizeof(s),
-                               "Option -O path %s is quoted, remove the quotes",
-                               argv[na]);
-                      HTS_PANIC_PRINTF(s);
-                      htsmain_free();
-                      return -1;
-                    }
-                    if (c == '\0')
-                      break;
+                for(i = 0 /*, j = 0 */ , inQuote = 0, path = &opt->path_html;
+                    argv[na][i] != 0; i++) {
+                  /* only a plain -O groups a comma with quotes */
+                  if (!noDbl && argv[na][i] == '"') {
+                    if (inQuote)
+                      inQuote = 0;
+                    else
+                      inQuote = 1;
+                  } else if (!inQuote && !noDbl && argv[na][i] == ',') {
                     path = &opt->path_log;
-                    start = i + 1;
-                  } else if (c == '"') {
-                    inQuote = !inQuote;
                   } else {
-                    StringAddchar(*path, c);
+                    StringAddchar(*path, argv[na][i]);
                   }
                 }
                 if (StringLength(opt->path_log) == 0) {
@@ -2214,6 +2200,12 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                     return -1;
                   }
                   na++;
+                  if (hts_is_quoted(argv[na], strlen(argv[na]))) {
+                    cmdl_panic_value(opt, "Option warc-max-size needs a size",
+                                     argv[na]);
+                    htsmain_free();
+                    return -1;
+                  }
                   { // reject non-numeric/negative/overflow; keep default 0
                     // (single file)
                     char *end;
@@ -2386,7 +2378,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 break;
 
               default:{
-                cmdl_bad_option(opt, argv[na], "%", *com);
+                cmdl_bad_option(opt, argv[na], "%", com);
                 htsmain_free();
                 return -1;
                 }
@@ -2455,7 +2447,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               } break;
 
               default:{
-                cmdl_bad_option(opt, argv[na], "@", *com);
+                cmdl_bad_option(opt, argv[na], "@", com);
                 htsmain_free();
                 return -1;
               } break;
@@ -2747,7 +2739,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             break;
             //
           default:{
-            cmdl_bad_option(opt, argv[na], "", *com);
+            cmdl_bad_option(opt, argv[na], "", com);
             htsmain_free();
             return -1;
             }
@@ -2762,15 +2754,11 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         const size_t capa = strlen(url) + urlSize + 32;
 
         if (hts_is_quoted(argv[na], urlSize)) {
-          char s[HTS_CDLMAXSIZE + 256];
-
-          snprintf(s, sizeof(s), "URL %s is quoted, remove the quotes",
-                   argv[na]);
-          HTS_PANIC_PRINTF(s);
+          cmdl_panic_value(opt, "Argument refused", argv[na]);
           htsmain_free();
           return -1;
         }
-        /* a rule may match a quote, but one is most likely left over */
+        /* a filter may hold a quote on purpose, but usually it is a leftover */
         if ((argv[na][0] == '+' || argv[na][0] == '-') &&
             strchr(argv[na], '"') != NULL)
           fprintf(stderr, "* Warning: filter %s holds a quote, kept as is\n",

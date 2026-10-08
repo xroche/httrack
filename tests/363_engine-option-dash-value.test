@@ -107,17 +107,14 @@ echo OK
 # Nothing vets a clustered spelling, and the URL pass reads the word after it as
 # short options, so -q%F -mirrored would silently mean -i; left relaxed, -qF
 # --mirror sends "-w" as the User-Agent and drops the mirror. A quoted whole
-# token resolves through the alias layer no more than a clustered one does: the
-# quotes come off in a later pass, so the word looks canonical by the time the
-# engine reads it. hts_split_cmdline(), which WebHTTrack posts through, keeps
-# them inside the token, so this one is reachable from the UI.
+# token is refused as quoted.
 printf '[an unvetted spelling still refuses the word after it] ..\t'
 for opt in %A %F %K %L %S %rf F; do
     for word in --mirror -q -dashvalue; do
         parse "-q${opt}" "$word"
         refused "-q${opt} ${word}" 'needs'
         parse "\"-${opt}\"" "$word"
-        refused "\"-${opt}\" ${word}" 'is quoted'
+        refused "\"-${opt}\" ${word}" "Argument refused: \"-${opt}\" is quoted"
     done
 done
 echo OK
