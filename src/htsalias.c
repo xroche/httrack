@@ -1007,21 +1007,21 @@ cmdl_file_result optinclude_file(const char *name, cmdl_argv *cmd) {
       char *a, *b;
       int result;
 
-      /* a clipped option can mean something else, so it is not applied */
-      if (hts_readline(fp, line, 250, HTS_LINE_DROP_TAB)) {
+      /* a clipped option can mean something else, so it is skipped */
+      if (hts_readline(fp, line, 250, HTS_LINE_DROP_FF)) {
         fprintf(stderr, "* %s: line too long, ignored\n", name);
         continue;
       }
       hts_lowcase(line);
       /* trim first: a blank line is skipped, not parsed as an option */
       hts_rtrim(line, HTS_REALSPACES);
-      if (strnotempty(line)) {
-        /* no comment line: # // ; */
-        if (strchr("#/;", line[0]) == NULL) {
+      a = line;
+      while (is_realspace(*a))
+        a++;
+      if (*a != '\0') {
+        /* no comment line: # // ; even indented */
+        if (strchr("#/;", *a) == NULL) {
           /* jump "set " and spaces */
-          a = line;
-          while(is_realspace(*a))
-            a++;
           if (strncmp(a, "set", 3) == 0) {
             if (is_realspace(*(a + 3))) {
               a += 4;

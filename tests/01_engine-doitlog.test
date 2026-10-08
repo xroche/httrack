@@ -159,8 +159,7 @@ cmp -s "$tmp/doit4.before" "$tmp/doit4.after" || {
 }
 
 # --- 6. the reader's split: extra spaces add no token, quotes go ----------
-# A crafted line over a real cache. The TAB never reaches the splitter, because
-# linput() drops it.
+# A crafted line over a real cache. The TAB is argument data, not a separator.
 out5="$tmp/out5"
 rc=0
 "$bin" "$url" -O "$out5" --quiet -n -%v0 -r2 >/dev/null 2>&1 || rc=$?
@@ -173,7 +172,7 @@ mv "$tmp/doit5" "$out5/hts-cache/doit.log"
 rc=0
 (cd "$out5" && "$bin" >/dev/null 2>&1) || rc=$?
 test "$rc" -eq 0 || fail "crafted-line reprise exited $rc"
-want="$url -O $out5 -q -n -%v0 -%F \"xy z\" -r2"
+want="$url -O $out5 -q -n -%v0 -%F \"x"$'\t'"y z\" -r2"
 got=$(head -1 "$out5/hts-cache/doit.log")
 got=${got%"$SELFTEST_CR"} # LF is CR LF on Windows
 test "$got" = "$want" || fail "crafted line read back as [$got], want [$want]"

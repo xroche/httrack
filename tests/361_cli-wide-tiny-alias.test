@@ -70,7 +70,7 @@ echoed ' -p0C0I0t ' 'plain spider' --spider
 echoed ' -p1c32 ' 'wide skeleton' --wide-skeleton
 echoed ' -p1 ' 'plain skeleton' --skeleton
 echoed ' -Xc32 ' 'wide purge-old' --wide-purge-old
-echoed ' -o2c1 ' 'tiny generate-errors' --tiny-generate-errors 2
+echoed ' -o1c1 ' 'tiny generate-errors' --tiny-generate-errors 1
 echoed ' -c8 ' 'plain sockets' --sockets 8
 ok "the prefix glues its count on, and only the prefix does"
 

@@ -261,15 +261,6 @@ static void cmdl_print_args(httrackp *opt, const cmdl_argv *cmd) {
   } \
 } while(0)
 
-/* Scan a decimal option argument into an option field. "%d" writes an int,
-   and an enum field is one byte under -fshort-enums, so never aim it there. */
-#define scanOptInt(arg, field)                                                 \
-  do {                                                                         \
-    int value_;                                                                \
-    if (sscanf((arg), "%d", &value_) == 1)                                     \
-      (field) = value_;                                                        \
-  } while (0)
-
 /* Read the glued digits of the option at com into field, or refuse the
    command line when they are above max. With no digits, nothing changes.
    A refusal panics and returns -1 from hts_main_internal. */
@@ -286,6 +277,14 @@ static void cmdl_print_args(httrackp *opt, const cmdl_argv *cmd) {
   } while (0)
 #define readGluedInt(field, max) readGluedOpt_(cmdl_glued_int, field, max)
 #define readGluedLLint(field, max) readGluedOpt_(cmdl_glued_llint, field, max)
+/* readGluedInt() for an enum, narrower than an int under -fshort-enums. */
+#define readGluedEnum(field, max)                                              \
+  do {                                                                         \
+    int level_ = (field);                                                      \
+                                                                               \
+    readGluedInt(level_, max);                                                 \
+    (field) = level_;                                                          \
+  } while (0)
 
 hts_scan_result cmdl_glued_llint(char **com, LLint min, LLint max, LLint *out) {
   const char *const digits = *com + 1;
@@ -686,6 +685,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   // Option O and includerc
   {
     int loops = 0;
+    /* Pass 1 strips every slot and pass 2 only the rc tokens at [1, fresh). */
+    int fresh = argc;
 
     while(loops < 2) {
       char *com;
@@ -693,7 +694,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 
       for(na = 1; na < argc; na++) {
 
-        if (!hts_unquote_arg(argv[na])) {
+        if (na < fresh && !hts_unquote_arg(argv[na])) {
           /* +256 holds the prefix around a max-length argument. */
           char BIGSTK s[HTS_CDLMAXSIZE + 256];
 
@@ -776,10 +777,12 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           || (strnotempty(StringBuff(opt->path_html))))
         loops++;                // do not loop once again and do not include rc file (O option exists)
       else {
-        if ((!fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                  StringBuff(opt->path_log),
-                                  "hts-cache/doit.log"))) ||
-            (argv_url > 0)) {
+        /* Read the rc file once, because pass 2 only strips its tokens. */
+        if (loops == 0 &&
+            ((!fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                   StringBuff(opt->path_log),
+                                   "hts-cache/doit.log"))) ||
+             (argv_url > 0))) {
           /* first rc file that exists wins */
           cmdl_file_result res =
               optinclude_file(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
@@ -803,6 +806,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             htsmain_free();
             return -1;
           }
+          fresh = 1 + x_cmd.argc - argc;
           /* the array may have been grown and moved */
           argv = x_cmd.argv;
           argc = x_cmd.argc;
@@ -823,15 +827,16 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                              StringBuff(opt->path_log), "hts-cache/doit.log"),
                      "rb");
     if (fp) {
-      int insert_after = 1;     /* insérer après nom au début */
+      int insert_after = 1; /* insert after the program name */
 
       String buff = STRING_EMPTY;
       char **tokens;
       int ntokens = 0;
       int i;
       hts_boolean ok;
+      /* a TAB is argument data, since the writer leaves it unquoted */
       const hts_boolean cut = hts_readline_alloc(
-          fp, &buff, HTS_READLINE_ALLOC_MAX, HTS_LINE_DROP_TAB);
+          fp, &buff, HTS_READLINE_ALLOC_MAX, HTS_LINE_DROP_FF);
 
       fclose(fp);
       fp = NULL;
@@ -1386,13 +1391,11 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           case 'K':
             opt->urlmode = HTS_URLMODE_ABSOLUTE;
             if (isdigit((unsigned char) *(com + 1))) {
-              scanOptInt(com + 1, opt->urlmode);
+              readGluedEnum(opt->urlmode, HTS_URLMODE_TRANSPARENT_PROXY);
               if (opt->urlmode == HTS_URLMODE_ABSOLUTE) { // in fact K0 ==> K2
                 // and K ==> K0
                 opt->urlmode = HTS_URLMODE_RELATIVE;
               }
-              while(isdigit((unsigned char) *(com + 1)))
-                com++;
             }
             break;
           case 'c':
@@ -1475,9 +1478,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             break;
             //
           case 'b':
-            scanOptInt(com + 1, opt->accept_cookie);
-            while(isdigit((unsigned char) *(com + 1)))
-              com++;
+            readGluedInt(opt->accept_cookie, HTS_TRUE);
             break;
             //
           case 'N':
@@ -1539,9 +1540,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           } break;
           case 's':
             if (isdigit((unsigned char) *(com + 1))) {
-              scanOptInt(com + 1, opt->robots);
-              while(isdigit((unsigned char) *(com + 1)))
-                com++;
+              readGluedEnum(opt->robots, HTS_ROBOTS_ALWAYS_STRICT);
             } else
               opt->robots = HTS_ROBOTS_SOMETIMES;
 #if DEBUG_ROBOTS
@@ -1549,21 +1548,15 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 #endif
             break;
           case 'o':
-            scanOptInt(com + 1, opt->errpage);
-            while(isdigit((unsigned char) *(com + 1)))
-              com++;
+            readGluedInt(opt->errpage, HTS_TRUE);
             break;
           case 'u':
-            scanOptInt(com + 1, opt->check_type);
-            while(isdigit((unsigned char) *(com + 1)))
-              com++;
+            readGluedInt(opt->check_type, 2);
             break;
             //
           case 'C':
             if (isdigit((unsigned char) *(com + 1))) {
-              scanOptInt(com + 1, opt->cache);
-              while(isdigit((unsigned char) *(com + 1)))
-                com++;
+              readGluedEnum(opt->cache, HTS_CACHE_TEST_UPDATE);
             } else
               opt->cache = HTS_CACHE_PRIORITY;
             break;
@@ -1631,9 +1624,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               case 'I':
                 opt->kindex = 1;
                 if (isdigit((unsigned char) *(com + 1))) {
-                  scanOptInt(com + 1, opt->kindex);
-                  while(isdigit((unsigned char) *(com + 1)))
-                    com++;
+                  readGluedInt(opt->kindex, 2);
                 }
                 break;          // Keyword Index
               case 'c':
@@ -1727,9 +1718,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               case 'v':
                 opt->verbosedisplay = HTS_VERBOSE_FULL;
                 if (isdigit((unsigned char) *(com + 1))) {
-                  scanOptInt(com + 1, opt->verbosedisplay);
-                  while(isdigit((unsigned char) *(com + 1)))
-                    com++;
+                  readGluedEnum(opt->verbosedisplay, HTS_VERBOSE_FULL);
                 }
                 break;
               case 'i':
@@ -1742,9 +1731,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               case 'N':
                 opt->savename_delayed = HTS_SAVENAME_DELAYED_HARD;
                 if (isdigit((unsigned char) *(com + 1))) {
-                  scanOptInt(com + 1, opt->savename_delayed);
-                  while(isdigit((unsigned char) *(com + 1)))
-                    com++;
+                  readGluedEnum(opt->savename_delayed,
+                                HTS_SAVENAME_DELAYED_HARD);
                 }
                 break;
               case 'D':

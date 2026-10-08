@@ -1,0 +1,140 @@
+#!/bin/bash
+#
+# TAB in the config readers: .httrackrc splits on it like a space and skips an
+# indented comment, doit.log keeps it as argument data, and a >postfile:
+# request line may be TAB-separated. Form feed is still dropped.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+python=$(find_python) || skip "python3 missing"
+require_httrack
+
+# absolute before any cd, or a relative PATH entry finds the installed one
+bin=$(command -v httrack)
+case "$bin" in
+/*) ;;
+*) bin="$(cd "$(dirname "$bin")" && pwd)/$(basename "$bin")" ;;
+esac
+
+TAB=$'\t'
+FF=$'\f'
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_tabs.XXXXXX") || exit 1
+serverpid=
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmp"
+}
+cleanup_push cleanup
+
+wire=$tmp/wire
+srverr=$tmp/server.err
+fail_dump_var wire srverr
+"$python" "$(nativepath "$testdir/postfile-server.py")" "$(nativepath "$wire")" \
+    unused >"$tmp/server.out" 2>"$srverr" &
+serverpid=$!
+port=$(discover_server_port "$tmp/server.out" "$serverpid") || exit 1
+
+# --- 1. .httrackrc: TAB separates, indented lines are read -------------------
+d1=$tmp/rc
+mkdir -p "$d1"
+{
+    printf 'set\tsockets\t7\r\n'
+    printf '\t set\ttimeout\t37\n'
+    printf '   depth 3\n'
+    printf '\t# user-agent zzcomment-tab\n'
+    printf '    # user-agent zzcomment-space\r\n'
+    printf '  ; user-agent zzcomment-semi\n'
+    printf '\t // user-agent zzcomment-slash\n'
+    printf 'user-agent\tua-rc\tb\fc\n'
+} >"$d1/.httrackrc"
+cp "$d1/.httrackrc" "$d1/httrackrc" # the Windows name
+
+# no -O, or the rc files are not read
+log1=$tmp/rc.log
+fail_dump_var log1
+rc=0
+(cd "$d1" && run_with_timeout 120 "$bin" "http://127.0.0.1:$port/rc.html" \
+    --robots=0 --retries=0 --quiet -%v0 >"$log1" 2>&1) || rc=$?
+test "$rc" -eq 0 || fail ".httrackrc crawl exited $rc"
+assert_eq 0 "$(count_matching_lines 'Unknown option' "$log1")" \
+    "options the engine rejected from .httrackrc"
+line=$(head -1 "$d1/hts-cache/doit.log")
+line=${line%"$SELFTEST_CR"}
+for opt in -c7 -T37 -r3 "-F ua-rc${TAB}bc"; do
+    case " $line " in
+    *" $opt "*) ;;
+    *) fail ".httrackrc option [$opt] not applied: [$line]" ;;
+    esac
+done
+for f in "$d1/hts-cache/doit.log" "$wire" "$log1"; do
+    assert_eq 0 "$(count_matching_lines zzcomment "$f")" "comment text in $f"
+done
+# form feed is dropped, so the header carries only SP and HTAB
+assert_eq 1 "$(count_matching_lines_regexp \
+    "^User-Agent: ua-rc${TAB}bc${SELFTEST_CR}?\$" "$wire")" \
+    "User-Agent lines sent from .httrackrc"
+
+# --- 2. doit.log: a TAB inside a value survives a resume ---------------------
+out=$tmp/doit
+url="http://127.0.0.1:$port/doit.html"
+rc=0
+run_with_timeout 120 "$bin" "$url" -O "$out" --quiet -n -%v0 --robots=0 \
+    --retries=0 -r1 >/dev/null 2>&1 || rc=$?
+test "$rc" -eq 0 || fail "initial mirror exited $rc"
+doit_args="-q -n -%v0 -F ua${TAB}tab +*x${TAB}y* \"+*p q${TAB}r*\" -r1"
+{
+    printf '%s\n' "$url -O $out ${doit_args/tab/t${FF}ab}"
+    tail -n +2 "$out/hts-cache/doit.log"
+} >"$tmp/doit.new"
+mv "$tmp/doit.new" "$out/hts-cache/doit.log"
+rc=0
+(cd "$out" && run_with_timeout 120 "$bin" >/dev/null 2>&1) || rc=$?
+test "$rc" -eq 0 || fail "resume exited $rc"
+# the form feed is dropped, the TABs are kept
+want="$url -O $out $doit_args"
+got=$(head -1 "$out/hts-cache/doit.log")
+got=${got%"$SELFTEST_CR"} # LF is CR LF on Windows
+test "$got" = "$want" || fail "resume rewrote the line as [$got], want [$want]"
+test "$(count_matching_lines_regexp \
+    "^User-Agent: ua${TAB}tab${SELFTEST_CR}?\$" "$wire")" -ne 0 ||
+    fail "the resumed crawl did not send the user-agent with its TAB"
+
+# --- 3. >postfile: the request line is read whole, TAB-separated or long ------
+# request PREFIX: the first request whose line starts with PREFIX, CR stripped.
+request() {
+    awk -v p="$1" '
+        /^=== REQUEST ===$/ { first = 1; on = 0; next }
+        first { first = 0; if (!done && index($0, p) == 1) on = done = 1 }
+        on { sub(/\r$/, ""); print }' "$wire"
+}
+postfile() { # postfile NAME LINE: a postfile whose request line is LINE
+    printf '%s\r\nX-Tabs: 1\r\n\r\n' "$2" >"$tmp/$1.txt"
+    echo "http://127.0.0.1:$port/$1.html?>postfile:$(nativepath "$tmp/$1.txt")"
+}
+# 999 bytes fill the buffer exactly, and 1500 overflow it
+pad999=$(repeat_chars $((999 - 22)) a)
+pad1500=$(repeat_chars $((1500 - 23 - 10)) b)
+urls=(
+    "$(postfile tabbed "GET${TAB}/tabbed${TAB}HTTP/1.0")"
+    "$(postfile short 'GET /short HTTP/1.0')"
+    "$(postfile long999 "GET /long999 HTTP/1.0 $pad999")"
+    "$(postfile long1500 "GET /long1500 HTTP/1.0 ${pad1500}zztail1500")"
+)
+test "$(wc -c <"$tmp/long999.txt")" -eq $((999 + 15)) || fail "bad 999 fixture"
+test "$(wc -c <"$tmp/long1500.txt")" -eq $((1500 + 15)) || fail "bad 1500 fixture"
+rc=0
+run_with_timeout 120 "$bin" "${urls[@]}" -O "$tmp/pf" --robots=0 --retries=0 \
+    -c1 --quiet -%v0 >/dev/null 2>&1 || rc=$?
+test "$rc" -ne 124 || fail "the postfile crawl watchdog fired"
+test "$rc" -le 128 || fail "the postfile crawl ended abnormally ($rc)"
+bad=
+for name in tabbed short long999 long1500; do
+    want="GET /$name HTTP/1.0"$'\n'"X-Tabs: 1"
+    test "$(request "GET /$name ")" = "$want" || bad="$bad $name"
+done
+test -z "$bad" || fail "postfile requests not sent as written:$bad"
+assert_eq 0 "$(count_matching_lines zztail1500 "$wire")" \
+    "lines carrying the tail of the 1500-byte request line"

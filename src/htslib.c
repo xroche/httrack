@@ -58,6 +58,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsencoding.h"
 #include "htsescape.h"
 #include "htscodec.h"
+#include "htslines.h"
 
 #include <limits.h>
 
@@ -1135,7 +1136,8 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
           char BIGSTK line[1100];
           char BIGSTK protocol[256], url[HTS_URLMAXSIZE * 2], method[256];
 
-          linput(fp, line, 1000);
+          /* a TAB may separate the request line's words */
+          hts_readline(fp, line, 1000, HTS_LINE_DROP_FF);
           /* widths bound method[256], url[HTS_URLMAXSIZE*2], protocol[256] */
           if (sscanf(line, "%255s %2047s %255s", method, url, protocol) == 3) {
             // http proxy: absolute-URI; socks/CONNECT tunnel: origin-form

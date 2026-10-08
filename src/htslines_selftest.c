@@ -64,9 +64,11 @@ static size_t st_lines_decode(const char *arg, char *buf, size_t size) {
   return n;
 }
 
-/* "t" for HTS_LINE_DROP_TAB, "n" for HTS_LINE_DROP_NUL, "-" for neither. */
+/* "t" for HTS_LINE_DROP_TAB, "f" for HTS_LINE_DROP_FF, "n" for
+   HTS_LINE_DROP_NUL, "-" for none. */
 static int st_lines_flags(const char *arg) {
   return (strchr(arg, 't') != NULL ? HTS_LINE_DROP_TAB : 0) |
+         (strchr(arg, 'f') != NULL ? HTS_LINE_DROP_FF : 0) |
          (strchr(arg, 'n') != NULL ? HTS_LINE_DROP_NUL : 0);
 }
 
@@ -163,7 +165,7 @@ static int st_readline(httrackp *opt, int argc, char **argv) {
 /* Set when a legacy read stopped for want of room, not at the line's end. */
 static hts_boolean st_legacy_full;
 
-/* htslib.c's linput() (HTS_LINE_DROP_TAB), rawlinput() (0) and htsserver.h's
+/* htslib.c's linput() (TAB and FF), rawlinput() (none) and htsserver.h's
    linput() (both), which differ only in the bytes they drop. */
 static int legacy_linput(FILE *fp, char *s, int max, int flags) {
   int c;
@@ -179,7 +181,8 @@ static int legacy_linput(FILE *fp, char *s, int max, int flags) {
         c = -1;
         break;
       default:
-        if (!(((flags & HTS_LINE_DROP_TAB) != 0 && (c == 9 || c == 12)) ||
+        if (!(((flags & HTS_LINE_DROP_TAB) != 0 && c == 9) ||
+              ((flags & HTS_LINE_DROP_FF) != 0 && c == 12) ||
               ((flags & HTS_LINE_DROP_NUL) != 0 && c == 0)))
           s[j++] = (char) c;
         break;
@@ -201,7 +204,8 @@ static int legacy_srv_linput_trim(FILE *fp, char *s, int max) {
   if (ls) {
     char *a;
 
-    rlen = legacy_linput(fp, ls, max, HTS_LINE_DROP_TAB | HTS_LINE_DROP_NUL);
+    rlen = legacy_linput(
+        fp, ls, max, HTS_LINE_DROP_TAB | HTS_LINE_DROP_FF | HTS_LINE_DROP_NUL);
     if (rlen) {
       while ((rlen > 0) && is_realspace(ls[max(rlen - 1, 0)]))
         ls[--rlen] = '\0';
@@ -248,8 +252,9 @@ static const char *const st_reader_names[ST_NREADERS] = {
     "linput", "rawlinput", "srv-linput", "srv-cpp"};
 
 static const int st_reader_flags[ST_NREADERS] = {
-    HTS_LINE_DROP_TAB, 0, HTS_LINE_DROP_TAB | HTS_LINE_DROP_NUL,
-    HTS_LINE_DROP_TAB | HTS_LINE_DROP_NUL};
+    HTS_LINE_DROP_TAB | HTS_LINE_DROP_FF, 0,
+    HTS_LINE_DROP_TAB | HTS_LINE_DROP_FF | HTS_LINE_DROP_NUL,
+    HTS_LINE_DROP_TAB | HTS_LINE_DROP_FF | HTS_LINE_DROP_NUL};
 
 /* One read by reader r, old or new, at cap into s. Returns the offset after. */
 static long st_read(FILE *fp, int r, size_t cap, hts_boolean legacy, char *s,

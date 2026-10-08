@@ -1,0 +1,61 @@
+#!/bin/bash
+#
+# A level glued to a short option (-s3, -%v1) takes the values its help lists,
+# and one above them is refused instead of being stored.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+require_httrack
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_level.XXXXXX")
+cleanup_push rm -rf "$tmp"
+n=0
+
+run() { # run OPTION...: the output of one refused run
+    local rc=0 out
+    n=$((n + 1))
+    out=$(httrack -q -O "$tmp/$n" 'http://127.0.0.1:1/' "$@" 2>&1) || rc=$?
+    test "$rc" -eq 255 || fail "httrack $* exited $rc, not 255: $out"
+    printf '%s\n' "$out"
+}
+
+# The largest level of each option passes, and its digits are all read, so the
+# trailing -T-9 is what fails the parse. No level is 9.
+for opt in -K5 -b1 -s3 -o1 -u2 -C2 -%I2 -%v2 -%N2; do
+    out=$(run "$opt" -T-9)
+    grep -q 'invalid option 9' <<<"$out" || fail "$opt was refused: $out"
+    for bad in "$((${opt: -1} + 1))" 4294967298; do
+        out=$(run "${opt%?}$bad")
+        grep -q "Value out of range in option ${opt%?}$bad" <<<"$out" ||
+            fail "${opt%?}$bad was not refused: $out"
+    done
+done
+
+# The level reaches the engine: -s0 fetches what robots.txt forbids. The
+# robotsblob agent gets a robots.txt that disallows /secret/.
+root="$tmp/site"
+mkdir -p "$root/secret"
+echo '<a href="secret/a.html">a</a>' >"$root/index.html"
+echo a >"$root/secret/a.html"
+for level in 0 2; do
+    want=--not-found
+    test "$level" -ne 0 || want=--found
+    bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$root")" \
+        "$want" secret/a.html \
+        httrack BASEURL/index.html -q -r3 -s$level -F robotsblob10-agent
+done
+
+# -b0 drops the cookie third.php needs, -u0 keeps the .php names, and -%I0
+# writes no index. Their defaults are on, so a level left unstored shows here.
+bash "$top_srcdir/tests/local-crawl.sh" \
+    --found cookies/second.php --not-found cookies/third.php \
+    --not-found ../index.txt --not-found ../sindex.html \
+    httrack BASEURL/cookies/entrance.php -q -b0 -u0 -%I0
+bash "$top_srcdir/tests/local-crawl.sh" \
+    --found cookies/third.html --found ../sindex.html --not-found ../index.txt \
+    httrack BASEURL/cookies/entrance.php -q -b1 -u2 -%I2

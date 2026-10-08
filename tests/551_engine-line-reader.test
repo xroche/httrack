@@ -8,14 +8,16 @@ set -euo pipefail
 . "${0%"${0##*/}"}./testlib.sh"
 
 # readline CAP FLAGS TEXT [cpp] prints [line] per read of a feof() loop, or "!"
-# for a cut one. CAP counts the NUL; t drops TAB and FF, n drops NUL.
+# for a cut one. CAP counts the NUL; t drops TAB, f form feed, n NUL.
 selftest_queue "[abc][d]" readline 4 t 'abc\nd'
 selftest_queue "[abc][d]" readline 4 t 'abc\r\nd'
 selftest_queue "![x]" readline 4 t 'abcd\nx'
 selftest_queue "[ab][c][]" readline 4 t 'ab\r\nc\r\n'
 selftest_queue "[a][][b]" readline 8 t 'a\n\nb'
 selftest_queue "[]" readline 8 t
-selftest_queue "[ab]" readline 8 t 'a\tb\f'
+selftest_queue "[ab]" readline 8 tf 'a\tb\f'
+selftest_queue "[ab\\x0c]" readline 8 t 'a\tb\f'
+selftest_queue "[a\\x09b]" readline 8 f 'a\tb\f'
 selftest_queue "[a\\x09b]" readline 8 - 'a\tb'
 selftest_queue "[ab]" readline 8 tn 'a\0b'
 selftest_queue "[a\\x00b]" readline 8 t 'a\0b'
