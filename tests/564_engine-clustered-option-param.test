@@ -21,7 +21,9 @@ for o in "-q -O" -qO -qO1 -%PO "-q -%rf" -q%rf -q\&rf "-q -#C" -q#C; do
     # shellcheck disable=SC2086 # $o is one or two options
     (cd "$tmp" && "$bin" $o "$tmp/nourl$name" -r1 </dev/null >"$tmp/nourl$name.out" 2>&1) || rc=$?
     test "$rc" -ne 0 || fail "$o PATH with no URL was accepted: $(<"$tmp/nourl$name.out")"
-    grep -qF "usage:" "$tmp/nourl$name.out" || fail "$o PATH: no usage: $(<"$tmp/nourl$name.out")"
+    # without -q, Windows runs the wizard, which refuses with its own message
+    grep -qE "usage:|No URL to mirror" "$tmp/nourl$name.out" ||
+        fail "$o PATH: no refusal: $(<"$tmp/nourl$name.out")"
 done
 
 # an option that takes no value leaves the next word a URL, & spelling % too
