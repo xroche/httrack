@@ -15,7 +15,7 @@ export HOME="$tmp"
 url="file://$tmp/none.html"
 
 # with no URL, the cluster refuses with usage, like its spelled-out control
-for o in "-q -O" -qO -qO1 -%vO "-q -%rf" -q%rf -q\&rf "-q -#C" -q#C; do
+for o in "-q -O" -qO -qO1 -%PO "-q -%rf" -q%rf -q\&rf "-q -#C" -q#C; do
     name=${o// /_}
     rc=0
     # shellcheck disable=SC2086 # $o is one or two options
