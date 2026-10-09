@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# RFC 6265 4.1.1 makes the DQUOTEs part of a quoted cookie-value, and 5.2 strips
-# only whitespace, so the jar keeps a quoted value and a quoted cookie-av whole.
+# The jar keeps a quoted cookie-value and a quoted cookie-av whole, because
+# RFC 6265 5.2 strips only whitespace.
 
 set -euo pipefail
 
@@ -30,6 +30,8 @@ jar "example.com|TRUE|\"/d\"|FALSE|1999999999|sess|a" '' \
     'Set-Cookie: sess=a; path="/d"'
 jar "\"example.com\"|TRUE|/|FALSE|1999999999|sess|a" '' \
     'Set-Cookie: sess=a; domain="example.com"'
+# A single quote is a cookie-octet too, so the scan keeps it like a DQUOTE.
+jar "$REC|sess|'ab'" "Cookie: sess='ab'" "Set-Cookie: sess='ab'"
 # Real whitespace is still skipped, and the class is wider than a space.
 jar "$REC|sess|ab" 'Cookie: sess=ab' 'Set-Cookie: sess=  ab'
 TAB=$(printf '\011')
