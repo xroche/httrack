@@ -54,29 +54,6 @@ jobs:
           grep -qx "%define so_ver $so" httrack.spec
           ! grep -q "^Patch0:" httrack.spec
 
-      # One file we ship postdates their %files. Packaging it keeps rpm's
-      # unpackaged-file check armed for a second, which is the finding this job
-      # exists to make. The entry reds once they package the file by name, so it
-      # cannot see them covering it by a glob, as their icon line now may.
-      - name: Acknowledge the files their %files predates
-        run: |
-          set -euo pipefail
-          cd work
-          acknowledged=(
-            "scalable|%{_datadir}/icons/hicolor/scalable/apps/%{name}.svg"
-          )
-          for entry in "${acknowledged[@]}"; do
-            token=${entry%%|*}
-            path=${entry#*|}
-            if grep -q "$token" httrack.spec; then
-              echo "openSUSE now packages $token: drop it from acknowledged" >&2
-              exit 1
-            fi
-            # Line 107 is the only bare %files; the others name a subpackage.
-            sed -i "/^%files\$/a $path" httrack.spec
-            grep -qx "$path" httrack.spec
-          done
-
       - name: rpmbuild, then install what it produced
         timeout-minutes: 30
         run: |
