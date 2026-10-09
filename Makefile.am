@@ -19,7 +19,7 @@ EXTRA_DIST = INSTALL.Linux \
 		tools/downstream-drift.sh \
 		tools/windows-kill-grade.sh \
 		tools/hurd-vm.sh \
-		tools/parser-diff.sh tools/parser-diff-normalize.sh \
+		tools/parser-diff.sh \
 		$(PARSER_CORPUS_LIST)
 
 # The suite's staged installs serialise on this; a killed holder leaves it behind.

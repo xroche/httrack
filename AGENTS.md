@@ -146,8 +146,8 @@ more care than its diff size suggests.
 - **Prove it by differential against the previous release binary.** `bash
   tools/parser-diff.sh` builds both, crawls `tools/parser-corpus/` with each and
   diffs the mirrors. Run `--self-check` first, because it proves the diff could
-  have seen a change at all. A source read that has not been confronted with two running binaries is a
-  hypothesis.
+  have seen a change at all. A source read that has not been confronted with
+  two running binaries is a hypothesis.
 - **Pair every probe with a control that fires**, including one in the narrowing
   direction. A mutant that wrongly rejects tells you the differential can see a
   loss and not only a gain.

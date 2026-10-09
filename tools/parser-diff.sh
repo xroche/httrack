@@ -1,53 +1,46 @@
 #!/bin/bash
 #
-# Differential for src/htsparse.c: crawl a corpus with a released httrack and
-# with the working tree's, then diff the mirrors. The suite only crawls fixtures
-# the parser already handles, so this is what sees the damage it cannot.
+# Differential for src/htsparse.c. The suite only crawls fixtures the parser
+# already handles, so this is what sees the damage it cannot. --help says how to
+# run it, and what follows is what the comparison keeps and why.
 #
-# Run --self-check first: it proves the diff can see a planted parser change.
-# --help lists the options. Two signals are compared, both built by
-# tools/parser-diff-normalize.sh: every mirrored file byte for byte, and the
-# fetch manifest (hts-cache/new.txt), which names each URL the parser found and
-# the file it was saved to, so a link gained or lost shows up even when no page
-# body changed.
+# Three signals are compared, each normalized only where two runs of one binary
+# disagree:
+#   - every mirrored file, byte for byte. The page footer is off (-%F '')
+#     because its {date} is the only wall-clock value a mirrored page carries.
+#   - hts-changes.json, written by --changes. It names each URL the parser
+#     found, the file it went to and its size, so a link gained or lost shows
+#     up even when no page body changed. Compared sorted, because the file
+#     records completion order and adjacent fetches race.
+#   - hts-log.txt, the only place a scanned-but-filtered candidate appears. The
+#     corpus carries off-host <loc> entries that are never fetched and never
+#     mirrored, so without this a change to the <loc> scanner would be invisible.
 #
-# Excluded from the diff, because each varies between two runs of one binary:
-#   - hts-cache/new.zip and new.lst: the zip envelope stores mtimes
-#   - hts-cache/doit.log: carries its own generation timestamp
-#   - hts-log.txt: timestamps and durations
-#   - the mirrored-page footer, switched off with -%F '' on both legs: its {date}
-#     is wall-clock. The version it prints is HTTRACK_AFF_VERSION, "3.x", which
-#     does not move between releases, so only the date forced this.
+# Dropped: the hts-cache directory, because new.zip and new.lst store mtimes
+# and doit.log carries its own timestamp. Stripped from the two kept text
+# files: the per-line clock, the generator version, the build path, and the run
+# duration and transfer rate.
 #
-# robots.txt comes from tests/local-server.py's own route, not from the corpus:
-# httrack reads it from the host root only, so a corpus copy would be dead. That
-# server also answers /sitemap.xml, which is why the corpus names its own
+# robots.txt comes from tests/local-server.py's own route rather than from the
+# corpus, because httrack reads it from the host root only. That server also
+# answers /sitemap.xml, which is why the corpus names its own
 # corpus-sitemap.xml and the crawl points --sitemap-url at it.
+#
+# A SIGKILL that follows a SIGTERM leaves the workdir, both builds and the
+# server behind, because the trap cannot run until the foreground make returns.
 
 set -euo pipefail
 
 progdir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 srcdir=$(CDPATH='' cd -- "$progdir/.." && pwd)
 server="$srcdir/tests/local-server.py"
-normalize="$progdir/parser-diff-normalize.sh"
-
-baseline=
-baseline_bin=
-tree="$srcdir"
-tree_bin=
 corpus="$progdir/parser-corpus"
 entry=/index.html
-workdir=
-keep=0
-jobs=$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)
-extra_args=
-mode=release
 
-# The mutant the self-check plants: srcset stops being split into candidates,
-# so `srcset="a.gif 1x, b.gif 2x"` is taken as one bogus URL.
-mutant_file=src/htsparse.c
-mutant_match='srcset_p[ ]*=[ ]*1;'
-mutant_repl='srcset_p = 0;'
+baseline=
+keep=0
+mode=release
+jobs=$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)
 
 die() {
     echo "parser-diff: $*" >&2
@@ -56,24 +49,19 @@ die() {
 
 usage() {
     cat <<'EOF'
-Crawl a corpus with a released httrack and with the working tree's, then diff
-the two mirrors. Exit 0 when they agree, 1 when they differ, 2 on a harness
-failure. The header comment of this script lists what the diff excludes.
+Crawl tools/parser-corpus/ with a released httrack and with the working tree's,
+then diff the two mirrors. Exit 0 when they agree, 1 when they differ, 2 on a
+harness failure. The header comment of this script lists what the diff drops.
+
+Everything is built and crawled under a temporary directory, which is removed
+on exit unless --keep is given. A SIGKILL leaves it behind.
 
 Options:
-  --baseline REF        git ref to build the baseline from (default: newest X.Y.Z tag)
-  --baseline-bin PATH   use an already-built httrack as the baseline
-  --tree DIR            source tree under test (default: this script's tree)
-  --tree-bin PATH       use an already-built httrack as the tree under test
-  --corpus DIR          docroot to crawl (default: tools/parser-corpus)
-  --entry PATH          entry path on the server (default: /index.html)
-  --httrack-args 'ARGS' extra arguments appended to both crawls
-  --workdir DIR         where to build and crawl (default: a temporary directory)
-  --keep                keep the workdir
-  --jobs N              make -j width
-  --self-noise          run the tree's binary as both legs; must report no change
-  --self-check          --self-noise, then the tree against a mutant of itself;
-                        passes only when the first is clean and the second is not
+  --baseline REF  git ref to build the baseline from (default: newest X.Y.Z tag)
+  --keep          keep the temporary directory, to read the two mirrors
+  --self-check    the tree against itself, which must be clean, then against a
+                  mutant that finds more links and one that finds fewer, each of
+                  which must be reported
 EOF
 }
 
@@ -83,44 +71,8 @@ while [ $# -gt 0 ]; do
         baseline=$2
         shift 2
         ;;
-    --baseline-bin)
-        baseline_bin=$2
-        shift 2
-        ;;
-    --tree)
-        tree=$2
-        shift 2
-        ;;
-    --tree-bin)
-        tree_bin=$2
-        shift 2
-        ;;
-    --corpus)
-        corpus=$2
-        shift 2
-        ;;
-    --entry)
-        entry=$2
-        shift 2
-        ;;
-    --httrack-args)
-        extra_args=$2
-        shift 2
-        ;;
-    --workdir)
-        workdir=$2
-        shift 2
-        ;;
     --keep)
         keep=1
-        shift
-        ;;
-    --jobs)
-        jobs=$2
-        shift 2
-        ;;
-    --self-noise)
-        mode=self-noise
         shift
         ;;
     --self-check)
@@ -136,55 +88,52 @@ while [ $# -gt 0 ]; do
 done
 
 [ -r "$server" ] || die "no $server"
-[ -r "$normalize" ] || die "no $normalize"
 [ -d "$corpus" ] || die "no corpus directory $corpus"
 command -v python3 >/dev/null || die "python3 is needed to serve the corpus"
 
+# Two floors, because httrack exits 0 having fetched nothing and two empty
+# mirrors agree, so a collapsed crawl reads exactly like a clean run. The first
+# is the committed corpus's own file count, which only ever grows, so a corpus
+# that lost files cannot shrink the second floor with it. The second is four
+# fifths of what the corpus holds, which leaves room for the entries the corpus
+# deliberately never fetches.
+min_corpus=132
+corpus_files=$(find "$corpus" -type f | wc -l)
+[ "$corpus_files" -ge "$min_corpus" ] ||
+    die "the corpus at $corpus holds $corpus_files files, under its own $min_corpus"
+min_files=$((corpus_files * 4 / 5))
+
 server_pid=
-server_port=
 cleanup() {
     set +e
     [ -n "$server_pid" ] && kill "$server_pid" 2>/dev/null
     [ -n "$server_pid" ] && wait "$server_pid" 2>/dev/null
-    if [ -n "$workdir" ] && [ "$keep" = 0 ]; then
+    if [ -n "${workdir:-}" ] && [ "$keep" = 0 ]; then
         rm -rf "$workdir"
-    elif [ -n "$workdir" ]; then
+    elif [ -n "${workdir:-}" ]; then
         echo "parser-diff: kept $workdir" >&2
     fi
 }
 trap 'set +e; cleanup' EXIT
 trap 'exit 2' HUP INT TERM
 
-if [ -z "$workdir" ]; then
-    workdir=$(mktemp -d "${TMPDIR:-/tmp}/parser-diff.XXXXXX") || die "mktemp failed"
-else
-    mkdir -p "$workdir"
-    workdir=$(CDPATH='' cd -- "$workdir" && pwd)
-fi
+# mktemp owns the name, so the removal above reaches only what this run made.
+workdir=$(mktemp -d "${TMPDIR:-/tmp}/parser-diff.XXXXXX") || die "mktemp failed"
 
-# Newest release tag, by version order rather than by creation date.
+# Echo the newest release tag, ordered by version rather than by creation date.
 newest_tag() {
-    git -C "$tree" tag -l |
+    git -C "$srcdir" tag -l |
         sed -n 's/^\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)$/\1/p' |
         sort -t. -k1,1n -k2,2n -k3,3n |
         tail -1
 }
 
-# Build httrack from $1 into $2 and echo the binary's path.
-build_tree() {
-    local src=$1 bld=$2 log
-    log="$bld.log"
-    mkdir -p "$bld"
-    # One && chain: bash 3.2 drops errexit inside a subshell guarded by ||.
-    (
-        cd "$src" && bash ./bootstrap &&
-            cd "$bld" && bash "$src/configure" --disable-dependency-tracking &&
-            make -j"$jobs"
-    ) >"$log" 2>&1 || {
-        tail -30 "$log" >&2
-        die "build of $src failed, see $log"
-    }
-    echo "$bld/src/httrack"
+# Copy the tree at $1 into $2, .git aside. Never build in the real checkout,
+# because bootstrap writes some sixty gitignored files there and config.status
+# can re-run under another session's live build directory.
+copy_tree() {
+    mkdir -p "$2"
+    (cd "$1" && tar --exclude=.git -cf - .) | (cd "$2" && tar -xf -)
 }
 
 # Export the tree at $2 into $3, coucal included, without touching $1's refs.
@@ -203,27 +152,29 @@ export_ref() {
         git -C "$dst" submodule update --init src/coucal ||
             die "cannot populate src/coucal at $ref"
     fi
-    # The clone shares $src's object store; the build reads files only.
+    # The clone shares $src's object store, but the build reads files only.
     rm -rf "$dst/.git"
 }
 
-# Crawl the running server into $workdir/mirror-$2 with the binary $1.
-crawl() {
-    local bin=$1 leg=$2 dir
-    dir="$workdir/mirror-$leg"
-    rm -rf "$dir"
-    mkdir -p "$dir"
-    # shellcheck disable=SC2086 # extra_args and sitemap_args are deliberate splits
-    (cd "$dir" && "$bin" "$base_url$entry" -O . -q -%F '' \
-        $sitemap_args $extra_args) \
-        >"$workdir/crawl-$leg.out" 2>&1 || {
-        tail -20 "$workdir/crawl-$leg.out" >&2
-        die "the $leg crawl failed"
+# Build httrack from $1 into $2 and echo the binary's path.
+build_tree() {
+    local src=$1 bld=$2 log
+    log="$bld.log"
+    mkdir -p "$bld"
+    # One && chain, because bash 3.2 drops errexit inside a subshell guarded by ||.
+    (
+        cd "$src" && bash ./bootstrap &&
+            cd "$bld" && bash "$src/configure" --disable-dependency-tracking &&
+            make -j"$jobs"
+    ) >"$log" 2>&1 || {
+        tail -30 "$log" >&2
+        die "build of $src failed, see $log"
     }
+    echo "$bld/src/httrack"
 }
 
-# Sets server_pid and server_port. Not a command substitution: the pid has to
-# land in the caller's shell for cleanup to reach it.
+# Sets server_pid and server_port. Not a command substitution, because the pid
+# has to land in the caller's shell for cleanup to reach it.
 start_server() {
     local root=$1 tries=0
     server_port=
@@ -242,15 +193,15 @@ start_server() {
 }
 
 # SITEBASE and SITEHOSTREL only resolve once the ephemeral port is known, which
-# is why the corpus is served from a copy.
+# is why the corpus is served from a copy. Reads base_url and base_host.
 expand_corpus() {
     local root=$1 list f
     list="$workdir/corpus-files"
     find "$root" -type f \
         \( -name '*.html' -o -name '*.xml' -o -name '*.css' -o -name '*.js' \
         -o -name '*.txt' -o -name '*.svg' -o -name '*.vtt' \) >"$list"
-    # Read from a file, not a pipe: a sed failure in a pipeline's subshell would
-    # leave a half-written page behind and still look like a success.
+    # Read from a file, not a pipe, because a sed failure in a pipeline's subshell
+    # would leave a half-written page behind and still look like a success.
     while IFS= read -r f; do
         sed -e "s|SITEBASE|$base_url|g" -e "s|SITEHOSTREL|//$base_host|g" \
             "$f" >"$f.pd"
@@ -258,16 +209,81 @@ expand_corpus() {
     done <"$list"
 }
 
+# Crawl the running server into $workdir/mirror-$2 with the binary $1. Reads
+# base_url, entry and sitemap_args, all set below.
+crawl() {
+    local bin=$1 leg=$2 dir
+    dir="$workdir/mirror-$leg"
+    rm -rf "$dir"
+    mkdir -p "$dir"
+    # shellcheck disable=SC2086 # sitemap_args is a deliberate split
+    (cd "$dir" && "$bin" "$base_url$entry" -O . -q -%F '' --changes \
+        $sitemap_args) \
+        >"$workdir/crawl-$leg.out" 2>&1 || {
+        tail -20 "$workdir/crawl-$leg.out" >&2
+        die "the $leg crawl failed"
+    }
+}
+
+# Flatten hts-changes.json into one line per entry, sorted, because two runs of
+# one binary swap adjacent entries: the file records completion order, and
+# adjacent fetches race. The date and generator keys go, because they carry the
+# clock and the version.
+changes_py='
+import json, sys
+d = json.load(open(sys.argv[1]))
+for k in ("schema", "first_crawl", "partial", "purged"):
+    print("header", k, d.get(k))
+print("header counts", json.dumps(d.get("counts", {}), sort_keys=True))
+for state in ("new", "changed", "unchanged", "gone"):
+    rows = d.get(state) or []
+    for e in sorted(rows, key=lambda e: (e.get("url", ""), e.get("file", ""))):
+        print("entry", state, e.get("url"), e.get("file"), e.get("size"))
+'
+
+# Snapshot the mirror at $1 into $2, dropping what two runs of one binary
+# disagree on. The header comment says what goes and why.
+normalize() {
+    local src=$1 dst=$2
+    rm -rf "$dst"
+    mkdir -p "$dst/files"
+    (cd "$src" && tar -cf - .) | (cd "$dst/files" && tar -xf -)
+    rm -rf "$dst/files/hts-cache"
+    : >"$dst/CHANGES"
+    if [ -f "$dst/files/hts-changes.json" ]; then
+        python3 -c "$changes_py" "$dst/files/hts-changes.json" >"$dst/CHANGES" ||
+            die "cannot read $dst/files/hts-changes.json"
+        rm -f "$dst/files/hts-changes.json"
+    fi
+    : >"$dst/LOG"
+    if [ -f "$dst/files/hts-log.txt" ]; then
+        # Lines 1 and 2 are the launch stamp and the command line, which carry
+        # the version and the build path. "N links scanned, N files written"
+        # sits on the duration line, so the timing goes and the counts stay.
+        sed -e '1,2d' \
+            -e 's/^[0-9][0-9]:[0-9][0-9]:[0-9][0-9]	//' \
+            -e 's|^HTTrack Website Copier/[^ ]* mirror complete in [0-9]* seconds*|mirror complete|' \
+            -e 's| \[[0-9]* bytes received at [0-9]* bytes/sec\]||' \
+            "$dst/files/hts-log.txt" >"$dst/LOG"
+        rm -f "$dst/files/hts-log.txt"
+    fi
+}
+
 # Compare the two mirrors. Returns 1 when they differ.
 compare() {
-    local a="$workdir/mirror-$1" b="$workdir/mirror-$2" na nb rc=0
-    na="$workdir/norm-$1"
-    nb="$workdir/norm-$2"
-    bash "$normalize" "$a" "$na"
-    bash "$normalize" "$b" "$nb"
+    local na="$workdir/norm-$1" nb="$workdir/norm-$2" leg files fetched rc=0
+    normalize "$workdir/mirror-$1" "$na"
+    normalize "$workdir/mirror-$2" "$nb"
+    for leg in "$1" "$2"; do
+        files=$(find "$workdir/norm-$leg/files" -type f | wc -l)
+        fetched=$(grep -c '^entry ' "$workdir/norm-$leg/CHANGES" || true)
+        [ "$files" -ge "$min_files" ] ||
+            die "the $leg mirror holds $files files, under the corpus floor of $min_files"
+        [ "$fetched" -ge "$min_files" ] ||
+            die "the $leg crawl fetched $fetched URLs, under the corpus floor of $min_files"
+        echo "$leg: $files files, $fetched fetched"
+    done
     diff -ru "$na" "$nb" >"$workdir/diff-$1-$2.txt" 2>&1 || rc=1
-    # Print the sizes: a crawl that fetched almost nothing agrees with itself too.
-    echo "$1: $(find "$na/files" -type f | wc -l) files, $(wc -l <"$na/MANIFEST") fetched"
     if [ "$rc" = 0 ]; then
         echo "no difference: $1 and $2 mirror the corpus identically"
     else
@@ -285,71 +301,93 @@ start_server "$docroot"
 base_host="127.0.0.1:$server_port"
 base_url="http://$base_host"
 expand_corpus "$docroot"
-# A corpus naming no sitemap gets no --sitemap-url: the suite's server answers
-# /sitemap.xml itself, so the corpus cannot use that name.
 sitemap_args=
 if [ -f "$docroot/corpus-sitemap.xml" ]; then
     sitemap_args="--sitemap-url $base_url/corpus-sitemap.xml"
 fi
 echo "parser-diff: corpus $corpus served at $base_url$entry"
 
-if [ -n "$tree_bin" ]; then
-    tree_httrack=$tree_bin
-else
-    echo "parser-diff: building the tree under test"
-    tree_httrack=$(build_tree "$tree" "$workdir/bld-tree")
+# Before the builds, because two legs at one commit are one binary and print
+# the same "no difference" a real pass prints.
+if [ "$mode" = release ]; then
+    [ -n "$baseline" ] || baseline=$(newest_tag)
+    [ -n "$baseline" ] || die "no X.Y.Z tag found, pass --baseline"
+    git -C "$srcdir" rev-parse --verify --quiet "$baseline^{commit}" >/dev/null ||
+        die "no such ref: $baseline"
+    if git -C "$srcdir" diff --quiet "$baseline" HEAD -- src &&
+        git -C "$srcdir" diff --quiet HEAD -- src; then
+        die "src/ is identical at $baseline and in the tree, so both legs are one binary"
+    fi
 fi
+
+echo "parser-diff: building the tree under test"
+copy_tree "$srcdir" "$workdir/src-tree"
+tree_httrack=$(build_tree "$workdir/src-tree" "$workdir/bld-tree")
 [ -r "$tree_httrack" ] || die "no tree binary at $tree_httrack"
 
 case "$mode" in
-self-noise | self-check)
-    crawl "$tree_httrack" treeA
-    crawl "$tree_httrack" treeB
-    noise_rc=0
-    compare treeA treeB || noise_rc=1
-    if [ "$mode" = self-noise ]; then
-        exit "$noise_rc"
-    fi
-    ;;
-esac
-
-case "$mode" in
 release)
-    if [ -n "$baseline_bin" ]; then
-        base_httrack=$baseline_bin
-    else
-        [ -n "$baseline" ] || baseline=$(newest_tag)
-        [ -n "$baseline" ] || die "no X.Y.Z tag found, pass --baseline"
-        echo "parser-diff: building the baseline at $baseline"
-        export_ref "$tree" "$baseline" "$workdir/src-baseline"
-        base_httrack=$(build_tree "$workdir/src-baseline" "$workdir/bld-baseline")
-    fi
+    echo "parser-diff: building the baseline at $baseline"
+    export_ref "$srcdir" "$baseline" "$workdir/src-baseline"
+    base_httrack=$(build_tree "$workdir/src-baseline" "$workdir/bld-baseline")
     [ -r "$base_httrack" ] || die "no baseline binary at $base_httrack"
     crawl "$base_httrack" baseline
     crawl "$tree_httrack" tree
     compare baseline tree
     ;;
 self-check)
-    echo "parser-diff: planting the mutant in a copy of the tree"
-    mutant="$workdir/src-mutant"
-    mkdir -p "$mutant"
-    (cd "$tree" && tar --exclude=.git -cf - .) | (cd "$mutant" && tar -xf -)
-    [ -f "$mutant/$mutant_file" ] || die "no $mutant_file in $tree"
-    hits=$(grep -c "$mutant_match" "$mutant/$mutant_file" || true)
-    [ "$hits" = 1 ] ||
-        die "the mutant pattern $mutant_match matches $hits times in $mutant_file, not once"
-    sed "s|$mutant_match|$mutant_repl|" "$mutant/$mutant_file" >"$mutant/$mutant_file.pd"
-    mv "$mutant/$mutant_file.pd" "$mutant/$mutant_file"
-    mutant_httrack=$(build_tree "$mutant" "$workdir/bld-mutant")
-    crawl "$mutant_httrack" mutant
-    mutant_rc=0
-    compare treeA mutant || mutant_rc=1
+    # Each mutant edits one hts_detect row, the table deciding whether an
+    # attribute is read as a link. No test under tests/ names "cite" or
+    # "data-srcset", so make check stays green on both and only the corpus sees
+    # them. The corpus spells the data-srcset value with a "1x" descriptor, so
+    # the dirty-attribute fallback cannot take it for a path and rescue it.
+    mutant_file=src/htslib.c
+
+    crawl "$tree_httrack" treeA
+    crawl "$tree_httrack" treeB
+    noise_rc=0
+    compare treeA treeB || noise_rc=1
+
+    rcs=
+    for direction in widen narrow; do
+        echo
+        echo "parser-diff: planting the $direction mutant in a copy of the tree"
+        mutant="$workdir/src-$direction"
+        copy_tree "$srcdir" "$mutant"
+        [ -f "$mutant/$mutant_file" ] || die "no $mutant_file in $srcdir"
+        # The newline is escaped, because BSD sed takes no \n in a replacement.
+        case "$direction" in
+        widen)
+            match='  "background",'
+            repl='  "background",\
+  "cite",'
+            ;;
+        narrow)
+            match='  "data-srcset",'
+            repl=''
+            ;;
+        esac
+        hits=$(grep -c "^$match" "$mutant/$mutant_file" || true)
+        [ "$hits" = 1 ] ||
+            die "the $direction pattern matches $hits times in $mutant_file, not once"
+        sed "s|^$match.*\$|$repl|" "$mutant/$mutant_file" >"$mutant/$mutant_file.pd"
+        mv "$mutant/$mutant_file.pd" "$mutant/$mutant_file"
+        mutant_httrack=$(build_tree "$mutant" "$workdir/bld-$direction")
+        crawl "$mutant_httrack" "$direction"
+        rc=0
+        compare treeA "$direction" || rc=1
+        rcs="$rcs $direction=$rc"
+    done
+
     echo
-    echo "self-check: unmutated tree against itself ... $([ "$noise_rc" = 0 ] && echo clean || echo NOISY)"
-    echo "self-check: mutated tree against the tree   ... $([ "$mutant_rc" = 1 ] && echo reported || echo MISSED)"
-    if [ "$noise_rc" != 0 ] || [ "$mutant_rc" != 1 ]; then
-        die "the control did not fire both ways"
-    fi
+    echo "self-check: the tree against itself ... $([ "$noise_rc" = 0 ] && echo clean || echo NOISY)"
+    for pair in $rcs; do
+        echo "self-check: the ${pair%=*} mutant     ... $([ "${pair#*=}" = 1 ] && echo reported || echo MISSED)"
+    done
+    [ "$noise_rc" = 0 ] || die "the tree does not compare clean against itself"
+    case "$rcs" in
+    *=0*) die "a mutant went unreported" ;;
+    esac
     echo "self-check: PASS"
     ;;
 esac
