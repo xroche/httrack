@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html><head><title>data attributes</title></head>
+<body>
+<!-- Any attribute whose value looks like a path is followed, so a mirror of a
+     framework-driven page keeps working. The JSON blob is no path, so it is
+     the one case here that stays unfetched. -->
+<div data-url="d-url.html">data-url</div>
+<div data-src="d-src.gif">data-src</div>
+<div data-href="d-href.html">data-href</div>
+<div data-srcset="d-srcset.gif 1x">data-srcset</div>
+<div ng-src="d-ngsrc.gif" v-bind:src="d-vbind.gif">framework attributes</div>
+<div data-template="<a href='d-template.html'>markup in a data attribute</a>"></div>
+<input type="hidden" name="src" value="d-hidden.gif">
+<div data-config='{"src":"d-json.gif","href":"d-json.html"}'>JSON in a data attribute</div>
+<a href="d-real.html" data-href="d-beside.html">a real link beside a data one</a>
+</body></html>

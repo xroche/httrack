@@ -18,7 +18,9 @@ EXTRA_DIST = INSTALL.Linux \
 		tools/tsan-suppressions.txt \
 		tools/downstream-drift.sh \
 		tools/windows-kill-grade.sh \
-		tools/hurd-vm.sh
+		tools/hurd-vm.sh \
+		tools/parser-diff.sh \
+		$(PARSER_CORPUS_LIST)
 
 # The suite's staged installs serialise on this; a killed holder leaves it behind.
 clean-local:

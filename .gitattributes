@@ -31,3 +31,6 @@ lang.indexes text eol=lf
 
 # Byte-exact fuzz vectors, whatever their line endings look like.
 fuzz/corpus/** -text
+
+# Same reason, plus binary stubs a CRLF checkout would corrupt.
+tools/parser-corpus/** -text

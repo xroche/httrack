@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html><head><title>absolute and non-http schemes</title></head>
+<body>
+<a href="SITEBASE/a-abs.html">absolute, same host</a>
+<a href="SITEHOSTREL/a-protorel.html">protocol relative, same host</a>
+<a href="http://parser-offhost.invalid/a-offhost.html">absolute, off host</a>
+<a href="mailto:nobody@example.invalid">mailto</a>
+<a href="tel:+15550100">tel</a>
+<a href="javascript:void(0)">javascript</a>
+<a href="#top">fragment only</a>
+<a href="//parser-offhost.invalid/a-protorel-off.html">protocol relative, off host</a>
+<img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="data uri">
+<a href="ftp://parser-offhost.invalid/pub/">ftp</a>
+</body></html>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<url><loc>SITEBASE/orphan1.html</loc><lastmod>2024-01-01</lastmod></url>
+<url><loc>SITEBASE/orphan2.html?a=1&amp;b=2</loc></url>
+<url><loc> SITEBASE/orphan3.html </loc></url>
+<url><loc>http://sitemap-offhost.invalid/x.html</loc></url>
+</urlset>

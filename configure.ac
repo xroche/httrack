@@ -1100,6 +1100,24 @@ AC_SUBST([FUZZ_CORPUS_LIST])
 AC_MSG_RESULT([$hts_ncorpus])
 test "$hts_ncorpus" -gt 0 || AC_MSG_ERROR([no fuzz corpus file matched fuzz/corpus/*/*])
 
+# The parser differential's corpus needs the same list, two levels deep at most.
+# A whitespace-holding name is refused here, where the file can be named,
+# because make dist would otherwise split the entry and blame distdir-am.
+AC_MSG_CHECKING([for parser corpus files])
+PARSER_CORPUS_LIST=
+hts_nparser=0
+for hts_p in "$srcdir"/tools/parser-corpus/* "$srcdir"/tools/parser-corpus/*/*; do
+	test -f "$hts_p" || continue
+	case $hts_p in
+	*[[[:space:]]]*) AC_MSG_ERROR([corpus filename contains whitespace: $hts_p]) ;;
+	esac
+	PARSER_CORPUS_LIST="$PARSER_CORPUS_LIST `echo "$hts_p" | sed 's|.*/tools/parser-corpus/|tools/parser-corpus/|'`"
+	hts_nparser=`expr $hts_nparser + 1`
+done
+AC_SUBST([PARSER_CORPUS_LIST])
+AC_MSG_RESULT([$hts_nparser])
+test "$hts_nparser" -gt 0 || AC_MSG_ERROR([no file matched tools/parser-corpus/*])
+
 # The doc pages reach license.txt and its neighbours with "../", so htmldir defaults
 # one level below $(docdir), where those install. A --htmldir naming a path wins.
 AS_IF([test "x$htmldir" = 'x${docdir}'], [htmldir='${docdir}/html'])
