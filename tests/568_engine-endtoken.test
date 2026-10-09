@@ -21,8 +21,8 @@ tok 9 "it's here" '"it'"'"'s here">'
 tok 20 'alternate stylesheet' '   "alternate stylesheet">'
 # Leading whitespace is trimmed on both sides of the opening quote, and the two
 # runs below hold every byte of the class, not just the space a mutant would
-# keep. The batch path carries TAB, CR and LF; argv rewrites them to a space.
-WSRUN=$(printf '\011\015\012 ')
+# keep. The batch path carries them raw; argv rewrites them to a space.
+WSRUN=$(printf '\011\013\014\015\012 ')
 tok 20 'alternate stylesheet' "${WSRUN}\"alternate stylesheet\">"
 tok 20 'alternate stylesheet' "\"${WSRUN}alternate stylesheet\">"
 # An empty value is empty, not the attribute that follows it.
@@ -31,6 +31,7 @@ tok 0 '' ''
 # An unquoted value ends at a space, or at a quote, which HTML forbids inside
 # one. Trimming the '>' is the caller's job.
 tok 11 'stylesheet>' 'stylesheet>'
+tok 10 'stylesheet' 'stylesheet href=x>'
 tok 10 'stylesheet' 'stylesheet" href=x>'
 # A quote left open runs to the end of the document.
 tok 21 'stylesheet href=x.css' '"stylesheet href=x.css'
