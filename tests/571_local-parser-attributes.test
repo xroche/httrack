@@ -72,8 +72,10 @@ bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$quoting")" \
     httrack 'BASEURL/index.html' -r3
 
 # --- 2. what must not become a link ----------------------------------------
-# Each name below is reachable only if the parser widened into a construct that
-# is not a link, which is how #1377 and #497 shipped.
+# alt, title and name are in hts_nodetect[], so the -%P scan refuses them
+# whatever the value holds. The rest are refused for the value's shape alone,
+# and metabare.html proves it: a bare path in the same content attribute IS
+# fetched.
 nolink="$tmp/nolink"
 mkdir -p "$nolink"
 cat >"$nolink/index.html" <<'EOF'
@@ -81,6 +83,7 @@ cat >"$nolink/index.html" <<'EOF'
 <html><head><title>no link</title>
 <meta name="description" content="not a link: metadesc.html">
 <meta name="keywords" content="a keyword, metakw.html">
+<meta name="author" content="metabare.html">
 </head><body>
 <p>Body text naming plaintext.html, which no tag points at.</p>
 <img src="ok.gif" alt="alttext.html" title="titletext.html" name="nametext.html">
@@ -89,7 +92,8 @@ cat >"$nolink/index.html" <<'EOF'
 <a href="real.html">the one real link</a>
 </body></html>
 EOF
-for n in metadesc metakw plaintext alttext titletext nametext jsonhref real; do
+for n in metadesc metakw metabare plaintext alttext titletext nametext \
+    jsonhref real; do
     page "$nolink/$n.html"
 done
 printf 'GIF89a' >"$nolink/ok.gif"
@@ -98,7 +102,7 @@ cp "$nolink/ok.gif" "$nolink/jsonsrc.gif"
 # real.html and ok.gif prove the crawl ran: without them every absence below
 # would also hold for a crawl that fetched nothing.
 bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$nolink")" \
-    --errors 0 --found real.html --found ok.gif \
+    --errors 0 --found real.html --found ok.gif --found metabare.html \
     --not-found metadesc.html --not-found metakw.html \
     --not-found plaintext.html \
     --not-found alttext.html --not-found titletext.html \
@@ -109,10 +113,12 @@ bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$nolink")" \
     --file-matches index.html 'alt="alttext\.html"' \
     httrack 'BASEURL/index.html' -r3
 
-# --- 3. a path-looking attribute value is followed, on purpose -------------
-# The engine takes any attribute whose value looks like a path, so a mirror of
-# a framework-driven page keeps working. Only the JSON blob stays untouched,
-# because its value is not a path.
+# --- 3. contract, and the -%P heuristic on top of it ------------------------
+# data-src (hts_detect[]) and the href= inside data-template are links by
+# contract. The other five come from the -%P last-resort scan, on by default,
+# which takes any quoted value that looks like a path. That scan copies from
+# the attribute's own quote to the first inner one, so the JSON blob's only
+# candidate is "{".
 attrs="$tmp/attrs"
 mkdir -p "$attrs"
 cat >"$attrs/index.html" <<'EOF'
@@ -138,5 +144,17 @@ bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$attrs")" \
     --found hidden.gif \
     --not-found cfgsrc.gif --not-found cfghref.html \
     httrack 'BASEURL/index.html' -r3
+
+# Same fixture under -%P0: only the two contract links survive. A change moving
+# one of the other five into the contract reds here and nowhere else, which is
+# the #497 class.
+bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$attrs")" \
+    --errors 0 \
+    --found dsrc.gif --found dtmpl.html \
+    --not-found durl.html --not-found dhref.html \
+    --not-found ngsrc.gif --not-found vbind.gif \
+    --not-found hidden.gif \
+    --not-found cfgsrc.gif --not-found cfghref.html \
+    httrack 'BASEURL/index.html' -r3 '-%P0'
 
 exit 0
