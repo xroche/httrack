@@ -1845,10 +1845,8 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
           a++;                  // sauter espaces
         if (*a == '=') {        // name=value
           a++;
-          /* real whitespace only: RFC 6265 keeps the quotes of a quoted
-             cookie-value, and is_space() would drop just the opening one */
-          while (is_realspace(*a))
-            a++;
+          while(is_space(*a))
+            a++;                // sauter espaces
           value_st = a;
           while((*a != ';') && (*a))
             a++; // prochain ;
