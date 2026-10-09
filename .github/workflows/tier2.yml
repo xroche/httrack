@@ -375,6 +375,36 @@ jobs:
         if: failure()
         run: cat tests/test-suite.log 2>/dev/null || true
 
+  # tools/parser-diff.sh is the differential behind every src/htsparse.c change,
+  # and --self-check proves that diff can see a change at all. It builds the
+  # engine four times, which is why it is here and not on the PR path.
+  parser-self-check:
+    name: parser differential self-check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
+          sudo apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev python3
+
+      - name: Self-check the parser differential
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/self-check.log"
+          bash tools/parser-diff.sh --self-check | tee "$log"
+          # An exit status cannot tell a run that planted both mutants from a
+          # future early exit that plants neither.
+          grep -qE '^self-check: the widen mutant +\.\.\. reported$' "$log"
+          grep -qE '^self-check: the narrow mutant +\.\.\. reported$' "$log"
+
   # Other people's packaging recipes, each building our dist tarball. A red here
   # is often theirs to fix rather than ours.
   alpine:
@@ -414,6 +444,7 @@ jobs:
       - auto-features
       - no-getrandom
       - no-spawn
+      - parser-self-check
       - alpine
       - arch
       - fedora
