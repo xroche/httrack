@@ -149,6 +149,7 @@
     <ClCompile Include="htsnet_selftest.c" />
     <ClCompile Include="htsopt_selftest.c" />
     <ClCompile Include="htsparse_selftest.c" />
+    <ClCompile Include="htstools_selftest.c" />
     <ClCompile Include="htsencoding.c" />
     <ClCompile Include="htsescape.c" />
     <ClCompile Include="htsfilters.c" />

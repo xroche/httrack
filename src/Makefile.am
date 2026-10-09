@@ -89,7 +89,8 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	htsheader_selftest.c htsio_selftest.c htslib_selftest.c \
 	htslines_selftest.c \
 	htsmime_selftest.c htsname_selftest.c htsnet_selftest.c \
-	htsopt_selftest.c htsparse_selftest.c htswarc_selftest.c \
+	htsopt_selftest.c htsparse_selftest.c htstools_selftest.c \
+	htswarc_selftest.c \
 	htswizard_selftest.c \
 	htscatchurl.c htsfilters.c htsftp.c htshash.c coucal/coucal.c \
 	htscmdline.c htshelp.c htslib.c htslines.c htsurlport.c htsdate.c htscoremain.c \

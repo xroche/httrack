@@ -180,8 +180,8 @@ static int sf_rel_is_stylesheet(const char *tag_name) {
     /* rel's own value only, as a token: an unbounded search reads the next
        tag's rel, and a stray "stylesheet" there inlines a page. */
     len = rech_endtoken(tag_name + i + p, &value);
-    /* rech_endtoken stops an unquoted value at whitespace only, and runs to the
-       document NUL when a quote is left open; neither may leave this tag. */
+    /* Cut at this tag's '>'. A tag left unclosed has none, so the value runs
+       to the document NUL. */
     for (j = 0; j < len; j++) {
       if (value[j] == '>') {
         len = j;

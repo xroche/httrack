@@ -129,6 +129,7 @@ extern const struct selftest_entry selftests_name[];
 extern const struct selftest_entry selftests_net[];
 extern const struct selftest_entry selftests_opt[];
 extern const struct selftest_entry selftests_parse[];
+extern const struct selftest_entry selftests_tools[];
 extern const struct selftest_entry selftests_warc[];
 extern const struct selftest_entry selftests_wizard[];
 

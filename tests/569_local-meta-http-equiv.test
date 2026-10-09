@@ -1,0 +1,40 @@
+#!/bin/bash
+#
+# <meta http-equiv="..."> matches on the quoted value alone, so whitespace
+# inside the quotes is trimmed and an empty value matches nothing instead of
+# reading the attribute after it (#1915).
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+root=$(mktemp -d)
+cleanup_push rm -rf "$root"
+echo b >"$root/b.html"
+echo k >"$root/keep.html"
+
+# A matched refresh pragma hands content= to the URL extractor and b.html is
+# mirrored. An unmatched one leaves `url=b.html"` to the generic tag scan, which
+# keeps the closing quote and 404s, so the error count separates the two.
+crawl() { # crawl matched|unmatched META-ATTRIBUTES...
+    local mode=$1 found=--found errors=0
+    shift
+    if test "$mode" != matched; then
+        found=--not-found
+        errors=1
+    fi
+    printf '<meta %s content="0; url=b.html"><a href="keep.html">k</a>\n' \
+        "$*" >"$root/index.html"
+    bash "$top_srcdir/tests/local-crawl.sh" --root "$root" \
+        --errors "$errors" --found keep.html "$found" b.html \
+        httrack BASEURL/index.html
+}
+
+crawl matched 'http-equiv="refresh"'
+crawl matched 'http-equiv=" Refresh"'
+crawl matched "http-equiv=' refresh '"
+# An empty value takes nothing from the attribute that follows it, so it reads
+# like the unknown pragma below rather than like a refresh.
+crawl unmatched 'http-equiv="" refresh'
+crawl unmatched 'http-equiv="x"'
