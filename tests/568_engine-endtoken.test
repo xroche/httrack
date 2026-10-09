@@ -1,0 +1,58 @@
+#!/bin/bash
+#
+# rech_endtoken() reads an HTML attribute value: a quoted one whole, inner
+# spaces included, and an unquoted one up to the next space.
+# Driven by 'httrack -#test=endtoken', plus the Set-Cookie value scan that
+# shared the same character class (#1915).
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# TAIL is a tag's bytes from just past `attr=`, which is where the two callers
+# enter the scan.
+tok() { # tok LEN VALUE TAIL
+    selftest_queue "len=$1 value=[$2]" endtoken "$3"
+}
+
+tok 10 'stylesheet' '"stylesheet">'
+tok 20 'alternate stylesheet' '"alternate stylesheet">'
+tok 20 'alternate stylesheet' "'alternate stylesheet'>"
+tok 9 "it's here" '"it'"'"'s here">'
+tok 20 'alternate stylesheet' '   "alternate stylesheet">'
+# An empty value is empty, not the attribute that follows it.
+tok 0 '' '"" href="x.css">'
+tok 0 '' ''
+# An unquoted value ends at a space, or at a quote, which HTML forbids inside
+# one. Trimming the '>' is the caller's job.
+tok 10 'stylesheet' 'stylesheet href=x>'
+tok 11 'stylesheet>' 'stylesheet>'
+tok 10 'stylesheet' 'stylesheet" href=x>'
+# A quote left open runs to the end of the document.
+tok 21 'stylesheet href=x.css' '"stylesheet href=x.css'
+tok 10 'stylesheet' '"stylesheet"'
+# What the <meta http-equiv="..."> caller reads.
+tok 12 'Content-Type' '"Content-Type" content="text/html">'
+
+# What the single-file caller does with the value: a multi-word rel still names
+# a stylesheet, which is the bug reported in #1915.
+cls() { # cls CLASS TAG
+    selftest_queue "class=$1" singlefileclass "$2"
+}
+
+cls c '<link rel="stylesheet" href="x.css">'
+cls c '<link rel="alternate stylesheet" href="x.css">'
+cls c "<link rel='alternate stylesheet' href=\"x.css\">"
+cls c '<link rel=stylesheet href="x.css">'
+cls - '<link rel="alternate" href="x.css">'
+# An empty rel names no stylesheet, rather than reading the next attribute.
+cls - '<link rel="" href="x.css">'
+# No rel at all, and a tag the table never follows.
+cls 0 '<link href="x.css">'
+cls 0 '<a href="x.html">'
+
+# RFC 6265 makes the quotes part of a quoted cookie-value.
+selftest_queue 'cookiequote: OK' cookiequote
+
+selftest_run_queued

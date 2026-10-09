@@ -887,6 +887,37 @@ static int st_cookiespandiff(httrackp *opt, int argc, char **argv) {
   return st.failures != 0;
 }
 
+/* RFC 6265 makes the DQUOTEs part of a quoted cookie-value, so the whole value
+   must come back unchanged (#1915). */
+static int st_cookiequote(httrackp *opt, int argc, char **argv) {
+  static const char quoted[] = "Set-Cookie: sess=\"a b\"; path=/";
+
+  static const struct {
+    const char *header;
+    const char *needle;
+    hts_boolean want;
+  } cases[] = {
+      {quoted, "sess=\"a b\"", HTS_TRUE},
+      {quoted, "sess=a b\"", HTS_FALSE}, // the opening quote read as a space
+      {"Set-Cookie: sess=ab; path=/", "sess=ab", HTS_TRUE}, // control
+  };
+
+  size_t i;
+  int err = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    err |= cookie_expect_at("cookiequote",
+                            cookie_roundtrip("example.com", cases[i].header,
+                                             "example.com", cases[i].needle),
+                            cases[i].want, cases[i].needle);
+  }
+  printf("cookiequote: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
@@ -903,6 +934,8 @@ const struct selftest_entry selftests_cookie[] = {
     {"cookieimport", "<dir>",
      "load a jar (and Windows IE cookies) from a long+non-ASCII folder",
      st_cookieimport},
+    {"cookiequote", "", "a quoted cookie value keeps both of its quotes",
+     st_cookiequote},
     {"cookiespandiff", "",
      "the cookie field getter matches a frozen copy of the old one",
      st_cookiespandiff},

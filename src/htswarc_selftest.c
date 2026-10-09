@@ -1969,6 +1969,20 @@ static void sf_fixture(httrackp *opt, const char *root) {
          12);
 }
 
+/* singlefileclass <tag>: the class single-file gives TAG's href, where TAG
+   starts at its '<'. 'c' is a stylesheet, '-' any other asset, '0' a reference
+   left alone. */
+static int st_singlefileclass(httrackp *opt, int argc, char **argv) {
+  const char *const tag = argc >= 1 ? argv[0] : "<";
+  const char *const href = strstr(tag, "href=");
+  const char cls =
+      href != NULL ? singlefile_ref_class(tag + 1, href, tag) : '\0';
+
+  (void) opt;
+  printf("class=%c\n", cls != '\0' ? cls : '0');
+  return 0;
+}
+
 /* -#test=singlefile <dir>: rewrite a hand-built mirror and check what gets
    inlined, what must keep its link, the per-asset cap, and idempotence. */
 static int st_singlefile(httrackp *opt, int argc, char **argv) {
@@ -2609,6 +2623,8 @@ const struct selftest_entry selftests_warc[] = {
     {"warc-wacz", "<dir>", "--wacz package: layout, STORE mode, sha256 digests",
      st_warc_wacz},
 #endif
+    {"singlefileclass", "<link tag>",
+     "class single-file gives a <link href> reference", st_singlefileclass},
     {"singlefile", "<dir>",
      "--single-file: what is inlined, the per-asset cap, idempotence",
      st_singlefile},

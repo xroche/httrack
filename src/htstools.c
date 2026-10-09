@@ -684,7 +684,9 @@ HTS_INLINE int rech_endtoken(const char *adr, const char **start) {
   char quote = '\0';
   int length = 0;
 
-  adr += strspn(adr, HTS_SPACES);
+  /* Real whitespace only: HTS_SPACES holds both quotes, so skipping that set
+     would eat the opening quote and cut the value at its first inner space. */
+  adr += strspn(adr, HTS_REALSPACES);
   if (*adr == '"' || *adr == '\'')
     quote = *adr++;
   *start = adr;
