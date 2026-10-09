@@ -54,18 +54,16 @@ jobs:
           grep -qx "%define so_ver $so" httrack.spec
           ! grep -q "^Patch0:" httrack.spec
 
-      # Three files we ship postdate their %files, and their spec will not move
-      # for years. Packaging those three keeps rpm's unpackaged-file check armed
-      # for a fourth, which is the finding this job exists to make. Each entry
-      # reds once they package it themselves, which is when it has to go.
+      # One file we ship postdates their %files. Packaging it keeps rpm's
+      # unpackaged-file check armed for a second, which is the finding this job
+      # exists to make. The entry reds once they package the file by name, so it
+      # cannot see them covering it by a glob, as their icon line now may.
       - name: Acknowledge the files their %files predates
         run: |
           set -euo pipefail
           cd work
           acknowledged=(
-            "libhttrack.pc|%{_libdir}/pkgconfig/libhttrack.pc"
             "scalable|%{_datadir}/icons/hicolor/scalable/apps/%{name}.svg"
-            "metainfo|%{_datadir}/metainfo/com.httrack.WebHTTrack.metainfo.xml"
           )
           for entry in "${acknowledged[@]}"; do
             token=${entry%%|*}
