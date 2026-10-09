@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html><head><title>meta refresh</title>
-<meta http-equiv="refresh" content="0; url=t1.html">
-<meta http-equiv="Refresh" content="5;URL='t2.html'">
+<meta http-equiv="refresh" content="0; url=m-refresh.html">
+<!-- The engine keeps the quotes of URL='...', so this one 404s on purpose,
+     and a fix shows up as the error line leaving hts-log.txt. -->
+<meta http-equiv="Refresh" content="5;URL='m-quoted.html'">
 <meta http-equiv="content-type" content="text/html; charset=iso-8859-1">
-<meta name="description" content="not a link: t3.html">
+<meta name="description" content="not a link: m-desc.html">
 </head>
 <body>
-<a href="t1.html">after the refresh</a>
+<a href="m-after.html">after the refresh</a>
 </body></html>

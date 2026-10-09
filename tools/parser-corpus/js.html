@@ -2,15 +2,15 @@
 <html><head><title>js</title></head>
 <body>
 <script type="text/javascript">
-var a = "t1.html";
-var b = 't2.html';
-document.write("<a href=\"t3.html\">escaped quotes</a>");
-var img = new Image(); img.src = "pixel.gif";
+var a = "j-dquote.html";
+var b = 'j-squote.html';
+document.write("<a href=\"j-escaped.html\">escaped quotes</a>");
+var img = new Image(); img.src = "j-imgsrc.gif";
 var notalink = "a > b && c < d";
-window.location = "t1.html";
+window.location = "j-location.html";
 </script>
-<script src="script.js"></script>
-<script type="module" src="module.js"></script>
-<a href="t1.html" onclick="window.open('t2.html'); return false;">inline handler</a>
-<body onload="go('t3.html')">
+<script src="j-plain.js"></script>
+<script type="module" src="j-module.js"></script>
+<a href="j-anchor.html" onclick="window.open('j-onclick.html'); return false;">inline handler</a>
+<body onload="go('j-onload.html')">
 </body></html>

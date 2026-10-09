@@ -1,15 +1,15 @@
 <!DOCTYPE html>
 <html><head><title>css</title>
 <style type="text/css">
-@import url("style.css");
-@import 'style2.css';
-body { background: url(pixel.gif) no-repeat; }
-div.a { background-image: url('pixel.gif'); }
-div.b { background-image: url( "pixel.gif" ); }
+@import url("c-import.css");
+@import 'c-import2.css';
+body { background: url(c-bare.gif) no-repeat; }
+div.a { background-image: url('c-squote.gif'); }
+div.b { background-image: url( "c-dquote.gif" ); }
 div.c { background: url(data:image/gif;base64,R0lGODlhAQABAAAAACw=); }
 </style>
 </head>
 <body>
-<div style="background: url(pixel.gif)">inline style</div>
-<link rel="stylesheet" type="text/css" href="style.css">
+<div style="background: url(c-inline.gif)">inline style</div>
+<link rel="stylesheet" type="text/css" href="c-link.css">
 </body></html>

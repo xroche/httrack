@@ -1,4 +1,0 @@
-@import url("style2.css");
-body { background: url(pixel.gif); }
-h1 { background: url('pixel.gif'); list-style-image: url( pixel2.gif ); }
-@font-face { font-family: x; src: url("font.woff2") format("woff2"); }

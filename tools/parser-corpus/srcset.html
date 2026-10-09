@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html><head><title>srcset</title></head>
 <body>
-<img src="pixel.gif" srcset="pixel.gif 1x, pixel2.gif 2x" alt="srcset">
-<img src="pixel.gif" srcset="pixel.gif 100w,
-                             pixel2.gif 200w" sizes="(max-width: 100px) 100px, 200px">
+<img src="s-src.gif" srcset="s-1x.gif 1x, s-2x.gif 2x" alt="srcset">
+<img src="s-wsrc.gif" srcset="s-100w.gif 100w,
+                              s-200w.gif 200w" sizes="(max-width: 100px) 100px, 200px">
 <picture>
-<source srcset="pixel2.gif" type="image/gif" media="(min-width: 100px)">
-<img src="pixel.gif" alt="picture fallback">
+<source srcset="s-picture.gif" type="image/gif" media="(min-width: 100px)">
+<img src="s-fallback.gif" alt="picture fallback">
 </picture>
-<link rel="preload" as="image" href="pixel.gif" imagesrcset="pixel2.gif 2x">
+<link rel="preload" as="image" href="s-preload.gif" imagesrcset="s-imagesrcset.gif 2x">
 </body></html>
