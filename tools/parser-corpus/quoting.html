@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html><head><title>quoting</title></head>
+<body>
+<a href="t1.html">double quoted</a>
+<a href='t2.html'>single quoted</a>
+<a href=t3.html>unquoted</a>
+<a href = "t4.html" >spaces around equals</a>
+<a href="with_space.html">plain target</a>
+<a href="with space.html">value with an inner space</a>
+<a href="with%20space.html">value with an encoded space</a>
+<a href="t1.html" title='he said "hi"'>quote inside the other quote</a>
+<a href="">empty value</a>
+<a href>valueless attribute</a>
+<a href="t1.html#frag">fragment</a>
+<a href="t1.html?a=1&amp;b=2">query</a>
+<a href="t1.html?a=1&b=2">unescaped ampersand in query</a>
+<a
+   href="t2.html"
+   >attribute on its own line</a>
+<a href="t1.html"  hreflang="en"  rel="next">sibling attributes</a>
+<a data-href="notalink.html" href="t3.html">data-href first</a>
+<img src="pixel.gif" alt="a > b" width=1 height=1>
+<img src='pixel.gif' alt='unclosed quote in text: it"s fine'>
+<link rel="stylesheet" href="style.css">
+<script src=script.js></script>
+</body></html>

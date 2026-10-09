@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html><head><title>data attributes</title></head>
+<body>
+<div data-url="notalink.html">data-url is not a link</div>
+<div data-src="notalink.gif">data-src is not a link</div>
+<div data-href="notalink.html">data-href is not a link</div>
+<div data-config='{"src":"notalink.gif","href":"notalink.html"}'>JSON in a data attribute</div>
+<div data-template="<a href='notalink.html'>markup in a data attribute</a>"></div>
+<div ng-src="notalink.gif" v-bind:src="notalink.gif">framework attributes</div>
+<a href="t1.html" data-href="notalink.html">a real link beside a data one</a>
+<input type="hidden" name="src" value="notalink.gif">
+</body></html>

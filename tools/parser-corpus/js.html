@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html><head><title>js</title></head>
+<body>
+<script type="text/javascript">
+var a = "t1.html";
+var b = 't2.html';
+document.write("<a href=\"t3.html\">escaped quotes</a>");
+var img = new Image(); img.src = "pixel.gif";
+var notalink = "a > b && c < d";
+window.location = "t1.html";
+</script>
+<script src="script.js"></script>
+<script type="module" src="module.js"></script>
+<a href="t1.html" onclick="window.open('t2.html'); return false;">inline handler</a>
+<body onload="go('t3.html')">
+</body></html>

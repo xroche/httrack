@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html><head><title>srcset</title></head>
+<body>
+<img src="pixel.gif" srcset="pixel.gif 1x, pixel2.gif 2x" alt="srcset">
+<img src="pixel.gif" srcset="pixel.gif 100w,
+                             pixel2.gif 200w" sizes="(max-width: 100px) 100px, 200px">
+<picture>
+<source srcset="pixel2.gif" type="image/gif" media="(min-width: 100px)">
+<img src="pixel.gif" alt="picture fallback">
+</picture>
+<link rel="preload" as="image" href="pixel.gif" imagesrcset="pixel2.gif 2x">
+</body></html>

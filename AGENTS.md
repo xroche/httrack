@@ -143,9 +143,11 @@ more care than its diff size suggests.
   string reaches your test it may already have been entity-decoded and
   truncated at `#` and `?`. Read what happened to it upstream, rather than
   assuming it still holds what the page held.
-- **Prove it by differential against the previous release binary.** Build both,
-  crawl one fixture, diff the mirrored output. A source read that has not been
-  confronted with two running binaries is a hypothesis.
+- **Prove it by differential against the previous release binary.** `bash
+  tools/parser-diff.sh` builds both, crawls `tools/parser-corpus/` with each and
+  diffs the mirrors. Run `--self-check` first, because it proves the diff could
+  have seen a change at all. A source read that has not been confronted with two running binaries is a
+  hypothesis.
 - **Pair every probe with a control that fires**, including one in the narrowing
   direction. A mutant that wrongly rejects tells you the differential can see a
   loss and not only a gain.

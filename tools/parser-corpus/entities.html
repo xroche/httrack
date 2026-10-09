@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html><head><title>entities</title></head>
+<body>
+<a href="t1.html?a=1&amp;b=2">named entity</a>
+<a href="t1.html?a=1&#38;b=2">decimal entity</a>
+<a href="t1.html?a=1&#x26;b=2">hex entity</a>
+<a href="t&#49;.html">entity inside the path</a>
+<a href="t1.html?q=caf&eacute;">accented entity</a>
+<a href="t1.html?q=a&nbsp;b">nbsp entity</a>
+<a href="t1.html?q=&lt;tag&gt;">angle brackets</a>
+<a href="t1.html?a=1&notanentity;b=2">text that looks like an entity</a>
+<p>Bare text entities: &amp; &lt; &gt; &quot; &#169;</p>
+</body></html>
