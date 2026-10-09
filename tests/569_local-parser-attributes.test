@@ -1,0 +1,142 @@
+#!/bin/bash
+# What src/htsparse.c takes for a link, and what it leaves alone. Every target
+# here has exactly one referrer, so a construct the parser stops recognising
+# loses its file instead of being reached by a sibling.
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_parserattr.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+
+# A one-line target page. Absolute paths only: make check puts a relative
+# src/ on PATH, so this test never changes directory.
+page() { # page PATH
+    printf '<!DOCTYPE html>\n<html><body>target %s</body></html>\n' \
+        "$(basename "$1")" >"$1"
+}
+
+# --- 1. every attribute-value quoting form is a link ------------------------
+quoting="$tmp/quoting"
+mkdir -p "$quoting"
+cat >"$quoting/index.html" <<'EOF'
+<!DOCTYPE html>
+<html><head><title>quoting</title></head><body>
+<a href="dquote.html">double quoted</a>
+<a href='squote.html'>single quoted</a>
+<a href=bare.html>unquoted</a>
+<a href = "spaced.html" >spaces around the equals</a>
+<a
+   href="ownline.html"
+   >attribute on its own line</a>
+<a href="enc%20space.html">encoded space</a>
+<a href="frag.html#top">fragment</a>
+<a href="sib.html" hreflang="en" rel="next">sibling attributes</a>
+<a data-href="datafirst.html" href="afterdata.html">data-href before href</a>
+<a href="tquote.html" title='he said "hi"'>the other quote inside</a>
+<a href="inner space.html">unencoded inner space</a>
+<a href="query.html?a=1&amp;b=2">entity in the query</a>
+<a href="">empty value</a>
+<a href>valueless attribute</a>
+<img src="dq.gif" alt="a > b" width=1 height=1>
+<img src='sq.gif' alt='it"s fine'>
+<link rel="stylesheet" href="sheet.css">
+<script src=plain.js></script>
+</body></html>
+EOF
+for n in dquote squote bare spaced ownline "enc space" frag sib datafirst \
+    afterdata tquote "inner space" query; do
+    page "$quoting/$n.html"
+done
+printf 'GIF89a' >"$quoting/dq.gif"
+cp "$quoting/dq.gif" "$quoting/sq.gif"
+echo 'body { color: #000 }' >"$quoting/sheet.css"
+echo 'var plain = 1;' >"$quoting/plain.js"
+
+# The mirrored names: a %20 is decoded on the way to disk, and a query string
+# is folded into a hash the audit cannot spell, so the cache answers for it.
+bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$quoting")" \
+    --errors 0 \
+    --found dquote.html --found squote.html --found bare.html \
+    --found spaced.html --found ownline.html --found 'enc space.html' \
+    --found frag.html --found sib.html --found datafirst.html \
+    --found afterdata.html --found tquote.html --found 'inner space.html' \
+    --found dq.gif --found sq.gif --found sheet.css --found plain.js \
+    --cache-found '/query.html?a=1&b=2' \
+    --file-matches index.html 'href="inner%20space\.html"' \
+    --file-matches index.html 'href="#"' \
+    --file-matches index.html 'alt="a > b"' \
+    --file-matches index.html "title='he said \"hi\"'" \
+    --file-matches index.html '<a href>valueless' \
+    httrack 'BASEURL/index.html' -r3
+
+# --- 2. what must not become a link ----------------------------------------
+# Each name below is reachable only if the parser widened into a construct that
+# is not a link, which is how #1377 and #497 shipped.
+nolink="$tmp/nolink"
+mkdir -p "$nolink"
+cat >"$nolink/index.html" <<'EOF'
+<!DOCTYPE html>
+<html><head><title>no link</title>
+<meta name="description" content="not a link: metadesc.html">
+<meta name="keywords" content="a keyword, metakw.html">
+</head><body>
+<p>Body text naming plaintext.html, which no tag points at.</p>
+<img src="ok.gif" alt="alttext.html" title="titletext.html" name="nametext.html">
+<div data-config='{"src":"jsonsrc.gif","href":"jsonhref.html"}'>JSON in an attribute</div>
+<script type="text/javascript">var notalink = "a > b && c < d";</script>
+<a href="real.html">the one real link</a>
+</body></html>
+EOF
+for n in metadesc metakw plaintext alttext titletext nametext jsonhref real; do
+    page "$nolink/$n.html"
+done
+printf 'GIF89a' >"$nolink/ok.gif"
+cp "$nolink/ok.gif" "$nolink/jsonsrc.gif"
+
+# real.html and ok.gif prove the crawl ran: without them every absence below
+# would also hold for a crawl that fetched nothing.
+bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$nolink")" \
+    --errors 0 --found real.html --found ok.gif \
+    --not-found metadesc.html --not-found metakw.html \
+    --not-found plaintext.html \
+    --not-found alttext.html --not-found titletext.html \
+    --not-found nametext.html \
+    --not-found jsonhref.html --not-found jsonsrc.gif \
+    --file-matches index.html 'var notalink = "a > b && c < d"' \
+    --file-matches index.html 'content="not a link: metadesc\.html"' \
+    --file-matches index.html 'alt="alttext\.html"' \
+    httrack 'BASEURL/index.html' -r3
+
+# --- 3. a path-looking attribute value is followed, on purpose -------------
+# The engine takes any attribute whose value looks like a path, so a mirror of
+# a framework-driven page keeps working. Only the JSON blob stays untouched,
+# because its value is not a path.
+attrs="$tmp/attrs"
+mkdir -p "$attrs"
+cat >"$attrs/index.html" <<'EOF'
+<!DOCTYPE html>
+<html><head><title>path-looking attributes</title></head><body>
+<div data-url="durl.html">data-url</div>
+<div data-src="dsrc.gif">data-src</div>
+<div data-href="dhref.html">data-href</div>
+<div ng-src="ngsrc.gif" v-bind:src="vbind.gif">framework attributes</div>
+<div data-template="<a href='dtmpl.html'>markup in an attribute</a>"></div>
+<input type="hidden" name="src" value="hidden.gif">
+<div data-config='{"src":"cfgsrc.gif","href":"cfghref.html"}'>JSON</div>
+</body></html>
+EOF
+for n in durl dhref dtmpl cfghref; do page "$attrs/$n.html"; done
+printf 'GIF89a' >"$attrs/dsrc.gif"
+for n in ngsrc vbind hidden cfgsrc; do cp "$attrs/dsrc.gif" "$attrs/$n.gif"; done
+
+bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$attrs")" \
+    --errors 0 \
+    --found durl.html --found dsrc.gif --found dhref.html \
+    --found ngsrc.gif --found vbind.gif --found dtmpl.html \
+    --found hidden.gif \
+    --not-found cfgsrc.gif --not-found cfghref.html \
+    httrack 'BASEURL/index.html' -r3
+
+exit 0
