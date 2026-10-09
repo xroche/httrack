@@ -54,31 +54,6 @@ jobs:
           grep -qx "%define so_ver $so" httrack.spec
           ! grep -q "^Patch0:" httrack.spec
 
-      # Three files we ship postdate their %files, and their spec will not move
-      # for years. Packaging those three keeps rpm's unpackaged-file check armed
-      # for a fourth, which is the finding this job exists to make. Each entry
-      # reds once they package it themselves, which is when it has to go.
-      - name: Acknowledge the files their %files predates
-        run: |
-          set -euo pipefail
-          cd work
-          acknowledged=(
-            "libhttrack.pc|%{_libdir}/pkgconfig/libhttrack.pc"
-            "scalable|%{_datadir}/icons/hicolor/scalable/apps/%{name}.svg"
-            "metainfo|%{_datadir}/metainfo/com.httrack.WebHTTrack.metainfo.xml"
-          )
-          for entry in "${acknowledged[@]}"; do
-            token=${entry%%|*}
-            path=${entry#*|}
-            if grep -q "$token" httrack.spec; then
-              echo "openSUSE now packages $token: drop it from acknowledged" >&2
-              exit 1
-            fi
-            # Line 107 is the only bare %files; the others name a subpackage.
-            sed -i "/^%files\$/a $path" httrack.spec
-            grep -qx "$path" httrack.spec
-          done
-
       - name: rpmbuild, then install what it produced
         timeout-minutes: 30
         run: |
