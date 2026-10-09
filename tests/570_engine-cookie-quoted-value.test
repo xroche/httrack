@@ -1,0 +1,38 @@
+#!/bin/bash
+#
+# RFC 6265 4.1.1 makes the DQUOTEs part of a quoted cookie-value, and 5.2 strips
+# only whitespace, so the jar keeps a quoted value and a quoted cookie-av whole.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+REC="example.com|TRUE|/|FALSE|1999999999"
+# The record's own tabs print as '|'. Both halves, because 5.4 sends the value
+# as stored and only the stored half shows what a cookie-av kept.
+jar() { # jar STORED SENT HEADER
+    selftest_queue_lines "stored=$1
+sent=$2" cookiequote "$3"
+}
+
+jar "$REC|sess|\"a b\"" 'Cookie: sess="a b"' 'Set-Cookie: sess="a b"; path=/'
+jar "$REC|sess|ab" 'Cookie: sess=ab' 'Set-Cookie: sess=ab; path=/'
+# A padded quoted value keeps its padding: the quotes are the value's, so the
+# space behind the opening one is not leading whitespace.
+jar "$REC|sess|\" a \"" 'Cookie: sess=" a "' 'Set-Cookie: sess=" a "'
+# An unbalanced quote is one value byte, not a cookie to drop. WPT pins this as
+# "Set value with unbalanced leading quote" (cookies/value/value.html).
+jar "$REC|a|\"" 'Cookie: a="' 'Set-Cookie: a="'
+# Every cookie-av value comes through the same scan, so a quoted path or domain
+# keeps its quotes too and then matches nothing, as the empty Cookie line says.
+jar "example.com|TRUE|\"/d\"|FALSE|1999999999|sess|a" '' \
+    'Set-Cookie: sess=a; path="/d"'
+jar "\"example.com\"|TRUE|/|FALSE|1999999999|sess|a" '' \
+    'Set-Cookie: sess=a; domain="example.com"'
+# Real whitespace is still skipped, and the class is wider than a space.
+jar "$REC|sess|ab" 'Cookie: sess=ab' 'Set-Cookie: sess=  ab'
+TAB=$(printf '\011')
+jar "$REC|sess|ab" 'Cookie: sess=ab' "Set-Cookie: sess=${TAB}ab"
+
+selftest_run_queued

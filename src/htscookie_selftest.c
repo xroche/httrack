@@ -887,6 +887,35 @@ static int st_cookiespandiff(httrackp *opt, int argc, char **argv) {
   return st.failures != 0;
 }
 
+/* cookiequote HEADER: what the jar keeps of HEADER and what it then sends
+   back, with the record's tabs shown as '|'. Both, because RFC 6265 5.4 sends
+   a value as stored and only the stored side shows a cookie-av's own bytes. */
+static int st_cookiequote(httrackp *opt, int argc, char **argv) {
+  static t_cookie cookie;
+  char line[512];
+  char hdr[1024];
+  htsblk r;
+  size_t i, n;
+
+  (void) opt;
+  memset(&r, 0, sizeof(r));
+  cookie.max_len = sizeof(cookie.data);
+  cookie.data[0] = '\0';
+  line[0] = '\0';
+  strlncatbuff(line, argc >= 1 ? argv[0] : "", sizeof(line), sizeof(line) - 1);
+  treathead(&cookie, "example.com", "/", &r, line);
+  n = strlen(cookie.data);
+  if (n != 0 && cookie.data[n - 1] == '\n')
+    n--;
+  printf("stored=");
+  for (i = 0; i < n; i++)
+    putchar(cookie.data[i] == '\t' ? '|' : cookie.data[i]);
+  printf("\n");
+  http_cookie_header(&cookie, "example.com", "/", hdr, sizeof(hdr));
+  printf("sent=%s\n", hdr);
+  return 0;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
@@ -903,6 +932,8 @@ const struct selftest_entry selftests_cookie[] = {
     {"cookieimport", "<dir>",
      "load a jar (and Windows IE cookies) from a long+non-ASCII folder",
      st_cookieimport},
+    {"cookiequote", "<Set-Cookie header>",
+     "what the jar stores of a quoted cookie value and av", st_cookiequote},
     {"cookiespandiff", "",
      "the cookie field getter matches a frozen copy of the old one",
      st_cookiespandiff},
