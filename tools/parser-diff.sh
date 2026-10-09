@@ -92,11 +92,8 @@ done
 command -v python3 >/dev/null || die "python3 is needed to serve the corpus"
 
 # Two floors, because httrack exits 0 having fetched nothing and two empty
-# mirrors agree, so a collapsed crawl reads exactly like a clean run. The first
-# is the committed corpus's own file count, which only ever grows, so a corpus
-# that lost files cannot shrink the second floor with it. The second is four
-# fifths of what the corpus holds, which leaves room for the entries the corpus
-# deliberately never fetches.
+# mirrors agree. The corpus count only ever grows, so a lost corpus file cannot
+# shrink the mirror floor with it.
 min_corpus=133
 corpus_files=$(find "$corpus" -type f | wc -l)
 [ "$corpus_files" -ge "$min_corpus" ] ||
@@ -265,9 +262,8 @@ normalize() {
     fi
     : >"$dst/LOG"
     if [ -f "$dst/files/hts-log.txt" ]; then
-        # Lines 1 and 2 are the launch stamp and the command line, which carry
-        # the version and the build path. "N links scanned, N files written"
-        # sits on the duration line, so the timing goes and the counts stay.
+        # "N links scanned, N files written" sits on the duration line, so the
+        # timing goes and the counts stay.
         sed -e '1,2d' \
             -e 's/^[0-9][0-9]:[0-9][0-9]:[0-9][0-9]	//' \
             -e 's|^HTTrack Website Copier/[^ ]* mirror complete in [0-9]* seconds*|mirror complete|' \
@@ -351,12 +347,12 @@ self-check)
     # the dirty-attribute fallback cannot take it for a path and rescue it.
     mutant_file=src/htslib.c
 
-    crawl "$tree_httrack" treeA
-    crawl "$tree_httrack" treeB
+    crawl "$tree_httrack" reference
+    crawl "$tree_httrack" rerun
     noise_rc=0
-    compare treeA treeB || noise_rc=1
+    compare reference rerun || noise_rc=1
 
-    rcs=
+    missed=0
     for direction in widen narrow; do
         echo
         echo "parser-diff: planting the $direction mutant in a copy of the tree"
@@ -383,8 +379,10 @@ self-check)
         mutant_httrack=$(build_tree "$mutant" "$workdir/bld-$direction")
         crawl "$mutant_httrack" "$direction"
         rc=0
-        compare treeA "$direction" || rc=1
-        rcs="$rcs $direction=$rc"
+        compare reference "$direction" || rc=1
+        [ "$rc" = 1 ] || missed=$((missed + 1))
+        printf 'self-check: %-23s ... %s\n' "the $direction mutant" \
+            "$([ "$rc" = 1 ] && echo reported || echo MISSED)"
     done
 
     # A bumped version must read as no change at all. The two mutants above
@@ -402,19 +400,16 @@ self-check)
     mv "$bumped/src/htsglobal.h.pd" "$bumped/src/htsglobal.h"
     crawl "$(build_tree "$bumped" "$workdir/bld-version")" version
     version_rc=0
-    compare treeA version || version_rc=1
+    compare reference version || version_rc=1
 
     echo
-    echo "self-check: the tree against itself ... $([ "$noise_rc" = 0 ] && echo clean || echo NOISY)"
-    echo "self-check: a bumped version         ... $([ "$version_rc" = 0 ] && echo quiet || echo REPORTED)"
-    for pair in $rcs; do
-        echo "self-check: the ${pair%=*} mutant     ... $([ "${pair#*=}" = 1 ] && echo reported || echo MISSED)"
-    done
+    printf 'self-check: %-23s ... %s\n' 'the tree against itself' \
+        "$([ "$noise_rc" = 0 ] && echo clean || echo NOISY)"
+    printf 'self-check: %-23s ... %s\n' 'a bumped version' \
+        "$([ "$version_rc" = 0 ] && echo quiet || echo REPORTED)"
     [ "$noise_rc" = 0 ] || die "the tree does not compare clean against itself"
     [ "$version_rc" = 0 ] || die "a version bump alone is reported as a difference"
-    case "$rcs" in
-    *=0*) die "a mutant went unreported" ;;
-    esac
+    [ "$missed" = 0 ] || die "$missed mutant(s) went unreported"
     echo "self-check: PASS"
     ;;
 esac
