@@ -54,13 +54,15 @@ cp "$quoting/dq.gif" "$quoting/sq.gif"
 echo 'body { color: #000 }' >"$quoting/sheet.css"
 echo 'var plain = 1;' >"$quoting/plain.js"
 
-# The mirrored names: a %20 is decoded on the way to disk, and a query string
-# is folded into a hash the audit cannot spell, so the cache answers for it.
+# Under -%P0, so a dead href parser cannot be masked by the -%P scan picking
+# the same values up. datafirst.html is the data-href, which only -%P reaches.
+# A %20 is decoded on the way to disk, and a query string is folded into a hash
+# the audit cannot spell, so the cache answers for it.
 bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$quoting")" \
     --errors 0 \
     --found dquote.html --found squote.html --found bare.html \
     --found spaced.html --found ownline.html --found 'enc space.html' \
-    --found frag.html --found sib.html --found datafirst.html \
+    --found frag.html --found sib.html --not-found datafirst.html \
     --found afterdata.html --found tquote.html --found 'inner space.html' \
     --found dq.gif --found sq.gif --found sheet.css --found plain.js \
     --cache-found '/query.html?a=1&b=2' \
@@ -69,7 +71,7 @@ bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$quoting")" \
     --file-matches index.html 'alt="a > b"' \
     --file-matches index.html "title='he said \"hi\"'" \
     --file-matches index.html '<a href>valueless' \
-    httrack 'BASEURL/index.html' -r3
+    httrack 'BASEURL/index.html' -r3 '-%P0'
 
 # --- 2. what must not become a link ----------------------------------------
 # alt, title and name are in hts_nodetect[], so the -%P scan skips them
@@ -84,7 +86,7 @@ cat >"$nolink/index.html" <<'EOF'
 <meta name="keywords" content="a keyword, metakw.html">
 <meta name="author" content="metabare.html">
 </head><body>
-<p>Body text naming plaintext.html, which no tag points at.</p>
+<p>The -%P scan opens only at a quote, so plaintext.html stays prose.</p>
 <img src="ok.gif" alt="alttext.html" title="titletext.html" name="nametext.html">
 <script type="text/javascript">var notalink = "a > b && c < d";</script>
 <a href="real.html">the one real link</a>
@@ -110,8 +112,9 @@ bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$nolink")" \
 
 # --- 3. contract, and the -%P heuristic on top of it ------------------------
 # data-src and the href= inside data-template are links by contract, the first
-# through hts_detect[]. The other five come from the -%P scan, which stops at
-# the first inner quote, so the JSON blob's only candidate is "{".
+# through hts_detect[]. The other five come from the -%P scan, which opens a
+# candidate only where "=(," precedes the quote, so the JSON blob's paths sit
+# behind a ":" and stay unread.
 attrs="$tmp/attrs"
 mkdir -p "$attrs"
 cat >"$attrs/index.html" <<'EOF'
