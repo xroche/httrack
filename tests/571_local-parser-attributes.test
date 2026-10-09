@@ -10,8 +10,8 @@ set -euo pipefail
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_parserattr.XXXXXX") || exit 1
 cleanup_push rm -rf "$tmp"
 
-# A one-line target page. Absolute paths only: make check puts a relative
-# src/ on PATH, so this test never changes directory.
+# Absolute paths only, because a relative src/ on PATH would run the wrong
+# httrack once anything changed directory (AGENTS.md).
 page() { # page PATH
     printf '<!DOCTYPE html>\n<html><body>target %s</body></html>\n' \
         "$(basename "$1")" >"$1"
@@ -72,10 +72,9 @@ bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$quoting")" \
     httrack 'BASEURL/index.html' -r3
 
 # --- 2. what must not become a link ----------------------------------------
-# alt, title and name are in hts_nodetect[], so the -%P scan refuses them
-# whatever the value holds. The rest are refused for the value's shape alone,
-# and metabare.html proves it: a bare path in the same content attribute IS
-# fetched.
+# alt, title and name are in hts_nodetect[], so the -%P scan skips them
+# outright. The <meta> absences trace to the value's shape instead, and
+# metabare.html proves it, being a bare path in the same content attribute.
 nolink="$tmp/nolink"
 mkdir -p "$nolink"
 cat >"$nolink/index.html" <<'EOF'
@@ -87,38 +86,32 @@ cat >"$nolink/index.html" <<'EOF'
 </head><body>
 <p>Body text naming plaintext.html, which no tag points at.</p>
 <img src="ok.gif" alt="alttext.html" title="titletext.html" name="nametext.html">
-<div data-config='{"src":"jsonsrc.gif","href":"jsonhref.html"}'>JSON in an attribute</div>
 <script type="text/javascript">var notalink = "a > b && c < d";</script>
 <a href="real.html">the one real link</a>
 </body></html>
 EOF
-for n in metadesc metakw metabare plaintext alttext titletext nametext \
-    jsonhref real; do
+for n in metadesc metakw metabare plaintext alttext titletext nametext real; do
     page "$nolink/$n.html"
 done
 printf 'GIF89a' >"$nolink/ok.gif"
-cp "$nolink/ok.gif" "$nolink/jsonsrc.gif"
 
-# real.html and ok.gif prove the crawl ran: without them every absence below
-# would also hold for a crawl that fetched nothing.
+# real.html and ok.gif prove the crawl ran, because every absence below would
+# also hold for a crawl that fetched nothing.
 bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$nolink")" \
     --errors 0 --found real.html --found ok.gif --found metabare.html \
     --not-found metadesc.html --not-found metakw.html \
     --not-found plaintext.html \
     --not-found alttext.html --not-found titletext.html \
     --not-found nametext.html \
-    --not-found jsonhref.html --not-found jsonsrc.gif \
     --file-matches index.html 'var notalink = "a > b && c < d"' \
     --file-matches index.html 'content="not a link: metadesc\.html"' \
     --file-matches index.html 'alt="alttext\.html"' \
     httrack 'BASEURL/index.html' -r3
 
 # --- 3. contract, and the -%P heuristic on top of it ------------------------
-# data-src (hts_detect[]) and the href= inside data-template are links by
-# contract. The other five come from the -%P last-resort scan, on by default,
-# which takes any quoted value that looks like a path. That scan copies from
-# the attribute's own quote to the first inner one, so the JSON blob's only
-# candidate is "{".
+# data-src and the href= inside data-template are links by contract, the first
+# through hts_detect[]. The other five come from the -%P scan, which stops at
+# the first inner quote, so the JSON blob's only candidate is "{".
 attrs="$tmp/attrs"
 mkdir -p "$attrs"
 cat >"$attrs/index.html" <<'EOF'
@@ -137,6 +130,7 @@ for n in durl dhref dtmpl cfghref; do page "$attrs/$n.html"; done
 printf 'GIF89a' >"$attrs/dsrc.gif"
 for n in ngsrc vbind hidden cfgsrc; do cp "$attrs/dsrc.gif" "$attrs/$n.gif"; done
 
+# Engine default, so -%P is on and all seven are links.
 bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$attrs")" \
     --errors 0 \
     --found durl.html --found dsrc.gif --found dhref.html \
@@ -145,9 +139,8 @@ bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$attrs")" \
     --not-found cfgsrc.gif --not-found cfghref.html \
     httrack 'BASEURL/index.html' -r3
 
-# Same fixture under -%P0: only the two contract links survive. A change moving
-# one of the other five into the contract reds here and nowhere else, which is
-# the #497 class.
+# Under -%P0 only the two contract links survive, so a change promoting one of
+# the other five reds here and nowhere else, which is the #497 class.
 bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$attrs")" \
     --errors 0 \
     --found dsrc.gif --found dtmpl.html \
