@@ -97,7 +97,7 @@ command -v python3 >/dev/null || die "python3 is needed to serve the corpus"
 # that lost files cannot shrink the second floor with it. The second is four
 # fifths of what the corpus holds, which leaves room for the entries the corpus
 # deliberately never fetches.
-min_corpus=132
+min_corpus=133
 corpus_files=$(find "$corpus" -type f | wc -l)
 [ "$corpus_files" -ge "$min_corpus" ] ||
     die "the corpus at $corpus holds $corpus_files files, under its own $min_corpus"
@@ -255,6 +255,14 @@ normalize() {
             die "cannot read $dst/files/hts-changes.json"
         rm -f "$dst/files/hts-changes.json"
     fi
+    # The generated index credits the engine by version, so without this a
+    # release branch's own bump reads as a parser difference. The version alone
+    # goes, which leaves a real change to that line visible.
+    if [ -f "$dst/files/index.html" ]; then
+        sed -e 's|\(Website Copier/\)[^ ]*|\1VERSION|g' \
+            "$dst/files/index.html" >"$dst/files/index.html.pd"
+        mv "$dst/files/index.html.pd" "$dst/files/index.html"
+    fi
     : >"$dst/LOG"
     if [ -f "$dst/files/hts-log.txt" ]; then
         # Lines 1 and 2 are the launch stamp and the command line, which carry
@@ -379,12 +387,31 @@ self-check)
         rcs="$rcs $direction=$rc"
     done
 
+    # A bumped version must read as no change at all. The two mutants above
+    # only prove the diff can see a loss and a gain, never that it stays quiet
+    # on the one edit every release branch opens with.
+    echo
+    echo "parser-diff: planting a version bump in a copy of the tree"
+    bumped="$workdir/src-version"
+    copy_tree "$srcdir" "$bumped"
+    hits=$(grep -c '^#define HTTRACK_VERSION ' "$bumped/src/htsglobal.h" || true)
+    [ "$hits" = 1 ] ||
+        die "HTTRACK_VERSION is defined $hits times in src/htsglobal.h, not once"
+    sed 's|^#define HTTRACK_VERSION .*$|#define HTTRACK_VERSION "9.99-9"|' \
+        "$bumped/src/htsglobal.h" >"$bumped/src/htsglobal.h.pd"
+    mv "$bumped/src/htsglobal.h.pd" "$bumped/src/htsglobal.h"
+    crawl "$(build_tree "$bumped" "$workdir/bld-version")" version
+    version_rc=0
+    compare treeA version || version_rc=1
+
     echo
     echo "self-check: the tree against itself ... $([ "$noise_rc" = 0 ] && echo clean || echo NOISY)"
+    echo "self-check: a bumped version         ... $([ "$version_rc" = 0 ] && echo quiet || echo REPORTED)"
     for pair in $rcs; do
         echo "self-check: the ${pair%=*} mutant     ... $([ "${pair#*=}" = 1 ] && echo reported || echo MISSED)"
     done
     [ "$noise_rc" = 0 ] || die "the tree does not compare clean against itself"
+    [ "$version_rc" = 0 ] || die "a version bump alone is reported as a difference"
     case "$rcs" in
     *=0*) die "a mutant went unreported" ;;
     esac
