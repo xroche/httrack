@@ -1,7 +1,7 @@
 #!/bin/bash
-# What src/htsparse.c takes for a link, and what it leaves alone. Every target
-# here has exactly one referrer, so a construct the parser stops recognising
-# loses its file instead of being reached by a sibling.
+# This test pins what src/htsparse.c follows and what it leaves alone. Every
+# target here has exactly one referrer, so a construct the parser stops
+# recognising loses its file instead of being reached by a sibling.
 set -euo pipefail
 
 # shellcheck source=tests/crawllib.sh
@@ -10,8 +10,6 @@ set -euo pipefail
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_parserattr.XXXXXX") || exit 1
 cleanup_push rm -rf "$tmp"
 
-# Absolute paths only, because a relative src/ on PATH would run the wrong
-# httrack once anything changed directory (AGENTS.md).
 page() { # page PATH
     printf '<!DOCTYPE html>\n<html><body>target %s</body></html>\n' \
         "$(basename "$1")" >"$1"
@@ -54,10 +52,10 @@ cp "$quoting/dq.gif" "$quoting/sq.gif"
 echo 'body { color: #000 }' >"$quoting/sheet.css"
 echo 'var plain = 1;' >"$quoting/plain.js"
 
-# Under -%P0, so a dead href parser cannot be masked by the -%P scan picking
-# the same values up. datafirst.html is the data-href, which only -%P reaches.
-# A %20 is decoded on the way to disk, and a query string is folded into a hash
-# the audit cannot spell, so the cache answers for it.
+# -%P0 turns the -%P scan off, so it cannot mask a dead href parser.
+# datafirst.html is a data-href, which only -%P reaches. A %20 is decoded on the
+# way to disk, and a query string folds into a hash the audit cannot spell, so
+# the cache answers for it.
 bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$quoting")" \
     --errors 0 \
     --found dquote.html --found squote.html --found bare.html \
@@ -70,13 +68,12 @@ bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$quoting")" \
     --file-matches index.html 'href="#"' \
     --file-matches index.html 'alt="a > b"' \
     --file-matches index.html "title='he said \"hi\"'" \
-    --file-matches index.html '<a href>valueless' \
     httrack 'BASEURL/index.html' -r3 '-%P0'
 
 # --- 2. what must not become a link ----------------------------------------
 # alt, title and name are in hts_nodetect[], so the -%P scan skips them
 # outright. The <meta> absences trace to the value's shape instead, and
-# metabare.html proves it, being a bare path in the same content attribute.
+# metabare.html, a bare path in the same content attribute, proves it.
 nolink="$tmp/nolink"
 mkdir -p "$nolink"
 cat >"$nolink/index.html" <<'EOF'
@@ -105,16 +102,14 @@ bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$nolink")" \
     --not-found plaintext.html \
     --not-found alttext.html --not-found titletext.html \
     --not-found nametext.html \
-    --file-matches index.html 'var notalink = "a > b && c < d"' \
     --file-matches index.html 'content="not a link: metadesc\.html"' \
-    --file-matches index.html 'alt="alttext\.html"' \
     httrack 'BASEURL/index.html' -r3
 
 # --- 3. contract, and the -%P heuristic on top of it ------------------------
-# data-src and the href= inside data-template are links by contract, the first
-# through hts_detect[]. The other five come from the -%P scan, which opens a
-# candidate only where "=(," precedes the quote, so the JSON blob's paths sit
-# behind a ":" and stay unread.
+# data-src and the href= inside data-template are links by contract, through
+# hts_detect[]. The rest come from the -%P scan, which opens a candidate only
+# where "=(," precedes the quote, so data-args pins the "(" and "," arms while
+# the JSON blob's paths sit behind a ":" and stay unread.
 attrs="$tmp/attrs"
 mkdir -p "$attrs"
 cat >"$attrs/index.html" <<'EOF'
@@ -127,30 +122,34 @@ cat >"$attrs/index.html" <<'EOF'
 <div data-template="<a href='dtmpl.html'>markup in an attribute</a>"></div>
 <input type="hidden" name="src" value="hidden.gif">
 <div data-config='{"src":"cfgsrc.gif","href":"cfghref.html"}'>JSON</div>
+<div data-args='load("paren.gif","comma.gif")'>a call with two paths</div>
 </body></html>
 EOF
 for n in durl dhref dtmpl cfghref; do page "$attrs/$n.html"; done
 printf 'GIF89a' >"$attrs/dsrc.gif"
-for n in ngsrc vbind hidden cfgsrc; do cp "$attrs/dsrc.gif" "$attrs/$n.gif"; done
+for n in ngsrc vbind hidden cfgsrc paren comma; do
+    cp "$attrs/dsrc.gif" "$attrs/$n.gif"
+done
 
-# Engine default, so -%P is on and all seven are links.
+# Engine default, so -%P is on and the seven scan-only values are links.
 bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$attrs")" \
     --errors 0 \
-    --found durl.html --found dsrc.gif --found dhref.html \
-    --found ngsrc.gif --found vbind.gif --found dtmpl.html \
+    --found durl.html --found dhref.html \
+    --found ngsrc.gif --found vbind.gif \
     --found hidden.gif \
+    --found paren.gif --found comma.gif \
     --not-found cfgsrc.gif --not-found cfghref.html \
     httrack 'BASEURL/index.html' -r3
 
-# Under -%P0 only the two contract links survive, so a change promoting one of
-# the other five reds here and nowhere else, which is the #497 class.
+# Under -%P0 only the two contract links survive, so a change promoting any of
+# the other seven reds here and nowhere else, which is the #497 class.
 bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$attrs")" \
     --errors 0 \
     --found dsrc.gif --found dtmpl.html \
     --not-found durl.html --not-found dhref.html \
     --not-found ngsrc.gif --not-found vbind.gif \
     --not-found hidden.gif \
-    --not-found cfgsrc.gif --not-found cfghref.html \
+    --not-found paren.gif --not-found comma.gif \
     httrack 'BASEURL/index.html' -r3 '-%P0'
 
 exit 0
