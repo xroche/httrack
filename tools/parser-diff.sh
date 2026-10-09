@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# Differential for src/htsparse.c. The suite only crawls fixtures the parser
-# already handles, so this is what sees the damage it cannot. --help says how to
-# run it, and what follows is what the comparison keeps and why.
+# Differential for src/htsparse.c. --help says how to run it, and what follows
+# is what the comparison keeps and why.
 #
 # Three signals are compared, each normalized only where two runs of one binary
 # disagree:
@@ -20,14 +19,6 @@
 # and doit.log carries its own timestamp. Stripped from the two kept text
 # files: the per-line clock, the generator version, the build path, and the run
 # duration and transfer rate.
-#
-# robots.txt comes from tests/local-server.py's own route rather than from the
-# corpus, because httrack reads it from the host root only. That server also
-# answers /sitemap.xml, which is why the corpus names its own
-# corpus-sitemap.xml and the crawl points --sitemap-url at it.
-#
-# A SIGKILL that follows a SIGTERM leaves the workdir, both builds and the
-# server behind, because the trap cannot run until the foreground make returns.
 
 set -euo pipefail
 
@@ -99,6 +90,10 @@ corpus_files=$(find "$corpus" -type f | wc -l)
 [ "$corpus_files" -ge "$min_corpus" ] ||
     die "the corpus at $corpus holds $corpus_files files, under its own $min_corpus"
 min_files=$((corpus_files * 4 / 5))
+# A third floor, on bytes. The two above count files and URLs, so two mirrors
+# whose pages all came out empty clear them and compare equal.
+corpus_bytes=$(find "$corpus" -type f -exec cat {} + | wc -c)
+min_bytes=$((corpus_bytes / 2))
 
 server_pid=
 cleanup() {
@@ -171,7 +166,10 @@ build_tree() {
 }
 
 # Sets server_pid and server_port. Not a command substitution, because the pid
-# has to land in the caller's shell for cleanup to reach it.
+# has to land in the caller's shell for cleanup to reach it. tests/testlib.sh
+# has a hardened discover_server_port, but reaching it would pull in the whole
+# TAP harness, so this waits longer than its 200 ticks suggest and strips the CR
+# a Windows python under wsl2 leaves behind.
 start_server() {
     local root=$1 tries=0
     server_port=
@@ -222,10 +220,8 @@ crawl() {
     }
 }
 
-# Flatten hts-changes.json into one line per entry, sorted, because two runs of
-# one binary swap adjacent entries: the file records completion order, and
-# adjacent fetches race. The date and generator keys go, because they carry the
-# clock and the version.
+# Flatten hts-changes.json into one line per entry. The header comment says what
+# is dropped and why.
 changes_py='
 import json, sys
 d = json.load(open(sys.argv[1]))
@@ -257,7 +253,8 @@ normalize() {
     # goes, which leaves a real change to that line visible.
     if [ -f "$dst/files/index.html" ]; then
         sed -e 's|\(Website Copier/\)[^ ]*|\1VERSION|g' \
-            "$dst/files/index.html" >"$dst/files/index.html.pd"
+            "$dst/files/index.html" >"$dst/files/index.html.pd" ||
+            die "cannot normalize $dst/files/index.html"
         mv "$dst/files/index.html.pd" "$dst/files/index.html"
     fi
     : >"$dst/LOG"
@@ -267,15 +264,16 @@ normalize() {
         sed -e '1,2d' \
             -e 's/^[0-9][0-9]:[0-9][0-9]:[0-9][0-9]	//' \
             -e 's|^HTTrack Website Copier/[^ ]* mirror complete in [0-9]* seconds*|mirror complete|' \
-            -e 's| \[[0-9]* bytes received at [0-9]* bytes/sec\]||' \
-            "$dst/files/hts-log.txt" >"$dst/LOG"
+            -e 's| at [0-9]* bytes/sec\]| at RATE]|' \
+            "$dst/files/hts-log.txt" >"$dst/LOG" ||
+            die "cannot normalize $dst/files/hts-log.txt"
         rm -f "$dst/files/hts-log.txt"
     fi
 }
 
 # Compare the two mirrors. Returns 1 when they differ.
 compare() {
-    local na="$workdir/norm-$1" nb="$workdir/norm-$2" leg files fetched rc=0
+    local na="$workdir/norm-$1" nb="$workdir/norm-$2" leg files fetched bytes rc=0
     normalize "$workdir/mirror-$1" "$na"
     normalize "$workdir/mirror-$2" "$nb"
     for leg in "$1" "$2"; do
@@ -285,7 +283,12 @@ compare() {
             die "the $leg mirror holds $files files, under the corpus floor of $min_files"
         [ "$fetched" -ge "$min_files" ] ||
             die "the $leg crawl fetched $fetched URLs, under the corpus floor of $min_files"
-        echo "$leg: $files files, $fetched fetched"
+        bytes=$(find "$workdir/norm-$leg/files" -type f -exec cat {} + | wc -c)
+        [ "$bytes" -ge "$min_bytes" ] ||
+            die "the $leg mirror holds $bytes bytes, under the corpus floor of $min_bytes"
+        [ -s "$workdir/norm-$leg/LOG" ] ||
+            die "the $leg mirror left an empty hts-log.txt, so the scan signal is gone"
+        echo "$leg: $files files, $fetched fetched, $bytes bytes"
     done
     diff -ru "$na" "$nb" >"$workdir/diff-$1-$2.txt" 2>&1 || rc=1
     if [ "$rc" = 0 ]; then
@@ -305,6 +308,8 @@ start_server "$docroot"
 base_host="127.0.0.1:$server_port"
 base_url="http://$base_host"
 expand_corpus "$docroot"
+# The server owns /sitemap.xml and /robots.txt, which httrack reads from the
+# host root only, so the corpus names its own sitemap and the crawl points at it.
 sitemap_args=
 if [ -f "$docroot/corpus-sitemap.xml" ]; then
     sitemap_args="--sitemap-url $base_url/corpus-sitemap.xml"
@@ -341,10 +346,12 @@ release)
     ;;
 self-check)
     # Each mutant edits one hts_detect row, the table deciding whether an
-    # attribute is read as a link. No test under tests/ names "cite" or
-    # "data-srcset", so make check stays green on both and only the corpus sees
-    # them. The corpus spells the data-srcset value with a "1x" descriptor, so
-    # the dirty-attribute fallback cannot take it for a path and rescue it.
+    # attribute is read as a link. make check stays green on both, so only the
+    # corpus sees them: no test names "cite", and the one data-srcset under
+    # tests/ (local-server.py, for test 36) carries the same two URLs in a
+    # plain srcset on the preceding img, which satisfies that test either way.
+    # The corpus spells the data-srcset value with a "1x" descriptor, so the
+    # dirty-attribute fallback cannot take it for a path and rescue it.
     mutant_file=src/htslib.c
 
     crawl "$tree_httrack" reference
@@ -398,7 +405,9 @@ self-check)
     sed 's|^#define HTTRACK_VERSION .*$|#define HTTRACK_VERSION "9.99-9"|' \
         "$bumped/src/htsglobal.h" >"$bumped/src/htsglobal.h.pd"
     mv "$bumped/src/htsglobal.h.pd" "$bumped/src/htsglobal.h"
-    crawl "$(build_tree "$bumped" "$workdir/bld-version")" version
+    bumped_httrack=$(build_tree "$bumped" "$workdir/bld-version")
+    [ -r "$bumped_httrack" ] || die "no version binary at $bumped_httrack"
+    crawl "$bumped_httrack" version
     version_rc=0
     compare reference version || version_rc=1
 
