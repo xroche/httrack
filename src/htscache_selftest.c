@@ -1113,10 +1113,11 @@ int cache_golden_selftest(httrackp *opt, const char *dir, int regen) {
 
 /* All reconcile inputs/outputs, wiped between cases. */
 static const char *const reconcile_files[] = {
-    "hts-cache/new.zip", "hts-cache/old.zip",   "hts-cache/new.dat",
-    "hts-cache/old.dat", "hts-cache/new.ndx",   "hts-cache/old.ndx",
-    "hts-cache/new.lst", "hts-cache/old.lst",   "hts-cache/new.txt",
-    "hts-cache/old.txt", "hts-in_progress.lock"};
+    "hts-cache/new.zip",     "hts-cache/old.zip",    "hts-cache/new.dat",
+    "hts-cache/old.dat",     "hts-cache/new.ndx",    "hts-cache/old.ndx",
+    "hts-cache/new.lst",     "hts-cache/old.lst",    "hts-cache/new.txt",
+    "hts-cache/old.txt",     "hts-in_progress.lock", "hts-cache/damaged.zip",
+    "hts-cache/damaged.lst", "hts-cache/damaged.txt"};
 
 static char *reconcile_st_path(httrackp *opt, const char *name) {
   return fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
@@ -1233,6 +1234,79 @@ static int reconcile_expect(httrackp *opt, const char *name, LLint size,
     return 1;
   }
   return 0;
+}
+
+/* Run cache_init's rotation for write, then release what it opened. */
+static void reconcile_rotate(httrackp *opt) {
+  cache_back cache;
+  const int was_cache = opt->cache;
+  const hts_log_type was_debug = opt->debug;
+
+  opt->cache = 1;
+  opt->debug = LOG_ERROR; /* the expected repair warnings would reach stdout */
+  selftest_open_for_write(&cache, opt);
+  if (cache.lst != NULL)
+    fclose(cache.lst);
+  if (cache.txt != NULL)
+    fclose(cache.txt);
+  selftest_close(&cache);
+  opt->cache = was_cache;
+  opt->debug = was_debug;
+}
+
+/* cache_init must never rotate an unrepairable new.zip over a good old.zip,
+   and old.zip, old.lst and old.txt must stay one generation. */
+static int reconcile_rotation_cases(httrackp *opt, LLint partial,
+                                    LLint complete, LLint damaged, LLint small,
+                                    LLint medium, LLint directory_end) {
+  int failures = 0;
+
+  /* unrepairable new.zip: the old generation survives whole */
+  reconcile_wipe(opt);
+  reconcile_put_zip(opt, "hts-cache/old.zip", complete, 0);
+  reconcile_put(opt, "hts-cache/old.lst", small);
+  reconcile_put(opt, "hts-cache/old.txt", small);
+  reconcile_put(opt, "hts-cache/new.zip", damaged);
+  reconcile_put(opt, "hts-cache/new.lst", medium);
+  reconcile_put(opt, "hts-cache/new.txt", medium);
+  reconcile_rotate(opt);
+  failures += reconcile_expect_zip(opt, "hts-cache/old.zip", complete,
+                                   "rotate-damaged");
+  failures +=
+      reconcile_expect(opt, "hts-cache/old.lst", small, "rotate-damaged");
+  failures +=
+      reconcile_expect(opt, "hts-cache/old.txt", small, "rotate-damaged");
+  failures +=
+      reconcile_expect(opt, "hts-cache/damaged.zip", damaged, "rotate-damaged");
+  failures +=
+      reconcile_expect(opt, "hts-cache/damaged.lst", medium, "rotate-damaged");
+  failures +=
+      reconcile_expect(opt, "hts-cache/damaged.txt", medium, "rotate-damaged");
+
+  /* repairable new.zip: repaired, then rotated as usual */
+  reconcile_wipe(opt);
+  reconcile_put_zip(opt, "hts-cache/old.zip", complete, 0);
+  reconcile_put(opt, "hts-cache/old.lst", small);
+  reconcile_put_zip(opt, "hts-cache/new.zip", partial, 0);
+  reconcile_truncate(opt, "hts-cache/new.zip", directory_end);
+  reconcile_put(opt, "hts-cache/new.lst", medium);
+  reconcile_rotate(opt);
+  failures += reconcile_expect_zip(opt, "hts-cache/old.zip", partial,
+                                   "rotate-repairable");
+  failures +=
+      reconcile_expect(opt, "hts-cache/old.lst", medium, "rotate-repairable");
+  failures +=
+      reconcile_expect(opt, "hts-cache/damaged.zip", -1, "rotate-repairable");
+
+  /* unrepairable new.zip and no old.zip: nothing to protect, rotate */
+  reconcile_wipe(opt);
+  reconcile_put(opt, "hts-cache/new.zip", damaged);
+  reconcile_rotate(opt);
+  failures +=
+      reconcile_expect(opt, "hts-cache/old.zip", damaged, "rotate-noold");
+  failures +=
+      reconcile_expect(opt, "hts-cache/damaged.zip", -1, "rotate-noold");
+  return failures;
 }
 
 int cache_reconcile_selftest(httrackp *opt, const char *dir) {
@@ -1518,6 +1592,8 @@ int cache_reconcile_selftest(httrackp *opt, const char *dir) {
   failures +=
       reconcile_expect(opt, "hts-cache/new.zip", SMALL, "rollback-noop");
 
+  failures += reconcile_rotation_cases(opt, PARTIAL, COMPLETE, DAMAGED, SMALL,
+                                       MEDIUM, ZIP_DIRECTORY_END);
   reconcile_wipe(opt);
   return failures;
 }
