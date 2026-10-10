@@ -1,0 +1,130 @@
+#!/bin/bash
+#
+# A catalog line may be keyed by its lang.def symbol instead of its English
+# text. Re-keying any subset of a catalog must render every string unchanged.
+
+set -euo pipefail
+
+# shellcheck source=tests/webhttracklib.sh
+. "${0%"${0##*/}"}./webhttracklib.sh"
+
+htsserver_require
+distdir=${HTS_DISTDIR}
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_langsym.XXXXXX") || fail "no tmpdir"
+cleanup_push htsserver_cleanup_dir "${work}"
+
+# A root whose catalogs and server pages we own; the rest links the dist.
+root=${work}/root
+mkdir -p "${root}/html/server" "${root}/lang"
+for entry in "${distdir}"/*; do
+    case ${entry##*/} in
+    html | lang) ;;
+    *) ln -s "${entry}" "${root}/${entry##*/}" ;;
+    esac
+done
+for entry in "${distdir}"/html/*; do
+    test "${entry##*/}" = server || ln -s "${entry}" "${root}/html/${entry##*/}"
+done
+for entry in "${distdir}"/html/server/*; do
+    ln -s "${entry}" "${root}/html/server/${entry##*/}"
+done
+for entry in "${distdir}"/lang/*; do
+    case ${entry##*/} in
+    English.txt | Francais.txt) ;;
+    *) ln -s "${entry}" "${root}/lang/${entry##*/}" ;;
+    esac
+done
+
+# Writes the probe page naming every symbol, and the French catalog variants:
+# none, all, or odd lines re-keyed and moved to the end.
+# English.txt is a copy too, so that its own re-keying can be tested.
+"${HTS_PYTHON}" - "${distdir}" "${root}" "${work}" <<'PY' || fail "cannot build the fixtures"
+import collections, sys
+
+distdir, root, work = sys.argv[1:4]
+
+
+def pairs(path):
+    lines = open(path, "rb").read().split(b"\n")
+    lines = [l.rstrip(b"\r") for l in lines]
+    return [(lines[i], lines[i + 1]) for i in range(0, len(lines) - 1, 2)]
+
+
+# lang.def stores the Nth copy of a repeated English text as text + N.
+symbol = {}
+for sym, text in pairs(distdir + "/lang.def"):
+    if not sym.startswith((b"LANG_", b"LISTDEF_")):
+        continue
+    key, n = text, 0
+    while key in symbol:
+        n += 1
+        key = text + str(n).encode()
+    symbol[key] = sym
+
+probe = b"\n".join(b"%s=${%s}" % (s, s) for s in sorted(symbol.values()))
+open(root + "/html/server/langprobe.html", "wb").write(probe + b"\n")
+
+
+
+def keyed(name):
+    seen, out = collections.Counter(), []
+    for text, value in pairs(distdir + "/lang/" + name + ".txt"):
+        n = seen[text]
+        seen[text] += 1
+        out.append((text, symbol.get(text + (str(n).encode() if n else b"")), value))
+    return out
+
+
+french = keyed("Francais")
+if sum(1 for t, s, v in french if s and t + b"1" in symbol) < 20:
+    sys.exit("too few repeated texts to split; the parse is broken")
+
+
+def write(name, pick, moved=False, catalog=french):
+    lines = [
+        (True, [sym, value]) if sym and pick(i) else (False, [text, value])
+        for i, (text, sym, value) in enumerate(catalog)
+    ]
+    # A symbol line holds its meaning wherever it sits, unlike a repeated text.
+    if moved:
+        lines.sort(key=lambda line: line[0])
+    out = [x for _, pair in lines for x in pair]
+    open(work + "/" + name, "wb").write(b"\r\n".join(out) + b"\r\n")
+
+
+write("none", lambda i: False)
+write("all", lambda i: True)
+write("odd-last", lambda i: i % 2 == 1, moved=True)
+write("english", lambda i: False, catalog=keyed("English"))
+write("english-all", lambda i: True, catalog=keyed("English"))
+PY
+
+render() { # $1 = French variant, $2 = English variant
+    cp "${work}/$1" "${root}/lang/Francais.txt"
+    cp "${work}/${2:-english}" "${root}/lang/English.txt"
+    mkdir -p "${work}/h$1"
+    htsserver_start --root "${root}" --home "${work}/h$1" --log "${work}/srv$1.log" lang 2
+    "${HTS_PYTHON}" - "${HTS_URL}server/langprobe.html" "${work}/$1.out" <<'PY' || fail "no probe page for $1"
+import sys, urllib.request
+
+open(sys.argv[2], "wb").write(urllib.request.urlopen(sys.argv[1], timeout=20).read())
+PY
+}
+
+printf '[a catalog may key any subset of its lines by symbol] ..\t'
+render none
+# Control: the probe must show French, or equal pages would prove nothing.
+# "Start" is two symbols with different French values, so it also pins the order.
+grep -q '^LANG_J9=Démarrer\.\.\.' "${work}/none.out" || fail "the probe page shows no French"
+grep -q '^LANG_J13=DEMARRER!' "${work}/none.out" || fail "the probe page shows no French"
+for v in all odd-last; do
+    render "${v}"
+    cmp -s "${work}/none.out" "${work}/${v}.out" ||
+        fail "re-keying ${v} lines changed: $(diff "${work}/none.out" "${work}/${v}.out" | head -5)"
+done
+# The English fallback pass must not overwrite what the French one filled.
+render all english-all
+cmp -s "${work}/none.out" "${work}/all.out" ||
+    fail "re-keying English changed: $(diff "${work}/none.out" "${work}/all.out" | head -5)"
+echo ok
