@@ -828,83 +828,6 @@ cleanup:
 /* back_new() sizes its slot table from -cN, so a user can ask for one that
    does not fit. The contract is a NULL return, which httpmirror() turns into a
    log line and a stopped mirror, where an abort loses that message. */
-/* A link whose strings cannot be copied is dropped whole rather than left
-   half-built in opt->liens, and the crawl is told instead of aborted (#57). */
-static int st_recordoom(httrackp *opt, int argc, char **argv) {
-  static const size_t huge = 64 * 1024 * 1024;
-  struct_back *sback = NULL;
-  hash_struct hash;
-  cache_back cache;
-  char *big = NULL;
-  int rc = 1;
-  int before;
-  int recorded;
-
-  (void) argc;
-  (void) argv;
-  memset(&cache, 0, sizeof(cache));
-  st_mirror_wiring(opt, &sback, &hash, HTS_FALSE);
-  if (!hts_record_link(opt, "www.example.com", "/a.html", "/p/a.html", "", "",
-                       NULL)) {
-    printf("recordoom: FAILED (no first link)\n");
-    goto done;
-  }
-  before = opt->lien_tot;
-  big = malloct(huge);
-  assertf(big != NULL);
-  memset(big, 'x', huge - 1);
-  big[huge - 1] = '\0';
-#ifndef _WIN32
-  {
-    struct rlimit saved, tight;
-
-    if (getrlimit(RLIMIT_AS, &saved) != 0) {
-      printf("recordoom: cannot cap memory, skipped\n");
-      rc = 0;
-      goto done;
-    }
-    tight = saved;
-    tight.rlim_cur = 1024 * 1024;
-    if (setrlimit(RLIMIT_AS, &tight) != 0) {
-      printf("recordoom: cannot cap memory, skipped\n");
-      rc = 0;
-      goto done;
-    }
-    recorded = hts_record_link(opt, big, "/b.html", "/p/b.html", "", "", NULL);
-    (void) setrlimit(RLIMIT_AS, &saved);
-  }
-#else
-  printf("recordoom: cannot cap memory, skipped\n");
-  rc = 0;
-  goto done;
-#endif
-  if (recorded) {
-    printf("recordoom: cap did not bite, skipped\n");
-    rc = 0;
-    goto done;
-  }
-  if (opt->lien_tot != before || opt->liens[before] != NULL ||
-      strcmp(opt->liens[before - 1]->fil, "/a.html") != 0) {
-    printf("recordoom: FAILED (the refused link left %d entries, want %d)\n",
-           opt->lien_tot, before);
-    goto done;
-  }
-  if (!hts_record_link(opt, "www.example.com", "/c.html", "/p/c.html", "", "",
-                       NULL) ||
-      opt->lien_tot != before + 1 ||
-      strcmp(opt->liens[before]->fil, "/c.html") != 0) {
-    printf("recordoom: FAILED (no link recorded after the refusal)\n");
-    goto done;
-  }
-  printf("recordoom: oom OK\n");
-  rc = 0;
-
-done:
-  freet(big);
-  st_mirror_wiring_free(opt, &cache, &sback, &hash);
-  return rc;
-}
-
 static int st_backnew(httrackp *opt, int argc, char **argv) {
   /* Too big to serve without the allocator asking the kernel for more. */
   enum { slots = 4096 };
@@ -984,6 +907,88 @@ static int st_backnew(httrackp *opt, int argc, char **argv) {
   printf("backnew: cannot cap memory, skipped\n");
   return 0;
 #endif
+}
+
+/* A link whose strings cannot be copied is dropped whole, not left half-built.
+ */
+static int st_recordoom(httrackp *opt, int argc, char **argv) {
+  static const size_t huge = 64 * 1024 * 1024;
+  struct_back *sback = NULL;
+  hash_struct hash;
+  cache_back cache;
+  char *big = NULL;
+  int rc = 1;
+  int before;
+  int recorded = 0, recorded_cod = 0, after = -1, after_cod = -1;
+
+  (void) argc;
+  (void) argv;
+  memset(&cache, 0, sizeof(cache));
+  st_mirror_wiring(opt, &sback, &hash, HTS_FALSE);
+  if (!hts_record_link(opt, "www.example.com", "/a.html", "/p/a.html", "", "",
+                       NULL)) {
+    printf("recordoom: FAILED (no first link)\n");
+    goto done;
+  }
+  before = opt->lien_tot;
+  big = malloct(huge);
+  assertf(big != NULL);
+  memset(big, 'x', huge - 1);
+  big[huge - 1] = '\0';
+#ifndef _WIN32
+  {
+    struct rlimit saved, tight;
+
+    if (getrlimit(RLIMIT_AS, &saved) != 0) {
+      printf("recordoom: cannot cap memory, skipped\n");
+      rc = 0;
+      goto done;
+    }
+    tight = saved;
+    tight.rlim_cur = 1024 * 1024;
+    if (setrlimit(RLIMIT_AS, &tight) != 0) {
+      printf("recordoom: cannot cap memory, skipped\n");
+      rc = 0;
+      goto done;
+    }
+    /* the address, then the codebase of a .class: the first and last copy */
+    recorded = hts_record_link(opt, big, "/b.html", "/p/b.html", "", "", NULL);
+    after = opt->lien_tot;
+    recorded_cod = hts_record_link(opt, "www.example.com", "/d.class",
+                                   "/p/d.class", "", "", big);
+    after_cod = opt->lien_tot;
+    (void) setrlimit(RLIMIT_AS, &saved);
+  }
+#else
+  printf("recordoom: cannot cap memory, skipped\n");
+  rc = 0;
+  goto done;
+#endif
+  if (recorded || recorded_cod) {
+    printf("recordoom: cap did not bite, skipped\n");
+    rc = 0;
+    goto done;
+  }
+  if (after != before || after_cod != before || opt->liens[before] != NULL) {
+    printf("recordoom: FAILED (refused links left %d then %d entries, want "
+           "%d)\n",
+           after, after_cod, before);
+    goto done;
+  }
+  if (!hts_record_link(opt, "www.example.com", "/c.html", "/p/c.html", "", "",
+                       NULL) ||
+      opt->lien_tot != before + 1 ||
+      strcmp(opt->liens[before]->fil, "/c.html") != 0) {
+    printf("recordoom: FAILED (no link recorded after the refusal)\n");
+    goto done;
+  }
+  printf("recordoom: oom OK\n");
+  rc = 0;
+
+done:
+  freet(big);
+  st_mirror_wiring_free(opt, &cache, &sback, &hash);
+  return rc;
 }
 
 /* Both 32-bit halves carry the step, so a torn read has unequal halves. */

@@ -347,7 +347,7 @@ size_t hts_record_link_latest(httrackp *opt);
 /* Mark link at index lpos as not to be processed (sets pass2 = -1). */
 void hts_invalidate_link(httrackp * opt, int lpos);
 
-/* Allocate the link heap once; HTS_FALSE when out of memory. */
+/* Allocates the link heap if absent, and returns HTS_FALSE without memory. */
 hts_boolean hts_record_init(httrackp *opt);
 
 void hts_record_free(httrackp *opt);

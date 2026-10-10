@@ -293,8 +293,7 @@ static size_t hts_record_link_alloc(httrackp *opt) {
   return hts_record_link_latest(opt);
 }
 
-/* Remove the entry hts_record_link_alloc() just added, keeping the NULL guard.
- */
+/* Undo hts_record_link_alloc(), so no half-built entry stays in the table. */
 static void hts_record_link_drop_latest(httrackp *opt) {
   lien_buffers *const liensbuf = opt->liensbuf;
 

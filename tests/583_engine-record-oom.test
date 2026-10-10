@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # A link whose strings cannot be allocated must be dropped and reported, not
-# abort the crawl or stay half-built in the link table (#57). The cap is
+# abort the crawl or stay half-built in the link table. The cap is
 # RLIMIT_AS, so a host where it is advisory reports a skip.
 
 set -euo pipefail
