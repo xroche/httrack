@@ -33,34 +33,36 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsselftest_int.h"
 
-/* True if a Cookie header line is a whole RFC 6265 list of `count` pairs. A
-   dropped cookie must take its separator with it, because a trailing "a; "
-   reads as part of the next value. */
+/* True if a Cookie header line is a whole RFC 6265 list of `count` pairs and
+   nothing else. A dropped cookie must take its separator with it, because a
+   trailing "a; " reads as part of the next value. */
 static hts_boolean cookie_line_is_whole(const char *line, int count) {
+  const char *end = strstr(line, H_CRLF);
   const char *p;
   int seen = 0;
 
+  if (end == NULL || end[sizeof(H_CRLF) - 1] != '\0')
+    return HTS_FALSE; // unterminated, or something follows the line
   if (strncmp(line, "Cookie: ", 8) != 0)
     return HTS_FALSE;
   p = line + 8;
-  for (;;) {
-    const char *eq = strchr(p, '=');
+  while (p < end) {
     const char *sep = strstr(p, "; ");
-    const char *end = strstr(p, H_CRLF);
+    const char *stop = (sep != NULL && sep < end) ? sep : end;
+    const char *eq = memchr(p, '=', (size_t) (stop - p));
 
-    if (end == NULL || end == p)
-      return HTS_FALSE;
-    if (sep != NULL && sep < end) {
-      if (eq == NULL || eq >= sep || eq == p)
-        return HTS_FALSE;
-      p = sep + 2;
-    } else {
-      if (eq == NULL || eq >= end || eq == p)
-        return HTS_FALSE;
-      seen++;
-      break;
-    }
+    if (eq == NULL || eq == p || eq + 1 == stop)
+      return HTS_FALSE; // no '=', an empty name, or an empty value
+    if (memchr(p, ';', (size_t) (stop - p)) != NULL)
+      return HTS_FALSE; // a ';' inside a pair never came from this writer
+    if (strncmp(p, "Cookie: ", 8) == 0)
+      return HTS_FALSE; // the prefix again, so the line was rebuilt mid-way
     seen++;
+    if (stop == end)
+      break;
+    p = sep + 2;
+    if (p >= end)
+      return HTS_FALSE; // a separator with no pair after it
   }
   return seen == count ? HTS_TRUE : HTS_FALSE;
 }
@@ -120,6 +122,39 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
     err = 1;
   if (strstr(hdr, "junk") != NULL) // wrong-domain cookie leaked
     err = 1;
+
+  /* cookie_line_is_whole is the only barrier between a clipped line and a
+     pass below, so what it refuses is asserted rather than assumed. */
+  {
+    static const struct {
+      const char *line;
+      int count;
+    } bad[] = {
+        {"Cookie: a=1; " H_CRLF, 1},                    // trailing separator
+        {"Cookie: a=1", 1},                             // no CRLF
+        {"Cookie: a=1" H_CRLF "x", 1},                  // trailing junk
+        {"Cookie: a=1" H_CRLF "Cookie: b=2" H_CRLF, 2}, // a second line
+        {"Cookie: Cookie: a=1" H_CRLF, 1},              // the prefix again
+        {"Cookie: a=1; b=" H_CRLF, 2},                  // empty value
+        {"Cookie: =1" H_CRLF, 1},                       // empty name
+        {"Cookie: a=1;b=2" H_CRLF, 1},                  // ';' with no space
+        {"Cookie: a=x; z=9" H_CRLF, 1}, // a value that forged a pair
+        {"Cookie: a=1; b=2" H_CRLF, 1}, // count below the pairs present
+        {"Cookie: a=1" H_CRLF, 2},      // count above them
+        {"a=1" H_CRLF, 1},              // no prefix
+    };
+
+    size_t i;
+
+    for (i = 0; i < sizeof(bad) / sizeof(bad[0]); i++) {
+      if (cookie_line_is_whole(bad[i].line, bad[i].count)) {
+        err = 1;
+        printf("  accepted a bad line: %s\n", bad[i].line);
+      }
+    }
+    if (!cookie_line_is_whole("Cookie: a=1; b=2" H_CRLF, 2))
+      err = 1; // the control: a whole line must still pass
+  }
 
   /* #101: every matching cookie is sent, not a fixed few. */
   {

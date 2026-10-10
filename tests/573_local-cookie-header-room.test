@@ -46,5 +46,6 @@ bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$doc")" --errors 0
 bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$doc")" \
     --no-host-root \
     --log-not-found 'Request header too large' \
+    --log-found 'Request too large for [0-9]* cookie' \
     httrack "BASEURL/index.html?>post:field=$(awk 'BEGIN { while (length(s) < 800) s = s "x"; print substr(s, 1, 800) }')" \
     --cookies-file "$(nativepath "$jar")"
