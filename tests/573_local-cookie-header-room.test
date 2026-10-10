@@ -1,0 +1,51 @@
+#!/bin/bash
+# #101: the Cookie line is written last, so it must leave room for the blank
+# line that ends the request and for the body that follows it. A jar whose
+# matching set outgrows the request buffer used to take that room and the
+# engine refused its own request.
+set -eu
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_101.XXXXXX") || exit 1
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+doc="${tmpdir}/doc"
+mkdir -p "$doc"
+printf '<html><body><a href="p.html">p</a></body></html>\n' >"${doc}/index.html"
+printf '<html><body>page</body></html>\n' >"${doc}/p.html"
+
+# Cookies enough to outgrow the 16 KB request buffer, ending in short ones so
+# the line packs to within a few bytes of its bound whatever the port's length.
+jar="${tmpdir}/jar.txt"
+big=$(awk 'BEGIN { while (length(s) < 1000) s = s "v"; print substr(s, 1, 1000) }')
+{
+    echo "# Netscape HTTP Cookie File"
+    for i in $(seq 0 13); do
+        printf '127.0.0.1\tFALSE\t/\tFALSE\t9999999999\tb%02d\t%s\n' "$i" "$big"
+    done
+    for i in $(seq 0 299); do
+        printf '127.0.0.1\tFALSE\t/\tFALSE\t9999999999\tt%03d\tv\n' "$i"
+    done
+} >"$jar"
+
+# No body: only the terminating blank line has to survive the cookie line.
+bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$doc")" --errors 0 \
+    --found 'index.html' \
+    --found 'p.html' \
+    --log-not-found 'Request header too large' \
+    httrack 'BASEURL/index.html' --cookies-file "$(nativepath "$jar")"
+
+# With a body, which is appended after that blank line and needs its own room.
+# Errors are not asserted: the fixture serves no POST, so the reply itself is an
+# error either way. What must not happen is the engine refusing to send at all.
+bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$doc")" \
+    --no-host-root \
+    --log-not-found 'Request header too large' \
+    --log-found 'Request too large for [0-9]* cookie' \
+    httrack "BASEURL/index.html?>post:field=$(awk 'BEGIN { while (length(s) < 800) s = s "x"; print substr(s, 1, 800) }')" \
+    --cookies-file "$(nativepath "$jar")"

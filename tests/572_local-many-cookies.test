@@ -1,0 +1,15 @@
+#!/bin/bash
+#
+# #101: every stored cookie must be replayed, not just the first eight. The byte
+# bound on the header line is covered by the -#test=cookies sweep, not here.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+# gate.html answers 500 unless every cookie the index page set comes back, so a
+# dropped one shows up both as a crawl error and as a missing marker.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    --found 'manycookies/gate.html' \
+    --file-matches 'manycookies/gate.html' 'ALL-COOKIES-REPLAYED' \
+    httrack 'BASEURL/manycookies/index.html'

@@ -33,9 +33,44 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsselftest_int.h"
 
+/* True if a Cookie header line is a whole RFC 6265 list of `count` pairs and
+   nothing else. A dropped cookie must take its separator with it, because a
+   trailing "a; " reads as part of the next value. */
+static hts_boolean cookie_line_is_whole(const char *line, int count) {
+  const char *end = strstr(line, H_CRLF);
+  const char *p;
+  int seen = 0;
+
+  if (end == NULL || end[sizeof(H_CRLF) - 1] != '\0')
+    return HTS_FALSE; // unterminated, or something follows the line
+  if (strncmp(line, "Cookie: ", 8) != 0)
+    return HTS_FALSE;
+  p = line + 8;
+  while (p < end) {
+    const char *sep = strstr(p, "; ");
+    const char *stop = (sep != NULL && sep < end) ? sep : end;
+    const char *eq = memchr(p, '=', (size_t) (stop - p));
+
+    if (eq == NULL || eq == p || eq + 1 == stop)
+      return HTS_FALSE; // no '=', an empty name, or an empty value
+    if (memchr(p, ';', (size_t) (stop - p)) != NULL)
+      return HTS_FALSE; // a ';' inside a pair never came from this writer
+    if (strncmp(p, "Cookie: ", 8) == 0)
+      return HTS_FALSE; // the prefix again, so the line was rebuilt mid-way
+    seen++;
+    if (stop == end)
+      break;
+    p = sep + 2;
+    if (p >= end)
+      return HTS_FALSE; // a separator with no pair after it
+  }
+  return seen == count ? HTS_TRUE : HTS_FALSE;
+}
+
 static int st_cookies(httrackp *opt, int argc, char **argv) {
   static t_cookie cookie;
   char hdr[1024];
+  char many_hdr[4096];
   /* RFC 6265: bare name=value pairs, no $Version/$Path (#151). */
   const char *expected = "Cookie: name=value; has_js=1" H_CRLF;
   const char *dom = "www.example.com";
@@ -87,6 +122,95 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
     err = 1;
   if (strstr(hdr, "junk") != NULL) // wrong-domain cookie leaked
     err = 1;
+
+  /* cookie_line_is_whole is the only barrier between a clipped line and a
+     pass below, so what it refuses is asserted rather than assumed. */
+  {
+    static const struct {
+      const char *line;
+      int count;
+    } bad[] = {
+        {"Cookie: a=1; " H_CRLF, 1},                    // trailing separator
+        {"Cookie: a=1", 1},                             // no CRLF
+        {"Cookie: a=1" H_CRLF "x", 1},                  // trailing junk
+        {"Cookie: a=1" H_CRLF "Cookie: b=2" H_CRLF, 2}, // a second line
+        {"Cookie: Cookie: a=1" H_CRLF, 1},              // the prefix again
+        {"Cookie: a=1; b=" H_CRLF, 2},                  // empty value
+        {"Cookie: =1" H_CRLF, 1},                       // empty name
+        {"Cookie: a=1;b=2" H_CRLF, 1},                  // ';' with no space
+        {"Cookie: a=x; z=9" H_CRLF, 1}, // a value that forged a pair
+        {"Cookie: a=1; b=2" H_CRLF, 1}, // count below the pairs present
+        {"Cookie: a=1" H_CRLF, 2},      // count above them
+        {"a=1" H_CRLF, 1},              // no prefix
+    };
+
+    size_t i;
+
+    for (i = 0; i < sizeof(bad) / sizeof(bad[0]); i++) {
+      if (cookie_line_is_whole(bad[i].line, bad[i].count)) {
+        err = 1;
+        printf("  accepted a bad line: %s\n", bad[i].line);
+      }
+    }
+    if (!cookie_line_is_whole("Cookie: a=1; b=2" H_CRLF, 2))
+      err = 1; // the control: a whole line must still pass
+  }
+
+  /* #101: every matching cookie is sent, not a fixed few. */
+  {
+    static t_cookie many;
+    char tight[64];
+    const int n = 20;
+    hts_boolean clipped = HTS_FALSE;
+    int i;
+    int sent;
+
+    many.max_len = sizeof(many.data);
+    many.data[0] = '\0';
+    for (i = 0; i < n; i++) {
+      char name[16];
+      char value[16];
+
+      snprintf(name, sizeof(name), "c%02d", i);
+      snprintf(value, sizeof(value), "v%02d", i);
+      if (cookie_add(&many, name, value, dom, "/") != 0)
+        err = 1;
+    }
+    sent = http_cookie_header(&many, dom, "/", many_hdr, sizeof(many_hdr));
+    if (sent != n)
+      err = 1;
+    if (!cookie_line_is_whole(many_hdr, n))
+      err = 1;
+    for (i = 0; i < n; i++) {
+      char pair[24];
+
+      snprintf(pair, sizeof(pair), "c%02d=v%02d", i, i);
+      if (strstr(many_hdr, pair) == NULL)
+        err = 1;
+    }
+
+    /* A buffer too small for the whole set still ends clean, and the clip
+       lands between a pair, on its separator or on the CRLF by the size. */
+    for (i = 1; i <= (int) sizeof(tight); i++) {
+      memset(tight, 'X', sizeof(tight)); /* a lost NUL must not read as empty */
+      sent = http_cookie_header(&many, dom, "/", tight, (size_t) i);
+      if (sent < 0 || sent > n)
+        err = 1;
+      else if (sent == 0) {
+        if (tight[0] != '\0')
+          err = 1;
+      } else {
+        if (sent < n)
+          clipped = HTS_TRUE;
+        if (!cookie_line_is_whole(tight, sent)) {
+          err = 1;
+          printf("  clipped at size %d: %s\n", i, tight);
+        }
+      }
+    }
+    if (!clipped) // a sweep that never clipped proves nothing about clipping
+      err = 1;
+  }
 #ifndef _WIN32
   /* the jar holds live session cookies: cookie_save must keep it 0600 */
   {
@@ -108,8 +232,10 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
   }
 #endif
   printf("cookie-header: %s\n", err ? "FAIL" : "OK");
-  if (err)
+  if (err) {
     printf("  got: %s\n", hdr);
+    printf("  many: %s\n", many_hdr);
+  }
   return err;
 }
 
