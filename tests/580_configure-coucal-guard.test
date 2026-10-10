@@ -33,7 +33,7 @@ if test "$rc" -eq 0; then
 fi
 grep -q 'error: src/coucal is empty' <<<"$out" || {
     echo "FAIL: no submodule error; configure said:"
-    echo "$out"
+    tail -5 <<<"$out"
     exit 1
 }
 grep -q 'git submodule update --init src/coucal' <<<"$out" || {
@@ -46,7 +46,7 @@ grep -q 'git submodule update --init src/coucal' <<<"$out" || {
 run_configure
 grep -q 'checking for the coucal submodule... yes' <<<"$out" || {
     echo "FAIL: guard did not pass with coucal present; configure said:"
-    echo "$out"
+    tail -5 <<<"$out"
     exit 1
 }
 if grep -q 'src/coucal is empty' <<<"$out"; then
