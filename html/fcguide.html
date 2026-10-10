@@ -220,7 +220,7 @@ Spider options:
   sN follow robots.txt and meta robots tags (0=never,1=sometimes,* 2=always) (--robots[=N])
  %h  force HTTP/1.0 requests (reduce update features, only for old servers or proxies) (--http-10)
  %B  tolerant requests (accept bogus responses on some servers, but not standard!) (--tolerant)
- %s  update hacks: various hacks to limit re-transfers when updating (identical size, bogus response..) (--updatehack)
+ %s  update hacks: keep a file already on disk when its size matches, even on a first crawl, and accept some bogus responses (--updatehack)
  %A  assume that a type (cgi,asp..) is always linked with a mime type (-%A php3=text/html) (--assume &lt;param&gt;)
 
 Browser ID:
