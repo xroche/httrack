@@ -356,6 +356,36 @@ found "v.webm" "$out10"
 found "subs.vtt" "$out10"
 notfound "plain.gif" "$out10"
 
+# <img srcset> and data-srcset follow the same way (#136). <img data-src> stays
+# refused: its values are often placeholders, and those must not be fetched.
+sitess="$tmp/imgsrcset"
+mkdir -p "$sitess"
+for f in s1 s2 d ds1 ds2 div divss; do gif "$sitess/$f.gif"; done
+gif "$sitess/{{url}}" # a placeholder that resolves, so refusing it is observable
+cat >"$sitess/index.html" <<EOF
+<html><body><a href="leaf.html">leaf</a></body></html>
+EOF
+cat >"$sitess/leaf.html" <<EOF
+<html><body>
+<img srcset="s1.gif 1x, s2.gif 2x">
+<img data-src="d.gif">
+<img data-src="{{url}}">
+<img data-srcset="ds1.gif 480w, ds2.gif 800w">
+<div data-src="div.gif" srcset="divss.gif 1x"></div>
+</body></html>
+EOF
+outss="$tmp/imgsrcset-out"
+rm -rf "$outss"
+mkdir -p "$outss"
+httrack "file://$sitess/index.html" -O "$outss" --quiet --near -r2 >"$outss/.log" 2>&1 || true
+for f in s1 s2 ds1 ds2; do found "$f.gif" "$outss"; done
+for f in '*url*' d.gif div.gif divss.gif; do notfound "$f" "$outss"; done
+leafss=$(find "$outss" -name leaf.html | head -1)
+grep -Fq 'srcset="s1.gif 1x, s2.gif 2x"' "$leafss" ||
+    fail "#136: img srcset not rewritten to the local candidates"
+grep -Fq 'data-srcset="ds1.gif 480w, ds2.gif 800w"' "$leafss" ||
+    fail "#136: img data-srcset not rewritten to the local candidates"
+
 # Unknown-attr (data-*) URLs (#201/#203): the script automaton state must reset at
 # </script>, or detection dies for the rest of the page after the first script.
 site11="$tmp/dataattr"
