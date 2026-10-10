@@ -2454,6 +2454,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
 
 cleanup:
   /* single exit: every bailout jumps here, so the closes below always run */
+  /* a bailout skips the ending, so close a .mht left open or held */
+  usercommand(opt, 0, NULL, NULL, NULL, NULL);
   /* the summary above is skipped by every bailout, so the note goes here */
   if (opt->log != NULL) {
     char BIGSTK upperNote[256];
@@ -3834,19 +3836,15 @@ int usercommand_exe(httrackp *opt, const char *cmd, const char *file) {
 #endif
 }
 
-/* Scratch file holding the parts written before the archive's root page. */
-static const char *mimehtml_held_name(httrackp *opt) {
-  return fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                 StringBuff(opt->path_html), "index.mht.part");
-}
+/* MIME/MHTML writer states, held in opt->state.mimehtml_created. */
+#define MIMEHTML_NONE 0    /* no part written yet */
+#define MIMEHTML_WRITING 1 /* writing index.mht */
+#define MIMEHTML_HELD 2    /* holding parts in ~index.mht.part, no root yet */
+#define MIMEHTML_FAILED (-1)
 
-/* Writing the whole mirror twice is not worth a start=, so stop holding at
-   this many bytes and let the first part be the root as before. */
-#define MIMEHTML_HELD_MAX (16 * 1024 * 1024)
-
-/* RFC 2387: without start= the root is the first part, which is whichever file
-   the mirror happened to finish first. `startcid` names the page instead, and
-   is NULL when the archive holds no page at all. */
+/* Without start=, RFC 2387 defaults the root to the first part, whichever file
+   the mirror happened to finish first. `startcid` is NULL when the archive
+   holds no page. */
 static void mimehtml_write_header(httrackp *opt, const char *startcid) {
   char BIGSTK currtime[256];
 
@@ -3870,12 +3868,14 @@ static void mimehtml_write_header(httrackp *opt, const char *startcid) {
           "\r\n");
 }
 
-/* Create index.mht with `startcid` as its root, and move in any held parts. */
-static hts_boolean mimehtml_create(httrackp *opt, const char *startcid) {
+/* Create index.mht with `startcid` as its root, and move in the parts held so
+   far, which opt->state.mimefp points at while they are held. */
+static void mimehtml_create(httrackp *opt, const char *startcid) {
   FILE *const held = opt->state.mimefp;
   char BIGSTK heldname[HTS_URLMAXSIZE * 2];
 
-  strcpybuff(heldname, mimehtml_held_name(opt));
+  strcpybuff(heldname, fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                               StringBuff(opt->path_html), "~index.mht.part"));
   opt->state.mimefp = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                                     StringBuff(opt->path_html), "index.mht"),
                             "wb");
@@ -3884,9 +3884,9 @@ static hts_boolean mimehtml_create(httrackp *opt, const char *startcid) {
       fclose(held);
       (void) UNLINK(heldname);
     }
-    opt->state.mimehtml_created = -1;
+    opt->state.mimehtml_created = MIMEHTML_FAILED;
     hts_log_print(opt, LOG_ERROR, "unable to create index.mht");
-    return HTS_FALSE;
+    return;
   }
   (void) UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                         StringBuff(opt->path_html), "index.eml"));
@@ -3903,22 +3903,21 @@ static hts_boolean mimehtml_create(httrackp *opt, const char *startcid) {
 #endif
   mimehtml_write_header(opt, startcid);
   if (held != NULL) {
-    char buff[16384];
+    char BIGSTK buff[32768];
     size_t len;
 
     rewind(held);
     while ((len = fread(buff, 1, sizeof(buff), held)) > 0) {
       if (fwrite(buff, 1, len, opt->state.mimefp) != len) {
         hts_log_print(opt, LOG_ERROR | LOG_ERRNO,
-                      "index.mht is truncated, could not write %s", heldname);
+                      "index.mht is truncated, could not move in %s", heldname);
         break;
       }
     }
     fclose(held);
     (void) UNLINK(heldname);
   }
-  opt->state.mimehtml_created = 1;
-  return HTS_TRUE;
+  opt->state.mimehtml_created = MIMEHTML_WRITING;
 }
 
 static void postprocess_file(httrackp *opt, const char *save, const char *adr,
@@ -3932,8 +3931,9 @@ static void postprocess_file(httrackp *opt, const char *save, const char *adr,
         strnotempty(save) && fexist_utf8(save)) {
       const char *rsc_save = save;
       const char *rsc_fil = strrchr(fil, '/');
-      const int isHtml = (ishtml(opt, save) == 1);
-      char BIGSTK cid[HTS_URLMAXSIZE * 3];
+      /* Read the part before the header names it: a start= whose part then
+         fails to open would leave the reader with no root at all. */
+      FILE *const fp = FOPEN(save, "rb");
       int n;
 
       if (rsc_fil == NULL)
@@ -3951,34 +3951,39 @@ static void postprocess_file(httrackp *opt, const char *save, const char *adr,
         rsc_save += n;
       }
 
-      make_content_id(adr, fil, cid, sizeof(cid));
-      if (opt->state.mimehtml_created == 0) {
-        srand((unsigned int) time(NULL));
-        StringRoom(opt->state.mimemid, 256);
-        sprintf(StringBuffRW(opt->state.mimemid), "----=_MIMEPart_%d_%d_=----",
-                (int) time(NULL), (int) rand());
-        StringSetLength(opt->state.mimemid, -1);
-        if (isHtml) {
-          (void) mimehtml_create(opt, cid);
-        } else {
-          /* Hold it aside until a page turns up to be the root. */
-          opt->state.mimefp = FOPEN(mimehtml_held_name(opt), "w+b");
-          if (opt->state.mimefp == NULL) {
-            opt->state.mimehtml_created = -1;
-            hts_log_print(opt, LOG_ERROR, "unable to create index.mht");
-          } else {
-            opt->state.mimehtml_created = 2;
-          }
-        }
-      } else if (opt->state.mimehtml_created == 2 &&
-                 opt->state.mimefp != NULL &&
-                 (isHtml || ftell(opt->state.mimefp) > MIMEHTML_HELD_MAX)) {
-        (void) mimehtml_create(opt, isHtml ? cid : NULL);
-      }
-      if (opt->state.mimehtml_created > 0 && opt->state.mimefp != NULL) {
-        FILE *fp = FOPEN(save, "rb");
+      if (fp != NULL) {
+        const int isHtml = (ishtml(opt, save) == 1);
+        char BIGSTK cid[HTS_URLMAXSIZE * 3];
 
-        if (fp != NULL) {
+        make_content_id(adr, fil, cid, sizeof(cid));
+        if (opt->state.mimehtml_created == MIMEHTML_NONE) {
+          srand((unsigned int) time(NULL));
+          StringRoom(opt->state.mimemid, 256);
+          sprintf(StringBuffRW(opt->state.mimemid),
+                  "----=_MIMEPart_%d_%d_=----", (int) time(NULL), (int) rand());
+          StringSetLength(opt->state.mimemid, -1);
+          if (isHtml) {
+            mimehtml_create(opt, cid);
+          } else {
+            /* Hold it aside until a page turns up to be the root. A saved
+               name never carries a '~', so no mirrored file lands here. */
+            opt->state.mimefp =
+                FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                              StringBuff(opt->path_html), "~index.mht.part"),
+                      "w+b");
+            if (opt->state.mimefp == NULL) {
+              opt->state.mimehtml_created = MIMEHTML_FAILED;
+              hts_log_print(opt, LOG_ERROR, "unable to create index.mht");
+            } else {
+              opt->state.mimehtml_created = MIMEHTML_HELD;
+            }
+          }
+        } else if (opt->state.mimehtml_created == MIMEHTML_HELD && isHtml) {
+          mimehtml_create(opt, cid);
+        }
+        if (opt->state.mimefp != NULL &&
+            (opt->state.mimehtml_created == MIMEHTML_WRITING ||
+             opt->state.mimehtml_created == MIMEHTML_HELD)) {
           char buff[60 * 100 + 2];
           char mimebuff[256];
           size_t len;
@@ -3987,19 +3992,15 @@ static void postprocess_file(httrackp *opt, const char *save, const char *adr,
           guess_httptype_sized(opt, mimebuff, sizeof(mimebuff), save);
           fprintf(opt->state.mimefp, "--%s\r\n",
                   StringBuff(opt->state.mimemid));
-          /*if (first)
-             fprintf(opt->state.mimefp, "Content-disposition: inline\r\n");
-             else */
           fprintf(opt->state.mimefp,
                   "Content-disposition: attachment; filename=\"%s\"\r\n",
                   rsc_save);
           fprintf(opt->state.mimefp,
-                  "Content-Type: %s\r\n" "Content-Transfer-Encoding: %s\r\n"
-                  /*"Content-Location: http://localhost/%s\r\n" */
-                  "Content-ID: <%s>\r\n" "\r\n", mimebuff,
-                  isHtml ? "8bit" : "base64"
-                  /*, rsc_save */
-                  , cid);
+                  "Content-Type: %s\r\n"
+                  "Content-Transfer-Encoding: %s\r\n"
+                  "Content-ID: <%s>\r\n"
+                  "\r\n",
+                  mimebuff, isHtml ? "8bit" : "base64", cid);
           while((len = fread(buff, 1, sizeof(buff) - 2, fp)) > 0) {
             buff[len] = '\0';
             if (!isHtml) {
@@ -4012,16 +4013,17 @@ static void postprocess_file(httrackp *opt, const char *save, const char *adr,
               fprintf(opt->state.mimefp, "%s", buff);
             }
           }
-          fclose(fp);
           fprintf(opt->state.mimefp, "\r\n\r\n");
         }
+        fclose(fp);
       }
     } else if (save == NULL) {
-      /* The mirror held no page, so the archive gets no root. */
-      if (opt->state.mimehtml_created == 2) {
-        (void) mimehtml_create(opt, NULL);
+      /* The mirror saved no page, so the archive gets no root. */
+      if (opt->state.mimehtml_created == MIMEHTML_HELD) {
+        mimehtml_create(opt, NULL);
       }
-      if (opt->state.mimehtml_created == 1 && opt->state.mimefp != NULL) {
+      if (opt->state.mimehtml_created == MIMEHTML_WRITING &&
+          opt->state.mimefp != NULL) {
         fprintf(opt->state.mimefp, "--%s--\r\n",
                 StringBuff(opt->state.mimemid));
         fclose(opt->state.mimefp);
