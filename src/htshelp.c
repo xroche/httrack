@@ -608,8 +608,8 @@ void help(const char *app, int more) {
   infomsg(" %z  do not request compressed content (%z0 request)");
   infomsg
     (" %B  tolerant requests (accept bogus responses on some servers, but not standard!)");
-  infomsg
-    (" %s  update hacks: keep a file already on disk when its size matches, even on a first crawl, and accept some bogus responses");
+  infomsg(" %s  update hacks: keep a file already on disk when its size "
+          "matches, even on a first crawl, and accept some bogus responses");
   infomsg
     (" %u  url hacks: various hacks to limit duplicate URLs (strip //, www.foo.com==foo.com..)");
   infomsg("     opt out of one url-hack part: --keep-www-prefix "
