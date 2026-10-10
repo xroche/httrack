@@ -1,8 +1,7 @@
 #!/bin/bash
-# Issue #1926: with the cache deleted, the previous mirror's own copy is the
-# only record of what a link was named. -%N0 found it and resumed from it; the
-# default -%N2 named the link ".delayed" instead, so the on-disk resume never
-# fired and every file came down again.
+# Issue #1926: an update whose cache is gone must resume from the files already
+# in the mirror. The default -%N2 named every link ".delayed", so the on-disk
+# resume in back_add() never fired and each file came down again.
 set -eu
 
 # shellcheck source=tests/crawllib.sh
@@ -10,6 +9,9 @@ set -eu
 
 marker='Kept existing file'
 assets=(ranged/asset.bin ranged/asset.gif)
+# Named from its URL alone, so the mirror's copy of it says nothing about the
+# name an undelayed run would pick. It must be fetched again, not kept.
+bare=ranged/bare
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_1926.XXXXXX") || exit 1
 cleanup() {
@@ -24,6 +26,7 @@ cat >"${tmpdir}/root/index.html" <<'HTML'
 <html><body>
 <a href="/ranged/asset.bin">bin</a>
 <a href="/ranged/asset.gif">gif</a>
+<a href="/ranged/bare">bare</a>
 </body></html>
 HTML
 
@@ -41,7 +44,7 @@ crawl() { # crawl <label> <outdir> [httrack args...]
 # What the server holds, and the names the delayed type check settles on.
 refout="${tmpdir}/out-ref"
 crawl ref "$refout"
-for f in "${assets[@]}"; do
+for f in "${assets[@]}" "$bare"; do
     assert_file "${refout}/${host}/${f}" "reference mirror"
 done
 
@@ -52,7 +55,7 @@ seed() { # seed <outdir> <byte>
     local out=$1 byte=$2 f
     rm -rf "$out"
     mkdir -p "${out}/${host}/ranged"
-    for f in "${assets[@]}"; do
+    for f in "${assets[@]}" "$bare"; do
         repeat_chars "$(size_of "${refout}/${host}/${f}")" "$byte" \
             >"${out}/${host}/${f}"
     done
@@ -64,6 +67,7 @@ kept_lines() { # kept_lines <outdir>
 
 keptout="${tmpdir}/out-kept"
 seed "$keptout" Q
+# No -%N, so this is the default -%N2, the mode #1926 broke.
 crawl kept "$keptout"
 n=$(kept_lines "$keptout")
 test "$n" -eq "${#assets[@]}" ||
@@ -84,21 +88,25 @@ done
 left=$(find "${keptout}/${host}" -name '*.delayed' | sort)
 test -z "$left" || fail "kept: the mirror holds a placeholder:
 ${left}"
-ok "an update with no cache keeps both files"
+# The count above is the whole assertion for the extensionless file: keeping it
+# would make three, and its bytes prove it was fetched rather than kept.
+cmp -s "${keptout}/${host}/${bare}" "${refout}/${host}/${bare}" ||
+    fail "kept: ${bare} was kept, so an extensionless name was adopted"
+ok "an update with no cache keeps both named files, and only those"
 
 # Control: a genuine prefix of each asset. Neither size matches, so both are
 # completed off the server and nothing may claim a file was kept.
 part="${tmpdir}/out-part"
 rm -rf "$part"
 mkdir -p "${part}/${host}/ranged"
-for f in "${assets[@]}"; do
+for f in "${assets[@]}" "$bare"; do
     dd if="${refout}/${host}/${f}" of="${part}/${host}/${f}" bs=1 count=4096 \
         2>/dev/null
 done
 crawl part "$part"
 n=$(kept_lines "$part")
 test "$n" -eq 0 || fail "part: the log claims $n files were kept"
-for f in "${assets[@]}"; do
+for f in "${assets[@]}" "$bare"; do
     cmp -s "${part}/${host}/${f}" "${refout}/${host}/${f}" ||
         fail "part: ${f} does not match the server's copy"
 done

@@ -1273,6 +1273,11 @@ class Handler(SimpleHTTPRequestHandler):
     def route_ranged_gif(self):
         self.send_ranged(self.RANGED_GIF, "image/gif")
 
+    # A type no extension maps to, so the mirror names this one from the URL
+    # alone and the saved name carries no extension at all (#1926).
+    def route_ranged_bare(self):
+        self.send_ranged(self.RANGED_GIF, "application/x-httrack-nomap")
+
     # 256 KB: past stdio's buffer, so the write itself reaches the disk.
     DISKFULL_BIN = b"DISKFULL\n" + b"\x41\x42\x43\x44" * 65536
 
@@ -3842,6 +3847,7 @@ class Handler(SimpleHTTPRequestHandler):
         "/dynfail/dyngone.html": route_dynfail_gone,
         "/ranged/asset.bin": route_ranged_asset,
         "/ranged/asset.gif": route_ranged_gif,
+        "/ranged/bare": route_ranged_bare,
         "/types/index.html": route_types_index,
         "/types/control.php": route_types,
         "/types/photo.png": route_types,

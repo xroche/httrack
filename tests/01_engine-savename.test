@@ -180,3 +180,24 @@ full '/nul/x.bin' 'application/octet-stream' \
     '/dev/null/www.example.com/nul_/x.bin'
 
 selftest_run_queued
+
+# #1926: with no cache, the mirror's own copy is what names the link. A known
+# extension is taken from disk, while an HTML copy is not, so the delayed type
+# still decides the name of a page.
+ondisk=$(mktemp -d)
+cleanup_push rm -rf "$ondisk"
+mkdir -p "${ondisk}/www.example.com"
+printf 'BINARY\n' >"${ondisk}/www.example.com/p.bin"
+printf '<html></html>\n' >"${ondisk}/www.example.com/p.html"
+
+ondisk_name() { # ondisk_name <fil> <content-type> <want> [args...]
+    local fil=$1 ctype=$2 want=$3 got
+    shift 3
+    got=$("$HTTRACK_PATH" -O "$ondisk" '-#test=savename' "$fil" "$ctype" "$@") ||
+        fail "savename $fil: the engine failed"
+    test "$got" = "savename: ${ondisk}/www.example.com/${want}" ||
+        fail "savename $fil: expected [${want}], got [$got]"
+}
+
+ondisk_name '/p.bin' 'text/html' 'p.bin' statuscode=301
+ondisk_name '/p.html' 'text/html' 'p.html.0.delayed' statuscode=301
