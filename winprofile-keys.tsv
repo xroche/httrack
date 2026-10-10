@@ -107,7 +107,7 @@ Warc	win,web,droid	setting	checkbox	--warc		WarcFile,WarcMaxSize,WarcCdx	agreed	
 WarcCdx	win,web	setting	checkbox	--warc-cdx		Warc	agreed	0		
 WarcFile	web,droid	setting	string			Warc	none			
 WarcMaxSize	web	setting	string			Warc	none			
-WildCardFilters	win,web,droid	setting	string				agreed	+*.png +*.gif +*.jpg +*.jpeg +*.css +*.js -ad.doubleclick.net/* -mime:application/foobar	literal	
+WildCardFilters	win,web,droid	setting	string				agreed	+*.png +*.gif +*.jpg +*.jpeg +*.webp +*.avif +*.svg +*.css +*.js +*.woff2 +*.woff +*.ttf +*.otf +*.mp4 +*.webm -ad.doubleclick.net/* -mime:application/foobar	literal	
 WordIndex	win,web,droid	setting	checkbox	--search-index	--search-index=0		agreed	0		
 
 KeepDoubleSlashes		setting	string							KeepSlashes
