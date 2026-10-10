@@ -75,8 +75,10 @@ until test -n "$partial"; do
     grep -aq '^RETR ' "$cmds" 2>/dev/null && partial=$(find "$out" -name f.bin)
     poll_wait 1
 done
-# The engine matches the cancel against the save path, byte for byte.
-printf '%s\n' "$partial" >"${trigger}.tmp"
+# The engine matches the cancel against the save path, byte for byte. The URL
+# goes first: it matches nothing, and the engine must say so.
+url="ftp://127.0.0.1:${FTP_PORT}/f.bin"
+printf '%s\n%s\n' "$url" "$partial" >"${trigger}.tmp"
 mv "${trigger}.tmp" "$trigger"
 
 wait_bounded "$crawlpid" 90 || fail "the cancelled crawl never ended"
@@ -88,6 +90,12 @@ crawlpid=
 grep -aq 'Cancelled by User' "${out}/hts-log.txt" ||
     fail "the cancel never reached the transfer: $(grep -a Error "${out}/hts-log.txt" || true)"
 test -s "$closes" || fail "the interposer logged no close() at all"
+grep -aqF "Cancel matched no transfer in progress (it takes the local save path, not the URL): $url" \
+    "${out}/hts-log.txt" || fail "a cancel by URL was not reported"
+if grep -aqF "Cancel matched no transfer in progress (it takes the local save path, not the URL): $partial" \
+    "${out}/hts-log.txt"; then
+    fail "the matching cancel was reported as unmatched"
+fi
 ok "the cancel landed on an in-flight transfer ($(wc -l <"$closes") closes seen)"
 
 badf=$(count_matching_lines ' EBADF$' "$closes")
