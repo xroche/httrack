@@ -234,9 +234,6 @@ static char *hts_record_link_strdup_(httrackp *opt, const char *s) {
 
   assertf(liensbuf != NULL);
   s_dup = hts_arena_strdup(&liensbuf->strings, s);
-  if (s_dup == NULL) {
-    hts_record_assert_memory_failed(strlen(s) + 1);
-  }
   return s_dup;
 }
 
@@ -272,7 +269,7 @@ static size_t hts_record_link_alloc(httrackp *opt) {
   // The entries are pointed at from elsewhere, so they must keep their address
   link = (lien_url *) hts_arena_alloc(&liensbuf->liens, sizeof(*link));
   if (link == NULL) {
-    hts_record_assert_memory_failed(sizeof(*link));
+    return (size_t) -1;
   }
   memset(link, 0, sizeof(*link));
 
@@ -296,13 +293,22 @@ static size_t hts_record_link_alloc(httrackp *opt) {
   return hts_record_link_latest(opt);
 }
 
-void hts_record_init(httrackp *opt) {
+/* Remove the entry hts_record_link_alloc() just added, keeping the NULL guard.
+ */
+static void hts_record_link_drop_latest(httrackp *opt) {
+  lien_buffers *const liensbuf = opt->liensbuf;
+
+  assertf(TypedArraySize(liensbuf->ptr) != 0);
+  TypedArraySize(liensbuf->ptr)--;
+  TypedArrayElts(liensbuf->ptr)[TypedArraySize(liensbuf->ptr)] = NULL;
+  opt->lien_tot = (int) TypedArraySize(liensbuf->ptr);
+}
+
+hts_boolean hts_record_init(httrackp *opt) {
   if (opt->liensbuf == NULL) {
     opt->liensbuf = calloct(sizeof(*opt->liensbuf), 1);
-    if (opt->liensbuf == NULL) {
-      hts_record_assert_memory_failed(sizeof(*opt->liensbuf));
-    }
   }
+  return opt->liensbuf != NULL;
 }
 
 // wipe records
@@ -340,6 +346,7 @@ static int hts_record_link_(httrackp * opt,
     || (link->former_adr = hts_record_link_strdup(opt, ref_address)) == NULL
     || (link->former_fil = hts_record_link_strdup(opt, ref_file)) == NULL
     ) {
+    hts_record_link_drop_latest(opt);
     return 0;
   }
 
@@ -348,6 +355,7 @@ static int hts_record_link_(httrackp * opt,
     const size_t len = strlen(file);
     if (len > 6 && strncmp(&file[len - 6], ".class", 6) == 0) {
       if ((link->cod = hts_record_link_strdup(opt, codebase)) == NULL) {
+        hts_record_link_drop_latest(opt);
         return 0;
       }
     }
@@ -371,11 +379,13 @@ int hts_record_link(httrackp * opt,
                     const char *codebase) {
   const int success = 
     hts_record_link_(opt, address, file, save, ref_address, ref_file, codebase);
-  if (!success) {
+  if (!success && opt->maxlink > 0 && opt->lien_tot >= opt->maxlink) {
     hts_log_print(opt, LOG_PANIC, "Too many links (links=%ld, limit=%ld)", 
                   (long int) heap_top_index(), (long int) opt->maxlink);
     hts_log_print(opt, LOG_INFO,
       "To avoid that: use #L option for more links (example: -#L1000000, or -#L0 to disable)");
+  } else if (!success) {
+    hts_log_print(opt, LOG_PANIC, "Not enough memory to record a link");
   }
   return success;
 }
@@ -846,7 +856,11 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   hts_changes_free_opt(opt);
 
   // initialize link heap
-  hts_record_init(opt);
+  if (!hts_record_init(opt)) {
+    printf("PANIC! : Not enough memory [%d]\n", __LINE__);
+    XH_extuninit;
+    return 0;
+  }
 
   // initialiser ptr et lien_tot
   ptr = 0;

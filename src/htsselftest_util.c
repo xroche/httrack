@@ -66,7 +66,7 @@ void st_mirror_wiring(httrackp *opt, struct_back **sback, hash_struct *hash,
   hash_init(opt, hash, opt->urlhack);
   hash->liens = (const lien_url *const *const *) &opt->liens;
   opt->hash = hash;
-  hts_record_init(opt);
+  assertf(hts_record_init(opt));
 }
 
 /* Everything a cache_back holds, freed. Called again mid-test where the cache

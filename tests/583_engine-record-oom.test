@@ -1,0 +1,29 @@
+#!/bin/bash
+#
+# A link whose strings cannot be allocated must be dropped and reported, not
+# abort the crawl or stay half-built in the link table (#57). The cap is
+# RLIMIT_AS, so a host where it is advisory reports a skip.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+rc=0
+out=$(ASAN_OPTIONS="${ASAN_OPTIONS-}${ASAN_OPTIONS:+:}allocator_may_return_null=1" \
+    httrack -O /dev/null -#test=recordoom 2>&1) || rc=$?
+test "$rc" -eq 0 || fail "-#test=recordoom: exited $rc, output: $(tail -c 2000 <<<"$out")"
+last=$(tail -n 1 <<<"$out")
+case "$last" in
+"recordoom: oom OK")
+    grep -q 'Not enough memory to record a link' <<<"$out" ||
+        fail "the refused link was not reported: $out"
+    ;;
+*skipped*)
+    echo "SKIP: $last" >&2
+    ;;
+*)
+    fail "expected the failed allocation to be reported, got: $out"
+    ;;
+esac
+exit 0
