@@ -27,7 +27,10 @@ test -n "$rules" || fail "no WildCardFilters row in winprofile-keys.tsv"
 mkdir -p "${tmpdir}/aroot" "${tmpdir}/broot/cdn"
 # Kept: every type the default rules name. Refused: types they do not, which is
 # what stops a permissive rule set from passing this test.
-kept="logo.webp pic.avif draw.svg font.woff2 old.woff face.ttf shape.otf clip.mp4 reel.webm"
+# BANNER.WEBP is here because the rules match case-insensitively, which nothing
+# else asserts. Its stem differs from logo.webp, because the engine folds case
+# when it picks a save name and would store a second logo.webp as logo-2.webp.
+kept="logo.webp BANNER.WEBP pic.avif draw.svg font.woff2 old.woff face.ttf shape.otf clip.mp4 reel.webm"
 refused="paper.pdf bundle.zip audio.ogg"
 for f in $kept $refused; do
     printf 'body of %s\n' "$f" >"${tmpdir}/broot/cdn/${f}"
