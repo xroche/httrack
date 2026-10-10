@@ -1113,11 +1113,12 @@ int cache_golden_selftest(httrackp *opt, const char *dir, int regen) {
 
 /* All reconcile inputs/outputs, wiped between cases. */
 static const char *const reconcile_files[] = {
-    "hts-cache/new.zip",     "hts-cache/old.zip",    "hts-cache/new.dat",
-    "hts-cache/old.dat",     "hts-cache/new.ndx",    "hts-cache/old.ndx",
-    "hts-cache/new.lst",     "hts-cache/old.lst",    "hts-cache/new.txt",
-    "hts-cache/old.txt",     "hts-in_progress.lock", "hts-cache/damaged.zip",
-    "hts-cache/damaged.lst", "hts-cache/damaged.txt"};
+    "hts-cache/new.zip",     "hts-cache/old.zip",     "hts-cache/new.dat",
+    "hts-cache/old.dat",     "hts-cache/new.ndx",     "hts-cache/old.ndx",
+    "hts-cache/new.lst",     "hts-cache/old.lst",     "hts-cache/new.txt",
+    "hts-cache/old.txt",     "hts-in_progress.lock",  "hts-cache/damaged.zip",
+    "hts-cache/damaged.lst", "hts-cache/damaged.txt", "hts-cache/repair.zip",
+    "hts-cache/repair.tmp"};
 
 static char *reconcile_st_path(httrackp *opt, const char *name) {
   return fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
@@ -1287,10 +1288,14 @@ static int reconcile_rotation_cases(httrackp *opt, LLint partial,
   reconcile_wipe(opt);
   reconcile_put_zip(opt, "hts-cache/old.zip", complete, 0);
   reconcile_put(opt, "hts-cache/old.lst", small);
+  reconcile_put(opt, "hts-cache/old.txt", small);
   reconcile_put_zip(opt, "hts-cache/new.zip", partial, 0);
   reconcile_truncate(opt, "hts-cache/new.zip", directory_end);
   reconcile_put(opt, "hts-cache/new.lst", medium);
+  reconcile_put(opt, "hts-cache/new.txt", medium);
   reconcile_rotate(opt);
+  failures +=
+      reconcile_expect(opt, "hts-cache/old.txt", medium, "rotate-repairable");
   failures += reconcile_expect_zip(opt, "hts-cache/old.zip", partial,
                                    "rotate-repairable");
   failures +=
@@ -1306,6 +1311,16 @@ static int reconcile_rotation_cases(httrackp *opt, LLint partial,
       reconcile_expect(opt, "hts-cache/old.zip", damaged, "rotate-noold");
   failures +=
       reconcile_expect(opt, "hts-cache/damaged.zip", -1, "rotate-noold");
+
+  /* an empty old.zip holds no generation either */
+  reconcile_wipe(opt);
+  reconcile_put(opt, "hts-cache/old.zip", 0);
+  reconcile_put(opt, "hts-cache/new.zip", damaged);
+  reconcile_rotate(opt);
+  failures +=
+      reconcile_expect(opt, "hts-cache/old.zip", damaged, "rotate-emptyold");
+  failures +=
+      reconcile_expect(opt, "hts-cache/damaged.zip", -1, "rotate-emptyold");
   return failures;
 }
 
