@@ -21,6 +21,38 @@ tmp=$(mktemp -d)
 cleanup_push rm -rf "$tmp"
 keys="$tmp/english.keys"
 
+# A catalog may key a line by its lang.def symbol instead of its English text.
+# Every check below reads text keys, so it runs on copies keyed by text again.
+syms="$tmp/symbols"
+LC_ALL=C awk '{ sub(/\r$/, "") } NR%2==1 { k = $0 }
+    NR%2==0 && k ~ /^(LANG|LISTDEF)_/ { print k "\t" $0 }' "$def" >"$syms"
+nsyms=$(wc -l <"$syms")
+[ "$nsyms" -ge 510 ] || fail "only $nsyms symbols parsed from $def; the parse is broken"
+mkdir "$tmp/lang"
+for f in "$langdir"/*.txt; do
+    if ! LC_ALL=C command grep -qE '^(LANG|LISTDEF)_' "$f"; then
+        cp "$f" "$tmp/lang/"
+        continue
+    fi
+    LC_ALL=C awk -v syms="$syms" -v name="${f##*/}" '
+        BEGIN { FS = "\t"; while ((getline < syms) > 0) text[$1] = $2; FS = " " }
+        NR % 2 == 1 {
+            cr = sub(/\r$/, "")
+            if (($0 in text) && seen[$0]++) {
+                printf "%s:%d: symbol keyed twice: %s\n", name, NR, $0 >"/dev/stderr"
+                bad++
+            }
+            if ($0 in text)
+                $0 = text[$0]
+            printf "%s%s\n", $0, (cr ? "\r" : "")
+            next
+        }
+        { print }
+        END { exit(bad > 0) }' "$f" >"$tmp/lang/${f##*/}" || fail "a catalog keys a symbol twice"
+done
+langdir="$tmp/lang"
+eng="$langdir/English.txt"
+
 # Byte-wise: the catalogs and lang.def are UTF-8, and CRLF but for Uzbek.txt.
 LC_ALL=C awk 'NR%2==1 { sub(/\r$/, ""); print }' "$eng" >"$keys"
 
