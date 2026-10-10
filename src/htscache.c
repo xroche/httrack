@@ -1251,7 +1251,7 @@ static void cache_set_aside_damaged(httrackp *opt) {
 
 // Initialisation du cache: créer nouveau, renomer ancien, charger..
 void cache_init(cache_back * cache, httrackp * opt) {
-  hts_boolean keep_old = HTS_TRUE;
+  hts_boolean keep_old = HTS_FALSE;
 
   // ---
   // utilisation du cache: renommer ancien éventuel et charger index
