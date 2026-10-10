@@ -3538,8 +3538,7 @@ static int st_pathcontained(httrackp *opt, int argc, char **argv) {
   return failures != 0;
 }
 
-/* Undo make_content_id()'s escaping; returns 0 on a byte that cannot be in its
-   output, which is what a non-injective map eventually produces. */
+/* Undo make_content_id()'s escaping; 0 on a byte it never emits. */
 static int cid_unescape(const char *cid, char *dest, const size_t size) {
   size_t j = 0;
 
@@ -3549,7 +3548,7 @@ static int cid_unescape(const char *cid, char *dest, const size_t size) {
     if (*cid == '-') {
       const int c = hts_ehex(cid + 1);
 
-      if (c <= 0)
+      if (c < 0)
         return 0;
       dest[j++] = (char) c;
       cid += 2;
@@ -3563,16 +3562,16 @@ static int cid_unescape(const char *cid, char *dest, const size_t size) {
   return 1;
 }
 
-/* A .mht reader binds a cid: reference by exact match, so two URLs sharing one
-   Content-ID serve one part for both (#1925). Unescaping every id back to its
-   own URL is what proves the map injective. */
+/* Unescaping every id back to its own URL is what proves the map injective;
+   make_content_id() in htslib.c says why that matters. */
 static int st_contentid(httrackp *opt, int argc, char **argv) {
-  /* the pair that collided: '.' escapes to the marker, and the second name
-     spells that escape out */
+  /* "/p.gif" escapes to "-2egif", and the other two names spell that escape
+     out, with the old marker and with the new one */
   static const char *const fils[] = {"/p.gif", "/pX2egif", "/p-2egif", NULL};
   char BIGSTK cid[HTS_URLMAXSIZE * 3];
   char BIGSTK url[HTS_URLMAXSIZE * 3];
   char BIGSTK back[HTS_URLMAXSIZE * 3];
+  char fil[8];
   int failures = 0;
   int i, c;
 
@@ -3591,8 +3590,9 @@ static int st_contentid(httrackp *opt, int argc, char **argv) {
 
   /* every byte a path can carry, so no unescaped character is missed */
   for (c = 1; c <= 255; c++) {
-    snprintf(url, sizeof(url), "h/a%cb", c);
-    make_content_id("h", url + 1, cid, sizeof(cid));
+    snprintf(fil, sizeof(fil), "/a%cb", c);
+    snprintf(url, sizeof(url), "h%s", fil);
+    make_content_id("h", fil, cid, sizeof(cid));
     if (!cid_unescape(cid, back, sizeof(back)) || strcmp(back, url) != 0) {
       printf("contentid: byte %d -> '%s' -> '%s'\n", c, cid, back);
       failures++;

@@ -691,8 +691,8 @@ HTSEXT_API char *escape_check_url_addr(const char *const src, char *const dest,
                                        const size_t size);
 
 /** Build one opaque MIME/MHTML content-id token in @p dest from @p adr and
-    @p fil, escaped as escape_in_url() does it and with every '%' turned into an
-    'X'. */
+    @p fil: escape_in_url() escaping with '-' for '%', so two URLs never share
+    a token. */
 HTSEXT_API size_t make_content_id(const char *const adr, const char *const fil,
                                   char *const dest, const size_t size);
 

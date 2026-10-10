@@ -1,6 +1,5 @@
 #!/bin/bash
-# Issue #1925: make_content_id() escaped '%' to 'X', which a path can carry
-# literally, so "/p.gif" and "/pX2egif" shared one Content-ID and one MIME part
+# Issue #1925: two paths could alias onto one Content-ID, so one MIME part
 # served both images. Nothing in tests/ produced a .mht before this.
 set -eu
 
