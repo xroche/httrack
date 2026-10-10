@@ -1,0 +1,71 @@
+#!/bin/bash
+# #139: the default scan rules decide which foreign-host assets a GUI crawl
+# keeps. They are read here from winprofile-keys.tsv, the one source the three
+# copies are generated from, so a typo in a rule fails a crawl rather than only
+# a comparison of copies.
+set -eu
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_139.XXXXXX") || exit 1
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+: "${top_srcdir:=..}"
+tsv="$top_srcdir/winprofile-keys.tsv"
+test -r "$tsv" || {
+    echo "winprofile-keys.tsv is absent (dist tarball?)" >&2
+    exit 77
+}
+# Field 9 of the row is the default value, tab separated.
+rules=$(awk -F'\t' '$1 == "WildCardFilters" { print $9 }' "$tsv")
+test -n "$rules" || fail "no WildCardFilters row in winprofile-keys.tsv"
+
+mkdir -p "${tmpdir}/aroot" "${tmpdir}/broot/cdn"
+# Kept: every type the default rules name. Refused: types they do not, which is
+# what stops a permissive rule set from passing this test.
+# BANNER.WEBP is here because the rules match case-insensitively, which nothing
+# else asserts. Its stem differs from logo.webp, because the engine folds case
+# when it picks a save name and would store a second logo.webp as logo-2.webp.
+kept="logo.webp BANNER.WEBP pic.avif draw.svg font.woff2 old.woff face.ttf shape.otf clip.mp4 reel.webm"
+refused="paper.pdf bundle.zip audio.ogg"
+for f in $kept $refused; do
+    printf 'body of %s\n' "$f" >"${tmpdir}/broot/cdn/${f}"
+done
+
+blog="${tmpdir}/b-server.log"
+: >"$blog"
+local_server_start --root "${tmpdir}/broot" --log "$blog"
+bport=$SRV_PORT
+alog="${tmpdir}/a-server.log"
+: >"$alog"
+local_server_start --root "${tmpdir}/aroot" --log "$alog"
+aport=$SRV_PORT
+
+{
+    echo '<html><body>'
+    for f in $kept $refused; do
+        printf '<img src="http://127.0.0.1:%s/cdn/%s">\n' "$bport" "$f"
+    done
+    echo '</body></html>'
+} >"${tmpdir}/aroot/index.html"
+
+require_httrack
+
+# The GUI splits the field token by token into argv, so the test does the same.
+# shellcheck disable=SC2086 # the split into one argument per rule is the point
+local_crawl --log "${tmpdir}/crawl.log" "http://127.0.0.1:${aport}/index.html" \
+    -O "${tmpdir}/out" --quiet --max-time=120 --timeout=30 --robots=0 \
+    $rules || fail "the crawl failed with the default scan rules"
+
+cdn="${tmpdir}/out/127.0.0.1_${bport}/cdn"
+for f in $kept; do
+    test -s "${cdn}/${f}" || fail "$f was not kept, though the default rules name it"
+done
+for f in $refused; do
+    ! test -e "${cdn}/${f}" ||
+        fail "$f was kept, though no default rule names it"
+done

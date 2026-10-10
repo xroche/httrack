@@ -1151,7 +1151,9 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
     initStrElt initStr[] = {{"user", HTS_DEFAULT_USER_AGENT},
                             {"footer", HTS_DEFAULT_FOOTER},
                             {"url2",
-                             "+*.png +*.gif +*.jpg +*.jpeg +*.css +*.js "
+                             "+*.png +*.gif +*.jpg +*.jpeg +*.webp +*.avif "
+                             "+*.svg +*.css +*.js +*.woff2 +*.woff +*.ttf "
+                             "+*.otf +*.mp4 +*.webm "
                              "-ad.doubleclick.net/* -mime:application/foobar"},
                             {NULL, NULL}};
     int i = 0;
