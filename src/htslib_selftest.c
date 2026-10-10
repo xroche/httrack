@@ -3538,6 +3538,72 @@ static int st_pathcontained(httrackp *opt, int argc, char **argv) {
   return failures != 0;
 }
 
+/* Undo make_content_id()'s escaping; 0 on a byte it never emits. */
+static int cid_unescape(const char *cid, char *dest, const size_t size) {
+  size_t j = 0;
+
+  for (; *cid != '\0'; cid++) {
+    if (j + 1 >= size)
+      return 0;
+    if (*cid == '-') {
+      const int c = hts_ehex(cid + 1);
+
+      if (c < 0)
+        return 0;
+      dest[j++] = (char) c;
+      cid += 2;
+    } else if (isalnum((unsigned char) *cid)) {
+      dest[j++] = *cid;
+    } else {
+      return 0;
+    }
+  }
+  dest[j] = '\0';
+  return 1;
+}
+
+/* Unescaping every id back to its own URL is what proves the map injective;
+   make_content_id() in htslib.c says why that matters. */
+static int st_contentid(httrackp *opt, int argc, char **argv) {
+  /* "/p.gif" escapes to "-2egif", and the other two names spell that escape
+     out, with the old marker and with the new one */
+  static const char *const fils[] = {"/p.gif", "/pX2egif", "/p-2egif", NULL};
+  char BIGSTK cid[HTS_URLMAXSIZE * 3];
+  char BIGSTK url[HTS_URLMAXSIZE * 3];
+  char BIGSTK back[HTS_URLMAXSIZE * 3];
+  char fil[8];
+  int failures = 0;
+  int i, c;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  for (i = 0; fils[i] != NULL; i++) {
+    make_content_id("www.example.com", fils[i], cid, sizeof(cid));
+    snprintf(url, sizeof(url), "www.example.com%s", fils[i]);
+    if (!cid_unescape(cid, back, sizeof(back)) || strcmp(back, url) != 0) {
+      printf("contentid: '%s' -> '%s' -> '%s'\n", url, cid, back);
+      failures++;
+    }
+  }
+
+  /* every byte a path can carry, so no unescaped character is missed */
+  for (c = 1; c <= 255; c++) {
+    snprintf(fil, sizeof(fil), "/a%cb", c);
+    snprintf(url, sizeof(url), "h%s", fil);
+    make_content_id("h", fil, cid, sizeof(cid));
+    if (!cid_unescape(cid, back, sizeof(back)) || strcmp(back, url) != 0) {
+      printf("contentid: byte %d -> '%s' -> '%s'\n", c, cid, back);
+      failures++;
+    }
+  }
+
+  if (failures == 0)
+    printf("contentid: OK\n");
+  return failures != 0;
+}
+
 const struct selftest_entry selftests_lib[] = {
     {"hashtable", "<count|file>", "coucal hashtable stress test", st_hashtable},
     {"strsafe", "[overflow|overflow-buff|overflow-src [str]]",
@@ -3590,5 +3656,7 @@ const struct selftest_entry selftests_lib[] = {
     {"statrecv", "",
      "the received-bytes counter keeps every add from every thread",
      st_statrecv},
+    {"contentid", "", "every .mht Content-ID unescapes back to its own URL",
+     st_contentid},
     {NULL, NULL, NULL, NULL},
 };
