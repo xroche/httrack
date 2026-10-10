@@ -325,7 +325,6 @@ ci_suite_heartbeat() {
 # and Windows has a disposition for none of that set.
 # engine-sigterm-noatexit forks a child per case and raises SIGINT at it, and
 # Windows has neither fork() nor that disposition.
-# configure-coucal-guard runs the generated configure, which this job never makes.
 expected_skips_msys="01_engine-usercommand.test
 01_engine-footer-overflow.test
 253_local-ftp-close-once.test
@@ -370,7 +369,6 @@ expected_skips_msys="01_engine-usercommand.test
 465_local-mirror-completed.test
 481_local-chunked-oom.test
 494_local-mptcp.test
-580_configure-coucal-guard.test
 01_engine-mptcp.test"
 
 # Measured, not predicted: windows-build run 33927128153, both platforms alike.
@@ -396,7 +394,6 @@ expected_skips_msys="01_engine-usercommand.test
 # inert but the replaying bash runs it.
 # engine-sigterm-noatexit forks a child per case and raises SIGINT at it, and
 # Windows has neither fork() nor that disposition.
-# configure-coucal-guard runs the generated configure, which this job never makes.
 expected_skips_wsl2="01_engine-usercommand.test
 01_engine-footer-overflow.test
 253_local-ftp-close-once.test
@@ -442,7 +439,6 @@ expected_skips_wsl2="01_engine-usercommand.test
 294_local-wizard-eof.test
 481_local-chunked-oom.test
 494_local-mptcp.test
-580_configure-coucal-guard.test
 01_engine-mptcp.test"
 
 # Sets ci_skip_list to the pinned skip set for backend $1, failing loudly if

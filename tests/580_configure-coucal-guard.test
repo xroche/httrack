@@ -2,13 +2,13 @@
 # configure must stop with a clear message when the src/coucal submodule is empty (#247).
 set -euo pipefail
 
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
 top="${abs_top_srcdir:-${top_srcdir:-..}}"
 aux="configure config.guess config.sub ltmain.sh compile missing install-sh"
 for f in $aux; do
-    test -r "$top/$f" || {
-        echo "SKIP: $top/$f missing, the tree is not bootstrapped"
-        exit 77
-    }
+    test -r "$top/$f" || skip "$top/$f missing, the tree is not bootstrapped"
 done
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_coucalguard.XXXXXX")
