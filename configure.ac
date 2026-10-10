@@ -26,14 +26,14 @@ Please visit our Website: http://www.httrack.com
 ])
 
 AC_CONFIG_SRCDIR(src/httrack.c)
-# src/coucal is a git submodule, so a plain clone or a GitHub tag archive has it empty.
+# src/coucal is a submodule, empty in a tag archive or a clone without --recurse-submodules.
 AC_MSG_CHECKING([for the coucal submodule])
 AS_IF([test -f "$srcdir/src/coucal/coucal.c"],
 	[AC_MSG_RESULT([yes])],
 	[AC_MSG_RESULT([no])
 	 AC_MSG_ERROR([src/coucal is empty. In a git clone, run
     git submodule update --init src/coucal
-then configure again. A GitHub tag archive does not include it, so use the
+Then run configure again. A GitHub tag archive does not include it, so use the
 httrack-<version>.tar.gz release tarball instead.])])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS(config.h)

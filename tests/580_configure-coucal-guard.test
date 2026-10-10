@@ -11,7 +11,7 @@ for f in $aux; do
     test -r "$top/$f" || skip "$top/$f missing, the tree is not bootstrapped"
 done
 
-tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_coucalguard.XXXXXX")
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_coucalguard.XXXXXX") || exit 1
 trap 'set +e; rm -rf "$tmp"' EXIT
 
 # A source tree holding only what configure reads before the guard.
@@ -22,15 +22,16 @@ done
 : >"$tmp/src/httrack.c"
 
 run_configure() {
-    (cd "$tmp/build" && bash ../configure >out 2>&1) && rc=0 || rc=$?
+    (cd "$tmp/build" && bash ../configure >out 2>&1) || true
     out=$(cat "$tmp/build/out")
 }
 
 run_configure
-if test "$rc" -eq 0; then
-    echo "FAIL: configure succeeded with an empty src/coucal"
+grep -q 'checking for the coucal submodule... no' <<<"$out" || {
+    echo "FAIL: the guard did not report coucal missing; configure said:"
+    tail -5 <<<"$out"
     exit 1
-fi
+}
 grep -q 'error: src/coucal is empty' <<<"$out" || {
     echo "FAIL: no submodule error; configure said:"
     tail -5 <<<"$out"
