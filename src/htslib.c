@@ -936,38 +936,69 @@ static void print_buffer(buff_struct*const str, const char *format, ...) {
    domain/path. The port in domain is ignored (see cookie_host). RFC 6265
    form: bare "name=value" pairs joined by "; ", no $Version/$Path attributes
    (those are RFC 2965 syntax that modern servers reject, issue #151).
-   Returns the number of cookies emitted. */
+   A pair that will not fit whole is dropped whole and counted in *skipped (may
+   be NULL), so the line never ends mid-pair and never raises the caller's
+   overflow. max_bytes caps what the line takes of bstr, leaving room for the
+   headers after it; 0 means all of it. Returns the number emitted. */
 static int append_cookie_header(buff_struct *bstr, t_cookie *cookie,
-                                const char *domain, const char *path) {
+                                const char *domain, const char *path,
+                                size_t max_bytes, int *skipped) {
+  const size_t crlf = sizeof(H_CRLF) - 1;
   char buffer[8192];
   char host[256];
   char *b;
-  int cook = 0;
-  int max_cookies = 8;
+  int count = 0;
+  size_t limit;
 
-  if (cookie == NULL)
+  if (skipped != NULL)
+    *skipped = 0;
+  if (cookie == NULL || bstr->overflow)
+    return 0;
+  if (bstr->capacity <= crlf + 1) // too small to hold even an empty line
     return 0;
   if (!cookie_host(domain, host, sizeof(host)))
     return 0;
   domain = host;
+
+  /* Highest position a pair may reach, keeping the closing CRLF and the NUL. */
+  limit = bstr->capacity - crlf - 1;
+  if (bstr->pos >= limit) // already full, and the subtraction below would wrap
+    return 0;
+  if (max_bytes != 0 && max_bytes < limit - bstr->pos)
+    limit = bstr->pos + max_bytes;
+
   b = cookie->data;
   do {
     b = cookie_find(b, "", domain, path); // next matching cookie
     if (b != NULL) {
-      max_cookies--;
-      if (!cook) {
-        print_buffer(bstr, "Cookie: ");
-        cook = 1;
-      } else
-        print_buffer(bstr, "; ");
-      print_buffer(bstr, "%s", cookie_get(buffer, b, 5));
-      print_buffer(bstr, "=%s", cookie_get(buffer, b, 6));
+      const size_t mark = bstr->pos;
+      hts_boolean fits = mark < limit;
+
+      if (fits) {
+        if (count == 0)
+          print_buffer(bstr, "Cookie: ");
+        else
+          print_buffer(bstr, "; ");
+        print_buffer(bstr, "%s", cookie_get(buffer, b, 5));
+        print_buffer(bstr, "=%s", cookie_get(buffer, b, 6));
+        fits = !bstr->overflow && bstr->pos <= limit;
+      }
+      if (fits) {
+        count++;
+      } else {
+        /* Rewind: half a pair would be read as another cookie's value. */
+        bstr->pos = mark;
+        bstr->buffer[mark] = '\0';
+        bstr->overflow = HTS_FALSE;
+        if (skipped != NULL)
+          (*skipped)++;
+      }
       b = cookie_nextfield(b);
     }
-  } while (b != NULL && max_cookies > 0);
-  if (cook)
+  } while (b != NULL);
+  if (count != 0)
     print_buffer(bstr, H_CRLF);
-  return cook;
+  return count;
 }
 
 /* Build the request Cookie line for domain/path into dst (always
@@ -978,7 +1009,7 @@ int http_cookie_header(t_cookie *cookie, const char *domain, const char *path,
 
   assertf(dst != NULL && dst_size > 0);
   dst[0] = '\0';
-  return append_cookie_header(&bstr, cookie, domain, path);
+  return append_cookie_header(&bstr, cookie, domain, path, 0, NULL);
 }
 
 hts_boolean hts_body_missing_unexpectedly(const htsblk *r) {
@@ -1288,7 +1319,15 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
     }
     // send stored cookies matching this host/path
     if (cookie != NULL && !http_headers_have_field(custom, "Cookie")) {
-      append_cookie_header(&bstr, cookie, jump_identification_const(adr), fil);
+      int skipped;
+
+      append_cookie_header(&bstr, cookie, jump_identification_const(adr), fil,
+                           bstr.capacity / 2, &skipped);
+      if (skipped != 0) {
+        hts_log_print(opt, LOG_WARNING,
+                      "Cookie header full for %s%s, %d cookie(s) not sent",
+                      jump_identification_const(adr), fil, skipped);
+      }
     }
     // gérer le keep-alive (garder socket)
     if (retour->req.http11 && !retour->req.nokeepalive) {

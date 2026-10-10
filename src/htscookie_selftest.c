@@ -33,6 +33,38 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsselftest_int.h"
 
+/* True if a Cookie header line is a whole RFC 6265 list of `count` pairs. A
+   dropped cookie must take its separator with it, because a trailing "a; "
+   reads as part of the next value. */
+static hts_boolean cookie_line_is_whole(const char *line, int count) {
+  const char *p;
+  int seen = 0;
+
+  if (strncmp(line, "Cookie: ", 8) != 0)
+    return HTS_FALSE;
+  p = line + 8;
+  for (;;) {
+    const char *eq = strchr(p, '=');
+    const char *sep = strstr(p, "; ");
+    const char *end = strstr(p, H_CRLF);
+
+    if (end == NULL || end == p)
+      return HTS_FALSE;
+    if (sep != NULL && sep < end) {
+      if (eq == NULL || eq >= sep || eq == p)
+        return HTS_FALSE;
+      p = sep + 2;
+    } else {
+      if (eq == NULL || eq >= end || eq == p)
+        return HTS_FALSE;
+      seen++;
+      break;
+    }
+    seen++;
+  }
+  return seen == count ? HTS_TRUE : HTS_FALSE;
+}
+
 static int st_cookies(httrackp *opt, int argc, char **argv) {
   static t_cookie cookie;
   char hdr[1024];
@@ -87,6 +119,63 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
     err = 1;
   if (strstr(hdr, "junk") != NULL) // wrong-domain cookie leaked
     err = 1;
+
+  /* #101: every matching cookie is sent, not a fixed few. A cap of eight
+     silently dropped the later cookies of a login session. */
+  {
+    static t_cookie many;
+    char big[4096];
+    char tight[64];
+    const int n = 20;
+    int i;
+    int sent;
+
+    many.max_len = sizeof(many.data);
+    many.data[0] = '\0';
+    for (i = 0; i < n; i++) {
+      char name[16];
+      char value[16];
+
+      snprintf(name, sizeof(name), "c%02d", i);
+      snprintf(value, sizeof(value), "v%02d", i);
+      if (cookie_add(&many, name, value, dom, "/") != 0)
+        err = 1;
+    }
+    sent = http_cookie_header(&many, dom, "/", big, sizeof(big));
+    if (sent != n)
+      err = 1;
+    if (!cookie_line_is_whole(big, n))
+      err = 1;
+    for (i = 0; i < n; i++) {
+      char pair[24];
+
+      snprintf(pair, sizeof(pair), "c%02d=v%02d", i, i);
+      if (strstr(big, pair) == NULL)
+        err = 1;
+    }
+
+    /* Too small a buffer drops whole pairs, keeping the closing CRLF the
+       request needs: a clipped pair would be read as another cookie's value. */
+    sent = http_cookie_header(&many, dom, "/", tight, sizeof(tight));
+    if (sent <= 0 || sent >= n)
+      err = 1;
+    if (!cookie_line_is_whole(tight, sent))
+      err = 1;
+
+    /* Swept rather than sized once, because the clip lands between a pair, on
+       its separator or on the CRLF depending on the size. */
+    for (i = 1; i <= (int) sizeof(tight); i++) {
+      memset(tight, 'X', sizeof(tight)); /* a lost NUL must not read as empty */
+      sent = http_cookie_header(&many, dom, "/", tight, (size_t) i);
+      if (sent < 0 || sent > n)
+        err = 1;
+      else if (sent == 0) {
+        if (tight[0] != '\0')
+          err = 1;
+      } else if (!cookie_line_is_whole(tight, sent))
+        err = 1;
+    }
+  }
 #ifndef _WIN32
   /* the jar holds live session cookies: cookie_save must keep it 0600 */
   {

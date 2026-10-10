@@ -3009,6 +3009,29 @@ class Handler(SimpleHTTPRequestHandler):
         nonce = int(self.request_cookies().get("gate", "0")) + 1
         self._wall_redirect("wall.php", f"gate={nonce}; Path=/")
 
+    # --- /manycookies/ (#101): a login hands out more cookies than the request
+    # header used to carry, and the gate page needs every one of them back.
+    MANY_COOKIES = 12
+    MANY_MARK = b"ALL-COOKIES-REPLAYED"
+
+    def _many_cookies(self):
+        return [("c%02d" % i, "v%02d" % i) for i in range(self.MANY_COOKIES)]
+
+    def route_manycookies_index(self):
+        for name, value in self._many_cookies():
+            self._set_cookies.append(f"{name}={value}; Path=/manycookies/")
+        self.send_html('\t<a href="gate.html">gate</a>')
+
+    def route_manycookies_gate(self):
+        jar = self.request_cookies()
+        missing = [n for n, v in self._many_cookies() if jar.get(n) != v]
+        if missing:
+            self.fail_cookie("cookie " + ",".join(missing))
+            return
+        self.send_raw(
+            b"<html><body>" + self.MANY_MARK + b"</body></html>\n", "text/html"
+        )
+
     def _wall_redirect(self, location, set_cookie):
         self.send_response(302, "Found")
         self.send_header("Location", location)
@@ -4004,6 +4027,8 @@ class Handler(SimpleHTTPRequestHandler):
         "/cookiewall3/wall.php": route_cookiewall3_wall,
         "/cookiewall4/index.html": route_cookiewall4_index,
         "/cookiewall4/wall.php": route_cookiewall4_wall,
+        "/manycookies/index.html": route_manycookies_index,
+        "/manycookies/gate.html": route_manycookies_gate,
         "/redir/index.html": route_redir_index,
         "/redir/go.php": route_redir_go,
         "/redir/target.html": route_redir_target,
