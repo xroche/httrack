@@ -2454,8 +2454,6 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
 
 cleanup:
   /* single exit: every bailout jumps here, so the closes below always run */
-  /* a bailout skips the ending, so close a .mht left open or held */
-  usercommand(opt, 0, NULL, NULL, NULL, NULL);
   /* the summary above is skipped by every bailout, so the note goes here */
   if (opt->log != NULL) {
     char BIGSTK upperNote[256];
@@ -3868,8 +3866,8 @@ static void mimehtml_write_header(httrackp *opt, const char *startcid) {
           "\r\n");
 }
 
-/* Create index.mht with `startcid` as its root, and move in the parts held so
-   far, which opt->state.mimefp points at while they are held. */
+/* Create index.mht with `startcid` as its root, and move in the parts held in
+   opt->state.mimefp. */
 static void mimehtml_create(httrackp *opt, const char *startcid) {
   FILE *const held = opt->state.mimefp;
   char BIGSTK heldname[HTS_URLMAXSIZE * 2];
@@ -3931,8 +3929,8 @@ static void postprocess_file(httrackp *opt, const char *save, const char *adr,
         strnotempty(save) && fexist_utf8(save)) {
       const char *rsc_save = save;
       const char *rsc_fil = strrchr(fil, '/');
-      /* Read the part before the header names it: a start= whose part then
-         fails to open would leave the reader with no root at all. */
+      /* Read the part before naming it as start=, since a part that fails to
+         open must never become the root. */
       FILE *const fp = FOPEN(save, "rb");
       int n;
 
@@ -3981,9 +3979,7 @@ static void postprocess_file(httrackp *opt, const char *save, const char *adr,
         } else if (opt->state.mimehtml_created == MIMEHTML_HELD && isHtml) {
           mimehtml_create(opt, cid);
         }
-        if (opt->state.mimefp != NULL &&
-            (opt->state.mimehtml_created == MIMEHTML_WRITING ||
-             opt->state.mimehtml_created == MIMEHTML_HELD)) {
+        if (opt->state.mimefp != NULL) {
           char buff[60 * 100 + 2];
           char mimebuff[256];
           size_t len;
