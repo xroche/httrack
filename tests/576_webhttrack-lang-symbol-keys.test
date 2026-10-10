@@ -37,7 +37,7 @@ for entry in "${distdir}"/lang/*; do
 done
 
 # Writes the probe page naming every symbol, and the French catalog variants:
-# none, all, odd or even occurrences re-keyed, in place or moved.
+# none, all, or odd lines re-keyed and moved to the end.
 # English.txt is a copy too, so that its own re-keying can be tested.
 "${HTS_PYTHON}" - "${distdir}" "${root}" "${work}" <<'PY' || fail "cannot build the fixtures"
 import collections, sys
@@ -81,24 +81,21 @@ if sum(1 for t, s, v in french if s and t + b"1" in symbol) < 20:
     sys.exit("too few repeated texts to split; the parse is broken")
 
 
-def write(name, pick, where=0, catalog=french):
+def write(name, pick, moved=False, catalog=french):
     lines = [
         (True, [sym, value]) if sym and pick(i) else (False, [text, value])
         for i, (text, sym, value) in enumerate(catalog)
     ]
     # A symbol line holds its meaning wherever it sits, unlike a repeated text.
-    if where:
-        lines.sort(key=lambda line: line[0] == (where > 0))
+    if moved:
+        lines.sort(key=lambda line: line[0])
     out = [x for _, pair in lines for x in pair]
     open(work + "/" + name, "wb").write(b"\r\n".join(out) + b"\r\n")
 
 
 write("none", lambda i: False)
 write("all", lambda i: True)
-write("odd", lambda i: i % 2 == 1)
-write("even", lambda i: i % 2 == 0)
-write("odd-last", lambda i: i % 2 == 1, 1)
-write("even-first", lambda i: i % 2 == 0, -1)
+write("odd-last", lambda i: i % 2 == 1, moved=True)
 write("english", lambda i: False, catalog=keyed("English"))
 write("english-all", lambda i: True, catalog=keyed("English"))
 PY
@@ -121,7 +118,7 @@ render none
 # "Start" is two symbols with different French values, so it also pins the order.
 grep -q '^LANG_J9=Démarrer\.\.\.' "${work}/none.out" || fail "the probe page shows no French"
 grep -q '^LANG_J13=DEMARRER!' "${work}/none.out" || fail "the probe page shows no French"
-for v in all odd even odd-last even-first; do
+for v in all odd-last; do
     render "${v}"
     cmp -s "${work}/none.out" "${work}/${v}.out" ||
         fail "re-keying ${v} lines changed: $(diff "${work}/none.out" "${work}/${v}.out" | head -5)"

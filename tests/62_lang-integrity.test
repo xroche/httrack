@@ -28,13 +28,9 @@ LC_ALL=C awk '{ sub(/\r$/, "") } NR%2==1 { k = $0 }
     NR%2==0 && k ~ /^(LANG|LISTDEF)_/ { print k "\t" $0 }' "$def" >"$syms"
 nsyms=$(wc -l <"$syms")
 [ "$nsyms" -ge 510 ] || fail "only $nsyms symbols parsed from $def; the parse is broken"
-mkdir "$tmp/lang"
-for f in "$langdir"/*.txt; do
-    if ! LC_ALL=C command grep -qE '^(LANG|LISTDEF)_' "$f"; then
-        cp "$f" "$tmp/lang/"
-        continue
-    fi
-    LC_ALL=C awk -v syms="$syms" -v name="${f##*/}" '
+# Writes $1 keyed by text again, and fails on a symbol keyed twice.
+untag() {
+    LC_ALL=C awk -v syms="$syms" -v name="${1##*/}" '
         BEGIN { FS = "\t"; while ((getline < syms) > 0) text[$1] = $2; FS = " " }
         NR % 2 == 1 {
             cr = sub(/\r$/, "")
@@ -48,7 +44,21 @@ for f in "$langdir"/*.txt; do
             next
         }
         { print }
-        END { exit(bad > 0) }' "$f" >"$tmp/lang/${f##*/}" || fail "a catalog keys a symbol twice"
+        END { exit(bad > 0) }' "$1"
+}
+# No catalog carries a symbol key yet, so prove both behaviours on a fixture.
+printf 'LANG_J9\r\nx\r\n' >"$tmp/sym.txt"
+[ "$(untag "$tmp/sym.txt")" = "$(printf 'Start\r\nx\r')" ] ||
+    fail "a symbol key is not translated back to its English text"
+printf 'LANG_J9\nx\nLANG_J9\ny\n' >"$tmp/sym.txt"
+! untag "$tmp/sym.txt" >/dev/null 2>&1 || fail "a symbol keyed twice goes unnoticed"
+mkdir "$tmp/lang"
+for f in "$langdir"/*.txt; do
+    if LC_ALL=C command grep -qE '^(LANG|LISTDEF)_' "$f"; then
+        untag "$f" >"$tmp/lang/${f##*/}" || fail "a catalog keys a symbol twice"
+    else
+        cp "$f" "$tmp/lang/"
+    fi
 done
 langdir="$tmp/lang"
 eng="$langdir/English.txt"
