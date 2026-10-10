@@ -1053,6 +1053,21 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                                     "hts-cache/old.txt")))
               UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                              StringBuff(opt->path_log), "hts-cache/old.txt"));
+            {
+              static const char *const damaged[] = {"hts-cache/damaged.zip",
+                                                    "hts-cache/damaged.lst",
+                                                    "hts-cache/damaged.txt"};
+              size_t i;
+
+              for (i = 0; i < sizeof(damaged) / sizeof(damaged[0]); i++) {
+                const char *const name =
+                    fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                            StringBuff(opt->path_log), damaged[i]);
+
+                if (fexist_utf8(name))
+                  UNLINK(name);
+              }
+            }
             if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                                     StringBuff(opt->path_log),
                                     "hts-cache/doit.log")))

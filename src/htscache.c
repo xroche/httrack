@@ -1201,8 +1201,58 @@ const char *cache_repair(httrackp *opt, const char *name,
   return NULL;
 }
 
+/* May new.zip replace old.zip? Not when it is beyond repair and old.zip holds a
+   generation the rotation would destroy. */
+static hts_boolean cache_new_generation_usable(httrackp *opt) {
+  unsigned long entries = 0;
+  unsigned long bytes = 0;
+  const char *why;
+  unzFile zip = hts_unzOpen_utf8(reconcile_path(opt, "hts-cache/new.zip"));
+
+  if (zip != NULL) {
+    unzClose(zip);
+    return HTS_TRUE;
+  }
+  if (fsize_utf8(reconcile_path(opt, "hts-cache/old.zip")) <= 0)
+    return HTS_TRUE;
+  hts_log_print(opt, LOG_WARNING, "Cache: damaged cache, trying to repair");
+  why = cache_repair(opt, reconcile_path(opt, "hts-cache/new.zip"), &entries,
+                     &bytes);
+  if (why != NULL) {
+    hts_log_print(opt, LOG_WARNING, "Cache: %s", why);
+    return HTS_FALSE;
+  }
+  hts_log_print(opt, LOG_WARNING,
+                "Cache: %d bytes successfully recovered in %d entries",
+                (int) bytes, (int) entries);
+  return HTS_TRUE;
+}
+
+/* Move the damaged generation aside, so old.* stay one consistent set. */
+static void cache_set_aside_damaged(httrackp *opt) {
+  static const char *const names[][2] = {
+      {"hts-cache/new.zip", "hts-cache/damaged.zip"},
+      {"hts-cache/new.lst", "hts-cache/damaged.lst"},
+      {"hts-cache/new.txt", "hts-cache/damaged.txt"}};
+  char BIGSTK dst[HTS_URLMAXSIZE * 2];
+  size_t i;
+
+  for (i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
+    strcpybuff(dst, reconcile_path(opt, names[i][1]));
+    if (fexist_utf8(reconcile_path(opt, names[i][0])) &&
+        !hts_rename_over(opt, reconcile_path(opt, names[i][0]), dst))
+      hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
+                    "Cache: could not set %s aside", names[i][0]);
+  }
+  hts_log_print(opt, LOG_WARNING,
+                "Cache: the last cache is beyond repair, so the previous "
+                "cache is used instead");
+}
+
 // Initialisation du cache: créer nouveau, renomer ancien, charger..
 void cache_init(cache_back * cache, httrackp * opt) {
+  hts_boolean keep_old = HTS_FALSE;
+
   // ---
   // utilisation du cache: renommer ancien éventuel et charger index
   hts_log_print(opt, LOG_DEBUG, "Cache: enabled=%d, base=%s, ro=%d",
@@ -1228,12 +1278,16 @@ void cache_init(cache_back * cache, httrackp * opt) {
               OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
               StringBuff(opt->path_log),
               "hts-cache/new.zip")))) { // a previous cache exists.. rename it
-        if (!hts_rename_over(
-                opt,
-                fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                        StringBuff(opt->path_log), "hts-cache/new.zip"),
-                fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                        StringBuff(opt->path_log), "hts-cache/old.zip"))) {
+        if (!cache_new_generation_usable(opt)) {
+          keep_old = HTS_TRUE;
+          cache_set_aside_damaged(opt);
+        } else if (!hts_rename_over(
+                       opt,
+                       fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                               StringBuff(opt->path_log), "hts-cache/new.zip"),
+                       fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                               StringBuff(opt->path_log),
+                               "hts-cache/old.zip"))) {
           hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
                         "Cache: error while moving previous cache");
         } else {
@@ -1424,15 +1478,15 @@ void cache_init(cache_back * cache, httrackp * opt) {
 
         if (cache->zipOutput != NULL) {
           // supprimer old.lst
-          if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                  StringBuff(opt->path_log),
-                                  "hts-cache/old.lst")))
+          if (!keep_old && fexist_utf8(fconcat(
+                               OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                               StringBuff(opt->path_log), "hts-cache/old.lst")))
             UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                            StringBuff(opt->path_log), "hts-cache/old.lst"));
           // renommer
-          if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                  StringBuff(opt->path_log),
-                                  "hts-cache/new.lst")))
+          if (!keep_old && fexist_utf8(fconcat(
+                               OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                               StringBuff(opt->path_log), "hts-cache/new.lst")))
             RENAME(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                            StringBuff(opt->path_log), "hts-cache/new.lst"),
                    fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
@@ -1446,15 +1500,15 @@ void cache_init(cache_back * cache, httrackp * opt) {
           opt->state.strc.lst = cache->lst;
 
           // supprimer old.txt
-          if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                  StringBuff(opt->path_log),
-                                  "hts-cache/old.txt")))
+          if (!keep_old && fexist_utf8(fconcat(
+                               OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                               StringBuff(opt->path_log), "hts-cache/old.txt")))
             UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                            StringBuff(opt->path_log), "hts-cache/old.txt"));
           // renommer
-          if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                  StringBuff(opt->path_log),
-                                  "hts-cache/new.txt")))
+          if (!keep_old && fexist_utf8(fconcat(
+                               OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                               StringBuff(opt->path_log), "hts-cache/new.txt")))
             RENAME(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                            StringBuff(opt->path_log), "hts-cache/new.txt"),
                    fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
