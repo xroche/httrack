@@ -4624,8 +4624,11 @@ HTSEXT_API size_t make_content_id(const char *const adr, const char *const fil,
   size_t esc_size = escape_in_url(adr, dest, size);
   esc_size += escape_in_url(fil, dest + esc_size, size - esc_size);
   RUNTIME_TIME_CHECK_SIZE(size);
+  /* A '%' would be decoded again by whoever reads the cid: URL. The marker has
+     to be a character escape_in_url() itself escapes, or two URLs can share one
+     Content-ID and one part then serves both (#1925). */
   for(a = dest ; (a = strchr(a, '%')) != NULL ; a++) {
-    *a = 'X';
+    *a = '-';
   }
   return esc_size;
 }

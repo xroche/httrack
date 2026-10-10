@@ -1,0 +1,64 @@
+#!/bin/bash
+# Issue #1925: make_content_id() escaped '%' to 'X', which a path can carry
+# literally, so "/p.gif" and "/pX2egif" shared one Content-ID and one MIME part
+# served both images. Nothing in tests/ produced a .mht before this.
+set -eu
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_1925.XXXXXX") || exit 1
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+mkdir -p "${tmpdir}/root"
+# GIF89a header, enough for the engine to type both bodies the same way.
+printf 'GIF89a\001\000\001\000\200\000\000\377\377\377\000\000\000!\371\004\001\000\000\000\000,\000\000\000\000\001\000\001\000\000\002\002D\001\000;' \
+    >"${tmpdir}/root/p.gif"
+cp "${tmpdir}/root/p.gif" "${tmpdir}/root/pX2egif"
+cat >"${tmpdir}/root/index.html" <<'EOF'
+<html><body>
+<img src="p.gif">
+<img src="pX2egif">
+</body></html>
+EOF
+
+require_httrack
+
+# The generator itself, over every byte a path can carry.
+httrack '-#test=contentid' >/dev/null 2>&1 || fail "the contentid self-test failed"
+
+local_server_start --root "${tmpdir}/root" --log "${tmpdir}/server.log"
+
+local_crawl --log "${tmpdir}/crawl.log" "http://127.0.0.1:${SRV_PORT}/index.html" \
+    -O "${tmpdir}/out" --quiet --max-time=120 --timeout=30 --robots=0 '-%M' ||
+    fail "crawl failed"
+
+mht="${tmpdir}/out/index.mht"
+test -s "$mht" || fail "no .mht archive was written"
+
+# Both <img> must still be rewritten, or the distinctness below is vacuous.
+refs=$(command grep -ao 'cid:[A-Za-z0-9_-]*' "$mht" | sed 's/^cid://' | sort)
+test "$(printf '%s\n' "$refs" | wc -l)" -eq 2 ||
+    fail "the page part holds these cid: references
+${refs}"
+test "$(printf '%s\n' "$refs" | sort -u | wc -l)" -eq 2 ||
+    fail "the two images share one cid: reference
+${refs}"
+
+ids=$(command grep -ao '^Content-ID: <[^>]*>' "$mht" | sed 's/^Content-ID: <//;s/>$//' | sort)
+test "$(printf '%s\n' "$ids" | wc -l)" -eq 3 ||
+    fail "the archive holds these Content-ID headers
+${ids}"
+test "$(printf '%s\n' "$ids" | sort -u | wc -l)" -eq 3 ||
+    fail "two parts share one Content-ID
+${ids}"
+
+# Each reference must resolve to a part that is actually in the archive.
+while read -r ref; do
+    command grep -qxF "$ref" <<<"$ids" ||
+        fail "cid:${ref} names no part of the archive
+${ids}"
+done <<<"$refs"
