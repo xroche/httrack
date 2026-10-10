@@ -1,0 +1,17 @@
+#!/bin/bash
+#
+# No WebHTTrack page may offer a control that only says it is not
+# implemented, like the old Capture URL button (#300).
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+top="${abs_top_srcdir:-${top_srcdir:-..}}"
+pages=("$top"/html/server/*.html)
+test -f "$top/html/server/addurl.html" || fail "no addurl.html under $top/html/server"
+
+found=$(grep -il 'not yet implemented' "${pages[@]}" || true)
+test -z "$found" || fail "placeholder control in: $found"
+echo "OK: ${#pages[@]} pages checked"
