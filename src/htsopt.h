@@ -244,7 +244,10 @@ struct htsoptstate {
   volatile int exit_xh;
   int back_add_stats; /**< bumped each time a file is queued for transfer */
   /* */
-  int mimehtml_created; /**< MIME/MHTML output already started */
+  /** MIME/MHTML output state: 0 not started, 1 writing index.mht, 2 holding
+      parts in index.mht.part until a page can be named as the root, -1 the
+      archive could not be created */
+  int mimehtml_created;
   String mimemid;       /**< MIME multipart boundary id */
   FILE *mimefp;         /**< MIME/MHTML output file */
   int delayedId;        /**< counter for delayed-type-check ids */

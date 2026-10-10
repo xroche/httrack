@@ -1,0 +1,89 @@
+#!/bin/bash
+# Issue #223: nothing named the root of a .mht archive, so a reader took the
+# first part (RFC 2387), which is whichever file the mirror finished first.
+set -eu
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_223.XXXXXX") || exit 1
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+mkdir -p "${tmpdir}/root"
+printf 'GIF89a\001\000\001\000\200\000\000\377\377\377\000\000\000!\371\004\001\000\000\000\000,\000\000\000\000\001\000\001\000\000\002\002D\001\000;' \
+    >"${tmpdir}/root/a.gif"
+cp "${tmpdir}/root/a.gif" "${tmpdir}/root/b.gif"
+cp "${tmpdir}/root/a.gif" "${tmpdir}/root/c.gif"
+cat >"${tmpdir}/root/index.html" <<'HTML'
+<html><body><h1>start</h1>
+<img src="a.gif"><img src="b.gif"><img src="c.gif">
+<a href="sub.html">sub</a>
+</body></html>
+HTML
+cat >"${tmpdir}/root/sub.html" <<'HTML'
+<html><body><h1>sub</h1><img src="a.gif"></body></html>
+HTML
+
+# Content-Type, Content-disposition and Content-ID of the part named $2.
+part_of_cid() {
+    awk -v cid="$2" '
+        { sub(/\r$/, "") }
+        /^--/ { inpart = 1; ct = ""; id = ""; fn = ""; next }
+        inpart && /^$/ { if (id == cid) print ct "\t" fn; inpart = 0; next }
+        inpart && /^Content-Type: / { ct = substr($0, 15) }
+        inpart && /^Content-disposition: / { fn = $0 }
+        inpart && /^Content-ID: </ { id = substr($0, 14, length($0) - 14) }
+    ' "$1"
+}
+
+require_httrack
+local_server_start --root "${tmpdir}/root" --log "${tmpdir}/server.log"
+
+local_crawl --log "${tmpdir}/crawl.log" "http://127.0.0.1:${SRV_PORT}/index.html" \
+    -O "${tmpdir}/out" --quiet --max-time=120 --timeout=30 --robots=0 '-%M' ||
+    fail "crawl failed"
+
+mht="${tmpdir}/out/index.mht"
+test -s "$mht" || fail "no .mht archive was written"
+
+start=$(sed -n 's/^[[:space:]]*start="<\(.*\)>"[[:space:]]*$/\1/p' "$mht" | tr -d '\r')
+test -n "$start" || fail "the archive names no root part
+$(sed -n '1,12p' "$mht")"
+
+root=$(part_of_cid "$mht" "$start")
+test -n "$root" || fail "start=<${start}> names no part of the archive"
+case $root in
+"text/html"$'\t'*'filename="'*'/index.html"') ;;
+*) fail "the root part is not the page the crawl started from
+${root}" ;;
+esac
+
+# The page is written after some of its own images, so the first part is not
+# the root and a reader with no start= lands on a GIF.
+first=$(command grep -m1 '^Content-Type: ' "$mht" | tr -d '\r')
+test "$first" = "Content-Type: multipart/related;" ||
+    fail "the message header lost its own Content-Type
+${first}"
+
+test ! -e "${tmpdir}/out/index.mht.part" ||
+    fail "the scratch file holding the early parts was left behind"
+
+# A mirror with no page at all: no root to name, and still a whole archive.
+local_crawl --log "${tmpdir}/crawl2.log" "http://127.0.0.1:${SRV_PORT}/a.gif" \
+    -O "${tmpdir}/out2" --quiet --max-time=120 --timeout=30 --robots=0 '-%M' ||
+    fail "the image-only crawl failed"
+
+mht2="${tmpdir}/out2/index.mht"
+test -s "$mht2" || fail "no .mht archive was written for the image-only crawl"
+! command grep -q 'start=' "$mht2" ||
+    fail "an archive with no page still names a root
+$(sed -n '1,12p' "$mht2")"
+boundary=$(sed -n 's/^[[:space:]]*boundary="\(.*\)";[[:space:]]*$/\1/p' "$mht2" | tr -d '\r')
+test -n "$boundary" || fail "the image-only archive carries no boundary"
+command grep -qF -- "--${boundary}--" "$mht2" ||
+    fail "the image-only archive is not closed"
+test ! -e "${tmpdir}/out2/index.mht.part" ||
+    fail "the scratch file was left behind by the image-only crawl"
