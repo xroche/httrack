@@ -61,9 +61,8 @@ htspair_t hts_detect_embed[] = {
 
 /* HTML5 media siblings of <img src>: same near-link treatment (#451) */
 static const htspair_t hts_detect_embed_html5[] = {
-    {"source", "src"}, {"source", "srcset"}, {"track", "src"},
-    {"img", "srcset"}, {"img", "data-src"},  {"img", "data-srcset"},
-    {NULL, NULL}};
+    {"source", "src"}, {"source", "srcset"},   {"track", "src"},
+    {"img", "srcset"}, {"img", "data-srcset"}, {NULL, NULL}};
 
 /* Internal */
 static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
