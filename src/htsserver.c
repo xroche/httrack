@@ -1231,6 +1231,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
     if (linputsoc_t(soc_c, line1, sizeof(line1) - 2, timeout) > 0) {
       int meth = 0;
+      /* meth is rewritten later, so HEAD needs its own flag */
+      hts_boolean is_head = HTS_FALSE;
 
       if (strfield(line1, "get ")) {
         meth = 1;
@@ -1238,6 +1240,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
         meth = 2;
       } else if (strfield(line1, "head ")) {    /* yes, we can do that */
         meth = 10;
+        is_head = HTS_TRUE;
       } else {
 #ifdef _DEBUG
 #endif
@@ -2398,7 +2401,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
       StringCat(headers, "\r\n");
       /* Only HEAD omits the body that Content-length announces. */
       if (send_all(soc_c, StringBuff(headers), StringLength(headers)) &&
-          meth != 10) {
+          !is_head) {
         (void) send_all(soc_c, StringBuff(output), StringLength(output));
       }
     } else {

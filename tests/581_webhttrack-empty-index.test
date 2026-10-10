@@ -44,24 +44,13 @@ def fetch(request):
     sock = socket.create_connection((parts.hostname, parts.port), timeout=20)
     try:
         sock.sendall(request)
+        sock.shutdown(socket.SHUT_WR)
         raw = b""
         while True:
-            try:
-                chunk = sock.recv(4096)
-            except socket.timeout:
-                break
+            chunk = sock.recv(4096)
             if not chunk:
                 break
             raw += chunk
-            if b"\r\n\r\n" in raw:
-                head, body = raw.split(b"\r\n\r\n", 1)
-                declared = [
-                    int(line.split(b":", 1)[1])
-                    for line in head.split(b"\r\n")
-                    if line.lower().startswith(b"content-length:")
-                ]
-                if declared and len(body) >= declared[0]:
-                    break
     finally:
         sock.close()
     head, _, body = raw.partition(b"\r\n\r\n")
@@ -81,7 +70,7 @@ def check(name, request, status, want_body):
         print(f"FAIL {name}: status {line!r}, want {status!r}")
         rc = 1
     elif declared is None or declared == 0:
-        print(f"FAIL {name}: declared length {declared!r}, want a 404 page")
+        print(f"FAIL {name}: declared length {declared!r}, want an error page")
         rc = 1
     elif len(body) != (declared if want_body else 0):
         print(f"FAIL {name}: declared {declared}, body {len(body)} bytes")
@@ -99,5 +88,12 @@ check("GET of a missing page",
 check("HEAD of a missing page",
       b"HEAD /server/nope.html HTTP/1.0\r\n" + host + b"\r\n",
       b"HTTP/1.0 404", False)
+check("HEAD / without index.html",
+      b"HEAD / HTTP/1.0\r\n" + host + b"\r\n", b"HTTP/1.0 404", False)
+foreign = b"Host: example.com\r\n"
+check("HEAD from a foreign Host",
+      b"HEAD / HTTP/1.0\r\n" + foreign + b"\r\n", b"HTTP/1.0 403", False)
+check("GET from a foreign Host",
+      b"GET / HTTP/1.0\r\n" + foreign + b"\r\n", b"HTTP/1.0 403", True)
 sys.exit(rc)
 PY
