@@ -356,6 +356,32 @@ found "v.webm" "$out10"
 found "subs.vtt" "$out10"
 notfound "plain.gif" "$out10"
 
+# <img srcset>, data-src and data-srcset follow the same way (#136). Each image
+# is reachable only through that attribute; the <div data-src> stays refused.
+site11="$tmp/imgsrcset"
+mkdir -p "$site11"
+for f in s1 s2 d ds1 ds2 div; do gif "$site11/$f.gif"; done
+cat >"$site11/index.html" <<EOF
+<html><body><a href="leaf.html">leaf</a></body></html>
+EOF
+cat >"$site11/leaf.html" <<EOF
+<html><body>
+<img srcset="s1.gif 1x, s2.gif 2x">
+<img data-src="d.gif">
+<img data-srcset="ds1.gif 480w, ds2.gif 800w">
+<div data-src="div.gif"></div>
+</body></html>
+EOF
+out11="$tmp/imgsrcset-out"
+rm -rf "$out11"
+mkdir -p "$out11"
+httrack "file://$site11/index.html" -O "$out11" --quiet --near -r2 >"$out11/.log" 2>&1 || true
+for f in s1 s2 d ds1 ds2; do found "$f.gif" "$out11"; done
+notfound "div.gif" "$out11"
+leaf11=$(find "$out11" -name leaf.html | head -1)
+grep -Fq 'srcset="s1.gif 1x, s2.gif 2x"' "$leaf11" ||
+    ! echo "FAIL #136: img srcset not rewritten to the local candidates" || exit 1
+
 # Unknown-attr (data-*) URLs (#201/#203): the script automaton state must reset at
 # </script>, or detection dies for the rest of the page after the first script.
 site11="$tmp/dataattr"
