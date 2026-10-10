@@ -2,3 +2,7 @@
 # is a pointed hint whose match context is empty, so the path lives in the
 # display pointer, not the override -- match with '*'.
 httrack-doc: extra-license-file *
+
+# The manual's pages load this web font by a relative path, so it stays beside them.
+httrack-doc: font-in-non-font-package *
+httrack-doc: woff-font-in-wrong-dir *
