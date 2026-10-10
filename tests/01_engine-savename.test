@@ -80,8 +80,9 @@ name '/doc.pdf' 'text/html' 'doc.pdf' body=hex:255044462D312E34
 name '/doc.pdf' 'text/html' 'doc.html' 'body=<html><body>soft 404</body></html>'
 name '/style.css' 'image/png' 'style.png' 'body=body { }' # no rule for css: wire wins
 
-# A redirect answer resolves nothing: delayed placeholder name.
-name '/x.php' 'text/html' 'x.0.delayed' statuscode=301
+# A redirect answer resolves nothing: delayed placeholder name, which keeps the
+# URL's own extension so an update can look for the file under it (#1926).
+name '/x.php' 'text/html' 'x.php.0.delayed' statuscode=301
 
 # Root and query-only URLs get index + the md5-of-query suffix.
 name '/' 'text/html' 'index.html'

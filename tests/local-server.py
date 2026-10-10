@@ -1241,21 +1241,24 @@ class Handler(SimpleHTTPRequestHandler):
     # on-disk acceptance path reads as "already complete", shorter gets a 206.
     RANGED_BIN = b"RANGED-" + bytes((i * 11 + 5) % 256 for i in range(8192))
 
-    def route_ranged_asset(self):
-        body = self.RANGED_BIN
+    # Same body under a known extension (#1926): the delayed placeholder used to
+    # drop that extension, so the previous mirror's copy could not be found.
+    RANGED_GIF = b"GIF89a" + bytes((i * 7 + 3) % 256 for i in range(8192))
+
+    def send_ranged(self, body, content_type):
         m = re.match(r"bytes=(\d+)-", self.headers.get("Range", "") or "")
         start = int(m.group(1)) if m else 0
         if not m or start == 0:
-            self.send_raw(body, "application/octet-stream")
+            self.send_raw(body, content_type)
         elif start >= len(body):
             self.send_response(416, "Requested Range Not Satisfiable")
-            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header("Content-Type", content_type)
             self.send_header("Content-Range", "bytes */%d" % len(body))
             self.send_header("Content-Length", "0")
             self.end_headers()
         else:
             self.send_response(206, "Partial Content")
-            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header("Content-Type", content_type)
             self.send_header(
                 "Content-Range", "bytes %d-%d/%d" % (start, len(body) - 1, len(body))
             )
@@ -1263,6 +1266,12 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             if self.command != "HEAD":
                 self.wfile.write(body[start:])
+
+    def route_ranged_asset(self):
+        self.send_ranged(self.RANGED_BIN, "application/octet-stream")
+
+    def route_ranged_gif(self):
+        self.send_ranged(self.RANGED_GIF, "image/gif")
 
     # 256 KB: past stdio's buffer, so the write itself reaches the disk.
     DISKFULL_BIN = b"DISKFULL\n" + b"\x41\x42\x43\x44" * 65536
@@ -3832,6 +3841,7 @@ class Handler(SimpleHTTPRequestHandler):
         "/dynfail/dynchild.html": route_dynfail_child,
         "/dynfail/dyngone.html": route_dynfail_gone,
         "/ranged/asset.bin": route_ranged_asset,
+        "/ranged/asset.gif": route_ranged_gif,
         "/types/index.html": route_types_index,
         "/types/control.php": route_types,
         "/types/photo.png": route_types,
