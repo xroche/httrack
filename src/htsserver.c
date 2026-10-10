@@ -198,6 +198,25 @@ static void setfilters_from_text(httrackp *opt, const char *text) {
   freet(copy);
 }
 
+/* Send all of buf, resuming after a short write. */
+static hts_boolean send_all(T_SOC soc, const char *buf, size_t len) {
+  while (len > 0) {
+    const int chunk = len > INT_MAX ? INT_MAX : (int) len;
+    const int n = (int) send(soc, buf, chunk, 0);
+
+    if (n <= 0) {
+#ifndef _WIN32
+      if (n < 0 && errno == EINTR)
+        continue;
+#endif
+      return HTS_FALSE;
+    }
+    buf += n;
+    len -= (size_t) n;
+  }
+  return HTS_TRUE;
+}
+
 static int is_html(const char *file) {
   const char *const type = server_content_type(file);
 
@@ -2377,15 +2396,10 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
         StringCat(headers, tmp);
       }
       StringCat(headers, "\r\n");
-      /* a refusal cleared meth, yet the Content-length above promises a body */
-      if (((size_t) send(soc_c, StringBuff(headers),
-                         (int) StringLength(headers),
-                         0) != StringLength(headers)) ||
-          ((meth == 1 || denied != NULL) &&
-           ((size_t) send(soc_c, StringBuff(output), (int) StringLength(output),
-                          0) != StringLength(output)))) {
-#ifdef _DEBUG
-#endif
+      /* Only HEAD omits the body that Content-length announces. */
+      if (send_all(soc_c, StringBuff(headers), StringLength(headers)) &&
+          meth != 10) {
+        (void) send_all(soc_c, StringBuff(output), StringLength(output));
       }
     } else {
 #ifdef _DEBUG
