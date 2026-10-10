@@ -1,6 +1,7 @@
 /* Fires the engine's per-link cancel, the one WebHTTrack's stop button pushes,
-   from outside the engine: 253_local-ftp-close-once.test writes the save path
-   to cancel into FTPCANCEL_TRIGGER once the FTP transfer is in flight. */
+   from outside the engine: 253_local-ftp-close-once.test writes the names to
+   cancel, one per line, into FTPCANCEL_TRIGGER once the FTP transfer is in
+   flight. */
 
 #define _GNU_SOURCE
 #include <dlfcn.h>
@@ -36,13 +37,20 @@ static void *ftpcancel_thread(void *unused) {
 
     if (fp != NULL) {
       char url[2048];
-      const char *const got = fgets(url, (int) sizeof(url), fp);
-      char *const eol = got != NULL ? strchr(url, '\n') : NULL;
+      int pushed = 0;
 
+      /* one push per line, in order */
+      while (fgets(url, (int) sizeof(url), fp) != NULL) {
+        char *const eol = strchr(url, '\n');
+
+        if (eol != NULL) {
+          *eol = '\0';
+          push(ftpcancel_opt, url);
+          pushed = 1;
+        }
+      }
       fclose(fp);
-      if (eol != NULL) {
-        *eol = '\0';
-        push(ftpcancel_opt, url);
+      if (pushed) {
         return NULL;
       }
     }

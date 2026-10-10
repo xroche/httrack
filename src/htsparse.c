@@ -4697,6 +4697,8 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
 
         while((s = hts_cancel_file_pop(opt)) != NULL) {
           if (strnotempty(s)) { // fichier à canceller
+            hts_boolean matched = HTS_FALSE;
+
             for(i = 0; i < back_max; i++) {
               /* Once, and with the acquire matching ftp_worker_release(): two
                  reads can straddle a worker publishing STATUS_FTP_READY and
@@ -4705,6 +4707,7 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
 
               if (status > 0) {
                 if (strcmp(back[i].url_sav, s) == 0) {  // ok trouvé
+                  matched = HTS_TRUE;
                   if (status != 1000) {
 #if HTS_DEBUG_CLOSESOCK
                     DEBUG_W("user cancel: deletehttp\n");
@@ -4720,6 +4723,12 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
                     hts_store_release_int(&back[i].stop_ftp, 1);
                 }
               }
+            }
+            if (!matched) {
+              hts_log_print(opt, LOG_WARNING,
+                            "Cancel ignored, no transfer in progress has this "
+                            "save path (finished, or a URL was passed): %s",
+                            s);
             }
             s[0] = '\0';
           }
