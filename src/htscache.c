@@ -1245,8 +1245,8 @@ static void cache_set_aside_damaged(httrackp *opt) {
                     "Cache: could not set %s aside", names[i][0]);
   }
   hts_log_print(opt, LOG_WARNING,
-                "Cache: the last cache is beyond repair and was moved to "
-                "hts-cache/damaged.*; the previous cache is used instead");
+                "Cache: the last cache is beyond repair, so the previous "
+                "cache is used instead");
 }
 
 // Initialisation du cache: créer nouveau, renomer ancien, charger..

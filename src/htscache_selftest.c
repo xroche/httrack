@@ -1284,6 +1284,24 @@ static int reconcile_rotation_cases(httrackp *opt, LLint partial,
   failures +=
       reconcile_expect(opt, "hts-cache/damaged.txt", medium, "rotate-damaged");
 
+  /* a set-aside that fails must still leave old.lst alone */
+  reconcile_wipe(opt);
+#ifdef _WIN32
+  mkdir(reconcile_st_path(opt, "hts-cache/damaged.lst"));
+#else
+  mkdir(reconcile_st_path(opt, "hts-cache/damaged.lst"), HTS_PROTECT_FOLDER);
+#endif
+  reconcile_put(opt, "hts-cache/damaged.lst/blocker", small);
+  reconcile_put_zip(opt, "hts-cache/old.zip", complete, 0);
+  reconcile_put(opt, "hts-cache/old.lst", small);
+  reconcile_put(opt, "hts-cache/new.zip", damaged);
+  reconcile_put(opt, "hts-cache/new.lst", medium);
+  reconcile_rotate(opt);
+  failures +=
+      reconcile_expect(opt, "hts-cache/old.lst", small, "rotate-asidefail");
+  remove(reconcile_st_path(opt, "hts-cache/damaged.lst/blocker"));
+  (void) RMDIR(reconcile_st_path(opt, "hts-cache/damaged.lst"));
+
   /* repairable new.zip: repaired, then rotated as usual */
   reconcile_wipe(opt);
   reconcile_put_zip(opt, "hts-cache/old.zip", complete, 0);
