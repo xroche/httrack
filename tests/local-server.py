@@ -3009,8 +3009,7 @@ class Handler(SimpleHTTPRequestHandler):
         nonce = int(self.request_cookies().get("gate", "0")) + 1
         self._wall_redirect("wall.php", f"gate={nonce}; Path=/")
 
-    # --- /manycookies/ (#101): a login hands out more cookies than the request
-    # header used to carry, and the gate page needs every one of them back.
+    # --- /manycookies/ (#101): the gate page needs every cookie back.
     MANY_COOKIES = 12
     MANY_MARK = b"ALL-COOKIES-REPLAYED"
 

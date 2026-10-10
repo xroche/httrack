@@ -1,15 +1,14 @@
 #!/bin/bash
 #
-# #101: a login hands out more cookies than the old eight-cookie request cap
-# carried, so the gate page rejected the mirror. Every stored cookie must be
-# replayed.
+# #101: every stored cookie must be replayed, not just the first eight. The byte
+# bound on the header line is covered by the -#test=cookies sweep, not here.
 
 set -euo pipefail
 
 : "${top_srcdir:=..}"
 
-# gate.html answers 500 unless all twelve cookies come back, so a dropped one
-# shows up both as a crawl error and as a missing marker.
+# gate.html answers 500 unless every cookie the index page set comes back, so a
+# dropped one shows up both as a crawl error and as a missing marker.
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
     --found 'manycookies/gate.html' \
     --file-matches 'manycookies/gate.html' 'ALL-COOKIES-REPLAYED' \

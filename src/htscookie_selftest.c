@@ -68,6 +68,7 @@ static hts_boolean cookie_line_is_whole(const char *line, int count) {
 static int st_cookies(httrackp *opt, int argc, char **argv) {
   static t_cookie cookie;
   char hdr[1024];
+  char many_hdr[4096];
   /* RFC 6265: bare name=value pairs, no $Version/$Path (#151). */
   const char *expected = "Cookie: name=value; has_js=1" H_CRLF;
   const char *dom = "www.example.com";
@@ -120,13 +121,12 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
   if (strstr(hdr, "junk") != NULL) // wrong-domain cookie leaked
     err = 1;
 
-  /* #101: every matching cookie is sent, not a fixed few. A cap of eight
-     silently dropped the later cookies of a login session. */
+  /* #101: every matching cookie is sent, not a fixed few. */
   {
     static t_cookie many;
-    char big[4096];
     char tight[64];
     const int n = 20;
+    hts_boolean clipped = HTS_FALSE;
     int i;
     int sent;
 
@@ -141,29 +141,21 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
       if (cookie_add(&many, name, value, dom, "/") != 0)
         err = 1;
     }
-    sent = http_cookie_header(&many, dom, "/", big, sizeof(big));
+    sent = http_cookie_header(&many, dom, "/", many_hdr, sizeof(many_hdr));
     if (sent != n)
       err = 1;
-    if (!cookie_line_is_whole(big, n))
+    if (!cookie_line_is_whole(many_hdr, n))
       err = 1;
     for (i = 0; i < n; i++) {
       char pair[24];
 
       snprintf(pair, sizeof(pair), "c%02d=v%02d", i, i);
-      if (strstr(big, pair) == NULL)
+      if (strstr(many_hdr, pair) == NULL)
         err = 1;
     }
 
-    /* Too small a buffer drops whole pairs, keeping the closing CRLF the
-       request needs: a clipped pair would be read as another cookie's value. */
-    sent = http_cookie_header(&many, dom, "/", tight, sizeof(tight));
-    if (sent <= 0 || sent >= n)
-      err = 1;
-    if (!cookie_line_is_whole(tight, sent))
-      err = 1;
-
-    /* Swept rather than sized once, because the clip lands between a pair, on
-       its separator or on the CRLF depending on the size. */
+    /* A buffer too small for the whole set still ends clean, and the clip
+       lands between a pair, on its separator or on the CRLF by the size. */
     for (i = 1; i <= (int) sizeof(tight); i++) {
       memset(tight, 'X', sizeof(tight)); /* a lost NUL must not read as empty */
       sent = http_cookie_header(&many, dom, "/", tight, (size_t) i);
@@ -172,9 +164,17 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
       else if (sent == 0) {
         if (tight[0] != '\0')
           err = 1;
-      } else if (!cookie_line_is_whole(tight, sent))
-        err = 1;
+      } else {
+        if (sent < n)
+          clipped = HTS_TRUE;
+        if (!cookie_line_is_whole(tight, sent)) {
+          err = 1;
+          printf("  clipped at size %d: %s\n", i, tight);
+        }
+      }
     }
+    if (!clipped) // a sweep that never clipped proves nothing about clipping
+      err = 1;
   }
 #ifndef _WIN32
   /* the jar holds live session cookies: cookie_save must keep it 0600 */
@@ -197,8 +197,10 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
   }
 #endif
   printf("cookie-header: %s\n", err ? "FAIL" : "OK");
-  if (err)
+  if (err) {
     printf("  got: %s\n", hdr);
+    printf("  many: %s\n", many_hdr);
+  }
   return err;
 }
 
