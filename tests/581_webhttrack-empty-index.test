@@ -1,0 +1,99 @@
+#!/bin/bash
+#
+# Every htsserver reply but HEAD must carry the body its Content-length
+# declares, including the 404 for GET / when index.html is missing (#83).
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/webhttracklib.sh
+. "${testdir}/webhttracklib.sh"
+
+htsserver_require
+htsserver_distroot
+
+# A root whose html/server lacks index.html.
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_noindex.XXXXXX") || fail "no tmpdir"
+cleanup_push htsserver_cleanup_dir "${work}"
+root="${work}/root"
+mkdir -p "${root}/html/server"
+for entry in "${HTS_DISTROOT}"/*; do
+    test "${entry##*/}" = html || ln -s "${entry}" "${root}/${entry##*/}"
+done
+for entry in "${HTS_DISTROOT}"/html/*; do
+    test "${entry##*/}" = server || ln -s "${entry}" "${root}/html/${entry##*/}"
+done
+for entry in "${HTS_DISTROOT}"/html/server/*; do
+    test "${entry##*/}" = index.html ||
+        ln -s "${entry}" "${root}/html/server/${entry##*/}"
+done
+test -f "${HTS_DISTROOT}/html/server/index.html" ||
+    fail "the dist root has no index.html, so removing it proves nothing"
+
+htsserver_start --root "${root}" --home "${work}"
+
+"${HTS_PYTHON}" - "${HTS_URL}" <<'PY' || fail "body length checks failed"
+import socket, sys, urllib.parse
+
+parts = urllib.parse.urlsplit(sys.argv[1])
+rc = 0
+
+
+def fetch(request):
+    """Return (status line, declared length, body) for one raw request."""
+    sock = socket.create_connection((parts.hostname, parts.port), timeout=20)
+    try:
+        sock.sendall(request)
+        sock.shutdown(socket.SHUT_WR)
+        raw = b""
+        while True:
+            chunk = sock.recv(4096)
+            if not chunk:
+                break
+            raw += chunk
+    finally:
+        sock.close()
+    head, _, body = raw.partition(b"\r\n\r\n")
+    lines = head.split(b"\r\n")
+    declared = [
+        int(line.split(b":", 1)[1])
+        for line in lines
+        if line.lower().startswith(b"content-length:")
+    ]
+    return lines[0], declared[0] if declared else None, body
+
+
+def check(name, request, status, want_body):
+    global rc
+    line, declared, body = fetch(request)
+    if not line.startswith(status):
+        print(f"FAIL {name}: status {line!r}, want {status!r}")
+        rc = 1
+    elif declared is None or declared == 0:
+        print(f"FAIL {name}: declared length {declared!r}, want an error page")
+        rc = 1
+    elif len(body) != (declared if want_body else 0):
+        print(f"FAIL {name}: declared {declared}, body {len(body)} bytes")
+        rc = 1
+    else:
+        print(f"ok {name}: declared {declared}, body {len(body)}")
+
+
+host = f"Host: {parts.hostname}:{parts.port}\r\n".encode()
+check("GET / without index.html",
+      b"GET / HTTP/1.0\r\n" + host + b"\r\n", b"HTTP/1.0 404", True)
+check("GET of a missing page",
+      b"GET /server/nope.html HTTP/1.0\r\n" + host + b"\r\n",
+      b"HTTP/1.0 404", True)
+check("HEAD of a missing page",
+      b"HEAD /server/nope.html HTTP/1.0\r\n" + host + b"\r\n",
+      b"HTTP/1.0 404", False)
+check("HEAD / without index.html",
+      b"HEAD / HTTP/1.0\r\n" + host + b"\r\n", b"HTTP/1.0 404", False)
+foreign = b"Host: example.com\r\n"
+check("HEAD from a foreign Host",
+      b"HEAD / HTTP/1.0\r\n" + foreign + b"\r\n", b"HTTP/1.0 403", False)
+check("GET from a foreign Host",
+      b"GET / HTTP/1.0\r\n" + foreign + b"\r\n", b"HTTP/1.0 403", True)
+sys.exit(rc)
+PY
