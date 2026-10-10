@@ -955,16 +955,17 @@ static int append_cookie_header(buff_struct *bstr, t_cookie *cookie,
     *skipped = 0;
   if (cookie == NULL || bstr->overflow)
     return 0;
-  if (bstr->capacity <= crlf_len + 1) // too small to hold even an empty line
-    return 0;
   if (!cookie_host(domain, host, sizeof(host)))
     return 0;
   domain = host;
 
-  /* Highest position a pair may reach, keeping this line's CRLF, the NUL, and
-     what the caller still owes. */
+  /* Highest position a pair may reach: cookies get what is left once this
+     line's CRLF, the NUL and whatever the caller still owes are set aside.
+     Both tests are what keep the subtractions from wrapping. */
+  if (bstr->capacity <= crlf_len + 1)
+    return 0;
   max_pos = bstr->capacity - crlf_len - 1;
-  if (reserve >= max_pos) // nothing left to spend on cookies
+  if (reserve >= max_pos)
     return 0;
   max_pos -= reserve;
 
