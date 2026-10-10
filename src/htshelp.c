@@ -609,7 +609,7 @@ void help(const char *app, int more) {
   infomsg
     (" %B  tolerant requests (accept bogus responses on some servers, but not standard!)");
   infomsg
-    (" %s  update hacks: various hacks to limit re-transfers when updating (identical size, bogus response..)");
+    (" %s  update hacks: keep a file already on disk when its size matches, even on a first crawl, and accept some bogus responses");
   infomsg
     (" %u  url hacks: various hacks to limit duplicate URLs (strip //, www.foo.com==foo.com..)");
   infomsg("     opt out of one url-hack part: --keep-www-prefix "
