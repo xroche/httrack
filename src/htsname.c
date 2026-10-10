@@ -427,6 +427,65 @@ hts_boolean url_query_value(const char *url, const char *name, char *dst,
   return HTS_TRUE;
 }
 
+/* The last dot of the name part, or NULL when the name carries no extension. */
+static char *name_last_dot(char *path) {
+  char *lastDot = NULL;
+
+  for (; *path != '\0'; path++) {
+    if (*path == '.') {
+      lastDot = path;
+    } else if (*path == '/' || *path == '\\') {
+      lastDot = NULL;
+    }
+  }
+  return lastDot;
+}
+
+/* Drop the delayed-type placeholder tail when the mirror already holds the file
+   the shortened name points at (#1926). HTS_TRUE when the tail was dropped. */
+static hts_boolean url_savename_undelay(httrackp *opt, char *save,
+                                        const size_t size,
+                                        /* "<id>.delayed", no leading dot */
+                                        const char *delayed_tail) {
+  char BIGSTK candidate[HTS_URLMAXSIZE * 2];
+  char catbuff[CATBUFF_SIZE];
+  const size_t len = strlen(save);
+  size_t cut = 0; /* prefix to keep, 0 until a tail matches */
+
+  /* the exact tail, so a link whose own name ends in ".<hex>" keeps it */
+  if (delayed_tail != NULL && strnotempty(delayed_tail)) {
+    const size_t n = strlen(delayed_tail) + 1;
+
+    if (len > n && save[len - n] == '.' &&
+        strcmp(save + len - n + 1, delayed_tail) == 0)
+      cut = len - n;
+  }
+  if (cut == 0) {
+    if (!IS_DELAYED_EXT(save) || len <= strlen("." DELAYED_EXT))
+      return HTS_FALSE;
+    cut = len - strlen("." DELAYED_EXT);
+  }
+  /* the copy below trusts this size, so refuse rather than clip */
+  if (cut + 1 > sizeof(candidate))
+    return HTS_FALSE;
+  strclipbuff(candidate, cut + 1, save);
+  /* an undelayed run gives an extensionless link ".html" or probes its type, so
+     the mirror's copy of one says nothing about the name this link would get */
+  if (name_last_dot(candidate) == NULL)
+    return HTS_FALSE;
+  /* back_add()'s on-disk resume skips HTML, its links having moved */
+  if (ishtml(opt, candidate) == 1)
+    return HTS_FALSE;
+  if (fsize_utf8(fconv(catbuff, sizeof(catbuff), candidate)) <= 0)
+    return HTS_FALSE;
+  hts_log_print(opt, LOG_DEBUG,
+                "engine: save-name: keeping the previous mirror's name %s "
+                "instead of the placeholder %s",
+                candidate, save);
+  strlcpybuff(save, candidate, size);
+  return HTS_TRUE;
+}
+
 // Build the local save name (save) from adr/fil; renames on collision
 // (e.g. INDEX.HTML vs index.html).
 int url_savename(lien_adrfilsave *const afs,
@@ -1006,7 +1065,9 @@ int url_savename(lien_adrfilsave *const afs,
 
       while((a > fil) && (*a != '.') && (*a != '/'))
         a--;
-      if (*a == '.' && known_ext)
+      /* the placeholder is temporary, so it keeps the name an undelayed run
+         would have picked */
+      if (*a == '.' && known_ext && !ext_chg_delayed)
         *a = '\0'; // cut
       url_savename_addtail(fil, sizeof(fil), ".", ext);
     } else {
@@ -1606,16 +1667,8 @@ int url_savename(lien_adrfilsave *const afs,
 
   /* Ensure that the MANDATORY "temporary" extension is set */
   if (ext_chg_delayed) {
-    char *ptr;
-    char *lastDot = NULL;
+    char *const lastDot = name_last_dot(afs->save);
 
-    for(ptr = afs->save; *ptr != 0; ptr++) {
-      if (*ptr == '.') {
-        lastDot = ptr;
-      } else if (*ptr == '/' || *ptr == '\\') {
-        lastDot = NULL;
-      }
-    }
     if (lastDot == NULL) {
       strcatbuff(afs->save, "." DELAYED_EXT);
     } else if (!IS_DELAYED_EXT(afs->save)) {
@@ -1814,6 +1867,10 @@ int url_savename(lien_adrfilsave *const afs,
     strcatbuff(tempo, afs->save);
     strcpybuff(afs->save, tempo);
   }
+  // Before the collision search, so a name already taken this run still moves.
+  if (ext_chg_delayed)
+    url_savename_undelay(opt, afs->save, sizeof(afs->save), ext);
+
   // vérifier que le nom n'est pas déja pris...
   if (opt->liens != NULL) {
     int nom_ok;
