@@ -1,0 +1,56 @@
+#!/bin/bash
+# configure must stop with a clear message when the src/coucal submodule is empty (#247).
+set -euo pipefail
+
+top="${abs_top_srcdir:-${top_srcdir:-..}}"
+aux="configure config.guess config.sub ltmain.sh compile missing install-sh"
+for f in $aux; do
+    test -r "$top/$f" || {
+        echo "SKIP: $top/$f missing, the tree is not bootstrapped"
+        exit 77
+    }
+done
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_coucalguard.XXXXXX")
+trap 'set +e; rm -rf "$tmp"' EXIT
+
+# A source tree holding only what configure reads before the guard.
+mkdir -p "$tmp/src/coucal" "$tmp/build"
+for f in $aux; do
+    cp "$top/$f" "$tmp/"
+done
+: >"$tmp/src/httrack.c"
+
+run_configure() {
+    (cd "$tmp/build" && bash ../configure >out 2>&1) && rc=0 || rc=$?
+    out=$(cat "$tmp/build/out")
+}
+
+run_configure
+if test "$rc" -eq 0; then
+    echo "FAIL: configure succeeded with an empty src/coucal"
+    exit 1
+fi
+grep -q 'error: src/coucal is empty' <<<"$out" || {
+    echo "FAIL: no submodule error; configure said:"
+    echo "$out"
+    exit 1
+}
+grep -q 'git submodule update --init src/coucal' <<<"$out" || {
+    echo "FAIL: the error does not give the fix"
+    exit 1
+}
+
+# Control: with coucal present the guard passes and configure goes on.
+: >"$tmp/src/coucal/coucal.c"
+run_configure
+grep -q 'checking for the coucal submodule... yes' <<<"$out" || {
+    echo "FAIL: guard did not pass with coucal present; configure said:"
+    echo "$out"
+    exit 1
+}
+if grep -q 'src/coucal is empty' <<<"$out"; then
+    echo "FAIL: guard fired with coucal present"
+    exit 1
+fi
+echo "OK"
