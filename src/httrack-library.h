@@ -459,10 +459,10 @@ HTSEXT_API int hts_setpause(httrackp *opt, int);
     either way (#1595). @return 0; no-op if @p opt is NULL. */
 HTSEXT_API int hts_request_stop(httrackp *opt, hts_boolean keep_resume);
 
-/** Queue a single in-progress file to be cancelled by the engine.
-    @p url is the file's local save path, as the engine reports it in
-    back[].url_sav, and not its URL. A path matching no transfer is logged and
-    ignored. It is copied internally. Takes the state lock, so it is
+/** Queue one in-progress file to be cancelled by the engine.
+    @p url must be the file's local save path (lien_back.url_sav, as the loop
+    callback's back[] shows it), not its URL. It is matched byte for byte, and
+    a path matching no transfer is logged and ignored. Copied internally;
     thread-safe. @return the underlying push result. */
 HTSEXT_API int hts_cancel_file_push(httrackp *opt, const char *url);
 

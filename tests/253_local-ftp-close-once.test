@@ -90,9 +90,9 @@ crawlpid=
 grep -aq 'Cancelled by User' "${out}/hts-log.txt" ||
     fail "the cancel never reached the transfer: $(grep -a Error "${out}/hts-log.txt" || true)"
 test -s "$closes" || fail "the interposer logged no close() at all"
-grep -aqF "Cancel matched no transfer in progress (it takes the local save path, not the URL): $url" \
+grep -aqF "Cancel ignored, no transfer in progress has this save path (finished, or a URL was passed): $url" \
     "${out}/hts-log.txt" || fail "a cancel by URL was not reported"
-if grep -aqF "Cancel matched no transfer in progress (it takes the local save path, not the URL): $partial" \
+if grep -aqF "Cancel ignored, no transfer in progress has this save path (finished, or a URL was passed): $partial" \
     "${out}/hts-log.txt"; then
     fail "the matching cancel was reported as unmatched"
 fi

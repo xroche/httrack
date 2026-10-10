@@ -4726,8 +4726,8 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
             }
             if (!matched) {
               hts_log_print(opt, LOG_WARNING,
-                            "Cancel matched no transfer in progress (it takes "
-                            "the local save path, not the URL): %s",
+                            "Cancel ignored, no transfer in progress has this "
+                            "save path (finished, or a URL was passed): %s",
                             s);
             }
             s[0] = '\0';
