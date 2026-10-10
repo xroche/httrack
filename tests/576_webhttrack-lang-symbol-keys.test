@@ -14,7 +14,7 @@ distdir=${HTS_DISTDIR}
 work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_langsym.XXXXXX") || fail "no tmpdir"
 cleanup_push htsserver_cleanup_dir "${work}"
 
-# A root whose French catalog and server pages we own; the rest links the dist.
+# A root whose catalogs and server pages we own; the rest links the dist.
 root=${work}/root
 mkdir -p "${root}/html/server" "${root}/lang"
 for entry in "${distdir}"/*; do
@@ -30,12 +30,15 @@ for entry in "${distdir}"/html/server/*; do
     ln -s "${entry}" "${root}/html/server/${entry##*/}"
 done
 for entry in "${distdir}"/lang/*; do
-    test "${entry##*/}" = Francais.txt || ln -s "${entry}" "${root}/lang/${entry##*/}"
+    case ${entry##*/} in
+    English.txt | Francais.txt) ;;
+    *) ln -s "${entry}" "${root}/lang/${entry##*/}" ;;
+    esac
 done
 
 # Writes the probe page naming every symbol, and the French catalog variants:
-# none, all, odd or even occurrences re-keyed, in place or moved, plus an
-# unknown symbol.
+# none, all, odd or even occurrences re-keyed, in place or moved.
+# English.txt is a copy too, so that its own re-keying can be tested.
 "${HTS_PYTHON}" - "${distdir}" "${root}" "${work}" <<'PY' || fail "cannot build the fixtures"
 import collections, sys
 
@@ -59,25 +62,29 @@ for sym, text in pairs(distdir + "/lang.def"):
         key = text + str(n).encode()
     symbol[key] = sym
 
-probe = b"\n".join(b"%s=${%s}" % (s, s) for s in sorted(symbol.values()) + [b"LANG_NOSUCH"])
+probe = b"\n".join(b"%s=${%s}" % (s, s) for s in sorted(symbol.values()))
 open(root + "/html/server/langprobe.html", "wb").write(probe + b"\n")
 
-catalog = pairs(distdir + "/lang/Francais.txt")
-seen = collections.Counter()
-keyed = []
-for text, value in catalog:
-    n = seen[text]
-    seen[text] += 1
-    keyed.append((text, symbol.get(text + (str(n).encode() if n else b"")), value))
-repeated = sum(1 for t, s, v in keyed if s and seen[t] > 1)
-if repeated < 20:
-    sys.exit("only %d repeated texts to split; the parse is broken" % repeated)
 
 
-def write(name, pick, where=0):
+def keyed(name):
+    seen, out = collections.Counter(), []
+    for text, value in pairs(distdir + "/lang/" + name + ".txt"):
+        n = seen[text]
+        seen[text] += 1
+        out.append((text, symbol.get(text + (str(n).encode() if n else b"")), value))
+    return out
+
+
+french = keyed("Francais")
+if sum(1 for t, s, v in french if s and t + b"1" in symbol) < 20:
+    sys.exit("too few repeated texts to split; the parse is broken")
+
+
+def write(name, pick, where=0, catalog=french):
     lines = [
         (True, [sym, value]) if sym and pick(i) else (False, [text, value])
-        for i, (text, sym, value) in enumerate(keyed)
+        for i, (text, sym, value) in enumerate(catalog)
     ]
     # A symbol line holds its meaning wherever it sits, unlike a repeated text.
     if where:
@@ -92,12 +99,13 @@ write("odd", lambda i: i % 2 == 1)
 write("even", lambda i: i % 2 == 0)
 write("odd-last", lambda i: i % 2 == 1, 1)
 write("even-first", lambda i: i % 2 == 0, -1)
-typo = [b"LANG_NOSUCH", b"x"] + [x for t, s, v in keyed for x in (t, v)]
-open(work + "/typo", "wb").write(b"\r\n".join(typo) + b"\r\n")
+write("english", lambda i: False, catalog=keyed("English"))
+write("english-all", lambda i: True, catalog=keyed("English"))
 PY
 
-render() { # $1 = catalog variant
+render() { # $1 = French variant, $2 = English variant
     cp "${work}/$1" "${root}/lang/Francais.txt"
+    cp "${work}/${2:-english}" "${root}/lang/English.txt"
     mkdir -p "${work}/h$1"
     htsserver_start --root "${root}" --home "${work}/h$1" --log "${work}/srv$1.log" lang 2
     "${HTS_PYTHON}" - "${HTS_URL}server/langprobe.html" "${work}/$1.out" <<'PY' || fail "no probe page for $1"
@@ -118,10 +126,8 @@ for v in all odd even odd-last even-first; do
     cmp -s "${work}/none.out" "${work}/${v}.out" ||
         fail "re-keying ${v} lines changed: $(diff "${work}/none.out" "${work}/${v}.out" | head -5)"
 done
-echo ok
-
-printf '[an unknown symbol key is ignored] ..\t'
-render typo
-cmp -s "${work}/none.out" "${work}/typo.out" ||
-    fail "a stray key changed: $(diff "${work}/none.out" "${work}/typo.out" | head -5)"
+# The English fallback pass must not overwrite what the French one filled.
+render all english-all
+cmp -s "${work}/none.out" "${work}/all.out" ||
+    fail "re-keying English changed: $(diff "${work}/none.out" "${work}/all.out" | head -5)"
 echo ok

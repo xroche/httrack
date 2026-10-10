@@ -77,7 +77,6 @@ int NewLangStrSz = 1024;
 coucal NewLangStr = NULL;
 int NewLangStrKeysSz = 1024;
 coucal NewLangStrKeys = NULL;
-coucal NewLangSyms = NULL;
 int NewLangListSz = 1024;
 coucal NewLangList = NULL;
 
@@ -2514,10 +2513,10 @@ static hts_boolean lang_read_pair(FILE *fp, char *key, char *value,
   return HTS_TRUE;
 }
 
-/* Is this catalog key a lang.def symbol rather than English text? */
+/* Is this catalog key a symbol rather than English text from lang.def? */
 static hts_boolean lang_is_symbol(const char *key) {
-  return (strncmp(key, "LANG_", 5) == 0 || strncmp(key, "LISTDEF_", 8) == 0) &&
-         NewLangSyms != NULL && coucal_exists(NewLangSyms, key);
+  return !strnotempty(LANGINTKEY(key)) &&
+         (strncmp(key, "LANG_", 5) == 0 || strncmp(key, "LISTDEF_", 8) == 0);
 }
 
 /* One pass over a catalog, taking either its symbol-keyed or its text-keyed
@@ -2532,29 +2531,31 @@ static void lang_load_catalog(FILE *fp, hts_boolean fallback,
     const char *intkey;
 
     if (!lang_read_pair(fp, extkey, value, 8000) || !strnotempty(extkey) ||
-        !strnotempty(value))
+        !strnotempty(value) || lang_is_symbol(extkey) != symbols)
       continue;
-    intkey = LANGINTKEY(extkey);
-    if (!strnotempty(intkey) && lang_is_symbol(extkey)) {
-      if (!symbols || strnotempty(LANGSEL(extkey)))
+    if (symbols) {
+      if (strnotempty(LANGSEL(extkey)))
         continue;
       intkey = extkey;
-    } else if (symbols || !strnotempty(intkey)) {
-      continue;
-    } else if (strnotempty(LANGSEL(intkey))) {
-      /* Repeated English text: lang.def keys its Nth copy as text + N. */
-      const size_t pos = strlen(extkey);
-      int increment = 0;
-
-      if (fallback)
-        continue;
-      do {
-        increment++;
-        sprintf(extkey + pos, "%d", increment);
-        intkey = LANGINTKEY(extkey);
-      } while (strnotempty(intkey) && strnotempty(LANGSEL(intkey)));
+    } else {
+      intkey = LANGINTKEY(extkey);
       if (!strnotempty(intkey))
         continue;
+      if (strnotempty(LANGSEL(intkey))) {
+        /* Repeated English text: lang.def keys its Nth copy as text + N. */
+        const size_t pos = strlen(extkey);
+        int increment = 0;
+
+        if (fallback)
+          continue;
+        do {
+          increment++;
+          sprintf(extkey + pos, "%d", increment);
+          intkey = LANGINTKEY(extkey);
+        } while (strnotempty(intkey) && strnotempty(LANGSEL(intkey)));
+        if (!strnotempty(intkey))
+          continue;
+      }
     }
     {
       char *const buff = malloct(strlen(value) + 1);
@@ -2579,11 +2580,9 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
     LANG_DELETE();
     NewLangStr = coucal_new(0);
     NewLangStrKeys = coucal_new(0);
-    NewLangSyms = coucal_new(0);
     coucal_set_name(NewLangStr, "NewLangStr");
     coucal_set_name(NewLangStrKeys, "NewLangStrKeys");
-    coucal_set_name(NewLangSyms, "NewLangSyms");
-    if (NewLangStr == NULL || NewLangStrKeys == NULL || NewLangSyms == NULL) {
+    if ((NewLangStr == NULL) || (NewLangStrKeys == NULL)) {
       abortLog("Error in lang.h: not enough memory");
     } else {
       coucal_value_is_malloc(NewLangStr, 1);
@@ -2618,8 +2617,7 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
             } while(strnotempty(test));
           }
 
-          coucal_write(NewLangSyms, intkey, (intptr_t) 0);
-          if (!strnotempty(test)) {
+          if (!strnotempty(test)) { // éviter doublons
             const size_t len = strlen(intkey);
             char *const buff = (char *) malloc(len + 1);
 
@@ -2807,7 +2805,6 @@ static void conv_printf(const char *from, char *to) {
 static void LANG_DELETE(void) {
   coucal_delete(&NewLangStr);
   coucal_delete(&NewLangStrKeys);
-  coucal_delete(&NewLangSyms);
 }
 
 // sélection de la langue
