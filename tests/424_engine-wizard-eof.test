@@ -52,15 +52,18 @@ if pid == 0:
     if mode == "ioerror":
         os.close(0)
     os.execv(prog, [prog])
-os.close(slave)
+# The parent keeps slave open for the whole read loop. Closing it first makes
+# the child the last holder, and BSD and macOS revoke a pty on that last close
+# and throw away whatever is still queued, so the parent read nothing at all.
 if mode == "typed":
     os.write(master, b"\n" + b"proj\n")
-# The byte budget catches a spin. This catches the other regression, an engine
-# that stops asking and then hangs without printing anything.
+# The byte budget catches a spin. The deadline catches the other regression, an
+# engine that stops asking and then hangs without printing anything.
 deadline = time.time() + 60
 total = 0
 spun = False
 seen = b""
+status = None
 with open(out, "wb", 0) as log:
     while True:
         if time.time() > deadline or total > (1 << 20):
@@ -69,20 +72,29 @@ with open(out, "wb", 0) as log:
         # The typed arm never reaches EOF, so stop at the question after this one.
         if mode == "typed" and b"Base path" in seen:
             break
-        if not select.select([master], [], [], 0.5)[0]:
+        if select.select([master], [], [], 0.5)[0]:
+            try:
+                data = os.read(master, 65536)
+            except OSError:
+                break
+            if not data:
+                break
+            log.write(data)
+            seen += data
+            total += len(data)
             continue
-        try:
-            data = os.read(master, 65536)
-        except OSError:
+        # Nothing queued. Our own slave keeps the pty alive, so EOF never
+        # arrives; an exited child with an idle pty is the end of the output.
+        if status is not None:
             break
-        if not data:
-            break
-        log.write(data)
-        seen += data
-        total += len(data)
-if spun or mode == "typed":
+        wpid, wstatus = os.waitpid(pid, os.WNOHANG)
+        if wpid == pid:
+            status = wstatus
+os.close(slave)
+if (spun or mode == "typed") and status is None:
     os.kill(pid, 9)
-_, status = os.waitpid(pid, 0)
+if status is None:
+    _, status = os.waitpid(pid, 0)
 if spun:
     sys.exit(1)
 print("signal" if os.WIFSIGNALED(status) else os.waitstatus_to_exitcode(status))
@@ -91,6 +103,9 @@ print("signal" if os.WIFSIGNALED(status) else os.waitstatus_to_exitcode(status))
 run() { # run MODE
     "$python" -c "$runner" "$bin" "$1" "${dir}/$1.out" ||
         fail "$1: the wizard never stopped asking for a project name"
+    # An empty transcript means the reader lost the output, which otherwise
+    # reads downstream as an engine that printed no prompt.
+    test -s "${dir}/$1.out" || fail "$1: the pty transcript is empty"
 }
 asked() { # asked MODE
     count_matching_lines "Enter project name" "${dir}/$1.out"
