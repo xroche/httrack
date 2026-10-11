@@ -1,0 +1,170 @@
+#!/bin/bash
+# Issue #223: nothing named a .mht archive's root. RFC 2387 then picks the first
+# part, whichever file the mirror finished first. The archive must name the
+# first page it saves.
+set -eu
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_223.XXXXXX") || exit 1
+cleanup() {
+    chmod -R u+rwX "$tmpdir" 2>/dev/null
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+mkdir -p "${tmpdir}/root"
+printf 'GIF89a\001\000\001\000\200\000\000\377\377\377\000\000\000!\371\004\001\000\000\000\000,\000\000\000\000\001\000\001\000\000\002\002D\001\000;' \
+    >"${tmpdir}/root/a.gif"
+cp "${tmpdir}/root/a.gif" "${tmpdir}/root/b.gif"
+printf 'VICTIMDATA-0123456789' >"${tmpdir}/root/index.mht.part"
+cat >"${tmpdir}/root/index.html" <<'HTML'
+<html><body><h1>start</h1>
+<img src="a.gif"><img src="b.gif">
+<a href="sub.html">sub</a>
+</body></html>
+HTML
+cat >"${tmpdir}/root/sub.html" <<'HTML'
+<html><body><h1>sub</h1><img src="a.gif"></body></html>
+HTML
+cat >"${tmpdir}/root/plain.html" <<'HTML'
+<html><body><h1>no assets here</h1></body></html>
+HTML
+
+flags=(--quiet --max-time=120 --timeout=30 --robots=0 '-%M')
+
+# Reading the header last would still satisfy every presence check below.
+assert_whole_archive() { # <archive text> <what it is>
+    local b n
+    test "$(head -1 <<<"$1")" = "From: HTTrack Website Copier <nobody@localhost>" ||
+        fail "$2 does not open with its message header
+$(head -3 <<<"$1")"
+    command grep -q 'type="text/html"' <<<"$1" ||
+        fail "$2 lost the type parameter off its Content-Type
+$(head -8 <<<"$1")"
+    b=$(sed -n 's/^[[:space:]]*boundary="\(.*\)";$/\1/p' <<<"$1")
+    test -n "$b" || fail "$2 carries no boundary"
+    command grep -qxF -- "--${b}--" <<<"$1" || fail "$2 is not closed"
+    # One delimiter opens each part, so a damaged one leaves a part no reader sees.
+    n=$(command grep -c '^Content-ID: ' <<<"$1" || true)
+    test "$(command grep -cxF -- "--${b}" <<<"$1" || true)" -eq "$n" ||
+        fail "$2 holds ${n} parts and a different number of delimiters"
+}
+
+root_cid() { # <archive text>
+    sed -n 's/^[[:space:]]*start="<\(.*\)>"$/\1/p' <<<"$1"
+}
+
+require_httrack
+local_server_start --root "${tmpdir}/root" --log "${tmpdir}/server.log"
+
+# Two images are seeded first and -c1 keeps one transfer in flight, so both are
+# archived before any page. Two held parts, not one, so promoting on the second
+# part rather than on the first page is a different answer.
+local_crawl --log "${tmpdir}/crawl.log" "http://127.0.0.1:${SRV_PORT}/a.gif" \
+    "http://127.0.0.1:${SRV_PORT}/b.gif" \
+    "http://127.0.0.1:${SRV_PORT}/index.html" -O "${tmpdir}/out" -c1 \
+    "${flags[@]}" || fail "crawl failed"
+
+mht="${tmpdir}/out/index.mht"
+test -s "$mht" || fail "no .mht archive was written"
+text=$(tr -d '\r' <"$mht")
+assert_whole_archive "$text" "the archive"
+
+start=$(root_cid "$text")
+test -n "$start" || fail "the archive names no root part
+$(head -12 <<<"$text")"
+
+# Three header lines sit above Content-ID, so -B3 takes them too.
+root=$(command grep -B3 -xF "Content-ID: <${start}>" <<<"$text") ||
+    fail "start=<${start}> names no part of the archive"
+command grep -qx 'Content-Type: text/html' <<<"$root" ||
+    fail "the root part is not a page
+${root}"
+command grep -q 'filename="[^"]*/index\.html"' <<<"$root" ||
+    fail "the root part is not the page the crawl started from
+${root}"
+
+# A page goes in as text and an image base64, so a part that claims the wrong
+# encoding is undecodable.
+command grep -qx 'Content-Transfer-Encoding: 8bit' <<<"$root" ||
+    fail "the page part is not sent as text
+${root}"
+image=$(command grep -A2 -xF 'Content-Type: image/gif' <<<"$text")
+command grep -qx 'Content-Transfer-Encoding: base64' <<<"$image" ||
+    fail "an image part is not sent as base64
+${image}"
+
+# The root is not the first part, which is what start= exists to say.
+first=$(command grep -m1 '^Content-disposition: ' <<<"$text")
+command grep -qF '.gif"' <<<"$first" ||
+    fail "a held image is no longer the first part written
+${first}"
+
+# Every part held back before the root arrived has to survive the move.
+for f in a.gif b.gif index.html sub.html; do
+    command grep -qF "filename=\"127.0.0.1_${SRV_PORT}/${f}\"" <<<"$text" ||
+        fail "the archive lost the ${f} part
+$(command grep '^Content-disposition: ' <<<"$text")"
+done
+
+test ! -e "${tmpdir}/out/~index.mht.part" ||
+    fail "~index.mht.part, holding the early parts, was left behind"
+
+# A page saved before anything else goes straight into the archive, with no
+# part held first.
+local_crawl --log "${tmpdir}/crawl3.log" "http://127.0.0.1:${SRV_PORT}/plain.html" \
+    -O "${tmpdir}/out3" "${flags[@]}" || fail "the page-only crawl failed"
+
+test -s "${tmpdir}/out3/index.mht" || fail "the page-only crawl wrote no archive"
+text3=$(tr -d '\r' <"${tmpdir}/out3/index.mht")
+assert_whole_archive "$text3" "the page-only archive"
+start3=$(root_cid "$text3")
+test -n "$start3" || fail "a page saved first is not named as the root
+$(head -12 <<<"$text3")"
+command grep -B3 -xF "Content-ID: <${start3}>" <<<"$text3" |
+    command grep -q 'filename="[^"]*/plain\.html"' ||
+    fail "the page-only archive names some other part as its root"
+
+# A mirrored file may be saved to the name the held parts use, and the engine
+# must not delete it. url_savename drops the '~', so no URL can reach it.
+local_crawl --log "${tmpdir}/crawl4.log" \
+    "http://127.0.0.1:${SRV_PORT}/index.mht.part" -O "${tmpdir}/out4" \
+    "${flags[@]}" -N '%n.%t' || fail "the colliding-name crawl failed"
+
+test "$(cat "${tmpdir}/out4/index.mht.part" 2>/dev/null)" = VICTIMDATA-0123456789 ||
+    fail "the mirrored index.mht.part was clobbered by the held parts"
+test -s "${tmpdir}/out4/index.mht" || fail "the colliding-name crawl wrote no archive"
+text4=$(tr -d '\r' <"${tmpdir}/out4/index.mht")
+command grep -q 'filename="[^"]*index\.mht\.part"' <<<"$text4" ||
+    fail "the mirrored index.mht.part reached no part of the archive"
+# Nothing in this crawl is a page, so the archive names no root and is closed
+# on the path that flushes the held parts at the end.
+assert_whole_archive "$text4" "the page-free archive"
+test -z "$(root_cid "$text4")" ||
+    fail "an archive with no page still names a root
+$(head -12 <<<"$text4")"
+
+# A page the engine cannot read back must not become the root, since the header
+# is written first and a failed read would leave start= dangling.
+local_crawl --log "${tmpdir}/crawl5.log" "http://127.0.0.1:${SRV_PORT}/index.html" \
+    -O "${tmpdir}/out5" --quiet --max-time=120 --timeout=30 --robots=0 ||
+    fail "the plain crawl failed"
+page="${tmpdir}/out5/127.0.0.1_${SRV_PORT}/index.html"
+chmod 000 "$page"
+if test -r "$page"; then
+    echo "# this user reads a mode-000 file, so the unreadable page is not checked"
+else
+    local_crawl --log "${tmpdir}/crawl6.log" --continue -O "${tmpdir}/out5" \
+        -c1 "${flags[@]}" || fail "the update crawl failed"
+    test -s "${tmpdir}/out5/index.mht" || fail "the update crawl wrote no archive"
+    text5=$(tr -d '\r' <"${tmpdir}/out5/index.mht")
+    start5=$(root_cid "$text5")
+    test -n "$start5" || fail "the readable page was not named as the root
+$(head -12 <<<"$text5")"
+    command grep -qxF "Content-ID: <${start5}>" <<<"$text5" ||
+        fail "start=<${start5}> names no part, so the unreadable page was named
+$(command grep '^Content-ID: ' <<<"$text5")"
+fi
+chmod 644 "$page"

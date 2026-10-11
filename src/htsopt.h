@@ -244,7 +244,7 @@ struct htsoptstate {
   volatile int exit_xh;
   int back_add_stats; /**< bumped each time a file is queued for transfer */
   /* */
-  int mimehtml_created; /**< MIME/MHTML output already started */
+  int mimehtml_created; /**< .mht writer state, see MIMEHTML_* in htscore.c */
   String mimemid;       /**< MIME multipart boundary id */
   FILE *mimefp;         /**< MIME/MHTML output file */
   int delayedId;        /**< counter for delayed-type-check ids */
