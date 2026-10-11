@@ -52,8 +52,11 @@ root_cid() { # <archive text>
 require_httrack
 local_server_start --root "${tmpdir}/root" --log "${tmpdir}/server.log"
 
-local_crawl --log "${tmpdir}/crawl.log" "http://127.0.0.1:${SRV_PORT}/index.html" \
-    -O "${tmpdir}/out" "${flags[@]}" || fail "crawl failed"
+# The image is seeded first and -c1 keeps one transfer in flight, so it is
+# archived before any page and the held path always runs.
+local_crawl --log "${tmpdir}/crawl.log" "http://127.0.0.1:${SRV_PORT}/a.gif" \
+    "http://127.0.0.1:${SRV_PORT}/index.html" -O "${tmpdir}/out" -c1 \
+    "${flags[@]}" || fail "crawl failed"
 
 mht="${tmpdir}/out/index.mht"
 test -s "$mht" || fail "no .mht archive was written"
@@ -74,14 +77,11 @@ command grep -q 'filename="[^"]*/index\.html"' <<<"$root" ||
     fail "the root part is not the page the crawl started from
 ${root}"
 
-# The page is saved after some of its own images, so the root is not the first
-# part. Should that order ever change, the archive opens on a page without a
-# start= and this probe is where that shows up.
+# The root is not the first part, which is what start= exists to say.
 first=$(command grep -m1 '^Content-disposition: ' <<<"$text")
-case $first in
-*'/index.html"'*) fail "the page is now the first part written
-${first}" ;;
-esac
+command grep -qF "/a.gif\"" <<<"$first" ||
+    fail "the held image is no longer the first part written
+${first}"
 
 # Every part held back before the root arrived has to survive the move.
 for f in a.gif b.gif index.html sub.html; do
@@ -92,19 +92,6 @@ done
 
 test ! -e "${tmpdir}/out/~index.mht.part" ||
     fail "~index.mht.part, holding the early parts, was left behind"
-
-# A crawl with no page gets no root, but the archive is still whole.
-local_crawl --log "${tmpdir}/crawl2.log" "http://127.0.0.1:${SRV_PORT}/a.gif" \
-    -O "${tmpdir}/out2" "${flags[@]}" || fail "the image-only crawl failed"
-
-test -s "${tmpdir}/out2/index.mht" || fail "the image-only crawl wrote no archive"
-text2=$(tr -d '\r' <"${tmpdir}/out2/index.mht")
-assert_whole_archive "$text2" "the image-only archive"
-test -z "$(root_cid "$text2")" ||
-    fail "an archive with no page still names a root
-$(head -12 <<<"$text2")"
-test ! -e "${tmpdir}/out2/~index.mht.part" ||
-    fail "~index.mht.part was left behind by the image-only crawl"
 
 # A page saved before anything else goes straight into the archive, with no
 # part held first.
@@ -130,9 +117,15 @@ local_crawl --log "${tmpdir}/crawl4.log" \
 test "$(cat "${tmpdir}/out4/index.mht.part" 2>/dev/null)" = VICTIMDATA-0123456789 ||
     fail "the mirrored index.mht.part was clobbered by the held parts"
 test -s "${tmpdir}/out4/index.mht" || fail "the colliding-name crawl wrote no archive"
-command grep -q 'filename="[^"]*index\.mht\.part"' \
-    <<<"$(tr -d '\r' <"${tmpdir}/out4/index.mht")" ||
+text4=$(tr -d '\r' <"${tmpdir}/out4/index.mht")
+command grep -q 'filename="[^"]*index\.mht\.part"' <<<"$text4" ||
     fail "the mirrored index.mht.part reached no part of the archive"
+# Nothing in this crawl is a page, so the archive names no root and is closed
+# on the path that flushes the held parts at the end.
+assert_whole_archive "$text4" "the page-free archive"
+test -z "$(root_cid "$text4")" ||
+    fail "an archive with no page still names a root
+$(head -12 <<<"$text4")"
 
 # A page the engine cannot read back must not become the root, since the header
 # is written first and a failed read would leave start= dangling.
