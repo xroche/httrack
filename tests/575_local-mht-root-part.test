@@ -36,7 +36,7 @@ flags=(--quiet --max-time=120 --timeout=30 --robots=0 '-%M')
 
 # Reading the header last would still satisfy every presence check below.
 assert_whole_archive() { # <archive text> <what it is>
-    local b
+    local b n
     test "$(head -1 <<<"$1")" = "From: HTTrack Website Copier <nobody@localhost>" ||
         fail "$2 does not open with its message header
 $(head -3 <<<"$1")"
@@ -46,6 +46,10 @@ $(head -8 <<<"$1")"
     b=$(sed -n 's/^[[:space:]]*boundary="\(.*\)";$/\1/p' <<<"$1")
     test -n "$b" || fail "$2 carries no boundary"
     command grep -qxF -- "--${b}--" <<<"$1" || fail "$2 is not closed"
+    # One delimiter opens each part, so a damaged one leaves a part no reader sees.
+    n=$(command grep -c '^Content-ID: ' <<<"$1" || true)
+    test "$(command grep -cxF -- "--${b}" <<<"$1" || true)" -eq "$n" ||
+        fail "$2 holds ${n} parts and a different number of delimiters"
 }
 
 root_cid() { # <archive text>
@@ -55,9 +59,11 @@ root_cid() { # <archive text>
 require_httrack
 local_server_start --root "${tmpdir}/root" --log "${tmpdir}/server.log"
 
-# The image is seeded first and -c1 keeps one transfer in flight, so it is
-# archived before any page and the held path always runs.
+# Two images are seeded first and -c1 keeps one transfer in flight, so both are
+# archived before any page. Two held parts, not one, so promoting on the second
+# part rather than on the first page is a different answer.
 local_crawl --log "${tmpdir}/crawl.log" "http://127.0.0.1:${SRV_PORT}/a.gif" \
+    "http://127.0.0.1:${SRV_PORT}/b.gif" \
     "http://127.0.0.1:${SRV_PORT}/index.html" -O "${tmpdir}/out" -c1 \
     "${flags[@]}" || fail "crawl failed"
 
@@ -92,8 +98,8 @@ ${image}"
 
 # The root is not the first part, which is what start= exists to say.
 first=$(command grep -m1 '^Content-disposition: ' <<<"$text")
-command grep -qF "/a.gif\"" <<<"$first" ||
-    fail "the held image is no longer the first part written
+command grep -qF '.gif"' <<<"$first" ||
+    fail "a held image is no longer the first part written
 ${first}"
 
 # Every part held back before the root arrived has to survive the move.
