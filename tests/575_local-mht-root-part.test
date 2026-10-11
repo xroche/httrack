@@ -40,6 +40,9 @@ assert_whole_archive() { # <archive text> <what it is>
     test "$(head -1 <<<"$1")" = "From: HTTrack Website Copier <nobody@localhost>" ||
         fail "$2 does not open with its message header
 $(head -3 <<<"$1")"
+    command grep -q 'type="text/html"' <<<"$1" ||
+        fail "$2 lost the type parameter off its Content-Type
+$(head -8 <<<"$1")"
     b=$(sed -n 's/^[[:space:]]*boundary="\(.*\)";$/\1/p' <<<"$1")
     test -n "$b" || fail "$2 carries no boundary"
     command grep -qxF -- "--${b}--" <<<"$1" || fail "$2 is not closed"
@@ -76,6 +79,16 @@ ${root}"
 command grep -q 'filename="[^"]*/index\.html"' <<<"$root" ||
     fail "the root part is not the page the crawl started from
 ${root}"
+
+# A page goes in as text and an image base64, so a part that claims the wrong
+# encoding is undecodable.
+command grep -qx 'Content-Transfer-Encoding: 8bit' <<<"$root" ||
+    fail "the page part is not sent as text
+${root}"
+image=$(command grep -A2 -xF 'Content-Type: image/gif' <<<"$text")
+command grep -qx 'Content-Transfer-Encoding: base64' <<<"$image" ||
+    fail "an image part is not sent as base64
+${image}"
 
 # The root is not the first part, which is what start= exists to say.
 first=$(command grep -m1 '^Content-disposition: ' <<<"$text")
@@ -138,7 +151,7 @@ if test -r "$page"; then
     echo "# this user reads a mode-000 file, so the unreadable page is not checked"
 else
     local_crawl --log "${tmpdir}/crawl6.log" --continue -O "${tmpdir}/out5" \
-        "${flags[@]}" || fail "the update crawl failed"
+        -c1 "${flags[@]}" || fail "the update crawl failed"
     test -s "${tmpdir}/out5/index.mht" || fail "the update crawl wrote no archive"
     text5=$(tr -d '\r' <"${tmpdir}/out5/index.mht")
     start5=$(root_cid "$text5")
