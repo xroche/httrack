@@ -52,15 +52,17 @@ if pid == 0:
     if mode == "ioerror":
         os.close(0)
     os.execv(prog, [prog])
-os.close(slave)
+# macOS flushes a pty on the last close of a slave, so the master then reads
+# zero bytes: the parent has to hold one of its own until it has read the lot.
 if mode == "typed":
     os.write(master, b"\n" + b"proj\n")
-# The byte budget catches a spin. This catches the other regression, an engine
-# that stops asking and then hangs without printing anything.
+# The byte budget catches a spin. The deadline catches the other regression, an
+# engine that stops asking and then hangs without printing anything.
 deadline = time.time() + 60
 total = 0
 spun = False
 seen = b""
+status = None
 with open(out, "wb", 0) as log:
     while True:
         if time.time() > deadline or total > (1 << 20):
@@ -70,6 +72,13 @@ with open(out, "wb", 0) as log:
         if mode == "typed" and b"Base path" in seen:
             break
         if not select.select([master], [], [], 0.5)[0]:
+            # An exited child with an idle pty has no more output to give, and
+            # our own slave means EOF never arrives to say so.
+            if status is not None:
+                break
+            wpid, wstatus = os.waitpid(pid, os.WNOHANG)
+            if wpid == pid:
+                status = wstatus
             continue
         try:
             data = os.read(master, 65536)
@@ -80,9 +89,11 @@ with open(out, "wb", 0) as log:
         log.write(data)
         seen += data
         total += len(data)
-if spun or mode == "typed":
+os.close(slave)
+if (spun or mode == "typed") and status is None:
     os.kill(pid, 9)
-_, status = os.waitpid(pid, 0)
+if status is None:
+    _, status = os.waitpid(pid, 0)
 if spun:
     sys.exit(1)
 print("signal" if os.WIFSIGNALED(status) else os.waitstatus_to_exitcode(status))
@@ -91,6 +102,8 @@ print("signal" if os.WIFSIGNALED(status) else os.waitstatus_to_exitcode(status))
 run() { # run MODE
     "$python" -c "$runner" "$bin" "$1" "${dir}/$1.out" ||
         fail "$1: the wizard never stopped asking for a project name"
+    # Otherwise a reader that lost the output reads as an engine that printed no prompt.
+    test -s "${dir}/$1.out" || fail "$1: the pty transcript is empty"
 }
 asked() { # asked MODE
     count_matching_lines "Enter project name" "${dir}/$1.out"
@@ -118,5 +131,7 @@ run typed >/dev/null
 test "$(asked typed)" -eq 2 || fail "typed: asked $(asked typed) times, expected 2"
 grep -q "No project name given" "${dir}/typed.out" &&
     fail "typed: a blank line at a terminal was taken for the end of the stream"
+grep -q "usage:" "${dir}/typed.out" ||
+    fail "typed: a blank line asked again without printing the option list"
 
 ok "a blank line still prints the option list and asks again"
