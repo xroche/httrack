@@ -79,3 +79,71 @@ grep -iqE "^[0-9:]*[[:space:]]Error:" "$log2" ||
 test ! -f "$out2/alldead_${SRV_PORT}/simple/basic.html" || fail "file downloaded despite every address failing"
 
 echo "OK: connect fallback succeeds, and exhausting all addresses errors out"
+
+# Both cases above answer the connect with a refusal, which the engine sees as a
+# ready socket carrying an error. A dead IPv6 on a dual-stack host instead drops
+# the SYN, and that path is the one #1942 broke: it waits for the deadline. Only
+# Linux lets us build it, because a listener whose accept queue is full drops
+# every later SYN there, where macOS and the BSDs complete or refuse it.
+case "$HTS_OS" in
+Linux)
+    drop_py="$tmpdir/drop.py"
+    cat >"$drop_py" <<'PYEOF'
+import socket, sys, time
+
+# Hold 127.0.0.2:PORT with a full accept queue and never accept, so every
+# later SYN is dropped and a connect to it hangs instead of being refused.
+port = int(sys.argv[1])
+srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+srv.bind(("127.0.0.2", port))
+srv.listen(1)
+held = []
+for _ in range(6):
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.setblocking(False)
+    s.connect_ex(("127.0.0.2", port))
+    held.append(s)
+print("ready", flush=True)
+while True:
+    time.sleep(3600)
+PYEOF
+    "${SRV_PYTHON}" "$drop_py" "$SRV_PORT" >"$tmpdir/drop.out" 2>&1 &
+    drop_pid=$!
+    drop_stop() {
+        kill "$drop_pid" 2>/dev/null
+        wait "$drop_pid" 2>/dev/null
+    }
+    cleanup_push drop_stop
+    # The fixture is useless if the address answers, so prove it does not.
+    for _ in $(seq 1 50); do
+        test -s "$tmpdir/drop.out" && break
+        sleep 0.1
+    done
+    grep -q ready "$tmpdir/drop.out" ||
+        fail_dump "the dropping fixture never came up" "$tmpdir/drop.out"
+    # The connect must TIME OUT, not merely fail: with
+    # net.ipv4.tcp_abort_on_overflow=1 a full queue sends a RST instead, and a
+    # refusal is the path the two cases above already cover. Reading "it failed"
+    # as "it dropped" would silently test nothing new.
+    probe_rc=0
+    timeout 2 bash -c "exec 3<>/dev/tcp/127.0.0.2/${SRV_PORT}" 2>/dev/null ||
+        probe_rc=$?
+    if test "$probe_rc" -ne 124; then
+        echo "127.0.0.2:${SRV_PORT} did not drop the connect (rc=${probe_rc}); skipping that case"
+    else
+        out3="$tmpdir/crawl3"
+        HTTRACK_DEBUG_RESOLVE="drophost:127.0.0.2,127.0.0.1" \
+            local_crawl --log "$tmpdir/log3" "http://drophost:${SRV_PORT}/simple/basic.html" -O "$out3" -c1 --robots=0 --timeout=4 --retries=0 --quiet -Z
+        log3="$out3/hts-log.txt"
+        grep -q "trying next address" "$log3" ||
+            fail_dump "a dropped SYN never reached the next address" "$log3"
+        test -f "$out3/drophost_${SRV_PORT}/simple/basic.html" ||
+            fail_dump "basic.html not downloaded past a dropped SYN" "$log3"
+        echo "OK: a dropped SYN falls back before the slot's timeout"
+    fi
+    ;;
+*)
+    echo "a dropped SYN needs a full accept queue, which only Linux gives; skipping that case"
+    ;;
+esac
