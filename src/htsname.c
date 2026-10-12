@@ -893,7 +893,10 @@ int url_savename(lien_adrfilsave *const afs,
                               {
                                 int set_prio_to = 0;
 
-                                if (hts_acceptlink(opt, ptr, moved.adr, moved.fil, NULL, NULL, &set_prio_to, NULL) == 1) { /* forbidden */
+                                if (hts_acceptlink(opt, ptr, moved.adr,
+                                                   moved.fil, NULL, NULL,
+                                                   HTS_FALSE, &set_prio_to,
+                                                   NULL) == 1) { /* forbidden */
                                   has_been_moved = 1;
                                   back_maydelete(opt, cache, sback, b); // ok
                                   strcpybuff(current.adr, moved.adr);

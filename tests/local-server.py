@@ -3482,10 +3482,10 @@ class Handler(SimpleHTTPRequestHandler):
                 ).encode(),
                 "application/x-javascript",
             )
-        elif name.endswith(".ttf"):
-            self.send_raw(big_asset(name), "font/ttf")
         else:
-            self.send_raw(big_asset(name), "image/webp")
+            # Each body names itself, so a test can tell it from an error page.
+            body = ("webfont asset %s\n" % name).encode()
+            self.send_raw(body, "font/ttf" if name.endswith(".ttf") else "image/webp")
 
     # --- a page whose local name comes from its cached type (#1421) ---------
     # page.php answers text/html, so it mirrors as page.html. It then fails to

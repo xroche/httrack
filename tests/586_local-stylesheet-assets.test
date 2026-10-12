@@ -1,18 +1,14 @@
 #!/bin/bash
-# #139: the fonts and images a stylesheet names. Two separate losses, so two
-# separate assertions: the sheet arrives as a near link and its assets used to
-# be refused one level too deep, and the // of the second url's scheme used to
-# read as a comment and kill the rest of the line.
+# #139: the fonts and images a stylesheet names. A sheet taken as a near link
+# lost them one level too deep, and the // of an absolute url()'s scheme read
+# as a comment and killed the rest of the line.
 set -eu
 
 # shellcheck source=tests/crawllib.sh
 . "${0%"${0##*/}"}./crawllib.sh"
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_586.XXXXXX") || exit 1
-cleanup() {
-    rm -rf "$tmpdir"
-}
-cleanup_push cleanup
+cleanup_push rm -rf "$tmpdir"
 
 : "${top_srcdir:=..}"
 tsv="$top_srcdir/winprofile-keys.tsv"
@@ -24,7 +20,7 @@ rules=$(awk -F'\t' '$1 == "WildCardFilters" { print $9 }' "$tsv")
 test -n "$rules" || fail "no WildCardFilters row in winprofile-keys.tsv"
 
 mkdir -p "${tmpdir}/aroot" "${tmpdir}/broot"
-blog="${tmpdir}/b-server.log"
+blog="${tmpdir}/b-server.log" # local_server_start reads the port back from it
 : >"$blog"
 local_server_start --root "${tmpdir}/broot" --log "$blog"
 bport=$SRV_PORT
@@ -33,13 +29,27 @@ alog="${tmpdir}/a-server.log"
 local_server_start --root "${tmpdir}/aroot" --log "$alog"
 aport=$SRV_PORT
 
+# What host B's /webfont/ route serves, every url absolute and on one line:
+#   css      /*url(hidden.webp)*/ @font-face{src:url(face.ttf)} body{url(bg.webp)}
+#   boot.js  // "jshidden.webp", then "jsseen.webp" on the next line
 # /webfont/css has no extension, so no default rule names it and only --near
 # brings it in, which is how the reporter's Google Fonts link behaved.
 cat >"${tmpdir}/aroot/index.html" <<HTML
 <html><head>
 <link rel="stylesheet" href="http://127.0.0.1:${bport}/webfont/css">
 <script src="http://127.0.0.1:${bport}/webfont/boot.js"></script>
-</head><body>page</body></html>
+</head><body><a href="stray.html">stray</a></body></html>
+HTML
+
+# The parser never leaves this <style>, so it reads the script below in CSS
+# state. The // must still hide its URL there.
+cat >"${tmpdir}/aroot/stray.html" <<HTML
+<html><body><textarea><style></textarea>
+<script>
+// var hidden = "http://127.0.0.1:${bport}/webfont/strayhidden.webp";
+var seen = "http://127.0.0.1:${bport}/webfont/strayseen.webp";
+</script>
+</body></html>
 HTML
 
 require_httrack
@@ -50,9 +60,10 @@ local_crawl --log "${tmpdir}/crawl.log" "http://127.0.0.1:${aport}/index.html" \
     $rules || fail "the crawl failed"
 
 out="${tmpdir}/out/127.0.0.1_${bport}/webfont"
-test -s "${out}/face.ttf" ||
+# Each body names itself, so a saved error page fails these.
+command grep -q "webfont asset face.ttf" "${out}/face.ttf" 2>/dev/null ||
     fail "the stylesheet's font was not mirrored"
-test -s "${out}/bg.webp" ||
+command grep -q "webfont asset bg.webp" "${out}/bg.webp" 2>/dev/null ||
     fail "the url() after the first one on the line was not mirrored"
 ! test -e "${out}/hidden.webp" ||
     fail "a url() inside a /* */ comment was mirrored"
@@ -60,10 +71,14 @@ test -s "${out}/jsseen.webp" ||
     fail "a plain javascript URL was not mirrored"
 ! test -e "${out}/jshidden.webp" ||
     fail "a URL behind a // comment in javascript was mirrored"
+test -s "${out}/strayseen.webp" ||
+    fail "a javascript URL after an unclosed <style> was not mirrored"
+! test -e "${out}/strayhidden.webp" ||
+    fail "an unclosed <style> made a javascript // comment scannable"
 
 sheet=$(ls "${out}"/css* 2>/dev/null) ||
     fail "the stylesheet itself was not mirrored"
-command grep -q 'url(face.ttf)' "$sheet" ||
-    fail "the mirrored stylesheet still points at the live font"
-command grep -q 'url(bg.webp)' "$sheet" ||
-    fail "the mirrored stylesheet still points at the live image"
+# Both live urls become relative, and the one in the comment is left alone.
+left=$({ command grep -o "http://127.0.0.1:${bport}" "$sheet" || true; } | wc -l)
+test "$left" -eq 1 ||
+    fail "the mirrored stylesheet keeps $left absolute urls, wanted 1"

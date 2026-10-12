@@ -1489,10 +1489,12 @@ static int st_urlbounds(httrackp *opt, int argc, char **argv) {
   opt->getmode |= HTS_GETMODE_NONHTML;
   opt->robots = HTS_ROBOTS_NEVER;
   st_urlbounds_path(fil, wzfits);
-  assertf(hts_acceptlink(opt, 0, adr, fil, NULL, NULL, &prio, NULL) == 0);
+  assertf(hts_acceptlink(opt, 0, adr, fil, NULL, NULL, HTS_FALSE, &prio,
+                         NULL) == 0);
   filptr = 0; /* the primary link left its own filters */
   st_urlbounds_path(fil, wzfits + 1);
-  assertf(hts_acceptlink(opt, 0, adr, fil, NULL, NULL, &prio, NULL) == 1);
+  assertf(hts_acceptlink(opt, 0, adr, fil, NULL, NULL, HTS_FALSE, &prio,
+                         NULL) == 1);
 
   /* #1561 bounds ident_url_relatif(), not ident_url_absolute(), which still
      takes a scheme-less URL of HTS_URLMAXSIZE*2 - 1 bytes and splits off a
