@@ -472,4 +472,25 @@ notfound "tagdecoy.gif" "$out11" # a '=' glued to the tag name is not an attr
 # a </script> inside a JS string must not cause phantom fetches later
 notfound "phantom.gif" "$out11"
 
+# A framework binding (Vue :x, v-x, @x, Angular [x]) holds JavaScript, never a
+# URL: its value is not fetched even when a file of that name exists.
+sitebind="$tmp/binding"
+mkdir -p "$sitebind"
+for f in item.src onload.js hero.png plain.gif; do gif "$sitebind/$f"; done
+cat >"$sitebind/index.html" <<EOF
+<html><body>
+<img :data-src="item.src">
+<img v-lazy="item.src">
+<img @load="onload.js">
+<img [src]="hero.png">
+<img data-x="plain.gif">
+</body></html>
+EOF
+outbind="$tmp/binding-out"
+rm -rf "$outbind"
+mkdir -p "$outbind"
+httrack "file://$sitebind/index.html" -O "$outbind" --quiet -r2 >"$outbind/.log" 2>&1 || true
+found "plain.gif" "$outbind"
+for f in 'item*' 'onload*' 'hero*'; do notfound "$f" "$outbind"; done
+
 exit 0
