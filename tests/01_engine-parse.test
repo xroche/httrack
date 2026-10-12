@@ -356,8 +356,8 @@ found "v.webm" "$out10"
 found "subs.vtt" "$out10"
 notfound "plain.gif" "$out10"
 
-# <img srcset> and data-srcset follow the same way (#136). <img data-src> stays
-# refused: its values are often placeholders, and those must not be fetched.
+# <img srcset>, data-srcset and data-src follow the same way (#136), but a
+# data-src placeholder such as {{url}} is still not fetched.
 sitess="$tmp/imgsrcset"
 mkdir -p "$sitess"
 for f in s1 s2 d ds1 ds2 div divss; do gif "$sitess/$f.gif"; done
@@ -378,13 +378,39 @@ outss="$tmp/imgsrcset-out"
 rm -rf "$outss"
 mkdir -p "$outss"
 httrack "file://$sitess/index.html" -O "$outss" --quiet --near -r2 >"$outss/.log" 2>&1 || true
-for f in s1 s2 ds1 ds2; do found "$f.gif" "$outss"; done
-for f in '*url*' d.gif div.gif divss.gif; do notfound "$f" "$outss"; done
+for f in s1 s2 ds1 ds2 d; do found "$f.gif" "$outss"; done
+for f in '*url*' div.gif divss.gif; do notfound "$f" "$outss"; done
 leafss=$(find "$outss" -name leaf.html | head -1)
 grep -Fq 'srcset="s1.gif 1x, s2.gif 2x"' "$leafss" ||
     fail "#136: img srcset not rewritten to the local candidates"
 grep -Fq 'data-srcset="ds1.gif 480w, ds2.gif 800w"' "$leafss" ||
     fail "#136: img data-srcset not rewritten to the local candidates"
+
+# A data-src placeholder is no URL, with or without --near: it is not fetched
+# and stays byte for byte, while a bare word that is a real file still is.
+siteph="$tmp/placeholder"
+mkdir -p "$siteph"
+gif "$siteph/photo"
+gif "$siteph/lazy" # real, but on the placeholder list: refused on purpose
+gif "$siteph/{{url}}"
+cat >"$siteph/index.html" <<EOF
+<html><body>
+<img data-src="{{url}}">
+<img data-src='{"src":"a.jpg"}'>
+<img data-src="lazy">
+<img data-src="photo">
+</body></html>
+EOF
+outph="$tmp/placeholder-out"
+rm -rf "$outph"
+mkdir -p "$outph"
+httrack "file://$siteph/index.html" -O "$outph" --quiet -r2 >"$outph/.log" 2>&1 || true
+found "photo" "$outph"
+for f in '*url*' 'lazy*' '*src*'; do notfound "$f" "$outph"; done
+pageph=$(find "$outph" -path '*placeholder/index.html' | head -1)
+for v in 'data-src="{{url}}"' "data-src='{\"src\":\"a.jpg\"}'" 'data-src="lazy"'; do
+    grep -Fq "$v" "$pageph" || fail "placeholder rewritten, want $v kept"
+done
 
 # Unknown-attr (data-*) URLs (#201/#203): the script automaton state must reset at
 # </script>, or detection dies for the rest of the page after the first script.
