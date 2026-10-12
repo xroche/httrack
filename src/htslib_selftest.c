@@ -1042,6 +1042,22 @@ static int array_growth_selftests(void) {
       TypedArrayCapa(w) > ((size_t) -1) / sizeof(arrays_wide_t))
     err = 1;
 
+  /* Room already there: no allocator call at all, because a realloc to the same
+     capacity copies the whole store under ASan (OSS-Fuzz 5622506602692608). A
+     borrowed store turns any such call into a crash. */
+  {
+    char borrowed[64];
+    TypedArray(char) b = EMPTY_TYPED_ARRAY;
+
+    TypedArrayPtr(b) = borrowed;
+    TypedArrayCapa(b) = sizeof(borrowed);
+    TypedArraySize(b) = 10;
+    TypedArrayEnsureRoom(b, sizeof(borrowed) - 10);
+    if (TypedArrayPtr(b) != borrowed || TypedArrayCapa(b) != sizeof(borrowed) ||
+        TypedArraySize(b) != 10)
+      err = 1;
+  } /* No TypedArrayFree: the store is not the allocator's. */
+
   /* Many small growths, checking the payload survives every reallocation. */
   for (i = 0; i < 5000; i++) {
     TypedArrayAdd(a, (char) ('a' + (i % 26)));

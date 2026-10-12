@@ -128,17 +128,21 @@ static HTS_UNUSED void hts_record_assert_memory_failed(const size_t size) {
     size_t capa_ = TypedArrayCapa(A);                                          \
     void *newPtr_;                                                             \
     assertf(room_ <= maxCapa_ - TypedArraySize(A));                            \
-    /* Saturating: a plain capa_*2 wraps to 0 and the loop never ends. */      \
-    while (capa_ - TypedArraySize(A) < room_) {                                \
-      capa_ = capa_ < minCapa_       ? minCapa_                                \
-              : capa_ > maxCapa_ / 2 ? maxCapa_                                \
-                                     : capa_ * 2;                              \
-    }                                                                          \
-    /* Via a temporary: realloc keeps the old block on failure. */             \
-    newPtr_ = realloct(TypedArrayPtr(A), capa_ * TypedArrayWidth(A));          \
-    if (newPtr_ != NULL) {                                                     \
-      TypedArrayPtr(A) = newPtr_;                                              \
-      TypedArrayCapa(A) = capa_;                                               \
+    /* The room is already there: reallocating to the same capacity copies the \
+       whole store under ASan, which made one append per byte quadratic. */    \
+    if (!TypedArrayHasRoom(A, room_)) {                                        \
+      /* Saturating: a plain capa_*2 wraps to 0 and the loop never ends. */    \
+      while (capa_ - TypedArraySize(A) < room_) {                              \
+        capa_ = capa_ < minCapa_       ? minCapa_                              \
+                : capa_ > maxCapa_ / 2 ? maxCapa_                              \
+                                       : capa_ * 2;                            \
+      }                                                                        \
+      /* Via a temporary: realloc keeps the old block on failure. */           \
+      newPtr_ = realloct(TypedArrayPtr(A), capa_ * TypedArrayWidth(A));        \
+      if (newPtr_ != NULL) {                                                   \
+        TypedArrayPtr(A) = newPtr_;                                            \
+        TypedArrayCapa(A) = capa_;                                             \
+      }                                                                        \
     }                                                                          \
   } while (0)
 
