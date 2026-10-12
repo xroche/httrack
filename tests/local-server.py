@@ -3459,8 +3459,8 @@ class Handler(SimpleHTTPRequestHandler):
     # --- a web-font stylesheet, Google Fonts' shape (#139) -----------------
     # The <link> names an extension-less path, which no default scan rule can
     # match, and the sheet's own url() assets sit on this same foreign host.
-    # Every url is absolute and on one line, so a scan that reads the // of a
-    # scheme as a comment loses every asset after the first.
+    # Every url is absolute, on one line, so a scan reading a scheme's // as a
+    # comment loses every asset after the first.
 
     def route_webfont(self):
         name = urlsplit(self.path).path.rsplit("/", 1)[-1]

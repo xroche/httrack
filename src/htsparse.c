@@ -238,9 +238,7 @@ static void hts_automate_lookup(const script_automate *aut) {
     }
     assertf(next >= 0 && next < INSCRIPT_NSTATES);
     /* CSS has no // comment, and the one in http:// would otherwise kill the
-       rest of the line, url() calls included (#139). The gate is the document
-       and not incss, because an unclosed <style> leaves incss set over real
-       javascript. */
+       rest of the line, url() calls included (#139). */
     if (next == INSCRIPT_SLASHSLASH && *aut->css_file) {
       next = INSCRIPT_SLASH;
     }
@@ -924,7 +922,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       int incomment = 0;        // dans un <!--
       int inscript = 0;         // dans un scipt pour applets javascript)
       int incss = 0;            /* CSS lets url(x) go unquoted */
-      hts_boolean css_file = HTS_FALSE; /* the document is a stylesheet */
+      hts_boolean css_file = HTS_FALSE;
       int inscript_locked = 0;  // in locked script (ie. js file)
       signed char inscript_state[INSCRIPT_NSTATES][257];
       INSCRIPT inscript_state_pos = INSCRIPT_START;

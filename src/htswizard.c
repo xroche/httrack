@@ -495,8 +495,8 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
   }
   // -------------------- PRELUDE OF PHASE 3-BIS --------------------
 
-  /* Built-in known tags (<img src=..>, ..), and every url() of a stylesheet,
-     which names a font or an image and carries no tag to match (#139) */
+  /* Built-in tags (<img src=..>) and every stylesheet url(), which names a
+     font or image but carries no tag to match (#139) */
   if (forbidden_url != 0 && opt->nearlink) {
     if (in_css_file ||
         (tag != NULL && attribute != NULL &&

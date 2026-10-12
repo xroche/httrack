@@ -124,8 +124,8 @@ hts_boolean hts_link_is_foreign_asset(httrackp *opt, int ptr);
 hts_boolean hts_upper_links_note(httrackp *opt, char *dst, size_t dstsize);
 
 /* `tag` and `attribute` name the markup the link came from, or are NULL where
-   there is none. `in_css_file` says it came from a stylesheet, whose url() is
-   an embedded asset carrying no tag to name. */
+   there is none. `in_css_file` says it came from a stylesheet, where url() has
+   no tag to match. */
 int hts_acceptlink(httrackp *opt, int ptr, const char *adr, const char *fil,
                    const char *tag, const char *attribute,
                    hts_boolean in_css_file, int *set_prio_to_0,

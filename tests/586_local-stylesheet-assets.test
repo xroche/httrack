@@ -33,7 +33,7 @@ aport=$SRV_PORT
 #   css      /*url(hidden.webp)*/ @font-face{src:url(face.ttf)} body{url(bg.webp)}
 #   boot.js  // "jshidden.webp", then "jsseen.webp" on the next line
 # /webfont/css has no extension, so no default rule names it and only --near
-# brings it in, which is how the reporter's Google Fonts link behaved.
+# brings it in, as with the Google Fonts link in #139.
 cat >"${tmpdir}/aroot/index.html" <<HTML
 <html><head>
 <link rel="stylesheet" href="http://127.0.0.1:${bport}/webfont/css">
@@ -62,23 +62,26 @@ local_crawl --log "${tmpdir}/crawl.log" "http://127.0.0.1:${aport}/index.html" \
 out="${tmpdir}/out/127.0.0.1_${bport}/webfont"
 # Each body names itself, so a saved error page fails these.
 command grep -q "webfont asset face.ttf" "${out}/face.ttf" 2>/dev/null ||
-    fail "the stylesheet's font was not mirrored"
+    fail "the near-linked stylesheet's font was not mirrored"
 command grep -q "webfont asset bg.webp" "${out}/bg.webp" 2>/dev/null ||
     fail "the url() after the first one on the line was not mirrored"
 ! test -e "${out}/hidden.webp" ||
     fail "a url() inside a /* */ comment was mirrored"
-test -s "${out}/jsseen.webp" ||
+command grep -q "webfont asset jsseen.webp" "${out}/jsseen.webp" 2>/dev/null ||
     fail "a plain javascript URL was not mirrored"
 ! test -e "${out}/jshidden.webp" ||
     fail "a URL behind a // comment in javascript was mirrored"
-test -s "${out}/strayseen.webp" ||
+command grep -q "webfont asset strayseen.webp" "${out}/strayseen.webp" \
+    2>/dev/null ||
     fail "a javascript URL after an unclosed <style> was not mirrored"
 ! test -e "${out}/strayhidden.webp" ||
     fail "an unclosed <style> made a javascript // comment scannable"
 
 sheet=$(ls "${out}"/css* 2>/dev/null) ||
     fail "the stylesheet itself was not mirrored"
-# Both live urls become relative, and the one in the comment is left alone.
-left=$({ command grep -o "http://127.0.0.1:${bport}" "$sheet" || true; } | wc -l)
-test "$left" -eq 1 ||
-    fail "the mirrored stylesheet keeps $left absolute urls, wanted 1"
+# Both live urls must become relative, and the commented one must not.
+! command grep -qF -e "127.0.0.1:${bport}/webfont/face.ttf" \
+    -e "127.0.0.1:${bport}/webfont/bg.webp" "$sheet" ||
+    fail "the mirrored stylesheet still points at the live host"
+command grep -qF "url(http://127.0.0.1:${bport}/webfont/hidden.webp)" "$sheet" ||
+    fail "the url() inside the /* */ comment was rewritten"
