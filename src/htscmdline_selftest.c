@@ -617,6 +617,7 @@ static int st_ruleopt(httrackp *opt, int argc, char **argv) {
     fprintf(stderr, "usage: -#test=ruleopt <arg>\n");
     return 1;
   }
+  assertf(!hts_rule_would_be_read_as_opt(NULL));
   printf("%s\n", hts_rule_would_be_read_as_opt(argv[0]) ? "option" : "other");
   return 0;
 }

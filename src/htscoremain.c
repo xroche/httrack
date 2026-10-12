@@ -704,7 +704,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 
         /* Compter URLs et détecter -i,-q.. */
         if (tmp_argc == 1) {    /* pas -P & co */
-          if (!hts_rule_would_be_read_as_opt(tmp_argv[0])) { /* pas -c0 & co */
+          if (!hts_rule_would_be_read_as_opt(tmp_argv[0])) { /* not -c0 & co */
             cmdl_count_url(&argv_url);
             if (!argv_firsturl)
               argv_firsturl = x_cmd.argv[x_cmd.argc - 1];
@@ -3409,10 +3409,10 @@ static hts_boolean cmdl_shortopt_has(const char *s, char c) {
   return HTS_FALSE;
 }
 
-hts_boolean hts_rule_would_be_read_as_opt(const char *arg) {
+HTSEXT_API hts_boolean hts_rule_would_be_read_as_opt(const char *arg) {
   if (arg == NULL || arg[0] != '-')
     return HTS_FALSE;
-  // A dot is a host (-www.a.com), except beside a '%' as in -%c0.5.
+  // A dot means a host (-www.a.com), but any '%' keeps -%c0.5 an option.
   if (strchr(arg, '.') != NULL && strchr(arg, '%') == NULL)
     return HTS_FALSE;
   return strchr(arg, '/') == NULL && strchr(arg, '*') == NULL;
