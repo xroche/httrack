@@ -58,25 +58,26 @@ run_shim >/dev/null || fail "the shim died on an empty argument list"
 
 # A newline inside an argument, which a line-oriented cut used to truncate. The
 # tail lands on its own line, so that line is what proves it survived.
+# `grep -q` on a pipe can SIGPIPE printf mid-write, so match a here-string.
 out=$(run_shim "$(printf '/mnt/d/a\nb')")
-printf '%s\n' "$out" | command grep -qx 'ARG=D:/a' ||
+command grep -qx 'ARG=D:/a' <<<"$out" ||
     fail "the head of a path holding a newline is wrong: [$out]"
-printf '%s\n' "$out" | command grep -qx 'b' ||
+command grep -qx 'b' <<<"$out" ||
     fail "everything after a newline in a path was dropped: [$out]"
 
 # httrack's own -O takes dir,cache, and both halves are paths.
 out=$(run_shim '/mnt/d/a,/mnt/d/b')
-printf '%s\n' "$out" | command grep -qx 'ARG=D:/a,D:/b' ||
+command grep -qx 'ARG=D:/a,D:/b' <<<"$out" ||
     fail "a comma-joined pair left its second half untranslated: [$out]"
 
 # An option carrying a path, which is the shape 282 builds.
 out=$(run_shim '--list=/mnt/d/x')
-printf '%s\n' "$out" | command grep -qx 'ARG=--list=D:/x' ||
+command grep -qx 'ARG=--list=D:/x' <<<"$out" ||
     fail "an option value was not translated: [$out]"
 
 # A URL is not a path, whatever it happens to contain.
 out=$(run_shim 'http://host/mnt/d/x')
-printf '%s\n' "$out" | command grep -qx 'ARG=http://host/mnt/d/x' ||
+command grep -qx 'ARG=http://host/mnt/d/x' <<<"$out" ||
     fail "a URL carrying /mnt/ was rewritten: [$out]"
 
 ok "the shim translates drvfs paths and file:// URLs, and survives no arguments"
