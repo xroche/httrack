@@ -704,7 +704,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 
         /* Compter URLs et détecter -i,-q.. */
         if (tmp_argc == 1) {    /* pas -P & co */
-          if (!cmdl_opt(tmp_argv[0])) { /* pas -c0 & co */
+          if (!hts_rule_would_be_read_as_opt(tmp_argv[0])) { /* pas -c0 & co */
             cmdl_count_url(&argv_url);
             if (!argv_firsturl)
               argv_firsturl = x_cmd.argv[x_cmd.argc - 1];
@@ -772,7 +772,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       for(na = 1; na < argc; na++) {
 
         /* another option's value is not an option (--user-agent -Oz) */
-        if (cmdl_opt(argv[na]) && !x_cmd.param[na]) { // option
+        if (hts_rule_would_be_read_as_opt(argv[na]) &&
+            !x_cmd.param[na]) { // option
           const char *const word = argv[na];
           char name[8];
           size_t at = 1;
@@ -1341,9 +1342,9 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       /* the tokens the loop stepped over were the previous option's */
       if (prev_opt != 0)
         x_cmd.span[prev_opt] = na - prev_opt;
-      prev_opt = cmdl_opt(argv[na]) ? na : 0;
+      prev_opt = hts_rule_would_be_read_as_opt(argv[na]) ? na : 0;
 
-      if (cmdl_opt(argv[na])) { // option
+      if (hts_rule_would_be_read_as_opt(argv[na])) { // option
         com = argv[na] + 1;
 
         while(*com) {
@@ -2820,7 +2821,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           com++;
         }                       // while
 
-      } else {                  // URL/filters
+      } else { // URL/filters
         char catbuff[CATBUFF_SIZE];
         const size_t urlSize = strlen(argv[na]);
         const size_t capa = strlen(url) + urlSize + 32;
@@ -2847,7 +2848,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   : unescape_http_unharm(catbuff, sizeof(catbuff), argv[na], 1),
               url, url_sz);
         }
-      }                         // if argv=- etc. 
+      } // if argv=- etc.
 
     }                           // for
     if (prev_opt != 0)
@@ -3408,17 +3409,11 @@ static hts_boolean cmdl_shortopt_has(const char *s, char c) {
   return HTS_FALSE;
 }
 
-// détermine si l'argument est une option
-int cmdl_opt(char *s) {
-  if (s[0] == '-') {            // c'est peut être une option
-    if (strchr(s, '.') != NULL && strchr(s, '%') == NULL)
-      return 0;                 // sans doute un -www.truc.fr (note: -www n'est pas compris)
-    else if (strchr(s, '/') != NULL)
-      return 0;                 // idem, -*cgi-bin/
-    else if (strchr(s, '*') != NULL)
-      return 0;                 // joker, idem
-    else
-      return 1;
-  } else
-    return 0;
+hts_boolean hts_rule_would_be_read_as_opt(const char *arg) {
+  if (arg == NULL || arg[0] != '-')
+    return HTS_FALSE;
+  // A dot is a host (-www.a.com), except beside a '%' as in -%c0.5.
+  if (strchr(arg, '.') != NULL && strchr(arg, '%') == NULL)
+    return HTS_FALSE;
+  return strchr(arg, '/') == NULL && strchr(arg, '*') == NULL;
 }

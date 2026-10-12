@@ -611,6 +611,16 @@ static int st_unquotearg(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+static int st_ruleopt(httrackp *opt, int argc, char **argv) {
+  (void) opt;
+  if (argc != 1) {
+    fprintf(stderr, "usage: -#test=ruleopt <arg>\n");
+    return 1;
+  }
+  printf("%s\n", hts_rule_would_be_read_as_opt(argv[0]) ? "option" : "other");
+  return 0;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
@@ -624,5 +634,6 @@ const struct selftest_entry selftests_cmdline[] = {
      st_splitargs},
     {"quotearg", "[arg...]", "quote arguments for a command line", st_quotearg},
     {"unquotearg", "<arg>", "strip an argument's quote pair", st_unquotearg},
+    {"ruleopt", "<arg>", "is a '-' token an option or a scan rule", st_ruleopt},
     {NULL, NULL, NULL, NULL},
 };
