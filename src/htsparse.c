@@ -715,6 +715,31 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
   }
 }
 
+/* Is this raw data-src / data-srcset value a lazy-load placeholder rather
+   than a URL? Templates ({{x}}, JSON) and a few placeholder words are. */
+static hts_boolean data_attr_is_not_url(const char *s, size_t len) {
+  static const char *const words[] = {
+      "lazy",  "placeholder", "none",  "null",  "undefined",
+      "false", "true",        "blank", "empty", NULL};
+  size_t i;
+
+  while (len > 0 && (unsigned char) *s <= ' ') {
+    s++;
+    len--;
+  }
+  while (len > 0 && (unsigned char) s[len - 1] <= ' ')
+    len--;
+  for (i = 0; i < len && s[i] != '?'; i++) { /* a query may carry JSON */
+    if (s[i] == '{' || s[i] == '}' || s[i] == '<' || s[i] == '>' || s[i] == '"')
+      return HTS_TRUE;
+  }
+  for (i = 0; words[i] != NULL; i++) {
+    if (strlen(words[i]) == len && strncasecmp(s, words[i], len) == 0)
+      return HTS_TRUE;
+  }
+  return HTS_FALSE;
+}
+
 /* Percent-encode '(' and ')' in a link emitted into an unquoted url(...) (CSS
    or JS): a literal ')' closes the token early and the UA mis-parses the value
    (#163). The UA decodes %28/%29 back to the saved-on-disk name. */
@@ -1024,6 +1049,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
         int ending_p = '\0';    // ending quote?
         int archivetag_p = 0;   // avoid multiple-archives with commas
         int srcset_p = 0;       // srcset="url1 480w, url2 2x": list of URLs
+        int dataattr_p = 0;     // data-src / data-srcset: may hold a template
         int unquoted_script = 0;
         INSCRIPT inscript_state_pos_prev = inscript_state_pos;
 
@@ -1605,6 +1631,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       while((p == 0) && (strnotempty(hts_detect[i]))) {
                         p = rech_tageq(html, hts_detect[i]);
                         if (p) {
+                          dataattr_p = strncmp(hts_detect[i], "data-", 5) == 0;
                           /* This is a temporary hack to avoid archive=foo.jar,bar.jar .. */
                           if (strcmp(hts_detect[i], "archive") == 0) {
                             archivetag_p = 1;
@@ -2031,6 +2058,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             const char *eadr = NULL;  /* fin de l'URL */
 
             int ok = 1;
+            hts_boolean not_url = HTS_FALSE;
             char quote = '\0';
             int quoteinscript = 0;
             int noquote = 0;
@@ -2233,10 +2261,16 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
               if (strfield(html, "(Empty Reference!)")) {
                 ok = -1;        // No
               }
-
+              // a lazy-load placeholder or template is no URL: leave it as is
+              if (ok == 0 && dataattr_p &&
+                  data_attr_is_not_url(html, (size_t) (eadr - html - 1))) {
+                hts_log_print(opt, LOG_DEBUG, "data attribute is no URL: %.*s",
+                              (int) (eadr - html - 1), html);
+                not_url = HTS_TRUE;
+              }
             }
 
-            if (ok == 0) {      // tester un lien
+            if (ok == 0 && !not_url) { // tester un lien
               char BIGSTK lien[HTS_URLMAXSIZE * 2];
               int meme_adresse = 0;     // 0 par défaut pour primary
 
@@ -3585,7 +3619,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
               }                 // if strlen(lien)>0
 
-            }                   // if ok==0      
+            } // if ok==0
 
             assertf(eadr - html >= 0);   // Should not go back
             if (eadr > html) {
@@ -3610,6 +3644,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   hts_automate_increment(
                       &saut, (int) (q - html)); // keep the automate in sync
                   ok = 1;
+                  not_url = HTS_FALSE;
                   goto srcset_next;
                 }
               }
