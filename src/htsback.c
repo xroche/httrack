@@ -332,9 +332,8 @@ static int back_connect_next(httrackp *opt, struct_back *sback, int i) {
 
   back[i].r.soc = soc;
   cf->addr_index = next;
-  cf->connect_start = time_local();
   if (back[i].timeout > 0)
-    back[i].timeout_refresh = cf->connect_start;
+    back[i].timeout_refresh = time_local();
   back[i].status = STATUS_CONNECTING;
   hts_log_print(opt, LOG_DEBUG,
                 "connect failed, trying next address (%d/%d) for %s", next + 1,
@@ -3735,10 +3734,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
           cf->addr_count = hts_dns_resolve_all(opt, back[i].url_adr, scratch,
                                                HTS_MAXADDRNUM, NULL);
-          /* The slot's own timeout reads this same base. A later one makes the
-             fallback fall due after the timeout has abandoned the slot, which
-             is how a short timeout lost it on FreeBSD (#1942). */
-          cf->connect_start = back[i].timeout_refresh;
         }
 
         // vérifier l'existance de timeout-check
@@ -5433,9 +5428,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               const hts_connect_fallback *const cf =
                   &sback->connect_fallback[i];
 
-              if (back_connect_fallback_due(cf->addr_index, cf->addr_count,
-                                            (int) (act - cf->connect_start),
-                                            back[i].timeout)) {
+              if (back_connect_fallback_due(
+                      cf->addr_index, cf->addr_count,
+                      (int) (act - back[i].timeout_refresh), back[i].timeout)) {
                 if (back_connect_next(opt, sback, i)) {
                   continue; // reconnected to the next candidate
                 }

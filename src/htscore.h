@@ -159,7 +159,6 @@ struct lien_adrfilsave {
 typedef struct hts_connect_fallback {
   int addr_index;       /**< candidate being connected (0-based) */
   int addr_count;       /**< resolved addresses; -1 = not yet probed */
-  TStamp connect_start; /**< when the current candidate's connect began */
 } hts_connect_fallback;
 
 /** The download-slot ring: the set of concurrent transfers in flight.
