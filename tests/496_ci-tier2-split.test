@@ -166,23 +166,71 @@ test -z "$bad" || fail "required contexts nothing emits on a pull request:$bad
 A required check that never reports blocks every open PR, not only this one.
 Keep the job where it is, or drop the context from the ruleset first."
 
-# Second invariant: tier2.yml owns the schedule for the legs it absorbed, so a
-# workflow reachable only by workflow_call has to be named there.
-orphans=
-for wf in "$wfdir"/*.yml "$wfdir"/*.yaml; do
-    test -r "$wf" || continue # the .yaml glob matches nothing today
-    base=${wf##*/}
-    test "$base" != tier2.yml || continue
-    # Callable, and with no trigger of its own that would ever fire.
-    command grep -q '^  workflow_call:' "$wf" || continue
-    command grep -Eq '^  (schedule|push|pull_request|release|workflow_run):' "$wf" && continue
-    # A uses: line, not any mention: a commented-out call runs nothing.
-    command grep -Eq "^ *uses: \./\.github/workflows/$base\$" "$wfdir/tier2.yml" ||
-        orphans="$orphans $base"
-done
+# Second invariant: a workflow reachable only by workflow_call has to be named
+# by one that actually runs. tier2.yml schedules the legs it absorbed, and
+# ci.yml calls sanitizer.yml on the pull-request path.
+#
+# workflow_dispatch does not count, for the callable workflow or for its caller:
+# a button nobody presses is not coverage.
+triggered() { # triggered <workflow>: does it run without a human pressing one?
+    command grep -Eq '^  (schedule|push|pull_request|release|workflow_run):' "$1"
+}
 
-test -z "$orphans" || fail "callable workflows nothing schedules and tier2.yml does not call:$orphans
+# One predicate for the verdict and for the mutant below, so the two cannot
+# drift apart and report on different sets.
+orphan_gaps() { # orphan_gaps <workflow dir>: prints the callable workflows nothing calls
+    local d=$1 wf base caller out=''
+    for wf in "$d"/*.yml "$d"/*.yaml; do
+        test -r "$wf" || continue # the .yaml glob matches nothing today
+        base=${wf##*/}
+        # Callable, and with no trigger of its own that would ever fire.
+        command grep -q '^  workflow_call:' "$wf" || continue
+        triggered "$wf" && continue
+        for caller in "$d"/*.yml; do
+            test "$caller" != "$wf" || continue
+            triggered "$caller" || continue
+            # A uses: line, not any mention: a commented-out call runs nothing.
+            command grep -Eq "^ *uses: \./\.github/workflows/$base\$" "$caller" && continue 2
+        done
+        out="$out $base"
+    done
+    printf '%s' "$out"
+}
+
+orphans=$(orphan_gaps "$wfdir")
+test -z "$orphans" || fail "callable workflows nothing schedules and nothing calls:$orphans
 A workflow with neither a trigger nor a caller never runs again, and says nothing about it."
+
+# The mutant this exists to catch: a callable workflow loses the caller that ran
+# it. Every callable workflow takes its turn, so the check is proved on each
+# edge rather than on whichever one happens to sort first.
+mutdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_orphan.XXXXXX")
+cleanup_push rm -rf "$mutdir"
+proved=0
+for wf in "$wfdir"/*.yml; do
+    base=${wf##*/}
+    command grep -q '^  workflow_call:' "$wf" || continue
+    triggered "$wf" && continue
+    rm -f "$mutdir"/*.yml
+    cp "$wfdir"/*.yml "$mutdir"/
+    dropped=''
+    for caller in "$mutdir"/*.yml; do
+        test "${caller##*/}" != "$base" || continue
+        triggered "$caller" || continue
+        command grep -Eq "^ *uses: \./\.github/workflows/$base\$" "$caller" || continue
+        command grep -v "^ *uses: \./\.github/workflows/$base\$" "$caller" >"$caller.cut"
+        mv "$caller.cut" "$caller"
+        dropped=yes
+    done
+    # Nothing called it, which the verdict above already owns.
+    test -n "$dropped" || continue
+    case " $(orphan_gaps "$mutdir") " in
+    *" $base "*) ;;
+    *) fail "$base left with no caller went unreported" ;;
+    esac
+    proved=$((proved + 1))
+done
+test "$proved" -gt 0 || fail "no callable workflow has a caller, so the mutant proves nothing"
 
 # Third invariant: each gate has to need every other job in its workflow. A job
 # it does not name can red while the gate reports green, which is worse than

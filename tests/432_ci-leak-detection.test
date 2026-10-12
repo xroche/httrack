@@ -11,6 +11,7 @@ set -euo pipefail
 
 top=${abs_top_srcdir:-$(cd "$testdir/.." && pwd)}
 workflow="$top/.github/workflows/ci.yml"
+leg="$top/.github/workflows/sanitizer.yml"
 
 if ! test -r "$workflow"; then
     test -d "$top/.github" && fail "$workflow is gone but $top/.github is not"
@@ -23,7 +24,9 @@ if test -z "$py" || ! "$py" -c 'import yaml' 2>/dev/null; then
 fi
 
 # Read out of the parsed workflow, so reformatting it moves no verdict.
-"$py" - "$workflow" <<'PY' || fail "the sanitize leg no longer looks for leaks"
+audit=$(mktemp "${TMPDIR:-/tmp}/httrack_leakaudit.XXXXXX")
+cleanup_push rm -f "$audit"
+cat >"$audit" <<'PY'
 import sys
 
 import yaml
@@ -35,20 +38,50 @@ job = jobs.get("sanitize")
 if job is None:
     sys.exit("no sanitize job in the workflow")
 
-seen = 0
-for step in job.get("steps", []):
+# Two shapes, because the leg has been both: its own steps, and a call into
+# sanitizer.yml that takes the options as NAME=value lines.
+found = []
+for step in job.get("steps") or []:
     opts = (step.get("env") or {}).get("ASAN_OPTIONS")
-    if opts is None:
-        continue
-    seen += 1
-    name = step.get("name")
+    if opts is not None:
+        found.append(("step %r" % step.get("name"), opts))
+for line in ((job.get("with") or {}).get("options") or "").splitlines():
+    name, sep, value = line.partition("=")
+    if sep and name.strip() == "ASAN_OPTIONS":
+        found.append(("the options input", value))
+
+for name, opts in found:
     # Last value wins in the sanitizer flag parser.
     flags = [f for f in opts.split(":") if f.startswith("detect_leaks=")]
     if not flags:
-        sys.exit("step %r sets ASAN_OPTIONS without detect_leaks" % name)
+        sys.exit("%s sets ASAN_OPTIONS without detect_leaks" % name)
     if flags[-1].split("=", 1)[1] == "0":
-        sys.exit("step %r runs with detect_leaks=0" % name)
+        sys.exit("%s runs with detect_leaks=0" % name)
 
-if seen == 0:
-    sys.exit("no step in the sanitize job sets ASAN_OPTIONS")
+if not found:
+    sys.exit("nothing sets ASAN_OPTIONS for the sanitize job")
 PY
+
+"$py" "$audit" "$workflow" || fail "the sanitize leg no longer looks for leaks"
+
+# A parser reading the wrong shape finds no ASAN_OPTIONS at all, and the check
+# above would then pass on an empty set. The mutant is what rules that out.
+# Only the sanitize leg spells it with '=', so the fuzz job's own
+# "ASAN_OPTIONS: detect_leaks=1" cannot stand in for it.
+mut=$(mktemp "${TMPDIR:-/tmp}/httrack_leakmut.XXXXXX")
+cleanup_push rm -f "$mut"
+sed 's/ASAN_OPTIONS=detect_leaks=1/ASAN_OPTIONS=detect_leaks=0/' "$workflow" >"$mut"
+cmp -s "$workflow" "$mut" && fail "the detect_leaks=0 mutant changed nothing, so it proves nothing"
+"$py" "$audit" "$mut" >/dev/null 2>&1 && fail "detect_leaks=0 went unreported"
+
+# Asking for leak detection is half of it: a leg whose options never reach the
+# environment runs with the runtime's own defaults, and the audit above cannot
+# see that, because the write lives in the workflow ci.yml calls.
+if test -r "$leg"; then
+    command grep -q 'GITHUB_ENV' "$leg" ||
+        fail "$leg no longer writes the runtime options to GITHUB_ENV"
+elif command grep -q 'uses: \./\.github/workflows/' "$workflow"; then
+    fail "ci.yml calls a workflow for its legs but $leg is gone"
+fi
+
+echo "leak detection OK (the sanitize leg asks for it, and detect_leaks=0 reds this test)"
