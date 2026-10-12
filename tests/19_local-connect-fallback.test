@@ -122,8 +122,15 @@ PYEOF
     done
     grep -q ready "$tmpdir/drop.out" ||
         fail_dump "the dropping fixture never came up" "$tmpdir/drop.out"
-    if timeout 2 bash -c "exec 3<>/dev/tcp/127.0.0.2/${SRV_PORT}" 2>/dev/null; then
-        echo "127.0.0.2:${SRV_PORT} answers, so it cannot stand in for a dropped SYN; skipping"
+    # The connect must TIME OUT, not merely fail: with
+    # net.ipv4.tcp_abort_on_overflow=1 a full queue sends a RST instead, and a
+    # refusal is the path the two cases above already cover. Reading "it failed"
+    # as "it dropped" would silently test nothing new.
+    probe_rc=0
+    timeout 2 bash -c "exec 3<>/dev/tcp/127.0.0.2/${SRV_PORT}" 2>/dev/null ||
+        probe_rc=$?
+    if test "$probe_rc" -ne 124; then
+        echo "127.0.0.2:${SRV_PORT} did not drop the connect (rc=${probe_rc}); skipping that case"
     else
         out3="$tmpdir/crawl3"
         HTTRACK_DEBUG_RESOLVE="drophost:127.0.0.2,127.0.0.1" \
