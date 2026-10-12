@@ -356,7 +356,7 @@ jobs:
       cc: gcc
       cflags: -fsanitize=address,undefined -fno-sanitize-recover=all -g -O1 -fno-omit-frame-pointer
       ldflags: -fsanitize=address,undefined
-      packages: libssl-dev libbrotli-dev libzstd-dev
+      extra_packages: libssl-dev libbrotli-dev libzstd-dev
       # Leak detection is on, because nothing else in CI catches a dropped free.
       # LSan only reports at a normal exit, so a test that kills the engine still
       # contributes nothing. Every other finding aborts the run.
@@ -369,8 +369,8 @@ jobs:
       # bytes by default, so max_malloc_fill_size lifts it to cover large cache
       # buffers; free_fill flags use-after-free reads.
       #
-      # gcc's UBSan ignores log_path and writes to stderr, which most tests
-      # redirect away, so this is the leg the stderr copies exist for.
+      # gcc's UBSan ignores the log_path appended to both lines below and writes
+      # to stderr, which most tests redirect away, so this leg keeps the copies.
       options: |
         ASAN_OPTIONS=detect_leaks=1:abort_on_error=1:halt_on_error=1:strict_string_checks=1:malloc_fill_byte=202:max_malloc_fill_size=2147483647:free_fill_byte=203:max_free_fill_size=2147483647
         UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1
@@ -385,13 +385,13 @@ jobs:
       slug: ubsan
       cc: clang
       # unsigned-integer-overflow stays out, because it is defined behaviour and
-      # the hashes rely on it. Static, because the runtime is not in the .so's.
+      # the hashes rely on it.
       cflags: -fsanitize=undefined -fno-sanitize-recover=all -g -O1 -fno-omit-frame-pointer
       ldflags: -fsanitize=undefined
-      configure: --disable-shared --enable-static
-      packages: clang libssl-dev libbrotli-dev libzstd-dev
+      # The runtime is not in the .so's.
+      configure_args: --disable-shared --enable-static
+      extra_packages: clang libssl-dev libbrotli-dev libzstd-dev
       options: UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1
-      # clang's UBSan honours log_path, so none of its report reaches stderr.
       capture_stderr: false
       # --disable-shared already skips 30 of the 591, so floor what ran.
       min_pass: 500
@@ -408,10 +408,10 @@ jobs:
       cc: clang
       cflags: -fsanitize=memory -fsanitize-memory-track-origins=2 -fno-sanitize-recover=all -g -O1 -fno-omit-frame-pointer
       ldflags: -fsanitize=memory
-      configure: --disable-https --disable-shared --enable-static
-      # Brotli and zstd are left out as well, because configure would find them
-      # and an uninstrumented library floods MSan with false positives.
-      packages: clang
+      configure_args: --disable-https --disable-shared --enable-static
+      # No brotli or zstd: configure would find them, and an uninstrumented
+      # library floods MSan with false positives.
+      extra_packages: clang
       options: MSAN_OPTIONS=abort_on_error=1:halt_on_error=1
       # The zlib-dependent self-tests are named 01_zlib-*, which this glob leaves
       # out, because uninstrumented libz floods MSan the same way.
@@ -432,8 +432,8 @@ jobs:
       cc: clang
       cflags: -fsanitize=thread -fno-sanitize-recover=all -g -O1 -fno-omit-frame-pointer
       ldflags: -fsanitize=thread
-      configure: --disable-shared --enable-static
-      packages: clang libssl-dev libbrotli-dev libzstd-dev
+      configure_args: --disable-shared --enable-static
+      extra_packages: clang libssl-dev libbrotli-dev libzstd-dev
       # TSan exits 66 on a report by itself, so the leg reds without halt_on_error.
       options: TSAN_OPTIONS=allocator_may_return_null=1:suppressions=$GITHUB_WORKSPACE/tools/tsan-suppressions.txt
       # The engine self-tests, where the FTP, DNS and lazy-lock worker threads
@@ -444,9 +444,7 @@ jobs:
       #
       # 467 and 503 are named because they are the purpose-built FTP thread tests
       # and do not match the glob, so the leg would otherwise never run the two
-      # tests it exists to guard. The rest are the FTP crawls that drive worker
-      # threads against the stop and abort paths, and WebHTTrack, whose server,
-      # crawl and watchdog threads share its flags.
+      # tests it exists to guard.
       tests: >-
         467_engine-ftp-worker-tail.test 503_engine-ftp-handoff.test
         110_local-ftp-parallel.test 121_local-ftp-nocache-splice.test

@@ -11,6 +11,7 @@ set -euo pipefail
 
 top=${abs_top_srcdir:-$(cd "$testdir/.." && pwd)}
 workflow="$top/.github/workflows/ci.yml"
+leg="$top/.github/workflows/sanitizer.yml"
 
 if ! test -r "$workflow"; then
     test -d "$top/.github" && fail "$workflow is gone but $top/.github is not"
@@ -65,10 +66,22 @@ PY
 
 # A parser reading the wrong shape finds no ASAN_OPTIONS at all, and the check
 # above would then pass on an empty set. The mutant is what rules that out.
+# Only the sanitize leg spells it with '=', so the fuzz job's own
+# "ASAN_OPTIONS: detect_leaks=1" cannot stand in for it.
 mut=$(mktemp "${TMPDIR:-/tmp}/httrack_leakmut.XXXXXX")
 cleanup_push rm -f "$mut"
-sed 's/detect_leaks=1/detect_leaks=0/' "$workflow" >"$mut"
+sed 's/ASAN_OPTIONS=detect_leaks=1/ASAN_OPTIONS=detect_leaks=0/' "$workflow" >"$mut"
 cmp -s "$workflow" "$mut" && fail "the detect_leaks=0 mutant changed nothing, so it proves nothing"
 "$py" "$audit" "$mut" >/dev/null 2>&1 && fail "detect_leaks=0 went unreported"
+
+# Asking for leak detection is half of it: a leg whose options never reach the
+# environment runs with the runtime's own defaults, and the audit above cannot
+# see that, because the write lives in the workflow ci.yml calls.
+if test -r "$leg"; then
+    command grep -q 'GITHUB_ENV' "$leg" ||
+        fail "$leg no longer writes the runtime options to GITHUB_ENV"
+elif command grep -q 'uses: \./\.github/workflows/' "$workflow"; then
+    fail "ci.yml calls a workflow for its legs but $leg is gone"
+fi
 
 echo "leak detection OK (the sanitize leg asks for it, and detect_leaks=0 reds this test)"

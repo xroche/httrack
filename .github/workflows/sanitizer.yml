@@ -1,11 +1,8 @@
-# One sanitized build and suite run, called once per runtime by ci.yml. The four
-# legs differed only in the compiler, the flags, which tests they run and which
-# options their runtime takes, so everything else lives here once.
+# One sanitized build and suite run, called once per runtime by ci.yml.
 name: Sanitizer leg
 
 on:
-  # Called by ci.yml, which runs on the pull-request path. No trigger of its own,
-  # so 496_ci-tier2-split.test checks that a caller names it.
+  # No trigger of its own: ci.yml calls it on the pull-request path.
   workflow_call:
     inputs:
       slug:
@@ -24,21 +21,20 @@ on:
         description: LDFLAGS, which repeat the -fsanitize= selection.
         required: true
         type: string
-      configure:
-        description: Extra configure arguments, such as --disable-shared.
+      configure_args:
+        description: Arguments added to ./configure, such as --disable-shared.
         required: false
         type: string
         default: ""
-      packages:
-        description: apt packages beyond the ones every leg needs.
+      extra_packages:
+        description: apt packages beyond build-essential, the autotools and zlib.
         required: false
         type: string
         default: ""
       options:
         description: One NAME=value line per runtime. log_path is appended, and $GITHUB_WORKSPACE expanded.
-        required: false
+        required: true
         type: string
-        default: ""
       capture_stderr:
         description: Keep a copy of each test's stderr? Needed by a runtime that ignores log_path.
         required: false
@@ -74,7 +70,7 @@ jobs:
 
       - name: Install build dependencies
         env:
-          EXTRA: ${{ inputs.packages }}
+          EXTRA: ${{ inputs.extra_packages }}
         run: |
           set -euo pipefail
           sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
@@ -88,7 +84,7 @@ jobs:
           CC_: ${{ inputs.cc }}
           CFLAGS_: ${{ inputs.cflags }}
           LDFLAGS_: ${{ inputs.ldflags }}
-          EXTRA: ${{ inputs.configure }}
+          EXTRA: ${{ inputs.configure_args }}
         run: |
           set -euo pipefail
           autoreconf -fi
@@ -105,17 +101,19 @@ jobs:
           CAPTURE: ${{ inputs.capture_stderr }}
         run: |
           set -euo pipefail
-          mkdir -p "$GITHUB_WORKSPACE/sanitizer-logs" "$GITHUB_WORKSPACE/sanitizer-stderr"
-          # Every runtime writes <slug>.<pid> into one directory, so the collect
-          # step reads them all without being told which ran.
+          mkdir -p "$GITHUB_WORKSPACE/sanitizer-logs"
           while IFS= read -r opt; do
             test -n "$opt" || continue
+            # Everything before the first = is the variable name GITHUB_ENV takes,
+            # so a line without one would quietly export a name nobody reads.
+            case $opt in *=*) ;; *) echo "::error::no = in option line: $opt"; exit 1 ;; esac
             # A caller writing a path spells it $GITHUB_WORKSPACE, which nothing
             # would expand here, because the value reaches us as plain text.
             opt=${opt//\$GITHUB_WORKSPACE/$GITHUB_WORKSPACE}
             echo "$opt:log_path=$GITHUB_WORKSPACE/sanitizer-logs/$SLUG" >>"$GITHUB_ENV"
           done <<<"$OPTIONS"
           if test "$CAPTURE" = true; then
+            mkdir -p "$GITHUB_WORKSPACE/sanitizer-stderr"
             echo "HTTRACK_STDERR_CAPTURE_DIR=$GITHUB_WORKSPACE/sanitizer-stderr" >>"$GITHUB_ENV"
           fi
 
@@ -129,9 +127,8 @@ jobs:
           if test -n "$PATTERNS"; then
             tests=
             for pat in $PATTERNS; do
-              # A pattern that matches nothing would otherwise reach TESTS as
-              # itself, and name a file the runner then fails on for the wrong
-              # reason. Report the pattern instead.
+              # An unmatched pattern survives as itself and would reach TESTS as
+              # the name of a file that is not there.
               matched=
               for t in tests/$pat; do
                 test -e "$t" || continue
@@ -144,8 +141,7 @@ jobs:
           else
             make check -j"$CHECK_JOBS"
           fi
-          # A configure or selection change can mass-skip and still report green,
-          # and only ci-windows-suite.sh floors a skip set anywhere else.
+          # A configure or selection change can mass-skip and still report green.
           if test "${MIN_PASS:-0}" -gt 0; then
             passed=$(awk '/^# PASS:/ { print $3 }' tests/test-suite.log)
             test "${passed:-0}" -ge "$MIN_PASS" ||
@@ -160,7 +156,8 @@ jobs:
         if: always()
         run: |
           set -euo pipefail
-          sh tools/ci-sanitizer-report.sh -s "$GITHUB_WORKSPACE/sanitizer-stderr" \
+          sh tools/ci-sanitizer-report.sh \
+            ${HTTRACK_STDERR_CAPTURE_DIR:+-s "$HTTRACK_STDERR_CAPTURE_DIR"} \
             "$GITHUB_WORKSPACE/sanitizer-logs" tests
 
       - name: Upload the sanitizer and per-test logs
