@@ -128,21 +128,21 @@ static HTS_UNUSED void hts_record_assert_memory_failed(const size_t size) {
     size_t capa_ = TypedArrayCapa(A);                                          \
     void *newPtr_;                                                             \
     assertf(room_ <= maxCapa_ - TypedArraySize(A));                            \
-    /* The room is already there: reallocating to the same capacity copies the \
-       whole store under ASan, which made one append per byte quadratic. */    \
-    if (!TypedArrayHasRoom(A, room_)) {                                        \
-      /* Saturating: a plain capa_*2 wraps to 0 and the loop never ends. */    \
-      while (capa_ - TypedArraySize(A) < room_) {                              \
-        capa_ = capa_ < minCapa_       ? minCapa_                              \
-                : capa_ > maxCapa_ / 2 ? maxCapa_                              \
-                                       : capa_ * 2;                            \
-      }                                                                        \
-      /* Via a temporary: realloc keeps the old block on failure. */           \
-      newPtr_ = realloct(TypedArrayPtr(A), capa_ * TypedArrayWidth(A));        \
-      if (newPtr_ != NULL) {                                                   \
-        TypedArrayPtr(A) = newPtr_;                                            \
-        TypedArrayCapa(A) = capa_;                                             \
-      }                                                                        \
+    /* Leaves the enclosing do/while: a realloc to the capacity the block      \
+       already has copies the whole store under ASan. */                       \
+    if (TypedArrayHasRoom(A, room_))                                           \
+      break;                                                                   \
+    /* Saturating: a plain capa_*2 wraps to 0 and the loop never ends. */      \
+    while (capa_ - TypedArraySize(A) < room_) {                                \
+      capa_ = capa_ < minCapa_       ? minCapa_                                \
+              : capa_ > maxCapa_ / 2 ? maxCapa_                                \
+                                     : capa_ * 2;                              \
+    }                                                                          \
+    /* Via a temporary: realloc keeps the old block on failure. */             \
+    newPtr_ = realloct(TypedArrayPtr(A), capa_ * TypedArrayWidth(A));          \
+    if (newPtr_ != NULL) {                                                     \
+      TypedArrayPtr(A) = newPtr_;                                              \
+      TypedArrayCapa(A) = capa_;                                               \
     }                                                                          \
   } while (0)
 
@@ -159,13 +159,19 @@ static HTS_UNUSED void hts_record_assert_memory_failed(const size_t size) {
 
 /**
  * Add 'COUNT' elements, not bytes, read from 'PTR'.
- * The array is left untouched when the store cannot grow. 'PTR' must not point
- * into the array, because a grow frees the old store. A 'COUNT' the array could
- * never address aborts, see TypedArrayEnsureRoom().
+ * A 'COUNT' of 0 does nothing. The array is left untouched when the store
+ * cannot grow. 'PTR' must not point into the array, because a grow frees the
+ * old store. A 'COUNT' the array could never address aborts, see
+ * TypedArrayEnsureRoom().
  **/
 #define TypedArrayAppend(A, PTR, COUNT)                                        \
   do {                                                                         \
     const size_t count_ = (COUNT);                                             \
+    /* An array that never grew has no store, and a zero offset off a NULL     \
+       pointer is undefined even where nothing is copied. */                   \
+    if (count_ == 0) {                                                         \
+      break;                                                                   \
+    }                                                                          \
     /* This 1-case is to benefit from type safety. */                          \
     if (count_ == 1) {                                                         \
       TypedArrayAdd(A, *(PTR));                                                \

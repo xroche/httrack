@@ -8,7 +8,8 @@ set -euo pipefail
 # htsarrays.h growth macros (driven by 'httrack -#test=arrays').
 
 # Success path: growth reaches the requested room and the payload survives
-# every reallocation.
+# every reallocation. A growth that needlessly reallocates a borrowed store
+# aborts instead, so the missing "OK" is what reports it.
 assert_selftest "arrays: OK" arrays run
 
 # A hang is the pre-fix symptom here, so bound the runs where the shell can
