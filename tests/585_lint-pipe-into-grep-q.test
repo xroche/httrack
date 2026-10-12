@@ -1,0 +1,60 @@
+#!/bin/bash
+#
+# AGENTS.md bans piping into `grep -q`, which exits on its first match: bash
+# writes one line per write(2), so the producer takes SIGPIPE and pipefail makes
+# that the script's status. Both sites that shipped with it were written after
+# the rule, one failing a test on a working binary and one making a CI gate
+# report sync OK for the mistake it guards.
+
+set -euo pipefail
+export LC_ALL=C
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# shellcheck disable=SC2154 # testdir comes from testlib.sh
+top="$testdir/.."
+
+# The file list lives in the index, and a distcheck tarball carries none.
+if ! command -v git >/dev/null 2>&1 ||
+    ! git -C "$top" ls-files --error-unmatch AGENTS.md >/dev/null 2>&1; then
+    skip "no checkout here, so there is no file list to scan"
+fi
+
+# A bash builtin producer is what exposes this: printf and echo flush per line,
+# where an external producer block-buffers and lands its few lines in one write.
+re='(printf|echo)[^|]*\|[[:space:]]*(command[[:space:]]+)?grep([[:space:]]+-[a-zA-Z]+)*[[:space:]]+-[a-zA-Z]*q[a-zA-Z]*'
+
+# A whole-line comment is prose about the rule, as in 01_engine-xfread.test.
+scan() { # scan FILE...
+    grep -nE "$re" "$@" /dev/null | grep -vE ':[0-9]+:[[:space:]]*#' || true
+}
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/pipe_into_q.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "$work"
+
+cat >"$work/bad.sh" <<'BAD'
+printf '%s\n' "$x" | grep -q foo
+BAD
+cat >"$work/good.sh" <<'GOOD'
+grep -q foo <<<"$x"
+GOOD
+test -n "$(scan "$work/bad.sh")" || fail "the scan missed the form it exists to catch"
+test -z "$(scan "$work/good.sh")" || fail "the scan flagged a here-string: $(scan "$work/good.sh")"
+
+# A read loop rather than mapfile, which macOS bash 3.2 does not have. This
+# file is skipped, because it carries the bad form as its own control fixture.
+files=()
+while IFS= read -r f; do
+    case $f in */"${0##*/}") continue ;; esac
+    files+=("$top/$f")
+done < <(git -C "$top" ls-files \
+    '*.sh' '*.test' bootstrap .githooks/pre-commit src/webhttrack.in '.github/workflows/*.yml')
+# Well under the 638 scanned today, so only a collapsed glob trips it.
+test "${#files[@]}" -ge 600 || fail "the scan found only ${#files[@]} files to read"
+
+hits=$(scan "${files[@]}")
+test -z "$hits" || fail "capture the output and match a here-string instead:
+$hits"
+
+ok "no tracked script pipes a builtin into grep -q"
