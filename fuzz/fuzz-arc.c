@@ -78,8 +78,23 @@ static int fuzz_arc_setup(void) {
   return 0;
 }
 
+/* PT_Enumerate() returns a NULL-terminated array of pointers into the same
+   block, so touching each string is what proves the references land in it. */
+static void fuzz_arc_walk(char **list) {
+  static volatile size_t sink; /* keeps the reads from being optimised away */
+  size_t i;
+
+  if (list == NULL) {
+    return;
+  }
+  for (i = 0; list[i] != NULL; i++) {
+    sink += strlen(list[i]);
+  }
+}
+
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   PT_Indexes indexes;
+  char **flat = NULL, **tree = NULL, **none = NULL;
   FILE *fp;
   hts_boolean written;
 
@@ -99,8 +114,22 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     if (PT_AddIndex(indexes, arc_in) > 0) {
       /* the writer reads back every entry the loader indexed */
       (void) PT_SaveCache(indexes, arc_out);
+      /* Both enumeration shapes: an empty prefix takes every entry, and
+         subtree=1 takes the branch no caller in the tree reaches. */
+      flat = PT_Enumerate(indexes, "", 0);
+      tree = PT_Enumerate(indexes, "http://", 1);
+      /* A prefix no cache can hold, so every input also walks the path that
+         matches nothing and returns NULL. */
+      none = PT_Enumerate(indexes, "http://255.255.255.255./", 0);
     }
     PT_Delete(indexes);
   }
+  /* Read every reference back: the block holds offsets turned into pointers,
+     so a wrong one only shows when something follows it. */
+  fuzz_arc_walk(flat);
+  fuzz_arc_walk(tree);
+  PT_Enumerate_Delete(&flat);
+  PT_Enumerate_Delete(&tree);
+  PT_Enumerate_Delete(&none);
   return 0;
 }
