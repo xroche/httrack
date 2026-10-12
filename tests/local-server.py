@@ -3456,6 +3456,37 @@ class Handler(SimpleHTTPRequestHandler):
         else:
             self.send_raw(self.FAKE_PNG, "image/png")
 
+    # --- a web-font stylesheet, Google Fonts' shape (#139) -----------------
+    # The <link> names an extension-less path, which no default scan rule can
+    # match, and the sheet's own url() assets sit on this same foreign host.
+    # Every url is absolute, on one line, so a scan reading a scheme's // as a
+    # comment loses every asset after the first.
+
+    def route_webfont(self):
+        name = urlsplit(self.path).path.rsplit("/", 1)[-1]
+        base = "http://127.0.0.1:%d/webfont/" % self.server.server_address[1]
+        if name == "css":
+            self.send_raw(
+                (
+                    "/*url(%shidden.webp)*/@font-face{font-family:'F';"
+                    "src:url(%sface.ttf) format('truetype');}"
+                    "body{background:url(%sbg.webp);}" % (base, base, base)
+                ).encode(),
+                "text/css",
+            )
+        elif name == "boot.js":
+            self.send_raw(
+                (
+                    '// var hidden = "%sjshidden.webp";\n'
+                    'var seen = "%sjsseen.webp";\n' % (base, base)
+                ).encode(),
+                "application/x-javascript",
+            )
+        else:
+            # Each body names itself, so a test can tell it from an error page.
+            body = ("webfont asset %s\n" % name).encode()
+            self.send_raw(body, "font/ttf" if name.endswith(".ttf") else "image/webp")
+
     # --- a page whose local name comes from its cached type (#1421) ---------
     # page.php answers text/html, so it mirrors as page.html. It then fails to
     # answer on two consecutive updates, answers again on the fourth crawl, and
@@ -4271,6 +4302,9 @@ class Handler(SimpleHTTPRequestHandler):
             return True
         if path.startswith("/asset/"):
             self.route_asset()
+            return True
+        if path.startswith("/webfont/"):
+            self.route_webfont()
             return True
         if path.startswith("/ctpurge/"):
             self.route_ctpurge()

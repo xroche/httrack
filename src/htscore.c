@@ -4862,7 +4862,8 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
           int just_test_it = 0;
 
           forbidden_url =
-            hts_acceptlink(opt, ptr, afs.af.adr, afs.af.fil, NULL, NULL, &set_prio_to, &just_test_it);
+              hts_acceptlink(opt, ptr, afs.af.adr, afs.af.fil, NULL, NULL,
+                             HTS_FALSE, &set_prio_to, &just_test_it);
           hts_log_print(opt, LOG_DEBUG,
                         "result for wizard external module link: %d",
                         forbidden_url);

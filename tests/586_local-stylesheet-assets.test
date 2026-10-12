@@ -1,0 +1,87 @@
+#!/bin/bash
+# #139: the fonts and images a stylesheet names. A sheet taken as a near link
+# lost them one level too deep, and the // of an absolute url()'s scheme read
+# as a comment and killed the rest of the line.
+set -eu
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_586.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmpdir"
+
+: "${top_srcdir:=..}"
+tsv="$top_srcdir/winprofile-keys.tsv"
+test -r "$tsv" || {
+    echo "winprofile-keys.tsv is absent (dist tarball?)" >&2
+    exit 77
+}
+rules=$(awk -F'\t' '$1 == "WildCardFilters" { print $9 }' "$tsv")
+test -n "$rules" || fail "no WildCardFilters row in winprofile-keys.tsv"
+
+mkdir -p "${tmpdir}/aroot" "${tmpdir}/broot"
+blog="${tmpdir}/b-server.log" # local_server_start reads the port back from it
+: >"$blog"
+local_server_start --root "${tmpdir}/broot" --log "$blog"
+bport=$SRV_PORT
+alog="${tmpdir}/a-server.log"
+: >"$alog"
+local_server_start --root "${tmpdir}/aroot" --log "$alog"
+aport=$SRV_PORT
+
+# What host B's /webfont/ route serves, every url absolute and on one line:
+#   css      /*url(hidden.webp)*/ @font-face{src:url(face.ttf)} body{url(bg.webp)}
+#   boot.js  // "jshidden.webp", then "jsseen.webp" on the next line
+# /webfont/css has no extension, so no default rule names it and only --near
+# brings it in, as with the Google Fonts link in #139.
+cat >"${tmpdir}/aroot/index.html" <<HTML
+<html><head>
+<link rel="stylesheet" href="http://127.0.0.1:${bport}/webfont/css">
+<script src="http://127.0.0.1:${bport}/webfont/boot.js"></script>
+</head><body><a href="stray.html">stray</a></body></html>
+HTML
+
+# The parser never leaves this <style>, so it reads the script below in CSS
+# state. The // must still hide its URL there.
+cat >"${tmpdir}/aroot/stray.html" <<HTML
+<html><body><textarea><style></textarea>
+<script>
+// var hidden = "http://127.0.0.1:${bport}/webfont/strayhidden.webp";
+var seen = "http://127.0.0.1:${bport}/webfont/strayseen.webp";
+</script>
+</body></html>
+HTML
+
+require_httrack
+
+# shellcheck disable=SC2086 # one argument per rule, as the GUI splits them
+local_crawl --log "${tmpdir}/crawl.log" "http://127.0.0.1:${aport}/index.html" \
+    -O "${tmpdir}/out" --quiet --max-time=120 --timeout=30 --robots=0 --near \
+    $rules || fail "the crawl failed"
+
+out="${tmpdir}/out/127.0.0.1_${bport}/webfont"
+# Each body names itself, so a saved error page fails these.
+command grep -q "webfont asset face.ttf" "${out}/face.ttf" 2>/dev/null ||
+    fail "the near-linked stylesheet's font was not mirrored"
+command grep -q "webfont asset bg.webp" "${out}/bg.webp" 2>/dev/null ||
+    fail "the url() after the first one on the line was not mirrored"
+! test -e "${out}/hidden.webp" ||
+    fail "a url() inside a /* */ comment was mirrored"
+command grep -q "webfont asset jsseen.webp" "${out}/jsseen.webp" 2>/dev/null ||
+    fail "a plain javascript URL was not mirrored"
+! test -e "${out}/jshidden.webp" ||
+    fail "a URL behind a // comment in javascript was mirrored"
+command grep -q "webfont asset strayseen.webp" "${out}/strayseen.webp" \
+    2>/dev/null ||
+    fail "a javascript URL after an unclosed <style> was not mirrored"
+! test -e "${out}/strayhidden.webp" ||
+    fail "an unclosed <style> made a javascript // comment scannable"
+
+sheet=$(ls "${out}"/css* 2>/dev/null) ||
+    fail "the stylesheet itself was not mirrored"
+# Both live urls must become relative, and the commented one must not.
+! command grep -qF -e "127.0.0.1:${bport}/webfont/face.ttf" \
+    -e "127.0.0.1:${bport}/webfont/bg.webp" "$sheet" ||
+    fail "the mirrored stylesheet still points at the live host"
+command grep -qF "url(http://127.0.0.1:${bport}/webfont/hidden.webp)" "$sheet" ||
+    fail "the url() inside the /* */ comment was rewritten"

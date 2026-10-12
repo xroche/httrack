@@ -123,10 +123,13 @@ hts_boolean hts_link_is_foreign_asset(httrackp *opt, int ptr);
    the start directory. */
 hts_boolean hts_upper_links_note(httrackp *opt, char *dst, size_t dstsize);
 
-int hts_acceptlink(httrackp * opt, int ptr,
-                   const char *adr, const char *fil,
+/* `tag` and `attribute` name the markup the link came from, or are NULL where
+   there is none. `in_css_file` says it came from a stylesheet, where url() has
+   no tag to match. */
+int hts_acceptlink(httrackp *opt, int ptr, const char *adr, const char *fil,
                    const char *tag, const char *attribute,
-                   int *set_prio_to_0, int *just_test_it);
+                   hts_boolean in_css_file, int *set_prio_to_0,
+                   int *just_test_it);
 int hts_testlinksize(httrackp * opt, const char *adr, const char *fil, LLint size);
 int hts_acceptmime(httrackp * opt, int ptr,
                    const char *adr, const char *fil, const char *mime);

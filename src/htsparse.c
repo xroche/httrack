@@ -223,6 +223,7 @@ typedef enum {
    can drive it without capturing them by lexical scope. */
 typedef struct {
   const int *inscript;             /* nonzero while inside a script body */
+  const hts_boolean *css_file;     /* is the whole document a stylesheet? */
   const signed char (*table)[257]; /* [INSCRIPT_NSTATES][257] transitions */
   INSCRIPT *pos;                   /* current state */
   const char **html;               /* parse cursor */
@@ -236,6 +237,11 @@ static void hts_automate_lookup(const script_automate *aut) {
       next = aut->table[*aut->pos][INSCRIPT_DEFAULT];
     }
     assertf(next >= 0 && next < INSCRIPT_NSTATES);
+    /* CSS has no // comment, and the one in http:// would otherwise kill the
+       rest of the line, url() calls included (#139). */
+    if (next == INSCRIPT_SLASHSLASH && *aut->css_file) {
+      next = INSCRIPT_SLASH;
+    }
     *aut->pos = (INSCRIPT) next;
   }
 }
@@ -916,6 +922,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       int incomment = 0;        // dans un <!--
       int inscript = 0;         // dans un scipt pour applets javascript)
       int incss = 0;            /* CSS lets url(x) go unquoted */
+      hts_boolean css_file = HTS_FALSE;
       int inscript_locked = 0;  // in locked script (ie. js file)
       signed char inscript_state[INSCRIPT_NSTATES][257];
       INSCRIPT inscript_state_pos = INSCRIPT_START;
@@ -975,7 +982,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       inscript_state[INSCRIPT_COMMENT2]['*'] = INSCRIPT_COMMENT2;
       inscript_state[INSCRIPT_ANTISLASH_IN_QUOTE][INSCRIPT_DEFAULT] = INSCRIPT_INQUOTE; /* #8: escape in '' */
       inscript_state[INSCRIPT_ANTISLASH_IN_QUOTE2][INSCRIPT_DEFAULT] = INSCRIPT_INQUOTE2;       /* #9: escape in "" */
-      const script_automate saut = {&inscript, inscript_state,
+      const script_automate saut = {&inscript, &css_file, inscript_state,
                                     &inscript_state_pos, &html};
 
       /* Primary list or URLs */
@@ -991,6 +998,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
         inscript = 1;
         incss =
             (compare_mime(opt, r->contenttype, str->url_file, "text/css") != 0);
+        css_file = incss ? HTS_TRUE : HTS_FALSE;
         inscript_locked = 1;    /* Don't exit js space upon </script> */
         if (opt->parsedebug) {
           HT_ADD("<@@ inscript @@>");
@@ -2834,10 +2842,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       hts_log_print(opt, LOG_DEBUG,
                                     "wizard link test at %s%s..", afs.af.adr, afs.af.fil);
                       forbidden_url =
-                        hts_acceptlink(opt, ptr, afs.af.adr, afs.af.fil,
-                                       intag_name ? intag_name : NULL,
-                                       intag_name ? tag_attr_start : NULL,
-                                       &set_prio_to, &just_test_it);
+                          hts_acceptlink(opt, ptr, afs.af.adr, afs.af.fil,
+                                         intag_name ? intag_name : NULL,
+                                         intag_name ? tag_attr_start : NULL,
+                                         css_file, &set_prio_to, &just_test_it);
                       hts_log_print(opt, LOG_DEBUG,
                                     "result for wizard link test: %d",
                                     forbidden_url);
@@ -2896,12 +2904,11 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                               hts_log_print(opt, LOG_DEBUG,
                                             "wizard moved link retest at %s%s..",
                                             afs.af.adr, afs.af.fil);
-                              forbidden_url =
-                                hts_acceptlink(opt, ptr, afs.af.adr, afs.af.fil,
-                                               intag_name ? intag_name : NULL,
-                                               intag_name ? tag_attr_start :
-                                               NULL, &set_prio_to,
-                                               &just_test_it);
+                              forbidden_url = hts_acceptlink(
+                                  opt, ptr, afs.af.adr, afs.af.fil,
+                                  intag_name ? intag_name : NULL,
+                                  intag_name ? tag_attr_start : NULL, css_file,
+                                  &set_prio_to, &just_test_it);
                               hts_log_print(opt, LOG_DEBUG,
                                             "result for wizard moved link retest: %d",
                                             forbidden_url);
@@ -4005,7 +4012,9 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
                             "wizard link test for moved file at %s%s..",
                             moved->adr, moved->fil);
               // accepté?
-              if (hts_acceptlink(opt, ptr, moved->adr, moved->fil, NULL, NULL, &set_prio_to, NULL) != 1) {   /* nouvelle adresse non refusée ? */
+              if (hts_acceptlink(opt, ptr, moved->adr, moved->fil, NULL, NULL,
+                                 HTS_FALSE, &set_prio_to, NULL) !=
+                  1) { /* nouvelle adresse non refusée ? */
                 get_it = 1;
                 hts_log_print(opt, LOG_DEBUG, "moved link accepted: %s%s",
                               moved->adr, moved->fil);
@@ -4013,7 +4022,7 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
             } else if (same_savefile) {
               // A stub would point at itself; follow the redirect instead.
               if (hts_acceptlink(opt, ptr, moved->adr, moved->fil, NULL, NULL,
-                                 &set_prio_to, NULL) != 1) {
+                                 HTS_FALSE, &set_prio_to, NULL) != 1) {
                 get_it = 1;
                 hts_log_print(opt, LOG_WARNING,
                               "Redirect to a same-file alias, fetching real "
@@ -5282,8 +5291,11 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
                   {
                     int set_prio_to = 0;
 
-                    if (hts_acceptlink(opt, ptr, moved.adr, moved.fil, NULL, NULL, &set_prio_to, NULL) == 1) {     /* forbidden */
-                      /* Note: the cache 'cached_tests' system will remember this error, and we'll only issue ONE request */
+                    if (hts_acceptlink(opt, ptr, moved.adr, moved.fil, NULL,
+                                       NULL, HTS_FALSE, &set_prio_to,
+                                       NULL) == 1) { /* forbidden */
+                      /* Note: the cache 'cached_tests' system will remember
+                       * this error, and we'll only issue ONE request */
                       *forbidden_url = 1;       /* Forbidden! */
                       hts_log_print(opt, LOG_DEBUG,
                                     "link forbidden because of redirect beyond the mirror scope at %s%s -> %s%s",

@@ -68,8 +68,9 @@ static const htspair_t hts_detect_embed_html5[] = {
 /* Internal */
 static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
                            const char *fil, const char *tag,
-                           const char *attribute, int *set_prio_to,
-                           int *just_test_it, int *upper_refused_out);
+                           const char *attribute, hts_boolean in_css_file,
+                           int *set_prio_to, int *just_test_it,
+                           int *upper_refused_out);
 
 hts_boolean hts_upper_links_note(httrackp *opt, char *dst, size_t dstsize) {
   if (dst == NULL || dstsize == 0)
@@ -104,14 +105,14 @@ retour:
 -1 pas d'avis
 */
 
-int hts_acceptlink(httrackp * opt, int ptr,
-                   const char *adr, const char *fil,
+int hts_acceptlink(httrackp *opt, int ptr, const char *adr, const char *fil,
                    const char *tag, const char *attribute,
-                   int *set_prio_to, int *just_test_it) {
+                   hts_boolean in_css_file, int *set_prio_to,
+                   int *just_test_it) {
   int upper_refused = 0;
   int forbidden_url =
-      hts_acceptlink_(opt, ptr, adr, fil, tag, attribute, set_prio_to,
-                      just_test_it, &upper_refused);
+      hts_acceptlink_(opt, ptr, adr, fil, tag, attribute, in_css_file,
+                      set_prio_to, just_test_it, &upper_refused);
   int prev_prio = set_prio_to ? *set_prio_to : 0;
 
   // -------------------- PHASE 6 --------------------
@@ -463,8 +464,9 @@ static hts_boolean hts_wizard_url_fits(const char *adr, const char *fil) {
 
 static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
                            const char *fil, const char *tag,
-                           const char *attribute, int *set_prio_to,
-                           int *just_test_it, int *upper_refused_out) {
+                           const char *attribute, hts_boolean in_css_file,
+                           int *set_prio_to, int *just_test_it,
+                           int *upper_refused_out) {
   int forbidden_url = -1;
   int meme_adresse;
   int embedded_triggered = 0;
@@ -493,10 +495,13 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
   }
   // -------------------- PRELUDE OF PHASE 3-BIS --------------------
 
-  /* Built-in known tags (<img src=..>, ..) */
-  if (forbidden_url != 0 && opt->nearlink && tag != NULL && attribute != NULL) {
-    if (is_embed_pair(hts_detect_embed, tag, attribute) ||
-        is_embed_pair(hts_detect_embed_html5, tag, attribute)) {
+  /* Built-in tags (<img src=..>) and every stylesheet url(), which names a
+     font or image but carries no tag to match (#139) */
+  if (forbidden_url != 0 && opt->nearlink) {
+    if (in_css_file ||
+        (tag != NULL && attribute != NULL &&
+         (is_embed_pair(hts_detect_embed, tag, attribute) ||
+          is_embed_pair(hts_detect_embed_html5, tag, attribute)))) {
       embedded_triggered = 1;
     }
   }
