@@ -260,6 +260,23 @@ const char *hts_dirty_attr_name(const char *quote, const char *tag_start,
   return a < *nend && a > tag_start + 1 ? a : NULL;
 }
 
+/* Is this attribute a framework binding (Vue :x, v-x, @x, Angular [x], (x),
+   Alpine x-bind:x)? Its value is a JavaScript expression, never a URL. */
+static hts_boolean hts_attr_is_js_binding(const char *name, const char *nend) {
+  static const char *const prefixes[] = {":",  "@",       "[",     "(",
+                                         "v-", "x-bind:", "x-on:", NULL};
+  const size_t len = (size_t) (nend - name);
+  int i;
+
+  for (i = 0; prefixes[i] != NULL; i++) {
+    const size_t l = strlen(prefixes[i]);
+
+    if (len > l && strncasecmp(name, prefixes[i], l) == 0)
+      return HTS_TRUE;
+  }
+  return HTS_FALSE;
+}
+
 /* Contract in htsparse.h. Resolves the owning attribute itself, since
    intag_startattr is unreliable mid-tag. */
 hts_boolean hts_dirty_attr_detectable(const char *quote,
@@ -1993,6 +2010,21 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                             }
                                           }
                                         }
+                              }
+
+                              if (url_ok && intag && intag_start_valid &&
+                                  intag_start) {
+                                const char *nend;
+                                const char *const name = hts_dirty_attr_name(
+                                    html, intag_start, &nend);
+
+                                if (name != NULL &&
+                                    hts_attr_is_js_binding(name, nend)) {
+                                  url_ok = 0;
+                                  hts_log_print(opt, LOG_DEBUG,
+                                                "dirty parsing: binding "
+                                                "attribute avoided");
+                                }
                               }
 
                               // Accepter URL, on la traitera comme une URL

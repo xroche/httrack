@@ -131,18 +131,19 @@ for n in ngsrc vbind hidden cfgsrc paren comma; do
     cp "$attrs/dsrc.gif" "$attrs/$n.gif"
 done
 
-# Engine default, so -%P is on and the seven scan-only values are links.
+# Engine default, so -%P is on and six scan-only values are links. v-bind:src
+# is a Vue binding, whose value is JavaScript, so it is never one.
 bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$attrs")" \
     --errors 0 \
     --found durl.html --found dhref.html \
-    --found ngsrc.gif --found vbind.gif \
+    --found ngsrc.gif --not-found vbind.gif \
     --found hidden.gif \
     --found paren.gif --found comma.gif \
     --not-found cfgsrc.gif --not-found cfghref.html \
     httrack 'BASEURL/index.html' -r3
 
 # Under -%P0 only the two contract links survive, so a change promoting any of
-# the other seven reds here and nowhere else, which is the #497 class.
+# the other six reds here and nowhere else, which is the #497 class.
 bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$attrs")" \
     --errors 0 \
     --found dsrc.gif --found dtmpl.html \
