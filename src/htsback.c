@@ -301,11 +301,14 @@ int back_connect_fallback_due(int addr_index, int addr_count, int elapsed,
 
   if (addr_index + 1 >= addr_count) // last (or only) candidate: no fallback
     return 0;
-  if (timeout <= 0) // no timeout management: never force it
+  if (timeout <= 1) // no timeout management, or no room for a second connect
     return 0;
-  deadline = (timeout < HTS_CONNECT_FALLBACK_TIMEOUT)
-                 ? timeout
-                 : HTS_CONNECT_FALLBACK_TIMEOUT;
+  /* Half the slot's budget, so the next address gets the other half. Spending
+     all of it made this fall due in the same pass as the timeout that abandons
+     the slot, and Linux then fell back where FreeBSD timed out (#1942). */
+  deadline = (timeout + 1) / 2;
+  if (deadline > HTS_CONNECT_FALLBACK_TIMEOUT)
+    deadline = HTS_CONNECT_FALLBACK_TIMEOUT;
   return elapsed >= deadline;
 }
 
@@ -3735,7 +3738,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
           cf->addr_count = hts_dns_resolve_all(opt, back[i].url_adr, scratch,
                                                HTS_MAXADDRNUM, NULL);
-          cf->connect_start = time_local();
+          /* The slot's own timeout runs from here too, so the fallback cannot
+             fall due after the timeout that abandons the slot (#1942). */
+          cf->connect_start = back[i].timeout_refresh;
         }
 
         // vérifier l'existance de timeout-check

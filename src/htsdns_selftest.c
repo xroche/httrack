@@ -599,9 +599,24 @@ int dns_selftests(httrackp *opt) {
     CHECK(back_connect_fallback_due(0, 2, 9, 120) == 0);
     CHECK(back_connect_fallback_due(0, 2, 10, 120) == 1);
     CHECK(back_connect_fallback_due(2, 4, 10, 120) == 1);
-    /* a shorter slot timeout shortens the deadline (min(timeout, cap)) */
-    CHECK(back_connect_fallback_due(0, 2, 4, 5) == 0);
-    CHECK(back_connect_fallback_due(0, 2, 5, 5) == 1);
+    /* A shorter slot timeout shortens the deadline. #1942 spent the WHOLE
+       timeout here, so the fallback and the timeout that abandons the slot fell
+       due together and the platform picked the winner. */
+    CHECK(back_connect_fallback_due(0, 2, 2, 5) == 0);
+    CHECK(back_connect_fallback_due(0, 2, 3, 5) == 1);
+    /* The property behind those two, over every timeout that has room: due
+       strictly before the slot dies, and never before the first connect has
+       had any time at all. */
+    {
+      int t;
+
+      for (t = 2; t <= 600; t++) {
+        CHECK(back_connect_fallback_due(0, 2, t - 1, t) == 1);
+        CHECK(back_connect_fallback_due(0, 2, 0, t) == 0);
+      }
+    }
+    /* one second leaves no room for a second connect, so do not force one */
+    CHECK(back_connect_fallback_due(0, 2, 1, 1) == 0);
     /* no timeout management: never force a fallback */
     CHECK(back_connect_fallback_due(0, 2, 9999, 0) == 0);
   }
