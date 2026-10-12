@@ -442,9 +442,8 @@ char **PT_Enumerate(PT_Indexes indexes, const char *url, int subtree) {
     struct_coucal_enum en = coucal_enum_new(indexes->cil);
     coucal_item *chain;
     void *blk = NULL;
-    /* Always built: the subtree branch used to leave it NULL and hand that
-       NULL to coucal below, which reads it. Its keys are whole remaining
-       paths there, which coucal already keeps unique, so it never matches. */
+    /* Always built, because coucal does not check for a NULL table. The
+       dedup below is skipped under subtree, where keys can reduce to one. */
     coucal hdupes = coucal_new(0);
 
     coucal_set_name(hdupes, "hdupes");
@@ -473,7 +472,8 @@ char **PT_Enumerate(PT_Indexes indexes, const char *url, int subtree) {
               StringClear(subitem);
               if (len > 0)
                 StringMemcat(subitem, item, len);
-              if (len == 0 || !coucal_exists(hdupes, StringBuff(subitem))) {
+              if (len == 0 || subtree ||
+                  !coucal_exists(hdupes, StringBuff(subitem))) {
                 if (len > 0)
                   StringCat(list, StringBuff(subitem));
                 if (isFolder)
@@ -496,7 +496,7 @@ char **PT_Enumerate(PT_Indexes indexes, const char *url, int subtree) {
       /* One slot per URL plus the NULL that ends the array. */
       const size_t slots = (size_t) listCount + 1;
       char *nullPointer = NULL;
-      char *item;
+      char *str;
       size_t i;
 
       /* The array of references first, then the strings it points into. */
@@ -504,18 +504,18 @@ char **PT_Enumerate(PT_Indexes indexes, const char *url, int subtree) {
         StringMemcat(listindexes, (char *) &nullPointer, sizeof(nullPointer));
       StringMemcat(listindexes, StringBuff(list), StringLength(list));
       /* ---- no reallocation beyond this point (fixed addresses) ---- */
-      /* The loop above appended one NUL-terminated string per listCount, in
-         this order, so walking them hands back the references in slot order. */
-      item = StringBuffRW(listindexes) + slots * sizeof(char *);
+      /* The enumeration loop appended one NUL-terminated name per count,
+         in this order, so walking them fills the slots. The last stays NULL. */
+      str = StringBuffRW(listindexes) + slots * sizeof(char *);
       for(i = 0; i < listCount; i++) {
-        memcpy(&StringBuffRW(listindexes)[i * sizeof(char *)], &item,
-               sizeof(item));
-        item += strlen(item) + 1;
+        /* memcpy, because a char* buffer is not aligned for a char** store. */
+        memcpy(&StringBuffRW(listindexes)[i * sizeof(char *)], &str,
+               sizeof(str));
+        str += strlen(str) + 1;
       }
       blk = StringAcquire(&listindexes);
     }
-    /* Both buffers were also leaked when nothing matched, which a request for
-       a path the cache does not hold reaches. */
+    /* The no-match return used to leak both, so free them on every path. */
     StringFree(list);
     StringFree(listindexes);
     return (char **) blk;

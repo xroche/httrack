@@ -114,20 +114,17 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     if (PT_AddIndex(indexes, arc_in) > 0) {
       /* the writer reads back every entry the loader indexed */
       (void) PT_SaveCache(indexes, arc_out);
-      /* Both enumeration shapes: an empty prefix takes every entry, and
-         subtree=1 takes the branch no caller in the tree reaches. */
+      /* An empty prefix takes every entry, subtree=1 takes the other shape,
+         and a prefix almost no input indexes takes the no-match return. */
       flat = PT_Enumerate(indexes, "", 0);
       tree = PT_Enumerate(indexes, "http://", 1);
-      /* A prefix no cache can hold, so every input also walks the path that
-         matches nothing and returns NULL. */
       none = PT_Enumerate(indexes, "http://255.255.255.255./", 0);
     }
     PT_Delete(indexes);
   }
-  /* Read every reference back: the block holds offsets turned into pointers,
-     so a wrong one only shows when something follows it. */
   fuzz_arc_walk(flat);
   fuzz_arc_walk(tree);
+  fuzz_arc_walk(none);
   PT_Enumerate_Delete(&flat);
   PT_Enumerate_Delete(&tree);
   PT_Enumerate_Delete(&none);
