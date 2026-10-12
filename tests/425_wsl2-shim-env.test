@@ -58,25 +58,30 @@ run_shim >/dev/null || fail "the shim died on an empty argument list"
 
 # A newline inside an argument, which a line-oriented cut used to truncate. The
 # tail lands on its own line, so that line is what proves it survived.
+# `grep -q` on a pipe can SIGPIPE printf mid-write.
 out=$(run_shim "$(printf '/mnt/d/a\nb')")
-printf '%s\n' "$out" | command grep -qx 'ARG=D:/a' ||
+command grep -qx 'ARG=D:/a' <<<"$out" ||
     fail "the head of a path holding a newline is wrong: [$out]"
-printf '%s\n' "$out" | command grep -qx 'b' ||
+command grep -qx 'b' <<<"$out" ||
     fail "everything after a newline in a path was dropped: [$out]"
 
-# httrack's own -O takes dir,cache, and both halves are paths.
-out=$(run_shim '/mnt/d/a,/mnt/d/b')
-printf '%s\n' "$out" | command grep -qx 'ARG=D:/a,D:/b' ||
-    fail "a comma-joined pair left its second half untranslated: [$out]"
+# httrack's own -O takes dir,cache, and both halves are paths. Three pieces,
+# because two cannot tell the loop from a pair handled on its own.
+out=$(run_shim '/mnt/d/a,/mnt/d/b,/mnt/d/c')
+command grep -qx 'ARG=D:/a,D:/b,D:/c' <<<"$out" ||
+    fail "a comma-joined list left a piece untranslated: [$out]"
 
-# An option carrying a path, which is the shape 282 builds.
-out=$(run_shim '--list=/mnt/d/x')
-printf '%s\n' "$out" | command grep -qx 'ARG=--list=D:/x' ||
+# An option carrying a path. The first is the shape 282 builds, the second is
+# there because the shim takes any dashed option, not a list of names.
+out=$(run_shim '--list=/mnt/d/x' '-O=/mnt/d/y')
+command grep -qx 'ARG=--list=D:/x' <<<"$out" ||
     fail "an option value was not translated: [$out]"
+command grep -qx 'ARG=-O=D:/y' <<<"$out" ||
+    fail "a single-dash option value was not translated: [$out]"
 
 # A URL is not a path, whatever it happens to contain.
 out=$(run_shim 'http://host/mnt/d/x')
-printf '%s\n' "$out" | command grep -qx 'ARG=http://host/mnt/d/x' ||
+command grep -qx 'ARG=http://host/mnt/d/x' <<<"$out" ||
     fail "a URL carrying /mnt/ was rewritten: [$out]"
 
 ok "the shim translates drvfs paths and file:// URLs, and survives no arguments"
