@@ -143,7 +143,7 @@ bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$attrs")" \
     httrack 'BASEURL/index.html' -r3
 
 # Under -%P0 only the two contract links survive, so a change promoting any of
-# the other six reds here and nowhere else, which is the #497 class.
+# the other seven reds here and nowhere else, which is the #497 class.
 bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$attrs")" \
     --errors 0 \
     --found dsrc.gif --found dtmpl.html \
