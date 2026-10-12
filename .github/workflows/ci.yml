@@ -421,12 +421,9 @@ jobs:
             tests/*.log
           if-no-files-found: ignore
 
-  # clang's UndefinedBehaviorSanitizer, because gcc's has no check for several
-  # classes gcc shares the -fsanitize=undefined name with. Pointer arithmetic on
-  # a null pointer is the one that cost us: #1946 sat in proxytrack for years
-  # while the gcc leg above passed, and it reached us as an OSS-Fuzz report
-  # because OSS-Fuzz builds with clang. Static, since the runtime is not in the
-  # .so's; the three tests that assert an installed shared object skip there.
+  # clang checks more under the same -fsanitize=undefined name than gcc does, so
+  # the gcc leg above missed #1946, a null-pointer arithmetic bug that sat in
+  # proxytrack for years and reached us from OSS-Fuzz, which builds with clang.
   ubsan:
     name: ubsan (UndefinedBehaviorSanitizer, clang)
     runs-on: ubuntu-24.04
@@ -444,8 +441,8 @@ jobs:
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
 
       - name: Configure (UBSan, static)
-        # No unsigned-integer-overflow: it is defined behaviour, and the hashes
-        # and mixers rely on it. The fuzz leg carries it with an ignorelist.
+        # Static, because the runtime is not in the .so's. unsigned-integer-overflow
+        # stays out, because it is defined behaviour and the hashes rely on it.
         run: |
           set -euo pipefail
           autoreconf -fi
@@ -458,16 +455,19 @@ jobs:
         run: make -j"$(nproc)"
 
       - name: Test (UBSan)
-        # clang's UBSan honours log_path, unlike gcc's, so a report survives a
-        # test that redirects stderr. The abort is what reds the test either way.
         env:
           UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1:log_path=${{ github.workspace }}/sanitizer-logs/ubsan
-          HTTRACK_STDERR_CAPTURE_DIR: ${{ github.workspace }}/sanitizer-stderr
         timeout-minutes: 20
         run: |
           set -euo pipefail
-          mkdir -p "$GITHUB_WORKSPACE/sanitizer-logs" "$GITHUB_WORKSPACE/sanitizer-stderr"
+          mkdir -p "$GITHUB_WORKSPACE/sanitizer-logs"
           make check -j"$CHECK_JOBS"
+          # --disable-shared already skips 30 of the 591, so a later configure
+          # change here could mass-skip and still report green. Nothing else
+          # floors a Linux leg's skip set the way ci-windows-suite.sh does.
+          passed=$(awk '/^# PASS:/ { print $3 }' tests/test-suite.log)
+          test "${passed:-0}" -ge 500 ||
+            { echo "::error::only ${passed:-0} tests ran under UBSan"; exit 1; }
 
       - name: Print the test log on failure
         if: failure()
@@ -477,8 +477,7 @@ jobs:
         if: always()
         run: |
           set -euo pipefail
-          sh tools/ci-sanitizer-report.sh -s "$GITHUB_WORKSPACE/sanitizer-stderr" \
-            "$GITHUB_WORKSPACE/sanitizer-logs" tests
+          sh tools/ci-sanitizer-report.sh "$GITHUB_WORKSPACE/sanitizer-logs" tests
 
       - name: Upload the sanitizer and per-test logs
         if: always()
@@ -487,7 +486,6 @@ jobs:
           name: ubsan-logs
           path: |
             sanitizer-logs/
-            sanitizer-stderr/
             tests/*.log
           if-no-files-found: ignore
 
