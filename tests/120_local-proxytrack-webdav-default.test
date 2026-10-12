@@ -82,6 +82,13 @@ responses=$(count_matching_lines '<response ' <<<"$resp")
 test "$responses" -eq 2 ||
     fail "expected the root and its default document, got $responses responses: $resp"
 
+# A path the cache does not hold, so the enumerator finds nothing. A non-NULL
+# empty block here would have the caller walk a bogus array.
+resp=$(propfind "absent-directory/") ||
+    fail_dump "PROPFIND on a path the cache does not hold did not answer" "$ptlog"
+grep -q '^HTTP/1\.[01] [0-9][0-9][0-9] ' <<<"$resp" ||
+    fail "expected a status line for an absent path: $resp"
+
 # The crash killed the process, so a second request is the liveness proof.
 resp=$(propfind "") ||
     fail_dump "proxytrack died serving the previous PROPFIND" "$ptlog"
