@@ -1,0 +1,175 @@
+# One sanitized build and suite run, called once per runtime by ci.yml. The four
+# legs differed only in the compiler, the flags, which tests they run and which
+# options their runtime takes, so everything else lives here once.
+name: Sanitizer leg
+
+on:
+  # Called by ci.yml, which runs on the pull-request path. No trigger of its own,
+  # so 496_ci-tier2-split.test checks that a caller names it.
+  workflow_call:
+    inputs:
+      slug:
+        description: Names the log files and the artifact.
+        required: true
+        type: string
+      cc:
+        description: The compiler to configure with.
+        required: true
+        type: string
+      cflags:
+        description: CFLAGS, which carry the -fsanitize= selection.
+        required: true
+        type: string
+      ldflags:
+        description: LDFLAGS, which repeat the -fsanitize= selection.
+        required: true
+        type: string
+      configure:
+        description: Extra configure arguments, such as --disable-shared.
+        required: false
+        type: string
+        default: ""
+      packages:
+        description: apt packages beyond the ones every leg needs.
+        required: false
+        type: string
+        default: ""
+      options:
+        description: One NAME=value line per runtime. log_path is appended, and $GITHUB_WORKSPACE expanded.
+        required: false
+        type: string
+        default: ""
+      capture_stderr:
+        description: Keep a copy of each test's stderr? Needed by a runtime that ignores log_path.
+        required: false
+        type: boolean
+        default: true
+      tests:
+        description: Test names and globs to run, relative to tests/. Empty runs the suite.
+        required: false
+        type: string
+        default: ""
+      min_pass:
+        description: Fail under this many passing tests. 0 does not check.
+        required: false
+        type: number
+        default: 0
+
+# Least privilege: the workflow only needs to read the repo.
+permissions:
+  contents: read
+
+# ci.yml and tier2.yml carry the same number for the legs they run themselves.
+# A reusable workflow inherits no env from its caller.
+env:
+  CHECK_JOBS: 16
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        env:
+          EXTRA: ${{ inputs.packages }}
+        run: |
+          set -euo pipefail
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
+          # shellcheck disable=SC2086 # a package list, and the splitting is the point
+          sudo apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev $EXTRA
+
+      - name: Configure
+        env:
+          CC_: ${{ inputs.cc }}
+          CFLAGS_: ${{ inputs.cflags }}
+          LDFLAGS_: ${{ inputs.ldflags }}
+          EXTRA: ${{ inputs.configure }}
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          # shellcheck disable=SC2086 # configure arguments, and the splitting is the point
+          ./configure CC="$CC_" CFLAGS="$CFLAGS_" LDFLAGS="$LDFLAGS_" $EXTRA
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      - name: Set the runtime options
+        env:
+          OPTIONS: ${{ inputs.options }}
+          SLUG: ${{ inputs.slug }}
+          CAPTURE: ${{ inputs.capture_stderr }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/sanitizer-logs" "$GITHUB_WORKSPACE/sanitizer-stderr"
+          # Every runtime writes <slug>.<pid> into one directory, so the collect
+          # step reads them all without being told which ran.
+          while IFS= read -r opt; do
+            test -n "$opt" || continue
+            # A caller writing a path spells it $GITHUB_WORKSPACE, which nothing
+            # would expand here, because the value reaches us as plain text.
+            opt=${opt//\$GITHUB_WORKSPACE/$GITHUB_WORKSPACE}
+            echo "$opt:log_path=$GITHUB_WORKSPACE/sanitizer-logs/$SLUG" >>"$GITHUB_ENV"
+          done <<<"$OPTIONS"
+          if test "$CAPTURE" = true; then
+            echo "HTTRACK_STDERR_CAPTURE_DIR=$GITHUB_WORKSPACE/sanitizer-stderr" >>"$GITHUB_ENV"
+          fi
+
+      - name: Test
+        env:
+          PATTERNS: ${{ inputs.tests }}
+          MIN_PASS: ${{ inputs.min_pass }}
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          if test -n "$PATTERNS"; then
+            tests=
+            for pat in $PATTERNS; do
+              # A pattern that matches nothing would otherwise reach TESTS as
+              # itself, and name a file the runner then fails on for the wrong
+              # reason. Report the pattern instead.
+              matched=
+              for t in tests/$pat; do
+                test -e "$t" || continue
+                tests="$tests ${t##*/}"
+                matched=yes
+              done
+              test -n "$matched" || { echo "::error::no test matches $pat"; exit 1; }
+            done
+            make check -j"$CHECK_JOBS" TESTS="$tests"
+          else
+            make check -j"$CHECK_JOBS"
+          fi
+          # A configure or selection change can mass-skip and still report green,
+          # and only ci-windows-suite.sh floors a skip set anywhere else.
+          if test "${MIN_PASS:-0}" -gt 0; then
+            passed=$(awk '/^# PASS:/ { print $3 }' tests/test-suite.log)
+            test "${passed:-0}" -ge "$MIN_PASS" ||
+              { echo "::error::only ${passed:-0} tests ran, wanted $MIN_PASS"; exit 1; }
+          fi
+
+      - name: Print the test log on failure
+        if: failure()
+        run: cat tests/test-suite.log 2>/dev/null || true
+
+      - name: Collect sanitizer findings
+        if: always()
+        run: |
+          set -euo pipefail
+          sh tools/ci-sanitizer-report.sh -s "$GITHUB_WORKSPACE/sanitizer-stderr" \
+            "$GITHUB_WORKSPACE/sanitizer-logs" tests
+
+      - name: Upload the sanitizer and per-test logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.slug }}-logs
+          path: |
+            sanitizer-logs/
+            sanitizer-stderr/
+            tests/*.log
+          if-no-files-found: ignore

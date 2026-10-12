@@ -350,144 +350,51 @@ jobs:
   # arch-independent and the matrix already covers compile portability).
   sanitize:
     name: sanitize (ASan+UBSan, gcc)
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          submodules: recursive
-
-      - name: Install build dependencies
-        run: |
-          set -euo pipefail
-          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
-          sudo apt-get install -y --no-install-recommends \
-            build-essential autoconf automake libtool autoconf-archive \
-            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
-
-      - name: Configure (sanitized)
-        run: |
-          set -euo pipefail
-          autoreconf -fi
-          ./configure CC=gcc \
-            CFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -g -O1 -fno-omit-frame-pointer" \
-            LDFLAGS="-fsanitize=address,undefined"
-
-      - name: Build
-        run: make -j"$(nproc)"
-
-      - name: Test (sanitized)
-        # Leak detection is on, because nothing else in CI catches a dropped
-        # free. LSan only reports at a normal exit, so a test that kills the
-        # engine still contributes nothing. Every other finding aborts the run.
-        #
-        # Poison fresh allocations with 0xCA and freed blocks with 0xCB (decimal
-        # 202/203) so memory never reads back as accidental zeros: a missing-NUL
-        # fread buffer then runs strlen off into the redzone instead of stopping
-        # at a lucky zero. Distinct bytes tell the two apart in a dump (0xCA =
-        # uninitialized, 0xCB = use-after-free). ASan caps its malloc fill at 4096
-        # bytes by default, so max_malloc_fill_size lifts it to cover large cache
-        # buffers; free_fill flags use-after-free reads.
-        env:
-          ASAN_OPTIONS: detect_leaks=1:abort_on_error=1:halt_on_error=1:strict_string_checks=1:malloc_fill_byte=202:max_malloc_fill_size=2147483647:free_fill_byte=203:max_free_fill_size=2147483647:log_path=${{ github.workspace }}/sanitizer-logs/asan
-          # No log_path here: gcc's UBSan ignores it and writes to stderr, which
-          # most tests redirect away; the harness keeps a copy under the directory
-          # below.
-          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
-          HTTRACK_STDERR_CAPTURE_DIR: ${{ github.workspace }}/sanitizer-stderr
-        timeout-minutes: 20
-        run: |
-          mkdir -p "$GITHUB_WORKSPACE/sanitizer-logs" "$GITHUB_WORKSPACE/sanitizer-stderr"
-          make check -j"$CHECK_JOBS"
-
-      - name: Print the test log on failure
-        if: failure()
-        run: cat tests/test-suite.log 2>/dev/null || true
-
-      - name: Collect sanitizer findings
-        if: always()
-        run: |
-          set -euo pipefail
-          sh tools/ci-sanitizer-report.sh -s "$GITHUB_WORKSPACE/sanitizer-stderr" \
-            "$GITHUB_WORKSPACE/sanitizer-logs" tests
-
-      - name: Upload the sanitizer and per-test logs
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: sanitize-logs
-          path: |
-            sanitizer-logs/
-            sanitizer-stderr/
-            tests/*.log
-          if-no-files-found: ignore
+    uses: ./.github/workflows/sanitizer.yml
+    with:
+      slug: sanitize
+      cc: gcc
+      cflags: -fsanitize=address,undefined -fno-sanitize-recover=all -g -O1 -fno-omit-frame-pointer
+      ldflags: -fsanitize=address,undefined
+      packages: libssl-dev libbrotli-dev libzstd-dev
+      # Leak detection is on, because nothing else in CI catches a dropped free.
+      # LSan only reports at a normal exit, so a test that kills the engine still
+      # contributes nothing. Every other finding aborts the run.
+      #
+      # Poison fresh allocations with 0xCA and freed blocks with 0xCB (decimal
+      # 202/203) so memory never reads back as accidental zeros: a missing-NUL
+      # fread buffer then runs strlen off into the redzone instead of stopping at
+      # a lucky zero. Distinct bytes tell the two apart in a dump (0xCA =
+      # uninitialized, 0xCB = use-after-free). ASan caps its malloc fill at 4096
+      # bytes by default, so max_malloc_fill_size lifts it to cover large cache
+      # buffers; free_fill flags use-after-free reads.
+      #
+      # gcc's UBSan ignores log_path and writes to stderr, which most tests
+      # redirect away, so this is the leg the stderr copies exist for.
+      options: |
+        ASAN_OPTIONS=detect_leaks=1:abort_on_error=1:halt_on_error=1:strict_string_checks=1:malloc_fill_byte=202:max_malloc_fill_size=2147483647:free_fill_byte=203:max_free_fill_size=2147483647
+        UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1
 
   # clang checks more under the same -fsanitize=undefined name than gcc does, so
   # the gcc leg above missed #1946, a null-pointer arithmetic bug that sat in
   # proxytrack for years and reached us from OSS-Fuzz, which builds with clang.
   ubsan:
     name: ubsan (UndefinedBehaviorSanitizer, clang)
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          submodules: recursive
-
-      - name: Install build dependencies
-        run: |
-          set -euo pipefail
-          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
-          sudo apt-get install -y --no-install-recommends \
-            build-essential clang autoconf automake libtool autoconf-archive \
-            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
-
-      - name: Configure (UBSan, static)
-        # Static, because the runtime is not in the .so's. unsigned-integer-overflow
-        # stays out, because it is defined behaviour and the hashes rely on it.
-        run: |
-          set -euo pipefail
-          autoreconf -fi
-          ./configure CC=clang \
-            CFLAGS="-fsanitize=undefined -fno-sanitize-recover=all -g -O1 -fno-omit-frame-pointer" \
-            LDFLAGS="-fsanitize=undefined" \
-            --disable-shared --enable-static
-
-      - name: Build
-        run: make -j"$(nproc)"
-
-      - name: Test (UBSan)
-        env:
-          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1:log_path=${{ github.workspace }}/sanitizer-logs/ubsan
-        timeout-minutes: 20
-        run: |
-          set -euo pipefail
-          mkdir -p "$GITHUB_WORKSPACE/sanitizer-logs"
-          make check -j"$CHECK_JOBS"
-          # --disable-shared already skips 30 of the 591, so a later configure
-          # change here could mass-skip and still report green. Nothing else
-          # floors a Linux leg's skip set the way ci-windows-suite.sh does.
-          passed=$(awk '/^# PASS:/ { print $3 }' tests/test-suite.log)
-          test "${passed:-0}" -ge 500 ||
-            { echo "::error::only ${passed:-0} tests ran under UBSan"; exit 1; }
-
-      - name: Print the test log on failure
-        if: failure()
-        run: cat tests/test-suite.log 2>/dev/null || true
-
-      - name: Collect sanitizer findings
-        if: always()
-        run: |
-          set -euo pipefail
-          sh tools/ci-sanitizer-report.sh "$GITHUB_WORKSPACE/sanitizer-logs" tests
-
-      - name: Upload the sanitizer and per-test logs
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: ubsan-logs
-          path: |
-            sanitizer-logs/
-            tests/*.log
-          if-no-files-found: ignore
+    uses: ./.github/workflows/sanitizer.yml
+    with:
+      slug: ubsan
+      cc: clang
+      # unsigned-integer-overflow stays out, because it is defined behaviour and
+      # the hashes rely on it. Static, because the runtime is not in the .so's.
+      cflags: -fsanitize=undefined -fno-sanitize-recover=all -g -O1 -fno-omit-frame-pointer
+      ldflags: -fsanitize=undefined
+      configure: --disable-shared --enable-static
+      packages: clang libssl-dev libbrotli-dev libzstd-dev
+      options: UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1
+      # clang's UBSan honours log_path, so none of its report reaches stderr.
+      capture_stderr: false
+      # --disable-shared already skips 30 of the 591, so floor what ran.
+      min_pass: 500
 
   # MemorySanitizer catches reads of uninitialized memory (#143's stack-garbage
   # size filter) that ASan/UBSan miss. It flags any byte an uninstrumented lib
@@ -495,67 +402,20 @@ jobs:
   # (--disable-https), no zlib cache tests, static (the runtime is not in .so's).
   msan:
     name: msan (MemorySanitizer, clang)
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          submodules: recursive
-
-      - name: Install build dependencies
-        run: |
-          set -euo pipefail
-          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
-          sudo apt-get install -y --no-install-recommends \
-            build-essential clang autoconf automake libtool autoconf-archive \
-            zlib1g-dev
-
-      - name: Configure (MSan, static, no https)
-        run: |
-          set -euo pipefail
-          autoreconf -fi
-          ./configure CC=clang \
-            CFLAGS="-fsanitize=memory -fsanitize-memory-track-origins=2 -fno-sanitize-recover=all -g -O1 -fno-omit-frame-pointer" \
-            LDFLAGS="-fsanitize=memory" \
-            --disable-https --disable-shared --enable-static
-
-      - name: Build
-        run: make -j"$(nproc)"
-
-      - name: Test (offline self-tests under MSan)
-        env:
-          MSAN_OPTIONS: abort_on_error=1:halt_on_error=1:log_path=${{ github.workspace }}/sanitizer-logs/msan
-          HTTRACK_STDERR_CAPTURE_DIR: ${{ github.workspace }}/sanitizer-stderr
-        timeout-minutes: 20
-        run: |
-          set -euo pipefail
-          mkdir -p "$GITHUB_WORKSPACE/sanitizer-logs" "$GITHUB_WORKSPACE/sanitizer-stderr"
-          # 01_engine-* only; zlib-dependent self-tests are named 01_zlib-* and
-          # skipped here (uninstrumented libz floods MSan with false positives).
-          # shellcheck disable=SC2012 # our own test names, no exotic bytes
-          tests="$(cd tests && ls 01_engine-*.test | tr '\n' ' ')"
-          make check -j"$CHECK_JOBS" TESTS="$tests"
-
-      - name: Print the test log on failure
-        if: failure()
-        run: cat tests/test-suite.log 2>/dev/null || true
-
-      - name: Collect sanitizer findings
-        if: always()
-        run: |
-          set -euo pipefail
-          sh tools/ci-sanitizer-report.sh -s "$GITHUB_WORKSPACE/sanitizer-stderr" \
-            "$GITHUB_WORKSPACE/sanitizer-logs" tests
-
-      - name: Upload the sanitizer and per-test logs
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: msan-logs
-          path: |
-            sanitizer-logs/
-            sanitizer-stderr/
-            tests/*.log
-          if-no-files-found: ignore
+    uses: ./.github/workflows/sanitizer.yml
+    with:
+      slug: msan
+      cc: clang
+      cflags: -fsanitize=memory -fsanitize-memory-track-origins=2 -fno-sanitize-recover=all -g -O1 -fno-omit-frame-pointer
+      ldflags: -fsanitize=memory
+      configure: --disable-https --disable-shared --enable-static
+      # Brotli and zstd are left out as well, because configure would find them
+      # and an uninstrumented library floods MSan with false positives.
+      packages: clang
+      options: MSAN_OPTIONS=abort_on_error=1:halt_on_error=1
+      # The zlib-dependent self-tests are named 01_zlib-*, which this glob leaves
+      # out, because uninstrumented libz floods MSan the same way.
+      tests: 01_engine-*.test
 
   # ThreadSanitizer is the only thing in CI that can see a missing release/acquire
   # pair: on x86-64 the plain-access code and the synchronized code behave the
@@ -566,85 +426,35 @@ jobs:
   # would only cost coverage. Required through ci gate, like every job here.
   tsan:
     name: tsan (ThreadSanitizer, clang)
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          submodules: recursive
-
-      - name: Install build dependencies
-        run: |
-          set -euo pipefail
-          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
-          sudo apt-get install -y --no-install-recommends \
-            build-essential clang autoconf automake libtool autoconf-archive \
-            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
-
-      - name: Configure (TSan, static)
-        run: |
-          set -euo pipefail
-          autoreconf -fi
-          ./configure CC=clang \
-            CFLAGS="-fsanitize=thread -fno-sanitize-recover=all -g -O1 -fno-omit-frame-pointer" \
-            LDFLAGS="-fsanitize=thread" \
-            --disable-shared --enable-static
-
-      - name: Build
-        run: make -j"$(nproc)"
-
-      - name: Test (offline self-tests under TSan)
-        # TSan exits 66 on a report by itself, so the leg reds without halt_on_error.
-        env:
-          TSAN_OPTIONS: allocator_may_return_null=1:suppressions=${{ github.workspace }}/tools/tsan-suppressions.txt:log_path=${{ github.workspace }}/sanitizer-logs/tsan
-          HTTRACK_STDERR_CAPTURE_DIR: ${{ github.workspace }}/sanitizer-stderr
-        timeout-minutes: 20
-        run: |
-          set -euo pipefail
-          mkdir -p "$GITHUB_WORKSPACE/sanitizer-logs" "$GITHUB_WORKSPACE/sanitizer-stderr"
-          # The engine self-tests, where the FTP, DNS and lazy-lock worker threads
-          # run, plus the crawls that run FTP and WebHTTrack threads. Do not widen
-          # this to the allocation-failure self-tests:
-          # allocator_may_return_null lets 439_engine-ucs2 through, but TSan's
-          # allocator still aborts on 237_engine-arrays and 446_engine-backnew.
-          #
-          # 467 and 503 are named because they are the purpose-built FTP thread tests
-          # and do not match the glob, so the leg would otherwise never run the two
-          # tests it exists to guard.
-          tests="467_engine-ftp-worker-tail.test 503_engine-ftp-handoff.test"
-          # FTP crawls, which run worker threads against the stop and abort paths
-          tests="$tests 110_local-ftp-parallel.test 121_local-ftp-nocache-splice.test"
-          tests="$tests 234_local-ftp-maxtime.test 243_local-ftp-deadhost-interrupt.test"
-          tests="$tests 255_local-ftp-sigterm.test 263_local-ftp-stop-window.test"
-          # WebHTTrack, whose server, crawl and watchdog threads share its flags
-          tests="$tests 65_port-siblings.test 289_webhttrack-lifetime.test"
-          tests="$tests 319_webhttrack-addurl.test 371_webhttrack-help-reachable.test"
-          tests="$tests 537_webhttrack-addfilter.test"
-          for t in tests/01_engine-*.test; do
-            tests="$tests ${t##*/}"
-          done
-          make check -j"$CHECK_JOBS" TESTS="$tests"
-
-      - name: Print the test log on failure
-        if: failure()
-        run: cat tests/test-suite.log 2>/dev/null || true
-
-      - name: Collect sanitizer findings
-        if: always()
-        run: |
-          set -euo pipefail
-          sh tools/ci-sanitizer-report.sh -s "$GITHUB_WORKSPACE/sanitizer-stderr" \
-            "$GITHUB_WORKSPACE/sanitizer-logs" tests
-
-      - name: Upload the sanitizer and per-test logs
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: tsan-logs
-          path: |
-            sanitizer-logs/
-            sanitizer-stderr/
-            tests/*.log
-          if-no-files-found: ignore
+    uses: ./.github/workflows/sanitizer.yml
+    with:
+      slug: tsan
+      cc: clang
+      cflags: -fsanitize=thread -fno-sanitize-recover=all -g -O1 -fno-omit-frame-pointer
+      ldflags: -fsanitize=thread
+      configure: --disable-shared --enable-static
+      packages: clang libssl-dev libbrotli-dev libzstd-dev
+      # TSan exits 66 on a report by itself, so the leg reds without halt_on_error.
+      options: TSAN_OPTIONS=allocator_may_return_null=1:suppressions=$GITHUB_WORKSPACE/tools/tsan-suppressions.txt
+      # The engine self-tests, where the FTP, DNS and lazy-lock worker threads
+      # run, plus the crawls that run FTP and WebHTTrack threads. Do not widen
+      # this to the allocation-failure self-tests: allocator_may_return_null lets
+      # 439_engine-ucs2 through, but TSan's allocator still aborts on
+      # 237_engine-arrays and 446_engine-backnew.
+      #
+      # 467 and 503 are named because they are the purpose-built FTP thread tests
+      # and do not match the glob, so the leg would otherwise never run the two
+      # tests it exists to guard. The rest are the FTP crawls that drive worker
+      # threads against the stop and abort paths, and WebHTTrack, whose server,
+      # crawl and watchdog threads share its flags.
+      tests: >-
+        467_engine-ftp-worker-tail.test 503_engine-ftp-handoff.test
+        110_local-ftp-parallel.test 121_local-ftp-nocache-splice.test
+        234_local-ftp-maxtime.test 243_local-ftp-deadhost-interrupt.test
+        255_local-ftp-sigterm.test 263_local-ftp-stop-window.test
+        65_port-siblings.test 289_webhttrack-lifetime.test
+        319_webhttrack-addurl.test 371_webhttrack-help-reachable.test
+        537_webhttrack-addfilter.test 01_engine-*.test
 
   # libFuzzer smoke: build the fuzz/ harnesses over the pure hostile-input
   # parsers and replay each seed corpus under ASan+UBSan+LeakSanitizer. Replay

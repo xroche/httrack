@@ -166,23 +166,78 @@ test -z "$bad" || fail "required contexts nothing emits on a pull request:$bad
 A required check that never reports blocks every open PR, not only this one.
 Keep the job where it is, or drop the context from the ruleset first."
 
-# Second invariant: tier2.yml owns the schedule for the legs it absorbed, so a
-# workflow reachable only by workflow_call has to be named there.
+# Second invariant: a workflow reachable only by workflow_call has to be named
+# by one that actually runs. tier2.yml schedules the legs it absorbed, and
+# ci.yml calls sanitizer.yml on the pull-request path.
+triggered() { # triggered <workflow>: does it run without a human pressing a button?
+    command grep -Eq '^  (schedule|push|pull_request|release|workflow_run):' "$1"
+}
+
 orphans=
 for wf in "$wfdir"/*.yml "$wfdir"/*.yaml; do
     test -r "$wf" || continue # the .yaml glob matches nothing today
     base=${wf##*/}
-    test "$base" != tier2.yml || continue
     # Callable, and with no trigger of its own that would ever fire.
     command grep -q '^  workflow_call:' "$wf" || continue
-    command grep -Eq '^  (schedule|push|pull_request|release|workflow_run):' "$wf" && continue
-    # A uses: line, not any mention: a commented-out call runs nothing.
-    command grep -Eq "^ *uses: \./\.github/workflows/$base\$" "$wfdir/tier2.yml" ||
-        orphans="$orphans $base"
+    triggered "$wf" && continue
+    called=
+    for caller in "$wfdir"/*.yml; do
+        test "$caller" != "$wf" || continue
+        triggered "$caller" || continue
+        # A uses: line, not any mention: a commented-out call runs nothing.
+        command grep -Eq "^ *uses: \./\.github/workflows/$base\$" "$caller" || continue
+        called=yes
+        break
+    done
+    test -n "$called" || orphans="$orphans $base"
 done
 
-test -z "$orphans" || fail "callable workflows nothing schedules and tier2.yml does not call:$orphans
+test -z "$orphans" || fail "callable workflows nothing schedules and nothing calls:$orphans
 A workflow with neither a trigger nor a caller never runs again, and says nothing about it."
+
+# The mutant this exists to catch: the only caller loses its uses: line, which
+# leaves the callable workflow running nowhere and saying nothing about it.
+orphan_gaps() { # orphan_gaps <dir>: prints the orphans it finds
+    local d=$1 wf base caller out=
+    for wf in "$d"/*.yml; do
+        base=${wf##*/}
+        command grep -q '^  workflow_call:' "$wf" || continue
+        triggered "$wf" && continue
+        for caller in "$d"/*.yml; do
+            test "$caller" != "$wf" || continue
+            triggered "$caller" || continue
+            command grep -Eq "^ *uses: \./\.github/workflows/$base\$" "$caller" && continue 2
+        done
+        out="$out $base"
+    done
+    printf '%s' "$out"
+}
+
+# Derived rather than named, so renaming a workflow cannot quietly disarm it.
+victim='' victim_caller=''
+for wf in "$wfdir"/*.yml; do
+    base=${wf##*/}
+    command grep -q '^  workflow_call:' "$wf" || continue
+    triggered "$wf" && continue
+    for caller in "$wfdir"/*.yml; do
+        test "$caller" != "$wf" || continue
+        triggered "$caller" || continue
+        command grep -Eq "^ *uses: \./\.github/workflows/$base\$" "$caller" || continue
+        victim=$base victim_caller=${caller##*/}
+        break 2
+    done
+done
+test -n "$victim" || fail "no callable workflow has a caller, so the mutant below proves nothing"
+
+mutdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_orphan.XXXXXX")
+cleanup_push rm -rf "$mutdir"
+cp "$wfdir"/*.yml "$mutdir"/
+command grep -v "^ *uses: \./\.github/workflows/$victim\$" "$wfdir/$victim_caller" \
+    >"$mutdir/$victim_caller"
+cmp -s "$wfdir/$victim_caller" "$mutdir/$victim_caller" &&
+    fail "dropping $victim's caller from $victim_caller changed nothing, so it proves nothing"
+test -n "$(orphan_gaps "$mutdir")" ||
+    fail "$victim left with no caller went unreported"
 
 # Third invariant: each gate has to need every other job in its workflow. A job
 # it does not name can red while the gate reports green, which is worse than
