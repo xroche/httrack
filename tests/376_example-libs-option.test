@@ -18,6 +18,7 @@ case "$HTS_OS" in
 Linux | Darwin) ;;
 *) skip "the plugin install layout is checked on Linux and macOS only" ;;
 esac
+skip_if_static "the example plugins are shared objects"
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/examplelibs.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "${work}"
