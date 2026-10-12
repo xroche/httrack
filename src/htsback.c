@@ -301,14 +301,11 @@ int back_connect_fallback_due(int addr_index, int addr_count, int elapsed,
 
   if (addr_index + 1 >= addr_count) // last (or only) candidate: no fallback
     return 0;
-  if (timeout <= 1) // no timeout management, or no room for a second connect
+  if (timeout <= 0) // no timeout management: never force it
     return 0;
-  /* Half the slot's budget, so the next address gets the other half. Spending
-     all of it made this fall due in the same pass as the timeout that abandons
-     the slot, and Linux then fell back where FreeBSD timed out (#1942). */
-  deadline = (timeout + 1) / 2;
-  if (deadline > HTS_CONNECT_FALLBACK_TIMEOUT)
-    deadline = HTS_CONNECT_FALLBACK_TIMEOUT;
+  deadline = (timeout < HTS_CONNECT_FALLBACK_TIMEOUT)
+                 ? timeout
+                 : HTS_CONNECT_FALLBACK_TIMEOUT;
   return elapsed >= deadline;
 }
 
@@ -3738,8 +3735,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
           cf->addr_count = hts_dns_resolve_all(opt, back[i].url_adr, scratch,
                                                HTS_MAXADDRNUM, NULL);
-          /* The slot's own timeout runs from here too, so the fallback cannot
-             fall due after the timeout that abandons the slot (#1942). */
+          /* The slot's own timeout reads this same base. A later one makes the
+             fallback fall due after the timeout has abandoned the slot, which
+             is how a short timeout lost it on FreeBSD (#1942). */
           cf->connect_start = back[i].timeout_refresh;
         }
 
@@ -5428,8 +5426,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
         if (back_is_live(back_status(&back[i]))) { // receiving, connecting, ..
           if (back[i].timeout > 0) {
-            // a stuck connect with a fallback address: retry the next one well
-            // before the full timeout (dead IPv6 on a dual-stack host, ...)
+            // a stuck connect with a fallback address: retry the next one
+            // (dead IPv6 on a dual-stack host, ...). Checked before the
+            // timeout below, which is what decides the tie at a short timeout.
             if (back_status(&back[i]) == STATUS_CONNECTING) {
               const hts_connect_fallback *const cf =
                   &sback->connect_fallback[i];
