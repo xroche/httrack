@@ -46,8 +46,6 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsurlport.h"
 
-int cmdl_opt(char *s);
-
 /* Read the digits glued after the option letter at *com (as in -c8) into *out
    if in [min, max], and move *com onto the last digit, refused or not. Unlike
    hts_scan_llint(), it skips no white space and stops on the last digit, not

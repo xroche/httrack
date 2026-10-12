@@ -442,6 +442,12 @@ HTSEXT_API hts_boolean hts_host_alias_rule_ok(const char *rule);
    exact, as the expander's is. @return HTS_TRUE if known. */
 HTSEXT_API hts_boolean hts_footer_field_ok(const char *name);
 
+/** Would the engine read @p arg as an option cluster rather than as a scan
+   rule? A '-' token is a rule when it holds a '/', a '*', or a '.' with no '%'
+    anywhere in it, so a front end can tell which "-..." it is about to emit.
+    @return HTS_FALSE for NULL or a token not starting with '-'. */
+HTSEXT_API hts_boolean hts_rule_would_be_read_as_opt(const char *arg);
+
 /** Return the engine's last error message, empty when there was none. The
     string lives inside @p opt, so never free it and read it only while @p opt
     lives. @p opt must not be NULL. */

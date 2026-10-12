@@ -1,0 +1,22 @@
+#!/bin/bash
+#
+# hts_rule_would_be_read_as_opt(): which '-' tokens the engine reads as options.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+ruleopt() { selftest_queue "$2" ruleopt "$1"; }
+
+ruleopt -c8 option
+ruleopt -%P option
+ruleopt - option
+ruleopt -%c0.5 option
+# The '%' exception covers the whole token, not only a -% option.
+ruleopt -www.test.com%2Fa.html option
+ruleopt -www.a.com other
+ruleopt -%P/x other
+ruleopt -*cgi-bin other
+ruleopt '-%*x' other
+ruleopt c8 other
+selftest_run_queued
