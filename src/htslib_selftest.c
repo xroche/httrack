@@ -1042,6 +1042,29 @@ static int array_growth_selftests(void) {
       TypedArrayCapa(w) > ((size_t) -1) / sizeof(arrays_wide_t))
     err = 1;
 
+  /* Asking for exactly the room left must not reach the allocator, which on a
+     borrowed store aborts. That abort is the assertion, because no field
+     EnsureRoom writes differs afterwards (OSS-Fuzz 5622506602692608). */
+  {
+    char borrowed[64];
+    TypedArray(char) b = EMPTY_TYPED_ARRAY;
+
+    TypedArrayPtr(b) = borrowed;
+    TypedArrayCapa(b) = sizeof(borrowed);
+    TypedArraySize(b) = 10;
+    TypedArrayEnsureRoom(b, TypedArrayRoom(b));
+  } /* No TypedArrayFree: the store is not the allocator's. */
+
+  /* Walk a zero-count append on an array that never grew, which must not take
+     the address of its missing store. Clang's UBSan is the only oracle for it,
+     so this case asserts nothing and no leg of the suite can go red on it. */
+  {
+    TypedArray(char) z = EMPTY_TYPED_ARRAY;
+
+    TypedArrayAppend(z, "abc", 0);
+    TypedArrayFree(z);
+  }
+
   /* Many small growths, checking the payload survives every reallocation. */
   for (i = 0; i < 5000; i++) {
     TypedArrayAdd(a, (char) ('a' + (i % 26)));
