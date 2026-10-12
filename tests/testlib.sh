@@ -92,6 +92,10 @@ skip_on_hurd() { ! is_hurd || skip "GNU/Hurd: $*"; }
 # the cause is unproven.
 skip_crash_on_hurd() { skip_on_hurd "a deliberate crash has been followed by an ext2fs wedge"; }
 
+# A --disable-shared tree builds no library and no plugin, so libhttrack.so
+# being absent answers for every test that looks for one.
+skip_if_static() { test -r "${HTTRACK_SHLIB:-}" || skip "static build: $*"; }
+
 # Does RLIMIT_FSIZE actually stop a write here? GNU/Hurd accepts the limit and
 # writes past it anyway, so a test that needs a refused write has to ask rather
 # than assume. Measured on the file, not on the exit status: a host that

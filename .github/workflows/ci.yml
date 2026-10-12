@@ -421,6 +421,76 @@ jobs:
             tests/*.log
           if-no-files-found: ignore
 
+  # clang's UndefinedBehaviorSanitizer, because gcc's has no check for several
+  # classes gcc shares the -fsanitize=undefined name with. Pointer arithmetic on
+  # a null pointer is the one that cost us: #1946 sat in proxytrack for years
+  # while the gcc leg above passed, and it reached us as an OSS-Fuzz report
+  # because OSS-Fuzz builds with clang. Static, since the runtime is not in the
+  # .so's; the three tests that assert an installed shared object skip there.
+  ubsan:
+    name: ubsan (UndefinedBehaviorSanitizer, clang)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
+          sudo apt-get install -y --no-install-recommends \
+            build-essential clang autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
+
+      - name: Configure (UBSan, static)
+        # No unsigned-integer-overflow: it is defined behaviour, and the hashes
+        # and mixers rely on it. The fuzz leg carries it with an ignorelist.
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          ./configure CC=clang \
+            CFLAGS="-fsanitize=undefined -fno-sanitize-recover=all -g -O1 -fno-omit-frame-pointer" \
+            LDFLAGS="-fsanitize=undefined" \
+            --disable-shared --enable-static
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      - name: Test (UBSan)
+        # clang's UBSan honours log_path, unlike gcc's, so a report survives a
+        # test that redirects stderr. The abort is what reds the test either way.
+        env:
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1:log_path=${{ github.workspace }}/sanitizer-logs/ubsan
+          HTTRACK_STDERR_CAPTURE_DIR: ${{ github.workspace }}/sanitizer-stderr
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/sanitizer-logs" "$GITHUB_WORKSPACE/sanitizer-stderr"
+          make check -j"$CHECK_JOBS"
+
+      - name: Print the test log on failure
+        if: failure()
+        run: cat tests/test-suite.log 2>/dev/null || true
+
+      - name: Collect sanitizer findings
+        if: always()
+        run: |
+          set -euo pipefail
+          sh tools/ci-sanitizer-report.sh -s "$GITHUB_WORKSPACE/sanitizer-stderr" \
+            "$GITHUB_WORKSPACE/sanitizer-logs" tests
+
+      - name: Upload the sanitizer and per-test logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ubsan-logs
+          path: |
+            sanitizer-logs/
+            sanitizer-stderr/
+            tests/*.log
+          if-no-files-found: ignore
+
   # MemorySanitizer catches reads of uninitialized memory (#143's stack-garbage
   # size filter) that ASan/UBSan miss. It flags any byte an uninstrumented lib
   # wrote, so the job stays in our own code: offline self-tests only, no openssl
@@ -1086,6 +1156,7 @@ jobs:
       - webhttrack-linux
       - linux-i386
       - sanitize
+      - ubsan
       - msan
       - tsan
       - fuzz

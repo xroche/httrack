@@ -11,6 +11,7 @@ set -euo pipefail
 
 target_is_linux ||
     skip "the stop driver interposes through LD_PRELOAD, which is Linux-only here"
+skip_if_static "the stop driver is an LD_PRELOAD shared object"
 # Anything else missing is a build problem, not a skip, or the test passes
 # vacuously.
 test -r "${STOPRESUME_LIB:-}" ||
