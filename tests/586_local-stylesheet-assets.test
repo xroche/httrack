@@ -1,0 +1,69 @@
+#!/bin/bash
+# #139: the fonts and images a stylesheet names. Two separate losses, so two
+# separate assertions: the sheet arrives as a near link and its assets used to
+# be refused one level too deep, and the // of the second url's scheme used to
+# read as a comment and kill the rest of the line.
+set -eu
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_586.XXXXXX") || exit 1
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+: "${top_srcdir:=..}"
+tsv="$top_srcdir/winprofile-keys.tsv"
+test -r "$tsv" || {
+    echo "winprofile-keys.tsv is absent (dist tarball?)" >&2
+    exit 77
+}
+rules=$(awk -F'\t' '$1 == "WildCardFilters" { print $9 }' "$tsv")
+test -n "$rules" || fail "no WildCardFilters row in winprofile-keys.tsv"
+
+mkdir -p "${tmpdir}/aroot" "${tmpdir}/broot"
+blog="${tmpdir}/b-server.log"
+: >"$blog"
+local_server_start --root "${tmpdir}/broot" --log "$blog"
+bport=$SRV_PORT
+alog="${tmpdir}/a-server.log"
+: >"$alog"
+local_server_start --root "${tmpdir}/aroot" --log "$alog"
+aport=$SRV_PORT
+
+# /webfont/css has no extension, so no default rule names it and only --near
+# brings it in, which is how the reporter's Google Fonts link behaved.
+cat >"${tmpdir}/aroot/index.html" <<HTML
+<html><head>
+<link rel="stylesheet" href="http://127.0.0.1:${bport}/webfont/css">
+<script src="http://127.0.0.1:${bport}/webfont/boot.js"></script>
+</head><body>page</body></html>
+HTML
+
+require_httrack
+
+# shellcheck disable=SC2086 # one argument per rule, as the GUI splits them
+local_crawl --log "${tmpdir}/crawl.log" "http://127.0.0.1:${aport}/index.html" \
+    -O "${tmpdir}/out" --quiet --max-time=120 --timeout=30 --robots=0 --near \
+    $rules || fail "the crawl failed"
+
+out="${tmpdir}/out/127.0.0.1_${bport}/webfont"
+test -s "${out}/face.ttf" ||
+    fail "the stylesheet's font was not mirrored"
+test -s "${out}/bg.webp" ||
+    fail "the url() after the first one on the line was not mirrored"
+! test -e "${out}/hidden.webp" ||
+    fail "a url() inside a /* */ comment was mirrored"
+test -s "${out}/jsseen.webp" ||
+    fail "a plain javascript URL was not mirrored"
+! test -e "${out}/jshidden.webp" ||
+    fail "a URL behind a // comment in javascript was mirrored"
+
+sheet=$(ls "${out}"/css* 2>/dev/null) ||
+    fail "the stylesheet itself was not mirrored"
+command grep -q 'url(face.ttf)' "$sheet" ||
+    fail "the mirrored stylesheet still points at the live font"
+command grep -q 'url(bg.webp)' "$sheet" ||
+    fail "the mirrored stylesheet still points at the live image"

@@ -223,6 +223,7 @@ typedef enum {
    can drive it without capturing them by lexical scope. */
 typedef struct {
   const int *inscript;             /* nonzero while inside a script body */
+  const int *incss;                /* nonzero while that body is CSS */
   const signed char (*table)[257]; /* [INSCRIPT_NSTATES][257] transitions */
   INSCRIPT *pos;                   /* current state */
   const char **html;               /* parse cursor */
@@ -236,8 +237,24 @@ static void hts_automate_lookup(const script_automate *aut) {
       next = aut->table[*aut->pos][INSCRIPT_DEFAULT];
     }
     assertf(next >= 0 && next < INSCRIPT_NSTATES);
+    /* CSS has no // comment, and the one in http:// would otherwise kill
+       the rest of the line, url() calls included (#139). */
+    if (next == INSCRIPT_SLASHSLASH && *aut->incss) {
+      next = INSCRIPT_SLASH;
+    }
     *aut->pos = (INSCRIPT) next;
   }
+}
+
+/* The (tag, attribute) pair the wizard matches an embedded asset by. A
+   stylesheet's url() carries no tag, so it gets a stand-in one (#139). */
+static htspair_t hts_link_tag_pair(const char *tag, const char *attr,
+                                   hts_boolean in_stylesheet) {
+  htspair_t pair;
+
+  pair.tag = tag != NULL ? tag : (in_stylesheet ? "style" : NULL);
+  pair.attr = tag != NULL ? attr : (in_stylesheet ? "url" : NULL);
+  return pair;
 }
 
 /* Contract in htsparse.h. */
@@ -975,7 +992,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       inscript_state[INSCRIPT_COMMENT2]['*'] = INSCRIPT_COMMENT2;
       inscript_state[INSCRIPT_ANTISLASH_IN_QUOTE][INSCRIPT_DEFAULT] = INSCRIPT_INQUOTE; /* #8: escape in '' */
       inscript_state[INSCRIPT_ANTISLASH_IN_QUOTE2][INSCRIPT_DEFAULT] = INSCRIPT_INQUOTE2;       /* #9: escape in "" */
-      const script_automate saut = {&inscript, inscript_state,
+      const script_automate saut = {&inscript, &incss, inscript_state,
                                     &inscript_state_pos, &html};
 
       /* Primary list or URLs */
@@ -2831,13 +2848,14 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 if ((p_type != 2) && (p_type != -2)) {  // tester autorisations?
                   if (!p_nocatch) {
                     if (afs.af.adr[0] != '\0') {
+                      const htspair_t pair = hts_link_tag_pair(
+                          intag_name, tag_attr_start, inscript_locked && incss);
+
                       hts_log_print(opt, LOG_DEBUG,
                                     "wizard link test at %s%s..", afs.af.adr, afs.af.fil);
-                      forbidden_url =
-                        hts_acceptlink(opt, ptr, afs.af.adr, afs.af.fil,
-                                       intag_name ? intag_name : NULL,
-                                       intag_name ? tag_attr_start : NULL,
-                                       &set_prio_to, &just_test_it);
+                      forbidden_url = hts_acceptlink(
+                          opt, ptr, afs.af.adr, afs.af.fil, pair.tag, pair.attr,
+                          &set_prio_to, &just_test_it);
                       hts_log_print(opt, LOG_DEBUG,
                                     "result for wizard link test: %d",
                                     forbidden_url);
@@ -2893,15 +2911,16 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         if ((ptr > 0) && (p_type != 2) && (p_type != -2)) {     // tester autorisations?
                           if (!p_nocatch) {
                             if (afs.af.adr[0] != '\0') {
+                              const htspair_t pair =
+                                  hts_link_tag_pair(intag_name, tag_attr_start,
+                                                    inscript_locked && incss);
+
                               hts_log_print(opt, LOG_DEBUG,
                                             "wizard moved link retest at %s%s..",
                                             afs.af.adr, afs.af.fil);
-                              forbidden_url =
-                                hts_acceptlink(opt, ptr, afs.af.adr, afs.af.fil,
-                                               intag_name ? intag_name : NULL,
-                                               intag_name ? tag_attr_start :
-                                               NULL, &set_prio_to,
-                                               &just_test_it);
+                              forbidden_url = hts_acceptlink(
+                                  opt, ptr, afs.af.adr, afs.af.fil, pair.tag,
+                                  pair.attr, &set_prio_to, &just_test_it);
                               hts_log_print(opt, LOG_DEBUG,
                                             "result for wizard moved link retest: %d",
                                             forbidden_url);

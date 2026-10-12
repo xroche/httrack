@@ -59,6 +59,11 @@ htspair_t hts_detect_embed[] = {
   {NULL, NULL}
 };
 
+/* A stylesheet's url(), which the parser names by this pair for want of a tag:
+   without it a near-linked sheet's font is dropped one level too deep (#139) */
+static const htspair_t hts_detect_embed_css[] = {{"style", "url"},
+                                                 {NULL, NULL}};
+
 /* HTML5 media siblings of <img src>: same near-link treatment (#451) */
 static const htspair_t hts_detect_embed_html5[] = {
     {"source", "src"}, {"source", "srcset"},   {"track", "src"},
@@ -496,7 +501,8 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
   /* Built-in known tags (<img src=..>, ..) */
   if (forbidden_url != 0 && opt->nearlink && tag != NULL && attribute != NULL) {
     if (is_embed_pair(hts_detect_embed, tag, attribute) ||
-        is_embed_pair(hts_detect_embed_html5, tag, attribute)) {
+        is_embed_pair(hts_detect_embed_html5, tag, attribute) ||
+        is_embed_pair(hts_detect_embed_css, tag, attribute)) {
       embedded_triggered = 1;
     }
   }
