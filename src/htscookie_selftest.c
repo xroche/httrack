@@ -924,7 +924,7 @@ static const char *legacy_cookie_get(char *buffer, const char *cookie_base,
 }
 
 /* Both getters run on canary-filled buffers, which must come out equal. */
-static void cookiediff_one(querydiff_stats *st, const char *line, char *o,
+static void cookiediff_one(parsediff_stats *st, const char *line, char *o,
                            char *n) {
   int param;
 
@@ -939,7 +939,7 @@ static void cookiediff_one(querydiff_stats *st, const char *line, char *o,
     rn = cookie_get(n, line, param);
     if ((ro == o) != (rn == n) || memcmp(o, n, COOKIEDIFF_SIZE) != 0) {
       snprintf(arg, sizeof(arg), "%d", param);
-      querydiff_fail(st, "cookie_get", line, arg, ro, rn);
+      parsediff_fail(st, "cookie_get", line, arg, ro, rn);
     }
   }
 }
@@ -972,7 +972,7 @@ static int st_cookiespandiff(httrackp *opt, int argc, char **argv) {
                                          " ", "\t\t", "/",  "x"};
   /* A field one byte under the 8192-byte buffer still fits. */
   static const size_t lengths[] = {8190, 8191};
-  querydiff_stats st = {0, 0, 0, 0};
+  parsediff_stats st = {0, 0};
   char *o = malloct(COOKIEDIFF_SIZE);
   char *n = malloct(COOKIEDIFF_SIZE);
   uint32_t seed = 547;
@@ -986,7 +986,7 @@ static int st_cookiespandiff(httrackp *opt, int argc, char **argv) {
   for (i = 0; hand[i] != NULL; i++)
     cookiediff_one(&st, hand[i], o, n);
   for (i = 0; i < sizeof(lengths) / sizeof(lengths[0]); i++) {
-    char *run = querydiff_run('x', lengths[i]);
+    char *run = parsediff_run('x', lengths[i]);
     String line = STRING_EMPTY;
 
     cookiediff_one(&st, run, o, n);
@@ -1000,7 +1000,7 @@ static int st_cookiespandiff(httrackp *opt, int argc, char **argv) {
   for (r = 0; r < 4000; r++) {
     String line = STRING_EMPTY;
 
-    querydiff_random(&line, &seed, alphabet,
+    parsediff_random(&line, &seed, alphabet,
                      sizeof(alphabet) / sizeof(alphabet[0]), 16);
     cookiediff_one(&st, StringBuff(line) != NULL ? StringBuff(line) : "", o, n);
     StringFree(line);

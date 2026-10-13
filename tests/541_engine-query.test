@@ -1,0 +1,52 @@
+#!/bin/bash
+#
+# This test covers what the shared query iterator reads and what %[param]
+# looks up with it.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# Every field is read, empty ones too, and the key ends at the first '='. A '|'
+# marks the end of the key.
+selftest_queue "[a]" querynext a
+selftest_queue "[a][]" querynext "a&"
+selftest_queue "[][]" querynext "&"
+selftest_queue "[a][b|c][][d|e=f]" querynext "a&b=c&&d=e=f"
+selftest_queue "[|v]" querynext "=v"
+selftest_queue "[k|]" querynext "k="
+selftest_queue "[x|1?id=5]" querynext "x=1?id=5"
+selftest_queue "[%41|%26][+]" querynext "%41=%26&+"
+
+# %[param] wants a field with an '=' whose key is exactly the name, and takes
+# the first such field. A found value prints as [value], a miss as (none).
+selftest_queue "(none)" queryparam "/p" id
+selftest_queue "(none)" queryparam "/p?id&x=1" id
+selftest_queue "[1]" queryparam "/p?id=1&id=2" id
+selftest_queue "[v]" queryparam "/p?=v" "" # an empty name matches an empty key
+
+# A second '?' stays inside the value and never starts a field. A name holding
+# '=' or '&' never matches, because no key can hold either.
+selftest_queue "[5?id=6]" queryparam "/p?id=5?id=6" id
+# 'xd' is as long as 'id', so a key matched by length alone would show.
+selftest_queue "(none)" queryparam "/p?xd=1?id=5" id
+selftest_queue "(none)" queryparam "/p?a=b=5" "a=b"
+selftest_queue "(none)" queryparam "/p?a&b=3" "a&b"
+
+# The value is clipped to the buffer, whose size counts the NUL, and a one-byte
+# buffer still finds the field.
+selftest_queue "[123]" queryparam "/p?id=12345" id 4
+selftest_queue "[]" queryparam "/p?id=12345" id 1
+
+# A longer value comes back whole up to the buffer, so a cap hidden inside the
+# lookup would show.
+selftest_queue "[$(repeat_chars 255 x)]" queryparam "/p?id=$(repeat_chars 300 x)" id
+
+# Every buffer size must stay inside its buffer, terminate it, and read the
+# field the widest one reads. The count is exact, so a corpus that shrinks
+# fails here.
+selftest_queue_lines "querysweep: 160336 cases, 0 failures
+querysweep: OK" querysweep
+
+selftest_run_queued

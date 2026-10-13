@@ -814,6 +814,15 @@ static int st_stripquery(httrackp *opt, int argc, char **argv) {
   assertf(strcmp(fil_normalized_filtered("/p?a=1&b=2", dest, "*"), "/p") == 0);
   assertf(strcmp(fil_normalized_filtered("/p?utm=1", dest, "utm"), "/p") == 0);
 
+  /* an empty field is not a param, so a query holding only one keeps its '?' */
+  assertf(strcmp(fil_normalized_filtered("/d//p?", dest, "a"), "/d/p?") == 0);
+  /* the kept query must re-normalize to itself, or two spellings of one URL
+     stop deduping */
+  assertf(strcmp(fil_normalized_filtered("/p?a=1&&b=2", dest, "a"),
+                 "/p?&b=2") == 0);
+  assertf(strcmp(fil_normalized_filtered("/p?b=2&", dest, "z"), "/p?&b=2") ==
+          0);
+
   /* degenerate forms a=, b, c== (key 'c'); strip c keeps a= and b */
   assertf(strcmp(fil_normalized_filtered("/p?a=&b&c==", dest, "c"),
                  "/p?a=&b") == 0);

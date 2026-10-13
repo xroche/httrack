@@ -2463,7 +2463,7 @@ static void legacy_http_header_value(const char *hdr, const char *name,
   }
 }
 
-static void warcdiff_one(querydiff_stats *st, const char *hdr) {
+static void warcdiff_one(parsediff_stats *st, const char *hdr) {
   static const long long cls[] = {-1, 0, 42};
   static const char *const names[] = {"Content-Type", "content-type",
                                       "Content-Length", "X", ""};
@@ -2481,7 +2481,7 @@ static void warcdiff_one(querydiff_stats *st, const char *hdr) {
     if (fo != (n != NULL) ||
         (n != NULL &&
          (strlen(n) != StringLength(o) || memcmp(n, ob, StringLength(o)) != 0)))
-      querydiff_fail(st, "normalize_http_headers", hdr != NULL ? hdr : "(null)",
+      parsediff_fail(st, "normalize_http_headers", hdr != NULL ? hdr : "(null)",
                      "", ob, n != NULL ? n : "(null)");
     StringFree(o);
     freet(n);
@@ -2496,7 +2496,7 @@ static void warcdiff_one(querydiff_stats *st, const char *hdr) {
       legacy_http_header_value(hdr, names[i], o, sizes[j]);
       warc_http_header_value(hdr, names[i], n, sizes[j]);
       if (memcmp(o, n, sizeof(o)) != 0)
-        querydiff_fail(st, "http_header_value", hdr != NULL ? hdr : "(null)",
+        parsediff_fail(st, "http_header_value", hdr != NULL ? hdr : "(null)",
                        names[i], o, n);
     }
   }
@@ -2543,7 +2543,7 @@ static int st_warcspandiff(httrackp *opt, int argc, char **argv) {
                                          "content-type"};
   /* These header values sit around the 256-byte output buffer. */
   static const size_t lengths[] = {254, 255, 256, 257};
-  querydiff_stats st = {0, 0, 0, 0};
+  parsediff_stats st = {0, 0};
   uint32_t seed = 547;
   size_t i;
   int r;
@@ -2564,7 +2564,7 @@ static int st_warcspandiff(httrackp *opt, int argc, char **argv) {
   for (i = 0; hand[i] != NULL; i++)
     warcdiff_one(&st, hand[i]);
   for (i = 0; i < sizeof(lengths) / sizeof(lengths[0]); i++) {
-    char *run = querydiff_run('x', lengths[i]);
+    char *run = parsediff_run('x', lengths[i]);
     String hdr = STRING_EMPTY;
 
     StringCat(hdr, "HTTP/1.1 200 OK\r\nContent-Type: ");
@@ -2578,7 +2578,7 @@ static int st_warcspandiff(httrackp *opt, int argc, char **argv) {
   for (r = 0; r < 6000; r++) {
     String hdr = STRING_EMPTY;
 
-    querydiff_random(&hdr, &seed, alphabet,
+    parsediff_random(&hdr, &seed, alphabet,
                      sizeof(alphabet) / sizeof(alphabet[0]), 20);
     warcdiff_one(&st, StringBuff(hdr) != NULL ? StringBuff(hdr) : "");
     StringFree(hdr);

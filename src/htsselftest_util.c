@@ -183,7 +183,7 @@ too_long:
   return 0;
 }
 
-void querydiff_fail(querydiff_stats *st, const char *site, const char *in,
+void parsediff_fail(parsediff_stats *st, const char *site, const char *in,
                     const char *arg, const char *old, const char *cur) {
   st->failures++;
   if (st->failures <= 20) {
@@ -194,7 +194,7 @@ void querydiff_fail(querydiff_stats *st, const char *site, const char *in,
   }
 }
 
-char *querydiff_run(char c, size_t n) {
+char *parsediff_run(char c, size_t n) {
   char *s = malloct(n + 1);
 
   assertf(s != NULL);
@@ -203,7 +203,7 @@ char *querydiff_run(char c, size_t n) {
   return s;
 }
 
-void querydiff_random(String *out, uint32_t *seed, const char *const *alphabet,
+void parsediff_random(String *out, uint32_t *seed, const char *const *alphabet,
                       size_t nalpha, int maxtok) {
   const int ntok =
       (int) ((*seed = *seed * 1103515245u + 12345u) >> 16) % maxtok;
