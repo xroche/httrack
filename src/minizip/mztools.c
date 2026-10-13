@@ -111,7 +111,7 @@ extern int ZEXPORT unzRepair(const char* file, const char* fileOut, const char* 
 
         /* Data */
         {
-          /* Copy in chunks: the size is untrusted, so never allocate it. */
+          /* Copy in chunks because the size is untrusted. */
           uLong dataSize = cpsize;
           char data[8192];
           if (dataSize == 0) {
@@ -242,7 +242,10 @@ extern int ZEXPORT unzRepair(const char* file, const char* fileOut, const char* 
     }
 
     /* Final merge (file + central directory) */
-    fclose(fpOutCD);
+    /* A buffered write can fail only at close. */
+    if (fclose(fpOutCD) != 0) {
+      err = Z_ERRNO;
+    }
     if (err == Z_OK) {
       fpOutCD = fopen(fileOutTmp, "rb");
       if (fpOutCD != NULL) {
@@ -260,7 +263,9 @@ extern int ZEXPORT unzRepair(const char* file, const char* fileOut, const char* 
 
     /* Close */
     fclose(fpZip);
-    fclose(fpOut);
+    if (fclose(fpOut) != 0) {
+      err = Z_ERRNO;
+    }
 
     /* Wipe temporary file */
     (void)remove(fileOutTmp);

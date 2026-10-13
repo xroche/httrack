@@ -3788,9 +3788,10 @@ static int st_zip_repair_shift(httrackp *opt, int argc, char **argv) {
   return (err == Z_OK && nrec == 1) ? 0 : 1;
 }
 
-/* Drives unzRepair over one local file header whose compressed size is
-   CPSIZE, followed by PAYLOAD bytes of data. */
-static int zip_repair_size_case(const char *dir, uLong cpsize, size_t payload,
+/* Repairs one local file header claiming CPSIZE (or UNCPSIZE when CPSIZE is 0)
+   followed by PAYLOAD bytes of data. A NULL OUT_OVERRIDE writes into DIR. */
+static int zip_repair_size_case(const char *dir, const char *out_override,
+                                uLong cpsize, uLong uncpsize, size_t payload,
                                 uLong *nrec, uLong *bytes) {
   unsigned char header[31] = {0x50, 0x4b, 0x03, 0x04, 0x14};
   char in[HTS_URLMAXSIZE], out[HTS_URLMAXSIZE], tmp[HTS_URLMAXSIZE];
@@ -3798,10 +3799,10 @@ static int zip_repair_size_case(const char *dir, uLong cpsize, size_t payload,
   size_t i;
   FILE *fp;
 
-  header[18] = (unsigned char) (cpsize & 0xff);
-  header[19] = (unsigned char) ((cpsize >> 8) & 0xff);
-  header[20] = (unsigned char) ((cpsize >> 16) & 0xff);
-  header[21] = (unsigned char) ((cpsize >> 24) & 0xff);
+  for (i = 0; i < 4; i++) {
+    header[18 + i] = (unsigned char) (cpsize >> (8 * i)); /* compressed size */
+    header[22 + i] = (unsigned char) (uncpsize >> (8 * i)); /* uncompressed */
+  }
   header[26] = 1; /* filename length */
   header[30] = 'a';
   snprintf(in, sizeof(in), "%s/damaged.zip", dir);
@@ -3818,27 +3819,27 @@ static int zip_repair_size_case(const char *dir, uLong cpsize, size_t payload,
     return Z_ERRNO;
   *nrec = 0;
   *bytes = 0;
-  return unzRepair(in, out, tmp, nrec, bytes);
+  return unzRepair(in, out_override != NULL ? out_override : out, tmp, nrec,
+                   bytes);
 }
 
-/* A local header's compressed size is untrusted: a truncated entry must fail
-   with Z_ERRNO whatever size it claims, never allocate that size up front nor
-   skip its data, and an entry larger than one copy chunk must survive whole. */
+/* A truncated entry fails with Z_ERRNO whatever size its header claims. */
 static int st_zip_repair_size(httrackp *opt, int argc, char **argv) {
   static const struct {
-    uLong cpsize;
+    uLong cpsize, uncpsize;
     size_t payload;
     int err;
-    uLong nrec;
+    uLong bytes;
   } cases[] = {
-      {20000, 20000, Z_OK, 1},        /* several chunks, intact */
-      {0x7fffffffUL, 16, Z_ERRNO, 0}, /* would allocate ~2GB */
-      {0x80000010UL, 16, Z_ERRNO, 0}, /* went negative and was skipped */
-      {0xffffffffUL, 16, Z_ERRNO, 0},
+      {20000, 0, 20000, Z_OK, 20000},    /* more than one copy chunk */
+      {0, 20000, 20000, Z_OK, 20000},    /* size taken from uncpsize */
+      {0x7fffffffUL, 0, 16, Z_ERRNO, 0}, /* INT_MAX */
+      {0x80000010UL, 0, 16, Z_ERRNO, 0}, /* negative as an int */
   };
 
   size_t i;
   int fails = 0;
+  FILE *fp;
 
   (void) opt;
   if (argc < 1) {
@@ -3847,15 +3848,26 @@ static int st_zip_repair_size(httrackp *opt, int argc, char **argv) {
   }
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     uLong nrec, bytes;
-    const int err = zip_repair_size_case(argv[0], cases[i].cpsize,
-                                         cases[i].payload, &nrec, &bytes);
-    const hts_boolean want_bytes =
-        cases[i].err != Z_OK || bytes == cases[i].cpsize;
+    const int err =
+        zip_repair_size_case(argv[0], NULL, cases[i].cpsize, cases[i].uncpsize,
+                             cases[i].payload, &nrec, &bytes);
 
-    if (err != cases[i].err || nrec != cases[i].nrec || !want_bytes) {
-      printf("zip-repair-size: FAIL cpsize=%lx err=%d nrec=%lu bytes=%lu\n",
-             (unsigned long) cases[i].cpsize, err, (unsigned long) nrec,
+    if (err != cases[i].err ||
+        (err == Z_OK && (nrec != 1 || bytes != cases[i].bytes))) {
+      printf("zip-repair-size: FAIL row %lu err=%d nrec=%lu bytes=%lu\n",
+             (unsigned long) i, err, (unsigned long) nrec,
              (unsigned long) bytes);
+      fails++;
+    }
+  }
+  /* A write that fails only at close (/dev/full) must fail the repair. */
+  if ((fp = fopen("/dev/full", "wb")) != NULL) {
+    uLong nrec, bytes;
+
+    fclose(fp);
+    if (zip_repair_size_case(argv[0], "/dev/full", 16, 0, 16, &nrec, &bytes) !=
+        Z_ERRNO) {
+      printf("zip-repair-size: FAIL a close error was not reported\n");
       fails++;
     }
   }
