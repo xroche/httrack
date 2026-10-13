@@ -1735,7 +1735,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         if ((*html == 'o') && (*(html + 1) == 'n')
                             && isUpperLetter(*(html + 2))) {
                           p = 0;
-                          while(isalpha((unsigned char) html[p]) && (p < 64))
+                          while ((p < 64) && isalpha((unsigned char) html[p]))
                             p++;
                           if (p < 64) {
                             while(is_space(html[p]))

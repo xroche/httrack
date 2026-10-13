@@ -1,0 +1,33 @@
+#!/bin/bash
+#
+# unzRepair copies an entry's untrusted compressed size, never allocates it.
+
+set -eu
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+out=$(httrack -#test=zip-repair-size "$dir")
+grep -qx "zip-repair-size: OK" <<<"$out" || fail "expected 'zip-repair-size: OK', got: $out"
+
+# Under a 1GB cap a 2GB allocation fails, so the INT_MAX row can tell.
+probe=$(ASAN_OPTIONS=help=1:detect_leaks=0 httrack -O /dev/null --version 2>&1 || true)
+case "$probe" in
+*AddressSanitizer*)
+    echo "no capped run: a sanitized build cannot start under the cap"
+    exit 0
+    ;;
+esac
+if [ "$(uname -s)" != Linux ]; then
+    echo "no capped run: the cap is only relied on under Linux"
+    exit 0
+fi
+if ! (ulimit -v 1048576 && httrack --version >/dev/null 2>&1); then
+    echo "no capped run: httrack does not start under the cap"
+    exit 0
+fi
+out=$(ulimit -v 1048576 && httrack -#test=zip-repair-size "$dir") ||
+    fail "capped run failed: $out"
+grep -qx "zip-repair-size: OK" <<<"$out" || fail "capped: expected 'zip-repair-size: OK', got: $out"

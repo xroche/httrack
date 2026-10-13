@@ -39,10 +39,10 @@ extern int ZEXPORT unzRepair(const char* file, const char* fileOut, const char* 
     char header[30];
     char filename[1024];
     char extra[1024];
-    int offset = 0;
-    int offsetCD = 0;
+    uLong offset = 0;
+    uLong offsetCD = 0;
     while ( fread(header, 1, 30, fpZip) == 30 ) {
-      int currentOffset = offset;
+      uLong currentOffset = offset;
 
       /* File entry */
       if (READ_32(header) == 0x04034b50) {
@@ -111,31 +111,26 @@ extern int ZEXPORT unzRepair(const char* file, const char* fileOut, const char* 
 
         /* Data */
         {
-          int dataSize = cpsize;
+          /* Copy in chunks because the size is untrusted. */
+          uLong dataSize = cpsize;
+          char data[8192];
           if (dataSize == 0) {
             dataSize = uncpsize;
           }
-          if (dataSize > 0) {
-            char* data = malloc(dataSize);
-            if (data != NULL) {
-              if ((int)fread(data, 1, dataSize, fpZip) == dataSize) {
-                if ((int)fwrite(data, 1, dataSize, fpOut) == dataSize) {
-                  offset += dataSize;
-                  totalBytes += dataSize;
-                } else {
-                  err = Z_ERRNO;
-                }
-              } else {
-                err = Z_ERRNO;
-              }
-              free(data);
-              if (err != Z_OK) {
-                break;
-              }
-            } else {
-              err = Z_MEM_ERROR;
+          while (dataSize > 0) {
+            const size_t chunk =
+                dataSize < sizeof(data) ? (size_t) dataSize : sizeof(data);
+            if (fread(data, 1, chunk, fpZip) != chunk ||
+                fwrite(data, 1, chunk, fpOut) != chunk) {
+              err = Z_ERRNO;
               break;
             }
+            offset += chunk;
+            totalBytes += chunk;
+            dataSize -= chunk;
+          }
+          if (err != Z_OK) {
+            break;
           }
         }
 
@@ -247,7 +242,10 @@ extern int ZEXPORT unzRepair(const char* file, const char* fileOut, const char* 
     }
 
     /* Final merge (file + central directory) */
-    fclose(fpOutCD);
+    /* A buffered write may fail only at close. */
+    if (fclose(fpOutCD) != 0) {
+      err = Z_ERRNO;
+    }
     if (err == Z_OK) {
       fpOutCD = fopen(fileOutTmp, "rb");
       if (fpOutCD != NULL) {
@@ -265,7 +263,9 @@ extern int ZEXPORT unzRepair(const char* file, const char* fileOut, const char* 
 
     /* Close */
     fclose(fpZip);
-    fclose(fpOut);
+    if (fclose(fpOut) != 0) {
+      err = Z_ERRNO;
+    }
 
     /* Wipe temporary file */
     (void)remove(fileOutTmp);

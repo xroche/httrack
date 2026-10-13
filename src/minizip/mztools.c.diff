@@ -13,7 +13,7 @@
  
  #define WRITE_8(buff, n) do { \
    *((unsigned char*)(buff)) = (unsigned char) ((n) & 0xff); \
-@@ -32,7 +33,7 @@
+@@ -32,16 +33,16 @@
    FILE* fpZip = fopen(file, "rb");
    FILE* fpOut = fopen(fileOut, "wb");
    FILE* fpOutCD = fopen(fileOutTmp, "wb");
@@ -22,7 +22,65 @@
      int entries = 0;
      uLong totalBytes = 0;
      char header[30];
-@@ -141,8 +142,8 @@
+     char filename[1024];
+     char extra[1024];
+-    int offset = 0;
+-    int offsetCD = 0;
++    uLong offset = 0;
++    uLong offsetCD = 0;
+     while ( fread(header, 1, 30, fpZip) == 30 ) {
+-      int currentOffset = offset;
++      uLong currentOffset = offset;
+ 
+       /* File entry */
+       if (READ_32(header) == 0x04034b50) {
+@@ -110,39 +111,34 @@
+ 
+         /* Data */
+         {
+-          int dataSize = cpsize;
++          /* Copy in chunks because the size is untrusted. */
++          uLong dataSize = cpsize;
++          char data[8192];
+           if (dataSize == 0) {
+             dataSize = uncpsize;
+           }
+-          if (dataSize > 0) {
+-            char* data = malloc(dataSize);
+-            if (data != NULL) {
+-              if ((int)fread(data, 1, dataSize, fpZip) == dataSize) {
+-                if ((int)fwrite(data, 1, dataSize, fpOut) == dataSize) {
+-                  offset += dataSize;
+-                  totalBytes += dataSize;
+-                } else {
+-                  err = Z_ERRNO;
+-                }
+-              } else {
+-                err = Z_ERRNO;
+-              }
+-              free(data);
+-              if (err != Z_OK) {
+-                break;
+-              }
+-            } else {
+-              err = Z_MEM_ERROR;
++          while (dataSize > 0) {
++            const size_t chunk =
++                dataSize < sizeof(data) ? (size_t) dataSize : sizeof(data);
++            if (fread(data, 1, chunk, fpZip) != chunk ||
++                fwrite(data, 1, chunk, fpOut) != chunk) {
++              err = Z_ERRNO;
+               break;
+             }
++            offset += chunk;
++            totalBytes += chunk;
++            dataSize -= chunk;
++          }
++          if (err != Z_OK) {
++            break;
+           }
+         }
+ 
          /* Central directory entry */
          {
            char header[46];
@@ -33,7 +91,7 @@
            WRITE_32(header, 0x02014b50);
            WRITE_16(header + 4, version);
            WRITE_16(header + 6, version);
-@@ -189,7 +190,7 @@
+@@ -189,7 +185,7 @@
  
              /* Comment field */
              if (comsize > 0) {
@@ -42,7 +100,7 @@
                  offsetCD += comsize;
                } else {
                  err = Z_ERRNO;
-@@ -216,8 +217,8 @@
+@@ -216,8 +212,8 @@
      {
        int entriesZip = entries;
        char header[22];
@@ -53,7 +111,7 @@
        if (entriesZip > 0xffff) {
          entriesZip = 0xffff;
        }
-@@ -235,7 +236,7 @@
+@@ -235,7 +231,7 @@
  
          /* Comment field */
          if (comsize > 0) {
@@ -62,6 +120,29 @@
              err = Z_ERRNO;
            }
          }
+@@ -246,7 +242,10 @@
+     }
+ 
+     /* Final merge (file + central directory) */
+-    fclose(fpOutCD);
++    /* A buffered write can fail only at close. */
++    if (fclose(fpOutCD) != 0) {
++      err = Z_ERRNO;
++    }
+     if (err == Z_OK) {
+       fpOutCD = fopen(fileOutTmp, "rb");
+       if (fpOutCD != NULL) {
+@@ -264,7 +263,9 @@
+ 
+     /* Close */
+     fclose(fpZip);
+-    fclose(fpOut);
++    if (fclose(fpOut) != 0) {
++      err = Z_ERRNO;
++    }
+ 
+     /* Wipe temporary file */
+     (void)remove(fileOutTmp);
 @@ -279,6 +280,18 @@
        }
      }
