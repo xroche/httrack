@@ -79,7 +79,7 @@ the operational checklist: toolchain, invariants, and how to ship a change.
   platform-specific: GNU `tail | head -c 3` survives, the uutils coreutils leg
   turns the same line into exit 141 with no output at all. Let the reader seek
   instead: `od -An -c -j <skip> -N <len> file`. Test 585 checks the `printf` and
-  `echo` producers, which are the ones bash flushes per line.
+  `echo` producers.
 - Never assert a fault by signal *number*: SIGBUS is 7 on x86, arm, powerpc and
   s390x but 10 on hppa, alpha, mips and sparc. Map it with `kill -l "$n"`.
 - A fixture that needs a host to stay silent must settle (500ms), re-probe every

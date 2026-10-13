@@ -210,7 +210,7 @@ for f in "$langdir"/*.txt; do
     elif [ "$lf" != "$base" ]; then
         echo "$base.txt: LANGUAGE_FILE is \"$lf\", not the basename"
         fail=1
-    elif printf '%s' "$lf" | LC_ALL=C grep -q '[^ -~]'; then
+    elif LC_ALL=C grep -q '[^ -~]' <<<"$lf"; then
         echo "$base.txt: LANGUAGE_FILE \"$lf\" is not ASCII; the update endpoint cannot decode it"
         fail=1
     fi
