@@ -18,8 +18,8 @@ if ! command -v git >/dev/null 2>&1 ||
 fi
 
 # Only printf and echo, because bash flushes those per line where an external
-# producer batches its few lines into one write. An env prefix is allowed after
-# the pipe, because `LC_ALL=C grep` is this tree's house style.
+# producer batches its lines into one write. An env prefix counts too, since
+# `LC_ALL=C grep` is house style here.
 piped_into_grep_q='(printf|echo)[^|]*\|[[:space:]]*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*(command[[:space:]]+)?grep([[:space:]]+-[a-zA-Z]+)*[[:space:]]+-[a-zA-Z]*q[a-zA-Z]*'
 
 # /dev/null keeps grep's FILE: prefix, and a whole-line comment is prose, not code.
@@ -54,8 +54,8 @@ while IFS= read -r f; do
     files+=("$top/$f")
 done < <(git -C "$top" ls-files \
     '*.sh' '*.test' bootstrap .githooks/pre-commit src/webhttrack.in '.github/workflows/*.yml')
-# ci.yml's own shape for this: a count cannot see a dropped glob, so pin the half
-# that cannot shrink and name the files no extension glob reaches.
+# A count cannot see a dropped glob, so pin the half that cannot shrink and name
+# the files no extension glob reaches (the shape ci.yml uses for the same list).
 test "${#files[@]}" -ge "$(git -C "$top" ls-files '*.sh' '*.test' | wc -l)" ||
     fail "the scan read only ${#files[@]} files"
 for must in .github/workflows/ci.yml bootstrap .githooks/pre-commit src/webhttrack.in; do
