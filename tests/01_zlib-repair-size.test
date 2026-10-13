@@ -24,6 +24,10 @@ if [ "$(uname -s)" != Linux ]; then
     echo "no capped run: the cap is only relied on under Linux"
     exit 0
 fi
+if ! (ulimit -v 1048576 && httrack --version >/dev/null 2>&1); then
+    echo "no capped run: httrack does not start under the cap"
+    exit 0
+fi
 out=$(ulimit -v 1048576 && httrack -#test=zip-repair-size "$dir") ||
     fail "capped run failed: $out"
 grep -qx "zip-repair-size: OK" <<<"$out" || fail "capped: expected 'zip-repair-size: OK', got: $out"

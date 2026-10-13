@@ -242,7 +242,7 @@ extern int ZEXPORT unzRepair(const char* file, const char* fileOut, const char* 
     }
 
     /* Final merge (file + central directory) */
-    /* A buffered write can fail only at close. */
+    /* A buffered write may fail only at close. */
     if (fclose(fpOutCD) != 0) {
       err = Z_ERRNO;
     }

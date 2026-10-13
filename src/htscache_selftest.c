@@ -3788,8 +3788,8 @@ static int st_zip_repair_shift(httrackp *opt, int argc, char **argv) {
   return (err == Z_OK && nrec == 1) ? 0 : 1;
 }
 
-/* Repairs one local file header claiming CPSIZE (or UNCPSIZE when CPSIZE is 0)
-   followed by PAYLOAD bytes of data. A NULL OUT_OVERRIDE writes into DIR. */
+/* Repairs one local file header claiming CPSIZE, or UNCPSIZE when CPSIZE is 0,
+   followed by PAYLOAD bytes of data, writing to OUT_OVERRIDE if not NULL. */
 static int zip_repair_size_case(const char *dir, const char *out_override,
                                 uLong cpsize, uLong uncpsize, size_t payload,
                                 uLong *nrec, uLong *bytes) {
@@ -3817,6 +3817,10 @@ static int zip_repair_size_case(const char *dir, const char *out_override,
   fclose(fp);
   if (!ok)
     return Z_ERRNO;
+  /* unzRepair removes its output when the temp file fails to open. */
+  if ((fp = fopen(tmp, "wb")) == NULL)
+    return Z_ERRNO;
+  fclose(fp);
   *nrec = 0;
   *bytes = 0;
   return unzRepair(in, out_override != NULL ? out_override : out, tmp, nrec,
