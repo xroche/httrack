@@ -945,6 +945,18 @@ static void index_base_path(char *path, size_t size, const char *filename) {
   }
 }
 
+/* Join a save name read back out of a cache onto the store root, refusing one
+   that could escape it. That root is empty whenever the store was named with
+   no parent directory, so an absolute name would be opened verbatim. */
+static hts_boolean store_join_root(char *dst, size_t size, const char *root,
+                                   const char *name) {
+  if (!hts_path_is_relative_contained(name)) {
+    return HTS_FALSE;
+  }
+  snprintf(dst, size, "%s%s", root, name);
+  return HTS_TRUE;
+}
+
 int PT_LoadCache__New(PT_Index index_, const char *filename) {
   if (index_ != NULL && filename != NULL) {
     PT_Index__New index = &index_->slots.formatNew;
@@ -1185,9 +1197,14 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
             else if (index->safeCache || (previous_save_[0] != '/'      // /home/foo/bar.gif
                                           && (!isalpha(previous_save_[0]) || previous_save_[1] != ':')) // c:/home/foo/bar.gif
               ) {
-              index->safeCache = 1;
-              snprintf(previous_save, sizeof(previous_save), "%s%s",
-                       index->path, previous_save_);
+              if (!store_join_root(previous_save, sizeof(previous_save),
+                                   index->path, previous_save_)) {
+                PT_Element_failf(r, "Cache filename leaving the store: %s",
+                                 previous_save_);
+                r->statuscode = STATUSCODE_INVALID;
+              } else {
+                index->safeCache = 1;
+              }
             }
             // bogus format (includes buggy absolute path)
             else {
@@ -1211,28 +1228,24 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
               if (index->fixedPath > 0) {
                 int saveLen = (int) strlen(previous_save_);
 
-                /* The suffix is what gets joined, so it is what must be
-                   checked: the guard above saw the whole string, and "/a../b"
-                   hides a
-                   "../b" behind a first component that is not "..". */
-                if (index->fixedPath < saveLen &&
-                    !hts_path_is_relative_contained(previous_save_ +
-                                                    index->fixedPath)) {
-                  PT_Element_failf(r, "Cache filename leaving the store: %s",
-                                   previous_save_);
-                  r->statuscode = STATUSCODE_INVALID;
-                } else if (index->fixedPath < saveLen) {
-                  snprintf(previous_save, sizeof(previous_save), "%s%s",
-                           index->path, previous_save_ + index->fixedPath);
-                } else {
+                if (index->fixedPath >= saveLen) {
                   PT_Element_failf(
                       r, "Bogus fixePath prefix for %s (prefixLen=%d)",
                       previous_save_, (int) index->fixedPath);
                   r->statuscode = STATUSCODE_INVALID;
+                } else if (!store_join_root(previous_save,
+                                            sizeof(previous_save), index->path,
+                                            previous_save_ +
+                                                index->fixedPath)) {
+                  PT_Element_failf(r, "Cache filename leaving the store: %s",
+                                   previous_save_);
+                  r->statuscode = STATUSCODE_INVALID;
                 }
-              } else {
-                snprintf(previous_save, sizeof(previous_save), "%s%s",
-                         index->path, previous_save_);
+              } else if (!store_join_root(previous_save, sizeof(previous_save),
+                                          index->path, previous_save_)) {
+                PT_Element_failf(r, "Cache filename leaving the store: %s",
+                                 previous_save_);
+                r->statuscode = STATUSCODE_INVALID;
               }
             }
           }
@@ -1948,9 +1961,14 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
           else if (index->safeCache || (previous_save_[0] != '/'        // /home/foo/bar.gif
                                         && (!isalpha(previous_save_[0]) || previous_save_[1] != ':'))   // c:/home/foo/bar.gif
             ) {
-            index->safeCache = 1;
-            snprintf(previous_save, sizeof(previous_save), "%s%s", index->path,
-                     previous_save_);
+            if (!store_join_root(previous_save, sizeof(previous_save),
+                                 index->path, previous_save_)) {
+              PT_Element_failf(r, "Cache filename leaving the store: %s",
+                               previous_save_);
+              r->statuscode = STATUSCODE_INVALID;
+            } else {
+              index->safeCache = 1;
+            }
           }
           // bogus format (includes buggy absolute path)
           else {
@@ -1974,27 +1992,23 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
             if (index->fixedPath > 0) {
               int saveLen = (int) strlen(previous_save_);
 
-              /* The suffix is what gets joined, so it is what must be checked:
-                 the guard above saw the whole string, and "/a../b" hides a
-                 "../b" behind a first component that is not "..". */
-              if (index->fixedPath < saveLen &&
-                  !hts_path_is_relative_contained(previous_save_ +
-                                                  index->fixedPath)) {
-                PT_Element_failf(r, "Cache filename leaving the store: %s",
-                                 previous_save_);
-                r->statuscode = STATUSCODE_INVALID;
-              } else if (index->fixedPath < saveLen) {
-                snprintf(previous_save, sizeof(previous_save), "%s%s",
-                         index->path, previous_save_ + index->fixedPath);
-              } else {
+              if (index->fixedPath >= saveLen) {
                 PT_Element_failf(r,
                                  "Bogus fixePath prefix for %s (prefixLen=%d)",
                                  previous_save_, (int) index->fixedPath);
                 r->statuscode = STATUSCODE_INVALID;
+              } else if (!store_join_root(previous_save, sizeof(previous_save),
+                                          index->path,
+                                          previous_save_ + index->fixedPath)) {
+                PT_Element_failf(r, "Cache filename leaving the store: %s",
+                                 previous_save_);
+                r->statuscode = STATUSCODE_INVALID;
               }
-            } else {
-              snprintf(previous_save, sizeof(previous_save), "%s%s",
-                       index->path, previous_save_);
+            } else if (!store_join_root(previous_save, sizeof(previous_save),
+                                        index->path, previous_save_)) {
+              PT_Element_failf(r, "Cache filename leaving the store: %s",
+                               previous_save_);
+              r->statuscode = STATUSCODE_INVALID;
             }
           }
         }

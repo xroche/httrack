@@ -2587,6 +2587,18 @@ static void lang_load_catalog(FILE *fp, hts_boolean fallback,
   }
 }
 
+/* Build the lang/ name of the catalog lang.def calls hashname. Refuses a name
+   that is not a bare basename, so would leave lang/, and one too long for dst.
+ */
+static hts_boolean lang_catalog_path(char *dst, size_t size,
+                                     const char *hashname) {
+  if (!strnotempty(hashname) || strpbrk(hashname, "/\\") != NULL ||
+      strstr(hashname, "..") != NULL) {
+    return HTS_FALSE;
+  }
+  return slprintfbuff(dst, size, "lang/%s.txt", hashname);
+}
+
 static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
   const char *hashname;
   char catbuff[CATBUFF_SIZE];
@@ -2666,6 +2678,7 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
      helpers abort, and a long line in a catalog must not kill the server. */
   if (limit_to) {
     char wanted[256];
+    char lbasename[1024];
 
     wanted[0] = '\0';
     strlncatbuff(wanted, limit_to, sizeof(wanted), sizeof(wanted) - 1);
@@ -2674,13 +2687,10 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
        key must not look like the end of the list. */
     if (hashname != NULL)
       strlncatbuff(limit_to, hashname, limit_size, limit_size - 1);
-    /* lang.def names a bare basename; a separator in it would leave lang/. */
-    if (limit_to[0] != '\0' && strpbrk(hashname, "/\\") == NULL &&
-        strstr(hashname, "..") == NULL) {
-      char lbasename[1024];
+    if (limit_to[0] != '\0' &&
+        lang_catalog_path(lbasename, sizeof(lbasename), hashname)) {
       FILE *fp;
 
-      snprintf(lbasename, sizeof(lbasename), "lang/%s.txt", hashname);
       fp = fopen(fconcat(catbuff, sizeof(catbuff), path, lbasename), "rb");
       if (fp != NULL) {
         char extkey[8192];
@@ -2720,7 +2730,9 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
         sprintf(name, "LANGUAGE_%d", (loops == 0) ? (selected_lang + 1) : 1);
         hashname = LANGINTKEY(name);
       }
-      sprintf(lbasename, "lang/%s.txt", hashname);
+      if (!lang_catalog_path(lbasename, sizeof(lbasename), hashname)) {
+        return 0;
+      }
       fp = fopen(fconcat(catbuff, sizeof(catbuff), path, lbasename), "rb");
       if (fp) {
         /* Symbols go first so that a repeated text skips their slots. */

@@ -1,0 +1,110 @@
+#!/bin/bash
+# A ProxyTrack store is someone else's file, and the save name it holds is
+# joined to the store's own directory. That directory is empty whenever the
+# store was named without a parent, so an absolute save name was opened
+# verbatim and its bytes went into the archive.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+python=$(find_python) || skip "python3 not found"
+
+# resolved before the first cd: make check puts a relative src/ on PATH
+bin=$(command -v proxytrack) || fail "proxytrack not found on PATH"
+case "$bin" in
+/*) ;;
+*) bin="$(cd "$(dirname "$bin")" && pwd)/$(basename "$bin")" ;;
+esac
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+# Write hostile.ndx and hostile.dat into $1, for an entry whose save name is $2
+# and whose body is the file $3 names.
+make_store() {
+    "$python" - "$(nativepath "$1")" "$2" "$(nativepath "$3")" <<'EOF'
+import os
+import sys
+
+store, save, bodyfile = sys.argv[1], sys.argv[2], sys.argv[3]
+body = open(bodyfile, "rb").read()
+
+
+def field(v):
+    b = v.encode()
+    return b"%d\n" % len(b) + b
+
+
+# a version-4 record: every field is a decimal length on its own line followed
+# by that many raw bytes
+rec = b"".join(
+    [
+        field("200"),               # statuscode
+        field(str(len(body))),      # size
+        field("OK"),                # msg
+        field("text/html"),         # contenttype
+        field("iso-8859-1"),        # charset       (version >= 3)
+        field(""),                  # lastmodified
+        field(""),                  # etag
+        field(""),                  # location
+        field(""),                  # cdispo        (version >= 2)
+        field("example.com"),       # adr           (version >= 4)
+        field("/p.html"),           # fil
+        field(save),                # save
+        field("HTS"),               # integrity marker
+        field(str(len(body))),      # body length
+    ]
+)
+pad = b"#" * 8  # the record sits past 0 so the .ndx can point at it negatively
+open(os.path.join(store, "hostile.dat"), "wb").write(pad + rec)
+
+# two length-prefixed header fields, then four lines per entry: host, file,
+# position, and one the reader skips. A negative position puts the body in a
+# file of its own rather than in the .dat.
+with open(os.path.join(store, "hostile.ndx"), "wb") as f:
+    f.write(field("CACHE-1.4"))
+    f.write(field("Wed, 01 Jan 2025 00:00:00 GMT"))
+    f.write(b"\n-\n")
+    f.write(b"example.com\n/p.html\n-%d\n-\n" % len(pad))
+EOF
+}
+
+# --convert reads every entry with FETCH_BODY, so it opens the save name and
+# copies what it finds. Naming the store relatively is what leaves the joined
+# root empty.
+convert() {
+    (
+        cd "$1" || exit 1
+        "$bin" --convert out.arc hostile.ndx
+    ) >"$dir/log" 2>&1
+    subshell_ok $?
+}
+
+printf 'OUTSIDE-THE-STORE-%s\n' "$$" >"$dir/secret.txt"
+secret=$(cat "$dir/secret.txt")
+
+# The absolute name is the escape the empty root allows. The ".." one is only
+# refused while BOTH this join and the whole-string check above it hold, so it
+# pins the pair rather than either one.
+for save in "$(nativepath "$dir/secret.txt")" "example.com/../../secret.txt"; do
+    rm -rf "$dir/esc"
+    mkdir -p "$dir/esc"
+    make_store "$dir/esc" "$save" "$dir/secret.txt"
+    convert "$dir/esc"
+    test -s "$dir/esc/out.arc" || fail "no archive was written for save=$save"
+    if grep -aqF -- "$secret" "$dir/esc/out.arc"; then
+        fail "save=$save read a file outside the store into the archive"
+    fi
+done
+
+# The narrowing control: a contained relative name must still be served, or
+# every refusal above would pass on a reader that stopped reading bodies.
+mkdir -p "$dir/ok/example.com"
+printf 'INSIDE-THE-STORE-%s\n' "$$" >"$dir/ok/example.com/p.html"
+inside=$(cat "$dir/ok/example.com/p.html")
+make_store "$dir/ok" "example.com/p.html" "$dir/ok/example.com/p.html"
+convert "$dir/ok"
+grep -aqF -- "$inside" "$dir/ok/out.arc" ||
+    fail "a contained save name lost its body: $(cat "$dir/log")"
