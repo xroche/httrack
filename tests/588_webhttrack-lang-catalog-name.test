@@ -1,0 +1,113 @@
+#!/bin/bash
+# lang.def names the catalog file for each language and the server joins that
+# name to lang/, so the name has to be a bare basename. One carrying a
+# separator read a catalog from outside lang/, and a long one overflowed the
+# 1024-byte buffer the name was formatted into. The sanitizer CI build turns
+# that overflow into a hard stack-buffer-overflow.
+
+set -euo pipefail
+
+# shellcheck source=tests/webhttracklib.sh
+. "${0%"${0##*/}"}./webhttracklib.sh"
+
+htsserver_require
+htsserver_distroot
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_langname.XXXXXX") || fail "no tmpdir"
+cleanup_push htsserver_cleanup_dir "${work}"
+
+long=$(printf 'X%.0s' $(seq 1 1100))
+
+# A root sharing the dist tree's entries by symlink. lang.def and lang/ are
+# real, because the test writes into both and a write through a symlink would
+# land in the source tree. $2 replaces the value paired with LANGUAGE_1, which
+# is the catalog the default language loads and is lang.def's very first line.
+make_root() { # $1 = root, $2 = catalog name
+    local root=$1 name=$2 entry
+    mkdir -p "${root}/lang"
+    for entry in "${HTS_DISTROOT}"/*; do
+        case "${entry##*/}" in
+        lang.def | lang) ;;
+        *) ln -s "${entry}" "${root}/${entry##*/}" ;;
+        esac
+    done
+    for entry in "${HTS_DISTDIR}"/lang/*; do
+        ln -s "${entry}" "${root}/lang/${entry##*/}"
+    done
+    if test -z "${name}"; then
+        cp "${HTS_DISTDIR}/lang.def" "${root}/lang.def"
+        return 0
+    fi
+    {
+        printf '%s\n' "${name}"
+        tail -n +2 "${HTS_DISTDIR}/lang.def"
+    } >"${root}/lang.def"
+    # A real catalog where the name resolves, so a refusal cannot be mistaken
+    # for the file being absent. The over-long name is past NAME_MAX, and there
+    # the overflow rather than the open is the point.
+    if test "${#name}" -lt 240; then
+        mkdir -p "$(dirname "${root}/lang/${name}")"
+        cp "${HTS_DISTDIR}/lang/English.txt" "${root}/lang/${name}.txt"
+    fi
+}
+
+# Start htsserver on the named root and return once it has announced. The
+# announcement comes BEFORE the catalog load, so reaching it says nothing about
+# whether the name was accepted: the server dies just after on a refusal.
+serve() { # $1 = root
+    htsserver_start --root "${work}/$1" --home "${work}/$1.home" \
+        --log "${work}/$1.log"
+    srvlog="${work}/$1.log"
+}
+
+# True once ${srvlog} carries the refusal, which the server reports as
+# "unable to find lang.def" even though lang.def was read and only the catalog
+# it named was refused. False once $1 seconds pass, and once the server has
+# exited the log is final, so one last look settles it.
+refused() { # $1 = seconds to wait
+    local deadline=$((SECONDS + $1))
+    while test "${SECONDS}" -lt "${deadline}"; do
+        if grep -qE 'unable to find lang.def' "${srvlog}"; then return 0; fi
+        if ! htsserver_alive; then break; fi
+        poll_wait 0.1
+    done
+    grep -qE 'unable to find lang.def' "${srvlog}"
+}
+
+# Two controls, so a guard that refused every name could not pass: the stock
+# lang.def, and a planted name long enough that a length-blind guard would
+# reject it.
+for label in stock planted; do
+    case "${label}" in
+    stock) name='' ;;
+    planted) name='a-planted-catalog-with-a-long-enough-name' ;;
+    esac
+    mkdir -p "${work}/${label}.home"
+    make_root "${work}/${label}" "${name}"
+    serve "${label}"
+    # A refusal kills the server, so staying up IS the answer and needs no
+    # wait; the short one only covers the gap after the announcement.
+    if refused 2; then
+        fail "a ${label} catalog name was refused: $(cat "${srvlog}")"
+    fi
+    htsserver_alive || fail "the ${label} root killed the server"
+    htsserver_stop
+done
+
+for label in dotdot subdir overlong; do
+    case "${label}" in
+    # No separator, so only the ".." test can refuse this one. That test is
+    # defence in depth rather than a traversal stopper: a ".." name with a
+    # separator is already refused for the separator.
+    dotdot) name=.. ;;
+    subdir) name=lang2/planted ;;
+    # Past NAME_MAX, so a build without a sanitizer cannot tell the refusal
+    # from the open failing. The sanitizer leg is what catches the overflow.
+    overlong) name=${long} ;;
+    esac
+    mkdir -p "${work}/${label}.home"
+    make_root "${work}/${label}" "${name}"
+    serve "${label}"
+    refused 30 || fail "a ${label} catalog name was accepted: $(cat "${srvlog}")"
+    htsserver_stop
+done

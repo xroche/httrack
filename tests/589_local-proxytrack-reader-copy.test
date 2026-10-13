@@ -1,0 +1,59 @@
+#!/bin/bash
+# store.c resolves a cache record's save name twice, once per cache format, and
+# says so: the second block is marked a copy of the first. The path-injection
+# fix had to be applied to both, and only the .ndx format is reachable from a
+# test, so nothing else notices if the copies drift apart.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+python=$(find_python) || skip "python3 not found"
+
+# testlib.sh defaults top_srcdir to a relative "..", which the Windows suite
+# needs: nativepath cannot convert an absolute one for python.exe
+src="${top_srcdir}/src/proxy/store.c"
+test -r "${src}" || fail "no ${src}"
+
+"${python}" - "$(nativepath "${src}")" <<'EOF' || fail "the two readers disagree"
+import re
+import sys
+
+lines = open(sys.argv[1], encoding="utf-8", errors="surrogateescape").read().split("\n")
+
+
+def block(start, end, after, what):
+    """The lines between the first start and the next end, past line `after`."""
+    first = last = None
+    for i, line in enumerate(lines):
+        if i < after:
+            continue
+        if first is None and re.search(start, line):
+            first = i
+        elif first is not None and re.search(end, line):
+            last = i
+            break
+    if first is None or last is None:
+        # a renamed marker must fail here, not quietly compare nothing
+        sys.exit("%s: no block between %r and %r" % (what, start, end))
+    return "\n".join(lines[first + 1:last])
+
+
+def tokens(text):
+    text = re.sub(r"/\*.*?\*/", " ", text, flags=re.S)
+    text = re.sub(r"//[^\n]*", " ", text)
+    return re.sub(r"\s+", "", text)
+
+
+new = tokens(block(r"/\* Previous entry \*/", r"/\* Corrupt: negative",
+                   1000, "the new.zip reader"))
+old = tokens(block(r"COPY OF THE __New\(\) CODE", r"END OF COPY",
+                   1800, "the .ndx reader"))
+if not new or not old:
+    sys.exit("one of the blocks came back empty, so this proved nothing")
+if new != old:
+    sys.exit("the .ndx reader is no longer a copy of the new.zip one:\n"
+             "  new.zip: %s\n  .ndx:    %s" % (new[:200], old[:200]))
+print("both readers resolve the save name identically (%d tokens)" % len(new))
+EOF
