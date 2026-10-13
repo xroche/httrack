@@ -114,14 +114,26 @@ test -s "$dir/esc/out.arc" || fail "no archive was written for the escape"
 if grep -qaF -- "$secret" "$dir/esc/out.arc"; then
     fail "an absolute save name read a file outside the store"
 fi
-# The record must be PARSED and then refused: one the reader could not read at
-# all would leave the archive equally free of the secret, and it says so with a
-# header error instead.
-grep -qaF 'Cache Read Error : Bad Data' "$dir/esc/out.arc" ||
-    fail "the escaping record was not refused: $(cat "$dir/log")"
+# The record must be PARSED and then refused by the guard this case is for:
+# one the reader could not read at all would leave the archive equally free of
+# the secret, and three different guards can refuse a name.
+grep -qaF 'holds no path to reduce' "$dir/log" ||
+    fail "the escape was not refused by the fallback: $(cat "$dir/log")"
 if grep -qaF 'Truncated or corrupt cache record' "$dir/log"; then
     fail "the escaping record never parsed, so the refusal proves nothing"
 fi
+
+# A ".." name is refused by the whole-string check above the join as well, so
+# this case only reds when both that check and the join are broken. The
+# directory has to exist or the name could not resolve even unguarded.
+mkdir -p "$dir/dots/example.com"
+make_store "$dir/dots" "example.com/../../secret.txt=$dir/secret.txt"
+convert "$dir/dots"
+if grep -qaF -- "$secret" "$dir/dots/out.arc"; then
+    fail "a .. save name read a file outside the store"
+fi
+grep -qaF 'holds a ".." component' "$dir/log" ||
+    fail "the .. name was dropped without being refused: $(cat "$dir/log")"
 
 # previous_save holds HTS_URLMAXSIZE * 2 bytes, so a name that long leaves no
 # room for the root. A clipped join names a file nobody stored, so it must be
@@ -134,11 +146,12 @@ make_store "$dir/clip/a/b" "$long=$dir/secret.txt"
     "$bin" --convert out.arc a/b/hostile.ndx
 ) >"$dir/log" 2>&1
 subshell_ok $?
-grep -qaF 'Cache Read Error : Bad Data' "$dir/clip/out.arc" ||
+grep -qaF 'does not fit under the store root' "$dir/log" ||
     fail "a clipped join was not refused: $(cat "$dir/log")"
 
 # A contained name first marks the store safe, and the sticky flag then sends
-# an absolute one down a different join than the fallback above.
+# an absolute one down a different join than the fallback above. The reader
+# walks the entries in .ndx order, so the contained one has to come first.
 mkdir -p "$dir/sticky/example.com"
 cp "$dir/ok/example.com/p.html" "$dir/sticky/example.com/p.html"
 make_store "$dir/sticky" "example.com/p.html=$dir/sticky/example.com/p.html" \
@@ -147,7 +160,7 @@ convert "$dir/sticky"
 if grep -qaF -- "$secret" "$dir/sticky/out.arc"; then
     fail "an absolute save name read outside the store once safeCache was set"
 fi
-grep -qaF 'Cache Read Error : Bad Data' "$dir/sticky/out.arc" ||
+grep -qaF 'is not a contained relative name' "$dir/log" ||
     fail "the safeCache escape was not refused: $(cat "$dir/log")"
 grep -qaF -- "$inside" "$dir/sticky/out.arc" ||
     fail "the refusal cost the contained entry its body: $(cat "$dir/log")"

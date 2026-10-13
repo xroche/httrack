@@ -948,16 +948,31 @@ static void index_base_path(char *path, size_t size, const char *filename) {
 /* Join a save name read back out of a cache onto the store root. That root is
    empty whenever the store was named with no parent directory, so an absolute
    name would be opened verbatim. A clipped join names a different file, so it
-   is refused too, as htscache.c's own reader refuses one. */
+   is refused too, as htscache.c's own reader refuses one. dst comes back empty
+   on a refusal, so it can never hold the join before it. */
 static HTS_CHECK_RESULT hts_boolean index_join_root(char *dst, size_t size,
                                                     const char *root,
                                                     const char *name) {
   dst[0] = '\0';
-  return hts_path_is_relative_contained(name) &&
-         slprintfbuff(dst, size, "%s%s", root, name);
+  if (!hts_path_is_relative_contained(name)) {
+    proxytrack_print_log(WARNING,
+                         "cache filename is not a contained relative name, "
+                         "not serving it: %s",
+                         name);
+    return HTS_FALSE;
+  }
+  if (!slprintfbuff(dst, size, "%s%s", root, name)) {
+    proxytrack_print_log(WARNING,
+                         "cache filename does not fit under the store root, "
+                         "not serving it: %s",
+                         name);
+    return HTS_FALSE;
+  }
+  return HTS_TRUE;
 }
 
-/* Refuse the record whose save name is this, and say why. */
+/* Refuse the record whose save name is this. The generic handler further down
+   overwrites the element's own message, so each caller logs why it refused. */
 static void PT_Element_refuse_save(PT_Element r, const char *save) {
   PT_Element_failf(r, "Cache filename leaving the store: %s", save);
   r->statuscode = STATUSCODE_INVALID;
@@ -1188,6 +1203,10 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
               !hts_path_is_contained(previous_save_)) {
             /* the archive is someone else's file, and previous_save is opened
                at :1982 and served to the client */
+            proxytrack_print_log(WARNING,
+                                 "cache filename holds a \"..\" component, "
+                                 "not serving it: %s",
+                                 previous_save_);
             PT_Element_refuse_save(r, previous_save_);
             previous_save_[0] = '\0';
           }
@@ -1198,9 +1217,11 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
               strcpybuff(previous_save, previous_save_);
             }
             // relative ? (hack)
-            else if (index->safeCache || (previous_save_[0] != '/'      // /home/foo/bar.gif
-                                          && (!isalpha(previous_save_[0]) || previous_save_[1] != ':')) // c:/home/foo/bar.gif
-              ) {
+            else if (index->safeCache ||
+                     (previous_save_[0] != '/' // /home/foo/bar.gif
+                      && (!isalpha((unsigned char) previous_save_[0]) ||
+                          previous_save_[1] != ':')) // c:/home/foo/bar.gif
+            ) {
               if (!index_join_root(previous_save, sizeof(previous_save),
                                    index->path, previous_save_)) {
                 PT_Element_refuse_save(r, previous_save_);
@@ -1246,6 +1267,11 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
               } else {
                 /* an absolute name the host guess could not reduce, so no
                    relative part is left to join onto the root */
+                proxytrack_print_log(
+                    WARNING,
+                    "cache filename is absolute and holds no path to reduce, "
+                    "not serving it: %s",
+                    previous_save_);
                 PT_Element_refuse_save(r, previous_save_);
               }
             }
@@ -1947,6 +1973,10 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
             !hts_path_is_contained(previous_save_)) {
           /* same reason as the __New() reader: previous_save is opened and its
              bytes go to the client */
+          proxytrack_print_log(WARNING,
+                               "cache filename holds a \"..\" component, "
+                               "not serving it: %s",
+                               previous_save_);
           PT_Element_refuse_save(r, previous_save_);
           previous_save_[0] = '\0';
         }
@@ -1957,9 +1987,11 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
             strcpybuff(previous_save, previous_save_);
           }
           // relative ? (hack)
-          else if (index->safeCache || (previous_save_[0] != '/'        // /home/foo/bar.gif
-                                        && (!isalpha(previous_save_[0]) || previous_save_[1] != ':'))   // c:/home/foo/bar.gif
-            ) {
+          else if (index->safeCache ||
+                   (previous_save_[0] != '/' // /home/foo/bar.gif
+                    && (!isalpha((unsigned char) previous_save_[0]) ||
+                        previous_save_[1] != ':')) // c:/home/foo/bar.gif
+          ) {
             if (!index_join_root(previous_save, sizeof(previous_save),
                                  index->path, previous_save_)) {
               PT_Element_refuse_save(r, previous_save_);
@@ -2002,6 +2034,11 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
             } else {
               /* an absolute name the host guess could not reduce, so no
                  relative part is left to join onto the root */
+              proxytrack_print_log(
+                  WARNING,
+                  "cache filename is absolute and holds no path to reduce, "
+                  "not serving it: %s",
+                  previous_save_);
               PT_Element_refuse_save(r, previous_save_);
             }
           }

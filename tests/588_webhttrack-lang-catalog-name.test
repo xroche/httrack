@@ -60,10 +60,12 @@ serve() { # $1 = root
     srvlog="${work}/$1.log"
 }
 
-# True once ${srvlog} carries the refusal. False on the deadline, and once the
-# server has exited the log is final, so one last look settles it.
-refused() {
-    local deadline=$((SECONDS + 30))
+# True once ${srvlog} carries the refusal, which the server reports as
+# "unable to find lang.def" even though lang.def was read and only the catalog
+# it named was refused. False once $1 seconds pass, and once the server has
+# exited the log is final, so one last look settles it.
+refused() { # $1 = seconds to wait
+    local deadline=$((SECONDS + $1))
     while test "${SECONDS}" -lt "${deadline}"; do
         if grep -qE 'unable to find lang.def' "${srvlog}"; then return 0; fi
         if ! htsserver_alive; then break; fi
@@ -83,7 +85,9 @@ for label in stock planted; do
     mkdir -p "${work}/${label}.home"
     make_root "${work}/${label}" "${name}"
     serve "${label}"
-    if refused; then
+    # A refusal kills the server, so staying up IS the answer and needs no
+    # wait; the short one only covers the gap after the announcement.
+    if refused 2; then
         fail "a ${label} catalog name was refused: $(cat "${srvlog}")"
     fi
     htsserver_alive || fail "the ${label} root killed the server"
@@ -92,14 +96,18 @@ done
 
 for label in dotdot subdir overlong; do
     case "${label}" in
-    # no separator, so only the ".." test can refuse it
+    # No separator, so only the ".." test can refuse this one. That test is
+    # defence in depth rather than a traversal stopper: a ".." name with a
+    # separator is already refused for the separator.
     dotdot) name=.. ;;
     subdir) name=lang2/planted ;;
+    # Past NAME_MAX, so a build without a sanitizer cannot tell the refusal
+    # from the open failing. The sanitizer leg is what catches the overflow.
     overlong) name=${long} ;;
     esac
     mkdir -p "${work}/${label}.home"
     make_root "${work}/${label}" "${name}"
     serve "${label}"
-    refused || fail "a ${label} catalog name was accepted: $(cat "${srvlog}")"
+    refused 30 || fail "a ${label} catalog name was accepted: $(cat "${srvlog}")"
     htsserver_stop
 done
