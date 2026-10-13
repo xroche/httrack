@@ -1,8 +1,8 @@
 #!/bin/bash
 # A ProxyTrack store is someone else's file, and the save name it holds is
 # joined to the store's own directory. That directory is empty whenever the
-# store was named without a parent, so an absolute save name was opened
-# verbatim and its bytes went into the archive.
+# store was named with no parent, so an absolute save name was opened verbatim
+# and its bytes went into the archive.
 
 set -euo pipefail
 
@@ -21,15 +21,16 @@ esac
 dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
 
-# Write hostile.ndx and hostile.dat into $1, for an entry whose save name is $2
-# and whose body is the file $3 names.
-make_store() {
-    "$python" - "$(nativepath "$1")" "$2" "$(nativepath "$3")" <<'EOF'
+# Write hostile.ndx and hostile.dat into $1, one entry per "<save>=<body file>"
+# pair that follows. Several entries exercise the reader's per-store state.
+make_store() { # $1 = store dir, $2.. = save=bodyfile
+    local store=$1
+    shift
+    "$python" - "$(nativepath "$store")" "$@" <<'EOF'
 import os
 import sys
 
-store, save, bodyfile = sys.argv[1], sys.argv[2], sys.argv[3]
-body = open(bodyfile, "rb").read()
+store, pairs = sys.argv[1], sys.argv[2:]
 
 
 def field(v):
@@ -39,26 +40,34 @@ def field(v):
 
 # a version-4 record: every field is a decimal length on its own line followed
 # by that many raw bytes
-rec = b"".join(
-    [
-        field("200"),               # statuscode
-        field(str(len(body))),      # size
-        field("OK"),                # msg
-        field("text/html"),         # contenttype
-        field("iso-8859-1"),        # charset       (version >= 3)
-        field(""),                  # lastmodified
-        field(""),                  # etag
-        field(""),                  # location
-        field(""),                  # cdispo        (version >= 2)
-        field("example.com"),       # adr           (version >= 4)
-        field("/p.html"),           # fil
-        field(save),                # save
-        field("HTS"),               # integrity marker
-        field(str(len(body))),      # body length
-    ]
-)
-pad = b"#" * 8  # the record sits past 0 so the .ndx can point at it negatively
-open(os.path.join(store, "hostile.dat"), "wb").write(pad + rec)
+def record(save, body):
+    return b"".join(
+        [
+            field("200"),               # statuscode
+            field(str(len(body))),      # size
+            field("OK"),                # msg
+            field("text/html"),         # contenttype
+            field("iso-8859-1"),        # charset       (version >= 3)
+            field(""),                  # lastmodified
+            field(""),                  # etag
+            field(""),                  # location
+            field(""),                  # cdispo        (version >= 2)
+            field("example.com"),       # adr           (version >= 4)
+            field("/p.html"),           # fil
+            field(save),                # save
+            field("HTS"),               # integrity marker
+            field(str(len(body))),      # body length
+        ]
+    )
+
+
+dat = b"#" * 8  # entry 1 sits past 0 so the .ndx can point at it negatively
+offsets = []
+for pair in pairs:
+    save, bodyfile = pair.split("=", 1)
+    offsets.append(len(dat))
+    dat += record(save, open(bodyfile, "rb").read())
+open(os.path.join(store, "hostile.dat"), "wb").write(dat)
 
 # two length-prefixed header fields, then four lines per entry: host, file,
 # position, and one the reader skips. A negative position puts the body in a
@@ -67,7 +76,8 @@ with open(os.path.join(store, "hostile.ndx"), "wb") as f:
     f.write(field("CACHE-1.4"))
     f.write(field("Wed, 01 Jan 2025 00:00:00 GMT"))
     f.write(b"\n-\n")
-    f.write(b"example.com\n/p.html\n-%d\n-\n" % len(pad))
+    for i, off in enumerate(offsets):
+        f.write(b"example.com\n/p%d.html\n-%d\n-\n" % (i, off))
 EOF
 }
 
@@ -84,27 +94,60 @@ convert() {
 
 printf 'OUTSIDE-THE-STORE-%s\n' "$$" >"$dir/secret.txt"
 secret=$(cat "$dir/secret.txt")
+abs=$(nativepath "$dir/secret.txt")
 
-# The absolute name is the escape the empty root allows. The ".." one is only
-# refused while BOTH this join and the whole-string check above it hold, so it
-# pins the pair rather than either one.
-for save in "$(nativepath "$dir/secret.txt")" "example.com/../../secret.txt"; do
-    rm -rf "$dir/esc"
-    mkdir -p "$dir/esc"
-    make_store "$dir/esc" "$save" "$dir/secret.txt"
-    convert "$dir/esc"
-    test -s "$dir/esc/out.arc" || fail "no archive was written for save=$save"
-    if grep -aqF -- "$secret" "$dir/esc/out.arc"; then
-        fail "save=$save read a file outside the store into the archive"
-    fi
-done
-
-# The narrowing control: a contained relative name must still be served, or
-# every refusal above would pass on a reader that stopped reading bodies.
+# The narrowing control first: a contained relative name must be served, or
+# every refusal below would pass on a reader that stopped reading bodies.
 mkdir -p "$dir/ok/example.com"
 printf 'INSIDE-THE-STORE-%s\n' "$$" >"$dir/ok/example.com/p.html"
 inside=$(cat "$dir/ok/example.com/p.html")
-make_store "$dir/ok" "example.com/p.html" "$dir/ok/example.com/p.html"
+make_store "$dir/ok" "example.com/p.html=$dir/ok/example.com/p.html"
 convert "$dir/ok"
-grep -aqF -- "$inside" "$dir/ok/out.arc" ||
+grep -qaF -- "$inside" "$dir/ok/out.arc" ||
     fail "a contained save name lost its body: $(cat "$dir/log")"
+
+# An absolute name reaches the join through the host-guess fallback.
+mkdir -p "$dir/esc"
+make_store "$dir/esc" "$abs=$dir/secret.txt"
+convert "$dir/esc"
+test -s "$dir/esc/out.arc" || fail "no archive was written for the escape"
+if grep -qaF -- "$secret" "$dir/esc/out.arc"; then
+    fail "an absolute save name read a file outside the store"
+fi
+# The record must be PARSED and then refused: one the reader could not read at
+# all would leave the archive equally free of the secret, and it says so with a
+# header error instead.
+grep -qaF 'Cache Read Error : Bad Data' "$dir/esc/out.arc" ||
+    fail "the escaping record was not refused: $(cat "$dir/log")"
+if grep -qaF 'Truncated or corrupt cache record' "$dir/log"; then
+    fail "the escaping record never parsed, so the refusal proves nothing"
+fi
+
+# previous_save holds HTS_URLMAXSIZE * 2 bytes, so a name that long leaves no
+# room for the root. A clipped join names a file nobody stored, so it must be
+# refused rather than opened.
+mkdir -p "$dir/clip/a/b"
+long="example.com/$(printf 'a%.0s' $(seq 1 2030)).html"
+make_store "$dir/clip/a/b" "$long=$dir/secret.txt"
+(
+    cd "$dir/clip" || exit 1
+    "$bin" --convert out.arc a/b/hostile.ndx
+) >"$dir/log" 2>&1
+subshell_ok $?
+grep -qaF 'Cache Read Error : Bad Data' "$dir/clip/out.arc" ||
+    fail "a clipped join was not refused: $(cat "$dir/log")"
+
+# A contained name first marks the store safe, and the sticky flag then sends
+# an absolute one down a different join than the fallback above.
+mkdir -p "$dir/sticky/example.com"
+cp "$dir/ok/example.com/p.html" "$dir/sticky/example.com/p.html"
+make_store "$dir/sticky" "example.com/p.html=$dir/sticky/example.com/p.html" \
+    "$abs=$dir/secret.txt"
+convert "$dir/sticky"
+if grep -qaF -- "$secret" "$dir/sticky/out.arc"; then
+    fail "an absolute save name read outside the store once safeCache was set"
+fi
+grep -qaF 'Cache Read Error : Bad Data' "$dir/sticky/out.arc" ||
+    fail "the safeCache escape was not refused: $(cat "$dir/log")"
+grep -qaF -- "$inside" "$dir/sticky/out.arc" ||
+    fail "the refusal cost the contained entry its body: $(cat "$dir/log")"

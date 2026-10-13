@@ -945,16 +945,22 @@ static void index_base_path(char *path, size_t size, const char *filename) {
   }
 }
 
-/* Join a save name read back out of a cache onto the store root, refusing one
-   that could escape it. That root is empty whenever the store was named with
-   no parent directory, so an absolute name would be opened verbatim. */
-static hts_boolean store_join_root(char *dst, size_t size, const char *root,
-                                   const char *name) {
-  if (!hts_path_is_relative_contained(name)) {
-    return HTS_FALSE;
-  }
-  snprintf(dst, size, "%s%s", root, name);
-  return HTS_TRUE;
+/* Join a save name read back out of a cache onto the store root. That root is
+   empty whenever the store was named with no parent directory, so an absolute
+   name would be opened verbatim. A clipped join names a different file, so it
+   is refused too, as htscache.c's own reader refuses one. */
+static HTS_CHECK_RESULT hts_boolean index_join_root(char *dst, size_t size,
+                                                    const char *root,
+                                                    const char *name) {
+  dst[0] = '\0';
+  return hts_path_is_relative_contained(name) &&
+         slprintfbuff(dst, size, "%s%s", root, name);
+}
+
+/* Refuse the record whose save name is this, and say why. */
+static void PT_Element_refuse_save(PT_Element r, const char *save) {
+  PT_Element_failf(r, "Cache filename leaving the store: %s", save);
+  r->statuscode = STATUSCODE_INVALID;
 }
 
 int PT_LoadCache__New(PT_Index index_, const char *filename) {
@@ -1182,9 +1188,7 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
               !hts_path_is_contained(previous_save_)) {
             /* the archive is someone else's file, and previous_save is opened
                at :1982 and served to the client */
-            PT_Element_failf(r, "Cache filename leaving the store: %s",
-                             previous_save_);
-            r->statuscode = STATUSCODE_INVALID;
+            PT_Element_refuse_save(r, previous_save_);
             previous_save_[0] = '\0';
           }
           if (previous_save_[0] != '\0') {
@@ -1197,11 +1201,9 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
             else if (index->safeCache || (previous_save_[0] != '/'      // /home/foo/bar.gif
                                           && (!isalpha(previous_save_[0]) || previous_save_[1] != ':')) // c:/home/foo/bar.gif
               ) {
-              if (!store_join_root(previous_save, sizeof(previous_save),
+              if (!index_join_root(previous_save, sizeof(previous_save),
                                    index->path, previous_save_)) {
-                PT_Element_failf(r, "Cache filename leaving the store: %s",
-                                 previous_save_);
-                r->statuscode = STATUSCODE_INVALID;
+                PT_Element_refuse_save(r, previous_save_);
               } else {
                 index->safeCache = 1;
               }
@@ -1221,7 +1223,9 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                   piece[0] = '\0';
                   strncat(piece, start, len);
                   if ((where = strstr(previous_save_, piece)) != NULL) {
-                    index->fixedPath = (int) (where - previous_save_);  // offset to relative path
+                    index->fixedPath =
+                        (int) (where -
+                               previous_save_); // offset to relative path
                   }
                 }
               }
@@ -1233,19 +1237,16 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                       r, "Bogus fixePath prefix for %s (prefixLen=%d)",
                       previous_save_, (int) index->fixedPath);
                   r->statuscode = STATUSCODE_INVALID;
-                } else if (!store_join_root(previous_save,
+                } else if (!index_join_root(previous_save,
                                             sizeof(previous_save), index->path,
                                             previous_save_ +
                                                 index->fixedPath)) {
-                  PT_Element_failf(r, "Cache filename leaving the store: %s",
-                                   previous_save_);
-                  r->statuscode = STATUSCODE_INVALID;
+                  PT_Element_refuse_save(r, previous_save_);
                 }
-              } else if (!store_join_root(previous_save, sizeof(previous_save),
-                                          index->path, previous_save_)) {
-                PT_Element_failf(r, "Cache filename leaving the store: %s",
-                                 previous_save_);
-                r->statuscode = STATUSCODE_INVALID;
+              } else {
+                /* an absolute name the host guess could not reduce, so no
+                   relative part is left to join onto the root */
+                PT_Element_refuse_save(r, previous_save_);
               }
             }
           }
@@ -1946,9 +1947,7 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
             !hts_path_is_contained(previous_save_)) {
           /* same reason as the __New() reader: previous_save is opened and its
              bytes go to the client */
-          PT_Element_failf(r, "Cache filename leaving the store: %s",
-                           previous_save_);
-          r->statuscode = STATUSCODE_INVALID;
+          PT_Element_refuse_save(r, previous_save_);
           previous_save_[0] = '\0';
         }
         if (previous_save_[0] != '\0') {
@@ -1961,11 +1960,9 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
           else if (index->safeCache || (previous_save_[0] != '/'        // /home/foo/bar.gif
                                         && (!isalpha(previous_save_[0]) || previous_save_[1] != ':'))   // c:/home/foo/bar.gif
             ) {
-            if (!store_join_root(previous_save, sizeof(previous_save),
+            if (!index_join_root(previous_save, sizeof(previous_save),
                                  index->path, previous_save_)) {
-              PT_Element_failf(r, "Cache filename leaving the store: %s",
-                               previous_save_);
-              r->statuscode = STATUSCODE_INVALID;
+              PT_Element_refuse_save(r, previous_save_);
             } else {
               index->safeCache = 1;
             }
@@ -1997,18 +1994,15 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
                                  "Bogus fixePath prefix for %s (prefixLen=%d)",
                                  previous_save_, (int) index->fixedPath);
                 r->statuscode = STATUSCODE_INVALID;
-              } else if (!store_join_root(previous_save, sizeof(previous_save),
+              } else if (!index_join_root(previous_save, sizeof(previous_save),
                                           index->path,
                                           previous_save_ + index->fixedPath)) {
-                PT_Element_failf(r, "Cache filename leaving the store: %s",
-                                 previous_save_);
-                r->statuscode = STATUSCODE_INVALID;
+                PT_Element_refuse_save(r, previous_save_);
               }
-            } else if (!store_join_root(previous_save, sizeof(previous_save),
-                                        index->path, previous_save_)) {
-              PT_Element_failf(r, "Cache filename leaving the store: %s",
-                               previous_save_);
-              r->statuscode = STATUSCODE_INVALID;
+            } else {
+              /* an absolute name the host guess could not reduce, so no
+                 relative part is left to join onto the root */
+              PT_Element_refuse_save(r, previous_save_);
             }
           }
         }

@@ -2587,11 +2587,11 @@ static void lang_load_catalog(FILE *fp, hts_boolean fallback,
   }
 }
 
-/* Build the lang/ name of the catalog lang.def calls hashname. Refuses a name
-   that is not a bare basename, so would leave lang/, and one too long for dst.
- */
-static hts_boolean lang_catalog_path(char *dst, size_t size,
-                                     const char *hashname) {
+/* Format "lang/<hashname>.txt" into dst, where hashname is the catalog name
+   lang.def gave this language. Refuses an empty name, one carrying a separator
+   or "..", and one too long for dst. */
+static HTS_CHECK_RESULT hts_boolean lang_catalog_path(char *dst, size_t size,
+                                                      const char *hashname) {
   if (!strnotempty(hashname) || strpbrk(hashname, "/\\") != NULL ||
       strstr(hashname, "..") != NULL) {
     return HTS_FALSE;
@@ -2678,7 +2678,7 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
      helpers abort, and a long line in a catalog must not kill the server. */
   if (limit_to) {
     char wanted[256];
-    char lbasename[1024];
+    char lbasename[1024]; /* the guard below writes it, so it outlives the if */
 
     wanted[0] = '\0';
     strlncatbuff(wanted, limit_to, sizeof(wanted), sizeof(wanted) - 1);
