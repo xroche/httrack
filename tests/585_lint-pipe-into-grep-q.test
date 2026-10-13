@@ -1,0 +1,73 @@
+#!/bin/bash
+#
+# A regression test for AGENTS.md's ban on piping into `grep -q`.
+
+set -euo pipefail
+export LC_ALL=C
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# shellcheck disable=SC2154 # top_srcdir comes from testlib.sh
+top="$top_srcdir"
+
+# The file list lives in the index, and a distcheck tarball carries none.
+if ! command -v git >/dev/null 2>&1 ||
+    ! git -C "$top" ls-files --error-unmatch AGENTS.md >/dev/null 2>&1; then
+    skip "no checkout here, so there is no file list to scan"
+fi
+
+# Only printf and echo, because bash flushes those per line where an external
+# producer batches its lines into one write. An env prefix counts too, since
+# `LC_ALL=C grep` is house style here.
+piped_into_grep_q='(printf|echo)[^|]*\|[[:space:]]*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*(command[[:space:]]+)?grep([[:space:]]+-[a-zA-Z]+)*[[:space:]]+-[a-zA-Z]*q[a-zA-Z]*'
+
+# /dev/null keeps grep's FILE: prefix, and a whole-line comment is prose, not code.
+scan() { # scan FILE...
+    local out
+    out=$(grep -nE "$piped_into_grep_q" "$@" /dev/null) || test $? -eq 1 || return 2
+    printf '%s\n' "$out" | grep -vE ':[0-9]+:[[:space:]]*#' || true
+}
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/pipe_into_q.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "$work"
+
+# The second hit carries a trailing comment, which a filter that dropped every
+# line holding a `#` would lose along with it. The third wears the env prefix.
+cat >"$work/bad.sh" <<'BAD'
+printf '%s\n' "$x" | grep -q foo
+echo "$x" | grep -q bar # a note
+printf '%s\n' "$x" | LC_ALL=C grep -q baz
+BAD
+cat >"$work/good.sh" <<'GOOD'
+grep -q foo <<<"$x"
+GOOD
+test "$(scan "$work/bad.sh" | grep -c 'bad\.sh:')" = 3 ||
+    fail "the scan did not report all three banned lines: [$(scan "$work/bad.sh")]"
+test -z "$(scan "$work/good.sh")" || fail "the scan flagged a here-string: $(scan "$work/good.sh")"
+
+# A read loop, because macOS bash 3.2 has no mapfile.
+files=()
+while IFS= read -r f; do
+    # Only this file, which carries the banned form as its own fixture.
+    case $f in tests/"${0##*/}") continue ;; esac
+    files+=("$top/$f")
+done < <(git -C "$top" ls-files \
+    '*.sh' '*.test' bootstrap .githooks/pre-commit src/webhttrack.in '.github/workflows/*.yml')
+# A count cannot see a dropped glob, so pin the half that cannot shrink and name
+# the files no extension glob reaches (the shape ci.yml uses for the same list).
+test "${#files[@]}" -ge "$(git -C "$top" ls-files '*.sh' '*.test' | wc -l)" ||
+    fail "the scan read only ${#files[@]} files"
+for must in .github/workflows/ci.yml bootstrap .githooks/pre-commit src/webhttrack.in; do
+    case " ${files[*]} " in
+    *" $top/$must "*) ;;
+    *) fail "the scan no longer reaches $must" ;;
+    esac
+done
+
+# A `fail` inside scan would land in this assignment rather than on the log.
+hits=$(scan "${files[@]}") || fail "grep read none of the files it was given"
+test -z "$hits" || fail "these pipe a builtin into grep -q, so capture the output and match a here-string:
+$hits"
+
+ok "no tracked script pipes a builtin into grep -q"
