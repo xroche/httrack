@@ -73,23 +73,21 @@ size_t st_mkdeep(char *buf, size_t bufsize, const char *dir, const char *nseg,
                  const char *who, size_t *baselen);
 
 /* These are the tallies of a self-test that compares a parser with a frozen
-   copy. Only the query diff uses the allowed_* tallies. */
+   copy. */
 typedef struct {
   unsigned long cases;
   unsigned long failures;
-  unsigned long allowed_qmark; /* a second '?' no longer starts a field */
-  unsigned long allowed_name;  /* a name with '=' or '&' is never a key */
-} querydiff_stats;
+} parsediff_stats;
 
 /* Count a mismatch on IN, and print the first 20 of them. */
-void querydiff_fail(querydiff_stats *st, const char *site, const char *in,
+void parsediff_fail(parsediff_stats *st, const char *site, const char *in,
                     const char *arg, const char *old, const char *cur);
 
 /* Return a malloct'd run of N copies of C, which the caller frees. */
-char *querydiff_run(char c, size_t n);
+char *parsediff_run(char c, size_t n);
 
 /* Append to OUT up to MAXTOK - 1 tokens drawn from ALPHABET by the LCG SEED. */
-void querydiff_random(String *out, uint32_t *seed, const char *const *alphabet,
+void parsediff_random(String *out, uint32_t *seed, const char *const *alphabet,
                       size_t nalpha, int maxtok);
 
 #endif

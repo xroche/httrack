@@ -2491,379 +2491,46 @@ static int st_statrecv(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
-/* ------------------------------------------------------------ */
-/* querydiff: the old query parsers of fil_normalized and %[param], */
-/* run next to the shared iterator.                              */
-/* TODO(#1878): delete with the legacy parsers.                  */
-/* ------------------------------------------------------------ */
-
-static int legacy_sortNormFnc(const void *a_, const void *b_) {
-  const char *const *const a = (const char *const *) a_;
-  const char *const *const b = (const char *const *) b_;
-
-  return strcmp(*a + 1, *b + 1);
-}
-
-/* Path normalizer core: optionally collapse redundant '//' (DO_SLASH) and/or
-   sort query arguments (DO_QUERY) so equivalent URLs dedupe. */
-static char *legacy_fil_normalized_ex(const char *source, char *dest,
-                                      int do_slash, int do_query) {
-  char lastc = 0;
-  int gotquery = 0;
-  size_t ampargs = 0;
-  size_t i, j;
-  char *query = NULL;
-
-  for (i = j = 0; source[i] != '\0'; i++) {
-    if (!gotquery && source[i] == '?') {
-      gotquery = 1;
-      ampargs = 1;
-    }
-    if (do_slash && !gotquery && lastc == '/' && source[i] == '/') {
-      // foo//bar -> foo/bar
-    } else {
-      if (gotquery && source[i] == '&') {
-        ampargs++;
-      }
-      dest[j++] = source[i];
-    }
-    lastc = source[i];
-  }
-  dest[j++] = '\0';
-
-  /* Sort arguments (&foo=1&bar=2 == &bar=2&foo=1) */
-  if (do_query && ampargs > 1) {
-    char **amps = malloct(ampargs * sizeof(char *));
-    char *copyBuff = NULL;
-    size_t qLen = 0;
-
-    assertf(amps != NULL);
-    gotquery = 0;
-    for (i = j = 0; dest[i] != '\0'; i++) {
-      if ((gotquery && dest[i] == '&') || (!gotquery && dest[i] == '?')) {
-        if (!gotquery) {
-          gotquery = 1;
-          query = &dest[i];
-          qLen = strlen(query);
-        }
-        assertf(j < ampargs);
-        amps[j++] = &dest[i];
-        dest[i] = '\0';
-      }
-    }
-    assertf(gotquery);
-    assertf(j == ampargs);
-
-    /* Sort 'em all */
-    qsort(amps, ampargs, sizeof(char *), legacy_sortNormFnc);
-
-    /* Replace query by sorted query */
-    copyBuff = malloct(qLen + 1);
-    assertf(copyBuff != NULL);
-    {
-      htsbuff cb = htsbuff_ptr(copyBuff, qLen + 1);
-
-      for (i = 0; i < ampargs; i++) {
-        htsbuff_cat(&cb, i == 0 ? "?" : "&");
-        htsbuff_cat(&cb, amps[i] + 1);
-      }
-      assertf(cb.len == qLen);
-    }
-    /* query points into dest where the original qLen-byte query was */
-    strlcpybuff(query, copyBuff, qLen + 1);
-
-    /* Cleanup */
-    freet(amps);
-    freet(copyBuff);
-  }
-
-  return dest;
-}
-
-static int legacy_hts_query_key_stripped(const char *arg, size_t keylen,
-                                         const char *strip) {
-  const char *p = strip;
-
-  while (*p != '\0') {
-    const char *start = p;
-    size_t toklen;
-
-    while (*p != '\0' && *p != ',')
-      p++;
-    toklen = (size_t) (p - start);
-    while (toklen > 0 && *start == ' ') {
-      start++;
-      toklen--;
-    }
-    while (toklen > 0 && start[toklen - 1] == ' ')
-      toklen--;
-    if (toklen == 1 && start[0] == '*')
-      return 1;
-    if (toklen == keylen && strncmp(start, arg, keylen) == 0)
-      return 1;
-    if (*p == ',')
-      p++;
-  }
-  return 0;
-}
-
-static char *legacy_fil_normalized_filtered_ex(const char *source, char *dest,
-                                               const char *strip, int do_slash,
-                                               int do_query) {
-  const char *query;
-  char BIGSTK tmp[HTS_URLMAXSIZE * 2];
-  htsbuff cb;
-  int wrote = 0;
-
-  /* No strip list, or no query: plain normalization. */
-  if (strip == NULL || *strip == '\0' ||
-      (query = strchr(source, '?')) == NULL) {
-    return legacy_fil_normalized_ex(source, dest, do_slash, do_query);
-  }
-
-  /* Copy the path, re-emit kept query args, let fil_normalized() sort. Walk
-     every field incl. empty/trailing ("a&","?&&") so the result is a fixpoint
-     (the read re-normalizes it; a dropped empty arg would miss dedup). */
-  cb = htsbuff_ptr(tmp, sizeof(tmp));
-  htsbuff_catn(&cb, source, (size_t) (query - source));
-  for (query++;;) {
-    const char *const arg = query;
-    const char *eq = NULL;
-    size_t keylen, arglen;
-
-    while (*query != '\0' && *query != '&') {
-      if (eq == NULL && *query == '=')
-        eq = query;
-      query++;
-    }
-    arglen = (size_t) (query - arg);
-    keylen = eq != NULL ? (size_t) (eq - arg) : arglen;
-    if (!legacy_hts_query_key_stripped(arg, keylen, strip)) {
-      htsbuff_catc(&cb, wrote ? '&' : '?');
-      htsbuff_catn(&cb, arg, arglen);
-      wrote = 1;
-    }
-    if (*query == '\0')
-      break;
-    query++;
-  }
-  return legacy_fil_normalized_ex(tmp, dest, do_slash, do_query);
-}
-
-/* This is the old %[param] lookup of url_savename(). */
-static hts_boolean legacy_url_query_value(const char *fil_complete,
-                                          const char *token, char *value,
-                                          size_t size) {
-  char name[256];
-  char *c;
-
-  assertf(strlen(token) + 2 <= sizeof(name));
-  strcpybuff(name, token);
-  strcatbuff(name, "="); /* param=.. */
-  value[0] = '\0';
-  c = strchr(fil_complete, '?');
-  if (c) {
-    char *cp;
-
-    while ((cp = strstr(c + 1, name)) && *(cp - 1) != '?' &&
-           *(cp - 1) != '&') { /* finds [?&]param= */
-      c = cp;
-    }
-    if (cp) {
-      char *d = value;
-
-      c = cp + strlen(name); /* jumps "param=" */
-      while (*c != '\0' && *c != '&' && d + 1 < value + size) {
-        *d++ = *c++;
-      }
-      *d = '\0';
-      return HTS_TRUE;
-    }
-  }
-  return HTS_FALSE;
-}
-
-/* This compares fil_normalized, which runs the --strip-query filter and the
-   query sort. */
-static void querydiff_normalize(querydiff_stats *st, const char *url) {
-  static const char *const strips[] = {NULL,    "",   "*", "a",  "a, sid",
-                                       " x ,y", "id", "=", ",,", NULL};
-  const size_t size = strlen(url) + 1;
-  char *o = malloct(size);
-  char *n = malloct(size);
+/* Prints %[param]'s value for the key argv[1] of argv[0]'s query, clipped to
+   argv[2] bytes with the NUL, as [value] or "(none)". The buffer is poisoned
+   first, so a stray NUL, a missing one, or a write past the size all show. */
+static int st_queryparam(httrackp *opt, int argc, char **argv) {
+  char buff[256];
+  size_t size = sizeof(buff);
+  const char *overrun = "";
+  hts_boolean found;
   size_t i;
-  int flags;
-
-  assertf(o != NULL && n != NULL);
-  for (i = 0; i == 0 || strips[i] != NULL; i++) {
-    for (flags = 0; flags < 4; flags++) {
-      st->cases++;
-      legacy_fil_normalized_filtered_ex(url, o, strips[i], flags & 1,
-                                        (flags >> 1) & 1);
-      fil_normalized_filtered_ex(url, n, strips[i], flags & 1,
-                                 (flags >> 1) & 1);
-      if (strcmp(o, n) != 0)
-        querydiff_fail(st, "fil_normalized", url,
-                       strips[i] != NULL ? strips[i] : "(null)", o, n);
-    }
-  }
-  freet(o);
-  freet(n);
-}
-
-/* This returns a copy of s with each '?' after the first skip ones replaced by
-   '\001', which cannot start a field. */
-static char *querydiff_hide_qmarks(const char *s, int skip) {
-  char *const copy = strdupt(s);
-  char *p;
-
-  assertf(copy != NULL);
-  for (p = copy; *p != '\0'; p++) {
-    if (*p == '?' && skip-- <= 0)
-      *p = '\001';
-  }
-  return copy;
-}
-
-/* This compares %[param]. A name holding '=' or '&' may now find nothing. A
-   URL with a second '?' may differ when the old lookup gives the new result
-   once every '?' past the first is hidden, in the name too. */
-static void querydiff_template(querydiff_stats *st, const char *url,
-                               const char *name) {
-  static const size_t sizes[] = {1, 2, 4, 256};
-  size_t i;
-
-  for (i = 0; i < sizeof(sizes) / sizeof(sizes[0]); i++) {
-    char o[256], n[256];
-    const hts_boolean fo = legacy_url_query_value(url, name, o, sizes[i]);
-    const hts_boolean fn = url_query_value(url, name, n, sizes[i]);
-
-    st->cases++;
-    if (fo == fn && (!fo || strcmp(o, n) == 0))
-      continue;
-    if (strpbrk(name, "=&") != NULL) {
-      if (!fn) {
-        st->allowed_name++;
-        continue;
-      }
-    } else if (strchr(url, '?') != NULL &&
-               strchr(strchr(url, '?') + 1, '?') != NULL) {
-      char *hurl = querydiff_hide_qmarks(url, 1);
-      char *hname = querydiff_hide_qmarks(name, 0);
-      char h[256];
-      const hts_boolean fh = legacy_url_query_value(hurl, hname, h, sizes[i]);
-      char *p;
-
-      freet(hurl);
-      freet(hname);
-      for (p = h; *p != '\0'; p++) {
-        if (*p == '\001')
-          *p = '?';
-      }
-      if (fh == fn && (!fh || strcmp(h, n) == 0)) {
-        st->allowed_qmark++;
-        continue;
-      }
-    }
-    querydiff_fail(st, "%[param]", url, name, fo ? o : "(none)",
-                   fn ? n : "(none)");
-  }
-}
-
-static void querydiff_one(querydiff_stats *st, const char *q) {
-  static const char *const names[] = {"id",  "a",   "sid", "",    "ID",
-                                      "a=b", "a&b", "?",   "x?id"};
-  String url = STRING_EMPTY;
-  size_t i;
-
-  StringCat(url, "/d//p?");
-  StringCat(url, q);
-  querydiff_normalize(st, StringBuff(url));
-  for (i = 0; i < sizeof(names) / sizeof(names[0]); i++)
-    querydiff_template(st, StringBuff(url), names[i]);
-  StringFree(url);
-}
-
-static int st_querydiff(httrackp *opt, int argc, char **argv) {
-  static const char *const hand[] = {
-      "",           "&",          "&&",
-      "a",          "a&",         "&a",
-      "a&&b",       "a=",         "=",
-      "=v",         "a=b=c",      "a=1&b=2&a=3",
-      "b=2&a=1",    "a=1&&",      "&&a=1",
-      "a&b=c&d=e",  "a=1&b&c=2",  "id=5?id=6",
-      "x=1?id=5",   "xid=5&id=6", "id=a%2",
-      "id=%41%42",  "id==5",      "id",
-      "id&id=7",    "?id=1",      "a=b=5",
-      "a&b=3",      "#a=1&b",     ";a=1;b=2",
-      "+=+&+",      "a b=c d&e",  "sid=a+b&sid=%41",
-      "a=1?x?id=7", "x?id=7",     "ID=5&id=6",
-      "Id=5",       NULL};
-  /* Long fields at and around the template's 255-byte value and 254-byte
-     name. */
-  static const size_t lengths[] = {63, 64, 65, 254, 255, 256, 300};
-  static const char *const alphabet[] = {"a", "=",   "&",   "%",   "?",  ";",
-                                         "#", "+",   " ",   "sid", "id", "/",
-                                         "1", "%41", "abc", "x"};
-  querydiff_stats st = {0, 0, 0, 0};
-  uint32_t seed = 1872;
-  size_t i;
-  int r;
 
   (void) opt;
-  (void) argc;
-  (void) argv;
-  /* These checks pin the two intended changes. */
-  {
-    char v[256];
-
-    if (url_query_value("/p?x=1?id=5", "id", v, sizeof(v)) ||
-        !url_query_value("/p?id=5?id=6", "id", v, sizeof(v)) ||
-        strcmp(v, "5?id=6") != 0) {
-      querydiff_fail(&st, "%[param] second '?'", "?id=5?id=6", "id", "", v);
-    }
-    if (url_query_value("/p?a=b=5", "a=b", v, sizeof(v)) ||
-        url_query_value("/p?a&b=3", "a&b", v, sizeof(v))) {
-      querydiff_fail(&st, "%[param] name with '=' or '&'", "?a=b=5", "a=b",
-                     "(none)", v);
+  if (argc < 2 || argc > 3) {
+    fprintf(stderr, "queryparam: takes a url, a name and an optional size\n");
+    return 1;
+  }
+  if (argc == 3) {
+    size = (size_t) atoi(argv[2]);
+    if (size < 1 || size > sizeof(buff)) {
+      fprintf(stderr, "queryparam: the size is 1..%u\n",
+              (unsigned) sizeof(buff));
+      return 1;
     }
   }
-  for (i = 0; hand[i] != NULL; i++)
-    querydiff_one(&st, hand[i]);
-  for (i = 0; i < sizeof(lengths) / sizeof(lengths[0]); i++) {
-    char *run = querydiff_run('x', lengths[i]);
-    String q = STRING_EMPTY;
-
-    StringCat(q, "a=1&");
-    StringCat(q, run);
-    StringCat(q, "=v&id=");
-    StringCat(q, run);
-    querydiff_one(&st, StringBuff(q));
-    if (lengths[i] <= 254) { /* the template's name cap */
-      querydiff_template(&st, "/p?x=1&", run);
-      StringClear(q);
-      StringCat(q, "/p?a=1&");
-      StringCat(q, run);
-      StringCat(q, "=v");
-      querydiff_template(&st, StringBuff(q), run);
-    }
-    StringFree(q);
-    freet(run);
+  memset(buff, 'Z', sizeof(buff));
+  found = url_query_value(argv[0], argv[1], buff, size);
+  for (i = size; i < sizeof(buff); i++) {
+    if (buff[i] != 'Z')
+      overrun = " OVERRUN";
   }
-  for (r = 0; r < 4000; r++) {
-    String q = STRING_EMPTY;
-
-    querydiff_random(&q, &seed, alphabet,
-                     sizeof(alphabet) / sizeof(alphabet[0]), 24);
-    querydiff_one(&st, StringBuff(q) != NULL ? StringBuff(q) : "");
-    StringFree(q);
+  if (memchr(buff, '\0', size) == NULL) {
+    printf("UNTERMINATED%s\n", overrun);
+    return 1;
   }
-  printf("querydiff: %lu cases, %lu failures, allowed: %lu second '?', %lu "
-         "name with '=' or '&'\n",
-         st.cases, st.failures, st.allowed_qmark, st.allowed_name);
-  if (st.failures == 0)
-    printf("querydiff: OK\n");
-  return st.failures != 0;
+  if (found) {
+    printf("[%s]%s\n", buff, overrun);
+  } else {
+    /* The lookup empties the buffer whether or not it finds the key. */
+    printf("(none)%s%s\n", buff[0] != '\0' ? " DIRTY" : "", overrun);
+  }
+  return 0;
 }
 
 /* Prints each field of argv[0] as [key] or [key|value], because '|' shows
@@ -2894,6 +2561,34 @@ static int st_querynext(httrackp *opt, int argc, char **argv) {
   printf("%s%s\n", StringBuff(out), bad ? " BADLEN" : "");
   StringFree(out);
   return bad;
+}
+
+/* This is the old --strip-query rule matcher. */
+static int legacy_hts_query_key_stripped(const char *arg, size_t keylen,
+                                         const char *strip) {
+  const char *p = strip;
+
+  while (*p != '\0') {
+    const char *start = p;
+    size_t toklen;
+
+    while (*p != '\0' && *p != ',')
+      p++;
+    toklen = (size_t) (p - start);
+    while (toklen > 0 && *start == ' ') {
+      start++;
+      toklen--;
+    }
+    while (toklen > 0 && start[toklen - 1] == ' ')
+      toklen--;
+    if (toklen == 1 && start[0] == '*')
+      return 1;
+    if (toklen == keylen && strncmp(start, arg, keylen) == 0)
+      return 1;
+    if (*p == ',')
+      p++;
+  }
+  return 0;
 }
 
 /* spandiff compares the frozen old rule parsers with the span-based ones. */
@@ -3115,7 +2810,7 @@ static const char *legacy_hts_host_alias_looping(const char *rules,
   return NULL;
 }
 
-static void spandiff_one(querydiff_stats *st, const char *rules,
+static void spandiff_one(parsediff_stats *st, const char *rules,
                          const char *longhost, const char *longfil) {
   static const char *const keys[] = {"",      "a",         "sid",    "*",
                                      "a.com", " ",         "x",      "utm",
@@ -3140,7 +2835,7 @@ static void spandiff_one(querydiff_stats *st, const char *rules,
     st->cases++;
     if (hts_query_key_stripped(keys[i], strlen(keys[i]), rules) !=
         (legacy_hts_query_key_stripped(keys[i], strlen(keys[i]), rules) != 0))
-      querydiff_fail(st, "hts_query_key_stripped", rules, keys[i], "", "");
+      parsediff_fail(st, "hts_query_key_stripped", rules, keys[i], "", "");
   }
   for (i = 0; i < sizeof(adrs) / sizeof(adrs[0]); i += 2) {
     const char *const adr = adrs[i] != NULL ? adrs[i] : longhost;
@@ -3157,7 +2852,7 @@ static void spandiff_one(querydiff_stats *st, const char *rules,
       rn = hts_query_strip_keys(rules, adr, fil, n, sizes[j]);
       if ((ro == NULL) != (rn == NULL) ||
           (ro != NULL && (rn != n || strcmp(o, n) != 0)))
-        querydiff_fail(st, "hts_query_strip_keys", rules, adr,
+        parsediff_fail(st, "hts_query_strip_keys", rules, adr,
                        ro != NULL ? o : "(none)", rn != NULL ? n : "(none)");
     }
   }
@@ -3173,12 +2868,12 @@ static void spandiff_one(querydiff_stats *st, const char *rules,
 
       st->cases++;
       if (co != cn || (co != NULL && lo != ln))
-        querydiff_fail(st, "hts_host_alias_match", rules, host, "", "");
+        parsediff_fail(st, "hts_host_alias_match", rules, host, "", "");
     }
   }
   st->cases++;
   if (hts_host_alias_rule_ok(rules) != legacy_hts_host_alias_rule_ok(rules))
-    querydiff_fail(st, "hts_host_alias_rule_ok", rules, "", "", "");
+    parsediff_fail(st, "hts_host_alias_rule_ok", rules, "", "", "");
   for (www = 0; www < 2; www++) {
     for (j = 0; j < sizeof(sizes) / sizeof(sizes[0]); j++) {
       char o[4096], n[4096];
@@ -3191,7 +2886,7 @@ static void spandiff_one(querydiff_stats *st, const char *rules,
       rn = hts_host_alias_looping(rules, www, n, sizes[j]);
       if ((ro == NULL) != (rn == NULL) || (rn != NULL && rn != n) ||
           memcmp(o, n, sizeof(o)) != 0)
-        querydiff_fail(st, "hts_host_alias_looping", rules, "",
+        parsediff_fail(st, "hts_host_alias_looping", rules, "",
                        ro != NULL ? o : "(none)", rn != NULL ? n : "(none)");
     }
   }
@@ -3203,7 +2898,7 @@ static void spandiff_one(querydiff_stats *st, const char *rules,
     (void) hts_span_copy(line, one, line.len + 1);
     st->cases++;
     if (hts_host_alias_rule_ok(one) != legacy_hts_host_alias_rule_ok(one))
-      querydiff_fail(st, "hts_host_alias_rule_ok", one, "line", "", "");
+      parsediff_fail(st, "hts_host_alias_rule_ok", one, "line", "", "");
     freet(one);
   }
 }
@@ -3280,11 +2975,11 @@ static int st_spandiff(httrackp *opt, int argc, char **argv) {
       "a.com", "b",  "x",     "*",       "=",   ",",   "\n",  " ",
       "\t",    "/",  "www.",  "http://", "sid", "utm", "a",   "?",
       "*.com", "//", "x.com", "primary", "@",   "\r",  "://", ""};
-  querydiff_stats st = {0, 0, 0, 0};
+  parsediff_stats st = {0, 0};
   uint32_t seed = 546;
   size_t i;
   int r;
-  char *longhost = querydiff_run('x', 2047);
+  char *longhost = parsediff_run('x', 2047);
   String longfil = STRING_EMPTY;
 
   (void) opt;
@@ -3304,13 +2999,13 @@ static int st_spandiff(httrackp *opt, int argc, char **argv) {
 
     t = hts_span_trim(s, " ab", " ab");
     if (t.p != nul + 2 || t.len != 1)
-      querydiff_fail(&st, "hts_span_trim NUL", "' a\\0b '", "", "", "");
+      parsediff_fail(&st, "hts_span_trim NUL", "' a\\0b '", "", "", "");
     if (!hts_span_next(&cur, nul + s.len, '\0', &f) || f.len != 2 ||
         !hts_span_next(&cur, nul + s.len, '\0', &f) || f.p != nul + 3 ||
         f.len != 2 || hts_span_next(&cur, nul + s.len, '\0', &f))
-      querydiff_fail(&st, "hts_span_next NUL", "' a\\0b '", "", "", "");
+      parsediff_fail(&st, "hts_span_next NUL", "' a\\0b '", "", "", "");
     if (!hts_span_copy(s, d, sizeof(d)) || memcmp(d, nul, sizeof(nul)) != 0)
-      querydiff_fail(&st, "hts_span_copy NUL", "' a\\0b '", "", "", "");
+      parsediff_fail(&st, "hts_span_copy NUL", "' a\\0b '", "", "", "");
   }
   /* No NUL follows these bytes, so an over-read shows under ASan. */
   {
@@ -3329,15 +3024,15 @@ static int st_spandiff(httrackp *opt, int argc, char **argv) {
     for (cur = buf; hts_span_next(&cur, buf + len, ',', &f);)
       n++;
     if (n != 2 || f.p != buf + 3 || f.len != len - 3)
-      querydiff_fail(&st, "hts_span_next unterminated", text, "", "", "");
+      parsediff_fail(&st, "hts_span_next unterminated", text, "", "", "");
     if (hts_span_split(f, ';', &h, &t) || !hts_span_split(f, '=', &h, &t) ||
         t.p != buf + 5 || t.len != 2)
-      querydiff_fail(&st, "hts_span_split unterminated", text, "", "", "");
+      parsediff_fail(&st, "hts_span_split unterminated", text, "", "", "");
     t = hts_span_trim(s, " ", "/");
     if (t.p != buf + 1 || t.len != len - 2)
-      querydiff_fail(&st, "hts_span_trim unterminated", text, "", "", "");
+      parsediff_fail(&st, "hts_span_trim unterminated", text, "", "", "");
     if (!hts_span_copy(s, d, sizeof(d)) || strcmp(d, text) != 0)
-      querydiff_fail(&st, "hts_span_copy unterminated", text, "", "", "");
+      parsediff_fail(&st, "hts_span_copy unterminated", text, "", "", "");
     freet(buf);
   }
   for (i = 0; hand[i] != NULL; i++)
@@ -3347,7 +3042,7 @@ static int st_spandiff(httrackp *opt, int argc, char **argv) {
         "%s=b.com",  "%s/=b.com",    "%s =b.com",    " %s=b.com", "a.com=%s",
         "a.com=%s/", "%s*=sid",      "%s=sid",       "sid,%s",    "*=%s",
         "%s",        "b,%s,c=a.com", "a.com/*%s=sid"};
-    char *run = querydiff_run('x', lengths[i]);
+    char *run = parsediff_run('x', lengths[i]);
     size_t k;
 
     for (k = 0; k < sizeof(shapes) / sizeof(shapes[0]); k++) {
@@ -3366,7 +3061,7 @@ static int st_spandiff(httrackp *opt, int argc, char **argv) {
                                         sizeof(o)) == NULL ||
             hts_query_strip_keys(StringBuff(rules), "a.com",
                                  StringBuff(longfil), n, sizeof(n)) == NULL)
-          querydiff_fail(&st, "clipped pattern matches", StringBuff(rules),
+          parsediff_fail(&st, "clipped pattern matches", StringBuff(rules),
                          "a.com", "", "");
       }
       StringFree(rules);
@@ -3390,7 +3085,7 @@ static int st_spandiff(httrackp *opt, int argc, char **argv) {
   for (r = 0; r < 6000; r++) {
     String rules = STRING_EMPTY;
 
-    querydiff_random(&rules, &seed, alphabet,
+    parsediff_random(&rules, &seed, alphabet,
                      sizeof(alphabet) / sizeof(alphabet[0]), 16);
     spandiff_one(&st, StringBuff(rules) != NULL ? StringBuff(rules) : "",
                  longhost, StringBuff(longfil));
@@ -3649,9 +3344,8 @@ const struct selftest_entry selftests_lib[] = {
      "last-char helpers never index before the buffer (#770, #781, #821)",
      st_lastchar},
     {"rtrim", "", "hts_rtrim never walks below the buffer", st_rtrim},
-    {"querydiff", "",
-     "the shared query iterator matches the six parsers it replaced",
-     st_querydiff},
+    {"queryparam", "<url> <name> [size]", "the value %[param] reads for a key",
+     st_queryparam},
     {"querynext", "<query>", "the fields the shared query iterator reads",
      st_querynext},
     {"spandiff", "",

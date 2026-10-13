@@ -1,0 +1,39 @@
+#!/bin/bash
+#
+# What the shared query iterator reads, and what %[param] looks up with it.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# Every field is read, empty ones too, and the key ends at the first '='. A '|'
+# marks the end of the key.
+selftest_queue "[a]" querynext a
+selftest_queue "[a][]" querynext "a&"
+selftest_queue "[][]" querynext "&"
+selftest_queue "[a][b|c][][d|e=f]" querynext "a&b=c&&d=e=f"
+selftest_queue "[|v]" querynext "=v"
+selftest_queue "[k|]" querynext "k="
+selftest_queue "[x|1?id=5]" querynext "x=1?id=5"
+selftest_queue "[%41|%26][+]" querynext "%41=%26&+"
+
+# %[param] wants a field with an '=' whose key is exactly the name, and takes
+# the first such field.
+selftest_queue "(none)" queryparam "/p" id
+selftest_queue "(none)" queryparam "/p?id&x=1" id
+selftest_queue "[1]" queryparam "/p?id=1&id=2" id
+selftest_queue "[v]" queryparam "/p?=v" ""
+
+# A second '?' stays inside the value instead of starting a field, and a name
+# holding '=' or '&' never matches, because no key can hold either.
+selftest_queue "[5?id=6]" queryparam "/p?id=5?id=6" id
+selftest_queue "(none)" queryparam "/p?x=1?id=5" id
+selftest_queue "(none)" queryparam "/p?a=b=5" "a=b"
+selftest_queue "(none)" queryparam "/p?a&b=3" "a&b"
+
+# The value is clipped to the buffer, and a one-byte buffer still finds it.
+selftest_queue "[123]" queryparam "/p?id=12345" id 4
+selftest_queue "[]" queryparam "/p?id=12345" id 1
+
+selftest_run_queued
