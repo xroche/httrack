@@ -1,0 +1,19 @@
+#!/bin/bash
+#
+# unzRepair copies an entry's untrusted compressed size, never allocates it.
+
+set -eu
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+bin=$(command -v httrack)
+# A 1GB address-space cap makes a 2GB allocation fail; sanitizers cannot run under it.
+if (ulimit -v 1048576 && "$bin" -#test >/dev/null 2>&1); then
+    out=$(ulimit -v 1048576 && "$bin" -#test=zip-repair-size "$dir")
+else
+    out=$("$bin" -#test=zip-repair-size "$dir")
+fi
+grep -qx "zip-repair-size: OK" <<<"$out" || fail "expected 'zip-repair-size: OK', got: $out"

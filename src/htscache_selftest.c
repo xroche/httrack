@@ -3788,6 +3788,82 @@ static int st_zip_repair_shift(httrackp *opt, int argc, char **argv) {
   return (err == Z_OK && nrec == 1) ? 0 : 1;
 }
 
+/* Drives unzRepair over one local file header whose compressed size is
+   CPSIZE, followed by PAYLOAD bytes of data. */
+static int zip_repair_size_case(const char *dir, uLong cpsize, size_t payload,
+                                uLong *nrec, uLong *bytes) {
+  unsigned char header[31] = {0x50, 0x4b, 0x03, 0x04, 0x14};
+  char in[HTS_URLMAXSIZE], out[HTS_URLMAXSIZE], tmp[HTS_URLMAXSIZE];
+  hts_boolean ok;
+  size_t i;
+  FILE *fp;
+
+  header[18] = (unsigned char) (cpsize & 0xff);
+  header[19] = (unsigned char) ((cpsize >> 8) & 0xff);
+  header[20] = (unsigned char) ((cpsize >> 16) & 0xff);
+  header[21] = (unsigned char) ((cpsize >> 24) & 0xff);
+  header[26] = 1; /* filename length */
+  header[30] = 'a';
+  snprintf(in, sizeof(in), "%s/damaged.zip", dir);
+  snprintf(out, sizeof(out), "%s/repair.zip", dir);
+  snprintf(tmp, sizeof(tmp), "%s/repair.tmp", dir);
+  fp = fopen(in, "wb");
+  if (fp == NULL)
+    return Z_ERRNO;
+  ok = hts_fwrite_exact(header, sizeof(header), fp);
+  for (i = 0; ok && i < payload; i++)
+    ok = fputc('x', fp) != EOF;
+  fclose(fp);
+  if (!ok)
+    return Z_ERRNO;
+  *nrec = 0;
+  *bytes = 0;
+  return unzRepair(in, out, tmp, nrec, bytes);
+}
+
+/* A local header's compressed size is untrusted: a truncated entry must fail
+   with Z_ERRNO whatever size it claims, never allocate that size up front nor
+   skip its data, and an entry larger than one copy chunk must survive whole. */
+static int st_zip_repair_size(httrackp *opt, int argc, char **argv) {
+  static const struct {
+    uLong cpsize;
+    size_t payload;
+    int err;
+    uLong nrec;
+  } cases[] = {
+      {20000, 20000, Z_OK, 1},        /* several chunks, intact */
+      {0x7fffffffUL, 16, Z_ERRNO, 0}, /* would allocate ~2GB */
+      {0x80000010UL, 16, Z_ERRNO, 0}, /* went negative and was skipped */
+      {0xffffffffUL, 16, Z_ERRNO, 0},
+  };
+
+  size_t i;
+  int fails = 0;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "zip-repair-size: needs a directory\n");
+    return 1;
+  }
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    uLong nrec, bytes;
+    const int err = zip_repair_size_case(argv[0], cases[i].cpsize,
+                                         cases[i].payload, &nrec, &bytes);
+    const hts_boolean want_bytes =
+        cases[i].err != Z_OK || bytes == cases[i].cpsize;
+
+    if (err != cases[i].err || nrec != cases[i].nrec || !want_bytes) {
+      printf("zip-repair-size: FAIL cpsize=%lx err=%d nrec=%lu bytes=%lu\n",
+             (unsigned long) cases[i].cpsize, err, (unsigned long) nrec,
+             (unsigned long) bytes);
+      fails++;
+    }
+  }
+  if (fails == 0)
+    printf("zip-repair-size: OK\n");
+  return fails != 0;
+}
+
 #ifdef _WIN32
 #define HTS_FILENO(fp) _fileno(fp)
 #else
@@ -4402,6 +4478,9 @@ const struct selftest_entry selftests_cache[] = {
     {"zip-repair-shift", "<dir>",
      "cache zip-repair header read must not overflow a signed shift",
      st_zip_repair_shift},
+    {"zip-repair-size", "<dir>",
+     "cache zip-repair must copy an untrusted entry size, never allocate it",
+     st_zip_repair_size},
     {"zip-repair-openfail", "<dir>",
      "cache zip-repair must not write through an output it failed to open",
      st_zip_repair_openfail},
