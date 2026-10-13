@@ -2542,10 +2542,15 @@ static void querysweep_one(parsediff_stats *st, const char *url,
                            const char *name) {
   static const size_t sizes[] = {1, 2, 4, 63, 64, 65, 254, 255};
   char oracle[256];
-  const hts_boolean oracle_found =
-      url_query_value(url, name, oracle, sizeof(oracle));
+  hts_boolean oracle_found;
   size_t i;
 
+  memset(oracle, QUERYPARAM_POISON, sizeof(oracle));
+  oracle_found = url_query_value(url, name, oracle, sizeof(oracle));
+  if (memchr(oracle, '\0', sizeof(oracle)) == NULL) {
+    parsediff_fail(st, "url_query_value left no terminator", url, name, "", "");
+    return;
+  }
   for (i = 0; i < sizeof(sizes) / sizeof(sizes[0]); i++) {
     const size_t size = sizes[i];
     char buff[256];
