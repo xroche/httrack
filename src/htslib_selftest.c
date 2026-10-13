@@ -2491,13 +2491,17 @@ static int st_statrecv(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
-/* Prints %[param]'s value for the key argv[1] of argv[0]'s query, clipped to
-   argv[2] bytes with the NUL, as [value] or "(none)". The buffer is poisoned
-   first, so a stray NUL, a missing one, or a write past the size all show. */
+/* The byte an overrun or a stray NUL has to disturb. */
+#define QUERYPARAM_POISON 'Z'
+
+/* Prints the value %[param] looks up as [value], or "(none)" for no such key.
+   The buffer is poisoned first, so a stray NUL, a missing one and a write past
+   the size all show. */
 static int st_queryparam(httrackp *opt, int argc, char **argv) {
   char buff[256];
   size_t size = sizeof(buff);
   const char *overrun = "";
+  const char *not_emptied = "";
   hts_boolean found;
   size_t i;
 
@@ -2514,10 +2518,10 @@ static int st_queryparam(httrackp *opt, int argc, char **argv) {
       return 1;
     }
   }
-  memset(buff, 'Z', sizeof(buff));
+  memset(buff, QUERYPARAM_POISON, sizeof(buff));
   found = url_query_value(argv[0], argv[1], buff, size);
   for (i = size; i < sizeof(buff); i++) {
-    if (buff[i] != 'Z')
+    if (buff[i] != QUERYPARAM_POISON)
       overrun = " OVERRUN";
   }
   if (memchr(buff, '\0', size) == NULL) {
@@ -2526,11 +2530,99 @@ static int st_queryparam(httrackp *opt, int argc, char **argv) {
   }
   if (found) {
     printf("[%s]%s\n", buff, overrun);
-  } else {
-    /* The lookup empties the buffer whether or not it finds the key. */
-    printf("(none)%s%s\n", buff[0] != '\0' ? " DIRTY" : "", overrun);
+    return 0;
   }
+  /* The lookup empties the buffer whether or not it finds the key. */
+  if (buff[0] != '\0') {
+    not_emptied = " NOT-EMPTIED";
+  }
+  printf("(none)%s%s\n", not_emptied, overrun);
   return 0;
+}
+
+/* One url_query_value read per buffer size. The widest read is the oracle for
+   the narrow ones, because every size reads the same field and clips its value
+   to size - 1 bytes. */
+static void querysweep_one(parsediff_stats *st, const char *url,
+                           const char *name) {
+  static const size_t sizes[] = {1, 2, 4, 63, 64, 65, 254, 255};
+  char wide[256];
+  const hts_boolean found = url_query_value(url, name, wide, sizeof(wide));
+  size_t i;
+
+  for (i = 0; i < sizeof(sizes) / sizeof(sizes[0]); i++) {
+    const size_t size = sizes[i];
+    char buff[256];
+    hts_boolean got;
+    size_t j;
+
+    st->cases++;
+    memset(buff, QUERYPARAM_POISON, sizeof(buff));
+    got = url_query_value(url, name, buff, size);
+    for (j = size; j < sizeof(buff); j++) {
+      if (buff[j] != QUERYPARAM_POISON) {
+        parsediff_fail(st, "url_query_value wrote past the size", url, name,
+                       wide, "");
+        break;
+      }
+    }
+    if (memchr(buff, '\0', size) == NULL) {
+      parsediff_fail(st, "url_query_value left no terminator", url, name, wide,
+                     "");
+    } else if (got != found || strlen(buff) >= size ||
+               strncmp(buff, wide, size - 1) != 0) {
+      parsediff_fail(st, "url_query_value clipped wrong", url, name, wide,
+                     buff);
+    }
+  }
+}
+
+/* The random half of the deleted query differential, kept as a bounds check
+   that needs no second parser. */
+static int st_querysweep(httrackp *opt, int argc, char **argv) {
+  static const char *const names[] = {"id", "a", "sid", "", "x?id"};
+  static const char *const alphabet[] = {"a", "=",   "&",   "%",   "?",  ";",
+                                         "#", "+",   " ",   "sid", "id", "/",
+                                         "1", "%41", "abc", "x"};
+  /* Fields at and around the 255-byte value the lookup used to cap at. */
+  static const size_t lengths[] = {63, 64, 65, 254, 255, 256, 300};
+  parsediff_stats st = {0, 0};
+  uint32_t seed = 1872;
+  size_t i, j;
+  int r;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (i = 0; i < sizeof(lengths) / sizeof(lengths[0]); i++) {
+    char *run = parsediff_run('x', lengths[i]);
+    String q = STRING_EMPTY;
+
+    StringCat(q, "/p?a=1&id=");
+    StringCat(q, run);
+    StringCat(q, "&");
+    StringCat(q, run);
+    StringCat(q, "=v");
+    for (j = 0; j < sizeof(names) / sizeof(names[0]); j++)
+      querysweep_one(&st, StringBuff(q), names[j]);
+    querysweep_one(&st, StringBuff(q), run);
+    StringFree(q);
+    freet(run);
+  }
+  for (r = 0; r < 4000; r++) {
+    String q = STRING_EMPTY;
+
+    StringCat(q, "/p?");
+    parsediff_random(&q, &seed, alphabet,
+                     sizeof(alphabet) / sizeof(alphabet[0]), 24);
+    for (j = 0; j < sizeof(names) / sizeof(names[0]); j++)
+      querysweep_one(&st, StringBuff(q), names[j]);
+    StringFree(q);
+  }
+  printf("querysweep: %lu cases, %lu failures\n", st.cases, st.failures);
+  if (st.failures == 0)
+    printf("querysweep: OK\n");
+  return st.failures != 0;
 }
 
 /* Prints each field of argv[0] as [key] or [key|value], because '|' shows
@@ -3346,6 +3438,8 @@ const struct selftest_entry selftests_lib[] = {
     {"rtrim", "", "hts_rtrim never walks below the buffer", st_rtrim},
     {"queryparam", "<url> <name> [size]", "the value %[param] reads for a key",
      st_queryparam},
+    {"querysweep", "", "%[param] stays inside every buffer size it is given",
+     st_querysweep},
     {"querynext", "<query>", "the fields the shared query iterator reads",
      st_querynext},
     {"spandiff", "",
