@@ -11,7 +11,9 @@ set -euo pipefail
 
 python=$(find_python) || skip "python3 not found"
 
-src="${top_srcdir:-${HTS_TESTDIR}/..}/src/proxy/store.c"
+# testlib.sh defaults top_srcdir to a relative "..", which the Windows suite
+# needs: nativepath cannot convert an absolute one for python.exe
+src="${top_srcdir}/src/proxy/store.c"
 test -r "${src}" || fail "no ${src}"
 
 "${python}" - "$(nativepath "${src}")" <<'EOF' || fail "the two readers disagree"

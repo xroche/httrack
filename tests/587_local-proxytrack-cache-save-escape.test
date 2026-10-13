@@ -23,7 +23,7 @@ cleanup_push rm -rf "$dir"
 
 # Write hostile.ndx and hostile.dat into $1, one entry per "<save>=<body file>"
 # pair that follows. Several entries exercise the reader's per-store state.
-make_store() { # $1 = store dir, $2.. = save=bodyfile
+make_store() { # $1 = store dir, $2.. = save=bodyfile, bodyfile native
     local store=$1
     shift
     "$python" - "$(nativepath "$store")" "$@" <<'EOF'
@@ -95,20 +95,21 @@ convert() {
 printf 'OUTSIDE-THE-STORE-%s\n' "$$" >"$dir/secret.txt"
 secret=$(cat "$dir/secret.txt")
 abs=$(nativepath "$dir/secret.txt")
+nsecret=$abs
 
 # The narrowing control first: a contained relative name must be served, or
 # every refusal below would pass on a reader that stopped reading bodies.
 mkdir -p "$dir/ok/example.com"
 printf 'INSIDE-THE-STORE-%s\n' "$$" >"$dir/ok/example.com/p.html"
 inside=$(cat "$dir/ok/example.com/p.html")
-make_store "$dir/ok" "example.com/p.html=$dir/ok/example.com/p.html"
+make_store "$dir/ok" "example.com/p.html=$(nativepath "$dir/ok/example.com/p.html")"
 convert "$dir/ok"
 grep -qaF -- "$inside" "$dir/ok/out.arc" ||
     fail "a contained save name lost its body: $(cat "$dir/log")"
 
 # An absolute name reaches the join through the host-guess fallback.
 mkdir -p "$dir/esc"
-make_store "$dir/esc" "$abs=$dir/secret.txt"
+make_store "$dir/esc" "$abs=$nsecret"
 convert "$dir/esc"
 test -s "$dir/esc/out.arc" || fail "no archive was written for the escape"
 if grep -qaF -- "$secret" "$dir/esc/out.arc"; then
@@ -127,7 +128,7 @@ fi
 # this case only reds when both that check and the join are broken. The
 # directory has to exist or the name could not resolve even unguarded.
 mkdir -p "$dir/dots/example.com"
-make_store "$dir/dots" "example.com/../../secret.txt=$dir/secret.txt"
+make_store "$dir/dots" "example.com/../../secret.txt=$nsecret"
 convert "$dir/dots"
 if grep -qaF -- "$secret" "$dir/dots/out.arc"; then
     fail "a .. save name read a file outside the store"
@@ -140,7 +141,7 @@ grep -qaF 'holds a ".." component' "$dir/log" ||
 # refused rather than opened.
 mkdir -p "$dir/clip/a/b"
 long="example.com/$(printf 'a%.0s' $(seq 1 2030)).html"
-make_store "$dir/clip/a/b" "$long=$dir/secret.txt"
+make_store "$dir/clip/a/b" "$long=$nsecret"
 (
     cd "$dir/clip" || exit 1
     "$bin" --convert out.arc a/b/hostile.ndx
@@ -154,8 +155,9 @@ grep -qaF 'does not fit under the store root' "$dir/log" ||
 # walks the entries in .ndx order, so the contained one has to come first.
 mkdir -p "$dir/sticky/example.com"
 cp "$dir/ok/example.com/p.html" "$dir/sticky/example.com/p.html"
-make_store "$dir/sticky" "example.com/p.html=$dir/sticky/example.com/p.html" \
-    "$abs=$dir/secret.txt"
+make_store "$dir/sticky" \
+    "example.com/p.html=$(nativepath "$dir/sticky/example.com/p.html")" \
+    "$abs=$nsecret"
 convert "$dir/sticky"
 if grep -qaF -- "$secret" "$dir/sticky/out.arc"; then
     fail "an absolute save name read outside the store once safeCache was set"
