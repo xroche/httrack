@@ -72,8 +72,8 @@ size_t st_utf16_units(const char *s, size_t n);
 size_t st_mkdeep(char *buf, size_t bufsize, const char *dir, const char *nseg,
                  const char *who, size_t *baselen);
 
-/* These are the tallies of a self-test that compares a parser with a frozen
-   copy. */
+/* These are the tallies of a self-test that sweeps a parser over many
+   inputs. */
 typedef struct {
   unsigned long cases;
   unsigned long failures;

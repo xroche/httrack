@@ -814,8 +814,8 @@ static int st_stripquery(httrackp *opt, int argc, char **argv) {
   assertf(strcmp(fil_normalized_filtered("/p?a=1&b=2", dest, "*"), "/p") == 0);
   assertf(strcmp(fil_normalized_filtered("/p?utm=1", dest, "utm"), "/p") == 0);
 
-  /* an empty field survives the strip, so the kept query re-normalizes to
-     itself and two spellings of one URL still dedupe */
+  /* the kept query must re-normalize to itself, or two spellings of one URL
+     stop deduping */
   assertf(strcmp(fil_normalized_filtered("/p?a=1&&b=2", dest, "a"),
                  "/p?&b=2") == 0);
   assertf(strcmp(fil_normalized_filtered("/p?b=2&", dest, "z"), "/p?&b=2") ==

@@ -26,8 +26,8 @@ selftest_queue "(none)" queryparam "/p?id&x=1" id
 selftest_queue "[1]" queryparam "/p?id=1&id=2" id
 selftest_queue "[v]" queryparam "/p?=v" "" # an empty name matches an empty key
 
-# A second '?' stays inside the value, not starting a field. A name holding '='
-# or '&' never matches, because no key can hold either.
+# A second '?' stays inside the value and never starts a field. A name holding
+# '=' or '&' never matches, because no key can hold either.
 selftest_queue "[5?id=6]" queryparam "/p?id=5?id=6" id
 # 'xd' is as long as 'id', so a key matched by length alone would show.
 selftest_queue "(none)" queryparam "/p?xd=1?id=5" id
@@ -39,9 +39,9 @@ selftest_queue "(none)" queryparam "/p?a&b=3" "a&b"
 selftest_queue "[123]" queryparam "/p?id=12345" id 4
 selftest_queue "[]" queryparam "/p?id=12345" id 1
 
-# No buffer size may be written past, left unterminated, or read a different
-# field than the widest one does. The count is exact, so a shrinking corpus
-# shows.
+# Every buffer size must stay inside its buffer, terminate it, and read the
+# field the widest one reads. The count is exact, so a corpus that shrinks
+# fails here.
 selftest_queue_lines "querysweep: 160336 cases, 0 failures
 querysweep: OK" querysweep
 

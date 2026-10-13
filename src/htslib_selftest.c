@@ -2491,7 +2491,7 @@ static int st_statrecv(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
-/* The byte an overrun or a stray NUL has to disturb. */
+/* An overrun or a stray NUL must disturb this byte. */
 #define QUERYPARAM_POISON 'Z'
 
 /* Prints the value %[param] looks up as [value], or "(none)" for no such key.
@@ -2501,7 +2501,6 @@ static int st_queryparam(httrackp *opt, int argc, char **argv) {
   char buff[256];
   size_t size = sizeof(buff);
   const char *overrun = "";
-  const char *not_emptied = "";
   hts_boolean found;
   size_t i;
 
@@ -2530,61 +2529,57 @@ static int st_queryparam(httrackp *opt, int argc, char **argv) {
   }
   if (found) {
     printf("[%s]%s\n", buff, overrun);
-    return 0;
+  } else {
+    /* The lookup empties the buffer whether or not it finds the key. */
+    printf("(none)%s%s\n", buff[0] != '\0' ? " NOT-EMPTIED" : "", overrun);
   }
-  /* The lookup empties the buffer whether or not it finds the key. */
-  if (buff[0] != '\0') {
-    not_emptied = " NOT-EMPTIED";
-  }
-  printf("(none)%s%s\n", not_emptied, overrun);
   return 0;
 }
 
-/* One url_query_value read per buffer size. The widest read is the oracle for
-   the narrow ones, because every size reads the same field and clips its value
-   to size - 1 bytes. */
+/* Every size reads the same field and clips its value to size - 1 bytes, so
+   the widest read is the oracle for the narrow ones. */
 static void querysweep_one(parsediff_stats *st, const char *url,
                            const char *name) {
   static const size_t sizes[] = {1, 2, 4, 63, 64, 65, 254, 255};
-  char wide[256];
-  const hts_boolean found = url_query_value(url, name, wide, sizeof(wide));
+  char oracle[256];
+  const hts_boolean oracle_found =
+      url_query_value(url, name, oracle, sizeof(oracle));
   size_t i;
 
   for (i = 0; i < sizeof(sizes) / sizeof(sizes[0]); i++) {
     const size_t size = sizes[i];
     char buff[256];
-    hts_boolean got;
+    hts_boolean found;
     size_t j;
 
     st->cases++;
     memset(buff, QUERYPARAM_POISON, sizeof(buff));
-    got = url_query_value(url, name, buff, size);
+    found = url_query_value(url, name, buff, size);
     for (j = size; j < sizeof(buff); j++) {
       if (buff[j] != QUERYPARAM_POISON) {
         parsediff_fail(st, "url_query_value wrote past the size", url, name,
-                       wide, "");
+                       oracle, "");
         break;
       }
     }
     if (memchr(buff, '\0', size) == NULL) {
-      parsediff_fail(st, "url_query_value left no terminator", url, name, wide,
-                     "");
-    } else if (got != found || strlen(buff) >= size ||
-               strncmp(buff, wide, size - 1) != 0) {
-      parsediff_fail(st, "url_query_value clipped wrong", url, name, wide,
+      parsediff_fail(st, "url_query_value left no terminator", url, name,
+                     oracle, "");
+    } else if (found != oracle_found || strlen(buff) >= size ||
+               strncmp(buff, oracle, size - 1) != 0) {
+      parsediff_fail(st, "url_query_value clipped wrong", url, name, oracle,
                      buff);
     }
   }
 }
 
-/* The random half of the deleted query differential, kept as a bounds check
-   that needs no second parser. */
+/* Nothing in fuzz/ reaches url_query_value, so these queries are generated. */
 static int st_querysweep(httrackp *opt, int argc, char **argv) {
   static const char *const names[] = {"id", "a", "sid", "", "x?id"};
   static const char *const alphabet[] = {"a", "=",   "&",   "%",   "?",  ";",
                                          "#", "+",   " ",   "sid", "id", "/",
                                          "1", "%41", "abc", "x"};
-  /* Fields at and around the 255-byte value the lookup used to cap at. */
+  /* These field lengths straddle the buffer sizes above. */
   static const size_t lengths[] = {63, 64, 65, 254, 255, 256, 300};
   parsediff_stats st = {0, 0};
   uint32_t seed = 1872;
