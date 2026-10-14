@@ -1,0 +1,109 @@
+#!/bin/bash
+# A cache written before 3.40 holds an absolute save name, so moving the mirror
+# breaks it unless the reader can find the relative part again. It looks for the
+# URL's host inside the name, and htsname.c lowercases the name it writes while
+# the key keeps the case the href had (#1958).
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+python=$(find_python) || skip "python3 not found"
+
+# resolved before the first cd: make check puts a relative src/ on PATH
+bin=$(command -v proxytrack) || fail "proxytrack not found on PATH"
+case "$bin" in
+/*) ;;
+*) bin="$(cd "$(dirname "$bin")" && pwd)/$(basename "$bin")" ;;
+esac
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+# Write legacy.ndx and legacy.dat for one entry keyed $2, whose save name is the
+# absolute $3 and whose body is the file $4 names.
+make_store() { # $1 = store dir, $2 = url key, $3 = save name, $4 = body file
+    "$python" - "$(nativepath "$1")" "$2" "$3" "$(nativepath "$4")" <<'EOF'
+import os
+import sys
+
+store, key, save, bodyfile = sys.argv[1:5]
+body = open(bodyfile, "rb").read()
+
+
+def field(v):
+    b = v.encode()
+    return b"%d\n" % len(b) + b
+
+
+host, _, fil = key.partition("/")
+rec = b"".join(
+    [
+        field("200"),               # statuscode
+        field(str(len(body))),      # size
+        field("OK"),                # msg
+        field("text/html"),         # contenttype
+        field("iso-8859-1"),        # charset       (version >= 3)
+        field(""),                  # lastmodified
+        field(""),                  # etag
+        field(""),                  # location
+        field(""),                  # cdispo        (version >= 2)
+        field(host),                # adr           (version >= 4)
+        field("/" + fil),           # fil
+        field(save),                # save
+        field("HTS"),               # integrity marker
+        field(str(len(body))),      # body length
+    ]
+)
+pad = b"#" * 8  # the record sits past 0 so the .ndx can point at it negatively
+open(os.path.join(store, "legacy.dat"), "wb").write(pad + rec)
+
+# two length-prefixed header fields, then four lines per entry: host, file,
+# position, and one the reader skips. A negative position puts the body in a
+# file of its own rather than in the .dat.
+with open(os.path.join(store, "legacy.ndx"), "wb") as f:
+    f.write(field("CACHE-1.4"))
+    f.write(field("Wed, 01 Jan 2025 00:00:00 GMT"))
+    f.write(b"\n-\n")
+    f.write(b"%s\n/%s\n-%d\n-\n" % (host.encode(), fil.encode(), len(pad)))
+EOF
+}
+
+# The store is named with two separators so its root is the mirror directory,
+# which is what the reduced name gets joined to.
+convert() { # $1 = mirror dir
+    (
+        cd "$1" || exit 1
+        "$bin" --convert out.arc new/hts-cache/legacy.ndx
+    ) >"$dir/log" 2>&1
+    subshell_ok $?
+}
+
+# The mirror moved: the save name points where it used to live, and nothing is
+# there now. Only the host component can lead the reader back to the body.
+build() { # $1 = tag, $2 = url key, $3 = save name
+    mkdir -p "$dir/$1/new/hts-cache" "$dir/$1/new/example.com"
+    printf 'MOVED-LEGACY-%s\n' "$$" >"$dir/$1/new/example.com/index.html"
+    make_store "$dir/$1/new/hts-cache" "$2" "$3" \
+        "$dir/$1/new/example.com/index.html"
+}
+
+moved=$(printf 'MOVED-LEGACY-%s\n' "$$")
+gone=/gone/old/mirror/example.com/index.html
+
+# A host the href spelled in mixed case still has to find its own body.
+build mixed "Example.COM/index.html" "$gone"
+convert "$dir/mixed"
+grep -qaF -- "$moved" "$dir/mixed/out.arc" ||
+    fail "a mixed-case host lost its body: $(cat "$dir/log")"
+
+# The narrowing control: a name sharing nothing with the host has no relative
+# part to find, so it must still be refused rather than joined.
+build nohost "Example.COM/index.html" /gone/old/elsewhere/index.html
+convert "$dir/nohost"
+if grep -qaF -- "$moved" "$dir/nohost/out.arc"; then
+    fail "a name holding no host component was served anyway"
+fi
+grep -qaF 'holds no path to reduce' "$dir/log" ||
+    fail "that name was dropped without being refused: $(cat "$dir/log")"

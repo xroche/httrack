@@ -1243,10 +1243,14 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
 
                   piece[0] = '\0';
                   strncat(piece, start, len);
-                  if ((where = strstr(previous_save_, piece)) != NULL) {
-                    index->fixedPath =
-                        (int) (where -
-                               previous_save_); // offset to relative path
+                  /* Case-insensitive: htsname.c lowercases the save path it
+                     writes while the key keeps the href's case, so a mixed-case
+                     host in a link left the name looking unreducible. */
+                  for (where = previous_save_; *where != '\0'; where++) {
+                    if (strfield(where, piece)) {
+                      index->fixedPath = (int) (where - previous_save_);
+                      break;
+                    }
                   }
                 }
               }
@@ -2013,8 +2017,14 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
 
                 piece[0] = '\0';
                 strncat(piece, start, len);
-                if ((where = strstr(previous_save_, piece)) != NULL) {
-                  index->fixedPath = (int) (where - previous_save_);    // offset to relative path
+                /* Case-insensitive: htsname.c lowercases the save path it
+                   writes while the key keeps the href's case, so a mixed-case
+                   host in a link left the name looking unreducible. */
+                for (where = previous_save_; *where != '\0'; where++) {
+                  if (strfield(where, piece)) {
+                    index->fixedPath = (int) (where - previous_save_);
+                    break;
+                  }
                 }
               }
             }
