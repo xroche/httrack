@@ -82,24 +82,25 @@ convert() { # $1 = mirror dir
 
 # The mirror moved: the save name points where it used to live, and nothing is
 # there now. Only the host component can lead the reader back to the body.
+moved=MOVED-LEGACY-$$
+
 build() { # $1 = tag, $2 = url key, $3 = save name
     mkdir -p "$dir/$1/new/hts-cache" "$dir/$1/new/example.com"
-    printf 'MOVED-LEGACY-%s\n' "$$" >"$dir/$1/new/example.com/index.html"
+    printf '%s\n' "$moved" >"$dir/$1/new/example.com/index.html"
     make_store "$dir/$1/new/hts-cache" "$2" "$3" \
         "$dir/$1/new/example.com/index.html"
 }
 
-moved=$(printf 'MOVED-LEGACY-%s\n' "$$")
-gone=/gone/old/mirror/example.com/index.html
-
-# A host the href spelled in mixed case still has to find its own body.
-build mixed "Example.COM/index.html" "$gone"
+# A host the href spelled in mixed case still has to find its own body. The
+# save name holds that host, so the reader can still locate the relative part.
+build mixed "Example.COM/index.html" /gone/old/mirror/example.com/index.html
 convert "$dir/mixed"
 grep -qaF -- "$moved" "$dir/mixed/out.arc" ||
     fail "a mixed-case host lost its body: $(cat "$dir/log")"
 
-# The narrowing control: a name sharing nothing with the host has no relative
-# part to find, so it must still be refused rather than joined.
+# The narrowing control: this save name holds no host, so there is no relative
+# part to find and it must still be refused rather than joined. store.c says so
+# in the log when it refuses.
 build nohost "Example.COM/index.html" /gone/old/elsewhere/index.html
 convert "$dir/nohost"
 if grep -qaF -- "$moved" "$dir/nohost/out.arc"; then
