@@ -13,8 +13,11 @@ htsserver_require
 work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_usercss.XXXXXX") || fail "no tmpdir"
 cleanup_push htsserver_cleanup_dir "${work}"
 
-name=.httrack.css
-! target_is_windows || name=httrack.css
+css_name=.httrack.css
+! target_is_windows || css_name=httrack.css
+
+# The opening words of html/server/user.css.
+shipped='Shipped empty'
 
 # The default mirror base path is ~/websites.
 mkdir -p "${work}/websites"
@@ -30,27 +33,27 @@ user_css() {
 }
 
 reply=$(user_css)
-grep -q 'Shipped empty' <<<"${reply}" || fail "no override: not the shipped user.css"
+grep -qF "${shipped}" <<<"${reply}" || fail "no override: not the shipped user.css"
 
-printf '/* MIRROR-CSS */\n' >"${work}/websites/${name}"
+printf '/* MIRROR-CSS */\n' >"${work}/websites/${css_name}"
 reply=$(user_css)
-grep -q 'MIRROR-CSS' <<<"${reply}" || fail "the mirror base path's ${name} is not served"
+grep -q 'MIRROR-CSS' <<<"${reply}" || fail "the mirror base path's ${css_name} is not served"
 
-printf '/* HOME-CSS */\n' >"${work}/${name}"
+printf '/* HOME-CSS */\n' >"${work}/${css_name}"
 reply=$(user_css)
-grep -q 'HOME-CSS' <<<"${reply}" || fail "HOME/${name} does not win over the mirror's"
+grep -q 'HOME-CSS' <<<"${reply}" || fail "HOME/${css_name} does not win over the mirror's"
 ! grep -q 'MIRROR-CSS' <<<"${reply}" || fail "both stylesheets served"
 
 # Looked up per request, so an edit shows on the next reload.
-rm "${work}/${name}"
+rm "${work}/${css_name}"
 reply=$(user_css)
-grep -q 'MIRROR-CSS' <<<"${reply}" || fail "a removed HOME/${name} is still served"
+grep -q 'MIRROR-CSS' <<<"${reply}" || fail "a removed HOME/${css_name} is still served"
 
 # A directory by that name is not a stylesheet.
-rm "${work}/websites/${name}"
-mkdir "${work}/${name}"
+rm "${work}/websites/${css_name}"
+mkdir "${work}/${css_name}"
 reply=$(user_css)
-grep -q 'Shipped empty' <<<"${reply}" || fail "a directory named ${name} was served"
+grep -qF "${shipped}" <<<"${reply}" || fail "a directory named ${css_name} was served"
 
 htsserver_stop
 htsserver_assert_reaped

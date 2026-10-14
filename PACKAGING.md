@@ -55,6 +55,8 @@ relative symlink to `$(docdir)`, which is how the panes' Help links reach the
 manual. Stripping the documentation leaves that link dangling, htsserver answers
 404, and the panes hide the links they would have carried. Ship the symlink with
 the interface or with the documentation, whichever your split prefers.
+`$(datadir)/httrack/html/palette.css` belongs to the interface. The documentation
+installs its own copy beside `doc.css`.
 
 Older releases installed the interface under `$(docdir)` and made
 `$(datadir)/httrack/html` the symlink, which is what several recipes carried a

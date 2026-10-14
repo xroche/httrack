@@ -1,6 +1,6 @@
 /* The HTTrack palette, shared by the documentation (doc.css) and the WebHTTrack
-   UI (server/style.css). The two blocks below are kept byte-identical with the
-   website's site.css. */
+   UI (server/style.css). The light and dark blocks are kept byte-identical with
+   the website's site.css. */
 
 :root {
 	--field: #77b;

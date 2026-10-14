@@ -719,22 +719,20 @@ static hts_boolean path_append(char *dst, size_t size, const char *src) {
 #define USER_STYLESHEET "/.httrack.css"
 #endif
 
-/* Writes into dst the file the UI's user.css is served from: the user's
-   stylesheet, then the one in the mirror base path, then the system one.
-   Returns HTS_FALSE when none exists, so the shipped user.css is served. */
-static hts_boolean user_stylesheet(char *dst, size_t size) {
-  const char *dirs[3];
+/* Finds the file served as the UI's user.css: the one in the home folder, then
+   in the mirror base path, then in sysconfdir. Returns HTS_FALSE, with dst
+   empty, when none exists, so the shipped user.css is served. */
+static hts_boolean find_user_stylesheet(char *dst, size_t size) {
   intptr_t adr = 0;
+  const char *const mirror_base =
+      coucal_readptr(NewLangList, "path", &adr) ? (const char *) adr : NULL;
+#ifdef _WIN32
+  const char *const dirs[] = {gethomedir(), mirror_base};
+#else
+  const char *const dirs[] = {gethomedir(), mirror_base, HTS_ETCPATH};
+#endif
   size_t i;
 
-  dirs[0] = gethomedir();
-  dirs[1] =
-      coucal_readptr(NewLangList, "path", &adr) ? (const char *) adr : NULL;
-#ifndef _WIN32
-  dirs[2] = HTS_ETCPATH;
-#else
-  dirs[2] = NULL;
-#endif
   for (i = 0; i < sizeof(dirs) / sizeof(dirs[0]); i++) {
     dst[0] = '\0';
     if (dirs[i] != NULL && dirs[i][0] != '\0' &&
@@ -1774,10 +1772,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             }
           }
 
-          if (!virtualpath && strcmp(file, "/server/user.css") == 0 &&
-              user_stylesheet(fsfile, sizeof(fsfile))) {
-            /* fsfile names the user's stylesheet */
-          } else if (!virtualpath) {
+          if (!virtualpath && (strcmp(file, "/server/user.css") != 0 ||
+                               !find_user_stylesheet(fsfile, sizeof(fsfile)))) {
             if (!path_append(fsfile, sizeof(fsfile), path) ||
                 !path_append(fsfile, sizeof(fsfile), "html") ||
                 !path_append(fsfile, sizeof(fsfile), file)) {

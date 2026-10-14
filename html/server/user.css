@@ -1,7 +1,4 @@
-/* Shipped empty. WebHTTrack serves the first of these files in its place:
-   ~/.httrack.css (httrack.css in the home folder on Windows), .httrack.css in
-   the mirror base path, then httrack.css next to httrack.conf. Override the
-   tokens of ../palette.css and style.css, for example:
-
-   :root { --field: #345; --panel: #eee; --accent: #9bc; }
-*/
+/* Shipped empty. WebHTTrack serves the first of these instead, if one exists:
+   ~/.httrack.css, .httrack.css in the mirror base path, then httrack.css next
+   to httrack.conf. On Windows the names drop the dot and there is no third one.
+   Example: :root { --field: #345; --panel: #eee; --accent: #9bc; } */
