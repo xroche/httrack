@@ -47,6 +47,14 @@ reply=$(htsserver_get /server/style.css)
 grep -q 'palette.css' <<<"${reply}" || fail "style.css: ${reply}"
 ! grep -q 'HOME-CSS' <<<"${reply}" || fail "the override is served for style.css too"
 
+# Saving a project sets the mirror root, which must not capture user.css.
+sid=$(htsserver_sid)
+test "${#sid}" -eq 32 || fail "no session id: [${sid}]"
+htsserver_post "sid=${sid}&path=${work}/websites&projname=proj&command=httrack&command_do=save&winprofile=x" \
+    /server/step4.html >/dev/null
+reply=$(user_css)
+grep -q 'HOME-CSS' <<<"${reply}" || fail "a saved project hides HOME/${css_name}"
+
 # Looked up per request, so an edit shows on the next reload.
 rm "${work}/${css_name}"
 reply=$(user_css)

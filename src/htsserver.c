@@ -1772,6 +1772,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             }
           }
 
+          /* user.css is the user's override when one exists */
           if (!virtualpath && (strcmp(file, "/server/user.css") != 0 ||
                                !find_user_stylesheet(fsfile, sizeof(fsfile)))) {
             if (!path_append(fsfile, sizeof(fsfile), path) ||
@@ -1779,7 +1780,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                 !path_append(fsfile, sizeof(fsfile), file)) {
               fsfile[0] = '\0';
             }
-          } else if (StringNotEmpty(website)) {
+          } else if (virtualpath && StringNotEmpty(website)) {
             /* Never the posted "projpath": a client root reads any file. */
             if (!path_append(fsfile, sizeof(fsfile), StringBuff(website)) ||
                 !path_append(fsfile, sizeof(fsfile), "/") ||
