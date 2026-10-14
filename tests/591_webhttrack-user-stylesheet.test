@@ -1,0 +1,72 @@
+#!/bin/bash
+#
+# The UI's user.css is the first stylesheet found in the home folder, then the
+# mirror base path, then the system folder, and the shipped one otherwise.
+
+set -euo pipefail
+
+# shellcheck source=tests/webhttracklib.sh
+. "${0%"${0##*/}"}./webhttracklib.sh"
+
+htsserver_require
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_usercss.XXXXXX") || fail "no tmpdir"
+cleanup_push htsserver_cleanup_dir "${work}"
+
+css_name=.httrack.css
+! target_is_windows || css_name=httrack.css
+
+# The opening words of html/server/user.css.
+shipped='Shipped empty'
+
+# The default mirror base path is ~/websites.
+mkdir -p "${work}/websites"
+htsserver_start --home "${work}"
+
+# Prints the body of /server/user.css after checking it is served as CSS.
+user_css() {
+    local reply
+    reply=$(htsserver_get /server/user.css)
+    grep -q '^HTTP/1.[01] 200' <<<"${reply}" || fail "user.css: ${reply}"
+    grep -qi '^Content-type: text/css' <<<"${reply}" || fail "user.css type: ${reply}"
+    printf '%s\n' "${reply}"
+}
+
+reply=$(user_css)
+grep -qF "${shipped}" <<<"${reply}" || fail "no override: not the shipped user.css"
+
+printf '/* MIRROR-CSS */\n' >"${work}/websites/${css_name}"
+reply=$(user_css)
+grep -q 'MIRROR-CSS' <<<"${reply}" || fail "the mirror base path's ${css_name} is not served"
+
+printf '/* HOME-CSS */\n' >"${work}/${css_name}"
+reply=$(user_css)
+grep -q 'HOME-CSS' <<<"${reply}" || fail "HOME/${css_name} does not win over the mirror's"
+! grep -q 'MIRROR-CSS' <<<"${reply}" || fail "both stylesheets served"
+reply=$(htsserver_get /server/style.css)
+grep -q 'palette.css' <<<"${reply}" || fail "style.css: ${reply}"
+! grep -q 'HOME-CSS' <<<"${reply}" || fail "the override is served for style.css too"
+
+# Saving a project sets the mirror root, which must not capture user.css.
+sid=$(htsserver_sid)
+test "${#sid}" -eq 32 || fail "no session id: [${sid}]"
+htsserver_post "sid=${sid}&path=${work}/websites&projname=proj&command=httrack&command_do=save&winprofile=x" \
+    /server/step4.html >/dev/null
+reply=$(user_css)
+grep -q 'HOME-CSS' <<<"${reply}" || fail "a saved project hides HOME/${css_name}"
+
+# Looked up per request, so an edit shows on the next reload.
+rm "${work}/${css_name}"
+reply=$(user_css)
+grep -q 'MIRROR-CSS' <<<"${reply}" || fail "a removed HOME/${css_name} is still served"
+
+# A directory by that name is not a stylesheet.
+rm "${work}/websites/${css_name}"
+mkdir "${work}/${css_name}"
+reply=$(user_css)
+grep -qF "${shipped}" <<<"${reply}" || fail "a directory named ${css_name} was served"
+
+htsserver_stop
+htsserver_assert_reaped
+
+echo OK

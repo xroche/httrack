@@ -1,0 +1,65 @@
+#!/bin/bash
+#
+# The docs and the WebHTTrack UI share html/palette.css. Each must resolve every
+# token it reads, the UI must load user.css last, and each install tree must
+# carry its own copy of the palette.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+srcdir="${abs_top_srcdir:?not run under make check}"
+html="${srcdir}/html"
+
+# Prints the custom properties a stylesheet defines, one per line.
+defined() { grep -oE -- '--[A-Za-z0-9_-]+[[:space:]]*:' "$@" | tr -d ' \t:' | sort -u; }
+
+palette=$(defined "${html}/palette.css")
+# The palette has 11 distinct tokens.
+test "$(grep -c . <<<"${palette}")" -ge 11 || fail "palette.css defines too few tokens: ${palette}"
+
+checked=0
+for css in "${html}/doc.css" "${html}/server/style.css"; do
+    grep -q '@import url(\(\.\./\)\?palette.css);' "${css}" || fail "${css} does not import palette.css"
+    known=$(printf '%s\n' "${palette}" "$(defined "${css}" || true)")
+    while IFS= read -r used; do
+        test -n "${used}" || continue
+        grep -qxF -- "${used}" <<<"${known}" || fail "${css##*/} reads ${used}, which nothing defines"
+        checked=$((checked + 1))
+    done <<<"$(grep -oE 'var\(--[A-Za-z0-9_-]+' "${css}" | sed 's/^var(//' | sort -u)"
+done
+test "${checked}" -ge 22 || fail "only ${checked} var() references found"
+
+# The user stylesheet has to come after style.css, or it cannot override it.
+pages=0
+for page in "${html}"/server/*.html; do
+    grep -q 'href="style.css"' "${page}" || continue
+    order=$(grep -oE 'href="(style|user)\.css"' "${page}" | tr '\n' ' ')
+    test "${order}" = 'href="style.css" href="user.css" ' ||
+        fail "${page##*/} loads ${order:-nothing}, not style.css then user.css"
+    pages=$((pages + 1))
+done
+test "${pages}" -ge 21 || fail "only ${pages} UI pages load style.css"
+
+# Debian ships the docs and the UI in different packages, so both need a copy.
+work=$(mktemp -d "${TMPDIR:-/tmp}/palette.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${work}"
+stage_install_target install "${work}/inst" "${work}/log" html ||
+    fail "make -C html install failed"
+for css in doc.css server/style.css; do
+    installed=$(find "${work}/inst" -path "*/${css}" -type f)
+    test -n "${installed}" || fail "${css} not installed"
+    ref=$(sed -n 's/^@import url(\(.*\));$/\1/p' "${installed}")
+    test -f "$(dirname "${installed}")/${ref}" ||
+        fail "installed ${css} imports ${ref}, which is not beside it"
+done
+
+# Debian moves files by these lists and never checks for a file left behind.
+files="${srcdir}/debian/webhttrack-common.files"
+if test -d "${srcdir}/debian"; then
+    grep -qx 'usr/share/httrack/html/palette.css' "${files}" ||
+        fail "${files} does not ship the UI's palette.css"
+fi
+
+echo "palette: ${checked} var() references resolve, ${pages} UI pages load user.css last"

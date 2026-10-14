@@ -2,37 +2,9 @@
    beside the page (guide.css). Read from disk as often as over http, so
    everything here has to work from a file:// URL. */
 
-:root {
-	--field: #77b;
-	--panel: #ccd;
-	--accent: #99c;
-	--ink: #111;
-	--ink-soft: #444;
-	--rule: #aab;
-	--link: #00c;
-	--link-hover: #c00;
-	--code-bg: #e8e8f2;
-	--chip: #dde;
-	--shadow: rgba(0, 0, 0, .25);
-}
+@import url(palette.css);
 
-@media (prefers-color-scheme: dark) {
-	:root {
-		--field: #171a2b;
-		--panel: #22263a;
-		--accent: #3b4066;
-		--ink: #e6e6ee;
-		--ink-soft: #a9adc4;
-		--rule: #3b4066;
-		--link: #9db4ff;
-		--link-hover: #ff9d9d;
-		--code-bg: #14172a;
-		--chip: #2e3350;
-		--shadow: rgba(0, 0, 0, .6);
-	}
-}
-
-/* Additions stay out of the palette block above: it is kept byte-identical with the website's. */
+/* Add tokens here, not in palette.css, which the UI and the website share. */
 :root {
 	--body-font: system-ui, -apple-system, "Segoe UI", Roboto, "Trebuchet MS", Verdana, sans-serif;
 }
@@ -366,23 +338,7 @@ dialog#zoom::backdrop { background: rgba(0, 0, 0, .8); }
 	z-index: 10;
 }
 
-/* Some browsers still apply prefers-color-scheme: dark when printing, so the ink
-   comes out #e6e6ee on white paper. Reset the palette, not each rule reading it. */
 @media print {
-	:root {
-		--field: #77b;
-		--panel: #ccd;
-		--accent: #99c;
-		--ink: #111;
-		--ink-soft: #444;
-		--rule: #aab;
-		--link: #00c;
-		--link-hover: #c00;
-		--code-bg: #e8e8f2;
-		--chip: #dde;
-		--shadow: rgba(0, 0, 0, .25);
-	}
-
 	body { background: #fff; }
 	.toc, .filter { display: none; }
 	.wrap { display: block; border: 0; }

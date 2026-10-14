@@ -1,6 +1,27 @@
+@import url(../palette.css);
+
+/* UI-only tokens: the light values are the UI's own, the dark ones come from the palette. */
+:root {
+	--ui-ink: #000;
+	--ui-link: #00f;
+	--ui-visited: #000;
+	--ui-alert: #f00;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		color-scheme: dark;
+		--ui-ink: var(--ink);
+		--ui-link: var(--link);
+		--ui-visited: var(--ink-soft);
+		--ui-alert: #ff8080;
+	}
+}
+
 body {
 	margin: 0;  padding: 0;  margin-bottom: 15px;  margin-top: 8px;
-	background: #77b;
+	background: var(--field);
+	color: var(--ui-ink);
 }
 body, td {
 	font: 14px "Trebuchet MS", Verdana, Arial, Helvetica, sans-serif;
@@ -33,10 +54,16 @@ body, td {
 #siteNavigation a:active  { text-decoration: none;  background-color: #ccc; }
 
 
-a:link    { text-decoration: underline;  color: #00f; }
-a:visited { text-decoration: underline;  color: #000; }
-a:hover   { text-decoration: underline;  color: #c00; }
+a:link    { text-decoration: underline;  color: var(--ui-link); }
+a:visited { text-decoration: underline;  color: var(--ui-visited); }
+a:hover   { text-decoration: underline;  color: var(--link-hover); }
 a:active  { text-decoration: underline; }
+
+/* Links on the black bars stay white in every state. */
+#subTitle a, .tabCtrl a { background: #000;  color: #fff; }
+
+.alert   { color: var(--ui-alert); }
+.cmdline { color: var(--ui-link); }
 
 #pageContent {
 	clear: both;
@@ -49,7 +76,7 @@ a:active  { text-decoration: underline; }
 	}
 
 #pageContent, #siteNavigation {
-	background-color: #ccd;
+	background-color: var(--panel);
 	}
 
 
@@ -71,3 +98,11 @@ h4 { margin: 0;  font-weight: bold;  font-size: 1.18em; }
 .tblRegular td    { padding: 6px;  background-image: url(images/fade.gif);  border: 2px solid #99c; }
 .tblHeaderColor, .tblHeaderColor td { background: #99c; }
 .tblNoBorder td   { border: 0; }
+
+/* The same dark-scheme exceptions as the doc pages (html/doc.css). */
+@media (prefers-color-scheme: dark) {
+	#pageContent { background-image: none; }
+	/* The browser's own active red is too dark on the dark panel. */
+	a:active { color: var(--link-hover); }
+	#title { filter: invert(1); }
+}

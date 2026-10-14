@@ -713,6 +713,38 @@ static hts_boolean path_append(char *dst, size_t size, const char *src) {
   return HTS_TRUE;
 }
 
+#ifdef _WIN32
+#define USER_STYLESHEET "/httrack.css"
+#else
+#define USER_STYLESHEET "/.httrack.css"
+#endif
+
+/* Finds the file served as the UI's user.css: the one in the home folder, then
+   in the mirror base path, then in sysconfdir. Returns HTS_FALSE, with dst
+   empty, when none exists, so the shipped user.css is served. */
+static hts_boolean find_user_stylesheet(char *dst, size_t size) {
+  intptr_t adr = 0;
+  const char *const mirror_base =
+      coucal_readptr(NewLangList, "path", &adr) ? (const char *) adr : NULL;
+#ifdef _WIN32
+  const char *const dirs[] = {gethomedir(), mirror_base};
+#else
+  const char *const dirs[] = {gethomedir(), mirror_base, HTS_ETCPATH};
+#endif
+  size_t i;
+
+  for (i = 0; i < sizeof(dirs) / sizeof(dirs[0]); i++) {
+    dst[0] = '\0';
+    if (dirs[i] != NULL && dirs[i][0] != '\0' &&
+        path_append(dst, size, dirs[i]) &&
+        path_append(dst, size, USER_STYLESHEET) && fexist(dst)) {
+      return HTS_TRUE;
+    }
+  }
+  dst[0] = '\0';
+  return HTS_FALSE;
+}
+
 /* Append c to dst as an HTML entity, or return HTS_FALSE if it needs none. */
 static hts_boolean cat_html_escaped(String *dst, char c) {
   switch (c) {
@@ -1740,13 +1772,15 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             }
           }
 
-          if (!virtualpath) {
+          /* user.css is the user's override when one exists */
+          if (!virtualpath && (strcmp(file, "/server/user.css") != 0 ||
+                               !find_user_stylesheet(fsfile, sizeof(fsfile)))) {
             if (!path_append(fsfile, sizeof(fsfile), path) ||
                 !path_append(fsfile, sizeof(fsfile), "html") ||
                 !path_append(fsfile, sizeof(fsfile), file)) {
               fsfile[0] = '\0';
             }
-          } else if (StringNotEmpty(website)) {
+          } else if (virtualpath && StringNotEmpty(website)) {
             /* Never the posted "projpath": a client root reads any file. */
             if (!path_append(fsfile, sizeof(fsfile), StringBuff(website)) ||
                 !path_append(fsfile, sizeof(fsfile), "/") ||

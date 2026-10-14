@@ -49,7 +49,7 @@ test -z "${bad}" || fail "not a target keyword: $(tr '\n' ' ' <<<"${bad}")"
 
 # ---- print palette ----
 
-css="${htmldir}/doc.css"
+css="${htmldir}/palette.css"
 test -r "${css}" || fail "no ${css}"
 
 # Emits "scope name value" for every custom property in a :root block.
@@ -83,6 +83,10 @@ declared=$(sed -n '/^@media (prefers-color-scheme: dark) {$/,/^}$/p' "${css}" |
 test "${declared}" -ge 5 || fail "found no dark palette in ${css} to compare against"
 test "$(count_in dark)" -eq "${declared}" ||
     fail "awk read $(count_in dark) of ${declared} dark tokens in ${css}: the parse is broken"
+
+# A token missing from one scheme silently keeps the other scheme's value.
+test "$(count_in light)" -eq "${declared}" ||
+    fail "${css} has $(count_in light) light tokens but ${declared} dark ones"
 
 dark_names=$(awk '$1 == "dark" { print $2 }' <<<"${tokens}")
 for name in ${dark_names}; do
