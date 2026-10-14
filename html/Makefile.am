@@ -8,6 +8,8 @@ HelpHtmlfontsdir = $(HelpHtmldir)/fonts
 # The served UI is runtime, not documentation, so it installs under $(datadir):
 # every packaging system treats $(docdir) as strippable.
 WebHtmldir = $(datadir)/httrack/html/server
+# The UI loads ../palette.css, so a second copy installs beside server/.
+WebHtmlrootdir = $(datadir)/httrack/html
 WebHtmlimagesdir = $(WebHtmldir)/images
 WebPixmapdir = $(datadir)/pixmaps
 WebIcon16x16dir = $(datadir)/icons/hicolor/16x16/apps
@@ -32,6 +34,7 @@ HelpHtmlimg_DATA  = $(srcdir)/img/*
 HelpHtmlimages_DATA = $(srcdir)/images/*
 # doc.css reaches the woff2 by a relative URL, so it installs beside the pages.
 HelpHtmlfonts_DATA = $(srcdir)/fonts/*
+WebHtmlroot_DATA = $(srcdir)/palette.css
 WebHtml_DATA = $(srcdir)/server/*.html $(srcdir)/server/*.js $(srcdir)/server/*.css
 WebHtmlimages_DATA = $(srcdir)/server/images/*
 # Generated from the brand master by gen/export.py. Asserted by tests/160.

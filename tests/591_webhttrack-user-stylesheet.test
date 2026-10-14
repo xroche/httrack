@@ -1,0 +1,58 @@
+#!/bin/bash
+#
+# The UI's user.css is the first stylesheet found in the home folder, then the
+# mirror base path, then the system folder, and the shipped one otherwise.
+
+set -euo pipefail
+
+# shellcheck source=tests/webhttracklib.sh
+. "${0%"${0##*/}"}./webhttracklib.sh"
+
+htsserver_require
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_usercss.XXXXXX") || fail "no tmpdir"
+cleanup_push htsserver_cleanup_dir "${work}"
+
+name=.httrack.css
+! target_is_windows || name=httrack.css
+
+# The default mirror base path is ~/websites.
+mkdir -p "${work}/websites"
+htsserver_start --home "${work}"
+
+# Prints the body of /server/user.css after checking it is served as CSS.
+user_css() {
+    local reply
+    reply=$(htsserver_get /server/user.css)
+    grep -q '^HTTP/1.[01] 200' <<<"${reply}" || fail "user.css: ${reply}"
+    grep -qi '^Content-type: text/css' <<<"${reply}" || fail "user.css type: ${reply}"
+    printf '%s\n' "${reply}"
+}
+
+reply=$(user_css)
+grep -q 'Shipped empty' <<<"${reply}" || fail "no override: not the shipped user.css"
+
+printf '/* MIRROR-CSS */\n' >"${work}/websites/${name}"
+reply=$(user_css)
+grep -q 'MIRROR-CSS' <<<"${reply}" || fail "the mirror base path's ${name} is not served"
+
+printf '/* HOME-CSS */\n' >"${work}/${name}"
+reply=$(user_css)
+grep -q 'HOME-CSS' <<<"${reply}" || fail "HOME/${name} does not win over the mirror's"
+! grep -q 'MIRROR-CSS' <<<"${reply}" || fail "both stylesheets served"
+
+# Looked up per request, so an edit shows on the next reload.
+rm "${work}/${name}"
+reply=$(user_css)
+grep -q 'MIRROR-CSS' <<<"${reply}" || fail "a removed HOME/${name} is still served"
+
+# A directory by that name is not a stylesheet.
+rm "${work}/websites/${name}"
+mkdir "${work}/${name}"
+reply=$(user_css)
+grep -q 'Shipped empty' <<<"${reply}" || fail "a directory named ${name} was served"
+
+htsserver_stop
+htsserver_assert_reaped
+
+echo OK

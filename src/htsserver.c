@@ -713,6 +713,40 @@ static hts_boolean path_append(char *dst, size_t size, const char *src) {
   return HTS_TRUE;
 }
 
+#ifdef _WIN32
+#define USER_STYLESHEET "/httrack.css"
+#else
+#define USER_STYLESHEET "/.httrack.css"
+#endif
+
+/* Writes into dst the file the UI's user.css is served from: the user's
+   stylesheet, then the one in the mirror base path, then the system one.
+   Returns HTS_FALSE when none exists, so the shipped user.css is served. */
+static hts_boolean user_stylesheet(char *dst, size_t size) {
+  const char *dirs[3];
+  intptr_t adr = 0;
+  size_t i;
+
+  dirs[0] = gethomedir();
+  dirs[1] =
+      coucal_readptr(NewLangList, "path", &adr) ? (const char *) adr : NULL;
+#ifndef _WIN32
+  dirs[2] = HTS_ETCPATH;
+#else
+  dirs[2] = NULL;
+#endif
+  for (i = 0; i < sizeof(dirs) / sizeof(dirs[0]); i++) {
+    dst[0] = '\0';
+    if (dirs[i] != NULL && dirs[i][0] != '\0' &&
+        path_append(dst, size, dirs[i]) &&
+        path_append(dst, size, USER_STYLESHEET) && fexist(dst)) {
+      return HTS_TRUE;
+    }
+  }
+  dst[0] = '\0';
+  return HTS_FALSE;
+}
+
 /* Append c to dst as an HTML entity, or return HTS_FALSE if it needs none. */
 static hts_boolean cat_html_escaped(String *dst, char c) {
   switch (c) {
@@ -1740,7 +1774,10 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             }
           }
 
-          if (!virtualpath) {
+          if (!virtualpath && strcmp(file, "/server/user.css") == 0 &&
+              user_stylesheet(fsfile, sizeof(fsfile))) {
+            /* fsfile names the user's stylesheet */
+          } else if (!virtualpath) {
             if (!path_append(fsfile, sizeof(fsfile), path) ||
                 !path_append(fsfile, sizeof(fsfile), "html") ||
                 !path_append(fsfile, sizeof(fsfile), file)) {

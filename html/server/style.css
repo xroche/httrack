@@ -1,6 +1,37 @@
+@import url(../palette.css);
+
+/* UI-only tokens: the light values keep the UI's own look, the dark ones reuse the palette. */
+:root {
+	--ui-ink: #000;
+	--ui-link: #00f;
+	--ui-visited: #000;
+	--ui-nav: #448;
+	--ui-nav-hover: #fff;
+	--ui-nav-active: #ccc;
+	--ui-hr: #000;
+	--ui-alert: #f00;
+	--ui-cmdline: #00f;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		color-scheme: dark;
+		--ui-ink: var(--ink);
+		--ui-link: var(--link);
+		--ui-visited: var(--ink-soft);
+		--ui-nav: var(--link);
+		--ui-nav-hover: var(--accent);
+		--ui-nav-active: var(--chip);
+		--ui-hr: var(--rule);
+		--ui-alert: #ff8080;
+		--ui-cmdline: var(--link);
+	}
+}
+
 body {
 	margin: 0;  padding: 0;  margin-bottom: 15px;  margin-top: 8px;
-	background: #77b;
+	background: var(--field);
+	color: var(--ui-ink);
 }
 body, td {
 	font: 14px "Trebuchet MS", Verdana, Arial, Helvetica, sans-serif;
@@ -18,25 +49,31 @@ body, td {
 	}
 
 .tabCtrl {
-	background: #000;  color: #fff;  padding: 4px;  font-weight: bold; 
+	background: #000;  color: #fff;  padding: 4px;  font-weight: bold;
 	}
 
 #siteNavigation a, #siteNavigation .current {
-	font-weight: bold;  color: #448;
+	font-weight: bold;  color: var(--ui-nav);
 	}
 #siteNavigation a:link    { text-decoration: none; }
 #siteNavigation a:visited { text-decoration: none; }
 
-#siteNavigation .current { background-color: #ccd; }
+#siteNavigation .current { background-color: var(--panel); }
 
-#siteNavigation a:hover   { text-decoration: none;  background-color: #fff;  color: #000; }
-#siteNavigation a:active  { text-decoration: none;  background-color: #ccc; }
+#siteNavigation a:hover   { text-decoration: none;  background-color: var(--ui-nav-hover);  color: var(--ui-ink); }
+#siteNavigation a:active  { text-decoration: none;  background-color: var(--ui-nav-active); }
 
 
-a:link    { text-decoration: underline;  color: #00f; }
-a:visited { text-decoration: underline;  color: #000; }
-a:hover   { text-decoration: underline;  color: #c00; }
+a:link    { text-decoration: underline;  color: var(--ui-link); }
+a:visited { text-decoration: underline;  color: var(--ui-visited); }
+a:hover   { text-decoration: underline;  color: var(--link-hover); }
 a:active  { text-decoration: underline; }
+
+/* Links on the black bars stay white in every state. */
+#subTitle a, .tabCtrl a { background: #000;  color: #fff; }
+
+.alert   { color: var(--ui-alert); }
+.cmdline { color: var(--ui-cmdline); }
 
 #pageContent {
 	clear: both;
@@ -49,14 +86,14 @@ a:active  { text-decoration: underline; }
 	}
 
 #pageContent, #siteNavigation {
-	background-color: #ccd;
+	background-color: var(--panel);
 	}
 
 
 .imgLeft  { float: left;   margin-right: 10px;  margin-bottom: 10px; }
 .imgRight { float: right;  margin-left: 10px;   margin-bottom: 10px; }
 
-hr { height: 1px;  color: #000;  background-color: #000;  margin-bottom: 15px; }
+hr { height: 1px;  color: var(--ui-hr);  background-color: var(--ui-hr);  margin-bottom: 15px; }
 
 h1 { margin: 0;  font-weight: bold;  font-size: 2em; }
 h2 { margin: 0;  font-weight: bold;  font-size: 1.6em; }
@@ -68,6 +105,13 @@ h4 { margin: 0;  font-weight: bold;  font-size: 1.18em; }
 .tableWidth { min-width: 400px; }
 
 .tblRegular       { border-collapse: collapse; }
-.tblRegular td    { padding: 6px;  background-image: url(images/fade.gif);  border: 2px solid #99c; }
-.tblHeaderColor, .tblHeaderColor td { background: #99c; }
+.tblRegular td    { padding: 6px;  background-image: url(images/fade.gif);  border: 2px solid var(--accent); }
+.tblHeaderColor, .tblHeaderColor td { background: var(--accent); }
 .tblNoBorder td   { border: 0; }
+
+/* The same dark-scheme exceptions as the doc pages (html/doc.css). */
+@media (prefers-color-scheme: dark) {
+	#pageContent { background-image: none; }
+	.tblRegular td { background-image: none; }
+	#title { filter: invert(1); }
+}

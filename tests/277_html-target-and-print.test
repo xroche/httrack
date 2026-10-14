@@ -49,7 +49,7 @@ test -z "${bad}" || fail "not a target keyword: $(tr '\n' ' ' <<<"${bad}")"
 
 # ---- print palette ----
 
-css="${htmldir}/doc.css"
+css="${htmldir}/palette.css"
 test -r "${css}" || fail "no ${css}"
 
 # Emits "scope name value" for every custom property in a :root block.
