@@ -1,0 +1,122 @@
+#!/bin/bash
+# A cache written before 3.40 holds an absolute save name, so moving the mirror
+# breaks it unless the reader can find the relative part again. It looks for the
+# URL's host inside the name, and htsname.c lowercases the name it writes while
+# the key keeps the case the href had (#1958).
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+python=$(find_python) || skip "python3 not found"
+
+# resolved before the first cd: make check puts a relative src/ on PATH
+bin=$(command -v proxytrack) || fail "proxytrack not found on PATH"
+case "$bin" in
+/*) ;;
+*) bin="$(cd "$(dirname "$bin")" && pwd)/$(basename "$bin")" ;;
+esac
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+# Write legacy.ndx and legacy.dat for one entry keyed $2, whose save name is the
+# absolute $3 and whose body is the file $4 names.
+make_store() { # $1 = store dir, $2 = url key, $3 = save name, $4 = body file
+    "$python" - "$(nativepath "$1")" "$2" "$3" "$(nativepath "$4")" <<'EOF'
+import os
+import sys
+
+store, key, save, bodyfile = sys.argv[1:5]
+body = open(bodyfile, "rb").read()
+
+
+def field(v):
+    b = v.encode()
+    return b"%d\n" % len(b) + b
+
+
+host, _, fil = key.partition("/")
+rec = b"".join(
+    [
+        field("200"),               # statuscode
+        field(str(len(body))),      # size
+        field("OK"),                # msg
+        field("text/html"),         # contenttype
+        field("iso-8859-1"),        # charset       (version >= 3)
+        field(""),                  # lastmodified
+        field(""),                  # etag
+        field(""),                  # location
+        field(""),                  # cdispo        (version >= 2)
+        field(host),                # adr           (version >= 4)
+        field("/" + fil),           # fil
+        field(save),                # save
+        field("HTS"),               # integrity marker
+        field(str(len(body))),      # body length
+    ]
+)
+pad = b"#" * 8  # the record sits past 0 so the .ndx can point at it negatively
+open(os.path.join(store, "legacy.dat"), "wb").write(pad + rec)
+
+# two length-prefixed header fields, then four lines per entry: host, file,
+# position, and one the reader skips. A negative position puts the body in a
+# file of its own rather than in the .dat.
+with open(os.path.join(store, "legacy.ndx"), "wb") as f:
+    f.write(field("CACHE-1.4"))
+    f.write(field("Wed, 01 Jan 2025 00:00:00 GMT"))
+    f.write(b"\n-\n")
+    f.write(b"%s\n/%s\n-%d\n-\n" % (host.encode(), fil.encode(), len(pad)))
+EOF
+}
+
+# The store is named with two separators so its root is the mirror directory,
+# which is what the reduced name gets joined to.
+convert() { # $1 = mirror dir
+    (
+        cd "$1" || exit 1
+        "$bin" --convert out.arc new/hts-cache/legacy.ndx
+    ) >"$dir/log" 2>&1
+    subshell_ok $?
+}
+
+# The mirror moved: the save name points where it used to live, and nothing is
+# there now. Only the host component can lead the reader back to the body.
+moved=MOVED-LEGACY-$$
+
+build() { # $1 = tag, $2 = url key, $3 = save name, $4 = body under the mirror
+    mkdir -p "$dir/$1/new/hts-cache" "$(dirname "$dir/$1/new/$4")"
+    printf '%s\n' "$moved" >"$dir/$1/new/$4"
+    make_store "$dir/$1/new/hts-cache" "$2" "$3" "$dir/$1/new/$4"
+}
+
+# A host the href spelled in mixed case still has to find its own body. The
+# save name holds that host, so the reader can still locate the relative part.
+build mixed "Example.COM/index.html" /gone/old/mirror/example.com/index.html \
+    example.com/index.html
+convert "$dir/mixed"
+grep -qaF -- "$moved" "$dir/mixed/out.arc" ||
+    fail "a mixed-case host lost its body: $(cat "$dir/log")"
+
+# The narrowing control: this save name holds no host, so there is no relative
+# part to find and it must still be refused rather than joined. store.c says so
+# in the log when it refuses.
+build nohost "Example.COM/index.html" /gone/old/elsewhere/index.html \
+    example.com/index.html
+convert "$dir/nohost"
+test -s "$dir/nohost/out.arc" ||
+    fail "no archive was written, so finding no body proves nothing"
+if grep -qaF -- "$moved" "$dir/nohost/out.arc"; then
+    fail "a name holding no host component was served anyway"
+fi
+grep -qaF 'holds no path to reduce' "$dir/log" ||
+    fail "that name was dropped without being refused: $(cat "$dir/log")"
+
+# The host twice over: the reader must still take the FIRST match, as the
+# byte-exact search did, so the body sits under that suffix and not the later
+# one. Reading the last match instead would look for Example.com/index.html.
+build twice "Example.COM/index.html" /old/example.com/b/Example.com/index.html \
+    example.com/b/Example.com/index.html
+convert "$dir/twice"
+grep -qaF -- "$moved" "$dir/twice/out.arc" ||
+    fail "a repeated host did not resolve against its first match: $(cat "$dir/log")"
