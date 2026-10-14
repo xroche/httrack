@@ -945,6 +945,21 @@ static void index_base_path(char *path, size_t size, const char *filename) {
   }
 }
 
+/* First place in a legacy save name where the URL's host occurs, or NULL.
+   Case-insensitive, because htsname.c lowercases the host directory it writes
+   while the key keeps the case the href had. strstrcase() lives in the library
+   proxytrack does not link, so this walks strfield() instead. */
+static const char *save_find_host(const char *save, const char *host) {
+  const char *p;
+
+  for (p = save; *p != '\0'; p++) {
+    if (strfield(p, host)) {
+      return p;
+    }
+  }
+  return NULL;
+}
+
 /* Join a save name read back out of a cache onto the store root. That root is
    empty whenever the store was named with no parent directory, so an absolute
    name would be opened verbatim. A clipped join names a different file, so it
@@ -1243,14 +1258,8 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
 
                   piece[0] = '\0';
                   strncat(piece, start, len);
-                  /* Case-insensitive: htsname.c lowercases the save path it
-                     writes while the key keeps the href's case, so a mixed-case
-                     host in a link left the name looking unreducible. */
-                  for (where = previous_save_; *where != '\0'; where++) {
-                    if (strfield(where, piece)) {
-                      index->fixedPath = (int) (where - previous_save_);
-                      break;
-                    }
+                  if ((where = save_find_host(previous_save_, piece)) != NULL) {
+                    index->fixedPath = (int) (where - previous_save_);
                   }
                 }
               }
@@ -2017,14 +2026,8 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
 
                 piece[0] = '\0';
                 strncat(piece, start, len);
-                /* Case-insensitive: htsname.c lowercases the save path it
-                   writes while the key keeps the href's case, so a mixed-case
-                   host in a link left the name looking unreducible. */
-                for (where = previous_save_; *where != '\0'; where++) {
-                  if (strfield(where, piece)) {
-                    index->fixedPath = (int) (where - previous_save_);
-                    break;
-                  }
+                if ((where = save_find_host(previous_save_, piece)) != NULL) {
+                  index->fixedPath = (int) (where - previous_save_);
                 }
               }
             }
