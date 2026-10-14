@@ -84,6 +84,10 @@ test "${declared}" -ge 5 || fail "found no dark palette in ${css} to compare aga
 test "$(count_in dark)" -eq "${declared}" ||
     fail "awk read $(count_in dark) of ${declared} dark tokens in ${css}: the parse is broken"
 
+# A token missing from one scheme silently keeps the other scheme's value.
+test "$(count_in light)" -eq "${declared}" ||
+    fail "${css} has $(count_in light) light tokens but ${declared} dark ones"
+
 dark_names=$(awk '$1 == "dark" { print $2 }' <<<"${tokens}")
 for name in ${dark_names}; do
     light=$(value_of light "${name}")

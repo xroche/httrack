@@ -43,6 +43,9 @@ printf '/* HOME-CSS */\n' >"${work}/${css_name}"
 reply=$(user_css)
 grep -q 'HOME-CSS' <<<"${reply}" || fail "HOME/${css_name} does not win over the mirror's"
 ! grep -q 'MIRROR-CSS' <<<"${reply}" || fail "both stylesheets served"
+reply=$(htsserver_get /server/style.css)
+grep -q 'palette.css' <<<"${reply}" || fail "style.css: ${reply}"
+! grep -q 'HOME-CSS' <<<"${reply}" || fail "the override is served for style.css too"
 
 # Looked up per request, so an edit shows on the next reload.
 rm "${work}/${css_name}"

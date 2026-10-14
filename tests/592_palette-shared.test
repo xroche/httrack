@@ -55,4 +55,11 @@ for css in doc.css server/style.css; do
         fail "installed ${css} imports ${ref}, which is not beside it"
 done
 
+# Debian moves files by these lists and never checks for a file left behind.
+files="${srcdir}/debian/webhttrack-common.files"
+if test -d "${srcdir}/debian"; then
+    grep -qx 'usr/share/httrack/html/palette.css' "${files}" ||
+        fail "${files} does not ship the UI's palette.css"
+fi
+
 echo "palette: ${checked} var() references resolve, ${pages} UI pages load user.css last"
