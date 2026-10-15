@@ -1,8 +1,9 @@
 #!/bin/bash
 #
 # The docs and the WebHTTrack UI share html/palette.css. Each must resolve every
-# token it reads, the UI must load user.css last, and each install tree must
-# carry its own copy of the palette.
+# token it reads, and each install tree must carry its own copy of the palette.
+# The UI must load user.css last, and keep what themes rely on: a class per page
+# and colours read from variables.
 
 set -euo pipefail
 
@@ -18,6 +19,9 @@ defined() { grep -oE -- '--[A-Za-z0-9_-]+[[:space:]]*:' "$@" | tr -d ' \t:' | so
 palette=$(defined "${html}/palette.css")
 # The palette has 11 distinct tokens.
 test "$(grep -c . <<<"${palette}")" -ge 11 || fail "palette.css defines too few tokens: ${palette}"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/palette.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${work}"
 
 checked=0
 for css in "${html}/doc.css" "${html}/server/style.css"; do
@@ -38,13 +42,35 @@ for page in "${html}"/server/*.html; do
     order=$(grep -oE 'href="(style|user)\.css"' "${page}" | tr '\n' ' ')
     test "${order}" = 'href="style.css" href="user.css" ' ||
         fail "${page##*/} loads ${order:-nothing}, not style.css then user.css"
+    # Themes target a page by this class.
+    name=${page##*/}
+    grep -qE "<body class=\"([^\"]* )?page-${name%.html}[\" ]" "${page}" ||
+        fail "${name} has no page-${name%.html} body class"
     pages=$((pages + 1))
 done
 test "${pages}" -ge 21 || fail "only ${pages} UI pages load style.css"
 
+# Prints each colour declaration that reads no variable, or a variable with a
+# literal fallback. The values none, 0, transparent and inherit set no colour.
+fixed_colours() {
+    tr '\n' ' ' <"$1" |
+        awk '{ gsub(/\/\*([^*]|\*+[^*\/])*\*+\//, ""); gsub(/[{};]/, "\n"); print }' |
+        awk '{ sub(/^[[:space:]]+/, ""); sub(/[[:space:]]+$/, ""); t = tolower($0) }
+            t ~ /^([a-z-]*color|background(-image)?|border(-[a-z]+)*|outline|(box|text)-shadow|fill|stroke)[[:space:]]*:/ &&
+            (t !~ /var\(/ || t ~ /var\(--[^,)]*,/) && t !~ /:[[:space:]]*(none|0|transparent|inherit)$/'
+}
+# A colour written as a literal is one no theme can change.
+probe="${work}/probe.css"
+cat >"${probe}" <<'EOF2'
+:root { --x: #000; color-scheme: dark; }
+#a { COLOR: Black; border: 1px solid var(--x); background: none; outline: 0; box-shadow: transparent; color: inherit; /* fill: red; */ caret-color: var(--x, red) }
+EOF2
+test "$(fixed_colours "${probe}" | tr '\n' '|')" = "COLOR: Black|caret-color: var(--x, red)|" ||
+    fail "fixed_colours misreads the probe: $(fixed_colours "${probe}")"
+fixed=$(fixed_colours "${html}/server/style.css")
+test -z "${fixed}" || fail "style.css sets colours a theme cannot change: ${fixed}"
+
 # Debian ships the docs and the UI in different packages, so both need a copy.
-work=$(mktemp -d "${TMPDIR:-/tmp}/palette.XXXXXX") || fail "no tmpdir"
-cleanup_push rm -rf "${work}"
 stage_install_target install "${work}/inst" "${work}/log" html ||
     fail "make -C html install failed"
 for css in doc.css server/style.css; do
