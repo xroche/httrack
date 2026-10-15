@@ -1,8 +1,9 @@
 #!/bin/bash
 #
 # The docs and the WebHTTrack UI share html/palette.css. Each must resolve every
-# token it reads, the UI must load user.css last, and each install tree must
-# carry its own copy of the palette.
+# token it reads, and each install tree must carry its own copy of the palette.
+# The UI must load user.css last, and keep what themes rely on: a class per page
+# and colours read from variables.
 
 set -euo pipefail
 
@@ -18,6 +19,9 @@ defined() { grep -oE -- '--[A-Za-z0-9_-]+[[:space:]]*:' "$@" | tr -d ' \t:' | so
 palette=$(defined "${html}/palette.css")
 # The palette has 11 distinct tokens.
 test "$(grep -c . <<<"${palette}")" -ge 11 || fail "palette.css defines too few tokens: ${palette}"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/palette.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${work}"
 
 checked=0
 for css in "${html}/doc.css" "${html}/server/style.css"; do
@@ -38,51 +42,39 @@ for page in "${html}"/server/*.html; do
     order=$(grep -oE 'href="(style|user)\.css"' "${page}" | tr '\n' ' ')
     test "${order}" = 'href="style.css" href="user.css" ' ||
         fail "${page##*/} loads ${order:-nothing}, not style.css then user.css"
+    # Themes target a page by this class.
+    name=${page##*/}
+    grep -qE "<body class=\"([^\"]* )?page-${name%.html}[\" ]" "${page}" ||
+        fail "${name} has no page-${name%.html} body class"
     pages=$((pages + 1))
 done
 test "${pages}" -ge 21 || fail "only ${pages} UI pages load style.css"
 
-# Themes select pages by this class, so it is part of the user.css contract.
-for page in "${html}"/server/*.html; do
-    grep -q 'href="style.css"' "${page}" || continue
-    name=${page##*/}
-    grep -q "<body class=\"page-${name%.html}\"" "${page}" || fail "${name} has no page-${name%.html} body class"
-done
-
-# A colour written as a literal cannot be themed, so only rules no page uses may keep one.
-# Prints 0 if some page has $1, an id or class written #x or .x, or a tag name.
-on_a_page() {
-    case "$1" in
-    [#.]*) set -- "(id|class)=\"([^\"]* )?${1#?}( [^\"]*)?\"" ;;
-    *) set -- "<$1[[:space:]>]" ;;
-    esac
-    grep -qiE "$1" "${html}"/server/*.html
+# Prints each colour declaration outside :root blocks that does not read a variable.
+fixed_colours() {
+    tr '\n' ' ' <"$1" |
+        awk '{ gsub(/\/\*([^*]|\*+[^*\/])*\*+\//, ""); gsub(/[{};]/, "\n&\n"); print }' |
+        awk '
+            { sub(/^[[:space:]]+/, ""); sub(/[[:space:]]+$/, "") }
+            $0 == "" { next }
+            $0 == "{" { depth++; if (!root && text ~ /:root/) root = depth; text = ""; next }
+            $0 == ";" || $0 == "}" {
+                if (!root && text ~ /^(color|background(-color|-image)?|border(-[a-z]+)*|outline(-color)?|(box|text)-shadow)[[:space:]]*:/ &&
+                    text !~ /var\(/ && text !~ /:[[:space:]]*(none|0|transparent|inherit)$/) print text
+                text = ""
+                if ($0 == "}") { if (depth == root) root = 0; depth-- }
+                next
+            }
+            { text = $0 }'
 }
-literal=0
-while IFS= read -r selector; do
-    test -n "${selector}" || continue
-    while IFS= read -r part; do
-        hooks=$(grep -oE '[#.][A-Za-z][A-Za-z0-9_-]*' <<<"${part}" || true)
-        live=1
-        if test -n "${hooks}"; then
-            for hook in ${hooks}; do on_a_page "${hook}" || live=0; done
-        else
-            on_a_page "$(grep -oE '^[[:space:]]*[A-Za-z][A-Za-z0-9]*' <<<"${part}" | tr -d '[:space:]')" || live=0
-        fi
-        test "${live}" = 0 || fail "style.css colours ${part} with a literal, not a variable"
-    done <<<"$(tr ',' '\n' <<<"${selector}")"
-    literal=$((literal + 1))
-done <<<"$(awk '
-    /:root/ { root = 1 }
-    /\{/ { if (!root) selector = $0; sub(/[[:space:]]*\{.*/, "", selector) }
-    !root && /#[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]/ { print selector }
-    /\}/ { root = 0 }' "${html}/server/style.css" | sort -u)"
-# The seven unused rules carry them today.
-test "${literal}" -ge 7 || fail "only ${literal} literal-colour rules found"
+# A colour written as a literal is one no theme can change.
+probe="${work}/probe.css"
+printf '%s\n' ':root { --x: #000; }' '#a' '{ color: black; border: 1px solid var(--x); }' >"${probe}"
+test "$(fixed_colours "${probe}")" = "color: black" || fail "fixed_colours misses a named colour"
+fixed=$(fixed_colours "${html}/server/style.css")
+test -z "${fixed}" || fail "style.css sets colours a theme cannot change: ${fixed}"
 
 # Debian ships the docs and the UI in different packages, so both need a copy.
-work=$(mktemp -d "${TMPDIR:-/tmp}/palette.XXXXXX") || fail "no tmpdir"
-cleanup_push rm -rf "${work}"
 stage_install_target install "${work}/inst" "${work}/log" html ||
     fail "make -C html install failed"
 for css in doc.css server/style.css; do

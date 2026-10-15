@@ -1,6 +1,6 @@
 @import url(../palette.css);
 
-/* UI-only tokens: the light values are the UI's own, the dark ones come from the palette. */
+/* The UI's own variables, which a user stylesheet can override. The dark values follow. */
 :root {
 	--ui-ink: #000;
 	--ui-link: #00f;
@@ -8,7 +8,7 @@
 	--ui-alert: #f00;
 	--ui-font-family: "Trebuchet MS", Verdana, Arial, Helvetica, sans-serif;
 	--ui-font-size: 14px;
-	/* The title and tab bars, and the frame under each page. */
+	/* --ui-bar colours the title and tab bars and the line under each page. */
 	--ui-bar: #000;
 	--ui-bar-ink: #fff;
 	--ui-panel-image: url(images/bg_rings.svg);
@@ -52,24 +52,12 @@ body, td {
 	background: var(--ui-bar);  color: var(--ui-bar-ink);  padding: 4px;  font-weight: bold; 
 	}
 
-#siteNavigation a, #siteNavigation .current {
-	font-weight: bold;  color: #448;
-	}
-#siteNavigation a:link    { text-decoration: none; }
-#siteNavigation a:visited { text-decoration: none; }
-
-#siteNavigation .current { background-color: #ccd; }
-
-#siteNavigation a:hover   { text-decoration: none;  background-color: #fff;  color: #000; }
-#siteNavigation a:active  { text-decoration: none;  background-color: #ccc; }
-
-
 a:link    { text-decoration: underline;  color: var(--ui-link); }
 a:visited { text-decoration: underline;  color: var(--ui-visited); }
 a:hover   { text-decoration: underline;  color: var(--link-hover); }
 a:active  { text-decoration: underline; }
 
-/* Links on the black bars stay white in every state. */
+/* Links on the bars keep the bar colours in every state. */
 #subTitle a, .tabCtrl a { background: var(--ui-bar);  color: var(--ui-bar-ink); }
 
 .alert   { color: var(--ui-alert); }
@@ -83,17 +71,12 @@ a:active  { text-decoration: underline; }
 	background-image: var(--ui-panel-image);
 	background-repeat: no-repeat;
 	background-position: top right;
-	}
-
-#pageContent, #siteNavigation {
 	background-color: var(--panel);
 	}
 
 
 .imgLeft  { float: left;   margin-right: 10px;  margin-bottom: 10px; }
 .imgRight { float: right;  margin-left: 10px;   margin-bottom: 10px; }
-
-hr { height: 1px;  color: #000;  background-color: #000;  margin-bottom: 15px; }
 
 h1 { margin: 0;  font-weight: bold;  font-size: 2em; }
 h2 { margin: 0;  font-weight: bold;  font-size: 1.6em; }
@@ -103,11 +86,6 @@ h4 { margin: 0;  font-weight: bold;  font-size: 1.18em; }
 .blak { background-color: var(--ui-bar); }
 .hide { display: none; }
 .tableWidth { min-width: 400px; }
-
-.tblRegular       { border-collapse: collapse; }
-.tblRegular td    { padding: 6px;  background-image: url(images/fade.gif);  border: 2px solid #99c; }
-.tblHeaderColor, .tblHeaderColor td { background: #99c; }
-.tblNoBorder td   { border: 0; }
 
 /* The same dark-scheme exceptions as the doc pages (html/doc.css). */
 @media (prefers-color-scheme: dark) {
