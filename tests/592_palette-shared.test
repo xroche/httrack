@@ -63,7 +63,7 @@ fixed_colours() {
 probe="${work}/probe.css"
 cat >"${probe}" <<'EOF2'
 :root { --x: #000; color-scheme: dark; }
-#a { COLOR: Black; border: 1px solid var(--x); background: none; /* fill: red; */ caret-color: var(--x, red) }
+#a { COLOR: Black; border: 1px solid var(--x); background: none; outline: 0; box-shadow: transparent; color: inherit; /* fill: red; */ caret-color: var(--x, red) }
 EOF2
 test "$(fixed_colours "${probe}" | tr '\n' '|')" = "COLOR: Black|caret-color: var(--x, red)|" ||
     fail "fixed_colours misreads the probe: $(fixed_colours "${probe}")"
