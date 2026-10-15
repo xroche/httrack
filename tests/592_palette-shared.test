@@ -42,6 +42,44 @@ for page in "${html}"/server/*.html; do
 done
 test "${pages}" -ge 21 || fail "only ${pages} UI pages load style.css"
 
+# Themes select pages by this class, so it is part of the user.css contract.
+for page in "${html}"/server/*.html; do
+    grep -q 'href="style.css"' "${page}" || continue
+    name=${page##*/}
+    grep -q "<body class=\"page-${name%.html}\"" "${page}" || fail "${name} has no page-${name%.html} body class"
+done
+
+# A colour written as a literal cannot be themed, so only rules no page uses may keep one.
+# Prints 0 if some page has $1, an id or class written #x or .x, or a tag name.
+on_a_page() {
+    case "$1" in
+    [#.]*) set -- "(id|class)=\"([^\"]* )?${1#?}( [^\"]*)?\"" ;;
+    *) set -- "<$1[[:space:]>]" ;;
+    esac
+    grep -qiE "$1" "${html}"/server/*.html
+}
+literal=0
+while IFS= read -r selector; do
+    test -n "${selector}" || continue
+    while IFS= read -r part; do
+        hooks=$(grep -oE '[#.][A-Za-z][A-Za-z0-9_-]*' <<<"${part}" || true)
+        live=1
+        if test -n "${hooks}"; then
+            for hook in ${hooks}; do on_a_page "${hook}" || live=0; done
+        else
+            on_a_page "$(grep -oE '^[[:space:]]*[A-Za-z][A-Za-z0-9]*' <<<"${part}" | tr -d '[:space:]')" || live=0
+        fi
+        test "${live}" = 0 || fail "style.css colours ${part} with a literal, not a variable"
+    done <<<"$(tr ',' '\n' <<<"${selector}")"
+    literal=$((literal + 1))
+done <<<"$(awk '
+    /:root/ { root = 1 }
+    /\{/ { if (!root) selector = $0; sub(/[[:space:]]*\{.*/, "", selector) }
+    !root && /#[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]/ { print selector }
+    /\}/ { root = 0 }' "${html}/server/style.css" | sort -u)"
+# The seven unused rules carry them today.
+test "${literal}" -ge 7 || fail "only ${literal} literal-colour rules found"
+
 # Debian ships the docs and the UI in different packages, so both need a copy.
 work=$(mktemp -d "${TMPDIR:-/tmp}/palette.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "${work}"
