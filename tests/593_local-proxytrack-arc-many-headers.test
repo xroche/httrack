@@ -1,0 +1,46 @@
+#!/bin/bash
+#
+# A record with millions of header lines must read back in linear time.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+# shellcheck source=tests/arclib.sh
+. "${0%"${0##*/}"}./arclib.sh"
+
+export LC_ALL=C
+
+dir=$(mktemp -d)
+cleanup() {
+    rm -rf "$dir"
+}
+cleanup_push cleanup
+
+# quadratic appends overrun the deadline tenfold, linear ones take a second
+LINES=3000000
+
+{
+    printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n'
+    awk -v n="$LINES" 'BEGIN { for (i = 0; i < n; i++) printf "X-H: %d\r\n", i }'
+    printf '\r\n'
+} >"$dir/head"
+printf 'BODY' >"$dir/body"
+{
+    arc_filedesc
+    arc_record "http://example.invalid/page.html" text/html 200 \
+        "$dir/head" "$dir/body"
+} >"$dir/in.arc"
+
+status=0
+run_with_timeout 60 proxytrack --convert "$dir/out.arc" "$dir/in.arc" \
+    >/dev/null 2>"$dir/log" || status=$?
+test "$status" -ne 124 || fail "proxytrack took over 60s on $LINES header lines"
+test "$status" -eq 0 || fail "proxytrack exited $status: $(cat "$dir/log")"
+out=$(cat "$dir/out.arc")
+for n in 0 500; do
+    grep -q "X-H: $n"$'\r' <<<"$out" || fail "header line X-H: $n was lost or lost its CR"
+done
+grep -q 'BODY' <<<"$out" || fail "the body was lost"
+
+echo "OK: $LINES header lines read back in linear time"

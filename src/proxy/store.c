@@ -1100,6 +1100,30 @@ int PT_LoadCache__New(PT_Index index_, const char *filename) {
   return 0;
 }
 
+/* Append "name: value\r\n" to *headers, doubling its *cap-byte block.
+   Unlike StringCat, it drops the line on allocation failure. */
+static void PT_AppendHeader(char **headers, size_t *len, size_t *cap,
+                            const char *name, const char *value) {
+  const size_t nameLen = strlen(name);
+  const size_t valueLen = strlen(value);
+  const size_t need = nameLen + valueLen + sizeof(": \r\n"); /* NUL included */
+
+  if (need > *cap - *len) {
+    const size_t want = (*cap > SIZE_MAX / 2 - need) ? 0 : *cap * 2 + need;
+    char *const grown = want != 0 ? realloct(*headers, want) : NULL;
+
+    if (grown == NULL)
+      return;
+    *headers = grown;
+    *cap = want;
+  }
+  memcpy(*headers + *len, name, nameLen);
+  memcpy(*headers + *len + nameLen, ": ", 2);
+  memcpy(*headers + *len + nameLen + 2, value, valueLen);
+  memcpy(*headers + *len + nameLen + 2 + valueLen, "\r\n", 3);
+  *len += nameLen + 2 + valueLen + 2;
+}
+
 static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                                       int flags) {
   PT_Index__New index = (PT_Index__New) & index_->slots.formatNew;
@@ -1109,6 +1133,7 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
   char catbuff[CATBUFF_SIZE];
   intptr_t hash_pos;
   int hash_pos_return;
+  size_t headersLen = 0, headersCap = 0;
   PT_Element r = NULL;
 
   if (index == NULL || index->hash == NULL || index->zFile == NULL
@@ -1194,21 +1219,8 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
               ZIP_READFIELD_STRING(line, value, "X-Save", previous_save_,
                                    sizeof(previous_save_));
               if (line[0] != '\0') {
-                const int len = r->headers ? ((int) strlen(r->headers)) : 0;
-                /* one byte more than the four appends below write */
-                const int nlen = (int) (strlen(line) + 2 + strlen(value) +
-                                        sizeof("\r\n") + 1);
-                char *const grown = realloct(r->headers, len + nlen);
-
-                /* keep the headers read so far rather than losing them */
-                if (grown != NULL) {
-                  r->headers = grown;
-                  r->headers[len] = '\0';
-                  strcat(r->headers, line);
-                  strcat(r->headers, ": ");
-                  strcat(r->headers, value);
-                  strcat(r->headers, "\r\n");
-                }
+                PT_AppendHeader(&r->headers, &headersLen, &headersCap, line,
+                                value);
               }
             }
           } while (offset < readSizeHeader && !lineEof);
@@ -2625,6 +2637,7 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
   char location_default[HTS_URLMAXSIZE * 2];
   intptr_t hash_pos;
   int hash_pos_return;
+  size_t headersLen = 0, headersCap = 0;
   PT_Element r = NULL;
 
   if (index == NULL || index->hash == NULL || url == NULL || *url == 0)
@@ -2683,21 +2696,8 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
               HTTP_READFIELD_STRING(line, value, "Content-Disposition",
                                     r->cdispo, sizeof(r->cdispo));
               if (line[0] != '\0') {
-                const int len = r->headers ? ((int) strlen(r->headers)) : 0;
-                /* one byte more than the four appends below write */
-                const int nlen = (int) (strlen(line) + 2 + strlen(value) +
-                                        sizeof("\r\n") + 1);
-                char *const grown = realloct(r->headers, len + nlen);
-
-                /* keep the headers read so far rather than losing them */
-                if (grown != NULL) {
-                  r->headers = grown;
-                  r->headers[len] = '\0';
-                  strcat(r->headers, line);
-                  strcat(r->headers, ": ");
-                  strcat(r->headers, value);
-                  strcat(r->headers, "\r\n");
-                }
+                PT_AppendHeader(&r->headers, &headersLen, &headersCap, line,
+                                value);
               }
             }
           }
