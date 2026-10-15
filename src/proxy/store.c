@@ -1100,14 +1100,13 @@ int PT_LoadCache__New(PT_Index index_, const char *filename) {
   return 0;
 }
 
-/* Append "name: value\r\n" to *headers, a string of *len bytes in a block of
-   *cap. The block doubles, so a record of many header lines stays linear. On
-   allocation failure the line is dropped and the headers read so far kept. */
+/* Append "name: value\r\n" to *headers, doubling its *cap-byte block.
+   Unlike StringCat, it drops the line on allocation failure. */
 static void PT_AppendHeader(char **headers, size_t *len, size_t *cap,
                             const char *name, const char *value) {
   const size_t nameLen = strlen(name);
   const size_t valueLen = strlen(value);
-  const size_t need = nameLen + valueLen + sizeof(": \r\n");
+  const size_t need = nameLen + valueLen + sizeof(": \r\n"); /* NUL included */
 
   if (need > *cap - *len) {
     const size_t want = (*cap > SIZE_MAX / 2 - need) ? 0 : *cap * 2 + need;
