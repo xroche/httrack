@@ -2,8 +2,9 @@
    ~/.httrack.css, .httrack.css in the mirror base path, then httrack.css next
    to httrack.conf. On Windows the names drop the dot and there is no third one.
    Set the --ui-* variables at the top of style.css, and --field, --panel and
-   --link-hover from palette.css, rather than restyling selectors, which change.
-   A dark theme also sets color-scheme: dark, for dark form controls.
-   Each page's <body> has a class named after it, for example page-option2.
-   During a mirror, every step shows page-refresh, then page-finished.
+   --link-hover from palette.css, because selectors may change between releases.
+   Set color-scheme to match the theme, so form controls follow it.
+   Each styled page's <body> has a class named after it, for example page-option2.
+   While a mirror runs, every wizard page is replaced by page-refresh, then by
+   page-finished.
    Example: :root { --field: #345; --panel: #eee; --ui-bar: #236; } */

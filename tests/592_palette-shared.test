@@ -50,27 +50,23 @@ for page in "${html}"/server/*.html; do
 done
 test "${pages}" -ge 21 || fail "only ${pages} UI pages load style.css"
 
-# Prints each colour declaration outside :root blocks that does not read a variable.
+# Prints each colour declaration that reads no variable, or a variable with a
+# literal fallback. The values none, 0, transparent and inherit set no colour.
 fixed_colours() {
     tr '\n' ' ' <"$1" |
-        awk '{ gsub(/\/\*([^*]|\*+[^*\/])*\*+\//, ""); gsub(/[{};]/, "\n&\n"); print }' |
-        awk '
-            { sub(/^[[:space:]]+/, ""); sub(/[[:space:]]+$/, "") }
-            $0 == "" { next }
-            $0 == "{" { depth++; if (!root && text ~ /:root/) root = depth; text = ""; next }
-            $0 == ";" || $0 == "}" {
-                if (!root && text ~ /^(color|background(-color|-image)?|border(-[a-z]+)*|outline(-color)?|(box|text)-shadow)[[:space:]]*:/ &&
-                    text !~ /var\(/ && text !~ /:[[:space:]]*(none|0|transparent|inherit)$/) print text
-                text = ""
-                if ($0 == "}") { if (depth == root) root = 0; depth-- }
-                next
-            }
-            { text = $0 }'
+        awk '{ gsub(/\/\*([^*]|\*+[^*\/])*\*+\//, ""); gsub(/[{};]/, "\n"); print }' |
+        awk '{ sub(/^[[:space:]]+/, ""); sub(/[[:space:]]+$/, ""); t = tolower($0) }
+            t ~ /^([a-z-]*color|background(-image)?|border(-[a-z]+)*|outline|(box|text)-shadow|fill|stroke)[[:space:]]*:/ &&
+            (t !~ /var\(/ || t ~ /var\(--[^,)]*,/) && t !~ /:[[:space:]]*(none|0|transparent|inherit)$/'
 }
 # A colour written as a literal is one no theme can change.
 probe="${work}/probe.css"
-printf '%s\n' ':root { --x: #000; }' '#a' '{ color: black; border: 1px solid var(--x); }' >"${probe}"
-test "$(fixed_colours "${probe}")" = "color: black" || fail "fixed_colours misses a named colour"
+cat >"${probe}" <<'EOF2'
+:root { --x: #000; color-scheme: dark; }
+#a { COLOR: Black; border: 1px solid var(--x); background: none; /* fill: red; */ caret-color: var(--x, red) }
+EOF2
+test "$(fixed_colours "${probe}" | tr '\n' '|')" = "COLOR: Black|caret-color: var(--x, red)|" ||
+    fail "fixed_colours misreads the probe: $(fixed_colours "${probe}")"
 fixed=$(fixed_colours "${html}/server/style.css")
 test -z "${fixed}" || fail "style.css sets colours a theme cannot change: ${fixed}"
 
