@@ -1058,3 +1058,5 @@ The rules you set here apply to the mirror now running. Removing a rule lets new
 Pravidla, která zde nastavíte, platí pro právě probíhající stahování. Odebrání pravidla znovu propustí nové odkazy, ale odkaz, který už pravidlo odmítlo, se v tomto stahování nevrátí.
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Tento filtr nelze použít. Filtr začíná znakem + nebo -, za ním následuje vzor a musí se vejít na jeden krátký řádek.
+Theme:
+

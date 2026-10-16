@@ -1058,3 +1058,5 @@ The rules you set here apply to the mirror now running. Removing a rule lets new
 Pravidlá, ktoré tu nastavíte, platia pre práve prebiehajúce zrkadlenie. Odstránenie pravidla znova prepustí nové odkazy, ale odkaz, ktorý pravidlo už odmietlo, sa v tomto zrkadlení nevráti.
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Toto pravidlo pre vyhľadávanie nemožno použiť. Pravidlo začína znakom + alebo -, za ním nasleduje vzor a musí sa zmestiť na jeden krátky riadok.
+Theme:
+

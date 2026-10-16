@@ -745,6 +745,131 @@ static hts_boolean find_user_stylesheet(char *dst, size_t size) {
   return HTS_FALSE;
 }
 
+#ifdef _WIN32
+#define UI_SETTINGS "/httrack-ui.ini"
+#else
+#define UI_SETTINGS "/.httrack-ui.ini"
+#endif
+
+#define THEME_CLASSIC "classic"
+#define THEME_NAME_MAX 32
+#define THEMES_MAX 64
+
+/* The theme chosen in the UI, kept across runs in UI_SETTINGS. */
+static char ui_theme[THEME_NAME_MAX + 1] = THEME_CLASSIC;
+
+/* Is name usable as a theme folder name, and so safe inside a path? */
+static hts_boolean theme_name_is_valid(const char *name) {
+  const size_t len = strlen(name);
+
+  return len > 0 && len <= THEME_NAME_MAX &&
+                 strspn(name, "abcdefghijklmnopqrstuvwxyz"
+                              "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-") == len
+             ? HTS_TRUE
+             : HTS_FALSE;
+}
+
+/* Does html/server/themes/<name>/theme.css exist under the server root? */
+static hts_boolean theme_is_installed(const char *path, const char *name) {
+  char file[1024];
+
+  file[0] = '\0';
+  return theme_name_is_valid(name) && strcmp(name, THEME_CLASSIC) != 0 &&
+                 path_append(file, sizeof(file), path) &&
+                 path_append(file, sizeof(file), "html/server/themes/") &&
+                 path_append(file, sizeof(file), name) &&
+                 path_append(file, sizeof(file), "/theme.css") && fexist(file)
+             ? HTS_TRUE
+             : HTS_FALSE;
+}
+
+/* The theme to apply: Classic while the chosen one is not installed, so that a
+   removed folder falls back without the choice being forgotten. */
+static const char *effective_theme(const char *path) {
+  return theme_is_installed(path, ui_theme) ? ui_theme : THEME_CLASSIC;
+}
+
+static int theme_name_cmp(const void *a, const void *b) {
+  return strcmp(*(char *const *) a, *(char *const *) b);
+}
+
+/* Returns the installed theme names, sorted and one per line, as a heap string
+   that is empty when there are none. */
+static char *list_themes(const char *path) {
+  char dir[1024];
+  char *names[THEMES_MAX];
+  size_t count = 0;
+  size_t i;
+  find_handle h;
+  String list = STRING_EMPTY;
+  char *result;
+
+  dir[0] = '\0';
+  if (path_append(dir, sizeof(dir), path) &&
+      path_append(dir, sizeof(dir), "html/server/themes") &&
+      (h = hts_findfirst(dir)) != NULL) {
+    do {
+      const char *const name = hts_findgetname(h);
+
+      if (count < THEMES_MAX && name != NULL && hts_findisdir(h) &&
+          theme_is_installed(path, name)) {
+        names[count++] = strdupt(name);
+      }
+    } while (hts_findnext(h));
+    hts_findclose(h);
+  }
+  qsort(names, count, sizeof(names[0]), theme_name_cmp);
+  for (i = 0; i < count; i++) {
+    if (i != 0) {
+      StringCat(list, "\n");
+    }
+    StringCat(list, names[i]);
+    freet(names[i]);
+  }
+  result = strdupt(StringNotEmpty(list) ? StringBuff(list) : "");
+  StringFree(list);
+  return result;
+}
+
+/* Reads the chosen theme from UI_SETTINGS in the home folder, a file of
+   key=value lines. */
+static void load_ui_settings(void) {
+  char file[1024];
+  FILE *fp;
+
+  file[0] = '\0';
+  if (!path_append(file, sizeof(file), gethomedir()) ||
+      !path_append(file, sizeof(file), UI_SETTINGS) || !fexist(file) ||
+      (fp = fopen(file, "rb")) == NULL) {
+    return;
+  }
+  while (!feof(fp)) {
+    char line[256];
+
+    if (linput(fp, line, sizeof(line) - 2) > 0 &&
+        strncmp(line, "uitheme=", 8) == 0 && theme_name_is_valid(line + 8)) {
+      strcpybuff(ui_theme, line + 8);
+    }
+  }
+  fclose(fp);
+}
+
+/* Chooses name as the theme. A settings file that cannot be written only
+   loses the choice at exit. */
+static void save_ui_theme(const char *name) {
+  char file[1024];
+  FILE *fp;
+
+  strcpybuff(ui_theme, name);
+  file[0] = '\0';
+  if (path_append(file, sizeof(file), gethomedir()) &&
+      path_append(file, sizeof(file), UI_SETTINGS) &&
+      (fp = fopen(file, "wb")) != NULL) {
+    fprintf(fp, "uitheme=%s\n", ui_theme);
+    fclose(fp);
+  }
+}
+
 /* Append c to dst as an HTML entity, or return HTS_FALSE if it needs none. */
 static hts_boolean cat_html_escaped(String *dst, char c) {
   switch (c) {
@@ -913,6 +1038,17 @@ static void cat_cmdline_arglist(String *output, const char *value,
     }
     StringCat(*output, "\"");
   }
+}
+
+/* Close the value of a ${liststr:} entry, marking it selected when it equals
+   the escaped selected value. */
+static void cat_liststr_close(String *output, const String *item,
+                              const String *selected) {
+  StringCat(*output,
+            StringNotEmpty(*selected) &&
+                    strcmp(StringBuff(*item), StringBuff(*selected)) == 0
+                ? "\" selected>"
+                : "\">");
 }
 
 /* Append one <select> entry, unless its id is the hidden one. Ids reach
@@ -1209,6 +1345,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
       coucal_write(NewLangList, "path", (intptr_t) strdup(pth));
     }
   }
+  load_ui_settings();
 
   /* Lock */
   webhttrack_lock();
@@ -1447,6 +1584,19 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             coucal_write(NewLangList, "lang_",
                           (intptr_t) strdup((char *) adr));
           }
+        }
+
+        /* Only a change counts: the menu shows Classic while the chosen theme
+           is missing, and posting that back must not forget the choice. */
+        if (coucal_readptr(NewLangList, "uitheme", &adr)) {
+          const char *const posted = (const char *) adr;
+
+          if (strcmp(posted, effective_theme(path)) != 0 &&
+              (strcmp(posted, THEME_CLASSIC) == 0 ||
+               theme_is_installed(path, posted))) {
+            save_ui_theme(posted);
+          }
+          coucal_write(NewLangList, "uitheme", (intptr_t) NULL);
         }
 
         /* Load existing project settings */
@@ -1789,6 +1939,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             }
           }
 
+          /* theme.css is generated below, never read from disk */
+          if (!virtualpath && strcmp(file, "/server/theme.css") == 0) {
+            fsfile[0] = '\0';
+          }
+
           /* Regular files only: reading a directory or FIFO never ends, and
              "path" may hold "..", so only the untrusted halves are checked. */
           if (fsfile[0] && strstr(file, "..") == NULL && fexist(fsfile) &&
@@ -1866,6 +2021,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                     int format = 0;
                     int listDefault = 0;
                     int listHidden = 0; /* ids start at 1, so 0 hides none */
+                    /* ${liststr:} entry to mark selected, attribute-escaped */
+                    String listSelected = STRING_EMPTY;
                     hts_boolean unquoted = HTS_FALSE;
                     /* value comes from the template, not from the settings */
                     hts_boolean literal = HTS_FALSE;
@@ -1897,8 +2054,22 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                       name += p;
                       format = 2;
                     } else if ((p = strfield(name, "liststr:"))) {
+                      /* ${liststr:<var>:<key>} selects the entry equal to
+                         <var>, as ${listid:} does */
+                      char *const colon = strchr(name + p, ':');
+
                       name += p;
                       format = -2;
+                      if (colon != NULL) {
+                        intptr_t adr = 0;
+
+                        *colon = '\0';
+                        if (coucal_readptr(NewLangList, name, &adr) &&
+                            adr != 0) {
+                          cat_attr_escaped(&listSelected, (const char *) adr);
+                        }
+                        name = colon + 1;
+                      }
                     } else if ((p = strfield(name, "date:"))) {
                       /* Expanded on each request, so the footer year cannot
                          drift from the calendar the way a stamped one does
@@ -2012,6 +2183,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                         }
                       } else if (strcmp(name, "end-if") == 0) {
                         outputmode = 0;
+                      } else if (strcmp(name, "loadthemes") == 0) {
+                        coucal_write(NewLangList, "uithemes",
+                                     (intptr_t) list_themes(path));
+                        coucal_write(NewLangList, "uitheme",
+                                     (intptr_t) strdupt(effective_theme(path)));
                       } else if (strcmp(name, "loadhash") == 0) {
                         intptr_t adr = 0;
 
@@ -2283,7 +2459,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                                 StringCat(output, "<br>\r\n");
                               } else if (format == -2) {
                                 StringCat(output, StringBuff(tmpbuff));
-                                StringCat(output, "\">");
+                                cat_liststr_close(&output, &tmpbuff,
+                                                  &listSelected);
                                 StringCat(output, StringBuff(tmpbuff));
                                 StringCat(output, "</option>\r\n");
                                 StringCat(output, "<option value=\"");
@@ -2316,7 +2493,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                                             listDefault, listHidden);
                           } else if (format == -2) {
                             StringCat(output, StringBuff(tmpbuff));
-                            StringCat(output, "\">");
+                            cat_liststr_close(&output, &tmpbuff, &listSelected);
                             StringCat(output, StringBuff(tmpbuff));
                             StringCat(output, "</option>");
                           } else {
@@ -2326,6 +2503,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                         }
                       }
                     }
+                    StringFree(listSelected);
                     str = pos;
                   } else {
                     if (outputmode != -1) {
@@ -2373,6 +2551,22 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
               }
             }
             fclose(fp);
+          } else if (!virtualpath && strcmp(file, "/server/theme.css") == 0) {
+            /* An import keeps the theme's relative URLs relative to its own
+               folder. Not cached, so a switch shows on the next page. */
+            const char *const theme = effective_theme(path);
+
+            StringCat(headers, "HTTP/1.0 200 OK\r\n"
+                               "Server: httrack small server\r\n"
+                               "Content-type: text/css\r\n"
+                               "Cache-Control: no-cache, must-revalidate, "
+                               "private\r\n"
+                               "Pragma: no-cache\r\n");
+            if (strcmp(theme, THEME_CLASSIC) != 0) {
+              StringCat(output, "@import url(themes/");
+              StringCat(output, theme);
+              StringCat(output, "/theme.css);\n");
+            }
           } else if (strcmp(file, "/ping") == 0) {
             /* A cached heartbeat would never reach us again, and silence is
                what the watchdog reads as a dead window. */

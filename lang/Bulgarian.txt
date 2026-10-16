@@ -1058,3 +1058,5 @@ The rules you set here apply to the mirror now running. Removing a rule lets new
 Правилата, които задавате тук, важат за огледалото, което се изпълнява в момента. Премахването на правило отново пропуска новите връзки, но връзка, която то вече е отхвърлило, няма да се върне при това изпълнение.
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Това правило за сканиране не може да се използва. Правилото започва с + или -, следвано от шаблон, и трябва да се побира на един кратък ред.
+Theme:
+

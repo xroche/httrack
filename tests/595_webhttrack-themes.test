@@ -1,0 +1,118 @@
+#!/bin/bash
+#
+# A folder under html/server/themes holding a theme.css is a theme. The welcome
+# page lists the installed ones, a posted choice is kept in the home folder, and
+# a chosen theme whose folder is gone falls back to Classic without being lost.
+
+set -euo pipefail
+
+# shellcheck source=tests/webhttracklib.sh
+. "${0%"${0##*/}"}./webhttracklib.sh"
+
+htsserver_require
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_themes.XXXXXX") || fail "no tmpdir"
+cleanup_push htsserver_cleanup_dir "${work}"
+
+settings=.httrack-ui.ini
+! target_is_windows || settings=httrack-ui.ini
+
+# A server root of links into the tree, with a copy of html/server to add
+# themes to.
+root=${work}/root
+mkdir -p "${root}/html" "${work}/home/websites"
+for entry in "${HTS_DISTDIR}"/*; do
+    test "${entry##*/}" = html || ln -s "${entry}" "${root}/${entry##*/}"
+done
+for entry in "${HTS_DISTDIR}"/html/*; do
+    test "${entry##*/}" = server || ln -s "${entry}" "${root}/html/${entry##*/}"
+done
+cp -R "${HTS_DISTDIR}/html/server" "${root}/html/server"
+themes=${root}/html/server/themes
+
+# Prints /server/theme.css after checking it is served as uncached CSS.
+theme_css() {
+    local reply
+    reply=$(htsserver_get /server/theme.css)
+    grep -q '^HTTP/1.[01] 200' <<<"${reply}" || fail "theme.css: ${reply}"
+    grep -qi '^Content-type: text/css' <<<"${reply}" || fail "theme.css type: ${reply}"
+    grep -qi '^Cache-Control: no-cache' <<<"${reply}" || fail "theme.css is cacheable: ${reply}"
+    printf '%s\n' "${reply}"
+}
+
+# Posts a theme choice from the welcome page, as its menu does.
+choose() { # choose BODY
+    local reply
+    reply=$(htsserver_post "$1&redirect=index.html" /server/step2.html)
+    grep -q '^HTTP/1.[01] 302' <<<"${reply}" || fail "post $1: ${reply}"
+    grep -q '^Location: index.html' <<<"${reply}" || fail "post $1 redirect: ${reply}"
+}
+
+htsserver_start --root "${root}" --home "${work}/home"
+sid=$(htsserver_sid)
+test "${#sid}" -eq 32 || fail "no session id: [${sid}]"
+
+# Without themes, Classic is served and there is nothing to choose.
+reply=$(theme_css)
+! grep -q '@import' <<<"${reply}" || fail "a theme is served with none installed: ${reply}"
+reply=$(htsserver_get /server/index.html)
+! grep -q 'name="uitheme"' <<<"${reply}" || fail "a theme menu with no theme installed"
+
+# Copying a folder in is enough. Names sort, and these are not themes: a folder
+# without theme.css, a name unsafe in a URL, and the reserved name classic.
+for name in zeta alpha Bad.Name classic; do
+    mkdir -p "${themes}/${name}"
+    printf '/* %s */\n' "${name}" >"${themes}/${name}/theme.css"
+done
+mkdir "${themes}/nocss"
+reply=$(htsserver_get /server/index.html)
+options=$(grep -oE '<option value="[^"]*"( selected)?>' <<<"${reply}" |
+    sed -n '/value="classic"/,$p' | tr '\n' ' ')
+test "${options}" = '<option value="classic"> <option value="alpha"> <option value="zeta"> ' ||
+    fail "theme menu: ${options}"
+
+choose "sid=${sid}&uitheme=zeta"
+reply=$(theme_css)
+grep -qF '@import url(themes/zeta/theme.css);' <<<"${reply}" || fail "zeta not applied: ${reply}"
+grep -qx 'uitheme=zeta' "${work}/home/${settings}" || fail "zeta not saved"
+reply=$(htsserver_get /server/index.html)
+grep -q '<option value="zeta" selected>' <<<"${reply}" || fail "zeta not selected"
+reply=$(htsserver_get /server/themes/zeta/theme.css)
+grep -qF '/* zeta */' <<<"${reply}" || fail "the imported file is not served: ${reply}"
+
+# Names that are not installed themes change nothing.
+for bad in nocss Bad.Name ../zeta ''; do
+    choose "sid=${sid}&uitheme=${bad}"
+    grep -qx 'uitheme=zeta' "${work}/home/${settings}" || fail "uitheme=${bad} was saved"
+    grep -qF 'themes/zeta/' <<<"$(theme_css)" || fail "uitheme=${bad} was applied"
+done
+
+# A post without the session id is refused.
+reply=$(htsserver_post "uitheme=alpha&redirect=index.html" /server/step2.html)
+! grep -q '^HTTP/1.[01] 302' <<<"${reply}" || fail "a post without sid was accepted"
+grep -qF 'themes/zeta/' <<<"$(theme_css)" || fail "a post without sid changed the theme"
+
+# A removed folder falls back to Classic. The menu then posts classic with any
+# other change, which must not forget zeta.
+mv "${themes}/zeta" "${work}/zeta"
+! grep -q '@import' <<<"$(theme_css)" || fail "a removed theme is still served"
+choose "sid=${sid}&uitheme=classic&lang=1"
+grep -qx 'uitheme=zeta' "${work}/home/${settings}" || fail "the fallback overwrote zeta"
+mv "${work}/zeta" "${themes}/zeta"
+grep -qF 'themes/zeta/' <<<"$(theme_css)" || fail "zeta did not come back with its folder"
+
+# The choice outlives the server.
+htsserver_stop
+htsserver_start --root "${root}" --home "${work}/home"
+grep -qF 'themes/zeta/' <<<"$(theme_css)" || fail "zeta lost on restart"
+
+# Classic is a choice too.
+sid=$(htsserver_sid)
+choose "sid=${sid}&uitheme=classic"
+grep -qx 'uitheme=classic' "${work}/home/${settings}" || fail "classic not saved"
+! grep -q '@import' <<<"$(theme_css)" || fail "classic not applied"
+
+htsserver_stop
+htsserver_assert_reaped
+
+echo OK

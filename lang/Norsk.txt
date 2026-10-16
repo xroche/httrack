@@ -1058,3 +1058,5 @@ The rules you set here apply to the mirror now running. Removing a rule lets new
 Reglene du angir her, gjelder for kopieringen som pågår nå. Fjerner du en regel, slipper nye lenker gjennom igjen, men en lenke regelen allerede har avvist, kommer ikke tilbake i denne kopieringen.
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Denne søkeregelen kan ikke brukes. En regel begynner med + eller -, etterfulgt av et mønster, og må få plass på én kort linje.
+Theme:
+
