@@ -43,7 +43,7 @@ for css in "${html}"/server/themes/*/theme.css; do
     known=$(printf '%s\n' "${palette}" "${ui}" "$(defined "${css}" || true)")
     while IFS= read -r used; do
         test -n "${used}" || continue
-        grep -qxF -- "${used}" <<<"${known}" || fail "${css#${html}/} reads ${used}, which nothing defines"
+        grep -qxF -- "${used}" <<<"${known}" || fail "${css#"${html}"/} reads ${used}, which nothing defines"
     done <<<"$(grep -oE 'var\(--[A-Za-z0-9_-]+' "${css}" | sed 's/^var(//' | sort -u)"
 done
 
