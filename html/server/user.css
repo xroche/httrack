@@ -7,6 +7,6 @@
    Each styled page's <body> has a class named after it, for example page-option2.
    While a mirror runs, every wizard page is replaced by page-refresh, then by
    page-finished.
-   A theme, html/server/themes/<name>/theme.css, follows the same rules and
-   loads before this file.
+   A theme, html/server/themes/<name>/theme.css or the same under
+   ~/.httrack/themes, follows the same rules and loads before this file.
    Example: :root { --field: #345; --panel: #eee; --ui-bar: #236; } */

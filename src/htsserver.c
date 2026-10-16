@@ -751,8 +751,15 @@ static hts_boolean find_user_stylesheet(char *dst, size_t size) {
 #define UI_SETTINGS "/.httrack-ui.ini"
 #endif
 
+#ifdef _WIN32
+#define USER_THEMES "/httrack/themes"
+#else
+#define USER_THEMES "/.httrack/themes"
+#endif
+
 #define THEME_CLASSIC "classic"
 #define THEME_NAME_MAX 32
+#define THEMES_URL "/server/themes/"
 
 /* This holds the chosen UI theme, which UI_SETTINGS keeps across runs. */
 static char ui_theme[THEME_NAME_MAX + 1] = THEME_CLASSIC;
@@ -766,16 +773,58 @@ static hts_boolean theme_name_is_valid(const char *name) {
                       "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-") == len;
 }
 
-/* Does html/server/themes/<name>/theme.css exist under the server root? */
-static hts_boolean theme_is_installed(const char *path, const char *name) {
+/* Writes the folder of the user's themes, or of the ones under the server
+   root, into dst. False if it does not fit. */
+static hts_boolean themes_dir(char *dst, size_t size, const char *path,
+                              hts_boolean user) {
+  dst[0] = '\0';
+  return user ? path_append(dst, size, gethomedir()) &&
+                    path_append(dst, size, USER_THEMES)
+              : path_append(dst, size, path) &&
+                    path_append(dst, size, "html/server/themes");
+}
+
+/* Does that folder hold <name>/theme.css? name must already be valid. */
+static hts_boolean theme_in(const char *path, hts_boolean user,
+                            const char *name) {
   char file[1024];
 
-  file[0] = '\0';
-  return theme_name_is_valid(name) && strcmp(name, THEME_CLASSIC) != 0 &&
-         path_append(file, sizeof(file), path) &&
-         path_append(file, sizeof(file), "html/server/themes/") &&
+  return themes_dir(file, sizeof(file), path, user) &&
+         path_append(file, sizeof(file), "/") &&
          path_append(file, sizeof(file), name) &&
          path_append(file, sizeof(file), "/theme.css") && fexist(file);
+}
+
+/* Is name a theme in the user's folder or under the server root? */
+static hts_boolean theme_is_installed(const char *path, const char *name) {
+  return theme_name_is_valid(name) && strcmp(name, THEME_CLASSIC) != 0 &&
+         (theme_in(path, HTS_TRUE, name) || theme_in(path, HTS_FALSE, name));
+}
+
+/* Finds the file a THEMES_URL "<name>/..." URL names among the user's themes,
+   which win over an installed theme of the same name. False, with dst empty,
+   for any other URL. */
+static hts_boolean find_user_theme_file(char *dst, size_t size,
+                                        const char *file) {
+  const char *const start = file + sizeof(THEMES_URL) - 1;
+  const char *rest;
+  char name[THEME_NAME_MAX + 1];
+
+  dst[0] = '\0';
+  if (strncmp(file, THEMES_URL, sizeof(THEMES_URL) - 1) != 0 ||
+      (rest = strchr(start, '/')) == NULL ||
+      (size_t) (rest - start) > THEME_NAME_MAX) {
+    return HTS_FALSE;
+  }
+  memcpy(name, start, rest - start);
+  name[rest - start] = '\0';
+  if (!theme_name_is_valid(name) || !theme_in(NULL, HTS_TRUE, name) ||
+      !themes_dir(dst, size, NULL, HTS_TRUE) || !path_append(dst, size, "/") ||
+      !path_append(dst, size, name) || !path_append(dst, size, rest)) {
+    dst[0] = '\0';
+    return HTS_FALSE;
+  }
+  return HTS_TRUE;
 }
 
 /* Returns the chosen theme, or Classic while its folder is missing, which
@@ -788,26 +837,30 @@ static int theme_name_cmp(const void *a, const void *b) {
   return strcmp(*(char *const *) a, *(char *const *) b);
 }
 
-/* Returns the installed theme names, sorted and one per line, as a heap string
-   that is empty when there are none. */
+/* Returns the theme names of both folders, sorted and one per line, as a heap
+   string that is empty when there are none. */
 static char *list_themes(const char *path) {
   char dir[1024];
   char **names = NULL;
   size_t count = 0;
   size_t capacity = 0;
   size_t i;
-  find_handle h;
+  int user;
   String list = STRING_EMPTY;
   char *result;
 
-  dir[0] = '\0';
-  if (path_append(dir, sizeof(dir), path) &&
-      path_append(dir, sizeof(dir), "html/server/themes") &&
-      (h = hts_findfirst(dir)) != NULL) {
+  for (user = 0; user < 2; user++) {
+    find_handle h;
+
+    if (!themes_dir(dir, sizeof(dir), path, user != 0) ||
+        (h = hts_findfirst(dir)) == NULL) {
+      continue;
+    }
     do {
       const char *const name = hts_findgetname(h);
 
-      if (name != NULL && theme_is_installed(path, name)) {
+      if (name != NULL && theme_name_is_valid(name) &&
+          strcmp(name, THEME_CLASSIC) != 0 && theme_in(path, user != 0, name)) {
         if (count == capacity) {
           char **const grown =
               (char **) realloct(names, (capacity + 16) * sizeof(names[0]));
@@ -827,10 +880,15 @@ static char *list_themes(const char *path) {
     qsort(names, count, sizeof(names[0]), theme_name_cmp);
   }
   for (i = 0; i < count; i++) {
-    if (i != 0) {
-      StringCat(list, "\n");
+    /* a user's theme may share its name with an installed one */
+    if (i == 0 || strcmp(names[i], names[i - 1]) != 0) {
+      if (StringNotEmpty(list)) {
+        StringCat(list, "\n");
+      }
+      StringCat(list, names[i]);
     }
-    StringCat(list, names[i]);
+  }
+  for (i = 0; i < count; i++) {
     freet(names[i]);
   }
   freet(names);
@@ -1936,9 +1994,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             }
           }
 
-          /* user.css is the user's override when one exists */
-          if (!virtualpath && (strcmp(file, "/server/user.css") != 0 ||
-                               !find_user_stylesheet(fsfile, sizeof(fsfile)))) {
+          /* user.css and the user's themes override the shipped files */
+          if (!virtualpath &&
+              !(strcmp(file, "/server/user.css") == 0
+                    ? find_user_stylesheet(fsfile, sizeof(fsfile))
+                    : find_user_theme_file(fsfile, sizeof(fsfile), file))) {
             if (!path_append(fsfile, sizeof(fsfile), path) ||
                 !path_append(fsfile, sizeof(fsfile), "html") ||
                 !path_append(fsfile, sizeof(fsfile), file)) {
@@ -1953,8 +2013,12 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             }
           }
 
-          /* theme.css is generated below, never read from disk */
-          if (!virtualpath && strcmp(file, "/server/theme.css") == 0) {
+          /* theme.css is generated below. A theme holds styles and assets, so
+             HTML in one is refused, not expanded with the session id. */
+          if (!virtualpath &&
+              (strcmp(file, "/server/theme.css") == 0 ||
+               (strncmp(file, THEMES_URL, sizeof(THEMES_URL) - 1) == 0 &&
+                is_html(file)))) {
             fsfile[0] = '\0';
           }
 
