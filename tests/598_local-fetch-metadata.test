@@ -18,6 +18,7 @@ selftest_queue 'dest=document mode=navigate user=?1' fetchdest 'area shape=rect 
 selftest_queue 'dest=iframe mode=navigate user=?1' fetchdest 'a href=x' href x iframe
 selftest_queue 'dest=frame mode=navigate user=?1' fetchdest 'a target=_self href=x' href x frame
 selftest_queue 'dest=document mode=navigate user=?1' fetchdest 'a target=_top href=x' href x iframe
+selftest_queue 'dest=document mode=navigate user=?1' fetchdest 'a/target=_top href=x' href x iframe
 selftest_queue 'dest=document mode=navigate user=?1' fetchdest 'a target="_blank" href=x' href x frame
 selftest_queue 'dest=document mode=navigate user=?1' fetchdest 'a target=_parent href=x' href
 selftest_queue none fetchdest 'a target=_parent href=x' href x iframe

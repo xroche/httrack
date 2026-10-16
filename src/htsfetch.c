@@ -49,7 +49,7 @@ static hts_boolean tag_attr_find(const char *tag_name, const char *name,
   const size_t want = strlen(name);
   const char *p = tag_name;
 
-  while (*p != '\0' && *p != '>' && !is_realspace(*p))
+  while (*p != '\0' && *p != '>' && *p != '/' && !is_realspace(*p))
     p++;
   for (;;) {
     const char *n;
