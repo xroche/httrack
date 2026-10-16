@@ -745,8 +745,9 @@ static void parse_fetch_meta(httrackp *opt, int ptr, hts_fetch_meta *fm,
                              hts_boolean redirect_stub,
                              hts_boolean meta_refresh, hts_boolean opaque,
                              hts_boolean inscript, hts_boolean incss,
-                             hts_boolean tagless_body, const char *tag_name,
-                             const char *attr, const char *fil) {
+                             hts_boolean tagless_body, int link_frame,
+                             const char *tag_name, const char *attr,
+                             const char *fil) {
   const hts_fetch_meta *const page = &heap(ptr)->fetch;
 
   memset(fm, 0, sizeof(*fm));
@@ -766,10 +767,10 @@ static void parse_fetch_meta(httrackp *opt, int ptr, hts_fetch_meta *fm,
   if (meta_refresh)
     fm->dest = (unsigned char) hts_fetch_same_frame(page->dest);
   else if (!opaque && inscript && incss)
-    hts_fetch_classify(fm, NULL, attr, fil, page->dest);
+    hts_fetch_classify(fm, NULL, attr, fil, HTS_FETCH_DEST_UNKNOWN);
   /* A script body names URLs for code a crawler never runs. */
   else if (!opaque && !inscript && tag_name != NULL)
-    hts_fetch_classify(fm, tag_name, attr, fil, page->dest);
+    hts_fetch_classify(fm, tag_name, attr, fil, link_frame);
   /* A file no known page loaded leaves initiator 0, which sends none. */
   fm->initiator = tagless_body ? page->initiator : ptr;
 }
@@ -958,6 +959,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       int incomment = 0;        // dans un <!--
       int inscript = 0;         // dans un scipt pour applets javascript)
       int incss = 0;            /* CSS lets url(x) go unquoted */
+      int link_frame =
+          -1; /* what a link with no target navigates, once known */
       hts_boolean css_file = HTS_FALSE;
       int inscript_locked = 0;  // in locked script (ie. js file)
       signed char inscript_state[INSCRIPT_NSTATES][257];
@@ -2958,11 +2961,18 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       strcpybuff(afs.save, "");     // dummy
                     }
                   }
+                  /* A <base target> sends every link with no target to a
+                     frame we cannot tell. */
+                  if (link_frame < 0)
+                    link_frame =
+                        hts_fetch_has_base_target(r->adr)
+                            ? HTS_FETCH_DEST_UNKNOWN
+                            : hts_fetch_same_frame(heap(ptr)->fetch.dest);
                   parse_fetch_meta(
                       opt, ptr, &link_fetch, HTTP_IS_REDIRECT(r->statuscode),
                       p_searchMETAURL, in_media != NULL || p_type != 0,
-                      inscript, incss, sf_tagless_body, sf_tag, tag_attr_start,
-                      afs.af.fil);
+                      inscript, incss, sf_tagless_body, link_frame, sf_tag,
+                      tag_attr_start, afs.af.fil);
                   /* Naming followed redirects whose hops it does not keep. */
                   if (former.adr[0] != '\0')
                     link_fetch.dest = HTS_FETCH_DEST_UNKNOWN;

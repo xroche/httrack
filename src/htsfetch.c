@@ -184,36 +184,44 @@ static hts_fetch_dest link_dest(const char *tag_name, hts_boolean *cors) {
 
 int hts_fetch_same_frame(int page_dest) {
   switch (page_dest) {
+  case HTS_FETCH_DEST_DOCUMENT:
   case HTS_FETCH_DEST_IFRAME:
   case HTS_FETCH_DEST_FRAME:
     return page_dest;
-  case HTS_FETCH_DEST_OBJECT:
-  case HTS_FETCH_DEST_EMBED:
-    return HTS_FETCH_DEST_UNKNOWN;
   default:
-    return HTS_FETCH_DEST_DOCUMENT;
+    return HTS_FETCH_DEST_UNKNOWN;
   }
 }
 
-/* The destination of a click on a link with this target, in a page fetched
-   as page_dest. A named target is a frame we cannot tell. */
-static int link_target_dest(const char *tag_name, int page_dest) {
+hts_boolean hts_fetch_has_base_target(const char *html) {
+  const char *p;
+
+  for (p = strchr(html, '<'); p != NULL; p = strchr(p + 1, '<')) {
+    if (hts_cmp_tag_token(p + 1, "base") && tag_has_attr(p + 1, "target"))
+      return HTS_TRUE;
+  }
+  return HTS_FALSE;
+}
+
+/* The destination of a click on a link with this target. A named target is
+   a frame we cannot tell. */
+static int link_target_dest(const char *tag_name, int page_frame) {
   const char *target;
   size_t len;
 
   if (!tag_attr_find(tag_name, "target", &target, &len) ||
       span_eq(target, len, "_self", 5))
-    return hts_fetch_same_frame(page_dest);
+    return page_frame;
   if (span_eq(target, len, "_top", 4) || span_eq(target, len, "_blank", 6))
     return HTS_FETCH_DEST_DOCUMENT;
   if (span_eq(target, len, "_parent", 7) &&
-      hts_fetch_same_frame(page_dest) == HTS_FETCH_DEST_DOCUMENT)
+      page_frame == HTS_FETCH_DEST_DOCUMENT)
     return HTS_FETCH_DEST_DOCUMENT;
   return HTS_FETCH_DEST_UNKNOWN;
 }
 
 void hts_fetch_classify(hts_fetch_meta *fm, const char *tag_name,
-                        const char *attr, const char *fil, int page_dest) {
+                        const char *attr, const char *fil, int page_frame) {
   static const char *const font_exts[] = {"woff2", "woff", "ttf",
                                           "otf",   "eot",  NULL};
   /* No svg, which @font-face can name too. */
@@ -279,7 +287,7 @@ void hts_fetch_classify(hts_fetch_meta *fm, const char *tag_name,
   if (fm->dest == HTS_FETCH_DEST_DOCUMENT && tag_has_attr(tag_name, "download"))
     fm->dest = HTS_FETCH_DEST_UNKNOWN;
   if (fm->dest == HTS_FETCH_DEST_DOCUMENT) {
-    fm->dest = (unsigned char) link_target_dest(tag_name, page_dest);
+    fm->dest = (unsigned char) link_target_dest(tag_name, page_frame);
     fm->user = HTS_TRUE;
   }
   if (tag_has_attr(tag_name, "crossorigin") ||

@@ -3495,6 +3495,8 @@ class Handler(SimpleHTTPRequestHandler):
                 '<iframe src="frame.html"></iframe>'
                 '<a href="page.html">p</a><a href="%scross.html">x</a>'
                 '<a href="moved.html">m</a><img src="noext">'
+                '<a href="named.html" target="main">n</a>'
+                '<a href="based.html">b</a>'
                 "</body></html>" % (echo, other, other)
             )
             self.send_raw(body.encode(), "text/html")
@@ -3513,6 +3515,12 @@ class Handler(SimpleHTTPRequestHandler):
                 '<meta http-equiv="refresh" content="0; url=refreshed.html">'
                 '<a href="inframe.html">f</a>'
             )
+            self.send_raw((body + echo).encode(), "text/html")
+        elif name == "named.html":
+            body = '<a href="from-named.html">f</a>\n'
+            self.send_raw((body + echo).encode(), "text/html")
+        elif name == "based.html":
+            body = '<base target="_top"><a href="from-based.html">f</a>\n'
             self.send_raw((body + echo).encode(), "text/html")
         elif name == "start.html":
             self.send_redirect(here + "index.html")

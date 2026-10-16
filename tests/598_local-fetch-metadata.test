@@ -23,6 +23,7 @@ selftest_queue 'dest=document mode=navigate user=?1' fetchdest 'a target=_parent
 selftest_queue none fetchdest 'a target=_parent href=x' href x iframe
 selftest_queue none fetchdest 'a target=main href=x' href
 selftest_queue none fetchdest 'a href=x' href x object
+selftest_queue none fetchdest 'a href=x' href x empty
 selftest_queue "dest=iframe $nav" fetchdest 'iframe src=x' src
 selftest_queue "dest=frame $nav" fetchdest 'frame src=x' src
 selftest_queue "dest=object $nav" fetchdest 'object data=x' data
@@ -120,6 +121,13 @@ bash "$top_srcdir/tests/local-crawl.sh" \
     --file-not-matches "$d/refreshed.html" '^Sec-Fetch-User' \
     --file-matches "$d/inframe.html" '^Sec-Fetch-Dest: iframe$' \
     --file-matches "$d/inframe.html" '^Sec-Fetch-User: [?]1$' \
+    --file-matches "$d/named.html" '^PATH ' \
+    --file-not-matches "$d/named.html" '^Sec-Fetch' \
+    --file-matches "$d/from-named.html" '^PATH ' \
+    --file-not-matches "$d/from-named.html" '^Sec-Fetch' \
+    --file-matches "$d/based.html" '^Sec-Fetch-Dest: document$' \
+    --file-matches "$d/from-based.html" '^PATH ' \
+    --file-not-matches "$d/from-based.html" '^Sec-Fetch' \
     --file-not-matches "$d/page.html" '^Upgrade-Insecure-Requests' \
     httrack "BASEURL/$d/index.html" -F "$chrome" '+localhost*'
 

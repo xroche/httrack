@@ -65,7 +65,8 @@ static int st_fetchdest(httrackp *opt, int argc, char **argv) {
     attr++;
   }
   memset(&fm, 0, sizeof(fm));
-  hts_fetch_classify(&fm, tag, attr, argc >= 3 ? argv[2] : "", page);
+  hts_fetch_classify(&fm, tag, attr, argc >= 3 ? argv[2] : "",
+                     hts_fetch_same_frame(page));
   if (fm.dest == HTS_FETCH_DEST_UNKNOWN)
     printf("none\n");
   else
