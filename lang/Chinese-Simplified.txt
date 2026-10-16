@@ -1059,4 +1059,6 @@ The rules you set here apply to the mirror now running. Removing a rule lets new
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 无法使用此扫描规则。规则以 + 或 - 开头，后接匹配模式，且必须是一行简短文字。
 Theme:
-
+主题:
+Classic
+经典

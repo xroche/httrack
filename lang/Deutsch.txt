@@ -1059,4 +1059,6 @@ Die hier festgelegten Regeln gelten für die laufende Site-Kopie. Das Entfernen 
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Diese Filterregel kann nicht verwendet werden. Eine Regel beginnt mit + oder -, gefolgt von einem Muster, und muss in eine kurze Zeile passen.
 Theme:
-
+Design:
+Classic
+Klassisch

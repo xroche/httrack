@@ -1059,4 +1059,6 @@ Regulile pe care le setaţi aici se aplică clonării aflate în desfăşurare. 
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Această regulă de scanare nu poate fi folosită. O regulă începe cu + sau -, continuă cu un tipar şi trebuie să încapă pe un singur rând scurt.
 Theme:
-
+Temă:
+Classic
+Clasic

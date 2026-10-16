@@ -1059,4 +1059,6 @@ De regler, du angiver her, gælder for den spejlkopiering, der kører nu. Fjerne
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Denne skanningsregel kan ikke bruges. En regel starter med + eller -, efterfulgt af et mønster, og skal stå på én kort linje.
 Theme:
-
+Tema:
+Classic
+Klassisk

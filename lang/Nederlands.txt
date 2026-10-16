@@ -1059,4 +1059,6 @@ De regels die u hier instelt, gelden voor de spiegeling die nu loopt. Het verwij
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Dit filter kan niet worden gebruikt. Een filter begint met + of -, gevolgd door een patroon, en moet op één korte regel passen.
 Theme:
-
+Thema:
+Classic
+Klassiek

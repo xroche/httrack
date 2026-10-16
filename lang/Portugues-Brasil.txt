@@ -1059,4 +1059,6 @@ As regras definidas aqui valem para a cópia em andamento. Remover uma regra vol
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Este filtro não pode ser usado. Um filtro começa com + ou -, seguido de um padrão, e deve caber em uma única linha curta.
 Theme:
-
+Tema:
+Classic
+Clássico

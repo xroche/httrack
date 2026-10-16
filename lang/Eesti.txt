@@ -1059,4 +1059,6 @@ Siin määratud reeglid kehtivad praegu käimasoleva saidikopeerimise kohta. Ree
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Seda filtreerimisreeglit ei saa kasutada. Reegel algab märgiga + või -, millele järgneb muster, ning peab mahtuma ühele lühikesele reale.
 Theme:
-
+Teema:
+Classic
+Klassikaline

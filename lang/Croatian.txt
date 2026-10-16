@@ -1059,4 +1059,6 @@ Pravila koja ovdje postavite primjenjuju se na zrcaljenje koje je u tijeku. Ukla
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Ovo pravilo filtriranja ne može se upotrijebiti. Pravilo počinje znakom + ili -, nakon čega slijedi uzorak, i mora stati u jedan kratki redak.
 Theme:
-
+Tema:
+Classic
+Klasična

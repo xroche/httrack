@@ -1059,4 +1059,6 @@ Reguły ustawione tutaj obowiązują w trwającym właśnie kopiowaniu. Usunięc
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Tego filtra nie można użyć. Filtr zaczyna się znakiem + lub -, po nim następuje wzorzec, a całość musi mieścić się w jednym krótkim wierszu.
 Theme:
-
+Motyw:
+Classic
+Klasyczny

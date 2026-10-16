@@ -1090,3 +1090,5 @@ LANG_LIVERULESBAD
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 LANG_UITHEME
 Theme:
+LANG_UITHEMECLASSIC
+Classic

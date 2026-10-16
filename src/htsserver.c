@@ -753,9 +753,8 @@ static hts_boolean find_user_stylesheet(char *dst, size_t size) {
 
 #define THEME_CLASSIC "classic"
 #define THEME_NAME_MAX 32
-#define THEMES_MAX 64
 
-/* The theme chosen in the UI, kept across runs in UI_SETTINGS. */
+/* This holds the chosen UI theme, which UI_SETTINGS keeps across runs. */
 static char ui_theme[THEME_NAME_MAX + 1] = THEME_CLASSIC;
 
 /* Is name usable as a theme folder name, and so safe inside a path? */
@@ -763,10 +762,8 @@ static hts_boolean theme_name_is_valid(const char *name) {
   const size_t len = strlen(name);
 
   return len > 0 && len <= THEME_NAME_MAX &&
-                 strspn(name, "abcdefghijklmnopqrstuvwxyz"
-                              "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-") == len
-             ? HTS_TRUE
-             : HTS_FALSE;
+         strspn(name, "abcdefghijklmnopqrstuvwxyz"
+                      "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-") == len;
 }
 
 /* Does html/server/themes/<name>/theme.css exist under the server root? */
@@ -775,16 +772,14 @@ static hts_boolean theme_is_installed(const char *path, const char *name) {
 
   file[0] = '\0';
   return theme_name_is_valid(name) && strcmp(name, THEME_CLASSIC) != 0 &&
-                 path_append(file, sizeof(file), path) &&
-                 path_append(file, sizeof(file), "html/server/themes/") &&
-                 path_append(file, sizeof(file), name) &&
-                 path_append(file, sizeof(file), "/theme.css") && fexist(file)
-             ? HTS_TRUE
-             : HTS_FALSE;
+         path_append(file, sizeof(file), path) &&
+         path_append(file, sizeof(file), "html/server/themes/") &&
+         path_append(file, sizeof(file), name) &&
+         path_append(file, sizeof(file), "/theme.css") && fexist(file);
 }
 
-/* The theme to apply: Classic while the chosen one is not installed, so that a
-   removed folder falls back without the choice being forgotten. */
+/* Returns the chosen theme, or Classic while its folder is missing, which
+   keeps the choice for when the folder comes back. */
 static const char *effective_theme(const char *path) {
   return theme_is_installed(path, ui_theme) ? ui_theme : THEME_CLASSIC;
 }
@@ -797,8 +792,9 @@ static int theme_name_cmp(const void *a, const void *b) {
    that is empty when there are none. */
 static char *list_themes(const char *path) {
   char dir[1024];
-  char *names[THEMES_MAX];
+  char **names = NULL;
   size_t count = 0;
+  size_t capacity = 0;
   size_t i;
   find_handle h;
   String list = STRING_EMPTY;
@@ -811,14 +807,25 @@ static char *list_themes(const char *path) {
     do {
       const char *const name = hts_findgetname(h);
 
-      if (count < THEMES_MAX && name != NULL &&
-          theme_is_installed(path, name)) {
+      if (name != NULL && theme_is_installed(path, name)) {
+        if (count == capacity) {
+          char **const grown =
+              (char **) realloct(names, (capacity + 16) * sizeof(names[0]));
+
+          if (grown == NULL) {
+            break;
+          }
+          names = grown;
+          capacity += 16;
+        }
         names[count++] = strdupt(name);
       }
     } while (hts_findnext(h));
     hts_findclose(h);
   }
-  qsort(names, count, sizeof(names[0]), theme_name_cmp);
+  if (count != 0) {
+    qsort(names, count, sizeof(names[0]), theme_name_cmp);
+  }
   for (i = 0; i < count; i++) {
     if (i != 0) {
       StringCat(list, "\n");
@@ -826,24 +833,24 @@ static char *list_themes(const char *path) {
     StringCat(list, names[i]);
     freet(names[i]);
   }
+  freet(names);
   result = strdupt(StringNotEmpty(list) ? StringBuff(list) : "");
   StringFree(list);
   return result;
 }
 
-/* Reads the chosen theme from UI_SETTINGS in the home folder, a file of
-   key=value lines. */
+/* Reads the chosen theme from UI_SETTINGS in the home folder. */
 static void load_ui_settings(void) {
   char file[1024];
   FILE *fp;
 
   file[0] = '\0';
   if (!path_append(file, sizeof(file), gethomedir()) ||
-      !path_append(file, sizeof(file), UI_SETTINGS) || !fexist(file) ||
+      !path_append(file, sizeof(file), UI_SETTINGS) ||
       (fp = fopen(file, "rb")) == NULL) {
     return;
   }
-  while (!feof(fp)) {
+  while (!feof(fp) && !ferror(fp)) {
     char line[256];
 
     if (linput(fp, line, sizeof(line) - 2) > 0 &&
@@ -854,9 +861,9 @@ static void load_ui_settings(void) {
   fclose(fp);
 }
 
-/* Chooses name as the theme. A settings file that cannot be written only
-   loses the choice at exit. */
-static void save_ui_theme(const char *name) {
+/* Chooses name as the theme. If UI_SETTINGS cannot be written, the choice
+   lasts until the server exits. */
+static void set_ui_theme(const char *name) {
   char file[1024];
   FILE *fp;
 
@@ -1041,7 +1048,7 @@ static void cat_cmdline_arglist(String *output, const char *value,
 }
 
 /* Close the value of a ${liststr:} entry, marking it selected when it equals
-   the escaped selected value. */
+   the selected value. Both are attribute-escaped. */
 static void cat_liststr_close(String *output, const String *item,
                               const String *selected) {
   StringCat(*output,
@@ -1594,7 +1601,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
           if (strcmp(posted, effective_theme(path)) != 0 &&
               (strcmp(posted, THEME_CLASSIC) == 0 ||
                theme_is_installed(path, posted))) {
-            save_ui_theme(posted);
+            set_ui_theme(posted);
           }
           coucal_write(NewLangList, "uitheme", (intptr_t) NULL);
         }
@@ -2064,8 +2071,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                         intptr_t adr = 0;
 
                         *colon = '\0';
-                        if (coucal_readptr(NewLangList, name, &adr) &&
-                            adr != 0) {
+                        if (coucal_readptr(NewLangList, name, &adr)) {
                           cat_attr_escaped(&listSelected, (const char *) adr);
                         }
                         name = colon + 1;
@@ -2186,7 +2192,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                       } else if (strcmp(name, "loadthemes") == 0) {
                         coucal_write(NewLangList, "uithemes",
                                      (intptr_t) list_themes(path));
-                        coucal_write(NewLangList, "uitheme",
+                        coucal_write(NewLangList, "uitheme_shown",
                                      (intptr_t) strdupt(effective_theme(path)));
                       } else if (strcmp(name, "loadhash") == 0) {
                         intptr_t adr = 0;

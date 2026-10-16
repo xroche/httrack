@@ -1059,4 +1059,6 @@ Pravila, ki jih nastavite tukaj, veljajo za zrcaljenje, ki trenutno poteka. Odst
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Tega pravila iskanja ni mogoče uporabiti. Pravilo se začne z znakom + ali -, nato sledi vzorec, in mora biti v eni kratki vrstici.
 Theme:
-
+Tema:
+Classic
+Klasična

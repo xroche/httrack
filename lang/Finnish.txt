@@ -1059,4 +1059,6 @@ Tähän asettamasi säännöt koskevat parhaillaan käynnissä olevaa peilausta.
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Tätä lukusääntöä ei voi käyttää. Sääntö alkaa merkillä + tai -, jota seuraa hakukuvio, ja sen on mahduttava yhdelle lyhyelle riville.
 Theme:
-
+Teema:
+Classic
+Perinteinen

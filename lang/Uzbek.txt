@@ -1059,4 +1059,6 @@ Bu yerda belgilagan qoidalaringiz hozir bajarilayotgan ko’zgu yaratish jarayon
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Bu filtrdan foydalanib bo’lmaydi. Filtr + yoki - belgisi bilan boshlanadi, undan keyin namuna keladi va bitta qisqa qatorga sig’ishi kerak.
 Theme:
-
+Mavzu:
+Classic
+Klassik

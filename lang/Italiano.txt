@@ -1059,4 +1059,6 @@ Le regole impostate qui valgono per la copia in corso. Rimuovere una regola lasc
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Questo filtro non può essere usato. Un filtro inizia con + o -, seguito da un modello, e deve stare su una sola riga breve.
 Theme:
-
+Tema:
+Classic
+Classico

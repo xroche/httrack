@@ -1059,4 +1059,6 @@ Reglene du angir her, gjelder for kopieringen som pågår nå. Fjerner du en reg
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Denne søkeregelen kan ikke brukes. En regel begynner med + eller -, etterfulgt av et mønster, og må få plass på én kort linje.
 Theme:
-
+Tema:
+Classic
+Klassisk

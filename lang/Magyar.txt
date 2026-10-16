@@ -1059,4 +1059,6 @@ Az itt megadott szabályok az éppen futó tükrözésre vonatkoznak. Egy szabá
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Ez a szűrő nem használható. A szűrő + vagy - jellel kezdődik, ezt egy minta követi, és egyetlen rövid sorba kell férnie.
 Theme:
-
+Téma:
+Classic
+Klasszikus

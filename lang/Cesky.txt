@@ -1059,4 +1059,6 @@ Pravidla, která zde nastavíte, platí pro právě probíhající stahování. 
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Tento filtr nelze použít. Filtr začíná znakem + nebo -, za ním následuje vzor a musí se vejít na jeden krátký řádek.
 Theme:
-
+Motiv:
+Classic
+Klasický

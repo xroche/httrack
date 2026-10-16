@@ -1060,3 +1060,5 @@ This scan rule cannot be used. A rule starts with + or -, then a pattern, and ho
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Theme:
 Theme:
+Classic
+Classic
