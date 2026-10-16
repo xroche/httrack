@@ -1,0 +1,54 @@
+#!/bin/bash
+# A Range resume must not offer gzip: a compressed answer cannot be appended to
+# the partial file.
+set -eu
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+asset=ranged/asset.bin
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_resume_gzip.XXXXXX") || exit 1
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+require_httrack
+
+mkdir -p "${tmpdir}/root"
+printf '<html><body><a href="/%s">bin</a></body></html>\n' "$asset" \
+    >"${tmpdir}/root/index.html"
+
+reqlog="${tmpdir}/requests"
+local_server_start --root "${tmpdir}/root" --env RANGED_LOG="$(nativepath "$reqlog")"
+host="127.0.0.1_${SRV_PORT}"
+
+crawl() { # crawl <label> <outdir>
+    local_crawl --log "${tmpdir}/crawl-$1.log" "${BASEURL}/index.html" \
+        -O "$2" --quiet --robots=0 --timeout=30 || fail "$1: crawl failed"
+}
+
+# Control: a whole fetch offers gzip, so the log can see the header.
+refout="${tmpdir}/out-ref"
+crawl ref "$refout"
+assert_file "${refout}/${host}/${asset}" "reference mirror"
+grep -q $'^-\t.*gzip' "$reqlog" || fail "ref: the whole fetch offered no gzip:
+$(cat "$reqlog")"
+ok "a whole fetch offers gzip"
+
+# A prefix on disk and no cache: the engine resumes it with a Range request.
+: >"$reqlog"
+part="${tmpdir}/out-part"
+mkdir -p "${part}/${host}/ranged"
+dd if="${refout}/${host}/${asset}" of="${part}/${host}/${asset}" bs=1 \
+    count=4096 2>/dev/null
+crawl part "$part"
+grep -q $'^bytes=4096-\t' "$reqlog" || fail "part: no Range resume was sent:
+$(cat "$reqlog")"
+grep -q $'^bytes=4096-\tidentity$' "$reqlog" ||
+    fail "part: the Range resume offered a compressed coding:
+$(cat "$reqlog")"
+cmp -s "${part}/${host}/${asset}" "${refout}/${host}/${asset}" ||
+    fail "part: the resumed file does not match the server's copy"
+ok "a Range resume asks for identity only"

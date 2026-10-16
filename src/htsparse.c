@@ -4163,8 +4163,7 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
       }
 
       // Re-get once, only if a partial existed and both Range triggers are
-      // gone; a failed removal gives up rather than looping. range_used is
-      // unreliable (it does not survive the delayed-type two-pass).
+      // gone; a failed removal gives up rather than looping.
       if (had_partial && ref_gone && !fexist_utf8(heap(ptr)->sav)) {
         hts_log_print(opt, LOG_DEBUG, "Partial file reget (%s) for %s%s",
                       r->msg, urladr(), urlfil());

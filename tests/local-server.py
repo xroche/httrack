@@ -1246,6 +1246,16 @@ class Handler(SimpleHTTPRequestHandler):
     RANGED_GIF = b"GIF89a" + bytes((i * 7 + 3) % 256 for i in range(8192))
 
     def send_ranged(self, body, content_type):
+        log = os.environ.get("RANGED_LOG")
+        if log:
+            with open(log, "a", newline="\n") as fp:
+                fp.write(
+                    "%s\t%s\n"
+                    % (
+                        self.headers.get("Range", "-"),
+                        self.headers.get("Accept-Encoding", "-"),
+                    )
+                )
         m = re.match(r"bytes=(\d+)-", self.headers.get("Range", "") or "")
         start = int(m.group(1)) if m else 0
         if not m or start == 0:
