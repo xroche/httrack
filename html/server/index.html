@@ -113,7 +113,7 @@ ${do:if-not-empty:uithemes}
 	${LANG_UITHEME} 
 		<select name="uitheme" onChange="form.redirect.value='index.html'; form.submit()">
 		<option value="classic">${LANG_UITHEMECLASSIC}</option>
-		${liststr:uitheme_shown:uithemes}
+		${listlabel:uitheme_shown:uithemes}
 		</select>
 	</td></tr>
 ${do:end-if}

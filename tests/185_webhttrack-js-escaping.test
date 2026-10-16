@@ -21,7 +21,7 @@ script = re.compile(r"<script\b[^>]*>(.*?)</script>", re.S | re.I)
 subst = re.compile(r"\$\{([^}]*)\}")
 # Directives expand to template-written markup, or (arg:) escape the value
 # themselves. unquoted: only rewrites ", so it needs the mode like a bare key.
-directive = re.compile(r"/\*|^(do|test|ztest|checked|list|liststr|listid|fexist"
+directive = re.compile(r"/\*|^(do|test|ztest|checked|list|liststr|listlabel|listid|fexist"
                        r"|file-exists|arg):")
 # Shipped translations, build-time constants and the four digits the server
 # computes itself; everything else is runtime data. Only the date: field that
