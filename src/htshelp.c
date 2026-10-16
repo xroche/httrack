@@ -640,8 +640,8 @@ void help(const char *app, int more) {
   infomsg(" %l  preferred language (-%l \"fr, en, jp, *\"");
   infomsg(" %a  accepted formats (-%a \"text/html,image/png;q=0.9,*/*;q=0.1\"");
   infomsg(" %X  additional HTTP header line (-%X \"X-Magic: 42\"");
-  infomsg(" %Q  send the client hints the browser named by -F would send,"
-          " over HTTPS (%Q0 don't)");
+  infomsg(" %Q  send the client hints and Sec-Fetch-* headers the browser"
+          " named by -F would send (%Q0 don't)");
   infomsg("");
   infomsg("Log, index, cache");
   infomsg("  C  create/use a cache for updates and retries (C0 no cache,* C1 "

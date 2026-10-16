@@ -40,6 +40,7 @@ Please visit our Website: http://www.httrack.com
 #include "htswarc.h"
 #include "htschanges.h"
 #include "htssinglefile.h"
+#include "htsfetch.h"
 
 /* specific definitions */
 #include "htsdate.h"
@@ -829,7 +830,7 @@ T_SOC http_xfopen(httrackp *opt, int mode, int treat, int waitconnect,
 
     // connecté?
     if (waitconnect) {
-      http_sendhead(opt, NULL, mode, xsend, adr, fil, NULL, NULL, retour);
+      http_sendhead(opt, NULL, mode, xsend, adr, fil, NULL, NULL, NULL, retour);
     }
 
     if (soc != INVALID_SOCKET) {
@@ -1267,11 +1268,26 @@ hts_boolean hts_client_hints_of(const char *user_agent, hts_client_hints *ch) {
   return HTS_TRUE;
 }
 
+/* Sec-Fetch-* for this request, or NULL when a browser would send none: an
+   unknown destination, a URL that is not trustworthy, or a User-Agent that is
+   no current browser. */
+static const hts_fetch_meta *
+fetch_meta_sent(httrackp *opt, const hts_fetch_meta *fetch, const char *adr,
+                const htsblk *retour, const char *custom) {
+  if (fetch == NULL || fetch->dest == HTS_FETCH_DEST_UNKNOWN ||
+      opt->browser_headers == HTS_FALSE || !hts_fetch_trustworthy(adr) ||
+      !retour->req.user_agent_send || retour->req.user_agent == NULL ||
+      strncmp(retour->req.user_agent, "Mozilla/5.0 ", 12) != 0 ||
+      http_headers_have_field(custom, "User-Agent"))
+    return NULL;
+  return fetch;
+}
+
 // envoi d'une requète
-int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
-                  const char *xsend, const char *adr, const char *fil,
-                  const char *referer_adr, const char *referer_fil,
-                  htsblk * retour) {
+int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
+                  const char *adr, const char *fil, const char *referer_adr,
+                  const char *referer_fil, const hts_fetch_meta *fetch,
+                  htsblk *retour) {
   char BIGSTK buffer_head_request[16384];
   buff_struct bstr = { buffer_head_request, sizeof(buffer_head_request), 0 };
 
@@ -1282,6 +1298,8 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
 
   /* the extra-headers box wins: skip the engine's own line (#1337, #1340) */
   const char *const custom = retour->req.headers;
+  const hts_fetch_meta *const sent_fetch =
+      fetch_meta_sent(opt, fetch, adr, retour, custom);
 
   /* adr and the referer come off the network and can carry raw CR/LF; capped
      at their own source buffers, so the worst case emitted does not grow. */
@@ -1499,6 +1517,14 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
         }
       }
 
+      /* On https only, so a server answering it cannot move a plain http
+         crawl onto https. */
+      if (sent_fetch != NULL && hts_fetch_is_navigation(sent_fetch->dest) &&
+          hts_request_is_secure(retour) &&
+          !http_headers_have_field(custom, "Upgrade-Insecure-Requests")) {
+        print_buffer(&bstr, "Upgrade-Insecure-Requests: 1" H_CRLF);
+      }
+
       if (retour->req.user_agent_send && strnotempty(retour->req.user_agent) &&
           !http_headers_have_field(custom, "User-Agent")) {
         print_buffer(&bstr, "User-Agent: %s" H_CRLF, retour->req.user_agent);
@@ -1508,6 +1534,21 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
       if (strnotempty(retour->req.accept) &&
           !http_headers_have_field(custom, "Accept")) {
         print_buffer(&bstr, "Accept: %s" H_CRLF, retour->req.accept);
+      }
+
+      if (sent_fetch != NULL) {
+        if (!http_headers_have_field(custom, "Sec-Fetch-Site"))
+          print_buffer(&bstr, "Sec-Fetch-Site: %s" H_CRLF,
+                       hts_fetch_site_name(sent_fetch->site));
+        if (!http_headers_have_field(custom, "Sec-Fetch-Mode"))
+          print_buffer(&bstr, "Sec-Fetch-Mode: %s" H_CRLF,
+                       hts_fetch_mode_name(sent_fetch));
+        if (sent_fetch->user &&
+            !http_headers_have_field(custom, "Sec-Fetch-User"))
+          print_buffer(&bstr, "Sec-Fetch-User: ?1" H_CRLF);
+        if (!http_headers_have_field(custom, "Sec-Fetch-Dest"))
+          print_buffer(&bstr, "Sec-Fetch-Dest: %s" H_CRLF,
+                       hts_fetch_dest_name(sent_fetch->dest));
       }
 
       // Accept-language

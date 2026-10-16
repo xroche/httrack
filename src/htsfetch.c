@@ -1,0 +1,404 @@
+/* ------------------------------------------------------------ */
+/*
+HTTrack Website Copier, Offline Browser for Windows and Unix
+Copyright (C) 1998 Xavier Roche and other contributors
+
+SPDX-License-Identifier: GPL-3.0-or-later
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+Ethical use: we kindly ask that you NOT use this software to harvest email
+addresses or to collect any other private information about people. Doing so
+would dishonor our work and waste the many hours we have spent on it.
+
+Please visit our Website: http://www.httrack.com
+*/
+
+/* ------------------------------------------------------------ */
+/* File: Fetch Metadata request headers (Sec-Fetch-*)          */
+/* ------------------------------------------------------------ */
+
+#define HTS_INTERNAL_BYTECODE
+
+#include "htsfetch.h"
+
+#include "htscore.h"
+#include "htswizard.h"
+
+/* Find attribute name in the start tag at tag_name. On a match, *value and
+ *len hold its value, empty when it has none. */
+static hts_boolean tag_attr_find(const char *tag_name, const char *name,
+                                 const char **value, size_t *len) {
+  const size_t want = strlen(name);
+  const char *p = tag_name;
+
+  while (*p != '\0' && *p != '>' && !is_realspace(*p))
+    p++;
+  for (;;) {
+    const char *n;
+    size_t nlen;
+
+    while (is_realspace(*p) || *p == '/')
+      p++;
+    if (*p == '\0' || *p == '>')
+      return HTS_FALSE;
+    for (n = p; *p != '\0' && *p != '>' && *p != '=' && !is_realspace(*p);)
+      p++;
+    nlen = (size_t) (p - n);
+    while (is_realspace(*p))
+      p++;
+    *value = p;
+    *len = 0;
+    if (*p == '=') {
+      p++;
+      while (is_realspace(*p))
+        p++;
+      if (*p == '"' || *p == '\'') {
+        const char quote = *p++;
+
+        for (*value = p; *p != '\0' && *p != quote; p++)
+          ;
+        *len = (size_t) (p - *value);
+        if (*p != '\0')
+          p++;
+      } else {
+        for (*value = p; *p != '\0' && *p != '>' && !is_realspace(*p); p++)
+          ;
+        *len = (size_t) (p - *value);
+      }
+    }
+    if (nlen == want && strncasecmp(n, name, want) == 0)
+      return HTS_TRUE;
+  }
+}
+
+/* Does the whitespace-separated list s, length len, hold token? */
+static hts_boolean has_token(const char *s, size_t len, const char *token) {
+  const size_t want = strlen(token);
+  size_t i = 0;
+
+  while (i < len) {
+    size_t start;
+
+    while (i < len && is_realspace(s[i]))
+      i++;
+    for (start = i; i < len && !is_realspace(s[i]); i++)
+      ;
+    if (i - start == want && strncasecmp(s + start, token, want) == 0)
+      return HTS_TRUE;
+  }
+  return HTS_FALSE;
+}
+
+/* Is the value of attribute name in the start tag at tag_name exactly word? */
+static hts_boolean tag_attr_is(const char *tag_name, const char *name,
+                               const char *word) {
+  const char *value;
+  size_t len;
+
+  return tag_attr_find(tag_name, name, &value, &len) && len == strlen(word) &&
+                 strncasecmp(value, word, len) == 0
+             ? HTS_TRUE
+             : HTS_FALSE;
+}
+
+static hts_boolean tag_has_attr(const char *tag_name, const char *name) {
+  const char *value;
+  size_t len;
+
+  return tag_attr_find(tag_name, name, &value, &len);
+}
+
+/* Is the extension of the path fil one of exts? */
+static hts_boolean fil_ext_in(const char *fil, const char *const *exts) {
+  const char *const end = fil + strcspn(fil, "?#");
+  const char *dot = NULL;
+  const char *p;
+  size_t i;
+
+  for (p = fil; p < end; p++) {
+    if (*p == '.')
+      dot = p + 1;
+    else if (*p == '/')
+      dot = NULL;
+  }
+  if (dot == NULL)
+    return HTS_FALSE;
+  for (i = 0; exts[i] != NULL; i++) {
+    const size_t n = strlen(exts[i]);
+
+    if ((size_t) (end - dot) == n && strncasecmp(dot, exts[i], n) == 0)
+      return HTS_TRUE;
+  }
+  return HTS_FALSE;
+}
+
+/* The destination a <link> gets from its rel and as attributes. */
+static hts_fetch_dest link_dest(const char *tag_name, hts_boolean *cors) {
+  static const struct {
+    const char *as;
+    hts_fetch_dest dest;
+  } preload[] = {{"style", HTS_FETCH_DEST_STYLE},
+                 {"script", HTS_FETCH_DEST_SCRIPT},
+                 {"image", HTS_FETCH_DEST_IMAGE},
+                 {"font", HTS_FETCH_DEST_FONT}};
+
+  const char *rel;
+  size_t len, i;
+
+  if (!tag_attr_find(tag_name, "rel", &rel, &len))
+    return HTS_FETCH_DEST_UNKNOWN;
+  if (has_token(rel, len, "stylesheet"))
+    return HTS_FETCH_DEST_STYLE;
+  if (has_token(rel, len, "icon"))
+    return HTS_FETCH_DEST_IMAGE;
+  if (has_token(rel, len, "modulepreload")) {
+    *cors = HTS_TRUE;
+    return HTS_FETCH_DEST_SCRIPT;
+  }
+  if (has_token(rel, len, "preload")) {
+    for (i = 0; i < sizeof(preload) / sizeof(preload[0]); i++) {
+      if (tag_attr_is(tag_name, "as", preload[i].as))
+        return preload[i].dest;
+    }
+  }
+  return HTS_FETCH_DEST_UNKNOWN;
+}
+
+void hts_fetch_classify(hts_fetch_meta *fm, const char *tag_name,
+                        const char *attr, const char *fil) {
+  static const char *const font_exts[] = {"woff2", "woff", "ttf",
+                                          "otf",   "eot",  NULL};
+  static const char *const image_exts[] = {"png",  "jpg", "jpeg", "gif", "webp",
+                                           "avif", "svg", "ico",  "bmp", NULL};
+  static const char *const css_exts[] = {"css", NULL};
+
+  /* (tag, attribute) pairs with a fixed destination; NULL matches any tag. */
+  static const struct {
+    const char *tag, *attr;
+    hts_fetch_dest dest;
+  } rules[] = {
+      {"a", "href", HTS_FETCH_DEST_DOCUMENT},
+      {"area", "href", HTS_FETCH_DEST_DOCUMENT},
+      {"iframe", "src", HTS_FETCH_DEST_IFRAME},
+      {"frame", "src", HTS_FETCH_DEST_FRAME},
+      {"object", "data", HTS_FETCH_DEST_OBJECT},
+      {"embed", "src", HTS_FETCH_DEST_EMBED},
+      {"img", "src", HTS_FETCH_DEST_IMAGE},
+      {"img", "srcset", HTS_FETCH_DEST_IMAGE},
+      {"img", "data-src", HTS_FETCH_DEST_IMAGE},
+      {"img", "data-srcset", HTS_FETCH_DEST_IMAGE},
+      {"source", "srcset", HTS_FETCH_DEST_IMAGE},
+      {"input", "src", HTS_FETCH_DEST_IMAGE},
+      {"video", "poster", HTS_FETCH_DEST_IMAGE},
+      {NULL, "background", HTS_FETCH_DEST_IMAGE},
+      {"video", "src", HTS_FETCH_DEST_VIDEO},
+      {"audio", "src", HTS_FETCH_DEST_AUDIO},
+      {"script", "src", HTS_FETCH_DEST_SCRIPT},
+  };
+
+  size_t i;
+
+  fm->dest = HTS_FETCH_DEST_UNKNOWN;
+  fm->cors = HTS_FALSE;
+  fm->user = HTS_FALSE;
+  if (attr == NULL)
+    return;
+  if (tag_name == NULL) {
+    /* url() and @import look alike to the parser, so the path decides. */
+    if (fil_ext_in(fil, css_exts))
+      fm->dest = HTS_FETCH_DEST_STYLE;
+    else if (fil_ext_in(fil, font_exts))
+      fm->dest = HTS_FETCH_DEST_FONT;
+    else if (fil_ext_in(fil, image_exts))
+      fm->dest = HTS_FETCH_DEST_IMAGE;
+    return;
+  }
+  if (hts_cmp_tag_token(tag_name, "link") && hts_cmp_tag_token(attr, "href")) {
+    fm->dest = (unsigned char) link_dest(tag_name, &fm->cors);
+  } else {
+    for (i = 0; i < sizeof(rules) / sizeof(rules[0]); i++) {
+      if ((rules[i].tag == NULL || hts_cmp_tag_token(tag_name, rules[i].tag)) &&
+          strncasecmp(attr, rules[i].attr, strlen(rules[i].attr)) == 0 &&
+          !isalnum((unsigned char) attr[strlen(rules[i].attr)]) &&
+          attr[strlen(rules[i].attr)] != '-') {
+        fm->dest = (unsigned char) rules[i].dest;
+        break;
+      }
+    }
+  }
+  if (fm->dest == HTS_FETCH_DEST_DOCUMENT)
+    fm->user = HTS_TRUE;
+  if (tag_has_attr(tag_name, "crossorigin") ||
+      (fm->dest == HTS_FETCH_DEST_SCRIPT &&
+       tag_attr_is(tag_name, "type", "module")))
+    fm->cors = HTS_TRUE;
+}
+
+/* The parts of an origin: scheme, host and port. */
+typedef struct fetch_origin {
+  hts_boolean https;
+  const char *host;
+  size_t host_len;
+  int port;
+} fetch_origin;
+
+static void origin_of(const char *adr, fetch_origin *o) {
+  const char *p = jump_protocol_const(adr);
+  const char *at, *end;
+
+  o->https = strfield(adr, "https:") ? HTS_TRUE : HTS_FALSE;
+  end = p + strcspn(p, "/?#");
+  at = memchr(p, '@', (size_t) (end - p));
+  if (at != NULL)
+    p = at + 1;
+  o->host = p;
+  if (*p == '[') {
+    const char *const close = memchr(p, ']', (size_t) (end - p));
+
+    p = close != NULL ? close + 1 : end;
+  } else {
+    while (p < end && *p != ':')
+      p++;
+  }
+  o->host_len = (size_t) (p - o->host);
+  o->port = o->https ? 443 : 80;
+  if (p < end && *p == ':' && p + 1 < end)
+    o->port = atoi(p + 1);
+  /* "example.com." names the same host as "example.com" */
+  if (o->host_len > 1 && o->host[o->host_len - 1] == '.')
+    o->host_len--;
+}
+
+static hts_boolean host_is_ip(const char *host, size_t len) {
+  size_t i;
+
+  if (len > 0 && host[0] == '[')
+    return HTS_TRUE;
+  for (i = 0; i < len; i++) {
+    if (!isdigit((unsigned char) host[i]) && host[i] != '.')
+      return HTS_FALSE;
+  }
+  return HTS_TRUE;
+}
+
+/* The tail of the host same-site compares: the last two labels, or the whole
+   host for an IP literal. */
+static const char *site_key(const fetch_origin *o, size_t *len) {
+  size_t i = o->host_len, dots = 0;
+
+  *len = o->host_len;
+  if (host_is_ip(o->host, o->host_len))
+    return o->host;
+  while (i > 0) {
+    if (o->host[i - 1] == '.' && ++dots == 2)
+      break;
+    i--;
+  }
+  *len = o->host_len - i;
+  return o->host + i;
+}
+
+static hts_boolean span_eq(const char *a, size_t alen, const char *b,
+                           size_t blen) {
+  return alen == blen && strncasecmp(a, b, alen) == 0 ? HTS_TRUE : HTS_FALSE;
+}
+
+hts_fetch_site hts_fetch_site_of(const char *from_adr, const char *to_adr) {
+  fetch_origin from, to;
+  const char *fk, *tk;
+  size_t fl, tl;
+
+  origin_of(from_adr, &from);
+  origin_of(to_adr, &to);
+  if (from.https != to.https)
+    return HTS_FETCH_SITE_CROSS_SITE;
+  if (span_eq(from.host, from.host_len, to.host, to.host_len))
+    return from.port == to.port ? HTS_FETCH_SITE_SAME_ORIGIN
+                                : HTS_FETCH_SITE_SAME_SITE;
+  fk = site_key(&from, &fl);
+  tk = site_key(&to, &tl);
+  return span_eq(fk, fl, tk, tl) ? HTS_FETCH_SITE_SAME_SITE
+                                 : HTS_FETCH_SITE_CROSS_SITE;
+}
+
+void hts_fetch_through(httrackp *opt, hts_fetch_meta *fm, const char *adr) {
+  hts_fetch_site site;
+
+  if (fm->dest == HTS_FETCH_DEST_UNKNOWN || fm->site == HTS_FETCH_SITE_NONE)
+    return;
+  /* No page to compare with: send nothing rather than a guess. */
+  if (fm->initiator <= 0 || fm->initiator >= opt->lien_tot) {
+    fm->dest = HTS_FETCH_DEST_UNKNOWN;
+    return;
+  }
+  site = hts_fetch_site_of(heap(fm->initiator)->adr, adr);
+  if (site > fm->site)
+    fm->site = (unsigned char) site;
+}
+
+hts_boolean hts_fetch_trustworthy(const char *adr) {
+  fetch_origin o;
+  const char *dot;
+
+  origin_of(adr, &o);
+  if (o.https)
+    return HTS_TRUE;
+  if (span_eq(o.host, o.host_len, "localhost", 9) ||
+      span_eq(o.host, o.host_len, "[::1]", 5))
+    return HTS_TRUE;
+  if (o.host_len > 10 &&
+      span_eq(o.host + o.host_len - 10, 10, ".localhost", 10))
+    return HTS_TRUE;
+  dot = memchr(o.host, '.', o.host_len);
+  return dot != NULL && span_eq(o.host, (size_t) (dot - o.host), "127", 3) &&
+                 host_is_ip(o.host, o.host_len)
+             ? HTS_TRUE
+             : HTS_FALSE;
+}
+
+hts_boolean hts_fetch_is_navigation(int dest) {
+  return dest >= HTS_FETCH_DEST_DOCUMENT && dest <= HTS_FETCH_DEST_EMBED
+             ? HTS_TRUE
+             : HTS_FALSE;
+}
+
+const char *hts_fetch_dest_name(int dest) {
+  static const char *const names[] = {"empty",  "document", "iframe", "frame",
+                                      "object", "embed",    "image",  "script",
+                                      "style",  "font",     "audio",  "video"};
+
+  return dest >= 0 && (size_t) dest < sizeof(names) / sizeof(names[0])
+             ? names[dest]
+             : "empty";
+}
+
+const char *hts_fetch_mode_name(const hts_fetch_meta *fm) {
+  if (hts_fetch_is_navigation(fm->dest))
+    return "navigate";
+  return fm->cors || fm->dest == HTS_FETCH_DEST_FONT ? "cors" : "no-cors";
+}
+
+const char *hts_fetch_site_name(int site) {
+  switch (site) {
+  case HTS_FETCH_SITE_NONE:
+    return "none";
+  case HTS_FETCH_SITE_SAME_SITE:
+    return "same-site";
+  case HTS_FETCH_SITE_CROSS_SITE:
+    return "cross-site";
+  default:
+    return "same-origin";
+  }
+}
