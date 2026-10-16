@@ -31,6 +31,9 @@ cp -R "${HTS_DISTDIR}/html/server" "${root}/html/server"
 # distcheck makes the source tree read-only, and cp keeps those modes.
 chmod -R u+w "${root}/html/server"
 themes=${root}/html/server/themes
+# This fixture tests discovery from an empty installed-theme folder first; keep
+# shipped themes out of that isolated scenario.
+rm -rf "${themes}"
 # theme.css is generated, so a file by that name is never served.
 printf '/* SHADOW */\n' >"${root}/html/server/theme.css"
 

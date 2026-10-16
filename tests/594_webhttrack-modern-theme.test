@@ -1,0 +1,91 @@
+#!/bin/bash
+#
+# The shipped Modern theme is a plain native WebHTTrack theme: the server lists
+# it, persists the choice and imports its stylesheet between style.css and
+# user.css. The HTML pages, documentation and JavaScript stay theme-agnostic.
+
+set -euo pipefail
+
+# shellcheck source=tests/webhttracklib.sh
+. "${0%"${0##*/}"}./webhttracklib.sh"
+
+python=$(find_python) || skip "python3 not found"
+htsserver_require
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_modern.XXXXXX") || fail "no tmpdir"
+cleanup_push htsserver_cleanup_dir "${work}"
+
+root=${work}/root
+mkdir -p "${root}/html" "${work}/home/websites"
+for entry in "${HTS_DISTDIR}"/*; do
+    test "${entry##*/}" = html || ln -s "${entry}" "${root}/${entry##*/}"
+done
+for entry in "${HTS_DISTDIR}"/html/*; do
+    test "${entry##*/}" = server || ln -s "${entry}" "${root}/html/${entry##*/}"
+done
+cp -R "${HTS_DISTDIR}/html/server" "${root}/html/server"
+chmod -R u+w "${root}/html/server"
+
+modern=${root}/html/server/themes/modern/theme.css
+test -f "${modern}" || fail "Modern theme.css is not shipped"
+test ! -e "${root}/html/server/themes/modern/modern.js" || fail "Modern theme ships JavaScript"
+
+htsserver_start --root "${root}" --home "${work}/home"
+sid=$(htsserver_sid)
+test "${#sid}" -eq 32 || fail "no session id: [${sid}]"
+
+index=$(htsserver_get /server/index.html)
+grep -q '<option value="modern">' <<<"${index}" || fail "Modern is not listed by the native theme menu"
+! grep -q 'modern.js' <<<"${index}" || fail "Modern still loads a JavaScript loader"
+
+# Check actual stylesheet order in the served page without depending on CSS
+# values. user.css must remain after the server-selected theme.
+printf '%s\n' "${index}" | "${python}" -c '
+import re, sys
+html = sys.stdin.read()
+hrefs = re.findall(r"<link[^>]+href=[\"\x27]([^\"\x27]+)", html, re.I)
+try:
+    style = hrefs.index("style.css")
+    theme = hrefs.index("/server/theme.css")
+    user = hrefs.index("user.css")
+except ValueError as exc:
+    raise SystemExit("missing stylesheet link: %s" % (exc,))
+if not style < theme < user:
+    raise SystemExit("stylesheet order is %r" % (hrefs,))
+'
+
+choose_reply=$(htsserver_post "sid=${sid}&uitheme=modern&redirect=index.html" /server/step2.html)
+grep -q '^HTTP/1.[01] 302' <<<"${choose_reply}" || fail "Modern choice was not accepted"
+
+theme_reply=$(htsserver_get /server/theme.css)
+grep -qF '@import url(themes/modern/theme.css);' <<<"${theme_reply}" || fail "Modern is not imported by /server/theme.css"
+
+modern_reply=$(htsserver_get /server/themes/modern/theme.css)
+grep -q '^HTTP/1.[01] 200' <<<"${modern_reply}" || fail "Modern theme.css is not served"
+grep -qi '^Content-type: text/css' <<<"${modern_reply}" || fail "Modern theme.css has the wrong content type"
+
+# The server owns persistence. Restart it with the same home and verify the
+# Modern choice is still effective without browser storage or a loader.
+htsserver_stop
+htsserver_start --root "${root}" --home "${work}/home"
+theme_reply=$(htsserver_get /server/theme.css)
+grep -qF '@import url(themes/modern/theme.css);' <<<"${theme_reply}" || fail "Modern choice did not survive a server restart"
+index=$(htsserver_get /server/index.html)
+grep -q '<option value="modern" selected>' <<<"${index}" || fail "Modern is not selected after restart"
+sid=$(htsserver_sid)
+
+# Help and Manual remain their own package and do not load the WebHTTrack theme.
+manual=$(htsserver_get /doc/html/index.html)
+! grep -q '/server/theme.css' <<<"${manual}" || fail "Manual was made theme-aware"
+guide=$(htsserver_get /doc/html/guide.html)
+! grep -q '/server/theme.css' <<<"${guide}" || fail "Help was made theme-aware"
+
+classic_reply=$(htsserver_post "sid=${sid}&uitheme=classic&redirect=index.html" /server/step2.html)
+grep -q '^HTTP/1.[01] 302' <<<"${classic_reply}" || fail "Classic choice was not accepted"
+classic_css=$(htsserver_get /server/theme.css)
+! grep -q '@import' <<<"${classic_css}" || fail "Classic unexpectedly imports a theme"
+
+htsserver_stop
+htsserver_assert_reaped
+
+echo "Modern: native CSS theme selected and served without JavaScript"

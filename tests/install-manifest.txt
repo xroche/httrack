@@ -33,6 +33,7 @@
 @DATADIR@/httrack/html/server/step3.html
 @DATADIR@/httrack/html/server/step4.html
 @DATADIR@/httrack/html/server/style.css
+@DATADIR@/httrack/html/server/themes/modern/theme.css
 @DATADIR@/httrack/html/server/user.css
 @DATADIR@/httrack/lang.def
 @DATADIR@/httrack/lang.indexes
