@@ -9,7 +9,7 @@
   --panel: #ffffff;
   --accent: #eaf1ff;
   --ink: #17263f;
-  --ink-soft: #65758e;
+  --ink-soft: #607087;
   --rule: #dfe7f2;
   --link: #2563eb;
   --link-hover: #1d4ed8;
@@ -65,8 +65,8 @@ html {
 
 body {
   min-height: 100vh;
-  margin: 0 !important;
-  padding: 22px 20px 24px !important;
+  margin: 0;
+  padding: 22px 20px 24px;
   background: var(--field);
   color: var(--ui-ink);
   line-height: 1.55;
@@ -74,8 +74,8 @@ body {
 }
 
 body > table {
-  width: min(1120px, 100%) !important;
-  min-width: 0 !important;
+  width: min(1120px, 100%);
+  min-width: 0;
   max-width: 1120px;
   margin-left: auto;
   margin-right: auto;
@@ -86,15 +86,15 @@ body > table {
 }
 
 #title {
-  width: min(350px, 66vw) !important;
+  width: min(350px, 66vw);
   max-width: 100%;
-  height: auto !important;
+  height: auto;
   margin: 0 0 10px 4px;
 }
 
 /* Native title/help bar. */
 #subTitle {
-  padding: 13px 18px !important;
+  padding: 13px 18px;
   letter-spacing: .02em;
 }
 
@@ -133,7 +133,7 @@ body > table {
 
 #pageContent {
   min-width: 0;
-  padding: 26px 34px 34px !important;
+  padding: 26px 34px 34px;
   border: 1px solid var(--rule);
   border-top: 0;
   border-bottom: 1px solid var(--rule);
@@ -304,19 +304,19 @@ body > table {
 /* Existing page hooks keep the native forms usable on narrow screens. */
 @media (max-width: 720px) {
   body {
-    padding: 12px 9px 20px !important;
+    padding: 12px 9px 20px;
   }
 
   #title {
-    width: min(260px, 61vw) !important;
+    width: min(260px, 61vw);
   }
 
   #subTitle {
-    padding: 11px 13px !important;
+    padding: 11px 13px;
   }
 
   #pageContent {
-    padding: 18px 16px 24px !important;
+    padding: 18px 16px 24px;
   }
 
   #pageContent input[size],
@@ -332,7 +332,7 @@ body > table {
 @media (max-width: 420px) {
   /* Native option tabs stay within the viewport without changing their markup. */
   body[class^="page-option"] #pageContent > table.tableWidth {
-    width: 100% !important;
+    width: 100%;
     table-layout: fixed;
   }
 
@@ -349,11 +349,20 @@ body > table {
   }
 
   #title {
-    width: min(205px, 55vw) !important;
+    width: min(205px, 55vw);
   }
 
   #pageContent {
-    padding: 16px 12px 22px !important;
+    padding: 16px 12px 22px;
+  }
+
+  .page-step3 #pageContent form table table td:first-child {
+    white-space: nowrap;
+  }
+
+  .page-step3 #pageContent input[name="filelist"] {
+    width: 100%;
+    min-width: 0;
   }
 
   .page-option2 #pageContent select[name="build"],
@@ -363,7 +372,7 @@ body > table {
   }
 
   .page-option6 #pageContent form > table:first-of-type {
-    width: 100% !important;
+    width: 100%;
     table-layout: fixed;
   }
 
@@ -382,7 +391,7 @@ body > table {
   }
 
   .page-option11 #pageContent form > table:first-of-type {
-    width: 100% !important;
+    width: 100%;
     table-layout: fixed;
   }
 

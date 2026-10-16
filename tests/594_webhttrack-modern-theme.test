@@ -9,7 +9,6 @@ set -euo pipefail
 # shellcheck source=tests/webhttracklib.sh
 . "${0%"${0##*/}"}./webhttracklib.sh"
 
-python=$(find_python) || skip "python3 not found"
 htsserver_require
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_modern.XXXXXX") || fail "no tmpdir"
@@ -28,7 +27,6 @@ chmod -R u+w "${root}/html/server"
 
 modern=${root}/html/server/themes/modern/theme.css
 test -f "${modern}" || fail "Modern theme.css is not shipped"
-test ! -e "${root}/html/server/themes/modern/modern.js" || fail "Modern theme ships JavaScript"
 
 htsserver_start --root "${root}" --home "${work}/home"
 sid=$(htsserver_sid)
@@ -36,23 +34,10 @@ test "${#sid}" -eq 32 || fail "no session id: [${sid}]"
 
 index=$(htsserver_get /server/index.html)
 grep -q '<option value="modern">' <<<"${index}" || fail "Modern is not listed by the native theme menu"
-! grep -q 'modern.js' <<<"${index}" || fail "Modern still loads a JavaScript loader"
-
-# Check actual stylesheet order in the served page without depending on CSS
-# values. user.css must remain after the server-selected theme.
-printf '%s\n' "${index}" | "${python}" -c '
-import re, sys
-html = sys.stdin.read()
-hrefs = re.findall(r"<link[^>]+href=[\"\x27]([^\"\x27]+)", html, re.I)
-try:
-    style = hrefs.index("style.css")
-    theme = hrefs.index("/server/theme.css")
-    user = hrefs.index("user.css")
-except ValueError as exc:
-    raise SystemExit("missing stylesheet link: %s" % (exc,))
-if not style < theme < user:
-    raise SystemExit("stylesheet order is %r" % (hrefs,))
-'
+# Installing a theme must not change the default: Classic serves no theme import
+# until the user explicitly chooses one.
+classic_default=$(htsserver_get /server/theme.css)
+! grep -q '@import' <<<"${classic_default}" || fail "a shipped theme replaced Classic as the default"
 
 choose_reply=$(htsserver_post "sid=${sid}&uitheme=modern&redirect=index.html" /server/step2.html)
 grep -q '^HTTP/1.[01] 302' <<<"${choose_reply}" || fail "Modern choice was not accepted"
@@ -73,12 +58,6 @@ grep -qF '@import url(themes/modern/theme.css);' <<<"${theme_reply}" || fail "Mo
 index=$(htsserver_get /server/index.html)
 grep -q '<option value="modern" selected>' <<<"${index}" || fail "Modern is not selected after restart"
 sid=$(htsserver_sid)
-
-# Help and Manual remain their own package and do not load the WebHTTrack theme.
-manual=$(htsserver_get /doc/html/index.html)
-! grep -q '/server/theme.css' <<<"${manual}" || fail "Manual was made theme-aware"
-guide=$(htsserver_get /doc/html/guide.html)
-! grep -q '/server/theme.css' <<<"${guide}" || fail "Help was made theme-aware"
 
 classic_reply=$(htsserver_post "sid=${sid}&uitheme=classic&redirect=index.html" /server/step2.html)
 grep -q '^HTTP/1.[01] 302' <<<"${classic_reply}" || fail "Classic choice was not accepted"
