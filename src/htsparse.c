@@ -739,16 +739,16 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
   }
 }
 
-/* Is this raw data-src / data-srcset value a lazy-load placeholder rather
-   than a URL? Templates ({{x}}, JSON) and a few placeholder words are. */
-/* How a browser fetches the link found while parsing link ptr: the page is
-   the origin its subresources compare against, and a stylesheet or script
-   file passes on the origin of the page that loaded it. */
+/* How a browser fetches the link found while parsing link ptr. Links in a
+   stylesheet or script file compare with the page that loaded that file. */
 static void parse_fetch_meta(httrackp *opt, int ptr, hts_fetch_meta *fm,
+                             hts_boolean redirect_stub,
                              hts_boolean meta_refresh, hts_boolean opaque,
                              hts_boolean inscript, hts_boolean incss,
-                             hts_boolean whole_file, const char *tag_name,
+                             hts_boolean tagless_body, const char *tag_name,
                              const char *attr, const char *fil) {
+  const hts_fetch_meta *const page = &heap(ptr)->fetch;
+
   memset(fm, 0, sizeof(*fm));
   if (ptr == 0) { /* a start URL, as if typed in */
     fm->dest = HTS_FETCH_DEST_DOCUMENT;
@@ -756,18 +756,29 @@ static void parse_fetch_meta(httrackp *opt, int ptr, hts_fetch_meta *fm,
     fm->user = HTS_TRUE;
     return;
   }
-  /* A script body names URLs for code a crawler never runs. */
+  /* The page written in place of a redirect continues its chain. */
+  if (redirect_stub) {
+    *fm = *page;
+    hts_fetch_through(opt, fm, heap(ptr)->adr);
+    return;
+  }
+  /* A refresh navigates whatever frame holds the page. */
   if (meta_refresh)
-    fm->dest = HTS_FETCH_DEST_DOCUMENT;
+    fm->dest = page->dest == HTS_FETCH_DEST_IFRAME ||
+                       page->dest == HTS_FETCH_DEST_FRAME
+                   ? page->dest
+                   : HTS_FETCH_DEST_DOCUMENT;
   else if (!opaque && inscript && incss)
     hts_fetch_classify(fm, NULL, attr, fil);
+  /* A script body names URLs for code a crawler never runs. */
   else if (!opaque && !inscript && tag_name != NULL)
     hts_fetch_classify(fm, tag_name, attr, fil);
-  fm->initiator = whole_file && heap(ptr)->fetch.initiator > 0
-                      ? heap(ptr)->fetch.initiator
-                      : ptr;
+  /* A file no known page loaded leaves initiator 0, which sends none. */
+  fm->initiator = tagless_body ? page->initiator : ptr;
 }
 
+/* Is this raw data-src / data-srcset value a lazy-load placeholder rather
+   than a URL? Templates ({{x}}, JSON) and a few placeholder words are. */
 static hts_boolean data_attr_is_not_url(const char *s, size_t len) {
   static const char *const words[] = {
       "lazy",  "placeholder", "none",  "null",  "undefined",
@@ -2950,10 +2961,14 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       strcpybuff(afs.save, "");     // dummy
                     }
                   }
-                  parse_fetch_meta(opt, ptr, &link_fetch, p_searchMETAURL,
-                                   in_media != NULL || p_type != 0, inscript,
-                                   incss, inscript_locked, sf_tag,
-                                   tag_attr_start, afs.af.fil);
+                  parse_fetch_meta(
+                      opt, ptr, &link_fetch, HTTP_IS_REDIRECT(r->statuscode),
+                      p_searchMETAURL, in_media != NULL || p_type != 0,
+                      inscript, incss, sf_tagless_body, sf_tag, tag_attr_start,
+                      afs.af.fil);
+                  /* Naming followed redirects whose hops it does not keep. */
+                  if (former.adr[0] != '\0')
+                    link_fetch.dest = HTS_FETCH_DEST_UNKNOWN;
                   // resolve unresolved type
                   if (r_sv != -1 && p_type != 2 && p_type != -2
                       && forbidden_url == 0 && IS_DELAYED_EXT(afs.save)
@@ -5309,7 +5324,6 @@ int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
             if (strnotempty(mov_url)) {   // location existe!
               lien_adrfil moved;
               moved.adr[0] = moved.fil[0] = '\0';
-              /* Sec-Fetch-Site takes the worst hop of the chain */
               if (fetch != NULL)
                 hts_fetch_through(opt, fetch, afs->af.adr);
               //

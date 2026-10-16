@@ -1268,13 +1268,14 @@ hts_boolean hts_client_hints_of(const char *user_agent, hts_client_hints *ch) {
   return HTS_TRUE;
 }
 
-/* Sec-Fetch-* for this request, or NULL when a browser would send none: an
-   unknown destination, a URL that is not trustworthy, or a User-Agent that is
-   no current browser. */
+/* Return fetch, or NULL when a browser would send no Sec-Fetch-*. That is the
+   case for an unknown destination or site, -%Q0, an untrustworthy URL, and a
+   User-Agent that is no current browser or that -%X replaces. */
 static const hts_fetch_meta *
 fetch_meta_sent(httrackp *opt, const hts_fetch_meta *fetch, const char *adr,
                 const htsblk *retour, const char *custom) {
   if (fetch == NULL || fetch->dest == HTS_FETCH_DEST_UNKNOWN ||
+      fetch->site == HTS_FETCH_SITE_UNSET ||
       opt->browser_headers == HTS_FALSE || !hts_fetch_trustworthy(adr) ||
       !retour->req.user_agent_send || retour->req.user_agent == NULL ||
       strncmp(retour->req.user_agent, "Mozilla/5.0 ", 12) != 0 ||

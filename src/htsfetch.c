@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 1998 Xavier Roche and other contributors
+Copyright (C) 2026 Xavier Roche and other contributors
 
 SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -26,7 +26,8 @@ Please visit our Website: http://www.httrack.com
 */
 
 /* ------------------------------------------------------------ */
-/* File: Fetch Metadata request headers (Sec-Fetch-*)          */
+/* File: htsfetch.c subroutines:                               */
+/*       Fetch Metadata request headers (Sec-Fetch-*)           */
 /* ------------------------------------------------------------ */
 
 #define HTS_INTERNAL_BYTECODE
@@ -180,8 +181,9 @@ void hts_fetch_classify(hts_fetch_meta *fm, const char *tag_name,
                         const char *attr, const char *fil) {
   static const char *const font_exts[] = {"woff2", "woff", "ttf",
                                           "otf",   "eot",  NULL};
+  /* No svg, which @font-face can name too. */
   static const char *const image_exts[] = {"png",  "jpg", "jpeg", "gif", "webp",
-                                           "avif", "svg", "ico",  "bmp", NULL};
+                                           "avif", "ico", "bmp",  NULL};
   static const char *const css_exts[] = {"css", NULL};
 
   /* (tag, attribute) pairs with a fixed destination; NULL matches any tag. */
@@ -238,6 +240,9 @@ void hts_fetch_classify(hts_fetch_meta *fm, const char *tag_name,
       }
     }
   }
+  /* A download is no navigation, and its destination is not one we send. */
+  if (fm->dest == HTS_FETCH_DEST_DOCUMENT && tag_has_attr(tag_name, "download"))
+    fm->dest = HTS_FETCH_DEST_UNKNOWN;
   if (fm->dest == HTS_FETCH_DEST_DOCUMENT)
     fm->user = HTS_TRUE;
   if (tag_has_attr(tag_name, "crossorigin") ||
@@ -246,7 +251,7 @@ void hts_fetch_classify(hts_fetch_meta *fm, const char *tag_name,
     fm->cors = HTS_TRUE;
 }
 
-/* The parts of an origin: scheme, host and port. */
+/* An origin splits into scheme, host and port. */
 typedef struct fetch_origin {
   hts_boolean https;
   const char *host;
@@ -282,15 +287,7 @@ static void origin_of(const char *adr, fetch_origin *o) {
 }
 
 static hts_boolean host_is_ip(const char *host, size_t len) {
-  size_t i;
-
-  if (len > 0 && host[0] == '[')
-    return HTS_TRUE;
-  for (i = 0; i < len; i++) {
-    if (!isdigit((unsigned char) host[i]) && host[i] != '.')
-      return HTS_FALSE;
-  }
-  return HTS_TRUE;
+  return (len > 0 && host[0] == '[') || hts_host_is_ipv4(host, len);
 }
 
 /* The tail of the host same-site compares: the last two labels, or the whole
@@ -352,6 +349,8 @@ hts_boolean hts_fetch_trustworthy(const char *adr) {
   fetch_origin o;
   const char *dot;
 
+  if (strfield(adr, "ftp:"))
+    return HTS_FALSE;
   origin_of(adr, &o);
   if (o.https)
     return HTS_TRUE;
@@ -363,7 +362,7 @@ hts_boolean hts_fetch_trustworthy(const char *adr) {
     return HTS_TRUE;
   dot = memchr(o.host, '.', o.host_len);
   return dot != NULL && span_eq(o.host, (size_t) (dot - o.host), "127", 3) &&
-                 host_is_ip(o.host, o.host_len)
+                 hts_host_is_ipv4(o.host, o.host_len)
              ? HTS_TRUE
              : HTS_FALSE;
 }

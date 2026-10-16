@@ -3046,7 +3046,7 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
       // fresh connect: address list not yet probed, start at the first
       sback->connect_fallback[p].addr_index = 0;
       sback->connect_fallback[p].addr_count = -1;
-      /* A type probe is no fetch a browser makes. */
+      /* A type probe carries no fetch metadata. */
       memset(&sback->fetch[p], 0, sizeof(sback->fetch[p]));
       if (fetch != NULL && !test) {
         sback->fetch[p] = *fetch;

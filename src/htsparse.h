@@ -249,7 +249,7 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
   to be ready for naming, having its header MIME type
   If the final URL is to be forbidden, sets 'forbidden_url' to the corresponding value
 */
-/* fetch (or NULL) is how a browser fetches it, and gains the hops followed. */
+/* When fetch is not NULL, each redirect hop followed is merged into it. */
 int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
                      char *parent_adr, char *parent_fil, lien_adrfil *former,
                      int *forbidden_url, hts_fetch_meta *fetch);

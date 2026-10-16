@@ -3494,26 +3494,37 @@ class Handler(SimpleHTTPRequestHandler):
                 '<img src="img.png"><img src="bounce.png">'
                 '<iframe src="frame.html"></iframe>'
                 '<a href="page.html">p</a><a href="%scross.html">x</a>'
+                '<a href="moved.html">m</a><img src="noext">'
                 "</body></html>" % (echo, other, other)
             )
             self.send_raw(body.encode(), "text/html")
         elif name == "style.css":
-            css = "/*%s*/ @font-face{src:url(font.woff2)} body{background:url(bg.png)}"
+            css = (
+                "/*%s*/ @font-face{src:url(font.woff2)} body{background:url(bg.png)}"
+                " div{background:url(bg.svg)}"
+            )
             self.send_raw((css % echo).encode(), "text/css")
         elif name == "xstyle.css":
-            # The font is the page's own origin: Site compares with the page.
+            # The font sits on the page's origin, so it is same-origin.
             css = "/*%s*/ @font-face{src:url(%sxfont.woff2)}"
             self.send_raw((css % (echo, here)).encode(), "text/css")
-        elif name == "bounce.png":
-            self.send_redirect(other + "bounce2.png")
-        elif name == "bounce2.png":
-            self.send_redirect(here + "bounced.png")
+        elif name == "frame.html":
+            body = '<meta http-equiv="refresh" content="0; url=refreshed.html">'
+            self.send_raw((body + echo).encode(), "text/html")
+        elif name == "start.html":
+            self.send_redirect(here + "index.html")
+        # Each chain leaves for localhost and comes back, so it is cross-site.
+        elif name in ("bounce.png", "moved.html", "noext"):
+            self.send_redirect(other + "hop-" + name)
+        elif name.startswith("hop-"):
+            self.send_redirect(here + "landed-" + name[4:])
         else:
             types = {
                 "png": "image/png",
                 "js": "text/javascript",
                 "woff2": "font/woff2",
                 "html": "text/html",
+                "svg": "image/svg+xml",
             }
             ctype = types.get(name.rsplit(".", 1)[-1], "text/plain")
             self.send_raw(echo.encode(), ctype)
