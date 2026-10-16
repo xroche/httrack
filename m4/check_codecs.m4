@@ -1,5 +1,6 @@
 dnl @synopsis CHECK_BROTLI()
 dnl @synopsis CHECK_ZSTD()
+dnl @synopsis CHECK_PSL()
 dnl
 dnl Look for libbrotlidec and libzstd, the decoders for the "br" and "zstd"
 dnl HTTP content codings. Both are optional: a missing library only drops the
@@ -9,13 +10,13 @@ dnl is to use the library when it is found, unless --disable-auto-features asked
 dnl for every unrequested optional feature to default to no.
 dnl
 dnl Define HTS_USEBROTLI / HTS_USEZSTD to 1 or 0, and substitute BROTLI_LIBS /
-dnl ZSTD_LIBS.
+dnl ZSTD_LIBS. CHECK_PSL does the same for libpsl (HTS_USEPSL, PSL_LIBS).
 
-dnl CHECK_CODEC(name, NAME, header, library, symbol, companion-libs)
+dnl CHECK_CODEC(name, NAME, header, library, symbol, companion-libs, [what])
 AC_DEFUN([CHECK_CODEC], [
 AC_REQUIRE([HTS_EXPAND_LIBDIR])
 AC_ARG_WITH([$1],
-	[AS_HELP_STRING([--with-$1@<:@=DIR@:>@],[Enable the $1 content coding @<:@default=auto@:>@])],
+	[AS_HELP_STRING([--with-$1@<:@=DIR@:>@],[Enable ]m4_default([$7], [the $1 content coding])[ @<:@default=auto@:>@])],
 	[codec_want=$withval
 	codec_asked=yes], [codec_want=$hts_feature_default
 	codec_asked=no])
@@ -55,7 +56,7 @@ if test "$codec_want" != "no"; then
 		AC_MSG_ERROR([$1 requested but lib$4/$3 not found])
 	fi
 fi
-AC_MSG_CHECKING([whether to enable the $1 content coding])
+AC_MSG_CHECKING([whether to enable ]m4_default([$7], [the $1 content coding]))
 dnl Name who decided: "auto" is the build environment's answer, not the packager's.
 if test "$codec_want" = "auto"; then
 	AC_MSG_RESULT([$codec_have (auto)])
@@ -65,9 +66,9 @@ else
 	AC_MSG_RESULT([$codec_have (requested)])
 fi
 if test "$codec_have" = "yes"; then
-	AC_DEFINE([HTS_USE$2], [1], [Define to 1 to decode the $1 content coding])
+	AC_DEFINE([HTS_USE$2], [1], [Define to 1 to enable ]m4_default([$7], [the $1 content coding]))
 else
-	AC_DEFINE([HTS_USE$2], [0], [Define to 1 to decode the $1 content coding])
+	AC_DEFINE([HTS_USE$2], [0], [Define to 1 to enable ]m4_default([$7], [the $1 content coding]))
 fi
 AC_SUBST([$2_LIBS])
 AC_SUBST([$2_ENABLED], [$codec_have])
@@ -79,3 +80,7 @@ AC_DEFUN([CHECK_BROTLI],
 
 AC_DEFUN([CHECK_ZSTD],
 	[CHECK_CODEC([zstd], [ZSTD], [zstd.h], [zstd], [ZSTD_decompressStream], [])])
+
+dnl Same-site checks fall back to a last-two-labels heuristic without libpsl.
+AC_DEFUN([CHECK_PSL],
+	[CHECK_CODEC([psl], [PSL], [libpsl.h], [psl], [psl_latest], [], [Public Suffix List lookups])])

@@ -6697,6 +6697,7 @@ HTSEXT_API int hts_init(void) {
 
   /* Before any thread reads the verdict */
   hts_mptcp_probe();
+  hts_fetch_init();
 
   /* Ensure external modules are loaded */
   hts_debug_log_print("calling htspe_init()");  /* debug */
@@ -6778,6 +6779,7 @@ int hts_uninit_module(void) {
     return 1;
   htsthread_uninit();
   htspe_uninit();
+  hts_fetch_uninit();
   hts_init_ok = 0;
   return 1;
 }

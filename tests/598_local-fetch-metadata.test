@@ -77,6 +77,18 @@ selftest_queue cross-site fetchsite https://127.0.0.1 https://127.0.0.2
 selftest_queue cross-site fetchsite https://10.1.0.1 https://10.2.0.1
 selftest_queue cross-site fetchsite https://example.com https://www.example.org
 
+# The Public Suffix List splits hosts that the last-two-labels rule joins.
+psl=$(httrack -#test=fetchpsl) || fail "httrack -#test=fetchpsl failed"
+if test "$(httrack -#test=features | sed -n 's/^psl //p')" = 1; then
+    test "${psl}" = psl || fail "built with libpsl, but the list did not load"
+fi
+if test "${psl}" = psl; then
+    selftest_queue cross-site fetchsite https://a.github.io https://b.github.io
+    selftest_queue cross-site fetchsite https://github.io https://a.github.io
+    selftest_queue cross-site fetchsite https://a.co.uk https://b.co.uk
+    selftest_queue same-site fetchsite https://a.example.co.uk https://B.Example.CO.UK.
+fi
+
 selftest_queue yes fetchtrust https://www.example.com
 selftest_queue yes fetchtrust localhost:8080
 selftest_queue yes fetchtrust www.localhost

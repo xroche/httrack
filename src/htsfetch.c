@@ -37,6 +37,35 @@ Please visit our Website: http://www.httrack.com
 #include "htscore.h"
 #include "htswizard.h"
 
+#if HTS_USEPSL
+#include <libpsl.h>
+
+/* Read-only once hts_init() has set it, so crawl threads share it unlocked. */
+static psl_ctx_t *fetch_psl = NULL;
+#endif
+
+void hts_fetch_init(void) {
+#if HTS_USEPSL
+  if (fetch_psl == NULL)
+    fetch_psl = psl_latest(NULL);
+#endif
+}
+
+void hts_fetch_uninit(void) {
+#if HTS_USEPSL
+  psl_free(fetch_psl);
+  fetch_psl = NULL;
+#endif
+}
+
+hts_boolean hts_fetch_has_psl(void) {
+#if HTS_USEPSL
+  return fetch_psl != NULL;
+#else
+  return HTS_FALSE;
+#endif
+}
+
 static hts_boolean span_eq(const char *a, size_t alen, const char *b,
                            size_t blen) {
   return alen == blen && strncasecmp(a, b, alen) == 0 ? HTS_TRUE : HTS_FALSE;
@@ -335,14 +364,42 @@ static hts_boolean host_is_ip(const char *host, size_t len) {
   return (len > 0 && host[0] == '[') || hts_host_is_ipv4(host, len);
 }
 
-/* The tail of the host same-site compares: the last two labels, or the whole
-   host for an IP literal. */
+#if HTS_USEPSL
+/* The registrable domain of the host, or the whole host when it is itself a
+   public suffix. NULL when the list cannot answer. */
+static const char *psl_site_key(const fetch_origin *o, size_t *len) {
+  char host[256];
+  const char *reg;
+
+  if (fetch_psl == NULL || o->host_len >= sizeof(host))
+    return NULL;
+  memcpy(host, o->host, o->host_len);
+  host[o->host_len] = '\0';
+  hts_lowcase(host);
+  reg = psl_registrable_domain(fetch_psl, host);
+  if (reg == NULL)
+    reg = host;
+  *len = o->host_len - (size_t) (reg - host);
+  return o->host + (reg - host);
+}
+#endif
+
+/* The tail of the host same-site compares: the registrable domain, else the
+   last two labels, or the whole host for an IP literal. */
 static const char *site_key(const fetch_origin *o, size_t *len) {
   size_t i = o->host_len, dots = 0;
 
   *len = o->host_len;
   if (host_is_ip(o->host, o->host_len))
     return o->host;
+#if HTS_USEPSL
+  {
+    const char *const key = psl_site_key(o, len);
+
+    if (key != NULL)
+      return key;
+  }
+#endif
   while (i > 0) {
     if (o->host[i - 1] == '.' && ++dots == 2)
       break;

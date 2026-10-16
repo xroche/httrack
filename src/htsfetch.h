@@ -38,6 +38,11 @@ Please visit our Website: http://www.httrack.com
 #include "htsglobal.h"
 #include "htsopt.h"
 
+/* 1 when libpsl decides which hosts are same-site. */
+#ifndef HTS_USEPSL
+#define HTS_USEPSL 0
+#endif
+
 /* A destination the parser cannot name stays UNKNOWN, because a wrong value
    can draw a 403 where none passes. */
 typedef enum hts_fetch_dest {
@@ -79,6 +84,15 @@ int hts_fetch_same_frame(int page_dest);
 /* Does the NUL-terminated page html have a <base target>, which sends its
    links with no target to a frame we cannot tell? */
 hts_boolean hts_fetch_has_base_target(const char *html);
+
+/* Load the Public Suffix List when the build has libpsl. Call it from
+   hts_init(), before any crawl thread compares sites. hts_fetch_uninit()
+   frees it. */
+void hts_fetch_init(void);
+void hts_fetch_uninit(void);
+
+/* Does the Public Suffix List decide same-site, rather than the heuristic? */
+hts_boolean hts_fetch_has_psl(void);
 
 /* Return how the URL at to_adr relates to the origin at from_adr: SAME_ORIGIN,
    SAME_SITE or CROSS_SITE. Same-site compares the last two host labels, so it
