@@ -139,12 +139,18 @@ listed=$(grep -c '<option value="' <<<"$(htsserver_get /server/index.html)" || t
 test "${listed}" -eq 79 || fail "${listed} menu entries, not 79"
 rm -r "${themes}"/t[0-9]*
 
-# A user's theme folder adds themes and wins over an installed one of the same
-# name, but a folder there without theme.css hides nothing.
+# A user's theme folder adds themes, and one there wins over the installed theme
+# of that name for all its files. A folder without theme.css hides nothing, and
+# a name the menu cannot offer is not served from there either.
 userthemes=${work}/home/.httrack/themes
 ! target_is_windows || userthemes=${work}/home/httrack/themes
-mkdir -p "${userthemes}/zeta" "${userthemes}/solo/img" "${userthemes}/alpha"
+mkdir -p "${userthemes}/zeta" "${userthemes}/solo/img" "${userthemes}/alpha" \
+    "${userthemes}/classic" "${userthemes}/Bad.Name" "${themes}/zeta/img"
 printf '/* user zeta */\n' >"${userthemes}/zeta/theme.css"
+printf 'installed\n' >"${themes}/zeta/img/b.txt"
+printf '/* user classic */\n' >"${userthemes}/classic/theme.css"
+printf '/* user bad */\n' >"${userthemes}/Bad.Name/theme.css"
+printf '<p>page</p>\n' >"${themes}/alpha/page.html"
 printf '/* user solo */\n' >"${userthemes}/solo/theme.css"
 printf 'asset\n' >"${userthemes}/solo/img/a.txt"
 printf '<p>page</p>\n' >"${userthemes}/solo/page.html"
@@ -156,16 +162,25 @@ reply=$(htsserver_get /server/themes/zeta/theme.css)
 grep -qF '/* user zeta */' <<<"${reply}" || fail "the user's zeta does not win: ${reply}"
 reply=$(htsserver_get /server/themes/alpha/theme.css)
 grep -qF '/* alpha */' <<<"${reply}" || fail "an empty user folder hid the installed alpha: ${reply}"
+reply=$(htsserver_get /server/themes/zeta/img/b.txt)
+grep -q '^HTTP/1.[01] 404' <<<"${reply}" || fail "the user's zeta borrowed an installed file: ${reply}"
+reply=$(htsserver_get /server/themes/classic/theme.css)
+! grep -qF 'user classic' <<<"${reply}" || fail "a user folder named classic was served"
 reply=$(htsserver_get /server/themes/solo/img/a.txt)
 grep -q '^asset' <<<"${reply}" || fail "a user theme's asset is not served: ${reply}"
-reply=$(htsserver_get /server/themes/solo/page.html)
-grep -q '^HTTP/1.[01] 404' <<<"${reply}" || fail "an HTML file in a theme was served: ${reply}"
+for url in /server/themes/solo/page.html /server/themes/alpha/page.html \
+    //server//themes/alpha/page.html; do
+    reply=$(htsserver_get "${url}")
+    grep -q '^HTTP/1.[01] 404' <<<"${reply}" || fail "${url} was served: ${reply}"
+done
 sid=$(htsserver_sid)
 choose "sid=${sid}&uitheme=solo"
 reply=$(theme_css)
 grep -qF '@import url(themes/solo/theme.css);' <<<"${reply}" || fail "solo not applied: ${reply}"
+grep -qx 'uitheme=solo' "${work}/home/${settings}" || fail "solo not saved"
+# The restart below expects zeta.
 choose "sid=${sid}&uitheme=zeta"
-rm -r "${userthemes}/solo" "${userthemes}/alpha"
+rm -r "${userthemes:?}"/* "${themes}/zeta/img" "${themes}/alpha/page.html"
 
 # The choice outlives the server.
 htsserver_stop
