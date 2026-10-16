@@ -111,9 +111,10 @@ offline browser : copy websites to a local directory</p>
 <b>-%w, --disable-module</b> ] [ <b>-F, --user-agent</b> ] [
 <b>-%R, --referer</b> ] [ <b>-%E, --from</b> ] [ <b>-%F,
 --footer</b> ] [ <b>-%l, --language</b> ] [ <b>-%a,
---accept</b> ] [ <b>-%X, --headers</b> ] [ <b>-C,
---cache[=N]</b> ] [ <b>-k, --store-all-in-cache</b> ] [
-<b>-%r, --warc</b> ] [ <b>-%d, --changes[=0]</b> ] [ <b>-%n,
+--accept</b> ] [ <b>-%X, --headers</b> ] [ <b>-%Q,
+--browser-headers[=0]</b> ] [ <b>-C, --cache[=N]</b> ] [
+<b>-k, --store-all-in-cache</b> ] [ <b>-%r, --warc</b> ] [
+<b>-%d, --changes[=0]</b> ] [ <b>-%n,
 --do-not-recatch[=0]</b> ] [ <b>-%v, --display[=N]</b> ] [
 <b>-Q, --do-not-log</b> ] [ <b>-q, --quiet</b> ] [ <b>-z,
 --extra-log</b> ] [ <b>-Z, --debug-log</b> ] [ <b>-v,
@@ -1171,6 +1172,19 @@ or legacy %s) (--footer &lt;param&gt;)</p></td></tr>
 
 <p>additional HTTP header line (-%X &quot;X-Magic: 42&quot;
 (--headers &lt;param&gt;)</p></td></tr>
+<tr valign="top" align="left">
+<td width="9%"></td>
+<td width="4%">
+
+
+<p>-%Q</p></td>
+<td width="5%"></td>
+<td width="82%">
+
+
+<p>send the client hints the browser named by -F would
+send, over HTTPS (%Q0 don&rsquo;t)
+(--browser-headers[=0])</p> </td></tr>
 </table>
 
 <h3>Log, index, cache

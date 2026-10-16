@@ -1,0 +1,72 @@
+#!/bin/bash
+#
+# Client hints (-%Q): the Sec-CH-UA* values a Chromium User-Agent implies, and
+# the requests that carry them.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+chrome='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36'
+
+# Chrome's own values for 138, 140 and 141: the brand order and the fake brand
+# both move with the major version.
+selftest_queue 'ua="Not)A;Brand";v="8", "Chromium";v="138", "Google Chrome";v="138" mobile=?0 platform="Windows"' \
+    clienthints 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36'
+selftest_queue 'ua="Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140" mobile=?1 platform="Android"' \
+    clienthints 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36'
+selftest_queue 'ua="Google Chrome";v="141", "Not?A_Brand";v="8", "Chromium";v="141" mobile=?0 platform="Windows"' \
+    clienthints "$chrome"
+selftest_queue 'ua="Microsoft Edge";v="141", "Not?A_Brand";v="8", "Chromium";v="141" mobile=?0 platform="Windows"' \
+    clienthints "$chrome Edg/141.0.0.0"
+selftest_queue 'ua="Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139" mobile=?0 platform="macOS"' \
+    clienthints 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36'
+selftest_queue 'ua="Chromium";v="142", "Google Chrome";v="142", "Not_A Brand";v="99" mobile=?0 platform="Linux"' \
+    clienthints 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36'
+selftest_queue 'ua="Google Chrome";v="143", "Chromium";v="143", "Not A(Brand";v="24" mobile=?0 platform="Chrome OS"' \
+    clienthints 'Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36'
+# Browsers that send none, Chromium-based or not.
+selftest_queue none clienthints 'Mozilla/5.0 (X11; Linux x86_64; rv:143.0) Gecko/20100101 Firefox/143.0'
+selftest_queue none clienthints 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15'
+selftest_queue none clienthints "$chrome OPR/125.0.0.0"
+selftest_queue none clienthints 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/141.0.0.0 Safari/537.36'
+selftest_queue none clienthints 'Mozilla/5.0 (compatible; HTTrack/3.x; +https://www.httrack.com/)'
+selftest_queue none clienthints "${chrome/Chrome\/141.0.0.0/Chrome\/}"
+selftest_queue none clienthints "${chrome/(Windows NT 10.0; Win64; x64)/(Plan9)}"
+selftest_queue none clienthints "${chrome%)*}"
+selftest_run_queued
+
+if test "$HTTPS_SUPPORT" == "no"; then
+    echo "no https support compiled, skipping the crawls"
+    exit 0
+fi
+
+echo_file='reqheaders/echo.txt'
+hint='^sec-ch-ua: "Google Chrome";v="141", "Not[?]A_Brand";v="8", "Chromium";v="141"'
+
+# The hints go out over HTTPS, before the User-Agent as Chrome orders them.
+bash "$top_srcdir/tests/local-crawl.sh" --tls --errors 0 \
+    --file-matches "$echo_file" "$hint" \
+    --file-matches "$echo_file" '^sec-ch-ua-mobile: [?]0' \
+    --file-matches "$echo_file" '^sec-ch-ua-platform: "Windows"' \
+    httrack "BASEURL/$echo_file" -F "$chrome"
+
+# Never over plain HTTP, where browsers send none.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    --file-matches "$echo_file" '^User-Agent: .*Chrome/141' \
+    --file-not-matches "$echo_file" '^sec-ch-ua' \
+    httrack "BASEURL/$echo_file" -F "$chrome"
+
+# -%Q0 turns them off.
+bash "$top_srcdir/tests/local-crawl.sh" --tls --errors 0 \
+    --file-matches "$echo_file" '^User-Agent: .*Chrome/141' \
+    --file-not-matches "$echo_file" '^sec-ch-ua' \
+    httrack "BASEURL/$echo_file" -F "$chrome" -%Q0
+
+# A hint given with -%X replaces the engine's own, which leaves the others.
+bash "$top_srcdir/tests/local-crawl.sh" --tls --errors 0 \
+    --file-matches "$echo_file" '^sec-ch-ua-platform: "Linux"' \
+    --file-not-matches "$echo_file" '^sec-ch-ua-platform: "Windows"' \
+    --file-matches "$echo_file" "$hint" \
+    httrack "BASEURL/$echo_file" -F "$chrome" -%X 'sec-ch-ua-platform: "Linux"'

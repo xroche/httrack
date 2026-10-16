@@ -650,6 +650,9 @@ struct httrackp {
   int user_filters;        /**< count of the user's rules, held right after the
                                 wizard's block. Live state, so copy_htsopt must leave
                                 it alone. Tail: ABI */
+  hts_tristate browser_headers; /**< send the headers the browser named by
+                                     the User-Agent would (-%Q). HTS_DEFAULT:
+                                     on. Tail: ABI */
 };
 
 /** Running statistics for a mirror. */

@@ -3414,7 +3414,26 @@ static int st_contentid(httrackp *opt, int argc, char **argv) {
   return failures != 0;
 }
 
+/* -#test=clienthints <user-agent>: the Sec-CH-UA* values it implies. */
+static int st_clienthints(httrackp *opt, int argc, char **argv) {
+  hts_client_hints ch;
+
+  (void) opt;
+  if (argc != 1) {
+    fprintf(stderr, "clienthints: takes a user-agent\n");
+    return 1;
+  }
+  if (!hts_client_hints_of(argv[0], &ch))
+    printf("none\n");
+  else
+    printf("ua=%s mobile=?%d platform=%s\n", ch.ua, ch.mobile ? 1 : 0,
+           ch.platform);
+  return 0;
+}
+
 const struct selftest_entry selftests_lib[] = {
+    {"clienthints", "<user-agent>",
+     "the client hints a browser sending this User-Agent adds", st_clienthints},
     {"hashtable", "<count|file>", "coucal hashtable stress test", st_hashtable},
     {"strsafe", "[overflow|overflow-buff|overflow-src [str]]",
      "bounded string-op self-test", st_strsafe},
