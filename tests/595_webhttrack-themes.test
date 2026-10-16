@@ -82,13 +82,13 @@ test "${options}" = '<option value="classic"> <option value="alpha"> <option val
     fail "theme menu: ${options}"
 
 # A label is the folder name, capitalised and with - and _ read as spaces.
-mkdir "${themes}/night-owl_2"
-printf '/* owl */\n' >"${themes}/night-owl_2/theme.css"
+mkdir "${themes}/night-Owl_2"
+printf '/* owl */\n' >"${themes}/night-Owl_2/theme.css"
 reply=$(htsserver_get /server/index.html)
-for option in '"alpha">Alpha<' '"night-owl_2">Night owl 2<' '"zeta">Zeta<'; do
+for option in '"alpha">Alpha<' '"night-Owl_2">Night Owl 2<' '"zeta">Zeta<'; do
     grep -qF "<option value=${option}/option>" <<<"${reply}" || fail "no ${option} in the theme menu"
 done
-rm -r "${themes}/night-owl_2"
+rm -r "${themes}/night-Owl_2"
 
 choose "sid=${sid}&uitheme=zeta"
 reply=$(theme_css)

@@ -845,8 +845,7 @@ static const char *effective_theme(const char *path) {
   return theme_exists(path, ui_theme) ? ui_theme : THEME_CLASSIC;
 }
 
-/* Appends "name<TAB>label", where the label reads "solarized-dark" as
-   "Solarized dark". */
+/* Appends "name<TAB>label", labelling "solarized-dark" as "Solarized dark". */
 static void cat_theme_entry(String *list, const char *name) {
   const char *p;
 
@@ -2166,12 +2165,12 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                       name += p;
                       format = 2;
                     } else if ((p = strfield(name, "liststr:")) ||
-                               (pairs =
-                                    (p = strfield(name, "listlabel:")) != 0)) {
-                      /* ${liststr:<var>:<key>} selects the entry equal to
-                         <var>, as ${listid:} does */
+                               (p = strfield(name, "listlabel:"))) {
+                      /* ${liststr:<var>:<key>} and ${listlabel:<var>:<key>}
+                         select the entry equal to <var>, as ${listid:} does */
                       char *const colon = strchr(name + p, ':');
 
+                      pairs = strfield(name, "listlabel:") != 0;
                       name += p;
                       format = -2;
                       if (colon != NULL) {
