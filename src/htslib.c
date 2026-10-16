@@ -1269,8 +1269,9 @@ hts_boolean hts_client_hints_of(const char *user_agent, hts_client_hints *ch) {
 }
 
 /* Return fetch, or NULL when a browser would send no Sec-Fetch-*. That is the
-   case for an unknown destination or site, -%Q0, an untrustworthy URL, and a
-   User-Agent that is no current browser or that -%X replaces. */
+   case for an unknown destination, -%Q0, an untrustworthy URL, and a
+   User-Agent that is no current browser or that -%X replaces. An unset site
+   means a hop missed hts_fetch_through, which must not read as same-origin. */
 static const hts_fetch_meta *
 fetch_meta_sent(httrackp *opt, const hts_fetch_meta *fetch, const char *adr,
                 const htsblk *retour, const char *custom) {

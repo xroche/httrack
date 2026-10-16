@@ -14,6 +14,15 @@ nav='mode=navigate user=-'
 nocors='mode=no-cors user=-'
 selftest_queue 'dest=document mode=navigate user=?1' fetchdest 'a href=x' href
 selftest_queue 'dest=document mode=navigate user=?1' fetchdest 'area shape=rect href=x' href
+# A click navigates the frame the link names, which only a few targets tell.
+selftest_queue 'dest=iframe mode=navigate user=?1' fetchdest 'a href=x' href x iframe
+selftest_queue 'dest=frame mode=navigate user=?1' fetchdest 'a target=_self href=x' href x frame
+selftest_queue 'dest=document mode=navigate user=?1' fetchdest 'a target=_top href=x' href x iframe
+selftest_queue 'dest=document mode=navigate user=?1' fetchdest 'a target="_blank" href=x' href x frame
+selftest_queue 'dest=document mode=navigate user=?1' fetchdest 'a target=_parent href=x' href
+selftest_queue none fetchdest 'a target=_parent href=x' href x iframe
+selftest_queue none fetchdest 'a target=main href=x' href
+selftest_queue none fetchdest 'a href=x' href x object
 selftest_queue "dest=iframe $nav" fetchdest 'iframe src=x' src
 selftest_queue "dest=frame $nav" fetchdest 'frame src=x' src
 selftest_queue "dest=object $nav" fetchdest 'object data=x' data
@@ -109,6 +118,8 @@ bash "$top_srcdir/tests/local-crawl.sh" \
     --file-matches "$d/landed-noext" '^Sec-Fetch-Site: cross-site$' \
     --file-matches "$d/refreshed.html" '^Sec-Fetch-Dest: iframe$' \
     --file-not-matches "$d/refreshed.html" '^Sec-Fetch-User' \
+    --file-matches "$d/inframe.html" '^Sec-Fetch-Dest: iframe$' \
+    --file-matches "$d/inframe.html" '^Sec-Fetch-User: [?]1$' \
     --file-not-matches "$d/page.html" '^Upgrade-Insecure-Requests' \
     httrack "BASEURL/$d/index.html" -F "$chrome" '+localhost*'
 

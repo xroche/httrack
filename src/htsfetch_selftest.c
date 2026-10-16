@@ -34,18 +34,24 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsfetch.h"
 
-/* -#test=fetchdest <tag> <attr> [fil]: what a browser fetches for the
+/* -#test=fetchdest <tag> <attr> [fil [page]]: what a browser fetches for the
    attribute attr of the start tag <tag ...>, or, with tag "-", for a
-   stylesheet reference to fil. */
+   stylesheet reference to fil, in a page fetched as dest page (document). */
 static int st_fetchdest(httrackp *opt, int argc, char **argv) {
   hts_fetch_meta fm;
   const char *tag = NULL, *attr;
   char needle[64];
+  int page = HTS_FETCH_DEST_DOCUMENT;
 
   (void) opt;
-  if (argc < 2 || argc > 3 || strlen(argv[1]) + 2 > sizeof(needle)) {
-    fprintf(stderr, "fetchdest: takes <tag> <attr> [fil]\n");
+  if (argc < 2 || argc > 4 || strlen(argv[1]) + 2 > sizeof(needle)) {
+    fprintf(stderr, "fetchdest: takes <tag> <attr> [fil [page]]\n");
     return 1;
+  }
+  if (argc == 4) {
+    for (page = HTS_FETCH_DEST_VIDEO;
+         page > 0 && strcmp(hts_fetch_dest_name(page), argv[3]) != 0; page--)
+      ;
   }
   attr = argv[1];
   if (strcmp(argv[0], "-") != 0) {
@@ -59,7 +65,7 @@ static int st_fetchdest(httrackp *opt, int argc, char **argv) {
     attr++;
   }
   memset(&fm, 0, sizeof(fm));
-  hts_fetch_classify(&fm, tag, attr, argc == 3 ? argv[2] : "");
+  hts_fetch_classify(&fm, tag, attr, argc >= 3 ? argv[2] : "", page);
   if (fm.dest == HTS_FETCH_DEST_UNKNOWN)
     printf("none\n");
   else

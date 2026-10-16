@@ -37,6 +37,11 @@ Please visit our Website: http://www.httrack.com
 #include "htscore.h"
 #include "htswizard.h"
 
+static hts_boolean span_eq(const char *a, size_t alen, const char *b,
+                           size_t blen) {
+  return alen == blen && strncasecmp(a, b, alen) == 0 ? HTS_TRUE : HTS_FALSE;
+}
+
 /* Find attribute name in the start tag at tag_name. On a match, *value and
  *len hold its value, empty when it has none. */
 static hts_boolean tag_attr_find(const char *tag_name, const char *name,
@@ -177,8 +182,38 @@ static hts_fetch_dest link_dest(const char *tag_name, hts_boolean *cors) {
   return HTS_FETCH_DEST_UNKNOWN;
 }
 
+int hts_fetch_same_frame(int page_dest) {
+  switch (page_dest) {
+  case HTS_FETCH_DEST_IFRAME:
+  case HTS_FETCH_DEST_FRAME:
+    return page_dest;
+  case HTS_FETCH_DEST_OBJECT:
+  case HTS_FETCH_DEST_EMBED:
+    return HTS_FETCH_DEST_UNKNOWN;
+  default:
+    return HTS_FETCH_DEST_DOCUMENT;
+  }
+}
+
+/* The destination of a click on a link with this target, in a page fetched
+   as page_dest. A named target is a frame we cannot tell. */
+static int link_target_dest(const char *tag_name, int page_dest) {
+  const char *target;
+  size_t len;
+
+  if (!tag_attr_find(tag_name, "target", &target, &len) ||
+      span_eq(target, len, "_self", 5))
+    return hts_fetch_same_frame(page_dest);
+  if (span_eq(target, len, "_top", 4) || span_eq(target, len, "_blank", 6))
+    return HTS_FETCH_DEST_DOCUMENT;
+  if (span_eq(target, len, "_parent", 7) &&
+      hts_fetch_same_frame(page_dest) == HTS_FETCH_DEST_DOCUMENT)
+    return HTS_FETCH_DEST_DOCUMENT;
+  return HTS_FETCH_DEST_UNKNOWN;
+}
+
 void hts_fetch_classify(hts_fetch_meta *fm, const char *tag_name,
-                        const char *attr, const char *fil) {
+                        const char *attr, const char *fil, int page_dest) {
   static const char *const font_exts[] = {"woff2", "woff", "ttf",
                                           "otf",   "eot",  NULL};
   /* No svg, which @font-face can name too. */
@@ -243,8 +278,10 @@ void hts_fetch_classify(hts_fetch_meta *fm, const char *tag_name,
   /* A download is no navigation, and its destination is not one we send. */
   if (fm->dest == HTS_FETCH_DEST_DOCUMENT && tag_has_attr(tag_name, "download"))
     fm->dest = HTS_FETCH_DEST_UNKNOWN;
-  if (fm->dest == HTS_FETCH_DEST_DOCUMENT)
+  if (fm->dest == HTS_FETCH_DEST_DOCUMENT) {
+    fm->dest = (unsigned char) link_target_dest(tag_name, page_dest);
     fm->user = HTS_TRUE;
+  }
   if (tag_has_attr(tag_name, "crossorigin") ||
       (fm->dest == HTS_FETCH_DEST_SCRIPT &&
        tag_attr_is(tag_name, "type", "module")))
@@ -305,11 +342,6 @@ static const char *site_key(const fetch_origin *o, size_t *len) {
   }
   *len = o->host_len - i;
   return o->host + i;
-}
-
-static hts_boolean span_eq(const char *a, size_t alen, const char *b,
-                           size_t blen) {
-  return alen == blen && strncasecmp(a, b, alen) == 0 ? HTS_TRUE : HTS_FALSE;
 }
 
 hts_fetch_site hts_fetch_site_of(const char *from_adr, const char *to_adr) {

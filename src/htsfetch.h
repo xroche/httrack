@@ -66,9 +66,14 @@ typedef enum hts_fetch_site {
 
 /* Fill dest, cors and user for the attribute at attr, in the start tag just
    past '<' at tag_name, or for path fil in a stylesheet when tag_name is NULL.
+   page_dest is the destination the page holding the reference was fetched as.
  */
 void hts_fetch_classify(hts_fetch_meta *fm, const char *tag_name,
-                        const char *attr, const char *fil);
+                        const char *attr, const char *fil, int page_dest);
+
+/* Return the destination of a navigation that stays in the frame of a page
+   fetched as page_dest, or UNKNOWN when that frame is no iframe or frame. */
+int hts_fetch_same_frame(int page_dest);
 
 /* Return how the URL at to_adr relates to the origin at from_adr: SAME_ORIGIN,
    SAME_SITE or CROSS_SITE. Same-site compares the last two host labels, so it

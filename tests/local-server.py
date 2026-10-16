@@ -3509,7 +3509,10 @@ class Handler(SimpleHTTPRequestHandler):
             css = "/*%s*/ @font-face{src:url(%sxfont.woff2)}"
             self.send_raw((css % (echo, here)).encode(), "text/css")
         elif name == "frame.html":
-            body = '<meta http-equiv="refresh" content="0; url=refreshed.html">'
+            body = (
+                '<meta http-equiv="refresh" content="0; url=refreshed.html">'
+                '<a href="inframe.html">f</a>'
+            )
             self.send_raw((body + echo).encode(), "text/html")
         elif name == "start.html":
             self.send_redirect(here + "index.html")

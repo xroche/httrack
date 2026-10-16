@@ -764,15 +764,12 @@ static void parse_fetch_meta(httrackp *opt, int ptr, hts_fetch_meta *fm,
   }
   /* A refresh navigates whatever frame holds the page. */
   if (meta_refresh)
-    fm->dest = page->dest == HTS_FETCH_DEST_IFRAME ||
-                       page->dest == HTS_FETCH_DEST_FRAME
-                   ? page->dest
-                   : HTS_FETCH_DEST_DOCUMENT;
+    fm->dest = (unsigned char) hts_fetch_same_frame(page->dest);
   else if (!opaque && inscript && incss)
-    hts_fetch_classify(fm, NULL, attr, fil);
+    hts_fetch_classify(fm, NULL, attr, fil, page->dest);
   /* A script body names URLs for code a crawler never runs. */
   else if (!opaque && !inscript && tag_name != NULL)
-    hts_fetch_classify(fm, tag_name, attr, fil);
+    hts_fetch_classify(fm, tag_name, attr, fil, page->dest);
   /* A file no known page loaded leaves initiator 0, which sends none. */
   fm->initiator = tagless_body ? page->initiator : ptr;
 }
