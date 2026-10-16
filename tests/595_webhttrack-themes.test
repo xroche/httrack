@@ -92,6 +92,17 @@ for bad in nocss Bad.Name zeta/ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; do
     grep -qF 'themes/zeta/' <<<"${reply}" || fail "uitheme=${bad} was applied"
 done
 
+# Settings files share the server's table with posted fields, and an ini line
+# is not a choice.
+htsserver_stop
+printf 'uitheme=alpha\n' >"${work}/home/.httrack.ini"
+! target_is_windows || cp "${work}/home/.httrack.ini" "${work}/home/httrack.ini"
+htsserver_start --root "${root}" --home "${work}/home"
+sid=$(htsserver_sid)
+htsserver_get /server/about.html >/dev/null
+grep -qx 'uitheme=zeta' "${work}/home/${settings}" || fail "an ini line changed the saved theme"
+rm -f "${work}/home/.httrack.ini" "${work}/home/httrack.ini"
+
 # A post without the session id is refused.
 reply=$(htsserver_post "uitheme=alpha&redirect=index.html" /server/step2.html)
 ! grep -q '^HTTP/1.[01] 302' <<<"${reply}" || fail "a post without sid was accepted"

@@ -1061,4 +1061,4 @@ Această regulă de scanare nu poate fi folosită. O regulă începe cu + sau -,
 Theme:
 Temă:
 Classic
-Clasic
+Clasică

@@ -1367,6 +1367,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
     const char *error_redirect = NULL;
     /* Why the request was refused, for the error page; NULL until it is. */
     const char *denied = NULL;
+    /* The theme an authenticated body posted, or empty. */
+    char posted_theme[THEME_NAME_MAX + 1] = "";
     const char *denied_status = "403 Forbidden";
     /* A Content-length we cannot read as a size refuses the body. */
     hts_boolean bad_length = HTS_FALSE;
@@ -1571,7 +1573,16 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             if (strfield2(ua, "on")) /* hack : "on" == 1 */
               ua = "1";
             hts_unescapehttp(ua, &sua);
-            coucal_write(NewLangList, key, (intptr_t) StringAcquire(&sua));
+            /* Not stored: ini files fill the same table. */
+            if (strcmp(key, "uitheme") == 0) {
+              posted_theme[0] = '\0';
+              if (StringNotEmpty(sua) && StringLength(sua) <= THEME_NAME_MAX) {
+                strcpybuff(posted_theme, StringBuff(sua));
+              }
+              StringFree(sua);
+            } else {
+              coucal_write(NewLangList, key, (intptr_t) StringAcquire(&sua));
+            }
           }
         }
       }
@@ -1595,15 +1606,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
         /* Only a change counts: the menu shows Classic while the chosen theme
            is missing, and posting that back must not forget the choice. */
-        if (coucal_readptr(NewLangList, "uitheme", &adr)) {
-          const char *const posted = (const char *) adr;
-
-          if (strcmp(posted, effective_theme(path)) != 0 &&
-              (strcmp(posted, THEME_CLASSIC) == 0 ||
-               theme_is_installed(path, posted))) {
-            set_ui_theme(posted);
-          }
-          coucal_write(NewLangList, "uitheme", (intptr_t) NULL);
+        if (posted_theme[0] != '\0' &&
+            strcmp(posted_theme, effective_theme(path)) != 0 &&
+            (strcmp(posted_theme, THEME_CLASSIC) == 0 ||
+             theme_is_installed(path, posted_theme))) {
+          set_ui_theme(posted_theme);
         }
 
         /* Load existing project settings */
