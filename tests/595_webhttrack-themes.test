@@ -81,12 +81,21 @@ options=$(grep -oE '<option value="[^"]*"( selected)?>' <<<"${reply}" |
 test "${options}" = '<option value="classic"> <option value="alpha"> <option value="beta"> <option value="echo"> <option value="golf"> <option value="kilo"> <option value="mid"> <option value="yank"> <option value="zeta"> ' ||
     fail "theme menu: ${options}"
 
+# A label is the folder name, capitalised and with - and _ read as spaces.
+mkdir "${themes}/night-Owl_2"
+printf '/* owl */\n' >"${themes}/night-Owl_2/theme.css"
+reply=$(htsserver_get /server/index.html)
+for option in '"alpha">Alpha<' '"night-Owl_2">Night Owl 2<' '"zeta">Zeta<'; do
+    grep -qF "<option value=${option}/option>" <<<"${reply}" || fail "no ${option} in the theme menu"
+done
+rm -r "${themes}/night-Owl_2"
+
 choose "sid=${sid}&uitheme=zeta"
 reply=$(theme_css)
 grep -qF '@import url(themes/zeta/theme.css);' <<<"${reply}" || fail "zeta not applied: ${reply}"
 grep -qx 'uitheme=zeta' "${work}/home/${settings}" || fail "zeta not saved"
 reply=$(htsserver_get /server/index.html)
-grep -q '<option value="zeta" selected>' <<<"${reply}" || fail "zeta not selected"
+grep -qF '<option value="zeta" selected>Zeta</option>' <<<"${reply}" || fail "zeta not selected"
 reply=$(htsserver_get /server/themes/zeta/theme.css)
 grep -qF '/* zeta */' <<<"${reply}" || fail "the imported file is not served: ${reply}"
 

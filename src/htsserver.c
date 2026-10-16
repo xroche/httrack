@@ -845,12 +845,27 @@ static const char *effective_theme(const char *path) {
   return theme_exists(path, ui_theme) ? ui_theme : THEME_CLASSIC;
 }
 
+/* Appends "name<TAB>label", labelling "solarized-dark" as "Solarized dark". */
+static void cat_theme_entry(String *list, const char *name) {
+  const char *p;
+
+  StringCat(*list, name);
+  StringCat(*list, "\t");
+  for (p = name; *p != '\0'; p++) {
+    const char c = *p == '-' || *p == '_' ? ' '
+                   : p == name            ? (char) toupper((unsigned char) *p)
+                                          : *p;
+
+    StringMemcat(*list, &c, 1);
+  }
+}
+
 static int theme_name_cmp(const void *a, const void *b) {
   return strcmp(*(char *const *) a, *(char *const *) b);
 }
 
-/* Returns the theme names of both folders, sorted and one per line, as a heap
-   string that is empty when there are none. */
+/* Returns the themes of both folders, sorted and one "name<TAB>label" per
+   line, as a heap string that is empty when there are none. */
 static char *list_themes(const char *path) {
   char dir[1024];
   char **names = NULL;
@@ -899,7 +914,7 @@ static char *list_themes(const char *path) {
       if (StringNotEmpty(list)) {
         StringCat(list, "\n");
       }
-      StringCat(list, names[i]);
+      cat_theme_entry(&list, names[i]);
     }
   }
   for (i = 0; i < count; i++) {
@@ -2121,6 +2136,9 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                     hts_boolean literal = HTS_FALSE;
                     /* value is UTF-8, so emit it as character references */
                     hts_boolean needs_ncr = HTS_FALSE;
+                    /* ${listlabel:} entries are "value<TAB>label" */
+                    hts_boolean pairs = HTS_FALSE;
+                    hts_boolean in_label = HTS_FALSE;
                     char datebuff[16];
 
                     name[0] = '\0';
@@ -2146,11 +2164,13 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                     } else if ((p = strfield(name, "list:"))) {
                       name += p;
                       format = 2;
-                    } else if ((p = strfield(name, "liststr:"))) {
-                      /* ${liststr:<var>:<key>} selects the entry equal to
-                         <var>, as ${listid:} does */
+                    } else if ((p = strfield(name, "liststr:")) ||
+                               (p = strfield(name, "listlabel:"))) {
+                      /* ${liststr:<var>:<key>} and ${listlabel:<var>:<key>}
+                         select the entry equal to <var>, as ${listid:} does */
                       char *const colon = strchr(name + p, ':');
 
+                      pairs = strfield(name, "listlabel:") != 0;
                       name += p;
                       format = -2;
                       if (colon != NULL) {
@@ -2551,9 +2571,12 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                                 StringCat(output, "<br>\r\n");
                               } else if (format == -2) {
                                 StringCat(output, StringBuff(tmpbuff));
-                                cat_liststr_close(&output, &tmpbuff,
-                                                  &listSelected);
-                                StringCat(output, StringBuff(tmpbuff));
+                                if (!in_label) {
+                                  cat_liststr_close(&output, &tmpbuff,
+                                                    &listSelected);
+                                  StringCat(output, StringBuff(tmpbuff));
+                                }
+                                in_label = HTS_FALSE;
                                 StringCat(output, "</option>\r\n");
                                 StringCat(output, "<option value=\"");
                               } else {
@@ -2562,6 +2585,16 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                               }
                               StringClear(tmpbuff);
                               break;
+                            case 9:
+                              if (pairs && !in_label) {
+                                StringCat(output, StringBuff(tmpbuff));
+                                cat_liststr_close(&output, &tmpbuff,
+                                                  &listSelected);
+                                StringClear(tmpbuff);
+                                in_label = HTS_TRUE;
+                                break;
+                              }
+                              HTS_FALLTHROUGH;
                             default:
                               if (needs_ncr &&
                                   (used = cat_html_ncr(&tmpbuff, fstr)) != 0) {
@@ -2585,8 +2618,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                                             listDefault, listHidden);
                           } else if (format == -2) {
                             StringCat(output, StringBuff(tmpbuff));
-                            cat_liststr_close(&output, &tmpbuff, &listSelected);
-                            StringCat(output, StringBuff(tmpbuff));
+                            if (!in_label) {
+                              cat_liststr_close(&output, &tmpbuff,
+                                                &listSelected);
+                              StringCat(output, StringBuff(tmpbuff));
+                            }
                             StringCat(output, "</option>");
                           } else {
                             StringCat(output, StringBuff(tmpbuff));

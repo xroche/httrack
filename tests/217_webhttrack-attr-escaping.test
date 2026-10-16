@@ -38,6 +38,8 @@ printf '%s\r\n' \
 projects="${work}/projects"
 mkdir -p "${projects}/p\"q/hts-cache"
 printf 'Category=c%%22d\r\n' >"${projects}/p\"q/hts-cache/winprofile.ini"
+mkdir -p "${projects}/t/hts-cache"
+printf 'Category=x%%09y\r\n' >"${projects}/t/hts-cache/winprofile.ini"
 
 # Loaded on the first request; a Windows path, so the render has to leave the
 # backslash alone for what the browser posts back to rewrite the same file.
@@ -168,6 +170,9 @@ for want in ("p&#34;q", "c&#34;d"):
         sys.exit("step2.html lists %r, not %r" % (options, want))
 if '<option value="p"q">' in body or '<option value="c"d">' in body:
     sys.exit("step2.html closes an option value early:\n%s" % body[:4000])
+# a tab stays in the value, as only ${listlabel:} splits on it
+if '<option value="x\ty">x\ty</option>' not in body:
+    sys.exit("step2.html splits a category on its tab:\n%s" % body[:4000])
 
 PY
 echo OK
