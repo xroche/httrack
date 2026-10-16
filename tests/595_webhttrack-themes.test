@@ -151,6 +151,9 @@ printf 'installed\n' >"${themes}/zeta/img/b.txt"
 printf '/* user classic */\n' >"${userthemes}/classic/theme.css"
 printf '/* user bad */\n' >"${userthemes}/Bad.Name/theme.css"
 printf '<p>page</p>\n' >"${themes}/alpha/page.html"
+# A case-insensitive filesystem opens this spelling too, so build it here.
+mkdir -p "${root}/html/server/Themes/alpha"
+printf '<p>page</p>\n' >"${root}/html/server/Themes/alpha/page.html"
 printf '/* user solo */\n' >"${userthemes}/solo/theme.css"
 printf 'asset\n' >"${userthemes}/solo/img/a.txt"
 printf '<p>page</p>\n' >"${userthemes}/solo/page.html"
@@ -169,7 +172,7 @@ reply=$(htsserver_get /server/themes/classic/theme.css)
 reply=$(htsserver_get /server/themes/solo/img/a.txt)
 grep -q '^asset' <<<"${reply}" || fail "a user theme's asset is not served: ${reply}"
 for url in /server/themes/solo/page.html /server/themes/alpha/page.html \
-    //server//themes/alpha/page.html; do
+    //server//themes/alpha/page.html /server/Themes/alpha/page.html; do
     reply=$(htsserver_get "${url}")
     grep -q '^HTTP/1.[01] 404' <<<"${reply}" || fail "${url} was served: ${reply}"
 done
@@ -180,7 +183,8 @@ grep -qF '@import url(themes/solo/theme.css);' <<<"${reply}" || fail "solo not a
 grep -qx 'uitheme=solo' "${work}/home/${settings}" || fail "solo not saved"
 # The restart below expects zeta.
 choose "sid=${sid}&uitheme=zeta"
-rm -r "${userthemes:?}"/* "${themes}/zeta/img" "${themes}/alpha/page.html"
+rm -r "${userthemes:?}"/* "${themes}/zeta/img" "${themes}/alpha/page.html" \
+    "${root}/html/server/Themes"
 
 # The choice outlives the server.
 htsserver_stop

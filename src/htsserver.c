@@ -883,7 +883,9 @@ static char *list_themes(const char *path) {
           names = grown;
           capacity += 16;
         }
-        names[count++] = strdupt(name);
+        if ((names[count] = strdupt(name)) != NULL) {
+          count++;
+        }
       }
     } while (hts_findnext(h));
     hts_findclose(h);
