@@ -63,7 +63,7 @@ reply=$(htsserver_get /server/index.html)
 
 # Copying a folder in is enough. Names sort, and these are not themes: a folder
 # without theme.css, a name unsafe in a URL, and the reserved name classic.
-for name in zeta alpha Bad.Name classic; do
+for name in alpha zeta Bad.Name classic; do
     mkdir -p "${themes}/${name}"
     printf '/* %s */\n' "${name}" >"${themes}/${name}/theme.css"
 done
