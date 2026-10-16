@@ -35,6 +35,18 @@ for css in "${html}/doc.css" "${html}/server/style.css"; do
 done
 test "${checked}" -ge 22 || fail "only ${checked} var() references found"
 
+# Themes may read the shared palette and the UI hooks defined by style.css.
+# Check every shipped theme so a typo in var(--...) cannot land unnoticed.
+ui=$(defined "${html}/server/style.css")
+for css in "${html}"/server/themes/*/theme.css; do
+    test -f "${css}" || continue
+    known=$(printf '%s\n' "${palette}" "${ui}" "$(defined "${css}" || true)")
+    while IFS= read -r used; do
+        test -n "${used}" || continue
+        grep -qxF -- "${used}" <<<"${known}" || fail "${css#"${html}"/} reads ${used}, which nothing defines"
+    done <<<"$(grep -oE 'var\(--[A-Za-z0-9_-]+' "${css}" | sed 's/^var(//' | sort -u)"
+done
+
 # A theme overrides style.css, and the user stylesheet overrides both.
 pages=0
 for page in "${html}"/server/*.html; do
