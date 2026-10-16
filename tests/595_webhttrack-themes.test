@@ -29,6 +29,8 @@ for entry in "${HTS_DISTDIR}"/html/*; do
 done
 cp -R "${HTS_DISTDIR}/html/server" "${root}/html/server"
 themes=${root}/html/server/themes
+# theme.css is generated, so a file by that name is never served.
+printf '/* SHADOW */\n' >"${root}/html/server/theme.css"
 
 # Prints /server/theme.css after checking it is served as uncached CSS.
 theme_css() {
@@ -55,6 +57,7 @@ test "${#sid}" -eq 32 || fail "no session id: [${sid}]"
 # Without themes, Classic is served and there is nothing to choose.
 reply=$(theme_css)
 ! grep -q '@import' <<<"${reply}" || fail "a theme is served with none installed: ${reply}"
+! grep -q 'SHADOW' <<<"${reply}" || fail "a theme.css file on disk was served"
 reply=$(htsserver_get /server/index.html)
 ! grep -q 'name="uitheme"' <<<"${reply}" || fail "a theme menu with no theme installed"
 
@@ -100,6 +103,16 @@ choose "sid=${sid}&uitheme=classic&lang=1"
 grep -qx 'uitheme=zeta' "${work}/home/${settings}" || fail "the fallback overwrote zeta"
 mv "${work}/zeta" "${themes}/zeta"
 grep -qF 'themes/zeta/' <<<"$(theme_css)" || fail "zeta did not come back with its folder"
+
+# The menu holds at most 64 themes.
+for i in $(seq 1 70); do
+    mkdir "${themes}/t${i}"
+    : >"${themes}/t${i}/theme.css"
+done
+# Classic, then 64 of the 72 installed.
+listed=$(grep -c '<option value="' <<<"$(htsserver_get /server/index.html)" || true)
+test "${listed}" -eq 65 || fail "${listed} menu entries, not 65"
+rm -r "${themes}"/t[0-9]*
 
 # The choice outlives the server.
 htsserver_stop

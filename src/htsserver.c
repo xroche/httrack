@@ -811,7 +811,7 @@ static char *list_themes(const char *path) {
     do {
       const char *const name = hts_findgetname(h);
 
-      if (count < THEMES_MAX && name != NULL && hts_findisdir(h) &&
+      if (count < THEMES_MAX && name != NULL &&
           theme_is_installed(path, name)) {
         names[count++] = strdupt(name);
       }
