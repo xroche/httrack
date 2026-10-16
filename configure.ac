@@ -689,9 +689,6 @@ CHECK_ZLIB()
 CHECK_BROTLI()
 CHECK_ZSTD()
 
-### Public Suffix List, for Sec-Fetch-Site (optional)
-CHECK_PSL()
-
 ### OpenSSL is explicitly enabled/disabled ?
 AC_MSG_CHECKING(whether to enable https support)
 AC_ARG_ENABLE([https],
@@ -938,7 +935,6 @@ AS_CASE([" $OPENSSL_LIBS "],
 hts_pc_dep "$hts_pc_openssl" "$OPENSSL_LIBS"
 hts_pc_dep libbrotlidec "$BROTLI_LIBS"
 hts_pc_dep libzstd "$ZSTD_LIBS"
-hts_pc_dep libpsl "$PSL_LIBS"
 
 # An installed header includes <openssl/ssl.h>, so a consumer needs that include
 # path. Requires.private does not reliably carry it: a keg-only Homebrew prefix

@@ -41,6 +41,7 @@ Please visit our Website: http://www.httrack.com
 #include "htschanges.h"
 #include "htssinglefile.h"
 #include "htsfetch.h"
+#include "htspsl.h"
 
 /* specific definitions */
 #include "htsdate.h"
@@ -6697,7 +6698,7 @@ HTSEXT_API int hts_init(void) {
 
   /* Before any thread reads the verdict */
   hts_mptcp_probe();
-  hts_fetch_init();
+  hts_psl_init();
 
   /* Ensure external modules are loaded */
   hts_debug_log_print("calling htspe_init()");  /* debug */
@@ -6779,7 +6780,7 @@ int hts_uninit_module(void) {
     return 1;
   htsthread_uninit();
   htspe_uninit();
-  hts_fetch_uninit();
+  hts_psl_uninit();
   hts_init_ok = 0;
   return 1;
 }

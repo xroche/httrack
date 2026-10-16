@@ -9,6 +9,7 @@ on:
       - distro packaging recipe canary
       - appstream metainfo (networked)
       - mptcp negotiation (networked)
+      - Public Suffix List drift
       - CodeQL
       - HTTraQt
     types: [completed]

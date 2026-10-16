@@ -35,35 +35,8 @@ Please visit our Website: http://www.httrack.com
 #include "htsfetch.h"
 
 #include "htscore.h"
+#include "htspsl.h"
 #include "htswizard.h"
-
-#if HTS_USEPSL
-#include <libpsl.h>
-
-/* Read-only once hts_init() has set it, so crawl threads share it unlocked. */
-static psl_ctx_t *fetch_psl = NULL;
-#endif
-
-void hts_fetch_init(void) {
-#if HTS_USEPSL
-  fetch_psl = psl_latest(NULL);
-#endif
-}
-
-void hts_fetch_uninit(void) {
-#if HTS_USEPSL
-  psl_free(fetch_psl);
-  fetch_psl = NULL;
-#endif
-}
-
-hts_boolean hts_fetch_has_psl(void) {
-#if HTS_USEPSL
-  return fetch_psl != NULL;
-#else
-  return HTS_FALSE;
-#endif
-}
 
 static hts_boolean span_eq(const char *a, size_t alen, const char *b,
                            size_t blen) {
@@ -361,7 +334,6 @@ static hts_boolean host_is_ip(const char *host, size_t len) {
   return (len > 0 && host[0] == '[') || hts_host_is_ipv4(host, len);
 }
 
-#if HTS_USEPSL
 /* The registrable domain of the first n bytes of the host, extended to its end,
    or the whole host when it is a public suffix or too long. NULL when the list
    did not load. */
@@ -369,20 +341,19 @@ static const char *psl_site_key(const fetch_origin *o, size_t n, size_t *len) {
   char host[256];
   const char *reg;
 
-  if (fetch_psl == NULL)
+  if (!hts_psl_loaded())
     return NULL;
   if (n >= sizeof(host))
     return o->host;
   memcpy(host, o->host, n);
   host[n] = '\0';
   hts_lowcase(host);
-  reg = psl_registrable_domain(fetch_psl, host);
+  reg = hts_psl_registrable_domain(host);
   if (reg == NULL)
     reg = host;
   *len = o->host_len - (size_t) (reg - host);
   return o->host + (reg - host);
 }
-#endif
 
 /* The tail of the host same-site compares: the registrable domain, else the
    last two labels, or the whole host for an IP literal. */
@@ -405,14 +376,12 @@ static const char *site_key(const fetch_origin *o, size_t *len) {
     ;
   if (i < n && isdigit((unsigned char) o->host[i]))
     return o->host;
-#if HTS_USEPSL
   {
     const char *const key = psl_site_key(o, n, len);
 
     if (key != NULL)
       return key;
   }
-#endif
   i = n;
   while (i > 0) {
     if (o->host[i - 1] == '.' && ++dots == 2)

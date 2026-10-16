@@ -32,7 +32,6 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 #include "htsselftest_int.h"
-#include "htsfetch.h"
 #include <limits.h>
 #include <stdint.h>
 
@@ -44,7 +43,6 @@ static int st_features(httrackp *opt, int argc, char **argv) {
   (void) argv;
   printf("brotli %d\n", HTS_USEBROTLI ? 1 : 0);
   printf("zstd %d\n", HTS_USEZSTD ? 1 : 0);
-  printf("psl %d\n", HTS_USEPSL ? 1 : 0);
 #if (defined(__linux) && defined(HAVE_BACKTRACE))
   printf("backtrace 1\n");
 #else

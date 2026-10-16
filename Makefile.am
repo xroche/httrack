@@ -12,6 +12,7 @@ EXTRA_DIST = INSTALL.Linux \
 		bootstrap build.sh doc/winprofile-ini.md \
 		winprofile-keys.tsv winprofile-escapes.tsv \
 		tools/gen-winprofile-keys.py \
+		tools/psl-gen.py \
 		tools/doc-chrome.py \
 		tools/check-includes.py \
 		tools/ci-sanitizer-report.sh \
