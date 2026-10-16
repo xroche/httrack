@@ -1693,7 +1693,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   com++;
                 }
                 break;          // No passwords in html files
-              case 'Q':         // browser-headers: client hints matching -F
+              case 'Q':
                 opt->browser_headers = HTS_TRUE;
                 if (*(com + 1) == '0') {
                   opt->browser_headers = HTS_FALSE;

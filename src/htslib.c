@@ -1128,7 +1128,6 @@ hts_boolean hts_location_is_safe(const char *location) {
                                                                  : HTS_FALSE;
 }
 
-/* Does this request travel over TLS? */
 static hts_boolean hts_request_is_secure(const htsblk *retour) {
 #if HTS_USEOPENSSL
   return retour->ssl ? HTS_TRUE : HTS_FALSE;
@@ -1139,38 +1138,59 @@ static hts_boolean hts_request_is_secure(const htsblk *retour) {
 }
 
 /* Is the product token at s, length n, named name ("Chrome" for "Chrome/141")?
-   On a match, *major is its leading number, or -1 when it has none. */
+   On a match, *major is its leading number, or -1 unless the version is digits
+   and dots with no leading zero. */
 static hts_boolean ua_product_is(const char *s, size_t n, const char *name,
                                  int *major) {
   const size_t len = strlen(name);
+  long v = 0;
+  size_t i;
 
   if (n <= len || strncmp(s, name, len) != 0 || s[len] != '/')
     return HTS_FALSE;
   *major = -1;
-  if (isdigit((unsigned char) s[len + 1])) {
-    long v = 0;
-    size_t i;
-
-    for (i = len + 1; i < n && isdigit((unsigned char) s[i]) && v < 100000; i++)
-      v = v * 10 + (s[i] - '0');
-    *major = v < 100000 ? (int) v : -1;
+  if (s[len + 1] == '0')
+    return HTS_TRUE;
+  for (i = len + 1; i < n && isdigit((unsigned char) s[i]) && v < 100000; i++)
+    v = v * 10 + (s[i] - '0');
+  if (i == len + 1 || v >= 100000)
+    return HTS_TRUE;
+  for (; i < n; i++) {
+    if (s[i] != '.' && !isdigit((unsigned char) s[i]))
+      return HTS_TRUE;
   }
+  *major = (int) v;
   return HTS_TRUE;
 }
 
+/* Does the UA comment s, length n, contain word? */
+static hts_boolean ua_comment_has(const char *s, size_t n, const char *word) {
+  const size_t len = strlen(word);
+  size_t i;
+
+  for (i = 0; i + len <= n; i++) {
+    if (strncmp(s + i, word, len) == 0)
+      return HTS_TRUE;
+  }
+  return HTS_FALSE;
+}
+
 hts_boolean hts_client_hints_of(const char *user_agent, hts_client_hints *ch) {
-  /* Chromium's GREASE brand: user_agent_utils.cc, seeded by the major. */
+  /* Chromium's GREASE brand and brand order (user_agent_utils.cc), seeded by
+     the major; older majors used another formula. */
+  enum { GREASE_FIRST_MAJOR = 108 };
+
   static const char grease_chars[] = " (:-./);=?_";
   static const char *const grease_versions[] = {"8", "99", "24"};
   static const int orders[6][3] = {{0, 1, 2}, {0, 2, 1}, {1, 0, 2},
                                    {1, 2, 0}, {2, 0, 1}, {2, 1, 0}};
   const char *comment = NULL;
-  char comment_buf[256];
-  int chrome = -1, edge = -1;
-  hts_boolean mobile = HTS_FALSE, mozilla = HTS_FALSE, edge_seen = HTS_FALSE;
+  size_t comment_len = 0;
+  int chrome = -1, edge = 0;
+  hts_boolean mobile = HTS_FALSE, mozilla = HTS_FALSE;
   const char *p;
   char brands[3][48];
-  const char *slot[3];
+  const char *shuffled[3];
   int i;
 
   memset(ch, 0, sizeof(*ch));
@@ -1182,7 +1202,9 @@ hts_boolean hts_client_hints_of(const char *user_agent, hts_client_hints *ch) {
     size_t n;
     int major;
 
-    if (*p == ' ') {
+    if ((unsigned char) *p < ' ') {
+      return HTS_FALSE;
+    } else if (*p == ' ') {
       p++;
     } else if (*p == '(') {
       const char *const end = strchr(p, ')');
@@ -1190,23 +1212,18 @@ hts_boolean hts_client_hints_of(const char *user_agent, hts_client_hints *ch) {
       if (end == NULL)
         return HTS_FALSE;
       if (comment == NULL) {
-        const size_t len = (size_t) (end - p - 1);
-        const size_t room = sizeof(comment_buf) - 1;
-
         comment = p + 1;
-        memcpy(comment_buf, comment, len < room ? len : room);
-        comment_buf[len < room ? len : room] = '\0';
+        comment_len = (size_t) (end - comment);
       }
       p = end + 1;
     } else {
-      for (n = 0; p[n] != '\0' && p[n] != ' ' && p[n] != '('; n++)
+      for (n = 0; (unsigned char) p[n] > ' ' && p[n] != '('; n++)
         ;
       if (ua_product_is(p, n, "Chrome", &major))
         chrome = major;
-      else if (ua_product_is(p, n, "Edg", &major)) {
+      else if (ua_product_is(p, n, "Edg", &major))
         edge = major;
-        edge_seen = HTS_TRUE;
-      } else if (ua_product_is(p, n, "Mozilla", &major))
+      else if (ua_product_is(p, n, "Mozilla", &major))
         mozilla = HTS_TRUE;
       else if (n == 6 && strncmp(p, "Mobile", 6) == 0)
         mobile = HTS_TRUE;
@@ -1216,24 +1233,22 @@ hts_boolean hts_client_hints_of(const char *user_agent, hts_client_hints *ch) {
       p += n;
     }
   }
-  if (!mozilla || chrome <= 0 || comment == NULL || (edge_seen && edge <= 0))
+  if (!mozilla || chrome < GREASE_FIRST_MAJOR || comment == NULL || edge < 0)
     return HTS_FALSE;
 
   /* Android before Linux: an Android comment names both. */
-#define UA_COMMENT_HAS(word) (strstr(comment_buf, word) != NULL)
-  if (UA_COMMENT_HAS("Android"))
+  if (ua_comment_has(comment, comment_len, "Android"))
     strcpybuff(ch->platform, "\"Android\"");
-  else if (UA_COMMENT_HAS("CrOS"))
+  else if (ua_comment_has(comment, comment_len, "CrOS"))
     strcpybuff(ch->platform, "\"Chrome OS\"");
-  else if (UA_COMMENT_HAS("Windows"))
+  else if (ua_comment_has(comment, comment_len, "Windows"))
     strcpybuff(ch->platform, "\"Windows\"");
-  else if (UA_COMMENT_HAS("Macintosh"))
+  else if (ua_comment_has(comment, comment_len, "Macintosh"))
     strcpybuff(ch->platform, "\"macOS\"");
-  else if (UA_COMMENT_HAS("Linux") || UA_COMMENT_HAS("X11"))
+  else if (ua_comment_has(comment, comment_len, "Linux"))
     strcpybuff(ch->platform, "\"Linux\"");
   else
     return HTS_FALSE;
-#undef UA_COMMENT_HAS
 
   snprintf(brands[0], sizeof(brands[0]), "\"Not%cA%cBrand\";v=\"%s\"",
            grease_chars[chrome % 11], grease_chars[(chrome + 1) % 11],
@@ -1245,8 +1260,9 @@ hts_boolean hts_client_hints_of(const char *user_agent, hts_client_hints *ch) {
     snprintf(brands[2], sizeof(brands[2]), "\"Google Chrome\";v=\"%d\"",
              chrome);
   for (i = 0; i < 3; i++)
-    slot[orders[chrome % 6][i]] = brands[i];
-  snprintf(ch->ua, sizeof(ch->ua), "%s, %s, %s", slot[0], slot[1], slot[2]);
+    shuffled[orders[chrome % 6][i]] = brands[i];
+  snprintf(ch->ua, sizeof(ch->ua), "%s, %s, %s", shuffled[0], shuffled[1],
+           shuffled[2]);
   ch->mobile = mobile;
   return HTS_TRUE;
 }
@@ -1466,10 +1482,9 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
         print_buffer(&bstr, "From: %s" H_CRLF, retour->req.from);
       }
 
-      /* Browsers send client hints over HTTPS only, and a User-Agent from the
-         extra headers is not the one they would have to match. */
-      if (opt != NULL && opt->browser_headers != HTS_FALSE &&
-          hts_request_is_secure(retour) && retour->req.user_agent_send &&
+      /* HTTPS only, and only beside the User-Agent the hints come from. */
+      if (opt->browser_headers != HTS_FALSE && hts_request_is_secure(retour) &&
+          retour->req.user_agent_send &&
           !http_headers_have_field(custom, "User-Agent")) {
         hts_client_hints ch;
 

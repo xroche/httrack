@@ -621,7 +621,6 @@ class Handler(SimpleHTTPRequestHandler):
         ).encode()
 
     def route_reqheaders(self):
-        # The request's own header lines, so a test can read what was sent.
         self.send_raw(str(self.headers).encode(), "text/plain")
 
     def route_robots(self):

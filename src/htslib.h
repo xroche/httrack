@@ -270,13 +270,6 @@ LLint check_downloadable_bytes(int rate);
 
 int hts_uninit_module(void);
 
-// fonctions principales
-T_SOC http_xfopen(httrackp * opt, int mode, int treat, int waitconnect,
-                  const char *xsend, const char *adr, const char *fil, htsblk * retour);
-int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
-                  const char *adr, const char *fil, const char *referer_adr,
-                  const char *referer_fil, htsblk *retour);
-
 /* Client hints a Chromium browser sends by default (Sec-CH-UA*). */
 typedef struct hts_client_hints {
   char ua[128];       /**< Sec-CH-UA brand list */
@@ -285,8 +278,17 @@ typedef struct hts_client_hints {
 } hts_client_hints;
 
 /* Fill ch with the hints the browser named by user_agent sends. Returns
-   HTS_FALSE when that browser sends none: anything but Chrome or Edge. */
+   HTS_FALSE when that browser sends none: anything but Chrome or Edge from
+   M108. */
 hts_boolean hts_client_hints_of(const char *user_agent, hts_client_hints *ch);
+
+// fonctions principales
+T_SOC http_xfopen(httrackp * opt, int mode, int treat, int waitconnect,
+                  const char *xsend, const char *adr, const char *fil, htsblk * retour);
+int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, const char *xsend,
+                  const char *adr, const char *fil,
+                  const char *referer_adr, const char *referer_fil,
+                  htsblk * retour);
 /* Build the request "Cookie:" header line for stored cookies matching
    domain/path into dst (NUL-terminated), wrapping the logic http_sendhead()
    uses. A port in domain is ignored (see cookie_host). Returns cookies
