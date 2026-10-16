@@ -34,6 +34,10 @@ selftest_queue 'ua="Chromium";v="142", "Google Chrome";v="142", "Not_A Brand";v=
 selftest_queue 'ua="Google Chrome";v="143", "Chromium";v="143", "Not A(Brand";v="24" mobile=?0 platform="Chrome OS"' \
     clienthints 'Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36'
 
+# The platform word may close the comment.
+selftest_queue 'ua="Google Chrome";v="141", "Not?A_Brand";v="8", "Chromium";v="141" mobile=?0 platform="Windows"' \
+    clienthints "${chrome/Windows NT 10.0; Win64; x64/Windows}"
+
 # Browsers that send none, Chromium-based or not.
 selftest_queue none clienthints 'Mozilla/5.0 (X11; Linux x86_64; rv:143.0) Gecko/20100101 Firefox/143.0'
 selftest_queue none clienthints 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15'
@@ -46,6 +50,8 @@ selftest_queue none clienthints "$(chrome_v '')"                              # 
 selftest_queue none clienthints "$(chrome_v 141abc)"                          # not a version
 selftest_queue none clienthints "$(chrome_v 0141.0.0.0)"                      # leading zero
 selftest_queue none clienthints "$chrome Edg/"                                # Edge with no version
+selftest_queue none clienthints "$chrome Edg/140.0.0.0"                       # Edge major is Chromium's
+selftest_queue none clienthints "$(chrome_v 1410000000)"                      # too long to be a version
 selftest_queue none clienthints "${chrome/Windows NT 10.0; Win64; x64/Plan9}" # unknown platform
 selftest_queue none clienthints "${chrome#Mozilla/5.0 }"                      # no Mozilla token
 selftest_queue none clienthints "${chrome/Windows NT 10.0; Win64; x64/X11; FreeBSD amd64}"

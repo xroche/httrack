@@ -1138,8 +1138,8 @@ static hts_boolean hts_request_is_secure(const htsblk *retour) {
 }
 
 /* Is the product token at s, length n, named name ("Chrome" for "Chrome/141")?
-   On a match, *major is its leading number, or -1 unless the version is digits
-   and dots with no leading zero. */
+   On a match, *major is the version's first number, or -1 when the version is
+   malformed. */
 static hts_boolean ua_product_is(const char *s, size_t n, const char *name,
                                  int *major) {
   const size_t len = strlen(name);
@@ -1177,7 +1177,7 @@ static hts_boolean ua_comment_has(const char *s, size_t n, const char *word) {
 
 hts_boolean hts_client_hints_of(const char *user_agent, hts_client_hints *ch) {
   /* Chromium's GREASE brand and brand order (user_agent_utils.cc), seeded by
-     the major; older majors used another formula. */
+     the major. Before M108 the formula differed. */
   enum { GREASE_FIRST_MAJOR = 108 };
 
   static const char grease_chars[] = " (:-./);=?_";
@@ -1186,7 +1186,8 @@ hts_boolean hts_client_hints_of(const char *user_agent, hts_client_hints *ch) {
                                    {1, 2, 0}, {2, 0, 1}, {2, 1, 0}};
   const char *comment = NULL;
   size_t comment_len = 0;
-  int chrome = -1, edge = 0;
+  int chrome = -1;
+  int edge = 0; /* 0: no Edg token */
   hts_boolean mobile = HTS_FALSE, mozilla = HTS_FALSE;
   const char *p;
   char brands[3][48];
@@ -1202,9 +1203,7 @@ hts_boolean hts_client_hints_of(const char *user_agent, hts_client_hints *ch) {
     size_t n;
     int major;
 
-    if ((unsigned char) *p < ' ') {
-      return HTS_FALSE;
-    } else if (*p == ' ') {
+    if (*p == ' ') {
       p++;
     } else if (*p == '(') {
       const char *const end = strchr(p, ')');
@@ -1233,7 +1232,8 @@ hts_boolean hts_client_hints_of(const char *user_agent, hts_client_hints *ch) {
       p += n;
     }
   }
-  if (!mozilla || chrome < GREASE_FIRST_MAJOR || comment == NULL || edge < 0)
+  /* Edge's major is always the Chromium one. */
+  if (!mozilla || chrome < GREASE_FIRST_MAJOR || (edge != 0 && edge != chrome))
     return HTS_FALSE;
 
   /* Android before Linux: an Android comment names both. */
