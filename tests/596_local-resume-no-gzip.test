@@ -1,6 +1,6 @@
 #!/bin/bash
 # A Range resume must not offer gzip: a compressed answer cannot be appended to
-# the partial file. back_add() set the flag and then wiped it with the request.
+# the partial file.
 set -eu
 
 # shellcheck source=tests/crawllib.sh
