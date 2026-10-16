@@ -151,9 +151,14 @@ printf 'installed\n' >"${themes}/zeta/img/b.txt"
 printf '/* user classic */\n' >"${userthemes}/classic/theme.css"
 printf '/* user bad */\n' >"${userthemes}/Bad.Name/theme.css"
 printf '<p>page</p>\n' >"${themes}/alpha/page.html"
-# A case-insensitive filesystem opens this spelling too, so build it here.
-mkdir -p "${root}/html/server/Themes/alpha"
-printf '<p>page</p>\n' >"${root}/html/server/Themes/alpha/page.html"
+# A case-insensitive filesystem opens this spelling as themes/, and elsewhere
+# the test builds it.
+variant=
+if ! test -e "${root}/html/server/Themes"; then
+    variant=${root}/html/server/Themes
+    mkdir -p "${variant}/alpha"
+    printf '<p>page</p>\n' >"${variant}/alpha/page.html"
+fi
 printf '/* user solo */\n' >"${userthemes}/solo/theme.css"
 printf 'asset\n' >"${userthemes}/solo/img/a.txt"
 printf '<p>page</p>\n' >"${userthemes}/solo/page.html"
@@ -183,8 +188,8 @@ grep -qF '@import url(themes/solo/theme.css);' <<<"${reply}" || fail "solo not a
 grep -qx 'uitheme=solo' "${work}/home/${settings}" || fail "solo not saved"
 # The restart below expects zeta.
 choose "sid=${sid}&uitheme=zeta"
-rm -r "${userthemes:?}"/* "${themes}/zeta/img" "${themes}/alpha/page.html" \
-    "${root}/html/server/Themes"
+rm -r "${userthemes:?}"/* "${themes}/zeta/img" "${themes}/alpha/page.html"
+test -z "${variant}" || rm -r "${variant}"
 
 # The choice outlives the server.
 htsserver_stop
