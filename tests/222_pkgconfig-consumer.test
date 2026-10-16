@@ -101,8 +101,7 @@ run_consumer() { # <binary> <what it is>
 cd "${work}"
 run_consumer "${work}/consumer" "the consumer"
 
-# Debian's libpsl.pc leaves out libidn2 and libunistring, so print them, or
-# fail when even they do not make a static libpsl link.
+# Print the libs Debian's libpsl.pc omits, or fail if the static link still breaks.
 psl_static_extra() {
     local extra
     local -a psl_argv

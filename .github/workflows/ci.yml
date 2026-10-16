@@ -61,7 +61,7 @@ jobs:
           sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential clang autoconf automake libtool autoconf-archive \
-            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev libpsl-dev libunistring-dev \
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev libpsl-dev libidn2-dev libunistring-dev \
             appstream appstream-util
 
       - name: Configure
@@ -133,6 +133,11 @@ jobs:
         timeout-minutes: 20
         run: |
           make check -j"$CHECK_JOBS"
+          # The static link must run here, because no other libpsl leg can.
+          if grep -q "no static libpsl" tests/222_pkgconfig-consumer.log; then
+            echo "test 222 skipped its static link" >&2
+            exit 1
+          fi
 
       - name: Print the test log on failure
         if: failure()
@@ -318,8 +323,7 @@ jobs:
       - name: Install build dependencies (multilib + 32-bit libs)
         run: |
           set -euo pipefail
-          # No libpsl here, so one leg runs the same-site fallback and the static
-          # pkg-config link, which Debian's libpsl.pc cannot satisfy.
+          # No libpsl here, so one leg runs the same-site fallback.
           sudo dpkg --add-architecture i386
           sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \

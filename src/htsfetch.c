@@ -338,7 +338,7 @@ static void origin_of(const char *adr, fetch_origin *o) {
 
   o->https = strfield(adr, "https:") ? HTS_TRUE : HTS_FALSE;
   end = p + strcspn(p, "/?#");
-  /* The last '@' ends the userinfo, as jump_identification_const() reads it. */
+  /* The last '@' ends the userinfo. */
   at = strrchr_limit(p, '@', end);
   if (at != NULL)
     p = at;
@@ -362,16 +362,17 @@ static hts_boolean host_is_ip(const char *host, size_t len) {
 }
 
 #if HTS_USEPSL
-/* The registrable domain of the host, or the whole host when it is itself a
-   public suffix. NULL when the list cannot answer. */
-static const char *psl_site_key(const fetch_origin *o, size_t *len) {
+/* The registrable domain of the first n bytes of the host, extended to its end,
+   or the whole host when it is itself a public suffix. NULL when the list
+   cannot answer. */
+static const char *psl_site_key(const fetch_origin *o, size_t n, size_t *len) {
   char host[256];
   const char *reg;
 
-  if (fetch_psl == NULL || o->host_len >= sizeof(host))
+  if (fetch_psl == NULL || n >= sizeof(host))
     return NULL;
-  memcpy(host, o->host, o->host_len);
-  host[o->host_len] = '\0';
+  memcpy(host, o->host, n);
+  host[n] = '\0';
   hts_lowcase(host);
   reg = psl_registrable_domain(fetch_psl, host);
   if (reg == NULL)
@@ -384,22 +385,28 @@ static const char *psl_site_key(const fetch_origin *o, size_t *len) {
 /* The tail of the host same-site compares: the registrable domain, else the
    last two labels, or the whole host for an IP literal. */
 static const char *site_key(const fetch_origin *o, size_t *len) {
-  size_t i = o->host_len, dots = 0;
+  size_t n = o->host_len, i, dots = 0;
 
   *len = o->host_len;
   if (host_is_ip(o->host, o->host_len))
     return o->host;
+  /* "a.example.com." keys on "example.com.", and libpsl cannot read the dot. */
+  if (n > 1 && o->host[n - 1] == '.')
+    n--;
+  /* An empty label leaves no domain, so only the same host matches. */
+  for (i = 0; i < n; i++) {
+    if (o->host[i] == '.' && (i == 0 || i + 1 == n || o->host[i + 1] == '.'))
+      return o->host;
+  }
 #if HTS_USEPSL
   {
-    const char *const key = psl_site_key(o, len);
+    const char *const key = psl_site_key(o, n, len);
 
     if (key != NULL)
       return key;
   }
 #endif
-  /* "a.example.com." keys on "example.com.", as the list does. */
-  if (i > 1 && o->host[i - 1] == '.')
-    i--;
+  i = n;
   while (i > 0) {
     if (o->host[i - 1] == '.' && ++dots == 2)
       break;
