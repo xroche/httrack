@@ -1,0 +1,103 @@
+#!/bin/bash
+#
+# Client hints (-%Q): the Sec-CH-UA* values a Chromium User-Agent implies, and
+# the requests that carry them.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+chrome='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36'
+
+# A Windows Chrome UA of the given version.
+chrome_v() { echo "${chrome/141.0.0.0/$1}"; }
+
+# Chrome's own values: the brand order and the fake brand move with the major.
+selftest_queue 'ua="Not?A_Brand";v="8", "Chromium";v="108", "Google Chrome";v="108" mobile=?0 platform="Windows"' \
+    clienthints "$(chrome_v 108.0.0.0)"
+selftest_queue 'ua="Not)A;Brand";v="8", "Chromium";v="138", "Google Chrome";v="138" mobile=?0 platform="Windows"' \
+    clienthints "$(chrome_v 138.0.0.0)"
+selftest_queue 'ua="Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140" mobile=?1 platform="Android"' \
+    clienthints 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36'
+selftest_queue 'ua="Google Chrome";v="141", "Not?A_Brand";v="8", "Chromium";v="141" mobile=?0 platform="Windows"' \
+    clienthints "$chrome"
+selftest_queue 'ua="Microsoft Edge";v="141", "Not?A_Brand";v="8", "Chromium";v="141" mobile=?0 platform="Windows"' \
+    clienthints "$chrome Edg/141.0.0.0"
+# An Android tablet sends no Mobile token.
+selftest_queue 'ua="Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140" mobile=?0 platform="Android"' \
+    clienthints 'Mozilla/5.0 (Linux; Android 13; SM-X700) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36'
+selftest_queue 'ua="Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139" mobile=?0 platform="macOS"' \
+    clienthints 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36'
+selftest_queue 'ua="Chromium";v="142", "Google Chrome";v="142", "Not_A Brand";v="99" mobile=?0 platform="Linux"' \
+    clienthints 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36'
+selftest_queue 'ua="Google Chrome";v="143", "Chromium";v="143", "Not A(Brand";v="24" mobile=?0 platform="Chrome OS"' \
+    clienthints 'Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36'
+
+# The platform word may close the comment.
+selftest_queue 'ua="Google Chrome";v="141", "Not?A_Brand";v="8", "Chromium";v="141" mobile=?0 platform="Windows"' \
+    clienthints "${chrome/Windows NT 10.0; Win64; x64/Windows}"
+
+# Browsers that send none, Chromium-based or not.
+selftest_queue none clienthints 'Mozilla/5.0 (X11; Linux x86_64; rv:143.0) Gecko/20100101 Firefox/143.0'
+selftest_queue none clienthints 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15'
+selftest_queue none clienthints 'Mozilla/5.0 (compatible; HTTrack/3.x; +https://www.httrack.com/)'
+selftest_queue none clienthints "$chrome OPR/125.0.0.0" # Opera
+selftest_queue none clienthints "${chrome/Chrome/HeadlessChrome}"
+selftest_queue none clienthints "$(chrome_v 107.0.0.0)"                       # older fake-brand formula
+selftest_queue none clienthints "$(chrome_v 50.0.0.0)"                        # before client hints
+selftest_queue none clienthints "$(chrome_v '')"                              # no version
+selftest_queue none clienthints "$(chrome_v 141abc)"                          # not a version
+selftest_queue none clienthints "$(chrome_v 0141.0.0.0)"                      # leading zero
+selftest_queue none clienthints "$chrome Edg/"                                # Edge with no version
+selftest_queue none clienthints "$chrome Edg/140.0.0.0"                       # Edge major is Chromium's
+selftest_queue none clienthints "$(chrome_v 1410000000)"                      # too long to be a version
+selftest_queue none clienthints "${chrome/Windows NT 10.0; Win64; x64/Plan9}" # unknown platform
+selftest_queue none clienthints "${chrome#Mozilla/5.0 }"                      # no Mozilla token
+selftest_queue none clienthints "${chrome/Windows NT 10.0; Win64; x64/X11; FreeBSD amd64}"
+selftest_queue none clienthints "${chrome%)*}" # comment never closed
+selftest_run_queued
+
+if test "$HTTPS_SUPPORT" == "no"; then
+    echo "no https support compiled, skipping the crawls"
+    exit 0
+fi
+
+echo_file='reqheaders/echo.txt'
+hint='^sec-ch-ua: "Google Chrome";v="141", "Not[?]A_Brand";v="8", "Chromium";v="141"'
+
+# The hints go out over HTTPS.
+bash "$top_srcdir/tests/local-crawl.sh" --tls --errors 0 \
+    --file-matches "$echo_file" "$hint" \
+    --file-matches "$echo_file" '^sec-ch-ua-mobile: [?]0' \
+    --file-matches "$echo_file" '^sec-ch-ua-platform: "Windows"' \
+    httrack "BASEURL/$echo_file" -F "$chrome"
+
+# Never over plain HTTP, where browsers send none.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    --file-matches "$echo_file" '^User-Agent: .*Chrome/141' \
+    --file-not-matches "$echo_file" '^sec-ch-ua' \
+    httrack "BASEURL/$echo_file" -F "$chrome"
+
+# -%Q0 turns them off.
+bash "$top_srcdir/tests/local-crawl.sh" --tls --errors 0 \
+    --file-matches "$echo_file" '^User-Agent: .*Chrome/141' \
+    --file-not-matches "$echo_file" '^sec-ch-ua' \
+    httrack "BASEURL/$echo_file" -F "$chrome" -%Q0
+
+# A hint from -%X replaces the engine's own.
+bash "$top_srcdir/tests/local-crawl.sh" --tls --errors 0 \
+    --file-matches "$echo_file" '^sec-ch-ua: "Test";v="1"$' \
+    --file-matches "$echo_file" '^sec-ch-ua-mobile: [?]1' \
+    --file-matches "$echo_file" '^sec-ch-ua-platform: "Linux"' \
+    --file-not-matches "$echo_file" '^sec-ch-ua: "Google' \
+    --file-not-matches "$echo_file" '^sec-ch-ua-mobile: [?]0' \
+    --file-not-matches "$echo_file" '^sec-ch-ua-platform: "Windows"' \
+    httrack "BASEURL/$echo_file" -F "$chrome" -%X 'sec-ch-ua: "Test";v="1"' \
+    -%X 'sec-ch-ua-mobile: ?1' -%X 'sec-ch-ua-platform: "Linux"'
+
+# A User-Agent from -%X is not the one the hints come from.
+bash "$top_srcdir/tests/local-crawl.sh" --tls --errors 0 \
+    --file-matches "$echo_file" '^User-Agent: .*Firefox/143' \
+    --file-not-matches "$echo_file" '^sec-ch-ua' \
+    httrack "BASEURL/$echo_file" -F "$chrome" -%X 'User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:143.0) Gecko/20100101 Firefox/143.0'

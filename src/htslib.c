@@ -1128,6 +1128,145 @@ hts_boolean hts_location_is_safe(const char *location) {
                                                                  : HTS_FALSE;
 }
 
+static hts_boolean hts_request_is_secure(const htsblk *retour) {
+#if HTS_USEOPENSSL
+  return retour->ssl ? HTS_TRUE : HTS_FALSE;
+#else
+  (void) retour;
+  return HTS_FALSE;
+#endif
+}
+
+/* Is the product token at s, length n, named name ("Chrome" for "Chrome/141")?
+   On a match, *major is the version's first number, or -1 when the version is
+   malformed. */
+static hts_boolean ua_product_is(const char *s, size_t n, const char *name,
+                                 int *major) {
+  const size_t len = strlen(name);
+  long v = 0;
+  size_t i;
+
+  if (n <= len || strncmp(s, name, len) != 0 || s[len] != '/')
+    return HTS_FALSE;
+  *major = -1;
+  if (s[len + 1] == '0')
+    return HTS_TRUE;
+  for (i = len + 1; i < n && isdigit((unsigned char) s[i]) && v < 100000; i++)
+    v = v * 10 + (s[i] - '0');
+  if (i == len + 1 || v >= 100000)
+    return HTS_TRUE;
+  for (; i < n; i++) {
+    if (s[i] != '.' && !isdigit((unsigned char) s[i]))
+      return HTS_TRUE;
+  }
+  *major = (int) v;
+  return HTS_TRUE;
+}
+
+/* Does the UA comment s, length n, contain word? */
+static hts_boolean ua_comment_has(const char *s, size_t n, const char *word) {
+  const size_t len = strlen(word);
+  size_t i;
+
+  for (i = 0; i + len <= n; i++) {
+    if (strncmp(s + i, word, len) == 0)
+      return HTS_TRUE;
+  }
+  return HTS_FALSE;
+}
+
+hts_boolean hts_client_hints_of(const char *user_agent, hts_client_hints *ch) {
+  /* Chromium's GREASE brand and brand order (user_agent_utils.cc), seeded by
+     the major. Before M108 the formula differed. */
+  enum { GREASE_FIRST_MAJOR = 108 };
+
+  static const char grease_chars[] = " (:-./);=?_";
+  static const char *const grease_versions[] = {"8", "99", "24"};
+  static const int orders[6][3] = {{0, 1, 2}, {0, 2, 1}, {1, 0, 2},
+                                   {1, 2, 0}, {2, 0, 1}, {2, 1, 0}};
+  const char *comment = NULL;
+  size_t comment_len = 0;
+  int chrome = -1;
+  int edge = 0; /* 0: no Edg token */
+  hts_boolean mobile = HTS_FALSE, mozilla = HTS_FALSE;
+  const char *p;
+  char brands[3][48];
+  const char *shuffled[3];
+  int i;
+
+  memset(ch, 0, sizeof(*ch));
+  if (user_agent == NULL)
+    return HTS_FALSE;
+  /* Every product token must be one Chrome or Edge sends, so any other
+     browser built on Chromium (Opera, Samsung, headless) gets no hints. */
+  for (p = user_agent; *p != '\0';) {
+    size_t n;
+    int major;
+
+    if (*p == ' ') {
+      p++;
+    } else if (*p == '(') {
+      const char *const end = strchr(p, ')');
+
+      if (end == NULL)
+        return HTS_FALSE;
+      if (comment == NULL) {
+        comment = p + 1;
+        comment_len = (size_t) (end - comment);
+      }
+      p = end + 1;
+    } else {
+      for (n = 0; (unsigned char) p[n] > ' ' && p[n] != '('; n++)
+        ;
+      if (ua_product_is(p, n, "Chrome", &major))
+        chrome = major;
+      else if (ua_product_is(p, n, "Edg", &major))
+        edge = major;
+      else if (ua_product_is(p, n, "Mozilla", &major))
+        mozilla = HTS_TRUE;
+      else if (n == 6 && strncmp(p, "Mobile", 6) == 0)
+        mobile = HTS_TRUE;
+      else if (!ua_product_is(p, n, "AppleWebKit", &major) &&
+               !ua_product_is(p, n, "Safari", &major))
+        return HTS_FALSE;
+      p += n;
+    }
+  }
+  /* Edge's major is always the Chromium one. */
+  if (!mozilla || chrome < GREASE_FIRST_MAJOR || (edge != 0 && edge != chrome))
+    return HTS_FALSE;
+
+  /* Android before Linux: an Android comment names both. */
+  if (ua_comment_has(comment, comment_len, "Android"))
+    strcpybuff(ch->platform, "\"Android\"");
+  else if (ua_comment_has(comment, comment_len, "CrOS"))
+    strcpybuff(ch->platform, "\"Chrome OS\"");
+  else if (ua_comment_has(comment, comment_len, "Windows"))
+    strcpybuff(ch->platform, "\"Windows\"");
+  else if (ua_comment_has(comment, comment_len, "Macintosh"))
+    strcpybuff(ch->platform, "\"macOS\"");
+  else if (ua_comment_has(comment, comment_len, "Linux"))
+    strcpybuff(ch->platform, "\"Linux\"");
+  else
+    return HTS_FALSE;
+
+  snprintf(brands[0], sizeof(brands[0]), "\"Not%cA%cBrand\";v=\"%s\"",
+           grease_chars[chrome % 11], grease_chars[(chrome + 1) % 11],
+           grease_versions[chrome % 3]);
+  snprintf(brands[1], sizeof(brands[1]), "\"Chromium\";v=\"%d\"", chrome);
+  if (edge > 0)
+    snprintf(brands[2], sizeof(brands[2]), "\"Microsoft Edge\";v=\"%d\"", edge);
+  else
+    snprintf(brands[2], sizeof(brands[2]), "\"Google Chrome\";v=\"%d\"",
+             chrome);
+  for (i = 0; i < 3; i++)
+    shuffled[orders[chrome % 6][i]] = brands[i];
+  snprintf(ch->ua, sizeof(ch->ua), "%s, %s, %s", shuffled[0], shuffled[1],
+           shuffled[2]);
+  ch->mobile = mobile;
+  return HTS_TRUE;
+}
+
 // envoi d'une requète
 int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
                   const char *xsend, const char *adr, const char *fil,
@@ -1343,6 +1482,23 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
         print_buffer(&bstr, "From: %s" H_CRLF, retour->req.from);
       }
 
+      /* HTTPS only, and only beside the User-Agent the hints come from. */
+      if (opt->browser_headers != HTS_FALSE && hts_request_is_secure(retour) &&
+          retour->req.user_agent_send &&
+          !http_headers_have_field(custom, "User-Agent")) {
+        hts_client_hints ch;
+
+        if (hts_client_hints_of(retour->req.user_agent, &ch)) {
+          if (!http_headers_have_field(custom, "Sec-CH-UA"))
+            print_buffer(&bstr, "sec-ch-ua: %s" H_CRLF, ch.ua);
+          if (!http_headers_have_field(custom, "Sec-CH-UA-Mobile"))
+            print_buffer(&bstr, "sec-ch-ua-mobile: ?%d" H_CRLF,
+                         ch.mobile ? 1 : 0);
+          if (!http_headers_have_field(custom, "Sec-CH-UA-Platform"))
+            print_buffer(&bstr, "sec-ch-ua-platform: %s" H_CRLF, ch.platform);
+        }
+      }
+
       if (retour->req.user_agent_send && strnotempty(retour->req.user_agent) &&
           !http_headers_have_field(custom, "User-Agent")) {
         print_buffer(&bstr, "User-Agent: %s" H_CRLF, retour->req.user_agent);
@@ -1365,13 +1521,10 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
           !http_headers_have_field(custom, "Accept-Encoding")) {
         hts_boolean compressible =
             (!retour->req.range_used && !retour->req.nocompression);
-        hts_boolean secure = HTS_FALSE;
 
-#if HTS_USEOPENSSL
-        secure = retour->ssl ? HTS_TRUE : HTS_FALSE;
-#endif
-        print_buffer(&bstr, "Accept-Encoding: %s" H_CRLF,
-                     hts_acceptencoding(compressible, secure));
+        print_buffer(
+            &bstr, "Accept-Encoding: %s" H_CRLF,
+            hts_acceptencoding(compressible, hts_request_is_secure(retour)));
       }
 
       /* Authentification */
@@ -6873,6 +7026,7 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->mirror_completed = HTS_DEFAULT;
   opt->transport_failures = 0;
   opt->mptcp = HTS_DEFAULT;
+  opt->browser_headers = HTS_DEFAULT;
   opt->mptcp_connections = 0;
   opt->mptcp_fallbacks = 0;
   opt->upper_links_refused = 0;

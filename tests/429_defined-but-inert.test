@@ -16,7 +16,7 @@ tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_inert.XXXXXX") || exit 1
 cleanup_push rm -rf "$tmp"
 
 # --- the option set that refuses the option names itself ---------------------
-# 'Q' is in neither the '%' set nor the '@' set, so the same letter reaches both
+# 'V' is in neither the '%' set nor the '@' set, so the same letter reaches both
 # default arms and the prefix is the only thing that can differ.
 refusal() { # refusal ARG
     local rc=0
@@ -25,10 +25,10 @@ refusal() { # refusal ARG
     firstline "$(cat "$tmp/refuse.out")"
 }
 
-got=$(refusal -%Q)
-assert_eq "* invalid option %Q" "$got" "the % set"
-got=$(refusal -@Q)
-assert_eq "* invalid option @Q" "$got" "the @ set"
+got=$(refusal -%V)
+assert_eq "* invalid option %V" "$got" "the % set"
+got=$(refusal -@V)
+assert_eq "* invalid option @V" "$got" "the @ set"
 
 # --- --help says which build it came from ------------------------------------
 httrack --help >"$tmp/help.out" 2>&1 || fail_dump "--help failed" "$tmp/help.out"

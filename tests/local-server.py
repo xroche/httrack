@@ -620,6 +620,9 @@ class Handler(SimpleHTTPRequestHandler):
             "User-agent: *\n" + "".join("Disallow: %s\n" % r for r in rules)
         ).encode()
 
+    def route_reqheaders(self):
+        self.send_raw(str(self.headers).encode(), "text/plain")
+
     def route_robots(self):
         # The Sitemap: record is group-independent; only --sitemap acts on it.
         ua = self.headers.get("User-Agent") or ""
@@ -3779,6 +3782,7 @@ class Handler(SimpleHTTPRequestHandler):
         "/gated/index.php": route_gated_index,
         "/gated/secret.php": route_gated_secret,
         "/robots.txt": route_robots,
+        "/reqheaders/echo.txt": route_reqheaders,
         "/sitemapdir/index.xml": route_sitemap_index,
         "/sitemap.xml": route_sitemap_index,
         "/sitemapdir/pages.xml.gz": route_sitemap_pages,

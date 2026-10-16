@@ -4723,6 +4723,9 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
   if (from->mptcp > -1)
     to->mptcp = from->mptcp;
 
+  if (from->browser_headers > -1)
+    to->browser_headers = from->browser_headers;
+
   if (StringNotEmpty(from->user_agent))
     StringCopyS(to->user_agent, from->user_agent);
 
