@@ -38,10 +38,10 @@ Please visit our Website: http://www.httrack.com
 #include "htscharset.h"
 #include "coucal.h"
 
-/* What a key stands for: "x" itself, "*.x", "!x", or a mix of them. */
-#define PSL_RULE 1
-#define PSL_WILDCARD 2
-#define PSL_EXCEPTION 4
+/* Kinds of rule for one key "x", which a key can combine. */
+#define PSL_EXACT 1     /* "x" */
+#define PSL_WILDCARD 2  /* "*.x" */
+#define PSL_EXCEPTION 4 /* "!x" */
 
 /* Written only by hts_init() and the self-tests, before any thread reads. */
 static coucal psl_rules = NULL;
@@ -49,7 +49,7 @@ static char psl_version[64] = "";
 
 /* Add one rule as the list spells it, converting a Unicode name to IDNA. */
 static void psl_add(coucal rules, const char *rule, size_t len) {
-  intptr_t kind = PSL_RULE, old = 0;
+  intptr_t kind = PSL_EXACT, old = 0;
   char *idna = NULL;
   char key[256];
 
@@ -79,106 +79,110 @@ static void psl_add(coucal rules, const char *rule, size_t len) {
   freet(idna);
 }
 
-static void psl_set(coucal rules, const char *version) {
+/* Replace the list in use with rules, freeing the old one. */
+static void psl_install(coucal rules, const char *version, size_t vlen) {
   coucal_delete(&psl_rules);
   psl_rules = rules;
   psl_version[0] = '\0';
   strlncatbuff(psl_version, version, sizeof(psl_version),
-               sizeof(psl_version) - 1);
+               vlen < sizeof(psl_version) ? vlen : sizeof(psl_version) - 1);
 }
 
-/* Copy the stamp out of a "// VERSION: <stamp>" line, or return HTS_FALSE. */
-static hts_boolean psl_version_line(const char *line, char *version,
-                                    size_t size) {
+/* Add the rule on one line of a list file, or note its VERSION stamp. */
+static void psl_add_line(coucal rules, const char *line, size_t len,
+                         const char **version, size_t *vlen) {
   static const char tag[] = "// VERSION: ";
-  size_t n;
+  size_t i = 0, n;
 
-  if (strncmp(line, tag, sizeof(tag) - 1) != 0)
-    return HTS_FALSE;
-  line += sizeof(tag) - 1;
-  n = strcspn(line, " \t\r\n");
-  version[0] = '\0';
-  strlncatbuff(version, line, size, n < size ? n : size - 1);
-  return HTS_TRUE;
-}
+  if (len >= sizeof(tag) - 1 && memcmp(line, tag, sizeof(tag) - 1) == 0) {
+    *version = line + sizeof(tag) - 1;
+    for (*vlen = 0; *vlen < len - (sizeof(tag) - 1); (*vlen)++) {
+      const char c = (*version)[*vlen];
 
-hts_boolean hts_psl_load_file(const char *path) {
-  char line[1024], version[64] = "";
-  coucal rules;
-  FILE *fp = FOPEN(path, "rb");
-
-  if (fp == NULL)
-    return HTS_FALSE;
-  rules = coucal_new(0);
-  while (fgets(line, sizeof(line), fp) != NULL) {
-    const char *p = line;
-    size_t len;
-
-    if (psl_version_line(line, version, sizeof(version)))
-      continue;
-    /* A line longer than the buffer is no rule, so skip all of it. */
-    if (strchr(line, '\n') == NULL && !feof(fp)) {
-      int c;
-
-      while ((c = fgetc(fp)) != EOF && c != '\n')
-        ;
-      continue;
+      if (c == ' ' || c == '\t' || c == '\r')
+        break;
     }
-    while (*p == ' ' || *p == '\t')
-      p++;
-    if (p[0] == '/' && p[1] == '/')
-      continue;
-    len = strcspn(p, " \t\r\n");
-    if (len != 0)
-      psl_add(rules, p, len);
-  }
-  fclose(fp);
-  if (coucal_nitems(rules) == 0) {
-    coucal_delete(&rules);
-    return HTS_FALSE;
-  }
-  psl_set(rules, version);
-  return HTS_TRUE;
-}
-
-/* The VERSION stamp of the list file at path, or "" when it has none. */
-static void psl_file_version(const char *path, char *version, size_t size) {
-  char line[256];
-  FILE *fp = FOPEN(path, "rb");
-  int i;
-
-  version[0] = '\0';
-  if (fp == NULL)
     return;
-  /* The stamp sits in the header comment. */
-  for (i = 0; i < 32 && fgets(line, sizeof(line), fp) != NULL; i++) {
-    if (psl_version_line(line, version, size))
+  }
+  while (i < len && (line[i] == ' ' || line[i] == '\t'))
+    i++;
+  if (len - i >= 2 && line[i] == '/' && line[i + 1] == '/')
+    return;
+  for (n = 0; i + n < len; n++) {
+    const char c = line[i + n];
+
+    if (c == ' ' || c == '\t' || c == '\r')
       break;
   }
-  fclose(fp);
+  if (n != 0)
+    psl_add(rules, line + i, n);
 }
 
-void hts_psl_init(void) {
+hts_boolean hts_psl_load_file(const char *path, size_t min_rules) {
+  const LLint size = fsize(path);
+  const char *version = "", *p, *end;
+  size_t vlen = 0;
+  char *text;
+  coucal rules;
+  FILE *fp;
+
+  /* The real list is a few hundred KB. */
+  if (size <= 0 || size > 16 * 1024 * 1024)
+    return HTS_FALSE;
+  fp = FOPEN(path, "rb");
+  if (fp == NULL)
+    return HTS_FALSE;
+  text = malloct((size_t) size);
+  if (fread(text, 1, (size_t) size, fp) != (size_t) size) {
+    fclose(fp);
+    freet(text);
+    return HTS_FALSE;
+  }
+  fclose(fp);
+  rules = coucal_new(0);
+  for (p = text, end = text + size; p < end;) {
+    const char *const eol = memchr(p, '\n', (size_t) (end - p));
+    const size_t len = (size_t) ((eol != NULL ? eol : end) - p);
+
+    psl_add_line(rules, p, len, &version, &vlen);
+    p += len + 1;
+  }
+  if (coucal_nitems(rules) < min_rules || coucal_nitems(rules) == 0) {
+    coucal_delete(&rules);
+    freet(text);
+    return HTS_FALSE;
+  }
+  psl_install(rules, version, vlen);
+  freet(text);
+  return HTS_TRUE;
+}
+
+/* A system list replaces the built-in one only when it is about as large. */
+#define PSL_MIN_SYSTEM_RULES 1000
+
+void hts_psl_init_from(const char *path) {
   coucal rules;
   size_t i;
 
-#ifndef _WIN32
-  {
-    static const char system_list[] =
-        "/usr/share/publicsuffix/public_suffix_list.dat";
-    char version[64];
-
-    /* A distro updates its copy, so prefer it when it is the newer one. */
-    psl_file_version(system_list, version, sizeof(version));
-    if (strcmp(version, hts_psl_builtin_version) > 0 &&
-        hts_psl_load_file(system_list))
-      return;
-  }
-#endif
+  if (path != NULL && hts_psl_load_file(path, PSL_MIN_SYSTEM_RULES))
+    return;
   rules = coucal_new(0);
-  for (i = 0; hts_psl_builtin[i] != NULL; i++)
-    psl_add(rules, hts_psl_builtin[i], strlen(hts_psl_builtin[i]));
-  psl_set(rules, hts_psl_builtin_version);
+  for (i = 0; hts_psl_builtin[i] != NULL; i++) {
+    const char *p = hts_psl_builtin[i];
+    const char *const end = p + hts_psl_builtin_size[i] - 1;
+
+    for (; p < end; p += strlen(p) + 1)
+      psl_add(rules, p, strlen(p));
+  }
+  psl_install(rules, hts_psl_builtin_version, strlen(hts_psl_builtin_version));
+}
+
+void hts_psl_init(void) {
+#ifdef HTS_PSL_FILE
+  hts_psl_init_from(HTS_PSL_FILE);
+#else
+  hts_psl_init_from(NULL);
+#endif
 }
 
 void hts_psl_uninit(void) {
@@ -197,7 +201,7 @@ static intptr_t psl_kind(const char *key) {
 }
 
 /* Fill labels[k] with where the last k + 1 labels of host start, and return
-   their count. Return 0 for an empty label or too many labels. */
+   their count. Return 0 for an empty label or more than max labels. */
 static size_t psl_labels(const char *host, const char **labels, size_t max) {
   size_t n = 0;
   const char *p;
@@ -225,18 +229,19 @@ static size_t psl_suffix(const char *const *labels, size_t n) {
 
     if (kind & PSL_EXCEPTION)
       exception = k + 1;
-    /* "*.x" covers one label under x, which is the key one level up. */
-    if ((kind & PSL_RULE) || (parent & PSL_WILDCARD))
+    /* "*.x" makes y.x a suffix, and x one too, as browsers read it. */
+    if ((kind & (PSL_EXACT | PSL_WILDCARD)) || (parent & PSL_WILDCARD))
       suffix = k + 1;
     parent = kind;
   }
-  /* An exception names a registrable domain, so its suffix is one label less.
-   */
+  /* An exception is a registrable domain, so drop its first label. */
   return exception != 0 ? exception - 1 : suffix;
 }
 
 const char *hts_psl_registrable_domain(const char *host) {
-  const char *labels[128];
+  const char *labels[128], *idna_labels[128];
+  const char *const *keys = labels;
+  char *idna = NULL;
   size_t n, suffix;
 
   if (psl_rules == NULL)
@@ -244,18 +249,16 @@ const char *hts_psl_registrable_domain(const char *host) {
   n = psl_labels(host, labels, sizeof(labels) / sizeof(labels[0]));
   if (n == 0)
     return NULL;
-  if (hts_isStringAscii(host, strlen(host))) {
-    suffix = psl_suffix(labels, n);
-  } else {
-    /* The rules are IDNA, and the conversion keeps every dot. */
-    const char *idna_labels[128];
-    char *idna = hts_convertStringUTF8ToIDNA(host, strlen(host));
-
-    if (idna == NULL)
+  /* The rules are IDNA, and the conversion keeps every dot. */
+  if (!hts_isStringAscii(host, strlen(host))) {
+    idna = hts_convertStringUTF8ToIDNA(host, strlen(host));
+    if (idna == NULL || psl_labels(idna, idna_labels, n) != n) {
+      freet(idna);
       return NULL;
-    suffix =
-        psl_labels(idna, idna_labels, n) == n ? psl_suffix(idna_labels, n) : n;
-    freet(idna);
+    }
+    keys = idna_labels;
   }
+  suffix = psl_suffix(keys, n);
+  freet(idna);
   return suffix < n ? labels[suffix] : NULL;
 }

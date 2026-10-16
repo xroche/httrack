@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# The Public Suffix List lookup against the list's own test vectors
+# Check the Public Suffix List lookup against the list's own test vectors
 # (tests/test_psl.txt in github.com/publicsuffix/list), and the list loader.
 
 set -euo pipefail
@@ -9,9 +9,6 @@ set -euo pipefail
 . "${0%"${0##*/}"}./testlib.sh"
 
 require_httrack
-
-version=$(httrack -#test=pslversion) || fail "httrack -#test=pslversion failed"
-[[ ${version} =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}_ ]] || fail "no VERSION stamp: '${version}'"
 
 selftest_queue null psl 'COM'
 selftest_queue example.com psl 'example.COM'
@@ -91,6 +88,10 @@ selftest_queue xn--85x722f.xn--fiqs8s psl 'www.xn--85x722f.xn--fiqs8s'
 selftest_queue shishi.xn--fiqs8s psl 'shishi.xn--fiqs8s'
 selftest_queue null psl 'xn--fiqs8s'
 
+# A wildcard rule's base is a suffix too, as browsers read "*.kobe.jp".
+selftest_queue null psl kobe.jp
+selftest_queue null psl ca-west-1.rds.amazonaws.com
+
 # The loader reads the list's own syntax, and skips what is not a rule.
 work=$(mktemp -d "${TMPDIR:-/tmp}/psl.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "${work}"
@@ -98,19 +99,42 @@ list=${work}/list.dat
 {
     printf '// VERSION: 2000-01-01_00-00-00_UTC\n'
     printf '// com\n'
+    printf 'EXAMPLE.Test\n'
     printf 'example\n'
     printf '  *.ck   trailing text\n'
     printf '!www.ck\n'
     printf '\345\205\254\345\217\270.cn\n'
-    printf '%01100d\n' 0
+    printf '\377\376.zz\n'
+    printf 'zz\000junk\na.yy\n'
+    printf 'crlf.test\r\n'
+    printf 'last.rule'
 } >"${list}"
-selftest_queue example.com pslfile "${list}" a.b.example.com
-selftest_queue b.example pslfile "${list}" a.b.example
-selftest_queue a.b.ck pslfile "${list}" x.a.b.ck
-selftest_queue www.ck pslfile "${list}" a.www.ck
-selftest_queue x.xn--55qx5d.cn pslfile "${list}" a.x.xn--55qx5d.cn
+stamp=2000-01-01_00-00-00_UTC
+selftest_queue_lines "example.com"$'\n'"${stamp}" pslfile "${list}" a.b.example.com
+selftest_queue_lines "b.example.test"$'\n'"${stamp}" pslfile "${list}" a.b.example.test
+selftest_queue_lines "b.example"$'\n'"${stamp}" pslfile "${list}" a.b.example
+selftest_queue_lines "a.b.ck"$'\n'"${stamp}" pslfile "${list}" x.a.b.ck
+selftest_queue_lines "www.ck"$'\n'"${stamp}" pslfile "${list}" a.www.ck
+selftest_queue_lines "x.xn--55qx5d.cn"$'\n'"${stamp}" pslfile "${list}" a.x.xn--55qx5d.cn
+selftest_queue_lines "r.a.yy"$'\n'"${stamp}" pslfile "${list}" q.r.a.yy
+selftest_queue_lines "b.crlf.test"$'\n'"${stamp}" pslfile "${list}" a.b.crlf.test
+selftest_queue_lines "y.last.rule"$'\n'"${stamp}" pslfile "${list}" x.y.last.rule
 selftest_queue unreadable pslfile "${work}/missing.dat" a.example.com
 selftest_queue unreadable pslfile /dev/null a.example.com
 # The list in use is back after each load.
 selftest_queue example.co.uk psl a.example.co.uk
+
+# A configured list file wins only when it holds about as many rules as the
+# real list, and the built-in list stays the fallback.
+builtin=$(sed -n 's/^const char hts_psl_builtin_version\[\] = "\(.*\)";$/\1/p' \
+    "${abs_top_srcdir:?not run under make check}/src/htspsl_data.c")
+test -n "${builtin}" || fail "no stamp in src/htspsl_data.c"
+big=${work}/big.dat
+{
+    printf '// VERSION: 2000-01-02_00-00-00_UTC\n'
+    for i in $(seq 1 1100); do printf 'r%d.test\n' "${i}"; done
+} >"${big}"
+selftest_queue 2000-01-02_00-00-00_UTC pslinit "${big}"
+selftest_queue "${builtin}" pslinit "${list}"
+selftest_queue "${builtin}" pslinit "${work}/missing.dat"
 selftest_run_queued

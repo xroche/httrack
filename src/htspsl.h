@@ -39,18 +39,25 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h"
 
-/* The list compiled in, NULL-terminated, and its upstream VERSION stamp. */
+/* The list compiled in: NUL-separated rules in chunks of hts_psl_builtin_size
+   bytes, a NULL after the last chunk, and the upstream VERSION stamp. */
 extern const char *const hts_psl_builtin[];
+extern const size_t hts_psl_builtin_size[];
 extern const char hts_psl_builtin_version[];
 
-/* Load the built-in list, or the system copy when its VERSION is newer. Call
-   it from hts_init(), before any thread looks a host up. */
+/* Load the list file configure named with --with-psl-file, else the built-in
+   list. Call it from hts_init(), before any thread looks a host up. */
 void hts_psl_init(void);
 void hts_psl_uninit(void);
 
+/* Load the list file at path, or the built-in list when path is NULL or the
+   file holds fewer rules than a real list. */
+void hts_psl_init_from(const char *path);
+
 /* Replace the list with the rules in the file at path. Return HTS_FALSE, and
-   keep the old list, when the file cannot be read or holds no rule. */
-hts_boolean hts_psl_load_file(const char *path);
+   keep the old list, when the file cannot be read or holds fewer than
+   min_rules rules. */
+hts_boolean hts_psl_load_file(const char *path, size_t min_rules);
 
 /* Is a list loaded? */
 hts_boolean hts_psl_loaded(void);
@@ -60,7 +67,7 @@ const char *hts_psl_version(void);
 
 /* Return where the registrable domain starts in host, which is lowercase with
    no trailing dot. Return NULL when host is itself a public suffix, has an
-   empty label, or no list is loaded. */
+   empty label (a trailing dot counts), or no list is loaded. */
 const char *hts_psl_registrable_domain(const char *host);
 
 #endif

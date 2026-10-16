@@ -123,11 +123,12 @@ the old name is transitional) rather than letting the chroot decide. Ours does.
 ## The Public Suffix List is built in
 
 httrack compiles in a copy of the Public Suffix List, `src/htspsl_data.c`, to
-decide which hosts are the same site for the `Sec-Fetch-Site` header. Outside
-Windows it reads `/usr/share/publicsuffix/public_suffix_list.dat` instead when
-that file carries a newer `// VERSION:` stamp. A distribution that ships the
-`publicsuffix` package therefore keeps the list current without patching
-httrack, and nothing needs to build-depend on libpsl.
+decide which hosts are the same site for the `Sec-Fetch-Site` header. If your
+distribution ships the list, pass `--with-psl-file` (or
+`--with-psl-file=PATH` when it is not at
+`/usr/share/publicsuffix/public_suffix_list.dat`). httrack then reads that file
+at startup, so a package update reaches it, and it keeps the built-in copy for
+when the file is missing. Debian recommends `publicsuffix` from `libhttrack3`.
 
 ## Do not re-encode the tree
 

@@ -57,21 +57,34 @@ static int st_psl(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* -#test=pslfile <file> <host>: the same under the list in file, after which
-   the list in use is reloaded. */
+/* -#test=pslfile <file> <host>: look host up under a list file, print the
+   file's stamp, then restore the default list. */
 static int st_pslfile(httrackp *opt, int argc, char **argv) {
-  hts_boolean loaded;
-
   (void) opt;
   if (argc != 2) {
     fprintf(stderr, "pslfile: takes <file> <host>\n");
     return 1;
   }
-  loaded = hts_psl_load_file(argv[0]);
-  if (loaded)
+  if (hts_psl_load_file(argv[0], 1)) {
     print_registrable(argv[1]);
-  else
+    printf("%s\n", hts_psl_version());
+  } else {
     printf("unreadable\n");
+  }
+  hts_psl_init();
+  return 0;
+}
+
+/* -#test=pslinit <file>: the stamp of the list a build configured with
+   --with-psl-file=<file> would use, then restore the default list. */
+static int st_pslinit(httrackp *opt, int argc, char **argv) {
+  (void) opt;
+  if (argc != 1) {
+    fprintf(stderr, "pslinit: takes <file>\n");
+    return 1;
+  }
+  hts_psl_init_from(argv[0]);
+  printf("%s\n", hts_psl_version());
   hts_psl_init();
   return 0;
 }
@@ -90,6 +103,8 @@ const struct selftest_entry selftests_psl[] = {
      st_psl},
     {"pslfile", "<file> <host>", "registrable domain under a list file",
      st_pslfile},
+    {"pslinit", "<file>", "VERSION stamp of the list a list file gives",
+     st_pslinit},
     {"pslversion", "", "VERSION stamp of the Public Suffix List in use",
      st_pslversion},
     {NULL, NULL, NULL, NULL},
