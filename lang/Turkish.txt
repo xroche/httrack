@@ -1058,3 +1058,7 @@ The rules you set here apply to the mirror now running. Removing a rule lets new
 Burada belirlediğiniz kurallar şu anda çalışan yansıya uygulanır. Bir kuralı kaldırmak yeni bağlantıların yeniden geçmesine izin verir, ancak kuralın daha önce reddettiği bir bağlantı bu yansıda geri gelmez.
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Bu tarama kuralı kullanılamaz. Bir kural + veya - ile başlar, ardından bir desen gelir ve tek bir kısa satıra sığmalıdır.
+Theme:
+Tema:
+Classic
+Klasik

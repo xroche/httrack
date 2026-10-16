@@ -1058,3 +1058,7 @@ The rules you set here apply to the mirror now running. Removing a rule lets new
 Reglerna som du anger här gäller för kopieringen som pågår nu. Tar du bort en regel släpps nya länkar igenom igen, men en länk som regeln redan har avvisat kommer inte tillbaka under den här kopieringen.
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Den här sökregeln kan inte användas. En regel börjar med + eller -, följt av ett mönster, och måste rymmas på en kort rad.
+Theme:
+Tema:
+Classic
+Klassiskt

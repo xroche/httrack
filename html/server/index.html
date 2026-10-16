@@ -7,6 +7,7 @@
 	<title>HTTrack Website Copier - Offline Browser</title>
 
 	<link rel="stylesheet" type="text/css" media="screen" href="style.css">
+	<link rel="stylesheet" type="text/css" media="screen" href="/server/theme.css">
 	<link rel="stylesheet" type="text/css" media="screen" href="user.css">
 	<script type="text/javascript" src="ping.js" defer></script>
 
@@ -106,6 +107,16 @@ ${LANG_THANKYOU}!
 		${listid:lang:#iso}
 		</select>
 	</td></tr>
+${do:loadthemes}
+${do:if-not-empty:uithemes}
+	<tr><td align="right">
+	${LANG_UITHEME} 
+		<select name="uitheme" onChange="form.redirect.value='index.html'; form.submit()">
+		<option value="classic">${LANG_UITHEMECLASSIC}</option>
+		${liststr:uitheme_shown:uithemes}
+		</select>
+	</td></tr>
+${do:end-if}
 
 
 	<tr><td align="right">

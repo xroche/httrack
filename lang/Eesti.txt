@@ -1058,3 +1058,7 @@ The rules you set here apply to the mirror now running. Removing a rule lets new
 Siin määratud reeglid kehtivad praegu käimasoleva saidikopeerimise kohta. Reegli eemaldamine laseb uued lingid jälle läbi, kuid link, mille reegel on juba tagasi lükanud, sellel kopeerimisel enam tagasi ei tule.
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Seda filtreerimisreeglit ei saa kasutada. Reegel algab märgiga + või -, millele järgneb muster, ning peab mahtuma ühele lühikesele reale.
+Theme:
+Teema:
+Classic
+Klassikaline
