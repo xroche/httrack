@@ -83,9 +83,10 @@ static void psl_add(coucal rules, const char *rule, size_t len) {
 static void psl_install(coucal rules, const char *version, size_t vlen) {
   coucal_delete(&psl_rules);
   psl_rules = rules;
-  psl_version[0] = '\0';
-  strlncatbuff(psl_version, version, sizeof(psl_version),
-               vlen < sizeof(psl_version) ? vlen : sizeof(psl_version) - 1);
+  if (vlen >= sizeof(psl_version))
+    vlen = sizeof(psl_version) - 1;
+  memcpy(psl_version, version, vlen);
+  psl_version[vlen] = '\0';
 }
 
 /* Add the rule on one line of a list file, or note its VERSION stamp. */
@@ -132,13 +133,14 @@ hts_boolean hts_psl_load_file(const char *path, size_t min_rules) {
   fp = FOPEN(path, "rb");
   if (fp == NULL)
     return HTS_FALSE;
-  text = malloct((size_t) size);
+  text = malloct((size_t) size + 1);
   if (fread(text, 1, (size_t) size, fp) != (size_t) size) {
     fclose(fp);
     freet(text);
     return HTS_FALSE;
   }
   fclose(fp);
+  text[size] = '\0';
   rules = coucal_new(0);
   for (p = text, end = text + size; p < end;) {
     const char *const eol = memchr(p, '\n', (size_t) (end - p));
@@ -229,7 +231,7 @@ static size_t psl_suffix(const char *const *labels, size_t n) {
 
     if (kind & PSL_EXCEPTION)
       exception = k + 1;
-    /* "*.x" makes y.x a suffix, and x one too, as browsers read it. */
+    /* "*.x" makes x and y.x suffixes, as browsers read it. */
     if ((kind & (PSL_EXACT | PSL_WILDCARD)) || (parent & PSL_WILDCARD))
       suffix = k + 1;
     parent = kind;

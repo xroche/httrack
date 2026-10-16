@@ -689,7 +689,7 @@ CHECK_ZLIB()
 CHECK_BROTLI()
 CHECK_ZSTD()
 
-### Public Suffix List file a distribution keeps current (optional)
+### Optional Public Suffix List file
 AC_ARG_WITH([psl-file],
 	[AS_HELP_STRING([--with-psl-file@<:@=PATH@:>@],[Read the Public Suffix List from PATH at startup, falling back to the built-in copy @<:@default=no, PATH=/usr/share/publicsuffix/public_suffix_list.dat@:>@])],
 	[psl_file=$withval], [psl_file=no])

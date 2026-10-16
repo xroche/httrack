@@ -127,8 +127,8 @@ decide which hosts are the same site for the `Sec-Fetch-Site` header. If your
 distribution ships the list, pass `--with-psl-file` (or
 `--with-psl-file=PATH` when it is not at
 `/usr/share/publicsuffix/public_suffix_list.dat`). httrack then reads that file
-at startup, so a package update reaches it, and it keeps the built-in copy for
-when the file is missing. Debian recommends `publicsuffix` from `libhttrack3`.
+at startup, so a package update reaches it, and it keeps the built-in copy as
+the fallback. Debian recommends `publicsuffix` from `libhttrack3`.
 
 ## Do not re-encode the tree
 

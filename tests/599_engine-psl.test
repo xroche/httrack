@@ -135,6 +135,11 @@ big=${work}/big.dat
     for i in $(seq 1 1100); do printf 'r%d.test\n' "${i}"; done
 } >"${big}"
 selftest_queue 2000-01-02_00-00-00_UTC pslinit "${big}"
+# The floor is 1000 distinct rules: one fewer falls back.
+head -n 1001 "${big}" >"${work}/floor.dat"
+head -n 1000 "${big}" >"${work}/below.dat"
+selftest_queue 2000-01-02_00-00-00_UTC pslinit "${work}/floor.dat"
+selftest_queue "${builtin}" pslinit "${work}/below.dat"
 selftest_queue "${builtin}" pslinit "${list}"
 selftest_queue "${builtin}" pslinit "${work}/missing.dat"
 selftest_run_queued

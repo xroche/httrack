@@ -1,5 +1,5 @@
-# The built-in Public Suffix List is a snapshot, so this reds once upstream is
-# 60 days ahead. Refresh it with "python3 tools/psl-gen.py" and commit it.
+# The built-in Public Suffix List is a snapshot, so this reds when the rules
+# differ and upstream is over 60 days newer. Refresh it with "python3 tools/psl-gen.py" and commit it.
 name: Public Suffix List drift
 
 on:

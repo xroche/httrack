@@ -106,7 +106,7 @@ def main():
         "--check",
         type=int,
         metavar="DAYS",
-        help="exit 1 when OUTPUT differs from the list and is DAYS older",
+        help="exit 1 when OUTPUT differs and is more than DAYS days behind",
     )
     args = parser.parse_args()
     version, rules = parse(read_list(args.source))
