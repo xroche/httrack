@@ -87,6 +87,15 @@ static int st_fetchsite(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* -#test=fetchpsl: which rule decides same-site. */
+static int st_fetchpsl(httrackp *opt, int argc, char **argv) {
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  printf("%s\n", hts_fetch_has_psl() ? "psl" : "heuristic");
+  return 0;
+}
+
 /* -#test=fetchtrust <adr>: does a browser send Sec-Fetch-* to this host? */
 static int st_fetchtrust(httrackp *opt, int argc, char **argv) {
   (void) opt;
@@ -103,6 +112,8 @@ const struct selftest_entry selftests_fetch[] = {
      "Sec-Fetch-Dest and -Mode for a reference", st_fetchdest},
     {"fetchsite", "<from> <to>", "Sec-Fetch-Site between two URLs",
      st_fetchsite},
+    {"fetchpsl", "", "does the Public Suffix List decide same-site",
+     st_fetchpsl},
     {"fetchtrust", "<adr>", "is Sec-Fetch-* sent to this host", st_fetchtrust},
     {NULL, NULL, NULL, NULL},
 };

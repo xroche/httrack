@@ -66,16 +66,43 @@ selftest_queue none fetchdest - url /f/a.svg
 selftest_queue none fetchdest - url /a.png/b
 
 selftest_queue same-origin fetchsite https://a.example.com https://a.example.com:443
-selftest_queue same-origin fetchsite https://EXAMPLE.com. https://example.com/x
+selftest_queue same-origin fetchsite https://EXAMPLE.com https://example.com/x
+# A browser keeps the trailing dot, so these are two hosts.
+selftest_queue cross-site fetchsite https://example.com. https://example.com/x
+selftest_queue cross-site fetchsite https://a.example.com. https://b.example.com
+selftest_queue same-site fetchsite https://a.example.com. https://b.example.com.
+selftest_queue cross-site fetchsite https://a.com.. https://b.com..
+selftest_queue cross-site fetchsite https://a..example.com https://b..example.com
+selftest_queue cross-site fetchsite http://0x7f.0.0.1 http://0x8.0.0.1
 selftest_queue same-site fetchsite https://a.example.com https://a.example.com:8443
 selftest_queue same-site fetchsite https://a.example.com https://b.example.com
 selftest_queue same-site fetchsite https://u:p@a.example.com https://b.example.com
+selftest_queue same-origin fetchsite https://a@b@example.com https://example.com
 selftest_queue same-site fetchsite 'https://[::1]:8080' 'https://[::1]:8081'
 selftest_queue cross-site fetchsite https://a.example.com https://b.other.com
 selftest_queue cross-site fetchsite www.example.com https://www.example.com
 selftest_queue cross-site fetchsite https://127.0.0.1 https://127.0.0.2
 selftest_queue cross-site fetchsite https://10.1.0.1 https://10.2.0.1
 selftest_queue cross-site fetchsite https://example.com https://www.example.org
+
+# The Public Suffix List splits hosts that the last-two-labels rule joins.
+site_rule=$(httrack -#test=fetchpsl) || fail "httrack -#test=fetchpsl failed"
+if test "$(httrack -#test=features | sed -n 's/^psl //p')" = 1; then
+    test "${site_rule}" = psl || fail "built with libpsl, but the list did not load"
+fi
+if test "${site_rule}" = psl; then
+    selftest_queue cross-site fetchsite https://a.github.io https://b.github.io
+    selftest_queue cross-site fetchsite https://github.io https://a.github.io
+    selftest_queue cross-site fetchsite https://a.co.uk https://b.co.uk
+    selftest_queue cross-site fetchsite https://s3.amazonaws.com https://x.amazonaws.com
+    selftest_queue cross-site fetchsite https://a.example.io https://b.example.it
+    selftest_queue same-site fetchsite https://a.example.co.uk https://B.Example.CO.UK
+    selftest_queue cross-site fetchsite https://a.example.co.uk. https://b.example.co.uk
+    selftest_queue cross-site fetchsite https://a.co.uk. https://b.co.uk.
+    long=$(printf "%0250d" 0 | tr 0 x)
+    selftest_queue cross-site fetchsite "https://a${long}.co.uk" "https://b${long}.co.uk"
+    selftest_queue same-site fetchsite https://a.example.co.uk. https://b.example.co.uk.
+fi
 
 selftest_queue yes fetchtrust https://www.example.com
 selftest_queue yes fetchtrust localhost:8080

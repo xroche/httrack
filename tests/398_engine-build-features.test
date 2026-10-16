@@ -29,6 +29,7 @@ want_feature() {
     case $1 in
     brotli) macro_is "${config}" HTS_USEBROTLI 1 && echo 1 || echo 0 ;;
     zstd) macro_is "${config}" HTS_USEZSTD 1 && echo 1 || echo 0 ;;
+    psl) macro_is "${config}" HTS_USEPSL 1 && echo 1 || echo 0 ;;
     # htsbacktrace.c needs __linux as well as the macro.
     backtrace)
         if target_is_linux && macro_is "${config}" HAVE_BACKTRACE 1; then
@@ -68,7 +69,7 @@ want_feature() {
     esac
 }
 
-known="brotli zstd backtrace iconv crashtest mptcp mptcpinfo"
+known="brotli zstd psl backtrace iconv crashtest mptcp mptcpinfo"
 for f in ${known}; do
     got=$(sed -n "s/^${f} //p" <<<"${report}")
     test -n "${got}" || fail "-#test=features reports nothing for ${f}"

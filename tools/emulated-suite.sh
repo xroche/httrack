@@ -40,7 +40,7 @@ apt-get update
 # leg covers is the engine self-tests and the install plumbing.
 apt-get install -y --no-install-recommends \
     build-essential autoconf automake libtool autoconf-archive \
-    zlib1g-dev libssl-dev libbrotli-dev libzstd-dev ca-certificates
+    zlib1g-dev libssl-dev libbrotli-dev libzstd-dev libpsl-dev ca-certificates
 
 bash ./bootstrap
 mkdir -p /bld

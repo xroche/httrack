@@ -27,7 +27,11 @@ somebody has to move at every bump.
   `--with-iconv[=DIR]` converts charsets with `iconv()`. All four default to
   `auto`. See
   [the optional dependencies are automagic](#the-optional-dependencies-are-automagic).
-- `--disable-auto-features` turns those four defaults into `no`. Pass it.
+- `--with-psl[=DIR]` uses libpsl to decide which hosts are the same site, for
+  the `Sec-Fetch-Site` header. Without it, httrack compares the last two labels
+  of each host name, so `a.github.io` and `b.github.io` count as one site. It
+  defaults to `auto` too.
+- `--disable-auto-features` turns those defaults into `no`. Pass it.
 - `--enable-https=yes|no|auto` selects OpenSSL. On by default.
 - `--enable-ipv6=yes|no|auto` selects IPv6, and probes for `getaddrinfo` by
   default. It picks which arm of `SOCaddr` the installed headers declare, so pin
@@ -99,14 +103,14 @@ meson's `auto_features=disabled`:
 
 ```
 ./configure --disable-auto-features \
-    --with-brotli --with-zstd --enable-backtrace --with-iconv
+    --with-brotli --with-zstd --enable-backtrace --with-iconv --with-psl
 ```
 
 Everything you pass beside it still wins, and fails loudly when its library is
 absent. The one exception is `--enable-backtrace` away from Linux, which reports
 `no (not implemented on <host>)` and carries on, so a recipe can pass it for
 every architecture it builds. Every optional feature you leave out is off,
-whatever the builder has installed, so the line above names all four this build
+whatever the builder has installed, so the line above names every one this build
 takes. zlib and OpenSSL are not among them, because both are required and both
 already fail the build when they are missing. A feature the switch turned off
 reports as `no (auto-features off)`, which is how you tell it apart from a probe

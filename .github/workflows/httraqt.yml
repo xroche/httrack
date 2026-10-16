@@ -43,7 +43,7 @@ jobs:
           sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
-            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev \
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev libpsl-dev \
             cmake qt6-base-dev qt6-multimedia-dev
 
       - name: Build and install libhttrack

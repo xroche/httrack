@@ -37,6 +37,34 @@ Please visit our Website: http://www.httrack.com
 #include "htscore.h"
 #include "htswizard.h"
 
+#if HTS_USEPSL
+#include <libpsl.h>
+
+/* Read-only once hts_init() has set it, so crawl threads share it unlocked. */
+static psl_ctx_t *fetch_psl = NULL;
+#endif
+
+void hts_fetch_init(void) {
+#if HTS_USEPSL
+  fetch_psl = psl_latest(NULL);
+#endif
+}
+
+void hts_fetch_uninit(void) {
+#if HTS_USEPSL
+  psl_free(fetch_psl);
+  fetch_psl = NULL;
+#endif
+}
+
+hts_boolean hts_fetch_has_psl(void) {
+#if HTS_USEPSL
+  return fetch_psl != NULL;
+#else
+  return HTS_FALSE;
+#endif
+}
+
 static hts_boolean span_eq(const char *a, size_t alen, const char *b,
                            size_t blen) {
   return alen == blen && strncasecmp(a, b, alen) == 0 ? HTS_TRUE : HTS_FALSE;
@@ -310,9 +338,10 @@ static void origin_of(const char *adr, fetch_origin *o) {
 
   o->https = strfield(adr, "https:") ? HTS_TRUE : HTS_FALSE;
   end = p + strcspn(p, "/?#");
-  at = memchr(p, '@', (size_t) (end - p));
+  /* The last '@' ends the userinfo. */
+  at = strrchr_limit(p, '@', end);
   if (at != NULL)
-    p = at + 1;
+    p = at;
   o->host = p;
   if (*p == '[') {
     const char *const close = memchr(p, ']', (size_t) (end - p));
@@ -326,23 +355,65 @@ static void origin_of(const char *adr, fetch_origin *o) {
   o->port = o->https ? 443 : 80;
   if (p < end && *p == ':' && p + 1 < end)
     o->port = atoi(p + 1);
-  /* "example.com." names the same host as "example.com" */
-  if (o->host_len > 1 && o->host[o->host_len - 1] == '.')
-    o->host_len--;
 }
 
 static hts_boolean host_is_ip(const char *host, size_t len) {
   return (len > 0 && host[0] == '[') || hts_host_is_ipv4(host, len);
 }
 
-/* The tail of the host same-site compares: the last two labels, or the whole
-   host for an IP literal. */
+#if HTS_USEPSL
+/* The registrable domain of the first n bytes of the host, extended to its end,
+   or the whole host when it is a public suffix or too long. NULL when the list
+   did not load. */
+static const char *psl_site_key(const fetch_origin *o, size_t n, size_t *len) {
+  char host[256];
+  const char *reg;
+
+  if (fetch_psl == NULL)
+    return NULL;
+  if (n >= sizeof(host))
+    return o->host;
+  memcpy(host, o->host, n);
+  host[n] = '\0';
+  hts_lowcase(host);
+  reg = psl_registrable_domain(fetch_psl, host);
+  if (reg == NULL)
+    reg = host;
+  *len = o->host_len - (size_t) (reg - host);
+  return o->host + (reg - host);
+}
+#endif
+
+/* The tail of the host same-site compares: the registrable domain, else the
+   last two labels, or the whole host for an IP literal. */
 static const char *site_key(const fetch_origin *o, size_t *len) {
-  size_t i = o->host_len, dots = 0;
+  size_t n = o->host_len, i, dots = 0;
 
   *len = o->host_len;
   if (host_is_ip(o->host, o->host_len))
     return o->host;
+  /* "a.example.com." keys on "example.com.", and libpsl cannot read the dot. */
+  if (n > 1 && o->host[n - 1] == '.')
+    n--;
+  /* An empty label leaves no domain, so only the same host matches. */
+  for (i = 0; i < n; i++) {
+    if (o->host[i] == '.' && (i == 0 || i + 1 == n || o->host[i + 1] == '.'))
+      return o->host;
+  }
+  /* A browser reads "0x7f.0.0.1" as IPv4, and no TLD starts with a digit. */
+  for (i = n; i > 0 && o->host[i - 1] != '.'; i--)
+    ;
+  if (i < n && isdigit((unsigned char) o->host[i]))
+    return o->host;
+#if HTS_USEPSL
+  {
+    const char *const key = psl_site_key(o, n, len);
+
+    if (key != NULL)
+      return key;
+  }
+#endif
+  i = n;
   while (i > 0) {
     if (o->host[i - 1] == '.' && ++dots == 2)
       break;
