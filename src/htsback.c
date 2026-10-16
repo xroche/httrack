@@ -2933,9 +2933,7 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
           }
           back[p].http11 = 1;   /* 1.1 */
           back[p].range_req_size = (LLint) file_size;
-          back[p].r.req.range_used = 1;
-          back[p].is_update = 1;        /* this is an update of a file */
-          back[p].r.req.nocompression = 1;      /* Do not compress when updating! */
+          back[p].is_update = 1; /* this is an update of a file */
         } else {
           /* broken ; remove */
           url_savename_refname_remove(opt, adr, fil);
@@ -2985,8 +2983,6 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
                 back[p].http11 = 1;     // En tête 1.1
                 back[p].is_update = 1;  /* this is an update of a file */
                 back[p].range_req_size = sz;
-                back[p].r.req.range_used = 1;
-                back[p].r.req.nocompression = 1;
               } else {
                 hts_log_print(opt, LOG_WARNING,
                               "Could not find timestamp for partially present file, restarting (lost "
@@ -3064,6 +3060,8 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
       // et http11
       back[p].r.req.http11 = back[p].http11;
       back[p].r.req.nocompression = opt->nocompression;
+      // set here: hts_init_htsblk() above wiped the request
+      back[p].r.req.range_used = back[p].range_req_size > 0;
       back[p].r.req.nokeepalive = opt->nokeepalive;
 
       // mode ftp, court-circuit!
