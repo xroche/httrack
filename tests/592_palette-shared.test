@@ -39,8 +39,8 @@ test "${checked}" -ge 22 || fail "only ${checked} var() references found"
 pages=0
 for page in "${html}"/server/*.html; do
     grep -q 'href="style.css"' "${page}" || continue
-    order=$(grep -oE 'href="(style|theme|user)\.css"' "${page}" | tr '\n' ' ')
-    test "${order}" = 'href="style.css" href="theme.css" href="user.css" ' ||
+    order=$(grep -oE 'href="(style|/server/theme|user)\.css"' "${page}" | tr '\n' ' ')
+    test "${order}" = 'href="style.css" href="/server/theme.css" href="user.css" ' ||
         fail "${page##*/} loads ${order:-nothing}, not style.css, theme.css, then user.css"
     # Themes target a page by this class.
     name=${page##*/}
