@@ -73,6 +73,7 @@ selftest_queue cross-site fetchsite https://a.example.com. https://b.example.com
 selftest_queue same-site fetchsite https://a.example.com. https://b.example.com.
 selftest_queue cross-site fetchsite https://a.com.. https://b.com..
 selftest_queue cross-site fetchsite https://a..example.com https://b..example.com
+selftest_queue cross-site fetchsite http://0x7f.0.0.1 http://0x8.0.0.1
 selftest_queue same-site fetchsite https://a.example.com https://a.example.com:8443
 selftest_queue same-site fetchsite https://a.example.com https://b.example.com
 selftest_queue same-site fetchsite https://u:p@a.example.com https://b.example.com
@@ -98,6 +99,8 @@ if test "${site_rule}" = psl; then
     selftest_queue same-site fetchsite https://a.example.co.uk https://B.Example.CO.UK
     selftest_queue cross-site fetchsite https://a.example.co.uk. https://b.example.co.uk
     selftest_queue cross-site fetchsite https://a.co.uk. https://b.co.uk.
+    long=$(printf "%0250d" 0 | tr 0 x)
+    selftest_queue cross-site fetchsite "https://a${long}.co.uk" "https://b${long}.co.uk"
     selftest_queue same-site fetchsite https://a.example.co.uk. https://b.example.co.uk.
 fi
 

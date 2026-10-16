@@ -363,14 +363,16 @@ static hts_boolean host_is_ip(const char *host, size_t len) {
 
 #if HTS_USEPSL
 /* The registrable domain of the first n bytes of the host, extended to its end,
-   or the whole host when it is itself a public suffix. NULL when the list
-   cannot answer. */
+   or the whole host when it is a public suffix or too long. NULL when the list
+   did not load. */
 static const char *psl_site_key(const fetch_origin *o, size_t n, size_t *len) {
   char host[256];
   const char *reg;
 
-  if (fetch_psl == NULL || n >= sizeof(host))
+  if (fetch_psl == NULL)
     return NULL;
+  if (n >= sizeof(host))
+    return o->host;
   memcpy(host, o->host, n);
   host[n] = '\0';
   hts_lowcase(host);
@@ -398,6 +400,11 @@ static const char *site_key(const fetch_origin *o, size_t *len) {
     if (o->host[i] == '.' && (i == 0 || i + 1 == n || o->host[i + 1] == '.'))
       return o->host;
   }
+  /* A browser reads "0x7f.0.0.1" as IPv4, and no TLD starts with a digit. */
+  for (i = n; i > 0 && o->host[i - 1] != '.'; i--)
+    ;
+  if (i < n && isdigit((unsigned char) o->host[i]))
+    return o->host;
 #if HTS_USEPSL
   {
     const char *const key = psl_site_key(o, n, len);
