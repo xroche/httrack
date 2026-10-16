@@ -27,6 +27,8 @@ for entry in "${HTS_DISTDIR}"/html/*; do
     test "${entry##*/}" = server || ln -s "${entry}" "${root}/html/${entry##*/}"
 done
 cp -R "${HTS_DISTDIR}/html/server" "${root}/html/server"
+# distcheck makes the source tree read-only, and cp keeps those modes.
+chmod -R u+w "${root}/html/server"
 themes=${root}/html/server/themes
 # theme.css is generated, so a file by that name is never served.
 printf '/* SHADOW */\n' >"${root}/html/server/theme.css"

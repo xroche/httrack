@@ -328,7 +328,8 @@ AC_SUBST([LIBC_FORCE_LINK])
 ### PIE
 CFLAGS_PIE=""
 LDFLAGS_PIE=""
-AX_CHECK_COMPILE_FLAG([-fpie], [CFLAGS_PIE="-fpie"], [], [-Werror])
+# sparc64 caps the GOT under -fpie, and htsserver outgrew it, so use -fPIE.
+AX_CHECK_COMPILE_FLAG([-fPIE], [CFLAGS_PIE="-fPIE"], [], [-Werror])
 AX_CHECK_LINK_FLAG([-pie], [LDFLAGS_PIE="-pie"])
 AC_SUBST([CFLAGS_PIE])
 AC_SUBST([LDFLAGS_PIE])
