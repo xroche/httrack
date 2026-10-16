@@ -3475,6 +3475,71 @@ class Handler(SimpleHTTPRequestHandler):
     # Every url is absolute, on one line, so a scan reading a scheme's // as a
     # comment loses every asset after the first.
 
+    def route_fetchmeta(self):
+        """A page naming one resource per destination, each echoing the
+        request headers it was fetched with (Sec-Fetch-*)."""
+        name = urlsplit(self.path).path.rsplit("/", 1)[-1]
+        scheme = "https" if hasattr(self.connection, "cipher") else "http"
+        port = self.server.server_address[1]
+        here = "%s://127.0.0.1:%d/fetchmeta/" % (scheme, port)
+        other = "%s://localhost:%d/fetchmeta/" % (scheme, port)
+        echo = "PATH %s\n%s" % (self.path, self.headers)
+        if name == "index.html":
+            body = (
+                "<html><!--%s--><head>"
+                '<link rel="stylesheet" href="style.css">'
+                '<link rel="stylesheet" href="%sxstyle.css">'
+                '<link rel="canonical" href="canon.html">'
+                '<script src="app.js"></script></head><body>'
+                '<img src="img.png"><img src="bounce.png">'
+                '<iframe src="frame.html"></iframe>'
+                '<a href="page.html">p</a><a href="%scross.html">x</a>'
+                '<a href="moved.html">m</a><img src="noext">'
+                '<a href="named.html" target="main">n</a>'
+                '<a href="based.html">b</a>'
+                "</body></html>" % (echo, other, other)
+            )
+            self.send_raw(body.encode(), "text/html")
+        elif name == "style.css":
+            css = (
+                "/*%s*/ @font-face{src:url(font.woff2)} body{background:url(bg.png)}"
+                " div{background:url(bg.svg)}"
+            )
+            self.send_raw((css % echo).encode(), "text/css")
+        elif name == "xstyle.css":
+            # The font sits on the page's origin, so it is same-origin.
+            css = "/*%s*/ @font-face{src:url(%sxfont.woff2)}"
+            self.send_raw((css % (echo, here)).encode(), "text/css")
+        elif name == "frame.html":
+            body = (
+                '<meta http-equiv="refresh" content="0; url=refreshed.html">'
+                '<a href="inframe.html">f</a>'
+            )
+            self.send_raw((body + echo).encode(), "text/html")
+        elif name == "named.html":
+            body = '<a href="from-named.html">f</a>\n'
+            self.send_raw((body + echo).encode(), "text/html")
+        elif name == "based.html":
+            body = '<base target="_top"><a href="from-based.html">f</a>\n'
+            self.send_raw((body + echo).encode(), "text/html")
+        elif name == "start.html":
+            self.send_redirect(here + "index.html")
+        # Each chain leaves for localhost and comes back, so it is cross-site.
+        elif name in ("bounce.png", "moved.html", "noext"):
+            self.send_redirect(other + "hop-" + name)
+        elif name.startswith("hop-"):
+            self.send_redirect(here + "landed-" + name[4:])
+        else:
+            types = {
+                "png": "image/png",
+                "js": "text/javascript",
+                "woff2": "font/woff2",
+                "html": "text/html",
+                "svg": "image/svg+xml",
+            }
+            ctype = types.get(name.rsplit(".", 1)[-1], "text/plain")
+            self.send_raw(echo.encode(), ctype)
+
     def route_webfont(self):
         name = urlsplit(self.path).path.rsplit("/", 1)[-1]
         base = "http://127.0.0.1:%d/webfont/" % self.server.server_address[1]
@@ -4316,6 +4381,9 @@ class Handler(SimpleHTTPRequestHandler):
             return True
         if path.startswith("/asset/"):
             self.route_asset()
+            return True
+        if path.startswith("/fetchmeta/"):
+            self.route_fetchmeta()
             return True
         if path.startswith("/webfont/"):
             self.route_webfont()

@@ -64,6 +64,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsparse.h"
 #include "htssinglefile.h"
 #include "htsback.h"
+#include "htsfetch.h"
 
 // arrays
 #include "htsarrays.h"
@@ -738,6 +739,42 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
   }
 }
 
+/* How a browser fetches the link found while parsing link ptr. Links in a
+   stylesheet or script file compare with the page that loaded that file. */
+static void parse_fetch_meta(httrackp *opt, int ptr, hts_fetch_meta *fm,
+                             hts_boolean redirect_stub,
+                             hts_boolean meta_refresh, hts_boolean opaque,
+                             hts_boolean inscript, hts_boolean incss,
+                             hts_boolean tagless_body, int link_frame,
+                             const char *tag_name, const char *attr,
+                             const char *fil) {
+  const hts_fetch_meta *const page = &heap(ptr)->fetch;
+
+  memset(fm, 0, sizeof(*fm));
+  if (ptr == 0) { /* a start URL, as if typed in */
+    fm->dest = HTS_FETCH_DEST_DOCUMENT;
+    fm->site = HTS_FETCH_SITE_NONE;
+    fm->user = HTS_TRUE;
+    return;
+  }
+  /* The page written in place of a redirect continues its chain. */
+  if (redirect_stub) {
+    *fm = *page;
+    hts_fetch_through(opt, fm, heap(ptr)->adr);
+    return;
+  }
+  /* A refresh navigates whatever frame holds the page. */
+  if (meta_refresh)
+    fm->dest = (unsigned char) hts_fetch_same_frame(page->dest);
+  else if (!opaque && inscript && incss)
+    hts_fetch_classify(fm, NULL, attr, fil, HTS_FETCH_DEST_UNKNOWN);
+  /* A script body names URLs for code a crawler never runs. */
+  else if (!opaque && !inscript && tag_name != NULL)
+    hts_fetch_classify(fm, tag_name, attr, fil, link_frame);
+  /* A file no known page loaded leaves initiator 0, which sends none. */
+  fm->initiator = tagless_body ? page->initiator : ptr;
+}
+
 /* Is this raw data-src / data-srcset value a lazy-load placeholder rather
    than a URL? Templates ({{x}}, JSON) and a few placeholder words are. */
 static hts_boolean data_attr_is_not_url(const char *s, size_t len) {
@@ -922,6 +959,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       int incomment = 0;        // dans un <!--
       int inscript = 0;         // dans un scipt pour applets javascript)
       int incss = 0;            /* CSS lets url(x) go unquoted */
+      int link_frame =
+          -1; /* what a link with no target navigates, once known */
       hts_boolean css_file = HTS_FALSE;
       int inscript_locked = 0;  // in locked script (ie. js file)
       signed char inscript_state[INSCRIPT_NSTATES][257];
@@ -2109,6 +2148,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                that legitimately has no tag. */
             const char *const sf_tag = intag_start_valid ? intag_name : NULL;
             const int sf_tagless_body = inscript_locked;
+            hts_fetch_meta link_fetch = {0};
 
             /* The cap stops discovery here, so the rest of the page is
                written external rather than pointing at files nothing fetches.
@@ -2921,6 +2961,21 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       strcpybuff(afs.save, "");     // dummy
                     }
                   }
+                  /* A <base target> sends every link with no target to a
+                     frame we cannot tell. */
+                  if (link_frame < 0)
+                    link_frame =
+                        hts_fetch_has_base_target(r->adr)
+                            ? HTS_FETCH_DEST_UNKNOWN
+                            : hts_fetch_same_frame(heap(ptr)->fetch.dest);
+                  parse_fetch_meta(
+                      opt, ptr, &link_fetch, HTTP_IS_REDIRECT(r->statuscode),
+                      p_searchMETAURL, in_media != NULL || p_type != 0,
+                      inscript, incss, sf_tagless_body, link_frame, sf_tag,
+                      tag_attr_start, afs.af.fil);
+                  /* Naming followed redirects whose hops it does not keep. */
+                  if (former.adr[0] != '\0')
+                    link_fetch.dest = HTS_FETCH_DEST_UNKNOWN;
                   // resolve unresolved type
                   if (r_sv != -1 && p_type != 2 && p_type != -2
                       && forbidden_url == 0 && IS_DELAYED_EXT(afs.save)
@@ -2928,10 +2983,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     time_t t;
 
                     // pas d'erreur, on continue
-                    r_sv =
-                      hts_wait_delayed(str, &afs, heap(ptr)->adr,
-                                       heap(ptr)->fil, &former,
-                                       &forbidden_url);
+                    r_sv = hts_wait_delayed(str, &afs, heap(ptr)->adr,
+                                            heap(ptr)->fil, &former,
+                                            &forbidden_url, &link_fetch);
 
                     /* User interaction, because hts_wait_delayed can be slow.. (3.43) */
                     t = time(NULL);
@@ -3604,6 +3658,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             XH_uninit;  // désallocation mémoire & buffers
                             return -1;
                           }
+                          heap_top()->fetch = link_fetch;
                           // mode test?
                           if (!just_test_it)
                             heap_top()->testmode = 0;      // pas mode test
@@ -4068,6 +4123,9 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
                     // same transfer under another name: carry the restart latch
                     // too, else a 206/alias alternation restarts for free
                     heap_top()->refetch_whole = heap(ptr)->refetch_whole;
+                    // Sec-Fetch-Site takes the worst hop of the chain
+                    heap_top()->fetch = heap(ptr)->fetch;
+                    hts_fetch_through(opt, &heap_top()->fetch, heap(ptr)->adr);
                     heap_top()->premier = heap(ptr)->premier;
                     heap_top()->precedent = heap(ptr)->precedent;
                   } else {      // oups erreur, plus de mémoire!!
@@ -4174,6 +4232,7 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
           heap_top()->pass2 = max(heap(ptr)->pass2, numero_passe);
           heap_top()->retry = heap(ptr)->retry;
           heap_top()->refetch_whole = heap(ptr)->refetch_whole;
+          heap_top()->fetch = heap(ptr)->fetch;
           heap_top()->premier = heap(ptr)->premier;
           heap_top()->precedent = ptr;
           error = 1;
@@ -4360,6 +4419,7 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
             heap_top()->pass2 = max(heap(ptr)->pass2, numero_passe);
             heap_top()->retry =
                 restart_whole ? heap(ptr)->retry : heap(ptr)->retry - 1;
+            heap_top()->fetch = heap(ptr)->fetch;
             heap_top()->premier = heap(ptr)->premier;
             heap_top()->precedent = heap(ptr)->precedent;
             // refetch whole with no Range, and latch out a second free restart
@@ -4522,8 +4582,8 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
         /* No headers were passed, so the name may still be a placeholder: the
            parser resolves it before recording, and so must we (#1253). */
         if (r_sv != -1 && IS_DELAYED_EXT(add.save)) {
-          r_sv =
-              hts_wait_delayed(str, &add, NULL, NULL, &former, &forbidden_url);
+          r_sv = hts_wait_delayed(str, &add, NULL, NULL, &former,
+                                  &forbidden_url, NULL);
         }
         if (r_sv != -1) {
           /* A refused type, or a stop that left the placeholder: recording
@@ -4655,7 +4715,7 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
     if (back_add(sback, opt, cache, urladr(), urlfil(), savename(),
                  heap(heap(ptr)->precedent)->adr,
                  heap(heap(ptr)->precedent)->fil, heap(ptr)->testmode,
-                 heap(ptr)->refetch_whole) == -1) {
+                 heap(ptr)->refetch_whole, &heap(ptr)->fetch) == -1) {
       printf("PANIC! : Crash adding error, unexpected error found.. [%d]\n",
              __LINE__);
 #if BDEBUG==1
@@ -5006,9 +5066,9 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
 }
 
 /* Wait for delayed types */
-int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
+int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
                      char *parent_adr, char *parent_fil, lien_adrfil *former,
-                     int *forbidden_url) {
+                     int *forbidden_url, hts_fetch_meta *fetch) {
   ENGINE_LOAD_CONTEXT_BASE();
   hash_struct *const hash = hashptr;
 
@@ -5096,9 +5156,9 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
       }
 
       /* Add in backing (back_index() will respond correctly) */
-      if (back_add_if_not_exists
-          (sback, opt, cache, afs->af.adr, afs->af.fil, afs->save, parent_adr, parent_fil,
-           0) != -1) {
+      if (back_add_if_not_exists(sback, opt, cache, afs->af.adr, afs->af.fil,
+                                 afs->save, parent_adr, parent_fil, 0,
+                                 fetch) != -1) {
         int b;
 
         b = back_index(opt, sback, afs->af.adr, afs->af.fil, afs->save);
@@ -5155,9 +5215,9 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
           }
 
           /* Re-Add wiht correct type */
-          if (back_add_if_not_exists
-              (sback, opt, cache, afs->af.adr, afs->af.fil, afs->save, parent_adr, parent_fil,
-               0) != -1) {
+          if (back_add_if_not_exists(sback, opt, cache, afs->af.adr,
+                                     afs->af.fil, afs->save, parent_adr,
+                                     parent_fil, 0, fetch) != -1) {
             b = back_index(opt, sback, afs->af.adr, afs->af.fil, afs->save);
           }
           if (b < 0) {
@@ -5271,6 +5331,8 @@ int hts_wait_delayed(htsmoduleStruct * str, lien_adrfilsave *afs,
             if (strnotempty(mov_url)) {   // location existe!
               lien_adrfil moved;
               moved.adr[0] = moved.fil[0] = '\0';
+              if (fetch != NULL)
+                hts_fetch_through(opt, fetch, afs->af.adr);
               //
               if (ident_url_relatif(mov_url, afs->af.adr, afs->af.fil, &moved) >= 0) {
                 hts_log_print(opt, LOG_DEBUG,

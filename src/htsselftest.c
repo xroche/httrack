@@ -223,6 +223,7 @@ static const struct selftest_entry *const selftest_tables[] = {
     selftests_filters, selftests_header,  selftests_io,     selftests_mime,
     selftests_name,    selftests_net,     selftests_opt,    selftests_parse,
     selftests_tools,   selftests_warc,    selftests_wizard, selftests_lines,
+    selftests_fetch,
 };
 
 static void list_selftests(void) {

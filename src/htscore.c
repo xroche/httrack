@@ -4284,7 +4284,7 @@ int back_fill(struct_back * sback, httrackp * opt, cache_back * cache,
           if (back_add(sback, opt, cache, heap(p)->adr, heap(p)->fil,
                        heap(p)->sav, heap(heap(p)->precedent)->adr,
                        heap(heap(p)->precedent)->fil, heap(p)->testmode,
-                       heap(p)->refetch_whole) == -1) {
+                       heap(p)->refetch_whole, &heap(p)->fetch) == -1) {
             hts_log_print(opt, LOG_DEBUG,
                           "error: unable to add more links through back_add for back_fill");
 #if BDEBUG==1
@@ -4891,8 +4891,8 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
               lien_adrfil former;
 
               former.adr[0] = former.fil[0] = '\0';
-              r =
-                hts_wait_delayed(str, &afs, NULL, NULL, &former, &forbidden_url);
+              r = hts_wait_delayed(str, &afs, NULL, NULL, &former,
+                                   &forbidden_url, NULL);
             }
             // end resolve unresolved type
             opt->savename_type = a;

@@ -51,6 +51,7 @@ Please visit our Website: http://www.httrack.com
 /* END specific definitions */
 
 #include "htsback.h"
+#include "htsfetch.h"
 
 #include "htsftp.h"
 #include "htscodec.h"
@@ -237,9 +238,11 @@ struct_back *back_new(httrackp *opt, int back_max) {
   sback->lnk = (lien_back *) calloct((back_max + 1), sizeof(lien_back));
   sback->connect_fallback = (hts_connect_fallback *) calloct(
       (back_max + 1), sizeof(hts_connect_fallback));
+  sback->fetch =
+      (hts_fetch_meta *) calloct((back_max + 1), sizeof(hts_fetch_meta));
   sback->ready = coucal_new(0);
   if (sback->lnk == NULL || sback->connect_fallback == NULL ||
-      sback->ready == NULL) {
+      sback->fetch == NULL || sback->ready == NULL) {
     back_free(&sback);
     return NULL;
   }
@@ -264,6 +267,7 @@ void back_free(struct_back ** sback) {
       (*sback)->lnk = NULL;
     }
     freet((*sback)->connect_fallback);
+    freet((*sback)->fetch);
     if ((*sback)->ready != NULL) {
       coucal_delete(&(*sback)->ready);
       (*sback)->ready_size_bytes = 0;
@@ -2552,13 +2556,14 @@ int back_stack_available(struct_back * sback) {
 }
 
 // ajouter un lien en backing
-int back_add_if_not_exists(struct_back * sback, httrackp * opt,
-                           cache_back * cache, const char *adr, const char *fil, const char *save,
-                           const char *referer_adr, const char *referer_fil, int test) {
+int back_add_if_not_exists(struct_back *sback, httrackp *opt, cache_back *cache,
+                           const char *adr, const char *fil, const char *save,
+                           const char *referer_adr, const char *referer_fil,
+                           int test, const hts_fetch_meta *fetch) {
   back_clean(opt, cache, sback);        /* first cleanup the backlog to ensure that we have some entry left */
   if (!back_exist(sback, opt, adr, fil, save)) {
     return back_add(sback, opt, cache, adr, fil, save, referer_adr, referer_fil,
-                    test, HTS_FALSE);
+                    test, HTS_FALSE, fetch);
   }
   return 0;
 }
@@ -2566,7 +2571,7 @@ int back_add_if_not_exists(struct_back * sback, httrackp * opt,
 int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
              const char *adr, const char *fil, const char *save,
              const char *referer_adr, const char *referer_fil, int test,
-             hts_boolean refetch_whole) {
+             hts_boolean refetch_whole, const hts_fetch_meta *fetch) {
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
   int p = 0;
@@ -3041,6 +3046,12 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
       // fresh connect: address list not yet probed, start at the first
       sback->connect_fallback[p].addr_index = 0;
       sback->connect_fallback[p].addr_count = -1;
+      /* A type probe carries no fetch metadata. */
+      memset(&sback->fetch[p], 0, sizeof(sback->fetch[p]));
+      if (fetch != NULL && !test) {
+        sback->fetch[p] = *fetch;
+        hts_fetch_through(opt, &sback->fetch[p], adr);
+      }
       // recopier proxy
       if ((back[p].r.req.proxy.active = opt->proxy.active)) {
         if (StringBuff(opt->proxy.bindhost) != NULL)
@@ -3893,7 +3904,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             const int sent = http_sendhead(
                 opt, opt->cookie, back[i].head_request == 1, back[i].send_too,
                 back[i].url_adr, back[i].url_fil, back[i].referer_adr,
-                back[i].referer_fil, &back[i].r);
+                back[i].referer_fil, &sback->fetch[i], &back[i].r);
 
             /* A refused or unsent request left the socket closed, so the slot
                is finished rather than waiting for headers (#1822). */

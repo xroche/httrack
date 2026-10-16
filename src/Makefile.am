@@ -85,14 +85,15 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	htsselftest.c htsselftest_util.c \
 	htsback_selftest.c htscache_selftest.c htscharset_selftest.c \
 	htscmdline_selftest.c \
-	htscookie_selftest.c htsdns_selftest.c htsfilters_selftest.c \
+	htscookie_selftest.c htsdns_selftest.c htsfetch_selftest.c \
+	htsfilters_selftest.c \
 	htsheader_selftest.c htsio_selftest.c htslib_selftest.c \
 	htslines_selftest.c \
 	htsmime_selftest.c htsname_selftest.c htsnet_selftest.c \
 	htsopt_selftest.c htsparse_selftest.c htstools_selftest.c \
 	htswarc_selftest.c \
 	htswizard_selftest.c \
-	htscatchurl.c htsfilters.c htsftp.c htshash.c coucal/coucal.c \
+	htscatchurl.c htsfetch.c htsfilters.c htsftp.c htshash.c coucal/coucal.c \
 	htscmdline.c htshelp.c htslib.c htslines.c htsurlport.c htsdate.c htscoremain.c \
 	htsname.c htsrobots.c htstools.c htsrandom.c htswizard.c \
 	htsalias.c htsthread.c htsindex.c htsbauth.c \
@@ -109,7 +110,7 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	htshelp.h htsindex.h htsio.h htslib.h htslines.h htsurlport.h htsmd5.h \
 	htsmodules.h htsname.h htsnet.h htssniff.h \
 	htsopt.h htsrobots.h htsthread.h htswin32.h  \
-	htscrashtest.h htstools.h htsrandom.h htswizard.h htswrap.h htscodec.h htswarc.h htschanges.h htssinglefile.h htssitemap.h htsproxy.h htszlib.h  \
+	htscrashtest.h htstools.h htsrandom.h htswizard.h htswrap.h htscodec.h htswarc.h htschanges.h htssinglefile.h htsfetch.h htssitemap.h htsproxy.h htszlib.h  \
 	htsstrings.h htsarrays.h htsarena.h httrack-library.h \
 	htscharset.h punycode.h htsencoding.h htsescape.h \
 	htsentities.h htsentities.sh htsbasiccharsets.sh htscodepages.h \

@@ -120,7 +120,8 @@ const char *hts_optalias[][4] = {
   {"accept", "-%a", "param1", ""},
   {"headers", "-%X", "param1", ""},
   {"browser-headers", "-%Q", "onoff",
-   "send the client hints the browser named by -F would send"},
+   "send the client hints and Sec-Fetch-* headers the browser named by -F "
+   "would send"},
   {"structure", "-N", "paramn", ""},
   {"user-structure", "-N", "param1", ""},
   {"long-names", "-L", "param", ""},

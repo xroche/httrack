@@ -1,0 +1,196 @@
+#!/bin/bash
+#
+# Fetch metadata (-%Q): the Sec-Fetch-* values a browser sends for each kind
+# of reference, and the requests that carry them.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+chrome='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36'
+
+nav='mode=navigate user=-'
+nocors='mode=no-cors user=-'
+selftest_queue 'dest=document mode=navigate user=?1' fetchdest 'a href=x' href
+selftest_queue 'dest=document mode=navigate user=?1' fetchdest 'area shape=rect href=x' href
+# A click navigates the frame the link names, which only a few targets tell.
+selftest_queue 'dest=iframe mode=navigate user=?1' fetchdest 'a href=x' href x iframe
+selftest_queue 'dest=frame mode=navigate user=?1' fetchdest 'a target=_self href=x' href x frame
+selftest_queue 'dest=document mode=navigate user=?1' fetchdest 'a target=_top href=x' href x iframe
+selftest_queue 'dest=document mode=navigate user=?1' fetchdest 'a/target=_top href=x' href x iframe
+selftest_queue 'dest=document mode=navigate user=?1' fetchdest 'a target="_blank" href=x' href x frame
+selftest_queue 'dest=document mode=navigate user=?1' fetchdest 'a target=_parent href=x' href
+selftest_queue none fetchdest 'a target=_parent href=x' href x iframe
+selftest_queue none fetchdest 'a target=main href=x' href
+selftest_queue none fetchdest 'a href=x' href x object
+selftest_queue none fetchdest 'a href=x' href x empty
+selftest_queue "dest=iframe $nav" fetchdest 'iframe src=x' src
+selftest_queue "dest=frame $nav" fetchdest 'frame src=x' src
+selftest_queue "dest=object $nav" fetchdest 'object data=x' data
+selftest_queue "dest=embed $nav" fetchdest 'embed src=x' src
+selftest_queue "dest=image $nocors" fetchdest 'img src=x' src
+selftest_queue "dest=image $nocors" fetchdest 'img srcset=x' srcset
+selftest_queue "dest=image $nocors" fetchdest 'img data-srcset=x' data-srcset
+selftest_queue "dest=image $nocors" fetchdest 'source srcset=x' srcset
+selftest_queue "dest=image $nocors" fetchdest 'video poster=x' poster
+selftest_queue "dest=image $nocors" fetchdest 'td background=x' background
+selftest_queue "dest=video $nocors" fetchdest 'video src=x' src
+selftest_queue "dest=audio $nocors" fetchdest 'audio src=x' src
+selftest_queue "dest=script $nocors" fetchdest 'script src=x' src
+selftest_queue 'dest=script mode=cors user=-' fetchdest 'script type="module" src=x' src
+selftest_queue 'dest=image mode=cors user=-' fetchdest 'img crossorigin src=x' src
+selftest_queue 'dest=script mode=cors user=-' fetchdest "script crossorigin='anonymous' src=x" src
+selftest_queue "dest=style $nocors" fetchdest 'link rel=stylesheet href=x' href
+selftest_queue "dest=style $nocors" fetchdest 'link rel="alternate stylesheet" href=x' href
+selftest_queue "dest=image $nocors" fetchdest 'link rel="shortcut icon" href=x' href
+selftest_queue 'dest=font mode=cors user=-' fetchdest 'link rel=preload as=font href=x' href
+selftest_queue "dest=style $nocors" fetchdest 'link rel=preload as=style href=x' href
+selftest_queue 'dest=script mode=cors user=-' fetchdest 'link rel=modulepreload href=x' href
+# A stylesheet reference: the path tells a font from an image.
+selftest_queue 'dest=font mode=cors user=-' fetchdest - url /f/a.woff2
+selftest_queue "dest=image $nocors" fetchdest - url '/i/a.PNG?v=2'
+selftest_queue "dest=style $nocors" fetchdest - import /c/a.css
+# A reference the classifier cannot name sends nothing.
+selftest_queue none fetchdest 'link rel=canonical href=x' href
+selftest_queue none fetchdest 'link href=x' href
+selftest_queue none fetchdest 'link rel=preload as=fetch href=x' href
+selftest_queue none fetchdest 'link rel=prefetch as=script href=x' href
+selftest_queue none fetchdest 'link rel=stylesheet-x href=x' href
+selftest_queue none fetchdest 'source src=x' src
+selftest_queue none fetchdest 'img longdesc=x' longdesc
+selftest_queue none fetchdest 'a download href=x' href
+selftest_queue none fetchdest 'img data-src-x=x' data-src-x
+selftest_queue none fetchdest - url /a/b.php
+selftest_queue none fetchdest - url /f/a.svg
+selftest_queue none fetchdest - url /a.png/b
+
+selftest_queue same-origin fetchsite https://a.example.com https://a.example.com:443
+selftest_queue same-origin fetchsite https://EXAMPLE.com. https://example.com/x
+selftest_queue same-site fetchsite https://a.example.com https://a.example.com:8443
+selftest_queue same-site fetchsite https://a.example.com https://b.example.com
+selftest_queue same-site fetchsite https://u:p@a.example.com https://b.example.com
+selftest_queue same-site fetchsite 'https://[::1]:8080' 'https://[::1]:8081'
+selftest_queue cross-site fetchsite https://a.example.com https://b.other.com
+selftest_queue cross-site fetchsite www.example.com https://www.example.com
+selftest_queue cross-site fetchsite https://127.0.0.1 https://127.0.0.2
+selftest_queue cross-site fetchsite https://10.1.0.1 https://10.2.0.1
+selftest_queue cross-site fetchsite https://example.com https://www.example.org
+
+selftest_queue yes fetchtrust https://www.example.com
+selftest_queue yes fetchtrust localhost:8080
+selftest_queue yes fetchtrust www.localhost
+selftest_queue yes fetchtrust 127.0.0.1:80
+selftest_queue yes fetchtrust '[::1]:80'
+selftest_queue no fetchtrust www.example.com
+selftest_queue no fetchtrust 10.0.0.1
+selftest_queue no fetchtrust 127.example.com
+selftest_queue no fetchtrust localhost.example.com
+selftest_queue no fetchtrust ftp://127.0.0.1/
+selftest_run_queued
+
+d=fetchmeta
+# Loopback is trustworthy, so a plain http crawl of the test server sends them.
+bash "$top_srcdir/tests/local-crawl.sh" \
+    --file-matches "$d/index.html" '^Sec-Fetch-Site: none$' \
+    --file-matches "$d/index.html" '^Sec-Fetch-User: [?]1$' \
+    --file-matches "$d/page.html" '^Sec-Fetch-Site: same-origin$' \
+    --file-matches "$d/page.html" '^Sec-Fetch-User: [?]1$' \
+    --file-matches "$d/page.html" '^Sec-Fetch-Dest: document$' \
+    --file-matches "$d/frame.html" '^Sec-Fetch-Dest: iframe$' \
+    --file-matches "$d/frame.html" '^Sec-Fetch-Mode: navigate$' \
+    --file-not-matches "$d/frame.html" '^Sec-Fetch-User' \
+    --file-matches "$d/img.png" '^Sec-Fetch-Dest: image$' \
+    --file-matches "$d/img.png" '^Sec-Fetch-Mode: no-cors$' \
+    --file-not-matches "$d/img.png" '^Sec-Fetch-User' \
+    --file-matches "$d/app.js" '^Sec-Fetch-Dest: script$' \
+    --file-matches "$d/style.css" '^Sec-Fetch-Dest: style$' \
+    --file-matches "$d/font.woff2" '^Sec-Fetch-Dest: font$' \
+    --file-matches "$d/font.woff2" '^Sec-Fetch-Mode: cors$' \
+    --file-matches "$d/bg.png" '^Sec-Fetch-Dest: image$' \
+    --file-matches "$d/canon.html" '^PATH ' \
+    --file-not-matches "$d/canon.html" '^Sec-Fetch' \
+    --file-matches "$d/bg.svg" '^PATH ' \
+    --file-not-matches "$d/bg.svg" '^Sec-Fetch' \
+    --file-matches "$d/xfont.woff2" '^Sec-Fetch-Site: same-origin$' \
+    --file-matches "$d/landed-bounce.png" '^Sec-Fetch-Site: cross-site$' \
+    --file-matches "$d/landed-bounce.png" '^Sec-Fetch-Dest: image$' \
+    --file-matches "$d/landed-moved.html" '^Sec-Fetch-Site: cross-site$' \
+    --file-matches "$d/landed-moved.html" '^Sec-Fetch-User: [?]1$' \
+    --file-matches "$d/landed-noext" '^Sec-Fetch-Site: cross-site$' \
+    --file-matches "$d/refreshed.html" '^Sec-Fetch-Dest: iframe$' \
+    --file-not-matches "$d/refreshed.html" '^Sec-Fetch-User' \
+    --file-matches "$d/inframe.html" '^Sec-Fetch-Dest: iframe$' \
+    --file-matches "$d/inframe.html" '^Sec-Fetch-User: [?]1$' \
+    --file-matches "$d/named.html" '^PATH ' \
+    --file-not-matches "$d/named.html" '^Sec-Fetch' \
+    --file-matches "$d/from-named.html" '^PATH ' \
+    --file-not-matches "$d/from-named.html" '^Sec-Fetch' \
+    --file-matches "$d/based.html" '^Sec-Fetch-Dest: document$' \
+    --file-matches "$d/from-based.html" '^PATH ' \
+    --file-not-matches "$d/from-based.html" '^Sec-Fetch' \
+    --file-not-matches "$d/page.html" '^Upgrade-Insecure-Requests' \
+    httrack "BASEURL/$d/index.html" -F "$chrome" '+localhost*'
+
+# The parser follows the redirects rather than the type check, and a page
+# redirect becomes a page of its own that links to the target.
+bash "$top_srcdir/tests/local-crawl.sh" \
+    --file-matches "$d/bounce.png" '^PATH /fetchmeta/landed-bounce.png$' \
+    --file-matches "$d/bounce.png" '^Sec-Fetch-Site: cross-site$' \
+    --file-matches "$d/bounce.png" '^Sec-Fetch-Dest: image$' \
+    --file-matches "$d/landed-moved.html" '^Sec-Fetch-Site: cross-site$' \
+    --file-matches "$d/landed-moved.html" '^Sec-Fetch-User: [?]1$' \
+    --file-matches "$d/index.html" '^Sec-Fetch-Site: none$' \
+    --file-matches "$d/landed-noext.html" '^PATH ' \
+    --file-not-matches "$d/landed-noext.html" '^Sec-Fetch' \
+    httrack "BASEURL/$d/start.html" -F "$chrome" '+localhost*' -%N0
+
+# No browser loads the links of a stylesheet opened on its own.
+bash "$top_srcdir/tests/local-crawl.sh" \
+    --file-matches "$d/bg.png" '^PATH ' \
+    --file-not-matches "$d/bg.png" '^Sec-Fetch' \
+    httrack "BASEURL/$d/style.css" -F "$chrome"
+
+# -%Q0 sends nothing, and so does a User-Agent that is no current browser.
+bash "$top_srcdir/tests/local-crawl.sh" \
+    --file-matches "$d/page.html" '^PATH ' \
+    --file-not-matches "$d/page.html" '^Sec-Fetch' \
+    httrack "BASEURL/$d/index.html" -F "$chrome" -%Q0
+bash "$top_srcdir/tests/local-crawl.sh" \
+    --file-matches "$d/page.html" '^PATH ' \
+    --file-not-matches "$d/page.html" '^Sec-Fetch' \
+    httrack "BASEURL/$d/index.html"
+bash "$top_srcdir/tests/local-crawl.sh" \
+    --file-matches "$d/page.html" '^User-Agent: Test$' \
+    --file-not-matches "$d/page.html" '^Sec-Fetch' \
+    httrack "BASEURL/$d/index.html" -F "$chrome" -%X 'User-Agent: Test'
+
+# A Sec-Fetch-* line from -%X replaces the engine's own.
+bash "$top_srcdir/tests/local-crawl.sh" \
+    --file-matches "$d/page.html" '^Sec-Fetch-Site: cross-site$' \
+    --file-not-matches "$d/page.html" '^Sec-Fetch-Site: same-origin' \
+    --file-matches "$d/page.html" '^Sec-Fetch-Mode: cors$' \
+    --file-not-matches "$d/page.html" '^Sec-Fetch-Mode: navigate' \
+    --file-matches "$d/page.html" '^Sec-Fetch-User: [?]0$' \
+    --file-not-matches "$d/page.html" '^Sec-Fetch-User: [?]1' \
+    --file-matches "$d/page.html" '^Sec-Fetch-Dest: empty$' \
+    --file-not-matches "$d/page.html" '^Sec-Fetch-Dest: document' \
+    httrack "BASEURL/$d/index.html" -F "$chrome" -%X 'Sec-Fetch-Site: cross-site' \
+    -%X 'Sec-Fetch-Mode: cors' -%X 'Sec-Fetch-User: ?0' -%X 'Sec-Fetch-Dest: empty'
+
+if test "$HTTPS_SUPPORT" == "no"; then
+    echo "no https support compiled, skipping the https crawl"
+    exit 0
+fi
+
+# Upgrade-Insecure-Requests goes on https navigations only.
+bash "$top_srcdir/tests/local-crawl.sh" --tls \
+    --file-matches "$d/page.html" '^Upgrade-Insecure-Requests: 1$' \
+    --file-matches "$d/frame.html" '^Upgrade-Insecure-Requests: 1$' \
+    --file-matches "$d/img.png" '^Sec-Fetch-Dest: image$' \
+    --file-not-matches "$d/img.png" '^Upgrade-Insecure-Requests' \
+    httrack "BASEURL/$d/index.html" -F "$chrome"
+bash "$top_srcdir/tests/local-crawl.sh" --tls \
+    --file-matches "$d/page.html" '^Upgrade-Insecure-Requests: 0$' \
+    --file-not-matches "$d/page.html" '^Upgrade-Insecure-Requests: 1' \
+    httrack "BASEURL/$d/index.html" -F "$chrome" -%X 'Upgrade-Insecure-Requests: 0'
