@@ -61,7 +61,7 @@ jobs:
           sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential clang autoconf automake libtool autoconf-archive \
-            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev libpsl-dev \
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev libpsl-dev libunistring-dev \
             appstream appstream-util
 
       - name: Configure
@@ -332,6 +332,7 @@ jobs:
           set -euo pipefail
           autoreconf -fi
           ./configure --build=i686-pc-linux-gnu CC="gcc -m32"
+          grep -q "define HTS_USEPSL 0" config.h
 
       - name: Build
         run: make -j"$(nproc)"

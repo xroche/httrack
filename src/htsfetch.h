@@ -38,7 +38,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsglobal.h"
 #include "htsopt.h"
 
-/* 1 when libpsl decides which hosts are same-site. */
+/* 1 when the build links libpsl. */
 #ifndef HTS_USEPSL
 #define HTS_USEPSL 0
 #endif
@@ -95,8 +95,8 @@ void hts_fetch_uninit(void);
 hts_boolean hts_fetch_has_psl(void);
 
 /* Return how the URL at to_adr relates to the origin at from_adr: SAME_ORIGIN,
-   SAME_SITE or CROSS_SITE. Same-site compares the last two host labels, so it
-   never says cross-site where the Public Suffix List says same-site. */
+   SAME_SITE or CROSS_SITE. Same-site compares registrable domains from the
+   Public Suffix List when it loaded, else the last two host labels. */
 hts_fetch_site hts_fetch_site_of(const char *from_adr, const char *to_adr);
 
 /* Merge the hop to adr into fm->site. Clears fm->dest when fm->initiator names

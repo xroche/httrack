@@ -46,8 +46,7 @@ static psl_ctx_t *fetch_psl = NULL;
 
 void hts_fetch_init(void) {
 #if HTS_USEPSL
-  if (fetch_psl == NULL)
-    fetch_psl = psl_latest(NULL);
+  fetch_psl = psl_latest(NULL);
 #endif
 }
 
@@ -339,9 +338,10 @@ static void origin_of(const char *adr, fetch_origin *o) {
 
   o->https = strfield(adr, "https:") ? HTS_TRUE : HTS_FALSE;
   end = p + strcspn(p, "/?#");
-  at = memchr(p, '@', (size_t) (end - p));
+  /* The last '@' ends the userinfo, as jump_identification_const() reads it. */
+  at = strrchr_limit(p, '@', end);
   if (at != NULL)
-    p = at + 1;
+    p = at;
   o->host = p;
   if (*p == '[') {
     const char *const close = memchr(p, ']', (size_t) (end - p));
@@ -355,9 +355,6 @@ static void origin_of(const char *adr, fetch_origin *o) {
   o->port = o->https ? 443 : 80;
   if (p < end && *p == ':' && p + 1 < end)
     o->port = atoi(p + 1);
-  /* "example.com." names the same host as "example.com" */
-  if (o->host_len > 1 && o->host[o->host_len - 1] == '.')
-    o->host_len--;
 }
 
 static hts_boolean host_is_ip(const char *host, size_t len) {
@@ -400,6 +397,9 @@ static const char *site_key(const fetch_origin *o, size_t *len) {
       return key;
   }
 #endif
+  /* "a.example.com." keys on "example.com.", as the list does. */
+  if (i > 1 && o->host[i - 1] == '.')
+    i--;
   while (i > 0) {
     if (o->host[i - 1] == '.' && ++dots == 2)
       break;

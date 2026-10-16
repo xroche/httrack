@@ -3,7 +3,7 @@ dnl @synopsis CHECK_ZSTD()
 dnl @synopsis CHECK_PSL()
 dnl
 dnl Look for libbrotlidec and libzstd, the decoders for the "br" and "zstd"
-dnl HTTP content codings. Both are optional: a missing library only drops the
+dnl HTTP content codings, and for libpsl, the Public Suffix List. Both are optional: a missing library only drops the
 dnl coding from Accept-Encoding. --with-brotli=DIR / --with-zstd=DIR point at a
 dnl prefix; --without-brotli / --without-zstd disable the coding; the default
 dnl is to use the library when it is found, unless --disable-auto-features asked
@@ -66,9 +66,9 @@ else
 	AC_MSG_RESULT([$codec_have (requested)])
 fi
 if test "$codec_have" = "yes"; then
-	AC_DEFINE([HTS_USE$2], [1], [Define to 1 to enable ]m4_default([$7], [the $1 content coding]))
+	AC_DEFINE([HTS_USE$2], [1], [Define to 1 to ]m4_ifval([$7], [[enable $7]], [[decode the $1 content coding]]))
 else
-	AC_DEFINE([HTS_USE$2], [0], [Define to 1 to enable ]m4_default([$7], [the $1 content coding]))
+	AC_DEFINE([HTS_USE$2], [0], [Define to 1 to ]m4_ifval([$7], [[enable $7]], [[decode the $1 content coding]]))
 fi
 AC_SUBST([$2_LIBS])
 AC_SUBST([$2_ENABLED], [$codec_have])
@@ -81,6 +81,5 @@ AC_DEFUN([CHECK_BROTLI],
 AC_DEFUN([CHECK_ZSTD],
 	[CHECK_CODEC([zstd], [ZSTD], [zstd.h], [zstd], [ZSTD_decompressStream], [])])
 
-dnl Same-site checks fall back to a last-two-labels heuristic without libpsl.
 AC_DEFUN([CHECK_PSL],
 	[CHECK_CODEC([psl], [PSL], [libpsl.h], [psl], [psl_latest], [], [Public Suffix List lookups])])

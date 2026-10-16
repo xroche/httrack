@@ -101,27 +101,32 @@ run_consumer() { # <binary> <what it is>
 cd "${work}"
 run_consumer "${work}/consumer" "the consumer"
 
-# Debian's libpsl.pc leaves out libidn2 and libunistring, so nothing can link a
-# static libpsl from it, ours included.
-psl_static_broken() {
+# Debian's libpsl.pc leaves out libidn2 and libunistring, so print them, or
+# fail when even they do not make a static libpsl link.
+psl_static_extra() {
+    local extra
     local -a psl_argv
-    grep -q -e '-lpsl' <<<"$(pc_query --static --libs)" ||
-        grep -q -e libpsl <<<"$(pc_query --print-requires-private)" || return 1
-    read -r -a psl_argv <<<"$("${pkgconfig}" --static --cflags --libs libpsl)"
-    ! "${cc_argv[@]}" -static -o "${work}/pslprobe" -x c - "${psl_argv[@]}" \
-        >/dev/null 2>&1 <<<$'#include <libpsl.h>\nint main(void) { return psl_latest(NULL) == 0; }'
+    grep -q -e '-lpsl' <<<"$(pc_query --static --libs)" || return 0
+    extra=$("${pkgconfig}" --static --libs libidn2 2>/dev/null || true)
+    read -r -a psl_argv <<<"$("${pkgconfig}" --static --cflags --libs libpsl) ${extra}"
+    "${cc_argv[@]}" -static -o "${work}/pslprobe" -x c - "${psl_argv[@]}" \
+        >/dev/null 2>&1 <<<$'#include <libpsl.h>\nint main(void) { return psl_latest(NULL) == 0; }' ||
+        return 1
+    echo "${extra}"
 }
 
 # An archive link needs each library ahead of the ones it uses, an order the
 # shared link above cannot exercise.
+psl_static=yes
+psl_extra=$(psl_static_extra) || psl_static=no
 read -r -a static_cflags_argv <<<"$(pc_query --static --cflags)"
-read -r -a static_libs_argv <<<"$(pc_query --static --libs)"
+read -r -a static_libs_argv <<<"$(pc_query --static --libs) ${psl_extra}"
 if [ ! -f "${staged_libdir}/libhttrack.a" ] ||
     ! "${cc_argv[@]}" -static -o "${work}/staticprobe" -x c - \
         <<<'int main(void) { return 0; }' >/dev/null 2>&1; then
     echo "no libhttrack.a, or no working -static here; skipping the archive link" >&2
-elif psl_static_broken; then
-    echo "libpsl.pc does not name what a static libpsl needs; skipping the archive link" >&2
+elif test "${psl_static}" = no; then
+    echo "no static libpsl, libidn2 and libunistring here; skipping the archive link" >&2
 elif ! "${cc_argv[@]}" "${static_cflags_argv[@]}" -static -o "${work}/consumer-static" \
     "${work}/consumer.c" "${static_libs_argv[@]}" 2>"${work}/cc-static.log"; then
     # A sanitized build's archive needs the runtime -static cannot supply.
