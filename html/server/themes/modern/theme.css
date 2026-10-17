@@ -32,6 +32,14 @@
   --modern-raised: var(--code-bg);
   --modern-primary: var(--link);
   --modern-radius: 16px;
+  --modern-control-rule: #cbd7e7;
+  --modern-focus-ring: rgba(37, 99, 235, .12);
+  --modern-action-bg: linear-gradient(180deg, #2f6ee8, #2563eb);
+  --modern-action-hover: #1d4ed8;
+  --modern-action-ink: #ffffff;
+  --modern-page-bg: radial-gradient(ellipse at 6% 0%, #e2edff 0, transparent 43%),
+                    radial-gradient(ellipse at 100% 20%, #e6f6ff 0, transparent 40%),
+                    var(--field);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -52,6 +60,13 @@
     --ui-alert: #ff8e8e;
     --ui-bar: #1b3156;
     --ui-title-filter: invert(1);
+    --modern-control-rule: #425a78;
+    --modern-focus-ring: rgba(127, 170, 255, .16);
+    --modern-action-bg: #8bb5ff;
+    --modern-action-hover: #a9c8ff;
+    --modern-action-ink: #071830;
+    --modern-page-bg: radial-gradient(ellipse at 0 0, #142d51 0, transparent 50%),
+                      var(--field);
   }
 }
 
@@ -67,7 +82,7 @@ body {
   min-height: 100vh;
   margin: 0;
   padding: 22px 20px 24px;
-  background: var(--field);
+  background: var(--modern-page-bg);
   color: var(--ui-ink);
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
@@ -127,6 +142,33 @@ body > table {
   background: rgba(255, 255, 255, .18);
 }
 
+#pageContent a,
+#pageContent a:link,
+#pageContent a:visited,
+#footer a,
+#footer a:link,
+#footer a:visited {
+  color: var(--modern-primary);
+  text-decoration: none;
+}
+
+#pageContent a:hover,
+#footer a:hover {
+  color: var(--link-hover);
+  text-decoration: underline;
+}
+
+#pageContent a:focus-visible,
+#pageContent button:focus-visible,
+#pageContent input:focus-visible,
+#pageContent select:focus-visible,
+#pageContent textarea:focus-visible,
+#subTitle a:focus-visible,
+#footer a:focus-visible {
+  outline: 3px solid var(--modern-focus-ring);
+  outline-offset: 2px;
+}
+
 .blak {
   background: transparent;
 }
@@ -142,7 +184,42 @@ body > table {
   background-image: none;
   box-shadow: 0 16px 46px var(--shadow);
   color: var(--ink);
+  line-height: 1.65;
   overflow-wrap: break-word;
+}
+
+#pageContent > table:first-of-type {
+  width: 100%;
+  margin: 0 0 13px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--rule);
+  border-collapse: separate;
+}
+
+#pageContent > table:first-of-type td {
+  padding: 4px 0;
+  vertical-align: middle;
+}
+
+#pageContent > table:first-of-type td:last-child {
+  text-align: right;
+}
+
+#pageContent > table:first-of-type h2 {
+  min-height: 1.2em;
+  margin: 0;
+}
+
+#pageContent > table:first-of-type td:last-child a {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 11px;
+  border: 1px solid var(--rule);
+  border-radius: 9px;
+  background: var(--modern-raised);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 #pageContent h1,
@@ -150,12 +227,22 @@ body > table {
 #pageContent h3,
 #pageContent h4 {
   color: var(--ink);
-  line-height: 1.25;
+  line-height: 1.24;
+  letter-spacing: -.025em;
 }
 
 #pageContent h2 {
   margin: 2px 0 8px;
-  font-size: 1.65em;
+  font-size: clamp(20px, 2.6vw, 28px);
+  font-weight: 750;
+}
+
+#pageContent h3 {
+  font-size: 18px;
+}
+
+#pageContent h4 {
+  font-size: 15px;
 }
 
 #pageContent h2[align="center"] {
@@ -171,13 +258,29 @@ body > table {
   color: var(--ink-soft);
 }
 
+#pageContent > form,
+#pageContent form,
+#pageContent form > table,
 #pageContent table {
   max-width: 100%;
+}
+
+#pageContent table td {
+  vertical-align: middle;
+}
+
+#pageContent table[border="0"] {
+  border-color: transparent;
 }
 
 #pageContent td {
   padding-top: 5px;
   padding-bottom: 5px;
+}
+
+#pageContent td td {
+  padding-top: 6px;
+  padding-bottom: 6px;
 }
 
 #pageContent input,
@@ -191,13 +294,16 @@ body > table {
 #pageContent select,
 #pageContent textarea {
   max-width: 100%;
-  min-height: 38px;
-  padding: 8px 11px;
-  border: 1px solid var(--rule);
-  border-radius: 9px;
-  background: var(--panel);
+  min-height: 40px;
+  padding: 9px 12px;
+  border: 1px solid var(--modern-control-rule);
+  border-radius: 10px;
+  background-color: var(--panel);
   color: var(--ink);
-  box-shadow: 0 1px 2px var(--shadow);
+  box-shadow: 0 1px 2px rgba(12, 31, 60, .025);
+  font-size: 14px;
+  line-height: 1.4;
+  transition: border-color .15s, box-shadow .15s, background-color .15s;
 }
 
 #pageContent input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):focus,
@@ -206,6 +312,7 @@ body > table {
   border-color: var(--modern-primary);
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+  box-shadow: 0 0 0 3px var(--modern-focus-ring);
 }
 
 #pageContent input[type="checkbox"],
@@ -215,43 +322,153 @@ body > table {
   margin: 0 6px 0 2px;
   accent-color: var(--modern-primary);
   vertical-align: middle;
+  cursor: pointer;
 }
 
 #pageContent input[type="submit"],
 #pageContent input[type="button"] {
-  min-height: 38px;
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
   max-width: 100%;
   margin: 3px 2px;
-  padding: 8px 16px;
+  padding: 9px 18px;
   border: 1px solid var(--rule);
-  border-radius: 9px;
+  border-radius: 10px;
   background: var(--modern-raised);
   color: var(--ink);
+  box-shadow: 0 1px 2px rgba(17, 38, 68, .04);
+  font-size: 13px;
   font-weight: 700;
+  line-height: 1.3;
+  white-space: normal;
+  text-align: center;
   cursor: pointer;
+  transition: background .16s, border-color .16s, box-shadow .16s, transform .16s;
 }
 
 #pageContent input[type="submit"]:hover,
 #pageContent input[type="button"]:hover {
   border-color: var(--modern-primary);
   background: var(--accent);
+  box-shadow: 0 3px 9px var(--modern-focus-ring);
+}
+
+#pageContent input[type="submit"]:active,
+#pageContent input[type="button"]:active {
+  transform: translateY(1px);
+}
+
+/* Primary actions formerly identified by JS, now matched on native attributes. */
+#pageContent input[name="nextBtn"][type="submit"],
+#pageContent input[type="submit"][onclick*="form.closeme.value=1"],
+.page-addurl #pageContent input[type="button"][value="OK"],
+.page-about #pageContent input[type="button"][value="OK"] {
+  border-color: var(--modern-primary);
+  background: var(--modern-action-bg);
+  color: var(--modern-action-ink);
+  box-shadow: 0 4px 12px var(--modern-focus-ring);
+}
+
+#pageContent input[name="nextBtn"][type="submit"]:hover,
+#pageContent input[type="submit"][onclick*="form.closeme.value=1"]:hover,
+.page-addurl #pageContent input[type="button"][value="OK"]:hover,
+.page-about #pageContent input[type="button"][value="OK"]:hover {
+  border-color: var(--modern-action-hover);
+  background: var(--modern-action-hover);
+  color: var(--modern-action-ink);
 }
 
 #pageContent textarea {
+  display: block;
   width: min(100%, 790px);
   min-height: 130px;
+  margin-top: 12px;
   resize: vertical;
+}
+
+#pageContent textarea[style*="visibility:hidden"],
+#pageContent textarea[style*="visibility: hidden"] {
+  display: none;
+}
+
+#pageContent input[name="projname"],
+#pageContent input[name="path"],
+#pageContent input[name="projcateg"] {
+  min-height: 42px;
+}
+
+/* Native select polish restored from the pre-merge Pixel pass. */
+#pageContent select {
+  appearance: none;
+  -webkit-appearance: none;
+  min-width: 110px;
+  padding-right: 42px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='m5 7.5 5 5 5-5' stroke='%23607087' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 17px 17px;
+  cursor: pointer;
+}
+
+@media (prefers-color-scheme: dark) {
+  #pageContent select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='m5 7.5 5 5 5-5' stroke='%239aadca' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  }
+}
+
+@media (forced-colors: active) {
+  #pageContent select {
+    appearance: auto;
+    -webkit-appearance: menulist;
+    padding-right: 12px;
+    background-image: none;
+  }
+}
+
+/* Match the old runtime spacing using stable native page hooks. */
+.page-index #pageContent select,
+.page-option9 #pageContent select[name="logtype"],
+.page-option10 #pageContent select[name="proxytype"],
+.page-step2 #pageContent select[name="loadprojname"],
+.page-step2 #pageContent select[name="loadprojcateg"],
+.page-step3 #pageContent select[name="todo"] {
+  margin-inline-start: 11px;
+}
+
+.page-option2 #pageContent select[name="build"],
+.page-option3 #pageContent select,
+.page-option8 #pageContent select {
+  margin-top: 9px;
+}
+
+#pageContent hr {
+  height: 1px;
+  margin: 20px 0;
+  border: 0;
+  background: var(--rule);
 }
 
 #pageContent pre {
   max-width: 100%;
   padding: 14px;
   overflow: auto;
+  overflow-wrap: anywhere;
   border: 1px solid var(--rule);
   border-radius: 10px;
   background: var(--code-bg);
   color: var(--ink);
+  font-size: 12px;
   white-space: pre-wrap;
+}
+
+/* Keep the small pause-file limit visually numeric without changing its value. */
+.page-option5 #pageContent input[name="pausefiles"] {
+  width: 8ch;
+  max-width: 100%;
 }
 
 /* Native option tabs; no generated navigation or JavaScript. */
@@ -266,12 +483,14 @@ body > table {
 #pageContent .tabCtrl a:link,
 #pageContent .tabCtrl a:visited {
   display: block;
-  padding: 8px 7px;
+  padding: 9px 8px;
   border: 1px solid var(--rule);
-  border-radius: 8px;
+  border-radius: 9px;
   background: var(--modern-raised);
   color: var(--ink-soft);
   text-decoration: none;
+  font-size: 12px;
+  font-weight: 650;
 }
 
 #pageContent .tabCtrl a:hover,
@@ -281,8 +500,25 @@ body > table {
   color: var(--modern-primary);
 }
 
+.page-option1 #pageContent .tabCtrl a[href="option1.html"],
+.page-option2 #pageContent .tabCtrl a[href="option2.html"],
+.page-option3 #pageContent .tabCtrl a[href="option3.html"],
+.page-option4 #pageContent .tabCtrl a[href="option4.html"],
+.page-option5 #pageContent .tabCtrl a[href="option5.html"],
+.page-option6 #pageContent .tabCtrl a[href="option6.html"],
+.page-option7 #pageContent .tabCtrl a[href="option7.html"],
+.page-option8 #pageContent .tabCtrl a[href="option8.html"],
+.page-option9 #pageContent .tabCtrl a[href="option9.html"],
+.page-option10 #pageContent .tabCtrl a[href="option10.html"],
+.page-option11 #pageContent .tabCtrl a[href="option11.html"] {
+  border-color: var(--modern-primary);
+  background: var(--modern-action-bg);
+  color: var(--modern-action-ink);
+  box-shadow: 0 3px 8px var(--modern-focus-ring);
+}
+
 #footer {
-  padding: 14px 6px 4px;
+  padding: 10px 6px;
   text-align: center;
   font-size: 12px;
 }
@@ -319,6 +555,10 @@ body > table {
     padding: 18px 16px 24px;
   }
 
+  #pageContent h2 {
+    font-size: 21px;
+  }
+
   #pageContent input[size],
   #pageContent textarea[cols] {
     max-width: 100%;
@@ -326,6 +566,21 @@ body > table {
 
   #pageContent td {
     overflow-wrap: anywhere;
+  }
+
+  .page-option2 #pageContent select[name="build"],
+  .page-option3 #pageContent select,
+  .page-option8 #pageContent select,
+  .page-option9 #pageContent select[name="logtype"],
+  .page-option10 #pageContent select[name="proxytype"],
+  .page-step2 #pageContent select[name="loadprojname"],
+  .page-step2 #pageContent select[name="loadprojcateg"],
+  .page-step3 #pageContent select[name="todo"] {
+    display: block;
+    width: min(100%, 320px);
+    min-width: 0;
+    margin-inline-start: 0;
+    margin-top: 10px;
   }
 }
 
