@@ -1,0 +1,23 @@
+# The built-in Public Suffix List is a snapshot, so this reds when the rules
+# differ and upstream is over 60 days newer. Refresh it with "python3 tools/psl-gen.py" and commit it.
+name: Public Suffix List drift
+
+on:
+  schedule:
+    - cron: "37 5 * * 2"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: built-in list matches upstream
+    # Scheduled workflows run per-fork independently; skip anywhere but upstream.
+    if: github.repository == 'xroche/httrack'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Compare src/htspsl_data.c with the upstream list
+        run: python3 tools/psl-gen.py --check 60

@@ -51,6 +51,13 @@ Comment:
  The woff2 is the latin subset at weight 700, as served by Google Fonts.
  Upstream declares no Reserved Font Name, so the subset keeps the family name.
 
+Files: src/htspsl_data.c
+Copyright: Public Suffix List contributors
+License: MPL-2.0
+Comment:
+ Generated from https://publicsuffix.org/list/public_suffix_list.dat by
+ tools/psl-gen.py.
+
 Files: debian/*
 Copyright: 2002-2026 Xavier Roche <xavier@debian.org>
 License: GPL-3+
@@ -201,3 +208,11 @@ License: OFL-1.1
  DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
  FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
  OTHER DEALINGS IN THE FONT SOFTWARE.
+
+License: MPL-2.0
+ This Source Code Form is subject to the terms of the Mozilla Public
+ License, v. 2.0. If a copy of the MPL was not distributed with this
+ file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ .
+ On Debian systems, the full text of the Mozilla Public License version 2.0
+ can be found in the file /usr/share/common-licenses/MPL-2.0.

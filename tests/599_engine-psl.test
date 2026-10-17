@@ -1,0 +1,143 @@
+#!/bin/bash
+#
+# Check the Public Suffix List lookup against the list's own test vectors
+# (tests/test_psl.txt in github.com/publicsuffix/list), and the list loader.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+require_httrack
+
+selftest_queue null psl 'COM'
+selftest_queue example.com psl 'example.COM'
+selftest_queue example.com psl 'WwW.example.COM'
+selftest_queue null psl '.com'
+selftest_queue null psl '.example'
+selftest_queue null psl '.example.com'
+selftest_queue null psl '.example.example'
+selftest_queue null psl 'example'
+selftest_queue example.example psl 'example.example'
+selftest_queue example.example psl 'b.example.example'
+selftest_queue example.example psl 'a.b.example.example'
+selftest_queue null psl 'biz'
+selftest_queue domain.biz psl 'domain.biz'
+selftest_queue domain.biz psl 'b.domain.biz'
+selftest_queue domain.biz psl 'a.b.domain.biz'
+selftest_queue null psl 'com'
+selftest_queue example.com psl 'example.com'
+selftest_queue example.com psl 'b.example.com'
+selftest_queue example.com psl 'a.b.example.com'
+selftest_queue null psl 'uk.com'
+selftest_queue example.uk.com psl 'example.uk.com'
+selftest_queue example.uk.com psl 'b.example.uk.com'
+selftest_queue example.uk.com psl 'a.b.example.uk.com'
+selftest_queue test.ac psl 'test.ac'
+selftest_queue null psl 'mm'
+selftest_queue null psl 'c.mm'
+selftest_queue b.c.mm psl 'b.c.mm'
+selftest_queue b.c.mm psl 'a.b.c.mm'
+selftest_queue null psl 'jp'
+selftest_queue test.jp psl 'test.jp'
+selftest_queue test.jp psl 'www.test.jp'
+selftest_queue null psl 'ac.jp'
+selftest_queue test.ac.jp psl 'test.ac.jp'
+selftest_queue test.ac.jp psl 'www.test.ac.jp'
+selftest_queue null psl 'kyoto.jp'
+selftest_queue test.kyoto.jp psl 'test.kyoto.jp'
+selftest_queue null psl 'ide.kyoto.jp'
+selftest_queue b.ide.kyoto.jp psl 'b.ide.kyoto.jp'
+selftest_queue b.ide.kyoto.jp psl 'a.b.ide.kyoto.jp'
+selftest_queue null psl 'c.kobe.jp'
+selftest_queue b.c.kobe.jp psl 'b.c.kobe.jp'
+selftest_queue b.c.kobe.jp psl 'a.b.c.kobe.jp'
+selftest_queue city.kobe.jp psl 'city.kobe.jp'
+selftest_queue city.kobe.jp psl 'www.city.kobe.jp'
+selftest_queue null psl 'ck'
+selftest_queue null psl 'test.ck'
+selftest_queue b.test.ck psl 'b.test.ck'
+selftest_queue b.test.ck psl 'a.b.test.ck'
+selftest_queue www.ck psl 'www.ck'
+selftest_queue www.ck psl 'www.www.ck'
+selftest_queue null psl 'us'
+selftest_queue test.us psl 'test.us'
+selftest_queue test.us psl 'www.test.us'
+selftest_queue null psl 'ak.us'
+selftest_queue test.ak.us psl 'test.ak.us'
+selftest_queue test.ak.us psl 'www.test.ak.us'
+selftest_queue null psl 'k12.ak.us'
+selftest_queue test.k12.ak.us psl 'test.k12.ak.us'
+selftest_queue test.k12.ak.us psl 'www.test.k12.ak.us'
+selftest_queue 食狮.com.cn psl '食狮.com.cn'
+selftest_queue 食狮.公司.cn psl '食狮.公司.cn'
+selftest_queue 食狮.公司.cn psl 'www.食狮.公司.cn'
+selftest_queue shishi.公司.cn psl 'shishi.公司.cn'
+selftest_queue null psl '公司.cn'
+selftest_queue 食狮.中国 psl '食狮.中国'
+selftest_queue 食狮.中国 psl 'www.食狮.中国'
+selftest_queue shishi.中国 psl 'shishi.中国'
+selftest_queue null psl '中国'
+selftest_queue xn--85x722f.com.cn psl 'xn--85x722f.com.cn'
+selftest_queue xn--85x722f.xn--55qx5d.cn psl 'xn--85x722f.xn--55qx5d.cn'
+selftest_queue xn--85x722f.xn--55qx5d.cn psl 'www.xn--85x722f.xn--55qx5d.cn'
+selftest_queue shishi.xn--55qx5d.cn psl 'shishi.xn--55qx5d.cn'
+selftest_queue null psl 'xn--55qx5d.cn'
+selftest_queue xn--85x722f.xn--fiqs8s psl 'xn--85x722f.xn--fiqs8s'
+selftest_queue xn--85x722f.xn--fiqs8s psl 'www.xn--85x722f.xn--fiqs8s'
+selftest_queue shishi.xn--fiqs8s psl 'shishi.xn--fiqs8s'
+selftest_queue null psl 'xn--fiqs8s'
+
+# A wildcard rule's base is a suffix too, as browsers read "*.kobe.jp".
+selftest_queue null psl kobe.jp
+selftest_queue null psl ca-west-1.rds.amazonaws.com
+
+# The loader reads the list's own syntax, and skips what is not a rule.
+work=$(mktemp -d "${TMPDIR:-/tmp}/psl.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${work}"
+list=${work}/list.dat
+{
+    printf '// VERSION: 2000-01-01_00-00-00_UTC\n'
+    printf '// com\n'
+    printf 'EXAMPLE.Test\n'
+    printf 'example\n'
+    printf '  *.ck   trailing text\n'
+    printf '!www.ck\n'
+    printf '\345\205\254\345\217\270.cn\n'
+    printf '\377\376.zz\n'
+    printf 'zz\000junk\na.yy\n'
+    printf 'crlf.test\r\n'
+    printf 'last.rule'
+} >"${list}"
+stamp=2000-01-01_00-00-00_UTC
+selftest_queue_lines "example.com"$'\n'"${stamp}" pslfile "${list}" a.b.example.com
+selftest_queue_lines "b.example.test"$'\n'"${stamp}" pslfile "${list}" a.b.example.test
+selftest_queue_lines "b.example"$'\n'"${stamp}" pslfile "${list}" a.b.example
+selftest_queue_lines "a.b.ck"$'\n'"${stamp}" pslfile "${list}" x.a.b.ck
+selftest_queue_lines "www.ck"$'\n'"${stamp}" pslfile "${list}" a.www.ck
+selftest_queue_lines "x.xn--55qx5d.cn"$'\n'"${stamp}" pslfile "${list}" a.x.xn--55qx5d.cn
+selftest_queue_lines "r.a.yy"$'\n'"${stamp}" pslfile "${list}" q.r.a.yy
+selftest_queue_lines "b.crlf.test"$'\n'"${stamp}" pslfile "${list}" a.b.crlf.test
+selftest_queue_lines "y.last.rule"$'\n'"${stamp}" pslfile "${list}" x.y.last.rule
+selftest_queue unreadable pslfile "${work}/missing.dat" a.example.com
+selftest_queue unreadable pslfile /dev/null a.example.com
+# The list in use is back after each load.
+selftest_queue example.co.uk psl a.example.co.uk
+
+# A configured list file wins only when it holds about as many rules as the
+# real list, and the built-in list stays the fallback.
+builtin=$(httrack -#test=pslinit "${work}/missing.dat") || fail "pslinit failed"
+[[ ${builtin} =~ ^20[0-9]{2}-[0-9]{2}-[0-9]{2}_ ]] || fail "built-in stamp: '${builtin}'"
+big=${work}/big.dat
+{
+    printf '// VERSION: 2000-01-02_00-00-00_UTC\n'
+    for i in $(seq 1 1100); do printf 'r%d.test\n' "${i}"; done
+} >"${big}"
+selftest_queue 2000-01-02_00-00-00_UTC pslinit "${big}"
+# The floor is 1000 distinct rules: one fewer falls back.
+head -n 1001 "${big}" >"${work}/floor.dat"
+head -n 1000 "${big}" >"${work}/below.dat"
+selftest_queue 2000-01-02_00-00-00_UTC pslinit "${work}/floor.dat"
+selftest_queue "${builtin}" pslinit "${work}/below.dat"
+selftest_queue "${builtin}" pslinit "${list}"
+selftest_run_queued

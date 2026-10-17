@@ -689,8 +689,18 @@ CHECK_ZLIB()
 CHECK_BROTLI()
 CHECK_ZSTD()
 
-### Public Suffix List, for Sec-Fetch-Site (optional)
-CHECK_PSL()
+### Optional Public Suffix List file
+AC_ARG_WITH([psl-file],
+	[AS_HELP_STRING([--with-psl-file@<:@=PATH@:>@],[Read the Public Suffix List from PATH at startup, falling back to the built-in copy @<:@default=no, PATH=/usr/share/publicsuffix/public_suffix_list.dat@:>@])],
+	[psl_file=$withval], [psl_file=no])
+AS_CASE([$psl_file],
+	[yes], [psl_file=/usr/share/publicsuffix/public_suffix_list.dat],
+	[no|""], [psl_file=])
+AC_MSG_CHECKING([which Public Suffix List file to read])
+AS_IF([test -n "$psl_file"],
+	[AC_DEFINE_UNQUOTED([HTS_PSL_FILE], ["$psl_file"], [Public Suffix List file read at startup])
+	AC_MSG_RESULT([$psl_file])],
+	[AC_MSG_RESULT([none, built-in copy only])])
 
 ### OpenSSL is explicitly enabled/disabled ?
 AC_MSG_CHECKING(whether to enable https support)
@@ -938,7 +948,6 @@ AS_CASE([" $OPENSSL_LIBS "],
 hts_pc_dep "$hts_pc_openssl" "$OPENSSL_LIBS"
 hts_pc_dep libbrotlidec "$BROTLI_LIBS"
 hts_pc_dep libzstd "$ZSTD_LIBS"
-hts_pc_dep libpsl "$PSL_LIBS"
 
 # An installed header includes <openssl/ssl.h>, so a consumer needs that include
 # path. Requires.private does not reliably carry it: a keg-only Homebrew prefix

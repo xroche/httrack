@@ -44,7 +44,7 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          brew install autoconf automake libtool autoconf-archive brotli zstd libpsl
+          brew install autoconf automake libtool autoconf-archive brotli zstd
 
       # --disable-shared keeps libhttrack inside the binaries.
       - name: Build and install into a temp prefix

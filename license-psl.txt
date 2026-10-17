@@ -1,0 +1,6 @@
+HTTrack includes the Public Suffix List (https://publicsuffix.org/), which is
+subject to the terms of the Mozilla Public License, v. 2.0. You can obtain a
+copy of the MPL at https://mozilla.org/MPL/2.0/.
+
+Its source form is src/htspsl_data.c in the HTTrack source distribution, and
+the list itself is at https://publicsuffix.org/list/public_suffix_list.dat.

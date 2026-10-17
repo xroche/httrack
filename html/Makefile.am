@@ -28,7 +28,7 @@ MetaInfodir = $(datadir)/metainfo
 # Explicit filenames (e.g. ../history.txt, div/search.sh) resolve via VPATH and
 # need no prefix.
 # They install into $(docdir), one level above the pages that link to them.
-HelpHtmlroot_DATA = ../httrack-doc.html ../history.txt ../greetings.txt ../license.txt
+HelpHtmlroot_DATA = ../httrack-doc.html ../history.txt ../greetings.txt ../license.txt ../license-psl.txt
 HelpHtml_DATA = $(srcdir)/*.html $(srcdir)/*.js $(srcdir)/*.css
 HelpHtmldiv_DATA = div/search.sh
 HelpHtmlimg_DATA  = $(srcdir)/img/*

@@ -140,6 +140,7 @@
     <ClCompile Include="htscrashtest.c" />
     <ClCompile Include="htsdns_selftest.c" />
     <ClCompile Include="htsfetch_selftest.c" />
+    <ClCompile Include="htspsl_selftest.c" />
     <ClCompile Include="htsfilters_selftest.c" />
     <ClCompile Include="htsheader_selftest.c" />
     <ClCompile Include="htsio_selftest.c" />
@@ -154,6 +155,8 @@
     <ClCompile Include="htsencoding.c" />
     <ClCompile Include="htsescape.c" />
     <ClCompile Include="htsfetch.c" />
+    <ClCompile Include="htspsl.c" />
+    <ClCompile Include="htspsl_data.c" />
     <ClCompile Include="htsfilters.c" />
     <ClCompile Include="htsftp.c" />
     <ClCompile Include="htshash.c" />

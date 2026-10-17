@@ -47,8 +47,8 @@ the operational checklist: toolchain, invariants, and how to ship a change.
   workflow keeps `workflow_call` and `workflow_dispatch` and has no schedule of
   its own. Drop its `uses:` from `tier2.yml` and nothing runs it again. A canary
   that watches the outside world (`appstream-network`, `mptcp-network`,
-  `downstream-drift`, `httraqt-upstream`) has to fire when no branch moved, so it
-  keeps its own cron and stays out of tier-2.
+  `downstream-drift`, `httraqt-upstream`, `psl-drift`) has to fire when no
+  branch moved, so it keeps its own cron and stays out of tier-2.
 - `distcheck` is a required context and builds from the dist tarball, which has no
   `.github/`. A test reading a file from there must skip when it is missing, not
   fail. Fail only when the directory is present and the file is not, so a real

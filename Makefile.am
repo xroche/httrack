@@ -4,7 +4,7 @@ SUBDIRS = src man m4 libtest templates lang html tests fuzz
 ACLOCAL_AMFLAGS = -I m4
 
 EXTRA_DIST = INSTALL.Linux \
-		gpl-fr.txt license.txt greetings.txt history.txt \
+		gpl-fr.txt license.txt license-psl.txt greetings.txt history.txt \
 		httrack-doc.html lang.def README.md PACKAGING.md tools/mkdeb.sh \
 		tools/macos-app.sh tools/macos-bundle.sh tools/macos-release.sh \
 		tools/httrack-launcher.c \
@@ -12,6 +12,7 @@ EXTRA_DIST = INSTALL.Linux \
 		bootstrap build.sh doc/winprofile-ini.md \
 		winprofile-keys.tsv winprofile-escapes.tsv \
 		tools/gen-winprofile-keys.py \
+		tools/psl-gen.py \
 		tools/doc-chrome.py \
 		tools/check-includes.py \
 		tools/ci-sanitizer-report.sh \

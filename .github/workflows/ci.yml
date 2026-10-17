@@ -61,7 +61,7 @@ jobs:
           sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential clang autoconf automake libtool autoconf-archive \
-            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev libpsl-dev libidn2-dev libunistring-dev \
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev \
             appstream appstream-util
 
       - name: Configure
@@ -96,7 +96,6 @@ jobs:
           # a missing decoder would silently drop the coding from Accept-Encoding
           grep -q "define HTS_USEBROTLI 1" config.h
           grep -q "define HTS_USEZSTD 1" config.h
-          grep -q "define HTS_USEPSL 1" config.h
           # losing either would make every crash test skip, and the suite stay green
           grep -q "define HAVE_BACKTRACE 1" config.h
           grep -q "define HAVE_SPAWN_H 1" config.h
@@ -133,11 +132,6 @@ jobs:
         timeout-minutes: 20
         run: |
           make check -j"$CHECK_JOBS"
-          # The static link must run here, because no other libpsl leg can.
-          if grep -q "no static libpsl" tests/222_pkgconfig-consumer.log; then
-            echo "test 222 skipped its static link" >&2
-            exit 1
-          fi
 
       - name: Print the test log on failure
         if: failure()
@@ -162,7 +156,7 @@ jobs:
           sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
-            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev libpsl-dev
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
 
       - name: Configure
         run: |
@@ -209,7 +203,7 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          brew install autoconf automake libtool autoconf-archive brotli zstd libpsl
+          brew install autoconf automake libtool autoconf-archive brotli zstd
 
       - name: Configure
         run: |
@@ -221,7 +215,6 @@ jobs:
             LDFLAGS="-L${ssl}/lib -L${brewp}/lib"
           grep -q "define HTS_USEBROTLI 1" config.h
           grep -q "define HTS_USEZSTD 1" config.h
-          grep -q "define HTS_USEPSL 1" config.h
           # brew --prefix answers for a formula it has not installed, so a
           # renamed or missing bottle would leave every TLS test skipping.
           grep -q "define HTS_USEOPENSSL 1" config.h
@@ -260,7 +253,7 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          brew install autoconf automake libtool autoconf-archive brotli zstd libpsl
+          brew install autoconf automake libtool autoconf-archive brotli zstd
 
       - name: Build and install into a temp prefix
         run: |
@@ -294,7 +287,7 @@ jobs:
           sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
-            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev libpsl-dev
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
 
       - name: Build and install into a temp prefix
         run: |
@@ -323,7 +316,6 @@ jobs:
       - name: Install build dependencies (multilib + 32-bit libs)
         run: |
           set -euo pipefail
-          # No libpsl here, so one leg runs the same-site fallback.
           sudo dpkg --add-architecture i386
           sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
@@ -336,7 +328,6 @@ jobs:
           set -euo pipefail
           autoreconf -fi
           ./configure --build=i686-pc-linux-gnu CC="gcc -m32"
-          grep -q "define HTS_USEPSL 0" config.h
 
       - name: Build
         run: make -j"$(nproc)"
@@ -365,7 +356,7 @@ jobs:
       cc: gcc
       cflags: -fsanitize=address,undefined -fno-sanitize-recover=all -g -O1 -fno-omit-frame-pointer
       ldflags: -fsanitize=address,undefined
-      extra_packages: libssl-dev libbrotli-dev libzstd-dev libpsl-dev
+      extra_packages: libssl-dev libbrotli-dev libzstd-dev
       # Leak detection is on, because nothing else in CI catches a dropped free.
       # LSan only reports at a normal exit, so a test that kills the engine still
       # contributes nothing. Every other finding aborts the run.
@@ -399,7 +390,7 @@ jobs:
       ldflags: -fsanitize=undefined
       # The runtime is not in the .so's.
       configure_args: --disable-shared --enable-static
-      extra_packages: clang libssl-dev libbrotli-dev libzstd-dev libpsl-dev
+      extra_packages: clang libssl-dev libbrotli-dev libzstd-dev
       options: UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1
       capture_stderr: false
       # --disable-shared already skips 30 of the 591, so floor what ran.
@@ -442,7 +433,7 @@ jobs:
       cflags: -fsanitize=thread -fno-sanitize-recover=all -g -O1 -fno-omit-frame-pointer
       ldflags: -fsanitize=thread
       configure_args: --disable-shared --enable-static
-      extra_packages: clang libssl-dev libbrotli-dev libzstd-dev libpsl-dev
+      extra_packages: clang libssl-dev libbrotli-dev libzstd-dev
       # TSan exits 66 on a report by itself, so the leg reds without halt_on_error.
       options: TSAN_OPTIONS=allocator_may_return_null=1:suppressions=$GITHUB_WORKSPACE/tools/tsan-suppressions.txt
       # The engine self-tests, where the FTP, DNS and lazy-lock worker threads
@@ -482,7 +473,7 @@ jobs:
           sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential clang autoconf automake libtool autoconf-archive \
-            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev libpsl-dev
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
 
       # unsigned-integer-overflow is not in -fsanitize=undefined, and it is how
       # a bounds test that adds before it compares passes (#1796).
@@ -520,7 +511,7 @@ jobs:
           sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential clang autoconf automake libtool autoconf-archive \
-            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev libpsl-dev
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
 
       - name: Configure (fuzzers, static)
         run: |
@@ -587,7 +578,7 @@ jobs:
           sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
-            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev libpsl-dev
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
 
       - name: Configure (deprecated OpenSSL API hidden)
         run: |
@@ -622,7 +613,7 @@ jobs:
           apt-get install -y --no-install-recommends \
             ca-certificates git \
             build-essential autoconf automake libtool autoconf-archive \
-            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev libpsl-dev \
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev \
             pkgconf debhelper devscripts lintian fakeroot
 
       - uses: actions/checkout@v7
@@ -666,7 +657,7 @@ jobs:
           sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
-            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev libpsl-dev
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
 
       - name: distcheck
         run: |
