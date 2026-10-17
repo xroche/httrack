@@ -1457,14 +1457,16 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
                0) /* or referer AND addresses are https */
            ) &&
           !http_headers_have_field(custom, "Referer")) { // not file://
-        /* keep the referer's own scheme: a bare host is http */
-        const int scheme_len =
-            (int) (jump_protocol_const(referer_adr) - referer_adr);
+        /* An https or ftp address is stored with its scheme, an http one bare.
+         */
+        const char *const scheme =
+            strncmp(referer_adr, "https://", 8) == 0 ? "https://"
+            : strncmp(referer_adr, "ftp://", 6) == 0 ? "ftp://"
+                                                     : "http://";
 
         /* one escape per piece, so neither can outgrow its own source buffer */
         print_buffer(
-            &bstr, "Referer: %.*s%s", scheme_len != 0 ? scheme_len : 7,
-            scheme_len != 0 ? referer_adr : "http://",
+            &bstr, "Referer: %s%s", scheme,
             escape_check_url_addr(jump_identification_const(referer_adr), esc,
                                   sizeof(esc)));
         print_buffer(&bstr, "%s" H_CRLF,
