@@ -1308,7 +1308,7 @@ static hts_boolean ua_is_firefox(const char *user_agent) {
                                                                : HTS_FALSE;
 }
 
-int hts_browser_family_of(const char *user_agent) {
+hts_browser_family hts_browser_family_of(const char *user_agent) {
   hts_client_hints ch;
 
   if (user_agent == NULL)
@@ -1335,7 +1335,7 @@ fetch_meta_sent(httrackp *opt, const hts_fetch_meta *fetch, const char *adr,
   return fetch;
 }
 
-/* The request headers a browser table may reorder, in the order they go out
+/* A browser table may reorder these headers, which go out in this order
    without one. */
 typedef enum http_header_slot {
   HDR_REFERER,
@@ -1359,15 +1359,12 @@ typedef enum http_header_slot {
   HDR_COUNT
 } http_header_slot;
 
-/* Where one header sits in the scratch block; start == end when unsent. */
+/* A span locates one header in the scratch block, and is empty when unsent. */
 typedef struct http_header_span {
   size_t start, end;
 } http_header_span;
 
-#define HDR_OPEN(h) (slots[h].start = hdr.pos)
-#define HDR_CLOSE(h) (slots[h].end = hdr.pos)
-
-/* Orders captured from Chrome 155 and Firefox 158. A header the browser never
+/* Chrome 155 and Firefox 158 send these orders. A header the browser never
    sends goes first (Content-length, From) or last. */
 static const unsigned char header_orders[][HDR_COUNT] = {
     {HDR_REFERER, HDR_CONTENT_LENGTH, HDR_CONNECTION, HDR_HOST, HDR_FROM,
@@ -1386,7 +1383,7 @@ static const unsigned char header_orders[][HDR_COUNT] = {
      HDR_USER_AGENT, HDR_CH_UA_MOBILE, HDR_ACCEPT, HDR_FETCH_SITE,
      HDR_FETCH_MODE, HDR_FETCH_USER, HDR_FETCH_DEST, HDR_REFERER,
      HDR_ACCEPT_ENCODING},
-    /* Firefox; Origin was never captured, so it sits where Firefox's CORS
+    /* Firefox: Origin was never captured, so it sits where Firefox's CORS
        requests put it. */
     {HDR_CONTENT_LENGTH, HDR_FROM, HDR_HOST, HDR_USER_AGENT, HDR_ACCEPT,
      HDR_ACCEPT_LANGUAGE, HDR_ACCEPT_ENCODING, HDR_ORIGIN, HDR_CONNECTION,
@@ -1394,7 +1391,7 @@ static const unsigned char header_orders[][HDR_COUNT] = {
      HDR_FETCH_SITE, HDR_FETCH_USER, HDR_CH_UA, HDR_CH_UA_MOBILE,
      HDR_CH_UA_PLATFORM}};
 
-const unsigned char *http_header_order(int family, int dest) {
+const unsigned char *http_header_order(hts_browser_family family, int dest) {
   switch (family) {
   case HTS_BROWSER_CHROME:
     return header_orders[hts_fetch_is_navigation(dest) ? 1 : 2];
@@ -1437,10 +1434,12 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
                   htsblk *retour) {
   char BIGSTK buffer_head_request[16384];
   buff_struct bstr = { buffer_head_request, sizeof(buffer_head_request), 0 };
-  /* The headers a browser table orders, rendered here before they go out. */
+  /* The headers a browser table orders are rendered here before they go out. */
   char BIGSTK buffer_headers[16384];
   buff_struct hdr = {buffer_headers, sizeof(buffer_headers), 0};
   http_header_span slots[HDR_COUNT];
+#define HDR_OPEN(h) (slots[h].start = hdr.pos)
+#define HDR_CLOSE(h) (slots[h].end = hdr.pos)
 
   int direct_url = 0;           // ne pas analyser l'url (exemple: ftp://)
   const char *search_tag = NULL;
@@ -1451,11 +1450,10 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
   const char *const custom = retour->req.headers;
   const hts_fetch_meta *const sent_fetch =
       fetch_meta_sent(opt, fetch, adr, retour, custom);
-  /* The Accept, header order and Accept-Language tables of that browser. */
+  /* That browser's tables pick the Accept, header order and Accept-Language. */
   const hts_browser_family family =
-      sent_fetch != NULL
-          ? (hts_browser_family) hts_browser_family_of(retour->req.user_agent)
-          : HTS_BROWSER_NONE;
+      sent_fetch != NULL ? hts_browser_family_of(retour->req.user_agent)
+                         : HTS_BROWSER_NONE;
 
   /* adr and the referer come off the network and can carry raw CR/LF; capped
      at their own source buffers, so the worst case emitted does not grow. */
@@ -1601,8 +1599,10 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
 #endif
       }
     }
-    if (referer_adr != NULL && referer_fil != NULL &&
-        strnotempty(referer_adr) && strnotempty(referer_fil)) {
+    // Referer?
+    if (referer_adr != NULL && referer_fil != NULL && strnotempty(referer_adr)
+        && strnotempty(referer_fil)
+      ) {                       // non vide
       if ((strcmp(referer_adr, "file://") != 0) &&
           (/* no https referer to http urls */
            (strncmp(referer_adr, "https://", 8) != 0) /* referer is not https */
@@ -1718,10 +1718,12 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
         HDR_CLOSE(HDR_USER_AGENT);
       }
 
+      /* dest comes from fetch, so a KIND= entry applies without Sec-Fetch-*. */
       {
-        char accept_buf[256];
+        char accept_buf[HTS_ACCEPT_MAXSIZE];
         const char *const accept = hts_accept_lookup(
             StringBuff(opt->accept_kinds), retour->req.accept,
+            opt->accept_given,
             fetch != NULL ? fetch->dest : HTS_FETCH_DEST_UNKNOWN, family,
             accept_buf, sizeof(accept_buf));
 
@@ -1764,8 +1766,7 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
           !http_headers_have_field(custom, "Accept-Language")) {
         const char *lang = retour->req.lang_iso;
 
-        if (family != HTS_BROWSER_NONE &&
-            strcmp(lang, HTS_ACCEPT_LANGUAGE_LEGACY) == 0)
+        if (family != HTS_BROWSER_NONE && !opt->lang_given)
           lang = HTS_ACCEPT_LANGUAGE_BROWSER;
         HDR_OPEN(HDR_ACCEPT_LANGUAGE);
         print_buffer(&hdr, "Accept-Language: %s" H_CRLF, lang);
@@ -1787,10 +1788,13 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
 
       /* Chrome sends a cors request's Origin even same-origin, Firefox only
          cross-origin. */
-      if (family != HTS_BROWSER_NONE &&
+      if (sent_fetch != NULL && family != HTS_BROWSER_NONE &&
           strcmp(hts_fetch_mode_name(sent_fetch), "cors") == 0 &&
           !http_headers_have_field(custom, "Origin")) {
-        const char *const from = hts_fetch_initiator_adr(opt, sent_fetch);
+        const char *const from =
+            sent_fetch->initiator > 0 && sent_fetch->initiator < opt->lien_tot
+                ? heap(sent_fetch->initiator)->adr
+                : NULL;
         char origin[HTS_URLMAXSIZE * 2];
 
         if (from != NULL && hts_fetch_origin(from, origin, sizeof(origin)) &&
@@ -1809,6 +1813,7 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
             sent_fetch != NULL ? sent_fetch->dest : HTS_FETCH_DEST_UNKNOWN);
         int i;
 
+        /* Only a library caller can set opt strings past the argv caps. */
         if (hdr.overflow)
           bstr.overflow = HTS_TRUE;
         for (i = 0; i < HDR_COUNT; i++) {
@@ -1819,6 +1824,8 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
                          hdr.buffer + h->start);
         }
       }
+#undef HDR_OPEN
+#undef HDR_CLOSE
       /* Authentification */
       {
         char autorisation[1100];
@@ -7335,6 +7342,8 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   StringCopy(opt->lang_iso, HTS_ACCEPT_LANGUAGE_LEGACY);
   StringCopy(opt->accept, HTS_ACCEPT_LEGACY);
   StringCopy(opt->accept_kinds, "");
+  opt->accept_given = HTS_FALSE;
+  opt->lang_given = HTS_FALSE;
   StringCopy(opt->headers, "");
   StringCopy(opt->mimedefs, "\n");      // aucun filtre mime (\n IMPORTANT)
   StringClear(opt->mod_blacklist);

@@ -3507,8 +3507,12 @@ class Handler(SimpleHTTPRequestHandler):
             )
             self.send_raw((css % echo).encode(), "text/css")
         elif name == "xstyle.css":
-            # The font sits on the page's origin, so it is same-origin.
-            css = "/*%s*/ @font-face{src:url(%sxfont.woff2)}"
+            # xfont sits on the page's origin, so it is same-origin, and
+            # cfont is cross-site.
+            css = (
+                "/*%s*/ @font-face{src:url(%sxfont.woff2)}"
+                " @font-face{src:url(cfont.woff2)}"
+            )
             self.send_raw((css % (echo, here)).encode(), "text/css")
         elif name == "frame.html":
             body = (

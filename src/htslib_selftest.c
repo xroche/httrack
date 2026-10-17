@@ -3432,39 +3432,33 @@ static int st_clienthints(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* -#test=browserfamily <user-agent>: whose header tables it gets. */
+/* -#test=browserfamily <user-agent> prints the browser whose tables it gets. */
 static int st_browserfamily(httrackp *opt, int argc, char **argv) {
-  static const char *const names[] = {"none", "chrome", "firefox"};
-
   (void) opt;
   if (argc != 1) {
     fprintf(stderr, "browserfamily: takes a user-agent\n");
     return 1;
   }
-  printf("%s\n", names[hts_browser_family_of(argv[0])]);
+  printf("%s\n", st_family_name(hts_browser_family_of(argv[0])));
   return 0;
 }
 
-/* -#test=headerorder <none|chrome|firefox> <dest>: the header order of a
-   request from that browser, which must name every header once. */
+/* -#test=headerorder <none|chrome|firefox> <dest> prints a request's header
+   order, and fails unless it names every header once. */
 static int st_headerorder(httrackp *opt, int argc, char **argv) {
-  static const char *const families[] = {"none", "chrome", "firefox"};
   const int n = http_header_slot_count();
   const unsigned char *order;
   unsigned char seen[64];
-  int family, dest, i;
+  hts_browser_family family;
+  int dest, i;
 
   (void) opt;
   if (argc != 2 || n > (int) sizeof(seen)) {
     fprintf(stderr, "headerorder: takes <none|chrome|firefox> <dest>\n");
     return 1;
   }
-  for (family = 2; family > 0 && strcmp(families[family], argv[0]) != 0;
-       family--)
-    ;
-  for (dest = HTS_FETCH_DEST_VIDEO;
-       dest > 0 && strcmp(hts_fetch_dest_name(dest), argv[1]) != 0; dest--)
-    ;
+  if (!st_family_of(argv[0], &family) || !st_dest_of(argv[1], &dest))
+    return 1;
   order = http_header_order(family, dest);
   memset(seen, 0, sizeof(seen));
   for (i = 0; i < n; i++) {

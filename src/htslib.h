@@ -36,6 +36,7 @@ Please visit our Website: http://www.httrack.com
 #define HTS_DEFH
 
 #include "httrack-library.h"
+#include "htsfetch.h"
 
 /* Forward definitions */
 #ifndef HTS_DEF_FWSTRUCT_htsrequest
@@ -282,13 +283,13 @@ typedef struct hts_client_hints {
    M108. */
 hts_boolean hts_client_hints_of(const char *user_agent, hts_client_hints *ch);
 
-/* Return the hts_browser_family (htsfetch.h) whose request headers user_agent
-   names: Chrome and Edge as hts_client_hints_of() tells them, or Firefox. */
-int hts_browser_family_of(const char *user_agent);
+/* Return the browser family whose request headers user_agent names: Chrome
+   and Edge as hts_client_hints_of() tells them, or Firefox. */
+hts_browser_family hts_browser_family_of(const char *user_agent);
 
-/* Return the order, http_header_slot_count() slot numbers, in which a request
-   from family (hts_browser_family) to dest sends the headers it may reorder. */
-const unsigned char *http_header_order(int family, int dest);
+/* Return http_header_slot_count() slot numbers: the order in which family
+   sends the reorderable headers of a request to dest. */
+const unsigned char *http_header_order(hts_browser_family family, int dest);
 
 /* Return the header name of slot, or NULL past the last one. */
 const char *http_header_slot_name(int slot);

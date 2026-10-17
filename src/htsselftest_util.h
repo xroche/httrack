@@ -36,11 +36,23 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h"
 #include "htscore.h"
+#include "htsfetch.h"
 #include <stdint.h>
 
 #ifdef HTS_INTERNAL_BYTECODE
 
 size_t st_decode_body(const char *arg, char *buf, size_t size);
+
+/* Set *dest to the Sec-Fetch-Dest named name, "empty" being UNKNOWN. Return
+   HTS_FALSE, after complaining, when name is no destination. */
+hts_boolean st_dest_of(const char *name, int *dest);
+
+/* Set *family to the browser family named name ("none", "chrome" or
+   "firefox"). Return HTS_FALSE, after complaining, for any other name. */
+hts_boolean st_family_of(const char *name, hts_browser_family *family);
+
+/* Return the name st_family_of() reads for family. */
+const char *st_family_name(hts_browser_family family);
 
 // é and 中 in UTF-8: the charset axis of the long-path tests (#630).
 #define ST_NONASCII "\xC3\xA9\xE4\xB8\xAD"

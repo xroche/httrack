@@ -503,13 +503,7 @@ hts_boolean hts_fetch_origin(const char *adr, char *dst, size_t size) {
   return n > 0 && (size_t) n < size ? HTS_TRUE : HTS_FALSE;
 }
 
-const char *hts_fetch_initiator_adr(httrackp *opt, const hts_fetch_meta *fm) {
-  if (fm == NULL || fm->initiator <= 0 || fm->initiator >= opt->lien_tot)
-    return NULL;
-  return heap(fm->initiator)->adr;
-}
-
-/* --accept kinds in display order: hts_accept_kinds() publishes this list. */
+/* hts_accept_kinds() publishes the --accept kinds in this display order. */
 static const char *const accept_kinds[] = {
     "document", "iframe", "frame", "image",  "style", "script",
     "font",     "audio",  "video", "object", "embed", NULL};
@@ -522,20 +516,21 @@ enum { ACCEPT_KINDS = sizeof(accept_kinds) / sizeof(accept_kinds[0]) - 1 };
   "0.7"
 #define FIREFOX_NAV                                                            \
   "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+#define BROWSER_STYLE "text/css,*/*;q=0.1"
 
-/* What Chrome 155 and Firefox 158 send, per accept_kinds entry. embed, never
-   captured, follows object. */
+/* Chrome 155 and Firefox 158 send these, indexed by family - 1 and
+   accept_kinds entry. embed was never captured, so it follows object. */
 static const char *const accept_presets[][ACCEPT_KINDS] = {
     /* HTS_BROWSER_CHROME */
     {CHROME_NAV, CHROME_NAV, CHROME_NAV,
      "image/jxl,image/avif,image/webp,image/apng,image/svg+xml,image/*,*/"
      "*;q=0.8",
-     "text/css,*/*;q=0.1", "*/*", "*/*", "*/*", "*/*", CHROME_NAV, CHROME_NAV},
+     BROWSER_STYLE, "*/*", "*/*", "*/*", "*/*", CHROME_NAV, CHROME_NAV},
     /* HTS_BROWSER_FIREFOX */
     {FIREFOX_NAV, FIREFOX_NAV, FIREFOX_NAV,
      "image/avif,image/jxl,image/webp,image/png,image/svg+xml,image/*;q=0.8,*/"
      "*;q=0.5",
-     "text/css,*/*;q=0.1", "*/*",
+     BROWSER_STYLE, "*/*",
      "application/font-woff2;q=1.0,application/font-woff;q=0.9,*/*;q=0.8",
      "audio/webm,audio/ogg,audio/wav,audio/*;q=0.9,application/ogg;q=0.7,"
      "video/*;q=0.6,*/*;q=0.5",
@@ -593,7 +588,8 @@ static const char *accept_list_find(const char *list, int kind, char *buf,
 }
 
 const char *hts_accept_lookup(const char *list, const char *user_default,
-                              int dest, hts_browser_family family, char *buf,
+                              hts_boolean user_given, int dest,
+                              hts_browser_family family, char *buf,
                               size_t size) {
   const int kind = accept_kind_of_dest(dest);
   const char *v;
@@ -607,9 +603,7 @@ const char *hts_accept_lookup(const char *list, const char *user_default,
                               size)) != NULL)
       return v;
   }
-  if (user_default == NULL || strcmp(user_default, HTS_ACCEPT_LEGACY) != 0)
-    return user_default;
-  if (kind >= 0 && family != HTS_BROWSER_NONE)
+  if (!user_given && kind >= 0 && family != HTS_BROWSER_NONE)
     return accept_presets[family - 1][kind];
   return user_default;
 }

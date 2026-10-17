@@ -112,12 +112,21 @@ page = s.get("option6.html")
 check('<option value="text/css,*/*;q=0.1" label="Chrome">' in page,
       "the style row suggests Chrome's value")
 check(page.count("<datalist ") == 12, "twelve Accept rows")
-s.post("option6.html", [("acceptdefault", "x/y"), ("acceptimage", "img/x"),
-                        ("acceptfont", "")])
+check(len(re.findall(r'<input name="accept[a-z]+"[^>]* maxlength="255"', page))
+      == 12, "each Accept row stops one byte short of HTS_ACCEPT_MAXSIZE")
+KINDS = ("document", "iframe", "frame", "image", "style", "script", "font",
+         "audio", "video", "object", "embed")
+ACCEPT = dict((k, "img/x" if k == "image" else "k/" + k) for k in KINDS)
+s.post("option6.html", [("acceptdefault", "x/y")] +
+       [("accept" + k, v) for k, v in ACCEPT.items()])
 cmd = cmdline()
 check('--accept "x/y"' in cmd, "the default row is sent bare")
-check('--accept "image=img/x"' in cmd, "the image row is sent with its kind")
+for k, v in ACCEPT.items():
+    check('--accept "%s=%s"' % (k, v) in cmd, "the %s row is sent with its kind" % k)
+s.post("option6.html", [("acceptfont", "")])
+cmd = cmdline()
 check("font=" not in cmd, "a blank row sends nothing")
+check(len(re.findall("--accept ", cmd)) == 11, "the other rows stay")
 
 if rc:
     sys.exit(rc)
@@ -186,7 +195,10 @@ check("--check-type=2" in cmd, "--check-type survives the round trip")
 check(len(re.findall("--assume ", cmd)) == npairs,
       "every --assume survives the round trip")
 check("--user-agent" not in cmd, "a reloaded blank browser id stays unsent")
-check('--accept "image=img/x"' in cmd and '--accept "x/y"' in cmd,
+check(re.findall('--accept "([^"]*)"', cmd) ==
+      ["x/y", "document=k/document", "iframe=k/iframe", "frame=k/frame",
+       "image=img/x", "style=k/style", "script=k/script", "audio=k/audio",
+       "video=k/video", "object=k/object", "embed=k/embed"],
       "the Accept rows survive the round trip")
 sys.exit(rc)
 PY

@@ -2152,8 +2152,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                     } else if ((p = strfield(name, "attr:"))) {
                       name += p;
                       format = 7;
-                      /* ${attr:acceptpreset:<browser>:<kind>}: the engine's
-                         own Accept value, or nothing when it has none */
+                      /* ${attr:acceptpreset:<browser>:<kind>} expands to the
+                         engine's Accept value, or to nothing. */
                       if ((p = strfield(name, "acceptpreset:"))) {
                         char *const colon = strchr(name + p, ':');
                         const char *v;

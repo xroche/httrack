@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# Per-kind Accept and the browser header order on the wire: the Chrome and
-# Firefox tables, --accept 'KIND=VALUE', and the header block of a User-Agent
-# with no table, which must stay what httrack always sent.
+# These crawls check on the wire the Chrome and Firefox tables, --accept
+# 'KIND=VALUE', and that a User-Agent with no table sends the old header block.
 
 set -euo pipefail
 
@@ -88,13 +87,36 @@ same "firefox language" "$(header img.png Accept-Language)" 'Accept-Language: fr
 # The font is same-origin, so Firefox sends no Origin.
 same "firefox font origin" "$(header font.woff2 Origin)" ''
 
-# The user's entry for a kind, then -%a, win over the table; a frame takes
-# the document entry.
-crawl -F "$chrome" -%a x/y --accept image=img/x --accept document=doc/x
+# Firefox sends Origin cross-origin only, after Accept-Encoding, and en-US
+# when -%l is not given. cfont.woff2 sits on localhost, the page does not.
+crawl -F "$firefox" '+localhost*'
+cfont=../../localhost_$SRV_PORT/fetchmeta/cfont.woff2
+same "firefox cross font order" "$(names "$cfont")" \
+    Host,User-Agent,Accept,Accept-Language,Accept-Encoding,Origin,Connection,Referer,Sec-Fetch-Dest,Sec-Fetch-Mode,Sec-Fetch-Site
+same "firefox cross font origin" "$(header "$cfont" Origin)" \
+    "Origin: http://127.0.0.1:$SRV_PORT"
+same "firefox same font origin" "$(header xfont.woff2 Origin)" ''
+same "firefox default language" "$(header img.png Accept-Language)" \
+    'Accept-Language: en-US,en;q=0.9'
+
+# An explicit -%a or -%l equal to the built-in value is still the user's.
+crawl -F "$chrome" -%a "$legacy" -%l 'en, *'
+for f in page.html frame.html img.png style.css app.js font.woff2; do
+    same "explicit legacy $f" "$(header "$f" Accept)" "Accept: $legacy"
+done
+same "explicit language" "$(header img.png Accept-Language)" 'Accept-Language: en, *'
+
+# The user's entry for a kind, then -%a, win over the table, and a frame
+# takes the document entry.
+# A kind's value may be 255 bytes long (HTS_ACCEPT_MAXSIZE).
+long=text/$(printf '%*s' 250 '' | tr ' ' a)
+crawl -F "$chrome" -%a x/y --accept image=img/x --accept document=doc/x \
+    --accept "style=$long"
 same "user image" "$(header img.png Accept)" 'Accept: img/x'
 same "user page" "$(header page.html Accept)" 'Accept: doc/x'
 same "user frame" "$(header frame.html Accept)" 'Accept: doc/x'
 same "user script" "$(header app.js Accept)" 'Accept: x/y'
+same "user style" "$(header style.css Accept)" "Accept: $long"
 
 # No table: the block httrack always sent, byte for byte, a kind's entry
 # included.
@@ -115,9 +137,11 @@ same "no table script" "$(sed '/^$/,$d' "$root/app.js")" "$want"
 same "no table image" "$(header img.png Accept)" 'Accept: img/x'
 same "no table page" "$(header page.html Accept)" "Accept: $legacy"
 
-# -%Q0 turns the Chrome table off with the rest of the browser headers.
-crawl -F "$chrome" -%Q0
+# -%Q0 turns the Chrome table off with the rest of the browser headers, but a
+# kind's entry still applies.
+crawl -F "$chrome" -%Q0 --accept image=img/x
 same "-%Q0 image order" "$(names img.png)" \
     Referer,Connection,Host,User-Agent,Accept,Accept-Language,Accept-Encoding
-same "-%Q0 image" "$(header img.png Accept)" "Accept: $legacy"
+same "-%Q0 image" "$(header img.png Accept)" 'Accept: img/x'
+same "-%Q0 page" "$(header page.html Accept)" "Accept: $legacy"
 same "-%Q0 language" "$(header img.png Accept-Language)" 'Accept-Language: en, *'

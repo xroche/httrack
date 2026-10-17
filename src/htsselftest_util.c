@@ -35,6 +35,34 @@ Please visit our Website: http://www.httrack.com
 
 /* Decode an argument ("hex:FFD8.." or literal text) into buf. Raw non-UTF-8
    bytes cannot survive a Windows command line, so hostile inputs go as hex. */
+static const char *const st_families[] = {"none", "chrome", "firefox"};
+
+hts_boolean st_dest_of(const char *name, int *dest) {
+  for (*dest = HTS_FETCH_DEST_VIDEO; *dest >= 0; (*dest)--) {
+    if (strcmp(hts_fetch_dest_name(*dest), name) == 0)
+      return HTS_TRUE;
+  }
+  fprintf(stderr, "unknown destination: %s\n", name);
+  return HTS_FALSE;
+}
+
+hts_boolean st_family_of(const char *name, hts_browser_family *family) {
+  int i;
+
+  for (i = 0; i < (int) (sizeof(st_families) / sizeof(st_families[0])); i++) {
+    if (strcmp(st_families[i], name) == 0) {
+      *family = (hts_browser_family) i;
+      return HTS_TRUE;
+    }
+  }
+  fprintf(stderr, "unknown browser family: %s\n", name);
+  return HTS_FALSE;
+}
+
+const char *st_family_name(hts_browser_family family) {
+  return st_families[family];
+}
+
 size_t st_decode_body(const char *arg, char *buf, size_t size) {
   size_t n = 0;
 

@@ -653,8 +653,10 @@ struct httrackp {
   hts_tristate
       browser_headers; /**< send the browser headers the User-Agent
                             implies (-%Q). HTS_DEFAULT: on. Tail: ABI */
-  String accept_kinds; /**< --accept 'KIND=VALUE' entries, one "kind=value"
-                            line each, the last one winning. Tail: ABI */
+  String accept_kinds; /**< Each --accept 'KIND=VALUE' adds a "kind=value"
+                            line, and the last one wins. Tail: ABI */
+  hts_boolean accept_given; /**< Did the user give -%a? Tail: ABI */
+  hts_boolean lang_given;   /**< Did the user give -%l? Tail: ABI */
 };
 
 /** Running statistics for a mirror. */

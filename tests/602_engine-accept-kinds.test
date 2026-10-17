@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# Per-kind Accept (--accept 'KIND=VALUE'): how an argument is read, which
-# value a request sends, the browser tables and the browser header orders.
+# These cases pin how --accept 'KIND=VALUE' is read, which Accept a request
+# sends, the browser tables and the browser header orders.
 
 set -euo pipefail
 
@@ -22,7 +22,7 @@ f_video='video/webm,video/ogg,video/*;q=0.9,application/ogg;q=0.7,audio/*;q=0.6,
 css='text/css,*/*;q=0.1'
 legacy='text/html,image/png,image/jpeg,image/pjpeg,image/x-xbitmap,image/svg+xml,image/gif;q=0.9,*/*;q=0.1'
 
-# A kind is a kind word before the first '='; a media type is never one.
+# A kind is a kind word before the first '=', so a media type is never one.
 selftest_queue image acceptkind 'image=a/b'
 selftest_queue embed acceptkind 'embed=a=b'
 selftest_queue document acceptkind 'document='
@@ -35,10 +35,14 @@ selftest_queue default acceptkind 'image'
 selftest_queue default acceptkind '=a/b'
 
 # The kind's entry, then -%a, then the browser table, then the built-in value.
+# "-" means no -%a was given, and "empty" is the unknown destination.
 selftest_queue legacy accept image none -
 selftest_queue "$c_img" accept image chrome -
 selftest_queue "$f_img" accept image firefox -
 selftest_queue x/y accept image chrome x/y
+# An explicit -%a equal to the built-in value still beats the browser table.
+selftest_queue legacy accept image chrome "$legacy"
+selftest_queue legacy accept document firefox "$legacy"
 selftest_queue a/b accept image chrome x/y image=a/b
 selftest_queue a/b accept image none - image=a/b
 selftest_queue c/d accept image chrome - image=a/b image=c/d
@@ -53,6 +57,17 @@ selftest_queue legacy accept object none - document=d/e
 # A request whose kind is unknown takes -%a or the built-in value.
 selftest_queue legacy accept empty chrome - image=a/b
 selftest_queue x/y accept empty firefox x/y
+
+# An Origin drops the scheme's default port and refuses a host no header can
+# carry (hex: "http://a\x01test", "http://a\x7ftest", "http://a\xc3\xa9test").
+selftest_queue http://a.test fetchorigin a.test
+selftest_queue http://a.test fetchorigin http://a.test:80/x
+selftest_queue https://a.test fetchorigin https://a.test:443/
+selftest_queue http://a.test:8080 fetchorigin http://a.test:8080/
+selftest_queue https://a.test:80 fetchorigin https://a.test:80/
+selftest_queue '(refused)' fetchorigin hex:687474703a2f2f610174657374
+selftest_queue '(refused)' fetchorigin hex:687474703a2f2f617f74657374
+selftest_queue '(refused)' fetchorigin hex:687474703a2f2f61c3a974657374
 
 # hts_accept_preset() and hts_accept_kinds().
 selftest_queue document,iframe,frame,image,style,script,font,audio,video,object,embed acceptpreset
@@ -89,6 +104,10 @@ selftest_queue chrome browserfamily "$chrome Edg/141.0.0.0"
 selftest_queue firefox browserfamily "$firefox"
 selftest_queue firefox browserfamily 'Mozilla/5.0 (Android 14; Mobile; rv:131.0) Gecko/131.0 Firefox/131.0'
 selftest_queue none browserfamily "${firefox//158.0/89.0}"
+selftest_queue firefox browserfamily "${firefox//158.0/90.0}"
+selftest_queue none browserfamily "${firefox#Mozilla/5.0 }"
+selftest_queue none browserfamily "${firefox/ Gecko\/20100101/}"
+selftest_queue none browserfamily 'Mozilla/5.0 Gecko/20100101 Firefox/158.0 (X11'
 selftest_queue none browserfamily "$firefox SeaMonkey/2.53.20"
 selftest_queue none browserfamily 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/131.0 Mobile/15E148 Safari/605.1.15'
 selftest_queue none browserfamily "$chrome OPR/125.0.0.0"
@@ -99,14 +118,9 @@ order_legacy='Referer,Content-length,Connection,Host,From,sec-ch-ua,sec-ch-ua-mo
 order_c_nav='Content-length,From,Host,Connection,Origin,sec-ch-ua,sec-ch-ua-mobile,sec-ch-ua-platform,Accept-Language,Upgrade-Insecure-Requests,User-Agent,Accept,Sec-Fetch-Site,Sec-Fetch-Mode,Sec-Fetch-User,Sec-Fetch-Dest,Referer,Accept-Encoding'
 order_c_sub='Content-length,From,Host,Connection,Origin,sec-ch-ua-platform,Accept-Language,sec-ch-ua,Upgrade-Insecure-Requests,User-Agent,sec-ch-ua-mobile,Accept,Sec-Fetch-Site,Sec-Fetch-Mode,Sec-Fetch-User,Sec-Fetch-Dest,Referer,Accept-Encoding'
 order_f='Content-length,From,Host,User-Agent,Accept,Accept-Language,Accept-Encoding,Origin,Connection,Referer,Upgrade-Insecure-Requests,Sec-Fetch-Dest,Sec-Fetch-Mode,Sec-Fetch-Site,Sec-Fetch-User,sec-ch-ua,sec-ch-ua-mobile,sec-ch-ua-platform'
+# The order reads dest only through hts_fetch_is_navigation().
 selftest_queue "$order_legacy" headerorder none document
-selftest_queue "$order_legacy" headerorder none image
-for k in document iframe frame object embed; do
-    selftest_queue "$order_c_nav" headerorder chrome "$k"
-done
-for k in image style script font audio video empty; do
-    selftest_queue "$order_c_sub" headerorder chrome "$k"
-done
+selftest_queue "$order_c_nav" headerorder chrome document
+selftest_queue "$order_c_sub" headerorder chrome image
 selftest_queue "$order_f" headerorder firefox document
-selftest_queue "$order_f" headerorder firefox image
 selftest_run_queued
