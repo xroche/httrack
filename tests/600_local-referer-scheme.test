@@ -1,0 +1,27 @@
+#!/bin/bash
+#
+# The Referer keeps the scheme of the page that links to the resource.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+d=fetchmeta
+bash "$top_srcdir/tests/local-crawl.sh" \
+    --file-matches "$d/img.png" '^Referer: http://127[.]0[.]0[.]1:[0-9]*/fetchmeta/index[.]html$' \
+    httrack "BASEURL/$d/index.html"
+
+# A user name that spells a scheme is no scheme.
+bash "$top_srcdir/tests/local-crawl.sh" \
+    --file-matches "$d/img.png" '^Referer: http://127[.]0[.]0[.]1:[0-9]*/fetchmeta/index[.]html$' \
+    httrack "http://ftp:secret@BASEHOST/$d/index.html"
+
+if test "$HTTPS_SUPPORT" == "no"; then
+    echo "no https support compiled, skipping the https crawl"
+    exit 0
+fi
+
+bash "$top_srcdir/tests/local-crawl.sh" --tls \
+    --file-matches "$d/img.png" '^Referer: https://127[.]0[.]0[.]1:[0-9]*/fetchmeta/index[.]html$' \
+    httrack "BASEURL/$d/index.html"
