@@ -2894,13 +2894,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 
   // If both cache generations exist, keep the most complete one
   hts_cache_reconcile(opt, CACHE_RECONCILE_INTERRUPTED);
-  // Débuggage des en têtes
-  if (_DEBUG_HEAD) {
-    ioinfo = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                           StringBuff(opt->path_log), "hts-ioinfo.txt"),
-                   "wb");
-  }
-
   {
     /* Sized to the concat-buffer capacity so it can always hold the lock-file
        path produced by fconcat(), even with a long log path (issue #183). */
@@ -2963,6 +2956,19 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     } else {
       opt->log = NULL;
       opt->errlog = NULL;
+    }
+
+    // -%H may run before path_log exists, so create it first.
+    if (_DEBUG_HEAD) {
+      structcheck_utf8(StringBuff(opt->path_log));
+      ioinfo = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                             StringBuff(opt->path_log), "hts-ioinfo.txt"),
+                     "wb");
+      if (ioinfo == NULL)
+        hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
+                      "unable to create header debug file %s",
+                      fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                              StringBuff(opt->path_log), "hts-ioinfo.txt"));
     }
 
     // un petit lock-file pour indiquer un miroir en cours, ainsi qu'un éventuel fichier log
@@ -3298,6 +3304,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     if (_DEBUG_HEAD) {
       if (ioinfo) {
         fclose(ioinfo);
+        ioinfo = NULL;
       }
     }
     // supprimer lock
