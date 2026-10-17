@@ -1062,3 +1062,35 @@ Theme:
 Tema:
 Classic
 Klasična
+Accept headers
+Glave Accept
+The Accept header sent for each kind of link. Automatic sends what the chosen browser sends.
+Glava Accept, poslana za vsako vrsto povezave. Samodejno pošlje to, kar pošlje izbrani brskalnik.
+Automatic
+Samodejno
+Old HTTrack value
+Stara vrednost HTTrack
+Default
+Privzeto
+Pages
+Strani
+Inline frames
+Vgrajeni okvirji
+Frames
+Okvirji
+Images
+Slike
+Style sheets
+Slogovne predloge
+Scripts
+Skripti
+Fonts
+Pisave
+Audio
+Zvok
+Video
+Video
+Objects
+Predmeti
+Embedded content
+Vdelana vsebina

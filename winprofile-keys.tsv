@@ -7,6 +7,18 @@
 # ASCII only. No value may contain a tab.
 #
 # key	owners	scope	kind	flag_on	flag_off	composed_with	default_state	default_value	empty_means	legacy_of
+AcceptDefault	win,web,droid	setting	string				agreed		absent	
+AcceptDocument	win,web,droid	setting	string				agreed		absent	
+AcceptIframe	win,web,droid	setting	string				agreed		absent	
+AcceptFrame	win,web,droid	setting	string				agreed		absent	
+AcceptImage	win,web,droid	setting	string				agreed		absent	
+AcceptStyle	win,web,droid	setting	string				agreed		absent	
+AcceptScript	win,web,droid	setting	string				agreed		absent	
+AcceptFont	win,web,droid	setting	string				agreed		absent	
+AcceptAudio	win,web,droid	setting	string				agreed		absent	
+AcceptVideo	win,web,droid	setting	string				agreed		absent	
+AcceptObject	win,web,droid	setting	string				agreed		absent	
+AcceptEmbed	win,web,droid	setting	string				agreed		absent	
 AcceptLanguage	win,droid	setting	string				derived		literal	
 Build	win,web,droid	setting	list:0:15			BuildString	agreed	0		
 BuildString	win,web,droid	setting	string			Build	agreed	%h%p/%n%q.%t	literal	

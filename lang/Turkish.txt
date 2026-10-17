@@ -1062,3 +1062,35 @@ Theme:
 Tema:
 Classic
 Klasik
+Accept headers
+Accept üstbilgileri
+The Accept header sent for each kind of link. Automatic sends what the chosen browser sends.
+Her bağlantı türü için gönderilen Accept üstbilgisi. Otomatik, seçilen tarayıcının gönderdiğini gönderir.
+Automatic
+Otomatik
+Old HTTrack value
+Eski HTTrack değeri
+Default
+Varsayılan
+Pages
+Sayfalar
+Inline frames
+Satır içi çerçeveler
+Frames
+Çerçeveler
+Images
+Görüntüler
+Style sheets
+Stil sayfaları
+Scripts
+Betikler
+Fonts
+Yazı tipleri
+Audio
+Ses
+Video
+Video
+Objects
+Nesneler
+Embedded content
+Gömülü içerik

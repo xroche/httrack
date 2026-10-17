@@ -307,6 +307,34 @@ static int st_copyopt(httrackp *opt, int argc, char **argv) {
   if (strcmp(StringBuff(to->warc_file), "run.warc.gz") != 0)
     err = 1;
 
+  /* accept_kinds deep-copies, and an explicit -%a or -%l carries its flag. */
+  StringCopy(from->accept_kinds, "image=a/b");
+  StringCopy(from->accept, "x/y");
+  from->accept_given = HTS_TRUE;
+  StringCopy(from->lang_iso, "fr");
+  from->lang_given = HTS_TRUE;
+  copy_htsopt(from, to);
+  if (strcmp(StringBuff(to->accept_kinds), "image=a/b") != 0 ||
+      strcmp(StringBuff(to->accept), "x/y") != 0 || !to->accept_given ||
+      strcmp(StringBuff(to->lang_iso), "fr") != 0 || !to->lang_given)
+    err = 1;
+  /* A default -%a or -%l never overwrites an explicit one. */
+  StringCopy(from->accept, HTS_ACCEPT_LEGACY);
+  from->accept_given = HTS_FALSE;
+  StringCopy(from->lang_iso, HTS_ACCEPT_LANGUAGE_LEGACY);
+  from->lang_given = HTS_FALSE;
+  copy_htsopt(from, to);
+  if (strcmp(StringBuff(to->accept), "x/y") != 0 || !to->accept_given ||
+      strcmp(StringBuff(to->lang_iso), "fr") != 0 || !to->lang_given)
+    err = 1;
+  /* An explicit -%a or -%l equal to the built-in value still overwrites. */
+  from->accept_given = HTS_TRUE;
+  from->lang_given = HTS_TRUE;
+  copy_htsopt(from, to);
+  if (strcmp(StringBuff(to->accept), HTS_ACCEPT_LEGACY) != 0 ||
+      strcmp(StringBuff(to->lang_iso), HTS_ACCEPT_LANGUAGE_LEGACY) != 0)
+    err = 1;
+
   from->changes = HTS_TRUE;
   to->changes = HTS_FALSE;
   copy_htsopt(from, to);

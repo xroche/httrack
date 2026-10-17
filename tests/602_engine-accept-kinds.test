@@ -1,0 +1,128 @@
+#!/bin/bash
+#
+# These cases pin how --accept 'KIND=VALUE' is read, which Accept a request
+# sends, the browser tables and the browser header orders.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+chrome='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36'
+firefox='Mozilla/5.0 (X11; Linux x86_64; rv:158.0) Gecko/20100101 Firefox/158.0'
+
+# Values from browser-headers/captures.md (Chrome 155, Firefox 158, headed).
+c_nav='text/html,application/xhtml+xml,application/xml;q=0.9,image/jxl,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7'
+c_img='image/jxl,image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
+f_nav='text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+f_img='image/avif,image/jxl,image/webp,image/png,image/svg+xml,image/*;q=0.8,*/*;q=0.5'
+f_font='application/font-woff2;q=1.0,application/font-woff;q=0.9,*/*;q=0.8'
+f_audio='audio/webm,audio/ogg,audio/wav,audio/*;q=0.9,application/ogg;q=0.7,video/*;q=0.6,*/*;q=0.5'
+f_video='video/webm,video/ogg,video/*;q=0.9,application/ogg;q=0.7,audio/*;q=0.6,*/*;q=0.5'
+css='text/css,*/*;q=0.1'
+legacy='text/html,image/png,image/jpeg,image/pjpeg,image/x-xbitmap,image/svg+xml,image/gif;q=0.9,*/*;q=0.1'
+
+# A kind is a kind word before the first '=', so a media type is never one.
+selftest_queue image acceptkind 'image=a/b'
+selftest_queue embed acceptkind 'embed=a=b'
+selftest_queue document acceptkind 'document='
+selftest_queue default acceptkind 'application/signed-exchange;v=b3'
+selftest_queue default acceptkind 'text/html;level=1,*/*'
+selftest_queue default acceptkind '*/*;q=0.8'
+selftest_queue default acceptkind 'imagex=a/b'
+selftest_queue default acceptkind 'Image=a/b'
+selftest_queue default acceptkind 'image'
+selftest_queue default acceptkind '=a/b'
+
+# The kind's entry, then -%a, then the browser table, then the built-in value.
+# "-" means no -%a was given, and "empty" is the unknown destination.
+selftest_queue legacy accept image none -
+selftest_queue "$c_img" accept image chrome -
+selftest_queue "$f_img" accept image firefox -
+selftest_queue x/y accept image chrome x/y
+# An explicit -%a equal to the built-in value still beats the browser table.
+selftest_queue legacy accept image chrome "$legacy"
+selftest_queue legacy accept document firefox "$legacy"
+selftest_queue a/b accept image chrome x/y image=a/b
+selftest_queue a/b accept image none - image=a/b
+selftest_queue c/d accept image chrome - image=a/b image=c/d
+selftest_queue '*/*' accept script chrome - image=a/b
+selftest_queue '(empty)' accept image chrome - image=
+selftest_queue '(empty)' accept image chrome ''
+# A frame falls back to the document entry, an object does not.
+selftest_queue d/e accept iframe chrome - document=d/e
+selftest_queue i/f accept iframe none - document=d/e iframe=i/f
+selftest_queue d/e accept frame none - document=d/e iframe=i/f
+selftest_queue legacy accept object none - document=d/e
+# A request whose kind is unknown takes -%a or the built-in value.
+selftest_queue legacy accept empty chrome - image=a/b
+selftest_queue x/y accept empty firefox x/y
+
+# An Origin drops the scheme's default port and refuses a host no header can
+# carry (hex: "http://a\x01test", "http://a\x7ftest", "http://a\xc3\xa9test").
+selftest_queue http://a.test fetchorigin a.test
+selftest_queue http://a.test fetchorigin http://a.test:80/x
+selftest_queue https://a.test fetchorigin https://a.test:443/
+selftest_queue http://a.test:8080 fetchorigin http://a.test:8080/
+selftest_queue https://a.test:80 fetchorigin https://a.test:80/
+selftest_queue '(refused)' fetchorigin hex:687474703a2f2f610174657374
+selftest_queue '(refused)' fetchorigin hex:687474703a2f2f617f74657374
+selftest_queue '(refused)' fetchorigin hex:687474703a2f2f61c3a974657374
+
+# hts_accept_preset() and hts_accept_kinds().
+selftest_queue document,iframe,frame,image,style,script,font,audio,video,object,embed acceptpreset
+for k in document iframe frame object embed; do
+    selftest_queue "$c_nav" acceptpreset chrome "$k"
+done
+for k in document iframe frame; do
+    selftest_queue "$f_nav" acceptpreset firefox "$k"
+done
+selftest_queue "$c_img" acceptpreset chrome image
+selftest_queue "$f_img" acceptpreset firefox image
+selftest_queue "$css" acceptpreset chrome style
+selftest_queue "$css" acceptpreset firefox style
+for k in script font audio video; do
+    selftest_queue '*/*' acceptpreset chrome "$k"
+done
+selftest_queue '*/*' acceptpreset firefox script
+selftest_queue "$f_font" acceptpreset firefox font
+selftest_queue "$f_audio" acceptpreset firefox audio
+selftest_queue "$f_video" acceptpreset firefox video
+selftest_queue '*/*' acceptpreset firefox object
+selftest_queue '*/*' acceptpreset firefox embed
+selftest_queue "$legacy" acceptpreset legacy image
+selftest_queue "$legacy" acceptpreset legacy
+selftest_queue '(null)' acceptpreset chrome
+selftest_queue '(null)' acceptpreset firefox ''
+selftest_queue '(null)' acceptpreset chrome empty
+selftest_queue '(null)' acceptpreset legacy Image
+selftest_queue '(null)' acceptpreset safari image
+
+# Chrome and Edge as the client hints tell them, and Firefox from 90.
+selftest_queue chrome browserfamily "$chrome"
+selftest_queue chrome browserfamily "$chrome Edg/141.0.0.0"
+selftest_queue firefox browserfamily "$firefox"
+selftest_queue firefox browserfamily 'Mozilla/5.0 (Android 14; Mobile; rv:131.0) Gecko/131.0 Firefox/131.0'
+selftest_queue none browserfamily "${firefox//158.0/89.0}"
+selftest_queue firefox browserfamily "${firefox//158.0/90.0}"
+selftest_queue none browserfamily "${firefox#Mozilla/5.0 }"
+selftest_queue none browserfamily "${firefox/ Gecko\/20100101/}"
+selftest_queue none browserfamily 'Mozilla/5.0 Gecko/20100101 Firefox/158.0 (X11'
+selftest_queue none browserfamily "$firefox SeaMonkey/2.53.20"
+selftest_queue none browserfamily 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/131.0 Mobile/15E148 Safari/605.1.15'
+selftest_queue none browserfamily "$chrome OPR/125.0.0.0"
+selftest_queue none browserfamily 'Mozilla/5.0 (compatible; HTTrack/3.x; +https://www.httrack.com/)'
+
+# Without a browser table the order is the one httrack always sent.
+order_legacy='Referer,Content-length,Connection,Host,From,sec-ch-ua,sec-ch-ua-mobile,sec-ch-ua-platform,Upgrade-Insecure-Requests,User-Agent,Accept,Sec-Fetch-Site,Sec-Fetch-Mode,Sec-Fetch-User,Sec-Fetch-Dest,Accept-Language,Accept-Encoding,Origin'
+order_c_nav='Content-length,From,Host,Connection,Origin,sec-ch-ua,sec-ch-ua-mobile,sec-ch-ua-platform,Accept-Language,Upgrade-Insecure-Requests,User-Agent,Accept,Sec-Fetch-Site,Sec-Fetch-Mode,Sec-Fetch-User,Sec-Fetch-Dest,Referer,Accept-Encoding'
+order_c_sub='Content-length,From,Host,Connection,Origin,sec-ch-ua-platform,Accept-Language,sec-ch-ua,Upgrade-Insecure-Requests,User-Agent,sec-ch-ua-mobile,Accept,Sec-Fetch-Site,Sec-Fetch-Mode,Sec-Fetch-User,Sec-Fetch-Dest,Referer,Accept-Encoding'
+order_f='Content-length,From,Host,User-Agent,Accept,Accept-Language,Accept-Encoding,Origin,Connection,Referer,Upgrade-Insecure-Requests,Sec-Fetch-Dest,Sec-Fetch-Mode,Sec-Fetch-Site,Sec-Fetch-User,sec-ch-ua,sec-ch-ua-mobile,sec-ch-ua-platform'
+# Chrome gives an iframe the navigation order and an empty dest the other.
+selftest_queue "$order_legacy" headerorder none document
+selftest_queue "$order_c_nav" headerorder chrome document
+selftest_queue "$order_c_nav" headerorder chrome iframe
+selftest_queue "$order_c_sub" headerorder chrome image
+selftest_queue "$order_c_sub" headerorder chrome empty
+selftest_queue "$order_f" headerorder firefox document
+selftest_run_queued

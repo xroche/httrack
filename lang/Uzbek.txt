@@ -1062,3 +1062,35 @@ Theme:
 Mavzu:
 Classic
 Klassik
+Accept headers
+Accept sarlavhalari
+The Accept header sent for each kind of link. Automatic sends what the chosen browser sends.
+Har bir havola turi uchun yuboriladigan Accept sarlavhasi. Avtomatik tanlangan brauzer yuboradigan qiymatni yuboradi.
+Automatic
+Avtomatik
+Old HTTrack value
+Eski HTTrack qiymati
+Default
+Standart
+Pages
+Sahifalar
+Inline frames
+Ichki ramkalar
+Frames
+Ramkalar
+Images
+Rasmlar
+Style sheets
+Uslublar jadvallari
+Scripts
+Skriptlar
+Fonts
+Shriftlar
+Audio
+Audio
+Video
+Video
+Objects
+Obyektlar
+Embedded content
+Ichiga joylangan kontent

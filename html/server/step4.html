@@ -165,6 +165,19 @@ ${/* -m<n> resets the html limit, so the bare form must precede the -m,<n> one *
 \
 ${/* an empty -F mutes the header instead of defaulting, so a blank box sends nothing */}
 	${test:user:--user-agent "}${arg:user}${test:user:"}
+${/* the engine reads a default such as image=x as the image row, so it is not sent */}
+	${do:if-not-accept-kind:acceptdefault}${test:acceptdefault:--accept "}${arg:acceptdefault}${test:acceptdefault:"}${do:end-if}${do:output-mode:html}
+	${test:acceptdocument:--accept "document=}${arg:acceptdocument}${test:acceptdocument:"}
+	${test:acceptiframe:--accept "iframe=}${arg:acceptiframe}${test:acceptiframe:"}
+	${test:acceptframe:--accept "frame=}${arg:acceptframe}${test:acceptframe:"}
+	${test:acceptimage:--accept "image=}${arg:acceptimage}${test:acceptimage:"}
+	${test:acceptstyle:--accept "style=}${arg:acceptstyle}${test:acceptstyle:"}
+	${test:acceptscript:--accept "script=}${arg:acceptscript}${test:acceptscript:"}
+	${test:acceptfont:--accept "font=}${arg:acceptfont}${test:acceptfont:"}
+	${test:acceptaudio:--accept "audio=}${arg:acceptaudio}${test:acceptaudio:"}
+	${test:acceptvideo:--accept "video=}${arg:acceptvideo}${test:acceptvideo:"}
+	${test:acceptobject:--accept "object=}${arg:acceptobject}${test:acceptobject:"}
+	${test:acceptembed:--accept "embed=}${arg:acceptembed}${test:acceptembed:"}
 	--footer "${arg:footer}"
 \
 	${unquoted:url2}
@@ -289,6 +302,18 @@ TimeOut=${timeout}
 RateOut=${rate}
 UserID=${user}
 Footer=${footer}
+AcceptDefault=${acceptdefault}
+AcceptDocument=${acceptdocument}
+AcceptIframe=${acceptiframe}
+AcceptFrame=${acceptframe}
+AcceptImage=${acceptimage}
+AcceptStyle=${acceptstyle}
+AcceptScript=${acceptscript}
+AcceptFont=${acceptfont}
+AcceptAudio=${acceptaudio}
+AcceptVideo=${acceptvideo}
+AcceptObject=${acceptobject}
+AcceptEmbed=${acceptembed}
 MaxRate=${maxrate}
 WildCardFilters=${url2}
 Depth=${depth}

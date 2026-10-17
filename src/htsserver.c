@@ -839,6 +839,21 @@ static hts_boolean find_user_theme_file(char *dst, size_t size,
   return HTS_TRUE;
 }
 
+/* Would the engine read value as a kind's --accept, not the default one? */
+static hts_boolean names_accept_kind(const char *value) {
+  const char *const eq = strchr(value, '=');
+  const char *const *k;
+
+  if (eq == NULL)
+    return HTS_FALSE;
+  for (k = hts_accept_kinds(); *k != NULL; k++) {
+    if (strlen(*k) == (size_t) (eq - value) &&
+        strncmp(*k, value, (size_t) (eq - value)) == 0)
+      return HTS_TRUE;
+  }
+  return HTS_FALSE;
+}
+
 /* Returns the chosen theme, or Classic while its folder is missing, which
    keeps the choice for when the folder comes back. */
 static const char *effective_theme(const char *path) {
@@ -2152,6 +2167,20 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                     } else if ((p = strfield(name, "attr:"))) {
                       name += p;
                       format = 7;
+                      /* ${attr:acceptpreset:<browser>:<kind>} expands to the
+                         engine's Accept value, or to nothing. */
+                      if ((p = strfield(name, "acceptpreset:"))) {
+                        char *const colon = strchr(name + p, ':');
+                        const char *v;
+
+                        name += p;
+                        langstr = "";
+                        if (colon != NULL) {
+                          *colon = '\0';
+                          if ((v = hts_accept_preset(name, colon + 1)) != NULL)
+                            langstr = v;
+                        }
+                      }
                     } else if ((p = strfield(name, "js:"))) {
                       name += p;
                       format = 6;
@@ -2291,6 +2320,13 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
                         if (coucal_readptr(NewLangList, pos2, &adr)
                             && *((char *) adr) != 0) {
+                          outputmode = -1;
+                        }
+                      } else if (strcmp(name, "if-not-accept-kind") == 0) {
+                        intptr_t adr = 0;
+
+                        if (coucal_readptr(NewLangList, pos2, &adr) &&
+                            adr != 0 && names_accept_kind((char *) adr)) {
                           outputmode = -1;
                         }
                       } else if (strcmp(name, "end-if") == 0) {

@@ -1,0 +1,146 @@
+#!/bin/bash
+#
+# These crawls check on the wire the Chrome and Firefox tables, --accept
+# 'KIND=VALUE', and that a User-Agent with no table sends the old header block.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+find_python >/dev/null || skip "python3 not found"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_accept.XXXXXX") || exit 1
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+local_server_start
+require_httrack
+
+chrome='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36'
+firefox='Mozilla/5.0 (X11; Linux x86_64; rv:158.0) Gecko/20100101 Firefox/158.0'
+other='Mozilla/5.0 (compatible; Test/1.0)'
+legacy='text/html,image/png,image/jpeg,image/pjpeg,image/x-xbitmap,image/svg+xml,image/gif;q=0.9,*/*;q=0.1'
+
+n=0
+# Crawl the fetchmeta fixture, whose files echo the request that fetched them.
+crawl() {
+    n=$((n + 1))
+    dir="$tmpdir/crawl$n"
+    mkdir "$dir"
+    local_crawl --log "$tmpdir/log$n" -O "$dir" --quiet --robots=0 \
+        --timeout=30 --retries=0 -%F '' "$BASEURL/fetchmeta/index.html" "$@" ||
+        fail "crawl $n failed: $(cat "$tmpdir/log$n")"
+    root="$dir/127.0.0.1_$SRV_PORT/fetchmeta"
+}
+
+# The header names of the request a file echoes, comma-joined.
+names() {
+    awk 'NR > 1 && /^$/ { exit } NR > 1 { sub(/:.*/, ""); printf "%s%s", s, $0; s = "," }' "$root/$1"
+}
+
+# The header line name of the request a file echoes.
+header() {
+    awk -v h="$2" 'NR > 1 && /^$/ { exit } index($0, h ": ") == 1 { print }' "$root/$1"
+}
+
+same() { # same WHAT GOT WANT
+    test "$2" = "$3" || fail "$1: got '$2', want '$3'"
+}
+
+# Chrome: its navigation and subresource orders (the client hints and
+# Upgrade-Insecure-Requests go on https only), and its Accept per kind.
+crawl -F "$chrome"
+same "chrome page order" "$(names page.html)" \
+    Host,Connection,Accept-Language,User-Agent,Accept,Sec-Fetch-Site,Sec-Fetch-Mode,Sec-Fetch-User,Sec-Fetch-Dest,Referer,Accept-Encoding
+same "chrome image order" "$(names img.png)" \
+    Host,Connection,Accept-Language,User-Agent,Accept,Sec-Fetch-Site,Sec-Fetch-Mode,Sec-Fetch-Dest,Referer,Accept-Encoding
+same "chrome font order" "$(names font.woff2)" \
+    Host,Connection,Origin,Accept-Language,User-Agent,Accept,Sec-Fetch-Site,Sec-Fetch-Mode,Sec-Fetch-Dest,Referer,Accept-Encoding
+same "chrome page" "$(header page.html Accept)" \
+    'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/jxl,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7'
+same "chrome image" "$(header img.png Accept)" \
+    'Accept: image/jxl,image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
+same "chrome style" "$(header style.css Accept)" 'Accept: text/css,*/*;q=0.1'
+same "chrome script" "$(header app.js Accept)" 'Accept: */*'
+same "chrome language" "$(header img.png Accept-Language)" \
+    'Accept-Language: en-US,en;q=0.9'
+same "chrome font origin" "$(header font.woff2 Origin)" \
+    "Origin: http://127.0.0.1:$SRV_PORT"
+same "chrome image origin" "$(header img.png Origin)" ''
+
+# Firefox: one order, its own Accept values, and an explicit -%l kept.
+crawl -F "$firefox" -%l fr
+same "firefox page order" "$(names page.html)" \
+    Host,User-Agent,Accept,Accept-Language,Accept-Encoding,Connection,Referer,Sec-Fetch-Dest,Sec-Fetch-Mode,Sec-Fetch-Site,Sec-Fetch-User
+same "firefox image order" "$(names img.png)" \
+    Host,User-Agent,Accept,Accept-Language,Accept-Encoding,Connection,Referer,Sec-Fetch-Dest,Sec-Fetch-Mode,Sec-Fetch-Site
+same "firefox page" "$(header page.html Accept)" \
+    'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+same "firefox image" "$(header img.png Accept)" \
+    'Accept: image/avif,image/jxl,image/webp,image/png,image/svg+xml,image/*;q=0.8,*/*;q=0.5'
+same "firefox font" "$(header font.woff2 Accept)" \
+    'Accept: application/font-woff2;q=1.0,application/font-woff;q=0.9,*/*;q=0.8'
+same "firefox language" "$(header img.png Accept-Language)" 'Accept-Language: fr'
+# The font is same-origin, so Firefox sends no Origin.
+same "firefox font origin" "$(header font.woff2 Origin)" ''
+
+# Firefox sends Origin cross-origin only, after Accept-Encoding, and en-US
+# when -%l is not given. cfont.woff2 sits on localhost, the page does not.
+crawl -F "$firefox" '+localhost*'
+cfont=../../localhost_$SRV_PORT/fetchmeta/cfont.woff2
+same "firefox cross font order" "$(names "$cfont")" \
+    Host,User-Agent,Accept,Accept-Language,Accept-Encoding,Origin,Connection,Referer,Sec-Fetch-Dest,Sec-Fetch-Mode,Sec-Fetch-Site
+same "firefox cross font origin" "$(header "$cfont" Origin)" \
+    "Origin: http://127.0.0.1:$SRV_PORT"
+same "firefox same font origin" "$(header xfont.woff2 Origin)" ''
+same "firefox default language" "$(header img.png Accept-Language)" \
+    'Accept-Language: en-US,en;q=0.9'
+
+# An explicit -%a or -%l equal to the built-in value is still the user's.
+crawl -F "$chrome" -%a "$legacy" -%l 'en, *'
+for f in page.html frame.html img.png style.css app.js font.woff2; do
+    same "explicit legacy $f" "$(header "$f" Accept)" "Accept: $legacy"
+done
+same "explicit language" "$(header img.png Accept-Language)" 'Accept-Language: en, *'
+
+# The user's entry for a kind, then -%a, win over the table, and a frame
+# takes the document entry. A kind's value may be 255 bytes long.
+long=text/$(printf '%*s' 250 '' | tr ' ' a)
+crawl -F "$chrome" -%a x/y --accept image=img/x --accept document=doc/x \
+    --accept "style=$long"
+same "user image" "$(header img.png Accept)" 'Accept: img/x'
+same "user page" "$(header page.html Accept)" 'Accept: doc/x'
+same "user frame" "$(header frame.html Accept)" 'Accept: doc/x'
+same "user script" "$(header app.js Accept)" 'Accept: x/y'
+same "user style" "$(header style.css Accept)" "Accept: $long"
+
+# No table: the block httrack always sent, byte for byte, a kind's entry
+# included.
+crawl -F "$other" --accept image=img/x
+want=$(printf '%s\n' \
+    "PATH /fetchmeta/app.js" \
+    "Referer: http://127.0.0.1:$SRV_PORT/fetchmeta/index.html" \
+    "Connection: keep-alive" \
+    "Host: 127.0.0.1:$SRV_PORT" \
+    "User-Agent: $other" \
+    "Accept: $legacy" \
+    "Sec-Fetch-Site: same-origin" \
+    "Sec-Fetch-Mode: no-cors" \
+    "Sec-Fetch-Dest: script" \
+    "Accept-Language: en, *" \
+    "Accept-Encoding: gzip, deflate, identity;q=0.9")
+same "no table script" "$(sed '/^$/,$d' "$root/app.js")" "$want"
+same "no table image" "$(header img.png Accept)" 'Accept: img/x'
+same "no table page" "$(header page.html Accept)" "Accept: $legacy"
+
+# -%Q0 turns the Chrome table off with the rest of the browser headers, but a
+# kind's entry still applies.
+crawl -F "$chrome" -%Q0 --accept image=img/x
+same "-%Q0 image order" "$(names img.png)" \
+    Referer,Connection,Host,User-Agent,Accept,Accept-Language,Accept-Encoding
+same "-%Q0 image" "$(header img.png Accept)" 'Accept: img/x'
+same "-%Q0 page" "$(header page.html Accept)" "Accept: $legacy"
+same "-%Q0 language" "$(header img.png Accept-Language)" 'Accept-Language: en, *'

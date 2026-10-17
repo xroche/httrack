@@ -118,6 +118,176 @@ ${LANG_I43b}
 >
 </td></tr>
 
+<tr><td colspan="2">
+<br><b>${LANG_ACCEPT}</b>
+</td></tr>
+
+<tr><td>
+${LANG_ACCEPTDEFAULT}
+</td><td>
+<input name="acceptdefault" value="${attr:acceptdefault}" size="60" maxlength="255" list="acceptdefault-list" placeholder="${attr:LANG_ACCEPTAUTO}"
+			title='${html:LANG_ACCEPTTIP}' onMouseOver="info('${js:LANG_ACCEPTTIP}'); return true" onMouseOut="info('&nbsp;'); return true"
+>
+<datalist id="acceptdefault-list">
+	<option value="${attr:acceptpreset:legacy:}" label="${attr:LANG_ACCEPTLEGACY}">
+	<option value="*/*" label="*/*">
+</datalist>
+</td></tr>
+
+<tr><td>
+${LANG_ACCEPTDOCUMENT}
+</td><td>
+<input name="acceptdocument" value="${attr:acceptdocument}" size="60" maxlength="255" list="acceptdocument-list" placeholder="${attr:LANG_ACCEPTAUTO}"
+			title='${html:LANG_ACCEPTTIP}' onMouseOver="info('${js:LANG_ACCEPTTIP}'); return true" onMouseOut="info('&nbsp;'); return true"
+>
+<datalist id="acceptdocument-list">
+	<option value="${attr:acceptpreset:chrome:document}" label="Chrome">
+	<option value="${attr:acceptpreset:firefox:document}" label="Firefox">
+	<option value="${attr:acceptpreset:legacy:document}" label="${attr:LANG_ACCEPTLEGACY}">
+	<option value="*/*" label="*/*">
+</datalist>
+</td></tr>
+
+<tr><td>
+${LANG_ACCEPTIFRAME}
+</td><td>
+<input name="acceptiframe" value="${attr:acceptiframe}" size="60" maxlength="255" list="acceptiframe-list" placeholder="${attr:LANG_ACCEPTAUTO}"
+			title='${html:LANG_ACCEPTTIP}' onMouseOver="info('${js:LANG_ACCEPTTIP}'); return true" onMouseOut="info('&nbsp;'); return true"
+>
+<datalist id="acceptiframe-list">
+	<option value="${attr:acceptpreset:chrome:iframe}" label="Chrome">
+	<option value="${attr:acceptpreset:firefox:iframe}" label="Firefox">
+	<option value="${attr:acceptpreset:legacy:iframe}" label="${attr:LANG_ACCEPTLEGACY}">
+	<option value="*/*" label="*/*">
+</datalist>
+</td></tr>
+
+<tr><td>
+${LANG_ACCEPTFRAME}
+</td><td>
+<input name="acceptframe" value="${attr:acceptframe}" size="60" maxlength="255" list="acceptframe-list" placeholder="${attr:LANG_ACCEPTAUTO}"
+			title='${html:LANG_ACCEPTTIP}' onMouseOver="info('${js:LANG_ACCEPTTIP}'); return true" onMouseOut="info('&nbsp;'); return true"
+>
+<datalist id="acceptframe-list">
+	<option value="${attr:acceptpreset:chrome:frame}" label="Chrome">
+	<option value="${attr:acceptpreset:firefox:frame}" label="Firefox">
+	<option value="${attr:acceptpreset:legacy:frame}" label="${attr:LANG_ACCEPTLEGACY}">
+	<option value="*/*" label="*/*">
+</datalist>
+</td></tr>
+
+<tr><td>
+${LANG_ACCEPTIMAGE}
+</td><td>
+<input name="acceptimage" value="${attr:acceptimage}" size="60" maxlength="255" list="acceptimage-list" placeholder="${attr:LANG_ACCEPTAUTO}"
+			title='${html:LANG_ACCEPTTIP}' onMouseOver="info('${js:LANG_ACCEPTTIP}'); return true" onMouseOut="info('&nbsp;'); return true"
+>
+<datalist id="acceptimage-list">
+	<option value="${attr:acceptpreset:chrome:image}" label="Chrome">
+	<option value="${attr:acceptpreset:firefox:image}" label="Firefox">
+	<option value="${attr:acceptpreset:legacy:image}" label="${attr:LANG_ACCEPTLEGACY}">
+	<option value="*/*" label="*/*">
+</datalist>
+</td></tr>
+
+<tr><td>
+${LANG_ACCEPTSTYLE}
+</td><td>
+<input name="acceptstyle" value="${attr:acceptstyle}" size="60" maxlength="255" list="acceptstyle-list" placeholder="${attr:LANG_ACCEPTAUTO}"
+			title='${html:LANG_ACCEPTTIP}' onMouseOver="info('${js:LANG_ACCEPTTIP}'); return true" onMouseOut="info('&nbsp;'); return true"
+>
+<datalist id="acceptstyle-list">
+	<option value="${attr:acceptpreset:chrome:style}" label="Chrome">
+	<option value="${attr:acceptpreset:firefox:style}" label="Firefox">
+	<option value="${attr:acceptpreset:legacy:style}" label="${attr:LANG_ACCEPTLEGACY}">
+	<option value="*/*" label="*/*">
+</datalist>
+</td></tr>
+
+<tr><td>
+${LANG_ACCEPTSCRIPT}
+</td><td>
+<input name="acceptscript" value="${attr:acceptscript}" size="60" maxlength="255" list="acceptscript-list" placeholder="${attr:LANG_ACCEPTAUTO}"
+			title='${html:LANG_ACCEPTTIP}' onMouseOver="info('${js:LANG_ACCEPTTIP}'); return true" onMouseOut="info('&nbsp;'); return true"
+>
+<datalist id="acceptscript-list">
+	<option value="${attr:acceptpreset:chrome:script}" label="Chrome">
+	<option value="${attr:acceptpreset:firefox:script}" label="Firefox">
+	<option value="${attr:acceptpreset:legacy:script}" label="${attr:LANG_ACCEPTLEGACY}">
+	<option value="*/*" label="*/*">
+</datalist>
+</td></tr>
+
+<tr><td>
+${LANG_ACCEPTFONT}
+</td><td>
+<input name="acceptfont" value="${attr:acceptfont}" size="60" maxlength="255" list="acceptfont-list" placeholder="${attr:LANG_ACCEPTAUTO}"
+			title='${html:LANG_ACCEPTTIP}' onMouseOver="info('${js:LANG_ACCEPTTIP}'); return true" onMouseOut="info('&nbsp;'); return true"
+>
+<datalist id="acceptfont-list">
+	<option value="${attr:acceptpreset:chrome:font}" label="Chrome">
+	<option value="${attr:acceptpreset:firefox:font}" label="Firefox">
+	<option value="${attr:acceptpreset:legacy:font}" label="${attr:LANG_ACCEPTLEGACY}">
+	<option value="*/*" label="*/*">
+</datalist>
+</td></tr>
+
+<tr><td>
+${LANG_ACCEPTAUDIO}
+</td><td>
+<input name="acceptaudio" value="${attr:acceptaudio}" size="60" maxlength="255" list="acceptaudio-list" placeholder="${attr:LANG_ACCEPTAUTO}"
+			title='${html:LANG_ACCEPTTIP}' onMouseOver="info('${js:LANG_ACCEPTTIP}'); return true" onMouseOut="info('&nbsp;'); return true"
+>
+<datalist id="acceptaudio-list">
+	<option value="${attr:acceptpreset:chrome:audio}" label="Chrome">
+	<option value="${attr:acceptpreset:firefox:audio}" label="Firefox">
+	<option value="${attr:acceptpreset:legacy:audio}" label="${attr:LANG_ACCEPTLEGACY}">
+	<option value="*/*" label="*/*">
+</datalist>
+</td></tr>
+
+<tr><td>
+${LANG_ACCEPTVIDEO}
+</td><td>
+<input name="acceptvideo" value="${attr:acceptvideo}" size="60" maxlength="255" list="acceptvideo-list" placeholder="${attr:LANG_ACCEPTAUTO}"
+			title='${html:LANG_ACCEPTTIP}' onMouseOver="info('${js:LANG_ACCEPTTIP}'); return true" onMouseOut="info('&nbsp;'); return true"
+>
+<datalist id="acceptvideo-list">
+	<option value="${attr:acceptpreset:chrome:video}" label="Chrome">
+	<option value="${attr:acceptpreset:firefox:video}" label="Firefox">
+	<option value="${attr:acceptpreset:legacy:video}" label="${attr:LANG_ACCEPTLEGACY}">
+	<option value="*/*" label="*/*">
+</datalist>
+</td></tr>
+
+<tr><td>
+${LANG_ACCEPTOBJECT}
+</td><td>
+<input name="acceptobject" value="${attr:acceptobject}" size="60" maxlength="255" list="acceptobject-list" placeholder="${attr:LANG_ACCEPTAUTO}"
+			title='${html:LANG_ACCEPTTIP}' onMouseOver="info('${js:LANG_ACCEPTTIP}'); return true" onMouseOut="info('&nbsp;'); return true"
+>
+<datalist id="acceptobject-list">
+	<option value="${attr:acceptpreset:chrome:object}" label="Chrome">
+	<option value="${attr:acceptpreset:firefox:object}" label="Firefox">
+	<option value="${attr:acceptpreset:legacy:object}" label="${attr:LANG_ACCEPTLEGACY}">
+	<option value="*/*" label="*/*">
+</datalist>
+</td></tr>
+
+<tr><td>
+${LANG_ACCEPTEMBED}
+</td><td>
+<input name="acceptembed" value="${attr:acceptembed}" size="60" maxlength="255" list="acceptembed-list" placeholder="${attr:LANG_ACCEPTAUTO}"
+			title='${html:LANG_ACCEPTTIP}' onMouseOver="info('${js:LANG_ACCEPTTIP}'); return true" onMouseOut="info('&nbsp;'); return true"
+>
+<datalist id="acceptembed-list">
+	<option value="${attr:acceptpreset:chrome:embed}" label="Chrome">
+	<option value="${attr:acceptpreset:firefox:embed}" label="Firefox">
+	<option value="${attr:acceptpreset:legacy:embed}" label="${attr:LANG_ACCEPTLEGACY}">
+	<option value="*/*" label="*/*">
+</datalist>
+</td></tr>
+
 </table>
 
 <tr><td>

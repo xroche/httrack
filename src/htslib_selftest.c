@@ -33,6 +33,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsselftest_int.h"
 #include "htsname.h"
+#include "htsfetch.h"
 
 #include <stdint.h>
 #ifndef _WIN32
@@ -3431,9 +3432,53 @@ static int st_clienthints(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* -#test=browserfamily <user-agent> prints the browser whose tables it gets. */
+static int st_browserfamily(httrackp *opt, int argc, char **argv) {
+  (void) opt;
+  if (argc != 1) {
+    fprintf(stderr, "browserfamily: takes a user-agent\n");
+    return 1;
+  }
+  printf("%s\n", st_family_name(hts_browser_family_of(argv[0])));
+  return 0;
+}
+
+/* -#test=headerorder <none|chrome|firefox> <dest> prints a request's header
+   order, and fails unless it names every header once. */
+static int st_headerorder(httrackp *opt, int argc, char **argv) {
+  const int n = http_header_slot_count();
+  const unsigned char *order;
+  unsigned char seen[64];
+  hts_browser_family family;
+  int dest, i;
+
+  (void) opt;
+  if (argc != 2 || n > (int) sizeof(seen)) {
+    fprintf(stderr, "headerorder: takes <none|chrome|firefox> <dest>\n");
+    return 1;
+  }
+  if (!st_family_of(argv[0], &family) || !st_dest_of(argv[1], &dest))
+    return 1;
+  order = http_header_order(family, dest);
+  memset(seen, 0, sizeof(seen));
+  for (i = 0; i < n; i++) {
+    if (order[i] >= n || seen[order[i]]++ != 0) {
+      printf("slot %d repeats or is out of range\n", order[i]);
+      return 1;
+    }
+    printf("%s%s", i != 0 ? "," : "", http_header_slot_name(order[i]));
+  }
+  printf("\n");
+  return 0;
+}
+
 const struct selftest_entry selftests_lib[] = {
     {"clienthints", "<user-agent>",
      "the client hints a browser sending this User-Agent adds", st_clienthints},
+    {"browserfamily", "<user-agent>",
+     "the browser whose header tables this User-Agent gets", st_browserfamily},
+    {"headerorder", "<none|chrome|firefox> <dest>",
+     "the header order of a request from that browser", st_headerorder},
     {"hashtable", "<count|file>", "coucal hashtable stress test", st_hashtable},
     {"strsafe", "[overflow|overflow-buff|overflow-src [str]]",
      "bounded string-op self-test", st_strsafe},

@@ -13,6 +13,8 @@ bin=$(httrack_path)
 testdir=$(cd "$(dirname "$0")" && pwd)
 hdr="$(cd "${top_srcdir:-${testdir}/..}" && pwd)/src/htsglobal.h"
 assert_file "$hdr" "no htsglobal.h to read the caps from"
+libhdr="${hdr%/*}/httrack-library.h"
+assert_file "$libhdr" "no httrack-library.h to read the caps from"
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_argcaps.XXXXXX") || exit 1
 cleanup_push rm -rf "$tmp"
@@ -21,7 +23,7 @@ echo '<html><body>x</body></html>' >"$tmp/page.html"
 
 # POSIX BRE only: BSD sed has no \+
 cap() {
-    sed -n "s/^#define $1[[:space:]][[:space:]]*\([0-9][0-9]*\).*/\1/p" "$hdr"
+    sed -n "s/^#define $1[[:space:]][[:space:]]*\([0-9][0-9]*\).*/\1/p" "$hdr" "$libhdr"
 }
 
 run() { # option value tag
@@ -34,7 +36,8 @@ caps="-%F HTS_FOOTER_MAXSIZE Footer string too long
 -%R HTS_REFERER_MAXSIZE Referer URL too long
 -%L HTS_FILELIST_MAXSIZE File list string too long
 -%b HTS_BINDHOST_MAXSIZE Hostname string too long
--%E HTS_FROMEMAIL_MAXSIZE From email too long"
+-%E HTS_FROMEMAIL_MAXSIZE From email too long
+-%a HTS_ACCEPT_MAXSIZE Accept list string too long"
 
 n=0
 while read -r opt macro msg; do
@@ -54,6 +57,20 @@ while read -r opt macro msg; do
     grep -qF "$msg" <<<"$out" || fail "$opt was not rejected by \"$msg\""
 done <<<"$caps"
 
-test "$n" -eq 6 || fail "expected 6 caps, checked $n"
+test "$n" -eq 7 || fail "expected 7 caps, checked $n"
+
+# The KIND= prefix of --accept does not count against its cap.
+limit=$(cap HTS_ACCEPT_MAXSIZE)
+# The front ends were promised 256, so a change here is a contract change.
+assert_eq 256 "$limit" "HTS_ACCEPT_MAXSIZE"
+val=$(printf "%*s" "$limit" "" | tr ' ' a)
+rc=0
+run --accept "image=${val%a}" kinda >/dev/null || rc=$?
+assert_eq 0 "$rc" "--accept image= rejected a value one byte under HTS_ACCEPT_MAXSIZE"
+rc=0
+out=$(run --accept "image=$val" kindb) || rc=$?
+test "$rc" -ne 0 || fail "--accept image= accepted a value of exactly HTS_ACCEPT_MAXSIZE"
+grep -qF "Accept list string too long" <<<"$out" ||
+    fail "--accept image= was not rejected by its cap"
 
 exit 0

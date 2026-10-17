@@ -33,6 +33,13 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTSFETCH_DEFH
 #define HTSFETCH_DEFH
 
+/* httrack mimics the headers of these browsers. */
+typedef enum hts_browser_family {
+  HTS_BROWSER_NONE = 0,
+  HTS_BROWSER_CHROME, /* Chrome and Edge */
+  HTS_BROWSER_FIREFOX
+} hts_browser_family;
+
 #ifdef HTS_INTERNAL_BYTECODE
 
 #include "htsglobal.h"
@@ -100,6 +107,33 @@ hts_boolean hts_fetch_is_navigation(int dest);
 const char *hts_fetch_dest_name(int dest);
 const char *hts_fetch_mode_name(const hts_fetch_meta *fm);
 const char *hts_fetch_site_name(int site);
+
+/* Write the "scheme://host[:port]" origin of adr into dst. Return HTS_FALSE
+   when the host holds a byte a header line cannot carry or dst is too small. */
+hts_boolean hts_fetch_origin(const char *adr, char *dst, size_t size);
+
+/* httrack sends this Accept when neither -%a nor a browser table names one. */
+#define HTS_ACCEPT_LEGACY                                                      \
+  "text/html,image/png,image/jpeg,image/pjpeg,image/x-xbitmap,image/"          \
+  "svg+xml,image/gif;q=0.9,*/*;q=0.1"
+
+/* httrack sends HTS_ACCEPT_LANGUAGE_LEGACY without -%l, and a browser table
+   sends HTS_ACCEPT_LANGUAGE_BROWSER instead. */
+#define HTS_ACCEPT_LANGUAGE_LEGACY "en, *"
+#define HTS_ACCEPT_LANGUAGE_BROWSER "en-US,en;q=0.9"
+
+/* Return the kind index of the --accept argument arg when it starts with a
+   kind word and '=', else -1. */
+int hts_accept_kind_of(const char *arg);
+
+/* Return the first Accept of: dest's kind line in list, the document line for
+   a frame, user_default if user_given, family's table, user_default. A list
+   line is "kind=value", the last one wins, and its value is copied into buf
+   (size bytes). */
+const char *hts_accept_lookup(const char *list, const char *user_default,
+                              hts_boolean user_given, int dest,
+                              hts_browser_family family, char *buf,
+                              size_t size);
 
 #endif
 

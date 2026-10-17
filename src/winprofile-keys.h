@@ -17,10 +17,22 @@ typedef struct {
   const char *legacy_of;
 } winprofile_key_t;
 
-#define WINPROFILE_KEY_COUNT 107
+#define WINPROFILE_KEY_COUNT 119
 
 /* clang-format off */
 static const winprofile_key_t winprofile_keys[WINPROFILE_KEY_COUNT] = {
+  {"AcceptDefault", "win,web,droid", "setting", "string", "", "", "", "agreed", "", "absent", ""},
+  {"AcceptDocument", "win,web,droid", "setting", "string", "", "", "", "agreed", "", "absent", ""},
+  {"AcceptIframe", "win,web,droid", "setting", "string", "", "", "", "agreed", "", "absent", ""},
+  {"AcceptFrame", "win,web,droid", "setting", "string", "", "", "", "agreed", "", "absent", ""},
+  {"AcceptImage", "win,web,droid", "setting", "string", "", "", "", "agreed", "", "absent", ""},
+  {"AcceptStyle", "win,web,droid", "setting", "string", "", "", "", "agreed", "", "absent", ""},
+  {"AcceptScript", "win,web,droid", "setting", "string", "", "", "", "agreed", "", "absent", ""},
+  {"AcceptFont", "win,web,droid", "setting", "string", "", "", "", "agreed", "", "absent", ""},
+  {"AcceptAudio", "win,web,droid", "setting", "string", "", "", "", "agreed", "", "absent", ""},
+  {"AcceptVideo", "win,web,droid", "setting", "string", "", "", "", "agreed", "", "absent", ""},
+  {"AcceptObject", "win,web,droid", "setting", "string", "", "", "", "agreed", "", "absent", ""},
+  {"AcceptEmbed", "win,web,droid", "setting", "string", "", "", "", "agreed", "", "absent", ""},
   {"AcceptLanguage", "win,droid", "setting", "string", "", "", "", "derived", "", "literal", ""},
   {"Build", "win,web,droid", "setting", "list:0:15", "", "", "BuildString", "agreed", "0", "", ""},
   {"BuildString", "win,web,droid", "setting", "string", "", "", "Build", "agreed", "%h%p/%n%q.%t", "literal", ""},

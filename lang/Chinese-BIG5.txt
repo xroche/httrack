@@ -1062,3 +1062,35 @@ Theme:
 主題:
 Classic
 經典
+Accept headers
+Accept 標頭
+The Accept header sent for each kind of link. Automatic sends what the chosen browser sends.
+為每種連結傳送的 Accept 標頭。「自動」會傳送所選瀏覽器傳送的值。
+Automatic
+自動
+Old HTTrack value
+舊版 HTTrack 值
+Default
+預設
+Pages
+網頁
+Inline frames
+內嵌框架
+Frames
+框架
+Images
+圖片
+Style sheets
+樣式表
+Scripts
+指令碼
+Fonts
+字型
+Audio
+音訊
+Video
+視訊
+Objects
+物件
+Embedded content
+嵌入內容

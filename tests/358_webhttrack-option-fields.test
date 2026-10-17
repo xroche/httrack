@@ -106,6 +106,40 @@ check('--user-agent "Probe/1.0"' in cmdline(), "a filled browser id is sent")
 s.post("option6.html", [("user", "")])
 check("--user-agent" not in cmdline(), "a blank browser id sends no --user-agent")
 
+# The Accept box: the default row is a bare --accept, a kind's row is prefixed,
+# a blank row sends nothing, and the suggestions are the engine's own values.
+page = s.get("option6.html")
+check('<option value="text/css,*/*;q=0.1" label="Chrome">' in page,
+      "the style row suggests Chrome's value")
+check(page.count("<datalist ") == 12, "twelve Accept rows")
+check(len(re.findall(r'<input name="accept[a-z]+"[^>]* maxlength="255"', page))
+      == 12, "each Accept row stops one byte short of HTS_ACCEPT_MAXSIZE")
+KINDS = ("document", "iframe", "frame", "image", "style", "script", "font",
+         "audio", "video", "object", "embed")
+ACCEPT = dict((k, "img/x" if k == "image" else "k/" + k) for k in KINDS)
+s.post("option6.html", [("acceptdefault", "x/y")] +
+       [("accept" + k, v) for k, v in ACCEPT.items()])
+cmd = cmdline()
+check('--accept "x/y"' in cmd, "the default row is sent bare")
+for k, v in ACCEPT.items():
+    check('--accept "%s=%s"' % (k, v) in cmd, "the %s row is sent with its kind" % k)
+s.post("option6.html", [("acceptfont", "")])
+cmd = cmdline()
+check("font=" not in cmd, "a blank row sends nothing")
+check(len(re.findall("--accept ", cmd)) == 11, "the other rows stay")
+# The engine reads a default that starts with a kind and "=" as that kind's row.
+for v in ("image=*/*", "font="):
+    s.post("option6.html", [("acceptdefault", v)])
+    check('--accept "%s"' % v not in cmdline(), "a default of %s is refused" % v)
+presets = sorted(set(html.unescape(v)
+                     for v in re.findall(r'<option value="([^"]+)"', page)))
+check(len(presets) >= 10 and any(v.startswith("image/jxl,") for v in presets),
+      "the presets include Chrome's image value")
+for v in presets:
+    s.post("option6.html", [("acceptdefault", v)])
+    check('--accept "%s"' % v in cmdline(), "the default %s is sent" % v)
+s.post("option6.html", [("acceptdefault", "x/y")])
+
 if rc:
     sys.exit(rc)
 # Start, the way the browser's button does: both textareas as rendered, with
@@ -136,6 +170,9 @@ grep -q -- "-%A foo=text/html" <<<"${argv}" ||
 assume_flags=$(tr ' ' '\n' <<<"${argv}" | grep -c -- '-%A' || true)
 assert_eq "${pairs}" "${assume_flags}" "-%A flags in the recorded argv"
 ! grep -q -- "-F " <<<"${argv}" || fail "a blank browser id still sent -F: ${argv}"
+grep -q -- "-%a x/y" <<<"${argv}" || fail "the default Accept never reached the engine: ${argv}"
+grep -q -- "-%a image=img/x" <<<"${argv}" ||
+    fail "the image Accept never reached the engine: ${argv}"
 
 # The rule changed the crawl, not just the argv: without it data.foo stays a
 # binary the engine never opens, so deep.html is unreachable.
@@ -170,6 +207,11 @@ check("--check-type=2" in cmd, "--check-type survives the round trip")
 check(len(re.findall("--assume ", cmd)) == npairs,
       "every --assume survives the round trip")
 check("--user-agent" not in cmd, "a reloaded blank browser id stays unsent")
+check(re.findall('--accept "([^"]*)"', cmd) ==
+      ["x/y", "document=k/document", "iframe=k/iframe", "frame=k/frame",
+       "image=img/x", "style=k/style", "script=k/script", "audio=k/audio",
+       "video=k/video", "object=k/object", "embed=k/embed"],
+      "the Accept rows survive the round trip")
 sys.exit(rc)
 PY
 

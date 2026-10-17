@@ -1062,3 +1062,35 @@ Theme:
 Design:
 Classic
 Klassisch
+Accept headers
+Accept-Header
+The Accept header sent for each kind of link. Automatic sends what the chosen browser sends.
+Der Accept-Header, der für jede Art von Link gesendet wird. Automatisch sendet, was der gewählte Browser sendet.
+Automatic
+Automatisch
+Old HTTrack value
+Alter HTTrack-Wert
+Default
+Standard
+Pages
+Seiten
+Inline frames
+Inline-Frames
+Frames
+Frames
+Images
+Bilder
+Style sheets
+Stylesheets
+Scripts
+Skripte
+Fonts
+Schriftarten
+Audio
+Audio
+Video
+Video
+Objects
+Objekte
+Embedded content
+Eingebettete Inhalte

@@ -4735,6 +4735,19 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
   if (StringNotEmpty(from->host_alias))
     StringCopyS(to->host_alias, from->host_alias);
 
+  if (StringNotEmpty(from->accept_kinds))
+    StringCopyS(to->accept_kinds, from->accept_kinds);
+
+  /* An explicit -%a or -%l travels with its flag, so it stays explicit. */
+  if (from->accept_given) {
+    StringCopyS(to->accept, from->accept);
+    to->accept_given = HTS_TRUE;
+  }
+  if (from->lang_given) {
+    StringCopyS(to->lang_iso, from->lang_iso);
+    to->lang_given = HTS_TRUE;
+  }
+
   if (StringNotEmpty(from->cookies_file))
     StringCopyS(to->cookies_file, from->cookies_file);
 

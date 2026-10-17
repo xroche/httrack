@@ -1062,3 +1062,35 @@ Theme:
 Motív:
 Classic
 Klasický
+Accept headers
+Hlavičky Accept
+The Accept header sent for each kind of link. Automatic sends what the chosen browser sends.
+Hlavička Accept odosielaná pre každý druh odkazu. Automaticky odošle to, čo odosiela zvolený prehliadač.
+Automatic
+Automaticky
+Old HTTrack value
+Stará hodnota HTTrack
+Default
+Predvolené
+Pages
+Stránky
+Inline frames
+Vložené rámy
+Frames
+Rámy
+Images
+Obrázky
+Style sheets
+Štýly
+Scripts
+Skripty
+Fonts
+Písma
+Audio
+Zvuk
+Video
+Video
+Objects
+Objekty
+Embedded content
+Vložený obsah

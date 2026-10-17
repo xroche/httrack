@@ -448,6 +448,20 @@ HTSEXT_API hts_boolean hts_footer_field_ok(const char *name);
     @return HTS_FALSE for NULL or a token not starting with '-'. */
 HTSEXT_API hts_boolean hts_rule_would_be_read_as_opt(const char *arg);
 
+/** An --accept value, its KIND= prefix aside, must be shorter than this. */
+#define HTS_ACCEPT_MAXSIZE 256
+
+/** Return the kinds --accept 'KIND=VALUE' takes (the Sec-Fetch-Dest words) in
+    the order a front end lists them. The array is static and NULL-terminated,
+    so never free it. */
+HTSEXT_API const char *const *hts_accept_kinds(void);
+
+/** Return the static Accept @p browser sends for @p kind. @p browser is
+    "chrome", "firefox" or "legacy" (the old httrack value). @p kind is one of
+    hts_accept_kinds(), or NULL or empty for the default row. @return NULL
+    when that browser has no value for it, or either name is unknown. */
+HTSEXT_API const char *hts_accept_preset(const char *browser, const char *kind);
+
 /** Return the engine's last error message, empty when there was none. The
     string lives inside @p opt, so never free it and read it only while @p opt
     lives. @p opt must not be NULL. */
