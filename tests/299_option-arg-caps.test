@@ -61,6 +61,8 @@ test "$n" -eq 7 || fail "expected 7 caps, checked $n"
 
 # The KIND= prefix of --accept does not count against its cap.
 limit=$(cap HTS_ACCEPT_MAXSIZE)
+# The front ends were promised 256, so a change here is a contract change.
+assert_eq 256 "$limit" "HTS_ACCEPT_MAXSIZE"
 val=$(printf "%*s" "$limit" "" | tr ' ' a)
 rc=0
 run --accept "image=${val%a}" kinda >/dev/null || rc=$?

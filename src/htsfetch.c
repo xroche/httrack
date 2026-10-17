@@ -204,8 +204,8 @@ hts_boolean hts_fetch_has_base_target(const char *html) {
   return HTS_FALSE;
 }
 
-/* The destination of a click on a link with this target. A named target is
-   a frame we cannot tell. */
+/* Return the destination a click on a link with this target loads. A named
+   target is a frame we cannot tell. */
 static int link_target_dest(const char *tag_name, int page_frame) {
   const char *target;
   size_t len;

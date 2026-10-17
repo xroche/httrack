@@ -107,8 +107,7 @@ done
 same "explicit language" "$(header img.png Accept-Language)" 'Accept-Language: en, *'
 
 # The user's entry for a kind, then -%a, win over the table, and a frame
-# takes the document entry.
-# A kind's value may be 255 bytes long (HTS_ACCEPT_MAXSIZE).
+# takes the document entry. A kind's value may be 255 bytes long.
 long=text/$(printf '%*s' 250 '' | tr ' ' a)
 crawl -F "$chrome" -%a x/y --accept image=img/x --accept document=doc/x \
     --accept "style=$long"

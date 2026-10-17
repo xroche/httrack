@@ -117,8 +117,8 @@ hts_boolean hts_fetch_origin(const char *adr, char *dst, size_t size);
   "text/html,image/png,image/jpeg,image/pjpeg,image/x-xbitmap,image/"          \
   "svg+xml,image/gif;q=0.9,*/*;q=0.1"
 
-/* httrack sends LEGACY without -%l, and a browser table sends BROWSER
-   instead. */
+/* httrack sends HTS_ACCEPT_LANGUAGE_LEGACY without -%l, and a browser table
+   sends HTS_ACCEPT_LANGUAGE_BROWSER instead. */
 #define HTS_ACCEPT_LANGUAGE_LEGACY "en, *"
 #define HTS_ACCEPT_LANGUAGE_BROWSER "en-US,en;q=0.9"
 

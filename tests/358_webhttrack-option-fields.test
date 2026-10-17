@@ -127,6 +127,18 @@ s.post("option6.html", [("acceptfont", "")])
 cmd = cmdline()
 check("font=" not in cmd, "a blank row sends nothing")
 check(len(re.findall("--accept ", cmd)) == 11, "the other rows stay")
+# The engine reads a default that starts with a kind and "=" as that kind's row.
+for v in ("image=*/*", "font="):
+    s.post("option6.html", [("acceptdefault", v)])
+    check('--accept "%s"' % v not in cmdline(), "a default of %s is refused" % v)
+presets = sorted(set(html.unescape(v)
+                     for v in re.findall(r'<option value="([^"]+)"', page)))
+check(len(presets) >= 10 and any(v.startswith("image/jxl,") for v in presets),
+      "the presets include Chrome's image value")
+for v in presets:
+    s.post("option6.html", [("acceptdefault", v)])
+    check('--accept "%s"' % v in cmdline(), "the default %s is sent" % v)
+s.post("option6.html", [("acceptdefault", "x/y")])
 
 if rc:
     sys.exit(rc)

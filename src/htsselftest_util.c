@@ -33,8 +33,6 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsselftest_int.h"
 
-/* Decode an argument ("hex:FFD8.." or literal text) into buf. Raw non-UTF-8
-   bytes cannot survive a Windows command line, so hostile inputs go as hex. */
 static const char *const st_families[] = {"none", "chrome", "firefox"};
 
 hts_boolean st_dest_of(const char *name, int *dest) {
@@ -63,6 +61,8 @@ const char *st_family_name(hts_browser_family family) {
   return st_families[family];
 }
 
+/* Decode an argument ("hex:FFD8.." or literal text) into buf. Raw non-UTF-8
+   bytes cannot survive a Windows command line, so hostile inputs go as hex. */
 size_t st_decode_body(const char *arg, char *buf, size_t size) {
   size_t n = 0;
 

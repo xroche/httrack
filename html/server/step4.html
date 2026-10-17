@@ -165,7 +165,8 @@ ${/* -m<n> resets the html limit, so the bare form must precede the -m,<n> one *
 \
 ${/* an empty -F mutes the header instead of defaulting, so a blank box sends nothing */}
 	${test:user:--user-agent "}${arg:user}${test:user:"}
-	${test:acceptdefault:--accept "}${arg:acceptdefault}${test:acceptdefault:"}
+${/* the engine reads a default such as image=x as the image row, so it is not sent */}
+	${do:if-not-accept-kind:acceptdefault}${test:acceptdefault:--accept "}${arg:acceptdefault}${test:acceptdefault:"}${do:end-if}${do:output-mode:html}
 	${test:acceptdocument:--accept "document=}${arg:acceptdocument}${test:acceptdocument:"}
 	${test:acceptiframe:--accept "iframe=}${arg:acceptiframe}${test:acceptiframe:"}
 	${test:acceptframe:--accept "frame=}${arg:acceptframe}${test:acceptframe:"}

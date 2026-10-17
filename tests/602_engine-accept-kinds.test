@@ -118,9 +118,11 @@ order_legacy='Referer,Content-length,Connection,Host,From,sec-ch-ua,sec-ch-ua-mo
 order_c_nav='Content-length,From,Host,Connection,Origin,sec-ch-ua,sec-ch-ua-mobile,sec-ch-ua-platform,Accept-Language,Upgrade-Insecure-Requests,User-Agent,Accept,Sec-Fetch-Site,Sec-Fetch-Mode,Sec-Fetch-User,Sec-Fetch-Dest,Referer,Accept-Encoding'
 order_c_sub='Content-length,From,Host,Connection,Origin,sec-ch-ua-platform,Accept-Language,sec-ch-ua,Upgrade-Insecure-Requests,User-Agent,sec-ch-ua-mobile,Accept,Sec-Fetch-Site,Sec-Fetch-Mode,Sec-Fetch-User,Sec-Fetch-Dest,Referer,Accept-Encoding'
 order_f='Content-length,From,Host,User-Agent,Accept,Accept-Language,Accept-Encoding,Origin,Connection,Referer,Upgrade-Insecure-Requests,Sec-Fetch-Dest,Sec-Fetch-Mode,Sec-Fetch-Site,Sec-Fetch-User,sec-ch-ua,sec-ch-ua-mobile,sec-ch-ua-platform'
-# The order reads dest only through hts_fetch_is_navigation().
+# Chrome gives an iframe the navigation order and an empty dest the other.
 selftest_queue "$order_legacy" headerorder none document
 selftest_queue "$order_c_nav" headerorder chrome document
+selftest_queue "$order_c_nav" headerorder chrome iframe
 selftest_queue "$order_c_sub" headerorder chrome image
+selftest_queue "$order_c_sub" headerorder chrome empty
 selftest_queue "$order_f" headerorder firefox document
 selftest_run_queued
