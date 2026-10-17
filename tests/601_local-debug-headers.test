@@ -1,0 +1,15 @@
+#!/bin/bash
+#
+# -%H writes hts-ioinfo.txt into an -O directory that does not exist yet, with
+# a non-ASCII name so Windows goes through the UTF-8 path handling (#630).
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+# Host root is <logroot>/127.0.0.1_<port>, so ../ reaches the log directory.
+bash "$top_srcdir/tests/local-crawl.sh" --outdir-intl 'débug' --errors 0 \
+    --found 'simple/basic.html' \
+    --file-matches ../hts-ioinfo.txt '^<<< GET /simple/basic\.html ' \
+    --file-matches ../hts-ioinfo.txt '^>>> HTTP/1\.[01] 200' \
+    httrack 'BASEURL/simple/basic.html' -%H
