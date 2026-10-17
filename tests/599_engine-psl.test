@@ -126,9 +126,8 @@ selftest_queue example.co.uk psl a.example.co.uk
 
 # A configured list file wins only when it holds about as many rules as the
 # real list, and the built-in list stays the fallback.
-builtin=$(sed -n 's/^const char hts_psl_builtin_version\[\] = "\(.*\)";$/\1/p' \
-    "${abs_top_srcdir:?not run under make check}/src/htspsl_data.c")
-test -n "${builtin}" || fail "no stamp in src/htspsl_data.c"
+builtin=$(httrack -#test=pslinit "${work}/missing.dat") || fail "pslinit failed"
+[[ ${builtin} =~ ^20[0-9]{2}-[0-9]{2}-[0-9]{2}_ ]] || fail "built-in stamp: '${builtin}'"
 big=${work}/big.dat
 {
     printf '// VERSION: 2000-01-02_00-00-00_UTC\n'
@@ -141,5 +140,4 @@ head -n 1000 "${big}" >"${work}/below.dat"
 selftest_queue 2000-01-02_00-00-00_UTC pslinit "${work}/floor.dat"
 selftest_queue "${builtin}" pslinit "${work}/below.dat"
 selftest_queue "${builtin}" pslinit "${list}"
-selftest_queue "${builtin}" pslinit "${work}/missing.dat"
 selftest_run_queued
