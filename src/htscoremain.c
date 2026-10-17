@@ -2958,7 +2958,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       opt->errlog = NULL;
     }
 
-    // Header debugging (-%H): path_log may not exist yet.
+    // -%H may run before path_log exists, so create it first.
     if (_DEBUG_HEAD) {
       structcheck_utf8(StringBuff(opt->path_log));
       ioinfo = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
@@ -3304,6 +3304,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     if (_DEBUG_HEAD) {
       if (ioinfo) {
         fclose(ioinfo);
+        ioinfo = NULL;
       }
     }
     // supprimer lock
