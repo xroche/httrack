@@ -33,6 +33,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsselftest_int.h"
 #include "htsname.h"
+#include "htsfetch.h"
 
 #include <stdint.h>
 #ifndef _WIN32
@@ -3431,9 +3432,59 @@ static int st_clienthints(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* -#test=browserfamily <user-agent>: whose header tables it gets. */
+static int st_browserfamily(httrackp *opt, int argc, char **argv) {
+  static const char *const names[] = {"none", "chrome", "firefox"};
+
+  (void) opt;
+  if (argc != 1) {
+    fprintf(stderr, "browserfamily: takes a user-agent\n");
+    return 1;
+  }
+  printf("%s\n", names[hts_browser_family_of(argv[0])]);
+  return 0;
+}
+
+/* -#test=headerorder <none|chrome|firefox> <dest>: the header order of a
+   request from that browser, which must name every header once. */
+static int st_headerorder(httrackp *opt, int argc, char **argv) {
+  static const char *const families[] = {"none", "chrome", "firefox"};
+  const int n = http_header_slot_count();
+  const unsigned char *order;
+  unsigned char seen[64];
+  int family, dest, i;
+
+  (void) opt;
+  if (argc != 2 || n > (int) sizeof(seen)) {
+    fprintf(stderr, "headerorder: takes <none|chrome|firefox> <dest>\n");
+    return 1;
+  }
+  for (family = 2; family > 0 && strcmp(families[family], argv[0]) != 0;
+       family--)
+    ;
+  for (dest = HTS_FETCH_DEST_VIDEO;
+       dest > 0 && strcmp(hts_fetch_dest_name(dest), argv[1]) != 0; dest--)
+    ;
+  order = http_header_order(family, dest);
+  memset(seen, 0, sizeof(seen));
+  for (i = 0; i < n; i++) {
+    if (order[i] >= n || seen[order[i]]++ != 0) {
+      printf("slot %d repeats or is out of range\n", order[i]);
+      return 1;
+    }
+    printf("%s%s", i != 0 ? "," : "", http_header_slot_name(order[i]));
+  }
+  printf("\n");
+  return 0;
+}
+
 const struct selftest_entry selftests_lib[] = {
     {"clienthints", "<user-agent>",
      "the client hints a browser sending this User-Agent adds", st_clienthints},
+    {"browserfamily", "<user-agent>",
+     "the browser whose header tables this User-Agent gets", st_browserfamily},
+    {"headerorder", "<none|chrome|firefox> <dest>",
+     "the header order of a request from that browser", st_headerorder},
     {"hashtable", "<count|file>", "coucal hashtable stress test", st_hashtable},
     {"strsafe", "[overflow|overflow-buff|overflow-src [str]]",
      "bounded string-op self-test", st_strsafe},

@@ -101,6 +101,42 @@ const char *hts_fetch_dest_name(int dest);
 const char *hts_fetch_mode_name(const hts_fetch_meta *fm);
 const char *hts_fetch_site_name(int site);
 
+/* Write the "scheme://host[:port]" origin of adr into dst, or return HTS_FALSE
+   when the host holds a byte a header line cannot carry or dst is too small. */
+hts_boolean hts_fetch_origin(const char *adr, char *dst, size_t size);
+
+/* Return the address of the page fm compares its site against, or NULL. */
+const char *hts_fetch_initiator_adr(httrackp *opt, const hts_fetch_meta *fm);
+
+/* The Accept sent when neither -%a nor a browser table names one. */
+#define HTS_ACCEPT_LEGACY                                                      \
+  "text/html,image/png,image/jpeg,image/pjpeg,image/x-xbitmap,image/"          \
+  "svg+xml,image/gif;q=0.9,*/*;q=0.1"
+
+/* The Accept-Language sent without -%l, and the one a browser table sends in
+   its place. */
+#define HTS_ACCEPT_LANGUAGE_LEGACY "en, *"
+#define HTS_ACCEPT_LANGUAGE_BROWSER "en-US,en;q=0.9"
+
+/* The browsers whose headers httrack mimics. */
+typedef enum hts_browser_family {
+  HTS_BROWSER_NONE = 0,
+  HTS_BROWSER_CHROME, /* Chrome and Edge */
+  HTS_BROWSER_FIREFOX
+} hts_browser_family;
+
+/* Return the kind index of the --accept argument arg when it starts with a
+   kind word and '=', else -1. */
+int hts_accept_kind_of(const char *arg);
+
+/* Return the Accept a request to dest sends. list holds the "kind=value"
+   lines of --accept, the last one winning; user_default is the -%a value, read
+   as unset when it equals HTS_ACCEPT_LEGACY. A value from list is copied into
+   buf (size bytes), so the result lives as long as buf or user_default. */
+const char *hts_accept_lookup(const char *list, const char *user_default,
+                              int dest, hts_browser_family family, char *buf,
+                              size_t size);
+
 #endif
 
 #endif

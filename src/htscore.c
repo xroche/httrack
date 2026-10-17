@@ -4735,6 +4735,9 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
   if (StringNotEmpty(from->host_alias))
     StringCopyS(to->host_alias, from->host_alias);
 
+  if (StringNotEmpty(from->accept_kinds))
+    StringCopyS(to->accept_kinds, from->accept_kinds);
+
   if (StringNotEmpty(from->cookies_file))
     StringCopyS(to->cookies_file, from->cookies_file);
 

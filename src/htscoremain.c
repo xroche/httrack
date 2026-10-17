@@ -57,6 +57,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscrashtest.h"
 #include "htsmd5.h"
 #include "htsthread.h"
+#include "htsfetch.h"
 
 #include <ctype.h>
 /* hts_self_path() */
@@ -2004,13 +2005,24 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   htsmain_free();
                   return -1;
                 } else {
+                  const char *value;
+
                   na++;
-                  if (strlen(argv[na]) >= 256) {
+                  value = argv[na];
+                  if (hts_accept_kind_of(argv[na]) >= 0)
+                    value = strchr(argv[na], '=') + 1;
+                  if (strlen(value) >= 256) {
                     HTS_PANIC_PRINTF("Accept list string too long");
                     htsmain_free();
                     return -1;
                   }
-                  StringCopy(opt->accept, argv[na]);
+                  if (value == argv[na]) {
+                    StringCopy(opt->accept, argv[na]);
+                  } else {
+                    if (StringNotEmpty(opt->accept_kinds))
+                      StringCat(opt->accept_kinds, "\n");
+                    StringCat(opt->accept_kinds, argv[na]);
+                  }
                 }
                 break;
                 //

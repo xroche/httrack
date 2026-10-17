@@ -481,3 +481,156 @@ const char *hts_fetch_site_name(int site) {
     return "same-origin";
   }
 }
+
+hts_boolean hts_fetch_origin(const char *adr, char *dst, size_t size) {
+  fetch_origin o;
+  size_t i;
+  int n;
+
+  origin_of(adr, &o);
+  if (o.host_len == 0)
+    return HTS_FALSE;
+  for (i = 0; i < o.host_len; i++) {
+    if ((unsigned char) o.host[i] <= ' ' || (unsigned char) o.host[i] >= 0x7f)
+      return HTS_FALSE;
+  }
+  if (o.port == (o.https ? 443 : 80))
+    n = snprintf(dst, size, "%s://%.*s", o.https ? "https" : "http",
+                 (int) o.host_len, o.host);
+  else
+    n = snprintf(dst, size, "%s://%.*s:%d", o.https ? "https" : "http",
+                 (int) o.host_len, o.host, o.port);
+  return n > 0 && (size_t) n < size ? HTS_TRUE : HTS_FALSE;
+}
+
+const char *hts_fetch_initiator_adr(httrackp *opt, const hts_fetch_meta *fm) {
+  if (fm == NULL || fm->initiator <= 0 || fm->initiator >= opt->lien_tot)
+    return NULL;
+  return heap(fm->initiator)->adr;
+}
+
+/* --accept kinds in display order: hts_accept_kinds() publishes this list. */
+static const char *const accept_kinds[] = {
+    "document", "iframe", "frame", "image",  "style", "script",
+    "font",     "audio",  "video", "object", "embed", NULL};
+
+enum { ACCEPT_KINDS = sizeof(accept_kinds) / sizeof(accept_kinds[0]) - 1 };
+
+#define CHROME_NAV                                                             \
+  "text/html,application/xhtml+xml,application/xml;q=0.9,image/jxl,image/"     \
+  "avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q="   \
+  "0.7"
+#define FIREFOX_NAV                                                            \
+  "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+
+/* What Chrome 155 and Firefox 158 send, per accept_kinds entry. embed, never
+   captured, follows object. */
+static const char *const accept_presets[][ACCEPT_KINDS] = {
+    /* HTS_BROWSER_CHROME */
+    {CHROME_NAV, CHROME_NAV, CHROME_NAV,
+     "image/jxl,image/avif,image/webp,image/apng,image/svg+xml,image/*,*/"
+     "*;q=0.8",
+     "text/css,*/*;q=0.1", "*/*", "*/*", "*/*", "*/*", CHROME_NAV, CHROME_NAV},
+    /* HTS_BROWSER_FIREFOX */
+    {FIREFOX_NAV, FIREFOX_NAV, FIREFOX_NAV,
+     "image/avif,image/jxl,image/webp,image/png,image/svg+xml,image/*;q=0.8,*/"
+     "*;q=0.5",
+     "text/css,*/*;q=0.1", "*/*",
+     "application/font-woff2;q=1.0,application/font-woff;q=0.9,*/*;q=0.8",
+     "audio/webm,audio/ogg,audio/wav,audio/*;q=0.9,application/ogg;q=0.7,"
+     "video/*;q=0.6,*/*;q=0.5",
+     "video/webm,video/ogg,video/*;q=0.9,application/ogg;q=0.7,audio/*;q=0.6,"
+     "*/*;q=0.5",
+     "*/*", "*/*"}};
+
+/* Return the accept_kinds index of the n bytes at name, or -1. */
+static int accept_kind_index(const char *name, size_t n) {
+  int i;
+
+  for (i = 0; i < ACCEPT_KINDS; i++) {
+    if (strlen(accept_kinds[i]) == n && strncmp(accept_kinds[i], name, n) == 0)
+      return i;
+  }
+  return -1;
+}
+
+/* Return the accept_kinds index of dest, or -1 for an unknown one. */
+static int accept_kind_of_dest(int dest) {
+  const char *const name = hts_fetch_dest_name(dest);
+
+  return dest == HTS_FETCH_DEST_UNKNOWN ? -1
+                                        : accept_kind_index(name, strlen(name));
+}
+
+int hts_accept_kind_of(const char *arg) {
+  const char *const eq = strchr(arg, '=');
+
+  return eq != NULL ? accept_kind_index(arg, (size_t) (eq - arg)) : -1;
+}
+
+/* Copy the value of the last list line for kind into buf, or return NULL. */
+static const char *accept_list_find(const char *list, int kind, char *buf,
+                                    size_t size) {
+  const char *found = NULL;
+  size_t found_len = 0;
+  const char *line;
+
+  for (line = list; line != NULL && *line != '\0';) {
+    const char *const end = line + strcspn(line, "\n");
+    const char *const eq = memchr(line, '=', (size_t) (end - line));
+
+    if (eq != NULL && accept_kind_index(line, (size_t) (eq - line)) == kind) {
+      found = eq + 1;
+      found_len = (size_t) (end - found);
+    }
+    line = *end != '\0' ? end + 1 : end;
+  }
+  if (found == NULL || found_len >= size)
+    return NULL;
+  memcpy(buf, found, found_len);
+  buf[found_len] = '\0';
+  return buf;
+}
+
+const char *hts_accept_lookup(const char *list, const char *user_default,
+                              int dest, hts_browser_family family, char *buf,
+                              size_t size) {
+  const int kind = accept_kind_of_dest(dest);
+  const char *v;
+
+  if (kind >= 0) {
+    if ((v = accept_list_find(list, kind, buf, size)) != NULL)
+      return v;
+    if ((dest == HTS_FETCH_DEST_IFRAME || dest == HTS_FETCH_DEST_FRAME) &&
+        (v = accept_list_find(list,
+                              accept_kind_of_dest(HTS_FETCH_DEST_DOCUMENT), buf,
+                              size)) != NULL)
+      return v;
+  }
+  if (user_default == NULL || strcmp(user_default, HTS_ACCEPT_LEGACY) != 0)
+    return user_default;
+  if (kind >= 0 && family != HTS_BROWSER_NONE)
+    return accept_presets[family - 1][kind];
+  return user_default;
+}
+
+HTSEXT_API const char *const *hts_accept_kinds(void) { return accept_kinds; }
+
+HTSEXT_API const char *hts_accept_preset(const char *browser,
+                                         const char *kind) {
+  const int k = kind != NULL && *kind != '\0'
+                    ? accept_kind_index(kind, strlen(kind))
+                    : -1;
+
+  if (browser == NULL || (kind != NULL && *kind != '\0' && k < 0))
+    return NULL;
+  if (strcmp(browser, "legacy") == 0)
+    return HTS_ACCEPT_LEGACY;
+  if (k < 0)
+    return NULL;
+  if (strcmp(browser, "chrome") == 0)
+    return accept_presets[HTS_BROWSER_CHROME - 1][k];
+  if (strcmp(browser, "firefox") == 0)
+    return accept_presets[HTS_BROWSER_FIREFOX - 1][k];
+  return NULL;
+}
