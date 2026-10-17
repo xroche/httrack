@@ -2152,6 +2152,20 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                     } else if ((p = strfield(name, "attr:"))) {
                       name += p;
                       format = 7;
+                      /* ${attr:acceptpreset:<browser>:<kind>}: the engine's
+                         own Accept value, or nothing when it has none */
+                      if ((p = strfield(name, "acceptpreset:"))) {
+                        char *const colon = strchr(name + p, ':');
+                        const char *v;
+
+                        name += p;
+                        langstr = "";
+                        if (colon != NULL) {
+                          *colon = '\0';
+                          if ((v = hts_accept_preset(name, colon + 1)) != NULL)
+                            langstr = v;
+                        }
+                      }
                     } else if ((p = strfield(name, "js:"))) {
                       name += p;
                       format = 6;

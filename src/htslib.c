@@ -1601,9 +1601,8 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
 #endif
       }
     }
-    if (referer_adr != NULL && referer_fil != NULL && strnotempty(referer_adr)
-        && strnotempty(referer_fil)
-      ) {                       // not empty
+    if (referer_adr != NULL && referer_fil != NULL &&
+        strnotempty(referer_adr) && strnotempty(referer_fil)) {
       if ((strcmp(referer_adr, "file://") != 0) &&
           (/* no https referer to http urls */
            (strncmp(referer_adr, "https://", 8) != 0) /* referer is not https */

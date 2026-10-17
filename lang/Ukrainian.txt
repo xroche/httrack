@@ -1062,3 +1062,35 @@ Theme:
 Тема:
 Classic
 Класична
+Accept headers
+Заголовки Accept
+The Accept header sent for each kind of link. Automatic sends what the chosen browser sends.
+Заголовок Accept, що надсилається для кожного виду посилання. «Автоматично» надсилає те, що надсилає вибраний браузер.
+Automatic
+Автоматично
+Old HTTrack value
+Старе значення HTTrack
+Default
+Типово
+Pages
+Сторінки
+Inline frames
+Вбудовані фрейми
+Frames
+Фрейми
+Images
+Зображення
+Style sheets
+Таблиці стилів
+Scripts
+Скрипти
+Fonts
+Шрифти
+Audio
+Аудіо
+Video
+Відео
+Objects
+Об’єкти
+Embedded content
+Вбудований вміст

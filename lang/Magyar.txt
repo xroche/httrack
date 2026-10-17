@@ -1062,3 +1062,35 @@ Theme:
 Téma:
 Classic
 Klasszikus
+Accept headers
+Accept fejlécek
+The Accept header sent for each kind of link. Automatic sends what the chosen browser sends.
+Az egyes hivatkozásfajtákhoz küldött Accept fejléc. Az Automatikus azt küldi, amit a választott böngésző.
+Automatic
+Automatikus
+Old HTTrack value
+Régi HTTrack-érték
+Default
+Alapértelmezett
+Pages
+Oldalak
+Inline frames
+Beágyazott keretek
+Frames
+Keretek
+Images
+Képek
+Style sheets
+Stíluslapok
+Scripts
+Szkriptek
+Fonts
+Betűtípusok
+Audio
+Hang
+Video
+Videó
+Objects
+Objektumok
+Embedded content
+Beágyazott tartalom

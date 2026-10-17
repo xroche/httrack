@@ -1062,3 +1062,35 @@ Theme:
 主题:
 Classic
 经典
+Accept headers
+Accept 标头
+The Accept header sent for each kind of link. Automatic sends what the chosen browser sends.
+为每种链接发送的 Accept 标头。“自动”发送所选浏览器发送的值。
+Automatic
+自动
+Old HTTrack value
+旧版 HTTrack 值
+Default
+默认
+Pages
+网页
+Inline frames
+内嵌框架
+Frames
+框架
+Images
+图片
+Style sheets
+样式表
+Scripts
+脚本
+Fonts
+字体
+Audio
+音频
+Video
+视频
+Objects
+对象
+Embedded content
+嵌入内容

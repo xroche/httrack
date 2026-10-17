@@ -1062,3 +1062,35 @@ Theme:
 Teema:
 Classic
 Klassikaline
+Accept headers
+Accept-päised
+The Accept header sent for each kind of link. Automatic sends what the chosen browser sends.
+Accept-päis, mis saadetakse iga lingi liigi jaoks. Automaatne saadab selle, mida valitud brauser saadab.
+Automatic
+Automaatne
+Old HTTrack value
+HTTracki vana väärtus
+Default
+Vaikimisi
+Pages
+Lehed
+Inline frames
+Tekstisisesed raamid
+Frames
+Raamid
+Images
+Pildid
+Style sheets
+Laaditabelid
+Scripts
+Skriptid
+Fonts
+Fondid
+Audio
+Heli
+Video
+Video
+Objects
+Objektid
+Embedded content
+Manustatud sisu

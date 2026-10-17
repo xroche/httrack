@@ -1062,3 +1062,35 @@ Theme:
 Θέμα:
 Classic
 Κλασικό
+Accept headers
+Κεφαλίδες Accept
+The Accept header sent for each kind of link. Automatic sends what the chosen browser sends.
+Η κεφαλίδα Accept που αποστέλλεται για κάθε είδος συνδέσμου. Η αυτόματη επιλογή στέλνει ό,τι στέλνει το επιλεγμένο πρόγραμμα περιήγησης.
+Automatic
+Αυτόματα
+Old HTTrack value
+Παλιά τιμή του HTTrack
+Default
+Προεπιλογή
+Pages
+Σελίδες
+Inline frames
+Ενσωματωμένα πλαίσια
+Frames
+Πλαίσια
+Images
+Εικόνες
+Style sheets
+Φύλλα στυλ
+Scripts
+Σενάρια
+Fonts
+Γραμματοσειρές
+Audio
+Ήχος
+Video
+Βίντεο
+Objects
+Αντικείμενα
+Embedded content
+Ενσωματωμένο περιεχόμενο

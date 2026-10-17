@@ -1062,3 +1062,35 @@ Theme:
 Tema:
 Classic
 Klassiskt
+Accept headers
+Accept-huvuden
+The Accept header sent for each kind of link. Automatic sends what the chosen browser sends.
+Accept-huvudet som skickas för varje typ av länk. Automatiskt skickar det som den valda webbläsaren skickar.
+Automatic
+Automatiskt
+Old HTTrack value
+Gammalt HTTrack-värde
+Default
+Standard
+Pages
+Sidor
+Inline frames
+Inbäddade ramar
+Frames
+Ramar
+Images
+Bilder
+Style sheets
+Formatmallar
+Scripts
+Skript
+Fonts
+Teckensnitt
+Audio
+Ljud
+Video
+Video
+Objects
+Objekt
+Embedded content
+Inbäddat innehåll

@@ -1062,3 +1062,35 @@ Theme:
 Tema:
 Classic
 Clássico
+Accept headers
+Cabeçalhos Accept
+The Accept header sent for each kind of link. Automatic sends what the chosen browser sends.
+O cabeçalho Accept enviado para cada tipo de ligação. Automático envia o que o navegador escolhido envia.
+Automatic
+Automático
+Old HTTrack value
+Valor antigo do HTTrack
+Default
+Predefinido
+Pages
+Páginas
+Inline frames
+Molduras incorporadas
+Frames
+Molduras
+Images
+Imagens
+Style sheets
+Folhas de estilo
+Scripts
+Scripts
+Fonts
+Tipos de letra
+Audio
+Áudio
+Video
+Vídeo
+Objects
+Objetos
+Embedded content
+Conteúdo incorporado

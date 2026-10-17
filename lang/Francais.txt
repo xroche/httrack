@@ -1062,3 +1062,35 @@ Theme:
 Thème :
 Classic
 Classique
+Accept headers
+En-têtes Accept
+The Accept header sent for each kind of link. Automatic sends what the chosen browser sends.
+L'en-tête Accept envoyé pour chaque type de lien. Automatique envoie ce qu'envoie le navigateur choisi.
+Automatic
+Automatique
+Old HTTrack value
+Ancienne valeur de HTTrack
+Default
+Par défaut
+Pages
+Pages
+Inline frames
+Cadres intégrés
+Frames
+Cadres
+Images
+Images
+Style sheets
+Feuilles de style
+Scripts
+Scripts
+Fonts
+Polices
+Audio
+Audio
+Video
+Vidéo
+Objects
+Objets
+Embedded content
+Contenu intégré

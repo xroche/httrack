@@ -1062,3 +1062,35 @@ Theme:
 テーマ:
 Classic
 クラシック
+Accept headers
+Accept ヘッダー
+The Accept header sent for each kind of link. Automatic sends what the chosen browser sends.
+リンクの種類ごとに送信する Accept ヘッダー。「自動」は選択したブラウザーが送信する値を送信します。
+Automatic
+自動
+Old HTTrack value
+旧 HTTrack の値
+Default
+既定
+Pages
+ページ
+Inline frames
+インラインフレーム
+Frames
+フレーム
+Images
+画像
+Style sheets
+スタイルシート
+Scripts
+スクリプト
+Fonts
+フォント
+Audio
+音声
+Video
+動画
+Objects
+オブジェクト
+Embedded content
+埋め込みコンテンツ

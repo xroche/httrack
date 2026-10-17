@@ -1062,3 +1062,35 @@ Theme:
 Tema:
 Classic
 Klassisk
+Accept headers
+Accept-headere
+The Accept header sent for each kind of link. Automatic sends what the chosen browser sends.
+Accept-headeren, der sendes for hver slags link. Automatisk sender det, som den valgte browser sender.
+Automatic
+Automatisk
+Old HTTrack value
+Gammel HTTrack-værdi
+Default
+Standard
+Pages
+Sider
+Inline frames
+Indlejrede rammer
+Frames
+Rammer
+Images
+Billeder
+Style sheets
+Typografiark
+Scripts
+Scripts
+Fonts
+Skrifttyper
+Audio
+Lyd
+Video
+Video
+Objects
+Objekter
+Embedded content
+Indlejret indhold

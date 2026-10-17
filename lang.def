@@ -1092,3 +1092,35 @@ LANG_UITHEME
 Theme:
 LANG_UITHEMECLASSIC
 Classic
+LANG_ACCEPT
+Accept headers
+LANG_ACCEPTTIP
+The Accept header sent for each kind of link. Automatic sends what the chosen browser sends.
+LANG_ACCEPTAUTO
+Automatic
+LANG_ACCEPTLEGACY
+Old HTTrack value
+LANG_ACCEPTDEFAULT
+Default
+LANG_ACCEPTDOCUMENT
+Pages
+LANG_ACCEPTIFRAME
+Inline frames
+LANG_ACCEPTFRAME
+Frames
+LANG_ACCEPTIMAGE
+Images
+LANG_ACCEPTSTYLE
+Style sheets
+LANG_ACCEPTSCRIPT
+Scripts
+LANG_ACCEPTFONT
+Fonts
+LANG_ACCEPTAUDIO
+Audio
+LANG_ACCEPTVIDEO
+Video
+LANG_ACCEPTOBJECT
+Objects
+LANG_ACCEPTEMBED
+Embedded content

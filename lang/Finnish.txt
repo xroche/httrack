@@ -1062,3 +1062,35 @@ Theme:
 Teema:
 Classic
 Perinteinen
+Accept headers
+Accept-otsakkeet
+The Accept header sent for each kind of link. Automatic sends what the chosen browser sends.
+Accept-otsake, joka lähetetään kullekin linkkityypille. Automaattinen lähettää sen, mitä valittu selain lähettää.
+Automatic
+Automaattinen
+Old HTTrack value
+HTTrackin vanha arvo
+Default
+Oletus
+Pages
+Sivut
+Inline frames
+Upotetut kehykset
+Frames
+Kehykset
+Images
+Kuvat
+Style sheets
+Tyylitiedostot
+Scripts
+Komentosarjat
+Fonts
+Fontit
+Audio
+Ääni
+Video
+Video
+Objects
+Objektit
+Embedded content
+Upotettu sisältö

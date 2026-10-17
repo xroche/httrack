@@ -1062,3 +1062,35 @@ Theme:
 Temă:
 Classic
 Clasică
+Accept headers
+Antete Accept
+The Accept header sent for each kind of link. Automatic sends what the chosen browser sends.
+Antetul Accept trimis pentru fiecare tip de legătură. Automat trimite ce trimite browserul ales.
+Automatic
+Automat
+Old HTTrack value
+Valoarea veche HTTrack
+Default
+Implicit
+Pages
+Pagini
+Inline frames
+Cadre încorporate
+Frames
+Cadre
+Images
+Imagini
+Style sheets
+Foi de stil
+Scripts
+Scripturi
+Fonts
+Fonturi
+Audio
+Audio
+Video
+Video
+Objects
+Obiecte
+Embedded content
+Conținut încorporat

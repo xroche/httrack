@@ -1062,3 +1062,35 @@ Theme:
 Motyw:
 Classic
 Klasyczny
+Accept headers
+Nagłówki Accept
+The Accept header sent for each kind of link. Automatic sends what the chosen browser sends.
+Nagłówek Accept wysyłany dla każdego rodzaju odnośnika. Automatycznie wysyła to, co wysyła wybrana przeglądarka.
+Automatic
+Automatycznie
+Old HTTrack value
+Stara wartość HTTrack
+Default
+Domyślnie
+Pages
+Strony
+Inline frames
+Ramki wewnętrzne
+Frames
+Ramki
+Images
+Obrazy
+Style sheets
+Arkusze stylów
+Scripts
+Skrypty
+Fonts
+Czcionki
+Audio
+Dźwięk
+Video
+Wideo
+Objects
+Obiekty
+Embedded content
+Treść osadzona
