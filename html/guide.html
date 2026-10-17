@@ -630,6 +630,17 @@ bottom are the ones that keep you welcome.</p>
 	translation a multilingual site hands over.</p>
 </div>
 
+<div class="opt" id="opt-accept-headers">
+	<div class="opt-head"><span class="opt-name">Accept headers</span><span class="cli">-%a, --accept</span></div>
+	<p>The <code>Accept</code> header sent for each kind of link: pages, frames, images, style
+	sheets, scripts, fonts, audio, video and embedded objects. A row left on Automatic sends what
+	the chosen browser sends, so a Chrome, Edge or Firefox identity gets that browser's own values
+	when browser headers (<code>-%Q</code>) are on. Any other identity gets the old HTTrack value.
+	On the command line, <code>--accept 'image=image/png,*/*'</code> sets one kind, and a value
+	with no kind sets the default.</p>
+	<p data-for="win">The rows open in their own window, from the Accept headers button.</p>
+</div>
+
 <div class="opt" data-for="win web">
 	<div class="opt-head"><span class="opt-name">Default referer</span><span class="cli">-%R, --referer</span></div>
 	<p>The <code>Referer</code> sent with the first request. Occasionally needed by sites that refuse

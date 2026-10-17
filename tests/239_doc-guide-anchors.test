@@ -48,9 +48,9 @@ fi
 # One target per Android screen; the pane-to-anchor map lives in httrack-android.
 fail=0
 for anchor in droid-first-launch step-start step-project step-address options \
-    step-run step-done droid-storage-location; do
+    step-run step-done droid-storage-location opt-accept-headers; do
     check "${anchor}" || fail=1
 done
 test "${fail}" -eq 0 || exit 1
 
-echo "guide anchors: the eight Android help targets are present and droid-visible"
+echo "guide anchors: the nine Android help targets are present and droid-visible"
