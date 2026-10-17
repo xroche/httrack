@@ -45,6 +45,7 @@ SCREENS = {
         "10_options_browser_id",
         "10_options_browser_id",
     ),
+    "opt-accept-headers": ("12b_options_accept_headers", None, None),
     "opt-spider": ("10_options_spider", "12_options_spider", "11_options_spider"),
     "opt-proxy": ("04_options_proxy", "14_options_proxy", "12_options_proxy_address"),
     "opt-log-index-cache": (
