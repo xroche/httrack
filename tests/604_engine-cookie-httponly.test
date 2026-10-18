@@ -1,0 +1,12 @@
+#!/bin/bash
+#
+# A "#HttpOnly_" jar line loads as a cookie, and other '#' lines stay comments.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+assert_selftest "cookiehttponly: OK" cookiehttponly "$dir"

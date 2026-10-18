@@ -430,23 +430,30 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
 
         if (strnotempty(line)) {
           if (!cut && strlen(line) < line_max) {
-            if (line[0] != '#') {
+            /* curl and browser exports mark an HttpOnly cookie this way */
+            static const char httponly[] = "#HttpOnly_";
+            const char *const rec =
+                strncmp(line, httponly, sizeof(httponly) - 1) == 0
+                    ? line + sizeof(httponly) - 1
+                    : line;
+
+            if (rec[0] != '#') {
               char domain[256];             // cookie domain (.netscape.com)
               char path[256];               // path (/)
               char cook_name[1024];         // cookie name (MYCOOK)
               char BIGSTK cook_value[8192]; // value (ID=toto,S=1234)
 
 #if DEBUG_COOK
-              printf("%s\n", line);
+              printf("%s\n", rec);
 #endif
-              if (cookie_load_field(opt, domain, sizeof(domain), buffer, line,
-                                    0, "domain", file) &&
-                  cookie_load_field(opt, path, sizeof(path), buffer, line, 2,
+              if (cookie_load_field(opt, domain, sizeof(domain), buffer, rec, 0,
+                                    "domain", file) &&
+                  cookie_load_field(opt, path, sizeof(path), buffer, rec, 2,
                                     "path", file) &&
                   cookie_load_field(opt, cook_name, sizeof(cook_name), buffer,
-                                    line, 5, "name", file) &&
+                                    rec, 5, "name", file) &&
                   cookie_load_field(opt, cook_value, sizeof(cook_value), buffer,
-                                    line, 6, "value", file)) {
+                                    rec, 6, "value", file)) {
                 // the jar caps a field tighter still, and a full one refuses
                 if (cookie_add(cookie, cook_name, cook_value, domain, path) !=
                     0) {
