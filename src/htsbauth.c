@@ -326,8 +326,8 @@ hts_boolean cookie_max_age_time(const char *value, int64_t now, int64_t *when) {
 }
 
 /* Return the Unix time of the UTC date in tm, in 64 bits because a 32-bit
-   time_t ends in 2038. The year must be 0 or later, and tm_mon 0 to 11, as
-   convert_time_rfc822_pivot yields them. */
+   time_t ends in 2038. The calendar year must be 1 or later, and tm_mon 0 to
+   11, as convert_time_rfc822_pivot yields them. */
 static int64_t cookie_utc_seconds(const struct tm *tm) {
   // days from the civil date, counting years from March (Howard Hinnant)
   const int64_t y = (int64_t) tm->tm_year + 1900 - (tm->tm_mon < 2 ? 1 : 0);
@@ -546,8 +546,8 @@ static hts_boolean cookie_resolve(char *file, size_t size, const char *name) {
   return slprintfbuff(file, size, "%s", name);
 }
 
-/* Is file missing or empty while bak, which a save died before restoring,
-   is not? Then warn, naming shown, because a rewrite would lose the .bak. */
+/* A missing file beside a .bak, or an empty one beside a non-empty .bak, is
+   left unchanged: then warn, naming shown, and return HTS_TRUE. */
 static hts_boolean cookie_bak_stranded(httrackp *opt, const char *file,
                                        const char *bak, const char *shown) {
   if (!fexist_utf8(bak))
@@ -717,8 +717,8 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
           if (rec[0] == '#') {
             if (!cookie_known_comment(rec)) {
               hts_log_print(opt, LOG_WARNING,
-                            "Cookies: %s holds a comment a rewrite would "
-                            "drop: %.64s",
+                            "Cookies: ignoring a comment no known tool "
+                            "writes in %s: %.64s",
                             given, rec);
               refused++;
             }
@@ -972,8 +972,8 @@ static void cookie_sync_dir(const char *file) {
 }
 #endif
 
-/* Name in dst the temporary beside path. The pid in it keeps two runs on one
-   jar apart, so a crashed run's temporary stays until removed by hand. */
+/* Name in dst the temporary beside path, with the pid in it. No run deletes
+   another's temporary, so a crashed run leaves its own behind. */
 static hts_boolean cookie_tmpname(char *dst, size_t size, const char *path) {
   return slprintfbuff(dst, size, "%s.%lu.tmp", path, back_self_pid());
 }
@@ -1056,19 +1056,10 @@ static int cookie_commit(httrackp *opt, t_cookie *cookie, const char *file,
   return 0;
 }
 
-/* See htsbauth.h. */
-int cookie_save(t_cookie *cookie, const char *name) {
-  char file[CATBUFF_SIZE];
-
-  if (!strnotempty(cookie->data))
-    return 0;
-  if (!cookie_resolve(file, sizeof(file), name))
-    return -1;
-  return cookie_commit(NULL, cookie, file, NULL, name);
-}
-
-/* See htsbauth.h. */
-void cookie_save_replacing(httrackp *opt, t_cookie *cookie, const char *name) {
+/* Save the jar over name as cookie_save does, keeping the old content in
+   name's .bak when keep_bak is HTS_TRUE. */
+static int cookie_save_to(httrackp *opt, t_cookie *cookie, const char *name,
+                          hts_boolean keep_bak) {
   char file[CATBUFF_SIZE];
   char bak[CATBUFF_SIZE];
 
@@ -1077,18 +1068,28 @@ void cookie_save_replacing(httrackp *opt, t_cookie *cookie, const char *name) {
                   "Cookies: cannot rewrite %s, because it is a symbolic link "
                   "to a missing file",
                   name);
-    return;
+    return -1;
   }
   // an empty jar still empties an existing file, or a deleted cookie survives
   if (!strnotempty(cookie->data) && !fexist_utf8(file))
-    return;
-  if (!slprintfbuff(bak, sizeof(bak), "%s.bak", file)) {
+    return 0;
+  if (keep_bak && !slprintfbuff(bak, sizeof(bak), "%s.bak", file)) {
     hts_log_print(opt, LOG_WARNING,
                   "Cookies: cannot rewrite %s because its name is too long",
                   name);
-    return;
+    return -1;
   }
-  (void) cookie_commit(opt, cookie, file, bak, name);
+  return cookie_commit(opt, cookie, file, keep_bak ? bak : NULL, name);
+}
+
+/* See htsbauth.h. */
+int cookie_save(httrackp *opt, t_cookie *cookie, const char *name) {
+  return cookie_save_to(opt, cookie, name, HTS_FALSE);
+}
+
+/* See htsbauth.h. */
+void cookie_save_replacing(httrackp *opt, t_cookie *cookie, const char *name) {
+  (void) cookie_save_to(opt, cookie, name, HTS_TRUE);
 }
 
 // Insert string ins before s. s_size is the capacity of the buffer at s.

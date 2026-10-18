@@ -192,7 +192,7 @@ RUN_CALLBACK0(opt, end); \
         cookie_save_replacing(opt, opt->cookie,                                \
                               StringBuff(opt->cookies_file));                  \
     } else if (opt->accept_cookie && cookies_file_refused != COOKIE_LOAD_KEEP) \
-      cookie_save(opt->cookie,                                                 \
+      cookie_save(opt, opt->cookie,                                            \
                   fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),           \
                           StringBuff(opt->path_log), "cookies.txt"));          \
     bauth_free(&cookie);                                                       \

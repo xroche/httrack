@@ -567,8 +567,9 @@ directory, and writes the jar back to its output directory at the end. With
 that file alone is the jar. HTTrack rewrites it at the end and keeps its old
 content as
 .IR <file>.bak .
-HTTrack leaves the file unchanged and warns if a line could not be loaded, a
-cookie repeats, or a comment no known tool writes appears.
+HTTrack leaves the file unchanged and warns if a line could not be loaded or a
+cookie repeats. It does the same when the file holds a comment that no known
+tool writes.
 .PP
 A running mirror also watches its own output directory for these. Creating one
 is how a script drives an engine it has no other handle on. On Windows, which

@@ -66,7 +66,7 @@ holds() { grep -qxF "$2" <<<"$(tr -d '\r' <"$1")"; }
 # no_tmp FILE MSG: fail if a temporary beside FILE was left behind
 no_tmp() {
     local f
-    for f in "$1".*.tmp; do
+    for f in "$1"*.tmp; do
         test ! -e "$f" || fail "$2"
     done
 }

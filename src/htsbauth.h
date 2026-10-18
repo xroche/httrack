@@ -138,17 +138,16 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *path,
 
 /** Write the jar's cookies to name in Netscape format, owner-only on Unix.
     The new jar goes to a temporary file first, which then replaces name in one
-    step, so name holds the old or the new jar whatever fails. An empty jar
-    writes nothing. Returns 0 when the file was written or the jar was empty,
-    and -1 when any step failed. */
-int cookie_save(t_cookie *cookie, const char *name);
+    step, so name holds the old or the new jar whatever fails. A symbolic link
+    is followed and stays a link, and a dangling one is refused. An empty jar
+    writes a header alone, or nothing when name does not exist. Returns 0 when
+    the file was written or needed no write, and -1 after a warning logged
+    through opt, which may be NULL. */
+int cookie_save(httrackp *opt, t_cookie *cookie, const char *name);
 
 /** Save the jar as cookie_save does, but first keep the old content as a
-    .bak file. Both files go beside the target of a symbolic link, which stays
-    a link. A dangling link is not rewritten. A missing or empty file beside a
-    non-empty .bak is left unchanged. An empty jar writes a header alone, or
-    nothing when name does not exist. A failure is logged through opt, which
-    may be NULL. */
+    .bak file, beside the target of a symbolic link. A missing file beside a
+    .bak, or an empty one beside a non-empty .bak, is left unchanged. */
 void cookie_save_replacing(httrackp *opt, t_cookie *cookie, const char *name);
 
 /** Insert ins in front of the string at s, whose buffer holds s_size bytes. */
