@@ -1042,6 +1042,141 @@ static int st_cookiequote(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Is NAME=VALUE a whole pair of the Cookie line HDR, rather than the tail
+   of a longer one? */
+static hts_boolean cookie_sent(const char *hdr, const char *pair) {
+  const size_t len = strlen(pair);
+  const char *p;
+
+  for (p = strstr(hdr, pair); p != NULL; p = strstr(p + 1, pair)) {
+    if (p > hdr && p[-1] == ' ' &&
+        (p[len] == ';' || p[len] == '\r' || p[len] == '\0'))
+      return HTS_TRUE;
+  }
+  return HTS_FALSE;
+}
+
+/* RFC 6265 5.3: a Domain= the request host may not claim drops the cookie,
+   and an expired Max-Age or Expires erases the stored one. */
+static int st_cookiesetscope(httrackp *opt, int argc, char **argv) {
+#define LABEL "cookie-setscope"
+#define PAST "Expires=Thu, 01 Jan 1970 00:00:00 GMT"
+#define FUTURE "Expires=Fri, 01 Jan 2100 00:00:00 GMT"
+
+  static const struct {
+    const char *host, *header; // header NULL: only query
+    const char *query, *pair;
+    hts_boolean want;
+  } steps[] = {
+      // a foreign Domain= is refused, and not stored for its sender either
+      {"evil.test", "Set-Cookie: x=1; Domain=victim.test", "victim.test", "x=1",
+       HTS_FALSE},
+      {"evil.test", NULL, "evil.test", "x=1", HTS_FALSE},
+      {"a.b.test", "Set-Cookie: p=1; Domain=b.test", "c.b.test", "p=1",
+       HTS_TRUE},
+      {"a.b.test", "Set-Cookie: pd=1; Domain=.B.Test", "c.b.test", "pd=1",
+       HTS_TRUE},
+      {"b.test", "Set-Cookie: child=1; Domain=a.b.test", "a.b.test", "child=1",
+       HTS_FALSE},
+      {"wwwexample.test", "Set-Cookie: lab=1; Domain=example.test",
+       "example.test", "lab=1", HTS_FALSE},
+      // a public suffix reaches every host under it
+      {"a.foo.com", "Set-Cookie: ps=1; Domain=com", "b.bar.com", "ps=1",
+       HTS_FALSE},
+      {"a.foo.com", NULL, "a.foo.com", "ps=1", HTS_FALSE},
+      {"a.b.co.uk", "Set-Cookie: uk=1; Domain=co.uk", "c.d.co.uk", "uk=1",
+       HTS_FALSE},
+      {"a.b.co.uk", "Set-Cookie: bk=1; Domain=b.co.uk", "c.b.co.uk", "bk=1",
+       HTS_TRUE},
+      {"a.foo.com", "Set-Cookie: pf=1; Domain=foo.com", "c.foo.com", "pf=1",
+       HTS_TRUE},
+      // a public suffix may still name itself
+      {"localhost:8080", "Set-Cookie: lh=1; Domain=localhost", "localhost",
+       "lh=1", HTS_TRUE},
+      // an address only ever names itself
+      {"127.0.0.1", "Set-Cookie: ix=1; Domain=127.0.0.2", "127.0.0.2", "ix=1",
+       HTS_FALSE},
+      {"127.0.0.1", "Set-Cookie: ie=1; Domain=127.0.0.1", "127.0.0.1", "ie=1",
+       HTS_TRUE},
+      {"192.168.1.1", "Set-Cookie: ip=1; Domain=1.1", "192.168.1.1", "ip=1",
+       HTS_FALSE},
+      // no Domain= stays on its host
+      {"del.test", "Set-Cookie: y=1", "del.test", "y=1", HTS_TRUE},
+      // an expired cookie erases the stored one, an empty value included
+      {"del.test", "Set-Cookie: z=1", "del.test", "z=1", HTS_TRUE},
+      {"del.test", "Set-Cookie: z=gone; Max-Age=0", "del.test", "z=1",
+       HTS_FALSE},
+      {"del.test", NULL, "del.test", "z=gone", HTS_FALSE},
+      {"del.test", "Set-Cookie: q=1", "del.test", "q=1", HTS_TRUE},
+      {"del.test", "Set-Cookie: q=; Max-Age=0", "del.test", "q=1", HTS_FALSE},
+      {"del.test", NULL, "del.test", "q=", HTS_FALSE},
+      {"del.test", "Set-Cookie: n=1", "del.test", "n=1", HTS_TRUE},
+      {"del.test", "Set-Cookie: n=1; Max-Age=-5", "del.test", "n=1", HTS_FALSE},
+      {"del.test", "Set-Cookie: e=1", "del.test", "e=1", HTS_TRUE},
+      {"del.test", "Set-Cookie: e=gone; " PAST, "del.test", "e=gone",
+       HTS_FALSE},
+      {"del.test", NULL, "del.test", "e=1", HTS_FALSE},
+      {"del.test", "Set-Cookie: f=1; " FUTURE, "del.test", "f=1", HTS_TRUE},
+      // Max-Age outranks Expires, either way round
+      {"del.test", "Set-Cookie: m=1; Max-Age=3600; " PAST, "del.test", "m=1",
+       HTS_TRUE},
+      {"del.test", "Set-Cookie: m=; " FUTURE "; Max-Age=0", "del.test", "m=1",
+       HTS_FALSE},
+      // a Max-Age that is no number is ignored
+      {"del.test", "Set-Cookie: g=1; Max-Age=soon", "del.test", "g=1",
+       HTS_TRUE},
+      // an empty value with no expiry replaces the old one
+      {"del.test", "Set-Cookie: g=", "del.test", "g=1", HTS_FALSE},
+      // rotation still replaces
+      {"del.test", "Set-Cookie: w=1", "del.test", "w=1", HTS_TRUE},
+      {"del.test", "Set-Cookie: w=2", "del.test", "w=1", HTS_FALSE},
+      {"del.test", NULL, "del.test", "w=2", HTS_TRUE},
+      // a Domain= erase reaches a Domain= cookie
+      {"www.del.test", "Set-Cookie: dd=1; Domain=del.test", "a.del.test",
+       "dd=1", HTS_TRUE},
+      {"www.del.test", "Set-Cookie: dd=; Domain=del.test; Max-Age=0",
+       "a.del.test", "dd=1", HTS_FALSE},
+      // a host cannot erase another host's cookie either
+      {"victim.test", "Set-Cookie: v=1", "victim.test", "v=1", HTS_TRUE},
+      {"evil.test", "Set-Cookie: v=; Domain=victim.test; Max-Age=0",
+       "victim.test", "v=1", HTS_TRUE},
+  };
+
+  static t_cookie jar;
+  char hdr[4096];
+  size_t i;
+  int err = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  jar.max_len = sizeof(jar.data);
+  jar.data[0] = '\0';
+  for (i = 0; i < sizeof(steps) / sizeof(steps[0]); i++) {
+    if (steps[i].header != NULL) {
+      htsblk r;
+      char line[256]; // treathead NUL-cuts the header in place
+
+      memset(&r, 0, sizeof(r));
+      strcpybuff(line, steps[i].header);
+      treathead(&jar, steps[i].host, "/", &r, line);
+    }
+    http_cookie_header(&jar, steps[i].query, "/", hdr, sizeof(hdr));
+    if (cookie_sent(hdr, steps[i].pair) != steps[i].want) {
+      printf("%s: step %d: %s from %s, %s %s sent to %s\n", LABEL, (int) i,
+             steps[i].header != NULL ? steps[i].header : "(query)",
+             steps[i].host, steps[i].pair, steps[i].want ? "not" : "wrongly",
+             steps[i].query);
+      err = 1;
+    }
+  }
+  printf("%s: %s\n", LABEL, err ? "FAIL" : "OK");
+  return err;
+#undef FUTURE
+#undef PAST
+#undef LABEL
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
@@ -1060,6 +1195,9 @@ const struct selftest_entry selftests_cookie[] = {
      st_cookieimport},
     {"cookiequote", "<Set-Cookie header>",
      "what the jar stores of a quoted cookie value and av", st_cookiequote},
+    {"cookiesetscope", "",
+     "Set-Cookie honours Domain= scope and Max-Age/Expires erasure",
+     st_cookiesetscope},
     {"cookiespandiff", "",
      "the cookie field getter matches a frozen copy of the old one",
      st_cookiespandiff},

@@ -1,0 +1,15 @@
+#!/bin/bash
+#
+# Set-Cookie may name only the request host or a parent that is no public
+# suffix, and an expired Max-Age or Expires erases the stored cookie.
+# Driven by the 'httrack -#test=cookiesetscope' selftest.
+
+set -eu
+
+out=$(httrack -#test=cookiesetscope)
+
+# Exact-match the success line so a renamed or removed selftest cannot pass.
+test "$out" = "cookie-setscope: OK" || {
+    echo "expected 'cookie-setscope: OK', got: $out" >&2
+    exit 1
+}

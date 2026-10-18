@@ -2316,6 +2316,9 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
       char name[256];
       char BIGSTK value[8192];
       int next = 0;
+      hts_boolean has_domain = HTS_FALSE;
+      hts_tristate max_age_expired = HTS_DEFAULT;
+      hts_tristate expires_expired = HTS_DEFAULT;
 
       name[0] = value[0] = '\0';
       //
@@ -2349,10 +2352,9 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
             a++; // prochain ;
           value_end = a;
           // vérifier débordements
-          if ((((int) (token_end - token_st)) < 200)
-              && (((int) (value_end - value_st)) < 8000)
-              && (((int) (token_end - token_st)) > 0)
-              && (((int) (value_end - value_st)) > 0)) {
+          if ((((int) (token_end - token_st)) < 200) &&
+              (((int) (value_end - value_st)) < 8000) &&
+              (((int) (token_end - token_st)) > 0)) {
             int name_len = (int) (token_end - token_st);
             int value_len = (int) (value_end - value_st);
 
@@ -2364,30 +2366,36 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
             printf("detected cookie-av: name=\"%s\" value=\"%s\"\n", name,
                    value);
 #endif
-            if (strfield2(name, "domain")) {
-              if ((size_t) value_len < sizeof(domain) - 1) {
+            /* RFC 6265 5.2 ignores an attribute with an empty value, but a
+               cookie may have one: "name=; Max-Age=0" is how one is erased */
+            if (value_len == 0 && strnotempty(cook_name)) {
+            } else if (strfield2(name, "domain")) {
+              if (value_len == 0 || strcmp(value, ".") == 0) {
+              } else if ((size_t) value_len < sizeof(domain) - 1) {
                 strcpybuff(domain, value);
+                has_domain = HTS_TRUE;
               } else {
                 cook_name[0] = 0;
                 break;
               }
             } else if (strfield2(name, "path")) {
-              if ((size_t) value_len < sizeof(path) - 1) {
+              if (value_len == 0) {
+              } else if ((size_t) value_len < sizeof(path) - 1) {
                 strcpybuff(path, value);
               } else {
                 cook_name[0] = 0;
                 break;
               }
             } else if (strfield2(name, "max-age")) {
-              // ignoré..
+              max_age_expired = cookie_max_age_expired(value);
             } else if (strfield2(name, "expires")) {
-              // ignoré..
+              expires_expired = cookie_expires_expired(value, time(NULL));
             } else if (strfield2(name, "version")) {
               // ignoré..
             } else if (strfield2(name, "comment")) {
               // ignoré
-            } else if (strfield2(name, "secure")) {     // ne devrait pas arriver ici
-              // ignoré
+            } else if (strfield2(name, "secure")) { // carries no value
+              // ignored
             } else {
               if ((size_t) value_len < sizeof(cook_value) - 1 &&
                   (size_t) name_len < sizeof(cook_name) - 1) {
@@ -2413,12 +2421,24 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
         }
       } while((*a) && (!next));
       if (strnotempty(cook_name)) {     // cookie?
+        /* Max-Age outranks Expires (RFC 6265 5.3 step 3) */
+        const hts_boolean expired = max_age_expired != HTS_DEFAULT
+                                        ? max_age_expired == HTS_TRUE
+                                        : expires_expired == HTS_TRUE;
+
 #if DEBUG_COOK
         printf
           ("new cookie: name=\"%s\" value=\"%s\" domain=\"%s\" path=\"%s\"\n",
            cook_name, cook_value, domain, path);
 #endif
-        cookie_add(cookie, cook_name, cook_value, domain, path);
+        // a Domain= the host may not claim drops the cookie (5.3 step 6)
+        if (has_domain &&
+            (adr == NULL || !cookie_domain_allowed(domain, scoped)))
+          continue;
+        if (expired)
+          cookie_del(cookie, cook_name, domain, path);
+        else
+          cookie_add(cookie, cook_name, cook_value, domain, path);
       }
     }
   }
