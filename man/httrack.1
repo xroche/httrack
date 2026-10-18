@@ -557,6 +557,17 @@ refused the command line, or a cache operation it asked for failed. No mirror ra
 .RS
 The system wide configuration file.
 .RE
+.TP
+.I cookies.txt
+The cookie jar, in Netscape format. Without
+.IR \-\-cookies\-file ,
+the mirror reads the one in its output directory and the one in the current
+directory, and writes the jar back to its output directory at the end. With
+.IR \-\-cookies\-file ,
+that file alone is the jar. The crawl rewrites it at the end and keeps its old
+content as
+.IR <file>.bak .
+The file is left unchanged when some of its lines could not be loaded.
 .PP
 A running mirror also watches its own output directory for these. Creating one
 is how a script drives an engine it has no other handle on. On Windows, which

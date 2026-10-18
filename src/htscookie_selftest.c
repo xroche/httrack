@@ -439,7 +439,7 @@ static int st_cookieport(httrackp *opt, int argc, char **argv) {
   err |= cookie_expect(cookie_add(&jar, "pwn", "OWNED", "", "/") == 0,
                        HTS_FALSE, "an empty domain entered the jar");
 
-  /* cookie_del normalises like cookie_add, so one string reaches the same
+  /* cookie_remove normalises like cookie_add, so one string reaches the same
      entry through either. Control: the neighbour stays. */
   jar.data[0] = '\0';
   if (cookie_add(&jar, "gone", "G", "example.com:8080", "/") != 0 ||
@@ -447,7 +447,7 @@ static int st_cookieport(httrackp *opt, int argc, char **argv) {
     printf("cookie-port: FAIL (cookie_add setup, delete form)\n");
     return 1;
   }
-  cookie_del(&jar, "gone", "example.com:8080", "/");
+  cookie_remove(&jar, "gone", "example.com:8080", "/");
   err |= cookie_expect(strstr(jar.data, "gone") != NULL, HTS_FALSE,
                        "a port-qualified delete missed its cookie");
   err |= cookie_expect(strstr(jar.data, "kept") != NULL, HTS_TRUE,
@@ -1068,6 +1068,7 @@ static int st_cookiesetscope(httrackp *opt, int argc, char **argv) {
     const char *query, *pair;
     hts_boolean want;
   } steps[] = {
+      // header (NULL: none) sent by host, then is pair sent to query?
       // a foreign Domain= is refused, and not stored for its sender either
       {"evil.test", "Set-Cookie: x=1; Domain=victim.test", "victim.test", "x=1",
        HTS_FALSE},
@@ -1298,9 +1299,7 @@ static void cookiejar_slurp(const char *path, char *buf, size_t size) {
   buf[n] = '\0';
 }
 
-/* -#test=cookiejar <dir>: the jar keeps what a Set-Cookie or a cookies.txt
-   says about host-only, Secure, HttpOnly and expiry, matches a record by its
-   whole identity, and says when it refuses one. */
+/* -#test=cookiejar <dir>: the jar keeps every cookie attribute. */
 static int st_cookiejar(httrackp *opt, int argc, char **argv) {
 #define LABEL "cookie-jar"
 
@@ -1309,6 +1308,7 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
     const char *to, *path, *pair;
     hts_boolean want;
   } steps[] = {
+      // header (NULL: none) sent by from, then is pair sent to to+path?
       // no Domain= is host-only, a Domain= reaches subdomains
       {"jar.test", "Set-Cookie: h=1", "jar.test", "/", "h=1", HTS_TRUE},
       {"jar.test", NULL, "www.jar.test", "/", "h=1", HTS_FALSE},
@@ -1322,20 +1322,35 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
       {"jar.test", "Set-Cookie: h=; Path=/a; Max-Age=0", "jar.test", "/a/x",
        "h=1", HTS_TRUE},
       {"jar.test", NULL, "jar.test", "/a/x", "h=2", HTS_FALSE},
-      // a host-only erasure cannot reach the Domain= cookie of that name
-      {"jar.test", "Set-Cookie: d=; Max-Age=0", "www.jar.test", "/", "d=1",
-       HTS_TRUE},
+      // an erasure from another host cannot reach it
       {"www.jar.test", "Set-Cookie: d=; Max-Age=0", "jar.test", "/", "d=1",
        HTS_TRUE},
+      // host-only is no part of the identity, so either form erases the other
+      {"jar.test", "Set-Cookie: d=; Max-Age=0", "www.jar.test", "/", "d=1",
+       HTS_FALSE},
+      {"jar.test", "Set-Cookie: d=1; Domain=jar.test", "www.jar.test", "/",
+       "d=1", HTS_TRUE},
       {"www.jar.test", "Set-Cookie: d=; Domain=jar.test; Max-Age=0", "jar.test",
        "/", "d=1", HTS_FALSE},
-      // a host-only cookie and a Domain= one of one name live side by side
+      // and either form replaces the other, taking its scope
       {"jar.test", "Set-Cookie: two=host", "jar.test", "/", "two=host",
        HTS_TRUE},
       {"jar.test", "Set-Cookie: two=dom; Domain=jar.test", "jar.test", "/",
-       "two=host", HTS_TRUE},
+       "two=host", HTS_FALSE},
       {"jar.test", NULL, "www.jar.test", "/", "two=dom", HTS_TRUE},
-      {"jar.test", NULL, "www.jar.test", "/", "two=host", HTS_FALSE},
+      {"jar.test", "Set-Cookie: two=back", "www.jar.test", "/", "two=dom",
+       HTS_FALSE},
+      {"jar.test", NULL, "www.jar.test", "/", "two=back", HTS_FALSE},
+      {"jar.test", NULL, "jar.test", "/", "two=back", HTS_TRUE},
+      // a dotted Domain= and an undotted one name the same cookie
+      {"www.dot.test", "Set-Cookie: dt=1; Domain=.dot.test", "a.dot.test", "/",
+       "dt=1", HTS_TRUE},
+      {"www.dot.test", "Set-Cookie: dt=2; Domain=dot.test", "a.dot.test", "/",
+       "dt=1", HTS_FALSE},
+      {"www.dot.test", NULL, "a.dot.test", "/", "dt=2", HTS_TRUE},
+      {"www.dot.test", "Set-Cookie: dt=3; Domain=.dot.test", "a.dot.test", "/",
+       "dt=2", HTS_FALSE},
+      {"www.dot.test", NULL, "a.dot.test", "/", "dt=3", HTS_TRUE},
       // Secure goes out over https only, as an attribute or as av=value
       {"https://jar.test", "Set-Cookie: s=1; Secure", "jar.test", "/", "s=1",
        HTS_FALSE},
@@ -1346,8 +1361,6 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
       {"https://jar.test", NULL, "https://jar.test", "/", "s2=1", HTS_TRUE},
       // a cookie named like an attribute is still a cookie
       {"jar.test", "Set-Cookie: secure=1", "jar.test", "/", "secure=1",
-       HTS_TRUE},
-      {"jar.test", "Set-Cookie: ho=1; HttpOnly", "jar.test", "/", "ho=1",
        HTS_TRUE},
   };
 
@@ -1400,6 +1413,11 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
          400 * 86400, 400 * 86400 + 2},
         {"Set-Cookie: big=1; Max-Age=99999999999999999999", "big", 400 * 86400,
          400 * 86400 + 2},
+        // 2^63 and 2^64 + 1, which an unguarded int64 wraps to < 0 and to 1
+        {"Set-Cookie: b63=1; Max-Age=9223372036854775808", "b63", 400 * 86400,
+         400 * 86400 + 2},
+        {"Set-Cookie: b64=1; Max-Age=18446744073709551617", "b64", 400 * 86400,
+         400 * 86400 + 2},
     };
 
     jar.data[0] = '\0';
@@ -1436,9 +1454,11 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
     }
     // a record that has expired since it was stored is not sent
     {
-      cookie_attr attr = {HTS_FALSE, HTS_FALSE, HTS_FALSE, 0};
+      cookie_attr attr = {.host_only = HTS_FALSE,
+                          .secure = HTS_FALSE,
+                          .http_only = HTS_FALSE,
+                          .expires = now - 10};
 
-      attr.expires = now - 10;
       jar.data[0] = '\0';
       assertf(cookie_set(&jar, "old", "1", "jar.test", "/", &attr) == 0);
       attr.expires = now + 3600;
@@ -1509,19 +1529,50 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
       printf("%s: the saved jar holds [%s]\n", LABEL, text);
       err = 1;
     }
-    // a Set-Cookie HttpOnly saves the way a loaded one does
+    /* A Set-Cookie HttpOnly saves the way a loaded one does, in either form,
+       and the saved domain is dotted exactly when subdomains get it. */
     {
-      htsblk r;
-      char line[] = "Set-Cookie: web=1; HttpOnly";
+      static const struct {
+        const char *header, *saved;
+      } saves[] = {
+          {"Set-Cookie: web=1; HttpOnly",
+           "\n#HttpOnly_jar.test\tFALSE\t/\tFALSE\t0\tweb\t1" LF},
+          {"Set-Cookie: hv=1; HttpOnly=yes",
+           "\n#HttpOnly_jar.test\tFALSE\t/\tFALSE\t0\thv\t1" LF},
+          {"Set-Cookie: dm=1; Domain=jar.test",
+           "\n.jar.test\tTRUE\t/\tFALSE\t0\tdm\t1" LF},
+      };
 
-      memset(&r, 0, sizeof(r));
       jar.data[0] = '\0';
-      treathead(&jar, "jar.test", "/", &r, line);
+      for (i = 0; i < sizeof(saves) / sizeof(saves[0]); i++) {
+        htsblk r;
+        char line[256];
+
+        memset(&r, 0, sizeof(r));
+        strcpybuff(line, saves[i].header);
+        treathead(&jar, "jar.test", "/", &r, line);
+      }
+      // a dotted host-only record, from a hand-edited jar, saves undotted
+      {
+        cookie_attr attr = {.host_only = HTS_TRUE,
+                            .secure = HTS_FALSE,
+                            .http_only = HTS_FALSE,
+                            .expires = 0};
+
+        assertf(cookie_set(&jar, "hd", "1", ".jar.test", "/", &attr) == 0);
+      }
       assertf(cookie_save(&jar, saved) == 0);
       cookiejar_slurp(saved, text, sizeof(text));
-      if (strstr(text, "\n#HttpOnly_jar.test\tFALSE\t/\tFALSE\t0\tweb\t1\n") ==
-          NULL) {
-        printf("%s: saved a Set-Cookie HttpOnly as [%s]\n", LABEL, text);
+      for (i = 0; i < sizeof(saves) / sizeof(saves[0]); i++) {
+        if (strstr(text, saves[i].saved) == NULL) {
+          printf("%s: saved %s as [%s]\n", LABEL, saves[i].header, text);
+          err = 1;
+        }
+      }
+      if (strncmp(text, "# Netscape HTTP Cookie File" LF,
+                  sizeof("# Netscape HTTP Cookie File" LF) - 1) != 0 ||
+          strstr(text, "\njar.test\tFALSE\t/\tFALSE\t0\thd\t1" LF) == NULL) {
+        printf("%s: the saved jar is [%s]\n", LABEL, text);
         err = 1;
       }
     }
@@ -1551,7 +1602,7 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
     opt->log = log;
     opt->debug = LOG_WARNING;
     jar.data[0] = '\0';
-    assertf(cookie_load(opt, &jar, fpath, "cookies.txt") == 0);
+    assertf(cookie_load(opt, &jar, fpath, "cookies.txt") == 1);
     rewind(log);
     n = fread(logged, 1, sizeof(logged) - 1, log);
     logged[n] = '\0';
@@ -1614,6 +1665,108 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
       err = 1;
     }
   }
+  /* An older build wrote TRUE in field 1 of every record, so a host-only
+     Set-Cookie must still replace and erase a record loaded from its jar. */
+  {
+    static const struct {
+      const char *header, *pair;
+      hts_boolean want;
+    } legacy[] = {
+        {NULL, "SID=old", HTS_TRUE},
+        {"Set-Cookie: SID=new", "SID=new", HTS_TRUE},
+        {NULL, "SID=old", HTS_FALSE},
+        {"Set-Cookie: SID=; Max-Age=0", "SID=new", HTS_FALSE},
+        {NULL, "SID=", HTS_FALSE},
+    };
+
+    FILE *fp = FOPEN(file, "wb");
+
+    assertf(fp != NULL);
+    fprintf(fp, "127.0.0.1\tTRUE\t/\tFALSE\t1999999999\tSID\told\n");
+    fclose(fp);
+    jar.data[0] = '\0';
+    assertf(cookie_load(NULL, &jar, fpath, "cookies.txt") == 0);
+    for (i = 0; i < sizeof(legacy) / sizeof(legacy[0]); i++) {
+      if (legacy[i].header != NULL) {
+        htsblk r;
+        char line[256];
+
+        memset(&r, 0, sizeof(r));
+        strcpybuff(line, legacy[i].header);
+        treathead(&jar, "127.0.0.1", "/", &r, line);
+      }
+      http_cookie_header(&jar, "127.0.0.1", "/", hdr, sizeof(hdr));
+      if (cookie_sent(hdr, legacy[i].pair) != legacy[i].want) {
+        printf("%s: legacy jar row %d sent [%s]\n", LABEL, (int) i, hdr);
+        err = 1;
+      }
+    }
+    if (strstr(jar.data, "SID") != NULL) {
+      printf("%s: the legacy jar kept [%s]\n", LABEL, jar.data);
+      err = 1;
+    }
+    (void) UNLINK(file);
+  }
+
+  /* A line short of seven fields or with no name is skipped and counted, and a
+     comment, a blank line or an expired cookie is not. */
+  {
+    FILE *fp = FOPEN(file, "wb");
+    int skipped;
+
+    assertf(fp != NULL);
+    fprintf(fp, "# Netscape HTTP Cookie File\n"
+                "\n"
+                "short.test\tTRUE\t/\n"
+                "short.test\tTRUE\t/\tFALSE\t0\t\tnoname\n"
+                "short.test\tTRUE\t/\tFALSE\t1\tpast\t1\n"
+                "short.test\tTRUE\t/\tFALSE\t0\tgood\t1\n");
+    fclose(fp);
+    jar.data[0] = '\0';
+    skipped = cookie_load(NULL, &jar, fpath, "cookies.txt");
+    if (skipped != 2 || strstr(jar.data, "\tgood\t1") == NULL ||
+        strstr(jar.data, "noname") != NULL) {
+      printf("%s: malformed lines: %d skipped, jar [%s]\n", LABEL, skipped,
+             jar.data);
+      err = 1;
+    }
+    (void) UNLINK(file);
+  }
+
+  /* A TAB or a line break in any field would forge a field or a record. */
+  {
+    htsblk r;
+    char line[] = "Set-Cookie: tab=a\tb=c";
+    char crlf[] = "Set-Cookie: nl=a\nb";
+
+    memset(&r, 0, sizeof(r));
+    jar.data[0] = '\0';
+    treathead(&jar, "jar.test", "/", &r, line);
+    treathead(&jar, "jar.test", "/", &r, crlf);
+    if (cookie_set(&jar, "t\tn", "1", "jar.test", "/", NULL) == 0 ||
+        cookie_set(&jar, "tn", "1", "jar.test", "/\tx", NULL) == 0 ||
+        cookie_set(&jar, "tn", "1", "jar\t.test", "/", NULL) == 0 ||
+        strnotempty(jar.data)) {
+      printf("%s: a field with a TAB was stored: [%s]\n", LABEL, jar.data);
+      err = 1;
+    }
+  }
+
+#ifdef __linux__
+  /* A write that fails only at flush time still fails the save. */
+  {
+    struct stat st;
+
+    if (geteuid() != 0 && stat("/dev/full", &st) == 0 && S_ISCHR(st.st_mode)) {
+      jar.data[0] = '\0';
+      assertf(cookie_add(&jar, "full", "1", "jar.test", "/") == 0);
+      if (cookie_save(&jar, "/dev/full") != -1) {
+        printf("%s: a save to /dev/full did not fail\n", LABEL);
+        err = 1;
+      }
+    }
+  }
+#endif
   printf("%s: %s\n", LABEL, err ? "FAIL" : "OK");
   return err;
 #undef LABEL

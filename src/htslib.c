@@ -2331,7 +2331,10 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
       hts_boolean has_max_age = HTS_FALSE;
       hts_boolean has_expires = HTS_FALSE;
       int64_t max_age_when = 0, expires_when = 0;
-      cookie_attr attr = {HTS_FALSE, HTS_FALSE, HTS_FALSE, 0};
+      cookie_attr attr = {.host_only = HTS_FALSE,
+                          .secure = HTS_FALSE,
+                          .http_only = HTS_FALSE,
+                          .expires = 0};
       hts_boolean first = HTS_TRUE;
 
       name[0] = value[0] = '\0';
@@ -2426,7 +2429,7 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
             }
             // RFC 6265 5.2 ignores any other attribute, SameSite for example
           }
-        } else if (!first) { // a bare attribute
+        } else { // a bare attribute
           const size_t len = (size_t) (token_end - token_st);
 
           if (len == 6 && strfield(token_st, "secure"))
@@ -2456,12 +2459,12 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
         if (!has_domain ||
             (adr != NULL && cookie_domain_allowed(domain, scoped))) {
           if (attr.expires != 0 && attr.expires <= now) {
-            cookie_remove(cookie, cook_name, domain, path, attr.host_only);
+            cookie_remove(cookie, cook_name, domain, path);
           } else if (cookie_set(cookie, cook_name, cook_value, domain, path,
                                 &attr) != 0) {
             hts_log_print(opt, LOG_WARNING,
                           "Cookies: the jar did not store '%.64s' set by %s",
-                          cook_name, adr != NULL ? adr : "(unknown)");
+                          cook_name, adr);
           }
         }
       }

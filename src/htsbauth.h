@@ -89,10 +89,10 @@ typedef struct httrackp httrackp;
     HTS_FALSE means the caller sends no cookie. */
 hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size);
 
-/** Bytes of name plus value a jar record may hold. */
+/** A jar record holds this many bytes of name plus value. */
 #define COOKIE_MAX_PAIR 4096
 
-/** The attributes a jar record keeps beside name, value, domain and path. */
+/** A jar record keeps these beside name, value, domain and path. */
 typedef struct cookie_attr {
   hts_boolean host_only; /**< sent to its domain alone, not to subdomains */
   hts_boolean secure;    /**< sent over https only */
@@ -101,47 +101,46 @@ typedef struct cookie_attr {
 } cookie_attr;
 
 /** Store cook_name=cook_value for domain/path, with domain normalised by
-    cookie_host, replacing the record of the same name, domain, host-only
-    flag and path. attr NULL means a session cookie that subdomains also get.
-    !=0 if the jar refused it, an empty domain included. */
+    cookie_host, replacing the record of the same name, domain and path.
+    attr NULL means a session cookie that subdomains also get. !=0 if the jar
+    refused it, an empty domain included. */
 int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
                const char *domain, const char *path, const cookie_attr *attr);
 
-/** cookie_set with attr NULL. */
+/** This is cookie_set with attr NULL. */
 int cookie_add(t_cookie *cookie, const char *cook_name, const char *cook_value,
                const char *domain, const char *path);
 
-/** Erase the record of cook_name with exactly this domain, host-only flag and
-    path, with domain normalised by cookie_host as cookie_set does. Always 0:
-    a domain nothing can be stored under holds nothing to erase. */
+/** Erase the record of cook_name with exactly this domain and path, with
+    domain normalised by cookie_host as cookie_set does. Always 0: a domain
+    nothing can be stored under holds nothing to erase. */
 int cookie_remove(t_cookie *cookie, const char *cook_name, const char *domain,
-                  const char *path, hts_boolean host_only);
-
-/** cookie_remove of the record cookie_add stores. */
-int cookie_del(t_cookie *cookie, const char *cook_name, const char *domain,
-               const char *path);
+                  const char *path);
 
 /** May the jar record at rec go out at NOW, over https when https is
     HTS_TRUE? An expired record never may, and a Secure one needs https. */
 hts_boolean cookie_sendable(const char *rec, hts_boolean https, int64_t now);
 
 /** Load the Netscape jar <path>/<name> into cookie (plus the copied IE jars in
-    <path> on Windows). A line whose field does not fit is refused, not clipped,
-    and reported through opt, which may be NULL. Returns 0 if the jar was
-    opened, -1 otherwise. */
+    <path> on Windows). A line that is malformed, has a field that does not
+    fit, or that the jar refuses is skipped and reported through opt, which may
+    be NULL. Returns -1 if the jar could not be opened, else the number of
+    skipped lines. Comments, blank lines and expired cookies are not counted. */
 int cookie_load(httrackp *opt, t_cookie *cookie, const char *path,
                 const char *name);
 
 /** Write the jar's cookies to name in Netscape format, owner-only on Unix.
-    Returns 0 when the file was written or the jar was empty, and -1 when the
-    file could not be opened. */
+    Returns 0 when the file was written or the jar was empty, and -1 when any
+    open, write or close failed. */
 int cookie_save(t_cookie *cookie, const char *name);
 
-/** Write the jar over the cookies file name the user gave, after moving
-    the old file to <name>.bak (an older .bak is replaced). A failure is
-    logged through opt, which may be NULL, and leaves the .bak alone. Returns
-    0 when written or when the jar is empty, -1 otherwise. */
-int cookie_save_replacing(httrackp *opt, t_cookie *cookie, const char *name);
+/** Write the jar to <name>.tmp, then move the old file to <name>.bak (an
+    older .bak is replaced) and the new one over name. An empty jar writes
+    nothing. A failure is logged through opt, which may be NULL. If the write
+    or the backup fails, name and .bak are unchanged. If only the last move
+    fails, .bak holds the old content of name. HTS_FALSE on a failure. */
+hts_boolean cookie_save_replacing(httrackp *opt, t_cookie *cookie,
+                                  const char *name);
 
 /** Insert ins in front of the string at s, whose buffer holds s_size bytes. */
 void cookie_insert(char *s, size_t s_size, const char *ins);
@@ -178,10 +177,11 @@ hts_boolean cookie_max_age_time(const char *value, int64_t now, int64_t *when);
     date, so the attribute is ignored. */
 hts_boolean cookie_expires_time(const char *value, int64_t now, int64_t *when);
 
-/** First jar record at or after s whose name (an empty cook_name accepts any),
-    domain and path match, or NULL. The domain match folds case and reaches a
-    subdomain only when the record is not host-only, and the record's own path
-    must be a byte-exact prefix of path. The result points into s. */
+/** Return the first jar record at or after s whose name, domain and path
+    match, or NULL. An empty cook_name matches any name. The domain match folds
+   case and reaches a subdomain only when the record is not host-only, and the
+   record's own path must be a byte-exact prefix of path. The result points into
+   s. */
 char *cookie_find(char *s, const char *cook_name, const char *domain,
                   const char *path);
 

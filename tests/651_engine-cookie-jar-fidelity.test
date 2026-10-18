@@ -1,8 +1,8 @@
 #!/bin/bash
 #
 # The cookie jar keeps host-only, Secure, HttpOnly and expiry from a
-# Set-Cookie and through a cookies.txt load and save, holds 4096 bytes,
-# replaces a cookie only by its whole identity, and logs a cookie it refuses.
+# Set-Cookie and through a cookies.txt load and save, and --cookies-file is
+# written back safely, or left alone when part of it could not be loaded.
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
@@ -10,17 +10,45 @@ set -euo pipefail
 
 dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
+cleanup_push chmod -R u+w "$dir"
 
 assert_selftest "cookie-jar: OK" cookiejar "$dir"
 
 # --cookies-file with cookies off is read by nothing, so it is logged
 : "${top_srcdir:=..}"
-bash "$top_srcdir/tests/local-crawl.sh" --cookie 'session=opensesame' \
+crawl() { bash "$top_srcdir/tests/local-crawl.sh" "$@"; }
+crawl --cookie 'session=opensesame' \
     --log-found 'Cookies are disabled, so the cookies file' \
     httrack 'BASEURL/gated/index.php' -o0 -b0
-bash "$top_srcdir/tests/local-crawl.sh" --cookie 'session=opensesame' \
+crawl --cookie 'session=opensesame' \
     --found 'gated/secret.html' --log-not-found 'Cookies are disabled' \
     httrack 'BASEURL/gated/index.php' -o0
+
+# A Secure cookie goes out over https and never over http
+secure=$(printf '127.0.0.1\tFALSE\t/\tTRUE\t1999999999\tsession\topensesame')
+if test "${HTTPS_SUPPORT:-}" != no; then
+    printf '%s\n' "$secure" >"$dir/s1.txt"
+    crawl --tls --found 'gated/secret.html' \
+        httrack 'BASEURL/gated/index.php' -o0 --cookies-file "$dir/s1.txt"
+fi
+printf '%s\n' "$secure" >"$dir/s2.txt"
+crawl --found 'gated/index.html' --not-found 'gated/secret.html' \
+    httrack 'BASEURL/gated/index.php' -o0 --cookies-file "$dir/s2.txt"
+
+# A Set-Cookie the full jar refuses is logged during a real crawl. The filler
+# path is never requested, so its cookies are never sent.
+big=$(repeat_chars 4000 v)
+: >"$dir/full.txt"
+for i in 1 2 3 4 5 6 7; do
+    printf '127.0.0.1\tTRUE\t/x/\tFALSE\t1999999999\tc%s\t%s\n' "$i" "$big" \
+        >>"$dir/full.txt"
+done
+# filler + name + domain + path + the 256 bytes cookie_set reserves = 30000
+filler=$((30000 - $(size_of "$dir/full.txt") - 2 - 9 - 3 - 256))
+printf '127.0.0.1\tTRUE\t/x/\tFALSE\t1999999999\tf1\t%s\n' \
+    "$(repeat_chars "$filler" f)" >>"$dir/full.txt"
+crawl --log-found "did not store 'cat' set by 127\\.0\\.0\\.1" \
+    httrack 'BASEURL/cookies/entrance.php' -o0 --cookies-file "$dir/full.txt"
 
 # The jar goes back over --cookies-file, whose old bytes move to .bak, and not
 # to the mirror's own cookies.txt. Without the option it still goes there.
@@ -28,23 +56,95 @@ bin=$(httrack_path)
 site="$dir/site"
 mkdir -p "$site"
 echo '<html>hello</html>' >"$site/index.html"
+run() { "$bin" "file://$site/index.html" --quiet "$@" >/dev/null 2>&1; }
+# cookie_save() ends its lines with CRLF on Windows
+holds() { grep -qxF "$2" <<<"$(tr -d '\r' <"$1")"; }
 jar="$dir/jar.txt"
 printf 'www.example.com\tTRUE\t/\tFALSE\t0\tkept\t1\n' >"$jar"
 cp "$jar" "$dir/orig.txt"
-"$bin" "file://$site/index.html" -O "$dir/m1" --cookies-file "$jar" --quiet \
-    >/dev/null 2>&1
+run -O "$dir/m1" --cookies-file "$jar"
 cmp "$jar.bak" "$dir/orig.txt" || fail "jar.bak is not the original file"
-want=$(printf 'www.example.com\tTRUE\t/\tFALSE\t0\tkept\t1')
-# cookie_save() ends its lines with CRLF on Windows
-grep -qxF "$want" <<<"$(tr -d '\r' <"$jar")" || fail "the cookies file does not hold the jar"
+want=$(printf '.www.example.com\tTRUE\t/\tFALSE\t0\tkept\t1')
+holds "$jar" "$want" || fail "the cookies file does not hold the jar"
+holds "$jar" '# Netscape HTTP Cookie File' || fail "no Netscape header line"
 test ! -e "$dir/m1/cookies.txt" || fail "the mirror's cookies.txt was written"
+test ! -e "$jar.tmp" || fail "the temporary jar was left behind"
+if py=$(find_python); then
+    "$py" -c 'import sys, http.cookiejar as c
+j = c.MozillaCookieJar(sys.argv[1])
+j.load(ignore_discard=True, ignore_expires=True)
+sys.exit(0 if [k.name for k in j] == ["kept"] else 1)' "$(nativepath "$jar")" ||
+        fail "MozillaCookieJar cannot read the saved jar"
+fi
 cp "$jar" "$dir/run1.txt"
-"$bin" "file://$site/index.html" -O "$dir/m2" --cookies-file "$jar" --quiet \
-    >/dev/null 2>&1
+run -O "$dir/m2" --cookies-file "$jar"
 cmp "$jar.bak" "$dir/run1.txt" || fail "a second run did not rotate jar.bak"
 mkdir "$dir/cwd"
 cp "$dir/orig.txt" "$dir/cwd/cookies.txt"
-(cd "$dir/cwd" && "$bin" "file://$site/index.html" -O "$dir/m3" --quiet \
-    >/dev/null 2>&1)
+(cd "$dir/cwd" && run -O "$dir/m3")
 subshell_ok $?
 assert_file "$dir/m3/cookies.txt" "the mirror's cookies.txt without the option"
+holds "$dir/m3/cookies.txt" "$want" || fail "the mirror's cookies.txt lost the jar"
+
+# With --cookies-file, the mirror's and the current directory's jars stay out
+mkdir -p "$dir/m4"
+printf 'www.example.com\tTRUE\t/\tFALSE\t0\tlogonly\t1\n' >"$dir/m4/cookies.txt"
+printf 'www.example.com\tTRUE\t/\tFALSE\t0\tcwdonly\t1\n' >"$dir/cwd/cookies.txt"
+cp "$dir/orig.txt" "$jar"
+(cd "$dir/cwd" && run -O "$dir/m4" --cookies-file "$jar")
+subshell_ok $?
+holds "$jar" "$want" || fail "the cookies file lost its own cookie"
+! grep -q 'only' "$jar" || fail "another jar was merged into the cookies file"
+
+# A line the load skipped leaves the file as it was, and says so
+bad="$dir/bad.txt"
+{
+    printf 'www.example.com\tTRUE\t/\tFALSE\t0\tkept\t1\n'
+    printf 'www.example.com\tTRUE\t/\n'
+} >"$bad"
+cp "$bad" "$dir/bad-orig.txt"
+run -O "$dir/m5" --cookies-file "$bad"
+cmp "$bad" "$dir/bad-orig.txt" || fail "a partly loaded cookies file was rewritten"
+test ! -e "$bad.bak" || fail "a partly loaded cookies file was backed up"
+grep -q 'is left unchanged' "$dir/m5/hts-log.txt" ||
+    fail "no warning that the cookies file was left unchanged"
+
+# A jar holding only expired cookies is not written back
+old="$dir/old.txt"
+printf 'www.example.com\tTRUE\t/\tFALSE\t1\tgone\t1\n' >"$old"
+cp "$old" "$dir/old-orig.txt"
+run -O "$dir/m6" --cookies-file "$old"
+cmp "$old" "$dir/old-orig.txt" || fail "an all-expired jar was rewritten"
+test ! -e "$old.bak" || fail "an all-expired jar was backed up"
+
+# A save that fails leaves the file and its .bak as they were
+bakdir="$dir/bakdir"
+mkdir -p "$bakdir/jar.txt.bak"
+echo keep >"$bakdir/jar.txt.bak/x"
+cp "$dir/orig.txt" "$bakdir/jar.txt"
+run -O "$dir/m7" --cookies-file "$bakdir/jar.txt"
+cmp "$bakdir/jar.txt" "$dir/orig.txt" || fail "a failed backup changed the jar"
+test -f "$bakdir/jar.txt.bak/x" || fail "a failed backup changed the .bak"
+test ! -e "$bakdir/jar.txt.tmp" || fail "a failed save left its temporary file"
+ro="$dir/ro"
+mkdir "$ro"
+cp "$dir/orig.txt" "$ro/jar.txt"
+echo older >"$ro/jar.txt.bak"
+chmod a-w "$ro"
+# root and Windows can still write there, so the failure cannot be staged
+if test ! -w "$ro"; then
+    run -O "$dir/m8" --cookies-file "$ro/jar.txt"
+    cmp "$ro/jar.txt" "$dir/orig.txt" || fail "a failed save changed the jar"
+    test "$(cat "$ro/jar.txt.bak")" = older || fail "a failed save changed .bak"
+    grep -q 'is unchanged' "$dir/m8/hts-log.txt" ||
+        fail "no warning that the save failed"
+fi
+chmod u+w "$ro"
+
+# A directory given as the cookies file ends the load instead of spinning
+mkdir "$dir/adir"
+rc=0
+run_with_timeout 120 "$bin" "file://$site/index.html" --quiet -O "$dir/m9" \
+    --cookies-file "$dir/adir" >/dev/null 2>&1 || rc=$?
+test "$rc" -ne 124 || fail "a directory as the cookies file hangs the load"
+test -d "$dir/adir" || fail "the directory given as the cookies file moved"

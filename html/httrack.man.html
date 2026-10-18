@@ -2437,6 +2437,17 @@ operation it asked for failed. No mirror ran.</p></td></tr>
 <p style="margin-left:18%;">The system wide configuration
 file.</p>
 
+<p style="margin-left:9%;"><i>cookies.txt</i></p>
+
+<p style="margin-left:18%;">The cookie jar, in Netscape
+format. Without <i>--cookies-file</i>, the mirror reads the
+one in its output directory and the one in the current
+directory, and writes the jar back to its output directory
+at the end. With <i>--cookies-file</i>, that file alone is
+the jar. The crawl rewrites it at the end and keeps its old
+content as <i>&lt;file&gt;.bak</i>. The file is left
+unchanged when some of its lines could not be loaded.</p>
+
 <p style="margin-left:9%; margin-top: 1em">A running mirror
 also watches its own output directory for these. Creating
 one is how a script drives an engine it has no other handle

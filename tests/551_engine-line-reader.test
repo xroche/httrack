@@ -162,13 +162,17 @@ jar="$d3/jar.txt"
         "$(repeat_chars 8200 L)"
     rec GOODNEXT v2
 } >"$jar"
+# The current directory's jar, because the mirror's copy says what was loaded
+# where a --cookies-file with a refused line is left alone.
+mkdir "$d3/cwd"
+cp "$jar" "$d3/cwd/cookies.txt"
 rc=0
-"$bin" "file://$d3/index.html" -O "$d3/out" --cookies-file "$jar" --quiet \
-    >/dev/null 2>&1 || rc=$?
+cd "$d3/cwd"
+"$bin" "file://$d3/index.html" -O "$d3/out" --quiet >/dev/null 2>&1 || rc=$?
+cd "$d3"
 test "$rc" -eq 0 || fail "cookie crawl exited $rc"
-# the jar is written back over --cookies-file
-loaded=$(tr -d '\r' <"$jar")
-grep -qxF "$(rec GOODNEXT v2)" <<<"$loaded" || fail "the cookie after the long lines was lost"
+loaded=$(tr -d '\r' <"$d3/out/cookies.txt")
+grep -qxF ".$(rec GOODNEXT v2)" <<<"$loaded" || fail "the cookie after the long lines was lost"
 for gone in TAILCOOKIE NULCUT; do
     if grep -q "$gone" <<<"$loaded"; then
         fail "$gone came from a line too long to load"

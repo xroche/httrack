@@ -727,7 +727,10 @@ bottom are the ones that keep you welcome.</p>
 <div class="opt" data-for="win web">
 	<div class="opt-head"><span class="opt-name">Load cookies from file</span><span class="cli">-%K, --cookies-file</span></div>
 	<p>Preloads cookies from a Netscape <code>cookies.txt</code> before the crawl starts. How you
-	mirror something that needs you logged in, by exporting the session from your browser.</p>
+	mirror something that needs you logged in, by exporting the session from your browser.
+	At the end of the crawl the file is rewritten with the cookies the crawl ended with, and the old one
+	is kept as <code>.bak</code>. The file is left unchanged when some of its lines could not be
+	loaded.</p>
 </div>
 
 <div class="opt" data-for="win web droid">

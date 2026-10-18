@@ -388,8 +388,7 @@ hts_boolean hts_proxy_is_connect(const char *name);
 
 void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * retour,
                char *rcvd);
-/* treathead, logging through opt (which may be NULL) a cookie the jar
-   refused. */
+/* Run treathead, logging any refused cookie through opt, which may be NULL. */
 void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
                    const char *fil, htsblk *retour, char *rcvd);
 void treatfirstline(htsblk * retour, const char *rcvd);
