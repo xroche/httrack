@@ -1042,6 +1042,48 @@ static int st_cookiequote(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* -#test=cookiehttponly <dir>: a "#HttpOnly_" jar line is a record, and any
+   other '#' line, even one shaped like a record, stays a comment. */
+static int st_cookiehttponly(httrackp *opt, int argc, char **argv) {
+  static t_cookie ck;
+  char fpath[HTS_URLMAXSIZE * 2];
+  char file[HTS_URLMAXSIZE * 2];
+  char hdr[1024];
+  FILE *fp;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "cookiehttponly: needs a writable dir\n");
+    return 1;
+  }
+  assertf(sprintfbuff(fpath, "%s/", argv[0]));
+  assertf(sprintfbuff(file, "%scookies.txt", fpath));
+  fp = FOPEN(file, "wb");
+  assertf(fp != NULL);
+  fprintf(fp, "# Netscape HTTP Cookie File\n"
+              "#HttpOnly_.example.com\tTRUE\t/\tFALSE\t0\tsid\tabc\n"
+              "#.example.com\tTRUE\t/\tFALSE\t0\tdead\tx\n"
+              "#HttpOnly_#.example.com\tTRUE\t/\tFALSE\t0\tdead2\tx\n"
+              "#httponly_.example.com\tTRUE\t/\tFALSE\t0\tdead3\tx\n"
+              "#HttpOnlyX.example.com\tTRUE\t/\tFALSE\t0\tdead4\tx\n"
+              ".example.com\tTRUE\t/\tFALSE\t0\tplain\t1\n"
+              "#HttpOnly_.example.com\tTRUE\t/\tFALSE\t0\tsid2\tdef\n");
+  fclose(fp);
+  ck.max_len = sizeof(ck.data);
+  ck.data[0] = '\0';
+  assertf(cookie_load(NULL, &ck, fpath, "cookies.txt") == 0);
+  (void) UNLINK(file);
+  http_cookie_header(&ck, "www.example.com", "/", hdr, sizeof(hdr));
+  if (strstr(hdr, "sid=abc") == NULL || strstr(hdr, "plain=1") == NULL ||
+      strstr(hdr, "sid2=def") == NULL || strstr(hdr, "dead") != NULL ||
+      strchr(ck.data, '#') != NULL) {
+    fprintf(stderr, "cookiehttponly: sent [%s], jar [%s]\n", hdr, ck.data);
+    return 1;
+  }
+  printf("cookiehttponly: OK\n");
+  return 0;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
@@ -1058,6 +1100,8 @@ const struct selftest_entry selftests_cookie[] = {
     {"cookieimport", "<dir>",
      "load a jar (and Windows IE cookies) from a long+non-ASCII folder",
      st_cookieimport},
+    {"cookiehttponly", "<dir>",
+     "a #HttpOnly_ jar line loads, other comments do not", st_cookiehttponly},
     {"cookiequote", "<Set-Cookie header>",
      "what the jar stores of a quoted cookie value and av", st_cookiequote},
     {"cookiespandiff", "",
