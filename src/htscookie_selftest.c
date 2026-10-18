@@ -1555,11 +1555,11 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
   assertf(sprintfbuff(saved, "%ssaved.txt", fpath));
   {
     static const char *const kept[] = {
-        ".load.test\tTRUE\t/\tFALSE\t0\tdom\t1\n",
-        "host.test\tFALSE\t/\tFALSE\t0\tonly\t1\n",
-        ".load.test\tTRUE\t/\tTRUE\t0\tsec\t1\n",
-        ".load.test\tTRUE\t/\tFALSE\t4102444800\tfuture\t1\n",
-        "#HttpOnly_.load.test\tTRUE\t/\tFALSE\t0\thid\t1\n",
+        ".load.test\tTRUE\t/\tFALSE\t0\tdom\t1" LF,
+        "host.test\tFALSE\t/\tFALSE\t0\tonly\t1" LF,
+        ".load.test\tTRUE\t/\tTRUE\t0\tsec\t1" LF,
+        ".load.test\tTRUE\t/\tFALSE\t4102444800\tfuture\t1" LF,
+        "#HttpOnly_.load.test\tTRUE\t/\tFALSE\t0\thid\t1" LF,
     };
 
     static const struct {
