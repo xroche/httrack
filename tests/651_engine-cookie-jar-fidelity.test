@@ -1,0 +1,14 @@
+#!/bin/bash
+#
+# The cookie jar keeps host-only, Secure, HttpOnly and expiry from a
+# Set-Cookie and through a cookies.txt load and save, replaces a cookie only
+# by its whole identity, and logs a cookie it refuses.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+assert_selftest "cookie-jar: OK" cookiejar "$dir"

@@ -88,16 +88,38 @@ typedef struct httrackp httrackp;
     HTS_FALSE means the caller sends no cookie. */
 hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size);
 
+/** The attributes a jar record keeps beside name, value, domain and path. */
+typedef struct cookie_attr {
+  hts_boolean host_only; /**< sent to its domain alone, not to subdomains */
+  hts_boolean secure;    /**< sent over https only */
+  hts_boolean http_only; /**< kept only so a saved jar round-trips */
+  int64_t expires;       /**< absolute unix time, 0 for a session cookie */
+} cookie_attr;
+
 /** Store cook_name=cook_value for domain/path, with domain normalised by
-    cookie_host. !=0 if the jar refused it, an empty domain included. */
+    cookie_host, replacing the record of the same name, domain, host-only
+    flag and path. attr NULL means a session cookie that subdomains also get.
+    !=0 if the jar refused it, an empty domain included. */
+int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
+               const char *domain, const char *path, const cookie_attr *attr);
+
+/** cookie_set with attr NULL. */
 int cookie_add(t_cookie *cookie, const char *cook_name, const char *cook_value,
                const char *domain, const char *path);
 
-/** Erase cook_name for domain/path, with domain normalised by cookie_host as
-    cookie_add does. Always 0: a domain nothing can be stored under holds
-    nothing to erase. */
+/** Erase the record of cook_name with exactly this domain, host-only flag and
+    path, with domain normalised by cookie_host as cookie_set does. Always 0:
+    a domain nothing can be stored under holds nothing to erase. */
+int cookie_remove(t_cookie *cookie, const char *cook_name, const char *domain,
+                  const char *path, hts_boolean host_only);
+
+/** cookie_remove of the record cookie_add stores. */
 int cookie_del(t_cookie *cookie, const char *cook_name, const char *domain,
                const char *path);
+
+/** May the jar record at rec go out at NOW, over https when https is
+    HTS_TRUE? An expired record never may, and a Secure one needs https. */
+hts_boolean cookie_sendable(const char *rec, hts_boolean https, int64_t now);
 
 /** Load the Netscape jar <path>/<name> into cookie (plus the copied IE jars in
     <path> on Windows). A line whose field does not fit is refused, not clipped,
@@ -135,18 +157,20 @@ hts_boolean cookie_domain_match(const char *jar_dom, const char *host);
     parent of it that is not a public suffix. */
 hts_boolean cookie_domain_allowed(const char *domain, const char *host);
 
-/** Has a Set-Cookie Max-Age VALUE expired the cookie (RFC 6265 5.2.2)?
-    HTS_DEFAULT when VALUE is no delta-seconds, so the attribute is ignored. */
-hts_tristate cookie_max_age_expired(const char *value);
+/** Read a Set-Cookie Max-Age VALUE received at NOW into *when, the absolute
+    expiry, capped 400 days ahead and never below 1 (RFC 6265 5.2.2).
+    HTS_FALSE when VALUE is no delta-seconds, so the attribute is ignored. */
+hts_boolean cookie_max_age_time(const char *value, int64_t now, int64_t *when);
 
-/** Has a Set-Cookie Expires VALUE passed at NOW (RFC 6265 5.2.1)?
-    HTS_DEFAULT when VALUE is no date, so the attribute is ignored. */
-hts_tristate cookie_expires_expired(const char *value, time_t now);
+/** Read a Set-Cookie Expires VALUE received at NOW into *when, bounded as
+    cookie_max_age_time is (RFC 6265 5.2.1). HTS_FALSE when VALUE is no date,
+    so the attribute is ignored. */
+hts_boolean cookie_expires_time(const char *value, int64_t now, int64_t *when);
 
 /** First jar record at or after s whose name (an empty cook_name accepts any),
-    domain and path match, or NULL. The domain match folds case, and the
-    record's own path must be a byte-exact prefix of path. The result points
-    into s. */
+    domain and path match, or NULL. The domain match folds case and reaches a
+    subdomain only when the record is not host-only, and the record's own path
+    must be a byte-exact prefix of path. The result points into s. */
 char *cookie_find(char *s, const char *cook_name, const char *domain,
                   const char *path);
 

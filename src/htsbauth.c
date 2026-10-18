@@ -48,6 +48,10 @@ Please visit our Website: http://www.httrack.com
 
 /* END specific definitions */
 
+/* How a cookies.txt line marks HttpOnly, and how a jar record does. */
+#define COOKIE_HTTPONLY_PREFIX "#HttpOnly_"
+#define COOKIE_HTTPONLY_FIELD "HttpOnly"
+
 /* See htsbauth.h. */
 hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size) {
   const char *host = jump_identification_const(adr);
@@ -86,24 +90,30 @@ hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size) {
   return HTS_TRUE;
 }
 
-// gestion des cookie
-// ajoute, dans l'ordre
-// !=0 : erreur
-int cookie_add(t_cookie * cookie, const char *cook_name, const char *cook_value,
-               const char *domain, const char *path) {
+/* See htsbauth.h. Records are kept longest path first. */
+int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
+               const char *domain, const char *path, const cookie_attr *attr) {
+  static const cookie_attr session = {HTS_FALSE, HTS_FALSE, HTS_FALSE, 0};
   char buffer[8192];
   char host[256];
   char *a = cookie->data;
   char *insert;
   char cook[16384];
 
+  if (attr == NULL)
+    attr = &session;
   /* One representation per host, because an old or hand-edited jar carries a
      port the send side no longer queries with. */
   if (!cookie_host(domain, host, sizeof(host)))
     return -1;
+  // a TAB or a line break inside a field would forge another field or record
+  if (strpbrk(cook_name, "\t\r\n") != NULL ||
+      strpbrk(cook_value, "\t\r\n") != NULL ||
+      strpbrk(host, "\t\r\n") != NULL || strpbrk(path, "\t\r\n") != NULL)
+    return -1;
 
-  // erase any duplicate; cookie_del normalises too, so it takes the raw domain
-  cookie_del(cookie, cook_name, domain, path);
+  // erase any duplicate; cookie_remove normalises too, so it takes the raw one
+  cookie_remove(cookie, cook_name, domain, path, attr->host_only);
   domain = host;
   if (strlen(cook_value) > 1024)
     return -1;                  // trop long
@@ -143,21 +153,13 @@ int cookie_add(t_cookie * cookie, const char *cook_name, const char *cook_value,
       insert = a;               // insérer ici
     }
   }
-  // construction du cookie
-  strcpybuff(cook, domain);
-  strcatbuff(cook, "\t");
-  strcatbuff(cook, "TRUE");
-  strcatbuff(cook, "\t");
-  strcatbuff(cook, path);
-  strcatbuff(cook, "\t");
-  strcatbuff(cook, "FALSE");
-  strcatbuff(cook, "\t");
-  strcatbuff(cook, "1999999999");
-  strcatbuff(cook, "\t");
-  strcatbuff(cook, cook_name);
-  strcatbuff(cook, "\t");
-  strcatbuff(cook, cook_value);
-  strcatbuff(cook, "\n");
+  /* The Netscape fields, then an eighth only this jar reads: the file form
+     marks HttpOnly with a "#HttpOnly_" prefix instead (see cookie_save). */
+  assertf(sprintfbuff(cook, "%s\t%s\t%s\t%s\t" LLintP "\t%s\t%s%s\n", domain,
+                      attr->host_only ? "FALSE" : "TRUE", path,
+                      attr->secure ? "TRUE" : "FALSE", (LLint) attr->expires,
+                      cook_name, cook_value,
+                      attr->http_only ? "\t" COOKIE_HTTPONLY_FIELD : ""));
   /* Backstop, not a live gate: the check above reserves 256 bytes and this
      record adds ~30 of literals, so it fires only if that assembly ever
      outgrows the headroom. Overflow-safe form regardless. */
@@ -176,17 +178,66 @@ int cookie_add(t_cookie * cookie, const char *cook_name, const char *cook_value,
   return 0;
 }
 
-// effacer cookie si existe
-int cookie_del(t_cookie * cookie, const char *cook_name, const char *domain, const char *path) {
+/* See htsbauth.h. */
+int cookie_add(t_cookie *cookie, const char *cook_name, const char *cook_value,
+               const char *domain, const char *path) {
+  return cookie_set(cookie, cook_name, cook_value, domain, path, NULL);
+}
+
+/* Is the record at rec host-only? Field 1 is the Netscape include-subdomains
+   flag, so only an explicit FALSE says so. */
+static hts_boolean cookie_is_host_only(const char *rec) {
+  char buffer[8192];
+
+  return strcmpnocase(cookie_get(buffer, rec, 1), "FALSE") == 0;
+}
+
+/* Do two jar domains name the same domain? The leading dot is the Netscape
+   spelling of the same thing. */
+static hts_boolean cookie_same_domain(const char *a, const char *b) {
+  if (a[0] == '.')
+    a++;
+  if (b[0] == '.')
+    b++;
+  return strcmpnocase(a, b) == 0;
+}
+
+/* The record of exactly this name, domain, host-only flag and path (RFC 6265
+   5.3 step 11), or NULL. */
+static char *cookie_find_exact(char *s, const char *cook_name,
+                               const char *domain, const char *path,
+                               hts_boolean host_only) {
+  char buffer[8192];
+  char *a;
+
+  for (a = s; *a != '\0'; a = cookie_nextfield(a)) {
+    if (strcmp(cookie_get(buffer, a, 5), cook_name) == 0 &&
+        cookie_same_domain(cookie_get(buffer, a, 0), domain) &&
+        strcmp(cookie_get(buffer, a, 2), path) == 0 &&
+        cookie_is_host_only(a) == host_only)
+      return a;
+  }
+  return NULL;
+}
+
+/* See htsbauth.h. */
+int cookie_del(t_cookie *cookie, const char *cook_name, const char *domain,
+               const char *path) {
+  return cookie_remove(cookie, cook_name, domain, path, HTS_FALSE);
+}
+
+/* See htsbauth.h. */
+int cookie_remove(t_cookie *cookie, const char *cook_name, const char *domain,
+                  const char *path, hts_boolean host_only) {
   char *a, *b;
   char host[256];
 
-  /* Same normalisation as cookie_add, or the pair would disagree on where a
+  /* Same normalisation as cookie_set, or the pair would disagree on where a
      port-qualified domain was stored. */
   if (!cookie_host(domain, host, sizeof(host)))
     return 0; // nothing can be stored under it, so nothing to delete
 
-  b = cookie_find(cookie->data, cook_name, host, path);
+  b = cookie_find_exact(cookie->data, cook_name, host, path, host_only);
   if (b) {
     a = cookie_nextfield(b);
     cookie_delete(b, cookie->max_len - (size_t) (b - cookie->data), a - b);
@@ -243,30 +294,74 @@ hts_boolean cookie_domain_allowed(const char *domain, const char *host) {
   return !hts_psl_loaded() || hts_psl_registrable_domain(dom) != NULL;
 }
 
-/* See htsbauth.h. */
-hts_tristate cookie_max_age_expired(const char *value) {
-  const hts_boolean negative = value[0] == '-';
-  const char *const digits = value + (negative ? 1 : 0);
-  const size_t ndigits = strspn(digits, "0123456789");
+/* RFC 6265bis 5.6.1 caps a cookie's life at 400 days, which also keeps the
+   sum below from overflowing. */
+#define COOKIE_MAX_LIFE ((int64_t) 400 * 24 * 3600)
 
-  if (ndigits == 0 || digits[ndigits + strspn(digits + ndigits, " \t")] != '\0')
-    return HTS_DEFAULT;
-  // digit by digit, so no delta is too large to read
-  return negative || strspn(digits, "0") == ndigits ? HTS_TRUE : HTS_FALSE;
+/* Bound WHEN to (0, now + COOKIE_MAX_LIFE], because 0 means a session. */
+static int64_t cookie_bound_expiry(int64_t when, int64_t now) {
+  if (when > now + COOKIE_MAX_LIFE)
+    return now + COOKIE_MAX_LIFE;
+  return when < 1 ? 1 : when;
 }
 
 /* See htsbauth.h. */
-hts_tristate cookie_expires_expired(const char *value, time_t now) {
+hts_boolean cookie_max_age_time(const char *value, int64_t now, int64_t *when) {
+  const hts_boolean negative = value[0] == '-';
+  const char *const digits = value + (negative ? 1 : 0);
+  const size_t ndigits = strspn(digits, "0123456789");
+  int64_t delta = 0;
+  size_t i;
+
+  if (ndigits == 0 || digits[ndigits + strspn(digits + ndigits, " \t")] != '\0')
+    return HTS_FALSE;
+  // saturate at the cap, so no delta is too large to read
+  for (i = 0; i < ndigits && delta <= COOKIE_MAX_LIFE; i++)
+    delta = delta * 10 + (digits[i] - '0');
+  *when = negative || delta == 0 ? 1 : cookie_bound_expiry(now + delta, now);
+  return HTS_TRUE;
+}
+
+/* See htsbauth.h. */
+hts_boolean cookie_expires_time(const char *value, int64_t now, int64_t *when) {
   struct tm buffer;
   struct tm *const tm = convert_time_rfc822(&buffer, value);
-  time_t when;
+  time_t t;
 
   if (tm == NULL)
-    return HTS_DEFAULT;
-  when = timegm(tm);
-  if (when == (time_t) -1)
-    return HTS_DEFAULT;
-  return when <= now ? HTS_TRUE : HTS_FALSE;
+    return HTS_FALSE;
+  t = timegm(tm);
+  if (t == (time_t) -1)
+    return HTS_FALSE;
+  *when = cookie_bound_expiry((int64_t) t, now);
+  return HTS_TRUE;
+}
+
+/* Field 4 of the record at rec: its unix expiry, 0 for a session cookie or
+   one the field does not spell as digits. */
+static int64_t cookie_record_expiry(const char *rec) {
+  char buffer[8192];
+  const char *const field = cookie_get(buffer, rec, 4);
+  const size_t ndigits = strspn(field, "0123456789");
+  int64_t when = 0;
+  size_t i;
+
+  if (ndigits == 0 || field[ndigits] != '\0')
+    return 0;
+  // saturate rather than overflow on a hand-edited value
+  for (i = 0; i < ndigits && when < INT64_MAX / 10 - 9; i++)
+    when = when * 10 + (field[i] - '0');
+  return when;
+}
+
+/* See htsbauth.h. */
+hts_boolean cookie_sendable(const char *rec, hts_boolean https, int64_t now) {
+  char buffer[8192];
+  const int64_t expires = cookie_record_expiry(rec);
+
+  if (expires != 0 && expires <= now)
+    return HTS_FALSE;
+  return https || strcmpnocase(cookie_get(buffer, rec, 3), "TRUE") != 0;
 }
 
 // rechercher cookie à partir de la position s (par exemple s=cookie.data)
@@ -290,7 +385,9 @@ char *cookie_find(char *s, const char *cook_name, const char *domain, const char
 
       /* The path below is byte-exact where the domain is not, because RFC 6265
          folds a host name and matches a path literally. */
-      if (cookie_domain_match(chk_dom, domain)) { // same domain
+      if (cookie_domain_match(chk_dom, domain) &&
+          (!cookie_is_host_only(a) ||
+           cookie_same_domain(chk_dom, domain))) { // same domain
         //
         const char *chk_path = cookie_get(buffer, a, 2);    // chemin concerné par le cookie
 
@@ -398,7 +495,13 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
                         && strnotempty(cook_value)
                         && strnotempty(domainpathpath)) {
                       if (ident_url_absolute(domainpathpath, &af) >= 0) {
-                        cookie_add(cookie, cook_name, cook_value, af.adr, af.fil);
+                        if (cookie_add(cookie, cook_name, cook_value, af.adr,
+                                       af.fil) != 0) {
+                          hts_log_print(opt, LOG_WARNING,
+                                        "Cookies: the jar did not store "
+                                        "'%.64s': %s",
+                                        cook_name, u);
+                        }
                         cookie_merged = 1;
                       }
                     }
@@ -434,11 +537,11 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
         if (strnotempty(line)) {
           if (!cut && strlen(line) < line_max) {
             /* curl and browser exports mark an HttpOnly cookie this way */
-            static const char httponly[] = "#HttpOnly_";
+            static const char httponly[] = COOKIE_HTTPONLY_PREFIX;
+            const hts_boolean is_httponly =
+                strncmp(line, httponly, sizeof(httponly) - 1) == 0;
             const char *const rec =
-                strncmp(line, httponly, sizeof(httponly) - 1) == 0
-                    ? line + sizeof(httponly) - 1
-                    : line;
+                is_httponly ? line + sizeof(httponly) - 1 : line;
 
             if (rec[0] != '#') {
               char domain[256];             // cookie domain (.netscape.com)
@@ -457,9 +560,18 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
                                     rec, 5, "name", file) &&
                   cookie_load_field(opt, cook_value, sizeof(cook_value), buffer,
                                     rec, 6, "value", file)) {
-                // the jar caps a field tighter still, and a full one refuses
-                if (cookie_add(cookie, cook_name, cook_value, domain, path) !=
-                    0) {
+                cookie_attr attr;
+
+                attr.host_only = cookie_is_host_only(rec);
+                attr.secure =
+                    strcmpnocase(cookie_get(buffer, rec, 3), "TRUE") == 0;
+                attr.http_only = is_httponly;
+                attr.expires = cookie_record_expiry(rec);
+                if (attr.expires != 0 && attr.expires <= (int64_t) time(NULL)) {
+                  // expired: a browser would have dropped it already
+                } else if (cookie_set(cookie, cook_name, cook_value, domain,
+                                      path, &attr) != 0) {
+                  // the jar caps a field tighter still, and a full one refuses
                   hts_log_print(opt, LOG_WARNING,
                                 "Cookies: the jar did not store '%.64s': %s",
                                 cook_name, file);
@@ -508,7 +620,23 @@ int cookie_save(t_cookie * cookie, const char *name) {
               "# HTTrack Website Copier Cookie File" LF
               "# This file format is compatible with Netscape cookies" LF);
       do {
+        char *extra = line;
+        int i;
+
         a += binput(a, line, 8000);
+        // the eighth field is ours: the file form marks HttpOnly by prefix
+        for (i = 0; i < 7 && extra != NULL; i++) {
+          extra = strchr(extra, '\t');
+          if (extra != NULL && i < 6)
+            extra++;
+        }
+        if (extra != NULL) {
+          *extra = '\0';
+          fprintf(fp, "%s",
+                  strcmp(extra + 1, COOKIE_HTTPONLY_FIELD) == 0
+                      ? COOKIE_HTTPONLY_PREFIX
+                      : "");
+        }
         fprintf(fp, "%s" LF, line);
       } while(strnotempty(line));
       fclose(fp);

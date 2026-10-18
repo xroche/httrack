@@ -1215,6 +1215,291 @@ static int st_cookiehttponly(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Read the whole file at path into buf, or "" when it cannot be opened. */
+static void cookiejar_slurp(const char *path, char *buf, size_t size) {
+  FILE *const fp = FOPEN(path, "rb");
+  size_t n = 0;
+
+  if (fp != NULL) {
+    n = fread(buf, 1, size - 1, fp);
+    fclose(fp);
+  }
+  buf[n] = '\0';
+}
+
+/* -#test=cookiejar <dir>: the jar keeps what a Set-Cookie or a cookies.txt
+   says about host-only, Secure, HttpOnly and expiry, matches a record by its
+   whole identity, and says when it refuses one. */
+static int st_cookiejar(httrackp *opt, int argc, char **argv) {
+#define LABEL "cookie-jar"
+
+  static const struct {
+    const char *from, *header; // header NULL: only query
+    const char *to, *path, *pair;
+    hts_boolean want;
+  } steps[] = {
+      // no Domain= is host-only, a Domain= reaches subdomains
+      {"jar.test", "Set-Cookie: h=1", "jar.test", "/", "h=1", HTS_TRUE},
+      {"jar.test", NULL, "www.jar.test", "/", "h=1", HTS_FALSE},
+      {"jar.test", "Set-Cookie: d=1; Domain=jar.test", "www.jar.test", "/",
+       "d=1", HTS_TRUE},
+      // a longer path is another cookie, and its erasure leaves "/" alone
+      {"jar.test", "Set-Cookie: h=2; Path=/a", "jar.test", "/", "h=1",
+       HTS_TRUE},
+      {"jar.test", NULL, "jar.test", "/", "h=2", HTS_FALSE},
+      {"jar.test", NULL, "jar.test", "/a/x", "h=2", HTS_TRUE},
+      {"jar.test", "Set-Cookie: h=; Path=/a; Max-Age=0", "jar.test", "/a/x",
+       "h=1", HTS_TRUE},
+      {"jar.test", NULL, "jar.test", "/a/x", "h=2", HTS_FALSE},
+      // a host-only erasure cannot reach the Domain= cookie of that name
+      {"jar.test", "Set-Cookie: d=; Max-Age=0", "www.jar.test", "/", "d=1",
+       HTS_TRUE},
+      {"www.jar.test", "Set-Cookie: d=; Max-Age=0", "jar.test", "/", "d=1",
+       HTS_TRUE},
+      {"www.jar.test", "Set-Cookie: d=; Domain=jar.test; Max-Age=0", "jar.test",
+       "/", "d=1", HTS_FALSE},
+      // a host-only cookie and a Domain= one of one name live side by side
+      {"jar.test", "Set-Cookie: two=host", "jar.test", "/", "two=host",
+       HTS_TRUE},
+      {"jar.test", "Set-Cookie: two=dom; Domain=jar.test", "jar.test", "/",
+       "two=host", HTS_TRUE},
+      {"jar.test", NULL, "www.jar.test", "/", "two=dom", HTS_TRUE},
+      {"jar.test", NULL, "www.jar.test", "/", "two=host", HTS_FALSE},
+      // Secure goes out over https only, as an attribute or as av=value
+      {"https://jar.test", "Set-Cookie: s=1; Secure", "jar.test", "/", "s=1",
+       HTS_FALSE},
+      {"https://jar.test", NULL, "http://jar.test", "/", "s=1", HTS_FALSE},
+      {"https://jar.test", NULL, "https://jar.test", "/", "s=1", HTS_TRUE},
+      {"https://jar.test", "Set-Cookie: s2=1; SECURE=yes", "http://jar.test",
+       "/", "s2=1", HTS_FALSE},
+      {"https://jar.test", NULL, "https://jar.test", "/", "s2=1", HTS_TRUE},
+      // a cookie named like an attribute is still a cookie
+      {"jar.test", "Set-Cookie: secure=1", "jar.test", "/", "secure=1",
+       HTS_TRUE},
+      {"jar.test", "Set-Cookie: ho=1; HttpOnly", "jar.test", "/", "ho=1",
+       HTS_TRUE},
+  };
+
+  static t_cookie jar;
+  const int64_t now = (int64_t) time(NULL);
+  char buffer[8192];
+  char hdr[4096];
+  char fpath[HTS_URLMAXSIZE * 2];
+  char file[HTS_URLMAXSIZE * 2];
+  char saved[HTS_URLMAXSIZE * 2];
+  char BIGSTK text[8192];
+  size_t i;
+  int err = 0;
+
+  if (argc < 1) {
+    fprintf(stderr, "cookiejar: needs a writable dir\n");
+    return 1;
+  }
+  jar.max_len = sizeof(jar.data);
+  jar.data[0] = '\0';
+  for (i = 0; i < sizeof(steps) / sizeof(steps[0]); i++) {
+    if (steps[i].header != NULL) {
+      htsblk r;
+      char line[256]; // treathead NUL-cuts the header in place
+
+      memset(&r, 0, sizeof(r));
+      strcpybuff(line, steps[i].header);
+      treathead(&jar, steps[i].from, "/", &r, line);
+    }
+    http_cookie_header(&jar, steps[i].to, steps[i].path, hdr, sizeof(hdr));
+    if (cookie_sent(hdr, steps[i].pair) != steps[i].want) {
+      printf("%s: step %d: %s from %s, %s %s sent to %s%s\n", LABEL, (int) i,
+             steps[i].header != NULL ? steps[i].header : "(query)",
+             steps[i].from, steps[i].pair, steps[i].want ? "not" : "wrongly",
+             steps[i].to, steps[i].path);
+      err = 1;
+    }
+  }
+
+  /* Expiry is absolute: Max-Age outranks Expires, a session is 0, and a
+     Set-Cookie lives 400 days at most. */
+  {
+    static const struct {
+      const char *header, *name;
+      int64_t low, high; // from now
+    } lives[] = {
+        {"Set-Cookie: ma=1; Expires=Fri, 01 Jan 2100 00:00:00 GMT; Max-Age=60",
+         "ma", 60, 62},
+        {"Set-Cookie: ex=1; Expires=Fri, 01 Jan 2100 00:00:00 GMT", "ex",
+         400 * 86400, 400 * 86400 + 2},
+        {"Set-Cookie: big=1; Max-Age=99999999999999999999", "big", 400 * 86400,
+         400 * 86400 + 2},
+    };
+
+    jar.data[0] = '\0';
+    for (i = 0; i < sizeof(lives) / sizeof(lives[0]); i++) {
+      htsblk r;
+      char line[256];
+      const char *rec;
+      int64_t when;
+
+      memset(&r, 0, sizeof(r));
+      strcpybuff(line, lives[i].header);
+      treathead(&jar, "jar.test", "/", &r, line);
+      rec = cookie_find(jar.data, lives[i].name, "jar.test", "/");
+      when = rec != NULL ? (int64_t) atoll(cookie_get(buffer, rec, 4)) : 0;
+      if (when < now + lives[i].low || when > now + lives[i].high) {
+        printf("%s: %s stored expiry " LLintP ", now " LLintP "\n", LABEL,
+               lives[i].header, (LLint) when, (LLint) now);
+        err = 1;
+      }
+    }
+    // a session cookie writes 0
+    {
+      htsblk r;
+      char line[] = "Set-Cookie: sess=1";
+      const char *rec;
+
+      memset(&r, 0, sizeof(r));
+      treathead(&jar, "jar.test", "/", &r, line);
+      rec = cookie_find(jar.data, "sess", "jar.test", "/");
+      if (rec == NULL || strcmp(cookie_get(buffer, rec, 4), "0") != 0) {
+        printf("%s: a session cookie is not stored with expiry 0\n", LABEL);
+        err = 1;
+      }
+    }
+    // a record that has expired since it was stored is not sent
+    {
+      cookie_attr attr = {HTS_FALSE, HTS_FALSE, HTS_FALSE, 0};
+
+      attr.expires = now - 10;
+      jar.data[0] = '\0';
+      assertf(cookie_set(&jar, "old", "1", "jar.test", "/", &attr) == 0);
+      attr.expires = now + 3600;
+      assertf(cookie_set(&jar, "young", "1", "jar.test", "/", &attr) == 0);
+      http_cookie_header(&jar, "jar.test", "/", hdr, sizeof(hdr));
+      if (cookie_sent(hdr, "old=1") || !cookie_sent(hdr, "young=1")) {
+        printf("%s: expired record at send: [%s]\n", LABEL, hdr);
+        err = 1;
+      }
+    }
+  }
+
+  /* A cookies.txt keeps host-only, Secure, HttpOnly and expiry through a
+     load and a save, and an expired line is not loaded. */
+  assertf(sprintfbuff(fpath, "%s/", argv[0]));
+  assertf(sprintfbuff(file, "%scookies.txt", fpath));
+  assertf(sprintfbuff(saved, "%ssaved.txt", fpath));
+  {
+    static const char *const kept[] = {
+        ".load.test\tTRUE\t/\tFALSE\t0\tdom\t1\n",
+        "host.test\tFALSE\t/\tFALSE\t0\tonly\t1\n",
+        ".load.test\tTRUE\t/\tTRUE\t0\tsec\t1\n",
+        ".load.test\tTRUE\t/\tFALSE\t4102444800\tfuture\t1\n",
+        "#HttpOnly_.load.test\tTRUE\t/\tFALSE\t0\thid\t1\n",
+    };
+
+    static const struct {
+      const char *to, *pair;
+      hts_boolean want;
+    } sends[] = {
+        {"www.load.test", "dom=1", HTS_TRUE},
+        {"www.load.test", "future=1", HTS_TRUE},
+        {"www.load.test", "hid=1", HTS_TRUE},
+        {"www.load.test", "past=1", HTS_FALSE},
+        {"www.load.test", "sec=1", HTS_FALSE},
+        {"https://www.load.test", "sec=1", HTS_TRUE},
+        {"host.test", "only=1", HTS_TRUE},
+        {"sub.host.test", "only=1", HTS_FALSE},
+    };
+
+    FILE *fp = FOPEN(file, "wb");
+
+    assertf(fp != NULL);
+    fprintf(fp, "# Netscape HTTP Cookie File\n"
+                ".load.test\tTRUE\t/\tFALSE\t1\tpast\t1\n");
+    for (i = 0; i < sizeof(kept) / sizeof(kept[0]); i++)
+      fprintf(fp, "%s", kept[i]);
+    fclose(fp);
+    jar.data[0] = '\0';
+    assertf(cookie_load(NULL, &jar, fpath, "cookies.txt") == 0);
+    for (i = 0; i < sizeof(sends) / sizeof(sends[0]); i++) {
+      http_cookie_header(&jar, sends[i].to, "/", hdr, sizeof(hdr));
+      if (cookie_sent(hdr, sends[i].pair) != sends[i].want) {
+        printf("%s: loaded %s %s sent to %s\n", LABEL, sends[i].pair,
+               sends[i].want ? "not" : "wrongly", sends[i].to);
+        err = 1;
+      }
+    }
+    assertf(cookie_save(&jar, saved) == 0);
+    cookiejar_slurp(saved, text, sizeof(text));
+    for (i = 0; i < sizeof(kept) / sizeof(kept[0]); i++) {
+      if (strstr(text, kept[i]) == NULL) {
+        printf("%s: the saved jar lost %s", LABEL, kept[i]);
+        err = 1;
+      }
+    }
+    if (strstr(text, "past") != NULL || strstr(text, "\tHttpOnly") != NULL) {
+      printf("%s: the saved jar holds [%s]\n", LABEL, text);
+      err = 1;
+    }
+    // a Set-Cookie HttpOnly saves the way a loaded one does
+    {
+      htsblk r;
+      char line[] = "Set-Cookie: web=1; HttpOnly";
+
+      memset(&r, 0, sizeof(r));
+      jar.data[0] = '\0';
+      treathead(&jar, "jar.test", "/", &r, line);
+      assertf(cookie_save(&jar, saved) == 0);
+      cookiejar_slurp(saved, text, sizeof(text));
+      if (strstr(text, "\n#HttpOnly_jar.test\tFALSE\t/\tFALSE\t0\tweb\t1\n") ==
+          NULL) {
+        printf("%s: saved a Set-Cookie HttpOnly as [%s]\n", LABEL, text);
+        err = 1;
+      }
+    }
+    (void) UNLINK(file);
+    (void) UNLINK(saved);
+  }
+
+  /* A Set-Cookie the jar refuses is logged, once, and a stored one is not. */
+  {
+    FILE *const projectlog = opt->log;
+    FILE *const log = tmpfile();
+    const int saveddebug = opt->debug;
+    char logged[1024];
+    size_t n;
+    const char *p;
+    int count = 0;
+    htsblk r;
+    char fits[] = "Set-Cookie: fits=1";
+    char full[] = "Set-Cookie: full=1";
+
+    assertf(log != NULL);
+    opt->log = log;
+    opt->debug = LOG_WARNING;
+    jar.data[0] = '\0';
+    memset(&r, 0, sizeof(r));
+    jar.max_len = 300; // room for one record and its headroom, not two
+    treathead_opt(opt, &jar, "jar.test", "/", &r, fits);
+    treathead_opt(opt, &jar, "jar.test", "/", &r, full);
+    jar.max_len = sizeof(jar.data);
+    rewind(log);
+    n = fread(logged, 1, sizeof(logged) - 1, log);
+    logged[n] = '\0';
+    fclose(log);
+    opt->log = projectlog;
+    opt->debug = saveddebug;
+    for (p = strstr(logged, "did not store"); p != NULL;
+         p = strstr(p + 1, "did not store"))
+      count++;
+    if (count != 1 || strstr(logged, "'full'") == NULL ||
+        strstr(jar.data, "fits") == NULL) {
+      printf("%s: refusal log [%s], jar [%s]\n", LABEL, logged, jar.data);
+      err = 1;
+    }
+  }
+  printf("%s: %s\n", LABEL, err ? "FAIL" : "OK");
+  return err;
+#undef LABEL
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
@@ -1235,6 +1520,9 @@ const struct selftest_entry selftests_cookie[] = {
      "a #HttpOnly_ jar line loads, other comments do not", st_cookiehttponly},
     {"cookiequote", "<Set-Cookie header>",
      "what the jar stores of a quoted cookie value and av", st_cookiequote},
+    {"cookiejar", "<dir>",
+     "the jar keeps host-only, Secure, HttpOnly and expiry, and logs a refusal",
+     st_cookiejar},
     {"cookiesetscope", "",
      "Set-Cookie honours Domain= scope and Max-Age/Expires erasure",
      st_cookiesetscope},

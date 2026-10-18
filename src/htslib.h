@@ -303,10 +303,10 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
                   const char *referer_fil, const hts_fetch_meta *fetch,
                   htsblk *retour);
 /* Build the request "Cookie:" header line for stored cookies matching
-   domain/path into dst (NUL-terminated), wrapping the logic http_sendhead()
-   uses. A port in domain is ignored (see cookie_host). Returns cookies
-   emitted. */
-int http_cookie_header(t_cookie *cookie, const char *domain, const char *path,
+   adr/path into dst (NUL-terminated), wrapping the logic http_sendhead()
+   uses. adr may carry its scheme, and only "https://" gets Secure cookies. A
+   port in adr is ignored (see cookie_host). Returns cookies emitted. */
+int http_cookie_header(t_cookie *cookie, const char *adr, const char *path,
                        char *dst, size_t dst_size);
 
 /* True if the raw CRLF-separated header block, a request one we build or a
@@ -384,6 +384,10 @@ hts_boolean hts_proxy_is_connect(const char *name);
 
 void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * retour,
                char *rcvd);
+/* treathead, logging through opt (which may be NULL) a cookie the jar
+   refused. */
+void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
+                   const char *fil, htsblk *retour, char *rcvd);
 void treatfirstline(htsblk * retour, const char *rcvd);
 
 /* The three-digit HTTP status code at s, or -1 when s does not start with
