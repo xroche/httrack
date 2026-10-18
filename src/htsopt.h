@@ -567,8 +567,8 @@ struct httrackp {
       no_www_dedup; /**< with urlhack, keep www.host distinct from host */
   hts_boolean no_slash_dedup; /**< with urlhack, keep redundant // in paths */
   hts_boolean no_query_dedup; /**< with urlhack, keep query-argument order */
-  String cookies_file; /**< Path of the Netscape jar, rewritten at the end
-                          (--cookies-file). */
+  String cookies_file; /**< The crawl loads this Netscape jar and rewrites
+                          it at the end (--cookies-file). */
   int pause_min_ms; /**< inter-file pause lower bound, ms (0=off, #185) */
   int pause_max_ms; /**< inter-file pause upper bound, ms */
   String why_url;   /**< URL to diagnose (--why): print the deciding filter rule

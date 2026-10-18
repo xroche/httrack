@@ -188,7 +188,7 @@ RUN_CALLBACK0(opt, end); \
                       "Cookies: %s is left unchanged, because %d of its "      \
                       "lines would be lost",                                   \
                       StringBuff(opt->cookies_file), cookies_file_refused);    \
-      else                                                                     \
+      else if (cookies_file_refused != COOKIE_LOAD_KEEP) /* it said why */     \
         cookie_save_replacing(opt, opt->cookie,                                \
                               StringBuff(opt->cookies_file));                  \
     } else if (opt->accept_cookie)                                             \

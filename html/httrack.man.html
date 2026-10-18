@@ -2447,7 +2447,9 @@ at the end. With <i>--cookies-file</i>, that file alone is
 the jar. HTTrack rewrites it at the end and keeps its old
 content as <i>&lt;file&gt;.bak</i>. HTTrack leaves that file
 unchanged and logs a warning if a line could not be loaded,
-a cookie repeats, or a comment is not a standard header.</p>
+a cookie repeats, or the file holds a comment other than the
+header lines curl, wget, yt-dlp, browser exports and HTTrack
+write.</p>
 
 <p style="margin-left:9%; margin-top: 1em">A running mirror
 also watches its own output directory for these. Creating

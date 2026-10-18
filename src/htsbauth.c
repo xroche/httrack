@@ -35,12 +35,17 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsbauth.h"
 
+#include <stdint.h>
+
 /* specific definitions */
 #include "htsglobal.h"
 #include "htslib.h"
 #include "htscore.h"
 #include "htspsl.h"
+#include "htsdate.h"
+#include "htscookie_selftest.h"
 #ifdef _WIN32
+#include <io.h>         /* _commit */
 #include "htscharset.h" /* hts_pathToUCS2, hts_convertUCS2StringToUTF8 */
 #endif
 
@@ -320,14 +325,31 @@ hts_boolean cookie_max_age_time(const char *value, int64_t now, int64_t *when) {
   return HTS_TRUE;
 }
 
+/* Return the Unix time of the UTC date in tm, in 64 bits because a 32-bit
+   time_t ends in 2038. tm_mon must be 0 to 11. */
+static int64_t cookie_utc_seconds(const struct tm *tm) {
+  // days from the civil date, counting years from March (Howard Hinnant)
+  const int64_t y = (int64_t) tm->tm_year + 1900 - (tm->tm_mon < 2 ? 1 : 0);
+  const int64_t era = (y >= 0 ? y : y - 399) / 400;
+  const int64_t yoe = y - era * 400;
+  const int64_t doy =
+      (153 * ((tm->tm_mon + 10) % 12) + 2) / 5 + tm->tm_mday - 1;
+  const int64_t days =
+      era * 146097 + yoe * 365 + yoe / 4 - yoe / 100 + doy - 719468;
+
+  return days * 86400 + (int64_t) tm->tm_hour * 3600 +
+         (int64_t) tm->tm_min * 60 + tm->tm_sec;
+}
+
 /* See htsbauth.h. */
 hts_boolean cookie_expires_time(const char *value, int64_t now, int64_t *when) {
-  // RFC 6265 5.1.1 reads a two-digit year below 70 as 20xx
-  const time_t t = hts_parse_date(value, 69);
+  struct tm tm;
 
-  if (t == (time_t) -1)
+  // RFC 6265 5.1.1 reads a two-digit year below 70 as 20xx
+  if (convert_time_rfc822_pivot(&tm, value, 69) == NULL || tm.tm_mon < 0 ||
+      tm.tm_mon > 11)
     return HTS_FALSE;
-  *when = cookie_bound_expiry((int64_t) t, now);
+  *when = cookie_bound_expiry(cookie_utc_seconds(&tm), now);
   return HTS_TRUE;
 }
 
@@ -591,7 +613,12 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
     // file points into catbuff; nothing below writes catbuff again
     const char *const file = fconcat(catbuff, sizeof(catbuff), fpath, name);
     FILE *fp = FOPEN(file, "rb");
+    const int open_errno = errno;
     int refused = 0;
+    hts_boolean keep = HTS_FALSE;
+    char bak[CATBUFF_SIZE];
+    const hts_boolean has_bak =
+        slprintfbuff(bak, sizeof(bak), "%s.bak", file) && fexist_utf8(bak);
 
     if (fp) {
       char BIGSTK line[8192];
@@ -603,9 +630,8 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
         seen->max_len = sizeof(seen->data);
       } else {
         hts_log_print(opt, LOG_WARNING,
-                      "Cookies: out of memory, so repeats in %s go unseen",
-                      file);
-        refused++;
+                      "Cookies: out of memory, so %s is left unchanged", file);
+        keep = HTS_TRUE;
       }
       // ferror ends the loop too, because a directory never reaches EOF
       while (!feof(fp) && !ferror(fp) &&
@@ -729,32 +755,39 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
                       "Cookies: stopped reading before the end of %s", file);
         refused++;
       }
+      // a crash before the data reached the disk may leave an empty file
+      if (!keep && feof(fp) && ftell(fp) == 0 && has_bak &&
+          fsize_utf8(bak) > 0) {
+        hts_log_print(opt, LOG_WARNING,
+                      "Cookies: %s is empty but its .bak is not, so it is "
+                      "left unchanged until you restore or delete the .bak",
+                      file);
+        keep = HTS_TRUE;
+      }
       fclose(fp);
       freet(seen);
-      return refused;
-    } else if (errno != ENOENT) {
+      return keep ? COOKIE_LOAD_KEEP : refused;
+    } else if (open_errno != ENOENT) {
       // the file exists, so a rewrite would replace what was never read
-      hts_log_print(opt, LOG_WARNING | LOG_ERRNO, "Cookies: could not read %s",
+      errno = open_errno;
+      hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
+                    "Cookies: could not read %s, so it is left unchanged",
                     file);
-      return 1;
-    } else {
-      char bak[CATBUFF_SIZE];
-
+      return COOKIE_LOAD_KEEP;
+    } else if (has_bak) {
       // a save that died midway may have left only the backup
-      if (slprintfbuff(bak, sizeof(bak), "%s.bak", file) && fexist_utf8(bak)) {
-        hts_log_print(opt, LOG_WARNING,
-                      "Cookies: %s is missing but its .bak exists, so it is "
-                      "not created until you restore or delete the .bak",
-                      file);
-        return 1;
-      }
+      hts_log_print(opt, LOG_WARNING,
+                    "Cookies: %s is missing but its .bak exists, so it is "
+                    "not created until you restore or delete the .bak",
+                    file);
+      return COOKIE_LOAD_KEEP;
     }
   }
   return -1;
 }
 
-/* Create name for writing, or NULL. The file is owner-only on Unix because
-   it holds session cookies. */
+/* Open name for writing, creating it if needed, and return NULL on failure.
+   The file is owner-only on Unix because it holds session cookies. */
 static FILE *cookie_create(const char *name) {
   char catbuff[CATBUFF_SIZE];
 #ifdef _WIN32
@@ -770,6 +803,21 @@ static FILE *cookie_create(const char *name) {
     (void) fchmod(fd, HTS_PROTECT_FILE);
   return fp;
 #endif
+}
+
+/* Flush fp to the disk and close it. Did every step succeed? */
+static hts_boolean cookie_close_synced(FILE *fp) {
+  // a crash after the rename must not leave an empty file behind it
+  hts_boolean ok = fflush(fp) == 0;
+
+#ifdef _WIN32
+  ok = ok && _commit(_fileno(fp)) == 0;
+#else
+  // EINVAL: a device such as /dev/stdout cannot be synced
+  ok = ok && (fsync(fileno(fp)) == 0 || errno == EINVAL);
+#endif
+  // fclose runs whatever failed, so the stream is never leaked
+  return fclose(fp) == 0 && ok;
 }
 
 /* Write the jar to name, or only a header if it is empty. Return 0 on
@@ -810,8 +858,8 @@ static int cookie_write(t_cookie *cookie, const char *name) {
       if (fprintf(fp, "%s%s" LF, cookie_is_host_only(line) ? "" : ".", rec) < 0)
         ok = HTS_FALSE;
     }
-    // fclose flushes, so it reports a write the buffer held back
-    if (fclose(fp) != 0)
+    // the close reports a write the buffer held back
+    if (!cookie_close_synced(fp))
       ok = HTS_FALSE;
     return ok ? 0 : -1;
   }
@@ -825,8 +873,10 @@ int cookie_save(t_cookie *cookie, const char *name) {
 
 int cookie_save_fault_selftest = 0;
 
-/* Copy src to dst. The copy is owner-only on Unix. */
+/* Copy src to dst, which the caller removes on failure. The copy is
+   owner-only on Unix. */
 static hts_boolean cookie_copy(const char *src, const char *dst) {
+  const int fault = cookie_save_fault_selftest;
   char buf[8192];
   FILE *const in = FOPEN(src, "rb");
   FILE *const out = in != NULL ? cookie_create(dst) : NULL;
@@ -834,32 +884,85 @@ static hts_boolean cookie_copy(const char *src, const char *dst) {
   size_t n;
 
   while (ok && (n = fread(buf, 1, sizeof(buf), in)) > 0)
-    ok = fwrite(buf, 1, n, out) == n;
-  if (in != NULL && ferror(in))
+    ok =
+        fwrite(buf, 1, (fault & COOKIE_FAULT_COPY_WRITE) ? n / 2 : n, out) == n;
+  if (in != NULL && (ferror(in) || (fault & COOKIE_FAULT_COPY_READ)))
     ok = HTS_FALSE;
   if (in != NULL)
     fclose(in);
-  if (out != NULL && fclose(out) != 0)
+  if (out != NULL &&
+      (!cookie_close_synced(out) || (fault & COOKIE_FAULT_COPY_CLOSE)))
     ok = HTS_FALSE;
-  if (!ok)
-    (void) UNLINK(dst);
   return ok;
 }
 
-/* Make bak hold what file holds, leaving file in place. */
-static hts_boolean cookie_backup(const char *file, const char *bak) {
-  (void) UNLINK(bak);
-#ifndef _WIN32
-  if (!(cookie_save_fault_selftest & COOKIE_FAULT_NOLINK)) {
-    if (link(file, bak) == 0)
-      return HTS_TRUE;
-    // something UNLINK cannot remove is in the way, a directory for one
-    if (errno == EEXIST)
-      return HTS_FALSE;
-  }
+/* Move src over dst in one step. Did it succeed? */
+static hts_boolean cookie_move(const char *src, const char *dst) {
+#ifdef _WIN32
+  LPWSTR wsrc = hts_pathToUCS2(src);
+  LPWSTR wdst = hts_pathToUCS2(dst);
+  const hts_boolean ok =
+      wsrc != NULL && wdst != NULL &&
+      MoveFileExW(wsrc, wdst,
+                  MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
+
+  freet(wsrc);
+  freet(wdst);
+  if (!ok)
+    errno = EACCES; // the log reads errno, not GetLastError()
+  return ok;
+#else
+  return RENAME(src, dst) == 0;
 #endif
-  // Windows, or a filesystem without hard links
-  return cookie_copy(file, bak);
+}
+
+#ifndef _WIN32
+/* Flush the directory holding file, so that a rename in it survives a crash.
+   A failure is ignored, because some filesystems cannot sync a directory. */
+static void cookie_sync_dir(const char *file) {
+  char dir[CATBUFF_SIZE];
+  char *slash;
+  int fd;
+
+  if (!slprintfbuff(dir, sizeof(dir), "%s", file))
+    return;
+  slash = strrchr(dir, '/');
+  if (slash == NULL)
+    strcpybuff(dir, ".");
+  else
+    slash[slash == dir ? 1 : 0] = '\0';
+  fd = open(dir, O_RDONLY);
+  if (fd != -1) {
+    (void) fsync(fd);
+    close(fd);
+  }
+}
+#endif
+
+/* Make bak hold what file holds, leaving file in place. The old bak stays
+   until the new one is complete. */
+static hts_boolean cookie_backup(const char *file, const char *bak) {
+  char next[CATBUFF_SIZE];
+  hts_boolean ok;
+  int err;
+
+  if (!slprintfbuff(next, sizeof(next), "%s.tmp", bak))
+    return HTS_FALSE;
+  (void) UNLINK(next);
+#ifndef _WIN32
+  if (!(cookie_save_fault_selftest & COOKIE_FAULT_NOLINK) &&
+      link(file, next) == 0)
+    ok = HTS_TRUE;
+  else
+#endif
+    // Windows, or a filesystem without hard links
+    ok = cookie_copy(file, next);
+  ok = ok && cookie_move(next, bak);
+  err = errno;
+  // a failed copy, or a move onto another link to the same file, leaves next
+  (void) UNLINK(next);
+  errno = err;
+  return ok;
 }
 
 /* Move tmp over file in one step, so that file holds the old or the new jar
@@ -867,24 +970,12 @@ static hts_boolean cookie_backup(const char *file, const char *bak) {
 static hts_boolean cookie_replace(const char *tmp, const char *file) {
   if (cookie_save_fault_selftest & COOKIE_FAULT_REPLACE)
     return HTS_FALSE;
-#ifdef _WIN32
-  {
-    LPWSTR wtmp = hts_pathToUCS2(tmp);
-    LPWSTR wfile = hts_pathToUCS2(file);
-    const hts_boolean ok =
-        wtmp != NULL && wfile != NULL &&
-        MoveFileExW(wtmp, wfile,
-                    MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
-
-    freet(wtmp);
-    freet(wfile);
-    if (!ok)
-      errno = EACCES; // the log reads errno, not GetLastError()
-    return ok;
-  }
-#else
-  return RENAME(tmp, file) == 0;
+  if (!cookie_move(tmp, file))
+    return HTS_FALSE;
+#ifndef _WIN32
+  cookie_sync_dir(file);
 #endif
+  return HTS_TRUE;
 }
 
 /* See htsbauth.h. */
@@ -897,6 +988,16 @@ void cookie_save_replacing(httrackp *opt, t_cookie *cookie, const char *name) {
   // an empty jar still empties an existing file, or a deleted cookie survives
   if (!strnotempty(cookie->data) && !fexist_utf8(file))
     return;
+#ifndef _WIN32
+  {
+    // so a symbolic link stays one, with .tmp and .bak beside its target
+    char *real = realpath(file, NULL);
+
+    if (real != NULL && strlen(real) < sizeof(file))
+      strcpybuff(file, real);
+    freet(real);
+  }
+#endif
   if (!slprintfbuff(tmp, sizeof(tmp), "%s.tmp", file) ||
       !slprintfbuff(bak, sizeof(bak), "%s.bak", file)) {
     hts_log_print(opt, LOG_WARNING,
@@ -906,8 +1007,7 @@ void cookie_save_replacing(httrackp *opt, t_cookie *cookie, const char *name) {
   (void) UNLINK(tmp);
   if (cookie_write(cookie, tmp) != 0) {
     hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
-                  "Cookies: could not write %s.tmp, so %s is unchanged", name,
-                  name);
+                  "Cookies: could not write %s, so %s is unchanged", tmp, name);
     (void) UNLINK(tmp);
     return;
   }

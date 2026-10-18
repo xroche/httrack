@@ -177,9 +177,39 @@ mkdir "$lost"
 cp "$dir/orig.txt" "$lost/jar.txt.bak"
 crawl --found 'cookies/entrance.html' \
     --log-found 'is missing but its \.bak exists' \
+    --log-not-found 'lines would be lost' \
     httrack 'BASEURL/cookies/entrance.php' -o0 -r1 --cookies-file "$lost/jar.txt"
 test ! -e "$lost/jar.txt" || fail "a cookies file was created over its .bak"
 cmp "$lost/jar.txt.bak" "$dir/orig.txt" || fail "the .bak of a missing jar changed"
+
+# An empty cookies file beside a non-empty .bak, as a crash before the data
+# reached the disk leaves it, is left alone too
+empty="$dir/emptydir"
+mkdir "$empty"
+: >"$empty/jar.txt"
+cp "$dir/orig.txt" "$empty/jar.txt.bak"
+run -O "$dir/m13" --cookies-file "$empty/jar.txt"
+test ! -s "$empty/jar.txt" || fail "an empty cookies file was rewritten over its .bak"
+cmp "$empty/jar.txt.bak" "$dir/orig.txt" || fail "the .bak of an empty jar changed"
+log=$(cat "$dir/m13/hts-log.txt")
+grep -q 'is empty but its \.bak is not' <<<"$log" ||
+    fail "no warning that the cookies file is empty"
+! grep -q 'lines would be lost' <<<"$log" ||
+    fail "an empty cookies file was said to lose lines"
+
+# A symbolic link stays one, and its target is rewritten with .bak beside it
+if ! target_is_windows; then
+    mkdir "$dir/linkdir" "$dir/linkdir/sub"
+    cp "$dir/orig.txt" "$dir/linkdir/sub/real"
+    ln -s sub/real "$dir/linkdir/jar.txt"
+    run -O "$dir/m14" --cookies-file "$dir/linkdir/jar.txt"
+    test -L "$dir/linkdir/jar.txt" || fail "the symbolic link became a file"
+    holds "$dir/linkdir/sub/real" '# Written by HTTrack Website Copier' ||
+        fail "the link target was not rewritten"
+    cmp "$dir/linkdir/sub/real.bak" "$dir/orig.txt" ||
+        fail "the link target's .bak is not the original file"
+    test ! -e "$dir/linkdir/jar.txt.bak" || fail "the .bak went beside the link"
+fi
 
 # A cookies file that does not exist yet is created
 new="$dir/new.txt"
@@ -238,8 +268,11 @@ chmod 000 "$unread"
 if ! test -r "$unread"; then
     run -O "$dir/m12" --cookies-file "$unread"
     test ! -e "$unread.bak" || fail "an unreadable cookies file was rewritten"
-    grep -q 'could not read' "$dir/m12/hts-log.txt" ||
+    log=$(cat "$dir/m12/hts-log.txt")
+    grep -q 'could not read' <<<"$log" ||
         fail "no warning that the cookies file could not be read"
+    ! grep -q 'lines would be lost' <<<"$log" ||
+        fail "an unreadable cookies file was said to lose lines"
 fi
 chmod u+rw "$unread"
 cmp "$unread" "$dir/orig.txt" || fail "an unreadable cookies file changed"
