@@ -1107,6 +1107,22 @@ static int st_cookiesetscope(httrackp *opt, int argc, char **argv) {
       {"del.test", "Set-Cookie: ep=1; Path=", "del.test", "ep=1", HTS_TRUE},
       // a pair is matched whole, not as the tail or head of a longer one
       {"sub.test", "Set-Cookie: az=10", "sub.test", "z=1", HTS_FALSE},
+      // an unusable first pair voids the header, it never promotes the next
+      {"sub.test",
+       "Set-Cookie: "
+       "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
+       "n"
+       "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
+       "n"
+       "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
+       "n"
+       "=1; Path=/; Max-Age=99",
+       "sub.test", "Path=/", HTS_FALSE},
+      {"sub.test", "Set-Cookie: =1; Path=/", "sub.test", "Path=/", HTS_FALSE},
+      // the first pair is the cookie whatever its name
+      {"sub.test", "Set-Cookie: Domain=x; a=1", "sub.test", "Domain=x",
+       HTS_TRUE},
+      {"sub.test", NULL, "sub.test", "a=1", HTS_FALSE},
       // an attribute after the first pair is never a cookie
       {"sub.test", "Set-Cookie: ss=1; SameSite=Lax", "sub.test", "SameSite=Lax",
        HTS_FALSE},

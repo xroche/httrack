@@ -2310,7 +2310,7 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
     if (adr != NULL && (strlen(adr) >= sizeof(domain) ||
                         !cookie_host(adr, scoped, sizeof(scoped))))
       return;
-    while(*a) {
+    {
       char *token_st, *token_end;
       char *value_st, *value_end;
       char name[256];
@@ -2318,6 +2318,7 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
       hts_boolean has_domain = HTS_FALSE;
       hts_tristate max_age_expired = HTS_DEFAULT;
       hts_tristate expires_passed = HTS_DEFAULT;
+      hts_boolean first = HTS_TRUE;
 
       name[0] = value[0] = '\0';
       //
@@ -2366,15 +2367,10 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
             printf("detected cookie-av: name=\"%s\" value=\"%s\"\n", name,
                    value);
 #endif
-            if (strnotempty(cook_name) == 0) {
+            if (first) {
               // the first pair is the cookie, and "name=" may erase one
-              if ((size_t) value_len < sizeof(cook_value) - 1 &&
-                  (size_t) name_len < sizeof(cook_name) - 1) {
-                strcpybuff(cook_name, name);
-                strcpybuff(cook_value, value);
-              } else {
-                break;
-              }
+              strcpybuff(cook_name, name);
+              strcpybuff(cook_value, value);
             } else if (strfield2(name, "domain")) {
               if (value_len == 0 || strcmp(value, ".") == 0) {
                 // ignored, so the cookie stays on the host
@@ -2409,6 +2405,8 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
             // RFC 6265 5.2 ignores any other attribute, SameSite for example
           }
         }
+        // an unusable first pair leaves no cookie, so the header is ignored
+        first = HTS_FALSE;
         while ((*a != ';') && (*a))
           a++;
         while (*a == ';')
@@ -2426,13 +2424,13 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
            cook_name, cook_value, domain, path);
 #endif
         // a Domain= the host may not claim drops the cookie (5.3 step 6)
-        if (has_domain &&
-            (adr == NULL || !cookie_domain_allowed(domain, scoped))) {
-          // ignored
-        } else if (expired)
-          cookie_del(cookie, cook_name, domain, path);
-        else
-          cookie_add(cookie, cook_name, cook_value, domain, path);
+        if (!has_domain ||
+            (adr != NULL && cookie_domain_allowed(domain, scoped))) {
+          if (expired)
+            cookie_del(cookie, cook_name, domain, path);
+          else
+            cookie_add(cookie, cook_name, cook_value, domain, path);
+        }
       }
     }
   }
