@@ -126,15 +126,19 @@ cookies.txt" (without "LOCALLY"), sent the data of its users to a remote server.
 removed from the Chrome Web Store in 2023. Do not install it.</p>
 <p><b>A cookie file is as good as your password.</b> A person who has the file can use
 your session. Do not share it, and delete it when the copy is done. When a crawl ends,
-HTTrack also writes the cookies that it holds to <code>cookies.txt</code> in the
-project folder. Delete that file too.</p>
+HTTrack writes the cookies that it holds back to the file that you gave with
+<code>--cookies-file</code>, and keeps the old file as <code>cookies.txt.bak</code>.
+Delete both files.</p>
 </div>
 
 <p>Most session cookies are marked "HttpOnly". In a <code>cookies.txt</code> file, the
-lines of these cookies start with <code>#HttpOnly_</code>. Recent versions of HTTrack
+lines of these cookies start with <code>#HttpOnly_</code>. HTTrack versions newer than 3.50.5
 read these lines. Older versions think that they are comments and ignore them, so the
 login does not work. With an older version, remove <code>#HttpOnly_</code> from the
 start of these lines.</p>
+
+<p>HTTrack keeps a cookie only if its name and its value together are 4096 bytes or
+less. It ignores a longer cookie and writes a warning in its log.</p>
 
 <h2 id="user-agent">Step 2: find the User-Agent of your browser</h2>
 
