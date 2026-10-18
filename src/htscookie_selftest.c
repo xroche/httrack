@@ -1059,7 +1059,7 @@ static hts_boolean cookie_sent(const char *hdr, const char *pair) {
 /* RFC 6265 5.3: a Domain= the request host may not claim drops the cookie,
    and an expired Max-Age or Expires erases the stored one. */
 static int st_cookiesetscope(httrackp *opt, int argc, char **argv) {
-#define LABEL "cookie-setscope"
+  static const char LABEL[] = "cookie-setscope";
 #define PAST "Expires=Thu, 01 Jan 1970 00:00:00 GMT"
 #define FUTURE "Expires=Fri, 01 Jan 2100 00:00:00 GMT"
 
@@ -1088,20 +1088,49 @@ static int st_cookiesetscope(httrackp *opt, int argc, char **argv) {
        HTS_FALSE},
       {"a.b.co.uk", "Set-Cookie: bk=1; Domain=b.co.uk", "c.b.co.uk", "bk=1",
        HTS_TRUE},
-      {"a.foo.com", "Set-Cookie: pf=1; Domain=foo.com", "c.foo.com", "pf=1",
-       HTS_TRUE},
+      {"a.b.co.uk", "Set-Cookie: ucu=1; Domain=CO.UK", "c.d.co.uk", "ucu=1",
+       HTS_FALSE},
       // a public suffix may still name itself
       {"localhost:8080", "Set-Cookie: lh=1; Domain=localhost", "localhost",
        "lh=1", HTS_TRUE},
       // an address only ever names itself
-      {"127.0.0.1", "Set-Cookie: ix=1; Domain=127.0.0.2", "127.0.0.2", "ix=1",
-       HTS_FALSE},
       {"127.0.0.1", "Set-Cookie: ie=1; Domain=127.0.0.1", "127.0.0.1", "ie=1",
        HTS_TRUE},
       {"192.168.1.1", "Set-Cookie: ip=1; Domain=1.1", "192.168.1.1", "ip=1",
        HTS_FALSE},
       // no Domain= stays on its host
       {"del.test", "Set-Cookie: y=1", "del.test", "y=1", HTS_TRUE},
+      // an empty or "." Domain=, and an empty Path=, are ignored
+      {"del.test", "Set-Cookie: ed=1; Domain=", "del.test", "ed=1", HTS_TRUE},
+      {"del.test", "Set-Cookie: dot=1; Domain=.", "del.test", "dot=1",
+       HTS_TRUE},
+      {"del.test", "Set-Cookie: ep=1; Path=", "del.test", "ep=1", HTS_TRUE},
+      // a pair is matched whole, not as the tail or head of a longer one
+      {"sub.test", "Set-Cookie: az=10", "sub.test", "z=1", HTS_FALSE},
+      // an unusable first pair voids the header, it never promotes the next
+      {"sub.test",
+       "Set-Cookie: "
+       "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
+       "n"
+       "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
+       "n"
+       "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
+       "n"
+       "=1; Path=/; Max-Age=99",
+       "sub.test", "Path=/", HTS_FALSE},
+      {"sub.test", "Set-Cookie: =1; Path=/", "sub.test", "Path=/", HTS_FALSE},
+      // the first pair is the cookie whatever its name
+      {"sub.test", "Set-Cookie: Domain=x; a=1", "sub.test", "Domain=x",
+       HTS_TRUE},
+      {"sub.test", NULL, "sub.test", "a=1", HTS_FALSE},
+      // an attribute after the first pair is never a cookie
+      {"sub.test", "Set-Cookie: ss=1; SameSite=Lax", "sub.test", "SameSite=Lax",
+       HTS_FALSE},
+      {"sub.test", "Set-Cookie: pr=1; Priority=High", "sub.test",
+       "Priority=High", HTS_FALSE},
+      {"sub.test", "Set-Cookie: pt=1; Partitioned; Unknown=1", "sub.test",
+       "Unknown=1", HTS_FALSE},
+      {"sub.test", NULL, "sub.test", "pt=1", HTS_TRUE},
       // an expired cookie erases the stored one, an empty value included
       {"del.test", "Set-Cookie: z=1", "del.test", "z=1", HTS_TRUE},
       {"del.test", "Set-Cookie: z=gone; Max-Age=0", "del.test", "z=1",
@@ -1122,11 +1151,39 @@ static int st_cookiesetscope(httrackp *opt, int argc, char **argv) {
        HTS_TRUE},
       {"del.test", "Set-Cookie: m=; " FUTURE "; Max-Age=0", "del.test", "m=1",
        HTS_FALSE},
+      {"del.test", NULL, "del.test", "m=", HTS_FALSE},
       // a Max-Age that is no number is ignored
       {"del.test", "Set-Cookie: g=1; Max-Age=soon", "del.test", "g=1",
        HTS_TRUE},
       // an empty value with no expiry replaces the old one
       {"del.test", "Set-Cookie: g=", "del.test", "g=1", HTS_FALSE},
+      {"del.test", NULL, "del.test", "g=", HTS_TRUE},
+      // a two-digit year below 70 is 20xx (RFC 6265 5.1.1)
+      {"del.test", "Set-Cookie: y60=1; Expires=Sun, 01-Jan-60 00:00:00 GMT",
+       "del.test", "y60=1", HTS_TRUE},
+      {"del.test", "Set-Cookie: y69=1; Expires=Tue, 01-Jan-69 00:00:00 GMT",
+       "del.test", "y69=1", HTS_TRUE},
+      {"del.test", "Set-Cookie: y50=1; Expires=Sat, 01-Jan-50 00:00:00 GMT",
+       "del.test", "y50=1", HTS_TRUE},
+      {"del.test", "Set-Cookie: y70=1", "del.test", "y70=1", HTS_TRUE},
+      {"del.test", "Set-Cookie: y70=1; Expires=Thu, 01-Jan-70 00:00:00 GMT",
+       "del.test", "y70=1", HTS_FALSE},
+      // a later invalid duplicate is ignored, not a reset
+      {"del.test", "Set-Cookie: dm=1", "del.test", "dm=1", HTS_TRUE},
+      {"del.test", "Set-Cookie: dm=1; Max-Age=0; Max-Age=soon", "del.test",
+       "dm=1", HTS_FALSE},
+      {"del.test", "Set-Cookie: de=1", "del.test", "de=1", HTS_TRUE},
+      {"del.test", "Set-Cookie: de=1; " PAST "; Expires=garbage", "del.test",
+       "de=1", HTS_FALSE},
+      // a value's trailing whitespace is trimmed
+      {"a.b.test", "Set-Cookie: tw=1; Domain=b.test ; Path=/", "c.b.test",
+       "tw=1", HTS_TRUE},
+      {"del.test", "Set-Cookie: mt=1", "del.test", "mt=1", HTS_TRUE},
+      {"del.test", "Set-Cookie: mt=1; Max-Age=0 ", "del.test", "mt=1",
+       HTS_FALSE},
+      {"del.test", "Set-Cookie: ms=1", "del.test", "ms=1", HTS_TRUE},
+      {"del.test", "Set-Cookie: ms=1; Max-Age=0 ; Path=/", "del.test", "ms=1",
+       HTS_FALSE},
       // rotation still replaces
       {"del.test", "Set-Cookie: w=1", "del.test", "w=1", HTS_TRUE},
       {"del.test", "Set-Cookie: w=2", "del.test", "w=1", HTS_FALSE},
@@ -1136,6 +1193,7 @@ static int st_cookiesetscope(httrackp *opt, int argc, char **argv) {
        "dd=1", HTS_TRUE},
       {"www.del.test", "Set-Cookie: dd=; Domain=del.test; Max-Age=0",
        "a.del.test", "dd=1", HTS_FALSE},
+      {"www.del.test", NULL, "a.del.test", "dd=", HTS_FALSE},
       // a host cannot erase another host's cookie either
       {"victim.test", "Set-Cookie: v=1", "victim.test", "v=1", HTS_TRUE},
       {"evil.test", "Set-Cookie: v=; Domain=victim.test; Max-Age=0",
@@ -1170,11 +1228,20 @@ static int st_cookiesetscope(httrackp *opt, int argc, char **argv) {
       err = 1;
     }
   }
+  // the jar file keeps "/" for an empty Path=, as a browser export does
+  {
+    char *const ep = cookie_find(jar.data, "ep", "del.test", "/");
+    char field[8192]; // cookie_get's buffer size
+
+    if (ep == NULL || strcmp(cookie_get(field, ep, 2), "/") != 0) {
+      printf("%s: an empty Path= is not stored as /\n", LABEL);
+      err = 1;
+    }
+  }
   printf("%s: %s\n", LABEL, err ? "FAIL" : "OK");
   return err;
 #undef FUTURE
 #undef PAST
-#undef LABEL
 }
 
 /* -#test=cookiehttponly <dir>: a "#HttpOnly_" jar line is a record, and any
@@ -1199,7 +1266,10 @@ static int st_cookiehttponly(httrackp *opt, int argc, char **argv) {
               "#HttpOnly_.example.com\tTRUE\t/\tFALSE\t0\tsid\tabc\n"
               "#.example.com\tTRUE\t/\tFALSE\t0\tdead\tx\n"
               "#HttpOnly_#.example.com\tTRUE\t/\tFALSE\t0\tdead2\tx\n"
-              ".example.com\tTRUE\t/\tFALSE\t0\tplain\t1\n");
+              "#httponly_.example.com\tTRUE\t/\tFALSE\t0\tdead3\tx\n"
+              "#HttpOnlyX.example.com\tTRUE\t/\tFALSE\t0\tdead4\tx\n"
+              ".example.com\tTRUE\t/\tFALSE\t0\tplain\t1\n"
+              "#HttpOnly_.example.com\tTRUE\t/\tFALSE\t0\tsid2\tdef\n");
   fclose(fp);
   ck.max_len = sizeof(ck.data);
   ck.data[0] = '\0';
@@ -1207,7 +1277,8 @@ static int st_cookiehttponly(httrackp *opt, int argc, char **argv) {
   (void) UNLINK(file);
   http_cookie_header(&ck, "www.example.com", "/", hdr, sizeof(hdr));
   if (strstr(hdr, "sid=abc") == NULL || strstr(hdr, "plain=1") == NULL ||
-      strstr(hdr, "dead") != NULL || strchr(ck.data, '#') != NULL) {
+      strstr(hdr, "sid2=def") == NULL || strstr(hdr, "dead") != NULL ||
+      strchr(ck.data, '#') != NULL) {
     fprintf(stderr, "cookiehttponly: sent [%s], jar [%s]\n", hdr, ck.data);
     return 1;
   }

@@ -40,7 +40,6 @@ Please visit our Website: http://www.httrack.com
 #include "htslib.h"
 #include "htslines.h"
 #include "htscore.h"
-#include "htsdate.h"
 #include "htspsl.h"
 #ifdef _WIN32
 #include "htscharset.h" /* hts_pathToUCS2, hts_convertUCS2StringToUTF8 */
@@ -312,7 +311,7 @@ hts_boolean cookie_max_age_time(const char *value, int64_t now, int64_t *when) {
   int64_t delta = 0;
   size_t i;
 
-  if (ndigits == 0 || digits[ndigits + strspn(digits + ndigits, " \t")] != '\0')
+  if (ndigits == 0 || digits[ndigits] != '\0')
     return HTS_FALSE;
   // saturate at the cap, so no delta is too large to read
   for (i = 0; i < ndigits && delta <= COOKIE_MAX_LIFE; i++)
@@ -323,13 +322,9 @@ hts_boolean cookie_max_age_time(const char *value, int64_t now, int64_t *when) {
 
 /* See htsbauth.h. */
 hts_boolean cookie_expires_time(const char *value, int64_t now, int64_t *when) {
-  struct tm buffer;
-  struct tm *const tm = convert_time_rfc822(&buffer, value);
-  time_t t;
+  // RFC 6265 5.1.1 reads a two-digit year below 70 as 20xx
+  const time_t t = hts_parse_date(value, 69);
 
-  if (tm == NULL)
-    return HTS_FALSE;
-  t = timegm(tm);
   if (t == (time_t) -1)
     return HTS_FALSE;
   *when = cookie_bound_expiry((int64_t) t, now);

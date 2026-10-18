@@ -246,6 +246,10 @@ void hts_init_htsblk(htsblk * r);
    no usable delay. `now` dates the HTTP-date form, and the caller caps. */
 int hts_parse_retry_after(const char *value, time_t now);
 
+/* Read the HTTP date S as a time_t, with a two-digit year up to PIVOT in 20xx
+   (see convert_time_rfc822_pivot). (time_t) -1 when S is not a date. */
+time_t hts_parse_date(const char *s, int pivot);
+
 // attach specific project log to hachtable logger
 void hts_set_hash_handler(coucal hashtable, httrackp *opt);
 
