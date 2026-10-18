@@ -3662,11 +3662,12 @@ int hts_parse_retry_after(const char *value, time_t now) {
     return -1;
   while (is_space(*p))
     p++;
-  for (end = p; *end != '\0' && !is_space(*end); end++)
-    ;
+  end = p + strspn(p, "0123456789");
+  while (is_space(*end))
+    end++;
 
-  /* delta-seconds is 1*DIGIT, so a trailing token means an HTTP-date */
-  if (end > p && (size_t) (end - p) == strspn(p, "0123456789")) {
+  // delta-seconds is the whole value, so "06 Nov 2026 ..." is a date
+  if (end > p && *end == '\0') {
     LLint secs;
 
     // Every byte is a digit, so a refusal means too big, which clips.

@@ -152,11 +152,13 @@ static int st_retryafter(httrackp *opt, int argc, char **argv) {
       {"Sun, 06 Nov 1994 08:50:37 GMT", 60},
       {"Sun, 06 Nov 1994 08:49:37 GMT", 0},
       {"Sun, 06 Nov 1994 08:48:37 GMT", 0}, /* already past, never negative */
+      {"06 Nov 1994 08:50:37 GMT", 60},     /* its first token is all digits */
       /* nothing usable: -1, which is what keeps a bare 503 fatal */
       {"", -1},
       {"   ", -1},
       {"soon", -1},
       {"12x", -1},
+      {"12 x", -1},
       {"-5", -1},
       {"1.5", -1},
   };
