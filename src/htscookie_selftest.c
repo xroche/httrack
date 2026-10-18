@@ -2127,7 +2127,8 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
   }
 #endif
 
-  /* An empty jar empties an existing project jar, and creates no file. */
+  /* An empty jar empties an existing project jar, and creates none when it is
+   * missing. */
   {
     FILE *fp = FOPEN(file, "wb");
 
@@ -2211,6 +2212,7 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
         COOKIE_FAULT_NOLINK | COOKIE_FAULT_COPY_READ,
         COOKIE_FAULT_NOLINK | COOKIE_FAULT_COPY_CLOSE,
         COOKIE_FAULT_WRITE,
+        COOKIE_FAULT_CLOSE,
     };
     const int copy_faults = COOKIE_FAULT_COPY_WRITE | COOKIE_FAULT_COPY_READ |
                             COOKIE_FAULT_COPY_CLOSE;
@@ -2228,7 +2230,8 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
       const hts_boolean copy_fails = (fault & copy_faults) != 0;
       // a failed write stops before the backup, so .bak keeps the older jar
       const hts_boolean bak_kept =
-          copy_fails || (fault & COOKIE_FAULT_WRITE) != 0;
+          copy_fails ||
+          (fault & (COOKIE_FAULT_WRITE | COOKIE_FAULT_CLOSE)) != 0;
       const hts_boolean fails = bak_kept || (fault & COOKIE_FAULT_REPLACE) != 0;
       FILE *fp = FOPEN(file, "wb");
 #ifndef _WIN32
@@ -2313,8 +2316,10 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
     }
 
     /* A project jar whose rewrite fails keeps its old content. */
-    for (i = 0; i < 2; i++) {
-      const int fault = i == 0 ? COOKIE_FAULT_WRITE : COOKIE_FAULT_REPLACE;
+    for (i = 0; i < 3; i++) {
+      static const int project_faults[] = {
+          COOKIE_FAULT_WRITE, COOKIE_FAULT_CLOSE, COOKIE_FAULT_REPLACE};
+      const int fault = project_faults[i];
       FILE *fp = FOPEN(file, "wb");
 
       assertf(fp != NULL);

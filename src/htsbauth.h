@@ -147,7 +147,7 @@ int cookie_save(httrackp *opt, t_cookie *cookie, const char *name);
 
 /** Save the jar as cookie_save does, but first keep the old content as a
     .bak file, beside the target of a symbolic link. A missing file beside a
-    .bak, or an empty one beside a non-empty .bak, is left unchanged. */
+    .bak, or an empty one beside a non-empty .bak, is not rewritten. */
 void cookie_save_replacing(httrackp *opt, t_cookie *cookie, const char *name);
 
 /** Insert ins in front of the string at s, whose buffer holds s_size bytes. */

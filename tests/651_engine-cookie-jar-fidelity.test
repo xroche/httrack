@@ -323,3 +323,22 @@ if ! test -r "$dir/m18/cookies.txt"; then
 fi
 chmod u+rw "$dir/m18/cookies.txt"
 cmp "$dir/m18/cookies.txt" "$dir/orig.txt" || fail "an unreadable project jar changed"
+
+# A project jar whose save fails says so: its link target sits in a read-only
+# directory, while the log beside the link stays writable
+if ! target_is_windows; then
+    mkdir -p "$dir/ro19" "$dir/cwd19" "$dir/m19"
+    cp "$dir/orig.txt" "$dir/ro19/cookies.txt"
+    cp "$dir/orig.txt" "$dir/cwd19/cookies.txt"
+    ln -s "$dir/ro19/cookies.txt" "$dir/m19/cookies.txt"
+    chmod a-w "$dir/ro19"
+    if test ! -w "$dir/ro19"; then
+        (cd "$dir/cwd19" && run -O "$dir/m19")
+        subshell_ok $?
+        grep -q "could not write" "$dir/m19/hts-log.txt" ||
+            fail "no warning that the project jar could not be saved"
+    fi
+    chmod u+w "$dir/ro19"
+    cmp "$dir/ro19/cookies.txt" "$dir/orig.txt" ||
+        fail "a project jar whose save failed changed"
+fi

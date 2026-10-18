@@ -42,6 +42,7 @@ Please visit our Website: http://www.httrack.com
 #define COOKIE_FAULT_COPY_READ 8  /**< the copy reports a read error */
 #define COOKIE_FAULT_COPY_CLOSE 16 /**< closing the copy fails */
 #define COOKIE_FAULT_WRITE 32      /**< the jar write fails after its header */
+#define COOKIE_FAULT_CLOSE 64      /**< closing the jar write fails */
 
 /* The self-tests set the faults to inject here. It stays 0 otherwise. */
 extern int cookie_save_fault_selftest;

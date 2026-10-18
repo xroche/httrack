@@ -546,8 +546,8 @@ static hts_boolean cookie_resolve(char *file, size_t size, const char *name) {
   return slprintfbuff(file, size, "%s", name);
 }
 
-/* A missing file beside a .bak, or an empty one beside a non-empty .bak, is
-   left unchanged: then warn, naming shown, and return HTS_TRUE. */
+/* Warn, naming shown, and return HTS_TRUE when file is missing beside bak or
+   empty beside a non-empty bak. */
 static hts_boolean cookie_bak_stranded(httrackp *opt, const char *file,
                                        const char *bak, const char *shown) {
   if (!fexist_utf8(bak))
@@ -717,8 +717,7 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
           if (rec[0] == '#') {
             if (!cookie_known_comment(rec)) {
               hts_log_print(opt, LOG_WARNING,
-                            "Cookies: ignoring a comment no known tool "
-                            "writes in %s: %.64s",
+                            "Cookies: ignoring an unknown comment in %s: %.64s",
                             given, rec);
               refused++;
             }
@@ -899,7 +898,8 @@ static int cookie_write(t_cookie *cookie, const char *name) {
         ok = HTS_FALSE;
     }
     // the close reports a write the buffer held back
-    if (!cookie_close_synced(fp))
+    if (!cookie_close_synced(fp) ||
+        (cookie_save_fault_selftest & COOKIE_FAULT_CLOSE))
       ok = HTS_FALSE;
     return ok ? 0 : -1;
   }
