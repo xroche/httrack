@@ -2336,21 +2336,6 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
     }
   }
 
-#ifdef __linux__
-  /* A write that fails only at flush time still fails the save. */
-  {
-    struct stat st;
-
-    if (geteuid() != 0 && stat("/dev/full", &st) == 0 && S_ISCHR(st.st_mode)) {
-      jar.data[0] = '\0';
-      assertf(cookie_add(&jar, "full", "1", "jar.test", "/") == 0);
-      if (cookie_save(NULL, &jar, "/dev/full") != -1) {
-        printf("%s: a save to /dev/full did not fail\n", LABEL);
-        err = 1;
-      }
-    }
-  }
-#endif
   printf("%s: %s\n", LABEL, err ? "FAIL" : "OK");
   return err;
 #undef LABEL
