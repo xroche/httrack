@@ -112,17 +112,16 @@ int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
       strpbrk(host, "\t\r\n") != NULL || strpbrk(path, "\t\r\n") != NULL)
     return -1;
 
+  // RFC 6265 6.1 asks for 4096 bytes of name and value per cookie
+  if (strlen(cook_name) > COOKIE_MAX_PAIR ||
+      strlen(cook_value) > COOKIE_MAX_PAIR - strlen(cook_name))
+    return -1;
+  if (strlen(host) > 256 || strlen(path) > 256)
+    return -1;
+
   // erase any duplicate; cookie_remove normalises too, so it takes the raw one
   cookie_remove(cookie, cook_name, domain, path, attr->host_only);
   domain = host;
-  if (strlen(cook_value) > 1024)
-    return -1;                  // trop long
-  if (strlen(cook_name) > 256)
-    return -1;                  // trop long
-  if (strlen(domain) > 256)
-    return -1;                  // trop long
-  if (strlen(path) > 256)
-    return -1; // too long
   /* Each part against the room left, never a sum: the sum of five lengths
      read off the wire can wrap and pass a check it should fail. */
   {
@@ -546,7 +545,7 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
             if (rec[0] != '#') {
               char domain[256];             // cookie domain (.netscape.com)
               char path[256];               // path (/)
-              char cook_name[1024];         // cookie name (MYCOOK)
+              char BIGSTK cook_name[COOKIE_MAX_PAIR + 1]; // name (MYCOOK)
               char BIGSTK cook_value[8192]; // value (ID=toto,S=1234)
 
 #if DEBUG_COOK

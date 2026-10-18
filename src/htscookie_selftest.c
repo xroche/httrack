@@ -1283,11 +1283,11 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
   static t_cookie jar;
   const int64_t now = (int64_t) time(NULL);
   char buffer[8192];
-  char hdr[4096];
+  char BIGSTK hdr[8192];
   char fpath[HTS_URLMAXSIZE * 2];
   char file[HTS_URLMAXSIZE * 2];
   char saved[HTS_URLMAXSIZE * 2];
-  char BIGSTK text[8192];
+  char BIGSTK text[16384];
   size_t i;
   int err = 0;
 
@@ -1453,6 +1453,54 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
         printf("%s: saved a Set-Cookie HttpOnly as [%s]\n", LABEL, text);
         err = 1;
       }
+    }
+    (void) UNLINK(file);
+    (void) UNLINK(saved);
+  }
+
+  /* A cookie of RFC 6265's 4096 bytes loads, saves and goes out whole, and
+     one byte more is refused with a warning rather than cut. */
+  {
+    FILE *const projectlog = opt->log;
+    FILE *const log = tmpfile();
+    const int saveddebug = opt->debug;
+    char BIGSTK big[COOKIE_MAX_PAIR + 2];
+    char BIGSTK pair[COOKIE_MAX_PAIR + 8];
+    char logged[1024];
+    size_t n;
+    FILE *fp = FOPEN(file, "wb");
+
+    assertf(fp != NULL && log != NULL);
+    memset(big, 'v', COOKIE_MAX_PAIR - 3);
+    big[COOKIE_MAX_PAIR - 3] = '\0';
+    fprintf(fp, "big.test\tFALSE\t/\tFALSE\t0\tfit\t%s\n", big);
+    strcatbuff(big, "v"); // name and value now one byte over
+    fprintf(fp, "big.test\tFALSE\t/\tFALSE\t0\tnot\t%s\n", big);
+    fclose(fp);
+    opt->log = log;
+    opt->debug = LOG_WARNING;
+    jar.data[0] = '\0';
+    assertf(cookie_load(opt, &jar, fpath, "cookies.txt") == 0);
+    rewind(log);
+    n = fread(logged, 1, sizeof(logged) - 1, log);
+    logged[n] = '\0';
+    fclose(log);
+    opt->log = projectlog;
+    opt->debug = saveddebug;
+    big[COOKIE_MAX_PAIR - 3] = '\0';
+    assertf(sprintfbuff(pair, "fit=%s", big));
+    http_cookie_header(&jar, "big.test", "/", hdr, sizeof(hdr));
+    if (!cookie_sent(hdr, pair) || strstr(jar.data, "\tnot\t") != NULL ||
+        strstr(logged, "did not store 'not'") == NULL) {
+      printf("%s: a 4096-byte cookie: sent %d bytes, log [%s]\n", LABEL,
+             (int) strlen(hdr), logged);
+      err = 1;
+    }
+    assertf(cookie_save(&jar, saved) == 0);
+    cookiejar_slurp(saved, text, sizeof(text));
+    if (strstr(text, big) == NULL || strstr(text, "\tnot\t") != NULL) {
+      printf("%s: the saved jar lost the 4096-byte cookie\n", LABEL);
+      err = 1;
     }
     (void) UNLINK(file);
     (void) UNLINK(saved);

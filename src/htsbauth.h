@@ -88,6 +88,9 @@ typedef struct httrackp httrackp;
     HTS_FALSE means the caller sends no cookie. */
 hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size);
 
+/** Bytes of name plus value a jar record may hold. */
+#define COOKIE_MAX_PAIR 4096
+
 /** The attributes a jar record keeps beside name, value, domain and path. */
 typedef struct cookie_attr {
   hts_boolean host_only; /**< sent to its domain alone, not to subdomains */

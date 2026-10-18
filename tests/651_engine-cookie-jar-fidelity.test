@@ -1,8 +1,8 @@
 #!/bin/bash
 #
 # The cookie jar keeps host-only, Secure, HttpOnly and expiry from a
-# Set-Cookie and through a cookies.txt load and save, replaces a cookie only
-# by its whole identity, and logs a cookie it refuses.
+# Set-Cookie and through a cookies.txt load and save, holds 4096 bytes,
+# replaces a cookie only by its whole identity, and logs a cookie it refuses.
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
@@ -12,3 +12,12 @@ dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
 
 assert_selftest "cookie-jar: OK" cookiejar "$dir"
+
+# --cookies-file with cookies off is read by nothing, so it is logged
+: "${top_srcdir:=..}"
+bash "$top_srcdir/tests/local-crawl.sh" --cookie 'session=opensesame' \
+    --log-found 'Cookies are disabled, so the cookies file' \
+    httrack 'BASEURL/gated/index.php' -o0 -b0
+bash "$top_srcdir/tests/local-crawl.sh" --cookie 'session=opensesame' \
+    --found 'gated/secret.html' --log-not-found 'Cookies are disabled' \
+    httrack 'BASEURL/gated/index.php' -o0

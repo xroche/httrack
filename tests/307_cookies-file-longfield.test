@@ -24,7 +24,7 @@ rec() { # rec DOMAIN PATH NAME VALUE
 
 # Each destination is hit at the first byte that must not fit and at the byte
 # below it, so a > for a >= in the bound reds this. The three capacities differ
-# (domain[256], path[256], cook_name[1024]), and the message pins each one.
+# (domain[256], path[256], cook_name[4097]), and the message pins each one.
 jar="$tmp/jar.txt"
 {
     rec www.example.com / GOODFIRST v1
@@ -35,10 +35,11 @@ jar="$tmp/jar.txt"
     rec www.example.com "/$(repeat_chars 255 A)" PATH256 v
     rec www.example.com "/$(repeat_chars 254 A)" PATH255 v
     rec www.example.com / "NAME2000$(repeat_chars 1992 A)" v
-    rec www.example.com / "NAME1024$(repeat_chars 1016 A)" v
-    # fits cook_name[1024] but not cookie_add()'s own 256-byte cap, so the line
-    # is gone for a second reason, which has to be reported too
-    rec www.example.com / "JARCAP$(repeat_chars 294 A)" v
+    rec www.example.com / "NAME4500$(repeat_chars 4492 A)" v
+    rec www.example.com / "NAME4097$(repeat_chars 4089 A)" v
+    # fits cook_name but, with its value, not the jar's 4096-byte cap, so the
+    # line is gone for a second reason, which has to be reported too
+    rec www.example.com / "JARCAP$(repeat_chars 4090 A)" v
     # cook_value[8192] is out of reach behind the line gate, so it is pinned
     # from below: neither of these may be refused for its value
     rec www.example.com / BIGVAL "$(repeat_chars 500 v)"
@@ -68,13 +69,14 @@ log=$(tr -d '\r' <"$out/hts-log.txt")
 for want in "$(rec www.example.com / GOODFIRST v1)" \
     "$(rec "$(repeat_chars 255 a)" / DOM255 v)" \
     "$(rec www.example.com "/$(repeat_chars 254 A)" PATH255 v)" \
+    "$(rec www.example.com / "NAME2000$(repeat_chars 1992 A)" v)" \
     "$(rec www.example.com / BIGVAL "$(repeat_chars 500 v)")" \
     "$(rec www.example.com / GOODLAST v2)"; do
     grep -qxF "$want" <<<"$loaded" ||
         fail "a line that fits did not load whole: ${want:0:40}... in $jar_out"
 done
 
-for gone in DOM2000 DOM256 PATH2000 PATH256 NAME2000 NAME1024 JARCAP \
+for gone in DOM2000 DOM256 PATH2000 PATH256 NAME4500 NAME4097 JARCAP \
     BIGVAL7900 LONGLINE; do
     ! grep -q "$gone" <<<"$loaded" ||
         fail "$gone was stored from a line that had to be refused: $jar_out"
@@ -87,8 +89,8 @@ refusals=(
     "domain field is 256 bytes (maximum 255)"
     "path field is 2000 bytes (maximum 255)"
     "path field is 256 bytes (maximum 255)"
-    "name field is 2000 bytes (maximum 1023)"
-    "name field is 1024 bytes (maximum 1023)"
+    "name field is 4500 bytes (maximum 4096)"
+    "name field is 4097 bytes (maximum 4096)"
 )
 for want in "${refusals[@]}"; do
     grep -qF "Cookies: ignoring a line whose $want: $jar" <<<"$log" ||

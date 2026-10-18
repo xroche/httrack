@@ -779,8 +779,13 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
     // A user-supplied cookie file is merged last so it wins on conflicts
     if (strnotempty(StringBuff(opt->cookies_file)))
       cookie_load(opt, opt->cookie, "", StringBuff(opt->cookies_file));
-  } else
+  } else {
     opt->cookie = NULL;
+    if (strnotempty(StringBuff(opt->cookies_file)))
+      hts_log_print(opt, LOG_WARNING,
+                    "Cookies are disabled, so the cookies file %s is not read",
+                    StringBuff(opt->cookies_file));
+  }
 
   hts_store_release_int(&opt->state.exit_xh, 0);
   /* a fault a previous mirror recovered from must not abort this one */
