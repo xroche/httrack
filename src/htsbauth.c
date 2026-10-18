@@ -661,7 +661,7 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
         seen->max_len = sizeof(seen->data);
       } else {
         hts_log_print(opt, LOG_WARNING,
-                      "Cookies: out of memory, so %s is left unchanged", file);
+                      "Cookies: out of memory, so %s is left unchanged", given);
         keep = HTS_TRUE;
       }
       // ferror ends the loop too, because a directory never reaches EOF
@@ -675,13 +675,13 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
           hts_log_print(opt, LOG_WARNING,
                         "Cookies: ignoring an over-long line "
                         "(%d bytes, maximum %d): %s",
-                        (int) len, (int) line_max - 1, file);
+                        (int) len, (int) line_max - 1, given);
           refused++;
         } else if (memchr(line, '\0', len) != NULL ||
                    memchr(line, '\r', len) != NULL) {
           hts_log_print(opt, LOG_WARNING,
                         "Cookies: ignoring a line holding a NUL or a CR: %s",
-                        file);
+                        given);
           refused++;
         } else if (line[strspn(line, " \t")] != '\0') {
           /* curl and browser exports mark an HttpOnly cookie this way */
@@ -696,7 +696,7 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
               hts_log_print(opt, LOG_WARNING,
                             "Cookies: %s holds a comment a rewrite would "
                             "drop: %.64s",
-                            file, rec);
+                            given, rec);
               refused++;
             }
           } else {
@@ -716,7 +716,7 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
               hts_log_print(opt, LOG_WARNING,
                             "Cookies: ignoring a line with fewer than 7 "
                             "fields or no name: %s",
-                            file);
+                            given);
               refused++;
             } else if (tabs > 7 ||
                        (tabs == 7 && strcmp(cookie_get(buffer, rec, 7),
@@ -725,22 +725,22 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
               hts_log_print(opt, LOG_WARNING,
                             "Cookies: ignoring a line with more than 7 "
                             "fields: %s",
-                            file);
+                            given);
               refused++;
             } else if (!cookie_is_number(cookie_get(buffer, rec, 4))) {
               hts_log_print(opt, LOG_WARNING,
                             "Cookies: ignoring a line whose expiry is not a "
                             "whole number: %s",
-                            file);
+                            given);
               refused++;
             } else if (cookie_load_field(opt, domain, sizeof(domain), buffer,
-                                         rec, 0, "domain", file) &&
+                                         rec, 0, "domain", given) &&
                        cookie_load_field(opt, path, sizeof(path), buffer, rec,
-                                         2, "path", file) &&
+                                         2, "path", given) &&
                        cookie_load_field(opt, cook_name, sizeof(cook_name),
-                                         buffer, rec, 5, "name", file) &&
+                                         buffer, rec, 5, "name", given) &&
                        cookie_load_field(opt, cook_value, sizeof(cook_value),
-                                         buffer, rec, 6, "value", file)) {
+                                         buffer, rec, 6, "value", given)) {
               cookie_attr attr;
               char host[256];
 
@@ -760,7 +760,7 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
                 if (repeated) {
                   hts_log_print(opt, LOG_WARNING,
                                 "Cookies: '%.64s' appears twice in %s",
-                                cook_name, file);
+                                cook_name, given);
                   refused++;
                 }
                 if (cookie_set(cookie, cook_name, cook_value, domain, path,
@@ -769,7 +769,7 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
                   hts_log_print(opt, LOG_WARNING,
                                 "Cookies: the jar did not store '%.64s' from "
                                 "%s",
-                                cook_name, file);
+                                cook_name, given);
                   refused++;
                 } else if (seen != NULL && !repeated) {
                   (void) cookie_set(seen, cook_name, "", domain, path, NULL);
@@ -783,7 +783,7 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
       }
       if (!feof(fp)) {
         hts_log_print(opt, LOG_WARNING,
-                      "Cookies: stopped reading before the end of %s", file);
+                      "Cookies: stopped reading before the end of %s", given);
         refused++;
       }
       // a crash before the data reached the disk may leave an empty file
@@ -792,7 +792,7 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
         hts_log_print(opt, LOG_WARNING,
                       "Cookies: %s is empty but its .bak is not, so it is "
                       "left unchanged until you restore or delete the .bak",
-                      file);
+                      given);
         keep = HTS_TRUE;
       }
       fclose(fp);
@@ -802,14 +802,14 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
       // the file exists, so a rewrite would replace what was never read
       hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
                     "Cookies: could not read %s, so it is left unchanged",
-                    file);
+                    given);
       return COOKIE_LOAD_KEEP;
     } else if (has_bak) {
       // a save that died midway may have left only the backup
       hts_log_print(opt, LOG_WARNING,
                     "Cookies: %s is missing but its .bak exists, so it is "
                     "not created until you restore or delete the .bak",
-                    file);
+                    given);
       return COOKIE_LOAD_KEEP;
     }
   }
