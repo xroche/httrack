@@ -4775,7 +4775,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                   back[i].url_adr, back[i].url_fil);
                     hts_log_print(opt, LOG_WARNING,
                                   "Solve the challenge in a browser, then pass "
-                                  "its cookies with --cookies-file. The "
+                                  "its cookies with --cookies-file and its "
+                                  "exact user-agent with --user-agent. The "
                                   "clearance expires, and is tied to that "
                                   "browser's address and user-agent.");
                   }

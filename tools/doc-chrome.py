@@ -27,6 +27,7 @@ NAV = [
         [
             ("guide.html", "Interface guide"),
             ("faq.html", "FAQ and troubleshooting"),
+            ("login.html", "Sites behind a login"),
             ("abuse.html", "Using HTTrack responsibly"),
         ],
     ),
@@ -72,6 +73,7 @@ TITLES = {
     "fcguide.html": "HTTrack Users Guide, by Fred Cohen (3.10)",
     "filters.html": "HTTrack filter syntax",
     "library.html": "The libhttrack library",
+    "login.html": "Mirror a site behind a login or a CAPTCHA",
     "plug.html": "HTTrack callbacks and plugins",
     "plug_330.html": "HTTrack callbacks, 3.30 and earlier",
     "scripting.html": "Scripting HTTrack",
@@ -96,6 +98,8 @@ DESCRIPTIONS = {
     "filters.html": "HTTrack filter syntax: wildcards, and the size and MIME-type"
     " forms of a scan rule.",
     "library.html": "Linking against the libhttrack library.",
+    "login.html": "Copy a site that needs a login or a CAPTCHA: export the cookies"
+    " of your browser, and give HTTrack the same User-Agent.",
     "plug.html": "Plugging your own C functions into the HTTrack engine.",
     "plug_330.html": "The HTTrack callback API as it was in release 3.30 and earlier.",
     "scripting.html": "Driving the httrack command-line program from shell and"

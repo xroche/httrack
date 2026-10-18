@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- doc-chrome:head -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Copy a site that needs a login or a CAPTCHA: export the cookies of your browser, and give HTTrack the same User-Agent.">
+<link rel="stylesheet" href="doc.css">
+<script src="doc.js" defer></script>
+<!-- /doc-chrome:head -->
+<title>Mirror a site behind a login or a CAPTCHA</title>
+</head>
+<body>
+
+<!-- doc-chrome:top -->
+<!-- doc-chrome:masthead -->
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+	<img src="images/wordmark.svg" width="400" height="36" alt="HTTrack Website Copier">
+	<div class="tagline">Free software offline browser</div>
+</header>
+<!-- /doc-chrome:masthead -->
+
+<div class="wrap">
+
+<nav class="toc" aria-label="Documentation">
+	<h2>On this page</h2>
+	<ul>
+		<li><a href="#when">When to use this method</a></li>
+		<li><a href="#how">How it works</a></li>
+		<li><a href="#export">Step 1: export the cookies</a></li>
+		<li><a href="#user-agent">Step 2: find the User-Agent of your browser</a></li>
+		<li><a href="#run">Step 3: run HTTrack</a></li>
+		<li><a href="#limits">Limits</a></li>
+	</ul>
+	<h2>Start here</h2>
+	<ul>
+		<li><a href="guide.html">Interface guide</a></li>
+		<li><a href="faq.html">FAQ and troubleshooting</a></li>
+		<li><a href="login.html" aria-current="page" class="here">Sites behind a login</a></li>
+		<li><a href="abuse.html">Using HTTrack responsibly</a></li>
+	</ul>
+	<h2>Command line</h2>
+	<ul>
+		<li><a href="cmdguide.html">Command-line guide</a></li>
+		<li><a href="httrack.man.html">Option reference</a></li>
+		<li><a href="filters.html">Filter syntax</a></li>
+	</ul>
+	<h2>Developers</h2>
+	<ul>
+		<li><a href="dev.html">Programming</a></li>
+		<li><a href="library.html">libhttrack API</a></li>
+		<li><a href="plug.html">Callbacks</a></li>
+		<li><a href="scripting.html">Scripting</a></li>
+		<li><a href="cache.html">Cache format</a></li>
+		<li><a href="changes.html">Change report format</a></li>
+	</ul>
+	<h2>More</h2>
+	<ul>
+		<li><a href="fcguide.html">Users Guide (3.10)</a></li>
+		<li><a href="contact.html">Contact and credits</a></li>
+		<li><a href="index.html">All documentation</a></li>
+	</ul>
+</nav>
+
+<main id="main">
+<!-- /doc-chrome:top -->
+
+<h1>Mirror a site behind a login or a CAPTCHA</h1>
+
+<p class="lede">Some sites show their pages only after you log in, or only after you pass a
+check such as a CAPTCHA. HTTrack cannot fill in a login form and cannot solve a CAPTCHA.
+But it can use the session of a browser where you already logged in.</p>
+
+<h2 id="when">When to use this method</h2>
+
+<p>Use it when one of these is true:</p>
+<ul>
+<li>The site has a login form, a single sign-on page (SSO), or a second step such as a
+code from your phone (2FA).</li>
+<li>The site shows a CAPTCHA, or a "checking your browser" page, before the content.</li>
+<li>The mirror contains the login page instead of the pages that you see in your
+browser.</li>
+</ul>
+
+<p>Some sites ask for a user name and a password in a small browser window (HTTP Basic
+authentication). For these sites, you do not need this method. Put the user name and
+the password in the address, for example <code>https://user:password@example.com/</code>.
+The <a href="faq.html#QM6">FAQ</a> tells more.</p>
+
+<h2 id="how">How it works</h2>
+
+<p>When you log in, the site gives your browser a cookie. The browser sends this cookie
+with each request, so the site knows that you are logged in. You copy the cookies from
+your browser into a file, and HTTrack sends the same cookies.</p>
+
+<p>You also give HTTrack the User-Agent of your browser. The User-Agent is the text that
+tells the site which browser it talks to. Some sites accept a cookie only from the
+browser that received it.</p>
+
+<h2 id="export">Step 1: export the cookies</h2>
+
+<ol>
+<li>Log in to the site with your usual browser. If there is a CAPTCHA, solve it. Then
+open a page that you want to copy, to make sure that you are logged in.</li>
+<li>Save the cookies of this site to a file named <code>cookies.txt</code>, in the
+Netscape format. Two tools can do this:
+<ul>
+<li><b>A browser extension.</b> The extension "Get cookies.txt LOCALLY" is open source,
+and it is available for Firefox and Chrome. It writes the file on your computer and
+sends nothing to other computers. Export only the cookies of the site that you want
+to copy.</li>
+<li><b>curl.</b> For a simple login form, curl can log in and save the cookies with its
+<code>-c</code> option:
+<pre>curl -c cookies.txt -d 'user=me&amp;password=secret' https://example.com/login</pre>
+Change the field names and the address to match the form. This does not work if the
+login has a CAPTCHA or a second step.</li>
+</ul></li>
+</ol>
+
+<div class="note">
+<p><b>Be careful with cookie extensions.</b> An extension that reads your cookies has
+the keys to all your accounts. An older extension with a similar name, "Get
+cookies.txt" (without "LOCALLY"), sent the data of its users to a remote server. It was
+removed from the Chrome Web Store in 2023. Do not install it.</p>
+<p><b>A cookie file is as good as your password.</b> A person who has the file can use
+your session. Do not share it, and delete it when the copy is done. When a crawl ends,
+HTTrack also writes the cookies that it holds to <code>cookies.txt</code> in the
+project folder. Delete that file too.</p>
+</div>
+
+<p>Most session cookies are marked "HttpOnly". In a <code>cookies.txt</code> file, the
+lines of these cookies start with <code>#HttpOnly_</code>. Recent versions of HTTrack
+read these lines. Older versions think that they are comments and ignore them, so the
+login does not work. With an older version, remove <code>#HttpOnly_</code> from the
+start of these lines.</p>
+
+<h2 id="user-agent">Step 2: find the User-Agent of your browser</h2>
+
+<p>Use the same browser that you logged in with:</p>
+<ul>
+<li><b>Firefox:</b> type <code>about:support</code> in the address bar. Copy the
+"User Agent" line in the "Application Basics" section.</li>
+<li><b>Chrome or Edge:</b> type <code>chrome://version</code> (or
+<code>edge://version</code>) in the address bar. Copy the "User agent" line.</li>
+<li><b>All browsers:</b> press F12 to open the developer tools, and open the
+"Console" tab. Type <code>navigator.userAgent</code> and press Enter.</li>
+</ul>
+
+<p>Copy the full text, with no change. It starts with <code>Mozilla/5.0</code>.</p>
+
+<h2 id="run">Step 3: run HTTrack</h2>
+
+<p>On the command line, give the cookie file with <code>--cookies-file</code>
+(<code>-%K</code>) and the User-Agent with <code>--user-agent</code> (<code>-F</code>):</p>
+
+<pre>httrack https://example.com/members/ -O mysite \
+    --cookies-file cookies.txt \
+    --user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36" \
+    --sockets=2 \
+    "-*logout*" "-*signout*" "-*sign-out*"</pre>
+
+<ul>
+<li>Use the User-Agent that you copied in step 2, not the one in this example.</li>
+<li><code>--sockets=2</code> (<code>-c2</code>) opens only two connections at a time.
+Many fast requests from one logged-in user look like abuse, and the site can then end
+your session.</li>
+<li>The filters <code>"-*logout*"</code>, <code>"-*signout*"</code> and
+<code>"-*sign-out*"</code> stop HTTrack from following the logout link. A visit to that
+link ends your session. Look at the address of the logout link on your site, and add a
+filter for it if its name is different. The <a href="filters.html">filter syntax</a>
+page tells more.</li>
+<li>When the User-Agent is a browser, recent versions also send the other headers that
+this browser sends (<code>--browser-headers</code>, <code>-%Q</code>). This is on by
+default.</li>
+</ul>
+
+<p>If you put the file in the project folder with the name <code>cookies.txt</code>,
+HTTrack also reads it without <code>--cookies-file</code>.</p>
+
+<h3 id="winhttrack">WinHTTrack and WebHTTrack</h3>
+
+<p>Click "Set options", then:</p>
+<ul>
+<li>On the "Spider" tab, type the path of the file in "Load cookies from file". Keep
+"Accept cookies" selected.</li>
+<li>On the "Browser ID" tab, paste the User-Agent in "Identity".</li>
+<li>On the "Flow Control" tab, set "N# connections" to 2.</li>
+<li>On the "Scan Rules" tab, add <code>-*logout*</code> and the other logout
+filters.</li>
+</ul>
+
+<p>A built-in "log in with a browser" step is planned for WinHTTrack and for the Android
+app.</p>
+
+<h2 id="limits">Limits</h2>
+
+<ul>
+<li><b>Cookies expire.</b> A session can end after some minutes or some days. If the
+mirror starts to contain login pages again, log in again, export the cookies again,
+and continue the mirror.</li>
+<li><b>Bot protection can still refuse HTTrack.</b> Services such as Cloudflare give a
+"clearance" cookie after a check. This cookie is tied to your IP address, to your
+browser and to your device. HTTrack connects in a different way from a browser, and
+these services can see the difference. So a site with strict protection can refuse
+HTTrack, even with the correct cookies and User-Agent. When HTTrack sees such a
+refusal, it writes a "Bot protection challenge" warning in its log.</li>
+<li><b>HTTrack does not solve CAPTCHAs.</b> It does not use CAPTCHA-solving
+services.</li>
+<li><b>Respect the terms of the site.</b> A login does not give you the right to copy
+everything. Read the terms of use of the site, and read
+<a href="abuse.html">Using HTTrack responsibly</a>.</li>
+</ul>
+
+<!-- doc-chrome:bottom -->
+</main>
+</div>
+
+<dialog id="zoom" aria-label="Enlarged image"><img src="" alt=""></dialog>
+<!-- /doc-chrome:bottom -->
+
+<!-- doc-chrome:footer -->
+<footer>
+	<small>&copy; 1998-2026 Xavier Roche &amp; other contributors - Web Design: Leto Kauler.</small>
+	<a href="https://endsoftwarepatents.org/innovating-without-patents/" target="_blank" rel="noopener" title="This site is innovating without patents!"><img src="images/esp_chicklet.png" width="91" height="17" alt="End Software Patents"></a>
+</footer>
+<!-- /doc-chrome:footer -->
+
+</body>
+</html>

@@ -37,6 +37,7 @@
 	<ul>
 		<li><a href="guide.html">Interface guide</a></li>
 		<li><a href="faq.html" aria-current="page" class="here">FAQ and troubleshooting</a></li>
+		<li><a href="login.html">Sites behind a login</a></li>
 		<li><a href="abuse.html">Using HTTrack responsibly</a></li>
 	</ul>
 	<h2>Command line</h2>
@@ -557,6 +558,7 @@ A: <em>You may need cookies! Cookies are specific data (for example, your userna
 you have logged in certain sites so that you only have to log-in once. For example, after having entered your username in a website, you can
 view pages and articles, and the next time you will go to this site, you will not have to re-enter your username/password.<br>
 To supply your own cookies to an HTTrack project, put a Netscape-format <tt>cookies.txt</tt> file in your project folder, or point HTTrack at one with the <tt>--cookies-file</tt> option. You can export your browser's session cookies to that format with a browser extension.
+<br>The page <a href="login.html">Mirror a site behind a login or a CAPTCHA</a> tells how, step by step.
 </em>
 <br>
 <br>
@@ -787,7 +789,8 @@ A: <em>Yes. See the URL capture abilities (--catchurl for command-line release, 
 A: <em>Yes. See the shell system command option (-V option for command-line release)</em>
 
 <br><br><a NAME="QM6">Q: <strong>Can I use username/password authentication on a site?</strong></a><br>
-A: <em>Yes. Use user:password@your_url (example: <tt>http://foo:bar@www.example.com/private/mybox.html</tt>)</em>
+A: <em>Yes. Use user:password@your_url (example: <tt>http://foo:bar@www.example.com/private/mybox.html</tt>)<br>
+This works for HTTP Basic authentication only. For a login form, see <a href="login.html">Mirror a site behind a login or a CAPTCHA</a>.</em>
 
 <br><br><a NAME="QM7">Q: <strong>Can I use username/password authentication for a proxy?</strong></a><br>
 A: <em>Yes. Use user:password@your_proxy_name as your proxy name (example: <tt>smith:foo@proxy.mycorp.com</tt>)</em>
