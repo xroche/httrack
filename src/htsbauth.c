@@ -40,7 +40,6 @@ Please visit our Website: http://www.httrack.com
 #include "htslib.h"
 #include "htslines.h"
 #include "htscore.h"
-#include "htsdate.h"
 #include "htspsl.h"
 #ifdef _WIN32
 #include "htscharset.h" /* hts_pathToUCS2, hts_convertUCS2StringToUTF8 */
@@ -248,22 +247,20 @@ hts_tristate cookie_max_age_expired(const char *value) {
   const hts_boolean negative = value[0] == '-';
   const char *const digits = value + (negative ? 1 : 0);
   const size_t ndigits = strspn(digits, "0123456789");
-
-  if (ndigits == 0 || digits[ndigits + strspn(digits + ndigits, " \t")] != '\0')
-    return HTS_DEFAULT;
+  const char *const rest = digits + ndigits;
   // digit by digit, so no delta is too large to read
-  return negative || strspn(digits, "0") == ndigits ? HTS_TRUE : HTS_FALSE;
+  const hts_boolean zero = strspn(digits, "0") == ndigits;
+
+  if (ndigits == 0 || *rest != '\0')
+    return HTS_DEFAULT;
+  return negative || zero ? HTS_TRUE : HTS_FALSE;
 }
 
 /* See htsbauth.h. */
-hts_tristate cookie_expires_expired(const char *value, time_t now) {
-  struct tm buffer;
-  struct tm *const tm = convert_time_rfc822(&buffer, value);
-  time_t when;
+hts_tristate cookie_expires_passed(const char *value, time_t now) {
+  // RFC 6265 5.1.1 reads a two-digit year below 70 as 20xx
+  const time_t when = hts_parse_date(value, 69);
 
-  if (tm == NULL)
-    return HTS_DEFAULT;
-  when = timegm(tm);
   if (when == (time_t) -1)
     return HTS_DEFAULT;
   return when <= now ? HTS_TRUE : HTS_FALSE;

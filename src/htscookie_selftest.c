@@ -1059,7 +1059,7 @@ static hts_boolean cookie_sent(const char *hdr, const char *pair) {
 /* RFC 6265 5.3: a Domain= the request host may not claim drops the cookie,
    and an expired Max-Age or Expires erases the stored one. */
 static int st_cookiesetscope(httrackp *opt, int argc, char **argv) {
-#define LABEL "cookie-setscope"
+  static const char LABEL[] = "cookie-setscope";
 #define PAST "Expires=Thu, 01 Jan 1970 00:00:00 GMT"
 #define FUTURE "Expires=Fri, 01 Jan 2100 00:00:00 GMT"
 
@@ -1127,6 +1127,29 @@ static int st_cookiesetscope(httrackp *opt, int argc, char **argv) {
        HTS_TRUE},
       // an empty value with no expiry replaces the old one
       {"del.test", "Set-Cookie: g=", "del.test", "g=1", HTS_FALSE},
+      // a two-digit year below 70 is 20xx (RFC 6265 5.1.1)
+      {"del.test", "Set-Cookie: y60=1; Expires=Sun, 01-Jan-60 00:00:00 GMT",
+       "del.test", "y60=1", HTS_TRUE},
+      {"del.test", "Set-Cookie: y69=1; Expires=Tue, 01-Jan-69 00:00:00 GMT",
+       "del.test", "y69=1", HTS_TRUE},
+      {"del.test", "Set-Cookie: y50=1; Expires=Sat, 01-Jan-50 00:00:00 GMT",
+       "del.test", "y50=1", HTS_TRUE},
+      {"del.test", "Set-Cookie: y70=1", "del.test", "y70=1", HTS_TRUE},
+      {"del.test", "Set-Cookie: y70=1; Expires=Thu, 01-Jan-70 00:00:00 GMT",
+       "del.test", "y70=1", HTS_FALSE},
+      // a later invalid duplicate is ignored, not a reset
+      {"del.test", "Set-Cookie: dm=1", "del.test", "dm=1", HTS_TRUE},
+      {"del.test", "Set-Cookie: dm=1; Max-Age=0; Max-Age=soon", "del.test",
+       "dm=1", HTS_FALSE},
+      {"del.test", "Set-Cookie: de=1", "del.test", "de=1", HTS_TRUE},
+      {"del.test", "Set-Cookie: de=1; " PAST "; Expires=garbage", "del.test",
+       "de=1", HTS_FALSE},
+      // a value's trailing whitespace is trimmed
+      {"a.b.test", "Set-Cookie: tw=1; Domain=b.test ; Path=/", "c.b.test",
+       "tw=1", HTS_TRUE},
+      {"del.test", "Set-Cookie: mt=1", "del.test", "mt=1", HTS_TRUE},
+      {"del.test", "Set-Cookie: mt=1; Max-Age=0 ", "del.test", "mt=1",
+       HTS_FALSE},
       // rotation still replaces
       {"del.test", "Set-Cookie: w=1", "del.test", "w=1", HTS_TRUE},
       {"del.test", "Set-Cookie: w=2", "del.test", "w=1", HTS_FALSE},
@@ -1174,7 +1197,6 @@ static int st_cookiesetscope(httrackp *opt, int argc, char **argv) {
   return err;
 #undef FUTURE
 #undef PAST
-#undef LABEL
 }
 
 /* ------------------------------------------------------------ */

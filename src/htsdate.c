@@ -50,6 +50,11 @@ static void lowcase(char *s) {
 }
 
 struct tm *convert_time_rfc822(struct tm *result, const char *s) {
+  return convert_time_rfc822_pivot(result, s, 50);
+}
+
+struct tm *convert_time_rfc822_pivot(struct tm *result, const char *s,
+                                     int pivot) {
   char months[] = "jan feb mar apr may jun jul aug sep oct nov dec";
   char str[256];
   char *a;
@@ -129,7 +134,7 @@ struct tm *convert_time_rfc822(struct tm *result, const char *s) {
       result->tm_hour = result_n2;
       result->tm_min = result_n3;
       result->tm_sec = result_n4 > 0 ? result_n4 : 0;
-      if (result_n1 <= 50) /* 00 means 2000 */
+      if (result_n1 <= pivot) /* 00 means 2000 */
         result->tm_year = result_n1 + 100;
       else if (result_n1 < 1000) /* 99 means 1999 */
         result->tm_year = result_n1;

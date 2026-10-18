@@ -2318,7 +2318,7 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
       int next = 0;
       hts_boolean has_domain = HTS_FALSE;
       hts_tristate max_age_expired = HTS_DEFAULT;
-      hts_tristate expires_expired = HTS_DEFAULT;
+      hts_tristate expires_passed = HTS_DEFAULT;
 
       name[0] = value[0] = '\0';
       //
@@ -2351,6 +2351,9 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
           while((*a != ';') && (*a))
             a++; // prochain ;
           value_end = a;
+          // RFC 6265 5.2 trims the value
+          while (value_end > value_st && is_realspace(value_end[-1]))
+            value_end--;
           // vérifier débordements
           if ((((int) (token_end - token_st)) < 200) &&
               (((int) (value_end - value_st)) < 8000) &&
@@ -2369,8 +2372,10 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
             /* RFC 6265 5.2 ignores an attribute with an empty value, but a
                cookie may have one: "name=; Max-Age=0" is how one is erased */
             if (value_len == 0 && strnotempty(cook_name)) {
+              // ignored
             } else if (strfield2(name, "domain")) {
               if (value_len == 0 || strcmp(value, ".") == 0) {
+                // ignored, so the cookie stays on the host
               } else if ((size_t) value_len < sizeof(domain) - 1) {
                 strcpybuff(domain, value);
                 has_domain = HTS_TRUE;
@@ -2380,6 +2385,7 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
               }
             } else if (strfield2(name, "path")) {
               if (value_len == 0) {
+                // ignored, so the path stays "/"
               } else if ((size_t) value_len < sizeof(path) - 1) {
                 strcpybuff(path, value);
               } else {
@@ -2387,9 +2393,16 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
                 break;
               }
             } else if (strfield2(name, "max-age")) {
-              max_age_expired = cookie_max_age_expired(value);
+              const hts_tristate got = cookie_max_age_expired(value);
+
+              // an invalid value is ignored, not a reset (5.3)
+              if (got != HTS_DEFAULT)
+                max_age_expired = got;
             } else if (strfield2(name, "expires")) {
-              expires_expired = cookie_expires_expired(value, time(NULL));
+              const hts_tristate got = cookie_expires_passed(value, time(NULL));
+
+              if (got != HTS_DEFAULT)
+                expires_passed = got;
             } else if (strfield2(name, "version")) {
               // ignoré..
             } else if (strfield2(name, "comment")) {
@@ -2424,7 +2437,7 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
         /* Max-Age outranks Expires (RFC 6265 5.3 step 3) */
         const hts_boolean expired = max_age_expired != HTS_DEFAULT
                                         ? max_age_expired == HTS_TRUE
-                                        : expires_expired == HTS_TRUE;
+                                        : expires_passed == HTS_TRUE;
 
 #if DEBUG_COOK
         printf
@@ -2433,9 +2446,9 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
 #endif
         // a Domain= the host may not claim drops the cookie (5.3 step 6)
         if (has_domain &&
-            (adr == NULL || !cookie_domain_allowed(domain, scoped)))
-          continue;
-        if (expired)
+            (adr == NULL || !cookie_domain_allowed(domain, scoped))) {
+          // ignored
+        } else if (expired)
           cookie_del(cookie, cook_name, domain, path);
         else
           cookie_add(cookie, cook_name, cook_value, domain, path);
@@ -3647,13 +3660,8 @@ int hts_parse_retry_after(const char *value, time_t now) {
   }
 
   {
-    struct tm buffer;
-    struct tm *tm_s = convert_time_rfc822(&buffer, p);
-    time_t when;
+    const time_t when = hts_parse_date(p, 50);
 
-    if (tm_s == NULL)
-      return -1;
-    when = timegm(tm_s);
     if (when == (time_t) -1)
       return -1;
     if (when <= now)
@@ -3664,6 +3672,14 @@ int hts_parse_retry_after(const char *value, time_t now) {
       return INT_MAX;
     return (int) (when - now);
   }
+}
+
+/* See htslib.h. */
+time_t hts_parse_date(const char *s, int pivot) {
+  struct tm buffer;
+  struct tm *const tm_s = convert_time_rfc822_pivot(&buffer, s, pivot);
+
+  return tm_s != NULL ? timegm(tm_s) : (time_t) -1;
 }
 
 /* sets file time from RFC822 date+time, -1 if error*/

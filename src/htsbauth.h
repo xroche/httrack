@@ -40,7 +40,6 @@ Please visit our Website: http://www.httrack.com
 #define HTSBAUTH_DEFH
 
 #include <sys/types.h>
-#include <time.h>
 
 #include "htsglobal.h" /* hts_boolean */
 
@@ -73,6 +72,8 @@ struct t_cookie {
 
 /* Library internal definitions */
 #ifdef HTS_INTERNAL_BYTECODE
+
+#include <time.h>
 
 #ifndef HTS_DEF_FWSTRUCT_httrackp
 #define HTS_DEF_FWSTRUCT_httrackp
@@ -132,16 +133,18 @@ hts_boolean cookie_domain_match(const char *jar_dom, const char *host);
 
 /** May a Set-Cookie from HOST, normalised by cookie_host, carry the Domain
     attribute DOMAIN? RFC 6265 5.3 says yes when DOMAIN is HOST itself, or a
-    parent of it that is not a public suffix. */
+    parent of it that is not a public suffix. A leading '.' on DOMAIN is
+    accepted. When no suffix list is loaded, every parent domain is allowed. */
 hts_boolean cookie_domain_allowed(const char *domain, const char *host);
 
 /** Has a Set-Cookie Max-Age VALUE expired the cookie (RFC 6265 5.2.2)?
-    HTS_DEFAULT when VALUE is no delta-seconds, so the attribute is ignored. */
+    HTS_DEFAULT when VALUE is not a whole number, so the attribute is
+    ignored. */
 hts_tristate cookie_max_age_expired(const char *value);
 
 /** Has a Set-Cookie Expires VALUE passed at NOW (RFC 6265 5.2.1)?
-    HTS_DEFAULT when VALUE is no date, so the attribute is ignored. */
-hts_tristate cookie_expires_expired(const char *value, time_t now);
+    HTS_DEFAULT when VALUE is not a date, so the attribute is ignored. */
+hts_tristate cookie_expires_passed(const char *value, time_t now);
 
 /** First jar record at or after s whose name (an empty cook_name accepts any),
     domain and path match, or NULL. The domain match folds case, and the
