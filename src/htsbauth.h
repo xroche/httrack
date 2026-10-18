@@ -136,6 +136,12 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *path,
     file could not be opened. */
 int cookie_save(t_cookie *cookie, const char *name);
 
+/** Write the jar over the cookies file name the user gave, after moving
+    the old file to <name>.bak (an older .bak is replaced). A failure is
+    logged through opt, which may be NULL, and leaves the .bak alone. Returns
+    0 when written or when the jar is empty, -1 otherwise. */
+int cookie_save_replacing(httrackp *opt, t_cookie *cookie, const char *name);
+
 /** Insert ins in front of the string at s, whose buffer holds s_size bytes. */
 void cookie_insert(char *s, size_t s_size, const char *ins);
 

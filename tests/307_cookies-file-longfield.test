@@ -56,9 +56,9 @@ rc=0
 # 134 is the SIGABRT the unchecked strcpybuff produced here before the fix
 assert_eq 0 "$rc" "crawl exit status"
 
-# the jar is written back when the mirror ends, so it says what was loaded.
-# cookie_save() ends its lines with LF, which is CRLF on Windows.
-jar_out="$out/cookies.txt"
+# the jar is written back over --cookies-file when the mirror ends, so it says
+# what was loaded. cookie_save() ends its lines with LF, which is CRLF on Windows.
+jar_out="$jar"
 assert_file "$jar_out" "reloaded jar"
 loaded=$(tr -d '\r' <"$jar_out")
 log=$(tr -d '\r' <"$out/hts-log.txt")

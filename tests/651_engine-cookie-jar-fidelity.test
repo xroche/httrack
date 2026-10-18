@@ -21,3 +21,30 @@ bash "$top_srcdir/tests/local-crawl.sh" --cookie 'session=opensesame' \
 bash "$top_srcdir/tests/local-crawl.sh" --cookie 'session=opensesame' \
     --found 'gated/secret.html' --log-not-found 'Cookies are disabled' \
     httrack 'BASEURL/gated/index.php' -o0
+
+# The jar goes back over --cookies-file, whose old bytes move to .bak, and not
+# to the mirror's own cookies.txt. Without the option it still goes there.
+bin=$(httrack_path)
+site="$dir/site"
+mkdir -p "$site"
+echo '<html>hello</html>' >"$site/index.html"
+jar="$dir/jar.txt"
+printf 'www.example.com\tTRUE\t/\tFALSE\t0\tkept\t1\n' >"$jar"
+cp "$jar" "$dir/orig.txt"
+"$bin" "file://$site/index.html" -O "$dir/m1" --cookies-file "$jar" --quiet \
+    >/dev/null 2>&1
+cmp "$jar.bak" "$dir/orig.txt" || fail "jar.bak is not the original file"
+want=$(printf 'www.example.com\tTRUE\t/\tFALSE\t0\tkept\t1')
+# cookie_save() ends its lines with CRLF on Windows
+grep -qxF "$want" <<<"$(tr -d '\r' <"$jar")" || fail "the cookies file does not hold the jar"
+test ! -e "$dir/m1/cookies.txt" || fail "the mirror's cookies.txt was written"
+cp "$jar" "$dir/run1.txt"
+"$bin" "file://$site/index.html" -O "$dir/m2" --cookies-file "$jar" --quiet \
+    >/dev/null 2>&1
+cmp "$jar.bak" "$dir/run1.txt" || fail "a second run did not rotate jar.bak"
+mkdir "$dir/cwd"
+cp "$dir/orig.txt" "$dir/cwd/cookies.txt"
+(cd "$dir/cwd" && "$bin" "file://$site/index.html" -O "$dir/m3" --quiet \
+    >/dev/null 2>&1)
+subshell_ok $?
+assert_file "$dir/m3/cookies.txt" "the mirror's cookies.txt without the option"

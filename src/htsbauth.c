@@ -646,6 +646,39 @@ int cookie_save(t_cookie * cookie, const char *name) {
   return -1;
 }
 
+/* See htsbauth.h. */
+int cookie_save_replacing(httrackp *opt, t_cookie *cookie, const char *name) {
+  char file[CATBUFF_SIZE];
+  char bak[CATBUFF_SIZE];
+
+  if (!strnotempty(cookie->data))
+    return 0; // nothing to write, so the user's file stays as it was
+  fconv(file, sizeof(file), name);
+  if (!slprintfbuff(bak, sizeof(bak), "%s.bak", file)) {
+    hts_log_print(opt, LOG_WARNING, "Cookies: no room to name a backup of %s",
+                  name);
+    return -1;
+  }
+  if (fexist_utf8(file)) {
+    // Windows renames over no existing file
+    (void) UNLINK(bak);
+    if (RENAME(file, bak) != 0) {
+      hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
+                    "Cookies: could not back up %s, so it is not rewritten",
+                    name);
+      return -1;
+    }
+  }
+  if (cookie_save(cookie, file) != 0) {
+    hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
+                  "Cookies: could not write %s, its previous content is in "
+                  "%s.bak",
+                  name, name);
+    return -1;
+  }
+  return 0;
+}
+
 // Insert string ins before s. s_size is the capacity of the buffer at s.
 void cookie_insert(char *s, size_t s_size, const char *ins) {
   char *buff;

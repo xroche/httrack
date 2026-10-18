@@ -166,7 +166,8 @@ rc=0
 "$bin" "file://$d3/index.html" -O "$d3/out" --cookies-file "$jar" --quiet \
     >/dev/null 2>&1 || rc=$?
 test "$rc" -eq 0 || fail "cookie crawl exited $rc"
-loaded=$(tr -d '\r' <"$d3/out/cookies.txt")
+# the jar is written back over --cookies-file
+loaded=$(tr -d '\r' <"$jar")
 grep -qxF "$(rec GOODNEXT v2)" <<<"$loaded" || fail "the cookie after the long lines was lost"
 for gone in TAILCOOKIE NULCUT; do
     if grep -q "$gone" <<<"$loaded"; then
