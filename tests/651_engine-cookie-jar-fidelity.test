@@ -209,6 +209,32 @@ if ! target_is_windows; then
     cmp "$dir/linkdir/sub/real.bak" "$dir/orig.txt" ||
         fail "the link target's .bak is not the original file"
     test ! -e "$dir/linkdir/jar.txt.bak" || fail "the .bak went beside the link"
+    # the empty-file and missing-file guards read the .bak beside the target
+    mkdir -p "$dir/link2/sub"
+    : >"$dir/link2/sub/real"
+    cp "$dir/orig.txt" "$dir/link2/sub/real.bak"
+    ln -s sub/real "$dir/link2/jar.txt"
+    run -O "$dir/m16" --cookies-file "$dir/link2/jar.txt"
+    test ! -s "$dir/link2/sub/real" || fail "an empty link target was rewritten"
+    cmp "$dir/link2/sub/real.bak" "$dir/orig.txt" ||
+        fail "the .bak of an empty link target changed"
+    grep -q 'is empty but its \.bak is not' "$dir/m16/hts-log.txt" ||
+        fail "no warning that the link target is empty"
+    # a dangling link is left alone, with or without a .bak beside its target,
+    # even when the crawl set cookies to save
+    for b in bak nobak; do
+        mkdir -p "$dir/link-$b/sub"
+        test "$b" = nobak || cp "$dir/orig.txt" "$dir/link-$b/sub/real.bak"
+        ln -s sub/real "$dir/link-$b/jar.txt"
+        crawl --found 'cookies/entrance.html' \
+            --log-found 'is a symbolic link to a missing file' \
+            httrack 'BASEURL/cookies/entrance.php' -o0 -r1 \
+            --cookies-file "$dir/link-$b/jar.txt"
+        test -L "$dir/link-$b/jar.txt" || fail "$b: a dangling link became a file"
+        test ! -e "$dir/link-$b/sub/real" || fail "$b: a dangling link was followed"
+        test "$b" = nobak || cmp "$dir/link-$b/sub/real.bak" "$dir/orig.txt" ||
+            fail "$b: the .bak behind a dangling link changed"
+    done
 fi
 
 # A cookies file that does not exist yet is created
@@ -276,3 +302,18 @@ if ! test -r "$unread"; then
 fi
 chmod u+rw "$unread"
 cmp "$unread" "$dir/orig.txt" || fail "an unreadable cookies file changed"
+
+# Without --cookies-file, an unreadable project jar is not overwritten either.
+# The current directory's jar gives the crawl a cookie to save.
+mkdir -p "$dir/cwd18" "$dir/m18"
+cp "$dir/orig.txt" "$dir/cwd18/cookies.txt"
+cp "$dir/orig.txt" "$dir/m18/cookies.txt"
+chmod 0200 "$dir/m18/cookies.txt"
+if ! test -r "$dir/m18/cookies.txt"; then
+    (cd "$dir/cwd18" && run -O "$dir/m18")
+    subshell_ok $?
+    grep -q 'could not read' "$dir/m18/hts-log.txt" ||
+        fail "no warning that the project jar could not be read"
+fi
+chmod u+rw "$dir/m18/cookies.txt"
+cmp "$dir/m18/cookies.txt" "$dir/orig.txt" || fail "an unreadable project jar changed"

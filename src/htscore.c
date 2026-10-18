@@ -191,7 +191,7 @@ RUN_CALLBACK0(opt, end); \
       else if (cookies_file_refused != COOKIE_LOAD_KEEP) /* it said why */     \
         cookie_save_replacing(opt, opt->cookie,                                \
                               StringBuff(opt->cookies_file));                  \
-    } else if (opt->accept_cookie)                                             \
+    } else if (opt->accept_cookie && cookies_file_refused != COOKIE_LOAD_KEEP) \
       cookie_save(opt->cookie,                                                 \
                   fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),           \
                           StringBuff(opt->path_log), "cookies.txt"));          \
@@ -683,7 +683,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   hash_struct hash;             // système de hachage, accélère la recherche dans les liens
   hash_struct *const hashptr = &hash;
   t_cookie BIGSTK cookie;       // gestion des cookies
-  int cookies_file_refused = 0; // lines a rewrite of -%K would lose
+  int cookies_file_refused = 0; // cookie_load result for the jar to rewrite
 
   int ptr;                      // pointeur actuel sur les liens
   int retcode = 1; // return code for the single exit; a bailout sets -1
@@ -788,7 +788,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
       cookies_file_refused =
           cookie_load(opt, opt->cookie, "", StringBuff(opt->cookies_file));
     } else {
-      cookie_load(opt, opt->cookie, StringBuff(opt->path_log), "cookies.txt");
+      cookies_file_refused = cookie_load(
+          opt, opt->cookie, StringBuff(opt->path_log), "cookies.txt");
       cookie_load(opt, opt->cookie, "", "cookies.txt");
     }
   } else {

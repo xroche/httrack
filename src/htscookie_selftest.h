@@ -43,7 +43,7 @@ Please visit our Website: http://www.httrack.com
 #define COOKIE_FAULT_COPY_READ 8  /**< the copy reports a read error */
 #define COOKIE_FAULT_COPY_CLOSE 16 /**< closing the copy fails */
 
-/* The faults in force, which stays 0 outside the self-tests. */
+/* Faults to inject. It stays 0 outside the self-tests. */
 extern int cookie_save_fault_selftest;
 
 #endif

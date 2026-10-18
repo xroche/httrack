@@ -127,9 +127,11 @@ hts_boolean cookie_sendable(const char *rec, hts_boolean https, int64_t now);
     field that does not fit, a cookie the jar refuses, a repeated cookie, and
     a comment no known tool writes. Returns the count, or -1 if the file does
     not exist and has no <name>.bak. Returns COOKIE_LOAD_KEEP after a warning
-    when no rewrite may replace the file: it cannot be opened, it is missing
-    while its .bak exists, or it is empty while its .bak is not. Blank lines,
-    known header comments and expired cookies are not counted. */
+    when the crawl must not rewrite the file: it cannot be opened, it is a
+    dangling symbolic link, it is missing while its .bak exists, it is empty
+    while its .bak is not, or memory ran out. A symbolic link is followed, so
+    the .bak is the one beside its target. Blank lines, known header comments
+    and expired cookies are not counted. */
 int cookie_load(httrackp *opt, t_cookie *cookie, const char *path,
                 const char *name);
 #define COOKIE_LOAD_KEEP (-2)
@@ -139,9 +141,10 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *path,
     was empty, and -1 when any open, write or close failed. */
 int cookie_save(t_cookie *cookie, const char *name);
 
-/** Write the jar to <name>.tmp, keep the old file as <name>.bak, then move
-    the new file over name in one step. So name holds the old or the new jar
-    whatever fails, and a symbolic link keeps pointing at it. An empty jar
+/** Write the jar to <file>.tmp, keep the old file as <file>.bak, then move
+    the new file over file in one step, where file is name with symbolic links
+    followed. So file holds the old or the new jar whatever fails, and the link
+    keeps pointing at file. A dangling link is not rewritten. An empty jar
     writes a header alone, or nothing when name does not exist. A failure is
     logged through opt, which may be NULL. */
 void cookie_save_replacing(httrackp *opt, t_cookie *cookie, const char *name);

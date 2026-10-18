@@ -1482,6 +1482,8 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
           {"Sun, 06 Nov 1994 08:49:37 GMT", 784111777LL},
           {"Wed, 01 Mar 2000 00:00:00 GMT", 951868800LL},
           {"Tue, 29 Feb 2000 23:59:59 GMT", 951868799LL},
+          {"Wed, 15 Jul 2026 12:00:00 GMT", 1784116800LL},
+          {"Thu, 31 Dec 2026 23:59:59 GMT", 1798761599LL},
       };
 
       for (i = 0; i < sizeof(dates) / sizeof(dates[0]); i++) {
@@ -1492,6 +1494,23 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
             when != dates[i].unix_time) {
           printf("%s: %s read as " LLintP "\n", LABEL, dates[i].date,
                  (LLint) when);
+          err = 1;
+        }
+      }
+    }
+    // out-of-range fields are capped, not overflowed
+    {
+      static const char *const huge[] = {
+          "Thu, 2147483647 Jan 2027 00:00:00 GMT",
+          "2147483647 Dec 2147483647 2147483647:2147483647:2147483647",
+      };
+
+      for (i = 0; i < sizeof(huge) / sizeof(huge[0]); i++) {
+        int64_t when = 0;
+
+        if (!cookie_expires_time(huge[i], 0, &when) ||
+            when != (int64_t) 400 * 24 * 3600) {
+          printf("%s: %s read as " LLintP "\n", LABEL, huge[i], (LLint) when);
           err = 1;
         }
       }

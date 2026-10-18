@@ -326,14 +326,15 @@ hts_boolean cookie_max_age_time(const char *value, int64_t now, int64_t *when) {
 }
 
 /* Return the Unix time of the UTC date in tm, in 64 bits because a 32-bit
-   time_t ends in 2038. tm_mon must be 0 to 11. */
+   time_t ends in 2038. Every field must be non-negative, with tm_mon 0 to 11,
+   as convert_time_rfc822_pivot yields them. */
 static int64_t cookie_utc_seconds(const struct tm *tm) {
   // days from the civil date, counting years from March (Howard Hinnant)
   const int64_t y = (int64_t) tm->tm_year + 1900 - (tm->tm_mon < 2 ? 1 : 0);
-  const int64_t era = (y >= 0 ? y : y - 399) / 400;
+  const int64_t era = y / 400;
   const int64_t yoe = y - era * 400;
-  const int64_t doy =
-      (153 * ((tm->tm_mon + 10) % 12) + 2) / 5 + tm->tm_mday - 1;
+  const int64_t doy = (153 * (int64_t) ((tm->tm_mon + 10) % 12) + 2) / 5 +
+                      (int64_t) tm->tm_mday - 1;
   const int64_t days =
       era * 146097 + yoe * 365 + yoe / 4 - yoe / 100 + doy - 719468;
 
@@ -346,8 +347,7 @@ hts_boolean cookie_expires_time(const char *value, int64_t now, int64_t *when) {
   struct tm tm;
 
   // RFC 6265 5.1.1 reads a two-digit year below 70 as 20xx
-  if (convert_time_rfc822_pivot(&tm, value, 69) == NULL || tm.tm_mon < 0 ||
-      tm.tm_mon > 11)
+  if (convert_time_rfc822_pivot(&tm, value, 69) == NULL)
     return HTS_FALSE;
   *when = cookie_bound_expiry(cookie_utc_seconds(&tm), now);
   return HTS_TRUE;
@@ -524,6 +524,29 @@ static hts_boolean cookie_known_comment(const char *line) {
 }
 
 /* See htsbauth.h. */
+/* Copy into file the path that name names once symbolic links are followed,
+   so the load and the save find the same .bak. Returns HTS_FALSE when name
+   is a dangling link or the path does not fit. */
+static hts_boolean cookie_resolve(char *file, size_t size, const char *name) {
+#ifndef _WIN32
+  char *real = realpath(name, NULL);
+  struct stat st;
+
+  if (real != NULL) {
+    const hts_boolean fits = strlen(real) < size;
+
+    if (fits)
+      strlcpybuff(file, real, size);
+    freet(real);
+    return fits;
+  }
+  // a save would replace the link by a plain file
+  if (lstat(name, &st) == 0 && S_ISLNK(st.st_mode))
+    return HTS_FALSE;
+#endif
+  return slprintfbuff(file, size, "%s", name);
+}
+
 int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
                 const char *name) {
   char catbuff[CATBUFF_SIZE];
@@ -610,16 +633,24 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
 
   // then cookies.txt
   {
-    // file points into catbuff; nothing below writes catbuff again
-    const char *const file = fconcat(catbuff, sizeof(catbuff), fpath, name);
-    FILE *fp = FOPEN(file, "rb");
-    const int open_errno = errno;
+    const char *const given = fconcat(catbuff, sizeof(catbuff), fpath, name);
+    char file[CATBUFF_SIZE];
+    char bak[CATBUFF_SIZE];
     int refused = 0;
     hts_boolean keep = HTS_FALSE;
-    char bak[CATBUFF_SIZE];
-    const hts_boolean has_bak =
-        slprintfbuff(bak, sizeof(bak), "%s.bak", file) && fexist_utf8(bak);
+    hts_boolean has_bak;
+    FILE *fp;
 
+    if (!cookie_resolve(file, sizeof(file), given)) {
+      hts_log_print(opt, LOG_WARNING,
+                    "Cookies: %s is a symbolic link to a missing file, or its "
+                    "target name is too long, so it is left unchanged",
+                    given);
+      return COOKIE_LOAD_KEEP;
+    }
+    has_bak =
+        slprintfbuff(bak, sizeof(bak), "%s.bak", file) && fexist_utf8(bak);
+    fp = FOPEN(file, "rb");
     if (fp) {
       char BIGSTK line[8192];
       const size_t line_max = 8000;
@@ -767,9 +798,8 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
       fclose(fp);
       freet(seen);
       return keep ? COOKIE_LOAD_KEEP : refused;
-    } else if (open_errno != ENOENT) {
+    } else if (errno != ENOENT) {
       // the file exists, so a rewrite would replace what was never read
-      errno = open_errno;
       hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
                     "Cookies: could not read %s, so it is left unchanged",
                     file);
@@ -816,7 +846,7 @@ static hts_boolean cookie_close_synced(FILE *fp) {
   // EINVAL: a device such as /dev/stdout cannot be synced
   ok = ok && (fsync(fileno(fp)) == 0 || errno == EINVAL);
 #endif
-  // fclose runs whatever failed, so the stream is never leaked
+  // Close even after a failure, so the stream never leaks
   return fclose(fp) == 0 && ok;
 }
 
@@ -984,20 +1014,16 @@ void cookie_save_replacing(httrackp *opt, t_cookie *cookie, const char *name) {
   char tmp[CATBUFF_SIZE];
   char bak[CATBUFF_SIZE];
 
-  fconv(file, sizeof(file), name);
+  if (!cookie_resolve(file, sizeof(file), fconv(tmp, sizeof(tmp), name))) {
+    hts_log_print(opt, LOG_WARNING,
+                  "Cookies: cannot rewrite %s, it is a symbolic link to a "
+                  "missing file or its target name is too long",
+                  name);
+    return;
+  }
   // an empty jar still empties an existing file, or a deleted cookie survives
   if (!strnotempty(cookie->data) && !fexist_utf8(file))
     return;
-#ifndef _WIN32
-  {
-    // so a symbolic link stays one, with .tmp and .bak beside its target
-    char *real = realpath(file, NULL);
-
-    if (real != NULL && strlen(real) < sizeof(file))
-      strcpybuff(file, real);
-    freet(real);
-  }
-#endif
   if (!slprintfbuff(tmp, sizeof(tmp), "%s.tmp", file) ||
       !slprintfbuff(bak, sizeof(bak), "%s.bak", file)) {
     hts_log_print(opt, LOG_WARNING,
