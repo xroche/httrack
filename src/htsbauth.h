@@ -126,8 +126,9 @@ hts_boolean cookie_sendable(const char *rec, hts_boolean https, int64_t now);
     reported through opt, which may be NULL: a malformed or unreadable line, a
     field that does not fit, a cookie the jar refuses, a repeated cookie, and
     a comment no known tool writes. Returns -1 if the file does not exist, else
-    the count, and an existing file that cannot be opened counts 1. Blank lines,
-    known header comments and expired cookies are not counted. */
+    the count. An existing file that cannot be opened counts 1, and so does a
+    missing one whose <name>.bak exists. Blank lines, known header comments and
+    expired cookies are not counted. */
 int cookie_load(httrackp *opt, t_cookie *cookie, const char *path,
                 const char *name);
 
@@ -136,13 +137,16 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *path,
     was empty, and -1 when any open, write or close failed. */
 int cookie_save(t_cookie *cookie, const char *name);
 
-/** Write the jar to <name>.tmp, then move the old file to <name>.bak (an
-    older .bak is replaced) and the new one over name. An empty jar writes a
-    header alone, or nothing when name does not exist. A failure is logged
-    through opt, which may be NULL. If the write or the backup fails, name and
-    .bak are unchanged. If only the last move fails, .bak holds the old content
-    of name. */
+/** Write the jar to <name>.tmp, make <name>.bak a copy of name, then move the
+    new file over name in one step. So name holds the old or the new jar
+    whatever fails. An empty jar writes a header alone, or nothing when name
+    does not exist. A failure is logged through opt, which may be NULL. */
 void cookie_save_replacing(httrackp *opt, t_cookie *cookie, const char *name);
+
+/** Self-test faults for cookie_save_replacing, 0 outside the self-tests. */
+#define COOKIE_FAULT_NOLINK 1  /**< back up by copy, as without hard links */
+#define COOKIE_FAULT_REPLACE 2 /**< fail the final move */
+extern int cookie_save_fault_selftest;
 
 /** Insert ins in front of the string at s, whose buffer holds s_size bytes. */
 void cookie_insert(char *s, size_t s_size, const char *ins);

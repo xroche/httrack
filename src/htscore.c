@@ -186,7 +186,7 @@ RUN_CALLBACK0(opt, end); \
       if (cookies_file_refused > 0)                                            \
         hts_log_print(opt, LOG_WARNING,                                        \
                       "Cookies: %s is left unchanged, because %d of its "      \
-                      "lines could not be loaded",                             \
+                      "lines would be lost",                                   \
                       StringBuff(opt->cookies_file), cookies_file_refused);    \
       else                                                                     \
         cookie_save_replacing(opt, opt->cookie,                                \

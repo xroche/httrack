@@ -2444,10 +2444,10 @@ format. Without <i>--cookies-file</i>, the mirror reads the
 one in its output directory and the one in the current
 directory, and writes the jar back to its output directory
 at the end. With <i>--cookies-file</i>, that file alone is
-the jar. The crawl rewrites it at the end and keeps its old
-content as <i>&lt;file&gt;.bak</i>. The file is left
-unchanged, with a warning, when a line could not be loaded,
-repeats a cookie, or holds a comment HTTrack would drop.</p>
+the jar. HTTrack rewrites it at the end and keeps its old
+content as <i>&lt;file&gt;.bak</i>. HTTrack leaves that file
+unchanged and logs a warning if a line could not be loaded,
+a cookie repeats, or a comment is not a standard header.</p>
 
 <p style="margin-left:9%; margin-top: 1em">A running mirror
 also watches its own output directory for these. Creating

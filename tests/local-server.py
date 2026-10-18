@@ -3047,7 +3047,8 @@ class Handler(SimpleHTTPRequestHandler):
     # A page that deletes the SID cookie, for the --cookies-file rewrite.
     def route_cookies_forget(self):
         self._set_cookies.append("SID=x; Max-Age=0; Path=/")
-        self.send_html("\tForgotten.")
+        sid = self.request_cookies().get("SID", "none")
+        self.send_html(f"\tForgotten SID={sid}.")
 
     # --- /manycookies/ (#101): the gate page needs every cookie back.
     MANY_COOKIES = 12
