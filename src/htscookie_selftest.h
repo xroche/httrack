@@ -35,15 +35,15 @@ Please visit our Website: http://www.httrack.com
 
 #ifdef HTS_INTERNAL_BYTECODE
 
-/* Faults the self-tests inject into cookie_save_replacing. Each bit names the
-   step it makes fail. */
+/* Each bit makes one step of a cookie save fail in the self-tests. */
 #define COOKIE_FAULT_NOLINK 1     /**< back up by copy, as without hard links */
 #define COOKIE_FAULT_REPLACE 2    /**< the final move fails */
 #define COOKIE_FAULT_COPY_WRITE 4 /**< the copy writes half of a block */
 #define COOKIE_FAULT_COPY_READ 8  /**< the copy reports a read error */
 #define COOKIE_FAULT_COPY_CLOSE 16 /**< closing the copy fails */
+#define COOKIE_FAULT_WRITE 32      /**< the jar write fails after its header */
 
-/* Faults to inject. It stays 0 outside the self-tests. */
+/* The self-tests set the faults to inject here. It stays 0 otherwise. */
 extern int cookie_save_fault_selftest;
 
 #endif

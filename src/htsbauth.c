@@ -326,8 +326,8 @@ hts_boolean cookie_max_age_time(const char *value, int64_t now, int64_t *when) {
 }
 
 /* Return the Unix time of the UTC date in tm, in 64 bits because a 32-bit
-   time_t ends in 2038. Every field must be non-negative, with tm_mon 0 to 11,
-   as convert_time_rfc822_pivot yields them. */
+   time_t ends in 2038. The year must be 0 or later, and tm_mon 0 to 11, as
+   convert_time_rfc822_pivot yields them. */
 static int64_t cookie_utc_seconds(const struct tm *tm) {
   // days from the civil date, counting years from March (Howard Hinnant)
   const int64_t y = (int64_t) tm->tm_year + 1900 - (tm->tm_mon < 2 ? 1 : 0);
@@ -523,7 +523,6 @@ static hts_boolean cookie_known_comment(const char *line) {
   return HTS_FALSE;
 }
 
-/* See htsbauth.h. */
 /* Copy into file the path that name names once symbolic links are followed,
    so the load and the save find the same .bak. Returns HTS_FALSE when name
    is a dangling link or the path does not fit. */
@@ -547,6 +546,30 @@ static hts_boolean cookie_resolve(char *file, size_t size, const char *name) {
   return slprintfbuff(file, size, "%s", name);
 }
 
+/* Is file missing or empty while bak, which a save died before restoring,
+   is not? Then warn, naming shown, because a rewrite would lose the .bak. */
+static hts_boolean cookie_bak_stranded(httrackp *opt, const char *file,
+                                       const char *bak, const char *shown) {
+  if (!fexist_utf8(bak))
+    return HTS_FALSE;
+  if (!fexist_utf8(file)) {
+    hts_log_print(opt, LOG_WARNING,
+                  "Cookies: %s is missing but its .bak exists, so it is "
+                  "not created until you restore or delete the .bak",
+                  shown);
+    return HTS_TRUE;
+  }
+  if (fsize_utf8(file) == 0 && fsize_utf8(bak) > 0) {
+    hts_log_print(opt, LOG_WARNING,
+                  "Cookies: %s is empty but its .bak is not, so it is "
+                  "left unchanged until you restore or delete the .bak",
+                  shown);
+    return HTS_TRUE;
+  }
+  return HTS_FALSE;
+}
+
+/* See htsbauth.h. */
 int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
                 const char *name) {
   char catbuff[CATBUFF_SIZE];
@@ -638,18 +661,18 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
     char bak[CATBUFF_SIZE];
     int refused = 0;
     hts_boolean keep = HTS_FALSE;
-    hts_boolean has_bak;
     FILE *fp;
 
     if (!cookie_resolve(file, sizeof(file), given)) {
       hts_log_print(opt, LOG_WARNING,
-                    "Cookies: %s is a symbolic link to a missing file, or its "
-                    "target name is too long, so it is left unchanged",
+                    "Cookies: %s is a symbolic link to a missing file, so it "
+                    "is left unchanged",
                     given);
       return COOKIE_LOAD_KEEP;
     }
-    has_bak =
-        slprintfbuff(bak, sizeof(bak), "%s.bak", file) && fexist_utf8(bak);
+    if (slprintfbuff(bak, sizeof(bak), "%s.bak", file) &&
+        cookie_bak_stranded(opt, file, bak, given))
+      return COOKIE_LOAD_KEEP;
     fp = FOPEN(file, "rb");
     if (fp) {
       char BIGSTK line[8192];
@@ -786,15 +809,6 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
                       "Cookies: stopped reading before the end of %s", given);
         refused++;
       }
-      // a crash before the data reached the disk may leave an empty file
-      if (!keep && feof(fp) && ftell(fp) == 0 && has_bak &&
-          fsize_utf8(bak) > 0) {
-        hts_log_print(opt, LOG_WARNING,
-                      "Cookies: %s is empty but its .bak is not, so it is "
-                      "left unchanged until you restore or delete the .bak",
-                      given);
-        keep = HTS_TRUE;
-      }
       fclose(fp);
       freet(seen);
       return keep ? COOKIE_LOAD_KEEP : refused;
@@ -802,13 +816,6 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
       // the file exists, so a rewrite would replace what was never read
       hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
                     "Cookies: could not read %s, so it is left unchanged",
-                    given);
-      return COOKIE_LOAD_KEEP;
-    } else if (has_bak) {
-      // a save that died midway may have left only the backup
-      hts_log_print(opt, LOG_WARNING,
-                    "Cookies: %s is missing but its .bak exists, so it is "
-                    "not created until you restore or delete the .bak",
                     given);
       return COOKIE_LOAD_KEEP;
     }
@@ -850,6 +857,8 @@ static hts_boolean cookie_close_synced(FILE *fp) {
   return fclose(fp) == 0 && ok;
 }
 
+int cookie_save_fault_selftest = 0;
+
 /* Write the jar to name, or only a header if it is empty. Return 0 on
    success. */
 static int cookie_write(t_cookie *cookie, const char *name) {
@@ -862,7 +871,8 @@ static int cookie_write(t_cookie *cookie, const char *name) {
 
     // Python's MozillaCookieJar refuses a file without this first line
     if (fprintf(fp, "# Netscape HTTP Cookie File" LF
-                    "# Written by HTTrack Website Copier" LF) < 0)
+                    "# Written by HTTrack Website Copier" LF) < 0 ||
+        (cookie_save_fault_selftest & COOKIE_FAULT_WRITE))
       ok = HTS_FALSE;
     while (*a != '\0') {
       char *extra = line;
@@ -895,13 +905,6 @@ static int cookie_write(t_cookie *cookie, const char *name) {
   }
   return -1;
 }
-
-/* See htsbauth.h. */
-int cookie_save(t_cookie *cookie, const char *name) {
-  return strnotempty(cookie->data) ? cookie_write(cookie, name) : 0;
-}
-
-int cookie_save_fault_selftest = 0;
 
 /* Copy src to dst, which the caller removes on failure. The copy is
    owner-only on Unix. */
@@ -969,6 +972,12 @@ static void cookie_sync_dir(const char *file) {
 }
 #endif
 
+/* Name in dst the temporary beside path. The pid in it keeps two runs on one
+   jar apart, so a crashed run's temporary stays until removed by hand. */
+static hts_boolean cookie_tmpname(char *dst, size_t size, const char *path) {
+  return slprintfbuff(dst, size, "%s.%lu.tmp", path, back_self_pid());
+}
+
 /* Make bak hold what file holds, leaving file in place. The old bak stays
    until the new one is complete. */
 static hts_boolean cookie_backup(const char *file, const char *bak) {
@@ -976,7 +985,7 @@ static hts_boolean cookie_backup(const char *file, const char *bak) {
   hts_boolean ok;
   int err;
 
-  if (!slprintfbuff(next, sizeof(next), "%s.tmp", bak))
+  if (!cookie_tmpname(next, sizeof(next), bak))
     return HTS_FALSE;
   (void) UNLINK(next);
 #ifndef _WIN32
@@ -1008,46 +1017,78 @@ static hts_boolean cookie_replace(const char *tmp, const char *file) {
   return HTS_TRUE;
 }
 
-/* See htsbauth.h. */
-void cookie_save_replacing(httrackp *opt, t_cookie *cookie, const char *name) {
-  char file[CATBUFF_SIZE];
+/* Write the jar beside file, back file up to bak unless bak is NULL, then
+   move the new jar over file. Return 0, or -1 after a warning naming name. */
+static int cookie_commit(httrackp *opt, t_cookie *cookie, const char *file,
+                         const char *bak, const char *name) {
   char tmp[CATBUFF_SIZE];
-  char bak[CATBUFF_SIZE];
 
-  if (!cookie_resolve(file, sizeof(file), fconv(tmp, sizeof(tmp), name))) {
+  if (!cookie_tmpname(tmp, sizeof(tmp), file)) {
     hts_log_print(opt, LOG_WARNING,
-                  "Cookies: cannot rewrite %s, it is a symbolic link to a "
-                  "missing file or its target name is too long",
+                  "Cookies: cannot rewrite %s because its name is too long",
                   name);
-    return;
-  }
-  // an empty jar still empties an existing file, or a deleted cookie survives
-  if (!strnotempty(cookie->data) && !fexist_utf8(file))
-    return;
-  if (!slprintfbuff(tmp, sizeof(tmp), "%s.tmp", file) ||
-      !slprintfbuff(bak, sizeof(bak), "%s.bak", file)) {
-    hts_log_print(opt, LOG_WARNING,
-                  "Cookies: cannot rewrite %s, its name is too long", name);
-    return;
+    return -1;
   }
   (void) UNLINK(tmp);
   if (cookie_write(cookie, tmp) != 0) {
     hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
                   "Cookies: could not write %s, so %s is unchanged", tmp, name);
     (void) UNLINK(tmp);
-    return;
+    return -1;
   }
-  if (fexist_utf8(file) && !cookie_backup(file, bak)) {
+  // the file may have changed since the load checked it
+  if (bak != NULL && cookie_bak_stranded(opt, file, bak, name)) {
+    (void) UNLINK(tmp);
+    return -1;
+  }
+  if (bak != NULL && fexist_utf8(file) && !cookie_backup(file, bak)) {
     hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
                   "Cookies: could not back up %s, so it is unchanged", name);
     (void) UNLINK(tmp);
-    return;
+    return -1;
   }
   if (!cookie_replace(tmp, file)) {
     hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
                   "Cookies: could not replace %s, so it is unchanged", name);
     (void) UNLINK(tmp);
+    return -1;
   }
+  return 0;
+}
+
+/* See htsbauth.h. */
+int cookie_save(t_cookie *cookie, const char *name) {
+  char file[CATBUFF_SIZE];
+
+  if (!strnotempty(cookie->data))
+    return 0;
+  if (!cookie_resolve(file, sizeof(file), name))
+    return -1;
+  return cookie_commit(NULL, cookie, file, NULL, name);
+}
+
+/* See htsbauth.h. */
+void cookie_save_replacing(httrackp *opt, t_cookie *cookie, const char *name) {
+  char file[CATBUFF_SIZE];
+  char bak[CATBUFF_SIZE];
+
+  if (!cookie_resolve(file, sizeof(file), fconv(bak, sizeof(bak), name))) {
+    hts_log_print(opt, LOG_WARNING,
+                  "Cookies: cannot rewrite %s, because it is a symbolic link "
+                  "to a missing file",
+                  name);
+    return;
+  }
+  // an empty jar still empties an existing file, or a deleted cookie survives
+  if (!strnotempty(cookie->data) && !fexist_utf8(file))
+    return;
+  if (!slprintfbuff(bak, sizeof(bak), "%s.bak", file)) {
+    hts_log_print(opt, LOG_WARNING,
+                  "Cookies: cannot rewrite %s because its name is too long",
+                  name);
+    return;
+  }
+  (void) cookie_commit(opt, cookie, file, bak, name);
 }
 
 // Insert string ins before s. s_size is the capacity of the buffer at s.

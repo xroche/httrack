@@ -63,6 +63,13 @@ echo '<html>hello</html>' >"$site/index.html"
 run() { "$bin" "file://$site/index.html" --quiet "$@" >/dev/null 2>&1; }
 # cookie_save() ends its lines with CRLF on Windows
 holds() { grep -qxF "$2" <<<"$(tr -d '\r' <"$1")"; }
+# no_tmp FILE MSG: fail if a temporary beside FILE was left behind
+no_tmp() {
+    local f
+    for f in "$1".*.tmp; do
+        test ! -e "$f" || fail "$2"
+    done
+}
 jar="$dir/jar.txt"
 printf 'www.example.com\tTRUE\t/\tFALSE\t0\tkept\t1\n' >"$jar"
 cp "$jar" "$dir/orig.txt"
@@ -72,7 +79,7 @@ want=$(printf '.www.example.com\tTRUE\t/\tFALSE\t0\tkept\t1')
 holds "$jar" "$want" || fail "the cookies file does not hold the jar"
 holds "$jar" '# Netscape HTTP Cookie File' || fail "no Netscape header line"
 test ! -e "$dir/m1/cookies.txt" || fail "the mirror's cookies.txt was written"
-test ! -e "$jar.tmp" || fail "the temporary jar was left behind"
+no_tmp "$jar" "the temporary jar was left behind"
 if py=$(find_python); then
     "$py" -c 'import sys, http.cookiejar as c
 j = c.MozillaCookieJar(sys.argv[1])
@@ -209,6 +216,13 @@ if ! target_is_windows; then
     cmp "$dir/linkdir/sub/real.bak" "$dir/orig.txt" ||
         fail "the link target's .bak is not the original file"
     test ! -e "$dir/linkdir/jar.txt.bak" || fail "the .bak went beside the link"
+    # a warning names the path the user gave, not the resolved one
+    mkdir -p "$dir/real19"
+    ln -s real19 "$dir/link19"
+    printf 'www.example.com\tTRUE\t/\n' >"$dir/real19/jar.txt"
+    run -O "$dir/m19" --cookies-file "$dir/link19/jar.txt"
+    grep -qF "no name: $dir/link19/jar.txt" "$dir/m19/hts-log.txt" ||
+        fail "a warning names the resolved path"
     # the empty-file and missing-file guards read the .bak beside the target
     mkdir -p "$dir/link2/sub"
     : >"$dir/link2/sub/real"
@@ -251,17 +265,9 @@ cp "$dir/orig.txt" "$bakdir/jar.txt"
 run -O "$dir/m7" --cookies-file "$bakdir/jar.txt"
 cmp "$bakdir/jar.txt" "$dir/orig.txt" || fail "a failed backup changed the jar"
 test -f "$bakdir/jar.txt.bak/x" || fail "a failed backup changed the .bak"
-test ! -e "$bakdir/jar.txt.tmp" || fail "a failed save left its temporary file"
+no_tmp "$bakdir/jar.txt" "a failed save left its temporary file"
 grep -q 'could not back up' "$dir/m7/hts-log.txt" ||
     fail "no warning that the backup failed"
-tmpdir="$dir/tmpdir"
-mkdir -p "$tmpdir/jar.txt.tmp"
-cp "$dir/orig.txt" "$tmpdir/jar.txt"
-run -O "$dir/m11" --cookies-file "$tmpdir/jar.txt"
-cmp "$tmpdir/jar.txt" "$dir/orig.txt" || fail "a failed write changed the jar"
-test ! -e "$tmpdir/jar.txt.bak" || fail "a failed write made a .bak"
-grep -q 'could not write' "$dir/m11/hts-log.txt" ||
-    fail "no warning that the write failed"
 ro="$dir/ro"
 mkdir "$ro"
 cp "$dir/orig.txt" "$ro/jar.txt"

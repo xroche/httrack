@@ -2078,6 +2078,22 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
     }
     (void) UNLINK(file);
   }
+#ifndef _WIN32
+  /* A link to a missing file stays a link, even with cookies to save. */
+  {
+    char link[HTS_URLMAXSIZE * 2];
+    struct stat st;
+
+    assertf(sprintfbuff(link, "%sdangling.txt", fpath));
+    assertf(symlink("missing-target.txt", link) == 0);
+    cookie_save_replacing(NULL, &jar, link);
+    if (lstat(link, &st) != 0 || !S_ISLNK(st.st_mode)) {
+      printf("%s: a dangling link was replaced\n", LABEL);
+      err = 1;
+    }
+    (void) UNLINK(link);
+  }
+#endif
 
   /* The file holds the old or the new jar whatever step fails, and .bak gets
      the old one with or without hard links. A copy that fails leaves the
@@ -2101,8 +2117,8 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
     char tmp[HTS_URLMAXSIZE * 2];
 
     assertf(sprintfbuff(bak, "%s.bak", file));
-    assertf(sprintfbuff(baktmp, "%s.bak.tmp", file));
-    assertf(sprintfbuff(tmp, "%s.tmp", file));
+    assertf(sprintfbuff(baktmp, "%s.bak.%lu.tmp", file, back_self_pid()));
+    assertf(sprintfbuff(tmp, "%s.%lu.tmp", file, back_self_pid()));
     jar.data[0] = '\0';
     assertf(cookie_add(&jar, "new", "1", "jar.test", "/") == 0);
     for (i = 0; i < sizeof(faults) / sizeof(faults[0]); i++) {
@@ -2157,6 +2173,62 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
 #endif
       (void) UNLINK(file);
       (void) UNLINK(bak);
+    }
+
+    /* A file emptied or deleted after the load keeps the .bak as it was. */
+    for (i = 0; i < 2; i++) {
+      FILE *fp = FOPEN(file, "wb");
+
+      assertf(fp != NULL);
+      fprintf(fp, "%s", old);
+      fclose(fp);
+      jar.data[0] = '\0';
+      assertf(cookie_load(NULL, &jar, fpath, "cookies.txt") == 0);
+      assertf(cookie_add(&jar, "new", "1", "jar.test", "/") == 0);
+      if (i == 0) {
+        fp = FOPEN(file, "wb");
+        assertf(fp != NULL);
+        fclose(fp);
+      } else {
+        assertf(UNLINK(file) == 0);
+      }
+      fp = FOPEN(bak, "wb");
+      assertf(fp != NULL);
+      fprintf(fp, "%s", older);
+      fclose(fp);
+      cookie_save_replacing(NULL, &jar, file);
+      cookiejar_slurp(bak, text, sizeof(text));
+      if (strcmp(text, older) != 0 || (i == 0) != fexist_utf8(file) ||
+          fsize_utf8(file) > 0 || fexist_utf8(tmp)) {
+        printf("%s: a jar %s mid-crawl left .bak as [%s]\n", LABEL,
+               i == 0 ? "emptied" : "deleted", text);
+        err = 1;
+      }
+      (void) UNLINK(file);
+      (void) UNLINK(bak);
+    }
+
+    /* A project jar whose rewrite fails keeps its old content. */
+    for (i = 0; i < 2; i++) {
+      const int fault = i == 0 ? COOKIE_FAULT_WRITE : COOKIE_FAULT_REPLACE;
+      FILE *fp = FOPEN(file, "wb");
+
+      assertf(fp != NULL);
+      fprintf(fp, "%s", old);
+      fclose(fp);
+      cookie_save_fault_selftest = fault;
+      if (cookie_save(&jar, file) != -1) {
+        printf("%s: fault %d did not fail cookie_save\n", LABEL, fault);
+        err = 1;
+      }
+      cookie_save_fault_selftest = 0;
+      cookiejar_slurp(file, text, sizeof(text));
+      if (strcmp(text, old) != 0 || fexist_utf8(tmp) || fexist_utf8(bak)) {
+        printf("%s: fault %d left the project jar as [%s]\n", LABEL, fault,
+               text);
+        err = 1;
+      }
+      (void) UNLINK(file);
     }
   }
 
