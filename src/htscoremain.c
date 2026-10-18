@@ -2236,7 +2236,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   StringCat(opt->host_alias, argv[na]);
                 }
                 break;
-              case 'K': // cookies-file: extra Netscape cookies.txt to preload
+              case 'K': // cookies-file: the Netscape jar, rewritten at the end
                 /* a vetted pair's value may begin with '-' (#1425) */
                 if ((na + 1 >= argc) ||
                     (argv[na + 1][0] == '-' && !optparam_dash_ok(&x_cmd, na))) {

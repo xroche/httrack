@@ -726,8 +726,12 @@ bottom are the ones that keep you welcome.</p>
 
 <div class="opt" data-for="win web">
 	<div class="opt-head"><span class="opt-name">Load cookies from file</span><span class="cli">-%K, --cookies-file</span></div>
-	<p>Preloads cookies from a Netscape <code>cookies.txt</code> before the crawl starts. How you
-	mirror something that needs you logged in, by exporting the session from your browser.</p>
+	<p>Uses a Netscape <code>cookies.txt</code> as the whole cookie jar. Export your browser session
+	to it to mirror a site that needs a login.
+	At the end of the crawl the file is rewritten with the cookies the crawl ended with, and the old one
+	is kept as <code>.bak</code>. HTTrack leaves the file unchanged and warns if a line
+	could not be loaded or a cookie repeats. It does the same when the file holds a comment
+	that no known tool writes.</p>
 </div>
 
 <div class="opt" data-for="win web droid">

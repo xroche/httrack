@@ -593,7 +593,7 @@ void help(const char *app, int more) {
   infomsg("");
   infomsg("Spider options:");
   infomsg("  bN accept cookies in cookies.txt (0=do not accept,* 1=accept)");
-  infomsg(" %K  load extra cookies from a Netscape cookies.txt");
+  infomsg(" %K  use a Netscape cookies.txt as the jar, rewritten at the end");
   infomsg(" %Y  explain which filter rule accepts or rejects a URL, then exit");
   infomsg
     ("  u  check document type if unknown (cgi,asp..) (u0 don't check, * u1 check but /, u2 check always)");

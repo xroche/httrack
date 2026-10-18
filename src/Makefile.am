@@ -103,7 +103,7 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	md5.c \
 	minizip/ioapi.c minizip/mztools.c minizip/unzip.c minizip/zip.c \
 	hts-indextmpl.h htsalias.h htsback.h htsbase.h htssafe.h htsdate.h \
-	htsbasenet.h htsbauth.h htscache.h htscache_selftest.h htsdns_selftest.h htsparse_selftest.h \
+	htsbasenet.h htsbauth.h htscache.h htscache_selftest.h htscookie_selftest.h htsdns_selftest.h htsparse_selftest.h \
 	htsselftest.h htsselftest_int.h htsselftest_util.h htscatchurl.h  \
 	htscmdline.h htsconfig.h htscore.h htsparse.h htscoremain.h htsdefines.h  \
 	htsfilters.h htsftp.h htsglobal.h htshash.h coucal/coucal.h \

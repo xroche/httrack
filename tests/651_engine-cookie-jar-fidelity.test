@@ -1,0 +1,343 @@
+#!/bin/bash
+#
+# The cookie jar keeps host-only, Secure, HttpOnly and expiry from a
+# Set-Cookie and through a cookies.txt load and save, and --cookies-file is
+# written back safely, or left alone when part of it could not be loaded.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+cleanup_push chmod -R u+w "$dir"
+
+assert_selftest "cookie-jar: OK" cookiejar "$dir"
+
+# --cookies-file with cookies off is read by nothing, so it is logged
+: "${top_srcdir:=..}"
+crawl() { bash "$top_srcdir/tests/local-crawl.sh" "$@"; }
+crawl --cookie 'session=opensesame' \
+    --log-found 'Cookies are disabled, so the cookies file' \
+    httrack 'BASEURL/gated/index.php' -o0 -b0
+crawl --cookie 'session=opensesame' \
+    --found 'gated/secret.html' --log-not-found 'Cookies are disabled' \
+    httrack 'BASEURL/gated/index.php' -o0
+
+# A Secure cookie goes out over https and never over http
+secure=$(printf '127.0.0.1\tFALSE\t/\tTRUE\t1999999999\tsession\topensesame')
+if test "${HTTPS_SUPPORT:-}" != no; then
+    printf '%s\n' "$secure" >"$dir/s1.txt"
+    crawl --tls --found 'gated/secret.html' \
+        httrack 'BASEURL/gated/index.php' -o0 --cookies-file "$dir/s1.txt"
+    # a Secure Set-Cookie on a self-redirect is seen only through https
+    crawl --tls --errors 0 \
+        --file-matches 'cookiewall5/wall.html' 'REAL-CONTENT-BEHIND-COOKIE-WALL' \
+        httrack 'BASEURL/cookiewall5/index.html'
+fi
+printf '%s\n' "$secure" >"$dir/s2.txt"
+crawl --found 'gated/index.html' --not-found 'gated/secret.html' \
+    httrack 'BASEURL/gated/index.php' -o0 --cookies-file "$dir/s2.txt"
+
+# A Set-Cookie the full jar refuses is logged during a real crawl. The filler
+# path is never requested, so its cookies are never sent.
+big=$(repeat_chars 4000 v)
+: >"$dir/full.txt"
+for i in 1 2 3 4 5 6 7; do
+    printf '127.0.0.1\tTRUE\t/x/\tFALSE\t1999999999\tc%s\t%s\n' "$i" "$big" \
+        >>"$dir/full.txt"
+done
+# filler + name + domain + path + the 256 bytes cookie_set reserves = 30000
+filler=$((30000 - $(size_of "$dir/full.txt") - 2 - 9 - 3 - 256))
+printf '127.0.0.1\tTRUE\t/x/\tFALSE\t1999999999\tf1\t%s\n' \
+    "$(repeat_chars "$filler" f)" >>"$dir/full.txt"
+crawl --log-found "did not store 'cat' set by 127\\.0\\.0\\.1" \
+    httrack 'BASEURL/cookies/entrance.php' -o0 --cookies-file "$dir/full.txt"
+
+# The jar goes back over --cookies-file, whose old bytes move to .bak, and not
+# to the mirror's own cookies.txt. Without the option it still goes there.
+bin=$(httrack_path)
+site="$dir/site"
+mkdir -p "$site"
+echo '<html>hello</html>' >"$site/index.html"
+run() { "$bin" "file://$site/index.html" --quiet "$@" >/dev/null 2>&1; }
+# cookie_save() ends its lines with CRLF on Windows
+holds() { grep -qxF "$2" <<<"$(tr -d '\r' <"$1")"; }
+# no_tmp FILE MSG: fail if a temporary beside FILE was left behind
+no_tmp() {
+    local f
+    for f in "$1"*.tmp; do
+        test ! -e "$f" || fail "$2"
+    done
+}
+jar="$dir/jar.txt"
+printf 'www.example.com\tTRUE\t/\tFALSE\t0\tkept\t1\n' >"$jar"
+cp "$jar" "$dir/orig.txt"
+run -O "$dir/m1" --cookies-file "$jar"
+cmp "$jar.bak" "$dir/orig.txt" || fail "jar.bak is not the original file"
+want=$(printf '.www.example.com\tTRUE\t/\tFALSE\t0\tkept\t1')
+holds "$jar" "$want" || fail "the cookies file does not hold the jar"
+holds "$jar" '# Netscape HTTP Cookie File' || fail "no Netscape header line"
+test ! -e "$dir/m1/cookies.txt" || fail "the mirror's cookies.txt was written"
+no_tmp "$jar" "the temporary jar was left behind"
+if py=$(find_python); then
+    "$py" -c 'import sys, http.cookiejar as c
+j = c.MozillaCookieJar(sys.argv[1])
+j.load(ignore_discard=True, ignore_expires=True)
+sys.exit(0 if [k.name for k in j] == ["kept"] else 1)' "$(nativepath "$jar")" ||
+        fail "MozillaCookieJar cannot read the saved jar"
+fi
+cp "$jar" "$dir/run1.txt"
+run -O "$dir/m2" --cookies-file "$jar"
+cmp "$jar.bak" "$dir/run1.txt" || fail "a second run did not rotate jar.bak"
+mkdir "$dir/cwd"
+cp "$dir/orig.txt" "$dir/cwd/cookies.txt"
+(cd "$dir/cwd" && run -O "$dir/m3")
+subshell_ok $?
+assert_file "$dir/m3/cookies.txt" "the mirror's cookies.txt without the option"
+holds "$dir/m3/cookies.txt" "$want" || fail "the mirror's cookies.txt lost the jar"
+
+# With --cookies-file, the mirror's and the current directory's jars stay out
+mkdir -p "$dir/m4"
+printf 'www.example.com\tTRUE\t/\tFALSE\t0\tlogonly\t1\n' >"$dir/m4/cookies.txt"
+printf 'www.example.com\tTRUE\t/\tFALSE\t0\tcwdonly\t1\n' >"$dir/cwd/cookies.txt"
+cp "$dir/orig.txt" "$jar"
+(cd "$dir/cwd" && run -O "$dir/m4" --cookies-file "$jar")
+subshell_ok $?
+holds "$jar" "$want" || fail "the cookies file lost its own cookie"
+! grep -q 'only' "$jar" || fail "another jar was merged into the cookies file"
+
+# A line the load skipped leaves the file as it was, and says so
+bad="$dir/bad.txt"
+{
+    printf 'www.example.com\tTRUE\t/\tFALSE\t0\tkept\t1\n'
+    printf 'www.example.com\tTRUE\t/\n'
+} >"$bad"
+cp "$bad" "$dir/bad-orig.txt"
+run -O "$dir/m5" --cookies-file "$bad"
+cmp "$bad" "$dir/bad-orig.txt" || fail "a partly loaded cookies file was rewritten"
+test ! -e "$bad.bak" || fail "a partly loaded cookies file was backed up"
+grep -q 'is left unchanged' "$dir/m5/hts-log.txt" ||
+    fail "no warning that the cookies file was left unchanged"
+
+# Each line a rewrite would lose leaves the file as it was, and says so
+case_no=0
+kept_as_is() { # kept_as_is WHAT PRINTF-FORMAT
+    case_no=$((case_no + 1))
+    local f="$dir/k$case_no.txt"
+    # shellcheck disable=SC2059
+    printf "$2" >"$f"
+    cp "$f" "$f.orig"
+    run -O "$dir/k$case_no" --cookies-file "$f"
+    cmp "$f" "$f.orig" || fail "$1: the cookies file was rewritten"
+    test ! -e "$f.bak" || fail "$1: the cookies file was backed up"
+    grep -q 'is left unchanged' "$dir/k$case_no/hts-log.txt" ||
+        fail "$1: no warning that the file was left unchanged"
+}
+ok='www.example.com\tTRUE\t/\tFALSE\t0\tkept\t1\n'
+kept_as_is 'an oversize domain' "$ok$(repeat_chars 300 d)\tTRUE\t/\tFALSE\t0\tn\t1\n"
+kept_as_is 'an over-long line' "${ok}x.test\tTRUE\t/\tFALSE\t0\tn\t$(repeat_chars 8100 v)\n"
+kept_as_is 'a six-field line' "${ok}x.test\tTRUE\t/\tFALSE\t0\tn\n"
+kept_as_is 'a repeated cookie' "${ok}.www.example.com\tTRUE\t/\tFALSE\t0\tkept\t2\n"
+kept_as_is 'a TAB in a value' "${ok}x.test\tTRUE\t/\tFALSE\t0\tn\ta\tb\n"
+kept_as_is 'a NUL in a value' "${ok}x.test\tTRUE\t/\tFALSE\t0\tn\ta\0b\n"
+kept_as_is 'a CR in a flag' "${ok}x.test\tTRUE\t/\tFALSE\r\t0\tn\tb\n"
+kept_as_is 'a comment' "# my login for x.test\n$ok"
+kept_as_is 'a fractional expiry' "${ok}x.test\tTRUE\t/\tFALSE\t1999999999.5\tn\t1\n"
+
+# A curl jar's own comments are not a reason to leave it alone
+curljar="$dir/curl.txt"
+printf '# Netscape HTTP Cookie File\n# https://curl.se/docs/http-cookies.html\n# This file was generated by libcurl! Edit at your own risk.\n\n%b' "$ok" >"$curljar"
+run -O "$dir/m10" --cookies-file "$curljar"
+holds "$curljar" '# Written by HTTrack Website Copier' || fail "a curl jar was not rewritten"
+# nor are those of the "Get cookies.txt LOCALLY" browser extension
+kaijar="$dir/kairi.txt"
+printf '# Netscape HTTP Cookie File\n# https://curl.haxx.se/rfc/cookie_spec.html\n# This is a generated file! Do not edit.\n\nexample.com\tFALSE\t/\tFALSE\t0\tkai\t1\n' >"$kaijar"
+run -O "$dir/m13" --cookies-file "$kaijar"
+holds "$kaijar" '# Written by HTTrack Website Copier' ||
+    fail "a browser-extension jar was not rewritten"
+holds "$kaijar" "$(printf 'example.com\tFALSE\t/\tFALSE\t0\tkai\t1')" ||
+    fail "a browser-extension jar lost its host-only cookie"
+
+# A jar holding only expired cookies loses nothing, so it is emptied
+old="$dir/old.txt"
+printf 'www.example.com\tTRUE\t/\tFALSE\t1\tgone\t1\n' >"$old"
+cp "$old" "$dir/old-orig.txt"
+run -O "$dir/m6" --cookies-file "$old"
+! grep -q gone "$old" || fail "an all-expired jar kept its cookie"
+holds "$old" '# Netscape HTTP Cookie File' || fail "an emptied jar has no header"
+cmp "$old.bak" "$dir/old-orig.txt" || fail "an emptied jar's .bak is not the original"
+
+# A cookie the server deletes is gone from the file, even when none is left
+gone="$dir/gone.txt"
+printf '127.0.0.1\tFALSE\t/\tFALSE\t1999999999\tSID\told\n' >"$gone"
+crawl --file-matches 'cookies/forget.html' 'SID=old' \
+    httrack 'BASEURL/cookies/forget.php' -o0 --cookies-file "$gone"
+! grep -q SID "$gone" || fail "a deleted cookie survived in the cookies file"
+test "$(tr -d '\r' <"$gone")" = "$(printf '# Netscape HTTP Cookie File\n# Written by HTTrack Website Copier')" ||
+    fail "the emptied cookies file is not a header alone"
+
+# A missing cookies file beside its .bak, as a save that died leaves it, is
+# not recreated, so the next save cannot rotate the .bak away
+lost="$dir/lostdir"
+mkdir "$lost"
+cp "$dir/orig.txt" "$lost/jar.txt.bak"
+crawl --found 'cookies/entrance.html' \
+    --log-found 'is missing but its \.bak exists' \
+    --log-not-found 'lines would be lost' \
+    httrack 'BASEURL/cookies/entrance.php' -o0 -r1 --cookies-file "$lost/jar.txt"
+test ! -e "$lost/jar.txt" || fail "a cookies file was created over its .bak"
+cmp "$lost/jar.txt.bak" "$dir/orig.txt" || fail "the .bak of a missing jar changed"
+
+# An empty cookies file beside a non-empty .bak, as a crash before the data
+# reached the disk leaves it, is left alone too
+empty="$dir/emptydir"
+mkdir "$empty"
+: >"$empty/jar.txt"
+cp "$dir/orig.txt" "$empty/jar.txt.bak"
+run -O "$dir/m13" --cookies-file "$empty/jar.txt"
+test ! -s "$empty/jar.txt" || fail "an empty cookies file was rewritten over its .bak"
+cmp "$empty/jar.txt.bak" "$dir/orig.txt" || fail "the .bak of an empty jar changed"
+log=$(cat "$dir/m13/hts-log.txt")
+grep -q 'is empty but its \.bak is not' <<<"$log" ||
+    fail "no warning that the cookies file is empty"
+! grep -q 'lines would be lost' <<<"$log" ||
+    fail "an empty cookies file was said to lose lines"
+
+# A symbolic link stays one, and its target is rewritten with .bak beside it
+if ! target_is_windows; then
+    mkdir "$dir/linkdir" "$dir/linkdir/sub"
+    cp "$dir/orig.txt" "$dir/linkdir/sub/real"
+    ln -s sub/real "$dir/linkdir/jar.txt"
+    run -O "$dir/m14" --cookies-file "$dir/linkdir/jar.txt"
+    test -L "$dir/linkdir/jar.txt" || fail "the symbolic link became a file"
+    holds "$dir/linkdir/sub/real" '# Written by HTTrack Website Copier' ||
+        fail "the link target was not rewritten"
+    cmp "$dir/linkdir/sub/real.bak" "$dir/orig.txt" ||
+        fail "the link target's .bak is not the original file"
+    test ! -e "$dir/linkdir/jar.txt.bak" || fail "the .bak went beside the link"
+    # a warning names the path the user gave, not the resolved one
+    mkdir -p "$dir/real19"
+    ln -s real19 "$dir/link19"
+    printf 'www.example.com\tTRUE\t/\n' >"$dir/real19/jar.txt"
+    run -O "$dir/m19" --cookies-file "$dir/link19/jar.txt"
+    grep -qF "no name: $dir/link19/jar.txt" "$dir/m19/hts-log.txt" ||
+        fail "a warning names the resolved path"
+    # the empty-file and missing-file guards read the .bak beside the target
+    mkdir -p "$dir/link2/sub"
+    : >"$dir/link2/sub/real"
+    cp "$dir/orig.txt" "$dir/link2/sub/real.bak"
+    ln -s sub/real "$dir/link2/jar.txt"
+    run -O "$dir/m16" --cookies-file "$dir/link2/jar.txt"
+    test ! -s "$dir/link2/sub/real" || fail "an empty link target was rewritten"
+    cmp "$dir/link2/sub/real.bak" "$dir/orig.txt" ||
+        fail "the .bak of an empty link target changed"
+    grep -q 'is empty but its \.bak is not' "$dir/m16/hts-log.txt" ||
+        fail "no warning that the link target is empty"
+    # a dangling link is left alone, with or without a .bak beside its target,
+    # even when the crawl set cookies to save
+    for b in bak nobak; do
+        mkdir -p "$dir/link-$b/sub"
+        test "$b" = nobak || cp "$dir/orig.txt" "$dir/link-$b/sub/real.bak"
+        ln -s sub/real "$dir/link-$b/jar.txt"
+        crawl --found 'cookies/entrance.html' \
+            --log-found 'is a symbolic link to a missing file' \
+            httrack 'BASEURL/cookies/entrance.php' -o0 -r1 \
+            --cookies-file "$dir/link-$b/jar.txt"
+        test -L "$dir/link-$b/jar.txt" || fail "$b: a dangling link became a file"
+        test ! -e "$dir/link-$b/sub/real" || fail "$b: a dangling link was followed"
+        test "$b" = nobak || cmp "$dir/link-$b/sub/real.bak" "$dir/orig.txt" ||
+            fail "$b: the .bak behind a dangling link changed"
+    done
+fi
+
+# A cookies file that does not exist yet is created
+new="$dir/new.txt"
+crawl --found 'cookies/entrance.html' \
+    httrack 'BASEURL/cookies/entrance.php' -o0 -r1 --cookies-file "$new"
+grep -q 'cat' "$new" || fail "a missing cookies file was not created"
+
+# A save that fails leaves the file and its .bak as they were
+bakdir="$dir/bakdir"
+mkdir -p "$bakdir/jar.txt.bak"
+echo keep >"$bakdir/jar.txt.bak/x"
+cp "$dir/orig.txt" "$bakdir/jar.txt"
+run -O "$dir/m7" --cookies-file "$bakdir/jar.txt"
+cmp "$bakdir/jar.txt" "$dir/orig.txt" || fail "a failed backup changed the jar"
+test -f "$bakdir/jar.txt.bak/x" || fail "a failed backup changed the .bak"
+no_tmp "$bakdir/jar.txt" "a failed save left its temporary file"
+grep -q 'could not back up' "$dir/m7/hts-log.txt" ||
+    fail "no warning that the backup failed"
+ro="$dir/ro"
+mkdir "$ro"
+cp "$dir/orig.txt" "$ro/jar.txt"
+echo older >"$ro/jar.txt.bak"
+chmod a-w "$ro"
+# root and Windows can still write there, so the failure cannot be staged
+if test ! -w "$ro"; then
+    run -O "$dir/m8" --cookies-file "$ro/jar.txt"
+    cmp "$ro/jar.txt" "$dir/orig.txt" || fail "a failed save changed the jar"
+    test "$(cat "$ro/jar.txt.bak")" = older || fail "a failed save changed .bak"
+    grep -q 'could not write' "$dir/m8/hts-log.txt" ||
+        fail "no warning that the save failed"
+fi
+chmod u+w "$ro"
+
+# A directory given as the cookies file ends the load instead of spinning
+mkdir "$dir/adir"
+rc=0
+run_with_timeout 120 "$bin" "file://$site/index.html" --quiet -O "$dir/m9" \
+    --cookies-file "$dir/adir" >/dev/null 2>&1 || rc=$?
+test "$rc" -ne 124 || fail "a directory as the cookies file hangs the load"
+test -d "$dir/adir" || fail "the directory given as the cookies file moved"
+test ! -e "$dir/adir.bak" || fail "a directory as the cookies file was rewritten"
+
+# An unreadable cookies file is left alone, and says so
+unread="$dir/unread.txt"
+cp "$dir/orig.txt" "$unread"
+chmod 000 "$unread"
+# root and Windows can still read it, so the failure cannot be staged
+if ! test -r "$unread"; then
+    run -O "$dir/m12" --cookies-file "$unread"
+    test ! -e "$unread.bak" || fail "an unreadable cookies file was rewritten"
+    log=$(cat "$dir/m12/hts-log.txt")
+    grep -q 'could not read' <<<"$log" ||
+        fail "no warning that the cookies file could not be read"
+    ! grep -q 'lines would be lost' <<<"$log" ||
+        fail "an unreadable cookies file was said to lose lines"
+fi
+chmod u+rw "$unread"
+cmp "$unread" "$dir/orig.txt" || fail "an unreadable cookies file changed"
+
+# Without --cookies-file, an unreadable project jar is not overwritten either.
+# The current directory's jar gives the crawl a cookie to save.
+mkdir -p "$dir/cwd18" "$dir/m18"
+cp "$dir/orig.txt" "$dir/cwd18/cookies.txt"
+cp "$dir/orig.txt" "$dir/m18/cookies.txt"
+chmod 0200 "$dir/m18/cookies.txt"
+if ! test -r "$dir/m18/cookies.txt"; then
+    (cd "$dir/cwd18" && run -O "$dir/m18")
+    subshell_ok $?
+    grep -q 'could not read' "$dir/m18/hts-log.txt" ||
+        fail "no warning that the project jar could not be read"
+fi
+chmod u+rw "$dir/m18/cookies.txt"
+cmp "$dir/m18/cookies.txt" "$dir/orig.txt" || fail "an unreadable project jar changed"
+
+# HTTrack warns when a project jar cannot be saved. Its link target sits in a
+# read-only directory, but the log beside the link stays writable.
+if ! target_is_windows; then
+    mkdir -p "$dir/ro19" "$dir/cwd19" "$dir/m19"
+    cp "$dir/orig.txt" "$dir/ro19/cookies.txt"
+    ln -s "$dir/ro19/cookies.txt" "$dir/m19/cookies.txt"
+    chmod a-w "$dir/ro19"
+    if test ! -w "$dir/ro19"; then
+        (cd "$dir/cwd19" && run -O "$dir/m19")
+        subshell_ok $?
+        grep -q "could not write" "$dir/m19/hts-log.txt" ||
+            fail "no warning that the project jar could not be saved"
+    fi
+    chmod u+w "$dir/ro19"
+    cmp "$dir/ro19/cookies.txt" "$dir/orig.txt" ||
+        fail "a project jar whose save failed changed"
+fi

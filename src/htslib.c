@@ -935,7 +935,8 @@ static void print_buffer(buff_struct*const str, const char *format, ...) {
 }
 
 /* Append the request "Cookie:" header line for every stored cookie matching
-   domain/path. The port in domain is ignored (see cookie_host). RFC 6265
+   adr/path, where adr may carry its scheme and only "https://" gets a Secure
+   cookie. The port in adr is ignored (see cookie_host). RFC 6265
    form: bare "name=value" pairs joined by "; ", no $Version/$Path attributes
    (those are RFC 2965 syntax that modern servers reject, issue #151).
    A pair that will not fit whole is dropped whole and counted in *skipped (may
@@ -944,9 +945,12 @@ static void print_buffer(buff_struct*const str, const char *format, ...) {
    in reserve how many bytes it still has to write after it.
    Returns the number emitted. */
 static int append_cookie_header(buff_struct *bstr, t_cookie *cookie,
-                                const char *domain, const char *path,
+                                const char *adr, const char *path,
                                 size_t reserve, int *skipped) {
   const size_t crlf_len = sizeof(H_CRLF) - 1;
+  const hts_boolean https = strfield(adr, "https://") != 0;
+  const int64_t now = (int64_t) time(NULL);
+  const char *domain;
   char buffer[8192];
   char host[256];
   char *b;
@@ -957,7 +961,7 @@ static int append_cookie_header(buff_struct *bstr, t_cookie *cookie,
     *skipped = 0;
   if (cookie == NULL || bstr->overflow)
     return 0;
-  if (!cookie_host(domain, host, sizeof(host)))
+  if (!cookie_host(adr, host, sizeof(host)))
     return 0;
   domain = host;
 
@@ -974,7 +978,9 @@ static int append_cookie_header(buff_struct *bstr, t_cookie *cookie,
   b = cookie->data;
   do {
     b = cookie_find(b, "", domain, path); // next matching cookie
-    if (b != NULL) {
+    if (b != NULL && !cookie_sendable(b, https, now)) {
+      b = cookie_nextfield(b);
+    } else if (b != NULL) {
       const size_t mark = bstr->pos;
       hts_boolean kept = HTS_FALSE;
 
@@ -1005,15 +1011,15 @@ static int append_cookie_header(buff_struct *bstr, t_cookie *cookie,
   return count;
 }
 
-/* Build the request Cookie line for domain/path into dst (always
+/* Build the request Cookie line for adr/path into dst (always
    NUL-terminated). Returns the number of cookies emitted. */
-int http_cookie_header(t_cookie *cookie, const char *domain, const char *path,
+int http_cookie_header(t_cookie *cookie, const char *adr, const char *path,
                        char *dst, size_t dst_size) {
   buff_struct bstr = {dst, dst_size, 0};
 
   assertf(dst != NULL && dst_size > 0);
   dst[0] = '\0';
-  return append_cookie_header(&bstr, cookie, domain, path, 0, NULL);
+  return append_cookie_header(&bstr, cookie, adr, path, 0, NULL);
 }
 
 hts_boolean hts_body_missing_unexpectedly(const htsblk *r) {
@@ -1877,7 +1883,7 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
     if (cookie != NULL && !http_headers_have_field(custom, "Cookie")) {
       int skipped;
 
-      append_cookie_header(&bstr, cookie, jump_identification_const(adr), fil,
+      append_cookie_header(&bstr, cookie, adr, fil,
                            sizeof(H_CRLF) - 1 + body_len, &skipped);
       if (skipped != 0) {
         hts_log_print(opt, LOG_WARNING,
@@ -2059,6 +2065,11 @@ static void keep_alive_param(const char *s, int *value) {
 // gestion des cookies
 void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * retour,
                char *rcvd) {
+  treathead_opt(NULL, cookie, adr, fil, retour, rcvd);
+}
+
+void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
+                   const char *fil, htsblk *retour, char *rcvd) {
   int p;
 
   if ((p = strfield(rcvd, "Content-length:")) != 0) {
@@ -2301,6 +2312,7 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
     char path[256];             // chemin (/)
     char cook_name[256];        // nom cookie (MYCOOK)
     char BIGSTK cook_value[8192];       // valeur (ID=toto,S=1234)
+    const int64_t now = (int64_t) time(NULL);
 
 #if DEBUG_COOK
     printf("set-cookie detected\n");
@@ -2316,20 +2328,24 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
       char name[256];
       char BIGSTK value[8192];
       hts_boolean has_domain = HTS_FALSE;
-      hts_tristate max_age_expired = HTS_DEFAULT;
-      hts_tristate expires_passed = HTS_DEFAULT;
+      hts_boolean has_max_age = HTS_FALSE;
+      hts_boolean has_expires = HTS_FALSE;
+      int64_t max_age_when = 0, expires_when = 0;
+      cookie_attr attr = {.host_only = HTS_FALSE,
+                          .secure = HTS_FALSE,
+                          .http_only = HTS_FALSE,
+                          .expires = 0};
       hts_boolean first = HTS_TRUE;
 
       name[0] = value[0] = '\0';
       //
 
-      // initialiser cookie lu actuellement
-      /* raw, because cookie_add() normalises and doing that twice is not the
+      /* raw, because cookie_set() normalises and doing that twice is not the
          same as doing it once; no adr means empty, which it refuses */
       strcpybuff(domain, adr != NULL ? adr : "");
-      strcpybuff(path, "/");    // chemin (/)
-      strcpybuff(cook_name, "");        // nom cookie (MYCOOK)
-      strcpybuff(cook_value, "");       // valeur (ID=toto,S=1234)
+      strcpybuff(path, "/");
+      strcpybuff(cook_name, "");
+      strcpybuff(cook_value, "");
       // read every pair up to the end of the header
       do {
         while(is_space(*a))
@@ -2391,19 +2407,34 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
                 break;
               }
             } else if (strfield2(name, "max-age")) {
-              const hts_tristate got = cookie_max_age_expired(value);
+              int64_t when;
 
               // an invalid value is ignored, not a reset (5.3)
-              if (got != HTS_DEFAULT)
-                max_age_expired = got;
+              if (cookie_max_age_time(value, now, &when)) {
+                has_max_age = HTS_TRUE;
+                max_age_when = when;
+              }
             } else if (strfield2(name, "expires")) {
-              const hts_tristate got = cookie_expires_passed(value, time(NULL));
+              int64_t when;
 
-              if (got != HTS_DEFAULT)
-                expires_passed = got;
+              if (cookie_expires_time(value, now, &when)) {
+                has_expires = HTS_TRUE;
+                expires_when = when;
+              }
+            } else if (strfield2(name, "secure")) {
+              attr.secure = HTS_TRUE;
+            } else if (strfield2(name, "httponly")) {
+              attr.http_only = HTS_TRUE;
             }
             // RFC 6265 5.2 ignores any other attribute, SameSite for example
           }
+        } else { // a bare attribute
+          const size_t len = (size_t) (token_end - token_st);
+
+          if (len == 6 && strfield(token_st, "secure"))
+            attr.secure = HTS_TRUE;
+          else if (len == 8 && strfield(token_st, "httponly"))
+            attr.http_only = HTS_TRUE;
         }
         // an unusable first pair leaves no cookie, so the header is ignored
         first = HTS_FALSE;
@@ -2414,9 +2445,9 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
       } while (*a);
       if (strnotempty(cook_name)) {     // cookie?
         /* Max-Age outranks Expires (RFC 6265 5.3 step 3) */
-        const hts_boolean expired = max_age_expired != HTS_DEFAULT
-                                        ? max_age_expired == HTS_TRUE
-                                        : expires_passed == HTS_TRUE;
+        attr.expires =
+            has_max_age ? max_age_when : (has_expires ? expires_when : 0);
+        attr.host_only = !has_domain;
 
 #if DEBUG_COOK
         printf
@@ -2426,10 +2457,14 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
         // a Domain= the host may not claim drops the cookie (5.3 step 6)
         if (!has_domain ||
             (adr != NULL && cookie_domain_allowed(domain, scoped))) {
-          if (expired)
-            cookie_del(cookie, cook_name, domain, path);
-          else
-            cookie_add(cookie, cook_name, cook_value, domain, path);
+          if (attr.expires != 0 && attr.expires <= now) {
+            cookie_remove(cookie, cook_name, domain, path);
+          } else if (cookie_set(cookie, cook_name, cook_value, domain, path,
+                                &attr) != 0) {
+            hts_log_print(opt, LOG_WARNING,
+                          "Cookies: the jar did not store '%.64s' set by %s",
+                          cook_name, adr);
+          }
         }
       }
     }

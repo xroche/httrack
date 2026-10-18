@@ -3011,13 +3011,21 @@ class Handler(SimpleHTTPRequestHandler):
     def route_cookiewall2_wall(self):
         self._cookiewall_reply("wall.html")
 
-    def _cookiewall_reply(self, location):
+    # Secure twin, crawled over TLS: the wall is seen to change only when the
+    # engine asks with the https scheme.
+    def route_cookiewall5_index(self):
+        self.send_html('\t<a href="wall.php">wall</a>')
+
+    def route_cookiewall5_wall(self):
+        self._cookiewall_reply("wall.php", "gate=1; Path=/; Secure")
+
+    def _cookiewall_reply(self, location, set_cookie="gate=1; Path=/"):
         if self.request_cookies().get("gate") == "1":
             self.send_raw(
                 b"<html><body>" + self.WALL_MARK + b"</body></html>\n", "text/html"
             )
         else:
-            self._wall_redirect(location, "gate=1; Path=/")
+            self._wall_redirect(location, set_cookie)
 
     # No-cookie self-redirect: the jar never changes, so httrack must give up at
     # once rather than re-fetch (proves the cookie-wall retry stays gated on #15).
@@ -3035,6 +3043,12 @@ class Handler(SimpleHTTPRequestHandler):
     def route_cookiewall4_wall(self):
         nonce = int(self.request_cookies().get("gate", "0")) + 1
         self._wall_redirect("wall.php", f"gate={nonce}; Path=/")
+
+    # A page that deletes the SID cookie, for the --cookies-file rewrite.
+    def route_cookies_forget(self):
+        self._set_cookies.append("SID=x; Max-Age=0; Path=/")
+        sid = self.request_cookies().get("SID", "none")
+        self.send_html(f"\tForgotten SID={sid}.")
 
     # --- /manycookies/ (#101): the gate page needs every cookie back.
     MANY_COOKIES = 12
@@ -3848,6 +3862,7 @@ class Handler(SimpleHTTPRequestHandler):
         "/cookies/entrance.php": route_entrance,
         "/cookies/second.php": route_second,
         "/cookies/third.php": route_third,
+        "/cookies/forget.php": route_cookies_forget,
         "/gated/index.php": route_gated_index,
         "/gated/secret.php": route_gated_secret,
         "/robots.txt": route_robots,
@@ -4156,6 +4171,8 @@ class Handler(SimpleHTTPRequestHandler):
         "/cookiewall3/wall.php": route_cookiewall3_wall,
         "/cookiewall4/index.html": route_cookiewall4_index,
         "/cookiewall4/wall.php": route_cookiewall4_wall,
+        "/cookiewall5/index.html": route_cookiewall5_index,
+        "/cookiewall5/wall.php": route_cookiewall5_wall,
         "/manycookies/index.html": route_manycookies_index,
         "/manycookies/gate.html": route_manycookies_gate,
         "/redir/index.html": route_redir_index,

@@ -32,6 +32,7 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 #include "htsselftest_int.h"
+#include "htscookie_selftest.h"
 
 /* True if a Cookie header line is a whole RFC 6265 list of `count` pairs and
    nothing else. A dropped cookie must take its separator with it, because a
@@ -218,13 +219,13 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
     struct stat st;
 
     (void) UNLINK(jar);
-    assertf(cookie_save(&cookie, jar) == 0);
+    assertf(cookie_save(NULL, &cookie, jar) == 0);
     assertf(stat(jar, &st) == 0);
     assertf((st.st_mode & 07777) == HTS_PROTECT_FILE);
     assertf(st.st_size > 0); /* mode-only checks would pass an empty jar */
     /* a pre-existing world-readable jar must be tightened, not kept */
     assertf(chmod(jar, 0644) == 0);
-    assertf(cookie_save(&cookie, jar) == 0);
+    assertf(cookie_save(NULL, &cookie, jar) == 0);
     assertf(stat(jar, &st) == 0);
     assertf((st.st_mode & 07777) == HTS_PROTECT_FILE);
     assertf(st.st_size > 0);
@@ -439,7 +440,7 @@ static int st_cookieport(httrackp *opt, int argc, char **argv) {
   err |= cookie_expect(cookie_add(&jar, "pwn", "OWNED", "", "/") == 0,
                        HTS_FALSE, "an empty domain entered the jar");
 
-  /* cookie_del normalises like cookie_add, so one string reaches the same
+  /* cookie_remove normalises like cookie_add, so one string reaches the same
      entry through either. Control: the neighbour stays. */
   jar.data[0] = '\0';
   if (cookie_add(&jar, "gone", "G", "example.com:8080", "/") != 0 ||
@@ -447,7 +448,7 @@ static int st_cookieport(httrackp *opt, int argc, char **argv) {
     printf("cookie-port: FAIL (cookie_add setup, delete form)\n");
     return 1;
   }
-  cookie_del(&jar, "gone", "example.com:8080", "/");
+  cookie_remove(&jar, "gone", "example.com:8080", "/");
   err |= cookie_expect(strstr(jar.data, "gone") != NULL, HTS_FALSE,
                        "a port-qualified delete missed its cookie");
   err |= cookie_expect(strstr(jar.data, "kept") != NULL, HTS_TRUE,
@@ -1068,6 +1069,7 @@ static int st_cookiesetscope(httrackp *opt, int argc, char **argv) {
     const char *query, *pair;
     hts_boolean want;
   } steps[] = {
+      // header (NULL: none) sent by host, then is pair sent to query?
       // a foreign Domain= is refused, and not stored for its sender either
       {"evil.test", "Set-Cookie: x=1; Domain=victim.test", "victim.test", "x=1",
        HTS_FALSE},
@@ -1273,8 +1275,37 @@ static int st_cookiehttponly(httrackp *opt, int argc, char **argv) {
   fclose(fp);
   ck.max_len = sizeof(ck.data);
   ck.data[0] = '\0';
-  assertf(cookie_load(NULL, &ck, fpath, "cookies.txt") == 0);
+  // the four dead lines are comments a rewrite would drop
+  assertf(cookie_load(NULL, &ck, fpath, "cookies.txt") == 4);
   (void) UNLINK(file);
+  // each one counts on its own, so no two can trade places
+  {
+    static const char *const dead[] = {
+        "#.example.com\tTRUE\t/\tFALSE\t0\tdead\tx\n",
+        "#HttpOnly_#.example.com\tTRUE\t/\tFALSE\t0\tdead2\tx\n",
+        "#httponly_.example.com\tTRUE\t/\tFALSE\t0\tdead3\tx\n",
+        "#HttpOnlyX.example.com\tTRUE\t/\tFALSE\t0\tdead4\tx\n",
+    };
+    static t_cookie one;
+    size_t i;
+
+    one.max_len = sizeof(one.data);
+    for (i = 0; i < sizeof(dead) / sizeof(dead[0]); i++) {
+      fp = FOPEN(file, "wb");
+      assertf(fp != NULL);
+      fprintf(fp, "%s.example.com\tTRUE\t/\tFALSE\t0\tplain\t1\n", dead[i]);
+      fclose(fp);
+      one.data[0] = '\0';
+      if (cookie_load(NULL, &one, fpath, "cookies.txt") != 1 ||
+          strstr(one.data, "dead") != NULL ||
+          strstr(one.data, "\tplain\t1") == NULL) {
+        fprintf(stderr, "cookiehttponly: %s loaded as [%s]\n", dead[i],
+                one.data);
+        return 1;
+      }
+      (void) UNLINK(file);
+    }
+  }
   http_cookie_header(&ck, "www.example.com", "/", hdr, sizeof(hdr));
   if (strstr(hdr, "sid=abc") == NULL || strstr(hdr, "plain=1") == NULL ||
       strstr(hdr, "sid2=def") == NULL || strstr(hdr, "dead") != NULL ||
@@ -1284,6 +1315,1035 @@ static int st_cookiehttponly(httrackp *opt, int argc, char **argv) {
   }
   printf("cookiehttponly: OK\n");
   return 0;
+}
+
+/* Read the whole file at path into buf, or "" when it cannot be opened. */
+static void cookiejar_slurp(const char *path, char *buf, size_t size) {
+  FILE *const fp = FOPEN(path, "rb");
+  size_t n = 0;
+
+  if (fp != NULL) {
+    n = fread(buf, 1, size - 1, fp);
+    fclose(fp);
+  }
+  buf[n] = '\0';
+}
+
+/* -#test=cookiejar <dir>: the jar keeps every cookie attribute. */
+static int st_cookiejar(httrackp *opt, int argc, char **argv) {
+#define LABEL "cookie-jar"
+
+  static const struct {
+    const char *from, *header; // header NULL: only query
+    const char *to, *path, *pair;
+    hts_boolean want;
+  } steps[] = {
+      // header (NULL: none) sent by from, then is pair sent to to+path?
+      // no Domain= is host-only, a Domain= reaches subdomains
+      {"jar.test", "Set-Cookie: h=1", "jar.test", "/", "h=1", HTS_TRUE},
+      {"jar.test", NULL, "www.jar.test", "/", "h=1", HTS_FALSE},
+      {"jar.test", "Set-Cookie: d=1; Domain=jar.test", "www.jar.test", "/",
+       "d=1", HTS_TRUE},
+      // a longer path is another cookie, and its erasure leaves "/" alone
+      {"jar.test", "Set-Cookie: h=2; Path=/a", "jar.test", "/", "h=1",
+       HTS_TRUE},
+      {"jar.test", NULL, "jar.test", "/", "h=2", HTS_FALSE},
+      {"jar.test", NULL, "jar.test", "/a/x", "h=2", HTS_TRUE},
+      {"jar.test", "Set-Cookie: h=; Path=/a; Max-Age=0", "jar.test", "/a/x",
+       "h=1", HTS_TRUE},
+      {"jar.test", NULL, "jar.test", "/a/x", "h=2", HTS_FALSE},
+      // an erasure from another host cannot reach it
+      {"www.jar.test", "Set-Cookie: d=; Max-Age=0", "jar.test", "/", "d=1",
+       HTS_TRUE},
+      // host-only is no part of the identity, so either form erases the other
+      {"jar.test", "Set-Cookie: d=; Max-Age=0", "www.jar.test", "/", "d=1",
+       HTS_FALSE},
+      {"jar.test", "Set-Cookie: d=1; Domain=jar.test", "www.jar.test", "/",
+       "d=1", HTS_TRUE},
+      {"www.jar.test", "Set-Cookie: d=; Domain=jar.test; Max-Age=0", "jar.test",
+       "/", "d=1", HTS_FALSE},
+      // and either form replaces the other, taking its scope
+      {"jar.test", "Set-Cookie: two=host", "jar.test", "/", "two=host",
+       HTS_TRUE},
+      {"jar.test", "Set-Cookie: two=dom; Domain=jar.test", "jar.test", "/",
+       "two=host", HTS_FALSE},
+      {"jar.test", NULL, "www.jar.test", "/", "two=dom", HTS_TRUE},
+      {"jar.test", "Set-Cookie: two=back", "www.jar.test", "/", "two=dom",
+       HTS_FALSE},
+      {"jar.test", NULL, "www.jar.test", "/", "two=back", HTS_FALSE},
+      {"jar.test", NULL, "jar.test", "/", "two=back", HTS_TRUE},
+      // a dotted Domain= and an undotted one name the same cookie
+      {"www.dot.test", "Set-Cookie: dt=1; Domain=.dot.test", "a.dot.test", "/",
+       "dt=1", HTS_TRUE},
+      {"www.dot.test", "Set-Cookie: dt=2; Domain=dot.test", "a.dot.test", "/",
+       "dt=1", HTS_FALSE},
+      {"www.dot.test", NULL, "a.dot.test", "/", "dt=2", HTS_TRUE},
+      {"www.dot.test", "Set-Cookie: dt=3; Domain=.dot.test", "a.dot.test", "/",
+       "dt=2", HTS_FALSE},
+      {"www.dot.test", NULL, "a.dot.test", "/", "dt=3", HTS_TRUE},
+      // Secure goes out over https only, as an attribute or as av=value
+      {"https://jar.test", "Set-Cookie: s=1; Secure", "jar.test", "/", "s=1",
+       HTS_FALSE},
+      {"https://jar.test", NULL, "http://jar.test", "/", "s=1", HTS_FALSE},
+      {"https://jar.test", NULL, "https://jar.test", "/", "s=1", HTS_TRUE},
+      {"https://jar.test", "Set-Cookie: s2=1; SECURE=yes", "http://jar.test",
+       "/", "s2=1", HTS_FALSE},
+      {"https://jar.test", NULL, "https://jar.test", "/", "s2=1", HTS_TRUE},
+      // a cookie named like an attribute is still a cookie
+      {"jar.test", "Set-Cookie: secure=1", "jar.test", "/", "secure=1",
+       HTS_TRUE},
+      // an attribute that only starts with Secure is not Secure
+      {"jar.test", "Set-Cookie: sx=1; Securex", "http://jar.test", "/", "sx=1",
+       HTS_TRUE},
+  };
+
+  static t_cookie jar;
+  const int64_t now = (int64_t) time(NULL);
+  char buffer[8192];
+  char BIGSTK hdr[8192];
+  char fpath[HTS_URLMAXSIZE * 2];
+  char file[HTS_URLMAXSIZE * 2];
+  char saved[HTS_URLMAXSIZE * 2];
+  char BIGSTK text[16384];
+  size_t i;
+  int err = 0;
+
+  if (argc < 1) {
+    fprintf(stderr, "cookiejar: needs a writable dir\n");
+    return 1;
+  }
+  jar.max_len = sizeof(jar.data);
+  jar.data[0] = '\0';
+  for (i = 0; i < sizeof(steps) / sizeof(steps[0]); i++) {
+    if (steps[i].header != NULL) {
+      htsblk r;
+      char line[256]; // treathead NUL-cuts the header in place
+
+      memset(&r, 0, sizeof(r));
+      strcpybuff(line, steps[i].header);
+      treathead(&jar, steps[i].from, "/", &r, line);
+    }
+    http_cookie_header(&jar, steps[i].to, steps[i].path, hdr, sizeof(hdr));
+    if (cookie_sent(hdr, steps[i].pair) != steps[i].want) {
+      printf("%s: step %d: %s from %s, %s %s sent to %s%s\n", LABEL, (int) i,
+             steps[i].header != NULL ? steps[i].header : "(query)",
+             steps[i].from, steps[i].pair, steps[i].want ? "not" : "wrongly",
+             steps[i].to, steps[i].path);
+      err = 1;
+    }
+  }
+
+  /* Expiry is absolute: Max-Age outranks Expires, a session is 0, and a
+     Set-Cookie lives 400 days at most. */
+  {
+    static const struct {
+      const char *header, *name;
+      int64_t low, high; // from now
+    } lives[] = {
+        {"Set-Cookie: ma=1; Expires=Fri, 01 Jan 2100 00:00:00 GMT; Max-Age=60",
+         "ma", 60, 62},
+        {"Set-Cookie: ex=1; Expires=Fri, 01 Jan 2100 00:00:00 GMT", "ex",
+         400 * 86400, 400 * 86400 + 2},
+        {"Set-Cookie: big=1; Max-Age=99999999999999999999", "big", 400 * 86400,
+         400 * 86400 + 2},
+        // 2^63 and 2^64 + 1, which an unguarded int64 wraps to < 0 and to 1
+        {"Set-Cookie: b63=1; Max-Age=9223372036854775808", "b63", 400 * 86400,
+         400 * 86400 + 2},
+        {"Set-Cookie: b64=1; Max-Age=18446744073709551617", "b64", 400 * 86400,
+         400 * 86400 + 2},
+    };
+
+    jar.data[0] = '\0';
+    for (i = 0; i < sizeof(lives) / sizeof(lives[0]); i++) {
+      htsblk r;
+      char line[256];
+      const char *rec;
+      int64_t when;
+
+      memset(&r, 0, sizeof(r));
+      strcpybuff(line, lives[i].header);
+      treathead(&jar, "jar.test", "/", &r, line);
+      rec = cookie_find(jar.data, lives[i].name, "jar.test", "/");
+      when = rec != NULL ? (int64_t) atoll(cookie_get(buffer, rec, 4)) : 0;
+      if (when < now + lives[i].low || when > now + lives[i].high) {
+        printf("%s: %s stored expiry " LLintP ", now " LLintP "\n", LABEL,
+               lives[i].header, (LLint) when, (LLint) now);
+        err = 1;
+      }
+    }
+    // exact dates, the first two past a 32-bit time_t
+    {
+      static const struct {
+        const char *date;
+        int64_t unix_time;
+      } dates[] = {
+          {"Fri, 01 Jan 2100 00:00:00 GMT", 4102444800LL},
+          {"Tue, 19 Jan 2038 03:14:08 GMT", 2147483648LL},
+          {"Sun, 06 Nov 1994 08:49:37 GMT", 784111777LL},
+          {"Wed, 01 Mar 2000 00:00:00 GMT", 951868800LL},
+          {"Tue, 29 Feb 2000 23:59:59 GMT", 951868799LL},
+          {"Wed, 15 Jul 2026 12:00:00 GMT", 1784116800LL},
+          {"Thu, 31 Dec 2026 23:59:59 GMT", 1798761599LL},
+      };
+
+      for (i = 0; i < sizeof(dates) / sizeof(dates[0]); i++) {
+        int64_t when = 0;
+
+        if (!cookie_expires_time(dates[i].date, dates[i].unix_time - 10,
+                                 &when) ||
+            when != dates[i].unix_time) {
+          printf("%s: %s read as " LLintP "\n", LABEL, dates[i].date,
+                 (LLint) when);
+          err = 1;
+        }
+      }
+    }
+    // out-of-range fields are capped, not overflowed
+    {
+      static const char *const huge[] = {
+          "Thu, 2147483647 Jan 2027 00:00:00 GMT",
+          "2147483647 Dec 2147483647 2147483647:2147483647:2147483647",
+      };
+
+      for (i = 0; i < sizeof(huge) / sizeof(huge[0]); i++) {
+        int64_t when = 0;
+
+        if (!cookie_expires_time(huge[i], 0, &when) ||
+            when != (int64_t) 400 * 24 * 3600) {
+          printf("%s: %s read as " LLintP "\n", LABEL, huge[i], (LLint) when);
+          err = 1;
+        }
+      }
+    }
+    // a session cookie writes 0
+    {
+      htsblk r;
+      char line[] = "Set-Cookie: sess=1";
+      const char *rec;
+
+      memset(&r, 0, sizeof(r));
+      treathead(&jar, "jar.test", "/", &r, line);
+      rec = cookie_find(jar.data, "sess", "jar.test", "/");
+      if (rec == NULL || strcmp(cookie_get(buffer, rec, 4), "0") != 0) {
+        printf("%s: a session cookie is not stored with expiry 0\n", LABEL);
+        err = 1;
+      }
+    }
+    // a record that has expired since it was stored is not sent
+    {
+      cookie_attr attr = {.host_only = HTS_FALSE,
+                          .secure = HTS_FALSE,
+                          .http_only = HTS_FALSE,
+                          .expires = now - 10};
+
+      jar.data[0] = '\0';
+      assertf(cookie_set(&jar, "old", "1", "jar.test", "/", &attr) == 0);
+      attr.expires = now + 3600;
+      assertf(cookie_set(&jar, "young", "1", "jar.test", "/", &attr) == 0);
+      http_cookie_header(&jar, "jar.test", "/", hdr, sizeof(hdr));
+      if (cookie_sent(hdr, "old=1") || !cookie_sent(hdr, "young=1")) {
+        printf("%s: expired record at send: [%s]\n", LABEL, hdr);
+        err = 1;
+      }
+    }
+  }
+
+  /* A cookies.txt keeps host-only, Secure, HttpOnly and expiry through a
+     load and a save, and an expired line is not loaded. */
+  assertf(sprintfbuff(fpath, "%s/", argv[0]));
+  assertf(sprintfbuff(file, "%scookies.txt", fpath));
+  assertf(sprintfbuff(saved, "%ssaved.txt", fpath));
+  {
+    static const char *const kept[] = {
+        ".load.test\tTRUE\t/\tFALSE\t0\tdom\t1" LF,
+        "host.test\tFALSE\t/\tFALSE\t0\tonly\t1" LF,
+        ".load.test\tTRUE\t/\tTRUE\t0\tsec\t1" LF,
+        ".load.test\tTRUE\t/\tFALSE\t4102444800\tfuture\t1" LF,
+        "#HttpOnly_.load.test\tTRUE\t/\tFALSE\t0\thid\t1" LF,
+    };
+
+    static const struct {
+      const char *to, *pair;
+      hts_boolean want;
+    } sends[] = {
+        {"www.load.test", "dom=1", HTS_TRUE},
+        {"www.load.test", "future=1", HTS_TRUE},
+        {"www.load.test", "hid=1", HTS_TRUE},
+        {"www.load.test", "past=1", HTS_FALSE},
+        {"www.load.test", "sec=1", HTS_FALSE},
+        {"https://www.load.test", "sec=1", HTS_TRUE},
+        {"host.test", "only=1", HTS_TRUE},
+        {"sub.host.test", "only=1", HTS_FALSE},
+    };
+
+    FILE *fp = FOPEN(file, "wb");
+
+    assertf(fp != NULL);
+    fprintf(fp, "# Netscape HTTP Cookie File\n"
+                ".load.test\tTRUE\t/\tFALSE\t1\tpast\t1\n");
+    for (i = 0; i < sizeof(kept) / sizeof(kept[0]); i++)
+      fprintf(fp, "%s", kept[i]);
+    fclose(fp);
+    jar.data[0] = '\0';
+    assertf(cookie_load(NULL, &jar, fpath, "cookies.txt") == 0);
+    for (i = 0; i < sizeof(sends) / sizeof(sends[0]); i++) {
+      http_cookie_header(&jar, sends[i].to, "/", hdr, sizeof(hdr));
+      if (cookie_sent(hdr, sends[i].pair) != sends[i].want) {
+        printf("%s: loaded %s %s sent to %s\n", LABEL, sends[i].pair,
+               sends[i].want ? "not" : "wrongly", sends[i].to);
+        err = 1;
+      }
+    }
+    assertf(cookie_save(NULL, &jar, saved) == 0);
+    cookiejar_slurp(saved, text, sizeof(text));
+    for (i = 0; i < sizeof(kept) / sizeof(kept[0]); i++) {
+      if (strstr(text, kept[i]) == NULL) {
+        printf("%s: the saved jar lost %s", LABEL, kept[i]);
+        err = 1;
+      }
+    }
+    if (strstr(text, "past") != NULL || strstr(text, "\tHttpOnly") != NULL) {
+      printf("%s: the saved jar holds [%s]\n", LABEL, text);
+      err = 1;
+    }
+    /* A Set-Cookie HttpOnly saves the way a loaded one does, in either form,
+       and the saved domain is dotted exactly when subdomains get it. */
+    {
+      static const struct {
+        const char *header, *saved;
+      } saves[] = {
+          {"Set-Cookie: web=1; HttpOnly",
+           "\n#HttpOnly_jar.test\tFALSE\t/\tFALSE\t0\tweb\t1" LF},
+          {"Set-Cookie: hv=1; HttpOnly=yes",
+           "\n#HttpOnly_jar.test\tFALSE\t/\tFALSE\t0\thv\t1" LF},
+          {"Set-Cookie: dm=1; Domain=jar.test",
+           "\n.jar.test\tTRUE\t/\tFALSE\t0\tdm\t1" LF},
+      };
+
+      jar.data[0] = '\0';
+      for (i = 0; i < sizeof(saves) / sizeof(saves[0]); i++) {
+        htsblk r;
+        char line[256];
+
+        memset(&r, 0, sizeof(r));
+        strcpybuff(line, saves[i].header);
+        treathead(&jar, "jar.test", "/", &r, line);
+      }
+      // a dotted host-only record, from a hand-edited jar, saves undotted
+      {
+        cookie_attr attr = {.host_only = HTS_TRUE,
+                            .secure = HTS_FALSE,
+                            .http_only = HTS_FALSE,
+                            .expires = 0};
+
+        assertf(cookie_set(&jar, "hd", "1", ".jar.test", "/", &attr) == 0);
+      }
+      assertf(cookie_save(NULL, &jar, saved) == 0);
+      cookiejar_slurp(saved, text, sizeof(text));
+      for (i = 0; i < sizeof(saves) / sizeof(saves[0]); i++) {
+        if (strstr(text, saves[i].saved) == NULL) {
+          printf("%s: saved %s as [%s]\n", LABEL, saves[i].header, text);
+          err = 1;
+        }
+      }
+      if (strncmp(text, "# Netscape HTTP Cookie File" LF,
+                  sizeof("# Netscape HTTP Cookie File" LF) - 1) != 0 ||
+          strstr(text, "\njar.test\tFALSE\t/\tFALSE\t0\thd\t1" LF) == NULL) {
+        printf("%s: the saved jar is [%s]\n", LABEL, text);
+        err = 1;
+      }
+    }
+    (void) UNLINK(file);
+    (void) UNLINK(saved);
+  }
+
+  /* A cookie of RFC 6265's 4096 bytes loads, saves and goes out whole, and
+     one byte more is refused with a warning rather than cut. */
+  {
+    FILE *const projectlog = opt->log;
+    FILE *const log = tmpfile();
+    const int saveddebug = opt->debug;
+    char BIGSTK big[COOKIE_MAX_PAIR + 2];
+    char BIGSTK pair[COOKIE_MAX_PAIR + 8];
+    char logged[1024];
+    size_t n;
+    FILE *fp = FOPEN(file, "wb");
+
+    assertf(fp != NULL && log != NULL);
+    memset(big, 'v', COOKIE_MAX_PAIR - 3);
+    big[COOKIE_MAX_PAIR - 3] = '\0';
+    fprintf(fp, "big.test\tFALSE\t/\tFALSE\t0\tfit\t%s\n", big);
+    strcatbuff(big, "v"); // name and value now one byte over
+    fprintf(fp, "big.test\tFALSE\t/\tFALSE\t0\tnot\t%s\n", big);
+    fclose(fp);
+    opt->log = log;
+    opt->debug = LOG_WARNING;
+    jar.data[0] = '\0';
+    assertf(cookie_load(opt, &jar, fpath, "cookies.txt") == 1);
+    rewind(log);
+    n = fread(logged, 1, sizeof(logged) - 1, log);
+    logged[n] = '\0';
+    fclose(log);
+    opt->log = projectlog;
+    opt->debug = saveddebug;
+    big[COOKIE_MAX_PAIR - 3] = '\0';
+    assertf(sprintfbuff(pair, "fit=%s", big));
+    http_cookie_header(&jar, "big.test", "/", hdr, sizeof(hdr));
+    if (!cookie_sent(hdr, pair) || strstr(jar.data, "\tnot\t") != NULL ||
+        strstr(logged, "did not store 'not'") == NULL) {
+      printf("%s: a 4096-byte cookie: sent %d bytes, log [%s]\n", LABEL,
+             (int) strlen(hdr), logged);
+      err = 1;
+    }
+    assertf(cookie_save(NULL, &jar, saved) == 0);
+    cookiejar_slurp(saved, text, sizeof(text));
+    if (strstr(text, big) == NULL || strstr(text, "\tnot\t") != NULL) {
+      printf("%s: the saved jar lost the 4096-byte cookie\n", LABEL);
+      err = 1;
+    }
+    (void) UNLINK(file);
+    (void) UNLINK(saved);
+  }
+
+  /* A Set-Cookie the jar refuses is logged, once, and a stored one is not. */
+  {
+    FILE *const projectlog = opt->log;
+    FILE *const log = tmpfile();
+    const int saveddebug = opt->debug;
+    char logged[1024];
+    size_t n;
+    const char *p;
+    int count = 0;
+    htsblk r;
+    char fits[] = "Set-Cookie: fits=1";
+    char full[] = "Set-Cookie: full=1";
+
+    assertf(log != NULL);
+    opt->log = log;
+    opt->debug = LOG_WARNING;
+    jar.data[0] = '\0';
+    memset(&r, 0, sizeof(r));
+    jar.max_len = 300; // room for one record and its headroom, not two
+    treathead_opt(opt, &jar, "jar.test", "/", &r, fits);
+    treathead_opt(opt, &jar, "jar.test", "/", &r, full);
+    jar.max_len = sizeof(jar.data);
+    rewind(log);
+    n = fread(logged, 1, sizeof(logged) - 1, log);
+    logged[n] = '\0';
+    fclose(log);
+    opt->log = projectlog;
+    opt->debug = saveddebug;
+    for (p = strstr(logged, "did not store"); p != NULL;
+         p = strstr(p + 1, "did not store"))
+      count++;
+    if (count != 1 || strstr(logged, "'full'") == NULL ||
+        strstr(jar.data, "fits") == NULL) {
+      printf("%s: refusal log [%s], jar [%s]\n", LABEL, logged, jar.data);
+      err = 1;
+    }
+  }
+  /* An older build wrote TRUE in field 1 of every record, so a host-only
+     Set-Cookie must still replace and erase a record loaded from its jar. */
+  {
+    static const struct {
+      const char *header, *pair;
+      hts_boolean want;
+    } legacy[] = {
+        {NULL, "SID=old", HTS_TRUE},
+        {"Set-Cookie: SID=new", "SID=new", HTS_TRUE},
+        {NULL, "SID=old", HTS_FALSE},
+        {"Set-Cookie: SID=; Max-Age=0", "SID=new", HTS_FALSE},
+        {NULL, "SID=", HTS_FALSE},
+    };
+
+    FILE *fp = FOPEN(file, "wb");
+
+    assertf(fp != NULL);
+    fprintf(fp, "127.0.0.1\tTRUE\t/\tFALSE\t1999999999\tSID\told\n");
+    fclose(fp);
+    jar.data[0] = '\0';
+    assertf(cookie_load(NULL, &jar, fpath, "cookies.txt") == 0);
+    for (i = 0; i < sizeof(legacy) / sizeof(legacy[0]); i++) {
+      if (legacy[i].header != NULL) {
+        htsblk r;
+        char line[256];
+
+        memset(&r, 0, sizeof(r));
+        strcpybuff(line, legacy[i].header);
+        treathead(&jar, "127.0.0.1", "/", &r, line);
+      }
+      http_cookie_header(&jar, "127.0.0.1", "/", hdr, sizeof(hdr));
+      if (cookie_sent(hdr, legacy[i].pair) != legacy[i].want) {
+        printf("%s: legacy jar row %d sent [%s]\n", LABEL, (int) i, hdr);
+        err = 1;
+      }
+    }
+    if (strstr(jar.data, "SID") != NULL) {
+      printf("%s: the legacy jar kept [%s]\n", LABEL, jar.data);
+      err = 1;
+    }
+    (void) UNLINK(file);
+  }
+
+  /* A line short of seven fields or with no name is skipped and counted, and a
+     comment, a blank line or an expired cookie is not. */
+  {
+    FILE *fp = FOPEN(file, "wb");
+    int skipped;
+
+    assertf(fp != NULL);
+    fprintf(fp, "# Netscape HTTP Cookie File\n"
+                "\n"
+                "short.test\tTRUE\t/\n"
+                "short.test\tTRUE\t/\tFALSE\t0\t\tnoname\n"
+                "short.test\tTRUE\t/\tFALSE\t1\tpast\t1\n"
+                "short.test\tTRUE\t/\tFALSE\t0\tgood\t1\n");
+    fclose(fp);
+    jar.data[0] = '\0';
+    skipped = cookie_load(NULL, &jar, fpath, "cookies.txt");
+    if (skipped != 2 || strstr(jar.data, "\tgood\t1") == NULL ||
+        strstr(jar.data, "noname") != NULL) {
+      printf("%s: malformed lines: %d skipped, jar [%s]\n", LABEL, skipped,
+             jar.data);
+      err = 1;
+    }
+    (void) UNLINK(file);
+  }
+
+  /* A TAB or a line break in any field would forge a field or a record. */
+  {
+    htsblk r;
+    char line[] = "Set-Cookie: tab=a\tb=c";
+    char crlf[] = "Set-Cookie: nl=a\nb";
+
+    memset(&r, 0, sizeof(r));
+    jar.data[0] = '\0';
+    treathead(&jar, "jar.test", "/", &r, line);
+    treathead(&jar, "jar.test", "/", &r, crlf);
+    if (cookie_set(&jar, "t\tn", "1", "jar.test", "/", NULL) == 0 ||
+        cookie_set(&jar, "tn", "1", "jar.test", "/\tx", NULL) == 0 ||
+        cookie_set(&jar, "tn", "1", "jar\t.test", "/", NULL) == 0 ||
+        strnotempty(jar.data)) {
+      printf("%s: a field with a TAB was stored: [%s]\n", LABEL, jar.data);
+      err = 1;
+    }
+  }
+
+  /* Each line a rewrite would lose is counted, and a line a known tool
+     writes is not. */
+  {
+#define ROWS(text, skipped, rec, absent)                                       \
+  {text, sizeof(text) - 1, skipped, rec, absent}
+#define ROWR(text, skipped, rec) ROWS(text, skipped, rec, NULL)
+#define ROWA(text, skipped, absent) ROWS(text, skipped, NULL, absent)
+#define ROW(text, skipped) ROWS(text, skipped, NULL, NULL)
+
+    static const struct {
+      const char *bytes;
+      size_t len;
+      int skipped;
+      const char *rec;    // NULL, or a record the jar must then hold
+      const char *absent; // NULL, or a string the jar must not hold
+    } loads[] = {
+        // the same name, domain and path twice, whatever the host-only flag,
+        // and the last one wins
+        ROWS("d.test\tFALSE\t/\tFALSE\t0\tsid\t1\n"
+             ".D.test\tTRUE\t/\tFALSE\t0\tsid\t2\n",
+             1, "\tsid\t2\n", "\tsid\t1\n"),
+        ROW("d.test\tTRUE\t/\tFALSE\t0\tsid\t1\n"
+            "d.test\tTRUE\t/a\tFALSE\t0\tsid\t2\n"
+            "d.test\tTRUE\t/\tFALSE\t0\tsid2\t3\n",
+            0),
+        // an expired twin is dropped on load, so a rewrite loses nothing
+        ROW("d.test\tTRUE\t/\tFALSE\t0\tsid\t1\n"
+            "d.test\tTRUE\t/\tFALSE\t1\tsid\t2\n",
+            0),
+        ROW("d.test\tTRUE\t/\tFALSE\t0\tn\tv1\tv2\n", 1),
+        ROWA("x.test\tTRUE\t/\tFALSE\t0\tn\ta\tb\tc\n", 1, "\tn\t"),
+        // an expiry a rewrite would turn into 0
+        ROWA("d.test\tTRUE\t/\tFALSE\t12abc\tn\tv\n", 1, "\tn\t"),
+        ROWA("d.test\tTRUE\t/\tFALSE\t1767225600.5\tn\tv\n", 1, "\tn\t"),
+        ROWA("d.test\tTRUE\t/\tFALSE\t\tn\tv\n", 1, "\tn\t"),
+        ROW("d.test\tTRUE\t/\tFALSE\t0\tn\tv\tHttpOnly\n", 0),
+        ROW("d.test\tTRUE\t/\tFALSE\t0\tn\tv\0x\n", 1),
+        // the jar refuses a CR in a name or a value, but not in a flag
+        ROW("d.test\tTRUE\t/\tFALSE\r\t0\tn\tv\n", 1),
+        // a CRLF ends the line, so it is no CR in the value
+        ROWR("d.test\tTRUE\t/\tFALSE\t0\tn\tv\r\n", 0, "\tn\tv\n"),
+        ROW("# my own note\n", 1),
+        ROW("# Netscape HTTP Cookie File (my note)\n", 1),
+        ROW("# Edit at your own risk. Mine.\n", 1),
+        // each line a known tool writes, then the spacing variants
+        ROW("# Netscape HTTP Cookie File\n", 0),
+        ROW("# HTTP Cookie File\n", 0),
+        ROW("# Written by HTTrack Website Copier\n", 0),
+        ROW("# https://curl.se/docs/http-cookies.html\n", 0),
+        ROW("# https://curl.haxx.se/docs/http-cookies.html\n", 0),
+        ROW("# http://curl.haxx.se/rfc/cookie_spec.html\n", 0),
+        ROW("# https://curl.haxx.se/rfc/cookie_spec.html\n", 0),
+        ROW("# This file was generated by libcurl! Edit at your own risk.\n",
+            0),
+        ROW("# http://www.netscape.com/newsref/std/cookie_spec.html\n", 0),
+        ROW("# This is a generated file! Do not edit.\n", 0),
+        ROW("# This is a generated file!  Do not edit.\n", 0),
+        ROW("# This file is generated by yt-dlp.  Do not edit.\n", 0),
+        ROW("# Generated by Wget on 2026-01-01 00:00:00.\n", 0),
+        ROW("# Generated by hand: my login\n", 1),
+        ROW("# Edit at your own risk.\n", 0),
+        ROW("#  Netscape\tHTTP Cookie File \t\n", 0),
+        ROW("# Netscape HTTP Cookie File\n"
+            "# https://curl.se/docs/http-cookies.html\n"
+            "# This file was generated by libcurl! Edit at your own risk.\n"
+            "\n \t\n",
+            0),
+        ROW("# HTTP Cookie File\n"
+            "# Generated by Wget on 2026-01-01 00:00:00.\n"
+            "# Edit at your own risk.\n",
+            0),
+    };
+
+#undef ROW
+#undef ROWA
+#undef ROWR
+#undef ROWS
+
+    for (i = 0; i < sizeof(loads) / sizeof(loads[0]); i++) {
+      FILE *fp = FOPEN(file, "wb");
+      int skipped;
+
+      assertf(fp != NULL);
+      assertf(fwrite(loads[i].bytes, 1, loads[i].len, fp) == loads[i].len);
+      fclose(fp);
+      jar.data[0] = '\0';
+      skipped = cookie_load(NULL, &jar, fpath, "cookies.txt");
+      if (skipped != loads[i].skipped ||
+          (loads[i].rec != NULL && strstr(jar.data, loads[i].rec) == NULL) ||
+          (loads[i].absent != NULL &&
+           strstr(jar.data, loads[i].absent) != NULL)) {
+        printf("%s: load row %d skipped %d lines, not %d, jar [%s]\n", LABEL,
+               (int) i, skipped, loads[i].skipped, jar.data);
+        err = 1;
+      }
+    }
+    // of a repeated cookie, the last line is the one sent
+    {
+      FILE *fp = FOPEN(file, "wb");
+
+      assertf(fp != NULL);
+      fprintf(fp, "d.test\tTRUE\t/\tFALSE\t0\tsid\tfirst\n"
+                  "d.test\tTRUE\t/\tFALSE\t0\tsid\tlast\n");
+      fclose(fp);
+      jar.data[0] = '\0';
+      assertf(cookie_load(NULL, &jar, fpath, "cookies.txt") == 1);
+      http_cookie_header(&jar, "www.d.test", "/", hdr, sizeof(hdr));
+      if (!cookie_sent(hdr, "sid=last") || cookie_sent(hdr, "sid=first")) {
+        printf("%s: a repeated cookie sent [%s]\n", LABEL, hdr);
+        err = 1;
+      }
+    }
+    // the eighth field we write marks HttpOnly
+    {
+      FILE *fp = FOPEN(file, "wb");
+
+      assertf(fp != NULL);
+      fprintf(fp, "d.test\tTRUE\t/\tFALSE\t0\tn\tv\tHttpOnly\n");
+      fclose(fp);
+      jar.data[0] = '\0';
+      assertf(cookie_load(NULL, &jar, fpath, "cookies.txt") == 0);
+      assertf(cookie_save(NULL, &jar, saved) == 0);
+      cookiejar_slurp(saved, text, sizeof(text));
+      if (strstr(text, "\n#HttpOnly_.d.test\tTRUE\t/\tFALSE\t0\tn\tv" LF) ==
+          NULL) {
+        printf("%s: an eighth HttpOnly field saved as [%s]\n", LABEL, text);
+        err = 1;
+      }
+    }
+    (void) UNLINK(file);
+    (void) UNLINK(saved);
+    jar.data[0] = '\0';
+    if (cookie_load(NULL, &jar, fpath, "cookies.txt") != -1) {
+      printf("%s: a missing jar is not reported as missing\n", LABEL);
+      err = 1;
+    }
+    // a missing jar beside its .bak is what a save that died leaves
+    {
+      char bak[HTS_URLMAXSIZE * 2];
+      FILE *fp;
+
+      assertf(sprintfbuff(bak, "%s.bak", file));
+      fp = FOPEN(bak, "wb");
+      assertf(fp != NULL);
+      fclose(fp);
+      if (cookie_load(NULL, &jar, fpath, "cookies.txt") != COOKIE_LOAD_KEEP) {
+        printf("%s: a missing jar with a .bak is rewritten\n", LABEL);
+        err = 1;
+      }
+      // an empty jar beside a non-empty .bak is what a crash before sync leaves
+      fp = FOPEN(file, "wb");
+      assertf(fp != NULL);
+      fclose(fp);
+      if (cookie_load(NULL, &jar, fpath, "cookies.txt") != 0) {
+        printf("%s: an empty jar with an empty .bak is not loaded\n", LABEL);
+        err = 1;
+      }
+      fp = FOPEN(bak, "wb");
+      assertf(fp != NULL);
+      fprintf(fp, "d.test\tTRUE\t/\tFALSE\t0\told\t1\n");
+      fclose(fp);
+      if (cookie_load(NULL, &jar, fpath, "cookies.txt") != COOKIE_LOAD_KEEP) {
+        printf("%s: an empty jar with a non-empty .bak is rewritten\n", LABEL);
+        err = 1;
+      }
+      (void) UNLINK(file);
+      (void) UNLINK(bak);
+    }
+#ifndef _WIN32
+    // a jar that exists but cannot be read would be replaced unread
+    if (geteuid() != 0) {
+      FILE *fp = FOPEN(file, "wb");
+
+      assertf(fp != NULL);
+      assertf(fchmod(fileno(fp), 0) == 0);
+      fclose(fp);
+      if (cookie_load(NULL, &jar, fpath, "cookies.txt") != COOKIE_LOAD_KEEP) {
+        printf("%s: an unreadable jar is rewritten\n", LABEL);
+        err = 1;
+      }
+      (void) UNLINK(file);
+    }
+#endif
+  }
+
+  /* A replacement too large for a full jar leaves the old record in place. */
+  {
+    char BIGSTK value[201];
+
+    memset(value, 'v', sizeof(value) - 1);
+    value[sizeof(value) - 1] = '\0';
+    jar.data[0] = '\0';
+    jar.max_len = 300;
+    assertf(cookie_add(&jar, "keep", "1", "jar.test", "/") == 0);
+    if (cookie_add(&jar, "keep", value, "jar.test", "/") == 0 ||
+        strstr(jar.data, "\tkeep\t1\n") == NULL) {
+      printf("%s: a refused replacement left [%s]\n", LABEL, jar.data);
+      err = 1;
+    }
+    // the room the old record frees counts, so a same-size one replaces it
+    jar.max_len = strlen(jar.data) + 260;
+    if (cookie_add(&jar, "keep", "2", "jar.test", "/") != 0 ||
+        strstr(jar.data, "\tkeep\t2\n") == NULL ||
+        strstr(jar.data, "\tkeep\t1\n") != NULL) {
+      printf("%s: a same-size replacement left [%s]\n", LABEL, jar.data);
+      err = 1;
+    }
+    jar.max_len = sizeof(jar.data);
+  }
+
+  /* An empty jar empties an existing file and keeps the old one in .bak. It
+     creates no missing file, but a jar with cookies does. */
+  {
+    char bak[HTS_URLMAXSIZE * 2];
+    FILE *fp = FOPEN(file, "wb");
+
+    assertf(sprintfbuff(bak, "%s.bak", file));
+    assertf(fp != NULL);
+    fprintf(fp, "d.test\tTRUE\t/\tFALSE\t0\tgone\t1\n");
+    fclose(fp);
+    jar.data[0] = '\0';
+    cookie_save_replacing(opt, &jar, file);
+    cookiejar_slurp(file, text, sizeof(text));
+    if (strstr(text, "# Netscape HTTP Cookie File") != text ||
+        strstr(text, "gone") != NULL) {
+      printf("%s: an empty jar saved as [%s]\n", LABEL, text);
+      err = 1;
+    }
+    cookiejar_slurp(bak, text, sizeof(text));
+    if (strstr(text, "\tgone\t1") == NULL) {
+      printf("%s: the emptied jar's .bak is [%s]\n", LABEL, text);
+      err = 1;
+    }
+    (void) UNLINK(file);
+    (void) UNLINK(bak);
+    cookie_save_replacing(opt, &jar, file);
+    if (fexist_utf8(file)) {
+      printf("%s: an empty jar created a file\n", LABEL);
+      err = 1;
+    }
+    assertf(cookie_add(&jar, "new", "1", "jar.test", "/") == 0);
+    cookie_save_replacing(opt, &jar, file);
+    cookiejar_slurp(file, text, sizeof(text));
+    if (strstr(text, "\tnew\t1") == NULL || fexist_utf8(bak)) {
+      printf("%s: a missing jar was saved as [%s]\n", LABEL, text);
+      err = 1;
+    }
+    (void) UNLINK(file);
+  }
+#ifndef _WIN32
+  /* A link to a missing file stays a link, even with cookies to save. */
+  {
+    char link[HTS_URLMAXSIZE * 2];
+    struct stat st;
+
+    assertf(sprintfbuff(link, "%sdangling.txt", fpath));
+    assertf(symlink("missing-target.txt", link) == 0);
+    cookie_save_replacing(NULL, &jar, link);
+    if (lstat(link, &st) != 0 || !S_ISLNK(st.st_mode)) {
+      printf("%s: a dangling link was replaced\n", LABEL);
+      err = 1;
+    }
+    // the project jar refuses it too
+    if (cookie_save(NULL, &jar, link) != -1 || lstat(link, &st) != 0 ||
+        !S_ISLNK(st.st_mode)) {
+      printf("%s: the project jar replaced a dangling link\n", LABEL);
+      err = 1;
+    }
+    (void) UNLINK(link);
+  }
+
+  /* The project jar follows a link to its target, and stays a link. */
+  {
+    char link[HTS_URLMAXSIZE * 2];
+    char target[HTS_URLMAXSIZE * 2];
+    struct stat st;
+    FILE *fp;
+
+    assertf(sprintfbuff(link, "%sproject-link.txt", fpath));
+    assertf(sprintfbuff(target, "%sproject-target.txt", fpath));
+    fp = FOPEN(target, "wb");
+    assertf(fp != NULL);
+    fclose(fp);
+    assertf(symlink("project-target.txt", link) == 0);
+    jar.data[0] = '\0';
+    assertf(cookie_add(&jar, "linked", "1", "jar.test", "/") == 0);
+    assertf(cookie_save(NULL, &jar, link) == 0);
+    cookiejar_slurp(target, text, sizeof(text));
+    if (lstat(link, &st) != 0 || !S_ISLNK(st.st_mode) ||
+        strstr(text, "\tlinked\t1") == NULL) {
+      printf("%s: a project jar link left the target as [%s]\n", LABEL, text);
+      err = 1;
+    }
+    (void) UNLINK(link);
+    (void) UNLINK(target);
+  }
+#endif
+
+  /* An empty jar empties an existing project jar, and creates none when it is
+   * missing. */
+  {
+    FILE *fp = FOPEN(file, "wb");
+
+    assertf(fp != NULL);
+    fprintf(fp, "d.test\tTRUE\t/\tFALSE\t0\tgone\t1\n");
+    fclose(fp);
+    jar.data[0] = '\0';
+    assertf(cookie_save(NULL, &jar, file) == 0);
+    cookiejar_slurp(file, text, sizeof(text));
+    if (strstr(text, "# Netscape HTTP Cookie File") != text ||
+        strstr(text, "gone") != NULL) {
+      printf("%s: an emptied project jar saved as [%s]\n", LABEL, text);
+      err = 1;
+    }
+    (void) UNLINK(file);
+    if (cookie_save(NULL, &jar, file) != 0 || fexist_utf8(file)) {
+      printf("%s: an empty project jar created a file\n", LABEL);
+      err = 1;
+    }
+  }
+
+  /* A save names its temporaries after its own pid, and leaves another run's
+     temporaries alone. */
+  {
+    char planted[4][HTS_URLMAXSIZE * 2];
+    char bak[HTS_URLMAXSIZE * 2];
+    const unsigned long other = back_self_pid() + 1;
+    int pass;
+
+    assertf(sprintfbuff(bak, "%s.bak", file));
+    assertf(sprintfbuff(planted[0], "%s.tmp", file));
+    assertf(sprintfbuff(planted[1], "%s.bak.tmp", file));
+    assertf(sprintfbuff(planted[2], "%s.%lu.tmp", file, other));
+    assertf(sprintfbuff(planted[3], "%s.bak.%lu.tmp", file, other));
+    jar.data[0] = '\0';
+    assertf(cookie_add(&jar, "pid", "1", "jar.test", "/") == 0);
+    for (pass = 0; pass < 2; pass++) {
+      size_t k;
+      FILE *fp = FOPEN(file, "wb");
+
+      assertf(fp != NULL);
+      fclose(fp);
+      for (k = 0; k < sizeof(planted) / sizeof(planted[0]); k++) {
+        fp = FOPEN(planted[k], "wb");
+        assertf(fp != NULL);
+        fclose(fp);
+      }
+      if (pass == 0)
+        cookie_save_replacing(NULL, &jar, file);
+      else
+        assertf(cookie_save(NULL, &jar, file) == 0);
+      cookiejar_slurp(file, text, sizeof(text));
+      if (strstr(text, "\tpid\t1") == NULL) {
+        printf("%s: pass %d saved [%s]\n", LABEL, pass, text);
+        err = 1;
+      }
+      for (k = 0; k < sizeof(planted) / sizeof(planted[0]); k++) {
+        if (!fexist_utf8(planted[k])) {
+          printf("%s: pass %d deleted %s\n", LABEL, pass, planted[k]);
+          err = 1;
+        }
+        (void) UNLINK(planted[k]);
+      }
+      (void) UNLINK(file);
+      (void) UNLINK(bak);
+    }
+  }
+
+  /* The file holds the old or the new jar whatever step fails, and .bak gets
+     the old one with or without hard links. A copy that fails leaves the
+     previous .bak as it was. */
+  {
+    static const char old[] = "d.test\tTRUE\t/\tFALSE\t0\told\t1\n";
+    static const char older[] = "d.test\tTRUE\t/\tFALSE\t0\tolder\t1\n";
+    static const int faults[] = {
+        0,
+        COOKIE_FAULT_NOLINK,
+        COOKIE_FAULT_REPLACE,
+        COOKIE_FAULT_NOLINK | COOKIE_FAULT_REPLACE,
+        COOKIE_FAULT_NOLINK | COOKIE_FAULT_COPY_WRITE,
+        COOKIE_FAULT_NOLINK | COOKIE_FAULT_COPY_READ,
+        COOKIE_FAULT_NOLINK | COOKIE_FAULT_COPY_CLOSE,
+        COOKIE_FAULT_WRITE,
+        COOKIE_FAULT_CLOSE,
+    };
+    const int copy_faults = COOKIE_FAULT_COPY_WRITE | COOKIE_FAULT_COPY_READ |
+                            COOKIE_FAULT_COPY_CLOSE;
+    char bak[HTS_URLMAXSIZE * 2];
+    char baktmp[HTS_URLMAXSIZE * 2];
+    char tmp[HTS_URLMAXSIZE * 2];
+
+    assertf(sprintfbuff(bak, "%s.bak", file));
+    assertf(sprintfbuff(baktmp, "%s.bak.%lu.tmp", file, back_self_pid()));
+    assertf(sprintfbuff(tmp, "%s.%lu.tmp", file, back_self_pid()));
+    jar.data[0] = '\0';
+    assertf(cookie_add(&jar, "new", "1", "jar.test", "/") == 0);
+    for (i = 0; i < sizeof(faults) / sizeof(faults[0]); i++) {
+      const int fault = faults[i];
+      const hts_boolean copy_fails = (fault & copy_faults) != 0;
+      // a failed write stops before the backup, so .bak keeps the older jar
+      const hts_boolean bak_kept =
+          copy_fails ||
+          (fault & (COOKIE_FAULT_WRITE | COOKIE_FAULT_CLOSE)) != 0;
+      const hts_boolean fails = bak_kept || (fault & COOKIE_FAULT_REPLACE) != 0;
+      FILE *fp = FOPEN(file, "wb");
+#ifndef _WIN32
+      struct stat before, after;
+#endif
+
+      assertf(fp != NULL);
+      fprintf(fp, "%s", old);
+#ifndef _WIN32
+      assertf(fstat(fileno(fp), &before) == 0);
+#endif
+      fclose(fp);
+      fp = FOPEN(bak, "wb");
+      assertf(fp != NULL);
+      fprintf(fp, "%s", older);
+      fclose(fp);
+      cookie_save_fault_selftest = fault;
+      cookie_save_replacing(NULL, &jar, file);
+      cookie_save_fault_selftest = 0;
+      cookiejar_slurp(file, text, sizeof(text));
+      if ((strcmp(text, old) == 0) != fails ||
+          (!fails && strstr(text, "\tnew\t1") == NULL) || fexist_utf8(tmp) ||
+          fexist_utf8(baktmp)) {
+        printf("%s: fault %d left the jar as [%s]\n", LABEL, fault, text);
+        err = 1;
+      }
+      cookiejar_slurp(bak, text, sizeof(text));
+      if (strcmp(text, bak_kept ? older : old) != 0) {
+        printf("%s: fault %d left .bak as [%s]\n", LABEL, fault, text);
+        err = 1;
+      }
+#ifndef _WIN32
+      // a link keeps the old file itself, a copy is owner-only
+      fp = FOPEN(bak, "rb");
+      assertf(fp != NULL);
+      assertf(fstat(fileno(fp), &after) == 0);
+      fclose(fp);
+      if (!bak_kept &&
+          ((fault == 0 && after.st_ino != before.st_ino) ||
+           (after.st_mode & 077) !=
+               ((fault & COOKIE_FAULT_NOLINK) ? 0 : (before.st_mode & 077)))) {
+        printf("%s: fault %d made .bak inode %lu mode %o\n", LABEL, fault,
+               (unsigned long) after.st_ino, (unsigned) after.st_mode);
+        err = 1;
+      }
+#endif
+      (void) UNLINK(file);
+      (void) UNLINK(bak);
+    }
+
+    /* A file emptied or deleted after the load keeps the .bak as it was. */
+    for (i = 0; i < 2; i++) {
+      FILE *fp = FOPEN(file, "wb");
+
+      assertf(fp != NULL);
+      fprintf(fp, "%s", old);
+      fclose(fp);
+      jar.data[0] = '\0';
+      assertf(cookie_load(NULL, &jar, fpath, "cookies.txt") == 0);
+      assertf(cookie_add(&jar, "new", "1", "jar.test", "/") == 0);
+      if (i == 0) {
+        fp = FOPEN(file, "wb");
+        assertf(fp != NULL);
+        fclose(fp);
+      } else {
+        assertf(UNLINK(file) == 0);
+      }
+      fp = FOPEN(bak, "wb");
+      assertf(fp != NULL);
+      fprintf(fp, "%s", older);
+      fclose(fp);
+      cookie_save_replacing(NULL, &jar, file);
+      cookiejar_slurp(bak, text, sizeof(text));
+      if (strcmp(text, older) != 0 || (i == 0) != fexist_utf8(file) ||
+          fsize_utf8(file) > 0 || fexist_utf8(tmp)) {
+        printf("%s: a jar %s mid-crawl left .bak as [%s]\n", LABEL,
+               i == 0 ? "emptied" : "deleted", text);
+        err = 1;
+      }
+      (void) UNLINK(file);
+      (void) UNLINK(bak);
+    }
+
+    /* A project jar whose rewrite fails keeps its old content. */
+    for (i = 0; i < 3; i++) {
+      static const int project_faults[] = {
+          COOKIE_FAULT_WRITE, COOKIE_FAULT_CLOSE, COOKIE_FAULT_REPLACE};
+      const int fault = project_faults[i];
+      FILE *fp = FOPEN(file, "wb");
+
+      assertf(fp != NULL);
+      fprintf(fp, "%s", old);
+      fclose(fp);
+      cookie_save_fault_selftest = fault;
+      if (cookie_save(NULL, &jar, file) != -1) {
+        printf("%s: fault %d did not fail cookie_save\n", LABEL, fault);
+        err = 1;
+      }
+      cookie_save_fault_selftest = 0;
+      cookiejar_slurp(file, text, sizeof(text));
+      if (strcmp(text, old) != 0 || fexist_utf8(tmp) || fexist_utf8(bak)) {
+        printf("%s: fault %d left the project jar as [%s]\n", LABEL, fault,
+               text);
+        err = 1;
+      }
+      (void) UNLINK(file);
+    }
+  }
+
+  printf("%s: %s\n", LABEL, err ? "FAIL" : "OK");
+  return err;
+#undef LABEL
 }
 
 /* ------------------------------------------------------------ */
@@ -1306,6 +2366,9 @@ const struct selftest_entry selftests_cookie[] = {
      "a #HttpOnly_ jar line loads, other comments do not", st_cookiehttponly},
     {"cookiequote", "<Set-Cookie header>",
      "what the jar stores of a quoted cookie value and av", st_cookiequote},
+    {"cookiejar", "<dir>",
+     "the jar keeps host-only, Secure, HttpOnly and expiry, and logs a refusal",
+     st_cookiejar},
     {"cookiesetscope", "",
      "Set-Cookie honours Domain= scope and Max-Age/Expires erasure",
      st_cookiesetscope},
