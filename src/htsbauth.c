@@ -40,6 +40,7 @@ Please visit our Website: http://www.httrack.com
 #include "htslib.h"
 #include "htslines.h"
 #include "htscore.h"
+#include "htspsl.h"
 #ifdef _WIN32
 #include "htscharset.h" /* hts_pathToUCS2, hts_convertUCS2StringToUTF8 */
 #endif
@@ -220,6 +221,49 @@ hts_boolean cookie_domain_match(const char *jar_dom, const char *host) {
   if (hts_host_is_ipv4(host, host_len) || memchr(host, ':', host_len) != NULL)
     return HTS_FALSE;
   return HTS_TRUE;
+}
+
+/* See htsbauth.h. */
+hts_boolean cookie_domain_allowed(const char *domain, const char *host) {
+  char dom[256];
+
+  // a Netscape jar writes ".example.com" where RFC 6265 stores example.com
+  if (domain[0] == '.')
+    domain++;
+  if (domain[0] == '\0' || strlen(domain) >= sizeof(dom))
+    return HTS_FALSE;
+  strcpybuff(dom, domain);
+  hts_lowcase(dom);
+  if (strcmp(dom, host) == 0)
+    return HTS_TRUE;
+  if (!cookie_domain_match(dom, host))
+    return HTS_FALSE;
+  // a public suffix such as "com" would reach every host under it
+  return !hts_psl_loaded() || hts_psl_registrable_domain(dom) != NULL;
+}
+
+/* See htsbauth.h. */
+hts_tristate cookie_max_age_expired(const char *value) {
+  const hts_boolean negative = value[0] == '-';
+  const char *const digits = value + (negative ? 1 : 0);
+  const size_t ndigits = strspn(digits, "0123456789");
+  const char *const rest = digits + ndigits;
+  // digit by digit, so no delta is too large to read
+  const hts_boolean zero = strspn(digits, "0") == ndigits;
+
+  if (ndigits == 0 || *rest != '\0')
+    return HTS_DEFAULT;
+  return negative || zero ? HTS_TRUE : HTS_FALSE;
+}
+
+/* See htsbauth.h. */
+hts_tristate cookie_expires_passed(const char *value, time_t now) {
+  // RFC 6265 5.1.1 reads a two-digit year below 70 as 20xx
+  const time_t when = hts_parse_date(value, 69);
+
+  if (when == (time_t) -1)
+    return HTS_DEFAULT;
+  return when <= now ? HTS_TRUE : HTS_FALSE;
 }
 
 // rechercher cookie à partir de la position s (par exemple s=cookie.data)

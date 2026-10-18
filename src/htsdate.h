@@ -41,4 +41,9 @@ Please visit our Website: http://www.httrack.com
    so proxytrack, which does not link the library, can share it. */
 struct tm *convert_time_rfc822(struct tm *result, const char *s);
 
+/* As convert_time_rfc822, but a two-digit year up to PIVOT means 20xx and one
+   above it 19xx. HTTP dates use 50, and cookies use 69 (RFC 6265 5.1.1). */
+struct tm *convert_time_rfc822_pivot(struct tm *result, const char *s,
+                                     int pivot);
+
 #endif

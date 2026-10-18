@@ -2310,12 +2310,15 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
     if (adr != NULL && (strlen(adr) >= sizeof(domain) ||
                         !cookie_host(adr, scoped, sizeof(scoped))))
       return;
-    while(*a) {
+    {
       char *token_st, *token_end;
       char *value_st, *value_end;
       char name[256];
       char BIGSTK value[8192];
-      int next = 0;
+      hts_boolean has_domain = HTS_FALSE;
+      hts_tristate max_age_expired = HTS_DEFAULT;
+      hts_tristate expires_passed = HTS_DEFAULT;
+      hts_boolean first = HTS_TRUE;
 
       name[0] = value[0] = '\0';
       //
@@ -2327,10 +2330,8 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
       strcpybuff(path, "/");    // chemin (/)
       strcpybuff(cook_name, "");        // nom cookie (MYCOOK)
       strcpybuff(cook_value, "");       // valeur (ID=toto,S=1234)
-      // boucler jusqu'au prochain cookie ou la fin
+      // read every pair up to the end of the header
       do {
-        char *start_loop = a;
-
         while(is_space(*a))
           a++;                  // sauter espaces
         token_st = a;           // départ token
@@ -2348,11 +2349,13 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
           while((*a != ';') && (*a))
             a++; // prochain ;
           value_end = a;
+          // RFC 6265 5.2 trims the value
+          while (value_end > value_st && is_realspace(value_end[-1]))
+            value_end--;
           // vérifier débordements
-          if ((((int) (token_end - token_st)) < 200)
-              && (((int) (value_end - value_st)) < 8000)
-              && (((int) (token_end - token_st)) > 0)
-              && (((int) (value_end - value_st)) > 0)) {
+          if ((((int) (token_end - token_st)) < 200) &&
+              (((int) (value_end - value_st)) < 8000) &&
+              (((int) (token_end - token_st)) > 0)) {
             int name_len = (int) (token_end - token_st);
             int value_len = (int) (value_end - value_st);
 
@@ -2364,61 +2367,70 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
             printf("detected cookie-av: name=\"%s\" value=\"%s\"\n", name,
                    value);
 #endif
-            if (strfield2(name, "domain")) {
-              if ((size_t) value_len < sizeof(domain) - 1) {
+            if (first) {
+              // the first pair is the cookie, and "name=" may erase one
+              strcpybuff(cook_name, name);
+              strcpybuff(cook_value, value);
+            } else if (strfield2(name, "domain")) {
+              if (value_len == 0 || strcmp(value, ".") == 0) {
+                // ignored, so the cookie stays on the host
+              } else if ((size_t) value_len < sizeof(domain) - 1) {
                 strcpybuff(domain, value);
+                has_domain = HTS_TRUE;
               } else {
                 cook_name[0] = 0;
                 break;
               }
             } else if (strfield2(name, "path")) {
-              if ((size_t) value_len < sizeof(path) - 1) {
+              if (value_len == 0) {
+                // ignored, so the path stays "/"
+              } else if ((size_t) value_len < sizeof(path) - 1) {
                 strcpybuff(path, value);
               } else {
                 cook_name[0] = 0;
                 break;
               }
             } else if (strfield2(name, "max-age")) {
-              // ignoré..
+              const hts_tristate got = cookie_max_age_expired(value);
+
+              // an invalid value is ignored, not a reset (5.3)
+              if (got != HTS_DEFAULT)
+                max_age_expired = got;
             } else if (strfield2(name, "expires")) {
-              // ignoré..
-            } else if (strfield2(name, "version")) {
-              // ignoré..
-            } else if (strfield2(name, "comment")) {
-              // ignoré
-            } else if (strfield2(name, "secure")) {     // ne devrait pas arriver ici
-              // ignoré
-            } else {
-              if ((size_t) value_len < sizeof(cook_value) - 1 &&
-                  (size_t) name_len < sizeof(cook_name) - 1) {
-                if (strnotempty(cook_name) == 0) {      // noter premier: nom et valeur cookie
-                  strcpybuff(cook_name, name);
-                  strcpybuff(cook_value, value);
-                } else {        // prochain cookie
-                  a = start_loop;       // on devra recommencer à cette position
-                  next = 1;     // enregistrer
-                }
-              } else {
-                cook_name[0] = 0;
-                break;
-              }
+              const hts_tristate got = cookie_expires_passed(value, time(NULL));
+
+              if (got != HTS_DEFAULT)
+                expires_passed = got;
             }
+            // RFC 6265 5.2 ignores any other attribute, SameSite for example
           }
         }
-        if (!next) {
-          while((*a != ';') && (*a))
-            a++;                // prochain
-          while(*a == ';')
-            a++;                // sauter ;
-        }
-      } while((*a) && (!next));
+        // an unusable first pair leaves no cookie, so the header is ignored
+        first = HTS_FALSE;
+        while ((*a != ';') && (*a))
+          a++;
+        while (*a == ';')
+          a++;
+      } while (*a);
       if (strnotempty(cook_name)) {     // cookie?
+        /* Max-Age outranks Expires (RFC 6265 5.3 step 3) */
+        const hts_boolean expired = max_age_expired != HTS_DEFAULT
+                                        ? max_age_expired == HTS_TRUE
+                                        : expires_passed == HTS_TRUE;
+
 #if DEBUG_COOK
         printf
           ("new cookie: name=\"%s\" value=\"%s\" domain=\"%s\" path=\"%s\"\n",
            cook_name, cook_value, domain, path);
 #endif
-        cookie_add(cookie, cook_name, cook_value, domain, path);
+        // a Domain= the host may not claim drops the cookie (5.3 step 6)
+        if (!has_domain ||
+            (adr != NULL && cookie_domain_allowed(domain, scoped))) {
+          if (expired)
+            cookie_del(cookie, cook_name, domain, path);
+          else
+            cookie_add(cookie, cook_name, cook_value, domain, path);
+        }
       }
     }
   }
@@ -3627,13 +3639,8 @@ int hts_parse_retry_after(const char *value, time_t now) {
   }
 
   {
-    struct tm buffer;
-    struct tm *tm_s = convert_time_rfc822(&buffer, p);
-    time_t when;
+    const time_t when = hts_parse_date(p, 50);
 
-    if (tm_s == NULL)
-      return -1;
-    when = timegm(tm_s);
     if (when == (time_t) -1)
       return -1;
     if (when <= now)
@@ -3644,6 +3651,14 @@ int hts_parse_retry_after(const char *value, time_t now) {
       return INT_MAX;
     return (int) (when - now);
   }
+}
+
+/* See htslib.h. */
+time_t hts_parse_date(const char *s, int pivot) {
+  struct tm buffer;
+  struct tm *const tm_s = convert_time_rfc822_pivot(&buffer, s, pivot);
+
+  return tm_s != NULL ? timegm(tm_s) : (time_t) -1;
 }
 
 /* sets file time from RFC822 date+time, -1 if error*/
