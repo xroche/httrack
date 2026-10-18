@@ -21,7 +21,7 @@ Annuler les changements
 Click to confirm
 Cliquez pour confirmer
 Click to get help!
-Cliquez pour avoir de l'aide!
+Cliquez pour avoir de l'aide !
 Click to return to previous screen
 Pour revenir à la fenêtre précédente
 Click to go to next screen
@@ -53,15 +53,15 @@ Entrez un ou plusieurs mot(s)-clé(s) pour la règle de filtrage
 Add Scan Rule
 Ajouter une règle de filtrage
 Criterion
-Critère:
+Critère :
 String
-Mot-clé:
+Mot-clé :
 Add
 Ajouter
 Scan Rules
 Règles de filtrage
 Use wildcards to exclude or include URLs or links.\nYou can put several scan strings on the same line.\nUse spaces as separators.\n\nExample: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
-Utilisez les jokers pour définir des critères d'exclusion ou d'inclusion portant sur plusieurs URLs ou liens.\nVous pouvez regrouper les mots-clés sur une même ligne en les séparant par des espaces.\nExemple: +*.zip -www.*.com,-www.*.edu/cgi-bin/*.cgi
+Utilisez les jokers pour définir des critères d'exclusion ou d'inclusion portant sur plusieurs URLs ou liens.\nVous pouvez regrouper les mots-clés sur une même ligne en les séparant par des espaces.\nExemple : +*.zip -www.*.com,-www.*.edu/cgi-bin/*.cgi
 Exclude links
 Liens à exclure..
 Include link(s)
@@ -75,7 +75,7 @@ Les liens répondant à cette règle seront exclus
 Matching links will be included:
 Les liens répondant à cette règle seront inclus
 Example:
-Exemple:
+Exemple :
 gif\r\nWill match all GIF files
 gif\r\ndétectera tous les fichiers GIF
 blue\r\nWill find all files with a matching 'blue' sub-string such as 'bluesky-small.jpeg'
@@ -111,9 +111,9 @@ Enregistrer les réglages courants en tant que réglages par défaut
 Click to confirm
 Cliquez pour confirmer
 No log files in %s!
-Aucun fichier journal dans %s!
+Aucun fichier journal dans %s !
 No 'index.html' file in %s!
-Aucun fichier 'index.html' dans %s!
+Aucun fichier 'index.html' dans %s !
 Click to quit WinHTTrack Website Copier
 Cliquez pour quitter WinHTTrack Website Copier
 View log files
@@ -135,7 +135,7 @@ Voir le rapport de copie
 Close the log file window
 Refermer le journal
 Info type:
-Entrées du journal:
+Entrées du journal :
 Errors
 Erreurs
 Infos
@@ -179,7 +179,7 @@ Test des liens de la page
 Pause - Toggle [Mirror]/[Pause download] to resume operation
 Interruption - Désélectionnez la commande 'Suspendre les téléchargements' pour reprendre (menu 'Copie de site')
 Finishing pending transfers - Select [Cancel] to stop now!
-Fin des transferts en cours - Cliquez sur [Annuler] pour terminer immédiatement !
+Fin des transferts en cours - Cliquez sur [Annuler] pour terminer immédiatement !
 scanning
 parcours
 Waiting for scheduled time..
@@ -193,21 +193,21 @@ Copie du site en attente (%d secondes)
 Site mirroring in progress [%s, %s bytes]
 Copie du site en cours (%s, %s octets)
 Site mirroring finished!
-Copie du site terminée!
+Copie du site terminée !
 A problem occurred during the mirroring operation\n
 Incident durant la copie du site\n
 \nDuring:\n
 Durant:\n
 \nSee the log file if necessary.\n\nClick FINISH to quit WinHTTrack Website Copier.\n\nThanks for using WinHTTrack!
-Voyez le fichier journal au besoin\n\nCliquez sur TERMINER pour quitter WinHTTrack\n\nMerci d'utiliser WinHTTrack!
+Voyez le fichier journal au besoin\n\nCliquez sur TERMINER pour quitter WinHTTrack\n\nMerci d'utiliser WinHTTrack !
 Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) if necessary to ensure that everything is OK.\n\nThanks for using WinHTTrack!
-la copie du site est terminée\nCliquez sur OK pour quitter WinHTTrack\nConsultez au besoin les fichiers journaux pour vérifier que tout s'est bien passé\n\nMerci d'utiliser WinHTTrack!
+la copie du site est terminée\nCliquez sur OK pour quitter WinHTTrack\nConsultez au besoin les fichiers journaux pour vérifier que tout s'est bien passé\n\nMerci d'utiliser WinHTTrack !
 * * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
-* * ERREUR DE COPIE! * *\r\nHTTrack a détecté que la copie courante était vide. Si il s'agissait d'une mise à jour, l'ancienne copie a été restaurée.\r\nRaison: soit la (les) première(s) page(s) n'ont pu être téléchargées, soit un problème de connexion est survenu.\r\n=> Vérifiez que le site existe toujours, et/ou vérifiez les réglages du proxy! <=
+* * ERREUR DE COPIE ! * *\r\nHTTrack a détecté que la copie courante était vide. Si il s'agissait d'une mise à jour, l'ancienne copie a été restaurée.\r\nRaison : soit la (les) première(s) page(s) n'ont pu être téléchargées, soit un problème de connexion est survenu.\r\n=> Vérifiez que le site existe toujours, et/ou vérifiez les réglages du proxy ! <=
 Mirroring operation stopped before the end.\nThe files already downloaded are kept.\nSee log file(s) if necessary.\n\nThanks for using WinHTTrack!
-Mirroring operation stopped before the end.\nThe files already downloaded are kept.\nSee log file(s) if necessary.\n\nThanks for using WinHTTrack!
+Mirroring operation stopped before the end.\nThe files already downloaded are kept.\nSee log file(s) if necessary.\n\nThanks for using WinHTTrack !
 \n\nTip: Click [View log file] to see warning or error messages
-\nConseil: sélectionnez la commande 'Voir le fichier journal' pour visionner les messages d'erreur et d'avertissement
+\nConseil : sélectionnez la commande 'Voir le fichier journal' pour visionner les messages d'erreur et d'avertissement
 Do you really want to quit WinHTTrack Website Copier?
 Voulez-vous vraiment quitter WinHTTrack Website Copier?
 - Mirroring Mode -\n\nEnter address(es) in URL box
@@ -273,7 +273,7 @@ Options de réglage de WinHTTrack (*.opt)|*.opt||
 Address List text file (*.txt)|*.txt||
 Fichier texte avec liste d'adresses (*.txt)|*.txt||
 File not found!
-Fichier introuvable!
+Fichier introuvable !
 Do you really want to change the project name/path?
 Voulez-vous vraiment changer le nom/chemin du projet?
 Load user-default options?
@@ -283,15 +283,15 @@ Enregistrer en tant que configuration personnalisée par défaut?
 Reset all default options?
 Effacer toutes les options par défaut?
 Welcome to WinHTTrack!
-Bienvenue dans WinHTTrack Website Copier!
+Bienvenue dans WinHTTrack Website Copier !
 Action:
-Action:
+Action :
 Max Depth
-Profondeur maximale:
+Profondeur maximale :
 Maximum external depth:
-Profondeur exterieure:
+Profondeur exterieure :
 Filters (refuse/accept links) :
-Règles de filtrage (inclure/exclure des liens) :
+Règles de filtrage (inclure/exclure des liens) :
 Paths
 Chemins
 Save prefs
@@ -307,11 +307,11 @@ Nom du projet
 Add a URL...
 Ajouter...
 Web Addresses: (URL)
-Adresse Web: (URL)
+Adresse Web : (URL)
 Stop WinHTTrack?
 Stopper WinHTTrack?
 No log files in %s!
-Aucun fichier journal dans %s!
+Aucun fichier journal dans %s !
 Pause Download?
 Suspendre la copie du site?
 Stop the mirroring operation
@@ -323,31 +323,31 @@ Cliquez pour sauter un lien ou interrompre sa copie
 Click to skip a link
 Cliquez pour sauter un lien
 Bytes saved
-Octets écrits:
+Octets écrits :
 Links scanned
-Liens parcourus:
+Liens parcourus :
 Time:
-Temps:
+Temps :
 Connections:
-Connexions:
+Connexions :
 Running:
-En cours:
+En cours :
 Hide
 Minimiser
 Transfer rate
-Taux transfert:
+Taux transfert :
 SKIP
 PASSER
 Information
 Informations
 Files written:
-Fichiers écrits:
+Fichiers écrits :
 Files updated:
-Fichiers mis à jour:
+Fichiers mis à jour :
 Errors:
-Erreurs:
+Erreurs :
 In progress:
-En cours:
+En cours :
 Follow external links
 Récupérer les fichiers jusque sur les liens extérieurs
 Test all links in pages
@@ -413,7 +413,7 @@ Taux de transfert maximum
 Maximum connections/seconds (avoid server overload)
 Nombre max. de connexions/secondes (limite la surcharge des serveurs)
 Maximum number of links that can be tested (not saved!)
-Nombre maximum des liens qui peuvent être testés (pas sauvés!)
+Nombre maximum des liens qui peuvent être testés (pas sauvés !)
 Browser identity
 Identifiants du Navigateur Internet
 Comment to be placed in each HTML file
@@ -457,7 +457,7 @@ Créer un fichier de débogage
 Use non-standard requests to get round some server bugs
 Essayer d'éviter les bugs de certains serveurs en utilisant des requêtes non standard
 Use old HTTP/1.0 requests (limits engine power!)
-L'utilisation des anciennes requêtes HTTP/1.0 limite les capacités du moteur de capture!
+L'utilisation des anciennes requêtes HTTP/1.0 limite les capacités du moteur de capture !
 Attempt to limit retransfers through several tricks (file size test..)
 Essayer de limiter les retransferts via certains trucs (test de taille de fichier..)
 Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
@@ -473,7 +473,7 @@ Tester tous les liens (même ceux exclus par les règles)
 Try to catch all URLs (even in unknown tags/code)
 Essayer de détecter tous les liens (y compris tags inconnus/code javascript)
 Get HTML files first!
-Télécharger les HTML en premier!
+Télécharger les HTML en premier !
 Structure type (how links are saved)
 Type de structure locale (manière dont les liens sont enregistrés)
 Use a cache for updates
@@ -505,7 +505,7 @@ Options à ne modifier qu'exceptionnellement
 Activate Debugging Mode (winhttrack.log)
 Activer le mode de débogage (winhttrack.log)
 Rewrite links: internal / external
-Réécriture des liens: internes / externes
+Réécriture des liens : internes / externes
 Flow control
 Contrôle du flux
 Limits
@@ -621,9 +621,9 @@ Quitter WinHTTrack Website Copier
 Back to starting page
 Retour à la page de démarrage
 Click to start!
-Cliquez pour démarrer!
+Cliquez pour démarrer !
 No saved password for this connection!
-Pas de mot de passe enregistré pour cette connexion!
+Pas de mot de passe enregistré pour cette connexion !
 Can not get remote connection settings
 Impossible d'obtenir les paramètres de connexion
 Select a connection provider
@@ -637,9 +637,9 @@ Enregistrer uniquement les réglages, ne pas lancer le téléchargement maintena
 On hold
 Temporisation
 Transfer scheduled for: (hh/mm/ss)
-Attendre avant de commencer jusqu'à: (hh/mm/ss)
+Attendre avant de commencer jusqu'à : (hh/mm/ss)
 Start
-DEMARRER!
+DEMARRER !
 Connect to provider (RAS)
 Fournisseur d'accès
 Connect to this provider
@@ -649,19 +649,19 @@ Déconnecter à la fin de l'opération
 Disconnect modem on completion
 Déconnecter le modem lorsque l'opération sera finie
 \r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nEngine and interfaces: Xavier Roche\r\nCode, documentation and packaging: many contributors\r\n\r\n(C) Xavier Roche and other contributors\r\nMANY THANKS for English translations to:\r\nXavier Roche, Robert Lagadec
-\r\n(signalez-nous tout bug ou problème)\r\n\r\nDéveloppement:\r\nInterface (Windows): Xavier Roche\r\nMoteur: Xavier Roche\r\n\r\n(C) Xavier Roche and other contributors\r\nMERCI pour la relecture à:\r\nRobert Lagadec
+\r\n(signalez-nous tout bug ou problème)\r\n\r\nDéveloppement :\r\nInterface (Windows) : Xavier Roche\r\nMoteur : Xavier Roche\r\n\r\n(C) Xavier Roche and other contributors\r\nMERCI pour la relecture à :\r\nRobert Lagadec
 About WinHTTrack Website Copier
 A propos de WinHTTrack Website Copier
 Please visit our Web page
-Visitez notre site Web!
+Visitez notre site Web !
 Wizard query
 Question du Compagnon WinHTTrack
 Your answer:
-Votre réponse:
+Votre réponse :
 Link detected..
 Un lien a été détecté
 Choose a rule
-Choisir une règle:
+Choisir une règle :
 Ignore this link
 Ignorer ce lien
 Ignore directory
@@ -795,15 +795,15 @@ Sélectionnez ou créez une nouvelle catégorie, pour trier vos projets à l'aid
 HTTrack Project Wizard...
 Compagnon du projet WinHTTrack
 New project name:
-Nom du nouveau projet:
+Nom du nouveau projet :
 Existing project name:
-Nom du projet existant:
+Nom du projet existant :
 Project name:
-Nom du projet:
+Nom du projet :
 Base path:
-Chemin de base:
+Chemin de base :
 Project category:
-Catégorie du projet:
+Catégorie du projet :
 C:\\My Web Sites
 C:\\Mes Sites Web
 Type a new project name, \r\nor select existing project to update/resume
@@ -821,7 +821,7 @@ Nom d'utilisateur (Login)
 Password
 Mot de passe
 Forms or complex links:
-Formulaires ou liens complexes:
+Formulaires ou liens complexes :
 Capture URL...
 Capturer l'URL...
 Enter URL address(es) here
@@ -835,7 +835,7 @@ Utilisez cet outil pour capturer des liens accessibles uniquement via formulaire
 Choose language according to preference
 Sélectionnez votre langue ici
 Catch URL!
-Capturer cette adresse URL!
+Capturer cette adresse URL !
 Please set temporary browser proxy settings to the following values (Copy/Paste Proxy Address and Port).\nThen click on the Form SUBMIT button in your browser page, or click on the specific link you want to capture.
 Veuillez fixer temporairement les réglages proxy de votre navigateur sur les réglages ci-dessous (copiez/collez l'adresse proxy et le port).\nEnsuite, dans votre navigateur, cliquez sur le bouton 'submit' du formulaire, ou cliquez sur le lien spécifique que vous voulez aspirer.
 This will send the desired link from your browser to WinHTTrack.
@@ -847,9 +847,9 @@ Copier/collez les réglages temporaires du proxy ici
 Cancel
 Annuler
 Unable to find Help files!
-Impossible de trouver les fichiers d'aide!
+Impossible de trouver les fichiers d'aide !
 Unable to save parameters!
-Impossible d'enregistrer les paramètres!
+Impossible d'enregistrer les paramètres !
 Please drag only one folder at a time
 Veuillez ne déposer qu'un dossier à la fois
 Please drag only folders, not files
@@ -859,25 +859,25 @@ Ne déposez que des dossiers
 Select user-defined structure?
 Choisir une structure personnalisée pour la copie du site?
 Please ensure that the user-defined-string is correct,\notherwise filenames will be bogus!
-Vérifiez que la chaîne personnalisée est correcte\nSi elle ne l'est pas, les noms de fichiers seront erronés!
+Vérifiez que la chaîne personnalisée est correcte\nSi elle ne l'est pas, les noms de fichiers seront erronés !
 Do you really want to use a user-defined structure?
 Voulez-vous vraiment sélectionner une structure personnalisée?
 Too manu URLs, cannot handle so many links!!
-Trop d'adresses URLs, impossible de prendre en charge autant de liens!!
+Trop d'adresses URLs, impossible de prendre en charge autant de liens !!
 Not enough memory, fatal internal error..
 Pas assez de mémoire, erreur interne fatale...
 Unknown operation!
-Opération inconnue!
+Opération inconnue !
 Add this URL?\r\n
 Ajouter cette adresse URL?\r\n
 Warning: main process is still not responding, cannot add URL(s)..
-Attention: le processus principal ne répond toujours pas, impossible d'ajouter ces URLs...
+Attention : le processus principal ne répond toujours pas, impossible d'ajouter ces URLs...
 Type/MIME associations
 Correspondances type/MIME
 File types:
-Types de fichiers:
+Types de fichiers :
 MIME identity:
-Correspondance MIME:
+Correspondance MIME :
 Select or modify your file type(s) here
 Sélectionnez ou modifiez le(s) type(s) de fichiers ici
 Select or modify your MIME type(s) here
@@ -891,15 +891,15 @@ Informations sur les fichiers téléchargés
 Freeze Window
 Figer la fenêtre
 More information:
-Plus d'informations:
+Plus d'informations :
 Welcome to WinHTTrack Website Copier!\n\nPlease click on the NEXT button to\n\n- start a new project\n- or resume a partial download
-Bienvenue dans WinHTTrack Website Copier!\n\nVeuillez cliquer sur le bouton SUIVANT\n\n- pour démarrer un nouveau projet\n- ou reprendre un projet existant
+Bienvenue dans WinHTTrack Website Copier !\n\nVeuillez cliquer sur le bouton SUIVANT\n\n- pour démarrer un nouveau projet\n- ou reprendre un projet existant
 File names with extension:\nFile names containing:\nThis file name:\nFolder names containing:\nThis folder name:\nLinks on this domain:\nLinks on domains containing:\nLinks from this host:\nLinks containing:\nThis link:\nALL LINKS
 Fichiers de type:\nFichiers contenant:\nCe fichier:\nNoms de dossiers contenant:\nCe dossier:\nLiens sur ce domaine:\nLiens sur un domaine contenant:\nLiens de ce serveur:\nLiens contenant:\nCe lien:\nTOUS LES LIENS
 Show all\nHide debug\nHide infos\nHide debug and infos
 Tout montrer\nCacher infos de débogage\nCacher infos générales\nCacher débogage et infos
 Site-structure (default)\nHtml in web/,       images/other files in web/images/\nHtml in web/html,   images/other in web/images\nHtml in web/,       images/other in web/\nHtml in web/,       images/other in web/xxx, where xxx is the file extension\nHtml in web/html,   images/other in web/xxx\nSite-structure, without www.domain.xxx/\nHtml in site_name/, images/other files in site_name/images/\nHtml in site_name/html, images/other in site_name/images\nHtml in site_name/, images/other in site_name/\nHtml in site_name/, images/other in site_name/xxx\nHtml in site_name/html, images/other in site_name/xxx\nAll files in web/, with random names (gadget !)\nAll files in site_name/, with random names (gadget !)\nUser-defined structure..
-Structure du site (par défaut)\nHtml dans web/,       images/autres dans web/images/\nHtml dans web/html,   images/autres dans web/images\nHtml dans web/,       images/autres dans web/\nHtml dans web/,       images/autres dans web/xxx, où xxx est le type\nHtml dans web/html,   images/autres dans web/xxx\nStructure du site, sans www.domain.xxx/\nHtml dans site_name/, images/autres dans site_name/images/\nHtml dans site_name/html, images/autres dans site_name/images\nHtml dans site_name/, images/autres dans site_name/\nHtml dans site_name/, images/autres dans site_name/xxx\nHtml dans site_name/html, images/autres dans site_name/xxx\nTous les fichiers dans web/, avec des noms aléatoires (gadget !)\nTous les fichiers dans site_name/, avec des noms aléatoires (gadget !)\nStructure définie par l'utilisateur..
+Structure du site (par défaut)\nHtml dans web/,       images/autres dans web/images/\nHtml dans web/html,   images/autres dans web/images\nHtml dans web/,       images/autres dans web/\nHtml dans web/,       images/autres dans web/xxx, où xxx est le type\nHtml dans web/html,   images/autres dans web/xxx\nStructure du site, sans www.domain.xxx/\nHtml dans site_name/, images/autres dans site_name/images/\nHtml dans site_name/html, images/autres dans site_name/images\nHtml dans site_name/, images/autres dans site_name/\nHtml dans site_name/, images/autres dans site_name/xxx\nHtml dans site_name/html, images/autres dans site_name/xxx\nTous les fichiers dans web/, avec des noms aléatoires (gadget !)\nTous les fichiers dans site_name/, avec des noms aléatoires (gadget !)\nStructure définie par l'utilisateur..
 Just scan\nStore html files\nStore non html files\nStore all files (default)\nStore html files first
 Analyse des liens uniquement\nEnregistrer les fichiers HTML\nEnregistrer les fichiers non-HTML\nEnregistrer tous les fichiers (par défaut)\nEnregistrer d'abord les fichiers HTML
 Stay in the same directory\nCan go down (default)\nCan go up\nCan both go up & down
@@ -951,7 +951,7 @@ Visiter le forum de HTTrack
 View License
 Lire la license
 Beware: you local browser might be unable to browse files with embedded filenames
-Attention: il se pourrait que votre navigateur soit incapable de lire les fichiers contenant des espaces
+Attention : il se pourrait que votre navigateur soit incapable de lire les fichiers contenant des espaces
 Recreated HTTrack internal cached resources
 Cache des ressources interne recréé
 Could not create internal cached resources
@@ -959,7 +959,7 @@ Impossible de créer le cache des ressources interne
 Could not get the system external storage directory
 Impossible de localuser le système de stockage externe
 Could not write to:
-Impossible d'écrire dans:
+Impossible d'écrire dans :
 Read-only media (SDCARD)
 Média en lecture seule (SDCARD)
 No storage media (SDCARD)
@@ -967,21 +967,21 @@ Pas de média (SDCARD)
 HTTrack may not be able to download websites until this problem is fixed
 Il se peut que HTTrack soit incapable de télécharger des sites tant que ce problème n'est pas réglé
 HTTrack: mirror '%s' stopped!
-HTTrack: miroir '%s' stoppé!
+HTTrack : miroir '%s' stoppé !
 Click on this notification to restart the interrupted mirror
 Cliquez sur cette notification pour redémarrer la copie interrompue
 HTTrack: could not save profile for '%s'!
-HTTrack: impossible de sauver le profil pour '%s'
+HTTrack : impossible de sauver le profil pour '%s'
 Proxy type:
-Type de proxy :
+Type de proxy :
 Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
 Protocole du proxy. HTTP : proxy standard. HTTP (tunnel CONNECT) : envoie chaque requête via un tunnel CONNECT, pour les proxys acceptant uniquement CONNECT comme le HTTPTunnelPort de Tor. SOCKS5 : port par défaut 1080.
 Load cookies from file:
-Charger les cookies depuis un fichier :
+Charger les cookies depuis un fichier :
 Preload cookies from a Netscape cookies.txt file before crawling.
 Précharger les cookies depuis un fichier Netscape cookies.txt avant la copie du site.
 Pause between files:
-Pause entre les fichiers :
+Pause entre les fichiers :
 Random delay between file downloads, in seconds. Use MIN:MAX for a random range (e.g. 2:8).
 Délai aléatoire entre les téléchargements de fichiers, en secondes. Utilisez MIN:MAX pour une plage aléatoire (par ex. 2:8).
 Keep the www. prefix (do not merge www.host with host)
@@ -997,7 +997,7 @@ Conserver l'ordre d'origine de la query string
 Do not reorder query-string parameters when deduplicating URLs.
 Ne pas réordonner les paramètres de la query string lors de la déduplication des URL.
 Strip query keys:
-Supprimer les clés de query string :
+Supprimer les clés de query string :
 Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
 Clés de query string à retirer du nommage des fichiers enregistrés, séparées par des virgules (par ex. sid,utm_source).
 Write a WARC archive of the crawl
@@ -1005,7 +1005,7 @@ Write a WARC archive of the crawl
 Also save every fetched response into an ISO-28500 WARC/1.1 archive, next to the mirror.
 Enregistrer aussi chaque réponse téléchargée dans une archive WARC/1.1 (ISO-28500), à côté du miroir.
 WARC archive name:
-Nom de l'archive WARC :
+Nom de l'archive WARC :
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
 Nom de base optionnel pour l'archive WARC ; laissez vide pour le générer automatiquement dans le répertoire de sortie.
 Report what changed since the previous mirror
@@ -1017,7 +1017,7 @@ Intégrer les ressources en URI data: (pages autonomes)
 Once the mirror is finished, rewrite every saved page with its stylesheets, scripts, images and fonts embedded, so a page can also be opened on its own.
 Une fois le miroir terminé, réécrire chaque page enregistrée avec ses feuilles de style, scripts, images et polices intégrés, afin qu'une page puisse aussi être ouverte seule.
 Largest inlined asset (bytes):
-Taille maximale d'une ressource intégrée (octets) :
+Taille maximale d'une ressource intégrée (octets) :
 An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
 Au-delà de cette taille, la ressource reste un lien ordinaire ; laissez vide pour la valeur par défaut de 10485760 octets.
 Seed the crawl from the site's sitemap
@@ -1025,7 +1025,7 @@ Partir du plan de site (sitemap)
 Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
 Lire le plan de site (lignes Sitemap: de robots.txt, puis /sitemap.xml) et ajouter chaque URL listée comme adresse de départ.
 Sitemap address:
-Adresse du plan de site :
+Adresse du plan de site :
 Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
 Adresse d'un plan de site à lire au lieu de sonder le site ; laissez vide pour sonder robots.txt puis /sitemap.xml.
 Write a CDXJ index of the WARC archive
@@ -1037,11 +1037,11 @@ Empaqueter le crawl dans un fichier WACZ
 Bundle the WARC archive, its CDXJ index and the mirrored pages into a single WACZ file; implies the WARC archive and the CDXJ index.
 Regrouper l'archive WARC, son index CDXJ et les pages du miroir dans un seul fichier WACZ ; implique l'archive WARC et l'index CDXJ.
 WARC segment size limit:
-Taille maximale d'un segment WARC :
+Taille maximale d'un segment WARC :
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
 Commencer un nouveau segment WARC dès que le courant dépasse ce nombre d'octets ; laissez vide ou 0 pour un fichier unique.
 Host aliases:
-Alias d'hôtes :
+Alias d'hôtes :
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
 Autres noms d'hôtes servant ce même site, ramenés à un seul, une règle par ligne (ex. www2.example.com,m.example.com=example.com).
 Mirror %s and every host below it
@@ -1059,7 +1059,7 @@ Les règles définies ici s'appliquent à la copie en cours. Retirer une règle 
 This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
 Cette règle de filtrage ne peut pas être utilisée. Une règle commence par + ou -, suivi d'un motif, et tient sur une seule ligne courte.
 Theme:
-Thème :
+Thème :
 Classic
 Classique
 Accept headers

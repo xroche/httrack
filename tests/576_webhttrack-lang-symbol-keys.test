@@ -117,7 +117,7 @@ render none
 # Control: the probe must show French, or equal pages would prove nothing.
 # "Start" is two symbols with different French values, so it also pins the order.
 grep -q '^LANG_J9=Démarrer\.\.\.' "${work}/none.out" || fail "the probe page shows no French"
-grep -q '^LANG_J13=DEMARRER!' "${work}/none.out" || fail "the probe page shows no French"
+grep -q '^LANG_J13=DEMARRER !' "${work}/none.out" || fail "the probe page shows no French"
 for v in all odd-last; do
     render "${v}"
     cmp -s "${work}/none.out" "${work}/${v}.out" ||

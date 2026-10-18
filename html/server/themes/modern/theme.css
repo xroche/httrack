@@ -295,7 +295,7 @@ body > table {
 #pageContent textarea {
   max-width: 100%;
   min-height: 40px;
-  padding: 9px 12px;
+  padding: 7px 10px;
   border: 1px solid var(--modern-control-rule);
   border-radius: 10px;
   background-color: var(--panel);
@@ -323,6 +323,10 @@ body > table {
   accent-color: var(--modern-primary);
   vertical-align: middle;
   cursor: pointer;
+}
+
+#pageContent input[type="checkbox"] {
+  transform: translateY(-3px);
 }
 
 #pageContent input[type="submit"],
@@ -362,6 +366,31 @@ body > table {
   transform: translateY(1px);
 }
 
+/* Keep option dialog actions on one symmetric row across all native views. */
+:where(body[class^="page-option"]) #pageContent {
+  position: relative;
+}
+
+:where(body[class^="page-option"]) #pageContent input:where([type="button"][onclick*="window.close"]) {
+  position: absolute;
+  right: 40px;
+  translate: 0 -23px;
+}
+
+:where(.page-option5) #pageContent input:where([type="button"][onclick*="window.close"]) {
+  right: 41px;
+}
+
+@media (max-width: 720px) {
+  :where(body[class^="page-option"]) #pageContent input:where([type="button"][onclick*="window.close"]) {
+    right: 22px;
+  }
+
+  :where(.page-option5) #pageContent input:where([type="button"][onclick*="window.close"]) {
+    right: 23px;
+  }
+}
+
 /* Primary actions formerly identified by JS, now matched on native attributes. */
 #pageContent input[name="nextBtn"][type="submit"],
 #pageContent input[type="submit"][onclick*="form.closeme.value=1"],
@@ -395,10 +424,166 @@ body > table {
   display: none;
 }
 
+:where(.page-addurl) #pageContent .url-scheme {
+  display: inline-block;
+  margin-inline-end: 8px;
+}
+
+@media (min-width: 421px) {
+  :where(.page-addurl) #pageContent form:where([name="form"]) > table {
+    --addurl-label-width: 150px;
+    --addurl-scheme-width: 50px;
+    border-spacing: 0;
+  }
+
+  :where(.page-addurl) #pageContent form:where([name="form"]) > table > tbody > tr:first-child > td:first-child {
+    width: var(--addurl-label-width);
+  }
+
+  :where(.page-addurl) #pageContent .url-scheme {
+    width: var(--addurl-scheme-width);
+    margin-inline-end: 0;
+  }
+
+  :where(.page-addurl) #pageContent form:where([name="form"]) > table > tbody > tr:nth-child(2) > td > table {
+    border-spacing: 0;
+  }
+
+  :where(.page-addurl) #pageContent form:where([name="form"]) > table > tbody > tr:nth-child(2) > td > table th {
+    padding: 10px 0 8px;
+    text-align: left;
+    font-weight: 650;
+  }
+
+  :where(.page-addurl) #pageContent form:where([name="form"]) > table > tbody > tr:nth-child(2) > td > table td:first-child {
+    width: calc(var(--addurl-label-width) + var(--addurl-scheme-width) - 1px);
+  }
+}
+
+@media (min-width: 721px) {
+  :where(.page-addurl) #pageContent form:where([name="form"]) > table {
+    --addurl-label-width: 170px;
+  }
+}
+
 #pageContent input[name="projname"],
 #pageContent input[name="path"],
 #pageContent input[name="projcateg"] {
   min-height: 42px;
+}
+
+/* Project editor geometry on the native step2 markup. */
+@media (min-width: 721px) {
+  :where(.page-step2) #pageContent form:where([name="form"]) > table:where([width="100%"]) {
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  :where(.page-step2) #pageContent form:where([name="form"]) > table:where([width="100%"]) > tbody > tr:first-child > td {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto auto auto auto;
+    column-gap: 20px;
+    row-gap: 10px;
+    width: 100%;
+    padding: 8px 2px 16px;
+    box-sizing: border-box;
+    color: var(--ink-soft);
+    font-size: 12px;
+    font-weight: 650;
+    line-height: 1.5;
+  }
+
+  :where(.page-step2) #pageContent form:where([name="form"]) > table:where([width="100%"]) > tbody > tr:first-child > td > br {
+    display: none;
+  }
+
+  :where(.page-step2) #pageContent select:where([name="loadprojname"]) {
+    grid-column: 1;
+    grid-row: 2;
+    width: 100%;
+    min-width: 0;
+    margin: 0 0 7px;
+    font-size: 14px;
+    font-weight: 400;
+  }
+
+  :where(.page-step2) #pageContent input:where([name="projname"]) {
+    grid-column: 2;
+    grid-row: 2;
+    width: 100%;
+    min-width: 0;
+    margin: 0 0 7px;
+    font-size: 14px;
+    font-weight: 400;
+  }
+
+  :where(.page-step2) #pageContent form:where([name="form"]) > table:where([width="100%"]) > tbody > tr:first-child > td > table:where([border="0"]) {
+    grid-column: 1;
+    grid-row: 3 / span 2;
+    display: grid;
+    grid-template-columns: 40% minmax(0, 1fr);
+    grid-template-rows: auto 40px;
+    column-gap: 8px;
+    row-gap: 10px;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border-spacing: 0;
+    color: var(--ink-soft);
+    font-size: 12px;
+    font-weight: 650;
+    line-height: 1.5;
+  }
+
+  :where(.page-step2) #pageContent form:where([name="form"]) > table:where([width="100%"]) > tbody > tr:first-child > td > table:where([border="0"]) > tbody,
+  :where(.page-step2) #pageContent form:where([name="form"]) > table:where([width="100%"]) > tbody > tr:first-child > td > table:where([border="0"]) > tbody > tr,
+  :where(.page-step2) #pageContent form:where([name="form"]) > table:where([width="100%"]) > tbody > tr:first-child > td > table:where([border="0"]) > tbody > tr > td {
+    display: contents;
+  }
+
+  :where(.page-step2) #pageContent select:where([name="loadprojcateg"]) {
+    grid-column: 1;
+    grid-row: 2;
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    font-size: 14px;
+    font-weight: 400;
+  }
+
+  :where(.page-step2) #pageContent input:where([name="projcateg"]) {
+    grid-column: 2;
+    grid-row: 2;
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    font-size: 14px;
+    font-weight: 400;
+  }
+
+  :where(.page-step2) #pageContent input:where([name="path"]) {
+    grid-column: 2;
+    grid-row: 4;
+    justify-self: start;
+    width: calc(100% - 94px);
+    min-width: 0;
+    margin: 0;
+    font-size: 14px;
+    font-weight: 400;
+  }
+
+  :where(.page-step2) #pageContent form:where([name="form"]) > table:where([width="100%"]) > tbody > tr:first-child > td > input:where([type="button"]) {
+    grid-column: 2;
+    grid-row: 4;
+    justify-self: end;
+    align-self: center;
+    margin: 0;
+  }
+
+  :where(.page-step2) #pageContent form:where([name="form"]) > table:where([width="100%"]) > tbody > tr:last-child > td > table:where([width="100%"]) {
+    margin-top: 8px;
+  }
 }
 
 /* Native select polish restored from the pre-merge Pixel pass. */
@@ -433,8 +618,6 @@ body > table {
 .page-index #pageContent select,
 .page-option9 #pageContent select[name="logtype"],
 .page-option10 #pageContent select[name="proxytype"],
-.page-step2 #pageContent select[name="loadprojname"],
-.page-step2 #pageContent select[name="loadprojcateg"],
 .page-step3 #pageContent select[name="todo"] {
   margin-inline-start: 11px;
 }
@@ -443,6 +626,73 @@ body > table {
 .page-option3 #pageContent select,
 .page-option8 #pageContent select {
   margin-top: 9px;
+}
+
+.page-option3 #pageContent form[name="form"] > table:first-of-type {
+  margin-top: 9px;
+}
+
+/* Align legacy inline option fields on the longest label in each view. */
+@media (min-width: 721px) {
+  .page-option8 #pageContent input[name="sitemapurl"] {
+    margin-inline-start: 88px;
+  }
+
+  .page-option9 #pageContent input[name="warcfile"] {
+    margin-inline-start: 82px;
+  }
+
+  .page-option9 #pageContent select[name="logtype"] {
+    margin-inline-start: 104px;
+  }
+
+  .page-option10 #pageContent input[name="prox"] {
+    margin-inline-start: 16px;
+  }
+
+  /* French typography: keep a visible gap after ':' before horizontal fields. */
+  html[lang="fr"] .page-option2 #pageContent input[name="singlefilemax"] {
+    margin-inline-start: 8px;
+  }
+
+  html[lang="fr"] :where(.page-option4, .page-option5, .page-option6)
+    #pageContent form[name="form"] > table:first-of-type > tbody > tr > td + td {
+    padding-inline-start: 8px;
+  }
+
+  html[lang="fr"] .page-option8 #pageContent input[name="cookiesfile"] {
+    margin-inline-start: 8px;
+  }
+
+  html[lang="fr"] .page-option8 #pageContent input[name="sitemapurl"] {
+    margin-inline-start: 96px;
+  }
+
+  html[lang="fr"] .page-option9 #pageContent input[name="warcfile"] {
+    margin-inline-start: 90px;
+  }
+
+  html[lang="fr"] .page-option9 #pageContent input[name="warcmaxsize"] {
+    margin-inline-start: 8px;
+  }
+
+  html[lang="fr"] .page-option9 #pageContent select[name="logtype"] {
+    margin-inline-start: 112px;
+  }
+
+  html[lang="fr"] .page-option10 #pageContent select[name="proxytype"] {
+    margin-inline-start: 19px;
+  }
+
+  html[lang="fr"] .page-option10 #pageContent input[name="prox"] {
+    margin-inline-start: 24px;
+    margin-inline-end: 6px;
+  }
+
+  html[lang="fr"] .page-option10 #pageContent input[name="portprox"] {
+    margin-inline-start: 0;
+    margin-bottom: 10px;
+  }
 }
 
 #pageContent hr {
@@ -471,26 +721,59 @@ body > table {
   max-width: 100%;
 }
 
-/* Native option tabs; no generated navigation or JavaScript. */
+/* Native option tabs, laid out like the validated 8094 flex navigation. */
+:where(body[class^="page-option"]) #pageContent > table.tableWidth {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  background: var(--modern-raised);
+  box-sizing: border-box;
+}
+
+:where(body[class^="page-option"]) #pageContent > table.tableWidth > tbody {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+:where(body[class^="page-option"]) #pageContent > table.tableWidth > tbody > tr {
+  display: contents;
+}
+
 #pageContent .tabCtrl {
-  padding: 3px;
+  min-width: 0;
+  padding: 0;
   border: 0;
   background: transparent;
   color: var(--ink-soft);
+}
+
+:where(body[class^="page-option"]) #pageContent > table.tableWidth > tbody > tr:last-child > .tabCtrl:nth-child(5) {
+  grid-column: span 2;
+}
+
+:where(body[class^="page-option"]) #pageContent > table.tableWidth > tbody > tr:last-child > .tabCtrl:last-child {
+  display: none;
 }
 
 #pageContent .tabCtrl a,
 #pageContent .tabCtrl a:link,
 #pageContent .tabCtrl a:visited {
   display: block;
-  padding: 9px 8px;
+  height: 100%;
+  padding: 8px 12px;
   border: 1px solid var(--rule);
   border-radius: 9px;
-  background: var(--modern-raised);
+  background: var(--panel);
   color: var(--ink-soft);
   text-decoration: none;
   font-size: 12px;
-  font-weight: 650;
+  font-weight: 700;
+  line-height: 1.35;
+  box-sizing: border-box;
 }
 
 #pageContent .tabCtrl a:hover,
@@ -498,6 +781,10 @@ body > table {
   border-color: var(--modern-primary);
   background: var(--accent);
   color: var(--modern-primary);
+}
+
+html[lang="fr"] #pageContent .i18n-colon {
+  margin-inline-start: .25em;
 }
 
 .page-option1 #pageContent .tabCtrl a[href="option1.html"],
@@ -530,7 +817,8 @@ body > table {
 /* The welcome page keeps the server-provided language and theme menus. */
 .page-index #pageContent select[name="lang"],
 .page-index #pageContent select[name="uitheme"] {
-  min-width: 150px;
+  width: 220px;
+  max-width: 100%;
 }
 
 .page-index #pageContent form > table {
@@ -568,6 +856,19 @@ body > table {
     overflow-wrap: anywhere;
   }
 
+  :where(body[class^="page-option"]) #pageContent > table.tableWidth {
+    padding: 8px;
+  }
+
+  :where(body[class^="page-option"]) #pageContent > table.tableWidth > tbody {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px;
+  }
+
+  :where(body[class^="page-option"]) #pageContent .tabCtrl a {
+    padding: 8px;
+  }
+
   .page-option2 #pageContent select[name="build"],
   .page-option3 #pageContent select,
   .page-option8 #pageContent select,
@@ -585,20 +886,24 @@ body > table {
 }
 
 @media (max-width: 420px) {
-  /* Native option tabs stay within the viewport without changing their markup. */
-  body[class^="page-option"] #pageContent > table.tableWidth {
-    width: 100%;
-    table-layout: fixed;
+  :where(body[class^="page-option"]) #pageContent > table.tableWidth > tbody {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 5px;
   }
 
-  body[class^="page-option"] #pageContent > table.tableWidth .tabCtrl {
-    width: 16.666%;
+  :where(body[class^="page-option"]) #pageContent > table.tableWidth > tbody > tr {
+    display: contents;
+  }
+
+  :where(body[class^="page-option"]) #pageContent .tabCtrl {
+    flex: 1 0 auto;
     min-width: 0;
   }
 
-  body[class^="page-option"] #pageContent > table.tableWidth .tabCtrl a {
+  :where(body[class^="page-option"]) #pageContent .tabCtrl a {
     min-width: 0;
-    padding: 7px 3px;
     font-size: 11px;
     overflow-wrap: anywhere;
   }
