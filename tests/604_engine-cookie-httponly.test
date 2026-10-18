@@ -1,0 +1,13 @@
+#!/bin/bash
+#
+# A Netscape jar line starting "#HttpOnly_" (curl, yt-dlp, browser exports)
+# is a cookie, and any other '#' line stays a comment.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+assert_selftest "cookiehttponly: OK" cookiehttponly "$dir"
