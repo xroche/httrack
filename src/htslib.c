@@ -2315,7 +2315,6 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
       char *value_st, *value_end;
       char name[256];
       char BIGSTK value[8192];
-      int next = 0;
       hts_boolean has_domain = HTS_FALSE;
       hts_tristate max_age_expired = HTS_DEFAULT;
       hts_tristate expires_passed = HTS_DEFAULT;
@@ -2330,10 +2329,8 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
       strcpybuff(path, "/");    // chemin (/)
       strcpybuff(cook_name, "");        // nom cookie (MYCOOK)
       strcpybuff(cook_value, "");       // valeur (ID=toto,S=1234)
-      // boucler jusqu'au prochain cookie ou la fin
+      // read every pair up to the end of the header
       do {
-        char *start_loop = a;
-
         while(is_space(*a))
           a++;                  // sauter espaces
         token_st = a;           // départ token
@@ -2369,10 +2366,15 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
             printf("detected cookie-av: name=\"%s\" value=\"%s\"\n", name,
                    value);
 #endif
-            /* RFC 6265 5.2 ignores an attribute with an empty value, but a
-               cookie may have one: "name=; Max-Age=0" is how one is erased */
-            if (value_len == 0 && strnotempty(cook_name)) {
-              // ignored
+            if (strnotempty(cook_name) == 0) {
+              // the first pair is the cookie, and "name=" may erase one
+              if ((size_t) value_len < sizeof(cook_value) - 1 &&
+                  (size_t) name_len < sizeof(cook_name) - 1) {
+                strcpybuff(cook_name, name);
+                strcpybuff(cook_value, value);
+              } else {
+                break;
+              }
             } else if (strfield2(name, "domain")) {
               if (value_len == 0 || strcmp(value, ".") == 0) {
                 // ignored, so the cookie stays on the host
@@ -2403,36 +2405,15 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
 
               if (got != HTS_DEFAULT)
                 expires_passed = got;
-            } else if (strfield2(name, "version")) {
-              // ignoré..
-            } else if (strfield2(name, "comment")) {
-              // ignoré
-            } else if (strfield2(name, "secure")) { // carries no value
-              // ignored
-            } else {
-              if ((size_t) value_len < sizeof(cook_value) - 1 &&
-                  (size_t) name_len < sizeof(cook_name) - 1) {
-                if (strnotempty(cook_name) == 0) {      // noter premier: nom et valeur cookie
-                  strcpybuff(cook_name, name);
-                  strcpybuff(cook_value, value);
-                } else {        // prochain cookie
-                  a = start_loop;       // on devra recommencer à cette position
-                  next = 1;     // enregistrer
-                }
-              } else {
-                cook_name[0] = 0;
-                break;
-              }
             }
+            // RFC 6265 5.2 ignores any other attribute, SameSite for example
           }
         }
-        if (!next) {
-          while((*a != ';') && (*a))
-            a++;                // prochain
-          while(*a == ';')
-            a++;                // sauter ;
-        }
-      } while((*a) && (!next));
+        while ((*a != ';') && (*a))
+          a++;
+        while (*a == ';')
+          a++;
+      } while (*a);
       if (strnotempty(cook_name)) {     // cookie?
         /* Max-Age outranks Expires (RFC 6265 5.3 step 3) */
         const hts_boolean expired = max_age_expired != HTS_DEFAULT
