@@ -189,8 +189,8 @@ RUN_CALLBACK0(opt, end); \
                       "lines could not be loaded",                             \
                       StringBuff(opt->cookies_file), cookies_file_refused);    \
       else                                                                     \
-        (void) cookie_save_replacing(opt, opt->cookie,                         \
-                                     StringBuff(opt->cookies_file));           \
+        cookie_save_replacing(opt, opt->cookie,                                \
+                              StringBuff(opt->cookies_file));                  \
     } else if (opt->accept_cookie)                                             \
       cookie_save(opt->cookie,                                                 \
                   fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),           \
@@ -683,7 +683,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   hash_struct hash;             // système de hachage, accélère la recherche dans les liens
   hash_struct *const hashptr = &hash;
   t_cookie BIGSTK cookie;       // gestion des cookies
-  int cookies_file_refused = 0; // lines the --cookies-file load skipped
+  int cookies_file_refused = 0; // lines a rewrite of -%K would lose
 
   int ptr;                      // pointeur actuel sur les liens
   int retcode = 1; // return code for the single exit; a bailout sets -1

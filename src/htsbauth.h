@@ -94,9 +94,9 @@ hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size);
 
 /** A jar record keeps these beside name, value, domain and path. */
 typedef struct cookie_attr {
-  hts_boolean host_only; /**< sent to its domain alone, not to subdomains */
-  hts_boolean secure;    /**< sent over https only */
-  hts_boolean http_only; /**< kept only so a saved jar round-trips */
+  hts_boolean host_only; /**< Is it sent to its domain alone? */
+  hts_boolean secure;    /**< Is it sent over https only? */
+  hts_boolean http_only; /**< Is it HttpOnly? It is kept for the save. */
   int64_t expires;       /**< absolute unix time, 0 for a session cookie */
 } cookie_attr;
 
@@ -117,30 +117,32 @@ int cookie_add(t_cookie *cookie, const char *cook_name, const char *cook_value,
 int cookie_remove(t_cookie *cookie, const char *cook_name, const char *domain,
                   const char *path);
 
-/** May the jar record at rec go out at NOW, over https when https is
-    HTS_TRUE? An expired record never may, and a Secure one needs https. */
+/** Is the record at rec sendable at NOW, over https when https is HTS_TRUE?
+    An expired record never is. A Secure one needs https. */
 hts_boolean cookie_sendable(const char *rec, hts_boolean https, int64_t now);
 
 /** Load the Netscape jar <path>/<name> into cookie (plus the copied IE jars in
-    <path> on Windows). A line that is malformed, has a field that does not
-    fit, or that the jar refuses is skipped and reported through opt, which may
-    be NULL. Returns -1 if the jar could not be opened, else the number of
-    skipped lines. Comments, blank lines and expired cookies are not counted. */
+    <path> on Windows). Each line a rewrite would lose is skipped, counted and
+    reported through opt, which may be NULL: a malformed or unreadable line, a
+    field that does not fit, a cookie the jar refuses, a repeated cookie, and
+    a comment no known tool writes. Returns -1 if the file does not exist, else
+    the count, and an existing file that cannot be opened counts 1. Blank lines,
+    known header comments and expired cookies are not counted. */
 int cookie_load(httrackp *opt, t_cookie *cookie, const char *path,
                 const char *name);
 
 /** Write the jar's cookies to name in Netscape format, owner-only on Unix.
-    Returns 0 when the file was written or the jar was empty, and -1 when any
-    open, write or close failed. */
+    An empty jar writes nothing. Returns 0 when the file was written or the jar
+    was empty, and -1 when any open, write or close failed. */
 int cookie_save(t_cookie *cookie, const char *name);
 
 /** Write the jar to <name>.tmp, then move the old file to <name>.bak (an
-    older .bak is replaced) and the new one over name. An empty jar writes
-    nothing. A failure is logged through opt, which may be NULL. If the write
-    or the backup fails, name and .bak are unchanged. If only the last move
-    fails, .bak holds the old content of name. HTS_FALSE on a failure. */
-hts_boolean cookie_save_replacing(httrackp *opt, t_cookie *cookie,
-                                  const char *name);
+    older .bak is replaced) and the new one over name. An empty jar writes a
+    header alone, or nothing when name does not exist. A failure is logged
+    through opt, which may be NULL. If the write or the backup fails, name and
+    .bak are unchanged. If only the last move fails, .bak holds the old content
+    of name. */
+void cookie_save_replacing(httrackp *opt, t_cookie *cookie, const char *name);
 
 /** Insert ins in front of the string at s, whose buffer holds s_size bytes. */
 void cookie_insert(char *s, size_t s_size, const char *ins);
@@ -179,9 +181,9 @@ hts_boolean cookie_expires_time(const char *value, int64_t now, int64_t *when);
 
 /** Return the first jar record at or after s whose name, domain and path
     match, or NULL. An empty cook_name matches any name. The domain match folds
-   case and reaches a subdomain only when the record is not host-only, and the
-   record's own path must be a byte-exact prefix of path. The result points into
-   s. */
+    case. It reaches a subdomain only when the record is not host-only. The
+    record's own path must be a byte-exact prefix of path. The result points
+    into s. */
 char *cookie_find(char *s, const char *cook_name, const char *domain,
                   const char *path);
 

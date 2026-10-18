@@ -879,8 +879,8 @@ them) (--generate-errors[=N])</p></td></tr>
 <td width="82%">
 
 
-<p>load extra cookies from a Netscape cookies.txt
-(--cookies-file &lt;param&gt;)</p></td></tr>
+<p>use a Netscape cookies.txt as the jar, rewritten at the
+end (--cookies-file &lt;param&gt;)</p></td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="4%">
@@ -2446,7 +2446,8 @@ directory, and writes the jar back to its output directory
 at the end. With <i>--cookies-file</i>, that file alone is
 the jar. The crawl rewrites it at the end and keeps its old
 content as <i>&lt;file&gt;.bak</i>. The file is left
-unchanged when some of its lines could not be loaded.</p>
+unchanged, with a warning, when a line could not be loaded,
+repeats a cookie, or holds a comment HTTrack would drop.</p>
 
 <p style="margin-left:9%; margin-top: 1em">A running mirror
 also watches its own output directory for these. Creating

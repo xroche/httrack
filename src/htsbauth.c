@@ -38,7 +38,6 @@ Please visit our Website: http://www.httrack.com
 /* specific definitions */
 #include "htsglobal.h"
 #include "htslib.h"
-#include "htslines.h"
 #include "htscore.h"
 #include "htspsl.h"
 #include "htstools.h" /* hts_rename_over */
@@ -92,6 +91,9 @@ hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size) {
   return HTS_TRUE;
 }
 
+static char *cookie_find_exact(char *s, const char *cook_name,
+                               const char *domain, const char *path);
+
 /* See htsbauth.h. Records are kept longest path first. */
 int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
                const char *domain, const char *path, const cookie_attr *attr) {
@@ -103,6 +105,8 @@ int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
   char host[256];
   char *a = cookie->data;
   char *insert;
+  char *old;
+  size_t used;
   char cook[16384];
 
   if (attr == NULL)
@@ -125,15 +129,18 @@ int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
   if (strlen(path) > 256)
     return -1;
 
-  // cookie_remove normalises the domain too, so it takes the raw one
-  cookie_remove(cookie, cook_name, domain, path);
   domain = host;
+  /* The record this one replaces still holds its room, so count it free, but
+     remove it only once the new one is known to fit. */
+  old = cookie_find_exact(cookie->data, cook_name, domain, path);
+  used = strlen(cookie->data) -
+         (old != NULL ? (size_t) (cookie_nextfield(old) - old) : 0);
   /* Each part against the room left, never a sum: the sum of five lengths
      read off the wire can wrap and pass a check it should fail. */
   {
-    const size_t parts[] = {strlen(cookie->data), strlen(cook_value),
-                            strlen(cook_name),    strlen(domain),
-                            strlen(path),         256};
+    const size_t parts[] = {
+        used,           strlen(cook_value), strlen(cook_name),
+        strlen(domain), strlen(path),       256};
     size_t left = cookie->max_len;
     size_t i;
 
@@ -141,21 +148,6 @@ int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
       if (parts[i] > left)
         return -1; // no room to add it
       left -= parts[i];
-    }
-  }
-
-  insert = a;                   // insérer ici
-  while(*a) {
-    if (strlen(cookie_get(buffer, a, 2)) < strlen(path))        // long. path (le + long est prioritaire)
-      a = cookie->data + strlen(cookie->data);  // fin
-    else {
-      a = strchr(a, '\n');      // prochain champ
-      if (a == NULL)
-        a = cookie->data + strlen(cookie->data);        // fin
-      else
-        a++;
-      a += strspn(a, "\n");
-      insert = a;               // insérer ici
     }
   }
   /* The Netscape fields, then an eighth only this jar reads, because the file
@@ -169,11 +161,20 @@ int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
   /* Backstop, not a live gate: the check above reserves 256 bytes and this
      record adds ~30 of literals, so it fires only if that assembly ever
      outgrows the headroom. Overflow-safe form regardless. */
-  {
-    const size_t used = strlen(cookie->data);
+  if (used >= cookie->max_len || strlen(cook) >= cookie->max_len - used)
+    return -1; // no room to add it
+  if (old != NULL)
+    cookie_delete(old, cookie->max_len - (size_t) (old - cookie->data),
+                  (size_t) (cookie_nextfield(old) - old));
 
-    if (used >= cookie->max_len || strlen(cook) >= cookie->max_len - used)
-      return -1; // no room to add it
+  insert = a; // the longest path goes first, so insert before shorter ones
+  while (*a) {
+    if (strlen(cookie_get(buffer, a, 2)) < strlen(path))
+      a = cookie->data + strlen(cookie->data);
+    else {
+      a = cookie_nextfield(a);
+      insert = a;
+    }
   }
   cookie_insert(insert, cookie->max_len - (size_t) (insert - cookie->data),
                 cook);
@@ -427,6 +428,53 @@ static hts_boolean cookie_load_field(httrackp *opt, char *dst, size_t dst_size,
   return HTS_TRUE;
 }
 
+/* Read a line of fp into s, without its LF or the CR before it, setting *len
+   to the bytes stored. HTS_FALSE when it did not fit, and then *len is the
+   whole length. A NUL is stored like any other byte. */
+static hts_boolean cookie_readline(FILE *fp, char *s, size_t size,
+                                   size_t *len) {
+  size_t n = 0, total = 0;
+  int c;
+
+  while ((c = fgetc(fp)) != EOF && c != '\n') {
+    if (n + 1 < size)
+      s[n++] = (char) c;
+    total++;
+  }
+  if (n > 0 && s[n - 1] == '\r' && n == total) {
+    n--;
+    total--;
+  }
+  s[n] = '\0';
+  *len = total;
+  return n == total ? HTS_TRUE : HTS_FALSE;
+}
+
+/* Is this comment line one curl, wget, a browser export or HTTrack writes, so
+   that a rewrite loses nothing by dropping it? */
+static hts_boolean cookie_known_comment(const char *line) {
+  static const char *const known[] = {
+      "# Netscape HTTP Cookie File",
+      "# HTTP Cookie File",
+      "# Written by HTTrack Website Copier",
+      "# https://curl.se/docs/http-cookies.html",
+      "# https://curl.haxx.se/docs/http-cookies.html",
+      "# http://curl.haxx.se/rfc/cookie_spec.html",
+      "# This file was generated by libcurl! Edit at your own risk.",
+      "# http://www.netscape.com/newsref/std/cookie_spec.html",
+      "# This is a generated file!  Do not edit.",
+      "# Generated by Wget on ",
+      "# Edit at your own risk.",
+  };
+  size_t i;
+
+  for (i = 0; i < sizeof(known) / sizeof(known[0]); i++) {
+    if (strncmp(line, known[i], strlen(known[i])) == 0)
+      return HTS_TRUE;
+  }
+  return HTS_FALSE;
+}
+
 // Read cookies.txt (+ copied IE cookies *@*.txt on Windows); !=0 on error.
 int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
                 const char *name) {
@@ -522,76 +570,113 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
     if (fp) {
       char BIGSTK line[8192];
       const size_t line_max = 8000;
+      // this load's records alone, so a line repeating one is caught
+      t_cookie *seen = (t_cookie *) calloct(1, sizeof(t_cookie));
 
+      if (seen != NULL)
+        seen->max_len = sizeof(seen->data);
       // ferror ends the loop too, because a directory never reaches EOF
       while (!feof(fp) && !ferror(fp) &&
              strlen(cookie->data) < cookie->max_len) {
-        /* TABs separate the fields, so the reader keeps them */
-        const hts_boolean cut = hts_readline(fp, line, 8100, 0);
+        size_t len;
+        const hts_boolean whole = cookie_readline(fp, line, sizeof(line), &len);
 
-        if (strnotempty(line)) {
-          if (!cut && strlen(line) < line_max) {
-            /* curl and browser exports mark an HttpOnly cookie this way */
-            static const char httponly[] = COOKIE_HTTPONLY_PREFIX;
-            const hts_boolean is_httponly =
-                strncmp(line, httponly, sizeof(httponly) - 1) == 0;
-            const char *const rec =
-                is_httponly ? line + sizeof(httponly) - 1 : line;
+        if (!whole || len >= line_max) {
+          hts_log_print(opt, LOG_WARNING,
+                        "Cookies: ignoring an over-long line "
+                        "(%d bytes, maximum %d): %s",
+                        (int) len, (int) line_max - 1, file);
+          refused++;
+        } else if (memchr(line, '\0', len) != NULL ||
+                   memchr(line, '\r', len) != NULL) {
+          hts_log_print(opt, LOG_WARNING,
+                        "Cookies: ignoring a line holding a NUL or a CR: %s",
+                        file);
+          refused++;
+        } else if (line[strspn(line, " \t")] != '\0') {
+          /* curl and browser exports mark an HttpOnly cookie this way */
+          static const char httponly[] = COOKIE_HTTPONLY_PREFIX;
+          const hts_boolean is_httponly =
+              strncmp(line, httponly, sizeof(httponly) - 1) == 0;
+          const char *const rec =
+              is_httponly ? line + sizeof(httponly) - 1 : line;
 
-            if (rec[0] != '#') {
-              char domain[256];             // cookie domain (.netscape.com)
-              char path[256];               // path (/)
-              char BIGSTK cook_name[COOKIE_MAX_PAIR + 1]; // name (MYCOOK)
-              char BIGSTK cook_value[8192]; // value (ID=toto,S=1234)
-              const char *p;
-              int tabs = 0;
-
-#if DEBUG_COOK
-              printf("%s\n", rec);
-#endif
-              for (p = strchr(rec, '\t'); p != NULL; p = strchr(p + 1, '\t'))
-                tabs++;
-              if (tabs < 6 || !strnotempty(cookie_get(buffer, rec, 5))) {
-                hts_log_print(opt, LOG_WARNING,
-                              "Cookies: ignoring a line with fewer than 7 "
-                              "fields or no name: %s",
-                              file);
-                refused++;
-              } else if (cookie_load_field(opt, domain, sizeof(domain), buffer,
-                                           rec, 0, "domain", file) &&
-                         cookie_load_field(opt, path, sizeof(path), buffer, rec,
-                                           2, "path", file) &&
-                         cookie_load_field(opt, cook_name, sizeof(cook_name),
-                                           buffer, rec, 5, "name", file) &&
-                         cookie_load_field(opt, cook_value, sizeof(cook_value),
-                                           buffer, rec, 6, "value", file)) {
-                cookie_attr attr;
-
-                attr.host_only = cookie_is_host_only(rec);
-                attr.secure =
-                    strcmpnocase(cookie_get(buffer, rec, 3), "TRUE") == 0;
-                attr.http_only = is_httponly;
-                attr.expires = cookie_record_expiry(rec);
-                if (attr.expires != 0 && attr.expires <= (int64_t) time(NULL)) {
-                  // expired: a browser would have dropped it already
-                } else if (cookie_set(cookie, cook_name, cook_value, domain,
-                                      path, &attr) != 0) {
-                  // the jar caps a field tighter still, and a full one refuses
-                  hts_log_print(opt, LOG_WARNING,
-                                "Cookies: the jar did not store '%.64s': %s",
-                                cook_name, file);
-                  refused++;
-                }
-              } else {
-                refused++;
-              }
+          if (rec[0] == '#') {
+            if (!cookie_known_comment(rec)) {
+              hts_log_print(opt, LOG_WARNING,
+                            "Cookies: %s holds a comment a rewrite would "
+                            "drop: %.64s",
+                            file, rec);
+              refused++;
             }
           } else {
-            hts_log_print(opt, LOG_WARNING,
-                          "Cookies: ignoring an over-long line "
-                          "(%d bytes, maximum %d): %s",
-                          (int) strlen(line), (int) line_max - 1, file);
-            refused++;
+            char domain[256];                           // .netscape.com
+            char path[256];                             // /
+            char BIGSTK cook_name[COOKIE_MAX_PAIR + 1]; // MYCOOK
+            char BIGSTK cook_value[8192];               // ID=toto,S=1234
+            const char *p;
+            int tabs = 0;
+
+#if DEBUG_COOK
+            printf("%s\n", rec);
+#endif
+            for (p = strchr(rec, '\t'); p != NULL; p = strchr(p + 1, '\t'))
+              tabs++;
+            if (tabs < 6 || !strnotempty(cookie_get(buffer, rec, 5))) {
+              hts_log_print(opt, LOG_WARNING,
+                            "Cookies: ignoring a line with fewer than 7 "
+                            "fields or no name: %s",
+                            file);
+              refused++;
+            } else if (tabs > 7 ||
+                       (tabs == 7 && strcmp(cookie_get(buffer, rec, 7),
+                                            COOKIE_HTTPONLY_FIELD) != 0)) {
+              // a TAB in the value: the eighth field is only ever ours
+              hts_log_print(opt, LOG_WARNING,
+                            "Cookies: ignoring a line with more than 7 "
+                            "fields: %s",
+                            file);
+              refused++;
+            } else if (cookie_load_field(opt, domain, sizeof(domain), buffer,
+                                         rec, 0, "domain", file) &&
+                       cookie_load_field(opt, path, sizeof(path), buffer, rec,
+                                         2, "path", file) &&
+                       cookie_load_field(opt, cook_name, sizeof(cook_name),
+                                         buffer, rec, 5, "name", file) &&
+                       cookie_load_field(opt, cook_value, sizeof(cook_value),
+                                         buffer, rec, 6, "value", file)) {
+              cookie_attr attr;
+              char host[256];
+
+              attr.host_only = cookie_is_host_only(rec);
+              attr.secure =
+                  strcmpnocase(cookie_get(buffer, rec, 3), "TRUE") == 0;
+              attr.http_only = is_httponly || tabs == 7;
+              attr.expires = cookie_record_expiry(rec);
+              if (attr.expires != 0 && attr.expires <= (int64_t) time(NULL)) {
+                // expired: a browser would have dropped it already
+              } else if (seen != NULL &&
+                         cookie_host(domain, host, sizeof(host)) &&
+                         cookie_find_exact(seen->data, cook_name, host, path) !=
+                             NULL) {
+                // a rewrite would keep one of the two
+                hts_log_print(opt, LOG_WARNING,
+                              "Cookies: '%.64s' appears twice in %s", cook_name,
+                              file);
+                refused++;
+              } else if (cookie_set(cookie, cook_name, cook_value, domain, path,
+                                    &attr) != 0) {
+                // the jar caps a field tighter still, and a full one refuses
+                hts_log_print(opt, LOG_WARNING,
+                              "Cookies: the jar did not store '%.64s': %s",
+                              cook_name, file);
+                refused++;
+              } else if (seen != NULL) {
+                (void) cookie_set(seen, cook_name, "", domain, path, NULL);
+              }
+            } else {
+              refused++;
+            }
           }
         }
       }
@@ -601,115 +686,118 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
         refused++;
       }
       fclose(fp);
+      freet(seen);
       return refused;
+    } else if (errno != ENOENT) {
+      // the file exists, so a rewrite would replace what was never read
+      hts_log_print(opt, LOG_WARNING | LOG_ERRNO, "Cookies: could not read %s",
+                    file);
+      return 1;
     }
   }
   return -1;
 }
 
-/* Write cookies.txt; returns 0 on success. The jar holds live session
-   cookies, so keep it owner-only on Unix (Windows inherits folder ACLs). */
-int cookie_save(t_cookie * cookie, const char *name) {
+/* Write the jar to name, a header alone when it is empty; 0 on success. The
+   jar holds live session cookies, so keep it owner-only on Unix (Windows
+   inherits folder ACLs). */
+static int cookie_write(t_cookie *cookie, const char *name) {
   char catbuff[CATBUFF_SIZE];
-
-  if (strnotempty(cookie->data)) {
-    char BIGSTK line[8192];
+  char BIGSTK line[8192];
 #ifdef _WIN32
-    FILE *fp = FOPEN(fconv(catbuff, sizeof(catbuff), name), "wb");
+  FILE *fp = FOPEN(fconv(catbuff, sizeof(catbuff), name), "wb");
 #else
-    const int fd = open(fconv(catbuff, sizeof(catbuff), name),
-                        O_WRONLY | O_CREAT | O_TRUNC, HTS_PROTECT_FILE);
-    FILE *fp = fd != -1 ? fdopen(fd, "wb") : NULL;
+  const int fd = open(fconv(catbuff, sizeof(catbuff), name),
+                      O_WRONLY | O_CREAT | O_TRUNC, HTS_PROTECT_FILE);
+  FILE *fp = fd != -1 ? fdopen(fd, "wb") : NULL;
 
-    if (fd != -1 && fp == NULL)
-      close(fd);    /* fdopen failed: don't leak the descriptor */
-    if (fp != NULL) /* O_CREAT's mode skips pre-existing jars: tighten those */
-      (void) fchmod(fd, HTS_PROTECT_FILE);
+  if (fd != -1 && fp == NULL)
+    close(fd);    /* fdopen failed: don't leak the descriptor */
+  if (fp != NULL) /* O_CREAT's mode skips pre-existing jars: tighten those */
+    (void) fchmod(fd, HTS_PROTECT_FILE);
 #endif
 
-    if (fp) {
-      char *a = cookie->data;
-      hts_boolean ok = HTS_TRUE;
+  if (fp) {
+    const char *a = cookie->data;
+    hts_boolean ok = HTS_TRUE;
 
-      // Python's MozillaCookieJar refuses a file without this first line
-      if (fprintf(fp, "# Netscape HTTP Cookie File" LF
-                      "# Written by HTTrack Website Copier" LF) < 0)
-        ok = HTS_FALSE;
-      do {
-        char *extra = line;
-        const char *dom = line;
-        int i;
+    // Python's MozillaCookieJar refuses a file without this first line
+    if (fprintf(fp, "# Netscape HTTP Cookie File" LF
+                    "# Written by HTTrack Website Copier" LF) < 0)
+      ok = HTS_FALSE;
+    while (*a != '\0') {
+      char *extra = line;
+      const char *rec = line;
+      int i;
 
-        a += binput(a, line, 8000);
-        if (!strnotempty(line))
-          continue;
-        // the eighth field is ours: the file form marks HttpOnly by prefix
-        for (i = 0; i < 7 && extra != NULL; i++) {
-          extra = strchr(extra, '\t');
-          if (extra != NULL && i < 6)
-            extra++;
-        }
-        if (extra != NULL) {
-          *extra = '\0';
-          if (fprintf(fp, "%s", COOKIE_HTTPONLY_PREFIX) < 0)
-            ok = HTS_FALSE;
-        }
-        // a Netscape jar dots the domain exactly when field 1 is TRUE
-        if (dom[0] == '.')
-          dom++;
-        if (fprintf(fp, "%s%s" LF, cookie_is_host_only(line) ? "" : ".", dom) <
-            0)
+      a += binput(a, line, 8000);
+      // stop on the seventh TAB, so the cut takes it with the eighth field
+      for (i = 0; i < 7 && extra != NULL; i++) {
+        extra = strchr(extra, '\t');
+        if (extra != NULL && i < 6)
+          extra++;
+      }
+      // the eighth field is ours: the file form marks HttpOnly by prefix
+      if (extra != NULL) {
+        *extra = '\0';
+        if (fprintf(fp, "%s", COOKIE_HTTPONLY_PREFIX) < 0)
           ok = HTS_FALSE;
-      } while (*a != '\0');
-      if (fflush(fp) != 0)
+      }
+      // a Netscape jar dots the domain exactly when field 1 is TRUE
+      if (rec[0] == '.')
+        rec++;
+      if (fprintf(fp, "%s%s" LF, cookie_is_host_only(line) ? "" : ".", rec) < 0)
         ok = HTS_FALSE;
-      if (fclose(fp) != 0)
-        ok = HTS_FALSE;
-      return ok ? 0 : -1;
     }
-  } else
-    return 0;
+    // fclose flushes, so it reports a write the buffer held back
+    if (fclose(fp) != 0)
+      ok = HTS_FALSE;
+    return ok ? 0 : -1;
+  }
   return -1;
 }
 
 /* See htsbauth.h. */
-hts_boolean cookie_save_replacing(httrackp *opt, t_cookie *cookie,
-                                  const char *name) {
+int cookie_save(t_cookie *cookie, const char *name) {
+  return strnotempty(cookie->data) ? cookie_write(cookie, name) : 0;
+}
+
+/* See htsbauth.h. */
+void cookie_save_replacing(httrackp *opt, t_cookie *cookie, const char *name) {
   char file[CATBUFF_SIZE];
   char tmp[CATBUFF_SIZE];
   char bak[CATBUFF_SIZE];
 
-  if (!strnotempty(cookie->data))
-    return HTS_TRUE; // nothing to write, so the user's file stays as it was
   fconv(file, sizeof(file), name);
+  // an empty jar still empties an existing file, or a deleted cookie survives
+  if (!strnotempty(cookie->data) && !fexist_utf8(file))
+    return;
   if (!slprintfbuff(tmp, sizeof(tmp), "%s.tmp", file) ||
       !slprintfbuff(bak, sizeof(bak), "%s.bak", file)) {
     hts_log_print(opt, LOG_WARNING,
-                  "Cookies: the name %s is too long to rewrite it", name);
-    return HTS_FALSE;
+                  "Cookies: cannot rewrite %s, its name is too long", name);
+    return;
   }
-  if (cookie_save(cookie, tmp) != 0) {
+  if (cookie_write(cookie, tmp) != 0) {
     hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
                   "Cookies: could not write %s.tmp, so %s is unchanged", name,
                   name);
     (void) UNLINK(tmp);
-    return HTS_FALSE;
+    return;
   }
   if (fexist_utf8(file) && !hts_rename_over(opt, file, bak)) {
     hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
                   "Cookies: could not back up %s, so it is unchanged", name);
     (void) UNLINK(tmp);
-    return HTS_FALSE;
+    return;
   }
   if (!hts_rename_over(opt, tmp, file)) {
     hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
-                  "Cookies: could not replace %s, its previous content is in "
+                  "Cookies: could not replace %s, but its old content is in "
                   "%s.bak",
                   name, name);
     (void) UNLINK(tmp);
-    return HTS_FALSE;
   }
-  return HTS_TRUE;
 }
 
 // Insert string ins before s. s_size is the capacity of the buffer at s.

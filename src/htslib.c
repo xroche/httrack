@@ -1011,7 +1011,7 @@ static int append_cookie_header(buff_struct *bstr, t_cookie *cookie,
   return count;
 }
 
-/* Build the request Cookie line for domain/path into dst (always
+/* Build the request Cookie line for adr/path into dst (always
    NUL-terminated). Returns the number of cookies emitted. */
 int http_cookie_header(t_cookie *cookie, const char *adr, const char *path,
                        char *dst, size_t dst_size) {
@@ -2340,13 +2340,12 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
       name[0] = value[0] = '\0';
       //
 
-      // initialiser cookie lu actuellement
-      /* raw, because cookie_add() normalises and doing that twice is not the
+      /* raw, because cookie_set() normalises and doing that twice is not the
          same as doing it once; no adr means empty, which it refuses */
       strcpybuff(domain, adr != NULL ? adr : "");
-      strcpybuff(path, "/");    // chemin (/)
-      strcpybuff(cook_name, "");        // nom cookie (MYCOOK)
-      strcpybuff(cook_value, "");       // valeur (ID=toto,S=1234)
+      strcpybuff(path, "/");
+      strcpybuff(cook_name, "");
+      strcpybuff(cook_value, "");
       // read every pair up to the end of the header
       do {
         while(is_space(*a))
