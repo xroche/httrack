@@ -60,6 +60,12 @@ a:active  { text-decoration: underline; }
 /* Links on the bars keep the bar colours in every state. */
 #subTitle a, .tabCtrl a { background: var(--ui-bar);  color: var(--ui-bar-ink); }
 
+/* The open option tab. Forced colors drop its shadow, so it gets a border there. */
+.tabCtrl a:where([aria-current]) { text-decoration: none;  box-shadow: inset 0 -3px var(--ui-bar-ink); }
+@media (forced-colors: active) {
+	.tabCtrl a:where([aria-current]) { border: 2px solid var(--ui-bar-ink); }
+}
+
 .alert   { color: var(--ui-alert); }
 .cmdline { color: var(--ui-link); }
 
