@@ -4886,8 +4886,7 @@ hts_boolean hts_host_is_ipv4(const char *host, size_t len) {
 }
 
 hts_boolean hts_host_is_address(const char *host, size_t len) {
-  return (len > 0 && host[0] == '[') || memchr(host, ':', len) != NULL ||
-         hts_host_is_ipv4(host, len);
+  return memchr(host, ':', len) != NULL || hts_host_is_ipv4(host, len);
 }
 
 hts_boolean hts_proxy_is_socks(const char *name) {

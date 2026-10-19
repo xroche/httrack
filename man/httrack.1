@@ -580,8 +580,8 @@ as a browser console prints it, or a pasted
 request header. Those cookies are sent to the registrable domain of the first
 start URL and its subdomains, or to that host alone when it is an address or a
 public suffix. They are Secure when that URL is https. HTTrack never rewrites
-such a file. HttpOnly cookies are not in it, so export a Netscape file for
-those, with a cookies.txt export extension or DevTools "Copy as cURL".
+such a file. HttpOnly cookies are not in it. A cookies.txt export has them,
+and so does the Cookie header from DevTools "Copy as cURL", pasted here.
 .PP
 A running mirror also watches its own output directory for these. Creating one
 is how a script drives an engine it has no other handle on. On Windows, which

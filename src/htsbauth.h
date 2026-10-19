@@ -138,12 +138,11 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *path,
 
 /** This is cookie_load, but when start_url is not NULL, a file whose first
     non-blank line is a document.cookie string ("a=1; b=2", no TAB, no blank
-    in the first name, not a comment, an optional "Cookie:" and UTF-8 BOM) is
-    read as session cookies for path "/" of the registrable domain of
-    start_url. An address or a public suffix gets them for that host alone.
-    They are Secure iff start_url is https. Such a file returns
-    COOKIE_LOAD_KEEP, because a save would replace it, and so does one
-    start_url names no host for. */
+    in the first name, not a comment, with an optional UTF-8 BOM, outer quotes
+    and "Cookie:") is read as session cookies for path "/" of the registrable
+    domain of start_url. An address or a public suffix gets them for that host
+    alone. They are Secure iff start_url is https. Such a file, or a start_url
+    with no host, returns COOKIE_LOAD_KEEP, because a save would replace it. */
 int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *path,
                      const char *name, const char *start_url);
 #define COOKIE_LOAD_KEEP (-2)

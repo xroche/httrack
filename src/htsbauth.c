@@ -360,7 +360,7 @@ static hts_boolean cookie_is_number(const char *s) {
   return n > 0 && s[n] == '\0';
 }
 
-/* Is s a jar expiry? Python's MozillaCookieJar leaves a session's empty. */
+/* Is s an expiry: digits, or empty for a session? */
 static hts_boolean cookie_is_expiry(const char *s) {
   return cookie_is_number(s) || s[0] == '\0';
 }
@@ -488,6 +488,7 @@ static hts_boolean cookie_known_comment(const char *line) {
   static const char *const known[] = {
       "# Netscape HTTP Cookie File",
       "# HTTP Cookie File",
+      "# HTTP cookie file.",
       "# Written by HTTrack Website Copier",
       "# https://curl.se/docs/http-cookies.html",
       "# https://curl.haxx.se/docs/http-cookies.html",
@@ -580,7 +581,7 @@ static const char cookie_bom[] = "\xEF\xBB\xBF";
 
 /* Return where the pairs of a document.cookie line start, past blanks and a
    pasted "Cookie:" header name. */
-static const char *cookie_flat_start(const char *line) {
+static char *cookie_flat_start(char *line) {
   int n;
 
   line += strspn(line, " \t");
@@ -590,21 +591,29 @@ static const char *cookie_flat_start(const char *line) {
 }
 
 /* Does the first non-blank line of fp look like a document.cookie string?
-   Rewinds fp. */
-static hts_boolean cookie_is_flat(FILE *fp) {
+ *quote receives the quote around that whole line, or 0. Rewinds fp. */
+static hts_boolean cookie_is_flat(FILE *fp, int *quote) {
   char line[8192];
   hts_boolean first = HTS_TRUE;
   hts_boolean flat = HTS_FALSE;
 
+  *quote = 0;
   while (fgets(line, sizeof(line), fp) != NULL) {
-    const char *p = line;
+    char *p = line;
     const char *eq;
+    size_t end;
 
     if (first && strncmp(p, cookie_bom, sizeof(cookie_bom) - 1) == 0)
       p += sizeof(cookie_bom) - 1;
     first = HTS_FALSE;
     if (p[strspn(p, " \t\r\n")] == '\0')
       continue;
+    p += strspn(p, " \t");
+    for (end = strlen(p); end > 0 && strchr(" \t\r\n", p[end - 1]); end--)
+      ;
+    // a browser console shows the string quoted
+    if ((p[0] == '\'' || p[0] == '"') && end > 1 && p[end - 1] == p[0])
+      *quote = *p++;
     p = cookie_flat_start(p);
     eq = strchr(p, '=');
     // a name holds no blank, so a Netscape line spaced instead of TABbed fails
@@ -613,6 +622,8 @@ static hts_boolean cookie_is_flat(FILE *fp) {
     break;
   }
   rewind(fp);
+  if (!flat)
+    *quote = 0;
   return flat;
 }
 
@@ -680,12 +691,14 @@ static hts_boolean cookie_flat_pair(httrackp *opt, t_cookie *cookie, char *pair,
    domain of start_url. The file is never rewritten, because the save would
    turn it into a Netscape jar, so this returns COOKIE_LOAD_KEEP. */
 static int cookie_load_flat(httrackp *opt, t_cookie *cookie, FILE *fp,
-                            const char *given, const char *start_url) {
+                            const char *given, const char *start_url,
+                            int quote) {
   char host[256];
   char BIGSTK pair[COOKIE_MAX_PAIR + 2]; // name, '=', value and the NUL
   size_t len = 0;
   hts_boolean nul = HTS_FALSE, too_long = HTS_FALSE;
   hts_boolean line_start = HTS_TRUE;
+  hts_boolean quoted = HTS_FALSE, quote_done = quote == 0;
   hts_boolean https = HTS_FALSE;
   cookie_attr attr;
   const char *domain;
@@ -741,18 +754,28 @@ static int cookie_load_flat(httrackp *opt, t_cookie *cookie, FILE *fp,
         hts_log_print(opt, LOG_WARNING,
                       "Cookies: ignoring a cookie holding a NUL in %s", given);
     } else if (len > 0) {
-      const char *p;
+      char *p = pair;
 
       while (len > 0 && strchr(" \t\r", pair[len - 1]) != NULL)
         len--;
       pair[len] = '\0';
-      p = line_start ? cookie_flat_start(pair) : pair;
-      if (*p != '\0' && cookie_flat_pair(opt, cookie, pair + (p - pair), domain,
-                                         &attr, given, &ignored))
+      // the quotes around the first line, which cookie_is_flat found
+      if (line_start && !quote_done && pair[0] == quote) {
+        quote_done = quoted = HTS_TRUE;
+        p++;
+      }
+      if (quoted && c != ';' && pair + len - 1 >= p && pair[len - 1] == quote)
+        pair[--len] = '\0';
+      if (line_start)
+        p = cookie_flat_start(p);
+      if (*p != '\0' &&
+          cookie_flat_pair(opt, cookie, p, domain, &attr, given, &ignored))
         stored++;
     }
     len = 0;
     nul = too_long = HTS_FALSE;
+    if (c != ';')
+      quoted = HTS_FALSE;
     line_start = c == '\n';
   } while (c != EOF);
   if (ignored > COOKIE_FLAT_WARNINGS)
@@ -868,6 +891,7 @@ int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *fpath,
     char bak[CATBUFF_SIZE];
     int refused = 0;
     hts_boolean keep = HTS_FALSE;
+    int quote = 0;
     FILE *fp;
 
     if (!cookie_resolve(file, sizeof(file), given)) {
@@ -881,8 +905,9 @@ int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *fpath,
         cookie_bak_stranded(opt, file, bak, given))
       return COOKIE_LOAD_KEEP;
     fp = FOPEN(file, "rb");
-    if (fp != NULL && start_url != NULL && cookie_is_flat(fp)) {
-      const int ret = cookie_load_flat(opt, cookie, fp, given, start_url);
+    if (fp != NULL && start_url != NULL && cookie_is_flat(fp, &quote)) {
+      const int ret =
+          cookie_load_flat(opt, cookie, fp, given, start_url, quote);
 
       fclose(fp);
       return ret;
@@ -890,6 +915,7 @@ int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *fpath,
     if (fp) {
       char BIGSTK line[8192];
       const size_t line_max = 8000;
+      hts_boolean first_line = HTS_TRUE;
       // this load's records alone, so a line repeating one is caught
       t_cookie *seen = (t_cookie *) calloct(1, sizeof(t_cookie));
 
@@ -907,6 +933,13 @@ int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *fpath,
 
         // len counts what the buffer cut too, so this catches that line
         cookie_readline(fp, line, sizeof(line), &len);
+        if (first_line && len >= sizeof(cookie_bom) - 1 &&
+            strncmp(line, cookie_bom, sizeof(cookie_bom) - 1) == 0) {
+          len -= sizeof(cookie_bom) - 1;
+          memmove(line, line + sizeof(cookie_bom) - 1,
+                  strlen(line) + 1 - (sizeof(cookie_bom) - 1));
+        }
+        first_line = HTS_FALSE;
         if (len >= line_max) {
           hts_log_print(opt, LOG_WARNING,
                         "Cookies: ignoring an over-long line "

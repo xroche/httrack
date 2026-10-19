@@ -30,6 +30,15 @@ crawl --found 'gated/index.html' --not-found 'gated/secret.html' \
     --log-found 'loaded 1 from the document.cookie string' \
     httrack 'BASEURL/gated/index.php' -o0 --cookies-file "$tmpdir/wrong.txt"
 
+# --why stops before the cookies file is read, so it leaves it alone
+bin=$(httrack_path)
+printf 'example.com\tFALSE\t/\tFALSE\t0\tkeep\t1\n' >"$tmpdir/why.txt"
+cp "$tmpdir/why.txt" "$tmpdir/why-orig.txt"
+"$bin" --why http://example.com/x.html http://example.com/ -O "$tmpdir/why" \
+    --cookies-file "$tmpdir/why.txt" >"$tmpdir/why.log" 2>&1 ||
+    fail_dump "--why failed" "$tmpdir/why.log"
+cmp "$tmpdir/why.txt" "$tmpdir/why-orig.txt" || fail "--why rewrote the cookies file"
+
 local_server_start
 # a start URL from an -%L list binds it too
 printf '%s/gated/index.php\n' "$BASEURL" >"$tmpdir/urls.txt"
