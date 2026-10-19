@@ -4701,7 +4701,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                        */
 
                       if (strnotempty(rcvd))
-                        treathead(opt->cookie, back[i].url_adr, back[i].url_fil, &back[i].r, rcvd);     // traiter
+                        treathead_opt(opt, opt->cookie, back[i].url_adr,
+                                      back[i].url_fil, &back[i].r, rcvd);
 
                       // parfois les serveurs buggés renvoient un content-range avec un 200
                       if (back[i].r.statuscode == HTTP_OK)      // 'OK'

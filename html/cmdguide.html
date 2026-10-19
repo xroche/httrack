@@ -312,7 +312,7 @@ options control what HTTrack says about itself.</p>
   <tr><td><tt>--headers (-%X)</tt></td><td>Add raw header lines to every request.</td></tr>
   <tr><td><tt>--browser-headers (-%Q)</tt></td><td>When <tt>-F</tt> names a browser (<tt>Mozilla/5.0 ...</tt>), send over HTTPS the headers it adds. Chrome and Edge get their client hints, and every browser gets <tt>Sec-Fetch-*</tt>. A link httrack cannot classify gets no <tt>Sec-Fetch-*</tt>, since a wrong value can get it refused. On by default, and <tt>-%Q0</tt> turns it off.</td></tr>
   <tr><td><tt>--footer (-%F)</tt></td><td>A footer written into saved pages (on disk, not a network header). See <b>Footer fields</b> below.</td></tr>
-  <tr><td><tt>--cookies (-b), --cookies-file (-%K)</tt></td><td>Accept cookies, and preload a Netscape <tt>cookies.txt</tt>.</td></tr>
+  <tr><td><tt>--cookies (-b), --cookies-file (-%K)</tt></td><td>Accept cookies, and use a Netscape <tt>cookies.txt</tt> as the jar, rewritten at the end.</td></tr>
 </table>
 
 <p><b>Footer fields.</b> A footer with no <tt>%s</tt> may reference named fields:

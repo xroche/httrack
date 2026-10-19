@@ -182,8 +182,17 @@ RUN_CALLBACK0(opt, end); \
       fclose(maketrack_fp);                                                    \
       maketrack_fp = NULL;                                                     \
     }                                                                          \
-    if (opt->accept_cookie)                                                    \
-      cookie_save(opt->cookie,                                                 \
+    if (opt->accept_cookie && strnotempty(StringBuff(opt->cookies_file))) {    \
+      if (cookies_file_refused > 0)                                            \
+        hts_log_print(opt, LOG_WARNING,                                        \
+                      "Cookies: %s is left unchanged, because %d of its "      \
+                      "lines would be lost",                                   \
+                      StringBuff(opt->cookies_file), cookies_file_refused);    \
+      else if (cookies_file_refused != COOKIE_LOAD_KEEP) /* it said why */     \
+        cookie_save_replacing(opt, opt->cookie,                                \
+                              StringBuff(opt->cookies_file));                  \
+    } else if (opt->accept_cookie && cookies_file_refused != COOKIE_LOAD_KEEP) \
+      cookie_save(opt, opt->cookie,                                            \
                   fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),           \
                           StringBuff(opt->path_log), "cookies.txt"));          \
     bauth_free(&cookie);                                                       \
@@ -674,6 +683,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   hash_struct hash;             // système de hachage, accélère la recherche dans les liens
   hash_struct *const hashptr = &hash;
   t_cookie BIGSTK cookie;       // gestion des cookies
+  int cookies_file_refused = 0; // cookie_load result for the jar to rewrite
 
   int ptr;                      // pointeur actuel sur les liens
   int retcode = 1; // return code for the single exit; a bailout sets -1
@@ -773,14 +783,22 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
     opt->cookie = &cookie;
     cookie.max_len = 30000;     // max len
     strcpybuff(cookie.data, "");
-    // Load the mirror's cookies.txt, then the one in the current directory
-    cookie_load(opt, opt->cookie, StringBuff(opt->path_log), "cookies.txt");
-    cookie_load(opt, opt->cookie, "", "cookies.txt");
-    // A user-supplied cookie file is merged last so it wins on conflicts
-    if (strnotempty(StringBuff(opt->cookies_file)))
-      cookie_load(opt, opt->cookie, "", StringBuff(opt->cookies_file));
-  } else
+    // the --cookies-file is the whole jar, because the crawl writes it back
+    if (strnotempty(StringBuff(opt->cookies_file))) {
+      cookies_file_refused =
+          cookie_load(opt, opt->cookie, "", StringBuff(opt->cookies_file));
+    } else {
+      cookies_file_refused = cookie_load(
+          opt, opt->cookie, StringBuff(opt->path_log), "cookies.txt");
+      cookie_load(opt, opt->cookie, "", "cookies.txt");
+    }
+  } else {
     opt->cookie = NULL;
+    if (strnotempty(StringBuff(opt->cookies_file)))
+      hts_log_print(opt, LOG_WARNING,
+                    "Cookies are disabled, so the cookies file %s is not read",
+                    StringBuff(opt->cookies_file));
+  }
 
   hts_store_release_int(&opt->state.exit_xh, 0);
   /* a fault a previous mirror recovered from must not abort this one */

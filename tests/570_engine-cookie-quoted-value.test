@@ -8,7 +8,8 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-REC="example.com|TRUE|/|FALSE|1999999999"
+# host-only, because no Domain=, and a session cookie
+REC="example.com|FALSE|/|FALSE|0"
 # The record's own tabs print as '|'. Both halves, because 5.4 sends the value
 # as stored and only the stored half shows what a cookie-av kept.
 jar() { # jar STORED SENT HEADER
@@ -24,12 +25,12 @@ jar "$REC|sess|\" a \"" 'Cookie: sess=" a "' 'Set-Cookie: sess=" a "'
 # An unbalanced quote is one value byte, not a cookie to drop. WPT pins this as
 # "Set value with unbalanced leading quote" (cookies/value/value.html).
 jar "$REC|a|\"" 'Cookie: a="' 'Set-Cookie: a="'
-# Every cookie-av value comes through the same scan, so a quoted path or domain
-# keeps its quotes too and then matches nothing, as the empty Cookie line says.
-jar "example.com|TRUE|\"/d\"|FALSE|1999999999|sess|a" '' \
+# Every cookie-av value comes through the same scan, so a quoted path keeps its
+# quotes too and then matches nothing, as the empty Cookie line says. A quoted
+# domain is no domain of the host, so the cookie is not stored at all.
+jar "example.com|FALSE|\"/d\"|FALSE|0|sess|a" '' \
     'Set-Cookie: sess=a; path="/d"'
-jar "\"example.com\"|TRUE|/|FALSE|1999999999|sess|a" '' \
-    'Set-Cookie: sess=a; domain="example.com"'
+jar '' '' 'Set-Cookie: sess=a; domain="example.com"'
 # A single quote is a cookie-octet too, so the scan keeps it like a DQUOTE.
 jar "$REC|sess|'ab'" "Cookie: sess='ab'" "Set-Cookie: sess='ab'"
 # Real whitespace is still skipped, and the class is wider than a space.

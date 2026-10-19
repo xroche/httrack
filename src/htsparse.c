@@ -5097,8 +5097,8 @@ int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
          self-redirect Set-Cookie trips the retry, not a concurrent slot's. */
       cookie_before[0] = '\0';
       if (opt->accept_cookie && opt->cookie != NULL)
-        http_cookie_header(opt->cookie, jump_identification_const(afs->af.adr),
-                           afs->af.fil, cookie_before, sizeof(cookie_before));
+        http_cookie_header(opt->cookie, afs->af.adr, afs->af.fil, cookie_before,
+                           sizeof(cookie_before));
 
       /* Wait for an available slot */
       if (!hts_wait_available_socket(sback, opt, cache, ptr))
@@ -5307,9 +5307,8 @@ int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
                across its self-redirect (a Set-Cookie it just set). */
             cookie_after[0] = '\0';
             if (opt->accept_cookie && opt->cookie != NULL)
-              http_cookie_header(
-                  opt->cookie, jump_identification_const(afs->af.adr),
-                  afs->af.fil, cookie_after, sizeof(cookie_after));
+              http_cookie_header(opt->cookie, afs->af.adr, afs->af.fil,
+                                 cookie_after, sizeof(cookie_after));
             cookies_changed = strcmp(cookie_before, cookie_after) != 0;
 
             mov_url[0] = '\0';

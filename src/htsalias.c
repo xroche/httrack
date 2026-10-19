@@ -137,7 +137,7 @@ const char *hts_optalias[][4] = {
    "fold other hostnames of one site onto it "
    "([scheme://]alias[,...]=[scheme://]host)"},
   {"cookies-file", "-%K", "param1",
-   "load extra cookies from a Netscape cookies.txt"},
+   "use a Netscape cookies.txt as the jar, rewritten at the end"},
   {"changes", "-%d", "onoff",
    "write hts-changes.json: what this crawl changed vs. the previous mirror"},
   {"sitemap", "-%m", "single",
