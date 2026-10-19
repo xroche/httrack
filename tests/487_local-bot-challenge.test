@@ -9,12 +9,14 @@ set -eu
 
 note='Bot protection challenge at .*/challenge/blocked\.html'
 advice='pass its cookies with --cookies-file'
+ua_advice='its exact User-Agent with --user-agent'
 refused='"Forbidden" \(403\) at link'
 
 # A good page keeps the mirror from rolling back, so the 403 is the only error.
 bash "$top_srcdir/tests/local-crawl.sh" --errors 1 \
     --log-found "$note" \
     --log-found "$advice" \
+    --log-found "$ua_advice" \
     --log-found "${refused} .*/challenge/blocked\\.html" \
     httrack 'BASEURL/simple/basic.html' 'BASEURL/challenge/blocked.html' \
     --retries=0
