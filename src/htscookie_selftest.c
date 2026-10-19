@@ -2416,7 +2416,7 @@ static int st_cookieflat(httrackp *opt, int argc, char **argv) {
   static const struct {
     const char *content, *start_url;
     int ret;
-    const char *want[3]; // every record the jar then holds, NULL-ended
+    const char *want[4]; // every record the jar then holds, NULL-ended
     const char *log;     // NULL: no check
   } cases[] = {
       // a registrable domain over https, with '=' in a value
@@ -2492,6 +2492,20 @@ static int st_cookieflat(httrackp *opt, int argc, char **argv) {
        COOKIE_LOAD_KEEP,
        {FLAT_DOMAIN("example.net", PLAIN, "a", "1"),
         FLAT_DOMAIN("example.net", PLAIN, "b", "2"), NULL},
+       NULL},
+      // only the last pair of the quoted line loses a closing quote
+      {"'a=x'; b=2'",
+       "http://example.net/",
+       COOKIE_LOAD_KEEP,
+       {FLAT_DOMAIN("example.net", PLAIN, "a", "x'"),
+        FLAT_DOMAIN("example.net", PLAIN, "b", "2"), NULL},
+       NULL},
+      {"\"a=1; b=2\"\nc=3\"",
+       "http://example.net/",
+       COOKIE_LOAD_KEEP,
+       {FLAT_DOMAIN("example.net", PLAIN, "a", "1"),
+        FLAT_DOMAIN("example.net", PLAIN, "b", "2"),
+        FLAT_DOMAIN("example.net", PLAIN, "c", "3\""), NULL},
        NULL},
       {"'a=1; b=2",
        "http://example.net/",

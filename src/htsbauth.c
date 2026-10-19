@@ -786,8 +786,8 @@ static int cookie_load_flat(httrackp *opt, t_cookie *cookie, FILE *fp,
                   "Cookies: stopped reading before the end of %s", given);
   hts_log_print(opt, LOG_WARNING,
                 "Cookies: loaded %d from the document.cookie string in %s for "
-                "%s%s. HttpOnly cookies are missing: use a cookies.txt export "
-                "or DevTools \"Copy as cURL\"",
+                "%s%s. HttpOnly cookies are missing: use a cookies.txt export, "
+                "or paste the Cookie header from DevTools \"Copy as cURL\"",
                 stored, given, domain,
                 attr.host_only ? " alone" : " and its subdomains");
   return COOKIE_LOAD_KEEP;
