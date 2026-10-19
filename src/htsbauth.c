@@ -35,6 +35,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsbauth.h"
 
+#include <limits.h>
 #include <stdint.h>
 
 /* specific definitions */
@@ -271,9 +272,8 @@ hts_boolean cookie_domain_match(const char *jar_dom, const char *host) {
      ends a label, for example "example.com" is no parent of wwwexample.com. */
   if (host[host_len - dom_len - 1] != '.')
     return HTS_FALSE;
-  /* An address has no parent domain, or "1.1" would reach 192.168.1.1, and
-     cookie_host unbrackets IPv6, so a colon left here is an address too. */
-  if (hts_host_is_ipv4(host, host_len) || memchr(host, ':', host_len) != NULL)
+  // an address has no parent domain, or "1.1" would reach 192.168.1.1
+  if (hts_host_is_address(host, host_len))
     return HTS_FALSE;
   return HTS_TRUE;
 }
@@ -360,10 +360,9 @@ static hts_boolean cookie_is_number(const char *s) {
   return n > 0 && s[n] == '\0';
 }
 
-/* Is s a jar expiry: digits, or blank for a session as Python's
-   MozillaCookieJar writes it? */
+/* Is s a jar expiry? Python's MozillaCookieJar leaves a session's empty. */
 static hts_boolean cookie_is_expiry(const char *s) {
-  return cookie_is_number(s) || s[strspn(s, " ")] == '\0';
+  return cookie_is_number(s) || s[0] == '\0';
 }
 
 /* Return the expiry in field 4 of rec, or 0, a session, when it is not all
@@ -576,30 +575,45 @@ static hts_boolean cookie_bak_stranded(httrackp *opt, const char *file,
   return HTS_FALSE;
 }
 
-/* Is the first non-blank line of fp a document.cookie string, that is no TAB,
-   an '=' and no leading '#'? fp is rewound either way. */
-static hts_boolean cookie_is_flat(FILE *fp) {
-  hts_boolean seen = HTS_FALSE, comment = HTS_FALSE;
-  hts_boolean tab = HTS_FALSE, eq = HTS_FALSE;
-  int c;
+/* A Windows editor may put this UTF-8 byte order mark first. */
+static const char cookie_bom[] = "\xEF\xBB\xBF";
 
-  while ((c = fgetc(fp)) != EOF) {
-    if (c == '\n') {
-      if (seen)
-        break;
-      tab = HTS_FALSE;
-    } else if (c == '\t') {
-      tab = HTS_TRUE;
-    } else if (c != ' ' && c != '\r') {
-      if (!seen)
-        comment = c == '#';
-      seen = HTS_TRUE;
-      if (c == '=')
-        eq = HTS_TRUE;
-    }
+/* Return where the pairs of a document.cookie line start, past blanks and a
+   pasted "Cookie:" header name. */
+static const char *cookie_flat_start(const char *line) {
+  int n;
+
+  line += strspn(line, " \t");
+  if ((n = strfield(line, "Cookie:")) != 0)
+    line += n + strspn(line + n, " \t");
+  return line;
+}
+
+/* Does the first non-blank line of fp look like a document.cookie string?
+   Rewinds fp. */
+static hts_boolean cookie_is_flat(FILE *fp) {
+  char line[8192];
+  hts_boolean first = HTS_TRUE;
+  hts_boolean flat = HTS_FALSE;
+
+  while (fgets(line, sizeof(line), fp) != NULL) {
+    const char *p = line;
+    const char *eq;
+
+    if (first && strncmp(p, cookie_bom, sizeof(cookie_bom) - 1) == 0)
+      p += sizeof(cookie_bom) - 1;
+    first = HTS_FALSE;
+    if (p[strspn(p, " \t\r\n")] == '\0')
+      continue;
+    p = cookie_flat_start(p);
+    eq = strchr(p, '=');
+    // a name holds no blank, so a Netscape line spaced instead of TABbed fails
+    flat = p[0] != '#' && eq != NULL && strchr(p, '\t') == NULL &&
+           p + strcspn(p, " ") >= eq;
+    break;
   }
   rewind(fp);
-  return seen && !tab && eq && !comment;
+  return flat;
 }
 
 /* Copy the host of url, with or without a scheme, into dst as cookie_host
@@ -618,30 +632,45 @@ static hts_boolean cookie_url_host(const char *url, char *dst, size_t dst_size,
   return cookie_host(adr, dst, dst_size);
 }
 
-/* Store the pair "name=value" at pair, trimmed, as a cookie of domain. Returns
-   HTS_FALSE after a warning when it is not stored. */
+/* A document.cookie string logs this many ignored cookies, then a count. */
+#define COOKIE_FLAT_WARNINGS 10
+
+/* Count one more ignored cookie in *ignored. Should it still be logged? */
+static hts_boolean cookie_flat_ignore(int *ignored) {
+  if (*ignored < INT_MAX)
+    (*ignored)++;
+  return *ignored <= COOKIE_FLAT_WARNINGS;
+}
+
+/* Store the pair "name=value" at pair as a cookie of domain. Returns
+   HTS_FALSE when it is not stored, counted in *ignored. */
 static hts_boolean cookie_flat_pair(httrackp *opt, t_cookie *cookie, char *pair,
                                     const char *domain, const cookie_attr *attr,
-                                    const char *given) {
+                                    const char *given, int *ignored) {
   char *const eq = strchr(pair, '=');
 
   if (eq == NULL || eq == pair) {
-    hts_log_print(opt, LOG_WARNING,
-                  "Cookies: ignoring a cookie with no name in %s: %.64s", given,
-                  pair);
+    if (cookie_flat_ignore(ignored))
+      hts_log_print(opt, LOG_WARNING,
+                    "Cookies: ignoring a cookie with no name in %s: %.64s",
+                    given, pair);
     return HTS_FALSE;
   }
   *eq = '\0';
+  // a browser lists the most specific path first, so the first one wins
   if (cookie_find_exact(cookie->data, pair, domain, "/") != NULL) {
-    // a browser lists the most specific path first, so the first one wins
-    hts_log_print(opt, LOG_WARNING, "Cookies: '%.64s' appears twice in %s",
-                  pair, given);
+    if (cookie_flat_ignore(ignored))
+      hts_log_print(
+          opt, LOG_WARNING,
+          "Cookies: ignoring a repeated '%.64s' in %s, the first wins", pair,
+          given);
     return HTS_FALSE;
   }
   if (cookie_set(cookie, pair, eq + 1, domain, "/", attr) != 0) {
-    hts_log_print(opt, LOG_WARNING,
-                  "Cookies: the jar did not store '%.64s' from %s", pair,
-                  given);
+    if (cookie_flat_ignore(ignored))
+      hts_log_print(opt, LOG_WARNING,
+                    "Cookies: ignoring '%.64s' in %s (not stored)", pair,
+                    given);
     return HTS_FALSE;
   }
   return HTS_TRUE;
@@ -655,23 +684,24 @@ static int cookie_load_flat(httrackp *opt, t_cookie *cookie, FILE *fp,
   char host[256];
   char BIGSTK pair[COOKIE_MAX_PAIR + 2]; // name, '=', value and the NUL
   size_t len = 0;
-  hts_boolean nul = HTS_FALSE, line_start = HTS_TRUE;
+  hts_boolean nul = HTS_FALSE, too_long = HTS_FALSE;
+  hts_boolean line_start = HTS_TRUE;
   hts_boolean https = HTS_FALSE;
   cookie_attr attr;
   const char *domain;
-  int stored = 0;
+  int stored = 0, ignored = 0;
+  size_t i;
   int c;
 
-  if (start_url == NULL ||
-      !cookie_url_host(start_url, host, sizeof(host), &https)) {
+  if (!cookie_url_host(start_url, host, sizeof(host), &https)) {
     hts_log_print(opt, LOG_WARNING,
                   "Cookies: %s is a document.cookie string, but there is no "
-                  "start URL to bind it to, so it is not read",
+                  "start URL to bind it to, so it is ignored",
                   given);
     return COOKIE_LOAD_KEEP;
   }
   // an address or a public suffix has no parent domain to share cookies with
-  domain = hts_host_is_ipv4(host, strlen(host)) || strchr(host, ':') != NULL
+  domain = hts_host_is_address(host, strlen(host))
                ? NULL
                : hts_psl_registrable_domain(host);
   attr.host_only = domain == NULL;
@@ -681,6 +711,12 @@ static int cookie_load_flat(httrackp *opt, t_cookie *cookie, FILE *fp,
   if (domain == NULL)
     domain = host;
 
+  for (i = 0; i < sizeof(cookie_bom) - 1; i++) {
+    if (fgetc(fp) != (unsigned char) cookie_bom[i]) {
+      rewind(fp);
+      break;
+    }
+  }
   do {
     c = fgetc(fp);
     if (c != EOF && c != ';' && c != '\n') {
@@ -688,44 +724,47 @@ static int cookie_load_flat(httrackp *opt, t_cookie *cookie, FILE *fp,
       if (len == 0 && (c == ' ' || c == '\t' || c == '\r'))
         continue;
       if (len < sizeof(pair) - 1)
-        pair[len] = (char) c;
-      if (len < sizeof(pair))
-        len++;
+        pair[len++] = (char) c;
+      else
+        too_long = HTS_TRUE;
       if (c == '\0')
         nul = HTS_TRUE;
       continue;
     }
-    if (len >= sizeof(pair)) {
-      hts_log_print(opt, LOG_WARNING,
-                    "Cookies: ignoring a cookie over %d bytes in %s",
-                    (int) sizeof(pair) - 2, given);
+    if (too_long) {
+      if (cookie_flat_ignore(&ignored))
+        hts_log_print(opt, LOG_WARNING,
+                      "Cookies: ignoring a cookie over %d bytes in %s",
+                      (int) sizeof(pair) - 2, given);
     } else if (nul) {
-      hts_log_print(opt, LOG_WARNING,
-                    "Cookies: ignoring a cookie holding a NUL in %s", given);
+      if (cookie_flat_ignore(&ignored))
+        hts_log_print(opt, LOG_WARNING,
+                      "Cookies: ignoring a cookie holding a NUL in %s", given);
     } else if (len > 0) {
-      char *p = pair;
+      const char *p;
 
       while (len > 0 && strchr(" \t\r", pair[len - 1]) != NULL)
         len--;
       pair[len] = '\0';
-      // a "Cookie:" request header pasted whole
-      if (line_start && strfield(p, "Cookie:"))
-        p += strspn(p + 7, " \t") + 7;
-      if (*p != '\0' && cookie_flat_pair(opt, cookie, p, domain, &attr, given))
+      p = line_start ? cookie_flat_start(pair) : pair;
+      if (*p != '\0' && cookie_flat_pair(opt, cookie, pair + (p - pair), domain,
+                                         &attr, given, &ignored))
         stored++;
     }
     len = 0;
-    nul = HTS_FALSE;
+    nul = too_long = HTS_FALSE;
     line_start = c == '\n';
   } while (c != EOF);
+  if (ignored > COOKIE_FLAT_WARNINGS)
+    hts_log_print(opt, LOG_WARNING, "Cookies: ignored %d more cookies in %s",
+                  ignored - COOKIE_FLAT_WARNINGS, given);
   if (ferror(fp))
     hts_log_print(opt, LOG_WARNING,
                   "Cookies: stopped reading before the end of %s", given);
   hts_log_print(opt, LOG_WARNING,
-                "Cookies: loaded %d from the document.cookie string in %s "
-                "for %s%s, and left the file unchanged. That string lacks "
-                "HttpOnly cookies, so use DevTools \"Copy as cURL\" or a "
-                "cookies.txt export extension to get them",
+                "Cookies: loaded %d from the document.cookie string in %s for "
+                "%s%s. HttpOnly cookies are missing: use a cookies.txt export "
+                "or DevTools \"Copy as cURL\"",
                 stored, given, domain,
                 attr.host_only ? " alone" : " and its subdomains");
   return COOKIE_LOAD_KEEP;
@@ -842,7 +881,7 @@ int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *fpath,
         cookie_bak_stranded(opt, file, bak, given))
       return COOKIE_LOAD_KEEP;
     fp = FOPEN(file, "rb");
-    if (fp != NULL && cookie_is_flat(fp)) {
+    if (fp != NULL && start_url != NULL && cookie_is_flat(fp)) {
       const int ret = cookie_load_flat(opt, cookie, fp, given, start_url);
 
       fclose(fp);

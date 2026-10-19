@@ -131,16 +131,19 @@ hts_boolean cookie_sendable(const char *rec, hts_boolean https, int64_t now);
     dangling symbolic link, it is missing while its .bak exists, it is empty
     while its .bak is not, or memory ran out. A symbolic link is followed, so
     the .bak is the one beside its target. Blank lines, known header comments
-    and expired cookies are not counted. */
+    and expired cookies are not counted. An empty expiry field is a session
+    cookie, and only the Netscape format is read. */
 int cookie_load(httrackp *opt, t_cookie *cookie, const char *path,
                 const char *name);
 
-/** This is cookie_load, but a file whose first non-blank line is a
-    document.cookie string ("a=1; b=2", no TAB, not a comment) is read as
-    session cookies for path "/" of the registrable domain of start_url, or of
-    its exact host when it is an address or a public suffix. Secure iff
-    start_url is https. start_url NULL or "" refuses such a file. Such a file
-    returns COOKIE_LOAD_KEEP, because a save would replace it. */
+/** This is cookie_load, but when start_url is not NULL, a file whose first
+    non-blank line is a document.cookie string ("a=1; b=2", no TAB, no blank
+    in the first name, not a comment, an optional "Cookie:" and UTF-8 BOM) is
+    read as session cookies for path "/" of the registrable domain of
+    start_url. An address or a public suffix gets them for that host alone.
+    They are Secure iff start_url is https. Such a file returns
+    COOKIE_LOAD_KEEP, because a save would replace it, and so does one
+    start_url names no host for. */
 int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *path,
                      const char *name, const char *start_url);
 #define COOKIE_LOAD_KEEP (-2)

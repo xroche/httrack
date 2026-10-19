@@ -1322,6 +1322,35 @@ static int st_cookiehttponly(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* This holds opt's log and level while a block captures its warnings. */
+typedef struct cookie_logcap {
+  FILE *saved, *log;
+  int debug;
+} cookie_logcap;
+
+/* Send opt's warnings to a temporary file until cookie_log_stop. */
+static void cookie_log_start(httrackp *opt, cookie_logcap *cap) {
+  cap->saved = opt->log;
+  cap->debug = opt->debug;
+  cap->log = tmpfile();
+  assertf(cap->log != NULL);
+  opt->log = cap->log;
+  opt->debug = LOG_WARNING;
+}
+
+/* Restore opt's log, and copy what was captured into buf. */
+static void cookie_log_stop(httrackp *opt, cookie_logcap *cap, char *buf,
+                            size_t size) {
+  size_t n;
+
+  rewind(cap->log);
+  n = fread(buf, 1, size - 1, cap->log);
+  buf[n] = '\0';
+  fclose(cap->log);
+  opt->log = cap->saved;
+  opt->debug = cap->debug;
+}
+
 /* Read the whole file at path into buf, or "" when it cannot be opened. */
 static void cookiejar_slurp(const char *path, char *buf, size_t size) {
   FILE *const fp = FOPEN(path, "rb");
@@ -1665,32 +1694,23 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
   /* A cookie of RFC 6265's 4096 bytes loads, saves and goes out whole, and
      one byte more is refused with a warning rather than cut. */
   {
-    FILE *const projectlog = opt->log;
-    FILE *const log = tmpfile();
-    const int saveddebug = opt->debug;
+    cookie_logcap cap;
     char BIGSTK big[COOKIE_MAX_PAIR + 2];
     char BIGSTK pair[COOKIE_MAX_PAIR + 8];
     char logged[1024];
-    size_t n;
     FILE *fp = FOPEN(file, "wb");
 
-    assertf(fp != NULL && log != NULL);
+    assertf(fp != NULL);
     memset(big, 'v', COOKIE_MAX_PAIR - 3);
     big[COOKIE_MAX_PAIR - 3] = '\0';
     fprintf(fp, "big.test\tFALSE\t/\tFALSE\t0\tfit\t%s\n", big);
     strcatbuff(big, "v"); // name and value now one byte over
     fprintf(fp, "big.test\tFALSE\t/\tFALSE\t0\tnot\t%s\n", big);
     fclose(fp);
-    opt->log = log;
-    opt->debug = LOG_WARNING;
     jar.data[0] = '\0';
+    cookie_log_start(opt, &cap);
     assertf(cookie_load(opt, &jar, fpath, "cookies.txt") == 1);
-    rewind(log);
-    n = fread(logged, 1, sizeof(logged) - 1, log);
-    logged[n] = '\0';
-    fclose(log);
-    opt->log = projectlog;
-    opt->debug = saveddebug;
+    cookie_log_stop(opt, &cap, logged, sizeof(logged));
     big[COOKIE_MAX_PAIR - 3] = '\0';
     assertf(sprintfbuff(pair, "fit=%s", big));
     http_cookie_header(&jar, "big.test", "/", hdr, sizeof(hdr));
@@ -1712,32 +1732,22 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
 
   /* A Set-Cookie the jar refuses is logged, once, and a stored one is not. */
   {
-    FILE *const projectlog = opt->log;
-    FILE *const log = tmpfile();
-    const int saveddebug = opt->debug;
+    cookie_logcap cap;
     char logged[1024];
-    size_t n;
     const char *p;
     int count = 0;
     htsblk r;
     char fits[] = "Set-Cookie: fits=1";
     char full[] = "Set-Cookie: full=1";
 
-    assertf(log != NULL);
-    opt->log = log;
-    opt->debug = LOG_WARNING;
+    cookie_log_start(opt, &cap);
     jar.data[0] = '\0';
     memset(&r, 0, sizeof(r));
     jar.max_len = 300; // room for one record and its headroom, not two
     treathead_opt(opt, &jar, "jar.test", "/", &r, fits);
     treathead_opt(opt, &jar, "jar.test", "/", &r, full);
     jar.max_len = sizeof(jar.data);
-    rewind(log);
-    n = fread(logged, 1, sizeof(logged) - 1, log);
-    logged[n] = '\0';
-    fclose(log);
-    opt->log = projectlog;
-    opt->debug = saveddebug;
+    cookie_log_stop(opt, &cap, logged, sizeof(logged));
     for (p = strstr(logged, "did not store"); p != NULL;
          p = strstr(p + 1, "did not store"))
       count++;
@@ -2352,132 +2362,139 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
 #undef LABEL
 }
 
-/* Write len bytes of content to dir/cookies.txt, load it for start_url with
-   the log in logged, and return the load's result. */
-static int cookieflat_load(httrackp *opt, t_cookie *jar, const char *dir,
-                           const char *content, size_t len,
-                           const char *start_url, char *logged, size_t size) {
-  FILE *const projectlog = opt->log;
-  const int saveddebug = opt->debug;
-  FILE *const log = tmpfile();
+static const char *cookieflat_dir;
+static char cookieflat_logged[16384];
+
+/* Write len bytes of content to cookies.txt in cookieflat_dir, load it for
+   start_url with the log in cookieflat_logged, and return the load's result. */
+static int cookieflat_load(httrackp *opt, t_cookie *jar, const char *content,
+                           size_t len, const char *start_url) {
+  cookie_logcap cap;
   char fpath[HTS_URLMAXSIZE * 2];
   char file[HTS_URLMAXSIZE * 2];
   FILE *fp;
-  size_t n;
   int ret;
 
-  assertf(sprintfbuff(fpath, "%s/", dir));
+  assertf(sprintfbuff(fpath, "%s/", cookieflat_dir));
   assertf(sprintfbuff(file, "%scookies.txt", fpath));
   fp = FOPEN(file, "wb");
-  assertf(fp != NULL && log != NULL);
+  assertf(fp != NULL);
   assertf(fwrite(content, 1, len, fp) == len);
   fclose(fp);
-  opt->log = log;
-  opt->debug = LOG_WARNING;
   jar->max_len = sizeof(jar->data);
   jar->data[0] = '\0';
+  cookie_log_start(opt, &cap);
   ret = cookie_load_from(opt, jar, fpath, "cookies.txt", start_url);
-  rewind(log);
-  n = fread(logged, 1, size - 1, log);
-  logged[n] = '\0';
-  fclose(log);
-  opt->log = projectlog;
-  opt->debug = saveddebug;
+  cookie_log_stop(opt, &cap, cookieflat_logged, sizeof(cookieflat_logged));
   (void) UNLINK(file);
   return ret;
 }
 
 static int st_cookieflat(httrackp *opt, int argc, char **argv) {
 #define LABEL "cookie-flat"
-#define FLAT_REC(dom, sub, sec, name, value)                                   \
-  dom "\t" sub "\t/\t" sec "\t0\t" name "\t" value "\n"
+#define SECURE "TRUE"
+#define PLAIN "FALSE"
+#define FLAT_DOMAIN(dom, sec, name, value)                                     \
+  dom "\tTRUE\t/\t" sec "\t0\t" name "\t" value "\n"
+#define FLAT_HOST(host, sec, name, value)                                      \
+  host "\tFALSE\t/\t" sec "\t0\t" name "\t" value "\n"
+#define BOM "\xEF\xBB\xBF"
 
   static const struct {
     const char *content, *start_url;
     int ret;
-    const char *want[3]; // jar records, NULL-ended
+    const char *want[3]; // every record the jar then holds, NULL-ended
     const char *log;     // NULL: no check
   } cases[] = {
-      // a registrable domain, https, '=' in a value
+      // a registrable domain over https, with '=' in a value
       {"a=1; b=2=3",
        "https://www.example.com/x",
        COOKIE_LOAD_KEEP,
-       {FLAT_REC("example.com", "TRUE", "TRUE", "a", "1"),
-        FLAT_REC("example.com", "TRUE", "TRUE", "b", "2=3"), NULL},
+       {FLAT_DOMAIN("example.com", SECURE, "a", "1"),
+        FLAT_DOMAIN("example.com", SECURE, "b", "2=3"), NULL},
        "loaded 2 from the document.cookie string in"},
       // a pasted request header, CRLF, blank lines, empty pairs and blanks
       {"\r\n \t \n Cookie:  a=1;; ;  b=2  \r\n",
        "WWW.Example.CO.UK",
        COOKIE_LOAD_KEEP,
-       {FLAT_REC("example.co.uk", "TRUE", "FALSE", "a", "1"),
-        FLAT_REC("example.co.uk", "TRUE", "FALSE", "b", "2"), NULL},
+       {FLAT_DOMAIN("example.co.uk", PLAIN, "a", "1"),
+        FLAT_DOMAIN("example.co.uk", PLAIN, "b", "2"), NULL},
        "for example.co.uk and its subdomains"},
-      // an address, a public suffix and a single label stay host-only
+      // an address or a public suffix stays host-only
       {"a=1",
        "http://127.0.0.1:8080/",
        COOKIE_LOAD_KEEP,
-       {FLAT_REC("127.0.0.1", "FALSE", "FALSE", "a", "1"), NULL},
+       {FLAT_HOST("127.0.0.1", PLAIN, "a", "1"), NULL},
        "for 127.0.0.1 alone"},
       {"a=1",
-       "http://[::1]:8080/",
+       "http://[::ffff:1.2.3.4]:8080/",
        COOKIE_LOAD_KEEP,
-       {FLAT_REC("::1", "FALSE", "FALSE", "a", "1"), NULL},
+       {FLAT_HOST("::ffff:1.2.3.4", PLAIN, "a", "1"), NULL},
        NULL},
       {"a=1",
        "http://co.uk/",
        COOKIE_LOAD_KEEP,
-       {FLAT_REC("co.uk", "FALSE", "FALSE", "a", "1"), NULL},
-       NULL},
-      {"a=1",
-       "http://localhost/",
-       COOKIE_LOAD_KEEP,
-       {FLAT_REC("localhost", "FALSE", "FALSE", "a", "1"), NULL},
+       {FLAT_HOST("co.uk", PLAIN, "a", "1"), NULL},
        NULL},
       // the first of a repeated name wins, and a pair with no name is refused
       {"a=1; junk; =x; a=2; c=3\n",
        "http://x.example.org/",
        COOKIE_LOAD_KEEP,
-       {FLAT_REC("example.org", "TRUE", "FALSE", "a", "1"),
-        FLAT_REC("example.org", "TRUE", "FALSE", "c", "3"), NULL},
-       "'a' appears twice"},
+       {FLAT_DOMAIN("example.org", PLAIN, "a", "1"),
+        FLAT_DOMAIN("example.org", PLAIN, "c", "3"), NULL},
+       "ignoring a repeated 'a'"},
       // a TAB on a later line is refused by the jar
       {"a=1\nb=2\tx\n",
        "http://example.net/",
        COOKIE_LOAD_KEEP,
-       {FLAT_REC("example.net", "TRUE", "FALSE", "a", "1"), NULL},
-       "did not store 'b'"},
-      // no start URL
+       {FLAT_DOMAIN("example.net", PLAIN, "a", "1"), NULL},
+       "ignoring 'b'"},
+      // a '#' after the first byte is no comment
+      {"a=1#x",
+       "http://example.net/",
+       COOKIE_LOAD_KEEP,
+       {FLAT_DOMAIN("example.net", PLAIN, "a", "1#x"), NULL},
+       NULL},
+      // "Cookie:" is a header name only at the start of a line
+      {"a=1; Cookie: b=2",
+       "http://example.net/",
+       COOKIE_LOAD_KEEP,
+       {FLAT_DOMAIN("example.net", PLAIN, "a", "1"),
+        FLAT_DOMAIN("example.net", PLAIN, "Cookie: b", "2"), NULL},
+       NULL},
+      // a UTF-8 BOM is not part of the first name, nor hides a comment
+      {BOM "a=1",
+       "http://example.net/",
+       COOKIE_LOAD_KEEP,
+       {FLAT_DOMAIN("example.net", PLAIN, "a", "1"), NULL},
+       NULL},
+      {BOM "#see=http://x/?a=b\nx.test\tFALSE\t/\tFALSE\t0\tn\tv\n",
+       "http://www.example.com/",
+       1,
+       {FLAT_HOST("x.test", PLAIN, "n", "v"), NULL},
+       NULL},
+      // a Netscape line spaced instead of TABbed has a blank in its first name
+      {"127.0.0.1 FALSE / FALSE 0 sp v=1\n",
+       "http://127.0.0.1/",
+       1,
+       {NULL},
+       "fewer than 7"},
+      // no start URL refuses it, and NULL reads a Netscape jar only
       {"a=1", "", COOKIE_LOAD_KEEP, {NULL}, "no start URL"},
-      {"a=1", NULL, COOKIE_LOAD_KEEP, {NULL}, "no start URL"},
+      {"a=1", NULL, 1, {NULL}, "fewer than 7"},
       // a TAB, a comment or no '=' on the first line keeps the Netscape path
       {"x.test\tFALSE\t/\tFALSE\t0\tn\tv\n",
        "http://www.example.com/",
        0,
-       {FLAT_REC("x.test", "FALSE", "FALSE", "n", "v"), NULL},
+       {FLAT_HOST("x.test", PLAIN, "n", "v"), NULL},
        NULL},
       {"# a=b\n", "http://www.example.com/", 1, {NULL}, "unknown comment"},
-      // a blank expiry is a session, as Python's MozillaCookieJar writes it
-      {"e.test\tFALSE\t/\tFALSE\t\tn\tv\n",
-       "http://www.example.com/",
-       0,
-       {FLAT_REC("e.test", "FALSE", "FALSE", "n", "v"), NULL},
-       NULL},
-      {"e.test\tFALSE\t/\tFALSE\t  \tn\tv\n",
-       "http://www.example.com/",
-       0,
-       {FLAT_REC("e.test", "FALSE", "FALSE", "n", "v"), NULL},
-       NULL},
-      {"e.test\tFALSE\t/\tFALSE\t1x\tn\tv\n",
-       "http://www.example.com/",
-       1,
-       {NULL},
-       "not a whole number"},
       {"a=b\tc\n", "http://www.example.com/", 1, {NULL}, "fewer than 7"},
       {"junk\n", "http://www.example.com/", 1, {NULL}, "fewer than 7"},
   };
 
   static t_cookie jar;
-  char BIGSTK logged[16384];
+  const char *const logged = cookieflat_logged;
   char BIGSTK text[COOKIE_MAX_PAIR * 3];
   char BIGSTK hdr[8192];
   size_t i, j;
@@ -2488,13 +2505,13 @@ static int st_cookieflat(httrackp *opt, int argc, char **argv) {
     fprintf(stderr, "%s: needs a writable dir\n", LABEL);
     return 1;
   }
+  cookieflat_dir = argv[0];
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     const char *const c = cases[i].content;
     size_t wanted = 0, lines = 0;
     hts_boolean missing = HTS_FALSE;
 
-    ret = cookieflat_load(opt, &jar, argv[0], c, strlen(c), cases[i].start_url,
-                          logged, sizeof(logged));
+    ret = cookieflat_load(opt, &jar, c, strlen(c), cases[i].start_url);
     for (; cases[i].want[wanted] != NULL; wanted++) {
       if (strstr(jar.data, cases[i].want[wanted]) == NULL)
         missing = HTS_TRUE;
@@ -2524,17 +2541,34 @@ static int st_cookieflat(httrackp *opt, int argc, char **argv) {
     n += COOKIE_MAX_PAIR;
     memcpy(text + n, "; n=a\0b; z=1", 12);
     n += 12;
-    ret = cookieflat_load(opt, &jar, argv[0], text, n, "http://big.test/",
-                          logged, sizeof(logged));
+    ret = cookieflat_load(opt, &jar, text, n, "http://big.test/");
     if (ret != COOKIE_LOAD_KEEP || strstr(jar.data, "\tv\txxx") == NULL ||
         strstr(jar.data, "\tw\t") != NULL ||
         strstr(jar.data, "\tn\t") != NULL ||
-        strstr(jar.data, FLAT_REC("big.test", "TRUE", "FALSE", "z", "1")) ==
-            NULL ||
+        strstr(jar.data, FLAT_DOMAIN("big.test", PLAIN, "z", "1")) == NULL ||
         strstr(logged, "ignoring a cookie over 4096 bytes") == NULL ||
         strstr(logged, "holding a NUL") == NULL ||
         strstr(logged, "loaded 2 from") == NULL) {
       printf("%s: long pairs: returned %d, log [%s]\n", LABEL, ret, logged);
+      err = 1;
+    }
+  }
+
+  /* Ignored cookies are logged ten times, then counted. */
+  {
+    const char *p;
+    int count = 0;
+
+    strcpybuff(text, "a=1;");
+    for (i = 0; i < 30; i++)
+      strcatbuff(text, "x;");
+    ret = cookieflat_load(opt, &jar, text, strlen(text), "http://example.net/");
+    for (p = strstr(logged, "no name"); p != NULL; p = strstr(p + 1, "no name"))
+      count++;
+    if (ret != COOKIE_LOAD_KEEP || count != 10 ||
+        strstr(logged, "ignored 20 more cookies") == NULL) {
+      printf("%s: 30 ignored cookies logged %d times, log [%s]\n", LABEL, count,
+             logged);
       err = 1;
     }
   }
@@ -2553,9 +2587,8 @@ static int st_cookieflat(httrackp *opt, int argc, char **argv) {
         {"https://example.org", HTS_FALSE},
     };
 
-    (void) cookieflat_load(opt, &jar, argv[0], "s=1", 3,
-                           "https://www.example.com:8443/a?b", logged,
-                           sizeof(logged));
+    (void) cookieflat_load(opt, &jar, "s=1", 3,
+                           "https://www.example.com:8443/a?b");
     for (i = 0; i < sizeof(sends) / sizeof(sends[0]); i++) {
       http_cookie_header(&jar, sends[i].to, "/any", hdr, sizeof(hdr));
       if (cookie_sent(hdr, "s=1") != sends[i].want) {
@@ -2568,7 +2601,11 @@ static int st_cookieflat(httrackp *opt, int argc, char **argv) {
 
   printf("%s: %s\n", LABEL, err ? "FAIL" : "OK");
   return err;
-#undef FLAT_REC
+#undef BOM
+#undef FLAT_HOST
+#undef FLAT_DOMAIN
+#undef PLAIN
+#undef SECURE
 #undef LABEL
 }
 

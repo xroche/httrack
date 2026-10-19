@@ -2448,18 +2448,20 @@ the jar. HTTrack rewrites it at the end and keeps its old
 content as <i>&lt;file&gt;.bak</i>. HTTrack leaves the file
 unchanged and warns if a line could not be loaded or a
 cookie repeats. It does the same when the file holds a
-comment that no known tool writes. A blank expiry field
+comment that no known tool writes. An empty expiry field
 means a session cookie.</p>
 
-<p style="margin-left:18%; margin-top: 1em">The file can
-also hold what a browser console prints for
-<i>document.cookie</i>, such as <i>a=1; b=2</i>, with or
-without a leading <i>Cookie:</i>. Those cookies are sent to
-the registrable domain of the first start URL and its
-subdomains, or to that host alone when it is an address, and
-they are Secure when that URL is https. HTTrack never
-rewrites such a file. The string holds no HttpOnly cookie,
-so a session that needs one needs a Netscape export.</p>
+<p style="margin-left:18%; margin-top: 1em">The file given
+to <i>--cookies-file</i> can also hold a document.cookie
+string, such as <i>a=1; b=2</i>, as a browser console prints
+it, or a pasted <i>Cookie:</i> request header. Those cookies
+are sent to the registrable domain of the first start URL
+and its subdomains, or to that host alone when it is an
+address or a public suffix. They are Secure when that URL is
+https. HTTrack never rewrites such a file. HttpOnly cookies
+are not in it, so export a Netscape file for those, with a
+cookies.txt export extension or DevTools &quot;Copy as
+cURL&quot;.</p>
 
 <p style="margin-left:9%; margin-top: 1em">A running mirror
 also watches its own output directory for these. Creating

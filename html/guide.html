@@ -732,10 +732,11 @@ bottom are the ones that keep you welcome.</p>
 	is kept as <code>.bak</code>. HTTrack leaves the file unchanged and warns if a line
 	could not be loaded or a cookie repeats. It does the same when the file holds a comment
 	that no known tool writes.</p>
-	<p>The file can also hold the <code>a=1; b=2</code> line that <code>document.cookie</code>
-	prints in the browser console. Those cookies go to the domain of the first start URL, and the
-	file is never rewritten. That line lacks HttpOnly cookies, so a login that needs one needs a
-	Netscape export.</p>
+	<p>The file can also hold a document.cookie string, such as <code>a=1; b=2</code>, as the
+	browser console prints it, or a pasted <code>Cookie:</code> request header. Those cookies go
+	to the domain of the first start URL, and the file is never rewritten. HttpOnly cookies are not
+	in it, so export a Netscape file for those, with a cookies.txt export extension or DevTools
+	"Copy as cURL".</p>
 </div>
 
 <div class="opt" data-for="win web droid">
