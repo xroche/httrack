@@ -143,11 +143,7 @@ body > table {
 }
 
 #pageContent a,
-#pageContent a:link,
-#pageContent a:visited,
-#footer a,
-#footer a:link,
-#footer a:visited {
+#footer a {
   color: var(--modern-primary);
   text-decoration: none;
 }
@@ -254,9 +250,7 @@ body > table {
   color: var(--ink-soft);
 }
 
-#pageContent > form,
 #pageContent form,
-#pageContent form > table,
 #pageContent table {
   max-width: 100%;
 }
@@ -306,7 +300,7 @@ body > table {
 #pageContent select:focus,
 #pageContent textarea:focus {
   border-color: var(--modern-primary);
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--modern-primary);
   outline-offset: 1px;
   box-shadow: 0 0 0 3px var(--modern-focus-ring);
 }
@@ -358,7 +352,7 @@ body > table {
   transform: translateY(1px);
 }
 
-/* Primary actions, as easy to override as any other button. */
+/* :where() keeps page and attribute tests out of specificity, so ~/.httrack.css can override these rules. */
 #pageContent input[type="submit"]:where([name="nextBtn"], [onclick*="form.closeme.value=1"]),
 :where(.page-addurl, .page-about) #pageContent input[type="button"]:where([value="OK"]) {
   border-color: var(--modern-primary);
@@ -386,7 +380,6 @@ body > table {
   display: none;
 }
 
-/* Custom select chevron. */
 #pageContent select {
   appearance: none;
   -webkit-appearance: none;
@@ -414,7 +407,6 @@ body > table {
   }
 }
 
-/* Per-page select spacing, as easy to override as #pageContent select. */
 :where(.page-index) #pageContent select,
 :where(.page-option9) #pageContent select:where([name="logtype"]),
 :where(.page-option10) #pageContent select:where([name="proxytype"]),
@@ -441,7 +433,6 @@ body > table {
   white-space: pre-wrap;
 }
 
-/* A narrow field for the pause-file count. */
 :where(.page-option5) #pageContent input:where([name="pausefiles"]) {
   width: 8ch;
   max-width: 100%;
@@ -476,7 +467,6 @@ body > table {
   color: var(--modern-primary);
 }
 
-/* The current option tab, as easy to override as any other tab. */
 :where(.page-option1) #pageContent .tabCtrl a:where([href="option1.html"]):is(:link, :visited),
 :where(.page-option2) #pageContent .tabCtrl a:where([href="option2.html"]):is(:link, :visited),
 :where(.page-option3) #pageContent .tabCtrl a:where([href="option3.html"]):is(:link, :visited),
