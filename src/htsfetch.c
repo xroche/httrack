@@ -330,10 +330,6 @@ static void origin_of(const char *adr, fetch_origin *o) {
     o->port = atoi(p + 1);
 }
 
-static hts_boolean host_is_ip(const char *host, size_t len) {
-  return (len > 0 && host[0] == '[') || hts_host_is_ipv4(host, len);
-}
-
 /* The registrable domain of the first n bytes of the host, extended to its end,
    or the whole host when it is a public suffix or too long. NULL when the list
    did not load. */
@@ -361,7 +357,7 @@ static const char *site_key(const fetch_origin *o, size_t *len) {
   size_t n = o->host_len, i, dots = 0;
 
   *len = o->host_len;
-  if (host_is_ip(o->host, o->host_len))
+  if (hts_host_is_address(o->host, o->host_len))
     return o->host;
   /* "a.example.com." keys on "example.com.", and libpsl cannot read the dot. */
   if (n > 1 && o->host[n - 1] == '.')

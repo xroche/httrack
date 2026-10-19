@@ -783,10 +783,9 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
     opt->cookie = &cookie;
     cookie.max_len = 30000;     // max len
     strcpybuff(cookie.data, "");
-    // the --cookies-file is the whole jar, because the crawl writes it back
     if (strnotempty(StringBuff(opt->cookies_file))) {
-      cookies_file_refused =
-          cookie_load(opt, opt->cookie, "", StringBuff(opt->cookies_file));
+      // loaded once the start URLs are known, and left alone until then
+      cookies_file_refused = COOKIE_LOAD_KEEP;
     } else {
       cookies_file_refused = cookie_load(
           opt, opt->cookie, StringBuff(opt->path_log), "cookies.txt");
@@ -1151,6 +1150,18 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
         hts_log_print(opt, LOG_ERROR, "Could not include URL list \"%s\": %s",
                       StringBuff(opt->filelist), filelist_err);
       }
+    }
+
+    // the --cookies-file is the whole jar, because the crawl writes it back
+    if (opt->accept_cookie && strnotempty(StringBuff(opt->cookies_file))) {
+      char BIGSTK start_url[HTS_URLMAXSIZE * 2];
+      const size_t first = strcspn(primary, "\n");
+
+      start_url[0] = '\0';
+      if (first < sizeof(start_url))
+        strlncatbuff(start_url, primary, sizeof(start_url), first);
+      cookies_file_refused = cookie_load_from(
+          opt, opt->cookie, "", StringBuff(opt->cookies_file), start_url);
     }
 
     // lien primaire

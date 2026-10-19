@@ -1,0 +1,59 @@
+#!/bin/bash
+#
+# --cookies-file also reads a pasted document.cookie string, binds it to the
+# first start URL's domain, and never rewrites the file.
+
+set -euo pipefail
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+tmpdir=$(mktemp -d)
+cleanup_push rm -rf "$tmpdir"
+
+assert_selftest "cookie-flat: OK" cookieflat "$tmpdir"
+
+: "${top_srcdir:=..}"
+crawl() { bash "$top_srcdir/tests/local-crawl.sh" "$@"; }
+
+# the gated page needs the cookie, and a filter rule is not the start URL
+printf 'Cookie: theme=dark; session=opensesame\r\n' >"$tmpdir/flat.txt"
+cp "$tmpdir/flat.txt" "$tmpdir/orig.txt"
+crawl --found 'gated/secret.html' \
+    --log-found 'loaded 2 from the document.cookie string in .* for 127\.0\.0\.1 alone' \
+    httrack '-*.zip' 'BASEURL/gated/index.php' -o0 --cookies-file "$tmpdir/flat.txt"
+cmp "$tmpdir/flat.txt" "$tmpdir/orig.txt" || fail "the pasted string was rewritten"
+test ! -e "$tmpdir/flat.txt.bak" || fail "the pasted string got a .bak"
+
+# control: a wrong value is sent too, and the gate stays shut
+printf 'session=wrong\n' >"$tmpdir/wrong.txt"
+crawl --found 'gated/index.html' --not-found 'gated/secret.html' \
+    --log-found 'loaded 1 from the document.cookie string' \
+    httrack 'BASEURL/gated/index.php' -o0 --cookies-file "$tmpdir/wrong.txt"
+
+# --why stops before the cookies file is read, so it leaves it alone
+bin=$(httrack_path)
+printf 'example.com\tFALSE\t/\tFALSE\t0\tkeep\t1\n' >"$tmpdir/why.txt"
+cp "$tmpdir/why.txt" "$tmpdir/why-orig.txt"
+"$bin" --why http://example.com/x.html http://example.com/ -O "$tmpdir/why" \
+    --cookies-file "$tmpdir/why.txt" >"$tmpdir/why.log" 2>&1 ||
+    fail_dump "--why failed" "$tmpdir/why.log"
+cmp "$tmpdir/why.txt" "$tmpdir/why-orig.txt" || fail "--why rewrote the cookies file"
+
+local_server_start
+# a start URL from an -%L list binds it too
+printf '%s/gated/index.php\n' "$BASEURL" >"$tmpdir/urls.txt"
+printf 'session=opensesame\n' >"$tmpdir/list.txt"
+local_crawl --log "$tmpdir/list.log" -O "$tmpdir/m1" -o0 \
+    -%L "$tmpdir/urls.txt" --cookies-file "$tmpdir/list.txt" ||
+    fail_dump "the -%L crawl failed" "$tmpdir/list.log"
+test -f "$tmpdir/m1/127.0.0.1_$SRV_PORT/gated/secret.html" ||
+    fail_dump "the -%L start URL got no cookie" "$tmpdir/list.log"
+
+# the project cookies.txt stays Netscape only, so the crawl still saves it
+mkdir -p "$tmpdir/m2"
+printf 'a=b\n' >"$tmpdir/m2/cookies.txt"
+local_crawl --log "$tmpdir/proj.log" -O "$tmpdir/m2" \
+    "$BASEURL/cookies/entrance.php" ||
+    fail_dump "the project crawl failed" "$tmpdir/proj.log"
+grep -q $'\tcat\tdog' "$tmpdir/m2/cookies.txt" ||
+    fail_dump "the project cookies.txt was not saved" "$tmpdir/m2/cookies.txt"
