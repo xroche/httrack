@@ -165,6 +165,10 @@ body > table {
   outline-offset: 2px;
 }
 
+#subTitle a:focus-visible {
+  outline-color: var(--ui-bar-ink);
+}
+
 .blak {
   background: transparent;
 }
@@ -352,7 +356,7 @@ body > table {
   transform: translateY(1px);
 }
 
-/* :where() keeps page and attribute tests out of specificity, so ~/.httrack.css can override these rules. */
+/* Here and below, :where() keeps page and attribute tests out of specificity, so a user stylesheet can override these rules. */
 #pageContent input[type="submit"]:where([name="nextBtn"], [onclick*="form.closeme.value=1"]),
 :where(.page-addurl, .page-about) #pageContent input[type="button"]:where([value="OK"]) {
   border-color: var(--modern-primary);
