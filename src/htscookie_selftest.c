@@ -217,16 +217,21 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
   {
     const char *jar = "st-cookies-jar.txt";
     struct stat st;
+    FILE *fp;
 
     (void) UNLINK(jar);
     assertf(cookie_save(NULL, &cookie, jar) == 0);
-    assertf(stat(jar, &st) == 0);
+    // check the opened file, not its name, so nothing can swap it in between
+    assertf((fp = FOPEN(jar, "rb")) != NULL && fstat(fileno(fp), &st) == 0);
+    fclose(fp);
     assertf((st.st_mode & 07777) == HTS_PROTECT_FILE);
     assertf(st.st_size > 0); /* mode-only checks would pass an empty jar */
     /* a pre-existing world-readable jar must be tightened, not kept */
-    assertf(chmod(jar, 0644) == 0);
+    assertf((fp = FOPEN(jar, "ab")) != NULL && fchmod(fileno(fp), 0644) == 0);
+    fclose(fp);
     assertf(cookie_save(NULL, &cookie, jar) == 0);
-    assertf(stat(jar, &st) == 0);
+    assertf((fp = FOPEN(jar, "rb")) != NULL && fstat(fileno(fp), &st) == 0);
+    fclose(fp);
     assertf((st.st_mode & 07777) == HTS_PROTECT_FILE);
     assertf(st.st_size > 0);
     (void) UNLINK(jar);
