@@ -9,7 +9,7 @@ set -eu
 
 note='Bot protection challenge at .*/challenge/blocked\.html'
 advice='pass its cookies with --cookies-file'
-ua_advice='its exact user-agent with --user-agent'
+ua_advice='its exact User-Agent with --user-agent'
 refused='"Forbidden" \(403\) at link'
 
 # A good page keeps the mirror from rolling back, so the 403 is the only error.
