@@ -1868,7 +1868,8 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
         // an expiry a rewrite would turn into 0
         ROWA("d.test\tTRUE\t/\tFALSE\t12abc\tn\tv\n", 1, "\tn\t"),
         ROWA("d.test\tTRUE\t/\tFALSE\t1767225600.5\tn\tv\n", 1, "\tn\t"),
-        ROWA("d.test\tTRUE\t/\tFALSE\t\tn\tv\n", 1, "\tn\t"),
+        // but a blank one is a session, which 0 also means
+        ROWR("d.test\tTRUE\t/\tFALSE\t\tn\tv\n", 0, "\t0\tn\tv\n"),
         ROW("d.test\tTRUE\t/\tFALSE\t0\tn\tv\tHttpOnly\n", 0),
         ROW("d.test\tTRUE\t/\tFALSE\t0\tn\tv\0x\n", 1),
         // the jar refuses a CR in a name or a value, but not in a flag
@@ -2351,6 +2352,226 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
 #undef LABEL
 }
 
+/* Write len bytes of content to dir/cookies.txt, load it for start_url with
+   the log in logged, and return the load's result. */
+static int cookieflat_load(httrackp *opt, t_cookie *jar, const char *dir,
+                           const char *content, size_t len,
+                           const char *start_url, char *logged, size_t size) {
+  FILE *const projectlog = opt->log;
+  const int saveddebug = opt->debug;
+  FILE *const log = tmpfile();
+  char fpath[HTS_URLMAXSIZE * 2];
+  char file[HTS_URLMAXSIZE * 2];
+  FILE *fp;
+  size_t n;
+  int ret;
+
+  assertf(sprintfbuff(fpath, "%s/", dir));
+  assertf(sprintfbuff(file, "%scookies.txt", fpath));
+  fp = FOPEN(file, "wb");
+  assertf(fp != NULL && log != NULL);
+  assertf(fwrite(content, 1, len, fp) == len);
+  fclose(fp);
+  opt->log = log;
+  opt->debug = LOG_WARNING;
+  jar->max_len = sizeof(jar->data);
+  jar->data[0] = '\0';
+  ret = cookie_load_from(opt, jar, fpath, "cookies.txt", start_url);
+  rewind(log);
+  n = fread(logged, 1, size - 1, log);
+  logged[n] = '\0';
+  fclose(log);
+  opt->log = projectlog;
+  opt->debug = saveddebug;
+  (void) UNLINK(file);
+  return ret;
+}
+
+static int st_cookieflat(httrackp *opt, int argc, char **argv) {
+#define LABEL "cookie-flat"
+#define FLAT_REC(dom, sub, sec, name, value)                                   \
+  dom "\t" sub "\t/\t" sec "\t0\t" name "\t" value "\n"
+
+  static const struct {
+    const char *content, *start_url;
+    int ret;
+    const char *want[3]; // jar records, NULL-ended
+    const char *log;     // NULL: no check
+  } cases[] = {
+      // a registrable domain, https, '=' in a value
+      {"a=1; b=2=3",
+       "https://www.example.com/x",
+       COOKIE_LOAD_KEEP,
+       {FLAT_REC("example.com", "TRUE", "TRUE", "a", "1"),
+        FLAT_REC("example.com", "TRUE", "TRUE", "b", "2=3"), NULL},
+       "loaded 2 from the document.cookie string in"},
+      // a pasted request header, CRLF, blank lines, empty pairs and blanks
+      {"\r\n \t \n Cookie:  a=1;; ;  b=2  \r\n",
+       "WWW.Example.CO.UK",
+       COOKIE_LOAD_KEEP,
+       {FLAT_REC("example.co.uk", "TRUE", "FALSE", "a", "1"),
+        FLAT_REC("example.co.uk", "TRUE", "FALSE", "b", "2"), NULL},
+       "for example.co.uk and its subdomains"},
+      // an address, a public suffix and a single label stay host-only
+      {"a=1",
+       "http://127.0.0.1:8080/",
+       COOKIE_LOAD_KEEP,
+       {FLAT_REC("127.0.0.1", "FALSE", "FALSE", "a", "1"), NULL},
+       "for 127.0.0.1 alone"},
+      {"a=1",
+       "http://[::1]:8080/",
+       COOKIE_LOAD_KEEP,
+       {FLAT_REC("::1", "FALSE", "FALSE", "a", "1"), NULL},
+       NULL},
+      {"a=1",
+       "http://co.uk/",
+       COOKIE_LOAD_KEEP,
+       {FLAT_REC("co.uk", "FALSE", "FALSE", "a", "1"), NULL},
+       NULL},
+      {"a=1",
+       "http://localhost/",
+       COOKIE_LOAD_KEEP,
+       {FLAT_REC("localhost", "FALSE", "FALSE", "a", "1"), NULL},
+       NULL},
+      // the first of a repeated name wins, and a pair with no name is refused
+      {"a=1; junk; =x; a=2; c=3\n",
+       "http://x.example.org/",
+       COOKIE_LOAD_KEEP,
+       {FLAT_REC("example.org", "TRUE", "FALSE", "a", "1"),
+        FLAT_REC("example.org", "TRUE", "FALSE", "c", "3"), NULL},
+       "'a' appears twice"},
+      // a TAB on a later line is refused by the jar
+      {"a=1\nb=2\tx\n",
+       "http://example.net/",
+       COOKIE_LOAD_KEEP,
+       {FLAT_REC("example.net", "TRUE", "FALSE", "a", "1"), NULL},
+       "did not store 'b'"},
+      // no start URL
+      {"a=1", "", COOKIE_LOAD_KEEP, {NULL}, "no start URL"},
+      {"a=1", NULL, COOKIE_LOAD_KEEP, {NULL}, "no start URL"},
+      // a TAB, a comment or no '=' on the first line keeps the Netscape path
+      {"x.test\tFALSE\t/\tFALSE\t0\tn\tv\n",
+       "http://www.example.com/",
+       0,
+       {FLAT_REC("x.test", "FALSE", "FALSE", "n", "v"), NULL},
+       NULL},
+      {"# a=b\n", "http://www.example.com/", 1, {NULL}, "unknown comment"},
+      // a blank expiry is a session, as Python's MozillaCookieJar writes it
+      {"e.test\tFALSE\t/\tFALSE\t\tn\tv\n",
+       "http://www.example.com/",
+       0,
+       {FLAT_REC("e.test", "FALSE", "FALSE", "n", "v"), NULL},
+       NULL},
+      {"e.test\tFALSE\t/\tFALSE\t  \tn\tv\n",
+       "http://www.example.com/",
+       0,
+       {FLAT_REC("e.test", "FALSE", "FALSE", "n", "v"), NULL},
+       NULL},
+      {"e.test\tFALSE\t/\tFALSE\t1x\tn\tv\n",
+       "http://www.example.com/",
+       1,
+       {NULL},
+       "not a whole number"},
+      {"a=b\tc\n", "http://www.example.com/", 1, {NULL}, "fewer than 7"},
+      {"junk\n", "http://www.example.com/", 1, {NULL}, "fewer than 7"},
+  };
+
+  static t_cookie jar;
+  char BIGSTK logged[16384];
+  char BIGSTK text[COOKIE_MAX_PAIR * 3];
+  char BIGSTK hdr[8192];
+  size_t i, j;
+  int ret;
+  int err = 0;
+
+  if (argc < 1) {
+    fprintf(stderr, "%s: needs a writable dir\n", LABEL);
+    return 1;
+  }
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    const char *const c = cases[i].content;
+    size_t wanted = 0, lines = 0;
+    hts_boolean missing = HTS_FALSE;
+
+    ret = cookieflat_load(opt, &jar, argv[0], c, strlen(c), cases[i].start_url,
+                          logged, sizeof(logged));
+    for (; cases[i].want[wanted] != NULL; wanted++) {
+      if (strstr(jar.data, cases[i].want[wanted]) == NULL)
+        missing = HTS_TRUE;
+    }
+    for (j = 0; jar.data[j] != '\0'; j++)
+      lines += jar.data[j] == '\n' ? 1 : 0;
+    if (ret != cases[i].ret || missing || lines != wanted ||
+        (cases[i].log != NULL && strstr(logged, cases[i].log) == NULL)) {
+      printf("%s: case %d returned %d, jar [%s], log [%s]\n", LABEL, (int) i,
+             ret, jar.data, logged);
+      err = 1;
+    }
+  }
+
+  /* 4096 bytes of name and value load, one more is refused, a NUL is
+     refused, and neither stops the pairs after it. */
+  {
+    size_t n = 0;
+
+    memcpy(text + n, "v=", 2);
+    n += 2;
+    memset(text + n, 'x', COOKIE_MAX_PAIR - 1);
+    n += COOKIE_MAX_PAIR - 1;
+    memcpy(text + n, "; w=", 4);
+    n += 4;
+    memset(text + n, 'y', COOKIE_MAX_PAIR);
+    n += COOKIE_MAX_PAIR;
+    memcpy(text + n, "; n=a\0b; z=1", 12);
+    n += 12;
+    ret = cookieflat_load(opt, &jar, argv[0], text, n, "http://big.test/",
+                          logged, sizeof(logged));
+    if (ret != COOKIE_LOAD_KEEP || strstr(jar.data, "\tv\txxx") == NULL ||
+        strstr(jar.data, "\tw\t") != NULL ||
+        strstr(jar.data, "\tn\t") != NULL ||
+        strstr(jar.data, FLAT_REC("big.test", "TRUE", "FALSE", "z", "1")) ==
+            NULL ||
+        strstr(logged, "ignoring a cookie over 4096 bytes") == NULL ||
+        strstr(logged, "holding a NUL") == NULL ||
+        strstr(logged, "loaded 2 from") == NULL) {
+      printf("%s: long pairs: returned %d, log [%s]\n", LABEL, ret, logged);
+      err = 1;
+    }
+  }
+
+  /* The cookies go to the subdomains of a domain, not to another domain, and
+     a Secure one not over http. */
+  {
+    static const struct {
+      const char *to;
+      hts_boolean want;
+    } sends[] = {
+        {"https://www.example.com", HTS_TRUE},
+        {"https://example.com", HTS_TRUE},
+        {"https://deep.www.example.com", HTS_TRUE},
+        {"http://www.example.com", HTS_FALSE},
+        {"https://example.org", HTS_FALSE},
+    };
+
+    (void) cookieflat_load(opt, &jar, argv[0], "s=1", 3,
+                           "https://www.example.com:8443/a?b", logged,
+                           sizeof(logged));
+    for (i = 0; i < sizeof(sends) / sizeof(sends[0]); i++) {
+      http_cookie_header(&jar, sends[i].to, "/any", hdr, sizeof(hdr));
+      if (cookie_sent(hdr, "s=1") != sends[i].want) {
+        printf("%s: s=1 %s sent to %s\n", LABEL,
+               sends[i].want ? "not" : "wrongly", sends[i].to);
+        err = 1;
+      }
+    }
+  }
+
+  printf("%s: %s\n", LABEL, err ? "FAIL" : "OK");
+  return err;
+#undef FLAT_REC
+#undef LABEL
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
@@ -2377,6 +2598,9 @@ const struct selftest_entry selftests_cookie[] = {
     {"cookiesetscope", "",
      "Set-Cookie honours Domain= scope and Max-Age/Expires erasure",
      st_cookiesetscope},
+    {"cookieflat", "<dir>",
+     "a document.cookie string loads as cookies of the start URL's domain",
+     st_cookieflat},
     {"cookiespandiff", "",
      "the cookie field getter matches a frozen copy of the old one",
      st_cookiespandiff},

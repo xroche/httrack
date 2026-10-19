@@ -678,6 +678,25 @@ static hts_boolean filter_rule_decode_(const char *rule, char *dest,
   return HTS_TRUE;
 }
 
+/* Copy the first token of url1 that is not a filter rule into dst, or "" when
+   there is none or it does not fit. */
+static void first_start_url(const char *url1, char *dst, size_t size) {
+  const char *a = url1 + strspn(url1, HTS_REALSPACES);
+
+  dst[0] = '\0';
+  while (*a != '\0') {
+    const size_t len = strcspn(a, HTS_REALSPACES);
+
+    if (*a != '+' && *a != '-') {
+      if (len < size)
+        strlncatbuff(dst, a, size, len);
+      return;
+    }
+    a += len;
+    a += strspn(a, HTS_REALSPACES);
+  }
+}
+
 int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   char *primary = NULL;         // première page, contenant les liens à scanner
   hash_struct hash;             // système de hachage, accélère la recherche dans les liens
@@ -780,17 +799,21 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
 
   // initialiser cookie
   if (opt->accept_cookie) {
+    char BIGSTK start_url[HTS_URLMAXSIZE * 2];
+
     opt->cookie = &cookie;
     cookie.max_len = 30000;     // max len
     strcpybuff(cookie.data, "");
+    first_start_url(url1, start_url, sizeof(start_url));
     // the --cookies-file is the whole jar, because the crawl writes it back
     if (strnotempty(StringBuff(opt->cookies_file))) {
-      cookies_file_refused =
-          cookie_load(opt, opt->cookie, "", StringBuff(opt->cookies_file));
+      cookies_file_refused = cookie_load_from(
+          opt, opt->cookie, "", StringBuff(opt->cookies_file), start_url);
     } else {
-      cookies_file_refused = cookie_load(
-          opt, opt->cookie, StringBuff(opt->path_log), "cookies.txt");
-      cookie_load(opt, opt->cookie, "", "cookies.txt");
+      cookies_file_refused =
+          cookie_load_from(opt, opt->cookie, StringBuff(opt->path_log),
+                           "cookies.txt", start_url);
+      cookie_load_from(opt, opt->cookie, "", "cookies.txt", start_url);
     }
   } else {
     opt->cookie = NULL;

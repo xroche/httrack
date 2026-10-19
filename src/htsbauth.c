@@ -360,7 +360,14 @@ static hts_boolean cookie_is_number(const char *s) {
   return n > 0 && s[n] == '\0';
 }
 
-/* Return the expiry in field 4 of rec, or 0 when it is not all digits. */
+/* Is s a jar expiry: digits, or blank for a session as Python's
+   MozillaCookieJar writes it? */
+static hts_boolean cookie_is_expiry(const char *s) {
+  return cookie_is_number(s) || s[strspn(s, " ")] == '\0';
+}
+
+/* Return the expiry in field 4 of rec, or 0, a session, when it is not all
+   digits. */
 static int64_t cookie_record_expiry(const char *rec) {
   char buffer[8192];
   const char *const field = cookie_get(buffer, rec, 4);
@@ -569,9 +576,170 @@ static hts_boolean cookie_bak_stranded(httrackp *opt, const char *file,
   return HTS_FALSE;
 }
 
+/* Is the first non-blank line of fp a document.cookie string, that is no TAB,
+   an '=' and no leading '#'? fp is rewound either way. */
+static hts_boolean cookie_is_flat(FILE *fp) {
+  hts_boolean seen = HTS_FALSE, comment = HTS_FALSE;
+  hts_boolean tab = HTS_FALSE, eq = HTS_FALSE;
+  int c;
+
+  while ((c = fgetc(fp)) != EOF) {
+    if (c == '\n') {
+      if (seen)
+        break;
+      tab = HTS_FALSE;
+    } else if (c == '\t') {
+      tab = HTS_TRUE;
+    } else if (c != ' ' && c != '\r') {
+      if (!seen)
+        comment = c == '#';
+      seen = HTS_TRUE;
+      if (c == '=')
+        eq = HTS_TRUE;
+    }
+  }
+  rewind(fp);
+  return seen && !tab && eq && !comment;
+}
+
+/* Copy the host of url, with or without a scheme, into dst as cookie_host
+   does, and set *https. */
+static hts_boolean cookie_url_host(const char *url, char *dst, size_t dst_size,
+                                   hts_boolean *https) {
+  const char *const rest = jump_protocol_const(url);
+  const size_t len = strcspn(rest, "/?#");
+  char adr[HTS_URLMAXSIZE];
+
+  *https = strfield(url, "https:") != 0;
+  if (len >= sizeof(adr))
+    return HTS_FALSE;
+  adr[0] = '\0';
+  strlncatbuff(adr, rest, sizeof(adr), len);
+  return cookie_host(adr, dst, dst_size);
+}
+
+/* Store the pair "name=value" at pair, trimmed, as a cookie of domain. Returns
+   HTS_FALSE after a warning when it is not stored. */
+static hts_boolean cookie_flat_pair(httrackp *opt, t_cookie *cookie, char *pair,
+                                    const char *domain, const cookie_attr *attr,
+                                    const char *given) {
+  char *const eq = strchr(pair, '=');
+
+  if (eq == NULL || eq == pair) {
+    hts_log_print(opt, LOG_WARNING,
+                  "Cookies: ignoring a cookie with no name in %s: %.64s", given,
+                  pair);
+    return HTS_FALSE;
+  }
+  *eq = '\0';
+  if (cookie_find_exact(cookie->data, pair, domain, "/") != NULL) {
+    // a browser lists the most specific path first, so the first one wins
+    hts_log_print(opt, LOG_WARNING, "Cookies: '%.64s' appears twice in %s",
+                  pair, given);
+    return HTS_FALSE;
+  }
+  if (cookie_set(cookie, pair, eq + 1, domain, "/", attr) != 0) {
+    hts_log_print(opt, LOG_WARNING,
+                  "Cookies: the jar did not store '%.64s' from %s", pair,
+                  given);
+    return HTS_FALSE;
+  }
+  return HTS_TRUE;
+}
+
+/* Load fp, a document.cookie string, as session cookies of the registrable
+   domain of start_url. The file is never rewritten, because the save would
+   turn it into a Netscape jar, so this returns COOKIE_LOAD_KEEP. */
+static int cookie_load_flat(httrackp *opt, t_cookie *cookie, FILE *fp,
+                            const char *given, const char *start_url) {
+  char host[256];
+  char BIGSTK pair[COOKIE_MAX_PAIR + 2]; // name, '=', value and the NUL
+  size_t len = 0;
+  hts_boolean nul = HTS_FALSE, line_start = HTS_TRUE;
+  hts_boolean https = HTS_FALSE;
+  cookie_attr attr;
+  const char *domain;
+  int stored = 0;
+  int c;
+
+  if (start_url == NULL ||
+      !cookie_url_host(start_url, host, sizeof(host), &https)) {
+    hts_log_print(opt, LOG_WARNING,
+                  "Cookies: %s is a document.cookie string, but there is no "
+                  "start URL to bind it to, so it is not read",
+                  given);
+    return COOKIE_LOAD_KEEP;
+  }
+  // an address or a public suffix has no parent domain to share cookies with
+  domain = hts_host_is_ipv4(host, strlen(host)) || strchr(host, ':') != NULL
+               ? NULL
+               : hts_psl_registrable_domain(host);
+  attr.host_only = domain == NULL;
+  attr.secure = https;
+  attr.http_only = HTS_FALSE;
+  attr.expires = 0;
+  if (domain == NULL)
+    domain = host;
+
+  do {
+    c = fgetc(fp);
+    if (c != EOF && c != ';' && c != '\n') {
+      // leading blanks are not counted against the room
+      if (len == 0 && (c == ' ' || c == '\t' || c == '\r'))
+        continue;
+      if (len < sizeof(pair) - 1)
+        pair[len] = (char) c;
+      if (len < sizeof(pair))
+        len++;
+      if (c == '\0')
+        nul = HTS_TRUE;
+      continue;
+    }
+    if (len >= sizeof(pair)) {
+      hts_log_print(opt, LOG_WARNING,
+                    "Cookies: ignoring a cookie over %d bytes in %s",
+                    (int) sizeof(pair) - 2, given);
+    } else if (nul) {
+      hts_log_print(opt, LOG_WARNING,
+                    "Cookies: ignoring a cookie holding a NUL in %s", given);
+    } else if (len > 0) {
+      char *p = pair;
+
+      while (len > 0 && strchr(" \t\r", pair[len - 1]) != NULL)
+        len--;
+      pair[len] = '\0';
+      // a "Cookie:" request header pasted whole
+      if (line_start && strfield(p, "Cookie:"))
+        p += strspn(p + 7, " \t") + 7;
+      if (*p != '\0' && cookie_flat_pair(opt, cookie, p, domain, &attr, given))
+        stored++;
+    }
+    len = 0;
+    nul = HTS_FALSE;
+    line_start = c == '\n';
+  } while (c != EOF);
+  if (ferror(fp))
+    hts_log_print(opt, LOG_WARNING,
+                  "Cookies: stopped reading before the end of %s", given);
+  hts_log_print(opt, LOG_WARNING,
+                "Cookies: loaded %d from the document.cookie string in %s "
+                "for %s%s, and left the file unchanged. That string lacks "
+                "HttpOnly cookies, so use DevTools \"Copy as cURL\" or a "
+                "cookies.txt export extension to get them",
+                stored, given, domain,
+                attr.host_only ? " alone" : " and its subdomains");
+  return COOKIE_LOAD_KEEP;
+}
+
 /* See htsbauth.h. */
 int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
                 const char *name) {
+  return cookie_load_from(opt, cookie, fpath, name, NULL);
+}
+
+/* See htsbauth.h. */
+int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *fpath,
+                     const char *name, const char *start_url) {
   char catbuff[CATBUFF_SIZE];
   char buffer[8192];
 
@@ -674,6 +842,12 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
         cookie_bak_stranded(opt, file, bak, given))
       return COOKIE_LOAD_KEEP;
     fp = FOPEN(file, "rb");
+    if (fp != NULL && cookie_is_flat(fp)) {
+      const int ret = cookie_load_flat(opt, cookie, fp, given, start_url);
+
+      fclose(fp);
+      return ret;
+    }
     if (fp) {
       char BIGSTK line[8192];
       const size_t line_max = 8000;
@@ -749,7 +923,7 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
                             "fields: %s",
                             given);
               refused++;
-            } else if (!cookie_is_number(cookie_get(buffer, rec, 4))) {
+            } else if (!cookie_is_expiry(cookie_get(buffer, rec, 4))) {
               hts_log_print(opt, LOG_WARNING,
                             "Cookies: ignoring a line whose expiry is not a "
                             "whole number: %s",

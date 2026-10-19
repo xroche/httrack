@@ -569,7 +569,18 @@ content as
 .IR <file>.bak .
 HTTrack leaves the file unchanged and warns if a line could not be loaded or a
 cookie repeats. It does the same when the file holds a comment that no known
-tool writes.
+tool writes. A blank expiry field means a session cookie.
+.IP
+The file can also hold what a browser console prints for
+.IR document.cookie ,
+such as
+.IR "a=1; b=2" ,
+with or without a leading
+.IR Cookie: .
+Those cookies are sent to the registrable domain of the first start URL and
+its subdomains, or to that host alone when it is an address, and they are
+Secure when that URL is https. HTTrack never rewrites such a file. The string
+holds no HttpOnly cookie, so a session that needs one needs a Netscape export.
 .PP
 A running mirror also watches its own output directory for these. Creating one
 is how a script drives an engine it has no other handle on. On Windows, which

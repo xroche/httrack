@@ -134,6 +134,15 @@ hts_boolean cookie_sendable(const char *rec, hts_boolean https, int64_t now);
     and expired cookies are not counted. */
 int cookie_load(httrackp *opt, t_cookie *cookie, const char *path,
                 const char *name);
+
+/** This is cookie_load, but a file whose first non-blank line is a
+    document.cookie string ("a=1; b=2", no TAB, not a comment) is read as
+    session cookies for path "/" of the registrable domain of start_url, or of
+    its exact host when it is an address or a public suffix. Secure iff
+    start_url is https. start_url NULL or "" refuses such a file. Such a file
+    returns COOKIE_LOAD_KEEP, because a save would replace it. */
+int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *path,
+                     const char *name, const char *start_url);
 #define COOKIE_LOAD_KEEP (-2)
 
 /** Write the jar's cookies to name in Netscape format, owner-only on Unix.

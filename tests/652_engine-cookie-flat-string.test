@@ -1,0 +1,38 @@
+#!/bin/bash
+#
+# --cookies-file also reads a pasted document.cookie string, binds it to the
+# first start URL's host, and never rewrites the file.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+assert_selftest "cookie-flat: OK" cookieflat "$dir"
+
+: "${top_srcdir:=..}"
+crawl() { bash "$top_srcdir/tests/local-crawl.sh" "$@"; }
+
+# the gated page needs the cookie, and a filter rule is not the start URL
+printf 'Cookie: theme=dark; session=opensesame\r\n' >"$dir/flat.txt"
+cp "$dir/flat.txt" "$dir/orig.txt"
+crawl --found 'gated/secret.html' \
+    --log-found 'loaded 2 from the document.cookie string in .* for 127\.0\.0\.1 alone' \
+    httrack '-*.zip' 'BASEURL/gated/index.php' -o0 --cookies-file "$dir/flat.txt"
+cmp "$dir/flat.txt" "$dir/orig.txt" || fail "the pasted string was rewritten"
+test ! -e "$dir/flat.txt.bak" || fail "the pasted string got a .bak"
+
+# control: a wrong value is sent too, and the gate stays shut
+printf 'session=wrong\n' >"$dir/wrong.txt"
+crawl --found 'gated/index.html' --not-found 'gated/secret.html' \
+    --log-found 'loaded 1 from the document.cookie string' \
+    httrack 'BASEURL/gated/index.php' -o0 --cookies-file "$dir/wrong.txt"
+
+# an https start URL makes the cookie Secure, which TLS still sends
+if test "${HTTPS_SUPPORT:-}" != no; then
+    printf 'session=opensesame\n' >"$dir/tls.txt"
+    crawl --tls --found 'gated/secret.html' \
+        httrack 'BASEURL/gated/index.php' -o0 --cookies-file "$dir/tls.txt"
+fi
