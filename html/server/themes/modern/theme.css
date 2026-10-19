@@ -1,5 +1,7 @@
 /* WebHTTrack Modern theme.
-   Uses the native WebHTTrack pages, shared palette and theme hooks only. */
+   Uses the native WebHTTrack pages, shared palette and theme hooks only.
+   Page and attribute tests sit in :where(), so a user stylesheet's plain
+   #pageContent rules override them. */
 
 :root {
   color-scheme: light;
@@ -32,6 +34,14 @@
   --modern-raised: var(--code-bg);
   --modern-primary: var(--link);
   --modern-radius: 16px;
+  --modern-control-rule: #cbd7e7;
+  --modern-primary-glow: rgba(37, 99, 235, .12);
+  --modern-action-bg: linear-gradient(180deg, #2f6ee8, #2563eb);
+  --modern-action-hover: #1d4ed8;
+  --modern-action-ink: #ffffff;
+  --modern-page-bg: radial-gradient(ellipse at 6% 0%, #e2edff 0, transparent 43%),
+                    radial-gradient(ellipse at 100% 20%, #e6f6ff 0, transparent 40%),
+                    var(--field);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -52,6 +62,13 @@
     --ui-alert: #ff8e8e;
     --ui-bar: #1b3156;
     --ui-title-filter: invert(1);
+    --modern-control-rule: #425a78;
+    --modern-primary-glow: rgba(127, 170, 255, .16);
+    --modern-action-bg: #8bb5ff;
+    --modern-action-hover: #a9c8ff;
+    --modern-action-ink: #071830;
+    --modern-page-bg: radial-gradient(ellipse at 0 0, #142d51 0, transparent 50%),
+                      var(--field);
   }
 }
 
@@ -67,7 +84,7 @@ body {
   min-height: 100vh;
   margin: 0;
   padding: 22px 20px 24px;
-  background: var(--field);
+  background: var(--modern-page-bg);
   color: var(--ui-ink);
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
@@ -127,6 +144,20 @@ body > table {
   background: rgba(255, 255, 255, .18);
 }
 
+#pageContent a:focus-visible,
+#pageContent input:focus-visible,
+#pageContent select:focus-visible,
+#pageContent textarea:focus-visible,
+#subTitle a:focus-visible,
+#footer a:focus-visible {
+  outline: 2px solid var(--modern-primary);
+  outline-offset: 2px;
+}
+
+#subTitle a:focus-visible {
+  outline-color: var(--ui-bar-ink);
+}
+
 .blak {
   background: transparent;
 }
@@ -142,6 +173,7 @@ body > table {
   background-image: none;
   box-shadow: 0 16px 46px var(--shadow);
   color: var(--ink);
+  line-height: 1.65;
   overflow-wrap: break-word;
 }
 
@@ -150,12 +182,18 @@ body > table {
 #pageContent h3,
 #pageContent h4 {
   color: var(--ink);
-  line-height: 1.25;
+  line-height: 1.24;
+  letter-spacing: -.025em;
 }
 
 #pageContent h2 {
   margin: 2px 0 8px;
-  font-size: 1.65em;
+  font-size: clamp(20px, 2.6vw, 28px);
+  font-weight: 750;
+}
+
+#pageContent h3 {
+  font-size: 18px;
 }
 
 #pageContent h2[align="center"] {
@@ -171,6 +209,7 @@ body > table {
   color: var(--ink-soft);
 }
 
+#pageContent form,
 #pageContent table {
   max-width: 100%;
 }
@@ -178,6 +217,44 @@ body > table {
 #pageContent td {
   padding-top: 5px;
   padding-bottom: 5px;
+}
+
+#pageContent td:where(#pageContent td td) {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+/* Page heading row, with its help link on the right. */
+#pageContent > table:where(:first-of-type) {
+  margin: 0 0 13px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--rule);
+}
+
+#pageContent td:where(#pageContent > table:first-of-type td) {
+  padding: 4px 0;
+}
+
+#pageContent td:where(#pageContent > table:first-of-type td:last-child) {
+  text-align: right;
+}
+
+#pageContent h2:where(#pageContent > table:first-of-type h2) {
+  min-height: 1.2em;
+  margin: 0;
+}
+
+#pageContent a:where(#pageContent > table:first-of-type td:last-child a) {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 11px;
+  border: 1px solid var(--rule);
+  border-radius: 9px;
+  background: var(--modern-raised);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
 }
 
 #pageContent input,
@@ -191,21 +268,24 @@ body > table {
 #pageContent select,
 #pageContent textarea {
   max-width: 100%;
-  min-height: 38px;
-  padding: 8px 11px;
-  border: 1px solid var(--rule);
-  border-radius: 9px;
-  background: var(--panel);
+  min-height: 40px;
+  padding: 9px 12px;
+  border: 1px solid var(--modern-control-rule);
+  border-radius: 10px;
+  background-color: var(--panel);
   color: var(--ink);
-  box-shadow: 0 1px 2px var(--shadow);
+  box-shadow: 0 1px 2px rgba(12, 31, 60, .025);
+  line-height: 1.4;
+  transition: border-color .15s, box-shadow .15s, background-color .15s;
 }
 
 #pageContent input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):focus,
 #pageContent select:focus,
 #pageContent textarea:focus {
   border-color: var(--modern-primary);
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--modern-primary);
   outline-offset: 1px;
+  box-shadow: 0 0 0 3px var(--modern-primary-glow);
 }
 
 #pageContent input[type="checkbox"],
@@ -215,43 +295,124 @@ body > table {
   margin: 0 6px 0 2px;
   accent-color: var(--modern-primary);
   vertical-align: middle;
+  cursor: pointer;
 }
 
 #pageContent input[type="submit"],
 #pageContent input[type="button"] {
-  min-height: 38px;
+  appearance: none;
+  -webkit-appearance: none;
+  min-height: 40px;
   max-width: 100%;
   margin: 3px 2px;
-  padding: 8px 16px;
+  padding: 9px 18px;
   border: 1px solid var(--rule);
-  border-radius: 9px;
+  border-radius: 10px;
   background: var(--modern-raised);
   color: var(--ink);
+  box-shadow: 0 1px 2px rgba(17, 38, 68, .04);
+  font-size: 13px;
   font-weight: 700;
+  line-height: 1.3;
+  white-space: normal;
   cursor: pointer;
+  transition: background .16s, border-color .16s, box-shadow .16s, transform .16s;
 }
 
 #pageContent input[type="submit"]:hover,
 #pageContent input[type="button"]:hover {
   border-color: var(--modern-primary);
   background: var(--accent);
+  box-shadow: 0 3px 9px var(--modern-primary-glow);
+}
+
+#pageContent input[type="submit"]:active,
+#pageContent input[type="button"]:active {
+  transform: translateY(1px);
+}
+
+/* The main button of each page. */
+#pageContent input[type="submit"]:where([name="nextBtn"], [onclick*="form.closeme.value=1"]),
+:where(.page-addurl, .page-about) #pageContent input[type="button"]:where([value="OK"]) {
+  border-color: var(--modern-primary);
+  background: var(--modern-action-bg);
+  color: var(--modern-action-ink);
+  box-shadow: 0 4px 12px var(--modern-primary-glow);
+}
+
+#pageContent input[type="submit"]:where([name="nextBtn"], [onclick*="form.closeme.value=1"]):hover,
+:where(.page-addurl, .page-about) #pageContent input[type="button"]:where([value="OK"]):hover {
+  border-color: var(--modern-action-hover);
+  background: var(--modern-action-hover);
 }
 
 #pageContent textarea {
+  display: block;
   width: min(100%, 790px);
   min-height: 130px;
+  margin-top: 12px;
   resize: vertical;
+}
+
+#pageContent textarea[style*="visibility:hidden"] {
+  display: none;
+}
+
+#pageContent select {
+  appearance: none;
+  -webkit-appearance: none;
+  min-width: 110px;
+  padding-right: 42px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='m5 7.5 5 5 5-5' stroke='%23607087' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 17px 17px;
+  cursor: pointer;
+}
+
+@media (prefers-color-scheme: dark) {
+  #pageContent select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='m5 7.5 5 5 5-5' stroke='%239aadca' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  }
+}
+
+@media (forced-colors: active) {
+  #pageContent select {
+    appearance: auto;
+    -webkit-appearance: auto;
+    padding-right: 12px;
+    background-image: none;
+  }
+}
+
+:where(.page-index) #pageContent select,
+:where(.page-option9) #pageContent select:where([name="logtype"]),
+:where(.page-option10) #pageContent select:where([name="proxytype"]),
+:where(.page-step2) #pageContent select:where([name="loadprojname"], [name="loadprojcateg"]),
+:where(.page-step3) #pageContent select:where([name="todo"]) {
+  margin-inline-start: 11px;
+}
+
+:where(.page-option2) #pageContent select:where([name="build"]),
+:where(.page-option3, .page-option8) #pageContent select {
+  margin-top: 9px;
 }
 
 #pageContent pre {
   max-width: 100%;
   padding: 14px;
   overflow: auto;
+  overflow-wrap: anywhere;
   border: 1px solid var(--rule);
   border-radius: 10px;
   background: var(--code-bg);
   color: var(--ink);
+  font-size: 12px;
   white-space: pre-wrap;
+}
+
+:where(.page-option5) #pageContent input:where([name="pausefiles"]) {
+  width: 8ch;
 }
 
 /* Native option tabs; no generated navigation or JavaScript. */
@@ -266,12 +427,14 @@ body > table {
 #pageContent .tabCtrl a:link,
 #pageContent .tabCtrl a:visited {
   display: block;
-  padding: 8px 7px;
+  padding: 9px 8px;
   border: 1px solid var(--rule);
-  border-radius: 8px;
+  border-radius: 9px;
   background: var(--modern-raised);
   color: var(--ink-soft);
   text-decoration: none;
+  font-size: 12px;
+  font-weight: 650;
 }
 
 #pageContent .tabCtrl a:hover,
@@ -281,8 +444,25 @@ body > table {
   color: var(--modern-primary);
 }
 
+:where(.page-option1) #pageContent .tabCtrl a:where([href="option1.html"]):is(:link, :visited),
+:where(.page-option2) #pageContent .tabCtrl a:where([href="option2.html"]):is(:link, :visited),
+:where(.page-option3) #pageContent .tabCtrl a:where([href="option3.html"]):is(:link, :visited),
+:where(.page-option4) #pageContent .tabCtrl a:where([href="option4.html"]):is(:link, :visited),
+:where(.page-option5) #pageContent .tabCtrl a:where([href="option5.html"]):is(:link, :visited),
+:where(.page-option6) #pageContent .tabCtrl a:where([href="option6.html"]):is(:link, :visited),
+:where(.page-option7) #pageContent .tabCtrl a:where([href="option7.html"]):is(:link, :visited),
+:where(.page-option8) #pageContent .tabCtrl a:where([href="option8.html"]):is(:link, :visited),
+:where(.page-option9) #pageContent .tabCtrl a:where([href="option9.html"]):is(:link, :visited),
+:where(.page-option10) #pageContent .tabCtrl a:where([href="option10.html"]):is(:link, :visited),
+:where(.page-option11) #pageContent .tabCtrl a:where([href="option11.html"]):is(:link, :visited) {
+  border-color: var(--modern-primary);
+  background: var(--modern-action-bg);
+  color: var(--modern-action-ink);
+  box-shadow: 0 3px 8px var(--modern-primary-glow);
+}
+
 #footer {
-  padding: 14px 6px 4px;
+  padding: 10px 6px;
   text-align: center;
   font-size: 12px;
 }
@@ -319,6 +499,10 @@ body > table {
     padding: 18px 16px 24px;
   }
 
+  #pageContent h2 {
+    font-size: 21px;
+  }
+
   #pageContent input[size],
   #pageContent textarea[cols] {
     max-width: 100%;
@@ -326,6 +510,19 @@ body > table {
 
   #pageContent td {
     overflow-wrap: anywhere;
+  }
+
+  :where(.page-option2) #pageContent select:where([name="build"]),
+  :where(.page-option3, .page-option8) #pageContent select,
+  :where(.page-option9) #pageContent select:where([name="logtype"]),
+  :where(.page-option10) #pageContent select:where([name="proxytype"]),
+  :where(.page-step2) #pageContent select:where([name="loadprojname"], [name="loadprojcateg"]),
+  :where(.page-step3) #pageContent select:where([name="todo"]) {
+    display: block;
+    width: min(100%, 320px);
+    min-width: 0;
+    margin-inline-start: 0;
+    margin-top: 10px;
   }
 }
 
