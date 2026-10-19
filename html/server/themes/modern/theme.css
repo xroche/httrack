@@ -165,7 +165,7 @@ body > table {
 #pageContent textarea:focus-visible,
 #subTitle a:focus-visible,
 #footer a:focus-visible {
-  outline: 3px solid var(--modern-focus-ring);
+  outline: 2px solid var(--modern-primary);
   outline-offset: 2px;
 }
 
@@ -239,10 +239,6 @@ body > table {
 
 #pageContent h3 {
   font-size: 18px;
-}
-
-#pageContent h4 {
-  font-size: 15px;
 }
 
 #pageContent h2[align="center"] {
@@ -362,21 +358,17 @@ body > table {
   transform: translateY(1px);
 }
 
-/* Primary actions formerly identified by JS, now matched on native attributes. */
-#pageContent input[name="nextBtn"][type="submit"],
-#pageContent input[type="submit"][onclick*="form.closeme.value=1"],
-.page-addurl #pageContent input[type="button"][value="OK"],
-.page-about #pageContent input[type="button"][value="OK"] {
+/* Primary actions, as easy to override as any other button. */
+#pageContent input[type="submit"]:where([name="nextBtn"], [onclick*="form.closeme.value=1"]),
+:where(.page-addurl, .page-about) #pageContent input[type="button"]:where([value="OK"]) {
   border-color: var(--modern-primary);
   background: var(--modern-action-bg);
   color: var(--modern-action-ink);
   box-shadow: 0 4px 12px var(--modern-focus-ring);
 }
 
-#pageContent input[name="nextBtn"][type="submit"]:hover,
-#pageContent input[type="submit"][onclick*="form.closeme.value=1"]:hover,
-.page-addurl #pageContent input[type="button"][value="OK"]:hover,
-.page-about #pageContent input[type="button"][value="OK"]:hover {
+#pageContent input[type="submit"]:where([name="nextBtn"], [onclick*="form.closeme.value=1"]):hover,
+:where(.page-addurl, .page-about) #pageContent input[type="button"]:where([value="OK"]):hover {
   border-color: var(--modern-action-hover);
   background: var(--modern-action-hover);
   color: var(--modern-action-ink);
@@ -390,18 +382,11 @@ body > table {
   resize: vertical;
 }
 
-#pageContent textarea[style*="visibility:hidden"],
-#pageContent textarea[style*="visibility: hidden"] {
+#pageContent textarea[style*="visibility:hidden"] {
   display: none;
 }
 
-#pageContent input[name="projname"],
-#pageContent input[name="path"],
-#pageContent input[name="projcateg"] {
-  min-height: 42px;
-}
-
-/* Native select polish restored from the pre-merge Pixel pass. */
+/* Custom select chevron. */
 #pageContent select {
   appearance: none;
   -webkit-appearance: none;
@@ -429,27 +414,18 @@ body > table {
   }
 }
 
-/* Match the old runtime spacing using stable native page hooks. */
-.page-index #pageContent select,
-.page-option9 #pageContent select[name="logtype"],
-.page-option10 #pageContent select[name="proxytype"],
-.page-step2 #pageContent select[name="loadprojname"],
-.page-step2 #pageContent select[name="loadprojcateg"],
-.page-step3 #pageContent select[name="todo"] {
+/* Per-page select spacing, as easy to override as #pageContent select. */
+:where(.page-index) #pageContent select,
+:where(.page-option9) #pageContent select:where([name="logtype"]),
+:where(.page-option10) #pageContent select:where([name="proxytype"]),
+:where(.page-step2) #pageContent select:where([name="loadprojname"], [name="loadprojcateg"]),
+:where(.page-step3) #pageContent select:where([name="todo"]) {
   margin-inline-start: 11px;
 }
 
-.page-option2 #pageContent select[name="build"],
-.page-option3 #pageContent select,
-.page-option8 #pageContent select {
+:where(.page-option2) #pageContent select:where([name="build"]),
+:where(.page-option3, .page-option8) #pageContent select {
   margin-top: 9px;
-}
-
-#pageContent hr {
-  height: 1px;
-  margin: 20px 0;
-  border: 0;
-  background: var(--rule);
 }
 
 #pageContent pre {
@@ -465,8 +441,8 @@ body > table {
   white-space: pre-wrap;
 }
 
-/* Keep the small pause-file limit visually numeric without changing its value. */
-.page-option5 #pageContent input[name="pausefiles"] {
+/* A narrow field for the pause-file count. */
+:where(.page-option5) #pageContent input:where([name="pausefiles"]) {
   width: 8ch;
   max-width: 100%;
 }
@@ -500,17 +476,18 @@ body > table {
   color: var(--modern-primary);
 }
 
-.page-option1 #pageContent .tabCtrl a[href="option1.html"],
-.page-option2 #pageContent .tabCtrl a[href="option2.html"],
-.page-option3 #pageContent .tabCtrl a[href="option3.html"],
-.page-option4 #pageContent .tabCtrl a[href="option4.html"],
-.page-option5 #pageContent .tabCtrl a[href="option5.html"],
-.page-option6 #pageContent .tabCtrl a[href="option6.html"],
-.page-option7 #pageContent .tabCtrl a[href="option7.html"],
-.page-option8 #pageContent .tabCtrl a[href="option8.html"],
-.page-option9 #pageContent .tabCtrl a[href="option9.html"],
-.page-option10 #pageContent .tabCtrl a[href="option10.html"],
-.page-option11 #pageContent .tabCtrl a[href="option11.html"] {
+/* The current option tab, as easy to override as any other tab. */
+:where(.page-option1) #pageContent .tabCtrl a:where([href="option1.html"]):is(:link, :visited),
+:where(.page-option2) #pageContent .tabCtrl a:where([href="option2.html"]):is(:link, :visited),
+:where(.page-option3) #pageContent .tabCtrl a:where([href="option3.html"]):is(:link, :visited),
+:where(.page-option4) #pageContent .tabCtrl a:where([href="option4.html"]):is(:link, :visited),
+:where(.page-option5) #pageContent .tabCtrl a:where([href="option5.html"]):is(:link, :visited),
+:where(.page-option6) #pageContent .tabCtrl a:where([href="option6.html"]):is(:link, :visited),
+:where(.page-option7) #pageContent .tabCtrl a:where([href="option7.html"]):is(:link, :visited),
+:where(.page-option8) #pageContent .tabCtrl a:where([href="option8.html"]):is(:link, :visited),
+:where(.page-option9) #pageContent .tabCtrl a:where([href="option9.html"]):is(:link, :visited),
+:where(.page-option10) #pageContent .tabCtrl a:where([href="option10.html"]):is(:link, :visited),
+:where(.page-option11) #pageContent .tabCtrl a:where([href="option11.html"]):is(:link, :visited) {
   border-color: var(--modern-primary);
   background: var(--modern-action-bg);
   color: var(--modern-action-ink);
@@ -568,14 +545,12 @@ body > table {
     overflow-wrap: anywhere;
   }
 
-  .page-option2 #pageContent select[name="build"],
-  .page-option3 #pageContent select,
-  .page-option8 #pageContent select,
-  .page-option9 #pageContent select[name="logtype"],
-  .page-option10 #pageContent select[name="proxytype"],
-  .page-step2 #pageContent select[name="loadprojname"],
-  .page-step2 #pageContent select[name="loadprojcateg"],
-  .page-step3 #pageContent select[name="todo"] {
+  :where(.page-option2) #pageContent select:where([name="build"]),
+  :where(.page-option3, .page-option8) #pageContent select,
+  :where(.page-option9) #pageContent select:where([name="logtype"]),
+  :where(.page-option10) #pageContent select:where([name="proxytype"]),
+  :where(.page-step2) #pageContent select:where([name="loadprojname"], [name="loadprojcateg"]),
+  :where(.page-step3) #pageContent select:where([name="todo"]) {
     display: block;
     width: min(100%, 320px);
     min-width: 0;
