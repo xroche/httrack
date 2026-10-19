@@ -60,6 +60,13 @@ a:active  { text-decoration: underline; }
 /* Links on the bars keep the bar colours in every state. */
 #subTitle a, .tabCtrl a { background: var(--ui-bar);  color: var(--ui-bar-ink); }
 
+/* The open option tab. */
+.tabCtrl a[aria-current] { text-decoration: none;  box-shadow: inset 0 -3px var(--ui-bar-ink); }
+@media (forced-colors: active) {
+	:root { --ui-tab-mark: Highlight; }
+	.tabCtrl a[aria-current] { border: 2px solid var(--ui-tab-mark); }
+}
+
 .alert   { color: var(--ui-alert); }
 .cmdline { color: var(--ui-link); }
 

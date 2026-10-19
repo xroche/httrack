@@ -28,6 +28,15 @@ chmod -R u+w "${root}/html/server"
 modern=${root}/html/server/themes/modern/theme.css
 test -f "${modern}" || fail "Modern theme.css is not shipped"
 
+# Themes find the open option tab by aria-current, so each page marks its own tab and no other.
+for n in 1 2 3 4 5 6 7 8 9 10 11; do
+    page=$(<"${HTS_DISTDIR}/html/server/option${n}.html")
+    marks=$(grep -oE '<a [^>]*aria-current[^>]*>' <<<"${page}" || true)
+    test "$(grep -c . <<<"${marks}")" -eq 1 || fail "option${n}.html: want one aria-current tab, got [${marks}]"
+    grep -qF "aria-current=\"page\" href=\"option${n}.html\"" <<<"${marks}" ||
+        fail "option${n}.html: aria-current is not on its own tab: [${marks}]"
+done
+
 htsserver_start --root "${root}" --home "${work}/home"
 sid=$(htsserver_sid)
 test "${#sid}" -eq 32 || fail "no session id: [${sid}]"

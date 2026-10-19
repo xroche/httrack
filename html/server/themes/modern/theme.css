@@ -444,21 +444,17 @@ body > table {
   color: var(--modern-primary);
 }
 
-:where(.page-option1) #pageContent .tabCtrl a:where([href="option1.html"]):is(:link, :visited),
-:where(.page-option2) #pageContent .tabCtrl a:where([href="option2.html"]):is(:link, :visited),
-:where(.page-option3) #pageContent .tabCtrl a:where([href="option3.html"]):is(:link, :visited),
-:where(.page-option4) #pageContent .tabCtrl a:where([href="option4.html"]):is(:link, :visited),
-:where(.page-option5) #pageContent .tabCtrl a:where([href="option5.html"]):is(:link, :visited),
-:where(.page-option6) #pageContent .tabCtrl a:where([href="option6.html"]):is(:link, :visited),
-:where(.page-option7) #pageContent .tabCtrl a:where([href="option7.html"]):is(:link, :visited),
-:where(.page-option8) #pageContent .tabCtrl a:where([href="option8.html"]):is(:link, :visited),
-:where(.page-option9) #pageContent .tabCtrl a:where([href="option9.html"]):is(:link, :visited),
-:where(.page-option10) #pageContent .tabCtrl a:where([href="option10.html"]):is(:link, :visited),
-:where(.page-option11) #pageContent .tabCtrl a:where([href="option11.html"]):is(:link, :visited) {
+#pageContent .tabCtrl a:where([aria-current]):is(:link, :visited) {
   border-color: var(--modern-primary);
   background: var(--modern-action-bg);
   color: var(--modern-action-ink);
   box-shadow: 0 3px 8px var(--modern-primary-glow);
+}
+
+@media (forced-colors: active) {
+  #pageContent .tabCtrl a:where([aria-current]):is(:link, :visited) {
+    border-color: Highlight;
+  }
 }
 
 #footer {
