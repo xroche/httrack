@@ -105,12 +105,21 @@ browser that received it.</p>
 <li>Log in to the site with your usual browser. If there is a CAPTCHA, solve it. Then
 open a page that you want to copy, to make sure that you are logged in.</li>
 <li>Save the cookies of this site to a file named <code>cookies.txt</code>, in the
-Netscape format. Two tools can do this:
+Netscape format. These tools can do this:
 <ul>
-<li><b>A browser extension.</b> The extension "Get cookies.txt LOCALLY" is open source,
-and it is available for Firefox and Chrome. It writes the file on your computer and
-sends nothing to other computers. Export only the cookies of the site that you want
-to copy.</li>
+<li><b>Chrome, Edge or Brave:</b> install the extension "Get cookies.txt LOCALLY". It is
+open source, and it writes the file on your computer and sends nothing to other
+computers. Open the site, click the extension, and export only the cookies of this
+site.</li>
+<li><b>Firefox:</b> install the extension "cookies.txt" (or "Get cookies.txt LOCALLY",
+which also exists for Firefox), and export the cookies of the site in the same
+way.</li>
+<li><b>No extension:</b> press F12, open the "Network" tab and reload the page.
+Right-click the first request and select "Copy as cURL". The copied command holds the
+<code>Cookie</code> header, which lists each cookie as <code>name=value</code>. Write
+each cookie on its own line of <code>cookies.txt</code>, with seven fields separated by
+a TAB: <code>example.com</code>, <code>FALSE</code>, <code>/</code>, <code>FALSE</code>,
+<code>0</code>, the name and the value.</li>
 <li><b>curl.</b> For a simple login form, curl can log in and save the cookies with its
 <code>-c</code> option:
 <pre>curl -c cookies.txt -d 'user=me&amp;password=secret' https://example.com/login</pre>
@@ -125,11 +134,17 @@ the keys to all your accounts. An older extension with a similar name, "Get
 cookies.txt" (without "LOCALLY"), sent the data of its users to a remote server. It was
 removed from the Chrome Web Store in 2023. Do not install it.</p>
 <p><b>A cookie file is as good as your password.</b> A person who has the file can use
-your session. Do not share it, and delete it when the copy is done. When a crawl ends,
-HTTrack writes the cookies that it holds back to the file that you gave with
-<code>--cookies-file</code>, and keeps the old file as <code>cookies.txt.bak</code>.
-Delete both files.</p>
+your session. Do not share it, and delete it when the copy is done. Also delete
+<code>cookies.txt.bak</code> (see below).</p>
 </div>
+
+<p>With <code>--cookies-file</code>, the file is the whole cookie jar of the crawl.
+When the crawl ends, HTTrack writes the cookies that it holds back to this file, and
+keeps the old file as <code>cookies.txt.bak</code>. It accepts the header lines that
+curl, wget, yt-dlp, Python and "Get cookies.txt LOCALLY" write. But if HTTrack could not
+load all of the file, it does not change the file, and it writes a warning in its log.
+This occurs, for example, when a line is truncated or repeated, or when a comment line
+comes from an unknown tool.</p>
 
 <p>Most session cookies are marked "HttpOnly". In a <code>cookies.txt</code> file, the
 lines of these cookies start with <code>#HttpOnly_</code>. HTTrack versions newer than 3.50.5
@@ -137,8 +152,12 @@ read these lines. Older versions think that they are comments and ignore them, s
 login does not work. With an older version, remove <code>#HttpOnly_</code> from the
 start of these lines.</p>
 
+<p>Do not copy the cookies with <code>copy(document.cookie)</code> in the browser
+console. A script cannot see the HttpOnly cookies, so the login cookie is missing.</p>
+
 <p>HTTrack keeps a cookie only if its name and its value together are 4096 bytes or
-less. It ignores a longer cookie and writes a warning in its log.</p>
+less. It ignores a longer cookie, writes a warning in its log, and does not change
+the file.</p>
 
 <h2 id="user-agent">Step 2: find the User-Agent of your browser</h2>
 
