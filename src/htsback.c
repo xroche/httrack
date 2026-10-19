@@ -4779,7 +4779,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                   "its cookies with --cookies-file and its "
                                   "exact User-Agent with --user-agent. The "
                                   "clearance expires, and is tied to that "
-                                  "browser's address and user-agent.");
+                                  "browser's address and User-Agent.");
                   }
 
                   /* 

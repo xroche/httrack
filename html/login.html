@@ -31,7 +31,7 @@
 		<li><a href="#export">Step 1: export the cookies</a></li>
 		<li><a href="#user-agent">Step 2: find the User-Agent of your browser</a></li>
 		<li><a href="#winhttrack">Step 3: run WinHTTrack or WebHTTrack</a></li>
-		<li><a href="#cmdline">Step 3: run httrack on the command line</a></li>
+		<li><a href="#cmdline">Or: run httrack on the command line</a></li>
 		<li><a href="#limits">Limits</a></li>
 	</ul>
 	<h2>Start here</h2>
@@ -119,7 +119,7 @@ your session. Do not share it, and delete it when the copy is done. Also delete
 </div>
 
 <p>Most session cookies are marked "HttpOnly" (not readable by scripts). In a cookies
-file, the lines of these cookies start with <code>#HttpOnly_</code>. HTTrack versions
+file, some tools (curl, yt-dlp) start the lines of these cookies with <code>#HttpOnly_</code>. HTTrack versions
 newer than 3.50.5 read these lines. Older versions treat them as comments and ignore
 them, so the login does not work. With an older version, remove <code>#HttpOnly_</code>
 from the start of these lines.</p>
@@ -142,7 +142,7 @@ logged in with:</p>
 
 <h2 id="winhttrack">Step 3: run WinHTTrack or WebHTTrack</h2>
 
-<p>Click "Set options", then:</p>
+<p>Start a new project and type the site address. Then click "Set options":</p>
 <ul>
 <li>On the "Spider" tab, type the path of the cookies file in "Load cookies from file".
 Keep "Accept cookies" selected.</li>
@@ -152,7 +152,7 @@ Keep "Accept cookies" selected.</li>
 <code>-*sign-out*</code>.</li>
 </ul>
 
-<h2 id="cmdline">Step 3: run httrack on the command line</h2>
+<h2 id="cmdline">Or: run httrack on the command line</h2>
 
 <p>Instead of the interface, you can use the command line. Give the cookies file with <code>--cookies-file</code> (<code>-%K</code>) and the
 User-Agent with <code>--user-agent</code> (<code>-F</code>):</p>
@@ -175,13 +175,10 @@ filter for it. See the <a href="filters.html">filter syntax</a> page.</li>
 <li><b>Cookies expire.</b> A session can end after some minutes or some days. If the
 mirror starts to contain login pages again, log in again, export the cookies again,
 and continue the mirror.</li>
-<li><b>HTTrack must read the whole cookies file.</b> If HTTrack cannot read the whole
-file, it leaves the file unchanged and writes a warning in its log.</li>
-<li><b>Bot protection can still refuse HTTrack.</b> Services such as Cloudflare give a
-"clearance" cookie after a check. So a site with strict protection can refuse HTTrack,
-even with the correct cookies and User-Agent. HTTrack writes a "Bot protection
+<li><b>Bot protection can still refuse HTTrack.</b> Services such as Cloudflare tie their
+"clearance" cookie to your browser, so they can refuse HTTrack even with the right
+cookies and User-Agent. HTTrack writes a "Bot protection
 challenge" warning in its log when it sees a Cloudflare refusal.</li>
-<li><b>HTTrack does not solve CAPTCHAs.</b></li>
 <li><b>Respect the terms of the site.</b> A login does not give you the right to copy
 everything. Read the terms of use of the site, and read
 <a href="abuse.html">Using HTTrack responsibly</a>.</li>
