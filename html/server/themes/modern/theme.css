@@ -1,5 +1,7 @@
 /* WebHTTrack Modern theme.
-   Uses the native WebHTTrack pages, shared palette and theme hooks only. */
+   Uses the native WebHTTrack pages, shared palette and theme hooks only.
+   Page and attribute tests sit in :where(), so a user stylesheet's plain
+   #pageContent rules override them. */
 
 :root {
   color-scheme: light;
@@ -33,7 +35,7 @@
   --modern-primary: var(--link);
   --modern-radius: 16px;
   --modern-control-rule: #cbd7e7;
-  --modern-focus-ring: rgba(37, 99, 235, .12);
+  --modern-primary-glow: rgba(37, 99, 235, .12);
   --modern-action-bg: linear-gradient(180deg, #2f6ee8, #2563eb);
   --modern-action-hover: #1d4ed8;
   --modern-action-ink: #ffffff;
@@ -61,7 +63,7 @@
     --ui-bar: #1b3156;
     --ui-title-filter: invert(1);
     --modern-control-rule: #425a78;
-    --modern-focus-ring: rgba(127, 170, 255, .16);
+    --modern-primary-glow: rgba(127, 170, 255, .16);
     --modern-action-bg: #8bb5ff;
     --modern-action-hover: #a9c8ff;
     --modern-action-ink: #071830;
@@ -142,20 +144,7 @@ body > table {
   background: rgba(255, 255, 255, .18);
 }
 
-#pageContent a,
-#footer a {
-  color: var(--modern-primary);
-  text-decoration: none;
-}
-
-#pageContent a:hover,
-#footer a:hover {
-  color: var(--link-hover);
-  text-decoration: underline;
-}
-
 #pageContent a:focus-visible,
-#pageContent button:focus-visible,
 #pageContent input:focus-visible,
 #pageContent select:focus-visible,
 #pageContent textarea:focus-visible,
@@ -186,40 +175,6 @@ body > table {
   color: var(--ink);
   line-height: 1.65;
   overflow-wrap: break-word;
-}
-
-#pageContent > table:first-of-type {
-  width: 100%;
-  margin: 0 0 13px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--rule);
-  border-collapse: separate;
-}
-
-#pageContent > table:first-of-type td {
-  padding: 4px 0;
-  vertical-align: middle;
-}
-
-#pageContent > table:first-of-type td:last-child {
-  text-align: right;
-}
-
-#pageContent > table:first-of-type h2 {
-  min-height: 1.2em;
-  margin: 0;
-}
-
-#pageContent > table:first-of-type td:last-child a {
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 11px;
-  border: 1px solid var(--rule);
-  border-radius: 9px;
-  background: var(--modern-raised);
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
 }
 
 #pageContent h1,
@@ -259,22 +214,47 @@ body > table {
   max-width: 100%;
 }
 
-#pageContent table td {
-  vertical-align: middle;
-}
-
-#pageContent table[border="0"] {
-  border-color: transparent;
-}
-
 #pageContent td {
   padding-top: 5px;
   padding-bottom: 5px;
 }
 
-#pageContent td td {
+#pageContent td:where(#pageContent td td) {
   padding-top: 6px;
   padding-bottom: 6px;
+}
+
+/* Page heading row, with its help link on the right. */
+#pageContent > table:where(:first-of-type) {
+  margin: 0 0 13px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--rule);
+}
+
+#pageContent td:where(#pageContent > table:first-of-type td) {
+  padding: 4px 0;
+}
+
+#pageContent td:where(#pageContent > table:first-of-type td:last-child) {
+  text-align: right;
+}
+
+#pageContent h2:where(#pageContent > table:first-of-type h2) {
+  min-height: 1.2em;
+  margin: 0;
+}
+
+#pageContent a:where(#pageContent > table:first-of-type td:last-child a) {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 11px;
+  border: 1px solid var(--rule);
+  border-radius: 9px;
+  background: var(--modern-raised);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
 }
 
 #pageContent input,
@@ -295,7 +275,6 @@ body > table {
   background-color: var(--panel);
   color: var(--ink);
   box-shadow: 0 1px 2px rgba(12, 31, 60, .025);
-  font-size: 14px;
   line-height: 1.4;
   transition: border-color .15s, box-shadow .15s, background-color .15s;
 }
@@ -306,7 +285,7 @@ body > table {
   border-color: var(--modern-primary);
   outline: 2px solid var(--modern-primary);
   outline-offset: 1px;
-  box-shadow: 0 0 0 3px var(--modern-focus-ring);
+  box-shadow: 0 0 0 3px var(--modern-primary-glow);
 }
 
 #pageContent input[type="checkbox"],
@@ -323,9 +302,6 @@ body > table {
 #pageContent input[type="button"] {
   appearance: none;
   -webkit-appearance: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   min-height: 40px;
   max-width: 100%;
   margin: 3px 2px;
@@ -339,7 +315,6 @@ body > table {
   font-weight: 700;
   line-height: 1.3;
   white-space: normal;
-  text-align: center;
   cursor: pointer;
   transition: background .16s, border-color .16s, box-shadow .16s, transform .16s;
 }
@@ -348,7 +323,7 @@ body > table {
 #pageContent input[type="button"]:hover {
   border-color: var(--modern-primary);
   background: var(--accent);
-  box-shadow: 0 3px 9px var(--modern-focus-ring);
+  box-shadow: 0 3px 9px var(--modern-primary-glow);
 }
 
 #pageContent input[type="submit"]:active,
@@ -356,20 +331,19 @@ body > table {
   transform: translateY(1px);
 }
 
-/* Here and below, :where() keeps page and attribute tests out of specificity, so a user stylesheet can override these rules. */
+/* The main button of each page. */
 #pageContent input[type="submit"]:where([name="nextBtn"], [onclick*="form.closeme.value=1"]),
 :where(.page-addurl, .page-about) #pageContent input[type="button"]:where([value="OK"]) {
   border-color: var(--modern-primary);
   background: var(--modern-action-bg);
   color: var(--modern-action-ink);
-  box-shadow: 0 4px 12px var(--modern-focus-ring);
+  box-shadow: 0 4px 12px var(--modern-primary-glow);
 }
 
 #pageContent input[type="submit"]:where([name="nextBtn"], [onclick*="form.closeme.value=1"]):hover,
 :where(.page-addurl, .page-about) #pageContent input[type="button"]:where([value="OK"]):hover {
   border-color: var(--modern-action-hover);
   background: var(--modern-action-hover);
-  color: var(--modern-action-ink);
 }
 
 #pageContent textarea {
@@ -405,7 +379,7 @@ body > table {
 @media (forced-colors: active) {
   #pageContent select {
     appearance: auto;
-    -webkit-appearance: menulist;
+    -webkit-appearance: auto;
     padding-right: 12px;
     background-image: none;
   }
@@ -439,7 +413,6 @@ body > table {
 
 :where(.page-option5) #pageContent input:where([name="pausefiles"]) {
   width: 8ch;
-  max-width: 100%;
 }
 
 /* Native option tabs; no generated navigation or JavaScript. */
@@ -485,7 +458,7 @@ body > table {
   border-color: var(--modern-primary);
   background: var(--modern-action-bg);
   color: var(--modern-action-ink);
-  box-shadow: 0 3px 8px var(--modern-focus-ring);
+  box-shadow: 0 3px 8px var(--modern-primary-glow);
 }
 
 #footer {
