@@ -3540,6 +3540,13 @@ class Handler(SimpleHTTPRequestHandler):
         elif name == "based.html":
             body = '<base target="_top"><a href="from-based.html">f</a>\n'
             self.send_raw((body + echo).encode(), "text/html")
+        elif name == "applet.html":
+            # The parser rewrites this tag in place between its two links.
+            body = (
+                "<applet background=a.png code=A.class"
+                " title='q codebase=C crossorigin x=' background=b.png></applet>"
+            )
+            self.send_raw(body.encode(), "text/html")
         elif name == "start.html":
             self.send_redirect(here + "index.html")
         # Each chain leaves for localhost and comes back, so it is cross-site.

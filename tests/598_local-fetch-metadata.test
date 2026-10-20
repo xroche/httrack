@@ -23,6 +23,17 @@ selftest_queue 'dest=document mode=navigate user=?1' fetchdest 'a target="_blank
 selftest_queue 'dest=document mode=navigate user=?1' fetchdest 'a target=_parent href=x' href
 selftest_queue none fetchdest 'a target=_parent href=x' href x iframe
 selftest_queue none fetchdest 'a target=main href=x' href
+# An unclosed tag ends at the next unquoted '<'.
+selftest_queue 'dest=document mode=navigate user=?1' fetchdest 'a href=x <a target=main' href
+selftest_queue 'dest=document mode=navigate user=?1' fetchdest 'a href=x<a target=main' href
+selftest_queue yes fetchbasetarget '<p><base href=y target=x>'
+selftest_queue yes fetchbasetarget '<base href=y <base target=x>'
+selftest_queue no fetchbasetarget '<base<a target=x>'
+selftest_queue no fetchbasetarget '<base foo<a target=x>'
+selftest_queue no fetchbasetarget '<base href=y<p target=x>'
+selftest_queue none fetchdest 'a href="x<" target=main' href
+selftest_queue no fetchbasetarget '<base href="<base target=x>">'
+selftest_queue no fetchbasetarget '<base href=y><a target=x>'
 selftest_queue none fetchdest 'a href=x' href x object
 selftest_queue none fetchdest 'a href=x' href x empty
 selftest_queue "dest=iframe $nav" fetchdest 'iframe src=x' src
@@ -109,6 +120,8 @@ selftest_queue no fetchtrust 127.example.com
 selftest_queue no fetchtrust localhost.example.com
 selftest_queue no fetchtrust ftp://127.0.0.1/
 selftest_run_queued
+# Alone, so that a quadratic scan stalls only this case.
+assert_selftest 'nobase document' fetchscale
 
 d=fetchmeta
 # Loopback is trustworthy, so a plain http crawl of the test server sends them.
@@ -165,6 +178,11 @@ bash "$top_srcdir/tests/local-crawl.sh" \
     --file-matches "$d/landed-noext.html" '^PATH ' \
     --file-not-matches "$d/landed-noext.html" '^Sec-Fetch' \
     httrack "BASEURL/$d/start.html" -F "$chrome" '+localhost*' -%N0
+
+# A link read after the parser rewrites its tag sees the rewritten tag.
+bash "$top_srcdir/tests/local-crawl.sh" \
+    --file-matches "$d/b.png" '^Sec-Fetch-Mode: cors$' \
+    httrack "BASEURL/$d/applet.html" -F "$chrome"
 
 # No browser loads the links of a stylesheet opened on its own.
 bash "$top_srcdir/tests/local-crawl.sh" \

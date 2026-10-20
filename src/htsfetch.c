@@ -44,13 +44,15 @@ static hts_boolean span_eq(const char *a, size_t alen, const char *b,
 }
 
 /* Find attribute name in the start tag at tag_name. On a match, *value and
- *len hold its value, empty when it has none. */
-static hts_boolean tag_attr_find(const char *tag_name, const char *name,
-                                 const char **value, size_t *len) {
+ *len hold its value, empty when it has none. Otherwise *end, if not NULL,
+ gets the tag's end, which is its '>', an unquoted '<' or the NUL. */
+static hts_boolean tag_attr_find_end(const char *tag_name, const char *name,
+                                     const char **value, size_t *len,
+                                     const char **end) {
   const size_t want = strlen(name);
   const char *p = tag_name;
 
-  while (*p != '\0' && *p != '>' && *p != '/' && !is_realspace(*p))
+  while (*p != '\0' && *p != '>' && *p != '<' && *p != '/' && !is_realspace(*p))
     p++;
   for (;;) {
     const char *n;
@@ -58,9 +60,13 @@ static hts_boolean tag_attr_find(const char *tag_name, const char *name,
 
     while (is_realspace(*p) || *p == '/')
       p++;
-    if (*p == '\0' || *p == '>')
+    if (*p == '\0' || *p == '>' || *p == '<') {
+      if (end != NULL)
+        *end = p;
       return HTS_FALSE;
-    for (n = p; *p != '\0' && *p != '>' && *p != '=' && !is_realspace(*p);)
+    }
+    for (n = p; *p != '\0' && *p != '>' && *p != '<' && *p != '=' &&
+                !is_realspace(*p);)
       p++;
     nlen = (size_t) (p - n);
     while (is_realspace(*p))
@@ -80,7 +86,8 @@ static hts_boolean tag_attr_find(const char *tag_name, const char *name,
         if (*p != '\0')
           p++;
       } else {
-        for (*value = p; *p != '\0' && *p != '>' && !is_realspace(*p); p++)
+        for (*value = p;
+             *p != '\0' && *p != '>' && *p != '<' && !is_realspace(*p); p++)
           ;
         *len = (size_t) (p - *value);
       }
@@ -88,6 +95,11 @@ static hts_boolean tag_attr_find(const char *tag_name, const char *name,
     if (nlen == want && strncasecmp(n, name, want) == 0)
       return HTS_TRUE;
   }
+}
+
+static hts_boolean tag_attr_find(const char *tag_name, const char *name,
+                                 const char **value, size_t *len) {
+  return tag_attr_find_end(tag_name, name, value, len, NULL);
 }
 
 /* Does the whitespace-separated list s, length len, hold token? */
@@ -197,8 +209,14 @@ int hts_fetch_same_frame(int page_dest) {
 hts_boolean hts_fetch_has_base_target(const char *html) {
   const char *p;
 
-  for (p = strchr(html, '<'); p != NULL; p = strchr(p + 1, '<')) {
-    if (hts_cmp_tag_token(p + 1, "base") && tag_has_attr(p + 1, "target"))
+  /* Resume where each <base> ended, so an unclosed one is not rescanned. */
+  for (p = strchr(html, '<'); p != NULL; p = strchr(p, '<')) {
+    const char *value;
+    size_t len;
+
+    p++;
+    if (hts_cmp_tag_token(p, "base") &&
+        tag_attr_find_end(p, "target", &value, &len, &p))
       return HTS_TRUE;
   }
   return HTS_FALSE;
@@ -206,12 +224,11 @@ hts_boolean hts_fetch_has_base_target(const char *html) {
 
 /* Return the destination a click on a link with this target loads. A named
    target is a frame we cannot tell. */
-static int link_target_dest(const char *tag_name, int page_frame) {
-  const char *target;
-  size_t len;
+static int link_target_dest(const hts_fetch_tag *tag, int page_frame) {
+  const char *const target = tag->target;
+  const size_t len = tag->target_len;
 
-  if (!tag_attr_find(tag_name, "target", &target, &len) ||
-      span_eq(target, len, "_self", 5))
+  if (target == NULL || span_eq(target, len, "_self", 5))
     return page_frame;
   if (span_eq(target, len, "_top", 4) || span_eq(target, len, "_blank", 6))
     return HTS_FETCH_DEST_DOCUMENT;
@@ -221,8 +238,29 @@ static int link_target_dest(const char *tag_name, int page_frame) {
   return HTS_FETCH_DEST_UNKNOWN;
 }
 
-void hts_fetch_classify(hts_fetch_meta *fm, const char *tag_name,
-                        const char *attr, const char *fil, int page_frame) {
+/* Read the start tag at name into *tag, unless *tag already holds it. */
+static void fetch_tag_read(hts_fetch_tag *tag, const char *name) {
+  const char *value;
+  size_t len;
+
+  if (tag->name == name)
+    return;
+  memset(tag, 0, sizeof(*tag));
+  tag->name = name;
+  if (hts_cmp_tag_token(name, "link"))
+    tag->link_dest = (unsigned char) link_dest(name, &tag->link_cors);
+  tag->download = tag_has_attr(name, "download");
+  tag->crossorigin = tag_has_attr(name, "crossorigin");
+  tag->module = tag_attr_is(name, "type", "module");
+  if (tag_attr_find(name, "target", &value, &len)) {
+    tag->target = value;
+    tag->target_len = len;
+  }
+}
+
+void hts_fetch_classify(hts_fetch_meta *fm, hts_fetch_tag *tag,
+                        const char *tag_name, const char *attr, const char *fil,
+                        int page_frame) {
   static const char *const font_exts[] = {"woff2", "woff", "ttf",
                                           "otf",   "eot",  NULL};
   /* No svg, which @font-face can name too. */
@@ -271,11 +309,14 @@ void hts_fetch_classify(hts_fetch_meta *fm, const char *tag_name,
       fm->dest = HTS_FETCH_DEST_IMAGE;
     return;
   }
-  if (hts_cmp_tag_token(tag_name, "link") && hts_cmp_tag_token(attr, "href")) {
-    fm->dest = (unsigned char) link_dest(tag_name, &fm->cors);
+  fetch_tag_read(tag, tag_name);
+  if (hts_cmp_tag_token(tag->name, "link") && hts_cmp_tag_token(attr, "href")) {
+    fm->dest = tag->link_dest;
+    fm->cors = tag->link_cors;
   } else {
     for (i = 0; i < sizeof(rules) / sizeof(rules[0]); i++) {
-      if ((rules[i].tag == NULL || hts_cmp_tag_token(tag_name, rules[i].tag)) &&
+      if ((rules[i].tag == NULL ||
+           hts_cmp_tag_token(tag->name, rules[i].tag)) &&
           strncasecmp(attr, rules[i].attr, strlen(rules[i].attr)) == 0 &&
           !isalnum((unsigned char) attr[strlen(rules[i].attr)]) &&
           attr[strlen(rules[i].attr)] != '-') {
@@ -285,15 +326,13 @@ void hts_fetch_classify(hts_fetch_meta *fm, const char *tag_name,
     }
   }
   /* A download is no navigation, and its destination is not one we send. */
-  if (fm->dest == HTS_FETCH_DEST_DOCUMENT && tag_has_attr(tag_name, "download"))
+  if (fm->dest == HTS_FETCH_DEST_DOCUMENT && tag->download)
     fm->dest = HTS_FETCH_DEST_UNKNOWN;
   if (fm->dest == HTS_FETCH_DEST_DOCUMENT) {
-    fm->dest = (unsigned char) link_target_dest(tag_name, page_frame);
+    fm->dest = (unsigned char) link_target_dest(tag, page_frame);
     fm->user = HTS_TRUE;
   }
-  if (tag_has_attr(tag_name, "crossorigin") ||
-      (fm->dest == HTS_FETCH_DEST_SCRIPT &&
-       tag_attr_is(tag_name, "type", "module")))
+  if (tag->crossorigin || (fm->dest == HTS_FETCH_DEST_SCRIPT && tag->module))
     fm->cors = HTS_TRUE;
 }
 

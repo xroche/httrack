@@ -71,13 +71,25 @@ typedef enum hts_fetch_site {
   HTS_FETCH_SITE_CROSS_SITE
 } hts_fetch_site;
 
+/* The attributes of one start tag that decide how its links are fetched.
+   Zero it per page, and again when the page bytes change in place. */
+typedef struct hts_fetch_tag {
+  const char *name; /* just past the '<', or NULL before the first read */
+  unsigned char link_dest; /* hts_fetch_dest of a <link href> */
+  hts_boolean link_cors, download, crossorigin, module;
+  const char *target; /* the target value, or NULL when it has none */
+  size_t target_len;
+} hts_fetch_tag;
+
 /* Fill dest, cors and user for the attribute at attr, in the start tag just
    past '<' at tag_name, or for path fil in a stylesheet when tag_name is NULL.
-   page_frame is what a link with no target navigates, from
+   tag caches the attributes of tag_name, so a tag with many links is read
+   once. page_frame is what a link with no target navigates, from
    hts_fetch_same_frame.
  */
-void hts_fetch_classify(hts_fetch_meta *fm, const char *tag_name,
-                        const char *attr, const char *fil, int page_frame);
+void hts_fetch_classify(hts_fetch_meta *fm, hts_fetch_tag *tag,
+                        const char *tag_name, const char *attr, const char *fil,
+                        int page_frame);
 
 /* Return the destination of a navigation that stays in the frame of a page
    fetched as page_dest: document, iframe or frame, else UNKNOWN. */
