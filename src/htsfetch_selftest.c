@@ -64,10 +64,8 @@ static int st_fetchdest(httrackp *opt, int argc, char **argv) {
   }
   memset(&fm, 0, sizeof(fm));
   memset(&ft, 0, sizeof(ft));
-  if (tag != NULL)
-    hts_fetch_tag_read(&ft, tag);
-  hts_fetch_classify(&fm, tag != NULL ? &ft : NULL, attr,
-                     argc >= 3 ? argv[2] : "", hts_fetch_same_frame(page));
+  hts_fetch_classify(&fm, &ft, tag, attr, argc >= 3 ? argv[2] : "",
+                     hts_fetch_same_frame(page));
   if (fm.dest == HTS_FETCH_DEST_UNKNOWN)
     printf("none\n");
   else
@@ -107,6 +105,38 @@ static int st_fetchbasetarget(httrackp *opt, int argc, char **argv) {
     return 1;
   }
   printf("%s\n", hts_fetch_has_base_target(argv[0]) ? "yes" : "no");
+  return 0;
+}
+
+/* -#test=fetchscale: an unclosed tag repeated, and one tag of many links,
+   scan in linear time. A quadratic scan runs into the test's time guard. */
+static int st_fetchscale(httrackp *opt, int argc, char **argv) {
+  static const char base[] = "<base a ", href[] = "href=a ";
+  const size_t count = 150000;
+  char *page = malloct(count * (sizeof(base) - 1) + 3);
+  hts_fetch_meta fm;
+  hts_fetch_tag ft;
+  hts_boolean found;
+  size_t i;
+
+  (void) opt;
+  (void) argv;
+  if (argc != 0 || page == NULL)
+    return 1;
+  for (i = 0; i < count; i++)
+    memcpy(page + i * (sizeof(base) - 1), base, sizeof(base) - 1);
+  page[count * (sizeof(base) - 1)] = '\0';
+  found = hts_fetch_has_base_target(page);
+  memcpy(page, "a ", 2);
+  for (i = 0; i < count; i++)
+    memcpy(page + 2 + i * (sizeof(href) - 1), href, sizeof(href) - 1);
+  page[2 + count * (sizeof(href) - 1)] = '\0';
+  memset(&ft, 0, sizeof(ft));
+  for (i = 0; i < count; i++)
+    hts_fetch_classify(&fm, &ft, page, page + 2 + i * (sizeof(href) - 1), "",
+                       HTS_FETCH_DEST_DOCUMENT);
+  printf("%s %s\n", found ? "base" : "nobase", hts_fetch_dest_name(fm.dest));
+  freet(page);
   return 0;
 }
 
@@ -206,6 +236,7 @@ const struct selftest_entry selftests_fetch[] = {
     {"fetchtrust", "<adr>", "is Sec-Fetch-* sent to this host", st_fetchtrust},
     {"fetchbasetarget", "<html>", "does a page carry a <base target>",
      st_fetchbasetarget},
+    {"fetchscale", "", "fetch metadata scans in linear time", st_fetchscale},
     {"fetchorigin", "<adr|hex:..>", "the Origin value of an address",
      st_fetchorigin},
     {"acceptkind", "<arg>", "the kind an --accept argument names",

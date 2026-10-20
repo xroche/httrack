@@ -746,7 +746,7 @@ static void parse_fetch_meta(httrackp *opt, int ptr, hts_fetch_meta *fm,
                              hts_boolean meta_refresh, hts_boolean opaque,
                              hts_boolean inscript, hts_boolean incss,
                              hts_boolean tagless_body, int link_frame,
-                             hts_fetch_tag *tag, const char *tag_name,
+                             hts_fetch_tag *tag_cache, const char *tag_name,
                              const char *attr, const char *fil) {
   const hts_fetch_meta *const page = &heap(ptr)->fetch;
 
@@ -767,12 +767,10 @@ static void parse_fetch_meta(httrackp *opt, int ptr, hts_fetch_meta *fm,
   if (meta_refresh)
     fm->dest = (unsigned char) hts_fetch_same_frame(page->dest);
   else if (!opaque && inscript && incss)
-    hts_fetch_classify(fm, NULL, attr, fil, HTS_FETCH_DEST_UNKNOWN);
+    hts_fetch_classify(fm, tag_cache, NULL, attr, fil, HTS_FETCH_DEST_UNKNOWN);
   /* A script body names URLs for code a crawler never runs. */
-  else if (!opaque && !inscript && tag_name != NULL) {
-    hts_fetch_tag_read(tag, tag_name);
-    hts_fetch_classify(fm, tag, attr, fil, link_frame);
-  }
+  else if (!opaque && !inscript && tag_name != NULL)
+    hts_fetch_classify(fm, tag_cache, tag_name, attr, fil, link_frame);
   /* A file no known page loaded leaves initiator 0, which sends none. */
   fm->initiator = tagless_body ? page->initiator : ptr;
 }
@@ -1848,6 +1846,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                   // no error?
                                   if (strlen(tempo) == (size_t) (b - html)) {
                                     strncpy(modify, tempo, strlen(tempo)); // PAS d'octet nul à la fin!
+                                    fetch_tag.name = NULL; /* the tag changed */
                                     p = 0;      // DEVALIDER!!
                                     p_type = 0;
                                     add_class = 0;

@@ -238,7 +238,8 @@ static int link_target_dest(const hts_fetch_tag *tag, int page_frame) {
   return HTS_FETCH_DEST_UNKNOWN;
 }
 
-void hts_fetch_tag_read(hts_fetch_tag *tag, const char *name) {
+/* Read the start tag at name into *tag, unless *tag already holds it. */
+static void fetch_tag_read(hts_fetch_tag *tag, const char *name) {
   const char *value;
   size_t len;
 
@@ -257,8 +258,9 @@ void hts_fetch_tag_read(hts_fetch_tag *tag, const char *name) {
   }
 }
 
-void hts_fetch_classify(hts_fetch_meta *fm, const hts_fetch_tag *tag,
-                        const char *attr, const char *fil, int page_frame) {
+void hts_fetch_classify(hts_fetch_meta *fm, hts_fetch_tag *tag,
+                        const char *tag_name, const char *attr, const char *fil,
+                        int page_frame) {
   static const char *const font_exts[] = {"woff2", "woff", "ttf",
                                           "otf",   "eot",  NULL};
   /* No svg, which @font-face can name too. */
@@ -297,7 +299,7 @@ void hts_fetch_classify(hts_fetch_meta *fm, const hts_fetch_tag *tag,
   fm->user = HTS_FALSE;
   if (attr == NULL)
     return;
-  if (tag == NULL) {
+  if (tag_name == NULL) {
     /* url() and @import look alike to the parser, so the path decides. */
     if (fil_ext_in(fil, css_exts))
       fm->dest = HTS_FETCH_DEST_STYLE;
@@ -307,6 +309,7 @@ void hts_fetch_classify(hts_fetch_meta *fm, const hts_fetch_tag *tag,
       fm->dest = HTS_FETCH_DEST_IMAGE;
     return;
   }
+  fetch_tag_read(tag, tag_name);
   if (hts_cmp_tag_token(tag->name, "link") && hts_cmp_tag_token(attr, "href")) {
     fm->dest = tag->link_dest;
     fm->cors = tag->link_cors;
