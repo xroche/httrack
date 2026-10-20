@@ -39,6 +39,7 @@ Please visit our Website: http://www.httrack.com
    stylesheet reference to fil, in a page fetched as dest page (document). */
 static int st_fetchdest(httrackp *opt, int argc, char **argv) {
   hts_fetch_meta fm;
+  hts_fetch_tag ft;
   const char *tag = NULL, *attr;
   char needle[64];
   int page = HTS_FETCH_DEST_DOCUMENT;
@@ -62,8 +63,11 @@ static int st_fetchdest(httrackp *opt, int argc, char **argv) {
     attr++;
   }
   memset(&fm, 0, sizeof(fm));
-  hts_fetch_classify(&fm, tag, attr, argc >= 3 ? argv[2] : "",
-                     hts_fetch_same_frame(page));
+  memset(&ft, 0, sizeof(ft));
+  if (tag != NULL)
+    hts_fetch_tag_read(&ft, tag);
+  hts_fetch_classify(&fm, tag != NULL ? &ft : NULL, attr,
+                     argc >= 3 ? argv[2] : "", hts_fetch_same_frame(page));
   if (fm.dest == HTS_FETCH_DEST_UNKNOWN)
     printf("none\n");
   else

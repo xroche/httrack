@@ -746,8 +746,8 @@ static void parse_fetch_meta(httrackp *opt, int ptr, hts_fetch_meta *fm,
                              hts_boolean meta_refresh, hts_boolean opaque,
                              hts_boolean inscript, hts_boolean incss,
                              hts_boolean tagless_body, int link_frame,
-                             const char *tag_name, const char *attr,
-                             const char *fil) {
+                             hts_fetch_tag *tag, const char *tag_name,
+                             const char *attr, const char *fil) {
   const hts_fetch_meta *const page = &heap(ptr)->fetch;
 
   memset(fm, 0, sizeof(*fm));
@@ -769,8 +769,10 @@ static void parse_fetch_meta(httrackp *opt, int ptr, hts_fetch_meta *fm,
   else if (!opaque && inscript && incss)
     hts_fetch_classify(fm, NULL, attr, fil, HTS_FETCH_DEST_UNKNOWN);
   /* A script body names URLs for code a crawler never runs. */
-  else if (!opaque && !inscript && tag_name != NULL)
-    hts_fetch_classify(fm, tag_name, attr, fil, link_frame);
+  else if (!opaque && !inscript && tag_name != NULL) {
+    hts_fetch_tag_read(tag, tag_name);
+    hts_fetch_classify(fm, tag, attr, fil, link_frame);
+  }
   /* A file no known page loaded leaves initiator 0, which sends none. */
   fm->initiator = tagless_body ? page->initiator : ptr;
 }
@@ -961,6 +963,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       int incss = 0;            /* CSS lets url(x) go unquoted */
       int link_frame =
           -1; /* what a link with no target navigates, once known */
+      hts_fetch_tag fetch_tag = {NULL};
       hts_boolean css_file = HTS_FALSE;
       int inscript_locked = 0;  // in locked script (ie. js file)
       signed char inscript_state[INSCRIPT_NSTATES][257];
@@ -2971,8 +2974,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   parse_fetch_meta(
                       opt, ptr, &link_fetch, HTTP_IS_REDIRECT(r->statuscode),
                       p_searchMETAURL, in_media != NULL || p_type != 0,
-                      inscript, incss, sf_tagless_body, link_frame, sf_tag,
-                      tag_attr_start, afs.af.fil);
+                      inscript, incss, sf_tagless_body, link_frame, &fetch_tag,
+                      sf_tag, tag_attr_start, afs.af.fil);
                   /* Naming followed redirects whose hops it does not keep. */
                   if (former.adr[0] != '\0')
                     link_fetch.dest = HTS_FETCH_DEST_UNKNOWN;
