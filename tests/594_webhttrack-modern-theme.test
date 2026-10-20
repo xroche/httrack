@@ -43,16 +43,20 @@ for file in "${HTS_DISTDIR}"/html/server/option*.html; do
 done
 test "${tabbed}" -ge 11 || fail "only ${tabbed} option pages carry the tab bar"
 
-# Themes find each page's main button by its class, so a page with one marks exactly one.
+# Each page with a main button has exactly one primary class, on that button.
 primaries=0
 for file in "${HTS_DISTDIR}"/html/server/*.html; do
     page=$(<"${file}")
     grep -qE 'name="nextBtn"|form\.closeme\.value=1|type="button" value="OK"' <<<"${page}" || continue
     primaries=$((primaries + 1))
-    marks=$(grep -oE '<[a-z]+ class="primary"' <<<"${page}" || true)
-    test "${marks}" = '<input class="primary"' || fail "${file##*/}: want one primary input, got [${marks}]"
+    marks=$(grep -oE 'class="[^"]*\<primary\>' <<<"${page}" || true)
+    test "$(grep -c . <<<"${marks}")" -eq 1 || fail "${file##*/}: want one primary class, got [${marks}]"
+    grep -qE '<input class="primary" (name="nextBtn"|type="submit" value="\$\{attr:LANG_OK\}"|type="button" value="OK")' <<<"${page}" ||
+        fail "${file##*/}: the primary class is not on the main button"
 done
 test "${primaries}" -eq 18 || fail "${primaries} pages have a main button, want 18"
+grep -qF ':where(.primary)' "${modern}" || fail "Modern does not style the primary class"
+! grep -qE 'nextBtn|closeme' "${modern}" || fail "Modern still finds main buttons by name or onclick"
 
 htsserver_start --root "${root}" --home "${work}/home"
 sid=$(htsserver_sid)

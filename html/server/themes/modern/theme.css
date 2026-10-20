@@ -39,10 +39,9 @@
   --modern-action-bg: linear-gradient(180deg, #2f6ee8, #2563eb);
   --modern-action-hover: #1d4ed8;
   --modern-action-ink: #ffffff;
-  /* Translucent, so a user.css --field shows through. */
-  --modern-page-bg: radial-gradient(ellipse at 6% 0%, rgba(37, 99, 235, .07) 0, transparent 43%),
-                    radial-gradient(ellipse at 100% 20%, rgba(56, 189, 248, .08) 0, transparent 40%),
-                    var(--field);
+  /* Translucent over --field, so a user.css --field shows through. */
+  --modern-page-glow: radial-gradient(ellipse at 6% 0%, rgba(191, 218, 255, .3) 0, transparent 43%),
+                      radial-gradient(ellipse at 100% 20%, rgba(204, 248, 255, .3) 0, transparent 40%);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -68,8 +67,7 @@
     --modern-action-bg: #8bb5ff;
     --modern-action-hover: #a9c8ff;
     --modern-action-ink: #071830;
-    --modern-page-bg: radial-gradient(ellipse at 0 0, rgba(127, 170, 255, .14) 0, transparent 50%),
-                      var(--field);
+    --modern-page-glow: radial-gradient(ellipse at 0 0, rgba(48, 130, 237, .22) 0, transparent 50%);
   }
 }
 
@@ -85,7 +83,7 @@ body {
   min-height: 100vh;
   margin: 0;
   padding: 22px 20px 24px;
-  background: var(--modern-page-bg);
+  background: var(--modern-page-glow), var(--field);
   color: var(--ui-ink);
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
