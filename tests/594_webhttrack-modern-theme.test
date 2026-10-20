@@ -43,6 +43,17 @@ for file in "${HTS_DISTDIR}"/html/server/option*.html; do
 done
 test "${tabbed}" -ge 11 || fail "only ${tabbed} option pages carry the tab bar"
 
+# Themes find each page's main button by its class, so a page with one marks exactly one.
+primaries=0
+for file in "${HTS_DISTDIR}"/html/server/*.html; do
+    page=$(<"${file}")
+    grep -qE 'name="nextBtn"|form\.closeme\.value=1|type="button" value="OK"' <<<"${page}" || continue
+    primaries=$((primaries + 1))
+    marks=$(grep -oE '<[a-z]+ class="primary"' <<<"${page}" || true)
+    test "${marks}" = '<input class="primary"' || fail "${file##*/}: want one primary input, got [${marks}]"
+done
+test "${primaries}" -eq 18 || fail "${primaries} pages have a main button, want 18"
+
 htsserver_start --root "${root}" --home "${work}/home"
 sid=$(htsserver_sid)
 test "${#sid}" -eq 32 || fail "no session id: [${sid}]"
