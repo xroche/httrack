@@ -92,7 +92,7 @@ the password in the address, for example <code>https://user:password@example.com
 See the <a href="faq.html#QM6">FAQ</a>.</p>
 
 <p>On Android, you do not need this page. Log in inside the app and tap "Use this
-login". The app exports the cookies and deletes them with the project.</p>
+login". The app saves the cookies file itself, and deletes it when you delete the project.</p>
 
 <h2 id="export">Step 1: export the cookies</h2>
 
@@ -118,9 +118,9 @@ access all your accounts. An older extension with a similar name, "Get cookies.t
 the Chrome Web Store in 2023. Do not install it.</p>
 <p><b>A cookies file is as good as your password.</b> A person who has the file can use
 your session. Do not share it, and delete it when the copy is done. Also delete
-<code>cookies.txt.bak</code>, which HTTrack writes next to it. If a copy was stopped, also
-delete any file whose name starts with <code>cookies.txt.</code> and ends with
-<code>.tmp</code>.</p>
+<code>cookies.txt.bak</code>, which HTTrack writes next to it. If HTTrack was stopped early,
+also delete files like <code>cookies.txt.1234.tmp</code> and
+<code>cookies.txt.bak.1234.tmp</code>.</p>
 </div>
 
 <p>Most session cookies are marked "HttpOnly" (not readable by scripts). In a cookies
