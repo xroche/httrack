@@ -95,6 +95,17 @@ static int st_fetchtrust(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* -#test=fetchbasetarget <html>: does the page carry a <base target>? */
+static int st_fetchbasetarget(httrackp *opt, int argc, char **argv) {
+  (void) opt;
+  if (argc != 1) {
+    fprintf(stderr, "fetchbasetarget: takes <html>\n");
+    return 1;
+  }
+  printf("%s\n", hts_fetch_has_base_target(argv[0]) ? "yes" : "no");
+  return 0;
+}
+
 /* -#test=fetchorigin <adr|hex:..> prints the Origin of adr, or "(refused)". */
 static int st_fetchorigin(httrackp *opt, int argc, char **argv) {
   char adr[HTS_URLMAXSIZE], origin[HTS_URLMAXSIZE * 2];
@@ -189,6 +200,8 @@ const struct selftest_entry selftests_fetch[] = {
     {"fetchsite", "<from> <to>", "Sec-Fetch-Site between two URLs",
      st_fetchsite},
     {"fetchtrust", "<adr>", "is Sec-Fetch-* sent to this host", st_fetchtrust},
+    {"fetchbasetarget", "<html>", "does a page carry a <base target>",
+     st_fetchbasetarget},
     {"fetchorigin", "<adr|hex:..>", "the Origin value of an address",
      st_fetchorigin},
     {"acceptkind", "<arg>", "the kind an --accept argument names",

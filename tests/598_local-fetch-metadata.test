@@ -23,6 +23,14 @@ selftest_queue 'dest=document mode=navigate user=?1' fetchdest 'a target="_blank
 selftest_queue 'dest=document mode=navigate user=?1' fetchdest 'a target=_parent href=x' href
 selftest_queue none fetchdest 'a target=_parent href=x' href x iframe
 selftest_queue none fetchdest 'a target=main href=x' href
+# An unclosed tag ends at the next '<', so its neighbour's target is not its own.
+selftest_queue 'dest=document mode=navigate user=?1' fetchdest 'a href=x <a target=main' href
+selftest_queue 'dest=document mode=navigate user=?1' fetchdest 'a href=x<a target=main' href
+selftest_queue none fetchdest 'a href="x<" target=main' href
+selftest_queue yes fetchbasetarget '<p><base href=y target=x>'
+selftest_queue yes fetchbasetarget '<base href=y <base target=x>'
+selftest_queue no fetchbasetarget '<base href="<base target=x>">'
+selftest_queue no fetchbasetarget '<base href=y><a target=x>'
 selftest_queue none fetchdest 'a href=x' href x object
 selftest_queue none fetchdest 'a href=x' href x empty
 selftest_queue "dest=iframe $nav" fetchdest 'iframe src=x' src

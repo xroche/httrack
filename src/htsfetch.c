@@ -44,13 +44,16 @@ static hts_boolean span_eq(const char *a, size_t alen, const char *b,
 }
 
 /* Find attribute name in the start tag at tag_name. On a match, *value and
- *len hold its value, empty when it has none. */
-static hts_boolean tag_attr_find(const char *tag_name, const char *name,
-                                 const char **value, size_t *len) {
+ *len hold its value, empty when it has none. Otherwise *end, if not NULL, is
+ where the tag ends: at '>', or at a '<' outside quotes so that an unclosed
+ tag stops short of the end of the page. */
+static hts_boolean tag_attr_find_end(const char *tag_name, const char *name,
+                                     const char **value, size_t *len,
+                                     const char **end) {
   const size_t want = strlen(name);
   const char *p = tag_name;
 
-  while (*p != '\0' && *p != '>' && *p != '/' && !is_realspace(*p))
+  while (*p != '\0' && *p != '>' && *p != '<' && *p != '/' && !is_realspace(*p))
     p++;
   for (;;) {
     const char *n;
@@ -58,9 +61,13 @@ static hts_boolean tag_attr_find(const char *tag_name, const char *name,
 
     while (is_realspace(*p) || *p == '/')
       p++;
-    if (*p == '\0' || *p == '>')
+    if (*p == '\0' || *p == '>' || *p == '<') {
+      if (end != NULL)
+        *end = p;
       return HTS_FALSE;
-    for (n = p; *p != '\0' && *p != '>' && *p != '=' && !is_realspace(*p);)
+    }
+    for (n = p; *p != '\0' && *p != '>' && *p != '<' && *p != '=' &&
+                !is_realspace(*p);)
       p++;
     nlen = (size_t) (p - n);
     while (is_realspace(*p))
@@ -80,7 +87,8 @@ static hts_boolean tag_attr_find(const char *tag_name, const char *name,
         if (*p != '\0')
           p++;
       } else {
-        for (*value = p; *p != '\0' && *p != '>' && !is_realspace(*p); p++)
+        for (*value = p;
+             *p != '\0' && *p != '>' && *p != '<' && !is_realspace(*p); p++)
           ;
         *len = (size_t) (p - *value);
       }
@@ -88,6 +96,11 @@ static hts_boolean tag_attr_find(const char *tag_name, const char *name,
     if (nlen == want && strncasecmp(n, name, want) == 0)
       return HTS_TRUE;
   }
+}
+
+static hts_boolean tag_attr_find(const char *tag_name, const char *name,
+                                 const char **value, size_t *len) {
+  return tag_attr_find_end(tag_name, name, value, len, NULL);
 }
 
 /* Does the whitespace-separated list s, length len, hold token? */
@@ -197,8 +210,14 @@ int hts_fetch_same_frame(int page_dest) {
 hts_boolean hts_fetch_has_base_target(const char *html) {
   const char *p;
 
-  for (p = strchr(html, '<'); p != NULL; p = strchr(p + 1, '<')) {
-    if (hts_cmp_tag_token(p + 1, "base") && tag_has_attr(p + 1, "target"))
+  /* Resume after each <base>, so an unclosed one is not rescanned per '<'. */
+  for (p = strchr(html, '<'); p != NULL; p = strchr(p, '<')) {
+    const char *value;
+    size_t len;
+
+    p++;
+    if (hts_cmp_tag_token(p, "base") &&
+        tag_attr_find_end(p, "target", &value, &len, &p))
       return HTS_TRUE;
   }
   return HTS_FALSE;
