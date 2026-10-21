@@ -545,9 +545,17 @@ int multipleStringMatch(const char *s, const char *match);
    field that carries a login replaced by the fprint_redacted() marker. */
 void fprintfio(FILE * fp, const char *buff, const char *prefix);
 
-/* Returns a copy of s, allocated with malloct, in which the password of every
-   user:pass@ is *** . The user and the host stay. NULL when out of memory. */
-char *hts_mask_passwords(const char *s);
+/* What hts_mask_passwords() reads: */
+typedef enum {
+  HTS_MASK_LINE, /* a log line, where an address may lack its scheme */
+  HTS_MASK_LIST, /* blank-separated start URLs and filters */
+  HTS_MASK_ADDR  /* one start URL, or a -P value */
+} hts_mask_mode;
+
+/* Returns a copy of s, allocated with malloct, in which every password the
+   engine would read out of an address in s is *** . The rest stays byte for
+   byte. NULL when out of memory. */
+char *hts_mask_passwords(const char *s, hts_mask_mode mode);
 
 /* Writes the marker that stands for a hidden secret of len bytes. */
 void fprint_redacted(FILE *fp, size_t len);

@@ -3109,8 +3109,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       }
       // fichier log        
       if (opt->log) {
-        char *masked_url = hts_mask_passwords(url);
-        int i;
+        char *masked_url = hts_mask_passwords(url, HTS_MASK_LIST);
+        int i, opt_at = 0;
 
         fprintf(opt->log,
                 "HTTrack" HTTRACK_VERSION "%s launched on %s at %s" LF,
@@ -3120,10 +3120,23 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         fprintf(opt->log, "(");
         for(i = 0; i < argc; i++) {
           const char *arg = argv[i]; // already UTF-8 on every platform
-          char *masked = hts_mask_passwords(arg);
           // quoted if it holds a blank and no quote
           const hts_boolean quote =
               strchr(arg, ' ') != NULL && strchr(arg, '\"') == NULL;
+          hts_boolean addr; // a start URL, or a -P value, is one address
+          char *masked;
+
+          if (x_cmd.span[i] != 0) {
+            opt_at = x_cmd.span[i] > 1 ? i : 0;
+            addr = HTS_FALSE;
+          } else if (opt_at != 0 && i < opt_at + x_cmd.span[opt_at]) {
+            addr = cmdl_shortopt_has(argv[opt_at], 'P');
+          } else {
+            opt_at = 0;
+            addr = i != 0 && arg[0] != '+' && arg[0] != '-';
+          }
+          masked =
+              hts_mask_passwords(arg, addr ? HTS_MASK_ADDR : HTS_MASK_LINE);
 
           if (quote)
             fputc('"', opt->log);

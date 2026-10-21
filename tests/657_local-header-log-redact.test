@@ -122,6 +122,24 @@ for line in "urluser:***@127.0.0.1:$port/setcookie.html" "puser:***@127.0.0.1:$p
 done
 ok "hts-log.txt masks the passwords of URLs, proxies and -%X headers"
 
+out=$(httrack -#test=maskpw) || fail "httrack -#test=maskpw exited non-zero: $out"
+test "$out" = "maskpw self-test: OK" || fail "expected 'maskpw self-test: OK', got: $out"
+# plain.html is reached only through the crawl, so its line comes from hts_log_print
+crawl choke "cuser:CHOKESECRET@127.0.0.1:$port/hop.html" "nuser:NOPATHSECRET@127.0.0.1:1" \
+    -z "-*:KEEPFILTER@*"
+log=$(<"$tmpdir/choke/hts-log.txt")
+for secret in CHOKESECRET NOPATHSECRET; do
+    if grep -qF "$secret" <<<"$log"; then
+        fail "$secret is in hts-log.txt: $(grep -F "$secret" <<<"$log")"
+    fi
+done
+for line in "at cuser:***@127.0.0.1:$port/hop.html nuser:***@127.0.0.1:1 -*:KEEPFILTER@*" \
+    " -%H nuser:***@127.0.0.1:1 -z " " -*:KEEPFILTER@* )" \
+    "link recorded: cuser:***@127.0.0.1:$port/plain.html"; do
+    grep -qF -- "$line" <<<"$log" || fail "no '$line' in hts-log.txt: $log"
+done
+ok "every hts-log.txt line masks a URL password and keeps the rest"
+
 root="$tmpdir/root"
 cmds="$tmpdir/cmds"
 mkdir -p "$root"

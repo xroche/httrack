@@ -5815,33 +5815,92 @@ void fprint_redacted(FILE *fp, size_t len) {
 static const char *const secret_fields[] = {
     "Authorization", "Proxy-Authorization", "Cookie", "Set-Cookie"};
 
-char *hts_mask_passwords(const char *s) {
-  const size_t len = strlen(s);
-  /* each mask eats at least ':' and '@' and writes 3 bytes */
-  char *const dst = (char *) malloct(len * 2 + 1);
-  size_t i, o = 0, start = 0;
+/* Is c allowed in a URL scheme (RFC 3986 3.1)? */
+static hts_boolean scheme_char(char c) {
+  return isalnum((unsigned char) c) || c == '+' || c == '-' || c == '.';
+}
 
-  if (dst == NULL)
-    return NULL;
-  for (i = 0; i < len; i++) {
-    if (s[i] == '@') {
-      const char *const colon = memchr(s + start, ':', i - start);
+/* Finds the password of the userinfo at the authority a: from the first ':'
+   up to the last '@' before the first '/', the split
+   jump_identification_const() makes. A token also ends at a blank, and with
+   path, it must go on to a '/'. Returns HTS_FALSE when there is none. */
+static hts_boolean userinfo_password(const char *a, hts_boolean token,
+                                     hts_boolean path, const char **pass,
+                                     const char **at) {
+  const char *end = a + strcspn(a, token ? "/ \t\r\n" : "/");
+  const char *colon;
 
-      // mailto:user@host names an address, not a login
-      if (colon != NULL && !strfield(s + start, "mailto:")) {
-        const size_t user = (size_t) (colon - s) + 1;
+  if (path && *end != '/')
+    return HTS_FALSE;
+  while (end > a && end[-1] != '@')
+    end--;
+  if (end == a)
+    return HTS_FALSE;
+  colon = memchr(a, ':', (size_t) (end - 1 - a));
+  if (colon == NULL)
+    return HTS_FALSE;
+  *pass = colon + 1;
+  *at = end - 1;
+  return HTS_TRUE;
+}
 
-        o -= i - user;
-        memcpy(dst + o, "***", 3);
-        o += 3;
-      }
-      start = i + 1;
-    } else if (strchr(" \t\r\n\"'<>()/,;=", s[i]) != NULL) {
-      start = i + 1;
-    }
-    dst[o++] = s[i];
+/* The masked copy: dst (NULL to only count) holds o bytes, and the source is
+   copied up to p. */
+typedef struct {
+  char *dst;
+  size_t o;
+  const char *p;
+} mask_out;
+
+static void mask_copy(mask_out *m, const char *src, size_t n) {
+  if (m->dst != NULL)
+    memcpy(m->dst + m->o, src, n);
+  m->o += n;
+}
+
+/* Masks the password at the authority a, if any, and moves *i past it. */
+static hts_boolean mask_at(mask_out *m, const char *a, hts_boolean token,
+                           hts_boolean path, const char **i) {
+  const char *pass, *at;
+
+  if (!userinfo_password(a, token, path, &pass, &at))
+    return HTS_FALSE;
+  mask_copy(m, m->p, (size_t) (pass - m->p));
+  mask_copy(m, "***", 3);
+  m->p = *i = at;
+  return HTS_TRUE;
+}
+
+/* Copies s to dst, or only counts when dst is NULL, with each password the
+   engine would read out of an address written as ***. Returns the length. */
+static size_t mask_passwords(const char *s, char *dst, hts_mask_mode mode) {
+  mask_out m = {dst, 0, s};
+  const char *i = s;
+
+  if (mode == HTS_MASK_ADDR)
+    (void) mask_at(&m, jump_protocol_const(s), HTS_FALSE, HTS_FALSE, &i);
+  while (*i != '\0') {
+    // an address the engine printed starts a token, often with no scheme
+    if (mode != HTS_MASK_ADDR && (i == s || strchr(" \t\r\n", i[-1])) &&
+        strchr("+-*", *i) == NULL &&
+        mask_at(&m, jump_protocol_const(i), HTS_TRUE, mode == HTS_MASK_LINE,
+                &i))
+      continue;
+    if (i != s && strncmp(i, "://", 3) == 0 && scheme_char(i[-1]) &&
+        mask_at(&m, i + 3, HTS_FALSE, HTS_FALSE, &i))
+      continue;
+    i++;
   }
-  dst[o] = '\0';
+  mask_copy(&m, m.p, strlen(m.p) + 1);
+  return m.o - 1;
+}
+
+char *hts_mask_passwords(const char *s, hts_mask_mode mode) {
+  const size_t len = mask_passwords(s, NULL, mode);
+  char *const dst = (char *) malloct(len + 1);
+
+  if (dst != NULL)
+    mask_passwords(s, dst, mode);
   return dst;
 }
 
@@ -7332,7 +7391,7 @@ HTSEXT_API void hts_log_vprint(httrackp * opt, int type, const char *format, va_
         char *line = (char *) malloct((size_t) n + 1);
         char *masked =
             line != NULL && vsnprintf(line, (size_t) n + 1, format, args) == n
-                ? hts_mask_passwords(line)
+                ? hts_mask_passwords(line, HTS_MASK_LINE)
                 : NULL;
 
         // never the raw line, which may hold a password
