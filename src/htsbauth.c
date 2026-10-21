@@ -295,7 +295,7 @@ static hts_boolean cookie_domain_is_suffix(const char *domain) {
     len--;
   if (len == 0 || !hts_psl_loaded() || hts_host_is_address(domain, len))
     return HTS_FALSE;
-  // callers bound the domain; never clip it into another name
+  // no caller passes a longer one, and a clipped copy names another domain
   if (len >= sizeof(dom))
     return HTS_FALSE;
   dom[0] = '\0';

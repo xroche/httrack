@@ -1915,6 +1915,7 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
              ".example.co.uk\tTRUE\t/\tFALSE\t0\tsfx\t1\n"),
         ROWR("example.com.\tTRUE\t/\tFALSE\t0\tsfx\t1\n", 0,
              "example.com.\tTRUE\t/\tFALSE\t0\tsfx\t1\n"),
+        // a trailing-dot suffix stays host-only too
         ROWR("com.\tTRUE\t/\tFALSE\t0\tsfx\t1\n", 0,
              "com.\tFALSE\t/\tFALSE\t0\tsfx\t1\n"),
         ROWR("127.0.0.1\tTRUE\t/\tFALSE\t0\tsfx\t1\n", 0,
