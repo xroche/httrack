@@ -1844,7 +1844,8 @@ static int st_y2038(httrackp *opt, int argc, char **argv) {
 
     if (hts_time_exact(2147483648LL, &got) != !narrow ||
         (int64_t) got != (narrow ? 7 : 2147483648LL) ||
-        !hts_time_exact(2147483647LL, &got) || (int64_t) got != 2147483647LL) {
+        !hts_time_exact(2147483647LL, &got) || (int64_t) got != 2147483647LL ||
+        hts_time_exact(-2147483649LL, &got) != !narrow) {
       printf("y2038: hts_time_exact accepted a clipped date\n");
       err = 1;
     }
@@ -1877,9 +1878,10 @@ static int st_y2038(httrackp *opt, int argc, char **argv) {
         err = 1;
       }
     }
-    /* The epoch means no date: refused, and the file keeps its time. */
+    /* The epoch and -1 mean no date: refused, and the file keeps its time. */
     if (set_filetime_rfc822(path, cases[4].date) != 0 ||
         set_filetime_rfc822(path, cases[0].date) != -1 ||
+        set_filetime_rfc822(path, cases[1].date) != -1 ||
         (int64_t) get_filetime(path) != cases[4].secs) {
       printf("y2038: the epoch changed the file's date\n");
       err = 1;
