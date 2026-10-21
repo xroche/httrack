@@ -186,6 +186,12 @@ hts_boolean cookie_domain_match(const char *jar_dom, const char *host);
     accepted. When no suffix list is loaded, every parent domain is allowed. */
 hts_boolean cookie_domain_allowed(const char *domain, const char *host);
 
+/** May a cookies.txt line for DOMAIN be loaded? A line that includes
+    subdomains (HOST_ONLY false) is refused when DOMAIN is a public suffix,
+    while a host-only one is always allowed, as RFC 6265 5.3 step 5 says. */
+hts_boolean cookie_jar_domain_allowed(const char *domain,
+                                      hts_boolean host_only);
+
 /** Read a Set-Cookie Max-Age VALUE received at NOW into *when, the absolute
     expiry, capped 400 days ahead and never below 1 (RFC 6265 5.2.2).
     HTS_FALSE when VALUE is not a whole number, so the attribute is ignored. */

@@ -278,6 +278,13 @@ hts_boolean cookie_domain_match(const char *jar_dom, const char *host) {
   return HTS_TRUE;
 }
 
+/* Is DOMAIN, lower case and without a leading dot, a public suffix such as
+   "com", which would reach every host under it? */
+static hts_boolean cookie_is_suffix(const char *domain) {
+  return hts_psl_loaded() && !hts_host_is_address(domain, strlen(domain)) &&
+         hts_psl_registrable_domain(domain) == NULL;
+}
+
 /* See htsbauth.h. */
 hts_boolean cookie_domain_allowed(const char *domain, const char *host) {
   char dom[256];
@@ -293,8 +300,23 @@ hts_boolean cookie_domain_allowed(const char *domain, const char *host) {
     return HTS_TRUE;
   if (!cookie_domain_match(dom, host))
     return HTS_FALSE;
-  // a public suffix such as "com" would reach every host under it
-  return !hts_psl_loaded() || hts_psl_registrable_domain(dom) != NULL;
+  return !cookie_is_suffix(dom);
+}
+
+/* See htsbauth.h. */
+hts_boolean cookie_jar_domain_allowed(const char *domain,
+                                      hts_boolean host_only) {
+  char dom[256];
+
+  if (host_only)
+    return HTS_TRUE;
+  if (domain[0] == '.')
+    domain++;
+  if (strlen(domain) >= sizeof(dom))
+    return HTS_FALSE;
+  strcpybuff(dom, domain);
+  hts_lowcase(dom);
+  return !cookie_is_suffix(dom);
 }
 
 /* RFC 6265bis 5.6.1 caps a cookie's life at 400 days, which also keeps the
@@ -1017,8 +1039,15 @@ int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *fpath,
                   strcmpnocase(cookie_get(buffer, rec, 3), "TRUE") == 0;
               attr.http_only = is_httponly || tabs == 7;
               attr.expires = cookie_record_expiry(rec);
-              // an expired one is skipped, because a browser drops it too
-              if (attr.expires == 0 || attr.expires > (int64_t) time(NULL)) {
+              if (!cookie_jar_domain_allowed(domain, attr.host_only)) {
+                hts_log_print(opt, LOG_WARNING,
+                              "Cookies: ignoring '%.64s' for the public "
+                              "suffix %s and its subdomains: %s",
+                              cook_name, domain, given);
+                refused++;
+              } else if (attr.expires == 0 ||
+                         attr.expires > (int64_t) time(NULL)) {
+                // a live one only, because a browser drops an expired one too
                 const hts_boolean repeated =
                     seen != NULL && cookie_host(domain, host, sizeof(host)) &&
                     cookie_find_exact(seen->data, cook_name, host, path) !=

@@ -1899,6 +1899,13 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
         ROW("d.test\tTRUE\t/\tFALSE\r\t0\tn\tv\n", 1),
         // a CRLF ends the line, so it is no CR in the value
         ROWR("d.test\tTRUE\t/\tFALSE\t0\tn\tv\r\n", 0, "\tn\tv\n"),
+        // a public suffix reaches every host under it, unless host-only
+        ROWA(".com\tTRUE\t/\tFALSE\t0\tsfx\t1\n", 1, "\tsfx\t"),
+        ROWA("CO.UK\tTRUE\t/\tFALSE\t0\tsfx\t1\n", 1, "\tsfx\t"),
+        ROWR("com\tFALSE\t/\tFALSE\t0\tsfx\t1\n", 0, "\tsfx\t1\n"),
+        ROWR(".example.co.uk\tTRUE\t/\tFALSE\t0\tsfx\t1\n", 0, "\tsfx\t1\n"),
+        ROWR("127.0.0.1\tTRUE\t/\tFALSE\t0\tsfx\t1\n", 0, "\tsfx\t1\n"),
+        ROWR("::1\tTRUE\t/\tFALSE\t0\tsfx\t1\n", 0, "\tsfx\t1\n"),
         ROW("# my own note\n", 1),
         ROW("# Netscape HTTP Cookie File (my note)\n", 1),
         ROW("# Edit at your own risk. Mine.\n", 1),
