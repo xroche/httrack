@@ -1936,7 +1936,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
                     StringCopy(website, StringBuff(fspath));
                     StringCat(tmpbuff, "winprofile.ini");
-                    fp = fopen(StringBuff(tmpbuff), "wb");
+                    /* owner-only: the profile may hold proxy credentials */
+                    fp = hts_fopen_private(StringBuff(tmpbuff), "wb");
                     if (fp != NULL) {
                       int count;
 
