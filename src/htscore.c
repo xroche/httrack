@@ -1130,7 +1130,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
           if (hts_is_quoted(line, strlen(line))) {
             hts_log_print(
                 opt, LOG_ERROR, "\"%s\", line %d: \"%s is quoted, ignored",
-                StringBuff(opt->filelist), lineno, url_nologin(opt, line + 1));
+                StringBuff(opt->filelist), lineno, adr_nologin(opt, line + 1));
             continue;
           }
           if (line[0]) {

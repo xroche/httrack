@@ -322,6 +322,25 @@ static void cmdl_panic_value(httrackp *opt, const char *msg,
   HTS_PANIC_PRINTF(s);
 }
 
+/* Prints a --host-alias rule with the login of each of its names masked. */
+static void print_rule_nologin(const char *rule) {
+  while (*rule != '\0') {
+    char tok[HTS_CDLMAXSIZE];
+    char shown[HTS_CDLMAXSIZE + 8];
+    size_t n = strcspn(rule, ",=");
+
+    if (n >= sizeof(tok))
+      n = sizeof(tok) - 1;
+    memcpy(tok, rule, n);
+    tok[n] = '\0';
+    fputs(adr_nologin_r(shown, sizeof(shown), tok), stdout);
+    rule += n;
+    if (*rule == ',' || *rule == '=')
+      putchar(*rule++);
+  }
+  putchar('\n');
+}
+
 /* Panic on com, the end of option arg that no option takes. When com is
    quoted, the message names the option before it. */
 static void cmdl_bad_option(httrackp *opt, const char *arg, const char *prefix,
@@ -2244,7 +2263,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   if (!hts_host_alias_rule_ok(argv[na])) {
                     HTS_PANIC_PRINTF("Invalid host-alias rule: expected "
                                      "alias[,alias...]=canonical-host");
-                    printf("Rejected: %s\n", argv[na]);
+                    printf("Rejected: ");
+                    print_rule_nologin(argv[na]);
                     printf("Each side names a host, optionally behind its "
                            "scheme; a path is not part of an address\n");
                     htsmain_free();

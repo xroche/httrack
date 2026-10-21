@@ -4361,13 +4361,19 @@ static void append_clipped(char *buf, size_t size, size_t *len, const char *s,
   buf[*len] = '\0';
 }
 
-/* Returns adr past its scheme and "//", the engine's or any "scheme://". */
+/* Returns adr past its blanks, scheme and "//", the engine's or any
+   "scheme://", or adr when it has no scheme. */
 static const char *login_start(const char *adr) {
-  const char *const known = jump_protocol_const(adr);
   const char *s = adr;
+  const char *known;
 
-  if (known != adr || !isalpha((unsigned char) *s))
+  while (isspace((unsigned char) *s))
+    s++;
+  known = jump_protocol_const(s);
+  if (known != s)
     return known;
+  if (!isalpha((unsigned char) *s))
+    return adr;
   while (isalnum((unsigned char) *s) || *s == '+' || *s == '-' || *s == '.')
     s++;
   return strncmp(s, "://", 3) == 0 ? s + 3 : adr;
@@ -6008,10 +6014,28 @@ char *hts_mask_passwords(const char *s, hts_mask_mode mode) {
   return dst;
 }
 
+/* Returns the length of the secret field name opening line, a line len bytes
+   long, even with no colon behind it, or 0. */
+static size_t secret_name_len(const char *line, size_t len) {
+  size_t word, i;
+
+  if (header_name_in(line, secret_fields,
+                     sizeof(secret_fields) / sizeof(secret_fields[0])))
+    return header_name_len(line);
+  if (memchr(line, ':', len) != NULL)
+    return 0;
+  word = strcspn(line, " \t\r\n");
+  for (i = 0; i < sizeof(secret_fields) / sizeof(secret_fields[0]); i++)
+    if (header_name_is(line, word, secret_fields[i], strlen(secret_fields[i])))
+      return word;
+  return 0;
+}
+
 void fprintfio(FILE *fp, const char *buff, const char *prefix) {
   const char *const start = buff;
   hts_boolean nl = HTS_TRUE;
   hts_boolean secret = HTS_FALSE;
+  size_t name = 0;
 
   while (*buff != '\0') {
     const size_t len = strcspn(buff, "\r\n");
@@ -6020,16 +6044,17 @@ void fprintfio(FILE *fp, const char *buff, const char *prefix) {
       size_t keep = len;
 
       /* a folded line continues the value above it */
-      if (*buff != ' ' && *buff != '\t')
-        secret =
-            header_name_in(buff, secret_fields,
-                           sizeof(secret_fields) / sizeof(secret_fields[0]));
+      if (*buff != ' ' && *buff != '\t') {
+        name = secret_name_len(buff, len);
+        secret = name != 0 ? HTS_TRUE : HTS_FALSE;
+      }
       if (secret) {
         const char *const colon = memchr(buff, ':', len);
 
-        keep = *buff != ' ' && *buff != '\t' && colon != NULL
-                   ? (size_t) (colon - buff) + 1
-                   : 0;
+        /* a line with no colon is redacted after its name */
+        keep = *buff == ' ' || *buff == '\t' ? 0
+               : colon != NULL               ? (size_t) (colon - buff) + 1
+                                             : name;
         while (keep < len && (buff[keep] == ' ' || buff[keep] == '\t'))
           keep++;
       }

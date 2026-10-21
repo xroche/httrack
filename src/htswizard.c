@@ -565,8 +565,8 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
         if (lienrelatif(tempo2, sizeof(tempo2), fil, heap(ptr)->fil) == 0) {
           hts_log_print(opt, LOG_DEBUG,
                         "build relative links to test: %s %s (with %s and %s)",
-                        tempo, tempo2, heap(heap(ptr)->premier)->fil,
-                        heap(ptr)->fil);
+                        url_nologin(opt, tempo), url_nologin(opt, tempo2),
+                        heap(heap(ptr)->premier)->fil, heap(ptr)->fil);
 
           // si vient de primary, ne pas tester lienrelatif avec (car host "différent")
           /*if (heap(heap(ptr)->premier) == 0) {   // vient de primary

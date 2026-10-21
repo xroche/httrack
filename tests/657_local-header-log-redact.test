@@ -146,6 +146,8 @@ for line in "at link luser:***@127.0.0.1:1/l8.html (from suser:***@127.0.0.1:$po
     "data attribute is no URL: http://u:***@127.0.0.1:$port/{w}.jpg" \
     "link detected in html (tag): mms://luser:***@127.0.0.1:$port/m.asf" \
     "link detected in html (tag): gopher://luser:***@127.0.0.1:$port/g" \
+    "link detected in html (tag):   gopher://luser:***@127.0.0.1:$port/g2" \
+    "build relative links to test: x-y.z+w://luser:***@h.example/a" \
     " http://***@127.0.0.1:$port/plain.html" \
     " -*:KEEPFILTER@* -%X \"X-Note: a:KEEPHEADER@c/d\" "; do
     grep -qF -- "$line" <<<"$log" || fail "no '$line' in hts-log.txt: $log"
@@ -182,9 +184,15 @@ ok "no project file holds a URL or proxy password"
 printf 'http://u:LONGPW@127.0.0.1/%s\n' "$(repeat_chars 2100 a)" >"$tmpdir/long.txt"
 out=$(httrack -O "$tmpdir/why" -q --why "http://u:WHYPW@127.0.0.1/x" -%S "$tmpdir/long.txt" \
     "-*x*" 2>&1) || fail "--why exited $?: $out"
-printf '"http://u:QUOTEPW@127.0.0.1:%s/plain.html"\n' "$port" >"$tmpdir/list.txt"
+printf '"http://u:QUOTEPWA@127.0.0.1:%s/plain.html"\n"u:QUOTEPWB@127.0.0.1:%s/plain.html"\n' \
+    "$port" "$port" >"$tmpdir/list.txt"
 crawl opts "http://127.0.0.1:$port/plain.html" -%L "$tmpdir/list.txt" \
-    -%X "Authorization: Basic AUTHPWA" -%X "Authorization: Basic AUTHPWB"
+    -%X "Authorization: Basic AUTHPWA" -%X "Authorization: Basic AUTHPWB" \
+    -%X "Authorization Basic MALPWA" -%X "proxy-authorization MALPWB"
+rc=0
+httrack "http://127.0.0.1:$port/plain.html" -O "$tmpdir/alias" \
+    --host-alias "http://u:ALIASPW@a.example/x=b.example" >>"$tmpdir/log" 2>&1 || rc=$?
+test "$rc" -ne 0 || fail "a host-alias rule with a path was accepted"
 rc=0
 httrack "\"http://u:QSTARTPW@127.0.0.1:$port/plain.html\"" -O "$tmpdir/quoted" \
     >>"$tmpdir/log" 2>&1 || rc=$?
@@ -194,12 +202,19 @@ $(cat "$tmpdir/log" "$tmpdir/why/hts-log.txt" "$tmpdir/opts/hts-log.txt")"
 for line in "URL longer than 2047 bytes, ignored: http://u:***@127.0.0.1/aaa" \
     "http://u:***@127.0.0.1/x: rejected by rule #1 (-*x*)" " -%Y http://u:***@127.0.0.1/x " \
     "line 1: \"http://u:***@127.0.0.1:$port/plain.html\" is quoted, ignored" \
+    "line 2: \"u:***@127.0.0.1:$port/plain.html\" is quoted, ignored" \
+    "Rejected: http://u:***@a.example/x=b.example" \
+    " -%X \"Authorization <redacted, 12 bytes>\" " \
     "Argument refused: \"http://u:***@127.0.0.1:$port/plain.html\" is quoted"; do
     grep -qF -- "$line" <<<"$log" || fail "no '$line' in the messages: $log"
 done
 grep -qxF "warning: -%X header replaces an earlier one: Authorization: <redacted, 13 bytes>" \
     "$tmpdir/log" || fail "no redacted -%X warning: $(<"$tmpdir/log")"
-if grep -E "(LONG|WHY|QUOTE|AUTH|QSTART)PW" <<<"$log"; then
+for line in "Authorization <redacted, 12 bytes>" "proxy-authorization <redacted, 6 bytes>"; do
+    grep -qxF "warning: -%X malformed header ignored: $line" "$tmpdir/log" ||
+        fail "no redacted '$line' warning: $(<"$tmpdir/log")"
+done
+if grep -E "(LONG|WHY|QUOTE|AUTH|QSTART|MAL|ALIAS)PW" <<<"$log"; then
     fail "a password is in the messages about arguments"
 fi
 # the progress display draws only on a terminal

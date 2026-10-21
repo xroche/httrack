@@ -1,28 +1,36 @@
 #!/usr/bin/env python3
 """List log calls that print an engine address without hiding its password.
 
-A log call is hts_log_print(), hts_log_vprint(), printf(), or fprintf() or
-fputs() to a log file, stdout or stderr. Its arguments must pass every adr,
-url_adr, urladr(), lien, url, link, line or codebase through adr_nologin() or
-url_nologin(). A log file includes hts-ioinfo.txt. An allowed call
-is named "file: format" in ALLOW. Code under "#if 0" or a debug switch such
-as "#if HDEBUG" is skipped. A call through a macro wrapper, or an address
-held in an alias variable, is not detected.
+A log call is hts_log_print(), hts_log_vprint(), printf(), puts(), or
+fprintf(), fputs() or fprintfio() to a log file, stdout or stderr. Its
+arguments must pass every identifier containing adr, url, lien or link, and
+every line or codebase, through adr_nologin() or url_nologin(). A log file
+includes hts-ioinfo.txt. An allowed call is named "file: format" in ALLOW.
+Code under "#if 0" or a debug switch such as "#if HDEBUG" is skipped. A call
+through a macro wrapper, or an address held in an alias variable, is not
+detected.
 """
 
 import re
 import sys
 
-CALL = re.compile(r"\b(hts_log_print|hts_log_vprint|printf|fprintf|fputs)\s*\(")
+CALL = re.compile(
+    r"\b(hts_log_print|hts_log_vprint|printf|puts|fprintf|fputs|fprintfio)\s*\("
+)
+STREAM_FIRST = ("fprintf", "fprintfio")
 LOG_FILE = re.compile(r"(opt->log|log|fp_log|ioinfo|stdout|stderr)\s*$")
 SAFE = re.compile(
-    r"\b(adr_nologin|url_nologin|jump_identification_const|jump_identification)"
-    r"\s*\("
+    r"\b(adr_nologin|url_nologin|adr_nologin_r|url_nologin_r|jump_identification_const"
+    r"|jump_identification|text_excerpt)\s*\("
 )
-ADDRESS = re.compile(r"\b(\w*adr|lien|url|link|line|codebase)\b")
-NULL_TEST = re.compile(
-    r"\b(\w*adr|lien|url|link|line|codebase)\b\s*(\(\s*\))?\s*[!=]=\s*NULL"
+NAME = r"\b(\w*(adr|url|lien|link)\w*|line|codebase)\b"
+ADDRESS = re.compile(NAME)
+# Names that hold a path, a local file, a count or a mode, never an address.
+NOT_ADDRESS = re.compile(
+    r"\w*fil|\w*_sav\w*|lien_n|lien_tot|maxlink|\w*forbidden_url|urlmode"
+    r"|catch_url_strerror|shown_url"
 )
+NULL_TEST = re.compile(NAME + r"\s*(\(\s*\))?\s*[!=]=\s*NULL")
 SIZEOF = re.compile(r"\bsizeof\s*\(\s*\w+\s*\)")
 DEBUG_IF = re.compile(r"\s*#\s*if(def)?\s+(0|\w*DEBUG\w*(\s*==\s*\d+)?)\s*(/[/*].*)?$")
 # Calls whose address argument is not printed as text, with the reason.
@@ -34,6 +42,12 @@ ALLOW = {
     "htscoremain.c: X-URL: %s\\r\\nX-Cache-Entry-Unreadable: yes\\r\\n\\r\\n": "-#C",
     "htscoremain.c: X-URL: %s\\r\\n": "-#C",
     "htscoremain.c: %s\\r\\n": "r.adr is the page body",
+    "htsback.c: >>> ": "r.adr is the response header block",
+    "htscore.c: index redirect omitted: first link too long (%s)": "a local file",
+    "htshelp.c: \\tProxy's address: \\t%s\\n\\tProxy's port: \\t%d\\n": "a local proxy",
+    'htshelp.c: \\nThe URL is: \\"%s\\"\\n': "--catchurl hands the URL back",
+    'htshelp.c: You can capture it through: httrack \\"%s\\"\\n': "--catchurl",
+    "htsweb.c: URL=http://%s:%d/\\n": "the server's own address",
 }
 
 
@@ -114,7 +128,7 @@ def strip_safe(s):
 
 
 def stream(call, name):
-    """Returns the FILE argument of an fprintf() or fputs() call."""
+    """Returns the FILE argument of an fprintf(), fprintfio() or fputs() call."""
     args = strip_literals(call[call.index("(") + 1 : -1])
     depth, parts, cur = 0, [], ""
     for c in args:
@@ -125,7 +139,7 @@ def stream(call, name):
         depth += {"(": 1, "[": 1, ")": -1, "]": -1}.get(c, 0)
         cur += c
     parts.append(cur)
-    return (parts[0] if name == "fprintf" else parts[-1]).strip()
+    return (parts[0] if name in STREAM_FIRST else parts[-1]).strip()
 
 
 def first_format(call):
@@ -143,13 +157,13 @@ def main(paths):
         names.add(name)
         for m in CALL.finditer(src):
             call = src[m.start() : call_end(src, m.end())]
-            if m.group(1) in ("fprintf", "fputs") and not LOG_FILE.search(
+            if m.group(1) in STREAM_FIRST + ("fputs",) and not LOG_FILE.search(
                 stream(call, m.group(1))
             ):
                 continue
             args = strip_safe(strip_literals(call[call.index("(") + 1 :]))
             args = SIZEOF.sub("", NULL_TEST.sub("", args))
-            if not ADDRESS.search(args):
+            if all(NOT_ADDRESS.fullmatch(a.group(0)) for a in ADDRESS.finditer(args)):
                 continue
             key = "%s: %s" % (name, first_format(call))
             if key in ALLOW:
