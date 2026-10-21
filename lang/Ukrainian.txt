@@ -1107,7 +1107,7 @@ Go
 Done
 Готово
 Clear login
-Скинути
+Вийти
 The browser did not open: %s.
 Браузер не відкрився: %s.
 The browser came back with no cookies, so nothing was kept.

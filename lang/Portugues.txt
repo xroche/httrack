@@ -1107,7 +1107,7 @@ Ir
 Done
 Concluir
 Clear login
-Limpar
+Terminar sessão
 The browser did not open: %s.
 O browser não abriu: %s.
 The browser came back with no cookies, so nothing was kept.

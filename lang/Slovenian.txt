@@ -1107,7 +1107,7 @@ Pojdi
 Done
 Končano
 Clear login
-Počisti
+Odjava
 The browser did not open: %s.
 Brskalnik se ni odprl: %s.
 The browser came back with no cookies, so nothing was kept.

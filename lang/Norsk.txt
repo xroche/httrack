@@ -1107,7 +1107,7 @@ Gå
 Done
 Ferdig
 Clear login
-Tøm login
+Logg ut
 The browser did not open: %s.
 Nettleseren ble ikke åpnet: %s.
 The browser came back with no cookies, so nothing was kept.

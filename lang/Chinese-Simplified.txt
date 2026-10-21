@@ -1107,7 +1107,7 @@ Go
 Done
 完成
 Clear login
-清除登录
+退出登录
 The browser did not open: %s.
 浏览器未能打开：%s。
 The browser came back with no cookies, so nothing was kept.

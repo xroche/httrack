@@ -1107,7 +1107,7 @@ Ir
 Done
 Listo
 Clear login
-Borrar login
+Cerrar sesión
 The browser did not open: %s.
 El navegador no se ha abierto: %s.
 The browser came back with no cookies, so nothing was kept.

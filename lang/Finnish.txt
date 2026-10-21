@@ -1107,7 +1107,7 @@ Siirry
 Done
 Valmis
 Clear login
-Tyhjennä
+Kirjaudu ulos
 The browser did not open: %s.
 Selain ei avautunut: %s.
 The browser came back with no cookies, so nothing was kept.
