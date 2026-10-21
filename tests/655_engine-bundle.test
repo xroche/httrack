@@ -196,8 +196,10 @@ if touch -d '2026-01-01T10:00:00.5' "$tmpdir/subsecond" 2>/dev/null &&
     test "$tmpdir/subsecond" -nt "$tmpdir/order3.txt"; then
     order order4 202601011000.00 202601011000.00 jar
     touch -d '2026-01-01T10:00:00.5' "$tmpdir/order4.txt"
+    want_rows=139
 else
     echo "skipping the sub-second jar order row: touch cannot set fractions" >&2
+    want_rows=138
 fi
 
 # A control byte in a -%K or cookies.txt jar loads as it always did.
@@ -445,8 +447,8 @@ else
 fi
 
 # The real count of queued rows, so a deleted row cannot pass unseen.
-test "${#SELFTEST_WANT[@]}" -eq 139 ||
-    fail "expected 139 queued rows, got ${#SELFTEST_WANT[@]}"
+test "${#SELFTEST_WANT[@]}" -eq "$want_rows" ||
+    fail "expected $want_rows queued rows, got ${#SELFTEST_WANT[@]}"
 selftest_run_queued
 
 # Warnings name the line, and never a byte of it that could be a secret: a
