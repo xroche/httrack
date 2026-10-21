@@ -1107,7 +1107,7 @@ Ugrás
 Done
 Kész
 Clear login
-Törlés
+Kijelentkezés
 The browser did not open: %s.
 A böngésző nem nyílt meg: %s.
 The browser came back with no cookies, so nothing was kept.

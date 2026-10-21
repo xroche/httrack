@@ -1107,7 +1107,7 @@ Mine
 Done
 Valmis
 Clear login
-Tühjenda
+Logi välja
 The browser did not open: %s.
 Brauser ei avanenud: %s.
 The browser came back with no cookies, so nothing was kept.

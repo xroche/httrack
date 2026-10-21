@@ -1107,7 +1107,7 @@ Git
 Done
 Bitti
 Clear login
-Oturumu sil
+Oturumu kapat
 The browser did not open: %s.
 Tarayıcı açılmadı: %s.
 The browser came back with no cookies, so nothing was kept.

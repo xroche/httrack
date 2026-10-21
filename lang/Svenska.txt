@@ -415,7 +415,7 @@ Max antal förbindelser/sekund (för att undvika överbelastning på servern)
 Maximum number of links that can be tested (not saved!)
 Max antal länkar som kan bli testade (inte sparat!)
 Browser identity
-Webbläsare identitet
+Webbläsaridentitet
 Comment to be placed in each HTML file
 Kommentarer för infogas i varje HTML fil
 Languages accepted by the browser
@@ -597,7 +597,7 @@ Flödeskontroll
 Limits
 Begränsningar
 Browser ID
-Webbläsare Identitet
+Webbläsaridentitet
 Scan Rules
 Sökregler
 Spider
@@ -1107,7 +1107,7 @@ Gå
 Done
 Klar
 Clear login
-Rensa login
+Logga ut
 The browser did not open: %s.
 Webbläsaren öppnades inte: %s.
 The browser came back with no cookies, so nothing was kept.
