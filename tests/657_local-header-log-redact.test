@@ -1,0 +1,90 @@
+#!/bin/bash
+#
+# The -%H log (hts-ioinfo.txt) hides the value of every header and FTP command
+# that carries a login, while the wire still carries it.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+require_httrack
+
+TAB=$'\t'
+
+python=$(find_python) || skip "python3 missing"
+
+server=$(nativepath "$top_srcdir/tests/header-injection-server.py")
+tmpdir=$(mktemp -d)
+serverpid=
+wire=$tmpdir/wire
+
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+"$python" "$server" "$(nativepath "$wire")" >"$tmpdir/server.out" 2>"$tmpdir/server.err" &
+serverpid=$!
+port=$(discover_server_port "$tmpdir/server.out" "$serverpid") || exit 1
+
+crawl() { # crawl TAG URL [extra httrack args...]
+    local tag=$1 url=$2 rc=0
+    shift 2
+    mkdir -p "$tmpdir/$tag"
+    if test -e "$tmpdir/cookies.txt"; then
+        cp "$tmpdir/cookies.txt" "$tmpdir/$tag/"
+    fi
+    run_with_timeout 90 httrack "$url" -O "$tmpdir/$tag" -c1 --robots=0 \
+        --retries=0 --quiet -%v0 -%H "$@" >>"$tmpdir/log" 2>&1 || rc=$?
+    test "$rc" -eq 0 || fail "$tag: the crawl exited $rc"
+    cat "$tmpdir/$tag/hts-ioinfo.txt" >>"$tmpdir/ioinfo"
+}
+
+printf '127.0.0.1\tFALSE\t/\tFALSE\t2999999999\tjarsess\tJARSECRET\n' \
+    >"$tmpdir/cookies.txt"
+crawl jar "http://urluser:URLSECRET@127.0.0.1:$port/setcookie.html" \
+    -%X "Proxy-Authorization : Bearer PROXYSECRET"
+rm "$tmpdir/cookies.txt"
+crawl box "http://127.0.0.1:$port/plain.html" -%X "authorization: Bearer AUTHSECRET"
+
+basic=$(printf urluser:URLSECRET | base64)
+log=$(<"$tmpdir/ioinfo")
+sent=$(<"$wire")
+grep -q "^>>> X-Visible: shown" <<<"$log" || fail "the response headers were not logged: $log"
+# the server sent these, so only the request secrets are on the wire
+for secret in JARSECRET PROXYSECRET AUTHSECRET "$basic" "srvsess=SETCOOKIESECRET"; do
+    grep -qF "$secret" <<<"$sent" || fail "$secret never reached the server"
+done
+for secret in JARSECRET PROXYSECRET AUTHSECRET "$basic" SETCOOKIESECRET \
+    SPACEDSECRET FOLDEDSECRET; do
+    if grep -qF "$secret" <<<"$log"; then
+        fail "$secret is in hts-ioinfo.txt: $(grep -F "$secret" <<<"$log")"
+    fi
+done
+for line in "<<< Authorization: <redacted, $((${#basic} + 6)) bytes>" \
+    "<<< Proxy-Authorization: <redacted, 18 bytes>" \
+    "<<< Cookie: <redacted, 17 bytes>" \
+    "<<< authorization: <redacted, 17 bytes>" \
+    ">>> Set-Cookie: <redacted, 31 bytes>" \
+    ">>> set-cookie$TAB: <redacted, 20 bytes>" \
+    ">>> $TAB<redacted, 19 bytes>"; do
+    grep -qF "$line" <<<"$log" || fail "no '$line' in hts-ioinfo.txt: $log"
+done
+ok "HTTP login headers are redacted in the log and sent in full"
+
+root="$tmpdir/root"
+cmds="$tmpdir/cmds"
+mkdir -p "$root"
+printf 'body\n' >"$root/f.txt"
+ftp_server_start --root "$root" --require-pass --log "$(nativepath "$cmds")"
+: >"$tmpdir/ioinfo"
+crawl ftp "ftp://ftpuser:FTPSECRET@127.0.0.1:${FTP_PORT}/f.txt"
+grep -qxF "PASS FTPSECRET" "$cmds" || fail "the FTP password never reached the server"
+log=$(<"$tmpdir/ioinfo")
+if grep -qF FTPSECRET <<<"$log"; then
+    fail "the FTP password is in hts-ioinfo.txt"
+fi
+grep -qF -- "---> PASS <redacted, 9 bytes>" <<<"$log" || fail "no redacted PASS: $log"
+ok "the FTP password is redacted in the log and sent in full"

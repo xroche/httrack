@@ -61,7 +61,22 @@ def body_for(request, port):
     # the proxied pages link onward too, so a poisoned *host* becomes a referer
     if b"/p.html" in line:
         return page('<a href="/deep2.html">deep</a>')
+    # sets a cookie and links on, so the next request sends it back (657)
+    if b"/setcookie.html" in line:
+        return page('<a href="/plain.html">plain</a>')
     return page("leaf")
+
+
+def extra_headers(request):
+    line = request.split(b"\r\n", 1)[0]
+    if b"/setcookie.html" in line:
+        # a blank before the colon and a folded line still belong to the field
+        return (
+            b"Set-Cookie: srvsess=SETCOOKIESECRET; Path=/\r\n"
+            b"set-cookie\t: spaced=SPACEDSECRET;\r\n\tfolded=FOLDEDSECRET\r\n"
+            b"X-Visible: shown\r\n"
+        )
+    return b""
 
 
 def handle(conn, port, logf, lock, seq):
@@ -86,7 +101,9 @@ def handle(conn, port, logf, lock, seq):
         try:
             conn.sendall(
                 b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n"
-                b"Content-Length: %d\r\nConnection: close\r\n\r\n" % len(body) + body
+                + extra_headers(data)
+                + b"Content-Length: %d\r\nConnection: close\r\n\r\n" % len(body)
+                + body
             )
         except OSError:
             pass

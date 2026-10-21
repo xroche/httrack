@@ -1414,7 +1414,12 @@ int send_line(T_SOC soc, const char *data) {
 
   if (_DEBUG_HEAD) {
     if (ioinfo) {
-      fprintf(ioinfo, "---> %s\x0d\x0a", data);
+      if (strncmp(data, "PASS ", 5) == 0) {
+        fprintf(ioinfo, "---> PASS ");
+        fprint_redacted(ioinfo, strlen(data + 5));
+        fprintf(ioinfo, "\x0d\x0a");
+      } else
+        fprintf(ioinfo, "---> %s\x0d\x0a", data);
       fflush(ioinfo);
     }
   }

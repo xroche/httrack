@@ -541,7 +541,12 @@ char *convtolower(char *catbuff, size_t catbuffsize, const char *a);
 void hts_lowcase(char *s);
 int multipleStringMatch(const char *s, const char *match);
 
+/* Writes a header block to fp, each line after prefix, with the value of a
+   field that carries a login replaced by the fprint_redacted() marker. */
 void fprintfio(FILE * fp, const char *buff, const char *prefix);
+
+/* Writes the marker that stands for a hidden secret of len bytes. */
+void fprint_redacted(FILE *fp, size_t len);
 
 /* A write to a socket whose peer is gone raises SIGPIPE, and the default
    action kills the process. The library must not install a handler, because

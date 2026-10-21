@@ -5806,25 +5806,52 @@ int may_unknown2(httrackp * opt, const char *mime, const char *filename) {
 
 // -- Utils fichiers
 
-// pretty print for i/o
-void fprintfio(FILE * fp, const char *buff, const char *prefix) {
-  char nl = 1;
+void fprint_redacted(FILE *fp, size_t len) {
+  fprintf(fp, "<redacted, %lu bytes>", (unsigned long) len);
+}
 
-  while(*buff) {
-    switch (*buff) {
-    case 13:
-      break;
-    case 10:
-      fprintf(fp, "\r\n");
-      nl = 1;
-      break;
-    default:
+/* Fields whose value carries a login, hidden from the -%H log. */
+static const char *const secret_fields[] = {
+    "Authorization", "Proxy-Authorization", "Cookie", "Set-Cookie"};
+
+void fprintfio(FILE *fp, const char *buff, const char *prefix) {
+  hts_boolean nl = HTS_TRUE;
+  hts_boolean secret = HTS_FALSE;
+
+  while (*buff != '\0') {
+    const size_t len = strcspn(buff, "\r\n");
+
+    if (len != 0) {
+      size_t keep = len;
+
+      /* a folded line continues the value above it */
+      if (*buff != ' ' && *buff != '\t')
+        secret =
+            header_name_in(buff, secret_fields,
+                           sizeof(secret_fields) / sizeof(secret_fields[0]));
+      if (secret) {
+        const char *const colon = memchr(buff, ':', len);
+
+        keep = *buff != ' ' && *buff != '\t' && colon != NULL
+                   ? (size_t) (colon - buff) + 1
+                   : 0;
+        while (keep < len && (buff[keep] == ' ' || buff[keep] == '\t'))
+          keep++;
+      }
       if (nl)
         fprintf(fp, "%s", prefix);
-      nl = 0;
-      fputc(*buff, fp);
+      nl = HTS_FALSE;
+      fwrite(buff, 1, keep, fp);
+      if (keep < len)
+        fprint_redacted(fp, len - keep);
     }
-    buff++;
+    buff += len;
+    if (*buff == '\n') {
+      fprintf(fp, "\r\n");
+      nl = HTS_TRUE;
+    }
+    if (*buff != '\0')
+      buff++;
   }
 }
 
