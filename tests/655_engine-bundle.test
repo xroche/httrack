@@ -382,7 +382,7 @@ differ() { # differ A B [C] -- A and the last one overlap with other identities
     test -z "${3:-}" || more=("http://beta.test/#httrack-bundle=$2")
     selftest_queue "refused: /$1.hts and /$last.hts cover the same site with a different user agent or headers" \
         bundle "$dir" "https://www.alpha.test/#httrack-bundle=$1" \
-        "${more[@]}" "https://alpha.test/#httrack-bundle=$last"
+        ${more[@]+"${more[@]}"} "https://alpha.test/#httrack-bundle=$last"
 }
 differ alpha alphaua
 differ alpha alphaauth
@@ -430,7 +430,10 @@ chain_ms() { # chain_ms N -- milliseconds to load N chained bundles
     t1=$(now_ms)
     echo "$((t1 - t0))"
 }
-if now_ms >/dev/null; then
+if target_is_windows; then
+    # 2000 URLs pass the 32767-character Windows command line
+    echo "skipping the chained bundle timing row on Windows" >&2
+elif now_ms >/dev/null; then
     t250=$(chain_ms 250)
     test "$t250" -ge 50 || t250=50
     skip_if_out_of_budget 1 "$((t250 * 8 / 1000 + 1))" "the 2000-bundle chain row"

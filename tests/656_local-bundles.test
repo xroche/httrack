@@ -157,8 +157,8 @@ printf '%s\n' '# HTTrack bundle 1' cookies "$(jar beta.test SID "v$(printf '\033
     >"$tmpdir/two/esc.hts"
 printf '%s\n' '# HTTrack bundle 1' cookies \
     "$(jar beta.test SID "$(repeat_chars 8100 v)")" >"$tmpdir/two/long.hts"
+printf '%s\n' 'http://www.beta.test/#httrack-bundle=../beta.test' >"$tmpdir/bad.txt"
 badlist=$(nativepath "$tmpdir/bad.txt")
-printf '%s\n' 'http://www.beta.test/#httrack-bundle=../beta.test' >"$badlist"
 stops=0
 stop() { # stop MESSAGE [httrack args...] -- MESSAGE is a whole line of output
     local want=$1 rc=0
