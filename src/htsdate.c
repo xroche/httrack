@@ -182,3 +182,24 @@ time_t hts_time_clip(int64_t t) {
   }
   return (time_t) t;
 }
+
+/* See htsdate.h. */
+hts_boolean hts_time_exact(int64_t t, time_t *out) {
+  const time_t clipped = hts_time_clip(t);
+
+  if ((int64_t) clipped != t)
+    return HTS_FALSE;
+  *out = clipped;
+  return HTS_TRUE;
+}
+
+/* See htsdate.h. */
+hts_boolean hts_tm_filetime(const struct tm *tm, time_t *out) {
+  const int64_t t = hts_utc_seconds(tm);
+
+  if (t == -1 || t == 0)
+    return HTS_FALSE;
+  // A date past what time_t holds stamps its last second, never 1901.
+  *out = hts_time_clip(t);
+  return HTS_TRUE;
+}

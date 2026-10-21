@@ -3734,14 +3734,13 @@ void time_local_rfc822(char *s) {
 /* sets file time. -1 if error */
 /* Note: utf-8 */
 int set_filetime(const char *file, struct tm *tm_time) {
-  const int64_t t = hts_utc_seconds(tm_time);
+  time_t t;
 
-  if (t != -1 && t != 0) {
+  if (hts_tm_filetime(tm_time, &t)) {
     STRUCT_UTIMBUF tim;
 
     memset(&tim, 0, sizeof(tim));
-    // a date past what time_t holds stamps its last second, never 1901
-    tim.actime = tim.modtime = hts_time_clip(t);
+    tim.actime = tim.modtime = t;
     return UTIME(file, &tim);
   }
   return -1;

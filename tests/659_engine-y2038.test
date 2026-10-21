@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# Dates on both sides of 2038 read as 64-bit seconds: HTTP dates, Retry-After
-# and mirrored file times, clipped rather than wrapped on a 32-bit time_t.
+# Dates on both sides of 2038 read correctly, and clip on a 32-bit time_t.
 
 set -euo pipefail
 

@@ -1743,7 +1743,8 @@ static int st_localtime(httrackp *opt, int argc, char **argv) {
 }
 
 /* Dates on both sides of 2038-01-19T03:14:07Z, where a 32-bit time_t ends.
-   argv[0] is a scratch directory for the file-time check. */
+   argv[0] is a scratch directory for the file-time check. The clip rows only
+   bite on a 32-bit time_t, which CI's linux-i386 job runs. */
 static int st_y2038(httrackp *opt, int argc, char **argv) {
   static const struct {
     const char *date;
@@ -1758,6 +1759,9 @@ static int st_y2038(httrackp *opt, int argc, char **argv) {
       {"Sun, 07 Feb 2106 06:28:15 GMT", 4294967295LL},
       {"Sun, 07 Feb 2106 06:28:16 GMT", 4294967296LL},
       {"Fri, 31 Dec 9999 23:59:59 GMT", 253402300799LL},
+      /* centuries that are not leap years */
+      {"Thu, 01 Mar 1900 00:00:00 GMT", -2203891200LL},
+      {"Mon, 01 Mar 2100 00:00:00 GMT", 4107542400LL},
   };
 
   const time_t ref = (time_t) 2147483640; /* 2038-01-19T03:14:00Z */
@@ -1799,10 +1803,23 @@ static int st_y2038(httrackp *opt, int argc, char **argv) {
              (LLint) hts_utc_seconds(&tm));
       err = 1;
     }
+    /* years 0 and -1, below the first 400-year era */
+    tm.tm_year = -1900;
+    tm.tm_mon = 0;
+    if (hts_utc_seconds(&tm) != -62167219200LL) {
+      printf("y2038: year 0 gave " LLintP "\n", (LLint) hts_utc_seconds(&tm));
+      err = 1;
+    }
+    tm.tm_year = -1901;
+    if (hts_utc_seconds(&tm) != -62198755200LL) {
+      printf("y2038: year -1 gave " LLintP "\n", (LLint) hts_utc_seconds(&tm));
+      err = 1;
+    }
   }
 
   /* A wait across the 2038 boundary, and one too long for an int. */
-  if (hts_parse_retry_after("Tue, 19 Jan 2038 03:14:10 GMT", ref) != 10 ||
+  if (hts_parse_retry_after("Tue, 19 Jan 2038 03:14:00 GMT", ref) != 0 ||
+      hts_parse_retry_after("Tue, 19 Jan 2038 03:14:10 GMT", ref) != 10 ||
       hts_parse_retry_after("Sat, 19 Jan 2039 03:14:00 GMT", ref) !=
           365 * 86400 ||
       hts_parse_retry_after("Sun, 07 Feb 2106 06:28:16 GMT", ref) != INT_MAX ||
@@ -1811,7 +1828,7 @@ static int st_y2038(httrackp *opt, int argc, char **argv) {
     err = 1;
   }
 
-  /* Clip, never wrap. */
+  /* A date past time_t clips and never wraps. */
   if ((int64_t) hts_time_clip(2147483648LL) !=
           (narrow ? 2147483647LL : 2147483648LL) ||
       (int64_t) hts_time_clip(253402300799LL) !=
@@ -1821,6 +1838,16 @@ static int st_y2038(httrackp *opt, int argc, char **argv) {
       (int64_t) hts_time_clip(2147483647LL) != 2147483647LL) {
     printf("y2038: hts_time_clip wrapped\n");
     err = 1;
+  }
+  {
+    time_t got = (time_t) 7;
+
+    if (hts_time_exact(2147483648LL, &got) != !narrow ||
+        (int64_t) got != (narrow ? 7 : 2147483648LL) ||
+        !hts_time_exact(2147483647LL, &got) || (int64_t) got != 2147483647LL) {
+      printf("y2038: hts_time_exact accepted a clipped date\n");
+      err = 1;
+    }
   }
 
   /* A mirrored file dated after 2038 keeps that date, or the last second a
@@ -1849,6 +1876,13 @@ static int st_y2038(httrackp *opt, int argc, char **argv) {
                cases[i].date, (LLint) got, (LLint) want);
         err = 1;
       }
+    }
+    /* The epoch means no date: refused, and the file keeps its time. */
+    if (set_filetime_rfc822(path, cases[4].date) != 0 ||
+        set_filetime_rfc822(path, cases[0].date) != -1 ||
+        (int64_t) get_filetime(path) != cases[4].secs) {
+      printf("y2038: the epoch changed the file's date\n");
+      err = 1;
     }
   }
 
