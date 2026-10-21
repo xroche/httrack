@@ -41,6 +41,7 @@ Please visit our Website: http://www.httrack.com
 /* specific definitions */
 #include "htsglobal.h"
 #include "htslib.h"
+#include "htslines.h"
 #include "htscore.h"
 #include "htspsl.h"
 #include "htsdate.h"

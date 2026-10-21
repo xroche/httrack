@@ -2946,7 +2946,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       /* Check FS directory structure created */
       structcheck_utf8(StringBuff(opt->path_log));
 
-      /* owner-only: the log echoes argv, and URLs with their userinfo */
+      /* owner-only: the log echoes the command line and URLs with passwords */
       opt->log =
           hts_fopen_private(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                                     StringBuff(opt->path_log), "hts-log.txt"),
@@ -2987,9 +2987,11 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     // -%H may run before path_log exists, so create it first.
     if (_DEBUG_HEAD) {
       structcheck_utf8(StringBuff(opt->path_log));
-      ioinfo = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                             StringBuff(opt->path_log), "hts-ioinfo.txt"),
-                     "wb");
+      /* owner-only: it records request headers, Authorization included */
+      ioinfo = hts_fopen_private(
+          fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                  StringBuff(opt->path_log), "hts-ioinfo.txt"),
+          "wb");
       if (ioinfo == NULL)
         hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
                       "unable to create header debug file %s",
