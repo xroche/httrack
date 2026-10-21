@@ -93,6 +93,7 @@ assert_private "running crawl" "$slow" hts-in_progress.lock hts-cache/doit.log \
 # WebHTTrack saves the project's winprofile.ini, which can carry a proxy password.
 web="$tmpdir/web"
 mkdir -p "$web/websites"
+cleanup_push htsserver_cleanup
 htsserver_start --home "$web"
 sid=$(htsserver_sid)
 test -n "$sid" || fail "no session id from htsserver"
