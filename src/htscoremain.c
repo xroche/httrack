@@ -592,7 +592,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   int httrack_logmode = 3;      // ONE log file
 
   ensureUrlCapacity(url, url_sz, 65536);
-  /* a previous run's bundles are not this one's */
+  /* a previous run's bundles and folder are not this one's, but only a library
+     caller loads twice on one opt */
   hts_bundle_free(opt);
   StringCopy(opt->bundle_dir, "");
 
@@ -1127,7 +1128,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             htsmain_free();
             return -1;
           } else if (strfield2(argv[i] + 2, "bundle-dir")) {
-            i++; /* its value, which the option parser reads */
+            i++; /* The option parser reads its value. */
           }
           //
           else {

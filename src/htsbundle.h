@@ -47,29 +47,24 @@ Please visit our Website: http://www.httrack.com
 /* A bundle name holds fewer bytes than this. */
 #define HTS_BUNDLE_NAME_MAX 128
 
-/* Cut the bundle suffix off url in place and copy its name into name, or ""
-   when url has none. NULL, or why the name is refused, url then left alone. */
-const char *hts_bundle_cut(char *url, char *name, size_t name_size);
-
-/* hts_bundle_cut(), then record that url names the bundle. A name given twice
-   is one bundle. NULL, or why the run must stop. */
+/* Cut the bundle suffix off url in place and record that url names that
+   bundle. A name given twice is one bundle. NULL, or why the run must stop. */
 const char *hts_bundle_take(httrackp *opt, char *url);
 
 /* Read every named bundle from opt->bundle_dir, or the project folder, and
    refuse two bundles that overlap with different identities or cookie values.
-   The cookies go into opt->cookie, under the records already there when
-   jar_file (or NULL) is newer than the bundle. HTS_FALSE after writing why
-   into err, naming the file: the run must stop. A second call reads the files
-   again. */
+   The cookies go into opt->cookie. A jar_file newer than the bundle keeps its
+   records. A NULL one never does. HTS_FALSE after writing why into err, naming
+   the file, and then the run must stop. A second call reads the files again. */
 hts_boolean hts_bundle_load_all(httrackp *opt, const char *jar_file, char *err,
                                 size_t err_size);
 
 /* The i-th url line of the loaded bundles, or NULL past the last one. */
 const char *hts_bundle_url(httrackp *opt, size_t i);
 
-/* Give req the UA and headers of the first bundle whose scope holds adr's
-   host, where it has them. Its headers go over https alone when any URL of
-   the bundles merged with it is https. */
+/* Give req the UA and the headers of the first bundle whose scope holds adr's
+   host, when that bundle has them. Its headers go over https alone when any URL
+   of the bundles merged with it is https. */
 void hts_bundle_identity(httrackp *opt, const char *adr, htsrequest *req);
 
 /* Forget the bundles named for opt. */
@@ -102,8 +97,8 @@ typedef struct cookie_filter {
 
 /* Load Netscape jar records from fp's position to its end through filter,
    as cookie_load reads a file. given names the file in warnings, which name
-   the line and none of its bytes. A line with a control byte other than TAB
-   stops the load. */
+   the line and none of its bytes. A line with a control byte other than TAB,
+   or one too long, stops the load. */
 void cookie_load_stream(httrackp *opt, t_cookie *cookie, FILE *fp,
                         const char *given, cookie_filter *filter);
 

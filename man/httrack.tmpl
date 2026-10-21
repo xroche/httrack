@@ -117,11 +117,17 @@ URLs naming the bundle and of its url lines. A host with no registrable domain,
 such as a public suffix, a single label or an address, covers itself alone.
 Scope lines replace that default. HTTrack drops a cookie outside the scope and
 gives the count in one warning. HTTrack refuses a Host, Cookie, Proxy\-* or
-framing header, and a line holding a control byte. A second
+framing header, a scope line naming a public suffix, and a line that holds a
+control byte or is too long, in the cookie jar too and even under
+.IR \-b0 .
+A second
 .I ua
 line, header lines over 8192 bytes, or a full cookie jar stops the run too. A
-repeated cookie line, an unknown key or an unknown # line only warns. Messages
-give the file and the line number, never the line's text. Two bundles whose
+repeated cookie line or an unknown key only warns, and so does an unknown #
+line in the cookie jar. Before the
+.I cookies
+line, a # line is a comment. Messages give the file and the line number, never
+a value. Two bundles whose
 scopes overlap must give the same user agent, headers and cookie values, or the
 run stops.
 .IP

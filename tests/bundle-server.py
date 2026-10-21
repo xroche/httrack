@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Three sites behind one proxy port, for 656_local-bundles.
+"""Several sites behind one proxy port, for 656_local-bundles.
 
 httrack reaches it as its -P proxy, so the absolute request URL names the
 site. Every request prints one "HIT <host><path> ua=<...> auth=<...>
@@ -22,6 +22,13 @@ PAGES = {
     "cdn.gamma.test/b.gif": "GIF89a",
     "github.io/": '<a href="http://attacker.github.io/x.html">x</a>',
     "attacker.github.io/x.html": "another user's site",
+    "evil.test/": "another site",
+    "sub.alpha.test/home": "back on the alpha site",
+}
+# out of the bundle's site and back in
+REDIRECTS = {
+    "www.alpha.test/out": "http://evil.test/back",
+    "evil.test/back": "http://sub.alpha.test/home",
 }
 
 lock = threading.Lock()
@@ -48,6 +55,12 @@ class Handler(BaseHTTPRequestHandler):
                 ),
                 flush=True,
             )
+        if key in REDIRECTS:
+            self.send_response(302)
+            self.send_header("Location", REDIRECTS[key])
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
         body = PAGES.get(key, "")
         ctype = "image/gif" if key.endswith(".gif") else "text/html"
         if ctype == "text/html":

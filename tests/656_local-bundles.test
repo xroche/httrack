@@ -63,13 +63,13 @@ hit() { # hit WHAT FROM LINE -- the server logged LINE after line FROM
     command grep -qxF "HIT $3" "$tmpdir/new.out" ||
         fail_dump "$1: no request [HIT $3]" "$tmpdir/new.out"
 }
-dated() { # dated BUNDLE-DATE JAR-DATE
-    touch -d "$1" "$alpha"
-    touch -d "$2" "$jarfile"
+dated() { # dated BUNDLE-TIME JAR-TIME -- times as touch -t takes them
+    touch -t "$1" "$alpha"
+    touch -t "$2" "$jarfile"
 }
 
 # The jar is newer than the bundle, so its SID wins. --bundle-dir is relative.
-dated '2026-01-01 10:00:00' '2026-01-02 10:00:00'
+dated 202601011000.00 202601021000.00
 crawl "$tmpdir" -O one --bundle-dir logins \
     'http://www.alpha.test/#httrack-bundle=alpha.test' \
     'http://www.beta.test/#httrack-bundle=beta.test' \
@@ -90,6 +90,7 @@ n=$(hits)
 test "$n" -eq 9 || fail_dump "$n lines, expected PORT and 8 requests" "$tmpdir/srv.out"
 cmp -s "$tmpdir/alpha.orig" "$alpha" || fail "the crawl wrote to the bundle"
 doit=$tmpdir/one/hts-cache/doit.log
+test -f "$doit" || fail "no $doit"
 command grep -qF -- '--bundle-dir logins' "$doit" &&
     fail_dump "doit.log kept a relative --bundle-dir" "$doit"
 # The suffix is cut before any URL reaches a file name, a log or the index.
@@ -124,14 +125,14 @@ update() { # update WANT-SID
     hit "--update with SID=$1" "$from" "www.alpha.test/ $a=$1 x=-"
 }
 refresh
-dated '2026-01-01 10:00:00' '2026-01-02 10:00:00'
+dated 202601011000.00 202601021000.00
 update alpha-server
 # a new capture is newer than the jar, so the fresh login wins
-dated '2026-01-03 10:00:00' '2026-01-02 10:00:00'
+dated 202601031000.00 202601021000.00
 update alpha-captured
 # and so it does on a tie, where a coarse clock cannot order the two
 refresh
-dated '2026-01-04 10:00:00' '2026-01-04 10:00:00'
+dated 202601041000.00 202601041000.00
 update alpha-captured
 
 # A -%L list names a bundle too, and it resolves in the project folder.
@@ -154,33 +155,56 @@ printf '# HTTrack bundle 1\nua U\rX-Injected: 1\nheader X-A: 1\rCookie: forged=1
     >"$tmpdir/two/cr.hts"
 printf '%s\n' '# HTTrack bundle 1' cookies "$(jar beta.test SID "v$(printf '\033')x")" \
     >"$tmpdir/two/esc.hts"
-printf '%s\n' 'http://www.beta.test/#httrack-bundle=../beta.test' >"$tmpdir/bad.txt"
+printf '%s\n' '# HTTrack bundle 1' cookies \
+    "$(jar beta.test SID "$(repeat_chars 8100 v)")" >"$tmpdir/two/long.hts"
+badlist=$(nativepath "$tmpdir/bad.txt")
+printf '%s\n' 'http://www.beta.test/#httrack-bundle=../beta.test' >"$badlist"
 stops=0
-stop() { # stop MESSAGE [httrack args...]
+stop() { # stop MESSAGE [httrack args...] -- MESSAGE is a whole line of output
     local want=$1 rc=0
     shift
     : >"$log"
     crawl "$tmpdir" -O two "$@" || rc=$?
     test "$rc" -ne 0 || fail "the run did not stop: $*"
-    command grep -qF "$want" "$log" || fail_dump "no message [$want]" "$log"
+    command grep -qxF "$want" "$log" || fail_dump "no message [$want]" "$log"
     stops=$((stops + 1))
 }
 before=$(hits)
-stop 'nosuch.hts: cannot read the login bundle' \
+stop 'Login bundle: two/nosuch.hts: cannot read the login bundle: No such file or directory' \
     'http://www.alpha.test/#httrack-bundle=nosuch'
-command grep -qxF 'Login bundle: two/nosuch.hts: cannot read the login bundle: No such file or directory' "$log" ||
-    fail_dump "the message changed" "$log"
-stop 'line 1: invalid login bundle name' -%L "$(nativepath "$tmpdir/bad.txt")"
-stop 'secret.hts, line 2: refused header: a proxy header is not for the site' \
+stop "\"$badlist\", line 1: invalid login bundle name: use letters, digits, '.', '_' and '-'" \
+    -%L "$badlist"
+stop 'Login bundle: two/secret.hts, line 2: refused header: a proxy header is not for the site' \
     'http://www.alpha.test/#httrack-bundle=secret'
-stop 'cr.hts, line 2: holds a control byte' \
+stop 'Login bundle: two/cr.hts, line 2: holds a control byte' \
     'http://www.alpha.test/#httrack-bundle=cr'
-stop 'esc.hts, line 3: a cookie line holds a control byte' \
-    'http://www.beta.test/#httrack-bundle=esc'
-test "$stops" -eq 5 || fail "$stops stops ran, expected 5"
+for b0 in -b1 -b0; do
+    stop 'Login bundle: two/esc.hts, line 3: a cookie line holds a control byte' \
+        "$b0" 'http://www.beta.test/#httrack-bundle=esc'
+done
+stop 'Login bundle: two/long.hts, line 3: a cookie line is too long' \
+    'http://www.beta.test/#httrack-bundle=long'
+test "$stops" -eq 7 || fail "$stops stops ran, expected 7"
 test "$(hits)" -eq "$before" || fail_dump "a refused bundle still crawled" "$tmpdir/srv.out"
 for f in "$log" "$tmpdir/two/hts-log.txt"; do
     test -f "$f" || fail "no $f"
     command grep -qF planted-secret "$f" && fail_dump "$f shows the secret" "$f"
 done
-true
+
+# The identity is per request host: it drops on a redirect away from the
+# bundle's site and returns on one back. A userinfo that spells the site's name
+# gets none of it.
+before=$(hits)
+crawl "$tmpdir" -O three --bundle-dir logins '+*evil.test/*' \
+    '+*sub.alpha.test/*' 'http://www.alpha.test/out#httrack-bundle=alpha.test' \
+    'http://www.alpha.test@evil.test/' || fail "the redirect crawl failed"
+a='ua=AlphaUA/1.0 auth=Bearer alpha-token cookie=PREF=alpha-pref; SID=alpha-captured x=-'
+g='ua=GlobalUA/9 auth=- cookie=- x=1'
+hit "redirect start" "$before" "www.alpha.test/out $a"
+hit "redirect out" "$before" "evil.test/back $g"
+hit "redirect back" "$before" "sub.alpha.test/home $a"
+# the userinfo is the user's own Basic login, sent as given
+hit "userinfo" "$before" \
+    "evil.test/ ua=GlobalUA/9 auth=Basic d3d3LmFscGhhLnRlc3Q= cookie=- x=1"
+test "$(($(hits) - before))" -eq 4 ||
+    fail_dump "redirect crawl: $(($(hits) - before)) requests, expected 4" "$tmpdir/srv.out"

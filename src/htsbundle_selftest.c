@@ -36,23 +36,34 @@ Please visit our Website: http://www.httrack.com
 
 /* -#test=bundlecut <url>: the bundle a start URL names, and the URL left. */
 static int st_bundlecut(httrackp *opt, int argc, char **argv) {
+  static const char nodir[] = "/nonexistent-bundlecut/";
   char url[HTS_URLMAXSIZE * 2];
-  char name[HTS_BUNDLE_NAME_MAX];
+  char err[1024];
   const char *why;
 
-  (void) opt;
   if (argc != 1 || strlen(argv[0]) >= sizeof(url)) {
     fprintf(stderr, "bundlecut: takes <url>\n");
     return 1;
   }
   strcpybuff(url, argv[0]);
-  why = hts_bundle_cut(url, name, sizeof(name));
-  if (why != NULL)
+  hts_bundle_free(opt);
+  why = hts_bundle_take(opt, url);
+  if (why != NULL) {
     printf("bad: %s\n", why);
-  else if (name[0] == '\0')
+  } else if (opt->bundle_state == NULL) {
     printf("none\n");
-  else
-    printf("%s %s\n", name, url);
+  } else {
+    /* the name shows in the file a load from a missing folder cannot open */
+    StringCopy(opt->bundle_dir, nodir);
+    assertf(!hts_bundle_load_all(opt, NULL, err, sizeof(err)) &&
+            strncmp(err, nodir, sizeof(nodir) - 1) == 0 &&
+            strstr(err, ".hts: ") != NULL);
+    printf("%.*s %s\n",
+           (int) (strstr(err, ".hts: ") - err) - (int) (sizeof(nodir) - 1),
+           err + sizeof(nodir) - 1, url);
+    StringCopy(opt->bundle_dir, "");
+    hts_bundle_free(opt);
+  }
   return 0;
 }
 
@@ -71,9 +82,10 @@ static void print_without_dir(const char *err, const char *dir) {
   printf("%s\n", p);
 }
 
-/* -#test=bundle <dir> <url>... [host:<adr>]... [jar:<file>] [twice]: load the
-   bundles the URLs name from dir over the jar file, twice when asked, then
-   print their url lines, the jar, and the UA and headers each adr gets. */
+/* -#test=bundle <dir> <url>... [host:<adr>]... [jar:<file>] [twice] [b0]: load
+   the bundles the URLs name from dir over the jar file, twice when asked, with
+   cookies off for b0, then print their url lines, the jar, and the UA and
+   headers each adr gets. */
 static int st_bundle(httrackp *opt, int argc, char **argv) {
   FILE *const log = opt->log;
   t_cookie *const prev = opt->cookie;
@@ -87,7 +99,7 @@ static int st_bundle(httrackp *opt, int argc, char **argv) {
 
   if (argc < 2 || jar == NULL) {
     fprintf(stderr, "bundle: takes <dir> <url>... [host:<adr>]... "
-                    "[jar:<file>] [twice]\n");
+                    "[jar:<file>] [twice] [b0]\n");
     freet(jar);
     return 1;
   }
@@ -104,6 +116,8 @@ static int st_bundle(httrackp *opt, int argc, char **argv) {
       (void) cookie_load(opt, jar, "", jar_file);
     } else if (strcmp(argv[i], "twice") == 0) {
       loads = 2;
+    } else if (strcmp(argv[i], "b0") == 0) {
+      opt->cookie = NULL;
     } else if (strncmp(argv[i], "host:", 5) != 0 &&
                strlen(argv[i]) < sizeof(buff)) {
       strcpybuff(buff, argv[i]);
@@ -153,7 +167,7 @@ done:
 
 const struct selftest_entry selftests_bundle[] = {
     {"bundlecut", "<url>", "the login bundle a start URL names", st_bundlecut},
-    {"bundle", "<dir> <url>... [host:<adr>]... [jar:<file>] [twice]",
+    {"bundle", "<dir> <url>... [host:<adr>]... [jar:<file>] [twice] [b0]",
      "load login bundles and print the identity each host gets", st_bundle},
     {NULL, NULL, NULL, NULL},
 };

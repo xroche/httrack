@@ -65,7 +65,8 @@ typedef struct bundle {
   size_t nscope;
   char *ua; /* NULL when it gives none */
   String headers;
-  hts_boolean https_only; /* Are its headers for https alone? */
+  hts_boolean https_only;  /* Are its headers for https alone? */
+  hts_boolean scope_given; /* Do scope lines replace the default scope? */
 } bundle;
 
 typedef struct hts_bundle_state {
@@ -102,6 +103,7 @@ static void bundle_clear(bundle *b) {
   freet(b->ua);
   StringClear(b->headers);
   b->https_only = HTS_FALSE;
+  b->scope_given = HTS_FALSE;
 }
 
 /* Is name a Windows device name, such as CON, aux.txt or com1? */
@@ -143,7 +145,9 @@ static const char *bundle_name_refusal(const char *name) {
   return NULL;
 }
 
-const char *hts_bundle_cut(char *url, char *name, size_t name_size) {
+/* Cut the bundle suffix off url in place and copy its name into name, or ""
+   when url has none. NULL, or why the name is refused and url is unchanged. */
+static const char *bundle_cut(char *url, char *name, size_t name_size) {
   char *const at = strstr(url, HTS_BUNDLE_SUFFIX);
   const char *why;
 
@@ -207,7 +211,7 @@ static hts_boolean bundle_add(httrackp *opt, const char *name,
 
 const char *hts_bundle_take(httrackp *opt, char *url) {
   char name[HTS_BUNDLE_NAME_MAX];
-  const char *const why = hts_bundle_cut(url, name, sizeof(name));
+  const char *const why = bundle_cut(url, name, sizeof(name));
 
   if (why != NULL || name[0] == '\0')
     return why;
@@ -226,16 +230,18 @@ hts_boolean hts_bundle_has_control(const char *s, size_t len) {
   return HTS_FALSE;
 }
 
-/* Read a line into line without its line end. NULL, or why the line is
-   refused: too long, or with a control byte other than TAB, because a CR
-   would end a header early. */
-static const char *bundle_readline(FILE *fp, char *line, size_t size) {
+/* Read a line of fewer than BUNDLE_LINE_MAX bytes, its line end aside, into
+   line. NULL, or why the line is refused: too long, or with a control byte
+   other than TAB, because a CR would end a header early. */
+static const char *bundle_readline(FILE *fp, char line[BUNDLE_LINE_MAX + 1]) {
   size_t len;
 
-  if (hts_readline_raw(fp, line, size, &len))
+  if (hts_readline_raw(fp, line, BUNDLE_LINE_MAX + 1, &len))
     return "too long";
   if (len > 0 && line[len - 1] == '\r')
     line[--len] = '\0';
+  if (len >= BUNDLE_LINE_MAX)
+    return "too long";
   return hts_bundle_has_control(line, len) ? "holds a control byte" : NULL;
 }
 
@@ -293,22 +299,19 @@ static const char *bundle_scope_add(bundle *b, const char *entry) {
   return strlist_add(&b->scope, &b->nscope, entry) ? NULL : "out of memory";
 }
 
-/* Note that url names b. An https one makes b's headers https-only, and
-   unless scope lines replace it, the URL's registrable domain joins the scope,
-   or its host alone when it has none: a public suffix, a single label or an
-   address. NULL, or why it could not. */
-static const char *bundle_note_url(bundle *b, const char *url,
-                                   hts_boolean scope_given) {
+/* Add url's https flag and default scope to b. NULL, or why it could not. */
+static const char *bundle_note_url(bundle *b, const char *url) {
   char host[256];
   char entry[sizeof(host) + 1];
   const char *reg;
 
   if (strfield(url, "https:"))
     b->https_only = HTS_TRUE;
-  if (scope_given)
+  if (b->scope_given)
     return NULL;
   if (!cookie_url_host(url, host, sizeof(host)))
     return "cannot work out the bundle's scope";
+  // a host with no registrable domain covers itself alone
   reg = hts_host_is_address(host, strlen(host))
             ? NULL
             : hts_psl_registrable_domain(host);
@@ -360,13 +363,12 @@ static hts_boolean key_is(const char *line, size_t klen, const char *key) {
 /* Read b's lines up to "cookies", leaving fp at its jar. *cookies_line gets
    the number of that line, or 0 when b has no cookies. */
 static hts_boolean bundle_parse(httrackp *opt, bundle *b, FILE *fp,
-                                hts_boolean *scope_given, int *cookies_line,
-                                char *err, size_t err_size) {
+                                int *cookies_line, char *err, size_t err_size) {
   static const char bom[] = "\xEF\xBB\xBF";
-  char BIGSTK line[BUNDLE_LINE_MAX];
+  char BIGSTK line[BUNDLE_LINE_MAX + 1];
   int lineno = 1;
   int version;
-  const char *why = bundle_readline(fp, line, sizeof(line));
+  const char *why = bundle_readline(fp, line);
 
   if (why != NULL)
     BUNDLE_FAIL("%s, line 1: %s", b->file, why);
@@ -378,14 +380,13 @@ static hts_boolean bundle_parse(httrackp *opt, bundle *b, FILE *fp,
                 b->file);
   if (version != 1)
     BUNDLE_FAIL("%s: bundle version %d is not supported", b->file, version);
-  *scope_given = HTS_FALSE;
   *cookies_line = 0;
   while (!feof(fp)) {
     const char *value;
     size_t klen;
 
     lineno++;
-    why = bundle_readline(fp, line, sizeof(line));
+    why = bundle_readline(fp, line);
     if (why != NULL)
       BUNDLE_FAIL("%s, line %d: %s", b->file, lineno, why);
     if (line[0] == '\0' || line[0] == '#')
@@ -440,7 +441,7 @@ static hts_boolean bundle_parse(httrackp *opt, bundle *b, FILE *fp,
       StringCat(b->headers, value);
       StringCat(b->headers, "\r\n");
     } else {
-      *scope_given = HTS_TRUE;
+      b->scope_given = HTS_TRUE;
       if (!bundle_scope_line(b, value, lineno, err, err_size))
         return HTS_FALSE;
     }
@@ -481,12 +482,19 @@ static hts_boolean bundle_admit(cookie_filter *filter, t_cookie *cookie,
     ctx->dropped++;
     return HTS_FALSE;
   }
+  if (strlen(name) > COOKIE_MAX_PAIR ||
+      strlen(value) > COOKIE_MAX_PAIR - strlen(name)) {
+    filter->why = "a cookie name and value pass 4096 bytes";
+    return HTS_FALSE;
+  }
   other = cookie_find_exact(ctx->all_bundles->data, name, host, path);
   if (other != NULL && !repeat &&
       strcmp(cookie_get(buffer, other, 6), value) != 0) {
     filter->why = "a cookie has another value in another bundle";
     return HTS_FALSE;
   }
+  /* unreachable while all_bundles outsizes opt->cookie; a silent skip would
+     stop the clash check */
   if (cookie_set(ctx->all_bundles, name, value, domain, path, NULL) != 0) {
     filter->why = "too many cookies to compare with the other bundles";
     return HTS_FALSE;
@@ -504,8 +512,8 @@ static hts_boolean bundle_load(httrackp *opt, bundle *b, const char *jar_file,
                               ? StringBuff(opt->bundle_dir)
                               : StringBuff(opt->path_log);
   const size_t dlen = strlen(dir);
-  hts_boolean scope_given;
   int cookies_line;
+  t_cookie *scratch = NULL;
   bundle_jar ctx;
   cookie_filter filter;
   const char *why = NULL;
@@ -522,14 +530,14 @@ static hts_boolean bundle_load(httrackp *opt, bundle *b, const char *jar_file,
   if (fp == NULL)
     BUNDLE_FAIL("%s: cannot read the login bundle: %s", b->file,
                 strerror(errno));
-  if (!bundle_parse(opt, b, fp, &scope_given, &cookies_line, err, err_size)) {
+  if (!bundle_parse(opt, b, fp, &cookies_line, err, err_size)) {
     fclose(fp);
     return HTS_FALSE;
   }
   for (i = 0; i < b->nstart && why == NULL; i++)
-    why = bundle_note_url(b, b->start_urls[i], scope_given);
+    why = bundle_note_url(b, b->start_urls[i]);
   for (i = 0; i < b->nurls && why == NULL; i++)
-    why = bundle_note_url(b, b->urls[i], scope_given);
+    why = bundle_note_url(b, b->urls[i]);
   if (why != NULL) {
     fclose(fp);
     BUNDLE_FAIL("%s: %s", b->file, why);
@@ -542,12 +550,22 @@ static hts_boolean bundle_load(httrackp *opt, bundle *b, const char *jar_file,
   filter.admit = bundle_admit;
   filter.ctx = &ctx;
   filter.line = cookies_line;
-  if (cookies_line != 0 && opt->cookie != NULL)
-    cookie_load_stream(opt, opt->cookie, fp, b->file, &filter);
-  else if (cookies_line != 0)
+  if (cookies_line != 0 && opt->cookie == NULL) {
     hts_log_print(opt, LOG_WARNING,
                   "Cookies are disabled, so the cookies of %s are not sent",
                   b->file);
+    // read all the same, so -b0 does not decide whether a bundle is valid
+    scratch = calloct(1, sizeof(t_cookie));
+    if (scratch == NULL) {
+      fclose(fp);
+      BUNDLE_FAIL("%s: out of memory", b->file);
+    }
+    scratch->max_len = sizeof(scratch->data);
+  }
+  if (cookies_line != 0)
+    cookie_load_stream(opt, scratch != NULL ? scratch : opt->cookie, fp,
+                       b->file, &filter);
+  freet(scratch);
   fclose(fp);
   if (ctx.dropped != 0)
     hts_log_print(opt, LOG_WARNING,
@@ -581,41 +599,33 @@ static hts_boolean bundle_same_identity(const bundle *a, const bundle *b) {
          strcmp(StringBuff(a->headers), StringBuff(b->headers)) == 0;
 }
 
-/* Bundles that overlap have merged, so an https URL in any of them makes the
-   headers of all of them https-only. */
-static void bundle_merge_https(hts_bundle_state *st) {
-  hts_boolean changed = HTS_TRUE;
-  size_t i, j;
-
-  while (changed) {
-    changed = HTS_FALSE;
-    for (i = 0; i < st->count; i++) {
-      for (j = 0; j < st->count; j++) {
-        bundle *const a = &st->items[i];
-        const bundle *const b = &st->items[j];
-
-        if (!a->https_only && b->https_only && bundle_scopes_overlap(a, b)) {
-          a->https_only = HTS_TRUE;
-          changed = HTS_TRUE;
-        }
-      }
-    }
-  }
+/* The bundle that stands for the merged group holding i. */
+static size_t bundle_group(size_t *group, size_t i) {
+  while (group[i] != i)
+    i = group[i] = group[group[i]];
+  return i;
 }
 
 hts_boolean hts_bundle_load_all(httrackp *opt, const char *jar_file, char *err,
                                 size_t err_size) {
   hts_bundle_state *const st = (hts_bundle_state *) opt->bundle_state;
   t_cookie *all_bundles;
+  size_t *group;
   hts_boolean ok = HTS_TRUE;
   size_t i, j;
 
   if (st == NULL)
     return HTS_TRUE;
   all_bundles = calloct(1, sizeof(t_cookie));
-  if (all_bundles == NULL)
+  group = calloct(st->count, sizeof(size_t));
+  if (all_bundles == NULL || group == NULL) {
+    freet(all_bundles);
+    freet(group);
     BUNDLE_FAIL("login bundles: out of memory");
+  }
   all_bundles->max_len = sizeof(all_bundles->data);
+  for (i = 0; i < st->count; i++)
+    group[i] = i;
   for (i = 0; i < st->count && ok; i++)
     ok = bundle_load(opt, &st->items[i], jar_file, all_bundles, err, err_size);
   for (i = 0; i < st->count && ok; i++) {
@@ -623,17 +633,27 @@ hts_boolean hts_bundle_load_all(httrackp *opt, const char *jar_file, char *err,
       const bundle *const a = &st->items[i];
       const bundle *const b = &st->items[j];
 
-      if (bundle_scopes_overlap(a, b) && !bundle_same_identity(a, b)) {
+      if (!bundle_scopes_overlap(a, b))
+        continue;
+      if (!bundle_same_identity(a, b)) {
         snprintf(err, err_size,
                  "%s and %s cover the same site with a different user agent "
                  "or headers",
                  a->file, b->file);
         ok = HTS_FALSE;
+      } else {
+        group[bundle_group(group, j)] = bundle_group(group, i);
       }
     }
   }
-  if (ok)
-    bundle_merge_https(st);
+  // an https URL in any merged bundle makes the headers of all https-only
+  for (i = 0; i < st->count; i++) {
+    if (st->items[i].https_only)
+      st->items[bundle_group(group, i)].https_only = HTS_TRUE;
+  }
+  for (i = 0; i < st->count; i++)
+    st->items[i].https_only = st->items[bundle_group(group, i)].https_only;
+  freet(group);
   freet(all_bundles);
   return ok;
 }

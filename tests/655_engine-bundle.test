@@ -115,6 +115,34 @@ https://mixed.test ua=M headers=X-M: 1|" bundle "$dir" \
         host:https://mixed.test
 done
 
+# Merging is transitive: A and C share no site, but both overlap B, so C's
+# https URL keeps A's headers off plain http too, in either order. scope lines
+# leave the https rule as it is.
+for n in a b c; do
+    lines=('# HTTrack bundle 1' 'ua H' 'header X-H: 1')
+    case $n in
+    a) lines+=('scope a.test' 'scope b.test') ;;
+    b) lines+=('scope b.test' 'scope c.test') ;;
+    c) lines+=('scope c.test' 'url https://www.c.test/') ;;
+    esac
+    bundle "chain$n" "${lines[@]}"
+done
+chain_hosts=(host:http://a.test host:https://a.test host:http://c.test)
+chain_out="http://a.test ua=H headers=global
+https://a.test ua=H headers=X-H: 1|
+http://c.test ua=H headers=global"
+selftest_queue_tail "
+$chain_out" bundle "$dir" 'http://a.test/#httrack-bundle=chaina' \
+    'http://b.test/#httrack-bundle=chainb' 'http://c.test/#httrack-bundle=chainc' \
+    "${chain_hosts[@]}"
+selftest_queue_tail "
+$chain_out" bundle "$dir" 'http://c.test/#httrack-bundle=chainc' \
+    'http://b.test/#httrack-bundle=chainb' 'http://a.test/#httrack-bundle=chaina' \
+    "${chain_hosts[@]}"
+selftest_queue_tail "
+http://c.test ua=H headers=global" bundle "$dir" \
+    'http://c.test/#httrack-bundle=chainc' host:http://c.test
+
 # The registrable domain follows the suffix list, not the last two labels. A
 # host with none (a public suffix, a single label) covers itself alone, and so
 # does an address.
@@ -149,22 +177,30 @@ a.beta.test ua=N${tab}x headers=X-N:${tab}1|
     host:a.www.alpha.test host:a.beta.test host:127.0.0.1 host:127.0.0.2
 
 # Of the bundle and the jar, the newer file wins, and the bundle wins a tie.
-order() { # order NAME BUNDLE-DATE JAR-DATE WINNER
+order() { # order NAME BUNDLE-TIME JAR-TIME WINNER -- times as touch -t takes
     bundle "$1" '# HTTrack bundle 1' cookies "$(jar order.test SID bundle)"
     jar order.test SID jar >"$tmpdir/$1.txt"
-    touch -d "$2" "$tmpdir/$1.hts"
-    touch -d "$3" "$tmpdir/$1.txt"
+    touch -t "$2" "$tmpdir/$1.hts"
+    touch -t "$3" "$tmpdir/$1.txt"
     selftest_queue "cookie .order.test SID=$4" bundle "$dir" \
         "http://www.order.test/#httrack-bundle=$1" "jar:$dir/$1.txt"
 }
-order order1 '2026-01-02 10:00:00' '2026-01-01 10:00:00' bundle
-order order2 '2026-01-01 10:00:00' '2026-01-02 10:00:00' jar
-order order3 '2026-01-01 10:00:00' '2026-01-01 10:00:00' bundle
-# half a second apart in the same second: a seconds-only compare calls it a tie
-if touch -d '2026-01-01 10:00:00.5' "$tmpdir/subsecond" 2>/dev/null &&
+order order1 202601021000.00 202601011000.00 bundle
+order order2 202601011000.00 202601021000.00 jar
+order order3 202601011000.00 202601011000.00 bundle
+# Half a second apart in the same second, which a seconds-only compare calls a
+# tie. Only a touch that sets fractions can write it.
+if touch -d '2026-01-01T10:00:00.5' "$tmpdir/subsecond" 2>/dev/null &&
     test "$tmpdir/subsecond" -nt "$tmpdir/order3.txt"; then
-    order order4 '2026-01-01 10:00:00' '2026-01-01 10:00:00.5' jar
+    order order4 202601011000.00 202601011000.00 jar
+    touch -d '2026-01-01T10:00:00.5' "$tmpdir/order4.txt"
 fi
+
+# A control byte in a -%K or cookies.txt jar loads as it always did.
+printf '.ctl.test\tTRUE\t/\tFALSE\t0\tK\ta\001b\n' >"$tmpdir/ctl.txt"
+bundle plain '# HTTrack bundle 1'
+selftest_queue "cookie .ctl.test K=a$(printf '\001')b" bundle "$dir" \
+    'http://www.alpha.test/#httrack-bundle=plain' "jar:$dir/ctl.txt"
 
 # Refused: each one stops the run and names the file and line, never a byte of
 # the line. The batch reads them all at the end, so each case writes its own.
@@ -202,8 +238,12 @@ refused ', line 3: refused header: header replaces an earlier one' \
     '# HTTrack bundle 1' 'header Authorization: a' 'header Authorization: secret-b'
 refused ', line 2: refused header: malformed header ignored' \
     '# HTTrack bundle 1' 'header Bearer secret-no-colon'
+# The header lines hold 8192 bytes at most, each with its CRLF.
+bundle hdr8192 '# HTTrack bundle 1' "header X-A: $(repeat_chars 5000 a)" \
+    "header X-B: $(repeat_chars 3178 b)"
+selftest_queue '' bundle "$dir" 'http://x.test/#httrack-bundle=hdr8192'
 refused ', line 3: the header lines pass 8192 bytes' '# HTTrack bundle 1' \
-    "header X-A: $(repeat_chars 5000 a)" "header X-B: $(repeat_chars 5000 b)"
+    "header X-A: $(repeat_chars 5000 a)" "header X-B: $(repeat_chars 3179 b)"
 # A control byte would split a header on the wire. The CR before the LF goes.
 ctl=', line 2: holds a control byte'
 refused "$ctl" '# HTTrack bundle 1' "$(printf 'ua x\rHost: evil.test')"
@@ -216,16 +256,45 @@ nbad=$((nbad + 1))
 printf '# HTTrack bundle 1\nua a\000Host: evil.test\n' >"$tmpdir/bad$nbad.hts"
 selftest_queue "refused: /bad$nbad.hts$ctl" bundle "$dir" \
     "http://www.alpha.test/#httrack-bundle=bad$nbad"
-# A line holds 8191 bytes at most, its line end aside.
+# A line holds 8191 bytes at most, its LF or CRLF aside.
 bundle long '# HTTrack bundle 1' "ua $(repeat_chars 8188 u)"
 selftest_queue '' bundle "$dir" 'http://x.test/#httrack-bundle=long'
+printf '# HTTrack bundle 1\nua %s\r\n' "$(repeat_chars 8188 u)" \
+    >"$tmpdir/longcrlf.hts"
+selftest_queue '' bundle "$dir" 'http://x.test/#httrack-bundle=longcrlf'
 refused ', line 2: too long' '# HTTrack bundle 1' "ua $(repeat_chars 8189 u)"
-nbad=$((nbad + 1))
-printf '# HTTrack bundle 1\nua %s\r\v\f\n' "$(repeat_chars 8188 u)" \
-    >"$tmpdir/bad$nbad.hts"
-selftest_queue "refused: /bad$nbad.hts, line 2: too long" bundle "$dir" \
-    "http://www.alpha.test/#httrack-bundle=bad$nbad"
-# In the jar, every control byte but TAB stops the run too.
+for end in '\r\v\f' '\v' '\f'; do
+    nbad=$((nbad + 1))
+    printf '# HTTrack bundle 1\nua %s%b\n' "$(repeat_chars 8188 u)" "$end" \
+        >"$tmpdir/bad$nbad.hts"
+    selftest_queue "refused: /bad$nbad.hts, line 2: too long" bundle "$dir" \
+        "http://www.alpha.test/#httrack-bundle=bad$nbad"
+done
+# In the jar, every control byte but TAB stops the run too, in any field and
+# under -b0, and so does a line too long to read whole.
+jarbad() { # jarbad LINE WHY [b0] -- LINE is the cookie line of a bundle
+    nbad=$((nbad + 1))
+    printf '# HTTrack bundle 1\ncookies\n%s\n' "$1" >"$tmpdir/bad$nbad.hts"
+    selftest_queue "refused: /bad$nbad.hts, line 3: $2" bundle "$dir" \
+        "http://www.alpha.test/#httrack-bundle=bad$nbad" "${@:3}"
+}
+ctlcookie='a cookie line holds a control byte'
+jarbad "$(printf '.al\001pha.test\tTRUE\t/\tFALSE\t0\tSID\tv')" "$ctlcookie"
+jarbad "$(printf '.alpha.test\tTRUE\t/\001\tFALSE\t0\tSID\tv')" "$ctlcookie"
+jarbad "$(printf '.alpha.test\tTRUE\t/\tFALSE\t0\tS\001ID\tv')" "$ctlcookie"
+jarbad "$(printf '.alpha.test\tTRUE\t/\tFALSE\t0\tSID\ta\001b')" "$ctlcookie" b0
+long=$(repeat_chars 8100 x)
+jarbad "$(printf '.alpha.test\tTRUE\t/\tFALSE\t0\tSID\t%s\001' "$long")" "$ctlcookie"
+for c in '\v' '\f'; do
+    jarbad "$(printf '%b.alpha.test\tTRUE\t/\tFALSE\t0\tSID\t%s' "$c" "$long")" "$ctlcookie"
+done
+jarbad "$(printf '.alpha.test\tTRUE\t/\tFALSE\t0\tSID\t%s' "$long")" 'a cookie line is too long'
+# past the bytes the reader keeps, the length alone stops it
+jarbad "$(printf '.alpha.test\tTRUE\t/\tFALSE\t0\tSID\t%s%s\001' "$long" "$long")" 'a cookie line is too long'
+jarbad "$(printf '.alpha.test\tTRUE\t/\tFALSE\t0\tSID\t%s' "$(repeat_chars 4094 v)")" 'a cookie name and value pass 4096 bytes'
+bundle b0ok '# HTTrack bundle 1' 'ua B0' cookies "$(jar alpha.test SID s)"
+selftest_queue 'www.alpha.test ua=B0 headers=global' bundle "$dir" \
+    'http://www.alpha.test/#httrack-bundle=b0ok' host:www.alpha.test b0
 for oct in 000 001 002 003 004 005 006 007 010 013 014 015 016 017 020 021 \
     022 023 024 025 026 027 030 031 032 033 034 035 036 037 177; do
     nbad=$((nbad + 1))
@@ -314,6 +383,17 @@ differ alpha beta alphaua
 selftest_queue "refused: /loop1.hts and /loop2.hts cover the same site with a different user agent or headers" \
     bundle "$dir" 'http://x.test/#httrack-bundle=loop1' \
     'http://127.0.0.1/#httrack-bundle=loop2'
+# A cookie of the same name on another path or domain is another cookie.
+bundle clash1 '# HTTrack bundle 1' cookies "$(jar alpha.test SID one)"
+bundle clash2 '# HTTrack bundle 1' cookies \
+    ".alpha.test${tab}TRUE${tab}/x${tab}FALSE${tab}0${tab}SID${tab}two"
+bundle clash3 '# HTTrack bundle 1' cookies "$(jar www.alpha.test SID three)"
+selftest_queue_lines "cookie .alpha.test SID=two
+cookie .alpha.test SID=one
+cookie .www.alpha.test SID=three" bundle "$dir" \
+    'http://alpha.test/#httrack-bundle=clash1' \
+    'http://www.alpha.test/#httrack-bundle=clash2' \
+    'http://x.alpha.test/#httrack-bundle=clash3'
 selftest_queue "refused: /alphasid.hts, line 6: a cookie has another value in another bundle" \
     bundle "$dir" 'https://www.alpha.test/#httrack-bundle=alpha' \
     'https://alpha.test/#httrack-bundle=alphasid'
@@ -327,6 +407,21 @@ for want in 'alpha.hts, line 7: unknown key$' 'alpha.hts, line 8: unknown key na
     'alpha.hts, line 13: a cookie appears twice$' 'alpha.hts, line 14: an unknown comment$' \
     'alpha.hts: 1 cookie\(s\) outside its scope left out'; do
     grep -qE "$want" <<<"$out" || fail "no warning [$want]: $out"
+done
+bundle warns '# HTTrack bundle 1' 'headers X: 1' 'abc123 v' \
+    "$(repeat_chars 33 k) v" "$(repeat_chars 32 k) v" cookies \
+    ".alpha.test${tab}TRUE${tab}/${tab}FALSE${tab}0${tab}A" \
+    "$(jar alpha.test B b)${tab}x${tab}y" \
+    ".alpha.test${tab}TRUE${tab}/${tab}FALSE${tab}soon${tab}C${tab}c" \
+    "$(jar "$(repeat_chars 300 d).alpha.test" D d)"
+out=$(httrack -#test=bundle "$dir" 'https://www.alpha.test/#httrack-bundle=warns' 2>&1)
+for want in 'line 2: unknown key headers' 'line 3: unknown key' \
+    'line 4: unknown key' "line 5: unknown key $(repeat_chars 32 k)" \
+    'line 7: a cookie line has fewer than 7 fields or no name' \
+    'line 8: a cookie line has more than 7 fields' \
+    'line 9: a cookie expiry is not a whole number' \
+    'line 10: a cookie field is too long'; do
+    grep -qE "/warns\.hts, $want\$" <<<"$out" || fail "no warning [$want]: $out"
 done
 secret=ZQXSECRET
 sec() { # sec NAME LINE... -- a bundle whose lines hold the secret
@@ -342,13 +437,16 @@ sec s5 cookies "#$secret" "$(jar alpha.test "$secret" 1)" \
     "$(jar alpha.test "$secret" 2)" "$(jar alpha.test "$secret" "$(repeat_chars 8000 x)")" \
     "$(jar alpha.test "$secret" 1)$(printf '\001')"
 sec control "url http://www.alpha.test/?t=$secret"
-for s in s1 s2 s3 s4 s5 control; do
+sec keys "token $secret"
+for s in s1 s2 s3 s4 s5 keys control; do
     out=$(httrack -#test=bundle "$dir" "https://www.alpha.test/#httrack-bundle=$s" 2>&1)
     case $s in
     control) grep -qF "$secret" <<<"$out" || fail "the probe cannot see a secret: $out" ;;
     *) grep -qF "$secret" <<<"$out" && fail "$s shows the secret: $out" ;;
     esac
     grep -qF "/$s.hts" <<<"$out" || test $s = control || fail "$s: no message: $out"
+    test $s != keys || grep -qE '/keys\.hts, line 2: unknown key token$' <<<"$out" ||
+        fail "the key alone is not named: $out"
 done
 
 # A bad name on the command line stops the run before it starts.
