@@ -73,6 +73,7 @@ struct t_cookie {
 /* Library internal definitions */
 #ifdef HTS_INTERNAL_BYTECODE
 
+#include <stdio.h>
 #include <time.h>
 
 #ifndef HTS_DEF_FWSTRUCT_httrackp
@@ -88,6 +89,11 @@ typedef struct httrackp httrackp;
     zone id keeps the bare '%' that a jar carries, not the URI's "%25".
     HTS_FALSE means the caller sends no cookie. */
 hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size);
+
+/** Copy the host of url, with or without a scheme, into dst as cookie_host
+    does, and set *https. */
+hts_boolean cookie_url_host(const char *url, char *dst, size_t dst_size,
+                            hts_boolean *https);
 
 /** A jar record holds this many bytes of name plus value. */
 #define COOKIE_MAX_PAIR 4096
@@ -147,6 +153,21 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *path,
 int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *path,
                      const char *name, const char *start_url);
 #define COOKIE_LOAD_KEEP (-2)
+
+/** Load Netscape jar records from fp's position to its end, as cookie_load
+    reads a file, naming name in warnings. fp stays open. Returns the count of
+    lines skipped, or COOKIE_LOAD_KEEP when memory ran out. */
+int cookie_load_stream(httrackp *opt, t_cookie *cookie, FILE *fp,
+                       const char *name);
+
+/** Store every record of src into dst, with its flags and expiry, replacing
+    a record of the same name, domain and path. Returns how many dst refused. */
+int cookie_merge(t_cookie *dst, t_cookie *src);
+
+/** Does b hold a record with the name, domain and path of one in a, but
+    another value? If so, copy that name into name (name_size bytes). */
+hts_boolean cookie_jars_conflict(t_cookie *a, t_cookie *b, char *name,
+                                 size_t name_size);
 
 /** Write the jar's cookies to name in Netscape format, owner-only on Unix.
     The new jar goes to a temporary file first, which then replaces name in one

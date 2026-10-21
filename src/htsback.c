@@ -36,6 +36,7 @@ Please visit our Website: http://www.httrack.com
 
 /* specific definitions */
 #include "htsnet.h"
+#include "htsbundle.h"
 #include "htscore.h"
 #include "htsio.h"
 #include "htswarc.h"
@@ -3068,6 +3069,10 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
       back[p].r.req.accept = StringBuff(opt->accept);
       back[p].r.req.headers = StringBuff(opt->headers);
       back[p].r.req.user_agent_send = opt->user_agent_send;
+      /* a login bundle's site gets the bundle's UA and headers */
+      if (hts_bundle_identity(opt, adr, &back[p].r.req.user_agent,
+                              &back[p].r.req.headers))
+        back[p].r.req.user_agent_send = 1;
       // et http11
       back[p].r.req.http11 = back[p].http11;
       back[p].r.req.nocompression = opt->nocompression;

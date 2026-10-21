@@ -1,0 +1,151 @@
+#!/bin/bash
+#
+# Login bundles (#httrack-bundle=NAME): the name a start URL carries, the file
+# format, the scope each bundle covers, and the bundles refused at startup.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+tmpdir=$(mktemp -d)
+cleanup_push rm -rf "$tmpdir"
+dir=$(nativepath "$tmpdir")
+
+bundle() { # bundle NAME LINE... -- writes $tmpdir/NAME.hts
+    local name=$1
+    shift
+    printf '%s\n' "$@" >"$tmpdir/$name.hts"
+}
+tab=$(printf '\t')
+jar() { # jar DOMAIN NAME VALUE -- one Netscape jar line
+    printf '%s' ".$1${tab}TRUE${tab}/${tab}FALSE${tab}0${tab}$2${tab}$3"
+}
+
+selftest_queue 'login1 https://example.com/members/' bundlecut \
+    'https://example.com/members/#httrack-bundle=login1'
+selftest_queue 'a.b_c-9 http://x/' bundlecut 'http://x/#httrack-bundle=a.b_c-9'
+selftest_queue none bundlecut 'http://x/#top'
+selftest_queue bad bundlecut 'http://x/#httrack-bundle='
+selftest_queue bad bundlecut 'http://x/#httrack-bundle=../x'
+selftest_queue bad bundlecut 'http://x/#httrack-bundle=a..b'
+selftest_queue bad bundlecut 'http://x/#httrack-bundle=.hidden'
+selftest_queue bad bundlecut 'http://x/#httrack-bundle=a/b'
+selftest_queue bad bundlecut 'http://x/#httrack-bundle=a\b'
+selftest_queue bad bundlecut 'http://x/#httrack-bundle=a%2fb'
+selftest_queue bad bundlecut 'http://x/#httrack-bundle=a b'
+
+# The default scope is the registrable domains of the naming URL, the url lines
+# and the cookie domains. Only the hosts in it get the UA and the headers.
+bundle alpha '# HTTrack bundle 1' 'url https://login.alpha-sso.test/start' \
+    'ua AlphaUA/1.0' 'header Authorization: Bearer t' 'header X-A: 1' \
+    'unknown-key is warned about' cookies "$(jar alpha.test SID s1)" \
+    "$(jar alpha-cdn.test C c1)"
+selftest_queue_lines "bundle alpha
+ua AlphaUA/1.0
+url https://login.alpha-sso.test/start
+scope alpha.test
+scope alpha-sso.test
+scope alpha-cdn.test
+header Authorization: Bearer t
+header X-A: 1
+cookie .alpha.test SID=s1
+cookie .alpha-cdn.test C=c1
+alpha.test ua=AlphaUA/1.0 headers=Authorization: Bearer t|X-A: 1|
+https://deep.www.alpha.test:8443 ua=AlphaUA/1.0 headers=Authorization: Bearer t|X-A: 1|
+login.alpha-sso.test ua=AlphaUA/1.0 headers=Authorization: Bearer t|X-A: 1|
+cdn.gamma.test ua=global headers=global
+notalpha.test ua=global headers=global" bundle "$dir" \
+    'http://www.alpha.test/#httrack-bundle=alpha' host:alpha.test \
+    host:https://deep.www.alpha.test:8443 host:login.alpha-sso.test \
+    host:cdn.gamma.test host:notalpha.test
+
+# scope lines replace the default, and a cookie outside them is dropped
+bundle narrow '# HTTrack bundle 1.3' 'scope WWW.alpha.test' 'ua N' cookies \
+    "$(jar alpha.test SID wide)" "$(jar www.alpha.test K narrow)"
+selftest_queue_lines "bundle narrow
+ua N
+scope www.alpha.test
+cookie .www.alpha.test K=narrow
+alpha.test ua=global headers=global
+a.www.alpha.test ua=N headers=global" bundle "$dir" \
+    'http://www.alpha.test/#httrack-bundle=narrow' host:alpha.test \
+    host:a.www.alpha.test
+
+# An address has no registrable domain, so it scopes to itself alone.
+bundle ip '# HTTrack bundle 1' 'ua I'
+selftest_queue_lines "bundle ip
+ua I
+scope 127.0.0.1
+127.0.0.1 ua=I headers=global
+127.0.0.2 ua=global headers=global" bundle "$dir" \
+    'http://127.0.0.1:8080/#httrack-bundle=ip' host:127.0.0.1 host:127.0.0.2
+
+# Refused: each one stops the run and names the file. The batch reads them all
+# at the end, so each case writes its own.
+nbad=0
+refused() { # refused WHY LINE... -- a one-bundle file the engine refuses
+    local why=$1
+    shift
+    nbad=$((nbad + 1))
+    bundle "bad$nbad" "$@"
+    selftest_queue "refused: /bad$nbad.hts$why" bundle "$dir" \
+        "http://www.alpha.test/#httrack-bundle=bad$nbad"
+}
+refused ': this bundle version is not supported: # HTTrack bundle 2' \
+    '# HTTrack bundle 2'
+refused ': not an HTTrack bundle, the first line must be "# HTTrack bundle 1"' \
+    'ua X'
+refused ', line 2: refused header (Host and Cookie are the engine'"'"'s): Host: x' \
+    '# HTTrack bundle 1' 'header Host: x'
+refused ', line 2: refused header (Host and Cookie are the engine'"'"'s): cookie: a=b' \
+    '# HTTrack bundle 1' 'header cookie: a=b'
+refused ', line 2: refused header (a proxy header is not for the site): Proxy-Authorization: x' \
+    '# HTTrack bundle 1' 'header Proxy-Authorization: x'
+refused ', line 2: refused header (framing header ignored): Transfer-Encoding: chunked' \
+    '# HTTrack bundle 1' 'header Transfer-Encoding: chunked'
+refused ', line 3: refused header (header replaces an earlier one): Authorization: b' \
+    '# HTTrack bundle 1' 'header Authorization: a' 'header Authorization: b'
+refused ', line 2: refused header (malformed header ignored): no colon' \
+    '# HTTrack bundle 1' 'header no colon'
+refused ', line 3: ua given twice' '# HTTrack bundle 1' 'ua A' 'ua B'
+refused ', line 2: scope co.uk is a public suffix' '# HTTrack bundle 1' \
+    'scope co.uk'
+refused ', line 2: invalid url: ftp:///' '# HTTrack bundle 1' 'url ftp:///'
+refused ', line 2: no value' '# HTTrack bundle 1' 'ua'
+refused ': 1 cookie line(s) could not be read, see the log' \
+    '# HTTrack bundle 1' cookies 'not a jar line'
+selftest_queue 'refused: /none.hts: cannot read the login bundle: No such file or directory' \
+    bundle "$dir" 'http://www.alpha.test/#httrack-bundle=none'
+
+# Several bundles: one name twice is one bundle, equal identities on one site
+# merge, and different ones are refused.
+bundle beta '# HTTrack bundle 1' 'ua BetaUA' cookies "$(jar beta.test SID b1)"
+bundle alpha2 '# HTTrack bundle 1' 'ua AlphaUA/1.0' \
+    'header Authorization: Bearer t' 'header X-A: 1' cookies \
+    "$(jar alpha.test OTHER o)"
+bundle alphaua '# HTTrack bundle 1' 'ua SomeoneElse'
+bundle alphasid '# HTTrack bundle 1' 'ua AlphaUA/1.0' \
+    'header Authorization: Bearer t' 'header X-A: 1' cookies \
+    "$(jar alpha.test SID another-account)"
+selftest_queue_lines "bundle beta
+ua BetaUA
+scope beta.test
+cookie .beta.test SID=b1
+www.beta.test ua=BetaUA headers=global" bundle "$dir" \
+    'http://www.beta.test/#httrack-bundle=beta' \
+    'http://beta.test/x#httrack-bundle=beta' host:www.beta.test
+selftest_queue_tail "
+alpha.test ua=AlphaUA/1.0 headers=Authorization: Bearer t|X-A: 1|
+beta.test ua=BetaUA headers=global" bundle "$dir" \
+    'http://www.alpha.test/#httrack-bundle=alpha' \
+    'http://alpha.test/#httrack-bundle=alpha2' \
+    'http://beta.test/#httrack-bundle=beta' host:alpha.test host:beta.test
+selftest_queue 'refused: /alpha.hts and /alphaua.hts cover the same site with a different user agent or headers' \
+    bundle "$dir" 'http://www.alpha.test/#httrack-bundle=alpha' \
+    'http://alpha.test/#httrack-bundle=alphaua'
+selftest_queue "refused: /alpha.hts and /alphasid.hts hold two values of the cookie 'SID'" \
+    bundle "$dir" 'http://www.alpha.test/#httrack-bundle=alpha' \
+    'http://alpha.test/#httrack-bundle=alphasid'
+
+selftest_run_queued

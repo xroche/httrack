@@ -58,6 +58,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsmd5.h"
 #include "htsthread.h"
 #include "htsfetch.h"
+#include "htsbundle.h"
 
 #include <ctype.h>
 /* hts_self_path() */
@@ -568,6 +569,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   int httrack_logmode = 3;      // ONE log file
 
   ensureUrlCapacity(url, url_sz, 65536);
+  hts_bundle_reset(opt); /* a previous run's bundles are not this one's */
 
   // Create options
   _DEBUG_HEAD = 0;              // pas de debuggage en têtes
@@ -2531,6 +2533,29 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 #endif
                 break;
 
+              case 'b': // --bundle-dir: where #httrack-bundle= names resolve
+                /* a vetted pair's value may begin with '-' (#1425) */
+                if ((na + 1 >= argc) ||
+                    (argv[na + 1][0] == '-' && !optparam_dash_ok(&x_cmd, na))) {
+                  HTS_PANIC_PRINTF("Option bundle-dir needs a blank space and "
+                                   "a folder");
+                  printf("Example: --bundle-dir \"/home/me/logins\"\n");
+                  htsmain_free();
+                  return -1;
+                }
+                na++;
+                if (strlen(argv[na]) >= HTS_URLMAXSIZE) {
+                  HTS_PANIC_PRINTF("Bundle folder path too long");
+                  htsmain_free();
+                  return -1;
+                }
+                if (!hts_bundle_set_dir(opt, argv[na])) {
+                  HTS_PANIC_PRINTF("Not enough memory");
+                  htsmain_free();
+                  return -1;
+                }
+                break;
+
               case 'm': { // --mptcp: Multipath TCP where the system has it
                 int on = 1;
 
@@ -2853,6 +2878,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 
       } else { // URL/filters
         char catbuff[CATBUFF_SIZE];
+        /* argv itself goes to doit.log, so the bundle suffix is cut here */
+        char word[HTS_CDLMAXSIZE];
         const size_t urlSize = strlen(argv[na]);
         const size_t capa = strlen(url) + urlSize + 32;
 
@@ -2867,15 +2894,38 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           fprintf(stderr, "* Warning: filter %s holds a quote, kept as is\n",
                   argv[na]);
         assertf(urlSize < HTS_URLMAXSIZE);
+        strcpybuff(word, argv[na]);
+        if (argv[na][0] != '+' && argv[na][0] != '-') {
+          char name[HTS_BUNDLE_NAME_MAX];
+
+          switch (hts_bundle_cut(word, name, sizeof(name))) {
+          case HTS_BUNDLE_NONE:
+            break;
+          case HTS_BUNDLE_BAD:
+            cmdl_panic_value(opt,
+                             "Invalid login bundle name (letters, digits, "
+                             "'.', '_' and '-' only)",
+                             argv[na]);
+            htsmain_free();
+            return -1;
+          case HTS_BUNDLE_NAMED:
+            if (!hts_bundle_name(opt, name, word)) {
+              HTS_PANIC_PRINTF("Not enough memory");
+              htsmain_free();
+              return -1;
+            }
+            break;
+          }
+        }
         if (urlSize < HTS_URLMAXSIZE) {
           ensureUrlCapacity(url, url_sz, capa);
           if (strnotempty(url))
             strlcatbuff(url, " ", url_sz); // separator space
           /* a rule is decoded once, where the engine splits the rules */
           append_escape_spc_url(
-              argv[na][0] == '+' || argv[na][0] == '-'
-                  ? argv[na]
-                  : unescape_http_unharm(catbuff, sizeof(catbuff), argv[na], 1),
+              word[0] == '+' || word[0] == '-'
+                  ? word
+                  : unescape_http_unharm(catbuff, sizeof(catbuff), word, 1),
               url, url_sz);
         }
       } // if argv=- etc.

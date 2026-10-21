@@ -165,6 +165,8 @@ const char *hts_optalias[][4] = {
    "longest Retry-After delay obeyed, in seconds"},
   {"mptcp", "-@m", "onoff",
    "carry connections over Multipath TCP where the system offers it"},
+  {"bundle-dir", "-@b", "param1",
+   "folder where #httrack-bundle= names are read, not the project folder"},
   {"generate-errors", "-o", "level", ""},
   {"do-not-generate-errors", "-o0", "single", ""},
   {"purge-old", "-X", "onoff", ""},
@@ -347,6 +349,7 @@ static const char *const dashvalue_opt[] = {
   "-%L",  /* list */
   "-%S",  /* urllist */
   "-%rf", /* warc-file */
+  "-@b",  /* bundle-dir */
   "-F",   /* user-agent */
   NULL
 };

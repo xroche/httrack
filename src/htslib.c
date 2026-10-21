@@ -36,6 +36,7 @@ Please visit our Website: http://www.httrack.com
 // Fichier librairie .c
 
 #include "htscore.h"
+#include "htsbundle.h"
 #include "htssitemap.h"
 #include "htswarc.h"
 #include "htschanges.h"
@@ -1153,6 +1154,19 @@ const char *http_custom_header_warning(const char *headers, const char *line) {
     if (http_headers_have_field(headers, field))
       return "header replaces an earlier one";
   }
+  return NULL;
+}
+
+const char *http_bundle_header_refusal(const char *headers, const char *line) {
+  static const char *const engine[] = {"Host", "Cookie"};
+  const char *const why = http_custom_header_warning(headers, line);
+
+  if (why != NULL)
+    return why;
+  if (header_name_in(line, engine, sizeof(engine) / sizeof(engine[0])))
+    return "Host and Cookie are the engine's";
+  if (strfield(line, "Proxy-"))
+    return "a proxy header is not for the site";
   return NULL;
 }
 
@@ -7574,6 +7588,7 @@ HTSEXT_API void hts_free_opt(httrackp * opt) {
     /* An FTP worker reads opt for its whole run, and not every caller drains
        its threads the way httrack.c does before getting here. */
     ftp_stop_workers();
+    hts_bundle_reset(opt);
 
     /* Alocated callbacks */
 

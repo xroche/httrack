@@ -86,6 +86,7 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	htsback_selftest.c htscache_selftest.c htscharset_selftest.c \
 	htscmdline_selftest.c \
 	htscookie_selftest.c htsdns_selftest.c htsfetch_selftest.c htspsl_selftest.c \
+	htsbundle_selftest.c \
 	htsfilters_selftest.c \
 	htsheader_selftest.c htsio_selftest.c htslib_selftest.c \
 	htslines_selftest.c \
@@ -96,14 +97,14 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	htscatchurl.c htsfetch.c htspsl.c htspsl_data.c htsfilters.c htsftp.c htshash.c coucal/coucal.c \
 	htscmdline.c htshelp.c htslib.c htslines.c htsurlport.c htsdate.c htscoremain.c \
 	htsname.c htsrobots.c htstools.c htsrandom.c htswizard.c \
-	htsalias.c htsthread.c htsindex.c htsbauth.c \
+	htsalias.c htsthread.c htsindex.c htsbauth.c htsbundle.c \
 	htscrashtest.c \
 	htsmd5.c htsnet.c htscodec.c htswarc.c htschanges.c htssinglefile.c htssitemap.c htsproxy.c htszlib.c htswrap.c htsconcat.c \
 	htsmodules.c htscharset.c punycode.c htsencoding.c htsescape.c htssniff.c \
 	md5.c \
 	minizip/ioapi.c minizip/mztools.c minizip/unzip.c minizip/zip.c \
 	hts-indextmpl.h htsalias.h htsback.h htsbase.h htssafe.h htsdate.h \
-	htsbasenet.h htsbauth.h htscache.h htscache_selftest.h htscookie_selftest.h htsdns_selftest.h htsparse_selftest.h \
+	htsbasenet.h htsbauth.h htsbundle.h htscache.h htscache_selftest.h htscookie_selftest.h htsdns_selftest.h htsparse_selftest.h \
 	htsselftest.h htsselftest_int.h htsselftest_util.h htscatchurl.h  \
 	htscmdline.h htsconfig.h htscore.h htsparse.h htscoremain.h htsdefines.h  \
 	htsfilters.h htsftp.h htsglobal.h htshash.h coucal/coucal.h \

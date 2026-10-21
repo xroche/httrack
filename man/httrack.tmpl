@@ -69,6 +69,49 @@ start URL and its subdomains, or to that host alone when it is an address or a
 public suffix. They are Secure when that URL is https. HTTrack never rewrites
 such a file. HttpOnly cookies are not in it. A cookies.txt export has them,
 and so does the Cookie header from DevTools "Copy as cURL", pasted here.
+.TP
+.I <name>.hts
+A login bundle, named by a start URL that ends with
+.IR #httrack\-bundle=<name> ,
+such as
+.IR https://example.com/members/#httrack\-bundle=login1 .
+The name holds letters, digits,
+.IR . ,
+.I _
+and
+.I \-
+only. HTTrack reads the file in the project folder, or in the folder given to
+.IR \-\-bundle\-dir ,
+and never writes it. HTTrack reads the suffix on the command line, in a
+.I \-%L
+list and in doit.log, never on a crawled link. A missing file, or one that
+does not parse, stops the run before any request.
+.IP
+The first line is
+.IR "# HTTrack bundle 1" .
+Then come
+.I url
+lines (more start URLs), at most one
+.I ua
+line, and
+.I header
+and
+.I scope
+lines. A
+.I cookies
+line ends them, and a Netscape cookie jar follows it.
+.IP
+The bundle's user agent and headers replace
+.I \-F
+and
+.I \-%X
+for each host in its scope, and only there. By default the scope is the
+registrable domains of the start URL naming the bundle, of its url lines and
+of its cookies. Scope lines replace that default. HTTrack refuses a cookie
+outside the scope, and a Host, Cookie, Proxy\-* or framing header. Its cookies
+load before cookies.txt, so a cookie the server refreshed wins. Two bundles
+whose scopes overlap must give the same user agent, headers and cookie values,
+or the run stops.
 .PP
 A running mirror also watches its own output directory for these. Creating one
 is how a script drives an engine it has no other handle on. On Windows, which

@@ -1,0 +1,112 @@
+#!/bin/bash
+#
+# Two login bundles and a CDN on a third domain, graded on what the server
+# received: each site gets its own UA, Authorization and cookies, and the CDN
+# gets the global -F and -%X and none of the bundles' identity.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+python=$(find_python) || skip "python3 missing"
+
+server=$(nativepath "$top_srcdir/tests/bundle-server.py")
+tmpdir=$(mktemp -d)
+serverpid=
+log=$tmpdir/crawl.log
+fail_dump_var log
+
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+"$python" "$server" >"$tmpdir/srv.out" 2>"$tmpdir/srv.err" &
+serverpid=$!
+port=$(discover_server_port "$tmpdir/srv.out" "$serverpid") || exit 1
+
+tab=$(printf '\t')
+jar() { # jar DOMAIN NAME VALUE -- one Netscape jar line
+    printf '%s' ".$1${tab}TRUE${tab}/${tab}FALSE${tab}0${tab}$2${tab}$3"
+}
+mkdir "$tmpdir/logins" "$tmpdir/one" "$tmpdir/two"
+printf '%s\n' '# HTTrack bundle 1' 'ua AlphaUA/1.0' \
+    'header Authorization: Bearer alpha-token' cookies \
+    "$(jar alpha.test SID alpha-captured)" "$(jar alpha.test PREF alpha-pref)" \
+    >"$tmpdir/logins/alpha.test.hts"
+printf '%s\n' '# HTTrack bundle 1' 'ua BetaUA/2.0' \
+    'header Authorization: Bearer beta-token' cookies \
+    "$(jar beta.test SID beta-captured)" >"$tmpdir/logins/beta.test.hts"
+cp "$tmpdir/logins/alpha.test.hts" "$tmpdir/alpha.orig"
+# the project jar loads over the bundle, as a cookie the server refreshed
+jar alpha.test SID alpha-refreshed >"$tmpdir/one/cookies.txt"
+
+crawl() { # crawl DIR [httrack args...]
+    local dir=$1 rc=0
+    shift
+    run_with_timeout 120 httrack -O "$(nativepath "$dir")" \
+        -P "127.0.0.1:$port" -F GlobalUA/9 -%X 'X-Global: 1' \
+        '+*cdn.gamma.test/*' -c1 --robots=0 -%v0 -q "$@" >>"$log" 2>&1 || rc=$?
+    test "$rc" -ne 124 || fail "crawl hit the deadline"
+    return "$rc"
+}
+
+hit() { # hit WHAT LINE -- the server must have logged LINE exactly
+    command grep -qxF "HIT $2" "$tmpdir/srv.out" ||
+        fail_dump "$1: no request [HIT $2]" "$tmpdir/srv.out"
+}
+
+crawl "$tmpdir/one" --bundle-dir "$(nativepath "$tmpdir/logins")" \
+    'http://www.alpha.test/#httrack-bundle=alpha.test' \
+    'http://www.beta.test/#httrack-bundle=beta.test' \
+    'http://alpha.test/plain.html' || fail "the bundle crawl failed"
+
+alpha='ua=AlphaUA/1.0 auth=Bearer alpha-token cookie=PREF=alpha-pref; SID=alpha-refreshed x=-'
+hit "start page" "www.alpha.test/ $alpha"
+hit "crawled link" "www.alpha.test/page.html $alpha"
+hit "plain URL on the bundle's site" "alpha.test/plain.html $alpha"
+hit "second bundle" "www.beta.test/ ua=BetaUA/2.0 auth=Bearer beta-token cookie=SID=beta-captured x=-"
+for gif in a.gif b.gif; do
+    hit "CDN" "cdn.gamma.test/$gif ua=GlobalUA/9 auth=- cookie=- x=1"
+done
+n=$(command grep -c '^HIT ' "$tmpdir/srv.out" || true)
+test "$n" -eq 6 || fail_dump "$n requests, expected 6" "$tmpdir/srv.out"
+
+# --update finds the bundle again: doit.log keeps the name and the folder
+doit=$tmpdir/one/hts-cache/doit.log
+command grep -qF '#httrack-bundle=alpha.test' "$doit" ||
+    fail_dump "doit.log lost the bundle name" "$doit"
+command grep -qF -- "-@b " "$doit" || fail_dump "doit.log lost --bundle-dir" "$doit"
+cmp -s "$tmpdir/alpha.orig" "$tmpdir/logins/alpha.test.hts" ||
+    fail "the crawl wrote to the bundle"
+
+# A -%L list names a bundle too, and it resolves in the project folder.
+cp "$tmpdir/logins/beta.test.hts" "$tmpdir/two/"
+printf '%s\n' 'http://www.beta.test/#httrack-bundle=beta.test' >"$tmpdir/list.txt"
+before=$(command grep -c '^HIT ' "$tmpdir/srv.out" || true)
+crawl "$tmpdir/two" -%L "$(nativepath "$tmpdir/list.txt")" ||
+    fail "the -%L crawl failed"
+after=$(command grep -c '^HIT ' "$tmpdir/srv.out" || true)
+test "$((after - before))" -eq 2 ||
+    fail_dump "-%L crawl: $((after - before)) requests, expected 2" "$tmpdir/srv.out"
+n=$(command grep -cxF "HIT www.beta.test/ ua=BetaUA/2.0 auth=Bearer beta-token cookie=SID=beta-captured x=-" "$tmpdir/srv.out" || true)
+test "$n" -eq 2 || fail_dump "-%L crawl: the beta page did not get its bundle" "$tmpdir/srv.out"
+
+# A missing bundle stops the run before any request, naming the file.
+rc=0
+crawl "$tmpdir/two" 'http://www.alpha.test/#httrack-bundle=nosuch' || rc=$?
+test "$rc" -ne 0 || fail "a missing bundle did not stop the run"
+command grep -qF "nosuch.hts: cannot read the login bundle" "$log" ||
+    fail_dump "no message naming the missing bundle" "$log"
+final=$(command grep -c '^HIT ' "$tmpdir/srv.out" || true)
+test "$final" -eq "$after" || fail_dump "a missing bundle still crawled" "$tmpdir/srv.out"
+
+# So does a -%L line naming an invalid one.
+printf '%s\n' 'http://www.beta.test/#httrack-bundle=../beta.test' >"$tmpdir/bad.txt"
+rc=0
+crawl "$tmpdir/two" -%L "$(nativepath "$tmpdir/bad.txt")" || rc=$?
+test "$rc" -ne 0 || fail "an invalid -%L bundle name did not stop the run"
+final=$(command grep -c '^HIT ' "$tmpdir/srv.out" || true)
+test "$final" -eq "$after" || fail_dump "an invalid -%L bundle name still crawled" "$tmpdir/srv.out"
