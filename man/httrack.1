@@ -56,7 +56,6 @@ httrack \- offline browser : copy websites to a local directory
 [ \fB\-%T, \-\-utf8\-conversion[=0]\fR ]
 [ \fB\-bN, \-\-cookies[=N]\fR ]
 [ \fB\-%K, \-\-cookies\-file\fR ]
-[ \fB\-@b, \-\-bundle\-dir\fR ]
 [ \fB\-%Y, \-\-why\fR ]
 [ \fB\-u, \-\-check\-type[=N]\fR ]
 [ \fB\-j, \-\-parse\-java[=N]\fR ]
@@ -243,12 +242,10 @@ links conversion to UTF\-8 (\-\-utf8\-conversion[=0])
 accept cookies in cookies.txt (0=do not accept,* 1=accept) (\-\-cookies[=N])
 .IP \-%K
 use a Netscape cookies.txt as the jar, rewritten at the end (\-\-cookies\-file <param>)
-.IP \-@b
-folder holding the login bundles that start URLs name (\-\-bundle\-dir <param>)
 .br
 <URL>#httrack\-bundle=<name> crawls <URL> with the user agent,
 .br
-headers and cookies of <name>.hts, by default in the project folder
+headers and cookies of the login bundle <name>.hts, read from the project folder or from \-\-bundle\-dir <dir>
 .IP \-%Y
 explain which filter rule accepts or rejects a URL, then exit (\-\-why <param>)
 .IP \-u
@@ -601,8 +598,9 @@ The name holds letters, digits,
 and
 .I \-
 only. HTTrack reads the file in the project folder, or in the folder given to
-.IR \-\-bundle\-dir ,
-and never writes it. HTTrack reads the suffix on the command line, in a
+.IR "\-\-bundle\-dir <dir>" ,
+and never writes it. doit.log keeps that folder as an absolute path. HTTrack
+reads the suffix on the command line, in a
 .I \-%L
 list and in doit.log, never on a crawled link. A missing file, or one that
 does not parse, stops the run before any request.
@@ -611,7 +609,7 @@ The first line is
 .IR "# HTTrack bundle 1" .
 Then come
 .I url
-lines (more start URLs), at most one
+lines, each one more start URL, at most one
 .I ua
 line, and
 .I header
@@ -625,13 +623,24 @@ The bundle's user agent and headers replace
 .I \-F
 and
 .I \-%X
-for each host in its scope, and only there. By default the scope is the
-registrable domains of the start URL naming the bundle, of its url lines and
-of its cookies. Scope lines replace that default. HTTrack refuses a cookie
-outside the scope, and a Host, Cookie, Proxy\-* or framing header. Its cookies
-load before cookies.txt, so a cookie the server refreshed wins. Two bundles
-whose scopes overlap must give the same user agent, headers and cookie values,
-or the run stops.
+for each host in its scope, and only there. A bundle with header lines but no
+.I ua
+line sends the
+.I \-F
+user agent. When every start URL naming the bundle is https, its headers go
+over https alone. By default the scope is the registrable domains of the start
+URLs naming the bundle and of its url lines. A host with no registrable domain,
+such as a public suffix, a single label or an address, covers itself alone.
+Scope lines replace that default. HTTrack drops a cookie outside the scope and
+gives the count in one warning. HTTrack refuses a Host, Cookie, Proxy\-* or
+framing header, and a line holding a control byte. Two bundles whose scopes
+overlap must give the same user agent, headers and cookie values, or the run
+stops.
+.IP
+The bundle's cookies go into the cookie jar, which HTTrack writes at the end of
+the crawl. Of the bundle and the jar, the newer file wins a cookie both hold.
+A new capture therefore wins over the jar, and a cookie the server refreshed
+wins over an older bundle. On equal times the bundle wins.
 .PP
 A running mirror also watches its own output directory for these. Creating one
 is how a script drives an engine it has no other handle on. On Windows, which

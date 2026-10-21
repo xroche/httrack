@@ -36,9 +36,10 @@ Please visit our Website: http://www.httrack.com
 #ifdef HTS_INTERNAL_BYTECODE
 
 #include <stddef.h>
+#include <stdio.h>
 
 #include "htsglobal.h"
-#include "htsbauth.h"
+#include "htsopt.h"
 
 /* A start URL ending with this names the bundle file <name>.hts. */
 #define HTS_BUNDLE_SUFFIX "#httrack-bundle="
@@ -52,45 +53,60 @@ typedef enum {
   HTS_BUNDLE_BAD    /* a suffix whose name is refused, URL left alone */
 } hts_bundle_suffix;
 
-/* Is name a bundle name: [A-Za-z0-9._-], not starting with '.' and no ".."? */
-hts_boolean hts_bundle_name_valid(const char *name);
-
 /* Cut the bundle suffix off url in place and copy its name into name. */
 hts_bundle_suffix hts_bundle_cut(char *url, char *name, size_t name_size);
 
-/* Forget the bundles and the --bundle-dir recorded for opt. */
-void hts_bundle_reset(httrackp *opt);
-
-/* Read names from dir rather than the project folder. HTS_FALSE when out of
-   memory. */
-hts_boolean hts_bundle_set_dir(httrackp *opt, const char *dir);
-
 /* Record that the start URL url (suffix already cut) names bundle name. A
    name given twice is one bundle. HTS_FALSE when out of memory. */
-hts_boolean hts_bundle_name(httrackp *opt, const char *name, const char *url);
+hts_boolean hts_bundle_add(httrackp *opt, const char *name, const char *url);
 
-/* Read every named bundle, then check scopes and identities. HTS_FALSE after
-   writing why into err, naming the file: the run must stop. */
-hts_boolean hts_bundle_load_all(httrackp *opt, char *err, size_t err_size);
+/* Read every named bundle from opt->bundle_dir, or the project folder, and
+   refuse two bundles that overlap with different identities or cookie values.
+   The cookies go into opt->cookie, under the records already there when the
+   jar file is newer than the bundle. jar is that file, or NULL. HTS_FALSE
+   after writing why into err, naming the file: the run must stop. A second
+   call reads the files again. */
+hts_boolean hts_bundle_load_all(httrackp *opt, const char *jar, char *err,
+                                size_t err_size);
 
-/* The bundles' url lines, each followed by a LF, in a malloct'd string the
-   caller freet's. NULL when there are none. */
-char *hts_bundle_urls(httrackp *opt);
+/* The i-th url line of the loaded bundles, or NULL past the last one. */
+const char *hts_bundle_url(httrackp *opt, size_t i);
 
-/* How many cookies the loaded bundles hold. */
-int hts_bundle_cookie_count(httrackp *opt);
+/* Give req the UA and headers of the first bundle whose scope holds adr's
+   host, where it has them. Its headers go over https alone when every URL
+   naming it is https. */
+void hts_bundle_identity(httrackp *opt, const char *adr, htsrequest *req);
 
-/* Store the bundles' cookies into jar. Returns how many it refused. */
-int hts_bundle_cookies(httrackp *opt, t_cookie *jar);
+/* Forget the bundles named for opt. */
+void hts_bundle_free(httrackp *opt);
 
-/* When adr's host is in a bundle's scope, point *ua and *headers at that
-   bundle's, for each it gives. Returns HTS_TRUE when it changed *ua. The
-   strings live until hts_bundle_reset. */
-hts_boolean hts_bundle_identity(httrackp *opt, const char *adr, const char **ua,
-                                const char **headers);
-
-/* Print each loaded bundle (UA, headers, scope, cookies) for the self-tests. */
+/* Print each loaded bundle (UA, url lines, scope, headers) for the
+   self-tests. */
 void hts_bundle_dump(httrackp *opt);
+
+/* htsbauth.c internals the bundles share. */
+
+/* Copy the host of url, with or without a scheme, into dst as cookie_host
+   does, and set *https. */
+hts_boolean cookie_url_host(const char *url, char *dst, size_t dst_size,
+                            hts_boolean *https);
+
+/* What cookie_load_stream lets into the jar, and the count of what it keeps
+   out. */
+typedef struct cookie_filter {
+  hts_boolean (*covers)(const void *scope, const char *host);
+  const void *scope;
+  t_cookie *others;  /* every bundle's records so far */
+  hts_boolean under; /* a record the jar holds already wins */
+  int dropped;       /* records outside the scope */
+  char clash[64];    /* a name others holds with another value, or "" */
+  int lost;          /* records the jar could not take */
+} cookie_filter;
+
+/* Load Netscape jar records from fp's position to its end through filter,
+   as cookie_load reads a file. name is the file name used in warnings. */
+void cookie_load_stream(httrackp *opt, t_cookie *cookie, FILE *fp,
+                        const char *name, cookie_filter *filter);
 
 #endif
 

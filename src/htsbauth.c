@@ -43,6 +43,7 @@ Please visit our Website: http://www.httrack.com
 #include "htslib.h"
 #include "htscore.h"
 #include "htspsl.h"
+#include "htsbundle.h"
 #include "htsdate.h"
 #include "htscookie_selftest.h"
 #ifdef _WIN32
@@ -652,7 +653,7 @@ static hts_boolean cookie_is_flat(FILE *fp, int *quote) {
   return flat;
 }
 
-/* See htsbauth.h. */
+/* See htsbundle.h. */
 hts_boolean cookie_url_host(const char *url, char *dst, size_t dst_size,
                             hts_boolean *https) {
   const char *const rest = jump_protocol_const(url);
@@ -817,11 +818,43 @@ static int cookie_load_flat(httrackp *opt, t_cookie *cookie, FILE *fp,
   return COOKIE_LOAD_KEEP;
 }
 
+/* Should filter let the record name=value for domain and path into cookie?
+   seen holds this load's records, which may repeat one without a clash. */
+static hts_boolean cookie_admit(cookie_filter *filter, t_cookie *cookie,
+                                t_cookie *seen, const char *name,
+                                const char *value, const char *domain,
+                                const char *path) {
+  char buffer[8192];
+  char host[256];
+  const char *other;
+
+  if (!cookie_host(domain, host, sizeof(host)) ||
+      !filter->covers(filter->scope, host[0] == '.' ? host + 1 : host)) {
+    filter->dropped++;
+    return HTS_FALSE;
+  }
+  other = cookie_find_exact(filter->others->data, name, host, path);
+  if (other != NULL &&
+      (seen == NULL ||
+       cookie_find_exact(seen->data, name, host, path) == NULL) &&
+      strcmp(cookie_get(buffer, other, 6), value) != 0) {
+    filter->clash[0] = '\0';
+    strlncatbuff(filter->clash, name, sizeof(filter->clash),
+                 sizeof(filter->clash) - 1);
+    return HTS_FALSE;
+  }
+  (void) cookie_set(filter->others, name, value, domain, path, NULL);
+  return !filter->under ||
+         cookie_find_exact(cookie->data, name, host, path) == NULL;
+}
+
 /* Read the Netscape records from fp's position to its end into cookie, and
    name the file as given in warnings. A UTF-8 BOM is skipped on the first line
-   when first_line is HTS_TRUE. Returns what cookie_load_from does. */
+   when first_line is HTS_TRUE. filter, when not NULL, picks the records.
+   Returns what cookie_load_from does. */
 static int cookie_load_records(httrackp *opt, t_cookie *cookie, FILE *fp,
-                               const char *given, hts_boolean first_line) {
+                               const char *given, hts_boolean first_line,
+                               cookie_filter *filter) {
   char buffer[8192];
   int refused = 0;
   hts_boolean keep = HTS_FALSE;
@@ -926,7 +959,9 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, FILE *fp,
           attr.http_only = is_httponly || tabs == 7;
           attr.expires = cookie_record_expiry(rec);
           // an expired one is skipped, because a browser drops it too
-          if (attr.expires == 0 || attr.expires > (int64_t) time(NULL)) {
+          if ((attr.expires == 0 || attr.expires > (int64_t) time(NULL)) &&
+              (filter == NULL || cookie_admit(filter, cookie, seen, cook_name,
+                                              cook_value, domain, path))) {
             const hts_boolean repeated =
                 seen != NULL && cookie_host(domain, host, sizeof(host)) &&
                 cookie_find_exact(seen->data, cook_name, host, path) != NULL;
@@ -952,6 +987,8 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, FILE *fp,
                             "%s",
                             cook_name, given);
               refused++;
+              if (filter != NULL)
+                filter->lost++;
             } else if (seen != NULL && !repeated) {
               (void) cookie_set(seen, cook_name, "", domain, path, NULL);
             }
@@ -966,6 +1003,8 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, FILE *fp,
     hts_log_print(opt, LOG_WARNING,
                   "Cookies: stopped reading before the end of %s", given);
     refused++;
+    if (filter != NULL)
+      filter->lost++;
   }
   freet(seen);
   return keep ? COOKIE_LOAD_KEEP : refused;
@@ -1088,7 +1127,8 @@ int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *fpath,
       return ret;
     }
     if (fp) {
-      const int ret = cookie_load_records(opt, cookie, fp, given, HTS_TRUE);
+      const int ret =
+          cookie_load_records(opt, cookie, fp, given, HTS_TRUE, NULL);
 
       fclose(fp);
       return ret;
@@ -1103,60 +1143,10 @@ int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *fpath,
   return -1;
 }
 
-/* See htsbauth.h. */
-int cookie_load_stream(httrackp *opt, t_cookie *cookie, FILE *fp,
-                       const char *name) {
-  return cookie_load_records(opt, cookie, fp, name, HTS_FALSE);
-}
-
-/* See htsbauth.h. */
-int cookie_merge(t_cookie *dst, t_cookie *src) {
-  char BIGSTK domain[8192];
-  char BIGSTK path[8192];
-  char BIGSTK name[8192];
-  char BIGSTK value[8192];
-  char buffer[8192];
-  int refused = 0;
-  char *a;
-
-  for (a = src->data; *a != '\0'; a = cookie_nextfield(a)) {
-    cookie_attr attr;
-
-    attr.host_only = cookie_is_host_only(a);
-    attr.secure = strcmpnocase(cookie_get(buffer, a, 3), "TRUE") == 0;
-    attr.http_only =
-        strcmp(cookie_get(buffer, a, 7), COOKIE_HTTPONLY_FIELD) == 0;
-    attr.expires = cookie_record_expiry(a);
-    if (cookie_set(dst, cookie_get(name, a, 5), cookie_get(value, a, 6),
-                   cookie_get(domain, a, 0), cookie_get(path, a, 2),
-                   &attr) != 0)
-      refused++;
-  }
-  return refused;
-}
-
-/* See htsbauth.h. */
-hts_boolean cookie_jars_conflict(t_cookie *a, t_cookie *b, char *name,
-                                 size_t name_size) {
-  char BIGSTK domain[8192];
-  char BIGSTK path[8192];
-  char BIGSTK cook_name[8192];
-  char buffer[8192];
-  char *rec;
-
-  for (rec = a->data; *rec != '\0'; rec = cookie_nextfield(rec)) {
-    const char *const other =
-        cookie_find_exact(b->data, cookie_get(cook_name, rec, 5),
-                          cookie_get(domain, rec, 0), cookie_get(path, rec, 2));
-
-    if (other != NULL &&
-        strcmp(cookie_get(buffer, rec, 6), cookie_get(domain, other, 6)) != 0) {
-      name[0] = '\0';
-      strlncatbuff(name, cook_name, name_size, name_size - 1);
-      return HTS_TRUE;
-    }
-  }
-  return HTS_FALSE;
+/* See htsbundle.h. */
+void cookie_load_stream(httrackp *opt, t_cookie *cookie, FILE *fp,
+                        const char *name, cookie_filter *filter) {
+  (void) cookie_load_records(opt, cookie, fp, name, HTS_FALSE, filter);
 }
 
 /* Open name for writing, creating it if needed, and return NULL on failure.

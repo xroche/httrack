@@ -3,7 +3,8 @@
 
 httrack reaches it as its -P proxy, so the absolute request URL names the
 site. Every request prints one "HIT <host><path> ua=<...> auth=<...>
-cookie=<...> x=<...>" line, "-" for a missing header. Prints "PORT <n>".
+cookie=<...> x=<...>" line, "-" for a missing header, with the cookies in
+name order. Prints "PORT <n>".
 """
 
 import sys
@@ -19,6 +20,8 @@ PAGES = {
     "www.beta.test/": '<img src="%s/b.gif">' % CDN,
     "cdn.gamma.test/a.gif": "GIF89a",
     "cdn.gamma.test/b.gif": "GIF89a",
+    "github.io/": '<a href="http://attacker.github.io/x.html">x</a>',
+    "attacker.github.io/x.html": "another user's site",
 }
 
 lock = threading.Lock()
@@ -32,7 +35,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         url = urlsplit(self.path)
-        key = url.hostname + url.path if url.hostname else self.path
+        key = url.hostname + url.path
         with lock:
             print(
                 "HIT %s ua=%s auth=%s cookie=%s x=%s"
@@ -40,14 +43,12 @@ class Handler(BaseHTTPRequestHandler):
                     key,
                     self.headers.get("User-Agent", "-"),
                     self.headers.get("Authorization", "-"),
-                    self.headers.get("Cookie", "-"),
+                    "; ".join(sorted(self.headers.get("Cookie", "-").split("; "))),
                     self.headers.get("X-Global", "-"),
                 ),
                 flush=True,
             )
-        body = PAGES.get(key)
-        if body is None:
-            return self.reply(404, b"no", "text/html")
+        body = PAGES.get(key, "")
         ctype = "image/gif" if key.endswith(".gif") else "text/html"
         if ctype == "text/html":
             body = "<html><body>%s</body></html>" % body

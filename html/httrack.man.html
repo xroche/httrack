@@ -101,16 +101,15 @@ offline browser : copy websites to a local directory</p>
 --generate-errors[=N]</b> ] [ <b>-X, --purge-old[=0]</b> ] [
 <b>-%p, --preserve</b> ] [ <b>-%T, --utf8-conversion[=0]</b>
 ] [ <b>-bN, --cookies[=N]</b> ] [ <b>-%K, --cookies-file</b>
-] [ <b>-@b, --bundle-dir</b> ] [ <b>-%Y, --why</b> ] [
-<b>-u, --check-type[=N]</b> ] [ <b>-j, --parse-java[=N]</b>
-] [ <b>-sN, --robots[=N]</b> ] [ <b>-%h, --http-10[=0]</b> ]
-[ <b>-%k, --keep-alive[=0]</b> ] [ <b>-%z,
---disable-compression[=0]</b> ] [ <b>-%B, --tolerant[=0]</b>
-] [ <b>-%s, --updatehack[=0]</b> ] [ <b>-%u,
---urlhack[=0]</b> ] [ <b>-%A, --assume</b> ] [ <b>-@iN,
---protocol[=N]</b> ] [ <b>-@mN, --mptcp[=0]</b> ] [ <b>-%w,
---disable-module</b> ] [ <b>-F, --user-agent</b> ] [ <b>-%R,
---referer</b> ] [ <b>-%E, --from</b> ] [ <b>-%F,
+] [ <b>-%Y, --why</b> ] [ <b>-u, --check-type[=N]</b> ] [
+<b>-j, --parse-java[=N]</b> ] [ <b>-sN, --robots[=N]</b> ] [
+<b>-%h, --http-10[=0]</b> ] [ <b>-%k, --keep-alive[=0]</b> ]
+[ <b>-%z, --disable-compression[=0]</b> ] [ <b>-%B,
+--tolerant[=0]</b> ] [ <b>-%s, --updatehack[=0]</b> ] [
+<b>-%u, --urlhack[=0]</b> ] [ <b>-%A, --assume</b> ] [
+<b>-@iN, --protocol[=N]</b> ] [ <b>-@mN, --mptcp[=0]</b> ] [
+<b>-%w, --disable-module</b> ] [ <b>-F, --user-agent</b> ] [
+<b>-%R, --referer</b> ] [ <b>-%E, --from</b> ] [ <b>-%F,
 --footer</b> ] [ <b>-%l, --language</b> ] [ <b>-%a,
 --accept</b> ] [ <b>-%X, --headers</b> ] [ <b>-%Q,
 --browser-headers[=0]</b> ] [ <b>-C, --cache[=N]</b> ] [
@@ -882,25 +881,14 @@ them) (--generate-errors[=N])</p></td></tr>
 
 <p>use a Netscape cookies.txt as the jar, rewritten at the
 end (--cookies-file &lt;param&gt;)</p></td></tr>
-<tr valign="top" align="left">
-<td width="9%"></td>
-<td width="4%">
-
-
-<p>-@b</p></td>
-<td width="5%"></td>
-<td width="82%">
-
-
-<p>folder holding the login bundles that start URLs name
-(--bundle-dir &lt;param&gt;)</p></td></tr>
 </table>
 
 
 <p style="margin-left:18%;">&lt;URL&gt;#httrack-bundle=&lt;name&gt;
 crawls &lt;URL&gt; with the user agent, <br>
-headers and cookies of &lt;name&gt;.hts, by default in the
-project folder</p>
+headers and cookies of the login bundle &lt;name&gt;.hts,
+read from the project folder or from --bundle-dir
+&lt;dir&gt;</p>
 
 <table width="100%" border="0" rules="none" frame="void"
        cellspacing="0" cellpadding="0">
@@ -2497,29 +2485,42 @@ start URL that ends with
 <i>https://example.com/members/#httrack-bundle=login1</i>.
 The name holds letters, digits, <i>.</i>, <i>_</i> and
 <i>-</i> only. HTTrack reads the file in the project folder,
-or in the folder given to <i>--bundle-dir</i>, and never
-writes it. HTTrack reads the suffix on the command line, in
-a <i>-%L</i> list and in doit.log, never on a crawled link.
-A missing file, or one that does not parse, stops the run
-before any request.</p>
+or in the folder given to <i>--bundle-dir &lt;dir&gt;</i>,
+and never writes it. doit.log keeps that folder as an
+absolute path. HTTrack reads the suffix on the command line,
+in a <i>-%L</i> list and in doit.log, never on a crawled
+link. A missing file, or one that does not parse, stops the
+run before any request.</p>
 
 <p style="margin-left:18%; margin-top: 1em">The first line
-is <i># HTTrack bundle 1</i>. Then come <i>url</i> lines
-(more start URLs), at most one <i>ua</i> line, and
+is <i># HTTrack bundle 1</i>. Then come <i>url</i> lines,
+each one more start URL, at most one <i>ua</i> line, and
 <i>header</i> and <i>scope</i> lines. A <i>cookies</i> line
 ends them, and a Netscape cookie jar follows it.</p>
 
 <p style="margin-left:18%; margin-top: 1em">The
 bundle&rsquo;s user agent and headers replace <i>-F</i> and
-<i>-%X</i> for each host in its scope, and only there. By
-default the scope is the registrable domains of the start
-URL naming the bundle, of its url lines and of its cookies.
-Scope lines replace that default. HTTrack refuses a cookie
-outside the scope, and a Host, Cookie, Proxy-* or framing
-header. Its cookies load before cookies.txt, so a cookie the
-server refreshed wins. Two bundles whose scopes overlap must
-give the same user agent, headers and cookie values, or the
-run stops.</p>
+<i>-%X</i> for each host in its scope, and only there. A
+bundle with header lines but no <i>ua</i> line sends the
+<i>-F</i> user agent. When every start URL naming the bundle
+is https, its headers go over https alone. By default the
+scope is the registrable domains of the start URLs naming
+the bundle and of its url lines. A host with no registrable
+domain, such as a public suffix, a single label or an
+address, covers itself alone. Scope lines replace that
+default. HTTrack drops a cookie outside the scope and gives
+the count in one warning. HTTrack refuses a Host, Cookie,
+Proxy-* or framing header, and a line holding a control
+byte. Two bundles whose scopes overlap must give the same
+user agent, headers and cookie values, or the run stops.</p>
+
+<p style="margin-left:18%; margin-top: 1em">The
+bundle&rsquo;s cookies go into the cookie jar, which HTTrack
+writes at the end of the crawl. Of the bundle and the jar,
+the newer file wins a cookie both hold. A new capture
+therefore wins over the jar, and a cookie the server
+refreshed wins over an older bundle. On equal times the
+bundle wins.</p>
 
 <p style="margin-left:9%; margin-top: 1em">A running mirror
 also watches its own output directory for these. Creating

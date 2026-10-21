@@ -1,8 +1,9 @@
 #!/bin/bash
 #
-# Two login bundles and a CDN on a third domain, graded on what the server
-# received: each site gets its own UA, Authorization and cookies, and the CDN
-# gets the global -F and -%X and none of the bundles' identity.
+# Login bundles in a real crawl, graded on what the server received: each site
+# gets its own UA, Authorization and cookies, while a CDN and another user's
+# site under a public suffix get the global -F and -%X. --update finds the
+# bundles again, and the newer of the bundle and the jar wins.
 
 set -euo pipefail
 
@@ -11,6 +12,7 @@ set -euo pipefail
 
 python=$(find_python) || skip "python3 missing"
 
+bin=$(httrack_path)
 server=$(nativepath "$top_srcdir/tests/bundle-server.py")
 tmpdir=$(mktemp -d)
 serverpid=
@@ -32,81 +34,140 @@ jar() { # jar DOMAIN NAME VALUE -- one Netscape jar line
     printf '%s' ".$1${tab}TRUE${tab}/${tab}FALSE${tab}0${tab}$2${tab}$3"
 }
 mkdir "$tmpdir/logins" "$tmpdir/one" "$tmpdir/two"
+alpha=$tmpdir/logins/alpha.test.hts
 printf '%s\n' '# HTTrack bundle 1' 'ua AlphaUA/1.0' \
     'header Authorization: Bearer alpha-token' cookies \
     "$(jar alpha.test SID alpha-captured)" "$(jar alpha.test PREF alpha-pref)" \
-    >"$tmpdir/logins/alpha.test.hts"
+    >"$alpha"
 printf '%s\n' '# HTTrack bundle 1' 'ua BetaUA/2.0' \
     'header Authorization: Bearer beta-token' cookies \
     "$(jar beta.test SID beta-captured)" >"$tmpdir/logins/beta.test.hts"
-cp "$tmpdir/logins/alpha.test.hts" "$tmpdir/alpha.orig"
-# the project jar loads over the bundle, as a cookie the server refreshed
-jar alpha.test SID alpha-refreshed >"$tmpdir/one/cookies.txt"
+printf '%s\n' '# HTTrack bundle 1' 'ua GhUA/3.0' \
+    'header Authorization: Bearer gh-token' >"$tmpdir/logins/gh.hts"
+cp "$alpha" "$tmpdir/alpha.orig"
+jarfile=$tmpdir/one/cookies.txt
+jar alpha.test SID alpha-refreshed >"$jarfile"
 
-crawl() { # crawl DIR [httrack args...]
-    local dir=$1 rc=0
+crawl() { # crawl CWD [httrack args...]
+    local cwd=$1 rc=0
     shift
-    run_with_timeout 120 httrack -O "$(nativepath "$dir")" \
-        -P "127.0.0.1:$port" -F GlobalUA/9 -%X 'X-Global: 1' \
-        '+*cdn.gamma.test/*' -c1 --robots=0 -%v0 -q "$@" >>"$log" 2>&1 || rc=$?
+    (cd "$cwd" && run_with_timeout 120 "$bin" -P "127.0.0.1:$port" \
+        -F GlobalUA/9 -%X 'X-Global: 1' '+*cdn.gamma.test/*' \
+        '+*github.io/*' -c1 --robots=0 -%v0 -q "$@") >>"$log" 2>&1 || rc=$?
     test "$rc" -ne 124 || fail "crawl hit the deadline"
     return "$rc"
 }
-
-hit() { # hit WHAT LINE -- the server must have logged LINE exactly
-    command grep -qxF "HIT $2" "$tmpdir/srv.out" ||
-        fail_dump "$1: no request [HIT $2]" "$tmpdir/srv.out"
+hits() { wc -l <"$tmpdir/srv.out"; }
+hit() { # hit WHAT FROM LINE -- the server logged LINE after line FROM
+    tail -n "+$(($2 + 1))" "$tmpdir/srv.out" >"$tmpdir/new.out"
+    command grep -qxF "HIT $3" "$tmpdir/new.out" ||
+        fail_dump "$1: no request [HIT $3]" "$tmpdir/new.out"
+}
+dated() { # dated BUNDLE-DATE JAR-DATE
+    touch -d "$1" "$alpha"
+    touch -d "$2" "$jarfile"
 }
 
-crawl "$tmpdir/one" --bundle-dir "$(nativepath "$tmpdir/logins")" \
+# The jar is newer than the bundle, so its SID wins. --bundle-dir is relative.
+dated '2026-01-01 10:00:00' '2026-01-02 10:00:00'
+crawl "$tmpdir" -O one --bundle-dir logins \
     'http://www.alpha.test/#httrack-bundle=alpha.test' \
     'http://www.beta.test/#httrack-bundle=beta.test' \
-    'http://alpha.test/plain.html' || fail "the bundle crawl failed"
-
-alpha='ua=AlphaUA/1.0 auth=Bearer alpha-token cookie=PREF=alpha-pref; SID=alpha-refreshed x=-'
-hit "start page" "www.alpha.test/ $alpha"
-hit "crawled link" "www.alpha.test/page.html $alpha"
-hit "plain URL on the bundle's site" "alpha.test/plain.html $alpha"
-hit "second bundle" "www.beta.test/ ua=BetaUA/2.0 auth=Bearer beta-token cookie=SID=beta-captured x=-"
+    'http://alpha.test/plain.html' 'http://github.io/#httrack-bundle=gh' ||
+    fail "the bundle crawl failed"
+a='ua=AlphaUA/1.0 auth=Bearer alpha-token cookie=PREF=alpha-pref; SID'
+hit "start page" 0 "www.alpha.test/ $a=alpha-refreshed x=-"
+hit "crawled link" 0 "www.alpha.test/page.html $a=alpha-refreshed x=-"
+hit "plain URL on the bundle's site" 0 "alpha.test/plain.html $a=alpha-refreshed x=-"
+hit "second bundle" 0 "www.beta.test/ ua=BetaUA/2.0 auth=Bearer beta-token cookie=SID=beta-captured x=-"
 for gif in a.gif b.gif; do
-    hit "CDN" "cdn.gamma.test/$gif ua=GlobalUA/9 auth=- cookie=- x=1"
+    hit "CDN" 0 "cdn.gamma.test/$gif ua=GlobalUA/9 auth=- cookie=- x=1"
 done
-n=$(command grep -c '^HIT ' "$tmpdir/srv.out" || true)
-test "$n" -eq 6 || fail_dump "$n requests, expected 6" "$tmpdir/srv.out"
-
-# --update finds the bundle again: doit.log keeps the name and the folder
+hit "suffix host" 0 "github.io/ ua=GhUA/3.0 auth=Bearer gh-token cookie=- x=-"
+hit "another user under the suffix" 0 \
+    "attacker.github.io/x.html ua=GlobalUA/9 auth=- cookie=- x=1"
+n=$(hits)
+test "$n" -eq 9 || fail_dump "$n lines, expected PORT and 8 requests" "$tmpdir/srv.out"
+cmp -s "$tmpdir/alpha.orig" "$alpha" || fail "the crawl wrote to the bundle"
 doit=$tmpdir/one/hts-cache/doit.log
-command grep -qF '#httrack-bundle=alpha.test' "$doit" ||
-    fail_dump "doit.log lost the bundle name" "$doit"
-command grep -qF -- "-@b " "$doit" || fail_dump "doit.log lost --bundle-dir" "$doit"
-cmp -s "$tmpdir/alpha.orig" "$tmpdir/logins/alpha.test.hts" ||
-    fail "the crawl wrote to the bundle"
+command grep -qF -- '--bundle-dir logins' "$doit" &&
+    fail_dump "doit.log kept a relative --bundle-dir" "$doit"
+# The suffix is cut before any URL reaches a file name, a log or the index.
+# hts-log.txt echoes the command line in parentheses, as doit.log keeps it.
+names=$(cd "$tmpdir/one" && find . -name '*httrack-bundle*')
+test -z "$names" || fail "a file name holds the bundle suffix: $names"
+for f in index.html hts-log.txt hts-cache/new.txt; do
+    test -f "$tmpdir/one/$f" || fail "no $f"
+    command grep -v '^(' "$tmpdir/one/$f" | command grep -F '#httrack-bundle' &&
+        fail_dump "$f holds the bundle suffix" "$tmpdir/one/$f"
+done
+command grep -qF 'http://www.alpha.test/ ' "$tmpdir/one/hts-log.txt" ||
+    fail_dump "hts-log.txt does not name the start URL" "$tmpdir/one/hts-log.txt"
+
+refresh() { # the server refreshed SID, as the saved jar holds it
+    sed "s/${tab}SID${tab}.*/${tab}SID${tab}alpha-server/" "$jarfile" >"$tmpdir/jar.new"
+    cat "$tmpdir/jar.new" >"$jarfile"
+    command grep -qF "SID${tab}alpha-server" "$jarfile" ||
+        fail_dump "the jar holds no SID to refresh" "$jarfile"
+}
+# --update from another folder reads doit.log, so it finds the bundles again.
+# The jar the crawl saved is newer: a cookie the server refreshed wins.
+update() { # update WANT-SID
+    local from
+    from=$(hits)
+    crawl / -O "$(nativepath "$tmpdir/one")" --update || fail "--update failed"
+    hit "--update with SID=$1" "$from" "www.alpha.test/ $a=$1 x=-"
+}
+refresh
+dated '2026-01-01 10:00:00' '2026-01-02 10:00:00'
+update alpha-server
+# a new capture is newer than the jar, so the fresh login wins
+dated '2026-01-03 10:00:00' '2026-01-02 10:00:00'
+update alpha-captured
+# and so it does on a tie, where a coarse clock cannot order the two
+refresh
+dated '2026-01-04 10:00:00' '2026-01-04 10:00:00'
+update alpha-captured
 
 # A -%L list names a bundle too, and it resolves in the project folder.
 cp "$tmpdir/logins/beta.test.hts" "$tmpdir/two/"
 printf '%s\n' 'http://www.beta.test/#httrack-bundle=beta.test' >"$tmpdir/list.txt"
-before=$(command grep -c '^HIT ' "$tmpdir/srv.out" || true)
-crawl "$tmpdir/two" -%L "$(nativepath "$tmpdir/list.txt")" ||
+before=$(hits)
+crawl "$tmpdir" -O two -%L "$(nativepath "$tmpdir/list.txt")" ||
     fail "the -%L crawl failed"
-after=$(command grep -c '^HIT ' "$tmpdir/srv.out" || true)
-test "$((after - before))" -eq 2 ||
-    fail_dump "-%L crawl: $((after - before)) requests, expected 2" "$tmpdir/srv.out"
-n=$(command grep -cxF "HIT www.beta.test/ ua=BetaUA/2.0 auth=Bearer beta-token cookie=SID=beta-captured x=-" "$tmpdir/srv.out" || true)
-test "$n" -eq 2 || fail_dump "-%L crawl: the beta page did not get its bundle" "$tmpdir/srv.out"
+test "$(($(hits) - before))" -eq 2 ||
+    fail_dump "-%L crawl: $(($(hits) - before)) requests, expected 2" "$tmpdir/srv.out"
+hit "-%L" "$before" "www.beta.test/ ua=BetaUA/2.0 auth=Bearer beta-token cookie=SID=beta-captured x=-"
 
-# A missing bundle stops the run before any request, naming the file.
-rc=0
-crawl "$tmpdir/two" 'http://www.alpha.test/#httrack-bundle=nosuch' || rc=$?
-test "$rc" -ne 0 || fail "a missing bundle did not stop the run"
-command grep -qF "nosuch.hts: cannot read the login bundle" "$log" ||
-    fail_dump "no message naming the missing bundle" "$log"
-final=$(command grep -c '^HIT ' "$tmpdir/srv.out" || true)
-test "$final" -eq "$after" || fail_dump "a missing bundle still crawled" "$tmpdir/srv.out"
-
-# So does a -%L line naming an invalid one.
+# A bundle that cannot be read stops the run before any request, with a message
+# that names it and never shows a refused header's value. A CR would end a
+# header early and start another on the wire.
+printf '%s\n' '# HTTrack bundle 1' 'header Proxy-Authorization: planted-secret' \
+    >"$tmpdir/two/secret.hts"
+printf '# HTTrack bundle 1\nua U\rX-Injected: 1\nheader X-A: 1\rCookie: forged=1\n' \
+    >"$tmpdir/two/cr.hts"
 printf '%s\n' 'http://www.beta.test/#httrack-bundle=../beta.test' >"$tmpdir/bad.txt"
-rc=0
-crawl "$tmpdir/two" -%L "$(nativepath "$tmpdir/bad.txt")" || rc=$?
-test "$rc" -ne 0 || fail "an invalid -%L bundle name did not stop the run"
-final=$(command grep -c '^HIT ' "$tmpdir/srv.out" || true)
-test "$final" -eq "$after" || fail_dump "an invalid -%L bundle name still crawled" "$tmpdir/srv.out"
+stops=0
+stop() { # stop MESSAGE [httrack args...]
+    local want=$1 rc=0
+    shift
+    : >"$log"
+    crawl "$tmpdir" -O two "$@" || rc=$?
+    test "$rc" -ne 0 || fail "the run did not stop: $*"
+    command grep -qF "$want" "$log" || fail_dump "no message [$want]" "$log"
+    stops=$((stops + 1))
+}
+before=$(hits)
+stop 'nosuch.hts: cannot read the login bundle' \
+    'http://www.alpha.test/#httrack-bundle=nosuch'
+stop 'line 1: invalid login bundle name' -%L "$(nativepath "$tmpdir/bad.txt")"
+stop 'refused header Proxy-Authorization' \
+    'http://www.alpha.test/#httrack-bundle=secret'
+stop 'line 2: too long or holding a control byte' \
+    'http://www.alpha.test/#httrack-bundle=cr'
+test "$stops" -eq 4 || fail "$stops stops ran, expected 4"
+test "$(hits)" -eq "$before" || fail_dump "a refused bundle still crawled" "$tmpdir/srv.out"
+for f in "$log" "$tmpdir/two/hts-log.txt"; do
+    command grep -qF planted-secret "$f" && fail_dump "$f shows the secret" "$f"
+done
+true

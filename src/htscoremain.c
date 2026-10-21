@@ -466,6 +466,40 @@ static hts_boolean optparam_dash_ok(const cmdl_argv *cmd, int na) {
   return na + 1 < cmd->argc && cmd->param[na + 1];
 }
 
+/* Read the --bundle-dir at NA into opt, made absolute in cmd too, so doit.log
+   finds the folder from anywhere. HTS_FALSE after the panic message. */
+static hts_boolean bundle_dir_set(httrackp *opt, cmdl_argv *cmd, int na) {
+  const char *dir = na + 1 < cmd->argc ? cmd->argv[na + 1] : NULL;
+  char cwd[HTS_URLMAXSIZE];
+  String abs = STRING_EMPTY;
+  char *copy;
+
+  if (dir == NULL || (dir[0] == '-' && !optparam_dash_ok(cmd, na))) {
+    HTS_PANIC_PRINTF("Option bundle-dir needs a blank space and a folder");
+    return HTS_FALSE;
+  }
+  if (dir[0] != '/' && dir[0] != '\\' && !(dir[0] != '\0' && dir[1] == ':')) {
+    if (getcwd(cwd, sizeof(cwd)) == NULL) {
+      HTS_PANIC_PRINTF("Option bundle-dir: cannot read the current folder");
+      return HTS_FALSE;
+    }
+    StringCat(abs, cwd);
+    StringCat(abs, "/");
+  }
+  StringCat(abs, dir);
+  if (StringLength(abs) >= HTS_URLMAXSIZE ||
+      (copy = hts_arena_strdup(&cmd->tokens, StringBuff(abs))) == NULL) {
+    StringFree(abs);
+    HTS_PANIC_PRINTF("Option bundle-dir: folder path too long, or out of "
+                     "memory");
+    return HTS_FALSE;
+  }
+  StringFree(abs);
+  cmd->argv[na + 1] = copy;
+  StringCopy(opt->bundle_dir, copy);
+  return HTS_TRUE;
+}
+
 /* Print the headers -#C lists for `url`, read back out of the ZIP cache. */
 static void cmdl_print_cache_entry(httrackp *opt, cache_back *cache,
                                    const char *url, int sendb) {
@@ -569,7 +603,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   int httrack_logmode = 3;      // ONE log file
 
   ensureUrlCapacity(url, url_sz, 65536);
-  hts_bundle_reset(opt); /* a previous run's bundles are not this one's */
+  hts_bundle_free(opt); /* a previous run's bundles are not this one's */
 
   // Create options
   _DEBUG_HEAD = 0;              // pas de debuggage en têtes
@@ -1101,6 +1135,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             HTS_PANIC_PRINTF(s);
             htsmain_free();
             return -1;
+          } else if (strfield2(argv[i] + 2, "bundle-dir")) {
+            i++; /* its value, which the option parser reads */
           }
           //
           else {
@@ -1111,7 +1147,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             htsmain_free();
             return -1;
           }
-
         }
       }
     }
@@ -1347,6 +1382,14 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         x_cmd.span[prev_opt] = na - prev_opt;
       prev_opt = hts_rule_would_be_read_as_opt(argv[na]) ? na : 0;
 
+      if (strcmp(argv[na], "--bundle-dir") == 0) {
+        if (!bundle_dir_set(opt, &x_cmd, na)) {
+          htsmain_free();
+          return -1;
+        }
+        na++;
+        continue;
+      }
       if (hts_rule_would_be_read_as_opt(argv[na])) { // option
         com = argv[na] + 1;
 
@@ -2533,29 +2576,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 #endif
                 break;
 
-              case 'b': // --bundle-dir: where #httrack-bundle= names resolve
-                /* a vetted pair's value may begin with '-' (#1425) */
-                if ((na + 1 >= argc) ||
-                    (argv[na + 1][0] == '-' && !optparam_dash_ok(&x_cmd, na))) {
-                  HTS_PANIC_PRINTF("Option bundle-dir needs a blank space and "
-                                   "a folder");
-                  printf("Example: --bundle-dir \"/home/me/logins\"\n");
-                  htsmain_free();
-                  return -1;
-                }
-                na++;
-                if (strlen(argv[na]) >= HTS_URLMAXSIZE) {
-                  HTS_PANIC_PRINTF("Bundle folder path too long");
-                  htsmain_free();
-                  return -1;
-                }
-                if (!hts_bundle_set_dir(opt, argv[na])) {
-                  HTS_PANIC_PRINTF("Not enough memory");
-                  htsmain_free();
-                  return -1;
-                }
-                break;
-
               case 'm': { // --mptcp: Multipath TCP where the system has it
                 int on = 1;
 
@@ -2878,7 +2898,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 
       } else { // URL/filters
         char catbuff[CATBUFF_SIZE];
-        /* argv itself goes to doit.log, so the bundle suffix is cut here */
+        /* doit.log keeps argv, so the bundle suffix is cut from a copy */
         char word[HTS_CDLMAXSIZE];
         const size_t urlSize = strlen(argv[na]);
         const size_t capa = strlen(url) + urlSize + 32;
@@ -2909,7 +2929,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             htsmain_free();
             return -1;
           case HTS_BUNDLE_NAMED:
-            if (!hts_bundle_name(opt, name, word)) {
+            if (!hts_bundle_add(opt, name, word)) {
               HTS_PANIC_PRINTF("Not enough memory");
               htsmain_free();
               return -1;

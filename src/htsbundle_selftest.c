@@ -59,31 +59,44 @@ static int st_bundlecut(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* -#test=bundle <dir> <url>... [host:<host>]...: load the bundles the URLs
-   name from dir, print them, then the UA and headers each host gets. */
+/* -#test=bundle <dir> <url>... [host:<adr>]... [jar:<file>]: load the bundles
+   the URLs name from dir over the jar file, print them and the jar, then the
+   UA and headers each adr gets. */
 static int st_bundle(httrackp *opt, int argc, char **argv) {
   FILE *const log = opt->log;
+  t_cookie *const prev = opt->cookie;
+  t_cookie *jar = calloct(1, sizeof(t_cookie));
+  const char *jar_file = NULL;
   char err[1024];
+  char *rec;
   int i;
 
-  if (argc < 2) {
-    fprintf(stderr, "bundle: takes <dir> <url>... [host:<host>]...\n");
+  if (argc < 2 || jar == NULL) {
+    fprintf(stderr, "bundle: takes <dir> <url>... [host:<adr>]... "
+                    "[jar:<file>]\n");
+    freet(jar);
     return 1;
   }
-  hts_bundle_reset(opt);
-  assertf(hts_bundle_set_dir(opt, argv[0]));
-  opt->log = stderr; /* warnings stay out of the graded output */
+  jar->max_len = 30000; /* httpmirror's */
+  opt->log = stderr;    /* warnings stay out of the graded output */
+  opt->cookie = jar;
+  hts_bundle_free(opt);
+  StringCopy(opt->bundle_dir, argv[0]);
   for (i = 1; i < argc; i++) {
     char url[HTS_URLMAXSIZE * 2];
     char name[HTS_BUNDLE_NAME_MAX];
 
-    if (strncmp(argv[i], "host:", 5) == 0 || strlen(argv[i]) >= sizeof(url))
-      continue;
-    strcpybuff(url, argv[i]);
-    if (hts_bundle_cut(url, name, sizeof(name)) == HTS_BUNDLE_NAMED)
-      assertf(hts_bundle_name(opt, name, url));
+    if (strncmp(argv[i], "jar:", 4) == 0) {
+      jar_file = argv[i] + 4;
+      (void) cookie_load(opt, jar, "", jar_file);
+    } else if (strncmp(argv[i], "host:", 5) != 0 &&
+               strlen(argv[i]) < sizeof(url)) {
+      strcpybuff(url, argv[i]);
+      if (hts_bundle_cut(url, name, sizeof(name)) == HTS_BUNDLE_NAMED)
+        assertf(hts_bundle_add(opt, name, url));
+    }
   }
-  if (!hts_bundle_load_all(opt, err, sizeof(err))) {
+  if (!hts_bundle_load_all(opt, jar_file, err, sizeof(err))) {
     /* the folder is the caller's, so the message is graded without it */
     const size_t dlen = strlen(argv[0]);
     const char *p = err;
@@ -95,35 +108,44 @@ static int st_bundle(httrackp *opt, int argc, char **argv) {
       p = at + dlen;
     }
     printf("%s\n", p);
-    hts_bundle_reset(opt);
-    opt->log = log;
-    return 0;
+    goto done;
   }
   hts_bundle_dump(opt);
+  for (rec = jar->data; *rec != '\0'; rec = cookie_nextfield(rec)) {
+    char dom[8192], cname[8192], value[8192];
+
+    printf("cookie %s %s=%s\n", cookie_get(dom, rec, 0),
+           cookie_get(cname, rec, 5), cookie_get(value, rec, 6));
+  }
   for (i = 1; i < argc; i++) {
     if (strncmp(argv[i], "host:", 5) == 0) {
-      const char *ua = "global";
-      const char *headers = "global";
+      htsrequest req;
       const char *p;
 
-      (void) hts_bundle_identity(opt, argv[i] + 5, &ua, &headers);
-      printf("%s ua=%s headers=", argv[i] + 5, ua);
+      memset(&req, 0, sizeof(req));
+      req.user_agent = req.headers = "global";
+      hts_bundle_identity(opt, argv[i] + 5, &req);
+      printf("%s ua=%s headers=", argv[i] + 5, req.user_agent);
       /* one line per host, so the block's line ends print as '|' */
-      for (p = headers; *p != '\0'; p++) {
+      for (p = req.headers; *p != '\0'; p++) {
         if (*p != '\r')
           putchar(*p == '\n' ? '|' : *p);
       }
       putchar('\n');
     }
   }
-  hts_bundle_reset(opt);
+done:
+  hts_bundle_free(opt);
+  StringCopy(opt->bundle_dir, "");
+  opt->cookie = prev;
   opt->log = log;
+  freet(jar);
   return 0;
 }
 
 const struct selftest_entry selftests_bundle[] = {
     {"bundlecut", "<url>", "the login bundle a start URL names", st_bundlecut},
-    {"bundle", "<dir> <url>... [host:<host>]...",
+    {"bundle", "<dir> <url>... [host:<adr>]... [jar:<file>]",
      "load login bundles and print the identity each host gets", st_bundle},
     {NULL, NULL, NULL, NULL},
 };

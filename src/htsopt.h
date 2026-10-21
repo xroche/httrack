@@ -657,6 +657,10 @@ struct httrackp {
                             line, and the last one wins. Tail: ABI */
   hts_boolean accept_given; /**< Did the user give -%a? Tail: ABI */
   hts_boolean lang_given;   /**< Did the user give -%l? Tail: ABI */
+  String bundle_dir;  /**< --bundle-dir: where login bundle names resolve, or
+                           empty for the project folder. Tail: ABI */
+  void *bundle_state; /**< hts_bundle_state*, or NULL. Live state, so
+                           copy_htsopt must leave it alone. Tail: ABI */
 };
 
 /** Running statistics for a mirror. */

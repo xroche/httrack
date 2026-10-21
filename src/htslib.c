@@ -7517,6 +7517,8 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   StringCopy(opt->accept_kinds, "");
   opt->accept_given = HTS_FALSE;
   opt->lang_given = HTS_FALSE;
+  StringCopy(opt->bundle_dir, "");
+  opt->bundle_state = NULL;
   StringCopy(opt->headers, "");
   StringCopy(opt->mimedefs, "\n");      // aucun filtre mime (\n IMPORTANT)
   StringClear(opt->mod_blacklist);
@@ -7588,7 +7590,7 @@ HTSEXT_API void hts_free_opt(httrackp * opt) {
     /* An FTP worker reads opt for its whole run, and not every caller drains
        its threads the way httrack.c does before getting here. */
     ftp_stop_workers();
-    hts_bundle_reset(opt);
+    hts_bundle_free(opt);
 
     /* Alocated callbacks */
 
@@ -7665,6 +7667,7 @@ HTSEXT_API void hts_free_opt(httrackp * opt) {
     StringFree(opt->lang_iso);
     StringFree(opt->accept);
     StringFree(opt->accept_kinds);
+    StringFree(opt->bundle_dir);
     StringFree(opt->headers);
     StringFree(opt->sys_com);
     StringFree(opt->mimedefs);

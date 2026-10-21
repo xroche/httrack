@@ -784,9 +784,14 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
     opt->cookie = &cookie;
     cookie.max_len = 30000;     // max len
     strcpybuff(cookie.data, "");
-    /* loaded over the login bundles once the start URLs are known, and left
-       alone until then */
-    cookies_file_refused = COOKIE_LOAD_KEEP;
+    if (strnotempty(StringBuff(opt->cookies_file))) {
+      // loaded once the start URLs are known, and left alone until then
+      cookies_file_refused = COOKIE_LOAD_KEEP;
+    } else {
+      cookies_file_refused = cookie_load(
+          opt, opt->cookie, StringBuff(opt->path_log), "cookies.txt");
+      cookie_load(opt, opt->cookie, "", "cookies.txt");
+    }
   } else {
     opt->cookie = NULL;
     if (strnotempty(StringBuff(opt->cookies_file)))
@@ -1136,12 +1141,14 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
             break;
           case HTS_BUNDLE_BAD:
             hts_log_print(opt, LOG_ERROR,
-                          "\"%s\", line %d: invalid login bundle name: %s",
-                          StringBuff(opt->filelist), lineno, line);
+                          "\"%s\", line %d: invalid login bundle name",
+                          StringBuff(opt->filelist), lineno);
+            fprintf(stderr, "\"%s\", line %d: invalid login bundle name\n",
+                    StringBuff(opt->filelist), lineno);
             bundle_refused = HTS_TRUE;
             continue;
           case HTS_BUNDLE_NAMED:
-            if (!hts_bundle_name(opt, name, line)) {
+            if (!hts_bundle_add(opt, name, line)) {
               hts_log_print(opt, LOG_ERROR, "Login bundle: out of memory");
               bundle_refused = HTS_TRUE;
             }
@@ -1167,85 +1174,6 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
       }
     }
 
-    /* the login bundles: their url lines are start URLs, and their cookies go
-       first in the jar, so what the server refreshed since wins */
-    {
-      char err[1024];
-      char *extra;
-
-      err[0] = '\0';
-      if (bundle_refused || !hts_bundle_load_all(opt, err, sizeof(err))) {
-        if (err[0] != '\0') {
-          hts_log_print(opt, LOG_ERROR, "Login bundle: %s", err);
-          fprintf(stderr, "Login bundle: %s\n", err);
-        } else {
-          fprintf(stderr, "Login bundle: %s refused, see the log\n",
-                  StringBuff(opt->filelist));
-        }
-        freet(primary);
-        XH_extuninit;
-        return 0;
-      }
-      extra = hts_bundle_urls(opt);
-      if (extra != NULL) {
-        size_t lines = 0;
-        size_t room;
-        const char *p;
-        char *grown;
-
-        for (p = extra; *p != '\0'; p++) {
-          if (*p == '\n')
-            lines++;
-        }
-        /* "http://" for each line, and the NUL */
-        room = strlen(extra) + lines * 7 + 1;
-        grown = room < (size_t) -1 - primarybuff.cap
-                    ? (char *) realloct(primary, primarybuff.cap + room)
-                    : NULL;
-        if (grown == NULL) {
-          printf("PANIC! : Not enough memory [%d]\n", __LINE__);
-          freet(extra);
-          freet(primary);
-          XH_extuninit;
-          return 0;
-        }
-        primary = grown;
-        primarybuff.buf = grown;
-        primarybuff.cap += room;
-        for (p = extra; *p != '\0';) {
-          const size_t len = strcspn(p, "\n");
-
-          if (strstr(p, ":/") == NULL || strstr(p, ":/") > p + len)
-            htsbuff_cat(&primarybuff, "http://");
-          htsbuff_catn(&primarybuff, p, len);
-          htsbuff_cat(&primarybuff, "\n");
-          p += len;
-          if (*p == '\n')
-            p++;
-        }
-        freet(extra);
-      }
-      if (opt->accept_cookie) {
-        const int refused = hts_bundle_cookies(opt, opt->cookie);
-
-        if (refused != 0) {
-          hts_log_print(opt, LOG_ERROR,
-                        "Login bundle: the jar is full, %d cookie(s) left out",
-                        refused);
-          fprintf(stderr,
-                  "Login bundle: the jar is full, %d cookie(s) left out\n",
-                  refused);
-          freet(primary);
-          XH_extuninit;
-          return 0;
-        }
-      } else if (hts_bundle_cookie_count(opt) != 0) {
-        hts_log_print(opt, LOG_WARNING,
-                      "Cookies are disabled, so the login bundles' cookies "
-                      "are not sent");
-      }
-    }
-
     // the --cookies-file is the whole jar, because the crawl writes it back
     if (opt->accept_cookie && strnotempty(StringBuff(opt->cookies_file))) {
       char BIGSTK start_url[HTS_URLMAXSIZE * 2];
@@ -1256,10 +1184,56 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
         strlncatbuff(start_url, primary, sizeof(start_url), first);
       cookies_file_refused = cookie_load_from(
           opt, opt->cookie, "", StringBuff(opt->cookies_file), start_url);
-    } else if (opt->accept_cookie) {
-      cookies_file_refused = cookie_load(
-          opt, opt->cookie, StringBuff(opt->path_log), "cookies.txt");
-      cookie_load(opt, opt->cookie, "", "cookies.txt");
+    }
+
+    /* the login bundles: url lines join the start URLs, cookies the jar */
+    {
+      char err[1024];
+      char jarbuff[CATBUFF_SIZE];
+      const char *jar = !opt->accept_cookie ? NULL
+                        : strnotempty(StringBuff(opt->cookies_file))
+                            ? StringBuff(opt->cookies_file)
+                            : fconcat(jarbuff, sizeof(jarbuff),
+                                      StringBuff(opt->path_log), "cookies.txt");
+      const char *extra;
+      size_t room = 0;
+      size_t i;
+
+      if (!bundle_refused && !hts_bundle_load_all(opt, jar, err, sizeof(err))) {
+        hts_log_print(opt, LOG_ERROR, "Login bundle: %s", err);
+        fprintf(stderr, "Login bundle: %s\n", err);
+        bundle_refused = HTS_TRUE;
+      }
+      for (i = 0; !bundle_refused && (extra = hts_bundle_url(opt, i)) != NULL;
+           i++)
+        room += strlen(extra) + sizeof("http://\n");
+      if (room != 0) {
+        char *const grown =
+            room < (size_t) -1 - primarybuff.cap
+                ? (char *) realloct(primary, primarybuff.cap + room)
+                : NULL;
+
+        if (grown == NULL) {
+          printf("PANIC! : Not enough memory [%d]\n", __LINE__);
+          bundle_refused = HTS_TRUE;
+        } else {
+          primary = primarybuff.buf = grown;
+          primarybuff.cap += room;
+        }
+      }
+      if (bundle_refused) {
+        /* the jar may hold half a bundle, so it is not saved */
+        cookies_file_refused = COOKIE_LOAD_KEEP;
+        freet(primary);
+        XH_extuninit;
+        return 0;
+      }
+      for (i = 0; (extra = hts_bundle_url(opt, i)) != NULL; i++) {
+        if (strstr(extra, ":/") == NULL)
+          htsbuff_cat(&primarybuff, "http://");
+        htsbuff_cat(&primarybuff, extra);
+        htsbuff_cat(&primarybuff, "\n");
+      }
     }
 
     // lien primaire
@@ -4864,6 +4838,9 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
 
   if (StringNotEmpty(from->accept_kinds))
     StringCopyS(to->accept_kinds, from->accept_kinds);
+
+  if (StringNotEmpty(from->bundle_dir))
+    StringCopyS(to->bundle_dir, from->bundle_dir);
 
   /* An explicit -%a or -%l travels with its flag, so it stays explicit. */
   if (from->accept_given) {
