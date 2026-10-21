@@ -453,7 +453,7 @@ selftest_run_queued
 
 # Warnings name the line, and never a byte of it that could be a secret: a
 # key in lowercase letters alone is named.
-out=$(httrack -#test=bundle "$dir" 'https://www.alpha.test/#httrack-bundle=alpha' 2>&1)
+out=$(httrack -#test=bundle "$dir" 'https://www.alpha.test/#httrack-bundle=alpha' 2>&1 | tr -d '\r')
 for want in 'alpha.hts, line 7: unknown key$' 'alpha.hts, line 8: unknown key nakedkey$' \
     'alpha.hts, line 13: a cookie appears twice$' 'alpha.hts, line 14: an unknown comment$' \
     'alpha.hts: 1 cookie\(s\) outside its scope left out'; do
@@ -465,7 +465,7 @@ bundle warns '# HTTrack bundle 1' 'headers X: 1' 'abc123 v' \
     "$(jar alpha.test B b)${tab}x${tab}y" \
     ".alpha.test${tab}TRUE${tab}/${tab}FALSE${tab}soon${tab}C${tab}c" \
     "$(jar "$(repeat_chars 300 d).alpha.test" D d)"
-out=$(httrack -#test=bundle "$dir" 'https://www.alpha.test/#httrack-bundle=warns' 2>&1)
+out=$(httrack -#test=bundle "$dir" 'https://www.alpha.test/#httrack-bundle=warns' 2>&1 | tr -d '\r')
 for want in 'line 2: unknown key headers' 'line 3: unknown key' \
     'line 4: unknown key' "line 5: unknown key $(repeat_chars 32 k)" \
     'line 7: a cookie line has fewer than 7 fields or no name' \
@@ -490,7 +490,7 @@ sec s5 cookies "#$secret" "$(jar alpha.test "$secret" 1)" \
 sec control "url http://www.alpha.test/?t=$secret"
 sec keys "token $secret"
 for s in s1 s2 s3 s4 s5 keys control; do
-    out=$(httrack -#test=bundle "$dir" "https://www.alpha.test/#httrack-bundle=$s" 2>&1)
+    out=$(httrack -#test=bundle "$dir" "https://www.alpha.test/#httrack-bundle=$s" 2>&1 | tr -d '\r')
     case $s in
     control) grep -qF "$secret" <<<"$out" || fail "the probe cannot see a secret: $out" ;;
     *) grep -qF "$secret" <<<"$out" && fail "$s shows the secret: $out" ;;
