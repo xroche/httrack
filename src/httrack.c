@@ -670,6 +670,7 @@ static int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_b
                 if (back[i].url_fil[0] != '/')
                   strcatbuff(s, "/");
                 strcatbuff(s, back[i].url_fil);
+                hts_hide_secrets(opt, s, sizeof(s));
 
                 StatsBuffer[index].file[0] = '\0';
                 {

@@ -385,8 +385,11 @@ int hts_record_link(httrackp * opt,
                     const char *address, const char *file, const char *save,
                     const char *ref_address, const char *ref_file,
                     const char *codebase) {
-  const int success = 
-    hts_record_link_(opt, address, file, save, ref_address, ref_file, codebase);
+  int success;
+
+  hts_secret_add_login(opt, address);
+  success = hts_record_link_(opt, address, file, save, ref_address, ref_file,
+                             codebase);
   if (!success && opt->maxlink > 0 && opt->lien_tot >= opt->maxlink) {
     hts_log_print(opt, LOG_PANIC, "Too many links (links=%ld, limit=%ld)", 
                   (long int) heap_top_index(), (long int) opt->maxlink);
@@ -4516,6 +4519,7 @@ HTSEXT_API int hts_is_exiting(httrackp * opt) {
 
 // message d'erreur?
 char *hts_errmsg(httrackp * opt) {
+  hts_hide_secrets(opt, opt->state._hts_errmsg, sizeof(opt->state._hts_errmsg));
   return opt->state._hts_errmsg;
 }
 

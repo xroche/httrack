@@ -1692,6 +1692,140 @@ static int nologin_rows(httrackp *opt) {
   return err;
 }
 
+/* Reads back the log of o, from offset at, into buf. */
+static void secrets_read(FILE *fp, long at, char *buf, size_t size) {
+  size_t n;
+
+  fflush(fp);
+  fseek(fp, at, SEEK_SET);
+  n = fread(buf, 1, size - 1, fp);
+  buf[n] = '\0';
+  fseek(fp, 0, SEEK_END);
+}
+
+/* Logs line through o and checks the log holds want, and none of bad. */
+static int secrets_row(httrackp *o, FILE *fp, const char *line,
+                       const char *want, const char *bad) {
+  char got[4096];
+  const long at = ftell(fp);
+
+  hts_log_print(o, LOG_NOTICE, "%s", line);
+  secrets_read(fp, at, got, sizeof(got));
+  if (strstr(got, want) == NULL || (bad != NULL && strstr(got, bad) != NULL)) {
+    fprintf(stderr, "secrets: '%s' logged '%s', want '%s'\n", line, got, want);
+    return 1;
+  }
+  return 0;
+}
+
+/* A hostile page offers 200 passwords, each twice: the first
+   HTS_SECRET_MAX stay hidden, and one warning says so. */
+static int secrets_full(void) {
+  httrackp *const o = hts_create_opt();
+  FILE *const fp = tmpfile();
+  char got[4096];
+  const char *w;
+  int err = 0, i;
+
+  if (o == NULL || fp == NULL) {
+    fprintf(stderr, "secrets: out of memory\n");
+    return 1;
+  }
+  o->log = fp;
+  o->debug = LOG_DEBUG;
+  for (i = 0; i < 200; i++) {
+    char url[64];
+
+    snprintf(url, sizeof(url), "http://u:ZPWCAP%03d@h/", i);
+    hts_secret_add_login(o, url);
+    hts_secret_add_login(o, url);
+  }
+  hts_log_print(o, LOG_NOTICE, "u:ZPWCAP000@h u:ZPWCAP%03d@h u:ZPWCAP%03d@h",
+                HTS_SECRET_MAX - 1, HTS_SECRET_MAX);
+  secrets_read(fp, 0, got, sizeof(got));
+  w = strstr(got, "passwords seen");
+  if (strstr(got, "u:***@h u:***@h u:ZPWCAP064@h") == NULL || w == NULL ||
+      strstr(w + 1, "passwords seen") != NULL) {
+    fprintf(stderr, "secrets: full set logged '%s'\n", got);
+    err = 1;
+  }
+  o->log = NULL;
+  fclose(fp);
+  hts_free_opt(o);
+  return err;
+}
+
+static int st_secrets(httrackp *opt, int argc, char **argv) {
+  httrackp *const o = hts_create_opt();
+  FILE *const fp = tmpfile();
+  char got[4096];
+  char big[HTS_SECRET_MAXLEN + 16];
+  long at;
+  int err = 0;
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  if (o == NULL || fp == NULL) {
+    fprintf(stderr, "secrets: out of memory\n");
+    return 1;
+  }
+  o->log = fp;
+  o->debug = LOG_DEBUG;
+  // none known: the line goes out as given
+  err |= secrets_row(o, fp, "a u:index@h/index.html", "a u:index@h/index.html",
+                     NULL);
+  // a short password is hidden only as a login
+  hts_secret_add_login(o, "http://u:index@h/");
+  err |= secrets_row(o, fp,
+                     "a u:index@h/index.html http://index.example/ index@h "
+                     "myindex@h /index",
+                     "a u:***@h/index.html http://index.example/ ***@h "
+                     "myindex@h /index",
+                     NULL);
+  // a token is hidden anywhere, a short cookie value only as a login
+  hts_secret_add_headers(o, "X-Keep: ZPWKEEP12345\r\n"
+                            "Authorization: Bearer ZPWTOKEN123\r\n"
+                            "cookie: a=1; sid=ZPWSID9999\r\n"
+                            "Proxy-Authorization Basic ZPWNOCOLON1");
+  err |= secrets_row(o, fp,
+                     "GET /x?t=ZPWTOKEN123&s=ZPWSID9999 a=1 ZPWKEEP12345 "
+                     "ZPWNOCOLON1",
+                     "GET /x?t=***&s=*** a=1 ZPWKEEP12345 ***", NULL);
+  // raw and unescaped, the way Basic sends it
+  hts_secret_add_login(o, "ftp://u:ZPW%40ESC99@h/");
+  err |= secrets_row(o, fp, "ZPW%40ESC99 ZPW@ESC99", "*** ***", NULL);
+  // a user alone is no password
+  hts_secret_add_login(o, "http://ZPWUSERONLY@h/");
+  err |= secrets_row(o, fp, "ZPWUSERONLY", "ZPWUSERONLY", NULL);
+  // too long to keep
+  memset(big, 'Z', sizeof(big) - 1);
+  big[sizeof(big) - 1] = '\0';
+  hts_secret_add(o, big, HTS_SECRET_MAXLEN + 1);
+  err |= secrets_row(o, fp, big, big, "***");
+  // the -%H log and a front end's own buffer
+  at = ftell(fp);
+  fprintfio(fp, "GET /?k=ZPWTOKEN123 HTTP/1.1\r\nX-K: ZPWTOKEN123\r\n", "<<< ",
+            o);
+  secrets_read(fp, at, got, sizeof(got));
+  if (strcmp(got, "<<< GET /?k=*** HTTP/1.1\r\n<<< X-K: ***\r\n") != 0) {
+    fprintf(stderr, "secrets: fprintfio wrote '%s'\n", got);
+    err = 1;
+  }
+  strcpybuff(got, "h/x?t=ZPWTOKEN123");
+  hts_hide_secrets(o, got, sizeof(got));
+  if (strcmp(got, "h/x?t=***") != 0) {
+    fprintf(stderr, "secrets: hts_hide_secrets gave '%s'\n", got);
+    err = 1;
+  }
+  o->log = NULL;
+  fclose(fp);
+  hts_free_opt(o);
+  err |= secrets_full();
+  printf("secrets self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 static int st_maskpw(httrackp *opt, int argc, char **argv) {
   static const struct {
     hts_mask_mode mode;
@@ -3665,6 +3799,10 @@ const struct selftest_entry selftests_lib[] = {
      "the fields and copies the span primitive makes", st_span},
     {"gmtime", "",
      "hts_gmtime() fills the caller's buffer, not a static (#794)", st_gmtime},
+    {"secrets", "",
+     "the log hides a password or token it has seen: a token anywhere, a "
+     "short password only as a login",
+     st_secrets},
     {"maskpw", "[list|addr <text>]",
      "the command-line echo masks the password of a URL login and nothing "
      "else",

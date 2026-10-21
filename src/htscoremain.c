@@ -574,6 +574,32 @@ static void cmdl_print_cache_entry(httrackp *opt, cache_back *cache,
   freet(r.adr);
 }
 
+/* Feeds the log backstop the passwords of the blank-separated start URLs,
+   but not of the +/- filters among them, of the proxy and --why, and the
+   secret -%X values. */
+static void hts_secret_learn_options(httrackp *opt, const char *urls) {
+  const char *u = urls;
+
+  while (*u != '\0') {
+    const size_t n = strcspn(u, " \t\r\n");
+
+    if (n != 0 && *u != '+' && *u != '-') {
+      char *word = malloct(n + 1);
+
+      if (word != NULL) {
+        memcpy(word, u, n);
+        word[n] = '\0';
+        hts_secret_add_login(opt, word);
+        freet(word);
+      }
+    }
+    u += n != 0 ? n : 1;
+  }
+  hts_secret_add_login(opt, StringBuff(opt->proxy.name));
+  hts_secret_add_login(opt, StringBuff(opt->why_url));
+  hts_secret_add_headers(opt, StringBuff(opt->headers));
+}
+
 static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   /* command line rebuilt from argv, config files and doit.log */
   cmdl_argv x_cmd = {NULL, NULL, NULL, 0, 0, {NULL, 0, 0}};
@@ -2070,7 +2096,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                     // with the -%H log's redaction of a login header
                     if (why != NULL) {
                       fprintf(stderr, "warning: -%%X %s: ", why);
-                      fprintfio(stderr, argv[na], "");
+                      fprintfio(stderr, argv[na], "", opt);
                       fputc('\n', stderr);
                     }
                   }
@@ -3137,6 +3163,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                         "engine: could not create hts-in_progress.lock, so"
                         " this mirror cannot be stopped or paused by a file");
       }
+      hts_secret_learn_options(opt, url);
       masked_url = hts_mask_passwords(url, HTS_MASK_LIST);
       shown_url = masked_url != NULL ? masked_url : "(out of memory)";
       // hts-log.txt
@@ -3174,7 +3201,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             fputc('"', opt->log);
           // a -%X login header gets the -%H log's redaction
           if (!addr || masked != NULL)
-            fprintfio(opt->log, addr ? masked : arg, "");
+            fprintfio(opt->log, addr ? masked : arg, "", opt);
           fputs(quote ? "\" " : " ", opt->log);
           freet(masked);
         }

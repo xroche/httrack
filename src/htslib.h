@@ -542,8 +542,41 @@ void hts_lowcase(char *s);
 int multipleStringMatch(const char *s, const char *match);
 
 /* Writes a header block to fp, each line after prefix, with the value of a
-   field that carries a login replaced by the fprint_redacted() marker. */
-void fprintfio(FILE * fp, const char *buff, const char *prefix);
+   field that carries a login replaced by the fprint_redacted() marker, and
+   each secret opt knows as ***. opt may be NULL. */
+void fprintfio(FILE *fp, const char *buff, const char *prefix, httrackp *opt);
+
+/* The backstop behind the per-site masking: opt keeps the first
+   HTS_SECRET_MAX passwords and tokens it sees, each up to HTS_SECRET_MAXLEN
+   bytes, and the log writers print each as ***. One of HTS_SECRET_TOKEN bytes
+   or more is hidden anywhere, a shorter one only as a login, before an '@',
+   so a password such as "index" leaves index.html alone. */
+#define HTS_SECRET_MAX 64
+#define HTS_SECRET_MAXLEN 1024
+#define HTS_SECRET_TOKEN 8
+
+/* Allocates and frees the set of opt->secrets. */
+void hts_secret_init(httrackp *opt);
+void hts_secret_free(httrackp *opt);
+
+/* Adds the len bytes at s to the set of opt. Thread-safe. Once the set is
+   full, logs one warning and adds nothing more. */
+void hts_secret_add(httrackp *opt, const char *s, size_t len);
+
+/* Adds the password of the login of url, in any scheme or none, raw and
+   unescaped. A user alone is not added. url may be NULL. */
+void hts_secret_add_login(httrackp *opt, const char *url);
+
+/* Adds the values of the Authorization, Proxy-Authorization and Cookie lines
+   of a -%X header block, which may be NULL. */
+void hts_secret_add_headers(httrackp *opt, const char *headers);
+
+/* Writes the len bytes at s to fp, with each secret of opt as ***. */
+void hts_secret_fwrite(httrackp *opt, FILE *fp, const char *s, size_t len);
+
+/* fprintf() to fp, with each secret of opt as ***. */
+void hts_secret_fprintf(httrackp *opt, FILE *fp, const char *format, ...)
+    HTS_PRINTF_FUN(3, 4);
 
 /* What hts_mask_passwords() reads: */
 typedef enum {

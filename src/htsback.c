@@ -4697,12 +4697,13 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 #endif
                     if (_DEBUG_HEAD) {
                       if (ioinfo) {
-                        fprintf(ioinfo,
-                                "[%d] response for %s%s:\r\ncode=%d\r\n",
-                                back[i].r.debugid,
-                                jump_identification_const(back[i].url_adr),
-                                back[i].url_fil, back[i].r.statuscode);
-                        fprintfio(ioinfo, back[i].r.adr, ">>> ");
+                        hts_secret_fprintf(
+                            opt, ioinfo,
+                            "[%d] response for %s%s:\r\ncode=%d\r\n",
+                            back[i].r.debugid,
+                            jump_identification_const(back[i].url_adr),
+                            back[i].url_fil, back[i].r.statuscode);
+                        fprintfio(ioinfo, back[i].r.adr, ">>> ", opt);
                         fprintf(ioinfo, "\r\n");
                         fflush(ioinfo);
                       }         // en-tête

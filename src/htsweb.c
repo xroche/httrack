@@ -890,6 +890,7 @@ int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_back * b
                   strlncatbuff(s, "/", sizeof(s), sizeof(s) - 1 - strlen(s));
                 strlncatbuff(s, back[i].url_fil, sizeof(s),
                              sizeof(s) - 1 - strlen(s));
+                hts_hide_secrets(opt, s, sizeof(s));
 
                 StatsBuffer[index].file[0] = '\0';
                 {
