@@ -39,9 +39,9 @@
   --modern-action-bg: linear-gradient(180deg, #2f6ee8, #2563eb);
   --modern-action-hover: #1d4ed8;
   --modern-action-ink: #ffffff;
-  --modern-page-bg: radial-gradient(ellipse at 6% 0%, #e2edff 0, transparent 43%),
-                    radial-gradient(ellipse at 100% 20%, #e6f6ff 0, transparent 40%),
-                    var(--field);
+  /* Translucent over --field, so a user.css --field shows through. */
+  --modern-page-glow: radial-gradient(ellipse at 6% 0%, rgba(191, 218, 255, .3) 0, transparent 43%),
+                      radial-gradient(ellipse at 100% 20%, rgba(204, 248, 255, .3) 0, transparent 40%);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -67,8 +67,7 @@
     --modern-action-bg: #8bb5ff;
     --modern-action-hover: #a9c8ff;
     --modern-action-ink: #071830;
-    --modern-page-bg: radial-gradient(ellipse at 0 0, #142d51 0, transparent 50%),
-                      var(--field);
+    --modern-page-glow: radial-gradient(ellipse at 0 0, rgba(48, 130, 237, .22) 0, transparent 50%);
   }
 }
 
@@ -84,7 +83,7 @@ body {
   min-height: 100vh;
   margin: 0;
   padding: 22px 20px 24px;
-  background: var(--modern-page-bg);
+  background: var(--modern-page-glow), var(--field);
   color: var(--ui-ink);
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
@@ -332,16 +331,14 @@ body > table {
 }
 
 /* The main button of each page. */
-#pageContent input[type="submit"]:where([name="nextBtn"], [onclick*="form.closeme.value=1"]),
-:where(.page-addurl, .page-about) #pageContent input[type="button"]:where([value="OK"]) {
+#pageContent input:is([type="submit"], [type="button"]):where(.primary) {
   border-color: var(--modern-primary);
   background: var(--modern-action-bg);
   color: var(--modern-action-ink);
   box-shadow: 0 4px 12px var(--modern-primary-glow);
 }
 
-#pageContent input[type="submit"]:where([name="nextBtn"], [onclick*="form.closeme.value=1"]):hover,
-:where(.page-addurl, .page-about) #pageContent input[type="button"]:where([value="OK"]):hover {
+#pageContent input:is([type="submit"], [type="button"]):where(.primary):hover {
   border-color: var(--modern-action-hover);
   background: var(--modern-action-hover);
 }
