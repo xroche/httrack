@@ -747,7 +747,7 @@ int url_savename(lien_adrfilsave *const afs,
 
           if (r.statuscode != -1) { // cache entry read OK
             hts_log_print(opt, LOG_DEBUG, "Testing link type (from cache) %s%s",
-                          adr_complete, fil_complete);
+                          adr_nologin(adr_complete), fil_complete);
             if (!HTTP_IS_REDIRECT(r.statuscode)) {
               const sniff_src src = {sback, NULL, adr, fil, previous_save};
 
@@ -828,7 +828,7 @@ int url_savename(lien_adrfilsave *const afs,
             current.adr[0] = current.fil[0] = '\0';
             opt->state._hts_in_html_parsing = 2;        // test
             hts_log_print(opt, LOG_DEBUG, "Testing link type %s%s",
-                          adr_complete, fil_complete);
+                          adr_nologin(adr_complete), fil_complete);
             strcpybuff(current.adr, adr_complete);
             strcpybuff(current.fil, fil_complete);
             // ajouter dans le backing le fichier en mode test
@@ -922,8 +922,10 @@ int url_savename(lien_adrfilsave *const afs,
                                 else {
                                   methode = BACK_ADD_TEST2;     // tester avec GET
                                   hts_log_print(opt, LOG_WARNING,
-                                                "Loop with HEAD request (during prefetch) at %s%s",
-                                                current.adr, current.fil);
+                                                "Loop with HEAD request "
+                                                "(during prefetch) at %s%s",
+                                                adr_nologin(current.adr),
+                                                current.fil);
                                 }
                                 if (!hts_wait_available_socket(sback, opt,
                                                                cache, ptr))
@@ -932,12 +934,13 @@ int url_savename(lien_adrfilsave *const afs,
                                              moved.fil, methode, referer_adr,
                                              referer_fil, 1, HTS_FALSE,
                                              NULL) != -1) { // OK
-                                  hts_log_print(opt, LOG_DEBUG,
-                                                "(during prefetch) %s (%d) to link %s at %s%s",
-                                                back[b].r.msg,
-                                                back[b].r.statuscode,
-                                                back[b].r.location, current.adr,
-                                                current.fil);
+                                  hts_log_print(
+                                      opt, LOG_DEBUG,
+                                      "(during prefetch) %s (%d) to link %s at "
+                                      "%s%s",
+                                      back[b].r.msg, back[b].r.statuscode,
+                                      URL_NOLOGIN(opt, back[b].r.location),
+                                      adr_nologin(current.adr), current.fil);
 
                                   // libérer emplacement backing actuel et attendre le prochain
                                   back_maydelete(opt, cache, sback, b);
@@ -953,14 +956,17 @@ int url_savename(lien_adrfilsave *const afs,
                                 } else { // sinon on fait rien et on s'en va..
                                          // (ftp etc)
                                   hts_log_print(opt, LOG_DEBUG,
-                                                "Warning: Savename redirect backing error at %s%s",
-                                                moved.adr, moved.fil);
+                                                "Warning: Savename redirect "
+                                                "backing error at %s%s",
+                                                adr_nologin(moved.adr),
+                                                moved.fil);
                                 }
                               }
                             } else {
-                              hts_log_print(opt, LOG_WARNING,
-                                            "Unable to test %s%s (loop to same filename)",
-                                            adr_complete, fil_complete);
+                              hts_log_print(
+                                  opt, LOG_WARNING,
+                                  "Unable to test %s%s (loop to same filename)",
+                                  adr_nologin(adr_complete), fil_complete);
                             }
 
                           }
@@ -968,7 +974,7 @@ int url_savename(lien_adrfilsave *const afs,
                       } else {  // arrêter les frais
                         hts_log_print(opt, LOG_WARNING,
                                       "Unable to test %s%s (loop)",
-                                      adr_complete, fil_complete);
+                                      adr_nologin(adr_complete), fil_complete);
                       }
                     }           // ok, leaving
                   }
@@ -1020,8 +1026,8 @@ int url_savename(lien_adrfilsave *const afs,
               printf("error while savename crash adding\n");
 #endif
               hts_log_print(opt, LOG_ERROR,
-                            "Unexpected savename backing error at %s%s", adr,
-                            fil_complete);
+                            "Unexpected savename backing error at %s%s",
+                            adr_nologin(adr), fil_complete);
             }
             // restaurer
             opt->state._hts_in_html_parsing = hihp;
@@ -1052,10 +1058,10 @@ int url_savename(lien_adrfilsave *const afs,
     if ((opt->debug > 1) && (opt->log != NULL)) {
       if (ext_chg == 1)
         hts_log_print(opt, LOG_DEBUG, "Changing link extension %s%s to .%s",
-                      adr_complete, fil_complete, ext);
+                      adr_nologin(adr_complete), fil_complete, ext);
       else
         hts_log_print(opt, LOG_DEBUG, "Changing link name %s%s to %s",
-                      adr_complete, fil_complete, ext);
+                      adr_nologin(adr_complete), fil_complete, ext);
     }
     if (ext_chg == 1) {
       // Cut the old extension only when it is empty (a bare trailing dot), the
@@ -1521,7 +1527,7 @@ int url_savename(lien_adrfilsave *const afs,
     if (*a != '.') {                         // agh pas de point
       strcatbuff(afs->save, ".html");        // préférable!
       hts_log_print(opt, LOG_DEBUG, "Default HTML type set for %s%s => %s",
-                    adr_complete, fil_complete, afs->save);
+                    adr_nologin(adr_complete), fil_complete, afs->save);
     }
   }
   // effacer pass au besoin pour les autentifications
@@ -1666,7 +1672,7 @@ int url_savename(lien_adrfilsave *const afs,
   }
 
   hts_log_print(opt, LOG_DEBUG, "engine: save-name: local name: %s%s -> %s",
-                adr, fil, afs->save);
+                adr_nologin(adr), fil, afs->save);
 
   /* Ensure that the MANDATORY "temporary" extension is set */
   if (ext_chg_delayed) {
@@ -1817,13 +1823,13 @@ int url_savename(lien_adrfilsave *const afs,
         free(saveFinal);
       } else {
         hts_log_print(opt, LOG_ERROR, "Could not revert to UTF-8: %s%s",
-          adr_complete, fil_complete);
+                      adr_nologin(adr_complete), fil_complete);
       }
       free(wsave);
 
       // log in debug
       hts_log_print(opt, LOG_DEBUG, "Too long filename shortened: %s%s => %s",
-        adr_complete, fil_complete, afs->save);
+                    adr_nologin(adr_complete), fil_complete, afs->save);
     } else {
       hts_log_print(opt, LOG_ERROR, "Could not read UTF-8: %s", afs->save);
     }

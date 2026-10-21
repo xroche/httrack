@@ -547,15 +547,26 @@ void fprintfio(FILE * fp, const char *buff, const char *prefix);
 
 /* What hts_mask_passwords() reads: */
 typedef enum {
-  HTS_MASK_LINE, /* a log line, where an address may lack its scheme */
   HTS_MASK_LIST, /* blank-separated start URLs and filters */
   HTS_MASK_ADDR  /* one start URL, or a -P value */
 } hts_mask_mode;
 
-/* Returns a copy of s, allocated with malloct, in which every password the
-   engine would read out of an address in s is *** . The rest stays byte for
-   byte. NULL when out of memory. */
+/* Returns a copy of s, allocated with malloct, in which the password of every
+   start URL or proxy address in s is *** . The rest stays byte for byte. NULL
+   when out of memory. */
 char *hts_mask_passwords(const char *s, hts_mask_mode mode);
+
+/* Returns the engine address adr without its login, for a log line: adr
+   itself when it has none, else the part after the login. */
+const char *adr_nologin(const char *adr);
+
+/* Returns url without its login, for a log line: url itself when it has no
+   scheme or no login, else a copy clipped to size bytes in buf. */
+const char *url_nologin(char *buf, size_t size, const char *url);
+
+/* url_nologin() into one of the rotating buffers of opt. */
+#define URL_NOLOGIN(OPT, URL)                                                  \
+  url_nologin(OPT_GET_BUFF(OPT), OPT_GET_BUFF_SIZE(OPT), URL)
 
 /* Writes the marker that stands for a hidden secret of len bytes. */
 void fprint_redacted(FILE *fp, size_t len);

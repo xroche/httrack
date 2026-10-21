@@ -36,6 +36,24 @@ def root_page(port):
     )
 
 
+# a password in every form the engine reads one (657)
+PLANTED = (
+    "http://luser:LINKPWA@127.0.0.1:%(p)d/l1.html",
+    "//luser:LINKPWB@127.0.0.1:%(p)d/l2.html",
+    "http://luser:LINKPWC1 LINKPWC2@127.0.0.1:%(p)d/l3.html",
+    "http://luser:LINKPWD;q@127.0.0.1:%(p)d/l4.html",
+    "http://luser:LINKPWE@LINKPWF@127.0.0.1:%(p)d/l5.html",
+    "http://luser:LINKPWG%%40q@127.0.0.1:%(p)d/l6.html",
+    "http://luser:LINKPWH@[::1]:1/l7.html",
+    "http://luser:LINKPWI@127.0.0.1:%(p)d",
+    "http://luser:LINKPWJ@127.0.0.1:1/l8.html",
+)
+
+
+def planted_page(port):
+    return page("".join('<a href="%s">l</a>' % (u % {"p": port}) for u in PLANTED))
+
+
 # the poisoned page must link onward, or its URL never becomes a Referer
 POISON_PAGE = page('<a href="/deep.html">deep</a>')
 # the ftp link takes the ftp-through-proxy emission site, which has no Host:
@@ -53,6 +71,8 @@ def body_for(request, port):
         return PROXY_ROOT
     if line.startswith(b"GET / "):
         return root_page(port)
+    if b"/planted.html" in line:
+        return planted_page(port)
     if b"/x" in line:
         return POISON_PAGE
     # one hop, so the second request of a crawl carries a Referer (328)

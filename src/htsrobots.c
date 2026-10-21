@@ -258,8 +258,8 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
     hts_log_print(opt, LOG_WARNING,
                   "robots.txt for %s: %d rule(s) not honoured as written, "
                   "starting with '%s' (rules kept up to %d bytes, lines to %d)",
-                  adr, ndropped, dropped, (int) HTS_ROBOTS_MAX_TOKEN_SIZE,
-                  (int) HTS_ROBOTS_LINE_SIZE);
+                  adr_nologin(adr), ndropped, dropped,
+                  (int) HTS_ROBOTS_MAX_TOKEN_SIZE, (int) HTS_ROBOTS_LINE_SIZE);
   if (StringNotEmpty(blob))
     checkrobots_set(robots, adr, StringBuff(blob));
   StringFree(blob);

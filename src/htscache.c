@@ -53,16 +53,18 @@ Please visit our Website: http://www.httrack.com
 void cache_mayadd(httrackp * opt, cache_back * cache, htsblk * r,
                   const char *url_adr, const char *url_fil,
                   const char *url_save) {
-  hts_log_print(opt, LOG_DEBUG, "File checked by cache: %s", url_adr);
+  hts_log_print(opt, LOG_DEBUG, "File checked by cache: %s",
+                adr_nologin(url_adr));
   // ---stockage en cache---
   // stocker dans le cache?
   if (opt->cache) {
     if (cache_writable(cache)) {
       // ensure not a temporary filename (should not happend ?!)
       if (IS_DELAYED_EXT(url_save)) {
-        hts_log_print(opt, LOG_WARNING,
-                      "aborted cache validation: %s%s still has temporary name %s",
-                      url_adr, url_fil, url_save);
+        hts_log_print(
+            opt, LOG_WARNING,
+            "aborted cache validation: %s%s still has temporary name %s",
+            adr_nologin(url_adr), url_fil, url_save);
         return;
       }
       // c'est le seul endroit ou l'on ajoute des elements dans le cache (fichier entier ou header)
@@ -105,9 +107,9 @@ void cache_mayadd(httrackp * opt, cache_back * cache, htsblk * r,
                   strcatbuff(tempo, "\n");
                   strcatbuff(tempo, r->location);
                 }
-                hts_log_print(opt, LOG_DEBUG,
-                              "Cached fast-header response: %s%s is %d",
-                              url_adr, url_fil, (int) r->statuscode);
+                hts_log_print(
+                    opt, LOG_DEBUG, "Cached fast-header response: %s%s is %d",
+                    adr_nologin(url_adr), url_fil, (int) r->statuscode);
                 coucal_add(cache->cached_tests,
                             concat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), url_adr, url_fil),
                             (intptr_t) strdupt(tempo));
@@ -207,9 +209,10 @@ static void cache_zip_write_failed(httrackp *opt, cache_back *cache,
     /* fatal: stop the mirror, exit non-zero */
     hts_store_release_int(&opt->state.exit_xh, -1);
   } else {
-    hts_log_print(
-        opt, LOG_WARNING, "cache write failed (%s: %s), entry not cached: %s%s",
-        what, hts_get_zerror(zErr, errbuf, sizeof(errbuf)), url_adr, url_fil);
+    hts_log_print(opt, LOG_WARNING,
+                  "cache write failed (%s: %s), entry not cached: %s%s", what,
+                  hts_get_zerror(zErr, errbuf, sizeof(errbuf)),
+                  adr_nologin(url_adr), url_fil);
   }
 }
 
@@ -274,7 +277,7 @@ void cache_keep_previous(httrackp *opt, cache_back *cache, const char *url_adr,
      URL's file. */
   if (r.statuscode > 0 && strcmp(previous_save, url_save) == 0) {
     hts_log_print(opt, LOG_DEBUG, "keeping the previous cache entry for %s%s",
-                  url_adr, url_fil);
+                  adr_nologin(url_adr), url_fil);
     cache_add_ex(opt, cache, &r, url_adr, url_fil, url_save, opt->all_in_cache,
                  StringBuff(opt->path_html_utf8), HTS_TRUE);
   }
@@ -336,12 +339,12 @@ static void cache_add_ex(httrackp *opt, cache_back *cache, const htsblk *r,
     if (r->is_write && url_save != NULL && strnotempty(url_save)) {
       hts_log_print(opt, LOG_WARNING,
                     "file too large for the cache, storing headers only: %s%s",
-                    url_adr, url_fil);
+                    adr_nologin(url_adr), url_fil);
       dataincache = 0;
     } else {
       hts_log_print(opt, LOG_WARNING,
-                    "entry too large for the cache, not cached: %s%s", url_adr,
-                    url_fil);
+                    "entry too large for the cache, not cached: %s%s",
+                    adr_nologin(url_adr), url_fil);
       return;
     }
   }
@@ -407,7 +410,7 @@ static void cache_add_ex(httrackp *opt, cache_back *cache, const htsblk *r,
   if (headersDropped != 0) {
     hts_log_print(opt, LOG_WARNING,
                   "cached headers too large, %d field(s) dropped: %s%s",
-                  headersDropped, url_adr, url_fil);
+                  headersDropped, adr_nologin(url_adr), url_fil);
   }
 
   /* Filename */
@@ -421,7 +424,7 @@ static void cache_add_ex(httrackp *opt, cache_back *cache, const htsblk *r,
                          url_fil)) {
       hts_log_print(opt, LOG_WARNING,
                     "URL too long to be cached, entry not cached: %s%s",
-                    url_adr, url_fil);
+                    adr_nologin(url_adr), url_fil);
       return;
     }
   }
@@ -720,7 +723,7 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
           if (!hts_location_is_safe(r.location)) {
             hts_log_print(opt, LOG_WARNING,
                           "cached Location naming a post token, dropped: %s%s",
-                          adr, fil);
+                          adr_nologin(adr), fil);
             r.location[0] = '\0';
           }
 
@@ -750,7 +753,7 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
               hts_log_print(opt, LOG_WARNING,
                             "cached filename leaving the mirror, "
                             "not using the cache entry: %s%s",
-                            adr, fil);
+                            adr_nologin(adr), fil);
               r.statuscode = STATUSCODE_INVALID;
               strcpybuff(r.msg, "Cache Read Error : Bad Filename");
             }
@@ -761,7 +764,7 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
               hts_log_print(opt, LOG_WARNING,
                             "cached filename too long once rebuilt under '%s', "
                             "not using the cache entry: %s%s",
-                            path_html, adr, fil);
+                            path_html, adr_nologin(adr), fil);
               r.statuscode = STATUSCODE_INVALID;
               strcpybuff(r.msg, "Cache Read Error : Filename Too Long");
             }

@@ -2567,7 +2567,7 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
                                 &attr) != 0) {
             hts_log_print(opt, LOG_WARNING,
                           "Cookies: the jar did not store '%.64s' set by %s",
-                          cook_name, adr);
+                          cook_name, adr_nologin(adr));
           }
         }
       }
@@ -4367,6 +4367,29 @@ HTSEXT_API const char *jump_identification_const(const char *source) {
 
 HTSEXT_API DECLARE_NON_CONST_VERSION(jump_identification)
 
+    const char *adr_nologin(const char *adr) {
+  const char *const host = jump_identification_const(adr);
+
+  return host != jump_protocol_const(adr) ? host : adr;
+}
+
+const char *url_nologin(char *buf, size_t size, const char *url) {
+  const char *const a = jump_protocol_const(url);
+  const char *const host = jump_identification_const(url);
+  size_t n = (size_t) (a - url), m = strlen(host);
+
+  if (a == url || host == a || size == 0)
+    return url;
+  if (n > size - 1)
+    n = size - 1;
+  if (m > size - 1 - n)
+    m = size - 1 - n;
+  memcpy(buf, url, n);
+  memcpy(buf + n, host, m);
+  buf[n + m] = '\0';
+  return buf;
+}
+
 HTSEXT_API const char *jump_normalized_const(const char *source) {
   if (strcmp(source, "file://") == 0)
     return source;
@@ -5815,23 +5838,15 @@ void fprint_redacted(FILE *fp, size_t len) {
 static const char *const secret_fields[] = {
     "Authorization", "Proxy-Authorization", "Cookie", "Set-Cookie"};
 
-/* Is c allowed in a URL scheme (RFC 3986 3.1)? */
-static hts_boolean scheme_char(char c) {
-  return isalnum((unsigned char) c) || c == '+' || c == '-' || c == '.';
-}
-
 /* Finds the password of the userinfo at the authority a: from the first ':'
    up to the last '@' before the first '/', the split
-   jump_identification_const() makes. A token also ends at a blank, and with
-   path, it must go on to a '/'. Returns HTS_FALSE when there is none. */
+   jump_identification_const() makes. A token also ends at a blank. Returns
+   HTS_FALSE when there is none. */
 static hts_boolean userinfo_password(const char *a, hts_boolean token,
-                                     hts_boolean path, const char **pass,
-                                     const char **at) {
+                                     const char **pass, const char **at) {
   const char *end = a + strcspn(a, token ? "/ \t\r\n" : "/");
   const char *colon;
 
-  if (path && *end != '/')
-    return HTS_FALSE;
   while (end > a && end[-1] != '@')
     end--;
   if (end == a)
@@ -5858,39 +5873,32 @@ static void mask_copy(mask_out *m, const char *src, size_t n) {
   m->o += n;
 }
 
-/* Masks the password at the authority a, if any, and moves *i past it. */
-static hts_boolean mask_at(mask_out *m, const char *a, hts_boolean token,
-                           hts_boolean path, const char **i) {
+/* Masks the password of the address at a, if any, and moves *i past it. */
+static void mask_at(mask_out *m, const char *a, hts_boolean token,
+                    const char **i) {
   const char *pass, *at;
 
-  if (!userinfo_password(a, token, path, &pass, &at))
-    return HTS_FALSE;
+  if (!userinfo_password(jump_protocol_const(a), token, &pass, &at))
+    return;
   mask_copy(m, m->p, (size_t) (pass - m->p));
   mask_copy(m, "***", 3);
   m->p = *i = at;
-  return HTS_TRUE;
 }
 
-/* Copies s to dst, or only counts when dst is NULL, with each password the
-   engine would read out of an address written as ***. Returns the length. */
+/* Copies s to dst, or only counts when dst is NULL, with the password of each
+   address written as ***. Returns the length. */
 static size_t mask_passwords(const char *s, char *dst, hts_mask_mode mode) {
   mask_out m = {dst, 0, s};
   const char *i = s;
 
   if (mode == HTS_MASK_ADDR)
-    (void) mask_at(&m, jump_protocol_const(s), HTS_FALSE, HTS_FALSE, &i);
-  while (*i != '\0') {
-    // an address the engine printed starts a token, often with no scheme
-    if (mode != HTS_MASK_ADDR && (i == s || strchr(" \t\r\n", i[-1])) &&
-        strchr("+-*", *i) == NULL &&
-        mask_at(&m, jump_protocol_const(i), HTS_TRUE, mode == HTS_MASK_LINE,
-                &i))
-      continue;
-    if (i != s && strncmp(i, "://", 3) == 0 && scheme_char(i[-1]) &&
-        mask_at(&m, i + 3, HTS_FALSE, HTS_FALSE, &i))
-      continue;
-    i++;
-  }
+    mask_at(&m, s, HTS_FALSE, &i);
+  else
+    for (; *i != '\0'; i++)
+      // a token that is no filter is a start URL
+      if ((i == s || strchr(" \t\r\n", i[-1]) != NULL) &&
+          strchr(" \t\r\n+-", *i) == NULL)
+        mask_at(&m, i, HTS_TRUE, &i);
   mask_copy(&m, m.p, strlen(m.p) + 1);
   return m.o - 1;
 }
@@ -7380,25 +7388,8 @@ HTSEXT_API void hts_log_vprint(httrackp * opt, int type, const char *format, va_
     fspc_count(opt, s_type);
 
     if (opt->log != NULL) {
-      va_list args_len;
-      int n;
-
-      va_copy(args_len, args);
-      n = vsnprintf(NULL, 0, format, args_len);
-      va_end(args_len);
       fspc(opt, opt->log, s_type);
-      if (n >= 0) {
-        char *line = (char *) malloct((size_t) n + 1);
-        char *masked =
-            line != NULL && vsnprintf(line, (size_t) n + 1, format, args) == n
-                ? hts_mask_passwords(line, HTS_MASK_LINE)
-                : NULL;
-
-        // never the raw line, which may hold a password
-        fputs(masked != NULL ? masked : "(log line lost)", opt->log);
-        freet(masked);
-        freet(line);
-      }
+      (void) vfprintf(opt->log, format, args);
       if ((type & LOG_ERRNO) != 0) {
         char errbuf[HTS_STRERROR_SIZE];
 

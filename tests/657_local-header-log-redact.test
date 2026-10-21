@@ -124,21 +124,24 @@ ok "hts-log.txt masks the passwords of URLs, proxies and -%X headers"
 
 out=$(httrack -#test=maskpw) || fail "httrack -#test=maskpw exited non-zero: $out"
 test "$out" = "maskpw self-test: OK" || fail "expected 'maskpw self-test: OK', got: $out"
-# plain.html is reached only through the crawl, so its line comes from hts_log_print
-crawl choke "cuser:CHOKESECRET@127.0.0.1:$port/hop.html" "nuser:NOPATHSECRET@127.0.0.1:1" \
-    -z "-*:KEEPFILTER@*"
-log=$(<"$tmpdir/choke/hts-log.txt")
-for secret in CHOKESECRET NOPATHSECRET; do
-    if grep -qF "$secret" <<<"$log"; then
-        fail "$secret is in hts-log.txt: $(grep -F "$secret" <<<"$log")"
-    fi
-done
-for line in "at cuser:***@127.0.0.1:$port/hop.html nuser:***@127.0.0.1:1 -*:KEEPFILTER@*" \
-    " -%H nuser:***@127.0.0.1:1 -z " " -*:KEEPFILTER@* )" \
-    "link recorded: cuser:***@127.0.0.1:$port/plain.html"; do
+# planted.html links with a password in every form the engine reads one
+crawl planted "http://suser:STARTPWA@127.0.0.1:$port/planted.html" \
+    "suser:STARTPWB@127.0.0.1:$port/hop.html" -z -Z -r4 -T5 "+*" "-*:KEEPFILTER@*" \
+    -%X "X-Note: a:KEEPHEADER@c/d"
+crawl planted-proxy "http://127.0.0.1:$port/planted.html" -P "puser:PROXYPW@127.0.0.1:$port" \
+    -z -Z -r4 -T5 "+*"
+log=$(<"$tmpdir/planted/hts-log.txt")
+for line in "at link 127.0.0.1:1/l8.html (from 127.0.0.1:$port/planted.html)" \
+    "at http://suser:***@127.0.0.1:$port/planted.html suser:***@127.0.0.1:$port/hop.html" \
+    " -*:KEEPFILTER@* -%X \"X-Note: a:KEEPHEADER@c/d\" "; do
     grep -qF -- "$line" <<<"$log" || fail "no '$line' in hts-log.txt: $log"
 done
-ok "every hts-log.txt line masks a URL password and keeps the rest"
+grep -qF "STARTPWA" "$tmpdir/planted/hts-cache/doit.log" || fail "the grep below cannot see a password"
+# doit.log, new.txt and new.zip keep the URLs that --update needs
+leaks=$(find "$tmpdir/planted" "$tmpdir/planted-proxy" -type f ! -name doit.log \
+    ! -name new.txt ! -name new.zip -exec grep -aoE "(STARTPW|LINKPW|PROXYPW)[A-Z0-9]*" {} + || true)
+test -z "$leaks" || fail "a password is in the project: $leaks"
+ok "no project file holds a URL or proxy password"
 
 root="$tmpdir/root"
 cmds="$tmpdir/cmds"

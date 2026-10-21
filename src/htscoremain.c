@@ -3135,14 +3135,13 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             opt_at = 0;
             addr = i != 0 && arg[0] != '+' && arg[0] != '-';
           }
-          masked =
-              hts_mask_passwords(arg, addr ? HTS_MASK_ADDR : HTS_MASK_LINE);
+          masked = addr ? hts_mask_passwords(arg, HTS_MASK_ADDR) : NULL;
 
           if (quote)
             fputc('"', opt->log);
           // a -%X login header gets the -%H log's redaction
-          if (masked != NULL)
-            fprintfio(opt->log, masked, "");
+          if (!addr || masked != NULL)
+            fprintfio(opt->log, addr ? masked : arg, "");
           fputs(quote ? "\" " : " ", opt->log);
           freet(masked);
         }

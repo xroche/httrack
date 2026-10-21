@@ -1628,14 +1628,52 @@ static int maskpw_pairs(size_t n) {
   for (size_t i = 1; i < len; i += 2)
     pairs[i] = '@';
   pairs[len] = '\0';
-  snprintf(in, len + 32, "404 at h/x?%s", pairs);
-  err = maskpw_row(in, in, HTS_MASK_LINE);
-  snprintf(in, len + 32, "at link a%sh/", pairs);
-  err |= maskpw_row(in, "at link a:***@h/", HTS_MASK_LINE);
+  snprintf(in, len + 32, "http://h/x?%s", pairs);
+  err = maskpw_row(in, in, HTS_MASK_LIST);
+  snprintf(in, len + 32, "a%sh/ -x", pairs);
+  err |= maskpw_row(in, "a:***@h/ -x", HTS_MASK_LIST);
   snprintf(in, len + 32, "http://a%sh", pairs);
   err |= maskpw_row(in, "http://a:***@h", HTS_MASK_ADDR);
   freet(pairs);
   freet(in);
+  return err;
+}
+
+/* Do adr_nologin() and url_nologin() drop the login and nothing else? */
+static int nologin_rows(void) {
+  static const struct {
+    const char *in, *want;
+  } adrs[] = {{"u:p@h:80", "h:80"},
+              {"u:p@q@h", "h"},
+              {"h:80", "h:80"},
+              {"https://h", "https://h"},
+              {"https://u:p@h", "h"}},
+    urls[] = {{"http://u:p@h/x", "http://h/x"},
+              {"//u:p@q@h", "//h"},
+              {"HTTPS://u:a b@[::1]:8/", "HTTPS://[::1]:8/"},
+              {"http://h/x?a@b", "http://h/x?a@b"},
+              {"mailto:a@b", "mailto:a@b"},
+              {"u:p@h/x", "u:p@h/x"},
+              {"http://u:p@hostname.example/x", "http://hostname.example"}};
+
+  char buf[24];
+  int err = 0;
+  size_t i;
+
+  for (i = 0; i < sizeof(adrs) / sizeof(adrs[0]); i++)
+    if (strcmp(adr_nologin(adrs[i].in), adrs[i].want) != 0) {
+      fprintf(stderr, "adr_nologin: '%s' gave '%s'\n", adrs[i].in,
+              adr_nologin(adrs[i].in));
+      err = 1;
+    }
+  for (i = 0; i < sizeof(urls) / sizeof(urls[0]); i++) {
+    const char *got = url_nologin(buf, sizeof(buf), urls[i].in);
+
+    if (strcmp(got, urls[i].want) != 0) {
+      fprintf(stderr, "url_nologin: '%s' gave '%s'\n", urls[i].in, got);
+      err = 1;
+    }
+  }
   return err;
 }
 
@@ -1644,41 +1682,25 @@ static int st_maskpw(httrackp *opt, int argc, char **argv) {
     hts_mask_mode mode;
     const char *in, *want;
   } rows[] = {
-      {HTS_MASK_LINE, "", ""},
-      {HTS_MASK_LINE, "http://u:p@h/", "http://u:***@h/"},
-      // the engine logs an http address with no scheme
-      {HTS_MASK_LINE, "at link u:p@h:80/x (from v:q@g/y)",
-       "at link u:***@h:80/x (from v:***@g/y)"},
-      {HTS_MASK_LINE, "see (u:p@h/x) 'v:q@g/y' \"w:r@f/z\"",
-       "see (u:***@h/x) 'v:***@g/y' \"w:***@f/z\""},
-      {HTS_MASK_LINE, "at link HTTP://u:p@h:80/x",
-       "at link HTTP://u:***@h:80/x"},
-      {HTS_MASK_LINE, "ftp://u:p@h", "ftp://u:***@h"},
-      {HTS_MASK_LINE, "x1+a.b-c://u:p@h/", "x1+a.b-c://u:***@h/"},
-      {HTS_MASK_LINE, "http://u@h/", "http://u@h/"},
-      {HTS_MASK_LINE, "http://:p@h/", "http://:***@h/"},
-      {HTS_MASK_LINE, "http://u:@h/", "http://u:***@h/"},
-      // the engine splits the userinfo at the last '@'
-      {HTS_MASK_LINE, "http://u:p@SECRETB@h/", "http://u:***@h/"},
-      {HTS_MASK_LINE, "u:p@SECRETB@h/", "u:***@h/"},
-      {HTS_MASK_LINE, "http://user:pw;SECRETA@h/", "http://user:***@h/"},
-      {HTS_MASK_LINE, "http://u:a,b=c\"d'e(f)<g> h@h/", "http://u:***@h/"},
-      {HTS_MASK_LINE, "http://u:a%2Fb@h/", "http://u:***@h/"},
-      // a raw '/' ends the authority, so the engine sends no password
-      {HTS_MASK_LINE, "http://u:a/b@h/", "http://u:a/b@h/"},
-      {HTS_MASK_LINE, "http://h1/ http://u:p@h2/ x:y@z",
-       "http://h1/ http://u:***@h2/ x:y@z"},
-      {HTS_MASK_LINE, "http://h/?r=ftp://u:p@g/", "http://h/?r=ftp://u:***@g/"},
-      // no address
-      {HTS_MASK_LINE, "-*:*@*", "-*:*@*"},
-      {HTS_MASK_LINE, "+*:*@*/x", "+*:*@*/x"},
-      {HTS_MASK_LINE, "http://h/x?t=10:30@x", "http://h/x?t=10:30@x"},
-      {HTS_MASK_LINE, "?t=10:30@x", "?t=10:30@x"},
-      {HTS_MASK_LINE, "mailto:a:b@c", "mailto:a:b@c"},
-      {HTS_MASK_LINE, "://u:p@h/", "://u:p@h/"},
-      {HTS_MASK_LINE, "user x:y@z said /", "user x:y@z said /"},
+      {HTS_MASK_LIST, "", ""},
       {HTS_MASK_LIST, "u:p@h http://v:q@g +*:*@* -*:*@*/x",
        "u:***@h http://v:***@g +*:*@* -*:*@*/x"},
+      {HTS_MASK_LIST, "HTTP://u:p@h:80/x ftp://u:p@h",
+       "HTTP://u:***@h:80/x ftp://u:***@h"},
+      {HTS_MASK_LIST, "http://h1/ http://h/?r=ftp://u:p@g/",
+       "http://h1/ http://h/?r=ftp://u:p@g/"},
+      {HTS_MASK_LIST, "http://h/x?t=10:30@x", "http://h/x?t=10:30@x"},
+      {HTS_MASK_ADDR, "http://u:p@h/", "http://u:***@h/"},
+      {HTS_MASK_ADDR, "http://u@h/", "http://u@h/"},
+      {HTS_MASK_ADDR, "http://:p@h/", "http://:***@h/"},
+      {HTS_MASK_ADDR, "http://u:@h/", "http://u:***@h/"},
+      // the engine splits the userinfo at the last '@'
+      {HTS_MASK_ADDR, "http://u:p@SECRETB@h/", "http://u:***@h/"},
+      {HTS_MASK_ADDR, "http://user:pw;SECRETA@h/", "http://user:***@h/"},
+      {HTS_MASK_ADDR, "http://u:a,b=c\"d'e(f)<g> h@h/", "http://u:***@h/"},
+      {HTS_MASK_ADDR, "http://u:a%2Fb@h/", "http://u:***@h/"},
+      // a raw '/' ends the authority, so the engine sends no password
+      {HTS_MASK_ADDR, "http://u:a/b@h/", "http://u:a/b@h/"},
       {HTS_MASK_ADDR, "u:p@h:8080", "u:***@h:8080"},
       {HTS_MASK_ADDR, "u:p@q@h:8080", "u:***@h:8080"},
       {HTS_MASK_ADDR, "u:a b@h/", "u:***@h/"},
@@ -1687,7 +1709,7 @@ static int st_maskpw(httrackp *opt, int argc, char **argv) {
       {HTS_MASK_ADDR, "u@h:8080", "u@h:8080"},
   };
 
-  static const char *const modes[] = {"line", "list", "addr"};
+  static const char *const modes[] = {"list", "addr"};
   int err = 0;
   size_t i;
 
@@ -1706,6 +1728,7 @@ static int st_maskpw(httrackp *opt, int argc, char **argv) {
   }
   for (i = 0; i < sizeof(rows) / sizeof(rows[0]); i++)
     err |= maskpw_row(rows[i].in, rows[i].want, rows[i].mode);
+  err |= nologin_rows();
   err |= maskpw_pairs(300);
   err |= maskpw_pairs(10000);
   printf("maskpw self-test: %s\n", err ? "FAIL" : "OK");
@@ -3626,8 +3649,9 @@ const struct selftest_entry selftests_lib[] = {
      "the fields and copies the span primitive makes", st_span},
     {"gmtime", "",
      "hts_gmtime() fills the caller's buffer, not a static (#794)", st_gmtime},
-    {"maskpw", "[line|list|addr <text>]",
-     "hts-log.txt masks the password of a URL login and nothing else",
+    {"maskpw", "[list|addr <text>]",
+     "the command-line echo masks the password of a URL login and nothing "
+     "else",
      st_maskpw},
     {"localtime", "<dir>",
      "hts_localtime() and get_filetime_rfc822()'s GMT labelling (#806)",
