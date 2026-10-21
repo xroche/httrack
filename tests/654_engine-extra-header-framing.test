@@ -1,0 +1,47 @@
+#!/bin/bash
+#
+# A -%X framing or hop-by-hop field is refused: on a bodyless GET, a server
+# would wait for a body that never comes.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+CRLF=$'\r\n'
+TAB=$'\t'
+
+tohex() { printf '%s' "$1" | od -An -v -t x1 | tr -d '[:space:]'; }
+
+hd() { # hd WANT BLOCK
+    selftest_queue "$1" headerdedup "hex:$(tohex "$req")" "hex:$(tohex "$2")"
+}
+
+req="GET /plain.html HTTP/1.1${CRLF}Host: h${CRLF}"
+
+for field in Content-Length Transfer-Encoding Connection Keep-Alive TE \
+    Upgrade Expect content-length TRANSFER-ENCODING; do
+    hd 'X-A: 1\r\n' "$field: 5${CRLF}X-A: 1$CRLF"
+done
+# a space before the colon, and the folded continuation of a refused line
+hd 'X-A: 1\r\n' "Transfer-Encoding : chunked${CRLF}X-A: 1$CRLF"
+hd 'X-A: 1\r\n' "Transfer-Encoding: gzip,$CRLF${TAB}chunked${CRLF}X-A: 1$CRLF"
+# neighbours of a refused name, and the fields a user may replace, go out
+hd 'TEX: 1\r\n' "TEX: 1$CRLF"
+hd 'X-Expect: 1\r\n' "X-Expect: 1$CRLF"
+hd 'Authorization: Basic eA==\r\n' "Authorization: Basic eA==$CRLF"
+hd 'Cookie: a=b\r\n' "Cookie: a=b$CRLF"
+
+selftest_run_queued
+
+# The command line refuses it too, with a warning.
+tmpdir=$(mktemp -d)
+cleanup() { rm -rf "$tmpdir"; }
+cleanup_push cleanup
+out=$(httrack -O "$tmpdir" -%X 'Content-Length: 5' -%X 'X-Kept: 1' \
+    "file://$tmpdir/none.html" --quiet 2>&1) || true
+grep -q 'warning: -%X framing header ignored: Content-Length: 5' \
+    <<<"$out" || fail "no warning for -%X Content-Length: $out"
+if grep -q 'X-Kept' <<<"$out"; then
+    fail "an ordinary -%X header drew a warning: $out"
+fi

@@ -642,7 +642,8 @@ void help(const char *app, int more) {
           "; repeat as -%a \"KIND=formats\" for one kind of link: document"
           " iframe frame image style script font audio video object embed");
   infomsg(" %X  additional HTTP header line (-%X \"X-Magic: 42\"; an Accept"
-          " line replaces every computed Accept, per-kind values included");
+          " line replaces every computed Accept, per-kind values included;"
+          " framing fields like Content-Length are refused");
   infomsg(" %Q  send the headers a browser -F implies: its Accept values,"
           " header order and Sec-Fetch-*, and client hints over HTTPS (%Q0"
           " don't)");

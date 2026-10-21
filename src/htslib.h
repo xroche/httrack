@@ -323,8 +323,13 @@ hts_boolean http_headers_have_field(const char *headers,
    follow, or the 412/416 whose stale resume partial the parser re-gets. */
 hts_boolean hts_body_missing_unexpectedly(const htsblk *r);
 
+/* Should a custom (-%X) header line be refused? True for a framing or
+   hop-by-hop field such as Content-Length or Transfer-Encoding. */
+hts_boolean http_header_line_refused(const char *line);
+
 /* Append the custom header block to dst (capacity dst_size), dropping any line
-   whose field dst carries plus its folded continuations. Aborts on overflow. */
+   whose field dst carries or that http_header_line_refused() refuses, plus its
+   folded continuations. Aborts on overflow. */
 void http_append_custom_headers(char *dst, size_t dst_size,
                                 const char *headers);
 

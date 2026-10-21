@@ -2040,6 +2040,11 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                     htsmain_free();
                     return -1;
                   }
+                  /* kept, so the request drops its folded lines with it */
+                  if (http_header_line_refused(argv[na]))
+                    fprintf(stderr,
+                            "warning: -%%X framing header ignored: %s\n",
+                            argv[na]);
                   StringCat(opt->headers, argv[na]);
                   StringCat(opt->headers, "\r\n");  /* separator */
                 }

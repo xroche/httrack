@@ -49,7 +49,7 @@ hd 'X-A: 1\r\nX-A: 2\r\n' "$req" "X-A: 1${CRLF}X-A: 2$CRLF"
 hd 'garbage\r\n' "$req" "garbage${CRLF}Connection: x$CRLF"
 hd 'garbage\r\n' "$req" "Connection: x${CRLF}garbage$CRLF"
 hd ':oops\r\n' "$req" ":oops$CRLF"
-hd 'Connection : x\r\n' "$req" "Connection : x$CRLF"
+hd 'Host : x\r\n' "$req" "Host : x$CRLF"
 hd '\r\nX-A: 1\r\n' "$req" "${CRLF}X-A: 1$CRLF"
 # the request line answers for no field name
 hd 'GET: 1\r\n' "GET /x HTTP/1.1$CRLF" "GET: 1$CRLF"

@@ -1062,6 +1062,39 @@ hts_boolean http_headers_have_field(const char *headers,
   return HTS_FALSE;
 }
 
+hts_boolean http_header_line_refused(const char *line) {
+  /* Message framing and hop-by-hop fields the engine does not honour. */
+  static const char *const refused[] = {"Content-Length",
+                                        "Transfer-Encoding",
+                                        "Connection",
+                                        "Keep-Alive",
+                                        "TE",
+                                        "Upgrade",
+                                        "Expect"};
+  size_t len, i;
+
+  if (line == NULL || *line == ' ' || *line == '\t')
+    return HTS_FALSE;
+  for (len = 0; line[len] != '\0' && line[len] != ':' && line[len] != '\r' &&
+                line[len] != '\n';
+       len++)
+    ;
+  if (line[len] != ':')
+    return HTS_FALSE;
+  /* a lenient server honours "Transfer-Encoding : chunked" all the same */
+  while (len > 0 && (line[len - 1] == ' ' || line[len - 1] == '\t'))
+    len--;
+  for (i = 0; i < sizeof(refused) / sizeof(refused[0]); i++) {
+    size_t j = 0;
+
+    while (j < len && streql(line[j], refused[i][j]))
+      j++;
+    if (j == len && refused[i][len] == '\0')
+      return HTS_TRUE;
+  }
+  return HTS_FALSE;
+}
+
 /* Dropping a line drops its folded continuations too: kept, that value would
    attach to whichever header precedes it in the request. */
 static void append_custom_headers(buff_struct *bstr, const char *headers) {
@@ -1085,10 +1118,10 @@ static void append_custom_headers(buff_struct *bstr, const char *headers) {
       const char *colon = line;
       char field[128];
 
-      keep = HTS_TRUE;
+      keep = !http_header_line_refused(line);
       while (colon < eol && *colon != ':')
         colon++;
-      if (colon > line && colon < eol &&
+      if (keep && colon > line && colon < eol &&
           (size_t) (colon - line) < sizeof(field)) {
         const size_t len = (size_t) (colon - line);
         const char cut = bstr->buffer[base];
