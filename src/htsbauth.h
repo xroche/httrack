@@ -102,7 +102,8 @@ typedef struct cookie_attr {
 
 /** Store cook_name=cook_value for domain/path, with domain normalised by
     cookie_host, replacing the record of the same name, domain and path.
-    attr NULL means a session cookie that subdomains also get. !=0 if the jar
+    attr NULL means a session cookie that subdomains also get, but a public
+    suffix domain such as "com" is always stored host-only. !=0 if the jar
     refused it, an empty domain included. */
 int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
                const char *domain, const char *path, const cookie_attr *attr);
@@ -185,12 +186,6 @@ hts_boolean cookie_domain_match(const char *jar_dom, const char *host);
     parent of it that is not a public suffix. A leading '.' on DOMAIN is
     accepted. When no suffix list is loaded, every parent domain is allowed. */
 hts_boolean cookie_domain_allowed(const char *domain, const char *host);
-
-/** May a cookies.txt line for DOMAIN be loaded? A line that includes
-    subdomains (HOST_ONLY false) is refused when DOMAIN is a public suffix,
-    while a host-only one is always allowed, as RFC 6265 5.3 step 5 says. */
-hts_boolean cookie_jar_domain_allowed(const char *domain,
-                                      hts_boolean host_only);
 
 /** Read a Set-Cookie Max-Age VALUE received at NOW into *when, the absolute
     expiry, capped 400 days ahead and never below 1 (RFC 6265 5.2.2).
