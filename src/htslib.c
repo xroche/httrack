@@ -6019,7 +6019,7 @@ static hts_boolean login_at(const char *s, size_t len, size_t i, size_t n) {
     return HTS_FALSE;
   if (i != 0 && s[i - 1] == ':') {
     u = i - 1;
-    while (u != 0 && strchr("/@ \t\r\n", s[u - 1]) == NULL)
+    while (u != 0 && strchr("/ \t\r\n", s[u - 1]) == NULL)
       u--;
     for (k = 0; k < sizeof(opaque) / sizeof(opaque[0]); k++)
       if (strlen(opaque[k]) == i - 1 - u && strfield(s + u, opaque[k]))
@@ -6341,26 +6341,14 @@ void hts_secret_add_headers(httrackp *opt, const char *headers) {
         v++;
       while (end > v && (end[-1] == ' ' || end[-1] == '\t'))
         end--;
-      hts_secret_add(opt, v, (size_t) (end - v), HTS_SECRET_HEADER);
-      if (header_name_is(line, name, "Cookie", 6) ||
-          header_name_is(line, name, "Set-Cookie", 10)) {
-        // each cookie value
-        while (v < end) {
-          const char *const stop = v + strcspn(v, ";");
-          const char *const eq = memchr(v, '=', (size_t) (stop - v));
-          const char *const last = stop < end ? stop : end;
-
-          if (eq != NULL && eq < last)
-            hts_secret_add(opt, eq + 1, (size_t) (last - eq - 1),
-                           HTS_SECRET_HEADER);
-          v = last;
-          while (v < end && (*v == ';' || *v == ' ' || *v == '\t'))
-            v++;
-        }
-      } else {
-        // the credentials after the scheme, as in "Basic TOKEN"
+      // a cookie value is often a plain word, and -%H hides the whole header
+      if (!header_name_is(line, name, "Cookie", 6) &&
+          !header_name_is(line, name, "Set-Cookie", 10)) {
+        // the whole value, then the credentials after the scheme ("Basic
+        // TOKEN")
         const char *cred = v + strcspn(v, " \t");
 
+        hts_secret_add(opt, v, (size_t) (end - v), HTS_SECRET_HEADER);
         while (cred < end && (*cred == ' ' || *cred == '\t'))
           cred++;
         if (cred < end)

@@ -122,6 +122,12 @@ for line in "urluser:***@127.0.0.1:$port/setcookie.html" "puser:***@127.0.0.1:$p
 done
 ok "hts-log.txt masks the passwords of URLs, proxies and -%X headers"
 
+# a -%X Cookie value is no token, so a path holding it stays readable
+crawl cookieword "http://127.0.0.1:$port/privacy/accepted-terms.html" \
+    -%X "Cookie: consent=accepted"
+grep -qF "/privacy/accepted-terms.html -O" "$tmpdir/cookieword/hts-log.txt" ||
+    fail "a Cookie value masked a path: $(<"$tmpdir/cookieword/hts-log.txt")"
+
 out=$(httrack -#test=maskpw) || fail "httrack -#test=maskpw exited non-zero: $out"
 test "$out" = "maskpw self-test: OK" || fail "expected 'maskpw self-test: OK', got: $out"
 out=$(httrack -#test=secrets) || fail "httrack -#test=secrets exited non-zero: $out"

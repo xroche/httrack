@@ -1804,13 +1804,22 @@ static int st_secrets(httrackp *opt, int argc, char **argv) {
   err |= secrets_row(o, fp,
                      "GET /x?t=ZPWTOKEN123&s=ZPWSID9999 a=1 ZPWKEEP12345 "
                      "ZPWNOCOLON1 ZPWSHRT u:ZPWSHRT@h",
-                     "GET /x?t=***&s=*** a=1 ZPWKEEP12345 *** ZPWSHRT "
+                     "GET /x?t=***&s=ZPWSID9999 a=1 ZPWKEEP12345 *** ZPWSHRT "
                      "u:ZPWSHRT@h",
                      NULL);
   // raw and unescaped, the way Basic sends it
   hts_secret_add_login(o, "ftp://u:ZPW%40ESC99@h/");
   err |= secrets_row(o, fp, "u:ZPW%40ESC99@h u:ZPW@ESC99@h ZPW%40ESC99",
                      "u:***@h u:***@h ZPW%40ESC99", NULL);
+  // the user part of a login may hold an '@'
+  hts_secret_add_login(o, "http://john@example.com:ZPWATPW99@h/");
+  err |= secrets_row(o, fp, "http://john@example.com:ZPWATPW99@h/ ZPWATPW99",
+                     "http://john@example.com:***@h/ ZPWATPW99", NULL);
+  // a cookie value is no token: it is often an ordinary word
+  hts_secret_add_headers(o, "Cookie: consent=zpwaccepted\r\n");
+  err |=
+      secrets_row(o, fp, "/privacy/zpwaccepted-terms.html consent=zpwaccepted",
+                  "/privacy/zpwaccepted-terms.html consent=zpwaccepted", NULL);
   // a user alone is no password
   hts_secret_add_login(o, "http://ZPWUSERONLY@h/");
   err |= secrets_row(o, fp, "ZPWUSERONLY@h", "ZPWUSERONLY@h", NULL);
