@@ -74,6 +74,24 @@ for line in "<<< Authorization: <redacted, $((${#basic} + 6)) bytes>" \
 done
 ok "HTTP login headers are redacted in the log and sent in full"
 
+# A cookie the loader refuses is logged by its name, never by its value.
+printf 'dup=1; dup=DUPSECRET; =NONAMESECRET; BARESECRET\n' >"$tmpdir/flat.txt"
+crawl flat "http://127.0.0.1:$port/plain.html" --cookies-file "$tmpdir/flat.txt"
+printf '#HTTPOnly_127.0.0.1\tFALSE\t/\tFALSE\t0\tcomname\tCOMMENTSECRET\n' \
+    >"$tmpdir/jar.txt"
+crawl netscape "http://127.0.0.1:$port/plain.html" --cookies-file "$tmpdir/jar.txt"
+log=$(cat "$tmpdir/flat/hts-log.txt" "$tmpdir/netscape/hts-log.txt")
+for secret in DUPSECRET NONAMESECRET BARESECRET COMMENTSECRET; do
+    if grep -qF "$secret" <<<"$log"; then
+        fail "$secret is in hts-log.txt: $(grep -F "$secret" <<<"$log")"
+    fi
+done
+for line in "ignoring a repeated 'dup'" "a cookie with no name" \
+    "unknown comment in $tmpdir/jar.txt: #HTTPOnly_127.0.0.1"; do
+    grep -qF "$line" <<<"$log" || fail "no '$line' in hts-log.txt: $log"
+done
+ok "a refused cookie is logged without its value"
+
 root="$tmpdir/root"
 cmds="$tmpdir/cmds"
 mkdir -p "$root"

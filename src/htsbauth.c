@@ -688,8 +688,7 @@ static hts_boolean cookie_flat_pair(httrackp *opt, t_cookie *cookie, char *pair,
   if (eq == NULL || eq == pair) {
     if (cookie_flat_ignore(ignored))
       hts_log_print(opt, LOG_WARNING,
-                    "Cookies: ignoring a cookie with no name in %s: %.64s",
-                    given, pair);
+                    "Cookies: ignoring a cookie with no name in %s", given);
     return HTS_FALSE;
   }
   *eq = '\0';
@@ -987,9 +986,11 @@ int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *fpath,
 
           if (rec[0] == '#') {
             if (!cookie_known_comment(rec)) {
+              // the first field only, because a later one may be a value
               hts_log_print(opt, LOG_WARNING,
-                            "Cookies: ignoring an unknown comment in %s: %.64s",
-                            given, rec);
+                            "Cookies: ignoring an unknown comment in %s: %.*s",
+                            given, (int) min(strcspn(rec, "\t"), (size_t) 64),
+                            rec);
               refused++;
             }
           } else {
