@@ -50,7 +50,7 @@ hd 'X-A: 1\r\n' "$req" "garbage${CRLF}X-A: 1$CRLF"
 hd 'X-A: 1\r\n' "$req" "garbage$CRLF more${CRLF}X-A: 1$CRLF"
 hd '' "$req" "Connection: x${CRLF}garbage$CRLF"
 for bad in ':' ': v' 'X A: 1' 'nocolon' 'Content-Length' 'TE' ':oops' 'X\A: 1' \
-    "X$(printf '\351'): 1"; do
+    "X$(printf '\351'): 1" "X$(printf '\001')Y: 1"; do
     hd 'X-A: 1\r\n' "$req" "$bad${CRLF}X-A: 1$CRLF"
 done
 hd "!#\$%&'*+-.^_\`|~09az: 1\\r\\n" "$req" "!#\$%&'*+-.^_\`|~09az: 1$CRLF"

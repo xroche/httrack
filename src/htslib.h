@@ -331,7 +331,7 @@ const char *http_custom_header_warning(const char *headers, const char *line);
 /* Append the custom header block to dst (capacity dst_size), dropping any line
    whose field dst carries, a malformed or framing line, an earlier copy of
    Host, Cookie or Authorization, and a leading folded line. Field names ignore
-   case and blanks before the colon. Aborts on overflow. */
+   case and blanks before the colon. A line that does not fit is left out. */
 void http_append_custom_headers(char *dst, size_t dst_size,
                                 const char *headers);
 
