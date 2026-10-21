@@ -123,7 +123,7 @@ int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
                                         OPT_GET_BUFF_SIZE(opt), user_pass));
     code64((unsigned char *) user_pass, (int) strlen(user_pass),
            (unsigned char *) autorisation, 0);
-    hts_secret_add(opt, autorisation, strlen(autorisation));
+    hts_secret_add(opt, autorisation, strlen(autorisation), HTS_SECRET_HEADER);
     strlcatbuff(req, "Proxy-Authorization: Basic ", sizeof(req));
     strlcatbuff(req, autorisation, sizeof(req));
     strlcatbuff(req, H_CRLF, sizeof(req));

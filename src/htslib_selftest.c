@@ -1760,6 +1760,7 @@ static int st_secrets(httrackp *opt, int argc, char **argv) {
   FILE *const fp = tmpfile();
   char got[4096];
   char big[HTS_SECRET_MAXLEN + 16];
+  const char *w;
   long at;
   int err = 0;
   (void) opt;
@@ -1775,33 +1776,56 @@ static int st_secrets(httrackp *opt, int argc, char **argv) {
   // none known: the line goes out as given
   err |= secrets_row(o, fp, "a u:index@h/index.html", "a u:index@h/index.html",
                      NULL);
-  // a short password is hidden only as a login
+  // a password is hidden only as a login, at any length
   hts_secret_add_login(o, "http://u:index@h/");
+  hts_secret_add_login(o, "http://u:download@h/");
   err |= secrets_row(o, fp,
                      "a u:index@h/index.html http://index.example/ index@h "
-                     "myindex@h /index",
+                     "myindex@h /index (index@h <x:index@h \"index@h",
                      "a u:***@h/index.html http://index.example/ ***@h "
-                     "myindex@h /index",
+                     "myindex@h /index (***@h <x:***@h \"***@h",
                      NULL);
-  // a token is hidden anywhere, a short cookie value only as a login
+  err |= secrets_row(o, fp,
+                     "GET /download/file.html ftp://download@h u:download@h",
+                     "GET /download/file.html ftp://***@h u:***@h", NULL);
+  // an address is no login
+  err |= secrets_row(o, fp,
+                     "mailto:index@h MAILTO:index@h news:index@h "
+                     "a@index@h //x:index@h",
+                     "mailto:index@h MAILTO:index@h news:index@h "
+                     "a@index@h //x:index@h",
+                     NULL);
+  // a token is hidden anywhere, a short one not at all
   hts_secret_add_headers(o, "X-Keep: ZPWKEEP12345\r\n"
                             "Authorization: Bearer ZPWTOKEN123\r\n"
                             "cookie: a=1; sid=ZPWSID9999\r\n"
-                            "Proxy-Authorization Basic ZPWNOCOLON1");
+                            "Proxy-Authorization Basic ZPWNOCOLON1\r\n"
+                            "Authorization: Bearer ZPWSHRT");
   err |= secrets_row(o, fp,
                      "GET /x?t=ZPWTOKEN123&s=ZPWSID9999 a=1 ZPWKEEP12345 "
-                     "ZPWNOCOLON1",
-                     "GET /x?t=***&s=*** a=1 ZPWKEEP12345 ***", NULL);
+                     "ZPWNOCOLON1 ZPWSHRT u:ZPWSHRT@h",
+                     "GET /x?t=***&s=*** a=1 ZPWKEEP12345 *** ZPWSHRT "
+                     "u:ZPWSHRT@h",
+                     NULL);
   // raw and unescaped, the way Basic sends it
   hts_secret_add_login(o, "ftp://u:ZPW%40ESC99@h/");
-  err |= secrets_row(o, fp, "ZPW%40ESC99 ZPW@ESC99", "*** ***", NULL);
+  err |= secrets_row(o, fp, "u:ZPW%40ESC99@h u:ZPW@ESC99@h ZPW%40ESC99",
+                     "u:***@h u:***@h ZPW%40ESC99", NULL);
   // a user alone is no password
   hts_secret_add_login(o, "http://ZPWUSERONLY@h/");
-  err |= secrets_row(o, fp, "ZPWUSERONLY", "ZPWUSERONLY", NULL);
-  // too long to keep
+  err |= secrets_row(o, fp, "ZPWUSERONLY@h", "ZPWUSERONLY@h", NULL);
+  // too long to keep: one warning
   memset(big, 'Z', sizeof(big) - 1);
   big[sizeof(big) - 1] = '\0';
-  hts_secret_add(o, big, HTS_SECRET_MAXLEN + 1);
+  at = ftell(fp);
+  hts_secret_add(o, big, HTS_SECRET_MAXLEN + 1, HTS_SECRET_HEADER);
+  hts_secret_add(o, big + 1, HTS_SECRET_MAXLEN + 1, HTS_SECRET_LOGIN);
+  secrets_read(fp, at, got, sizeof(got));
+  w = strstr(got, "over 1024 bytes");
+  if (w == NULL || strstr(w + 1, "over 1024 bytes") != NULL) {
+    fprintf(stderr, "secrets: a long secret logged '%s'\n", got);
+    err = 1;
+  }
   err |= secrets_row(o, fp, big, big, "***");
   // the -%H log and a front end's own buffer
   at = ftell(fp);

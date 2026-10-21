@@ -1702,7 +1702,8 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
         strcpybuff(user_pass, unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), user_pass));
         code64((unsigned char *) user_pass, (int) strlen(user_pass),
                (unsigned char *) autorisation, 0);
-        hts_secret_add(opt, autorisation, strlen(autorisation));
+        hts_secret_add(opt, autorisation, strlen(autorisation),
+                       HTS_SECRET_HEADER);
         print_buffer(&bstr, "Proxy-Authorization: Basic %s"H_CRLF,
                      autorisation);
 #if HDEBUG
@@ -1960,7 +1961,8 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
                                        OPT_GET_BUFF_SIZE(opt), user_pass));
               code64((unsigned char *) user_pass, (int) strlen(user_pass),
                      (unsigned char *) autorisation, 0);
-              hts_secret_add(opt, autorisation, strlen(autorisation));
+              hts_secret_add(opt, autorisation, strlen(autorisation),
+                             HTS_SECRET_HEADER);
               if (strcmp(fil, "/robots.txt")) /* pas robots.txt */
                 bauth_add(cookie, astart, fil, autorisation);
             } else {
@@ -5891,9 +5893,11 @@ int may_unknown2(httrackp * opt, const char *mime, const char *filename) {
 typedef struct hts_secret_set {
   htsmutex lock;
   int count;
-  hts_boolean full; /* a secret was refused for want of room */
+  hts_boolean full;    /* a secret was refused for want of room */
+  hts_boolean toolong; /* a secret was refused for its length */
   char *item[HTS_SECRET_MAX];
   size_t len[HTS_SECRET_MAX];
+  hts_secret_kind kind[HTS_SECRET_MAX];
 } hts_secret_set;
 
 void hts_secret_init(httrackp *opt) {
@@ -5917,19 +5921,25 @@ void hts_secret_free(httrackp *opt) {
   opt->secrets = NULL;
 }
 
-void hts_secret_add(httrackp *opt, const char *s, size_t len) {
+void hts_secret_add(httrackp *opt, const char *s, size_t len,
+                    hts_secret_kind kind) {
   hts_secret_set *const set =
       opt != NULL ? (hts_secret_set *) opt->secrets : NULL;
-  hts_boolean warn = HTS_FALSE;
+  hts_boolean warn = HTS_FALSE, warnlong = HTS_FALSE;
   int i;
 
-  if (set == NULL || len == 0 || len > HTS_SECRET_MAXLEN)
+  if (set == NULL || len == 0 ||
+      (kind == HTS_SECRET_HEADER && len < HTS_SECRET_TOKEN))
     return;
   hts_mutexlock(&set->lock);
   for (i = 0; i < set->count; i++)
-    if (set->len[i] == len && memcmp(set->item[i], s, len) == 0)
+    if (set->kind[i] == kind && set->len[i] == len &&
+        memcmp(set->item[i], s, len) == 0)
       break;
-  if (i == set->count) {
+  if (len > HTS_SECRET_MAXLEN) {
+    warnlong = set->toolong ? HTS_FALSE : HTS_TRUE;
+    set->toolong = HTS_TRUE;
+  } else if (i == set->count) {
     if (set->count < HTS_SECRET_MAX) {
       char *const copy = malloct(len + 1);
 
@@ -5938,6 +5948,7 @@ void hts_secret_add(httrackp *opt, const char *s, size_t len) {
         copy[len] = '\0';
         set->item[set->count] = copy;
         set->len[set->count] = len;
+        set->kind[set->count] = kind;
         set->count++;
       }
     } else if (!set->full) {
@@ -5952,6 +5963,11 @@ void hts_secret_add(httrackp *opt, const char *s, size_t len) {
                   "more than %d passwords seen: the log hides the later ones"
                   " only where they stand in a URL",
                   HTS_SECRET_MAX);
+  if (warnlong)
+    hts_log_print(opt, LOG_WARNING,
+                  "a password or token is over %d bytes, so the log hides it"
+                  " only in a URL login or a known header",
+                  HTS_SECRET_MAXLEN);
 }
 
 void hts_secret_add_login(httrackp *opt, const char *url) {
@@ -5966,7 +5982,8 @@ void hts_secret_add_login(httrackp *opt, const char *url) {
   colon = memchr(start, ':', (size_t) (host - 1 - start));
   if (colon == NULL)
     return;
-  hts_secret_add(opt, colon + 1, (size_t) (host - 1 - (colon + 1)));
+  hts_secret_add(opt, colon + 1, (size_t) (host - 1 - (colon + 1)),
+                 HTS_SECRET_LOGIN);
   // the Basic login is sent unescaped
   if (memchr(colon + 1, '%', (size_t) (host - 1 - (colon + 1))) != NULL &&
       (size_t) (host - 1 - (colon + 1)) < HTS_SECRET_MAXLEN) {
@@ -5977,20 +5994,42 @@ void hts_secret_add_login(httrackp *opt, const char *url) {
     pass[0] = '\0';
     strncatbuff(pass, colon + 1, (size_t) (host - 1 - (colon + 1)));
     p = unescape_http(plain, sizeof(plain), pass);
-    hts_secret_add(opt, p, strlen(p));
+    hts_secret_add(opt, p, strlen(p), HTS_SECRET_LOGIN);
   }
 }
 
-/* May a URL's login hold c? */
-static hts_boolean userinfo_byte(unsigned char c) {
-  return c != '\0' && (isalnum(c) || strchr("-._~%!$&'()*+,;=", c) != NULL)
+/* Does a word start at s + i, after the line start, a blank, a quote, '(' or
+   '<', or right after "://"? */
+static hts_boolean word_start(const char *s, size_t i) {
+  return i == 0 || strchr(" \t\r\n\"'(<", s[i - 1]) != NULL ||
+                 (i >= 3 && strncmp(s + i - 3, "://", 3) == 0)
              ? HTS_TRUE
              : HTS_FALSE;
 }
 
+/* Does the n bytes at s + i stand as a login, as in "SECRET@" or
+   "user:SECRET@", whose userinfo starts a word? */
+static hts_boolean login_at(const char *s, size_t len, size_t i, size_t n) {
+  // schemes whose "name:local@host" is an address, not a login
+  static const char *const opaque[] = {"mailto", "news", "sip",
+                                       "sips",   "tel",  "xmpp"};
+  size_t u = i, k;
+
+  if (i + n >= len || s[i + n] != '@')
+    return HTS_FALSE;
+  if (i != 0 && s[i - 1] == ':') {
+    u = i - 1;
+    while (u != 0 && strchr("/@ \t\r\n", s[u - 1]) == NULL)
+      u--;
+    for (k = 0; k < sizeof(opaque) / sizeof(opaque[0]); k++)
+      if (strlen(opaque[k]) == i - 1 - u && strfield(s + u, opaque[k]))
+        return HTS_FALSE;
+  }
+  return word_start(s, u);
+}
+
 /* Returns the length of the longest secret of set standing at s + i, or 0. A
-   short one counts only as a login: before an '@', after a ':' or a byte no
-   login holds. */
+   URL password counts only as a login, a header token anywhere. */
 static size_t secret_at(const hts_secret_set *set, const char *s, size_t len,
                         size_t i) {
   size_t best = 0;
@@ -6001,9 +6040,7 @@ static size_t secret_at(const hts_secret_set *set, const char *s, size_t len,
 
     if (n <= best || n > len - i || memcmp(s + i, set->item[k], n) != 0)
       continue;
-    if (n >= HTS_SECRET_TOKEN || (i + n < len && s[i + n] == '@' &&
-                                  (i == 0 || s[i - 1] == ':' ||
-                                   !userinfo_byte((unsigned char) s[i - 1]))))
+    if (set->kind[k] == HTS_SECRET_HEADER || login_at(s, len, i, n))
       best = n;
   }
   return best;
@@ -6304,7 +6341,7 @@ void hts_secret_add_headers(httrackp *opt, const char *headers) {
         v++;
       while (end > v && (end[-1] == ' ' || end[-1] == '\t'))
         end--;
-      hts_secret_add(opt, v, (size_t) (end - v));
+      hts_secret_add(opt, v, (size_t) (end - v), HTS_SECRET_HEADER);
       if (header_name_is(line, name, "Cookie", 6) ||
           header_name_is(line, name, "Set-Cookie", 10)) {
         // each cookie value
@@ -6314,7 +6351,8 @@ void hts_secret_add_headers(httrackp *opt, const char *headers) {
           const char *const last = stop < end ? stop : end;
 
           if (eq != NULL && eq < last)
-            hts_secret_add(opt, eq + 1, (size_t) (last - eq - 1));
+            hts_secret_add(opt, eq + 1, (size_t) (last - eq - 1),
+                           HTS_SECRET_HEADER);
           v = last;
           while (v < end && (*v == ';' || *v == ' ' || *v == '\t'))
             v++;
@@ -6326,7 +6364,7 @@ void hts_secret_add_headers(httrackp *opt, const char *headers) {
         while (cred < end && (*cred == ' ' || *cred == '\t'))
           cred++;
         if (cred < end)
-          hts_secret_add(opt, cred, (size_t) (end - cred));
+          hts_secret_add(opt, cred, (size_t) (end - cred), HTS_SECRET_HEADER);
       }
     }
     line += len;

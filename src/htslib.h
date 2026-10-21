@@ -548,20 +548,28 @@ void fprintfio(FILE *fp, const char *buff, const char *prefix, httrackp *opt);
 
 /* The backstop behind the per-site masking: opt keeps the first
    HTS_SECRET_MAX passwords and tokens it sees, each up to HTS_SECRET_MAXLEN
-   bytes, and the log writers print each as ***. One of HTS_SECRET_TOKEN bytes
-   or more is hidden anywhere, a shorter one only as a login, before an '@',
-   so a password such as "index" leaves index.html alone. */
+   bytes, and the log writers print each as ***. A URL password is hidden only
+   as a login, before an '@', so a password such as "index" leaves index.html
+   alone. A header token of HTS_SECRET_TOKEN bytes or more is hidden anywhere.
+ */
 #define HTS_SECRET_MAX 64
 #define HTS_SECRET_MAXLEN 1024
 #define HTS_SECRET_TOKEN 8
+
+typedef enum hts_secret_kind {
+  HTS_SECRET_LOGIN, /* a URL password */
+  HTS_SECRET_HEADER /* a header token, kept only from HTS_SECRET_TOKEN bytes */
+} hts_secret_kind;
 
 /* Allocates and frees the set of opt->secrets. */
 void hts_secret_init(httrackp *opt);
 void hts_secret_free(httrackp *opt);
 
 /* Adds the len bytes at s to the set of opt. Thread-safe. Once the set is
-   full, logs one warning and adds nothing more. */
-void hts_secret_add(httrackp *opt, const char *s, size_t len);
+   full, or for a secret over HTS_SECRET_MAXLEN bytes, logs one warning and
+   adds nothing. */
+void hts_secret_add(httrackp *opt, const char *s, size_t len,
+                    hts_secret_kind kind);
 
 /* Adds the password of the login of url, in any scheme or none, raw and
    unescaped. A user alone is not added. url may be NULL. */

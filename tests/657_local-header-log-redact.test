@@ -126,19 +126,20 @@ out=$(httrack -#test=maskpw) || fail "httrack -#test=maskpw exited non-zero: $ou
 test "$out" = "maskpw self-test: OK" || fail "expected 'maskpw self-test: OK', got: $out"
 out=$(httrack -#test=secrets) || fail "httrack -#test=secrets exited non-zero: $out"
 test "$out" = "secrets self-test: OK" || fail "expected 'secrets self-test: OK', got: $out"
-# a known password is hidden by value: a token anywhere, a word only as a login
+# a header token is hidden anywhere, a password only as a login
 crawl token "http://u:TOKENPWQ1@127.0.0.1:$port/token.html" -z -Z -r2 \
     -%X "Authorization: Bearer HDRTOKQ3"
 crawl word "http://u:html@127.0.0.1:$port/hop.html" -z -Z -r2
 log=$(cat "$tmpdir/token/hts-log.txt" "$tmpdir/token/hts-ioinfo.txt")
 for q in k=TOKENPWQ1 l=LINKTOKQ2 h=HDRTOKQ3; do
     grep -qF "GET /leaf.html?$q HTTP/1." "$wire" || fail "$q never reached the server"
-    if grep -qF "${q#*=}" <<<"$log"; then
-        fail "${q#*=} is in the log: $(grep -F "${q#*=}" <<<"$log")"
-    fi
-    for line in "/leaf.html?${q%=*}=***" "<<< GET /leaf.html?${q%=*}=*** HTTP/1."; do
-        grep -qF -- "$line" <<<"$log" || fail "no '$line' in the log: $log"
-    done
+done
+if grep -qF HDRTOKQ3 <<<"$log"; then
+    fail "HDRTOKQ3 is in the log: $(grep -F HDRTOKQ3 <<<"$log")"
+fi
+for line in "/leaf.html?h=***" "<<< GET /leaf.html?h=*** HTTP/1." \
+    "/leaf.html?k=TOKENPWQ1" "/leaf.html?l=LINKTOKQ2" "luser:***@127.0.0.1:$port/leaf.html"; do
+    grep -qF -- "$line" <<<"$log" || fail "no '$line' in the log: $log"
 done
 log=$(<"$tmpdir/word/hts-log.txt")
 for line in "u:***@127.0.0.1:$port/hop.html" "127.0.0.1:$port/plain.html"; do
@@ -147,7 +148,7 @@ done
 if grep -qF "u:html@" <<<"$log"; then
     fail "the password html is in hts-log.txt"
 fi
-ok "the log hides a known token anywhere, and a common word only as a login"
+ok "the log hides a header token anywhere, and a password only as a login"
 # planted.html links with a password in every form the engine reads one
 # not quiet, so stdout and stderr carry the start URLs too
 mkdir -p "$tmpdir/planted"

@@ -97,8 +97,8 @@ def body_for(request, port):
     # the proxied pages link onward too, so a poisoned *host* becomes a referer
     if b"/p.html" in line:
         return page('<a href="/deep2.html">deep</a>')
-    # the passwords of the start URL, of a link and of a -%X header come back
-    # in a query, which only the log's backstop hides
+    # the passwords of the start URL and of a link, and a -%X token, come back
+    # in a query, where the log's backstop hides only the token
     if b"/token.html" in line:
         return page(
             '<a href="http://luser:LINKTOKQ2@127.0.0.1:%d/leaf.html">l</a>'
