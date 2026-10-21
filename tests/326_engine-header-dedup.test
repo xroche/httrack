@@ -20,10 +20,11 @@ hf() { # hf present|absent BLOCK FIELD
 hf present "User-Agent: mine$CRLF" User-Agent
 hf present "user-agent: mine$CRLF" User-Agent
 hf present "USER-AGENT: mine$CRLF" user-agent
-# RFC 7230 forbids a space before the colon, and a server drops such a line:
-# honouring it here would leave the request with no User-Agent at all
-hf absent "User-Agent : mine$CRLF" User-Agent
-hf absent "User-Agent$TAB: mine$CRLF" User-Agent
+# a blank before the colon still names the field
+hf present "User-Agent : mine$CRLF" User-Agent
+hf present "User-Agent$TAB: mine$CRLF" User-Agent
+hf present "Cookie : a=b$CRLF" Cookie
+hf present "Authorization : Basic eA==$CRLF" Authorization
 # a name counts at the start of a line only, and a folded line starts nothing
 hf absent "X-Note: User-Agent: no$CRLF" User-Agent
 hf absent " User-Agent: folded$CRLF" User-Agent
@@ -168,11 +169,9 @@ assert_value boxrest Accept-Language xx
 assert_value boxrest Authorization 'Basic Ym94'
 assert_same_but boxrest '^(From|Accept-Language|Authorization):'
 
-# A malformed box line leaves the engine's own in place: a server drops
-# "User-Agent : x", so suppressing ours would send no usable name at all.
+# A blank before the colon is invalid, so the engine sends the name without it.
 probe boxbadws -%X 'User-Agent : x'
-assert_all_once boxbadws
-assert_value boxbadws User-Agent EngineUA/1.0
-assert_eq 1 "$(count_lines '^User-Agent :' "$tmpdir/boxbadws.req")" \
-    'boxbadws: the malformed line'
+assert_eq 1 "$(count_lines '^User-Agent' "$tmpdir/boxbadws.req")" \
+    'boxbadws: User-Agent lines'
+assert_value boxbadws User-Agent x
 assert_same_but boxbadws '^User-Agent'

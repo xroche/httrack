@@ -1,7 +1,8 @@
 #!/bin/bash
 #
 # The six headers #1337 left out: the box wins for Proxy-Authorization, Referer
-# and Cookie, the engine for Content-length, Connection and xsend's own (#1340).
+# and Cookie, and the engine for xsend's own lines. A framing field such as
+# Content-length or Connection never goes out from the box (#1340).
 
 set -euo pipefail
 
@@ -39,18 +40,36 @@ hd 'X-B: 2\r\n' "$req" "Connection: x$CRLF${TAB}folded${CRLF}X-B: 2$CRLF"
 hd '' "$req" "Connection: x${CRLF} one${CRLF}${TAB}two$CRLF"
 # a kept line keeps its own
 hd 'X-A: 1\r\n more\r\n' "$req" "X-A: 1$CRLF more$CRLF"
-# a block opening on a folded line has no field to be judged against, and went
-# out before the walk existed
-hd ' orphan\r\nX-A: 1\r\n' "$req" " orphan${CRLF}X-A: 1$CRLF"
+# a block opening on a folded line would continue the engine's last header
+hd 'X-A: 1\r\n' "$req" " orphan${CRLF}X-A: 1$CRLF"
 # the box may repeat a field of its own: only the engine's lines are probed
 hd 'X-A: 1\r\nX-A: 2\r\n' "$req" "X-A: 1${CRLF}X-A: 2$CRLF"
-# nothing a name can be read from is left alone, and the next line is judged
-# on its own
-hd 'garbage\r\n' "$req" "garbage${CRLF}Connection: x$CRLF"
-hd 'garbage\r\n' "$req" "Connection: x${CRLF}garbage$CRLF"
-hd ':oops\r\n' "$req" ":oops$CRLF"
-hd 'Connection : x\r\n' "$req" "Connection : x$CRLF"
-hd '\r\nX-A: 1\r\n' "$req" "${CRLF}X-A: 1$CRLF"
+# a line with no token name and colon is dropped, with its folded lines, and
+# the next line is judged on its own
+hd 'X-A: 1\r\n' "$req" "garbage${CRLF}X-A: 1$CRLF"
+hd 'X-A: 1\r\n' "$req" "garbage$CRLF more${CRLF}X-A: 1$CRLF"
+hd '' "$req" "Connection: x${CRLF}garbage$CRLF"
+for bad in ':' ': v' 'X A: 1' 'nocolon' 'Content-Length' 'TE' ':oops' 'X\A: 1' \
+    "X$(printf '\351'): 1" "X$(printf '\001')Y: 1"; do
+    hd 'X-A: 1\r\n' "$req" "$bad${CRLF}X-A: 1$CRLF"
+done
+hd "!#\$%&'*+-.^_\`|~09az: 1\\r\\n" "$req" "!#\$%&'*+-.^_\`|~09az: 1$CRLF"
+hd 'Content: 1\r\n' "$req" "Content: 1$CRLF"
+# a blank before the colon still names the field, so it is the engine's Host
+hd '' "$req" "Host : x$CRLF"
+hd '' "$req" "Host$TAB: x$CRLF"
+hd '' "GET /x HTTP/1.1${CRLF}Authorization: Basic e$CRLF" "Authorization : x$CRLF"
+hd '' "GET /x HTTP/1.1${CRLF}Cookie: a=b$CRLF" "Cookie : c=d$CRLF"
+# the last of a single-valued field wins, folded lines going with the dropped
+hd 'Host: b\r\n' "GET /x HTTP/1.1$CRLF" "Host: a${CRLF}Host : b$CRLF"
+hd 'X-A: 1\r\nHost: b\r\n' "GET /x HTTP/1.1$CRLF" "Host: a${CRLF}X-A: 1${CRLF}Host: b$CRLF"
+hd 'Host: x\r\n' "GET /x HTTP/1.1$CRLF" "Host$TAB: x$CRLF"
+hd 'Host: x\r\n' "GET /x HTTP/1.1$CRLF" "Host : x$CRLF"
+hd 'Host: x\r\n folded\r\n' "GET /x HTTP/1.1$CRLF" "Host$TAB : x$CRLF folded$CRLF"
+hd 'Cookie: b\r\n' "GET /x HTTP/1.1$CRLF" "Cookie: a$CRLF more${CRLF}Cookie: b$CRLF"
+hd 'Authorization: b\r\n' "GET /x HTTP/1.1$CRLF" \
+    "authorization: a${CRLF}Authorization: b$CRLF"
+hd 'X-A: 1\r\n' "$req" "${CRLF}X-A: 1$CRLF"
 # the request line answers for no field name
 hd 'GET: 1\r\n' "GET /x HTTP/1.1$CRLF" "GET: 1$CRLF"
 # an embedder fills opt->headers itself, so neither a final terminator nor CRLF

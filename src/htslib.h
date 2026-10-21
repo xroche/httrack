@@ -315,7 +315,8 @@ int http_cookie_header(t_cookie *cookie, const char *adr, const char *path,
 
 /* True if the raw CRLF-separated header block, a request one we build or a
    response one we received, starts a line with `field_name`, given without the
-   trailing colon (which is tolerated). headers must be NUL-terminated. */
+   trailing colon (which is tolerated), ignoring case and blanks before the
+   colon. headers must be NUL-terminated. */
 hts_boolean http_headers_have_field(const char *headers,
                                     const char *field_name);
 
@@ -323,8 +324,14 @@ hts_boolean http_headers_have_field(const char *headers,
    follow, or the 412/416 whose stale resume partial the parser re-gets. */
 hts_boolean hts_body_missing_unexpectedly(const htsblk *r);
 
+/* Returns the warning to print for a -%X line, or NULL when it goes out as
+   typed. headers is the block so far. */
+const char *http_custom_header_warning(const char *headers, const char *line);
+
 /* Append the custom header block to dst (capacity dst_size), dropping any line
-   whose field dst carries plus its folded continuations. Aborts on overflow. */
+   whose field dst carries, a malformed or framing line, an earlier copy of
+   Host, Cookie or Authorization, and a leading folded line. Field names ignore
+   case and blanks before the colon. A line that does not fit is left out. */
 void http_append_custom_headers(char *dst, size_t dst_size,
                                 const char *headers);
 
