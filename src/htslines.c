@@ -42,12 +42,10 @@ Please visit our Website: http://www.httrack.com
 
 /* Is c one of the bytes flags drop? */
 static hts_boolean line_drops(int c, int flags) {
-  return (flags & LINE_RAW) != 0 ? HTS_FALSE
-         : c == '\r' || ((flags & HTS_LINE_DROP_TAB) != 0 && c == '\t') ||
-                 ((flags & HTS_LINE_DROP_FF) != 0 && c == '\f') ||
-                 ((flags & HTS_LINE_DROP_NUL) != 0 && c == '\0')
-             ? HTS_TRUE
-             : HTS_FALSE;
+  return (flags & LINE_RAW) == 0 &&
+         (c == '\r' || ((flags & HTS_LINE_DROP_TAB) != 0 && c == '\t') ||
+          ((flags & HTS_LINE_DROP_FF) != 0 && c == '\f') ||
+          ((flags & HTS_LINE_DROP_NUL) != 0 && c == '\0'));
 }
 
 /* How a line ends once trimmed, which decides whether it continues. */
@@ -91,7 +89,7 @@ static hts_boolean readline_end(FILE *fp, char *s, size_t max, int flags,
     }
     if (j + 1 < max)
       s[j++] = (char) c;
-    else if (!is_realspace(c))
+    else if ((flags & LINE_RAW) != 0 || !is_realspace(c))
       cut = HTS_TRUE;
   }
   s[j] = '\0';

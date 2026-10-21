@@ -328,9 +328,8 @@ hts_boolean hts_body_missing_unexpectedly(const htsblk *r);
    typed. headers is the block so far. */
 const char *http_custom_header_warning(const char *headers, const char *line);
 
-/* Why a login bundle's header line is refused, or NULL when it is allowed:
-   the -%X warnings, plus Host, Cookie and Proxy-*. headers is the block so
-   far. */
+/* Why a bundle header line is refused, or NULL when allowed. headers is the
+   block so far. */
 const char *http_bundle_header_refusal(const char *headers, const char *line);
 
 /* Append the custom header block to dst (capacity dst_size), dropping any line

@@ -38,6 +38,7 @@ Please visit our Website: http://www.httrack.com
 static int st_bundlecut(httrackp *opt, int argc, char **argv) {
   char url[HTS_URLMAXSIZE * 2];
   char name[HTS_BUNDLE_NAME_MAX];
+  const char *why;
 
   (void) opt;
   if (argc != 1 || strlen(argv[0]) >= sizeof(url)) {
@@ -45,35 +46,48 @@ static int st_bundlecut(httrackp *opt, int argc, char **argv) {
     return 1;
   }
   strcpybuff(url, argv[0]);
-  switch (hts_bundle_cut(url, name, sizeof(name))) {
-  case HTS_BUNDLE_NONE:
+  why = hts_bundle_cut(url, name, sizeof(name));
+  if (why != NULL)
+    printf("bad: %s\n", why);
+  else if (name[0] == '\0')
     printf("none\n");
-    break;
-  case HTS_BUNDLE_BAD:
-    printf("bad\n");
-    break;
-  case HTS_BUNDLE_NAMED:
+  else
     printf("%s %s\n", name, url);
-    break;
-  }
   return 0;
 }
 
-/* -#test=bundle <dir> <url>... [host:<adr>]... [jar:<file>]: load the bundles
-   the URLs name from dir over the jar file, print them and the jar, then the
-   UA and headers each adr gets. */
+/* Print err with each "<dir>/" cut to "/", since the folder is the caller's. */
+static void print_without_dir(const char *err, const char *dir) {
+  const size_t dlen = strlen(dir);
+  const char *p = err;
+  const char *at;
+
+  while ((at = strstr(p, dir)) != NULL) {
+    const hts_boolean whole = at[dlen] == '/' || at[dlen] == '\\';
+
+    printf("%.*s", (int) (at - p) + (whole ? 0 : (int) dlen), p);
+    p = at + dlen;
+  }
+  printf("%s\n", p);
+}
+
+/* -#test=bundle <dir> <url>... [host:<adr>]... [jar:<file>] [twice]: load the
+   bundles the URLs name from dir over the jar file, twice when asked, then
+   print their url lines, the jar, and the UA and headers each adr gets. */
 static int st_bundle(httrackp *opt, int argc, char **argv) {
   FILE *const log = opt->log;
   t_cookie *const prev = opt->cookie;
   t_cookie *jar = calloct(1, sizeof(t_cookie));
   const char *jar_file = NULL;
+  int loads = 1;
   char err[1024];
+  const char *url;
   char *rec;
   int i;
 
   if (argc < 2 || jar == NULL) {
     fprintf(stderr, "bundle: takes <dir> <url>... [host:<adr>]... "
-                    "[jar:<file>]\n");
+                    "[jar:<file>] [twice]\n");
     freet(jar);
     return 1;
   }
@@ -83,34 +97,28 @@ static int st_bundle(httrackp *opt, int argc, char **argv) {
   hts_bundle_free(opt);
   StringCopy(opt->bundle_dir, argv[0]);
   for (i = 1; i < argc; i++) {
-    char url[HTS_URLMAXSIZE * 2];
-    char name[HTS_BUNDLE_NAME_MAX];
+    char buff[HTS_URLMAXSIZE * 2];
 
     if (strncmp(argv[i], "jar:", 4) == 0) {
       jar_file = argv[i] + 4;
       (void) cookie_load(opt, jar, "", jar_file);
+    } else if (strcmp(argv[i], "twice") == 0) {
+      loads = 2;
     } else if (strncmp(argv[i], "host:", 5) != 0 &&
-               strlen(argv[i]) < sizeof(url)) {
-      strcpybuff(url, argv[i]);
-      if (hts_bundle_cut(url, name, sizeof(name)) == HTS_BUNDLE_NAMED)
-        assertf(hts_bundle_add(opt, name, url));
+               strlen(argv[i]) < sizeof(buff)) {
+      strcpybuff(buff, argv[i]);
+      assertf(hts_bundle_take(opt, buff) == NULL);
     }
   }
-  if (!hts_bundle_load_all(opt, jar_file, err, sizeof(err))) {
-    /* the folder is the caller's, so the message is graded without it */
-    const size_t dlen = strlen(argv[0]);
-    const char *p = err;
-    const char *at;
-
-    printf("refused: ");
-    while ((at = strstr(p, argv[0])) != NULL) {
-      printf("%.*s", (int) (at - p), p);
-      p = at + dlen;
+  for (i = 0; i < loads; i++) {
+    if (!hts_bundle_load_all(opt, jar_file, err, sizeof(err))) {
+      printf("refused: ");
+      print_without_dir(err, argv[0]);
+      goto done;
     }
-    printf("%s\n", p);
-    goto done;
   }
-  hts_bundle_dump(opt);
+  for (i = 0; (url = hts_bundle_url(opt, i)) != NULL; i++)
+    printf("url %s\n", url);
   for (rec = jar->data; *rec != '\0'; rec = cookie_nextfield(rec)) {
     char dom[8192], cname[8192], value[8192];
 
@@ -145,7 +153,7 @@ done:
 
 const struct selftest_entry selftests_bundle[] = {
     {"bundlecut", "<url>", "the login bundle a start URL names", st_bundlecut},
-    {"bundle", "<dir> <url>... [host:<adr>]... [jar:<file>]",
+    {"bundle", "<dir> <url>... [host:<adr>]... [jar:<file>] [twice]",
      "load login bundles and print the identity each host gets", st_bundle},
     {NULL, NULL, NULL, NULL},
 };

@@ -94,13 +94,18 @@ command grep -qF -- '--bundle-dir logins' "$doit" &&
     fail_dump "doit.log kept a relative --bundle-dir" "$doit"
 # The suffix is cut before any URL reaches a file name, a log or the index.
 # hts-log.txt echoes the command line in parentheses, as doit.log keeps it.
-names=$(cd "$tmpdir/one" && find . -name '*httrack-bundle*')
-test -z "$names" || fail "a file name holds the bundle suffix: $names"
-for f in index.html hts-log.txt hts-cache/new.txt; do
-    test -f "$tmpdir/one/$f" || fail "no $f"
-    command grep -v '^(' "$tmpdir/one/$f" | command grep -F '#httrack-bundle' &&
-        fail_dump "$f holds the bundle suffix" "$tmpdir/one/$f"
-done
+no_suffix() { # no_suffix PROJECT
+    local names f
+    names=$(cd "$1" && find . -name '*httrack-bundle*')
+    test -z "$names" || fail "a file name holds the bundle suffix: $names"
+    for f in index.html hts-log.txt hts-cache/new.txt; do
+        test -f "$1/$f" || fail "no $1/$f"
+        if command grep -v '^(' "$1/$f" | command grep -F '#httrack-bundle'; then
+            fail_dump "$f holds the bundle suffix" "$1/$f"
+        fi
+    done
+}
+no_suffix "$tmpdir/one"
 command grep -qF 'http://www.alpha.test/ ' "$tmpdir/one/hts-log.txt" ||
     fail_dump "hts-log.txt does not name the start URL" "$tmpdir/one/hts-log.txt"
 
@@ -138,6 +143,7 @@ crawl "$tmpdir" -O two -%L "$(nativepath "$tmpdir/list.txt")" ||
 test "$(($(hits) - before))" -eq 2 ||
     fail_dump "-%L crawl: $(($(hits) - before)) requests, expected 2" "$tmpdir/srv.out"
 hit "-%L" "$before" "www.beta.test/ ua=BetaUA/2.0 auth=Bearer beta-token cookie=SID=beta-captured x=-"
+no_suffix "$tmpdir/two"
 
 # A bundle that cannot be read stops the run before any request, with a message
 # that names it and never shows a refused header's value. A CR would end a
@@ -146,6 +152,8 @@ printf '%s\n' '# HTTrack bundle 1' 'header Proxy-Authorization: planted-secret' 
     >"$tmpdir/two/secret.hts"
 printf '# HTTrack bundle 1\nua U\rX-Injected: 1\nheader X-A: 1\rCookie: forged=1\n' \
     >"$tmpdir/two/cr.hts"
+printf '%s\n' '# HTTrack bundle 1' cookies "$(jar beta.test SID "v$(printf '\033')x")" \
+    >"$tmpdir/two/esc.hts"
 printf '%s\n' 'http://www.beta.test/#httrack-bundle=../beta.test' >"$tmpdir/bad.txt"
 stops=0
 stop() { # stop MESSAGE [httrack args...]
@@ -160,14 +168,19 @@ stop() { # stop MESSAGE [httrack args...]
 before=$(hits)
 stop 'nosuch.hts: cannot read the login bundle' \
     'http://www.alpha.test/#httrack-bundle=nosuch'
+command grep -qxF 'Login bundle: two/nosuch.hts: cannot read the login bundle: No such file or directory' "$log" ||
+    fail_dump "the message changed" "$log"
 stop 'line 1: invalid login bundle name' -%L "$(nativepath "$tmpdir/bad.txt")"
-stop 'refused header Proxy-Authorization' \
+stop 'secret.hts, line 2: refused header: a proxy header is not for the site' \
     'http://www.alpha.test/#httrack-bundle=secret'
-stop 'line 2: too long or holding a control byte' \
+stop 'cr.hts, line 2: holds a control byte' \
     'http://www.alpha.test/#httrack-bundle=cr'
-test "$stops" -eq 4 || fail "$stops stops ran, expected 4"
+stop 'esc.hts, line 3: a cookie line holds a control byte' \
+    'http://www.beta.test/#httrack-bundle=esc'
+test "$stops" -eq 5 || fail "$stops stops ran, expected 5"
 test "$(hits)" -eq "$before" || fail_dump "a refused bundle still crawled" "$tmpdir/srv.out"
 for f in "$log" "$tmpdir/two/hts-log.txt"; do
+    test -f "$f" || fail "no $f"
     command grep -qF planted-secret "$f" && fail_dump "$f shows the secret" "$f"
 done
 true

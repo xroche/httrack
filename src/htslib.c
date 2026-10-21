@@ -1157,6 +1157,7 @@ const char *http_custom_header_warning(const char *headers, const char *line) {
   return NULL;
 }
 
+/* The -%X warnings, plus Host, Cookie and Proxy-*. */
 const char *http_bundle_header_refusal(const char *headers, const char *line) {
   static const char *const engine[] = {"Host", "Cookie"};
   const char *const why = http_custom_header_warning(headers, line);

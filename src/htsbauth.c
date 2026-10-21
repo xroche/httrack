@@ -97,8 +97,6 @@ hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size) {
   return HTS_TRUE;
 }
 
-static char *cookie_find_exact(char *s, const char *cook_name,
-                               const char *domain, const char *path);
 static hts_boolean cookie_domain_is_suffix(const char *domain);
 
 /* See htsbauth.h. Records are kept longest path first. */
@@ -219,10 +217,10 @@ static hts_boolean cookie_same_domain(const char *a, const char *b) {
   return strcmpnocase(a, b) == 0;
 }
 
-/* Return the record with this name, domain and path, or NULL. The host-only
-   flag is not part of that identity (RFC 6265 5.3 step 11). */
-static char *cookie_find_exact(char *s, const char *cook_name,
-                               const char *domain, const char *path) {
+/* See htsbundle.h. The host-only flag is not part of a record's identity
+   (RFC 6265 5.3 step 11). */
+char *cookie_find_exact(char *s, const char *cook_name, const char *domain,
+                        const char *path) {
   char buffer[8192];
   char *a;
 
@@ -469,19 +467,31 @@ char *cookie_nextfield(char *a) {
   return a;
 }
 
+/* Warn about the line just read. A bundle's warning gives the line number and
+   the reason but no byte of the line, which can hold a secret. */
+#define COOKIE_WARN(reason, ...)                                               \
+  do {                                                                         \
+    if (filter != NULL)                                                        \
+      hts_log_print(opt, LOG_WARNING, "Bundle %s, line %d: %s", given,         \
+                    filter->line, reason);                                     \
+    else                                                                       \
+      hts_log_print(opt, LOG_WARNING, __VA_ARGS__);                            \
+  } while (0)
+
 /* Copy Netscape-jar field <param> into dst, or refuse the line and say so: a
    shortened domain or path would silently change where the cookie is sent. */
 static hts_boolean cookie_load_field(httrackp *opt, char *dst, size_t dst_size,
                                      char *buffer, const char *line, int param,
-                                     const char *field_name, const char *file) {
+                                     const char *field_name, const char *given,
+                                     const cookie_filter *filter) {
   const char *const value = cookie_get(buffer, line, param);
   const size_t len = strlen(value);
 
   if (len >= dst_size) {
-    hts_log_print(opt, LOG_WARNING,
-                  "Cookies: ignoring a line whose %s field is %d bytes "
-                  "(maximum %d): %s",
-                  field_name, (int) len, (int) dst_size - 1, file);
+    COOKIE_WARN("a cookie field is too long",
+                "Cookies: ignoring a line whose %s field is %d bytes "
+                "(maximum %d): %s",
+                field_name, (int) len, (int) dst_size - 1, given);
     return HTS_FALSE;
   }
   strlcpybuff(dst, value, dst_size);
@@ -654,13 +664,11 @@ static hts_boolean cookie_is_flat(FILE *fp, int *quote) {
 }
 
 /* See htsbundle.h. */
-hts_boolean cookie_url_host(const char *url, char *dst, size_t dst_size,
-                            hts_boolean *https) {
+hts_boolean cookie_url_host(const char *url, char *dst, size_t dst_size) {
   const char *const rest = jump_protocol_const(url);
   const size_t len = strcspn(rest, "/?#");
   char adr[HTS_URLMAXSIZE];
 
-  *https = strfield(url, "https:") != 0;
   if (len >= sizeof(adr))
     return HTS_FALSE;
   adr[0] = '\0';
@@ -724,14 +732,13 @@ static int cookie_load_flat(httrackp *opt, t_cookie *cookie, FILE *fp,
   hts_boolean nul = HTS_FALSE, too_long = HTS_FALSE;
   hts_boolean line_start = HTS_TRUE;
   hts_boolean quoted = HTS_FALSE, quote_done = quote == 0;
-  hts_boolean https = HTS_FALSE;
   cookie_attr attr;
   const char *domain;
   int stored = 0, ignored = 0;
   size_t i;
   int c;
 
-  if (!cookie_url_host(start_url, host, sizeof(host), &https)) {
+  if (!cookie_url_host(start_url, host, sizeof(host))) {
     hts_log_print(opt, LOG_WARNING,
                   "Cookies: %s is a document.cookie string, but there is no "
                   "start URL to bind it to, so it is ignored",
@@ -743,7 +750,7 @@ static int cookie_load_flat(httrackp *opt, t_cookie *cookie, FILE *fp,
                ? NULL
                : hts_psl_registrable_domain(host);
   attr.host_only = domain == NULL;
-  attr.secure = https;
+  attr.secure = strfield(start_url, "https:") != 0;
   attr.http_only = HTS_FALSE;
   attr.expires = 0;
   if (domain == NULL)
@@ -818,36 +825,6 @@ static int cookie_load_flat(httrackp *opt, t_cookie *cookie, FILE *fp,
   return COOKIE_LOAD_KEEP;
 }
 
-/* Should filter let the record name=value for domain and path into cookie?
-   seen holds this load's records, which may repeat one without a clash. */
-static hts_boolean cookie_admit(cookie_filter *filter, t_cookie *cookie,
-                                t_cookie *seen, const char *name,
-                                const char *value, const char *domain,
-                                const char *path) {
-  char buffer[8192];
-  char host[256];
-  const char *other;
-
-  if (!cookie_host(domain, host, sizeof(host)) ||
-      !filter->covers(filter->scope, host[0] == '.' ? host + 1 : host)) {
-    filter->dropped++;
-    return HTS_FALSE;
-  }
-  other = cookie_find_exact(filter->others->data, name, host, path);
-  if (other != NULL &&
-      (seen == NULL ||
-       cookie_find_exact(seen->data, name, host, path) == NULL) &&
-      strcmp(cookie_get(buffer, other, 6), value) != 0) {
-    filter->clash[0] = '\0';
-    strlncatbuff(filter->clash, name, sizeof(filter->clash),
-                 sizeof(filter->clash) - 1);
-    return HTS_FALSE;
-  }
-  (void) cookie_set(filter->others, name, value, domain, path, NULL);
-  return !filter->under ||
-         cookie_find_exact(cookie->data, name, host, path) == NULL;
-}
-
 /* Read the Netscape records from fp's position to its end into cookie, and
    name the file as given in warnings. A UTF-8 BOM is skipped on the first line
    when first_line is HTS_TRUE. filter, when not NULL, picks the records.
@@ -871,11 +848,14 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, FILE *fp,
     keep = HTS_TRUE;
   }
   // ferror ends the loop too, because a directory never reaches EOF
-  while (!feof(fp) && !ferror(fp) && strlen(cookie->data) < cookie->max_len) {
+  while (!feof(fp) && !ferror(fp) && strlen(cookie->data) < cookie->max_len &&
+         (filter == NULL || filter->why == NULL)) {
     size_t len;
 
     // len counts what the buffer cut too, so this catches that line
     cookie_readline(fp, line, sizeof(line), &len);
+    if (filter != NULL)
+      filter->line++;
     if (first_line && len >= sizeof(cookie_bom) - 1 &&
         strncmp(line, cookie_bom, sizeof(cookie_bom) - 1) == 0) {
       len -= sizeof(cookie_bom) - 1;
@@ -884,11 +864,14 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, FILE *fp,
     }
     first_line = HTS_FALSE;
     if (len >= line_max) {
-      hts_log_print(opt, LOG_WARNING,
-                    "Cookies: ignoring an over-long line "
-                    "(%d bytes, maximum %d): %s",
-                    (int) len, (int) line_max - 1, given);
+      COOKIE_WARN("a cookie line is too long",
+                  "Cookies: ignoring an over-long line "
+                  "(%d bytes, maximum %d): %s",
+                  (int) len, (int) line_max - 1, given);
       refused++;
+    } else if (filter != NULL && hts_bundle_has_control(line, len)) {
+      // a bundle is written for this run, so a damaged one stops it
+      filter->why = "a cookie line holds a control byte";
     } else if (memchr(line, '\0', len) != NULL ||
                memchr(line, '\r', len) != NULL) {
       hts_log_print(opt, LOG_WARNING,
@@ -904,9 +887,9 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, FILE *fp,
 
       if (rec[0] == '#') {
         if (!cookie_known_comment(rec)) {
-          hts_log_print(opt, LOG_WARNING,
-                        "Cookies: ignoring an unknown comment in %s: %.64s",
-                        given, rec);
+          COOKIE_WARN("an unknown comment",
+                      "Cookies: ignoring an unknown comment in %s: %.64s",
+                      given, rec);
           refused++;
         }
       } else {
@@ -923,36 +906,39 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, FILE *fp,
         for (p = strchr(rec, '\t'); p != NULL; p = strchr(p + 1, '\t'))
           tabs++;
         if (tabs < 6 || !strnotempty(cookie_get(buffer, rec, 5))) {
-          hts_log_print(opt, LOG_WARNING,
-                        "Cookies: ignoring a line with fewer than 7 "
-                        "fields or no name: %s",
-                        given);
+          COOKIE_WARN("a cookie line has fewer than 7 fields or no name",
+                      "Cookies: ignoring a line with fewer than 7 "
+                      "fields or no name: %s",
+                      given);
           refused++;
         } else if (tabs > 7 ||
                    (tabs == 7 && strcmp(cookie_get(buffer, rec, 7),
                                         COOKIE_HTTPONLY_FIELD) != 0)) {
           // a TAB in the value, because only HTTrack writes an eighth field
-          hts_log_print(opt, LOG_WARNING,
-                        "Cookies: ignoring a line with more than 7 "
-                        "fields: %s",
-                        given);
+          COOKIE_WARN("a cookie line has more than 7 fields",
+                      "Cookies: ignoring a line with more than 7 "
+                      "fields: %s",
+                      given);
           refused++;
         } else if (!cookie_is_expiry(cookie_get(buffer, rec, 4))) {
-          hts_log_print(opt, LOG_WARNING,
-                        "Cookies: ignoring a line whose expiry is not a "
-                        "whole number: %s",
-                        given);
+          COOKIE_WARN("a cookie expiry is not a whole number",
+                      "Cookies: ignoring a line whose expiry is not a "
+                      "whole number: %s",
+                      given);
           refused++;
         } else if (cookie_load_field(opt, domain, sizeof(domain), buffer, rec,
-                                     0, "domain", given) &&
+                                     0, "domain", given, filter) &&
                    cookie_load_field(opt, path, sizeof(path), buffer, rec, 2,
-                                     "path", given) &&
+                                     "path", given, filter) &&
                    cookie_load_field(opt, cook_name, sizeof(cook_name), buffer,
-                                     rec, 5, "name", given) &&
+                                     rec, 5, "name", given, filter) &&
                    cookie_load_field(opt, cook_value, sizeof(cook_value),
-                                     buffer, rec, 6, "value", given)) {
+                                     buffer, rec, 6, "value", given, filter)) {
           cookie_attr attr;
           char host[256];
+          const hts_boolean repeated =
+              seen != NULL && cookie_host(domain, host, sizeof(host)) &&
+              cookie_find_exact(seen->data, cook_name, host, path) != NULL;
 
           attr.host_only = cookie_is_host_only(rec);
           attr.secure = strcmpnocase(cookie_get(buffer, rec, 3), "TRUE") == 0;
@@ -960,35 +946,33 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, FILE *fp,
           attr.expires = cookie_record_expiry(rec);
           // an expired one is skipped, because a browser drops it too
           if ((attr.expires == 0 || attr.expires > (int64_t) time(NULL)) &&
-              (filter == NULL || cookie_admit(filter, cookie, seen, cook_name,
-                                              cook_value, domain, path))) {
-            const hts_boolean repeated =
-                seen != NULL && cookie_host(domain, host, sizeof(host)) &&
-                cookie_find_exact(seen->data, cook_name, host, path) != NULL;
-
+              (filter == NULL ||
+               filter->admit(filter, cookie, repeated, cook_name, cook_value,
+                             domain, path))) {
             // cookie_set stores it host-only
             if (!attr.host_only && cookie_domain_is_suffix(domain))
-              hts_log_print(opt, LOG_WARNING,
-                            "Cookies: '%.64s' for the public suffix %s is "
-                            "now host-only: %s",
-                            cook_name, domain, given);
+              COOKIE_WARN("a cookie for a public suffix is now host-only",
+                          "Cookies: '%.64s' for the public suffix %s is "
+                          "now host-only: %s",
+                          cook_name, domain, given);
             // the last one wins, as curl reads it, but a rewrite loses one
             if (repeated) {
-              hts_log_print(opt, LOG_WARNING,
-                            "Cookies: '%.64s' appears twice in %s", cook_name,
-                            given);
+              COOKIE_WARN("a cookie appears twice",
+                          "Cookies: '%.64s' appears twice in %s", cook_name,
+                          given);
               refused++;
             }
             if (cookie_set(cookie, cook_name, cook_value, domain, path,
                            &attr) != 0) {
               // the jar caps a field tighter still, and a full one refuses
-              hts_log_print(opt, LOG_WARNING,
-                            "Cookies: the jar did not store '%.64s' from "
-                            "%s",
-                            cook_name, given);
-              refused++;
               if (filter != NULL)
-                filter->lost++;
+                filter->why = "the cookie jar did not store a cookie";
+              else
+                hts_log_print(opt, LOG_WARNING,
+                              "Cookies: the jar did not store '%.64s' from "
+                              "%s",
+                              cook_name, given);
+              refused++;
             } else if (seen != NULL && !repeated) {
               (void) cookie_set(seen, cook_name, "", domain, path, NULL);
             }
@@ -999,12 +983,10 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, FILE *fp,
       }
     }
   }
-  if (!feof(fp)) {
-    hts_log_print(opt, LOG_WARNING,
-                  "Cookies: stopped reading before the end of %s", given);
+  if (!feof(fp) && (filter == NULL || filter->why == NULL)) {
+    COOKIE_WARN("stopped reading before the end",
+                "Cookies: stopped reading before the end of %s", given);
     refused++;
-    if (filter != NULL)
-      filter->lost++;
   }
   freet(seen);
   return keep ? COOKIE_LOAD_KEEP : refused;
@@ -1127,8 +1109,8 @@ int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *fpath,
       return ret;
     }
     if (fp) {
-      const int ret =
-          cookie_load_records(opt, cookie, fp, given, HTS_TRUE, NULL);
+      const int ret = cookie_load_records(opt, cookie, fp, given,
+                                          /* first_line */ HTS_TRUE, NULL);
 
       fclose(fp);
       return ret;
@@ -1145,8 +1127,9 @@ int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *fpath,
 
 /* See htsbundle.h. */
 void cookie_load_stream(httrackp *opt, t_cookie *cookie, FILE *fp,
-                        const char *name, cookie_filter *filter) {
-  (void) cookie_load_records(opt, cookie, fp, name, HTS_FALSE, filter);
+                        const char *given, cookie_filter *filter) {
+  (void) cookie_load_records(opt, cookie, fp, given, /* first_line */ HTS_FALSE,
+                             filter);
 }
 
 /* Open name for writing, creating it if needed, and return NULL on failure.

@@ -47,66 +47,65 @@ Please visit our Website: http://www.httrack.com
 /* A bundle name holds fewer bytes than this. */
 #define HTS_BUNDLE_NAME_MAX 128
 
-typedef enum {
-  HTS_BUNDLE_NONE,  /* no suffix */
-  HTS_BUNDLE_NAMED, /* a valid name, cut off the URL */
-  HTS_BUNDLE_BAD    /* a suffix whose name is refused, URL left alone */
-} hts_bundle_suffix;
+/* Cut the bundle suffix off url in place and copy its name into name, or ""
+   when url has none. NULL, or why the name is refused, url then left alone. */
+const char *hts_bundle_cut(char *url, char *name, size_t name_size);
 
-/* Cut the bundle suffix off url in place and copy its name into name. */
-hts_bundle_suffix hts_bundle_cut(char *url, char *name, size_t name_size);
-
-/* Record that the start URL url (suffix already cut) names bundle name. A
-   name given twice is one bundle. HTS_FALSE when out of memory. */
-hts_boolean hts_bundle_add(httrackp *opt, const char *name, const char *url);
+/* hts_bundle_cut(), then record that url names the bundle. A name given twice
+   is one bundle. NULL, or why the run must stop. */
+const char *hts_bundle_take(httrackp *opt, char *url);
 
 /* Read every named bundle from opt->bundle_dir, or the project folder, and
    refuse two bundles that overlap with different identities or cookie values.
-   The cookies go into opt->cookie, under the records already there when the
-   jar file is newer than the bundle. jar is that file, or NULL. HTS_FALSE
-   after writing why into err, naming the file: the run must stop. A second
-   call reads the files again. */
-hts_boolean hts_bundle_load_all(httrackp *opt, const char *jar, char *err,
+   The cookies go into opt->cookie, under the records already there when
+   jar_file (or NULL) is newer than the bundle. HTS_FALSE after writing why
+   into err, naming the file: the run must stop. A second call reads the files
+   again. */
+hts_boolean hts_bundle_load_all(httrackp *opt, const char *jar_file, char *err,
                                 size_t err_size);
 
 /* The i-th url line of the loaded bundles, or NULL past the last one. */
 const char *hts_bundle_url(httrackp *opt, size_t i);
 
 /* Give req the UA and headers of the first bundle whose scope holds adr's
-   host, where it has them. Its headers go over https alone when every URL
-   naming it is https. */
+   host, where it has them. Its headers go over https alone when any URL of
+   the bundles merged with it is https. */
 void hts_bundle_identity(httrackp *opt, const char *adr, htsrequest *req);
 
 /* Forget the bundles named for opt. */
 void hts_bundle_free(httrackp *opt);
 
-/* Print each loaded bundle (UA, url lines, scope, headers) for the
-   self-tests. */
-void hts_bundle_dump(httrackp *opt);
+/* Do the len bytes at s hold a control byte other than TAB? */
+hts_boolean hts_bundle_has_control(const char *s, size_t len);
 
-/* htsbauth.c internals the bundles share. */
+/* The bundles share these htsbauth.c internals. */
 
 /* Copy the host of url, with or without a scheme, into dst as cookie_host
-   does, and set *https. */
-hts_boolean cookie_url_host(const char *url, char *dst, size_t dst_size,
-                            hts_boolean *https);
+   does. */
+hts_boolean cookie_url_host(const char *url, char *dst, size_t dst_size);
 
-/* What cookie_load_stream lets into the jar, and the count of what it keeps
-   out. */
+/* The record of s named cook_name for exactly domain and path, or NULL. */
+char *cookie_find_exact(char *s, const char *cook_name, const char *domain,
+                        const char *path);
+
+/* This filter picks what cookie_load_stream lets into the jar. */
 typedef struct cookie_filter {
-  hts_boolean (*covers)(const void *scope, const char *host);
-  const void *scope;
-  t_cookie *others;  /* every bundle's records so far */
-  hts_boolean under; /* a record the jar holds already wins */
-  int dropped;       /* records outside the scope */
-  char clash[64];    /* a name others holds with another value, or "" */
-  int lost;          /* records the jar could not take */
+  /* Should the record go into cookie? repeat says this load had it already.
+     Setting why stops the load. */
+  hts_boolean (*admit)(struct cookie_filter *filter, t_cookie *cookie,
+                       hts_boolean repeat, const char *name, const char *value,
+                       const char *domain, const char *path);
+  void *ctx;
+  int line;        /* the number of the last line read */
+  const char *why; /* NULL, or why the load stopped at line */
 } cookie_filter;
 
 /* Load Netscape jar records from fp's position to its end through filter,
-   as cookie_load reads a file. name is the file name used in warnings. */
+   as cookie_load reads a file. given names the file in warnings, which name
+   the line and none of its bytes. A line with a control byte other than TAB
+   stops the load. */
 void cookie_load_stream(httrackp *opt, t_cookie *cookie, FILE *fp,
-                        const char *name, cookie_filter *filter);
+                        const char *given, cookie_filter *filter);
 
 #endif
 

@@ -28,30 +28,37 @@ selftest_queue 'login1 https://example.com/members/' bundlecut \
 selftest_queue 'a.b_c-9 http://x/' bundlecut 'http://x/#httrack-bundle=a.b_c-9'
 selftest_queue "$name127 http://x/" bundlecut "http://x/#httrack-bundle=$name127"
 selftest_queue 'x http://x/#a' bundlecut 'http://x/#a#httrack-bundle=x'
-selftest_queue 'console http://x/' bundlecut 'http://x/#httrack-bundle=console'
-selftest_queue 'com10 http://x/' bundlecut 'http://x/#httrack-bundle=com10'
+for ok in console com10 com0 lpt10 nul1; do
+    selftest_queue "$ok http://x/" bundlecut "http://x/#httrack-bundle=$ok"
+done
 selftest_queue none bundlecut 'http://x/#top'
-for bad in '' ../x a..b .hidden a/b 'a\b' a%2fb "${name127}a" CON con.test \
-    Nul.x com1 LPT9.hts 'a#httrack-bundle=b'; do
-    selftest_queue bad bundlecut "http://x/#httrack-bundle=$bad"
+badname='bad: invalid login bundle name: '
+for bad in '' ../x a/b 'a\b' a%2fb 'a#httrack-bundle=b'; do
+    selftest_queue "${badname}use letters, digits, '.', '_' and '-'" \
+        bundlecut "http://x/#httrack-bundle=$bad"
+done
+for bad in ..x a..b .hidden; do
+    selftest_queue "${badname}it starts with '.' or holds \"..\"" \
+        bundlecut "http://x/#httrack-bundle=$bad"
+done
+selftest_queue "${badname}128 bytes or more" bundlecut \
+    "http://x/#httrack-bundle=${name127}a"
+for bad in CON con.test Nul.x prn aux com1 COM9 lpt1 LPT9.hts; do
+    selftest_queue "${badname}a Windows device name" bundlecut \
+        "http://x/#httrack-bundle=$bad"
 done
 
 # The default scope is the registrable domains of the naming URL and the url
 # lines. Cookie domains do not widen it: alpha-cdn.test's cookie is dropped.
 # The naming URL is https, so the headers go over https alone.
 bundle alpha '# HTTrack bundle 1' 'url https://login.alpha-sso.test/start' \
-    'ua AlphaUA/1.0' 'header Authorization: Bearer t' 'header X-A: 1' \
-    'unknown-key is warned about' cookies "$(jar alpha.test SID s1)" \
-    "$(jar alpha-cdn.test C c1)" "$(jar alpha.test PREF p1)" \
-    "$(jar alpha.test SID s2)" '# an unknown comment is warned about'
+    'ua AlphaUA/1.0' 'header Authorization: Bearer t' '# a note' \
+    'header X-A: 1' 'unknown-key is warned about' 'nakedkey' cookies \
+    "$(jar alpha.test SID s1)" "$(jar alpha-cdn.test C c1)" \
+    "$(jar alpha.test PREF p1)" "$(jar alpha.test SID s2)" \
+    '# an unknown comment is warned about'
 alpha_auth='ua=AlphaUA/1.0 headers=Authorization: Bearer t|X-A: 1|'
-selftest_queue_lines "bundle alpha
-ua AlphaUA/1.0
-url https://login.alpha-sso.test/start
-scope alpha.test
-scope alpha-sso.test
-header Authorization: Bearer t
-header X-A: 1
+selftest_queue_lines "url https://login.alpha-sso.test/start
 cookie .alpha.test PREF=p1
 cookie .alpha.test SID=s2
 https://alpha.test $alpha_auth
@@ -59,24 +66,60 @@ https://deep.www.alpha.test:8443 $alpha_auth
 http://www.alpha.test ua=AlphaUA/1.0 headers=global
 https://login.alpha-sso.test $alpha_auth
 https://cdn.gamma.test ua=global headers=global
-https://notalpha.test ua=global headers=global" bundle "$dir" \
+https://notalpha.test ua=global headers=global
+https://alpha-cdn.test ua=global headers=global" bundle "$dir" \
     'https://www.alpha.test/#httrack-bundle=alpha' host:https://alpha.test \
     host:https://deep.www.alpha.test:8443 host:http://www.alpha.test \
     host:https://login.alpha-sso.test host:https://cdn.gamma.test \
-    host:https://notalpha.test
+    host:https://notalpha.test host:https://alpha-cdn.test
+
+# A second load on one opt reads the files again rather than adding to them.
+selftest_queue_lines "url https://login.alpha-sso.test/start
+cookie .alpha.test PREF=p1
+cookie .alpha.test SID=s2
+https://alpha.test $alpha_auth" bundle "$dir" \
+    'https://www.alpha.test/#httrack-bundle=alpha' host:https://alpha.test \
+    twice
+
+# Any https URL of the bundle, naming it or a url line, keeps its headers off
+# plain http.
+bundle mixed '# HTTrack bundle 1' 'url http://www.mixed.test/' 'ua M' \
+    'header X-M: 1'
+for urls in 'https://mixed.test/ http://mixed.test/' \
+    'http://mixed.test/ https://mixed.test/'; do
+    read -r u1 u2 <<<"$urls"
+    selftest_queue_lines "url http://www.mixed.test/
+http://mixed.test ua=M headers=global
+http://www.mixed.test ua=M headers=global
+https://www.mixed.test ua=M headers=X-M: 1|" bundle "$dir" \
+        "$u1#httrack-bundle=mixed" "$u2#httrack-bundle=mixed" \
+        host:http://mixed.test host:http://www.mixed.test \
+        host:https://www.mixed.test
+done
+bundle mixed2 '# HTTrack bundle 1' 'url https://www.mixed.test/' 'ua M' \
+    'header X-M: 1'
+selftest_queue_tail "
+http://mixed.test ua=M headers=global" bundle "$dir" \
+    'http://mixed.test/#httrack-bundle=mixed2' host:http://mixed.test
+bundle plainm '# HTTrack bundle 1' 'ua M' 'header X-M: 1'
+selftest_queue "http://mixed.test ua=M headers=X-M: 1|" bundle "$dir" \
+    'http://mixed.test/#httrack-bundle=plainm' host:http://mixed.test
+# Bundles that merge share the rule, whichever is listed first.
+for pair in 'plainm mixed2' 'mixed2 plainm'; do
+    read -r u1 u2 <<<"$pair"
+    selftest_queue_tail "
+http://mixed.test ua=M headers=global
+https://mixed.test ua=M headers=X-M: 1|" bundle "$dir" \
+        "http://mixed.test/#httrack-bundle=$u1" \
+        "http://www.mixed.test/#httrack-bundle=$u2" host:http://mixed.test \
+        host:https://mixed.test
+done
 
 # The registrable domain follows the suffix list, not the last two labels. A
 # host with none (a public suffix, a single label) covers itself alone, and so
 # does an address.
 bundle uk '# HTTrack bundle 1' 'ua UK' 'header X-UK: 1'
-selftest_queue_lines "bundle uk
-ua UK
-scope alpha.co.uk
-scope =s3.amazonaws.com
-scope =wiki
-scope =127.0.0.1
-header X-UK: 1
-a.alpha.co.uk ua=UK headers=X-UK: 1|
+selftest_queue_lines "a.alpha.co.uk ua=UK headers=X-UK: 1|
 other.co.uk ua=global headers=global
 s3.amazonaws.com ua=UK headers=X-UK: 1|
 attacker.s3.amazonaws.com ua=global headers=global
@@ -92,18 +135,18 @@ a.wiki ua=global headers=global
     host:127.0.0.2
 
 # scope lines replace the default, and a cookie outside them is dropped. CRLF
-# line ends and a BOM are read.
-printf '\357\273\277# HTTrack bundle 1.3\r\nscope WWW.alpha.test\r\nua N\r\ncookies\r\n%s\r\n%s\r\n' \
+# line ends and a BOM are read. TAB is the one control byte a line may hold.
+printf '\357\273\277# HTTrack bundle 1.3\r\nscope WWW.alpha.test\r\nscope .beta.test\r\nscope 127.0.0.1\r\nua\tN\tx\r\nheader X-N:\t1\r\ncookies\r\n%s\r\n%s\r\n' \
     "$(jar alpha.test SID wide)" "$(jar www.alpha.test K narrow)" \
     >"$tmpdir/narrow.hts"
-selftest_queue_lines "bundle narrow
-ua N
-scope www.alpha.test
-cookie .www.alpha.test K=narrow
+selftest_queue_lines "cookie .www.alpha.test K=narrow
 alpha.test ua=global headers=global
-a.www.alpha.test ua=N headers=global" bundle "$dir" \
+a.www.alpha.test ua=N${tab}x headers=X-N:${tab}1|
+a.beta.test ua=N${tab}x headers=X-N:${tab}1|
+127.0.0.1 ua=N${tab}x headers=X-N:${tab}1|
+127.0.0.2 ua=global headers=global" bundle "$dir" \
     'http://www.alpha.test/#httrack-bundle=narrow' host:alpha.test \
-    host:a.www.alpha.test
+    host:a.www.alpha.test host:a.beta.test host:127.0.0.1 host:127.0.0.2
 
 # Of the bundle and the jar, the newer file wins, and the bundle wins a tie.
 order() { # order NAME BUNDLE-DATE JAR-DATE WINNER
@@ -111,16 +154,20 @@ order() { # order NAME BUNDLE-DATE JAR-DATE WINNER
     jar order.test SID jar >"$tmpdir/$1.txt"
     touch -d "$2" "$tmpdir/$1.hts"
     touch -d "$3" "$tmpdir/$1.txt"
-    selftest_queue_tail "
-cookie .order.test SID=$4" bundle "$dir" \
+    selftest_queue "cookie .order.test SID=$4" bundle "$dir" \
         "http://www.order.test/#httrack-bundle=$1" "jar:$dir/$1.txt"
 }
 order order1 '2026-01-02 10:00:00' '2026-01-01 10:00:00' bundle
 order order2 '2026-01-01 10:00:00' '2026-01-02 10:00:00' jar
 order order3 '2026-01-01 10:00:00' '2026-01-01 10:00:00' bundle
+# half a second apart in the same second: a seconds-only compare calls it a tie
+if touch -d '2026-01-01 10:00:00.5' "$tmpdir/subsecond" 2>/dev/null &&
+    test "$tmpdir/subsecond" -nt "$tmpdir/order3.txt"; then
+    order order4 '2026-01-01 10:00:00' '2026-01-01 10:00:00.5' jar
+fi
 
-# Refused: each one stops the run and names the file. The batch reads them all
-# at the end, so each case writes its own.
+# Refused: each one stops the run and names the file and line, never a byte of
+# the line. The batch reads them all at the end, so each case writes its own.
 nbad=0
 refused() { # refused WHY LINE... -- a one-bundle file the engine refuses
     local why=$1
@@ -143,34 +190,56 @@ selftest_queue "refused: /empty.hts$notbundle" bundle "$dir" \
 printf '\357\273\277' >"$tmpdir/bom.hts"
 selftest_queue "refused: /bom.hts$notbundle" bundle "$dir" \
     'http://www.alpha.test/#httrack-bundle=bom'
-# The messages name a refused header, never its value, which can be a secret.
-refused ', line 2: refused header Host: Host and Cookie are the engine'"'"'s' \
+refused ", line 2: refused header: Host and Cookie are the engine's" \
     '# HTTrack bundle 1' 'header Host: x'
-refused ', line 2: refused header cookie: Host and Cookie are the engine'"'"'s' \
+refused ", line 2: refused header: Host and Cookie are the engine's" \
     '# HTTrack bundle 1' 'header cookie: secret-cookie'
-refused ', line 2: refused header Proxy-Authorization: a proxy header is not for the site' \
+refused ', line 2: refused header: a proxy header is not for the site' \
     '# HTTrack bundle 1' 'header Proxy-Authorization: secret-proxy'
-refused ', line 2: refused header Transfer-Encoding: framing header ignored' \
+refused ', line 2: refused header: framing header ignored' \
     '# HTTrack bundle 1' 'header Transfer-Encoding: chunked'
-refused ', line 3: refused header Authorization: header replaces an earlier one' \
+refused ', line 3: refused header: header replaces an earlier one' \
     '# HTTrack bundle 1' 'header Authorization: a' 'header Authorization: secret-b'
 refused ', line 2: refused header: malformed header ignored' \
     '# HTTrack bundle 1' 'header Bearer secret-no-colon'
-# A CR, NUL or other control byte would split a header on the wire.
-ctl=', line 2: too long or holding a control byte'
+refused ', line 3: the header lines pass 8192 bytes' '# HTTrack bundle 1' \
+    "header X-A: $(repeat_chars 5000 a)" "header X-B: $(repeat_chars 5000 b)"
+# A control byte would split a header on the wire. The CR before the LF goes.
+ctl=', line 2: holds a control byte'
 refused "$ctl" '# HTTrack bundle 1' "$(printf 'ua x\rHost: evil.test')"
 refused "$ctl" '# HTTrack bundle 1' \
     "$(printf 'header X-A: 1\rCookie: forged=1\rProxy-Authorization: z')"
 refused "$ctl" '# HTTrack bundle 1' "$(printf 'scope a.test\001')"
-refused "$ctl" '# HTTrack bundle 1' "ua $(repeat_chars 8200 u)"
+refused "$ctl" '# HTTrack bundle 1' "$(printf 'ua a\177b')"
+refused ', line 1: holds a control byte' "$(printf '# HTTrack bundle 1\rua x')"
 nbad=$((nbad + 1))
 printf '# HTTrack bundle 1\nua a\000Host: evil.test\n' >"$tmpdir/bad$nbad.hts"
 selftest_queue "refused: /bad$nbad.hts$ctl" bundle "$dir" \
     "http://www.alpha.test/#httrack-bundle=bad$nbad"
+# A line holds 8191 bytes at most, its line end aside.
+bundle long '# HTTrack bundle 1' "ua $(repeat_chars 8188 u)"
+selftest_queue '' bundle "$dir" 'http://x.test/#httrack-bundle=long'
+refused ', line 2: too long' '# HTTrack bundle 1' "ua $(repeat_chars 8189 u)"
+nbad=$((nbad + 1))
+printf '# HTTrack bundle 1\nua %s\r\v\f\n' "$(repeat_chars 8188 u)" \
+    >"$tmpdir/bad$nbad.hts"
+selftest_queue "refused: /bad$nbad.hts, line 2: too long" bundle "$dir" \
+    "http://www.alpha.test/#httrack-bundle=bad$nbad"
+# In the jar, every control byte but TAB stops the run too.
+for oct in 000 001 002 003 004 005 006 007 010 013 014 015 016 017 020 021 \
+    022 023 024 025 026 027 030 031 032 033 034 035 036 037 177; do
+    nbad=$((nbad + 1))
+    {
+        printf '# HTTrack bundle 1\ncookies\n'
+        printf '.alpha.test\tTRUE\t/\tFALSE\t0\tSID\tv%bx\n' "\\0$oct"
+    } >"$tmpdir/bad$nbad.hts"
+    selftest_queue "refused: /bad$nbad.hts, line 3: a cookie line holds a control byte" \
+        bundle "$dir" "http://www.alpha.test/#httrack-bundle=bad$nbad"
+done
 refused ', line 3: ua given twice' '# HTTrack bundle 1' 'ua A' 'ua B'
-refused ', line 2: scope co.uk is a public suffix' '# HTTrack bundle 1' \
+refused ', line 2: the scope is a public suffix' '# HTTrack bundle 1' \
     'scope co.uk'
-refused ', line 2: invalid scope: ' '# HTTrack bundle 1' 'scope .'
+refused ', line 2: invalid scope' '# HTTrack bundle 1' 'scope .'
 refused ', line 2: invalid url' '# HTTrack bundle 1' 'url ftp:///'
 refused ', line 2: invalid url' '# HTTrack bundle 1' \
     'url http://a.test/#httrack-bundle=x'
@@ -183,33 +252,46 @@ full=()
 for i in $(seq 1 400); do
     full+=("$(jar alpha.test "C$i" "$(repeat_chars 100 v)")")
 done
-refused ': the cookie jar is full, or the file could not be read to its end' \
+refused ', line 227: the cookie jar did not store a cookie' \
     '# HTTrack bundle 1' cookies "${full[@]}"
+# 256 url lines and 256 scope domains at most
+urls=()
+scopes=()
+for i in $(seq 1 257); do
+    urls+=("url http://x.test/$i")
+    scopes+=("scope h$i.test")
+done
+bundle urls256 '# HTTrack bundle 1' "${urls[@]:0:256}"
+selftest_queue_tail '
+url http://x.test/256' bundle "$dir" 'http://x.test/#httrack-bundle=urls256'
+refused ', line 258: more than 256 url lines' '# HTTrack bundle 1' "${urls[@]}"
+refused ', line 258: more than 256 scope domains' '# HTTrack bundle 1' \
+    "${scopes[@]}"
 
 # Several bundles: one name twice is one bundle, equal identities on one site
 # merge with their cookies, and different ones are refused either way round.
 bundle beta '# HTTrack bundle 1' 'ua BetaUA' cookies "$(jar beta.test SID b1)"
 bundle alpha2 '# HTTrack bundle 1' 'ua AlphaUA/1.0' \
     'header Authorization: Bearer t' 'header X-A: 1' cookies \
-    "$(jar alpha.test OTHER o)"
-bundle alphaua '# HTTrack bundle 1' 'ua SomeoneElse'
+    "$(jar alpha.test OTHER o)" "$(jar alpha.test SID s2)"
+bundle alphaua '# HTTrack bundle 1' 'ua SomeoneElse' \
+    'header Authorization: Bearer t' 'header X-A: 1'
 bundle alphaauth '# HTTrack bundle 1' 'ua AlphaUA/1.0' \
     'header Authorization: Bearer u' 'header X-A: 1'
 bundle alphasid '# HTTrack bundle 1' 'ua AlphaUA/1.0' \
     'header Authorization: Bearer t' 'header X-A: 1' cookies \
     "$(jar alpha.test SID another-account)"
 bundle wwwalpha '# HTTrack bundle 1' 'scope www.alpha.test' 'ua Narrow'
-selftest_queue_lines "bundle beta
-ua BetaUA
-scope beta.test
-cookie .beta.test SID=b1
+bundle loop1 '# HTTrack bundle 1' 'scope 127.0.0.1' 'ua One'
+bundle loop2 '# HTTrack bundle 1' 'ua Two'
+selftest_queue_lines "cookie .beta.test SID=b1
 www.beta.test ua=BetaUA headers=global" bundle "$dir" \
     'http://www.beta.test/#httrack-bundle=beta' \
     'http://beta.test/x#httrack-bundle=beta' host:www.beta.test
 selftest_queue_tail "
 cookie .alpha.test PREF=p1
-cookie .alpha.test SID=s2
 cookie .alpha.test OTHER=o
+cookie .alpha.test SID=s2
 cookie .beta.test SID=b1
 https://alpha.test $alpha_auth
 beta.test ua=BetaUA headers=global" bundle "$dir" \
@@ -217,24 +299,61 @@ beta.test ua=BetaUA headers=global" bundle "$dir" \
     'https://alpha.test/#httrack-bundle=alpha2' \
     'http://beta.test/#httrack-bundle=beta' host:https://alpha.test \
     host:beta.test
-differ() { # differ A B -- A and B overlap with different identities
-    selftest_queue "refused: /$1.hts and /$2.hts cover the same site with a different user agent or headers" \
+differ() { # differ A B [C] -- A and the last one overlap with other identities
+    local last=${3:-$2} more=()
+    test -z "${3:-}" || more=("http://beta.test/#httrack-bundle=$2")
+    selftest_queue "refused: /$1.hts and /$last.hts cover the same site with a different user agent or headers" \
         bundle "$dir" "https://www.alpha.test/#httrack-bundle=$1" \
-        "https://alpha.test/#httrack-bundle=$2"
+        "${more[@]}" "https://alpha.test/#httrack-bundle=$last"
 }
 differ alpha alphaua
 differ alpha alphaauth
 differ alpha wwwalpha
 differ wwwalpha alpha
-selftest_queue "refused: /alphasid.hts: cookie 'SID' has another value in another bundle" \
+differ alpha beta alphaua
+selftest_queue "refused: /loop1.hts and /loop2.hts cover the same site with a different user agent or headers" \
+    bundle "$dir" 'http://x.test/#httrack-bundle=loop1' \
+    'http://127.0.0.1/#httrack-bundle=loop2'
+selftest_queue "refused: /alphasid.hts, line 6: a cookie has another value in another bundle" \
     bundle "$dir" 'https://www.alpha.test/#httrack-bundle=alpha' \
     'https://alpha.test/#httrack-bundle=alphasid'
 
 selftest_run_queued
 
+# Warnings name the line, and never a byte of it that could be a secret: a
+# key in lowercase letters alone is named.
+out=$(httrack -#test=bundle "$dir" 'https://www.alpha.test/#httrack-bundle=alpha' 2>&1)
+for want in 'alpha.hts, line 7: unknown key$' 'alpha.hts, line 8: unknown key nakedkey$' \
+    'alpha.hts, line 13: a cookie appears twice$' 'alpha.hts, line 14: an unknown comment$' \
+    'alpha.hts: 1 cookie\(s\) outside its scope left out'; do
+    grep -qE "$want" <<<"$out" || fail "no warning [$want]: $out"
+done
+secret=ZQXSECRET
+sec() { # sec NAME LINE... -- a bundle whose lines hold the secret
+    local name=$1
+    shift
+    printf '%s\n' '# HTTrack bundle 1' "$@" >"$tmpdir/$name.hts"
+}
+sec s1 "header Authorization Bearer $secret:x"
+sec s2 "X-Api-Key:$secret" "$secret" "url ftp:///$secret"
+sec s3 "scope $secret!"
+sec s4 "header X-A: $secret" "header Proxy-$secret: 1"
+sec s5 cookies "#$secret" "$(jar alpha.test "$secret" 1)" \
+    "$(jar alpha.test "$secret" 2)" "$(jar alpha.test "$secret" "$(repeat_chars 8000 x)")" \
+    "$(jar alpha.test "$secret" 1)$(printf '\001')"
+sec control "url http://www.alpha.test/?t=$secret"
+for s in s1 s2 s3 s4 s5 control; do
+    out=$(httrack -#test=bundle "$dir" "https://www.alpha.test/#httrack-bundle=$s" 2>&1)
+    case $s in
+    control) grep -qF "$secret" <<<"$out" || fail "the probe cannot see a secret: $out" ;;
+    *) grep -qF "$secret" <<<"$out" && fail "$s shows the secret: $out" ;;
+    esac
+    grep -qF "/$s.hts" <<<"$out" || test $s = control || fail "$s: no message: $out"
+done
+
 # A bad name on the command line stops the run before it starts.
 rc=0
-out=$(httrack -O "$dir/argv" 'http://x.test/#httrack-bundle=../a' 2>&1) || rc=$?
+out=$(httrack -O "$dir/argv" 'http://x.test/#httrack-bundle=..a' 2>&1) || rc=$?
 test "$rc" -ne 0 || fail "a bad bundle name on the command line was accepted"
-grep -qF 'Invalid login bundle name' <<<"$out" ||
+grep -qF "invalid login bundle name: it starts with '.' or holds \"..\"" <<<"$out" ||
     fail "no message for a bad bundle name: $out"

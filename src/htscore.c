@@ -1095,7 +1095,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
         int n = 0;
         int lineno = 0;
         char BIGSTK line[HTS_URLMAXSIZE * 2];
-        char name[HTS_BUNDLE_NAME_MAX];
+        const char *bundle_why;
 
         while(filelist_ptr < filelist_sz) {
           int adv;
@@ -1136,23 +1136,14 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
                           StringBuff(opt->filelist), lineno, line);
             continue;
           }
-          switch (hts_bundle_cut(line, name, sizeof(name))) {
-          case HTS_BUNDLE_NONE:
-            break;
-          case HTS_BUNDLE_BAD:
-            hts_log_print(opt, LOG_ERROR,
-                          "\"%s\", line %d: invalid login bundle name",
-                          StringBuff(opt->filelist), lineno);
-            fprintf(stderr, "\"%s\", line %d: invalid login bundle name\n",
-                    StringBuff(opt->filelist), lineno);
+          bundle_why = hts_bundle_take(opt, line);
+          if (bundle_why != NULL) {
+            hts_log_print(opt, LOG_ERROR, "\"%s\", line %d: %s",
+                          StringBuff(opt->filelist), lineno, bundle_why);
+            fprintf(stderr, "\"%s\", line %d: %s\n", StringBuff(opt->filelist),
+                    lineno, bundle_why);
             bundle_refused = HTS_TRUE;
             continue;
-          case HTS_BUNDLE_NAMED:
-            if (!hts_bundle_add(opt, name, line)) {
-              hts_log_print(opt, LOG_ERROR, "Login bundle: out of memory");
-              bundle_refused = HTS_TRUE;
-            }
-            break;
           }
           if (line[0]) {
             n++;
@@ -1190,16 +1181,18 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
     {
       char err[1024];
       char jarbuff[CATBUFF_SIZE];
-      const char *jar = !opt->accept_cookie ? NULL
-                        : strnotempty(StringBuff(opt->cookies_file))
-                            ? StringBuff(opt->cookies_file)
-                            : fconcat(jarbuff, sizeof(jarbuff),
-                                      StringBuff(opt->path_log), "cookies.txt");
+      const char *jar_file =
+          !opt->accept_cookie ? NULL
+          : strnotempty(StringBuff(opt->cookies_file))
+              ? StringBuff(opt->cookies_file)
+              : fconcat(jarbuff, sizeof(jarbuff), StringBuff(opt->path_log),
+                        "cookies.txt");
       const char *extra;
       size_t room = 0;
       size_t i;
 
-      if (!bundle_refused && !hts_bundle_load_all(opt, jar, err, sizeof(err))) {
+      if (!bundle_refused &&
+          !hts_bundle_load_all(opt, jar_file, err, sizeof(err))) {
         hts_log_print(opt, LOG_ERROR, "Login bundle: %s", err);
         fprintf(stderr, "Login bundle: %s\n", err);
         bundle_refused = HTS_TRUE;
@@ -4838,9 +4831,6 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
 
   if (StringNotEmpty(from->accept_kinds))
     StringCopyS(to->accept_kinds, from->accept_kinds);
-
-  if (StringNotEmpty(from->bundle_dir))
-    StringCopyS(to->bundle_dir, from->bundle_dir);
 
   /* An explicit -%a or -%l travels with its flag, so it stays explicit. */
   if (from->accept_given) {

@@ -110,15 +110,20 @@ for each host in its scope, and only there. A bundle with header lines but no
 .I ua
 line sends the
 .I \-F
-user agent. When every start URL naming the bundle is https, its headers go
-over https alone. By default the scope is the registrable domains of the start
+user agent. When any start URL naming the bundle, or any of its url lines, is
+https, its headers go over https alone, and so do those of the bundles it
+merges with. By default the scope is the registrable domains of the start
 URLs naming the bundle and of its url lines. A host with no registrable domain,
 such as a public suffix, a single label or an address, covers itself alone.
 Scope lines replace that default. HTTrack drops a cookie outside the scope and
 gives the count in one warning. HTTrack refuses a Host, Cookie, Proxy\-* or
-framing header, and a line holding a control byte. Two bundles whose scopes
-overlap must give the same user agent, headers and cookie values, or the run
-stops.
+framing header, and a line holding a control byte. A second
+.I ua
+line, header lines over 8192 bytes, or a full cookie jar stops the run too. A
+repeated cookie line, an unknown key or an unknown # line only warns. Messages
+give the file and the line number, never the line's text. Two bundles whose
+scopes overlap must give the same user agent, headers and cookie values, or the
+run stops.
 .IP
 The bundle's cookies go into the cookie jar, which HTTrack writes at the end of
 the crawl. Of the bundle and the jar, the newer file wins a cookie both hold.

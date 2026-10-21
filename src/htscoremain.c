@@ -466,37 +466,26 @@ static hts_boolean optparam_dash_ok(const cmdl_argv *cmd, int na) {
   return na + 1 < cmd->argc && cmd->param[na + 1];
 }
 
-/* Read the --bundle-dir at NA into opt, made absolute in cmd too, so doit.log
-   finds the folder from anywhere. HTS_FALSE after the panic message. */
+/* Store the --bundle-dir at na in opt and cmd as an absolute path, so doit.log
+   finds it from anywhere. HTS_FALSE after a panic. */
 static hts_boolean bundle_dir_set(httrackp *opt, cmdl_argv *cmd, int na) {
-  const char *dir = na + 1 < cmd->argc ? cmd->argv[na + 1] : NULL;
-  char cwd[HTS_URLMAXSIZE];
-  String abs = STRING_EMPTY;
+  const char *const dir = na + 1 < cmd->argc ? cmd->argv[na + 1] : NULL;
+  const hts_boolean relative = dir != NULL && dir[0] != '/' && dir[0] != '\\' &&
+                               !(dir[0] != '\0' && dir[1] == ':');
+  char cwd[HTS_URLMAXSIZE] = "";
+  char abs[HTS_URLMAXSIZE];
   char *copy;
 
-  if (dir == NULL || (dir[0] == '-' && !optparam_dash_ok(cmd, na))) {
+  if (dir == NULL || (dir[0] == '-' && !optparam_dash_ok(cmd, na)) ||
+      (relative && getcwd(cwd, sizeof(cwd)) == NULL) ||
+      !slprintfbuff(abs, sizeof(abs), "%s%s%s", cwd, relative ? "/" : "",
+                    dir) ||
+      (copy = hts_arena_strdup(&cmd->tokens, abs)) == NULL) {
     HTS_PANIC_PRINTF("Option bundle-dir needs a blank space and a folder");
     return HTS_FALSE;
   }
-  if (dir[0] != '/' && dir[0] != '\\' && !(dir[0] != '\0' && dir[1] == ':')) {
-    if (getcwd(cwd, sizeof(cwd)) == NULL) {
-      HTS_PANIC_PRINTF("Option bundle-dir: cannot read the current folder");
-      return HTS_FALSE;
-    }
-    StringCat(abs, cwd);
-    StringCat(abs, "/");
-  }
-  StringCat(abs, dir);
-  if (StringLength(abs) >= HTS_URLMAXSIZE ||
-      (copy = hts_arena_strdup(&cmd->tokens, StringBuff(abs))) == NULL) {
-    StringFree(abs);
-    HTS_PANIC_PRINTF("Option bundle-dir: folder path too long, or out of "
-                     "memory");
-    return HTS_FALSE;
-  }
-  StringFree(abs);
   cmd->argv[na + 1] = copy;
-  StringCopy(opt->bundle_dir, copy);
+  StringCopy(opt->bundle_dir, abs);
   return HTS_TRUE;
 }
 
@@ -603,7 +592,9 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   int httrack_logmode = 3;      // ONE log file
 
   ensureUrlCapacity(url, url_sz, 65536);
-  hts_bundle_free(opt); /* a previous run's bundles are not this one's */
+  /* a previous run's bundles are not this one's */
+  hts_bundle_free(opt);
+  StringCopy(opt->bundle_dir, "");
 
   // Create options
   _DEBUG_HEAD = 0;              // pas de debuggage en têtes
@@ -2916,25 +2907,12 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         assertf(urlSize < HTS_URLMAXSIZE);
         strcpybuff(word, argv[na]);
         if (argv[na][0] != '+' && argv[na][0] != '-') {
-          char name[HTS_BUNDLE_NAME_MAX];
+          const char *const why = hts_bundle_take(opt, word);
 
-          switch (hts_bundle_cut(word, name, sizeof(name))) {
-          case HTS_BUNDLE_NONE:
-            break;
-          case HTS_BUNDLE_BAD:
-            cmdl_panic_value(opt,
-                             "Invalid login bundle name (letters, digits, "
-                             "'.', '_' and '-' only)",
-                             argv[na]);
+          if (why != NULL) {
+            cmdl_panic_value(opt, why, argv[na]);
             htsmain_free();
             return -1;
-          case HTS_BUNDLE_NAMED:
-            if (!hts_bundle_add(opt, name, word)) {
-              HTS_PANIC_PRINTF("Not enough memory");
-              htsmain_free();
-              return -1;
-            }
-            break;
           }
         }
         if (urlSize < HTS_URLMAXSIZE) {
