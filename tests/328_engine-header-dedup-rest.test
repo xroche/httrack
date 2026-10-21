@@ -57,7 +57,9 @@ hd '' "$req" "Host$TAB: x$CRLF"
 hd '' "GET /x HTTP/1.1${CRLF}Authorization: Basic e$CRLF" "Authorization : x$CRLF"
 hd '' "GET /x HTTP/1.1${CRLF}Cookie: a=b$CRLF" "Cookie : c=d$CRLF"
 # the last of a single-valued field wins, folded lines going with the dropped
-hd 'Host : b\r\n' "GET /x HTTP/1.1$CRLF" "Host: a${CRLF}Host : b$CRLF"
+hd 'Host: b\r\n' "GET /x HTTP/1.1$CRLF" "Host: a${CRLF}Host : b$CRLF"
+hd 'Host: x\r\n' "GET /x HTTP/1.1$CRLF" "Host : x$CRLF"
+hd 'Host: x\r\n folded\r\n' "GET /x HTTP/1.1$CRLF" "Host$TAB : x$CRLF folded$CRLF"
 hd 'Cookie: b\r\n' "GET /x HTTP/1.1$CRLF" "Cookie: a$CRLF more${CRLF}Cookie: b$CRLF"
 hd 'Authorization: b\r\n' "GET /x HTTP/1.1$CRLF" \
     "authorization: a${CRLF}Authorization: b$CRLF"

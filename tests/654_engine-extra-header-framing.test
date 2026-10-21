@@ -87,7 +87,7 @@ fi
 
 probe host -%X 'Host : x'
 assert_eq 1 "$(lines '^Host' host)" 'host: Host lines'
-assert_eq 1 "$(lines '^Host : x' host)" 'host: the box Host'
+assert_eq 1 "$(lines '^Host: x' host)" 'host: the box Host, without the blank'
 
 probe twohosts -%X 'Host: a' -%X 'Host: b'
 assert_eq 1 "$(lines '^Host' twohosts)" 'twohosts: Host lines'

@@ -170,10 +170,9 @@ assert_value boxrest Accept-Language xx
 assert_value boxrest Authorization 'Basic Ym94'
 assert_same_but boxrest '^(From|Accept-Language|Authorization):'
 
-# A blank before the colon still names the field, so the box line replaces ours.
+# A blank before the colon is invalid, so the engine sends the name without it.
 probe boxbadws -%X 'User-Agent : x'
-assert_eq 0 "$(count_lines '^User-Agent:' "$tmpdir/boxbadws.req")" \
-    'boxbadws: the engine line'
-assert_eq 1 "$(count_lines '^User-Agent :' "$tmpdir/boxbadws.req")" \
-    'boxbadws: the box line'
+assert_eq 1 "$(count_lines '^User-Agent' "$tmpdir/boxbadws.req")" \
+    'boxbadws: User-Agent lines'
+assert_value boxbadws User-Agent x
 assert_same_but boxbadws '^User-Agent'

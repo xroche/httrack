@@ -1182,8 +1182,20 @@ static void append_custom_headers(buff_struct *bstr, const char *headers) {
           keep = HTS_FALSE;
       }
     }
-    if (keep)
-      print_buffer(bstr, "%.*s", (int) (next - line), line);
+    if (keep) {
+      const size_t len = header_name_len(line);
+      const char *rest = line + len;
+
+      /* a blank before the colon is invalid, so the name goes out without it */
+      if (len != 0) {
+        while (*rest != ':')
+          rest++;
+        print_buffer(bstr, "%.*s", (int) len, line);
+      } else {
+        rest = line;
+      }
+      print_buffer(bstr, "%.*s", (int) (next - rest), rest);
+    }
     line = next;
   }
 }
