@@ -978,7 +978,7 @@ Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request
 Puhverserveri protokoll. HTTP: tavaline puhverserver. HTTP (CONNECT-tunnel): saadab iga päringu läbi CONNECT-tunneli, ainult CONNECT-it toetavate puhverserverite jaoks nagu Tori HTTPTunnelPort. SOCKS5: vaikeport 1080.
 Load cookies from file:
 Lae küpsised failist:
-Preload cookies from a Netscape cookies.txt file before crawling.
+Use a Netscape cookies.txt file as the cookie jar. HTTrack loads it before crawling, and writes it back at the end unless a line in it could not be loaded.
 Lae küpsised eelnevalt Netscape cookies.txt failist enne kopeerimist.
 Pause between files:
 Paus failide vahel:
@@ -1094,3 +1094,31 @@ Objects
 Objektid
 Embedded content
 Manustatud sisu
+Log in with a browser...
+Logi sisse brauseriga...
+Log in to the site in a browser, and crawl with the cookies and the browser identity it was given
+Logi saidile sisse brauseris ja kopeeri sait nende küpsiste ja selle brauseri identiteediga, mille see sai
+No Microsoft Edge WebView2 runtime is installed on this computer
+Sellesse arvutisse ei ole paigaldatud Microsoft Edge WebView2 käituskeskkonda
+Log in with a browser
+Logi sisse brauseriga
+Go
+Mine
+Done
+Valmis
+Clear login
+Tühjenda
+The browser did not open: %s.
+Brauser ei avanenud: %s.
+The browser came back with no cookies, so nothing was kept.
+Brauser ei andnud ühtegi küpsist, seega midagi ei salvestatud.
+%d cookies were collected. They are used when you press OK.
+Koguti %d küpsist. Neid kasutatakse, kui vajutad OK.
+The browser gave no cookies the engine can use, so nothing was changed.
+Brauser ei andnud ühtegi küpsist, mida mootor saaks kasutada, seega midagi ei muudetud.
+The cookies could not be written to %s, so nothing was changed.
+Küpsiseid ei saanud kirjutada asukohta %s, seega midagi ei muudetud.
+%d of the browser's cookies were left out, because the engine would not read them.
+%d brauseri küpsist jäeti välja, sest mootor ei lugenud neid.
+The browser identity it reported cannot be used, so the mirror will send the default one.
+Teatatud brauseri identiteeti ei saa kasutada, seega kopeerimine saadab vaikimisi identiteedi.

@@ -978,7 +978,7 @@ Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request
 Protokol posrednika. HTTP: standardni posrednik. HTTP (CONNECT tunel): šalje svaki zahtjev kroz CONNECT tunel, za posrednike koji podržavaju samo CONNECT poput Torovog HTTPTunnelPorta. SOCKS5: zadani port 1080.
 Load cookies from file:
 Učitati kolačiće iz datoteke:
-Preload cookies from a Netscape cookies.txt file before crawling.
+Use a Netscape cookies.txt file as the cookie jar. HTTrack loads it before crawling, and writes it back at the end unless a line in it could not be loaded.
 Prije zrcaljenja učitati kolačiće iz datoteke Netscape cookies.txt.
 Pause between files:
 Stanka između datoteka:
@@ -1094,3 +1094,31 @@ Objects
 Objekti
 Embedded content
 Ugrađeni sadržaj
+Log in with a browser...
+Prijaviti se u pregledniku...
+Log in to the site in a browser, and crawl with the cookies and the browser identity it was given
+Prijavite se na mrežno mjesto u pregledniku, a zrcaljenje će koristiti dobivene kolačiće i pregledničko obilježje
+No Microsoft Edge WebView2 runtime is installed on this computer
+Na ovom računalu nije instaliran Microsoft Edge WebView2 runtime
+Log in with a browser
+Prijava putem preglednika
+Go
+Idi
+Done
+Gotovo
+Clear login
+Obrisati
+The browser did not open: %s.
+Preglednik se nije otvorio: %s.
+The browser came back with no cookies, so nothing was kept.
+Preglednik nije vratio nijedan kolačić, pa ništa nije spremljeno.
+%d cookies were collected. They are used when you press OK.
+Prikupljeno je %d kolačića. Upotrijebit će se kada stisnete U redu.
+The browser gave no cookies the engine can use, so nothing was changed.
+Preglednik nije dao nijedan kolačić koji HTTrack može upotrijebiti, pa ništa nije promijenjeno.
+The cookies could not be written to %s, so nothing was changed.
+Kolačiće nije moguće zapisati u %s, pa ništa nije promijenjeno.
+%d of the browser's cookies were left out, because the engine would not read them.
+%d preglednikovih kolačića je izostavljeno jer ih HTTrack nije mogao pročitati.
+The browser identity it reported cannot be used, so the mirror will send the default one.
+Prijavljeno pregledničko obilježje nije moguće upotrijebiti, pa će zrcaljenje poslati zadano.

@@ -978,7 +978,7 @@ Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request
 Protocolo do proxy. HTTP: proxy padrão. HTTP (túnel CONNECT): envia cada pedido através de um túnel CONNECT, para proxies que só suportam CONNECT como o HTTPTunnelPort do Tor. SOCKS5: porta predefinida 1080.
 Load cookies from file:
 Carregar cookies de um ficheiro:
-Preload cookies from a Netscape cookies.txt file before crawling.
+Use a Netscape cookies.txt file as the cookie jar. HTTrack loads it before crawling, and writes it back at the end unless a line in it could not be loaded.
 Pré-carregar cookies de um ficheiro Netscape cookies.txt antes de iniciar a cópia.
 Pause between files:
 Pausa entre ficheiros:
@@ -1094,3 +1094,31 @@ Objects
 Objetos
 Embedded content
 Conteúdo incorporado
+Log in with a browser...
+Iniciar sessão num browser...
+Log in to the site in a browser, and crawl with the cookies and the browser identity it was given
+Inicie sessão no site num browser e faça a cópia com os cookies e a identidade do browser recebidos
+No Microsoft Edge WebView2 runtime is installed on this computer
+Não há nenhum runtime do Microsoft Edge WebView2 instalado neste computador
+Log in with a browser
+Iniciar sessão num browser
+Go
+Ir
+Done
+Concluir
+Clear login
+Limpar
+The browser did not open: %s.
+O browser não abriu: %s.
+The browser came back with no cookies, so nothing was kept.
+O browser não devolveu cookies, por isso nada foi guardado.
+%d cookies were collected. They are used when you press OK.
+Foram recolhidos %d cookies. Serão utilizados quando premir OK.
+The browser gave no cookies the engine can use, so nothing was changed.
+O browser não deu nenhum cookie que o motor de captura possa usar, por isso nada foi alterado.
+The cookies could not be written to %s, so nothing was changed.
+Não foi possível escrever os cookies em %s, por isso nada foi alterado.
+%d of the browser's cookies were left out, because the engine would not read them.
+%d cookies do browser foram ignorados, porque o motor de captura não os conseguiu ler.
+The browser identity it reported cannot be used, so the mirror will send the default one.
+A identidade do browser indicada não pode ser utilizada, por isso a cópia enviará a identidade padrão.

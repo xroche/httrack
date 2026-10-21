@@ -978,7 +978,7 @@ Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request
 Protokol proxy. HTTP: standardní proxy. HTTP (tunel CONNECT): odešle každý požadavek přes tunel CONNECT, pro proxy podporující jen CONNECT jako HTTPTunnelPort v Toru. SOCKS5: výchozí port 1080.
 Load cookies from file:
 Načíst cookies ze souboru:
-Preload cookies from a Netscape cookies.txt file before crawling.
+Use a Netscape cookies.txt file as the cookie jar. HTTrack loads it before crawling, and writes it back at the end unless a line in it could not be loaded.
 Načíst cookies ze souboru Netscape cookies.txt před zahájením stahování.
 Pause between files:
 Prodleva mezi soubory:
@@ -1094,3 +1094,31 @@ Objects
 Objekty
 Embedded content
 Vložený obsah
+Log in with a browser...
+Přihlásit se v prohlížeči...
+Log in to the site in a browser, and crawl with the cookies and the browser identity it was given
+Přihlaste se k webu v prohlížeči a stahujte s cookies a totožností prohlížeče, které tím získáte
+No Microsoft Edge WebView2 runtime is installed on this computer
+V tomto počítači není nainstalováno prostředí Microsoft Edge WebView2
+Log in with a browser
+Přihlášení v prohlížeči
+Go
+Přejít
+Done
+Hotovo
+Clear login
+Odhlásit
+The browser did not open: %s.
+Prohlížeč se nepodařilo otevřít: %s.
+The browser came back with no cookies, so nothing was kept.
+Prohlížeč nevrátil žádné cookies, takže se nic neuložilo.
+%d cookies were collected. They are used when you press OK.
+Získáno cookies: %d. Použijí se po stisknutí OK.
+The browser gave no cookies the engine can use, so nothing was changed.
+Prohlížeč nedal žádné cookies, které by HTTrack mohl použít, takže se nic nezměnilo.
+The cookies could not be written to %s, so nothing was changed.
+Cookies se nepodařilo zapsat do %s, takže se nic nezměnilo.
+%d of the browser's cookies were left out, because the engine would not read them.
+Cookies z prohlížeče byly vynechány v počtu %d, protože je HTTrack nedokázal přečíst.
+The browser identity it reported cannot be used, so the mirror will send the default one.
+Nahlášenou totožnost prohlížeče nelze použít, takže se při stahování odešle výchozí.

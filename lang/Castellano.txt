@@ -978,7 +978,7 @@ Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request
 Protocolo del proxy. HTTP: proxy estándar. HTTP (túnel CONNECT): envía cada petición a través de un túnel CONNECT, para proxys que solo admiten CONNECT como el HTTPTunnelPort de Tor. SOCKS5: puerto predeterminado 1080.
 Load cookies from file:
 Cargar cookies desde un archivo:
-Preload cookies from a Netscape cookies.txt file before crawling.
+Use a Netscape cookies.txt file as the cookie jar. HTTrack loads it before crawling, and writes it back at the end unless a line in it could not be loaded.
 Precargar cookies desde un archivo Netscape cookies.txt antes de comenzar la descarga.
 Pause between files:
 Pausa entre archivos:
@@ -1094,3 +1094,31 @@ Objects
 Objetos
 Embedded content
 Contenido incrustado
+Log in with a browser...
+Iniciar sesión con un navegador...
+Log in to the site in a browser, and crawl with the cookies and the browser identity it was given
+Inicie sesión en el sitio con un navegador y haga la copia con las cookies y la identidad del navegador que recibió
+No Microsoft Edge WebView2 runtime is installed on this computer
+No hay ningún runtime de Microsoft Edge WebView2 instalado en este ordenador
+Log in with a browser
+Iniciar sesión con un navegador
+Go
+Ir
+Done
+Listo
+Clear login
+Borrar login
+The browser did not open: %s.
+El navegador no se ha abierto: %s.
+The browser came back with no cookies, so nothing was kept.
+El navegador no ha devuelto ninguna cookie, por lo que no se ha guardado nada.
+%d cookies were collected. They are used when you press OK.
+Se han recogido %d cookies. Se usarán cuando pulse OK.
+The browser gave no cookies the engine can use, so nothing was changed.
+El navegador no ha dado ninguna cookie que el motor pueda usar, por lo que no se ha cambiado nada.
+The cookies could not be written to %s, so nothing was changed.
+No se han podido escribir las cookies en %s, por lo que no se ha cambiado nada.
+%d of the browser's cookies were left out, because the engine would not read them.
+Se han descartado %d cookies del navegador, porque el motor no podía leerlas.
+The browser identity it reported cannot be used, so the mirror will send the default one.
+La identidad del navegador indicada no se puede usar, por lo que la copia enviará la predeterminada.

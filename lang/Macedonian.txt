@@ -978,7 +978,7 @@ Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request
 Протокол на прокси. HTTP: стандарден прокси. HTTP (тунел CONNECT): го испраќа секое барање преку тунел CONNECT, за прокси што поддржуваат само CONNECT како HTTPTunnelPort на Tor. SOCKS5: стандардна порта 1080.
 Load cookies from file:
 Вчитај колачиња од датотека:
-Preload cookies from a Netscape cookies.txt file before crawling.
+Use a Netscape cookies.txt file as the cookie jar. HTTrack loads it before crawling, and writes it back at the end unless a line in it could not be loaded.
 Однапред вчитај колачиња од датотека Netscape cookies.txt пред преземањето.
 Pause between files:
 Пауза меѓу датотеки:
@@ -1094,3 +1094,31 @@ Objects
 Објекти
 Embedded content
 Вградена содржина
+Log in with a browser...
+Најава преку прелистувач...
+Log in to the site in a browser, and crawl with the cookies and the browser identity it was given
+Најавете се на сајтот во прелистувач, а копирањето ќе продолжи со добиените колачиња и идентификацијата на прелистувачот
+No Microsoft Edge WebView2 runtime is installed on this computer
+На овој компјутер не е инсталирана извршната околина Microsoft Edge WebView2
+Log in with a browser
+Најава преку прелистувач
+Go
+Оди
+Done
+Готово
+Clear login
+Исчисти
+The browser did not open: %s.
+Прелистувачот не се отвори: %s.
+The browser came back with no cookies, so nothing was kept.
+Прелистувачот не врати ниту едно колаче, затоа ништо не е зачувано.
+%d cookies were collected. They are used when you press OK.
+Собрани колачиња: %d. Ќе се користат кога ќе притиснете „Добро“.
+The browser gave no cookies the engine can use, so nothing was changed.
+Прелистувачот не даде ниту едно колаче што HTTrack може да го користи, затоа ништо не е променето.
+The cookies could not be written to %s, so nothing was changed.
+Колачињата не можеа да се запишат во %s, затоа ништо не е променето.
+%d of the browser's cookies were left out, because the engine would not read them.
+Изоставени колачиња на прелистувачот: %d, бидејќи HTTrack не би можел да ги прочита.
+The browser identity it reported cannot be used, so the mirror will send the default one.
+Идентификацијата на прелистувачот што тој ја пријави не може да се користи, затоа копирањето ќе ја испраќа стандардната.

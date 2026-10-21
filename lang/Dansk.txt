@@ -978,7 +978,7 @@ Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request
 Proxyprotokol. HTTP: standardproxy. HTTP (CONNECT-tunnel): sender hver forespørgsel gennem en CONNECT-tunnel, til proxyer der kun understøtter CONNECT som Tors HTTPTunnelPort. SOCKS5: standardport 1080.
 Load cookies from file:
 Indlæs cookies fra fil:
-Preload cookies from a Netscape cookies.txt file before crawling.
+Use a Netscape cookies.txt file as the cookie jar. HTTrack loads it before crawling, and writes it back at the end unless a line in it could not be loaded.
 Indlæs cookies fra en Netscape cookies.txt-fil, før crawlingen starter.
 Pause between files:
 Pause mellem filer:
@@ -1094,3 +1094,31 @@ Objects
 Objekter
 Embedded content
 Indlejret indhold
+Log in with a browser...
+Log ind med en browser...
+Log in to the site in a browser, and crawl with the cookies and the browser identity it was given
+Log ind på webstedet i en browser, og crawl med de cookies og den browser-identitet, browseren fik
+No Microsoft Edge WebView2 runtime is installed on this computer
+Der er ikke installeret nogen Microsoft Edge WebView2-runtime på denne computer
+Log in with a browser
+Log ind med en browser
+Go
+Gå
+Done
+Færdig
+Clear login
+Ryd login
+The browser did not open: %s.
+Browseren blev ikke åbnet: %s.
+The browser came back with no cookies, so nothing was kept.
+Browseren kom tilbage uden cookies, så intet blev gemt.
+%d cookies were collected. They are used when you press OK.
+%d cookies blev indsamlet. De bruges, når du trykker på OK.
+The browser gave no cookies the engine can use, so nothing was changed.
+Browseren gav ingen cookies, som HTTrack kan bruge, så intet blev ændret.
+The cookies could not be written to %s, so nothing was changed.
+Disse cookies kunne ikke skrives til %s, så intet blev ændret.
+%d of the browser's cookies were left out, because the engine would not read them.
+%d af browserens cookies blev udeladt, fordi HTTrack ikke kunne læse dem.
+The browser identity it reported cannot be used, so the mirror will send the default one.
+Den browser-identitet, den oplyste, kan ikke bruges, så spejlkopieringen sender standardidentiteten.

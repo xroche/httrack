@@ -978,7 +978,7 @@ Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request
 Protocolo do proxy. HTTP: proxy padrão. HTTP (túnel CONNECT): envia cada requisição através de um túnel CONNECT, para proxies que só suportam CONNECT como o HTTPTunnelPort do Tor. SOCKS5: porta padrão 1080.
 Load cookies from file:
 Carregar cookies de um arquivo:
-Preload cookies from a Netscape cookies.txt file before crawling.
+Use a Netscape cookies.txt file as the cookie jar. HTTrack loads it before crawling, and writes it back at the end unless a line in it could not be loaded.
 Pré-carregar cookies de um arquivo Netscape cookies.txt antes de iniciar a cópia.
 Pause between files:
 Pausa entre arquivos:
@@ -1094,3 +1094,31 @@ Objects
 Objetos
 Embedded content
 Conteúdo incorporado
+Log in with a browser...
+Fazer login no navegador...
+Log in to the site in a browser, and crawl with the cookies and the browser identity it was given
+Faça login no site em um navegador e copie o site com os cookies e a identidade do navegador recebidos
+No Microsoft Edge WebView2 runtime is installed on this computer
+Nenhum runtime do Microsoft Edge WebView2 está instalado neste computador
+Log in with a browser
+Fazer login no navegador
+Go
+Ir
+Done
+Concluir
+Clear login
+Limpar
+The browser did not open: %s.
+O navegador não abriu: %s.
+The browser came back with no cookies, so nothing was kept.
+O navegador não retornou nenhum cookie, por isso nada foi salvo.
+%d cookies were collected. They are used when you press OK.
+Foram coletados %d cookies. Eles serão usados quando você clicar em OK.
+The browser gave no cookies the engine can use, so nothing was changed.
+O navegador não forneceu nenhum cookie que o HTTrack possa usar, por isso nada foi alterado.
+The cookies could not be written to %s, so nothing was changed.
+Não foi possível gravar os cookies em %s, por isso nada foi alterado.
+%d of the browser's cookies were left out, because the engine would not read them.
+%d cookies do navegador foram descartados, porque o HTTrack não conseguiu lê-los.
+The browser identity it reported cannot be used, so the mirror will send the default one.
+A identidade do navegador informada não pode ser usada, por isso a cópia do site enviará a identidade padrão.
