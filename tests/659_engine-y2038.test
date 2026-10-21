@@ -1,0 +1,13 @@
+#!/bin/bash
+#
+# Dates on both sides of 2038 read correctly, and clip on a 32-bit time_t.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_y2038.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmpdir"
+
+expect_ok "y2038" httrack -O "${tmpdir}/o1" -#test=y2038 "${tmpdir}/data"

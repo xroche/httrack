@@ -610,14 +610,14 @@ static void proxytrack_add_DAV_Item(String * item, String * buff,
   }
 }
 
-/* The RFC822 date of a cache entry as a time_t, or 0 if it does not parse.
-   The fields are GMT, so timegm() and never mktime() (#1491). */
+/* The RFC822 date of a cache entry as a time_t, clipped to its range, or 0 if
+   it does not parse. */
 static time_t get_time_rfc822(const char *s) {
   struct tm result;
 
   if (convert_time_rfc822(&result, s) == NULL)
     return (time_t) 0;
-  return timegm(&result);
+  return hts_time_clip(hts_utc_seconds(&result));
 }
 
 static PT_Element proxytrack_process_DAV_Request(PT_Indexes indexes,

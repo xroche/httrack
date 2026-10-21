@@ -351,23 +351,6 @@ hts_boolean cookie_max_age_time(const char *value, int64_t now, int64_t *when) {
   return HTS_TRUE;
 }
 
-/* Return the Unix time of the UTC date in tm, in 64 bits because a 32-bit
-   time_t ends in 2038. The calendar year must be 1 or later, and tm_mon 0 to
-   11, as convert_time_rfc822_pivot yields them. */
-static int64_t cookie_utc_seconds(const struct tm *tm) {
-  // days from the civil date, counting years from March (Howard Hinnant)
-  const int64_t y = (int64_t) tm->tm_year + 1900 - (tm->tm_mon < 2 ? 1 : 0);
-  const int64_t era = y / 400;
-  const int64_t yoe = y - era * 400;
-  const int64_t doy = (153 * (int64_t) ((tm->tm_mon + 10) % 12) + 2) / 5 +
-                      (int64_t) tm->tm_mday - 1;
-  const int64_t days =
-      era * 146097 + yoe * 365 + yoe / 4 - yoe / 100 + doy - 719468;
-
-  return days * 86400 + (int64_t) tm->tm_hour * 3600 +
-         (int64_t) tm->tm_min * 60 + tm->tm_sec;
-}
-
 /* See htsbauth.h. */
 hts_boolean cookie_expires_time(const char *value, int64_t now, int64_t *when) {
   struct tm tm;
@@ -375,7 +358,7 @@ hts_boolean cookie_expires_time(const char *value, int64_t now, int64_t *when) {
   // RFC 6265 5.1.1 reads a two-digit year below 70 as 20xx
   if (convert_time_rfc822_pivot(&tm, value, 69) == NULL)
     return HTS_FALSE;
-  *when = cookie_bound_expiry(cookie_utc_seconds(&tm), now);
+  *when = cookie_bound_expiry(hts_utc_seconds(&tm), now);
   return HTS_TRUE;
 }
 

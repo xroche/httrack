@@ -371,7 +371,7 @@ static hts_boolean write_progress_lock(httrackp *opt, const char *path,
   fprintf(fp, "UID=%d\n", (int) getuid());
   fprintf(fp, "GID=%d\n", (int) getuid());
 #endif
-  fprintf(fp, "START=%d\n", (int) time(NULL));
+  fprintf(fp, "START=" LLintP "\n", (LLint) time(NULL));
 #endif
   fclose(fp);
   /* Whole-second filesystems tie two files written in the same second, and the
