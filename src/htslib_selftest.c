@@ -1791,10 +1791,10 @@ static int st_y2038(httrackp *opt, int argc, char **argv) {
       err = 1;
     }
     tm.tm_year = 138;
-    tm.tm_mon = -13; /* December 2036 */
+    tm.tm_mon = -23; /* February 2036 */
     tm.tm_mday = 1;
     tm.tm_hour = 0;
-    if (hts_utc_seconds(&tm) != 2111702400LL) {
+    if (hts_utc_seconds(&tm) != 2085436800LL) {
       printf("y2038: a negative month gave " LLintP "\n",
              (LLint) hts_utc_seconds(&tm));
       err = 1;
