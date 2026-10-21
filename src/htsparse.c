@@ -1845,7 +1845,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                     strcatbuff(tempo, " ");
                                   // no error?
                                   if (strlen(tempo) == (size_t) (b - html)) {
-                                    strncpy(modify, tempo, strlen(tempo)); // PAS d'octet nul à la fin!
+                                    // overwrites the tag in place, so no NUL
+                                    memcpy(modify, tempo, strlen(tempo));
                                     fetch_tag.name = NULL; /* the tag changed */
                                     p = 0;      // DEVALIDER!!
                                     p_type = 0;
