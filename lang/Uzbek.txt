@@ -1107,7 +1107,7 @@ O’tish
 Done
 Tayyor
 Clear login
-Chiqish
+Hisobdan chiqish
 The browser did not open: %s.
 Brauzer ochilmadi: %s.
 The browser came back with no cookies, so nothing was kept.

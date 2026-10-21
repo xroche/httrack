@@ -1107,7 +1107,7 @@ Go
 Done
 Готово
 Clear login
-Изход
+Изход от профила
 The browser did not open: %s.
 Браузърът не се отвори: %s.
 The browser came back with no cookies, so nothing was kept.
