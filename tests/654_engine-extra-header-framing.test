@@ -95,8 +95,16 @@ assert_eq 1 "$(lines '^Host: b' twohosts)" 'twohosts: the last Host'
 warned twohosts 'header replaces an earlier one: Host: b'
 
 probe orphan -%X ' orphan' -%X 'X-Kept: 1'
-# a launcher that strips the leading blank leaves no folded line to test
-if test "$(lines '^orphan' orphan)" -eq 0; then
-    assert_eq 0 "$(lines 'orphan' orphan)" 'orphan: the folded line'
-    warned orphan 'folded line with no header to continue ignored:  orphan'
-fi
+# a launcher that strips the blank leaves a bare "orphan", dropped as malformed
+assert_eq 0 "$(lines 'orphan' orphan)" 'orphan: the folded line'
+assert_eq 1 "$(lines '^X-Kept: 1' orphan)" 'orphan: the kept line'
+grep -qE 'warning: -%X (folded line with no header to continue|malformed header) ignored: +orphan' \
+    "$tmpdir/orphan.err" || fail "orphan: no warning: $(cat "$tmpdir/orphan.err")"
+
+probe malformed -%X ':' -%X ': v' -%X 'X A: 1' -%X 'nocolon' \
+    -%X 'Content-Length' -%X 'X-Kept: 1'
+assert_eq 0 "$(lines '^(:|X A|nocolon|Content-Length)' malformed)" \
+    'malformed: the malformed lines'
+assert_eq 1 "$(lines '^X-Kept: 1' malformed)" 'malformed: the kept line'
+warned malformed 'malformed header ignored: X A: 1'
+warned malformed 'malformed header ignored: nocolon'

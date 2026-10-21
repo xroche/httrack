@@ -324,14 +324,14 @@ hts_boolean http_headers_have_field(const char *headers,
    follow, or the 412/416 whose stale resume partial the parser re-gets. */
 hts_boolean hts_body_missing_unexpectedly(const htsblk *r);
 
-/* What a -%X header line added after the block headers does wrong, as a
-   warning to print, or NULL when it goes out as typed. */
+/* Returns the warning to print for a -%X line, or NULL when it goes out as
+   typed. headers is the block so far. */
 const char *http_custom_header_warning(const char *headers, const char *line);
 
 /* Append the custom header block to dst (capacity dst_size), dropping any line
-   whose field dst carries, a framing field, an earlier copy of Host, Cookie or
-   Authorization, and a leading folded line. Field names ignore case and blanks
-   before the colon. Aborts on overflow. */
+   whose field dst carries, a malformed or framing line, an earlier copy of
+   Host, Cookie or Authorization, and a leading folded line. Field names ignore
+   case and blanks before the colon. Aborts on overflow. */
 void http_append_custom_headers(char *dst, size_t dst_size,
                                 const char *headers);
 

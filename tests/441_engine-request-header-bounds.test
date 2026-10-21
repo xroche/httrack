@@ -100,6 +100,6 @@ echo OK
 # guard turns on is pinned here instead: through http_append_custom_headers,
 # whose buffer size the case names. A line exactly filling it is dropped, and
 # one byte shorter still goes in.
-selftest_queue 'XXXXXXXXXXXXX' headerdedup AB XXXXXXXXXXXXX 16
-selftest_queue '' headerdedup AB XXXXXXXXXXXXXX 16
+selftest_queue 'X:XXXXXXXXXXX' headerdedup AB X:XXXXXXXXXXX 16
+selftest_queue '' headerdedup AB X:XXXXXXXXXXXX 16
 selftest_run_queued

@@ -20,8 +20,7 @@ hf() { # hf present|absent BLOCK FIELD
 hf present "User-Agent: mine$CRLF" User-Agent
 hf present "user-agent: mine$CRLF" User-Agent
 hf present "USER-AGENT: mine$CRLF" user-agent
-# a server that honours a blank before the colon reads the same field, so a
-# second engine line would be a duplicate
+# Servers differ on "Host : x", so the engine sends it as Host without the blank.
 hf present "User-Agent : mine$CRLF" User-Agent
 hf present "User-Agent$TAB: mine$CRLF" User-Agent
 hf present "Cookie : a=b$CRLF" Cookie

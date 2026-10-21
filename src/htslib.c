@@ -1032,9 +1032,9 @@ hts_boolean hts_body_missing_unexpectedly(const htsblk *r) {
   return HTS_TRUE;
 }
 
-/* Length of the field name opening line, blanks before the colon trimmed, or 0
-   for a folded line or one with no colon. Any server that honours "Host : x"
-   reads it as Host, so the engine does too. */
+/* Length of the field name that opens the line, without blanks before the
+   colon, or 0 for a folded line or one with no colon. Servers differ on
+   "Host : x", so the engine sends it as Host without the blank. */
 static size_t header_name_len(const char *line) {
   size_t len;
 
@@ -1051,8 +1051,7 @@ static size_t header_name_len(const char *line) {
   return len;
 }
 
-/* Is the name opening line, len bytes long, the field name (case-insensitive)?
- */
+/* Does the name on this line equal name, ignoring case? */
 static hts_boolean header_name_is(const char *line, size_t len,
                                   const char *name, size_t name_len) {
   size_t i = 0;
@@ -1062,6 +1061,21 @@ static hts_boolean header_name_is(const char *line, size_t len,
   while (i < len && streql(line[i], name[i]))
     i++;
   return i == len;
+}
+
+/* Does the line open with an RFC 7230 token name and a colon? */
+static hts_boolean header_line_valid(const char *line) {
+  const size_t len = header_name_len(line);
+  size_t i;
+
+  for (i = 0; i < len; i++) {
+    const unsigned char c = (unsigned char) line[i];
+
+    if (!(c >= 'a' && c <= 'z') && !(c >= 'A' && c <= 'Z') &&
+        !(c >= '0' && c <= '9') && strchr("!#$%&'*+-.^_`|~", c) == NULL)
+      return HTS_FALSE;
+  }
+  return len != 0;
 }
 
 static hts_boolean header_name_in(const char *line, const char *const *names,
@@ -1100,7 +1114,7 @@ hts_boolean http_headers_have_field(const char *headers,
   return HTS_FALSE;
 }
 
-/* Fields that frame the message or act per hop. */
+/* These fields frame the message or act per hop. */
 static hts_boolean header_line_refused(const char *line) {
   static const char *const refused[] = {"Content-Length",
                                         "Transfer-Encoding",
@@ -1126,18 +1140,18 @@ const char *http_custom_header_warning(const char *headers, const char *line) {
     return headers == NULL || *headers == '\0'
                ? "folded line with no header to continue ignored"
                : NULL;
+  if (!header_line_valid(line))
+    return "malformed header ignored";
   if (header_line_refused(line))
     return "framing header ignored";
   if (header_line_single(line) && headers != NULL) {
-    char field[128];
+    char field[sizeof("Authorization")];
     const size_t len = header_name_len(line);
 
-    if (len < sizeof(field)) {
-      memcpy(field, line, len);
-      field[len] = '\0';
-      if (http_headers_have_field(headers, field))
-        return "header replaces an earlier one";
-    }
+    memcpy(field, line, len);
+    field[len] = '\0';
+    if (http_headers_have_field(headers, field))
+      return "header replaces an earlier one";
   }
   return NULL;
 }
@@ -1166,8 +1180,8 @@ static void append_custom_headers(buff_struct *bstr, const char *headers) {
       const size_t len = header_name_len(line);
       char field[128];
 
-      keep = !header_line_refused(line);
-      if (keep && len != 0 && len < sizeof(field)) {
+      keep = header_line_valid(line) && !header_line_refused(line);
+      if (keep && len < sizeof(field)) {
         const char cut = bstr->buffer[base];
 
         memcpy(field, line, len);
@@ -1186,15 +1200,12 @@ static void append_custom_headers(buff_struct *bstr, const char *headers) {
       const size_t len = header_name_len(line);
       const char *rest = line + len;
 
-      /* a blank before the colon is invalid, so the name goes out without it */
-      if (len != 0) {
-        while (*rest != ':')
-          rest++;
-        print_buffer(bstr, "%.*s", (int) len, line);
-      } else {
-        rest = line;
-      }
-      print_buffer(bstr, "%.*s", (int) (next - rest), rest);
+      /* A blank before the colon is invalid, so the name goes out without it.
+         One write, so a line that does not fit leaves nothing behind. */
+      while (len != 0 && *rest != ':')
+        rest++;
+      print_buffer(bstr, "%.*s%.*s", (int) len, line, (int) (next - rest),
+                   rest);
     }
     line = next;
   }
