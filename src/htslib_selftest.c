@@ -35,6 +35,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsname.h"
 #include "htsfetch.h"
 
+#include <limits.h>
 #include <stdint.h>
 #ifndef _WIN32
 #include <sys/wait.h> /* the forking sigterm self-test reaps its children */

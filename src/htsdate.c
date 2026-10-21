@@ -38,6 +38,7 @@ Please visit our Website: http://www.httrack.com
 
 #include <ctype.h>
 #include <limits.h>
+#include <stdint.h>
 #include <string.h>
 
 /* hts_lowcase() lives in the library proxytrack does not link. */
