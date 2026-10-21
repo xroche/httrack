@@ -1915,6 +1915,8 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
              ".example.co.uk\tTRUE\t/\tFALSE\t0\tsfx\t1\n"),
         ROWR("example.com.\tTRUE\t/\tFALSE\t0\tsfx\t1\n", 0,
              "example.com.\tTRUE\t/\tFALSE\t0\tsfx\t1\n"),
+        ROWR("com.\tTRUE\t/\tFALSE\t0\tsfx\t1\n", 0,
+             "com.\tFALSE\t/\tFALSE\t0\tsfx\t1\n"),
         ROWR("127.0.0.1\tTRUE\t/\tFALSE\t0\tsfx\t1\n", 0,
              "127.0.0.1\tTRUE\t/\tFALSE\t0\tsfx\t1\n"),
         ROWR("::1\tTRUE\t/\tFALSE\t0\tsfx\t1\n", 0,
@@ -2050,6 +2052,35 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
         http_cookie_header(&jar, sfx[i].sub, "/", hdr, sizeof(hdr));
         if (cookie_sent(hdr, "sfx=1")) {
           printf("%s: suffix row %d: sent to %s\n", LABEL, (int) i, sfx[i].sub);
+          err = 1;
+        }
+      }
+    }
+    // only a live line that loses its subdomains says so
+    {
+      static const struct {
+        const char *line;
+        hts_boolean warns;
+      } logs[] = {
+          {".com\tTRUE\t/\tFALSE\t0\tsfx\t1\n", HTS_TRUE},
+          {"com\tFALSE\t/\tFALSE\t0\tsfx\t1\n", HTS_FALSE},
+          {".com\tTRUE\t/\tFALSE\t1\tsfx\t1\n", HTS_FALSE},
+      };
+
+      for (i = 0; i < sizeof(logs) / sizeof(logs[0]); i++) {
+        cookie_logcap cap;
+        char logged[1024];
+        FILE *fp = FOPEN(file, "wb");
+
+        assertf(fp != NULL);
+        fprintf(fp, "%s", logs[i].line);
+        fclose(fp);
+        jar.data[0] = '\0';
+        cookie_log_start(opt, &cap);
+        (void) cookie_load(opt, &jar, fpath, "cookies.txt");
+        cookie_log_stop(opt, &cap, logged, sizeof(logged));
+        if ((strstr(logged, "public suffix") != NULL) != logs[i].warns) {
+          printf("%s: suffix log row %d logged [%s]\n", LABEL, (int) i, logged);
           err = 1;
         }
       }

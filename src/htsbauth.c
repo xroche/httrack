@@ -282,8 +282,8 @@ hts_boolean cookie_domain_match(const char *jar_dom, const char *host) {
   return HTS_TRUE;
 }
 
-/* Is DOMAIN a public suffix such as "com", which reaches every host under it?
-   A leading or a trailing dot names the same domain. */
+/* Is DOMAIN a public suffix such as "com"? A leading or trailing dot is
+   ignored. */
 static hts_boolean cookie_domain_is_suffix(const char *domain) {
   char dom[256];
   size_t len;
@@ -295,9 +295,11 @@ static hts_boolean cookie_domain_is_suffix(const char *domain) {
     len--;
   if (len == 0 || !hts_psl_loaded() || hts_host_is_address(domain, len))
     return HTS_FALSE;
+  // callers bound the domain; never clip it into another name
+  if (len >= sizeof(dom))
+    return HTS_FALSE;
   dom[0] = '\0';
-  strlncatbuff(dom, domain, sizeof(dom),
-               len < sizeof(dom) ? len : sizeof(dom) - 1);
+  strlncatbuff(dom, domain, sizeof(dom), len);
   hts_lowcase(dom);
   return hts_psl_registrable_domain(dom) == NULL;
 }
@@ -1040,13 +1042,6 @@ int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *fpath,
                   strcmpnocase(cookie_get(buffer, rec, 3), "TRUE") == 0;
               attr.http_only = is_httponly || tabs == 7;
               attr.expires = cookie_record_expiry(rec);
-              // cookie_set makes it host-only
-              if (!attr.host_only && cookie_domain_is_suffix(domain))
-                hts_log_print(opt, LOG_WARNING,
-                              "Cookies: '%.64s' for the public suffix %s now "
-                              "reaches only %s: %s",
-                              cook_name, domain, domain + (domain[0] == '.'),
-                              given);
               // an expired one is skipped, because a browser drops it too
               if (attr.expires == 0 || attr.expires > (int64_t) time(NULL)) {
                 const hts_boolean repeated =
@@ -1054,6 +1049,12 @@ int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *fpath,
                     cookie_find_exact(seen->data, cook_name, host, path) !=
                         NULL;
 
+                // cookie_set stores it host-only
+                if (!attr.host_only && cookie_domain_is_suffix(domain))
+                  hts_log_print(opt, LOG_WARNING,
+                                "Cookies: '%.64s' for the public suffix %s is "
+                                "now host-only: %s",
+                                cook_name, domain, given);
                 // the last one wins, as curl reads it, but a rewrite loses one
                 if (repeated) {
                   hts_log_print(opt, LOG_WARNING,
