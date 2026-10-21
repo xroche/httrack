@@ -2276,10 +2276,10 @@ static int getDigit4(const char *const pos) {
 }
 
 static time_t getGMT(struct tm *tm) {
-  time_t t = timegm(tm);
+  const int64_t t = hts_utc_seconds(tm);
 
-  if (t != (time_t) - 1 && t != (time_t) 0) {
-    return t;
+  if (t != -1 && t != 0) {
+    return hts_time_clip(t);
   }
   return (time_t) - 1;
 }

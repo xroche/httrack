@@ -33,17 +33,25 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTSDATE_DEFH
 #define HTSDATE_DEFH
 
+#include <stdint.h>
 #include <time.h>
 
 /* Parse an RFC822 date such as "Sun, 06 Nov 1994 08:49:37 GMT" into "result",
    which is returned, or NULL if "s" does not parse. The fields are GMT, so a
-   caller wanting a time_t uses timegm(), never mktime() (#1491). Its own file
-   so proxytrack, which does not link the library, can share it. */
+   caller wanting seconds uses hts_utc_seconds(), never mktime() (#1491). Its
+   own file so proxytrack, which does not link the library, can share it. */
 struct tm *convert_time_rfc822(struct tm *result, const char *s);
 
 /* As convert_time_rfc822, but a two-digit year up to PIVOT means 20xx and one
    above it 19xx. HTTP dates use 50, and cookies use 69 (RFC 6265 5.1.1). */
 struct tm *convert_time_rfc822_pivot(struct tm *result, const char *s,
                                      int pivot);
+
+/* Return the Unix time of the UTC date in tm, in 64 bits because a 32-bit
+   time_t ends in 2038. Out-of-range fields carry over as with timegm(). */
+int64_t hts_utc_seconds(const struct tm *tm);
+
+/* Return t as a time_t, clipped to the range this platform's time_t holds. */
+time_t hts_time_clip(int64_t t);
 
 #endif

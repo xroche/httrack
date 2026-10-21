@@ -1742,6 +1742,120 @@ static int st_localtime(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* Dates on both sides of 2038-01-19T03:14:07Z, where a 32-bit time_t ends.
+   argv[0] is a scratch directory for the file-time check. */
+static int st_y2038(httrackp *opt, int argc, char **argv) {
+  static const struct {
+    const char *date;
+    int64_t secs;
+  } cases[] = {
+      {"Thu, 01 Jan 1970 00:00:00 GMT", 0},
+      {"Wed, 31 Dec 1969 23:59:59 GMT", -1},
+      {"Fri, 13 Dec 1901 20:45:52 GMT", -2147483648LL},
+      {"Tue, 29 Feb 2000 12:00:00 GMT", 951825600},
+      {"Tue, 19 Jan 2038 03:14:07 GMT", 2147483647},
+      {"Tue, 19 Jan 2038 03:14:08 GMT", 2147483648LL},
+      {"Sun, 07 Feb 2106 06:28:15 GMT", 4294967295LL},
+      {"Sun, 07 Feb 2106 06:28:16 GMT", 4294967296LL},
+      {"Fri, 31 Dec 9999 23:59:59 GMT", 253402300799LL},
+  };
+
+  const time_t ref = (time_t) 2147483640; /* 2038-01-19T03:14:00Z */
+  const hts_boolean narrow = sizeof(time_t) < sizeof(int64_t);
+  size_t i;
+  int err = 0;
+
+  (void) opt;
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    const int64_t got = hts_parse_date(cases[i].date, 50);
+
+    if (got != cases[i].secs) {
+      printf("y2038: \"%s\" gave " LLintP ", expected " LLintP "\n",
+             cases[i].date, (LLint) got, (LLint) cases[i].secs);
+      err = 1;
+    }
+  }
+
+  /* Out-of-range fields carry over as timegm() does. */
+  {
+    struct tm tm;
+
+    memset(&tm, 0, sizeof(tm));
+    tm.tm_year = 138;
+    tm.tm_mon = 12; /* January 2039 */
+    tm.tm_mday = 0; /* the day before: 2038-12-31 */
+    tm.tm_hour = -1;
+    if (hts_utc_seconds(&tm) != 2177362800LL) {
+      printf("y2038: unnormalised fields gave " LLintP "\n",
+             (LLint) hts_utc_seconds(&tm));
+      err = 1;
+    }
+    tm.tm_year = 138;
+    tm.tm_mon = -13; /* December 2036 */
+    tm.tm_mday = 1;
+    tm.tm_hour = 0;
+    if (hts_utc_seconds(&tm) != 2111702400LL) {
+      printf("y2038: a negative month gave " LLintP "\n",
+             (LLint) hts_utc_seconds(&tm));
+      err = 1;
+    }
+  }
+
+  /* A wait across the 2038 boundary, and one too long for an int. */
+  if (hts_parse_retry_after("Tue, 19 Jan 2038 03:14:10 GMT", ref) != 10 ||
+      hts_parse_retry_after("Sat, 19 Jan 2039 03:14:00 GMT", ref) !=
+          365 * 86400 ||
+      hts_parse_retry_after("Sun, 07 Feb 2106 06:28:16 GMT", ref) != INT_MAX ||
+      hts_parse_retry_after("Fri, 31 Dec 9999 23:59:59 GMT", ref) != INT_MAX) {
+    printf("y2038: a Retry-After date past 2038 was misread\n");
+    err = 1;
+  }
+
+  /* Clip, never wrap. */
+  if ((int64_t) hts_time_clip(2147483648LL) !=
+          (narrow ? 2147483647LL : 2147483648LL) ||
+      (int64_t) hts_time_clip(253402300799LL) !=
+          (narrow ? 2147483647LL : 253402300799LL) ||
+      (int64_t) hts_time_clip(-2147483649LL) !=
+          (narrow ? -2147483648LL : -2147483649LL) ||
+      (int64_t) hts_time_clip(2147483647LL) != 2147483647LL) {
+    printf("y2038: hts_time_clip wrapped\n");
+    err = 1;
+  }
+
+  /* A mirrored file dated after 2038 keeps that date, or the last second a
+     32-bit time_t holds. */
+  if (argc >= 1) {
+    char path[HTS_URLMAXSIZE];
+    FILE *fp;
+
+    snprintf(path, sizeof(path), "%s/y2038.bin", argv[0]);
+    structcheck(path);
+    fp = FOPEN(path, "wb");
+    if (fp == NULL) {
+      printf("y2038: cannot write %s\n", path);
+      return 1;
+    }
+    fclose(fp);
+    for (i = 5; i <= 6; i++) {
+      const int64_t want = narrow ? 2147483647LL : cases[i].secs;
+      time_t got;
+
+      if (set_filetime_rfc822(path, cases[i].date) != 0) {
+        printf("y2038: cannot date %s as \"%s\"\n", path, cases[i].date);
+        err = 1;
+      } else if ((int64_t) (got = get_filetime(path)) != want) {
+        printf("y2038: \"%s\" dated the file " LLintP ", expected " LLintP "\n",
+               cases[i].date, (LLint) got, (LLint) want);
+        err = 1;
+      }
+    }
+  }
+
+  printf("y2038: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 /* The x[strlen(x) - 1] class (#770), its pointer spelling x + strlen(x) - 1
    (#781) and its size_t index spelling (#821). The string starts mid-arena so
    the byte it must not touch is a real neighbour; poisoned with '#', not 0, or
@@ -3513,6 +3627,8 @@ const struct selftest_entry selftests_lib[] = {
      "the fields and copies the span primitive makes", st_span},
     {"gmtime", "",
      "hts_gmtime() fills the caller's buffer, not a static (#794)", st_gmtime},
+    {"y2038", "<dir>", "dates before and after 2038 read as 64-bit seconds",
+     st_y2038},
     {"localtime", "<dir>",
      "hts_localtime() and get_filetime_rfc822()'s GMT labelling (#806)",
      st_localtime},
