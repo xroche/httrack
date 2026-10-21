@@ -1643,16 +1643,13 @@ static int maskpw_pairs(size_t n) {
 static int nologin_rows(httrackp *opt) {
   static const struct {
     const char *in, *want;
-  } adrs[] = {{"u:p@h:80", "u:***@h:80"},
-              {"u:p@q@h", "u:***@h"},
-              {"u@h", "u@h"},
-              {":p@h", ":***@h"},
-              {"h:80", "h:80"},
-              {"file://", "file://"},
-              {"https://h", "https://h"},
-              {"https://u:p@h", "https://u:***@h"}},
+  } adrs[] = {{"u:p@h:80", "u:***@h:80"}, {"u:p@q@h", "u:***@h"},
+              {"u@h", "***@h"},           {":p@h", ":***@h"},
+              {"h:80", "h:80"},           {"file://", "file://"},
+              {"https://h", "https://h"}, {"https://u:p@h", "https://u:***@h"}},
     urls[] = {{"http://u:p@h/x", "http://u:***@h/x"},
               {"//u:p@q@h", "//u:***@h"},
+              {"http://tok@h/x", "http://***@h/x"},
               {"HTTPS://u:a b@[::1]:8/", "HTTPS://u:***@[::1]:8/"},
               {"http://h/x?a@b", "http://h/x?a@b"},
               {"mailto:a@b", "mailto:a@b"},
@@ -1681,9 +1678,15 @@ static int nologin_rows(httrackp *opt) {
   }
   /* An address without a login is returned as is, and takes no buffer. */
   if (adr_nologin(opt, adrs[4].in) != adrs[4].in ||
-      url_nologin(opt, urls[5].in) != urls[5].in ||
+      url_nologin(opt, urls[6].in) != urls[6].in ||
       opt->state.concat.index != index) {
     fprintf(stderr, "nologin: a rotating buffer was taken without a login\n");
+    err = 1;
+  }
+  /* Without an opt, as back_delete(NULL, ...) logs, the login is dropped. */
+  if (strcmp(adr_nologin(NULL, urls[0].in), "h/x") != 0 ||
+      strcmp(url_nologin(NULL, urls[0].in), "h/x") != 0) {
+    fprintf(stderr, "nologin: a NULL opt kept the login\n");
     err = 1;
   }
   return err;
@@ -1703,7 +1706,7 @@ static int st_maskpw(httrackp *opt, int argc, char **argv) {
        "http://h1/ http://h/?r=ftp://u:p@g/"},
       {HTS_MASK_LIST, "http://h/x?t=10:30@x", "http://h/x?t=10:30@x"},
       {HTS_MASK_ADDR, "http://u:p@h/", "http://u:***@h/"},
-      {HTS_MASK_ADDR, "http://u@h/", "http://u@h/"},
+      {HTS_MASK_ADDR, "http://u@h/", "http://***@h/"},
       {HTS_MASK_ADDR, "http://:p@h/", "http://:***@h/"},
       {HTS_MASK_ADDR, "http://u:@h/", "http://u:***@h/"},
       // the engine splits the userinfo at the last '@'
@@ -1718,7 +1721,9 @@ static int st_maskpw(httrackp *opt, int argc, char **argv) {
       {HTS_MASK_ADDR, "u:a b@h/", "u:***@h/"},
       {HTS_MASK_ADDR, "http://u:p@h:8080", "http://u:***@h:8080"},
       {HTS_MASK_ADDR, "h:8080", "h:8080"},
-      {HTS_MASK_ADDR, "u@h:8080", "u@h:8080"},
+      {HTS_MASK_ADDR, "u@h:8080", "***@h:8080"},
+      {HTS_MASK_LIST, "tok@h/ http://tok@g/ +*@g/*",
+       "***@h/ http://***@g/ +*@g/*"},
   };
 
   static const char *const modes[] = {"list", "addr"};

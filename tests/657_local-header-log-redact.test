@@ -128,12 +128,14 @@ test "$out" = "maskpw self-test: OK" || fail "expected 'maskpw self-test: OK', g
 # not quiet, so stdout and stderr carry the start URLs too
 mkdir -p "$tmpdir/planted"
 run_with_timeout 90 httrack "http://suser:STARTPWA@127.0.0.1:$port/planted.html" \
-    "suser:STARTPWB@127.0.0.1:$port/hop.html" -O "$tmpdir/planted" -c4 -s2 \
-    --sitemap-url "http://luser:LINKPWS@127.0.0.1:$port/sitemap.xml" --retries=0 -%v0 \
+    "suser:STARTPWB@127.0.0.1:$port/hop.html" "http://STARTPWT@127.0.0.1:$port/plain.html" \
+    -O "$tmpdir/planted" -c4 -s2 \
+    --sitemap-url "http://luser:LINKPWS@127.0.0.1:$port/sitemap.xml" --retries=0 -%v1 \
     -%H -z -Z -r4 -T5 "+*" "-*:KEEPFILTER@*" -%X "X-Note: a:KEEPHEADER@c/d" \
     </dev/null >"$tmpdir/planted/stdout.txt" 2>&1 || fail "planted: the crawl failed"
 crawl planted-proxy "http://127.0.0.1:$port/planted.html" -P "puser:PROXYPW@127.0.0.1:$port" \
-    -z -Z -r4 -T5 "+*"
+    -z -Z -r4 -T5 "+*" -%R "http://ruser:LINKPWREF@127.0.0.1:$port/"
+crawl planted-ftp "ftp://suser:STARTPWF@127.0.0.1:$port/f.txt" -P "puser:PROXYPW@127.0.0.1:$port"
 log=$(<"$tmpdir/planted/hts-log.txt")
 for line in "at link luser:***@127.0.0.1:1/l8.html (from suser:***@127.0.0.1:$port/planted.html)" \
     "link detected in javascript: http://luser:***@127.0.0.1:" \
@@ -141,16 +143,30 @@ for line in "at link luser:***@127.0.0.1:1/l8.html (from suser:***@127.0.0.1:$po
     "Sitemap: queued luser:***@127.0.0.1:$port/sitemap.xml" \
     "robots.txt added at suser:***@127.0.0.1:$port" \
     "at http://suser:***@127.0.0.1:$port/planted.html suser:***@127.0.0.1:$port/hop.html" \
+    "data attribute is no URL: http://u:***@127.0.0.1:$port/{w}.jpg" \
+    " http://***@127.0.0.1:$port/plain.html" \
     " -*:KEEPFILTER@* -%X \"X-Note: a:KEEPHEADER@c/d\" "; do
     grep -qF -- "$line" <<<"$log" || fail "no '$line' in hts-log.txt: $log"
 done
 grep -qF ">>> Location: http://ruser:***@127.0.0.1:$port/hop.html" "$tmpdir/planted/hts-ioinfo.txt" ||
     fail "no masked Location in hts-ioinfo.txt"
-grep -qF "mirroring http://suser:***@127.0.0.1:$port/planted.html" "$tmpdir/planted/stdout.txt" ||
-    fail "no masked start URL on stdout: $(<"$tmpdir/planted/stdout.txt")"
+# the page keeps the data-src value, which is no link, but the log must not
+grep -qF DATAPW "$tmpdir/planted/127.0.0.1_$port/planted.html" || fail "no data-src in the mirror"
+if grep -qF DATAPW <<<"$log"; then
+    fail "the data-src password is in hts-log.txt: $(grep -F DATAPW <<<"$log")"
+fi
+grep -qF "<<< Referer: http://ruser:***@127.0.0.1:$port/" "$tmpdir/planted-proxy/hts-ioinfo.txt" ||
+    fail "no masked -%R Referer in hts-ioinfo.txt"
+grep -qF "<<< GET ftp://suser:***@127.0.0.1:$port/f.txt HTTP/1." "$tmpdir/planted-ftp/hts-ioinfo.txt" ||
+    fail "no masked proxied ftp:// request line in hts-ioinfo.txt"
+stdout=$(<"$tmpdir/planted/stdout.txt")
+for line in "mirroring http://suser:***@127.0.0.1:$port/planted.html" \
+    "suser:***@127.0.0.1:$port/planted.html ("; do
+    grep -qF "$line" <<<"$stdout" || fail "no '$line' on stdout: $stdout"
+done
 grep -qF "STARTPWA" "$tmpdir/planted/hts-cache/doit.log" || fail "the grep below cannot see a password"
 # doit.log, new.txt and new.zip keep the URLs that --update needs
-leaks=$(find "$tmpdir/planted" "$tmpdir/planted-proxy" -type f ! -name doit.log \
+leaks=$(find "$tmpdir/planted" "$tmpdir/planted-proxy" "$tmpdir/planted-ftp" -type f ! -name doit.log \
     ! -name new.txt ! -name new.zip -exec grep -aoE "(STARTPW|LINKPW|PROXYPW)[A-Z0-9]*" {} + || true)
 test -z "$leaks" || fail "a password is in the project: $leaks"
 ok "no project file holds a URL or proxy password"

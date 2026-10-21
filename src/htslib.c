@@ -4361,27 +4361,31 @@ static void append_clipped(char *buf, size_t size, size_t *len, const char *s,
   buf[*len] = '\0';
 }
 
-/* Returns the ':' before the password in the login of adr, or NULL when there
-   is no password. A user alone stays, as the command-line echo shows it. */
-static const char *password_colon(const char *adr) {
-  const char *const scheme = jump_protocol_const(adr);
-  const char *const host = jump_identification_const(adr);
-
+/* Returns HTS_TRUE when adr has a login, a user alone included. */
+static hts_boolean has_login(const char *adr) {
   // "file://" is its own host, ahead of its scheme's end
-  return host > scheme ? memchr(scheme, ':', (size_t) (host - scheme)) : NULL;
+  return jump_identification_const(adr) > jump_protocol_const(adr) ? HTS_TRUE
+                                                                   : HTS_FALSE;
 }
 
 const char *adr_nologin_r(char *buf, size_t size, const char *adr) {
-  const char *const colon = password_colon(adr);
+  const char *const scheme = jump_protocol_const(adr);
+  const char *const host = jump_identification_const(adr);
+  const char *colon;
   size_t len = 0;
 
-  if (colon == NULL || size == 0)
+  if (!has_login(adr) || size == 0)
     return adr;
+  colon = memchr(scheme, ':', (size_t) (host - scheme));
   buf[0] = '\0';
-  append_clipped(buf, size, &len, adr, (size_t) (colon - adr));
-  append_clipped(buf, size, &len, ":***@", 5);
-  append_clipped(buf, size, &len, jump_identification_const(adr),
-                 strlen(jump_identification_const(adr)));
+  if (colon != NULL) {
+    append_clipped(buf, size, &len, adr, (size_t) (colon - adr));
+    append_clipped(buf, size, &len, ":***@", 5);
+  } else {
+    append_clipped(buf, size, &len, adr, (size_t) (scheme - adr));
+    append_clipped(buf, size, &len, "***@", 4);
+  }
+  append_clipped(buf, size, &len, host, strlen(host));
   return buf;
 }
 
@@ -4390,9 +4394,12 @@ const char *url_nologin_r(char *buf, size_t size, const char *url) {
 }
 
 const char *adr_nologin(httrackp *opt, const char *adr) {
-  return password_colon(adr) != NULL
-             ? adr_nologin_r(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), adr)
-             : adr;
+  if (!has_login(adr))
+    return adr;
+  // no buffer to mask into: drop the whole login
+  if (opt == NULL)
+    return jump_identification_const(adr);
+  return adr_nologin_r(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), adr);
 }
 
 const char *url_nologin(httrackp *opt, const char *url) {
@@ -5862,32 +5869,59 @@ void fprint_redacted(FILE *fp, size_t len) {
 static const char *const secret_fields[] = {
     "Authorization", "Proxy-Authorization", "Cookie", "Set-Cookie"};
 
-/* The -%H log hides the password of the URL these fields carry. */
-static const char *const url_fields[] = {"Location", "Content-Location"};
+/* The -%H log hides the login of the URL these fields carry. */
+static const char *const url_fields[] = {"Location", "Content-Location",
+                                         "Referer"};
 
-/* Writes the header line buff, len bytes long, with the password of its URL
-   value as ***. Returns HTS_FALSE, writing nothing, when out of memory. */
-static hts_boolean fprint_url_field(FILE *fp, const char *buff, size_t len) {
-  const char *const colon = memchr(buff, ':', len);
-  size_t keep = colon != NULL ? (size_t) (colon - buff) + 1 : len;
-  char *line = malloct(2 * len + 8);
+/* Writes the line buff, len bytes long, with the login of its URL, from keep
+   up to end, masked. Returns HTS_FALSE, writing nothing, when out of memory. */
+static hts_boolean fprint_url_span(FILE *fp, const char *buff, size_t len,
+                                   size_t keep, size_t end) {
+  char *line = malloct(2 * end + 8);
 
   if (line == NULL)
     return HTS_FALSE;
-  while (keep < len && (buff[keep] == ' ' || buff[keep] == '\t'))
-    keep++;
-  memcpy(line, buff, len);
-  line[len] = '\0';
+  memcpy(line, buff, end);
+  line[end] = '\0';
   fwrite(line, 1, keep, fp);
-  fputs(url_nologin_r(line + len + 1, len + 7, line + keep), fp);
+  fputs(url_nologin_r(line + end + 1, end + 7, line + keep), fp);
+  fwrite(buff + end, 1, len - end, fp);
   freet(line);
   return HTS_TRUE;
 }
 
-/* Finds the password of the userinfo at the authority a: from the first ':'
-   up to the last '@' before the first '/', the split
-   jump_identification_const() makes. A token also ends at a blank. Returns
-   HTS_FALSE when there is none. */
+/* Writes the header line buff, len bytes long, with the login of its URL
+   value masked. Returns HTS_FALSE, writing nothing, when out of memory. */
+static hts_boolean fprint_url_field(FILE *fp, const char *buff, size_t len) {
+  const char *const colon = memchr(buff, ':', len);
+  size_t keep = colon != NULL ? (size_t) (colon - buff) + 1 : len;
+
+  while (keep < len && (buff[keep] == ' ' || buff[keep] == '\t'))
+    keep++;
+  return fprint_url_span(fp, buff, len, keep, len);
+}
+
+/* Writes the request line buff, len bytes long, with the login of its target
+   masked, as a proxied ftp:// target carries one. Returns HTS_FALSE, writing
+   nothing, when buff is no "METHOD target HTTP/" line or out of memory. */
+static hts_boolean fprint_request_line(FILE *fp, const char *buff, size_t len) {
+  const char *const sp = memchr(buff, ' ', len);
+  const char *version;
+
+  if (sp == NULL)
+    return HTS_FALSE;
+  version = memchr(sp + 1, ' ', len - (size_t) (sp + 1 - buff));
+  if (version == NULL || (size_t) (buff + len - version) < 6 ||
+      strncmp(version, " HTTP/", 6) != 0)
+    return HTS_FALSE;
+  return fprint_url_span(fp, buff, len, (size_t) (sp + 1 - buff),
+                         (size_t) (version - buff));
+}
+
+/* Finds the secret of the userinfo at the authority a, which ends at the last
+   '@' before the first '/', the split jump_identification_const() makes: the
+   password after the first ':', or a user alone. A token also ends at a
+   blank. Returns HTS_FALSE when there is no userinfo. */
 static hts_boolean userinfo_password(const char *a, hts_boolean token,
                                      const char **pass, const char **at) {
   const char *end = a + strcspn(a, token ? "/ \t\r\n" : "/");
@@ -5898,9 +5932,7 @@ static hts_boolean userinfo_password(const char *a, hts_boolean token,
   if (end == a)
     return HTS_FALSE;
   colon = memchr(a, ':', (size_t) (end - 1 - a));
-  if (colon == NULL)
-    return HTS_FALSE;
-  *pass = colon + 1;
+  *pass = colon != NULL ? colon + 1 : a;
   *at = end - 1;
   return HTS_TRUE;
 }
@@ -5919,7 +5951,7 @@ static void mask_copy(mask_out *m, const char *src, size_t n) {
   m->o += n;
 }
 
-/* Masks the password of the address at a, if any, and moves *i past it. */
+/* Masks the login secret of the address at a, if any, and moves *i past it. */
 static void mask_at(mask_out *m, const char *a, hts_boolean token,
                     const char **i) {
   const char *pass, *at;
@@ -5931,8 +5963,8 @@ static void mask_at(mask_out *m, const char *a, hts_boolean token,
   m->p = *i = at;
 }
 
-/* Copies s to dst, or only counts when dst is NULL, with the password of each
-   address written as ***. Returns the length. */
+/* Copies s to dst, or only counts when dst is NULL, with the login secret of
+   each address written as ***. Returns the length. */
 static size_t mask_passwords(const char *s, char *dst, hts_mask_mode mode) {
   mask_out m = {dst, 0, s};
   const char *i = s;
@@ -5959,6 +5991,7 @@ char *hts_mask_passwords(const char *s, hts_mask_mode mode) {
 }
 
 void fprintfio(FILE *fp, const char *buff, const char *prefix) {
+  const char *const start = buff;
   hts_boolean nl = HTS_TRUE;
   hts_boolean secret = HTS_FALSE;
 
@@ -5985,10 +6018,11 @@ void fprintfio(FILE *fp, const char *buff, const char *prefix) {
       if (nl)
         fprintf(fp, "%s", prefix);
       nl = HTS_FALSE;
-      if (secret || *buff == ' ' || *buff == '\t' ||
-          !header_name_in(buff, url_fields,
-                          sizeof(url_fields) / sizeof(url_fields[0])) ||
-          !fprint_url_field(fp, buff, len)) {
+      if (!(buff == start && fprint_request_line(fp, buff, len)) &&
+          (secret || *buff == ' ' || *buff == '\t' ||
+           !header_name_in(buff, url_fields,
+                           sizeof(url_fields) / sizeof(url_fields[0])) ||
+           !fprint_url_field(fp, buff, len))) {
         fwrite(buff, 1, keep, fp);
         if (keep < len)
           fprint_redacted(fp, len - keep);

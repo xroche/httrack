@@ -1,29 +1,49 @@
 #!/usr/bin/env python3
 """List log calls that print an engine address without hiding its password.
 
-A log call is hts_log_print(), hts_log_vprint() or fprintf() to a log file.
-Its arguments must pass every adr, url_adr or urladr() through adr_nologin()
-or url_nologin(). An allowed call is named "file: format" in ALLOW.
+A log call is hts_log_print(), hts_log_vprint(), printf(), or fprintf() or
+fputs() to a log file, stdout or stderr. Its arguments must pass every adr,
+url_adr or urladr() through adr_nologin() or url_nologin(). An allowed call
+is named "file: format" in ALLOW. Code under "#if 0" or a debug switch such
+as "#if HDEBUG" is skipped. A call through a macro wrapper, or an address
+held in an alias variable, is not detected.
 """
 
 import re
 import sys
 
-CALL = re.compile(r"\b(hts_log_print|hts_log_vprint|fprintf)\s*\(")
-LOG_FILE = re.compile(r"fprintf\s*\(\s*(opt->log|log|fp_log)\b")
+CALL = re.compile(r"\b(hts_log_print|hts_log_vprint|printf|fprintf|fputs)\s*\(")
+LOG_FILE = re.compile(r"(opt->log|log|fp_log|stdout|stderr)\s*$")
 SAFE = re.compile(
     r"\b(adr_nologin|url_nologin|jump_identification_const|jump_identification)"
     r"\s*\("
 )
 ADDRESS = re.compile(r"\b\w*adr\b")
 NULL_TEST = re.compile(r"\b\w*adr\b\s*(\(\s*\))?\s*[!=]=\s*NULL")
+DEBUG_IF = re.compile(r"\s*#\s*if(def)?\s+(0|\w*DEBUG\w*(\s*==\s*\d+)?)\s*(/[/*].*)?$")
 # Calls whose address argument is not printed as text, with the reason.
 ALLOW = {
     "htsback.c: Illegal chunk (%s) for %s%s": "chunk_adr is a chunk size",
     "htsback.c: illegal chunk CRLF (%s) for %s%s": "chunk_adr is a chunk size",
     "htscore.c: dump 1024 bytes (address %p): ": "a pointer",
-    "htsparse.c: data attribute is no URL: %.*s": "eadr ends the value",
+    "htscoremain.c: X-Host: %s\\r\\n": "the -#C cache dump lists the entry",
+    "htscoremain.c: %s\\r\\n": "r.adr is the page body",
 }
+
+
+def drop_debug(src):
+    """Blanks the lines a debug switch compiles out, keeping line numbers."""
+    out, stack = [], []
+    for line in src.split("\n"):
+        if re.match(r"\s*#\s*if", line):
+            stack.append(bool(DEBUG_IF.match(line)) or (stack and stack[-1]))
+        elif re.match(r"\s*#\s*(else|elif)\b", line) and stack:
+            stack[-1] = len(stack) > 1 and stack[-2]
+        elif re.match(r"\s*#\s*endif\b", line) and stack:
+            stack.pop()
+            line = ""
+        out.append("" if stack and stack[-1] else line)
+    return "\n".join(out)
 
 
 def call_end(s, i):
@@ -58,6 +78,21 @@ def strip_safe(s):
         s = s[: m.start()] + s[call_end(s, m.end()) :]
 
 
+def stream(call, name):
+    """Returns the FILE argument of an fprintf() or fputs() call."""
+    args = strip_literals(call[call.index("(") + 1 : -1])
+    depth, parts, cur = 0, [], ""
+    for c in args:
+        if c == "," and depth == 0:
+            parts.append(cur)
+            cur = ""
+            continue
+        depth += {"(": 1, "[": 1, ")": -1, "]": -1}.get(c, 0)
+        cur += c
+    parts.append(cur)
+    return (parts[0] if name == "fprintf" else parts[-1]).strip()
+
+
 def first_format(call):
     m = re.search(r'"((\\.|[^"\\])*)"', call)
     return m.group(1) if m else ""
@@ -68,12 +103,14 @@ def main(paths):
     used, names = set(), set()
     for path in paths:
         with open(path, encoding="latin-1") as f:
-            src = f.read()
+            src = drop_debug(f.read())
         name = path.rsplit("/", 1)[-1]
         names.add(name)
         for m in CALL.finditer(src):
             call = src[m.start() : call_end(src, m.end())]
-            if m.group(1) == "fprintf" and not LOG_FILE.match(call):
+            if m.group(1) in ("fprintf", "fputs") and not LOG_FILE.search(
+                stream(call, m.group(1))
+            ):
                 continue
             args = strip_safe(strip_literals(call[call.index("(") + 1 :]))
             args = NULL_TEST.sub("", args)

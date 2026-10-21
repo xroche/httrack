@@ -551,23 +551,23 @@ typedef enum {
   HTS_MASK_ADDR  /* one start URL, or a -P value */
 } hts_mask_mode;
 
-/* Returns a copy of s, allocated with malloct, in which the password of every
-   start URL or proxy address in s is *** . The rest stays byte for byte. NULL
-   when out of memory. */
+/* Returns a copy of s, allocated with malloct, in which the password, or the
+   user alone, of every start URL or proxy address in s is *** . The rest stays
+   byte for byte. NULL when out of memory. */
 char *hts_mask_passwords(const char *s, hts_mask_mode mode);
 
 /* Log calls never print an address raw: pass adr_nologin() or url_nologin(),
    which test 660 checks. */
 
-/* Returns adr with its password as ***, for log lines: adr itself when it has
-   no password, else a copy clipped to size bytes in buf. */
+/* Returns adr with its login masked as user:*** or ***, for log lines: adr
+   itself when it has no login, else a copy clipped to size bytes in buf. */
 const char *adr_nologin_r(char *buf, size_t size, const char *adr);
 
 /* Same as adr_nologin_r(), but only a URL with a scheme or "//" has a login. */
 const char *url_nologin_r(char *buf, size_t size, const char *url);
 
 /* adr_nologin_r() and url_nologin_r() into a rotating buffer of opt, which
-   they take only when there is a login. */
+   they take only when there is a login. A NULL opt drops the login. */
 const char *adr_nologin(httrackp *opt, const char *adr);
 const char *url_nologin(httrackp *opt, const char *url);
 

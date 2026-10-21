@@ -55,6 +55,7 @@ PLANTED_FIRST = (
     '<a href="/slow.html">s</a>'
     '<img src="http://luser:LINKPWO@127.0.0.1:%(p)d/i.gif">'
     "<style>body{background:url(http://luser:LINKPWU@127.0.0.1:%(p)d/bg.png)}</style>"
+    '<img data-src="http://u:DATAPW@127.0.0.1:%(p)d/{w}.jpg" src="/i.gif">'
 )
 
 

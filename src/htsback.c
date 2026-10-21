@@ -5458,12 +5458,13 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
         if (opt->verbosedisplay == HTS_VERBOSE_SIMPLE) {
           if (back_status(&back[i]) == STATUS_READY) {
             if (back[i].r.statuscode == HTTP_OK)
-              printf("* %s%s (" LLintP " bytes) - OK\n", back[i].url_adr,
-                     back[i].url_fil, (LLint) back[i].r.size);
+              printf("* %s%s (" LLintP " bytes) - OK\n",
+                     adr_nologin(opt, back[i].url_adr), back[i].url_fil,
+                     (LLint) back[i].r.size);
             else
-              printf("* %s%s (" LLintP " bytes) - %d\n", back[i].url_adr,
-                     back[i].url_fil, (LLint) back[i].r.size,
-                     back[i].r.statuscode);
+              printf("* %s%s (" LLintP " bytes) - %d\n",
+                     adr_nologin(opt, back[i].url_adr), back[i].url_fil,
+                     (LLint) back[i].r.size, back[i].r.statuscode);
             fflush(stdout);
           }
         }

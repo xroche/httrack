@@ -335,13 +335,11 @@ static const char *html_inline_safe(const char *src, char *dst, size_t size) {
   return dst;
 }
 
-/* Drop a redirect Location's #fragment: a UA anchor, never part of the fetched
- * resource (#204). */
-/* Copies the first 32 bytes of the script text s, len bytes long, into buf
+/* Copies the first max bytes of the page text s, len bytes long, into buf
    for a debug line, with a URL login masked, or "(hidden)" when a login
    cannot be told apart. */
-static const char *script_excerpt(httrackp *opt, char *buf, size_t size,
-                                  const char *s, size_t len) {
+static const char *text_excerpt(httrackp *opt, char *buf, size_t size,
+                                const char *s, size_t len, size_t max) {
   char *copy = malloct(len + 1);
   const char *shown;
 
@@ -354,11 +352,13 @@ static const char *script_excerpt(httrackp *opt, char *buf, size_t size,
   if (shown == copy && jump_protocol_const(copy) == copy &&
       strchr(copy, '@') != NULL)
     shown = "(hidden)";
-  strlncatbuff(buf, shown, size, minimum(strlen(shown), 32));
+  strlncatbuff(buf, shown, size, minimum(strlen(shown), max));
   freet(copy);
   return buf;
 }
 
+/* Drop a redirect Location's #fragment: a UA anchor, never part of the fetched
+ * resource (#204). */
 static void url_drop_fragment(char *const url) {
   char *const frag = strchr(url, '#');
   if (frag != NULL)
@@ -1683,8 +1683,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                 "active code (%s) detected in javascript: %s",
                                 (check_this_fking_line == 2) ? "parse"
                                                              : "pickup",
-                                script_excerpt(opt, str, sizeof(str), b,
-                                               (size_t) (a - b + 1)));
+                                text_excerpt(opt, str, sizeof(str), b,
+                                             (size_t) (a - b + 1), 32));
                           }
                         }
 
@@ -1983,9 +1983,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                         hts_log_print(opt, LOG_DEBUG,
                                       "link detected in javascript: %s",
-                                      script_excerpt(opt, str, sizeof(str),
-                                                     html + jslink.offset,
-                                                     (size_t) jslink.length));
+                                      text_excerpt(opt, str, sizeof(str),
+                                                   html + jslink.offset,
+                                                   (size_t) jslink.length, 32));
                       }
                       p = jslink.offset; // p non nul: TRAITER CHAINE COMME
                                          // FICHIER
@@ -2371,8 +2371,14 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
               // a lazy-load placeholder or template is no URL: leave it as is
               if (ok == 0 && dataattr_p &&
                   data_attr_is_not_url(html, (size_t) (eadr - html - 1))) {
-                hts_log_print(opt, LOG_DEBUG, "data attribute is no URL: %.*s",
-                              (int) (eadr - html - 1), html);
+                const size_t len = (size_t) (eadr - html - 1);
+                char *shown = malloct(len + 8);
+
+                if (shown != NULL)
+                  hts_log_print(
+                      opt, LOG_DEBUG, "data attribute is no URL: %s",
+                      text_excerpt(opt, shown, len + 8, html, len, len + 7));
+                freet(shown);
                 not_url = HTS_TRUE;
               }
             }
@@ -5053,11 +5059,12 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
       if (b >= 0) {
         if (back[b].r.statuscode == HTTP_OK)
           printf("%d/%d: %s%s (" LLintP " bytes) - OK\n", ptr, opt->lien_tot,
-                 back[b].url_adr, back[b].url_fil, (LLint) back[b].r.size);
+                 adr_nologin(opt, back[b].url_adr), back[b].url_fil,
+                 (LLint) back[b].r.size);
         else
           printf("%d/%d: %s%s (" LLintP " bytes) - %d\n", ptr, opt->lien_tot,
-                 back[b].url_adr, back[b].url_fil, (LLint) back[b].r.size,
-                 back[b].r.statuscode);
+                 adr_nologin(opt, back[b].url_adr), back[b].url_fil,
+                 (LLint) back[b].r.size, back[b].r.statuscode);
       } else {
         hts_log_print(opt, LOG_ERROR, "Link disappeared");
       }
