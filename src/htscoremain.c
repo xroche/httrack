@@ -592,8 +592,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   int httrack_logmode = 3;      // ONE log file
 
   ensureUrlCapacity(url, url_sz, 65536);
-  /* a previous run's bundles and folder are not this one's, but only a library
-     caller loads twice on one opt */
+  /* a library caller may run twice on one opt */
   hts_bundle_free(opt);
   StringCopy(opt->bundle_dir, "");
 

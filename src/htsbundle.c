@@ -145,8 +145,8 @@ static const char *bundle_name_refusal(const char *name) {
   return NULL;
 }
 
-/* Cut the bundle suffix off url in place and copy its name into name, or ""
-   when url has none. NULL, or why the name is refused and url is unchanged. */
+/* Cut the suffix off url into name ("" if none). Returns NULL, or why the name
+ * is refused. */
 static const char *bundle_cut(char *url, char *name, size_t name_size) {
   char *const at = strstr(url, HTS_BUNDLE_SUFFIX);
   const char *why;
