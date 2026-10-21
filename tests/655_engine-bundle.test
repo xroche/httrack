@@ -5,6 +5,8 @@
 
 set -euo pipefail
 
+# TEST_TIMEOUT_AT_LEAST: 300
+
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
@@ -405,17 +407,39 @@ selftest_queue "refused: /alphasid.hts, line 6: a cookie has another value in an
     bundle "$dir" 'https://www.alpha.test/#httrack-bundle=alpha' \
     'https://alpha.test/#httrack-bundle=alphasid'
 
-# 2000 bundles chained by overlapping scopes load in seconds, not cubic time.
-chain=()
-for i in $(seq 1 2000); do
-    printf '# HTTrack bundle 1\nua U\nscope h%d.test\nscope h%d.test\n' \
-        "$i" "$((i + 1))" >"$tmpdir/ch$i.hts"
-    chain+=("http://h$i.test/#httrack-bundle=ch$i")
-done
-t0=$SECONDS
-assert_selftest 'h1.test ua=U headers=global' bundle "$dir" "${chain[@]}" host:h1.test
-test "$((SECONDS - t0))" -lt 10 ||
-    fail "2000 chained bundles took $((SECONDS - t0))s to load"
+# Chained bundles must load in linear time: 2000 may cost at most 64 times 250
+# (linear is about 8, cubic about 512). Relative, so slow legs pass.
+now_ms() {
+    if perl -MTime::HiRes=time -e 1 2>/dev/null; then
+        perl -MTime::HiRes=time -e 'printf "%d", time * 1000'
+    elif command -v python3 >/dev/null; then
+        python3 -c 'import time; print(int(time.time() * 1000))'
+    else
+        return 1
+    fi
+}
+chain_ms() { # chain_ms N -- milliseconds to load N chained bundles
+    local n=$1 i t0 t1 chain=()
+    for i in $(seq 1 "$n"); do
+        printf '# HTTrack bundle 1\nua U\nscope h%d.test\nscope h%d.test\n' \
+            "$i" "$((i + 1))" >"$tmpdir/ch$i.hts"
+        chain+=("http://h$i.test/#httrack-bundle=ch$i")
+    done
+    t0=$(now_ms)
+    assert_selftest 'h1.test ua=U headers=global' bundle "$dir" "${chain[@]}" host:h1.test
+    t1=$(now_ms)
+    echo "$((t1 - t0))"
+}
+if now_ms >/dev/null; then
+    t250=$(chain_ms 250)
+    test "$t250" -ge 50 || t250=50
+    skip_if_out_of_budget 1 "$((t250 * 8 / 1000 + 1))" "the 2000-bundle chain row"
+    t2000=$(chain_ms 2000)
+    test "$t2000" -le "$((t250 * 64))" ||
+        fail "2000 chained bundles took ${t2000}ms against ${t250}ms for 250: not linear"
+else
+    echo "skipping the chained bundle timing row: no perl or python3" >&2
+fi
 
 # The real count of queued rows, so a deleted row cannot pass unseen.
 test "${#SELFTEST_WANT[@]}" -eq 139 ||
