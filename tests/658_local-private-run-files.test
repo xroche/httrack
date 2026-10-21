@@ -1,0 +1,74 @@
+#!/bin/bash
+#
+# The files that echo the command line, which can hold credentials, are
+# owner-only even under a permissive umask, and an --update tightens old ones.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+skip_on_windows "no POSIX file modes"
+find_python >/dev/null || skip "python3 not found"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_private.XXXXXX") || exit 1
+crawlpid=
+cleanup() {
+    if test -n "$crawlpid"; then
+        kill_tree "$crawlpid"
+        wait "$crawlpid" 2>/dev/null || true
+    fi
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+require_httrack
+local_server_start
+umask 022
+
+mode_of() {
+    stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1"
+}
+
+assert_private() { # assert_private WHEN FILE...
+    local when=$1 f m
+    shift
+    for f in "$@"; do
+        test -f "$f" || fail "$when: no ${f##*/}"
+        m=$(mode_of "$f")
+        test "$m" = 600 || fail "$when: ${f##*/} is mode $m, want 600"
+    done
+}
+
+# Control: the probe must see a group- and world-readable file.
+: >"$tmpdir/control"
+test "$(mode_of "$tmpdir/control")" = 644 ||
+    fail "umask 022 made mode $(mode_of "$tmpdir/control"), so 600 proves nothing"
+
+out="$tmpdir/mirror"
+local_crawl --log "$tmpdir/log1" -O "$out" --quiet --robots=0 --timeout=30 \
+    --retries=0 "http://user:secret@127.0.0.1:$SRV_PORT/fetchmeta/index.html" ||
+    fail "crawl failed: $(<"$tmpdir/log1")"
+grep -q secret "$out/hts-cache/doit.log" || fail "doit.log does not hold the URL"
+assert_private "first crawl" "$out/hts-cache/doit.log" "$out/hts-log.txt"
+echo "first crawl: doit.log and hts-log.txt are 600"
+
+# An older engine left these readable, and the rewrite must not keep that mode.
+chmod 644 "$out/hts-cache/doit.log" "$out/hts-log.txt"
+local_crawl --log "$tmpdir/log2" -O "$out" --quiet --update ||
+    fail "update failed: $(<"$tmpdir/log2")"
+assert_private "update" "$out/hts-cache/doit.log" "$out/hts-log.txt"
+echo "update: the 644 files from before are 600"
+
+# The lock lives only while the crawl runs, so a rate-capped crawl holds it open.
+slow="$tmpdir/slow"
+httrack -O "$slow" --quiet --robots=0 --timeout=30 --retries=0 -c1 \
+    --max-rate=200000 "$BASEURL/bigfiles/index.html" >"$tmpdir/log3" 2>&1 &
+crawlpid=$!
+for _ in $(seq 1 300); do
+    test -e "$slow/hts-in_progress.lock" && break
+    kill -0 "$crawlpid" 2>/dev/null || break
+    sleep 0.1
+done
+assert_private "running crawl" "$slow/hts-in_progress.lock"
+echo "running crawl: hts-in_progress.lock is 600"

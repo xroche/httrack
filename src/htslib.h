@@ -670,6 +670,11 @@ void cut_path(char *fullpath, char *path, size_t path_size, char *pname,
 int fexist(const char *s);
 int fexist_utf8(const char *s);
 
+/* Open name (UTF-8) for writing with a "w" mode, truncating it, or return NULL.
+   On Unix the file is owner-only from creation and an existing one is
+   tightened, because it may hold credentials. */
+FILE *hts_fopen_private(const char *name, const char *mode);
+
 /* File size in bytes, -1 if absent or not a regular file. LLint, not off_t:
    the latter is a 32-bit long on MSVC, truncating any file of 2GB or more. */
 LLint fpsize(FILE *fp);

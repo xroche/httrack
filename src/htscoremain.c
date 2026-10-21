@@ -346,7 +346,7 @@ HTSEXT_API int hts_main(int argc, char **argv) {
    written at all. */
 static hts_boolean write_progress_lock(httrackp *opt, const char *path,
                                        const char *t, int argc, char **argv) {
-  FILE *fp = FOPEN(path, "wb");
+  FILE *fp = hts_fopen_private(path, "wb"); /* it echoes argv */
   int i;
 
   if (fp == NULL)
@@ -2946,13 +2946,16 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       /* Check FS directory structure created */
       structcheck_utf8(StringBuff(opt->path_log));
 
-      opt->log = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                               StringBuff(opt->path_log), "hts-log.txt"),
-                       "w");
-      if (httrack_logmode == 2)
-        opt->errlog = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                    StringBuff(opt->path_log), "hts-err.txt"),
+      /* owner-only: the log echoes argv, and URLs with their userinfo */
+      opt->log =
+          hts_fopen_private(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                    StringBuff(opt->path_log), "hts-log.txt"),
                             "w");
+      if (httrack_logmode == 2)
+        opt->errlog =
+            hts_fopen_private(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                      StringBuff(opt->path_log), "hts-err.txt"),
+                              "w");
       else
         opt->errlog = opt->log;
       if (opt->log == NULL) {
@@ -3063,9 +3066,11 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), "hts-cache"),
               HTS_PROTECT_FOLDER);
 #endif
-        fp = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                           StringBuff(opt->path_log), "hts-cache/doit.log"),
-                   "wb");
+        /* owner-only: the command line may carry credentials */
+        fp = hts_fopen_private(
+            fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                    StringBuff(opt->path_log), "hts-cache/doit.log"),
+            "wb");
         if (fp) {
           String line = STRING_EMPTY;
 

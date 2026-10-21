@@ -1099,25 +1099,6 @@ int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *fpath,
   return -1;
 }
 
-/* Open name for writing, creating it if needed, and return NULL on failure.
-   The file is owner-only on Unix because it holds session cookies. */
-static FILE *cookie_create(const char *name) {
-  char catbuff[CATBUFF_SIZE];
-#ifdef _WIN32
-  return FOPEN(fconv(catbuff, sizeof(catbuff), name), "wb");
-#else
-  const int fd = open(fconv(catbuff, sizeof(catbuff), name),
-                      O_WRONLY | O_CREAT | O_TRUNC, HTS_PROTECT_FILE);
-  FILE *fp = fd != -1 ? fdopen(fd, "wb") : NULL;
-
-  if (fd != -1 && fp == NULL)
-    close(fd);    /* fdopen failed: don't leak the descriptor */
-  if (fp != NULL) /* O_CREAT's mode skips pre-existing jars: tighten those */
-    (void) fchmod(fd, HTS_PROTECT_FILE);
-  return fp;
-#endif
-}
-
 /* Flush fp to the disk and close it. Did every step succeed? */
 static hts_boolean cookie_close_synced(FILE *fp) {
   // a crash after the rename must not leave an empty file behind it
@@ -1139,7 +1120,7 @@ int cookie_save_fault_selftest = 0;
    success. */
 static int cookie_write(t_cookie *cookie, const char *name) {
   char BIGSTK line[8192];
-  FILE *fp = cookie_create(name);
+  FILE *fp = hts_fopen_private(name, "wb");
 
   if (fp) {
     const char *a = cookie->data;
@@ -1189,7 +1170,7 @@ static hts_boolean cookie_copy(const char *src, const char *dst) {
   const int fault = cookie_save_fault_selftest;
   char buf[8192];
   FILE *const in = FOPEN(src, "rb");
-  FILE *const out = in != NULL ? cookie_create(dst) : NULL;
+  FILE *const out = in != NULL ? hts_fopen_private(dst, "wb") : NULL;
   hts_boolean ok = out != NULL;
   size_t n;
 
