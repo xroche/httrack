@@ -563,7 +563,8 @@ char *hts_mask_passwords(const char *s, hts_mask_mode mode);
    itself when it has no login, else a copy clipped to size bytes in buf. */
 const char *adr_nologin_r(char *buf, size_t size, const char *adr);
 
-/* Same as adr_nologin_r(), but only a URL with a scheme or "//" has a login. */
+/* Same as adr_nologin_r(), but only a URL with a scheme or "//" has a login.
+   Any "scheme://" counts, not only the ones the engine fetches. */
 const char *url_nologin_r(char *buf, size_t size, const char *url);
 
 /* adr_nologin_r() and url_nologin_r() into a rotating buffer of opt, which

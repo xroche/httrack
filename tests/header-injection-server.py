@@ -48,6 +48,8 @@ PLANTED = (
     "http://luser:LINKPWH@[::1]:1/l7.html",
     "http://luser:LINKPWI@127.0.0.1:%(p)d",
     "http://luser:LINKPWJ@127.0.0.1:1/l8.html",
+    "mms://luser:SCHEMEPWM@127.0.0.1:%(p)d/m.asf",
+    "gopher://luser:SCHEMEPWG@127.0.0.1:%(p)d/g",
     "/redir.html",
 )
 # the image loads while the engine waits on slow.html, so it is found ready

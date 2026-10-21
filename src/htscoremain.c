@@ -312,8 +312,11 @@ static void cmdl_panic_value(httrackp *opt, const char *msg,
                              const char *value) {
   char s[HTS_CDLMAXSIZE * 2 + 256];
 
+  char shown[HTS_CDLMAXSIZE];
+
   if (hts_is_quoted(value, strlen(value)))
-    snprintf(s, sizeof(s), "%s: %s " HTS_QUOTED_HINT, msg, value);
+    snprintf(s, sizeof(s), "%s: \"%s " HTS_QUOTED_HINT, msg,
+             adr_nologin_r(shown, sizeof(shown), value + 1));
   else
     snprintf(s, sizeof(s), "%s", msg);
   HTS_PANIC_PRINTF(s);
@@ -2045,8 +2048,12 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                     const char *const why = http_custom_header_warning(
                         StringBuff(opt->headers), argv[na]);
 
-                    if (why != NULL)
-                      fprintf(stderr, "warning: -%%X %s: %s\n", why, argv[na]);
+                    // with the -%H log's redaction of a login header
+                    if (why != NULL) {
+                      fprintf(stderr, "warning: -%%X %s: ", why);
+                      fprintfio(stderr, argv[na], "");
+                      fputc('\n', stderr);
+                    }
                   }
                   /* A refused line goes in, so the request drops its folds. */
                   if (StringNotEmpty(opt->headers) ||
@@ -3125,7 +3132,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           // quoted if it holds a blank and no quote
           const hts_boolean quote =
               strchr(arg, ' ') != NULL && strchr(arg, '\"') == NULL;
-          // a start URL, or a -P, -%mu or -%R value, is one address
+          // a start URL, or a -P, -%mu, -%R or --why value, is one address
           hts_boolean addr;
           char *masked;
 
@@ -3135,7 +3142,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           } else if (opt_at != 0 && i < opt_at + x_cmd.span[opt_at]) {
             addr = cmdl_shortopt_has(argv[opt_at], 'P') ||
                    cmdl_shortopt_named(argv[opt_at], "-%mu") ||
-                   cmdl_shortopt_named(argv[opt_at], "-%R");
+                   cmdl_shortopt_named(argv[opt_at], "-%R") ||
+                   cmdl_shortopt_named(argv[opt_at], "-%Y");
           } else {
             opt_at = 0;
             addr = i != 0 && arg[0] != '+' && arg[0] != '-';

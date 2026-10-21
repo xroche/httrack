@@ -988,7 +988,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
         // prochaine adresse
         if (!hts_scan_token(&a, url, sizeof(url))) {
           printf("URL longer than %d bytes, ignored: %.64s...\n",
-                 (int) (sizeof(url) - 1), url);
+                 (int) (sizeof(url) - 1), url_nologin(opt, url));
           hts_log_print(opt, LOG_WARNING,
                         "URL longer than %d bytes, ignored: %.64s...",
                         (int) (sizeof(url) - 1), url_nologin(opt, url));
@@ -1013,7 +1013,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
       else
         strcpybuff(url, StringBuff(opt->why_url));
       if (ident_url_absolute(url, &af) < 0) {
-        printf("--why: unable to parse URL %s" LF, StringBuff(opt->why_url));
+        printf("--why: unable to parse URL %s" LF,
+               adr_nologin(opt, StringBuff(opt->why_url)));
       } else {
         char *const query = af.fil + strcspn(af.fil, "?");
         char BIGSTK path[sizeof(af.fil)];
@@ -1030,15 +1031,15 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
             filters_match_url(filters, filptr, af.adr, af.fil, &jokDepth);
 
         if (jok > 0)
-          printf("%s: accepted by rule #%d (%s)" LF, url, jokDepth + 1,
-                 filters[jokDepth]);
+          printf("%s: accepted by rule #%d (%s)" LF, url_nologin(opt, url),
+                 jokDepth + 1, filters[jokDepth]);
         else if (jok < 0)
-          printf("%s: rejected by rule #%d (%s)" LF, url, jokDepth + 1,
-                 filters[jokDepth]);
+          printf("%s: rejected by rule #%d (%s)" LF, url_nologin(opt, url),
+                 jokDepth + 1, filters[jokDepth]);
         else
           printf("%s: no filter rule matches; the wizard decides "
                  "(same-site links are followed by default)" LF,
-                 url);
+                 url_nologin(opt, url));
       }
       freet(primary);
       /* --why answered; no mirror was asked for. The store comes first
@@ -1127,9 +1128,9 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
             continue;
           }
           if (hts_is_quoted(line, strlen(line))) {
-            hts_log_print(opt, LOG_ERROR,
-                          "\"%s\", line %d: %s is quoted, ignored",
-                          StringBuff(opt->filelist), lineno, line);
+            hts_log_print(
+                opt, LOG_ERROR, "\"%s\", line %d: \"%s is quoted, ignored",
+                StringBuff(opt->filelist), lineno, url_nologin(opt, line + 1));
             continue;
           }
           if (line[0]) {

@@ -36,6 +36,20 @@ lint "$work/htscore.c" >"$work/mut.out" && fail "the lint passed a raw urladr()"
 grep -q 'is ready, skipping' "$work/mut.out" ||
     fail "the mutant was not reported: $(<"$work/mut.out")"
 
+# Mutants: a raw address into hts-ioinfo.txt, and a raw lien.
+sed '/"\[%d\] request for %s%s:/{n;s/jump_identification_const(adr)/adr/;}' \
+    "$src/htslib.c" >"$work/htslib.c"
+cmp -s "$src/htslib.c" "$work/htslib.c" && fail "the htslib.c mutant changed nothing"
+lint "$work/htslib.c" >"$work/mut.out" && fail "the lint passed a raw adr to ioinfo"
+grep -q 'request for' "$work/mut.out" ||
+    fail "the ioinfo mutant was not reported: $(<"$work/mut.out")"
+sed '/"link detected in html (tag): %s",/{n;s/url_nologin(opt, lien)/lien/;}' \
+    "$src/htsparse.c" >"$work/htsparse.c"
+cmp -s "$src/htsparse.c" "$work/htsparse.c" && fail "the htsparse.c mutant changed nothing"
+lint "$work/htsparse.c" >"$work/mut.out" && fail "the lint passed a raw lien"
+grep -q 'link detected in html' "$work/mut.out" ||
+    fail "the lien mutant was not reported: $(<"$work/mut.out")"
+
 # Each form must be reported, and the safe ones not.
 cat >"$work/forms.c" <<'CEOF'
 f() {
@@ -52,6 +66,14 @@ f() {
   fprintf(stderr, "k %s", heap(i)->adr); /* hit */
   fputs(urladr(), stdout); /* hit */
   fputs(adr, fp);
+  fprintf(ioinfo, "n %s", adr); /* hit */
+  hts_log_print(opt, LOG_INFO, "o %s", lien); /* hit */
+  printf("p %s %s", url, link); /* hit */
+  fprintf(stderr, "q %s", line); /* hit */
+  hts_log_print(opt, LOG_DEBUG, "r %s", codebase); /* hit */
+  printf("s %d", (int) sizeof(url));
+  /* printf("t %s", lien); */
+  printf("u // %s", "lien");
 #if HDEBUG
   printf("l %s", adr);
 #else

@@ -875,9 +875,14 @@ int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_back * b
                 //
                 s[0] = '\0';
                 strcpybuff(StatsBuffer[index].url_sav, back[i].url_sav);        // pour cancel
-                if (strcmp(back[i].url_adr, "file://"))
-                  strcatbuff(s, back[i].url_adr);
-                else
+                if (strcmp(back[i].url_adr, "file://")) {
+                  size_t keep;
+                  const char *const host =
+                      stats_skip_login(back[i].url_adr, &keep);
+
+                  strncatbuff(s, back[i].url_adr, keep);
+                  strcatbuff(s, host);
+                } else
                   strcatbuff(s, "localhost");
                 /* url_adr and url_fil are each as wide as s, and this is
                    the progress display: clip rather than abort */

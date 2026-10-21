@@ -4361,16 +4361,34 @@ static void append_clipped(char *buf, size_t size, size_t *len, const char *s,
   buf[*len] = '\0';
 }
 
+/* Returns adr past its scheme and "//", the engine's or any "scheme://". */
+static const char *login_start(const char *adr) {
+  const char *const known = jump_protocol_const(adr);
+  const char *s = adr;
+
+  if (known != adr || !isalpha((unsigned char) *s))
+    return known;
+  while (isalnum((unsigned char) *s) || *s == '+' || *s == '-' || *s == '.')
+    s++;
+  return strncmp(s, "://", 3) == 0 ? s + 3 : adr;
+}
+
+/* Returns adr past its login, or login_start(adr) when it has none. */
+static const char *login_end(const char *adr) {
+  const char *const start = login_start(adr);
+  const char *const at = strrchr_limit(start, '@', strchr(start, '/'));
+
+  return at != NULL ? at : start;
+}
+
 /* Returns HTS_TRUE when adr has a login, a user alone included. */
 static hts_boolean has_login(const char *adr) {
-  // "file://" is its own host, ahead of its scheme's end
-  return jump_identification_const(adr) > jump_protocol_const(adr) ? HTS_TRUE
-                                                                   : HTS_FALSE;
+  return login_end(adr) > login_start(adr) ? HTS_TRUE : HTS_FALSE;
 }
 
 const char *adr_nologin_r(char *buf, size_t size, const char *adr) {
-  const char *const scheme = jump_protocol_const(adr);
-  const char *const host = jump_identification_const(adr);
+  const char *const scheme = login_start(adr);
+  const char *const host = login_end(adr);
   const char *colon;
   size_t len = 0;
 
@@ -4390,7 +4408,7 @@ const char *adr_nologin_r(char *buf, size_t size, const char *adr) {
 }
 
 const char *url_nologin_r(char *buf, size_t size, const char *url) {
-  return jump_protocol_const(url) != url ? adr_nologin_r(buf, size, url) : url;
+  return login_start(url) != url ? adr_nologin_r(buf, size, url) : url;
 }
 
 const char *adr_nologin(httrackp *opt, const char *adr) {
@@ -4398,12 +4416,12 @@ const char *adr_nologin(httrackp *opt, const char *adr) {
     return adr;
   // no buffer to mask into: drop the whole login
   if (opt == NULL)
-    return jump_identification_const(adr);
+    return login_end(adr);
   return adr_nologin_r(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), adr);
 }
 
 const char *url_nologin(httrackp *opt, const char *url) {
-  return jump_protocol_const(url) != url ? adr_nologin(opt, url) : url;
+  return login_start(url) != url ? adr_nologin(opt, url) : url;
 }
 
 // Returns source past its login (user:pass@), if any.

@@ -3,7 +3,8 @@
 
 A log call is hts_log_print(), hts_log_vprint(), printf(), or fprintf() or
 fputs() to a log file, stdout or stderr. Its arguments must pass every adr,
-url_adr or urladr() through adr_nologin() or url_nologin(). An allowed call
+url_adr, urladr(), lien, url, link, line or codebase through adr_nologin() or
+url_nologin(). A log file includes hts-ioinfo.txt. An allowed call
 is named "file: format" in ALLOW. Code under "#if 0" or a debug switch such
 as "#if HDEBUG" is skipped. A call through a macro wrapper, or an address
 held in an alias variable, is not detected.
@@ -13,13 +14,16 @@ import re
 import sys
 
 CALL = re.compile(r"\b(hts_log_print|hts_log_vprint|printf|fprintf|fputs)\s*\(")
-LOG_FILE = re.compile(r"(opt->log|log|fp_log|stdout|stderr)\s*$")
+LOG_FILE = re.compile(r"(opt->log|log|fp_log|ioinfo|stdout|stderr)\s*$")
 SAFE = re.compile(
     r"\b(adr_nologin|url_nologin|jump_identification_const|jump_identification)"
     r"\s*\("
 )
-ADDRESS = re.compile(r"\b\w*adr\b")
-NULL_TEST = re.compile(r"\b\w*adr\b\s*(\(\s*\))?\s*[!=]=\s*NULL")
+ADDRESS = re.compile(r"\b(\w*adr|lien|url|link|line|codebase)\b")
+NULL_TEST = re.compile(
+    r"\b(\w*adr|lien|url|link|line|codebase)\b\s*(\(\s*\))?\s*[!=]=\s*NULL"
+)
+SIZEOF = re.compile(r"\bsizeof\s*\(\s*\w+\s*\)")
 DEBUG_IF = re.compile(r"\s*#\s*if(def)?\s+(0|\w*DEBUG\w*(\s*==\s*\d+)?)\s*(/[/*].*)?$")
 # Calls whose address argument is not printed as text, with the reason.
 ALLOW = {
@@ -27,6 +31,8 @@ ALLOW = {
     "htsback.c: illegal chunk CRLF (%s) for %s%s": "chunk_adr is a chunk size",
     "htscore.c: dump 1024 bytes (address %p): ": "a pointer",
     "htscoremain.c: X-Host: %s\\r\\n": "the -#C cache dump lists the entry",
+    "htscoremain.c: X-URL: %s\\r\\nX-Cache-Entry-Unreadable: yes\\r\\n\\r\\n": "-#C",
+    "htscoremain.c: X-URL: %s\\r\\n": "-#C",
     "htscoremain.c: %s\\r\\n": "r.adr is the page body",
 }
 
@@ -44,6 +50,35 @@ def drop_debug(src):
             line = ""
         out.append("" if stack and stack[-1] else line)
     return "\n".join(out)
+
+
+def drop_comments(src):
+    """Blanks comments, keeping line numbers and string literals."""
+    out, i, quote = [], 0, None
+    while i < len(src):
+        c = src[i]
+        if quote:
+            if c == "\\":
+                out.append(src[i : i + 2])
+                i += 2
+                continue
+            if c == quote:
+                quote = None
+        elif c in "\"'":
+            quote = c
+        elif src.startswith("/*", i):
+            end = src.find("*/", i + 2)
+            end = len(src) if end < 0 else end + 2
+            out.append(re.sub(r"[^\n]", " ", src[i:end]))
+            i = end
+            continue
+        elif src.startswith("//", i):
+            end = src.find("\n", i)
+            i = len(src) if end < 0 else end
+            continue
+        out.append(c)
+        i += 1
+    return "".join(out)
 
 
 def call_end(s, i):
@@ -103,7 +138,7 @@ def main(paths):
     used, names = set(), set()
     for path in paths:
         with open(path, encoding="latin-1") as f:
-            src = drop_debug(f.read())
+            src = drop_debug(drop_comments(f.read()))
         name = path.rsplit("/", 1)[-1]
         names.add(name)
         for m in CALL.finditer(src):
@@ -113,7 +148,7 @@ def main(paths):
             ):
                 continue
             args = strip_safe(strip_literals(call[call.index("(") + 1 :]))
-            args = NULL_TEST.sub("", args)
+            args = SIZEOF.sub("", NULL_TEST.sub("", args))
             if not ADDRESS.search(args):
                 continue
             key = "%s: %s" % (name, first_format(call))
