@@ -1899,6 +1899,29 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
         ROW("d.test\tTRUE\t/\tFALSE\r\t0\tn\tv\n", 1),
         // a CRLF ends the line, so it is no CR in the value
         ROWR("d.test\tTRUE\t/\tFALSE\t0\tn\tv\r\n", 0, "\tn\tv\n"),
+        // a public suffix such as "com" loads host-only, so it reaches no other
+        ROWR(".com\tTRUE\t/\tFALSE\t0\tsfx\t1\n", 0,
+             ".com\tFALSE\t/\tFALSE\t0\tsfx\t1\n"),
+        ROWR("CO.UK\tTRUE\t/\tFALSE\t0\tsfx\t1\n", 0,
+             "co.uk\tFALSE\t/\tFALSE\t0\tsfx\t1\n"),
+        ROWR("nas\tTRUE\t/\tFALSE\t0\tsfx\t1\n", 0,
+             "nas\tFALSE\t/\tFALSE\t0\tsfx\t1\n"),
+        ROWR("#HttpOnly_.com\tTRUE\t/\tFALSE\t0\tsfx\t1\n", 0,
+             ".com\tFALSE\t/\tFALSE\t0\tsfx\t1\tHttpOnly\n"),
+        ROWA(".com\tTRUE\t/\tFALSE\t1\tsfx\t1\n", 0, "sfx"),
+        ROWR("com\tFALSE\t/\tFALSE\t0\tsfx\t1\n", 0,
+             "com\tFALSE\t/\tFALSE\t0\tsfx\t1\n"),
+        ROWR(".example.co.uk\tTRUE\t/\tFALSE\t0\tsfx\t1\n", 0,
+             ".example.co.uk\tTRUE\t/\tFALSE\t0\tsfx\t1\n"),
+        ROWR("example.com.\tTRUE\t/\tFALSE\t0\tsfx\t1\n", 0,
+             "example.com.\tTRUE\t/\tFALSE\t0\tsfx\t1\n"),
+        // a trailing-dot suffix stays host-only too
+        ROWR("com.\tTRUE\t/\tFALSE\t0\tsfx\t1\n", 0,
+             "com.\tFALSE\t/\tFALSE\t0\tsfx\t1\n"),
+        ROWR("127.0.0.1\tTRUE\t/\tFALSE\t0\tsfx\t1\n", 0,
+             "127.0.0.1\tTRUE\t/\tFALSE\t0\tsfx\t1\n"),
+        ROWR("::1\tTRUE\t/\tFALSE\t0\tsfx\t1\n", 0,
+             "::1\tTRUE\t/\tFALSE\t0\tsfx\t1\n"),
         ROW("# my own note\n", 1),
         ROW("# Netscape HTTP Cookie File (my note)\n", 1),
         ROW("# Edit at your own risk. Mine.\n", 1),
@@ -1985,6 +2008,82 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
           NULL) {
         printf("%s: an eighth HttpOnly field saved as [%s]\n", LABEL, text);
         err = 1;
+      }
+    }
+    /* A Domain= naming a suffix host stays host-only through a save and a
+       reload, and an old jar's TRUE line for one loads as host-only. */
+    {
+      static const struct {
+        const char *line; // NULL: a Set-Cookie from host instead
+        const char *host, *sub;
+      } sfx[] = {
+          {NULL, "localhost", "www.localhost"},
+          {".localhost\tTRUE\t/\tFALSE\t0\tsfx\t1\n", "localhost",
+           "www.localhost"},
+          {"nas\tTRUE\t/\tFALSE\t0\tsfx\t1\n", "nas", "www.nas"},
+      };
+
+      for (i = 0; i < sizeof(sfx) / sizeof(sfx[0]); i++) {
+        int skipped;
+
+        jar.data[0] = '\0';
+        if (sfx[i].line == NULL) {
+          htsblk r;
+          char line[64]; // treathead NUL-cuts the header in place
+
+          memset(&r, 0, sizeof(r));
+          strcpybuff(line, "Set-Cookie: sfx=1; Domain=localhost");
+          treathead(&jar, sfx[i].host, "/", &r, line);
+          assertf(cookie_save(NULL, &jar, file) == 0);
+        } else {
+          FILE *fp = FOPEN(file, "wb");
+
+          assertf(fp != NULL);
+          fprintf(fp, "%s", sfx[i].line);
+          fclose(fp);
+        }
+        jar.data[0] = '\0';
+        skipped = cookie_load(NULL, &jar, fpath, "cookies.txt");
+        http_cookie_header(&jar, sfx[i].host, "/", hdr, sizeof(hdr));
+        if (skipped != 0 || !cookie_sent(hdr, "sfx=1")) {
+          printf("%s: suffix row %d: %d skipped, not sent to %s, jar [%s]\n",
+                 LABEL, (int) i, skipped, sfx[i].host, jar.data);
+          err = 1;
+        }
+        http_cookie_header(&jar, sfx[i].sub, "/", hdr, sizeof(hdr));
+        if (cookie_sent(hdr, "sfx=1")) {
+          printf("%s: suffix row %d: sent to %s\n", LABEL, (int) i, sfx[i].sub);
+          err = 1;
+        }
+      }
+    }
+    // only a live line that loses its subdomains says so
+    {
+      static const struct {
+        const char *line;
+        hts_boolean warns;
+      } logs[] = {
+          {".com\tTRUE\t/\tFALSE\t0\tsfx\t1\n", HTS_TRUE},
+          {"com\tFALSE\t/\tFALSE\t0\tsfx\t1\n", HTS_FALSE},
+          {".com\tTRUE\t/\tFALSE\t1\tsfx\t1\n", HTS_FALSE},
+      };
+
+      for (i = 0; i < sizeof(logs) / sizeof(logs[0]); i++) {
+        cookie_logcap cap;
+        char logged[1024];
+        FILE *fp = FOPEN(file, "wb");
+
+        assertf(fp != NULL);
+        fprintf(fp, "%s", logs[i].line);
+        fclose(fp);
+        jar.data[0] = '\0';
+        cookie_log_start(opt, &cap);
+        (void) cookie_load(opt, &jar, fpath, "cookies.txt");
+        cookie_log_stop(opt, &cap, logged, sizeof(logged));
+        if ((strstr(logged, "public suffix") != NULL) != logs[i].warns) {
+          printf("%s: suffix log row %d logged [%s]\n", LABEL, (int) i, logged);
+          err = 1;
+        }
       }
     }
     (void) UNLINK(file);

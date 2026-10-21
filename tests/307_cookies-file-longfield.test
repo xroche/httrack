@@ -30,7 +30,7 @@ jar="$tmp/jar.txt"
     rec www.example.com / GOODFIRST v1
     rec "$(repeat_chars 2000 A)" / DOM2000 v
     rec "$(repeat_chars 256 A)" / DOM256 v
-    rec "$(repeat_chars 255 A)" / DOM255 v
+    rec "$(repeat_chars 251 A).COM" / DOM255 v
     rec www.example.com "/$(repeat_chars 1999 A)" PATH2000 v
     rec www.example.com "/$(repeat_chars 255 A)" PATH256 v
     rec www.example.com "/$(repeat_chars 254 A)" PATH255 v
@@ -76,7 +76,7 @@ log=$(tr -d '\r' <"$out/hts-log.txt")
 # only the rest of the line says the field was cut
 # the domain comes back lowercased (#1625), the uppercase path beside it does not
 for want in "$(rec www.example.com / GOODFIRST v1)" \
-    "$(rec "$(repeat_chars 255 a)" / DOM255 v)" \
+    "$(rec "$(repeat_chars 251 a).com" / DOM255 v)" \
     "$(rec www.example.com "/$(repeat_chars 254 A)" PATH255 v)" \
     "$(rec www.example.com / "NAME2000$(repeat_chars 1992 A)" v)" \
     "$(rec www.example.com / BIGVAL "$(repeat_chars 500 v)")" \

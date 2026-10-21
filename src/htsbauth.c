@@ -98,6 +98,7 @@ hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size) {
 
 static char *cookie_find_exact(char *s, const char *cook_name,
                                const char *domain, const char *path);
+static hts_boolean cookie_domain_is_suffix(const char *domain);
 
 /* See htsbauth.h. Records are kept longest path first. */
 int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
@@ -113,6 +114,7 @@ int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
   char *old;
   size_t used;
   char cook[16384];
+  hts_boolean host_only;
 
   if (attr == NULL)
     attr = &session;
@@ -135,6 +137,8 @@ int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
     return -1;
 
   domain = host;
+  // a public suffix such as "com" reaches only that host (RFC 6265 5.3 step 5)
+  host_only = attr->host_only || cookie_domain_is_suffix(domain);
   /* The record this one replaces still holds its room, so count it free, but
      remove it only once the new one is known to fit. */
   old = cookie_find_exact(cookie->data, cook_name, domain, path);
@@ -159,7 +163,7 @@ int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
      form marks HttpOnly with a "#HttpOnly_" prefix instead (see cookie_save).
      The checks above bound the record far below sizeof(cook). */
   (void) snprintf(cook, sizeof(cook), "%s\t%s\t%s\t%s\t" LLintP "\t%s\t%s%s\n",
-                  domain, attr->host_only ? "FALSE" : "TRUE", path,
+                  domain, host_only ? "FALSE" : "TRUE", path,
                   attr->secure ? "TRUE" : "FALSE", (LLint) attr->expires,
                   cook_name, cook_value,
                   attr->http_only ? "\t" COOKIE_HTTPONLY_FIELD : "");
@@ -278,6 +282,28 @@ hts_boolean cookie_domain_match(const char *jar_dom, const char *host) {
   return HTS_TRUE;
 }
 
+/* Is DOMAIN a public suffix such as "com"? A leading or trailing dot is
+   ignored. */
+static hts_boolean cookie_domain_is_suffix(const char *domain) {
+  char dom[256];
+  size_t len;
+
+  if (domain[0] == '.')
+    domain++;
+  len = strlen(domain);
+  if (len != 0 && domain[len - 1] == '.')
+    len--;
+  if (len == 0 || !hts_psl_loaded() || hts_host_is_address(domain, len))
+    return HTS_FALSE;
+  // no caller passes a longer one, and a clipped copy names another domain
+  if (len >= sizeof(dom))
+    return HTS_FALSE;
+  dom[0] = '\0';
+  strlncatbuff(dom, domain, sizeof(dom), len);
+  hts_lowcase(dom);
+  return hts_psl_registrable_domain(dom) == NULL;
+}
+
 /* See htsbauth.h. */
 hts_boolean cookie_domain_allowed(const char *domain, const char *host) {
   char dom[256];
@@ -293,8 +319,7 @@ hts_boolean cookie_domain_allowed(const char *domain, const char *host) {
     return HTS_TRUE;
   if (!cookie_domain_match(dom, host))
     return HTS_FALSE;
-  // a public suffix such as "com" would reach every host under it
-  return !hts_psl_loaded() || hts_psl_registrable_domain(dom) != NULL;
+  return !cookie_domain_is_suffix(dom);
 }
 
 /* RFC 6265bis 5.6.1 caps a cookie's life at 400 days, which also keeps the
@@ -1024,6 +1049,12 @@ int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *fpath,
                     cookie_find_exact(seen->data, cook_name, host, path) !=
                         NULL;
 
+                // cookie_set stores it host-only
+                if (!attr.host_only && cookie_domain_is_suffix(domain))
+                  hts_log_print(opt, LOG_WARNING,
+                                "Cookies: '%.64s' for the public suffix %s is "
+                                "now host-only: %s",
+                                cook_name, domain, given);
                 // the last one wins, as curl reads it, but a rewrite loses one
                 if (repeated) {
                   hts_log_print(opt, LOG_WARNING,

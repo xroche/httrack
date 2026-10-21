@@ -102,8 +102,9 @@ typedef struct cookie_attr {
 
 /** Store cook_name=cook_value for domain/path, with domain normalised by
     cookie_host, replacing the record of the same name, domain and path.
-    attr NULL means a session cookie that subdomains also get. !=0 if the jar
-    refused it, an empty domain included. */
+    attr NULL means a session cookie that subdomains also get, except for a
+    public suffix, which stays host-only. !=0 if the jar refused it, an empty
+    domain included. */
 int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
                const char *domain, const char *path, const cookie_attr *attr);
 
