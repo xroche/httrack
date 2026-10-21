@@ -11,6 +11,7 @@ set -euo pipefail
 require_httrack
 
 TAB=$'\t'
+CR=$'\r'
 
 python=$(find_python) || skip "python3 missing"
 
@@ -44,15 +45,21 @@ crawl() { # crawl TAG URL [extra httrack args...]
 
 printf '127.0.0.1\tFALSE\t/\tFALSE\t2999999999\tjarsess\tJARSECRET\n' \
     >"$tmpdir/cookies.txt"
+# -%X drops the blank before the colon (#1996), so only a response keeps one
 crawl jar "http://urluser:URLSECRET@127.0.0.1:$port/setcookie.html" \
     -%X "Proxy-Authorization : Bearer PROXYSECRET"
 rm "$tmpdir/cookies.txt"
-crawl box "http://127.0.0.1:$port/plain.html" -%X "authorization: Bearer AUTHSECRET"
+crawl box "http://127.0.0.1:$port/plain.html" -%X "authorization: Bearer AUTHSECRET" \
+    -%X "Cookie2: VISIBLE3"
 
 basic=$(printf urluser:URLSECRET | base64)
 log=$(<"$tmpdir/ioinfo")
 sent=$(<"$wire")
-grep -q "^>>> X-Visible: shown" <<<"$log" || fail "the response headers were not logged: $log"
+# a field whose name only starts like a hidden one stays in clear
+for line in ">>> X-Visible: shown" ">>> X-Cookie-Id: VISIBLE2" \
+    "<<< Cookie2: VISIBLE3" ">>> Authorization-Info: VISIBLE4"; do
+    grep -qxF "$line$CR" <<<"$log" || fail "no '$line' in hts-ioinfo.txt: $log"
+done
 # the server sent these, so only the request secrets are on the wire
 for secret in JARSECRET PROXYSECRET AUTHSECRET "$basic" "srvsess=SETCOOKIESECRET"; do
     grep -qF "$secret" <<<"$sent" || fail "$secret never reached the server"
@@ -75,22 +82,45 @@ done
 ok "HTTP login headers are redacted in the log and sent in full"
 
 # A cookie the loader refuses is logged by its name, never by its value.
-printf 'dup=1; dup=DUPSECRET; =NONAMESECRET; BARESECRET\n' >"$tmpdir/flat.txt"
+printf 'dup=1; dup=DUPSECRET; =NONAMESECRET\n' >"$tmpdir/flat.txt"
 crawl flat "http://127.0.0.1:$port/plain.html" --cookies-file "$tmpdir/flat.txt"
-printf '#HTTPOnly_127.0.0.1\tFALSE\t/\tFALSE\t0\tcomname\tCOMMENTSECRET\n' \
-    >"$tmpdir/jar.txt"
+printf 'ok=1; BARESECRET\n' >"$tmpdir/bare.txt"
+crawl bare "http://127.0.0.1:$port/plain.html" --cookies-file "$tmpdir/bare.txt"
+printf '%s\n' "#HTTPOnly_127.0.0.1${TAB}FALSE$TAB/${TAB}FALSE${TAB}0${TAB}comname${TAB}TABSECRET" \
+    "# SID=EQSECRET" "#TOKSECRET" >"$tmpdir/jar.txt"
 crawl netscape "http://127.0.0.1:$port/plain.html" --cookies-file "$tmpdir/jar.txt"
-log=$(cat "$tmpdir/flat/hts-log.txt" "$tmpdir/netscape/hts-log.txt")
-for secret in DUPSECRET NONAMESECRET BARESECRET COMMENTSECRET; do
+for tag in flat bare netscape; do
+    log=$(<"$tmpdir/$tag/hts-log.txt")
+    for secret in DUPSECRET NONAMESECRET BARESECRET TABSECRET EQSECRET TOKSECRET; do
+        if grep -qF "$secret" <<<"$log"; then
+            fail "$secret is in hts-log.txt: $(grep -F "$secret" <<<"$log")"
+        fi
+    done
+done
+grep -qF "ignoring a repeated 'dup'" "$tmpdir/flat/hts-log.txt" || fail "no repeated 'dup'"
+grep -qF "a cookie with no name" "$tmpdir/flat/hts-log.txt" || fail "no nameless =value"
+grep -qF "a cookie with no name" "$tmpdir/bare/hts-log.txt" || fail "no bare value"
+for n in 1 2 3; do
+    grep -qF "unknown comment on line $n of $tmpdir/jar.txt" "$tmpdir/netscape/hts-log.txt" ||
+        fail "no unknown comment on line $n: $(<"$tmpdir/netscape/hts-log.txt")"
+done
+ok "a refused cookie is logged without its value"
+
+# A password in a URL, a proxy or a -%X header never reaches hts-log.txt.
+crawl proxy "http://127.0.0.1:$port/plain.html" -P "puser:PPWSECRET@127.0.0.1:$port"
+grep -qF "Proxy-Authorization: Basic $(printf puser:PPWSECRET | base64)" "$wire" ||
+    fail "the proxy password never reached the proxy"
+log=$(cat "$tmpdir/jar/hts-log.txt" "$tmpdir/box/hts-log.txt" "$tmpdir/proxy/hts-log.txt")
+for secret in URLSECRET PPWSECRET AUTHSECRET PROXYSECRET; do
     if grep -qF "$secret" <<<"$log"; then
         fail "$secret is in hts-log.txt: $(grep -F "$secret" <<<"$log")"
     fi
 done
-for line in "ignoring a repeated 'dup'" "a cookie with no name" \
-    "unknown comment in $tmpdir/jar.txt: #HTTPOnly_127.0.0.1"; do
+for line in "urluser:***@127.0.0.1:$port/setcookie.html" "puser:***@127.0.0.1:$port" \
+    "authorization: <redacted, 17 bytes>"; do
     grep -qF "$line" <<<"$log" || fail "no '$line' in hts-log.txt: $log"
 done
-ok "a refused cookie is logged without its value"
+ok "hts-log.txt masks the passwords of URLs, proxies and -%X headers"
 
 root="$tmpdir/root"
 cmds="$tmpdir/cmds"
@@ -105,4 +135,10 @@ if grep -qF FTPSECRET <<<"$log"; then
     fail "the FTP password is in hts-ioinfo.txt"
 fi
 grep -qF -- "---> PASS <redacted, 9 bytes>" <<<"$log" || fail "no redacted PASS: $log"
+# the user name alone is no secret, so it stays
+grep -qF -- "---> USER ftpuser" <<<"$log" || fail "no USER in clear: $log"
+if grep -qF FTPSECRET "$tmpdir/ftp/hts-log.txt"; then
+    fail "the FTP password is in hts-log.txt"
+fi
+grep -qF "ftpuser:***@" "$tmpdir/ftp/hts-log.txt" || fail "no masked FTP URL in hts-log.txt"
 ok "the FTP password is redacted in the log and sent in full"

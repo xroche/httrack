@@ -5810,9 +5810,40 @@ void fprint_redacted(FILE *fp, size_t len) {
   fprintf(fp, "<redacted, %lu bytes>", (unsigned long) len);
 }
 
-/* Fields whose value carries a login, hidden from the -%H log. */
+/* The -%H log hides the value of these fields because they carry logins.
+   Unlike refused[] and single[], this list governs the log, not the wire. */
 static const char *const secret_fields[] = {
     "Authorization", "Proxy-Authorization", "Cookie", "Set-Cookie"};
+
+char *hts_mask_passwords(const char *s) {
+  const size_t len = strlen(s);
+  /* each mask eats at least ':' and '@' and writes 3 bytes */
+  char *const dst = (char *) malloct(len * 2 + 1);
+  size_t i, o = 0, start = 0;
+
+  if (dst == NULL)
+    return NULL;
+  for (i = 0; i < len; i++) {
+    if (s[i] == '@') {
+      const char *const colon = memchr(s + start, ':', i - start);
+
+      // mailto:user@host names an address, not a login
+      if (colon != NULL && !strfield(s + start, "mailto:")) {
+        const size_t user = (size_t) (colon - s) + 1;
+
+        o -= i - user;
+        memcpy(dst + o, "***", 3);
+        o += 3;
+      }
+      start = i + 1;
+    } else if (strchr(" \t\r\n\"'<>()/,;=", s[i]) != NULL) {
+      start = i + 1;
+    }
+    dst[o++] = s[i];
+  }
+  dst[o] = '\0';
+  return dst;
+}
 
 void fprintfio(FILE *fp, const char *buff, const char *prefix) {
   hts_boolean nl = HTS_TRUE;
@@ -7290,8 +7321,25 @@ HTSEXT_API void hts_log_vprint(httrackp * opt, int type, const char *format, va_
     fspc_count(opt, s_type);
 
     if (opt->log != NULL) {
+      va_list args_len;
+      int n;
+
+      va_copy(args_len, args);
+      n = vsnprintf(NULL, 0, format, args_len);
+      va_end(args_len);
       fspc(opt, opt->log, s_type);
-      (void) vfprintf(opt->log, format, args);
+      if (n >= 0) {
+        char *line = (char *) malloct((size_t) n + 1);
+        char *masked =
+            line != NULL && vsnprintf(line, (size_t) n + 1, format, args) == n
+                ? hts_mask_passwords(line)
+                : NULL;
+
+        // never the raw line, which may hold a password
+        fputs(masked != NULL ? masked : "(log line lost)", opt->log);
+        freet(masked);
+        freet(line);
+      }
       if ((type & LOG_ERRNO) != 0) {
         char errbuf[HTS_STRERROR_SIZE];
 

@@ -940,6 +940,7 @@ int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *fpath,
       char BIGSTK line[8192];
       const size_t line_max = 8000;
       hts_boolean first_line = HTS_TRUE;
+      int lineno = 0;
       // this load's records alone, so a line repeating one is caught
       t_cookie *seen = (t_cookie *) calloct(1, sizeof(t_cookie));
 
@@ -957,6 +958,8 @@ int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *fpath,
 
         // len counts what the buffer cut too, so this catches that line
         cookie_readline(fp, line, sizeof(line), &len);
+        if (lineno < INT_MAX)
+          lineno++;
         if (first_line && len >= sizeof(cookie_bom) - 1 &&
             strncmp(line, cookie_bom, sizeof(cookie_bom) - 1) == 0) {
           len -= sizeof(cookie_bom) - 1;
@@ -986,11 +989,11 @@ int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *fpath,
 
           if (rec[0] == '#') {
             if (!cookie_known_comment(rec)) {
-              // the first field only, because a later one may be a value
+              // no line text, because any part of it can hold a cookie value
               hts_log_print(opt, LOG_WARNING,
-                            "Cookies: ignoring an unknown comment in %s: %.*s",
-                            given, (int) min(strcspn(rec, "\t"), (size_t) 64),
-                            rec);
+                            "Cookies: ignoring an unknown comment on line %d "
+                            "of %s",
+                            lineno, given);
               refused++;
             }
           } else {

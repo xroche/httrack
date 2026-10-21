@@ -3109,18 +3109,29 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       }
       // fichier log        
       if (opt->log) {
+        char *masked_url = hts_mask_passwords(url);
         int i;
 
         fprintf(opt->log,
                 "HTTrack" HTTRACK_VERSION "%s launched on %s at %s" LF,
-                hts_get_version_info(opt), t, url);
+                hts_get_version_info(opt), t,
+                masked_url != NULL ? masked_url : "(out of memory)");
+        freet(masked_url);
         fprintf(opt->log, "(");
         for(i = 0; i < argc; i++) {
           const char *arg = argv[i]; // already UTF-8 on every platform
-          if (strchr(arg, ' ') == NULL || strchr(arg, '\"') != NULL)
-            fprintf(opt->log, "%s ", arg);
-          else                  // entre "" (si espace(s) et pas déja de ")
-            fprintf(opt->log, "\"%s\" ", arg);
+          char *masked = hts_mask_passwords(arg);
+          // quoted if it holds a blank and no quote
+          const hts_boolean quote =
+              strchr(arg, ' ') != NULL && strchr(arg, '\"') == NULL;
+
+          if (quote)
+            fputc('"', opt->log);
+          // a -%X login header gets the -%H log's redaction
+          if (masked != NULL)
+            fprintfio(opt->log, masked, "");
+          fputs(quote ? "\" " : " ", opt->log);
+          freet(masked);
         }
         fprintf(opt->log, ")" LF);
         fprintf(opt->log, LF);

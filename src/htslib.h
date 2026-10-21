@@ -545,6 +545,10 @@ int multipleStringMatch(const char *s, const char *match);
    field that carries a login replaced by the fprint_redacted() marker. */
 void fprintfio(FILE * fp, const char *buff, const char *prefix);
 
+/* Returns a copy of s, allocated with malloct, in which the password of every
+   user:pass@ is *** . The user and the host stay. NULL when out of memory. */
+char *hts_mask_passwords(const char *s);
+
 /* Writes the marker that stands for a hidden secret of len bytes. */
 void fprint_redacted(FILE *fp, size_t len);
 

@@ -75,6 +75,8 @@ def extra_headers(request):
             b"Set-Cookie: srvsess=SETCOOKIESECRET; Path=/\r\n"
             b"set-cookie\t: spaced=SPACEDSECRET;\r\n\tfolded=FOLDEDSECRET\r\n"
             b"X-Visible: shown\r\n"
+            b"X-Cookie-Id: VISIBLE2\r\n"
+            b"Authorization-Info: VISIBLE4\r\n"
         )
     return b""
 
