@@ -141,6 +141,8 @@ static int st_retryafter(httrackp *opt, int argc, char **argv) {
       {"120", 120},
       {" 120", 120},
       {"120\r\n", 120},
+      {"120 ", 120},
+      {"120\t", 120},
       {"0", 0},
       /* clipped, never wrapped negative; INT_MAX itself must survive intact */
       {"2147483640", 2147483640}, /* just under: clipping it is an off-by-one */
@@ -152,7 +154,7 @@ static int st_retryafter(httrackp *opt, int argc, char **argv) {
       {"Sun, 06 Nov 1994 08:50:37 GMT", 60},
       {"Sun, 06 Nov 1994 08:49:37 GMT", 0},
       {"Sun, 06 Nov 1994 08:48:37 GMT", 0}, /* already past, never negative */
-      {"06 Nov 1994 08:50:37 GMT", 60},     /* its first token is all digits */
+      {"06 Nov 1994 08:50:37 GMT", 60},     /* a date with no weekday */
       /* nothing usable: -1, which is what keeps a bare 503 fatal */
       {"", -1},
       {"   ", -1},
