@@ -2040,13 +2040,19 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                     htsmain_free();
                     return -1;
                   }
-                  /* kept, so the request drops its folded lines with it */
-                  if (http_header_line_refused(argv[na]))
-                    fprintf(stderr,
-                            "warning: -%%X framing header ignored: %s\n",
-                            argv[na]);
-                  StringCat(opt->headers, argv[na]);
-                  StringCat(opt->headers, "\r\n");  /* separator */
+                  {
+                    const char *const why = http_custom_header_warning(
+                        StringBuff(opt->headers), argv[na]);
+
+                    if (why != NULL)
+                      fprintf(stderr, "warning: -%%X %s: %s\n", why, argv[na]);
+                  }
+                  /* A refused line goes in, so the request drops its folds. */
+                  if (StringNotEmpty(opt->headers) ||
+                      (argv[na][0] != ' ' && argv[na][0] != '\t')) {
+                    StringCat(opt->headers, argv[na]);
+                    StringCat(opt->headers, "\r\n"); /* separator */
+                  }
                 }
                 break;
                 //

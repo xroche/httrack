@@ -34,14 +34,69 @@ hd 'Cookie: a=b\r\n' "Cookie: a=b$CRLF"
 
 selftest_run_queued
 
-# The command line refuses it too, with a warning.
+python=$(find_python) || skip "python3 missing"
+
+server=$(nativepath "$top_srcdir/tests/header-injection-server.py")
 tmpdir=$(mktemp -d)
-cleanup() { rm -rf "$tmpdir"; }
+serverpid=
+wire=$tmpdir/wire
+nreq=0
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+}
 cleanup_push cleanup
-out=$(httrack -O "$tmpdir" -%X 'Content-Length: 5' -%X 'X-Kept: 1' \
-    "file://$tmpdir/none.html" --quiet 2>&1) || true
-grep -q 'warning: -%X framing header ignored: Content-Length: 5' \
-    <<<"$out" || fail "no warning for -%X Content-Length: $out"
-if grep -q 'X-Kept' <<<"$out"; then
-    fail "an ordinary -%X header drew a warning: $out"
+
+"$python" "$server" "$(nativepath "$wire")" >"$tmpdir/server.out" 2>"$tmpdir/server.err" &
+serverpid=$!
+port=$(discover_server_port "$tmpdir/server.out" "$serverpid") || exit 1
+
+# One crawl of a leaf page: the request bytes land in $tmpdir/TAG.req and
+# stderr in $tmpdir/TAG.err.
+probe() { # probe TAG [extra httrack args...]
+    local tag=$1 rc=0
+    shift
+    run_with_timeout 90 httrack "http://127.0.0.1:$port/plain.html" \
+        -O "$tmpdir/$tag.mirror" -c1 --robots=0 --retries=0 --quiet -%v0 \
+        "$@" >"$tmpdir/$tag.err" 2>&1 || rc=$?
+    test "$rc" -eq 0 || fail "$tag: the crawl exited $rc"
+    nreq=$((nreq + 1))
+    cp "$wire.$nreq" "$tmpdir/$tag.req"
+}
+
+lines() { # lines ERE TAG
+    count_matching_lines_regexp "$1" "$tmpdir/$2.req"
+}
+
+# The command line warns about it.
+warned() { # warned TAG TEXT
+    grep -qF "warning: -%X $2" "$tmpdir/$1.err" ||
+        fail "$1: no warning '$2': $(cat "$tmpdir/$1.err")"
+}
+
+probe framing -%X 'Content-Length: 5' -%X 'Transfer-Encoding : chunked' \
+    -%X 'X-Kept: 1'
+assert_eq 0 "$(lines '^(Content-Length|Transfer-Encoding)' framing)" \
+    'framing: the refused lines'
+assert_eq 1 "$(lines '^X-Kept: 1' framing)" 'framing: the kept line'
+warned framing 'framing header ignored: Content-Length: 5'
+warned framing 'framing header ignored: Transfer-Encoding : chunked'
+if grep -q 'X-Kept' "$tmpdir/framing.err"; then
+    fail "an ordinary -%X header drew a warning"
+fi
+
+probe host -%X 'Host : x'
+assert_eq 1 "$(lines '^Host' host)" 'host: Host lines'
+assert_eq 1 "$(lines '^Host : x' host)" 'host: the box Host'
+
+probe twohosts -%X 'Host: a' -%X 'Host: b'
+assert_eq 1 "$(lines '^Host' twohosts)" 'twohosts: Host lines'
+assert_eq 1 "$(lines '^Host: b' twohosts)" 'twohosts: the last Host'
+warned twohosts 'header replaces an earlier one: Host: b'
+
+probe orphan -%X ' orphan' -%X 'X-Kept: 1'
+# a launcher that strips the leading blank leaves no folded line to test
+if test "$(lines '^orphan' orphan)" -eq 0; then
+    assert_eq 0 "$(lines 'orphan' orphan)" 'orphan: the folded line'
+    warned orphan 'folded line with no header to continue ignored:  orphan'
 fi

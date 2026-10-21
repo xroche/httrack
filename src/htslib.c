@@ -1032,6 +1032,50 @@ hts_boolean hts_body_missing_unexpectedly(const htsblk *r) {
   return HTS_TRUE;
 }
 
+/* Length of the field name opening line, blanks before the colon trimmed, or 0
+   for a folded line or one with no colon. Any server that honours "Host : x"
+   reads it as Host, so the engine does too. */
+static size_t header_name_len(const char *line) {
+  size_t len;
+
+  if (*line == ' ' || *line == '\t')
+    return 0;
+  for (len = 0; line[len] != '\0' && line[len] != ':' && line[len] != '\r' &&
+                line[len] != '\n';
+       len++)
+    ;
+  if (line[len] != ':')
+    return 0;
+  while (len > 0 && (line[len - 1] == ' ' || line[len - 1] == '\t'))
+    len--;
+  return len;
+}
+
+/* Is the name opening line, len bytes long, the field name (case-insensitive)?
+ */
+static hts_boolean header_name_is(const char *line, size_t len,
+                                  const char *name, size_t name_len) {
+  size_t i = 0;
+
+  if (len != name_len)
+    return HTS_FALSE;
+  while (i < len && streql(line[i], name[i]))
+    i++;
+  return i == len;
+}
+
+static hts_boolean header_name_in(const char *line, const char *const *names,
+                                  size_t count) {
+  const size_t len = header_name_len(line);
+  size_t i;
+
+  for (i = 0; len != 0 && i < count; i++) {
+    if (header_name_is(line, len, names[i], strlen(names[i])))
+      return HTS_TRUE;
+  }
+  return HTS_FALSE;
+}
+
 hts_boolean http_headers_have_field(const char *headers,
                                     const char *field_name) {
   size_t len;
@@ -1046,13 +1090,7 @@ hts_boolean http_headers_have_field(const char *headers,
     return HTS_FALSE;
   /* anchored, so a folded line or a name inside a value cannot match */
   for (line = headers; *line != '\0';) {
-    size_t i = 0;
-
-    while (i < len && streql(line[i], field_name[i]))
-      i++;
-    /* RFC 7230 forbids a space before the colon: tolerating one would drop our
-       line for a malformed one the server then ignores */
-    if (i == len && line[len] == ':')
+    if (header_name_is(line, header_name_len(line), field_name, len))
       return HTS_TRUE;
     while (*line != '\0' && *line != '\n' && *line != '\r')
       line++;
@@ -1062,8 +1100,8 @@ hts_boolean http_headers_have_field(const char *headers,
   return HTS_FALSE;
 }
 
-hts_boolean http_header_line_refused(const char *line) {
-  /* Message framing and hop-by-hop fields the engine does not honour. */
+/* Fields that frame the message or act per hop. */
+static hts_boolean header_line_refused(const char *line) {
   static const char *const refused[] = {"Content-Length",
                                         "Transfer-Encoding",
                                         "Connection",
@@ -1071,35 +1109,45 @@ hts_boolean http_header_line_refused(const char *line) {
                                         "TE",
                                         "Upgrade",
                                         "Expect"};
-  size_t len, i;
 
-  if (line == NULL || *line == ' ' || *line == '\t')
-    return HTS_FALSE;
-  for (len = 0; line[len] != '\0' && line[len] != ':' && line[len] != '\r' &&
-                line[len] != '\n';
-       len++)
-    ;
-  if (line[len] != ':')
-    return HTS_FALSE;
-  /* a lenient server honours "Transfer-Encoding : chunked" all the same */
-  while (len > 0 && (line[len - 1] == ' ' || line[len - 1] == '\t'))
-    len--;
-  for (i = 0; i < sizeof(refused) / sizeof(refused[0]); i++) {
-    size_t j = 0;
+  return header_name_in(line, refused, sizeof(refused) / sizeof(refused[0]));
+}
 
-    while (j < len && streql(line[j], refused[i][j]))
-      j++;
-    if (j == len && refused[i][len] == '\0')
-      return HTS_TRUE;
+/* Fields a request carries once, so a later custom line overrides an earlier.
+ */
+static hts_boolean header_line_single(const char *line) {
+  static const char *const single[] = {"Host", "Cookie", "Authorization"};
+
+  return header_name_in(line, single, sizeof(single) / sizeof(single[0]));
+}
+
+const char *http_custom_header_warning(const char *headers, const char *line) {
+  if (*line == ' ' || *line == '\t')
+    return headers == NULL || *headers == '\0'
+               ? "folded line with no header to continue ignored"
+               : NULL;
+  if (header_line_refused(line))
+    return "framing header ignored";
+  if (header_line_single(line) && headers != NULL) {
+    char field[128];
+    const size_t len = header_name_len(line);
+
+    if (len < sizeof(field)) {
+      memcpy(field, line, len);
+      field[len] = '\0';
+      if (http_headers_have_field(headers, field))
+        return "header replaces an earlier one";
+    }
   }
-  return HTS_FALSE;
+  return NULL;
 }
 
 /* Dropping a line drops its folded continuations too: kept, that value would
    attach to whichever header precedes it in the request. */
 static void append_custom_headers(buff_struct *bstr, const char *headers) {
   const size_t base = bstr->pos;
-  hts_boolean keep = HTS_TRUE;
+  /* a leading folded line would attach to the engine's last header */
+  hts_boolean keep = HTS_FALSE;
   const char *line;
 
   for (line = headers; *line != '\0';) {
@@ -1115,15 +1163,11 @@ static void append_custom_headers(buff_struct *bstr, const char *headers) {
       next++;
 
     if (*line != ' ' && *line != '\t') { /* not a folded continuation */
-      const char *colon = line;
+      const size_t len = header_name_len(line);
       char field[128];
 
-      keep = !http_header_line_refused(line);
-      while (colon < eol && *colon != ':')
-        colon++;
-      if (keep && colon > line && colon < eol &&
-          (size_t) (colon - line) < sizeof(field)) {
-        const size_t len = (size_t) (colon - line);
+      keep = !header_line_refused(line);
+      if (keep && len != 0 && len < sizeof(field)) {
         const char cut = bstr->buffer[base];
 
         memcpy(field, line, len);
@@ -1132,6 +1176,10 @@ static void append_custom_headers(buff_struct *bstr, const char *headers) {
         bstr->buffer[base] = '\0';
         keep = !http_headers_have_field(bstr->buffer, field);
         bstr->buffer[base] = cut;
+        /* the last of a single-valued field wins, as later options do */
+        if (keep && header_line_single(line) &&
+            http_headers_have_field(next, field))
+          keep = HTS_FALSE;
       }
     }
     if (keep)

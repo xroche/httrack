@@ -643,7 +643,8 @@ void help(const char *app, int more) {
           " iframe frame image style script font audio video object embed");
   infomsg(" %X  additional HTTP header line (-%X \"X-Magic: 42\"; an Accept"
           " line replaces every computed Accept, per-kind values included;"
-          " framing fields like Content-Length are refused");
+          " Content-Length, Transfer-Encoding, Connection, Keep-Alive, TE,"
+          " Upgrade and Expect are dropped");
   infomsg(" %Q  send the headers a browser -F implies: its Accept values,"
           " header order and Sec-Fetch-*, and client hints over HTTPS (%Q0"
           " don't)");
