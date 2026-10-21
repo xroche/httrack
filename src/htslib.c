@@ -2567,7 +2567,7 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
                                 &attr) != 0) {
             hts_log_print(opt, LOG_WARNING,
                           "Cookies: the jar did not store '%.64s' set by %s",
-                          cook_name, adr_nologin(adr));
+                          cook_name, adr_nologin(opt, adr));
           }
         }
       }
@@ -4351,8 +4351,55 @@ char *FUN(char *source) { \
   return ret != NULL ? source + ( ret - source ) : NULL; \
 }
 
-// retourne le pointeur ou le pointeur + offset si il existe dans la chaine un @ signifiant 
-// une identification
+/* Appends n bytes of s at buf[*len], clipped to size - 1, NUL-terminated. */
+static void append_clipped(char *buf, size_t size, size_t *len, const char *s,
+                           size_t n) {
+  if (n > size - 1 - *len)
+    n = size - 1 - *len;
+  memcpy(buf + *len, s, n);
+  *len += n;
+  buf[*len] = '\0';
+}
+
+/* Returns the ':' before the password in the login of adr, or NULL when there
+   is no password. A user alone stays, as the command-line echo shows it. */
+static const char *password_colon(const char *adr) {
+  const char *const scheme = jump_protocol_const(adr);
+  const char *const host = jump_identification_const(adr);
+
+  // "file://" is its own host, ahead of its scheme's end
+  return host > scheme ? memchr(scheme, ':', (size_t) (host - scheme)) : NULL;
+}
+
+const char *adr_nologin_r(char *buf, size_t size, const char *adr) {
+  const char *const colon = password_colon(adr);
+  size_t len = 0;
+
+  if (colon == NULL || size == 0)
+    return adr;
+  buf[0] = '\0';
+  append_clipped(buf, size, &len, adr, (size_t) (colon - adr));
+  append_clipped(buf, size, &len, ":***@", 5);
+  append_clipped(buf, size, &len, jump_identification_const(adr),
+                 strlen(jump_identification_const(adr)));
+  return buf;
+}
+
+const char *url_nologin_r(char *buf, size_t size, const char *url) {
+  return jump_protocol_const(url) != url ? adr_nologin_r(buf, size, url) : url;
+}
+
+const char *adr_nologin(httrackp *opt, const char *adr) {
+  return password_colon(adr) != NULL
+             ? adr_nologin_r(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), adr)
+             : adr;
+}
+
+const char *url_nologin(httrackp *opt, const char *url) {
+  return jump_protocol_const(url) != url ? adr_nologin(opt, url) : url;
+}
+
+// Returns source past its login (user:pass@), if any.
 HTSEXT_API const char *jump_identification_const(const char *source) {
   const char *a, *trytofind;
 
@@ -4366,29 +4413,6 @@ HTSEXT_API const char *jump_identification_const(const char *source) {
 }
 
 HTSEXT_API DECLARE_NON_CONST_VERSION(jump_identification)
-
-    const char *adr_nologin(const char *adr) {
-  const char *const host = jump_identification_const(adr);
-
-  return host != jump_protocol_const(adr) ? host : adr;
-}
-
-const char *url_nologin(char *buf, size_t size, const char *url) {
-  const char *const a = jump_protocol_const(url);
-  const char *const host = jump_identification_const(url);
-  size_t n = (size_t) (a - url), m = strlen(host);
-
-  if (a == url || host == a || size == 0)
-    return url;
-  if (n > size - 1)
-    n = size - 1;
-  if (m > size - 1 - n)
-    m = size - 1 - n;
-  memcpy(buf, url, n);
-  memcpy(buf + n, host, m);
-  buf[n + m] = '\0';
-  return buf;
-}
 
 HTSEXT_API const char *jump_normalized_const(const char *source) {
   if (strcmp(source, "file://") == 0)
@@ -5838,6 +5862,28 @@ void fprint_redacted(FILE *fp, size_t len) {
 static const char *const secret_fields[] = {
     "Authorization", "Proxy-Authorization", "Cookie", "Set-Cookie"};
 
+/* The -%H log hides the password of the URL these fields carry. */
+static const char *const url_fields[] = {"Location", "Content-Location"};
+
+/* Writes the header line buff, len bytes long, with the password of its URL
+   value as ***. Returns HTS_FALSE, writing nothing, when out of memory. */
+static hts_boolean fprint_url_field(FILE *fp, const char *buff, size_t len) {
+  const char *const colon = memchr(buff, ':', len);
+  size_t keep = colon != NULL ? (size_t) (colon - buff) + 1 : len;
+  char *line = malloct(2 * len + 8);
+
+  if (line == NULL)
+    return HTS_FALSE;
+  while (keep < len && (buff[keep] == ' ' || buff[keep] == '\t'))
+    keep++;
+  memcpy(line, buff, len);
+  line[len] = '\0';
+  fwrite(line, 1, keep, fp);
+  fputs(url_nologin_r(line + len + 1, len + 7, line + keep), fp);
+  freet(line);
+  return HTS_TRUE;
+}
+
 /* Finds the password of the userinfo at the authority a: from the first ':'
    up to the last '@' before the first '/', the split
    jump_identification_const() makes. A token also ends at a blank. Returns
@@ -5939,9 +5985,14 @@ void fprintfio(FILE *fp, const char *buff, const char *prefix) {
       if (nl)
         fprintf(fp, "%s", prefix);
       nl = HTS_FALSE;
-      fwrite(buff, 1, keep, fp);
-      if (keep < len)
-        fprint_redacted(fp, len - keep);
+      if (secret || *buff == ' ' || *buff == '\t' ||
+          !header_name_in(buff, url_fields,
+                          sizeof(url_fields) / sizeof(url_fields[0])) ||
+          !fprint_url_field(fp, buff, len)) {
+        fwrite(buff, 1, keep, fp);
+        if (keep < len)
+          fprint_redacted(fp, len - keep);
+      }
     }
     buff += len;
     if (*buff == '\n') {

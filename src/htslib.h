@@ -556,17 +556,20 @@ typedef enum {
    when out of memory. */
 char *hts_mask_passwords(const char *s, hts_mask_mode mode);
 
-/* Returns the engine address adr without its login, for a log line: adr
-   itself when it has none, else the part after the login. */
-const char *adr_nologin(const char *adr);
+/* Log calls never print an address raw: pass adr_nologin() or url_nologin(),
+   which test 660 checks. */
 
-/* Returns url without its login, for a log line: url itself when it has no
-   scheme or no login, else a copy clipped to size bytes in buf. */
-const char *url_nologin(char *buf, size_t size, const char *url);
+/* Returns adr with its password as ***, for log lines: adr itself when it has
+   no password, else a copy clipped to size bytes in buf. */
+const char *adr_nologin_r(char *buf, size_t size, const char *adr);
 
-/* url_nologin() into one of the rotating buffers of opt. */
-#define URL_NOLOGIN(OPT, URL)                                                  \
-  url_nologin(OPT_GET_BUFF(OPT), OPT_GET_BUFF_SIZE(OPT), URL)
+/* Same as adr_nologin_r(), but only a URL with a scheme or "//" has a login. */
+const char *url_nologin_r(char *buf, size_t size, const char *url);
+
+/* adr_nologin_r() and url_nologin_r() into a rotating buffer of opt, which
+   they take only when there is a login. */
+const char *adr_nologin(httrackp *opt, const char *adr);
+const char *url_nologin(httrackp *opt, const char *url);
 
 /* Writes the marker that stands for a hidden secret of len bytes. */
 void fprint_redacted(FILE *fp, size_t len);

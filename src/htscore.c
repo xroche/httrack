@@ -991,7 +991,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
                  (int) (sizeof(url) - 1), url);
           hts_log_print(opt, LOG_WARNING,
                         "URL longer than %d bytes, ignored: %.64s...",
-                        (int) (sizeof(url) - 1), URL_NOLOGIN(opt, url));
+                        (int) (sizeof(url) - 1), url_nologin(opt, url));
           continue;
         }
 
@@ -1402,14 +1402,15 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
               )
           ) {                   // sauter si lien annulé (ou fil vide)
           if (heap(ptr) != NULL && heap(ptr)->pass2 == -1) {
-            hts_log_print(opt, LOG_DEBUG, "link #%d is ready, skipping: %s%s..",
-                          ptr, ((urladr() != NULL) ? (urladr()) : (" ")),
-                          ((urlfil() != NULL) ? (urlfil()) : (" ")));
+            hts_log_print(
+                opt, LOG_DEBUG, "link #%d is ready, skipping: %s%s..", ptr,
+                ((urladr() != NULL) ? adr_nologin(opt, urladr()) : (" ")),
+                ((urlfil() != NULL) ? (urlfil()) : (" ")));
           } else {
-            hts_log_print(opt, LOG_DEBUG,
-                          "link #%d seems ready, skipping: %s%s..", ptr,
-                          ((urladr() != NULL) ? (urladr()) : (" ")),
-                          ((urlfil() != NULL) ? (urlfil()) : (" ")));
+            hts_log_print(
+                opt, LOG_DEBUG, "link #%d seems ready, skipping: %s%s..", ptr,
+                ((urladr() != NULL) ? adr_nologin(opt, urladr()) : (" ")),
+                ((urlfil() != NULL) ? (urlfil()) : (" ")));
           }
           // remove from stats
           if (heap(ptr)->pass2 == -1) {
@@ -1424,8 +1425,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
       }
       if (heap(ptr) != NULL) { // on a qq chose à récupérer?
 
-        hts_log_print(opt, LOG_DEBUG, "Wait get: %s%s", adr_nologin(urladr()),
-                      urlfil());
+        hts_log_print(opt, LOG_DEBUG, "Wait get: %s%s",
+                      adr_nologin(opt, urladr()), urlfil());
 #if DEBUG_ROBOTS
         if (strcmp(urlfil(), "/robots.txt") == 0) {
           printf("robots.txt detected\n");
@@ -1548,7 +1549,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
             hts_log_print(
                 opt, LOG_WARNING,
                 "Big file cancelled according to user's preferences: %s%s",
-                adr_nologin(urladr()), urlfil());
+                adr_nologin(opt, urladr()), urlfil());
           }
         }
       }
@@ -1601,9 +1602,9 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
           is_loaded_from_file = 1; \
           r.adr = readfile2_inmem(savename(), &r.size); \
           if (r.adr != NULL) { \
-            hts_log_print(opt, LOG_INFO, "File successfully loaded for parsing: %s%s (%d bytes)",adr_nologin(urladr()),urlfil(),(int)r.size); \
+            hts_log_print(opt, LOG_INFO, "File successfully loaded for parsing: %s%s (%d bytes)",adr_nologin(opt, urladr()),urlfil(),(int)r.size); \
           } else { \
-            hts_log_print(opt, LOG_ERROR, "File could not be loaded for parsing: %s%s",adr_nologin(urladr()),urlfil()); \
+            hts_log_print(opt, LOG_ERROR, "File could not be loaded for parsing: %s%s",adr_nologin(opt, urladr()),urlfil()); \
           } \
         } \
 } while(0)
@@ -1657,7 +1658,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
                 hts_log_print(
                     opt, LOG_ERROR,
                     "Not enough memory to convert %s%s from UCS2 to UTF-8",
-                    adr_nologin(urladr()), urlfil());
+                    adr_nologin(opt, urladr()), urlfil());
                 r.statuscode = STATUSCODE_INVALID;
                 strcpybuff(r.msg, "Not enough memory");
                 error = 1;
@@ -1665,8 +1666,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
                 hts_log_print(opt, LOG_WARNING,
                               "File %s%s converted from UCS2 to UTF-8 (old "
                               "size: %d bytes, new size: %d bytes)",
-                              adr_nologin(urladr()), urlfil(), (int) r.size,
-                              (int) new_size);
+                              adr_nologin(opt, urladr()), urlfil(),
+                              (int) r.size, (int) new_size);
                 freet(r.adr);
                 r.adr = new_adr;
                 r.size = (LLint) new_size;
@@ -1682,7 +1683,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
               strcpybuff(r.contenttype, "application/octet-stream");
               hts_log_print(opt, LOG_WARNING,
                             "File not parsed, looks like binary: %s%s",
-                            adr_nologin(urladr()), urlfil());
+                            adr_nologin(opt, urladr()), urlfil());
             }
 
             /* This hack allows you to avoid problems with parsing '\0' characters  */
@@ -1915,13 +1916,13 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
             if (page_charset[0] == '\0') {
               hts_log_print(opt, LOG_INFO,
                             "Warning: could not detect encoding for: %s%s",
-                            adr_nologin(urladr()), urlfil());
+                            adr_nologin(opt, urladr()), urlfil());
             }
           }
 
           /* Info for wrappers */
           hts_log_print(opt, LOG_INFO, "engine: check-html: %s%s",
-                        adr_nologin(urladr()), urlfil());
+                        adr_nologin(opt, urladr()), urlfil());
           {
             char BIGSTK buff_err_msg[1024];
             htsmoduleStruct BIGSTK str;
@@ -2020,12 +2021,12 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
               if (strnotempty(infobuff)) {
                 hts_log_print(opt, LOG_INFO,
                               "Note: robots.txt forbidden links for %s are: %s",
-                              adr_nologin(urladr()), infobuff);
+                              adr_nologin(opt, urladr()), infobuff);
                 hts_log_print(opt, LOG_NOTICE,
                               "Note: due to %s remote robots.txt rules, links "
                               "beginning with these path will be forbidden: %s "
                               "(see in the options to disable this)",
-                              adr_nologin(urladr()), infobuff);
+                              adr_nologin(opt, urladr()), infobuff);
               }
             }
             /* After robots_parse, so the rules this very body carries already
@@ -2083,7 +2084,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
             } else { // lien non autorisé! (ex: cgi-bin en html)
               hts_log_print(opt, LOG_DEBUG,
                             "non-html file ignored after upload at %s : %s",
-                            adr_nologin(urladr()), urlfil());
+                            adr_nologin(opt, urladr()), urlfil());
               if (r.adr) {
                 freet(r.adr);
                 r.adr = NULL;
@@ -2632,7 +2633,7 @@ void host_ban(httrackp * opt, int ptr,
         back[i].r.statuscode = STATUSCODE_TIMEOUT;      // timeout (peu importe si c'est un traffic jam)
         strcpybuff(back[i].r.msg, "Link Cancelled by host control");
         hts_log_print(opt, LOG_DEBUG, "Shutdown: %s%s",
-                      adr_nologin(back[i].url_adr), back[i].url_fil);
+                      adr_nologin(opt, back[i].url_adr), back[i].url_fil);
       }
   }
 
@@ -2648,7 +2649,7 @@ void host_ban(httrackp * opt, int ptr,
         if ((l > 0) && (l < 1020)) { // in range
           if (strfield2(jump_identification_const(heap(i)->adr), host)) {    // host
             hts_log_print(opt, LOG_DEBUG, "Cancel: %s%s",
-                          adr_nologin(heap(i)->adr), heap(i)->fil);
+                          adr_nologin(opt, heap(i)->adr), heap(i)->fil);
             hts_invalidate_link(opt, i);  // invalidate hashtable entry
             // on efface pas le hash, because si on rencontre le lien, reverif sav..
           }
@@ -2767,7 +2768,7 @@ static hts_boolean live_cancel_link_(httrackp *opt, struct_back *sback, int i) {
     /* no cache: a dropped page must not be recorded as fetched */
     back_delete(opt, NULL, sback, b);
   }
-  hts_log_print(opt, LOG_DEBUG, "Cancel: %s%s", adr_nologin(heap(i)->adr),
+  hts_log_print(opt, LOG_DEBUG, "Cancel: %s%s", adr_nologin(opt, heap(i)->adr),
                 heap(i)->fil);
   hts_invalidate_link(opt, i);
   /* the main loop takes every cancelled link out of this count */
@@ -4848,18 +4849,18 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
     codebase[0] = '\0';
 
     hts_log_print(opt, LOG_DEBUG, "(module): adding link : '%s'",
-                  URL_NOLOGIN(opt, link));
+                  url_nologin(opt, link));
     // recopie de "creer le lien"
     //    
 
     if (!RUN_CALLBACK1(opt, linkdetected, link)) {
       hts_log_print(opt, LOG_ERROR, "Link %s refused by external wrapper",
-                    URL_NOLOGIN(opt, link));
+                    url_nologin(opt, link));
       return 0;
     }
     if (!RUN_CALLBACK2(opt, linkdetected2, link, NULL)) {
       hts_log_print(opt, LOG_ERROR, "Link %s refused by external wrapper(2)",
-                    URL_NOLOGIN(opt, link));
+                    url_nologin(opt, link));
       return 0;
     }
     // adr = c'est la même
@@ -4891,14 +4892,14 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
           strcpybuff(codebase, tempo);  // couper host
         } else {
           hts_log_print(opt, LOG_ERROR, "Unexpected strstr error in base %s",
-                        URL_NOLOGIN(opt, codebase));
+                        url_nologin(opt, codebase));
         }
       }
     }
 
     if (!((int) strlen(codebase) < HTS_URLMAXSIZE)) {   // trop long
       hts_log_print(opt, LOG_ERROR, "Codebase too long, parsing skipped (%s)",
-                    URL_NOLOGIN(opt, codebase));
+                    url_nologin(opt, codebase));
     }
 
     {
@@ -4953,7 +4954,8 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
                   hts_log_print(
                       opt, LOG_DEBUG,
                       "(module): relative link at %s build with %s and %s: %s",
-                      adr_nologin(afs.af.adr), afs.save, savename(), tempo);
+                      adr_nologin(opt, afs.af.adr), afs.save, savename(),
+                      tempo);
                   if (str->localLink
                       && str->localLinkSize > (int) strlen(tempo) + 1) {
                     strlcpybuff(str->localLink, tempo, str->localLinkSize);
@@ -4965,7 +4967,7 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
 
           if (forbidden_url) {
             hts_log_print(opt, LOG_DEBUG, "(module): file not caught: %s",
-                          URL_NOLOGIN(opt, lien));
+                          url_nologin(opt, lien));
             if (str->localLink
                 && str->localLinkSize > (int) (strlen(afs.af.adr) + strlen(afs.af.fil) + 8)) {
               htsbuff lb = htsbuff_ptr(str->localLink, str->localLinkSize);
@@ -4979,8 +4981,8 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
           //
           if (r != -1) {
             hts_log_print(opt, LOG_DEBUG, "(module): %s%s -> %s (base %s)",
-                          adr_nologin(afs.af.adr), afs.af.fil, afs.save,
-                          URL_NOLOGIN(opt, codebase));
+                          adr_nologin(opt, afs.af.adr), afs.af.fil, afs.save,
+                          url_nologin(opt, codebase));
 
             // modifié par rapport à l'autre version (cf prio_fix notamment et save2)
 
@@ -5025,7 +5027,7 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
               heap_top()->retry = opt->retry;
 
               hts_log_print(opt, LOG_DEBUG, "(module): OK, NOTE: %s%s -> %s",
-                            adr_nologin(heap_top()->adr), heap_top()->fil,
+                            adr_nologin(opt, heap_top()->adr), heap_top()->fil,
                             heap_top()->sav);
             }
           }

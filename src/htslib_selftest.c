@@ -1639,40 +1639,52 @@ static int maskpw_pairs(size_t n) {
   return err;
 }
 
-/* Do adr_nologin() and url_nologin() drop the login and nothing else? */
-static int nologin_rows(void) {
+/* Do the nologin helpers hide the password and nothing else? */
+static int nologin_rows(httrackp *opt) {
   static const struct {
     const char *in, *want;
-  } adrs[] = {{"u:p@h:80", "h:80"},
-              {"u:p@q@h", "h"},
+  } adrs[] = {{"u:p@h:80", "u:***@h:80"},
+              {"u:p@q@h", "u:***@h"},
+              {"u@h", "u@h"},
+              {":p@h", ":***@h"},
               {"h:80", "h:80"},
+              {"file://", "file://"},
               {"https://h", "https://h"},
-              {"https://u:p@h", "h"}},
-    urls[] = {{"http://u:p@h/x", "http://h/x"},
-              {"//u:p@q@h", "//h"},
-              {"HTTPS://u:a b@[::1]:8/", "HTTPS://[::1]:8/"},
+              {"https://u:p@h", "https://u:***@h"}},
+    urls[] = {{"http://u:p@h/x", "http://u:***@h/x"},
+              {"//u:p@q@h", "//u:***@h"},
+              {"HTTPS://u:a b@[::1]:8/", "HTTPS://u:***@[::1]:8/"},
               {"http://h/x?a@b", "http://h/x?a@b"},
               {"mailto:a@b", "mailto:a@b"},
               {"u:p@h/x", "u:p@h/x"},
-              {"http://u:p@hostname.example/x", "http://hostname.example"}};
-
+              {"http://u:p@hostname.example/x", "http://u:***@hostname.e"}};
   char buf[24];
+  const int index = opt->state.concat.index;
   int err = 0;
   size_t i;
 
-  for (i = 0; i < sizeof(adrs) / sizeof(adrs[0]); i++)
-    if (strcmp(adr_nologin(adrs[i].in), adrs[i].want) != 0) {
-      fprintf(stderr, "adr_nologin: '%s' gave '%s'\n", adrs[i].in,
-              adr_nologin(adrs[i].in));
+  for (i = 0; i < sizeof(adrs) / sizeof(adrs[0]); i++) {
+    const char *got = adr_nologin_r(buf, sizeof(buf), adrs[i].in);
+
+    if (strcmp(got, adrs[i].want) != 0) {
+      fprintf(stderr, "adr_nologin: '%s' gave '%s'\n", adrs[i].in, got);
       err = 1;
     }
+  }
   for (i = 0; i < sizeof(urls) / sizeof(urls[0]); i++) {
-    const char *got = url_nologin(buf, sizeof(buf), urls[i].in);
+    const char *got = url_nologin_r(buf, sizeof(buf), urls[i].in);
 
     if (strcmp(got, urls[i].want) != 0) {
       fprintf(stderr, "url_nologin: '%s' gave '%s'\n", urls[i].in, got);
       err = 1;
     }
+  }
+  /* An address without a login is returned as is, and takes no buffer. */
+  if (adr_nologin(opt, adrs[4].in) != adrs[4].in ||
+      url_nologin(opt, urls[5].in) != urls[5].in ||
+      opt->state.concat.index != index) {
+    fprintf(stderr, "nologin: a rotating buffer was taken without a login\n");
+    err = 1;
   }
   return err;
 }
@@ -1713,7 +1725,6 @@ static int st_maskpw(httrackp *opt, int argc, char **argv) {
   int err = 0;
   size_t i;
 
-  (void) opt;
   if (argc >= 2) {
     char *got = NULL;
 
@@ -1728,7 +1739,7 @@ static int st_maskpw(httrackp *opt, int argc, char **argv) {
   }
   for (i = 0; i < sizeof(rows) / sizeof(rows[0]); i++)
     err |= maskpw_row(rows[i].in, rows[i].want, rows[i].mode);
-  err |= nologin_rows();
+  err |= nologin_rows(opt);
   err |= maskpw_pairs(300);
   err |= maskpw_pairs(10000);
   printf("maskpw self-test: %s\n", err ? "FAIL" : "OK");

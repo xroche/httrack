@@ -14,6 +14,7 @@ import os
 import socket
 import sys
 import threading
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -47,11 +48,19 @@ PLANTED = (
     "http://luser:LINKPWH@[::1]:1/l7.html",
     "http://luser:LINKPWI@127.0.0.1:%(p)d",
     "http://luser:LINKPWJ@127.0.0.1:1/l8.html",
+    "/redir.html",
+)
+# the image loads while the engine waits on slow.html, so it is found ready
+PLANTED_FIRST = (
+    '<a href="/slow.html">s</a>'
+    '<img src="http://luser:LINKPWO@127.0.0.1:%(p)d/i.gif">'
+    "<style>body{background:url(http://luser:LINKPWU@127.0.0.1:%(p)d/bg.png)}</style>"
 )
 
 
 def planted_page(port):
-    return page("".join('<a href="%s">l</a>' % (u % {"p": port}) for u in PLANTED))
+    links = "".join('<a href="%s">l</a>' % (u % {"p": port}) for u in PLANTED)
+    return page(PLANTED_FIRST % {"p": port} + links)
 
 
 # the poisoned page must link onward, or its URL never becomes a Referer
@@ -87,8 +96,10 @@ def body_for(request, port):
     return page("leaf")
 
 
-def extra_headers(request):
+def extra_headers(request, port):
     line = request.split(b"\r\n", 1)[0]
+    if b"/redir.html" in line:
+        return b"Location: http://ruser:LINKPWR@127.0.0.1:%d/hop.html\r\n" % port
     if b"/setcookie.html" in line:
         # a blank before the colon and a folded line still belong to the field
         return (
@@ -119,11 +130,23 @@ def handle(conn, port, logf, lock, seq):
             logf.flush()
             with open("%s.%d" % (sys.argv[1], seq[0]), "wb") as reqf:
                 reqf.write(data)
+        if b"/slow.html" in data.split(b"\r\n", 1)[0]:
+            time.sleep(2)
         body = body_for(data, port)
+        extra = extra_headers(data, port)
+        status = b"302 Found" if extra.startswith(b"Location:") else b"200 OK"
+        # a real image, which the engine finishes in the background (657)
+        image = b".gif " in data.split(b"\r\n", 1)[0]
+        if image:
+            body = b"GIF89a"
         try:
             conn.sendall(
-                b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n"
-                + extra_headers(data)
+                b"HTTP/1.1 "
+                + status
+                + b"\r\nContent-Type: "
+                + (b"image/gif" if image else b"text/html")
+                + b"\r\n"
+                + extra
                 + b"Content-Length: %d\r\nConnection: close\r\n\r\n" % len(body)
                 + body
             )

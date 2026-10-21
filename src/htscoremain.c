@@ -385,6 +385,7 @@ static hts_boolean write_progress_lock(httrackp *opt, const char *path,
 
 static int hts_main_internal(int argc, char **argv, httrackp * opt);
 static hts_boolean cmdl_shortopt_has(const char *s, char c);
+static hts_boolean cmdl_shortopt_named(const char *s, const char *opt);
 static void cmdl_doit_line(String *line, const cmdl_argv *cmd);
 
 // Main, récupère les paramètres et appelle le robot
@@ -2997,6 +2998,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     // un petit lock-file pour indiquer un miroir en cours, ainsi qu'un éventuel fichier log
     {
       char t[256];
+      char *masked_url;
+      const char *shown_url;
 
       time_local_rfc822(t);     // faut bien que ca serve quelque part l'heure RFC1945 arf'
 
@@ -3107,30 +3110,32 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                         "engine: could not create hts-in_progress.lock, so"
                         " this mirror cannot be stopped or paused by a file");
       }
-      // fichier log        
+      masked_url = hts_mask_passwords(url, HTS_MASK_LIST);
+      shown_url = masked_url != NULL ? masked_url : "(out of memory)";
+      // hts-log.txt
       if (opt->log) {
-        char *masked_url = hts_mask_passwords(url, HTS_MASK_LIST);
         int i, opt_at = 0;
 
         fprintf(opt->log,
                 "HTTrack" HTTRACK_VERSION "%s launched on %s at %s" LF,
-                hts_get_version_info(opt), t,
-                masked_url != NULL ? masked_url : "(out of memory)");
-        freet(masked_url);
+                hts_get_version_info(opt), t, shown_url);
         fprintf(opt->log, "(");
         for(i = 0; i < argc; i++) {
           const char *arg = argv[i]; // already UTF-8 on every platform
           // quoted if it holds a blank and no quote
           const hts_boolean quote =
               strchr(arg, ' ') != NULL && strchr(arg, '\"') == NULL;
-          hts_boolean addr; // a start URL, or a -P value, is one address
+          // a start URL, or a -P, -%mu or -%R value, is one address
+          hts_boolean addr;
           char *masked;
 
           if (x_cmd.span[i] != 0) {
             opt_at = x_cmd.span[i] > 1 ? i : 0;
             addr = HTS_FALSE;
           } else if (opt_at != 0 && i < opt_at + x_cmd.span[opt_at]) {
-            addr = cmdl_shortopt_has(argv[opt_at], 'P');
+            addr = cmdl_shortopt_has(argv[opt_at], 'P') ||
+                   cmdl_shortopt_named(argv[opt_at], "-%mu") ||
+                   cmdl_shortopt_named(argv[opt_at], "-%R");
           } else {
             opt_at = 0;
             addr = i != 0 && arg[0] != '+' && arg[0] != '-';
@@ -3159,14 +3164,15 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                HTTRACK_VERSION "%s " HTTRACK_AFF_AUTHORS "" LF, t,
                hts_get_version_info(opt));
         if (opt->wizard == HTS_WIZARD_NONE) {
-          printf
-            ("mirroring %s with %d levels, %d sockets,t=%d,s=%d,logm=%d,lnk=%d,mdg=%d\n",
-             url, opt->depth, opt->maxsoc, opt->travel, opt->seeker,
-             httrack_logmode, opt->urlmode, opt->getmode);
+          printf("mirroring %s with %d levels, %d "
+                 "sockets,t=%d,s=%d,logm=%d,lnk=%d,mdg=%d\n",
+                 shown_url, opt->depth, opt->maxsoc, opt->travel, opt->seeker,
+                 httrack_logmode, opt->urlmode, opt->getmode);
         } else { // the magic wizard
-          printf("mirroring %s with the wizard help..\n", url);
+          printf("mirroring %s with the wizard help..\n", shown_url);
         }
       }
+      freet(masked_url);
     }
 
     io_flush;
@@ -3458,13 +3464,20 @@ static void cmdl_doit_line(String *line, const cmdl_argv *cmd) {
 /* Does the short-option cluster s carry c from the main option set (-i, -iC2,
    -%Mi)? The i of -%i belongs to another set. */
 static hts_boolean cmdl_shortopt_has(const char *s, char c) {
+  const char opt[3] = {'-', c, '\0'};
+
+  return cmdl_shortopt_named(s, opt);
+}
+
+/* Does the short option cluster s hold the option opt, such as "-%mu"? */
+static hts_boolean cmdl_shortopt_named(const char *s, const char *opt) {
   char name[8];
   size_t at = 1;
 
   if (s[0] != '-' || s[1] == '-')
     return HTS_FALSE;
   while (optcluster_next(s, &at, name, sizeof(name)))
-    if (name[1] == c && name[2] == '\0')
+    if (strcmp(name, opt) == 0)
       return HTS_TRUE;
   return HTS_FALSE;
 }
