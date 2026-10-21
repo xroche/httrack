@@ -1107,7 +1107,7 @@ Go
 Done
 Готово
 Clear login
-Исчисти
+Одјава
 The browser did not open: %s.
 Прелистувачот не се отвори: %s.
 The browser came back with no cookies, so nothing was kept.

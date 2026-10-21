@@ -27,8 +27,8 @@ Please visit our Website: http://www.httrack.com
 
 /* ------------------------------------------------------------ */
 /* File: htslines.h                                             */
-/*       line readers for config files, shared by the engine    */
-/*       and htsserver                                          */
+/*       line readers for config files and an owner-only file   */
+/*       opener, shared by the engine and htsserver             */
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
@@ -40,6 +40,10 @@ Please visit our Website: http://www.httrack.com
 
 #include <stddef.h>
 #include <stdio.h>
+
+/* Open UTF-8 path name for writing ("w" or "wb" only), owner-only on Unix,
+   truncating it; NULL on failure. Links are followed, as fopen() does. */
+FILE *hts_fopen_private(const char *name, const char *mode);
 
 /* Flags for the readers below, which always drop CR. */
 #define HTS_LINE_DROP_TAB 1 /* TAB */

@@ -1025,7 +1025,10 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                     strlncatbuff(back->r.lastmodified, date,
                                  sizeof(back->r.lastmodified),
                                  sizeof(back->r.lastmodified) - 1);
-                    remote_mtime = timegm(&remote_tm);
+                    // a clipped date cannot prove the copy matches
+                    if (!hts_time_exact(hts_utc_seconds(&remote_tm),
+                                        &remote_mtime))
+                      remote_mtime = (time_t) -1;
                   }
                 }
 

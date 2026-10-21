@@ -1107,7 +1107,7 @@ Gå
 Done
 Færdig
 Clear login
-Ryd login
+Log ud
 The browser did not open: %s.
 Browseren blev ikke åbnet: %s.
 The browser came back with no cookies, so nothing was kept.

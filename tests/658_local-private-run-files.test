@@ -1,0 +1,105 @@
+#!/bin/bash
+#
+# The files that echo the command line, request headers or URLs, any of which
+# can hold a password, are owner-only even under a permissive umask.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+# shellcheck source=tests/webhttracklib.sh
+. "${0%"${0##*/}"}./webhttracklib.sh"
+
+skip_on_windows "no POSIX file modes"
+find_python >/dev/null || skip "python3 not found"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_private.XXXXXX") || exit 1
+crawlpid=
+cleanup() {
+    if test -n "$crawlpid"; then
+        kill_tree "$crawlpid"
+        wait "$crawlpid" 2>/dev/null || true
+    fi
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+require_httrack
+htsserver_require
+local_server_start
+umask 022
+
+mode_of() {
+    stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1"
+}
+
+assert_private() { # assert_private WHEN DIR FILE...
+    local when=$1 dir=$2 f m
+    shift 2
+    for f in "$@"; do
+        test -f "$dir/$f" || fail "$when: no $f"
+        m=$(mode_of "$dir/$f")
+        test "$m" = 600 || fail "$when: $f is mode $m, want 600"
+    done
+    echo "$when: mode 600 for $*"
+}
+
+# Control: the probe must see a group- and world-readable file.
+: >"$tmpdir/control"
+test "$(mode_of "$tmpdir/control")" = 644 ||
+    fail "umask 022 made mode $(mode_of "$tmpdir/control"), so 600 proves nothing"
+
+# The opener itself, read before the first write and so before a late chmod.
+mkdir "$tmpdir/st"
+httrack -#test=fopen-private "$tmpdir/st" >"$tmpdir/st.log" 2>&1 ||
+    fail "fopen-private self-test failed: $(<"$tmpdir/st.log")"
+grep -q '^fopen-private: OK$' "$tmpdir/st.log" ||
+    fail "fopen-private self-test said: $(<"$tmpdir/st.log")"
+
+# -f splits the errors into hts-err.txt, and -%H writes hts-ioinfo.txt.
+out="$tmpdir/mirror"
+files=(hts-cache/doit.log hts-log.txt hts-err.txt hts-ioinfo.txt
+    hts-cache/new.txt hts-cache/new.zip)
+local_crawl --log "$tmpdir/log1" -O "$out" --quiet --robots=0 --timeout=30 \
+    --retries=0 -f -%H \
+    "http://user:secret@127.0.0.1:$SRV_PORT/fetchmeta/index.html" ||
+    fail "crawl failed: $(<"$tmpdir/log1")"
+grep -q secret "$out/hts-cache/doit.log" || fail "doit.log does not hold the URL"
+assert_private "first crawl" "$out" "${files[@]}"
+
+# doit.log is rewritten in place, so a 0644 one from an older run must be
+# tightened. The logs are unlinked before they are made, so they cannot test it.
+chmod 644 "$out/hts-cache/doit.log"
+local_crawl --log "$tmpdir/log2" -O "$out" --quiet --update ||
+    fail "update failed: $(<"$tmpdir/log2")"
+assert_private "update" "$out" hts-cache/doit.log
+
+# A crawl held on a trickling page: the lock exists only while it runs, and a
+# file made private only at the end of the run is still 644 here.
+slow="$tmpdir/slow"
+httrack -O "$slow" --quiet --robots=0 --timeout=120 --retries=0 -c1 \
+    "$BASEURL/trickle/index.html" >"$tmpdir/log3" 2>&1 &
+crawlpid=$!
+for _ in $(seq 1 300); do
+    test -e "$slow/hts-cache/new.txt" && test -e "$slow/hts-in_progress.lock" &&
+        break
+    kill -0 "$crawlpid" 2>/dev/null ||
+        fail "the trickle crawl ended early: $(<"$tmpdir/log3")"
+    sleep 0.1
+done
+assert_private "running crawl" "$slow" hts-in_progress.lock hts-cache/doit.log \
+    hts-log.txt hts-cache/new.txt hts-cache/new.zip
+
+# WebHTTrack saves the project's winprofile.ini, which can carry a proxy password.
+web="$tmpdir/web"
+mkdir -p "$web/websites"
+cleanup_push htsserver_cleanup
+htsserver_start --home "$web"
+sid=$(htsserver_sid)
+test -n "$sid" || fail "no session id from htsserver"
+body="sid=$sid&path=$(nativepath "$web/websites")&projname=proj&command=httrack"
+body="$body&command_do=save&winprofile=Proxy%3Duser%3Asecret%40proxy"
+htsserver_post "$body" /server/step4.html >"$tmpdir/web.log" 2>&1 ||
+    fail "the save failed: $(<"$tmpdir/web.log")"
+assert_private "webhttrack save" "$web/websites/proj" hts-cache/winprofile.ini
+htsserver_cleanup

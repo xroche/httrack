@@ -278,7 +278,7 @@ HTS_UNUSED static struct tm PT_GetTime(time_t t) {
 HTS_UNUSED static int set_filetime(const char *file, struct tm *tm_time) {
   struct utimbuf tim;
 
-  tim.actime = tim.modtime = timegm(tm_time);
+  tim.actime = tim.modtime = hts_time_clip(hts_utc_seconds(tm_time));
   return utime(file, &tim);
 }
 HTS_UNUSED static int set_filetime_time_t(const char *file, time_t t) {

@@ -27,15 +27,46 @@ Please visit our Website: http://www.httrack.com
 
 /* ------------------------------------------------------------ */
 /* File: htslines.c                                             */
-/*       line readers for config files, shared by the engine    */
-/*       and htsserver                                          */
+/*       line readers for config files and an owner-only file   */
+/*       opener, shared by the engine and htsserver             */
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
 #include "htslines.h"
 #include "htslib.h"
 
+#include <errno.h>
 #include <string.h>
+#ifndef _WIN32
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
+
+FILE *hts_fopen_private(const char *name, const char *mode) {
+  char catbuff[CATBUFF_SIZE];
+
+  /* O_TRUNC below would silently turn an append into a rewrite */
+  if (strcmp(mode, "w") != 0 && strcmp(mode, "wb") != 0) {
+    errno = EINVAL;
+    return NULL;
+  }
+#ifdef _WIN32
+  return FOPEN(fconv(catbuff, sizeof(catbuff), name), mode);
+#else
+  {
+    const int fd = open(fconv(catbuff, sizeof(catbuff), name),
+                        O_WRONLY | O_CREAT | O_TRUNC, HTS_PROTECT_FILE);
+    FILE *fp = fd != -1 ? fdopen(fd, mode) : NULL;
+
+    if (fd != -1 && fp == NULL)
+      close(fd);    /* fdopen failed: don't leak the descriptor */
+    if (fp != NULL) /* O_CREAT's mode skips pre-existing files: tighten those */
+      (void) fchmod(fd, HTS_PROTECT_FILE);
+    return fp;
+  }
+#endif
+}
 
 /* hts_readline_raw() keeps every byte. */
 #define LINE_RAW 0x100

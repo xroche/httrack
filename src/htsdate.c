@@ -38,6 +38,7 @@ Please visit our Website: http://www.httrack.com
 
 #include <ctype.h>
 #include <limits.h>
+#include <stdint.h>
 #include <string.h>
 
 /* hts_lowcase() lives in the library proxytrack does not link. */
@@ -149,4 +150,57 @@ struct tm *convert_time_rfc822_pivot(struct tm *result, const char *s,
     return result;
   }
   return NULL;
+}
+
+/* See htsdate.h. */
+int64_t hts_utc_seconds(const struct tm *tm) {
+  // days from the civil date, counting years from March (Howard Hinnant)
+  int64_t y = (int64_t) tm->tm_year + 1900 + tm->tm_mon / 12;
+  int64_t m = tm->tm_mon % 12;
+  int64_t era, yoe, doy, days;
+
+  if (m < 0) {
+    m += 12;
+    y--;
+  }
+  if (m < 2)
+    y--;
+  era = (y >= 0 ? y : y - 399) / 400;
+  yoe = y - era * 400;
+  doy = (153 * ((m + 10) % 12) + 2) / 5 + (int64_t) tm->tm_mday - 1;
+  days = era * 146097 + yoe * 365 + yoe / 4 - yoe / 100 + doy - 719468;
+  return days * 86400 + (int64_t) tm->tm_hour * 3600 +
+         (int64_t) tm->tm_min * 60 + tm->tm_sec;
+}
+
+/* See htsdate.h. */
+time_t hts_time_clip(int64_t t) {
+  if (sizeof(time_t) < sizeof(int64_t)) {
+    if (t > INT32_MAX)
+      return (time_t) INT32_MAX;
+    if (t < INT32_MIN)
+      return (time_t) INT32_MIN;
+  }
+  return (time_t) t;
+}
+
+/* See htsdate.h. */
+hts_boolean hts_time_exact(int64_t t, time_t *out) {
+  const time_t clipped = hts_time_clip(t);
+
+  if ((int64_t) clipped != t)
+    return HTS_FALSE;
+  *out = clipped;
+  return HTS_TRUE;
+}
+
+/* See htsdate.h. */
+hts_boolean hts_tm_filetime(const struct tm *tm, time_t *out) {
+  const int64_t t = hts_utc_seconds(tm);
+
+  if (t == -1 || t == 0)
+    return HTS_FALSE;
+  // A date past what time_t holds stamps its last second, never 1901.
+  *out = hts_time_clip(t);
+  return HTS_TRUE;
 }

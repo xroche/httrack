@@ -41,6 +41,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsio.h"
 #include "htsbasenet.h"
 #include "htsmd5.h"
+#include "htslines.h"
 #include <limits.h>
 #include <time.h>
 
@@ -1470,7 +1471,14 @@ void cache_init(cache_back * cache, httrackp * opt) {
                                StringBuff(opt->path_log), "hts-cache/"));
 
       {
-        /* Create ZIP file cache */
+        /* owner-only before an entry names a URL: zip's "wb" keeps the mode */
+        FILE *const zfp = hts_fopen_private(
+            fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                    StringBuff(opt->path_log), "hts-cache/new.zip"),
+            "wb");
+
+        if (zfp != NULL)
+          fclose(zfp);
         cache->zipOutput = (void *) hts_zipOpen_utf8(
             fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                     StringBuff(opt->path_log), "hts-cache/new.zip"),
@@ -1514,10 +1522,11 @@ void cache_init(cache_back * cache, httrackp * opt) {
                    fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                            StringBuff(opt->path_log), "hts-cache/old.txt"));
           // ouvrir
-          cache->txt =
-              FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                            StringBuff(opt->path_log), "hts-cache/new.txt"),
-                    "wb");
+          /* owner-only: it lists URLs with their passwords */
+          cache->txt = hts_fopen_private(
+              fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                      StringBuff(opt->path_log), "hts-cache/new.txt"),
+              "wb");
           if (cache->txt) {
             fprintf(cache->txt,
                     "date\tsize'/'remotesize\tflags(request:Update,Range state:File response:Modified,Chunked,gZipped)\t");

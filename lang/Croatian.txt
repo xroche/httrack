@@ -1107,7 +1107,7 @@ Idi
 Done
 Gotovo
 Clear login
-Obrisati
+Odjava
 The browser did not open: %s.
 Preglednik se nije otvorio: %s.
 The browser came back with no cookies, so nothing was kept.

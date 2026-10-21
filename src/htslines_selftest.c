@@ -401,6 +401,78 @@ static int st_linediff(httrackp *opt, int argc, char **argv) {
   return k.failures == 0 ? 0 : 1;
 }
 
+/* hts_fopen_private() under umask 022: fstat() right after the open, before any
+   write, so a file made private only once written fails too. Arg: a directory.
+ */
+static int st_fopen_private(httrackp *opt, int argc, char **argv) {
+  char path[HTS_URLMAXSIZE * 2];
+  char data[8];
+  int failures = 0;
+  FILE *fp;
+  size_t i;
+  static const char *const refused[] = {"a", "ab", "r", "r+", "w+", "wb+"};
+
+  (void) opt;
+  if (argc < 1) {
+    printf("usage: -#test=fopen-private <dir>\n");
+    return 1;
+  }
+  snprintf(path, sizeof(path), "%s/kept", argv[0]);
+  fp = FOPEN(path, "wb");
+  if (fp == NULL || fputs("kept", fp) == EOF || fclose(fp) != 0) {
+    printf("fopen-private: cannot write %s\n", path);
+    return 1;
+  }
+  for (i = 0; i < sizeof(refused) / sizeof(refused[0]); i++) {
+    errno = 0;
+    fp = hts_fopen_private(path, refused[i]);
+    if (fp != NULL || errno != EINVAL) {
+      printf("fopen-private: mode \"%s\" was not refused\n", refused[i]);
+      failures++;
+      if (fp != NULL)
+        fclose(fp);
+    }
+  }
+  fp = FOPEN(path, "rb");
+  if (fp == NULL || fread(data, 1, sizeof(data), fp) != 4 ||
+      memcmp(data, "kept", 4) != 0) {
+    printf("fopen-private: a refused mode changed the file\n");
+    failures++;
+  }
+  if (fp != NULL)
+    fclose(fp);
+#ifndef _WIN32
+  {
+    const mode_t old = umask(022);
+    static const char *const names[] = {"fresh", "kept"};
+
+    /* "kept" exists at 0644 from older runs: it must be tightened and emptied
+     */
+    snprintf(path, sizeof(path), "%s/kept", argv[0]);
+    (void) chmod(path, 0644);
+    for (i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
+      struct stat st;
+
+      snprintf(path, sizeof(path), "%s/%s", argv[0], names[i]);
+      fp = hts_fopen_private(path, i == 0 ? "w" : "wb");
+      if (fp == NULL || fstat(fileno(fp), &st) != 0) {
+        printf("fopen-private: cannot open %s\n", names[i]);
+        failures++;
+      } else if ((st.st_mode & 0777) != 0600 || st.st_size != 0) {
+        printf("fopen-private: %s is mode %03o size %d before any write\n",
+               names[i], (unsigned) (st.st_mode & 0777), (int) st.st_size);
+        failures++;
+      }
+      if (fp != NULL)
+        fclose(fp);
+    }
+    (void) umask(old);
+  }
+#endif
+  printf("fopen-private: %s\n", failures == 0 ? "OK" : "FAIL");
+  return failures == 0 ? 0 : 1;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
@@ -410,5 +482,8 @@ const struct selftest_entry selftests_lines[] = {
      "config-file line reader: [line] per read, ! when cut", st_readline},
     {"linediff", "", "line readers against the legacy ones they replaced",
      st_linediff},
+    {"fopen-private", "<dir>",
+     "owner-only opener: 0600 before the first write, append refused",
+     st_fopen_private},
     {NULL, NULL, NULL, NULL},
 };
