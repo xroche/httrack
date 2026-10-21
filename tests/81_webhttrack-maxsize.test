@@ -64,7 +64,7 @@ want("--max-files" not in cmd and "--max-size" not in cmd,
 # A mistyped ${LANG_OK] key renders the OK button's label empty.
 opts = s.get("option2b.html")
 want("LANG_OK" not in opts, "unexpanded LANG_OK in option2b.html", "")
-want('<input type="submit" value="OK"' in opts, "no OK label in option2b.html",
+want('type="submit" value="OK"' in opts, "no OK label in option2b.html",
      "")
 PY
 
