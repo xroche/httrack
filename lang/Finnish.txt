@@ -978,7 +978,7 @@ Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request
 Välityspalvelimen protokolla. HTTP: tavallinen välityspalvelin. HTTP (CONNECT-tunneli): lähettää jokaisen pyynnön CONNECT-tunnelin kautta, vain CONNECT-yhteyksiä tukeville välityspalvelimille kuten Torin HTTPTunnelPort. SOCKS5: oletusportti 1080.
 Load cookies from file:
 Lataa evästeet tiedostosta:
-Preload cookies from a Netscape cookies.txt file before crawling.
+Use a Netscape cookies.txt file as the cookie jar. HTTrack loads it before crawling, and writes it back at the end unless a line in it could not be loaded.
 Lataa evästeet Netscape cookies.txt -tiedostosta ennen sivuston läpikäyntiä.
 Pause between files:
 Tauko tiedostojen välillä:
@@ -1094,3 +1094,31 @@ Objects
 Objektit
 Embedded content
 Upotettu sisältö
+Log in with a browser...
+Kirjaudu sisään selaimella...
+Log in to the site in a browser, and crawl with the cookies and the browser identity it was given
+Kirjaudu sivustolle selaimessa, ja käy sivusto läpi niillä evästeillä ja sillä selaimen tunnisteella, jotka se sai
+No Microsoft Edge WebView2 runtime is installed on this computer
+Tietokoneeseen ei ole asennettu Microsoft Edge WebView2 -ajoympäristöä
+Log in with a browser
+Kirjaudu sisään selaimella
+Go
+Siirry
+Done
+Valmis
+Clear login
+Tyhjennä
+The browser did not open: %s.
+Selain ei avautunut: %s.
+The browser came back with no cookies, so nothing was kept.
+Selain ei palauttanut yhtään evästettä, joten mitään ei tallennettu.
+%d cookies were collected. They are used when you press OK.
+Evästeitä kerättiin %d. Niitä käytetään, kun painat OK.
+The browser gave no cookies the engine can use, so nothing was changed.
+Selain ei antanut yhtään evästettä, jota moottori voisi käyttää, joten mitään ei muutettu.
+The cookies could not be written to %s, so nothing was changed.
+Evästeitä ei voitu kirjoittaa kohteeseen %s, joten mitään ei muutettu.
+%d of the browser's cookies were left out, because the engine would not read them.
+Selaimen evästeistä %d jätettiin pois, koska moottori ei lukenut niitä.
+The browser identity it reported cannot be used, so the mirror will send the default one.
+Ilmoitettua selaimen tunnistetta ei voi käyttää, joten peilaus lähettää oletustunnisteen.

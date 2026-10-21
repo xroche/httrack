@@ -978,7 +978,7 @@ Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request
 Proxyprotokoll. HTTP: standardproxy. HTTP (CONNECT-tunnel): skickar varje begäran genom en CONNECT-tunnel, för proxyservrar som bara stöder CONNECT som Tors HTTPTunnelPort. SOCKS5: standardport 1080.
 Load cookies from file:
 Läs in cookies från fil:
-Preload cookies from a Netscape cookies.txt file before crawling.
+Use a Netscape cookies.txt file as the cookie jar. HTTrack loads it before crawling, and writes it back at the end unless a line in it could not be loaded.
 Läs in cookies från en Netscape cookies.txt-fil innan crawlningen börjar.
 Pause between files:
 Paus mellan filer:
@@ -1094,3 +1094,31 @@ Objects
 Objekt
 Embedded content
 Inbäddat innehåll
+Log in with a browser...
+Logga in med en webbläsare...
+Log in to the site in a browser, and crawl with the cookies and the browser identity it was given
+Logga in på webbplatsen i en webbläsare, och crawla med de cookies och den webbläsaridentitet som den fick
+No Microsoft Edge WebView2 runtime is installed on this computer
+Det finns ingen Microsoft Edge WebView2-runtime installerad på den här datorn
+Log in with a browser
+Logga in med en webbläsare
+Go
+Gå
+Done
+Klar
+Clear login
+Rensa login
+The browser did not open: %s.
+Webbläsaren öppnades inte: %s.
+The browser came back with no cookies, so nothing was kept.
+Webbläsaren kom tillbaka utan cookies, så ingenting sparades.
+%d cookies were collected. They are used when you press OK.
+%d cookies samlades in. De används när du trycker på OK.
+The browser gave no cookies the engine can use, so nothing was changed.
+Webbläsaren gav inga cookies som HTTrack kan använda, så ingenting ändrades.
+The cookies could not be written to %s, so nothing was changed.
+Det gick inte att skriva dessa cookies till %s, så ingenting ändrades.
+%d of the browser's cookies were left out, because the engine would not read them.
+%d av webbläsarens cookies utelämnades, eftersom HTTrack inte kunde läsa dem.
+The browser identity it reported cannot be used, so the mirror will send the default one.
+Den webbläsaridentitet som angavs kan inte användas, så kopieringen skickar standardidentiteten.

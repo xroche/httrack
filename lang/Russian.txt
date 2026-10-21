@@ -978,7 +978,7 @@ Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request
 Протокол прокси. HTTP: обычный прокси. HTTP (туннель CONNECT): отправляет каждый запрос через туннель CONNECT, для прокси, поддерживающих только CONNECT, например HTTPTunnelPort в Tor. SOCKS5: порт по умолчанию 1080.
 Load cookies from file:
 Загрузить cookies из файла:
-Preload cookies from a Netscape cookies.txt file before crawling.
+Use a Netscape cookies.txt file as the cookie jar. HTTrack loads it before crawling, and writes it back at the end unless a line in it could not be loaded.
 Предварительно загрузить cookies из файла Netscape cookies.txt перед закачкой.
 Pause between files:
 Пауза между файлами:
@@ -1094,3 +1094,31 @@ Objects
 Объекты
 Embedded content
 Встроенное содержимое
+Log in with a browser...
+Войти через браузер...
+Log in to the site in a browser, and crawl with the cookies and the browser identity it was given
+Войдите на сайт в браузере, и зеркалирование пойдёт с полученными cookies и идентификацией браузера
+No Microsoft Edge WebView2 runtime is installed on this computer
+На этом компьютере не установлена среда выполнения Microsoft Edge WebView2
+Log in with a browser
+Вход через браузер
+Go
+Перейти
+Done
+Готово
+Clear login
+Сбросить
+The browser did not open: %s.
+Браузер не открылся: %s.
+The browser came back with no cookies, so nothing was kept.
+Браузер не вернул ни одного cookie, поэтому ничего не сохранено.
+%d cookies were collected. They are used when you press OK.
+Собрано cookies: %d. Они будут применены, когда вы нажмёте OK.
+The browser gave no cookies the engine can use, so nothing was changed.
+Браузер не дал ни одного cookie, пригодного для HTTrack, поэтому ничего не изменено.
+The cookies could not be written to %s, so nothing was changed.
+Не удалось записать cookies в %s, поэтому ничего не изменено.
+%d of the browser's cookies were left out, because the engine would not read them.
+Пропущено cookies браузера: %d, поскольку HTTrack не смог бы их прочитать.
+The browser identity it reported cannot be used, so the mirror will send the default one.
+Идентификацию браузера, которую он сообщил, использовать нельзя, поэтому при зеркалировании будет отправлена та, что по умолчанию.

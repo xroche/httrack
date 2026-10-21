@@ -978,7 +978,7 @@ Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request
 代理協定。HTTP：標準代理。HTTP（CONNECT 隧道）：透過 CONNECT 隧道傳送每個請求，用於僅支援 CONNECT 的代理，例如 Tor 的 HTTPTunnelPort。SOCKS5：預設連接埠 1080。
 Load cookies from file:
 從檔案載入 cookies:
-Preload cookies from a Netscape cookies.txt file before crawling.
+Use a Netscape cookies.txt file as the cookie jar. HTTrack loads it before crawling, and writes it back at the end unless a line in it could not be loaded.
 在抓取前從 Netscape 格式的 cookies.txt 檔案預先載入 cookies。
 Pause between files:
 檔案之間暫停:
@@ -1094,3 +1094,31 @@ Objects
 物件
 Embedded content
 嵌入內容
+Log in with a browser...
+使用瀏覽器登入...
+Log in to the site in a browser, and crawl with the cookies and the browser identity it was given
+在瀏覽器中登入網站，然後使用它取得的 cookies 與瀏覽器身份進行擷取
+No Microsoft Edge WebView2 runtime is installed on this computer
+此電腦上未安裝 Microsoft Edge WebView2 執行階段
+Log in with a browser
+使用瀏覽器登入
+Go
+前往
+Done
+完成
+Clear login
+清除登入
+The browser did not open: %s.
+瀏覽器無法開啟：%s。
+The browser came back with no cookies, so nothing was kept.
+瀏覽器未傳回任何 cookies，因此未保留任何內容。
+%d cookies were collected. They are used when you press OK.
+已收集 %d 個 cookies。按「確定」後將會使用。
+The browser gave no cookies the engine can use, so nothing was changed.
+瀏覽器未提供 HTTrack 可用的 cookies，因此未做任何變更。
+The cookies could not be written to %s, so nothing was changed.
+無法將 cookies 寫入 %s，因此未做任何變更。
+%d of the browser's cookies were left out, because the engine would not read them.
+瀏覽器的 cookies 中有 %d 個被略過，因為 HTTrack 無法讀取。
+The browser identity it reported cannot be used, so the mirror will send the default one.
+它回報的瀏覽器身份無法使用，因此鏡像將傳送預設值。

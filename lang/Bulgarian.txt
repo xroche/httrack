@@ -978,7 +978,7 @@ Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request
 Протокол на прокси. HTTP: стандартно прокси. HTTP (CONNECT тунел): изпраща всяка заявка през CONNECT тунел, за прокси поддържащи само CONNECT като HTTPTunnelPort на Tor. SOCKS5: порт по подразбиране 1080.
 Load cookies from file:
 Зареждане на 'бисквитки' от файл:
-Preload cookies from a Netscape cookies.txt file before crawling.
+Use a Netscape cookies.txt file as the cookie jar. HTTrack loads it before crawling, and writes it back at the end unless a line in it could not be loaded.
 Предварително зареждане на 'бисквитки' от файл Netscape cookies.txt преди обхождането.
 Pause between files:
 Пауза между файловете:
@@ -1094,3 +1094,31 @@ Objects
 Обекти
 Embedded content
 Вградено съдържание
+Log in with a browser...
+Вход през браузър...
+Log in to the site in a browser, and crawl with the cookies and the browser identity it was given
+Влезте в сайта през браузър и огледалото ще се създаде с получените 'бисквитки' и идентификацията на браузъра
+No Microsoft Edge WebView2 runtime is installed on this computer
+На този компютър не е инсталирана средата за изпълнение Microsoft Edge WebView2
+Log in with a browser
+Вход през браузър
+Go
+Отиди
+Done
+Готово
+Clear login
+Изчисти
+The browser did not open: %s.
+Браузърът не се отвори: %s.
+The browser came back with no cookies, so nothing was kept.
+Браузърът не върна нито една 'бисквитка', затова нищо не беше запазено.
+%d cookies were collected. They are used when you press OK.
+Събрани 'бисквитки': %d. Те се използват, когато натиснете „Да“.
+The browser gave no cookies the engine can use, so nothing was changed.
+Браузърът не даде нито една 'бисквитка', която HTTrack може да използва, затова нищо не беше променено.
+The cookies could not be written to %s, so nothing was changed.
+'Бисквитките' не можаха да бъдат записани в %s, затова нищо не беше променено.
+%d of the browser's cookies were left out, because the engine would not read them.
+Пропуснати 'бисквитки' на браузъра: %d, защото HTTrack не би могъл да ги прочете.
+The browser identity it reported cannot be used, so the mirror will send the default one.
+Идентификацията на браузъра, която той съобщи, не може да се използва, затова огледалото ще изпраща тази по подразбиране.

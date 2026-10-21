@@ -978,7 +978,7 @@ Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request
 Protokół proxy. HTTP: standardowe proxy. HTTP (tunel CONNECT): wysyła każde żądanie przez tunel CONNECT, dla proxy obsługujących tylko CONNECT, jak HTTPTunnelPort w Torze. SOCKS5: port domyślny 1080.
 Load cookies from file:
 Wczytaj ciasteczka z pliku:
-Preload cookies from a Netscape cookies.txt file before crawling.
+Use a Netscape cookies.txt file as the cookie jar. HTTrack loads it before crawling, and writes it back at the end unless a line in it could not be loaded.
 Wczytaj ciasteczka z pliku Netscape cookies.txt przed rozpoczęciem pobierania.
 Pause between files:
 Pauza między plikami:
@@ -1094,3 +1094,31 @@ Objects
 Obiekty
 Embedded content
 Treść osadzona
+Log in with a browser...
+Zaloguj się w przeglądarce...
+Log in to the site in a browser, and crawl with the cookies and the browser identity it was given
+Zaloguj się do strony w przeglądarce i kopiuj z użyciem otrzymanych ciasteczek oraz identyfikacji przeglądarki
+No Microsoft Edge WebView2 runtime is installed on this computer
+Na tym komputerze nie zainstalowano środowiska Microsoft Edge WebView2
+Log in with a browser
+Logowanie w przeglądarce
+Go
+Przejdź
+Done
+Gotowe
+Clear login
+Wyloguj
+The browser did not open: %s.
+Nie udało się otworzyć przeglądarki: %s.
+The browser came back with no cookies, so nothing was kept.
+Przeglądarka nie zwróciła żadnych ciasteczek, więc nic nie zostało zapisane.
+%d cookies were collected. They are used when you press OK.
+Zebrano ciasteczka: %d. Zostaną użyte po naciśnięciu OK.
+The browser gave no cookies the engine can use, so nothing was changed.
+Przeglądarka nie dała żadnych ciasteczek, których HTTrack mógłby użyć, więc nic nie zostało zmienione.
+The cookies could not be written to %s, so nothing was changed.
+Nie można było zapisać ciasteczek do %s, więc nic nie zostało zmienione.
+%d of the browser's cookies were left out, because the engine would not read them.
+Pominięto ciasteczka przeglądarki w liczbie %d, ponieważ HTTrack nie mógł ich odczytać.
+The browser identity it reported cannot be used, so the mirror will send the default one.
+Zgłoszonej identyfikacji przeglądarki nie można użyć, więc kopiowanie wyśle domyślną.

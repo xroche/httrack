@@ -978,7 +978,7 @@ Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request
 Proxyprotocol. HTTP: standaardproxy. HTTP (CONNECT-tunnel): stuurt elke aanvraag via een CONNECT-tunnel, voor proxy's die alleen CONNECT ondersteunen zoals Tors HTTPTunnelPort. SOCKS5: standaardpoort 1080.
 Load cookies from file:
 Cookies uit bestand laden:
-Preload cookies from a Netscape cookies.txt file before crawling.
+Use a Netscape cookies.txt file as the cookie jar. HTTrack loads it before crawling, and writes it back at the end unless a line in it could not be loaded.
 Cookies vooraf laden uit een Netscape cookies.txt-bestand voordat het crawlen begint.
 Pause between files:
 Pauze tussen bestanden:
@@ -1094,3 +1094,31 @@ Objects
 Objecten
 Embedded content
 Ingesloten inhoud
+Log in with a browser...
+Aanmelden met een browser...
+Log in to the site in a browser, and crawl with the cookies and the browser identity it was given
+Meld u in een browser aan bij de site en crawl met de cookies en de browser identiteit die hij heeft gekregen
+No Microsoft Edge WebView2 runtime is installed on this computer
+Er is geen Microsoft Edge WebView2-runtime op deze computer geïnstalleerd
+Log in with a browser
+Aanmelden met een browser
+Go
+Ga
+Done
+Klaar
+Clear login
+Afmelden
+The browser did not open: %s.
+De browser is niet geopend: %s.
+The browser came back with no cookies, so nothing was kept.
+De browser heeft geen cookies teruggegeven, dus er is niets bewaard.
+%d cookies were collected. They are used when you press OK.
+Er zijn %d cookies verzameld. Ze worden gebruikt als u op OK klikt.
+The browser gave no cookies the engine can use, so nothing was changed.
+De browser gaf geen cookies die HTTrack kan gebruiken, dus er is niets gewijzigd.
+The cookies could not be written to %s, so nothing was changed.
+De cookies konden niet naar %s worden geschreven, dus er is niets gewijzigd.
+%d of the browser's cookies were left out, because the engine would not read them.
+%d cookies van de browser zijn weggelaten, omdat HTTrack ze niet kon lezen.
+The browser identity it reported cannot be used, so the mirror will send the default one.
+De gemelde browser identiteit kan niet worden gebruikt, dus de spiegeling stuurt de standaardidentiteit.

@@ -978,7 +978,7 @@ Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request
 Πρωτόκολλο διαμεσολαβητή. HTTP: τυπικός διαμεσολαβητής. HTTP (σήραγγα CONNECT): στέλνει κάθε αίτημα μέσω σήραγγας CONNECT, για διαμεσολαβητές που υποστηρίζουν μόνο CONNECT όπως το HTTPTunnelPort του Tor. SOCKS5: προεπιλεγμένη θύρα 1080.
 Load cookies from file:
 Φόρτωση cookies από αρχείο:
-Preload cookies from a Netscape cookies.txt file before crawling.
+Use a Netscape cookies.txt file as the cookie jar. HTTrack loads it before crawling, and writes it back at the end unless a line in it could not be loaded.
 Προφόρτωση των cookies από ένα αρχείο Netscape cookies.txt πριν την ανίχνευση.
 Pause between files:
 Παύση μεταξύ αρχείων:
@@ -1094,3 +1094,31 @@ Objects
 Αντικείμενα
 Embedded content
 Ενσωματωμένο περιεχόμενο
+Log in with a browser...
+Σύνδεση με πρόγραμμα περιήγησης...
+Log in to the site in a browser, and crawl with the cookies and the browser identity it was given
+Συνδεθείτε στην τοποθεσία μέσω ενός προγράμματος περιήγησης και κάντε την αντιγραφή με τα cookies και την ταυτότητα περιήγησης που πήρε
+No Microsoft Edge WebView2 runtime is installed on this computer
+Δεν είναι εγκατεστημένο το περιβάλλον εκτέλεσης Microsoft Edge WebView2 σε αυτόν τον υπολογιστή
+Log in with a browser
+Σύνδεση με πρόγραμμα περιήγησης
+Go
+Μετάβαση
+Done
+Τέλος
+Clear login
+Αποσύνδεση
+The browser did not open: %s.
+Το πρόγραμμα περιήγησης δεν άνοιξε: %s.
+The browser came back with no cookies, so nothing was kept.
+Το πρόγραμμα περιήγησης δεν επέστρεψε cookies, οπότε δεν κρατήθηκε τίποτα.
+%d cookies were collected. They are used when you press OK.
+Συλλέχθηκαν %d cookies. Θα χρησιμοποιηθούν όταν πατήσετε Εντάξει.
+The browser gave no cookies the engine can use, so nothing was changed.
+Το πρόγραμμα περιήγησης δεν έδωσε cookies που να μπορεί να χρησιμοποιήσει το HTTrack, οπότε δεν άλλαξε τίποτα.
+The cookies could not be written to %s, so nothing was changed.
+Δεν ήταν δυνατή η εγγραφή των cookies στο %s, οπότε δεν άλλαξε τίποτα.
+%d of the browser's cookies were left out, because the engine would not read them.
+%d από τα cookies του προγράμματος περιήγησης παραλείφθηκαν, επειδή το HTTrack δεν θα τα διάβαζε.
+The browser identity it reported cannot be used, so the mirror will send the default one.
+Η ταυτότητα περιήγησης που δηλώθηκε δεν μπορεί να χρησιμοποιηθεί, οπότε η αντιγραφή θα στείλει την προεπιλεγμένη.

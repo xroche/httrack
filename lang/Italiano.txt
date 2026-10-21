@@ -978,7 +978,7 @@ Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request
 Protocollo del proxy. HTTP: proxy standard. HTTP (tunnel CONNECT): invia ogni richiesta attraverso un tunnel CONNECT, per proxy che supportano solo CONNECT come l'HTTPTunnelPort di Tor. SOCKS5: porta predefinita 1080.
 Load cookies from file:
 Carica i cookie da un file:
-Preload cookies from a Netscape cookies.txt file before crawling.
+Use a Netscape cookies.txt file as the cookie jar. HTTrack loads it before crawling, and writes it back at the end unless a line in it could not be loaded.
 Precarica i cookie da un file Netscape cookies.txt prima della copia.
 Pause between files:
 Pausa tra i file:
@@ -1094,3 +1094,31 @@ Objects
 Oggetti
 Embedded content
 Contenuto incorporato
+Log in with a browser...
+Accedi con un browser...
+Log in to the site in a browser, and crawl with the cookies and the browser identity it was given
+Accedi al sito con un browser e avvia la copia con i cookie e l'identità del browser che ha ricevuto
+No Microsoft Edge WebView2 runtime is installed on this computer
+Nessun runtime Microsoft Edge WebView2 è installato su questo computer
+Log in with a browser
+Accedi con un browser
+Go
+Vai
+Done
+Fatto
+Clear login
+Disconnetti
+The browser did not open: %s.
+Il browser non si è aperto: %s.
+The browser came back with no cookies, so nothing was kept.
+Il browser non ha restituito alcun cookie, quindi non è stato conservato nulla.
+%d cookies were collected. They are used when you press OK.
+Sono stati raccolti %d cookie. Verranno usati quando premi Ok.
+The browser gave no cookies the engine can use, so nothing was changed.
+Il browser non ha fornito cookie utilizzabili dal motore, quindi non è stato cambiato nulla.
+The cookies could not be written to %s, so nothing was changed.
+Non è stato possibile scrivere i cookie in %s, quindi non è stato cambiato nulla.
+%d of the browser's cookies were left out, because the engine would not read them.
+%d cookie del browser sono stati esclusi, perché il motore non poteva leggerli.
+The browser identity it reported cannot be used, so the mirror will send the default one.
+L'identità del browser segnalata non può essere usata, quindi il mirror invierà quella predefinita.

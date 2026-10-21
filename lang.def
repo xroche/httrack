@@ -1013,7 +1013,7 @@ Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request
 LANG_COOKIEFILE
 Load cookies from file:
 LANG_COOKIEFILETIP
-Preload cookies from a Netscape cookies.txt file before crawling.
+Use a Netscape cookies.txt file as the cookie jar. HTTrack loads it before crawling, and writes it back at the end unless a line in it could not be loaded.
 LANG_PAUSEFILES
 Pause between files:
 LANG_PAUSEFILESTIP
@@ -1124,3 +1124,31 @@ LANG_ACCEPTOBJECT
 Objects
 LANG_ACCEPTEMBED
 Embedded content
+LANG_BROWSERLOGIN
+Log in with a browser...
+LANG_BROWSERLOGINTIP
+Log in to the site in a browser, and crawl with the cookies and the browser identity it was given
+LANG_BROWSERLOGINNORUNTIME
+No Microsoft Edge WebView2 runtime is installed on this computer
+LANG_BROWSERLOGINTITLE
+Log in with a browser
+LANG_BROWSERLOGINGO
+Go
+LANG_BROWSERLOGINDONE
+Done
+LANG_BROWSERLOGINCLEAR
+Clear login
+LANG_BROWSERLOGINFAILED
+The browser did not open: %s.
+LANG_BROWSERLOGINNONE
+The browser came back with no cookies, so nothing was kept.
+LANG_BROWSERLOGINGOT
+%d cookies were collected. They are used when you press OK.
+LANG_BROWSERLOGINUNUSABLE
+The browser gave no cookies the engine can use, so nothing was changed.
+LANG_BROWSERLOGINNOTSAVED
+The cookies could not be written to %s, so nothing was changed.
+LANG_BROWSERLOGINDROPPED
+%d of the browser's cookies were left out, because the engine would not read them.
+LANG_BROWSERLOGINBADAGENT
+The browser identity it reported cannot be used, so the mirror will send the default one.

@@ -978,7 +978,7 @@ Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request
 Proksi protokoli. HTTP: oddiy proksi. HTTP (CONNECT tuneli): har bir so'rovni CONNECT tuneli orqali yuboradi; faqat CONNECT'ni qo'llab-quvvatlaydigan proksilar uchun, masalan Tor HTTPTunnelPort. SOCKS5: standart port 1080.
 Load cookies from file:
 Fayldan cookies yuklamoq:
-Preload cookies from a Netscape cookies.txt file before crawling.
+Use a Netscape cookies.txt file as the cookie jar. HTTrack loads it before crawling, and writes it back at the end unless a line in it could not be loaded.
 Ko’chirib olishdan oldin Netscape cookies.txt faylidan cookies’ni oldindan yuklamoq.
 Pause between files:
 Fayllar orasidagi pauza:
@@ -1094,3 +1094,31 @@ Objects
 Obyektlar
 Embedded content
 Ichiga joylangan kontent
+Log in with a browser...
+Brauzer orqali kirish...
+Log in to the site in a browser, and crawl with the cookies and the browser identity it was given
+Saytga brauzer orqali kiring, ko’zgu olishda esa olingan cookies va brauzer identifikatori ishlatiladi
+No Microsoft Edge WebView2 runtime is installed on this computer
+Bu kompyuterda Microsoft Edge WebView2 runtime o’rnatilmagan
+Log in with a browser
+Brauzer orqali kirish
+Go
+O’tish
+Done
+Tayyor
+Clear login
+Tozalash
+The browser did not open: %s.
+Brauzer ochilmadi: %s.
+The browser came back with no cookies, so nothing was kept.
+Brauzer hech qanday cookies qaytarmadi, shuning uchun hech narsa saqlanmadi.
+%d cookies were collected. They are used when you press OK.
+%d ta cookies yig’ildi. Ular OK bosilganda ishlatiladi.
+The browser gave no cookies the engine can use, so nothing was changed.
+Brauzer HTTrack ishlata oladigan cookies bermadi, shuning uchun hech narsa o’zgartirilmadi.
+The cookies could not be written to %s, so nothing was changed.
+Cookies %s ga yozib bo’lmadi, shuning uchun hech narsa o’zgartirilmadi.
+%d of the browser's cookies were left out, because the engine would not read them.
+Brauzerning %d ta cookies’i chetda qoldirildi, chunki HTTrack ularni o’qiy olmadi.
+The browser identity it reported cannot be used, so the mirror will send the default one.
+Bildirilgan brauzer identifikatoridan foydalanib bo’lmaydi, shuning uchun ko’zgu standart identifikatorni yuboradi.

@@ -978,7 +978,7 @@ Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request
 Protocol proxy. HTTP: proxy standard. HTTP (tunel CONNECT): trimite fiecare cerere printr-un tunel CONNECT, pentru proxy care accepta doar CONNECT precum HTTPTunnelPort al lui Tor. SOCKS5: port implicit 1080.
 Load cookies from file:
 Încarca cookies dintr-un fisier:
-Preload cookies from a Netscape cookies.txt file before crawling.
+Use a Netscape cookies.txt file as the cookie jar. HTTrack loads it before crawling, and writes it back at the end unless a line in it could not be loaded.
 Preîncarca cookies dintr-un fisier Netscape cookies.txt înainte de copiere.
 Pause between files:
 Pauza între fisiere:
@@ -1094,3 +1094,31 @@ Objects
 Obiecte
 Embedded content
 Conținut încorporat
+Log in with a browser...
+Autentificare cu un browser...
+Log in to the site in a browser, and crawl with the cookies and the browser identity it was given
+Autentificaţi-vă pe sit într-un browser, iar clonarea va folosi cookies şi identitatea browser-ului primite
+No Microsoft Edge WebView2 runtime is installed on this computer
+Pe acest calculator nu este instalat mediul de rulare Microsoft Edge WebView2
+Log in with a browser
+Autentificare cu un browser
+Go
+Mergi
+Done
+Gata
+Clear login
+Deconectare
+The browser did not open: %s.
+Browserul nu s-a deschis: %s.
+The browser came back with no cookies, so nothing was kept.
+Browserul nu a returnat cookies, aşa că nu s-a păstrat nimic.
+%d cookies were collected. They are used when you press OK.
+Au fost colectate %d cookies. Vor fi folosite când apăsaţi OK.
+The browser gave no cookies the engine can use, so nothing was changed.
+Browserul nu a dat cookies pe care HTTrack să le poată folosi, aşa că nu s-a schimbat nimic.
+The cookies could not be written to %s, so nothing was changed.
+Cookies nu au putut fi scrise în %s, aşa că nu s-a schimbat nimic.
+%d of the browser's cookies were left out, because the engine would not read them.
+%d dintre cookies-urile browserului au fost lăsate deoparte, deoarece HTTrack nu le-a putut citi.
+The browser identity it reported cannot be used, so the mirror will send the default one.
+Identitatea browser-ului raportată nu poate fi folosită, aşa că la clonare se va trimite cea implicită.
