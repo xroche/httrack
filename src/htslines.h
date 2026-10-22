@@ -54,6 +54,10 @@ FILE *hts_fopen_private(const char *name, const char *mode);
    when a non-space byte was dropped. At EOF it reads an empty line. */
 hts_boolean hts_readline(FILE *fp, char *s, size_t max, int flags);
 
+/* hts_readline(fp, s, max, 0) keeping CR and NUL, and storing the byte count
+   in len. HTS_TRUE when the line was cut. */
+hts_boolean hts_readline_raw(FILE *fp, char *s, size_t max, size_t *len);
+
 /* hts_readline() trimmed and joined after a trailing backslash. Leading spaces
    and backslashes count against max, so "abc\\\n\n" at 4 is cut. */
 hts_boolean hts_readline_cpp(FILE *fp, char *s, size_t max, int flags);

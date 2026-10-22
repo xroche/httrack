@@ -58,6 +58,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsmd5.h"
 #include "htsthread.h"
 #include "htsfetch.h"
+#include "htsbundle.h"
 
 #include <ctype.h>
 /* hts_self_path() */
@@ -488,6 +489,29 @@ static hts_boolean optparam_dash_ok(const cmdl_argv *cmd, int na) {
   return na + 1 < cmd->argc && cmd->param[na + 1];
 }
 
+/* Store the --bundle-dir at na in opt and cmd as an absolute path, so doit.log
+   finds it from anywhere. HTS_FALSE after a panic. */
+static hts_boolean bundle_dir_set(httrackp *opt, cmdl_argv *cmd, int na) {
+  const char *const dir = na + 1 < cmd->argc ? cmd->argv[na + 1] : NULL;
+  const hts_boolean relative = dir != NULL && dir[0] != '/' && dir[0] != '\\' &&
+                               !(dir[0] != '\0' && dir[1] == ':');
+  char cwd[HTS_URLMAXSIZE] = "";
+  char abs[HTS_URLMAXSIZE];
+  char *copy;
+
+  if (dir == NULL || (dir[0] == '-' && !optparam_dash_ok(cmd, na)) ||
+      (relative && getcwd(cwd, sizeof(cwd)) == NULL) ||
+      !slprintfbuff(abs, sizeof(abs), "%s%s%s", cwd, relative ? "/" : "",
+                    dir) ||
+      (copy = hts_arena_strdup(&cmd->tokens, abs)) == NULL) {
+    HTS_PANIC_PRINTF("Option bundle-dir needs a blank space and a folder");
+    return HTS_FALSE;
+  }
+  cmd->argv[na + 1] = copy;
+  StringCopy(opt->bundle_dir, abs);
+  return HTS_TRUE;
+}
+
 /* Print the headers -#C lists for `url`, read back out of the ZIP cache. */
 static void cmdl_print_cache_entry(httrackp *opt, cache_back *cache,
                                    const char *url, int sendb) {
@@ -615,6 +639,9 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   int httrack_logmode = 3;      // ONE log file
 
   ensureUrlCapacity(url, url_sz, 65536);
+  /* a library caller may run twice on one opt */
+  hts_bundle_free(opt);
+  StringCopy(opt->bundle_dir, "");
 
   // Create options
   _DEBUG_HEAD = 0;              // pas de debuggage en têtes
@@ -1146,6 +1173,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             HTS_PANIC_PRINTF(s);
             htsmain_free();
             return -1;
+          } else if (strfield2(argv[i] + 2, "bundle-dir")) {
+            i++; /* The option parser reads its value. */
           }
           //
           else {
@@ -1156,7 +1185,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             htsmain_free();
             return -1;
           }
-
         }
       }
     }
@@ -1392,6 +1420,14 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         x_cmd.span[prev_opt] = na - prev_opt;
       prev_opt = hts_rule_would_be_read_as_opt(argv[na]) ? na : 0;
 
+      if (strcmp(argv[na], "--bundle-dir") == 0) {
+        if (!bundle_dir_set(opt, &x_cmd, na)) {
+          htsmain_free();
+          return -1;
+        }
+        na++;
+        continue;
+      }
       if (hts_rule_would_be_read_as_opt(argv[na])) { // option
         com = argv[na] + 1;
 
@@ -2908,6 +2944,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 
       } else { // URL/filters
         char catbuff[CATBUFF_SIZE];
+        /* doit.log keeps argv, so the bundle suffix is cut from a copy */
+        char word[HTS_CDLMAXSIZE];
         const size_t urlSize = strlen(argv[na]);
         const size_t capa = strlen(url) + urlSize + 32;
 
@@ -2922,15 +2960,25 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           fprintf(stderr, "* Warning: filter %s holds a quote, kept as is\n",
                   argv[na]);
         assertf(urlSize < HTS_URLMAXSIZE);
+        strcpybuff(word, argv[na]);
+        if (argv[na][0] != '+' && argv[na][0] != '-') {
+          const char *const why = hts_bundle_take(opt, word);
+
+          if (why != NULL) {
+            cmdl_panic_value(opt, why, argv[na]);
+            htsmain_free();
+            return -1;
+          }
+        }
         if (urlSize < HTS_URLMAXSIZE) {
           ensureUrlCapacity(url, url_sz, capa);
           if (strnotempty(url))
             strlcatbuff(url, " ", url_sz); // separator space
           /* a rule is decoded once, where the engine splits the rules */
           append_escape_spc_url(
-              argv[na][0] == '+' || argv[na][0] == '-'
-                  ? argv[na]
-                  : unescape_http_unharm(catbuff, sizeof(catbuff), argv[na], 1),
+              word[0] == '+' || word[0] == '-'
+                  ? word
+                  : unescape_http_unharm(catbuff, sizeof(catbuff), word, 1),
               url, url_sz);
         }
       } // if argv=- etc.

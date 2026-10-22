@@ -50,6 +50,8 @@ ALLOW = {
     'htshelp.c: \\nThe URL is: \\"%s\\"\\n': "--catchurl hands the URL back",
     'htshelp.c: You can capture it through: httrack \\"%s\\"\\n': "--catchurl",
     "htsweb.c: URL=http://%s:%d/\\n": "the server's own address",
+    "htsbauth.c: Bundle %s, line %d: %s": "filter->line is a line number",
+    "htsbundle.c: Bundle %s, line %d: unknown key%s%.*s": "a lowercase key alone",
 }
 
 

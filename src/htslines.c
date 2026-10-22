@@ -68,13 +68,15 @@ FILE *hts_fopen_private(const char *name, const char *mode) {
 #endif
 }
 
+/* hts_readline_raw() keeps every byte. */
+#define LINE_RAW 0x100
+
 /* Is c one of the bytes flags drop? */
 static hts_boolean line_drops(int c, int flags) {
-  return c == '\r' || ((flags & HTS_LINE_DROP_TAB) != 0 && c == '\t') ||
-                 ((flags & HTS_LINE_DROP_FF) != 0 && c == '\f') ||
-                 ((flags & HTS_LINE_DROP_NUL) != 0 && c == '\0')
-             ? HTS_TRUE
-             : HTS_FALSE;
+  return (flags & LINE_RAW) == 0 &&
+         (c == '\r' || ((flags & HTS_LINE_DROP_TAB) != 0 && c == '\t') ||
+          ((flags & HTS_LINE_DROP_FF) != 0 && c == '\f') ||
+          ((flags & HTS_LINE_DROP_NUL) != 0 && c == '\0'));
 }
 
 /* How a line ends once trimmed, which decides whether it continues. */
@@ -118,7 +120,7 @@ static hts_boolean readline_end(FILE *fp, char *s, size_t max, int flags,
     }
     if (j + 1 < max)
       s[j++] = (char) c;
-    else if (!is_realspace(c))
+    else if ((flags & LINE_RAW) != 0 || !is_realspace(c))
       cut = HTS_TRUE;
   }
   s[j] = '\0';
@@ -131,6 +133,12 @@ hts_boolean hts_readline(FILE *fp, char *s, size_t max, int flags) {
   line_end end;
 
   return readline_end(fp, s, max, flags, &len, &end);
+}
+
+hts_boolean hts_readline_raw(FILE *fp, char *s, size_t max, size_t *len) {
+  line_end end;
+
+  return readline_end(fp, s, max, LINE_RAW, len, &end);
 }
 
 /* readline_end(), then the trim hts_readline_cpp() does on each line. */

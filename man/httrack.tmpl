@@ -69,6 +69,72 @@ start URL and its subdomains, or to that host alone when it is an address or a
 public suffix. They are Secure when that URL is https. HTTrack never rewrites
 such a file. HttpOnly cookies are not in it. A cookies.txt export has them,
 and so does the Cookie header from DevTools "Copy as cURL", pasted here.
+.TP
+.I <name>.hts
+A login bundle, named by a start URL that ends with
+.IR #httrack\-bundle=<name> ,
+such as
+.IR https://example.com/members/#httrack\-bundle=login1 .
+The name holds letters, digits,
+.IR . ,
+.I _
+and
+.I \-
+only. HTTrack reads the file in the project folder, or in the folder given to
+.IR "\-\-bundle\-dir <dir>" ,
+and never writes it. doit.log keeps that folder as an absolute path. HTTrack
+reads the suffix on the command line, in a
+.I \-%L
+list and in doit.log, never on a crawled link. A missing file, or one that
+does not parse, stops the run before any request.
+.IP
+The first line is
+.IR "# HTTrack bundle 1" .
+Then come
+.I url
+lines, each one more start URL, at most one
+.I ua
+line, and
+.I header
+and
+.I scope
+lines. A
+.I cookies
+line ends them, and a Netscape cookie jar follows it.
+.IP
+The bundle's user agent and headers replace
+.I \-F
+and
+.I \-%X
+for each host in its scope, and only there. A bundle with header lines but no
+.I ua
+line sends the
+.I \-F
+user agent. When any start URL naming the bundle, or any of its url lines, is
+https, its headers go over https alone, and so do those of the bundles it
+merges with. By default the scope is the registrable domains of the start
+URLs naming the bundle and of its url lines. A host with no registrable domain,
+such as a public suffix, a single label or an address, covers itself alone.
+Scope lines replace that default. HTTrack drops a cookie outside the scope and
+gives the count in one warning. HTTrack refuses a Host, Cookie, Proxy\-* or
+framing header, a scope line naming a public suffix, and a line that holds a
+control byte or is too long, in the cookie jar too and even under
+.IR \-b0 .
+A second
+.I ua
+line, header lines over 8192 bytes, or a full cookie jar stops the run too. A
+repeated cookie line or an unknown key only warns, and so does an unknown #
+line in the cookie jar. Before the
+.I cookies
+line, a # line is a comment. Messages give the file and the line number, never
+a value. Two bundles whose
+scopes overlap must give the same user agent, headers and cookie values, or the
+run stops.
+.IP
+The bundle's cookies go into the cookie jar, which HTTrack writes at the end of
+the crawl. Of the bundle and the jar, the newer file wins a cookie both hold.
+A new capture therefore wins over the jar, and a cookie the server refreshed
+wins over an older bundle. On equal times the bundle wins.
 .PP
 A running mirror also watches its own output directory for these. Creating one
 is how a script drives an engine it has no other handle on. On Windows, which

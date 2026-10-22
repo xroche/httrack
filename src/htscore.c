@@ -40,6 +40,7 @@ Please visit our Website: http://www.httrack.com
 
 /* File defs */
 #include "htscore.h"
+#include "htsbundle.h"
 
 /* after htscore.h, which is what pulls in config.h and so HAVE_PATHS_H */
 #ifndef _WIN32
@@ -681,6 +682,56 @@ static hts_boolean filter_rule_decode_(const char *rule, char *dest,
   return HTS_TRUE;
 }
 
+/* The jar whose records can win over a bundle's: the -%K file, or the
+   project's cookies.txt. NULL under -b0. */
+static const char *bundle_jar_file(httrackp *opt, char buff[CATBUFF_SIZE]) {
+  if (!opt->accept_cookie)
+    return NULL;
+  if (strnotempty(StringBuff(opt->cookies_file)))
+    return StringBuff(opt->cookies_file);
+  return fconcat(buff, CATBUFF_SIZE, StringBuff(opt->path_log), "cookies.txt");
+}
+
+/* Load the login bundles, and add their url lines to the start URLs in
+ *primary, which grows. HTS_FALSE after saying why the run must stop. */
+static hts_boolean bundle_start(httrackp *opt, char **primary,
+                                htsbuff *primarybuff) {
+  char err[1024];
+  char jarbuff[CATBUFF_SIZE];
+  const char *extra;
+  size_t room = 0;
+  size_t i;
+
+  if (!hts_bundle_load_all(opt, bundle_jar_file(opt, jarbuff), err,
+                           sizeof(err))) {
+    hts_log_print(opt, LOG_ERROR, "Login bundle: %s", err);
+    fprintf(stderr, "Login bundle: %s\n", err);
+    return HTS_FALSE;
+  }
+  for (i = 0; (extra = hts_bundle_url(opt, i)) != NULL; i++)
+    room += strlen(extra) + sizeof("http://\n");
+  if (room != 0) {
+    char *const grown =
+        room < (size_t) -1 - primarybuff->cap
+            ? (char *) realloct(*primary, primarybuff->cap + room)
+            : NULL;
+
+    if (grown == NULL) {
+      printf("PANIC! : Not enough memory [%d]\n", __LINE__);
+      return HTS_FALSE;
+    }
+    *primary = primarybuff->buf = grown;
+    primarybuff->cap += room;
+  }
+  for (i = 0; (extra = hts_bundle_url(opt, i)) != NULL; i++) {
+    if (strstr(extra, ":/") == NULL)
+      htsbuff_cat(primarybuff, "http://");
+    htsbuff_cat(primarybuff, extra);
+    htsbuff_cat(primarybuff, "\n");
+  }
+  return HTS_TRUE;
+}
+
 int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   char *primary = NULL;         // première page, contenant les liens à scanner
   hash_struct hash;             // système de hachage, accélère la recherche dans les liens
@@ -1054,6 +1105,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
 
     /* load URL file list */
     /* OPTIMIZED for fast load */
+    hts_boolean bundle_refused = HTS_FALSE; /* a -%L line named a bad one */
+
     if (StringNotEmpty(opt->filelist)) {
       char *filelist_buff = NULL;
       size_t filelist_sz = 0;
@@ -1096,6 +1149,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
         int n = 0;
         int lineno = 0;
         char BIGSTK line[HTS_URLMAXSIZE * 2];
+        const char *bundle_why;
 
         while(filelist_ptr < filelist_sz) {
           int adv;
@@ -1136,6 +1190,15 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
                 StringBuff(opt->filelist), lineno, adr_nologin(opt, line + 1));
             continue;
           }
+          bundle_why = hts_bundle_take(opt, line);
+          if (bundle_why != NULL) {
+            hts_log_print(opt, LOG_ERROR, "\"%s\", line %d: %s",
+                          StringBuff(opt->filelist), lineno, bundle_why);
+            fprintf(stderr, "\"%s\", line %d: %s\n", StringBuff(opt->filelist),
+                    lineno, bundle_why);
+            bundle_refused = HTS_TRUE;
+            continue;
+          }
           if (line[0]) {
             n++;
             if (strstr(line, ":/") == NULL) {
@@ -1166,6 +1229,15 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
         strlncatbuff(start_url, primary, sizeof(start_url), first);
       cookies_file_refused = cookie_load_from(
           opt, opt->cookie, "", StringBuff(opt->cookies_file), start_url);
+    }
+
+    // bundle url lines join the start URLs, and bundle cookies go to the jar
+    if (bundle_refused || !bundle_start(opt, &primary, &primarybuff)) {
+      /* the jar may hold half a bundle, so it is not saved */
+      cookies_file_refused = COOKIE_LOAD_KEEP;
+      freet(primary);
+      XH_extuninit;
+      return 0;
     }
 
     // lien primaire

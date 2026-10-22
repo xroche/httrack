@@ -36,6 +36,7 @@ Please visit our Website: http://www.httrack.com
 // Fichier librairie .c
 
 #include "htscore.h"
+#include "htsbundle.h"
 #include "htssitemap.h"
 #include "htswarc.h"
 #include "htschanges.h"
@@ -1153,6 +1154,20 @@ const char *http_custom_header_warning(const char *headers, const char *line) {
     if (http_headers_have_field(headers, field))
       return "header replaces an earlier one";
   }
+  return NULL;
+}
+
+/* The -%X warnings, plus Host, Cookie and Proxy-*. */
+const char *http_bundle_header_refusal(const char *headers, const char *line) {
+  static const char *const engine[] = {"Host", "Cookie"};
+  const char *const why = http_custom_header_warning(headers, line);
+
+  if (why != NULL)
+    return why;
+  if (header_name_in(line, engine, sizeof(engine) / sizeof(engine[0])))
+    return "Host and Cookie are the engine's";
+  if (strfield(line, "Proxy-"))
+    return "a proxy header is not for the site";
   return NULL;
 }
 
@@ -8120,6 +8135,8 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   StringCopy(opt->accept_kinds, "");
   opt->accept_given = HTS_FALSE;
   opt->lang_given = HTS_FALSE;
+  StringCopy(opt->bundle_dir, "");
+  opt->bundle_state = NULL;
   StringCopy(opt->headers, "");
   StringCopy(opt->mimedefs, "\n");      // aucun filtre mime (\n IMPORTANT)
   StringClear(opt->mod_blacklist);
@@ -8191,6 +8208,7 @@ HTSEXT_API void hts_free_opt(httrackp * opt) {
     /* An FTP worker reads opt for its whole run, and not every caller drains
        its threads the way httrack.c does before getting here. */
     ftp_stop_workers();
+    hts_bundle_free(opt);
 
     /* Alocated callbacks */
 
@@ -8267,6 +8285,7 @@ HTSEXT_API void hts_free_opt(httrackp * opt) {
     StringFree(opt->lang_iso);
     StringFree(opt->accept);
     StringFree(opt->accept_kinds);
+    StringFree(opt->bundle_dir);
     StringFree(opt->headers);
     StringFree(opt->sys_com);
     StringFree(opt->mimedefs);
