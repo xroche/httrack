@@ -6113,6 +6113,9 @@ static hts_boolean secrets_known(httrackp *opt) {
 
 /* vfprintf() to fp, with each secret of opt as ***. */
 static void secret_vfprintf(httrackp *opt, FILE *fp, const char *format,
+                            va_list args) HTS_PRINTF_FUN(3, 0);
+
+static void secret_vfprintf(httrackp *opt, FILE *fp, const char *format,
                             va_list args) {
   va_list args_copy;
   int n;

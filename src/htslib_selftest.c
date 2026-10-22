@@ -1656,6 +1656,7 @@ static int nologin_rows(httrackp *opt) {
               {"mailto:a@b", "mailto:a@b"},
               {"u:p@h/x", "u:p@h/x"},
               {"http://u:p@hostname.example/x", "http://u:***@hostname.e"}};
+
   char buf[24];
   const int index = opt->state.concat.index;
   int err = 0;
