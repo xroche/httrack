@@ -96,7 +96,7 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
   if (strcmp(hdr, expected) != 0)
     err = 1;
 
-  /* A hostile over-long request host must not overflow domain[256] in
+  /* A hostile over-long request host must not overflow domain[] in
      treathead's default-domain copy (that would abort the mirror). */
   {
     static t_cookie ck2;
@@ -265,7 +265,7 @@ static hts_boolean cookie_roundtrip(const char *host, const char *header,
 
 /* cookie_host must map ADR to WANT, or refuse ADR when WANT is NULL. */
 static hts_boolean cookie_host_is(const char *adr, const char *want) {
-  char host[256];
+  char host[COOKIE_MAX_DOMAIN];
   const hts_boolean ok = cookie_host(adr, host, sizeof(host));
 
   if (want == NULL)
@@ -715,7 +715,7 @@ static int st_cookiedomain(httrackp *opt, int argc, char **argv) {
    set that to, and must leave the bytes beyond it alone. */
 static int st_cookiecap(httrackp *opt, int argc, char **argv) {
   static t_cookie cookie;
-  /* Above the 256 bytes of headroom cookie_add reserves, or it refuses all. */
+  /* Above the COOKIE_HEADROOM bytes cookie_add reserves, or it refuses all. */
   const size_t cap = 512;
   static const char NAME[] = "n", DOM[] = "www.example.com", PATH[] = "/";
   char big[1024];
@@ -755,9 +755,10 @@ static int st_cookiecap(httrackp *opt, int argc, char **argv) {
   }
 
   /* The exact boundary, derived rather than hardcoded so it survives a change
-     to the fixture strings: cookie_add reserves 256 bytes beyond the parts. */
+     to the fixture strings: cookie_add reserves COOKIE_HEADROOM past them. */
   {
-    const size_t fixed = strlen(NAME) + strlen(DOM) + strlen(PATH) + 256;
+    const size_t fixed =
+        strlen(NAME) + strlen(DOM) + strlen(PATH) + COOKIE_HEADROOM;
     const size_t fits = cap - fixed;
 
     /* Exactly filling max_len is accepted... */

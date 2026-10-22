@@ -91,6 +91,16 @@ hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size);
 
 /** A jar record holds this many bytes of name plus value. */
 #define COOKIE_MAX_PAIR 4096
+/** A cookie domain buffer holds this many bytes, the NUL included. */
+#define COOKIE_MAX_DOMAIN 256
+/** A cookie path buffer holds this many bytes, the NUL included. */
+#define COOKIE_MAX_PATH 256
+/** A cookies.txt line must be shorter than this many bytes. */
+#define COOKIE_MAX_LINE 8000
+/** The mirror's jar fills this many bytes of t_cookie.data. */
+#define COOKIE_MAX_JAR 30000
+/** cookie_set keeps this many bytes of the jar free beyond a record's parts. */
+#define COOKIE_HEADROOM 256
 
 /** A jar record keeps these beside name, value, domain and path. */
 typedef struct cookie_attr {

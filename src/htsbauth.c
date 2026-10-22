@@ -109,7 +109,7 @@ int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
                                       .http_only = HTS_FALSE,
                                       .expires = 0};
   char buffer[8192];
-  char host[256];
+  char host[COOKIE_MAX_DOMAIN];
   char *a = cookie->data;
   char *insert;
   char *old;
@@ -134,7 +134,7 @@ int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
   if (strlen(cook_name) > COOKIE_MAX_PAIR ||
       strlen(cook_value) > COOKIE_MAX_PAIR - strlen(cook_name))
     return -1;
-  if (strlen(path) > 256)
+  if (strlen(path) > COOKIE_MAX_PATH)
     return -1;
 
   domain = host;
@@ -150,7 +150,7 @@ int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
   {
     const size_t parts[] = {
         used,           strlen(cook_value), strlen(cook_name),
-        strlen(domain), strlen(path),       256};
+        strlen(domain), strlen(path),       COOKIE_HEADROOM};
     size_t left = cookie->max_len;
     size_t i;
 
@@ -168,8 +168,8 @@ int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
                   attr->secure ? "TRUE" : "FALSE", (LLint) attr->expires,
                   cook_name, cook_value,
                   attr->http_only ? "\t" COOKIE_HTTPONLY_FIELD : "");
-  /* Backstop, not a live gate: the check above reserves 256 bytes and this
-     record adds ~30 of literals, so it fires only if that assembly ever
+  /* Backstop, not a live gate: the check above reserves COOKIE_HEADROOM and
+     this record adds ~30 of literals, so it fires only if that assembly ever
      outgrows the headroom. Overflow-safe form regardless. */
   if (used >= cookie->max_len || strlen(cook) >= cookie->max_len - used)
     return -1; // no room to add it
@@ -239,7 +239,7 @@ char *cookie_find_exact(char *s, const char *cook_name, const char *domain,
 int cookie_remove(t_cookie *cookie, const char *cook_name, const char *domain,
                   const char *path) {
   char *a, *b;
-  char host[256];
+  char host[COOKIE_MAX_DOMAIN];
 
   /* Same normalisation as cookie_set, or the pair would disagree on where a
      port-qualified domain was stored. */
@@ -286,7 +286,7 @@ hts_boolean cookie_domain_match(const char *jar_dom, const char *host) {
 /* Is DOMAIN a public suffix such as "com"? A leading or trailing dot is
    ignored. */
 static hts_boolean cookie_domain_is_suffix(const char *domain) {
-  char dom[256];
+  char dom[COOKIE_MAX_DOMAIN];
   size_t len;
 
   if (domain[0] == '.')
@@ -307,7 +307,7 @@ static hts_boolean cookie_domain_is_suffix(const char *domain) {
 
 /* See htsbauth.h. */
 hts_boolean cookie_domain_allowed(const char *domain, const char *host) {
-  char dom[256];
+  char dom[COOKIE_MAX_DOMAIN];
 
   // a Netscape jar writes ".example.com" where RFC 6265 stores example.com
   if (domain[0] == '.')
@@ -720,7 +720,7 @@ static hts_boolean cookie_flat_pair(httrackp *opt, t_cookie *cookie, char *pair,
 static int cookie_load_flat(httrackp *opt, t_cookie *cookie, FILE *fp,
                             const char *given, const char *start_url,
                             int quote) {
-  char host[256];
+  char host[COOKIE_MAX_DOMAIN];
   char BIGSTK pair[COOKIE_MAX_PAIR + 2]; // name, '=', value and the NUL
   size_t len = 0;
   hts_boolean nul = HTS_FALSE, too_long = HTS_FALSE;
@@ -830,7 +830,7 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, FILE *fp,
   int refused = 0;
   hts_boolean keep = HTS_FALSE;
   char BIGSTK line[8192];
-  const size_t line_max = 8000;
+  const size_t line_max = COOKIE_MAX_LINE;
   int lineno = 0;
   // this load's records alone, so a line repeating one is caught
   t_cookie *seen = (t_cookie *) calloct(1, sizeof(t_cookie));
@@ -895,8 +895,8 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, FILE *fp,
           refused++;
         }
       } else {
-        char domain[256];                           // .netscape.com
-        char path[256];                             // /
+        char domain[COOKIE_MAX_DOMAIN];             // .netscape.com
+        char path[COOKIE_MAX_PATH];                 // /
         char BIGSTK cook_name[COOKIE_MAX_PAIR + 1]; // MYCOOK
         char BIGSTK cook_value[8192];               // ID=toto,S=1234
         const char *p;
@@ -940,7 +940,7 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, FILE *fp,
                    cookie_load_field(opt, cook_value, sizeof(cook_value),
                                      buffer, rec, 6, "value", given, filter)) {
           cookie_attr attr;
-          char host[256];
+          char host[COOKIE_MAX_DOMAIN];
           const hts_boolean repeated =
               seen != NULL && cookie_host(domain, host, sizeof(host)) &&
               cookie_find_exact(seen->data, cook_name, host, path) != NULL;
@@ -1175,7 +1175,7 @@ static int cookie_write(t_cookie *cookie, const char *name) {
       const char *rec = line;
       int i;
 
-      a += binput(a, line, 8000);
+      a += binput(a, line, COOKIE_MAX_LINE);
       // stop on the seventh TAB, so the cut takes it with the eighth field
       for (i = 0; i < 7 && extra != NULL; i++) {
         extra = strchr(extra, '\t');
