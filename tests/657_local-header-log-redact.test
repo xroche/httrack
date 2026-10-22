@@ -101,7 +101,8 @@ grep -qF "ignoring a repeated 'dup'" "$tmpdir/flat/hts-log.txt" || fail "no repe
 grep -qF "a cookie with no name" "$tmpdir/flat/hts-log.txt" || fail "no nameless =value"
 grep -qF "a cookie with no name" "$tmpdir/bare/hts-log.txt" || fail "no bare value"
 for n in 1 2 3; do
-    grep -qF "unknown comment on line $n of $tmpdir/jar.txt" "$tmpdir/netscape/hts-log.txt" ||
+    # the log names the native path, which differs from $tmpdir on Windows
+    grep -qE "unknown comment on line $n of .*/jar\.txt" "$tmpdir/netscape/hts-log.txt" ||
         fail "no unknown comment on line $n: $(<"$tmpdir/netscape/hts-log.txt")"
 done
 ok "a refused cookie is logged without its value"

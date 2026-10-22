@@ -6402,6 +6402,48 @@ void fprintfio(FILE *fp, const char *buff, const char *prefix, httrackp *opt) {
   }
 }
 
+/* See htslib.h. */
+const char *hts_header_shown(httrackp *opt, const char *line, char *dst,
+                             size_t size) {
+  const size_t len = strcspn(line, "\r\n");
+  const size_t name = len != 0 ? secret_name_len(line, len) : 0;
+  const char *const colon = memchr(line, ':', len);
+  size_t keep = colon != NULL ? (size_t) (colon - line) + 1 : len;
+  char value[HTS_URLMAXSIZE * 2];
+  size_t n;
+
+  if (name != 0 && colon == NULL)
+    keep = name;
+  while (keep < len && (line[keep] == ' ' || line[keep] == '\t'))
+    keep++;
+  n = keep < size ? keep : size - 1;
+  memcpy(dst, line, n);
+  dst[n] = '\0';
+  if (keep < len && name != 0) {
+    // a clipped marker still hides the value
+    if (!slprintfbuff(dst + n, size - n, "<redacted, %lu bytes>",
+                      (unsigned long) (len - keep)))
+      (void) strclipbuff(dst + n, size - n, "<redacted>");
+  } else if (keep < len) {
+    const size_t v =
+        len - keep < sizeof(value) ? len - keep : sizeof(value) - 1;
+
+    memcpy(value, line + keep, v);
+    value[v] = '\0';
+    if (header_name_in(line, url_fields,
+                       sizeof(url_fields) / sizeof(url_fields[0]))) {
+      char masked[HTS_URLMAXSIZE * 2];
+
+      (void) strclipbuff(dst + n, size - n,
+                         url_nologin_r(masked, sizeof(masked), value));
+    } else {
+      (void) strclipbuff(dst + n, size - n, value);
+    }
+  }
+  hts_hide_secrets(opt, dst, size);
+  return dst;
+}
+
 /* Le fichier existe-t-il? (ou est-il accessible?) */
 /* Note: NOT utf-8 */
 /* Note: preserve errno */

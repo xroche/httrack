@@ -583,15 +583,13 @@ static void hts_secret_learn_options(httrackp *opt, const char *urls) {
   while (*u != '\0') {
     const size_t n = strcspn(u, " \t\r\n");
 
-    if (n != 0 && *u != '+' && *u != '-') {
-      char *word = malloct(n + 1);
+    // a start URL never exceeds the URL buffers, so a longer word is no URL
+    if (n != 0 && *u != '+' && *u != '-' && n < HTS_URLMAXSIZE * 2) {
+      char word[HTS_URLMAXSIZE * 2];
 
-      if (word != NULL) {
-        memcpy(word, u, n);
-        word[n] = '\0';
-        hts_secret_add_login(opt, word);
-        freet(word);
-      }
+      memcpy(word, u, n);
+      word[n] = '\0';
+      hts_secret_add_login(opt, word);
     }
     u += n != 0 ? n : 1;
   }
@@ -2095,9 +2093,12 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 
                     // with the -%H log's redaction of a login header
                     if (why != NULL) {
-                      fprintf(stderr, "warning: -%%X %s: ", why);
-                      fprintfio(stderr, argv[na], "", opt);
-                      fputc('\n', stderr);
+                      char shown[HTS_URLMAXSIZE * 2];
+
+                      /* one write, so a merged stdout cannot split it */
+                      fprintf(stderr, "warning: -%%X %s: %s\n", why,
+                              hts_header_shown(opt, argv[na], shown,
+                                               sizeof(shown)));
                     }
                   }
                   /* A refused line goes in, so the request drops its folds. */
