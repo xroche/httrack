@@ -97,7 +97,7 @@ hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size);
 #define COOKIE_MAX_PATH 256
 /** A cookies.txt line must be shorter than this many bytes. */
 #define COOKIE_MAX_LINE 8000
-/** The mirror's jar fills this many bytes of t_cookie.data. */
+/** The max_len httpmirror gives the jar, below sizeof(t_cookie.data). */
 #define COOKIE_MAX_JAR 30000
 /** cookie_set keeps this many bytes of the jar free beyond a record's parts. */
 #define COOKIE_HEADROOM 256
