@@ -82,10 +82,10 @@ static void print_without_dir(const char *err, const char *dir) {
   printf("%s\n", p);
 }
 
-/* -#test=bundle <dir> <url>... [host:<adr>]... [jar:<file>] [twice] [b0]: load
-   the bundles the URLs name from dir over the jar file, twice when asked, with
-   cookies off for b0, then print their url lines, the jar, and the UA and
-   headers each adr gets. */
+/* -#test=bundle <dir> <url>... [host:<adr>]... [hide:<text>]... [jar:<file>]
+   [twice] [b0]: load the bundles the URLs name from dir over the jar file,
+   twice when asked, with cookies off for b0, then print their url lines, the
+   jar, the UA and headers each adr gets, and each text as the logs show it. */
 static int st_bundle(httrackp *opt, int argc, char **argv) {
   FILE *const log = opt->log;
   t_cookie *const prev = opt->cookie;
@@ -99,7 +99,7 @@ static int st_bundle(httrackp *opt, int argc, char **argv) {
 
   if (argc < 2 || jar == NULL) {
     fprintf(stderr, "bundle: takes <dir> <url>... [host:<adr>]... "
-                    "[jar:<file>] [twice] [b0]\n");
+                    "[hide:<text>]... [jar:<file>] [twice] [b0]\n");
     freet(jar);
     return 1;
   }
@@ -119,6 +119,7 @@ static int st_bundle(httrackp *opt, int argc, char **argv) {
     } else if (strcmp(argv[i], "b0") == 0) {
       opt->cookie = NULL;
     } else if (strncmp(argv[i], "host:", 5) != 0 &&
+               strncmp(argv[i], "hide:", 5) != 0 &&
                strlen(argv[i]) < sizeof(buff)) {
       strcpybuff(buff, argv[i]);
       assertf(hts_bundle_take(opt, buff) == NULL);
@@ -154,6 +155,12 @@ static int st_bundle(httrackp *opt, int argc, char **argv) {
           putchar(*p == '\n' ? '|' : *p);
       }
       putchar('\n');
+    } else if (strncmp(argv[i], "hide:", 5) == 0) {
+      char shown[HTS_URLMAXSIZE * 2];
+
+      (void) strclipbuff(shown, sizeof(shown), argv[i] + 5);
+      hts_hide_secrets(opt, shown, sizeof(shown));
+      printf("hide %s\n", shown);
     }
   }
 done:
@@ -167,7 +174,9 @@ done:
 
 const struct selftest_entry selftests_bundle[] = {
     {"bundlecut", "<url>", "the login bundle a start URL names", st_bundlecut},
-    {"bundle", "<dir> <url>... [host:<adr>]... [jar:<file>] [twice] [b0]",
+    {"bundle",
+     "<dir> <url>... [host:<adr>]... [hide:<text>]... [jar:<file>] [twice] "
+     "[b0]",
      "load login bundles and print the identity each host gets", st_bundle},
     {NULL, NULL, NULL, NULL},
 };

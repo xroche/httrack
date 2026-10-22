@@ -1,0 +1,285 @@
+#!/bin/bash
+#
+# The -%H log (hts-ioinfo.txt) hides the value of every header and FTP command
+# that carries a login, while the wire still carries it.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+require_httrack
+
+TAB=$'\t'
+CR=$'\r'
+
+python=$(find_python) || skip "python3 missing"
+
+server=$(nativepath "$top_srcdir/tests/header-injection-server.py")
+tmpdir=$(mktemp -d)
+serverpid=
+wire=$tmpdir/wire
+
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+"$python" "$server" "$(nativepath "$wire")" >"$tmpdir/server.out" 2>"$tmpdir/server.err" &
+serverpid=$!
+port=$(discover_server_port "$tmpdir/server.out" "$serverpid") || exit 1
+
+crawl() { # crawl TAG URL [extra httrack args...]
+    local tag=$1 url=$2 rc=0
+    shift 2
+    mkdir -p "$tmpdir/$tag"
+    if test -e "$tmpdir/cookies.txt"; then
+        cp "$tmpdir/cookies.txt" "$tmpdir/$tag/"
+    fi
+    run_with_timeout 90 httrack "$url" -O "$tmpdir/$tag" -c1 --robots=0 \
+        --retries=0 --quiet -%v0 -%H "$@" >>"$tmpdir/log" 2>&1 || rc=$?
+    test "$rc" -eq 0 || fail "$tag: the crawl exited $rc"
+    cat "$tmpdir/$tag/hts-ioinfo.txt" >>"$tmpdir/ioinfo"
+}
+
+printf '127.0.0.1\tFALSE\t/\tFALSE\t2999999999\tjarsess\tJARSECRET\n' \
+    >"$tmpdir/cookies.txt"
+# -%X drops the blank before the colon (#1996), so only a response keeps one
+crawl jar "http://urluser:URLSECRET@127.0.0.1:$port/setcookie.html" \
+    -%X "Proxy-Authorization : Bearer PROXYSECRET"
+rm "$tmpdir/cookies.txt"
+crawl box "http://127.0.0.1:$port/plain.html" -%X "authorization: Bearer AUTHSECRET" \
+    -%X "Cookie2: VISIBLE3"
+
+basic=$(printf urluser:URLSECRET | base64)
+log=$(<"$tmpdir/ioinfo")
+sent=$(<"$wire")
+# a field whose name only starts like a hidden one stays in clear
+for line in ">>> X-Visible: shown" ">>> X-Cookie-Id: VISIBLE2" \
+    "<<< Cookie2: VISIBLE3" ">>> Authorization-Info: VISIBLE4"; do
+    grep -qxF "$line$CR" <<<"$log" || fail "no '$line' in hts-ioinfo.txt: $log"
+done
+# the server sent these, so only the request secrets are on the wire
+for secret in JARSECRET PROXYSECRET AUTHSECRET "$basic" "srvsess=SETCOOKIESECRET"; do
+    grep -qF "$secret" <<<"$sent" || fail "$secret never reached the server"
+done
+for secret in JARSECRET PROXYSECRET AUTHSECRET "$basic" SETCOOKIESECRET \
+    SPACEDSECRET FOLDEDSECRET; do
+    if grep -qF "$secret" <<<"$log"; then
+        fail "$secret is in hts-ioinfo.txt: $(grep -F "$secret" <<<"$log")"
+    fi
+done
+for line in "<<< Authorization: <redacted, $((${#basic} + 6)) bytes>" \
+    "<<< Proxy-Authorization: <redacted, 18 bytes>" \
+    "<<< Cookie: <redacted, 17 bytes>" \
+    "<<< authorization: <redacted, 17 bytes>" \
+    ">>> Set-Cookie: <redacted, 31 bytes>" \
+    ">>> set-cookie$TAB: <redacted, 20 bytes>" \
+    ">>> $TAB<redacted, 19 bytes>"; do
+    grep -qF "$line" <<<"$log" || fail "no '$line' in hts-ioinfo.txt: $log"
+done
+ok "HTTP login headers are redacted in the log and sent in full"
+
+# A cookie the loader refuses is logged by its name, never by its value.
+printf 'dup=1; dup=DUPSECRET; =NONAMESECRET\n' >"$tmpdir/flat.txt"
+crawl flat "http://127.0.0.1:$port/plain.html" --cookies-file "$tmpdir/flat.txt"
+printf 'ok=1; BARESECRET\n' >"$tmpdir/bare.txt"
+crawl bare "http://127.0.0.1:$port/plain.html" --cookies-file "$tmpdir/bare.txt"
+printf '%s\n' "#HTTPOnly_127.0.0.1${TAB}FALSE$TAB/${TAB}FALSE${TAB}0${TAB}comname${TAB}TABSECRET" \
+    "# SID=EQSECRET" "#TOKSECRET" >"$tmpdir/jar.txt"
+crawl netscape "http://127.0.0.1:$port/plain.html" --cookies-file "$tmpdir/jar.txt"
+for tag in flat bare netscape; do
+    log=$(<"$tmpdir/$tag/hts-log.txt")
+    for secret in DUPSECRET NONAMESECRET BARESECRET TABSECRET EQSECRET TOKSECRET; do
+        if grep -qF "$secret" <<<"$log"; then
+            fail "$secret is in hts-log.txt: $(grep -F "$secret" <<<"$log")"
+        fi
+    done
+done
+grep -qF "ignoring a repeated 'dup'" "$tmpdir/flat/hts-log.txt" || fail "no repeated 'dup'"
+grep -qF "a cookie with no name" "$tmpdir/flat/hts-log.txt" || fail "no nameless =value"
+grep -qF "a cookie with no name" "$tmpdir/bare/hts-log.txt" || fail "no bare value"
+for n in 1 2 3; do
+    # the log names the native path: another prefix and separator on Windows
+    grep -qE "unknown comment on line $n of .*jar\.txt" "$tmpdir/netscape/hts-log.txt" ||
+        fail "no unknown comment on line $n: $(<"$tmpdir/netscape/hts-log.txt")"
+done
+ok "a refused cookie is logged without its value"
+
+# A password in a URL, a proxy or a -%X header never reaches hts-log.txt.
+crawl proxy "http://127.0.0.1:$port/plain.html" -P "puser:PPWSECRET@127.0.0.1:$port"
+grep -qF "Proxy-Authorization: Basic $(printf puser:PPWSECRET | base64)" "$wire" ||
+    fail "the proxy password never reached the proxy"
+log=$(cat "$tmpdir/jar/hts-log.txt" "$tmpdir/box/hts-log.txt" "$tmpdir/proxy/hts-log.txt")
+for secret in URLSECRET PPWSECRET AUTHSECRET PROXYSECRET; do
+    if grep -qF "$secret" <<<"$log"; then
+        fail "$secret is in hts-log.txt: $(grep -F "$secret" <<<"$log")"
+    fi
+done
+for line in "urluser:***@127.0.0.1:$port/setcookie.html" "puser:***@127.0.0.1:$port" \
+    "authorization: <redacted, 17 bytes>"; do
+    grep -qF "$line" <<<"$log" || fail "no '$line' in hts-log.txt: $log"
+done
+ok "hts-log.txt masks the passwords of URLs, proxies and -%X headers"
+
+# a -%X Cookie value is no token, so a path holding it stays readable
+crawl cookieword "http://127.0.0.1:$port/privacy/accepted-terms.html" \
+    -%X "Cookie: consent=accepted"
+grep -qF "/privacy/accepted-terms.html -O" "$tmpdir/cookieword/hts-log.txt" ||
+    fail "a Cookie value masked a path: $(<"$tmpdir/cookieword/hts-log.txt")"
+
+out=$(httrack -#test=maskpw) || fail "httrack -#test=maskpw exited non-zero: $out"
+test "$out" = "maskpw self-test: OK" || fail "expected 'maskpw self-test: OK', got: $out"
+out=$(httrack -#test=secrets) || fail "httrack -#test=secrets exited non-zero: $out"
+test "$out" = "secrets self-test: OK" || fail "expected 'secrets self-test: OK', got: $out"
+# a header token is hidden anywhere, a password only as a login
+crawl token "http://u:TOKENPWQ1@127.0.0.1:$port/token.html" -z -Z -r2 \
+    -%X "Authorization: Bearer HDRTOKQ3"
+crawl word "http://u:html@127.0.0.1:$port/hop.html" -z -Z -r2
+log=$(cat "$tmpdir/token/hts-log.txt" "$tmpdir/token/hts-ioinfo.txt")
+for q in k=TOKENPWQ1 l=LINKTOKQ2 h=HDRTOKQ3; do
+    grep -qF "GET /leaf.html?$q HTTP/1." "$wire" || fail "$q never reached the server"
+done
+if grep -qF HDRTOKQ3 <<<"$log"; then
+    fail "HDRTOKQ3 is in the log: $(grep -F HDRTOKQ3 <<<"$log")"
+fi
+for line in "/leaf.html?h=***" "<<< GET /leaf.html?h=*** HTTP/1." \
+    "/leaf.html?k=TOKENPWQ1" "/leaf.html?l=LINKTOKQ2" "luser:***@127.0.0.1:$port/leaf.html"; do
+    grep -qF -- "$line" <<<"$log" || fail "no '$line' in the log: $log"
+done
+log=$(<"$tmpdir/word/hts-log.txt")
+for line in "u:***@127.0.0.1:$port/hop.html" "127.0.0.1:$port/plain.html"; do
+    grep -qF -- "$line" <<<"$log" || fail "no '$line' in hts-log.txt: $log"
+done
+if grep -qF "u:html@" <<<"$log"; then
+    fail "the password html is in hts-log.txt"
+fi
+ok "the log hides a header token anywhere, and a password only as a login"
+# planted.html links with a password in every form the engine reads one
+# not quiet, so stdout and stderr carry the start URLs too
+mkdir -p "$tmpdir/planted"
+run_with_timeout 90 httrack "http://suser:STARTPWA@127.0.0.1:$port/planted.html" \
+    "suser:STARTPWB@127.0.0.1:$port/hop.html" "http://STARTPWT@127.0.0.1:$port/plain.html" \
+    -O "$tmpdir/planted" -c4 -s2 \
+    --sitemap-url "http://luser:LINKPWS@127.0.0.1:$port/sitemap.xml" --retries=0 -%v1 \
+    -%H -z -Z -r4 -T5 "+*" "-*:KEEPFILTER@*" -%X "X-Note: a:KEEPHEADER@c/d" \
+    </dev/null >"$tmpdir/planted/stdout.txt" 2>&1 || fail "planted: the crawl failed"
+crawl planted-proxy "http://127.0.0.1:$port/planted.html" -P "puser:PROXYPW@127.0.0.1:$port" \
+    -z -Z -r4 -T5 "+*" -%R "http://ruser:LINKPWREF@127.0.0.1:$port/"
+crawl planted-ftp "ftp://suser:STARTPWF@127.0.0.1:$port/f.txt" -P "puser:PROXYPW@127.0.0.1:$port"
+log=$(<"$tmpdir/planted/hts-log.txt")
+for line in "at link luser:***@127.0.0.1:1/l8.html (from suser:***@127.0.0.1:$port/planted.html)" \
+    "link detected in javascript: http://luser:***@127.0.0.1:" \
+    "is ready, skipping: luser:***@127.0.0.1:$port/i.gif" \
+    "Sitemap: queued luser:***@127.0.0.1:$port/sitemap.xml" \
+    "robots.txt added at suser:***@127.0.0.1:$port" \
+    "at http://suser:***@127.0.0.1:$port/planted.html suser:***@127.0.0.1:$port/hop.html" \
+    "data attribute is no URL: http://u:***@127.0.0.1:$port/{w}.jpg" \
+    "link detected in html (tag): mms://luser:***@127.0.0.1:$port/m.asf" \
+    "link detected in html (tag): gopher://luser:***@127.0.0.1:$port/g" \
+    "link detected in html (tag):   gopher://luser:***@127.0.0.1:$port/g2" \
+    "build relative links to test: x-y.z+w://luser:***@h.example/a" \
+    " http://***@127.0.0.1:$port/plain.html" \
+    " -*:KEEPFILTER@* -%X \"X-Note: a:KEEPHEADER@c/d\" "; do
+    grep -qF -- "$line" <<<"$log" || fail "no '$line' in hts-log.txt: $log"
+done
+grep -qF ">>> Location: http://ruser:***@127.0.0.1:$port/hop.html" "$tmpdir/planted/hts-ioinfo.txt" ||
+    fail "no masked Location in hts-ioinfo.txt"
+# the page keeps a link the engine cannot fetch as it is, but the log must not
+grep -qF SCHEMEPWM "$tmpdir/planted/127.0.0.1_$port/planted.html" || fail "no mms:// link in the mirror"
+if grep -qF SCHEMEPW <<<"$log"; then
+    fail "an mms:// or gopher:// password is in hts-log.txt: $(grep -F SCHEMEPW <<<"$log")"
+fi
+# the page keeps the data-src value, which is no link, but the log must not
+grep -qF DATAPW "$tmpdir/planted/127.0.0.1_$port/planted.html" || fail "no data-src in the mirror"
+if grep -qF DATAPW <<<"$log"; then
+    fail "the data-src password is in hts-log.txt: $(grep -F DATAPW <<<"$log")"
+fi
+grep -qF "<<< Referer: http://ruser:***@127.0.0.1:$port/" "$tmpdir/planted-proxy/hts-ioinfo.txt" ||
+    fail "no masked -%R Referer in hts-ioinfo.txt"
+grep -qF "<<< GET ftp://suser:***@127.0.0.1:$port/f.txt HTTP/1." "$tmpdir/planted-ftp/hts-ioinfo.txt" ||
+    fail "no masked proxied ftp:// request line in hts-ioinfo.txt"
+stdout=$(<"$tmpdir/planted/stdout.txt")
+for line in "mirroring http://suser:***@127.0.0.1:$port/planted.html" \
+    "suser:***@127.0.0.1:$port/planted.html ("; do
+    grep -qF "$line" <<<"$stdout" || fail "no '$line' on stdout: $stdout"
+done
+grep -qF "STARTPWA" "$tmpdir/planted/hts-cache/doit.log" || fail "the grep below cannot see a password"
+# doit.log, new.txt and new.zip keep the URLs that --update needs
+leaks=$(find "$tmpdir/planted" "$tmpdir/planted-proxy" "$tmpdir/planted-ftp" -type f ! -name doit.log \
+    ! -name new.txt ! -name new.zip -exec grep -aoE "(STARTPW|LINKPW|PROXYPW)[A-Z0-9]*" {} + || true)
+test -z "$leaks" || fail "a password is in the project: $leaks"
+ok "no project file holds a URL or proxy password"
+
+# The messages about arguments and options mask them too.
+printf 'http://u:LONGPW@127.0.0.1/%s\n' "$(repeat_chars 2100 a)" >"$tmpdir/long.txt"
+out=$(httrack -O "$tmpdir/why" -q --why "http://u:WHYPW@127.0.0.1/x" -%S "$tmpdir/long.txt" \
+    "-*x*" 2>&1) || fail "--why exited $?: $out"
+printf '"http://u:QUOTEPWA@127.0.0.1:%s/plain.html"\n"u:QUOTEPWB@127.0.0.1:%s/plain.html"\n' \
+    "$port" "$port" >"$tmpdir/list.txt"
+crawl opts "http://127.0.0.1:$port/plain.html" -%L "$tmpdir/list.txt" \
+    -%X "Authorization: Basic AUTHPWA" -%X "Authorization: Basic AUTHPWB" \
+    -%X "Authorization Basic MALPWA" -%X "proxy-authorization MALPWB"
+rc=0
+httrack "http://127.0.0.1:$port/plain.html" -O "$tmpdir/alias" \
+    --host-alias "http://u:ALIASPW@a.example/x=b.example" >>"$tmpdir/log" 2>&1 || rc=$?
+test "$rc" -ne 0 || fail "a host-alias rule with a path was accepted"
+rc=0
+httrack "\"http://u:QSTARTPW@127.0.0.1:$port/plain.html\"" -O "$tmpdir/quoted" \
+    >>"$tmpdir/log" 2>&1 || rc=$?
+test "$rc" -ne 0 || fail "a quoted start URL was accepted"
+log="$out
+$(cat "$tmpdir/log" "$tmpdir/why/hts-log.txt" "$tmpdir/opts/hts-log.txt")"
+for line in "URL longer than 2047 bytes, ignored: http://u:***@127.0.0.1/aaa" \
+    "http://u:***@127.0.0.1/x: rejected by rule #1 (-*x*)" " -%Y http://u:***@127.0.0.1/x " \
+    "line 1: \"http://u:***@127.0.0.1:$port/plain.html\" is quoted, ignored" \
+    "line 2: \"u:***@127.0.0.1:$port/plain.html\" is quoted, ignored" \
+    "Rejected: http://u:***@a.example/x=b.example" \
+    " -%X \"Authorization <redacted, 12 bytes>\" " \
+    "Argument refused: \"http://u:***@127.0.0.1:$port/plain.html\" is quoted"; do
+    grep -qF -- "$line" <<<"$log" || fail "no '$line' in the messages: $log"
+done
+grep -qxF "warning: -%X header replaces an earlier one: Authorization: <redacted, 13 bytes>" \
+    "$tmpdir/log" || fail "no redacted -%X warning: $(<"$tmpdir/log")"
+for line in "Authorization <redacted, 12 bytes>" "proxy-authorization <redacted, 6 bytes>"; do
+    grep -qxF "warning: -%X malformed header ignored: $line" "$tmpdir/log" ||
+        fail "no redacted '$line' warning: $(<"$tmpdir/log")"
+done
+if grep -E "(LONG|WHY|QUOTE|AUTH|QSTART|MAL|ALIAS)PW" <<<"$log"; then
+    fail "a password is in the messages about arguments"
+fi
+# the progress display draws only on a terminal
+if "$python" -c 'import pty' 2>/dev/null; then
+    mkdir -p "$tmpdir/vt"
+    run_with_timeout 90 "$python" -c 'import pty, sys; pty.spawn(sys.argv[1:])' \
+        httrack "http://suser:VTPW@127.0.0.1:$port/planted.html" -O "$tmpdir/vt" -c4 \
+        --retries=0 -%v -z -r3 -T5 </dev/null >"$tmpdir/vt.out" 2>&1 ||
+        fail "the -%v crawl failed: $(<"$tmpdir/vt.out")"
+    grep -qF "127.0.0.1:$port/slow.html" "$tmpdir/vt.out" || fail "no -%v display: $(<"$tmpdir/vt.out")"
+    if grep -aoE "(VTPW|LINKPW)[A-Z0-9]*" "$tmpdir/vt.out"; then
+        fail "a password is in the -%v display"
+    fi
+fi
+ok "the messages about arguments and the progress display mask passwords"
+
+root="$tmpdir/root"
+cmds="$tmpdir/cmds"
+mkdir -p "$root"
+printf 'body\n' >"$root/f.txt"
+ftp_server_start --root "$root" --require-pass --log "$(nativepath "$cmds")"
+: >"$tmpdir/ioinfo"
+crawl ftp "ftp://ftpuser:FTPSECRET@127.0.0.1:${FTP_PORT}/f.txt"
+grep -qxF "PASS FTPSECRET" "$cmds" || fail "the FTP password never reached the server"
+log=$(<"$tmpdir/ioinfo")
+if grep -qF FTPSECRET <<<"$log"; then
+    fail "the FTP password is in hts-ioinfo.txt"
+fi
+grep -qF -- "---> PASS <redacted, 9 bytes>" <<<"$log" || fail "no redacted PASS: $log"
+# the user name alone is no secret, so it stays
+grep -qF -- "---> USER ftpuser" <<<"$log" || fail "no USER in clear: $log"
+if grep -qF FTPSECRET "$tmpdir/ftp/hts-log.txt"; then
+    fail "the FTP password is in hts-log.txt"
+fi
+grep -qF "ftpuser:***@" "$tmpdir/ftp/hts-log.txt" || fail "no masked FTP URL in hts-log.txt"
+ok "the FTP password is redacted in the log and sent in full"

@@ -639,7 +639,7 @@ static hts_boolean ftp_may_resume(httrackp *opt, const lien_back *back,
   if (back->r.totalsize <= back->range_req_size) {
     hts_log_print(opt, LOG_DEBUG,
                   "FTP: not resuming %s%s, the local copy is not shorter",
-                  back->url_adr, back->url_fil);
+                  adr_nologin(opt, back->url_adr), back->url_fil);
     return HTS_FALSE;
   }
   /* Equality, not ordering: a copy this code did not stamp carries a local
@@ -648,7 +648,7 @@ static hts_boolean ftp_may_resume(httrackp *opt, const lien_back *back,
       remote_mtime != local_mtime) {
     hts_log_print(opt, LOG_DEBUG,
                   "FTP: not resuming %s%s, the copy is not dated as the remote",
-                  back->url_adr, back->url_fil);
+                  adr_nologin(opt, back->url_adr), back->url_fil);
     return HTS_FALSE;
   }
   return HTS_TRUE;
@@ -881,7 +881,8 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
     SOCaddr_initport(server, port);
 
     strcpybuff(back->info, "connect");
-    hts_log_print(opt, LOG_DEBUG, "FTP: connecting to %s:%d", _adr, port);
+    hts_log_print(opt, LOG_DEBUG, "FTP: connecting to %s:%d",
+                  adr_nologin(opt, _adr), port);
 
     if (!ftp_connect(back, soc_ctl, &server, timeout, opt)) {
       strcpybuff(back->r.msg, "Unable to connect to the server");
@@ -1417,7 +1418,12 @@ int send_line(T_SOC soc, const char *data) {
 
   if (_DEBUG_HEAD) {
     if (ioinfo) {
-      fprintf(ioinfo, "---> %s\x0d\x0a", data);
+      if (strncmp(data, "PASS ", 5) == 0) {
+        fprintf(ioinfo, "---> PASS ");
+        fprint_redacted(ioinfo, strlen(data + 5));
+        fprintf(ioinfo, "\x0d\x0a");
+      } else
+        fprintf(ioinfo, "---> %s\x0d\x0a", data);
       fflush(ioinfo);
     }
   }

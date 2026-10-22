@@ -467,6 +467,12 @@ HTSEXT_API const char *hts_accept_preset(const char *browser, const char *kind);
     lives. @p opt must not be NULL. */
 HTSEXT_API char *hts_errmsg(httrackp *opt);
 
+/** Replace in place each password or token @p opt has seen with ***, so a
+    front end can show a URL it built itself. @p s is NUL-terminated in a
+    buffer of @p size bytes, and the result is clipped to it. Thread-safe.
+    A NULL @p opt does nothing, and out of memory empties @p s. */
+HTSEXT_API void hts_hide_secrets(httrackp *opt, char *s, size_t size);
+
 /** Get or set the transfer-pause flag. A second argument >= 0 sets it, where
     nonzero means paused, and a negative one only queries. @return the flag as
     it now stands. */

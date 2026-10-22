@@ -628,6 +628,12 @@ hts_boolean hts_bundle_load_all(httrackp *opt, const char *jar_file, char *err,
     group[i] = i;
   for (i = 0; i < st->count && ok; i++)
     ok = bundle_load(opt, &st->items[i], jar_file, all_bundles, err, err_size);
+  // the log backstop hides a bundle's tokens and url-line passwords too
+  for (i = 0; i < st->count && ok; i++) {
+    for (j = 0; j < st->items[i].nurls; j++)
+      hts_secret_add_login(opt, st->items[i].urls[j]);
+    hts_secret_add_headers(opt, StringBuff(st->items[i].headers));
+  }
   for (i = 0; i < st->count && ok; i++) {
     for (j = i + 1; j < st->count && ok; j++) {
       const bundle *const a = &st->items[i];

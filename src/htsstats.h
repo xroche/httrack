@@ -33,7 +33,9 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTS_STATS_DEFH
 #define HTS_STATS_DEFH
 
+#include <string.h>
 #include "htsglobal.h"
+#include "httrack-library.h"
 
 /* One row of the "in progress" display, shared so the CLI (httrack) and the
    web GUI (htsserver) cannot drift apart: each fills its own array. */
@@ -59,5 +61,19 @@ struct t_StatsBuffer {
   //
   int actived; // pour disabled
 };
+
+/* Returns where adr resumes past its login, which the display never shows,
+   and sets *keep to the length of the scheme shown before it. */
+HTS_STATIC const char *stats_skip_login(const char *adr, size_t *keep) {
+  const char *const host = jump_identification_const(adr);
+  const char *const sep = strstr(adr, "://");
+
+  if (host == adr || host[-1] != '@') {
+    *keep = 0;
+    return adr;
+  }
+  *keep = sep != NULL && sep < host ? (size_t) (sep + 3 - adr) : 0;
+  return host;
+}
 
 #endif

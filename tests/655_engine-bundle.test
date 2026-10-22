@@ -500,6 +500,14 @@ for s in s1 s2 s3 s4 s5 keys control; do
         fail "the key alone is not named: $out"
 done
 
+# The log backstop learns a bundle's header token and url-line password.
+bundle hidden '# HTTrack bundle 1' 'header Authorization: Bearer BUNDLETOKEN123' \
+    'url http://u:URLPASSWD9@www.alpha.test/x'
+assert_selftest 'hide x *** y' bundle "$dir" \
+    'https://www.alpha.test/#httrack-bundle=hidden' 'hide:x BUNDLETOKEN123 y'
+assert_selftest 'hide see http://u:***@h/' bundle "$dir" \
+    'https://www.alpha.test/#httrack-bundle=hidden' 'hide:see http://u:URLPASSWD9@h/'
+
 # A bad name on the command line stops the run before it starts.
 rc=0
 out=$(httrack -O "$dir/argv" 'http://x.test/#httrack-bundle=..a' 2>&1) || rc=$?

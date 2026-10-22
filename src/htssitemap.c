@@ -292,7 +292,7 @@ static hts_boolean sitemap_fetch_allowed(httrackp *opt, const char *adr,
   refused = (jok == -1) ? HTS_TRUE : HTS_FALSE;
   if (refused) {
     hts_log_print(opt, LOG_NOTICE, "Sitemap: filter rule #%d refuses %s%s",
-                  jokdepth + 1, adr, fil);
+                  jokdepth + 1, adr_nologin(opt, adr), fil);
     return HTS_FALSE;
   }
   /* A Sitemap: line, or a sitemapindex entry, is the site inviting the fetch;
@@ -301,8 +301,8 @@ static hts_boolean sitemap_fetch_allowed(httrackp *opt, const char *adr,
   if (src == HTS_SITEMAP_SRC_GUESSED &&
       hts_robots_forbids(opt, adr, fil, (jok != 0) ? HTS_TRUE : HTS_FALSE,
                          refused)) {
-    hts_log_print(opt, LOG_NOTICE, "Sitemap: robots.txt forbids %s%s", adr,
-                  fil);
+    hts_log_print(opt, LOG_NOTICE, "Sitemap: robots.txt forbids %s%s",
+                  adr_nologin(opt, adr), fil);
     return HTS_FALSE;
   }
   return HTS_TRUE;
@@ -319,8 +319,8 @@ static hts_boolean sitemap_queue_(httrackp *opt, const char *adr,
   if (st == NULL)
     return HTS_FALSE;
   if (st->ndocs >= HTS_SITEMAP_MAX_DOCS || level > HTS_SITEMAP_MAX_LEVEL) {
-    hts_log_print(opt, LOG_WARNING, "Sitemap: cap reached, skipping %s%s", adr,
-                  fil);
+    hts_log_print(opt, LOG_WARNING, "Sitemap: cap reached, skipping %s%s",
+                  adr_nologin(opt, adr), fil);
     return HTS_FALSE;
   }
   if (strlen(adr) >= sizeof(d->adr) || strlen(fil) >= sizeof(d->fil))
@@ -351,7 +351,8 @@ static hts_boolean sitemap_queue_(httrackp *opt, const char *adr,
   heap_top()->retry = opt->retry;
   heap_top()->premier = heap_top_index();
   heap_top()->precedent = heap_top_index();
-  hts_log_print(opt, LOG_INFO, "Sitemap: queued %s%s", adr, fil);
+  hts_log_print(opt, LOG_INFO, "Sitemap: queued %s%s", adr_nologin(opt, adr),
+                fil);
   return HTS_TRUE;
 }
 
@@ -370,8 +371,8 @@ void hts_sitemap_redirect(httrackp *opt, const char *adr, const char *fil,
   d->done = HTS_TRUE; /* the body lives at the target now */
   /* The engine already queued the target link, so only the marking moves. */
   (void) sitemap_queue_(opt, newadr, newfil, d->level, d->src, HTS_FALSE);
-  hts_log_print(opt, LOG_NOTICE, "Sitemap: %s%s redirects to %s%s", adr, fil,
-                newadr, newfil);
+  hts_log_print(opt, LOG_NOTICE, "Sitemap: %s%s redirects to %s%s",
+                adr_nologin(opt, adr), fil, adr_nologin(opt, newadr), newfil);
 }
 
 void hts_sitemap_seed(httrackp *opt, const char *starturl) {
@@ -384,7 +385,8 @@ void hts_sitemap_seed(httrackp *opt, const char *starturl) {
     } else {
       strcpybuff(url, StringBuff(opt->sitemap_url));
       if (strstr(url, ":/") == NULL)
-        hts_log_print(opt, LOG_ERROR, "Sitemap URL must be absolute: %s", url);
+        hts_log_print(opt, LOG_ERROR, "Sitemap URL must be absolute: %s",
+                      url_nologin(opt, url));
       else if (ident_url_absolute(url, &af) >= 0)
         (void) sitemap_queue(opt, af.adr, af.fil, 0, HTS_SITEMAP_SRC_USER);
     }
@@ -458,7 +460,7 @@ void hts_sitemap_robots(httrackp *opt, const char *adr, const char *sitemaps) {
       queued++;
   }
   hts_log_print(opt, LOG_NOTICE, "Sitemap: %d sitemap(s) queued for %s", queued,
-                adr);
+                adr_nologin(opt, adr));
 }
 
 hts_boolean hts_sitemap_pending(httrackp *opt, const char *adr,
@@ -522,8 +524,8 @@ static hts_boolean sitemap_seed_child(void *arg, const char *url) {
     return HTS_TRUE;
   if (!strfield2(af.adr, c->adr)) {
     hts_log_print(c->opt, LOG_WARNING,
-                  "Sitemap: ignoring off-host child sitemap %s%s", af.adr,
-                  af.fil);
+                  "Sitemap: ignoring off-host child sitemap %s%s",
+                  adr_nologin(c->opt, af.adr), af.fil);
     return HTS_TRUE;
   }
   if (sitemap_queue(c->opt, af.adr, af.fil, c->level + 1,
@@ -574,17 +576,17 @@ void hts_sitemap_ingest(httrackp *opt, htsmoduleStruct *str, const char *adr,
                        sitemap_seed_any, &ctx);
   heap(anchor)->depth = saved_depth;
   if (n < 0) {
-    hts_log_print(opt, LOG_ERROR, "Sitemap: could not decompress %s%s", adr,
-                  fil);
+    hts_log_print(opt, LOG_ERROR, "Sitemap: could not decompress %s%s",
+                  adr_nologin(opt, adr), fil);
     return;
   }
   if (ctx.is_index)
     hts_log_print(opt, LOG_NOTICE,
                   "Sitemap: %d of %d child sitemap(s) listed by %s%s",
-                  ctx.accepted, n, adr, fil);
+                  ctx.accepted, n, adr_nologin(opt, adr), fil);
   else
     hts_log_print(opt, LOG_NOTICE, "Sitemap: %d of %d URL(s) added from %s%s",
-                  ctx.accepted, n, adr, fil);
+                  ctx.accepted, n, adr_nologin(opt, adr), fil);
 }
 
 void hts_sitemap_free(httrackp *opt) {
