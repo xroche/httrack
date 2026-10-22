@@ -1122,3 +1122,7 @@ The cookies could not be written to %s, so nothing was changed.
 Изоставени колачиња на прелистувачот: %d, бидејќи HTTrack не би можел да ги прочита.
 The browser identity it reported cannot be used, so the mirror will send the default one.
 Идентификацијата на прелистувачот што тој ја пријави не може да се користи, затоа копирањето ќе ја испраќа стандардната.
+Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click its request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
+Најавете се на страницата во друго јазиче на овој прелистувач. Отворете ги алатките за развивачи (F12), па јазичето Network, повторно вчитајте ја страницата, кликнете со десното копче на нејзиното барање и изберете Copy as cURL (bash). Залепете го текстот тука. Работи и извоз во cookies.txt, за првата адреса во списокот.
+Sites: %s. Browser identity: %s.
+Страници: %s. Идентитет на прелистувачот: %s.

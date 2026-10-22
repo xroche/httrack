@@ -36,6 +36,10 @@ function doOpenWindow() {
   childWn=window.open('addurl.html', 'addurl', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=640, height=480');
   setTimeout("do_check_child()", 100);
 }
+function doOpenLogin() {
+  childWn=window.open('browserlogin.html', 'browserlogin', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=760, height=640');
+  setTimeout("do_check_child()", 100);
+}
 function do_check_child() {
   if (childWn && childWn.document) {
     if ((typeof childWn.wparent) == "undefined") {
@@ -123,6 +127,10 @@ ${do:end-if}
 		<input type="button" value="${attr:LANG_G43}" 
 		       onClick="doOpenWindow()"
 			title='${html:LANG_G24b}' onMouseOver="info('${js:LANG_G24b}'); return true" onMouseOut="info('&nbsp;'); return true"
+			   >
+		<input type="button" value="${attr:LANG_BROWSERLOGIN}"
+		       onClick="doOpenLogin()"
+			title='${html:LANG_BROWSERLOGINTIP}' onMouseOver="info('${js:LANG_BROWSERLOGINTIP}'); return true" onMouseOut="info('&nbsp;'); return true"
 			   >
 		</td></tr></table>
 		<br>

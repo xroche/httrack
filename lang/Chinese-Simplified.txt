@@ -1122,3 +1122,7 @@ The cookies could not be written to %s, so nothing was changed.
 浏览器的 cookies 中有 %d 个被忽略，因为 HTTrack 无法读取它们。
 The browser identity it reported cannot be used, so the mirror will send the default one.
 它报告的浏览器身份无法使用，因此镜像将发送默认值。
+Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click its request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
+在此浏览器的另一个标签页中登录网站。打开开发者工具（F12），再打开“网络”标签页，刷新页面，在该页面的请求上点击右键，选择 Copy as cURL (bash)。将文本粘贴到这里。也可以使用 cookies.txt 导出文件，它会用于列表中的第一个地址。
+Sites: %s. Browser identity: %s.
+网站：%s。浏览器身份：%s。

@@ -1122,3 +1122,7 @@ Não foi possível gravar os cookies em %s, por isso nada foi alterado.
 %d cookies do navegador foram descartados, porque o HTTrack não conseguiu lê-los.
 The browser identity it reported cannot be used, so the mirror will send the default one.
 A identidade do navegador informada não pode ser usada, por isso a cópia do site enviará a identidade padrão.
+Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click its request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
+Faça login no site em outra aba deste navegador. Abra as ferramentas de desenvolvedor (F12) e depois a aba Rede, recarregue a página, clique com o botão direito na requisição dela e escolha Copy as cURL (bash). Cole o texto aqui. Uma exportação cookies.txt também funciona, para o primeiro endereço da lista.
+Sites: %s. Browser identity: %s.
+Sites: %s. Identidade do navegador: %s.

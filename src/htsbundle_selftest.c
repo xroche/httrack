@@ -172,11 +172,97 @@ done:
   return 0;
 }
 
+/* -#test=regdomain <host>...: each host's registrable domain, or "none". */
+static int st_regdomain(httrackp *opt, int argc, char **argv) {
+  int i;
+
+  (void) opt;
+  for (i = 0; i < argc; i++) {
+    char reg[256];
+
+    printf("%s %s\n", argv[i],
+           hts_registrable_domain(argv[i], reg, sizeof(reg)) ? reg : "none");
+  }
+  return 0;
+}
+
+/* -#test=bundlename <name>: "ok", or why the name is refused. */
+static int st_bundlename(httrackp *opt, int argc, char **argv) {
+  const char *why;
+
+  (void) opt;
+  if (argc != 1) {
+    fprintf(stderr, "bundlename: takes <name>\n");
+    return 1;
+  }
+  why = hts_bundle_name_refusal(argv[0]);
+  printf("%s\n", why != NULL ? why : "ok");
+  return 0;
+}
+
+/* -#test=paste <dir> <file> [agent:<ua>] [url:<url>] [dry]: turn the paste
+   held in file into a bundle in dir, and print what came back. */
+static int st_paste(httrackp *opt, int argc, char **argv) {
+  const char *agent = NULL, *url = NULL;
+  hts_boolean dry = HTS_FALSE;
+  hts_paste_result *res = calloct(1, sizeof(*res));
+  String paste = STRING_EMPTY;
+  char buf[4096];
+  size_t n;
+  FILE *fp;
+  int i;
+
+  (void) opt;
+  fp = argc >= 2 ? FOPEN(argv[1], "rb") : NULL;
+  if (fp == NULL || res == NULL) {
+    fprintf(stderr, "paste: takes <dir> <file> [agent:<ua>] [url:<url>] "
+                    "[dry]\n");
+    if (fp != NULL)
+      fclose(fp);
+    freet(res);
+    return 1;
+  }
+  while ((n = fread(buf, 1, sizeof(buf), fp)) > 0)
+    StringMemcat(paste, buf, n);
+  fclose(fp);
+  for (i = 2; i < argc; i++) {
+    if (strncmp(argv[i], "agent:", 6) == 0)
+      agent = argv[i] + 6;
+    else if (strncmp(argv[i], "url:", 4) == 0)
+      url = argv[i] + 4;
+    else if (strcmp(argv[i], "dry") == 0)
+      dry = HTS_TRUE;
+  }
+  if (!StringNotEmpty(paste))
+    StringCat(paste, "");
+  if (strlen(StringBuff(paste)) != StringLength(paste)) {
+    printf("refused: the file holds a NUL\n");
+  } else if (!hts_bundle_from_paste(StringBuff(paste), argv[0], agent, url, dry,
+                                    res)) {
+    assertf(res->name[0] == '\0' && res->url[0] == '\0' &&
+            res->agent[0] == '\0' && res->hosts[0] == '\0' &&
+            res->cookies == 0 && res->error[0] != '\0');
+    printf("refused: %s\n", res->error);
+  } else {
+    assertf(res->error[0] == '\0');
+    printf("name=%s cookies=%d hosts=%s\nurl=%s\nagent=%s\n", res->name,
+           res->cookies, res->hosts, res->url, res->agent);
+  }
+  StringFree(paste);
+  freet(res);
+  return 0;
+}
+
 const struct selftest_entry selftests_bundle[] = {
     {"bundlecut", "<url>", "the login bundle a start URL names", st_bundlecut},
     {"bundle",
      "<dir> <url>... [host:<adr>]... [hide:<text>]... [jar:<file>] [twice] "
      "[b0]",
      "load login bundles and print the identity each host gets", st_bundle},
+    {"regdomain", "<host>...", "the registrable domain of each host",
+     st_regdomain},
+    {"bundlename", "<name>", "is name a login bundle name?", st_bundlename},
+    {"paste", "<dir> <file> [agent:<ua>] [url:<url>] [dry]",
+     "turn a pasted cURL command or cookies.txt into a login bundle", st_paste},
     {NULL, NULL, NULL, NULL},
 };

@@ -1,0 +1,110 @@
+#!/bin/bash
+#
+# WebHTTrack's "Log in with a browser" popup: a pasted Copy as cURL is
+# previewed without writing, then saved as <project>/<name>.hts, owner-only,
+# and the address it hands back carries the bundle suffix.
+
+set -euo pipefail
+
+# shellcheck source=tests/webhttracklib.sh
+. "${0%"${0##*/}"}./webhttracklib.sh"
+
+htsserver_require
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_login.XXXXXX") || fail "no tmpdir"
+cleanup_push htsserver_cleanup_dir "${work}"
+export HOME="${work}" # no ~/.httrack.ini of the developer's in the store
+
+htsserver_start
+sid=$(htsserver_sid)
+test "${#sid}" -eq 32 || fail "no session id in the panel (got '${sid}')"
+
+# The button sits beside "Add a URL...", and the popup renders its text.
+page=$(htsserver_get /server/step3.html)
+grep -qF "doOpenLogin()" <<<"${page}" || fail "no login button on step 3"
+grep -qF "window.open('browserlogin.html'" <<<"${page}" ||
+    fail "the button opens no popup"
+page=$(htsserver_get /server/browserlogin.html)
+grep -qF 'Copy as cURL (bash)' <<<"${page}" || fail "no instructions: ${page}"
+grep -qF 'name="blpaste"' <<<"${page}" || fail "no paste box"
+grep -qF "'Sites: %s. Browser identity: %s.'" <<<"${page}" ||
+    fail "the preview line is not rendered"
+! grep -qF 'LANG_' <<<"${page}" || fail "a catalog key is not rendered"
+
+# Name the project, as step 2 does.
+htsserver_client --path /server/step3.html --field "sid=${sid}" \
+    --field "path=${work}" --field projname=proj >/dev/null
+proj="${work}/proj"
+
+paste="curl 'https://www.login.test/members/#top' \\
+  -H 'User-Agent: PasteAgent/1.0' \\
+  -b 'SID=SECRETSID42; theme=dark'"
+
+# login FIELD... -- post to the popup, then read the page the post redirects
+# to, as the popup's script does, into $reply
+login() {
+    reply=$(htsserver_client --path /server/browserlogin.html "$@")
+    grep -q '^HTTP/1.[01] 302' <<<"${reply}" || fail "no redirect: ${reply:0:200}"
+    reply=$(htsserver_get /server/browserlogin.html)
+    grep -q '^HTTP/1.[01] 200' <<<"${reply}" || fail "no 200: ${reply:0:200}"
+}
+attr() { # attr NAME -- the popup's data-NAME value in $reply
+    sed -n "s/.*data-$1=\"\\([^\"]*\\)\".*/\\1/p" <<<"${reply}" | head -n 1
+}
+
+# Preview: the count, the hosts and the agent, and no file.
+login --field "sid=${sid}" --field blaction=preview --field "blpaste=${paste}" \
+    --field "blagent=PageAgent/2"
+test "$(attr state)" = preview || fail "preview state: $(attr state) $(attr error)"
+test "$(attr count)" = 2 || fail "preview count: $(attr count)"
+test "$(attr hosts)" = login.test || fail "preview hosts: $(attr hosts)"
+test "$(attr agent)" = PasteAgent/1.0 || fail "preview agent: $(attr agent)"
+test ! -e "${proj}/login.test.hts" || fail "the preview wrote the bundle"
+
+# A refused paste says why, and writes nothing.
+login --field "sid=${sid}" --field blaction=save \
+    --field 'blpaste=curl "https://www.login.test/" -b a=1'
+test "$(attr state)" = error || fail "a double-quoted paste was accepted"
+grep -qF "quotes" <<<"$(attr error)" || fail "no reason: $(attr error)"
+test ! -e "${proj}/login.test.hts" || fail "a refused paste wrote the bundle"
+
+# A post without the session id is refused before its fields are read.
+for bad in "" "sid=$(printf '0%.0s' {1..32})"; do
+    fields=(--field blaction=save --field "blpaste=${paste}")
+    test -z "${bad}" || fields+=(--field "${bad}")
+    out=$(htsserver_client --path /server/browserlogin.html "${fields[@]}")
+    grep -q '^HTTP/1.[01] 403' <<<"${out}" || fail "a post without a valid sid: ${out:0:200}"
+    test ! -e "${proj}/login.test.hts" || fail "a post without a valid sid wrote the bundle"
+done
+
+# OK: the file, owner-only, and the address with its suffix.
+login --field "sid=${sid}" --field blaction=save --field "blpaste=${paste}" \
+    --field "blagent=PageAgent/2"
+test "$(attr state)" = saved || fail "save state: $(attr state) $(attr error)"
+test "$(attr url)" = "https://www.login.test/members/#httrack-bundle=login.test" ||
+    fail "the address to add: $(attr url)"
+assert_file "${proj}/login.test.hts" "OK wrote no bundle"
+tab=$(printf '\t')
+want="# HTTrack bundle 1
+ua PasteAgent/1.0
+cookies
+.login.test${tab}TRUE${tab}/${tab}TRUE${tab}0${tab}SID${tab}SECRETSID42
+.login.test${tab}TRUE${tab}/${tab}TRUE${tab}0${tab}theme${tab}dark"
+got=$(cat "${proj}/login.test.hts")
+test "${got}" = "${want}" || fail "bundle content: [${got}]"
+mode=$(stat -c %a "${proj}/login.test.hts" 2>/dev/null ||
+    stat -f %Lp "${proj}/login.test.hts")
+test "${mode}" = 600 || fail "the bundle has mode ${mode}"
+
+# A project path that climbs out of its folder is refused.
+htsserver_client --path /server/step3.html --field "sid=${sid}" \
+    --field "path=${work}/sub" --field "projname=../escaped" >/dev/null
+login --field "sid=${sid}" --field blaction=save --field "blpaste=${paste}"
+test "$(attr state)" = error || fail "a climbing project path was accepted"
+test ! -e "${work}/escaped" || fail "a climbing project path was written"
+
+# The popup puts the suffixed address in place of the plain one.
+page=$(htsserver_get /server/browserlogin.html)
+grep -qF 'url.substring(0, url.indexOf("#"))' <<<"${page}" ||
+    fail "the popup no longer strips the fragment it replaces"
+echo "PASS"

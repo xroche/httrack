@@ -1122,3 +1122,7 @@ Küpsiseid ei saanud kirjutada asukohta %s, seega midagi ei muudetud.
 %d brauseri küpsist jäeti välja, sest mootor ei lugenud neid.
 The browser identity it reported cannot be used, so the mirror will send the default one.
 Teatatud brauseri identiteeti ei saa kasutada, seega kopeerimine saadab vaikimisi identiteedi.
+Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click its request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
+Logige saidile sisse selle brauseri teisel vahelehel. Avage arendaja tööriistad (F12) ja seejärel vaheleht Võrk, laadige leht uuesti, paremklõpsake selle päringul ja valige Copy as cURL (bash). Kleepige tekst siia. Sobib ka cookies.txt eksport, loendi esimese aadressi jaoks.
+Sites: %s. Browser identity: %s.
+Saidid: %s. Brauseri identiteet: %s.

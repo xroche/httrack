@@ -1122,3 +1122,7 @@ Disse cookies kunne ikke skrives til %s, så intet blev ændret.
 %d af browserens cookies blev udeladt, fordi HTTrack ikke kunne læse dem.
 The browser identity it reported cannot be used, so the mirror will send the default one.
 Den browser-identitet, den oplyste, kan ikke bruges, så spejlkopieringen sender standardidentiteten.
+Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click its request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
+Log ind på webstedet i en anden fane i denne browser. Åbn udviklerværktøjerne (F12) og derefter fanen Netværk, genindlæs siden, højreklik på dens anmodning og vælg Copy as cURL (bash). Indsæt teksten her. En cookies.txt-eksport virker også, for den første adresse på listen.
+Sites: %s. Browser identity: %s.
+Websteder: %s. Browseridentitet: %s.

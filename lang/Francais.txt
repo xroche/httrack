@@ -1122,3 +1122,7 @@ Les cookies n'ont pas pu être écrits dans %s, rien n'a donc été modifié.
 %d cookies du navigateur ont été écartés, car le moteur ne pouvait pas les lire.
 The browser identity it reported cannot be used, so the mirror will send the default one.
 L'identité de navigateur indiquée n'est pas utilisable, la copie du site enverra donc celle par défaut.
+Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click its request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
+Connectez-vous au site dans un autre onglet de ce navigateur. Ouvrez les outils de développement (F12) puis l'onglet Réseau, rechargez la page, faites un clic droit sur sa requête et choisissez Copy as cURL (bash). Collez le texte ici. Un export cookies.txt convient aussi, pour la première adresse de la liste.
+Sites: %s. Browser identity: %s.
+Sites : %s. Identité du navigateur : %s.

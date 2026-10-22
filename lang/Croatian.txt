@@ -1122,3 +1122,7 @@ Kolačiće nije moguće zapisati u %s, pa ništa nije promijenjeno.
 %d preglednikovih kolačića je izostavljeno jer ih HTTrack nije mogao pročitati.
 The browser identity it reported cannot be used, so the mirror will send the default one.
 Prijavljeno pregledničko obilježje nije moguće upotrijebiti, pa će zrcaljenje poslati zadano.
+Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click its request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
+Prijavite se na stranicu u drugoj kartici ovog preglednika. Otvorite alate za razvojne programere (F12), zatim karticu Mreža, ponovno učitajte stranicu, desnom tipkom kliknite njezin zahtjev i odaberite Copy as cURL (bash). Zalijepite tekst ovdje. Radi i izvoz cookies.txt, za prvu adresu na popisu.
+Sites: %s. Browser identity: %s.
+Stranice: %s. Identitet preglednika: %s.

@@ -681,11 +681,10 @@ static hts_boolean cookie_flat_ignore(int *ignored) {
   return *ignored <= COOKIE_FLAT_WARNINGS;
 }
 
-/* Store the pair "name=value" at pair as a cookie of domain. Returns
-   HTS_FALSE when it is not stored, counted in *ignored. */
-static hts_boolean cookie_flat_pair(httrackp *opt, t_cookie *cookie, char *pair,
-                                    const char *domain, const cookie_attr *attr,
-                                    const char *given, int *ignored) {
+/* See htsbundle.h. */
+hts_boolean cookie_flat_pair(httrackp *opt, t_cookie *cookie, char *pair,
+                             const char *domain, const cookie_attr *attr,
+                             const char *given, int *ignored) {
   char *const eq = strchr(pair, '=');
 
   if (eq == NULL || eq == pair) {
@@ -714,6 +713,24 @@ static hts_boolean cookie_flat_pair(httrackp *opt, t_cookie *cookie, char *pair,
   return HTS_TRUE;
 }
 
+/* See htsbundle.h. */
+const char *cookie_flat_bind(const char *url, char *host, size_t host_size,
+                             cookie_attr *attr) {
+  const char *domain;
+
+  if (!cookie_url_host(url, host, host_size))
+    return NULL;
+  // an address or a public suffix has no parent domain to share cookies with
+  domain = hts_host_is_address(host, strlen(host))
+               ? NULL
+               : hts_psl_registrable_domain(host);
+  attr->host_only = domain == NULL;
+  attr->secure = strfield(url, "https:") != 0;
+  attr->http_only = HTS_FALSE;
+  attr->expires = 0;
+  return domain != NULL ? domain : host;
+}
+
 /* Load fp, a document.cookie string, as session cookies of the registrable
    domain of start_url. The file is never rewritten, because the save would
    turn it into a Netscape jar, so this returns COOKIE_LOAD_KEEP. */
@@ -732,23 +749,14 @@ static int cookie_load_flat(httrackp *opt, t_cookie *cookie, FILE *fp,
   size_t i;
   int c;
 
-  if (!cookie_url_host(start_url, host, sizeof(host))) {
+  domain = cookie_flat_bind(start_url, host, sizeof(host), &attr);
+  if (domain == NULL) {
     hts_log_print(opt, LOG_WARNING,
                   "Cookies: %s is a document.cookie string, but there is no "
                   "start URL to bind it to, so it is ignored",
                   given);
     return COOKIE_LOAD_KEEP;
   }
-  // an address or a public suffix has no parent domain to share cookies with
-  domain = hts_host_is_address(host, strlen(host))
-               ? NULL
-               : hts_psl_registrable_domain(host);
-  attr.host_only = domain == NULL;
-  attr.secure = strfield(start_url, "https:") != 0;
-  attr.http_only = HTS_FALSE;
-  attr.expires = 0;
-  if (domain == NULL)
-    domain = host;
 
   for (i = 0; i < sizeof(cookie_bom) - 1; i++) {
     if (fgetc(fp) != (unsigned char) cookie_bom[i]) {
@@ -1155,14 +1163,45 @@ static hts_boolean cookie_close_synced(FILE *fp) {
 
 int cookie_save_fault_selftest = 0;
 
+/* See htsbundle.h. */
+void cookie_records_text(const t_cookie *cookie, String *out) {
+  char BIGSTK line[8192];
+  const char *a = cookie->data;
+
+  while (*a != '\0') {
+    char *extra = line;
+    const char *rec = line;
+    int i;
+
+    a += binput(a, line, COOKIE_MAX_LINE);
+    // stop on the seventh TAB, so the cut takes it with the eighth field
+    for (i = 0; i < 7 && extra != NULL; i++) {
+      extra = strchr(extra, '\t');
+      if (extra != NULL && i < 6)
+        extra++;
+    }
+    // the eighth field is ours: the file form marks HttpOnly by prefix
+    if (extra != NULL) {
+      *extra = '\0';
+      StringCat(*out, COOKIE_HTTPONLY_PREFIX);
+    }
+    // a Netscape jar dots the domain exactly when field 1 is TRUE
+    if (rec[0] == '.')
+      rec++;
+    if (!cookie_is_host_only(line))
+      StringCat(*out, ".");
+    StringCat(*out, rec);
+    StringCat(*out, LF);
+  }
+}
+
 /* Write the jar to name, or only a header if it is empty. Return 0 on
    success. */
 static int cookie_write(t_cookie *cookie, const char *name) {
-  char BIGSTK line[8192];
   FILE *fp = hts_fopen_private(name, "wb");
 
   if (fp) {
-    const char *a = cookie->data;
+    String text = STRING_EMPTY;
     hts_boolean ok = HTS_TRUE;
 
     // Python's MozillaCookieJar refuses a file without this first line
@@ -1170,30 +1209,11 @@ static int cookie_write(t_cookie *cookie, const char *name) {
                     "# Written by HTTrack Website Copier" LF) < 0 ||
         (cookie_save_fault_selftest & COOKIE_FAULT_WRITE))
       ok = HTS_FALSE;
-    while (*a != '\0') {
-      char *extra = line;
-      const char *rec = line;
-      int i;
-
-      a += binput(a, line, COOKIE_MAX_LINE);
-      // stop on the seventh TAB, so the cut takes it with the eighth field
-      for (i = 0; i < 7 && extra != NULL; i++) {
-        extra = strchr(extra, '\t');
-        if (extra != NULL && i < 6)
-          extra++;
-      }
-      // the eighth field is ours: the file form marks HttpOnly by prefix
-      if (extra != NULL) {
-        *extra = '\0';
-        if (fprintf(fp, "%s", COOKIE_HTTPONLY_PREFIX) < 0)
-          ok = HTS_FALSE;
-      }
-      // a Netscape jar dots the domain exactly when field 1 is TRUE
-      if (rec[0] == '.')
-        rec++;
-      if (fprintf(fp, "%s%s" LF, cookie_is_host_only(line) ? "" : ".", rec) < 0)
-        ok = HTS_FALSE;
-    }
+    cookie_records_text(cookie, &text);
+    if (StringNotEmpty(text) && fwrite(StringBuff(text), 1, StringLength(text),
+                                       fp) != StringLength(text))
+      ok = HTS_FALSE;
+    StringFree(text);
     // the close reports a write the buffer held back
     if (!cookie_close_synced(fp) ||
         (cookie_save_fault_selftest & COOKIE_FAULT_CLOSE))

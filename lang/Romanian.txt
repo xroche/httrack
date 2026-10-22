@@ -1122,3 +1122,7 @@ Cookies nu au putut fi scrise în %s, aşa că nu s-a schimbat nimic.
 %d dintre cookies-urile browserului au fost lăsate deoparte, deoarece HTTrack nu le-a putut citi.
 The browser identity it reported cannot be used, so the mirror will send the default one.
 Identitatea browser-ului raportată nu poate fi folosită, aşa că la clonare se va trimite cea implicită.
+Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click its request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
+Autentificați-vă pe site într-o altă filă a acestui browser. Deschideți instrumentele pentru dezvoltatori (F12), apoi fila Rețea, reîncărcați pagina, faceți clic dreapta pe cererea ei și alegeți Copy as cURL (bash). Lipiți textul aici. Merge și un export cookies.txt, pentru prima adresă din listă.
+Sites: %s. Browser identity: %s.
+Site-uri: %s. Identitatea browserului: %s.
