@@ -2276,12 +2276,9 @@ static int getDigit4(const char *const pos) {
 }
 
 static time_t getGMT(struct tm *tm) {
-  time_t t = timegm(tm);
+  time_t t;
 
-  if (t != (time_t) - 1 && t != (time_t) 0) {
-    return t;
-  }
-  return (time_t) - 1;
+  return hts_tm_filetime(tm, &t) ? t : (time_t) -1;
 }
 
 static time_t getArcTimestamp(const char *const line) {

@@ -3735,22 +3735,12 @@ void time_local_rfc822(char *s) {
     s[0] = '\0';
 }
 
-/* convertir une chaine en temps */
-static time_t getGMT(struct tm *tm) {
-  time_t t = timegm(tm);
-
-  if (t != (time_t) - 1 && t != (time_t) 0) {
-    return (time_t) t;
-  }
-  return (time_t) -1;
-}
-
 /* sets file time. -1 if error */
 /* Note: utf-8 */
 int set_filetime(const char *file, struct tm *tm_time) {
-  time_t t = getGMT(tm_time);
+  time_t t;
 
-  if (t != (time_t) - 1) {
+  if (hts_tm_filetime(tm_time, &t)) {
     STRUCT_UTIMBUF tim;
 
     memset(&tim, 0, sizeof(tim));
@@ -3783,26 +3773,24 @@ int hts_parse_retry_after(const char *value, time_t now) {
   }
 
   {
-    const time_t when = hts_parse_date(p, 50);
+    const int64_t when = hts_parse_date(p, 50);
 
-    if (when == (time_t) -1)
+    if (when == -1)
       return -1;
-    if (when <= now)
+    if (when <= (int64_t) now)
       return 0;
-    /* widen before subtracting: two time_t values can differ by more than an
-       int holds */
-    if ((LLint) when - (LLint) now > (LLint) INT_MAX)
+    if (when - (int64_t) now > INT_MAX)
       return INT_MAX;
-    return (int) (when - now);
+    return (int) (when - (int64_t) now);
   }
 }
 
 /* See htslib.h. */
-time_t hts_parse_date(const char *s, int pivot) {
+int64_t hts_parse_date(const char *s, int pivot) {
   struct tm buffer;
   struct tm *const tm_s = convert_time_rfc822_pivot(&buffer, s, pivot);
 
-  return tm_s != NULL ? timegm(tm_s) : (time_t) -1;
+  return tm_s != NULL ? hts_utc_seconds(tm_s) : -1;
 }
 
 /* sets file time from RFC822 date+time, -1 if error*/

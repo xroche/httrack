@@ -325,6 +325,7 @@ ci_suite_heartbeat() {
 # and Windows has a disposition for none of that set.
 # engine-sigterm-noatexit forks a child per case and raises SIGINT at it, and
 # Windows has neither fork() nor that disposition.
+# private-run-files checks POSIX file modes, which Windows does not have.
 expected_skips_msys="01_engine-usercommand.test
 01_engine-footer-overflow.test
 253_local-ftp-close-once.test
@@ -369,7 +370,8 @@ expected_skips_msys="01_engine-usercommand.test
 465_local-mirror-completed.test
 481_local-chunked-oom.test
 494_local-mptcp.test
-01_engine-mptcp.test"
+01_engine-mptcp.test
+658_local-private-run-files.test"
 
 # Measured, not predicted: windows-build run 33927128153, both platforms alike.
 # Written out rather than derived from the msys list above: the two lists are
@@ -394,6 +396,7 @@ expected_skips_msys="01_engine-usercommand.test
 # inert but the replaying bash runs it.
 # engine-sigterm-noatexit forks a child per case and raises SIGINT at it, and
 # Windows has neither fork() nor that disposition.
+# private-run-files checks POSIX file modes, which Windows does not have.
 expected_skips_wsl2="01_engine-usercommand.test
 01_engine-footer-overflow.test
 253_local-ftp-close-once.test
@@ -439,7 +442,8 @@ expected_skips_wsl2="01_engine-usercommand.test
 294_local-wizard-eof.test
 481_local-chunked-oom.test
 494_local-mptcp.test
-01_engine-mptcp.test"
+01_engine-mptcp.test
+658_local-private-run-files.test"
 
 # Sets ci_skip_list to the pinned skip set for backend $1, failing loudly if
 # there is none: an unknown backend must never fall back to an empty list,

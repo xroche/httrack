@@ -368,7 +368,7 @@ HTSEXT_API int hts_main(int argc, char **argv) {
    written at all. */
 static hts_boolean write_progress_lock(httrackp *opt, const char *path,
                                        const char *t, int argc, char **argv) {
-  FILE *fp = FOPEN(path, "wb");
+  FILE *fp = hts_fopen_private(path, "wb"); /* it echoes argv */
   int i;
 
   if (fp == NULL)
@@ -393,7 +393,7 @@ static hts_boolean write_progress_lock(httrackp *opt, const char *path,
   fprintf(fp, "UID=%d\n", (int) getuid());
   fprintf(fp, "GID=%d\n", (int) getuid());
 #endif
-  fprintf(fp, "START=%d\n", (int) time(NULL));
+  fprintf(fp, "START=" LLintP "\n", (LLint) time(NULL));
 #endif
   fclose(fp);
   /* Whole-second filesystems tie two files written in the same second, and the
@@ -3000,13 +3000,16 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       /* Check FS directory structure created */
       structcheck_utf8(StringBuff(opt->path_log));
 
-      opt->log = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                               StringBuff(opt->path_log), "hts-log.txt"),
-                       "w");
-      if (httrack_logmode == 2)
-        opt->errlog = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                    StringBuff(opt->path_log), "hts-err.txt"),
+      /* owner-only: the log echoes the command line and URLs with passwords */
+      opt->log =
+          hts_fopen_private(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                    StringBuff(opt->path_log), "hts-log.txt"),
                             "w");
+      if (httrack_logmode == 2)
+        opt->errlog =
+            hts_fopen_private(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                      StringBuff(opt->path_log), "hts-err.txt"),
+                              "w");
       else
         opt->errlog = opt->log;
       if (opt->log == NULL) {
@@ -3038,9 +3041,11 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     // -%H may run before path_log exists, so create it first.
     if (_DEBUG_HEAD) {
       structcheck_utf8(StringBuff(opt->path_log));
-      ioinfo = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                             StringBuff(opt->path_log), "hts-ioinfo.txt"),
-                     "wb");
+      /* owner-only: it records request headers, Authorization included */
+      ioinfo = hts_fopen_private(
+          fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                  StringBuff(opt->path_log), "hts-ioinfo.txt"),
+          "wb");
       if (ioinfo == NULL)
         hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
                       "unable to create header debug file %s",
@@ -3119,9 +3124,11 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), "hts-cache"),
               HTS_PROTECT_FOLDER);
 #endif
-        fp = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                           StringBuff(opt->path_log), "hts-cache/doit.log"),
-                   "wb");
+        /* owner-only: the command line may carry credentials */
+        fp = hts_fopen_private(
+            fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                    StringBuff(opt->path_log), "hts-cache/doit.log"),
+            "wb");
         if (fp) {
           String line = STRING_EMPTY;
 
