@@ -1122,3 +1122,7 @@ The cookies could not be written to %s, so nothing was changed.
 Пропущено cookies браузера: %d, оскільки HTTrack не зміг би їх прочитати.
 The browser identity it reported cannot be used, so the mirror will send the default one.
 Ідентифікацію браузера, яку він повідомив, використати не можна, тому дзеркалювання піде з ідентифікацією за замовчуванням.
+Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click its request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
+Увійдіть на сайт в іншій вкладці цього браузера. Відкрийте інструменти розробника (F12), потім вкладку «Мережа», перезавантажте сторінку, клацніть правою кнопкою на її запиті та виберіть Copy as cURL (bash). Вставте текст сюди. Підійде й експорт cookies.txt, для першої адреси у списку.
+Sites: %s. Browser identity: %s.
+Сайти: %s. Ідентифікатор браузера: %s.

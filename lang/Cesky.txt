@@ -1122,3 +1122,7 @@ Cookies se nepodařilo zapsat do %s, takže se nic nezměnilo.
 Cookies z prohlížeče byly vynechány v počtu %d, protože je HTTrack nedokázal přečíst.
 The browser identity it reported cannot be used, so the mirror will send the default one.
 Nahlášenou totožnost prohlížeče nelze použít, takže se při stahování odešle výchozí.
+Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click its request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
+Přihlaste se na web v jiné kartě tohoto prohlížeče. Otevřete nástroje pro vývojáře (F12) a kartu Síť, znovu načtěte stránku, klikněte pravým tlačítkem na její požadavek a zvolte Copy as cURL (bash). Vložte text sem. Funguje i export cookies.txt, pro první adresu v seznamu.
+Sites: %s. Browser identity: %s.
+Weby: %s. Identita prohlížeče: %s.

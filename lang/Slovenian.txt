@@ -1122,3 +1122,7 @@ Piškotkov ni bilo mogoče zapisati v %s, zato ni bilo nič spremenjeno.
 Izpuščeni piškotki brskalnika: %d, ker jih HTTrack ne bi mogel prebrati.
 The browser identity it reported cannot be used, so the mirror will send the default one.
 Istovetnosti brskalnika, ki jo je sporočil, ni mogoče uporabiti, zato bo zrcaljenje poslalo privzeto.
+Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click its request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
+Prijavite se na spletno mesto v drugem zavihku tega brskalnika. Odprite orodja za razvijalce (F12), nato zavihek Omrežje, znova naložite stran, z desno tipko kliknite njeno zahtevo in izberite Copy as cURL (bash). Prilepite besedilo sem. Deluje tudi izvoz cookies.txt, za prvi naslov na seznamu.
+Sites: %s. Browser identity: %s.
+Spletna mesta: %s. Identiteta brskalnika: %s.

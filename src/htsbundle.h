@@ -40,6 +40,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h"
 #include "htsopt.h"
+#include "htsbauth.h"
 
 /* A start URL ending with this names the bundle file <name>.hts. */
 #define HTS_BUNDLE_SUFFIX "#httrack-bundle="
@@ -82,6 +83,22 @@ hts_boolean cookie_url_host(const char *url, char *dst, size_t dst_size);
 /* The record of s named cook_name for exactly domain and path, or NULL. */
 char *cookie_find_exact(char *s, const char *cook_name, const char *domain,
                         const char *path);
+
+/* Copy url's host into host, and return the domain a document.cookie string
+   pasted for url binds its cookies to: the registrable domain, or the host
+   when it has none. attr gets the flags those cookies take. NULL when url has
+   no host. */
+const char *cookie_flat_bind(const char *url, char *host, size_t host_size,
+                             cookie_attr *attr);
+
+/* Store the pair "name=value" at pair as a cookie of domain. HTS_FALSE when it
+   is not stored, counted in *ignored. */
+hts_boolean cookie_flat_pair(httrackp *opt, t_cookie *cookie, char *pair,
+                             const char *domain, const cookie_attr *attr,
+                             const char *given, int *ignored);
+
+/* Append the jar's records to out, as a cookies.txt file writes them. */
+void cookie_records_text(const t_cookie *cookie, String *out);
 
 /* This filter picks what cookie_load_stream lets into the jar. */
 typedef struct cookie_filter {

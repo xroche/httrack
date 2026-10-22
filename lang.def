@@ -1152,3 +1152,7 @@ LANG_BROWSERLOGINDROPPED
 %d of the browser's cookies were left out, because the engine would not read them.
 LANG_BROWSERLOGINBADAGENT
 The browser identity it reported cannot be used, so the mirror will send the default one.
+LANG_BROWSERLOGINPASTE
+Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click its request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
+LANG_BROWSERLOGINFOR
+Sites: %s. Browser identity: %s.

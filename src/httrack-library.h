@@ -976,6 +976,41 @@ HTSEXT_API void hts_argv_utf8(int *pargc, char ***pargv);
     platform gives it. */
 HTSEXT_API hts_boolean hts_file_is_newer(const char *a, const char *b);
 
+/* Login bundles */
+
+/** Copy into out, of size bytes, the registrable domain of host through the
+    engine's public suffix list. HTS_FALSE, with out empty, when host has none
+    (a public suffix, a single label or an IP address) or out is too small. */
+HTSEXT_API hts_boolean hts_registrable_domain(const char *host, char *out,
+                                              size_t size);
+
+/** NULL when name may follow "#httrack-bundle=" in a start URL, or a short
+    English reason why it may not. */
+HTSEXT_API const char *hts_bundle_name_refusal(const char *name);
+
+/** What hts_bundle_from_paste found. After a failure, every field but error
+    is empty or zero. */
+typedef struct hts_paste_result {
+  char name[128];   /**< the bundle name: the file is <folder>/<name>.hts */
+  char url[2048];   /**< the start URL to add, ending with the bundle suffix */
+  char agent[1024]; /**< the user agent the bundle sends, or "" */
+  char hosts[1024]; /**< the domains of the kept cookies, comma-separated */
+  int cookies;      /**< the cookies inside the bundle's scope */
+  char error[256];  /**< why the paste was refused, or "" */
+} hts_paste_result;
+
+/** Turn paste, a DevTools "Copy as cURL (bash)" text or a cookies.txt export,
+    into the login bundle <folder>/<name>.hts, owner-only, replacing an older
+    one. agent serves when the cURL text names none, and url when the paste
+    holds none, as a cookies.txt does; both may be NULL. dry_run writes
+    nothing. HTS_FALSE when refused, with the reason in result->error. Call it
+    after hts_init(). */
+HTSEXT_API hts_boolean hts_bundle_from_paste(const char *paste,
+                                             const char *folder,
+                                             const char *agent, const char *url,
+                                             hts_boolean dry_run,
+                                             hts_paste_result *result);
+
 /* UTF-8 aware FILE API */
 /* On non-Windows these macros resolve directly to the POSIX calls. On Windows
    they map to the hts_*_utf8 wrappers below, which convert the UTF-8 path to

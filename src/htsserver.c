@@ -719,6 +719,105 @@ static hts_boolean path_append(char *dst, size_t size, const char *src) {
 #define USER_STYLESHEET "/.httrack.css"
 #endif
 
+/* The fields the browser login popup posts. The paste can hold session
+   cookies, so it never enters the key store. */
+typedef struct browserlogin_post {
+  String paste;
+  String agent;
+  String url;
+  char action[8]; /* "preview" or "save" */
+} browserlogin_post;
+
+/* Take the posted field key into login when it is one of the popup's, and say
+   whether it was. */
+static hts_boolean browserlogin_field(browserlogin_post *login, const char *key,
+                                      String *value) {
+  String *dst = NULL;
+
+  if (strcmp(key, "blaction") == 0) {
+    if (StringLength(*value) < sizeof(login->action))
+      strcpybuff(login->action, StringBuff(*value));
+    StringFree(*value);
+    return HTS_TRUE;
+  }
+  if (strcmp(key, "blpaste") == 0)
+    dst = &login->paste;
+  else if (strcmp(key, "blagent") == 0)
+    dst = &login->agent;
+  else if (strcmp(key, "blurl") == 0)
+    dst = &login->url;
+  if (dst == NULL)
+    return HTS_FALSE;
+  StringFree(*dst);
+  *dst = *value;
+  StringInit(*value);
+  return HTS_TRUE;
+}
+
+static void browserlogin_free(browserlogin_post *login) {
+  StringFree(login->paste);
+  StringFree(login->agent);
+  StringFree(login->url);
+}
+
+static void browserlogin_set(const char *key, const char *value) {
+  coucal_write(NewLangList, key, (intptr_t) strdup(value));
+}
+
+/* Preview the posted paste as a login bundle, or write it to <path>/<projname>
+   on "save", and leave the outcome in the bl* variables the popup reads. */
+static void browserlogin_run(const browserlogin_post *login) {
+  const hts_boolean save = strcmp(login->action, "save") == 0;
+  hts_paste_result *res = calloct(1, sizeof(*res));
+  String folder = STRING_EMPTY;
+  intptr_t adrpath = 0, adrproj = 0;
+  const char *error = NULL;
+  char count[32];
+
+  if (res == NULL) {
+    error = "out of memory";
+  } else if (!save && strcmp(login->action, "preview") != 0) {
+    error = "unknown action";
+  } else if (coucal_readptr(NewLangList, "path", &adrpath) &&
+             coucal_readptr(NewLangList, "projname", &adrproj) &&
+             *(const char *) adrproj != '\0') {
+    StringCopy(folder, (const char *) adrpath);
+    StringCat(folder, "/");
+    StringCat(folder, (const char *) adrproj);
+  } else if (save) {
+    error = "no project name";
+  }
+  if (error == NULL && save) {
+    String dirs = STRING_EMPTY;
+
+    StringCopy(dirs, StringBuff(folder));
+    StringCat(dirs, "/");
+    if (!hts_path_is_contained(StringBuff(folder)))
+      error = "the project path escapes its parent directory";
+    else if (structcheck(StringBuff(dirs)) != 0)
+      error = "cannot create the project folder";
+    StringFree(dirs);
+  }
+  if (error == NULL &&
+      !hts_bundle_from_paste(
+          StringNotEmpty(login->paste) ? StringBuff(login->paste) : "",
+          StringNotEmpty(folder) ? StringBuff(folder) : NULL,
+          StringBuff(login->agent), StringBuff(login->url), !save, res))
+    error = res->error;
+  snprintf(count, sizeof(count), "%d", error == NULL ? res->cookies : 0);
+  browserlogin_set("blstate", error != NULL ? "error"
+                              : save        ? "saved"
+                                            : "preview");
+  browserlogin_set("blerror", error != NULL ? error : "");
+  browserlogin_set("blname", error == NULL ? res->name : "");
+  browserlogin_set("blurl", error == NULL ? res->url : "");
+  browserlogin_set("blagent", error == NULL ? res->agent : "");
+  browserlogin_set("blhosts", error == NULL ? res->hosts : "");
+  browserlogin_set("blcount", count);
+  StringFree(folder);
+  freet(res);
+}
+
 /* Finds the file served as the UI's user.css: the one in the home folder, then
    in the mirror base path, then in sysconfdir. Returns HTS_FALSE, with dst
    empty, when none exists, so the shipped user.css is served. */
@@ -1661,7 +1760,9 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
       if (meth && buffer[0]) {
         const char *cur = buffer;
         hts_query_field f;
+        browserlogin_post login;
 
+        memset(&login, 0, sizeof(login));
         /* A field without '=' has no value to store, so it is skipped. */
         while (hts_query_next(&cur, &f)) {
           if (f.val != NULL) {
@@ -1682,11 +1783,14 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                 strcpybuff(posted_theme, StringBuff(sua));
               }
               StringFree(sua);
-            } else {
+            } else if (!browserlogin_field(&login, key, &sua)) {
               coucal_write(NewLangList, key, (intptr_t) StringAcquire(&sua));
             }
           }
         }
+        if (meth == 2 && login.action[0] != '\0')
+          browserlogin_run(&login);
+        browserlogin_free(&login);
       }
 
       /* Check variables (internal) */
