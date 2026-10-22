@@ -953,7 +953,7 @@ static int append_cookie_header(buff_struct *bstr, t_cookie *cookie,
   const int64_t now = (int64_t) time(NULL);
   const char *domain;
   char buffer[8192];
-  char host[256];
+  char host[COOKIE_MAX_DOMAIN];
   char *b;
   int count = 0;
   size_t max_pos;
@@ -2430,9 +2430,9 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
   } else if (((p = strfield(rcvd, "Set-Cookie:")) != 0) &&
              (cookie)) {        // ohh un cookie
     char *a = rcvd + p;         // pointeur
-    char domain[256];           // domaine cookie (.netscape.com)
-    char scoped[256];           // adr with no identification, brackets or port
-    char path[256];             // chemin (/)
+    char domain[COOKIE_MAX_DOMAIN]; // .netscape.com
+    char scoped[COOKIE_MAX_DOMAIN]; // adr without userinfo, brackets or port
+    char path[COOKIE_MAX_PATH];     // /
     char cook_name[256];        // nom cookie (MYCOOK)
     char BIGSTK cook_value[8192];       // valeur (ID=toto,S=1234)
     const int64_t now = (int64_t) time(NULL);

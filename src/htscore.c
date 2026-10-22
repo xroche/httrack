@@ -835,7 +835,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   // initialiser cookie
   if (opt->accept_cookie) {
     opt->cookie = &cookie;
-    cookie.max_len = 30000;     // max len
+    cookie.max_len = COOKIE_MAX_JAR; // max len
     strcpybuff(cookie.data, "");
     if (strnotempty(StringBuff(opt->cookies_file))) {
       // loaded once the start URLs are known, and left alone until then

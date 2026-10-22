@@ -103,7 +103,7 @@ static int st_bundle(httrackp *opt, int argc, char **argv) {
     freet(jar);
     return 1;
   }
-  jar->max_len = 30000; /* httpmirror's */
+  jar->max_len = COOKIE_MAX_JAR; /* httpmirror's */
   opt->log = stderr;    /* warnings stay out of the graded output */
   opt->cookie = jar;
   hts_bundle_free(opt);

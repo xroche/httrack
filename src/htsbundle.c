@@ -301,7 +301,7 @@ static const char *bundle_scope_add(bundle *b, const char *entry) {
 
 /* Add url's https flag and default scope to b. NULL, or why it could not. */
 static const char *bundle_note_url(bundle *b, const char *url) {
-  char host[256];
+  char host[COOKIE_MAX_DOMAIN];
   char entry[sizeof(host) + 1];
   const char *reg;
 
@@ -331,7 +331,7 @@ static const char *bundle_note_url(bundle *b, const char *url) {
 /* Add a scope line's domain to b's scope. */
 static hts_boolean bundle_scope_line(bundle *b, const char *value, int lineno,
                                      char *err, size_t err_size) {
-  char dom[256];
+  char dom[COOKIE_MAX_DOMAIN];
   char entry[sizeof(dom) + 1];
   const char *why;
 
@@ -414,7 +414,7 @@ static hts_boolean bundle_parse(httrackp *opt, bundle *b, FILE *fp,
     if (*value == '\0')
       BUNDLE_FAIL("%s, line %d: no value", b->file, lineno);
     if (key_is(line, klen, "url")) {
-      char host[256];
+      char host[COOKIE_MAX_DOMAIN];
 
       if (strlen(value) >= HTS_URLMAXSIZE ||
           strstr(value, HTS_BUNDLE_SUFFIX) != NULL ||
@@ -474,7 +474,7 @@ static hts_boolean bundle_admit(cookie_filter *filter, t_cookie *cookie,
                                 const char *path) {
   bundle_jar *const ctx = (bundle_jar *) filter->ctx;
   char buffer[8192];
-  char host[256];
+  char host[COOKIE_MAX_DOMAIN];
   const char *other;
 
   if (!cookie_host(domain, host, sizeof(host)) ||
@@ -678,7 +678,7 @@ const char *hts_bundle_url(httrackp *opt, size_t i) {
 
 void hts_bundle_identity(httrackp *opt, const char *adr, htsrequest *req) {
   const hts_bundle_state *const st = (hts_bundle_state *) opt->bundle_state;
-  char host[256];
+  char host[COOKIE_MAX_DOMAIN];
   size_t i;
 
   if (st == NULL || !cookie_host(adr, host, sizeof(host)))
