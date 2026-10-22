@@ -312,11 +312,33 @@ static void cmdl_panic_value(httrackp *opt, const char *msg,
                              const char *value) {
   char s[HTS_CDLMAXSIZE * 2 + 256];
 
+  char shown[HTS_CDLMAXSIZE];
+
   if (hts_is_quoted(value, strlen(value)))
-    snprintf(s, sizeof(s), "%s: %s " HTS_QUOTED_HINT, msg, value);
+    snprintf(s, sizeof(s), "%s: \"%s " HTS_QUOTED_HINT, msg,
+             adr_nologin_r(shown, sizeof(shown), value + 1));
   else
     snprintf(s, sizeof(s), "%s", msg);
   HTS_PANIC_PRINTF(s);
+}
+
+/* Prints a --host-alias rule with the login of each of its names masked. */
+static void print_rule_nologin(const char *rule) {
+  while (*rule != '\0') {
+    char tok[HTS_CDLMAXSIZE];
+    char shown[HTS_CDLMAXSIZE + 8];
+    size_t n = strcspn(rule, ",=");
+
+    if (n >= sizeof(tok))
+      n = sizeof(tok) - 1;
+    memcpy(tok, rule, n);
+    tok[n] = '\0';
+    fputs(adr_nologin_r(shown, sizeof(shown), tok), stdout);
+    rule += n;
+    if (*rule == ',' || *rule == '=')
+      putchar(*rule++);
+  }
+  putchar('\n');
 }
 
 /* Panic on com, the end of option arg that no option takes. When com is
@@ -385,6 +407,7 @@ static hts_boolean write_progress_lock(httrackp *opt, const char *path,
 
 static int hts_main_internal(int argc, char **argv, httrackp * opt);
 static hts_boolean cmdl_shortopt_has(const char *s, char c);
+static hts_boolean cmdl_shortopt_named(const char *s, const char *opt);
 static void cmdl_doit_line(String *line, const cmdl_argv *cmd);
 
 // Main, récupère les paramètres et appelle le robot
@@ -549,6 +572,30 @@ static void cmdl_print_cache_entry(httrackp *opt, cache_back *cache,
     fprintf(stdout, "%s\r\n", r.adr);
   }
   freet(r.adr);
+}
+
+/* Feeds the log backstop the passwords of the blank-separated start URLs,
+   but not of the +/- filters among them, of the proxy and --why, and the
+   secret -%X values. */
+static void hts_secret_learn_options(httrackp *opt, const char *urls) {
+  const char *u = urls;
+
+  while (*u != '\0') {
+    const size_t n = strcspn(u, " \t\r\n");
+
+    // a start URL never exceeds the URL buffers, so a longer word is no URL
+    if (n != 0 && *u != '+' && *u != '-' && n < HTS_URLMAXSIZE * 2) {
+      char word[HTS_URLMAXSIZE * 2];
+
+      memcpy(word, u, n);
+      word[n] = '\0';
+      hts_secret_add_login(opt, word);
+    }
+    u += n != 0 ? n : 1;
+  }
+  hts_secret_add_login(opt, StringBuff(opt->proxy.name));
+  hts_secret_add_login(opt, StringBuff(opt->why_url));
+  hts_secret_add_headers(opt, StringBuff(opt->headers));
 }
 
 static int hts_main_internal(int argc, char **argv, httrackp * opt) {
@@ -2044,8 +2091,15 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                     const char *const why = http_custom_header_warning(
                         StringBuff(opt->headers), argv[na]);
 
-                    if (why != NULL)
-                      fprintf(stderr, "warning: -%%X %s: %s\n", why, argv[na]);
+                    // with the -%H log's redaction of a login header
+                    if (why != NULL) {
+                      char shown[HTS_URLMAXSIZE * 2];
+
+                      /* one write, so a merged stdout cannot split it */
+                      fprintf(stderr, "warning: -%%X %s: %s\n", why,
+                              hts_header_shown(opt, argv[na], shown,
+                                               sizeof(shown)));
+                    }
                   }
                   /* A refused line goes in, so the request drops its folds. */
                   if (StringNotEmpty(opt->headers) ||
@@ -2236,7 +2290,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   if (!hts_host_alias_rule_ok(argv[na])) {
                     HTS_PANIC_PRINTF("Invalid host-alias rule: expected "
                                      "alias[,alias...]=canonical-host");
-                    printf("Rejected: %s\n", argv[na]);
+                    printf("Rejected: ");
+                    print_rule_nologin(argv[na]);
                     printf("Each side names a host, optionally behind its "
                            "scheme; a path is not part of an address\n");
                     htsmain_free();
@@ -3002,6 +3057,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     // un petit lock-file pour indiquer un miroir en cours, ainsi qu'un éventuel fichier log
     {
       char t[256];
+      char *masked_url;
+      const char *shown_url;
 
       time_local_rfc822(t);     // faut bien que ca serve quelque part l'heure RFC1945 arf'
 
@@ -3114,20 +3171,47 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                         "engine: could not create hts-in_progress.lock, so"
                         " this mirror cannot be stopped or paused by a file");
       }
-      // fichier log        
+      hts_secret_learn_options(opt, url);
+      masked_url = hts_mask_passwords(url, HTS_MASK_LIST);
+      shown_url = masked_url != NULL ? masked_url : "(out of memory)";
+      // hts-log.txt
       if (opt->log) {
-        int i;
+        int i, opt_at = 0;
 
         fprintf(opt->log,
                 "HTTrack" HTTRACK_VERSION "%s launched on %s at %s" LF,
-                hts_get_version_info(opt), t, url);
+                hts_get_version_info(opt), t, shown_url);
         fprintf(opt->log, "(");
         for(i = 0; i < argc; i++) {
           const char *arg = argv[i]; // already UTF-8 on every platform
-          if (strchr(arg, ' ') == NULL || strchr(arg, '\"') != NULL)
-            fprintf(opt->log, "%s ", arg);
-          else                  // entre "" (si espace(s) et pas déja de ")
-            fprintf(opt->log, "\"%s\" ", arg);
+          // quoted if it holds a blank and no quote
+          const hts_boolean quote =
+              strchr(arg, ' ') != NULL && strchr(arg, '\"') == NULL;
+          // a start URL, or a -P, -%mu, -%R or --why value, is one address
+          hts_boolean addr;
+          char *masked;
+
+          if (x_cmd.span[i] != 0) {
+            opt_at = x_cmd.span[i] > 1 ? i : 0;
+            addr = HTS_FALSE;
+          } else if (opt_at != 0 && i < opt_at + x_cmd.span[opt_at]) {
+            addr = cmdl_shortopt_has(argv[opt_at], 'P') ||
+                   cmdl_shortopt_named(argv[opt_at], "-%mu") ||
+                   cmdl_shortopt_named(argv[opt_at], "-%R") ||
+                   cmdl_shortopt_named(argv[opt_at], "-%Y");
+          } else {
+            opt_at = 0;
+            addr = i != 0 && arg[0] != '+' && arg[0] != '-';
+          }
+          masked = addr ? hts_mask_passwords(arg, HTS_MASK_ADDR) : NULL;
+
+          if (quote)
+            fputc('"', opt->log);
+          // a -%X login header gets the -%H log's redaction
+          if (!addr || masked != NULL)
+            fprintfio(opt->log, addr ? masked : arg, "", opt);
+          fputs(quote ? "\" " : " ", opt->log);
+          freet(masked);
         }
         fprintf(opt->log, ")" LF);
         fprintf(opt->log, LF);
@@ -3143,14 +3227,15 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                HTTRACK_VERSION "%s " HTTRACK_AFF_AUTHORS "" LF, t,
                hts_get_version_info(opt));
         if (opt->wizard == HTS_WIZARD_NONE) {
-          printf
-            ("mirroring %s with %d levels, %d sockets,t=%d,s=%d,logm=%d,lnk=%d,mdg=%d\n",
-             url, opt->depth, opt->maxsoc, opt->travel, opt->seeker,
-             httrack_logmode, opt->urlmode, opt->getmode);
+          printf("mirroring %s with %d levels, %d "
+                 "sockets,t=%d,s=%d,logm=%d,lnk=%d,mdg=%d\n",
+                 shown_url, opt->depth, opt->maxsoc, opt->travel, opt->seeker,
+                 httrack_logmode, opt->urlmode, opt->getmode);
         } else { // the magic wizard
-          printf("mirroring %s with the wizard help..\n", url);
+          printf("mirroring %s with the wizard help..\n", shown_url);
         }
       }
+      freet(masked_url);
     }
 
     io_flush;
@@ -3442,13 +3527,20 @@ static void cmdl_doit_line(String *line, const cmdl_argv *cmd) {
 /* Does the short-option cluster s carry c from the main option set (-i, -iC2,
    -%Mi)? The i of -%i belongs to another set. */
 static hts_boolean cmdl_shortopt_has(const char *s, char c) {
+  const char opt[3] = {'-', c, '\0'};
+
+  return cmdl_shortopt_named(s, opt);
+}
+
+/* Does the short option cluster s hold the option opt, such as "-%mu"? */
+static hts_boolean cmdl_shortopt_named(const char *s, const char *opt) {
   char name[8];
   size_t at = 1;
 
   if (s[0] != '-' || s[1] == '-')
     return HTS_FALSE;
   while (optcluster_next(s, &at, name, sizeof(name)))
-    if (name[1] == c && name[2] == '\0')
+    if (strcmp(name, opt) == 0)
       return HTS_TRUE;
   return HTS_FALSE;
 }

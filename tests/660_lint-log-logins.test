@@ -1,0 +1,109 @@
+#!/bin/bash
+#
+# Check that no log call prints an engine address with its password.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+python=$(find_python) || skip "no python3 to run the lint"
+checker="${testdir}/check-log-logins.py"
+src="${top_srcdir}/src"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/log_logins.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "$work"
+
+lint() { "$python" "$checker" "$@" 2>"$work/lint.err"; }
+
+files=()
+for f in "$src"/*.c; do
+    case "$f" in
+    *_selftest.c) ;;
+    *) files+=("$f") ;;
+    esac
+done
+test "${#files[@]}" -ge 40 || fail "the lint found only ${#files[@]} files to scan"
+out=$(lint "${files[@]}") || fail_dump "a log call prints an address raw:
+$out" "$work/lint.err"
+grep -qx "${#files[@]} files, 0 hits" "$work/lint.err" ||
+    fail_dump "the lint did not scan every file" "$work/lint.err"
+
+# Mutant: one wrapped address put back raw.
+sed 's/? adr_nologin(opt, urladr()) :/? (urladr()) :/' "$src/htscore.c" >"$work/htscore.c"
+cmp -s "$src/htscore.c" "$work/htscore.c" && fail "the htscore.c mutant changed nothing"
+lint "$work/htscore.c" >"$work/mut.out" && fail "the lint passed a raw urladr()"
+grep -q 'is ready, skipping' "$work/mut.out" ||
+    fail "the mutant was not reported: $(<"$work/mut.out")"
+
+# Mutants: a raw address into hts-ioinfo.txt, and a raw lien.
+sed '/"\[%d\] request for %s%s:/{n;s/jump_identification_const(adr)/adr/;}' \
+    "$src/htslib.c" >"$work/htslib.c"
+cmp -s "$src/htslib.c" "$work/htslib.c" && fail "the htslib.c mutant changed nothing"
+lint "$work/htslib.c" >"$work/mut.out" && fail "the lint passed a raw adr to ioinfo"
+grep -q 'request for' "$work/mut.out" ||
+    fail "the ioinfo mutant was not reported: $(<"$work/mut.out")"
+sed '/"link detected in html (tag): %s",/{n;s/url_nologin(opt, lien)/lien/;}' \
+    "$src/htsparse.c" >"$work/htsparse.c"
+cmp -s "$src/htsparse.c" "$work/htsparse.c" && fail "the htsparse.c mutant changed nothing"
+lint "$work/htsparse.c" >"$work/mut.out" && fail "the lint passed a raw lien"
+grep -q 'link detected in html' "$work/mut.out" ||
+    fail "the lien mutant was not reported: $(<"$work/mut.out")"
+
+# Mutants: a raw --why URL, and a raw lien through puts().
+sed 's/adr_nologin(opt, StringBuff(opt->why_url)))/StringBuff(opt->why_url))/' \
+    "$src/htscore.c" >"$work/htscore.c"
+cmp -s "$src/htscore.c" "$work/htscore.c" && fail "the --why mutant changed nothing"
+lint "$work/htscore.c" >"$work/mut.out" && fail "the lint passed a raw why_url"
+grep -q 'unable to parse URL' "$work/mut.out" ||
+    fail "the --why mutant was not reported: $(<"$work/mut.out")"
+{
+    cat "$src/htsparse.c"
+    printf 'static void mutant(void) {\n  puts(lien);\n}\n'
+} >"$work/htsparse.c"
+lint "$work/htsparse.c" >"$work/mut.out" && fail "the lint passed puts(lien)"
+grep -q 'puts(lien)' "$work/mut.out" ||
+    fail "the puts mutant was not reported: $(<"$work/mut.out")"
+
+# Each form must be reported, and the safe ones not.
+cat >"$work/forms.c" <<'CEOF'
+f() {
+  hts_log_print(opt, LOG_INFO, "a %s", adr); /* hit */
+  hts_log_print(opt, LOG_INFO, "b %s%s", back[i].url_adr, fil); /* hit */
+  hts_log_vprint(opt, LOG_INFO, "c %s", urladr()); /* hit */
+  fprintf(opt->log, "d %s", r->adr); /* hit */
+  hts_log_print(opt, LOG_INFO, "e %s", adr_nologin(opt, adr));
+  hts_log_print(opt, LOG_INFO, "f %s", url_nologin(opt, url_adr));
+  hts_log_print(opt, LOG_INFO, "g %s", urladr() != NULL ? "x" : "y");
+  fprintf(fp, "h %s", adr);
+  hts_log_print(opt, LOG_INFO, "i adr %s", "adr");
+  printf("j %s", adr); /* hit */
+  fprintf(stderr, "k %s", heap(i)->adr); /* hit */
+  fputs(urladr(), stdout); /* hit */
+  fputs(adr, fp);
+  fprintf(ioinfo, "n %s", adr); /* hit */
+  hts_log_print(opt, LOG_INFO, "o %s", lien); /* hit */
+  printf("p %s %s", url, link); /* hit */
+  fprintf(stderr, "q %s", line); /* hit */
+  hts_log_print(opt, LOG_DEBUG, "r %s", codebase); /* hit */
+  printf("s %d", (int) sizeof(url));
+  /* printf("t %s", lien); */
+  printf("u // %s", "lien");
+  puts(lien_in); /* hit */
+  fprintfio(stderr, finalurl, ""); /* hit */
+  printf("v %s", opt->why_url); /* hit */
+  fprintfio(fp, url, "");
+  printf("w %s%s -> %s", url_fil, urlfil(), back->url_sav);
+  fputs(adr_nologin_r(buf, sizeof(buf), adr), stdout);
+#if HDEBUG
+  printf("l %s", adr);
+#else
+  printf("m %s", adr); /* hit */
+#endif
+}
+CEOF
+lint "$work/forms.c" >"$work/forms.out" && fail "the lint passed the raw forms"
+want=$(grep -n '/\* hit \*/' "$work/forms.c" | cut -d: -f1)
+assert_eq "$want" "$(cut -d: -f2 "$work/forms.out")" "lines reported"
+
+echo "log login lint OK"

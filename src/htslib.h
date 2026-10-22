@@ -541,7 +541,85 @@ char *convtolower(char *catbuff, size_t catbuffsize, const char *a);
 void hts_lowcase(char *s);
 int multipleStringMatch(const char *s, const char *match);
 
-void fprintfio(FILE * fp, const char *buff, const char *prefix);
+/* Writes a header block to fp, each line after prefix, with the value of a
+   field that carries a login replaced by the fprint_redacted() marker, and
+   each secret opt knows as ***. opt may be NULL. */
+void fprintfio(FILE *fp, const char *buff, const char *prefix, httrackp *opt);
+/* The first line of buff as fprintfio() shows it, written into dst (size
+   bytes, clipped): for one write, which keeps the line whole on a merged
+   stdout and stderr. Returns dst. */
+const char *hts_header_shown(httrackp *opt, const char *line, char *dst,
+                             size_t size);
+
+/* The backstop behind the per-site masking: opt keeps the first
+   HTS_SECRET_MAX passwords and tokens it sees, each up to HTS_SECRET_MAXLEN
+   bytes, and the log writers print each as ***. A URL password is hidden only
+   as a login, before an '@', so a password such as "index" leaves index.html
+   alone. A header token of HTS_SECRET_TOKEN bytes or more is hidden anywhere.
+ */
+#define HTS_SECRET_MAX 64
+#define HTS_SECRET_MAXLEN 1024
+#define HTS_SECRET_TOKEN 8
+
+typedef enum hts_secret_kind {
+  HTS_SECRET_LOGIN, /* a URL password */
+  HTS_SECRET_HEADER /* a header token, kept only from HTS_SECRET_TOKEN bytes */
+} hts_secret_kind;
+
+/* Allocates and frees the set of opt->secrets. */
+void hts_secret_init(httrackp *opt);
+void hts_secret_free(httrackp *opt);
+
+/* Adds the len bytes at s to the set of opt. Thread-safe. Once the set is
+   full, or for a secret over HTS_SECRET_MAXLEN bytes, logs one warning and
+   adds nothing. */
+void hts_secret_add(httrackp *opt, const char *s, size_t len,
+                    hts_secret_kind kind);
+
+/* Adds the password of the login of url, in any scheme or none, raw and
+   unescaped. A user alone is not added. url may be NULL. */
+void hts_secret_add_login(httrackp *opt, const char *url);
+
+/* Adds the values of the Authorization, Proxy-Authorization and Cookie lines
+   of a -%X header block, which may be NULL. */
+void hts_secret_add_headers(httrackp *opt, const char *headers);
+
+/* Writes the len bytes at s to fp, with each secret of opt as ***. */
+void hts_secret_fwrite(httrackp *opt, FILE *fp, const char *s, size_t len);
+
+/* fprintf() to fp, with each secret of opt as ***. */
+void hts_secret_fprintf(httrackp *opt, FILE *fp, const char *format, ...)
+    HTS_PRINTF_FUN(3, 4);
+
+/* What hts_mask_passwords() reads: */
+typedef enum {
+  HTS_MASK_LIST, /* blank-separated start URLs and filters */
+  HTS_MASK_ADDR  /* one start URL, or a -P value */
+} hts_mask_mode;
+
+/* Returns a copy of s, allocated with malloct, in which the password, or the
+   user alone, of every start URL or proxy address in s is *** . The rest stays
+   byte for byte. NULL when out of memory. */
+char *hts_mask_passwords(const char *s, hts_mask_mode mode);
+
+/* Log calls never print an address raw: pass adr_nologin() or url_nologin(),
+   which test 660 checks. */
+
+/* Returns adr with its login masked as user:*** or ***, for log lines: adr
+   itself when it has no login, else a copy clipped to size bytes in buf. */
+const char *adr_nologin_r(char *buf, size_t size, const char *adr);
+
+/* Same as adr_nologin_r(), but only a URL with a scheme or "//" has a login.
+   Any "scheme://" counts, not only the ones the engine fetches. */
+const char *url_nologin_r(char *buf, size_t size, const char *url);
+
+/* adr_nologin_r() and url_nologin_r() into a rotating buffer of opt, which
+   they take only when there is a login. A NULL opt drops the login. */
+const char *adr_nologin(httrackp *opt, const char *adr);
+const char *url_nologin(httrackp *opt, const char *url);
+
+/* Writes the marker that stands for a hidden secret of len bytes. */
+void fprint_redacted(FILE *fp, size_t len);
 
 /* A write to a socket whose peer is gone raises SIGPIPE, and the default
    action kills the process. The library must not install a handler, because

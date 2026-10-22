@@ -1600,6 +1600,326 @@ static int st_gmtime(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* Is the masked in exactly want? Prints the difference when it is not. */
+static int maskpw_row(const char *in, const char *want, hts_mask_mode mode) {
+  char *got = hts_mask_passwords(in, mode);
+  const int err = got == NULL || strcmp(got, want) != 0;
+
+  if (err)
+    fprintf(stderr, "maskpw: '%.80s' gave '%.80s', want '%.80s'\n", in,
+            got != NULL ? got : "(null)", want);
+  freet(got);
+  return err;
+}
+
+/* A hostile URL of n ":@" pairs: in a path it stays, in a userinfo it is one
+   password. */
+static int maskpw_pairs(size_t n) {
+  const size_t len = 2 * n;
+  char *pairs = (char *) malloct(len + 1);
+  char *in = (char *) malloct(len + 32);
+  int err;
+
+  if (pairs == NULL || in == NULL) {
+    freet(pairs);
+    freet(in);
+    return 1;
+  }
+  memset(pairs, ':', len);
+  for (size_t i = 1; i < len; i += 2)
+    pairs[i] = '@';
+  pairs[len] = '\0';
+  snprintf(in, len + 32, "http://h/x?%s", pairs);
+  err = maskpw_row(in, in, HTS_MASK_LIST);
+  snprintf(in, len + 32, "a%sh/ -x", pairs);
+  err |= maskpw_row(in, "a:***@h/ -x", HTS_MASK_LIST);
+  snprintf(in, len + 32, "http://a%sh", pairs);
+  err |= maskpw_row(in, "http://a:***@h", HTS_MASK_ADDR);
+  freet(pairs);
+  freet(in);
+  return err;
+}
+
+/* Do the nologin helpers hide the password and nothing else? */
+static int nologin_rows(httrackp *opt) {
+  static const struct {
+    const char *in, *want;
+  } adrs[] = {{"u:p@h:80", "u:***@h:80"}, {"u:p@q@h", "u:***@h"},
+              {"u@h", "***@h"},           {":p@h", ":***@h"},
+              {"h:80", "h:80"},           {"file://", "file://"},
+              {"https://h", "https://h"}, {"https://u:p@h", "https://u:***@h"}},
+    urls[] = {{"http://u:p@h/x", "http://u:***@h/x"},
+              {"//u:p@q@h", "//u:***@h"},
+              {"http://tok@h/x", "http://***@h/x"},
+              {"HTTPS://u:a b@[::1]:8/", "HTTPS://u:***@[::1]:8/"},
+              {"http://h/x?a@b", "http://h/x?a@b"},
+              {"mailto:a@b", "mailto:a@b"},
+              {"u:p@h/x", "u:p@h/x"},
+              {"http://u:p@hostname.example/x", "http://u:***@hostname.e"}};
+
+  char buf[24];
+  const int index = opt->state.concat.index;
+  int err = 0;
+  size_t i;
+
+  for (i = 0; i < sizeof(adrs) / sizeof(adrs[0]); i++) {
+    const char *got = adr_nologin_r(buf, sizeof(buf), adrs[i].in);
+
+    if (strcmp(got, adrs[i].want) != 0) {
+      fprintf(stderr, "adr_nologin: '%s' gave '%s'\n", adrs[i].in, got);
+      err = 1;
+    }
+  }
+  for (i = 0; i < sizeof(urls) / sizeof(urls[0]); i++) {
+    const char *got = url_nologin_r(buf, sizeof(buf), urls[i].in);
+
+    if (strcmp(got, urls[i].want) != 0) {
+      fprintf(stderr, "url_nologin: '%s' gave '%s'\n", urls[i].in, got);
+      err = 1;
+    }
+  }
+  /* An address without a login is returned as is, and takes no buffer. */
+  if (adr_nologin(opt, adrs[4].in) != adrs[4].in ||
+      url_nologin(opt, urls[6].in) != urls[6].in ||
+      opt->state.concat.index != index) {
+    fprintf(stderr, "nologin: a rotating buffer was taken without a login\n");
+    err = 1;
+  }
+  /* Without an opt, as back_delete(NULL, ...) logs, the login is dropped. */
+  if (strcmp(adr_nologin(NULL, urls[0].in), "h/x") != 0 ||
+      strcmp(url_nologin(NULL, urls[0].in), "h/x") != 0) {
+    fprintf(stderr, "nologin: a NULL opt kept the login\n");
+    err = 1;
+  }
+  return err;
+}
+
+/* Reads back the log of o, from offset at, into buf. */
+static void secrets_read(FILE *fp, long at, char *buf, size_t size) {
+  size_t n;
+
+  fflush(fp);
+  fseek(fp, at, SEEK_SET);
+  n = fread(buf, 1, size - 1, fp);
+  buf[n] = '\0';
+  fseek(fp, 0, SEEK_END);
+}
+
+/* Logs line through o and checks the log holds want, and none of bad. */
+static int secrets_row(httrackp *o, FILE *fp, const char *line,
+                       const char *want, const char *bad) {
+  char got[4096];
+  const long at = ftell(fp);
+
+  hts_log_print(o, LOG_NOTICE, "%s", line);
+  secrets_read(fp, at, got, sizeof(got));
+  if (strstr(got, want) == NULL || (bad != NULL && strstr(got, bad) != NULL)) {
+    fprintf(stderr, "secrets: '%s' logged '%s', want '%s'\n", line, got, want);
+    return 1;
+  }
+  return 0;
+}
+
+/* A hostile page offers 200 passwords, each twice: the first
+   HTS_SECRET_MAX stay hidden, and one warning says so. */
+static int secrets_full(void) {
+  httrackp *const o = hts_create_opt();
+  FILE *const fp = tmpfile();
+  char got[4096];
+  const char *w;
+  int err = 0, i;
+
+  if (o == NULL || fp == NULL) {
+    fprintf(stderr, "secrets: out of memory\n");
+    return 1;
+  }
+  o->log = fp;
+  o->debug = LOG_DEBUG;
+  for (i = 0; i < 200; i++) {
+    char url[64];
+
+    snprintf(url, sizeof(url), "http://u:ZPWCAP%03d@h/", i);
+    hts_secret_add_login(o, url);
+    hts_secret_add_login(o, url);
+  }
+  hts_log_print(o, LOG_NOTICE, "u:ZPWCAP000@h u:ZPWCAP%03d@h u:ZPWCAP%03d@h",
+                HTS_SECRET_MAX - 1, HTS_SECRET_MAX);
+  secrets_read(fp, 0, got, sizeof(got));
+  w = strstr(got, "passwords seen");
+  if (strstr(got, "u:***@h u:***@h u:ZPWCAP064@h") == NULL || w == NULL ||
+      strstr(w + 1, "passwords seen") != NULL) {
+    fprintf(stderr, "secrets: full set logged '%s'\n", got);
+    err = 1;
+  }
+  o->log = NULL;
+  fclose(fp);
+  hts_free_opt(o);
+  return err;
+}
+
+static int st_secrets(httrackp *opt, int argc, char **argv) {
+  httrackp *const o = hts_create_opt();
+  FILE *const fp = tmpfile();
+  char got[4096];
+  char big[HTS_SECRET_MAXLEN + 16];
+  const char *w;
+  long at;
+  int err = 0;
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  if (o == NULL || fp == NULL) {
+    fprintf(stderr, "secrets: out of memory\n");
+    return 1;
+  }
+  o->log = fp;
+  o->debug = LOG_DEBUG;
+  // none known: the line goes out as given
+  err |= secrets_row(o, fp, "a u:index@h/index.html", "a u:index@h/index.html",
+                     NULL);
+  // a password is hidden only as a login, at any length
+  hts_secret_add_login(o, "http://u:index@h/");
+  hts_secret_add_login(o, "http://u:download@h/");
+  err |= secrets_row(o, fp,
+                     "a u:index@h/index.html http://index.example/ index@h "
+                     "myindex@h /index (index@h <x:index@h \"index@h",
+                     "a u:***@h/index.html http://index.example/ ***@h "
+                     "myindex@h /index (***@h <x:***@h \"***@h",
+                     NULL);
+  err |= secrets_row(o, fp,
+                     "GET /download/file.html ftp://download@h u:download@h",
+                     "GET /download/file.html ftp://***@h u:***@h", NULL);
+  // an address is no login
+  err |= secrets_row(o, fp,
+                     "mailto:index@h MAILTO:index@h news:index@h "
+                     "a@index@h //x:index@h",
+                     "mailto:index@h MAILTO:index@h news:index@h "
+                     "a@index@h //x:index@h",
+                     NULL);
+  // a token is hidden anywhere, a short one not at all
+  hts_secret_add_headers(o, "X-Keep: ZPWKEEP12345\r\n"
+                            "Authorization: Bearer ZPWTOKEN123\r\n"
+                            "cookie: a=1; sid=ZPWSID9999\r\n"
+                            "Proxy-Authorization Basic ZPWNOCOLON1\r\n"
+                            "Authorization: Bearer ZPWSHRT");
+  err |= secrets_row(o, fp,
+                     "GET /x?t=ZPWTOKEN123&s=ZPWSID9999 a=1 ZPWKEEP12345 "
+                     "ZPWNOCOLON1 ZPWSHRT u:ZPWSHRT@h",
+                     "GET /x?t=***&s=ZPWSID9999 a=1 ZPWKEEP12345 *** ZPWSHRT "
+                     "u:ZPWSHRT@h",
+                     NULL);
+  // raw and unescaped, the way Basic sends it
+  hts_secret_add_login(o, "ftp://u:ZPW%40ESC99@h/");
+  err |= secrets_row(o, fp, "u:ZPW%40ESC99@h u:ZPW@ESC99@h ZPW%40ESC99",
+                     "u:***@h u:***@h ZPW%40ESC99", NULL);
+  // the user part of a login may hold an '@'
+  hts_secret_add_login(o, "http://john@example.com:ZPWATPW99@h/");
+  err |= secrets_row(o, fp, "http://john@example.com:ZPWATPW99@h/ ZPWATPW99",
+                     "http://john@example.com:***@h/ ZPWATPW99", NULL);
+  // a cookie value is no token: it is often an ordinary word
+  hts_secret_add_headers(o, "Cookie: consent=zpwaccepted\r\n");
+  err |=
+      secrets_row(o, fp, "/privacy/zpwaccepted-terms.html consent=zpwaccepted",
+                  "/privacy/zpwaccepted-terms.html consent=zpwaccepted", NULL);
+  // a user alone is no password
+  hts_secret_add_login(o, "http://ZPWUSERONLY@h/");
+  err |= secrets_row(o, fp, "ZPWUSERONLY@h", "ZPWUSERONLY@h", NULL);
+  // too long to keep: one warning
+  memset(big, 'Z', sizeof(big) - 1);
+  big[sizeof(big) - 1] = '\0';
+  at = ftell(fp);
+  hts_secret_add(o, big, HTS_SECRET_MAXLEN + 1, HTS_SECRET_HEADER);
+  hts_secret_add(o, big + 1, HTS_SECRET_MAXLEN + 1, HTS_SECRET_LOGIN);
+  secrets_read(fp, at, got, sizeof(got));
+  w = strstr(got, "over 1024 bytes");
+  if (w == NULL || strstr(w + 1, "over 1024 bytes") != NULL) {
+    fprintf(stderr, "secrets: a long secret logged '%s'\n", got);
+    err = 1;
+  }
+  err |= secrets_row(o, fp, big, big, "***");
+  // the -%H log and a front end's own buffer
+  at = ftell(fp);
+  fprintfio(fp, "GET /?k=ZPWTOKEN123 HTTP/1.1\r\nX-K: ZPWTOKEN123\r\n", "<<< ",
+            o);
+  secrets_read(fp, at, got, sizeof(got));
+  if (strcmp(got, "<<< GET /?k=*** HTTP/1.1\r\n<<< X-K: ***\r\n") != 0) {
+    fprintf(stderr, "secrets: fprintfio wrote '%s'\n", got);
+    err = 1;
+  }
+  strcpybuff(got, "h/x?t=ZPWTOKEN123");
+  hts_hide_secrets(o, got, sizeof(got));
+  if (strcmp(got, "h/x?t=***") != 0) {
+    fprintf(stderr, "secrets: hts_hide_secrets gave '%s'\n", got);
+    err = 1;
+  }
+  o->log = NULL;
+  fclose(fp);
+  hts_free_opt(o);
+  err |= secrets_full();
+  printf("secrets self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
+static int st_maskpw(httrackp *opt, int argc, char **argv) {
+  static const struct {
+    hts_mask_mode mode;
+    const char *in, *want;
+  } rows[] = {
+      {HTS_MASK_LIST, "", ""},
+      {HTS_MASK_LIST, "u:p@h http://v:q@g +*:*@* -*:*@*/x",
+       "u:***@h http://v:***@g +*:*@* -*:*@*/x"},
+      {HTS_MASK_LIST, "HTTP://u:p@h:80/x ftp://u:p@h",
+       "HTTP://u:***@h:80/x ftp://u:***@h"},
+      {HTS_MASK_LIST, "http://h1/ http://h/?r=ftp://u:p@g/",
+       "http://h1/ http://h/?r=ftp://u:p@g/"},
+      {HTS_MASK_LIST, "http://h/x?t=10:30@x", "http://h/x?t=10:30@x"},
+      {HTS_MASK_ADDR, "http://u:p@h/", "http://u:***@h/"},
+      {HTS_MASK_ADDR, "http://u@h/", "http://***@h/"},
+      {HTS_MASK_ADDR, "http://:p@h/", "http://:***@h/"},
+      {HTS_MASK_ADDR, "http://u:@h/", "http://u:***@h/"},
+      // the engine splits the userinfo at the last '@'
+      {HTS_MASK_ADDR, "http://u:p@SECRETB@h/", "http://u:***@h/"},
+      {HTS_MASK_ADDR, "http://user:pw;SECRETA@h/", "http://user:***@h/"},
+      {HTS_MASK_ADDR, "http://u:a,b=c\"d'e(f)<g> h@h/", "http://u:***@h/"},
+      {HTS_MASK_ADDR, "http://u:a%2Fb@h/", "http://u:***@h/"},
+      // a raw '/' ends the authority, so the engine sends no password
+      {HTS_MASK_ADDR, "http://u:a/b@h/", "http://u:a/b@h/"},
+      {HTS_MASK_ADDR, "u:p@h:8080", "u:***@h:8080"},
+      {HTS_MASK_ADDR, "u:p@q@h:8080", "u:***@h:8080"},
+      {HTS_MASK_ADDR, "u:a b@h/", "u:***@h/"},
+      {HTS_MASK_ADDR, "http://u:p@h:8080", "http://u:***@h:8080"},
+      {HTS_MASK_ADDR, "h:8080", "h:8080"},
+      {HTS_MASK_ADDR, "u@h:8080", "***@h:8080"},
+      {HTS_MASK_LIST, "tok@h/ http://tok@g/ +*@g/*",
+       "***@h/ http://***@g/ +*@g/*"},
+  };
+
+  static const char *const modes[] = {"list", "addr"};
+  int err = 0;
+  size_t i;
+
+  if (argc >= 2) {
+    char *got = NULL;
+
+    for (i = 0; i < sizeof(modes) / sizeof(modes[0]); i++)
+      if (strcmp(argv[0], modes[i]) == 0)
+        got = hts_mask_passwords(argv[1], (hts_mask_mode) i);
+    if (got == NULL)
+      return 1;
+    printf("%s\n", got);
+    freet(got);
+    return 0;
+  }
+  for (i = 0; i < sizeof(rows) / sizeof(rows[0]); i++)
+    err |= maskpw_row(rows[i].in, rows[i].want, rows[i].mode);
+  err |= nologin_rows(opt);
+  err |= maskpw_pairs(300);
+  err |= maskpw_pairs(10000);
+  printf("maskpw self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 /* #806: hts_localtime() must own its output too, same rationale as
    hts_gmtime() (#794). Reference table computed under TZ=XXX5 (fixed
    UTC-5, no DST), which the driving .test script sets. */
@@ -3664,6 +3984,14 @@ const struct selftest_entry selftests_lib[] = {
      "the fields and copies the span primitive makes", st_span},
     {"gmtime", "",
      "hts_gmtime() fills the caller's buffer, not a static (#794)", st_gmtime},
+    {"secrets", "",
+     "the log hides a password it has seen in a login, and a header token "
+     "anywhere",
+     st_secrets},
+    {"maskpw", "[list|addr <text>]",
+     "the command-line echo masks the password of a URL login and nothing "
+     "else",
+     st_maskpw},
     {"y2038", "<dir>", "dates before and after 2038 read as 64-bit seconds",
      st_y2038},
     {"localtime", "<dir>",
