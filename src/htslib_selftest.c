@@ -3903,6 +3903,36 @@ static int st_clienthints(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* -#test=headerverdict <line> [earlier...] prints hts_custom_header_verdict()
+   for a -%X line following the earlier ones. */
+static int st_headerverdict(httrackp *opt, int argc, char **argv) {
+  static const char *const names[] = {"sent",
+                                      "dropped-orphan-fold",
+                                      "dropped-malformed",
+                                      "dropped-framing",
+                                      "sent-replaces-earlier",
+                                      "sent-unless-engine-overrides"};
+  char headers[1024];
+  hts_header_verdict v;
+  int i;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "headerverdict: takes a line, then the earlier lines\n");
+    return 1;
+  }
+  headers[0] = '\0';
+  for (i = 1; i < argc; i++) {
+    strcatbuff(headers, argv[i]);
+    strcatbuff(headers, "\r\n");
+  }
+  v = hts_custom_header_verdict(argc > 1 ? headers : NULL, argv[0]);
+  if ((size_t) v >= sizeof(names) / sizeof(names[0]))
+    return 1;
+  printf("%s=%d\n", names[v], (int) v);
+  return 0;
+}
+
 /* -#test=browserfamily <user-agent> prints the browser whose tables it gets. */
 static int st_browserfamily(httrackp *opt, int argc, char **argv) {
   (void) opt;
@@ -3946,6 +3976,8 @@ static int st_headerorder(httrackp *opt, int argc, char **argv) {
 const struct selftest_entry selftests_lib[] = {
     {"clienthints", "<user-agent>",
      "the client hints a browser sending this User-Agent adds", st_clienthints},
+    {"headerverdict", "<line> [earlier...]",
+     "what the engine does with a -%X line", st_headerverdict},
     {"browserfamily", "<user-agent>",
      "the browser whose header tables this User-Agent gets", st_browserfamily},
     {"headerorder", "<none|chrome|firefox> <dest>",

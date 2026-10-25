@@ -1,0 +1,57 @@
+#!/bin/bash
+#
+# hts_custom_header_verdict: the exported fate of a -%X line.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# the numbers are ABI, read by front ends
+verdict() { # verdict NAME LINE [EARLIER...]
+    local n
+    case $1 in
+    sent) n=0 ;;
+    dropped-orphan-fold) n=1 ;;
+    dropped-malformed) n=2 ;;
+    dropped-framing) n=3 ;;
+    sent-replaces-earlier) n=4 ;;
+    sent-unless-engine-overrides) n=5 ;;
+    *) fail "unknown verdict $1" ;;
+    esac
+    selftest_queue "$1=$n" headerverdict "${@:2}"
+}
+
+verdict sent "X-Magic: 42"
+verdict sent "User-Agent: me"
+# a fold takes the verdict of the line it continues
+verdict sent " folded" "X-Magic: 42"
+verdict sent " folded" "Host: b"
+verdict sent " folded" "Host: a" "Host: b"
+verdict sent " folded" "Host: a" "Host: b" "X-A: 1" " x"
+verdict dropped-framing " folded" "Connection: x"
+verdict dropped-malformed " folded" "X-A: 1" "bad line"
+verdict dropped-orphan-fold " folded" " earlier fold"
+verdict sent-unless-engine-overrides " folded" "Range: x"
+verdict dropped-orphan-fold " folded"
+verdict dropped-malformed "no colon here"
+verdict dropped-framing "Content-Length: 3"
+verdict dropped-framing "connection: close"
+# the line asked about survives, and the earlier Host is the one dropped
+verdict sent-replaces-earlier "Host: b" "Host: a"
+verdict sent-replaces-earlier "cookie: b=2" "X-A: 1" "Cookie: a=1"
+verdict sent "Host: b" "X-Host: a"
+# one earlier line alone names the line a replacement drops
+verdict sent-replaces-earlier "Cookie: b=2" "Cookie: a=1"
+verdict sent "Cookie: b=2" "X-A: 1"
+# a later duplicate of a repeatable field keeps both
+verdict sent "Accept: b" "Accept: a"
+for f in Range If-Match If-None-Match If-Modified-Since If-Unmodified-Since; do
+    verdict sent-unless-engine-overrides "$f: x"
+done
+verdict sent-unless-engine-overrides "range: bytes=0-"
+verdict sent "If-Range: x"
+verdict sent "Ranges: x"
+verdict sent-unless-engine-overrides "Range: b" "Range: a"
+verdict sent-unless-engine-overrides $'\tfolded' "If-Match: x"
+selftest_run_queued

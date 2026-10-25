@@ -462,6 +462,30 @@ HTSEXT_API const char *const *hts_accept_kinds(void);
     when that browser has no value for it, or either name is unknown. */
 HTSEXT_API const char *hts_accept_preset(const char *browser, const char *kind);
 
+/** What the engine does with a custom header line (-%X). Values are ABI. */
+typedef enum hts_header_verdict {
+  /** The line goes out as typed. */
+  HTS_HEADER_SENT = 0,
+  /** The engine drops a folded line with no line above it to continue. */
+  HTS_HEADER_DROPPED_ORPHAN_FOLD = 1,
+  /** The engine drops a line that is not "Name: value". */
+  HTS_HEADER_DROPPED_MALFORMED = 2,
+  /** The engine drops it, because it frames the message itself. */
+  HTS_HEADER_DROPPED_FRAMING = 3,
+  /** The line goes out, and the earlier line of the same field is dropped. */
+  HTS_HEADER_SENT_REPLACES_EARLIER = 4,
+  /** The line goes out, unless an update or a resume writes that field. */
+  HTS_HEADER_SENT_UNLESS_ENGINE_OVERRIDES = 5
+} hts_header_verdict;
+
+/** Return what the engine does with @p line. @p headers holds every custom
+    line before it, dropped ones included, separated by "\r\n", or is NULL.
+    A folded line gets the verdict its parent line would get alone. To learn
+    whether @p line replaces one earlier line, pass that line alone as
+    @p headers. Safe to call before any crawl. */
+HTSEXT_API hts_header_verdict hts_custom_header_verdict(const char *headers,
+                                                        const char *line);
+
 /** Return the engine's last error message, empty when there was none. The
     string lives inside @p opt, so never free it and read it only while @p opt
     lives. @p opt must not be NULL. */

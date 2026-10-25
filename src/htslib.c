@@ -1136,15 +1136,51 @@ static hts_boolean header_line_single(const char *line) {
   return header_name_in(line, single, sizeof(single) / sizeof(single[0]));
 }
 
-const char *http_custom_header_warning(const char *headers, const char *line) {
-  if (*line == ' ' || *line == '\t')
-    return headers == NULL || *headers == '\0'
-               ? "folded line with no header to continue ignored"
-               : NULL;
+/* An update or a resume writes these fields itself, dropping the custom line.
+ */
+static hts_boolean header_line_engine_conditional(const char *line) {
+  static const char *const conditional[] = {
+      "Range", "If-Match", "If-None-Match", "If-Modified-Since",
+      "If-Unmodified-Since"};
+
+  return header_name_in(line, conditional,
+                        sizeof(conditional) / sizeof(conditional[0]));
+}
+
+/* Return the last unfolded line of headers, or NULL. */
+static const char *last_unfolded_line(const char *headers) {
+  const char *last = NULL;
+  const char *line;
+
+  for (line = headers; *line != '\0';) {
+    if (*line != ' ' && *line != '\t')
+      last = line;
+    while (*line != '\0' && *line != '\r' && *line != '\n')
+      line++;
+    if (line[0] == '\r' && line[1] == '\n')
+      line += 2;
+    else if (*line != '\0')
+      line++;
+  }
+  return last;
+}
+
+HTSEXT_API hts_header_verdict hts_custom_header_verdict(const char *headers,
+                                                        const char *line) {
+  if (line == NULL)
+    return HTS_HEADER_DROPPED_MALFORMED;
+  if (*line == ' ' || *line == '\t') {
+    const char *const parent =
+        headers != NULL ? last_unfolded_line(headers) : NULL;
+
+    /* alone, or the parent would find its own field in headers */
+    return parent != NULL ? hts_custom_header_verdict(NULL, parent)
+                          : HTS_HEADER_DROPPED_ORPHAN_FOLD;
+  }
   if (!header_line_valid(line))
-    return "malformed header ignored";
+    return HTS_HEADER_DROPPED_MALFORMED;
   if (header_line_refused(line))
-    return "framing header ignored";
+    return HTS_HEADER_DROPPED_FRAMING;
   if (header_line_single(line) && headers != NULL) {
     char field[sizeof("Authorization")];
     const size_t len = header_name_len(line);
@@ -1152,7 +1188,30 @@ const char *http_custom_header_warning(const char *headers, const char *line) {
     memcpy(field, line, len);
     field[len] = '\0';
     if (http_headers_have_field(headers, field))
-      return "header replaces an earlier one";
+      return HTS_HEADER_SENT_REPLACES_EARLIER;
+  }
+  if (header_line_engine_conditional(line))
+    return HTS_HEADER_SENT_UNLESS_ENGINE_OVERRIDES;
+  return HTS_HEADER_SENT;
+}
+
+const char *http_custom_header_warning(const char *headers, const char *line) {
+  /* a fold's parent line already got its warning */
+  if ((*line == ' ' || *line == '\t') && headers != NULL && *headers != '\0')
+    return NULL;
+  switch (hts_custom_header_verdict(headers, line)) {
+  case HTS_HEADER_DROPPED_ORPHAN_FOLD:
+    return "folded line with no header to continue ignored";
+  case HTS_HEADER_DROPPED_MALFORMED:
+    return "malformed header ignored";
+  case HTS_HEADER_DROPPED_FRAMING:
+    return "framing header ignored";
+  case HTS_HEADER_SENT_REPLACES_EARLIER:
+    return "header replaces an earlier one";
+  case HTS_HEADER_SENT_UNLESS_ENGINE_OVERRIDES: /* valid, so a bundle may carry
+                                                   it */
+  case HTS_HEADER_SENT:
+    break;
   }
   return NULL;
 }
