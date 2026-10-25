@@ -118,9 +118,16 @@ agent=" paste "$dir/dry" "$in" dry
 # www.github.io is a site of its own, github.io being a public suffix.
 put "curl 'https://www.github.io/' -b a=1"
 selftest_queue_head "name=www.github.io cookies=1" paste "$dir/dry" "$in" dry
-# A device name falls back to the host.
+# A device name falls back to the host, then takes a leading "_".
 put "curl 'https://shop.con.com/' -b a=1"
 selftest_queue_head "name=shop.con.com cookies=1" paste "$dir/dry" "$in" dry
+put "curl 'https://www.con.com/' -b a=1"
+selftest_queue_head "name=_con.com cookies=1" paste "$dir/dry" "$in" dry
+put "curl 'http://COM1/' -b a=1"
+selftest_queue_head "name=_com1 cookies=1" paste "$dir/dry" "$in" dry
+long127="$(repeat_chars 57 a).$(repeat_chars 61 b).con.com"
+put "curl 'https://$long127/' -b a=1"
+selftest_queue_head "name=$long127 cookies=1" paste "$dir/dry" "$in" dry
 # Every trailing dot goes before the registrable domain lookup.
 put "curl 'https://a.site.test../' -b a=1"
 selftest_queue_head "name=site.test cookies=1" paste "$dir/dry" "$in" dry
@@ -262,8 +269,6 @@ refused 'an IP address cannot name a login bundle' "curl 'http://[::1]/' -b a=$s
 refused 'the address has no host' "curl 'http:///x' -b a=$sec"
 refused 'the address names no site' "curl 'https://www./' -b a=$sec"
 refused 'the address names no site' "curl 'https://www..:80/' -b a=$sec"
-refused 'invalid login bundle name: a Windows device name' "curl http://con/ -b a=$sec"
-refused 'invalid login bundle name: a Windows device name' "curl https://con.com/ -b a=$sec"
 refused 'invalid login bundle name: 128 bytes or more' \
     "curl 'https://$(repeat_chars 60 a).$(repeat_chars 63 b).con.com/' -b a=$sec"
 refused 'the address cannot be used' "curl 'https://bad.test/$(repeat_chars 1024 p)' -b a=$sec"
@@ -305,8 +310,8 @@ selftest_queue_head "refused: cannot write $dir/missing/nofolder.test.hts: " \
 put "curl https://words.test/ -b a=1$(for _ in $(seq 1 1020); do printf ' -k'; done)"
 selftest_queue_head "name=words.test cookies=1" paste "$dir/dry" "$in" dry
 
-test "${#SELFTEST_WANT[@]}" -eq 112 ||
-    fail "expected 112 queued rows, got ${#SELFTEST_WANT[@]}"
+test "${#SELFTEST_WANT[@]}" -eq 113 ||
+    fail "expected 113 queued rows, got ${#SELFTEST_WANT[@]}"
 selftest_run_queued
 
 # A host list too long to show ends with ",...", not with a cut name.

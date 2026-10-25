@@ -1269,11 +1269,12 @@ static const char *paste_host_idna(char *url, size_t size) {
 }
 
 /* Copy into name the bundle name of url: the registrable domain its scope
-   covers, else the host without the port, a leading "www." or trailing dots.
-   NULL, or why there is none. */
+   covers, else the host without the port, a leading "www." or trailing dots,
+   with "_" before a device name. NULL, or why there is none. */
 static const char *paste_name(const char *url, char name[HTS_BUNDLE_NAME_MAX]) {
   char host[COOKIE_MAX_DOMAIN];
   const char *h = host;
+  const char *escape;
   hts_boolean www;
   size_t len;
 
@@ -1293,9 +1294,11 @@ static const char *paste_name(const char *url, char name[HTS_BUNDLE_NAME_MAX]) {
     h += len < 4 ? len : 4;
   if (*h == '\0')
     return "the address names no site";
-  if (strlen(h) >= HTS_BUNDLE_NAME_MAX)
+  // no registered domain starts with "_", so the escape names no other site
+  escape = bundle_name_is_device(h) ? "_" : "";
+  if (strlen(h) >= HTS_BUNDLE_NAME_MAX - strlen(escape))
     return "invalid login bundle name: 128 bytes or more";
-  strlcpybuff(name, h, HTS_BUNDLE_NAME_MAX);
+  snprintf(name, HTS_BUNDLE_NAME_MAX, "%s%s", escape, h);
   return hts_bundle_name_refusal(name);
 }
 
