@@ -125,6 +125,10 @@ put "curl 'https://www.con.com/' -b a=1"
 selftest_queue_head "name=_con.com cookies=1" paste "$dir/dry" "$in" dry
 put "curl 'http://COM1/' -b a=1"
 selftest_queue_head "name=_com1 cookies=1" paste "$dir/dry" "$in" dry
+put "curl 'http://_gateway/' -b a=1"
+selftest_queue_head "name=_gateway cookies=1" paste "$dir/dry" "$in" dry
+put "curl 'https://a._x.com/' -b a=1"
+selftest_queue_head "name=_x.com cookies=1" paste "$dir/dry" "$in" dry
 long127="$(repeat_chars 57 a).$(repeat_chars 61 b).con.com"
 put "curl 'https://$long127/' -b a=1"
 selftest_queue_head "name=$long127 cookies=1" paste "$dir/dry" "$in" dry
@@ -269,9 +273,9 @@ refused 'an IP address cannot name a login bundle' "curl 'http://[::1]/' -b a=$s
 refused 'the address has no host' "curl 'http:///x' -b a=$sec"
 refused 'the address names no site' "curl 'https://www./' -b a=$sec"
 refused 'the address names no site' "curl 'https://www..:80/' -b a=$sec"
-refused 'a site name cannot start with "_"' "curl https://_con.com/ -b a=$sec"
-refused 'a site name cannot start with "_"' "curl https://a._x.com/ -b a=$sec"
-refused 'a site name cannot start with "_"' "curl http://_com1/ -b a=$sec"
+refused 'the name is kept for an escaped device name' "curl https://_con.com/ -b a=$sec"
+refused 'the name is kept for an escaped device name' "curl https://a._nul.com/ -b a=$sec"
+refused 'the name is kept for an escaped device name' "curl http://_com1/ -b a=$sec"
 refused 'invalid login bundle name: 128 bytes or more' \
     "curl 'https://$(repeat_chars 60 a).$(repeat_chars 63 b).con.com/' -b a=$sec"
 refused 'the address cannot be used' "curl 'https://bad.test/$(repeat_chars 1024 p)' -b a=$sec"
@@ -313,8 +317,8 @@ selftest_queue_head "refused: cannot write $dir/missing/nofolder.test.hts: " \
 put "curl https://words.test/ -b a=1$(for _ in $(seq 1 1020); do printf ' -k'; done)"
 selftest_queue_head "name=words.test cookies=1" paste "$dir/dry" "$in" dry
 
-test "${#SELFTEST_WANT[@]}" -eq 116 ||
-    fail "expected 116 queued rows, got ${#SELFTEST_WANT[@]}"
+test "${#SELFTEST_WANT[@]}" -eq 118 ||
+    fail "expected 118 queued rows, got ${#SELFTEST_WANT[@]}"
 selftest_run_queued
 
 # A host list too long to show ends with ",...", not with a cut name.
