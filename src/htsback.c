@@ -1023,9 +1023,8 @@ void back_refetch_backup(httrackp *opt, lien_back *const back) {
         hts_log_print(opt, LOG_WARNING, "replacing leftover backup %s",
                       back->tmpfile);
       saved = hts_rename_over(opt, back->url_sav, back->tmpfile);
-      /* Another slot sharing the directory may have removed it between the
-         structcheck_utf8 above and the rename: recreate it and try once more.
-       */
+      /* Another slot sharing the directory may have removed it since: recreate
+         it and try once more. */
       if (!saved && structcheck_utf8(back->tmpfile) == 0)
         saved = hts_rename_over(opt, back->url_sav, back->tmpfile);
     }
