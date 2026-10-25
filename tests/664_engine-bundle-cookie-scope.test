@@ -1,0 +1,39 @@
+#!/bin/bash
+#
+# hts_bundle_cookie_in_scope: the cookies a login bundle keeps by default.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+selftest_queue keep bundlescope www.httrack.com https://www.httrack.com/
+selftest_queue keep bundlescope .httrack.com https://www.httrack.com/
+selftest_queue keep bundlescope forum.httrack.com https://www.httrack.com/
+selftest_queue keep bundlescope HTTRACK.COM http://www.httrack.com:8080/a
+selftest_queue keep bundlescope httrack.com https://WWW.HTTRACK.COM/
+selftest_queue drop bundlescope .buecher.de https://www.httrack.com/
+selftest_queue drop bundlescope notexample.com http://example.com/
+selftest_queue drop bundlescope com http://example.com/
+# two start URLs widen the scope to both sites
+selftest_queue keep bundlescope a.com http://a.com/ http://b.org/
+selftest_queue keep bundlescope b.org http://a.com/ http://b.org/
+selftest_queue drop bundlescope c.net http://a.com/ http://b.org/
+# a host with no registrable domain covers itself alone
+selftest_queue keep bundlescope 192.168.0.1 http://192.168.0.1/
+selftest_queue drop bundlescope a.192.168.0.1 http://192.168.0.1/
+selftest_queue keep bundlescope intranet http://intranet/
+selftest_queue drop bundlescope a.intranet http://intranet/
+selftest_queue keep bundlescope .intranet http://intranet/
+selftest_queue keep bundlescope a.co.uk http://www.a.co.uk/
+selftest_queue drop bundlescope co.uk http://www.a.co.uk/
+# a trailing dot is a different domain to the cookie jar
+selftest_queue drop bundlescope httrack.com. https://www.httrack.com/
+# the suffix naming the bundle does not change its scope
+selftest_queue keep bundlescope httrack.com 'https://www.httrack.com/#httrack-bundle=httrack.com'
+selftest_queue drop bundlescope httrack.com 'https://www.httrack.com/#httrack-bundle=../x'
+selftest_queue drop bundlescope httrack.com
+# the engine refuses a bundle with one URL whose host it cannot read
+selftest_queue drop bundlescope httrack.com https://www.httrack.com/ /no/host
+selftest_queue drop bundlescope httrack.com /no/host https://www.httrack.com/
+selftest_run_queued

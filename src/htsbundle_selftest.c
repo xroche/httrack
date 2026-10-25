@@ -187,6 +187,21 @@ static int st_regdomain(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* -#test=bundlescope <cookie domain> <url>...: "keep" when a bundle naming the
+   URLs keeps a cookie set for the domain, else "drop". */
+static int st_bundlescope(httrackp *opt, int argc, char **argv) {
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "bundlescope: takes <cookie domain> <url>...\n");
+    return 1;
+  }
+  printf("%s\n", hts_bundle_cookie_in_scope((const char *const *) &argv[1],
+                                            (size_t) (argc - 1), argv[0])
+                     ? "keep"
+                     : "drop");
+  return 0;
+}
+
 /* -#test=bundlename <name>: "ok", or why the name is refused. */
 static int st_bundlename(httrackp *opt, int argc, char **argv) {
   const char *why;
@@ -306,6 +321,9 @@ const struct selftest_entry selftests_bundle[] = {
     {"regdomain", "<host>...", "the registrable domain of each host",
      st_regdomain},
     {"bundlename", "<name>", "is name a login bundle name?", st_bundlename},
+    {"bundlescope", "<cookie domain> <url>...",
+     "does a login bundle naming the URLs keep a cookie of that domain?",
+     st_bundlescope},
     {"paste", "<dir> <file> [agent:<ua>] [url:<url>] [dry]",
      "turn a pasted cURL command or cookies.txt into a login bundle", st_paste},
     {"pasterace", "<dir> <rounds>",

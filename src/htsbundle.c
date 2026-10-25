@@ -298,6 +298,13 @@ static hts_boolean bundle_in_scope(const bundle *b, const char *host) {
   return HTS_FALSE;
 }
 
+/* Does b's scope cover a cookie set for domain? host gets the folded domain. */
+static hts_boolean bundle_keeps_domain(const bundle *b, const char *domain,
+                                       char host[COOKIE_MAX_DOMAIN]) {
+  return cookie_host(domain, host, COOKIE_MAX_DOMAIN) &&
+         bundle_in_scope(b, host[0] == '.' ? host + 1 : host);
+}
+
 /* Add entry to b's scope. NULL, or why it could not. */
 static const char *bundle_scope_add(bundle *b, const char *entry) {
   size_t i;
@@ -489,8 +496,7 @@ static hts_boolean bundle_admit(cookie_filter *filter, t_cookie *cookie,
   char host[COOKIE_MAX_DOMAIN];
   const char *other;
 
-  if (!cookie_host(domain, host, sizeof(host)) ||
-      !bundle_in_scope(ctx->b, host[0] == '.' ? host + 1 : host)) {
+  if (!bundle_keeps_domain(ctx->b, domain, host)) {
     ctx->dropped++;
     return HTS_FALSE;
   }
@@ -747,6 +753,38 @@ HTSEXT_API hts_boolean hts_registrable_domain(const char *host, char *out,
 HTSEXT_API const char *hts_bundle_name_refusal(const char *name) {
   return name != NULL ? bundle_name_refusal(name)
                       : "invalid login bundle name: none given";
+}
+
+HTSEXT_API hts_boolean hts_bundle_cookie_in_scope(const char *const *urls,
+                                                  size_t nurls,
+                                                  const char *cookie_domain) {
+  char host[COOKIE_MAX_DOMAIN];
+  const char *why = NULL;
+  hts_boolean keeps;
+  bundle b;
+  size_t i;
+
+  if (urls == NULL || cookie_domain == NULL)
+    return HTS_FALSE;
+  memset(&b, 0, sizeof(b));
+  StringInit(b.headers);
+  for (i = 0; i < nurls && why == NULL; i++) {
+    char url[HTS_URLMAXSIZE];
+    char name[HTS_BUNDLE_NAME_MAX];
+
+    if (urls[i] == NULL || strlen(urls[i]) >= sizeof(url))
+      why = "invalid url";
+    else {
+      strcpybuff(url, urls[i]);
+      why = bundle_cut(url, name, sizeof(name));
+    }
+    if (why == NULL)
+      why = bundle_note_url(&b, url);
+  }
+  keeps = why == NULL && bundle_keeps_domain(&b, cookie_domain, host);
+  bundle_clear(&b);
+  StringFree(b.headers);
+  return keeps;
 }
 
 /* A paste holds fewer bytes than this. */
