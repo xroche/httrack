@@ -123,6 +123,7 @@ put "curl 'https://shop.con.com/' -b a=1"
 selftest_queue_head "name=shop.con.com cookies=1" paste "$dir/dry" "$in" dry
 put "curl 'https://a.site.test../' -b a=1"
 selftest_queue_head "name=site.test cookies=1" paste "$dir/dry" "$in" dry
+# A host too long for a bundle name still has a short registrable domain.
 put "curl 'https://$(repeat_chars 60 a).$(repeat_chars 63 b).test/' -b a=1"
 selftest_queue_head "name=$(repeat_chars 63 b).test cookies=1" paste "$dir/dry" "$in" dry
 put "curl 'https://a.例え.jp/' -b a=1"
