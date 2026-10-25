@@ -9,21 +9,30 @@ set -euo pipefail
 
 selftest_queue sent headerverdict "X-Magic: 42"
 selftest_queue sent headerverdict "User-Agent: me"
+# a fold takes the verdict of the line it continues
 selftest_queue sent headerverdict " folded" "X-Magic: 42"
-selftest_queue dropped-fold headerverdict " folded"
+selftest_queue sent headerverdict " folded" "Host: a" "Host: b" "X-A: 1" " x"
+selftest_queue dropped-framing headerverdict " folded" "Connection: x"
+selftest_queue dropped-malformed headerverdict " folded" "X-A: 1" "bad line"
+selftest_queue dropped-orphan-fold headerverdict " folded" " earlier fold"
+selftest_queue sent-unless-engine-overrides headerverdict " folded" "Range: x"
+selftest_queue dropped-orphan-fold headerverdict " folded"
 selftest_queue dropped-malformed headerverdict "no colon here"
 selftest_queue dropped-framing headerverdict "Content-Length: 3"
 selftest_queue dropped-framing headerverdict "connection: close"
 # the line asked about survives, and the earlier Host is the one dropped
-selftest_queue replaces-earlier headerverdict "Host: b" "Host: a"
-selftest_queue replaces-earlier headerverdict "cookie: b=2" "X-A: 1" "Cookie: a=1"
+selftest_queue sent-replaces-earlier headerverdict "Host: b" "Host: a"
+selftest_queue sent-replaces-earlier headerverdict "cookie: b=2" "X-A: 1" "Cookie: a=1"
 selftest_queue sent headerverdict "Host: b" "X-Host: a"
+# one earlier line alone names the line a replacement drops
+selftest_queue sent-replaces-earlier headerverdict "Cookie: b=2" "Cookie: a=1"
+selftest_queue sent headerverdict "Cookie: b=2" "X-A: 1"
 # a later duplicate of a repeatable field keeps both
 selftest_queue sent headerverdict "Accept: b" "Accept: a"
 for f in Range If-Match If-None-Match If-Modified-Since If-Unmodified-Since; do
-    selftest_queue engine-may-override headerverdict "$f: x"
+    selftest_queue sent-unless-engine-overrides headerverdict "$f: x"
 done
-selftest_queue engine-may-override headerverdict "range: bytes=0-"
+selftest_queue sent-unless-engine-overrides headerverdict "range: bytes=0-"
 selftest_queue sent headerverdict "If-Range: x"
 selftest_queue sent headerverdict "Ranges: x"
 selftest_run_queued

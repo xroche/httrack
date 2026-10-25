@@ -464,19 +464,20 @@ HTSEXT_API const char *hts_accept_preset(const char *browser, const char *kind);
 
 /** What the engine does with a custom header line (-%X). */
 typedef enum hts_header_verdict {
-  HTS_HEADER_SENT = 0,     /**< Sent as typed. */
-  HTS_HEADER_DROPPED_FOLD, /**< Dropped: a folded line with nothing above. */
-  HTS_HEADER_DROPPED_MALFORMED, /**< Dropped: not a "Name: value" line. */
-  HTS_HEADER_DROPPED_FRAMING,   /**< Dropped: the engine frames the message. */
-  /** Sent, and the EARLIER line of the same field is dropped. */
-  HTS_HEADER_REPLACES_EARLIER,
-  /** Sent, except when an update or a resume makes the engine send its own. */
-  HTS_HEADER_ENGINE_MAY_OVERRIDE
+  HTS_HEADER_SENT = 0,              /**< Sent as typed. */
+  HTS_HEADER_DROPPED_ORPHAN_FOLD,   /**< Dropped: a fold with no line above. */
+  HTS_HEADER_DROPPED_MALFORMED,     /**< Dropped: not a "Name: value" line. */
+  HTS_HEADER_DROPPED_FRAMING,       /**< Dropped: the engine frames messages. */
+  HTS_HEADER_SENT_REPLACES_EARLIER, /**< Sent. The earlier one is dropped. */
+  /** Sent, unless an update or a resume writes its own Range or If-* line. */
+  HTS_HEADER_SENT_UNLESS_ENGINE_OVERRIDES
 } hts_header_verdict;
 
-/** Tell what happens to @p line when it follows @p headers, the custom lines
-    before it ("\r\n"-separated, or NULL). A folded line shares the fate of
-    the line it continues. Safe to call before any crawl. */
+/** Return what the engine does with @p line when it follows @p headers, every
+    custom line before it, dropped ones included ("\r\n"-separated, or NULL).
+    A folded line gets the verdict of the line it continues, and goes with it
+    when a later line replaces that one. To find the line a replacement drops,
+    pass one earlier line alone as @p headers. Safe to call before any crawl. */
 HTSEXT_API hts_header_verdict hts_custom_header_verdict(const char *headers,
                                                         const char *line);
 

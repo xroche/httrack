@@ -3907,11 +3907,11 @@ static int st_clienthints(httrackp *opt, int argc, char **argv) {
    for a -%X line following the earlier ones. */
 static int st_headerverdict(httrackp *opt, int argc, char **argv) {
   static const char *const names[] = {"sent",
-                                      "dropped-fold",
+                                      "dropped-orphan-fold",
                                       "dropped-malformed",
                                       "dropped-framing",
-                                      "replaces-earlier",
-                                      "engine-may-override"};
+                                      "sent-replaces-earlier",
+                                      "sent-unless-engine-overrides"};
   char headers[1024];
   hts_header_verdict v;
   int i;
@@ -3927,7 +3927,7 @@ static int st_headerverdict(httrackp *opt, int argc, char **argv) {
     strcatbuff(headers, "\r\n");
   }
   v = hts_custom_header_verdict(argc > 1 ? headers : NULL, argv[0]);
-  if ((int) v < 0 || (size_t) v >= sizeof(names) / sizeof(names[0]))
+  if ((size_t) v >= sizeof(names) / sizeof(names[0]))
     return 1;
   printf("%s\n", names[v]);
   return 0;
