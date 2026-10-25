@@ -1110,12 +1110,10 @@ Clear login
 Logi välja
 The browser did not open: %s.
 Brauser ei avanenud: %s.
-The browser came back with no cookies, so nothing was kept.
-Brauser ei andnud ühtegi küpsist, seega midagi ei salvestatud.
+The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
+Brauser ei andnud ühtegi küpsist. Aadress ja brauseri identiteet salvestatakse projektiga, kui vajutad OK.
 Cookies collected: %d. They are used when you press OK.
 Kogutud küpsiseid: %d. Neid kasutatakse, kui vajutad OK.
-The browser gave no cookies the engine can use, so nothing was changed.
-Brauser ei andnud ühtegi küpsist, mida mootor saaks kasutada, seega midagi ei muudetud.
 The cookies could not be written to %s, so nothing was changed.
 Küpsiseid ei saanud kirjutada asukohta %s, seega midagi ei muudetud.
 %d of the browser's cookies were left out, because the engine would not read them.

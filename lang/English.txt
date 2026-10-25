@@ -1110,12 +1110,10 @@ Clear login
 Clear login
 The browser did not open: %s.
 The browser did not open: %s.
-The browser came back with no cookies, so nothing was kept.
-The browser came back with no cookies, so nothing was kept.
+The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
+The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
 Cookies collected: %d. They are used when you press OK.
 Cookies collected: %d. They are used when you press OK.
-The browser gave no cookies the engine can use, so nothing was changed.
-The browser gave no cookies the engine can use, so nothing was changed.
 The cookies could not be written to %s, so nothing was changed.
 The cookies could not be written to %s, so nothing was changed.
 %d of the browser's cookies were left out, because the engine would not read them.

@@ -1110,12 +1110,10 @@ Clear login
 Disconnetti
 The browser did not open: %s.
 Il browser non si è aperto: %s.
-The browser came back with no cookies, so nothing was kept.
-Il browser non ha restituito alcun cookie, quindi non è stato conservato nulla.
+The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
+Il browser non ha restituito alcun cookie. L'indirizzo e l'identità del browser verranno salvati con il progetto quando premi Ok.
 Cookies collected: %d. They are used when you press OK.
 Cookie raccolti: %d. Verranno usati quando premi Ok.
-The browser gave no cookies the engine can use, so nothing was changed.
-Il browser non ha fornito cookie utilizzabili dal motore, quindi non è stato cambiato nulla.
 The cookies could not be written to %s, so nothing was changed.
 Non è stato possibile scrivere i cookie in %s, quindi non è stato cambiato nulla.
 %d of the browser's cookies were left out, because the engine would not read them.

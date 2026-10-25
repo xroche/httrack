@@ -1110,12 +1110,10 @@ Clear login
 Hisobdan chiqish
 The browser did not open: %s.
 Brauzer ochilmadi: %s.
-The browser came back with no cookies, so nothing was kept.
-Brauzer hech qanday cookies qaytarmadi, shuning uchun hech narsa saqlanmadi.
+The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
+Brauzer hech qanday cookies qaytarmadi. OK bosilganda manzil va brauzer identifikatori loyiha bilan birga saqlanadi.
 Cookies collected: %d. They are used when you press OK.
 Yig’ilgan cookies: %d. Ular OK bosilganda ishlatiladi.
-The browser gave no cookies the engine can use, so nothing was changed.
-Brauzer HTTrack ishlata oladigan cookies bermadi, shuning uchun hech narsa o’zgartirilmadi.
 The cookies could not be written to %s, so nothing was changed.
 Cookies %s ga yozib bo’lmadi, shuning uchun hech narsa o’zgartirilmadi.
 %d of the browser's cookies were left out, because the engine would not read them.

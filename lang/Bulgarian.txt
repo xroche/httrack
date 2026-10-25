@@ -1110,12 +1110,10 @@ Clear login
 Изход от профила
 The browser did not open: %s.
 Браузърът не се отвори: %s.
-The browser came back with no cookies, so nothing was kept.
-Браузърът не върна нито една 'бисквитка', затова нищо не беше запазено.
+The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
+Браузърът не върна нито една 'бисквитка'. Адресът и идентичността на браузъра се запазват с проекта, когато натиснете „Да“.
 Cookies collected: %d. They are used when you press OK.
 Събрани 'бисквитки': %d. Те се използват, когато натиснете „Да“.
-The browser gave no cookies the engine can use, so nothing was changed.
-Браузърът не даде нито една 'бисквитка', която HTTrack може да използва, затова нищо не беше променено.
 The cookies could not be written to %s, so nothing was changed.
 'Бисквитките' не можаха да бъдат записани в %s, затова нищо не беше променено.
 %d of the browser's cookies were left out, because the engine would not read them.

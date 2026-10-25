@@ -1110,12 +1110,10 @@ Clear login
 Odhlásit
 The browser did not open: %s.
 Prohlížeč se nepodařilo otevřít: %s.
-The browser came back with no cookies, so nothing was kept.
-Prohlížeč nevrátil žádné cookies, takže se nic neuložilo.
+The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
+Prohlížeč nevrátil žádné cookies. Adresa a identita prohlížeče se po stisknutí OK uloží s projektem.
 Cookies collected: %d. They are used when you press OK.
 Získáno cookies: %d. Použijí se po stisknutí OK.
-The browser gave no cookies the engine can use, so nothing was changed.
-Prohlížeč nedal žádné cookies, které by HTTrack mohl použít, takže se nic nezměnilo.
 The cookies could not be written to %s, so nothing was changed.
 Cookies se nepodařilo zapsat do %s, takže se nic nezměnilo.
 %d of the browser's cookies were left out, because the engine would not read them.
