@@ -246,7 +246,8 @@ refused ', line 2: refused header: malformed header ignored' \
     '# HTTrack bundle 1' 'header Bearer secret-no-colon'
 # a conditional line loads, though an update overrides it
 bundle cond '# HTTrack bundle 1' 'header If-None-Match: "x"'
-selftest_queue '' bundle "$dir" 'http://x.test/#httrack-bundle=cond'
+selftest_queue 'http://x.test ua=global headers=If-None-Match: "x"|' bundle "$dir" \
+    'http://x.test/#httrack-bundle=cond' host:http://x.test
 # The header lines hold 8192 bytes at most, each with its CRLF.
 bundle hdr8192 '# HTTrack bundle 1' "header X-A: $(repeat_chars 5000 a)" \
     "header X-B: $(repeat_chars 3178 b)"

@@ -1136,7 +1136,8 @@ static hts_boolean header_line_single(const char *line) {
   return header_name_in(line, single, sizeof(single) / sizeof(single[0]));
 }
 
-/* Fields an update or a resume writes itself, dropping the custom line. */
+/* An update or a resume writes these fields itself, dropping the custom line.
+ */
 static hts_boolean header_line_engine_conditional(const char *line) {
   static const char *const conditional[] = {
       "Range", "If-Match", "If-None-Match", "If-Modified-Since",
@@ -1146,8 +1147,7 @@ static hts_boolean header_line_engine_conditional(const char *line) {
                         sizeof(conditional) / sizeof(conditional[0]));
 }
 
-/* The last line of headers that is not a folded continuation, or NULL. Lines
-   split as in append_custom_headers. */
+/* Return the last unfolded line of headers, or NULL. */
 static const char *last_unfolded_line(const char *headers) {
   const char *last = NULL;
   const char *line;
@@ -1173,7 +1173,7 @@ HTSEXT_API hts_header_verdict hts_custom_header_verdict(const char *headers,
     const char *const parent =
         headers != NULL ? last_unfolded_line(headers) : NULL;
 
-    /* without headers, so a replaced parent reads as sent */
+    /* alone, or the parent would find its own field in headers */
     return parent != NULL ? hts_custom_header_verdict(NULL, parent)
                           : HTS_HEADER_DROPPED_ORPHAN_FOLD;
   }
@@ -1208,7 +1208,8 @@ const char *http_custom_header_warning(const char *headers, const char *line) {
     return "framing header ignored";
   case HTS_HEADER_SENT_REPLACES_EARLIER:
     return "header replaces an earlier one";
-  case HTS_HEADER_SENT_UNLESS_ENGINE_OVERRIDES: /* valid, in a bundle too */
+  case HTS_HEADER_SENT_UNLESS_ENGINE_OVERRIDES: /* valid, so a bundle may carry
+                                                   it */
   case HTS_HEADER_SENT:
     break;
   }

@@ -26,6 +26,8 @@ verdict sent "X-Magic: 42"
 verdict sent "User-Agent: me"
 # a fold takes the verdict of the line it continues
 verdict sent " folded" "X-Magic: 42"
+verdict sent " folded" "Host: b"
+verdict sent " folded" "Host: a" "Host: b"
 verdict sent " folded" "Host: a" "Host: b" "X-A: 1" " x"
 verdict dropped-framing " folded" "Connection: x"
 verdict dropped-malformed " folded" "X-A: 1" "bad line"

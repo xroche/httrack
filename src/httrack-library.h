@@ -464,25 +464,25 @@ HTSEXT_API const char *hts_accept_preset(const char *browser, const char *kind);
 
 /** What the engine does with a custom header line (-%X). Values are ABI. */
 typedef enum hts_header_verdict {
-  /** Sent as typed. */
+  /** The line goes out as typed. */
   HTS_HEADER_SENT = 0,
-  /** Dropped: a folded line with no line above to continue. */
+  /** The engine drops a folded line with no line above it to continue. */
   HTS_HEADER_DROPPED_ORPHAN_FOLD = 1,
-  /** Dropped: not a "Name: value" line. */
+  /** The engine drops a line that is not "Name: value". */
   HTS_HEADER_DROPPED_MALFORMED = 2,
-  /** Dropped: the engine frames the message itself. */
+  /** The engine drops it, because it frames the message itself. */
   HTS_HEADER_DROPPED_FRAMING = 3,
-  /** Sent. The earlier line of the same field is dropped. */
+  /** The line goes out, and the earlier line of the same field is dropped. */
   HTS_HEADER_SENT_REPLACES_EARLIER = 4,
-  /** Sent, unless an update or a resume writes its own Range or If-* line. */
+  /** The line goes out, unless an update or a resume writes that field. */
   HTS_HEADER_SENT_UNLESS_ENGINE_OVERRIDES = 5
 } hts_header_verdict;
 
-/** Return what the engine does with @p line when it follows @p headers, every
-    custom line before it, dropped ones included ("\r\n"-separated, or NULL).
-    A folded line gets the verdict of the line it continues, and goes with it
-    when a later line replaces that one. To find the line a replacement drops,
-    pass one earlier line alone as @p headers. Safe to call before any crawl. */
+/** Return what the engine does with @p line. @p headers holds every custom
+    line before it, dropped ones included, separated by "\r\n", or is NULL.
+    A folded line gets the verdict its parent line would get alone. To learn
+    whether @p line replaces one earlier line, pass that line alone as
+    @p headers. Safe to call before any crawl. */
 HTSEXT_API hts_header_verdict hts_custom_header_verdict(const char *headers,
                                                         const char *line);
 
