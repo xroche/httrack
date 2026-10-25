@@ -1,0 +1,13 @@
+#!/bin/bash
+#
+# A gzip body decodes through a temporary under a non-ASCII -O. On Windows the
+# hts-tmp folder was made through the ANSI codepage, so the decode found none.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" --outdir-intl 'café' --errors 0 --files 3 \
+    --file-matches 'warcgz/page.html' 'verbatim gzip page' \
+    --file-matches 'warcgz/data.bin' 'verbatim gzip octet-stream' \
+    httrack 'BASEURL/warcgz/index.html'
