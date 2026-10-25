@@ -1136,15 +1136,28 @@ static hts_boolean header_line_single(const char *line) {
   return header_name_in(line, single, sizeof(single) / sizeof(single[0]));
 }
 
-const char *http_custom_header_warning(const char *headers, const char *line) {
+/* Fields the engine writes on an update or a resume, ahead of the custom
+   lines, so a custom line of the same field is then dropped. */
+static hts_boolean header_line_engine_conditional(const char *line) {
+  static const char *const conditional[] = {
+      "Range", "If-Match", "If-None-Match", "If-Modified-Since",
+      "If-Unmodified-Since"};
+
+  return header_name_in(line, conditional,
+                        sizeof(conditional) / sizeof(conditional[0]));
+}
+
+HTSEXT_API hts_header_verdict hts_custom_header_verdict(const char *headers,
+                                                        const char *line) {
+  if (line == NULL)
+    return HTS_HEADER_DROPPED_MALFORMED;
   if (*line == ' ' || *line == '\t')
-    return headers == NULL || *headers == '\0'
-               ? "folded line with no header to continue ignored"
-               : NULL;
+    return headers == NULL || *headers == '\0' ? HTS_HEADER_DROPPED_FOLD
+                                               : HTS_HEADER_SENT;
   if (!header_line_valid(line))
-    return "malformed header ignored";
+    return HTS_HEADER_DROPPED_MALFORMED;
   if (header_line_refused(line))
-    return "framing header ignored";
+    return HTS_HEADER_DROPPED_FRAMING;
   if (header_line_single(line) && headers != NULL) {
     char field[sizeof("Authorization")];
     const size_t len = header_name_len(line);
@@ -1152,9 +1165,26 @@ const char *http_custom_header_warning(const char *headers, const char *line) {
     memcpy(field, line, len);
     field[len] = '\0';
     if (http_headers_have_field(headers, field))
-      return "header replaces an earlier one";
+      return HTS_HEADER_REPLACES_EARLIER;
   }
-  return NULL;
+  if (header_line_engine_conditional(line))
+    return HTS_HEADER_ENGINE_MAY_OVERRIDE;
+  return HTS_HEADER_SENT;
+}
+
+const char *http_custom_header_warning(const char *headers, const char *line) {
+  switch (hts_custom_header_verdict(headers, line)) {
+  case HTS_HEADER_DROPPED_FOLD:
+    return "folded line with no header to continue ignored";
+  case HTS_HEADER_DROPPED_MALFORMED:
+    return "malformed header ignored";
+  case HTS_HEADER_DROPPED_FRAMING:
+    return "framing header ignored";
+  case HTS_HEADER_REPLACES_EARLIER:
+    return "header replaces an earlier one";
+  default: /* a conditional line is valid, in a bundle too */
+    return NULL;
+  }
 }
 
 /* The -%X warnings, plus Host, Cookie and Proxy-*. */
