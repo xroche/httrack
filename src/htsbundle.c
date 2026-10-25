@@ -1286,6 +1286,7 @@ static const char *paste_name(const char *url, char name[HTS_BUNDLE_NAME_MAX]) {
     host[--len] = '\0';
   // www.github.io is a site of its own, so "www." stays here
   if (hts_registrable_domain(host, name, HTS_BUNDLE_NAME_MAX) &&
+      !hts_host_is_address(name, strlen(name)) &&
       hts_bundle_name_refusal(name) == NULL)
     return NULL;
   if (www)

@@ -149,6 +149,9 @@ put "curl 'https://a.b.co.uk/' -b x=1"
 selftest_queue_head "name=b.co.uk cookies=1 hosts=b.co.uk" paste "$proj" "$in"
 put "curl 'http://10.0.0.1:8080/' -b x=1"
 selftest_queue_head "name=10.0.0.1 cookies=1 hosts=10.0.0.1" paste "$proj" "$in"
+# A registrable domain that reads as an address would share 127.1's file.
+put "curl 'http://x.127.1/' -b x=1"
+selftest_queue_head "name=x.127.1 cookies=1" paste "$dir/dry" "$in" dry
 
 # Firefox writes a character past U+FFFF as two \u halves.
 put "curl 'https://emoji.test/' -b \$'e=\\ud83d\\ude00'"
@@ -302,8 +305,8 @@ selftest_queue_head "refused: cannot write $dir/missing/nofolder.test.hts: " \
 put "curl https://words.test/ -b a=1$(for _ in $(seq 1 1020); do printf ' -k'; done)"
 selftest_queue_head "name=words.test cookies=1" paste "$dir/dry" "$in" dry
 
-test "${#SELFTEST_WANT[@]}" -eq 111 ||
-    fail "expected 111 queued rows, got ${#SELFTEST_WANT[@]}"
+test "${#SELFTEST_WANT[@]}" -eq 112 ||
+    fail "expected 112 queued rows, got ${#SELFTEST_WANT[@]}"
 selftest_run_queued
 
 # A host list too long to show ends with ",...", not with a cut name.
