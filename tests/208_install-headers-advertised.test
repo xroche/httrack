@@ -226,7 +226,7 @@ login_argv=()
 got=$(LD_LIBRARY_PATH="${lib%/*}" DYLD_LIBRARY_PATH="${lib%/*}" "$tmp/login")
 want="1 example.co.uk
 refused
-1 shop.example.co.uk 1 example.co.uk
+1 example.co.uk 1 example.co.uk
 0"
 test "$got" = "$want" || fail "the login bundle calls from outside: [$got]"
 

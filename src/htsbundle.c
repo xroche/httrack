@@ -1268,27 +1268,41 @@ static const char *paste_host_idna(char *url, size_t size) {
   return why;
 }
 
-/* Copy into name the bundle name of url's host: lowercase ASCII, without the
-   port, a leading "www." or trailing dots. NULL, or why there is none. */
+/* Copy into name the bundle name of url: the registrable domain its scope
+   covers, else the host without the port, a leading "www." or trailing dots,
+   with "_" before a device name. NULL, or why there is none. */
 static const char *paste_name(const char *url, char name[HTS_BUNDLE_NAME_MAX]) {
   char host[COOKIE_MAX_DOMAIN];
   const char *h = host;
+  // "_con.com" is what the escape below makes of con.com
+  const char *const taken = "the name is kept for an escaped device name";
+  const char *escape;
+  hts_boolean www;
   size_t len;
 
   if (!cookie_url_host(url, host, sizeof(host)))
     return "the address has no host";
   if (host[0] == '[' || strchr(host, ':') != NULL)
     return "an IP address cannot name a login bundle";
-  if (strncmp(h, "www.", 4) == 0)
-    h += 4;
-  for (len = strlen(h); len > 0 && h[len - 1] == '.';)
-    len--;
-  if (len == 0)
+  www = strncmp(host, "www.", 4) == 0;
+  for (len = strlen(host); len > 0 && host[len - 1] == '.';)
+    host[--len] = '\0';
+  // www.github.io is a site of its own, so "www." stays here
+  if (hts_registrable_domain(host, name, HTS_BUNDLE_NAME_MAX) &&
+      !hts_host_is_address(name, strlen(name)) &&
+      hts_bundle_name_refusal(name) == NULL)
+    return name[0] == '_' && bundle_name_is_device(name + 1) ? taken : NULL;
+  if (www)
+    h += len < 4 ? len : 4;
+  if (*h == '\0')
     return "the address names no site";
-  if (len >= HTS_BUNDLE_NAME_MAX)
+  if (*h == '_' && bundle_name_is_device(h + 1))
+    return taken;
+  escape = bundle_name_is_device(h) ? "_" : "";
+  if (strlen(h) >= HTS_BUNDLE_NAME_MAX - strlen(escape))
     return "invalid login bundle name: 128 bytes or more";
-  name[0] = '\0';
-  strlncatbuff(name, h, HTS_BUNDLE_NAME_MAX, len);
+  strlcpybuff(name, escape, HTS_BUNDLE_NAME_MAX);
+  strlcatbuff(name, h, HTS_BUNDLE_NAME_MAX);
   return hts_bundle_name_refusal(name);
 }
 

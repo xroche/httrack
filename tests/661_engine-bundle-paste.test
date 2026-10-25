@@ -101,7 +101,8 @@ selftest_queue_lines "name=api.test cookies=0 hosts=
 url=https://api.test/#httrack-bundle=api.test
 agent=" paste "$proj" "$in"
 
-# The name: no port, trailing dots or leading www., and an international host
+# The name is the registrable domain the scope covers, else the host with no
+# port, trailing dots or leading www. An international host
 # takes its ASCII form, in the address and the cookies too.
 for u in 'https://WWW.Site.test:81/x' 'https://site.test./' \
     'https://site.test../' 'http://www.site.test/'; do
@@ -114,8 +115,31 @@ put "curl 'https://WWW.BüCHER.de/x' -b a=1"
 selftest_queue_lines "name=xn--bcher-kva.de cookies=1 hosts=xn--bcher-kva.de
 url=https://www.xn--bcher-kva.de/x#httrack-bundle=xn--bcher-kva.de
 agent=" paste "$dir/dry" "$in" dry
+# www.github.io is a site of its own, github.io being a public suffix.
+put "curl 'https://www.github.io/' -b a=1"
+selftest_queue_head "name=www.github.io cookies=1" paste "$dir/dry" "$in" dry
+# A device name falls back to the host, then takes a leading "_".
+put "curl 'https://shop.con.com/' -b a=1"
+selftest_queue_head "name=shop.con.com cookies=1" paste "$dir/dry" "$in" dry
+put "curl 'https://www.con.com/' -b a=1"
+selftest_queue_head "name=_con.com cookies=1" paste "$dir/dry" "$in" dry
+put "curl 'http://COM1/' -b a=1"
+selftest_queue_head "name=_com1 cookies=1" paste "$dir/dry" "$in" dry
+put "curl 'http://_gateway/' -b a=1"
+selftest_queue_head "name=_gateway cookies=1" paste "$dir/dry" "$in" dry
+put "curl 'https://a._x.com/' -b a=1"
+selftest_queue_head "name=_x.com cookies=1" paste "$dir/dry" "$in" dry
+long127="$(repeat_chars 57 a).$(repeat_chars 61 b).con.com"
+put "curl 'https://$long127/' -b a=1"
+selftest_queue_head "name=$long127 cookies=1" paste "$dir/dry" "$in" dry
+# Every trailing dot goes before the registrable domain lookup.
+put "curl 'https://a.site.test../' -b a=1"
+selftest_queue_head "name=site.test cookies=1" paste "$dir/dry" "$in" dry
+# A host too long for a bundle name still has a short registrable domain.
+put "curl 'https://$(repeat_chars 60 a).$(repeat_chars 63 b).test/' -b a=1"
+selftest_queue_head "name=$(repeat_chars 63 b).test cookies=1" paste "$dir/dry" "$in" dry
 put "curl 'https://a.例え.jp/' -b a=1"
-selftest_queue_head "name=a.xn--r8jz45g.jp cookies=1" paste "$dir/dry" "$in" dry
+selftest_queue_head "name=xn--r8jz45g.jp cookies=1" paste "$dir/dry" "$in" dry
 # The trailing dots leave the address too, so the cookies name the same host.
 put "curl 'https://dots.test../x' -b a=1"
 selftest_queue_lines "name=dots.test cookies=1 hosts=dots.test
@@ -129,12 +153,16 @@ agent=" paste "$dir/dry" "$in" dry
 
 # Where header cookies land, checked as file bytes below: the registrable
 # domain, host-only for an address, never Secure over http. "g =h" is g.
+# A subdomain shares its site's name, so this replaces the shop.test bundle.
 put "curl 'https://app.shop.test/' -b 'g =h; k= v'"
-selftest_queue_head "name=app.shop.test cookies=2 hosts=shop.test" paste "$proj" "$in"
+selftest_queue_head "name=shop.test cookies=2 hosts=shop.test" paste "$proj" "$in"
 put "curl 'https://a.b.co.uk/' -b x=1"
-selftest_queue_head "name=a.b.co.uk cookies=1 hosts=b.co.uk" paste "$proj" "$in"
+selftest_queue_head "name=b.co.uk cookies=1 hosts=b.co.uk" paste "$proj" "$in"
 put "curl 'http://10.0.0.1:8080/' -b x=1"
 selftest_queue_head "name=10.0.0.1 cookies=1 hosts=10.0.0.1" paste "$proj" "$in"
+# A registrable domain that reads as an address would share 127.1's file.
+put "curl 'http://x.127.1/' -b x=1"
+selftest_queue_head "name=x.127.1 cookies=1" paste "$dir/dry" "$in" dry
 
 # Firefox writes a character past U+FFFF as two \u halves.
 put "curl 'https://emoji.test/' -b \$'e=\\ud83d\\ude00'"
@@ -245,9 +273,11 @@ refused 'an IP address cannot name a login bundle' "curl 'http://[::1]/' -b a=$s
 refused 'the address has no host' "curl 'http:///x' -b a=$sec"
 refused 'the address names no site' "curl 'https://www./' -b a=$sec"
 refused 'the address names no site' "curl 'https://www..:80/' -b a=$sec"
-refused 'invalid login bundle name: a Windows device name' "curl http://con/ -b a=$sec"
+refused 'the name is kept for an escaped device name' "curl https://_con.com/ -b a=$sec"
+refused 'the name is kept for an escaped device name' "curl https://a._nul.com/ -b a=$sec"
+refused 'the name is kept for an escaped device name' "curl http://_com1/ -b a=$sec"
 refused 'invalid login bundle name: 128 bytes or more' \
-    "curl 'https://$(repeat_chars 60 a).$(repeat_chars 63 b).test/' -b a=$sec"
+    "curl 'https://$(repeat_chars 60 a).$(repeat_chars 63 b).con.com/' -b a=$sec"
 refused 'the address cannot be used' "curl 'https://bad.test/$(repeat_chars 1024 p)' -b a=$sec"
 # 1023 bytes, "ü" being two of them, and 1029 once the host is in ASCII
 refused 'the address is too long once its host is in ASCII' \
@@ -287,8 +317,8 @@ selftest_queue_head "refused: cannot write $dir/missing/nofolder.test.hts: " \
 put "curl https://words.test/ -b a=1$(for _ in $(seq 1 1020); do printf ' -k'; done)"
 selftest_queue_head "name=words.test cookies=1" paste "$dir/dry" "$in" dry
 
-test "${#SELFTEST_WANT[@]}" -eq 106 ||
-    fail "expected 106 queued rows, got ${#SELFTEST_WANT[@]}"
+test "${#SELFTEST_WANT[@]}" -eq 118 ||
+    fail "expected 118 queued rows, got ${#SELFTEST_WANT[@]}"
 selftest_run_queued
 
 # A host list too long to show ends with ",...", not with a cut name.
@@ -308,12 +338,12 @@ esac
 test "${#hosts}" -lt 1024 || fail "the host list passes its buffer: ${#hosts}"
 
 # What the accepted rows wrote, and nothing the refused or dry ones did.
-for f in api.test app.shop.test a.b.co.uk 10.0.0.1 emoji.test example.com \
-    jar.test shop.test shop2.test; do
+for f in api.test shop.test b.co.uk 10.0.0.1 emoji.test example.com \
+    jar.test shop2.test; do
     assert_file "$tmpdir/proj/$f.hts" "bundle for $f"
 done
 set -- "$tmpdir"/proj/* "$tmpdir"/dry/*
-test $# -eq 10 || fail "unexpected files: $*"
+test $# -eq 9 || fail "unexpected files: $*"
 test "$(cat "$tmpdir/dry/site.test.hts")" = old || fail "a dry run replaced a bundle"
 test ! -e "$tmpdir/missing" || fail "a missing folder was created"
 ! grep -rqF "$sec" "$tmpdir/proj" "$tmpdir/dry" || fail "a refused paste reached a file"
@@ -338,11 +368,11 @@ ua UA/1
 cookies
 #HttpOnly_www.jar.test${tab}FALSE${tab}/x${tab}FALSE${tab}0${tab}H${tab}h
 .jar.test${tab}TRUE${tab}/${tab}TRUE${tab}1999999999${tab}A${tab}b"
-bytes app.shop.test "# HTTrack bundle 1
+bytes shop.test "# HTTrack bundle 1
 cookies
 .shop.test${tab}TRUE${tab}/${tab}TRUE${tab}0${tab}g${tab}h
 .shop.test${tab}TRUE${tab}/${tab}TRUE${tab}0${tab}k${tab}v"
-bytes a.b.co.uk "# HTTrack bundle 1
+bytes b.co.uk "# HTTrack bundle 1
 cookies
 .b.co.uk${tab}TRUE${tab}/${tab}TRUE${tab}0${tab}x${tab}1"
 bytes 10.0.0.1 "# HTTrack bundle 1
