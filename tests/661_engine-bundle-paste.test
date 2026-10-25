@@ -268,6 +268,22 @@ test "${#SELFTEST_WANT[@]}" -eq 100 ||
     fail "expected 100 queued rows, got ${#SELFTEST_WANT[@]}"
 selftest_run_queued
 
+# A host list too long to show ends with ",...", not with a cut name.
+rows=
+for i in $(seq 1 60); do
+    rows="$rows$(printf 'h%02d-%s.cut.test\tFALSE\t/\tFALSE\t0\tC\tc' "$i" \
+        "$(repeat_chars 20 x)")
+"
+done
+put "$rows"
+out=$(httrack -O /dev/null -#test=paste "$dir/dry" "$in" dry url:https://cut.test/ | tr -d '\r')
+hosts=$(sed -n 's/^name=cut.test cookies=60 hosts=//p' <<<"$out")
+case $hosts in
+h01-*.cut.test,h02-*,...) ;;
+*) fail "a long host list: $out" ;;
+esac
+test "${#hosts}" -lt 1024 || fail "the host list passes its buffer: ${#hosts}"
+
 # What the accepted rows wrote, and nothing the refused or dry ones did.
 for f in api.test app.shop.test a.b.co.uk 10.0.0.1 emoji.test example.com \
     jar.test shop.test shop2.test; do

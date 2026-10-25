@@ -106,7 +106,7 @@ function bl_address(line) {
 	return m ? m[1].toLowerCase() + a.substring(m[1].length) : "http://" + a;
 }
 // Put url in place of the first line holding the same address, or append it.
-// The other lines stay as they are.
+// The other lines stay as they are, so another page of the site keeps its own.
 function bl_add_to(text, url) {
 	var base = bl_address(url);
 	var lines = text.split("\n");
