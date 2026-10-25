@@ -1301,7 +1301,8 @@ static const char *paste_name(const char *url, char name[HTS_BUNDLE_NAME_MAX]) {
   escape = bundle_name_is_device(h) ? "_" : "";
   if (strlen(h) >= HTS_BUNDLE_NAME_MAX - strlen(escape))
     return "invalid login bundle name: 128 bytes or more";
-  snprintf(name, HTS_BUNDLE_NAME_MAX, "%s%s", escape, h);
+  strlcpybuff(name, escape, HTS_BUNDLE_NAME_MAX);
+  strlcatbuff(name, h, HTS_BUNDLE_NAME_MAX);
   return hts_bundle_name_refusal(name);
 }
 
