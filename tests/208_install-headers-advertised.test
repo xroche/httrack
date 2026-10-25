@@ -214,7 +214,11 @@ int main(void) {
   return 0;
 }
 EOF
-"${cc_argv[@]}" "${cpp_argv[@]}" -o "$tmp/login" "$tmp/login.c" "$lib" \
+# It runs, so it needs the build's own flags: a sanitized library needs the runtime.
+login_argv=()
+[ -z "${TEST_CFLAGS:-}" ] || read -r -a login_argv <<<"$TEST_CFLAGS"
+"${cc_argv[@]}" "${cpp_argv[@]}" ${login_argv[@]+"${login_argv[@]}"} \
+    -o "$tmp/login" "$tmp/login.c" "$lib" \
     -Wl,-rpath,"${lib%/*}" 2>"$tmp/login.log" || {
     cat "$tmp/login.log" >&2
     fail "the login bundle program does not build"
