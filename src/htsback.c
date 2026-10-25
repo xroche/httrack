@@ -977,7 +977,7 @@ static int create_back_tmpfile(httrackp *opt, lien_back *const back,
       return -1;
     }
     back->tmpfile = back->tmpfile_buffer;
-    if (structcheck(back->tmpfile) != 0) {
+    if (structcheck_utf8(back->tmpfile) != 0) {
       hts_log_print(opt, LOG_WARNING, "can not create directory to %s",
                     back->tmpfile);
       back->tmpfile_buffer[0] = '\0';
@@ -997,7 +997,7 @@ static int create_back_tmpfile(httrackp *opt, lien_back *const back,
       return -1;
     }
     back->tmpfile = back->tmpfile_buffer;
-    if (structcheck(back->tmpfile) != 0) {
+    if (structcheck_utf8(back->tmpfile) != 0) {
       hts_log_print(opt, LOG_WARNING, "can not create directory to %s",
                     back->tmpfile);
       back->tmpfile_buffer[0] = '\0';
@@ -1024,8 +1024,9 @@ void back_refetch_backup(httrackp *opt, lien_back *const back) {
                       back->tmpfile);
       saved = hts_rename_over(opt, back->url_sav, back->tmpfile);
       /* Another slot sharing the directory may have removed it between the
-         structcheck above and the rename: recreate it and try once more. */
-      if (!saved && structcheck(back->tmpfile) == 0)
+         structcheck_utf8 above and the rename: recreate it and try once more.
+       */
+      if (!saved && structcheck_utf8(back->tmpfile) == 0)
         saved = hts_rename_over(opt, back->url_sav, back->tmpfile);
     }
     if (!saved) {
@@ -1342,7 +1343,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
               }
               /* ensure that no remaining temporary file exists */
               if (back[p].tmpfile != NULL) {
-                unlink(back[p].tmpfile);
+                UNLINK(back[p].tmpfile);
                 back_tmpdir_drop(back[p].tmpfile); /* the .u went with it */
                 back[p].tmpfile = NULL;
               }
@@ -2540,7 +2541,7 @@ int back_clear_entry(lien_back * back) {
     }
     // only for security
     if (back->tmpfile && back->tmpfile[0] != '\0') {
-      (void) unlink(back->tmpfile);
+      (void) UNLINK(back->tmpfile);
       back_tmpdir_drop(back->tmpfile);
       back->tmpfile = NULL;
     }
@@ -2752,7 +2753,7 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
                   if (strcmp(previous_save, save) != 0 &&
                       fexist_utf8(
                           fconv(catbuff, sizeof(catbuff), previous_save))) {
-                    rename(fconv(catbuff, sizeof(catbuff), previous_save),
+                    RENAME(fconv(catbuff, sizeof(catbuff), previous_save),
                            fconv(catbuff2, sizeof(catbuff2), save));
                     if (fexist_utf8(fconv(catbuff, sizeof(catbuff), save))) {
                       found = 1;
