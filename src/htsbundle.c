@@ -1043,8 +1043,7 @@ static hts_boolean paste_is_curl(const char *s) {
          (s[4] == ' ' || s[4] == '\t' || curl_join(s + 4) != 0);
 }
 
-/* Copy the records of the cookies.txt paste s into out, one line per line of
-   s, with blank and comment lines left empty for the bundle reader. */
+/* Copy the cookies.txt paste s into out line for line, comments blanked. */
 static void paste_records(const char *s, String *out) {
   static const char httponly[] = "#HttpOnly_";
 

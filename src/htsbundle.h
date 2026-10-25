@@ -144,6 +144,11 @@ void cookie_load_stream(httrackp *opt, t_cookie *cookie, text_src *src,
 hts_boolean cookie_write_replace(const char *file, const char *data,
                                  size_t len);
 
+/* Why can the len bytes of host, past any ASCII lowercasing, not take an
+   ASCII form? IDNA needs strict UTF-8, and it encodes a capital outside ASCII
+   as another host. NULL when they can. */
+const char *cookie_host_refusal(const char *host, size_t len);
+
 #endif
 
 #endif

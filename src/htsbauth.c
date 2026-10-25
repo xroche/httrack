@@ -75,15 +75,20 @@ static hts_boolean cookie_is_capital(hts_UCS4 uc) {
     return uc % 2 == 0;
   if (uc >= 0x4c1 && uc <= 0x4ce)
     return uc % 2 == 1;
-  return (uc >= 0xc0 && uc <= 0xde && uc != 0xd7) || uc == 0x386 ||
+  if (uc >= 0x3d8 && uc <= 0x3ef) // Greek archaic letters and Coptic
+    return uc % 2 == 0;
+  return (uc >= 0xc0 && uc <= 0xde && uc != 0xd7) || uc == 0x370 ||
+         uc == 0x372 || uc == 0x376 || uc == 0x37f || uc == 0x386 ||
          (uc >= 0x388 && uc <= 0x38a) || uc == 0x38c || uc == 0x38e ||
          uc == 0x38f || (uc >= 0x391 && uc <= 0x3ab && uc != 0x3a2) ||
-         (uc >= 0x400 && uc <= 0x42f) || uc == 0x4c0 ||
-         (uc >= 0x531 && uc <= 0x556) || uc == 0x1e9e ||
+         uc == 0x3cf || (uc >= 0x3d2 && uc <= 0x3d4) || uc == 0x3f4 ||
+         uc == 0x3f7 || uc == 0x3f9 || uc == 0x3fa ||
+         (uc >= 0x3fd && uc <= 0x3ff) || (uc >= 0x400 && uc <= 0x42f) ||
+         uc == 0x4c0 || (uc >= 0x531 && uc <= 0x556) || uc == 0x1e9e ||
          (uc >= 0xff21 && uc <= 0xff3a);
 }
 
-/* See htsbauth.h. */
+/* See htsbundle.h. */
 const char *cookie_host_refusal(const char *host, size_t len) {
   size_t i, n;
   hts_UCS4 uc;

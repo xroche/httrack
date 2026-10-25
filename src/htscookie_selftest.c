@@ -330,6 +330,17 @@ static int st_cookieport(httrackp *opt, int argc, char **argv) {
       {".B\303\234CHER.example", NULL},          // a capital outside ASCII
       {".\320\220.example", NULL},               // a Cyrillic capital
       {".\320\260.example", ".xn--80a.example"}, // its small letter
+      {".\304\200.example", NULL},               // U+0100, Latin Extended-A
+      {".\305\271.example", NULL},               // U+0179, an odd capital there
+      {".\316\221.example", NULL},               // U+0391, Greek
+      {".\317\242.example", NULL},               // U+03E2, Coptic
+      {".\323\220.example", NULL},               // U+04D0, Cyrillic extended
+      {".\323\201.example", NULL},               // U+04C1, an odd capital there
+      {".\324\261.example", NULL},               // U+0531, Armenian
+      {".\341\270\200.example", NULL}, // U+1E00, Latin Extended Additional
+      {".\357\274\241.example", NULL}, // U+FF21, fullwidth
+      {".\303\227.example", ".xn--rca.example"}, // U+00D7 sits among capitals
+      {".\316\261.example", ".xn--mxa.example"}, // a small Greek letter
       // fits as typed, but not once in its ASCII form
       {"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
