@@ -442,7 +442,7 @@ command grep -qxF ".nolf.test${tab}TRUE${tab}/${tab}FALSE${tab}0${tab}N${tab}las
 
 # Two threads writing one bundle each use their own temporary.
 mkdir "$tmpdir/race"
-out=$(httrack -O /dev/null -#test=pasterace "$dir/race" 20 | tr -d '\r')
+out=$(httrack -O /dev/null -#test=pasterace "$dir/race" 500 | tr -d '\r')
 test "$out" = failed=0 || fail "two threads at once: $out"
 set -- "$tmpdir"/race/*.tmp
 test ! -e "$1" || fail "a temporary was left: $*"
