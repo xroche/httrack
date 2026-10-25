@@ -1349,11 +1349,23 @@ static hts_boolean cookie_move(const char *src, const char *dst) {
 #ifdef _WIN32
   LPWSTR wsrc = hts_pathToUCS2(src);
   LPWSTR wdst = hts_pathToUCS2(dst);
-  const hts_boolean ok =
-      wsrc != NULL && wdst != NULL &&
-      MoveFileExW(wsrc, wdst,
-                  MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
+  hts_boolean ok = HTS_FALSE;
+  int tries;
 
+  // dst is refused while another writer is replacing it, so wait that out
+  for (tries = 0; wsrc != NULL && wdst != NULL && tries < 20; tries++) {
+    DWORD err;
+
+    if (MoveFileExW(wsrc, wdst,
+                    MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0) {
+      ok = HTS_TRUE;
+      break;
+    }
+    err = GetLastError();
+    if (err != ERROR_ACCESS_DENIED && err != ERROR_SHARING_VIOLATION)
+      break;
+    Sleep(10);
+  }
   freet(wsrc);
   freet(wdst);
   if (!ok)
