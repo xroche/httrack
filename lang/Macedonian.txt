@@ -1126,3 +1126,5 @@ Log in to the site in another tab of this browser. Open the developer tools (F12
 Најавете се на страницата во друго јазиче на овој прелистувач. Отворете ги алатките за развивачи (F12), па јазичето Мрежа, повторно вчитајте ја страницата, кликнете со десното копче на првото барање и изберете Copy as cURL (bash). Залепете го текстот тука. Работи и извоз во cookies.txt, за првата адреса во списокот.
 Cookies for: %s. Browser identity: %s.
 Колачиња за: %s. Идентитет на прелистувачот: %s.
+A login cannot be saved for this address, so nothing was kept.
+За оваа адреса не може да се зачува најава, затоа ништо не е зачувано.

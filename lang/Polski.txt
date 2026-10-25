@@ -1126,3 +1126,5 @@ Log in to the site in another tab of this browser. Open the developer tools (F12
 Zaloguj się do witryny w innej karcie tej przeglądarki. Otwórz narzędzia deweloperskie (F12), a potem kartę Sieć, odśwież stronę, kliknij prawym przyciskiem pierwsze żądanie i wybierz Copy as cURL (bash). Wklej tutaj tekst. Działa też eksport cookies.txt, dla pierwszego adresu na liście.
 Cookies for: %s. Browser identity: %s.
 Ciasteczka dla: %s. Tożsamość przeglądarki: %s.
+A login cannot be saved for this address, so nothing was kept.
+Dla tego adresu nie można zapisać logowania, więc nic nie zostało zapisane.

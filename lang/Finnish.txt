@@ -1126,3 +1126,5 @@ Log in to the site in another tab of this browser. Open the developer tools (F12
 Kirjaudu sivustolle tämän selaimen toisessa välilehdessä. Avaa kehittäjätyökalut (F12) ja sitten Verkko-välilehti, lataa sivu uudelleen, napsauta ensimmäistä pyyntöä hiiren oikealla painikkeella ja valitse Copy as cURL (bash). Liitä teksti tähän. Myös cookies.txt-vienti toimii, luettelon ensimmäiselle osoitteelle.
 Cookies for: %s. Browser identity: %s.
 Evästeet sivustoille: %s. Selaimen tunniste: %s.
+A login cannot be saved for this address, so nothing was kept.
+Tälle osoitteelle ei voi tallentaa kirjautumista, joten mitään ei tallennettu.

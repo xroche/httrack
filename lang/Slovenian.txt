@@ -1126,3 +1126,5 @@ Log in to the site in another tab of this browser. Open the developer tools (F12
 Prijavite se na spletno mesto v drugem zavihku tega brskalnika. Odprite orodja za razvijalce (F12), nato zavihek Omrežje, znova naložite stran, z desno tipko kliknite prvo zahtevo in izberite Copy as cURL (bash). Prilepite besedilo sem. Deluje tudi izvoz cookies.txt, za prvi naslov na seznamu.
 Cookies for: %s. Browser identity: %s.
 Piškotki za: %s. Identiteta brskalnika: %s.
+A login cannot be saved for this address, so nothing was kept.
+Za ta naslov prijave ni mogoče shraniti, zato ni bilo nič shranjeno.

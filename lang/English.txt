@@ -1126,3 +1126,5 @@ Log in to the site in another tab of this browser. Open the developer tools (F12
 Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
 Cookies for: %s. Browser identity: %s.
 Cookies for: %s. Browser identity: %s.
+A login cannot be saved for this address, so nothing was kept.
+A login cannot be saved for this address, so nothing was kept.

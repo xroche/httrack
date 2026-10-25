@@ -1126,3 +1126,5 @@ Log in to the site in another tab of this browser. Open the developer tools (F12
 Melden Sie sich in einem anderen Tab dieses Browsers bei der Website an. Öffnen Sie die Entwicklertools (F12) und dort den Tab Netzwerk, laden Sie die Seite neu, klicken Sie mit der rechten Maustaste auf die erste Anfrage und wählen Sie Copy as cURL (bash). Fügen Sie den Text hier ein. Ein cookies.txt-Export funktioniert auch, für die erste Adresse der Liste.
 Cookies for: %s. Browser identity: %s.
 Cookies für: %s. Browser-Kennung: %s.
+A login cannot be saved for this address, so nothing was kept.
+Für diese Adresse kann keine Anmeldung gespeichert werden, daher wurde nichts übernommen.

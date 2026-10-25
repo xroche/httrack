@@ -1126,3 +1126,5 @@ Log in to the site in another tab of this browser. Open the developer tools (F12
 Logige saidile sisse selle brauseri teisel vahelehel. Avage arendaja tööriistad (F12) ja seejärel vaheleht Võrk, laadige leht uuesti, paremklõpsake esimesel päringul ja valige Copy as cURL (bash). Kleepige tekst siia. Sobib ka cookies.txt eksport, loendi esimese aadressi jaoks.
 Cookies for: %s. Browser identity: %s.
 Küpsised saitidele: %s. Brauseri identiteet: %s.
+A login cannot be saved for this address, so nothing was kept.
+Selle aadressi jaoks ei saa sisselogimist salvestada, seega midagi ei salvestatud.

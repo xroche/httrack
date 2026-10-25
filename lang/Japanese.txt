@@ -1126,3 +1126,5 @@ Log in to the site in another tab of this browser. Open the developer tools (F12
 このブラウザの別のタブでサイトにログインします。開発者ツール（F12）を開き、ネットワークタブを開いてページを再読み込みし、最初のリクエストを右クリックして Copy as cURL (bash) を選びます。そのテキストをここに貼り付けます。cookies.txt のエクスポートも使えます。その場合はリストの最初のアドレスに使われます。
 Cookies for: %s. Browser identity: %s.
 クッキーの対象: %s。ブラウザID: %s。
+A login cannot be saved for this address, so nothing was kept.
+このアドレスにはログインを保存できないため、何も保存しませんでした。

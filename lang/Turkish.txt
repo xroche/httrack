@@ -1126,3 +1126,5 @@ Log in to the site in another tab of this browser. Open the developer tools (F12
 Bu tarayıcının başka bir sekmesinde siteye giriş yapın. Geliştirici araçlarını (F12) ve ardından Ağ sekmesini açın, sayfayı yeniden yükleyin, ilk isteğe sağ tıklayın ve Copy as cURL (bash) seçeneğini seçin. Metni buraya yapıştırın. Bir cookies.txt dışa aktarımı da kullanılabilir; listedeki ilk adres için kullanılır.
 Cookies for: %s. Browser identity: %s.
 Çerezlerin ait olduğu siteler: %s. Tarayıcı kimliği: %s.
+A login cannot be saved for this address, so nothing was kept.
+Bu adres için oturum açma bilgisi kaydedilemiyor, bu yüzden hiçbir şey saklanmadı.

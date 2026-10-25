@@ -1126,3 +1126,5 @@ Log in to the site in another tab of this browser. Open the developer tools (F12
 Inicie sessão no site noutro separador deste browser. Abra as ferramentas de programador (F12) e depois o separador Rede, recarregue a página, clique com o botão direito no primeiro pedido e escolha Copy as cURL (bash). Cole o texto aqui. Uma exportação cookies.txt também funciona, para o primeiro endereço da lista.
 Cookies for: %s. Browser identity: %s.
 Cookies para: %s. Identidade do browser: %s.
+A login cannot be saved for this address, so nothing was kept.
+Não é possível guardar um início de sessão para este endereço, por isso nada foi guardado.
