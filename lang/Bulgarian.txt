@@ -1126,3 +1126,5 @@ Log in to the site in another tab of this browser. Open the developer tools (F12
 Влезте в сайта в друг раздел на този браузър. Отворете инструментите за разработчици (F12), след това раздела Мрежа, презаредете страницата, щракнете с десния бутон върху първата заявка и изберете Copy as cURL (bash). Поставете текста тук. Експорт във формат cookies.txt също работи, за първия адрес в списъка.
 Cookies for: %s. Browser identity: %s.
 'Бисквитки' за: %s. Идентичност на браузъра: %s.
+A login cannot be saved for this address, so nothing was kept.
+За този адрес не може да се запази вход, затова нищо не беше запазено.

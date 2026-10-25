@@ -1126,3 +1126,5 @@ Log in to the site in another tab of this browser. Open the developer tools (F12
 Увійдіть на сайт в іншій вкладці цього браузера. Відкрийте інструменти розробника (F12), потім вкладку «Мережа», перезавантажте сторінку, клацніть правою кнопкою на першому запиті та виберіть Copy as cURL (bash). Вставте текст сюди. Підійде й експорт cookies.txt, для першої адреси у списку.
 Cookies for: %s. Browser identity: %s.
 Cookies для: %s. Ідентифікатор браузера: %s.
+A login cannot be saved for this address, so nothing was kept.
+Для цієї адреси не можна зберегти вхід, тому нічого не збережено.

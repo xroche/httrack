@@ -1126,3 +1126,5 @@ Log in to the site in another tab of this browser. Open the developer tools (F12
 Prijavite se na stranicu u drugoj kartici ovog preglednika. Otvorite alate za razvojne programere (F12), zatim karticu Mreža, ponovno učitajte stranicu, desnom tipkom kliknite prvi zahtjev i odaberite Copy as cURL (bash). Zalijepite tekst ovdje. Radi i izvoz cookies.txt, za prvu adresu na popisu.
 Cookies for: %s. Browser identity: %s.
 Kolačići za: %s. Identitet preglednika: %s.
+A login cannot be saved for this address, so nothing was kept.
+Prijava se ne može spremiti za ovu adresu, pa ništa nije spremljeno.

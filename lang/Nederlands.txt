@@ -1126,3 +1126,5 @@ Log in to the site in another tab of this browser. Open the developer tools (F12
 Log in op de site in een ander tabblad van deze browser. Open de ontwikkelaarshulpmiddelen (F12) en daarna het tabblad Netwerk, laad de pagina opnieuw, klik met de rechtermuisknop op het eerste verzoek en kies Copy as cURL (bash). Plak de tekst hier. Een cookies.txt-export werkt ook, voor het eerste adres in de lijst.
 Cookies for: %s. Browser identity: %s.
 Cookies voor: %s. Browseridentiteit: %s.
+A login cannot be saved for this address, so nothing was kept.
+Voor dit adres kan geen login worden opgeslagen, dus er is niets bewaard.

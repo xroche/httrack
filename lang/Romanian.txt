@@ -1126,3 +1126,5 @@ Log in to the site in another tab of this browser. Open the developer tools (F12
 Autentificați-vă pe site într-o altă filă a acestui browser. Deschideți instrumentele pentru dezvoltatori (F12), apoi fila Rețea, reîncărcați pagina, faceți clic dreapta pe prima cerere și alegeți Copy as cURL (bash). Lipiți textul aici. Merge și un export cookies.txt, pentru prima adresă din listă.
 Cookies for: %s. Browser identity: %s.
 Cookies pentru: %s. Identitatea browserului: %s.
+A login cannot be saved for this address, so nothing was kept.
+Pentru această adresă nu se poate salva o autentificare, aşa că nu s-a păstrat nimic.

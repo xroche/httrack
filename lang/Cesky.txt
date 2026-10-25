@@ -1126,3 +1126,5 @@ Log in to the site in another tab of this browser. Open the developer tools (F12
 Přihlaste se na web v jiné kartě tohoto prohlížeče. Otevřete nástroje pro vývojáře (F12) a kartu Síť, znovu načtěte stránku, klikněte pravým tlačítkem na první požadavek a zvolte Copy as cURL (bash). Vložte text sem. Funguje i export cookies.txt, pro první adresu v seznamu.
 Cookies for: %s. Browser identity: %s.
 Cookies pro: %s. Identita prohlížeče: %s.
+A login cannot be saved for this address, so nothing was kept.
+Pro tuto adresu nelze přihlášení uložit, takže se nic neuložilo.

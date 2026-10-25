@@ -1126,3 +1126,5 @@ Log in to the site in another tab of this browser. Open the developer tools (F12
 Ushbu brauzerning boshqa varag’ida saytga kiring. Dasturchi vositalarini (F12), so’ng Tarmoq varag’ini oching, sahifani qayta yuklang, birinchi so’rovga sichqonchaning o’ng tugmasi bilan bosing va Copy as cURL (bash) ni tanlang. Matnni shu yerga qo’ying. cookies.txt eksporti ham ishlaydi, ro’yxatdagi birinchi manzil uchun.
 Cookies for: %s. Browser identity: %s.
 Cookies tegishli saytlar: %s. Brauzer identifikatori: %s.
+A login cannot be saved for this address, so nothing was kept.
+Bu manzil uchun kirishni saqlab bo'lmaydi, shuning uchun hech narsa saqlanmadi.

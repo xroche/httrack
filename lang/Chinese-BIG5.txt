@@ -1126,3 +1126,5 @@ Log in to the site in another tab of this browser. Open the developer tools (F12
 在此瀏覽器的另一個分頁中登入網站。開啟開發人員工具（F12），再開啟「網路」分頁，重新載入頁面，在第一個請求上按右鍵，選擇 Copy as cURL (bash)。將文字貼到這裡。也可以使用 cookies.txt 匯出檔，它會用於清單中的第一個位址。
 Cookies for: %s. Browser identity: %s.
 Cookies 適用於：%s。瀏覽器身份：%s。
+A login cannot be saved for this address, so nothing was kept.
+無法為此位址儲存登入資訊，因此未保留任何內容。

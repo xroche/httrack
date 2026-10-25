@@ -1126,3 +1126,5 @@ Log in to the site in another tab of this browser. Open the developer tools (F12
 Logga in på webbplatsen i en annan flik i den här webbläsaren. Öppna utvecklarverktygen (F12) och sedan fliken Nätverk, ladda om sidan, högerklicka på den första begäran och välj Copy as cURL (bash). Klistra in texten här. En cookies.txt-export fungerar också, för den första adressen i listan.
 Cookies for: %s. Browser identity: %s.
 Cookies för: %s. Webbläsaridentitet: %s.
+A login cannot be saved for this address, so nothing was kept.
+En inloggning kan inte sparas för den här adressen, så ingenting sparades.

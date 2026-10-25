@@ -1126,3 +1126,5 @@ Log in to the site in another tab of this browser. Open the developer tools (F12
 Jelentkezzen be a webhelyre a böngésző egy másik lapján. Nyissa meg a fejlesztői eszközöket (F12), majd a Hálózat lapot, töltse újra az oldalt, kattintson jobb gombbal az első kérésre, és válassza a Copy as cURL (bash) lehetőséget. Illessze be ide a szöveget. Egy cookies.txt export is megfelel, a lista első címéhez.
 Cookies for: %s. Browser identity: %s.
 Sütik ehhez: %s. Böngészőazonosító: %s.
+A login cannot be saved for this address, so nothing was kept.
+Ehhez a címhez nem menthető bejelentkezés, ezért semmi sem lett megtartva.
