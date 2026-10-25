@@ -1110,12 +1110,10 @@ Clear login
 Logg ut
 The browser did not open: %s.
 Nettleseren ble ikke åpnet: %s.
-The browser came back with no cookies, so nothing was kept.
-Nettleseren kom tilbake uten cookies, så ingenting ble lagret.
+The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
+Nettleseren kom tilbake uten cookies. Adressen og nettleser-identiteten lagres med prosjektet når du trykker på OK.
 Cookies collected: %d. They are used when you press OK.
 Innsamlede cookies: %d. De brukes når du trykker på OK.
-The browser gave no cookies the engine can use, so nothing was changed.
-Nettleseren ga ingen cookies som HTTrack kan bruke, så ingenting ble endret.
 The cookies could not be written to %s, so nothing was changed.
 Klarte ikke å skrive disse cookies til %s, så ingenting ble endret.
 %d of the browser's cookies were left out, because the engine would not read them.

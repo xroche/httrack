@@ -1110,12 +1110,10 @@ Clear login
 Odjava
 The browser did not open: %s.
 Preglednik se nije otvorio: %s.
-The browser came back with no cookies, so nothing was kept.
-Preglednik nije vratio nijedan kolačić, pa ništa nije spremljeno.
+The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
+Preglednik nije vratio nijedan kolačić. Adresa i identitet preglednika spremit će se s projektom kada stisnete U redu.
 Cookies collected: %d. They are used when you press OK.
 Prikupljeni kolačići: %d. Upotrijebit će se kada stisnete U redu.
-The browser gave no cookies the engine can use, so nothing was changed.
-Preglednik nije dao nijedan kolačić koji HTTrack može upotrijebiti, pa ništa nije promijenjeno.
 The cookies could not be written to %s, so nothing was changed.
 Kolačiće nije moguće zapisati u %s, pa ništa nije promijenjeno.
 %d of the browser's cookies were left out, because the engine would not read them.

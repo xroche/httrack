@@ -1110,12 +1110,10 @@ Clear login
 Odjava
 The browser did not open: %s.
 Brskalnik se ni odprl: %s.
-The browser came back with no cookies, so nothing was kept.
-Brskalnik ni vrnil nobenega piškotka, zato ni bilo nič shranjeno.
+The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
+Brskalnik ni vrnil nobenega piškotka. Naslov in identiteta brskalnika bosta shranjena s projektom, ko pritisnete „Vredu“.
 Cookies collected: %d. They are used when you press OK.
 Zbrani piškotki: %d. Uporabljeni bodo, ko pritisnete „Vredu“.
-The browser gave no cookies the engine can use, so nothing was changed.
-Brskalnik ni dal nobenega piškotka, ki bi ga HTTrack lahko uporabil, zato ni bilo nič spremenjeno.
 The cookies could not be written to %s, so nothing was changed.
 Piškotkov ni bilo mogoče zapisati v %s, zato ni bilo nič spremenjeno.
 %d of the browser's cookies were left out, because the engine would not read them.

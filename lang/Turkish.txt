@@ -1110,12 +1110,10 @@ Clear login
 Oturumu kapat
 The browser did not open: %s.
 Tarayıcı açılmadı: %s.
-The browser came back with no cookies, so nothing was kept.
-Tarayıcı hiç çerez döndürmedi, bu yüzden hiçbir şey saklanmadı.
+The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
+Tarayıcı hiç çerez döndürmedi. Tamam'a bastığınızda adres ve tarayıcı kimliği projeyle birlikte kaydedilecek.
 Cookies collected: %d. They are used when you press OK.
 Toplanan çerez sayısı: %d. Tamam'a bastığınızda kullanılacaklar.
-The browser gave no cookies the engine can use, so nothing was changed.
-Tarayıcı, HTTrack'in kullanabileceği hiçbir çerez vermedi, bu yüzden hiçbir şey değişmedi.
 The cookies could not be written to %s, so nothing was changed.
 Çerezler %s dosyasına yazılamadı, bu yüzden hiçbir şey değişmedi.
 %d of the browser's cookies were left out, because the engine would not read them.

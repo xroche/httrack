@@ -1110,12 +1110,10 @@ Clear login
 Одјава
 The browser did not open: %s.
 Прелистувачот не се отвори: %s.
-The browser came back with no cookies, so nothing was kept.
-Прелистувачот не врати ниту едно колаче, затоа ништо не е зачувано.
+The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
+Прелистувачот не врати ниту едно колаче. Адресата и идентитетот на прелистувачот ќе се зачуваат со проектот кога ќе притиснете „Добро“.
 Cookies collected: %d. They are used when you press OK.
 Собрани колачиња: %d. Ќе се користат кога ќе притиснете „Добро“.
-The browser gave no cookies the engine can use, so nothing was changed.
-Прелистувачот не даде ниту едно колаче што HTTrack може да го користи, затоа ништо не е променето.
 The cookies could not be written to %s, so nothing was changed.
 Колачињата не можеа да се запишат во %s, затоа ништо не е променето.
 %d of the browser's cookies were left out, because the engine would not read them.

@@ -1141,11 +1141,9 @@ Clear login
 LANG_BROWSERLOGINFAILED
 The browser did not open: %s.
 LANG_BROWSERLOGINNONE
-The browser came back with no cookies, so nothing was kept.
+The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
 LANG_BROWSERLOGINGOT
 Cookies collected: %d. They are used when you press OK.
-LANG_BROWSERLOGINUNUSABLE
-The browser gave no cookies the engine can use, so nothing was changed.
 LANG_BROWSERLOGINNOTSAVED
 The cookies could not be written to %s, so nothing was changed.
 LANG_BROWSERLOGINDROPPED

@@ -1110,12 +1110,10 @@ Clear login
 Déconnexion
 The browser did not open: %s.
 Le navigateur ne s'est pas ouvert : %s.
-The browser came back with no cookies, so nothing was kept.
-Le navigateur n'a renvoyé aucun cookie, rien n'a donc été conservé.
+The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
+Le navigateur n'a renvoyé aucun cookie. L'adresse et l'identité du navigateur seront enregistrées avec le projet quand vous cliquerez sur Oui.
 Cookies collected: %d. They are used when you press OK.
 Cookies récupérés : %d. Ils seront utilisés quand vous cliquerez sur Oui.
-The browser gave no cookies the engine can use, so nothing was changed.
-Le navigateur n'a donné aucun cookie utilisable par le moteur, rien n'a donc été modifié.
 The cookies could not be written to %s, so nothing was changed.
 Les cookies n'ont pas pu être écrits dans %s, rien n'a donc été modifié.
 %d of the browser's cookies were left out, because the engine would not read them.

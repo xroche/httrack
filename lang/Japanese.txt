@@ -1110,12 +1110,10 @@ Clear login
 ログアウト
 The browser did not open: %s.
 ブラウザを開けませんでした: %s。
-The browser came back with no cookies, so nothing was kept.
-ブラウザからクッキーが返されなかったため、何も保存しませんでした。
+The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
+ブラウザからクッキーが返されませんでした。OK を押すと、アドレスとブラウザIDがプロジェクトと一緒に保存されます。
 Cookies collected: %d. They are used when you press OK.
 クッキーを %d 個取得しました。OK を押すと使用されます。
-The browser gave no cookies the engine can use, so nothing was changed.
-HTTrack が使用できるクッキーがブラウザから得られなかったため、何も変更しませんでした。
 The cookies could not be written to %s, so nothing was changed.
 クッキーを %s に書き込めなかったため、何も変更しませんでした。
 %d of the browser's cookies were left out, because the engine would not read them.

@@ -1110,12 +1110,10 @@ Clear login
 Kijelentkezés
 The browser did not open: %s.
 A böngésző nem nyílt meg: %s.
-The browser came back with no cookies, so nothing was kept.
-A böngésző nem adott vissza sütiket, ezért semmi sem lett megtartva.
+The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
+A böngésző nem adott vissza sütiket. A cím és a böngészőazonosító az OK megnyomásakor a projekttel együtt mentésre kerül.
 Cookies collected: %d. They are used when you press OK.
 Összegyűjtött sütik: %d. A program az OK megnyomásakor használja fel őket.
-The browser gave no cookies the engine can use, so nothing was changed.
-A böngésző nem adott olyan sütit, amelyet a HTTrack használni tud, ezért semmi sem változott.
 The cookies could not be written to %s, so nothing was changed.
 A sütiket nem sikerült a(z) %s fájlba írni, ezért semmi sem változott.
 %d of the browser's cookies were left out, because the engine would not read them.

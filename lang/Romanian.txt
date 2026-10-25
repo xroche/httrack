@@ -1110,12 +1110,10 @@ Clear login
 Deconectare
 The browser did not open: %s.
 Browserul nu s-a deschis: %s.
-The browser came back with no cookies, so nothing was kept.
-Browserul nu a returnat cookies, aşa că nu s-a păstrat nimic.
+The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
+Browserul nu a returnat cookies. Adresa şi identitatea browserului vor fi salvate cu proiectul când apăsaţi OK.
 Cookies collected: %d. They are used when you press OK.
 Cookies colectate: %d. Vor fi folosite când apăsaţi OK.
-The browser gave no cookies the engine can use, so nothing was changed.
-Browserul nu a dat cookies pe care HTTrack să le poată folosi, aşa că nu s-a schimbat nimic.
 The cookies could not be written to %s, so nothing was changed.
 Cookies nu au putut fi scrise în %s, aşa că nu s-a schimbat nimic.
 %d of the browser's cookies were left out, because the engine would not read them.

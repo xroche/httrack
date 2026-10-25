@@ -1110,12 +1110,10 @@ Clear login
 Αποσύνδεση
 The browser did not open: %s.
 Το πρόγραμμα περιήγησης δεν άνοιξε: %s.
-The browser came back with no cookies, so nothing was kept.
-Το πρόγραμμα περιήγησης δεν επέστρεψε cookies, οπότε δεν κρατήθηκε τίποτα.
+The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
+Το πρόγραμμα περιήγησης δεν επέστρεψε cookies. Η διεύθυνση και η ταυτότητα του προγράμματος περιήγησης θα αποθηκευτούν με την εργασία όταν πατήσετε Εντάξει.
 Cookies collected: %d. They are used when you press OK.
 Cookies που συλλέχθηκαν: %d. Θα χρησιμοποιηθούν όταν πατήσετε Εντάξει.
-The browser gave no cookies the engine can use, so nothing was changed.
-Το πρόγραμμα περιήγησης δεν έδωσε cookies που να μπορεί να χρησιμοποιήσει το HTTrack, οπότε δεν άλλαξε τίποτα.
 The cookies could not be written to %s, so nothing was changed.
 Δεν ήταν δυνατή η εγγραφή των cookies στο %s, οπότε δεν άλλαξε τίποτα.
 %d of the browser's cookies were left out, because the engine would not read them.

@@ -1110,12 +1110,10 @@ Clear login
 Kirjaudu ulos
 The browser did not open: %s.
 Selain ei avautunut: %s.
-The browser came back with no cookies, so nothing was kept.
-Selain ei palauttanut yhtään evästettä, joten mitään ei tallennettu.
+The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
+Selain ei palauttanut yhtään evästettä. Osoite ja selaimen tunniste tallennetaan projektiin, kun painat OK.
 Cookies collected: %d. They are used when you press OK.
 Kerätyt evästeet: %d. Niitä käytetään, kun painat OK.
-The browser gave no cookies the engine can use, so nothing was changed.
-Selain ei antanut yhtään evästettä, jota moottori voisi käyttää, joten mitään ei muutettu.
 The cookies could not be written to %s, so nothing was changed.
 Evästeitä ei voitu kirjoittaa kohteeseen %s, joten mitään ei muutettu.
 %d of the browser's cookies were left out, because the engine would not read them.

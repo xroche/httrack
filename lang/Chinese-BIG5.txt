@@ -1110,12 +1110,10 @@ Clear login
 登出
 The browser did not open: %s.
 瀏覽器無法開啟：%s。
-The browser came back with no cookies, so nothing was kept.
-瀏覽器未傳回任何 cookies，因此未保留任何內容。
+The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
+瀏覽器未傳回任何 cookies。按「確定」後，位址和瀏覽器身份會與專案一起儲存。
 Cookies collected: %d. They are used when you press OK.
 已收集的 cookies：%d。按「確定」後將會使用。
-The browser gave no cookies the engine can use, so nothing was changed.
-瀏覽器未提供 HTTrack 可用的 cookies，因此未做任何變更。
 The cookies could not be written to %s, so nothing was changed.
 無法將 cookies 寫入 %s，因此未做任何變更。
 %d of the browser's cookies were left out, because the engine would not read them.

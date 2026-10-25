@@ -1110,12 +1110,10 @@ Clear login
 Terminar sessão
 The browser did not open: %s.
 O browser não abriu: %s.
-The browser came back with no cookies, so nothing was kept.
-O browser não devolveu cookies, por isso nada foi guardado.
+The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
+O browser não devolveu cookies. O endereço e a identidade do browser serão guardados com o projecto quando premir OK.
 Cookies collected: %d. They are used when you press OK.
 Cookies recolhidos: %d. Serão utilizados quando premir OK.
-The browser gave no cookies the engine can use, so nothing was changed.
-O browser não deu nenhum cookie que o motor de captura possa usar, por isso nada foi alterado.
 The cookies could not be written to %s, so nothing was changed.
 Não foi possível escrever os cookies em %s, por isso nada foi alterado.
 %d of the browser's cookies were left out, because the engine would not read them.

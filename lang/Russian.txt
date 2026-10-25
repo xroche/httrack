@@ -1110,12 +1110,10 @@ Clear login
 Выйти из аккаунта
 The browser did not open: %s.
 Браузер не открылся: %s.
-The browser came back with no cookies, so nothing was kept.
-Браузер не вернул ни одного cookie, поэтому ничего не сохранено.
+The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
+Браузер не вернул ни одного cookie. Адрес и идентификатор браузера будут сохранены вместе с проектом, когда вы нажмёте OK.
 Cookies collected: %d. They are used when you press OK.
 Собрано cookies: %d. Они будут применены, когда вы нажмёте OK.
-The browser gave no cookies the engine can use, so nothing was changed.
-Браузер не дал ни одного cookie, пригодного для HTTrack, поэтому ничего не изменено.
 The cookies could not be written to %s, so nothing was changed.
 Не удалось записать cookies в %s, поэтому ничего не изменено.
 %d of the browser's cookies were left out, because the engine would not read them.

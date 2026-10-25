@@ -1110,12 +1110,10 @@ Clear login
 Abmelden
 The browser did not open: %s.
 Der Browser wurde nicht geöffnet: %s.
-The browser came back with no cookies, so nothing was kept.
-Der Browser hat keine Cookies geliefert, daher wurde nichts übernommen.
+The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
+Der Browser hat keine Cookies geliefert. Die Adresse und die Browser-Kennung werden mit dem Projekt gespeichert, wenn Sie auf OK klicken.
 Cookies collected: %d. They are used when you press OK.
 Übernommene Cookies: %d. Sie werden verwendet, wenn Sie auf OK klicken.
-The browser gave no cookies the engine can use, so nothing was changed.
-Der Browser hat keine Cookies geliefert, die HTTrack verwenden kann, daher wurde nichts geändert.
 The cookies could not be written to %s, so nothing was changed.
 Die Cookies konnten nicht in %s geschrieben werden, daher wurde nichts geändert.
 %d of the browser's cookies were left out, because the engine would not read them.
