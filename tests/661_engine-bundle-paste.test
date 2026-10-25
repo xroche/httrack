@@ -121,6 +121,7 @@ selftest_queue_head "name=www.github.io cookies=1" paste "$dir/dry" "$in" dry
 # A device name falls back to the host.
 put "curl 'https://shop.con.com/' -b a=1"
 selftest_queue_head "name=shop.con.com cookies=1" paste "$dir/dry" "$in" dry
+# Every trailing dot goes before the registrable domain lookup.
 put "curl 'https://a.site.test../' -b a=1"
 selftest_queue_head "name=site.test cookies=1" paste "$dir/dry" "$in" dry
 # A host too long for a bundle name still has a short registrable domain.
