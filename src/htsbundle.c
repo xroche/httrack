@@ -298,7 +298,7 @@ static hts_boolean bundle_in_scope(const bundle *b, const char *host) {
   return HTS_FALSE;
 }
 
-/* Does b's scope cover a cookie set for domain? */
+/* Does b's scope cover a cookie set for domain? host gets the folded domain. */
 static hts_boolean bundle_keeps_domain(const bundle *b, const char *domain,
                                        char host[COOKIE_MAX_DOMAIN]) {
   return cookie_host(domain, host, COOKIE_MAX_DOMAIN) &&

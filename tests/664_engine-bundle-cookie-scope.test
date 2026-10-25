@@ -11,10 +11,12 @@ selftest_queue keep bundlescope www.httrack.com https://www.httrack.com/
 selftest_queue keep bundlescope .httrack.com https://www.httrack.com/
 selftest_queue keep bundlescope forum.httrack.com https://www.httrack.com/
 selftest_queue keep bundlescope HTTRACK.COM http://www.httrack.com:8080/a
+selftest_queue keep bundlescope httrack.com https://WWW.HTTRACK.COM/
 selftest_queue drop bundlescope .buecher.de https://www.httrack.com/
 selftest_queue drop bundlescope notexample.com http://example.com/
 selftest_queue drop bundlescope com http://example.com/
 # two start URLs widen the scope to both sites
+selftest_queue keep bundlescope a.com http://a.com/ http://b.org/
 selftest_queue keep bundlescope b.org http://a.com/ http://b.org/
 selftest_queue drop bundlescope c.net http://a.com/ http://b.org/
 # a host with no registrable domain covers itself alone
@@ -32,4 +34,5 @@ selftest_queue keep bundlescope httrack.com 'https://www.httrack.com/#httrack-bu
 selftest_queue drop bundlescope httrack.com
 # the engine refuses a bundle with one URL whose host it cannot read
 selftest_queue drop bundlescope httrack.com https://www.httrack.com/ /no/host
+selftest_queue drop bundlescope httrack.com /no/host https://www.httrack.com/
 selftest_run_queued
