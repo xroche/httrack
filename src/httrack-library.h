@@ -1012,10 +1012,11 @@ HTSEXT_API hts_boolean hts_registrable_domain(const char *host, char *out,
     English reason why it may not. */
 HTSEXT_API const char *hts_bundle_name_refusal(const char *name);
 
-/** Does a login bundle whose start URLs and url lines are the nurls urls keep a
-    cookie set for cookie_domain, the domain field of a cookies.txt line? This
-    is the default scope, with no scope lines. HTS_FALSE as well when a URL is
-    NULL or has no host, because the engine then refuses the whole bundle. */
+/** Does a login bundle named by the nurls start URLS keep a cookie set for
+    cookie_domain, the domain field of a cookies.txt line? This is the default
+    scope, with no scope lines, and url lines widen it as start URLs do.
+    HTS_FALSE as well when a URL is NULL, has no host or names an invalid
+   bundle, and the file itself is not checked. */
 HTSEXT_API hts_boolean hts_bundle_cookie_in_scope(const char *const *urls,
                                                   size_t nurls,
                                                   const char *cookie_domain);

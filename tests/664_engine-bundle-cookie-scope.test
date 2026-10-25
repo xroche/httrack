@@ -31,6 +31,7 @@ selftest_queue drop bundlescope co.uk http://www.a.co.uk/
 selftest_queue drop bundlescope httrack.com. https://www.httrack.com/
 # the suffix naming the bundle does not change its scope
 selftest_queue keep bundlescope httrack.com 'https://www.httrack.com/#httrack-bundle=httrack.com'
+selftest_queue drop bundlescope httrack.com 'https://www.httrack.com/#httrack-bundle=../x'
 selftest_queue drop bundlescope httrack.com
 # the engine refuses a bundle with one URL whose host it cannot read
 selftest_queue drop bundlescope httrack.com https://www.httrack.com/ /no/host

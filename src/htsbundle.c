@@ -768,10 +768,22 @@ HTSEXT_API hts_boolean hts_bundle_cookie_in_scope(const char *const *urls,
     return HTS_FALSE;
   memset(&b, 0, sizeof(b));
   StringInit(b.headers);
-  for (i = 0; i < nurls && why == NULL; i++)
-    why = urls[i] != NULL ? bundle_note_url(&b, urls[i]) : "no URL";
+  for (i = 0; i < nurls && why == NULL; i++) {
+    char url[HTS_URLMAXSIZE];
+    char name[HTS_BUNDLE_NAME_MAX];
+
+    if (urls[i] == NULL || strlen(urls[i]) >= sizeof(url))
+      why = "invalid url";
+    else {
+      strcpybuff(url, urls[i]);
+      why = bundle_cut(url, name, sizeof(name));
+    }
+    if (why == NULL)
+      why = bundle_note_url(&b, url);
+  }
   keeps = why == NULL && bundle_keeps_domain(&b, cookie_domain, host);
   bundle_clear(&b);
+  StringFree(b.headers);
   return keeps;
 }
 
