@@ -1274,6 +1274,8 @@ static const char *paste_host_idna(char *url, size_t size) {
 static const char *paste_name(const char *url, char name[HTS_BUNDLE_NAME_MAX]) {
   char host[COOKIE_MAX_DOMAIN];
   const char *h = host;
+  // keeps "_" for the escape below, which no other site can then take
+  const char *const underscore = "a site name cannot start with \"_\"";
   const char *escape;
   hts_boolean www;
   size_t len;
@@ -1289,12 +1291,13 @@ static const char *paste_name(const char *url, char name[HTS_BUNDLE_NAME_MAX]) {
   if (hts_registrable_domain(host, name, HTS_BUNDLE_NAME_MAX) &&
       !hts_host_is_address(name, strlen(name)) &&
       hts_bundle_name_refusal(name) == NULL)
-    return NULL;
+    return name[0] != '_' ? NULL : underscore;
   if (www)
     h += len < 4 ? len : 4;
   if (*h == '\0')
     return "the address names no site";
-  // no registered domain starts with "_", so the escape names no other site
+  if (*h == '_')
+    return underscore;
   escape = bundle_name_is_device(h) ? "_" : "";
   if (strlen(h) >= HTS_BUNDLE_NAME_MAX - strlen(escape))
     return "invalid login bundle name: 128 bytes or more";
