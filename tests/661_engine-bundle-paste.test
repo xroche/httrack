@@ -102,7 +102,7 @@ url=https://api.test/#httrack-bundle=api.test
 agent=" paste "$proj" "$in"
 
 # The name: no port, trailing dots or leading www., and an international host
-# takes its ASCII form.
+# takes its ASCII form, in the address and the cookies too.
 for u in 'https://WWW.Site.test:81/x' 'https://site.test./' \
     'https://site.test../' 'http://www.site.test/'; do
     put "curl '$u' -b a=1"
@@ -110,8 +110,10 @@ for u in 'https://WWW.Site.test:81/x' 'https://site.test./' \
 done
 put "curl 'http://wwwshop.test/' -b a=1"
 selftest_queue_head "name=wwwshop.test cookies=1" paste "$dir/dry" "$in" dry
-put "curl 'https://www.bücher.de/' -b a=1"
-selftest_queue_head "name=xn--bcher-kva.de cookies=1 hosts=bücher.de" paste "$dir/dry" "$in" dry
+put "curl 'https://WWW.BüCHER.de/x' -b a=1"
+selftest_queue_lines "name=xn--bcher-kva.de cookies=1 hosts=xn--bcher-kva.de
+url=https://www.xn--bcher-kva.de/x#httrack-bundle=xn--bcher-kva.de
+agent=" paste "$dir/dry" "$in" dry
 put "curl 'https://a.例え.jp/' -b a=1"
 selftest_queue_head "name=a.xn--r8jz45g.jp cookies=1" paste "$dir/dry" "$in" dry
 # The trailing dots leave the address too, so the cookies name the same host.
@@ -171,6 +173,16 @@ txt=$in
 selftest_queue_lines "name=jar.test cookies=2 hosts=www.jar.test,jar.test
 url=https://www.jar.test/page#httrack-bundle=jar.test
 agent=UA/1" paste "$proj" "$txt" 'url:https://www.jar.test/page#f' agent:UA/1
+# A browser exports an international domain in its ASCII form, an old jar in
+# UTF-8, and both match the address in either form.
+put "xn--bcher-kva.de${tab}FALSE${tab}/${tab}FALSE${tab}0${tab}P${tab}p"
+selftest_queue_head "name=xn--bcher-kva.de cookies=1 hosts=xn--bcher-kva.de" \
+    paste "$dir/dry" "$in" dry url:https://www.bücher.de/
+put ".bücher.de${tab}TRUE${tab}/${tab}FALSE${tab}0${tab}U${tab}u
+.xn--bcher-kva.de${tab}TRUE${tab}/${tab}FALSE${tab}0${tab}P${tab}p
+.other.de${tab}TRUE${tab}/${tab}FALSE${tab}0${tab}O${tab}o"
+selftest_queue_head "name=xn--bcher-kva.de cookies=2 hosts=xn--bcher-kva.de" \
+    paste "$dir/dry" "$in" dry url:https://www.xn--bcher-kva.de/
 put "$(printf '.crlf.test\tTRUE\t/\tFALSE\t0\tC\tc\r\n')"
 selftest_queue_head "name=crlf.test cookies=1" paste "$dir/dry" "$in" dry url:https://crlf.test/
 
@@ -269,8 +281,8 @@ selftest_queue_head "refused: cannot write $dir/missing/nofolder.test.hts: " \
 put "curl https://words.test/ -b a=1$(for _ in $(seq 1 1020); do printf ' -k'; done)"
 selftest_queue_head "name=words.test cookies=1" paste "$dir/dry" "$in" dry
 
-test "${#SELFTEST_WANT[@]}" -eq 101 ||
-    fail "expected 101 queued rows, got ${#SELFTEST_WANT[@]}"
+test "${#SELFTEST_WANT[@]}" -eq 103 ||
+    fail "expected 103 queued rows, got ${#SELFTEST_WANT[@]}"
 selftest_run_queued
 
 # A host list too long to show ends with ",...", not with a cut name.
@@ -382,4 +394,20 @@ if ! target_is_windows; then
     set -- "$tmpdir"/proj/*.tmp
     test ! -e "$1" || fail "a temporary was left: $*"
 fi
+
+# The last record of a cookies.txt needs no line end.
+put ".nolf.test${tab}TRUE${tab}/${tab}FALSE${tab}0${tab}A${tab}first
+.nolf.test${tab}TRUE${tab}/${tab}FALSE${tab}0${tab}N${tab}last"
+out=$(httrack -O /dev/null -#test=paste "$proj" "$in" url:https://nolf.test/ | tr -d '\r')
+grep -q '^name=nolf.test cookies=2 ' <<<"$out" || fail "no final LF: $out"
+command grep -qxF ".nolf.test${tab}TRUE${tab}/${tab}FALSE${tab}0${tab}N${tab}last" \
+    <<<"$(tr -d '\r' <"$tmpdir/proj/nolf.test.hts")" ||
+    fail_dump "the last record lost a byte" "$tmpdir/proj/nolf.test.hts"
+
+# Two threads writing one bundle each use their own temporary.
+mkdir "$tmpdir/race"
+out=$(httrack -O /dev/null -#test=pasterace "$dir/race" 20 | tr -d '\r')
+test "$out" = failed=0 || fail "two threads at once: $out"
+set -- "$tmpdir"/race/*.tmp
+test ! -e "$1" || fail "a temporary was left: $*"
 echo PASS

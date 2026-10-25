@@ -318,6 +318,9 @@ static int st_cookieport(httrackp *opt, int argc, char **argv) {
       {"[fe80::1%a5eth0]", "fe80::1%a5eth0"}, // 'a5' is not the introducer
       // an empty zone id is malformed, and still lands on one jar entry
       {"[fe80::1%25]:80", "fe80::1%"},
+      // the request names an international host in its ASCII form
+      {"WWW.B\303\274cher.example:81", "www.xn--bcher-kva.example"},
+      {".b\303\274cher.example", ".xn--bcher-kva.example"},
   };
 
   static const struct {

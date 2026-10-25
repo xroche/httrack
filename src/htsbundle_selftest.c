@@ -33,6 +33,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsselftest_int.h"
 
 #include "htsbundle.h"
+#include "htsthread.h"
 
 /* -#test=bundlecut <url>: the bundle a start URL names, and the URL left. */
 static int st_bundlecut(httrackp *opt, int argc, char **argv) {
@@ -255,6 +256,47 @@ static int st_paste(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+typedef struct paste_race {
+  const char *dir;
+  int rounds;
+  volatile int failed;
+} paste_race;
+
+static void paste_race_worker(void *arg) {
+  paste_race *const race = (paste_race *) arg;
+  hts_paste_result res;
+  int i;
+
+  for (i = 0; i < race->rounds; i++) {
+    res.size = sizeof(res);
+    if (!hts_bundle_from_paste("curl 'https://race.test/' -b a=1", race->dir,
+                               NULL, NULL, HTS_FALSE, &res))
+      (void) hts_increment_int(&race->failed);
+  }
+}
+
+/* Two threads of one process write the same bundle at once. */
+static int st_pasterace(httrackp *opt, int argc, char **argv) {
+  paste_race race;
+
+  (void) opt;
+  if (argc < 2) {
+    fprintf(stderr, "pasterace: takes <dir> <rounds>\n");
+    return 1;
+  }
+  race.dir = argv[0];
+  race.rounds = atoi(argv[1]);
+  race.failed = 0;
+  if (hts_newthread(paste_race_worker, &race) != 0 ||
+      hts_newthread(paste_race_worker, &race) != 0) {
+    fprintf(stderr, "pasterace: cannot start a thread\n");
+    return 1;
+  }
+  htsthread_wait_n(0);
+  printf("failed=%d\n", hts_load_acquire_int(&race.failed));
+  return 0;
+}
+
 const struct selftest_entry selftests_bundle[] = {
     {"bundlecut", "<url>", "the login bundle a start URL names", st_bundlecut},
     {"bundle",
@@ -266,5 +308,7 @@ const struct selftest_entry selftests_bundle[] = {
     {"bundlename", "<name>", "is name a login bundle name?", st_bundlename},
     {"paste", "<dir> <file> [agent:<ua>] [url:<url>] [dry]",
      "turn a pasted cURL command or cookies.txt into a login bundle", st_paste},
+    {"pasterace", "<dir> <rounds>",
+     "two threads write the same login bundle at once", st_pasterace},
     {NULL, NULL, NULL, NULL},
 };

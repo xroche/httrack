@@ -123,7 +123,8 @@ typedef struct text_src {
 /* A source reading fp from its position. */
 text_src text_src_file(FILE *fp);
 
-/* A source reading the len bytes at buf, which must outlive it. */
+/* A source reading the len bytes at buf, which must outlive it. The last line
+   needs no LF. */
 text_src text_src_mem(const char *buf, size_t len);
 
 /* Read a line into s, of size bytes, without its LF, and a CR before the LF

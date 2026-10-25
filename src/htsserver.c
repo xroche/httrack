@@ -771,6 +771,18 @@ static void browserlogin_set(const char *key, const char *value) {
   coucal_write(NewLangList, key, (intptr_t) strdup(value));
 }
 
+/* Run the posted paste through hts_bundle_from_paste into res. */
+static hts_boolean browserlogin_paste(const browserlogin_post *login,
+                                      const String *folder, const String *url,
+                                      hts_boolean dry_run,
+                                      hts_paste_result *res) {
+  return hts_bundle_from_paste(
+      StringNotEmpty(login->paste) ? StringBuff(login->paste) : "",
+      StringNotEmpty(*folder) ? StringBuff(*folder) : NULL,
+      StringBuff(login->agent), StringNotEmpty(*url) ? StringBuff(*url) : NULL,
+      dry_run, res);
+}
+
 /* Preview the posted paste as a login bundle, or write it to <path>/<projname>
    on "save", and leave the outcome in the bl* variables the popup reads. */
 static void browserlogin_run(const browserlogin_post *login) {
@@ -799,18 +811,10 @@ static void browserlogin_run(const browserlogin_post *login) {
   } else if (save) {
     error = "no project name";
   }
-  if (error == NULL && save) {
-    String dirs = STRING_EMPTY;
-
-    StringCopy(dirs, StringBuff(folder));
-    StringCat(dirs, "/");
-    // the base path is the user's own choice, the project name is not
-    if (!hts_path_is_relative_contained((const char *) adrproj))
-      error = "the project name escapes the base path";
-    else if (structcheck(StringBuff(dirs)) != 0)
-      error = "cannot create the project folder";
-    StringFree(dirs);
-  }
+  // the base path is the user's own choice, the project name is not
+  if (error == NULL && save &&
+      !hts_path_is_relative_contained((const char *) adrproj))
+    error = "the project name escapes the base path";
   // step 3 reads an address without a scheme as http
   if (StringNotEmpty(login->url)) {
     const char *const u = StringBuff(login->url);
@@ -821,13 +825,20 @@ static void browserlogin_run(const browserlogin_post *login) {
       StringCat(url, "http://");
     StringCat(url, u);
   }
-  if (error == NULL &&
-      !hts_bundle_from_paste(
-          StringNotEmpty(login->paste) ? StringBuff(login->paste) : "",
-          StringNotEmpty(folder) ? StringBuff(folder) : NULL,
-          StringBuff(login->agent),
-          StringNotEmpty(url) ? StringBuff(url) : NULL, !save, res))
+  // a refused paste must not leave an empty project folder behind
+  if (error == NULL && !browserlogin_paste(login, &folder, &url, HTS_TRUE, res))
     error = res->error;
+  if (error == NULL && save) {
+    String dirs = STRING_EMPTY;
+
+    StringCopy(dirs, StringBuff(folder));
+    StringCat(dirs, "/");
+    if (structcheck(StringBuff(dirs)) != 0)
+      error = "cannot create the project folder";
+    else if (!browserlogin_paste(login, &folder, &url, HTS_FALSE, res))
+      error = res->error;
+    StringFree(dirs);
+  }
   snprintf(count, sizeof(count), "%d", error == NULL ? res->cookies : 0);
   browserlogin_set("blstate", error != NULL ? "error"
                               : save        ? "saved"

@@ -49,9 +49,9 @@ Please visit our Website: http://www.httrack.com
 #include "htsdate.h"
 #include "htsio.h"
 #include "htscookie_selftest.h"
+#include "htscharset.h"
 #ifdef _WIN32
-#include <io.h>         /* _commit */
-#include "htscharset.h" /* hts_pathToUCS2, hts_convertUCS2StringToUTF8 */
+#include <io.h> /* _commit */
 #endif
 
 /* END specific definitions */
@@ -89,6 +89,17 @@ hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size) {
   strlncatbuff(dst, host, dst_size, len);
   // host names are case-insensitive, so one folded spelling reaches one entry
   hts_lowcase(dst);
+  // the request names an international host in its ASCII form, so a jar must
+  if (!hts_isStringAscii(dst, strlen(dst))) {
+    char *idna = hts_convertStringUTF8ToIDNA(dst, strlen(dst));
+    const hts_boolean fits = idna != NULL && strlen(idna) < dst_size;
+
+    if (fits)
+      strlcpybuff(dst, idna, dst_size);
+    freet(idna);
+    if (!fits)
+      return HTS_FALSE;
+  }
   /* "%25" is RFC 6874's URI spelling of a zone id's '%'. Only a bracketed
      literal carries it, because a bare host's '%' is already literal. */
   if (literal) {
@@ -1329,10 +1340,13 @@ static void cookie_sync_dir(const char *file) {
 }
 #endif
 
-/* Name in dst the temporary beside path, with the pid in it. No run deletes
-   another's temporary, so a crashed run leaves its own behind. */
+/* Name in dst the temporary beside path, with the pid and a per-call number
+   in it, so no other run or thread writes it. A crashed run leaves its own. */
 static hts_boolean cookie_tmpname(char *dst, size_t size, const char *path) {
-  return slprintfbuff(dst, size, "%s.%lu.tmp", path, back_self_pid());
+  static volatile int calls = 0;
+
+  return slprintfbuff(dst, size, "%s.%lu.%u.tmp", path, back_self_pid(),
+                      (unsigned int) hts_increment_int(&calls));
 }
 
 /* Make bak hold what file holds, leaving file in place. The old bak stays

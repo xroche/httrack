@@ -78,12 +78,12 @@ static HTS_INLINE HTS_UNUSED int hts_load_acquire_int(const volatile int *src) {
 #endif
 }
 
-/* Add one to a counter other threads also update. */
-static HTS_INLINE HTS_UNUSED void hts_increment_int(volatile int *dst) {
+/* Add one to a counter other threads also update, and return its new value. */
+static HTS_INLINE HTS_UNUSED int hts_increment_int(volatile int *dst) {
 #ifdef _MSC_VER
-  InterlockedIncrement((volatile LONG *) dst);
+  return (int) InterlockedIncrement((volatile LONG *) dst);
 #else
-  __atomic_fetch_add(dst, 1, __ATOMIC_RELAXED);
+  return __atomic_add_fetch(dst, 1, __ATOMIC_RELAXED);
 #endif
 }
 

@@ -99,11 +99,22 @@ function do_changed() {
 	document.form.okBtn.disabled = true;
 }
 // The address of a line of the list, as step 3 reads it: no fragment, and
-// http:// when it names no scheme, which compares in lowercase.
+// http:// when it names no scheme. The scheme and the host compare in
+// lowercase, and an international host in its ASCII form, as it is requested.
 function bl_address(line) {
 	var a = line.trim().split("#")[0];
 	var m = /^([a-zA-Z][a-zA-Z0-9+.-]*):\/\//.exec(a);
-	return m ? m[1].toLowerCase() + a.substring(m[1].length) : "http://" + a;
+	var rest = m ? a.substring(m[0].length) : a;
+	var host = /^[^\/?\\]*/.exec(rest)[0];
+	var name = host.replace(/:[0-9]*$/, "");
+	var ascii = name.toLowerCase();
+	try {
+		if (name.indexOf("@") < 0)
+			ascii = new URL("http://" + name + "/").hostname;
+	} catch (e) {
+	}
+	return (m ? m[1].toLowerCase() : "http") + "://" + ascii
+		+ host.substring(name.length) + rest.substring(host.length);
 }
 // Put url in place of the first line holding the same address, or append it.
 // The other lines stay as they are, so another page of the site keeps its own.

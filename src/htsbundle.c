@@ -1044,8 +1044,9 @@ static hts_boolean paste_is_curl(const char *s) {
 }
 
 /* Copy the records of the cookies.txt paste s into out, one line per line of
-   s so that line numbers hold. Blank and comment lines become empty lines,
-   because the bundle reader refuses comments it does not know. */
+   s so that line numbers hold, and a last line without LF keeps none. Blank and
+   comment lines become empty lines, because the bundle reader refuses comments
+   it does not know. */
 static void paste_records(const char *s, String *out) {
   static const char httponly[] = "#HttpOnly_";
 
@@ -1058,7 +1059,8 @@ static void paste_records(const char *s, String *out) {
     if (strspn(s, " \t") < len &&
         (s[0] != '#' || strncmp(s, httponly, sizeof(httponly) - 1) == 0))
       StringMemcat(*out, s, len);
-    StringCat(*out, "\n");
+    if (s[next - 1] == '\n')
+      StringCat(*out, "\n");
     s += next;
   }
 }
@@ -1245,6 +1247,31 @@ static void paste_trim_host_dots(char *url) {
   memmove(p, end, strlen(end) + 1);
 }
 
+/* Write the host of url, of size bytes, in its ASCII form, as the engine
+   requests it. NULL, or why it has none. */
+static const char *paste_host_idna(char *url, size_t size) {
+  char *const host = strstr(url, "://") + 3;
+  const size_t len = strcspn(host, ":/?\\");
+  const char *const rest = host + len;
+  char *idna;
+  const char *why = NULL;
+
+  if (hts_isStringAscii(host, len))
+    return NULL;
+  idna = hts_convertStringUTF8ToIDNA(host, len);
+  if (idna == NULL)
+    why = "the host has no ASCII form";
+  else if (strlen(idna) >= size - (size_t) (host - url) - strlen(rest))
+    why = "the address is too long once its host is in ASCII";
+  else {
+    hts_lowcase(idna);
+    memmove(host + strlen(idna), rest, strlen(rest) + 1);
+    memcpy(host, idna, strlen(idna));
+  }
+  freet(idna);
+  return why;
+}
+
 /* Copy into name the bundle name of url's host: lowercase ASCII, without the
    port, a leading "www." or trailing dots. NULL, or why there is none. */
 static const char *paste_name(const char *url, char name[HTS_BUNDLE_NAME_MAX]) {
@@ -1266,18 +1293,6 @@ static const char *paste_name(const char *url, char name[HTS_BUNDLE_NAME_MAX]) {
     return "invalid login bundle name: 128 bytes or more";
   name[0] = '\0';
   strlncatbuff(name, h, HTS_BUNDLE_NAME_MAX, len);
-  // an international name is a file name, so it takes its ASCII form
-  if (!hts_isStringAscii(name, len)) {
-    char *idna = hts_convertStringUTF8ToIDNA(name, len);
-    const hts_boolean fits = idna != NULL && strlen(idna) < HTS_BUNDLE_NAME_MAX;
-
-    if (fits)
-      strlcpybuff(name, idna, HTS_BUNDLE_NAME_MAX);
-    freet(idna);
-    if (!fits)
-      return "invalid login bundle name: the host has no ASCII form of fewer "
-             "than 128 bytes";
-  }
   return hts_bundle_name_refusal(name);
 }
 
@@ -1395,6 +1410,9 @@ HTSEXT_API hts_boolean hts_bundle_from_paste(const char *paste,
   if (why != NULL)
     PASTE_FAIL("%s", why);
   paste_trim_host_dots(base);
+  why = paste_host_idna(base, sizeof(base));
+  if (why != NULL)
+    PASTE_FAIL("%s", why);
   if (strlen(name) + strlen(HTS_BUNDLE_SUFFIX) >= HTS_CDLMAXSIZE - strlen(base))
     PASTE_FAIL("the address is longer than %d bytes once the bundle name is "
                "added",

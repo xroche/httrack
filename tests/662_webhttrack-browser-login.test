@@ -34,6 +34,12 @@ want("x.test/\r\nhttp://c.test/\r\n", "http://c.test/#httrack-bundle=c.test",
     "x.test/\r\nhttp://c.test/#httrack-bundle=c.test\r\n");
 want("http://d.test/\nhttp://d.test/", "http://d.test/#httrack-bundle=d.test",
     "http://d.test/#httrack-bundle=d.test\nhttp://d.test/");
+var x = "http://www.xn--bcher-kva.test/#httrack-bundle=xn--bcher-kva.test";
+want("HTTP://NoScheme.test/a", u, u);
+want("noscheme.TEST/A", u, "noscheme.TEST/A\n" + u);
+want("www.bücher.test/", x, x);
+want("http://WWW.BÜCHER.test:80/", x, "http://WWW.BÜCHER.test:80/\n" + x);
+want("u@noscheme.test/a", u, "u@noscheme.test/a\n" + u);
 console.log("ok " + n);
 EOF
 )
@@ -172,6 +178,13 @@ htsserver_client --path /server/step3.html --field "sid=${sid}" \
 login --field "sid=${sid}" --field blaction=save --field "blpaste=${paste}"
 test "$(attr state)" = saved || fail "a climbing base path: $(attr error)"
 assert_file "${work}/up/login.test.hts" "a climbing base path wrote no bundle"
+# A refused save creates no project folder.
+htsserver_client --path /server/step3.html --field "sid=${sid}" \
+    --field "path=${work}" --field "projname=refused" >/dev/null
+login --field "sid=${sid}" --field blaction=save --field "blpaste=curl https://x.test/"
+test "$(attr error)" = "the paste holds no cookie for x.test" ||
+    fail "a paste without cookies: $(attr error)"
+test ! -e "${work}/refused" || fail "a refused save created the project folder"
 
 # The popup puts the suffixed address in place of the first line naming the
 # same address, and leaves every other line as it was.
@@ -182,7 +195,7 @@ grep -qF 'function bl_add_to(' <<<"${js}" || fail "no bl_add_to in the popup"
 if command -v node >/dev/null 2>&1; then
     out=$(node -e "${js}
 ${BL_ADD_CASES}")
-    test "${out}" = "ok 6" || fail "the address list: ${out}"
+    test "${out}" = "ok 11" || fail "the address list: ${out}"
 else
     echo "no node, so the address list check did not run"
 fi
