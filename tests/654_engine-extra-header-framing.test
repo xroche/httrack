@@ -92,6 +92,10 @@ if grep -qF 'warning: -%X' "$tmpdir/conditional.err"; then
     fail "a conditional -%X header drew a warning"
 fi
 
+# a header name may begin with '-'
+probe dash -%X '-X-Foo: 1'
+assert_eq 1 "$(lines '^-X-Foo: 1' dash)" 'dash: the line'
+
 probe host -%X 'Host : x'
 assert_eq 1 "$(lines '^Host' host)" 'host: Host lines'
 assert_eq 1 "$(lines '^Host: x' host)" 'host: the box Host, without the blank'

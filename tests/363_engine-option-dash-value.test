@@ -99,6 +99,10 @@ parse --warc-file '-archive'
 accepted "--warc-file -archive"
 parse --list '-rules.txt'
 accepted "--list -rules.txt"
+parse --headers '-X-Foo: 1'
+accepted "--headers -X-Foo: 1"
+parse -%X '-X-Foo: 1'
+accepted "-%X -X-Foo: 1"
 parse --cookies-file '-cookies.txt' --assume '-foo=text/html'
 accepted "a dash value beside another"
 echo OK
@@ -109,7 +113,7 @@ echo OK
 # --mirror sends "-w" as the User-Agent and drops the mirror. A quoted whole
 # token is refused as quoted.
 printf '[an unvetted spelling still refuses the word after it] ..\t'
-for opt in %A %F %K %L %S %rf F; do
+for opt in %A %F %K %L %S %rf %X F; do
     for word in --mirror -q -dashvalue; do
         parse "-q${opt}" "$word"
         refused "-q${opt} ${word}" 'needs'
@@ -147,6 +151,7 @@ expand() { # expand OPTION [VALUE]
 assert_eq '-%A -foo=text/html' "$(expand --assume -foo=text/html)" "--assume"
 assert_eq '-%A -foo=text/html' "$(expand --assume=-foo=text/html)" "--assume="
 assert_eq '-%A -foo=text/html' "$(expand -%A -foo=text/html)" "-%A"
+assert_eq '-%X -X-Foo: 1' "$(expand --headers '-X-Foo: 1')" "--headers"
 assert_eq '-F -mybot/1.0' "$(expand --user-agent -mybot/1.0)" "--user-agent"
 parse --filterlist -rules.txt
 accepted "--filterlist -rules.txt"

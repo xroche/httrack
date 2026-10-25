@@ -349,6 +349,7 @@ static const char *const dashvalue_opt[] = {
   "-%L",  /* list */
   "-%S",  /* urllist */
   "-%rf", /* warc-file */
+  "-%X",  /* headers */
   "--bundle-dir",
   "-F",   /* user-agent */
   NULL

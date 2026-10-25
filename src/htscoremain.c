@@ -2110,7 +2110,9 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 break;
                 //
               case 'X':  // HTTP header line
-                if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
+                /* a vetted pair's value may begin with '-' (#1425) */
+                if ((na + 1 >= argc) ||
+                    (argv[na + 1][0] == '-' && !optparam_dash_ok(&x_cmd, na))) {
                   HTS_PANIC_PRINTF
                     ("Option %X needs to be followed by a blank space, and a raw HTTP header line");
                   printf("Example: -%%X \"X-Magic: 42\"\n");
