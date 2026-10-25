@@ -318,6 +318,35 @@ static int st_cookieport(httrackp *opt, int argc, char **argv) {
       {"[fe80::1%a5eth0]", "fe80::1%a5eth0"}, // 'a5' is not the introducer
       // an empty zone id is malformed, and still lands on one jar entry
       {"[fe80::1%25]:80", "fe80::1%"},
+      // the request names an international host in its ASCII form
+      {"WWW.B\303\274cher.example:81", "www.xn--bcher-kva.example"},
+      {".b\303\274cher.example", ".xn--bcher-kva.example"},
+      // IDNA would encode these as another host, or one holding a '/'
+      {".\300\257.example", NULL},               // an overlong '/'
+      {".\200.example", NULL},                   // a stray continuation byte
+      {".\355\240\200.example", NULL},           // a surrogate
+      {".\364\220\200\200.example", NULL},       // above U+10FFFF
+      {".b\303.example", NULL},                  // a truncated sequence
+      {".B\303\234CHER.example", NULL},          // a capital outside ASCII
+      {".\320\220.example", NULL},               // a Cyrillic capital
+      {".\320\260.example", ".xn--80a.example"}, // its small letter
+      {".\304\200.example", NULL},               // U+0100, Latin Extended-A
+      {".\305\271.example", NULL},               // U+0179, an odd capital there
+      {".\316\221.example", NULL},               // U+0391, Greek
+      {".\317\242.example", NULL},               // U+03E2, Coptic
+      {".\323\220.example", NULL},               // U+04D0, Cyrillic extended
+      {".\323\201.example", NULL},               // U+04C1, an odd capital there
+      {".\324\261.example", NULL},               // U+0531, Armenian
+      {".\341\270\200.example", NULL}, // U+1E00, Latin Extended Additional
+      {".\357\274\241.example", NULL}, // U+FF21, fullwidth
+      {".\303\227.example", ".xn--rca.example"}, // U+00D7 sits among capitals
+      {".\316\261.example", ".xn--mxa.example"}, // a small Greek letter
+      // fits as typed, but not once in its ASCII form
+      {"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\303\274",
+       NULL},
   };
 
   static const struct {

@@ -1112,8 +1112,8 @@ The browser did not open: %s.
 Το πρόγραμμα περιήγησης δεν άνοιξε: %s.
 The browser came back with no cookies, so nothing was kept.
 Το πρόγραμμα περιήγησης δεν επέστρεψε cookies, οπότε δεν κρατήθηκε τίποτα.
-%d cookies were collected. They are used when you press OK.
-Συλλέχθηκαν %d cookies. Θα χρησιμοποιηθούν όταν πατήσετε Εντάξει.
+Cookies collected: %d. They are used when you press OK.
+Cookies που συλλέχθηκαν: %d. Θα χρησιμοποιηθούν όταν πατήσετε Εντάξει.
 The browser gave no cookies the engine can use, so nothing was changed.
 Το πρόγραμμα περιήγησης δεν έδωσε cookies που να μπορεί να χρησιμοποιήσει το HTTrack, οπότε δεν άλλαξε τίποτα.
 The cookies could not be written to %s, so nothing was changed.
@@ -1122,3 +1122,7 @@ The cookies could not be written to %s, so nothing was changed.
 %d από τα cookies του προγράμματος περιήγησης παραλείφθηκαν, επειδή το HTTrack δεν θα τα διάβαζε.
 The browser identity it reported cannot be used, so the mirror will send the default one.
 Η ταυτότητα περιήγησης που δηλώθηκε δεν μπορεί να χρησιμοποιηθεί, οπότε η αντιγραφή θα στείλει την προεπιλεγμένη.
+Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
+Συνδεθείτε στον ιστότοπο σε άλλη καρτέλα αυτού του προγράμματος περιήγησης. Ανοίξτε τα εργαλεία προγραμματιστή (F12) και μετά την καρτέλα Δίκτυο, φορτώστε ξανά τη σελίδα, κάντε δεξί κλικ στο πρώτο αίτημα και επιλέξτε Copy as cURL (bash). Επικολλήστε το κείμενο εδώ. Λειτουργεί και μια εξαγωγή cookies.txt, για την πρώτη διεύθυνση της λίστας.
+Cookies for: %s. Browser identity: %s.
+Cookies για: %s. Ταυτότητα προγράμματος περιήγησης: %s.

@@ -8,6 +8,7 @@
 @DATADIR@/httrack/html/palette.css
 @DATADIR@/httrack/html/server/about.html
 @DATADIR@/httrack/html/server/addurl.html
+@DATADIR@/httrack/html/server/browserlogin.html
 @DATADIR@/httrack/html/server/error.html
 @DATADIR@/httrack/html/server/exit.html
 @DATADIR@/httrack/html/server/finished.html

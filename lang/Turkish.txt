@@ -1112,8 +1112,8 @@ The browser did not open: %s.
 Tarayıcı açılmadı: %s.
 The browser came back with no cookies, so nothing was kept.
 Tarayıcı hiç çerez döndürmedi, bu yüzden hiçbir şey saklanmadı.
-%d cookies were collected. They are used when you press OK.
-%d çerez toplandı. Tamam'a bastığınızda kullanılacaklar.
+Cookies collected: %d. They are used when you press OK.
+Toplanan çerez sayısı: %d. Tamam'a bastığınızda kullanılacaklar.
 The browser gave no cookies the engine can use, so nothing was changed.
 Tarayıcı, HTTrack'in kullanabileceği hiçbir çerez vermedi, bu yüzden hiçbir şey değişmedi.
 The cookies could not be written to %s, so nothing was changed.
@@ -1122,3 +1122,7 @@ The cookies could not be written to %s, so nothing was changed.
 Tarayıcının çerezlerinden %d tanesi dışarıda bırakıldı, çünkü HTTrack onları okuyamazdı.
 The browser identity it reported cannot be used, so the mirror will send the default one.
 Bildirdiği tarayıcı kimliği kullanılamıyor, bu yüzden yansı varsayılanı gönderecek.
+Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
+Bu tarayıcının başka bir sekmesinde siteye giriş yapın. Geliştirici araçlarını (F12) ve ardından Ağ sekmesini açın, sayfayı yeniden yükleyin, ilk isteğe sağ tıklayın ve Copy as cURL (bash) seçeneğini seçin. Metni buraya yapıştırın. Bir cookies.txt dışa aktarımı da kullanılabilir; listedeki ilk adres için kullanılır.
+Cookies for: %s. Browser identity: %s.
+Çerezlerin ait olduğu siteler: %s. Tarayıcı kimliği: %s.

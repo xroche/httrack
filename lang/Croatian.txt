@@ -1112,8 +1112,8 @@ The browser did not open: %s.
 Preglednik se nije otvorio: %s.
 The browser came back with no cookies, so nothing was kept.
 Preglednik nije vratio nijedan kolačić, pa ništa nije spremljeno.
-%d cookies were collected. They are used when you press OK.
-Prikupljeno je %d kolačića. Upotrijebit će se kada stisnete U redu.
+Cookies collected: %d. They are used when you press OK.
+Prikupljeni kolačići: %d. Upotrijebit će se kada stisnete U redu.
 The browser gave no cookies the engine can use, so nothing was changed.
 Preglednik nije dao nijedan kolačić koji HTTrack može upotrijebiti, pa ništa nije promijenjeno.
 The cookies could not be written to %s, so nothing was changed.
@@ -1122,3 +1122,7 @@ Kolačiće nije moguće zapisati u %s, pa ništa nije promijenjeno.
 %d preglednikovih kolačića je izostavljeno jer ih HTTrack nije mogao pročitati.
 The browser identity it reported cannot be used, so the mirror will send the default one.
 Prijavljeno pregledničko obilježje nije moguće upotrijebiti, pa će zrcaljenje poslati zadano.
+Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
+Prijavite se na stranicu u drugoj kartici ovog preglednika. Otvorite alate za razvojne programere (F12), zatim karticu Mreža, ponovno učitajte stranicu, desnom tipkom kliknite prvi zahtjev i odaberite Copy as cURL (bash). Zalijepite tekst ovdje. Radi i izvoz cookies.txt, za prvu adresu na popisu.
+Cookies for: %s. Browser identity: %s.
+Kolačići za: %s. Identitet preglednika: %s.

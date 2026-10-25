@@ -1112,8 +1112,8 @@ The browser did not open: %s.
 Brauser ei avanenud: %s.
 The browser came back with no cookies, so nothing was kept.
 Brauser ei andnud ühtegi küpsist, seega midagi ei salvestatud.
-%d cookies were collected. They are used when you press OK.
-Koguti %d küpsist. Neid kasutatakse, kui vajutad OK.
+Cookies collected: %d. They are used when you press OK.
+Kogutud küpsiseid: %d. Neid kasutatakse, kui vajutad OK.
 The browser gave no cookies the engine can use, so nothing was changed.
 Brauser ei andnud ühtegi küpsist, mida mootor saaks kasutada, seega midagi ei muudetud.
 The cookies could not be written to %s, so nothing was changed.
@@ -1122,3 +1122,7 @@ Küpsiseid ei saanud kirjutada asukohta %s, seega midagi ei muudetud.
 %d brauseri küpsist jäeti välja, sest mootor ei lugenud neid.
 The browser identity it reported cannot be used, so the mirror will send the default one.
 Teatatud brauseri identiteeti ei saa kasutada, seega kopeerimine saadab vaikimisi identiteedi.
+Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
+Logige saidile sisse selle brauseri teisel vahelehel. Avage arendaja tööriistad (F12) ja seejärel vaheleht Võrk, laadige leht uuesti, paremklõpsake esimesel päringul ja valige Copy as cURL (bash). Kleepige tekst siia. Sobib ka cookies.txt eksport, loendi esimese aadressi jaoks.
+Cookies for: %s. Browser identity: %s.
+Küpsised saitidele: %s. Brauseri identiteet: %s.

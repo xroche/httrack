@@ -1112,7 +1112,7 @@ The browser did not open: %s.
 Прелистувачот не се отвори: %s.
 The browser came back with no cookies, so nothing was kept.
 Прелистувачот не врати ниту едно колаче, затоа ништо не е зачувано.
-%d cookies were collected. They are used when you press OK.
+Cookies collected: %d. They are used when you press OK.
 Собрани колачиња: %d. Ќе се користат кога ќе притиснете „Добро“.
 The browser gave no cookies the engine can use, so nothing was changed.
 Прелистувачот не даде ниту едно колаче што HTTrack може да го користи, затоа ништо не е променето.
@@ -1122,3 +1122,7 @@ The cookies could not be written to %s, so nothing was changed.
 Изоставени колачиња на прелистувачот: %d, бидејќи HTTrack не би можел да ги прочита.
 The browser identity it reported cannot be used, so the mirror will send the default one.
 Идентификацијата на прелистувачот што тој ја пријави не може да се користи, затоа копирањето ќе ја испраќа стандардната.
+Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
+Најавете се на страницата во друго јазиче на овој прелистувач. Отворете ги алатките за развивачи (F12), па јазичето Мрежа, повторно вчитајте ја страницата, кликнете со десното копче на првото барање и изберете Copy as cURL (bash). Залепете го текстот тука. Работи и извоз во cookies.txt, за првата адреса во списокот.
+Cookies for: %s. Browser identity: %s.
+Колачиња за: %s. Идентитет на прелистувачот: %s.

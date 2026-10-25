@@ -47,10 +47,11 @@ Please visit our Website: http://www.httrack.com
 #include "htspsl.h"
 #include "htsbundle.h"
 #include "htsdate.h"
+#include "htsio.h"
 #include "htscookie_selftest.h"
+#include "htscharset.h"
 #ifdef _WIN32
-#include <io.h>         /* _commit */
-#include "htscharset.h" /* hts_pathToUCS2, hts_convertUCS2StringToUTF8 */
+#include <io.h> /* _commit */
 #endif
 
 /* END specific definitions */
@@ -60,6 +61,49 @@ Please visit our Website: http://www.httrack.com
 /* A jar record marks it in field 7. The fields are 0 domain, 1 subdomains,
    2 path, 3 secure, 4 expiry, 5 name, 6 value and 7 HttpOnly. */
 #define COOKIE_HTTPONLY_FIELD "HttpOnly"
+
+/* Is uc a capital letter of the Latin, Greek, Cyrillic or Armenian script? */
+static hts_boolean cookie_is_capital(hts_UCS4 uc) {
+  if (uc >= 0x100 && uc <= 0x17f) // Latin Extended-A pairs capital first
+    return uc == 0x178 ||
+           ((uc <= 0x137 || (uc >= 0x14a && uc <= 0x177)) && uc % 2 == 0) ||
+           (((uc >= 0x139 && uc <= 0x148) || (uc >= 0x179 && uc <= 0x17e)) &&
+            uc % 2 == 1);
+  if ((uc >= 0x460 && uc <= 0x481) || (uc >= 0x48a && uc <= 0x4bf) ||
+      (uc >= 0x4d0 && uc <= 0x52f) || (uc >= 0x1e00 && uc <= 0x1e95) ||
+      (uc >= 0x1ea0 && uc <= 0x1eff))
+    return uc % 2 == 0;
+  if (uc >= 0x4c1 && uc <= 0x4ce)
+    return uc % 2 == 1;
+  if (uc >= 0x3d8 && uc <= 0x3ef) // Greek archaic letters and Coptic
+    return uc % 2 == 0;
+  return (uc >= 0xc0 && uc <= 0xde && uc != 0xd7) || uc == 0x370 ||
+         uc == 0x372 || uc == 0x376 || uc == 0x37f || uc == 0x386 ||
+         (uc >= 0x388 && uc <= 0x38a) || uc == 0x38c || uc == 0x38e ||
+         uc == 0x38f || (uc >= 0x391 && uc <= 0x3ab && uc != 0x3a2) ||
+         uc == 0x3cf || (uc >= 0x3d2 && uc <= 0x3d4) || uc == 0x3f4 ||
+         uc == 0x3f7 || uc == 0x3f9 || uc == 0x3fa ||
+         (uc >= 0x3fd && uc <= 0x3ff) || (uc >= 0x400 && uc <= 0x42f) ||
+         uc == 0x4c0 || (uc >= 0x531 && uc <= 0x556) || uc == 0x1e9e ||
+         (uc >= 0xff21 && uc <= 0xff3a);
+}
+
+/* See htsbundle.h. */
+const char *cookie_host_refusal(const char *host, size_t len) {
+  size_t i, n;
+  hts_UCS4 uc;
+
+  if (!hts_isStringUTF8(host, len))
+    return "the host is not valid UTF-8";
+  for (i = 0; i < len; i += n) {
+    n = hts_readUTF8(&host[i], len - i, &uc);
+    if (n == 0) // a stalled reader would loop forever
+      return "the host is not valid UTF-8";
+    if (cookie_is_capital(uc))
+      return "write the host in lowercase";
+  }
+  return NULL;
+}
 
 /* See htsbauth.h. */
 hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size) {
@@ -88,6 +132,21 @@ hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size) {
   strlncatbuff(dst, host, dst_size, len);
   // host names are case-insensitive, so one folded spelling reaches one entry
   hts_lowcase(dst);
+  // the request names an international host in its ASCII form, so a jar must
+  if (!hts_isStringAscii(dst, strlen(dst))) {
+    char *idna;
+    hts_boolean fits;
+
+    if (cookie_host_refusal(dst, strlen(dst)) != NULL)
+      return HTS_FALSE;
+    idna = hts_convertStringUTF8ToIDNA(dst, strlen(dst));
+    fits = idna != NULL && strlen(idna) < dst_size;
+    if (fits)
+      strlcpybuff(dst, idna, dst_size);
+    freet(idna);
+    if (!fits)
+      return HTS_FALSE;
+  }
   /* "%25" is RFC 6874's URI spelling of a zone id's '%'. Only a bracketed
      literal carries it, because a bare host's '%' is already literal. */
   if (literal) {
@@ -495,11 +554,49 @@ static hts_boolean cookie_load_field(httrackp *opt, char *dst, size_t dst_size,
 
 /* Read a line of fp into s without its LF or the CR before it. *len receives
    the whole length, even when the line did not fit. A NUL is stored as is. */
-static void cookie_readline(FILE *fp, char *s, size_t size, size_t *len) {
+/* See htsbundle.h. */
+text_src text_src_file(FILE *fp) {
+  text_src src;
+
+  memset(&src, 0, sizeof(src));
+  src.fp = fp;
+  return src;
+}
+
+/* See htsbundle.h. */
+text_src text_src_mem(const char *buf, size_t len) {
+  text_src src;
+
+  memset(&src, 0, sizeof(src));
+  src.buf = buf;
+  src.len = len;
+  return src;
+}
+
+/* The next byte of src, or EOF. */
+static int text_src_getc(text_src *src) {
+  int c;
+
+  if (src->fp == NULL) {
+    if (src->pos < src->len)
+      return (unsigned char) src->buf[src->pos++];
+    src->eof = HTS_TRUE;
+    return EOF;
+  }
+  c = fgetc(src->fp);
+  if (c == EOF) {
+    src->eof = feof(src->fp) != 0;
+    src->error = ferror(src->fp) != 0;
+  }
+  return c;
+}
+
+/* See htsbundle.h. */
+void text_src_readline(text_src *src, char *s, size_t size, size_t *len) {
   size_t n = 0, total = 0;
   int c;
 
-  while ((c = fgetc(fp)) != EOF && c != '\n') {
+  while ((c = text_src_getc(src)) != EOF && c != '\n') {
     if (n + 1 < size)
       s[n++] = (char) c;
     total++;
@@ -681,11 +778,10 @@ static hts_boolean cookie_flat_ignore(int *ignored) {
   return *ignored <= COOKIE_FLAT_WARNINGS;
 }
 
-/* Store the pair "name=value" at pair as a cookie of domain. Returns
-   HTS_FALSE when it is not stored, counted in *ignored. */
-static hts_boolean cookie_flat_pair(httrackp *opt, t_cookie *cookie, char *pair,
-                                    const char *domain, const cookie_attr *attr,
-                                    const char *given, int *ignored) {
+/* See htsbundle.h. */
+hts_boolean cookie_flat_pair(httrackp *opt, t_cookie *cookie, char *pair,
+                             const char *domain, const cookie_attr *attr,
+                             const char *given, int *ignored) {
   char *const eq = strchr(pair, '=');
 
   if (eq == NULL || eq == pair) {
@@ -714,6 +810,24 @@ static hts_boolean cookie_flat_pair(httrackp *opt, t_cookie *cookie, char *pair,
   return HTS_TRUE;
 }
 
+/* See htsbundle.h. */
+const char *cookie_flat_bind(const char *url, char *host, size_t host_size,
+                             cookie_attr *attr) {
+  const char *domain;
+
+  if (!cookie_url_host(url, host, host_size))
+    return NULL;
+  // an address or a public suffix has no parent domain to share cookies with
+  domain = hts_host_is_address(host, strlen(host))
+               ? NULL
+               : hts_psl_registrable_domain(host);
+  attr->host_only = domain == NULL;
+  attr->secure = strfield(url, "https:") != 0;
+  attr->http_only = HTS_FALSE;
+  attr->expires = 0;
+  return domain != NULL ? domain : host;
+}
+
 /* Load fp, a document.cookie string, as session cookies of the registrable
    domain of start_url. The file is never rewritten, because the save would
    turn it into a Netscape jar, so this returns COOKIE_LOAD_KEEP. */
@@ -732,23 +846,14 @@ static int cookie_load_flat(httrackp *opt, t_cookie *cookie, FILE *fp,
   size_t i;
   int c;
 
-  if (!cookie_url_host(start_url, host, sizeof(host))) {
+  domain = cookie_flat_bind(start_url, host, sizeof(host), &attr);
+  if (domain == NULL) {
     hts_log_print(opt, LOG_WARNING,
                   "Cookies: %s is a document.cookie string, but there is no "
                   "start URL to bind it to, so it is ignored",
                   given);
     return COOKIE_LOAD_KEEP;
   }
-  // an address or a public suffix has no parent domain to share cookies with
-  domain = hts_host_is_address(host, strlen(host))
-               ? NULL
-               : hts_psl_registrable_domain(host);
-  attr.host_only = domain == NULL;
-  attr.secure = strfield(start_url, "https:") != 0;
-  attr.http_only = HTS_FALSE;
-  attr.expires = 0;
-  if (domain == NULL)
-    domain = host;
 
   for (i = 0; i < sizeof(cookie_bom) - 1; i++) {
     if (fgetc(fp) != (unsigned char) cookie_bom[i]) {
@@ -823,7 +928,7 @@ static int cookie_load_flat(httrackp *opt, t_cookie *cookie, FILE *fp,
    name the file as given in warnings. A UTF-8 BOM is skipped on the first line
    when first_line is HTS_TRUE. filter, when not NULL, picks the records.
    Returns what cookie_load_from does. */
-static int cookie_load_records(httrackp *opt, t_cookie *cookie, FILE *fp,
+static int cookie_load_records(httrackp *opt, t_cookie *cookie, text_src *src,
                                const char *given, hts_boolean first_line,
                                cookie_filter *filter) {
   char buffer[8192];
@@ -843,12 +948,12 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, FILE *fp,
     keep = HTS_TRUE;
   }
   // ferror ends the loop too, because a directory never reaches EOF
-  while (!feof(fp) && !ferror(fp) && strlen(cookie->data) < cookie->max_len &&
+  while (!src->eof && !src->error && strlen(cookie->data) < cookie->max_len &&
          (filter == NULL || filter->why == NULL)) {
     size_t len;
 
     // len counts what the buffer cut too, so this catches that line
-    cookie_readline(fp, line, sizeof(line), &len);
+    text_src_readline(src, line, sizeof(line), &len);
     if (lineno < INT_MAX)
       lineno++;
     if (filter != NULL)
@@ -989,7 +1094,7 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, FILE *fp,
       }
     }
   }
-  if (!feof(fp) && (filter == NULL || filter->why == NULL)) {
+  if (!src->eof && (filter == NULL || filter->why == NULL)) {
     cookie_warn(opt, filter, given, "stopped reading before the end",
                 "Cookies: stopped reading before the end of %s", given);
     refused++;
@@ -1115,7 +1220,8 @@ int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *fpath,
       return ret;
     }
     if (fp) {
-      const int ret = cookie_load_records(opt, cookie, fp, given,
+      text_src src = text_src_file(fp);
+      const int ret = cookie_load_records(opt, cookie, &src, given,
                                           /* first_line */ HTS_TRUE, NULL);
 
       fclose(fp);
@@ -1132,10 +1238,10 @@ int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *fpath,
 }
 
 /* See htsbundle.h. */
-void cookie_load_stream(httrackp *opt, t_cookie *cookie, FILE *fp,
+void cookie_load_stream(httrackp *opt, t_cookie *cookie, text_src *src,
                         const char *given, cookie_filter *filter) {
-  (void) cookie_load_records(opt, cookie, fp, given, /* first_line */ HTS_FALSE,
-                             filter);
+  (void) cookie_load_records(opt, cookie, src, given,
+                             /* first_line */ HTS_FALSE, filter);
 }
 
 /* Flush fp to the disk and close it. Did every step succeed? */
@@ -1155,14 +1261,45 @@ static hts_boolean cookie_close_synced(FILE *fp) {
 
 int cookie_save_fault_selftest = 0;
 
+/* See htsbundle.h. */
+void cookie_records_text(const t_cookie *cookie, String *out) {
+  char BIGSTK line[8192];
+  const char *a = cookie->data;
+
+  while (*a != '\0') {
+    char *extra = line;
+    const char *rec = line;
+    int i;
+
+    a += binput(a, line, COOKIE_MAX_LINE);
+    // stop on the seventh TAB, so the cut takes it with the eighth field
+    for (i = 0; i < 7 && extra != NULL; i++) {
+      extra = strchr(extra, '\t');
+      if (extra != NULL && i < 6)
+        extra++;
+    }
+    // the eighth field is ours: the file form marks HttpOnly by prefix
+    if (extra != NULL) {
+      *extra = '\0';
+      StringCat(*out, COOKIE_HTTPONLY_PREFIX);
+    }
+    // a Netscape jar dots the domain exactly when field 1 is TRUE
+    if (rec[0] == '.')
+      rec++;
+    if (!cookie_is_host_only(line))
+      StringCat(*out, ".");
+    StringCat(*out, rec);
+    StringCat(*out, LF);
+  }
+}
+
 /* Write the jar to name, or only a header if it is empty. Return 0 on
    success. */
 static int cookie_write(t_cookie *cookie, const char *name) {
-  char BIGSTK line[8192];
   FILE *fp = hts_fopen_private(name, "wb");
 
   if (fp) {
-    const char *a = cookie->data;
+    String text = STRING_EMPTY;
     hts_boolean ok = HTS_TRUE;
 
     // Python's MozillaCookieJar refuses a file without this first line
@@ -1170,30 +1307,11 @@ static int cookie_write(t_cookie *cookie, const char *name) {
                     "# Written by HTTrack Website Copier" LF) < 0 ||
         (cookie_save_fault_selftest & COOKIE_FAULT_WRITE))
       ok = HTS_FALSE;
-    while (*a != '\0') {
-      char *extra = line;
-      const char *rec = line;
-      int i;
-
-      a += binput(a, line, COOKIE_MAX_LINE);
-      // stop on the seventh TAB, so the cut takes it with the eighth field
-      for (i = 0; i < 7 && extra != NULL; i++) {
-        extra = strchr(extra, '\t');
-        if (extra != NULL && i < 6)
-          extra++;
-      }
-      // the eighth field is ours: the file form marks HttpOnly by prefix
-      if (extra != NULL) {
-        *extra = '\0';
-        if (fprintf(fp, "%s", COOKIE_HTTPONLY_PREFIX) < 0)
-          ok = HTS_FALSE;
-      }
-      // a Netscape jar dots the domain exactly when field 1 is TRUE
-      if (rec[0] == '.')
-        rec++;
-      if (fprintf(fp, "%s%s" LF, cookie_is_host_only(line) ? "" : ".", rec) < 0)
-        ok = HTS_FALSE;
-    }
+    cookie_records_text(cookie, &text);
+    if (StringNotEmpty(text) && fwrite(StringBuff(text), 1, StringLength(text),
+                                       fp) != StringLength(text))
+      ok = HTS_FALSE;
+    StringFree(text);
     // the close reports a write the buffer held back
     if (!cookie_close_synced(fp) ||
         (cookie_save_fault_selftest & COOKIE_FAULT_CLOSE))
@@ -1269,10 +1387,12 @@ static void cookie_sync_dir(const char *file) {
 }
 #endif
 
-/* Name in dst the temporary beside path, with the pid in it. No run deletes
-   another's temporary, so a crashed run leaves its own behind. */
+/* Name in dst a temporary beside path that no other run or thread writes. */
 static hts_boolean cookie_tmpname(char *dst, size_t size, const char *path) {
-  return slprintfbuff(dst, size, "%s.%lu.tmp", path, back_self_pid());
+  static volatile int calls = 0;
+
+  return slprintfbuff(dst, size, "%s.%lu.%u.tmp", path, back_self_pid(),
+                      (unsigned int) hts_increment_int(&calls));
 }
 
 /* Make bak hold what file holds, leaving file in place. The old bak stays
@@ -1312,6 +1432,32 @@ static hts_boolean cookie_replace(const char *tmp, const char *file) {
   cookie_sync_dir(file);
 #endif
   return HTS_TRUE;
+}
+
+/* See htsbundle.h. */
+hts_boolean cookie_write_replace(const char *file, const char *data,
+                                 size_t len) {
+  char tmp[CATBUFF_SIZE];
+  hts_boolean ok;
+  FILE *fp;
+  int err;
+
+  if (!cookie_tmpname(tmp, sizeof(tmp), file)) {
+    errno = ENAMETOOLONG;
+    return HTS_FALSE;
+  }
+  (void) UNLINK(tmp);
+  fp = hts_fopen_private(tmp, "wb");
+  if (fp == NULL)
+    return HTS_FALSE;
+  ok = hts_fwrite_exact(data, len, fp);
+  ok = cookie_close_synced(fp) && ok;
+  ok = ok && cookie_replace(tmp, file);
+  err = errno;
+  if (!ok)
+    (void) UNLINK(tmp);
+  errno = err;
+  return ok;
 }
 
 /* Write the jar beside file, back file up to bak unless bak is NULL, then

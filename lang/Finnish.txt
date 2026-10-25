@@ -1112,8 +1112,8 @@ The browser did not open: %s.
 Selain ei avautunut: %s.
 The browser came back with no cookies, so nothing was kept.
 Selain ei palauttanut yhtään evästettä, joten mitään ei tallennettu.
-%d cookies were collected. They are used when you press OK.
-Evästeitä kerättiin %d. Niitä käytetään, kun painat OK.
+Cookies collected: %d. They are used when you press OK.
+Kerätyt evästeet: %d. Niitä käytetään, kun painat OK.
 The browser gave no cookies the engine can use, so nothing was changed.
 Selain ei antanut yhtään evästettä, jota moottori voisi käyttää, joten mitään ei muutettu.
 The cookies could not be written to %s, so nothing was changed.
@@ -1122,3 +1122,7 @@ Evästeitä ei voitu kirjoittaa kohteeseen %s, joten mitään ei muutettu.
 Selaimen evästeistä %d jätettiin pois, koska moottori ei lukenut niitä.
 The browser identity it reported cannot be used, so the mirror will send the default one.
 Ilmoitettua selaimen tunnistetta ei voi käyttää, joten peilaus lähettää oletustunnisteen.
+Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
+Kirjaudu sivustolle tämän selaimen toisessa välilehdessä. Avaa kehittäjätyökalut (F12) ja sitten Verkko-välilehti, lataa sivu uudelleen, napsauta ensimmäistä pyyntöä hiiren oikealla painikkeella ja valitse Copy as cURL (bash). Liitä teksti tähän. Myös cookies.txt-vienti toimii, luettelon ensimmäiselle osoitteelle.
+Cookies for: %s. Browser identity: %s.
+Evästeet sivustoille: %s. Selaimen tunniste: %s.

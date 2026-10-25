@@ -1,0 +1,253 @@
+<html xmlns="http://www.w3.org/1999/xhtml" lang="${attr:LANGUAGE_ISO}">
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<meta name="description" content="${attr:LANG_METADESC}" />
+	<meta name="keywords" content="${attr:LANG_METAKEYW}" />
+	<title>'${html:projname}' - HTTrack Website Copier</title>
+
+
+
+	<link rel="stylesheet" type="text/css" media="screen" href="style.css">
+	<link rel="stylesheet" type="text/css" media="screen" href="/server/theme.css">
+	<link rel="stylesheet" type="text/css" media="screen" href="user.css">
+	<script type="text/javascript" src="ping.js" defer></script>
+
+<script language="javascript" id="blscript">
+<!--
+
+// initialize wparent to false if necessary (Konqueror bug workaround)
+if ((typeof wparent) == "undefined") {
+	wparent=false;
+}
+
+// The step 3 page, whose address list gets the login.
+function bl_parent() {
+	if (wparent)
+		return wparent;
+	if (window.opener && !window.opener.closed)
+		return window.opener.document;
+	return null;
+}
+function bl_urls() {
+	var p = bl_parent();
+	return p && p.form && p.form.urls ? p.form.urls : null;
+}
+// A cookies.txt carries no address, so the first one in the list names it.
+function bl_first_url() {
+	var urls = bl_urls();
+	var words = urls ? urls.value.split(/\s+/) : [];
+	for (var i = 0; i < words.length; i++) {
+		if (words[i].length > 0)
+			return words[i];
+	}
+	return "";
+}
+function bl_show(text, isError) {
+	var out = document.getElementById("bloutput");
+	out.className = isError ? "blerror" : "";
+	out.textContent = text;
+}
+function do_load() {
+	window.status=' ';
+	document.form.okBtn.disabled = true;
+}
+function do_unload() {
+}
+// Post the paste to the server, which answers with this page holding the outcome.
+function bl_post(action, done) {
+	var f = document.form;
+	var body = "sid=" + encodeURIComponent(f.sid.value)
+		+ "&blaction=" + action
+		+ "&blpaste=" + encodeURIComponent(f.blpaste.value)
+		+ "&blagent=" + encodeURIComponent(navigator.userAgent || "")
+		+ "&blurl=" + encodeURIComponent(bl_first_url());
+	var x = new XMLHttpRequest();
+	x.open("POST", "browserlogin.html", true);
+	x.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+	x.onreadystatechange = function() {
+		if (x.readyState != 4)
+			return;
+		var r = null;
+		if (x.status == 200) {
+			r = new DOMParser().parseFromString(x.responseText, "text/html").getElementById("blresult");
+		}
+		if (r == null) {
+			bl_show("HTTP " + x.status, true);
+		} else if (r.getAttribute("data-state") == "error") {
+			bl_show(r.getAttribute("data-error"), true);
+		} else {
+			done(r);
+		}
+	};
+	x.send(body);
+}
+function do_preview() {
+	document.form.okBtn.disabled = true;
+	bl_post("preview", function(r) {
+		// a function, so a dollar sign in the values is not a replacement pattern
+		var hosts = r.getAttribute("data-hosts") || r.getAttribute("data-name");
+		var agent = r.getAttribute("data-agent") || "-";
+		var count = r.getAttribute("data-count");
+		bl_show('${js:LANG_BROWSERLOGINGOT}'.replace("%d", function() { return count; })
+			+ "\n" + '${js:LANG_BROWSERLOGINFOR}'.replace("%s", function() { return hosts; })
+			.replace("%s", function() { return agent; }), false);
+		document.form.okBtn.disabled = false;
+	});
+}
+function do_changed() {
+	document.form.okBtn.disabled = true;
+}
+// The address of a list line as step 3 reads it, in the form it is requested.
+function bl_address(line) {
+	var a = line.trim().split("#")[0];
+	var m = /^([a-zA-Z][a-zA-Z0-9+.-]*):\/\//.exec(a);
+	var rest = m ? a.substring(m[0].length) : a;
+	var host = /^[^\/?\\]*/.exec(rest)[0];
+	var name = host.replace(/:[0-9]*$/, "");
+	var ascii = name.toLowerCase();
+	try {
+		if (name.indexOf("@") < 0)
+			ascii = new URL("http://" + name + "/").hostname;
+	} catch (e) {
+	}
+	return (m ? m[1].toLowerCase() : "http") + "://" + ascii
+		+ host.substring(name.length) + rest.substring(host.length);
+}
+// Put url in place of the first line holding the same address, or append it.
+// The other lines stay as they are, so another page of the site keeps its own.
+function bl_add_to(text, url) {
+	var base = bl_address(url);
+	var lines = text.split("\n");
+	for (var i = 0; i < lines.length; i++) {
+		var cr = /\r$/.test(lines[i]) ? "\r" : "";
+		if (lines[i].trim().length > 0 && bl_address(lines[i]) == base) {
+			lines[i] = url + cr;
+			return lines.join("\n");
+		}
+	}
+	if (text.length > 0 && !/\n$/.test(text))
+		text += "\n";
+	return text + url;
+}
+function bl_add(url) {
+	var urls = bl_urls();
+	if (!urls) {
+		alert('Javascript error, or parent window lost');
+		return false;
+	}
+	urls.value = bl_add_to(urls.value, url);
+	return true;
+}
+function do_ok() {
+	bl_post("save", function(r) {
+		if (bl_add(r.getAttribute("data-starturl"))) {
+			window.close();
+		}
+	});
+}
+function info(str) {
+	window.status = str;
+}
+// -->
+</script>
+<style>
+#bloutput { white-space: pre-wrap; }
+#bloutput.blerror { font-weight: bold; }
+</style>
+
+</head>
+<body class="page-browserlogin" onLoad="do_load();" onUnload="do_unload();">
+
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
+	<tr>
+	<td><img src="images/wordmark.svg" width="400" height="36" alt="HTTrack Website Copier" title="" border="0" id="title" /></td>
+	</tr>
+</table>
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="3" class="tableWidth">
+	<tr>
+	<td width="90%" id="subTitle">${LANG_OSFWB}</td>
+${/* the documentation is a separate package and may be absent */}
+${do:if-file-exists:html/doc/html/index.html}
+	<td id="subTitle" align="right">
+		<a href="/doc/html/index.html" target="_blank"
+			onClick="window.open('/doc/html/index.html', 'httrack-doc', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=980, height=760'); return false"
+			title='${html:LANG_MANUAL}' onMouseOver="info('${js:LANG_MANUAL}'); return true" onMouseOut="info('&nbsp;'); return true"
+		>
+		${LANG_MANUAL}
+		</a>
+	</td>
+${do:end-if}
+	</tr>
+</table>
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
+<tr class="blak">
+<td>
+	<table width="100%" border="0" align="center" cellspacing="1" cellpadding="0">
+	<tr>
+	<td colspan="6"> 
+		<table width="100%" border="0" align="center" cellspacing="0" cellpadding="10">
+		<tr> 
+		<td id="pageContent"> 
+<!-- ==================== End prologue ==================== -->
+
+<table border="0" width="100%">
+<tr><td width="90%">
+	<h2 align="center"><em>${LANG_BROWSERLOGINTITLE}</em></h2>
+</td>
+${do:if-file-exists:html/doc/html/login.html}
+<td>
+	<a href="/doc/html/login.html#webhttrack" target="_blank"
+		onClick="window.open('/doc/html/login.html#webhttrack', 'httrack-doc', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=980, height=760'); return false"
+			title='${html:LANG_TIPHELP}' onMouseOver="info('${js:LANG_TIPHELP}'); return true" onMouseOut="info('&nbsp;'); return true"
+	>${LANG_O5}</a>
+</td>
+${do:end-if}
+</tr></table>
+
+<form action="${attr:thisfile}" name="form" onSubmit="return false">
+<input type="hidden" name="sid" value="${attr:sid}">
+<p>${LANG_BROWSERLOGINPASTE}</p>
+<textarea name="blpaste" cols="70" rows="12" spellcheck="false" autocomplete="off"
+	onInput="do_changed()" onChange="do_changed()"
+	title='${html:LANG_BROWSERLOGINTIP}' onMouseOver="info('${js:LANG_BROWSERLOGINTIP}'); return true" onMouseOut="info('&nbsp;'); return true"
+></textarea>
+<p>
+<input type="button" name="previewBtn" value="${attr:LANG_BROWSERLOGINGO}" onClick="do_preview()">
+</p>
+<p id="bloutput" role="status"></p>
+<p>
+<input class="primary" type="button" name="okBtn" value="${attr:LANG_OK}" onClick="do_ok()"
+			title='${html:LANG_TIPOK}' onMouseOver="info('${js:LANG_TIPOK}'); return true" onMouseOut="info('&nbsp;'); return true"
+>
+<input type="button" name="cancelBtn" value="${attr:LANG_CANCEL}" onClick="window.close()">
+</p>
+</form>
+
+${/* the outcome of the last post, which the script above reads from the answer */}
+<div id="blresult" hidden data-state="${attr:blstate}" data-error="${attr:blerror}" data-name="${attr:blname}"
+	data-starturl="${attr:blstarturl}" data-count="${attr:blcount}" data-hosts="${attr:blhosts}" data-agent="${attr:blagent}"></div>
+
+<!-- ==================== Start epilogue ==================== -->
+		</td>
+		</tr>
+		</table>
+	</td>
+	</tr>
+	</table>
+</td>
+</tr>
+</table>
+
+<table width="76%" border="0" align="center" valign="bottom" cellspacing="0" cellpadding="0">
+	<tr>
+	<td id="footer"><small><small>&copy; 1998-${date:year} Xavier Roche &amp; other contributors - Web Design: Leto Kauler. - <a href="/server/about.html" target="_blank"
+			onClick="window.open('/server/about.html', 'httrack-about', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=640, height=480'); return false">${LANG_G21}</a></small></small></td>
+	</tr>
+</table>
+
+</body>
+
+</html>
+
+

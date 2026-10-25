@@ -1112,7 +1112,7 @@ The browser did not open: %s.
 Brskalnik se ni odprl: %s.
 The browser came back with no cookies, so nothing was kept.
 Brskalnik ni vrnil nobenega piškotka, zato ni bilo nič shranjeno.
-%d cookies were collected. They are used when you press OK.
+Cookies collected: %d. They are used when you press OK.
 Zbrani piškotki: %d. Uporabljeni bodo, ko pritisnete „Vredu“.
 The browser gave no cookies the engine can use, so nothing was changed.
 Brskalnik ni dal nobenega piškotka, ki bi ga HTTrack lahko uporabil, zato ni bilo nič spremenjeno.
@@ -1122,3 +1122,7 @@ Piškotkov ni bilo mogoče zapisati v %s, zato ni bilo nič spremenjeno.
 Izpuščeni piškotki brskalnika: %d, ker jih HTTrack ne bi mogel prebrati.
 The browser identity it reported cannot be used, so the mirror will send the default one.
 Istovetnosti brskalnika, ki jo je sporočil, ni mogoče uporabiti, zato bo zrcaljenje poslalo privzeto.
+Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
+Prijavite se na spletno mesto v drugem zavihku tega brskalnika. Odprite orodja za razvijalce (F12), nato zavihek Omrežje, znova naložite stran, z desno tipko kliknite prvo zahtevo in izberite Copy as cURL (bash). Prilepite besedilo sem. Deluje tudi izvoz cookies.txt, za prvi naslov na seznamu.
+Cookies for: %s. Browser identity: %s.
+Piškotki za: %s. Identiteta brskalnika: %s.

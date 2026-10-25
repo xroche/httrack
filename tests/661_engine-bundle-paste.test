@@ -1,0 +1,419 @@
+#!/bin/bash
+#
+# hts_bundle_from_paste: a pasted "Copy as cURL (bash)" or cookies.txt becomes
+# a login bundle the engine loads, and hostile pastes are refused. Also the two
+# exported rules front ends share: the registrable domain and the bundle name.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+tmpdir=$(mktemp -d)
+cleanup_push rm -rf "$tmpdir"
+dir=$(nativepath "$tmpdir")
+mkdir "$tmpdir/proj" "$tmpdir/dry" "$tmpdir/in"
+proj="$dir/proj"
+tab=$(printf '\t')
+
+n=0
+put() { # put CONTENT -- write a paste file, its name in $in
+    n=$((n + 1))
+    in="$dir/in/p$n"
+    printf '%s' "$1" >"$tmpdir/in/p$n"
+}
+
+# Registrable domains through the built-in suffix list. A host with none is a
+# public suffix, a single label or an address.
+assert_selftest "com none
+co.uk none
+s3.amazonaws.com none
+wiki none
+127.0.0.1 none
+::1 none
+WWW.Example.CO.UK. example.co.uk
+a.s3.amazonaws.com a.s3.amazonaws.com
+www.bücher.de bücher.de
+www.xn--bcher-kva.de xn--bcher-kva.de
+a.例え.jp 例え.jp" regdomain com co.uk s3.amazonaws.com wiki 127.0.0.1 ::1 \
+    WWW.Example.CO.UK. a.s3.amazonaws.com www.bücher.de www.xn--bcher-kva.de \
+    a.例え.jp
+
+for ok in example.com a.b_c-9 console; do
+    selftest_queue ok bundlename "$ok"
+done
+dots="invalid login bundle name: it starts with '.' or holds \"..\""
+for bad in .. a..b .x; do
+    selftest_queue "$dots" bundlename "$bad"
+done
+for bad in con COM1.txt lpt9; do
+    selftest_queue 'invalid login bundle name: a Windows device name' \
+        bundlename "$bad"
+done
+selftest_queue "invalid login bundle name: use letters, digits, '.', '_' and '-'" \
+    bundlename a/b
+
+# A value no output may carry: refused rows assert their exact text.
+sec=PLANTED7SECRET
+
+# cURL: -b and -H Cookie, a $'...' quote with escapes, backslash-newline
+# joins. The fragment goes, and the request's own User-Agent beats the page's.
+put "curl 'https://www.Example.com:8443/members/?a=1#frag' \\
+  -H 'accept: text/html' \\
+  -H 'User-Agent: Mozilla/5.0 Test' \\
+  -H 'authorization: Bearer tok123' \\
+  -b 'SID=abc; PREF=x=y' \\
+  -H \$'Cookie: K=v\\'q; \\u00e9t=\\x41; SID=second' \\
+  --compressed"
+curl1=$in
+selftest_queue_lines "name=example.com cookies=4 hosts=example.com
+url=https://www.Example.com:8443/members/?a=1#httrack-bundle=example.com
+agent=Mozilla/5.0 Test" paste "$proj" "$curl1" agent:PageAgent
+
+# The page's agent serves when the command names none, or an empty one. -A
+# names one too, and the blanks around an agent go.
+put "curl https://shop.test/cart -b a=1 -X GET"
+selftest_queue_lines "name=shop.test cookies=1 hosts=shop.test
+url=https://shop.test/cart#httrack-bundle=shop.test
+agent=PageAgent" paste "$proj" "$in" agent:PageAgent
+put "curl 'http://shop2.test/' -A '  Own/2 ' -b a=1"
+selftest_queue_lines "name=shop2.test cookies=1 hosts=shop2.test
+url=http://shop2.test/#httrack-bundle=shop2.test
+agent=Own/2" paste "$proj" "$in" agent:PageAgent
+put "curl 'http://dry.test/' -A '' -b a=1"
+selftest_queue_lines "name=dry.test cookies=1 hosts=dry.test
+url=http://dry.test/#httrack-bundle=dry.test
+agent=Page" paste "$dir/dry" "$in" dry agent:' Page '
+
+# Header names in any case, and the long options.
+put "curl 'https://lower.test/' -H 'cookie: c=1' -H 'user-agent: Low/1' -H 'X;'"
+selftest_queue_lines "name=lower.test cookies=1 hosts=lower.test
+url=https://lower.test/#httrack-bundle=lower.test
+agent=Low/1" paste "$dir/dry" "$in" dry
+put "curl --url 'https://long.test/' --cookie c=1 --header 'Cookie: d=2' --user-agent Long/1"
+selftest_queue_lines "name=long.test cookies=2 hosts=long.test
+url=https://long.test/#httrack-bundle=long.test
+agent=Long/1" paste "$dir/dry" "$in" dry
+
+# An Authorization header alone is a login too.
+put "curl 'https://api.test/' -H 'Authorization: Basic eDp5'"
+selftest_queue_lines "name=api.test cookies=0 hosts=
+url=https://api.test/#httrack-bundle=api.test
+agent=" paste "$proj" "$in"
+
+# The name: no port, trailing dots or leading www., and an international host
+# takes its ASCII form, in the address and the cookies too.
+for u in 'https://WWW.Site.test:81/x' 'https://site.test./' \
+    'https://site.test../' 'http://www.site.test/'; do
+    put "curl '$u' -b a=1"
+    selftest_queue_head "name=site.test cookies=1" paste "$dir/dry" "$in" dry
+done
+put "curl 'http://wwwshop.test/' -b a=1"
+selftest_queue_head "name=wwwshop.test cookies=1" paste "$dir/dry" "$in" dry
+put "curl 'https://WWW.BüCHER.de/x' -b a=1"
+selftest_queue_lines "name=xn--bcher-kva.de cookies=1 hosts=xn--bcher-kva.de
+url=https://www.xn--bcher-kva.de/x#httrack-bundle=xn--bcher-kva.de
+agent=" paste "$dir/dry" "$in" dry
+put "curl 'https://a.例え.jp/' -b a=1"
+selftest_queue_head "name=a.xn--r8jz45g.jp cookies=1" paste "$dir/dry" "$in" dry
+# The trailing dots leave the address too, so the cookies name the same host.
+put "curl 'https://dots.test../x' -b a=1"
+selftest_queue_lines "name=dots.test cookies=1 hosts=dots.test
+url=https://dots.test/x#httrack-bundle=dots.test
+agent=" paste "$dir/dry" "$in" dry
+# A suffix in the pasted address is replaced, never doubled.
+put "curl 'https://site.test/#httrack-bundle=other' -b a=1"
+selftest_queue_lines "name=site.test cookies=1 hosts=site.test
+url=https://site.test/#httrack-bundle=site.test
+agent=" paste "$dir/dry" "$in" dry
+
+# Where header cookies land, checked as file bytes below: the registrable
+# domain, host-only for an address, never Secure over http. "g =h" is g.
+put "curl 'https://app.shop.test/' -b 'g =h; k= v'"
+selftest_queue_head "name=app.shop.test cookies=2 hosts=shop.test" paste "$proj" "$in"
+put "curl 'https://a.b.co.uk/' -b x=1"
+selftest_queue_head "name=a.b.co.uk cookies=1 hosts=b.co.uk" paste "$proj" "$in"
+put "curl 'http://10.0.0.1:8080/' -b x=1"
+selftest_queue_head "name=10.0.0.1 cookies=1 hosts=10.0.0.1" paste "$proj" "$in"
+
+# Firefox writes a character past U+FFFF as two \u halves.
+put "curl 'https://emoji.test/' -b \$'e=\\ud83d\\ude00'"
+selftest_queue_head "name=emoji.test cookies=1" paste "$proj" "$in"
+
+# Hygiene: a BOM, leading blank lines, CRLF line ends and joins.
+put "$(printf '\357\273\277')curl 'https://bom.test/' -b a=1"
+selftest_queue_head "name=bom.test cookies=1" paste "$dir/dry" "$in" dry
+put "$(printf '\n \n')curl 'https://blank.test/' -b a=1"
+selftest_queue_head "name=blank.test cookies=1" paste "$dir/dry" "$in" dry
+put "$(printf "curl 'https://crlf.test/' \\\\\r\n  -b a=1\r\n")"
+selftest_queue_head "name=crlf.test cookies=1" paste "$dir/dry" "$in" dry
+
+# The biggest paste and the longest agent that pass.
+big="curl https://big.test/ -b a=1 -d '"
+put "$big$(repeat_chars $((262143 - ${#big} - 1)) d)'"
+selftest_queue_head "name=big.test cookies=1" paste "$dir/dry" "$in" dry
+put "curl https://agent.test/ -b a=1 -A $(repeat_chars 1023 u)"
+selftest_queue_head "name=agent.test cookies=1" paste "$dir/dry" "$in" dry
+# The longest address: 1000 bytes, then the suffix and the name make 1023.
+longurl="https://lu.test/$(repeat_chars $((1000 - 16)) p)"
+put "curl '$longurl' -b a=1"
+selftest_queue_head "name=lu.test cookies=1" paste "$dir/dry" "$in" dry
+
+# cookies.txt: the records keep their fields, comments and blank lines go, and
+# a cookie outside the scope of the address is left out, a dot boundary too.
+put "# Netscape HTTP Cookie File
+# a comment the bundle reader would warn about
+
+.jar.test${tab}TRUE${tab}/${tab}TRUE${tab}1999999999${tab}A${tab}b
+#HttpOnly_www.jar.test${tab}FALSE${tab}/x${tab}FALSE${tab}0${tab}H${tab}h
+.other.test${tab}TRUE${tab}/${tab}FALSE${tab}0${tab}O${tab}o
+.ar.test${tab}TRUE${tab}/${tab}FALSE${tab}0${tab}D1${tab}x
+xjar.test${tab}FALSE${tab}/${tab}FALSE${tab}0${tab}D2${tab}x"
+txt=$in
+selftest_queue_lines "name=jar.test cookies=2 hosts=www.jar.test,jar.test
+url=https://www.jar.test/page#httrack-bundle=jar.test
+agent=UA/1" paste "$proj" "$txt" 'url:https://www.jar.test/page#f' agent:UA/1
+# A browser exports an international domain in its ASCII form, an old jar in
+# UTF-8, and both match the address in either form.
+put "xn--bcher-kva.de${tab}FALSE${tab}/${tab}FALSE${tab}0${tab}P${tab}p"
+selftest_queue_head "name=xn--bcher-kva.de cookies=1 hosts=xn--bcher-kva.de" \
+    paste "$dir/dry" "$in" dry url:https://www.bücher.de/
+put ".bücher.de${tab}TRUE${tab}/${tab}FALSE${tab}0${tab}U${tab}u
+.xn--bcher-kva.de${tab}TRUE${tab}/${tab}FALSE${tab}0${tab}P${tab}p
+.other.de${tab}TRUE${tab}/${tab}FALSE${tab}0${tab}O${tab}o"
+selftest_queue_head "name=xn--bcher-kva.de cookies=2 hosts=xn--bcher-kva.de" \
+    paste "$dir/dry" "$in" dry url:https://www.xn--bcher-kva.de/
+put "$(printf '.crlf.test\tTRUE\t/\tFALSE\t0\tC\tc\r\n')"
+selftest_queue_head "name=crlf.test cookies=1" paste "$dir/dry" "$in" dry url:https://crlf.test/
+
+# Dry runs write nothing, even next to an older bundle.
+printf 'old\n' >"$tmpdir/dry/site.test.hts"
+put "curl 'https://site.test/' -b a=1"
+selftest_queue_head "name=site.test" paste "$dir/dry" "$in" dry
+
+# Refused, before anything is written.
+refused() { # refused WHY CONTENT [ARGS...]
+    put "$2"
+    selftest_queue "refused: $1" paste "$proj" "$in" "${@:3}"
+}
+refused 'nothing was pasted' ' '
+refused 'the paste holds a control byte' "curl 'https://bad.test/' -b '$sec=1$(printf '\001')'"
+refused 'the paste holds a control byte' "curl 'https://bad.test/' -b $sec=1$(printf '\033')"
+refused 'the paste holds a control byte' "curl 'https://bad.test/' -b $sec=1$(printf '\177')"
+refused 'the text holds a control byte' "curl 'https://bad.test/' -b \$'$sec=1\\nHost: evil'"
+refused 'the text holds a control byte' "curl 'https://bad.test/' -b '$sec=1
+b=2'"
+refused 'the text holds a control byte' "curl 'https://bad.test/' -A \$'x\\x7f' -b a=$sec"
+refused 'the text holds a NUL byte' "curl 'https://bad.test/' -b \$'a=$sec\\x00'"
+refused 'the text holds a NUL byte' "curl 'https://bad.test/' -b \$'a=$sec\\u0000'"
+refused 'a quote is not closed' "curl 'https://bad.test/ -b a=$sec"
+refused 'a quote is not closed' "curl \$'https://bad.test/ -b a=$sec"
+refused 'a quote is not closed' "curl 'https://bad.test/' -b \$'a=$sec\\'"
+noescape="\$'...' holds an escape no browser writes"
+for e in c 0 a U00e9 '"'; do
+    refused "$noescape" "curl 'https://bad.test/' -b \$'a=$sec\\$e'"
+done
+digits="an escape in \$'...' lacks its hex digits"
+refused "$digits" "curl 'https://bad.test/' -b \$'a=$sec\\xg1'"
+refused "$digits" "curl 'https://bad.test/' -b \$'a=$sec\\u00e'"
+refused "an escape in \$'...' is out of range" "curl 'https://bad.test/' -b \$'a=$sec\\ud800'"
+refused "an escape in \$'...' is out of range" "curl 'https://bad.test/' -b \$'a=$sec\\ude00'"
+refused 'a cookie holds a TAB' "curl 'https://bad.test/' -b \$'a=$sec\\tb'"
+shell="the text holds shell syntax other than '...' and \$'...' quotes"
+refused "$shell" "curl \"https://bad.test/\" -b a=$sec"
+refused "$shell" "curl https://bad.test/ -b a=$sec; rm -rf x"
+refused "$shell" "curl https://bad.test/ -b \`id\`"
+refused "$shell" "curl ^\"https://bad.test/^\" -b a=$sec"
+refused 'the command holds no URL' "curl -b a=$sec"
+refused '--url has no value' "curl -b a=$sec --url"
+refused 'the command holds more than one URL' "curl https://a.test/ https://b.test/ -b a=$sec"
+refused 'the command holds the unknown curl option -o' "curl https://bad.test/ -b a=1 -o $sec"
+refused 'the command holds the unknown curl option -b...' "curl https://bad.test/ -b$sec=1"
+refused 'the command holds the unknown curl option --output' "curl https://bad.test/ -b a=1 --output=$sec"
+refused 'an option has no value' "curl https://bad.test/ -b"
+refused '-b names a file, not cookies' "curl https://bad.test/ -b cookies.txt"
+refused 'a cookie in the paste has no name' "curl https://bad.test/ -b 'a=1; =$sec'"
+refused 'a cookie in the paste has no name' "curl https://bad.test/ -b 'a=1;  =$sec'"
+refused 'the paste holds no cookie for bad.test' "curl https://bad.test/ -H 'Accept: */*'"
+refused 'the address is not an http or https URL' "curl ftp://bad.test/ -b a=$sec"
+refused 'the address holds a user name or password' "curl 'https://user:$sec@www.bad.test:81/x' -b a=1"
+refused 'the address holds a user name or password' "curl 'http://$sec@bad.test/' -b a=1"
+# IDNA would encode a capital outside ASCII, or malformed UTF-8, as another host.
+refused 'write the host in lowercase' "curl 'https://www.BÜCHER.de/' -b a=$sec"
+refused 'the host is not valid UTF-8' "curl 'https://$(printf '\300\257').test/' -b a=$sec"
+refused 'an IP address cannot name a login bundle' "curl 'http://[::1]/' -b a=$sec"
+refused 'the address has no host' "curl 'http:///x' -b a=$sec"
+refused 'the address names no site' "curl 'https://www./' -b a=$sec"
+refused 'the address names no site' "curl 'https://www..:80/' -b a=$sec"
+refused 'invalid login bundle name: a Windows device name' "curl http://con/ -b a=$sec"
+refused 'invalid login bundle name: 128 bytes or more' \
+    "curl 'https://$(repeat_chars 60 a).$(repeat_chars 63 b).test/' -b a=$sec"
+refused 'the address cannot be used' "curl 'https://bad.test/$(repeat_chars 1024 p)' -b a=$sec"
+# 1023 bytes, "ü" being two of them, and 1029 once the host is in ASCII
+refused 'the address is too long once its host is in ASCII' \
+    "curl 'https://ü.test/$(repeat_chars $((1023 - 16)) p)' -b a=$sec"
+refused 'the address is longer than 1023 bytes once the bundle name is added' \
+    "curl '${longurl}p' -b a=$sec"
+refused 'the address holds a text direction control' \
+    "curl 'https://bad.test/$(printf '\342\200\256')' -b a=$sec"
+refused 'the address holds a text direction control' \
+    "curl 'https://bad.test/$(printf '\342\201\246')' -b a=$sec"
+refused 'the user agent holds a text direction control' \
+    "curl https://bad.test/ -b a=$sec -A 'UA$(printf '\342\200\252')'"
+refused 'the user agent is blank' "curl https://bad.test/ -b a=$sec -A \$'\\t'"
+refused 'the user agent is blank' "curl https://bad.test/ -b a=$sec" agent:' '
+refused 'a cookies.txt needs the address of the site' \
+    ".a.test${tab}TRUE${tab}/${tab}FALSE${tab}0${tab}A${tab}$sec"
+refused 'the paste holds no cookie for a.test' \
+    ".other.test${tab}TRUE${tab}/${tab}FALSE${tab}0${tab}A${tab}$sec" url:https://a.test/
+refused 'line 2 of the paste: a cookie line is too long' \
+    "# x
+.a.test${tab}TRUE${tab}/${tab}FALSE${tab}0${tab}A${tab}$sec$(repeat_chars 8000 v)" url:https://a.test/
+refused 'the paste is longer than 262143 bytes' "$big$(repeat_chars $((262144 - ${#big} - 1)) d)'"
+refused 'the command has too many words' \
+    "curl https://bad.test/ -b a=$sec$(for _ in $(seq 1 1021); do printf ' -k'; done)"
+many=
+for i in $(seq 1 400); do
+    many="$many C$i=$(repeat_chars 100 v);"
+done
+refused 'the cookies of the paste do not fit in a bundle' "curl https://bad.test/ -b '$many'"
+refused 'the user agent cannot be used' "curl https://bad.test/ -b a=$sec -A $(repeat_chars 1024 u)"
+# A folder that does not exist: the reason names the path, not the paste.
+put "curl https://nofolder.test/ -b a=$sec"
+selftest_queue_head "refused: cannot write $dir/missing/nofolder.test.hts: " \
+    paste "$dir/missing" "$in"
+
+# 1020 words pass, so the refusal above is the word count and nothing else.
+put "curl https://words.test/ -b a=1$(for _ in $(seq 1 1020); do printf ' -k'; done)"
+selftest_queue_head "name=words.test cookies=1" paste "$dir/dry" "$in" dry
+
+test "${#SELFTEST_WANT[@]}" -eq 106 ||
+    fail "expected 106 queued rows, got ${#SELFTEST_WANT[@]}"
+selftest_run_queued
+
+# A host list too long to show ends with ",...", not with a cut name.
+rows=
+for i in $(seq 1 60); do
+    rows="$rows$(printf 'h%02d-%s.cut.test\tFALSE\t/\tFALSE\t0\tC\tc' "$i" \
+        "$(repeat_chars 20 x)")
+"
+done
+put "$rows"
+out=$(httrack -O /dev/null -#test=paste "$dir/dry" "$in" dry url:https://cut.test/ | tr -d '\r')
+hosts=$(sed -n 's/^name=cut.test cookies=60 hosts=//p' <<<"$out")
+case $hosts in
+h01-*.cut.test,h02-*,...) ;;
+*) fail "a long host list: $out" ;;
+esac
+test "${#hosts}" -lt 1024 || fail "the host list passes its buffer: ${#hosts}"
+
+# What the accepted rows wrote, and nothing the refused or dry ones did.
+for f in api.test app.shop.test a.b.co.uk 10.0.0.1 emoji.test example.com \
+    jar.test shop.test shop2.test; do
+    assert_file "$tmpdir/proj/$f.hts" "bundle for $f"
+done
+set -- "$tmpdir"/proj/* "$tmpdir"/dry/*
+test $# -eq 10 || fail "unexpected files: $*"
+test "$(cat "$tmpdir/dry/site.test.hts")" = old || fail "a dry run replaced a bundle"
+test ! -e "$tmpdir/missing" || fail "a missing folder was created"
+! grep -rqF "$sec" "$tmpdir/proj" "$tmpdir/dry" || fail "a refused paste reached a file"
+
+# The exact files, owner-only. Header cookies bind to the registrable domain,
+# Secure over https, for the session, and the first of a repeated name wins.
+bytes() { # bytes NAME WANT -- the bundle NAME in proj holds WANT
+    local got
+    got=$(tr -d '\r' <"$tmpdir/proj/$1.hts") # CRLF on Windows
+    test "$got" = "$2" || fail "$1.hts content: [$got]"
+}
+bytes example.com "# HTTrack bundle 1
+ua Mozilla/5.0 Test
+header authorization: Bearer tok123
+cookies
+.example.com${tab}TRUE${tab}/${tab}TRUE${tab}0${tab}SID${tab}abc
+.example.com${tab}TRUE${tab}/${tab}TRUE${tab}0${tab}PREF${tab}x=y
+.example.com${tab}TRUE${tab}/${tab}TRUE${tab}0${tab}K${tab}v'q
+.example.com${tab}TRUE${tab}/${tab}TRUE${tab}0${tab}ét${tab}A"
+bytes jar.test "# HTTrack bundle 1
+ua UA/1
+cookies
+#HttpOnly_www.jar.test${tab}FALSE${tab}/x${tab}FALSE${tab}0${tab}H${tab}h
+.jar.test${tab}TRUE${tab}/${tab}TRUE${tab}1999999999${tab}A${tab}b"
+bytes app.shop.test "# HTTrack bundle 1
+cookies
+.shop.test${tab}TRUE${tab}/${tab}TRUE${tab}0${tab}g${tab}h
+.shop.test${tab}TRUE${tab}/${tab}TRUE${tab}0${tab}k${tab}v"
+bytes a.b.co.uk "# HTTrack bundle 1
+cookies
+.b.co.uk${tab}TRUE${tab}/${tab}TRUE${tab}0${tab}x${tab}1"
+bytes 10.0.0.1 "# HTTrack bundle 1
+cookies
+10.0.0.1${tab}FALSE${tab}/${tab}FALSE${tab}0${tab}x${tab}1"
+bytes shop2.test "# HTTrack bundle 1
+ua Own/2
+cookies
+.shop2.test${tab}TRUE${tab}/${tab}FALSE${tab}0${tab}a${tab}1"
+bytes emoji.test "# HTTrack bundle 1
+cookies
+.emoji.test${tab}TRUE${tab}/${tab}TRUE${tab}0${tab}e${tab}$(printf '\360\237\230\200')"
+if ! target_is_windows; then
+    for f in "$tmpdir"/proj/*.hts; do
+        mode=$(stat -c %a "$f" 2>/dev/null || stat -f %Lp "$f")
+        test "$mode" = 600 || fail "$f has mode $mode"
+    done
+fi
+
+# Round trip: the engine's own loader reads what was written.
+assert_selftest "cookie .example.com SID=abc
+cookie .example.com PREF=x=y
+cookie .example.com K=v'q
+cookie .example.com ét=A
+https://example.com ua=Mozilla/5.0 Test headers=authorization: Bearer tok123|
+http://example.com ua=Mozilla/5.0 Test headers=global" bundle "$proj" \
+    'https://www.Example.com:8443/members/?a=1#httrack-bundle=example.com' \
+    host:https://example.com host:http://example.com
+assert_selftest "cookie www.jar.test H=h
+cookie .jar.test A=b" bundle "$proj" 'https://www.jar.test/page#httrack-bundle=jar.test'
+
+# A second capture replaces the file, and tightens an older one's mode.
+chmod 644 "$tmpdir/proj/example.com.hts"
+put "curl 'https://example.com/' -b 'NEW=1'"
+out=$(httrack -O /dev/null -#test=paste "$proj" "$in" | tr -d '\r')
+grep -q '^name=example.com cookies=1 ' <<<"$out" || fail "second capture: $out"
+grep -q 'NEW' "$tmpdir/proj/example.com.hts" || fail "the file was not replaced"
+! grep -q 'SID' "$tmpdir/proj/example.com.hts" || fail "the old cookies stayed"
+if ! target_is_windows; then
+    mode=$(stat -c %a "$tmpdir/proj/example.com.hts" 2>/dev/null ||
+        stat -f %Lp "$tmpdir/proj/example.com.hts")
+    test "$mode" = 600 || fail "a replaced bundle has mode $mode"
+fi
+
+# A link at the bundle's name is replaced, and what it points to is untouched.
+if ! target_is_windows; then
+    printf 'keep\n' >"$tmpdir/target"
+    ln -s "$tmpdir/target" "$tmpdir/proj/link.test.hts"
+    put "curl 'https://link.test/' -b 'L=1'"
+    out=$(httrack -O /dev/null -#test=paste "$proj" "$in")
+    grep -q '^name=link.test cookies=1 ' <<<"$out" || fail "link capture: $out"
+    test "$(cat "$tmpdir/target")" = keep || fail "the write followed a link"
+    test ! -L "$tmpdir/proj/link.test.hts" || fail "the link was not replaced"
+    grep -q 'L' "$tmpdir/proj/link.test.hts" || fail "no bundle at the link's name"
+    set -- "$tmpdir"/proj/*.tmp
+    test ! -e "$1" || fail "a temporary was left: $*"
+fi
+
+# The last record of a cookies.txt needs no line end.
+put ".nolf.test${tab}TRUE${tab}/${tab}FALSE${tab}0${tab}A${tab}first
+.nolf.test${tab}TRUE${tab}/${tab}FALSE${tab}0${tab}N${tab}last"
+out=$(httrack -O /dev/null -#test=paste "$proj" "$in" url:https://nolf.test/ | tr -d '\r')
+grep -q '^name=nolf.test cookies=2 ' <<<"$out" || fail "no final LF: $out"
+command grep -qxF ".nolf.test${tab}TRUE${tab}/${tab}FALSE${tab}0${tab}N${tab}last" \
+    <<<"$(tr -d '\r' <"$tmpdir/proj/nolf.test.hts")" ||
+    fail_dump "the last record lost a byte" "$tmpdir/proj/nolf.test.hts"
+
+# Two threads writing one bundle each use their own temporary.
+mkdir "$tmpdir/race"
+out=$(httrack -O /dev/null -#test=pasterace "$dir/race" 20 | tr -d '\r')
+test "$out" = failed=0 || fail "two threads at once: $out"
+set -- "$tmpdir"/race/*.tmp
+test ! -e "$1" || fail "a temporary was left: $*"
+echo PASS

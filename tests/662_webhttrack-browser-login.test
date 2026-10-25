@@ -1,0 +1,224 @@
+#!/bin/bash
+#
+# WebHTTrack's "Log in with a browser" popup: a pasted Copy as cURL is
+# previewed without writing, then saved as <project>/<name>.hts, owner-only,
+# and the address it hands back carries the bundle suffix.
+
+set -euo pipefail
+
+# shellcheck source=tests/webhttracklib.sh
+. "${0%"${0##*/}"}./webhttracklib.sh"
+
+htsserver_require
+
+# bl_add_to cases, run after the popup's own script.
+BL_ADD_CASES=$(
+    cat <<'EOF'
+var n = 0;
+function want(text, url, expect) {
+    var got = bl_add_to(text, url);
+    if (got !== expect)
+        throw new Error(JSON.stringify([text, url, got]));
+    n++;
+}
+var u = "http://noscheme.test/a#httrack-bundle=noscheme.test";
+want("a.test/x\n\n  noscheme.test/a  \nHTTP://Other.test/", u,
+    "a.test/x\n\n" + u + "\nHTTP://Other.test/");
+want("a.test/x", "https://b.test/#httrack-bundle=b.test",
+    "a.test/x\nhttps://b.test/#httrack-bundle=b.test");
+want("http://s.test/", "https://s.test/#httrack-bundle=s.test",
+    "http://s.test/\nhttps://s.test/#httrack-bundle=s.test");
+want("HTTPS://s.test/#old", "https://s.test/#httrack-bundle=s.test",
+    "https://s.test/#httrack-bundle=s.test");
+want("x.test/\r\nhttp://c.test/\r\n", "http://c.test/#httrack-bundle=c.test",
+    "x.test/\r\nhttp://c.test/#httrack-bundle=c.test\r\n");
+want("http://d.test/\nhttp://d.test/", "http://d.test/#httrack-bundle=d.test",
+    "http://d.test/#httrack-bundle=d.test\nhttp://d.test/");
+var x = "http://www.xn--bcher-kva.test/#httrack-bundle=xn--bcher-kva.test";
+want("HTTP://NoScheme.test/a", u, u);
+want("noscheme.TEST/A", u, "noscheme.TEST/A\n" + u);
+want("www.bücher.test/", x, x);
+want("http://WWW.BÜCHER.test:80/", x, "http://WWW.BÜCHER.test:80/\n" + x);
+want("u@noscheme.test/a", u, "u@noscheme.test/a\n" + u);
+console.log("ok " + n);
+EOF
+)
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_login.XXXXXX") || fail "no tmpdir"
+cleanup_push htsserver_cleanup_dir "${work}"
+export HOME="${work}" # no ~/.httrack.ini of the developer's in the store
+
+htsserver_start
+sid=$(htsserver_sid)
+test "${#sid}" -eq 32 || fail "no session id in the panel (got '${sid}')"
+
+# The button sits beside "Add a URL...", and the popup renders its text.
+page=$(htsserver_get /server/step3.html)
+grep -qF "doOpenLogin()" <<<"${page}" || fail "no login button on step 3"
+grep -qF "window.open('browserlogin.html'" <<<"${page}" ||
+    fail "the button opens no popup"
+page=$(htsserver_get /server/browserlogin.html)
+grep -qF 'Copy as cURL (bash)' <<<"${page}" || fail "no instructions: ${page}"
+grep -qF 'name="blpaste"' <<<"${page}" || fail "no paste box"
+grep -qF "'Cookies for: %s. Browser identity: %s.'" <<<"${page}" ||
+    fail "the preview line is not rendered"
+! grep -qF 'LANG_' <<<"${page}" || fail "a catalog key is not rendered"
+
+# Name the project, as step 2 does.
+htsserver_client --path /server/step3.html --field "sid=${sid}" \
+    --field "path=${work}" --field projname=proj >/dev/null
+proj="${work}/proj"
+
+paste="curl 'https://www.login.test/members/#top' \\
+  -H 'User-Agent: PasteAgent/1.0' \\
+  -b 'SID=SECRETSID42; theme=dark'"
+
+# login FIELD... -- post to the popup, then read the page the post redirects
+# to, as the popup's script does, into $reply
+login() {
+    reply=$(htsserver_client --path /server/browserlogin.html "$@")
+    grep -q '^HTTP/1.[01] 302' <<<"${reply}" || fail "no redirect: ${reply:0:200}"
+    reply=$(htsserver_get /server/browserlogin.html)
+    grep -q '^HTTP/1.[01] 200' <<<"${reply}" || fail "no 200: ${reply:0:200}"
+}
+attr() { # attr NAME -- the popup's data-NAME value in $reply, unescaped
+    sed -n "s/.*data-$1=\"\\([^\"]*\\)\".*/\\1/p" <<<"${reply}" | head -n 1 |
+        sed -e "s/&#39;/'/g" -e 's/&quot;/"/g' -e 's/&lt;/</g' -e 's/&gt;/>/g' \
+            -e 's/&amp;/\&/g'
+}
+
+# Preview: the count, the hosts and the agent, and no file.
+login --field "sid=${sid}" --field blaction=preview --field "blpaste=${paste}" \
+    --field "blagent=PageAgent/2"
+test "$(attr state)" = preview || fail "preview state: $(attr state) $(attr error)"
+test "$(attr count)" = 2 || fail "preview count: $(attr count)"
+test "$(attr hosts)" = login.test || fail "preview hosts: $(attr hosts)"
+test "$(attr agent)" = PasteAgent/1.0 || fail "preview agent: $(attr agent)"
+test ! -e "${proj}/login.test.hts" || fail "the preview wrote the bundle"
+
+# A refused paste says why, and writes nothing.
+login --field "sid=${sid}" --field blaction=save \
+    --field 'blpaste=curl "https://www.login.test/" -b a=SECRETSID42'
+test "$(attr state)" = error || fail "a double-quoted paste was accepted"
+test "$(attr error)" = "the text holds shell syntax other than '...' and \$'...' quotes" ||
+    fail "the reason: $(attr error)"
+test ! -e "${proj}/login.test.hts" || fail "a refused paste wrote the bundle"
+
+# A NUL is refused rather than cutting the paste where the engine reads it.
+reply=$(htsserver_client --path /server/browserlogin.html --post \
+    "sid=${sid}&blaction=save&blpaste=curl%20https://nul.test/%20-b%20a=1%00%20-b%20SECRETSID42=x")
+grep -q '^HTTP/1.[01] 302' <<<"${reply}" || fail "no redirect: ${reply:0:200}"
+reply=$(htsserver_get /server/browserlogin.html)
+test "$(attr error)" = "the paste holds a NUL byte" || fail "a NUL: $(attr error)"
+test ! -e "${proj}/nul.test.hts" || fail "a paste holding a NUL was written"
+
+# An action other than preview or save runs nothing, a long one included.
+# The long one goes first, so a stale reply from the NUL post cannot pass.
+for action in previewx delete; do
+    login --field "sid=${sid}" --field "blaction=${action}" --field "blpaste=${paste}"
+    test "$(attr error)" = "unknown action" || fail "action ${action}: $(attr error)"
+done
+test ! -e "${proj}/login.test.hts" || fail "an unknown action wrote the bundle"
+# A GET carrying the fields runs nothing either.
+reply=$(htsserver_get "/server/browserlogin.html?sid=${sid}&blaction=save&blpaste=curl%20https://get.test/%20-b%20a=1")
+test ! -e "${proj}/get.test.hts" || fail "a GET wrote the bundle"
+
+# A post without the session id is refused before its fields are read.
+for bad in "" "sid=$(printf '0%.0s' {1..32})"; do
+    fields=(--field blaction=save --field "blpaste=${paste}")
+    test -z "${bad}" || fields+=(--field "${bad}")
+    out=$(htsserver_client --path /server/browserlogin.html "${fields[@]}")
+    grep -q '^HTTP/1.[01] 403' <<<"${out}" || fail "a post without a valid sid: ${out:0:200}"
+    test ! -e "${proj}/login.test.hts" || fail "a post without a valid sid wrote the bundle"
+done
+
+# OK: the file, owner-only, and the address with its suffix.
+login --field "sid=${sid}" --field blaction=save --field "blpaste=${paste}" \
+    --field "blagent=PageAgent/2"
+test "$(attr state)" = saved || fail "save state: $(attr state) $(attr error)"
+test "$(attr starturl)" = "https://www.login.test/members/#httrack-bundle=login.test" ||
+    fail "the address to add: $(attr starturl)"
+assert_file "${proj}/login.test.hts" "OK wrote no bundle"
+tab=$(printf '\t')
+want="# HTTrack bundle 1
+ua PasteAgent/1.0
+cookies
+.login.test${tab}TRUE${tab}/${tab}TRUE${tab}0${tab}SID${tab}SECRETSID42
+.login.test${tab}TRUE${tab}/${tab}TRUE${tab}0${tab}theme${tab}dark"
+got=$(cat "${proj}/login.test.hts")
+test "${got}" = "${want}" || fail "bundle content: [${got}]"
+mode=$(stat -c %a "${proj}/login.test.hts" 2>/dev/null ||
+    stat -f %Lp "${proj}/login.test.hts")
+test "${mode}" = 600 || fail "the bundle has mode ${mode}"
+
+# A cookies.txt takes the first address of the list, read as http:// when it
+# names no scheme, as step 3 reads it.
+login --field "sid=${sid}" --field blaction=save --field "blurl=noscheme.test/a" \
+    --field "blpaste=.noscheme.test${tab}TRUE${tab}/${tab}FALSE${tab}0${tab}N${tab}1"
+test "$(attr starturl)" = "http://noscheme.test/a#httrack-bundle=noscheme.test" ||
+    fail "a schemeless address: $(attr state) $(attr error) $(attr starturl)"
+
+# A preview needs no project. A save needs a name that stays in the base path,
+# but the base path itself may climb.
+htsserver_client --path /server/step3.html --field "sid=${sid}" \
+    --field "path=${work}/sub/.." --field projname= >/dev/null
+login --field "sid=${sid}" --field blaction=preview --field "blpaste=${paste}"
+test "$(attr state)" = preview || fail "a preview without a project: $(attr error)"
+login --field "sid=${sid}" --field blaction=save --field "blpaste=${paste}"
+test "$(attr error)" = "no project name" || fail "a save without a project: $(attr error)"
+htsserver_client --path /server/step3.html --field "sid=${sid}" \
+    --field "path=${work}/sub" --field "projname=../escaped" >/dev/null
+login --field "sid=${sid}" --field blaction=save --field "blpaste=${paste}"
+test "$(attr error)" = "the project name escapes the base path" ||
+    fail "a climbing project name: $(attr error)"
+test ! -e "${work}/escaped" || fail "a climbing project name was written"
+mkdir "${work}/sub"
+htsserver_client --path /server/step3.html --field "sid=${sid}" \
+    --field "path=${work}/sub/.." --field "projname=up" >/dev/null
+login --field "sid=${sid}" --field blaction=save --field "blpaste=${paste}"
+test "$(attr state)" = saved || fail "a climbing base path: $(attr error)"
+assert_file "${work}/up/login.test.hts" "a climbing base path wrote no bundle"
+# A refused save creates no project folder.
+htsserver_client --path /server/step3.html --field "sid=${sid}" \
+    --field "path=${work}" --field "projname=refused" >/dev/null
+login --field "sid=${sid}" --field blaction=save --field "blpaste=curl https://x.test/"
+test "$(attr error)" = "the paste holds no cookie for x.test" ||
+    fail "a paste without cookies: $(attr error)"
+test ! -e "${work}/refused" || fail "a refused save created the project folder"
+
+# The popup puts the suffixed address in place of the first line naming the
+# same address, and leaves every other line as it was.
+page=$(htsserver_get /server/browserlogin.html)
+js=$(sed -n '/<script language="javascript" id="blscript">/,/<\/script>/p' <<<"${page}" |
+    sed '1d;$d')
+grep -qF 'function bl_add_to(' <<<"${js}" || fail "no bl_add_to in the popup"
+if command -v node >/dev/null 2>&1; then
+    out=$(node -e "${js}
+${BL_ADD_CASES}")
+    test "${out}" = "ok 11" || fail "the address list: ${out}"
+else
+    echo "no node, so the address list check did not run"
+fi
+# Save the project, as step 4 does, so the profile and the log exist too.
+htsserver_python - "${HTS_URL}" "${work}" <<'PY' || fail "see above"
+import sys
+
+from webtestlib import Session, textarea
+
+s, work = Session(sys.argv[1]), sys.argv[2]
+step4 = s.get("step4.html?sid=" + s.sid)
+s.post("step4.html", [("path", work), ("projname", "proj"),
+                      ("command", textarea(step4, "command")),
+                      ("command_do", "save"),
+                      ("winprofile", textarea(step4, "winprofile"))])
+PY
+assert_file "${proj}/hts-cache/winprofile.ini" "the project was not saved"
+# The secret is in the bundle alone: not in the profile, the log, or a page.
+leaks=$(grep -rlF SECRETSID42 "${work}" | grep -v '\.hts$' || true)
+test -z "${leaks}" || fail "the cookie value leaked to: ${leaks}"
+for page in browserlogin.html step3.html step4.html; do
+    reply=$(htsserver_get "/server/${page}")
+    ! grep -qF SECRETSID42 <<<"${reply}" || fail "the cookie value is in ${page}"
+done
+
+echo "PASS"

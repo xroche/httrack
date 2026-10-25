@@ -208,3 +208,25 @@ hit "userinfo" "$before" \
     "evil.test/ ua=GlobalUA/9 auth=Basic d3d3LmFscGhhLnRlc3Q= cookie=- x=1"
 test "$(($(hits) - before))" -eq 4 ||
     fail_dump "redirect crawl: $(($(hits) - before)) requests, expected 4" "$tmpdir/srv.out"
+
+# A pasted login for an international host serves its Unicode and its ASCII
+# address alike, because the engine requests the host in its ASCII form.
+mkdir "$tmpdir/idn"
+idn() { # idn LABEL PASTE-URL CRAWL-URL HOST -- paste a login, crawl, check
+    local paste=$tmpdir/idn/$1.txt b
+    printf "curl '%s' -b 'C=%s'" "$2" "$1" >"$paste"
+    "$bin" -O /dev/null -#test=paste "$(nativepath "$tmpdir/idn")" \
+        "$(nativepath "$paste")" >"$tmpdir/idn/$1.out" ||
+        fail_dump "$1: the paste failed" "$tmpdir/idn/$1.out"
+    b=$(sed -n 's/^name=\([^ ]*\) .*/\1/p' "$tmpdir/idn/$1.out")
+    before=$(hits)
+    crawl "$tmpdir" -O idn --bundle-dir idn "$3#httrack-bundle=$b" ||
+        fail "$1: the crawl failed"
+    hit "$1" "$before" "$4/ ua=GlobalUA/9 auth=- cookie=C=$1 x=1"
+}
+idn ascii http://www.ascii.test/ http://www.ascii.test/ www.ascii.test
+idn uni http://www.bücher.test/ http://www.bücher.test/ www.xn--bcher-kva.test
+idn puny http://www.bücher.test/ http://www.xn--bcher-kva.test/ \
+    www.xn--bcher-kva.test
+idn puny2uni http://www.xn--bcher-kva.test/ http://www.bücher.test/ \
+    www.xn--bcher-kva.test

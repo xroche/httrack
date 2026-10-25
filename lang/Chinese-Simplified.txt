@@ -1112,8 +1112,8 @@ The browser did not open: %s.
 浏览器未能打开：%s。
 The browser came back with no cookies, so nothing was kept.
 浏览器没有返回任何 cookies，因此未保留任何内容。
-%d cookies were collected. They are used when you press OK.
-已收集 %d 个 cookies。按“确定”后将使用它们。
+Cookies collected: %d. They are used when you press OK.
+已收集的 cookies：%d。按“确定”后将使用它们。
 The browser gave no cookies the engine can use, so nothing was changed.
 浏览器没有提供 HTTrack 可用的 cookies，因此未做任何更改。
 The cookies could not be written to %s, so nothing was changed.
@@ -1122,3 +1122,7 @@ The cookies could not be written to %s, so nothing was changed.
 浏览器的 cookies 中有 %d 个被忽略，因为 HTTrack 无法读取它们。
 The browser identity it reported cannot be used, so the mirror will send the default one.
 它报告的浏览器身份无法使用，因此镜像将发送默认值。
+Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
+在此浏览器的另一个标签页中登录网站。打开开发者工具（F12），再打开“网络”标签页，刷新页面，在第一个请求上点击右键，选择 Copy as cURL (bash)。将文本粘贴到这里。也可以使用 cookies.txt 导出文件，它会用于列表中的第一个地址。
+Cookies for: %s. Browser identity: %s.
+Cookies 适用于：%s。浏览器身份：%s。

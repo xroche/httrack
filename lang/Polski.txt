@@ -1112,7 +1112,7 @@ The browser did not open: %s.
 Nie udało się otworzyć przeglądarki: %s.
 The browser came back with no cookies, so nothing was kept.
 Przeglądarka nie zwróciła żadnych ciasteczek, więc nic nie zostało zapisane.
-%d cookies were collected. They are used when you press OK.
+Cookies collected: %d. They are used when you press OK.
 Zebrano ciasteczka: %d. Zostaną użyte po naciśnięciu OK.
 The browser gave no cookies the engine can use, so nothing was changed.
 Przeglądarka nie dała żadnych ciasteczek, których HTTrack mógłby użyć, więc nic nie zostało zmienione.
@@ -1122,3 +1122,7 @@ Nie można było zapisać ciasteczek do %s, więc nic nie zostało zmienione.
 Pominięto ciasteczka przeglądarki w liczbie %d, ponieważ HTTrack nie mógł ich odczytać.
 The browser identity it reported cannot be used, so the mirror will send the default one.
 Zgłoszonej identyfikacji przeglądarki nie można użyć, więc kopiowanie wyśle domyślną.
+Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
+Zaloguj się do witryny w innej karcie tej przeglądarki. Otwórz narzędzia deweloperskie (F12), a potem kartę Sieć, odśwież stronę, kliknij prawym przyciskiem pierwsze żądanie i wybierz Copy as cURL (bash). Wklej tutaj tekst. Działa też eksport cookies.txt, dla pierwszego adresu na liście.
+Cookies for: %s. Browser identity: %s.
+Ciasteczka dla: %s. Tożsamość przeglądarki: %s.

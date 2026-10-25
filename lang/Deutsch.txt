@@ -1112,8 +1112,8 @@ The browser did not open: %s.
 Der Browser wurde nicht geöffnet: %s.
 The browser came back with no cookies, so nothing was kept.
 Der Browser hat keine Cookies geliefert, daher wurde nichts übernommen.
-%d cookies were collected. They are used when you press OK.
-%d Cookies wurden übernommen. Sie werden verwendet, wenn Sie auf OK klicken.
+Cookies collected: %d. They are used when you press OK.
+Übernommene Cookies: %d. Sie werden verwendet, wenn Sie auf OK klicken.
 The browser gave no cookies the engine can use, so nothing was changed.
 Der Browser hat keine Cookies geliefert, die HTTrack verwenden kann, daher wurde nichts geändert.
 The cookies could not be written to %s, so nothing was changed.
@@ -1122,3 +1122,7 @@ Die Cookies konnten nicht in %s geschrieben werden, daher wurde nichts geändert
 %d Cookies des Browsers wurden ausgelassen, weil HTTrack sie nicht lesen konnte.
 The browser identity it reported cannot be used, so the mirror will send the default one.
 Die gemeldete Browser-Kennung kann nicht verwendet werden, daher sendet die Spiegelung die Standardkennung.
+Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
+Melden Sie sich in einem anderen Tab dieses Browsers bei der Website an. Öffnen Sie die Entwicklertools (F12) und dort den Tab Netzwerk, laden Sie die Seite neu, klicken Sie mit der rechten Maustaste auf die erste Anfrage und wählen Sie Copy as cURL (bash). Fügen Sie den Text hier ein. Ein cookies.txt-Export funktioniert auch, für die erste Adresse der Liste.
+Cookies for: %s. Browser identity: %s.
+Cookies für: %s. Browser-Kennung: %s.
