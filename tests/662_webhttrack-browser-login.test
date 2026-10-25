@@ -107,7 +107,8 @@ test "$(attr error)" = "the paste holds a NUL byte" || fail "a NUL: $(attr error
 test ! -e "${proj}/nul.test.hts" || fail "a paste holding a NUL was written"
 
 # An action other than preview or save runs nothing, a long one included.
-for action in delete previewx; do
+# The long one goes first, so a stale reply from the NUL post cannot pass.
+for action in previewx delete; do
     login --field "sid=${sid}" --field "blaction=${action}" --field "blpaste=${paste}"
     test "$(attr error)" = "unknown action" || fail "action ${action}: $(attr error)"
 done

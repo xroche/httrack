@@ -114,6 +114,11 @@ put "curl 'https://www.bücher.de/' -b a=1"
 selftest_queue_head "name=xn--bcher-kva.de cookies=1 hosts=bücher.de" paste "$dir/dry" "$in" dry
 put "curl 'https://a.例え.jp/' -b a=1"
 selftest_queue_head "name=a.xn--r8jz45g.jp cookies=1" paste "$dir/dry" "$in" dry
+# The trailing dots leave the address too, so the cookies name the same host.
+put "curl 'https://dots.test../x' -b a=1"
+selftest_queue_lines "name=dots.test cookies=1 hosts=dots.test
+url=https://dots.test/x#httrack-bundle=dots.test
+agent=" paste "$dir/dry" "$in" dry
 # A suffix in the pasted address is replaced, never doubled.
 put "curl 'https://site.test/#httrack-bundle=other' -b a=1"
 selftest_queue_lines "name=site.test cookies=1 hosts=site.test
@@ -264,8 +269,8 @@ selftest_queue_head "refused: cannot write $dir/missing/nofolder.test.hts: " \
 put "curl https://words.test/ -b a=1$(for _ in $(seq 1 1020); do printf ' -k'; done)"
 selftest_queue_head "name=words.test cookies=1" paste "$dir/dry" "$in" dry
 
-test "${#SELFTEST_WANT[@]}" -eq 100 ||
-    fail "expected 100 queued rows, got ${#SELFTEST_WANT[@]}"
+test "${#SELFTEST_WANT[@]}" -eq 101 ||
+    fail "expected 101 queued rows, got ${#SELFTEST_WANT[@]}"
 selftest_run_queued
 
 # A host list too long to show ends with ",...", not with a cut name.
