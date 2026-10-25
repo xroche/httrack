@@ -3929,7 +3929,7 @@ static int st_headerverdict(httrackp *opt, int argc, char **argv) {
   v = hts_custom_header_verdict(argc > 1 ? headers : NULL, argv[0]);
   if ((size_t) v >= sizeof(names) / sizeof(names[0]))
     return 1;
-  printf("%s\n", names[v]);
+  printf("%s=%d\n", names[v], (int) v);
   return 0;
 }
 

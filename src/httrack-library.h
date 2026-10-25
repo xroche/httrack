@@ -462,15 +462,20 @@ HTSEXT_API const char *const *hts_accept_kinds(void);
     when that browser has no value for it, or either name is unknown. */
 HTSEXT_API const char *hts_accept_preset(const char *browser, const char *kind);
 
-/** What the engine does with a custom header line (-%X). */
+/** What the engine does with a custom header line (-%X). Values are ABI. */
 typedef enum hts_header_verdict {
-  HTS_HEADER_SENT = 0,              /**< Sent as typed. */
-  HTS_HEADER_DROPPED_ORPHAN_FOLD,   /**< Dropped: a fold with no line above. */
-  HTS_HEADER_DROPPED_MALFORMED,     /**< Dropped: not a "Name: value" line. */
-  HTS_HEADER_DROPPED_FRAMING,       /**< Dropped: the engine frames messages. */
-  HTS_HEADER_SENT_REPLACES_EARLIER, /**< Sent. The earlier one is dropped. */
+  /** Sent as typed. */
+  HTS_HEADER_SENT = 0,
+  /** Dropped: a folded line with no line above to continue. */
+  HTS_HEADER_DROPPED_ORPHAN_FOLD = 1,
+  /** Dropped: not a "Name: value" line. */
+  HTS_HEADER_DROPPED_MALFORMED = 2,
+  /** Dropped: the engine frames the message itself. */
+  HTS_HEADER_DROPPED_FRAMING = 3,
+  /** Sent. The earlier line of the same field is dropped. */
+  HTS_HEADER_SENT_REPLACES_EARLIER = 4,
   /** Sent, unless an update or a resume writes its own Range or If-* line. */
-  HTS_HEADER_SENT_UNLESS_ENGINE_OVERRIDES
+  HTS_HEADER_SENT_UNLESS_ENGINE_OVERRIDES = 5
 } hts_header_verdict;
 
 /** Return what the engine does with @p line when it follows @p headers, every
