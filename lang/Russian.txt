@@ -1112,7 +1112,7 @@ The browser did not open: %s.
 Браузер не открылся: %s.
 The browser came back with no cookies, so nothing was kept.
 Браузер не вернул ни одного cookie, поэтому ничего не сохранено.
-%d cookies were collected. They are used when you press OK.
+Cookies collected: %d. They are used when you press OK.
 Собрано cookies: %d. Они будут применены, когда вы нажмёте OK.
 The browser gave no cookies the engine can use, so nothing was changed.
 Браузер не дал ни одного cookie, пригодного для HTTrack, поэтому ничего не изменено.
@@ -1122,7 +1122,7 @@ The cookies could not be written to %s, so nothing was changed.
 Пропущено cookies браузера: %d, поскольку HTTrack не смог бы их прочитать.
 The browser identity it reported cannot be used, so the mirror will send the default one.
 Идентификацию браузера, которую он сообщил, использовать нельзя, поэтому при зеркалировании будет отправлена та, что по умолчанию.
-Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click its request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
-Войдите на сайт в другой вкладке этого браузера. Откройте инструменты разработчика (F12), затем вкладку «Сеть», перезагрузите страницу, щёлкните правой кнопкой по её запросу и выберите Copy as cURL (bash). Вставьте текст сюда. Подойдёт и экспорт cookies.txt, для первого адреса в списке.
-Sites: %s. Browser identity: %s.
-Сайты: %s. Идентификатор браузера: %s.
+Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
+Войдите на сайт в другой вкладке этого браузера. Откройте инструменты разработчика (F12), затем вкладку «Сеть», перезагрузите страницу, щёлкните правой кнопкой по первому запросу и выберите Copy as cURL (bash). Вставьте текст сюда. Подойдёт и экспорт cookies.txt, для первого адреса в списке.
+Cookies for: %s. Browser identity: %s.
+Cookies для: %s. Идентификатор браузера: %s.

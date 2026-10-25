@@ -1112,8 +1112,8 @@ The browser did not open: %s.
 Il browser non si è aperto: %s.
 The browser came back with no cookies, so nothing was kept.
 Il browser non ha restituito alcun cookie, quindi non è stato conservato nulla.
-%d cookies were collected. They are used when you press OK.
-Sono stati raccolti %d cookie. Verranno usati quando premi Ok.
+Cookies collected: %d. They are used when you press OK.
+Cookie raccolti: %d. Verranno usati quando premi Ok.
 The browser gave no cookies the engine can use, so nothing was changed.
 Il browser non ha fornito cookie utilizzabili dal motore, quindi non è stato cambiato nulla.
 The cookies could not be written to %s, so nothing was changed.
@@ -1122,7 +1122,7 @@ Non è stato possibile scrivere i cookie in %s, quindi non è stato cambiato nul
 %d cookie del browser sono stati esclusi, perché il motore non poteva leggerli.
 The browser identity it reported cannot be used, so the mirror will send the default one.
 L'identità del browser segnalata non può essere usata, quindi il mirror invierà quella predefinita.
-Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click its request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
-Accedi al sito in un'altra scheda di questo browser. Apri gli strumenti per sviluppatori (F12) e poi la scheda Rete, ricarica la pagina, fai clic destro sulla sua richiesta e scegli Copy as cURL (bash). Incolla qui il testo. Funziona anche un'esportazione cookies.txt, per il primo indirizzo dell'elenco.
-Sites: %s. Browser identity: %s.
-Siti: %s. Identità del browser: %s.
+Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
+Accedi al sito in un'altra scheda di questo browser. Apri gli strumenti per sviluppatori (F12) e poi la scheda Rete, ricarica la pagina, fai clic destro sulla prima richiesta e scegli Copy as cURL (bash). Incolla qui il testo. Funziona anche un'esportazione cookies.txt, per il primo indirizzo dell'elenco.
+Cookies for: %s. Browser identity: %s.
+Cookie per: %s. Identità del browser: %s.

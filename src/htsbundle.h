@@ -84,10 +84,8 @@ hts_boolean cookie_url_host(const char *url, char *dst, size_t dst_size);
 char *cookie_find_exact(char *s, const char *cook_name, const char *domain,
                         const char *path);
 
-/* Copy url's host into host, and return the domain a document.cookie string
-   pasted for url binds its cookies to: the registrable domain, or the host
-   when it has none. attr gets the flags those cookies take. NULL when url has
-   no host. */
+/* Copy url's host into host, set attr, and return the domain that cookies
+   pasted for url bind to: its registrable domain, or the host. NULL if none. */
 const char *cookie_flat_bind(const char *url, char *host, size_t host_size,
                              cookie_attr *attr);
 
@@ -112,12 +110,38 @@ typedef struct cookie_filter {
   const char *why; /* NULL, or why the load stopped at line */
 } cookie_filter;
 
-/* Load Netscape jar records from fp's position to its end through filter,
+/* Lines read from fp, or from the len bytes at buf when fp is NULL. */
+typedef struct text_src {
+  FILE *fp;
+  const char *buf;
+  size_t len;
+  size_t pos;
+  hts_boolean eof; /* a read went past the end, as feof() says */
+  hts_boolean error;
+} text_src;
+
+/* A source reading fp from its position. */
+text_src text_src_file(FILE *fp);
+
+/* A source reading the len bytes at buf, which must outlive it. */
+text_src text_src_mem(const char *buf, size_t len);
+
+/* Read a line into s, of size bytes, without its LF, and a CR before the LF
+   when the whole line fit. *len counts every byte of the line, cut or not. */
+void text_src_readline(text_src *src, char *s, size_t size, size_t *len);
+
+/* Load Netscape jar records from src's position to its end through filter,
    as cookie_load reads a file. given names the file in warnings, which name
    the line and none of its bytes. A line with a control byte other than TAB,
    or one too long, stops the load. */
-void cookie_load_stream(httrackp *opt, t_cookie *cookie, FILE *fp,
+void cookie_load_stream(httrackp *opt, t_cookie *cookie, text_src *src,
                         const char *given, cookie_filter *filter);
+
+/* Write the len bytes at data to a temporary beside file, owner-only, then
+   move it over file, so a symbolic link at file is replaced, never followed.
+   Did it succeed? On failure file is unchanged and errno says why. */
+hts_boolean cookie_write_replace(const char *file, const char *data,
+                                 size_t len);
 
 #endif
 

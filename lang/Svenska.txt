@@ -1112,8 +1112,8 @@ The browser did not open: %s.
 Webbläsaren öppnades inte: %s.
 The browser came back with no cookies, so nothing was kept.
 Webbläsaren kom tillbaka utan cookies, så ingenting sparades.
-%d cookies were collected. They are used when you press OK.
-%d cookies samlades in. De används när du trycker på OK.
+Cookies collected: %d. They are used when you press OK.
+Insamlade cookies: %d. De används när du trycker på OK.
 The browser gave no cookies the engine can use, so nothing was changed.
 Webbläsaren gav inga cookies som HTTrack kan använda, så ingenting ändrades.
 The cookies could not be written to %s, so nothing was changed.
@@ -1122,7 +1122,7 @@ Det gick inte att skriva dessa cookies till %s, så ingenting ändrades.
 %d av webbläsarens cookies utelämnades, eftersom HTTrack inte kunde läsa dem.
 The browser identity it reported cannot be used, so the mirror will send the default one.
 Den webbläsaridentitet som angavs kan inte användas, så kopieringen skickar standardidentiteten.
-Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click its request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
-Logga in på webbplatsen i en annan flik i den här webbläsaren. Öppna utvecklarverktygen (F12) och sedan fliken Nätverk, ladda om sidan, högerklicka på dess begäran och välj Copy as cURL (bash). Klistra in texten här. En cookies.txt-export fungerar också, för den första adressen i listan.
-Sites: %s. Browser identity: %s.
-Webbplatser: %s. Webbläsaridentitet: %s.
+Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
+Logga in på webbplatsen i en annan flik i den här webbläsaren. Öppna utvecklarverktygen (F12) och sedan fliken Nätverk, ladda om sidan, högerklicka på den första begäran och välj Copy as cURL (bash). Klistra in texten här. En cookies.txt-export fungerar också, för den första adressen i listan.
+Cookies for: %s. Browser identity: %s.
+Cookies för: %s. Webbläsaridentitet: %s.

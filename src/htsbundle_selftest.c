@@ -213,6 +213,8 @@ static int st_paste(httrackp *opt, int argc, char **argv) {
   int i;
 
   (void) opt;
+  if (res != NULL)
+    res->size = sizeof(*res);
   fp = argc >= 2 ? FOPEN(argv[1], "rb") : NULL;
   if (fp == NULL || res == NULL) {
     fprintf(stderr, "paste: takes <dir> <file> [agent:<ua>] [url:<url>] "

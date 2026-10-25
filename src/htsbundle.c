@@ -39,6 +39,7 @@ Please visit our Website: http://www.httrack.com
 #include "htslines.h"
 #include "htspsl.h"
 #include "htsio.h"
+#include "htscharset.h"
 #include "htssafe.h"
 
 #include <limits.h>
@@ -246,13 +247,11 @@ hts_boolean hts_bundle_has_control(const char *s, size_t len) {
 /* Read a line of fewer than BUNDLE_LINE_MAX bytes, its line end aside, into
    line. NULL, or why the line is refused: too long, or with a control byte
    other than TAB, because a CR would end a header early. */
-static const char *bundle_readline(FILE *fp, char line[BUNDLE_LINE_MAX + 1]) {
+static const char *bundle_readline(text_src *src,
+                                   char line[BUNDLE_LINE_MAX + 1]) {
   size_t len;
 
-  if (hts_readline_raw(fp, line, BUNDLE_LINE_MAX + 1, &len))
-    return "too long";
-  if (len > 0 && line[len - 1] == '\r')
-    line[--len] = '\0';
+  text_src_readline(src, line, BUNDLE_LINE_MAX + 1, &len);
   if (len >= BUNDLE_LINE_MAX)
     return "too long";
   return hts_bundle_has_control(line, len) ? "holds a control byte" : NULL;
@@ -375,13 +374,13 @@ static hts_boolean key_is(const char *line, size_t klen, const char *key) {
 
 /* Read b's lines up to "cookies", leaving fp at its jar. *cookies_line gets
    the number of that line, or 0 when b has no cookies. */
-static hts_boolean bundle_parse(httrackp *opt, bundle *b, FILE *fp,
+static hts_boolean bundle_parse(httrackp *opt, bundle *b, text_src *src,
                                 int *cookies_line, char *err, size_t err_size) {
   static const char bom[] = "\xEF\xBB\xBF";
   char BIGSTK line[BUNDLE_LINE_MAX + 1];
   int lineno = 1;
   int version;
-  const char *why = bundle_readline(fp, line);
+  const char *why = bundle_readline(src, line);
 
   if (why != NULL)
     BUNDLE_FAIL("%s, line 1: %s", b->file, why);
@@ -394,12 +393,12 @@ static hts_boolean bundle_parse(httrackp *opt, bundle *b, FILE *fp,
   if (version != 1)
     BUNDLE_FAIL("%s: bundle version %d is not supported", b->file, version);
   *cookies_line = 0;
-  while (!feof(fp)) {
+  while (!src->eof) {
     const char *value;
     size_t klen;
 
     lineno++;
-    why = bundle_readline(fp, line);
+    why = bundle_readline(src, line);
     if (why != NULL)
       BUNDLE_FAIL("%s, line %d: %s", b->file, lineno, why);
     if (line[0] == '\0' || line[0] == '#')
@@ -516,11 +515,11 @@ static hts_boolean bundle_admit(cookie_filter *filter, t_cookie *cookie,
          cookie_find_exact(cookie->data, name, host, path) == NULL;
 }
 
-/* Read b's bundle from fp, set its scope, and load its cookies, comparing
-   them with all_bundles. b->file names it in messages. The caller closes fp. */
-static hts_boolean bundle_load_fp(httrackp *opt, bundle *b, FILE *fp,
-                                  const char *jar_file, t_cookie *all_bundles,
-                                  char *err, size_t err_size) {
+/* Read b's bundle from src, set its scope, and load its cookies, comparing
+   them with all_bundles. b->file names it in messages. */
+static hts_boolean bundle_load_src(httrackp *opt, bundle *b, text_src *src,
+                                   const char *jar_file, t_cookie *all_bundles,
+                                   char *err, size_t err_size) {
   int cookies_line;
   t_cookie *scratch = NULL;
   bundle_jar ctx;
@@ -529,7 +528,7 @@ static hts_boolean bundle_load_fp(httrackp *opt, bundle *b, FILE *fp,
   size_t i;
 
   bundle_clear(b);
-  if (!bundle_parse(opt, b, fp, &cookies_line, err, err_size))
+  if (!bundle_parse(opt, b, src, &cookies_line, err, err_size))
     return HTS_FALSE;
   for (i = 0; i < b->nstart && why == NULL; i++)
     why = bundle_note_url(b, b->start_urls[i]);
@@ -556,7 +555,7 @@ static hts_boolean bundle_load_fp(httrackp *opt, bundle *b, FILE *fp,
     scratch->max_len = sizeof(scratch->data);
   }
   if (cookies_line != 0)
-    cookie_load_stream(opt, scratch != NULL ? scratch : opt->cookie, fp,
+    cookie_load_stream(opt, scratch != NULL ? scratch : opt->cookie, src,
                        b->file, &filter);
   freet(scratch);
   if (ctx.dropped != 0)
@@ -578,6 +577,7 @@ static hts_boolean bundle_load(httrackp *opt, bundle *b, const char *jar_file,
                               ? StringBuff(opt->bundle_dir)
                               : StringBuff(opt->path_log);
   hts_boolean ok;
+  text_src src;
   FILE *fp;
 
   if (!bundle_path(b->file, sizeof(b->file), dir, b->name))
@@ -586,7 +586,8 @@ static hts_boolean bundle_load(httrackp *opt, bundle *b, const char *jar_file,
   if (fp == NULL)
     BUNDLE_FAIL("%s: cannot read the login bundle: %s", b->file,
                 strerror(errno));
-  ok = bundle_load_fp(opt, b, fp, jar_file, all_bundles, err, err_size);
+  src = text_src_file(fp);
+  ok = bundle_load_src(opt, b, &src, jar_file, all_bundles, err, err_size);
   fclose(fp);
   return ok;
 }
@@ -754,6 +755,9 @@ HTSEXT_API const char *hts_bundle_name_refusal(const char *name) {
 /* A cURL command holds at most this many words. */
 #define PASTE_WORDS_MAX 1024
 
+HTS_STATIC_ASSERT(HTS_PASTE_NAME_SIZE == HTS_BUNDLE_NAME_MAX, paste_name_size);
+HTS_STATIC_ASSERT(HTS_PASTE_URL_SIZE == HTS_CDLMAXSIZE, paste_url_size);
+
 /* What a pasted cURL command gives. */
 typedef struct paste_curl {
   char **words;
@@ -762,6 +766,7 @@ typedef struct paste_curl {
   const char *ua;   /* the User-Agent, or NULL */
   const char *auth; /* the whole Authorization header line, or NULL */
   String cookies;   /* the Cookie header and -b values, joined by ';' */
+  char why[96];     /* a refusal naming an option */
 } paste_curl;
 
 /* Is c a byte bash keeps as it is outside quotes? */
@@ -790,107 +795,93 @@ static int curl_hex(char c) {
   return -1;
 }
 
+/* The value of the n hex digits at p, or -1. */
+static long curl_hex_run(const char *p, int n) {
+  long v = 0;
+  int i;
+
+  for (i = 0; i < n; i++) {
+    const int d = curl_hex(p[i]);
+
+    if (d < 0)
+      return -1;
+    v = v * 16 + d;
+  }
+  return v;
+}
+
 /* Decode the $'...' body at *pp, past the opening quote, into dst at *len,
-   which stays below cap, and leave *pp past the closing quote. NULL, or why it
-   is refused. */
-static const char *curl_ansi_quote(const char **pp, char *dst, size_t *len,
-                                   size_t cap) {
+   and leave *pp past the closing quote. Only the escapes Chrome and Firefox
+   write are read, and none decodes to more bytes than it takes. NULL, or why
+   it is refused. */
+static const char *curl_ansi_quote(const char **pp, char *dst, size_t *len) {
+  static const char digits[] = "an escape in $'...' lacks its hex digits";
   const char *p = *pp;
 
   while (*p != '\'') {
-    unsigned long cp = 0;
-    int digits = 0, max_digits, d;
-    hts_boolean utf8 = HTS_FALSE;
+    long cp;
 
     if (*p == '\0')
       return "a quote is not closed";
-    if (*len + 4 >= cap)
-      return "a word is too long";
     if (*p != '\\') {
       dst[(*len)++] = *p++;
       continue;
     }
     p++;
     switch (*p) {
-    case 'a':
-      cp = 7;
-      break;
-    case 'b':
-      cp = 8;
-      break;
-    case 'e':
-    case 'E':
-      cp = 27;
-      break;
-    case 'f':
-      cp = 12;
-      break;
-    case 'n':
-      cp = '\n';
-      break;
-    case 'r':
-      cp = '\r';
-      break;
-    case 't':
-      cp = '\t';
-      break;
-    case 'v':
-      cp = 11;
-      break;
     case '\\':
     case '\'':
-    case '"':
-    case '?':
-      cp = (unsigned char) *p;
+      cp = (unsigned char) *p++;
+      break;
+    case 'n':
+    case 'r':
+    case 't':
+      cp = *p == 'n' ? '\n' : *p == 'r' ? '\r' : '\t';
+      p++;
       break;
     case 'x':
+      if ((cp = curl_hex_run(p + 1, 2)) < 0)
+        return digits;
+      p += 3;
+      if (cp == 0)
+        return "the text holds a NUL byte";
+      dst[(*len)++] = (char) cp; // a raw byte, as bash gives it
+      continue;
     case 'u':
-    case 'U':
-      max_digits = *p == 'x' ? 2 : *p == 'u' ? 4 : 8;
-      utf8 = *p != 'x';
-      while (digits < max_digits && (d = curl_hex(p[1])) >= 0) {
-        cp = cp * 16 + (unsigned long) d;
-        digits++;
-        p++;
+      if ((cp = curl_hex_run(p + 1, 4)) < 0)
+        return digits;
+      p += 5;
+      // Firefox writes a character past U+FFFF as two UTF-16 halves
+      if (cp >= 0xd800 && cp <= 0xdbff && p[0] == '\\' && p[1] == 'u') {
+        const long low = curl_hex_run(p + 2, 4);
+
+        if (low >= 0xdc00 && low <= 0xdfff) {
+          cp = 0x10000 + ((cp - 0xd800) << 10) + (low - 0xdc00);
+          p += 6;
+        }
       }
-      if (digits == 0)
-        return "an escape in $'...' has no digits";
       break;
     default:
-      if (*p < '0' || *p > '7')
-        return "an unknown escape in $'...'";
-      cp = (unsigned long) (*p - '0');
-      digits = 1;
-      while (digits < 3 && p[1] >= '0' && p[1] <= '7') {
-        cp = cp * 8 + (unsigned long) (p[1] - '0');
-        digits++;
-        p++;
-      }
-      break;
+      return "$'...' holds an escape no browser writes";
     }
-    p++;
     if (cp == 0)
       return "the text holds a NUL byte";
-    if (!utf8 || cp < 0x80) {
-      if (cp > 0xff)
-        return "an escape in $'...' is out of range";
+    if (cp >= 0xd800 && cp <= 0xdfff)
+      return "an escape in $'...' is out of range";
+    if (cp < 0x80) {
       dst[(*len)++] = (char) cp;
     } else if (cp < 0x800) {
       dst[(*len)++] = (char) (0xc0 | (cp >> 6));
       dst[(*len)++] = (char) (0x80 | (cp & 0x3f));
     } else if (cp < 0x10000) {
-      if (cp >= 0xd800 && cp <= 0xdfff)
-        return "an escape in $'...' is out of range";
       dst[(*len)++] = (char) (0xe0 | (cp >> 12));
       dst[(*len)++] = (char) (0x80 | ((cp >> 6) & 0x3f));
       dst[(*len)++] = (char) (0x80 | (cp & 0x3f));
-    } else if (cp <= 0x10ffff) {
+    } else {
       dst[(*len)++] = (char) (0xf0 | (cp >> 18));
       dst[(*len)++] = (char) (0x80 | ((cp >> 12) & 0x3f));
       dst[(*len)++] = (char) (0x80 | ((cp >> 6) & 0x3f));
       dst[(*len)++] = (char) (0x80 | (cp & 0x3f));
-    } else {
-      return "an escape in $'...' is out of range";
     }
   }
   *pp = p + 1;
@@ -900,8 +891,8 @@ static const char *curl_ansi_quote(const char **pp, char *dst, size_t *len,
 /* Split the bash command s into c->words, accepting '...' and $'...' quotes
    and backslash-newline joins alone. NULL, or why it is refused. */
 static const char *curl_split(const char *s, paste_curl *c) {
-  const size_t cap = strlen(s) + 1;
-  char *word = malloct(cap);
+  // no word decodes to more bytes than s holds
+  char *word = malloct(strlen(s) + 1);
   const char *p = s;
   const char *why = NULL;
 
@@ -926,8 +917,6 @@ static const char *curl_split(const char *s, paste_curl *c) {
 
         if (end == NULL) {
           why = "a quote is not closed";
-        } else if ((size_t) (end - p - 1) >= cap - len) {
-          why = "a word is too long";
         } else {
           memcpy(word + len, p + 1, (size_t) (end - p - 1));
           len += (size_t) (end - p - 1);
@@ -935,10 +924,10 @@ static const char *curl_split(const char *s, paste_curl *c) {
         }
       } else if (p[0] == '$' && p[1] == '\'') {
         p += 2;
-        why = curl_ansi_quote(&p, word, &len, cap);
+        why = curl_ansi_quote(&p, word, &len);
       } else if ((n = curl_join(p)) != 0) {
         p += n;
-      } else if (curl_plain_byte((unsigned char) *p) && len + 1 < cap) {
+      } else if (curl_plain_byte((unsigned char) *p)) {
         word[len++] = *p++;
       } else {
         why = "the text holds shell syntax other than '...' and $'...' quotes";
@@ -958,27 +947,27 @@ static const char *curl_split(const char *s, paste_curl *c) {
   return why;
 }
 
-/* Read the header line h into c. NULL, or why it is refused. */
-static const char *curl_header(paste_curl *c, const char *h) {
+/* Read the header line h into c. */
+static void curl_header(paste_curl *c, const char *h) {
   const size_t nlen = strcspn(h, ":");
   const char *value = h + nlen;
 
   if (*value == '\0')
-    return NULL; // "Name;" sends an empty header, which carries nothing here
+    return; // "Name;" sends an empty header, which carries nothing here
   value++;
   value += strspn(value, " \t");
   if (nlen == strlen("Cookie") && strfield(h, "Cookie")) {
     StringCat(c->cookies, value);
     StringCat(c->cookies, ";");
   } else if (nlen == strlen("User-Agent") && strfield(h, "User-Agent")) {
-    c->ua = *value != '\0' ? value : NULL;
+    c->ua = value;
   } else if (nlen == strlen("Authorization") && strfield(h, "Authorization")) {
     c->auth = *value != '\0' ? h : NULL;
   }
-  return NULL;
 }
 
-/* Read the curl options of c->words. NULL, or why they are refused. */
+/* Read the curl options of c->words, whose first is "curl". NULL, or why they
+   are refused. */
 static const char *curl_options(paste_curl *c) {
   static const char *const no_arg[] = {
       "--compressed", "--insecure", "-k",         "-s",
@@ -992,8 +981,6 @@ static const char *curl_options(paste_curl *c) {
       "-e",         "--referer",     "-F",           "--form"};
   size_t i, k;
 
-  if (c->nwords == 0 || strcmp(c->words[0], "curl") != 0)
-    return "the text does not start with curl";
   for (i = 1; i < c->nwords; i++) {
     const char *const w = c->words[i];
     const char *const arg = i + 1 < c->nwords ? c->words[i + 1] : NULL;
@@ -1014,25 +1001,33 @@ static const char *curl_options(paste_curl *c) {
       known = strcmp(w, no_arg[k]) == 0;
     if (known)
       continue;
+    for (k = 0; k < sizeof(skip_arg) / sizeof(skip_arg[0]) && !known; k++)
+      known = strcmp(w, skip_arg[k]) == 0;
+    known = known || strcmp(w, "-H") == 0 || strcmp(w, "--header") == 0 ||
+            strcmp(w, "-b") == 0 || strcmp(w, "--cookie") == 0 ||
+            strcmp(w, "-A") == 0 || strcmp(w, "--user-agent") == 0;
+    if (!known) {
+      // the name alone, because "-bSID=x" or "--opt=x" glue a value to it
+      int shown = w[1] == '-' ? (int) strcspn(w, "=") : 2;
+
+      if (shown > 32)
+        shown = 32;
+      snprintf(c->why, sizeof(c->why),
+               "the command holds the unknown curl option %.*s%s", shown, w,
+               w[shown] != '\0' && w[shown] != '=' ? "..." : "");
+      return c->why;
+    }
     if (arg == NULL)
       return "an option has no value";
     if (strcmp(w, "-H") == 0 || strcmp(w, "--header") == 0) {
-      const char *const why = curl_header(c, arg);
-
-      if (why != NULL)
-        return why;
+      curl_header(c, arg);
     } else if (strcmp(w, "-b") == 0 || strcmp(w, "--cookie") == 0) {
       if (strchr(arg, '=') == NULL)
         return "-b names a file, not cookies";
       StringCat(c->cookies, arg);
       StringCat(c->cookies, ";");
     } else if (strcmp(w, "-A") == 0 || strcmp(w, "--user-agent") == 0) {
-      c->ua = arg[0] != '\0' ? arg : NULL;
-    } else {
-      for (k = 0; k < sizeof(skip_arg) / sizeof(skip_arg[0]) && !known; k++)
-        known = strcmp(w, skip_arg[k]) == 0;
-      if (!known)
-        return "the command holds an unknown curl option";
+      c->ua = arg;
     }
     i++;
   }
@@ -1068,23 +1063,23 @@ static void paste_records(const char *s, String *out) {
   }
 }
 
-/* A stream reading the len bytes at data, or NULL. */
-static FILE *paste_stream(char *data, size_t len) {
-#ifdef _WIN32
-  FILE *const fp = tmpfile();
+/* Do the len bytes at s hold a bidi control, U+202A to U+202E or U+2066 to
+   U+2069, which could make the preview show another text? */
+static hts_boolean paste_has_bidi(const char *s, size_t len) {
+  size_t i;
 
-  if (fp != NULL &&
-      (fwrite(data, 1, len, fp) != len || fseek(fp, 0, SEEK_SET) != 0)) {
-    fclose(fp);
-    return NULL;
+  for (i = 0; i + 2 < len; i++) {
+    const unsigned char a = (unsigned char) s[i], b = (unsigned char) s[i + 1],
+                        c = (unsigned char) s[i + 2];
+
+    if (a == 0xe2 && ((b == 0x80 && c >= 0xaa && c <= 0xae) ||
+                      (b == 0x81 && c >= 0xa6 && c <= 0xa9)))
+      return HTS_TRUE;
   }
-  return fp;
-#else
-  return len != 0 ? fmemopen(data, len, "r") : NULL;
-#endif
+  return HTS_FALSE;
 }
 
-/* Set b up as the bundle name, named by url alone. HTS_FALSE when out of
+/* Set up b as a bundle whose only start URL is url. HTS_FALSE when out of
    memory. */
 static hts_boolean paste_bundle(bundle *b, const char *name, const char *url) {
   memset(b, 0, sizeof(*b));
@@ -1100,16 +1095,73 @@ static void paste_bundle_free(bundle *b) {
   StringFree(b->headers);
 }
 
+/* Store the cookie pairs of c in jar as document.cookie pairs of url, bound
+   to its registrable domain. NULL, or why they are refused. */
+static const char *paste_curl_cookies(httrackp *opt, t_cookie *jar,
+                                      const paste_curl *c, const char *url) {
+  char host[COOKIE_MAX_DOMAIN];
+  cookie_attr attr;
+  const char *const domain = cookie_flat_bind(url, host, sizeof(host), &attr);
+  char *pairs =
+      strdupt(StringNotEmpty(c->cookies) ? StringBuff(c->cookies) : "");
+  const char *why = NULL;
+  char *p = pairs;
+  int ignored = 0;
+
+  if (pairs == NULL)
+    return "out of memory";
+  if (domain == NULL)
+    why = "the address has no host";
+  while (why == NULL && *p != '\0') {
+    char *const end = p + strcspn(p, ";");
+    char *pair = p, *eq, *name_end;
+    const char *value;
+    size_t len;
+
+    p = *end != '\0' ? end + 1 : end;
+    *end = '\0';
+    pair += strspn(pair, " ");
+    for (len = strlen(pair); len > 0 && pair[len - 1] == ' ';)
+      pair[--len] = '\0';
+    if (*pair == '\0')
+      continue;
+    if (strchr(pair, '\t') != NULL) {
+      why = "a cookie holds a TAB";
+      break;
+    }
+    eq = strchr(pair, '=');
+    for (name_end = eq;
+         name_end != NULL && name_end > pair && name_end[-1] == ' ';)
+      name_end--;
+    if (eq == NULL || name_end == pair) {
+      why = "a cookie in the paste has no name";
+      break;
+    }
+    // "g = h" is the cookie g, as a browser reads it
+    value = eq + 1 + strspn(eq + 1, " ");
+    *name_end = '\0';
+    if (cookie_find_exact(jar->data, pair, domain, "/") != NULL)
+      continue; // a browser lists the most specific path first, so it wins
+    *name_end = '=';
+    memmove(name_end + 1, value, strlen(value) + 1);
+    if (!cookie_flat_pair(opt, jar, pair, domain, &attr, "the paste", &ignored))
+      why = "the cookies of the paste do not fit in a bundle";
+  }
+  freet(pairs);
+  return why;
+}
+
 /* Load the cookies.txt records of text into jar, keeping those inside the
    scope of b. NULL, or why the paste is refused, with its line in *line. */
-static const char *paste_load_records(httrackp *opt, bundle *b, String *text,
-                                      t_cookie *jar, int *line) {
+static const char *paste_load_records(httrackp *opt, bundle *b,
+                                      const String *text, t_cookie *jar,
+                                      int *line) {
   t_cookie *all = calloct(1, sizeof(t_cookie));
+  text_src src = text_src_mem(StringBuff(*text), StringLength(*text));
   bundle_jar ctx;
   cookie_filter filter;
   const char *why = NULL;
   size_t i;
-  FILE *fp;
 
   *line = 0;
   if (all == NULL)
@@ -1117,10 +1169,6 @@ static const char *paste_load_records(httrackp *opt, bundle *b, String *text,
   all->max_len = sizeof(all->data);
   for (i = 0; i < b->nstart && why == NULL; i++)
     why = bundle_note_url(b, b->start_urls[i]);
-  fp = why == NULL ? paste_stream(StringBuffRW(*text), StringLength(*text))
-                   : NULL;
-  if (why == NULL && fp == NULL)
-    why = "cannot read the paste";
   if (why == NULL) {
     memset(&ctx, 0, sizeof(ctx));
     ctx.b = b;
@@ -1128,28 +1176,30 @@ static const char *paste_load_records(httrackp *opt, bundle *b, String *text,
     memset(&filter, 0, sizeof(filter));
     filter.admit = bundle_admit;
     filter.ctx = &ctx;
-    cookie_load_stream(opt, jar, fp, "the paste", &filter);
+    cookie_load_stream(opt, jar, &src, "the paste", &filter);
     why = filter.why;
     *line = filter.line;
   }
-  if (fp != NULL)
-    fclose(fp);
   freet(all);
   return why;
 }
 
-/* Count the records of jar into *count, and list their domains in hosts. */
-static void paste_jar_summary(const t_cookie *jar, int *count, char *hosts,
-                              size_t hosts_size) {
+/* Count the records of jar into *count, and list their domains in hosts,
+   ending with ",..." when they do not all fit. */
+static void paste_jar_summary(const t_cookie *jar, int *count,
+                              char hosts[HTS_PASTE_HOSTS_SIZE]) {
+  static const char more[] = ",...";
   char buffer[8192];
   char line[8192];
   const char *a = jar->data;
+  hts_boolean cut = HTS_FALSE;
 
   *count = 0;
   hosts[0] = '\0';
   while (*a != '\0') {
-    const char *dom;
     char needle[COOKIE_MAX_DOMAIN + 2];
+    char listed[HTS_PASTE_HOSTS_SIZE + 2];
+    const char *dom;
 
     a += binput(a, line, (int) sizeof(line) - 1);
     dom = cookie_get(buffer, line, 0);
@@ -1157,20 +1207,22 @@ static void paste_jar_summary(const t_cookie *jar, int *count, char *hosts,
       dom++;
     if (*count < INT_MAX)
       (*count)++;
-    snprintf(needle, sizeof(needle), ",%s,", dom);
     // the list is searched with commas around it, so one domain is one entry
-    {
-      char listed[sizeof(((hts_paste_result *) 0)->hosts) + 2];
-
-      snprintf(listed, sizeof(listed), ",%s,", hosts);
-      if (strstr(listed, needle) == NULL &&
-          strlen(dom) + 1 < hosts_size - strlen(hosts)) {
-        if (hosts[0] != '\0')
-          strlcatbuff(hosts, ",", hosts_size);
-        strlcatbuff(hosts, dom, hosts_size);
-      }
+    snprintf(needle, sizeof(needle), ",%s,", dom);
+    snprintf(listed, sizeof(listed), ",%s,", hosts);
+    if (strstr(listed, needle) != NULL)
+      continue;
+    if (strlen(dom) + sizeof(more) < HTS_PASTE_HOSTS_SIZE - strlen(hosts)) {
+      if (hosts[0] != '\0')
+        strlcatbuff(hosts, ",", HTS_PASTE_HOSTS_SIZE);
+      strlcatbuff(hosts, dom, HTS_PASTE_HOSTS_SIZE);
+    } else {
+      cut = HTS_TRUE;
     }
   }
+  if (cut)
+    strlcatbuff(hosts, hosts[0] != '\0' ? more : more + 1,
+                HTS_PASTE_HOSTS_SIZE);
 }
 
 /* Write the reason into result->error and return HTS_FALSE. */
@@ -1180,6 +1232,80 @@ static void paste_jar_summary(const t_cookie *jar, int *count, char *hosts,
     ok = HTS_FALSE;                                                            \
     goto done;                                                                 \
   } while (0)
+
+/* Drop the trailing dots of the host of url, in place, so the cookies and the
+   start URL name the host the name does. */
+static void paste_trim_host_dots(char *url) {
+  char *const host = strstr(url, "://") + 3;
+  char *const end = host + strcspn(host, ":/?\\");
+  char *p = end;
+
+  while (p > host && p[-1] == '.')
+    p--;
+  memmove(p, end, strlen(end) + 1);
+}
+
+/* Copy into name the bundle name of url's host: lowercase ASCII, without the
+   port, a leading "www." or trailing dots. NULL, or why there is none. */
+static const char *paste_name(const char *url, char name[HTS_BUNDLE_NAME_MAX]) {
+  char host[COOKIE_MAX_DOMAIN];
+  const char *h = host;
+  size_t len;
+
+  if (!cookie_url_host(url, host, sizeof(host)))
+    return "the address has no host";
+  if (host[0] == '[' || strchr(host, ':') != NULL)
+    return "an IP address cannot name a login bundle";
+  if (strncmp(h, "www.", 4) == 0)
+    h += 4;
+  for (len = strlen(h); len > 0 && h[len - 1] == '.';)
+    len--;
+  if (len == 0)
+    return "the address names no site";
+  if (len >= HTS_BUNDLE_NAME_MAX)
+    return "invalid login bundle name: 128 bytes or more";
+  name[0] = '\0';
+  strlncatbuff(name, h, HTS_BUNDLE_NAME_MAX, len);
+  // an international name is a file name, so it takes its ASCII form
+  if (!hts_isStringAscii(name, len)) {
+    char *idna = hts_convertStringUTF8ToIDNA(name, len);
+    const hts_boolean fits = idna != NULL && strlen(idna) < HTS_BUNDLE_NAME_MAX;
+
+    if (fits)
+      strlcpybuff(name, idna, HTS_BUNDLE_NAME_MAX);
+    freet(idna);
+    if (!fits)
+      return "invalid login bundle name: the host has no ASCII form of fewer "
+             "than 128 bytes";
+  }
+  return hts_bundle_name_refusal(name);
+}
+
+/* Trim the blanks around the user agent at *ua, into buf. NULL, or why it
+   cannot be sent. */
+static const char *paste_agent(const char **ua,
+                               char buf[HTS_PASTE_AGENT_SIZE]) {
+  const char *s = *ua;
+  size_t len;
+
+  if (s == NULL || s[0] == '\0') {
+    *ua = NULL;
+    return NULL;
+  }
+  s += strspn(s, " \t");
+  for (len = strlen(s); len > 0 && (s[len - 1] == ' ' || s[len - 1] == '\t');)
+    len--;
+  if (len == 0)
+    return "the user agent is blank";
+  if (len >= HTS_PASTE_AGENT_SIZE || hts_bundle_has_control(s, len))
+    return "the user agent cannot be used";
+  if (paste_has_bidi(s, len))
+    return "the user agent holds a text direction control";
+  buf[0] = '\0';
+  strlncatbuff(buf, s, HTS_PASTE_AGENT_SIZE, len);
+  *ua = buf;
+  return NULL;
+}
 
 /* See httrack-library.h. */
 HTSEXT_API hts_boolean hts_bundle_from_paste(const char *paste,
@@ -1193,31 +1319,34 @@ HTSEXT_API hts_boolean hts_bundle_from_paste(const char *paste,
   bundle b, check;
   t_cookie *jar = NULL, *all = NULL;
   httrackp *opt = NULL;
-  char host[COOKIE_MAX_DOMAIN];
   char name[HTS_BUNDLE_NAME_MAX];
   char base[HTS_URLMAXSIZE];
   char path[HTS_URLMAXSIZE * 2];
+  char ua_buf[HTS_PASTE_AGENT_SIZE];
   char err[512];
   const char *ua;
   const char *why;
-  hts_boolean curl, written, ok = HTS_TRUE;
+  text_src src;
+  hts_boolean curl, ok = HTS_TRUE;
   int count = 0, line;
-  size_t len, i;
-  FILE *fp = NULL;
+  size_t len, i, size = 0;
 
   memset(&c, 0, sizeof(c));
   memset(&b, 0, sizeof(b));
   memset(&check, 0, sizeof(check));
   StringInit(c.cookies);
-  if (result == NULL)
+  if (result == NULL || result->size < sizeof(*result))
     return HTS_FALSE;
+  size = result->size;
   memset(result, 0, sizeof(*result));
+  result->size = size;
+
+  // validate the paste before reading it, so a stray byte never reaches a file
   if (paste == NULL || paste[strspn(paste, " \t\r\n")] == '\0')
     PASTE_FAIL("nothing was pasted");
   len = strlen(paste);
   if (len >= PASTE_MAX)
-    PASTE_FAIL("the paste passes %d bytes", PASTE_MAX);
-  // checked before anything else, so a stray byte never reaches the file
+    PASTE_FAIL("the paste is longer than %d bytes", PASTE_MAX - 1);
   for (i = 0; i < len; i++) {
     const unsigned char ch = (unsigned char) paste[i];
 
@@ -1240,12 +1369,10 @@ HTSEXT_API hts_boolean hts_bundle_from_paste(const char *paste,
   } else if (url == NULL || url[0] == '\0') {
     PASTE_FAIL("a cookies.txt needs the address of the site");
   }
-  ua = curl && c.ua != NULL ? c.ua : agent;
-  if (ua != NULL && ua[0] == '\0')
-    ua = NULL;
-  if (ua != NULL && (strlen(ua) >= sizeof(result->agent) ||
-                     hts_bundle_has_control(ua, strlen(ua))))
-    PASTE_FAIL("the user agent cannot be used");
+  ua = curl && c.ua != NULL && c.ua[0] != '\0' ? c.ua : agent;
+  why = paste_agent(&ua, ua_buf);
+  if (why != NULL)
+    PASTE_FAIL("%s", why);
 
   // the fragment is cut, because a sign-in can return a token there
   len = strcspn(url, "#");
@@ -1253,28 +1380,31 @@ HTSEXT_API hts_boolean hts_bundle_from_paste(const char *paste,
     PASTE_FAIL("the address is not an http or https URL");
   if (len >= sizeof(base) || hts_bundle_has_control(url, len))
     PASTE_FAIL("the address cannot be used");
+  if (paste_has_bidi(url, len))
+    PASTE_FAIL("the address holds a text direction control");
   base[0] = '\0';
   strlncatbuff(base, url, sizeof(base), len);
+  {
+    const char *const auth = strstr(base, "://") + 3;
 
-  // the name: the host without a trailing dot or a leading "www."
-  if (!cookie_url_host(base, host, sizeof(host)))
-    PASTE_FAIL("the address has no host");
-  len = strlen(host);
-  if (len != 0 && host[len - 1] == '.')
-    host[--len] = '\0';
-  why = strncmp(host, "www.", 4) == 0 && host[4] != '\0' ? host + 4 : host;
-  if (strlen(why) >= sizeof(name))
-    PASTE_FAIL("invalid login bundle name: 128 bytes or more");
-  strcpybuff(name, why);
-  why = hts_bundle_name_refusal(name);
+    // the password would land in the URL list and the project file
+    if (memchr(auth, '@', strcspn(auth, "/?\\")) != NULL)
+      PASTE_FAIL("the address holds a user name or password");
+  }
+  why = paste_name(base, name);
   if (why != NULL)
     PASTE_FAIL("%s", why);
+  paste_trim_host_dots(base);
+  if (strlen(name) + strlen(HTS_BUNDLE_SUFFIX) >= HTS_CDLMAXSIZE - strlen(base))
+    PASTE_FAIL("the address is longer than %d bytes once the bundle name is "
+               "added",
+               HTS_CDLMAXSIZE - 1);
 
   opt = hts_create_opt();
   jar = calloct(1, sizeof(t_cookie));
   all = calloct(1, sizeof(t_cookie));
   if (opt == NULL || jar == NULL || all == NULL ||
-      !paste_bundle(&b, name, base))
+      !paste_bundle(&b, name, base) || !paste_bundle(&check, name, base))
     PASTE_FAIL("out of memory");
   opt->log = NULL; // the reason goes to the caller, not to stdout
   jar->max_len = COOKIE_MAX_JAR;
@@ -1282,48 +1412,9 @@ HTSEXT_API hts_boolean hts_bundle_from_paste(const char *paste,
 
   // the cookies, into jar
   if (curl) {
-    cookie_attr attr;
-    const char *const domain =
-        cookie_flat_bind(base, host, sizeof(host), &attr);
-    char *pairs =
-        StringNotEmpty(c.cookies) ? strdupt(StringBuff(c.cookies)) : NULL;
-    char *p = pairs;
-    int ignored = 0;
-
-    if (domain == NULL || (pairs == NULL && StringNotEmpty(c.cookies))) {
-      freet(pairs);
-      PASTE_FAIL("the address has no host");
-    }
-    while (p != NULL && *p != '\0') {
-      char *const end = p + strcspn(p, ";");
-      char *pair = p;
-      size_t plen;
-
-      p = *end != '\0' ? end + 1 : end;
-      *end = '\0';
-      pair += strspn(pair, " \t");
-      for (plen = strlen(pair); plen > 0 && strchr(" \t", pair[plen - 1]);)
-        pair[--plen] = '\0';
-      if (*pair != '\0') {
-        char *const eq = strchr(pair, '=');
-        hts_boolean repeat;
-
-        if (eq == NULL || eq == pair) {
-          freet(pairs);
-          PASTE_FAIL("a cookie in the paste has no name");
-        }
-        *eq = '\0';
-        // a browser lists the most specific path first, so the first one wins
-        repeat = cookie_find_exact(jar->data, pair, domain, "/") != NULL;
-        *eq = '=';
-        if (!repeat && !cookie_flat_pair(opt, jar, pair, domain, &attr,
-                                         "the paste", &ignored)) {
-          freet(pairs);
-          PASTE_FAIL("the cookies of the paste do not fit in a bundle");
-        }
-      }
-    }
-    freet(pairs);
+    why = paste_curl_cookies(opt, jar, &c, base);
+    if (why != NULL)
+      PASTE_FAIL("%s", why);
   } else {
     paste_records(paste, &records);
     why = paste_load_records(opt, &b, &records, jar, &line);
@@ -1331,7 +1422,6 @@ HTSEXT_API hts_boolean hts_bundle_from_paste(const char *paste,
       PASTE_FAIL("line %d of the paste: %s", line, why);
   }
 
-  // the bundle, as the engine reads it
   StringCat(text, "# HTTrack bundle 1" LF);
   if (ua != NULL) {
     StringCat(text, "ua ");
@@ -1349,38 +1439,24 @@ HTSEXT_API hts_boolean hts_bundle_from_paste(const char *paste,
   // read it back through the engine's own loader, which also gives the count
   memset(jar->data, 0, sizeof(jar->data));
   opt->cookie = jar;
-  fp = paste_stream(StringBuffRW(text), StringLength(text));
-  if (fp == NULL)
-    PASTE_FAIL("cannot read the bundle back");
-  if (!paste_bundle(&check, name, base))
-    PASTE_FAIL("out of memory");
-  if (!bundle_load_fp(opt, &check, fp, NULL, all, err, sizeof(err)))
+  src = text_src_mem(StringBuff(text), StringLength(text));
+  if (!bundle_load_src(opt, &check, &src, NULL, all, err, sizeof(err)))
     PASTE_FAIL("%s", err);
-  paste_jar_summary(jar, &count, result->hosts, sizeof(result->hosts));
+  paste_jar_summary(jar, &count, result->hosts);
   if (count == 0 && c.auth == NULL)
     PASTE_FAIL("the paste holds no cookie for %s", name);
 
-  if (!slprintfbuff(result->url, sizeof(result->url), "%s%s%s", base,
-                    HTS_BUNDLE_SUFFIX, name))
-    PASTE_FAIL("the address is too long");
-
   if (!dry_run) {
-    FILE *out;
-
     if (!bundle_path(path, sizeof(path), folder, name))
       PASTE_FAIL("the folder path is too long");
-    out = hts_fopen_private(path, "wb");
-    if (out == NULL)
+    if (!cookie_write_replace(path, StringBuff(text), StringLength(text)))
       PASTE_FAIL("cannot write %s: %s", path, strerror(errno));
-    written = hts_fwrite_exact(StringBuff(text), StringLength(text), out);
-    if (fclose(out) != 0 || !written) {
-      (void) UNLINK(path);
-      PASTE_FAIL("cannot write %s", path);
-    }
   }
   strcpybuff(result->name, name);
+  slprintfbuff_clip(result->url, sizeof(result->url), "%s%s%s", base,
+                    HTS_BUNDLE_SUFFIX, name);
   if (ua != NULL)
-    strlcpybuff(result->agent, ua, sizeof(result->agent));
+    strcpybuff(result->agent, ua);
   result->cookies = count;
 
 done:
@@ -1389,10 +1465,9 @@ done:
 
     strcpybuff(reason, result->error);
     memset(result, 0, sizeof(*result));
+    result->size = size;
     strcpybuff(result->error, reason);
   }
-  if (fp != NULL)
-    fclose(fp);
   if (opt != NULL) {
     opt->cookie = NULL;
     hts_free_opt(opt);

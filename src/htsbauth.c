@@ -47,6 +47,7 @@ Please visit our Website: http://www.httrack.com
 #include "htspsl.h"
 #include "htsbundle.h"
 #include "htsdate.h"
+#include "htsio.h"
 #include "htscookie_selftest.h"
 #ifdef _WIN32
 #include <io.h>         /* _commit */
@@ -495,11 +496,49 @@ static hts_boolean cookie_load_field(httrackp *opt, char *dst, size_t dst_size,
 
 /* Read a line of fp into s without its LF or the CR before it. *len receives
    the whole length, even when the line did not fit. A NUL is stored as is. */
-static void cookie_readline(FILE *fp, char *s, size_t size, size_t *len) {
+/* See htsbundle.h. */
+text_src text_src_file(FILE *fp) {
+  text_src src;
+
+  memset(&src, 0, sizeof(src));
+  src.fp = fp;
+  return src;
+}
+
+/* See htsbundle.h. */
+text_src text_src_mem(const char *buf, size_t len) {
+  text_src src;
+
+  memset(&src, 0, sizeof(src));
+  src.buf = buf;
+  src.len = len;
+  return src;
+}
+
+/* The next byte of src, or EOF. */
+static int text_src_getc(text_src *src) {
+  int c;
+
+  if (src->fp == NULL) {
+    if (src->pos < src->len)
+      return (unsigned char) src->buf[src->pos++];
+    src->eof = HTS_TRUE;
+    return EOF;
+  }
+  c = fgetc(src->fp);
+  if (c == EOF) {
+    src->eof = feof(src->fp) != 0;
+    src->error = ferror(src->fp) != 0;
+  }
+  return c;
+}
+
+/* See htsbundle.h. */
+void text_src_readline(text_src *src, char *s, size_t size, size_t *len) {
   size_t n = 0, total = 0;
   int c;
 
-  while ((c = fgetc(fp)) != EOF && c != '\n') {
+  while ((c = text_src_getc(src)) != EOF && c != '\n') {
     if (n + 1 < size)
       s[n++] = (char) c;
     total++;
@@ -831,7 +870,7 @@ static int cookie_load_flat(httrackp *opt, t_cookie *cookie, FILE *fp,
    name the file as given in warnings. A UTF-8 BOM is skipped on the first line
    when first_line is HTS_TRUE. filter, when not NULL, picks the records.
    Returns what cookie_load_from does. */
-static int cookie_load_records(httrackp *opt, t_cookie *cookie, FILE *fp,
+static int cookie_load_records(httrackp *opt, t_cookie *cookie, text_src *src,
                                const char *given, hts_boolean first_line,
                                cookie_filter *filter) {
   char buffer[8192];
@@ -851,12 +890,12 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, FILE *fp,
     keep = HTS_TRUE;
   }
   // ferror ends the loop too, because a directory never reaches EOF
-  while (!feof(fp) && !ferror(fp) && strlen(cookie->data) < cookie->max_len &&
+  while (!src->eof && !src->error && strlen(cookie->data) < cookie->max_len &&
          (filter == NULL || filter->why == NULL)) {
     size_t len;
 
     // len counts what the buffer cut too, so this catches that line
-    cookie_readline(fp, line, sizeof(line), &len);
+    text_src_readline(src, line, sizeof(line), &len);
     if (lineno < INT_MAX)
       lineno++;
     if (filter != NULL)
@@ -997,7 +1036,7 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, FILE *fp,
       }
     }
   }
-  if (!feof(fp) && (filter == NULL || filter->why == NULL)) {
+  if (!src->eof && (filter == NULL || filter->why == NULL)) {
     cookie_warn(opt, filter, given, "stopped reading before the end",
                 "Cookies: stopped reading before the end of %s", given);
     refused++;
@@ -1123,7 +1162,8 @@ int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *fpath,
       return ret;
     }
     if (fp) {
-      const int ret = cookie_load_records(opt, cookie, fp, given,
+      text_src src = text_src_file(fp);
+      const int ret = cookie_load_records(opt, cookie, &src, given,
                                           /* first_line */ HTS_TRUE, NULL);
 
       fclose(fp);
@@ -1140,10 +1180,10 @@ int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *fpath,
 }
 
 /* See htsbundle.h. */
-void cookie_load_stream(httrackp *opt, t_cookie *cookie, FILE *fp,
+void cookie_load_stream(httrackp *opt, t_cookie *cookie, text_src *src,
                         const char *given, cookie_filter *filter) {
-  (void) cookie_load_records(opt, cookie, fp, given, /* first_line */ HTS_FALSE,
-                             filter);
+  (void) cookie_load_records(opt, cookie, src, given,
+                             /* first_line */ HTS_FALSE, filter);
 }
 
 /* Flush fp to the disk and close it. Did every step succeed? */
@@ -1332,6 +1372,32 @@ static hts_boolean cookie_replace(const char *tmp, const char *file) {
   cookie_sync_dir(file);
 #endif
   return HTS_TRUE;
+}
+
+/* See htsbundle.h. */
+hts_boolean cookie_write_replace(const char *file, const char *data,
+                                 size_t len) {
+  char tmp[CATBUFF_SIZE];
+  hts_boolean ok;
+  FILE *fp;
+  int err;
+
+  if (!cookie_tmpname(tmp, sizeof(tmp), file)) {
+    errno = ENAMETOOLONG;
+    return HTS_FALSE;
+  }
+  (void) UNLINK(tmp);
+  fp = hts_fopen_private(tmp, "wb");
+  if (fp == NULL)
+    return HTS_FALSE;
+  ok = hts_fwrite_exact(data, len, fp);
+  ok = cookie_close_synced(fp) && ok;
+  ok = ok && cookie_replace(tmp, file);
+  err = errno;
+  if (!ok)
+    (void) UNLINK(tmp);
+  errno = err;
+  return ok;
 }
 
 /* Write the jar beside file, back file up to bak unless bak is NULL, then

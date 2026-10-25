@@ -13,7 +13,7 @@
 	<link rel="stylesheet" type="text/css" media="screen" href="user.css">
 	<script type="text/javascript" src="ping.js" defer></script>
 
-<script language="javascript">
+<script language="javascript" id="blscript">
 <!--
 
 // initialize wparent to false if necessary (Konqueror bug workaround)
@@ -98,37 +98,41 @@ function do_preview() {
 function do_changed() {
 	document.form.okBtn.disabled = true;
 }
-// Put url in the address list, in place of a line holding the same address.
+// The address of a line of the list, as step 3 reads it: no fragment, and
+// http:// when it names no scheme, which compares in lowercase.
+function bl_address(line) {
+	var a = line.trim().split("#")[0];
+	var m = /^([a-zA-Z][a-zA-Z0-9+.-]*):\/\//.exec(a);
+	return m ? m[1].toLowerCase() + a.substring(m[1].length) : "http://" + a;
+}
+// Put url in place of the first line holding the same address, or append it.
+// The other lines stay as they are.
+function bl_add_to(text, url) {
+	var base = bl_address(url);
+	var lines = text.split("\n");
+	for (var i = 0; i < lines.length; i++) {
+		var cr = /\r$/.test(lines[i]) ? "\r" : "";
+		if (lines[i].trim().length > 0 && bl_address(lines[i]) == base) {
+			lines[i] = url + cr;
+			return lines.join("\n");
+		}
+	}
+	if (text.length > 0 && !/\n$/.test(text))
+		text += "\n";
+	return text + url;
+}
 function bl_add(url) {
 	var urls = bl_urls();
 	if (!urls) {
 		alert('Javascript error, or parent window lost');
 		return false;
 	}
-	var base = url.substring(0, url.indexOf("#"));
-	var lines = urls.value.split(/\r?\n/);
-	var out = [];
-	var placed = false;
-	for (var i = 0; i < lines.length; i++) {
-		var t = lines[i].trim();
-		if (t.length == 0)
-			continue;
-		if (t.split("#")[0] == base) {
-			if (!placed)
-				out.push(url);
-			placed = true;
-		} else {
-			out.push(t);
-		}
-	}
-	if (!placed)
-		out.push(url);
-	urls.value = out.join("\r\n");
+	urls.value = bl_add_to(urls.value, url);
 	return true;
 }
 function do_ok() {
 	bl_post("save", function(r) {
-		if (bl_add(r.getAttribute("data-url"))) {
+		if (bl_add(r.getAttribute("data-starturl"))) {
 			window.close();
 		}
 	});
@@ -213,7 +217,7 @@ ${do:end-if}
 
 ${/* the outcome of the last post, which the script above reads from the answer */}
 <div id="blresult" hidden data-state="${attr:blstate}" data-error="${attr:blerror}" data-name="${attr:blname}"
-	data-url="${attr:blurl}" data-count="${attr:blcount}" data-hosts="${attr:blhosts}" data-agent="${attr:blagent}"></div>
+	data-starturl="${attr:blstarturl}" data-count="${attr:blcount}" data-hosts="${attr:blhosts}" data-agent="${attr:blagent}"></div>
 
 <!-- ==================== Start epilogue ==================== -->
 		</td>

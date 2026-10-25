@@ -103,8 +103,9 @@ not need steps 1 to 3.</p>
 <li>Log in to the site in another tab of the same browser.</li>
 <li>Press F12 to open the developer tools, and open the "Network" tab. Reload the
 page.</li>
-<li>Right-click the request of the page, and choose "Copy as cURL (bash)". Some
-browsers call it "Copy as cURL".</li>
+<li>Right-click the first request in the list (the page itself), and choose "Copy as
+cURL (bash)". Firefox calls it "Copy as cURL", or "Copy as cURL (POSIX)" on
+Windows.</li>
 <li>In WebHTTrack, on the page where you type the addresses, click "Log in with a
 browser...". Paste the text and click "Go". Check the number of cookies, then click
 "OK".</li>
@@ -113,9 +114,9 @@ browser...". Paste the text and click "Go". Check the number of cookies, then cl
 <p>WebHTTrack saves the login in the project folder, in a file named after the site, for
 example <code>example.com.hts</code>. Only your user account can read it. WebHTTrack also
 adds <code>#httrack-bundle=example.com</code> to the address, so the mirror uses this
-login and the User-Agent of your browser. A cookies.txt file works too: put the site
-address first in the list, then paste the content of the file. The <code>.hts</code>
-file is as good as your password, so delete it when the copy is done.</p>
+login and the User-Agent of your browser. A cookies.txt file works too: type the site
+address first in the address box, then paste the content of the file. Anyone who has the
+<code>.hts</code> file can use your login, so delete it when the copy is done.</p>
 
 <h2 id="export">Step 1: export the cookies</h2>
 

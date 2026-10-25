@@ -1112,8 +1112,8 @@ The browser did not open: %s.
 The browser did not open: %s.
 The browser came back with no cookies, so nothing was kept.
 The browser came back with no cookies, so nothing was kept.
-%d cookies were collected. They are used when you press OK.
-%d cookies were collected. They are used when you press OK.
+Cookies collected: %d. They are used when you press OK.
+Cookies collected: %d. They are used when you press OK.
 The browser gave no cookies the engine can use, so nothing was changed.
 The browser gave no cookies the engine can use, so nothing was changed.
 The cookies could not be written to %s, so nothing was changed.
@@ -1122,7 +1122,7 @@ The cookies could not be written to %s, so nothing was changed.
 %d of the browser's cookies were left out, because the engine would not read them.
 The browser identity it reported cannot be used, so the mirror will send the default one.
 The browser identity it reported cannot be used, so the mirror will send the default one.
-Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click its request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
-Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click its request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
-Sites: %s. Browser identity: %s.
-Sites: %s. Browser identity: %s.
+Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
+Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
+Cookies for: %s. Browser identity: %s.
+Cookies for: %s. Browser identity: %s.

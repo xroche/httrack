@@ -91,7 +91,7 @@ int main(void) {
   LLint size = -1;
   int truncated = -1;
   int kinds = 0;
-  hts_paste_result login;
+  hts_paste_result login = {sizeof(hts_paste_result)};
   char domain[256];
 
   hts_set_thread_hooks(embedder_enter, embedder_leave);
@@ -189,6 +189,42 @@ fi
 }
 ! "${cc_argv[@]}" -o "$tmp/unexported" "$tmp/unexported.o" "$lib" 2>/dev/null ||
     fail "${cc_argv[*]} linked an undefined symbol, the link above proved nothing"
+
+# The login bundle calls also run from outside the library.
+cat >"$tmp/login.c" <<'EOF'
+#include <stdio.h>
+#include <httrack/httrack-library.h>
+
+int main(void) {
+  hts_paste_result res = {sizeof(hts_paste_result)};
+  hts_paste_result small = {sizeof(hts_paste_result) - 1};
+  char domain[64];
+  hts_boolean ok;
+  const char *paste = "curl 'https://www.shop.example.co.uk/' -b 'SID=1'";
+
+  hts_init();
+  printf("%d %s\n", hts_registrable_domain("a.example.co.uk", domain,
+                                            sizeof(domain)), domain);
+  printf("%s\n", hts_bundle_name_refusal("con") != NULL ? "refused" : "ok");
+  ok = hts_bundle_from_paste(paste, NULL, NULL, NULL, HTS_TRUE, &res);
+  printf("%d %s %d %s\n", ok, res.name, res.cookies, res.hosts);
+  ok = hts_bundle_from_paste(paste, NULL, NULL, NULL, HTS_TRUE, &small);
+  printf("%d\n", ok);
+  hts_uninit();
+  return 0;
+}
+EOF
+"${cc_argv[@]}" "${cpp_argv[@]}" -o "$tmp/login" "$tmp/login.c" "$lib" \
+    -Wl,-rpath,"${lib%/*}" 2>"$tmp/login.log" || {
+    cat "$tmp/login.log" >&2
+    fail "the login bundle program does not build"
+}
+got=$(LD_LIBRARY_PATH="${lib%/*}" DYLD_LIBRARY_PATH="${lib%/*}" "$tmp/login")
+want="1 example.co.uk
+refused
+1 shop.example.co.uk 1 example.co.uk
+0"
+test "$got" = "$want" || fail "the login bundle calls from outside: [$got]"
 
 echo "an embedder compiled and linked the advertised calls from the installed headers"
 

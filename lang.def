@@ -1143,7 +1143,7 @@ The browser did not open: %s.
 LANG_BROWSERLOGINNONE
 The browser came back with no cookies, so nothing was kept.
 LANG_BROWSERLOGINGOT
-%d cookies were collected. They are used when you press OK.
+Cookies collected: %d. They are used when you press OK.
 LANG_BROWSERLOGINUNUSABLE
 The browser gave no cookies the engine can use, so nothing was changed.
 LANG_BROWSERLOGINNOTSAVED
@@ -1153,6 +1153,6 @@ LANG_BROWSERLOGINDROPPED
 LANG_BROWSERLOGINBADAGENT
 The browser identity it reported cannot be used, so the mirror will send the default one.
 LANG_BROWSERLOGINPASTE
-Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click its request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
+Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
 LANG_BROWSERLOGINFOR
-Sites: %s. Browser identity: %s.
+Cookies for: %s. Browser identity: %s.

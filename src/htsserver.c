@@ -725,7 +725,8 @@ typedef struct browserlogin_post {
   String paste;
   String agent;
   String url;
-  char action[8]; /* "preview" or "save" */
+  char action[8];  /* "preview" or "save", or "?" for any other value */
+  hts_boolean nul; /* a field held a NUL byte */
 } browserlogin_post;
 
 /* Take the posted field key into login when it is one of the popup's, and say
@@ -735,7 +736,9 @@ static hts_boolean browserlogin_field(browserlogin_post *login, const char *key,
   String *dst = NULL;
 
   if (strcmp(key, "blaction") == 0) {
-    if (StringLength(*value) < sizeof(login->action))
+    strcpybuff(login->action, "?");
+    if (StringLength(*value) < sizeof(login->action) &&
+        strlen(StringBuff(*value)) == StringLength(*value))
       strcpybuff(login->action, StringBuff(*value));
     StringFree(*value);
     return HTS_TRUE;
@@ -748,6 +751,10 @@ static hts_boolean browserlogin_field(browserlogin_post *login, const char *key,
     dst = &login->url;
   if (dst == NULL)
     return HTS_FALSE;
+  // a NUL would cut the paste where the engine reads it
+  if (StringNotEmpty(*value) &&
+      strlen(StringBuff(*value)) != StringLength(*value))
+    login->nul = HTS_TRUE;
   StringFree(*dst);
   *dst = *value;
   StringInit(*value);
@@ -770,14 +777,19 @@ static void browserlogin_run(const browserlogin_post *login) {
   const hts_boolean save = strcmp(login->action, "save") == 0;
   hts_paste_result *res = calloct(1, sizeof(*res));
   String folder = STRING_EMPTY;
+  String url = STRING_EMPTY;
   intptr_t adrpath = 0, adrproj = 0;
   const char *error = NULL;
   char count[32];
 
+  if (res != NULL)
+    res->size = sizeof(*res);
   if (res == NULL) {
     error = "out of memory";
   } else if (!save && strcmp(login->action, "preview") != 0) {
     error = "unknown action";
+  } else if (login->nul) {
+    error = "the paste holds a NUL byte";
   } else if (coucal_readptr(NewLangList, "path", &adrpath) &&
              coucal_readptr(NewLangList, "projname", &adrproj) &&
              *(const char *) adrproj != '\0') {
@@ -792,17 +804,29 @@ static void browserlogin_run(const browserlogin_post *login) {
 
     StringCopy(dirs, StringBuff(folder));
     StringCat(dirs, "/");
-    if (!hts_path_is_contained(StringBuff(folder)))
-      error = "the project path escapes its parent directory";
+    // the base path is the user's own choice, the project name is not
+    if (!hts_path_is_relative_contained((const char *) adrproj))
+      error = "the project name escapes the base path";
     else if (structcheck(StringBuff(dirs)) != 0)
       error = "cannot create the project folder";
     StringFree(dirs);
+  }
+  // step 3 reads an address without a scheme as http
+  if (StringNotEmpty(login->url)) {
+    const char *const u = StringBuff(login->url);
+    const size_t scheme = strspn(u, "abcdefghijklmnopqrstuvwxyz"
+                                    "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+.-");
+
+    if (scheme == 0 || strncmp(u + scheme, "://", 3) != 0)
+      StringCat(url, "http://");
+    StringCat(url, u);
   }
   if (error == NULL &&
       !hts_bundle_from_paste(
           StringNotEmpty(login->paste) ? StringBuff(login->paste) : "",
           StringNotEmpty(folder) ? StringBuff(folder) : NULL,
-          StringBuff(login->agent), StringBuff(login->url), !save, res))
+          StringBuff(login->agent),
+          StringNotEmpty(url) ? StringBuff(url) : NULL, !save, res))
     error = res->error;
   snprintf(count, sizeof(count), "%d", error == NULL ? res->cookies : 0);
   browserlogin_set("blstate", error != NULL ? "error"
@@ -810,11 +834,12 @@ static void browserlogin_run(const browserlogin_post *login) {
                                             : "preview");
   browserlogin_set("blerror", error != NULL ? error : "");
   browserlogin_set("blname", error == NULL ? res->name : "");
-  browserlogin_set("blurl", error == NULL ? res->url : "");
+  browserlogin_set("blstarturl", error == NULL ? res->url : "");
   browserlogin_set("blagent", error == NULL ? res->agent : "");
   browserlogin_set("blhosts", error == NULL ? res->hosts : "");
   browserlogin_set("blcount", count);
   StringFree(folder);
+  StringFree(url);
   freet(res);
 }
 

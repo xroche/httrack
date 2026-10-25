@@ -1112,7 +1112,7 @@ The browser did not open: %s.
 ブラウザを開けませんでした: %s。
 The browser came back with no cookies, so nothing was kept.
 ブラウザからクッキーが返されなかったため、何も保存しませんでした。
-%d cookies were collected. They are used when you press OK.
+Cookies collected: %d. They are used when you press OK.
 クッキーを %d 個取得しました。OK を押すと使用されます。
 The browser gave no cookies the engine can use, so nothing was changed.
 HTTrack が使用できるクッキーがブラウザから得られなかったため、何も変更しませんでした。
@@ -1122,7 +1122,7 @@ The cookies could not be written to %s, so nothing was changed.
 ブラウザのクッキーのうち %d 個は、HTTrack が読み取れないため除外しました。
 The browser identity it reported cannot be used, so the mirror will send the default one.
 報告されたブラウザIDは使用できないため、ミラーは既定のものを送信します。
-Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click its request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
-このブラウザの別のタブでサイトにログインします。開発者ツール（F12）を開き、ネットワークタブを開いてページを再読み込みし、そのリクエストを右クリックして Copy as cURL (bash) を選びます。そのテキストをここに貼り付けます。cookies.txt のエクスポートも使えます。その場合はリストの最初のアドレスに使われます。
-Sites: %s. Browser identity: %s.
-サイト: %s。ブラウザID: %s。
+Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
+このブラウザの別のタブでサイトにログインします。開発者ツール（F12）を開き、ネットワークタブを開いてページを再読み込みし、最初のリクエストを右クリックして Copy as cURL (bash) を選びます。そのテキストをここに貼り付けます。cookies.txt のエクスポートも使えます。その場合はリストの最初のアドレスに使われます。
+Cookies for: %s. Browser identity: %s.
+クッキーの対象: %s。ブラウザID: %s。
