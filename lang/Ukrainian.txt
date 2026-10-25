@@ -1111,7 +1111,7 @@ Clear login
 The browser did not open: %s.
 Браузер не відкрився: %s.
 The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
-Браузер не повернув жодного cookie. Адресу та ідентифікатор браузера буде збережено разом із проєктом, коли ви натиснете ОК.
+Браузер не повернув жодного cookie. Адресу та ідентифікатор браузера буде збережено разом із проектом, коли ви натиснете ОК.
 Cookies collected: %d. They are used when you press OK.
 Зібрано cookies: %d. Вони будуть застосовані, коли ви натиснете ОК.
 The cookies could not be written to %s, so nothing was changed.

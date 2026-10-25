@@ -1111,7 +1111,7 @@ Clear login
 The browser did not open: %s.
 Το πρόγραμμα περιήγησης δεν άνοιξε: %s.
 The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
-Το πρόγραμμα περιήγησης δεν επέστρεψε cookies. Η διεύθυνση και η ταυτότητα του προγράμματος περιήγησης θα αποθηκευτούν με το έργο όταν πατήσετε Εντάξει.
+Το πρόγραμμα περιήγησης δεν επέστρεψε cookies. Η διεύθυνση και η ταυτότητα του προγράμματος περιήγησης θα αποθηκευτούν με την εργασία όταν πατήσετε Εντάξει.
 Cookies collected: %d. They are used when you press OK.
 Cookies που συλλέχθηκαν: %d. Θα χρησιμοποιηθούν όταν πατήσετε Εντάξει.
 The cookies could not be written to %s, so nothing was changed.
