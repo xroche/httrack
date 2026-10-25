@@ -1182,13 +1182,16 @@ HTSEXT_API hts_header_verdict hts_custom_header_verdict(const char *headers,
   if (header_line_refused(line))
     return HTS_HEADER_DROPPED_FRAMING;
   if (header_line_single(line) && headers != NULL) {
-    char field[sizeof("Authorization")];
+    char field[128];
     const size_t len = header_name_len(line);
 
-    memcpy(field, line, len);
-    field[len] = '\0';
-    if (http_headers_have_field(headers, field))
-      return HTS_HEADER_SENT_REPLACES_EARLIER;
+    /* bounded here, not by the longest name in single[] */
+    if (len < sizeof(field)) {
+      memcpy(field, line, len);
+      field[len] = '\0';
+      if (http_headers_have_field(headers, field))
+        return HTS_HEADER_SENT_REPLACES_EARLIER;
+    }
   }
   if (header_line_engine_conditional(line))
     return HTS_HEADER_SENT_UNLESS_ENGINE_OVERRIDES;
