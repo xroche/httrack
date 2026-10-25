@@ -260,6 +260,7 @@ typedef struct paste_race {
   const char *dir;
   int rounds;
   volatile int failed;
+  char why[HTS_PASTE_ERROR_SIZE]; /* the first failure */
 } paste_race;
 
 static void paste_race_worker(void *arg) {
@@ -270,8 +271,9 @@ static void paste_race_worker(void *arg) {
   for (i = 0; i < race->rounds; i++) {
     res.size = sizeof(res);
     if (!hts_bundle_from_paste("curl 'https://race.test/' -b a=1", race->dir,
-                               NULL, NULL, HTS_FALSE, &res))
-      (void) hts_increment_int(&race->failed);
+                               NULL, NULL, HTS_FALSE, &res) &&
+        hts_increment_int(&race->failed) == 1)
+      strcpybuff(race->why, res.error);
   }
 }
 
@@ -287,6 +289,7 @@ static int st_pasterace(httrackp *opt, int argc, char **argv) {
   race.dir = argv[0];
   race.rounds = atoi(argv[1]);
   race.failed = 0;
+  race.why[0] = '\0';
   if (hts_newthread(paste_race_worker, &race) != 0 ||
       hts_newthread(paste_race_worker, &race) != 0) {
     fprintf(stderr, "pasterace: cannot start a thread\n");
@@ -294,6 +297,8 @@ static int st_pasterace(httrackp *opt, int argc, char **argv) {
   }
   htsthread_wait_n(0);
   printf("failed=%d\n", hts_load_acquire_int(&race.failed));
+  if (race.why[0] != '\0')
+    printf("first: %s\n", race.why);
   return 0;
 }
 
