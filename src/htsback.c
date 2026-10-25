@@ -2075,27 +2075,18 @@ static hts_boolean ref_get_record(FILE *fp, lien_back *dst) {
   return HTS_TRUE;
 }
 
-/* Record the state an interrupted transfer resumes from. Not utf-8. */
+/* Record the state an interrupted transfer resumes from. Note: utf-8 */
 int back_serialize_ref(httrackp * opt, const lien_back * src) {
   const char *filename =
     url_savename_refname_fullpath(opt, src->url_adr, src->url_fil);
-  FILE *fp = fopen(filename, "wb");
+  FILE *fp = FOPEN(filename, "wb");
 
-  if (fp == NULL) {
-#ifdef _WIN32
-    if (mkdir
-        (fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), CACHE_REFNAME))
-        == 0)
-#else
-    if (mkdir
-        (fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), CACHE_REFNAME),
-         S_IRWXU | S_IRWXG | S_IRWXO) == 0)
-#endif
-    {
-      /* note: local filename */
-      filename = url_savename_refname_fullpath(opt, src->url_adr, src->url_fil);
-      fp = fopen(filename, "wb");
-    }
+  if (fp == NULL &&
+      MKDIR(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                    StringBuff(opt->path_log), CACHE_REFNAME)) == 0) {
+    /* note: local filename */
+    filename = url_savename_refname_fullpath(opt, src->url_adr, src->url_fil);
+    fp = FOPEN(filename, "wb");
   }
   if (fp != NULL) {
     const int ser = ref_put_record(fp, src) && fflush(fp) == 0 ? 0 : 1;
