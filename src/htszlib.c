@@ -211,8 +211,10 @@ size_t hts_zhead(const void *in, size_t in_len, void *out, size_t out_len) {
 
 int hts_extract_meta(const char *path) {
   char catbuff[CATBUFF_SIZE];
-  unzFile zFile = unzOpen(fconcat(catbuff, sizeof(catbuff), path, "hts-cache/new.zip"));
-  zipFile zFileOut = zipOpen(fconcat(catbuff, sizeof(catbuff), path, "hts-cache/meta.zip"), 0);
+  unzFile zFile = hts_unzOpen_utf8(
+      fconcat(catbuff, sizeof(catbuff), path, "hts-cache/new.zip"));
+  zipFile zFileOut = hts_zipOpen_utf8(
+      fconcat(catbuff, sizeof(catbuff), path, "hts-cache/meta.zip"), 0);
 
   if (zFile != NULL && zFileOut != NULL) {
     if (unzGoToFirstFile(zFile) == Z_OK) {

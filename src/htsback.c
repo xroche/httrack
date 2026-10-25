@@ -977,7 +977,7 @@ static int create_back_tmpfile(httrackp *opt, lien_back *const back,
       return -1;
     }
     back->tmpfile = back->tmpfile_buffer;
-    if (structcheck(back->tmpfile) != 0) {
+    if (structcheck_utf8(back->tmpfile) != 0) {
       hts_log_print(opt, LOG_WARNING, "can not create directory to %s",
                     back->tmpfile);
       back->tmpfile_buffer[0] = '\0';
@@ -997,7 +997,7 @@ static int create_back_tmpfile(httrackp *opt, lien_back *const back,
       return -1;
     }
     back->tmpfile = back->tmpfile_buffer;
-    if (structcheck(back->tmpfile) != 0) {
+    if (structcheck_utf8(back->tmpfile) != 0) {
       hts_log_print(opt, LOG_WARNING, "can not create directory to %s",
                     back->tmpfile);
       back->tmpfile_buffer[0] = '\0';
@@ -1023,9 +1023,9 @@ void back_refetch_backup(httrackp *opt, lien_back *const back) {
         hts_log_print(opt, LOG_WARNING, "replacing leftover backup %s",
                       back->tmpfile);
       saved = hts_rename_over(opt, back->url_sav, back->tmpfile);
-      /* Another slot sharing the directory may have removed it between the
-         structcheck above and the rename: recreate it and try once more. */
-      if (!saved && structcheck(back->tmpfile) == 0)
+      /* Another slot sharing the directory may have removed it since: recreate
+         it and try once more. */
+      if (!saved && structcheck_utf8(back->tmpfile) == 0)
         saved = hts_rename_over(opt, back->url_sav, back->tmpfile);
     }
     if (!saved) {
@@ -1342,7 +1342,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
               }
               /* ensure that no remaining temporary file exists */
               if (back[p].tmpfile != NULL) {
-                unlink(back[p].tmpfile);
+                UNLINK(back[p].tmpfile);
                 back_tmpdir_drop(back[p].tmpfile); /* the .u went with it */
                 back[p].tmpfile = NULL;
               }
@@ -2075,27 +2075,18 @@ static hts_boolean ref_get_record(FILE *fp, lien_back *dst) {
   return HTS_TRUE;
 }
 
-/* Record the state an interrupted transfer resumes from. Not utf-8. */
+/* Record the state an interrupted transfer resumes from. Note: utf-8 */
 int back_serialize_ref(httrackp * opt, const lien_back * src) {
   const char *filename =
     url_savename_refname_fullpath(opt, src->url_adr, src->url_fil);
-  FILE *fp = fopen(filename, "wb");
+  FILE *fp = FOPEN(filename, "wb");
 
-  if (fp == NULL) {
-#ifdef _WIN32
-    if (mkdir
-        (fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), CACHE_REFNAME))
-        == 0)
-#else
-    if (mkdir
-        (fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log), CACHE_REFNAME),
-         S_IRWXU | S_IRWXG | S_IRWXO) == 0)
-#endif
-    {
-      /* note: local filename */
-      filename = url_savename_refname_fullpath(opt, src->url_adr, src->url_fil);
-      fp = fopen(filename, "wb");
-    }
+  if (fp == NULL &&
+      MKDIR(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                    StringBuff(opt->path_log), CACHE_REFNAME)) == 0) {
+    /* note: local filename */
+    filename = url_savename_refname_fullpath(opt, src->url_adr, src->url_fil);
+    fp = FOPEN(filename, "wb");
   }
   if (fp != NULL) {
     const int ser = ref_put_record(fp, src) && fflush(fp) == 0 ? 0 : 1;
@@ -2540,7 +2531,7 @@ int back_clear_entry(lien_back * back) {
     }
     // only for security
     if (back->tmpfile && back->tmpfile[0] != '\0') {
-      (void) unlink(back->tmpfile);
+      (void) UNLINK(back->tmpfile);
       back_tmpdir_drop(back->tmpfile);
       back->tmpfile = NULL;
     }
@@ -2752,7 +2743,7 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
                   if (strcmp(previous_save, save) != 0 &&
                       fexist_utf8(
                           fconv(catbuff, sizeof(catbuff), previous_save))) {
-                    rename(fconv(catbuff, sizeof(catbuff), previous_save),
+                    RENAME(fconv(catbuff, sizeof(catbuff), previous_save),
                            fconv(catbuff2, sizeof(catbuff2), save));
                     if (fexist_utf8(fconv(catbuff, sizeof(catbuff), save))) {
                       found = 1;
