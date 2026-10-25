@@ -97,7 +97,7 @@ const char *cookie_host_refusal(const char *host, size_t len) {
     return "the host is not valid UTF-8";
   for (i = 0; i < len; i += n) {
     n = hts_readUTF8(&host[i], len - i, &uc);
-    if (n == 0)
+    if (n == 0) // a stalled reader would loop forever
       return "the host is not valid UTF-8";
     if (cookie_is_capital(uc))
       return "write the host in lowercase";
