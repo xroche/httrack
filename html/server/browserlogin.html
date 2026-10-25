@@ -98,9 +98,7 @@ function do_preview() {
 function do_changed() {
 	document.form.okBtn.disabled = true;
 }
-// The address of a line of the list, as step 3 reads it: no fragment, and
-// http:// when it names no scheme. The scheme and the host compare in
-// lowercase, and an international host in its ASCII form, as it is requested.
+// The address of a list line as step 3 reads it, in the form it is requested.
 function bl_address(line) {
 	var a = line.trim().split("#")[0];
 	var m = /^([a-zA-Z][a-zA-Z0-9+.-]*):\/\//.exec(a);

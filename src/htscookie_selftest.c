@@ -321,6 +321,21 @@ static int st_cookieport(httrackp *opt, int argc, char **argv) {
       // the request names an international host in its ASCII form
       {"WWW.B\303\274cher.example:81", "www.xn--bcher-kva.example"},
       {".b\303\274cher.example", ".xn--bcher-kva.example"},
+      // IDNA would encode these as another host, or one holding a '/'
+      {".\300\257.example", NULL},               // an overlong '/'
+      {".\200.example", NULL},                   // a stray continuation byte
+      {".\355\240\200.example", NULL},           // a surrogate
+      {".\364\220\200\200.example", NULL},       // above U+10FFFF
+      {".b\303.example", NULL},                  // a truncated sequence
+      {".B\303\234CHER.example", NULL},          // a capital outside ASCII
+      {".\320\220.example", NULL},               // a Cyrillic capital
+      {".\320\260.example", ".xn--80a.example"}, // its small letter
+      // fits as typed, but not once in its ASCII form
+      {"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\303\274",
+       NULL},
   };
 
   static const struct {

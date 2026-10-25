@@ -1044,9 +1044,7 @@ static hts_boolean paste_is_curl(const char *s) {
 }
 
 /* Copy the records of the cookies.txt paste s into out, one line per line of
-   s so that line numbers hold, and a last line without LF keeps none. Blank and
-   comment lines become empty lines, because the bundle reader refuses comments
-   it does not know. */
+   s, with blank and comment lines left empty for the bundle reader. */
 static void paste_records(const char *s, String *out) {
   static const char httponly[] = "#HttpOnly_";
 
@@ -1259,9 +1257,8 @@ static const char *paste_host_idna(char *url, size_t size) {
   if (hts_isStringAscii(host, len))
     return NULL;
   idna = hts_convertStringUTF8ToIDNA(host, len);
-  if (idna == NULL)
-    why = "the host has no ASCII form";
-  else if (strlen(idna) >= size - (size_t) (host - url) - strlen(rest))
+  if (idna == NULL ||
+      strlen(idna) >= size - (size_t) (host - url) - strlen(rest))
     why = "the address is too long once its host is in ASCII";
   else {
     hts_lowcase(idna);
@@ -1405,6 +1402,9 @@ HTSEXT_API hts_boolean hts_bundle_from_paste(const char *paste,
     // the password would land in the URL list and the project file
     if (memchr(auth, '@', strcspn(auth, "/?\\")) != NULL)
       PASTE_FAIL("the address holds a user name or password");
+    why = cookie_host_refusal(auth, strcspn(auth, ":/?\\"));
+    if (why != NULL)
+      PASTE_FAIL("%s", why);
   }
   why = paste_name(base, name);
   if (why != NULL)

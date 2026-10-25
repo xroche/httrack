@@ -89,6 +89,11 @@ typedef struct httrackp httrackp;
     HTS_FALSE means the caller sends no cookie. */
 hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size);
 
+/** Why can the LEN bytes of HOST, past any ASCII lowercasing, not take an
+    ASCII form? IDNA needs strict UTF-8, and it encodes a capital outside ASCII
+    as another host. NULL when they can. */
+const char *cookie_host_refusal(const char *host, size_t len);
+
 /** A jar record holds this many bytes of name plus value. */
 #define COOKIE_MAX_PAIR 4096
 /** A cookie domain buffer holds this many bytes, the NUL included. */

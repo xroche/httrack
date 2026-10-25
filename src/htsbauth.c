@@ -62,6 +62,44 @@ Please visit our Website: http://www.httrack.com
    2 path, 3 secure, 4 expiry, 5 name, 6 value and 7 HttpOnly. */
 #define COOKIE_HTTPONLY_FIELD "HttpOnly"
 
+/* Is uc a capital letter of the Latin, Greek, Cyrillic or Armenian script? */
+static hts_boolean cookie_is_capital(hts_UCS4 uc) {
+  if (uc >= 0x100 && uc <= 0x17f) // Latin Extended-A pairs capital first
+    return uc == 0x178 ||
+           ((uc <= 0x137 || (uc >= 0x14a && uc <= 0x177)) && uc % 2 == 0) ||
+           (((uc >= 0x139 && uc <= 0x148) || (uc >= 0x179 && uc <= 0x17e)) &&
+            uc % 2 == 1);
+  if ((uc >= 0x460 && uc <= 0x481) || (uc >= 0x48a && uc <= 0x4bf) ||
+      (uc >= 0x4d0 && uc <= 0x52f) || (uc >= 0x1e00 && uc <= 0x1e95) ||
+      (uc >= 0x1ea0 && uc <= 0x1eff))
+    return uc % 2 == 0;
+  if (uc >= 0x4c1 && uc <= 0x4ce)
+    return uc % 2 == 1;
+  return (uc >= 0xc0 && uc <= 0xde && uc != 0xd7) || uc == 0x386 ||
+         (uc >= 0x388 && uc <= 0x38a) || uc == 0x38c || uc == 0x38e ||
+         uc == 0x38f || (uc >= 0x391 && uc <= 0x3ab && uc != 0x3a2) ||
+         (uc >= 0x400 && uc <= 0x42f) || uc == 0x4c0 ||
+         (uc >= 0x531 && uc <= 0x556) || uc == 0x1e9e ||
+         (uc >= 0xff21 && uc <= 0xff3a);
+}
+
+/* See htsbauth.h. */
+const char *cookie_host_refusal(const char *host, size_t len) {
+  size_t i, n;
+  hts_UCS4 uc;
+
+  if (!hts_isStringUTF8(host, len))
+    return "the host is not valid UTF-8";
+  for (i = 0; i < len; i += n) {
+    n = hts_readUTF8(&host[i], len - i, &uc);
+    if (n == 0)
+      return "the host is not valid UTF-8";
+    if (cookie_is_capital(uc))
+      return "write the host in lowercase";
+  }
+  return NULL;
+}
+
 /* See htsbauth.h. */
 hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size) {
   const char *host = jump_identification_const(adr);
@@ -91,9 +129,13 @@ hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size) {
   hts_lowcase(dst);
   // the request names an international host in its ASCII form, so a jar must
   if (!hts_isStringAscii(dst, strlen(dst))) {
-    char *idna = hts_convertStringUTF8ToIDNA(dst, strlen(dst));
-    const hts_boolean fits = idna != NULL && strlen(idna) < dst_size;
+    char *idna;
+    hts_boolean fits;
 
+    if (cookie_host_refusal(dst, strlen(dst)) != NULL)
+      return HTS_FALSE;
+    idna = hts_convertStringUTF8ToIDNA(dst, strlen(dst));
+    fits = idna != NULL && strlen(idna) < dst_size;
     if (fits)
       strlcpybuff(dst, idna, dst_size);
     freet(idna);
@@ -1340,8 +1382,7 @@ static void cookie_sync_dir(const char *file) {
 }
 #endif
 
-/* Name in dst the temporary beside path, with the pid and a per-call number
-   in it, so no other run or thread writes it. A crashed run leaves its own. */
+/* Name in dst a temporary beside path that no other run or thread writes. */
 static hts_boolean cookie_tmpname(char *dst, size_t size, const char *path) {
   static volatile int calls = 0;
 
