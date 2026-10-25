@@ -1269,35 +1269,33 @@ static const char *paste_host_idna(char *url, size_t size) {
 }
 
 /* Copy into name the bundle name of url: the registrable domain its scope
-   covers, else the host without the port, a leading "www." or trailing dots,
-   else "login". NULL, or why there is none. */
+   covers, else the host without the port, a leading "www." or trailing dots.
+   NULL, or why there is none. */
 static const char *paste_name(const char *url, char name[HTS_BUNDLE_NAME_MAX]) {
   char host[COOKIE_MAX_DOMAIN];
   const char *h = host;
+  hts_boolean www;
   size_t len;
 
   if (!cookie_url_host(url, host, sizeof(host)))
     return "the address has no host";
   if (host[0] == '[' || strchr(host, ':') != NULL)
     return "an IP address cannot name a login bundle";
-  // with "www." kept, as www.github.io is a site of its own
+  www = strncmp(host, "www.", 4) == 0;
+  for (len = strlen(host); len > 0 && host[len - 1] == '.';)
+    host[--len] = '\0';
+  // www.github.io is a site of its own, so "www." stays here
   if (hts_registrable_domain(host, name, HTS_BUNDLE_NAME_MAX) &&
       hts_bundle_name_refusal(name) == NULL)
     return NULL;
-  if (strncmp(h, "www.", 4) == 0)
-    h += 4;
-  for (len = strlen(h); len > 0 && h[len - 1] == '.';)
-    len--;
-  if (len == 0)
+  if (www)
+    h += len < 4 ? len : 4;
+  if (*h == '\0')
     return "the address names no site";
-  name[0] = '\0';
-  if (len < HTS_BUNDLE_NAME_MAX) {
-    strlncatbuff(name, h, HTS_BUNDLE_NAME_MAX, len);
-    if (hts_bundle_name_refusal(name) == NULL)
-      return NULL;
-  }
-  strlcpybuff(name, "login", HTS_BUNDLE_NAME_MAX);
-  return NULL;
+  if (strlen(h) >= HTS_BUNDLE_NAME_MAX)
+    return "invalid login bundle name: 128 bytes or more";
+  strlcpybuff(name, h, HTS_BUNDLE_NAME_MAX);
+  return hts_bundle_name_refusal(name);
 }
 
 /* Trim the blanks around the user agent at *ua, into buf. NULL, or why it

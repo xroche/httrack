@@ -102,7 +102,7 @@ url=https://api.test/#httrack-bundle=api.test
 agent=" paste "$proj" "$in"
 
 # The name is the registrable domain the scope covers, else the host with no
-# port, trailing dots or leading www., else "login". An international host
+# port, trailing dots or leading www. An international host
 # takes its ASCII form, in the address and the cookies too.
 for u in 'https://WWW.Site.test:81/x' 'https://site.test./' \
     'https://site.test../' 'http://www.site.test/'; do
@@ -118,11 +118,11 @@ agent=" paste "$dir/dry" "$in" dry
 # www.github.io is a site of its own, github.io being a public suffix.
 put "curl 'https://www.github.io/' -b a=1"
 selftest_queue_head "name=www.github.io cookies=1" paste "$dir/dry" "$in" dry
-# A device name falls back to the host, then to "login".
+# A device name falls back to the host.
 put "curl 'https://shop.con.com/' -b a=1"
 selftest_queue_head "name=shop.con.com cookies=1" paste "$dir/dry" "$in" dry
-put "curl 'http://con/' -b a=1"
-selftest_queue_head "name=login cookies=1" paste "$dir/dry" "$in" dry
+put "curl 'https://a.site.test../' -b a=1"
+selftest_queue_head "name=site.test cookies=1" paste "$dir/dry" "$in" dry
 put "curl 'https://$(repeat_chars 60 a).$(repeat_chars 63 b).test/' -b a=1"
 selftest_queue_head "name=$(repeat_chars 63 b).test cookies=1" paste "$dir/dry" "$in" dry
 put "curl 'https://a.例え.jp/' -b a=1"
@@ -257,6 +257,10 @@ refused 'an IP address cannot name a login bundle' "curl 'http://[::1]/' -b a=$s
 refused 'the address has no host' "curl 'http:///x' -b a=$sec"
 refused 'the address names no site' "curl 'https://www./' -b a=$sec"
 refused 'the address names no site' "curl 'https://www..:80/' -b a=$sec"
+refused 'invalid login bundle name: a Windows device name' "curl http://con/ -b a=$sec"
+refused 'invalid login bundle name: a Windows device name' "curl https://con.com/ -b a=$sec"
+refused 'invalid login bundle name: 128 bytes or more' \
+    "curl 'https://$(repeat_chars 60 a).$(repeat_chars 63 b).con.com/' -b a=$sec"
 refused 'the address cannot be used' "curl 'https://bad.test/$(repeat_chars 1024 p)' -b a=$sec"
 # 1023 bytes, "ü" being two of them, and 1029 once the host is in ASCII
 refused 'the address is too long once its host is in ASCII' \
@@ -296,8 +300,8 @@ selftest_queue_head "refused: cannot write $dir/missing/nofolder.test.hts: " \
 put "curl https://words.test/ -b a=1$(for _ in $(seq 1 1020); do printf ' -k'; done)"
 selftest_queue_head "name=words.test cookies=1" paste "$dir/dry" "$in" dry
 
-test "${#SELFTEST_WANT[@]}" -eq 108 ||
-    fail "expected 108 queued rows, got ${#SELFTEST_WANT[@]}"
+test "${#SELFTEST_WANT[@]}" -eq 111 ||
+    fail "expected 111 queued rows, got ${#SELFTEST_WANT[@]}"
 selftest_run_queued
 
 # A host list too long to show ends with ",...", not with a cut name.
