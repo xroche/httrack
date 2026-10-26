@@ -363,6 +363,9 @@ cookies
 .example.com${tab}TRUE${tab}/${tab}TRUE${tab}0${tab}PREF${tab}x=y
 .example.com${tab}TRUE${tab}/${tab}TRUE${tab}0${tab}K${tab}v'q
 .example.com${tab}TRUE${tab}/${tab}TRUE${tab}0${tab}ét${tab}A"
+bytes api.test "# HTTrack bundle 1
+header Authorization: Basic eDp5
+cookies"
 bytes jar.test "# HTTrack bundle 1
 ua UA/1
 cookies
@@ -439,6 +442,36 @@ grep -q '^name=nolf.test cookies=2 ' <<<"$out" || fail "no final LF: $out"
 command grep -qxF ".nolf.test${tab}TRUE${tab}/${tab}FALSE${tab}0${tab}N${tab}last" \
     <<<"$(tr -d '\r' <"$tmpdir/proj/nolf.test.hts")" ||
     fail_dump "the last record lost a byte" "$tmpdir/proj/nolf.test.hts"
+
+# HTS_PASTE_KEEP_EMPTY keeps a browser login that returned no cookie, as a
+# bundle with no cookies line. Cookies in scope still go in.
+mkdir "$tmpdir/keep"
+keep=$dir/keep
+put ""
+out=$(httrack -O /dev/null -#test=paste "$keep" "$in" keep agent:UA/E \
+    'url:https://www.empty.test/a#f' | tr -d '\r')
+test "$out" = "name=empty.test cookies=0 hosts=
+url=https://www.empty.test/a#httrack-bundle=empty.test
+agent=UA/E" || fail "empty keep: $out"
+test "$(tr -d '\r' <"$tmpdir/keep/empty.test.hts")" = "# HTTrack bundle 1
+ua UA/E" || fail_dump "empty keep content" "$tmpdir/keep/empty.test.hts"
+put ".other.test${tab}TRUE${tab}/${tab}FALSE${tab}0${tab}A${tab}$sec"
+out=$(httrack -O /dev/null -#test=paste "$keep" "$in" keep url:https://scope.test/ | tr -d '\r')
+grep -q '^name=scope.test cookies=0 hosts=$' <<<"$out" || fail "out of scope keep: $out"
+test "$(tr -d '\r' <"$tmpdir/keep/scope.test.hts")" = "# HTTrack bundle 1" ||
+    fail_dump "out of scope keep content" "$tmpdir/keep/scope.test.hts"
+put "curl 'https://full.test/' -b F=1"
+out=$(httrack -O /dev/null -#test=paste "$keep" "$in" keep | tr -d '\r')
+grep -q '^name=full.test cookies=1 hosts=full.test$' <<<"$out" || fail "full keep: $out"
+command grep -qx 'cookies' <<<"$(tr -d '\r' <"$tmpdir/keep/full.test.hts")" ||
+    fail_dump "full keep lost its cookies" "$tmpdir/keep/full.test.hts"
+put ""
+out=$(httrack -O /dev/null -#test=paste "$keep" "$in" keep dry url:https://dry.test/ | tr -d '\r')
+grep -q '^name=dry.test cookies=0 ' <<<"$out" || fail "dry keep: $out"
+out=$(httrack -O /dev/null -#test=paste "$keep" "$in" keep | tr -d '\r')
+test "$out" = "refused: a cookies.txt needs the address of the site" || fail "keep, no url: $out"
+set -- "$tmpdir"/keep/*
+test $# -eq 3 || fail "keep files: $*"
 
 # Two threads writing one bundle each use their own temporary.
 mkdir "$tmpdir/race"

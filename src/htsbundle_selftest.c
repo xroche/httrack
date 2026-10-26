@@ -216,11 +216,12 @@ static int st_bundlename(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* -#test=paste <dir> <file> [agent:<ua>] [url:<url>] [dry]: turn the paste
-   held in file into a bundle in dir, and print what came back. */
+/* -#test=paste <dir> <file> [agent:<ua>] [url:<url>] [dry] [keep]: turn the
+   paste held in file into a bundle in dir, and print what came back. keep
+   passes HTS_PASTE_KEEP_EMPTY. */
 static int st_paste(httrackp *opt, int argc, char **argv) {
   const char *agent = NULL, *url = NULL;
-  hts_boolean dry = HTS_FALSE;
+  hts_boolean dry = HTS_FALSE, keep = HTS_FALSE;
   hts_paste_result *res = calloct(1, sizeof(*res));
   String paste = STRING_EMPTY;
   char buf[4096];
@@ -234,7 +235,7 @@ static int st_paste(httrackp *opt, int argc, char **argv) {
   fp = argc >= 2 ? FOPEN(argv[1], "rb") : NULL;
   if (fp == NULL || res == NULL) {
     fprintf(stderr, "paste: takes <dir> <file> [agent:<ua>] [url:<url>] "
-                    "[dry]\n");
+                    "[dry] [keep]\n");
     if (fp != NULL)
       fclose(fp);
     freet(res);
@@ -250,13 +251,19 @@ static int st_paste(httrackp *opt, int argc, char **argv) {
       url = argv[i] + 4;
     else if (strcmp(argv[i], "dry") == 0)
       dry = HTS_TRUE;
+    else if (strcmp(argv[i], "keep") == 0)
+      keep = HTS_TRUE;
   }
   if (!StringNotEmpty(paste))
     StringCat(paste, "");
   if (strlen(StringBuff(paste)) != StringLength(paste)) {
     printf("refused: the file holds a NUL\n");
-  } else if (!hts_bundle_from_paste(StringBuff(paste), argv[0], agent, url, dry,
-                                    res)) {
+  } else if (!(keep ? hts_bundle_from_paste_flags(
+                          StringBuff(paste), argv[0], agent, url,
+                          HTS_PASTE_KEEP_EMPTY | (dry ? HTS_PASTE_DRY_RUN : 0),
+                          res)
+                    : hts_bundle_from_paste(StringBuff(paste), argv[0], agent,
+                                            url, dry, res))) {
     assertf(res->name[0] == '\0' && res->url[0] == '\0' &&
             res->agent[0] == '\0' && res->hosts[0] == '\0' &&
             res->cookies == 0 && res->error[0] != '\0');
@@ -329,7 +336,7 @@ const struct selftest_entry selftests_bundle[] = {
     {"bundlescope", "<cookie domain> <url>...",
      "does a login bundle naming the URLs keep a cookie of that domain?",
      st_bundlescope},
-    {"paste", "<dir> <file> [agent:<ua>] [url:<url>] [dry]",
+    {"paste", "<dir> <file> [agent:<ua>] [url:<url>] [dry] [keep]",
      "turn a pasted cURL command or cookies.txt into a login bundle", st_paste},
     {"pasterace", "<dir> <rounds>",
      "two threads write the same login bundle at once", st_pasterace},
