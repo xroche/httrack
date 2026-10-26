@@ -384,7 +384,7 @@ for key in sorted(claimed):
         checked += same(literal(init_str[var]), r["default_value"],
                         "%s default" % key)
 
-    # Each front end debugs its own way, so the table names no flag for these.
+    # These boxes do more than add a flag, so the table names none for them.
     if key in {"DebugMode"}:
         if len(emit.get(var, [])) != 1:
             sys.exit("%s: this repo emits no flag now, so it needs no exemption"
