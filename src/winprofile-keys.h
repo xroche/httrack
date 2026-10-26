@@ -17,7 +17,7 @@ typedef struct {
   const char *legacy_of;
 } winprofile_key_t;
 
-#define WINPROFILE_KEY_COUNT 119
+#define WINPROFILE_KEY_COUNT 120
 
 /* clang-format off */
 static const winprofile_key_t winprofile_keys[WINPROFILE_KEY_COUNT] = {
@@ -47,6 +47,7 @@ static const winprofile_key_t winprofile_keys[WINPROFILE_KEY_COUNT] = {
   {"CurrentPath2", "", "read_only", "string", "", "", "", "none", "", "", ""},
   {"CurrentURLList", "win,web", "project", "string", "", "", "", "agreed", "", "absent", ""},
   {"CurrentUrl", "win,web,droid", "project", "string", "", "", "", "agreed", "", "absent", ""},
+  {"DebugMode", "win,web", "setting", "checkbox", "", "", "", "agreed", "0", "", ""},
   {"Debugging", "droid", "setting", "string", "", "", "", "none", "", "", ""},
   {"DefaultReferer", "win,droid", "setting", "string", "", "", "", "agreed", "", "absent", ""},
   {"Depth", "win,web,droid", "setting", "string", "", "", "", "agreed", "", "absent", ""},

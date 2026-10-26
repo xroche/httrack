@@ -91,6 +91,10 @@ WinHTTrack reads neither `WarcFile` nor `WarcMaxSize`. A custom archive name
 therefore survives a round trip through it on disk, while a mirror run from it
 writes an auto-named archive.
 
+`DebugMode` names no flag, because each front end debugs its own way. WinHTTrack
+logs the headers and opens its own `winhttrack.log`, while WebHTTrack emits
+`--debug-headers`, so no single flag is true for both.
+
 A `default_state` of `derived` means the value is computed at run time, so no
 fixed default can be stated. Two rows have one: `AcceptLanguage`, built from the
 device locale, and `UserID`, which carries the engine's own version. A consumer
