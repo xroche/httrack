@@ -4712,10 +4712,11 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                       if (cut) {
                         /* not what the server sent: parsing it would follow a
                            truncated Location, or read its tail as headers */
-                        hts_log_print(opt, LOG_WARNING,
-                                      "Over-long header dropped for %s%s",
-                                      adr_nologin(opt, back[i].url_adr),
-                                      back[i].url_fil);
+                        hts_log_print(
+                            opt,
+                            hts_header_is_read(rcvd) ? LOG_WARNING : LOG_DEBUG,
+                            "Over-long header dropped for %s%s",
+                            adr_nologin(opt, back[i].url_adr), back[i].url_fil);
                         continue;
                       }
 #if HDEBUG
