@@ -1111,11 +1111,11 @@ Disconnetti
 The browser did not open: %s.
 Il browser non si è aperto: %s.
 The browser came back with no cookies. The address and the browser identity are saved with the project when the wizard finishes.
-Il browser non ha restituito alcun cookie. L'indirizzo e l'identità del browser verranno salvati con il progetto al termine della procedura guidata.
+Il browser non ha restituito alcun cookie. L'indirizzo e l'identità del browser verranno salvati con il progetto al termine del wizard.
 Cookies collected: %d. They are used when you press OK.
 Cookie raccolti: %d. Verranno usati quando premi Ok.
 Cookies collected: %d. They are saved with the project when the wizard finishes.
-Cookie raccolti: %d. Verranno salvati con il progetto al termine della procedura guidata.
+Cookie raccolti: %d. Verranno salvati con il progetto al termine del wizard.
 The login could not be written to %s.
 Non è stato possibile scrivere i dati di accesso in %s.
 Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
