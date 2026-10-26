@@ -2770,6 +2770,16 @@ class Handler(SimpleHTTPRequestHandler):
     def route_longloc_target(self):
         self.send_raw(b"<html><body>long-location target</body></html>\n", "text/html")
 
+    # Serves a quoted CSS url() whose file name holds "(2)".
+    def route_cssparen_index(self):
+        self.send_html(
+            "<style>body { background: url('bg (2).png'); }\n"
+            'p { background: url("tile (3).png"); }</style>'
+        )
+
+    def route_cssparen_png(self):
+        self.send_raw(b"\x89PNG\r\n\x1a\n", "image/png")
+
     # a long header httrack never parses, like the one algolia.com sends
     LONGCSP = ("Content-Security-Policy-Report-Only", "script-src " + "a" * 4800)
 
@@ -4198,6 +4208,9 @@ class Handler(SimpleHTTPRequestHandler):
         "/redir/index.html": route_redir_index,
         "/redir/go.php": route_redir_go,
         "/redir/target.html": route_redir_target,
+        "/cssparen/index.html": route_cssparen_index,
+        "/cssparen/bg (2).png": route_cssparen_png,
+        "/cssparen/tile (3).png": route_cssparen_png,
         "/longcsp/index.html": route_longcsp_index,
         "/longcsp/page.html": route_longcsp_page,
         "/longloc/index.html": route_longloc_index,

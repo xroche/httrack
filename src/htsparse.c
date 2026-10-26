@@ -574,6 +574,7 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
   link->length = 0;
   link->unquoted_end = '\0';
   link->is_module = HTS_FALSE;
+  link->escape_parens = HTS_FALSE;
 
   /* Can we parse javascript ? */
   if ((opt->parsejava & HTSPARSE_NO_JAVASCRIPT) != 0)
@@ -754,7 +755,9 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
       return HTS_FALSE;
     link->offset = (int) (a - cursor);
     link->length = (int) (c - a + 1);
-    link->unquoted_end = can_avoid_quotes ? quotes_replacement : '\0';
+    link->unquoted_end =
+        can_avoid_quotes && !ndelim ? quotes_replacement : '\0';
+    link->escape_parens = can_avoid_quotes ? HTS_TRUE : HTS_FALSE;
     /* CSS @import hits the same keyword, and module_base is inert in CSS. */
     link->is_module = (is_import || is_specifier) && !in_css;
     return HTS_TRUE;
@@ -1134,6 +1137,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
         int valid_p = 0;        // force to take p even if == 0
         int module_base = 0;    // module specifier: resolve against the script
         int ending_p = '\0';    // ending quote?
+        hts_boolean escape_parens = HTS_FALSE; // is this a CSS url()?
         int archivetag_p = 0;   // avoid multiple-archives with commas
         int srcset_p = 0;       // srcset="url1 480w, url2 2x": list of URLs
         int dataattr_p = 0;     // data-src / data-srcset: may hold a template
@@ -1991,6 +1995,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       p = jslink.offset; // p non nul: TRAITER CHAINE COMME
                                          // FICHIER
                       module_base = jslink.is_module;
+                      escape_parens = jslink.escape_parens;
                       if (jslink.unquoted_end != '\0')
                         ending_p = jslink.unquoted_end;
                     }
@@ -3458,8 +3463,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           /* Never escape high-chars (we don't know the encoding!!) */
                           inplace_escape_uri_utf(tempo, sizeof(tempo));
 
-                          // unquoted url() (CSS/JS): keep parens escaped
-                          if (ending_p == ')')
+                          // CSS url(): keep parens escaped
+                          if (escape_parens)
                             escape_url_parens(tempo, sizeof(tempo));
                         }
                         hts_log_print(

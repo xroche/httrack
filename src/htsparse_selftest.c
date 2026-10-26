@@ -788,6 +788,31 @@ int parse_selftest_jsscan(httrackp *opt, hts_boolean dump) {
     }
   }
 
+  /* A quoted url() may hold ')', so only an unquoted one ends there. */
+  {
+    static const struct {
+      const char *text;
+      int at, length;
+      char end;
+      hts_boolean in_css, escape;
+    } ends[] = {{"url(a.png)", 0, 5, ')', HTS_TRUE, HTS_TRUE},
+                {"url('a (2).png')", 0, 9, '\0', HTS_TRUE, HTS_TRUE},
+                {"url(\"a (2).png\")", 0, 9, '\0', HTS_TRUE, HTS_TRUE},
+                {"x.src=\"a (2).png\";", 1, 9, '\0', HTS_FALSE, HTS_FALSE}};
+
+    for (i = 0; i < sizeof(ends) / sizeof(ends[0]); i++) {
+      hts_js_link got;
+
+      if (!hts_js_scan_link(opt, ends[i].text + ends[i].at, ends[i].text,
+                            HTS_FALSE, '"', ends[i].in_css, &got) ||
+          got.length != ends[i].length || got.unquoted_end != ends[i].end ||
+          got.escape_parens != ends[i].escape) {
+        fprintf(stderr, "jsscan \"%s\": wrong end of link\n", ends[i].text);
+        err = 1;
+      }
+    }
+  }
+
   jsscan_sweep(opt, &sw);
   if (sw.dump)
     return 0;
