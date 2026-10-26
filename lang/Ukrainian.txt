@@ -1110,16 +1110,16 @@ Clear login
 Вийти з акаунта
 The browser did not open: %s.
 Браузер не відкрився: %s.
-The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
-Браузер не повернув жодного cookie. Адресу та ідентифікатор браузера буде збережено разом із проектом, коли ви натиснете ОК.
+The browser came back with no cookies. The address and the browser identity are saved with the project when the wizard finishes.
+Браузер не повернув жодного cookie. Адресу та ідентифікатор браузера буде збережено разом із проектом після завершення майстра.
 Cookies collected: %d. They are used when you press OK.
 Зібрано cookies: %d. Вони будуть застосовані, коли ви натиснете ОК.
-The cookies could not be written to %s, so nothing was changed.
-Не вдалося записати cookies у %s, тому нічого не змінено.
+Cookies collected: %d. They are saved with the project when the wizard finishes.
+Зібрано cookies: %d. Їх буде збережено разом із проектом після завершення майстра.
+The login could not be written to %s.
+Не вдалося записати дані входу в %s.
 %d of the browser's cookies were left out, because the engine would not read them.
 Пропущено cookies браузера: %d, оскільки HTTrack не зміг би їх прочитати.
-The browser identity it reported cannot be used, so the mirror will send the default one.
-Ідентифікацію браузера, яку він повідомив, використати не можна, тому дзеркалювання піде з ідентифікацією за замовчуванням.
 Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
 Увійдіть на сайт в іншій вкладці цього браузера. Відкрийте інструменти розробника (F12), потім вкладку «Мережа», перезавантажте сторінку, клацніть правою кнопкою на першому запиті та виберіть Copy as cURL (bash). Вставте текст сюди. Підійде й експорт cookies.txt, для першої адреси у списку.
 Cookies for: %s. Browser identity: %s.

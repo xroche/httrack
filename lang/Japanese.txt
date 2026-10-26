@@ -1110,16 +1110,16 @@ Clear login
 ログアウト
 The browser did not open: %s.
 ブラウザを開けませんでした: %s。
-The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
-ブラウザからクッキーが返されませんでした。OK を押すと、アドレスとブラウザIDがプロジェクトと一緒に保存されます。
+The browser came back with no cookies. The address and the browser identity are saved with the project when the wizard finishes.
+ブラウザからクッキーが返されませんでした。ウィザードが完了すると、アドレスとブラウザIDがプロジェクトと一緒に保存されます。
 Cookies collected: %d. They are used when you press OK.
 クッキーを %d 個取得しました。OK を押すと使用されます。
-The cookies could not be written to %s, so nothing was changed.
-クッキーを %s に書き込めなかったため、何も変更しませんでした。
+Cookies collected: %d. They are saved with the project when the wizard finishes.
+クッキーを %d 個取得しました。ウィザードが完了すると、プロジェクトと一緒に保存されます。
+The login could not be written to %s.
+ログイン情報を %s に書き込めませんでした。
 %d of the browser's cookies were left out, because the engine would not read them.
 ブラウザのクッキーのうち %d 個は、HTTrack が読み取れないため除外しました。
-The browser identity it reported cannot be used, so the mirror will send the default one.
-報告されたブラウザIDは使用できないため、ミラーは既定のものを送信します。
 Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
 このブラウザの別のタブでサイトにログインします。開発者ツール（F12）を開き、ネットワークタブを開いてページを再読み込みし、最初のリクエストを右クリックして Copy as cURL (bash) を選びます。そのテキストをここに貼り付けます。cookies.txt のエクスポートも使えます。その場合はリストの最初のアドレスに使われます。
 Cookies for: %s. Browser identity: %s.

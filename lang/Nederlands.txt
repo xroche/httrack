@@ -1110,16 +1110,16 @@ Clear login
 Afmelden
 The browser did not open: %s.
 De browser is niet geopend: %s.
-The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
-De browser heeft geen cookies teruggegeven. Het adres en de browseridentiteit worden met het project opgeslagen als u op OK klikt.
+The browser came back with no cookies. The address and the browser identity are saved with the project when the wizard finishes.
+De browser heeft geen cookies teruggegeven. Het adres en de browseridentiteit worden met het project opgeslagen wanneer de wizard is voltooid.
 Cookies collected: %d. They are used when you press OK.
 Verzamelde cookies: %d. Ze worden gebruikt als u op OK klikt.
-The cookies could not be written to %s, so nothing was changed.
-De cookies konden niet naar %s worden geschreven, dus er is niets gewijzigd.
+Cookies collected: %d. They are saved with the project when the wizard finishes.
+Verzamelde cookies: %d. Ze worden met het project opgeslagen wanneer de wizard is voltooid.
+The login could not be written to %s.
+De aanmelding kon niet naar %s worden geschreven.
 %d of the browser's cookies were left out, because the engine would not read them.
 %d cookies van de browser zijn weggelaten, omdat HTTrack ze niet kon lezen.
-The browser identity it reported cannot be used, so the mirror will send the default one.
-De gemelde browser identiteit kan niet worden gebruikt, dus de spiegeling stuurt de standaardidentiteit.
 Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
 Log in op de site in een ander tabblad van deze browser. Open de ontwikkelaarshulpmiddelen (F12) en daarna het tabblad Netwerk, laad de pagina opnieuw, klik met de rechtermuisknop op het eerste verzoek en kies Copy as cURL (bash). Plak de tekst hier. Een cookies.txt-export werkt ook, voor het eerste adres in de lijst.
 Cookies for: %s. Browser identity: %s.

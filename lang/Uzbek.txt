@@ -1110,16 +1110,16 @@ Clear login
 Hisobdan chiqish
 The browser did not open: %s.
 Brauzer ochilmadi: %s.
-The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
-Brauzer hech qanday cookies qaytarmadi. OK bosilganda manzil va brauzer identifikatori loyiha bilan birga saqlanadi.
+The browser came back with no cookies. The address and the browser identity are saved with the project when the wizard finishes.
+Brauzer hech qanday cookies qaytarmadi. Yaratuvchi tugaganda manzil va brauzer identifikatori loyiha bilan birga saqlanadi.
 Cookies collected: %d. They are used when you press OK.
 Yig’ilgan cookies: %d. Ular OK bosilganda ishlatiladi.
-The cookies could not be written to %s, so nothing was changed.
-Cookies %s ga yozib bo’lmadi, shuning uchun hech narsa o’zgartirilmadi.
+Cookies collected: %d. They are saved with the project when the wizard finishes.
+Yig’ilgan cookies: %d. Yaratuvchi tugaganda ular loyiha bilan birga saqlanadi.
+The login could not be written to %s.
+Kirish ma’lumotlarini %s ga yozib bo’lmadi.
 %d of the browser's cookies were left out, because the engine would not read them.
 Brauzerning %d ta cookies’i chetda qoldirildi, chunki HTTrack ularni o’qiy olmadi.
-The browser identity it reported cannot be used, so the mirror will send the default one.
-Bildirilgan brauzer identifikatoridan foydalanib bo’lmaydi, shuning uchun ko’zgu standart identifikatorni yuboradi.
 Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
 Ushbu brauzerning boshqa varag’ida saytga kiring. Dasturchi vositalarini (F12), so’ng Tarmoq varag’ini oching, sahifani qayta yuklang, birinchi so’rovga sichqonchaning o’ng tugmasi bilan bosing va Copy as cURL (bash) ni tanlang. Matnni shu yerga qo’ying. cookies.txt eksporti ham ishlaydi, ro’yxatdagi birinchi manzil uchun.
 Cookies for: %s. Browser identity: %s.

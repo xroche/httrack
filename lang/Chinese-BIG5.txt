@@ -1110,16 +1110,16 @@ Clear login
 登出
 The browser did not open: %s.
 瀏覽器無法開啟：%s。
-The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
-瀏覽器未傳回任何 cookies。按「確定」後，位址和瀏覽器身份會與專案一起儲存。
+The browser came back with no cookies. The address and the browser identity are saved with the project when the wizard finishes.
+瀏覽器未傳回任何 cookies。精靈完成後，位址和瀏覽器身份會與專案一起儲存。
 Cookies collected: %d. They are used when you press OK.
 已收集的 cookies：%d。按「確定」後將會使用。
-The cookies could not be written to %s, so nothing was changed.
-無法將 cookies 寫入 %s，因此未做任何變更。
+Cookies collected: %d. They are saved with the project when the wizard finishes.
+已收集的 cookies：%d。精靈完成後會與專案一起儲存。
+The login could not be written to %s.
+無法將登入資訊寫入 %s。
 %d of the browser's cookies were left out, because the engine would not read them.
 瀏覽器的 cookies 中有 %d 個被略過，因為 HTTrack 無法讀取。
-The browser identity it reported cannot be used, so the mirror will send the default one.
-它回報的瀏覽器身份無法使用，因此鏡像將傳送預設值。
 Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
 在此瀏覽器的另一個分頁中登入網站。開啟開發人員工具（F12），再開啟「網路」分頁，重新載入頁面，在第一個請求上按右鍵，選擇 Copy as cURL (bash)。將文字貼到這裡。也可以使用 cookies.txt 匯出檔，它會用於清單中的第一個位址。
 Cookies for: %s. Browser identity: %s.
