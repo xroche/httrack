@@ -1062,6 +1062,18 @@ HTSEXT_API hts_boolean hts_bundle_from_paste(const char *paste,
                                              hts_boolean dry_run,
                                              hts_paste_result *result);
 
+/* hts_bundle_from_paste_flags: write nothing, as dry_run does. */
+#define HTS_PASTE_DRY_RUN 1u
+/* hts_bundle_from_paste_flags: keep a bundle with no cookie, as a browser
+   login that returned none, rather than refuse it. paste may then be NULL. */
+#define HTS_PASTE_KEEP_EMPTY 2u
+
+/** hts_bundle_from_paste, with dry_run and the other choices as HTS_PASTE_*
+    bits in flags. A bundle with no cookie has no cookies line. */
+HTSEXT_API hts_boolean hts_bundle_from_paste_flags(
+    const char *paste, const char *folder, const char *agent, const char *url,
+    unsigned int flags, hts_paste_result *result);
+
 /* UTF-8 aware FILE API */
 /* On non-Windows these macros resolve directly to the POSIX calls. On Windows
    they map to the hts_*_utf8 wrappers below, which convert the UTF-8 path to

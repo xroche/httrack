@@ -1376,6 +1376,16 @@ HTSEXT_API hts_boolean hts_bundle_from_paste(const char *paste,
                                              const char *agent, const char *url,
                                              hts_boolean dry_run,
                                              hts_paste_result *result) {
+  return hts_bundle_from_paste_flags(paste, folder, agent, url,
+                                     dry_run ? HTS_PASTE_DRY_RUN : 0, result);
+}
+
+/* See httrack-library.h. */
+HTSEXT_API hts_boolean hts_bundle_from_paste_flags(
+    const char *paste, const char *folder, const char *agent, const char *url,
+    unsigned int flags, hts_paste_result *result) {
+  const hts_boolean dry_run = (flags & HTS_PASTE_DRY_RUN) != 0;
+  const hts_boolean keep_empty = (flags & HTS_PASTE_KEEP_EMPTY) != 0;
   paste_curl c;
   String records = STRING_EMPTY;
   String text = STRING_EMPTY;
@@ -1404,8 +1414,10 @@ HTSEXT_API hts_boolean hts_bundle_from_paste(const char *paste,
   memset(result, 0, sizeof(*result));
   result->size = size;
 
+  if (paste == NULL && keep_empty)
+    paste = "";
   // validate the paste before reading it, so a stray byte never reaches a file
-  if (paste == NULL || paste[strspn(paste, " \t\r\n")] == '\0')
+  if (paste == NULL || (paste[strspn(paste, " \t\r\n")] == '\0' && !keep_empty))
     PASTE_FAIL("nothing was pasted");
   len = strlen(paste);
   if (len >= PASTE_MAX)
@@ -1502,8 +1514,10 @@ HTSEXT_API hts_boolean hts_bundle_from_paste(const char *paste,
     StringCat(text, c.auth);
     StringCat(text, LF);
   }
-  StringCat(text, "cookies" LF);
-  cookie_records_text(jar, &text);
+  if (!keep_empty || jar->data[0] != '\0') {
+    StringCat(text, "cookies" LF);
+    cookie_records_text(jar, &text);
+  }
 
   // read it back through the engine's own loader, which also gives the count
   memset(jar->data, 0, sizeof(jar->data));
@@ -1512,7 +1526,7 @@ HTSEXT_API hts_boolean hts_bundle_from_paste(const char *paste,
   if (!bundle_load_src(opt, &check, &src, NULL, all, err, sizeof(err)))
     PASTE_FAIL("%s", err);
   paste_jar_summary(jar, &count, result->hosts);
-  if (count == 0 && c.auth == NULL)
+  if (count == 0 && c.auth == NULL && !keep_empty)
     PASTE_FAIL("the paste holds no cookie for %s", name);
 
   if (!dry_run) {

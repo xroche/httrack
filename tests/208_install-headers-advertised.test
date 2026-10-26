@@ -212,6 +212,10 @@ int main(void) {
   printf("%d %s %d %s\n", ok, res.name, res.cookies, res.hosts);
   ok = hts_bundle_from_paste(paste, NULL, NULL, NULL, HTS_TRUE, &small);
   printf("%d\n", ok);
+  ok = hts_bundle_from_paste_flags(NULL, NULL, NULL, url,
+                                   HTS_PASTE_DRY_RUN | HTS_PASTE_KEEP_EMPTY,
+                                   &res);
+  printf("%d %s %d\n", ok, res.name, res.cookies);
   hts_uninit();
   return 0;
 }
@@ -230,7 +234,8 @@ want="1
 1 example.co.uk
 refused
 1 example.co.uk 1 example.co.uk
-0"
+0
+1 example.co.uk 0"
 test "$got" = "$want" || fail "the login bundle calls from outside: [$got]"
 
 echo "an embedder compiled and linked the advertised calls from the installed headers"
