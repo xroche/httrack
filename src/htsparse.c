@@ -550,6 +550,31 @@ static hts_boolean js_specifier_is_url(const char *s) {
              : HTS_FALSE;
 }
 
+/* The quote an HTML entity at "s" stands for, or '\0'. Sets "*len", unless
+   NULL, to the entity's length when it is one. */
+static char html_entity_quote(const char *s, int *len) {
+  static const struct {
+    const char *name;
+    char quote;
+  } entities[] = {{"&quot;", '"'}, {"&QUOT;", '"'},  {"&#34;", '"'},
+                  {"&#x22;", '"'}, {"&#X22;", '"'},  {"&apos;", '\''},
+                  {"&#39;", '\''}, {"&#x27;", '\''}, {"&#X27;", '\''}};
+
+  size_t i;
+
+  // case matters: HTML has &QUOT; but no &APOS;
+  for (i = 0; i < sizeof(entities) / sizeof(entities[0]); i++) {
+    const size_t n = strlen(entities[i].name);
+
+    if (strncmp(s, entities[i].name, n) == 0) {
+      if (len != NULL)
+        *len = (int) n;
+      return entities[i].quote;
+    }
+  }
+  return '\0';
+}
+
 /* Contract in htsparse.h. */
 hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
                              const char *buffer, hts_boolean in_tag,
@@ -575,6 +600,7 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
   link->unquoted_end = '\0';
   link->is_module = HTS_FALSE;
   link->escape_parens = HTS_FALSE;
+  link->entity_quote = '\0';
 
   /* Can we parse javascript ? */
   if ((opt->parsejava & HTSPARSE_NO_JAVASCRIPT) != 0)
@@ -671,18 +697,32 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
 
   {
     const char *b, *c;
-    int ndelim = 1;
+    int ndelim = 1;    // length of the opening delimiter
+    int close_len = 1; // length of the closing delimiter
     int valid_url = 0;
+    // a style attribute may quote url() with an entity: url(&quot;a.png&quot;)
+    const char entity_quote =
+        in_tag && can_avoid_quotes ? html_entity_quote(a, &ndelim) : '\0';
 
-    if ((*a == 34) || (*a == '\''))
+    if (entity_quote != '\0')
+      a += ndelim;
+    else if ((*a == 34) || (*a == '\''))
       a++;
     else
       ndelim = 0;
     b = a;
-    if (ndelim) {
+    if (entity_quote != '\0') {
+      while (*b != 34 && *b != '\'' && *b != '>' && *b != '\0' &&
+             html_entity_quote(b, &close_len) != entity_quote)
+        b++;
+      // a raw quote or '>' ends the attribute before the closing entity
+      if (*b == 34 || *b == '\'' || *b == '>')
+        return HTS_FALSE;
+    } else if (ndelim) {
       while ((*b != 34) && (*b != '\'') && (*b != '\0'))
         b++;
     } else {
+      close_len = 0;
       while ((*b != quotes_replacement) && (*b != '\0'))
         b++;
     }
@@ -690,11 +730,11 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
     // no closing delimiter here (truncated input):
     // Don't scan past the buffer NUL or capture it.
     if (*c != '\0') {
-      c += ndelim;
+      c += close_len;
       while (*c == ' ')
         c++;
       valid_url = (strchr(expected_end, *c)) || (*c == '\n') || (*c == '\r') ||
-                  (is_import && *(b + 1 + ndelim) == ' ');
+                  (is_import && *(b + 1 + close_len) == ' ');
     }
     if (!valid_url)
       return HTS_FALSE;
@@ -758,6 +798,7 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
     link->unquoted_end =
         can_avoid_quotes && !ndelim ? quotes_replacement : '\0';
     link->escape_parens = can_avoid_quotes ? HTS_TRUE : HTS_FALSE;
+    link->entity_quote = entity_quote;
     /* CSS @import hits the same keyword, and module_base is inert in CSS. */
     link->is_module = (is_import || is_specifier) && !in_css;
     return HTS_TRUE;
@@ -1138,6 +1179,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
         int module_base = 0;    // module specifier: resolve against the script
         int ending_p = '\0';    // ending quote?
         hts_boolean escape_parens = HTS_FALSE; // is this a CSS url()?
+        char entity_end = '\0'; // quote of an entity-quoted url()
         int archivetag_p = 0;   // avoid multiple-archives with commas
         int srcset_p = 0;       // srcset="url1 480w, url2 2x": list of URLs
         int dataattr_p = 0;     // data-src / data-srcset: may hold a template
@@ -1996,6 +2038,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                          // FICHIER
                       module_base = jslink.is_module;
                       escape_parens = jslink.escape_parens;
+                      entity_end = jslink.entity_quote;
                       if (jslink.unquoted_end != '\0')
                         ending_p = jslink.unquoted_end;
                     }
@@ -2316,6 +2359,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       )         // si pas d'attente de quote spéciale ou si quote atteinte
                       ok = 0;
                   } else if (ending_p && (*eadr == ending_p))
+                    ok = 0;
+                  else if (entity_end != '\0' && *eadr == '&' &&
+                           html_entity_quote(eadr, NULL) == entity_end)
                     ok = 0;
                   else {
                     switch (*eadr) {
