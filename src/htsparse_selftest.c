@@ -807,13 +807,20 @@ int parse_selftest_jsscan(httrackp *opt, hts_boolean dump) {
          '"'},
         {"url(&#39;a.png?b&amp;c&#x27;)", 0, 13, '\0', HTS_TRUE, HTS_TRUE,
          HTS_TRUE, '\''},
+        {"url(&quot;it&#39;s.png&#34;)", 0, 12, '\0', HTS_TRUE, HTS_TRUE,
+         HTS_TRUE, '"'},
         /* a <style> block does not decode entities */
         {"url(&quot;a.png&quot;)", 0, 17, ')', HTS_FALSE, HTS_TRUE, HTS_TRUE,
+         '\0'},
+        /* HTML has no &APOS; */
+        {"url(&APOS;a.png&APOS;)", 0, 17, ')', HTS_TRUE, HTS_TRUE, HTS_TRUE,
          '\0'}};
 
-    /* the closing entity must stand for the same quote, before any raw one */
+    /* the closing entity must stand for the same quote, before a raw one or '>'
+     */
     static const char *const unclosed[] = {"url(&quot;a.png&#39;)",
-                                           "url(&quot;a.png\")"};
+                                           "url(&quot;a.png\")",
+                                           "url(&quot;a.png)>b&quot;)"};
 
     for (i = 0; i < sizeof(ends) / sizeof(ends[0]); i++) {
       hts_js_link got;

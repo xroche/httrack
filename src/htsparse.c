@@ -556,17 +556,19 @@ static char html_entity_quote(const char *s, int *len) {
   static const struct {
     const char *name;
     char quote;
-  } entities[] = {{"&quot;", '"'},  {"&#34;", '"'},  {"&#x22;", '"'},
-                  {"&apos;", '\''}, {"&#39;", '\''}, {"&#x27;", '\''}};
+  } entities[] = {{"&quot;", '"'}, {"&QUOT;", '"'},  {"&#34;", '"'},
+                  {"&#x22;", '"'}, {"&#X22;", '"'},  {"&apos;", '\''},
+                  {"&#39;", '\''}, {"&#x27;", '\''}, {"&#X27;", '\''}};
 
   size_t i;
 
+  // case matters: HTML has &QUOT; but no &APOS;
   for (i = 0; i < sizeof(entities) / sizeof(entities[0]); i++) {
-    const int n = strfield(s, entities[i].name);
+    const size_t n = strlen(entities[i].name);
 
-    if (n != 0) {
+    if (strncmp(s, entities[i].name, n) == 0) {
       if (len != NULL)
-        *len = n;
+        *len = (int) n;
       return entities[i].quote;
     }
   }
@@ -695,7 +697,7 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
 
   {
     const char *b, *c;
-    int ndelim = 1;
+    int ndelim = 1;    // length of the opening delimiter
     int close_len = 1; // length of the closing delimiter
     int valid_url = 0;
     // a style attribute may quote url() with an entity: url(&quot;a.png&quot;)
@@ -710,11 +712,11 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
       ndelim = 0;
     b = a;
     if (entity_quote != '\0') {
-      while (*b != 34 && *b != '\'' && *b != '\0' &&
+      while (*b != 34 && *b != '\'' && *b != '>' && *b != '\0' &&
              html_entity_quote(b, &close_len) != entity_quote)
         b++;
-      // a raw quote ends the attribute before the closing entity
-      if (*b == 34 || *b == '\'')
+      // a raw quote or '>' ends the attribute before the closing entity
+      if (*b == 34 || *b == '\'' || *b == '>')
         return HTS_FALSE;
     } else if (ndelim) {
       while ((*b != 34) && (*b != '\'') && (*b != '\0'))

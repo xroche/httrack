@@ -2776,7 +2776,8 @@ class Handler(SimpleHTTPRequestHandler):
             "<style>body { background: url('bg (2).png'); }\n"
             'p { background: url("tile (3).png"); }</style>\n'
             '<div style="background: url(&quot;ent (4).png&quot;)">a</div>\n'
-            '<div style="background: url(&#39;apos.png?a=1&amp;b=2&#39;)">b</div>'
+            '<div style="background: url(&#39;apos.png?a=1&amp;b=2&#39;)">b</div>\n'
+            '<div style="background: url(&quot;it&#39;s.png&quot;)">c</div>'
         )
 
     def route_cssparen_png(self):
@@ -4215,6 +4216,7 @@ class Handler(SimpleHTTPRequestHandler):
         "/cssparen/tile (3).png": route_cssparen_png,
         "/cssparen/ent (4).png": route_cssparen_png,
         "/cssparen/apos.png": route_cssparen_png,
+        "/cssparen/it's.png": route_cssparen_png,
         "/longcsp/index.html": route_longcsp_index,
         "/longcsp/page.html": route_longcsp_page,
         "/longloc/index.html": route_longloc_index,
