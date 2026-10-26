@@ -1126,3 +1126,5 @@ Cookies for: %s. Browser identity: %s.
 Cookies for: %s. Nettleser-identitet: %s.
 A login cannot be saved for this address, so nothing was kept.
 En innlogging kan ikke lagres for denne adressen, så ingenting ble lagret.
+Yes
+Ja

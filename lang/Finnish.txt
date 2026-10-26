@@ -1126,3 +1126,5 @@ Cookies for: %s. Browser identity: %s.
 Evästeet sivustoille: %s. Selaimen tunniste: %s.
 A login cannot be saved for this address, so nothing was kept.
 Tälle osoitteelle ei voi tallentaa kirjautumista, joten mitään ei tallennettu.
+Yes
+Kyllä

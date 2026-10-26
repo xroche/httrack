@@ -1126,3 +1126,5 @@ Cookies for: %s. Browser identity: %s.
 Cookies для: %s. Ідентифікатор браузера: %s.
 A login cannot be saved for this address, so nothing was kept.
 Для цієї адреси не можна зберегти вхід, тому нічого не збережено.
+Yes
+Так

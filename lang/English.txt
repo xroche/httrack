@@ -1126,3 +1126,5 @@ Cookies for: %s. Browser identity: %s.
 Cookies for: %s. Browser identity: %s.
 A login cannot be saved for this address, so nothing was kept.
 A login cannot be saved for this address, so nothing was kept.
+Yes
+Yes

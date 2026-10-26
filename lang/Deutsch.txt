@@ -1126,3 +1126,5 @@ Cookies for: %s. Browser identity: %s.
 Cookies für: %s. Browser-Kennung: %s.
 A login cannot be saved for this address, so nothing was kept.
 Für diese Adresse kann keine Anmeldung gespeichert werden, daher wurde nichts übernommen.
+Yes
+Ja

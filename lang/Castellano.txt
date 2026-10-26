@@ -9,7 +9,7 @@ Juan Pablo Barrio Lera  (Universidad de León) \r\n
 LANGUAGE_WINDOWSID
 Spanish (Spain, Modern Sort)
 OK
-Ya
+Aceptar
 Cancel
 Cancelar
 Exit
@@ -1126,3 +1126,5 @@ Cookies for: %s. Browser identity: %s.
 Cookies para: %s. Identidad del navegador: %s.
 A login cannot be saved for this address, so nothing was kept.
 No se puede guardar un inicio de sesión para esta dirección, por lo que no se ha guardado nada.
+Yes
+Sí

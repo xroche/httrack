@@ -1126,3 +1126,5 @@ Cookies for: %s. Browser identity: %s.
 Kolačići za: %s. Identitet preglednika: %s.
 A login cannot be saved for this address, so nothing was kept.
 Prijava se ne može spremiti za ovu adresu, pa ništa nije spremljeno.
+Yes
+Da

@@ -9,7 +9,7 @@ Dr. Martin Sereday (sereday at stonline.sk)\r\n
 LANGUAGE_WINDOWSID
 Slovak
 OK
-Áno
+OK
 Cancel
 Zrušiť
 Exit
@@ -1126,3 +1126,5 @@ Cookies for: %s. Browser identity: %s.
 Cookies pre: %s. Identita prehliadača: %s.
 A login cannot be saved for this address, so nothing was kept.
 Pre túto adresu nie je možné uložiť prihlásenie, takže sa nič neuložilo.
+Yes
+Áno

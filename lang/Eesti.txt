@@ -1126,3 +1126,5 @@ Cookies for: %s. Browser identity: %s.
 Küpsised saitidele: %s. Brauseri identiteet: %s.
 A login cannot be saved for this address, so nothing was kept.
 Selle aadressi jaoks ei saa sisselogimist salvestada, seega midagi ei salvestatud.
+Yes
+Jah

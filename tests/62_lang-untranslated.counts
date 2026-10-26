@@ -7,9 +7,9 @@
 # is still English: only the credit line was fixed (#1454).
 #
 # catalog                 identical empty
-Bulgarian.txt             4         3
+Bulgarian.txt             5         3
 Castellano.txt            11        0
-Cesky.txt                 5         23
+Cesky.txt                 6         23
 Chinese-BIG5.txt          2         4
 Chinese-Simplified.txt    1         23
 Croatian.txt              7         0
@@ -17,7 +17,7 @@ Dansk.txt                 13        0
 Deutsch.txt               13        4
 Eesti.txt                 9         18
 Finnish.txt               4         0
-Francais.txt              10        0
+Francais.txt              11        0
 Greek.txt                 6         0
 Italiano.txt              16        1
 Japanese.txt              4         23
@@ -30,7 +30,7 @@ Portugues-Brasil.txt      7         0
 Portugues.txt             7         26
 Romanian.txt              9         4
 Russian.txt               6         0
-Slovak.txt                8         18
+Slovak.txt                9         18
 Slovenian.txt             9         25
 Svenska.txt               11        23
 Turkish.txt               3         0

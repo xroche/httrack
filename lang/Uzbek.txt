@@ -1126,3 +1126,5 @@ Cookies for: %s. Browser identity: %s.
 Cookies tegishli saytlar: %s. Brauzer identifikatori: %s.
 A login cannot be saved for this address, so nothing was kept.
 Bu manzil uchun kirishni saqlab bo'lmaydi, shuning uchun hech narsa saqlanmadi.
+Yes
+Ha

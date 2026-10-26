@@ -9,7 +9,7 @@ LANGUAGE_AUTHOR
 LANGUAGE_WINDOWSID
 Bulgarian
 OK
-Да
+OK
 Cancel
 Отказ
 Exit
@@ -1126,3 +1126,5 @@ Cookies for: %s. Browser identity: %s.
 'Бисквитки' за: %s. Идентичност на браузъра: %s.
 A login cannot be saved for this address, so nothing was kept.
 За този адрес не може да се запази вход, затова нищо не беше запазено.
+Yes
+Да

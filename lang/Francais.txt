@@ -9,7 +9,7 @@ Xavier Roche (roche at httrack.com)\r\nRobert Lagadec (rlagadec at yahoo.fr) \r\
 LANGUAGE_WINDOWSID
 French (Standard)
 OK
-Oui
+OK
 Cancel
 Annuler
 Exit
@@ -1126,3 +1126,5 @@ Cookies for: %s. Browser identity: %s.
 Cookies pour : %s. Identité du navigateur : %s.
 A login cannot be saved for this address, so nothing was kept.
 Impossible d'enregistrer une connexion pour cette adresse, rien n'a donc été conservé.
+Yes
+Oui

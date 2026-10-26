@@ -1126,3 +1126,5 @@ Cookies for: %s. Browser identity: %s.
 Çerezlerin ait olduğu siteler: %s. Tarayıcı kimliği: %s.
 A login cannot be saved for this address, so nothing was kept.
 Bu adres için oturum açma bilgisi kaydedilemiyor, bu yüzden hiçbir şey saklanmadı.
+Yes
+Evet
