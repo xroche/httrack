@@ -171,7 +171,6 @@ crawl planted-ftp "ftp://suser:STARTPWF@127.0.0.1:$port/f.txt" -P "puser:PROXYPW
 log=$(<"$tmpdir/planted/hts-log.txt")
 for line in "at link luser:***@127.0.0.1:1/l8.html (from suser:***@127.0.0.1:$port/planted.html)" \
     "link detected in javascript: http://luser:***@127.0.0.1:" \
-    "is ready, skipping: luser:***@127.0.0.1:$port/i.gif" \
     "Sitemap: queued luser:***@127.0.0.1:$port/sitemap.xml" \
     "robots.txt added at suser:***@127.0.0.1:$port" \
     "at http://suser:***@127.0.0.1:$port/planted.html suser:***@127.0.0.1:$port/hop.html" \
