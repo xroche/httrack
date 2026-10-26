@@ -34,6 +34,9 @@ selftest_queue "2: ayy bee" bundlenames \
     "http://x/${s}ayy  -*${s}nope http://y/${s}bee http://z/${s}ayy http://w/"
 selftest_queue_head "refused: invalid login bundle name" bundlenames \
     "http://x/${s}../up"
+# the name runs to the end, so a second suffix is part of it
+selftest_queue_head "refused: invalid login bundle name" bundlenames \
+    "http://x/${s}ayy${s}bee"
 q="refused: address is quoted"
 selftest_queue "$q" bundlenames "\"http://x/${s}ayy\""
 selftest_queue "refused: address is (none)" bundlenames "(none) http://x/${s}ayy"
