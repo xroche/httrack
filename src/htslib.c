@@ -871,7 +871,9 @@ T_SOC http_xfopen(httrackp *opt, int mode, int treat, int waitconnect,
           printf(">%s\n", rcvd);
 #endif
           if (cut)
-            hts_log_print(NULL, LOG_WARNING, "Over-long header dropped");
+            hts_log_print(NULL,
+                          hts_header_is_read(rcvd) ? LOG_WARNING : LOG_DEBUG,
+                          "Over-long header dropped");
           else if (strnotempty(rcvd))
             treathead(NULL, NULL, NULL, retour, rcvd);
 
@@ -2253,6 +2255,7 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
   treathead_opt(NULL, cookie, adr, fil, retour, rcvd);
 }
 
+/* A header added here also goes into hts_header_is_read(). */
 void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
                    const char *fil, htsblk *retour, char *rcvd) {
   int p;
@@ -4146,6 +4149,30 @@ int binput(const char *buff, char *s, int max) {
 
   // then return the supplemental jump offset
   return count + 1;
+}
+
+hts_boolean hts_header_is_read(const char *line) {
+  static const char *const names[] = {"Connection:",
+                                      "Content-Disposition:",
+                                      "Content-Encoding:",
+                                      "Content-length:",
+                                      "Content-Range:",
+                                      "Content-type:",
+                                      "Date:",
+                                      "Etag:",
+                                      "Keep-Alive:",
+                                      "Last-Modified:",
+                                      "Location:",
+                                      "Retry-After:",
+                                      "Set-Cookie:",
+                                      "TE:",
+                                      "Transfer-Encoding:"};
+  size_t i;
+
+  for (i = 0; i < sizeof(names) / sizeof(names[0]); i++)
+    if (strfield(line, names[i]))
+      return HTS_TRUE;
+  return HTS_FALSE;
 }
 
 hts_boolean binput_line(const char *buff, const char *end, char *s, int max,

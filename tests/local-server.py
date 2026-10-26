@@ -2770,6 +2770,19 @@ class Handler(SimpleHTTPRequestHandler):
     def route_longloc_target(self):
         self.send_raw(b"<html><body>long-location target</body></html>\n", "text/html")
 
+    # a long header httrack never parses, like the one algolia.com sends
+    LONGCSP = ("Content-Security-Policy-Report-Only", "script-src " + "a" * 4800)
+
+    def route_longcsp_index(self):
+        self.send_raw(
+            b'<html><body><a href="page.html">page</a></body></html>\n',
+            "text/html",
+            (self.LONGCSP,),
+        )
+
+    def route_longcsp_page(self):
+        self.send_raw(b"<html><body>page</body></html>\n", "text/html", (self.LONGCSP,))
+
     # same shape with a Location the reader takes whole: the control proving
     # the fixture only refuses because the header outran the read
     def route_shortloc_index(self):
@@ -4185,6 +4198,8 @@ class Handler(SimpleHTTPRequestHandler):
         "/redir/index.html": route_redir_index,
         "/redir/go.php": route_redir_go,
         "/redir/target.html": route_redir_target,
+        "/longcsp/index.html": route_longcsp_index,
+        "/longcsp/page.html": route_longcsp_page,
         "/longloc/index.html": route_longloc_index,
         "/longloc/go.php": route_longloc_go,
         "/longloc/target.html": route_longloc_target,

@@ -20,3 +20,10 @@ bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
     --found 'shortloc/index.html' \
     --log-not-found 'Over-long header dropped' \
     httrack 'BASEURL/shortloc/index.html'
+
+# A long header httrack does not read is dropped without a warning.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    --files 2 \
+    --found 'longcsp/page.html' \
+    --log-not-found 'Over-long header' \
+    httrack 'BASEURL/longcsp/index.html'
