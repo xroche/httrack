@@ -222,7 +222,6 @@ static int st_bundlename(httrackp *opt, int argc, char **argv) {
 static int st_paste(httrackp *opt, int argc, char **argv) {
   const char *agent = NULL, *url = NULL;
   hts_boolean dry = HTS_FALSE, keep = HTS_FALSE;
-  hts_boolean ok;
   hts_paste_result *res = calloct(1, sizeof(*res));
   String paste = STRING_EMPTY;
   char buf[4096];
@@ -259,16 +258,12 @@ static int st_paste(httrackp *opt, int argc, char **argv) {
     StringCat(paste, "");
   if (strlen(StringBuff(paste)) != StringLength(paste)) {
     printf("refused: the file holds a NUL\n");
-    StringFree(paste);
-    freet(res);
-    return 0;
-  }
-  ok = keep ? hts_bundle_from_paste_flags(
-                  StringBuff(paste), argv[0], agent, url,
-                  HTS_PASTE_KEEP_EMPTY | (dry ? HTS_PASTE_DRY_RUN : 0), res)
-            : hts_bundle_from_paste(StringBuff(paste), argv[0], agent, url, dry,
-                                    res);
-  if (!ok) {
+  } else if (!(keep ? hts_bundle_from_paste_flags(
+                          StringBuff(paste), argv[0], agent, url,
+                          HTS_PASTE_KEEP_EMPTY | (dry ? HTS_PASTE_DRY_RUN : 0),
+                          res)
+                    : hts_bundle_from_paste(StringBuff(paste), argv[0], agent,
+                                            url, dry, res))) {
     assertf(res->name[0] == '\0' && res->url[0] == '\0' &&
             res->agent[0] == '\0' && res->hosts[0] == '\0' &&
             res->cookies == 0 && res->error[0] != '\0');

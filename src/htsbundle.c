@@ -1414,6 +1414,8 @@ HTSEXT_API hts_boolean hts_bundle_from_paste_flags(
   memset(result, 0, sizeof(*result));
   result->size = size;
 
+  if ((flags & ~(HTS_PASTE_DRY_RUN | HTS_PASTE_KEEP_EMPTY)) != 0)
+    PASTE_FAIL("unknown flags 0x%x", flags);
   if (paste == NULL && keep_empty)
     paste = "";
   // validate the paste before reading it, so a stray byte never reaches a file
