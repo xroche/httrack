@@ -788,6 +788,27 @@ int parse_selftest_jsscan(httrackp *opt, hts_boolean dump) {
     }
   }
 
+  /* only an unquoted url() ends at ')': a quoted one may hold "(2)" */
+  {
+    static const struct {
+      const char *text;
+      char end;
+    } ends[] = {{"url(a.png)", ')'},
+                {"url('a (2).png')", '\0'},
+                {"url(\"a (2).png\")", '\0'}};
+
+    for (i = 0; i < sizeof(ends) / sizeof(ends[0]); i++) {
+      hts_js_link got;
+
+      if (!hts_js_scan_link(opt, ends[i].text, ends[i].text, HTS_FALSE, '"',
+                            HTS_TRUE, &got) ||
+          got.unquoted_end != ends[i].end) {
+        fprintf(stderr, "jsscan \"%s\": wrong end of link\n", ends[i].text);
+        err = 1;
+      }
+    }
+  }
+
   jsscan_sweep(opt, &sw);
   if (sw.dump)
     return 0;

@@ -130,10 +130,13 @@ copy_tree() {
 
 # Export the tree at $2 into $3, coucal included, without touching $1's refs.
 export_ref() {
-    local src=$1 ref=$2 dst=$3 sha mod
+    local src=$1 ref=$2 dst=$3 sha mod commit
+    # Resolve in $src: in the clone, origin/master names $src's local master.
+    commit=$(git -C "$src" rev-parse --verify --quiet "$ref^{commit}") ||
+        die "no such ref: $ref"
     git clone --quiet --shared --no-checkout "$src" "$dst" ||
         die "cannot clone $src"
-    git -C "$dst" checkout --quiet "$ref" || die "no such ref: $ref"
+    git -C "$dst" checkout --quiet "$commit" || die "no such ref: $ref"
     sha=$(git -C "$dst" rev-parse "HEAD:src/coucal" 2>/dev/null) || sha=
     mod="$(git -C "$src" rev-parse --git-common-dir)/modules/src/coucal"
     mkdir -p "$dst/src/coucal"

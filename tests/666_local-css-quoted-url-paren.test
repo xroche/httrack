@@ -1,0 +1,13 @@
+#!/bin/bash
+# A quoted CSS url() ends at its quote, not at a ')' inside the file name.
+set -e
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    --files 3 \
+    --found 'cssparen/bg (2).png' \
+    --found 'cssparen/tile (3).png' \
+    --file-matches 'cssparen/index.html' "url\('bg%20%282%29\.png'\)" \
+    --file-matches 'cssparen/index.html' 'url\("tile%20%283%29\.png"\)' \
+    httrack 'BASEURL/cssparen/index.html'
