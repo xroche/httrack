@@ -2255,6 +2255,7 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
   treathead_opt(NULL, cookie, adr, fil, retour, rcvd);
 }
 
+/* A header added here also goes into hts_header_is_read(). */
 void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
                    const char *fil, htsblk *retour, char *rcvd) {
   int p;

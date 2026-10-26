@@ -63,10 +63,12 @@ fi
 bash "$top_srcdir/tests/local-crawl.sh" --server-mptcp --errors 0 --files 5 \
     "${auto[@]}" httrack 'BASEURL/simple/basic.html'
 
-# Nobody asked for it and no connection got it, so there is nothing to say.
-bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 5 \
-    --log-not-found 'Multipath TCP' \
-    httrack 'BASEURL/simple/basic.html' --sockets 4 --keep-alive=0
+# Without --mptcp, a fallback to a plain TCP server is not reported.
+if test "$retrans" -ge 0 && test "$blackhole" -gt 0; then
+    bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 5 \
+        --log-not-found 'Multipath TCP' \
+        httrack 'BASEURL/simple/basic.html' --sockets 4 --keep-alive=0
+fi
 
 # One connection counts once: a TLS handshake sends the slot back through the
 # connect path, which counted the same socket a second time. Needs TLS, so a

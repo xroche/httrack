@@ -508,8 +508,7 @@ int binput(const char *buff, char *s, int max);
 hts_boolean binput_line(const char *buff, const char *end, char *s, int max,
                         int *offset);
 hts_boolean finput_line(T_SOC fd, char *s, int max);
-/* Does treathead() read the header that "line" starts with? Keep in step with
-   it: an over-long header httrack ignores is not worth a warning. */
+/* Does treathead() read the header that "line" starts with? Keep in step. */
 hts_boolean hts_header_is_read(const char *line);
 int linput(FILE * fp, char *s, int max);
 int linputsoc(T_SOC soc, char *s, int max);

@@ -2770,8 +2770,7 @@ class Handler(SimpleHTTPRequestHandler):
     def route_longloc_target(self):
         self.send_raw(b"<html><body>long-location target</body></html>\n", "text/html")
 
-    # a header past the read buffer that httrack never parses, as algolia.com
-    # sends: dropping it is not worth a warning
+    # a long header httrack never parses, like the one algolia.com sends
     LONGCSP = ("Content-Security-Policy-Report-Only", "script-src " + "a" * 4800)
 
     def route_longcsp_index(self):
