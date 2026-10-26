@@ -384,6 +384,15 @@ for key in sorted(claimed):
         checked += same(literal(init_str[var]), r["default_value"],
                         "%s default" % key)
 
+    # These boxes do more than add a flag, so the table names none for them.
+    if key in {"DebugMode"}:
+        if len(emit.get(var, [])) != 1:
+            sys.exit("%s: this repo emits no flag now, so it needs no exemption"
+                     % key)
+        checked += same("", r["flag_on"], "%s flag_on" % key)
+        checked += same("", r["flag_off"], "%s flag_off" % key)
+        continue
+
     # Only an on/off setting has an on/off pair: a list emits through a ladder
     # the table deliberately does not carry.
     if kind != "checkbox" or len(emit.get(var, [])) != 1:

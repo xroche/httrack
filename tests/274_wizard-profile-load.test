@@ -63,6 +63,7 @@ Footer=x%%y
 Sitemap=1
 SitemapUrl=http://example.com/s.xml%
 ProxyType=0
+DebugMode=1
 EOF
 
 printf '[reloading a project reads its winprofile.ini] ..\t'
@@ -130,6 +131,7 @@ if maxrate is None or maxrate.group(1) != "0":
 # A checkbox field: the writer spells "cleared" as 0, so it must not come back
 # as a flag. Wacz is the control, on the same page and the same shape, and it
 # is ungated: --wacz names its own archive.
+want("--debug-headers")
 reject("--warc")
 reject("--replace-external")
 want("--wacz")
@@ -145,7 +147,8 @@ for box, ticked in [("warc", False), ("wacz", True)]:
         sys.exit("option9.html renders %d %s boxes" % (len(tag), box))
     if ("checked" in tag[0]) != ticked:
         sys.exit("the %s box came back %r" % (box, tag[0]))
-for key, value in [("Warc", "0"), ("Wacz", "1"), ("NoExternalPages", "0")]:
+for key, value in [("Warc", "0"), ("Wacz", "1"), ("NoExternalPages", "0"),
+                   ("DebugMode", "1")]:
     if ini.get(key) != value:
         sys.exit("%s saved back as %r, wanted %r" % (key, ini.get(key), value))
 

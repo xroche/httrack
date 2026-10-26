@@ -1323,6 +1323,7 @@ static const char *const ini_checkbox_keys[] = {
     "Index",
     "WordIndex",
     "Log",
+    "DebugMode",
     "RemoveTimeout",
     "RemoveRateout",
     "KeepAlive",
