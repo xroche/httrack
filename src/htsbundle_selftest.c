@@ -203,9 +203,10 @@ static int st_bundlescope(httrackp *opt, int argc, char **argv) {
 }
 
 /* -#test=bundlenames <urls> [<list file>]: the count and the bundle names the
-   addresses use, or "refused". */
+   addresses use, or "refused: <why>". */
 static int st_bundlenames(httrackp *opt, int argc, char **argv) {
   char **names;
+  char error[64];
   int n;
   int i;
 
@@ -214,10 +215,12 @@ static int st_bundlenames(httrackp *opt, int argc, char **argv) {
     fprintf(stderr, "bundlenames: takes <urls> [<list file>]\n");
     return 1;
   }
-  n = hts_bundle_names_in_use(argv[0], argc == 2 ? argv[1] : NULL, &names);
+  names = (char **) &n; /* so a failure must reset it */
+  n = hts_bundle_names_in_use(argv[0], argc == 2 ? argv[1] : NULL, &names,
+                              error, sizeof(error));
   if (n < 0) {
     assertf(names == NULL);
-    printf("refused\n");
+    printf("refused: %s\n", error);
     return 0;
   }
   assertf(names[n] == NULL);

@@ -629,7 +629,6 @@ const char *hts_urllist_load(const char *path, char **buff, size_t *size,
                                : "not a regular file";
   } else if ((*size = llint_to_size_t(fs)) == (size_t) -1) {
     err = "file too large";
-    *size = 0;
   } else {
     FILE *fp = FOPEN(path, "rb");
 
@@ -667,7 +666,6 @@ hts_urllist_status hts_urllist_next(const char *buff, size_t size, size_t *pos,
   *pos = term + 1;
   /* an embedded NUL ends the read too, and half a URL is not one */
   if (term < size && buff[term] == '\0') {
-    /* a NUL is not a line end: drop the rest of the line ourselves */
     while (*pos < size && buff[*pos] != '\n')
       (*pos)++;
     (*pos)++;

@@ -28,16 +28,29 @@ list=$d/list.txt
 : >"$d/empty"
 
 selftest_queue "0:" bundlenames ""
-selftest_queue "0:" bundlenames "http://x/ -*.gif +*.png"
+selftest_queue "0:" bundlenames \
+    "http://x/ -*.gif +*${s}plus -www.a.com/"
 selftest_queue "2: ayy bee" bundlenames \
     "http://x/${s}ayy  -*${s}nope http://y/${s}bee http://z/${s}ayy http://w/"
-selftest_queue "refused" bundlenames "http://x/${s}../up"
-selftest_queue "refused" bundlenames "\"http://x/${s}ayy\""
-selftest_queue "refused" bundlenames "$(printf 'http://x/%01030d' 0)"
-selftest_queue "5: zed ayy bee k cee" bundlenames "http://z/${s}zed http://a/${s}ayy" "$list"
+selftest_queue_head "refused: invalid login bundle name" bundlenames \
+    "http://x/${s}../up"
+q="refused: address is quoted"
+selftest_queue "$q" bundlenames "\"http://x/${s}ayy\""
+selftest_queue "$q" bundlenames "(none) http://x/${s}ayy"
+# the crawl takes a word of 1023 bytes, and refuses one of 1024
+selftest_queue "1: e" bundlenames "$(printf 'http://x/%0997d%se' 0 "$s")"
+selftest_queue "refused: address too long" bundlenames \
+    "$(printf 'http://x/%0998d%se' 0 "$s")"
+# the crawl reads -V as an option taking the next word, not as a filter
+selftest_queue "refused: address list holds an option" bundlenames \
+    "-V http://x/${s}ayy"
+# urls first, then the file, each name once
+selftest_queue "5: zed ayy bee k cee" bundlenames \
+    "http://z/${s}zed http://a/${s}ayy" "$list"
 selftest_queue "0:" bundlenames "" "$d/empty"
-selftest_queue "refused" bundlenames "" "$d/missing"
-selftest_queue "refused" bundlenames "" "$d"
+selftest_queue_head "refused: " bundlenames "" "$d/missing"
+selftest_queue "refused: not a regular file" bundlenames "" "$d"
 printf 'http://b/%s../bad\n' "$s" >"$d/bad.txt"
-selftest_queue "refused" bundlenames "" "$d/bad.txt"
+selftest_queue_head "refused: invalid login bundle name" bundlenames "" \
+    "$d/bad.txt"
 selftest_run_queued

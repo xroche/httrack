@@ -800,15 +800,13 @@ static hts_boolean names_add_once(char ***names, size_t *n, const char *name) {
   return strlist_add(names, n, name);
 }
 
-/* Add to *names the bundle that the start URL url names, if any. NULL, or why
-   the crawl refuses url. */
+/* Add to *names the bundle that the start URL url names, if any. Returns NULL,
+   or why the crawl refuses url. */
 static const char *names_note(char ***names, size_t *n, const char *url) {
   char copy[HTS_URLLIST_LINE_SIZE];
   char name[HTS_BUNDLE_NAME_MAX];
   const char *why;
 
-  if (strlen(url) >= sizeof(copy))
-    return "too long";
   strcpybuff(copy, url);
   why = bundle_cut(copy, name, sizeof(name));
   if (why == NULL && name[0] != '\0' && !names_add_once(names, n, name))
@@ -816,53 +814,76 @@ static const char *names_note(char ***names, size_t *n, const char *url) {
   return why;
 }
 
-HTSEXT_API int hts_bundle_names_in_use(const char *urls, const char *list_file,
-                                       char ***names) {
-  char **list = NULL;
-  size_t n = 0;
+/* Add to *names the bundles the words of urls name, as the command line reads
+   them. Returns NULL, or why the crawl refuses a word. */
+static const char *names_note_words(char ***names, size_t *n,
+                                    const char *urls) {
+  char *copy = strdupt(urls);
+  char *a = copy;
   const char *why = NULL;
 
+  if (copy == NULL)
+    return "out of memory";
+  a += strspn(a, HTS_REALSPACES);
+  while (why == NULL && *a != '\0') {
+    /* the crawl refuses a longer word */
+    char word[HTS_URLMAXSIZE];
+
+    if (!hts_scan_token(&a, word, sizeof(word)))
+      why = "address too long";
+    else if (hts_is_quoted(word, strlen(word)) ||
+             strcmp(word, HTS_NOPARAM) == 0)
+      why = "address is quoted";
+    /* an option may take the next word as its value */
+    else if (hts_rule_would_be_read_as_opt(word))
+      why = "address list holds an option";
+    else if (word[0] != '+' && word[0] != '-')
+      why = names_note(names, n, word);
+  }
+  freet(copy);
+  return why;
+}
+
+/* Add to *names the bundles the lines of the -%L file path name. Returns NULL,
+   or why the file cannot be read or the crawl refuses a line. */
+static const char *names_note_file(char ***names, size_t *n, const char *path,
+                                   char errbuf[HTS_STRERROR_SIZE]) {
+  char *buff;
+  size_t size;
+  size_t pos = 0;
+  const char *why = hts_urllist_load(path, &buff, &size, errbuf);
+
+  while (why == NULL) {
+    char line[HTS_URLLIST_LINE_SIZE];
+    const hts_urllist_status status = hts_urllist_next(buff, size, &pos, line);
+
+    if (status == HTS_URLLIST_END)
+      break;
+    /* the crawl drops these lines rather than refuse them */
+    if (status == HTS_URLLIST_LINE && !hts_is_quoted(line, strlen(line)))
+      why = names_note(names, n, line);
+  }
+  freet(buff);
+  return why;
+}
+
+HTSEXT_API int hts_bundle_names_in_use(const char *urls, const char *list_file,
+                                       char ***names, char *error,
+                                       size_t error_size) {
+  char **list = NULL;
+  size_t n = 0;
+  char errbuf[HTS_STRERROR_SIZE];
+  const char *why = NULL;
+
+  if (error != NULL && error_size != 0)
+    error[0] = '\0';
   if (names == NULL)
     return -1;
   *names = NULL;
-  if (urls != NULL) {
-    char *copy = strdupt(urls);
-    char *a = copy;
-
-    if (copy == NULL)
-      why = "out of memory";
-    else
-      a += strspn(a, HTS_REALSPACES);
-    while (why == NULL && *a != '\0') {
-      /* the crawl takes a command-line word shorter than this */
-      char word[HTS_URLMAXSIZE];
-
-      if (!hts_scan_token(&a, word, sizeof(word)))
-        why = "too long";
-      else if (hts_is_quoted(word, strlen(word)))
-        why = "quoted";
-      else if (word[0] != '+' && word[0] != '-')
-        why = names_note(&list, &n, word);
-    }
-    freet(copy);
-  }
-  if (why == NULL && list_file != NULL) {
-    char *buff;
-    size_t size;
-    size_t pos = 0;
-    char errbuf[HTS_STRERROR_SIZE];
-    char line[HTS_URLLIST_LINE_SIZE];
-    hts_urllist_status status;
-
-    why = hts_urllist_load(list_file, &buff, &size, errbuf);
-    while (why == NULL && (status = hts_urllist_next(buff, size, &pos, line)) !=
-                              HTS_URLLIST_END) {
-      /* the crawl drops these lines rather than refuse them */
-      if (status == HTS_URLLIST_LINE && !hts_is_quoted(line, strlen(line)))
-        why = names_note(&list, &n, line);
-    }
-    freet(buff);
-  }
+  if (urls != NULL)
+    why = names_note_words(&list, &n, urls);
+  if (why == NULL && list_file != NULL)
+    why = names_note_file(&list, &n, list_file, errbuf);
   if (why == NULL) {
     char **const grown = realloct(list, (n + 1) * sizeof(char *));
 
@@ -875,6 +896,8 @@ HTSEXT_API int hts_bundle_names_in_use(const char *urls, const char *list_file,
   }
   if (why != NULL) {
     strlist_free(&list, &n);
+    if (error != NULL && error_size != 0)
+      strlncatbuff(error, why, error_size, error_size - 1);
     return -1;
   }
   *names = list;
