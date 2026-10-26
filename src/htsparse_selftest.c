@@ -788,26 +788,51 @@ int parse_selftest_jsscan(httrackp *opt, hts_boolean dump) {
     }
   }
 
-  /* A quoted url() may hold ')', so only an unquoted one ends there. */
+  /* A quoted url() may hold ')', so only an unquoted one ends there. A style
+     attribute may write the quotes as entities. */
   {
     static const struct {
       const char *text;
       int at, length;
       char end;
-      hts_boolean in_css, escape;
-    } ends[] = {{"url(a.png)", 0, 5, ')', HTS_TRUE, HTS_TRUE},
-                {"url('a (2).png')", 0, 9, '\0', HTS_TRUE, HTS_TRUE},
-                {"url(\"a (2).png\")", 0, 9, '\0', HTS_TRUE, HTS_TRUE},
-                {"x.src=\"a (2).png\";", 1, 9, '\0', HTS_FALSE, HTS_FALSE}};
+      hts_boolean in_tag, in_css, escape;
+      char entity;
+    } ends[] = {
+        {"url(a.png)", 0, 5, ')', HTS_FALSE, HTS_TRUE, HTS_TRUE, '\0'},
+        {"url('a (2).png')", 0, 9, '\0', HTS_FALSE, HTS_TRUE, HTS_TRUE, '\0'},
+        {"url(\"a (2).png\")", 0, 9, '\0', HTS_FALSE, HTS_TRUE, HTS_TRUE, '\0'},
+        {"x.src=\"a (2).png\";", 1, 9, '\0', HTS_FALSE, HTS_FALSE, HTS_FALSE,
+         '\0'},
+        {"url(&quot;a (2).png&quot;)", 0, 9, '\0', HTS_TRUE, HTS_TRUE, HTS_TRUE,
+         '"'},
+        {"url(&#39;a.png?b&amp;c&#x27;)", 0, 13, '\0', HTS_TRUE, HTS_TRUE,
+         HTS_TRUE, '\''},
+        /* a <style> block does not decode entities */
+        {"url(&quot;a.png&quot;)", 0, 17, ')', HTS_FALSE, HTS_TRUE, HTS_TRUE,
+         '\0'}};
+
+    /* the closing entity must stand for the same quote, before any raw one */
+    static const char *const unclosed[] = {"url(&quot;a.png&#39;)",
+                                           "url(&quot;a.png\")"};
 
     for (i = 0; i < sizeof(ends) / sizeof(ends[0]); i++) {
       hts_js_link got;
 
       if (!hts_js_scan_link(opt, ends[i].text + ends[i].at, ends[i].text,
-                            HTS_FALSE, '"', ends[i].in_css, &got) ||
+                            ends[i].in_tag, '"', ends[i].in_css, &got) ||
           got.length != ends[i].length || got.unquoted_end != ends[i].end ||
-          got.escape_parens != ends[i].escape) {
+          got.escape_parens != ends[i].escape ||
+          got.entity_quote != ends[i].entity) {
         fprintf(stderr, "jsscan \"%s\": wrong end of link\n", ends[i].text);
+        err = 1;
+      }
+    }
+    for (i = 0; i < sizeof(unclosed) / sizeof(unclosed[0]); i++) {
+      hts_js_link got;
+
+      if (hts_js_scan_link(opt, unclosed[i], unclosed[i], HTS_TRUE, '"',
+                           HTS_TRUE, &got)) {
+        fprintf(stderr, "jsscan \"%s\": took an unclosed link\n", unclosed[i]);
         err = 1;
       }
     }

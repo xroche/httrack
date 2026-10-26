@@ -129,13 +129,16 @@ hts_boolean hts_dirty_link_is_url(httrackp *opt, const char *str, size_t len,
    at, and '\0' when the operand was quoted. "is_module" marks a JavaScript
    module specifier, which resolves against the script rather than the page.
    "escape_parens" marks a CSS url(), whose rewrite keeps ( and ) encoded.
-   All fields are zero when the scanner found nothing. */
+   "entity_quote" is the quote a style attribute wrote as an entity, as in
+   url(&quot;a.png&quot;), so the link ends at the matching entity. All fields
+   are zero when the scanner found nothing. */
 typedef struct hts_js_link {
   int offset;
   int length;
   char unquoted_end;
   hts_boolean is_module;
   hts_boolean escape_parens;
+  char entity_quote;
 } hts_js_link;
 
 /*
