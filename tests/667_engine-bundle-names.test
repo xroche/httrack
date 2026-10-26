@@ -1,0 +1,43 @@
+#!/bin/bash
+#
+# hts_bundle_names_in_use: the login bundles a project's addresses name.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+d=$(mktemp -d)
+trap 'set +e; rm -rf "$d"' EXIT
+
+s='#httrack-bundle='
+# the longest line the crawl keeps is 1024 bytes, and the next one is dropped
+kept=$(printf 'http://a/%0998d%sk' 0 "$s")
+cut=$(printf 'http://a/%0997d%sbig' 0 "$s")
+test ${#kept} -eq 1024 && test ${#cut} -eq 1025
+list=$d/list.txt
+{
+    printf 'http://b/%sbee\r\n' "$s"
+    printf '\n'
+    printf 'http://a/%sayy\n' "$s"
+    printf '"http://q/%squoted"\n' "$s"
+    printf 'http://n/%snul\0x\n' "$s"
+    printf '%s\n' "$cut" "$kept"
+    printf 'http://c/%scee' "$s"
+} >"$list"
+: >"$d/empty"
+
+selftest_queue "0:" bundlenames ""
+selftest_queue "0:" bundlenames "http://x/ -*.gif +*.png"
+selftest_queue "2: ayy bee" bundlenames \
+    "http://x/${s}ayy  -*${s}nope http://y/${s}bee http://z/${s}ayy http://w/"
+selftest_queue "refused" bundlenames "http://x/${s}../up"
+selftest_queue "refused" bundlenames "\"http://x/${s}ayy\""
+selftest_queue "refused" bundlenames "$(printf 'http://x/%01030d' 0)"
+selftest_queue "5: zed ayy bee k cee" bundlenames "http://z/${s}zed http://a/${s}ayy" "$list"
+selftest_queue "0:" bundlenames "" "$d/empty"
+selftest_queue "refused" bundlenames "" "$d/missing"
+selftest_queue "refused" bundlenames "" "$d"
+printf 'http://b/%s../bad\n' "$s" >"$d/bad.txt"
+selftest_queue "refused" bundlenames "" "$d/bad.txt"
+selftest_run_queued

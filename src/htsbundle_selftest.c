@@ -202,6 +202,33 @@ static int st_bundlescope(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* -#test=bundlenames <urls> [<list file>]: the count and the bundle names the
+   addresses use, or "refused". */
+static int st_bundlenames(httrackp *opt, int argc, char **argv) {
+  char **names;
+  int n;
+  int i;
+
+  (void) opt;
+  if (argc < 1 || argc > 2) {
+    fprintf(stderr, "bundlenames: takes <urls> [<list file>]\n");
+    return 1;
+  }
+  n = hts_bundle_names_in_use(argv[0], argc == 2 ? argv[1] : NULL, &names);
+  if (n < 0) {
+    assertf(names == NULL);
+    printf("refused\n");
+    return 0;
+  }
+  assertf(names[n] == NULL);
+  printf("%d:", n);
+  for (i = 0; i < n; i++)
+    printf(" %s", names[i]);
+  printf("\n");
+  hts_bundle_names_free(names);
+  return 0;
+}
+
 /* -#test=bundlename <name>: "ok", or why the name is refused. */
 static int st_bundlename(httrackp *opt, int argc, char **argv) {
   const char *why;
@@ -336,6 +363,8 @@ const struct selftest_entry selftests_bundle[] = {
     {"bundlescope", "<cookie domain> <url>...",
      "does a login bundle naming the URLs keep a cookie of that domain?",
      st_bundlescope},
+    {"bundlenames", "<urls> [<list file>]",
+     "the login bundle names the start addresses use", st_bundlenames},
     {"paste", "<dir> <file> [agent:<ua>] [url:<url>] [dry] [keep]",
      "turn a pasted cURL command or cookies.txt into a login bundle", st_paste},
     {"pasterace", "<dir> <rounds>",

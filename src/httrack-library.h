@@ -1021,6 +1021,20 @@ HTSEXT_API hts_boolean hts_bundle_cookie_in_scope(const char *const *urls,
                                                   size_t nurls,
                                                   const char *cookie_domain);
 
+/** Set *names to the login bundle names the start addresses use, each once,
+    in the order the crawl meets them. The addresses are urls, split at spaces
+    as the command line is, with + and - filter words skipped, then the lines
+    of the -%L file list_file, or none when it is NULL. Both are UTF-8.
+    Returns how many, with *names NULL-terminated and freed by
+    hts_bundle_names_free(). Returns -1 with *names NULL when list_file cannot
+    be read or the crawl would refuse an address: a quoted or too long word in
+    urls, or an invalid bundle name in either. */
+HTSEXT_API int hts_bundle_names_in_use(const char *urls, const char *list_file,
+                                       char ***names);
+
+/** Free what hts_bundle_names_in_use() gave. NULL is ignored. */
+HTSEXT_API void hts_bundle_names_free(char **names);
+
 /* The array sizes of hts_paste_result, in bytes with the NUL. */
 #define HTS_PASTE_NAME_SIZE 128
 #define HTS_PASTE_URL_SIZE 1024

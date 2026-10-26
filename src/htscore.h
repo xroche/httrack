@@ -352,6 +352,26 @@ hts_boolean hts_record_init(httrackp *opt);
 
 void hts_record_free(httrackp *opt);
 
+/* Load the -%L file at path into *buff, NUL-terminated after its *size bytes,
+   to be freed with freet(). NULL, or why it could not be read, with *buff NULL;
+   errbuf, of HTS_STRERROR_SIZE bytes, may hold the reason. */
+const char *hts_urllist_load(const char *path, char **buff, size_t *size,
+                             char *errbuf);
+
+/* The bytes a hts_urllist_next() line needs. */
+#define HTS_URLLIST_LINE_SIZE (HTS_URLMAXSIZE * 2)
+
+typedef enum hts_urllist_status {
+  HTS_URLLIST_END,  /* no line is left */
+  HTS_URLLIST_LINE, /* line holds the next line */
+  HTS_URLLIST_LONG, /* the line was too long, and is dropped */
+  HTS_URLLIST_NUL   /* the line held a NUL byte, and is dropped */
+} hts_urllist_status;
+
+/* Read the next -%L line of buff at *pos, and move *pos past it. */
+hts_urllist_status hts_urllist_next(const char *buff, size_t size, size_t *pos,
+                                    char line[HTS_URLLIST_LINE_SIZE]);
+
 /* Run the mirror for the given start URL(s) under opt. Top-level engine entry.
    Returns 1 once the crawl loop ran, 0 or -1 for a bailout. *completed says
    whether it reached the end: false for a bailout, and for any stop that cut it

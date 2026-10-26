@@ -35,6 +35,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsbundle.h"
 
 #include "htscore.h"
+#include "htscmdline.h"
 #include "htslib.h"
 #include "htslines.h"
 #include "htspsl.h"
@@ -785,6 +786,109 @@ HTSEXT_API hts_boolean hts_bundle_cookie_in_scope(const char *const *urls,
   bundle_clear(&b);
   StringFree(b.headers);
   return keeps;
+}
+
+/* Add name to the n names of *names unless it is there. HTS_FALSE when out of
+   memory. */
+static hts_boolean names_add_once(char ***names, size_t *n, const char *name) {
+  size_t i;
+
+  for (i = 0; i < *n; i++) {
+    if (strcmp((*names)[i], name) == 0)
+      return HTS_TRUE;
+  }
+  return strlist_add(names, n, name);
+}
+
+/* Add to *names the bundle that the start URL url names, if any. NULL, or why
+   the crawl refuses url. */
+static const char *names_note(char ***names, size_t *n, const char *url) {
+  char copy[HTS_URLLIST_LINE_SIZE];
+  char name[HTS_BUNDLE_NAME_MAX];
+  const char *why;
+
+  if (strlen(url) >= sizeof(copy))
+    return "too long";
+  strcpybuff(copy, url);
+  why = bundle_cut(copy, name, sizeof(name));
+  if (why == NULL && name[0] != '\0' && !names_add_once(names, n, name))
+    why = "out of memory";
+  return why;
+}
+
+HTSEXT_API int hts_bundle_names_in_use(const char *urls, const char *list_file,
+                                       char ***names) {
+  char **list = NULL;
+  size_t n = 0;
+  const char *why = NULL;
+
+  if (names == NULL)
+    return -1;
+  *names = NULL;
+  if (urls != NULL) {
+    char *copy = strdupt(urls);
+    char *a = copy;
+
+    if (copy == NULL)
+      why = "out of memory";
+    else
+      a += strspn(a, HTS_REALSPACES);
+    while (why == NULL && *a != '\0') {
+      /* the crawl takes a command-line word shorter than this */
+      char word[HTS_URLMAXSIZE];
+
+      if (!hts_scan_token(&a, word, sizeof(word)))
+        why = "too long";
+      else if (hts_is_quoted(word, strlen(word)))
+        why = "quoted";
+      else if (word[0] != '+' && word[0] != '-')
+        why = names_note(&list, &n, word);
+    }
+    freet(copy);
+  }
+  if (why == NULL && list_file != NULL) {
+    char *buff;
+    size_t size;
+    size_t pos = 0;
+    char errbuf[HTS_STRERROR_SIZE];
+    char line[HTS_URLLIST_LINE_SIZE];
+    hts_urllist_status status;
+
+    why = hts_urllist_load(list_file, &buff, &size, errbuf);
+    while (why == NULL && (status = hts_urllist_next(buff, size, &pos, line)) !=
+                              HTS_URLLIST_END) {
+      /* the crawl drops these lines rather than refuse them */
+      if (status == HTS_URLLIST_LINE && !hts_is_quoted(line, strlen(line)))
+        why = names_note(&list, &n, line);
+    }
+    freet(buff);
+  }
+  if (why == NULL) {
+    char **const grown = realloct(list, (n + 1) * sizeof(char *));
+
+    if (grown == NULL) {
+      why = "out of memory";
+    } else {
+      list = grown;
+      list[n] = NULL;
+    }
+  }
+  if (why != NULL) {
+    strlist_free(&list, &n);
+    return -1;
+  }
+  *names = list;
+  return (int) n;
+}
+
+HTSEXT_API void hts_bundle_names_free(char **names) {
+  size_t i;
+
+  if (names == NULL)
+    return;
+  for (i = 0; names[i] != NULL; i++)
+    freet(names[i]);
+  freet(names);
 }
 
 /* A paste holds fewer bytes than this. */
