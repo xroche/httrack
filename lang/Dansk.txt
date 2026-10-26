@@ -1110,16 +1110,14 @@ Clear login
 Log ud
 The browser did not open: %s.
 Browseren blev ikke åbnet: %s.
-The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
-Browseren kom tilbage uden cookies. Adressen og browseridentiteten gemmes med projektet, når du trykker på OK.
+The browser came back with no cookies. The address and the browser identity are saved with the project when the wizard finishes.
+Browseren kom tilbage uden cookies. Adressen og browseridentiteten gemmes med projektet, når guiden er færdig.
 Cookies collected: %d. They are used when you press OK.
 Indsamlede cookies: %d. De bruges, når du trykker på OK.
-The cookies could not be written to %s, so nothing was changed.
-Disse cookies kunne ikke skrives til %s, så intet blev ændret.
-%d of the browser's cookies were left out, because the engine would not read them.
-%d af browserens cookies blev udeladt, fordi HTTrack ikke kunne læse dem.
-The browser identity it reported cannot be used, so the mirror will send the default one.
-Den browser-identitet, den oplyste, kan ikke bruges, så spejlkopieringen sender standardidentiteten.
+Cookies collected: %d. They are saved with the project when the wizard finishes.
+Indsamlede cookies: %d. De gemmes med projektet, når guiden er færdig.
+The login could not be written to %s.
+Login-oplysningerne kunne ikke skrives til %s.
 Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
 Log ind på webstedet i en anden fane i denne browser. Åbn udviklerværktøjerne (F12) og derefter fanen Netværk, genindlæs siden, højreklik på den første anmodning og vælg Copy as cURL (bash). Indsæt teksten her. En cookies.txt-eksport virker også, for den første adresse på listen.
 Cookies for: %s. Browser identity: %s.

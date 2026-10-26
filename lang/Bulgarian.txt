@@ -1110,16 +1110,14 @@ Clear login
 Изход от профила
 The browser did not open: %s.
 Браузърът не се отвори: %s.
-The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
-Браузърът не върна нито една 'бисквитка'. Адресът и идентичността на браузъра се запазват с проекта, когато натиснете „Да“.
+The browser came back with no cookies. The address and the browser identity are saved with the project when the wizard finishes.
+Браузърът не върна нито една 'бисквитка'. Адресът и идентичността на браузъра се запазват с проекта, когато съветникът приключи.
 Cookies collected: %d. They are used when you press OK.
 Събрани 'бисквитки': %d. Те се използват, когато натиснете „Да“.
-The cookies could not be written to %s, so nothing was changed.
-'Бисквитките' не можаха да бъдат записани в %s, затова нищо не беше променено.
-%d of the browser's cookies were left out, because the engine would not read them.
-Пропуснати 'бисквитки' на браузъра: %d, защото HTTrack не би могъл да ги прочете.
-The browser identity it reported cannot be used, so the mirror will send the default one.
-Идентификацията на браузъра, която той съобщи, не може да се използва, затова огледалото ще изпраща тази по подразбиране.
+Cookies collected: %d. They are saved with the project when the wizard finishes.
+Събрани 'бисквитки': %d. Те се запазват с проекта, когато съветникът приключи.
+The login could not be written to %s.
+Входът не можа да бъде записан в %s.
 Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
 Влезте в сайта в друг раздел на този браузър. Отворете инструментите за разработчици (F12), след това раздела Мрежа, презаредете страницата, щракнете с десния бутон върху първата заявка и изберете Copy as cURL (bash). Поставете текста тук. Експорт във формат cookies.txt също работи, за първия адрес в списъка.
 Cookies for: %s. Browser identity: %s.

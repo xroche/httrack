@@ -1110,16 +1110,14 @@ Clear login
 Deconectare
 The browser did not open: %s.
 Browserul nu s-a deschis: %s.
-The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
-Browserul nu a returnat cookies. Adresa şi identitatea browserului vor fi salvate cu proiectul când apăsaţi OK.
+The browser came back with no cookies. The address and the browser identity are saved with the project when the wizard finishes.
+Browserul nu a returnat cookies. Adresa şi identitatea browserului vor fi salvate cu proiectul când se termină vrăjitorul.
 Cookies collected: %d. They are used when you press OK.
 Cookies colectate: %d. Vor fi folosite când apăsaţi OK.
-The cookies could not be written to %s, so nothing was changed.
-Cookies nu au putut fi scrise în %s, aşa că nu s-a schimbat nimic.
-%d of the browser's cookies were left out, because the engine would not read them.
-%d dintre cookies-urile browserului au fost lăsate deoparte, deoarece HTTrack nu le-a putut citi.
-The browser identity it reported cannot be used, so the mirror will send the default one.
-Identitatea browser-ului raportată nu poate fi folosită, aşa că la clonare se va trimite cea implicită.
+Cookies collected: %d. They are saved with the project when the wizard finishes.
+Cookies colectate: %d. Vor fi salvate cu proiectul când se termină vrăjitorul.
+The login could not be written to %s.
+Autentificarea nu a putut fi scrisă în %s.
 Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
 Autentificați-vă pe site într-o altă filă a acestui browser. Deschideți instrumentele pentru dezvoltatori (F12), apoi fila Rețea, reîncărcați pagina, faceți clic dreapta pe prima cerere și alegeți Copy as cURL (bash). Lipiți textul aici. Merge și un export cookies.txt, pentru prima adresă din listă.
 Cookies for: %s. Browser identity: %s.

@@ -1110,16 +1110,14 @@ Clear login
 Odhlásit
 The browser did not open: %s.
 Prohlížeč se nepodařilo otevřít: %s.
-The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
-Prohlížeč nevrátil žádné cookies. Adresa a identita prohlížeče se po stisknutí OK uloží s projektem.
+The browser came back with no cookies. The address and the browser identity are saved with the project when the wizard finishes.
+Prohlížeč nevrátil žádné cookies. Adresa a identita prohlížeče se uloží s projektem po dokončení pomocníka.
 Cookies collected: %d. They are used when you press OK.
 Získáno cookies: %d. Použijí se po stisknutí OK.
-The cookies could not be written to %s, so nothing was changed.
-Cookies se nepodařilo zapsat do %s, takže se nic nezměnilo.
-%d of the browser's cookies were left out, because the engine would not read them.
-Cookies z prohlížeče byly vynechány v počtu %d, protože je HTTrack nedokázal přečíst.
-The browser identity it reported cannot be used, so the mirror will send the default one.
-Nahlášenou totožnost prohlížeče nelze použít, takže se při stahování odešle výchozí.
+Cookies collected: %d. They are saved with the project when the wizard finishes.
+Získáno cookies: %d. Uloží se s projektem po dokončení pomocníka.
+The login could not be written to %s.
+Přihlášení se nepodařilo zapsat do %s.
 Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
 Přihlaste se na web v jiné kartě tohoto prohlížeče. Otevřete nástroje pro vývojáře (F12) a kartu Síť, znovu načtěte stránku, klikněte pravým tlačítkem na první požadavek a zvolte Copy as cURL (bash). Vložte text sem. Funguje i export cookies.txt, pro první adresu v seznamu.
 Cookies for: %s. Browser identity: %s.

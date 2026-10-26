@@ -1110,16 +1110,14 @@ Clear login
 Cerrar sesión
 The browser did not open: %s.
 El navegador no se ha abierto: %s.
-The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
-El navegador no ha devuelto ninguna cookie. La dirección y la identidad del navegador se guardarán con el proyecto cuando pulse OK.
+The browser came back with no cookies. The address and the browser identity are saved with the project when the wizard finishes.
+El navegador no ha devuelto ninguna cookie. La dirección y la identidad del navegador se guardarán con el proyecto cuando termine el asistente.
 Cookies collected: %d. They are used when you press OK.
 Cookies recogidas: %d. Se usarán cuando pulse OK.
-The cookies could not be written to %s, so nothing was changed.
-No se han podido escribir las cookies en %s, por lo que no se ha cambiado nada.
-%d of the browser's cookies were left out, because the engine would not read them.
-Se han descartado %d cookies del navegador, porque el motor no podía leerlas.
-The browser identity it reported cannot be used, so the mirror will send the default one.
-La identidad del navegador indicada no se puede usar, por lo que la copia enviará la predeterminada.
+Cookies collected: %d. They are saved with the project when the wizard finishes.
+Cookies recogidas: %d. Se guardarán con el proyecto cuando termine el asistente.
+The login could not be written to %s.
+No se ha podido escribir el inicio de sesión en %s.
 Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
 Inicie sesión en el sitio en otra pestaña de este navegador. Abra las herramientas para desarrolladores (F12) y luego la pestaña Red, recargue la página, haga clic derecho en la primera petición y elija Copy as cURL (bash). Pegue el texto aquí. Una exportación cookies.txt también sirve, para la primera dirección de la lista.
 Cookies for: %s. Browser identity: %s.

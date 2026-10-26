@@ -1110,16 +1110,14 @@ Clear login
 Terminar sessão
 The browser did not open: %s.
 O browser não abriu: %s.
-The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
-O browser não devolveu cookies. O endereço e a identidade do browser serão guardados com o projecto quando premir OK.
+The browser came back with no cookies. The address and the browser identity are saved with the project when the wizard finishes.
+O browser não devolveu cookies. O endereço e a identidade do browser serão guardados com o projecto quando o assistente terminar.
 Cookies collected: %d. They are used when you press OK.
 Cookies recolhidos: %d. Serão utilizados quando premir OK.
-The cookies could not be written to %s, so nothing was changed.
-Não foi possível escrever os cookies em %s, por isso nada foi alterado.
-%d of the browser's cookies were left out, because the engine would not read them.
-%d cookies do browser foram ignorados, porque o motor de captura não os conseguiu ler.
-The browser identity it reported cannot be used, so the mirror will send the default one.
-A identidade do browser indicada não pode ser utilizada, por isso a cópia enviará a identidade padrão.
+Cookies collected: %d. They are saved with the project when the wizard finishes.
+Cookies recolhidos: %d. Serão guardados com o projecto quando o assistente terminar.
+The login could not be written to %s.
+Não foi possível escrever o início de sessão em %s.
 Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
 Inicie sessão no site noutro separador deste browser. Abra as ferramentas de programador (F12) e depois o separador Rede, recarregue a página, clique com o botão direito no primeiro pedido e escolha Copy as cURL (bash). Cole o texto aqui. Uma exportação cookies.txt também funciona, para o primeiro endereço da lista.
 Cookies for: %s. Browser identity: %s.

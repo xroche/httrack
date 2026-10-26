@@ -1110,16 +1110,14 @@ Clear login
 Одјава
 The browser did not open: %s.
 Прелистувачот не се отвори: %s.
-The browser came back with no cookies. The address and the browser identity are saved with the project when you press OK.
-Прелистувачот не врати ниту едно колаче. Адресата и идентитетот на прелистувачот ќе се зачуваат со проектот кога ќе притиснете „Добро“.
+The browser came back with no cookies. The address and the browser identity are saved with the project when the wizard finishes.
+Прелистувачот не врати ниту едно колаче. Адресата и идентитетот на прелистувачот ќе се зачуваат со проектот кога ќе заврши волшебникот.
 Cookies collected: %d. They are used when you press OK.
 Собрани колачиња: %d. Ќе се користат кога ќе притиснете „Добро“.
-The cookies could not be written to %s, so nothing was changed.
-Колачињата не можеа да се запишат во %s, затоа ништо не е променето.
-%d of the browser's cookies were left out, because the engine would not read them.
-Изоставени колачиња на прелистувачот: %d, бидејќи HTTrack не би можел да ги прочита.
-The browser identity it reported cannot be used, so the mirror will send the default one.
-Идентификацијата на прелистувачот што тој ја пријави не може да се користи, затоа копирањето ќе ја испраќа стандардната.
+Cookies collected: %d. They are saved with the project when the wizard finishes.
+Собрани колачиња: %d. Ќе се зачуваат со проектот кога ќе заврши волшебникот.
+The login could not be written to %s.
+Најавата не можеше да се запише во %s.
 Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
 Најавете се на страницата во друго јазиче на овој прелистувач. Отворете ги алатките за развивачи (F12), па јазичето Мрежа, повторно вчитајте ја страницата, кликнете со десното копче на првото барање и изберете Copy as cURL (bash). Залепете го текстот тука. Работи и извоз во cookies.txt, за првата адреса во списокот.
 Cookies for: %s. Browser identity: %s.
