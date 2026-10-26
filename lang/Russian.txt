@@ -1118,6 +1118,8 @@ Cookies collected: %d. They are saved with the project when the wizard finishes.
 Собрано cookies: %d. Они будут сохранены вместе с проектом по завершении мастера.
 The login could not be written to %s.
 Не удалось записать данные входа в %s.
+%d of the browser's cookies were left out, because the engine would not read them.
+Пропущено cookies браузера: %d, поскольку HTTrack не смог бы их прочитать.
 Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
 Войдите на сайт в другой вкладке этого браузера. Откройте инструменты разработчика (F12), затем вкладку «Сеть», перезагрузите страницу, щёлкните правой кнопкой по первому запросу и выберите Copy as cURL (bash). Вставьте текст сюда. Подойдёт и экспорт cookies.txt, для первого адреса в списке.
 Cookies for: %s. Browser identity: %s.

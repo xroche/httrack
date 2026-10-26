@@ -1118,6 +1118,8 @@ Cookies collected: %d. They are saved with the project when the wizard finishes.
 Kerätyt evästeet: %d. Ne tallennetaan projektiin, kun velho on valmis.
 The login could not be written to %s.
 Kirjautumista ei voitu kirjoittaa kohteeseen %s.
+%d of the browser's cookies were left out, because the engine would not read them.
+Selaimen evästeistä %d jätettiin pois, koska moottori ei lukenut niitä.
 Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
 Kirjaudu sivustolle tämän selaimen toisessa välilehdessä. Avaa kehittäjätyökalut (F12) ja sitten Verkko-välilehti, lataa sivu uudelleen, napsauta ensimmäistä pyyntöä hiiren oikealla painikkeella ja valitse Copy as cURL (bash). Liitä teksti tähän. Myös cookies.txt-vienti toimii, luettelon ensimmäiselle osoitteelle.
 Cookies for: %s. Browser identity: %s.

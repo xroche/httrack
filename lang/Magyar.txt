@@ -1118,6 +1118,8 @@ Cookies collected: %d. They are saved with the project when the wizard finishes.
 Összegyűjtött sütik: %d. A varázsló befejezésekor a projekttel együtt mentésre kerülnek.
 The login could not be written to %s.
 A bejelentkezést nem sikerült a(z) %s fájlba írni.
+%d of the browser's cookies were left out, because the engine would not read them.
+A böngésző sütijei közül %d kimaradt, mert a HTTrack nem tudta beolvasni őket.
 Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
 Jelentkezzen be a webhelyre a böngésző egy másik lapján. Nyissa meg a fejlesztői eszközöket (F12), majd a Hálózat lapot, töltse újra az oldalt, kattintson jobb gombbal az első kérésre, és válassza a Copy as cURL (bash) lehetőséget. Illessze be ide a szöveget. Egy cookies.txt export is megfelel, a lista első címéhez.
 Cookies for: %s. Browser identity: %s.

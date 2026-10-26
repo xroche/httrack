@@ -1118,6 +1118,8 @@ Cookies collected: %d. They are saved with the project when the wizard finishes.
 Събрани 'бисквитки': %d. Те се запазват с проекта, когато съветникът приключи.
 The login could not be written to %s.
 Входът не можа да бъде записан в %s.
+%d of the browser's cookies were left out, because the engine would not read them.
+Пропуснати 'бисквитки' на браузъра: %d, защото HTTrack не би могъл да ги прочете.
 Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
 Влезте в сайта в друг раздел на този браузър. Отворете инструментите за разработчици (F12), след това раздела Мрежа, презаредете страницата, щракнете с десния бутон върху първата заявка и изберете Copy as cURL (bash). Поставете текста тук. Експорт във формат cookies.txt също работи, за първия адрес в списъка.
 Cookies for: %s. Browser identity: %s.

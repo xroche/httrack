@@ -1118,6 +1118,8 @@ Cookies collected: %d. They are saved with the project when the wizard finishes.
 Toplanan çerez sayısı: %d. Sihirbaz bittiğinde projeyle birlikte kaydedilecekler.
 The login could not be written to %s.
 Oturum açma bilgisi %s dosyasına yazılamadı.
+%d of the browser's cookies were left out, because the engine would not read them.
+Tarayıcının çerezlerinden %d tanesi dışarıda bırakıldı, çünkü HTTrack onları okuyamazdı.
 Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
 Bu tarayıcının başka bir sekmesinde siteye giriş yapın. Geliştirici araçlarını (F12) ve ardından Ağ sekmesini açın, sayfayı yeniden yükleyin, ilk isteğe sağ tıklayın ve Copy as cURL (bash) seçeneğini seçin. Metni buraya yapıştırın. Bir cookies.txt dışa aktarımı da kullanılabilir; listedeki ilk adres için kullanılır.
 Cookies for: %s. Browser identity: %s.

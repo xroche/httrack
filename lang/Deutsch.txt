@@ -1118,6 +1118,8 @@ Cookies collected: %d. They are saved with the project when the wizard finishes.
 Übernommene Cookies: %d. Sie werden mit dem Projekt gespeichert, wenn der Assistent abgeschlossen ist.
 The login could not be written to %s.
 Die Anmeldung konnte nicht in %s geschrieben werden.
+%d of the browser's cookies were left out, because the engine would not read them.
+%d Cookies des Browsers wurden ausgelassen, weil HTTrack sie nicht lesen konnte.
 Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
 Melden Sie sich in einem anderen Tab dieses Browsers bei der Website an. Öffnen Sie die Entwicklertools (F12) und dort den Tab Netzwerk, laden Sie die Seite neu, klicken Sie mit der rechten Maustaste auf die erste Anfrage und wählen Sie Copy as cURL (bash). Fügen Sie den Text hier ein. Ein cookies.txt-Export funktioniert auch, für die erste Adresse der Liste.
 Cookies for: %s. Browser identity: %s.

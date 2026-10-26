@@ -1118,6 +1118,8 @@ Cookies collected: %d. They are saved with the project when the wizard finishes.
 Verzamelde cookies: %d. Ze worden met het project opgeslagen wanneer de wizard is voltooid.
 The login could not be written to %s.
 De aanmelding kon niet naar %s worden geschreven.
+%d of the browser's cookies were left out, because the engine would not read them.
+%d cookies van de browser zijn weggelaten, omdat HTTrack ze niet kon lezen.
 Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
 Log in op de site in een ander tabblad van deze browser. Open de ontwikkelaarshulpmiddelen (F12) en daarna het tabblad Netwerk, laad de pagina opnieuw, klik met de rechtermuisknop op het eerste verzoek en kies Copy as cURL (bash). Plak de tekst hier. Een cookies.txt-export werkt ook, voor het eerste adres in de lijst.
 Cookies for: %s. Browser identity: %s.

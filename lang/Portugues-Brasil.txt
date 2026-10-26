@@ -1118,6 +1118,8 @@ Cookies collected: %d. They are saved with the project when the wizard finishes.
 Cookies coletados: %d. Eles serão salvos com o projeto quando o assistente terminar.
 The login could not be written to %s.
 Não foi possível gravar o login em %s.
+%d of the browser's cookies were left out, because the engine would not read them.
+%d cookies do navegador foram descartados, porque o HTTrack não conseguiu lê-los.
 Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
 Faça login no site em outra aba deste navegador. Abra as ferramentas de desenvolvedor (F12) e depois a aba Rede, recarregue a página, clique com o botão direito na primeira requisição e escolha Copy as cURL (bash). Cole o texto aqui. Uma exportação cookies.txt também funciona, para o primeiro endereço da lista.
 Cookies for: %s. Browser identity: %s.

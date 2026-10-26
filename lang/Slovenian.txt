@@ -1118,6 +1118,8 @@ Cookies collected: %d. They are saved with the project when the wizard finishes.
 Zbrani piškotki: %d. Shranjeni bodo s projektom, ko se čarovnik konča.
 The login could not be written to %s.
 Prijave ni bilo mogoče zapisati v %s.
+%d of the browser's cookies were left out, because the engine would not read them.
+Izpuščeni piškotki brskalnika: %d, ker jih HTTrack ne bi mogel prebrati.
 Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
 Prijavite se na spletno mesto v drugem zavihku tega brskalnika. Odprite orodja za razvijalce (F12), nato zavihek Omrežje, znova naložite stran, z desno tipko kliknite prvo zahtevo in izberite Copy as cURL (bash). Prilepite besedilo sem. Deluje tudi izvoz cookies.txt, za prvi naslov na seznamu.
 Cookies for: %s. Browser identity: %s.
