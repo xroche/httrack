@@ -215,7 +215,9 @@ static int st_bundlenames(httrackp *opt, int argc, char **argv) {
     fprintf(stderr, "bundlenames: takes <urls> [<list file>]\n");
     return 1;
   }
-  names = (char **) &n; /* so a failure must reset it */
+  /* so a failure must reset them */
+  names = (char **) &n;
+  strcpybuff(error, "stale");
   n = hts_bundle_names_in_use(argv[0], argc == 2 ? argv[1] : NULL, &names,
                               error, sizeof(error));
   if (n < 0) {

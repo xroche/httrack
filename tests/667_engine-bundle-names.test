@@ -36,14 +36,17 @@ selftest_queue_head "refused: invalid login bundle name" bundlenames \
     "http://x/${s}../up"
 q="refused: address is quoted"
 selftest_queue "$q" bundlenames "\"http://x/${s}ayy\""
-selftest_queue "$q" bundlenames "(none) http://x/${s}ayy"
+selftest_queue "refused: address is (none)" bundlenames "(none) http://x/${s}ayy"
 # the crawl takes a word of 1023 bytes, and refuses one of 1024
 selftest_queue "1: e" bundlenames "$(printf 'http://x/%0997d%se' 0 "$s")"
 selftest_queue "refused: address too long" bundlenames \
     "$(printf 'http://x/%0998d%se' 0 "$s")"
-# the crawl reads -V as an option taking the next word, not as a filter
-selftest_queue "refused: address list holds an option" bundlenames \
-    "-V http://x/${s}ayy"
+# The crawl reads these as options, which may take the next word. The leading
+# space keeps the engine's own command line from reading them first.
+o="refused: address list holds an option"
+selftest_queue "$o" bundlenames " -V http://x/${s}ayy"
+selftest_queue "$o" bundlenames " -&F.x http://x/${s}ayy"
+selftest_queue "$o" bundlenames " --list=/l.txt http://x/${s}ayy"
 # urls first, then the file, each name once
 selftest_queue "5: zed ayy bee k cee" bundlenames \
     "http://z/${s}zed http://a/${s}ayy" "$list"

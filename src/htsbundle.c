@@ -831,11 +831,14 @@ static const char *names_note_words(char ***names, size_t *n,
 
     if (!hts_scan_token(&a, word, sizeof(word)))
       why = "address too long";
-    else if (hts_is_quoted(word, strlen(word)) ||
-             strcmp(word, HTS_NOPARAM) == 0)
+    else if (hts_is_quoted(word, strlen(word)))
       why = "address is quoted";
-    /* an option may take the next word as its value */
-    else if (hts_rule_would_be_read_as_opt(word))
+    else if (strcmp(word, HTS_NOPARAM) == 0)
+      why = "address is (none)";
+    /* the crawl reads -& as -% and -- as an alias, and an option may take the
+       next word */
+    else if (strncmp(word, "-&", 2) == 0 || strncmp(word, "--", 2) == 0 ||
+             hts_rule_would_be_read_as_opt(word))
       why = "address list holds an option";
     else if (word[0] != '+' && word[0] != '-')
       why = names_note(names, n, word);
@@ -878,9 +881,10 @@ HTSEXT_API int hts_bundle_names_in_use(const char *urls, const char *list_file,
   if (error != NULL && error_size != 0)
     error[0] = '\0';
   if (names == NULL)
-    return -1;
-  *names = NULL;
-  if (urls != NULL)
+    why = "no names pointer";
+  else
+    *names = NULL;
+  if (why == NULL && urls != NULL)
     why = names_note_words(&list, &n, urls);
   if (why == NULL && list_file != NULL)
     why = names_note_file(&list, &n, list_file, errbuf);

@@ -225,6 +225,10 @@ int main(void) {
                               NULL, 0);
   printf("%d %s\n", n, names[0]);
   hts_bundle_names_free(names);
+  domain[0] = 'X';
+  printf("%d %d %c\n",
+         hts_bundle_names_in_use("-V", NULL, &names, NULL, 0),
+         hts_bundle_names_in_use("-V", NULL, &names, domain, 0), domain[0]);
   hts_uninit();
   return 0;
 }
@@ -246,7 +250,8 @@ refused
 0
 1 example.co.uk 0
 0 unknown flags 0x5
-1 shop"
+1 shop
+-1 -1 X"
 test "$got" = "$want" || fail "the login bundle calls from outside: [$got]"
 
 echo "an embedder compiled and linked the advertised calls from the installed headers"
