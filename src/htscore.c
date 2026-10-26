@@ -615,6 +615,66 @@ static void set_mirror_completed(httrackp *opt, hts_boolean *completed_out,
   hts_mutexrelease(&opt->state.lock);
 }
 
+const char *hts_urllist_load(const char *path, char **buff, size_t *size,
+                             char *errbuf) {
+  const LLint fs = fsize_utf8(path);
+  const char *err = NULL;
+
+  *buff = NULL;
+  *size = 0;
+  if (fs < 0) {
+    /* fsize() hides the cause; redo stat() for a precise errno (#49) */
+    STRUCT_STAT st;
+    err = STAT(path, &st) != 0 ? hts_strerror(errno, errbuf, HTS_STRERROR_SIZE)
+                               : "not a regular file";
+  } else if ((*size = llint_to_size_t(fs)) == (size_t) -1) {
+    err = "file too large";
+  } else {
+    FILE *fp = FOPEN(path, "rb");
+
+    if (fp == NULL) {
+      err = hts_strerror(errno, errbuf, HTS_STRERROR_SIZE);
+    } else {
+      *buff = malloct(*size + 1);
+      if (*buff == NULL) {
+        err = "out of memory";
+      } else if (!hts_fread_exact(*buff, *size, fp)) {
+        freet(*buff);
+        err = "read error";
+      } else {
+        (*buff)[*size] = '\0';
+      }
+      fclose(fp);
+    }
+  }
+  if (err != NULL)
+    *size = 0;
+  return err;
+}
+
+hts_urllist_status hts_urllist_next(const char *buff, size_t size, size_t *pos,
+                                    char line[HTS_URLLIST_LINE_SIZE]) {
+  int adv;
+  hts_boolean cut;
+  size_t term;
+
+  if (*pos >= size)
+    return HTS_URLLIST_END;
+  cut = binput_line(buff + *pos, buff + size, line, HTS_URLMAXSIZE + 1, &adv);
+  /* the byte it stopped on, past any CR it dropped */
+  term = *pos + (size_t) adv - 1;
+  *pos = term + 1;
+  /* an embedded NUL ends the read too, and half a URL is not one */
+  if (term < size && buff[term] == '\0') {
+    while (*pos < size && buff[*pos] != '\n')
+      (*pos)++;
+    (*pos)++;
+    return HTS_URLLIST_NUL;
+  }
+  /* a clipped URL is a different URL */
+  return cut ? HTS_URLLIST_LONG : HTS_URLLIST_LINE;
+}
+
 /* Reads old.lst's next "[path]" line. Returns HTS_FALSE when it is cut,
    malformed, absolute or too long. Only a corrupt or foreign old.lst holds such
    a line, because filenote() writes relative paths that fit. */
@@ -1110,78 +1170,33 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
     if (StringNotEmpty(opt->filelist)) {
       char *filelist_buff = NULL;
       size_t filelist_sz = 0;
-      const char *filelist_err = NULL; /* failure reason, NULL on success */
       char filelist_errbuf[HTS_STRERROR_SIZE];
-      const LLint fs = fsize_utf8(StringBuff(opt->filelist));
-
-      if (fs < 0) {
-        /* fsize() hides the cause; redo stat() for a precise errno (#49) */
-        STRUCT_STAT st;
-        filelist_err =
-            STAT(StringBuff(opt->filelist), &st) != 0
-                ? hts_strerror(errno, filelist_errbuf, sizeof(filelist_errbuf))
-                : "not a regular file";
-      } else if ((filelist_sz = llint_to_size_t(fs)) == (size_t) -1) {
-        filelist_err = "file too large";
-        filelist_sz = 0;
-      } else {
-        FILE *fp = FOPEN(StringBuff(opt->filelist), "rb");
-
-        if (fp == NULL) {
-          filelist_err =
-              hts_strerror(errno, filelist_errbuf, sizeof(filelist_errbuf));
-        } else {
-          filelist_buff = malloct(filelist_sz + 1);
-          if (filelist_buff == NULL) {
-            filelist_err = "out of memory";
-          } else if (!hts_fread_exact(filelist_buff, filelist_sz, fp)) {
-            freet(filelist_buff);
-            filelist_err = "read error";
-          } else {
-            filelist_buff[filelist_sz] = '\0';
-          }
-          fclose(fp);
-        }
-      }
+      const char *const filelist_err =
+          hts_urllist_load(StringBuff(opt->filelist), &filelist_buff,
+                           &filelist_sz, filelist_errbuf);
 
       if (filelist_buff != NULL) {
         size_t filelist_ptr = 0;
         int n = 0;
         int lineno = 0;
-        char BIGSTK line[HTS_URLMAXSIZE * 2];
+        char BIGSTK line[HTS_URLLIST_LINE_SIZE];
         const char *bundle_why;
+        hts_urllist_status status;
 
-        while(filelist_ptr < filelist_sz) {
-          int adv;
-          const hts_boolean cut = binput_line(filelist_buff + filelist_ptr,
-                                              filelist_buff + filelist_sz, line,
-                                              HTS_URLMAXSIZE + 1, &adv);
-          /* the byte it stopped on, past any CR it dropped */
-          const size_t term = filelist_ptr + (size_t) adv - 1;
-          /* an embedded NUL ends the read too, and half a URL is not one */
-          const hts_boolean nul =
-              term < filelist_sz && filelist_buff[term] == '\0';
-
+        while ((status = hts_urllist_next(filelist_buff, filelist_sz,
+                                          &filelist_ptr, line)) !=
+               HTS_URLLIST_END) {
           lineno++;
-          filelist_ptr = term + 1;
-          if (cut || nul) {
-            /* a clipped URL is a different URL, so name the line and drop it */
-            if (nul) {
-              hts_log_print(opt, LOG_WARNING,
-                            "\"%s\", line %d: URL contains a NUL byte, ignored",
-                            StringBuff(opt->filelist), lineno);
-              /* a NUL is not a line end: drop the rest of the line ourselves */
-              while (filelist_ptr < filelist_sz &&
-                     filelist_buff[filelist_ptr] != '\n') {
-                filelist_ptr++;
-              }
-              filelist_ptr++;
-            } else {
-              hts_log_print(
-                  opt, LOG_WARNING,
-                  "\"%s\", line %d: URL longer than %d bytes, ignored",
-                  StringBuff(opt->filelist), lineno, HTS_URLMAXSIZE);
-            }
+          if (status == HTS_URLLIST_NUL) {
+            hts_log_print(opt, LOG_WARNING,
+                          "\"%s\", line %d: URL contains a NUL byte, ignored",
+                          StringBuff(opt->filelist), lineno);
+            continue;
+          }
+          if (status == HTS_URLLIST_LONG) {
+            hts_log_print(opt, LOG_WARNING,
+                          "\"%s\", line %d: URL longer than %d bytes, ignored",
+                          StringBuff(opt->filelist), lineno, HTS_URLMAXSIZE);
             continue;
           }
           if (hts_is_quoted(line, strlen(line))) {
