@@ -1137,7 +1137,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
         int valid_p = 0;        // force to take p even if == 0
         int module_base = 0;    // module specifier: resolve against the script
         int ending_p = '\0';    // ending quote?
-        hts_boolean escape_parens = HTS_FALSE; // in a CSS url()
+        hts_boolean escape_parens = HTS_FALSE; // is this a CSS url()?
         int archivetag_p = 0;   // avoid multiple-archives with commas
         int srcset_p = 0;       // srcset="url1 480w, url2 2x": list of URLs
         int dataattr_p = 0;     // data-src / data-srcset: may hold a template

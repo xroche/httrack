@@ -2770,7 +2770,7 @@ class Handler(SimpleHTTPRequestHandler):
     def route_longloc_target(self):
         self.send_raw(b"<html><body>long-location target</body></html>\n", "text/html")
 
-    # a quoted CSS url() whose file name holds "(2)", as algolia.com has
+    # Serves a quoted CSS url() whose file name holds "(2)".
     def route_cssparen_index(self):
         self.send_html(
             "<style>body { background: url('bg (2).png'); }\n"

@@ -131,7 +131,7 @@ copy_tree() {
 # Export the tree at $2 into $3, coucal included, without touching $1's refs.
 export_ref() {
     local src=$1 ref=$2 dst=$3 sha mod commit
-    # Resolve in $src: in the clone, origin/master names $src's local master.
+    # Resolve in $src, because the clone's origin/master is $src's local master.
     commit=$(git -C "$src" rev-parse --verify --quiet "$ref^{commit}") ||
         die "no such ref: $ref"
     git clone --quiet --shared --no-checkout "$src" "$dst" ||
