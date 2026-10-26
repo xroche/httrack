@@ -1126,3 +1126,5 @@ Cookies for: %s. Browser identity: %s.
 Cookies για: %s. Ταυτότητα προγράμματος περιήγησης: %s.
 A login cannot be saved for this address, so nothing was kept.
 Δεν μπορεί να αποθηκευτεί σύνδεση για αυτή τη διεύθυνση, οπότε δεν κρατήθηκε τίποτα.
+Yes
+Ναι

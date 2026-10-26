@@ -1156,3 +1156,5 @@ LANG_BROWSERLOGINFOR
 Cookies for: %s. Browser identity: %s.
 LANG_BROWSERLOGINNONAME
 A login cannot be saved for this address, so nothing was kept.
+LANG_YES
+Yes

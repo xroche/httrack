@@ -1126,3 +1126,5 @@ Cookies for: %s. Browser identity: %s.
 Sütik ehhez: %s. Böngészőazonosító: %s.
 A login cannot be saved for this address, so nothing was kept.
 Ehhez a címhez nem menthető bejelentkezés, ezért semmi sem lett megtartva.
+Yes
+Igen

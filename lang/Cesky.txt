@@ -9,7 +9,7 @@ Antonín Matějčík (matejcik@volny.cz) \r\n
 LANGUAGE_WINDOWSID
 Czech
 OK
-Ano
+OK
 Cancel
 Zrušit
 Exit
@@ -1126,3 +1126,5 @@ Cookies for: %s. Browser identity: %s.
 Cookies pro: %s. Identita prohlížeče: %s.
 A login cannot be saved for this address, so nothing was kept.
 Pro tuto adresu nelze přihlášení uložit, takže se nic neuložilo.
+Yes
+Ano

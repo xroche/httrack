@@ -1126,3 +1126,5 @@ Cookies for: %s. Browser identity: %s.
 クッキーの対象: %s。ブラウザID: %s。
 A login cannot be saved for this address, so nothing was kept.
 このアドレスにはログインを保存できないため、何も保存しませんでした。
+Yes
+はい

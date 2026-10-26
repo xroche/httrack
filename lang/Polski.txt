@@ -1126,3 +1126,5 @@ Cookies for: %s. Browser identity: %s.
 Ciasteczka dla: %s. Tożsamość przeglądarki: %s.
 A login cannot be saved for this address, so nothing was kept.
 Dla tego adresu nie można zapisać logowania, więc nic nie zostało zapisane.
+Yes
+Tak

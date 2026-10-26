@@ -1126,3 +1126,5 @@ Cookies for: %s. Browser identity: %s.
 Колачиња за: %s. Идентитет на прелистувачот: %s.
 A login cannot be saved for this address, so nothing was kept.
 За оваа адреса не може да се зачува најава, затоа ништо не е зачувано.
+Yes
+Да

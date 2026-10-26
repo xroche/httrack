@@ -1126,3 +1126,5 @@ Cookies for: %s. Browser identity: %s.
 Cookies pentru: %s. Identitatea browserului: %s.
 A login cannot be saved for this address, so nothing was kept.
 Pentru această adresă nu se poate salva o autentificare, aşa că nu s-a păstrat nimic.
+Yes
+Da

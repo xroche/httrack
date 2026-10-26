@@ -1126,3 +1126,5 @@ Cookies for: %s. Browser identity: %s.
 Cookies 适用于：%s。浏览器身份：%s。
 A login cannot be saved for this address, so nothing was kept.
 无法为此地址保存登录信息，因此未保留任何内容。
+Yes
+是
