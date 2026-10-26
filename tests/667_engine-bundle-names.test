@@ -47,6 +47,7 @@ o="refused: address list holds an option"
 selftest_queue "$o" bundlenames " -V http://x/${s}ayy"
 selftest_queue "$o" bundlenames " -&F.x http://x/${s}ayy"
 selftest_queue "$o" bundlenames " --list=/l.txt http://x/${s}ayy"
+selftest_queue "$o" bundlenames " http://x/${s}ayy +"
 # urls first, then the file, each name once
 selftest_queue "5: zed ayy bee k cee" bundlenames \
     "http://z/${s}zed http://a/${s}ayy" "$list"

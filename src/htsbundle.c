@@ -835,10 +835,10 @@ static const char *names_note_words(char ***names, size_t *n,
       why = "address is quoted";
     else if (strcmp(word, HTS_NOPARAM) == 0)
       why = "address is (none)";
-    /* the crawl reads -& as -% and -- as an alias, and an option may take the
-       next word */
+    /* the crawl reads -& as -%, and -- and + as aliases, and an option may
+       take the next word */
     else if (strncmp(word, "-&", 2) == 0 || strncmp(word, "--", 2) == 0 ||
-             hts_rule_would_be_read_as_opt(word))
+             strcmp(word, "+") == 0 || hts_rule_would_be_read_as_opt(word))
       why = "address list holds an option";
     else if (word[0] != '+' && word[0] != '-')
       why = names_note(names, n, word);
