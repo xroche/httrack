@@ -80,8 +80,8 @@ htsserver_exec() {
 #   --home DIR       $HOME for the server, so no ~/.httrack.ini leaks in
 #   --log FILE       where the announcement lands (default: a temp file)
 #   --port N         a port already picked, to keep the fork out of a window the
-#                    caller is timing; owned by the caller, so a lost bind fails
-#                    rather than being redrawn
+#                    caller is timing; owned by the caller, so a lost bind
+#                    returns 2 for the caller to redraw
 #   --write-limit N  ulimit -f N; the log rides a pipe, which the cap spares
 # shellcheck disable=SC2120 # most callers need no htsserver argument
 htsserver_start() {
@@ -160,9 +160,11 @@ htsserver_start() {
         # Only a lost bind is worth redrawing; anything else is a regression.
         grep -qE "${BIND_LOST}" "${HTS_LOG}" ||
             fail "htsserver did not come up: $(<"${HTS_LOG}")"
-        test -z "${port}" ||
-            fail "htsserver could not bind port ${port}: $(<"${HTS_LOG}")"
         stop_server "${HTS_BGPID}"
+        if test -n "${port}"; then
+            echo "htsserver could not bind port ${port}: $(<"${HTS_LOG}")" >&2
+            return 2
+        fi
         # Loud, so an intermittent bind regression cannot hide behind the retry.
         echo "htsserver did not get port ${HTS_PORT}, retrying" >&2
     done

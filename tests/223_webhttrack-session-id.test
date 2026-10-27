@@ -22,6 +22,7 @@ launch() { # $1 = tag, $2 = port; leaves the URL in ${HTS_URL}
 # just after a tick leaves a whole second to get there; the bracket confirms it.
 urla=
 urlb=
+lost=0
 for _ in $(seq 1 10); do
     rm -f "${work}"/*.log
     mkdir -p "${work}/a" "${work}/b"
@@ -33,15 +34,25 @@ for _ in $(seq 1 10); do
         sleep 0.02
     done
     t0=$(date +%s)
-    launch a "${porta}"
+    # A neighbour can take a reserved port before the server binds it: redraw.
+    rc=0
+    launch a "${porta}" || rc=$?
     urla=${HTS_URL}
-    launch b "${portb}"
+    test "${rc}" != 0 || launch b "${portb}" || rc=$?
     urlb=${HTS_URL}
     t1=$(date +%s)
+    if test "${rc}" != 0; then
+        test "${rc}" = 2 || fail "htsserver_start returned ${rc}"
+        lost=$((lost + 1))
+        htsserver_cleanup_dir "${work}"
+        urla=
+        continue
+    fi
     test "${t0}" != "${t1}" || break
     htsserver_cleanup_dir "${work}"
     urla=
 done
+test "${lost}" -lt 10 || fail "every attempt lost a reserved port"
 test -n "${urla}" || skip "the box never started two servers inside one second"
 
 "${HTS_PYTHON}" - "${urla}" "${urlb}" <<'PY' || fail "session id checks failed"
