@@ -86,6 +86,21 @@ grep -q "^cookie \.alpha\.test B=$(repeat_chars 47 b)\$" <<<"$out" ||
 edge over 48
 assert_selftest 'refused: /over.hts, line 227: the cookie jar did not store a cookie' \
     bundle "$dir" 'http://www.alpha.test/#httrack-bundle=over'
+# records a newer jar already holds win, so they take no room in the bundle's
+records alpha.test 224 | sed "s/$value\$/1/" >"$tmpdir/wins.txt"
+{
+    printf '%s\n' '# HTTrack bundle 1' cookies
+    records alpha.test 224
+    printf '%s\n' "$sid"
+} >"$tmpdir/wins.hts"
+touch -t 202001010000 "$tmpdir/wins.hts"
+out=$(httrack -O /dev/null '-#test=bundle' "$dir" \
+    'http://www.alpha.test/#httrack-bundle=wins' "jar:$dir/wins.txt" \
+    2>/dev/null | tr -d '\r')
+grep -q '^cookie \.alpha\.test SID=s' <<<"$out" ||
+    fail "a bundle under a newer jar was not loaded: $(firstline "$out")"
+grep -qx 'cookie \.alpha\.test C1=1' <<<"$out" || fail "the newer jar lost: $(firstline "$out")"
+
 # with cookies off, the jar the records go to refuses as before
 # HttpOnly and an expiry make its records longer than the clash check's
 {

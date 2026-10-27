@@ -518,14 +518,16 @@ static hts_boolean bundle_admit(cookie_filter *filter, t_cookie *cookie,
     filter->why = "too many cookies to compare with the other bundles";
     return HTS_FALSE;
   }
-  // the bundles overflow an empty jar on their own, so the bundle is wrong
+  if (ctx->jar_wins &&
+      cookie_find_exact(cookie->data, name, host, path) != NULL)
+    return HTS_FALSE;
+  // the bundles overflow a jar without the -%K records, so the bundle is wrong
   if (ctx->alone != NULL &&
       cookie_set(ctx->alone, name, value, domain, path, attr) != 0) {
     filter->why = "the cookie jar did not store a cookie";
     return HTS_FALSE;
   }
-  return !ctx->jar_wins ||
-         cookie_find_exact(cookie->data, name, host, path) == NULL;
+  return HTS_TRUE;
 }
 
 /* Read b's bundle from src, set its scope, and load its cookies, comparing
