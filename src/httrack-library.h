@@ -491,33 +491,35 @@ typedef enum hts_cookies_verdict {
   /** The crawl writes its jar back over the file. */
   HTS_COOKIES_REWRITTEN = 0,
   /** The file does not exist, and the crawl creates it once its jar holds a
-      cookie. */
+      cookie. This says nothing about whether its directory is writable. */
   HTS_COOKIES_CREATED = 1,
   /** The file is kept, because a rewrite would lose some of its lines. */
   HTS_COOKIES_KEPT_LINES_LOST = 2,
-  /** The file is kept, because it exists but cannot be opened. */
+  /** The file is kept, because it cannot be read. */
   HTS_COOKIES_KEPT_UNREADABLE = 3,
+  /** The file is kept, because it is not a regular file. */
+  HTS_COOKIES_KEPT_NOT_A_FILE = 4,
   /** The file is kept, because it is a symbolic link to a missing file. */
-  HTS_COOKIES_KEPT_DANGLING_LINK = 4,
+  HTS_COOKIES_KEPT_DANGLING_LINK = 5,
   /** The file is not created, because its .bak exists. */
-  HTS_COOKIES_KEPT_MISSING_BESIDE_BAK = 5,
+  HTS_COOKIES_KEPT_MISSING_BESIDE_BAK = 6,
   /** The file is kept, because it is empty and its .bak is not. */
-  HTS_COOKIES_KEPT_EMPTY_BESIDE_BAK = 6,
+  HTS_COOKIES_KEPT_EMPTY_BESIDE_BAK = 7,
   /** The file is kept, because it is a document.cookie string. */
-  HTS_COOKIES_KEPT_DOCUMENT_COOKIE = 7,
-  /** The file is a document.cookie string with no start URL host to bind
-      it to, so the crawl ignores it and keeps it. */
-  HTS_COOKIES_KEPT_NO_START_URL = 8,
-  /** The file is kept, because memory ran out while reading it. */
-  HTS_COOKIES_KEPT_NO_MEMORY = 9
+  HTS_COOKIES_KEPT_DOCUMENT_COOKIE = 8,
+  /** The file is kept, because it is a document.cookie string and there is
+      no start URL host. */
+  HTS_COOKIES_KEPT_NO_START_URL = 9
 } hts_cookies_verdict;
 
 /** Return what a crawl with cookies on does to the -%K cookies file @p path,
-    when @p start_url is its first start URL (NULL for none). @p lost, when not
-    NULL, receives how many lines a rewrite would lose, which is 0 unless the
-    verdict is HTS_COOKIES_KEPT_LINES_LOST. The file is only read, and nothing
-    is logged, so a front end may call this as the user types. A NULL or empty
-    @p path gives HTS_COOKIES_KEPT_UNREADABLE. */
+    when @p start_url is its first start URL. A NULL or empty @p start_url
+    means none. A NULL, empty or over-long @p path gives
+    HTS_COOKIES_KEPT_UNREADABLE. @p lost, when not NULL, receives how many
+    lines a rewrite would lose, or 0 for any other verdict than
+    HTS_COOKIES_KEPT_LINES_LOST. The file is only read and nothing is logged,
+    so a front end may call this as the user types, but the cost grows with
+    the file size. */
 HTSEXT_API hts_cookies_verdict hts_cookies_file_verdict(const char *path,
                                                         const char *start_url,
                                                         int *lost);

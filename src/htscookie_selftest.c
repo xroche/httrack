@@ -2804,19 +2804,19 @@ static void cookiesverdict_log(httrackp *opt, int type, const char *format,
   cookiesverdict_logged++;
 }
 
-/* -#test=cookiesverdict <file> [start-url] prints hts_cookies_file_verdict(),
-   the lines lost, and the messages it logged beside those of a real load. */
+/* -#test=cookiesverdict <file> [start-url]. Prints the verdict, the lines
+   lost, and the log counts of the verdict and of a real load. */
 static int st_cookiesverdict(httrackp *opt, int argc, char **argv) {
   static const char *const names[] = {"rewritten",
                                       "created",
                                       "kept-lines-lost",
                                       "kept-unreadable",
+                                      "kept-not-a-file",
                                       "kept-dangling-link",
                                       "kept-missing-beside-bak",
                                       "kept-empty-beside-bak",
                                       "kept-document-cookie",
-                                      "kept-no-start-url",
-                                      "kept-no-memory"};
+                                      "kept-no-start-url"};
   const char *const start_url = argc > 1 ? argv[1] : NULL;
   hts_cookies_verdict v;
   t_cookie *jar;
@@ -2834,8 +2834,11 @@ static int st_cookiesverdict(httrackp *opt, int argc, char **argv) {
   hts_set_log_vprint_callback(cookiesverdict_log);
   v = hts_cookies_file_verdict(argv[0], start_url, &lost);
   quiet = cookiesverdict_logged;
-  ret = cookie_load_from(NULL, jar, "", argv[0],
-                         start_url != NULL ? start_url : "");
+  // a FIFO would block the real load
+  ret = v == HTS_COOKIES_KEPT_NOT_A_FILE
+            ? 0
+            : cookie_load_from(NULL, jar, "", argv[0],
+                               start_url != NULL ? start_url : "");
   loud = cookiesverdict_logged - quiet;
   hts_set_log_vprint_callback(NULL);
   freet(jar);

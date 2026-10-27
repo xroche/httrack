@@ -16,28 +16,51 @@ nohost="file://$dir/site/index.html"
 host="file://localhost$dir/site/index.html"
 rec() { printf 'www.example.com\tTRUE\t/\tFALSE\t0\t%s\t1\n' "$1"; }
 
+# ABI values
+vnum() {
+    case $1 in
+    rewritten) echo 0 ;;
+    created) echo 1 ;;
+    kept-lines-lost) echo 2 ;;
+    kept-unreadable) echo 3 ;;
+    kept-not-a-file) echo 4 ;;
+    kept-dangling-link) echo 5 ;;
+    kept-missing-beside-bak) echo 6 ;;
+    kept-empty-beside-bak) echo 7 ;;
+    kept-document-cookie) echo 8 ;;
+    kept-no-start-url) echo 9 ;;
+    *) fail "unknown verdict $1" ;;
+    esac
+}
+
+# verdict_only VERDICT FILE [URL]: the verdict alone, failing on a hang
+verdict_only() {
+    local n i=0 got
+    n=$(vnum "$1")
+    "$bin" -O /dev/null "-#test=cookiesverdict" "${@:2}" >"$dir/verdict.out" 2>&1 &
+    while kill -0 $! 2>/dev/null; do
+        i=$((i + 1))
+        if [ "$i" -gt 300 ]; then
+            kill $! 2>/dev/null || true
+            fail "$1: the verdict on $2 hangs"
+        fi
+        sleep 0.1
+    done
+    wait $! || fail_dump "$1: the verdict on $2 failed" "$dir/verdict.out"
+    got=$(tr -d '\r' <"$dir/verdict.out")
+    assert_match "^$1=$n lost=0 " "$got" "verdict of $2"
+}
+
 runs=0
 # check VERDICT LOST FILE URL LOG: the verdict, then a crawl that keeps FILE
 # and logs LOG, or that keeps nothing
 check() {
     local n got want log
-    # the numbers are ABI, read by front ends
-    case $1 in
-    rewritten) n=0 ;;
-    created) n=1 ;;
-    kept-lines-lost) n=2 ;;
-    kept-unreadable) n=3 ;;
-    kept-dangling-link) n=4 ;;
-    kept-missing-beside-bak) n=5 ;;
-    kept-empty-beside-bak) n=6 ;;
-    kept-document-cookie) n=7 ;;
-    kept-no-start-url) n=8 ;;
-    *) fail "unknown verdict $1" ;;
-    esac
+    n=$(vnum "$1")
     got=$("$bin" -O /dev/null "-#test=cookiesverdict" "$3" "$4" | tr -d '\r')
     want="^$1=$n lost=$2 load=-?[0-9]+ logged=0/[0-9]+\$"
     assert_match "$want" "$got" "verdict of $3"
-    # the load beside it logs, so the verdict's silence is not a dead counter
+    # a real load logs, so logged=0 is not a dead counter
     if [ "$n" -ge 2 ]; then
         assert_match ' logged=0/[1-9]' "$got" "the load of $3 logged nothing"
     fi
@@ -86,9 +109,26 @@ grep -qF '# Netscape HTTP Cookie File' "$dir/ok.txt" ||
 } >"$dir/lost.txt"
 check kept-lines-lost 3 "$dir/lost.txt" "$nohost" 'because 3 of its lines would be lost'
 
+{
+    rec a
+    rec b
+    printf 'www.example.com\tTRUE\t/\n'
+} >"$dir/lost1.txt"
+check kept-lines-lost 1 "$dir/lost1.txt" "$nohost" 'because 1 of its lines would be lost'
+
 printf 'a=1; b=2\n' >"$dir/flat.txt"
 check kept-document-cookie 0 "$dir/flat.txt" "$host" 'from the document.cookie string'
 check kept-no-start-url 0 "$dir/flat.txt" "$nohost" 'no start URL to bind it to'
+verdict_only kept-no-start-url "$dir/flat.txt"
+
+# a crawl reads these too, but a front end must not block on them
+mkdir "$dir/adir"
+verdict_only kept-not-a-file "$dir/adir" "$nohost"
+if mkfifo "$dir/fifo" 2>/dev/null && [ -p "$dir/fifo" ]; then
+    verdict_only kept-not-a-file "$dir/fifo" "$nohost"
+else
+    echo "no FIFO here, so the FIFO case is not run"
+fi
 
 rec a >"$dir/gone.txt.bak"
 check kept-missing-beside-bak 0 "$dir/gone.txt" "$nohost" 'is missing but its .bak exists'

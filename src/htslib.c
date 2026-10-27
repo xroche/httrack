@@ -7938,8 +7938,12 @@ HTSEXT_API void hts_set_log_vprint_callback(void (*callback)(httrackp * opt,
   hts_log_print_callback = callback;
 }
 
+char hts_log_quiet_tag;
+
 HTSEXT_API void hts_log_vprint(httrackp * opt, int type, const char *format, va_list args) {
   assertf(format != NULL);
+  if (opt == HTS_LOG_QUIET)
+    return;
   if (hts_log_print_callback != NULL) {
     va_list args_copy;
     va_copy(args_copy, args);

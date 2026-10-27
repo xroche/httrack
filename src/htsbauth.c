@@ -56,33 +56,6 @@ Please visit our Website: http://www.httrack.com
 
 /* END specific definitions */
 
-/* An opt that silences cookie_log, for a load that only asks what it would
-   decide. It is never dereferenced. */
-static char cookie_quiet_tag;
-#define COOKIE_QUIET ((httrackp *) (void *) &cookie_quiet_tag)
-
-/* hts_log_vprint, unless opt is COOKIE_QUIET. */
-static void cookie_vlog(httrackp *opt, int type, const char *format,
-                        va_list args) HTS_PRINTF_FUN(3, 0);
-
-static void cookie_vlog(httrackp *opt, int type, const char *format,
-                        va_list args) {
-  if (opt != COOKIE_QUIET)
-    hts_log_vprint(opt, type, format, args);
-}
-
-/* hts_log_print, unless opt is COOKIE_QUIET. */
-static void cookie_log(httrackp *opt, int type, const char *format, ...)
-    HTS_PRINTF_FUN(3, 4);
-
-static void cookie_log(httrackp *opt, int type, const char *format, ...) {
-  va_list args;
-
-  va_start(args, format);
-  cookie_vlog(opt, type, format, args);
-  va_end(args);
-}
-
 /* A cookies.txt line marks HttpOnly by this prefix. */
 #define COOKIE_HTTPONLY_PREFIX "#HttpOnly_"
 /* A jar record marks it in field 7. The fields are 0 domain, 1 subdomains,
@@ -550,12 +523,12 @@ static void cookie_warn(httrackp *opt, const cookie_filter *filter,
   va_list args;
 
   if (filter != NULL) {
-    cookie_log(opt, LOG_WARNING, "Bundle %s, line %d: %s", given, filter->line,
-               reason);
+    hts_log_print(opt, LOG_WARNING, "Bundle %s, line %d: %s", given,
+                  filter->line, reason);
     return;
   }
   va_start(args, fmt);
-  cookie_vlog(opt, LOG_WARNING, fmt, args);
+  hts_log_vprint(opt, LOG_WARNING, fmt, args);
   va_end(args);
 }
 
@@ -715,17 +688,17 @@ static hts_boolean cookie_bak_stranded(httrackp *opt, const char *file,
   if (!fexist_utf8(bak))
     return HTS_FALSE;
   if (!fexist_utf8(file)) {
-    cookie_log(opt, LOG_WARNING,
-               "Cookies: %s is missing but its .bak exists, so it is "
-               "not created until you restore or delete the .bak",
-               shown);
+    hts_log_print(opt, LOG_WARNING,
+                  "Cookies: %s is missing but its .bak exists, so it is "
+                  "not created until you restore or delete the .bak",
+                  shown);
     return HTS_TRUE;
   }
   if (fsize_utf8(file) == 0 && fsize_utf8(bak) > 0) {
-    cookie_log(opt, LOG_WARNING,
-               "Cookies: %s is empty but its .bak is not, so it is "
-               "left unchanged until you restore or delete the .bak",
-               shown);
+    hts_log_print(opt, LOG_WARNING,
+                  "Cookies: %s is empty but its .bak is not, so it is "
+                  "left unchanged until you restore or delete the .bak",
+                  shown);
     return HTS_TRUE;
   }
   return HTS_FALSE;
@@ -813,23 +786,25 @@ hts_boolean cookie_flat_pair(httrackp *opt, t_cookie *cookie, char *pair,
 
   if (eq == NULL || eq == pair) {
     if (cookie_flat_ignore(ignored))
-      cookie_log(opt, LOG_WARNING,
-                 "Cookies: ignoring a cookie with no name in %s", given);
+      hts_log_print(opt, LOG_WARNING,
+                    "Cookies: ignoring a cookie with no name in %s", given);
     return HTS_FALSE;
   }
   *eq = '\0';
   // a browser lists the most specific path first, so the first one wins
   if (cookie_find_exact(cookie->data, pair, domain, "/") != NULL) {
     if (cookie_flat_ignore(ignored))
-      cookie_log(opt, LOG_WARNING,
-                 "Cookies: ignoring a repeated '%.64s' in %s, the first wins",
-                 pair, given);
+      hts_log_print(
+          opt, LOG_WARNING,
+          "Cookies: ignoring a repeated '%.64s' in %s, the first wins", pair,
+          given);
     return HTS_FALSE;
   }
   if (cookie_set(cookie, pair, eq + 1, domain, "/", attr) != 0) {
     if (cookie_flat_ignore(ignored))
-      cookie_log(opt, LOG_WARNING,
-                 "Cookies: ignoring '%.64s' in %s (not stored)", pair, given);
+      hts_log_print(opt, LOG_WARNING,
+                    "Cookies: ignoring '%.64s' in %s (not stored)", pair,
+                    given);
     return HTS_FALSE;
   }
   return HTS_TRUE;
@@ -857,8 +832,8 @@ const char *cookie_flat_bind(const char *url, char *host, size_t host_size,
    domain of start_url. The file is never rewritten, because the save would
    turn it into a Netscape jar, so this returns COOKIE_LOAD_KEEP. */
 static int cookie_load_flat(httrackp *opt, t_cookie *cookie, FILE *fp,
-                            const char *given, const char *start_url, int quote,
-                            hts_cookies_verdict *why) {
+                            const char *given, const char *start_url,
+                            int quote, hts_cookies_verdict *why) {
   char host[COOKIE_MAX_DOMAIN];
   char BIGSTK pair[COOKIE_MAX_PAIR + 2]; // name, '=', value and the NUL
   size_t len = 0;
@@ -875,10 +850,10 @@ static int cookie_load_flat(httrackp *opt, t_cookie *cookie, FILE *fp,
   *why = domain != NULL ? HTS_COOKIES_KEPT_DOCUMENT_COOKIE
                         : HTS_COOKIES_KEPT_NO_START_URL;
   if (domain == NULL) {
-    cookie_log(opt, LOG_WARNING,
-               "Cookies: %s is a document.cookie string, but there is no "
-               "start URL to bind it to, so it is ignored",
-               given);
+    hts_log_print(opt, LOG_WARNING,
+                  "Cookies: %s is a document.cookie string, but there is no "
+                  "start URL to bind it to, so it is ignored",
+                  given);
     return COOKIE_LOAD_KEEP;
   }
 
@@ -904,13 +879,13 @@ static int cookie_load_flat(httrackp *opt, t_cookie *cookie, FILE *fp,
     }
     if (too_long) {
       if (cookie_flat_ignore(&ignored))
-        cookie_log(opt, LOG_WARNING,
-                   "Cookies: ignoring a cookie over %d bytes in %s",
-                   (int) sizeof(pair) - 2, given);
+        hts_log_print(opt, LOG_WARNING,
+                      "Cookies: ignoring a cookie over %d bytes in %s",
+                      (int) sizeof(pair) - 2, given);
     } else if (nul) {
       if (cookie_flat_ignore(&ignored))
-        cookie_log(opt, LOG_WARNING,
-                   "Cookies: ignoring a cookie holding a NUL in %s", given);
+        hts_log_print(opt, LOG_WARNING,
+                      "Cookies: ignoring a cookie holding a NUL in %s", given);
     } else if (len > 0) {
       char *p = pair;
 
@@ -937,17 +912,17 @@ static int cookie_load_flat(httrackp *opt, t_cookie *cookie, FILE *fp,
     line_start = c == '\n';
   } while (c != EOF);
   if (ignored > COOKIE_FLAT_WARNINGS)
-    cookie_log(opt, LOG_WARNING, "Cookies: ignored %d more cookies in %s",
-               ignored - COOKIE_FLAT_WARNINGS, given);
+    hts_log_print(opt, LOG_WARNING, "Cookies: ignored %d more cookies in %s",
+                  ignored - COOKIE_FLAT_WARNINGS, given);
   if (ferror(fp))
-    cookie_log(opt, LOG_WARNING,
-               "Cookies: stopped reading before the end of %s", given);
-  cookie_log(opt, LOG_WARNING,
-             "Cookies: loaded %d from the document.cookie string in %s for "
-             "%s%s. HttpOnly cookies are missing: use a cookies.txt export, "
-             "or paste the Cookie header from DevTools \"Copy as cURL\"",
-             stored, given, domain,
-             attr.host_only ? " alone" : " and its subdomains");
+    hts_log_print(opt, LOG_WARNING,
+                  "Cookies: stopped reading before the end of %s", given);
+  hts_log_print(opt, LOG_WARNING,
+                "Cookies: loaded %d from the document.cookie string in %s for "
+                "%s%s. HttpOnly cookies are missing: use a cookies.txt export, "
+                "or paste the Cookie header from DevTools \"Copy as cURL\"",
+                stored, given, domain,
+                attr.host_only ? " alone" : " and its subdomains");
   return COOKIE_LOAD_KEEP;
 }
 
@@ -955,6 +930,12 @@ static int cookie_load_flat(httrackp *opt, t_cookie *cookie, FILE *fp,
    name the file as given in warnings. A UTF-8 BOM is skipped on the first line
    when first_line is HTS_TRUE. filter, when not NULL, picks the records.
    Returns what cookie_load_from does. */
+/* Count a refused line, saturating like lineno. */
+static void cookie_refuse(int *refused) {
+  if (*refused < INT_MAX)
+    (*refused)++;
+}
+
 static int cookie_load_records(httrackp *opt, t_cookie *cookie, text_src *src,
                                const char *given, hts_boolean first_line,
                                cookie_filter *filter) {
@@ -970,8 +951,8 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, text_src *src,
   if (seen != NULL) {
     seen->max_len = sizeof(seen->data);
   } else {
-    cookie_log(opt, LOG_WARNING,
-               "Cookies: out of memory, so %s is left unchanged", given);
+    hts_log_print(opt, LOG_WARNING,
+                  "Cookies: out of memory, so %s is left unchanged", given);
     keep = HTS_TRUE;
   }
   // ferror ends the loop too, because a directory never reaches EOF
@@ -1000,16 +981,17 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, text_src *src,
     } else if (filter != NULL && len >= line_max) {
       filter->why = "a cookie line is too long";
     } else if (len >= line_max) {
-      cookie_log(opt, LOG_WARNING,
-                 "Cookies: ignoring an over-long line "
-                 "(%d bytes, maximum %d): %s",
-                 (int) len, (int) line_max - 1, given);
-      refused++;
+      hts_log_print(opt, LOG_WARNING,
+                    "Cookies: ignoring an over-long line "
+                    "(%d bytes, maximum %d): %s",
+                    (int) len, (int) line_max - 1, given);
+      cookie_refuse(&refused);
     } else if (memchr(line, '\0', len) != NULL ||
                memchr(line, '\r', len) != NULL) {
-      cookie_log(opt, LOG_WARNING,
-                 "Cookies: ignoring a line holding a NUL or a CR: %s", given);
-      refused++;
+      hts_log_print(opt, LOG_WARNING,
+                    "Cookies: ignoring a line holding a NUL or a CR: %s",
+                    given);
+      cookie_refuse(&refused);
     } else if (line[strspn(line, " \t")] != '\0') {
       /* curl and browser exports mark an HttpOnly cookie this way */
       static const char httponly[] = COOKIE_HTTPONLY_PREFIX;
@@ -1023,7 +1005,7 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, text_src *src,
           cookie_warn(opt, filter, given, "an unknown comment",
                       "Cookies: ignoring an unknown comment on line %d of %s",
                       lineno, given);
-          refused++;
+          cookie_refuse(&refused);
         }
       } else {
         char domain[COOKIE_MAX_DOMAIN];             // .netscape.com
@@ -1044,7 +1026,7 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, text_src *src,
                       "Cookies: ignoring a line with fewer than 7 "
                       "fields or no name: %s",
                       given);
-          refused++;
+          cookie_refuse(&refused);
         } else if (tabs > 7 ||
                    (tabs == 7 && strcmp(cookie_get(buffer, rec, 7),
                                         COOKIE_HTTPONLY_FIELD) != 0)) {
@@ -1054,14 +1036,14 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, text_src *src,
                       "Cookies: ignoring a line with more than 7 "
                       "fields: %s",
                       given);
-          refused++;
+          cookie_refuse(&refused);
         } else if (!cookie_is_expiry(cookie_get(buffer, rec, 4))) {
           cookie_warn(opt, filter, given,
                       "a cookie expiry is not a whole number",
                       "Cookies: ignoring a line whose expiry is not a "
                       "whole number: %s",
                       given);
-          refused++;
+          cookie_refuse(&refused);
         } else if (cookie_load_field(opt, domain, sizeof(domain), buffer, rec,
                                      0, "domain", given, filter) &&
                    cookie_load_field(opt, path, sizeof(path), buffer, rec, 2,
@@ -1097,7 +1079,7 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, text_src *src,
               cookie_warn(opt, filter, given, "a cookie appears twice",
                           "Cookies: '%.64s' appears twice in %s", cook_name,
                           given);
-              refused++;
+              cookie_refuse(&refused);
             }
             if (cookie_set(cookie, cook_name, cook_value, domain, path,
                            &attr) != 0) {
@@ -1105,17 +1087,17 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, text_src *src,
               if (filter != NULL)
                 filter->why = "the cookie jar did not store a cookie";
               else
-                cookie_log(opt, LOG_WARNING,
-                           "Cookies: the jar did not store '%.64s' from "
-                           "%s",
-                           cook_name, given);
-              refused++;
+                hts_log_print(opt, LOG_WARNING,
+                              "Cookies: the jar did not store '%.64s' from "
+                              "%s",
+                              cook_name, given);
+              cookie_refuse(&refused);
             } else if (seen != NULL && !repeated) {
               (void) cookie_set(seen, cook_name, "", domain, path, NULL);
             }
           }
         } else {
-          refused++;
+          cookie_refuse(&refused);
         }
       }
     }
@@ -1123,14 +1105,13 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, text_src *src,
   if (!src->eof && (filter == NULL || filter->why == NULL)) {
     cookie_warn(opt, filter, given, "stopped reading before the end",
                 "Cookies: stopped reading before the end of %s", given);
-    refused++;
+    cookie_refuse(&refused);
   }
   freet(seen);
   return keep ? COOKIE_LOAD_KEEP : refused;
 }
 
-/* Load the cookies file given into cookie as cookie_load_from does, past the
-   IE jars. *why receives the reason of a COOKIE_LOAD_KEEP. */
+/* cookie_load_from without the IE jars. *why receives the verdict. */
 static int cookie_load_file(httrackp *opt, t_cookie *cookie, const char *given,
                             const char *start_url, hts_cookies_verdict *why) {
   char file[CATBUFF_SIZE];
@@ -1140,10 +1121,10 @@ static int cookie_load_file(httrackp *opt, t_cookie *cookie, const char *given,
 
   *why = HTS_COOKIES_REWRITTEN;
   if (!cookie_resolve(file, sizeof(file), given)) {
-    cookie_log(opt, LOG_WARNING,
-               "Cookies: %s is a symbolic link to a missing file, so it "
-               "is left unchanged",
-               given);
+    hts_log_print(opt, LOG_WARNING,
+                  "Cookies: %s is a symbolic link to a missing file, so it "
+                  "is left unchanged",
+                  given);
     *why = HTS_COOKIES_KEPT_DANGLING_LINK;
     return COOKIE_LOAD_KEEP;
   }
@@ -1168,12 +1149,13 @@ static int cookie_load_file(httrackp *opt, t_cookie *cookie, const char *given,
 
     fclose(fp);
     if (ret == COOKIE_LOAD_KEEP)
-      *why = HTS_COOKIES_KEPT_NO_MEMORY;
+      *why = HTS_COOKIES_KEPT_UNREADABLE;
     return ret;
   } else if (errno != ENOENT) {
     // the file exists, so a rewrite would replace what was never read
-    cookie_log(opt, LOG_WARNING | LOG_ERRNO,
-               "Cookies: could not read %s, so it is left unchanged", given);
+    hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
+                  "Cookies: could not read %s, so it is left unchanged",
+                  given);
     *why = HTS_COOKIES_KEPT_UNREADABLE;
     return COOKIE_LOAD_KEEP;
   }
@@ -1248,10 +1230,10 @@ int cookie_load_from(httrackp *opt, t_cookie *cookie, const char *fpath,
                       if (ident_url_absolute(domainpathpath, &af) >= 0) {
                         if (cookie_add(cookie, cook_name, cook_value, af.adr,
                                        af.fil) != 0) {
-                          cookie_log(opt, LOG_WARNING,
-                                     "Cookies: the jar did not store "
-                                     "'%.64s' from %s",
-                                     cook_name, u);
+                          hts_log_print(opt, LOG_WARNING,
+                                        "Cookies: the jar did not store "
+                                        "'%.64s' from %s",
+                                        cook_name, u);
                         }
                         cookie_merged = 1;
                       }
@@ -1286,6 +1268,8 @@ HTSEXT_API hts_cookies_verdict hts_cookies_file_verdict(const char *path,
                                                         int *lost) {
   char catbuff[CATBUFF_SIZE];
   hts_cookies_verdict why = HTS_COOKIES_KEPT_UNREADABLE;
+  hts_filetime_t when;
+  const char *given;
   t_cookie *jar;
   int ret;
 
@@ -1293,13 +1277,18 @@ HTSEXT_API hts_cookies_verdict hts_cookies_file_verdict(const char *path,
     *lost = 0;
   if (path == NULL || *path == '\0')
     return HTS_COOKIES_KEPT_UNREADABLE;
+  given = fconcat(catbuff, sizeof(catbuff), "", path);
+  if (*given == '\0')
+    return HTS_COOKIES_KEPT_UNREADABLE;
+  // a FIFO or a device would block the read or never end it
+  if (hts_file_mtime(given, &when) && !when.is_plain_file)
+    return HTS_COOKIES_KEPT_NOT_A_FILE;
   jar = (t_cookie *) calloct(1, sizeof(t_cookie));
   if (jar == NULL)
-    return HTS_COOKIES_KEPT_NO_MEMORY;
+    return HTS_COOKIES_KEPT_UNREADABLE;
   jar->max_len = COOKIE_MAX_JAR;
-  // as httpmirror loads it, which always passes a start URL
-  ret = cookie_load_file(COOKIE_QUIET, jar,
-                         fconcat(catbuff, sizeof(catbuff), "", path),
+  // httpmirror always passes a start URL
+  ret = cookie_load_file(HTS_LOG_QUIET, jar, given,
                          start_url != NULL ? start_url : "", &why);
   freet(jar);
   if (ret > 0) {
@@ -1552,14 +1541,15 @@ static int cookie_commit(httrackp *opt, t_cookie *cookie, const char *file,
   char tmp[CATBUFF_SIZE];
 
   if (!cookie_tmpname(tmp, sizeof(tmp), file)) {
-    cookie_log(opt, LOG_WARNING,
-               "Cookies: cannot rewrite %s because its name is too long", name);
+    hts_log_print(opt, LOG_WARNING,
+                  "Cookies: cannot rewrite %s because its name is too long",
+                  name);
     return -1;
   }
   (void) UNLINK(tmp);
   if (cookie_write(cookie, tmp) != 0) {
-    cookie_log(opt, LOG_WARNING | LOG_ERRNO,
-               "Cookies: could not write %s, so %s is unchanged", tmp, name);
+    hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
+                  "Cookies: could not write %s, so %s is unchanged", tmp, name);
     (void) UNLINK(tmp);
     return -1;
   }
@@ -1569,14 +1559,14 @@ static int cookie_commit(httrackp *opt, t_cookie *cookie, const char *file,
     return -1;
   }
   if (bak != NULL && fexist_utf8(file) && !cookie_backup(file, bak)) {
-    cookie_log(opt, LOG_WARNING | LOG_ERRNO,
-               "Cookies: could not back up %s, so it is unchanged", name);
+    hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
+                  "Cookies: could not back up %s, so it is unchanged", name);
     (void) UNLINK(tmp);
     return -1;
   }
   if (!cookie_replace(tmp, file)) {
-    cookie_log(opt, LOG_WARNING | LOG_ERRNO,
-               "Cookies: could not replace %s, so it is unchanged", name);
+    hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
+                  "Cookies: could not replace %s, so it is unchanged", name);
     (void) UNLINK(tmp);
     return -1;
   }
@@ -1591,18 +1581,19 @@ static int cookie_save_to(httrackp *opt, t_cookie *cookie, const char *name,
   char bak[CATBUFF_SIZE];
 
   if (!cookie_resolve(file, sizeof(file), fconv(bak, sizeof(bak), name))) {
-    cookie_log(opt, LOG_WARNING,
-               "Cookies: cannot rewrite %s, because it is a symbolic link "
-               "to a missing file",
-               name);
+    hts_log_print(opt, LOG_WARNING,
+                  "Cookies: cannot rewrite %s, because it is a symbolic link "
+                  "to a missing file",
+                  name);
     return -1;
   }
   // an empty jar still empties an existing file, or a deleted cookie survives
   if (!strnotempty(cookie->data) && !fexist_utf8(file))
     return 0;
   if (keep_bak && !slprintfbuff(bak, sizeof(bak), "%s.bak", file)) {
-    cookie_log(opt, LOG_WARNING,
-               "Cookies: cannot rewrite %s because its name is too long", name);
+    hts_log_print(opt, LOG_WARNING,
+                  "Cookies: cannot rewrite %s because its name is too long",
+                  name);
     return -1;
   }
   return cookie_commit(opt, cookie, file, keep_bak ? bak : NULL, name);
