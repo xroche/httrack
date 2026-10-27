@@ -85,13 +85,12 @@ PY
 fi
 
 if test -n "${addr}"; then
-    port=$(htsserver_freeport)
-    htsserver_start --port "${port}" --home "${work}/wide" -- --bind "${addr}"
+    htsserver_start --home "${work}/wide" -- --bind "${addr}"
     case ${HTS_URL} in
     *"//${addr}:"*) ;;
     *) fail "--bind ${addr} advertised ${HTS_URL}" ;;
     esac
-    got=$(probe "${addr}" "${port}")
+    got=$(probe "${addr}" "${HTS_PORT}")
     test "${got}" = ok || fail "--bind ${addr} did not answer on ${addr} (${got})"
     echo "ok: --bind ${addr} widens the socket"
     htsserver_stop
@@ -99,23 +98,22 @@ else
     unobserved="no non-loopback IPv4 here"
 fi
 
-port=$(htsserver_freeport)
-htsserver_start --port "${port}" --home "${work}/default"
+htsserver_start --home "${work}/default"
 # webhttrack launches the browser on this URL, so a loopback bind has to
 # advertise a loopback address.
 case ${HTS_URL} in
 *//127.0.0.1:*) ;;
 *) fail "the default run advertised ${HTS_URL}, unreachable on a loopback bind" ;;
 esac
-got=$(probe 127.0.0.1 "${port}")
+got=$(probe 127.0.0.1 "${HTS_PORT}")
 test "${got}" = ok || fail "the default run refused 127.0.0.1 (${got})"
 echo "ok: the default socket answers on 127.0.0.1"
 if test -n "${addr}"; then
-    got=$(probe "${addr}" "${port}")
+    got=$(probe "${addr}" "${HTS_PORT}")
     test "${got}" = ConnectionRefusedError ||
         fail "the default run answers on ${addr} (${got})"
     # A dead server refuses too, so the refusal counts only while it is up.
-    got=$(probe 127.0.0.1 "${port}")
+    got=$(probe 127.0.0.1 "${HTS_PORT}")
     test "${got}" = ok || fail "the default run died before the refusal (${got})"
     echo "ok: and refuses ${addr}"
 fi

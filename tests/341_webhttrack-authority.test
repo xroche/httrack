@@ -132,7 +132,7 @@ htsserver_stop
 
 # webhttrack greps this URL out and hands it to the browser, so a wildcard bind
 # has to name a host that exists, and an IPv6 literal needs its URL brackets.
-htsserver_start --port "$(htsserver_freeport)" --home "${work}/wild" -- --bind 0.0.0.0
+htsserver_start --home "${work}/wild" -- --bind 0.0.0.0
 case ${HTS_URL} in
 *//127.0.0.1:*) ;;
 *) fail "--bind 0.0.0.0 advertised ${HTS_URL}, which no browser can open" ;;
@@ -154,7 +154,7 @@ try:
 except OSError:
     sys.exit(1)
 PY
-    htsserver_start --port "$(htsserver_freeport)" --home "${work}/v6" -- --bind ::1
+    htsserver_start --home "${work}/v6" -- --bind ::1
     case ${HTS_URL} in
     *"//[::1]:"*) ;;
     *) fail "--bind ::1 advertised ${HTS_URL}, which no browser can open" ;;
