@@ -1,0 +1,13 @@
+#!/bin/bash
+#
+# A playlist too big to keep in memory is read back from disk to be parsed. On
+# Windows that read went through the ANSI codepage under a non-ASCII -O.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" --outdir-intl 'café' --errors 0 --files 3 \
+    --found 'bigm3u/song.mp3' \
+    --log-found 'File successfully loaded for parsing' \
+    httrack 'BASEURL/bigm3u/index.html' -z

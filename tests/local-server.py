@@ -2783,6 +2783,17 @@ class Handler(SimpleHTTPRequestHandler):
     def route_cssparen_png(self):
         self.send_raw(b"\x89PNG\r\n\x1a\n", "image/png")
 
+    # A playlist over the 8 KB httrack loads in memory, so it is read back from disk.
+    def route_bigm3u_index(self):
+        self.send_html('<a href="list.m3u">playlist</a>')
+
+    def route_bigm3u_list(self):
+        body = b"\n" * 9000 + b"song.mp3\n"
+        self.send_raw(body, "audio/x-mpegurl")
+
+    def route_bigm3u_song(self):
+        self.send_raw(b"ID3", "audio/mpeg")
+
     # a long header httrack never parses, like the one algolia.com sends
     LONGCSP = ("Content-Security-Policy-Report-Only", "script-src " + "a" * 4800)
 
@@ -4217,6 +4228,9 @@ class Handler(SimpleHTTPRequestHandler):
         "/cssparen/ent (4).png": route_cssparen_png,
         "/cssparen/apos.png": route_cssparen_png,
         "/cssparen/it's.png": route_cssparen_png,
+        "/bigm3u/index.html": route_bigm3u_index,
+        "/bigm3u/list.m3u": route_bigm3u_list,
+        "/bigm3u/song.mp3": route_bigm3u_song,
         "/longcsp/index.html": route_longcsp_index,
         "/longcsp/page.html": route_longcsp_page,
         "/longloc/index.html": route_longloc_index,
