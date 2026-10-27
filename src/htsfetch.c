@@ -398,8 +398,7 @@ static const char *site_key(const fetch_origin *o, size_t *len) {
   *len = o->host_len;
   if (hts_host_is_address(o->host, o->host_len))
     return o->host;
-  /* "a.example.com." keys on "example.com.", which the suffix list cannot read.
-   */
+  /* "a.example.com." keys on "example.com.", which the list cannot read. */
   if (n > 1 && o->host[n - 1] == '.')
     n--;
   /* An empty label leaves no domain, so only the same host matches. */
