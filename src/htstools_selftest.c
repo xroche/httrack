@@ -27,7 +27,7 @@ Please visit our Website: http://www.httrack.com
 
 /* ------------------------------------------------------------ */
 /* File: htstools_selftest.c subroutines:                       */
-/*       self-tests for the HTML attribute-value scanner        */
+/*       self-tests for the attribute scanner, winprofile.ini   */
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
@@ -45,6 +45,54 @@ static int st_endtoken(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* profilecharset DIR: which winprofile.ini files declare UTF-8. Only
+   Charset=UTF-8 or utf8 does; the legacy reading is what every other file gets,
+   since Windows converts its category from ANSI on that answer (#216). */
+static int st_profilecharset(httrackp *opt, int argc, char **argv) {
+  static const struct {
+    const char *content;
+    hts_boolean utf8;
+  } cases[] = {
+      {"Category=x\r\n", HTS_FALSE},
+      {"Category=x\r\nCharset=UTF-8\r\n", HTS_TRUE},
+      {"charset=utf8\n", HTS_TRUE},
+      {"CHARSET=Utf-8\r\n", HTS_TRUE},
+      {"Charset=windows-1252\r\n", HTS_FALSE},
+      {"Charset=\r\n", HTS_FALSE},
+      {"Charset=UTF-8X\r\n", HTS_FALSE},
+      {"Charset=UTF-16\r\n", HTS_FALSE},
+      {"XCharset=UTF-8\r\n", HTS_FALSE},
+      {"Charset=latin1\r\nCharset=UTF-8\r\n", HTS_FALSE},
+  };
+
+  char path[HTS_URLMAXSIZE];
+  size_t i;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "profilecharset: needs a directory\n");
+    return 1;
+  }
+  snprintf(path, sizeof(path), "%s/winprofile.ini", argv[0]);
+  assertf(!hts_profile_charset_is_utf8(NULL));
+  assertf(!hts_profile_is_utf8(path)); /* missing file */
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    FILE *const fp = fopen(path, "wb");
+
+    assertf(fp != NULL);
+    assertf(fputs(cases[i].content, fp) >= 0);
+    assertf(fclose(fp) == 0);
+    if (hts_profile_is_utf8(path) != cases[i].utf8) {
+      fprintf(stderr, "profilecharset: case %u read as %s\n", (unsigned) i,
+              cases[i].utf8 ? "legacy" : "UTF-8");
+      return 1;
+    }
+  }
+  (void) unlink(path);
+  printf("profilecharset self-test OK\n");
+  return 0;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
@@ -52,5 +100,7 @@ static int st_endtoken(httrackp *opt, int argc, char **argv) {
 const struct selftest_entry selftests_tools[] = {
     {"endtoken", "<tag bytes after attr=>", "value rech_endtoken() reads",
      st_endtoken},
+    {"profilecharset", "<dir>",
+     "which winprofile.ini files declare Charset=UTF-8", st_profilecharset},
     {NULL, NULL, NULL, NULL},
 };

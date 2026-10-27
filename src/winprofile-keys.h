@@ -17,7 +17,7 @@ typedef struct {
   const char *legacy_of;
 } winprofile_key_t;
 
-#define WINPROFILE_KEY_COUNT 120
+#define WINPROFILE_KEY_COUNT 121
 
 /* clang-format off */
 static const winprofile_key_t winprofile_keys[WINPROFILE_KEY_COUNT] = {
@@ -39,6 +39,7 @@ static const winprofile_key_t winprofile_keys[WINPROFILE_KEY_COUNT] = {
   {"Cache", "win,web,droid", "setting", "checkbox", "", "--cache=0", "", "agreed", "1", "", ""},
   {"Category", "win,web,droid", "setting", "string", "", "", "", "agreed", "", "absent", ""},
   {"Changes", "win,web,droid", "setting", "checkbox", "--changes", "", "", "agreed", "0", "", ""},
+  {"Charset", "", "read_only", "string", "", "", "", "none", "", "absent", ""},
   {"CheckType", "win,web,droid", "setting", "list:0:3", "", "", "", "agreed", "1", "", ""},
   {"Cookies", "win,web,droid", "setting", "checkbox", "", "--cookies=0", "", "agreed", "1", "", ""},
   {"CookiesFile", "win,web,droid", "setting", "string", "", "", "", "agreed", "", "absent", ""},

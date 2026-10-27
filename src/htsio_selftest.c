@@ -778,6 +778,7 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
   /* utf-8 forms the index must carry whatever the input charset was */
   static const char *const projUTF8 = "caf\xC3\xA9";
   static const char *const catUTF8 = "th\xC3\xA9";
+  static const char *const declUTF8 = "gr\xC3\xBCn";
 
   assertf(argc >= 1);
   /* a non-ASCII top dir (#217) holding a non-ASCII sub-project (#216) */
@@ -799,6 +800,20 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
   assertf(fp != NULL);
   fprintf(fp, "category=%s\n", catName);
   fclose(fp);
+  /* a project declaring Charset=UTF-8 keeps its category as is, on Windows
+     too, rather than being converted a second time */
+  snprintf(path, sizeof(path), "%s/declared/hts-cache/", topdir);
+  assertf(structcheck(path) == 0);
+  snprintf(path, sizeof(path), "%s/declared/index.html", topdir);
+  fp = fopen(path, "wb");
+  assertf(fp != NULL);
+  fclose(fp);
+  assertf(snprintf(path, sizeof(path), "%s/declared/hts-cache/winprofile.ini",
+                   topdir) < (int) sizeof(path));
+  fp = fopen(path, "wb");
+  assertf(fp != NULL);
+  fprintf(fp, "Charset=UTF-8\r\nCategory=%s\r\n", declUTF8);
+  fclose(fp);
 
   assertf(hts_buildtopindex(opt, topdir, "") != 0);
 
@@ -815,6 +830,7 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
   buf[n] = '\0';
   assertf(strstr(buf, projUTF8) != NULL);
   assertf(strstr(buf, catUTF8) != NULL);
+  assertf(strstr(buf, declUTF8) != NULL);
   /* the marker proves binpath "" found no templates/ to read, so the rest of
      this checks the compiled-in copies and not a stray on-disk set */
   assertf(strstr(buf, "Template file not found") != NULL);
@@ -889,6 +905,15 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
   snprintf(path, sizeof(path), "%s/%s/hts-cache/winprofile.ini", topdir,
            projName);
   unlink(path);
+  assertf(snprintf(path, sizeof(path), "%s/declared/hts-cache/winprofile.ini",
+                   topdir) < (int) sizeof(path));
+  unlink(path);
+  snprintf(path, sizeof(path), "%s/declared/hts-cache", topdir);
+  rmdir(path);
+  snprintf(path, sizeof(path), "%s/declared/index.html", topdir);
+  unlink(path);
+  snprintf(path, sizeof(path), "%s/declared", topdir);
+  rmdir(path);
   snprintf(path, sizeof(path), "%s/%s/hts-cache", topdir, projName);
   rmdir(path);
   snprintf(path, sizeof(path), "%s/%s/index.html", topdir, projName);

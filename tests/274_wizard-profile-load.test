@@ -44,6 +44,7 @@ mkdir -p "${work}/proj/hts-cache"
 # separator of a rules box percent-encoded one byte at a time.
 cat >"${work}/proj/hts-cache/winprofile.ini" <<'EOF'
 CurrentUrl=http://example.com/
+Charset=UTF-8
 Category=c%
 MaxRate=0
 MaxTime=0
@@ -101,6 +102,12 @@ step4 = s.get("step4.html?sid=" + sid)
 flags = [line.strip() for line in textarea(step4, "command").split("\n")]
 ini = dict(line.split("=", 1) for line in textarea(step4, "winprofile")
            .replace("\r\n", "\n").split("\n") if "=" in line)
+
+
+# No writer emits Charset yet, so a declaration read back must not reach the
+# page or the re-saved profile.
+if "Charset" in ini or "Charset" in loaded or "Charset" in step4:
+    sys.exit("the Charset key leaked into the wizard: %r" % ini)
 
 
 def want(flag):

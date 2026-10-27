@@ -1127,8 +1127,8 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
                     category = NULL;
                   }
 #ifdef _WIN32
-                  /* category is ANSI-codepage, doc is utf-8: convert (#216) */
-                  else {
+                  /* a legacy category is ANSI-codepage, doc is utf-8 (#216) */
+                  else if (!hts_profile_is_utf8(StringBuff(iname))) {
                     char *cat_utf8 = hts_convertStringSystemToUTF8(
                         category, strlen(category));
                     if (cat_utf8 != NULL) {
@@ -1284,6 +1284,32 @@ HTSEXT_API char *hts_getcategory(const char *filename) {
     }
   }
   return StringBuffRW(categ);
+}
+
+hts_boolean hts_profile_charset_is_utf8(const char *value) {
+  return value != NULL &&
+                 (strfield2(value, "utf-8") || strfield2(value, "utf8"))
+             ? HTS_TRUE
+             : HTS_FALSE;
+}
+
+hts_boolean hts_profile_is_utf8(const char *filename) {
+  hts_boolean utf8 = HTS_FALSE;
+  FILE *const fp = fopen(filename, "rb");
+
+  if (fp != NULL) {
+    while (!feof(fp)) {
+      char BIGSTK line[1024];
+
+      if (linput(fp, line, sizeof(line) - 2) > 0 &&
+          strfield(line, "charset=")) {
+        utf8 = hts_profile_charset_is_utf8(line + 8);
+        break;
+      }
+    }
+    fclose(fp);
+  }
+  return utf8;
 }
 
 HTSEXT_API char *hts_getcategories(char *path, int type) {

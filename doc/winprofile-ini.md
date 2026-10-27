@@ -5,7 +5,7 @@ The project settings a HTTrack front end saves beside a mirror, so reopening the
 - **WinHTTrack** (httrack-windows, `WinHTTrack/Shell.cpp`) writes it from the dialog fields and reads it back. It is the original writer, and its conventions are the ones below.
 - **WebHTTrack** (`src/htsserver.c`, `html/server/step[24].html`) writes it from the posted form and reads it into the wizard's session state.
 - **HTTrack for Android** (httrack-android, `app/src/main/java/com/httrack/android/OptionsMapper.java`) reads and writes the same keys, with its own table of key to flag and key to default.
-- The **engine** reads one key, `Category`, to group projects in the top index, and with its own decoder: case-insensitive, first occurrence, `unescapehttp` rather than `unescapeini`, so a `+` becomes a space (`src/htstools.c`).
+- The **engine** reads two keys: `Category`, to group projects in the top index, and `Charset`, to know how that category is encoded. It uses its own decoder: case-insensitive, first occurrence, `unescapehttp` rather than `unescapeini`, so a `+` becomes a space (`src/htstools.c`).
 
 Neither GUI needs the file to run a mirror: the command line the wizard builds is what the engine takes, and `hts-cache/doit.log` records it. Getting the file wrong loses settings on reopen; it does not corrupt a mirror.
 
@@ -21,6 +21,8 @@ Two more divergences, both older than this document:
 - **The escapes are not the same set.** WinHTTrack escapes `%`, `=`, TAB, CR and LF and passes every other byte through, so its decoder is the exact inverse and turns **every other** `%xx` into a space; that decode is also case-sensitive, and `%0D` or `%3D` becomes a space. WebHTTrack escapes `%` and any byte under 32, writes `=` raw, and writes `%22` for a double quote in the 18 `${unquoted:}` fields. Android's `profileEncode` is WebHTTrack's set without the quote case. A footer or a filter list holding a quote therefore survives a WebHTTrack round trip and degrades in WinHTTrack, and an `=` inside a value survives only in the other direction. WebHTTrack collapses a `%0d%0a` pair to a lone CR; Android keeps CRLF. Android also **throws** on an escape it cannot parse or a raw control byte, abandoning the whole profile where the other two degrade one value.
 
 Neither side transcodes, and the file declares no encoding, so each front end guesses. WinHTTrack is an ANSI build and writes local-codepage bytes. WebHTTrack writes back whatever the browser posted, which is UTF-8. The two therefore disagree on every non-ASCII value; until 3.50 moved the catalogs and the served pages to UTF-8 they agreed whenever the host codepage matched the catalog's charset, which was common but never guaranteed. A profile written by one and read by the other keeps its ASCII and loses its accents.
+
+`Charset=UTF-8` declares that every value in the file is UTF-8. A reader compares the value without regard to case and also accepts `utf8`. When the key is absent, or has any other value, the file is legacy: on Windows its values are in the host ANSI codepage. The engine reads the key and does not convert a declared UTF-8 category a second time when it builds the top index. No front end writes the key yet. A front end that wrote it before the readers knew it would fail on every old reader, because an old reader ignores the key and shows the UTF-8 bytes as legacy text. So the readers come first, and the writers follow in a later release.
 
 ## Value conventions
 

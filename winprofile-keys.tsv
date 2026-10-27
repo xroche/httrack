@@ -25,6 +25,7 @@ BuildString	win,web,droid	setting	string			Build	agreed	%h%p/%n%q.%t	literal
 Cache	win,web,droid	setting	checkbox		--cache=0		agreed	1		
 Category	win,web,droid	setting	string				agreed		absent	
 Changes	win,web,droid	setting	checkbox	--changes			agreed	0		
+Charset		read_only	string				none		absent	
 CheckType	win,web,droid	setting	list:0:3				agreed	1		
 Cookies	win,web,droid	setting	checkbox		--cookies=0		agreed	1		
 CookiesFile	win,web,droid	setting	string				agreed		absent	
