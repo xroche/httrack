@@ -239,6 +239,10 @@ hts_boolean hts_file_backdate(const char *file, int seconds);
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 
+/** An opt that hts_log_vprint drops every message for. Never dereferenced. */
+extern char hts_log_quiet_tag;
+#define HTS_LOG_QUIET ((httrackp *) (void *) &hts_log_quiet_tag)
+
 // initialize an htsblk structure
 void hts_init_htsblk(htsblk * r);
 

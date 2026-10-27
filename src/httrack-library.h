@@ -486,6 +486,44 @@ typedef enum hts_header_verdict {
 HTSEXT_API hts_header_verdict hts_custom_header_verdict(const char *headers,
                                                         const char *line);
 
+/** What a crawl does to its -%K cookies file when it ends. Values are ABI. */
+typedef enum hts_cookies_verdict {
+  /** The crawl writes its jar back over the file. */
+  HTS_COOKIES_REWRITTEN = 0,
+  /** The file does not exist, and the crawl creates it once its jar holds a
+      cookie. This says nothing about whether its directory is writable. */
+  HTS_COOKIES_CREATED = 1,
+  /** The file is kept, because a rewrite would lose some of its lines. */
+  HTS_COOKIES_KEPT_LINES_LOST = 2,
+  /** The file is kept, because it cannot be read or memory ran out. */
+  HTS_COOKIES_KEPT_UNREADABLE = 3,
+  /** The file is kept, because it is not a regular file. */
+  HTS_COOKIES_KEPT_NOT_A_FILE = 4,
+  /** The file is kept, because it is a symbolic link to a missing file. */
+  HTS_COOKIES_KEPT_DANGLING_LINK = 5,
+  /** The file is not created, because its .bak exists. */
+  HTS_COOKIES_KEPT_MISSING_BESIDE_BAK = 6,
+  /** The file is kept, because it is empty and its .bak is not. */
+  HTS_COOKIES_KEPT_EMPTY_BESIDE_BAK = 7,
+  /** The file is kept, because it is a document.cookie string. */
+  HTS_COOKIES_KEPT_DOCUMENT_COOKIE = 8,
+  /** The file is kept, because it is a document.cookie string and there is
+      no start URL host. */
+  HTS_COOKIES_KEPT_NO_START_URL = 9
+} hts_cookies_verdict;
+
+/** Return what a crawl with cookies on does to the -%K cookies file @p path,
+    when @p start_url is its first start URL. A NULL or empty @p start_url
+    means none. A NULL, empty or over-long @p path gives
+    HTS_COOKIES_KEPT_UNREADABLE. @p lost, when not NULL, receives how many
+    lines a rewrite would lose, or 0 for any other verdict than
+    HTS_COOKIES_KEPT_LINES_LOST. The file is only read and nothing is logged,
+    so a front end may call this as the user types, but the cost grows with
+    the file size. */
+HTSEXT_API hts_cookies_verdict hts_cookies_file_verdict(const char *path,
+                                                        const char *start_url,
+                                                        int *lost);
+
 /** Return the engine's last error message, empty when there was none. The
     string lives inside @p opt, so never free it and read it only while @p opt
     lives. @p opt must not be NULL. */

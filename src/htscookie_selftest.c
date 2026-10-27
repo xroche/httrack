@@ -2793,6 +2793,62 @@ static int st_cookieflat(httrackp *opt, int argc, char **argv) {
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
 
+static int cookiesverdict_logged;
+
+static void cookiesverdict_log(httrackp *opt, int type, const char *format,
+                               va_list args) {
+  (void) opt;
+  (void) type;
+  (void) format;
+  (void) args;
+  cookiesverdict_logged++;
+}
+
+/* -#test=cookiesverdict <file> [start-url]. Prints the verdict, the lines
+   lost, and the log counts of the verdict and of a real load. */
+static int st_cookiesverdict(httrackp *opt, int argc, char **argv) {
+  static const char *const names[] = {"rewritten",
+                                      "created",
+                                      "kept-lines-lost",
+                                      "kept-unreadable",
+                                      "kept-not-a-file",
+                                      "kept-dangling-link",
+                                      "kept-missing-beside-bak",
+                                      "kept-empty-beside-bak",
+                                      "kept-document-cookie",
+                                      "kept-no-start-url"};
+  const char *const start_url = argc > 1 ? argv[1] : NULL;
+  hts_cookies_verdict v;
+  t_cookie *jar;
+  int lost = -1, quiet, loud, ret;
+
+  (void) opt;
+  if (argc < 1 || argc > 2) {
+    fprintf(stderr, "cookiesverdict: takes a file, then a start URL\n");
+    return 1;
+  }
+  jar = (t_cookie *) calloct(1, sizeof(t_cookie));
+  assertf(jar != NULL);
+  jar->max_len = COOKIE_MAX_JAR;
+  cookiesverdict_logged = 0;
+  hts_set_log_vprint_callback(cookiesverdict_log);
+  v = hts_cookies_file_verdict(argv[0], start_url, &lost);
+  quiet = cookiesverdict_logged;
+  // a FIFO would block the real load
+  ret = v == HTS_COOKIES_KEPT_NOT_A_FILE
+            ? 0
+            : cookie_load_from(NULL, jar, "", argv[0],
+                               start_url != NULL ? start_url : "");
+  loud = cookiesverdict_logged - quiet;
+  hts_set_log_vprint_callback(NULL);
+  freet(jar);
+  if ((size_t) v >= sizeof(names) / sizeof(names[0]))
+    return 1;
+  printf("%s=%d lost=%d load=%d logged=%d/%d\n", names[v], (int) v, lost, ret,
+         quiet, loud);
+  return 0;
+}
+
 const struct selftest_entry selftests_cookie[] = {
     {"cookies", "", "cookie request-header self-test", st_cookies},
     {"cookiecap", "", "cookie_add honours max_len", st_cookiecap},
@@ -2821,5 +2877,8 @@ const struct selftest_entry selftests_cookie[] = {
     {"cookiespandiff", "",
      "the cookie field getter matches a frozen copy of the old one",
      st_cookiespandiff},
+    {"cookiesverdict", "<file> [start-url]",
+     "what a crawl does to a -%K cookies file, beside a real load",
+     st_cookiesverdict},
     {NULL, NULL, NULL, NULL},
 };
