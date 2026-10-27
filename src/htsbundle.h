@@ -108,6 +108,7 @@ typedef struct cookie_filter {
   void *ctx;
   int line;        /* the number of the last line read */
   const char *why; /* NULL, or why the load stopped at line */
+  hts_boolean full_skips; /* Does a record the jar has no room for only warn? */
 } cookie_filter;
 
 /* Lines read from fp, or from the len bytes at buf when fp is NULL. */

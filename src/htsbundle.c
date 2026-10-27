@@ -512,8 +512,7 @@ static hts_boolean bundle_admit(cookie_filter *filter, t_cookie *cookie,
     filter->why = "a cookie has another value in another bundle";
     return HTS_FALSE;
   }
-  /* unreachable while all_bundles outsizes opt->cookie; a silent skip would
-     stop the clash check */
+  // a silent skip would stop the clash check
   if (cookie_set(ctx->all_bundles, name, value, domain, path, NULL) != 0) {
     filter->why = "too many cookies to compare with the other bundles";
     return HTS_FALSE;
@@ -551,6 +550,8 @@ static hts_boolean bundle_load_src(httrackp *opt, bundle *b, text_src *src,
   filter.admit = bundle_admit;
   filter.ctx = &ctx;
   filter.line = cookies_line;
+  // admit stored the record in all_bundles, so only room can refuse it here
+  filter.full_skips = HTS_TRUE;
   if (cookies_line != 0 && opt->cookie == NULL) {
     hts_log_print(opt, LOG_WARNING,
                   "Cookies are disabled, so the cookies of %s are not sent",

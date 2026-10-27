@@ -1,0 +1,42 @@
+#!/bin/bash
+#
+# A login bundle loaded over a -%K jar that is already full warns about the
+# cookie the jar cannot hold, rather than refusing the bundle.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+tmpdir=$(mktemp -d)
+cleanup_push rm -rf "$tmpdir"
+dir=$(nativepath "$tmpdir")
+tab=$(printf '\t')
+
+# 300 records of about 130 bytes outgrow the 30000 the jar holds
+value=$(repeat_chars 100 v)
+for i in $(seq 1 300); do
+    printf '.other.test%sTRUE%s/%sFALSE%s0%sC%d%s%s\n' "$tab" "$tab" "$tab" \
+        "$tab" "$tab" "$i" "$tab" "$value"
+done >"$tmpdir/cookies.txt"
+# a record bigger than the room the jar leaves short of a 130-byte one
+sid=$(repeat_chars 500 s)
+printf '%s\n' '# HTTrack bundle 1' 'ua FullUA' cookies \
+    ".alpha.test${tab}TRUE${tab}/${tab}FALSE${tab}0${tab}SID${tab}$sid" \
+    >"$tmpdir/full.hts"
+
+rc=0
+out=$(httrack -O /dev/null '-#test=bundle' "$dir" \
+    'http://www.alpha.test/#httrack-bundle=full' "jar:$dir/cookies.txt" \
+    host:http://www.alpha.test 2>"$tmpdir/err") || rc=$?
+test "$rc" -eq 0 || fail_dump "exited $rc: $out" "$tmpdir/err"
+out=$(tr -d '\r' <<<"$out")
+grep -q '^refused' <<<"$out" && fail_dump "bundle refused: $out" "$tmpdir/err"
+grep -qx 'http://www.alpha.test ua=FullUA headers=global' <<<"$out" ||
+    fail "the bundle UA was not applied: $out"
+grep -q '^cookie \.other\.test C1=' <<<"$out" || fail "the jar was not loaded"
+grep -q '^cookie \.alpha\.test SID=' <<<"$out" &&
+    fail "the full jar stored the bundle cookie, so the test proves nothing"
+grep -q 'full.hts, line 4: the cookie jar is full, so a cookie is left out' \
+    "$tmpdir/err" || fail_dump "no warning for the cookie left out" "$tmpdir/err"
+ok "a full jar warns about a bundle cookie"
