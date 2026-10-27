@@ -125,7 +125,10 @@ verdict_only kept-no-start-url "$dir/flat.txt" "file://C:/site/index.html"
 # a crawl reads these too, but a front end must not block on them
 mkdir "$dir/adir"
 verdict_only kept-not-a-file "$dir/adir" "$nohost"
-if mkfifo "$dir/fifo" 2>/dev/null && [ -p "$dir/fifo" ]; then
+# a WSL FIFO is not one to a native Windows exe
+if target_is_windows; then
+    echo "a Windows engine sees no FIFO, so the FIFO case is not run"
+elif mkfifo "$dir/fifo" 2>/dev/null && [ -p "$dir/fifo" ]; then
     verdict_only kept-not-a-file "$dir/fifo" "$nohost"
 else
     echo "no FIFO here, so the FIFO case is not run"
@@ -137,7 +140,10 @@ check kept-missing-beside-bak 0 "$dir/gone.txt" "$nohost" 'is missing but its .b
 rec a >"$dir/empty.txt.bak"
 check kept-empty-beside-bak 0 "$dir/empty.txt" "$nohost" 'is empty but its .bak is not'
 
-if ln -s "$dir/nowhere.txt" "$dir/link.txt" 2>/dev/null && [ -L "$dir/link.txt" ]; then
+# the engine checks for a dangling link on POSIX only
+if target_is_windows; then
+    echo "a Windows engine has no dangling link check, so that case is not run"
+elif ln -s "$dir/nowhere.txt" "$dir/link.txt" 2>/dev/null && [ -L "$dir/link.txt" ]; then
     check kept-dangling-link 0 "$dir/link.txt" "$nohost" 'symbolic link to a missing file'
 else
     echo "no symbolic links here, so the dangling link case is not run"
@@ -145,7 +151,8 @@ fi
 
 rec a >"$dir/locked.txt"
 chmod 000 "$dir/locked.txt"
-if ! cat "$dir/locked.txt" >/dev/null 2>&1; then
+# mode bits do not bind a native Windows exe
+if ! target_is_windows && ! cat "$dir/locked.txt" >/dev/null 2>&1; then
     check kept-unreadable 0 "$dir/locked.txt" "$nohost" 'could not read'
 else
     echo "a mode 000 file is readable here, so the unreadable case is not run"
