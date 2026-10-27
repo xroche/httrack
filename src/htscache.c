@@ -1556,11 +1556,12 @@ char *readfile(const char *fil) {
   return readfile2(fil, NULL);
 }
 
-/* Note: NOT utf-8 */
-static char *readfile_gen(const char *fil, LLint *size, hts_boolean inmem) {
+/* "utf8" says "fil" is UTF-8 rather than in the system codepage. */
+static char *readfile_gen(const char *fil, LLint *size, hts_boolean inmem,
+                          hts_boolean utf8) {
   char *adr = NULL;
   char catbuff[CATBUFF_SIZE];
-  const LLint len = fsize(fil);
+  const LLint len = utf8 ? fsize_utf8(fil) : fsize(fil);
 
   /* a size too large for size_t (32-bit Windows/i386) must fail closed: it
      would wrap malloct() short while fread() still read the untruncated len.
@@ -1573,7 +1574,8 @@ static char *readfile_gen(const char *fil, LLint *size, hts_boolean inmem) {
   if (buflen != (size_t) -1) { // exists, and is addressable
     FILE *fp;
 
-    fp = fopen(fconv(catbuff, sizeof(catbuff), fil), "rb");
+    fp = utf8 ? FOPEN(fconv(catbuff, sizeof(catbuff), fil), "rb")
+              : fopen(fconv(catbuff, sizeof(catbuff), fil), "rb");
     if (fp != NULL) {           // n'existe pas (!)
       adr = (char *) malloct(buflen + 1);
       if (size != NULL)
@@ -1594,12 +1596,12 @@ static char *readfile_gen(const char *fil, LLint *size, hts_boolean inmem) {
 
 /* Note: NOT utf-8 */
 char *readfile2(const char *fil, LLint *size) {
-  return readfile_gen(fil, size, HTS_FALSE);
+  return readfile_gen(fil, size, HTS_FALSE, HTS_FALSE);
 }
 
-/* Note: NOT utf-8 */
+/* Note: utf-8 */
 char *readfile2_inmem(const char *fil, LLint *size) {
-  return readfile_gen(fil, size, HTS_TRUE);
+  return readfile_gen(fil, size, HTS_TRUE, HTS_TRUE);
 }
 
 /* Note: utf-8 */
