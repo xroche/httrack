@@ -3847,8 +3847,12 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             if (srcset_p && ok == 0) {
               const char *const endp = r->adr + r->size;
               const char *q = html;
-              while(q < endp && *q != '\0' && *q != ',' && *q != quote
-                    && *q != '<' && *q != '>' && (unsigned char) *q >= 32)
+              /* whitespace ends an unquoted value, so its descriptor too */
+              const hts_boolean unquoted = !noquote && quote == '\0';
+
+              while (q < endp && *q != '\0' && *q != ',' && *q != quote &&
+                     *q != '<' && *q != '>' && (unsigned char) *q >= 32 &&
+                     !(unquoted && is_realspace(*q)))
                 q++;            // skip the descriptor
               if (q < endp && *q == ',') {
                 q++;

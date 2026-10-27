@@ -52,7 +52,7 @@ fileurl() { printf 'file://%s' "$(nativepath "$1")"; }
 # rewritten, descriptors preserved, following attributes left intact.
 site="$tmp/srcset"
 mkdir -p "$site"
-for f in a b c d e f g h i j v dz; do gif "$site/$f.gif"; done
+for f in a b c d e f g h i j k u v dz; do gif "$site/$f.gif"; done
 # unquoted heredoc: the absolute-URL candidate below is expanded here
 cat >"$site/index.html" <<EOF
 <html><body>
@@ -65,6 +65,7 @@ cat >"$site/index.html" <<EOF
 <img srcset="$(fileurl "$site")/j.gif 2x">
 <img srcset="data:image/gif;base64,R0lGODlhAQABAAAAACw= 1x, dz.gif 2x">
 <img srcset="">
+<img srcset=k.gif 2x,u.gif>
 <a href="a.gif">plain link still works</a>
 </body></html>
 EOF
@@ -73,7 +74,9 @@ crawl "$site/index.html" "$out"
 
 # every candidate downloads, incl. unique tails (catches first-only parsing),
 # whitespace-padded (h,i), <source src> (v), absolute (j), post-data: URI (dz)
-for f in a b c d e f g h i j v dz; do found "$f.gif" "$out"; done
+for f in a b c d e f g h i j k v dz; do found "$f.gif" "$out"; done
+# whitespace ends an unquoted srcset, so "2x,u.gif" is another attribute
+notfound "u.gif" "$out"
 
 # the width/density descriptors are not URLs and must not be fetched
 notfound "480w" "$out"
