@@ -1,0 +1,38 @@
+#!/bin/bash
+# A build without self-tests makes -#test fail.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+case "${SELFTESTS:-}" in
+yes | no) ;;
+*) skip "SELFTESTS unset, not run under make check" ;;
+esac
+[ -n "${abs_top_builddir:-}" ] || skip "abs_top_builddir unset, not run under make check"
+builddir=${abs_top_builddir}
+
+rc=0
+out=$(httrack -#test 2>&1) || rc=$?
+if [ "${SELFTESTS}" = yes ]; then
+    [ "${rc}" -eq 0 ] || fail "-#test exited ${rc}: ${out}"
+    grep -q 'filter' <<<"${out}" || fail "-#test listed no tests: ${out}"
+    exit 0
+fi
+
+[ "${rc}" -ne 0 ] || fail "-#test succeeded without self-tests: ${out}"
+grep -q 'no engine self-tests' <<<"${out}" || fail "no notice: ${out}"
+rc=0
+out=$(httrack -#test=filter a b 2>&1) || rc=$?
+[ "${rc}" -ne 0 ] || fail "-#test=filter succeeded without self-tests: ${out}"
+
+command -v nm >/dev/null || skip "no nm"
+libs=$(find "${builddir}/src/.libs" -maxdepth 1 \( -name 'libhttrack.so.*' -o -name 'libhttrack.a' \) -type f 2>/dev/null || true)
+[ -n "${libs}" ] || fail "no libhttrack under ${builddir}/src/.libs"
+for lib in ${libs}; do
+    syms=$(nm "${lib}" 2>/dev/null) || fail "nm failed on ${lib}"
+    grep -q ' hts_selftest$' <<<"${syms}" && fail "${lib} still carries hts_selftest"
+    grep -q ' selftests_filters$' <<<"${syms}" && fail "${lib} still carries selftests_filters"
+done
+exit 0

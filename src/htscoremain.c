@@ -1200,8 +1200,15 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 
       if (a[0] == '-' && a[1] == '#' && strncmp(a + 2, "test", 4) == 0 &&
           (a[6] == '\0' || a[6] == '=')) {
+#ifdef HTS_NO_SELFTEST
+        const int code = 1;
+
+        fprintf(stderr, "httrack: this build has no engine self-tests "
+                        "(built with HTS_NO_SELFTEST)\n");
+#else
         const char *const name = a[6] == '=' ? a + 7 : NULL;
         const int code = hts_selftest(opt, name, argc - (k + 1), &argv[k + 1]);
+#endif
 
         htsmain_free();
         return code;

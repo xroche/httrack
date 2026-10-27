@@ -82,18 +82,6 @@ webhttrack: webhttrack.in htsglobal.h Makefile
 CLEANFILES = webhttrack
 
 libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
-	htsselftest.c htsselftest_util.c \
-	htsback_selftest.c htscache_selftest.c htscharset_selftest.c \
-	htscmdline_selftest.c \
-	htscookie_selftest.c htsdns_selftest.c htsfetch_selftest.c htspsl_selftest.c \
-	htsbundle_selftest.c \
-	htsfilters_selftest.c \
-	htsheader_selftest.c htsio_selftest.c htslib_selftest.c \
-	htslines_selftest.c \
-	htsmime_selftest.c htsname_selftest.c htsnet_selftest.c \
-	htsopt_selftest.c htsparse_selftest.c htstools_selftest.c \
-	htswarc_selftest.c \
-	htswizard_selftest.c \
 	htscatchurl.c htsfetch.c htspsl.c htspsl_data.c htsfilters.c htsftp.c htshash.c coucal/coucal.c \
 	htscmdline.c htshelp.c htslib.c htslines.c htsurlport.c htsdate.c htscoremain.c \
 	htsname.c htsrobots.c htstools.c htsrandom.c htswizard.c \
@@ -121,6 +109,22 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 libhttrack_la_LIBADD = $(THREADS_LIBS) $(ZLIB_LIBS) $(BROTLI_LIBS) $(ZSTD_LIBS) $(OPENSSL_LIBS) $(DL_LIBS) $(SOCKET_LIBS) $(ICONV_LIBS)
 libhttrack_la_CFLAGS = $(AM_CFLAGS) -DLIBHTTRACK_EXPORTS -DZLIB_CONST
 libhttrack_la_LDFLAGS = $(AM_LDFLAGS) -version-info $(VERSION_INFO)
+
+# --disable-selftests leaves these out and defines HTS_NO_SELFTEST.
+if SELFTESTS
+libhttrack_la_SOURCES += htsselftest.c htsselftest_util.c \
+	htsback_selftest.c htscache_selftest.c htscharset_selftest.c \
+	htscmdline_selftest.c \
+	htscookie_selftest.c htsdns_selftest.c htsfetch_selftest.c htspsl_selftest.c \
+	htsbundle_selftest.c \
+	htsfilters_selftest.c \
+	htsheader_selftest.c htsio_selftest.c htslib_selftest.c \
+	htslines_selftest.c \
+	htsmime_selftest.c htsname_selftest.c htsnet_selftest.c \
+	htsopt_selftest.c htsparse_selftest.c htstools_selftest.c \
+	htswarc_selftest.c \
+	htswizard_selftest.c
+endif
 
 EXTRA_DIST = httrack.h htsstats.h webhttrack.in \
 		version.rc \

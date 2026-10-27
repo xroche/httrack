@@ -681,6 +681,29 @@ AS_IF([test x"$crash_test" = x"yes"],
 	[AC_DEFINE([HTS_CRASH_TEST], [1],
 		[Define to 1 to build the hidden -#c crash-test option.])])
 
+## On by default because the suite drives -#test.
+AC_ARG_ENABLE([selftests],
+	[AS_HELP_STRING([--disable-selftests],
+		[leave the engine self-tests (hidden -#test option) out of libhttrack; make check needs them @<:@default=enabled@:>@])],
+	[
+	case "${enableval}" in
+	no|yes)
+		selftests=$enableval
+		;;
+	*)
+		AC_MSG_ERROR([bad value for selftests, expected yes/no])
+		;;
+	esac
+	],
+	[selftests=yes])
+AC_MSG_CHECKING([whether to build the engine self-tests])
+AC_MSG_RESULT([$selftests])
+AS_IF([test x"$selftests" = x"no"],
+	[AC_DEFINE([HTS_NO_SELFTEST], [1],
+		[Define to 1 to leave the engine self-tests out of libhttrack.])])
+AM_CONDITIONAL([SELFTESTS], [test x"$selftests" = x"yes"])
+AC_SUBST([SELFTESTS], [$selftests])
+
 ## CSPRNG for the --single-file mark; /dev/urandom is the fallback
 AC_CHECK_FUNCS([getrandom])
 

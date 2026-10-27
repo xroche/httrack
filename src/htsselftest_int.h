@@ -43,6 +43,9 @@ Please visit our Website: http://www.httrack.com
 #include "htsselftest.h"
 
 #include "htsglobal.h"
+#ifdef HTS_NO_SELFTEST
+#error "HTS_NO_SELFTEST is set: leave the self-test sources out of the build"
+#endif
 #include "htscore.h"
 #include "htsmodules.h"
 #include "htsback.h"
