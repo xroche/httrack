@@ -2446,7 +2446,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
               }
             }
 
-            if (ok == 0 && !not_url) { // tester un lien
+            if (ok == 0 && !not_url) { // test a link
               char BIGSTK lien[HTS_URLMAXSIZE * 2];
               int meme_adresse = 0;     // 0 par défaut pour primary
 
@@ -3651,7 +3651,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     if ((afs.af.adr[0] != '\0') && (p_type != 2) &&
                         (p_type != -2) &&
                         (forbidden_url !=
-                         1)) { // si le fichier n'existe pas, ajouter à la liste
+                         1)) { // if the file does not exist, add it to the list
                       /* The gate above misses a cap that fills mid-page,
                          which the queued hts_addurl() records in
                          hts_mirror_process_user_interaction() can do after it.
@@ -4165,37 +4165,39 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
         strcpybuff(mov_url, r->location);
         url_drop_fragment(mov_url);
 
-        // url qque -> adresse+fichier
+        // any url -> address+file
         if ((reponse =
              ident_url_relatif(mov_url, urladr(), urlfil(), moved)) >= 0) {
-          int set_prio_to = 0;  // pas de priotité fixéd par wizard
+          int set_prio_to = 0; // no priority set by the wizard
           // A same-file alias redirect must be followed, not stubbed (#159).
           const hts_boolean same_savefile = hts_redirect_same_savefile(
               opt, urladr(), urlfil(), moved->adr, moved->fil);
-          // c'est (en gros) la même URL..
-          // si c'est un problème de casse dans le host c'est que le serveur est buggé
+          // this is (roughly) the same URL..
+          // a case problem in the host means the server is buggy
           // ("RFC says.." : host name IS case insensitive)
-          if ((strfield2(moved->adr, urladr()) != 0) && (strfield2(moved->fil, urlfil()) != 0)) { // identique à casse près
-            // on tourne en rond
+          // identical up to case, so we are going in circles
+          if ((strfield2(moved->adr, urladr()) != 0) &&
+              (strfield2(moved->fil, urlfil()) != 0)) {
             if (strcmp(moved->fil, urlfil()) == 0) {
               error = 1;
-              get_it = -1;      // ne rien faire
+              get_it = -1; // do nothing
               hts_log_print(opt, LOG_WARNING,
                             "Can not bear crazy server (%s) for %s%s", r->msg,
                             adr_nologin(opt, urladr()), urlfil());
-            } else {            // mauvaise casse, effacer entrée dans la pile et rejouer une fois
+            } else { // wrong case: erase the entry in the stack and replay once
               get_it = 1;
             }
-          } else {              // adresse différente
-            if (ishtml(opt, mov_url) == 0) {    // pas même adresse MAIS c'est un fichier non html (pas de page moved possible)
-              // -> on prend à cette adresse, le lien sera enregistré avec lien_record() (hash)
+          } else { // different address
+            // not the same address BUT a non-html file (no moved page possible)
+            if (ishtml(opt, mov_url) == 0) {
+              // -> take it at this address, the link is recorded with
+              // lien_record() (hash)
               hts_log_print(opt, LOG_DEBUG,
                             "wizard link test for moved file at %s%s..",
                             adr_nologin(opt, moved->adr), moved->fil);
-              // accepté?
+              // accepted? (new address not refused)
               if (hts_acceptlink(opt, ptr, moved->adr, moved->fil, NULL, NULL,
-                                 HTS_FALSE, &set_prio_to, NULL) !=
-                  1) { /* nouvelle adresse non refusée ? */
+                                 HTS_FALSE, &set_prio_to, NULL) != 1) {
                 get_it = 1;
                 hts_log_print(opt, LOG_DEBUG, "moved link accepted: %s%s",
                               adr_nologin(opt, moved->adr), moved->fil);
