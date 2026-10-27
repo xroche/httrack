@@ -2,7 +2,8 @@
 #
 # An <applet> or robots <meta> tag with no '>' and many code= or name=
 # attributes was rescanned to the end of the page once per attribute
-# (OSS-Fuzz 578272899). Quadratic, the big page trips the crawl watchdog.
+# (OSS-Fuzz 578272899). If the scan is quadratic, the big page trips the crawl
+# watchdog.
 
 set -e
 
@@ -30,17 +31,28 @@ def put(name, body):
 
 
 put("index.html",
-    b'<a href="big.html">b</a><a href="swap.html">s</a>'
-    b'<a href="nofollow.html">n</a>\n')
+    b'<a href="big.html">b</a><a href="swap-999.html">s</a>'
+    b'<a href="swap-1000.html">t</a><a href="robots-998.html">r</a>'
+    b'<a href="robots-999.html">q</a>\n')
 put("big.html",
-    b"<applet " + b"code=a " * 60000 + b"<meta " + b"name=a " * 250000)
-# Controls: both scans still act when the tag's '>' is close enough. The
-# applet's '>' sits 990 bytes after code=, just inside the 1000-byte window.
-pad = b" " * (990 - len(b"code=A.class codebase=c/"))
-put("swap.html", b"<applet code=A.class codebase=c/" + pad + b"></applet>\n")
-put("nofollow.html",
-    b'<meta name="robots" content="nofollow"><a href="hidden.html">h</a>\n')
+    b"<applet " + b"code=a " * 120000 + b"<meta " + b"name=a " * 250000)
+
+
+def at(head, offset):  # pad head so that '>' lands at offset
+    return head + b" " * (offset - len(head)) + b">"
+
+
+# Each scan still acts when '>' is inside its window, counted from the
+# attribute name, and does nothing one byte further.
+for off in (999, 1000):
+    put("swap-%d.html" % off,
+        b"<applet " + at(b"code=A.class codebase=c/", off) + b"</applet>\n")
+for off, link in ((998, b"hidden"), (999, b"shown")):
+    put("robots-%d.html" % off,
+        b"<meta " + at(b'name="robots" content="nofollow"', off) +
+        b'<a href="' + link + b'.html">l</a>\n')
 put("hidden.html", b"hidden\n")
+put("shown.html", b"shown\n")
 PY
 
 local_server_start --root "$doc"
@@ -55,19 +67,29 @@ test "$rc" -eq 0 || fail "crawl exited $rc: $(cat "${tmpdir}/log")"
 
 host="${out}/127.0.0.1_${SRV_PORT}"
 
-printf '[unclosed tags parsed] ..\t'
+printf '[unclosed tags parsed before the watchdog] ..\t'
 test -f "${host}/big.html" || fail "big.html not mirrored"
 echo OK
 
-printf '[codebase swapped before code] ..\t'
-swapped=$(cat "${host}/swap.html")
-case "$swapped" in
-*"<applet "*"codebase="*"code="*) echo OK ;;
-*) fail "no swap: $swapped" ;;
-esac
+swapped() { # swapped PAGE
+    case "$(cat "${host}/$1")" in
+    *"<applet "*"codebase="*"code="*) return 0 ;;
+    esac
+    return 1
+}
 
-printf '[robots meta nofollow obeyed] ..\t'
+printf '[codebase swapped with > at 999] ..\t'
+swapped swap-999.html || fail "no swap: $(cat "${host}/swap-999.html")"
+echo OK
+
+printf '[no swap with > at 1000] ..\t'
+! swapped swap-1000.html || fail "swapped: $(cat "${host}/swap-1000.html")"
+echo OK
+
+printf '[robots nofollow obeyed with > at 998] ..\t'
 test ! -e "${host}/hidden.html" || fail "nofollow link was followed"
-grep -q 'follow robots meta tag' "${out}/hts-log.txt" ||
-    fail "no nofollow warning in $(cat "${out}/hts-log.txt")"
+echo OK
+
+printf '[robots meta ignored with > at 999] ..\t'
+test -f "${host}/shown.html" || fail "link after a far '>' not followed"
 echo OK

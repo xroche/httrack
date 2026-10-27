@@ -1898,7 +1898,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                           // A codebase= after code= is swapped before it.
                           {
-                            /* the swap needs the tag's '>' this close */
+                            /* the swap needs '>' within this many bytes of
+                             * code= */
                             const size_t window = 1000;
                             const char *a;
 
@@ -1906,8 +1907,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             while ((size_t) (a - html) < window && *a &&
                                    *a != '>' && !rech_tageq(a, "codebase"))
                               a++;
-                            if ((size_t) (a - html) < window &&
-                                rech_tageq(a, "codebase")) {
+                            if (rech_tageq(a, "codebase")) {
                               const char *const b =
                                   tag_close_within(a, window - (a - html));
 
