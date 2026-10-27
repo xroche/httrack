@@ -74,12 +74,12 @@ htsserver_require
 hold_port
 taken=$HELD_PORT
 
-# The port the caller picked is the caller's problem: nothing to redraw.
+# The port the caller picked is the caller's to redraw, so it gets status 2.
 rc=0
 out=$(htsserver_start --log "$tmpdir/hts.log" --port "$taken" 2>&1) || rc=$?
-test "$rc" -ne 0 || fail "htsserver_start took a port it cannot bind: $out"
+test "$rc" -eq 2 || fail "htsserver_start returned $rc on a port it cannot bind: $out"
 assert_match "could not bind port $taken" "$out" "htsserver_start --port"
-ok "a caller-owned port that is taken fails where it was picked"
+ok "a caller-owned port that is taken returns 2 to the caller"
 
 # Hand out the taken port once, as a neighbour winning the race would. A file,
 # not a variable: the draw runs in a command substitution, whose subshell would
