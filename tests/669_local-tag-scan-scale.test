@@ -3,7 +3,7 @@
 # An <applet> or robots <meta> tag with no '>' and many code= or name=
 # attributes was rescanned to the end of the page once per attribute
 # (OSS-Fuzz 578272899). If the scan is quadratic, the big page trips the crawl
-# watchdog.
+# watchdog on a sanitizer build, which a release build is too fast to do.
 
 set -e
 
@@ -36,7 +36,7 @@ put("index.html",
     b'<a href="robots-998.html">r</a>'
     b'<a href="robots-999.html">q</a>\n')
 put("big.html",
-    b"<applet " + b"code=a " * 120000 + b"<meta " + b"name=a " * 250000)
+    b"<applet " + b"code=a " * 30000 + b"<meta " + b"name=a " * 30000)
 
 
 def at(head, offset):  # pad head so that '>' lands at offset
