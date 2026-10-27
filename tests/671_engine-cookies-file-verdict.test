@@ -120,6 +120,7 @@ printf 'a=1; b=2\n' >"$dir/flat.txt"
 check kept-document-cookie 0 "$dir/flat.txt" "$host" 'from the document.cookie string'
 check kept-no-start-url 0 "$dir/flat.txt" "$nohost" 'no start URL to bind it to'
 verdict_only kept-no-start-url "$dir/flat.txt"
+verdict_only kept-no-start-url "$dir/flat.txt" "file://C:/site/index.html"
 
 # a crawl reads these too, but a front end must not block on them
 mkdir "$dir/adir"
