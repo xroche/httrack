@@ -45,9 +45,7 @@ static int st_endtoken(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* profilecharset DIR: which winprofile.ini files declare UTF-8. Only
-   Charset=UTF-8 or utf8 does; the legacy reading is what every other file gets,
-   since Windows converts its category from ANSI on that answer (#216). */
+/* profilecharset DIR: which winprofile.ini files declare UTF-8. */
 static int st_profilecharset(httrackp *opt, int argc, char **argv) {
   static const struct {
     const char *content;
@@ -63,6 +61,8 @@ static int st_profilecharset(httrackp *opt, int argc, char **argv) {
       {"Charset=UTF-16\r\n", HTS_FALSE},
       {"XCharset=UTF-8\r\n", HTS_FALSE},
       {"Charset=latin1\r\nCharset=UTF-8\r\n", HTS_FALSE},
+      {"Charset:UTF-8\r\n", HTS_FALSE},
+      {NULL, HTS_FALSE}, /* a Charset line hidden in an over-long line's tail */
   };
 
   char path[HTS_URLMAXSIZE];
@@ -73,16 +73,25 @@ static int st_profilecharset(httrackp *opt, int argc, char **argv) {
     fprintf(stderr, "profilecharset: needs a directory\n");
     return 1;
   }
+  assertf(!hts_profile_declares_utf8(argv[0])); /* a directory, not a file */
   snprintf(path, sizeof(path), "%s/winprofile.ini", argv[0]);
-  assertf(!hts_profile_charset_is_utf8(NULL));
-  assertf(!hts_profile_is_utf8(path)); /* missing file */
+  assertf(!hts_profile_declares_utf8(path)); /* missing file */
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     FILE *const fp = fopen(path, "wb");
 
     assertf(fp != NULL);
-    assertf(fputs(cases[i].content, fp) >= 0);
+    if (cases[i].content != NULL) {
+      assertf(fputs(cases[i].content, fp) >= 0);
+    } else {
+      int k;
+
+      assertf(fputs("Footer=", fp) >= 0);
+      for (k = 0; k < 1014; k++)
+        assertf(fputc('a', fp) != EOF);
+      assertf(fputs("Charset=UTF-8\r\nCategory=gr\xFCn\r\n", fp) >= 0);
+    }
     assertf(fclose(fp) == 0);
-    if (hts_profile_is_utf8(path) != cases[i].utf8) {
+    if (hts_profile_declares_utf8(path) != cases[i].utf8) {
       fprintf(stderr, "profilecharset: case %u read as %s\n", (unsigned) i,
               cases[i].utf8 ? "legacy" : "UTF-8");
       return 1;
@@ -90,6 +99,21 @@ static int st_profilecharset(httrackp *opt, int argc, char **argv) {
   }
   (void) unlink(path);
   printf("profilecharset self-test OK\n");
+  return 0;
+}
+
+/* getcategory FILE: print the category hts_getcategory() reads. */
+static int st_getcategory(httrackp *opt, int argc, char **argv) {
+  char *categ;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "getcategory: needs a file\n");
+    return 1;
+  }
+  categ = hts_getcategory(argv[0]);
+  printf("category=[%s]\n", categ != NULL ? categ : "(none)");
+  freet(categ);
   return 0;
 }
 
@@ -102,5 +126,7 @@ const struct selftest_entry selftests_tools[] = {
      st_endtoken},
     {"profilecharset", "<dir>",
      "which winprofile.ini files declare Charset=UTF-8", st_profilecharset},
+    {"getcategory", "<file>", "the category hts_getcategory() reads",
+     st_getcategory},
     {NULL, NULL, NULL, NULL},
 };

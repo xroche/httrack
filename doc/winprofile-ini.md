@@ -5,7 +5,7 @@ The project settings a HTTrack front end saves beside a mirror, so reopening the
 - **WinHTTrack** (httrack-windows, `WinHTTrack/Shell.cpp`) writes it from the dialog fields and reads it back. It is the original writer, and its conventions are the ones below.
 - **WebHTTrack** (`src/htsserver.c`, `html/server/step[24].html`) writes it from the posted form and reads it into the wizard's session state.
 - **HTTrack for Android** (httrack-android, `app/src/main/java/com/httrack/android/OptionsMapper.java`) reads and writes the same keys, with its own table of key to flag and key to default.
-- The **engine** reads two keys: `Category`, to group projects in the top index, and `Charset`, to know how that category is encoded. It uses its own decoder: case-insensitive, first occurrence, `unescapehttp` rather than `unescapeini`, so a `+` becomes a space (`src/htstools.c`).
+- The **engine** reads two keys with its own reader: the first occurrence wins, and the key name ignores case (`src/htstools.c`). It groups projects in the top index by `Category`, which it decodes with `unescapehttp` rather than `unescapeini`, so a `+` becomes a space. It reads `Charset` to know how that category is encoded.
 
 Neither GUI needs the file to run a mirror: the command line the wizard builds is what the engine takes, and `hts-cache/doit.log` records it. Getting the file wrong loses settings on reopen; it does not corrupt a mirror.
 
@@ -22,7 +22,9 @@ Two more divergences, both older than this document:
 
 Neither side transcodes, and the file declares no encoding, so each front end guesses. WinHTTrack is an ANSI build and writes local-codepage bytes. WebHTTrack writes back whatever the browser posted, which is UTF-8. The two therefore disagree on every non-ASCII value; until 3.50 moved the catalogs and the served pages to UTF-8 they agreed whenever the host codepage matched the catalog's charset, which was common but never guaranteed. A profile written by one and read by the other keeps its ASCII and loses its accents.
 
-`Charset=UTF-8` declares that every value in the file is UTF-8. A reader compares the value without regard to case and also accepts `utf8`. When the key is absent, or has any other value, the file is legacy: on Windows its values are in the host ANSI codepage. The engine reads the key and does not convert a declared UTF-8 category a second time when it builds the top index. No front end writes the key yet. A front end that wrote it before the readers knew it would fail on every old reader, because an old reader ignores the key and shows the UTF-8 bytes as legacy text. So the readers come first, and the writers follow in a later release.
+`Charset=UTF-8` declares that every value in the file is UTF-8. The first `Charset` line decides. Its value is not percent-decoded, case does not matter, and `utf8` is accepted too. When the key is absent, or has any other value, the file is legacy, which on Windows means the host ANSI codepage. The engine reads the key, and it does not convert a declared UTF-8 category from ANSI when it builds the top index.
+
+No front end writes the key yet. An old reader ignores an unknown key, so the key alone breaks nothing. What breaks an old reader is a writer that switches its bytes to UTF-8, which is WinHTTrack's later step, so the readers ship first. WebHTTrack already writes UTF-8 and could declare the key at once. When it does, `step4.html` must write `Charset` back, or a re-save drops the declaration.
 
 ## Value conventions
 

@@ -104,8 +104,7 @@ ini = dict(line.split("=", 1) for line in textarea(step4, "winprofile")
            .replace("\r\n", "\n").split("\n") if "=" in line)
 
 
-# No writer emits Charset yet, so a declaration read back must not reach the
-# page or the re-saved profile.
+# Charset is read-only: it must not reach the page or the saved profile.
 if "Charset" in ini or "Charset" in loaded or "Charset" in step4:
     sys.exit("the Charset key leaked into the wizard: %r" % ini)
 

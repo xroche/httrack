@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# Only a winprofile.ini declaring Charset=UTF-8 skips the ANSI conversion of
-# its category; an absent or unknown value stays legacy.
+# Which winprofile.ini files declare UTF-8.
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh

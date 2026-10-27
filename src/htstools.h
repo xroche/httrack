@@ -160,13 +160,8 @@ hts_boolean hts_rename_over(httrackp *opt, const char *src, const char *dst);
 hts_boolean hts_rename_over_aside_selftest(httrackp *opt, const char *src,
                                            const char *dst);
 
-/* Does a winprofile.ini Charset= value declare UTF-8? NULL means absent, and
-   absent or any other value means the legacy host codepage. */
-hts_boolean hts_profile_charset_is_utf8(const char *value);
-
-/* Does the winprofile.ini at filename (system charset) declare Charset=UTF-8?
-   The first Charset line decides; a missing file is legacy. */
-hts_boolean hts_profile_is_utf8(const char *filename);
+/* Does the winprofile.ini at filename (system charset) declare UTF-8? */
+hts_boolean hts_profile_declares_utf8(const char *filename);
 
 /* True when stdout is a real terminal. Gate any VT escape or CR overwrite on
    it: a redirected log keeps that noise forever. */

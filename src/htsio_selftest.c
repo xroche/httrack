@@ -800,8 +800,7 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
   assertf(fp != NULL);
   fprintf(fp, "category=%s\n", catName);
   fclose(fp);
-  /* a project declaring Charset=UTF-8 keeps its category as is, on Windows
-     too, rather than being converted a second time */
+  /* Windows only: a declared UTF-8 category skips the ANSI conversion */
   snprintf(path, sizeof(path), "%s/declared/hts-cache/", topdir);
   assertf(structcheck(path) == 0);
   snprintf(path, sizeof(path), "%s/declared/index.html", topdir);

@@ -1128,7 +1128,7 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
                   }
 #ifdef _WIN32
                   /* a legacy category is ANSI-codepage, doc is utf-8 (#216) */
-                  else if (!hts_profile_is_utf8(StringBuff(iname))) {
+                  else if (!hts_profile_declares_utf8(StringBuff(iname))) {
                     char *cat_utf8 = hts_convertStringSystemToUTF8(
                         category, strlen(category));
                     if (cat_utf8 != NULL) {
@@ -1260,53 +1260,55 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
   return retval;
 }
 
+/* First line starting with key into line[size]: value offset, or 0. */
+static size_t profile_key_line(FILE *fp, const char *key, char *line,
+                               size_t size) {
+  int c = 0;
+
+  assertf(size != 0);
+  while (c != EOF) {
+    size_t n = 0;
+    int off;
+
+    while (n + 1 < size && (c = fgetc(fp)) != EOF && c != '\n') {
+      if (c != '\r' && c != '\t' && c != '\f')
+        line[n++] = (char) c;
+    }
+    line[n] = '\0';
+    if (n + 1 >= size) {
+      while ((c = fgetc(fp)) != EOF && c != '\n')
+        ;
+    }
+    if ((off = strfield(line, key)) != 0)
+      return (size_t) off;
+  }
+  return 0;
+}
+
 HTSEXT_API char *hts_getcategory(const char *filename) {
   String categ = STRING_EMPTY;
+  FILE *const fp = fexist(filename) ? fopen(filename, "rb") : NULL;
 
-  if (fexist(filename)) {
-    FILE *fp = fopen(filename, "rb");
+  if (fp != NULL) {
+    char BIGSTK line[1022];
+    const size_t off = profile_key_line(fp, "category=", line, sizeof(line));
 
-    if (fp != NULL) {
-      int done = 0;
-
-      while(!feof(fp) && !done) {
-        char BIGSTK line[1024];
-        int n = linput(fp, line, sizeof(line) - 2);
-
-        if (n > 0) {
-          if (strfield(line, "category=")) {
-            hts_unescapehttp(line + 9, &categ);
-            done = 1;
-          }
-        }
-      }
-      fclose(fp);
-    }
+    if (off != 0)
+      hts_unescapehttp(line + off, &categ);
+    fclose(fp);
   }
   return StringBuffRW(categ);
 }
 
-hts_boolean hts_profile_charset_is_utf8(const char *value) {
-  return value != NULL &&
-                 (strfield2(value, "utf-8") || strfield2(value, "utf8"))
-             ? HTS_TRUE
-             : HTS_FALSE;
-}
-
-hts_boolean hts_profile_is_utf8(const char *filename) {
+hts_boolean hts_profile_declares_utf8(const char *filename) {
   hts_boolean utf8 = HTS_FALSE;
   FILE *const fp = fopen(filename, "rb");
 
   if (fp != NULL) {
-    while (!feof(fp)) {
-      char BIGSTK line[1024];
+    char BIGSTK line[1022];
+    const size_t off = profile_key_line(fp, "charset=", line, sizeof(line));
 
-      if (linput(fp, line, sizeof(line) - 2) > 0 &&
-          strfield(line, "charset=")) {
-        utf8 = hts_profile_charset_is_utf8(line + 8);
-        break;
-      }
-    }
+    utf8 = off != 0 && hts_isCharsetUTF8(line + off);
     fclose(fp);
   }
   return utf8;
