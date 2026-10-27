@@ -926,16 +926,16 @@ static int cookie_load_flat(httrackp *opt, t_cookie *cookie, FILE *fp,
   return COOKIE_LOAD_KEEP;
 }
 
-/* Read the Netscape records from fp's position to its end into cookie, and
-   name the file as given in warnings. A UTF-8 BOM is skipped on the first line
-   when first_line is HTS_TRUE. filter, when not NULL, picks the records.
-   Returns what cookie_load_from does. */
 /* Count a refused line, saturating like lineno. */
 static void cookie_refuse(int *refused) {
   if (*refused < INT_MAX)
     (*refused)++;
 }
 
+/* Read the Netscape records from fp's position to its end into cookie, and
+   name the file as given in warnings. A UTF-8 BOM is skipped on the first line
+   when first_line is HTS_TRUE. filter, when not NULL, picks the records.
+   Returns what cookie_load_from does. */
 static int cookie_load_records(httrackp *opt, t_cookie *cookie, text_src *src,
                                const char *given, hts_boolean first_line,
                                cookie_filter *filter) {

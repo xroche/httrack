@@ -495,7 +495,7 @@ typedef enum hts_cookies_verdict {
   HTS_COOKIES_CREATED = 1,
   /** The file is kept, because a rewrite would lose some of its lines. */
   HTS_COOKIES_KEPT_LINES_LOST = 2,
-  /** The file is kept, because it cannot be read. */
+  /** The file is kept, because it cannot be read or memory ran out. */
   HTS_COOKIES_KEPT_UNREADABLE = 3,
   /** The file is kept, because it is not a regular file. */
   HTS_COOKIES_KEPT_NOT_A_FILE = 4,
