@@ -768,7 +768,7 @@ static void browserlogin_free(browserlogin_post *login) {
 }
 
 static void browserlogin_set(const char *key, const char *value) {
-  coucal_write(NewLangList, key, (intptr_t) strdup(value));
+  coucal_write(NewLangList, key, (intptr_t) strdupt(value));
 }
 
 /* Run the posted paste through hts_bundle_from_paste into res. */
@@ -1587,7 +1587,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
     if (!path_from_cmdline) {
       strcpybuff(pth, gethomedir());
       strcatbuff(pth, "/websites");
-      coucal_write(NewLangList, "path", (intptr_t) strdup(pth));
+      coucal_write(NewLangList, "path", (intptr_t) strdupt(pth));
     }
   }
   load_ui_settings();
@@ -1735,10 +1735,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
            */
           coucal_write(
               NewLangList, "commandReturnMsg",
-              (intptr_t) (commandReturnMsg ? strdup(commandReturnMsg) : NULL));
+              (intptr_t) (commandReturnMsg ? strdupt(commandReturnMsg) : NULL));
           coucal_write(NewLangList, "commandReturnCmdl",
-                       (intptr_t) (commandReturnCmdl ? strdup(commandReturnCmdl)
-                                                     : NULL));
+                       (intptr_t) (commandReturnCmdl
+                                       ? strdupt(commandReturnCmdl)
+                                       : NULL));
         } else {
           coucal_write(NewLangList, "commandReturn", (intptr_t) NULL);
           coucal_write(NewLangList, "commandReturnMsg", (intptr_t) NULL);
@@ -3103,7 +3104,7 @@ static void lang_load_catalog(FILE *fp, hts_boolean fallback,
           continue;
         do {
           increment++;
-          sprintf(extkey + pos, "%d", increment);
+          snprintf(extkey + pos, sizeof(extkey) - pos, "%d", increment);
           intkey = LANGINTKEY(extkey);
         } while (strnotempty(intkey) && strnotempty(LANGSEL(intkey)));
         if (!strnotempty(intkey))
