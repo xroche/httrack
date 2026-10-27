@@ -1,0 +1,122 @@
+#!/bin/bash
+#
+# hts_cookies_file_verdict says what a crawl then does to the -%K file.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+bin=$(httrack_path)
+dir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_cookiesverdict.XXXXXX")
+cleanup_push rm -rf "$dir"
+cleanup_push chmod -R u+rw "$dir"
+mkdir "$dir/site"
+echo '<html>hello</html>' >"$dir/site/index.html"
+nohost="file://$dir/site/index.html"
+host="file://localhost$dir/site/index.html"
+rec() { printf 'www.example.com\tTRUE\t/\tFALSE\t0\t%s\t1\n' "$1"; }
+
+runs=0
+# check VERDICT LOST FILE URL LOG: the verdict, then a crawl that keeps FILE
+# and logs LOG, or that keeps nothing
+check() {
+    local n got want log
+    # the numbers are ABI, read by front ends
+    case $1 in
+    rewritten) n=0 ;;
+    created) n=1 ;;
+    kept-lines-lost) n=2 ;;
+    kept-unreadable) n=3 ;;
+    kept-dangling-link) n=4 ;;
+    kept-missing-beside-bak) n=5 ;;
+    kept-empty-beside-bak) n=6 ;;
+    kept-document-cookie) n=7 ;;
+    kept-no-start-url) n=8 ;;
+    *) fail "unknown verdict $1" ;;
+    esac
+    got=$("$bin" -O /dev/null "-#test=cookiesverdict" "$3" "$4" | tr -d '\r')
+    want="^$1=$n lost=$2 load=-?[0-9]+ logged=0/[0-9]+\$"
+    assert_match "$want" "$got" "verdict of $3"
+    # the load beside it logs, so the verdict's silence is not a dead counter
+    if [ "$n" -ge 2 ]; then
+        assert_match ' logged=0/[1-9]' "$got" "the load of $3 logged nothing"
+    fi
+    if [ -L "$3" ]; then
+        readlink "$3" >"$dir/before"
+    elif [ -e "$3" ] && ! cat "$3" >/dev/null 2>&1; then
+        : >"$dir/before.locked"
+    elif [ -e "$3" ]; then
+        cp "$3" "$dir/before"
+    else
+        : >"$dir/before.absent"
+    fi
+    runs=$((runs + 1))
+    "$bin" "$4" -O "$dir/m$runs" --cookies-file "$3" --quiet >/dev/null 2>&1
+    log=$(tr -d '\r' <"$dir/m$runs/hts-log.txt")
+    if [ "$n" -lt 2 ]; then
+        ! grep -qE 'left unchanged|is not created' <<<"$log" ||
+            fail_dump "$1: the crawl kept $3" "$dir/m$runs/hts-log.txt"
+    else
+        grep -qF -- "$5" <<<"$log" ||
+            fail_dump "$1: the crawl did not log [$5]" "$dir/m$runs/hts-log.txt"
+        if [ -e "$dir/before.absent" ]; then
+            test ! -e "$3" || fail "$1: the crawl created $3"
+        elif [ -e "$dir/before.locked" ]; then
+            ! cat "$3" >/dev/null 2>&1 || fail "$1: the crawl rewrote $3"
+        elif [ -L "$3" ]; then
+            test "$(readlink "$3")" = "$(cat "$dir/before")" ||
+                fail "$1: the crawl replaced the link $3"
+        else
+            cmp -s "$3" "$dir/before" || fail "$1: the crawl rewrote $3"
+        fi
+    fi
+    rm -f "$dir/before" "$dir/before.absent" "$dir/before.locked"
+}
+
+rec a >"$dir/ok.txt"
+check rewritten 0 "$dir/ok.txt" "$nohost" ""
+grep -qF '# Netscape HTTP Cookie File' "$dir/ok.txt" ||
+    fail "rewritten: the crawl did not write the jar back"
+
+{
+    rec a
+    echo '# a comment no tool writes'
+    rec a
+    printf 'www.example.com\tTRUE\t/\n'
+} >"$dir/lost.txt"
+check kept-lines-lost 3 "$dir/lost.txt" "$nohost" 'because 3 of its lines would be lost'
+
+printf 'a=1; b=2\n' >"$dir/flat.txt"
+check kept-document-cookie 0 "$dir/flat.txt" "$host" 'from the document.cookie string'
+check kept-no-start-url 0 "$dir/flat.txt" "$nohost" 'no start URL to bind it to'
+
+rec a >"$dir/gone.txt.bak"
+check kept-missing-beside-bak 0 "$dir/gone.txt" "$nohost" 'is missing but its .bak exists'
+: >"$dir/empty.txt"
+rec a >"$dir/empty.txt.bak"
+check kept-empty-beside-bak 0 "$dir/empty.txt" "$nohost" 'is empty but its .bak is not'
+
+if ln -s "$dir/nowhere.txt" "$dir/link.txt" 2>/dev/null && [ -L "$dir/link.txt" ]; then
+    check kept-dangling-link 0 "$dir/link.txt" "$nohost" 'symbolic link to a missing file'
+else
+    echo "no symbolic links here, so the dangling link case is not run"
+fi
+
+rec a >"$dir/locked.txt"
+chmod 000 "$dir/locked.txt"
+if ! cat "$dir/locked.txt" >/dev/null 2>&1; then
+    check kept-unreadable 0 "$dir/locked.txt" "$nohost" 'could not read'
+else
+    echo "a mode 000 file is readable here, so the unreadable case is not run"
+fi
+chmod 600 "$dir/locked.txt"
+
+# a missing file is created once a Set-Cookie fills the jar
+check created 0 "$dir/new.txt" "$nohost" ""
+test ! -e "$dir/new.txt" || fail "created: an empty jar created the file"
+: "${top_srcdir:=..}"
+bash "$top_srcdir/tests/local-crawl.sh" --log-not-found 'left unchanged' \
+    httrack 'BASEURL/cookies/entrance.php' -o0 --cookies-file "$dir/new.txt"
+grep -qF 'cat' "$dir/new.txt" || fail "created: the crawl did not create the file"
+
+echo "every cookies file verdict matches what the crawl did"
