@@ -4086,8 +4086,9 @@ static void postprocess_file(httrackp *opt, const char *save, const char *adr,
         if (opt->state.mimehtml_created == MIMEHTML_NONE) {
           srand((unsigned int) time(NULL));
           StringRoom(opt->state.mimemid, 256);
-          sprintf(StringBuffRW(opt->state.mimemid),
-                  "----=_MIMEPart_%d_%d_=----", (int) time(NULL), (int) rand());
+          snprintf(StringBuffRW(opt->state.mimemid), 256,
+                   "----=_MIMEPart_%d_%d_=----", (int) time(NULL),
+                   (int) rand());
           StringSetLength(opt->state.mimemid, -1);
           if (isHtml) {
             mimehtml_create(opt, cid);
