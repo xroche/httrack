@@ -1,16 +1,17 @@
 #!/bin/bash
-# --disable-selftests (HTS_NO_SELFTEST) drops the self-tests and -#test says so.
+# A build without self-tests makes -#test fail.
 
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-builddir=${abs_top_builddir:?not run under make check}
 case "${SELFTESTS:-}" in
 yes | no) ;;
 *) skip "SELFTESTS unset, not run under make check" ;;
 esac
+[ -n "${abs_top_builddir:-}" ] || skip "abs_top_builddir unset, not run under make check"
+builddir=${abs_top_builddir}
 
 rc=0
 out=$(httrack -#test 2>&1) || rc=$?
