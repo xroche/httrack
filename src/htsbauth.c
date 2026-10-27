@@ -1058,7 +1058,7 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, text_src *src,
           if ((attr.expires == 0 || attr.expires > (int64_t) time(NULL)) &&
               (filter == NULL ||
                filter->admit(filter, cookie, repeated, cook_name, cook_value,
-                             domain, path))) {
+                             domain, path, &attr))) {
             // cookie_set stores it host-only
             if (!attr.host_only && cookie_domain_is_suffix(domain))
               cookie_warn(opt, filter, given,
@@ -1075,8 +1075,12 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, text_src *src,
             }
             if (cookie_set(cookie, cook_name, cook_value, domain, path,
                            &attr) != 0) {
-              // the jar caps a field tighter still, and a full one refuses
-              if (filter != NULL)
+              // with full_skips, the bundles alone fit, so -%K filled the jar
+              if (filter != NULL && filter->full_skips)
+                cookie_warn(opt, filter, given,
+                            "the cookie jar is full, so a cookie is left out",
+                            "Cookies: the jar is full: %s", given);
+              else if (filter != NULL)
                 filter->why = "the cookie jar did not store a cookie";
               else
                 hts_log_print(opt, LOG_WARNING,

@@ -307,6 +307,10 @@ for i in $(seq 1 400); do
     many="$many C$i=$(repeat_chars 100 v);"
 done
 refused 'the cookies of the paste do not fit in a bundle' "curl https://bad.test/ -b '$many'"
+recs=$(for i in $(seq 1 250); do
+    printf '.a.test\tTRUE\t/\tFALSE\t0\tC%d\t%s\n' "$i" "$(repeat_chars 100 v)"
+done)
+refused 'line 232 of the paste: the cookie jar did not store a cookie' "$recs" url:https://a.test/
 refused 'the user agent cannot be used' "curl https://bad.test/ -b a=$sec -A $(repeat_chars 1024 u)"
 # A folder that does not exist: the reason names the path, not the paste.
 put "curl https://nofolder.test/ -b a=$sec"
@@ -317,8 +321,8 @@ selftest_queue_head "refused: cannot write $dir/missing/nofolder.test.hts: " \
 put "curl https://words.test/ -b a=1$(for _ in $(seq 1 1020); do printf ' -k'; done)"
 selftest_queue_head "name=words.test cookies=1" paste "$dir/dry" "$in" dry
 
-test "${#SELFTEST_WANT[@]}" -eq 118 ||
-    fail "expected 118 queued rows, got ${#SELFTEST_WANT[@]}"
+test "${#SELFTEST_WANT[@]}" -eq 119 ||
+    fail "expected 119 queued rows, got ${#SELFTEST_WANT[@]}"
 selftest_run_queued
 
 # A host list too long to show ends with ",...", not with a cut name.

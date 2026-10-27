@@ -482,6 +482,7 @@ static hts_boolean bundle_jar_wins(const bundle *b, const char *jar_file) {
 typedef struct bundle_jar {
   const bundle *b;
   t_cookie *all_bundles; /* every bundle's records so far */
+  t_cookie *alone;       /* the same in a jar of opt->cookie's size, or NULL */
   hts_boolean jar_wins;  /* A record the jar holds already wins. */
   int dropped;           /* records outside the scope */
 } bundle_jar;
@@ -491,7 +492,7 @@ typedef struct bundle_jar {
 static hts_boolean bundle_admit(cookie_filter *filter, t_cookie *cookie,
                                 hts_boolean repeat, const char *name,
                                 const char *value, const char *domain,
-                                const char *path) {
+                                const char *path, const cookie_attr *attr) {
   bundle_jar *const ctx = (bundle_jar *) filter->ctx;
   char buffer[8192];
   char host[COOKIE_MAX_DOMAIN];
@@ -512,21 +513,29 @@ static hts_boolean bundle_admit(cookie_filter *filter, t_cookie *cookie,
     filter->why = "a cookie has another value in another bundle";
     return HTS_FALSE;
   }
-  /* unreachable while all_bundles outsizes opt->cookie; a silent skip would
-     stop the clash check */
+  // a silent skip would stop the clash check
   if (cookie_set(ctx->all_bundles, name, value, domain, path, NULL) != 0) {
     filter->why = "too many cookies to compare with the other bundles";
     return HTS_FALSE;
   }
-  return !ctx->jar_wins ||
-         cookie_find_exact(cookie->data, name, host, path) == NULL;
+  if (ctx->jar_wins &&
+      cookie_find_exact(cookie->data, name, host, path) != NULL)
+    return HTS_FALSE;
+  // the bundles overflow a jar without the -%K records, so the bundle is wrong
+  if (ctx->alone != NULL &&
+      cookie_set(ctx->alone, name, value, domain, path, attr) != 0) {
+    filter->why = "the cookie jar did not store a cookie";
+    return HTS_FALSE;
+  }
+  return HTS_TRUE;
 }
 
 /* Read b's bundle from src, set its scope, and load its cookies, comparing
    them with all_bundles. b->file names it in messages. */
 static hts_boolean bundle_load_src(httrackp *opt, bundle *b, text_src *src,
                                    const char *jar_file, t_cookie *all_bundles,
-                                   char *err, size_t err_size) {
+                                   t_cookie *alone, char *err,
+                                   size_t err_size) {
   int cookies_line;
   t_cookie *scratch = NULL;
   bundle_jar ctx;
@@ -546,11 +555,14 @@ static hts_boolean bundle_load_src(httrackp *opt, bundle *b, text_src *src,
   memset(&ctx, 0, sizeof(ctx));
   ctx.b = b;
   ctx.all_bundles = all_bundles;
+  ctx.alone = alone;
   ctx.jar_wins = bundle_jar_wins(b, jar_file);
   memset(&filter, 0, sizeof(filter));
   filter.admit = bundle_admit;
   filter.ctx = &ctx;
   filter.line = cookies_line;
+  // alone took the record, so only the -%K records leave no room for it
+  filter.full_skips = alone != NULL;
   if (cookies_line != 0 && opt->cookie == NULL) {
     hts_log_print(opt, LOG_WARNING,
                   "Cookies are disabled, so the cookies of %s are not sent",
@@ -578,8 +590,8 @@ static hts_boolean bundle_load_src(httrackp *opt, bundle *b, text_src *src,
 /* Read b's file, set its scope, and load its cookies, comparing them with
    all_bundles. */
 static hts_boolean bundle_load(httrackp *opt, bundle *b, const char *jar_file,
-                               t_cookie *all_bundles, char *err,
-                               size_t err_size) {
+                               t_cookie *all_bundles, t_cookie *alone,
+                               char *err, size_t err_size) {
   const char *const dir = StringNotEmpty(opt->bundle_dir)
                               ? StringBuff(opt->bundle_dir)
                               : StringBuff(opt->path_log);
@@ -594,7 +606,8 @@ static hts_boolean bundle_load(httrackp *opt, bundle *b, const char *jar_file,
     BUNDLE_FAIL("%s: cannot read the login bundle: %s", b->file,
                 strerror(errno));
   src = text_src_file(fp);
-  ok = bundle_load_src(opt, b, &src, jar_file, all_bundles, err, err_size);
+  ok = bundle_load_src(opt, b, &src, jar_file, all_bundles, alone, err,
+                       err_size);
   fclose(fp);
   return ok;
 }
@@ -632,6 +645,7 @@ hts_boolean hts_bundle_load_all(httrackp *opt, const char *jar_file, char *err,
                                 size_t err_size) {
   hts_bundle_state *const st = (hts_bundle_state *) opt->bundle_state;
   t_cookie *all_bundles;
+  t_cookie *alone = NULL;
   size_t *group;
   hts_boolean ok = HTS_TRUE;
   size_t i, j;
@@ -640,16 +654,23 @@ hts_boolean hts_bundle_load_all(httrackp *opt, const char *jar_file, char *err,
     return HTS_TRUE;
   all_bundles = calloct(1, sizeof(t_cookie));
   group = calloct(st->count, sizeof(size_t));
-  if (all_bundles == NULL || group == NULL) {
+  if (opt->cookie != NULL)
+    alone = calloct(1, sizeof(t_cookie));
+  if (all_bundles == NULL || group == NULL ||
+      (opt->cookie != NULL && alone == NULL)) {
     freet(all_bundles);
     freet(group);
+    freet(alone);
     BUNDLE_FAIL("login bundles: out of memory");
   }
   all_bundles->max_len = sizeof(all_bundles->data);
+  if (alone != NULL)
+    alone->max_len = opt->cookie->max_len;
   for (i = 0; i < st->count; i++)
     group[i] = i;
   for (i = 0; i < st->count && ok; i++)
-    ok = bundle_load(opt, &st->items[i], jar_file, all_bundles, err, err_size);
+    ok = bundle_load(opt, &st->items[i], jar_file, all_bundles, alone, err,
+                     err_size);
   // the log backstop hides a bundle's tokens and url-line passwords too
   for (i = 0; i < st->count && ok; i++) {
     for (j = 0; j < st->items[i].nurls; j++)
@@ -683,6 +704,7 @@ hts_boolean hts_bundle_load_all(httrackp *opt, const char *jar_file, char *err,
     st->items[i].https_only = st->items[bundle_group(group, i)].https_only;
   freet(group);
   freet(all_bundles);
+  freet(alone);
   return ok;
 }
 
@@ -1656,7 +1678,7 @@ HTSEXT_API hts_boolean hts_bundle_from_paste_flags(
   memset(jar->data, 0, sizeof(jar->data));
   opt->cookie = jar;
   src = text_src_mem(StringBuff(text), StringLength(text));
-  if (!bundle_load_src(opt, &check, &src, NULL, all, err, sizeof(err)))
+  if (!bundle_load_src(opt, &check, &src, NULL, all, NULL, err, sizeof(err)))
     PASTE_FAIL("%s", err);
   paste_jar_summary(jar, &count, result->hosts);
   if (count == 0 && c.auth == NULL && !keep_empty)
