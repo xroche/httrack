@@ -357,6 +357,18 @@ static const char *text_excerpt(httrackp *opt, char *buf, size_t size,
   return buf;
 }
 
+/* Return the first '>' in the first max bytes of s, or NULL. The bound stops a
+   tag with no '>' from being rescanned to the page end once per attribute. */
+static const char *tag_close_within(const char *s, size_t max) {
+  size_t i;
+
+  for (i = 0; i < max && s[i] != '\0'; i++) {
+    if (s[i] == '>')
+      return &s[i];
+  }
+  return NULL;
+}
+
 /* Drop a redirect Location's #fragment: a UA anchor, never part of the fetched
  * resource (#204). */
 static void url_drop_fragment(char *const url) {
@@ -1880,47 +1892,46 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       p = rech_tageq(html, "code");
                       if (p) {
                         if ((intag_start_valid) && check_tag(intag_start, "applet")) {  // dans un <applet !
-                          p_type = -1;  // juste le nom de fichier+dossier, écire avant codebase 
-                          add_class = 1;        // ajouter .class au besoin                         
+                          p_type =
+                              -1; // the bare file name, written before codebase
+                          add_class = 1; // add .class if missing
 
-                          // vérifier qu'il n'y a pas de codebase APRES
-                          // sinon on swappe les deux.
-                          // pas très propre mais c'est ce qu'il y a de plus simple à faire!!
-
+                          // A codebase= after code= is swapped before it.
                           {
+                            /* the swap needs '>' within this many bytes of
+                             * code= */
+                            const size_t window = 1000;
                             const char *a;
 
                             a = html;
-                            while((*a) && (*a != '>')
-                                  && (!rech_tageq(a, "codebase")))
+                            while ((size_t) (a - html) < window && *a &&
+                                   *a != '>' && !rech_tageq(a, "codebase"))
                               a++;
-                            if (rech_tageq(a, "codebase")) {    // banzai! codebase=
-                              char *b;
+                            if (rech_tageq(a, "codebase")) {
+                              const char *const b =
+                                  tag_close_within(a, window - (a - html));
 
-                              b = strchr(a, '>');
                               if (b != NULL) {
-                                if (b - html < 1000) { // au total < 1Ko
-                                  char BIGSTK tempo[HTS_URLMAXSIZE * 2];
-                                  const size_t offset = html - r->adr;
-                                  char *const modify = &r->adr[offset];
-                                  assertf(modify == html);
+                                char BIGSTK tempo[HTS_URLMAXSIZE * 2];
+                                const size_t offset = html - r->adr;
+                                char *const modify = &r->adr[offset];
+                                assertf(modify == html);
 
-                                  tempo[0] = '\0';
-                                  strncatbuff(tempo, a, b - a);
+                                tempo[0] = '\0';
+                                strncatbuff(tempo, a, b - a);
+                                strcatbuff(tempo, " ");
+                                strncatbuff(tempo, html, a - html - 1);
+                                // pad with spaces to the tag's exact length
+                                while (strlen(tempo) < (size_t) (b - html))
                                   strcatbuff(tempo, " ");
-                                  strncatbuff(tempo, html, a - html - 1);
-                                  // éventuellement remplire par des espaces pour avoir juste la taille
-                                  while(strlen(tempo) < (size_t) (b - html))
-                                    strcatbuff(tempo, " ");
-                                  // no error?
-                                  if (strlen(tempo) == (size_t) (b - html)) {
-                                    // overwrites the tag in place, so no NUL
-                                    memcpy(modify, tempo, strlen(tempo));
-                                    fetch_tag.name = NULL; /* the tag changed */
-                                    p = 0;      // DEVALIDER!!
-                                    p_type = 0;
-                                    add_class = 0;
-                                  }
+                                // no error?
+                                if (strlen(tempo) == (size_t) (b - html)) {
+                                  // overwrites the tag in place, so no NUL
+                                  memcpy(modify, tempo, strlen(tempo));
+                                  fetch_tag.name = NULL; /* the tag changed */
+                                  p = 0; // the link moved, so drop it
+                                  p_type = 0;
+                                  add_class = 0;
                                 }
                               }
                             }
@@ -1947,10 +1958,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             && check_tag(intag_start, "meta")) {
                           if (rech_tageq(html, "name")) {        // name=robots.txt
                             char tempo[1100];
-                            char *a;
+                            const char *a;
 
                             tempo[0] = '\0';
-                            a = strchr(html, '>');
+                            a = tag_close_within(html, 999);
 #if DEBUG_ROBOTS
                             printf("robots.txt meta tag detected\n");
 #endif
