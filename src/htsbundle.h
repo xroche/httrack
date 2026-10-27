@@ -104,11 +104,12 @@ typedef struct cookie_filter {
      Setting why stops the load. */
   hts_boolean (*admit)(struct cookie_filter *filter, t_cookie *cookie,
                        hts_boolean repeat, const char *name, const char *value,
-                       const char *domain, const char *path);
+                       const char *domain, const char *path,
+                       const cookie_attr *attr);
   void *ctx;
   int line;        /* the number of the last line read */
   const char *why; /* NULL, or why the load stopped at line */
-  size_t jar_base; /* bytes of -%K records the jar held before the bundles */
+  hts_boolean full_skips; /* Does a record the jar has no room for only warn? */
 } cookie_filter;
 
 /* Lines read from fp, or from the len bytes at buf when fp is NULL. */

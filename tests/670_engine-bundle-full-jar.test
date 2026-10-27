@@ -53,4 +53,48 @@ assert_selftest 'refused: /own.hts, line 227: the cookie jar did not store a coo
 records other.test 1 >"$tmpdir/small.txt"
 assert_selftest 'refused: /own.hts, line 227: the cookie jar did not store a cookie' \
     bundle "$dir" 'http://www.alpha.test/#httrack-bundle=own' "jar:$dir/small.txt"
+# larger -%K jars do not excuse it either, even one the bundle replaces
+records other.test 5 >"$tmpdir/five.txt"
+assert_selftest 'refused: /own.hts, line 227: the cookie jar did not store a cookie' \
+    bundle "$dir" 'http://www.alpha.test/#httrack-bundle=own' "jar:$dir/five.txt"
+printf '.alpha.test%sTRUE%s/%sFALSE%s0%sX%s%s\n' "$tab" "$tab" "$tab" "$tab" \
+    "$tab" "$tab" "$(repeat_chars 4000 x)" >"$tmpdir/x.txt"
+{
+    printf '%s\n' '# HTTrack bundle 1' cookies
+    printf '.alpha.test%sTRUE%s/%sFALSE%s0%sX%sx\n' "$tab" "$tab" "$tab" \
+        "$tab" "$tab" "$tab"
+    records alpha.test 224
+    printf '%s\n' "$sid"
+} >"$tmpdir/xrep.hts"
+assert_selftest 'refused: /xrep.hts, line 228: the cookie jar did not store a cookie' \
+    bundle "$dir" 'http://www.alpha.test/#httrack-bundle=xrep' "jar:$dir/x.txt"
+
+# a last value of 47 bytes fills an empty jar to its last byte, 48 overflows it
+edge() { # edge NAME LEN -- 224 records and a last one of LEN bytes
+    {
+        printf '%s\n' '# HTTrack bundle 1' cookies
+        records alpha.test 224
+        printf '.alpha.test%sTRUE%s/%sFALSE%s0%sB%s%s\n' "$tab" "$tab" "$tab" \
+            "$tab" "$tab" "$tab" "$(repeat_chars "$2" b)"
+    } >"$tmpdir/$1.hts"
+}
+edge fits 47
+out=$(httrack -O /dev/null '-#test=bundle' "$dir" \
+    'http://www.alpha.test/#httrack-bundle=fits' 2>/dev/null | tr -d '\r')
+grep -q "^cookie \.alpha\.test B=$(repeat_chars 47 b)\$" <<<"$out" ||
+    fail "the bundle that fills the jar exactly was not loaded: $(firstline "$out")"
+edge over 48
+assert_selftest 'refused: /over.hts, line 227: the cookie jar did not store a cookie' \
+    bundle "$dir" 'http://www.alpha.test/#httrack-bundle=over'
+# with cookies off, the jar the records go to refuses as before
+# HttpOnly and an expiry make its records longer than the clash check's
+{
+    printf '%s\n' '# HTTrack bundle 1' cookies
+    for i in $(seq 1 300); do
+        printf '#HttpOnly_.alpha.test%sTRUE%s/%sFALSE%s4102444800%sC%d%s%s\n' \
+            "$tab" "$tab" "$tab" "$tab" "$tab" "$i" "$tab" "$value"
+    done
+} >"$tmpdir/b0.hts"
+assert_selftest 'refused: /b0.hts, line 219: the cookie jar did not store a cookie' \
+    bundle "$dir" 'http://www.alpha.test/#httrack-bundle=b0' b0
 ok "a full jar warns about a bundle cookie, a bundle that overflows it alone is refused"
