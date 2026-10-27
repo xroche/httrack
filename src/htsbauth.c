@@ -924,6 +924,19 @@ static int cookie_load_flat(httrackp *opt, t_cookie *cookie, FILE *fp,
   return COOKIE_LOAD_KEEP;
 }
 
+/* Would the record fit in cookie without its first base bytes? Each length is
+   bounded by the reader's buffers, so the sum cannot wrap. */
+static hts_boolean cookie_fits_without(const t_cookie *cookie, size_t base,
+                                       const char *name, const char *value,
+                                       const char *domain, const char *path) {
+  const size_t used = strlen(cookie->data);
+  const size_t own = used > base ? used - base : 0;
+  const size_t need = strlen(name) + strlen(value) + strlen(domain) +
+                      strlen(path) + COOKIE_HEADROOM;
+
+  return base != 0 && own <= cookie->max_len && need <= cookie->max_len - own;
+}
+
 /* Read the Netscape records from fp's position to its end into cookie, and
    name the file as given in warnings. A UTF-8 BOM is skipped on the first line
    when first_line is HTS_TRUE. filter, when not NULL, picks the records.
@@ -1075,8 +1088,10 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, text_src *src,
             }
             if (cookie_set(cookie, cook_name, cook_value, domain, path,
                            &attr) != 0) {
-              // the jar caps a field tighter still, and a full one refuses
-              if (filter != NULL && filter->full_skips)
+              // a bundle record refused only for the -%K records just warns
+              if (filter != NULL &&
+                  cookie_fits_without(cookie, filter->jar_base, cook_name,
+                                      cook_value, domain, path))
                 cookie_warn(opt, filter, given,
                             "the cookie jar is full, so a cookie is left out",
                             "Cookies: the jar is full: %s", given);

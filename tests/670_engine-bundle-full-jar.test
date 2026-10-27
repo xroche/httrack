@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# A login bundle loaded over a -%K jar that is already full warns about the
-# cookie the jar cannot hold, rather than refusing the bundle.
+# A bundle loaded over a full -%K jar warns instead of failing.
 
 set -euo pipefail
 
@@ -13,17 +12,19 @@ cleanup_push rm -rf "$tmpdir"
 dir=$(nativepath "$tmpdir")
 tab=$(printf '\t')
 
-# 300 records of about 130 bytes outgrow the 30000 the jar holds
 value=$(repeat_chars 100 v)
-for i in $(seq 1 300); do
-    printf '.other.test%sTRUE%s/%sFALSE%s0%sC%d%s%s\n' "$tab" "$tab" "$tab" \
-        "$tab" "$tab" "$i" "$tab" "$value"
-done >"$tmpdir/cookies.txt"
-# a record bigger than the room the jar leaves short of a 130-byte one
-sid=$(repeat_chars 500 s)
-printf '%s\n' '# HTTrack bundle 1' 'ua FullUA' cookies \
-    ".alpha.test${tab}TRUE${tab}/${tab}FALSE${tab}0${tab}SID${tab}$sid" \
-    >"$tmpdir/full.hts"
+records() { # records DOMAIN COUNT -- COUNT jar lines of about 130 bytes
+    local i
+    for i in $(seq 1 "$2"); do
+        printf '.%s%sTRUE%s/%sFALSE%s0%sC%d%s%s\n' "$1" "$tab" "$tab" "$tab" \
+            "$tab" "$tab" "$i" "$tab" "$value"
+    done
+}
+# 300 records pass the 30000 bytes the jar holds
+records other.test 300 >"$tmpdir/cookies.txt"
+# a 500-byte cookie does not fit in what the full jar has left
+sid=".alpha.test${tab}TRUE${tab}/${tab}FALSE${tab}0${tab}SID${tab}$(repeat_chars 500 s)"
+printf '%s\n' '# HTTrack bundle 1' 'ua FullUA' cookies "$sid" >"$tmpdir/full.hts"
 
 rc=0
 out=$(httrack -O /dev/null '-#test=bundle' "$dir" \
@@ -39,4 +40,17 @@ grep -q '^cookie \.alpha\.test SID=' <<<"$out" &&
     fail "the full jar stored the bundle cookie, so the test proves nothing"
 grep -q 'full.hts, line 4: the cookie jar is full, so a cookie is left out' \
     "$tmpdir/err" || fail_dump "no warning for the cookie left out" "$tmpdir/err"
-ok "a full jar warns about a bundle cookie"
+
+# with no -%K jar, a bundle too big for the jar on its own is refused
+{
+    printf '%s\n' '# HTTrack bundle 1' cookies
+    records alpha.test 224
+    printf '%s\n' "$sid"
+} >"$tmpdir/own.hts"
+assert_selftest 'refused: /own.hts, line 227: the cookie jar did not store a cookie' \
+    bundle "$dir" 'http://www.alpha.test/#httrack-bundle=own'
+# a small -%K jar does not excuse it
+records other.test 1 >"$tmpdir/small.txt"
+assert_selftest 'refused: /own.hts, line 227: the cookie jar did not store a cookie' \
+    bundle "$dir" 'http://www.alpha.test/#httrack-bundle=own' "jar:$dir/small.txt"
+ok "a full jar warns about a bundle cookie, a bundle that overflows it alone is refused"

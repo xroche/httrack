@@ -524,8 +524,9 @@ static hts_boolean bundle_admit(cookie_filter *filter, t_cookie *cookie,
 /* Read b's bundle from src, set its scope, and load its cookies, comparing
    them with all_bundles. b->file names it in messages. */
 static hts_boolean bundle_load_src(httrackp *opt, bundle *b, text_src *src,
-                                   const char *jar_file, t_cookie *all_bundles,
-                                   char *err, size_t err_size) {
+                                   const char *jar_file, size_t jar_base,
+                                   t_cookie *all_bundles, char *err,
+                                   size_t err_size) {
   int cookies_line;
   t_cookie *scratch = NULL;
   bundle_jar ctx;
@@ -550,8 +551,8 @@ static hts_boolean bundle_load_src(httrackp *opt, bundle *b, text_src *src,
   filter.admit = bundle_admit;
   filter.ctx = &ctx;
   filter.line = cookies_line;
-  // admit stored the record in all_bundles, so only room can refuse it here
-  filter.full_skips = HTS_TRUE;
+  // The record is already in all_bundles, so only room refuses it here.
+  filter.jar_base = scratch != NULL ? 0 : jar_base;
   if (cookies_line != 0 && opt->cookie == NULL) {
     hts_log_print(opt, LOG_WARNING,
                   "Cookies are disabled, so the cookies of %s are not sent",
@@ -579,8 +580,8 @@ static hts_boolean bundle_load_src(httrackp *opt, bundle *b, text_src *src,
 /* Read b's file, set its scope, and load its cookies, comparing them with
    all_bundles. */
 static hts_boolean bundle_load(httrackp *opt, bundle *b, const char *jar_file,
-                               t_cookie *all_bundles, char *err,
-                               size_t err_size) {
+                               size_t jar_base, t_cookie *all_bundles,
+                               char *err, size_t err_size) {
   const char *const dir = StringNotEmpty(opt->bundle_dir)
                               ? StringBuff(opt->bundle_dir)
                               : StringBuff(opt->path_log);
@@ -595,7 +596,8 @@ static hts_boolean bundle_load(httrackp *opt, bundle *b, const char *jar_file,
     BUNDLE_FAIL("%s: cannot read the login bundle: %s", b->file,
                 strerror(errno));
   src = text_src_file(fp);
-  ok = bundle_load_src(opt, b, &src, jar_file, all_bundles, err, err_size);
+  ok = bundle_load_src(opt, b, &src, jar_file, jar_base, all_bundles, err,
+                       err_size);
   fclose(fp);
   return ok;
 }
@@ -633,6 +635,7 @@ hts_boolean hts_bundle_load_all(httrackp *opt, const char *jar_file, char *err,
                                 size_t err_size) {
   hts_bundle_state *const st = (hts_bundle_state *) opt->bundle_state;
   t_cookie *all_bundles;
+  size_t jar_base;
   size_t *group;
   hts_boolean ok = HTS_TRUE;
   size_t i, j;
@@ -647,10 +650,12 @@ hts_boolean hts_bundle_load_all(httrackp *opt, const char *jar_file, char *err,
     BUNDLE_FAIL("login bundles: out of memory");
   }
   all_bundles->max_len = sizeof(all_bundles->data);
+  jar_base = opt->cookie != NULL ? strlen(opt->cookie->data) : 0;
   for (i = 0; i < st->count; i++)
     group[i] = i;
   for (i = 0; i < st->count && ok; i++)
-    ok = bundle_load(opt, &st->items[i], jar_file, all_bundles, err, err_size);
+    ok = bundle_load(opt, &st->items[i], jar_file, jar_base, all_bundles, err,
+                     err_size);
   // the log backstop hides a bundle's tokens and url-line passwords too
   for (i = 0; i < st->count && ok; i++) {
     for (j = 0; j < st->items[i].nurls; j++)
@@ -1657,7 +1662,7 @@ HTSEXT_API hts_boolean hts_bundle_from_paste_flags(
   memset(jar->data, 0, sizeof(jar->data));
   opt->cookie = jar;
   src = text_src_mem(StringBuff(text), StringLength(text));
-  if (!bundle_load_src(opt, &check, &src, NULL, all, err, sizeof(err)))
+  if (!bundle_load_src(opt, &check, &src, NULL, 0, all, err, sizeof(err)))
     PASTE_FAIL("%s", err);
   paste_jar_summary(jar, &count, result->hosts);
   if (count == 0 && c.auth == NULL && !keep_empty)

@@ -336,8 +336,7 @@ full=()
 for i in $(seq 1 400); do
     full+=("$(jar alpha.test "C$i" "$(repeat_chars 100 v)")")
 done
-# past the jar's room a cookie only warns (670), past the bundles' it refuses
-refused ', line 248: too many cookies to compare with the other bundles' \
+refused ', line 227: the cookie jar did not store a cookie' \
     '# HTTrack bundle 1' cookies "${full[@]}"
 # 256 url lines and 256 scope domains at most
 urls=()
