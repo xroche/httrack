@@ -62,3 +62,10 @@ long="$dir/long.ini"
 } >"$long"
 got=$(httrack -O /dev/null -#test=getcategory "$long") || fail "getcategory: exited $?"
 assert_eq 'category=[real]' "$got" 'the category after an over-long line'
+
+# hts_getcategories() reads the same way.
+mkproject zeta
+cp "$long" "$dir/zeta/hts-cache/winprofile.ini"
+assert_eq 'categ:Music
+categ:Photos
+categ:real' "$(list categ)" 'the list skips an over-long line tail'

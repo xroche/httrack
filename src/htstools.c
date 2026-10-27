@@ -1333,7 +1333,7 @@ HTSEXT_API char *hts_getcategories(char *path, int type) {
     }
     do {
       if (hts_findisdir(h)) {
-        char BIGSTK line2[1024];
+        char BIGSTK line2[1022];
 
         StringCopy(iname, rpath);
         StringCat(iname, "/");
@@ -1344,25 +1344,17 @@ HTSEXT_API char *hts_getcategories(char *path, int type) {
             FILE *fp = fopen(StringBuff(iname), "rb");
 
             if (fp != NULL) {
-              int done = 0;
+              const size_t off =
+                  profile_key_line(fp, "category=", line2, sizeof(line2));
+              const char *const value = line2 + off;
 
-              while(!feof(fp) && !done) {
-                int n = linput(fp, line2, sizeof(line2) - 2);
-
-                if (n > 0) {
-                  if (strfield(line2, "category=")) {
-                    if (*(line2 + 9)) {
-                      if (!coucal_read(hashCateg, line2 + 9, NULL)) {
-                        coucal_write(hashCateg, line2 + 9, 0);
-                        if (StringLength(categ) > 0) {
-                          StringCat(categ, "\r\n");
-                        }
-                        hts_unescapehttp(line2 + 9, &categ);
-                      }
-                    }
-                    done = 1;
-                  }
+              if (off != 0 && *value != '\0' &&
+                  !coucal_read(hashCateg, value, NULL)) {
+                coucal_write(hashCateg, value, 0);
+                if (StringLength(categ) > 0) {
+                  StringCat(categ, "\r\n");
                 }
+                hts_unescapehttp(value, &categ);
               }
               line2[0] = '\0';
               fclose(fp);
