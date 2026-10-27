@@ -2,8 +2,8 @@
 """List log calls that print an engine address without hiding its password.
 
 A log call is hts_log_print(), hts_log_vprint(), hts_secret_fprintf(),
-printf(), puts(), or fprintf(), fputs() or fprintfio() to a log file, stdout
-or stderr. Its
+cookie_log(), cookie_vlog(), printf(), puts(), or fprintf(), fputs() or
+fprintfio() to a log file, stdout or stderr. Its
 arguments must pass every identifier containing adr, url, lien or link, and
 every line or codebase, through adr_nologin() or url_nologin(). A log file
 includes hts-ioinfo.txt. An allowed call is named "file: format" in ALLOW.
@@ -16,8 +16,8 @@ import re
 import sys
 
 CALL = re.compile(
-    r"\b(hts_log_print|hts_log_vprint|hts_secret_fprintf|printf|puts|fprintf|fputs"
-    r"|fprintfio)\s*\("
+    r"\b(hts_log_print|hts_log_vprint|hts_secret_fprintf|cookie_log|cookie_vlog"
+    r"|printf|puts|fprintf|fputs|fprintfio)\s*\("
 )
 STREAM_FIRST = ("fprintf", "fprintfio")
 LOG_FILE = re.compile(r"(opt->log|log|fp_log|ioinfo|stdout|stderr)\s*$")
