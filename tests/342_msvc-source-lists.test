@@ -21,14 +21,14 @@ win_only="minizip/iowin32.c"
 # Sources of one automake variable, one per line, continuations folded.
 am_sources() {
     awk -v var="$1" '
-        $0 ~ "^" var "[ \t]*=" { inlist = 1; sub(/^[^=]*=/, "") }
+        $0 ~ "^" var "[ \t]*[+]?=" { inlist = 1; sub(/^[^=]*=/, "") }
         inlist {
             line = $0
             cont = sub(/\\[ \t]*$/, "")
             n = split(line, tok, /[ \t]+/)
             for (i = 1; i <= n; i++)
                 if (tok[i] ~ /\.c$/) print tok[i]
-            if (!cont) exit
+            if (!cont) inlist = 0
         }' "$am" | sort -u
 }
 

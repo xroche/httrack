@@ -56,6 +56,7 @@ TESTS_ENVIRONMENT += CONFIGURED_HTMLDIR=$(htmldir)
 TESTS_ENVIRONMENT += ORIGIN_RPATH=$(ORIGIN_RPATH)
 # 225 and 376 both read what --disable-example-libs did to the install.
 TESTS_ENVIRONMENT += EXAMPLE_LIBS=$(EXAMPLE_LIBS)
+TESTS_ENVIRONMENT += SELFTESTS=$(SELFTESTS)
 # 222_pkgconfig-consumer.test asserts the staged .pc against these, and both
 # sides of the gate deciding whether it hands a consumer an rpath.
 TESTS_ENVIRONMENT += CONFIGURED_PREFIX=$(prefix)
