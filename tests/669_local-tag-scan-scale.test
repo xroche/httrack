@@ -1,0 +1,73 @@
+#!/bin/bash
+#
+# An <applet> or robots <meta> tag with no '>' and many code= or name=
+# attributes was rescanned to the end of the page once per attribute
+# (OSS-Fuzz 578272899). Quadratic, the big page trips the crawl watchdog.
+
+set -e
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+python=$(find_python) || skip "python3 not found"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_tagscan.XXXXXX") || exit 1
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+doc="${tmpdir}/doc"
+mkdir -p "$doc"
+
+"$python" - "$(nativepath "$doc")" <<'PY'
+import os
+import sys
+
+
+def put(name, body):
+    open(os.path.join(sys.argv[1], name), "wb").write(body)
+
+
+put("index.html",
+    b'<a href="big.html">b</a><a href="swap.html">s</a>'
+    b'<a href="nofollow.html">n</a>\n')
+put("big.html",
+    b"<applet " + b"code=a " * 60000 + b"<meta " + b"name=a " * 250000)
+# Controls: both scans still act when the tag's '>' is close enough. The
+# applet's '>' sits 990 bytes after code=, just inside the 1000-byte window.
+pad = b" " * (990 - len(b"code=A.class codebase=c/"))
+put("swap.html", b"<applet code=A.class codebase=c/" + pad + b"></applet>\n")
+put("nofollow.html",
+    b'<meta name="robots" content="nofollow"><a href="hidden.html">h</a>\n')
+put("hidden.html", b"hidden\n")
+PY
+
+local_server_start --root "$doc"
+require_httrack
+
+out="${tmpdir}/crawl"
+mkdir "$out"
+rc=0
+local_crawl --log "${tmpdir}/log" -O "$out" --quiet --timeout=30 \
+    --retries=0 "${BASEURL}/index.html" || rc=$?
+test "$rc" -eq 0 || fail "crawl exited $rc: $(cat "${tmpdir}/log")"
+
+host="${out}/127.0.0.1_${SRV_PORT}"
+
+printf '[unclosed tags parsed] ..\t'
+test -f "${host}/big.html" || fail "big.html not mirrored"
+echo OK
+
+printf '[codebase swapped before code] ..\t'
+swapped=$(cat "${host}/swap.html")
+case "$swapped" in
+*"<applet "*"codebase="*"code="*) echo OK ;;
+*) fail "no swap: $swapped" ;;
+esac
+
+printf '[robots meta nofollow obeyed] ..\t'
+test ! -e "${host}/hidden.html" || fail "nofollow link was followed"
+grep -q 'follow robots meta tag' "${out}/hts-log.txt" ||
+    fail "no nofollow warning in $(cat "${out}/hts-log.txt")"
+echo OK
