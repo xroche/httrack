@@ -32,7 +32,8 @@ def put(name, body):
 
 put("index.html",
     b'<a href="big.html">b</a><a href="swap-999.html">s</a>'
-    b'<a href="swap-1000.html">t</a><a href="robots-998.html">r</a>'
+    b'<a href="swap-1000.html">t</a><a href="swap-far.html">f</a>'
+    b'<a href="robots-998.html">r</a>'
     b'<a href="robots-999.html">q</a>\n')
 put("big.html",
     b"<applet " + b"code=a " * 120000 + b"<meta " + b"name=a " * 250000)
@@ -47,6 +48,9 @@ def at(head, offset):  # pad head so that '>' lands at offset
 for off in (999, 1000):
     put("swap-%d.html" % off,
         b"<applet " + at(b"code=A.class codebase=c/", off) + b"</applet>\n")
+# codebase= itself just past the window: the search must stop before it.
+put("swap-far.html", b"<applet " + at(b"code=A.class", 1001)[:-1] +
+    b"codebase=c/></applet>\n")
 for off, link in ((998, b"hidden"), (999, b"shown")):
     put("robots-%d.html" % off,
         b"<meta " + at(b'name="robots" content="nofollow"', off) +
@@ -82,11 +86,15 @@ printf '[codebase swapped with > at 999] ..\t'
 swapped swap-999.html || fail "no swap: $(cat "${host}/swap-999.html")"
 echo OK
 
-printf '[no swap with > at 1000] ..\t'
-! swapped swap-1000.html || fail "swapped: $(cat "${host}/swap-1000.html")"
-echo OK
+for page in swap-1000.html swap-far.html; do
+    printf '[no swap in %s] ..\t' "$page"
+    test -f "${host}/$page" || fail "$page not mirrored"
+    ! swapped "$page" || fail "swapped: $(cat "${host}/$page")"
+    echo OK
+done
 
 printf '[robots nofollow obeyed with > at 998] ..\t'
+test -f "${host}/robots-998.html" || fail "robots-998.html not mirrored"
 test ! -e "${host}/hidden.html" || fail "nofollow link was followed"
 echo OK
 
