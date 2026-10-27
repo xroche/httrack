@@ -832,8 +832,8 @@ const char *cookie_flat_bind(const char *url, char *host, size_t host_size,
    domain of start_url. The file is never rewritten, because the save would
    turn it into a Netscape jar, so this returns COOKIE_LOAD_KEEP. */
 static int cookie_load_flat(httrackp *opt, t_cookie *cookie, FILE *fp,
-                            const char *given, const char *start_url,
-                            int quote, hts_cookies_verdict *why) {
+                            const char *given, const char *start_url, int quote,
+                            hts_cookies_verdict *why) {
   char host[COOKIE_MAX_DOMAIN];
   char BIGSTK pair[COOKIE_MAX_PAIR + 2]; // name, '=', value and the NUL
   size_t len = 0;
@@ -1154,8 +1154,7 @@ static int cookie_load_file(httrackp *opt, t_cookie *cookie, const char *given,
   } else if (errno != ENOENT) {
     // the file exists, so a rewrite would replace what was never read
     hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
-                  "Cookies: could not read %s, so it is left unchanged",
-                  given);
+                  "Cookies: could not read %s, so it is left unchanged", given);
     *why = HTS_COOKIES_KEPT_UNREADABLE;
     return COOKIE_LOAD_KEEP;
   }
