@@ -1,0 +1,99 @@
+#!/bin/bash
+#
+# lang.def is generated from lang-symbols.tsv, and front ends read the TSV.
+
+set -e
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+distdir=${top_srcdir:-$(cd "${testdir}/.." && pwd)}
+distdir=$(cd "${distdir}" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+TSV="${distdir}/lang-symbols.tsv"
+DEF="${distdir}/lang.def"
+GEN="${distdir}/tools/gen-lang-def.py"
+
+# Missing is fatal, never a skip: a check that opts itself out proves nothing.
+for f in "${TSV}" "${DEF}" "${GEN}"; do
+    test -r "${f}" || fail "missing ${f}"
+done
+
+py=$(find_python) || skip "python3 not found"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/lang_symbols.XXXXXX") || fail "no tmpdir"
+cleanup() { rm -rf "${work}"; }
+cleanup_push cleanup
+
+printf '[lang.def matches the table] ..\t'
+"${py}" "${GEN}" "${TSV}" "${work}/lang.def" >/dev/null ||
+    fail "the generator rejected ${TSV}"
+cmp "${DEF}" "${work}/lang.def" ||
+    fail "lang.def is stale; re-run tools/gen-lang-def.py lang-symbols.tsv lang.def"
+echo OK
+
+printf '[the table keeps its shape] ..\t'
+# Pinned to today's counts as floors, so a truncated table cannot pass.
+counts=$(
+    "${py}" - "${TSV}" <<'PY'
+import sys
+n = {"language": 0, "meta": 0, "string": 0}
+for line in open(sys.argv[1], encoding="ascii"):
+    if not line.startswith("#"):
+        n[line.split("\t")[0]] += 1
+sys.stdout.reconfigure(newline="\n")
+print(n["language"], n["meta"], n["string"])
+PY
+) || fail "cannot count rows"
+read -r nlang nmeta nstr <<<"${counts}"
+if [ "${nlang}" -lt 30 ] || [ "${nmeta}" -ne 5 ] || [ "${nstr}" -lt 545 ]; then
+    fail "row counts shrank: ${counts}"
+fi
+echo "OK (${counts})"
+
+# Regenerating cannot see a bad row, because both files come from it: the
+# generator must refuse each of these instead.
+reject() {
+    local what=$1 why=$2 script=$3 err
+    printf '[%s is rejected] ..\t' "${what}"
+    "${py}" - "${TSV}" "${work}/bad.tsv" <<<"${script}" ||
+        fail "could not build the bad table"
+    if err=$("${py}" "${GEN}" "${work}/bad.tsv" "${work}/bad.def" 2>&1); then
+        fail "the generator accepted ${what}"
+    fi
+    # Refused for its own reason, not a neighbour's.
+    grep -q -- "${why}" <<<"${err}" || fail "wrong refusal: ${err}"
+    echo OK
+}
+
+# Each script rewrites the first string row and nothing else.
+prelude='import sys
+rows = open(sys.argv[1], encoding="ascii").read().split("\n")
+i = next(n for n, r in enumerate(rows) if r.startswith("string\t"))
+k, s, t = rows[i].split("\t")'
+save='open(sys.argv[2], "w", encoding="latin-1", newline="\n").write("\n".join(rows))'
+
+reject "a real tab in a text" "4 columns" "${prelude}
+rows[i] = '\t'.join([k, s, 'a\tb'])
+${save}"
+reject "a two-field row" "2 columns" "${prelude}
+rows[i] = '\t'.join([k, s])
+${save}"
+reject "a four-field row" "4 columns" "${prelude}
+rows[i] = '\t'.join([k, s, t, 'x'])
+${save}"
+reject "a non-ASCII byte" "byte 0xe9 is outside" "${prelude}
+rows[i] = '\t'.join([k, s, t]) + '\\xe9'
+${save}"
+reject "a duplicate symbol" "duplicate symbol" "${prelude}
+rows.insert(i + 1, rows[i])
+${save}"
+reject "a row out of its block" "after the string block" "${prelude}
+rows.insert(-1, 'language\tLANGUAGE_99\tKlingon')
+${save}"
+reject "an unknown kind" "bad kind" "${prelude}
+rows[i] = '\t'.join(['strings', s, t])
+${save}"
+reject "an empty text" "empty or padded" "${prelude}
+rows[i] = '\t'.join([k, s, ''])
+${save}"
