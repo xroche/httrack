@@ -42,7 +42,7 @@ This file lists all changes and fixes that have been made for HTTrack
 + Fixed: no warning for long headers httrack ignores, and an empty MPTCP summary is hidden (#2017)
 + Changed: WebHTTrack's "Capture URL" button, which did nothing, is removed (#1929)
 + Changed: configure stops when the coucal submodule is missing, and --disable-selftests leaves the engine self-tests out of the build (#1927, #2036)
-+ Changed: WinHTTrack saves its debugging checkbox in winprofile.ini, and the engine reads a Charset=UTF-8 declaration there (#2023, #2040)
++ Changed: WinHTTrack saves its debugging checkbox in winprofile.ini (#2023)
 + Changed: the language catalogs carry the browser login texts and reworded log-out, OK and Yes labels (#1997, #1998, #2010, #2024, #1869, #1871, #1873)
 + Changed: multiple internal hardening, parser, test and CI improvements
 
