@@ -1260,7 +1260,7 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
   return retval;
 }
 
-/* First line starting with key into line[size]: value offset, or 0. */
+/* Find the first line starting with key; never a long line's tail. */
 static size_t profile_key_line(FILE *fp, const char *key, char *line,
                                size_t size) {
   int c = 0;

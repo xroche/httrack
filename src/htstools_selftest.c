@@ -49,20 +49,22 @@ static int st_endtoken(httrackp *opt, int argc, char **argv) {
 static int st_profilecharset(httrackp *opt, int argc, char **argv) {
   static const struct {
     const char *content;
+    const char *tail; /* without content: an over-long line ending in tail */
     hts_boolean utf8;
   } cases[] = {
-      {"Category=x\r\n", HTS_FALSE},
-      {"Category=x\r\nCharset=UTF-8\r\n", HTS_TRUE},
-      {"charset=utf8\n", HTS_TRUE},
-      {"CHARSET=Utf-8\r\n", HTS_TRUE},
-      {"Charset=windows-1252\r\n", HTS_FALSE},
-      {"Charset=\r\n", HTS_FALSE},
-      {"Charset=UTF-8X\r\n", HTS_FALSE},
-      {"Charset=UTF-16\r\n", HTS_FALSE},
-      {"XCharset=UTF-8\r\n", HTS_FALSE},
-      {"Charset=latin1\r\nCharset=UTF-8\r\n", HTS_FALSE},
-      {"Charset:UTF-8\r\n", HTS_FALSE},
-      {NULL, HTS_FALSE}, /* a Charset line hidden in an over-long line's tail */
+      {"Category=x\r\n", NULL, HTS_FALSE},
+      {"Category=x\r\nCharset=UTF-8\r\n", NULL, HTS_TRUE},
+      {"charset=utf8\n", NULL, HTS_TRUE},
+      {"CHARSET=Utf-8\r\n", NULL, HTS_TRUE},
+      {"Charset=windows-1252\r\n", NULL, HTS_FALSE},
+      {"Charset=\r\n", NULL, HTS_FALSE},
+      {"Charset=UTF-8X\r\n", NULL, HTS_FALSE},
+      {"Charset=UTF-16\r\n", NULL, HTS_FALSE},
+      {"XCharset=UTF-8\r\n", NULL, HTS_FALSE},
+      {"Charset=latin1\r\nCharset=UTF-8\r\n", NULL, HTS_FALSE},
+      {"Charset:UTF-8\r\n", NULL, HTS_FALSE},
+      {NULL, "Charset=UTF-8\r\nCategory=gr\xFCn\r\n", HTS_FALSE},
+      {NULL, "x\nCharset=UTF-8\r\n", HTS_TRUE},
   };
 
   char path[HTS_URLMAXSIZE];
@@ -88,7 +90,7 @@ static int st_profilecharset(httrackp *opt, int argc, char **argv) {
       assertf(fputs("Footer=", fp) >= 0);
       for (k = 0; k < 1014; k++)
         assertf(fputc('a', fp) != EOF);
-      assertf(fputs("Charset=UTF-8\r\nCategory=gr\xFCn\r\n", fp) >= 0);
+      assertf(fputs(cases[i].tail, fp) >= 0);
     }
     assertf(fclose(fp) == 0);
     if (hts_profile_declares_utf8(path) != cases[i].utf8) {

@@ -69,3 +69,8 @@ cp "$long" "$dir/zeta/hts-cache/winprofile.ini"
 assert_eq 'categ:Music
 categ:Photos
 categ:real' "$(list categ)" 'the list skips an over-long line tail'
+
+# The tail is skipped up to LF, not up to a CR.
+printf 'Footer=%s\ntail\nCategory=real\r\n' "$(printf 'a%.0s' $(seq 1014))" >"$long"
+got=$(httrack -O /dev/null -#test=getcategory "$long") || fail "getcategory: exited $?"
+assert_eq 'category=[real]' "$got" 'the category after a bare-LF over-long line'
