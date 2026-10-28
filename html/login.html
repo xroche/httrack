@@ -72,8 +72,8 @@
 
 <p class="lede">Some sites show their pages only after you log in, or only after you pass a
 check such as a CAPTCHA. HTTrack cannot fill in a login form and cannot solve a CAPTCHA.
-But it can use the session of a browser where you already logged in: the site then accepts
-HTTrack as the same logged-in browser. Since version 3.51, WinHTTrack, WebHTTrack and the
+But it can use the session of a browser where you already logged in, so the site accepts
+HTTrack as that browser. Since version 3.51, WinHTTrack, WebHTTrack and the
 Android app each have a button that does this in a few clicks.</p>
 
 <h2 id="when">When to use this method</h2>
@@ -105,8 +105,8 @@ window opens on this address.</li>
 <li>Log in to the site as usual. If there is a CAPTCHA, solve it. Then go to the first
 page that you want to copy, and click "Done".</li>
 <li>WinHTTrack tells you how many cookies it collected. The address box now shows the
-page where the browser stopped. Click "OK" to keep the login, or "Cancel" to keep
-nothing.</li>
+page where the browser stopped. Click "OK" to keep the login, or "Cancel" to discard
+it.</li>
 </ol>
 
 <p>If the browser stops on another site than the one you started from, WinHTTrack warns
@@ -139,17 +139,16 @@ paste the content of the file.</p>
 <ol>
 <li>Start a new project. Give it a name, and type the address of the site. The address
 must start with <code>https://</code>.</li>
-<li>Tap "Log in with a browser", next to "Options".</li>
+<li>Tap "Log in with a browser", under the address field.</li>
 <li>Log in to the site as usual, then tap "Use this login". Google accounts do not work
 in this window.</li>
 </ol>
 
-<p>The app confirms how many cookies it saved. It also sets the safe settings for you: 2
-connections and no logout links. If the login ends on another address, the app puts that
-address in the address field.</p>
+<p>The app confirms how many cookies it saved. It also sets 2 connections and skips logout
+links, so that your login lasts.</p>
 
 <p>The app keeps the login in its private storage, so you never see a file. To delete
-it, tap "Forget the saved login", or delete the project. "Forget the saved login" also
+it, tap "Forget the saved login" in the menu of the login window, or delete the project. "Forget the saved login" also
 signs you out of all the sites in the browser of the app.</p>
 
 <h2 id="after">What HTTrack keeps, and what to do next</h2>
@@ -157,8 +156,8 @@ signs you out of all the sites in the browser of the app.</p>
 <p>WinHTTrack and WebHTTrack save the login in the project folder, in a file named after
 the site, for example <code>example.com.hts</code>. It holds the cookies and the
 User-Agent of the browser. They also add <code>#httrack-bundle=example.com</code> to the
-address, so the mirror uses this login. HTTrack sends the login only to this site, and
-not to the other sites that the mirror visits.</p>
+address, so the mirror uses this login. HTTrack sends the login only to this site and its
+subdomains.</p>
 
 <p>Then start the mirror. In WinHTTrack and WebHTTrack, two settings protect your
 session:</p>
@@ -171,10 +170,10 @@ session.</li>
 </ul>
 
 <div class="note">
-<p><b>The login file is as good as your password.</b> A person who has the
-<code>.hts</code> file can use your session. Do not share it, and delete it when the
-copy is done. Then also remove <code>#httrack-bundle=...</code> from the address of the
-project.</p>
+<p><b>Treat the <code>.hts</code> file like a password.</b> A person who has it can use
+your login. Do not share it, and delete it when the copy is done. Also remove
+<code>#httrack-bundle=...</code> from the project address, because HTTrack stops when
+this file is missing.</p>
 </div>
 
 <h2 id="manual">Without the button: export the cookies by hand</h2>
@@ -266,7 +265,7 @@ filter for it. See the <a href="filters.html">filter syntax</a> page.</li>
 
 <ul>
 <li><b>Cookies expire.</b> A session can end after some minutes or some days. If the
-mirror starts to contain login pages again, log in again with the button (or export the cookies again),
+mirror starts to contain login pages again, log in again, with the button or by exporting the cookies,
 and continue the mirror.</li>
 <li><b>Bot protection can still refuse HTTrack.</b> Services such as Cloudflare tie their
 "clearance" cookie to your browser, so they can refuse HTTrack even with the right
