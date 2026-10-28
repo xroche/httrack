@@ -10,7 +10,7 @@
 
 #include "htspsl.h"
 
-const char hts_psl_builtin_version[] = "2026-10-16_09-29-46_UTC";
+const char hts_psl_builtin_version[] = "2026-10-28_13-15-55_UTC";
 
 /* One rule per line keeps a refresh diff readable. */
 /* clang-format off */
@@ -7022,6 +7022,7 @@ static const char chunk1[] =
     "*.compute.estate\0"
     "*.alces.network\0"
     "alibabacloudcs.com\0"
+    "*.ztna-dingtalk.com\0"
     "ms.fun\0"
     "ms.show\0"
     "kasserver.com\0"
@@ -8546,11 +8547,11 @@ static const char chunk1[] =
     "is-very-evil.org\0"
     "is-very-good.org\0"
     "is-very-nice.org\0"
-    "is-very-sweet.org\0"
-    "isa-geek.org\0"
     ;
 
 static const char chunk2[] =
+    "is-very-sweet.org\0"
+    "isa-geek.org\0"
     "kicks-ass.org\0"
     "misconfused.org\0"
     "podzone.org\0"
@@ -8853,7 +8854,6 @@ static const char chunk2[] =
     "*.statics.cloud\0"
     "gadget.app\0"
     "gadget.host\0"
-    "aliases121.com\0"
     "campaign.gov.uk\0"
     "service.gov.uk\0"
     "independent-commission.uk\0"
@@ -8875,7 +8875,6 @@ static const char chunk2[] =
     "githubpreview.dev\0"
     "github.io\0"
     "gitlab.io\0"
-    "gitapp.si\0"
     "gitpage.si\0"
     "glideos.app\0"
     "nog.community\0"
@@ -9274,7 +9273,6 @@ static const char chunk2[] =
     "koobin.events\0"
     "webthings.io\0"
     "krellian.net\0"
-    "oya.to\0"
     "co.de\0"
     "shiptoday.app\0"
     "shiptoday.build\0"

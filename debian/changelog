@@ -1,3 +1,18 @@
+httrack (3.51.0-1) unstable; urgency=medium
+
+  * New upstream release.  Its main feature is logging in to a site before a
+    mirror, with login bundles saved per site.  Full list in history.txt.
+  * debian/rules: pass --with-psl-file, so httrack reads the Public Suffix
+    List from /usr/share/publicsuffix and falls back to its built-in copy.
+  * debian/control: libhttrack3 Recommends publicsuffix.
+  * debian/copyright: add src/htspsl_data.c, generated from the Public Suffix
+    List under MPL-2.0.
+  * debian/webhttrack-common.files: install the new palette.css.
+  * debian/httrack-doc.lintian-overrides: override the font warnings for the
+    manual's web font, which its pages load by a relative path.
+
+ -- Xavier Roche <xavier@debian.org>  Wed, 28 Oct 2026 18:38:54 +0100
+
 httrack (3.50.5-1) unstable; urgency=medium
 
   * New upstream release, with security and robustness fixes.  Full list in

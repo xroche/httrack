@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
   "name": "libhttrack",
-  "version-string": "3.50",
+  "version-string": "3.51",
   "builtin-baseline": "9eec002df1cd109f8f104cd966a763daf9751489",
   "dependencies": [
     "brotli",
