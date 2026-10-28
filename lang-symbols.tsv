@@ -1,0 +1,585 @@
+# Edit this file, never lang.def, then run tools/gen-lang-def.py to rewrite it.
+# Columns are kind, symbol and text. Kinds come in blocks, in the order
+# language, meta, string. Write a tab or newline in a text as \t or \n.
+# Keep the rows of a block in order, because a repeated English text is told
+# apart by its position.
+language	LANGUAGE_1	English
+language	LANGUAGE_2	Francais
+language	LANGUAGE_3	Castellano
+language	LANGUAGE_4	Deutsch
+language	LANGUAGE_5	Nederlands
+language	LANGUAGE_6	Polski
+language	LANGUAGE_7	Portugues
+language	LANGUAGE_8	Russian
+language	LANGUAGE_9	Italiano
+language	LANGUAGE_10	Turkish
+language	LANGUAGE_11	Magyar
+language	LANGUAGE_12	Portugues-Brasil
+language	LANGUAGE_13	Chinese-Simplified
+language	LANGUAGE_14	Chinese-BIG5
+language	LANGUAGE_15	Dansk
+language	LANGUAGE_16	Eesti
+language	LANGUAGE_17	Svenska
+language	LANGUAGE_18	Macedonian
+language	LANGUAGE_19	Japanese
+language	LANGUAGE_20	Slovak
+language	LANGUAGE_21	Cesky
+language	LANGUAGE_22	Ukrainian
+language	LANGUAGE_23	Norsk
+language	LANGUAGE_24	Slovenian
+language	LANGUAGE_25	Romanian
+language	LANGUAGE_26	Greek
+language	LANGUAGE_27	Bulgarian
+language	LANGUAGE_28	Finnish
+language	LANGUAGE_29	Croatian
+language	LANGUAGE_30	Uzbek
+meta	LANGUAGE_NAME	LANGUAGE_NAME
+meta	LANGUAGE_FILE	LANGUAGE_FILE
+meta	LANGUAGE_ISO	LANGUAGE_ISO
+meta	LANGUAGE_AUTHOR	LANGUAGE_AUTHOR
+meta	LANGUAGE_WINDOWSID	LANGUAGE_WINDOWSID
+string	LANG_OK	OK
+string	LANG_CANCEL	Cancel
+string	LANG_QUIT	Exit
+string	LANG_CLOSE	Close
+string	LANG_TIPCANCEL	Cancel changes
+string	LANG_TIPOK	Click to confirm
+string	LANG_TIPHELP	Click to get help!
+string	LANG_TIPPREV	Click to return to previous screen
+string	LANG_TIPNEXT	Click to go to next screen
+string	LANG_HIDEPWD	Hide password
+string	LANG_SAVEPROJECT	Save project
+string	LANG_CLOSEPRJ	Close current project?
+string	LANG_DELETECONF	Delete this project?
+string	LANG_DELETEEMPTYCONF	Delete empty project %s?
+string	LANG_ACTIONNYP	Action not yet implemented
+string	LANG_ERRORDEL	Error deleting this project
+string	LANG_B1	Select a rule for the filter
+string	LANG_B2	Enter keywords for the filter
+string	LANG_B3	Cancel
+string	LANG_B4	Add this rule
+string	LANG_A2	Please enter one or several keyword(s) for the rule
+string	LANG_B5	Add Scan Rule
+string	LANG_B6	Criterion
+string	LANG_B7	String
+string	LANG_B8	Add
+string	LANG_B9	Scan Rules
+string	LANG_B10	Use wildcards to exclude or include URLs or links.\nYou can put several scan strings on the same line.\nUse spaces as separators.\n\nExample: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
+string	LANG_B11	Exclude links
+string	LANG_B12	Include link(s)
+string	LANG_B13	Tip: To have ALL GIF files included, use something like +www.someweb.com/*.gif. \n(+*.gif / -*.gif will include/exclude ALL GIFs from ALL sites)
+string	LANG_B14	Save prefs
+string	LANG_B20	Matching links will be excluded:
+string	LANG_B21	Matching links will be included:
+string	LANG_B22	Example:
+string	LANG_B23	gif\r\nWill match all GIF files
+string	LANG_B24	blue\r\nWill find all files with a matching 'blue' sub-string such as 'bluesky-small.jpeg'
+string	LANG_B25	bigfile.mov\r\nWill match the file 'bigfile.mov', but not 'bigfile2.mov'
+string	LANG_B26	cgi\r\nWill find links with folder name matching sub-string 'cgi' such as /cgi-bin/somecgi.cgi
+string	LANG_B27	cgi-bin\r\nWill find links with folder name matching whole 'cgi-bin' string (but not cgi-bin-2, for example)
+string	LANG_B28	someweb.com\r\nWill find links with matching sub-string such as www.someweb.com, private.someweb.com etc.
+string	LANG_B29	someweb\r\nWill find links with matching folder sub-string such as www.someweb.com, www.someweb.edu, private.someweb.otherweb.com etc.
+string	LANG_B30	www.someweb.com\r\nWill find links matching whole 'www.someweb.com' sub-string (but not links such as private.someweb.com/..)
+string	LANG_B31	someweb\r\nWill find any links with matching sub-string such as www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html etc.
+string	LANG_B32	www.test.com/test/someweb.html\r\nWill only find the 'www.test.com/test/someweb.html' file. Note that you have to type the complete path (URL + site path)
+string	LANG_B33	All links will match
+string	LANG_C1	Add exclusion filter
+string	LANG_C2	Add inclusion filter
+string	LANG_C3	Existing filters
+string	LANG_C4	Cancel changes
+string	LANG_C5	Save current preferences as default values
+string	LANG_C6	Click to confirm
+string	LANG_D1	No log files in %s!
+string	LANG_D2	No 'index.html' file in %s!
+string	LANG_D3	Click to quit WinHTTrack Website Copier
+string	LANG_D4	View log files
+string	LANG_D5	Browse HTML start page
+string	LANG_D6	End of mirror
+string	LANG_D7	View log files
+string	LANG_D8	Browse Mirrored Website
+string	LANG_D9	New project...
+string	LANG_E1	View error and warning reports
+string	LANG_E2	View report
+string	LANG_E3	Close the log file window
+string	LANG_E4	Info type:
+string	LANG_E5	Errors
+string	LANG_E6	Infos
+string	LANG_E7	Find
+string	LANG_E8	Find a word
+string	LANG_E10	Info log file
+string	LANG_E11	Warning/Errors log file
+string	LANG_F1	Unable to initialize the OLE system
+string	LANG_F2	WinHTTrack could not find any interrupted download file cache in the specified folder!
+string	LANG_F3	Could not connect to provider
+string	LANG_F4	receive
+string	LANG_F5	request
+string	LANG_F6	connect
+string	LANG_F7	search
+string	LANG_F8	ready
+string	LANG_F9	error
+string	LANG_F10	Receiving files..
+string	LANG_F11	Parsing HTML file..
+string	LANG_F11b	Purging files..
+string	LANG_F11c	Loading cache in progress..
+string	LANG_F12	Parsing HTML file (testing links)..
+string	LANG_F13	Pause - Toggle [Mirror]/[Pause download] to resume operation
+string	LANG_F13b	Finishing pending transfers - Select [Cancel] to stop now!
+string	LANG_F14	scanning
+string	LANG_F15	Waiting for scheduled time..
+string	LANG_F15b	Transferring data..
+string	LANG_F16	Connecting to provider
+string	LANG_F17	[%d seconds] to go before start of operation
+string	LANG_F18	Site mirroring in progress [%s, %s bytes]
+string	LANG_F18b	Site mirroring finished!
+string	LANG_F19	A problem occurred during the mirroring operation\n
+string	LANG_F20	\nDuring:\n
+string	LANG_F21	\nSee the log file if necessary.\n\nClick FINISH to quit WinHTTrack Website Copier.\n\nThanks for using WinHTTrack!
+string	LANG_F22	Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) if necessary to ensure that everything is OK.\n\nThanks for using WinHTTrack!
+string	LANG_F22c	* * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
+string	LANG_F22s	Mirroring operation stopped before the end.\nThe files already downloaded are kept.\nSee log file(s) if necessary.\n\nThanks for using WinHTTrack!
+string	LANG_F23	\n\nTip: Click [View log file] to see warning or error messages
+string	LANG_G1	Do you really want to quit WinHTTrack Website Copier?
+string	LANG_G2	- Mirroring Mode -\n\nEnter address(es) in URL box
+string	LANG_G3	- Interactive Wizard Mode (questions) -\n\nEnter address(es) in URL box
+string	LANG_G4	- File Download Mode -\n\nEnter file address(es) in URL box
+string	LANG_G5	- Link Testing Mode -\n\nEnter Web address(es) with links to test in URL box
+string	LANG_G6	- Update Mode -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
+string	LANG_G6b	- Resume Mode (Interrupted Operation) -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
+string	LANG_G7	Log files Path
+string	LANG_G8	Path
+string	LANG_G1B	- Links List Mode -\n\nUse URL box to enter address(es) of page(s) containing links to mirror
+string	LANG_G1C	New project / Import?
+string	LANG_G9	Choose criterion
+string	LANG_G10	Maximum link scanning depth
+string	LANG_G11	Enter address(es) here
+string	LANG_G13	Define additional filtering rules
+string	LANG_G14	Proxy Name (if needed)
+string	LANG_G15	Proxy Port
+string	LANG_G15b	Define proxy settings
+string	LANG_G15c	Use standard HTTP proxy as FTP proxy
+string	LANG_G16	Path
+string	LANG_G17	Select Path
+string	LANG_G18	Path
+string	LANG_G19	Select Path
+string	LANG_G20	Quit WinHTTrack Website Copier
+string	LANG_G21	About WinHTTrack
+string	LANG_G22	Save current preferences as default values
+string	LANG_G23	Click to continue
+string	LANG_G24	Click to define options
+string	LANG_G24b	Click to add a URL
+string	LANG_G24c	Load URL(s) from text file
+string	LANG_G25	WinHTTrack preferences (*.opt)|*.opt||
+string	LANG_G25b	Address List text file (*.txt)|*.txt||
+string	LANG_G26	File not found!
+string	LANG_G26b	Do you really want to change the project name/path?
+string	LANG_G27	Load user-default options?
+string	LANG_G28	Save user-default options?
+string	LANG_G29	Reset all default options?
+string	LANG_G30	Welcome to WinHTTrack!
+string	LANG_G31	Action:
+string	LANG_G32	Max Depth
+string	LANG_G32b	Maximum external depth:
+string	LANG_G33	Filters (refuse/accept links) :
+string	LANG_G34	Paths
+string	LANG_G37	Save prefs
+string	LANG_G39	Define..
+string	LANG_G40	Set options..
+string	LANG_G41	Preferences and mirror options:
+string	LANG_G42	Project name
+string	LANG_G43	Add a URL...
+string	LANG_G44	Web Addresses: (URL)
+string	LANG_H1	Stop WinHTTrack?
+string	LANG_H2	No log files in %s!
+string	LANG_H3	Pause Download?
+string	LANG_H4	Stop the mirroring operation
+string	LANG_H5	Minimize to System Tray
+string	LANG_H6	Click to skip a link or stop parsing
+string	LANG_H7	Click to skip a link
+string	LANG_H8	Bytes saved
+string	LANG_H9	Links scanned
+string	LANG_H10	Time:
+string	LANG_H11	Connections:
+string	LANG_H12	Running:
+string	LANG_H13	Hide
+string	LANG_H14	Transfer rate
+string	LANG_H15	SKIP
+string	LANG_H16	Information
+string	LANG_H17	Files written:
+string	LANG_H18	Files updated:
+string	LANG_H19	Errors:
+string	LANG_H20	In progress:
+string	LANG_I1	Follow external links
+string	LANG_I2	Test all links in pages
+string	LANG_I2b	Try to ferret out all links
+string	LANG_I2c	Download HTML files first (faster)
+string	LANG_I3	Choose local site structure
+string	LANG_I4	Set user-defined structure on disk
+string	LANG_I5	Use a cache for updates and retries
+string	LANG_I5b	Do not update zero size or user-erased files
+string	LANG_I6	Create a Start Page
+string	LANG_I6b	Create a word database of all html pages
+string	LANG_I6c	Build a complete RFC822 mail (MHT/EML) archive of the mirror
+string	LANG_I7	Create error logging and report files
+string	LANG_I8	Generate DOS 8-3 filenames ONLY
+string	LANG_I8b	Generate ISO9660 filenames ONLY for CDROM medias
+string	LANG_I9	Do not create HTML error pages
+string	LANG_I10	Select file types to be saved to disk
+string	LANG_I11	Select parsing direction
+string	LANG_I11b	Select global parsing direction
+string	LANG_I11c	Setup URL rewriting rules for internal links (downloaded ones) and external links (not downloaded ones)
+string	LANG_I12	Max simultaneous connections
+string	LANG_I13	File timeout
+string	LANG_I14	Cancel all links from host if timeout occurs
+string	LANG_I15	Minimum admissible transfer rate
+string	LANG_I16	Cancel all links from host if too slow
+string	LANG_I17	Maximum number of retries on non-fatal errors
+string	LANG_I18	Maximum size for any single HTML file
+string	LANG_I19	Maximum size for any single non-HTML file
+string	LANG_I20	Maximum amount of bytes to retrieve from the Web
+string	LANG_I20b	Make a pause after downloading this amount of bytes
+string	LANG_I21	Maximum duration time for the mirroring operation
+string	LANG_I22	Maximum transfer rate
+string	LANG_I22b	Maximum connections/seconds (avoid server overload)
+string	LANG_I22c	Maximum number of links that can be tested (not saved!)
+string	LANG_I23	Browser identity
+string	LANG_I23b	Comment to be placed in each HTML file
+string	LANG_I23c	Languages accepted by the browser
+string	LANG_I23d	Additional HTTP headers to be sent in each requests
+string	LANG_I23e	HTTP referer to be sent for initial URLs
+string	LANG_I24	Back to starting page
+string	LANG_I25	Save current preferences as default values
+string	LANG_I26	Click to continue
+string	LANG_I27	Click to cancel changes
+string	LANG_I28	Follow local robots rules on sites
+string	LANG_I29	Links to non-localised external pages will produce error pages
+string	LANG_I1a	Do not erase obsolete files after update
+string	LANG_I1b	Accept cookies?
+string	LANG_I1c	Check document type when unknown?
+string	LANG_I1d	Parse java applets to retrieve included files that must be downloaded?
+string	LANG_I1e	Store all files in cache instead of HTML only
+string	LANG_I1f	Log file type (if generated)
+string	LANG_I1g	Maximum mirroring depth from root address
+string	LANG_I1g2	Maximum mirroring depth for external/forbidden addresses (0, that is, none, is the default)
+string	LANG_I1h	Create a debugging file
+string	LANG_I1i	Use non-standard requests to get round some server bugs
+string	LANG_I1j	Use old HTTP/1.0 requests (limits engine power!)
+string	LANG_I1k	Attempt to limit retransfers through several tricks (file size test..)
+string	LANG_I1k2	Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
+string	LANG_I30	Write external links without login/password
+string	LANG_I30b	Write internal links without query string
+string	LANG_I31	Get non-HTML files related to a link, eg external .ZIP or pictures
+string	LANG_I32	Test all links (even forbidden ones)
+string	LANG_I32b	Try to catch all URLs (even in unknown tags/code)
+string	LANG_I32c	Get HTML files first!
+string	LANG_I33	Structure type (how links are saved)
+string	LANG_I34	Use a cache for updates
+string	LANG_I34b	Do not re-download locally erased files
+string	LANG_I35	Make an index
+string	LANG_I35b	Make a word database
+string	LANG_I35c	Build a mail archive
+string	LANG_I36	Log files
+string	LANG_I37	DOS names (8+3)
+string	LANG_I37b	ISO9660 names (CDROM)
+string	LANG_I38	No error pages
+string	LANG_I39	Primary Scan Rule
+string	LANG_I40	Travel mode
+string	LANG_I40b	Global travel mode
+string	LANG_I40c	These options should be modified only exceptionally
+string	LANG_I40d	Activate Debugging Mode (winhttrack.log)
+string	LANG_I40e	Rewrite links: internal / external
+string	LANG_I41	Flow control
+string	LANG_I42	Limits
+string	LANG_I43	Identity
+string	LANG_I43b	HTML footer
+string	LANG_I43c	Languages
+string	LANG_I43d	Additional HTTP Headers
+string	LANG_I43e	Default referer URL
+string	LANG_I44	N# connections
+string	LANG_I45	Abandon host if error
+string	LANG_I46	Minimum transfer rate (B/s)
+string	LANG_I47	Abandon host if too slow
+string	LANG_I47b	Configure
+string	LANG_I47c	Use proxy for ftp transfers
+string	LANG_I47d	TimeOut(s)
+string	LANG_I47e	Persistent connections (Keep-Alive)
+string	LANG_I47f	Reduce connection time and type lookup time using persistent connections
+string	LANG_I48	Retries
+string	LANG_I49	Size limit
+string	LANG_I50	Max size of any HTML file (B)
+string	LANG_I50b	Max size of any non-HTML file
+string	LANG_I51	Max site size
+string	LANG_I52	Max time
+string	LANG_I53	Save prefs
+string	LANG_I54	Max transfer rate
+string	LANG_I55	Follow robots.txt
+string	LANG_I56	No external pages
+string	LANG_I57	Do not purge old files
+string	LANG_I58	Accept cookies
+string	LANG_I59	Check document type
+string	LANG_I60	Parse java files
+string	LANG_I61	Store ALL files in cache
+string	LANG_I62	Tolerant requests (for servers)
+string	LANG_I62b	Update hack (limit re-transfers)
+string	LANG_I62b2	URL hacks (join similar URLs)
+string	LANG_I63	Force old HTTP/1.0 requests (no 1.1)
+string	LANG_I64	Max connections / seconds
+string	LANG_I64b	Maximum number of links
+string	LANG_I65	Pause after downloading..
+string	LANG_I66	Hide passwords
+string	LANG_I67	Hide query strings
+string	LANG_IOPT1	Links
+string	LANG_IOPT2	Build
+string	LANG_IOPT3	Experts Only
+string	LANG_IOPT4	Flow Control
+string	LANG_IOPT5	Limits
+string	LANG_IOPT6	Browser ID
+string	LANG_IOPT7	Scan Rules
+string	LANG_IOPT8	Spider
+string	LANG_IOPT9	Log, Index, Cache
+string	LANG_IOPT10	Proxy
+string	LANG_IOPT11	MIME Types
+string	LANG_J1	Do you really want to quit WinHTTrack Website Copier?
+string	LANG_J2	Do not connect to a provider (already connected)
+string	LANG_J2b	Do not use remote access connection
+string	LANG_J3	Schedule the mirroring operation
+string	LANG_J4	Quit WinHTTrack Website Copier
+string	LANG_J5	Back to starting page
+string	LANG_J6	Click to start!
+string	LANG_J7	No saved password for this connection!
+string	LANG_J8	Can not get remote connection settings
+string	LANG_J8b	Select a connection provider
+string	LANG_J9	Start
+string	LANG_J10	Please adjust connection parameters if necessary,\nthen press FINISH to launch the mirroring operation.
+string	LANG_J10b	Save settings only, do not launch download now.
+string	LANG_J11	On hold
+string	LANG_J12	Transfer scheduled for: (hh/mm/ss)
+string	LANG_J13	Start
+string	LANG_J14	Connect to provider (RAS)
+string	LANG_J15	Connect to this provider
+string	LANG_J16	Disconnect when finished
+string	LANG_J17	Disconnect modem on completion
+string	LANG_K1	\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nEngine and interfaces: Xavier Roche\r\nCode, documentation and packaging: many contributors\r\n\r\n(C) Xavier Roche and other contributors\r\nMANY THANKS for English translations to:\r\nXavier Roche, Robert Lagadec
+string	LANG_K2	About WinHTTrack Website Copier
+string	LANG_K3	Please visit our Web page
+string	LANG_L1	Wizard query
+string	LANG_L2	Your answer:
+string	LANG_M1	Link detected..
+string	LANG_M2	Choose a rule
+string	LANG_M3	Ignore this link
+string	LANG_M4	Ignore directory
+string	LANG_M5	Ignore domain
+string	LANG_M6	Catch this page only
+string	LANG_M7	Mirror site
+string	LANG_M8	Mirror domain
+string	LANG_M9	Ignore all
+string	LANG_M10	Mirror %s and every host below it
+string	LANG_M11	Ignore %s and every host below it
+string	LANG_N1	Wizard query
+string	LANG_N2	NO
+string	LANG_O1	File
+string	LANG_O2	Options
+string	LANG_O3	Log
+string	LANG_O4	Window
+string	LANG_O5	Help
+string	LANG_O10	Pause transfer
+string	LANG_O11	Exit
+string	LANG_O12	Modify options
+string	LANG_O13	View log
+string	LANG_O14	View error log
+string	LANG_O14b	View file transfers
+string	LANG_O15	Hide
+string	LANG_O16	About WinHTTrack Website Copier
+string	LANG_O17	Check program updates...
+string	LANG_O18	&Toolbar
+string	LANG_O19	&Status Bar
+string	LANG_O20	S&plit
+string	LANG_P1	File
+string	LANG_P2	Preferences
+string	LANG_P3	Mirror
+string	LANG_P4	Log
+string	LANG_P5	Window
+string	LANG_P6	Help
+string	LANG_P10	Exit
+string	LANG_P11	Load default options
+string	LANG_P12	Save default options
+string	LANG_P12b	Reset to default options
+string	LANG_P13	Load options...
+string	LANG_P14	Save options as...
+string	LANG_P15	Language preference...
+string	LANG_P16	Contents...
+string	LANG_P17	About WinHTTrack...
+string	LANG_P18	New project\tCtrl+N
+string	LANG_P19	&Open...\tCtrl+O
+string	LANG_P20	&Save\tCtrl+S
+string	LANG_P21	Save &As...
+string	LANG_P22	&Delete...
+string	LANG_P23	&Browse sites...
+string	LANG_Q1	User-defined structure
+string	LANG_Q2	%n\tName of file without file type (ex: image)\r\n%N\tName of file including file type (ex: image.gif)\r\n%t\tFile type only (ex: gif)\r\n%p\tPath [without ending /] (ex: /someimages)\r\n%h\tHost name (ex: www.someweb.com)\r\n%M\tMD5 URL (128 bits, 32 ascii bytes)\r\n%Q\tMD5 query string (128 bits, 32 ascii bytes)\r\n%q\tMD5 small query string (16 bits, 4 ascii bytes)\r\n\r\n%s?\tShort name (ex: %sN)
+string	LANG_Q3	Example:\t%h%p/%n%q.%t\n->\t\tc:\\mirror\\www.someweb.com\\someimages\\image.gif
+string	LANG_R1	Proxy settings
+string	LANG_R2	Proxy address:
+string	LANG_R3	Proxy port:
+string	LANG_R4	Authentication (only if needed)
+string	LANG_R5	Login
+string	LANG_R6	Password
+string	LANG_R10	Enter proxy address here
+string	LANG_R11	Enter proxy port here
+string	LANG_R12	Enter proxy login
+string	LANG_R13	Enter proxy password
+string	LANG_S1	Enter project name here
+string	LANG_S2	Enter saving path here
+string	LANG_S3	Select existing project to update
+string	LANG_S4	Click here to select path
+string	LANG_S5	Select or create a new category name, to sort your mirrors in categories
+string	LANG_S10	HTTrack Project Wizard...
+string	LANG_S11	New project name:
+string	LANG_S11b	Existing project name:
+string	LANG_S11c	Project name:
+string	LANG_S12	Base path:
+string	LANG_S13	Project category:
+string	LANG_S20	C:\\My Web Sites
+string	LANG_S30	Type a new project name, \r\nor select existing project to update/resume
+string	LANG_S31	New project
+string	LANG_T1	Insert URL
+string	LANG_T2	URL:
+string	LANG_T4	Authentication (only if needed)
+string	LANG_T5	Login
+string	LANG_T6	Password
+string	LANG_T7	Forms or complex links:
+string	LANG_T8	Capture URL...
+string	LANG_T10	Enter URL address(es) here
+string	LANG_T12	Enter site login
+string	LANG_T13	Enter site password
+string	LANG_T14	Use this capture tool for links that can only be accessed through forms or javascript code
+string	LANG_U1	Choose language according to preference
+string	LANG_V1	Catch URL!
+string	LANG_V2	Please set temporary browser proxy settings to the following values (Copy/Paste Proxy Address and Port).\nThen click on the Form SUBMIT button in your browser page, or click on the specific link you want to capture.
+string	LANG_V3	This will send the desired link from your browser to WinHTTrack.
+string	LANG_V4	ABORT
+string	LANG_V10	Copy/Paste the temporary proxy parameters here
+string	LANG_V11	Cancel
+string	LANG_DIAL1	Unable to find Help files!
+string	LANG_DIAL2	Unable to save parameters!
+string	LANG_DIAL3	Please drag only one folder at a time
+string	LANG_DIAL4	Please drag only folders, not files
+string	LANG_DIAL5	Please drag folders only
+string	LANG_DIAL6	Select user-defined structure?
+string	LANG_DIAL7	Please ensure that the user-defined-string is correct,\notherwise filenames will be bogus!
+string	LANG_DIAL8	Do you really want to use a user-defined structure?
+string	LANG_DIAL9	Too manu URLs, cannot handle so many links!!
+string	LANG_DIAL10	Not enough memory, fatal internal error..
+string	LANG_DIAL11	Unknown operation!
+string	LANG_DIAL12	Add this URL?\r\n
+string	LANG_DIAL13	Warning: main process is still not responding, cannot add URL(s)..
+string	LANG_W1	Type/MIME associations
+string	LANG_W2	File types:
+string	LANG_W3	MIME identity:
+string	LANG_W4	Select or modify your file type(s) here
+string	LANG_W5	Select or modify your MIME type(s) here
+string	LANG_W6	Go up
+string	LANG_W7	Go down
+string	LANG_X1	File download information
+string	LANG_X2	Freeze Window
+string	LANG_X3	More information:
+string	LANG_Y1	Welcome to WinHTTrack Website Copier!\n\nPlease click on the NEXT button to\n\n- start a new project\n- or resume a partial download
+string	LISTDEF_1	File names with extension:\nFile names containing:\nThis file name:\nFolder names containing:\nThis folder name:\nLinks on this domain:\nLinks on domains containing:\nLinks from this host:\nLinks containing:\nThis link:\nALL LINKS
+string	LISTDEF_2	Show all\nHide debug\nHide infos\nHide debug and infos
+string	LISTDEF_3	Site-structure (default)\nHtml in web/,       images/other files in web/images/\nHtml in web/html,   images/other in web/images\nHtml in web/,       images/other in web/\nHtml in web/,       images/other in web/xxx, where xxx is the file extension\nHtml in web/html,   images/other in web/xxx\nSite-structure, without www.domain.xxx/\nHtml in site_name/, images/other files in site_name/images/\nHtml in site_name/html, images/other in site_name/images\nHtml in site_name/, images/other in site_name/\nHtml in site_name/, images/other in site_name/xxx\nHtml in site_name/html, images/other in site_name/xxx\nAll files in web/, with random names (gadget !)\nAll files in site_name/, with random names (gadget !)\nUser-defined structure..
+string	LISTDEF_4	Just scan\nStore html files\nStore non html files\nStore all files (default)\nStore html files first
+string	LISTDEF_5	Stay in the same directory\nCan go down (default)\nCan go up\nCan both go up & down
+string	LISTDEF_6	Stay on the same address (default)\nStay on the same domain\nStay on the same top level domain\nGo everywhere on the web
+string	LISTDEF_7	Never\nIf unknown (except /)\nIf unknown
+string	LISTDEF_8	no robots.txt rules\nrobots.txt except wizard\nfollow robots.txt rules
+string	LISTDEF_9	normal\nextended\ndebug
+string	LISTDEF_10	Download web site(s)\nDownload web site(s) + questions\nGet individual files\nDownload all sites in pages (multiple mirror)\nTest links in pages (bookmark test)\n* Continue interrupted download\n* Update existing download
+string	LISTDEF_11	Relative URI / Absolute URL (default)\nAbsolute URL / Absolute URL\nAbsolute URI / Absolute URL\nOriginal URL / Original URL
+string	LANG_OSFWB	Open Source offline browser
+string	LANG_METADESC	Website Copier/Offline Browser. Copy remote websites to your computer. Free.
+string	LANG_METAKEYW	httrack, winhttrack, webhttrack, offline browser
+string	LANG_URLLIST	URL list (.txt)
+string	LANG_PREVIOUS	Previous
+string	LANG_NEXT	Next
+string	LANG_URLS	URLs
+string	LANG_WARNING	Warning
+string	LANG_NOJS	Your browser does not currently support javascript. For better results, please use a javascript-aware browser.
+string	LANG_THANKYOU	Thank you
+string	LANG_CANCLSWND	You can now close this window
+string	LANG_SERVEND	Server terminated
+string	LANG_FATALERR	A fatal error has occurred during this mirror
+string	LANG_PROXYTYPE	Proxy type:
+string	LANG_PROXYTYPETIP	Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
+string	LANG_COOKIEFILE	Load cookies from file:
+string	LANG_COOKIEFILETIP	Use a Netscape cookies.txt file as the cookie jar. HTTrack loads it before crawling, and writes it back at the end unless a line in it could not be loaded.
+string	LANG_PAUSEFILES	Pause between files:
+string	LANG_PAUSEFILESTIP	Random delay between file downloads, in seconds. Use MIN:MAX for a random range (e.g. 2:8).
+string	LANG_KEEPWWW	Keep the www. prefix (do not merge www.host with host)
+string	LANG_KEEPWWWTIP	Do not treat www.host and host as the same site.
+string	LANG_KEEPSLASHES	Keep double slashes in URLs
+string	LANG_KEEPSLASHESTIP	Do not collapse duplicate slashes in URLs.
+string	LANG_KEEPQUERYORDER	Keep the original query-string order
+string	LANG_KEEPQUERYORDERTIP	Do not reorder query-string parameters when deduplicating URLs.
+string	LANG_STRIPQUERY	Strip query keys:
+string	LANG_STRIPQUERYTIP	Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
+string	LANG_HOSTALIAS	Host aliases:
+string	LANG_HOSTALIASTIP	Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
+string	LANG_WARC	Write a WARC archive of the crawl
+string	LANG_WARCTIP	Also save every fetched response into an ISO-28500 WARC/1.1 archive, next to the mirror.
+string	LANG_WARCFILE	WARC archive name:
+string	LANG_WARCFILETIP	Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
+string	LANG_WARCCDX	Write a CDXJ index of the WARC archive
+string	LANG_WARCCDXTIP	Also write a sorted CDXJ index listing every record in the WARC archive, for replay tools.
+string	LANG_WACZ	Package the crawl as a WACZ file
+string	LANG_WACZTIP	Bundle the WARC archive, its CDXJ index and the mirrored pages into a single WACZ file; implies the WARC archive and the CDXJ index.
+string	LANG_WARCMAXSIZE	WARC segment size limit:
+string	LANG_WARCMAXSIZETIP	Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
+string	LANG_CHANGES	Report what changed since the previous mirror
+string	LANG_CHANGESTIP	Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
+string	LANG_SINGLEFILE	Inline assets as data: URIs (self-contained pages)
+string	LANG_SINGLEFILETIP	Once the mirror is finished, rewrite every saved page with its stylesheets, scripts, images and fonts embedded, so a page can also be opened on its own.
+string	LANG_SINGLEFILEMAX	Largest inlined asset (bytes):
+string	LANG_SINGLEFILEMAXTIP	An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
+string	LANG_SITEMAP	Seed the crawl from the site's sitemap
+string	LANG_SITEMAPTIP	Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+string	LANG_SITEMAPURL	Sitemap address:
+string	LANG_SITEMAPURLTIP	Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+string	LANG_MANUAL	Manual
+string	LANG_MAXRETRYAFTER	Max Retry-After(s)
+string	LANG_MAXRETRYAFTERTIP	Longest delay to obey when a server sends a Retry-After header. Use 0 to retry without waiting.
+string	LANG_LIVERULES	The rules you set here apply to the mirror now running. Removing a rule lets new links through again, but a link it already refused will not come back in this run.
+string	LANG_LIVERULESBAD	This scan rule cannot be used. A rule starts with + or -, then a pattern, and holds one short line.
+string	LANG_UITHEME	Theme:
+string	LANG_UITHEMECLASSIC	Classic
+string	LANG_ACCEPT	Accept headers
+string	LANG_ACCEPTTIP	The Accept header sent for each kind of link. Automatic sends what the chosen browser sends.
+string	LANG_ACCEPTAUTO	Automatic
+string	LANG_ACCEPTLEGACY	Old HTTrack value
+string	LANG_ACCEPTDEFAULT	Default
+string	LANG_ACCEPTDOCUMENT	Pages
+string	LANG_ACCEPTIFRAME	Inline frames
+string	LANG_ACCEPTFRAME	Frames
+string	LANG_ACCEPTIMAGE	Images
+string	LANG_ACCEPTSTYLE	Style sheets
+string	LANG_ACCEPTSCRIPT	Scripts
+string	LANG_ACCEPTFONT	Fonts
+string	LANG_ACCEPTAUDIO	Audio
+string	LANG_ACCEPTVIDEO	Video
+string	LANG_ACCEPTOBJECT	Objects
+string	LANG_ACCEPTEMBED	Embedded content
+string	LANG_BROWSERLOGIN	Log in with a browser...
+string	LANG_BROWSERLOGINTIP	Log in to the site in a browser, and crawl with the cookies and the browser identity it was given
+string	LANG_BROWSERLOGINNORUNTIME	No Microsoft Edge WebView2 runtime is installed on this computer
+string	LANG_BROWSERLOGINTITLE	Log in with a browser
+string	LANG_BROWSERLOGINGO	Go
+string	LANG_BROWSERLOGINDONE	Done
+string	LANG_BROWSERLOGINCLEAR	Clear login
+string	LANG_BROWSERLOGINFAILED	The browser did not open: %s.
+string	LANG_BROWSERLOGINNONE	The browser came back with no cookies. The address and the browser identity are saved with the project when the wizard finishes.
+string	LANG_BROWSERLOGINGOT	Cookies collected: %d. They are used when you press OK.
+string	LANG_BROWSERLOGINGOTFINISH	Cookies collected: %d. They are saved with the project when the wizard finishes.
+string	LANG_BROWSERLOGINNOTSAVED	The login could not be written to %s.
+string	LANG_BROWSERLOGINDROPPED	%d of the browser's cookies were left out, because the engine would not read them.
+string	LANG_BROWSERLOGINPASTE	Log in to the site in another tab of this browser. Open the developer tools (F12), then the Network tab, reload the page, right-click the first request and choose Copy as cURL (bash). Paste the text here. A cookies.txt export also works, for the first address in the list.
+string	LANG_BROWSERLOGINFOR	Cookies for: %s. Browser identity: %s.
+string	LANG_BROWSERLOGINNONAME	A login cannot be saved for this address, so nothing was kept.
+string	LANG_YES	Yes

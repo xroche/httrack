@@ -1,0 +1,119 @@
+#!/bin/bash
+#
+# lang.def is generated from lang-symbols.tsv, and front ends read the TSV.
+
+set -e
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+distdir=${top_srcdir:-$(cd "${testdir}/.." && pwd)}
+distdir=$(cd "${distdir}" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+TSV="${distdir}/lang-symbols.tsv"
+DEF="${distdir}/lang.def"
+GEN="${distdir}/tools/gen-lang-def.py"
+
+# A missing file is fatal, never a skip.
+for f in "${TSV}" "${DEF}" "${GEN}"; do
+    test -r "${f}" || fail "missing ${f}"
+done
+
+py=$(find_python) || skip "python3 not found"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/lang_symbols.XXXXXX") || fail "no tmpdir"
+cleanup() { rm -rf "${work}"; }
+cleanup_push cleanup
+
+printf '[lang.def matches the table] ..\t'
+"${py}" "${GEN}" "${TSV}" "${work}/lang.def" >/dev/null ||
+    fail "the generator rejected ${TSV}"
+diff -u "${DEF}" "${work}/lang.def" ||
+    fail "lang.def differs from lang-symbols.tsv: edit the TSV, not lang.def, then run tools/gen-lang-def.py lang-symbols.tsv lang.def"
+echo OK
+
+printf '[a text at the length limit is accepted] ..\t'
+"${py}" - "${TSV}" "${work}/long.tsv" <<'PY' || fail "could not build the table"
+import sys
+rows = open(sys.argv[1], encoding="ascii").read().split("\n")
+i = next(n for n, r in enumerate(rows) if r.startswith("string\t"))
+k, s, t = rows[i].split("\t")
+rows[i] = "\t".join([k, s, "x" * 7999])
+open(sys.argv[2], "w", encoding="ascii", newline="\n").write("\n".join(rows))
+PY
+"${py}" "${GEN}" "${work}/long.tsv" "${work}/long.def" >/dev/null ||
+    fail "the generator refused a 7999-byte text"
+echo OK
+
+printf '[the table keeps its shape] ..\t'
+# A truncated table must fail, so the counts are floors, and meta is exact.
+counts=$(
+    "${py}" - "${TSV}" <<'PY'
+import sys
+n = {"language": 0, "meta": 0, "string": 0}
+for line in open(sys.argv[1], encoding="ascii"):
+    if not line.startswith("#"):
+        n[line.split("\t")[0]] += 1
+sys.stdout.reconfigure(newline="\n")
+print(n["language"], n["meta"], n["string"])
+PY
+) || fail "cannot count rows"
+read -r nlang nmeta nstr <<<"${counts}"
+if [ "${nlang}" -lt 30 ] || [ "${nmeta}" -ne 5 ] || [ "${nstr}" -lt 545 ]; then
+    fail "row counts shrank: ${counts}"
+fi
+echo "OK (${counts})"
+
+# Regenerating cannot see a bad row, so the generator must refuse each of these.
+# reject LABEL EXPECTED-ERROR PYTHON. PYTHON edits `rows`, the TSV's lines.
+# `i` is the first string row, and `k s t` are its fields.
+reject() {
+    local what=$1 want_err=$2 script=$3 err
+    printf '[%s is rejected] ..\t' "${what}"
+    "${py}" - "${TSV}" "${work}/bad.tsv" <<<"import sys
+rows = open(sys.argv[1], encoding='ascii').read().split('\n')
+i = next(n for n, r in enumerate(rows) if r.startswith('string\t'))
+k, s, t = rows[i].split('\t')
+${script}
+open(sys.argv[2], 'w', encoding='latin-1', newline='\n').write('\n'.join(rows))" ||
+        fail "could not build the bad table"
+    if err=$("${py}" "${GEN}" "${work}/bad.tsv" "${work}/bad.def" 2>&1); then
+        fail "the generator accepted ${what}"
+    fi
+    grep -q -- "${want_err}" <<<"${err}" || fail "wrong refusal: ${err}"
+    echo OK
+}
+
+reject "a real tab in a text" ": 4 columns" "rows[i] = '\t'.join([k, s, 'a\tb'])"
+reject "a two-field row" ": 2 columns" "rows[i] = '\t'.join([k, s])"
+reject "a non-ASCII byte" "byte 0xe9 is outside" "rows[i] += '\xe9'"
+reject "a CR byte" "byte 0x0d is outside" "rows[i] += '\r'"
+reject "a missing final newline" "no final newline" "rows.pop()"
+reject "a duplicate symbol" "duplicate symbol" "rows.insert(i + 1, rows[i])"
+reject "a row out of its block" "after the string block" \
+    "rows.insert(-1, 'language\tLANGUAGE_31\tKlingon')"
+reject "a gap in language numbers" "numbered from 1" \
+    "rows = [r for r in rows if '\tLANGUAGE_2\t' not in r]"
+reject "an unknown kind" "bad kind" "rows[i] = '\t'.join(['strings', s, t])"
+reject "a string symbol without LANG_" "bad symbol" "rows[i] = '\t'.join([k, 'X' + s, t])"
+reject "an empty text" "empty or padded" "rows[i] = '\t'.join([k, s, ''])"
+reject "a padded text" "empty or padded" "rows[i] += ' '"
+reject "a trailing backslash" "cannot hold" "rows[i] += '\\\\'"
+reject "a text too long for lang.def" "cannot hold" \
+    "rows[i] = '\t'.join([k, s, 'x' * 8000])"
+reject "a symbol too long for lang.def" "cannot hold" \
+    "rows[i] = '\t'.join([k, s + 'x' * 8000, t])"
+reject "a language named like a path" "plain file name" \
+    "rows = [r.replace('\tEnglish', '\t../English') for r in rows]"
+reject "a meta text unlike its symbol" "must repeat" \
+    "m = next(n for n, r in enumerate(rows) if r.startswith('meta'))
+rows[m] += 'x'"
+reject "a table with no meta rows" "no meta rows" \
+    "rows = [r for r in rows if not r.startswith('meta')]"
+reject "a text equal to a symbol" "a symbol for a text" "rows[i] = '\t'.join([k, s, 'LANG_YES'])"
+reject "a text named like a list" "a symbol for a text" "rows[i] = '\t'.join([k, s, 'LISTDEF_1x'])"
+reject "a text named like a language" "a symbol for a text" "rows[i] = '\t'.join([k, s, 'LANGUAGE_31'])"
+reject "a language named like a symbol" "a symbol for a text" \
+    "rows = [r.replace('\tEnglish', '\tLANG_X') for r in rows]"
+reject "a text on a repeat's key" "collides" \
+    "rows[i:i] = ['\t'.join([k, s + 'a', t]), '\t'.join([k, s + 'c', t + '1'])]"
