@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""Generate lang.def from lang-symbols.tsv.
+"""Generate lang.def from lang-symbols.tsv, the table front ends read.
 
-The TSV is the source of truth, and front ends read its columns rather than
-counting lang.def's lines. lang.def is kept, byte for byte, for its existing
-readers.
+lang.def is kept, byte for byte, for its existing readers.
 """
 import argparse
 import re
@@ -23,10 +21,9 @@ MAXTEXT = 7999
 
 
 def parse(path):
-    """Rows of the TSV, or exit naming the first row that is malformed."""
+    """Return the TSV's rows, or exit naming the first malformed one."""
     rows, seen, kind_at = [], set(), 0
-    # Bytes, not text: a stray non-ASCII byte must name its line rather than
-    # arrive as a decode traceback.
+    # Read bytes so a non-ASCII byte names its line, not a traceback.
     with open(path, "rb") as fp:
         for n, raw in enumerate(fp, 1):
             if not raw.endswith(b"\n"):
@@ -39,7 +36,7 @@ def parse(path):
             line = raw[:-1].decode("ascii")
             if not line or line.startswith("#"):
                 continue
-            # A real tab inside a text adds a column. Write it as \t instead.
+            # A real tab inside a text adds a column.
             f = line.split("\t")
             if len(f) != len(COLUMNS):
                 sys.exit("%s:%d: %d columns, want %d" % (path, n, len(f), len(COLUMNS)))
@@ -61,11 +58,12 @@ def parse(path):
                 sys.exit(
                     "%s:%d: %s has an empty or padded text" % (path, n, row["symbol"])
                 )
-            # lang.def's readers take such a text for a symbol.
+            # The server reads a LANG_ or LISTDEF_ key as a symbol, and finds
+            # languages by looking up LANGUAGE_1, LANGUAGE_2 and so on.
             if row["kind"] != "meta" and SYMBOL_LIKE.match(row["text"]):
                 sys.exit("%s:%d: %s has a symbol for a text" % (path, n, row["symbol"]))
             # A trailing backslash joins the next line in lang.def's readers.
-            if row["text"].endswith("\\") or len(row["text"]) > MAXTEXT:
+            if row["text"].endswith("\\") or max(map(len, f)) > MAXTEXT:
                 sys.exit(
                     "%s:%d: %s has a text lang.def cannot hold"
                     % (path, n, row["symbol"])
@@ -76,6 +74,9 @@ def parse(path):
                 sys.exit(
                     "%s:%d: languages must be numbered from 1 in order" % (path, n)
                 )
+            # A language's text names its catalog file, which the server opens.
+            if row["kind"] == "language" and re.search(r"[/\\]|\.\.", row["text"]):
+                sys.exit("%s:%d: a language text must be a plain file name" % (path, n))
             if row["kind"] == "meta" and row["text"] != row["symbol"]:
                 sys.exit("%s:%d: a meta row's text must repeat its symbol" % (path, n))
             rows.append(row)
@@ -87,17 +88,18 @@ def parse(path):
 
 
 def check_keys(path, rows):
-    """Exit unless htsserver.c keys every string row the way the TSV means.
+    """Exit if a text lands on another row's key.
 
-    The server keys each pair by its second line and names the Nth repeat of a
-    text text+N, so a text must not land on another row's key.
+    The server keys repeats of a text as text1, text2 and so on, taking the
+    first free key, so the TSV order holds only while no key collides.
     """
     keys, count = set(), {}
     for r in rows:
-        base = r["symbol"] if r["kind"] == "language" else r["text"]
-        n = count.get(base, 0)
-        count[base] = n + 1
-        want = base if n == 0 else "%s%d" % (base, n)
+        if r["kind"] != "string":
+            continue
+        n = count.get(r["text"], 0)
+        count[r["text"]] = n + 1
+        want = r["text"] if n == 0 else "%s%d" % (r["text"], n)
         if want in keys:
             sys.exit(
                 "%s: %s's text %r collides with another row"
