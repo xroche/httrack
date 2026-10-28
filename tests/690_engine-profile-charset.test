@@ -1,0 +1,12 @@
+#!/bin/bash
+#
+# Which winprofile.ini files declare UTF-8.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+dir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_profilecharset.XXXXXX")
+cleanup_push rm -rf "$dir"
+
+assert_selftest "profilecharset self-test OK" profilecharset "$dir"

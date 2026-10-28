@@ -1127,8 +1127,8 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
                     category = NULL;
                   }
 #ifdef _WIN32
-                  /* category is ANSI-codepage, doc is utf-8: convert (#216) */
-                  else {
+                  /* a legacy category is ANSI-codepage, doc is utf-8 (#216) */
+                  else if (!hts_profile_declares_utf8(StringBuff(iname))) {
                     char *cat_utf8 = hts_convertStringSystemToUTF8(
                         category, strlen(category));
                     if (cat_utf8 != NULL) {
@@ -1260,30 +1260,58 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
   return retval;
 }
 
+/* Find the first line starting with key; never a long line's tail. */
+static size_t profile_key_line(FILE *fp, const char *key, char *line,
+                               size_t size) {
+  int c = 0;
+
+  assertf(size != 0);
+  while (c != EOF) {
+    size_t n = 0;
+    int off;
+
+    while (n + 1 < size && (c = fgetc(fp)) != EOF && c != '\n') {
+      if (c != '\r' && c != '\t' && c != '\f')
+        line[n++] = (char) c;
+    }
+    line[n] = '\0';
+    if (n + 1 >= size) {
+      while ((c = fgetc(fp)) != EOF && c != '\n')
+        ;
+    }
+    if ((off = strfield(line, key)) != 0)
+      return (size_t) off;
+  }
+  return 0;
+}
+
 HTSEXT_API char *hts_getcategory(const char *filename) {
   String categ = STRING_EMPTY;
+  FILE *const fp = fexist(filename) ? fopen(filename, "rb") : NULL;
 
-  if (fexist(filename)) {
-    FILE *fp = fopen(filename, "rb");
+  if (fp != NULL) {
+    char BIGSTK line[1022];
+    const size_t off = profile_key_line(fp, "category=", line, sizeof(line));
 
-    if (fp != NULL) {
-      int done = 0;
-
-      while(!feof(fp) && !done) {
-        char BIGSTK line[1024];
-        int n = linput(fp, line, sizeof(line) - 2);
-
-        if (n > 0) {
-          if (strfield(line, "category=")) {
-            hts_unescapehttp(line + 9, &categ);
-            done = 1;
-          }
-        }
-      }
-      fclose(fp);
-    }
+    if (off != 0)
+      hts_unescapehttp(line + off, &categ);
+    fclose(fp);
   }
   return StringBuffRW(categ);
+}
+
+hts_boolean hts_profile_declares_utf8(const char *filename) {
+  hts_boolean utf8 = HTS_FALSE;
+  FILE *const fp = fopen(filename, "rb");
+
+  if (fp != NULL) {
+    char BIGSTK line[1022];
+    const size_t off = profile_key_line(fp, "charset=", line, sizeof(line));
+
+    utf8 = off != 0 && hts_isCharsetUTF8(line + off);
+    fclose(fp);
+  }
+  return utf8;
 }
 
 HTSEXT_API char *hts_getcategories(char *path, int type) {
@@ -1305,7 +1333,7 @@ HTSEXT_API char *hts_getcategories(char *path, int type) {
     }
     do {
       if (hts_findisdir(h)) {
-        char BIGSTK line2[1024];
+        char BIGSTK line2[1022];
 
         StringCopy(iname, rpath);
         StringCat(iname, "/");
@@ -1316,25 +1344,17 @@ HTSEXT_API char *hts_getcategories(char *path, int type) {
             FILE *fp = fopen(StringBuff(iname), "rb");
 
             if (fp != NULL) {
-              int done = 0;
+              const size_t off =
+                  profile_key_line(fp, "category=", line2, sizeof(line2));
+              const char *const value = line2 + off;
 
-              while(!feof(fp) && !done) {
-                int n = linput(fp, line2, sizeof(line2) - 2);
-
-                if (n > 0) {
-                  if (strfield(line2, "category=")) {
-                    if (*(line2 + 9)) {
-                      if (!coucal_read(hashCateg, line2 + 9, NULL)) {
-                        coucal_write(hashCateg, line2 + 9, 0);
-                        if (StringLength(categ) > 0) {
-                          StringCat(categ, "\r\n");
-                        }
-                        hts_unescapehttp(line2 + 9, &categ);
-                      }
-                    }
-                    done = 1;
-                  }
+              if (off != 0 && *value != '\0' &&
+                  !coucal_read(hashCateg, value, NULL)) {
+                coucal_write(hashCateg, value, 0);
+                if (StringLength(categ) > 0) {
+                  StringCat(categ, "\r\n");
                 }
+                hts_unescapehttp(value, &categ);
               }
               line2[0] = '\0';
               fclose(fp);

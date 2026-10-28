@@ -327,9 +327,9 @@ HTSEXT_API char *hts_getcategories(char *path, int type);
 
 /** Read the percent-decoded `category=` value from a winprofile.ini file. The
     result is heap-allocated and owned by the caller (free with freet()), or
-    NULL when the file is missing or has no category line. The bytes are UTF-8,
-    except on Windows, where WinHTTrack writes winprofile.ini in the local ANSI
-    codepage. */
+    NULL when the file is missing or has no category line. The bytes are not
+    converted. They are UTF-8 if the file declares Charset=UTF-8, else the
+    legacy encoding (the ANSI codepage on Windows). */
 HTSEXT_API char *hts_getcategory(const char *filename);
 
 /* Catch-URL */

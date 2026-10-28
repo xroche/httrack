@@ -160,6 +160,9 @@ hts_boolean hts_rename_over(httrackp *opt, const char *src, const char *dst);
 hts_boolean hts_rename_over_aside_selftest(httrackp *opt, const char *src,
                                            const char *dst);
 
+/* Does the winprofile.ini at filename (system charset) declare UTF-8? */
+hts_boolean hts_profile_declares_utf8(const char *filename);
+
 /* True when stdout is a real terminal. Gate any VT escape or CR overwrite on
    it: a redirected log keeps that noise forever. */
 hts_boolean hts_stdout_isterminal(void);
