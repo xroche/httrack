@@ -1,0 +1,37 @@
+#!/bin/bash
+#
+# The Windows build must get brotli 1.2.1 or later (CVE-2026-111497). A
+# version>= floor in the manifest makes vcpkg refuse a baseline that predates
+# it, which #2028 shipped silently, so this pins the floor itself.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+top=${abs_top_srcdir:-$(cd "$testdir/.." && pwd)}
+man="$top/src/vcpkg.json"
+[ -r "$man" ] || fail "cannot read $man"
+
+py=$(find_python) || skip "python3 not found"
+
+# The manifest goes in on stdin so a Windows python never sees a POSIX path.
+out=$("$py" -c '
+import json, sys
+m = json.load(sys.stdin)
+deps = [d for d in m.get("dependencies", [])
+        if (d if isinstance(d, str) else d.get("name")) == "brotli"]
+if len(deps) != 1:
+    sys.exit("expected one brotli dependency, found %d" % len(deps))
+d = deps[0]
+floor = d.get("version>=") if isinstance(d, dict) else None
+if not floor:
+    sys.exit("brotli carries no version>= floor")
+have = tuple(int(x) for x in floor.split("."))
+if have < (1, 2, 1):
+    sys.exit("brotli floor %s is below 1.2.1" % floor)
+if not m.get("builtin-baseline"):
+    sys.exit("a version>= floor needs a builtin-baseline")
+print(floor)
+' <"$man" 2>&1) || fail "$out"
+echo "brotli floor: $out"
