@@ -1,8 +1,8 @@
-# The source of lang.def, which tools/gen-lang-def.py writes from it: edit
-# this file, never lang.def. Columns: kind, symbol, text. Kinds come in
-# blocks, in this order: language, meta, string. A text holds \n and \t as
-# two characters, never a real tab. Rows of one kind keep their order, because
-# a repeated English text is told apart by its position.
+# Edit this file, never lang.def, then run tools/gen-lang-def.py to rewrite it.
+# Columns are kind, symbol and text. Kinds come in blocks, in the order
+# language, meta, string. Write a tab or newline in a text as \t or \n.
+# Keep the rows of a block in order, because a repeated English text is told
+# apart by its position.
 language	LANGUAGE_1	English
 language	LANGUAGE_2	Francais
 language	LANGUAGE_3	Castellano

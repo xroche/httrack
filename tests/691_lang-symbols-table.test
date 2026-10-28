@@ -14,7 +14,7 @@ TSV="${distdir}/lang-symbols.tsv"
 DEF="${distdir}/lang.def"
 GEN="${distdir}/tools/gen-lang-def.py"
 
-# Missing is fatal, never a skip: a check that opts itself out proves nothing.
+# A missing file is fatal, never a skip.
 for f in "${TSV}" "${DEF}" "${GEN}"; do
     test -r "${f}" || fail "missing ${f}"
 done
@@ -28,12 +28,12 @@ cleanup_push cleanup
 printf '[lang.def matches the table] ..\t'
 "${py}" "${GEN}" "${TSV}" "${work}/lang.def" >/dev/null ||
     fail "the generator rejected ${TSV}"
-cmp "${DEF}" "${work}/lang.def" ||
-    fail "lang.def is stale; re-run tools/gen-lang-def.py lang-symbols.tsv lang.def"
+diff -u "${DEF}" "${work}/lang.def" ||
+    fail "lang.def differs from lang-symbols.tsv: edit the TSV, not lang.def, then run tools/gen-lang-def.py lang-symbols.tsv lang.def"
 echo OK
 
 printf '[the table keeps its shape] ..\t'
-# Pinned to today's counts as floors, so a truncated table cannot pass.
+# Floors, except meta, so a truncated table cannot pass.
 counts=$(
     "${py}" - "${TSV}" <<'PY'
 import sys
@@ -51,49 +51,49 @@ if [ "${nlang}" -lt 30 ] || [ "${nmeta}" -ne 5 ] || [ "${nstr}" -lt 545 ]; then
 fi
 echo "OK (${counts})"
 
-# Regenerating cannot see a bad row, because both files come from it: the
-# generator must refuse each of these instead.
+# Regenerating cannot see a bad row, so the generator must refuse each of these.
+# reject LABEL EXPECTED-ERROR PYTHON: PYTHON edits `rows`, the TSV's lines; `i`
+# is the first string row and `k s t` its fields.
 reject() {
-    local what=$1 why=$2 script=$3 err
+    local what=$1 want_err=$2 script=$3 err
     printf '[%s is rejected] ..\t' "${what}"
-    "${py}" - "${TSV}" "${work}/bad.tsv" <<<"${script}" ||
+    "${py}" - "${TSV}" "${work}/bad.tsv" <<<"import sys
+rows = open(sys.argv[1], encoding='ascii').read().split('\n')
+i = next(n for n, r in enumerate(rows) if r.startswith('string\t'))
+k, s, t = rows[i].split('\t')
+${script}
+open(sys.argv[2], 'w', encoding='latin-1', newline='\n').write('\n'.join(rows))" ||
         fail "could not build the bad table"
     if err=$("${py}" "${GEN}" "${work}/bad.tsv" "${work}/bad.def" 2>&1); then
         fail "the generator accepted ${what}"
     fi
-    # Refused for its own reason, not a neighbour's.
-    grep -q -- "${why}" <<<"${err}" || fail "wrong refusal: ${err}"
+    grep -q -- "${want_err}" <<<"${err}" || fail "wrong refusal: ${err}"
     echo OK
 }
 
-# Each script rewrites the first string row and nothing else.
-prelude='import sys
-rows = open(sys.argv[1], encoding="ascii").read().split("\n")
-i = next(n for n, r in enumerate(rows) if r.startswith("string\t"))
-k, s, t = rows[i].split("\t")'
-save='open(sys.argv[2], "w", encoding="latin-1", newline="\n").write("\n".join(rows))'
-
-reject "a real tab in a text" "4 columns" "${prelude}
-rows[i] = '\t'.join([k, s, 'a\tb'])
-${save}"
-reject "a two-field row" "2 columns" "${prelude}
-rows[i] = '\t'.join([k, s])
-${save}"
-reject "a four-field row" "4 columns" "${prelude}
-rows[i] = '\t'.join([k, s, t, 'x'])
-${save}"
-reject "a non-ASCII byte" "byte 0xe9 is outside" "${prelude}
-rows[i] = '\t'.join([k, s, t]) + '\\xe9'
-${save}"
-reject "a duplicate symbol" "duplicate symbol" "${prelude}
-rows.insert(i + 1, rows[i])
-${save}"
-reject "a row out of its block" "after the string block" "${prelude}
-rows.insert(-1, 'language\tLANGUAGE_99\tKlingon')
-${save}"
-reject "an unknown kind" "bad kind" "${prelude}
-rows[i] = '\t'.join(['strings', s, t])
-${save}"
-reject "an empty text" "empty or padded" "${prelude}
-rows[i] = '\t'.join([k, s, ''])
-${save}"
+reject "a real tab in a text" ": 4 columns" "rows[i] = '\t'.join([k, s, 'a\tb'])"
+reject "a two-field row" ": 2 columns" "rows[i] = '\t'.join([k, s])"
+reject "a non-ASCII byte" "byte 0xe9 is outside" "rows[i] += '\xe9'"
+reject "a CR byte" "byte 0x0d is outside" "rows[i] += '\r'"
+reject "a missing final newline" "no final newline" "rows.pop()"
+reject "a duplicate symbol" "duplicate symbol" "rows.insert(i + 1, rows[i])"
+reject "a row out of its block" "after the string block" \
+    "rows.insert(-1, 'language\tLANGUAGE_31\tKlingon')"
+reject "a gap in language numbers" "numbered from 1" \
+    "rows = [r for r in rows if '\tLANGUAGE_2\t' not in r]"
+reject "an unknown kind" "bad kind" "rows[i] = '\t'.join(['strings', s, t])"
+reject "a string symbol without LANG_" "bad symbol" "rows[i] = '\t'.join([k, 'X' + s, t])"
+reject "an empty text" "empty or padded" "rows[i] = '\t'.join([k, s, ''])"
+reject "a padded text" "empty or padded" "rows[i] += ' '"
+reject "a trailing backslash" "cannot hold" "rows[i] += '\\\\'"
+reject "a text too long for lang.def" "cannot hold" "rows[i] += 'x' * 8000"
+reject "a meta text unlike its symbol" "must repeat" \
+    "m = next(n for n, r in enumerate(rows) if r.startswith('meta'))
+rows[m] += 'x'"
+reject "a table with no meta rows" "no meta rows" \
+    "rows = [r for r in rows if not r.startswith('meta')]"
+reject "a text equal to a symbol" "a symbol for a text" "rows[i] = '\t'.join([k, s, 'LANG_YES'])"
+reject "a language named like a symbol" "a symbol for a text" \
+    "rows = [r.replace('\tEnglish', '\tLANG_X') for r in rows]"
+reject "a text on a repeat's key" "collides" \
+    "rows[i:i] = ['\t'.join([k, s + 'a', t]), '\t'.join([k, s + 'b', t]), '\t'.join([k, s + 'c', t + '1'])]"

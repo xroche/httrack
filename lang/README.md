@@ -49,7 +49,7 @@ A translator only has to send the catalog: copy `English.txt` to `<Language>.txt
 
 The suite fails until all of this is done:
 
-- `lang.def`: append the basename and the next `LANGUAGE_<N>`.
+- `lang-symbols.tsv`: add a `language` row after the last one, with the next `LANGUAGE_<N>` and the basename. Then run `python3 tools/gen-lang-def.py lang-symbols.tsv lang.def`, because `lang.def` is generated and never edited by hand.
 - `lang.indexes`: append `<iso>:<N>` for that same N, with the code lowercased (`pt_br`). webhttrack turns the caller's locale into that number, so a wrong one serves another catalog.
 - `tests/62_lang-untranslated.counts` and `tests/62_lang-linebreaks.counts`: add one row to each.
 - `tests/install-manifest.txt`: add the installed `lang/<Language>.txt` path.

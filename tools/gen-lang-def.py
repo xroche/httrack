@@ -3,22 +3,28 @@
 
 The TSV is the source of truth, and front ends read its columns rather than
 counting lang.def's lines. lang.def is kept, byte for byte, for its existing
-readers. Generation only ever runs this way round.
+readers.
 """
 import argparse
 import re
 import sys
 
 COLUMNS = ["kind", "symbol", "text"]
-# Blocks in file order. A language row is written text first, the others
-# symbol first.
+# Blocks in file order.
 KINDS = ["language", "meta", "string"]
-SYMBOL = re.compile(r"^[A-Z][A-Za-z0-9_]*$")
+SYMBOL = {
+    "language": re.compile(r"^LANGUAGE_[0-9]+$"),
+    "meta": re.compile(r"^LANGUAGE_[A-Z]+$"),
+    "string": re.compile(r"^(LANG_|LISTDEF_)[A-Za-z0-9_]+$"),
+}
+SYMBOL_LIKE = re.compile(r"^(LANG_|LISTDEF_|LANGUAGE_)")
+# htsserver.c skips a longer line.
+MAXTEXT = 7999
 
 
 def parse(path):
     """Rows of the TSV, or exit naming the first row that is malformed."""
-    rows, seen, block = [], set(), 0
+    rows, seen, kind_at = [], set(), 0
     # Bytes, not text: a stray non-ASCII byte must name its line rather than
     # arrive as a decode traceback.
     with open(path, "rb") as fp:
@@ -33,21 +39,20 @@ def parse(path):
             line = raw[:-1].decode("ascii")
             if not line or line.startswith("#"):
                 continue
-            # A real tab inside a text adds a column, so it lands here: write
-            # it as the two characters \t.
+            # A real tab inside a text adds a column. Write it as \t instead.
             f = line.split("\t")
             if len(f) != len(COLUMNS):
                 sys.exit("%s:%d: %d columns, want %d" % (path, n, len(f), len(COLUMNS)))
             row = dict(zip(COLUMNS, f))
             if row["kind"] not in KINDS:
                 sys.exit("%s:%d: bad kind %r" % (path, n, row["kind"]))
-            if KINDS.index(row["kind"]) < block:
+            if KINDS.index(row["kind"]) < kind_at:
                 sys.exit(
                     "%s:%d: a %s row after the %s block"
-                    % (path, n, row["kind"], KINDS[block])
+                    % (path, n, row["kind"], KINDS[kind_at])
                 )
-            block = KINDS.index(row["kind"])
-            if not SYMBOL.match(row["symbol"]):
+            kind_at = KINDS.index(row["kind"])
+            if not SYMBOL[row["kind"]].match(row["symbol"]):
                 sys.exit("%s:%d: bad symbol %r" % (path, n, row["symbol"]))
             if row["symbol"] in seen:
                 sys.exit("%s:%d: duplicate symbol %s" % (path, n, row["symbol"]))
@@ -56,16 +61,53 @@ def parse(path):
                 sys.exit(
                     "%s:%d: %s has an empty or padded text" % (path, n, row["symbol"])
                 )
+            # lang.def's readers take such a text for a symbol.
+            if row["kind"] != "meta" and SYMBOL_LIKE.match(row["text"]):
+                sys.exit("%s:%d: %s has a symbol for a text" % (path, n, row["symbol"]))
+            # A trailing backslash joins the next line in lang.def's readers.
+            if row["text"].endswith("\\") or len(row["text"]) > MAXTEXT:
+                sys.exit(
+                    "%s:%d: %s has a text lang.def cannot hold"
+                    % (path, n, row["symbol"])
+                )
+            if row["kind"] == "language" and row["symbol"] != "LANGUAGE_%d" % (
+                len(rows) + 1
+            ):
+                sys.exit(
+                    "%s:%d: languages must be numbered from 1 in order" % (path, n)
+                )
             if row["kind"] == "meta" and row["text"] != row["symbol"]:
                 sys.exit("%s:%d: a meta row's text must repeat its symbol" % (path, n))
             rows.append(row)
     for k in KINDS:
         if not any(r["kind"] == k for r in rows):
             sys.exit("%s: no %s rows" % (path, k))
+    check_keys(path, rows)
     return rows
 
 
+def check_keys(path, rows):
+    """Exit unless htsserver.c keys every string row the way the TSV means.
+
+    The server keys each pair by its second line and names the Nth repeat of a
+    text text+N, so a text must not land on another row's key.
+    """
+    keys, count = set(), {}
+    for r in rows:
+        base = r["symbol"] if r["kind"] == "language" else r["text"]
+        n = count.get(base, 0)
+        count[base] = n + 1
+        want = base if n == 0 else "%s%d" % (base, n)
+        if want in keys:
+            sys.exit(
+                "%s: %s's text %r collides with another row"
+                % (path, r["symbol"], r["text"])
+            )
+        keys.add(want)
+
+
 def emit(rows, out):
+    """Write each row as two lines, text first for a language, else symbol first."""
     for r in rows:
         pair = (
             (r["text"], r["symbol"])
