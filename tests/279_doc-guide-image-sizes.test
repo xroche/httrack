@@ -50,12 +50,12 @@ expect_fail() { # expect_fail RE LABEL: the checker must reject, and say why
 }
 
 # One defect at a time, or one arm could be covering for another.
-edit 'width="1024" height="387"' 'width="1023" height="387"'
-expect_fail 'says 1023x387, the file is 1024x387' "a width off by one"
+edit 'width="1024" height="410"' 'width="1023" height="410"'
+expect_fail 'says 1023x410, the file is 1024x410' "a width off by one"
 restore
 
-edit 'width="1024" height="387"' 'width="1024" height="386"'
-expect_fail 'says 1024x386, the file is 1024x387' "a height off by one"
+edit 'width="1024" height="410"' 'width="1024" height="409"'
+expect_fail 'says 1024x409, the file is 1024x410' "a height off by one"
 restore
 
 # Swapping in another shipped PNG is the one mutant that touches the image
@@ -63,11 +63,11 @@ restore
 size=$(sed -n \
     's|.*src="img/guide-win-language.png"[^>]*width="\([0-9]*\)" height="\([0-9]*\)".*|\1x\2|p' \
     "${pristine}/guide.html")
-if test -z "${size}" || test "${size}" = "1024x387"; then
+if test -z "${size}" || test "${size}" = "1024x410"; then
     fail "no distinct geometry to swap in, got [${size}]"
 fi
 cp "${other}" "${shot}"
-expect_fail "says 1024x387, the file is ${size}" "a recaptured image"
+expect_fail "says 1024x410, the file is ${size}" "a recaptured image"
 restore
 
 dd if="${other}" of="${shot}" bs=20 count=1 2>/dev/null
@@ -82,13 +82,13 @@ printf 'ihdr' | dd of="${shot}" bs=1 seek=12 conv=notrunc 2>/dev/null
 expect_fail 'guide-web-start.png: no IHDR where a PNG keeps it' "a moved IHDR"
 restore
 
-edit 'width="1024" height="387"' 'width="1024"'
+edit 'width="1024" height="410"' 'width="1024"'
 expect_fail 'guide-web-start.png: <img> carries no width/height' "an unsized img"
 restore
 
 # A browser lays out the first of a repeated attribute, so the check must too.
-edit 'width="1024" height="387"' 'width="99" width="1024" height="387"'
-expect_fail 'says 99x387, the file is 1024x387' "a repeated width"
+edit 'width="1024" height="410"' 'width="99" width="1024" height="410"'
+expect_fail 'says 99x410, the file is 1024x410' "a repeated width"
 restore
 
 edit 'src="img/guide-web-start.png"' "src='img/guide-web-start.png'"
