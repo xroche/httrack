@@ -17,6 +17,7 @@ EXTRA_DIST = INSTALL.Linux \
 		tools/doc-chrome.py \
 		tools/check-includes.py \
 		tools/ci-sanitizer-report.sh \
+		tools/ci-test-log.sh \
 		tools/tsan-suppressions.txt \
 		tools/downstream-drift.sh \
 		tools/windows-kill-grade.sh \

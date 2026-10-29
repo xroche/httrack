@@ -522,6 +522,21 @@ fi
 
 test -z "$noexec_reason" || skip "$noexec_reason"
 
+# Skip pwsh's login check, whose macOS argv sysctl can fail ("procargs" errno 5).
+export __PWSH_LOGIN_CHECKED=1
+# Linux only, because only there does -Login visibly source ~/.profile.
+login_check_skipped() { # <interpreter>: 0 skipped, 1 ran anyway, 2 cannot tell
+    local h=$tmp/login-home
+    mkdir -p "$h"
+    printf 'echo ran >"%s/ran"\n' "$h" >"$h/.profile"
+    rm -f "$h/ran"
+    HOME=$h run_with_timeout 30 env -u __PWSH_LOGIN_CHECKED "$1" -Login -NoProfile -Command 'exit 0' >/dev/null 2>&1 || return 2
+    test -e "$h/ran" || return 2
+    rm -f "$h/ran"
+    HOME=$h run_with_timeout 30 "$1" -Login -NoProfile -Command 'exit 0' >/dev/null 2>&1 || return 2
+    test ! -e "$h/ran"
+}
+
 psruns=()
 psdead=()
 for c in pwsh powershell.exe powershell; do
@@ -1239,6 +1254,15 @@ for psrun in "${psruns[@]}"; do
     case $psrun in
     powershell*) psargs+=(-ExecutionPolicy Bypass) ;;
     esac
+    if test "$(uname -s)" = Linux; then
+        rc=0
+        login_check_skipped "$psrun" || rc=$?
+        case $rc in
+        0) ;;
+        1) fail "$psrun ignores __PWSH_LOGIN_CHECKED, so on macOS it still reaches the sysctl that kills it" ;;
+        *) skipped+=("the $psrun login-check control: -Login sourced no ~/.profile") ;;
+        esac
+    fi
 
     out=$(run_wd 120 -File "$(nativepath "$wdscript")" -SelfTest) ||
         fail "the $psrun self-test failed: $out"
