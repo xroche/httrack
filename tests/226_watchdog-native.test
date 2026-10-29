@@ -522,10 +522,9 @@ fi
 
 test -z "$noexec_reason" || skip "$noexec_reason"
 
-# Marks pwsh's login check as done: on macOS its argv sysctl fails now and then
-# with EIO, and pwsh dies at startup ("Call to 'procargs' failed with errno 5").
+# Skip pwsh's login check, whose macOS argv sysctl can fail ("procargs" errno 5).
 export __PWSH_LOGIN_CHECKED=1
-# Linux only, because there the check reads /proc and -Login then sources ~/.profile.
+# Linux only, because only there does -Login visibly source ~/.profile.
 login_check_skipped() { # <interpreter>: 0 skipped, 1 ran anyway, 2 cannot tell
     local h=$tmp/login-home
     mkdir -p "$h"
@@ -1261,7 +1260,7 @@ for psrun in "${psruns[@]}"; do
         case $rc in
         0) ;;
         1) fail "$psrun ignores __PWSH_LOGIN_CHECKED, so on macOS it still reaches the sysctl that kills it" ;;
-        *) skipped+=("the $psrun login-check control: -Login sourced no ~/.profile, so it could not tell") ;;
+        *) skipped+=("the $psrun login-check control: -Login sourced no ~/.profile") ;;
         esac
     fi
 

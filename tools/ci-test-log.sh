@@ -1,7 +1,6 @@
 #!/bin/sh
-# Print why the suite failed. A make check killed by the step timeout leaves no
-# test-suite.log, so fall back to each failed test's own log, then to the tests
-# still running when it died, which is where a wedge sits.
+# Print why the suite failed, falling back to per-test logs when a step timeout
+# left no test-suite.log.
 #
 # Usage: ci-test-log.sh [TEST_DIR], TEST_DIR defaulting to tests. Always exits 0.
 set -eu
@@ -14,7 +13,7 @@ fi
 echo "no $dir/test-suite.log, so make check did not finish"
 for trs in "$dir"/*.trs; do
     [ -f "$trs" ] || continue
-    case $(sed -n 's/^:test-result: //p' "$trs") in
+    case $(sed -n 's/^:test-result: //p' "$trs" || true) in
     *FAIL* | *ERROR*)
         echo "=== ${trs%.trs}.log"
         cat "${trs%.trs}.log" 2>/dev/null || true
@@ -28,7 +27,7 @@ for log in "$dir"/*.log; do
     case ${log##*/} in
     [0-9]*_*.log)
         echo "=== still running: $log"
-        tail -n 50 "$log"
+        tail -n 50 "$log" || true
         ;;
     esac
 done

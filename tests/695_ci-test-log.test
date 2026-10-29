@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# A make check killed by the CI step timeout writes no test-suite.log, and the
-# failure print then showed nothing at all, not even which test had failed.
+# The CI failure print names the failed test even when no test-suite.log exists.
 
 set -euo pipefail
 
@@ -50,6 +49,6 @@ for f in "$wf"/*.yml; do
     test "$stale" -eq 0 || fail "$f still prints test-suite.log alone"
     n=$((n + $(command grep -c 'run: sh tools/ci-test-log.sh' "$f" || true)))
 done
-# The real count, so a lost step reds here.
+# A floor at the real count, so a lost step reds here.
 test "$n" -ge 10 || fail "only $n workflow steps run tools/ci-test-log.sh"
 echo "ci-test-log OK ($n steps)"
