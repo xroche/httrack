@@ -1,0 +1,4 @@
+# HTTrack bundle 1
+url http://x.test/
+header X-Long: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+nakedkey

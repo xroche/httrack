@@ -1,0 +1,13 @@
+# HTTrack bundle 1
+url https://login.alpha-sso.test/start
+ua AlphaUA/1.0
+header Authorization: Bearer t
+# a note
+header X-A: 1
+unknown-key is warned about
+nakedkey
+cookies
+.alpha.test	TRUE	/	FALSE	0	SID	s1
+.alpha-cdn.test	TRUE	/	FALSE	0	C	c1
+.alpha.test	TRUE	/	FALSE	0	PREF	p1
+.alpha.test	TRUE	/	FALSE	0	SID	s2
