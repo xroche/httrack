@@ -671,7 +671,8 @@ static int surt_canon(const char *url, wbuf *out) {
         ok = 0;
         break;
       }
-      pv = pv * 10 + (port[k] - '0');
+      if (pv <= 65535) /* stop past 65535 so pv cannot overflow */
+        pv = pv * 10 + (port[k] - '0');
     }
     if (ok && pv != def_port &&
         (wbuf_add(out, ":", 1) != 0 || wbuf_add(out, port, portlen) != 0))
