@@ -2,7 +2,7 @@
 if FUZZERS
 noinst_PROGRAMS = fuzz-charset fuzz-codepage fuzz-meta fuzz-idna fuzz-entities \
 	fuzz-unescape fuzz-filters fuzz-url fuzz-header fuzz-cachendx \
-	fuzz-htsparse fuzz-singlefile fuzz-sitemap fuzz-arc
+	fuzz-htsparse fuzz-singlefile fuzz-sitemap fuzz-arc fuzz-robots
 endif
 
 AM_CPPFLAGS = \
@@ -43,6 +43,9 @@ fuzz_sitemap_SOURCES = fuzz-sitemap.c fuzz.h
 # coucal, minizip and md5 still come from the static libhttrack above.
 fuzz_arc_SOURCES = fuzz-arc.c fuzz.h $(top_srcdir)/src/proxy/store.c
 fuzz_arc_CPPFLAGS = $(AM_CPPFLAGS) -DZLIB_CONST
+
+# The robots.txt parser and its RFC 9309 wildcard matcher.
+fuzz_robots_SOURCES = fuzz-robots.c fuzz.h
 
 # Corpus list comes from configure: automake does not expand EXTRA_DIST globs.
 EXTRA_DIST = README.md run-fuzzers.sh check-corpus-list.sh ubsan-ignorelist.txt $(FUZZ_CORPUS_LIST)
