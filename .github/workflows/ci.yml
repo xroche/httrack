@@ -135,7 +135,7 @@ jobs:
 
       - name: Print the test log on failure
         if: failure()
-        run: cat tests/test-suite.log 2>/dev/null || true
+        run: sh tools/ci-test-log.sh
 
   # Reproduce the Debian buildds: they build in a minimal chroot with no
   # python3, so the local-server tests must SKIP (exit 77), not fail. GitHub
@@ -185,7 +185,7 @@ jobs:
 
       - name: Print the test log on failure
         if: failure()
-        run: cat tests/test-suite.log 2>/dev/null || true
+        run: sh tools/ci-test-log.sh
 
   # Portability: build and test on macOS (Darwin/clang) on a native runner --
   # no VM. The tree has no __APPLE__ branches, so Darwin exercises the
@@ -237,7 +237,7 @@ jobs:
 
       - name: Print the test log on failure
         if: failure()
-        run: cat tests/test-suite.log 2>/dev/null || true
+        run: sh tools/ci-test-log.sh
 
   # Runtime smoke of the WebHTTrack launcher on macOS: it carries a Darwin-only
   # browser path (open -W) and nothing else exercises htsserver. Install into a
@@ -339,7 +339,7 @@ jobs:
 
       - name: Print the test log on failure
         if: failure()
-        run: cat tests/test-suite.log 2>/dev/null || true
+        run: sh tools/ci-test-log.sh
 
   # Memory safety: build and run the suite under AddressSanitizer +
   # UndefinedBehaviorSanitizer. The offline engine self-tests drive the parsers
@@ -559,7 +559,7 @@ jobs:
 
       - name: Print the test log on failure
         if: failure()
-        run: cat tests/test-suite.log 2>/dev/null || true
+        run: sh tools/ci-test-log.sh
 
   # OpenSSL 4.0 removes the API 3.x deprecated. Building with that set hidden
   # keeps the engine ready for it: a deprecated call fails here rather than the

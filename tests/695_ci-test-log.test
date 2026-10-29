@@ -1,0 +1,55 @@
+#!/bin/bash
+#
+# A make check killed by the CI step timeout writes no test-suite.log, and the
+# failure print then showed nothing at all, not even which test had failed.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+top=${abs_top_srcdir:-$(cd "$testdir/.." && pwd)}
+script=$top/tools/ci-test-log.sh
+test -r "$script" || fail "no $script"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_citestlog.XXXXXX")
+cleanup_push rm -rf "$tmp"
+
+result() { # result <name> <result>: a finished test, with its .trs
+    echo "log of $1" >"$tmp/$1.log"
+    printf ':test-result: %s\n' "$2" >"$tmp/$1.trs"
+}
+result 10_ok PASS
+result 11_bad FAIL
+result 12_broke ERROR
+result 13_skipped SKIP
+echo "log of 14_wedged" >"$tmp/14_wedged.log"
+echo "not a test" >"$tmp/config.log"
+
+out=$(sh "$script" "$tmp")
+for want in 'log of 11_bad' 'log of 12_broke' 'still running: .*14_wedged.log' 'log of 14_wedged'; do
+    grep -q "$want" <<<"$out" || fail "no '$want' in: $out"
+done
+for unwanted in 10_ok 13_skipped 'not a test'; do
+    grep -q "$unwanted" <<<"$out" && fail "'$unwanted' printed: $out"
+done
+
+echo "the summary" >"$tmp/test-suite.log"
+out=$(sh "$script" "$tmp")
+test "$out" = "the summary" || fail "a finished suite printed more than its summary: $out"
+
+# Every failure print in CI has to go through the script.
+wf=$top/.github/workflows
+if ! test -d "$wf"; then
+    test -d "$top/.github" && fail "$wf is gone but $top/.github is not"
+    skip "no .github under $top (dist tarball), so the workflows cannot be read"
+fi
+n=0
+for f in "$wf"/*.yml; do
+    stale=$(command grep -c 'run: cat tests/test-suite.log' "$f" || true)
+    test "$stale" -eq 0 || fail "$f still prints test-suite.log alone"
+    n=$((n + $(command grep -c 'run: sh tools/ci-test-log.sh' "$f" || true)))
+done
+# The real count, so a lost step reds here.
+test "$n" -ge 10 || fail "only $n workflow steps run tools/ci-test-log.sh"
+echo "ci-test-log OK ($n steps)"

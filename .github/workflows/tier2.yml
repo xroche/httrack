@@ -75,7 +75,7 @@ jobs:
 
       - name: Print the test log on failure
         if: failure()
-        run: cat tests/test-suite.log 2>/dev/null || true
+        run: sh tools/ci-test-log.sh
 
   # The Ubuntu buildds run a development release every runner above is well behind.
   # That gap is what shipped 3.49.18 broken on every Ubuntu architecture but
@@ -134,7 +134,7 @@ jobs:
 
       - name: Print the test log on failure
         if: failure()
-        run: cat tests/test-suite.log 2>/dev/null || true
+        run: sh tools/ci-test-log.sh
 
   # The macOS app bundle (#886): assemble it, then prove it still works after being
   # moved, which is the only thing a .app has to survive that a prefix install does not.
@@ -333,7 +333,7 @@ jobs:
 
       - name: Print the test log on failure
         if: failure()
-        run: cat tests/test-suite.log 2>/dev/null || true
+        run: sh tools/ci-test-log.sh
 
   # Termux's cell: bionic before API 28 links backtrace() (libandroid-execinfo)
   # but ships no <spawn.h>, so the symbolizer the backtrace block pulls in is a
@@ -373,7 +373,7 @@ jobs:
 
       - name: Print the test log on failure
         if: failure()
-        run: cat tests/test-suite.log 2>/dev/null || true
+        run: sh tools/ci-test-log.sh
 
   # tools/parser-diff.sh is the differential behind every src/htsparse.c change,
   # and --self-check proves that diff can see a change at all. It builds the
