@@ -671,7 +671,7 @@ static int surt_canon(const char *url, wbuf *out) {
         ok = 0;
         break;
       }
-      if (pv <= 65535) /* past the port range: non-default, no overflow */
+      if (pv <= 65535) /* stop past 65535 so pv cannot overflow */
         pv = pv * 10 + (port[k] - '0');
     }
     if (ok && pv != def_port &&
