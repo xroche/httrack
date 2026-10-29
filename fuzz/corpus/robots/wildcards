@@ -1,0 +1,5 @@
+User-agent: *
+Disallow: /*.pdf$
+Disallow: /a*b
+Allow: /*.html$
+Disallow: /**/x
