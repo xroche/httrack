@@ -1,0 +1,5 @@
+HTTP/1.1 100 Continue
+HTTP/1.1 204
+HTTP/9.9 999 X
+garbage status line
+HTTP/1.1 200 OK (comment) x

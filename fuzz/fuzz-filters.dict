@@ -1,0 +1,9 @@
+# Wildcard filter lines (htsfilters.c).
+f_plus="+*.example.com/*"
+f_minus="-*/private/*"
+f_ext="+*.html"
+f_wild="*"
+f_bracket="*[path]/*"
+f_slash="/"
+f_star_dot="*."
+f_host="localhost"
