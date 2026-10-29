@@ -2177,6 +2177,7 @@ static int st_y2038(httrackp *opt, int argc, char **argv) {
   if (argc >= 1) {
     char path[HTS_URLMAXSIZE];
     FILE *fp;
+    hts_boolean wide_fs = HTS_TRUE;
 
     snprintf(path, sizeof(path), "%s/y2038.bin", argv[0]);
     structcheck(path);
@@ -2186,7 +2187,19 @@ static int st_y2038(httrackp *opt, int argc, char **argv) {
       return 1;
     }
     fclose(fp);
-    for (i = 5; i <= 6; i++) {
+    // XFS without bigtime, or ext4 with small inodes, clips past 2038.
+    if (!narrow) {
+      STRUCT_UTIMBUF tim;
+
+      memset(&tim, 0, sizeof(tim));
+      tim.actime = tim.modtime = (time_t) cases[6].secs;
+      if (UTIME(path, &tim) != 0 ||
+          (int64_t) get_filetime(path) != cases[6].secs) {
+        printf("y2038: this filesystem clips dates past 2038, skipped\n");
+        wide_fs = HTS_FALSE;
+      }
+    }
+    for (i = 5; wide_fs && i <= 6; i++) {
       const int64_t want = narrow ? 2147483647LL : cases[i].secs;
       time_t got;
 
