@@ -47,7 +47,7 @@ n=0
 for f in "$wf"/*.yml; do
     stale=$(command grep -c 'run: cat tests/test-suite.log' "$f" || true)
     test "$stale" -eq 0 || fail "$f still prints test-suite.log alone"
-    n=$((n + $(command grep -c 'run: sh tools/ci-test-log.sh' "$f" || true)))
+    n=$((n + $(command grep -c 'run: sh tools/ci-test-log[.]sh' "$f" || true)))
 done
 # A floor at the real count, so a lost step reds here.
 test "$n" -ge 10 || fail "only $n workflow steps run tools/ci-test-log.sh"
