@@ -592,6 +592,225 @@ cleanup:
   return rc;
 }
 
+/* Case variants of one name each take the next free suffix, and the walk to it
+   must not probe every suffix already taken: a page can list thousands. */
+static int st_savename_collide(httrackp *opt, int argc, char **argv) {
+  /* letters whose case varies, so 2^11 distinct paths */
+  static const char word[] = "abcdefghijk";
+  const int count = 2048;
+  cache_back cache;
+  struct_back *sback = NULL;
+  hash_struct hash;
+  int pass, k, rc = 0;
+
+  (void) argc;
+  (void) argv;
+  StringCopy(opt->path_html_utf8, "");
+  opt->savename_delayed = HTS_SAVENAME_DELAYED_NONE;
+  memset(&cache, 0, sizeof(cache));
+  cache.hashtable = coucal_new(0);
+  cache.cached_tests = coucal_new(0);
+  coucal_value_is_malloc(cache.cached_tests, 1);
+  st_mirror_wiring(opt, &sback, &hash, HTS_FALSE);
+
+  /* the second pass names the same links with the host's case changed */
+  for (pass = 0; pass < 2 && rc == 0; pass++) {
+    for (k = 0; k < count && rc == 0; k++) {
+      lien_adrfilsave afs;
+      char want[64];
+      size_t j;
+
+      memset(&afs, 0, sizeof(afs));
+      strcpybuff(afs.af.adr, pass == 0 ? "example.com" : "EXAMPLE.com");
+      strcpybuff(afs.af.fil, "/");
+      strcatbuff(afs.af.fil, word);
+      for (j = 0; j < sizeof(word) - 1; j++) {
+        if ((k >> j) & 1)
+          afs.af.fil[1 + j] = (char) toupper(afs.af.fil[1 + j]);
+      }
+      strcatbuff(afs.af.fil, ".html");
+      url_savename(&afs, NULL, NULL, NULL, opt, sback, &cache, &hash, 0, 0,
+                   NULL);
+      snprintf(want, sizeof(want), "example.com%.*s", (int) sizeof(word),
+               afs.af.fil);
+      if (k != 0)
+        snprintf(want + strlen(want), sizeof(want) - strlen(want), "-%d",
+                 k + 1);
+      strcatbuff(want, ".html");
+      if (strcmp(afs.save, want) != 0) {
+        fprintf(stderr, "savename-collide: %s%s named %s, not %s\n", afs.af.adr,
+                afs.af.fil, afs.save, want);
+        rc = 1;
+      } else if (pass == 0 && !hts_record_link(opt, afs.af.adr, afs.af.fil,
+                                               afs.save, "", "", NULL)) {
+        rc = 1;
+      }
+    }
+  }
+  /* each name costs a few probes; probing every taken suffix costs count^2/2 */
+  if (rc == 0 && hash.savename_probes > (size_t) count * 8) {
+    fprintf(stderr, "savename-collide: %d names took %lu probes\n", count,
+            (unsigned long) hash.savename_probes);
+    rc = 1;
+  }
+  if (rc == 0)
+    printf("savename-collide: %d names, %lu probes\n", count,
+           (unsigned long) hash.savename_probes);
+  coucal_delete(&cache.cached_tests);
+  st_mirror_wiring_free(opt, &cache, &sback, &hash);
+  return rc;
+}
+
+/* Replays url_savename() calls and checks that each name is the one a walk
+   name by name gives, whatever jumps earlier calls recorded. */
+static int st_savename_sequence(httrackp *opt, int argc, char **argv) {
+  /* A step "host path=name" names a link, "!host path name" records one as is
+     and "@N" switches the 8.3 mode. FLAGS hold the 8.3 mode | urlhack << 2. */
+  static const struct {
+    int flags;
+    const char *const steps[10];
+  } cases[] = {
+      /* a -0 suffix walks from 1 */
+      {0,
+       {"example.com /A-0.html=example.com/A-0.html",
+        "example.com /a-0.html=example.com/a-1.html",
+        "example.com /a-0.HTML=example.com/a-2.HTML",
+        "EXAMPLE.com /a-0.html=example.com/a-1.html"}},
+      /* the same in ISO9660 names */
+      {2,
+       {"example.com /A-0.html=EXAMPLE_C/A_0.HTM",
+        "example.com /a-0.html=EXAMPLE_C/A_1.HTM",
+        "example.com /a-0.HTML=EXAMPLE_C/A_2.HTM",
+        "EXAMPLE.com /a-0.html=EXAMPLE_C/A_1.HTM"}},
+      /* links sharing a fingerprint with distinct names block jumps */
+      {0,
+       {"!Example.COM /a--3.htm example.com/a-10-3.gif",
+        "!Example.COM /a-10.gif example.com/a--3.htm",
+        "EXAMPLE.com /a--3.htm=example.com/a--4.htm",
+        "EXAMPLE.com /A--3.htm=example.com/A--5.htm",
+        "example.com /a--3.htm=example.com/a--4.htm"}},
+      /* a naming-mode switch keeps its own jump table */
+      {0,
+       {"x /ABCDEFGH.htm=x/ABCDEFGH.htm", "x /AbCdefgh.htm=x/AbCdefgh-2.htm",
+        "x /ABcdefgh.htm=x/ABcdefgh-3.htm", "@1",
+        "x.y /abcdefgh.htm=X/ABCDEF-2.HTM"}},
+      /* a link recorded again keeps its first fingerprint owner */
+      {0,
+       {"EXAMPLE.com /A-01.HTML=example.com/A-01.HTML",
+        "EXAMPLE.com /A-01.html=example.com/A-2.html",
+        "!EXAMPLE.com /A-01.html example.com/a-01_10.php",
+        "EXAMPLE.com /a-01.html=example.com/a-3.html",
+        "example.com /A-01.html=example.com/A-2.html"}},
+      /* a walk reaching INT_MAX records no jump */
+      {2,
+       {"example.com /a-2147483646.HTML=EXAMPLE_C/A_2147483646.HTM",
+        "Example.COM /a-2147483646.htm=EXAMPLE_C/A_2147483647.HTM",
+        "Example.COM /A-2147483646.HTML=EXAMPLE_C/A_2147483647_2.HTM",
+        "EXAMPLE.com /a-2147483646=EXAMPLE_C/A_2147483647_3.HTM",
+        "EXAMPLE.com /A-2147483646.HTML=EXAMPLE_C/A_2147483647_2.HTM"}},
+      /* an irregular walk restarts name by name */
+      {0,
+       {"example.com /a-2147483640.html=example.com/a-2147483640.html",
+        "example.com /A-2147483640.html=example.com/A-2147483641.html",
+        "example.com /a-2147483640.HTML=example.com/a-2147483642.HTML",
+        "example.com /a-2147483640.htMl=example.com/a-2147483643.htMl",
+        "example.com /a-2147483640.htmL=example.com/a-2147483644.htmL",
+        "example.com /A-2147483640.htmL=example.com/A-2147483645.htmL",
+        "example.com /a-2147483640.HTml=example.com/a-2147483646.HTml",
+        "example.com /a-2147483640.HTMl=example.com/a-2147483647.HTMl",
+        "EXAMPLE.com /a-2147483640.HTML=example.com/a-2147483642.HTML"}},
+      /* a jump never passes the link's own name */
+      {0,
+       {"!example.com /a-00.HTML example.com/a-9.HTML",
+        "example.com /A-00.HTML=example.com/A-00.HTML",
+        "EXAMPLE.com /a-00.HTML=example.com/a-1.HTML"}},
+      /* only the very name the walk passed counts as passed */
+      {4,
+       {"www.example.com /abCDEf-9.gif=www.example.com/abCDEf-9.gif",
+        "!www.example.com /a-.gif example.com/ABCDEf-9.gif",
+        "EXAMPLE.com /abcdef-9.gif=example.com/abcdef-10.gif",
+        "www.example.com /AbcDef-9.gif=www.example.com/AbcDef-10.gif",
+        "www.example.com /abcdef-9.gif=www.example.com/abcdef-11.gif"}},
+      /* the passed name must be this link's */
+      {0,
+       {"EXAMPLE.com /a-2.HTML=example.com/a-2.HTML",
+        "Example.COM /a-2.html=example.com/a-3.html",
+        "!EXAMPLE.com /A-2.html example.com/a-3.HTML",
+        "EXAMPLE.com /a-2.html=example.com/a-4.html"}},
+      /* a forced high suffix does not swallow the link's name */
+      {0,
+       {"!example.com /c example.com/c-27.html",
+        "EXAMPLE.com /C=example.com/C.html",
+        "example.com /c=example.com/c-27.html"}},
+      /* a stored 8-digit suffix cuts no further back than the name start */
+      {1, {"!X /foo X-99999999", "!x /bar FOO.HTM", "x /foo=FOO-2.HTM"}},
+  };
+
+  const hts_savename_83 mode = opt->savename_83;
+  const hts_boolean urlhack = opt->urlhack;
+  size_t c, s;
+  int rc = 0;
+
+  (void) argc;
+  (void) argv;
+  StringCopy(opt->path_html_utf8, "");
+  opt->savename_delayed = HTS_SAVENAME_DELAYED_NONE;
+  for (c = 0; c < sizeof(cases) / sizeof(cases[0]) && rc == 0; c++) {
+    cache_back cache;
+    struct_back *sback = NULL;
+    hash_struct hash;
+
+    opt->savename_83 = (hts_savename_83) (cases[c].flags & 3);
+    opt->urlhack = (cases[c].flags & 4) != 0;
+    memset(&cache, 0, sizeof(cache));
+    cache.hashtable = coucal_new(0);
+    cache.cached_tests = coucal_new(0);
+    coucal_value_is_malloc(cache.cached_tests, 1);
+    st_mirror_wiring(opt, &sback, &hash, HTS_FALSE);
+    assertf(
+        hts_record_link(opt, "example.com", "/", "/dev/null", "", "", NULL));
+    for (s = 0; s < 10 && cases[c].steps[s] != NULL && rc == 0; s++) {
+      const char *const step = cases[c].steps[s];
+      char adr[64], fil[64], name[64];
+      lien_adrfilsave afs;
+      lien_adrfil former;
+
+      if (step[0] == '@') {
+        opt->savename_83 = (hts_savename_83) (step[1] - '0');
+        continue;
+      }
+      if (step[0] == '!') {
+        assertf(sscanf(step + 1, "%63s %63s %63s", adr, fil, name) == 3);
+        assertf(hts_record_link(opt, adr, fil, name, "", "", NULL));
+        continue;
+      }
+      assertf(sscanf(step, "%63s %63[^=]=%63s", adr, fil, name) == 3);
+      memset(&afs, 0, sizeof(afs));
+      memset(&former, 0, sizeof(former));
+      strcpybuff(afs.af.adr, adr);
+      strcpybuff(afs.af.fil, fil);
+      url_savename(&afs, &former, "example.com", "/", opt, sback, &cache, &hash,
+                   1, 0, NULL);
+      if (strcmp(afs.save, name) != 0) {
+        fprintf(stderr,
+                "savename-sequence: case %u step %u: %s%s named %s, not %s\n",
+                (unsigned) c, (unsigned) s, adr, fil, afs.save, name);
+        rc = 1;
+      } else if (hash_read(&hash, afs.save, NULL, HASH_STRUCT_FILENAME) < 0) {
+        assertf(hts_record_link(opt, adr, fil, afs.save, "", "", NULL));
+      }
+    }
+    coucal_delete(&cache.cached_tests);
+    st_mirror_wiring_free(opt, &cache, &sback, &hash);
+  }
+  /* queued self-tests share this opt */
+  opt->savename_83 = mode;
+  opt->urlhack = urlhack;
+  if (rc == 0)
+    printf("savename-sequence: %u cases\n", (unsigned) c);
+  return rc;
+}
+
 /* url_savename_addstr() takes attacker-controlled link text and must clip to
    the destination size it is handed, at every capacity (#1269). */
 static int st_savename_addstr(httrackp *opt, int argc, char **argv) {
@@ -1573,6 +1792,12 @@ const struct selftest_entry selftests_name[] = {
      st_getext},
     {"savename", "<fil> <content-type> [key=value ...]",
      "local save-name for a URL", st_savename},
+    {"savename-collide", "",
+     "case variants of one name rename without probing every suffix",
+     st_savename_collide},
+    {"savename-sequence", "",
+     "save-names of url_savename() call sequences match a name-by-name walk",
+     st_savename_sequence},
     {"savename-addstr", "",
      "save-name append clips to the destination size (#1269)",
      st_savename_addstr},

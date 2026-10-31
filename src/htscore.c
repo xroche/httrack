@@ -859,6 +859,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   robots.token = NULL;
   robots.next = NULL;
   opt->robotsptr = &robots;
+  /* The first XH_extuninit may run before hash_init(), and frees it. */
+  memset(&hash, 0, sizeof(hash));
   //
 
   /* per mirror, not per opt: an embedder reusing one opt would otherwise
