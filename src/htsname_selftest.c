@@ -592,6 +592,75 @@ cleanup:
   return rc;
 }
 
+/* Case variants of one name each take the next free suffix, and the walk to it
+   must not probe every suffix already taken: a page can list thousands. */
+static int st_savename_collide(httrackp *opt, int argc, char **argv) {
+  /* letters whose case varies, so 2^11 distinct paths */
+  static const char word[] = "abcdefghijk";
+  const int count = 2048;
+  cache_back cache;
+  struct_back *sback = NULL;
+  hash_struct hash;
+  int pass, k, rc = 0;
+
+  (void) argc;
+  (void) argv;
+  StringCopy(opt->path_html_utf8, "");
+  opt->savename_delayed = HTS_SAVENAME_DELAYED_NONE;
+  memset(&cache, 0, sizeof(cache));
+  cache.hashtable = coucal_new(0);
+  cache.cached_tests = coucal_new(0);
+  coucal_value_is_malloc(cache.cached_tests, 1);
+  st_mirror_wiring(opt, &sback, &hash, HTS_FALSE);
+
+  /* the second pass names the same links with the host's case changed */
+  for (pass = 0; pass < 2 && rc == 0; pass++) {
+    for (k = 0; k < count && rc == 0; k++) {
+      lien_adrfilsave afs;
+      char want[64];
+      size_t j;
+
+      memset(&afs, 0, sizeof(afs));
+      strcpybuff(afs.af.adr, pass == 0 ? "example.com" : "EXAMPLE.com");
+      strcpybuff(afs.af.fil, "/");
+      strcatbuff(afs.af.fil, word);
+      for (j = 0; j < sizeof(word) - 1; j++) {
+        if ((k >> j) & 1)
+          afs.af.fil[1 + j] = (char) toupper(afs.af.fil[1 + j]);
+      }
+      strcatbuff(afs.af.fil, ".html");
+      url_savename(&afs, NULL, NULL, NULL, opt, sback, &cache, &hash, 0, 0,
+                   NULL);
+      snprintf(want, sizeof(want), "example.com%.*s", (int) sizeof(word),
+               afs.af.fil);
+      if (k != 0)
+        snprintf(want + strlen(want), sizeof(want) - strlen(want), "-%d",
+                 k + 1);
+      strcatbuff(want, ".html");
+      if (strcmp(afs.save, want) != 0) {
+        fprintf(stderr, "savename-collide: %s%s named %s, not %s\n", afs.af.adr,
+                afs.af.fil, afs.save, want);
+        rc = 1;
+      } else if (pass == 0 && !hts_record_link(opt, afs.af.adr, afs.af.fil,
+                                               afs.save, "", "", NULL)) {
+        rc = 1;
+      }
+    }
+  }
+  /* each name costs a few probes; probing every taken suffix costs count^2/2 */
+  if (rc == 0 && hash.savename_probes > (size_t) count * 8) {
+    fprintf(stderr, "savename-collide: %d names took %lu probes\n", count,
+            (unsigned long) hash.savename_probes);
+    rc = 1;
+  }
+  if (rc == 0)
+    printf("savename-collide: %d names, %lu probes\n", count,
+           (unsigned long) hash.savename_probes);
+  coucal_delete(&cache.cached_tests);
+  st_mirror_wiring_free(opt, &cache, &sback, &hash);
+  return rc;
+}
+
 /* url_savename_addstr() takes attacker-controlled link text and must clip to
    the destination size it is handed, at every capacity (#1269). */
 static int st_savename_addstr(httrackp *opt, int argc, char **argv) {
@@ -1573,6 +1642,9 @@ const struct selftest_entry selftests_name[] = {
      st_getext},
     {"savename", "<fil> <content-type> [key=value ...]",
      "local save-name for a URL", st_savename},
+    {"savename-collide", "",
+     "case variants of one name rename without probing every suffix",
+     st_savename_collide},
     {"savename-addstr", "",
      "save-name append clips to the destination size (#1269)",
      st_savename_addstr},

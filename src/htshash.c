@@ -294,6 +294,14 @@ void hash_init(httrackp *opt, hash_struct *hash, hts_boolean normalized) {
   coucal_set_name(hash->sav, "hash->sav");
   coucal_set_name(hash->adrfil, "hash->adrfil");
   coucal_set_name(hash->former_adrfil, "hash->former_adrfil");
+  /* both keyed by plain strings, which coucal copies */
+  hash->savename_next = coucal_new(0);
+  hash->savename_owner = coucal_new(0);
+  hash->savename_probes = 0;
+  hts_set_hash_handler(hash->savename_next, opt);
+  hts_set_hash_handler(hash->savename_owner, opt);
+  coucal_set_name(hash->savename_next, "hash->savename_next");
+  coucal_set_name(hash->savename_owner, "hash->savename_owner");
 
   /* Case-insensitive comparison ; keys are direct char* filenames */
   coucal_value_set_key_handler(hash->sav,
@@ -338,6 +346,8 @@ void hash_free(hash_struct *hash) {
     coucal_delete(&hash->sav);
     coucal_delete(&hash->adrfil);
     coucal_delete(&hash->former_adrfil);
+    coucal_delete(&hash->savename_next);
+    coucal_delete(&hash->savename_owner);
   }
 }
 
@@ -403,8 +413,77 @@ int hash_read(const hash_struct * hash, const char *nom1, const char *nom2,
   }
 }
 
+/* Fingerprint of a host matched case-insensitively and a path matched exactly,
+   so two links url_savename() calls the same always share one. */
+static void savename_owner_key(char *key, size_t size, const char *adr,
+                               const char *fil) {
+  char BIGSTK low[HTS_URLMAXSIZE * 2];
+  coucal_hashkeys ha, hf;
+
+  low[0] = '\0';
+  strlncatbuff(low, adr, sizeof(low), sizeof(low) - 1);
+  hts_lowcase(low);
+  ha = coucal_hash_string(low);
+  hf = coucal_hash_string(fil);
+  snprintf(key, size, "%x.%x.%x.%x", (unsigned int) ha.hash1,
+           (unsigned int) ha.hash2, (unsigned int) hf.hash1,
+           (unsigned int) hf.hash2);
+}
+
+/* see htshash.h */
+int hash_savename_owner(hash_struct *hash, const char *adr, const char *fil) {
+  char key[64];
+  intptr_t value;
+
+  savename_owner_key(key, sizeof(key), adr, fil);
+  return coucal_read(hash->savename_owner, key, &value) ? (int) value : -1;
+}
+
+/* The key of NAME in savename_next: lowercased, as the save-name table
+   compares names, behind the naming mode. */
+static void savename_next_key(char *key, size_t size, char kind,
+                              const char *name) {
+  key[0] = kind;
+  key[1] = '\0';
+  strlncatbuff(key, name, size, size - 1);
+  hts_lowcase(key);
+}
+
+/* see htshash.h */
+int hash_savename_next(hash_struct *hash, char kind, const char *name) {
+  char BIGSTK key[HTS_URLMAXSIZE * 2 + 2];
+  intptr_t value;
+
+  savename_next_key(key, sizeof(key), kind, name);
+  return coucal_read(hash->savename_next, key, &value) ? (int) value : 0;
+}
+
+/* see htshash.h */
+void hash_savename_next_set(hash_struct *hash, char kind, const char *name,
+                            int n) {
+  char BIGSTK key[HTS_URLMAXSIZE * 2 + 2];
+
+  savename_next_key(key, sizeof(key), kind, name);
+  coucal_write(hash->savename_next, key, (intptr_t) n);
+}
+
 // enregistrement lien lpos dans les 3 tables hash1..3
 void hash_write(hash_struct * hash, size_t lpos) {
+  const lien_url *const link = (*hash->liens)[lpos];
+
+  /* several links one url_savename() call could match: remember if their
+     names differ */
+  {
+    char key[64];
+    intptr_t prev;
+
+    savename_owner_key(key, sizeof(key), link->adr, link->fil);
+    if (!coucal_read(hash->savename_owner, key, &prev))
+      coucal_write(hash->savename_owner, key, (intptr_t) lpos);
+    else if (prev >= 0 && strcasecmp((*hash->liens)[prev]->sav, link->sav) != 0)
+      coucal_write(hash->savename_owner, key, (intptr_t) -2);
+  }
+
   /* first entry: destination filename (lowercased) */
   coucal_write(hash->sav, (*hash->liens)[lpos]->sav, lpos);
 
