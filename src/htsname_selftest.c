@@ -742,6 +742,8 @@ static int st_savename_sequence(httrackp *opt, int argc, char **argv) {
        {"!example.com /c example.com/c-27.html",
         "EXAMPLE.com /C=example.com/C.html",
         "example.com /c=example.com/c-27.html"}},
+      /* a stored 8-digit suffix cuts no further back than the name start */
+      {1, {"!X /foo X-99999999", "!x /bar FOO.HTM", "x /foo=FOO-2.HTM"}},
   };
 
   const hts_savename_83 mode = opt->savename_83;

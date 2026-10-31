@@ -535,11 +535,12 @@ static int savename_collision_next(char *save, size_t size, const httrackp *opt,
       b--;
     if (*b == '/')
       b++;
-    /* max < 0 takes 1e7 collisions, because 8.3 maps a page's '-' to '_'. */
     max = max_char - 1 - nombre_digit(n);
     /* a cut reaching the directory changes the name being numbered */
-    if (max <= 0)
+    if (max <= 0) {
       *regular = HTS_FALSE;
+      max = 0; // a stored suffix of 1e7 or more would cut before b
+    }
     if ((int) strlen(b) > max)
       *(b + max) = '\0'; // leave room for the suffix
   }

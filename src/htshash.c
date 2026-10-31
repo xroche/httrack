@@ -413,8 +413,8 @@ int hash_read(const hash_struct * hash, const char *nom1, const char *nom2,
   }
 }
 
-/* KEY gets a fingerprint matching the host in any case and the path exactly,
-   as url_savename() matches links. */
+/* KEY matches the host in any case and the path exactly, as url_savename()
+   compares links. */
 static void savename_owner_key(char *key, size_t size, const char *adr,
                                const char *fil) {
   char BIGSTK low[HTS_URLMAXSIZE * 2];
@@ -439,8 +439,8 @@ int hash_savename_owner(hash_struct *hash, const char *adr, const char *fil) {
   return coucal_read(hash->savename_owner, key, &value) ? (int) value : -1;
 }
 
-/* KEY is NAME lowercased, as the save-name table compares names, behind the
-   naming mode KIND. */
+/* KEY is KIND followed by NAME lowercased, as the save-name table compares
+   names. */
 static void savename_next_key(char *key, size_t size, char kind,
                               const char *name) {
   key[0] = kind;
