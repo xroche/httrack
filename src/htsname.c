@@ -1935,7 +1935,7 @@ int url_savename(lien_adrfilsave *const afs,
           else
             strcatbuff(tempo, afs->save);
 
-          // tester la présence d'un -xx (ex: index-2.html -> index-3.html)
+          // bump an existing -N suffix (index-2.html -> index-3.html)
           stem = hts_rtrimlen(tempo, "0123456789");
           if (stem != 0 && tempo[stem - 1] == collisionSeparator) {
             LLint v = n;
@@ -1947,7 +1947,7 @@ int url_savename(lien_adrfilsave *const afs,
               tempo[stem - 1] = '\0';
             }
           }
-          // en plus il faut gérer le 8-3 .. pas facile le client
+          // then fit the name to 8.3 if asked
           if (opt->savename_83) {
             int max;
             char *a = hts_lastcharptr(tempo);
