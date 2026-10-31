@@ -1935,14 +1935,19 @@ int url_savename(lien_adrfilsave *const afs,
           else
             strcatbuff(tempo, afs->save);
 
-          // tester la présence d'un -xx (ex: index-2.html -> index-3.html)
+          // bump an existing -N suffix (index-2.html -> index-3.html)
           stem = hts_rtrimlen(tempo, "0123456789");
           if (stem != 0 && tempo[stem - 1] == collisionSeparator) {
-            sscanf(tempo + stem, "%d", &n);
-            tempo[stem - 1] = '\0'; // couper
-            n++;                // plus un
+            LLint v = n;
+
+            /* a suffix too large to increment stays part of the name */
+            if (tempo[stem] == '\0' ||
+                hts_parse_llint(tempo + stem, NULL, 0, INT_MAX - 1, &v)) {
+              n = (int) v + 1;
+              tempo[stem - 1] = '\0';
+            }
           }
-          // en plus il faut gérer le 8-3 .. pas facile le client
+          // then fit the name to 8.3 if asked
           if (opt->savename_83) {
             int max;
             char *a = hts_lastcharptr(tempo);
