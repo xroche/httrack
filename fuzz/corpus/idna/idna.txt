@@ -1,1 +1,11 @@
-xn--bcher-kva.example.com
+cafÃ©.example
+xn--caf-dma.example
+ä¸­æ.example
+xn--fiqs8s.example
+a.b.c.example
+.trailing.dot.example.
+UPPER.CASE.EXAMPLE
+xn--
+x.example
+-lead.example
+do..ouble.examplexn--bcher-kva.example.com
