@@ -294,7 +294,7 @@ void hash_init(httrackp *opt, hash_struct *hash, hts_boolean normalized) {
   coucal_set_name(hash->sav, "hash->sav");
   coucal_set_name(hash->adrfil, "hash->adrfil");
   coucal_set_name(hash->former_adrfil, "hash->former_adrfil");
-  /* both keyed by plain strings, which coucal copies */
+  /* keys are plain strings, which coucal copies */
   hash->savename_next = coucal_new(0);
   hash->savename_owner = coucal_new(0);
   hash->savename_probes = 0;
@@ -413,8 +413,8 @@ int hash_read(const hash_struct * hash, const char *nom1, const char *nom2,
   }
 }
 
-/* Fingerprint of a host matched case-insensitively and a path matched exactly,
-   so two links url_savename() calls the same always share one. */
+/* KEY gets a fingerprint matching the host in any case and the path exactly,
+   as url_savename() matches links. */
 static void savename_owner_key(char *key, size_t size, const char *adr,
                                const char *fil) {
   char BIGSTK low[HTS_URLMAXSIZE * 2];
@@ -439,8 +439,8 @@ int hash_savename_owner(hash_struct *hash, const char *adr, const char *fil) {
   return coucal_read(hash->savename_owner, key, &value) ? (int) value : -1;
 }
 
-/* The key of NAME in savename_next: lowercased, as the save-name table
-   compares names, behind the naming mode. */
+/* KEY is NAME lowercased, as the save-name table compares names, behind the
+   naming mode KIND. */
 static void savename_next_key(char *key, size_t size, char kind,
                               const char *name) {
   key[0] = kind;
@@ -467,7 +467,7 @@ void hash_savename_next_set(hash_struct *hash, char kind, const char *name,
   coucal_write(hash->savename_next, key, (intptr_t) n);
 }
 
-// enregistrement lien lpos dans les 3 tables hash1..3
+// record link lpos in this hash's tables
 void hash_write(hash_struct * hash, size_t lpos) {
   const lien_url *const link = (*hash->liens)[lpos];
 

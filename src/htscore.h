@@ -239,7 +239,7 @@ struct hash_struct {
   coucal former_adrfil;
   /* taken save-name -> the suffix its collision walk reached (htsname.c) */
   coucal savename_next;
-  /* host+path fingerprint -> the link holding it, or -1 for several names */
+  /* host+path fingerprint -> its link, or -2 when its links' names differ */
   coucal savename_owner;
   /* save-names the collision walk probed; a self-test reads it */
   size_t savename_probes;

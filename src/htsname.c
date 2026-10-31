@@ -535,6 +535,7 @@ static int savename_collision_next(char *save, size_t size, const httrackp *opt,
       b--;
     if (*b == '/')
       b++;
+    /* max < 0 takes 1e7 collisions, because 8.3 maps a page's '-' to '_'. */
     max = max_char - 1 - nombre_digit(n);
     /* a cut reaching the directory changes the name being numbered */
     if (max <= 0)
@@ -606,7 +607,7 @@ static hts_boolean savename_walk_skipped(const httrackp *opt, int max_char,
   strcpybuff(node, name);
   k = savename_collision_next(node, sizeof(node), opt, max_char, 0, &regular) -
       1;
-  if (k < 2 || k >= last)
+  if (k < 1 || k >= last)
     return HTS_FALSE;
   /* the walk reaches suffix K unless it starts above it */
   strcpybuff(node, first);
@@ -2021,9 +2022,10 @@ int url_savename(lien_adrfilsave *const afs,
     } else if (i >= 0) {
       /* the naming mode, which decides each name the walk tries */
       const char kind = (char) ('0' + opt->savename_83);
-      /* the link this one may be, which a jump must not pass */
+      /* A jump must not pass a name this link already holds. */
       const int owner = hash_savename_owner(hash, normadr, normfil);
       char BIGSTK first[HTS_URLMAXSIZE * 2];
+      /* -2 means several names may be this link's, so walk name by name. */
       hts_boolean jump = owner != -2 ? HTS_TRUE : HTS_FALSE;
       hts_boolean regular = HTS_TRUE;
       hts_boolean same;
