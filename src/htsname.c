@@ -486,6 +486,136 @@ static hts_boolean url_savename_undelay(httrackp *opt, char *save,
   return HTS_TRUE;
 }
 
+/* Replace SAVE (SIZE bytes), a name another link holds, by the next one to try:
+   index.html -> index-2.html -> index-3.html. Jump to suffix SKIP when it is
+   further. Clear *REGULAR when the new name breaks the rule that the walk
+   from any of its names is the same suffix sequence. Return the suffix. */
+static int savename_collision_next(char *save, size_t size, const httrackp *opt,
+                                   int max_char, int skip,
+                                   hts_boolean *regular) {
+  char BIGSTK tempo[HTS_URLMAXSIZE * 2];
+  char suffix[16];
+  char *a = hts_lastcharptr(save);
+  size_t stem;
+  int n = 2;
+  const char collisionSeparator =
+      ((opt->savename_83 != HTS_SAVENAME_83_ISO9660) ? '-' : '_');
+
+  tempo[0] = '\0';
+  while ((a > save) && (*a != '.') && (*a != '\\') && (*a != '/'))
+    a--;
+  if (*a == '.')
+    strncatbuff(tempo, save, a - save);
+  else
+    strcatbuff(tempo, save);
+
+  // bump an existing -N suffix (index-2.html -> index-3.html)
+  stem = hts_rtrimlen(tempo, "0123456789");
+  if (stem != 0 && tempo[stem - 1] == collisionSeparator) {
+    LLint v = n;
+
+    /* a suffix too large to increment stays part of the name */
+    if (tempo[stem] == '\0' ||
+        hts_parse_llint(tempo + stem, NULL, 0, INT_MAX - 1, &v)) {
+      n = (int) v + 1;
+      tempo[stem - 1] = '\0';
+    }
+  }
+  if (skip > n)
+    n = skip;
+  /* the next walk could not bump this suffix */
+  if (n == INT_MAX)
+    *regular = HTS_FALSE;
+  // then fit the name to 8.3 if asked
+  if (opt->savename_83) {
+    int max;
+    char *b = hts_lastcharptr(tempo);
+
+    while ((b > tempo) && (*b != '/'))
+      b--;
+    if (*b == '/')
+      b++;
+    /* max < 0 takes 1e7 collisions, because 8.3 maps a page's '-' to '_'. */
+    max = max_char - 1 - nombre_digit(n);
+    /* a cut reaching the directory changes the name being numbered */
+    if (max <= 0)
+      *regular = HTS_FALSE;
+    if ((int) strlen(b) > max)
+      *(b + max) = '\0'; // leave room for the suffix
+  }
+  // add the suffix, then the extension
+  snprintf(suffix, sizeof(suffix), "%c%d", collisionSeparator, n);
+  strcatbuff(tempo, suffix);
+  if (*a == '.')
+    strcatbuff(tempo, a);
+
+  strlcpybuff(save, tempo, size);
+  return n;
+}
+
+/* Is link I the one url_savename() is naming? */
+static hts_boolean savename_same_link(const httrackp *opt, int i,
+                                      const char *normadr,
+                                      const char *normfil) {
+  return strfield2(heap(i)->adr, normadr) != 0 &&
+         strcmp(heap(i)->fil, normfil) == 0;
+}
+
+/* Walk the collision names from SAVE until one is free or already this link's,
+   which then lands in SAVE. With JUMP, skip names an earlier walk found taken.
+   Set *SAME when the walk ended on this link's name, *LAST to the last suffix
+   tried. Return the number of steps. */
+static int savename_walk(char *save, size_t size, const httrackp *opt,
+                         hash_struct *hash, const char *normadr,
+                         const char *normfil, int max_char, char kind,
+                         hts_boolean jump, int *last, hts_boolean *same,
+                         hts_boolean *regular) {
+  int steps = 0;
+
+  *same = HTS_FALSE;
+  for (;;) {
+    int i;
+
+    hash->savename_probes++;
+    i = hash_read(hash, save, NULL, HASH_STRUCT_FILENAME);
+    if (i < 0)
+      break;
+    if (savename_same_link(opt, i, normadr, normfil)) {
+      /* keep its name, whatever its case */
+      if (strcmp(heap(i)->sav, save) != 0)
+        strlcpybuff(save, heap(i)->sav, size);
+      *same = HTS_TRUE;
+      break;
+    }
+    *last = savename_collision_next(
+        save, size, opt, max_char,
+        jump ? hash_savename_next(hash, kind, save) : 0, regular);
+    steps++;
+  }
+  return steps;
+}
+
+/* Is NAME on the collision walk from FIRST, before suffix LAST? */
+static hts_boolean savename_walk_skipped(const httrackp *opt, int max_char,
+                                         const char *first, int last,
+                                         const char *name) {
+  char BIGSTK node[HTS_URLMAXSIZE * 2];
+  hts_boolean regular = HTS_TRUE;
+  int k;
+
+  /* the suffix NAME carries, if it is a collision name at all */
+  strcpybuff(node, name);
+  k = savename_collision_next(node, sizeof(node), opt, max_char, 0, &regular) -
+      1;
+  if (k < 1 || k >= last)
+    return HTS_FALSE;
+  /* the walk reaches suffix K unless it starts above it */
+  strcpybuff(node, first);
+  return savename_collision_next(node, sizeof(node), opt, max_char, k,
+                                 &regular) == k &&
+         strcasecmp(node, name) == 0;
+}
+
 // Build the local save name (save) from adr/fil; renames on collision
 // (e.g. INDEX.HTML vs index.html).
 int url_savename(lien_adrfilsave *const afs,
@@ -1881,100 +2011,62 @@ int url_savename(lien_adrfilsave *const afs,
   if (ext_chg_delayed)
     url_savename_undelay(opt, afs->save, sizeof(afs->save), ext);
 
-  // vérifier que le nom n'est pas déja pris...
+  // rename on collision with another link's name
   if (opt->liens != NULL) {
-    int nom_ok;
+    const int i = hash_read(hash, afs->save, NULL, HASH_STRUCT_FILENAME);
 
-    do {
-      int i;
+    if (i >= 0 && savename_same_link(opt, i, normadr, normfil)) {
+      /* the same link: keep its name, whatever its case */
+      if (strcmp(heap(i)->sav, afs->save) != 0)
+        strcpybuff(afs->save, heap(i)->sav);
+    } else if (i >= 0) {
+      /* the naming mode, which decides each name the walk tries */
+      const char kind = (char) ('0' + opt->savename_83);
+      /* A jump must not pass a name this link already holds. */
+      const int owner = hash_savename_owner(hash, normadr, normfil);
+      char BIGSTK first[HTS_URLMAXSIZE * 2];
+      /* -2 means several names may be this link's, so walk name by name. */
+      hts_boolean jump = owner != -2 ? HTS_TRUE : HTS_FALSE;
+      hts_boolean regular = HTS_TRUE;
+      hts_boolean same;
+      int last = 0, steps, s;
 
-      //
-      nom_ok = 1;               // à priori bon
-      // on part de la fin pour optimiser, plus les opti de taille pour 
-      // aller encore plus vite..
-#if DEBUG_SAVENAME
-      printf("\nStart search\n");
-#endif
+      strcpybuff(first, afs->save);
+      steps =
+          savename_walk(afs->save, sizeof(afs->save), opt, hash, normadr,
+                        normfil, max_char, kind, jump, &last, &same, &regular);
+      if (owner >= 0 && !same) {
+        const char *const name = heap(owner)->sav;
+        const int j = hash_read(hash, name, NULL, HASH_STRUCT_FILENAME);
 
-      i = hash_read(hash, afs->save, NULL, HASH_STRUCT_FILENAME);      // lecture type 0 (sav)
-      if (i >= 0) {
-        int sameAdr = (strfield2(heap(i)->adr, normadr) != 0);
-        int sameFil;
-
-        sameFil = (strcmp(heap(i)->fil, normfil) == 0);
-        if (sameAdr && sameFil) {       // ok c'est le même lien, adresse déja définie
-          /* Take the existing name not to screw up with cAsE sEnSiTiViTy of Linux/Unix */
-          if (strcmp(heap(i)->sav, afs->save) != 0) {
-            strcpybuff(afs->save, heap(i)->sav);
-          }
-          i = 0;
-#if DEBUG_SAVENAME
-          printf("\nOK ALREADY DEFINED\n", 13, i);
-#endif
-        } else {                // utilisé par un AUTRE, changer de nom
-          char BIGSTK tempo[HTS_URLMAXSIZE * 2];
-          char *a = hts_lastcharptr(afs->save);
-          size_t stem;
-          int n = 2;
-          char collisionSeparator =
-              ((opt->savename_83 != HTS_SAVENAME_83_ISO9660) ? '-' : '_');
-
-          tempo[0] = '\0';
-
-#if DEBUG_SAVENAME
-          printf("\nWRONG CASE UNMATCH : \n%s\n%s, REDEFINE\n", heap(i)->fil,
-                 fil_complete);
-#endif
-          nom_ok = 0;
-          i = 0;
-
-          while((a > afs->save) && (*a != '.') && (*a != '\\') && (*a != '/'))
-            a--;
-          if (*a == '.')
-            strncatbuff(tempo, afs->save, a - afs->save);
-          else
-            strcatbuff(tempo, afs->save);
-
-          // bump an existing -N suffix (index-2.html -> index-3.html)
-          stem = hts_rtrimlen(tempo, "0123456789");
-          if (stem != 0 && tempo[stem - 1] == collisionSeparator) {
-            LLint v = n;
-
-            /* a suffix too large to increment stays part of the name */
-            if (tempo[stem] == '\0' ||
-                hts_parse_llint(tempo + stem, NULL, 0, INT_MAX - 1, &v)) {
-              n = (int) v + 1;
-              tempo[stem - 1] = '\0';
-            }
-          }
-          // then fit the name to 8.3 if asked
-          if (opt->savename_83) {
-            int max;
-            char *a = hts_lastcharptr(tempo);
-
-            while((a > tempo) && (*a != '/'))
-              a--;
-            if (*a == '/')
-              a++;
-            max = max_char - 1 - nombre_digit(n);
-            if ((int) strlen(a) > max)
-              *(a + max) = '\0';        // couper sinon il n'y aura pas la place!
-          }
-          // ajouter -xx (ex: index.html -> index-2.html)
-          sprintf(tempo + strlen(tempo), "%c%d", collisionSeparator, n);
-
-          // ajouter extension
-          if (*a == '.')
-            strcatbuff(tempo, a);
-
-          strcpybuff(afs->save, tempo);
-
-        }                       // if
+        if (!regular) {
+          /* no way to tell what the jumps passed: walk name by name */
+          strcpybuff(afs->save, first);
+          jump = HTS_FALSE;
+          regular = HTS_TRUE;
+          steps = savename_walk(afs->save, sizeof(afs->save), opt, hash,
+                                normadr, normfil, max_char, kind, jump, &last,
+                                &same, &regular);
+        } else if (j >= 0 && savename_same_link(opt, j, normadr, normfil) &&
+                   savename_walk_skipped(opt, max_char, first, last, name)) {
+          /* a walk name by name would have stopped there */
+          strcpybuff(afs->save, heap(j)->sav);
+        }
       }
-#if DEBUG_SAVENAME
-      printf("\nEnd search, %s\n", fil_complete);
-#endif
-    } while (!nom_ok);
+      /* every name this walk passed leads to LAST: let later walks jump */
+      if (regular) {
+        char BIGSTK node[HTS_URLMAXSIZE * 2];
+
+        strcpybuff(node, first);
+        for (s = 0; s < steps; s++) {
+          const int skip = jump ? hash_savename_next(hash, kind, node) : 0;
+
+          hash_savename_next_set(hash, kind, node, last);
+          (void) savename_collision_next(node, sizeof(node), opt, max_char,
+                                         skip, &regular);
+        }
+      }
+    }
   }
 
   return 0;

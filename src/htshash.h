@@ -65,6 +65,17 @@ const char *hash_url_key(hash_struct *hash, const char *adr, const char *fil,
 int hash_read(const hash_struct * hash, const char *nom1, const char *nom2,
               hash_struct_type type);
 void hash_write(hash_struct * hash, size_t lpos);
+/* The suffix the collision walk from the taken save-name NAME reached, every
+   name between being taken too; 0 if unknown. KIND tells the naming modes
+   apart. */
+int hash_savename_next(hash_struct *hash, char kind, const char *name);
+/* Record that the collision walk from NAME reached suffix N. */
+void hash_savename_next_set(hash_struct *hash, char kind, const char *name,
+                            int n);
+/* The link whose host matches ADR case-insensitively and whose path is FIL,
+   as url_savename() matches them: -1 if there is none, -2 if several links
+   with distinct save-names might. */
+int hash_savename_owner(hash_struct *hash, const char *adr, const char *fil);
 int *hash_calc_chaine(hash_struct * hash, hash_struct_type type, int pos);
 unsigned long int hash_cle(const char *nom1, const char *nom2);
 #endif

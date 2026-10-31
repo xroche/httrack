@@ -191,6 +191,11 @@ full '/HTS-TMP/a.bin' 'application/octet-stream' \
 full '/nul/x.bin' 'application/octet-stream' \
     '/dev/null/www.example.com/nul_/x.bin'
 
+# Thousands of case variants of one name must not probe every taken suffix.
+selftest_queue_head 'savename-collide: 2048 names,' savename-collide
+# Names after a jump must match the walk name by name, including a -0 suffix.
+selftest_queue_head 'savename-sequence: 11 cases' savename-sequence
+
 selftest_run_queued
 
 # #1926: with no cache, the mirror's own copy is what names the link. A known

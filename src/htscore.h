@@ -237,6 +237,12 @@ struct hash_struct {
   coucal adrfil;
   /* former address+path -> link index (renamed/moved entries) */
   coucal former_adrfil;
+  /* taken save-name -> the suffix its collision walk reached (htsname.c) */
+  coucal savename_next;
+  /* host+path fingerprint -> its link, or -2 when its links' names differ */
+  coucal savename_owner;
+  /* save-names the collision walk probed; a self-test reads it */
+  size_t savename_probes;
   /* effective urlhack sub-flags: www.==host / // collapse / query-arg sort */
   hts_boolean norm_host;
   hts_boolean norm_slash;
