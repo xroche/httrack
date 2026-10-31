@@ -101,6 +101,16 @@ name '/x.php' 'text/html' 'x-3.html' \
 name '/INDEX.HTML' 'text/html' 'INDEX-2.HTML' \
     'prior=www.example.com|/index.html|/dev/null/www.example.com/index.html'
 
+# A suffix too large to increment stays in the name, rather than overflow.
+name '/a-2.php' 'text/html' 'a-3.html' \
+    'prior=www.example.com|/o.html|/dev/null/www.example.com/a-2.html'
+name '/a-2147483646.php' 'text/html' 'a-2147483647.html' \
+    'prior=www.example.com|/o.html|/dev/null/www.example.com/a-2147483646.html'
+name '/a-2147483647.php' 'text/html' 'a-2147483647-2.html' \
+    'prior=www.example.com|/o.html|/dev/null/www.example.com/a-2147483647.html'
+name '/a-12345678901234567890.php' 'text/html' 'a-12345678901234567890-2.html' \
+    'prior=www.example.com|/o.html|/dev/null/www.example.com/a-12345678901234567890.html'
+
 # Same basename in another directory is NOT a collision.
 name '/x.php' 'text/html' 'x.html' \
     'prior=www.example.com|/sub/x.html|/dev/null/www.example.com/sub/x.html'
