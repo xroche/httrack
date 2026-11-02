@@ -6,10 +6,8 @@
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-start=$SECONDS
 out=$(CRAWL_DEADLINE=3 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
     httrack 'BASEURL/watchdog/stall' 2>&1) && rc=0 || rc=$?
-elapsed=$((SECONDS - start))
 
 # Skip (not fail) on causes unrelated to the watchdog: no python3/server, or a
 # port-announce race (flaky-13).
@@ -18,10 +16,13 @@ test "$rc" -ne 77 || skip "local crawl prerequisites missing"
 
 # The message prints only on the 124 reap, and 25s < the engine's --timeout=30, so
 # together they pin the fast exit on the 3s watchdog, not httrack giving up.
+# Timed from the engine's launch, so a slow server start on Hurd cannot red it.
 test "$rc" -ne 0 || fail "stalled crawl reported success"
-test "$elapsed" -lt 25 || fail "watchdog fired late (${elapsed}s)"
 grep -q "watchdog fired" <<<"$out" ||
     fail "crawl failed but not via the watchdog: $out"
+elapsed=$(sed -n 's/.*watchdog fired after [0-9]*s (at \([0-9][0-9]*\)s).*/\1/p' <<<"$out")
+test -n "$elapsed" || fail "the watchdog did not say when it fired: $out"
+test "$elapsed" -lt 25 || fail "watchdog fired late (${elapsed}s)"
 assert_wedge_stack "$out"
 
 echo "crawl watchdog OK (reaped in ${elapsed}s)"
