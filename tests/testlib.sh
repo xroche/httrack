@@ -1493,6 +1493,7 @@ wait_bounded() {
     local pid=$1 secs=$2 start=$SECONDS
     while kill -0 "$pid" 2>/dev/null; do
         if test "$((SECONDS - start))" -gt "$secs"; then
+            WATCHDOG_FIRED_AT=$((SECONDS - start))
             dump_overrun "$pid" "$secs" "pid $pid"
             kill_tree "$pid"
             reap_bounded "$pid" || true
