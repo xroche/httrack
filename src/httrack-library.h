@@ -1113,9 +1113,8 @@ typedef struct hts_paste_result {
     one. agent and url are fallbacks, used when the paste carries none; either
     may be NULL. dry_run writes nothing, and folder may then be NULL.
     HTS_FALSE when refused, with the reason in result->error, or with result
-    untouched when result->size is smaller than offsetof(hts_paste_result,
-    dropped). Call it after
-    hts_init(). */
+    untouched when result->size is smaller than
+    offsetof(hts_paste_result, dropped). Call it after hts_init(). */
 HTSEXT_API hts_boolean hts_bundle_from_paste(const char *paste,
                                              const char *folder,
                                              const char *agent, const char *url,
