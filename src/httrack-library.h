@@ -1103,8 +1103,8 @@ typedef struct hts_paste_result {
   char error[HTS_PASTE_ERROR_SIZE];
   /** the cookies inside the bundle's scope */
   int cookies;
-  /** the cookies of the hts_bundle_from_paste_hosts hosts left out because
-      the jar was full */
+  /** the cookies of hosts that hts_bundle_from_paste_hosts left out, because
+      the jar was full or a cookie was too long */
   int dropped;
 } hts_paste_result;
 
@@ -1113,7 +1113,8 @@ typedef struct hts_paste_result {
     one. agent and url are fallbacks, used when the paste carries none; either
     may be NULL. dry_run writes nothing, and folder may then be NULL.
     HTS_FALSE when refused, with the reason in result->error, or with result
-    untouched when result->size does not reach the dropped field. Call it after
+    untouched when result->size is smaller than offsetof(hts_paste_result,
+    dropped). Call it after
     hts_init(). */
 HTSEXT_API hts_boolean hts_bundle_from_paste(const char *paste,
                                              const char *folder,
@@ -1135,14 +1136,13 @@ HTSEXT_API hts_boolean hts_bundle_from_paste_flags(
     const char *paste, const char *folder, const char *agent, const char *url,
     unsigned int flags, hts_paste_result *result);
 
-/** Do what hts_bundle_from_paste_flags does, also keeping the cookies.txt
-    records of hosts, a comma or blank separated list such as the hosts a
-    browser login went through, or NULL. A host may be in Unicode or ASCII
-    (punycode). Each host stands for its registrable
-    domain, which gets a scope line when it keeps a record, without becoming a
-    start URL. A host no scope line can name, such as a public suffix, is
-    skipped. The address's own records come first, and those of hosts are left
-    out rather than refused once the jar is full. A cURL paste ignores hosts. */
+/** Do what hts_bundle_from_paste_flags does, and also keep the cookies.txt
+    records of hosts, a comma-separated list such as the hosts a browser login
+    went through, or NULL. Each host gets a scope line for its registrable
+    domain, and never becomes a start URL. A host that cannot have a scope
+    line, such as a public suffix, is skipped. The address's own records come
+    first, and result->dropped counts the records of hosts left out. A cURL
+    paste ignores hosts. */
 HTSEXT_API hts_boolean hts_bundle_from_paste_hosts(
     const char *paste, const char *folder, const char *agent, const char *url,
     const char *hosts, unsigned int flags, hts_paste_result *result);

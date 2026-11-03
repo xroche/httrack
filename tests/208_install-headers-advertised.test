@@ -222,6 +222,9 @@ int main(void) {
                                    NULL, NULL, url, "www.b.example",
                                    HTS_PASTE_DRY_RUN, &old);
   printf("%d %d %s %d\n", ok, old.cookies, old.hosts, old.dropped);
+  ok = hts_bundle_from_paste_hosts("", NULL, NULL, url, "b.example",
+                                   HTS_PASTE_DRY_RUN, &old);
+  printf("%d %s %d\n", ok, old.error, old.dropped);
   ok = hts_bundle_from_paste_flags(NULL, NULL, NULL, url,
                                    HTS_PASTE_DRY_RUN | HTS_PASTE_KEEP_EMPTY,
                                    &res);
@@ -257,6 +260,7 @@ refused
 1 example.co.uk 1 example.co.uk
 0
 1 1 b.example 7
+0 nothing was pasted 7
 1 example.co.uk 0
 0 unknown flags 0x5
 1 shop
