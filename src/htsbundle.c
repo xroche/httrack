@@ -45,6 +45,7 @@ Please visit our Website: http://www.httrack.com
 
 #include <limits.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <string.h>
 
 /* The size of a scope entry: a domain, or "=" and a host alone. */
