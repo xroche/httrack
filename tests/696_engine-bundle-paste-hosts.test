@@ -186,7 +186,15 @@ hand idp.test cookies "$(rec .idp.test ID a)"
 hand a.test 'scope a.test' 'scope idp.test' cookies "$(rec .idp.test ID a)" "$(rec .idp.test ID b)"
 refuses idp.test a.test
 refuses a.test idp.test
-# A home keeps every host past 256, here the start URL and 256 url lines.
+# A bundle repeating its own cookie is no clash, even when a newer -%K jar
+# turns its first copy away.
+hand rep.test cookies "$(rec .rep.test S one)" "$(rec .rep.test S two)"
+rec .rep.test S jar >"$tmpdir/clash/jar.txt"
+touch -t 203001010000 "$tmpdir/clash/jar.txt"
+out=$(httrack -O /dev/null -#test=bundle "$two" 'https://rep.test/#httrack-bundle=rep.test' \
+    "jar:$dir/clash/jar.txt" 2>/dev/null | tr -d '\r')
+command grep -qx 'cookie .rep.test S=jar' <<<"$out" || fail "a repeat behind a newer jar: $out"
+# A home keeps all 257 hosts: the start URL plus 256 url lines.
 {
     printf '# HTTrack bundle 1\nua UA\nscope idp.test\n'
     for i in $(seq 1 255); do

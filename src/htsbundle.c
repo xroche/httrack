@@ -324,8 +324,7 @@ static hts_boolean bundle_keeps_domain(const bundle *b, size_t n,
          scope_list_covers(b->scope, n, host[0] == '.' ? host + 1 : host);
 }
 
-/* Add entry to the n entries of *list, which holds max at most. NULL, or why
-   it could not. */
+/* Add entry to the n entries of *list, up to max. NULL, or why it could not. */
 static const char *scope_list_add(char ***list, size_t *n, const char *entry,
                                   size_t max) {
   size_t i;
@@ -361,9 +360,11 @@ static const char *bundle_note_url(bundle *b, const char *url) {
             : hts_psl_registrable_domain(host);
   snprintf(entry, sizeof(entry), "%s%s", reg != NULL ? "" : "=",
            reg != NULL ? reg : host);
-  // the start URLs and the capped url lines bound it
-  why = scope_list_add(&b->home, &b->nhome, entry, (size_t) -1);
-  return why != NULL || b->scope_given ? why : bundle_scope_add(b, entry);
+  // no cap: the start URLs and the 256 url lines bound it
+  why = scope_list_add(&b->home, &b->nhome, entry, SIZE_MAX);
+  if (why != NULL || b->scope_given)
+    return why;
+  return bundle_scope_add(b, entry);
 }
 
 /* Write the reason into err and return HTS_FALSE. The caller needs err and
@@ -513,7 +514,7 @@ static hts_boolean bundle_jar_wins(const bundle *b, const char *jar_file) {
          (jt.sec > bt.sec || (jt.sec == bt.sec && jt.nsec > bt.nsec));
 }
 
-/* Hosts skipped for a clash. */
+/* Each host here had a record skipped for a clash. */
 typedef struct bundle_clashes {
   char **hosts;
   size_t count;
@@ -524,10 +525,10 @@ typedef struct bundle_jar {
   const bundle *b;
   t_cookie *all_bundles; /* every bundle's records so far */
   t_cookie *alone;       /* the same in a jar of opt->cookie's size, or NULL */
-  /* hosts of skipped clashes, checked after every bundle loads; NULL refuses at
-     once */
+  /* Hosts of skipped clashes, checked after every bundle loads. NULL refuses at
+     once. */
   bundle_clashes *clashes;
-  t_cookie *mine;       /* the records no earlier bundle gave, or NULL */
+  t_cookie *mine; /* Records no earlier bundle gave. NULL when clashes is. */
   hts_boolean jar_wins; /* A record the jar holds already wins. */
   /* This pass keeps scope entries first_entry to end_entry - 1. */
   size_t first_entry;
@@ -563,10 +564,10 @@ static hts_boolean bundle_admit(cookie_filter *filter, t_cookie *cookie,
     filter->why = "a cookie name and value pass 4096 bytes";
   } else if ((other = cookie_find_exact(ctx->all_bundles->data, name, host,
                                         path)) != NULL &&
-             // a repeat is checked too unless this bundle gave it first
-             (!repeat ||
-              (ctx->mine != NULL &&
-               cookie_find_exact(ctx->mine->data, name, host, path) == NULL)) &&
+             // only a cookie this bundle gave first may change value
+             (ctx->mine != NULL
+                  ? cookie_find_exact(ctx->mine->data, name, host, path) == NULL
+                  : !repeat) &&
              strcmp(cookie_get(buffer, other, 6), value) != 0) {
     // outside this bundle's home, a later check decides
     if (ctx->clashes != NULL &&
