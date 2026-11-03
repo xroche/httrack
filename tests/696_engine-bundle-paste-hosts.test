@@ -37,7 +37,7 @@ $(rec .deep.c.test C)
 $(rec 127.0.0.1 I)
 $(rec .tracker.test T)
 $(rec .co.uk P)" url:https://www.a.test/ \
-    'hosts:WWW.B.TEST., x.c.test localhost 127.0.0.1 co.uk a.test'
+    'hosts:WWW.B.TEST., x.c.test localhost 127.0.0.1 co.uk a.test unused.test'
 test "$out" = "name=a.test cookies=4 hosts=a.test,www.b.test,deep.c.test,127.0.0.1
 url=https://www.a.test/#httrack-bundle=a.test
 agent=
@@ -80,7 +80,7 @@ command grep -q '^scope' <<<"$(bundle a.test)" &&
 # The address's records come first: the listed hosts take the room left and
 # are counted, not refused, past it.
 big=$(printf '%0100d' 0)
-recs=$(for i in $(seq 1 250); do
+recs=$(for i in $(seq 1 300); do
     printf '.b.test\tTRUE\t/\tFALSE\t0\tB%d\t%s\n' "$i" "$big"
 done)
 paste_run "$recs
@@ -89,7 +89,7 @@ kept=$(command grep -c "^\.b\.test$tab" <<<"$(bundle a.test)" || true)
 test "$kept" -gt 100 || fail "too few listed records kept: $kept"
 command grep -q "^\.a\.test$tab" <<<"$(bundle a.test)" ||
     fail_dump "the address's record was crowded out" "$tmpdir/proj/a.test.hts"
-test "$(sed -n 's/^dropped=//p' <<<"$out")" -eq $((250 - kept)) ||
+test "$(sed -n 's/^dropped=//p' <<<"$out")" -eq $((300 - kept)) ||
     fail "dropped count, $kept kept: $out"
 # The address's own overflow is still refused.
 paste_run "${recs//.b.test/.a.test}" url:https://a.test/ hosts:b.test

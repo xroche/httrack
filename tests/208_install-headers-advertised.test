@@ -192,12 +192,15 @@ fi
 
 # The login bundle calls also run from outside the library.
 cat >"$tmp/login.c" <<'EOF'
+#include <stddef.h>
 #include <stdio.h>
 #include <httrack/httrack-library.h>
 
 int main(void) {
   hts_paste_result res = {sizeof(hts_paste_result)};
-  hts_paste_result small = {sizeof(hts_paste_result) - 1};
+  /* a caller built before the dropped field */
+  hts_paste_result old = {offsetof(hts_paste_result, dropped)};
+  hts_paste_result small = {offsetof(hts_paste_result, dropped) - 1};
   char domain[64];
   hts_boolean ok;
   char **names;
@@ -214,6 +217,11 @@ int main(void) {
   printf("%d %s %d %s\n", ok, res.name, res.cookies, res.hosts);
   ok = hts_bundle_from_paste(paste, NULL, NULL, NULL, HTS_TRUE, &small);
   printf("%d\n", ok);
+  old.dropped = 7;
+  ok = hts_bundle_from_paste_hosts(".b.example\tTRUE\t/\tFALSE\t0\tB\tv\n",
+                                   NULL, NULL, url, "www.b.example",
+                                   HTS_PASTE_DRY_RUN, &old);
+  printf("%d %d %s %d\n", ok, old.cookies, old.hosts, old.dropped);
   ok = hts_bundle_from_paste_flags(NULL, NULL, NULL, url,
                                    HTS_PASTE_DRY_RUN | HTS_PASTE_KEEP_EMPTY,
                                    &res);
@@ -248,6 +256,7 @@ want="1
 refused
 1 example.co.uk 1 example.co.uk
 0
+1 1 b.example 7
 1 example.co.uk 0
 0 unknown flags 0x5
 1 shop
