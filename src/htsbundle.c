@@ -593,7 +593,8 @@ static hts_boolean bundle_admit(cookie_filter *filter, t_cookie *cookie,
     ctx->left_out++;
     return HTS_FALSE;
   }
-  if (ctx->jar_wins &&
+  // a repeat found in the jar is this bundle's own first copy
+  if (ctx->jar_wins && !repeat &&
       cookie_find_exact(cookie->data, name, host, path) != NULL)
     return HTS_FALSE;
   // the bundles overflow a jar without the -%K records, so the bundle is wrong

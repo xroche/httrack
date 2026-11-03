@@ -194,6 +194,11 @@ touch -t 203001010000 "$tmpdir/clash/jar.txt"
 out=$(httrack -O /dev/null -#test=bundle "$two" 'https://rep.test/#httrack-bundle=rep.test' \
     "jar:$dir/clash/jar.txt" 2>/dev/null | tr -d '\r')
 command grep -qx 'cookie .rep.test S=jar' <<<"$out" || fail "a repeat behind a newer jar: $out"
+rec .rep.test OTHER jar >"$tmpdir/clash/jar.txt"
+touch -t 203001010000 "$tmpdir/clash/jar.txt"
+out=$(httrack -O /dev/null -#test=bundle "$two" 'https://rep.test/#httrack-bundle=rep.test' \
+    "jar:$dir/clash/jar.txt" 2>/dev/null | tr -d '\r')
+command grep -qx 'cookie .rep.test S=two' <<<"$out" || fail "a repeat beside a newer jar: $out"
 # A home keeps all 257 hosts: the start URL plus 256 url lines.
 {
     printf '# HTTrack bundle 1\nua UA\nscope idp.test\n'
