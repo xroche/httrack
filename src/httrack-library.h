@@ -1084,8 +1084,9 @@ HTSEXT_API void hts_bundle_names_free(char **names);
 #define HTS_PASTE_ERROR_SIZE 256
 
 /** What hts_bundle_from_paste found. The caller sets size to
-    sizeof(hts_paste_result), so later fields can be added. After a failure,
-    every field but size and error is empty or zero. */
+    sizeof(hts_paste_result), so later fields can be added; a field past size
+    is not written. After a failure, every field but size and error is empty or
+    zero. */
 typedef struct hts_paste_result {
   /** sizeof(hts_paste_result), set by the caller */
   size_t size;
@@ -1102,6 +1103,9 @@ typedef struct hts_paste_result {
   char error[HTS_PASTE_ERROR_SIZE];
   /** the cookies inside the bundle's scope */
   int cookies;
+  /** the cookies of the hts_bundle_from_paste_hosts hosts left out because
+      the jar was full */
+  int dropped;
 } hts_paste_result;
 
 /** Turn paste, a DevTools "Copy as cURL (bash)" text or a cookies.txt export,
@@ -1130,6 +1134,18 @@ HTSEXT_API hts_boolean hts_bundle_from_paste(const char *paste,
 HTSEXT_API hts_boolean hts_bundle_from_paste_flags(
     const char *paste, const char *folder, const char *agent, const char *url,
     unsigned int flags, hts_paste_result *result);
+
+/** Do what hts_bundle_from_paste_flags does, also keeping the cookies.txt
+    records of hosts, a comma or blank separated list such as the hosts a
+    browser login went through, or NULL. A host may be in Unicode or ASCII
+    (punycode). Each host stands for its registrable
+    domain, which gets a scope line when it keeps a record, without becoming a
+    start URL. A host no scope line can name, such as a public suffix, is
+    skipped. The address's own records come first, and those of hosts are left
+    out rather than refused once the jar is full. A cURL paste ignores hosts. */
+HTSEXT_API hts_boolean hts_bundle_from_paste_hosts(
+    const char *paste, const char *folder, const char *agent, const char *url,
+    const char *hosts, unsigned int flags, hts_paste_result *result);
 
 /* UTF-8 aware FILE API */
 /* On non-Windows these macros resolve directly to the POSIX calls. On Windows

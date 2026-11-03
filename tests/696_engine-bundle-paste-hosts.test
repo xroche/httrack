@@ -1,0 +1,99 @@
+#!/bin/bash
+#
+# hts_bundle_from_paste_hosts: the cookies.txt records of the listed hosts are
+# kept under scope lines, never as start URLs.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+tmpdir=$(mktemp -d)
+cleanup_push rm -rf "$tmpdir"
+dir=$(nativepath "$tmpdir")
+mkdir "$tmpdir/in" "$tmpdir/proj"
+proj=$dir/proj
+tab=$(printf '\t')
+
+n=0
+rec() { # rec DOMAIN NAME -- one cookies.txt record
+    printf '%s\tTRUE\t/\tFALSE\t0\t%s\tv\n' "$1" "$2"
+}
+paste_run() { # paste_run CONTENT ARGS... -- the selftest's output in $out
+    n=$((n + 1))
+    printf '%s' "$1" >"$tmpdir/in/p$n"
+    shift
+    out=$(httrack -O /dev/null -#test=paste "$proj" "$dir/in/p$n" "$@" | tr -d '\r')
+}
+bundle() { # bundle NAME -- the bundle file, CRLF dropped
+    tr -d '\r' <"$tmpdir/proj/$1.hts"
+}
+
+# Listed hosts keep their records, each under its registrable domain. A host
+# no scope line can name is skipped, and an unlisted one stays out.
+paste_run "$(rec .a.test A)
+$(rec www.b.test B)
+$(rec .deep.c.test C)
+$(rec 127.0.0.1 I)
+$(rec .tracker.test T)
+$(rec .co.uk P)" url:https://www.a.test/ \
+    'hosts:WWW.B.TEST., x.c.test localhost 127.0.0.1 co.uk a.test'
+test "$out" = "name=a.test cookies=4 hosts=a.test,www.b.test,deep.c.test,127.0.0.1
+url=https://www.a.test/#httrack-bundle=a.test
+agent=
+dropped=0" || fail "listed hosts: $out"
+got=$(bundle a.test)
+test "$(command grep -v "$tab" <<<"$got")" = "# HTTrack bundle 1
+scope a.test
+scope b.test
+scope c.test
+scope 127.0.0.1
+cookies" || fail_dump "listed hosts: the scope lines" "$tmpdir/proj/a.test.hts"
+
+# No scope line unless a listed host kept a record, so the file is as before.
+want=$(printf '# HTTrack bundle 1\ncookies\n%s' "$(rec .a.test A)")
+for hosts in '' 'a.test' 'b.test' ' , '; do
+    paste_run "$(rec .a.test A)
+$(rec .tracker.test T)" url:https://a.test/ "hosts:$hosts"
+    test "$(bundle a.test)" = "$want" || fail_dump "hosts '$hosts'" "$tmpdir/proj/a.test.hts"
+done
+
+# A Unicode host matches the ASCII form a browser exports.
+paste_run "$(rec .a.test A)
+$(rec .xn--bcher-kva.de U)" url:https://a.test/ 'hosts:www.bücher.de'
+command grep -qx 'scope xn--bcher-kva.de' <<<"$(bundle a.test)" ||
+    fail_dump "IDNA host" "$tmpdir/proj/a.test.hts"
+
+# A base host no scope line can name keeps its paste contained.
+paste_run "$(rec intranet A)
+$(rec .b.test B)" url:http://intranet/ hosts:b.test
+test "$out" = "name=intranet cookies=1 hosts=intranet
+url=http://intranet/#httrack-bundle=intranet
+agent=
+dropped=0" || fail "single-label base: $out"
+
+# A cURL paste binds its cookies to the address, so the list changes nothing.
+paste_run "curl https://a.test/ -b K=1" hosts:b.test
+command grep -q '^scope' <<<"$(bundle a.test)" &&
+    fail_dump "cURL with hosts" "$tmpdir/proj/a.test.hts"
+
+# The address's records come first: the listed hosts take the room left and
+# are counted, not refused, past it.
+big=$(printf '%0100d' 0)
+recs=$(for i in $(seq 1 250); do
+    printf '.b.test\tTRUE\t/\tFALSE\t0\tB%d\t%s\n' "$i" "$big"
+done)
+paste_run "$recs
+$(rec .a.test A)" url:https://a.test/ hosts:b.test
+kept=$(command grep -c "^\.b\.test$tab" <<<"$(bundle a.test)" || true)
+test "$kept" -gt 100 || fail "too few listed records kept: $kept"
+command grep -q "^\.a\.test$tab" <<<"$(bundle a.test)" ||
+    fail_dump "the address's record was crowded out" "$tmpdir/proj/a.test.hts"
+test "$(sed -n 's/^dropped=//p' <<<"$out")" -eq $((250 - kept)) ||
+    fail "dropped count, $kept kept: $out"
+# The address's own overflow is still refused.
+paste_run "${recs//.b.test/.a.test}" url:https://a.test/ hosts:b.test
+command grep -q '^refused: line [0-9]* of the paste: the cookie jar did not store a cookie$' <<<"$out" ||
+    fail "the address's overflow: $out"
+
+echo PASS

@@ -44,6 +44,7 @@ Please visit our Website: http://www.httrack.com
 #include "htssafe.h"
 
 #include <limits.h>
+#include <stddef.h>
 #include <string.h>
 
 /* A bundle line, the jar aside, holds fewer bytes than this. */
@@ -289,14 +290,20 @@ static hts_boolean scope_covers(const char *entry, const char *host) {
                          : cookie_domain_match(entry, host);
 }
 
-static hts_boolean bundle_in_scope(const bundle *b, const char *host) {
+/* Does one of the first n entries of b's scope cover host? */
+static hts_boolean bundle_in_scope_n(const bundle *b, size_t n,
+                                     const char *host) {
   size_t i;
 
-  for (i = 0; i < b->nscope; i++) {
+  for (i = 0; i < n && i < b->nscope; i++) {
     if (scope_covers(b->scope[i], host))
       return HTS_TRUE;
   }
   return HTS_FALSE;
+}
+
+static hts_boolean bundle_in_scope(const bundle *b, const char *host) {
+  return bundle_in_scope_n(b, b->nscope, host);
 }
 
 /* Does b's scope cover a cookie set for domain? host gets the folded domain. */
@@ -348,28 +355,37 @@ static const char *bundle_note_url(bundle *b, const char *url) {
     return HTS_FALSE;                                                          \
   } while (0)
 
-/* Add a scope line's domain to b's scope. */
-static hts_boolean bundle_scope_line(bundle *b, const char *value, int lineno,
-                                     char *err, size_t err_size) {
+/* Copy into entry the scope entry of a scope line naming value. NULL, or why
+   the line is refused. */
+static const char *bundle_scope_entry(const char *value,
+                                      char entry[COOKIE_MAX_DOMAIN + 1]) {
   char dom[COOKIE_MAX_DOMAIN];
-  char entry[sizeof(dom) + 1];
-  const char *why;
 
   if (value[0] == '.')
     value++;
   if (value[0] == '\0' || strlen(value) >= sizeof(dom) ||
       strspn(value, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
                     "0123456789.-") != strlen(value))
-    BUNDLE_FAIL("%s, line %d: invalid scope", b->file, lineno);
+    return "invalid scope";
   strcpybuff(dom, value);
   hts_lowcase(dom);
   if (hts_host_is_address(dom, strlen(dom)))
-    snprintf(entry, sizeof(entry), "=%s", dom);
+    snprintf(entry, COOKIE_MAX_DOMAIN + 1, "=%s", dom);
   else if (hts_psl_registrable_domain(dom) != NULL)
-    strcpybuff(entry, dom);
+    strlcpybuff(entry, dom, COOKIE_MAX_DOMAIN + 1);
   else
-    BUNDLE_FAIL("%s, line %d: the scope is a public suffix", b->file, lineno);
-  why = bundle_scope_add(b, entry);
+    return "the scope is a public suffix";
+  return NULL;
+}
+
+/* Add a scope line's domain to b's scope. */
+static hts_boolean bundle_scope_line(bundle *b, const char *value, int lineno,
+                                     char *err, size_t err_size) {
+  char entry[COOKIE_MAX_DOMAIN + 1];
+  const char *why = bundle_scope_entry(value, entry);
+
+  if (why == NULL)
+    why = bundle_scope_add(b, entry);
   if (why != NULL)
     BUNDLE_FAIL("%s, line %d: %s", b->file, lineno, why);
   return HTS_TRUE;
@@ -485,6 +501,9 @@ typedef struct bundle_jar {
   t_cookie *alone;       /* the same in a jar of opt->cookie's size, or NULL */
   hts_boolean jar_wins;  /* A record the jar holds already wins. */
   int dropped;           /* records outside the scope */
+  size_t loaded; /* records the first scope entries cover are loaded already */
+  int admitted;  /* records this filter let through */
+  int full;      /* records left out because all_bundles was full */
 } bundle_jar;
 
 /* The cookie_filter admit callback: keep a record in the bundle's scope, and
@@ -502,6 +521,9 @@ static hts_boolean bundle_admit(cookie_filter *filter, t_cookie *cookie,
     ctx->dropped++;
     return HTS_FALSE;
   }
+  if (ctx->loaded != 0 &&
+      bundle_in_scope_n(ctx->b, ctx->loaded, host[0] == '.' ? host + 1 : host))
+    return HTS_FALSE;
   if (strlen(name) > COOKIE_MAX_PAIR ||
       strlen(value) > COOKIE_MAX_PAIR - strlen(name)) {
     filter->why = "a cookie name and value pass 4096 bytes";
@@ -515,6 +537,11 @@ static hts_boolean bundle_admit(cookie_filter *filter, t_cookie *cookie,
   }
   // a silent skip would stop the clash check
   if (cookie_set(ctx->all_bundles, name, value, domain, path, NULL) != 0) {
+    // a paste's extra hosts give way rather than refuse it
+    if (ctx->loaded != 0) {
+      ctx->full++;
+      return HTS_FALSE;
+    }
     filter->why = "too many cookies to compare with the other bundles";
     return HTS_FALSE;
   }
@@ -527,6 +554,8 @@ static hts_boolean bundle_admit(cookie_filter *filter, t_cookie *cookie,
     filter->why = "the cookie jar did not store a cookie";
     return HTS_FALSE;
   }
+  if (!repeat)
+    ctx->admitted++;
   return HTS_TRUE;
 }
 
@@ -1341,37 +1370,171 @@ static const char *paste_curl_cookies(httrackp *opt, t_cookie *jar,
   return why;
 }
 
+/* The number of records in jar. */
+static int paste_jar_count(const t_cookie *jar) {
+  const char *a;
+  int n = 0;
+
+  for (a = strchr(jar->data, '\n'); a != NULL; a = strchr(a + 1, '\n'))
+    n++;
+  return n;
+}
+
+/* Can a scope line stand for each of b's scope entries? */
+static hts_boolean paste_scope_writable(const bundle *b) {
+  char entry[COOKIE_MAX_DOMAIN + 1];
+  size_t i;
+
+  for (i = 0; i < b->nscope; i++) {
+    const char *const e = b->scope[i];
+
+    if (bundle_scope_entry(e + (e[0] == '='), entry) != NULL ||
+        strcmp(entry, e) != 0)
+      return HTS_FALSE;
+  }
+  return HTS_TRUE;
+}
+
+/* Add to b's scope the registrable domain of each host of the comma or blank
+   separated list hosts, skipping a host no scope line can name. */
+static void paste_scope_hosts(bundle *b, const char *hosts) {
+  static const char sep[] = ", \t\r\n";
+
+  for (hosts += strspn(hosts, sep); *hosts != '\0';
+       hosts += strspn(hosts, sep)) {
+    const size_t len = strcspn(hosts, sep);
+    char host[COOKIE_MAX_DOMAIN];
+    char entry[COOKIE_MAX_DOMAIN + 1];
+    char *idna = NULL;
+    const char *h = hosts;
+    const char *reg;
+    size_t n = len;
+
+    while (n > 0 && h[n - 1] == '.')
+      n--;
+    if (n > 0 && !hts_isStringAscii(h, n)) {
+      idna = hts_convertStringUTF8ToIDNA(h, n);
+      h = idna;
+      n = idna != NULL ? strlen(idna) : 0;
+    }
+    if (n > 0 && n < sizeof(host)) {
+      memcpy(host, h, n);
+      host[n] = '\0';
+      hts_lowcase(host);
+      reg = hts_host_is_address(host, n) ? host
+                                         : hts_psl_registrable_domain(host);
+      if (reg != NULL && bundle_scope_entry(reg, entry) == NULL &&
+          !bundle_in_scope(b, entry + (entry[0] == '=')) &&
+          bundle_scope_add(b, entry) != NULL) {
+        freet(idna);
+        return; // the list is full
+      }
+    }
+    freet(idna);
+    hosts += len;
+  }
+}
+
 /* Load the cookies.txt records of text into jar, keeping those inside the
-   scope of b. NULL, or why the paste is refused, with its line in *line. */
+   scope of b, then those of the hosts list, which may be NULL, while they fit.
+   *own gets the number of scope entries the address gave, *dropped the
+   records of hosts left out for room. NULL, or why the paste is refused, with
+   its line in *line. */
 static const char *paste_load_records(httrackp *opt, bundle *b,
                                       const String *text, t_cookie *jar,
-                                      int *line) {
+                                      const char *hosts, size_t *own,
+                                      int *dropped, int *line) {
   t_cookie *all = calloct(1, sizeof(t_cookie));
-  text_src src = text_src_mem(StringBuff(*text), StringLength(*text));
   bundle_jar ctx;
   cookie_filter filter;
   const char *why = NULL;
   size_t i;
 
   *line = 0;
+  *own = 0;
+  *dropped = 0;
   if (all == NULL)
     return "out of memory";
   all->max_len = sizeof(all->data);
   for (i = 0; i < b->nstart && why == NULL; i++)
     why = bundle_note_url(b, b->start_urls[i]);
-  if (why == NULL) {
-    memset(&ctx, 0, sizeof(ctx));
-    ctx.b = b;
-    ctx.all_bundles = all;
-    memset(&filter, 0, sizeof(filter));
-    filter.admit = bundle_admit;
-    filter.ctx = &ctx;
+  *own = b->nscope;
+  // the address's own records first, so the extra hosts never crowd them out
+  if (why == NULL && hosts != NULL && paste_scope_writable(b))
+    paste_scope_hosts(b, hosts);
+  memset(&ctx, 0, sizeof(ctx));
+  ctx.b = b;
+  ctx.all_bundles = all;
+  memset(&filter, 0, sizeof(filter));
+  filter.admit = bundle_admit;
+  filter.ctx = &ctx;
+  for (i = 0; i < 2 && why == NULL; i++) {
+    text_src src = text_src_mem(StringBuff(*text), StringLength(*text));
+    const int before = paste_jar_count(jar);
+    bundle first;
+
+    if (i == 1) {
+      if (b->nscope == *own)
+        break;
+      ctx.loaded = *own;
+      filter.full_skips = HTS_TRUE;
+      filter.line = 0;
+    } else {
+      // the first pass sees the address's scope alone
+      first = *b;
+      first.nscope = *own;
+      ctx.b = &first;
+    }
+    ctx.admitted = 0;
     cookie_load_stream(opt, jar, &src, "the paste", &filter);
+    ctx.b = b;
     why = filter.why;
     *line = filter.line;
+    if (i == 1)
+      *dropped = ctx.full + ctx.admitted - (paste_jar_count(jar) - before);
   }
   freet(all);
   return why;
+}
+
+/* Append to text a scope line per entry of b's scope when a record of jar
+   lies outside its first own entries: the own entries, then each one that
+   covers a record. */
+static void paste_scope_text(const bundle *b, size_t own, const t_cookie *jar,
+                             String *text) {
+  char buffer[8192];
+  char line[8192];
+  char host[COOKIE_MAX_DOMAIN];
+  hts_boolean *used;
+  hts_boolean any = HTS_FALSE;
+  const char *a = jar->data;
+  size_t i;
+
+  if (b->nscope == own)
+    return;
+  used = calloct(b->nscope, sizeof(*used));
+  if (used == NULL)
+    return;
+  while (*a != '\0') {
+    a += binput(a, line, (int) sizeof(line) - 1);
+    if (!cookie_host(cookie_get(buffer, line, 0), host, sizeof(host)))
+      continue;
+    for (i = 0; i < b->nscope; i++) {
+      if (scope_covers(b->scope[i], host[0] == '.' ? host + 1 : host)) {
+        used[i] = HTS_TRUE;
+        any = any || i >= own;
+        break;
+      }
+    }
+  }
+  for (i = 0; any && i < b->nscope; i++) {
+    if (i < own || used[i]) {
+      StringCat(*text, "scope ");
+      StringCat(*text, b->scope[i] + (b->scope[i][0] == '='));
+      StringCat(*text, LF);
+    }
+  }
+  freet(used);
 }
 
 /* Count the records of jar into *count, and list their domains in hosts,
@@ -1414,6 +1577,9 @@ static void paste_jar_summary(const t_cookie *jar, int *count,
     strlcatbuff(hosts, hosts[0] != '\0' ? more : more + 1,
                 HTS_PASTE_HOSTS_SIZE);
 }
+
+/* The size of an hts_paste_result before the dropped field. */
+#define PASTE_RESULT_MIN offsetof(hts_paste_result, dropped)
 
 /* Write the reason into result->error and return HTS_FALSE. */
 #define PASTE_FAIL(...)                                                        \
@@ -1537,6 +1703,14 @@ HTSEXT_API hts_boolean hts_bundle_from_paste(const char *paste,
 HTSEXT_API hts_boolean hts_bundle_from_paste_flags(
     const char *paste, const char *folder, const char *agent, const char *url,
     unsigned int flags, hts_paste_result *result) {
+  return hts_bundle_from_paste_hosts(paste, folder, agent, url, NULL, flags,
+                                     result);
+}
+
+/* See httrack-library.h. */
+HTSEXT_API hts_boolean hts_bundle_from_paste_hosts(
+    const char *paste, const char *folder, const char *agent, const char *url,
+    const char *hosts, unsigned int flags, hts_paste_result *result) {
   const hts_boolean dry_run = (flags & HTS_PASTE_DRY_RUN) != 0;
   const hts_boolean keep_empty = (flags & HTS_PASTE_KEEP_EMPTY) != 0;
   paste_curl c;
@@ -1554,17 +1728,17 @@ HTSEXT_API hts_boolean hts_bundle_from_paste_flags(
   const char *why;
   text_src src;
   hts_boolean curl, ok = HTS_TRUE;
-  int count = 0, line;
-  size_t len, i, size = 0;
+  int count = 0, dropped = 0, line;
+  size_t len, i, own = 0, size = 0;
 
   memset(&c, 0, sizeof(c));
   memset(&b, 0, sizeof(b));
   memset(&check, 0, sizeof(check));
   StringInit(c.cookies);
-  if (result == NULL || result->size < sizeof(*result))
+  if (result == NULL || result->size < PASTE_RESULT_MIN)
     return HTS_FALSE;
   size = result->size;
-  memset(result, 0, sizeof(*result));
+  memset(result, 0, size < sizeof(*result) ? size : sizeof(*result));
   result->size = size;
 
   if ((flags & ~(HTS_PASTE_DRY_RUN | HTS_PASTE_KEEP_EMPTY)) != 0)
@@ -1653,7 +1827,8 @@ HTSEXT_API hts_boolean hts_bundle_from_paste_flags(
       PASTE_FAIL("%s", why);
   } else {
     paste_records(paste, &records);
-    why = paste_load_records(opt, &b, &records, jar, &line);
+    why = paste_load_records(opt, &b, &records, jar, hosts, &own, &dropped,
+                             &line);
     if (why != NULL)
       PASTE_FAIL("line %d of the paste: %s", line, why);
   }
@@ -1669,6 +1844,8 @@ HTSEXT_API hts_boolean hts_bundle_from_paste_flags(
     StringCat(text, c.auth);
     StringCat(text, LF);
   }
+  if (!curl)
+    paste_scope_text(&b, own, jar, &text);
   if (!keep_empty || jar->data[0] != '\0') {
     StringCat(text, "cookies" LF);
     cookie_records_text(jar, &text);
@@ -1696,13 +1873,15 @@ HTSEXT_API hts_boolean hts_bundle_from_paste_flags(
   if (ua != NULL)
     strcpybuff(result->agent, ua);
   result->cookies = count;
+  if (size >= offsetof(hts_paste_result, dropped) + sizeof(result->dropped))
+    result->dropped = dropped;
 
 done:
   if (!ok) {
     char reason[sizeof(result->error)];
 
     strcpybuff(reason, result->error);
-    memset(result, 0, sizeof(*result));
+    memset(result, 0, size < sizeof(*result) ? size : sizeof(*result));
     result->size = size;
     strcpybuff(result->error, reason);
   }
