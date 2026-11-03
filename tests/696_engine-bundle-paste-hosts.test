@@ -123,7 +123,7 @@ command grep -q '^refused: line [0-9]* of the paste: the cookie jar did not stor
 
 # Two bundles that signed in through one site load together: the first one's
 # cookie and agent win there, with a warning. A clash on a bundle's own site
-# still refuses, in any order and even once the other value was skipped.
+# still refuses, in any order and even after a skip.
 mkdir "$tmpdir/two" "$tmpdir/clash"
 two=$dir/two
 agent=
@@ -171,7 +171,39 @@ for value in a b; do
     refuses a.test b.test idp.test
     refuses b.test a.test idp.test
 done
-# The site's owner may itself list hosts.
+# A site that is a bundle's home refuses a clash on any of its hosts, even on
+# a cookie that bundle does not hold.
+pastes "a.test:idp.test:$(rec login.idp.test ID a)" "b.test:idp.test:$(rec login.idp.test ID b)" \
+    "idp.test::$(rec .idp.test OTHER x)"
+refuses a.test b.test idp.test
+# A repeated record is checked against the other bundles too.
+hand() { # hand SITE LINES... -- write the bundle of SITE by hand
+    local site=$1
+    shift
+    printf '%s\n' '# HTTrack bundle 1' 'ua UA' "$@" >"$tmpdir/clash/$site.hts"
+}
+hand idp.test cookies "$(rec .idp.test ID a)"
+hand a.test 'scope a.test' 'scope idp.test' cookies "$(rec .idp.test ID a)" "$(rec .idp.test ID b)"
+refuses idp.test a.test
+refuses a.test idp.test
+# A home keeps every host past 256, here the start URL and 256 url lines.
+{
+    printf '# HTTrack bundle 1\nua UA\nscope idp.test\n'
+    for i in $(seq 1 255); do
+        printf 'url http://d%d.test/\n' "$i"
+    done
+    printf 'url https://www.idp.test/\ncookies\n'
+    rec .idp.test ID a
+} >"$tmpdir/clash/home.hts"
+hand b.test 'scope b.test' 'scope idp.test' cookies "$(rec .idp.test ID b)"
+for order in 'b.test home' 'home b.test'; do
+    read -r first second <<<"$order"
+    out=$(httrack -O /dev/null -#test=bundle "$two" "https://$first.example/#httrack-bundle=$first" \
+        "https://$second.example/#httrack-bundle=$second" 2>/dev/null | tr -d '\r')
+    command grep -q '^refused: .* has another value in another bundle$' <<<"$out" ||
+        fail "a home of 257 hosts, $order: $out"
+done
+
 pastes "own.test:idp.test:$(rec .own.test S one)
 $(rec .idp.test ID a)" "other.test:own.test:$(rec .own.test S two)"
 refuses own.test other.test
@@ -191,7 +223,9 @@ out=$(httrack -O /dev/null -#test=bundle "$dir/many" 'https://x.test/#httrack-bu
     tr -d '\r')
 command grep -qx 'cookie .x.test X=v' <<<"$out" || fail "256 url lines and a scope line: $(tail -1 <<<"$out")"
 # A start URL with no host is fine once a scope line names the site.
-out=$(httrack -O /dev/null -#test=bundle "$dir/many" 'file:///x#httrack-bundle=x.test' 2>/dev/null |
+mkdir "$tmpdir/nohost"
+printf '%s\n' '# HTTrack bundle 1' 'scope x.test' cookies "$(rec .x.test X)" >"$tmpdir/nohost/x.test.hts"
+out=$(httrack -O /dev/null -#test=bundle "$dir/nohost" 'file:///x#httrack-bundle=x.test' 2>/dev/null |
     tr -d '\r')
 command grep -qx 'cookie .x.test X=v' <<<"$out" || fail "a start URL with no host: $out"
 

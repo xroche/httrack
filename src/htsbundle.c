@@ -324,21 +324,23 @@ static hts_boolean bundle_keeps_domain(const bundle *b, size_t n,
          scope_list_covers(b->scope, n, host[0] == '.' ? host + 1 : host);
 }
 
-/* Add entry to the n entries of *list. NULL, or why it could not. */
-static const char *scope_list_add(char ***list, size_t *n, const char *entry) {
+/* Add entry to the n entries of *list, which holds max at most. NULL, or why
+   it could not. */
+static const char *scope_list_add(char ***list, size_t *n, const char *entry,
+                                  size_t max) {
   size_t i;
 
   for (i = 0; i < *n; i++) {
     if (strcmp((*list)[i], entry) == 0)
       return NULL;
   }
-  if (*n >= BUNDLE_LIST_MAX)
+  if (*n >= max)
     return "more than 256 scope domains";
   return strlist_add(list, n, entry) ? NULL : "out of memory";
 }
 
 static const char *bundle_scope_add(bundle *b, const char *entry) {
-  return scope_list_add(&b->scope, &b->nscope, entry);
+  return scope_list_add(&b->scope, &b->nscope, entry, BUNDLE_LIST_MAX);
 }
 
 /* Add url's https flag, home entry and default scope to b. NULL, or why it
@@ -347,6 +349,7 @@ static const char *bundle_note_url(bundle *b, const char *url) {
   char host[COOKIE_MAX_DOMAIN];
   char entry[SCOPE_ENTRY_SIZE];
   const char *reg;
+  const char *why;
 
   if (strfield(url, "https:"))
     b->https_only = HTS_TRUE;
@@ -358,9 +361,9 @@ static const char *bundle_note_url(bundle *b, const char *url) {
             : hts_psl_registrable_domain(host);
   snprintf(entry, sizeof(entry), "%s%s", reg != NULL ? "" : "=",
            reg != NULL ? reg : host);
-  // a home past the cap only loses the clash check of its last domains
-  (void) scope_list_add(&b->home, &b->nhome, entry);
-  return b->scope_given ? NULL : bundle_scope_add(b, entry);
+  // the start URLs and the capped url lines bound it
+  why = scope_list_add(&b->home, &b->nhome, entry, (size_t) -1);
+  return why != NULL || b->scope_given ? why : bundle_scope_add(b, entry);
 }
 
 /* Write the reason into err and return HTS_FALSE. The caller needs err and
@@ -510,8 +513,7 @@ static hts_boolean bundle_jar_wins(const bundle *b, const char *jar_file) {
          (jt.sec > bt.sec || (jt.sec == bt.sec && jt.nsec > bt.nsec));
 }
 
-/* The hosts of the records skipped because another bundle gave them another
-   value. */
+/* Hosts skipped for a clash. */
 typedef struct bundle_clashes {
   char **hosts;
   size_t count;
@@ -522,9 +524,10 @@ typedef struct bundle_jar {
   const bundle *b;
   t_cookie *all_bundles; /* every bundle's records so far */
   t_cookie *alone;       /* the same in a jar of opt->cookie's size, or NULL */
-  /* the hosts of records skipped for a clash, checked once every bundle is
-     read, or NULL to refuse a clash at once */
+  /* hosts of skipped clashes, checked after every bundle loads; NULL refuses at
+     once */
   bundle_clashes *clashes;
+  t_cookie *mine;       /* the records no earlier bundle gave, or NULL */
   hts_boolean jar_wins; /* A record the jar holds already wins. */
   /* This pass keeps scope entries first_entry to end_entry - 1. */
   size_t first_entry;
@@ -545,7 +548,7 @@ static hts_boolean bundle_admit(cookie_filter *filter, t_cookie *cookie,
   char buffer[8192];
   char host[COOKIE_MAX_DOMAIN];
   const char *bare;
-  const char *other;
+  const char *other = NULL;
 
   if (!bundle_keeps_domain(ctx->b, ctx->end_entry, domain, host)) {
     ctx->out_of_scope++;
@@ -560,7 +563,11 @@ static hts_boolean bundle_admit(cookie_filter *filter, t_cookie *cookie,
     filter->why = "a cookie name and value pass 4096 bytes";
   } else if ((other = cookie_find_exact(ctx->all_bundles->data, name, host,
                                         path)) != NULL &&
-             !repeat && strcmp(cookie_get(buffer, other, 6), value) != 0) {
+             // a repeat is checked too unless this bundle gave it first
+             (!repeat ||
+              (ctx->mine != NULL &&
+               cookie_find_exact(ctx->mine->data, name, host, path) == NULL)) &&
+             strcmp(cookie_get(buffer, other, 6), value) != 0) {
     // outside this bundle's home, a later check decides
     if (ctx->clashes != NULL &&
         !scope_list_covers(ctx->b->home, ctx->b->nhome, bare)) {
@@ -574,6 +581,9 @@ static hts_boolean bundle_admit(cookie_filter *filter, t_cookie *cookie,
              0) {
     // a silent skip would stop the clash check
     filter->why = "too many cookies to compare with the other bundles";
+  } else if (other == NULL && ctx->mine != NULL) {
+    // mine holds fewer records than all_bundles, so it has room
+    (void) cookie_set(ctx->mine, name, value, domain, path, NULL);
   }
   if (filter->why != NULL) {
     if (!ctx->give_way)
@@ -625,6 +635,12 @@ static hts_boolean bundle_load_src(httrackp *opt, bundle *b, text_src *src,
   ctx.alone = alone;
   ctx.end_entry = b->nscope;
   ctx.jar_wins = bundle_jar_wins(b, jar_file);
+  if (clashes != NULL) {
+    ctx.mine = calloct(1, sizeof(t_cookie));
+    if (ctx.mine == NULL)
+      BUNDLE_FAIL("%s: out of memory", b->file);
+    ctx.mine->max_len = sizeof(ctx.mine->data);
+  }
   memset(&filter, 0, sizeof(filter));
   filter.admit = bundle_admit;
   filter.ctx = &ctx;
@@ -637,14 +653,17 @@ static hts_boolean bundle_load_src(httrackp *opt, bundle *b, text_src *src,
                   b->file);
     // read all the same, so -b0 does not decide whether a bundle is valid
     scratch = calloct(1, sizeof(t_cookie));
-    if (scratch == NULL)
+    if (scratch == NULL) {
+      freet(ctx.mine);
       BUNDLE_FAIL("%s: out of memory", b->file);
+    }
     scratch->max_len = sizeof(scratch->data);
   }
   if (cookies_line != 0)
     cookie_load_stream(opt, scratch != NULL ? scratch : opt->cookie, src,
                        b->file, &filter);
   freet(scratch);
+  freet(ctx.mine);
   if (ctx.out_of_scope != 0)
     hts_log_print(opt, LOG_WARNING,
                   "Bundle %s: %d cookie(s) outside its scope left out; a "
@@ -756,7 +775,7 @@ hts_boolean hts_bundle_load_all(httrackp *opt, const char *jar_file, char *err,
   for (i = 0; i < st->count && ok; i++)
     ok = bundle_load(opt, &st->items[i], jar_file, all_bundles, &clashes, alone,
                      err, err_size);
-  // a skipped value is refused after all when the site is a bundle's home
+  // refuse a skipped clash on a site that is a bundle's home
   for (i = 0; i < clashes.count && ok; i++) {
     for (j = 0; j < st->count && ok; j++) {
       if (scope_list_covers(st->items[j].home, st->items[j].nhome,
