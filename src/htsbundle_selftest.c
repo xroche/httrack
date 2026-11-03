@@ -249,12 +249,13 @@ static int st_bundlename(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* -#test=paste <dir> <file> [agent:<ua>] [url:<url>] [dry] [keep]: turn the
-   paste held in file into a bundle in dir, and print what came back. keep
-   passes HTS_PASTE_KEEP_EMPTY. */
+/* -#test=paste <dir> <file> [agent:<ua>] [url:<url>] [hosts:<list>] [dry]
+   [keep]: turn the paste held in file into a bundle in dir, and print what
+   came back. keep passes HTS_PASTE_KEEP_EMPTY. */
 static int st_paste(httrackp *opt, int argc, char **argv) {
-  const char *agent = NULL, *url = NULL;
+  const char *agent = NULL, *url = NULL, *hosts = NULL;
   hts_boolean dry = HTS_FALSE, keep = HTS_FALSE;
+  unsigned int flags;
   hts_paste_result *res = calloct(1, sizeof(*res));
   String paste = STRING_EMPTY;
   char buf[4096];
@@ -268,6 +269,7 @@ static int st_paste(httrackp *opt, int argc, char **argv) {
   fp = argc >= 2 ? FOPEN(argv[1], "rb") : NULL;
   if (fp == NULL || res == NULL) {
     fprintf(stderr, "paste: takes <dir> <file> [agent:<ua>] [url:<url>] "
+                    "[hosts:<list>] "
                     "[dry] [keep]\n");
     if (fp != NULL)
       fclose(fp);
@@ -282,6 +284,8 @@ static int st_paste(httrackp *opt, int argc, char **argv) {
       agent = argv[i] + 6;
     else if (strncmp(argv[i], "url:", 4) == 0)
       url = argv[i] + 4;
+    else if (strncmp(argv[i], "hosts:", 6) == 0)
+      hosts = argv[i] + 6;
     else if (strcmp(argv[i], "dry") == 0)
       dry = HTS_TRUE;
     else if (strcmp(argv[i], "keep") == 0)
@@ -289,14 +293,16 @@ static int st_paste(httrackp *opt, int argc, char **argv) {
   }
   if (!StringNotEmpty(paste))
     StringCat(paste, "");
+  flags = (keep ? HTS_PASTE_KEEP_EMPTY : 0) | (dry ? HTS_PASTE_DRY_RUN : 0);
   if (strlen(StringBuff(paste)) != StringLength(paste)) {
     printf("refused: the file holds a NUL\n");
-  } else if (!(keep ? hts_bundle_from_paste_flags(
-                          StringBuff(paste), argv[0], agent, url,
-                          HTS_PASTE_KEEP_EMPTY | (dry ? HTS_PASTE_DRY_RUN : 0),
-                          res)
-                    : hts_bundle_from_paste(StringBuff(paste), argv[0], agent,
-                                            url, dry, res))) {
+  } else if (!(hosts != NULL
+                   ? hts_bundle_from_paste_hosts(StringBuff(paste), argv[0],
+                                                 agent, url, hosts, flags, res)
+               : keep ? hts_bundle_from_paste_flags(StringBuff(paste), argv[0],
+                                                    agent, url, flags, res)
+                      : hts_bundle_from_paste(StringBuff(paste), argv[0], agent,
+                                              url, dry, res))) {
     assertf(res->name[0] == '\0' && res->url[0] == '\0' &&
             res->agent[0] == '\0' && res->hosts[0] == '\0' &&
             res->cookies == 0 && res->error[0] != '\0');
@@ -305,6 +311,8 @@ static int st_paste(httrackp *opt, int argc, char **argv) {
     assertf(res->error[0] == '\0');
     printf("name=%s cookies=%d hosts=%s\nurl=%s\nagent=%s\n", res->name,
            res->cookies, res->hosts, res->url, res->agent);
+    if (hosts != NULL)
+      printf("dropped=%d\n", res->dropped);
   }
   StringFree(paste);
   freet(res);
@@ -371,7 +379,8 @@ const struct selftest_entry selftests_bundle[] = {
      st_bundlescope},
     {"bundlenames", "<urls> [<list file>]",
      "the login bundle names the start addresses use", st_bundlenames},
-    {"paste", "<dir> <file> [agent:<ua>] [url:<url>] [dry] [keep]",
+    {"paste",
+     "<dir> <file> [agent:<ua>] [url:<url>] [hosts:<list>] [dry] [keep]",
      "turn a pasted cURL command or cookies.txt into a login bundle", st_paste},
     {"pasterace", "<dir> <rounds>",
      "two threads write the same login bundle at once", st_pasterace},
