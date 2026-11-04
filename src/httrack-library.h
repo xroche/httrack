@@ -1135,11 +1135,13 @@ HTSEXT_API hts_boolean hts_bundle_from_paste_flags(
     const char *paste, const char *folder, const char *agent, const char *url,
     unsigned int flags, hts_paste_result *result);
 
-/** Do what hts_bundle_from_paste_flags does, and also keep the cookies.txt
+/** Do what hts_bundle_from_paste_flags does, and keep the cookies.txt
     records of hosts, a comma-separated list such as the hosts a browser login
     went through, or NULL. Each host gets a scope line for its registrable
     domain, and never becomes a start URL. A host that cannot have a scope
-    line, such as a public suffix, is skipped. The address's own records come
+    line, such as a public suffix, is skipped, and so is every host past 256
+    scope domains. The whole list is ignored when the address's own host cannot
+    have a scope line, such as "intranet". The address's own records come
     first, and result->dropped counts the records of hosts left out. A cURL
     paste ignores hosts. */
 HTSEXT_API hts_boolean hts_bundle_from_paste_hosts(
