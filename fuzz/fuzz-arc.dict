@@ -1,0 +1,10 @@
+# Tokens of the ARC/NEDX container formats.
+arc_hdr="filedesc://t.arc 0.0.0.0 20250101000000 text/plain 200 - - 0 t.arc 9"
+rec="http://example.com/p.html 0.0.0.0 20250101000000 text/html 200 - - 0 t.arc 120"
+http_resp="HTTP/1.1 200 OK"
+content_type="Content-Type: text/html"
+cache_magic="CACHE-1.1"
+nds_magic="\x00M8"
+date="Mon, 01 Jan 2024 00:00:00 GMT"
+host="www.example.com"
+path="/index.html"
