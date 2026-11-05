@@ -42,18 +42,22 @@ for bad in "redirect=/nosid" "sid=&redirect=/empty" \
         fail "refusal was not a 403: ${bad}"
 done
 
-# An over-long sid must be refused without crashing the server, and a second
-# sid field must not rescue a wrong first one.
+# An over-long sid must be refused without crashing the server, and a wrong
+# sid field must be refused whichever side of a good one it sits on.
 long=$(head -c 5000 /dev/zero | tr '\0' 'a')
 resp=$(htsserver_post "sid=${long}&redirect=/long")
 grep -q '^HTTP/1\.0 403 ' <<<"${resp}" || fail "a 5000-byte sid was not refused"
 htsserver_alive || fail "an over-long sid killed the server"
-resp=$(htsserver_post "sid=${sid}&sid=00000000000000000000000000000000&redirect=/dup")
-grep -q '^HTTP/1\.0 403 ' <<<"${resp}" || fail "a duplicate wrong sid was accepted"
+wrong=00000000000000000000000000000000
+for dup in "sid=${sid}&sid=${wrong}" "sid=${wrong}&sid=${sid}"; do
+    resp=$(htsserver_post "${dup}&redirect=/dup")
+    grep -q '^HTTP/1\.0 403 ' <<<"${resp}" || fail "a duplicate wrong sid was accepted: ${dup}"
+done
 
 # The ".." guard on static files: the path must not climb out of the tree.
 resp=$(htsserver_get /server/../../../../../../../../etc/passwd)
 grep -q '^HTTP/1\.0 200 ' <<<"${resp}" && fail "a path with .. was served"
+htsserver_alive || fail "a path with .. killed the server"
 
 # Suppressing the reply is not the same as refusing the write: the body is
 # applied to one global key store that later requests render from, and the

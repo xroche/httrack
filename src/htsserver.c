@@ -1642,10 +1642,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
     while ((soc_c = (T_SOC) accept(soc, NULL, NULL)) == INVALID_SOCKET) {
     }
 
-    /* The reads also share one total deadline, against a slow drip */
-    linputsoc_deadline = time(NULL) + timeout;
-    /* A client that stalls mid-line must not wedge the single-threaded server
-     */
+    /* A stalled client must not wedge the single-threaded server */
 #ifdef _WIN32
     {
       DWORD tv = (DWORD) timeout * 1000;
@@ -1669,6 +1666,9 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
     /* Lock */
     webhttrack_lock();
+
+    /* One total deadline for the whole request, against a slow drip */
+    linputsoc_deadline = time(NULL) + timeout;
 
     if (linputsoc_t(soc_c, line1, sizeof(line1) - 2, timeout) > 0) {
       int meth = 0;
@@ -1735,6 +1735,10 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             meth = 0;
           } else if ((size_t) sz > SMALLSERVER_BODY_MAX) {
             too_large = HTS_TRUE;
+          } else if (length >= 0 && (LLint) sz != length) {
+            meth = 0;
+            denied_status = "400 Bad Request";
+            denied = "Incomplete request body.";
           } else {
             buffer[sz] = '\0';
           }
@@ -2979,7 +2983,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
       shutdown(soc_c, 1);
 #endif
       /* IE may send a CRLF after the POST data, and a refused body is unread */
-      while (recv(soc_c, c, sizeof(c), 0) > 0)
+      while ((linputsoc_deadline == 0 || time(NULL) <= linputsoc_deadline) &&
+             recv(soc_c, c, sizeof(c), 0) > 0)
         ;
     }
 
@@ -3487,7 +3492,7 @@ static int recv_bl(T_SOC soc, void *buffer, size_t len, int timeout) {
     size_t offs = 0;
 
     while (n > 0 && size > 0 &&
-           (linputsoc_deadline == 0 || time(NULL) <= linputsoc_deadline)) {
+           (linputsoc_deadline == 0 || check_readinput_t(soc, timeout))) {
       n = recv(soc, ((char *) buffer) + offs, (int) size, 0);
       if (n > 0) {
         offs += n;

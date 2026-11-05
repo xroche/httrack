@@ -120,6 +120,8 @@ HTS_UNUSED static int linput(FILE * fp, char *s, int max);
 /* Time after which the socket reads below give up; 0 means none. */
 HTS_UNUSED static time_t linputsoc_deadline = 0;
 
+HTS_UNUSED static int check_readinput_t(T_SOC soc, int timeout);
+
 HTS_UNUSED static int linputsoc(T_SOC soc, char *s, int max) {
   int c;
   int j = 0;
@@ -127,7 +129,7 @@ HTS_UNUSED static int linputsoc(T_SOC soc, char *s, int max) {
   do {
     unsigned char ch;
 
-    if ((linputsoc_deadline == 0 || time(NULL) <= linputsoc_deadline) &&
+    if ((linputsoc_deadline == 0 || check_readinput_t(soc, 30)) &&
         recv(soc, &ch, 1, 0) == 1) {
       c = ch;
     } else {
@@ -158,6 +160,14 @@ HTS_UNUSED static int check_readinput_t(T_SOC soc, int timeout) {
     fd_set fds;                 // poll structures
     struct timeval tv;          // structure for select
 
+    if (linputsoc_deadline != 0) {
+      const time_t left = linputsoc_deadline - time(NULL);
+
+      if (left <= 0)
+        return 0;
+      if (left < timeout)
+        timeout = (int) left;
+    }
     FD_ZERO(&fds);
     FD_SET(soc, &fds);
     tv.tv_sec = timeout;
