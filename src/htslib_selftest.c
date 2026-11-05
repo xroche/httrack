@@ -1493,8 +1493,7 @@ static int st_structcheck(httrackp *opt, int argc, char **argv) {
   snprintf(target, sizeof(target), "%s/u8.txt", argv[0]);
   assertf(fexist_utf8(target));
 
-  /* an existing <name>.txt is never replaced: the moved file takes a free name
-   */
+  /* an existing <name>.txt is never replaced */
   for (int u8 = 0; u8 < 2; u8++) {
     const char *const nm = u8 ? "k8" : "kp";
     char got[16];
