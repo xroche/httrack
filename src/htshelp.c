@@ -360,6 +360,11 @@ void help_wizard(httrackp * opt) {
           g = !g;
         if (cmd[i] == ' ') {
           if (!g) {
+            if (argc >= (int) (sizeof(argv) / sizeof(argv[0])) - 1) {
+              printf("Too many arguments, nothing was launched\n");
+              freet(buffers);
+              return;
+            }
             cmd[i] = '\0';
             argv[argc++] = cmd + i + 1;
           }
