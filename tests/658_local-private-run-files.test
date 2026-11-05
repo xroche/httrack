@@ -60,9 +60,9 @@ grep -q '^fopen-private: OK$' "$tmpdir/st.log" ||
 # WARC keeps the request headers.
 out="$tmpdir/mirror"
 files=(hts-cache/doit.log hts-log.txt hts-err.txt hts-ioinfo.txt
-    hts-cache/new.txt hts-cache/new.zip out.warc.gz)
+    hts-cache/new.txt hts-cache/new.zip out.warc.gz out.wacz out.cdx)
 local_crawl --log "$tmpdir/log1" -O "$out" --quiet --robots=0 --timeout=30 \
-    --retries=0 -f -%H --warc-file "$out/out" \
+    --retries=0 -f -%H --warc-file "$out/out" --wacz \
     "http://user:secret@127.0.0.1:$SRV_PORT/fetchmeta/index.html" ||
     fail "crawl failed: $(<"$tmpdir/log1")"
 grep -q secret "$out/hts-cache/doit.log" || fail "doit.log does not hold the URL"
