@@ -1493,6 +1493,38 @@ static int st_structcheck(httrackp *opt, int argc, char **argv) {
   snprintf(target, sizeof(target), "%s/u8.txt", argv[0]);
   assertf(fexist_utf8(target));
 
+  /* an existing <name>.txt is never replaced: the moved file takes a free name
+   */
+  for (int u8 = 0; u8 < 2; u8++) {
+    const char *const nm = u8 ? "k8" : "kp";
+    char got[16];
+
+    snprintf(path, sizeof(path), "%s/%s.txt", argv[0], nm);
+    fp = FOPEN(path, "wb");
+    assertf(fp != NULL);
+    fputs("KEEP", fp);
+    fclose(fp);
+    snprintf(path, sizeof(path), "%s/%s", argv[0], nm);
+    fp = FOPEN(path, "wb");
+    assertf(fp != NULL);
+    fputs("PAGE", fp);
+    fclose(fp);
+    snprintf(path, sizeof(path), "%s/%s/sub/", argv[0], nm);
+    assertf((u8 ? structcheck_utf8(path) : structcheck(path)) == 0);
+    assertf(dir_exists(path));
+    snprintf(path, sizeof(path), "%s/%s.txt", argv[0], nm);
+    fp = FOPEN(path, "rb");
+    assertf(fp != NULL);
+    memset(got, 0, sizeof(got));
+    assertf(fread(got, 1, 4, fp) == 4 && memcmp(got, "KEEP", 4) == 0);
+    fclose(fp);
+    snprintf(path, sizeof(path), "%s/%s.1.txt", argv[0], nm);
+    fp = FOPEN(path, "rb");
+    assertf(fp != NULL);
+    assertf(fread(got, 1, 4, fp) == 4 && memcmp(got, "PAGE", 4) == 0);
+    fclose(fp);
+  }
+
   printf("structcheck self-test OK\n");
   return 0;
 }

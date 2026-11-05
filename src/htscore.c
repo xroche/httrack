@@ -696,6 +696,11 @@ static hts_boolean old_lst_entry(httrackp *opt, const char *lst,
   if (cut || len < 3 || line[0] != '[' || line[len - 1] != ']' ||
       line[1] == '/' || line[1] == '\\')
     return HTS_FALSE;
+  /* a ".." line would walk the purge out of the mirror */
+  line[len - 1] = '\0';
+  if (!hts_path_is_contained(line + 1))
+    return HTS_FALSE;
+  line[len - 1] = ']';
   if (root >= filesize || len - 2 >= filesize - root)
     return HTS_FALSE;
   memcpy(file, StringBuff(opt->path_html), root);
@@ -3105,6 +3110,25 @@ HTSEXT_API hts_boolean dir_exists(const char *path) {
   return 0;                     /* DOES NOT EXIST */
 }
 
+/* Names a free "<file>.txt" (then "<file>.N.txt") to move a file out of a
+   directory's way, so the move never replaces another file. */
+static hts_boolean structcheck_aside(char *aside, size_t size, const char *file,
+                                     hts_boolean utf8) {
+  int i;
+
+  for (i = 0; i < 100; i++) {
+    STRUCT_STAT st;
+    struct stat st8;
+
+    if (!(i == 0 ? slprintfbuff(aside, size, "%s.txt", file)
+                 : slprintfbuff(aside, size, "%s.%d.txt", file, i)))
+      return HTS_FALSE;
+    if ((utf8 ? STAT(aside, &st) : stat(aside, &st8)) != 0)
+      return HTS_TRUE;
+  }
+  return HTS_FALSE;
+}
+
 /* path must end with "/" or with the finename (/tmp/bar/ or /tmp/bar/foo.zip) */
 /* Note: *not* UTF-8 */
 HTSEXT_API int structcheck(const char *path) {
@@ -3187,7 +3211,7 @@ HTSEXT_API int structcheck(const char *path) {
 #if HTS_REMOVE_ANNOYING_INDEX
         if (S_ISREG(st.st_mode)) {      /* Regular file in place ; move it and create directory */
           /* bounded here, not by the path-length guard far above */
-          if (!sprintfbuff(tmpbuf, "%s.txt", file)) {
+          if (!structcheck_aside(tmpbuf, sizeof(tmpbuf), file, HTS_FALSE)) {
             errno = ENAMETOOLONG;
             return -1;
           }
@@ -3298,7 +3322,7 @@ HTSEXT_API int structcheck_utf8(const char *path) {
 #if HTS_REMOVE_ANNOYING_INDEX
         if (S_ISREG(st.st_mode)) {      /* Regular file in place ; move it and create directory */
           /* bounded here, not by the path-length guard far above */
-          if (!sprintfbuff(tmpbuf, "%s.txt", file)) {
+          if (!structcheck_aside(tmpbuf, sizeof(tmpbuf), file, HTS_TRUE)) {
             errno = ENAMETOOLONG;
             return -1;
           }
