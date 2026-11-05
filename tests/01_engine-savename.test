@@ -190,6 +190,10 @@ full '/HTS-TMP/a.bin' 'application/octet-stream' \
 # Control: the DOS device names this reuses must still be escaped.
 full '/nul/x.bin' 'application/octet-stream' \
     '/dev/null/www.example.com/nul_/x.bin'
+for dev in com5 com9 lpt5 lpt9 'conin$' 'conout$'; do
+    full "/$dev/x.bin" 'application/octet-stream' \
+        "/dev/null/www.example.com/${dev}_/x.bin"
+done
 
 # Thousands of case variants of one name must not probe every taken suffix.
 selftest_queue_head 'savename-collide: 2048 names,' savename-collide

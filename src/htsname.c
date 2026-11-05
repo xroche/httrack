@@ -72,9 +72,9 @@ Please visit our Website: http://www.httrack.com
 /* clang-format off */
 static const char *hts_tbdev[] = {
   "prn", "con", "aux", "nul",
-  "lpt1", "lpt2", "lpt3", "lpt4",
-  "com1", "com2", "com3", "com4",
-  "clock$",
+  "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
+  "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
+  "conin$", "conout$", "clock$",
   "emmxxxx0", "xmsxxxx0", "setverxx",
   ""
 };

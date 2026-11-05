@@ -676,8 +676,8 @@ hts_urllist_status hts_urllist_next(const char *buff, size_t size, size_t *pos,
 }
 
 /* Reads old.lst's next "[path]" line. Returns HTS_FALSE when it is cut,
-   malformed, absolute or too long. Only a corrupt or foreign old.lst holds such
-   a line, because filenote() writes relative paths that fit. */
+   malformed, absolute, escaping or too long. Only a corrupt or foreign old.lst
+   holds such a line, because filenote() writes relative paths that fit. */
 static hts_boolean old_lst_entry(httrackp *opt, const char *lst,
                                  const char *end, size_t *pos, char *line,
                                  size_t linesize, char *file, size_t filesize) {
@@ -701,6 +701,9 @@ static hts_boolean old_lst_entry(httrackp *opt, const char *lst,
   memcpy(file, StringBuff(opt->path_html), root);
   memcpy(file + root, line + 1, len - 2);
   file[root + len - 2] = '\0';
+  /* a ".." or drive prefix would walk the purge out of the mirror */
+  if (!hts_path_is_relative_contained(file + root))
+    return HTS_FALSE;
   return HTS_TRUE;
 }
 
@@ -3105,6 +3108,27 @@ HTSEXT_API hts_boolean dir_exists(const char *path) {
   return 0;                     /* DOES NOT EXIST */
 }
 
+/* Finds a free "<file>.txt" or "<file>.N.txt"; sets errno when none fits. */
+static hts_boolean structcheck_aside(char *aside, size_t size, const char *file,
+                                     hts_boolean utf8) {
+  int i;
+
+  for (i = 0; i < 100; i++) {
+    STRUCT_STAT st;
+    struct stat st8;
+
+    if (!(i == 0 ? slprintfbuff(aside, size, "%s.txt", file)
+                 : slprintfbuff(aside, size, "%s.%d.txt", file, i))) {
+      errno = ENAMETOOLONG;
+      return HTS_FALSE;
+    }
+    if ((utf8 ? STAT(aside, &st) : stat(aside, &st8)) != 0)
+      return HTS_TRUE;
+  }
+  errno = EEXIST;
+  return HTS_FALSE;
+}
+
 /* path must end with "/" or with the finename (/tmp/bar/ or /tmp/bar/foo.zip) */
 /* Note: *not* UTF-8 */
 HTSEXT_API int structcheck(const char *path) {
@@ -3187,10 +3211,8 @@ HTSEXT_API int structcheck(const char *path) {
 #if HTS_REMOVE_ANNOYING_INDEX
         if (S_ISREG(st.st_mode)) {      /* Regular file in place ; move it and create directory */
           /* bounded here, not by the path-length guard far above */
-          if (!sprintfbuff(tmpbuf, "%s.txt", file)) {
-            errno = ENAMETOOLONG;
+          if (!structcheck_aside(tmpbuf, sizeof(tmpbuf), file, HTS_FALSE))
             return -1;
-          }
           if (rename(file, tmpbuf) != 0) {      /* Can't rename regular file */
             return -1;
           }
@@ -3298,10 +3320,8 @@ HTSEXT_API int structcheck_utf8(const char *path) {
 #if HTS_REMOVE_ANNOYING_INDEX
         if (S_ISREG(st.st_mode)) {      /* Regular file in place ; move it and create directory */
           /* bounded here, not by the path-length guard far above */
-          if (!sprintfbuff(tmpbuf, "%s.txt", file)) {
-            errno = ENAMETOOLONG;
+          if (!structcheck_aside(tmpbuf, sizeof(tmpbuf), file, HTS_TRUE))
             return -1;
-          }
           if (RENAME(file, tmpbuf) != 0) {      /* Can't rename regular file */
             return -1;
           }
