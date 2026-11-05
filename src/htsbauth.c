@@ -1680,17 +1680,29 @@ const char *cookie_get(char *buffer, const char *cookie_base, int param) {
 
 // -- basic auth --
 
+/* First stored credential whose prefix starts key, or NULL. */
+static char *bauth_find(t_cookie *cookie, const char *key) {
+  bauth_chain *chain = &cookie->auth;
+
+  for (; chain != NULL; chain = chain->next) {
+    if (strnotempty(chain->prefix) &&
+        strncmp(key, chain->prefix, strlen(chain->prefix)) == 0)
+      return chain->auth;
+  }
+  return NULL;
+}
+
 /* déclarer un répertoire comme possédant une authentification propre */
 int bauth_add(t_cookie * cookie, const char *adr, const char *fil, const char *auth) {
   char buffer[HTS_URLMAXSIZE * 2];
 
   if (cookie) {
-    if (!bauth_check(cookie, adr, fil)) {       // n'existe pas déja
-      bauth_chain *chain = &cookie->auth;
-      char *prefix = bauth_prefix(buffer, adr, fil);
+    char *prefix = bauth_prefix(buffer, adr, fil);
 
-      if (prefix == NULL)
-        return 0;
+    /* exact scheme: an http entry must not hide an https login */
+    if (prefix != NULL && !bauth_find(cookie, prefix)) {
+      bauth_chain *chain = &cookie->auth;
+
       /* A clipped prefix matches more URLs than were authenticated. */
       if (strlen(prefix) >= sizeof(chain->prefix) ||
           strlen(auth) >= sizeof(chain->auth)) {
@@ -1734,19 +1746,19 @@ char *bauth_check(t_cookie * cookie, const char *adr, const char *fil) {
   char buffer[HTS_URLMAXSIZE * 2];
 
   if (cookie) {
-    bauth_chain *chain = &cookie->auth;
     char *prefix = bauth_prefix(buffer, adr, fil);
+    char *found;
 
     if (prefix == NULL)
       return NULL;
-    while(chain) {
-      if (strnotempty(chain->prefix)) {
-        if (strncmp(prefix, chain->prefix, strlen(chain->prefix)) == 0) {
-          return chain->auth;
-        }
-      }
-      chain = chain->next;
+    found = bauth_find(cookie, prefix);
+    /* an http login may follow a redirect to https, never the reverse */
+    if (found == NULL && strfield(adr, "https://")) {
+      prefix = bauth_prefix(buffer, adr + 8, fil);
+      if (prefix != NULL)
+        found = bauth_find(cookie, prefix);
     }
+    return found;
   }
   return NULL;
 }
@@ -1756,13 +1768,16 @@ char *bauth_check(t_cookie * cookie, const char *adr, const char *fil) {
 char *bauth_prefix(char *prefix, const char *adr, const char *fil) {
   const size_t size = HTS_URLMAXSIZE * 2;
   const char *const host = jump_identification_const(adr);
-  const size_t used = strlen(host);
+  /* the key carries the scheme, so an https login never matches plain http */
+  const char *const scheme = strfield(adr, "https://") ? "https://" : "http://";
+  const size_t used = strlen(scheme) + strlen(host);
   char *a;
 
   /* a clipped prefix matches URLs nobody authenticated, so refuse instead */
   if (used >= size || strlen(fil) >= size - used)
     return NULL;
-  strlcpybuff(prefix, host, size);
+  strlcpybuff(prefix, scheme, size);
+  strlcatbuff(prefix, host, size);
   strlcatbuff(prefix, fil, size);
   a = strchr(prefix, '?');
   if (a)

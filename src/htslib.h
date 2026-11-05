@@ -395,6 +395,19 @@ hts_boolean hts_is_control_free(const char *str);
    Such a host has no domain structure to reverse or to widen into. */
 hts_boolean hts_host_is_ipv4(const char *host, size_t len);
 
+/* Base-64 "user:pass" of the userinfo in a URL or proxy name, for a Basic
+   Authorization header, into out[out_size] (at least 1100 bytes). Returns 1
+   when filled, 0 when there is no userinfo, -1 when it is too long (765 bytes
+   max, as a clipped credential would authenticate as somebody else). */
+int hts_basic_auth_value(httrackp *opt, const char *url, char *out,
+                         size_t out_size);
+
+/* Copy the bare host name of a URL address into out[size] for the TLS SNI
+   extension: no scheme, userinfo or port. FALSE with out emptied when there is
+   no DNS name to send (IP literal, empty, or too long), as RFC 6066 forbids
+   literals. */
+hts_boolean hts_sni_hostname(const char *url_adr, char *out, size_t size);
+
 /* TRUE if host[0..len) is an IPv4 or IPv6 address literal. */
 hts_boolean hts_host_is_address(const char *host, size_t len);
 

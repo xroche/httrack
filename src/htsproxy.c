@@ -112,21 +112,20 @@ int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
 
   // creds go on the CONNECT, not the tunneled origin request
   if (link_has_authorization(retour->req.proxy.name)) {
-    const char *a = jump_identification_const(retour->req.proxy.name);
-    const char *astart = jump_protocol_const(retour->req.proxy.name);
     char autorisation[1100];
-    char user_pass[256];
 
-    autorisation[0] = user_pass[0] = '\0';
-    strncatbuff(user_pass, astart, (int) (a - astart) - 1);
-    strcpybuff(user_pass, unescape_http(OPT_GET_BUFF(opt),
-                                        OPT_GET_BUFF_SIZE(opt), user_pass));
-    code64((unsigned char *) user_pass, (int) strlen(user_pass),
-           (unsigned char *) autorisation, 0);
-    hts_secret_add(opt, autorisation, strlen(autorisation), HTS_SECRET_HEADER);
-    strlcatbuff(req, "Proxy-Authorization: Basic ", sizeof(req));
-    strlcatbuff(req, autorisation, sizeof(req));
-    strlcatbuff(req, H_CRLF, sizeof(req));
+    const int got = hts_basic_auth_value(opt, retour->req.proxy.name,
+                                         autorisation, sizeof(autorisation));
+
+    if (got < 0) {
+      strcpybuff(retour->msg, "proxy CONNECT: credentials too long");
+      return 0;
+    }
+    if (got > 0) {
+      strlcatbuff(req, "Proxy-Authorization: Basic ", sizeof(req));
+      strlcatbuff(req, autorisation, sizeof(req));
+      strlcatbuff(req, H_CRLF, sizeof(req));
+    }
   }
   strlcatbuff(req, H_CRLF, sizeof(req)); // end of request headers
 

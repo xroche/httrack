@@ -42,4 +42,19 @@ ftpaddr "ftp://$(printf 'a%.0s' $(seq 1 256))" 'error=Host name too long'
 ftpaddr "ftp://[::1]:$(printf '9%.0s' $(seq 1 200))" \
     "error=Invalid port: $(printf '9%.0s' $(seq 1 113))"
 
+# the TLS SNI is the bare DNS name: no userinfo, port or IP literal (RFC 6066)
+sni() { selftest_queue "$2" sniname "$1"; }
+
+sni 'https://example.com' 'sni=example.com'
+sni 'https://example.com:8443' 'sni=example.com'
+sni 'https://alice:hunter2@example.com:8443' 'sni=example.com'
+sni 'https://alice@example.com' 'sni=example.com'
+sni 'example.com:443' 'sni=example.com'
+sni 'example.com/p:q' 'sni=example.com'
+sni 'https://127.0.0.1:8443' 'sni=none'
+sni 'https://[::1]:8443' 'sni=none'
+sni 'https://user:pw@[::1]' 'sni=none'
+sni 'https://' 'sni=none'
+sni "https://$(printf 'a%.0s' $(seq 1 256))" 'sni=none'
+
 selftest_run_queued

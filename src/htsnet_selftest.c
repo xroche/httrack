@@ -129,6 +129,42 @@ static int st_ftpaddr(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Print the SNI host name a URL address yields. */
+static int st_sniname(httrackp *opt, int argc, char **argv) {
+  int i;
+
+  (void) opt;
+  for (i = 0; i < argc; i++) {
+    char host[256];
+
+    if (hts_sni_hostname(argv[i], host, sizeof(host)))
+      printf("sni=%s\n", host);
+    else
+      printf("sni=none\n");
+  }
+  return 0;
+}
+
+/* Print the Proxy-Authorization value a proxy name yields. */
+static int st_proxyauth(httrackp *opt, int argc, char **argv) {
+  char autorisation[1100];
+
+  if (argc != 1) {
+    fprintf(stderr, "proxyauth: needs a proxy argument\n");
+    return 1;
+  }
+  const int got =
+      hts_basic_auth_value(opt, argv[0], autorisation, sizeof(autorisation));
+
+  if (got > 0 && strlen(autorisation) > 64) /* long: print the length only */
+    printf("auth=len%d\n", (int) strlen(autorisation));
+  else if (got > 0)
+    printf("auth=%s\n", autorisation);
+  else
+    printf("auth=%s\n", got < 0 ? "toolong" : "none");
+  return 0;
+}
+
 /* Print what a PASV or EPSV reply parses into, or "refused". */
 static int st_ftppasv(httrackp *opt, int argc, char **argv) {
   char ip[64];
@@ -1415,6 +1451,10 @@ const struct selftest_entry selftests_net[] = {
 #endif
     {"ftpaddr", "<url-address>...", "host/port the FTP path splits out",
      st_ftpaddr},
+    {"proxyauth", "<proxy>", "Basic credentials a proxy name carries",
+     st_proxyauth},
+    {"sniname", "<url-address>...", "TLS SNI name taken from a URL address",
+     st_sniname},
     {"ftp-pasv", "pasv|epsv <reply>",
      "the address and port a PASV or EPSV reply parses into", st_ftppasv},
     {"proxyurl", "<proxy-arg>", "parse a -P proxy URL into host/port",

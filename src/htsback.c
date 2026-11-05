@@ -3871,10 +3871,11 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               // new session
               back[i].r.ssl_con = SSL_new(openssl_ctx);
               if (back[i].r.ssl_con) {
-                /* non-const twin: the OpenSSL macro casts the qualifier away */
-                char *hostname = jump_protocol(back[i].url_adr);
+                char hostname[256];
                 // some servers expect the hostname on the clienthello (SNI TLS extension)
-                SSL_set_tlsext_host_name(back[i].r.ssl_con, hostname);
+                if (hts_sni_hostname(back[i].url_adr, hostname,
+                                     sizeof(hostname)))
+                  SSL_set_tlsext_host_name(back[i].r.ssl_con, hostname);
                 SSL_clear(back[i].r.ssl_con);
                 if (SSL_set_fd(back[i].r.ssl_con, (int) back[i].r.soc) == 1) {
                   SSL_set_connect_state(back[i].r.ssl_con);
