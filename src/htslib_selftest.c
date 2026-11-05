@@ -1504,6 +1504,11 @@ static int st_structcheck(httrackp *opt, int argc, char **argv) {
     assertf(fp != NULL);
     fputs("KEEP", fp);
     fclose(fp);
+    snprintf(path, sizeof(path), "%s/%s.1.txt", argv[0], nm);
+    fp = FOPEN(path, "wb");
+    assertf(fp != NULL);
+    fputs("TAKEN", fp);
+    fclose(fp);
     snprintf(path, sizeof(path), "%s/%s", argv[0], nm);
     fp = FOPEN(path, "wb");
     assertf(fp != NULL);
@@ -1518,7 +1523,7 @@ static int st_structcheck(httrackp *opt, int argc, char **argv) {
     memset(got, 0, sizeof(got));
     assertf(fread(got, 1, 4, fp) == 4 && memcmp(got, "KEEP", 4) == 0);
     fclose(fp);
-    snprintf(path, sizeof(path), "%s/%s.1.txt", argv[0], nm);
+    snprintf(path, sizeof(path), "%s/%s.2.txt", argv[0], nm);
     fp = FOPEN(path, "rb");
     assertf(fp != NULL);
     assertf(fread(got, 1, 4, fp) == 4 && memcmp(got, "PAGE", 4) == 0);

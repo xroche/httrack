@@ -26,9 +26,12 @@ printf 'mine\n' >"${tmpdir}/work/victim.txt"
 opts=(--quiet --robots=0 --retries=1 -c1 --timeout=20 -I0
     -O "${mirror},${tmpdir}/cache")
 local_crawl --log "${tmpdir}/log1" "${opts[@]}" "${BASEURL}/index.html"
-printf '[../victim.txt]\n[../emptydir/x]\n' >>"${tmpdir}/cache/hts-cache/new.lst"
+mkdir -p "$mirror"
+printf 'x\n' >"${mirror}/inside.txt"
+printf '[inside.txt]\n[../victim.txt]\n[./../victim.txt]\n[../emptydir/x]\n' >>"${tmpdir}/cache/hts-cache/new.lst"
 local_crawl --log "${tmpdir}/log2" "${opts[@]}" --update "${BASEURL}/index.html"
 
+test ! -e "${mirror}/inside.txt" || fail "the purge did not run"
 assert_alive "${tmpdir}/work/victim.txt" mine
 test -d "${tmpdir}/work/emptydir" || fail "the purge removed a directory outside the mirror"
 ok "the purge ignored old.lst lines that leave the mirror"
