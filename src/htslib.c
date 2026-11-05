@@ -54,6 +54,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscrashtest.h"
 #include "htsback.h"
 #include "htsftp.h"
+#include "htsproxy.h"
 #include "htswrap.h"
 #include "htsmd5.h"
 #include "htsmodules.h"
@@ -1770,24 +1771,15 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
         strncmp(adr, "https://", 8) != 0) {
       if (link_has_authorization(retour->req.proxy.name) &&
           !http_headers_have_field(custom, "Proxy-Authorization")) {
-        const char *a = jump_identification_const(retour->req.proxy.name);
-        const char *astart = jump_protocol_const(retour->req.proxy.name);
         char autorisation[1100];
-        char user_pass[256];
 
-        autorisation[0] = user_pass[0] = '\0';
-        //
-        strncatbuff(user_pass, astart, (int) (a - astart) - 1);
-        strcpybuff(user_pass, unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), user_pass));
-        code64((unsigned char *) user_pass, (int) strlen(user_pass),
-               (unsigned char *) autorisation, 0);
-        hts_secret_add(opt, autorisation, strlen(autorisation),
-                       HTS_SECRET_HEADER);
-        print_buffer(&bstr, "Proxy-Authorization: Basic %s"H_CRLF,
-                     autorisation);
-#if HDEBUG
-        printf("Proxy-Authenticate, %s (code: %s)\n", user_pass, autorisation);
-#endif
+        if (hts_proxy_basic_auth(opt, retour->req.proxy.name, autorisation,
+                                 sizeof(autorisation)))
+          print_buffer(&bstr, "Proxy-Authorization: Basic %s" H_CRLF,
+                       autorisation);
+        else
+          hts_log_print(opt, LOG_WARNING,
+                        "proxy authorization dropped, credentials too long");
       }
     }
     // Referer?
@@ -2043,7 +2035,7 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
               hts_secret_add(opt, autorisation, strlen(autorisation),
                              HTS_SECRET_HEADER);
               if (strcmp(fil, "/robots.txt")) /* pas robots.txt */
-                bauth_add(cookie, astart, fil, autorisation);
+                bauth_add(cookie, adr, fil, autorisation);
             } else {
               /* 'a' is past the '@': the log gets the host, not the secret. */
               hts_log_print(
@@ -2051,7 +2043,7 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
                   "authorization dropped, credentials too long for %s", a);
             }
           }
-        } else if ((a = bauth_check(cookie, real_adr, fil)))
+        } else if ((a = bauth_check(cookie, adr, fil)))
           strcpybuff(autorisation, a);
         if (strnotempty(autorisation) &&
             !http_headers_have_field(custom, "Authorization")) {
@@ -5075,6 +5067,20 @@ HTSEXT_API char *adr_normalized(const char *source, char *dest) {
 }
 
 #undef endwith
+
+hts_boolean hts_sni_hostname(const char *url_adr, char *out, size_t size) {
+  const char *const host = jump_identification_const(url_adr);
+  const char *const colon = strchr(host, ':');
+  size_t len = strcspn(host, "/?#");
+
+  if (colon != NULL && (size_t) (colon - host) < len)
+    len = (size_t) (colon - host);
+  out[0] = '\0';
+  if (len == 0 || len >= size || host[0] == '[' || hts_host_is_ipv4(host, len))
+    return HTS_FALSE;
+  strlncatbuff(out, host, size, len);
+  return HTS_TRUE;
+}
 
 // find port (:80) or NULL if not found
 // can handle IPV6 addresses

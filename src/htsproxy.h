@@ -55,6 +55,13 @@ typedef struct htsblk htsblk;
 int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
                       int timeout);
 
+/* Base-64 "user:pass" of the credentials in a proxy name, for a
+   Proxy-Authorization: Basic header, into out[out_size] (at least 1100 bytes).
+   FALSE with out emptied when the name carries none or they are too long: a
+   clipped credential would authenticate as somebody else. */
+hts_boolean hts_proxy_basic_auth(httrackp *opt, const char *proxy_name,
+                                 char *out, size_t out_size);
+
 /* SOCKS5 (RFC 1928, RFC 1929 auth) handshake on the raw proxy socket, before
    any TLS: `retour->soc` must be TCP-connected to the proxy and `adr` is the
    origin (url_adr). The origin name is sent verbatim (ATYP=domain), so the

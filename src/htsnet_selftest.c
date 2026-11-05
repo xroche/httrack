@@ -32,6 +32,7 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 #include "htsselftest_int.h"
+#include "htsproxy.h"
 
 /* The two counters a front end polls, and the option beside them: published
    into the stats surface, and never carried onto another opt. Runs everywhere,
@@ -126,6 +127,37 @@ static int st_ftpaddr(httrackp *opt, int argc, char **argv) {
     else
       printf("error=%s\n", err);
   }
+  return 0;
+}
+
+/* Print the SNI host name a URL address yields. */
+static int st_sniname(httrackp *opt, int argc, char **argv) {
+  int i;
+
+  (void) opt;
+  for (i = 0; i < argc; i++) {
+    char host[256];
+
+    if (hts_sni_hostname(argv[i], host, sizeof(host)))
+      printf("sni=%s\n", host);
+    else
+      printf("sni=none\n");
+  }
+  return 0;
+}
+
+/* Print the Proxy-Authorization value a proxy name yields. */
+static int st_proxyauth(httrackp *opt, int argc, char **argv) {
+  char autorisation[1100];
+
+  if (argc != 1) {
+    fprintf(stderr, "proxyauth: needs a proxy argument\n");
+    return 1;
+  }
+  if (hts_proxy_basic_auth(opt, argv[0], autorisation, sizeof(autorisation)))
+    printf("auth=%s\n", autorisation);
+  else
+    printf("auth=none\n");
   return 0;
 }
 
@@ -1415,6 +1447,10 @@ const struct selftest_entry selftests_net[] = {
 #endif
     {"ftpaddr", "<url-address>...", "host/port the FTP path splits out",
      st_ftpaddr},
+    {"proxyauth", "<proxy>", "Basic credentials a proxy name carries",
+     st_proxyauth},
+    {"sniname", "<url-address>...", "TLS SNI name taken from a URL address",
+     st_sniname},
     {"ftp-pasv", "pasv|epsv <reply>",
      "the address and port a PASV or EPSV reply parses into", st_ftppasv},
     {"proxyurl", "<proxy-arg>", "parse a -P proxy URL into host/port",

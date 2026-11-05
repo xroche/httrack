@@ -93,4 +93,13 @@ p 'http://host:' 'name=http://host port=8080 host=host kind=http'
 # the fallback is the scheme's own default, not a hardcoded 8080
 p 'socks5://host:99999999999999' 'name=socks5://host port=1080 host=host kind=socks'
 
+# -#test=proxyauth prints the Proxy-Authorization value; a credential too long
+# for the buffer is refused, never aborts (htslib.c used to cap it at 255 bytes)
+pa() { selftest_queue "$2" proxyauth "$1"; }
+pa 'user:pass@proxy:3128' 'auth=dXNlcjpwYXNz'
+pa 'proxy:3128' 'auth=none'
+pa "u:$(printf 'a%.0s' $(seq 1 300))@proxy:3128" "auth=$(printf 'u:%0300d' 0 | tr 0 a | base64 -w0)"
+pa "u:$(printf 'a%.0s' $(seq 1 765))@proxy:3128" "auth=$(printf 'u:%0765d' 0 | tr 0 a | base64 -w0)"
+pa "u:$(printf 'a%.0s' $(seq 1 766))@proxy:3128" 'auth=none'
+
 selftest_run_queued

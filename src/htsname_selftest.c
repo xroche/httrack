@@ -1692,6 +1692,15 @@ static int st_urlbounds(httrackp *opt, int argc, char **argv) {
   assertf(bauth_add(cookie, adr, fil, "dXNlcjpwYXNz") == 1);
   assertf(bauth_check(cookie, adr, fil) != NULL);
 
+  /* A login learned on https is not offered to plain http, and vice versa. */
+  assertf(bauth_add(cookie, "https://www.example.com", "/s/p.html",
+                    "aHR0cHM=") == 1);
+  assertf(bauth_check(cookie, "https://www.example.com", "/s/q.html") != NULL);
+  assertf(bauth_check(cookie, "http://www.example.com", "/s/q.html") == NULL);
+  assertf(bauth_check(cookie, "www.example.com", "/s/q.html") == NULL);
+  assertf(bauth_check(cookie, "https://other.example.com", "/s/q.html") ==
+          NULL);
+
   /* bauth_prefix(): the key it keeps fills its buffer to the last byte, and
      #1561's guard then refuses to store a key wider than bauth_chain */
   st_urlbounds_path(fil, bafits);

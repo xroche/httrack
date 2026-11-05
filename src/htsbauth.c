@@ -1756,13 +1756,16 @@ char *bauth_check(t_cookie * cookie, const char *adr, const char *fil) {
 char *bauth_prefix(char *prefix, const char *adr, const char *fil) {
   const size_t size = HTS_URLMAXSIZE * 2;
   const char *const host = jump_identification_const(adr);
-  const size_t used = strlen(host);
+  /* an https login must not match plain http: the key carries the scheme */
+  const char *const scheme = strfield(adr, "https://") ? "https://" : "";
+  const size_t used = strlen(scheme) + strlen(host);
   char *a;
 
   /* a clipped prefix matches URLs nobody authenticated, so refuse instead */
   if (used >= size || strlen(fil) >= size - used)
     return NULL;
-  strlcpybuff(prefix, host, size);
+  strlcpybuff(prefix, scheme, size);
+  strlcatbuff(prefix, host, size);
   strlcatbuff(prefix, fil, size);
   a = strchr(prefix, '?');
   if (a)

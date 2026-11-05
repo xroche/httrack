@@ -395,6 +395,12 @@ hts_boolean hts_is_control_free(const char *str);
    Such a host has no domain structure to reverse or to widen into. */
 hts_boolean hts_host_is_ipv4(const char *host, size_t len);
 
+/* Copy the bare host name of a URL address into out[size] for the TLS SNI
+   extension: no scheme, userinfo or port. FALSE with out emptied when there is
+   no DNS name to send (IP literal, empty, or too long), as RFC 6066 forbids
+   literals. */
+hts_boolean hts_sni_hostname(const char *url_adr, char *out, size_t size);
+
 /* TRUE if host[0..len) is an IPv4 or IPv6 address literal. */
 hts_boolean hts_host_is_address(const char *host, size_t len);
 
