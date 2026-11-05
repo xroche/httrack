@@ -2018,7 +2018,6 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
         autorisation[0] = '\0';
         if (link_has_authorization(adr)) {      // ohh une authentification!
           const char *a = jump_identification_const(adr);
-          const char *astart = jump_protocol_const(adr);
 
           if (!direct_url) {    // pas ftp:// par exemple
             const int got = hts_basic_auth_value(opt, adr, autorisation,
@@ -5066,12 +5065,13 @@ int hts_basic_auth_value(httrackp *opt, const char *url, char *out,
   const size_t idlen = a > astart ? (size_t) (a - astart) - 1 : 0;
   char user_pass[768];
 
-  assertf(out_size >= 1100); /* base-64 of 767 bytes is 1024 */
+  assertf(out_size >= 1100); /* base-64 of 765 bytes is 1020 */
   out[0] = user_pass[0] = '\0';
   if (idlen == 0)
     return 0;
-  /* a clipped credential authenticates as somebody else */
-  if (idlen >= sizeof(user_pass))
+  /* a clipped credential authenticates as somebody else, and an encoded one
+     wider than bauth_chain.auth could not be stored for the child pages */
+  if (idlen > (sizeof(((bauth_chain *) 0)->auth) - 1) / 4 * 3)
     return -1;
   strncatbuff(user_pass, astart, (int) idlen);
   strcpybuff(user_pass, unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),

@@ -50,8 +50,8 @@ Please visit our Website: http://www.httrack.com
 typedef struct bauth_chain bauth_chain;
 #endif
 struct bauth_chain {
-  char prefix[1024]; /**< host and path, cut after the last '/', for example
-                          www.foo.com/secure/ */
+  char prefix[1024]; /**< scheme, host and path, cut after the last '/', for
+                          example http://www.foo.com/secure/ */
   char auth[1024];   /**< base-64 "user:pass", the value sent after
                           "Authorization: Basic " */
   struct bauth_chain *next; /**< next entry, NULL at the end */

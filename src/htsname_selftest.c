@@ -1658,10 +1658,12 @@ static int st_urlbounds(httrackp *opt, int argc, char **argv) {
   /* lien_url holds non-const strings, so the primary link owns its own */
   char adrbuf[] = "www.example.com", filroot[] = "/", savname[] = "index.html";
   const char *const adr = adrbuf;
-  /* the wizard builds "http://" + adr + fil, basic auth builds adr + fil */
+  /* the wizard builds "http://" + adr + fil, basic auth builds "http://" + adr
+   * + fil */
   const size_t wzfits =
       HTS_URLMAXSIZE * 2 - strlen("http://") - strlen(adr) - 1;
-  const size_t bafits = HTS_URLMAXSIZE * 2 - strlen(adr) - 1;
+  const size_t bafits =
+      HTS_URLMAXSIZE * 2 - strlen("http://") - strlen(adr) - 1;
   char BIGSTK fil[HTS_URLMAXSIZE * 2];
   char BIGSTK prefix[HTS_URLMAXSIZE * 2];
   lien_url primary, *liens[1];
@@ -1688,7 +1690,7 @@ static int st_urlbounds(httrackp *opt, int argc, char **argv) {
      bauth_check() never touches it, and a missing NULL guard would show. */
   strcpybuff(fil, "/secure/page.html?a=b");
   assertf(bauth_prefix(prefix, adr, fil) == prefix);
-  assertf(strcmp(prefix, "www.example.com/secure/") == 0);
+  assertf(strcmp(prefix, "http://www.example.com/secure/") == 0);
   assertf(bauth_add(cookie, adr, fil, "dXNlcjpwYXNz") == 1);
   assertf(bauth_check(cookie, adr, fil) != NULL);
 
@@ -1698,6 +1700,9 @@ static int st_urlbounds(httrackp *opt, int argc, char **argv) {
   assertf(bauth_check(cookie, "https://www.example.com", "/s/q.html") != NULL);
   assertf(bauth_check(cookie, "http://www.example.com", "/s/q.html") == NULL);
   assertf(bauth_check(cookie, "www.example.com", "/s/q.html") == NULL);
+  /* a host that reads as "https:" must not reach the https entry */
+  assertf(bauth_check(cookie, "http://https:", "//www.example.com/s/q.html") ==
+          NULL);
   /* an http login follows a redirect to https, and a later https login is
      still stored beside it */
   assertf(bauth_add(cookie, "old.example.com", "/d/p.html", "aHR0cA==") == 1);

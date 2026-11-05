@@ -397,7 +397,7 @@ hts_boolean hts_host_is_ipv4(const char *host, size_t len);
 
 /* Base-64 "user:pass" of the userinfo in a URL or proxy name, for a Basic
    Authorization header, into out[out_size] (at least 1100 bytes). Returns 1
-   when filled, 0 when there is no userinfo, -1 when it is too long (767 bytes
+   when filled, 0 when there is no userinfo, -1 when it is too long (765 bytes
    max, as a clipped credential would authenticate as somebody else). */
 int hts_basic_auth_value(httrackp *opt, const char *url, char *out,
                          size_t out_size);

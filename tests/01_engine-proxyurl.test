@@ -94,13 +94,13 @@ p 'http://host:' 'name=http://host port=8080 host=host kind=http'
 p 'socks5://host:99999999999999' 'name=socks5://host port=1080 host=host kind=socks'
 
 # -#test=proxyauth prints the Basic value of the userinfo ("lenN" past 64
-# characters): "none" without one, "toolong" past 767 bytes, never an abort
+# characters): "none" without one, "toolong" past 765 bytes, never an abort
 pa() { selftest_queue "$2" proxyauth "$1"; }
 pa 'user:pass@proxy:3128' 'auth=dXNlcjpwYXNz'
 pa 'proxy:3128' 'auth=none'
 pa '@proxy:3128' 'auth=none'
 pa "u:$(printf 'a%.0s' $(seq 1 300))@proxy:3128" 'auth=len404'
-pa "u:$(printf 'a%.0s' $(seq 1 765))@proxy:3128" 'auth=len1024'
-pa "u:$(printf 'a%.0s' $(seq 1 766))@proxy:3128" 'auth=toolong'
+pa "u:$(printf 'a%.0s' $(seq 1 763))@proxy:3128" 'auth=len1020'
+pa "u:$(printf 'a%.0s' $(seq 1 764))@proxy:3128" 'auth=toolong'
 
 selftest_run_queued
