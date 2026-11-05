@@ -45,8 +45,7 @@ Please visit our Website: http://www.httrack.com
    truncating it; NULL on failure. Links are followed, as fopen() does. */
 FILE *hts_fopen_private(const char *name, const char *mode);
 
-/* Like hts_fopen_private(), but fails if name exists, a link included (Unix).
- */
+/* Like hts_fopen_private(), but fails if name exists, a link included. */
 FILE *hts_fopen_private_new(const char *name, const char *mode);
 
 /* Flags for the readers below, which always drop CR. */
