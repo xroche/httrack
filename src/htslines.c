@@ -43,7 +43,7 @@ Please visit our Website: http://www.httrack.com
 #include <unistd.h>
 #endif
 
-/* Shared by the two openers: excl makes the open fail on an existing path. */
+/* excl: fail if name exists. */
 static FILE *fopen_private(const char *name, const char *mode,
                            hts_boolean excl) {
   char catbuff[CATBUFF_SIZE];
@@ -58,14 +58,10 @@ static FILE *fopen_private(const char *name, const char *mode,
   return FOPEN(fconv(catbuff, sizeof(catbuff), name), mode);
 #else
   {
-    int flags = O_WRONLY | O_CREAT | (excl ? O_EXCL : O_TRUNC);
+    const int flags = O_WRONLY | O_CREAT | (excl ? O_EXCL : O_TRUNC);
     int fd;
     FILE *fp;
 
-#ifdef O_NOFOLLOW
-    if (excl)
-      flags |= O_NOFOLLOW;
-#endif
     fd = open(fconv(catbuff, sizeof(catbuff), name), flags, HTS_PROTECT_FILE);
     fp = fd != -1 ? fdopen(fd, mode) : NULL;
     if (fd != -1 && fp == NULL)

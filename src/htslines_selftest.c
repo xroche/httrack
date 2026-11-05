@@ -466,7 +466,8 @@ static int st_fopen_private(httrackp *opt, int argc, char **argv) {
       if (fp != NULL)
         fclose(fp);
     }
-    /* _new: a fresh file is 0600, an existing file or a link is refused */
+    /* _new: a fresh file is 0600, an existing file or a link is refused
+     * (O_EXCL) */
     {
       char lnk[HTS_URLMAXSIZE * 2];
       struct stat st;
@@ -491,7 +492,7 @@ static int st_fopen_private(httrackp *opt, int argc, char **argv) {
       }
       if (symlink("kept", lnk) != 0 ||
           (fp = hts_fopen_private_new(lnk, "wb")) != NULL) {
-        printf("fopen-private: _new followed a link\n");
+        printf("fopen-private: _new did not refuse a link\n");
         failures++;
         if (fp != NULL)
           fclose(fp);

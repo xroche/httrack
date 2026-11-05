@@ -1061,6 +1061,8 @@ static void warc_wacz_package(warc_writer *w) {
     if (pre != NULL) {
       fclose(pre);
       zf = hts_zipOpen_utf8(fconv(catbuff, sizeof(catbuff), tmppath), 0);
+      if (zf == NULL)
+        (void) UNLINK(tmppath);
     }
   }
   if (zf == NULL) {
