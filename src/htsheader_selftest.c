@@ -887,6 +887,17 @@ static int st_acceptencoding(httrackp *opt, int argc, char **argv) {
       assertf(hts_zunpack(inpath, outpath) == (int) blen);
       assertf(ae_check_decoded(outpath, body, blen) == 0);
     }
+    /* A cap below the decoded size refuses the body; at the size it passes. */
+    snprintf(inpath, sizeof(inpath), "%s/ae-in-%d.z", argv[0], windowBits[0]);
+    assertf(ae_write_packed(inpath, windowBits[0], body, blen) == 0);
+    assertf(hts_zunpack_max(inpath, outpath, (LLint) blen - 1) < 0);
+    assertf(hts_codec_unpack_max(HTS_CODEC_DEFLATE, inpath, outpath,
+                                 (LLint) blen - 1) < 0);
+    assertf(hts_zunpack_max(inpath, outpath, (LLint) blen) == (int) blen);
+    assertf(hts_zunpack_max(inpath, outpath, 0) == (int) blen);
+    assertf(hts_codec_budget(1, 100) == 100);
+    assertf(hts_codec_budget(1, 0) == hts_codec_maxout(1));
+    assertf(hts_codec_budget(1, -1) == hts_codec_maxout(1));
     /* Fallback teeth: raw deflate misdetected as zlib; -1 without the retry. */
     snprintf(inpath, sizeof(inpath), "%s/ae-collide.z", argv[0]);
     snprintf(outpath, sizeof(outpath), "%s/ae-collide.out", argv[0]);

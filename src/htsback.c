@@ -1233,8 +1233,12 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                   back[p].r.statuscode = STATUSCODE_INVALID;
                 }
               } else {
-                snprintf(back[p].r.msg, sizeof(back[p].r.msg),
-                         "Open error when decompressing (can not generate a temporary file)");
+                /* never let the coded bytes be committed as the page */
+                htsblk_failf(&back[p].r, "Open error when decompressing (can "
+                                         "not generate a temporary file)");
+                back[p].r.statuscode = STATUSCODE_INVALID;
+                if (!back[p].r.is_write)
+                  deleteaddr(&back[p].r);
               }
             }
             // fermer fichier sortie
@@ -1262,8 +1266,12 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                      bytes be committed as the page */
                   if (!back[p].r.is_write)
                     deleteaddr(&back[p].r);
-                } else if ((size = hts_codec_unpack(codec, back[p].tmpfile,
-                                                    unpacked)) >= 0) {
+                } else if ((size = hts_codec_unpack_max(
+                                codec, back[p].tmpfile, unpacked,
+                                is_hypertext_mime(opt, back[p].r.contenttype,
+                                                  "")
+                                    ? back[p].maxfile_html
+                                    : back[p].maxfile_nonhtml)) >= 0) {
                   const hts_boolean sized =
                       back_set_decoded_size(&back[p].r, size);
 
