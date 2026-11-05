@@ -2983,7 +2983,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
       shutdown(soc_c, 1);
 #endif
       /* IE may send a CRLF after the POST data, and a refused body is unread */
-      while ((linputsoc_deadline == 0 || time(NULL) <= linputsoc_deadline) &&
+      while (check_readinput_t(soc_c, timeout) &&
              recv(soc_c, c, sizeof(c), 0) > 0)
         ;
     }
