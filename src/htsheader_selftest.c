@@ -890,9 +890,10 @@ static int st_acceptencoding(httrackp *opt, int argc, char **argv) {
     /* A cap below the decoded size refuses the body; at the size it passes. */
     snprintf(inpath, sizeof(inpath), "%s/ae-in-%d.z", argv[0], windowBits[0]);
     assertf(ae_write_packed(inpath, windowBits[0], body, blen) == 0);
-    assertf(hts_zunpack_max(inpath, outpath, (LLint) blen - 1) < 0);
+    assertf(hts_zunpack_max(inpath, outpath, (LLint) blen - 1) ==
+            HTS_CODEC_TOOBIG);
     assertf(hts_codec_unpack_max(HTS_CODEC_DEFLATE, inpath, outpath,
-                                 (LLint) blen - 1) < 0);
+                                 (LLint) blen - 1) == HTS_CODEC_TOOBIG);
     assertf(hts_zunpack_max(inpath, outpath, (LLint) blen) == (int) blen);
     assertf(hts_zunpack_max(inpath, outpath, 0) == (int) blen);
     assertf(hts_codec_budget(1, 100) == 100);
@@ -919,6 +920,10 @@ static int st_acceptencoding(httrackp *opt, int argc, char **argv) {
       assertf(ae_write_raw(inpath, idbody, ilen) == 0);
       assertf(hts_zunpack(inpath, outpath) == (int) ilen);
       assertf(ae_check_decoded(outpath, idbody, ilen) == 0);
+      /* the identity copy honours a cap too */
+      assertf(hts_zunpack_max(inpath, outpath, (LLint) ilen - 1) ==
+              HTS_CODEC_TOOBIG);
+      assertf(hts_zunpack_max(inpath, outpath, (LLint) ilen) == (int) ilen);
       freet(idbody);
     }
     /* Truncated gzip (CRC+ISIZE cut), zlib (ADLER32 cut) and raw deflate

@@ -1237,8 +1237,10 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                 htsblk_failf(&back[p].r, "Open error when decompressing (can "
                                          "not generate a temporary file)");
                 back[p].r.statuscode = STATUSCODE_INVALID;
-                if (!back[p].r.is_write)
-                  deleteaddr(&back[p].r);
+                deleteaddr(&back[p].r);
+                /* keep the previous copy out of the --update purge */
+                if (fexist_utf8(back[p].url_sav))
+                  filenote(&opt->state.strc, back[p].url_sav, NULL);
               }
             }
             // fermer fichier sortie
@@ -1315,6 +1317,13 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                         "could not replace %s; decoded copy kept as %s",
                         back[p].url_sav, unpacked);
                   }
+                } else if (size == HTS_CODEC_TOOBIG) {
+                  /* over -m once decoded: a verdict, as an uncoded body is */
+                  back[p].r.statuscode = STATUSCODE_TOO_BIG;
+                  strcpybuff(back[p].r.msg, "File too big");
+                  if (!back[p].r.is_write)
+                    deleteaddr(&back[p].r);
+                  UNLINK(unpacked);
                 } else {
                   back[p].r.statuscode = STATUSCODE_INVALID;
                   /* Our own disk, not the coded body: hts_codec_unpack() leaves

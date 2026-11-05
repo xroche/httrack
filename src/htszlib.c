@@ -63,7 +63,8 @@ int hts_zunpack_max(const char *filename, const char *newfile, LLint cap) {
 
     if (in != NULL) {
       unsigned char BIGSTK inbuf[8192];
-      const LLint maxout = hts_codec_budget(hts_codec_coded_size(in), cap);
+      const LLint coded = hts_codec_coded_size(in);
+      const LLint maxout = hts_codec_budget(coded, cap);
       size_t navail = fread(inbuf, 1, sizeof(inbuf), in);
       /* gzip/zlib headers -> +32 windowBits; else raw deflate (RFC1951) */
       const hts_boolean wrapped =
@@ -77,6 +78,7 @@ int hts_zunpack_max(const char *filename, const char *newfile, LLint cap) {
       hts_boolean not_deflate = HTS_FALSE;
       hts_boolean env_error = HTS_FALSE;
       hts_boolean bomb = HTS_FALSE;
+      hts_boolean copy_bomb = HTS_FALSE;
 
       /* deflate is ambiguous; on failure retry with the other windowBits */
       for (attempt = 0; attempt < 2 && ret < 0 && !bomb; attempt++) {
@@ -176,8 +178,9 @@ int hts_zunpack_max(const char *filename, const char *newfile, LLint cap) {
               size = -1;
               break;
             }
-            /* the copy is no smaller than the budget-checked input */
+            /* a mislabeled identity body is bounded like a decoded one */
             if (size > maxout - (LLint) navail) {
+              copy_bomb = HTS_TRUE;
               size = -1;
               break;
             }
@@ -190,6 +193,11 @@ int hts_zunpack_max(const char *filename, const char *newfile, LLint cap) {
           io_errno = errno;
           ret = -1;
         }
+      }
+      /* only a cap the caller set is a verdict; the built-in limit stays -1 */
+      if (ret < 0 && (bomb || copy_bomb) && !env_error && io_errno == 0 &&
+          hts_codec_cap_binds(coded, cap)) {
+        ret = HTS_CODEC_TOOBIG;
       }
       fclose(in);
     }

@@ -11,3 +11,9 @@ bash "$top_srcdir/tests/local-crawl.sh" --outdir-intl 'café' --errors 0 --files
     --file-matches 'warcgz/page.html' 'verbatim gzip page' \
     --file-matches 'warcgz/data.bin' 'verbatim gzip octet-stream' \
     httrack 'BASEURL/warcgz/index.html'
+
+# A gzip body that decodes past -m is refused like an uncoded one, and not saved.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 1 \
+    --not-found 'warcgz/big.bin' \
+    --log-found '"File too big".*warcgz/big\.bin' \
+    httrack 'BASEURL/warcgz/big.bin' -m100000
