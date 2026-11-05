@@ -1639,7 +1639,28 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 #endif
 
     /* Accept */
-    while((soc_c = (T_SOC) accept(soc, NULL, NULL)) == INVALID_SOCKET) ;
+    while ((soc_c = (T_SOC) accept(soc, NULL, NULL)) == INVALID_SOCKET) {
+    }
+
+    /* A client that stalls mid-line must not wedge the single-threaded server
+     */
+#ifdef _WIN32
+    {
+      DWORD tv = (DWORD) timeout * 1000;
+
+      (void) setsockopt(soc_c, SOL_SOCKET, SO_RCVTIMEO, (const char *) &tv,
+                        sizeof(tv));
+    }
+#else
+    {
+      struct timeval tv;
+
+      tv.tv_sec = timeout;
+      tv.tv_usec = 0;
+      (void) setsockopt(soc_c, SOL_SOCKET, SO_RCVTIMEO, (const void *) &tv,
+                        sizeof(tv));
+    }
+#endif
 
     /* Ping */
     client_event(SMALLSERVER_CLIENT_REQUEST, NULL);
