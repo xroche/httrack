@@ -659,9 +659,9 @@ HTS_INLINE int rech_tageq_all(const char *adr, const char *s) {
         quot = adr[p];
       } else if (adr[p] == '=' || is_realspace(adr[p])) {
         token = NULL;
-      } else if (adr[p] == '>') {
-        break;
-      } else {                  /* note: bogus for bogus foo = bar */
+      } else if (adr[p] == '>' || (adr[p] == '<' && p > 0)) {
+        break; /* '<' too: no rescan of the page per tag */
+      } else { /* note: bogus for bogus foo = bar */
         if (token == NULL) {
           if (strncasecmp(&adr[p], s, s_len) == 0
               && (is_realspace(adr[p + s_len]) || adr[p + s_len] == '=')

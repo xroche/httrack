@@ -2,8 +2,10 @@
 #
 # An <applet> or robots <meta> tag with no '>' and many code= or name=
 # attributes was rescanned to the end of the page once per attribute
-# (OSS-Fuzz 578272899). If the scan is quadratic, the big page trips the crawl
-# watchdog on a sanitizer build, which a release build is too fast to do.
+# (OSS-Fuzz 578272899). So were an http-equiv <meta> with no '>', a '>' in a
+# comment with no "-->" and an unclosed CSS url(. If a scan is quadratic, the
+# big page trips the crawl watchdog on a sanitizer build, which a release build
+# is too fast to do.
 
 set -e
 
@@ -31,12 +33,17 @@ def put(name, body):
 
 
 put("index.html",
-    b'<a href="big.html">b</a><a href="swap-999.html">s</a>'
+    b'<a href="big.html">b</a><a href="big-meta.html">m</a>'
+    b'<a href="big-comment.html">c</a><a href="big-css.html">s</a>'
+    b'<a href="swap-999.html">s</a>'
     b'<a href="swap-1000.html">t</a><a href="swap-far.html">f</a>'
     b'<a href="robots-998.html">r</a>'
     b'<a href="robots-999.html">q</a>\n')
 put("big.html",
     b"<applet " + b"code=a " * 30000 + b"<meta " + b"name=a " * 30000)
+put("big-meta.html", b"<meta http-equiv=a " * 30000)
+put("big-comment.html", b"<!--[if IE]>" * 30000)
+put("big-css.html", b"<style>@import url(" * 30000)
 
 
 def at(head, offset):  # pad head so that '>' lands at offset
@@ -72,7 +79,9 @@ test "$rc" -eq 0 || fail "crawl exited $rc: $(cat "${tmpdir}/log")"
 host="${out}/127.0.0.1_${SRV_PORT}"
 
 printf '[unclosed tags parsed before the watchdog] ..\t'
-test -f "${host}/big.html" || fail "big.html not mirrored"
+for page in big.html big-meta.html big-comment.html big-css.html; do
+    test -f "${host}/$page" || fail "$page not mirrored"
+done
 echo OK
 
 swapped() { # swapped PAGE

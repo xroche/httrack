@@ -735,8 +735,12 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
         b++;
     } else {
       close_len = 0;
-      while ((*b != quotes_replacement) && (*b != '\0'))
+      // A link past 2 * HTS_URLMAXSIZE is refused anyway; bound the scan.
+      while ((*b != quotes_replacement) && (*b != '\0')) {
+        if (b - a >= HTS_URLMAXSIZE * 2)
+          return HTS_FALSE;
         b++;
+      }
     }
     c = b--;
     // no closing delimiter here (truncated input):
@@ -1035,6 +1039,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       const char *in_media = NULL;    // in other media type (real media and so..)
       int intag = 0;            // on est dans un tag
       int incomment = 0;        // dans un <!--
+      const char *comment_close = NULL;         // cached "-->" at or after html
+      hts_boolean comment_unclosed = HTS_FALSE; // no "-->" left in the page
       int inscript = 0;         // dans un scipt pour applets javascript)
       int incss = 0;            /* CSS lets url(x) go unquoted */
       int link_frame =
@@ -1562,7 +1568,13 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                  <!-- foo > example <!-- bar > is sometimes accepted by browsers
                  when no --> is used somewhere else.. darn those browsers are dirty
                */
-              if (!strstr(html, "-->")) {
+              if (!comment_unclosed &&
+                  (comment_close == NULL || comment_close < html)) {
+                comment_close = strstr(html, "-->");
+                if (comment_close == NULL)
+                  comment_unclosed = HTS_TRUE;
+              }
+              if (comment_unclosed) {
                 intag = 0;
                 incomment = 0;
                 intag_start_valid = 0;
