@@ -56,12 +56,13 @@ httrack -#test=fopen-private "$tmpdir/st" >"$tmpdir/st.log" 2>&1 ||
 grep -q '^fopen-private: OK$' "$tmpdir/st.log" ||
     fail "fopen-private self-test said: $(<"$tmpdir/st.log")"
 
-# -f splits the errors into hts-err.txt, and -%H writes hts-ioinfo.txt.
+# -f splits the errors into hts-err.txt, -%H writes hts-ioinfo.txt, and the
+# WARC keeps the request headers.
 out="$tmpdir/mirror"
 files=(hts-cache/doit.log hts-log.txt hts-err.txt hts-ioinfo.txt
-    hts-cache/new.txt hts-cache/new.zip)
+    hts-cache/new.txt hts-cache/new.zip out.warc.gz)
 local_crawl --log "$tmpdir/log1" -O "$out" --quiet --robots=0 --timeout=30 \
-    --retries=0 -f -%H \
+    --retries=0 -f -%H --warc-file "$out/out" \
     "http://user:secret@127.0.0.1:$SRV_PORT/fetchmeta/index.html" ||
     fail "crawl failed: $(<"$tmpdir/log1")"
 grep -q secret "$out/hts-cache/doit.log" || fail "doit.log does not hold the URL"

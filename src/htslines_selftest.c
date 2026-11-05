@@ -466,6 +466,39 @@ static int st_fopen_private(httrackp *opt, int argc, char **argv) {
       if (fp != NULL)
         fclose(fp);
     }
+    /* _new: a fresh file is 0600, an existing file or a link is refused */
+    {
+      char lnk[HTS_URLMAXSIZE * 2];
+      struct stat st;
+
+      snprintf(path, sizeof(path), "%s/newfile", argv[0]);
+      snprintf(lnk, sizeof(lnk), "%s/newlink", argv[0]);
+      (void) unlink(path);
+      (void) unlink(lnk);
+      fp = hts_fopen_private_new(path, "wb");
+      if (fp == NULL || fstat(fileno(fp), &st) != 0 ||
+          (st.st_mode & 0777) != 0600) {
+        printf("fopen-private: _new did not make a 0600 file\n");
+        failures++;
+      }
+      if (fp != NULL)
+        fclose(fp);
+      fp = hts_fopen_private_new(path, "wb");
+      if (fp != NULL) {
+        printf("fopen-private: _new reopened an existing file\n");
+        failures++;
+        fclose(fp);
+      }
+      if (symlink("kept", lnk) != 0 ||
+          (fp = hts_fopen_private_new(lnk, "wb")) != NULL) {
+        printf("fopen-private: _new followed a link\n");
+        failures++;
+        if (fp != NULL)
+          fclose(fp);
+      }
+      (void) unlink(path);
+      (void) unlink(lnk);
+    }
     (void) umask(old);
   }
 #endif

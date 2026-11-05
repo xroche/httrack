@@ -1365,7 +1365,7 @@ void cookie_records_text(const t_cookie *cookie, String *out) {
 /* Write the jar to name, or only a header if it is empty. Return 0 on
    success. */
 static int cookie_write(t_cookie *cookie, const char *name) {
-  FILE *fp = hts_fopen_private(name, "wb");
+  FILE *fp = hts_fopen_private_new(name, "wb");
 
   if (fp) {
     String text = STRING_EMPTY;
@@ -1396,7 +1396,7 @@ static hts_boolean cookie_copy(const char *src, const char *dst) {
   const int fault = cookie_save_fault_selftest;
   char buf[8192];
   FILE *const in = FOPEN(src, "rb");
-  FILE *const out = in != NULL ? hts_fopen_private(dst, "wb") : NULL;
+  FILE *const out = in != NULL ? hts_fopen_private_new(dst, "wb") : NULL;
   hts_boolean ok = out != NULL;
   size_t n;
 
@@ -1528,7 +1528,7 @@ hts_boolean cookie_write_replace(const char *file, const char *data,
     return HTS_FALSE;
   }
   (void) UNLINK(tmp);
-  fp = hts_fopen_private(tmp, "wb");
+  fp = hts_fopen_private_new(tmp, "wb");
   if (fp == NULL)
     return HTS_FALSE;
   ok = hts_fwrite_exact(data, len, fp);

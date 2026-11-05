@@ -38,6 +38,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htscore.h"
 #include "htslib.h"
+#include "htslines.h"
 #include "htsio.h"
 #include "htsback.h"
 #include "htstools.h"
@@ -1356,9 +1357,8 @@ static int warc_rotate(warc_writer *w) {
            w->seg_ext);
   /* Open before advancing: w->seg must only ever name a segment that exists,
      or close-time packaging and swapping would work on a missing file. */
-  f = FOPEN(fconv(catbuff, sizeof(catbuff),
-                  warc_open_path(w, namebuf, openbuf, sizeof(openbuf))),
-            "wb");
+  f = hts_fopen_private(warc_open_path(w, namebuf, openbuf, sizeof(openbuf)),
+                        "wb");
   if (f == NULL)
     return -1;
   if (w->f != NULL)
@@ -1582,9 +1582,9 @@ warc_writer *warc_open(httrackp *opt, const char *path) {
   }
   /* Set only once arc_path is recorded, so a half-built writer never swaps. */
   w->protect_prev = fsize_utf8(path) > 0 ? HTS_TRUE : HTS_FALSE;
-  w->f = FOPEN(fconv(catbuff, sizeof(catbuff),
-                     warc_open_path(w, path, openbuf, sizeof(openbuf))),
-               "wb");
+  /* the archive keeps Cookie and Authorization headers: owner-only */
+  w->f = hts_fopen_private(warc_open_path(w, path, openbuf, sizeof(openbuf)),
+                           "wb");
   if (w->f == NULL) {
     warc_close(w);
     return NULL;
