@@ -32,7 +32,6 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 #include "htsselftest_int.h"
-#include "htsproxy.h"
 
 /* The two counters a front end polls, and the option beside them: published
    into the stats surface, and never carried onto another opt. Runs everywhere,
@@ -154,10 +153,15 @@ static int st_proxyauth(httrackp *opt, int argc, char **argv) {
     fprintf(stderr, "proxyauth: needs a proxy argument\n");
     return 1;
   }
-  if (hts_proxy_basic_auth(opt, argv[0], autorisation, sizeof(autorisation)))
+  const int got =
+      hts_basic_auth_value(opt, argv[0], autorisation, sizeof(autorisation));
+
+  if (got > 0 && strlen(autorisation) > 64) /* long: print the length only */
+    printf("auth=len%d\n", (int) strlen(autorisation));
+  else if (got > 0)
     printf("auth=%s\n", autorisation);
   else
-    printf("auth=none\n");
+    printf("auth=%s\n", got < 0 ? "toolong" : "none");
   return 0;
 }
 

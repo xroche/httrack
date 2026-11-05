@@ -54,7 +54,6 @@ Please visit our Website: http://www.httrack.com
 #include "htscrashtest.h"
 #include "htsback.h"
 #include "htsftp.h"
-#include "htsproxy.h"
 #include "htswrap.h"
 #include "htsmd5.h"
 #include "htsmodules.h"
@@ -1773,11 +1772,13 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
           !http_headers_have_field(custom, "Proxy-Authorization")) {
         char autorisation[1100];
 
-        if (hts_proxy_basic_auth(opt, retour->req.proxy.name, autorisation,
-                                 sizeof(autorisation)))
+        const int got = hts_basic_auth_value(
+            opt, retour->req.proxy.name, autorisation, sizeof(autorisation));
+
+        if (got > 0)
           print_buffer(&bstr, "Proxy-Authorization: Basic %s" H_CRLF,
                        autorisation);
-        else
+        else if (got < 0)
           hts_log_print(opt, LOG_WARNING,
                         "proxy authorization dropped, credentials too long");
       }
@@ -2020,23 +2021,13 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
           const char *astart = jump_protocol_const(adr);
 
           if (!direct_url) {    // pas ftp:// par exemple
-            char user_pass[256];
-            const size_t idlen = a > astart ? (size_t) (a - astart) - 1 : 0;
+            const int got = hts_basic_auth_value(opt, adr, autorisation,
+                                                 sizeof(autorisation));
 
-            user_pass[0] = '\0';
-            /* A clipped credential authenticates as somebody else. */
-            if (idlen < sizeof(user_pass)) {
-              strncatbuff(user_pass, astart, idlen);
-              strcpybuff(user_pass,
-                         unescape_http(OPT_GET_BUFF(opt),
-                                       OPT_GET_BUFF_SIZE(opt), user_pass));
-              code64((unsigned char *) user_pass, (int) strlen(user_pass),
-                     (unsigned char *) autorisation, 0);
-              hts_secret_add(opt, autorisation, strlen(autorisation),
-                             HTS_SECRET_HEADER);
+            if (got > 0) {
               if (strcmp(fil, "/robots.txt")) /* pas robots.txt */
                 bauth_add(cookie, adr, fil, autorisation);
-            } else {
+            } else if (got < 0) {
               /* 'a' is past the '@': the log gets the host, not the secret. */
               hts_log_print(
                   opt, LOG_WARNING,
@@ -5067,6 +5058,29 @@ HTSEXT_API char *adr_normalized(const char *source, char *dest) {
 }
 
 #undef endwith
+
+int hts_basic_auth_value(httrackp *opt, const char *url, char *out,
+                         size_t out_size) {
+  const char *const a = jump_identification_const(url);
+  const char *const astart = jump_protocol_const(url);
+  const size_t idlen = a > astart ? (size_t) (a - astart) - 1 : 0;
+  char user_pass[768];
+
+  assertf(out_size >= 1100); /* base-64 of 767 bytes is 1024 */
+  out[0] = user_pass[0] = '\0';
+  if (idlen == 0)
+    return 0;
+  /* a clipped credential authenticates as somebody else */
+  if (idlen >= sizeof(user_pass))
+    return -1;
+  strncatbuff(user_pass, astart, (int) idlen);
+  strcpybuff(user_pass, unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                      user_pass));
+  code64((unsigned char *) user_pass, (int) strlen(user_pass),
+         (unsigned char *) out, 0);
+  hts_secret_add(opt, out, strlen(out), HTS_SECRET_HEADER);
+  return 1;
+}
 
 hts_boolean hts_sni_hostname(const char *url_adr, char *out, size_t size) {
   const char *const host = jump_identification_const(url_adr);

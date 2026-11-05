@@ -222,14 +222,15 @@ char *cookie_nextfield(char *a);
 /* basic auth */
 
 /** Register credentials (auth = base-64 user:pass) for the prefix derived from
-    adr (host) and fil (path). No-op returning 0 if cookie is NULL, allocation
-    fails, a matching prefix is already stored, bauth_prefix builds no key, or
-    either string is too long for bauth_chain; returns 1 on insertion. */
+    adr (scheme, host) and fil (path). No-op returning 0 if cookie is NULL,
+   allocation fails, a matching prefix is already stored, bauth_prefix builds no
+   key, or either string is too long for bauth_chain; returns 1 on insertion. */
 int bauth_add(t_cookie *cookie, const char *adr, const char *fil,
               const char *auth);
 
 /** Return the base-64 credentials of the first stored prefix that starts
-    adr+fil, or NULL when none does or cookie is NULL. The result points into
+    adr+fil, or NULL when none does or cookie is NULL. An https request also
+    matches entries learned over http, never the reverse. The result points into
     the jar, so never free it, and bauth_free() invalidates it. */
 char *bauth_check(t_cookie *cookie, const char *adr, const char *fil);
 
@@ -237,10 +238,11 @@ char *bauth_check(t_cookie *cookie, const char *adr, const char *fil);
     a NULL jar and on a jar already freed; the jar itself is not released. */
 void bauth_free(t_cookie *cookie);
 
-/** Build the auth lookup key (host + path, query string stripped, truncated at
-    the last '/') from adr and fil into prefix; returns prefix, or NULL when
-    adr+fil does not fit, since a clipped key would match URLs nobody
-    authenticated. Caller must supply a buffer of HTS_URLMAXSIZE * 2 bytes. */
+/** Build the auth lookup key (scheme if https, host + path, query string
+   stripped, truncated at the last '/') from adr and fil into prefix; returns
+   prefix, or NULL when adr+fil does not fit, since a clipped key would match
+   URLs nobody authenticated. Caller must supply a buffer of HTS_URLMAXSIZE * 2
+   bytes. */
 char *bauth_prefix(char *buffer, const char *adr, const char *fil);
 
 #endif

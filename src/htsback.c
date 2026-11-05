@@ -3871,7 +3871,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               // new session
               back[i].r.ssl_con = SSL_new(openssl_ctx);
               if (back[i].r.ssl_con) {
-                /* non-const twin: the OpenSSL macro casts the qualifier away */
                 char hostname[256];
                 // some servers expect the hostname on the clienthello (SNI TLS extension)
                 if (hts_sni_hostname(back[i].url_adr, hostname,

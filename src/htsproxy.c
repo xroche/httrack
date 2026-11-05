@@ -77,26 +77,6 @@ static int proxy_getline(T_SOC soc, char *s, int max, int timeout) {
   return j;
 }
 
-hts_boolean hts_proxy_basic_auth(httrackp *opt, const char *proxy_name,
-                                 char *out, size_t out_size) {
-  const char *const a = jump_identification_const(proxy_name);
-  const char *const astart = jump_protocol_const(proxy_name);
-  const size_t idlen = a > astart ? (size_t) (a - astart) - 1 : 0;
-  char user_pass[768];
-
-  assertf(out_size >= 1100); /* base-64 of 767 bytes is 1024 */
-  out[0] = user_pass[0] = '\0';
-  if (idlen == 0 || idlen >= sizeof(user_pass))
-    return HTS_FALSE;
-  strncatbuff(user_pass, astart, (int) idlen);
-  strcpybuff(user_pass, unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                      user_pass));
-  code64((unsigned char *) user_pass, (int) strlen(user_pass),
-         (unsigned char *) out, 0);
-  hts_secret_add(opt, out, strlen(out), HTS_SECRET_HEADER);
-  return HTS_TRUE;
-}
-
 int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
                       int timeout) {
   const T_SOC soc = retour->soc;
@@ -134,14 +114,18 @@ int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
   if (link_has_authorization(retour->req.proxy.name)) {
     char autorisation[1100];
 
-    if (!hts_proxy_basic_auth(opt, retour->req.proxy.name, autorisation,
-                              sizeof(autorisation))) {
+    const int got = hts_basic_auth_value(opt, retour->req.proxy.name,
+                                         autorisation, sizeof(autorisation));
+
+    if (got < 0) {
       strcpybuff(retour->msg, "proxy CONNECT: credentials too long");
       return 0;
     }
-    strlcatbuff(req, "Proxy-Authorization: Basic ", sizeof(req));
-    strlcatbuff(req, autorisation, sizeof(req));
-    strlcatbuff(req, H_CRLF, sizeof(req));
+    if (got > 0) {
+      strlcatbuff(req, "Proxy-Authorization: Basic ", sizeof(req));
+      strlcatbuff(req, autorisation, sizeof(req));
+      strlcatbuff(req, H_CRLF, sizeof(req));
+    }
   }
   strlcatbuff(req, H_CRLF, sizeof(req)); // end of request headers
 

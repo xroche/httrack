@@ -1698,6 +1698,16 @@ static int st_urlbounds(httrackp *opt, int argc, char **argv) {
   assertf(bauth_check(cookie, "https://www.example.com", "/s/q.html") != NULL);
   assertf(bauth_check(cookie, "http://www.example.com", "/s/q.html") == NULL);
   assertf(bauth_check(cookie, "www.example.com", "/s/q.html") == NULL);
+  /* an http login follows a redirect to https, and a later https login is
+     still stored beside it */
+  assertf(bauth_add(cookie, "old.example.com", "/d/p.html", "aHR0cA==") == 1);
+  assertf(bauth_check(cookie, "https://old.example.com", "/d/q.html") != NULL);
+  assertf(bauth_add(cookie, "https://old.example.com", "/d/p.html",
+                    "aHR0cHM=") == 1);
+  assertf(strcmp(bauth_check(cookie, "https://old.example.com", "/d/q.html"),
+                 "aHR0cHM=") == 0);
+  assertf(strcmp(bauth_check(cookie, "old.example.com", "/d/q.html"),
+                 "aHR0cA==") == 0);
   assertf(bauth_check(cookie, "https://other.example.com", "/s/q.html") ==
           NULL);
 
