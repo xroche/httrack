@@ -326,6 +326,7 @@ void help_wizard(httrackp * opt) {
       int argc = 1;
       int g = 0;
       int i = 0;
+      char prog[] = "winhttrack";
 
       //
       printf("\n");
@@ -352,7 +353,7 @@ void help_wizard(httrackp * opt) {
       printf("\n");
 
       // couper en morceaux
-      argv[0] = strdup("winhttrack");
+      argv[0] = prog;
       argv[1] = cmd;
       argc++;
       while(cmd[i]) {
@@ -360,8 +361,9 @@ void help_wizard(httrackp * opt) {
           g = !g;
         if (cmd[i] == ' ') {
           if (!g) {
-            if (argc >= (int) (sizeof(argv) / sizeof(argv[0])) - 1) {
-              printf("Too many arguments, nothing was launched\n");
+            if (argc >= (int) (sizeof(argv) / sizeof(argv[0]))) {
+              printf("* too many arguments (%d max)\n",
+                     (int) (sizeof(argv) / sizeof(argv[0])));
               freet(buffers);
               return;
             }

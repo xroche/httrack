@@ -31,6 +31,7 @@ runner='
 import os, pty, select, sys, time
 
 prog, mode, out = sys.argv[1], sys.argv[2], sys.argv[3]
+answers = sys.argv[4] if len(sys.argv) > 4 else None
 master, slave = pty.openpty()
 pid = os.fork()
 if pid == 0:
@@ -39,6 +40,11 @@ if pid == 0:
     os.dup2(slave, 2)
     if mode == "eof":
         fd = os.open(os.devnull, os.O_RDONLY)
+        os.dup2(fd, 0)
+        if fd != 0:
+            os.close(fd)
+    elif mode == "file":
+        fd = os.open(answers, os.O_RDONLY)
         os.dup2(fd, 0)
         if fd != 0:
             os.close(fd)
@@ -99,8 +105,8 @@ if spun:
 print("signal" if os.WIFSIGNALED(status) else os.waitstatus_to_exitcode(status))
 '
 
-run() { # run MODE
-    "$python" -c "$runner" "$bin" "$1" "${dir}/$1.out" ||
+run() { # run MODE [ANSWERS-FILE]
+    "$python" -c "$runner" "$bin" "$1" "${dir}/$1.out" "${2:-}" ||
         fail "$1: the wizard never stopped asking for a project name"
     # Otherwise a reader that lost the output reads as an engine that printed no prompt.
     test -s "${dir}/$1.out" || fail "$1: the pty transcript is empty"
@@ -135,3 +141,23 @@ grep -q "usage:" "${dir}/typed.out" ||
     fail "typed: a blank line asked again without printing the option list"
 
 ok "a blank line still prints the option list and asks again"
+
+# --- too many wizard arguments are refused, not written past argv[256] -------
+# 248 spaces as the wildcards give about 250 arguments. Unfixed, the engine
+# overran its array and then started a crawl, so the answers aim it at a
+# scratch folder.
+
+{
+    printf '%s\n' proj "$dir/" http://127.0.0.1:9/ 1 ""
+    printf '%248s\n' ""
+    printf '\n%s\n' y
+} >"$dir/answers"
+status=$(run file "$dir/answers")
+test "$status" = 255 || fail "file: the engine ended with [$status], want 255"
+grep -q "too many arguments" "${dir}/file.out" ||
+    fail "file: 250 arguments were not refused"
+grep -q "Wizard command line" "${dir}/file.out" ||
+    fail "file: the wizard never reached its command line"
+test -e "$dir/proj" && fail "file: a mirror was started anyway"
+
+ok "a wizard line of too many arguments is refused and nothing starts"
