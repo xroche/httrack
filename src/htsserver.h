@@ -117,6 +117,9 @@ HTS_UNUSED static const char *gethomedir(void);
 HTS_UNUSED static int fexist(const char *s);
 HTS_UNUSED static int linput(FILE * fp, char *s, int max);
 
+/* Time after which the socket reads below give up; 0 means none. */
+HTS_UNUSED static time_t linputsoc_deadline = 0;
+
 HTS_UNUSED static int linputsoc(T_SOC soc, char *s, int max) {
   int c;
   int j = 0;
@@ -124,7 +127,8 @@ HTS_UNUSED static int linputsoc(T_SOC soc, char *s, int max) {
   do {
     unsigned char ch;
 
-    if (recv(soc, &ch, 1, 0) == 1) {
+    if ((linputsoc_deadline == 0 || time(NULL) <= linputsoc_deadline) &&
+        recv(soc, &ch, 1, 0) == 1) {
       c = ch;
     } else {
       c = EOF;

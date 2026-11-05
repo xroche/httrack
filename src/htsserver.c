@@ -1642,6 +1642,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
     while ((soc_c = (T_SOC) accept(soc, NULL, NULL)) == INVALID_SOCKET) {
     }
 
+    /* The reads also share one total deadline, against a slow drip */
+    linputsoc_deadline = time(NULL) + timeout;
     /* A client that stalls mid-line must not wedge the single-threaded server
      */
 #ifdef _WIN32
@@ -3484,7 +3486,8 @@ static int recv_bl(T_SOC soc, void *buffer, size_t len, int timeout) {
     size_t size = len;
     size_t offs = 0;
 
-    while(n > 0 && size > 0) {
+    while (n > 0 && size > 0 &&
+           (linputsoc_deadline == 0 || time(NULL) <= linputsoc_deadline)) {
       n = recv(soc, ((char *) buffer) + offs, (int) size, 0);
       if (n > 0) {
         offs += n;
