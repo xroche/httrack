@@ -855,6 +855,23 @@ static int cookie_hostcap_rows(void) {
       cookie_find_exact(jar.data, "c000", H, "/") == NULL)
     HC_FAIL("a bigger re-set evicted the record it replaces");
 
+  /* A hand-edited jar holding c000 twice, the second one far larger: the
+     record eviction spares is the one the set replaces (the first), so the
+     set is stored, not refused after the jar was compacted. */
+  jar.data[0] = '\0';
+  if (cookie_load_host(&jar, H, 60, "v"))
+    HC_FAIL("setup");
+  {
+    const size_t end = strlen(jar.data);
+
+    snprintf(jar.data + end, sizeof(jar.data) - end,
+             "%s\tFALSE\t/\tFALSE\t0\tc000\t%s\n", H, fat);
+  }
+  cookie_fill_jar(&jar);
+  if (cookie_set_capped(&jar, "c000", mid, H, "/", NULL) != 0 ||
+      cookie_find_exact(jar.data, "c000", H, "/") == NULL)
+    HC_FAIL("a jar with a duplicate record refused the re-set");
+
   /* A growing re-set at 50 records is stored, like a new 51st would be: the
      replaced record counts in its host, so the host evicts its oldest. */
   jar.data[0] = '\0';

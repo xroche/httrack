@@ -221,8 +221,7 @@ static int cookie_set_impl(t_cookie *cookie, const char *cook_name,
   old = cookie_find_exact(cookie->data, cook_name, domain, path);
   used = strlen(cookie->data) -
          (old != NULL ? (size_t) (cookie_nextfield(old) - old) : 0);
-  if (!cookie_fits(cookie->data, cookie->max_len, domain, cook_name, path,
-                   need))
+  if (need > cookie->max_len || used > cookie->max_len - need)
     return -1; // no room to add it
   /* The Netscape fields, then an eighth only this jar reads, because the file
      form marks HttpOnly with a "#HttpOnly_" prefix instead (see cookie_save).
@@ -417,7 +416,7 @@ static hts_boolean cookie_make_room(char *data, size_t max_len,
     goto done;
   pool_end = pool;
   /* Host 0 is the setter's, holding the new record. */
-  strcpy(pool_end, domain);
+  memcpy(pool_end, domain, strlen(domain) + 1);
   hosts[0].dom = pool_end;
   hosts[0].count = 1;
   hosts[0].bytes = rec_len;
@@ -431,7 +430,7 @@ static hts_boolean cookie_make_room(char *data, size_t max_len,
       h = (h + 1) & (mask - 1);
     if (table[h] == 0) {
       hosts[nh].dom = pool_end;
-      strcpy(pool_end, d);
+      memcpy(pool_end, d, strlen(d) + 1);
       pool_end += strlen(d) + 1;
       table[h] = ++nh;
     }
@@ -442,7 +441,8 @@ static hts_boolean cookie_make_room(char *data, size_t max_len,
     recs[i].host = table[h] - 1;
     hosts[recs[i].host].count++;
     hosts[recs[i].host].bytes += recs[i].len;
-    if (recs[i].host == 0 && cookie_is_self(a, domain, cook_name, path)) {
+    if (recs[i].host == 0 && self_len == 0 &&
+        cookie_is_self(a, domain, cook_name, path)) {
       self_len = recs[i].len;
       self_pos = i;
     }
