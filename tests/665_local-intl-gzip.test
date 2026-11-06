@@ -22,10 +22,10 @@ bash "$top_srcdir/tests/local-crawl.sh" --errors 1 \
 bash "$top_srcdir/tests/local-crawl.sh" --errors 1 \
     --not-found 'warcgz/huge.bin' \
     --log-found '"File too big".*warcgz/huge\.bin' \
-    httrack 'BASEURL/warcgz/huge.bin'
+    httrack 'BASEURL/warcgz/huge.bin' -A100000000
 
 # -mN limits non-HTML only, so HTML keeps the 256 MiB default.
 bash "$top_srcdir/tests/local-crawl.sh" --errors 1 \
     --not-found 'warcgz/huge.html' \
     --log-found '"File too big".*warcgz/huge\.html' \
-    httrack 'BASEURL/warcgz/huge.html' -m5000000
+    httrack 'BASEURL/warcgz/huge.html' -m5000000 -A100000000

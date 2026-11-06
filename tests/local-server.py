@@ -988,10 +988,19 @@ class Handler(SimpleHTTPRequestHandler):
     @classmethod
     def warcgz_huge_body(cls):
         if cls._warcgz_huge is None:
-            z = zlib.compressobj(9, zlib.DEFLATED, 31)
+            # a full flush resets the window, so the one block repeats verbatim
             chunk = b"\0" * (1 << 20)
-            parts = [z.compress(chunk) for _ in range(257)]
-            cls._warcgz_huge = b"".join(parts) + z.flush()
+            z = zlib.compressobj(9, zlib.DEFLATED, -15)
+            block = z.compress(chunk) + z.flush(zlib.Z_FULL_FLUSH)
+            crc = 0
+            for _ in range(257):
+                crc = zlib.crc32(chunk, crc)
+            cls._warcgz_huge = (
+                b"\x1f\x8b\x08\0\0\0\0\0\0\xff"
+                + block * 257
+                + zlib.compressobj(9, zlib.DEFLATED, -15).flush()
+                + struct.pack("<II", crc, (257 << 20) & 0xFFFFFFFF)
+            )
         return cls._warcgz_huge
 
     def route_warcgz_huge_bin(self):
