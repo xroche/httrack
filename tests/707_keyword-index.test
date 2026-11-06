@@ -1,0 +1,35 @@
+#!/bin/bash
+#
+# -%I1 indexes UTF-8 accented words, lists each word once per page, and
+# leaves no stale bytes at the end of index.txt.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+require_httrack
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_kwindex.XXXXXX")
+cleanup_push rm -rf "$tmp"
+
+# 1000 distinct words keep qwx (4 hits) under the "too common" threshold, and
+# the (31 hits) over it, which makes the writer rewind past its first attempt.
+{
+    printf '<html><body>uber \xc3\xbcber caf\xc3\xa9 na\xc3\xafve qwx qwx qwx'
+    for i in $(seq 1 1000); do printf ' w%dx' "$i"; done
+    for _ in $(seq 1 30); do printf ' the'; done
+    printf '</body></html>'
+} >"$tmp/index.html"
+
+# qwx once with 4 hits (not three lines), and nothing of the rewound "the" entry
+bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$tmp")" \
+    --file-matches ../index.txt '^uber' \
+    --file-matches ../index.txt '^cafe' \
+    --file-matches ../index.txt '^naive' \
+    --file-not-matches ../index.txt 'aber|cafae|naave' \
+    --file-matches ../index.txt '^.=4' \
+    --file-not-matches ../index.txt '=12|=31' \
+    httrack BASEURL/index.html -q -%I1

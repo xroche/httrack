@@ -40,6 +40,12 @@ Please visit our Website: http://www.httrack.com
 #include "htsio.h"
 
 #if HTS_MAKE_KEYWORD_INDEX
+#ifdef _WIN32
+#include <io.h>
+#define HTS_FTRUNCATE(fp, sz) _chsize_s(_fileno(fp), (sz))
+#else
+#define HTS_FTRUNCATE(fp, sz) ftruncate(fileno(fp), (sz))
+#endif
 #include "htshash.h"
 #include "coucal.h"
 
@@ -55,37 +61,10 @@ Please visit our Website: http://www.httrack.com
 // What characters to accept? - MUST NOT BE EMPTY AND MUST NOT CONTAIN THE SPACE
 // (32) CHARACTER!!!
 #define KEYW_ACCEPT          "abcdefghijklmnopqrstuvwxyz0123456789-_."
-// Convert A to a, and so on.. to avoid case problems in indexing
-// This can be a generic table, containing characters that are in fact not accepted by KEYW_ACCEPT
-// MUST HAVE SAME SIZES!!
-#define KEYW_TRANSCODE_FROM  (\
-                               "ABCDEFGHIJKLMNOPQRSTUVWXYZ" \
-                               "àâä" \
-                               "ÀÂÄ" \
-                               "éèêë" \
-                               "ÈÈÊË" \
-                               "ìîï" \
-                               "ÌÎÏ" \
-                               "òôö" \
-                               "ÒÔÖ" \
-                               "ùûü" \
-                               "ÙÛÜ" \
-                               "ÿ" \
-                             )
-#define KEYW_TRANSCODE_TO    ( \
-                               "abcdefghijklmnopqrstuvwxyz" \
-                               "aaa" \
-                               "aaa" \
-                               "eeee" \
-                               "eeee" \
-                               "iii" \
-                               "iii" \
-                               "ooo" \
-                               "ooo" \
-                               "uuu" \
-                               "uuu" \
-                               "y" \
-                             )
+// Letters U+00C0..U+00FF (UTF-8 C3 80..C3 BF) folded to ASCII, '?' if none
+#define KEYW_LATIN1_FOLD                                                       \
+  "aaaaaa?ceeeeiiii?nooooo?ouuuuy??"                                           \
+  "aaaaaa?ceeeeiiii?nooooo?ouuuuy?y"
 // These (accepted) characters will be ignored at beginning of a keyword
 #define KEYW_IGNORE_BEG       "-_."
 // These (accepted) characters will be stripped if at the end of a keyword
@@ -108,7 +87,6 @@ Please visit our Website: http://www.httrack.com
 
 /* End of Keyword Indexer Parameters */
 
-int strcpos(const char *adr, char c);
 int mystrcmp(const void *_e1, const void *_e2);
 
 // Global variables
@@ -214,12 +192,16 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
       // Okay, parse keywords
       if ((!inscript) && (!incomment) && (!intag)) {
         char cchar = html_data[i];
-        int pos;
         int len = (int) strlen(keyword);
 
         // Replace (ignore case, and so on..)
-        if ((pos = strcpos(KEYW_TRANSCODE_FROM, cchar)) >= 0)
-          cchar = KEYW_TRANSCODE_TO[pos];
+        if (cchar >= 'A' && cchar <= 'Z') {
+          cchar = (char) (cchar + ('a' - 'A'));
+        } else if ((unsigned char) cchar == 0xC3 && i + 1 < size &&
+                   ((unsigned char) html_data[i + 1] & 0xC0) == 0x80) {
+          cchar = KEYW_LATIN1_FOLD[(unsigned char) html_data[i + 1] & 0x3F];
+          i++; /* second byte of the UTF-8 pair */
+        }
 
         if (strchr(KEYW_ACCEPT, cchar)) {
           /* Ignore some characters at beginning */
@@ -251,7 +233,7 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
           /* Store it ? */
           if (len >= KEYW_MIN_LEN) {
             hts_primindex_words++;
-            if (coucal_inc(WordIndexHash, keyword)) {  /* added new */
+            if (coucal_inc(WordIndexHash, keyword) == 1) { /* added new */
               fprintf(tmpfp, "%s\n", keyword);
             }
           }
@@ -368,8 +350,8 @@ void index_finish(const char *indexpath, int mode) {
 
               HTS_STATIC_ASSERT(sizeof(word) == 82, keyw_scan_width_matches);
               int hit;
-              int total_hit = 0;
-              int total_line = 0;
+              LLint total_hit = 0;
+              LLint total_line = 0;
               int last_pos = 0;
               char word0 = '\0';
 
@@ -402,7 +384,7 @@ void index_finish(const char *indexpath, int mode) {
                     if (strcmp(word, current_word)) {   /* New word */
                       if (total_hit) {
                         if (mode == 1)  // TEXT
-                          fprintf(fp, "\t=%d\r\n", total_hit);
+                          fprintf(fp, "\t=%lld\r\n", (long long) total_hit);
                         if ((((total_hit * 1000) / hts_primindex_words) >=
                              KEYW_USELESS1K)
                             || (((total_line * 1000) / index) >=
@@ -411,14 +393,16 @@ void index_finish(const char *indexpath, int mode) {
                           fseek(fp, last_pos, SEEK_SET);
                           if (mode == 1)        // TEXT
                             fprintf(fp, "\tignored (%d)\r\n",
-                                    ((total_hit * 1000) / hts_primindex_words));
+                                    (int) ((total_hit * 1000) /
+                                           hts_primindex_words));
                           else
-                            fprintf(fp, "(ignored) [%d hits]<br>\r\n",
-                                    total_hit);
+                            fprintf(fp, "(ignored) [%lld hits]<br>\r\n",
+                                    (long long) total_hit);
                         } else {
                           if (mode == 1)        // TEXT
                             fprintf(fp, "\t(%d)\r\n",
-                                    ((total_hit * 1000) / hts_primindex_words));
+                                    (int) ((total_hit * 1000) /
+                                           hts_primindex_words));
                         }
                       }
                       if (mode == 1)    // TEXT
@@ -449,6 +433,9 @@ void index_finish(const char *indexpath, int mode) {
               }
               if (mode == 2)    // HTML
                 fprintf(fp, "</td></tr>\r\n</table>\r\n");
+              /* an "ignored" rewind can leave old bytes past the end */
+              if (fflush(fp) == 0 && ftell(fp) >= 0)
+                (void) HTS_FTRUNCATE(fp, ftell(fp));
               fclose(fp);
             }
           }
@@ -469,15 +456,6 @@ void index_finish(const char *indexpath, int mode) {
 /* Subroutines */
 
 #if HTS_MAKE_KEYWORD_INDEX
-int strcpos(const char *adr, char c) {
-  const char *apos = strchr(adr, c);
-
-  if (apos)
-    return (int) (apos - adr);
-  else
-    return -1;
-}
-
 int mystrcmp(const void *_e1, const void *_e2) {
   const char *const*const e1 = (const char *const*) _e1;
   const char *const*const e2 = (const char *const*) _e2;
