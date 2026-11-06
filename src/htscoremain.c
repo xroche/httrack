@@ -50,6 +50,7 @@ Please visit our Website: http://www.httrack.com
 #include "htswrap.h"
 #include "htsmodules.h"
 #include <limits.h>
+#include <float.h>
 #include <stdint.h>
 #include "htszlib.h"
 #include "htscharset.h"
@@ -1797,8 +1798,19 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   readGluedInt(opt->kindex, 2);
                 }
                 break;          // Keyword Index
-              case 'c':
-                sscanf(com + 1, "%f", &opt->maxconn);
+              case 'c': {
+                float v;
+
+                if (sscanf(com + 1, "%f", &v) == 1) {
+                  if (!(v == 0 || (v >= 1e-6f && v <= FLT_MAX))) {
+                    HTS_PANIC_PRINTF("Option connection-per-second needs a "
+                                     "rate of at least 0.000001");
+                    htsmain_free();
+                    return -1;
+                  }
+                  opt->maxconn = v;
+                }
+              }
                 while(isdigit((unsigned char) *(com + 1)) || *(com + 1) == '.')
                   com++;
                 break;
@@ -2414,8 +2426,14 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                     errno = 0;
                     v = strtoll(argv[na], &end, 10);
                     if (isdigit((unsigned char) argv[na][0]) && *end == '\0' &&
-                        errno != ERANGE)
+                        errno != ERANGE) {
                       opt->warc_max_size = v;
+                    } else {
+                      HTS_PANIC_PRINTF(
+                          "Option warc-max-size needs a non-negative number");
+                      htsmain_free();
+                      return -1;
+                    }
                   }
                 } else if (*(com + 1) == 'c') { // --warc-cdx: sorted CDXJ index
                   com++;
