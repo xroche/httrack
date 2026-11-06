@@ -458,12 +458,16 @@ void hts_finish_makeindex(httrackp *opt, int *makeindex_done,
                           const char *template_footer, const char *adr,
                           const char *fil);
 
-/* Re-encode 'size' bytes of UTF-16 as UTF-8, a surrogate outside a pair as
-   U+FFFD. 'swap' selects little-endian input, 'size' must be even. Returns a
+/* Re-encode 'size' bytes of UTF-16 as UTF-8, a surrogate outside a pair or a
+   dangling last byte as U+FFFD. 'swap' selects little-endian input. Returns a
    NUL-terminated buffer to release with freet(), its length (NUL excluded) in
    *outsize, or NULL when the result does not fit memory. */
 char *hts_ucs2_to_utf8(const unsigned char *src, size_t size, hts_boolean swap,
                        size_t *outsize);
+
+/* How many surrogates in 'size' bytes of UTF-16 are not half of a pair? */
+size_t hts_utf16_lone_surrogates(const unsigned char *src, size_t size,
+                                 hts_boolean swap);
 
 // Flush ht_buff[0..ht_len] to save on disk; *fp closed+NULLed on write.
 // Precondition: ht_len>0.

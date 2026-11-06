@@ -1234,15 +1234,32 @@ static int st_ucs2(httrackp *opt, int argc, char **argv) {
                                    "\xE2\x82\xAC"
                                    "\xF0\x9F\x98\x80"
                                    "\xEF\xBF\xBD";
-  /* The ends of the supplementary range, and halves out of order. */
-  static const unsigned short pairs[] = {0xD800, 0xDC00, 0xDBFF, 0xDFFF,
-                                         0xDC00, 0xD800, 'b',    0xDBFF};
+  /* The ends of the supplementary range, planes 2 and 3, and halves out of
+     order, doubled, or followed by a BMP unit. */
+  static const unsigned short pairs[] = {
+      0xD800, 0xDC00, 0xDBFF, 0xDFFF, 0xD840, 0xDC00, 0xD869, 0xDED6,
+      0xD880, 0xDC3F, 0xDC00, 0xD800, 'b',    0xDC00, 0xDC00, 0xD800,
+      0xD800, 0xD800, 0xDBFF, 0xD800, 0xE000, 0xDBFF};
   static const char pairs_utf8[] = "\xF0\x90\x80\x80"
                                    "\xF4\x8F\xBF\xBF"
+                                   "\xF0\xA0\x80\x80"
+                                   "\xF0\xAA\x9B\x96"
+                                   "\xF0\xB0\x80\xBF"
                                    "\xEF\xBF\xBD"
                                    "\xEF\xBF\xBD"
                                    "b"
+                                   "\xEF\xBF\xBD"
+                                   "\xEF\xBF\xBD"
+                                   "\xEF\xBF\xBD"
+                                   "\xEF\xBF\xBD"
+                                   "\xEF\xBF\xBD"
+                                   "\xEF\xBF\xBD"
+                                   "\xEF\xBF\xBD"
+                                   "\xEE\x80\x80"
                                    "\xEF\xBF\xBD";
+  /* A BOM, 'a', then one dangling byte: an odd-length (truncated) body. */
+  static const unsigned char odd[] = {0xFF, 0xFE, 'a', 0, 'b'};
+  static const unsigned char paired[] = {0x3D, 0xD8, 0x00, 0xDE, 'z'};
   static const unsigned short empty[] = {0};
 
   (void) opt;
@@ -1301,6 +1318,25 @@ static int st_ucs2(httrackp *opt, int argc, char **argv) {
       err = 1;
     if (ucs2_check(pairs, sizeof(pairs) / sizeof(pairs[0]), pairs_utf8,
                    HTS_TRUE))
+      err = 1;
+    {
+      size_t n = 0;
+      char *got = hts_ucs2_to_utf8(odd, sizeof(odd), HTS_TRUE, &n);
+
+      if (got == NULL || n != 7 ||
+          memcmp(got,
+                 "\xEF\xBB\xBF"
+                 "a"
+                 "\xEF\xBF\xBD",
+                 7) != 0)
+        err = 1;
+      freet(got);
+    }
+    /* What the crawler converts on: a dangling byte is not a lone half. */
+    if (hts_utf16_lone_surrogates(odd, sizeof(odd), HTS_TRUE) != 0 ||
+        hts_utf16_lone_surrogates(paired, sizeof(paired), HTS_TRUE) != 0 ||
+        hts_utf16_lone_surrogates(paired, 2, HTS_TRUE) != 1 ||
+        hts_utf16_lone_surrogates(paired + 2, 2, HTS_TRUE) != 1)
       err = 1;
     /* Every code unit alone, to pin the encoder against its ranges. */
     {
