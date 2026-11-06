@@ -2232,6 +2232,20 @@ static void keep_alive_param(const char *s, int *value) {
 
 // traiter ligne par ligne l'en tête
 // gestion des cookies
+/* RFC 6265 5.1.4 default-path of request path fil, as a length into fil; 0
+   means "/". A directory too long for the jar backs off to an ancestor. */
+static size_t cookie_default_path_len(const char *fil, size_t size) {
+  size_t len = fil != NULL && fil[0] == '/' ? strcspn(fil, "?") : 0;
+
+  while (len > 0 && fil[len - 1] != '/')
+    len--;
+  if (len > 0)
+    len--; // drop the rightmost "/"
+  while (len > 0 && (len >= size || fil[len] != '/'))
+    len--;
+  return len;
+}
+
 void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * retour,
                char *rcvd) {
   treathead_opt(NULL, cookie, adr, fil, retour, rcvd);
@@ -2480,6 +2494,7 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
     char domain[COOKIE_MAX_DOMAIN]; // .netscape.com
     char scoped[COOKIE_MAX_DOMAIN]; // adr without userinfo, brackets or port
     char path[COOKIE_MAX_PATH];     // /
+    char defpath[COOKIE_MAX_PATH];
     char cook_name[256];        // nom cookie (MYCOOK)
     char BIGSTK cook_value[8192];       // valeur (ID=toto,S=1234)
     const int64_t now = (int64_t) time(NULL);
@@ -2513,7 +2528,16 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
       /* raw, because cookie_set() normalises and doing that twice is not the
          same as doing it once; no adr means empty, which it refuses */
       strcpybuff(domain, adr != NULL ? adr : "");
-      strcpybuff(path, "/");
+      {
+        const size_t dlen = cookie_default_path_len(fil, sizeof(defpath));
+
+        defpath[0] = '\0';
+        if (dlen == 0)
+          strcpybuff(defpath, "/");
+        else
+          strncatbuff(defpath, fil, dlen);
+      }
+      strcpybuff(path, defpath);
       strcpybuff(cook_name, "");
       strcpybuff(cook_value, "");
       // read every pair up to the end of the header
@@ -2568,8 +2592,8 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
                 break;
               }
             } else if (strfield2(name, "path")) {
-              if (value_len == 0) {
-                // ignored, so the path stays "/"
+              if (value_len == 0 || value[0] != '/') {
+                strcpybuff(path, defpath); // RFC 6265 5.2.4
               } else if ((size_t) value_len < sizeof(path) - 1) {
                 strcpybuff(path, value);
               } else {

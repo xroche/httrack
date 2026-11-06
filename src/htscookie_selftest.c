@@ -1343,6 +1343,65 @@ static int st_cookiesetscope(httrackp *opt, int argc, char **argv) {
       err = 1;
     }
   }
+  /* RFC 6265 5.1.4 default-path, and 5.2.4 for a Path= not starting "/" */
+  {
+    static const struct {
+      const char *fil, *attr, *qpath;
+      hts_boolean want;
+    } dp[] = {
+        {"/a/b/c", "", "/a/b/x", HTS_TRUE},
+        {"/a/b/c", "", "/a/b", HTS_TRUE},
+        {"/a/b/c", "", "/a/x", HTS_FALSE},
+        {"/a/b/c", "", "/a/bc", HTS_FALSE},
+        {"/a/b/c", "", "/", HTS_FALSE},
+        {"/a/b/", "", "/a/b/x", HTS_TRUE},
+        {"/a/b/", "", "/a/c", HTS_FALSE},
+        {"/a", "", "/z", HTS_TRUE},
+        {"/", "", "/z", HTS_TRUE},
+        {"", "", "/z", HTS_TRUE},
+        {"a/b/c", "", "/z", HTS_TRUE},
+        {"/a/b?q=/c/d", "", "/a/z", HTS_TRUE},
+        {"/a/b?q=/c/d", "", "/z", HTS_FALSE},
+        {"/a/b", "; Path=foo", "/a/z", HTS_TRUE},
+        {"/a/b", "; Path=foo", "/z", HTS_FALSE},
+        {"/a/b", "; Path=", "/z", HTS_FALSE},
+        {"/a/b", "; Path=/z", "/z/q", HTS_TRUE},
+        {"/a/b", "; Path=/z; Path=foo", "/z/q", HTS_FALSE},
+    };
+
+    char longfil[COOKIE_MAX_PATH + 64];
+    char line[256];
+    htsblk r;
+
+    for (i = 0; i < sizeof(dp) / sizeof(dp[0]); i++) {
+      jar.data[0] = '\0';
+      memset(&r, 0, sizeof(r));
+      snprintf(line, sizeof(line), "Set-Cookie: dp=1%s", dp[i].attr);
+      treathead(&jar, "dp.test", dp[i].fil, &r, line);
+      http_cookie_header(&jar, "dp.test", dp[i].qpath, hdr, sizeof(hdr));
+      if (cookie_sent(hdr, "dp=1") != dp[i].want) {
+        printf("%s: dp=1%s set by %s %s %s\n", LABEL, dp[i].attr, dp[i].fil,
+               dp[i].want ? "does not reach" : "wrongly reaches", dp[i].qpath);
+        err = 1;
+      }
+    }
+    // a directory too long for the jar falls back to its longest ancestor
+    snprintf(longfil, sizeof(longfil), "/p/%0*d/f", COOKIE_MAX_PATH, 0);
+    jar.data[0] = '\0';
+    memset(&r, 0, sizeof(r));
+    strcpybuff(line, "Set-Cookie: dp=1");
+    treathead(&jar, "dp.test", longfil, &r, line);
+    http_cookie_header(&jar, "dp.test", "/p/q", hdr, sizeof(hdr));
+    if (!cookie_sent(hdr, "dp=1")) {
+      printf("%s: a too-long default path lost the cookie\n", LABEL);
+      err = 1;
+    }
+    http_cookie_header(&jar, "dp.test", "/q", hdr, sizeof(hdr));
+    if (cookie_sent(hdr, "dp=1")) {
+      printf("%s: a too-long default path widened to /\n", LABEL);
+      err = 1;
+    }
+  }
   printf("%s: %s\n", LABEL, err ? "FAIL" : "OK");
   return err;
 #undef FUTURE
