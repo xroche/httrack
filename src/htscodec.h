@@ -78,6 +78,9 @@ extern int hts_codec_unpack_max(hts_codec codec, const char *filename,
    lowered to cap if cap > 0. */
 extern LLint hts_codec_budget(LLint in_size, LLint cap);
 
+/* Cap for one decoded body: user_cap (-m) when > 0, else 256 MiB. */
+extern LLint hts_codec_decode_cap(LLint user_cap);
+
 /* Does cap, rather than the built-in limit, set the budget for in_size? */
 extern hts_boolean hts_codec_cap_binds(LLint in_size, LLint cap);
 

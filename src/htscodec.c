@@ -56,6 +56,8 @@ Please visit our Website: http://www.httrack.com
    Deflate cannot pass 1032x, so it only meets this at the 2 GiB ceiling. */
 #define HTS_CODEC_MAX_RATIO 4096
 #define HTS_CODEC_MIN_MAXOUT (1024 * 1024)
+/* Per-body decoded size without -m: past it a bomb is "File too big". */
+#define HTS_CODEC_DEFAULT_CAP ((LLint) 256 * 1024 * 1024)
 
 LLint hts_codec_maxout(LLint in_size) {
   LLint maxout;
@@ -73,6 +75,10 @@ LLint hts_codec_budget(LLint in_size, LLint cap) {
   const LLint maxout = hts_codec_maxout(in_size);
 
   return (cap > 0 && cap < maxout) ? cap : maxout;
+}
+
+LLint hts_codec_decode_cap(LLint user_cap) {
+  return user_cap > 0 ? user_cap : HTS_CODEC_DEFAULT_CAP;
 }
 
 hts_boolean hts_codec_cap_binds(LLint in_size, LLint cap) {

@@ -1004,6 +1004,12 @@ static int st_contentcodings(httrackp *opt, int argc, char **argv) {
   assertf(hts_codec_maxout(1) == 1024 * 1024);
   assertf(hts_codec_maxout(1024) == 4096 * 1024);
   assertf(hts_codec_maxout(1024 * 1024) == INT_MAX);
+  /* without -m one body decodes to 256 MiB; -m moves it either way */
+  assertf(hts_codec_decode_cap(-1) == (LLint) 256 * 1024 * 1024);
+  assertf(hts_codec_decode_cap(0) == (LLint) 256 * 1024 * 1024);
+  assertf(hts_codec_decode_cap(100) == 100);
+  assertf(hts_codec_decode_cap((LLint) 1 << 30) == (LLint) 1 << 30);
+  assertf(hts_codec_cap_binds(1024 * 1024, hts_codec_decode_cap(-1)));
 
   if (argc >= 1) {
     snprintf(inpath, sizeof(inpath), "%s/cc-in", argv[0]);
