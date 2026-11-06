@@ -213,8 +213,10 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
     } else if (strfield(html_data + i, "<!--")) {
       incomment = 1;
     } else if (strfield(html_data + i, "</script")) {
-      if (!incomment)
+      if (!incomment) {
         inscript = 0;
+        intag = 1;
+      }
     } else if (strfield(html_data + i, "-->")) {
       incomment = 0;
     } else if (html_data[i] == '<') {
