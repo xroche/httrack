@@ -1639,13 +1639,36 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 #endif
 
     /* Accept */
-    while((soc_c = (T_SOC) accept(soc, NULL, NULL)) == INVALID_SOCKET) ;
+    while ((soc_c = (T_SOC) accept(soc, NULL, NULL)) == INVALID_SOCKET) {
+    }
+
+    /* A stalled client must not wedge the single-threaded server */
+#ifdef _WIN32
+    {
+      DWORD tv = (DWORD) timeout * 1000;
+
+      (void) setsockopt(soc_c, SOL_SOCKET, SO_RCVTIMEO, (const char *) &tv,
+                        sizeof(tv));
+    }
+#else
+    {
+      struct timeval tv;
+
+      tv.tv_sec = timeout;
+      tv.tv_usec = 0;
+      (void) setsockopt(soc_c, SOL_SOCKET, SO_RCVTIMEO, (const void *) &tv,
+                        sizeof(tv));
+    }
+#endif
 
     /* Ping */
     client_event(SMALLSERVER_CLIENT_REQUEST, NULL);
 
     /* Lock */
     webhttrack_lock();
+
+    /* One total deadline for the whole request, against a slow drip */
+    linputsoc_deadline = time(NULL) + timeout;
 
     if (linputsoc_t(soc_c, line1, sizeof(line1) - 2, timeout) > 0) {
       int meth = 0;
@@ -1712,6 +1735,10 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             meth = 0;
           } else if ((size_t) sz > SMALLSERVER_BODY_MAX) {
             too_large = HTS_TRUE;
+          } else if (length >= 0 && (LLint) sz != length) {
+            meth = 0;
+            denied_status = "400 Bad Request";
+            denied = "Incomplete request body.";
           } else {
             buffer[sz] = '\0';
           }
@@ -2956,7 +2983,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
       shutdown(soc_c, 1);
 #endif
       /* IE may send a CRLF after the POST data, and a refused body is unread */
-      while (recv(soc_c, c, sizeof(c), 0) > 0)
+      while (check_readinput_t(soc_c, timeout) &&
+             recv(soc_c, c, sizeof(c), 0) > 0)
         ;
     }
 
@@ -3463,7 +3491,8 @@ static int recv_bl(T_SOC soc, void *buffer, size_t len, int timeout) {
     size_t size = len;
     size_t offs = 0;
 
-    while(n > 0 && size > 0) {
+    while (n > 0 && size > 0 &&
+           (linputsoc_deadline == 0 || check_readinput_t(soc, timeout))) {
       n = recv(soc, ((char *) buffer) + offs, (int) size, 0);
       if (n > 0) {
         offs += n;
