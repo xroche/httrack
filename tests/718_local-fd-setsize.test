@@ -8,8 +8,14 @@ set -euo pipefail
 
 : "${top_srcdir:=..}"
 
-python=$(find_python) || skip "python3 missing"
 skip_on_windows "windows: a Winsock fd_set has no descriptor ceiling to test"
+
+# The helper's boundary, before any crawl.
+out=$(httrack -O /dev/null '-#test=selectable' 2>&1) ||
+    fail "-#test=selectable failed: $out"
+assert_eq "selectable OK" "$out" "the selectable self-test verdict"
+
+python=$(find_python) || skip "python3 missing"
 
 crawl() { bash "$top_srcdir/tests/local-crawl.sh" "$@"; }
 
