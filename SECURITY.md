@@ -20,7 +20,7 @@ maintained. Confirm against current `master` when you can.
 
 A project folder (`doit.log`, `hts-cache`) and a `./.httrackrc` can carry `-V`,
 which runs a command, and `-%W`, which loads a plugin. Run HTTrack only on
-folders and in directories you trust.
+folders and in directories you trust. Your own `~/.httrackrc` is fine.
 
 ## AI-assisted findings
 
