@@ -769,15 +769,22 @@ static int cookie_load_host(t_cookie *jar, const char *host, int n,
   return 0;
 }
 
-/* Fill the jar with records of host "fill.test" until it refuses a small one.
- */
+/* Fill the jar with hosts of 20 records each (all under their share) until it
+   refuses one, then squeeze in tiny ones so no later record fits the slack. */
 static void cookie_fill_jar(t_cookie *jar) {
   char name[16];
+  char host[32];
   int i;
 
   for (i = 0; i < 100000; i++) {
     snprintf(name, sizeof(name), "f%05d", i);
-    if (cookie_add(jar, name, "v", "fill.test", "/") != 0)
+    snprintf(host, sizeof(host), "fill%d.test", i / 20);
+    if (cookie_add(jar, name, "v", host, "/") != 0)
+      break;
+  }
+  for (i = 0; i < 20; i++) {
+    snprintf(name, sizeof(name), "z%d", i);
+    if (cookie_add(jar, name, "", "z.t", "/") != 0)
       return;
   }
 }
@@ -857,6 +864,17 @@ static int cookie_hostcap_rows(void) {
   if (cookie_set_capped(&jar, "c000", mid, H, "/", NULL) == 0 ||
       cookie_count_host(jar.data, H) != 50)
     HC_FAIL("the replaced record was counted against its host");
+
+  /* A flooding host cannot starve another: A fills the jar, B still stores. */
+  jar.data[0] = '\0';
+  if (cookie_load_host(&jar, H, 400, "v"))
+    HC_FAIL("setup");
+  cookie_fill_jar(&jar);
+  if (cookie_set_capped(&jar, "bnew", "v", G, "/", NULL) != 0 ||
+      cookie_find_exact(jar.data, "bnew", G, "/") == NULL ||
+      cookie_find_exact(jar.data, "c000", H, "/") != NULL ||
+      cookie_find_exact(jar.data, "c001", H, "/") == NULL)
+    HC_FAIL("a host over its share did not make room for another host");
 
   /* The oldest is the first record of the shortest path. */
   jar.data[0] = '\0';

@@ -39,18 +39,18 @@ printf '%s\n' "$secure" >"$dir/s2.txt"
 crawl --found 'gated/index.html' --not-found 'gated/secret.html' \
     httrack 'BASEURL/gated/index.php' -o0 --cookies-file "$dir/s2.txt"
 
-# A Set-Cookie the full jar refuses is logged during a real crawl. Another host
-# holds the room, because a host over its share evicts its own. The filler path
-# is never requested, so its cookies are never sent.
+# A Set-Cookie the full jar refuses is logged during a real crawl. Five other
+# hosts hold the room, each under its share, so none is evicted. The filler
+# path is never requested, so its cookies are never sent.
 big=$(repeat_chars 4000 v)
 : >"$dir/full.txt"
 for i in 1 2 3 4 5 6 7; do
-    printf 'other.test\tTRUE\t/x/\tFALSE\t1999999999\tc%s\t%s\n' "$i" "$big" \
+    printf 'o%s.test\tTRUE\t/x/\tFALSE\t1999999999\tc%s\t%s\n' "$(((i + 1) / 2))" "$i" "$big" \
         >>"$dir/full.txt"
 done
 # filler + name + domain + path + the 256 bytes cookie_set reserves = 30000
-filler=$((30000 - $(size_of "$dir/full.txt") - 2 - 10 - 3 - 256))
-printf 'other.test\tTRUE\t/x/\tFALSE\t1999999999\tf1\t%s\n' \
+filler=$((30000 - $(size_of "$dir/full.txt") - 2 - 8 - 3 - 256))
+printf 'o5.test\tTRUE\t/x/\tFALSE\t1999999999\tf1\t%s\n' \
     "$(repeat_chars "$filler" f)" >>"$dir/full.txt"
 crawl --log-found "did not store 'cat' set by 127\\.0\\.0\\.1" \
     httrack 'BASEURL/cookies/entrance.php' -o0 --cookies-file "$dir/full.txt"

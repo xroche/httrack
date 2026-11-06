@@ -325,41 +325,87 @@ static hts_boolean cookie_fits(char *data, size_t max_len, const char *domain,
   return need <= max_len && used <= max_len - need ? HTS_TRUE : HTS_FALSE;
 }
 
-/* Evict records of a host over its share until a record of `need` bytes fits.
-   The oldest goes first: the jar keeps no age, so that is the first record of
-   the shortest path (records of one path length are stored oldest first). The
-   record being replaced stays. Does the record fit now? */
+/* Tally the records of host other than self: count, bytes, and the oldest.
+   The jar keeps no age, so that is the first record of the shortest path
+   (records of one path length are stored oldest first). */
+static void cookie_host_tally(char *data, const char *host, const char *self,
+                              size_t *count, size_t *bytes, char **oldest) {
+  char buffer[8192];
+  size_t best_len = 0;
+  char *a;
+
+  *count = 0;
+  *bytes = 0;
+  *oldest = NULL;
+  for (a = data; *a != '\0'; a = cookie_nextfield(a)) {
+    size_t plen;
+
+    if (a == self || !cookie_same_domain(cookie_get(buffer, a, 0), host))
+      continue;
+    (*count)++;
+    *bytes += (size_t) (cookie_nextfield(a) - a);
+    plen = strlen(cookie_get(buffer, a, 2));
+    if (*oldest == NULL || plen < best_len) {
+      *oldest = a;
+      best_len = plen;
+    }
+  }
+}
+
+/* Evict the oldest records of the largest host over its share until a record
+   of `need` bytes fits. The setter's host is judged with the new record
+   added, and the record being replaced stays. Does the record fit now? */
 static hts_boolean cookie_make_room(char *data, size_t max_len,
                                     const char *domain, const char *cook_name,
                                     const char *path, size_t need) {
   char buffer[8192];
+  char host[COOKIE_MAX_DOMAIN];
   const size_t rec_len = need - COOKIE_HEADROOM;
 
   while (!cookie_fits(data, max_len, domain, cook_name, path, need)) {
-    const char *const self = cookie_find_exact(data, cook_name, domain, path);
-    size_t count = 0, bytes = 0, best_len = 0;
-    char *victim = NULL;
+    char *self = cookie_find_exact(data, cook_name, domain, path);
+    size_t best_bytes = 0;
+    hts_boolean found = HTS_FALSE;
     char *a;
 
     for (a = data; *a != '\0'; a = cookie_nextfield(a)) {
-      size_t plen;
+      size_t count, bytes;
+      char *oldest;
 
-      if (a == self || !cookie_same_domain(cookie_get(buffer, a, 0), domain))
+      if (a == self)
         continue;
-      count++;
-      bytes += (size_t) (cookie_nextfield(a) - a);
-      plen = strlen(cookie_get(buffer, a, 2));
-      if (victim == NULL || plen < best_len) {
-        victim = a;
-        best_len = plen;
+      cookie_host_tally(data, cookie_get(buffer, a, 0), self, &count, &bytes,
+                        &oldest);
+      if (cookie_same_domain(buffer, domain)) {
+        count++;
+        bytes += rec_len;
+      }
+      if ((count > COOKIE_HOST_MAX_COUNT || bytes > COOKIE_HOST_MAX_BYTES) &&
+          (!found || bytes > best_bytes)) {
+        found = HTS_TRUE;
+        best_bytes = bytes;
+        strlcpybuff(host, buffer, sizeof(host));
       }
     }
-    if (victim == NULL ||
-        (count < COOKIE_HOST_MAX_COUNT && bytes <= COOKIE_HOST_MAX_BYTES &&
-         rec_len <= COOKIE_HOST_MAX_BYTES - bytes))
-      return HTS_FALSE; // under its share, so the jar stays full
-    cookie_delete(victim, max_len - (size_t) (victim - data),
-                  (size_t) (cookie_nextfield(victim) - victim));
+    if (!found)
+      return HTS_FALSE; // no host is over its share, so the jar stays full
+    for (;;) {
+      size_t count, bytes;
+      char *victim;
+
+      self = cookie_find_exact(data, cook_name, domain, path);
+      cookie_host_tally(data, host, self, &count, &bytes, &victim);
+      if (cookie_same_domain(host, domain)) {
+        count++;
+        bytes += rec_len;
+      }
+      if (victim == NULL ||
+          (count <= COOKIE_HOST_MAX_COUNT && bytes <= COOKIE_HOST_MAX_BYTES) ||
+          cookie_fits(data, max_len, domain, cook_name, path, need))
+        break;
+      cookie_delete(victim, max_len - (size_t) (victim - data),
+                    (size_t) (cookie_nextfield(victim) - victim));
+    }
   }
   return HTS_TRUE;
 }
