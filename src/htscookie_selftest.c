@@ -1359,6 +1359,7 @@ static int st_cookiesetscope(httrackp *opt, int argc, char **argv) {
         {"/a/b?q=/c/d", "", "/z", HTS_FALSE},
         {"/a/b", "; Path=foo", "/a/z", HTS_TRUE},
         {"/a/b", "; Path=foo", "/z", HTS_FALSE},
+        {"/a/b", "; Path=", "/z", HTS_FALSE},
         {"/a/b", "; Path=/z", "/z/q", HTS_TRUE},
         {"/a/b", "; Path=/z; Path=foo", "/z/q", HTS_FALSE},
     };
