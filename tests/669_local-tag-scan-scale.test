@@ -7,6 +7,8 @@
 # beside a well-formed twin of its size, and must take about as long, so the
 # test does not depend on the host speed.
 
+# TEST_TIMEOUT_AT_LEAST: 900
+
 set -e
 
 # shellcheck source=tests/crawllib.sh
@@ -84,6 +86,7 @@ crawl_page() { # crawl_page PAGE DIR: leaves the elapsed seconds in $secs
     secs=$((SECONDS - start))
 }
 
+left=4
 for kind in "" -meta -comment -css; do
     printf '[big%s.html parses as fast as its closed twin] ..\t' "$kind"
     crawl_page "ok$kind.html" "ok$kind"
@@ -94,6 +97,8 @@ for kind in "" -meta -comment -css; do
     test "$secs" -le $((twin * 6 + 5)) ||
         fail "big$kind.html took ${secs}s, its twin ${twin}s"
     echo OK
+    left=$((left - 1))
+    pace "$left" $((secs + twin)) "the hostile page pairs still to crawl (meta, comment, css url)"
 done
 
 out="${tmpdir}/crawl"
