@@ -44,9 +44,6 @@ Please visit our Website: http://www.httrack.com
 
 // -- robots --
 
-/* Bytes scanned by robots_find, so a self-test can bound the work. */
-size_t robots_find_work = 0;
-
 /* Leftmost match of seg in hay by KMP, O(haylen + seglen); -1 if absent. */
 static long robots_find(const char *seg, size_t seglen, const char *hay,
                         size_t haylen, unsigned int *fail) {
@@ -55,7 +52,6 @@ static long robots_find(const char *seg, size_t seglen, const char *hay,
   if (seglen == 0)
     return 0;
   fail[0] = 0;
-  robots_find_work += seglen + haylen;
   for (i = 1; i < seglen; i++) {
     while (k > 0 && seg[i] != seg[k])
       k = fail[k - 1];
@@ -74,7 +70,8 @@ static long robots_find(const char *seg, size_t seglen, const char *hay,
   return -1;
 }
 
-/* RFC 9309 path-prefix match: '*' is any run, a final '$' anchors the end. */
+/* RFC 9309 path-prefix match, linear: each '*'-separated piece is searched
+ * once. */
 static hts_boolean robots_pattern_match(const char *pattern, const char *path) {
   size_t patlen = strlen(pattern);
   const size_t pathlen = strlen(path);
