@@ -1240,6 +1240,13 @@ static int st_cookiesetscope(httrackp *opt, int argc, char **argv) {
        "sid=GOOD", HTS_TRUE},
       {"http://sec.test", "Set-Cookie: sid=EVIL", "https://sec.test",
        "sid=GOOD", HTS_TRUE},
+      {"http://sec.test", "Set-Cookie: sid=EVIL", "https://sec.test",
+       "sid=EVIL", HTS_FALSE},
+      // a parent Domain= would sit beside the Secure host cookie
+      {"https://www.dom.test", "Set-Cookie: sid=GOOD; Secure",
+       "https://www.dom.test", "sid=GOOD", HTS_TRUE},
+      {"http://a.dom.test", "Set-Cookie: sid=EVIL; Domain=dom.test",
+       "https://www.dom.test", "sid=EVIL", HTS_FALSE},
       {"http://sec.test", "Set-Cookie: sid=; Max-Age=0", "https://sec.test",
        "sid=GOOD", HTS_TRUE},
       {"http://sec.test", "Set-Cookie: sn=1; Secure", "https://sec.test",
@@ -1310,6 +1317,29 @@ static int st_cookiesetscope(httrackp *opt, int argc, char **argv) {
       printf("%s: cookie path %s %s %s\n", LABEL, paths[i].cpath,
              paths[i].want ? "does not reach" : "wrongly reaches",
              paths[i].qpath);
+      err = 1;
+    }
+  }
+  /* an http cookie on a deeper path would be sent before the Secure one */
+  {
+    static const char *const hdrs[] = {
+        "Set-Cookie: sid=GOOD; Path=/; Secure",
+        "Set-Cookie: sid=EVIL; Path=/app",
+    };
+    const char *const origin[] = {"https://deep.test", "http://deep.test"};
+    htsblk r;
+    char line[256];
+
+    jar.data[0] = '\0';
+    memset(&r, 0, sizeof(r));
+    for (i = 0; i < 2; i++) {
+      strcpybuff(line, hdrs[i]);
+      treathead(&jar, origin[i], "/", &r, line);
+    }
+    http_cookie_header(&jar, "https://deep.test", "/app/x", hdr, sizeof(hdr));
+    if (cookie_sent(hdr, "sid=EVIL") || !cookie_sent(hdr, "sid=GOOD")) {
+      printf("%s: plain http shadowed a Secure cookie on a deeper path: %s\n",
+             LABEL, hdr);
       err = 1;
     }
   }

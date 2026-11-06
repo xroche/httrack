@@ -294,19 +294,43 @@ char *cookie_find_exact(char *s, const char *cook_name, const char *domain,
   return NULL;
 }
 
+/* RFC 6265 5.1.4: does chk_path cover path on a "/" boundary? The query is
+   not part of the path. */
+static hts_boolean cookie_path_covers(const char *chk_path, const char *path) {
+  const size_t chk_len = strlen(chk_path);
+
+  return chk_len <= strlen(path) && strncmp(path, chk_path, chk_len) == 0 &&
+                 (chk_len == 0 || chk_path[chk_len - 1] == '/' ||
+                  path[chk_len] == '\0' || path[chk_len] == '/' ||
+                  path[chk_len] == '?')
+             ? HTS_TRUE
+             : HTS_FALSE;
+}
+
 /* See htsbauth.h. */
 hts_boolean cookie_is_secure_record(t_cookie *cookie, const char *cook_name,
                                     const char *domain, const char *path) {
   char buffer[8192];
   char host[COOKIE_MAX_DOMAIN];
-  const char *rec;
+  const char *new_dom;
+  char *rec;
 
   if (!cookie_host(domain, host, sizeof(host)))
     return HTS_FALSE;
-  rec = cookie_find_exact(cookie->data, cook_name, host, path);
-  return rec != NULL && strcmpnocase(cookie_get(buffer, rec, 3), "TRUE") == 0
-             ? HTS_TRUE
-             : HTS_FALSE;
+  new_dom = host[0] == '.' ? host + 1 : host;
+  for (rec = cookie->data; *rec != '\0'; rec = cookie_nextfield((char *) rec)) {
+    const char *const rec_dom = cookie_get(buffer, rec, 0);
+    char other[8192];
+
+    if (strcmp(cookie_get(other, rec, 5), cook_name) != 0 ||
+        strcmpnocase(cookie_get(other, rec, 3), "TRUE") != 0)
+      continue;
+    if ((cookie_domain_match(rec_dom, new_dom) ||
+         cookie_domain_match(new_dom, rec_dom)) &&
+        cookie_path_covers(cookie_get(other, rec, 2), path))
+      return HTS_TRUE;
+  }
+  return HTS_FALSE;
 }
 
 /* See htsbauth.h. */
@@ -501,16 +525,8 @@ char *cookie_find(char *s, const char *cook_name, const char *domain, const char
         //
         const char *chk_path = cookie_get(buffer, a, 2);    // chemin concerné par le cookie
 
-        const size_t chk_len = strlen(chk_path);
-
-        /* RFC 6265 5.1.4: a prefix ending on a "/" boundary, so "/foo" does
-           not reach "/foobar". The query is not part of the path. */
-        if (chk_len <= strlen(path) && strncmp(path, chk_path, chk_len) == 0 &&
-            (chk_len == 0 || chk_path[chk_len - 1] == '/' ||
-             path[chk_len] == '\0' || path[chk_len] == '/' ||
-             path[chk_len] == '?')) {
+        if (cookie_path_covers(chk_path, path))
           return a;
-        }
       }
     }
     a = cookie_nextfield(a);

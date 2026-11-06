@@ -122,8 +122,9 @@ int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
 int cookie_add(t_cookie *cookie, const char *cook_name, const char *cook_value,
                const char *domain, const char *path);
 
-/** Does the jar hold a Secure record of cook_name for exactly this domain and
-    path, with domain normalised by cookie_host? */
+/** Does the jar hold a Secure record of cook_name that a cookie for this
+    domain and path would shadow (RFC 6265bis 5.6)? Either domain may be the
+    parent, and the record's path must cover path on a "/" boundary. */
 hts_boolean cookie_is_secure_record(t_cookie *cookie, const char *cook_name,
                                     const char *domain, const char *path);
 
