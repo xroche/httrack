@@ -653,15 +653,16 @@ HTS_INLINE int rech_tageq_all(const char *adr, const char *s) {
   if (adr == NULL) {
     return 0;
   }
-  for(p = 0; adr[p] != 0; p++) {
+  /* Bounded, so a tag with no '>' is not rescanned to the page end per tag. */
+  for (p = 0; p < 1000 && adr[p] != 0; p++) {
     if (quot == 0) {
       if (adr[p] == '"' || adr[p] == '\'') {
         quot = adr[p];
       } else if (adr[p] == '=' || is_realspace(adr[p])) {
         token = NULL;
-      } else if (adr[p] == '>' || (adr[p] == '<' && p > 0)) {
-        break; /* '<' too: no rescan of the page per tag */
-      } else { /* note: bogus for bogus foo = bar */
+      } else if (adr[p] == '>') {
+        break;
+      } else {                  /* note: bogus for bogus foo = bar */
         if (token == NULL) {
           if (strncasecmp(&adr[p], s, s_len) == 0
               && (is_realspace(adr[p + s_len]) || adr[p + s_len] == '=')

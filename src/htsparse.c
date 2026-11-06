@@ -712,6 +712,7 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
     int ndelim = 1;    // length of the opening delimiter
     int close_len = 1; // length of the closing delimiter
     int valid_url = 0;
+    hts_boolean cut = HTS_FALSE; // the scan hit its bound
     // a style attribute may quote url() with an entity: url(&quot;a.png&quot;)
     const char entity_quote =
         in_tag && can_avoid_quotes ? html_entity_quote(a, &ndelim) : '\0';
@@ -735,17 +736,28 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
         b++;
     } else {
       close_len = 0;
-      // A link past 2 * HTS_URLMAXSIZE is refused anyway; bound the scan.
+      // Bounded scan. A link this long is refused later, unless a '#', a
+      // backslash or a '>' cuts it short, and then the short link stays.
       while ((*b != quotes_replacement) && (*b != '\0')) {
-        if (b - a >= HTS_URLMAXSIZE * 2)
-          return HTS_FALSE;
+        if (b - a >= HTS_URLMAXSIZE * 2) {
+          for (b = a; b - a < HTS_URLMAXSIZE * 2; b++) {
+            if (*b == '#' || *b == '\\' || *b == '>')
+              break;
+          }
+          if (b - a >= HTS_URLMAXSIZE * 2)
+            return HTS_FALSE;
+          cut = HTS_TRUE;
+          break;
+        }
         b++;
       }
     }
     c = b--;
     // no closing delimiter here (truncated input):
     // Don't scan past the buffer NUL or capture it.
-    if (*c != '\0') {
+    if (cut) {
+      valid_url = 1;
+    } else if (*c != '\0') {
       c += close_len;
       while (*c == ' ')
         c++;

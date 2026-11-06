@@ -12,6 +12,9 @@ set -e
 # shellcheck source=tests/crawllib.sh
 . "${0%"${0##*/}"}./crawllib.sh"
 
+# A quadratic page outlives this on a sanitizer build, a linear one needs ~15s.
+CRAWL_DEADLINE=90
+
 python=$(find_python) || skip "python3 not found"
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_tagscan.XXXXXX") || exit 1
@@ -41,9 +44,9 @@ put("index.html",
     b'<a href="robots-999.html">q</a>\n')
 put("big.html",
     b"<applet " + b"code=a " * 30000 + b"<meta " + b"name=a " * 30000)
-put("big-meta.html", b"<meta http-equiv=a " * 30000)
-put("big-comment.html", b"<!--[if IE]>" * 30000)
-put("big-css.html", b"<style>@import url(" * 30000)
+put("big-meta.html", b"<meta a=b " * 60000)
+put("big-comment.html", b"<!--[if IE]>" * 165000)
+put("big-css.html", b"<style>@import url(" * 135000)
 
 
 def at(head, offset):  # pad head so that '>' lands at offset
