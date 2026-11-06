@@ -39,9 +39,9 @@ printf '%s\n' "$secure" >"$dir/s2.txt"
 crawl --found 'gated/index.html' --not-found 'gated/secret.html' \
     httrack 'BASEURL/gated/index.php' -o0 --cookies-file "$dir/s2.txt"
 
-# (Another host fills it: a host over its share evicts its own.)
-# A Set-Cookie the full jar refuses is logged during a real crawl. The filler
-# path is never requested, so its cookies are never sent.
+# A Set-Cookie the full jar refuses is logged during a real crawl. Another host
+# holds the room, because a host over its share evicts its own. The filler path
+# is never requested, so its cookies are never sent.
 big=$(repeat_chars 4000 v)
 : >"$dir/full.txt"
 for i in 1 2 3 4 5 6 7; do
