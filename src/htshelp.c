@@ -635,6 +635,8 @@ void help(const char *app, int more) {
     (" @iN internet protocol (0=both ipv6+ipv4, 4=ipv4 only, 6=ipv6 only)");
   infomsg(" @mN carry connections over Multipath TCP where the system offers"
           " it (0=no, 1=yes)");
+  infomsg(" @cN verify https certificates and host names against the system "
+          "CA store (0=no, 1=yes)");
   infomsg(" %w  disable a specific external mime module (-%w httrack-plugin)");
   infomsg("");
   infomsg("Browser ID:");

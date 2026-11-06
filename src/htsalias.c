@@ -165,6 +165,8 @@ const char *hts_optalias[][4] = {
    "longest Retry-After delay obeyed, in seconds"},
   {"mptcp", "-@m", "onoff",
    "carry connections over Multipath TCP where the system offers it"},
+  {"check-cert", "-@c", "onoff",
+   "verify https certificates and host names against the system CA store"},
   {"bundle-dir", "--bundle-dir", "param1",
    "folder where #httrack-bundle= names are read, not the project folder"},
   {"generate-errors", "-o", "level", ""},

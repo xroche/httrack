@@ -663,6 +663,8 @@ struct httrackp {
                          ABI */
   void *bundle_state; /**< hts_bundle_state*, or NULL. Live state, so
                            copy_htsopt must leave it alone. Tail: ABI */
+  hts_tristate check_cert; /**< verify https certificates (--check-cert).
+                                HTS_DEFAULT: off. Tail: ABI */
 };
 
 /** Running statistics for a mirror. */

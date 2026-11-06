@@ -108,8 +108,9 @@ offline browser : copy websites to a local directory</p>
 --tolerant[=0]</b> ] [ <b>-%s, --updatehack[=0]</b> ] [
 <b>-%u, --urlhack[=0]</b> ] [ <b>-%A, --assume</b> ] [
 <b>-@iN, --protocol[=N]</b> ] [ <b>-@mN, --mptcp[=0]</b> ] [
-<b>-%w, --disable-module</b> ] [ <b>-F, --user-agent</b> ] [
-<b>-%R, --referer</b> ] [ <b>-%E, --from</b> ] [ <b>-%F,
+<b>-@cN, --check-cert[=0]</b> ] [ <b>-%w,
+--disable-module</b> ] [ <b>-F, --user-agent</b> ] [ <b>-%R,
+--referer</b> ] [ <b>-%E, --from</b> ] [ <b>-%F,
 --footer</b> ] [ <b>-%l, --language</b> ] [ <b>-%a,
 --accept</b> ] [ <b>-%X, --headers</b> ] [ <b>-%Q,
 --browser-headers[=0]</b> ] [ <b>-C, --cache[=N]</b> ] [
@@ -1075,6 +1076,18 @@ ipv6+ipv4, 4=ipv4 only, 6=ipv6 only) (--protocol[=N])</p></td></tr>
 
 <p>carry connections over Multipath TCP where the system
 offers it (0=no, 1=yes) (--mptcp[=0])</p></td></tr>
+<tr valign="top" align="left">
+<td width="9%"></td>
+<td width="5%">
+
+
+<p>-@cN</p></td>
+<td width="4%"></td>
+<td width="82%">
+
+
+<p>verify https certificates and host names against the
+system CA store (0=no, 1=yes) (--check-cert[=0])</p></td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="5%">
