@@ -183,7 +183,7 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
     if (!cookie_line_is_whole(many_hdr, n))
       err = 1;
     for (i = 0; i < n; i++) {
-      char pair[24];
+      char pair[32];
 
       snprintf(pair, sizeof(pair), "c%02d=v%02d", i, i);
       if (strstr(many_hdr, pair) == NULL)
