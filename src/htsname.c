@@ -1727,6 +1727,8 @@ int url_savename(lien_adrfilsave *const afs,
 
   /* Strip ending . or ' ' forbidden on windoz */
   cleanEndingSpaceOrDot(afs->save);
+  /* A blanked ".." component leaves a new '//' behind. */
+  cleanDoubleSlash(afs->save);
 
 #endif
 
