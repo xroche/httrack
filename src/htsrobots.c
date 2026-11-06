@@ -44,47 +44,87 @@ Please visit our Website: http://www.httrack.com
 
 // -- robots --
 
-/* RFC 9309 path-prefix match; '*' any run, '$' anchors end; linear. */
+/* Leftmost match of seg in hay by KMP, O(haylen + seglen); -1 if absent. */
+static long robots_find(const char *seg, size_t seglen, const char *hay,
+                        size_t haylen, unsigned int *fail) {
+  size_t i, k = 0;
+
+  if (seglen == 0)
+    return 0;
+  fail[0] = 0;
+  for (i = 1; i < seglen; i++) {
+    while (k > 0 && seg[i] != seg[k])
+      k = fail[k - 1];
+    if (seg[i] == seg[k])
+      k++;
+    fail[i] = (unsigned int) k;
+  }
+  for (i = 0, k = 0; i < haylen; i++) {
+    while (k > 0 && hay[i] != seg[k])
+      k = fail[k - 1];
+    if (hay[i] == seg[k])
+      k++;
+    if (k == seglen)
+      return (long) (i + 1 - seglen);
+  }
+  return -1;
+}
+
+/* RFC 9309 path-prefix match, linear: each '*'-separated piece is searched
+ * once. */
 static hts_boolean robots_pattern_match(const char *pattern, const char *path) {
   size_t patlen = strlen(pattern);
+  const size_t pathlen = strlen(path);
   hts_boolean anchored = HTS_FALSE;
-  const char *p, *pend, *s;
-  const char *star = NULL, *star_s = NULL;
+  const char *p, *pend, *star;
+  size_t pos;
+  unsigned int fail[HTS_ROBOTS_LINE_SIZE + 2];
 
   if (patlen > 0 && pattern[patlen - 1] == '$') {
     anchored = HTS_TRUE;
     patlen--;
   }
+  if (patlen > HTS_ROBOTS_LINE_SIZE + 1)
+    return HTS_FALSE; // cannot come from a stored rule
   p = pattern;
   pend = pattern + patlen;
-  s = path;
-  while (*s != '\0') {
-    if (p == pend) {
-      if (!anchored)
-        return HTS_TRUE;  // prefix matched
-      if (star != NULL) { // anchored: '*' must eat the rest
-        p = star + 1;
-        s = ++star_s;
-        continue;
-      }
+  star = memchr(p, '*', patlen);
+
+  /* First piece is a literal prefix of the path. */
+  {
+    const size_t seglen = (star != NULL) ? (size_t) (star - p) : patlen;
+
+    if (seglen > pathlen || memcmp(p, path, seglen) != 0)
       return HTS_FALSE;
-    }
-    if (*p == '*') {
-      star = p++;
-      star_s = s;
-    } else if (*p == *s) {
-      p++;
-      s++;
-    } else if (star != NULL) {
-      p = star + 1;
-      s = ++star_s;
-    } else {
-      return HTS_FALSE;
-    }
+    if (star == NULL)
+      return (!anchored || seglen == pathlen) ? HTS_TRUE : HTS_FALSE;
+    pos = seglen;
+    p = star + 1;
   }
-  while (p < pend && *p == '*')
-    p++;
-  return (p == pend) ? HTS_TRUE : HTS_FALSE;
+  /* Then each piece after a '*' (the last one is a suffix when anchored). */
+  while (p < pend) {
+    const char *next = memchr(p, '*', (size_t) (pend - p));
+    const size_t seglen =
+        (next != NULL) ? (size_t) (next - p) : (size_t) (pend - p);
+
+    if (next == NULL && anchored) {
+      return (seglen <= pathlen - pos &&
+              memcmp(p, path + pathlen - seglen, seglen) == 0)
+                 ? HTS_TRUE
+                 : HTS_FALSE;
+    }
+    if (seglen > 0) {
+      const long at = robots_find(p, seglen, path + pos, pathlen - pos, fail);
+
+      if (at < 0)
+        return HTS_FALSE;
+      pos += (size_t) at + seglen;
+    }
+    if (next == NULL)
+      break;
+    p = next + 1;
+  }
+  return HTS_TRUE;
 }
 
 /* fil="": is a rule set already recorded for this host? */

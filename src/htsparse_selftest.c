@@ -1323,6 +1323,73 @@ static int st_robots(httrackp *opt, int argc, char **argv) {
     assertf(rb_decide(&robots, txt, "/a/b") == 0);
   }
 
+  /* Several '*' pieces match left to right, and '$' pins the last piece. */
+  {
+    const char *txt = "User-agent: *\nDisallow: /a*b*c$\nDisallow: /x*y*\n";
+
+    assertf(rb_decide(&robots, txt, "/a1b2c") == -1);
+    assertf(rb_decide(&robots, txt, "/abc") == -1);
+    assertf(rb_decide(&robots, txt, "/a1b2c3") == 0);
+    assertf(rb_decide(&robots, txt, "/acb") == 0);
+    assertf(rb_decide(&robots, txt, "/xyy") == -1);
+    assertf(rb_decide(&robots, txt, "/yx") == 0);
+  }
+
+  /* Pieces must not overlap, '$' pins the end, '**' is one '*', and a '$' that
+     is not last is a plain character. */
+  {
+    const char *t1 = "User-agent: *\nDisallow: /a*ab$\n";
+    const char *t2 = "User-agent: *\nDisallow: /a*b$\n";
+    const char *t3 = "User-agent: *\nDisallow: /a*b*c$\n";
+    const char *t4 = "User-agent: *\nDisallow: /a**b\n";
+    const char *t5 = "User-agent: *\nDisallow: /a$b\n";
+
+    assertf(rb_decide(&robots, t1, "/ab") == 0);
+    assertf(rb_decide(&robots, t1, "/aab") == -1);
+    assertf(rb_decide(&robots, t2, "/abb") == -1);
+    assertf(rb_decide(&robots, t3, "/abcbc") == -1);
+    assertf(rb_decide(&robots, t4, "/axb") == -1);
+    assertf(rb_decide(&robots, t4, "/ab") == -1);
+    assertf(rb_decide(&robots, t4, "/a") == 0);
+    assertf(rb_decide(&robots, t5, "/a$b") == -1);
+    assertf(rb_decide(&robots, t5, "/a") == 0);
+  }
+
+  /* Hostile backtracking rules still decide. The longest
+     matching rule wins, so a hostile rule is what answers each path. */
+  {
+    const size_t capa = 450000;
+    char *txt = (char *) malloct(capa);
+    char path[1024], path2[1024];
+    size_t n;
+    int i;
+
+    assertf(txt != NULL);
+    n = (size_t) snprintf(txt, capa, "User-agent: *\nDisallow: /\n");
+    for (i = 0; i < 800; i++) {
+      n += (size_t) snprintf(txt + n, capa - n, "Disallow: /*");
+      memset(txt + n, 'a', 500);
+      n += 500;
+      n += (size_t) snprintf(txt + n, capa - n, "%03db\n", i);
+    }
+    /* Longer than every rule above, so it wins only if it matches. */
+    n += (size_t) snprintf(txt + n, capa - n, "Allow: /*");
+    memset(txt + n, 'a', 600);
+    n += 600;
+    (void) snprintf(txt + n, capa - n, "c\n");
+    path[0] = '/';
+    memset(path + 1, 'a', 900);
+    path[901] = '\0';
+    memcpy(path2, path, 902);
+    path2[901] = 'c';
+    path2[902] = '\0';
+    for (i = 0; i < 20; i++) {
+      assertf(rb_decide(&robots, txt, path) == -1); /* only Disallow: / */
+      assertf(rb_decide(&robots, txt, path2) == 0); /* Allow wins */
+    }
+    freet(txt);
+  }
+
   /* The httrack-specific group replaces the generic '*' group entirely. */
   {
     const char *txt = "User-agent: *\nDisallow: /everyone\n"
