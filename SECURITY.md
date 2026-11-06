@@ -16,6 +16,12 @@ release before disclosing publicly.
 Fixes land on `master` and ship in the next release; older releases aren't
 maintained. Confirm against current `master` when you can.
 
+## Trust the folder
+
+A project folder (`doit.log`, `hts-cache`) and a `./.httrackrc` can carry `-V`,
+which runs a command, and `-%W`, which loads a plugin. Run HTTrack only on
+folders and in directories you trust.
+
 ## AI-assisted findings
 
 Scanners and LLMs are fine, but only send reports you have verified yourself. A

@@ -651,17 +651,21 @@ void help(const char *app, int more) {
   infomsg(" %a  accepted formats (-%a \"text/html,image/png;q=0.9,*/*;q=0.1\""
           "; repeat as -%a \"KIND=formats\" for one kind of link: document"
           " iframe frame image style script font audio video object embed");
-  infomsg(" %X  additional HTTP header line (-%X \"X-Magic: 42\"; an Accept"
-          " line replaces every computed Accept, per-kind values included;"
-          " Content-Length, Transfer-Encoding, Connection, Keep-Alive, TE,"
-          " Upgrade and Expect are dropped");
+  infomsg(
+      " %X  additional HTTP header line (-%X \"X-Magic: 42\"; an Accept"
+      " line replaces every computed Accept, per-kind values included;"
+      " Content-Length, Transfer-Encoding, Connection, Keep-Alive, TE,"
+      " Upgrade and Expect are dropped; the line goes to every host the crawl"
+      " touches, other sites and redirect targets included, so put no secret"
+      " in it for a multi-host crawl");
   infomsg(" %Q  send the headers a browser -F implies: its Accept values,"
           " header order and Sec-Fetch-*, and client hints over HTTPS (%Q0"
           " don't)");
   infomsg("");
   infomsg("Log, index, cache");
-  infomsg("  C  create/use a cache for updates and retries (C0 no cache,* C1 "
-          "cache is prioritary,C2 test update before)");
+  infomsg("  C  create/use a cache for updates and retries (C0 no cache,C1 "
+          "cache is prioritary,C2 test update before; the default is C1, or C2 "
+          "when a finished mirror is in the folder)");
   infomsg("  k  store all files in cache (not useful if files on disk)");
   infomsg(" %r  write an ISO-28500 WARC/1.1 archive; --warc-file NAME sets the "
           "output name, --warc-max-size N rotates segments past N bytes, "
