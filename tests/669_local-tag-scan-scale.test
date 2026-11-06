@@ -2,13 +2,20 @@
 #
 # An <applet> or robots <meta> tag with no '>' and many code= or name=
 # attributes was rescanned to the end of the page once per attribute
-# (OSS-Fuzz 578272899). If the scan is quadratic, the big page trips the crawl
-# watchdog on a sanitizer build, which a release build is too fast to do.
+# (OSS-Fuzz 578272899). So were an http-equiv <meta> with no '>', a '>' in a
+# comment with no "-->" and an unclosed CSS url(. Each hostile page is crawled
+# beside a well-formed twin of its size, and must take about as long, so the
+# test does not depend on the host speed.
+
+# TEST_TIMEOUT_AT_LEAST: 900
 
 set -e
 
 # shellcheck source=tests/crawllib.sh
 . "${0%"${0##*/}"}./crawllib.sh"
+
+# Only a quadratic page on a sanitizer build gets near this.
+CRAWL_DEADLINE=300
 
 python=$(find_python) || skip "python3 not found"
 
@@ -31,12 +38,20 @@ def put(name, body):
 
 
 put("index.html",
-    b'<a href="big.html">b</a><a href="swap-999.html">s</a>'
+    b'<a href="swap-999.html">s</a>'
     b'<a href="swap-1000.html">t</a><a href="swap-far.html">f</a>'
     b'<a href="robots-998.html">r</a>'
     b'<a href="robots-999.html">q</a>\n')
 put("big.html",
     b"<applet " + b"code=a " * 30000 + b"<meta " + b"name=a " * 30000)
+put("big-meta.html", b"<meta a=b " * 60000)
+put("big-comment.html", b"<!--[if IE]>" * 165000)
+put("big-css.html", b"<style>@import url(" * 135000)
+# Twins with every tag closed.
+put("ok.html", b"<applet code=a>" * 30000 + b"<meta name=a>" * 30000)
+put("ok-meta.html", b"<meta a=b >" * 60000)
+put("ok-comment.html", b"<!--[if IE]-->" * 165000)
+put("ok-css.html", b"<style>@import url(x) " * 135000)
 
 
 def at(head, offset):  # pad head so that '>' lands at offset
@@ -62,6 +77,30 @@ PY
 local_server_start --root "$doc"
 require_httrack
 
+crawl_page() { # crawl_page PAGE DIR: leaves the elapsed seconds in $secs
+    local start=$SECONDS rc=0
+    mkdir "${tmpdir}/$2"
+    local_crawl --log "${tmpdir}/log" -O "${tmpdir}/$2" --quiet --timeout=30 \
+        --retries=0 "${BASEURL}/$1" || rc=$?
+    test "$rc" -eq 0 || fail "crawl of $1 exited $rc: $(cat "${tmpdir}/log")"
+    secs=$((SECONDS - start))
+}
+
+left=4
+for kind in "" -meta -comment -css; do
+    printf '[big%s.html parses as fast as its closed twin] ..\t' "$kind"
+    crawl_page "ok$kind.html" "ok$kind"
+    twin=$secs
+    crawl_page "big$kind.html" "big$kind"
+    test -f "${tmpdir}/big$kind/127.0.0.1_${SRV_PORT}/big$kind.html" ||
+        fail "big$kind.html not mirrored"
+    test "$secs" -le $((twin * 6 + 5)) ||
+        fail "big$kind.html took ${secs}s, its twin ${twin}s"
+    echo OK
+    left=$((left - 1))
+    pace "$left" $((secs + twin)) "the hostile page pairs still to crawl (meta, comment, css url)"
+done
+
 out="${tmpdir}/crawl"
 mkdir "$out"
 rc=0
@@ -70,10 +109,6 @@ local_crawl --log "${tmpdir}/log" -O "$out" --quiet --timeout=30 \
 test "$rc" -eq 0 || fail "crawl exited $rc: $(cat "${tmpdir}/log")"
 
 host="${out}/127.0.0.1_${SRV_PORT}"
-
-printf '[unclosed tags parsed before the watchdog] ..\t'
-test -f "${host}/big.html" || fail "big.html not mirrored"
-echo OK
 
 swapped() { # swapped PAGE
     case "$(cat "${host}/$1")" in

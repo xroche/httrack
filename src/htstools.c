@@ -653,7 +653,8 @@ HTS_INLINE int rech_tageq_all(const char *adr, const char *s) {
   if (adr == NULL) {
     return 0;
   }
-  for(p = 0; adr[p] != 0; p++) {
+  /* Bounded, so a tag with no '>' is not rescanned to the page end per tag. */
+  for (p = 0; p < 4096 && adr[p] != 0; p++) {
     if (quot == 0) {
       if (adr[p] == '"' || adr[p] == '\'') {
         quot = adr[p];
