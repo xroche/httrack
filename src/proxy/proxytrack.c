@@ -109,6 +109,7 @@ Remark: If no cache newer than the added one is found, all entries can be added 
 #include "htsbase.h"
 #include "htsnet.h"
 #include "htslib.h"
+#include "htsthread.h"
 #include "htsglobal.h"
 #include <limits.h>
 #include <stdio.h>
@@ -153,14 +154,47 @@ Remark: If no cache newer than the added one is found, all entries can be added 
 
 /* Static definitions */
 
-static int linputsoc(T_SOC soc, char *s, int max) {
+static void close_client(T_SOC soc) {
+#ifdef _WIN32
+  closesocket(soc);
+#else
+  close(soc);
+#endif
+}
+
+/* Bound the next recv() on a client by `seconds`. */
+static void set_recv_timeout(T_SOC soc, int seconds) {
+#ifdef _WIN32
+  DWORD tv = (DWORD) seconds * 1000;
+#else
+  struct timeval tv;
+
+  tv.tv_sec = seconds;
+  tv.tv_usec = 0;
+#endif
+  (void) setsockopt(soc, SOL_SOCKET, SO_RCVTIMEO, (const char *) &tv,
+                    sizeof(tv));
+}
+
+/* recv() that gives up at `deadline`, so a client trickling bytes cannot hold
+   the thread past it. */
+static int recv_until(T_SOC soc, char *buf, int len, time_t deadline) {
+  const time_t left = deadline - time(NULL);
+
+  if (left <= 0)
+    return -1;
+  set_recv_timeout(soc, (int) left);
+  return (int) recv(soc, buf, len, 0);
+}
+
+static int linputsoc(T_SOC soc, char *s, int max, time_t deadline) {
   int c;
   int j = 0;
 
   do {
     unsigned char ch;
 
-    if (recv(soc, &ch, 1, 0) == 1) {
+    if (recv_until(soc, (char *) &ch, 1, deadline) == 1) {
       c = ch;
     } else {
       c = EOF;
@@ -185,14 +219,16 @@ static int linputsoc(T_SOC soc, char *s, int max) {
   return j;
 }
 
-static int check_readinput_t(T_SOC soc, int timeout) {
-  if (soc != INVALID_SOCKET) {
+static int check_readinput_t(T_SOC soc, time_t deadline) {
+  const time_t left = deadline - time(NULL);
+
+  if (soc != INVALID_SOCKET && left > 0) {
     fd_set fds;                 // poll structures
     struct timeval tv;          // structure for select
 
     FD_ZERO(&fds);
     FD_SET(soc, &fds);
-    tv.tv_sec = timeout;
+    tv.tv_sec = (long) left;
     tv.tv_usec = 0;
     select((int) (soc + 1), &fds, NULL, NULL, &tv);
     if (FD_ISSET(soc, &fds))
@@ -203,9 +239,9 @@ static int check_readinput_t(T_SOC soc, int timeout) {
     return 0;
 }
 
-static int linputsoc_t(T_SOC soc, char *s, int max, int timeout) {
-  if (check_readinput_t(soc, timeout)) {
-    return linputsoc(soc, s, max);
+static int linputsoc_t(T_SOC soc, char *s, int max, time_t deadline) {
+  if (check_readinput_t(soc, deadline)) {
+    return linputsoc(soc, s, max, deadline);
   }
   return -1;
 }
@@ -758,12 +794,14 @@ static PT_Element proxytrack_process_DAV_Request(PT_Indexes indexes,
     StringFree(url);
     StringFree(buff);
 
-    elt->size = StringLength(response);
-    elt->adr = StringAcquire(&response);
-    elt->statuscode = 207;      /* Multi-Status */
-    strcpybuff(elt->charset, "utf-8");
-    strcpybuff(elt->contenttype, "text/xml");
-    strcpybuff(elt->msg, "Multi-Status");
+    if (elt != NULL) {
+      elt->size = StringLength(response);
+      elt->adr = StringAcquire(&response);
+      elt->statuscode = 207; /* Multi-Status */
+      strcpybuff(elt->charset, "utf-8");
+      strcpybuff(elt->contenttype, "text/xml");
+      strcpybuff(elt->msg, "Multi-Status");
+    }
     StringFree(response);
 
     return elt;
@@ -812,12 +850,14 @@ static PT_Element proxytrack_process_HTTP_List(PT_Indexes indexes,
     }
     StringCat(html, "</body>" "</html>");
     PT_Enumerate_Delete(&list);
-    elt->size = StringLength(html);
-    elt->adr = StringAcquire(&html);
-    elt->statuscode = HTTP_OK;
-    strcpybuff(elt->charset, "iso-8859-1");
-    strcpybuff(elt->contenttype, "text/html");
-    strcpybuff(elt->msg, "OK");
+    if (elt != NULL) {
+      elt->size = StringLength(html);
+      elt->adr = StringAcquire(&html);
+      elt->statuscode = HTTP_OK;
+      strcpybuff(elt->charset, "iso-8859-1");
+      strcpybuff(elt->contenttype, "text/html");
+      strcpybuff(elt->msg, "OK");
+    }
     StringFree(html);
     return elt;
   }
@@ -831,21 +871,22 @@ static size_t element_body_size(const PT_Element element) {
 }
 
 /* Read exactly len bytes: a slow client may split them over several recv(). */
-static int recv_exact(T_SOC soc, char *buf, int len) {
+static hts_boolean recv_exact(T_SOC soc, char *buf, int len, time_t deadline) {
   int got = 0;
 
   while (got < len) {
-    const int n = (int) recv(soc, buf + got, len - got, 0);
+    const int n = recv_until(soc, buf + got, len - got, deadline);
 
     if (n <= 0)
-      return 0;
+      return HTS_FALSE;
     got += n;
   }
-  return 1;
+  return HTS_TRUE;
 }
 
 static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
-  int timeout = 30;
+  const int timeout = 30; /* seconds a request may take */
+  time_t deadline = 0;
   int buffer_size = 32768;
   char *buffer = (char *) malloc(buffer_size);
   int line1Size = 1024;
@@ -881,11 +922,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 
   if (buffer == NULL || line == NULL || line1 == NULL) {
     proxytrack_print_log(CRITICAL, "proxytrack_process_HTTP:memory exhausted");
-#ifdef _WIN32
-    closesocket(soc_c);
-#else
-    close(soc_c);
-#endif
+    close_client(soc_c);
     return;
   }
 
@@ -905,6 +942,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 
     /* Clear context */
     length = 0;
+    deadline = time(NULL) + timeout;
     line[0] = line1[0] = '\0';
     buffer[0] = '\0';
     command = line1;
@@ -919,12 +957,12 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 #endif
 
     /* line1: "GET http://www.example.com/ HTTP/1.0" */
-    if (linputsoc_t(soc_c, line1, line1Size - 2, timeout) > 0
-        && (surl = strchr(line1, ' '))
-        && !(*surl = '\0')
-        && ++surl && (proto = strchr(surl, ' ')) && !(*proto = '\0') && ++proto) {
+    if (linputsoc_t(soc_c, line1, line1Size - 2, deadline) > 0 &&
+        (surl = strchr(line1, ' ')) && !(*surl = '\0') && ++surl &&
+        (proto = strchr(surl, ' ')) && !(*proto = '\0') && ++proto) {
       /* Flush headers */
-      while(linputsoc_t(soc_c, line, lineSize - 2, timeout) > 0 && line[0] != 0) {
+      while (linputsoc_t(soc_c, line, lineSize - 2, deadline) > 0 &&
+             line[0] != 0) {
         int p;
 
         if ((p = strfield(line, "Content-length:")) != 0) {
@@ -966,7 +1004,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
       if (length > 0) {
         if (length < 32768) {
           StringRoom(davRequest, length + 1);
-          if (recv_exact(soc_c, StringBuffRW(davRequest), length)) {
+          if (recv_exact(soc_c, StringBuffRW(davRequest), length, deadline)) {
             StringBuffRW(davRequest)[length] = 0;
           } else {
             msgCode = 500;
@@ -1126,7 +1164,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
           }
         }
         /* a refused record carries -1, which is no HTTP status */
-        if (element != NULL && element->statuscode < 0)
+        if (element != NULL && element->statuscode == STATUSCODE_INVALID)
           element->statuscode = 502;
         if (element != NULL) {
           /* lifted out of the format: a directive inside a macro argument list
@@ -1330,15 +1368,13 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 #else
       shutdown(soc_c, 1);
 #endif
-      while(recv(soc_c, ((char *) &c), 1, 0) > 0) ;
+      deadline = time(NULL) + timeout;
+      while (recv_until(soc_c, &c, 1, deadline) > 0)
+        ;
     }
   } while(keepAlive);
 
-#ifdef _WIN32
-  closesocket(soc_c);
-#else
-  close(soc_c);
-#endif
+  close_client(soc_c);
 
   StringFree(url);
   StringFree(urlRedirect);
@@ -1447,42 +1483,9 @@ proxytrack_process_generic(void (*process) (PT_Indexes indexes, T_SOC soc_c),
 #define PROXYTRACK_MAX_CLIENTS 256
 static volatile int proxytrack_clients = 0;
 
-static void close_client(T_SOC soc) {
-#ifdef _WIN32
-  closesocket(soc);
-#else
-  close(soc);
-#endif
-}
-
-static int clients_add(int delta) {
-#ifdef _MSC_VER
-  return (int) InterlockedExchangeAdd((volatile LONG *) &proxytrack_clients,
-                                      delta) +
-         delta;
-#else
-  return __atomic_add_fetch(&proxytrack_clients, delta, __ATOMIC_RELAXED);
-#endif
-}
-
-/* Bound every recv() on a client, so a silent peer cannot pin its thread. */
-static void set_recv_timeout(T_SOC soc, int seconds) {
-#ifdef _WIN32
-  DWORD tv = (DWORD) seconds * 1000;
-#else
-  struct timeval tv;
-
-  tv.tv_sec = seconds;
-  tv.tv_usec = 0;
-#endif
-  (void) setsockopt(soc, SOL_SOCKET, SO_RCVTIMEO, (const char *) &tv,
-                    sizeof(tv));
-}
-
 static void proxytrack_process_HTTP_counted(PT_Indexes indexes, T_SOC soc_c) {
-  set_recv_timeout(soc_c, 30);
   proxytrack_process_HTTP(indexes, soc_c);
-  clients_add(-1);
+  hts_add_int(&proxytrack_clients, -1);
 }
 
 /* Process HTTP proxy requests */
@@ -1497,18 +1500,18 @@ static int proxytrack_start_HTTP(PT_Indexes indexes, T_SOC soc) {
     T_SOC soc_c;
 
     if ((soc_c = (T_SOC) accept(soc, NULL, NULL)) != INVALID_SOCKET) {
-      if (clients_add(1) > PROXYTRACK_MAX_CLIENTS) {
+      if (hts_add_int(&proxytrack_clients, 1) > PROXYTRACK_MAX_CLIENTS) {
         static const char busy[] =
             "HTTP/1.1 503 Too Many Connections\r\nContent-Length: 0\r\n"
             "Connection: close\r\n\r\n";
 
         (void) send(soc_c, busy, (int) sizeof(busy) - 1, 0);
-        clients_add(-1);
+        hts_add_int(&proxytrack_clients, -1);
         close_client(soc_c);
       } else if (!proxytrack_process_HTTP_threaded(indexes, soc_c)) {
         proxytrack_print_log(CRITICAL,
                              "proxytrack_start_HTTP::Can not fork a thread");
-        clients_add(-1);
+        hts_add_int(&proxytrack_clients, -1);
         close_client(soc_c);
       }
     }
