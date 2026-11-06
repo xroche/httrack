@@ -159,10 +159,15 @@ hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size) {
 }
 
 static hts_boolean cookie_domain_is_suffix(const char *domain);
+static void cookie_trim_host(t_cookie *cookie, const char *domain,
+                             size_t new_len, const char *cook_name,
+                             const char *path);
 
 /* See htsbauth.h. Records are kept longest path first. */
-int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
-               const char *domain, const char *path, const cookie_attr *attr) {
+static int cookie_set_impl(t_cookie *cookie, const char *cook_name,
+                           const char *cook_value, const char *domain,
+                           const char *path, const cookie_attr *attr,
+                           hts_boolean cap_host) {
   static const cookie_attr session = {.host_only = HTS_FALSE,
                                       .secure = HTS_FALSE,
                                       .http_only = HTS_FALSE,
@@ -199,6 +204,12 @@ int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
   domain = host;
   // a public suffix such as "com" reaches only that host (RFC 6265 5.3 step 5)
   host_only = attr->host_only || cookie_domain_is_suffix(domain);
+  /* A host past its share loses its oldest records, so others keep room. */
+  if (cap_host)
+    cookie_trim_host(cookie, domain,
+                     strlen(cook_name) + strlen(cook_value) + strlen(domain) +
+                         strlen(path) + 32,
+                     cook_name, path);
   /* The record this one replaces still holds its room, so count it free, but
      remove it only once the new one is known to fit. */
   old = cookie_find_exact(cookie->data, cook_name, domain, path);
@@ -255,6 +266,21 @@ int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
 }
 
 /* See htsbauth.h. */
+int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
+               const char *domain, const char *path, const cookie_attr *attr) {
+  return cookie_set_impl(cookie, cook_name, cook_value, domain, path, attr,
+                         HTS_FALSE);
+}
+
+/* See htsbauth.h. */
+int cookie_set_capped(t_cookie *cookie, const char *cook_name,
+                      const char *cook_value, const char *domain,
+                      const char *path, const cookie_attr *attr) {
+  return cookie_set_impl(cookie, cook_name, cook_value, domain, path, attr,
+                         HTS_TRUE);
+}
+
+/* See htsbauth.h. */
 int cookie_add(t_cookie *cookie, const char *cook_name, const char *cook_value,
                const char *domain, const char *path) {
   return cookie_set(cookie, cook_name, cook_value, domain, path, NULL);
@@ -276,6 +302,49 @@ static hts_boolean cookie_same_domain(const char *a, const char *b) {
   if (b[0] == '.')
     b++;
   return strcmpnocase(a, b) == 0;
+}
+
+/* One host may hold this many records, or this many bytes of them (a quarter
+   of the jar), so it cannot starve the others. 50 is RFC 6265 6.1's minimum. */
+#define COOKIE_HOST_MAX_COUNT 50
+#define COOKIE_HOST_MAX_BYTES 8192
+
+/* Evict records of domain until a new one of new_len bytes fits its share. The
+   jar keeps no age, so the oldest is the first of the shortest path: records
+   of one length are stored oldest first. The record being replaced stays. */
+static void cookie_trim_host(t_cookie *cookie, const char *domain,
+                             size_t new_len, const char *cook_name,
+                             const char *path) {
+  char buffer[8192];
+
+  for (;;) {
+    size_t count = 0, bytes = 0, best_len = 0;
+    char *victim = NULL;
+    char *a;
+
+    for (a = cookie->data; *a != '\0'; a = cookie_nextfield(a)) {
+      size_t plen;
+
+      if (!cookie_same_domain(cookie_get(buffer, a, 0), domain))
+        continue;
+      if (strcmp(cookie_get(buffer, a, 5), cook_name) == 0 &&
+          strcmp(cookie_get(buffer, a, 2), path) == 0)
+        continue;
+      count++;
+      bytes += (size_t) (cookie_nextfield(a) - a);
+      plen = strlen(cookie_get(buffer, a, 2));
+      if (victim == NULL || plen < best_len) {
+        victim = a;
+        best_len = plen;
+      }
+    }
+    if (victim == NULL ||
+        (count < COOKIE_HOST_MAX_COUNT && bytes <= COOKIE_HOST_MAX_BYTES &&
+         new_len <= COOKIE_HOST_MAX_BYTES - bytes))
+      return;
+    cookie_delete(victim, cookie->max_len - (size_t) (victim - cookie->data),
+                  (size_t) (cookie_nextfield(victim) - victim));
+  }
 }
 
 /* See htsbundle.h. The host-only flag is not part of a record's identity

@@ -2639,8 +2639,8 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
                 cook_name, adr_nologin(opt, adr));
           } else if (attr.expires != 0 && attr.expires <= now) {
             cookie_remove(cookie, cook_name, domain, path);
-          } else if (cookie_set(cookie, cook_name, cook_value, domain, path,
-                                &attr) != 0) {
+          } else if (cookie_set_capped(cookie, cook_name, cook_value, domain,
+                                       path, &attr) != 0) {
             hts_log_print(opt, LOG_WARNING,
                           "Cookies: the jar did not store '%.64s' set by %s",
                           cook_name, adr_nologin(opt, adr));

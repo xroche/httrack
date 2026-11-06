@@ -33,6 +33,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsselftest_int.h"
 #include "htscookie_selftest.h"
+#include "htsbundle.h"
 
 /* True if a Cookie header line is a whole RFC 6265 list of `count` pairs and
    nothing else. A dropped cookie must take its separator with it, because a
@@ -828,6 +829,63 @@ static int st_cookiecap(httrackp *opt, int argc, char **argv) {
       err = 1;
       break;
     }
+  }
+
+  /* One host cannot starve the others: its oldest records go first. */
+  {
+    char name[16];
+    char fat[3001];
+    const char *const big_host = "big.example.com";
+
+    cookie.max_len = sizeof(cookie.data) - 1;
+    cookie.data[0] = '\0';
+    for (i = 0; i < 400; i++) {
+      snprintf(name, sizeof(name), "c%03u", (unsigned) i);
+      if (cookie_set_capped(&cookie, name, "v", big_host, PATH, NULL) != 0)
+        err = 1;
+    }
+    if (cookie_set_capped(&cookie, "other", "v", "small.example.org", PATH,
+                          NULL) != 0 ||
+        cookie_find_exact(cookie.data, "other", "small.example.org", PATH) ==
+            NULL) {
+      printf("cookie-cap: FAIL (another host was refused after one filled)\n");
+      err = 1;
+    }
+    if (cookie_find_exact(cookie.data, "c399", big_host, PATH) == NULL ||
+        cookie_find_exact(cookie.data, "c000", big_host, PATH) != NULL) {
+      printf("cookie-cap: FAIL (the host did not lose its oldest first)\n");
+      err = 1;
+    }
+    /* Big records hit the byte share, not the count. */
+    memset(fat, 'v', sizeof(fat) - 1);
+    fat[sizeof(fat) - 1] = '\0';
+    cookie.data[0] = '\0';
+    for (i = 0; i < 5; i++) {
+      snprintf(name, sizeof(name), "b%u", (unsigned) i);
+      if (cookie_set_capped(&cookie, name, fat, big_host, PATH, NULL) != 0)
+        err = 1;
+    }
+    if (strlen(cookie.data) > 8192 ||
+        cookie_find_exact(cookie.data, "b4", big_host, PATH) == NULL ||
+        cookie_find_exact(cookie.data, "b0", big_host, PATH) != NULL) {
+      printf("cookie-cap: FAIL (a host kept %u bytes)\n",
+             (unsigned) strlen(cookie.data));
+      err = 1;
+    }
+  }
+
+  /* A cookies file load stays uncapped, so a big jar round-trips. */
+  cookie.data[0] = '\0';
+  for (i = 0; i < 80; i++) {
+    char nm[16];
+
+    snprintf(nm, sizeof(nm), "l%02u", (unsigned) i);
+    if (cookie_add(&cookie, nm, "v", "big.example.com", PATH) != 0)
+      err = 1;
+  }
+  if (cookie_find_exact(cookie.data, "l00", "big.example.com", PATH) == NULL) {
+    printf("cookie-cap: FAIL (a plain cookie_add was capped)\n");
+    err = 1;
   }
 
   printf("cookie-cap: %s\n", err ? "FAIL" : "OK");
