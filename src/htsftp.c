@@ -964,6 +964,9 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
             htsblk_failf(&back->r, "PASV incorrect: %s", linejmp(line));
             back->r.statuscode = STATUSCODE_INVALID;
           }
+          /* data goes to the control peer: the 227 address is the server's
+           * say-so */
+          adr_ip[0] = '\0';
         } else {
           /*
            * try epsv (ipv6) *
