@@ -1323,6 +1323,27 @@ static int st_robots(httrackp *opt, int argc, char **argv) {
     assertf(rb_decide(&robots, txt, "/a/b") == 0);
   }
 
+  /* A rule set built to backtrack cannot stall one lookup: the step budget
+     runs out before the final Disallow, which then goes unread. */
+  {
+    char txt[40000], path[1024];
+    size_t n = (size_t) snprintf(txt, sizeof(txt), "User-agent: *\n");
+    int i;
+
+    for (i = 0; i < 60; i++) {
+      n += (size_t) snprintf(txt + n, sizeof(txt) - n, "Disallow: /*");
+      memset(txt + n, 'a', 500);
+      n += 500;
+      n += (size_t) snprintf(txt + n, sizeof(txt) - n, "%02db\n", i);
+    }
+    (void) snprintf(txt + n, sizeof(txt) - n, "Disallow: /a\n");
+    path[0] = '/';
+    memset(path + 1, 'a', 900);
+    path[901] = '\0';
+    assertf(rb_decide(&robots, txt, path) == 0);
+    assertf(rb_decide(&robots, "User-agent: *\nDisallow: /a\n", path) == -1);
+  }
+
   /* The httrack-specific group replaces the generic '*' group entirely. */
   {
     const char *txt = "User-agent: *\nDisallow: /everyone\n"

@@ -44,8 +44,14 @@ Please visit our Website: http://www.httrack.com
 
 // -- robots --
 
-/* RFC 9309 path-prefix match; '*' any run, '$' anchors end; linear. */
-static hts_boolean robots_pattern_match(const char *pattern, const char *path) {
+/* Matcher steps one checkrobots() call may spend; a hostile file costs O(n*m)
+ * per rule. */
+#define ROBOTS_MAX_STEPS 4000000u
+
+/* RFC 9309 path-prefix match; '*' any run, '$' anchors end. O(n*m) worst case,
+   so each step is charged to *budget and a spent budget means no match. */
+static hts_boolean robots_pattern_match(const char *pattern, const char *path,
+                                        size_t *budget) {
   size_t patlen = strlen(pattern);
   hts_boolean anchored = HTS_FALSE;
   const char *p, *pend, *s;
@@ -59,6 +65,9 @@ static hts_boolean robots_pattern_match(const char *pattern, const char *path) {
   pend = pattern + patlen;
   s = path;
   while (*s != '\0') {
+    if (*budget == 0)
+      return HTS_FALSE;
+    (*budget)--;
     if (p == pend) {
       if (!anchored)
         return HTS_TRUE;  // prefix matched
@@ -97,6 +106,7 @@ int checkrobots(const robots_wizard *robots, const char *adr, const char *fil) {
         char line[HTS_ROBOTS_LINE_SIZE + 2];
         size_t toklen = robots->token != NULL ? strlen(robots->token) : 0;
         size_t best_len = 0;
+        size_t budget = ROBOTS_MAX_STEPS;
         hts_boolean matched = HTS_FALSE;
         hts_boolean best_allow = HTS_FALSE;
 
@@ -113,7 +123,7 @@ int checkrobots(const robots_wizard *robots, const char *adr, const char *fil) {
                 (line[0] == 'A') ? HTS_TRUE : HTS_FALSE;
             const char *pat = line + 1;
 
-            if (robots_pattern_match(pat, fil)) {
+            if (robots_pattern_match(pat, fil, &budget)) {
               const size_t len = strlen(pat);
 
               if (!matched || len > best_len || (len == best_len && is_allow)) {
