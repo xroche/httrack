@@ -43,6 +43,7 @@ Please visit our Website: http://www.httrack.com
 #include <ctype.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 /* This models the rules hts_dirty_link_is_url answers, restated from the
    parser's intent rather than its code, so a disagreement is a finding about
@@ -1323,25 +1324,45 @@ static int st_robots(httrackp *opt, int argc, char **argv) {
     assertf(rb_decide(&robots, txt, "/a/b") == 0);
   }
 
-  /* A rule set built to backtrack cannot stall one lookup: the step budget
-     runs out before the final Disallow, which then goes unread. */
+  /* Several '*' pieces match left to right, and '$' pins the last piece. */
   {
-    char txt[40000], path[1024];
-    size_t n = (size_t) snprintf(txt, sizeof(txt), "User-agent: *\n");
+    const char *txt = "User-agent: *\nDisallow: /a*b*c$\nDisallow: /x*y*\n";
+
+    assertf(rb_decide(&robots, txt, "/a1b2c") == -1);
+    assertf(rb_decide(&robots, txt, "/abc") == -1);
+    assertf(rb_decide(&robots, txt, "/a1b2c3") == 0);
+    assertf(rb_decide(&robots, txt, "/acb") == 0);
+    assertf(rb_decide(&robots, txt, "/xyy") == -1);
+    assertf(rb_decide(&robots, txt, "/yx") == 0);
+  }
+
+  /* A rule set built to backtrack must stay cheap (60 lookups took 6 s when
+     the matcher was quadratic per rule) and must still decide correctly. */
+  {
+    const size_t capa = 450000;
+    char *txt = (char *) malloct(capa);
+    char path[1024];
+    size_t n;
+    time_t t0;
     int i;
 
-    for (i = 0; i < 60; i++) {
-      n += (size_t) snprintf(txt + n, sizeof(txt) - n, "Disallow: /*");
+    assertf(txt != NULL);
+    n = (size_t) snprintf(txt, capa, "User-agent: *\n");
+    for (i = 0; i < 800; i++) {
+      n += (size_t) snprintf(txt + n, capa - n, "Disallow: /*");
       memset(txt + n, 'a', 500);
       n += 500;
-      n += (size_t) snprintf(txt + n, sizeof(txt) - n, "%02db\n", i);
+      n += (size_t) snprintf(txt + n, capa - n, "%03db\n", i);
     }
-    (void) snprintf(txt + n, sizeof(txt) - n, "Disallow: /a\n");
+    (void) snprintf(txt + n, capa - n, "Disallow: /a\n");
     path[0] = '/';
     memset(path + 1, 'a', 900);
     path[901] = '\0';
-    assertf(rb_decide(&robots, txt, path) == 0);
-    assertf(rb_decide(&robots, "User-agent: *\nDisallow: /a\n", path) == -1);
+    t0 = time(NULL);
+    for (i = 0; i < 60; i++)
+      assertf(rb_decide(&robots, txt, path) == -1);
+    assertf(time(NULL) - t0 <= 2);
+    freet(txt);
   }
 
   /* The httrack-specific group replaces the generic '*' group entirely. */

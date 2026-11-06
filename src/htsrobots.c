@@ -44,56 +44,89 @@ Please visit our Website: http://www.httrack.com
 
 // -- robots --
 
-/* Matcher steps one checkrobots() call may spend; a hostile file costs O(n*m)
- * per rule. */
-#define ROBOTS_MAX_STEPS 4000000u
+/* Leftmost occurrence of seg[0..seglen) in hay[0..haylen) by KMP, O(haylen +
+   seglen) and no backtracking; `fail` holds seglen entries. -1 if absent. */
+static long robots_find(const char *seg, size_t seglen, const char *hay,
+                        size_t haylen, unsigned int *fail) {
+  size_t i, k = 0;
 
-/* RFC 9309 path-prefix match; '*' any run, '$' anchors end. O(n*m) worst case,
-   so each step is charged to *budget and a spent budget means no match. */
-static hts_boolean robots_pattern_match(const char *pattern, const char *path,
-                                        size_t *budget) {
+  if (seglen == 0)
+    return 0;
+  fail[0] = 0;
+  for (i = 1; i < seglen; i++) {
+    while (k > 0 && seg[i] != seg[k])
+      k = fail[k - 1];
+    if (seg[i] == seg[k])
+      k++;
+    fail[i] = (unsigned int) k;
+  }
+  for (i = 0, k = 0; i < haylen; i++) {
+    while (k > 0 && hay[i] != seg[k])
+      k = fail[k - 1];
+    if (hay[i] == seg[k])
+      k++;
+    if (k == seglen)
+      return (long) (i + 1 - seglen);
+  }
+  return -1;
+}
+
+/* RFC 9309 path-prefix match; '*' any run, '$' anchors end. The pattern is
+   split at '*' and each piece is searched once, left to right, so the cost is
+   linear in pattern plus path whatever the rule. */
+static hts_boolean robots_pattern_match(const char *pattern, const char *path) {
   size_t patlen = strlen(pattern);
+  const size_t pathlen = strlen(path);
   hts_boolean anchored = HTS_FALSE;
-  const char *p, *pend, *s;
-  const char *star = NULL, *star_s = NULL;
+  const char *p, *pend, *star;
+  size_t pos;
+  unsigned int fail[HTS_ROBOTS_LINE_SIZE + 2];
 
   if (patlen > 0 && pattern[patlen - 1] == '$') {
     anchored = HTS_TRUE;
     patlen--;
   }
+  if (patlen > HTS_ROBOTS_LINE_SIZE + 1)
+    return HTS_FALSE; // cannot come from a stored rule
   p = pattern;
   pend = pattern + patlen;
-  s = path;
-  while (*s != '\0') {
-    if (*budget == 0)
+  star = memchr(p, '*', patlen);
+
+  /* First piece is a literal prefix of the path. */
+  {
+    const size_t seglen = (star != NULL) ? (size_t) (star - p) : patlen;
+
+    if (seglen > pathlen || memcmp(p, path, seglen) != 0)
       return HTS_FALSE;
-    (*budget)--;
-    if (p == pend) {
-      if (!anchored)
-        return HTS_TRUE;  // prefix matched
-      if (star != NULL) { // anchored: '*' must eat the rest
-        p = star + 1;
-        s = ++star_s;
-        continue;
-      }
-      return HTS_FALSE;
-    }
-    if (*p == '*') {
-      star = p++;
-      star_s = s;
-    } else if (*p == *s) {
-      p++;
-      s++;
-    } else if (star != NULL) {
-      p = star + 1;
-      s = ++star_s;
-    } else {
-      return HTS_FALSE;
-    }
+    if (star == NULL)
+      return (!anchored || seglen == pathlen) ? HTS_TRUE : HTS_FALSE;
+    pos = seglen;
+    p = star + 1;
   }
-  while (p < pend && *p == '*')
-    p++;
-  return (p == pend) ? HTS_TRUE : HTS_FALSE;
+  /* Then each piece after a '*' (the last one is a suffix when anchored). */
+  while (p < pend) {
+    const char *next = memchr(p, '*', (size_t) (pend - p));
+    const size_t seglen =
+        (next != NULL) ? (size_t) (next - p) : (size_t) (pend - p);
+
+    if (next == NULL && anchored) {
+      return (seglen <= pathlen - pos &&
+              memcmp(p, path + pathlen - seglen, seglen) == 0)
+                 ? HTS_TRUE
+                 : HTS_FALSE;
+    }
+    if (seglen > 0) {
+      const long at = robots_find(p, seglen, path + pos, pathlen - pos, fail);
+
+      if (at < 0)
+        return HTS_FALSE;
+      pos += (size_t) at + seglen;
+    }
+    if (next == NULL)
+      break;
+    p = next + 1;
+  }
+  return HTS_TRUE;
 }
 
 /* fil="": is a rule set already recorded for this host? */
@@ -106,7 +139,6 @@ int checkrobots(const robots_wizard *robots, const char *adr, const char *fil) {
         char line[HTS_ROBOTS_LINE_SIZE + 2];
         size_t toklen = robots->token != NULL ? strlen(robots->token) : 0;
         size_t best_len = 0;
-        size_t budget = ROBOTS_MAX_STEPS;
         hts_boolean matched = HTS_FALSE;
         hts_boolean best_allow = HTS_FALSE;
 
@@ -123,7 +155,7 @@ int checkrobots(const robots_wizard *robots, const char *adr, const char *fil) {
                 (line[0] == 'A') ? HTS_TRUE : HTS_FALSE;
             const char *pat = line + 1;
 
-            if (robots_pattern_match(pat, fil, &budget)) {
+            if (robots_pattern_match(pat, fil)) {
               const size_t len = strlen(pat);
 
               if (!matched || len > best_len || (len == best_len && is_allow)) {
