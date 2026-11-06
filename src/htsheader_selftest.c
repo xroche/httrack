@@ -1027,7 +1027,9 @@ static int st_contentcodings(httrackp *opt, int argc, char **argv) {
       assertf((LLint) (4 * 1024 * 1024) >
               hts_codec_maxout((LLint) sizeof(cc_br_bomb)));
       assertf(ae_write_raw(inpath, cc_br_bomb, sizeof(cc_br_bomb)) == 0);
-      assertf(hts_codec_unpack(HTS_CODEC_BROTLI, inpath, outpath) < 0);
+      assertf(hts_codec_unpack(HTS_CODEC_BROTLI, inpath, outpath) == -1);
+      assertf(hts_codec_unpack_max(HTS_CODEC_BROTLI, inpath, outpath, 1000) ==
+              HTS_CODEC_TOOBIG);
     }
 #endif
 #if HTS_USEZSTD
@@ -1056,7 +1058,9 @@ static int st_contentcodings(httrackp *opt, int argc, char **argv) {
       /* the fixture must really be past the budget, whatever the ratio is */
       assertf((LLint) bomblen > hts_codec_maxout((LLint) zlen));
       assertf(ae_write_raw(inpath, zbuf, zlen) == 0);
-      assertf(hts_codec_unpack(HTS_CODEC_ZSTD, inpath, outpath) < 0);
+      assertf(hts_codec_unpack(HTS_CODEC_ZSTD, inpath, outpath) == -1);
+      assertf(hts_codec_unpack_max(HTS_CODEC_ZSTD, inpath, outpath, 1000) ==
+              HTS_CODEC_TOOBIG);
       freet(bomb);
       freet(zbuf);
     }
