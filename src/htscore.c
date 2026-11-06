@@ -551,19 +551,26 @@ static hts_UCS4 utf16_next(const unsigned char *src, size_t size, size_t *i,
   return 0xFFFD;
 }
 
-size_t hts_utf16_lone_surrogates(const unsigned char *src, size_t size,
-                                 hts_boolean swap) {
-  size_t count = 0;
+hts_boolean hts_utf16_looks_like_text(const unsigned char *src, size_t size,
+                                      hts_boolean swap) {
+  size_t suspicious = 0;
+  size_t ascii = 0;
   size_t i;
 
   for (i = 0; i < size;) {
     hts_boolean lone = HTS_FALSE;
+    const hts_UCS4 cp = utf16_next(src, size, &i, swap, &lone);
 
-    (void) utf16_next(src, size, &i, swap, &lone);
-    if (lone)
-      count++;
+    /* Random units land here about 13% of the time, text almost never. */
+    if (lone ||
+        (cp < 0x20 && cp != '\t' && cp != '\n' && cp != '\f' && cp != '\r') ||
+        (cp >= 0xE000 && cp <= 0xF8FF) || cp >= 0xF0000 ||
+        (cp >= 0xFDD0 && cp <= 0xFDEF) || (cp & 0xFFFE) == 0xFFFE)
+      suspicious++;
+    else if (cp >= 0x20 && cp <= 0x7E)
+      ascii++;
   }
-  return count;
+  return ascii >= 4 && suspicious <= size / 200 ? HTS_TRUE : HTS_FALSE;
 }
 
 char *hts_ucs2_to_utf8(const unsigned char *src, size_t size, hts_boolean swap,
@@ -1761,12 +1768,12 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
                 ucs2_bom && ((unsigned char) r.adr[0]) == 0xff ? HTS_TRUE
                                                                : HTS_FALSE;
 
-            /* Text has next to no lone surrogates, binary behind a stray BOM
-               about 3% of its units. Many NULs were always taken as text. */
-            if (ucs2_bom && (map[0] > r.size / 10 ||
-                             hts_utf16_lone_surrogates(
-                                 (const unsigned char *) r.adr, (size_t) r.size,
-                                 ucs2_swap) <= (size_t) r.size / 200)) {
+            /* A NUL-heavy body converts as before, any other must read as text.
+             */
+            if (ucs2_bom &&
+                (map[0] > r.size / 10 ||
+                 hts_utf16_looks_like_text((const unsigned char *) r.adr,
+                                           (size_t) r.size, ucs2_swap))) {
               size_t new_size = 0;
               char *const new_adr =
                   hts_ucs2_to_utf8((const unsigned char *) r.adr,

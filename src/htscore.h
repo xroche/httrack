@@ -465,9 +465,10 @@ void hts_finish_makeindex(httrackp *opt, int *makeindex_done,
 char *hts_ucs2_to_utf8(const unsigned char *src, size_t size, hts_boolean swap,
                        size_t *outsize);
 
-/* How many surrogates in 'size' bytes of UTF-16 are not half of a pair? */
-size_t hts_utf16_lone_surrogates(const unsigned char *src, size_t size,
-                                 hts_boolean swap);
+/* Does 'size' bytes of UTF-16 read as text: some ASCII, and next to no lone
+   surrogates, private-use, noncharacters or C0 controls? */
+hts_boolean hts_utf16_looks_like_text(const unsigned char *src, size_t size,
+                                      hts_boolean swap);
 
 // Flush ht_buff[0..ht_len] to save on disk; *fp closed+NULLed on write.
 // Precondition: ht_len>0.

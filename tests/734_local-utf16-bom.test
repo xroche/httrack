@@ -18,6 +18,7 @@ cleanup_push cleanup
 mkdir "${tmpdir}/docroot"
 "$python" - "$(nativepath "${tmpdir}/docroot")" <<'PY'
 import os
+import random
 import sys
 
 root = sys.argv[1]
@@ -41,10 +42,13 @@ put("asc.html", b"\xff\xfe" + page("ascii", "asc-next.html").encode("utf-16-le")
 put("nobom.html", page("ascii", "nobom-next.html").encode("utf-16-le"))
 put("u8.html", page(CJK + smile, "u8-next.html").encode())
 put("odd.html", b"\xff\xfe" + page(CJK, "odd-next.html").encode("utf-16-le") + b"<")  # truncated
+# a small random body that a lone-surrogate count alone lets through
+rng = random.Random(0)
+put("small.html", b"\xff\xfe" + bytes(rng.getrandbits(8) for _ in range(200)))
 put("bin.html", b"\xff\xfe" + bytes(range(256)) * 8)  # binary behind a stray BOM
-for n in ("le", "be", "asc", "nobom", "u8", "odd", "bin"):
+for n in ("le", "be", "asc", "nobom", "u8", "odd", "small", "bin"):
     put(n + "-next.html", b"<html><body>next</body></html>")
-links = "".join('<a href="%s.html">%s</a>' % (n, n) for n in ("le", "be", "asc", "nobom", "u8", "odd", "bin"))
+links = "".join('<a href="%s.html">%s</a>' % (n, n) for n in ("le", "be", "asc", "nobom", "u8", "odd", "small", "bin"))
 put("index.html", ("<html><body>%s</body></html>" % links).encode())
 PY
 
@@ -96,6 +100,7 @@ check("u8: link followed", os.path.exists(os.path.join(mirror, "u8-next.html")))
 check("nobom: NULs blanked, not decoded",
       rd(src, "nobom.html").replace(b"\0", b" ") in rd(mirror, "nobom.html"))
 check("nobom: link not followed", not os.path.exists(os.path.join(mirror, "nobom-next.html")))
+check("small: saved as served", rd(src, "small.html") == rd(mirror, "small.html"))
 check("bin: saved as served", rd(src, "bin.html") == rd(mirror, "bin.html"))
 sys.exit(1 if failed else 0)
 PY

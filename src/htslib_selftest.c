@@ -1259,7 +1259,6 @@ static int st_ucs2(httrackp *opt, int argc, char **argv) {
                                    "\xEF\xBF\xBD";
   /* A BOM, 'a', then one dangling byte: an odd-length (truncated) body. */
   static const unsigned char odd[] = {0xFF, 0xFE, 'a', 0, 'b'};
-  static const unsigned char paired[] = {0x3D, 0xD8, 0x00, 0xDE, 'z'};
   static const unsigned short empty[] = {0};
 
   (void) opt;
@@ -1332,12 +1331,36 @@ static int st_ucs2(httrackp *opt, int argc, char **argv) {
         err = 1;
       freet(got);
     }
-    /* What the crawler converts on: a dangling byte is not a lone half. */
-    if (hts_utf16_lone_surrogates(odd, sizeof(odd), HTS_TRUE) != 0 ||
-        hts_utf16_lone_surrogates(paired, sizeof(paired), HTS_TRUE) != 0 ||
-        hts_utf16_lone_surrogates(paired, 2, HTS_TRUE) != 1 ||
-        hts_utf16_lone_surrogates(paired + 2, 2, HTS_TRUE) != 1)
-      err = 1;
+    /* What the crawler converts on: some ASCII, almost nothing suspicious. */
+    {
+      static const unsigned char text[] = {'<', 0, 'p', 0, '>', 0, 0x2D, 0x4E,
+                                           '<', 0, '/', 0, 'p', 0, '>',  0};
+      static const unsigned char few[] = {'<', 0, 'p', 0, '>', 0, 0x2D, 0x4E};
+      unsigned char bad[sizeof(text)];
+      size_t k;
+
+      if (!hts_utf16_looks_like_text(text, sizeof(text), HTS_TRUE) ||
+          hts_utf16_looks_like_text(few, sizeof(few), HTS_TRUE))
+        err = 1;
+      /* One unit each: lone high and low halves, private use, noncharacters
+         and a C0 control; a dangling byte is not one of them. */
+      for (k = 0; k < 6; k++) {
+        static const unsigned short units[] = {0xD800, 0xDC00, 0xE000,
+                                               0xF8FF, 0xFDD0, 0xFFFE};
+
+        memcpy(bad, text, sizeof(text));
+        bad[6] = (unsigned char) (units[k] & 0xff);
+        bad[7] = (unsigned char) (units[k] >> 8);
+        if (hts_utf16_looks_like_text(bad, sizeof(bad), HTS_TRUE))
+          err = 1;
+      }
+      memcpy(bad, text, sizeof(text));
+      bad[6] = 0x01;
+      bad[7] = 0;
+      if (hts_utf16_looks_like_text(bad, sizeof(bad), HTS_TRUE) ||
+          !hts_utf16_looks_like_text(text, sizeof(text) - 1, HTS_TRUE))
+        err = 1;
+    }
     /* Every code unit alone, to pin the encoder against its ranges. */
     {
       unsigned int u;
