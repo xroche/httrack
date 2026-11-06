@@ -115,7 +115,8 @@ const char *hts_optalias[][4] = {
   {"disable-security-limits", "-%!", "onoff", ""},
   {"test", "-t", "single", ""},
   {"list", "-%L", "param1", ""},
-  {"urllist", "-%S", "param1", ""},
+  {"filterlist", "-%S", "param1", ""},
+  {"urllist", "-%S", "param1", "deprecated, use filterlist"},
   {"language", "-%l", "param1", ""}, {"lang", "-%l", "param1", ""},
   {"accept", "-%a", "param1", ""},
   {"headers", "-%X", "param1", ""},
@@ -280,7 +281,6 @@ const char *hts_optalias[][4] = {
   {"ultrawide", "-c48", "single", ""},
   {"http10", "-%h", "onoff", ""},
   {"filelist", "-%L", "param1", ""},
-  {"filterlist", "-%S", "param1", ""},
   /* END OF ALIASES */
 
   /* Filters */
