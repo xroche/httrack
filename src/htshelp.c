@@ -525,6 +525,7 @@ void help(const char *app, int more) {
   infomsg(" %eN set the external links depth to N (* %e0)");
   infomsg("  mN maximum file length for a non-html file");
   infomsg("  mN,N2 maximum file length for non html (N) and html (N2)");
+  infomsg("     without -m, a compressed file decodes to 256 MiB at most");
   infomsg("  MN maximum overall size that can be uploaded/scanned");
   infomsg("  EN maximum mirror time in seconds (60=1 minute, 3600=1 hour)");
   infomsg("  AN maximum transfer rate in bytes/seconds (1000=1KB/s max)");

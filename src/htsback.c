@@ -1266,10 +1266,11 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                     deleteaddr(&back[p].r);
                 } else if ((size = hts_codec_unpack_max(
                                 codec, back[p].tmpfile, unpacked,
-                                is_hypertext_mime(opt, back[p].r.contenttype,
-                                                  "")
-                                    ? back[p].maxfile_html
-                                    : back[p].maxfile_nonhtml)) >= 0) {
+                                hts_codec_decode_cap(
+                                    is_hypertext_mime(opt,
+                                                      back[p].r.contenttype, "")
+                                        ? back[p].maxfile_html
+                                        : back[p].maxfile_nonhtml))) >= 0) {
                   const hts_boolean sized =
                       back_set_decoded_size(&back[p].r, size);
 
@@ -1314,7 +1315,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                         back[p].url_sav, unpacked);
                   }
                 } else if (size == HTS_CODEC_TOOBIG) {
-                  /* over -m once decoded: a verdict, as an uncoded body is */
+                  /* over -m or the default cap once decoded: a verdict */
                   back[p].r.statuscode = STATUSCODE_TOO_BIG;
                   strcpybuff(back[p].r.msg, "File too big");
                   if (!back[p].r.is_write)
