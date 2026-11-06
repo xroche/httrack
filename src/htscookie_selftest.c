@@ -1235,6 +1235,41 @@ static int st_cookiesetscope(httrackp *opt, int argc, char **argv) {
       {"victim.test", "Set-Cookie: v=1", "victim.test", "v=1", HTS_TRUE},
       {"evil.test", "Set-Cookie: v=; Domain=victim.test; Max-Age=0",
        "victim.test", "v=1", HTS_TRUE},
+      // plain http cannot replace, erase or set a Secure cookie (6265bis 5.7)
+      {"https://sec.test", "Set-Cookie: sid=GOOD; Secure", "https://sec.test",
+       "sid=GOOD", HTS_TRUE},
+      {"http://sec.test", "Set-Cookie: sid=EVIL", "https://sec.test",
+       "sid=GOOD", HTS_TRUE},
+      {"http://sec.test", "Set-Cookie: sid=EVIL", "https://sec.test",
+       "sid=EVIL", HTS_FALSE},
+      // a parent Domain= would sit beside the Secure host cookie
+      {"https://www.dom.test", "Set-Cookie: sid=GOOD; Secure",
+       "https://www.dom.test", "sid=GOOD", HTS_TRUE},
+      {"http://a.dom.test", "Set-Cookie: sid=EVIL; Domain=dom.test",
+       "https://www.dom.test", "sid=EVIL", HTS_FALSE},
+      {"http://sec.test", "Set-Cookie: sid=; Max-Age=0", "https://sec.test",
+       "sid=GOOD", HTS_TRUE},
+      {"http://sec.test", "Set-Cookie: sn=1; Secure", "https://sec.test",
+       "sn=1", HTS_FALSE},
+      {"http://sec.test", "Set-Cookie: pl=1", "http://sec.test", "pl=1",
+       HTS_TRUE},
+      // controls: https still replaces and erases it
+      {"https://sec.test", "Set-Cookie: sid=NEW; Secure", "https://sec.test",
+       "sid=NEW", HTS_TRUE},
+      {"https://sec.test", "Set-Cookie: sid=; Max-Age=0", "https://sec.test",
+       "sid=NEW", HTS_FALSE},
+  };
+
+  /* a cookie path matches on a "/" boundary (RFC 6265 5.1.4) */
+  static const struct {
+    const char *cpath, *qpath;
+    hts_boolean want;
+  } paths[] = {
+      {"/foo", "/foo", HTS_TRUE},        {"/foo", "/foo/x", HTS_TRUE},
+      {"/foo", "/foo?a=b", HTS_TRUE},    {"/foo", "/foobar/x", HTS_FALSE},
+      {"/foo", "/foobar", HTS_FALSE},    {"/foo/", "/foo/x", HTS_TRUE},
+      {"/foo/", "/foobar/x", HTS_FALSE}, {"/", "/anything", HTS_TRUE},
+      {"/foo", "/fo", HTS_FALSE},
   };
 
   static t_cookie jar;
@@ -1272,6 +1307,39 @@ static int st_cookiesetscope(httrackp *opt, int argc, char **argv) {
 
     if (ep == NULL || strcmp(cookie_get(field, ep, 2), "/") != 0) {
       printf("%s: an empty Path= is not stored as /\n", LABEL);
+      err = 1;
+    }
+  }
+  for (i = 0; i < sizeof(paths) / sizeof(paths[0]); i++) {
+    cookie_seed(&jar, "path.test", paths[i].cpath);
+    http_cookie_header(&jar, "path.test", paths[i].qpath, hdr, sizeof(hdr));
+    if (cookie_sent(hdr, "id=A") != paths[i].want) {
+      printf("%s: cookie path %s %s %s\n", LABEL, paths[i].cpath,
+             paths[i].want ? "does not reach" : "wrongly reaches",
+             paths[i].qpath);
+      err = 1;
+    }
+  }
+  /* an http cookie on a deeper path would be sent before the Secure one */
+  {
+    static const char *const hdrs[] = {
+        "Set-Cookie: sid=GOOD; Path=/; Secure",
+        "Set-Cookie: sid=EVIL; Path=/app",
+    };
+    const char *const origin[] = {"https://deep.test", "http://deep.test"};
+    htsblk r;
+    char line[256];
+
+    jar.data[0] = '\0';
+    memset(&r, 0, sizeof(r));
+    for (i = 0; i < 2; i++) {
+      strcpybuff(line, hdrs[i]);
+      treathead(&jar, origin[i], "/", &r, line);
+    }
+    http_cookie_header(&jar, "https://deep.test", "/app/x", hdr, sizeof(hdr));
+    if (cookie_sent(hdr, "sid=EVIL") || !cookie_sent(hdr, "sid=GOOD")) {
+      printf("%s: plain http shadowed a Secure cookie on a deeper path: %s\n",
+             LABEL, hdr);
       err = 1;
     }
   }
