@@ -65,6 +65,22 @@ extern hts_boolean hts_codec_is_archive_ext(hts_codec codec, const char *ext);
 extern int hts_codec_unpack(hts_codec codec, const char *filename,
                             const char *newfile);
 
+/* As hts_codec_unpack(), with the decoded size also capped at cap when cap > 0
+   (the user's -m limit). Returns HTS_CODEC_TOOBIG when that cap was exceeded.
+ */
+extern int hts_codec_unpack_max(hts_codec codec, const char *filename,
+                                const char *newfile, LLint cap);
+/* hts_codec_unpack_max() result for a body decoding past a cap that lowered the
+   budget, as opposed to -1 for a bad stream or the built-in bomb limit. */
+#define HTS_CODEC_TOOBIG (-2)
+
+/* Decoded-size budget for in_size coded bytes: hts_codec_maxout(in_size),
+   lowered to cap if cap > 0. */
+extern LLint hts_codec_budget(LLint in_size, LLint cap);
+
+/* Does cap, rather than the built-in limit, set the budget for in_size? */
+extern hts_boolean hts_codec_cap_binds(LLint in_size, LLint cap);
+
 /* Decode up to out_len leading bytes of a coded body for the MIME sniffer;
    0 when nothing could be decoded. */
 extern size_t hts_codec_head(hts_codec codec, const void *in, size_t in_len,

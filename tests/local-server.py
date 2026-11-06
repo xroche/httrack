@@ -973,6 +973,14 @@ class Handler(SimpleHTTPRequestHandler):
             extra_headers=[("Content-Encoding", "gzip")],
         )
 
+    # 200 KB of zeros in a few hundred gzip bytes: over a -m between the two.
+    def route_warcgz_big(self):
+        self.send_raw(
+            gzip.compress(b"\0" * 200000),
+            "application/octet-stream",
+            extra_headers=[("Content-Encoding", "gzip")],
+        )
+
     # --- content codings ---------------------------------------------------
     # Canned br/zstd bodies (no brotli/zstd module in the stdlib): both decode
     # to CODEC_BODY. Regenerate with the brotli/zstd CLIs over that string.
@@ -3929,6 +3937,7 @@ class Handler(SimpleHTTPRequestHandler):
         "/warcgz/index.html": route_warcgz_index,
         "/warcgz/page.html": route_warcgz_page,
         "/warcgz/data.bin": route_warcgz_data,
+        "/warcgz/big.bin": route_warcgz_big,
         "/codec/index.html": route_codec_index,
         "/codec/br.html": route_codec_br,
         "/codec/zstd.html": route_codec_zstd,

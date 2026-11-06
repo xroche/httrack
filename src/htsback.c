@@ -1233,8 +1233,14 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                   back[p].r.statuscode = STATUSCODE_INVALID;
                 }
               } else {
-                snprintf(back[p].r.msg, sizeof(back[p].r.msg),
-                         "Open error when decompressing (can not generate a temporary file)");
+                /* never let the coded bytes be committed as the page */
+                htsblk_failf(&back[p].r, "Open error when decompressing (can "
+                                         "not generate a temporary file)");
+                back[p].r.statuscode = STATUSCODE_INVALID;
+                deleteaddr(&back[p].r);
+                /* keep the previous copy out of the --update purge */
+                if (fexist_utf8(back[p].url_sav))
+                  filenote(&opt->state.strc, back[p].url_sav, NULL);
               }
             }
             // fermer fichier sortie
@@ -1262,8 +1268,12 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                      bytes be committed as the page */
                   if (!back[p].r.is_write)
                     deleteaddr(&back[p].r);
-                } else if ((size = hts_codec_unpack(codec, back[p].tmpfile,
-                                                    unpacked)) >= 0) {
+                } else if ((size = hts_codec_unpack_max(
+                                codec, back[p].tmpfile, unpacked,
+                                is_hypertext_mime(opt, back[p].r.contenttype,
+                                                  "")
+                                    ? back[p].maxfile_html
+                                    : back[p].maxfile_nonhtml)) >= 0) {
                   const hts_boolean sized =
                       back_set_decoded_size(&back[p].r, size);
 
@@ -1307,6 +1317,13 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                         "could not replace %s; decoded copy kept as %s",
                         back[p].url_sav, unpacked);
                   }
+                } else if (size == HTS_CODEC_TOOBIG) {
+                  /* over -m once decoded: a verdict, as an uncoded body is */
+                  back[p].r.statuscode = STATUSCODE_TOO_BIG;
+                  strcpybuff(back[p].r.msg, "File too big");
+                  if (!back[p].r.is_write)
+                    deleteaddr(&back[p].r);
+                  UNLINK(unpacked);
                 } else {
                   back[p].r.statuscode = STATUSCODE_INVALID;
                   /* Our own disk, not the coded body: hts_codec_unpack() leaves
