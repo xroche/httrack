@@ -1727,7 +1727,7 @@ int url_savename(lien_adrfilsave *const afs,
 
   /* Strip ending . or ' ' forbidden on windoz */
   cleanEndingSpaceOrDot(afs->save);
-  /* A blanked ".." component leaves a new '//' behind. */
+  /* Blanking a dots-only component leaves '//' behind. */
   cleanDoubleSlash(afs->save);
 
 #endif
@@ -1989,6 +1989,8 @@ int url_savename(lien_adrfilsave *const afs,
       }
     }
   }
+  /* The cuts above can blank a directory too. */
+  cleanDoubleSlash(afs->save);
 #undef MAX_UTF8_SEQ_CHARS
 #undef MIN_LAST_SEG_RESERVE
 #undef MAX_LAST_SEG_RESERVE

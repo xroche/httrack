@@ -158,6 +158,15 @@ full '/%2e%2e/%2e%2e/etc/passwd' 'text/html' '/dev/null/www.example.com/etc/pass
 # A blanked ".." must not leave a '//' that aliases the plain name.
 full '/d/%2e%2e/x.html' 'text/html' '/dev/null/www.example.com/d/x.html'
 full '/x.html' 'text/html' '/dev/null/a/x.html' adr='a/../..' type=0
+# A long-name cut that blanks a directory must not leave a '//' either. Needs a
+# long -O, since the fil alone stays under the path cap.
+if ! target_is_windows; then
+    rep() { printf "$1%.0s" $(seq "$2"); }
+    outdir=/dev/null/$(rep p 200)/$(rep q 200)/$(rep r 200)/$(rep s 200)/$(rep t 190)
+    out=$("$HTTRACK_PATH" -O "$outdir" -#test=savename \
+        "/d/$(rep . 300)a/$(rep a 400)/$(rep b 280)/x.html" 'text/html')
+    assert_eq "/d/$(rep a 238)/$(rep b 238)/x.html" "${out#*www.example.com}" 'cut blanks a directory'
+fi
 full '/x.php' 'application/pdf' '/dev/null/www.example.com/evil.exe' 'cdispo=../../evil.exe'
 # Not queued: those spaces are htsmain()'s rewrite of the CR and TAB, which only
 # an argv goes through. Assigned first, since MSYS drops the CR from a $'..' that

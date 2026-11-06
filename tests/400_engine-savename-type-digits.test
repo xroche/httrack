@@ -48,7 +48,7 @@ selftest_queue 'savename: /dev/null/x/www.example.com/dir/page.html' savename \
 
 # cleanEndingSpaceOrDot() empties a component made only of dots or spaces, which
 # put the leading slash back after it had been stripped. Only a LEADING slash
-# goes here; a hole the emptied component leaves mid-name is collapsed at type 0.
+# goes here; a hole the emptied component leaves mid-name is collapsed.
 want 'x.html' 100 '/.../x.html' text/html
 want 'z.html' 100 '/ /z.html' text/html
 want 'y.html' 100 '/../../y.html' text/html
