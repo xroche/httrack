@@ -215,17 +215,8 @@ static int cookie_set_impl(t_cookie *cookie, const char *cook_name,
          strlen(path) + COOKIE_HEADROOM;
   if (cap_host && !cookie_fits(cookie->data, cookie->max_len, domain, cook_name,
                                path, need)) {
-    /* Rehearse on a copy, so a host that cannot free enough loses nothing. */
-    char *trial = calloct(cookie->max_len + 1, 1);
-
-    if (trial != NULL) {
-      strlcpybuff(trial, cookie->data, cookie->max_len + 1);
-      if (cookie_make_room(trial, cookie->max_len, domain, cook_name, path,
-                           need))
-        (void) cookie_make_room(cookie->data, cookie->max_len, domain,
-                                cook_name, path, need);
-    }
-    freet(trial);
+    (void) cookie_make_room(cookie->data, cookie->max_len, domain, cook_name,
+                            path, need);
   }
   old = cookie_find_exact(cookie->data, cook_name, domain, path);
   used = strlen(cookie->data) -
@@ -304,7 +295,8 @@ static hts_boolean cookie_same_domain(const char *a, const char *b) {
     a++;
   if (b[0] == '.')
     b++;
-  return strcmpnocase(a, b) == 0;
+  // strcmpnocase stops at the end of a, so "a.com" would match "a.com.evil"
+  return strlen(a) == strlen(b) && strcmpnocase(a, b) == 0;
 }
 
 /* A host may hold this many records, or this many bytes of them (a quarter of
@@ -332,12 +324,23 @@ static hts_boolean cookie_over_share(size_t count, size_t bytes) {
              : HTS_FALSE;
 }
 
-/* One host's records in the jar. */
-typedef struct cookie_share {
-  char host[COOKIE_MAX_DOMAIN];
+/* A record of the jar, as the eviction plan sees it. */
+typedef struct cookie_rec {
+  char *p;
+  size_t len;
+  size_t plen; // path length, the age rank
+  size_t pos;  // place in the jar, the tie-break
+  size_t host;
+} cookie_rec;
+
+/* One host: its tally, and its records in eviction order. */
+typedef struct cookie_host_tally {
+  char *dom;
   size_t count;
   size_t bytes;
-} cookie_share;
+  size_t cur; // next victim in the sorted records
+  size_t end;
+} cookie_host_tally;
 
 /* Is the record at a the one cookie_set replaces? */
 static hts_boolean cookie_is_self(const char *a, const char *domain,
@@ -351,96 +354,162 @@ static hts_boolean cookie_is_self(const char *a, const char *domain,
              : HTS_FALSE;
 }
 
+/* Hash of a domain as cookie_same_domain sees it. */
+static size_t cookie_domain_hash(const char *d) {
+  size_t h = 5381;
+
+  if (d[0] == '.')
+    d++;
+  for (; *d != '\0'; d++)
+    h = h * 33 + (size_t) hichar(*d);
+  return h;
+}
+
+/* Oldest first within a host: the shortest path, then the earliest place. */
+static int cookie_rec_cmp(const void *x, const void *y) {
+  const cookie_rec *a = x, *b = y;
+
+  if (a->host != b->host)
+    return a->host < b->host ? -1 : 1;
+  if (a->plen != b->plen)
+    return a->plen < b->plen ? -1 : 1;
+  return a->pos < b->pos ? -1 : a->pos > b->pos ? 1 : 0;
+}
+
 /* Evict the oldest records of the largest host over its share until a record
    of `need` bytes fits. One pass tallies every host, with the new record
-   added to the setter's, and each eviction then touches one host only. The
-   oldest is the first record of the shortest path: the jar keeps no age, and
-   records of one path length are stored oldest first. The record being
-   replaced stays, and counts in its host. Does the record fit now? */
+   added to the setter's, and the victims are picked from that tally and cut
+   out of the jar in one more pass. The oldest is the first record of the
+   shortest path: the jar keeps no age, and records of one path length are
+   stored oldest first. The record being replaced stays, and counts in its
+   host. The jar is untouched unless the record then fits. */
 static hts_boolean cookie_make_room(char *data, size_t max_len,
                                     const char *domain, const char *cook_name,
                                     const char *path, size_t need) {
   char buffer[8192];
   const size_t rec_len = need - COOKIE_HEADROOM;
-  size_t n = 1, nsh = 1, used, total, self_len = 0, freeable = 0;
-  cookie_share *sh;
+  const size_t total = strlen(data);
+  size_t n = 0, nh = 1, used, self_len = 0, freeable = 0, mask, i, k;
+  size_t self_pos = (size_t) -1;
+  cookie_rec *recs = NULL;
+  cookie_host_tally *hosts = NULL;
+  size_t *table = NULL, *over = NULL;
+  unsigned char *evict = NULL;
+  char *pool = NULL, *pool_end;
+  size_t nover = 0;
   hts_boolean ok = HTS_FALSE;
-  size_t i;
-  char *a;
+  char *a, *dst;
 
+  if (need > max_len)
+    return HTS_FALSE;
   for (a = data; *a != '\0'; a = cookie_nextfield(a))
     n++;
-  sh = calloct(n, sizeof(*sh));
-  if (sh == NULL)
-    return HTS_FALSE;
-  strlncatbuff(sh[0].host, domain, sizeof(sh[0].host), sizeof(sh[0].host) - 1);
-  sh[0].count = 1;
-  sh[0].bytes = rec_len;
-  for (a = data; *a != '\0'; a = cookie_nextfield(a)) {
-    const size_t len = (size_t) (cookie_nextfield(a) - a);
+  for (mask = 1; mask < 2 * (n + 1); mask <<= 1)
+    ;
+  recs = calloct(n + 1, sizeof(*recs));
+  hosts = calloct(n + 1, sizeof(*hosts));
+  table = calloct(mask, sizeof(*table)); // host index + 1, 0 for empty
+  over = calloct(n + 1, sizeof(*over));
+  evict = calloct(n + 1, 1);
+  pool = calloct(total + strlen(domain) + n + 2, 1);
+  if (recs == NULL || hosts == NULL || table == NULL || over == NULL ||
+      evict == NULL || pool == NULL)
+    goto done;
+  pool_end = pool;
+  /* Host 0 is the setter's, holding the new record. */
+  strcpy(pool_end, domain);
+  hosts[0].dom = pool_end;
+  hosts[0].count = 1;
+  hosts[0].bytes = rec_len;
+  pool_end += strlen(domain) + 1;
+  table[cookie_domain_hash(domain) & (mask - 1)] = 1;
+  for (a = data, i = 0; *a != '\0'; a = cookie_nextfield(a), i++) {
     const char *const d = cookie_get(buffer, a, 0);
+    size_t h = cookie_domain_hash(d) & (mask - 1);
 
-    for (i = 0; i < nsh && !cookie_same_domain(sh[i].host, d); i++)
-      ;
-    if (i == nsh) {
-      strlncatbuff(sh[i].host, d, sizeof(sh[i].host), sizeof(sh[i].host) - 1);
-      nsh++;
+    while (table[h] != 0 && !cookie_same_domain(hosts[table[h] - 1].dom, d))
+      h = (h + 1) & (mask - 1);
+    if (table[h] == 0) {
+      hosts[nh].dom = pool_end;
+      strcpy(pool_end, d);
+      pool_end += strlen(d) + 1;
+      table[h] = ++nh;
     }
-    sh[i].count++;
-    sh[i].bytes += len;
-    if (i == 0 && cookie_is_self(a, domain, cook_name, path))
-      self_len = len;
+    recs[i].p = a;
+    recs[i].len = (size_t) (cookie_nextfield(a) - a);
+    recs[i].plen = strlen(cookie_get(buffer, a, 2));
+    recs[i].pos = i;
+    recs[i].host = table[h] - 1;
+    hosts[recs[i].host].count++;
+    hosts[recs[i].host].bytes += recs[i].len;
+    if (recs[i].host == 0 && cookie_is_self(a, domain, cook_name, path)) {
+      self_len = recs[i].len;
+      self_pos = i;
+    }
   }
-  total = strlen(data);
   used = total - self_len;
   /* The most that evicting can free, so a hopeless set stops before it starts.
    */
-  for (i = 0; i < nsh; i++) {
-    if (cookie_over_share(sh[i].count, sh[i].bytes))
-      freeable += sh[i].bytes - (i == 0 ? rec_len + self_len : 0);
+  for (i = 0; i < nh; i++) {
+    if (cookie_over_share(hosts[i].count, hosts[i].bytes)) {
+      over[nover++] = i;
+      freeable += hosts[i].bytes - (i == 0 ? rec_len + self_len : 0);
+    }
   }
-  if (need > max_len || used > max_len - need + freeable)
+  if (used > max_len - need + freeable)
     goto done;
+  qsort(recs, n, sizeof(*recs), cookie_rec_cmp);
+  for (i = 0; i < n; i++) {
+    if (i == 0 || recs[i].host != recs[i - 1].host)
+      hosts[recs[i].host].cur = i;
+    hosts[recs[i].host].end = i + 1;
+  }
   while (used > max_len - need) {
-    cookie_share *best = NULL;
-    char *victim = NULL;
-    size_t best_len = 0, vlen;
+    cookie_host_tally *best = NULL;
 
-    for (i = 0; i < nsh; i++) {
-      if (cookie_over_share(sh[i].count, sh[i].bytes) &&
-          (best == NULL || sh[i].bytes > best->bytes))
-        best = &sh[i];
+    for (k = 0; k < nover; k++) {
+      cookie_host_tally *const h = &hosts[over[k]];
+
+      if (cookie_over_share(h->count, h->bytes) &&
+          (best == NULL || h->bytes > best->bytes))
+        best = h;
     }
     if (best == NULL)
       goto done; // no host is over its share, so the jar stays full
-    for (a = data; *a != '\0'; a = cookie_nextfield(a)) {
-      size_t plen;
-
-      if (!cookie_same_domain(cookie_get(buffer, a, 0), best->host) ||
-          (best == &sh[0] && cookie_is_self(a, domain, cook_name, path)))
-        continue;
-      plen = strlen(cookie_get(buffer, a, 2));
-      if (victim == NULL || plen < best_len) {
-        victim = a;
-        best_len = plen;
-      }
-    }
-    if (victim == NULL) {
+    if (best->cur < best->end && recs[best->cur].pos == self_pos)
+      best->cur++;
+    if (best->cur >= best->end) {
       best->count = best->bytes = 0; // only the replaced record is left
       continue;
     }
-    vlen = (size_t) (cookie_nextfield(victim) - victim);
-    cookie_delete(victim, max_len - (size_t) (victim - data), vlen);
-    if (strlen(data) != total - vlen)
-      goto done; // the delete failed, so stop rather than spin
-    total -= vlen;
-    used -= vlen;
+    evict[recs[best->cur].pos] = 1;
+    used -= recs[best->cur].len;
     best->count--;
-    best->bytes -= vlen;
+    best->bytes -= recs[best->cur].len;
+    best->cur++;
   }
+  /* Cut the victims out in place; the write point never passes the read. */
+  dst = data;
+  for (a = data, i = 0; *a != '\0'; i++) {
+    char *const next = cookie_nextfield(a);
+    const size_t len = (size_t) (next - a);
+
+    if (!evict[i]) {
+      if (dst != a)
+        memmove(dst, a, len);
+      dst += len;
+    }
+    a = next;
+  }
+  *dst = '\0';
   ok = HTS_TRUE;
 done:
-  freet(sh);
+  freet(recs);
+  freet(hosts);
+  freet(table);
+  freet(over);
+  freet(evict);
+  freet(pool);
   return ok;
 }
 

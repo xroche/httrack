@@ -884,6 +884,28 @@ static int cookie_hostcap_rows(void) {
       cookie_find_exact(jar.data, "c001", H, "/") == NULL)
     HC_FAIL("a host over its share did not make room for another host");
 
+  /* A longer host that starts with another is a different host. */
+  jar.data[0] = '\0';
+  if (cookie_add(&jar, "n", "mine", "google.com", "/") != 0 ||
+      cookie_add(&jar, "n", "theirs", "google.com.au", "/") != 0 ||
+      cookie_add(&jar, "b", "v", "bank.com", "/") != 0 ||
+      cookie_count_host(jar.data, "google.com") != 1 ||
+      cookie_count_host(jar.data, "google.com.au") != 1 ||
+      strstr(jar.data, "\tn\tmine") == NULL)
+    HC_FAIL("a host that extends another overwrote its cookie");
+  {
+    char name[16];
+
+    jar.max_len = 4000;
+    for (k = 0; k < 80; k++) {
+      snprintf(name, sizeof(name), "e%02d", k);
+      (void) cookie_set_capped(&jar, name, "v", "bank.com.evil.net", "/", NULL);
+    }
+    jar.max_len = 20000;
+    if (cookie_find_exact(jar.data, "b", "bank.com", "/") == NULL)
+      HC_FAIL("a flood from bank.com.evil.net evicted bank.com");
+  }
+
   /* A refused set leaves the jar byte for byte as it was. */
   {
     char val[61], huge[4001];
