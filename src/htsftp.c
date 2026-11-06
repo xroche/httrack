@@ -1547,6 +1547,8 @@ int check_socket(T_SOC soc) {
   fd_set fds, fds_e;            // poll structures
   struct timeval tv;            // structure for select
 
+  if (!hts_soc_selectable(soc))
+    return -1;
   FD_ZERO(&fds);
   FD_ZERO(&fds_e);
   // socket read 
@@ -1570,6 +1572,8 @@ int check_socket_connect(T_SOC soc) {
   fd_set fds, fds_e;            // poll structures
   struct timeval tv;            // structure for select
 
+  if (!hts_soc_selectable(soc))
+    return -1;
   FD_ZERO(&fds);
   FD_ZERO(&fds_e);
   // socket write 

@@ -1,0 +1,21 @@
+#!/bin/bash
+# A socket numbered FD_SETSIZE or more must fail its slot, not overflow an fd_set.
+
+set -eu
+
+: "${top_srcdir:=..}"
+
+# Fill every descriptor below 1100 so the crawl's sockets land above FD_SETSIZE.
+# The limit can be locked on a runner, which skips the test.
+python3 -c '
+import os, resource, sys
+try:
+    resource.setrlimit(resource.RLIMIT_NOFILE, (4096, 4096))
+except (ValueError, OSError):
+    sys.exit(77)
+for _ in range(1100):
+    os.set_inheritable(os.open("/dev/null", os.O_RDONLY), True)
+os.execvp(sys.argv[1], sys.argv[1:])
+' bash "$top_srcdir/tests/local-crawl.sh" --no-host-root \
+    --log-found 'beyond FD_SETSIZE' \
+    httrack 'BASEURL/sitemapdir/start.html' -r2

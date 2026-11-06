@@ -3481,6 +3481,8 @@ static int check_readinput(htsblk * r) {
     fd_set fds;                 // poll structures
     struct timeval tv;          // structure for select
 
+    if (!hts_soc_selectable(r->soc))
+      return 0;
     FD_ZERO(&fds);
     FD_SET(r->soc, &fds);
     tv.tv_sec = 0;

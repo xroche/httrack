@@ -86,6 +86,18 @@ typedef unsigned long in_addr_t;
 #endif
 #endif
 
+/** Can this socket go into an fd_set? A POSIX fd_set is a fixed bit array,
+    so a descriptor >= FD_SETSIZE would write past it. A Winsock fd_set is a
+    list that FD_SET bounds itself. */
+static HTS_INLINE HTS_UNUSED hts_boolean hts_soc_selectable(T_SOC soc) {
+#ifdef _WIN32
+  (void) soc;
+  return HTS_TRUE;
+#else
+  return soc >= 0 && soc < FD_SETSIZE ? HTS_TRUE : HTS_FALSE;
+#endif
+}
+
 #ifdef __cplusplus
 extern "C" {
 #endif

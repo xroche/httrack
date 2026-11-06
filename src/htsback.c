@@ -3109,8 +3109,14 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
           return 0;
         }
         if (!(back[p].r.req.proxy.active && opt->ftp_proxy)) {  // connexion directe, gérée en thread
-          FTPDownloadStruct *str =
-            (FTPDownloadStruct *) malloc(sizeof(FTPDownloadStruct));
+          FTPDownloadStruct *str = calloct(1, sizeof(FTPDownloadStruct));
+          if (str == NULL) {
+            back[p].r.statuscode = STATUSCODE_CONNERROR;
+            strcpybuff(back[p].r.msg, "Out of memory");
+            back[p].status = STATUS_READY;
+            back_set_finished(opt, sback, p);
+            return 0;
+          }
           str->pBack = &back[p];
           str->pOpt = opt;
           /* */
@@ -3512,6 +3518,19 @@ static int back_abort_limit(httrackp *opt, struct_back *sback,
 }
 
 // attente (gestion des buffers des sockets)
+/* Fail a slot whose socket cannot go into an fd_set, rather than overflow it.
+ */
+static void back_fail_unselectable(httrackp *opt, struct_back *sback, int i) {
+  lien_back *const b = &sback->lnk[i];
+
+  b->r.statuscode = STATUSCODE_CONNERROR;
+  strcpybuff(b->r.msg, "Socket number too high for select()");
+  b->status = STATUS_READY;
+  back_set_finished(opt, sback, i);
+  hts_log_print(opt, LOG_WARNING, "Socket %d is beyond FD_SETSIZE",
+                (int) b->r.soc);
+}
+
 void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                TStamp stat_timestart) {
   char catbuff[CATBUFF_SIZE];
@@ -3590,7 +3609,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
       if (st == STATUS_CONNECTING) {        // connecting
         // a connecting slot always carries a live socket; guard anyway so a
         // stray INVALID_SOCKET can never reach FD_SET (mirrors the recv branch)
-        if (back[i].r.soc != INVALID_SOCKET) {
+        if (back[i].r.soc != INVALID_SOCKET && !hts_soc_selectable(back[i].r.soc)) {
+          back_fail_unselectable(opt, sback, i);
+        } else if (back[i].r.soc != INVALID_SOCKET) {
           do_wait = 1;
 
           // noter socket write
@@ -3626,7 +3647,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
           //## if (back[i].url_adr[0]!=lOCAL_CHAR) {
 
           // vérification de sécurité
-          if (back[i].r.soc != INVALID_SOCKET) {        // hey, you never know..
+          if (back[i].r.soc != INVALID_SOCKET && !hts_soc_selectable(back[i].r.soc)) {
+            back_fail_unselectable(opt, sback, i);
+          } else if (back[i].r.soc != INVALID_SOCKET) {        // hey, you never know..
             if (
                 // Do not endlessly wait when receiving SSL http data (Patrick Pfeifer)
 #if HTS_USEOPENSSL
@@ -4428,7 +4451,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
                   back[i].chunk_adr[back[i].chunk_size - 1] = '\0';     // octet nul 
                   // skip leading spaces or cr
-                  while(isspace(*chstrip))
+                  while (isspace((unsigned char) *chstrip))
                     chstrip++;
                   chunk_data[0] = '\0';
                   strncatbuff(chunk_data, chstrip, sizeof(chunk_data) - 2);
