@@ -1224,14 +1224,41 @@ static int st_ucs4_oom(httrackp *opt, int argc, char **argv) {
 }
 
 static int st_ucs2(httrackp *opt, int argc, char **argv) {
-  /* A BOM, ASCII, a two-byte and a three-byte code point, and an unpaired
-     surrogate: only the ASCII one is a single output byte. */
-  static const unsigned short mixed[] = {0xFEFF, 'a', 0x00E9, 0x20AC, 0xD800};
+  /* A BOM, ASCII, a two-byte and a three-byte code point, a surrogate pair
+     and an unpaired surrogate: only the ASCII one is a single output byte. */
+  static const unsigned short mixed[] = {0xFEFF, 'a',    0x00E9, 0x20AC,
+                                         0xD83D, 0xDE00, 0xD800};
   static const char mixed_utf8[] = "\xEF\xBB\xBF"
                                    "a"
                                    "\xC3\xA9"
                                    "\xE2\x82\xAC"
-                                   "?";
+                                   "\xF0\x9F\x98\x80"
+                                   "\xEF\xBF\xBD";
+  /* The ends of the supplementary range, planes 2 and 3, and halves out of
+     order, doubled, or followed by a BMP unit. */
+  static const unsigned short pairs[] = {
+      0xD800, 0xDC00, 0xDBFF, 0xDFFF, 0xD840, 0xDC00, 0xD869, 0xDED6,
+      0xD880, 0xDC3F, 0xDC00, 0xD800, 'b',    0xDC00, 0xDC00, 0xD800,
+      0xD800, 0xD800, 0xDBFF, 0xD800, 0xE000, 0xDBFF};
+  static const char pairs_utf8[] = "\xF0\x90\x80\x80"
+                                   "\xF4\x8F\xBF\xBF"
+                                   "\xF0\xA0\x80\x80"
+                                   "\xF0\xAA\x9B\x96"
+                                   "\xF0\xB0\x80\xBF"
+                                   "\xEF\xBF\xBD"
+                                   "\xEF\xBF\xBD"
+                                   "b"
+                                   "\xEF\xBF\xBD"
+                                   "\xEF\xBF\xBD"
+                                   "\xEF\xBF\xBD"
+                                   "\xEF\xBF\xBD"
+                                   "\xEF\xBF\xBD"
+                                   "\xEF\xBF\xBD"
+                                   "\xEF\xBF\xBD"
+                                   "\xEE\x80\x80"
+                                   "\xEF\xBF\xBD";
+  /* A BOM, 'a', then one dangling byte: an odd-length (truncated) body. */
+  static const unsigned char odd[] = {0xFF, 0xFE, 'a', 0, 'b'};
   static const unsigned short empty[] = {0};
 
   (void) opt;
@@ -1288,7 +1315,53 @@ static int st_ucs2(httrackp *opt, int argc, char **argv) {
     if (ucs2_check(mixed, sizeof(mixed) / sizeof(mixed[0]), mixed_utf8,
                    HTS_FALSE))
       err = 1;
-    /* Every BMP code unit, to pin the encoder against its ranges. */
+    if (ucs2_check(pairs, sizeof(pairs) / sizeof(pairs[0]), pairs_utf8,
+                   HTS_TRUE))
+      err = 1;
+    {
+      size_t n = 0;
+      char *got = hts_ucs2_to_utf8(odd, sizeof(odd), HTS_TRUE, &n);
+
+      if (got == NULL || n != 7 ||
+          memcmp(got,
+                 "\xEF\xBB\xBF"
+                 "a"
+                 "\xEF\xBF\xBD",
+                 7) != 0)
+        err = 1;
+      freet(got);
+    }
+    /* What the crawler converts on: some ASCII, almost nothing suspicious. */
+    {
+      static const unsigned char text[] = {'<', 0, 'p', 0, '>', 0, 0x2D, 0x4E,
+                                           '<', 0, '/', 0, 'p', 0, '>',  0};
+      static const unsigned char few[] = {'<', 0, 'p', 0, '>', 0, 0x2D, 0x4E};
+      unsigned char bad[sizeof(text)];
+      size_t k;
+
+      if (!hts_utf16_looks_like_text(text, sizeof(text), HTS_TRUE) ||
+          hts_utf16_looks_like_text(few, sizeof(few), HTS_TRUE))
+        err = 1;
+      /* One unit each: lone high and low halves, private use, noncharacters
+         and a C0 control; a dangling byte is not one of them. */
+      for (k = 0; k < 6; k++) {
+        static const unsigned short units[] = {0xD800, 0xDC00, 0xE000,
+                                               0xF8FF, 0xFDD0, 0xFFFE};
+
+        memcpy(bad, text, sizeof(text));
+        bad[6] = (unsigned char) (units[k] & 0xff);
+        bad[7] = (unsigned char) (units[k] >> 8);
+        if (hts_utf16_looks_like_text(bad, sizeof(bad), HTS_TRUE))
+          err = 1;
+      }
+      memcpy(bad, text, sizeof(text));
+      bad[6] = 0x01;
+      bad[7] = 0;
+      if (hts_utf16_looks_like_text(bad, sizeof(bad), HTS_TRUE) ||
+          !hts_utf16_looks_like_text(text, sizeof(text) - 1, HTS_TRUE))
+        err = 1;
+    }
+    /* Every code unit alone, to pin the encoder against its ranges. */
     {
       unsigned int u;
 
@@ -1302,9 +1375,11 @@ static int st_ucs2(httrackp *opt, int argc, char **argv) {
         else if (u <= 0x7FF) {
           expect[len++] = (char) (0xC0 | (u >> 6));
           expect[len++] = (char) (0x80 | (u & 0x3F));
-        } else if (u >= 0xD800 && u <= 0xDFFF)
-          expect[len++] = '?';
-        else {
+        } else if (u >= 0xD800 && u <= 0xDFFF) {
+          expect[len++] = (char) 0xEF;
+          expect[len++] = (char) 0xBF;
+          expect[len++] = (char) 0xBD;
+        } else {
           expect[len++] = (char) (0xE0 | (u >> 12));
           expect[len++] = (char) (0x80 | ((u >> 6) & 0x3F));
           expect[len++] = (char) (0x80 | (u & 0x3F));

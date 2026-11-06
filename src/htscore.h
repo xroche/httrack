@@ -458,12 +458,17 @@ void hts_finish_makeindex(httrackp *opt, int *makeindex_done,
                           const char *template_footer, const char *adr,
                           const char *fil);
 
-/* Re-encode 'size' bytes of UCS2 (UTF-16, BMP only) as UTF-8. 'swap' selects
-   little-endian input, 'size' must be even. Returns a NUL-terminated buffer to
-   release with freet(), its length (NUL excluded) in *outsize, or NULL when the
-   result does not fit memory. */
+/* Re-encode 'size' bytes of UTF-16 as UTF-8, a surrogate outside a pair or a
+   dangling last byte as U+FFFD. 'swap' selects little-endian input. Returns a
+   NUL-terminated buffer to release with freet(), its length (NUL excluded) in
+   *outsize, or NULL when the result does not fit memory. */
 char *hts_ucs2_to_utf8(const unsigned char *src, size_t size, hts_boolean swap,
                        size_t *outsize);
+
+/* Does 'size' bytes of UTF-16 read as text: some ASCII, and next to no lone
+   surrogates, private-use, noncharacters or C0 controls? */
+hts_boolean hts_utf16_looks_like_text(const unsigned char *src, size_t size,
+                                      hts_boolean swap);
 
 // Flush ht_buff[0..ht_len] to save on disk; *fp closed+NULLed on write.
 // Precondition: ht_len>0.

@@ -518,40 +518,77 @@ hts_boolean hts_scan_token(char **ptr, char *dest, size_t destsize) {
   return len < destsize ? HTS_TRUE : HTS_FALSE;
 }
 
-/* UTF-8 byte count of the BMP code point 'unic'; an unpaired surrogate is
-   emitted as a single '?'. Ranges:
-   http://www.unicode.org/reports/tr28/tr28-3.html#conformance */
-static size_t utf8_width(unsigned int unic) {
-  if (unic <= 0x7F)
-    return 1;
-  else if (unic <= 0x7FF)
-    return 2;
-  else if (unic >= 0xD800 && unic <= 0xDFFF)
-    return 1;
-  else
-    return 3;
-}
-
-/* Read the 'i'th UCS2 code unit of 'src'. */
+/* Read the 16-bit code unit at byte offset 'i' of 'src'. */
 static unsigned int ucs2_unit(const unsigned char *src, size_t i,
                               hts_boolean swap) {
-  return swap ? src[i * 2] + (src[i * 2 + 1] << 8)
-              : (src[i * 2] << 8) + src[i * 2 + 1];
+  return swap ? src[i] + (src[i + 1] << 8) : (src[i] << 8) + src[i + 1];
+}
+
+/* Decode the code point at byte offset *i and step past it. A surrogate that
+   is not half of a pair, or a dangling last byte, becomes U+FFFD and sets
+   *lone when the former. */
+static hts_UCS4 utf16_next(const unsigned char *src, size_t size, size_t *i,
+                           hts_boolean swap, hts_boolean *lone) {
+  unsigned int hi;
+
+  if (size - *i < 2) {
+    *i = size;
+    return 0xFFFD;
+  }
+  hi = ucs2_unit(src, *i, swap);
+  *i += 2;
+  if (hi < 0xD800 || hi > 0xDFFF)
+    return hi;
+  if (hi <= 0xDBFF && size - *i >= 2) {
+    const unsigned int lo = ucs2_unit(src, *i, swap);
+
+    if (lo >= 0xDC00 && lo <= 0xDFFF) {
+      *i += 2;
+      return 0x10000 + ((hi - 0xD800) << 10) + (lo - 0xDC00);
+    }
+  }
+  *lone = HTS_TRUE;
+  return 0xFFFD;
+}
+
+hts_boolean hts_utf16_looks_like_text(const unsigned char *src, size_t size,
+                                      hts_boolean swap) {
+  size_t suspicious = 0;
+  size_t ascii = 0;
+  size_t i;
+
+  for (i = 0; i < size;) {
+    hts_boolean lone = HTS_FALSE;
+    const hts_UCS4 cp = utf16_next(src, size, &i, swap, &lone);
+
+    /* Random units land here about 13% of the time, text almost never. */
+    if (lone ||
+        (cp < 0x20 && cp != '\t' && cp != '\n' && cp != '\f' && cp != '\r') ||
+        (cp >= 0xE000 && cp <= 0xF8FF) || cp >= 0xF0000 ||
+        (cp >= 0xFDD0 && cp <= 0xFDEF) || (cp & 0xFFFE) == 0xFFFE)
+      suspicious++;
+    else if (cp >= 0x20 && cp <= 0x7E)
+      ascii++;
+  }
+  return ascii >= 4 && suspicious <= size / 200 ? HTS_TRUE : HTS_FALSE;
 }
 
 char *hts_ucs2_to_utf8(const unsigned char *src, size_t size, hts_boolean swap,
                        size_t *outsize) {
-  const size_t units = size / 2;
   /* Signed and wide, because three bytes per unit overflows a 32-bit size_t. */
   LLint total = 0;
+  hts_boolean lone = HTS_FALSE;
   size_t i;
   size_t offs = 0;
   char *dest;
 
   /* Sized exactly, because one output byte per code unit does not hold: a
      UTF-16 BOM alone is three UTF-8 bytes. */
-  for (i = 0; i < units; i++) {
-    total += (LLint) utf8_width(ucs2_unit(src, i, swap));
+  for (i = 0; i < size;) {
+    char seq[8];
+
+    total += (LLint) hts_writeUTF8(utf16_next(src, size, &i, swap, &lone), seq,
+                                   sizeof(seq));
   }
   if (!hts_inmem_size_fits(total + 1)) {
     return NULL;
@@ -560,22 +597,9 @@ char *hts_ucs2_to_utf8(const unsigned char *src, size_t size, hts_boolean swap,
   if (dest == NULL) {
     return NULL;
   }
-
-  for (i = 0; i < units; i++) {
-    const unsigned int unic = ucs2_unit(src, i, swap);
-
-    if (unic <= 0x7F) {
-      dest[offs++] = (char) unic;
-    } else if (unic <= 0x7FF) {
-      dest[offs++] = (char) (0xC0 | (unic >> 6));
-      dest[offs++] = (char) (0x80 | (unic & 0x3F));
-    } else if (unic >= 0xD800 && unic <= 0xDFFF) {
-      dest[offs++] = '?'; /* ill-formed */
-    } else {
-      dest[offs++] = (char) (0xE0 | (unic >> 12));
-      dest[offs++] = (char) (0x80 | ((unic >> 6) & 0x3F));
-      dest[offs++] = (char) (0x80 | (unic & 0x3F));
-    }
+  for (i = 0; i < size;) {
+    offs += hts_writeUTF8(utf16_next(src, size, &i, swap, &lone), &dest[offs],
+                          (size_t) total + 1 - offs);
   }
   assertf(offs == (size_t) total);
   dest[offs] = '\0';
@@ -1734,41 +1758,40 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
               }
             }
             const hts_boolean ucs2_bom =
-                (r.size >= 2 && r.size % 2 == 0 &&
-                 ((((unsigned char) r.adr[0]) == 0xff &&
-                   ((unsigned char) r.adr[1]) == 0xfe) ||
-                  (((unsigned char) r.adr[0]) == 0xfe &&
-                   ((unsigned char) r.adr[1]) == 0xff)))
+                (r.size >= 2 && ((((unsigned char) r.adr[0]) == 0xff &&
+                                  ((unsigned char) r.adr[1]) == 0xfe) ||
+                                 (((unsigned char) r.adr[0]) == 0xfe &&
+                                  ((unsigned char) r.adr[1]) == 0xff)))
                     ? HTS_TRUE
                     : HTS_FALSE;
+            const hts_boolean ucs2_swap =
+                ucs2_bom && ((unsigned char) r.adr[0]) == 0xff ? HTS_TRUE
+                                                               : HTS_FALSE;
 
-            if (ucs2_bom && map[0] <= r.size / 10)
-              hts_log_print(opt, LOG_WARNING,
-                            "File %s%s has a UCS2 byte order mark but too few "
-                            "NUL bytes, so it is saved as it came and its "
-                            "links are not followed",
-                            adr_nologin(opt, urladr()), urlfil());
-            /* On-the-fly UCS2 to UTF-8 conversion (note: UCS2 should never be used on the net) */
-            if (ucs2_bom && map[0] > r.size / 10) {
+            /* A NUL-heavy body converts as before, any other must read as text.
+             */
+            if (ucs2_bom &&
+                (map[0] > r.size / 10 ||
+                 hts_utf16_looks_like_text((const unsigned char *) r.adr,
+                                           (size_t) r.size, ucs2_swap))) {
               size_t new_size = 0;
-              char *const new_adr = hts_ucs2_to_utf8(
-                  (const unsigned char *) r.adr, (size_t) r.size,
-                  ((unsigned char) r.adr[0]) == 0xff ? HTS_TRUE : HTS_FALSE,
-                  &new_size);
+              char *const new_adr =
+                  hts_ucs2_to_utf8((const unsigned char *) r.adr,
+                                   (size_t) r.size, ucs2_swap, &new_size);
 
               if (new_adr == NULL) {
                 /* Fail the page, not the crawl: http_xfread1() answers the
                    same NULL the same way. */
                 hts_log_print(
                     opt, LOG_ERROR,
-                    "Not enough memory to convert %s%s from UCS2 to UTF-8",
+                    "Not enough memory to convert %s%s from UTF-16 to UTF-8",
                     adr_nologin(opt, urladr()), urlfil());
                 r.statuscode = STATUSCODE_INVALID;
                 strcpybuff(r.msg, "Not enough memory");
                 error = 1;
               } else {
                 hts_log_print(opt, LOG_WARNING,
-                              "File %s%s converted from UCS2 to UTF-8 (old "
+                              "File %s%s converted from UTF-16 to UTF-8 (old "
                               "size: %d bytes, new size: %d bytes)",
                               adr_nologin(opt, urladr()), urlfil(),
                               (int) r.size, (int) new_size);
