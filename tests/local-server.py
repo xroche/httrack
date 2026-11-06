@@ -24,6 +24,7 @@ import socketserver
 import struct
 import sys
 import time
+import zlib
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import quote, unquote, urlsplit
 
@@ -978,6 +979,32 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_raw(
             gzip.compress(b"\0" * 200000),
             "application/octet-stream",
+            extra_headers=[("Content-Encoding", "gzip")],
+        )
+
+    # 257 MiB of zeros in ~260 KB of gzip: just past the default decode cap.
+    _warcgz_huge = None
+
+    @classmethod
+    def warcgz_huge_body(cls):
+        if cls._warcgz_huge is None:
+            z = zlib.compressobj(9, zlib.DEFLATED, 31)
+            chunk = b"\0" * (1 << 20)
+            parts = [z.compress(chunk) for _ in range(257)]
+            cls._warcgz_huge = b"".join(parts) + z.flush()
+        return cls._warcgz_huge
+
+    def route_warcgz_huge_bin(self):
+        self.send_raw(
+            self.warcgz_huge_body(),
+            "application/octet-stream",
+            extra_headers=[("Content-Encoding", "gzip")],
+        )
+
+    def route_warcgz_huge_html(self):
+        self.send_raw(
+            self.warcgz_huge_body(),
+            "text/html",
             extra_headers=[("Content-Encoding", "gzip")],
         )
 
@@ -3938,6 +3965,8 @@ class Handler(SimpleHTTPRequestHandler):
         "/warcgz/page.html": route_warcgz_page,
         "/warcgz/data.bin": route_warcgz_data,
         "/warcgz/big.bin": route_warcgz_big,
+        "/warcgz/huge.bin": route_warcgz_huge_bin,
+        "/warcgz/huge.html": route_warcgz_huge_html,
         "/codec/index.html": route_codec_index,
         "/codec/br.html": route_codec_br,
         "/codec/zstd.html": route_codec_zstd,

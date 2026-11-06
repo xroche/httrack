@@ -17,3 +17,15 @@ bash "$top_srcdir/tests/local-crawl.sh" --errors 1 \
     --not-found 'warcgz/big.bin' \
     --log-found '"File too big".*warcgz/big\.bin' \
     httrack 'BASEURL/warcgz/big.bin' -m100000
+
+# Without -m, a body decoding past 256 MiB is refused the same way.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 1 \
+    --not-found 'warcgz/huge.bin' \
+    --log-found '"File too big".*warcgz/huge\.bin' \
+    httrack 'BASEURL/warcgz/huge.bin'
+
+# -mN limits non-HTML only, so HTML keeps the 256 MiB default.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 1 \
+    --not-found 'warcgz/huge.html' \
+    --log-found '"File too big".*warcgz/huge\.html' \
+    httrack 'BASEURL/warcgz/huge.html' -m5000000
