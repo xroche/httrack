@@ -23,10 +23,14 @@ crawl() {
         >"${tmp}/log" 2>&1 || RC=$?
 }
 
-refused() {
+refused() { # refused MESSAGE ARG...
+    local msg=$1
+    shift
     crawl "$@"
-    { test "${RC}" -ne 0 && test "${RC}" -ne 134; } ||
+    { test "${RC}" -ne 0 && test "${RC}" -ne 134 && test "${RC}" -ne 139 && test "${RC}" -ne 136; } ||
         fail_dump "$* not refused (exit ${RC})" "${tmp}/log"
+    grep -q "${msg}" "${tmp}/log" ||
+        fail_dump "$* refused without ${msg}" "${tmp}/log"
     test -z "$(find "${out}" -name 'page.html' 2>/dev/null)" ||
         fail_dump "$* still mirrored" "${tmp}/log"
 }
@@ -34,13 +38,27 @@ refused() {
 accepted() {
     crawl "$@"
     assert_eq 0 "${RC}" "$* exited"
+    test -n "$(find "${out}" -name 'page.html' 2>/dev/null)" ||
+        fail_dump "$* mirrored nothing" "${tmp}/log"
 }
 
 accepted --warc-max-size 1048576
+accepted --warc-max-size " 10 "
+accepted -%c0
+accepted -%c0.000001
+accepted -%c0.5
 accepted --connection-per-second=0.5
-for v in abc -5 10X 99999999999999999999 ""; do
-    refused --warc-max-size "$v"
+
+W='warc-max-size needs a non-negative number'
+refused "warc-max-size needs a blank space and a size" --warc-max-size=-5
+for v in abc 10X +5 "" 99999999999999999999; do
+    refused "${W}" "--warc-max-size=${v}"
+    refused "${W}" --warc-max-size "${v}"
 done
-for v in 0.0000001 nan inf 1e99; do
-    refused "-%c${v}"
-done
+
+C='connection-per-second needs a rate'
+refused "${C}" -%c0.0000001
+refused "${C}" -%c1e-7
+refused "${C}" -%cnan
+refused "${C}" -%c1e99
+refused "${C}" -%c1000000000000000000000000000000000000000

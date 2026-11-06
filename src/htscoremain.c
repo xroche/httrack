@@ -2423,9 +2423,15 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                     // (single file)
                     char *end;
                     LLint v;
+                    const char *num = argv[na];
+
+                    while (isspace((unsigned char) *num))
+                      num++;
                     errno = 0;
-                    v = strtoll(argv[na], &end, 10);
-                    if (isdigit((unsigned char) argv[na][0]) && *end == '\0' &&
+                    v = strtoll(num, &end, 10);
+                    while (isspace((unsigned char) *end))
+                      end++;
+                    if (isdigit((unsigned char) *num) && *end == '\0' &&
                         errno != ERANGE) {
                       opt->warc_max_size = v;
                     } else {
