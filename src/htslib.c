@@ -2230,22 +2230,20 @@ static void keep_alive_param(const char *s, int *value) {
     *value = got == HTS_SCAN_OK ? (int) v : 0;
 }
 
-// traiter ligne par ligne l'en tête
-// gestion des cookies
-/* RFC 6265 5.1.4 default-path of request path fil, as a length into fil; 0
-   means "/". A directory too long for the jar backs off to an ancestor. */
+/* RFC 6265 5.1.4 default-path of request path fil, as a length into fil below
+   size, the destination capacity; 0 means "/". A directory too long backs off
+   to an ancestor. */
 static size_t cookie_default_path_len(const char *fil, size_t size) {
   size_t len = fil != NULL && fil[0] == '/' ? strcspn(fil, "?") : 0;
 
-  while (len > 0 && fil[len - 1] != '/')
-    len--;
-  if (len > 0)
-    len--; // drop the rightmost "/"
+  // fil[len] is never "/" at the start, so this stops on the rightmost one
   while (len > 0 && (len >= size || fil[len] != '/'))
     len--;
   return len;
 }
 
+// traiter ligne par ligne l'en tête
+// gestion des cookies
 void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * retour,
                char *rcvd) {
   treathead_opt(NULL, cookie, adr, fil, retour, rcvd);
@@ -2592,7 +2590,7 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
                 break;
               }
             } else if (strfield2(name, "path")) {
-              if (value_len == 0 || value[0] != '/') {
+              if (value[0] != '/') {
                 strcpybuff(path, defpath); // RFC 6265 5.2.4
               } else if ((size_t) value_len < sizeof(path) - 1) {
                 strcpybuff(path, value);
