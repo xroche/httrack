@@ -38,6 +38,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htscore.h"
 #include "htslib.h"
+#include "htslines.h"
 #include "htsio.h"
 #include "htsback.h"
 #include "htstools.h"
@@ -866,7 +867,6 @@ static int cdx_cmp(const void *a, const void *b) {
 /* Sort and write the accumulated CDXJ lines to <base>.cdx. */
 static void warc_cdx_flush(warc_writer *w) {
   FILE *f;
-  char catbuff[CATBUFF_SIZE];
   size_t i;
   int werr, cerr;
   if (!w->cdx_on || w->cdx_path == NULL)
@@ -881,7 +881,7 @@ static void warc_cdx_flush(warc_writer *w) {
     return;
   }
   qsort(w->cdx_lines, w->cdx_count, sizeof(char *), cdx_cmp);
-  f = FOPEN(fconv(catbuff, sizeof(catbuff), w->cdx_path), "wb");
+  f = hts_fopen_private(w->cdx_path, "wb");
   if (f == NULL) {
     hts_log_print(w->opt, LOG_ERROR | LOG_ERRNO,
                   "WARC: could not write the index %s", w->cdx_path);
@@ -1053,7 +1053,18 @@ static void warc_wacz_package(warc_writer *w) {
   snprintf(tmppath, sizeof(tmppath), "%s.wacz.tmp", w->base_path);
   /* Build into a temp; only full success replaces <base>.wacz, so a zero-record
      re-run can't destroy a good archive (#522). */
-  zf = hts_zipOpen_utf8(fconv(catbuff, sizeof(catbuff), tmppath), 0);
+  /* the zip library reopens this file and keeps its owner-only mode */
+  zf = NULL;
+  {
+    FILE *const pre = hts_fopen_private(tmppath, "wb");
+
+    if (pre != NULL) {
+      fclose(pre);
+      zf = hts_zipOpen_utf8(fconv(catbuff, sizeof(catbuff), tmppath), 0);
+      if (zf == NULL)
+        (void) UNLINK(tmppath);
+    }
+  }
   if (zf == NULL) {
     hts_log_print(w->opt, LOG_WARNING, "WACZ: could not create %s", tmppath);
     return;
@@ -1349,16 +1360,14 @@ static int warc_write_warcinfo_record(warc_writer *w) {
 static int warc_rotate(warc_writer *w) {
   char namebuf[HTS_URLMAXSIZE * 2];
   char openbuf[HTS_URLMAXSIZE * 2 + sizeof(WARC_TMP_SUFFIX)];
-  char catbuff[CATBUFF_SIZE];
   const unsigned next = w->seg + 1;
   FILE *f;
   snprintf(namebuf, sizeof(namebuf), "%s-%05u%s", w->seg_base, next,
            w->seg_ext);
   /* Open before advancing: w->seg must only ever name a segment that exists,
      or close-time packaging and swapping would work on a missing file. */
-  f = FOPEN(fconv(catbuff, sizeof(catbuff),
-                  warc_open_path(w, namebuf, openbuf, sizeof(openbuf))),
-            "wb");
+  f = hts_fopen_private(warc_open_path(w, namebuf, openbuf, sizeof(openbuf)),
+                        "wb");
   if (f == NULL)
     return -1;
   if (w->f != NULL)
@@ -1582,9 +1591,9 @@ warc_writer *warc_open(httrackp *opt, const char *path) {
   }
   /* Set only once arc_path is recorded, so a half-built writer never swaps. */
   w->protect_prev = fsize_utf8(path) > 0 ? HTS_TRUE : HTS_FALSE;
-  w->f = FOPEN(fconv(catbuff, sizeof(catbuff),
-                     warc_open_path(w, path, openbuf, sizeof(openbuf))),
-               "wb");
+  /* the archive keeps Cookie and Authorization headers: owner-only */
+  w->f = hts_fopen_private(warc_open_path(w, path, openbuf, sizeof(openbuf)),
+                           "wb");
   if (w->f == NULL) {
     warc_close(w);
     return NULL;
