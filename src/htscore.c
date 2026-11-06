@@ -518,25 +518,43 @@ hts_boolean hts_scan_token(char **ptr, char *dest, size_t destsize) {
   return len < destsize ? HTS_TRUE : HTS_FALSE;
 }
 
-/* UTF-8 byte count of the BMP code point 'unic'; an unpaired surrogate is
-   emitted as a single '?'. Ranges:
+/* UTF-8 byte count of the code point 'unic'. Ranges:
    http://www.unicode.org/reports/tr28/tr28-3.html#conformance */
 static size_t utf8_width(unsigned int unic) {
   if (unic <= 0x7F)
     return 1;
   else if (unic <= 0x7FF)
     return 2;
-  else if (unic >= 0xD800 && unic <= 0xDFFF)
-    return 1;
-  else
+  else if (unic <= 0xFFFF)
     return 3;
+  else
+    return 4;
 }
 
-/* Read the 'i'th UCS2 code unit of 'src'. */
+/* Read the 'i'th UTF-16 code unit of 'src'. */
 static unsigned int ucs2_unit(const unsigned char *src, size_t i,
                               hts_boolean swap) {
   return swap ? src[i * 2] + (src[i * 2 + 1] << 8)
               : (src[i * 2] << 8) + src[i * 2 + 1];
+}
+
+/* Decode the code point at unit *i of 'units' and step past it. A surrogate
+   that is not half of a pair becomes U+FFFD. */
+static unsigned int utf16_next(const unsigned char *src, size_t units,
+                               size_t *i, hts_boolean swap) {
+  const unsigned int hi = ucs2_unit(src, (*i)++, swap);
+
+  if (hi < 0xD800 || hi > 0xDFFF)
+    return hi;
+  if (hi <= 0xDBFF && *i < units) {
+    const unsigned int lo = ucs2_unit(src, *i, swap);
+
+    if (lo >= 0xDC00 && lo <= 0xDFFF) {
+      (*i)++;
+      return 0x10000 + ((hi - 0xD800) << 10) + (lo - 0xDC00);
+    }
+  }
+  return 0xFFFD;
 }
 
 char *hts_ucs2_to_utf8(const unsigned char *src, size_t size, hts_boolean swap,
@@ -550,8 +568,8 @@ char *hts_ucs2_to_utf8(const unsigned char *src, size_t size, hts_boolean swap,
 
   /* Sized exactly, because one output byte per code unit does not hold: a
      UTF-16 BOM alone is three UTF-8 bytes. */
-  for (i = 0; i < units; i++) {
-    total += (LLint) utf8_width(ucs2_unit(src, i, swap));
+  for (i = 0; i < units;) {
+    total += (LLint) utf8_width(utf16_next(src, units, &i, swap));
   }
   if (!hts_inmem_size_fits(total + 1)) {
     return NULL;
@@ -561,18 +579,21 @@ char *hts_ucs2_to_utf8(const unsigned char *src, size_t size, hts_boolean swap,
     return NULL;
   }
 
-  for (i = 0; i < units; i++) {
-    const unsigned int unic = ucs2_unit(src, i, swap);
+  for (i = 0; i < units;) {
+    const unsigned int unic = utf16_next(src, units, &i, swap);
 
     if (unic <= 0x7F) {
       dest[offs++] = (char) unic;
     } else if (unic <= 0x7FF) {
       dest[offs++] = (char) (0xC0 | (unic >> 6));
       dest[offs++] = (char) (0x80 | (unic & 0x3F));
-    } else if (unic >= 0xD800 && unic <= 0xDFFF) {
-      dest[offs++] = '?'; /* ill-formed */
-    } else {
+    } else if (unic <= 0xFFFF) {
       dest[offs++] = (char) (0xE0 | (unic >> 12));
+      dest[offs++] = (char) (0x80 | ((unic >> 6) & 0x3F));
+      dest[offs++] = (char) (0x80 | (unic & 0x3F));
+    } else {
+      dest[offs++] = (char) (0xF0 | (unic >> 18));
+      dest[offs++] = (char) (0x80 | ((unic >> 12) & 0x3F));
       dest[offs++] = (char) (0x80 | ((unic >> 6) & 0x3F));
       dest[offs++] = (char) (0x80 | (unic & 0x3F));
     }
@@ -1742,14 +1763,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
                     ? HTS_TRUE
                     : HTS_FALSE;
 
-            if (ucs2_bom && map[0] <= r.size / 10)
-              hts_log_print(opt, LOG_WARNING,
-                            "File %s%s has a UCS2 byte order mark but too few "
-                            "NUL bytes, so it is saved as it came and its "
-                            "links are not followed",
-                            adr_nologin(opt, urladr()), urlfil());
-            /* On-the-fly UCS2 to UTF-8 conversion (note: UCS2 should never be used on the net) */
-            if (ucs2_bom && map[0] > r.size / 10) {
+            /* The BOM decides, not the NUL count: mostly-CJK text has few. */
+            if (ucs2_bom) {
               size_t new_size = 0;
               char *const new_adr = hts_ucs2_to_utf8(
                   (const unsigned char *) r.adr, (size_t) r.size,

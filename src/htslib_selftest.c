@@ -1224,14 +1224,25 @@ static int st_ucs4_oom(httrackp *opt, int argc, char **argv) {
 }
 
 static int st_ucs2(httrackp *opt, int argc, char **argv) {
-  /* A BOM, ASCII, a two-byte and a three-byte code point, and an unpaired
-     surrogate: only the ASCII one is a single output byte. */
-  static const unsigned short mixed[] = {0xFEFF, 'a', 0x00E9, 0x20AC, 0xD800};
+  /* A BOM, ASCII, a two-byte and a three-byte code point, a surrogate pair
+     and an unpaired surrogate: only the ASCII one is a single output byte. */
+  static const unsigned short mixed[] = {0xFEFF, 'a',    0x00E9, 0x20AC,
+                                         0xD83D, 0xDE00, 0xD800};
   static const char mixed_utf8[] = "\xEF\xBB\xBF"
                                    "a"
                                    "\xC3\xA9"
                                    "\xE2\x82\xAC"
-                                   "?";
+                                   "\xF0\x9F\x98\x80"
+                                   "\xEF\xBF\xBD";
+  /* The ends of the supplementary range, and halves out of order. */
+  static const unsigned short pairs[] = {0xD800, 0xDC00, 0xDBFF, 0xDFFF,
+                                         0xDC00, 0xD800, 'b',    0xDBFF};
+  static const char pairs_utf8[] = "\xF0\x90\x80\x80"
+                                   "\xF4\x8F\xBF\xBF"
+                                   "\xEF\xBF\xBD"
+                                   "\xEF\xBF\xBD"
+                                   "b"
+                                   "\xEF\xBF\xBD";
   static const unsigned short empty[] = {0};
 
   (void) opt;
@@ -1288,7 +1299,10 @@ static int st_ucs2(httrackp *opt, int argc, char **argv) {
     if (ucs2_check(mixed, sizeof(mixed) / sizeof(mixed[0]), mixed_utf8,
                    HTS_FALSE))
       err = 1;
-    /* Every BMP code unit, to pin the encoder against its ranges. */
+    if (ucs2_check(pairs, sizeof(pairs) / sizeof(pairs[0]), pairs_utf8,
+                   HTS_TRUE))
+      err = 1;
+    /* Every code unit alone, to pin the encoder against its ranges. */
     {
       unsigned int u;
 
@@ -1302,9 +1316,11 @@ static int st_ucs2(httrackp *opt, int argc, char **argv) {
         else if (u <= 0x7FF) {
           expect[len++] = (char) (0xC0 | (u >> 6));
           expect[len++] = (char) (0x80 | (u & 0x3F));
-        } else if (u >= 0xD800 && u <= 0xDFFF)
-          expect[len++] = '?';
-        else {
+        } else if (u >= 0xD800 && u <= 0xDFFF) {
+          expect[len++] = (char) 0xEF;
+          expect[len++] = (char) 0xBF;
+          expect[len++] = (char) 0xBD;
+        } else {
           expect[len++] = (char) (0xE0 | (u >> 12));
           expect[len++] = (char) (0x80 | ((u >> 6) & 0x3F));
           expect[len++] = (char) (0x80 | (u & 0x3F));

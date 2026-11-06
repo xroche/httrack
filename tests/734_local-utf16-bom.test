@@ -1,0 +1,96 @@
+#!/bin/bash
+#
+# A page opening with a UTF-16 BOM is saved as UTF-8 and parsed, however few
+# NUL bytes it holds, and a surrogate pair becomes one 4-byte sequence.
+
+set -euo pipefail
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+python=$(find_python) || skip "python3 not found"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_utf16.XXXXXX") || exit 1
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+mkdir "${tmpdir}/docroot"
+"$python" - "$(nativepath "${tmpdir}/docroot")" <<'PY'
+import os
+import sys
+
+root = sys.argv[1]
+CJK = "中文" * 300  # few NUL bytes in UTF-16
+
+
+def page(body, link):
+    return '<html><body><p>%s</p><a href="%s">next</a></body></html>' % (body, link)
+
+
+def put(name, data):
+    with open(os.path.join(root, name), "wb") as f:
+        f.write(data)
+
+
+smile = "\U0001f600"
+lone = "\ud800"  # an unpaired high surrogate
+put("le.html", b"\xff\xfe" + page(CJK + smile + lone, "le-next.html").encode("utf-16-le", "surrogatepass"))
+put("be.html", b"\xfe\xff" + page(CJK + smile + lone, "be-next.html").encode("utf-16-be", "surrogatepass"))
+put("asc.html", b"\xff\xfe" + page("ascii", "asc-next.html").encode("utf-16-le"))
+put("nobom.html", page("ascii", "nobom-next.html").encode("utf-16-le"))
+put("u8.html", page(CJK + smile, "u8-next.html").encode())
+for n in ("le", "be", "asc", "nobom", "u8"):
+    put(n + "-next.html", b"<html><body>next</body></html>")
+links = "".join('<a href="%s.html">%s</a>' % (n, n) for n in ("le", "be", "asc", "nobom", "u8"))
+put("index.html", ("<html><body>%s</body></html>" % links).encode())
+PY
+
+local_server_start --root "${tmpdir}/docroot"
+require_httrack
+
+local_crawl --log "${tmpdir}/log" -O "${tmpdir}/out" --quiet --robots=0 \
+    --timeout=30 --retries=0 "${BASEURL}/index.html"
+
+"$python" - "$(nativepath "$tmpdir")" "$SRV_PORT" <<'PY'
+import os
+import sys
+
+tmpdir, port = sys.argv[1], sys.argv[2]
+mirror = os.path.join(tmpdir, "out", "127.0.0.1_%s" % port)
+src = os.path.join(tmpdir, "docroot")
+failed = []
+
+
+def check(label, cond):
+    print("[%s] ..\t%s" % (label, "OK" if cond else "FAIL"))
+    if not cond:
+        failed.append(label)
+
+
+def rd(base, name):
+    with open(os.path.join(base, name), "rb") as f:
+        return f.read()
+
+
+CJK = ("中文" * 300).encode()
+SMILE = "\U0001f600".encode()
+FFFD = "�".encode()
+for n in ("le", "be"):
+    got = rd(mirror, n + ".html")
+    check(n + ": text decoded", CJK in got)
+    check(n + ": pair is one 4-byte sequence", SMILE + FFFD in got)
+    check(n + ": no NUL left", b"\0" not in got)
+    check(n + ": link followed", os.path.exists(os.path.join(mirror, n + "-next.html")))
+check("asc: still decoded", b"<p>ascii</p>" in rd(mirror, "asc.html"))
+check("asc: link followed", os.path.exists(os.path.join(mirror, "asc-next.html")))
+
+# Controls: what carries no BOM is saved as before.
+assert b"\0" in rd(src, "nobom.html")
+check("u8: bytes kept", b"<p>" + CJK + SMILE + b"</p>" in rd(mirror, "u8.html"))
+check("u8: link followed", os.path.exists(os.path.join(mirror, "u8-next.html")))
+check("nobom: NULs blanked, not decoded",
+      rd(src, "nobom.html").replace(b"\0", b" ") in rd(mirror, "nobom.html"))
+check("nobom: link not followed", not os.path.exists(os.path.join(mirror, "nobom-next.html")))
+sys.exit(1 if failed else 0)
+PY
