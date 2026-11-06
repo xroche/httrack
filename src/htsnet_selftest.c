@@ -1418,6 +1418,21 @@ static int st_socaddr(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+#ifndef _WIN32
+/* Only the sockets below FD_SETSIZE may go into an fd_set. */
+static int st_selectable(httrackp *opt, int argc, char **argv) {
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  assertf(hts_soc_selectable(0));
+  assertf(hts_soc_selectable(FD_SETSIZE - 1));
+  assertf(!hts_soc_selectable(FD_SETSIZE));
+  assertf(!hts_soc_selectable(INVALID_SOCKET));
+  printf("selectable OK\n");
+  return 0;
+}
+#endif
+
 /* ------------------------------------------------------------ */
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
@@ -1446,6 +1461,8 @@ const struct selftest_entry selftests_net[] = {
      "the capture proxy binds loopback and advertises the address it bound",
      st_catchurl_bind},
 #ifndef _WIN32
+    {"selectable", "", "which socket numbers may go into an fd_set",
+     st_selectable},
     {"sigpipe", "", "a write to a vanished peer must not kill the process",
      st_sigpipe},
 #endif
