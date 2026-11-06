@@ -1,0 +1,8 @@
+﻿# HTTrack bundle 1.3
+scope WWW.alpha.test
+scope .beta.test
+scope 127.0.0.1
+ua	N	x
+header X-N:	1
+cookies
+.alpha.test	TRUE	/	FALSE	0	N	v

@@ -1,0 +1,6 @@
+# HTTrack bundle 1
+url https://login.a.test/
+scope a.test
+cookies
+.b-cdn.test	TRUE	/	FALSE	0	OUT	side
+.a.test	TRUE	/	TRUE	1770000000	SEC	s1
