@@ -766,7 +766,6 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
 #if FTP_PASV
   int port_pasv = 0;
 #endif
-  char BIGSTK adr_ip[1024];
   char *adr, *real_adr;
   char BIGSTK ftp_path[CATBUFF_SIZE]; // the decoded URL path, screened once
   /* opt->timeout == 0 means unlimited; use INT_MAX so 0 doesn't make the read
@@ -783,7 +782,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
   SOCaddr server_data;
 
   //
-  line_retr[0] = adr_ip[0] = ftp_path[0] = '\0';
+  line_retr[0] = ftp_path[0] = '\0';
 
   // effacer
   strcpybuff(back->r.msg, "");
@@ -962,7 +961,10 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
         _CHECK_HALT_FTP;
         if (line[0] == '2') {
           // e.g. 227 Entering Passive Mode (123,45,67,89,177,27)
-          if (!ftp_parse_pasv(line, adr_ip, sizeof(adr_ip), &port_pasv)) {
+          char ignored_ip[64]; // data goes to the control peer
+
+          if (!ftp_parse_pasv(line, ignored_ip, sizeof(ignored_ip),
+                              &port_pasv)) {
             htsblk_failf(&back->r, "PASV incorrect: %s", linejmp(line));
             back->r.statuscode = STATUSCODE_INVALID;
           }
@@ -1064,8 +1066,6 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
         // Ok, se connecter
         if (port_pasv) {
           SOCaddr server;
-          hts_boolean resolved;
-          const char *error = "unknown error";
 
           // effacer structure
           memset(&server, 0, sizeof(server));
@@ -1073,62 +1073,45 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
           // infos
           strcpybuff(back->info, "resolv");
 
-          // résoudre
-          if (adr_ip[0]) {
-            resolved = ftp_dns_resolve(opt, back, adr_ip, &server, timeout,
-                                       &error) != NULL;
-          } else {
-            SOCaddr_copy_SOCaddr(server, server_data);
-            resolved = HTS_TRUE;
-          }
+          SOCaddr_copy_SOCaddr(server, server_data);
 
           // infos
           strcpybuff(back->info, "cnxdata");
-#if FTP_DEBUG
-          printf("Data: Connecting to %s:%d...\n", adr_ip, port_pasv);
-#endif
-          if (resolved) {
-            // socket
-            soc_dat =
-                hts_socket_client(SOCaddr_sinfamily(server), opt, HTS_FALSE);
-            if (soc_dat != INVALID_SOCKET) {
-              // structure: connexion au domaine internet, port 80 (ou autre)
-              SOCaddr_initport(server, port_pasv);
-              if (ftp_connect(back, soc_dat, &server, timeout, opt)) {
-                strcpybuff(back->info, "retr");
-                // clip, never abort: this line is built from a crawled URL
-                line[0] = '\0';
-                strlncatbuff(line, line_retr, sizeof(line), sizeof(line) - 1);
-                send_line(soc_ctl, line);
-                get_ftp_line(back, soc_ctl, line, sizeof(line), timeout, opt);
-                _CHECK_HALT_FTP;
-                if (line[0] == '1') {
-                  // OK
-                } else {
-                  deletesoc(soc_dat);
-                  soc_dat = INVALID_SOCKET;
-                  //
-                  htsblk_failf(&back->r, "RETR command error: %s",
-                               linejmp(line));
-                  back->r.statuscode = STATUSCODE_INVALID;
-                }               // sinon on est prêts
+          // socket
+          soc_dat =
+              hts_socket_client(SOCaddr_sinfamily(server), opt, HTS_FALSE);
+          if (soc_dat != INVALID_SOCKET) {
+            // structure: connexion au domaine internet, port 80 (ou autre)
+            SOCaddr_initport(server, port_pasv);
+            if (ftp_connect(back, soc_dat, &server, timeout, opt)) {
+              strcpybuff(back->info, "retr");
+              // clip, never abort: this line is built from a crawled URL
+              line[0] = '\0';
+              strlncatbuff(line, line_retr, sizeof(line), sizeof(line) - 1);
+              send_line(soc_ctl, line);
+              get_ftp_line(back, soc_ctl, line, sizeof(line), timeout, opt);
+              _CHECK_HALT_FTP;
+              if (line[0] == '1') {
+                // OK
               } else {
-#if FTP_DEBUG
-                printf("Data: unable to connect\n");
-#endif
                 deletesoc(soc_dat);
                 soc_dat = INVALID_SOCKET;
                 //
-                strcpybuff(back->r.msg, "Unable to connect");
+                htsblk_failf(&back->r, "RETR command error: %s", linejmp(line));
                 back->r.statuscode = STATUSCODE_INVALID;
               } // sinon on est prêts
             } else {
-              strcpybuff(back->r.msg, "Unable to create a socket");
+#if FTP_DEBUG
+              printf("Data: unable to connect\n");
+#endif
+              deletesoc(soc_dat);
+              soc_dat = INVALID_SOCKET;
+              //
+              strcpybuff(back->r.msg, "Unable to connect");
               back->r.statuscode = STATUSCODE_INVALID;
-            }                   // sinon on est prêts
+            } // sinon on est prêts
           } else {
-            htsblk_failf(&back->r, "Unable to resolve IP %s: %s", adr_ip,
-                         error);
+            strcpybuff(back->r.msg, "Unable to create a socket");
             back->r.statuscode = STATUSCODE_INVALID;
           } // sinon on est prêts
         } else {

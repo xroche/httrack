@@ -1608,6 +1608,11 @@ static const struct {
     {"date", "Sun, 06 Nov 1994 08:49:37 \t+1", NULL},
     {"date", "Sun, 06 Nov 1994 08:49:37 ++1", NULL},
     {"date", "4294967302 Nov 1994 08:49:37", "none"},
+    /* a zone letter or a month fragment is not a month */
+    {"date", "Sun, 06 Nov 1994 08:49:37 N", "y=94 m=10 d=6 8:49:37"},
+    {"date", "Sun, 06 Nov 1994 08:49:37 C", "y=94 m=10 d=6 8:49:37"},
+    {"date", "Sun, 06 Nov 1994 08:49:37 S", "y=94 m=10 d=6 8:49:37"},
+    {"date", "Sun, 06 ov 1994 08:49:37 GMT", "none"},
     {"server-length", " 50", NULL},
     {"server-length", " abc", NULL},
     {"server-length", " -5", NULL},
