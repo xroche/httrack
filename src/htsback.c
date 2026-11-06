@@ -2272,6 +2272,12 @@ int back_searchlive(httrackp * opt, struct_back * sback, const char *search_addr
   for(i = 0; i < back_max; i++) {
     if (back_status(&back[i]) == STATUS_ALIVE) {
       if (strfield2(back[i].url_adr, search_addr)) {    /* same location (xxc: check also virtual hosts?) */
+#if HTS_USEOPENSSL
+        // opened before --check-cert was turned on, so never verified
+        if (opt->check_cert == HTS_TRUE && back[i].r.ssl_con != NULL &&
+            (SSL_get_verify_mode(back[i].r.ssl_con) & SSL_VERIFY_PEER) == 0)
+          continue;
+#endif
         if (time_local() < back[i].ka_time_start + back[i].r.keep_alive_t) {
           return i;
         }

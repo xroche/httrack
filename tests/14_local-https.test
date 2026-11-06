@@ -2,9 +2,9 @@
 #
 # HTTPS crawl against the local test server, using the shipped self-signed
 # cert. httrack does not verify certs without --check-cert (test 735), so the
-# self-signed cert is accepted as-is and this
-# exercises the real TLS path offline. basic.html links to link.html with four
-# distinct query strings, each saved under a hashed name -> 5 files.
+# self-signed cert is accepted as-is and this exercises the real TLS path
+# offline. basic.html links to link.html with four distinct query strings, each
+# saved under a hashed name -> 5 files.
 
 : "${top_srcdir:=..}"
 

@@ -5129,6 +5129,11 @@ hts_boolean hts_ssl_check_cert(SSL *ssl, const char *url_adr) {
   if (state != 1 || param == NULL)
     return HTS_FALSE;
   if (hts_sni_hostname(url_adr, name, sizeof(name))) {
+    const size_t len = strlen(name);
+
+    /* certificates name "host", never the absolute "host." */
+    if (len > 1 && name[len - 1] == '.')
+      name[len - 1] = '\0';
     if (X509_VERIFY_PARAM_set1_host(param, name, 0) != 1)
       return HTS_FALSE;
   } else {
@@ -7961,8 +7966,7 @@ HTSEXT_API int hts_init(void) {
       abortLog("unable to initialize TLS: SSL_CTX_new()");
       assertf("unable to initialize TLS" == NULL);
     }
-    /* TLS floor (no SSLv3/TLS1.0/1.1); certs are checked only on --check-cert
-     */
+    /* TLS floor (no SSLv3/TLS1.0/1.1); --check-cert verifies certs */
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
     SSL_CTX_set_min_proto_version(openssl_ctx, TLS1_2_VERSION);
 #else
