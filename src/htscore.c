@@ -4482,6 +4482,8 @@ int check_flot(T_SOC s) {
   fd_set fds;
   struct timeval tv;
 
+  if (!hts_soc_selectable(s))
+    return 0;
   FD_ZERO(&fds);
   FD_SET((T_SOC) s, &fds);
   tv.tv_sec = 0;
@@ -4510,6 +4512,8 @@ int check_sockerror(T_SOC s) {
   fd_set fds;
   struct timeval tv;
 
+  if (!hts_soc_selectable(s))
+    return 1;
   FD_ZERO(&fds);
   FD_SET((T_SOC) s, &fds);
   tv.tv_sec = 0;

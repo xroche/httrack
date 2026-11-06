@@ -160,6 +160,8 @@ HTS_UNUSED static int check_readinput_t(T_SOC soc, int timeout) {
     fd_set fds;                 // poll structures
     struct timeval tv;          // structure for select
 
+    if (!hts_soc_selectable(soc))
+      return 0;
     if (linputsoc_deadline != 0) {
       const time_t left = linputsoc_deadline - time(NULL);
 

@@ -2767,6 +2767,8 @@ int check_readinput(htsblk * r) {
     const int soc = (int) r->soc;
 
     assertf(soc == r->soc);
+    if (!hts_soc_selectable(soc))
+      return 0;
     FD_ZERO(&fds);
     FD_SET(soc, &fds);
     tv.tv_sec = 0;
@@ -2788,6 +2790,8 @@ int check_readinput_t(T_SOC soc, int timeout) {
     const int isoc = (int) soc;
 
     assertf(isoc == soc);
+    if (!hts_soc_selectable(isoc))
+      return 0;
     FD_ZERO(&fds);
     FD_SET(isoc, &fds);
     tv.tv_sec = timeout;
@@ -2809,6 +2813,8 @@ int check_writeinput_t(T_SOC soc, int timeout) {
     const int isoc = (int) soc;
 
     assertf(isoc == soc);
+    if (!hts_soc_selectable(isoc))
+      return 0;
     FD_ZERO(&fds);
     FD_SET(isoc, &fds);
     tv.tv_sec = timeout;

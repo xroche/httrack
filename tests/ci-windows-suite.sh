@@ -326,6 +326,7 @@ ci_suite_heartbeat() {
 # engine-sigterm-noatexit forks a child per case and raises SIGINT at it, and
 # Windows has neither fork() nor that disposition.
 # private-run-files checks POSIX file modes, which Windows does not have.
+# fd-setsize tests the POSIX fd_set ceiling, and a Winsock fd_set has none.
 expected_skips_msys="01_engine-usercommand.test
 01_engine-footer-overflow.test
 253_local-ftp-close-once.test
@@ -371,7 +372,8 @@ expected_skips_msys="01_engine-usercommand.test
 481_local-chunked-oom.test
 494_local-mptcp.test
 01_engine-mptcp.test
-658_local-private-run-files.test"
+658_local-private-run-files.test
+718_local-fd-setsize.test"
 
 # Measured, not predicted: windows-build run 33927128153, both platforms alike.
 # Written out rather than derived from the msys list above: the two lists are
@@ -397,6 +399,7 @@ expected_skips_msys="01_engine-usercommand.test
 # engine-sigterm-noatexit forks a child per case and raises SIGINT at it, and
 # Windows has neither fork() nor that disposition.
 # private-run-files checks POSIX file modes, which Windows does not have.
+# fd-setsize tests the POSIX fd_set ceiling, and a Winsock fd_set has none.
 expected_skips_wsl2="01_engine-usercommand.test
 01_engine-footer-overflow.test
 253_local-ftp-close-once.test
@@ -443,7 +446,8 @@ expected_skips_wsl2="01_engine-usercommand.test
 481_local-chunked-oom.test
 494_local-mptcp.test
 01_engine-mptcp.test
-658_local-private-run-files.test"
+658_local-private-run-files.test
+718_local-fd-setsize.test"
 
 # Sets ci_skip_list to the pinned skip set for backend $1, failing loudly if
 # there is none: an unknown backend must never fall back to an empty list,
