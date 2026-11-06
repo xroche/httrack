@@ -26,10 +26,9 @@ jar "$REC|sess|\" a \"" 'Cookie: sess=" a "' 'Set-Cookie: sess=" a "'
 # "Set value with unbalanced leading quote" (cookies/value/value.html).
 jar "$REC|a|\"" 'Cookie: a="' 'Set-Cookie: a="'
 # Every cookie-av value comes through the same scan, so a quoted path keeps its
-# quotes too and then matches nothing, as the empty Cookie line says. A quoted
+# quotes, does not start with "/" and gets the default path (5.2.4). A quoted
 # domain is no domain of the host, so the cookie is not stored at all.
-jar "example.com|FALSE|\"/d\"|FALSE|0|sess|a" '' \
-    'Set-Cookie: sess=a; path="/d"'
+jar "$REC|sess|a" 'Cookie: sess=a' 'Set-Cookie: sess=a; path="/d"'
 jar '' '' 'Set-Cookie: sess=a; domain="example.com"'
 # A single quote is a cookie-octet too, so the scan keeps it like a DQUOTE.
 jar "$REC|sess|'ab'" "Cookie: sess='ab'" "Set-Cookie: sess='ab'"

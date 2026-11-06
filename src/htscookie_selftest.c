@@ -1343,6 +1343,80 @@ static int st_cookiesetscope(httrackp *opt, int argc, char **argv) {
       err = 1;
     }
   }
+  /* RFC 6265 5.1.4 default-path, and 5.2.4 for a Path= not starting "/" */
+  {
+    static const struct {
+      const char *fil, *attr, *qpath;
+      hts_boolean want;
+    } dp[] = {
+        {"/a/b/c", "", "/a/b/x", HTS_TRUE},
+        {"/a/b/c", "", "/a/bc", HTS_FALSE},
+        {"/a/b/c", "", "/", HTS_FALSE},
+        {"/a//c", "", "/a/x", HTS_TRUE},
+        {"/a", "", "/z", HTS_TRUE},
+        {"a/b/c", "", "/z", HTS_TRUE},
+        {"/a/b?q=/c/d", "", "/a/z", HTS_TRUE},
+        {"/a/b?q=/c/d", "", "/z", HTS_FALSE},
+        {"/a/b", "; Path=foo", "/a/z", HTS_TRUE},
+        {"/a/b", "; Path=foo", "/z", HTS_FALSE},
+        {"/a/b", "; Path=", "/z", HTS_FALSE},
+        {"/a/b", "; Path=/z", "/z/q", HTS_TRUE},
+        {"/a/b", "; Path=/z; Path=foo", "/z/q", HTS_FALSE},
+    };
+
+    char line[256];
+    htsblk r;
+
+    for (i = 0; i < sizeof(dp) / sizeof(dp[0]); i++) {
+      jar.data[0] = '\0';
+      memset(&r, 0, sizeof(r));
+      snprintf(line, sizeof(line), "Set-Cookie: dp=1%s", dp[i].attr);
+      treathead(&jar, "dp.test", dp[i].fil, &r, line);
+      http_cookie_header(&jar, "dp.test", dp[i].qpath, hdr, sizeof(hdr));
+      if (cookie_sent(hdr, "dp=1") != dp[i].want) {
+        printf("%s: dp=1%s set by %s %s %s\n", LABEL, dp[i].attr, dp[i].fil,
+               dp[i].want ? "does not reach" : "wrongly reaches", dp[i].qpath);
+        err = 1;
+      }
+    }
+    // a directory must fit the jar's path, or it backs off to "/p"
+    {
+      static const struct {
+        int dirlen;
+        const char *qpath; // "" means the directory itself plus "/x"
+        hts_boolean want;
+      } fit[] = {
+          {COOKIE_MAX_PATH - 1, "", HTS_TRUE},
+          {COOKIE_MAX_PATH - 1, "/p/q", HTS_FALSE},
+          {COOKIE_MAX_PATH, "/p/q", HTS_TRUE},
+          {COOKIE_MAX_PATH, "/q", HTS_FALSE},
+      };
+
+      char dir[COOKIE_MAX_PATH + 1];
+      char longfil[COOKIE_MAX_PATH + 8];
+      char q[COOKIE_MAX_PATH + 8];
+
+      for (i = 0; i < sizeof(fit) / sizeof(fit[0]); i++) {
+        snprintf(dir, sizeof(dir), "/p/%0*d", fit[i].dirlen - 3, 0);
+        snprintf(longfil, sizeof(longfil), "%s/f", dir);
+        snprintf(q, sizeof(q), "%s", fit[i].qpath);
+        if (q[0] == '\0')
+          snprintf(q, sizeof(q), "%s/x", dir);
+        jar.data[0] = '\0';
+        memset(&r, 0, sizeof(r));
+        strcpybuff(line, "Set-Cookie: dp=1");
+        treathead(&jar, "dp.test", longfil, &r, line);
+        http_cookie_header(&jar, "dp.test", q, hdr, sizeof(hdr));
+        if (cookie_sent(hdr, "dp=1") != fit[i].want) {
+          printf("%s: dp=1 set under a %d-byte directory %s %s\n", LABEL,
+                 fit[i].dirlen,
+                 fit[i].want ? "does not reach" : "wrongly reaches",
+                 fit[i].qpath[0] != '\0' ? fit[i].qpath : "its /x");
+          err = 1;
+        }
+      }
+    }
+  }
   printf("%s: %s\n", LABEL, err ? "FAIL" : "OK");
   return err;
 #undef FUTURE
