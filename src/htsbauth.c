@@ -295,6 +295,21 @@ char *cookie_find_exact(char *s, const char *cook_name, const char *domain,
 }
 
 /* See htsbauth.h. */
+hts_boolean cookie_is_secure_record(t_cookie *cookie, const char *cook_name,
+                                    const char *domain, const char *path) {
+  char buffer[8192];
+  char host[COOKIE_MAX_DOMAIN];
+  const char *rec;
+
+  if (!cookie_host(domain, host, sizeof(host)))
+    return HTS_FALSE;
+  rec = cookie_find_exact(cookie->data, cook_name, host, path);
+  return rec != NULL && strcmpnocase(cookie_get(buffer, rec, 3), "TRUE") == 0
+             ? HTS_TRUE
+             : HTS_FALSE;
+}
+
+/* See htsbauth.h. */
 int cookie_remove(t_cookie *cookie, const char *cook_name, const char *domain,
                   const char *path) {
   char *a, *b;
@@ -486,10 +501,15 @@ char *cookie_find(char *s, const char *cook_name, const char *domain, const char
         //
         const char *chk_path = cookie_get(buffer, a, 2);    // chemin concerné par le cookie
 
-        if (strlen(chk_path) <= strlen(path)) {
-          if (strncmp(path, chk_path, strlen(chk_path)) == 0) {       // même chemin
-            return a;
-          }
+        const size_t chk_len = strlen(chk_path);
+
+        /* RFC 6265 5.1.4: a prefix ending on a "/" boundary, so "/foo" does
+           not reach "/foobar". The query is not part of the path. */
+        if (chk_len <= strlen(path) && strncmp(path, chk_path, chk_len) == 0 &&
+            (chk_len == 0 || chk_path[chk_len - 1] == '/' ||
+             path[chk_len] == '\0' || path[chk_len] == '/' ||
+             path[chk_len] == '?')) {
+          return a;
         }
       }
     }

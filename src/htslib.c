@@ -2627,7 +2627,16 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
         // a Domain= the host may not claim drops the cookie (5.3 step 6)
         if (!has_domain ||
             (adr != NULL && cookie_domain_allowed(domain, scoped))) {
-          if (attr.expires != 0 && attr.expires <= now) {
+          /* RFC 6265bis 5.7: plain http may neither set a Secure cookie nor
+             touch one that is */
+          if (adr != NULL && !strfield(adr, "https://") &&
+              (attr.secure ||
+               cookie_is_secure_record(cookie, cook_name, domain, path))) {
+            hts_log_print(opt, LOG_WARNING,
+                          "Cookies: ignoring '%.64s' about a Secure cookie, "
+                          "set over plain http by %s",
+                          cook_name, adr_nologin(opt, adr));
+          } else if (attr.expires != 0 && attr.expires <= now) {
             cookie_remove(cookie, cook_name, domain, path);
           } else if (cookie_set(cookie, cook_name, cook_value, domain, path,
                                 &attr) != 0) {

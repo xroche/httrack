@@ -122,6 +122,11 @@ int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
 int cookie_add(t_cookie *cookie, const char *cook_name, const char *cook_value,
                const char *domain, const char *path);
 
+/** Does the jar hold a Secure record of cook_name for exactly this domain and
+    path, with domain normalised by cookie_host? */
+hts_boolean cookie_is_secure_record(t_cookie *cookie, const char *cook_name,
+                                    const char *domain, const char *path);
+
 /** Erase the record of cook_name with exactly this domain and path, with
     domain normalised by cookie_host as cookie_set does. Always 0: a domain
     nothing can be stored under holds nothing to erase. */
