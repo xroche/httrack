@@ -1,0 +1,112 @@
+#!/bin/bash
+#
+# ProxyTrack: a kept-alive request after one with a Content-Length is answered,
+# a refused cache record is a 502 rather than "-1", and a newer archive that
+# shares one URL does not hide the rest of an older one.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+python=$(find_python) || skip "python3 missing"
+
+dir=$(mktemp -d)
+ptpid=
+cleanup() {
+    stop_server "$ptpid"
+    rm -rf "$dir"
+}
+cleanup_push cleanup
+
+"$python" - "$(nativepath "$dir")" <<'PY'
+import os, sys, time, zipfile
+
+d = sys.argv[1]
+
+def entry(z, url, size, body=b"x"):
+    meta = (
+        "X-In-Cache: 1\r\nX-StatusCode: 200\r\nX-StatusMessage: ok\r\n"
+        "X-Size: %s\r\nContent-Type: text/html\r\n" % size
+    ).encode()
+    zi = zipfile.ZipInfo(url.replace("http://", ""))
+    zi.compress_type = zipfile.ZIP_STORED
+    zi.extra = meta
+    z.writestr(zi, body)
+
+with zipfile.ZipFile(os.path.join(d, "old.zip"), "w") as z:
+    for i in range(40):
+        entry(z, "http://example.com/u%d" % i, 1)
+    entry(z, "http://example.com/common", 1)
+    entry(z, "http://example.com/bad", -5)
+with zipfile.ZipFile(os.path.join(d, "new.zip"), "w") as z:
+    entry(z, "http://example.com/common", 1)
+now = time.time()
+os.utime(os.path.join(d, "old.zip"), (now - 1000, now - 1000))
+os.utime(os.path.join(d, "new.zip"), (now, now))
+PY
+
+launch_proxytrack() {
+    proxytrack "127.0.0.1:$proxyport" "127.0.0.1:$icpport" \
+        "$dir/new.zip" "$dir/old.zip" >"$ptlog" 2>&1 &
+    ptpid=$!
+}
+start_proxytrack "$dir/pt" launch_proxytrack
+
+"$python" - "$proxyport" <<'PY' || fail_dump "proxytrack replied wrongly" "$ptlog"
+import socket, sys
+
+port = int(sys.argv[1])
+
+def read_reply(sock):
+    buf = b""
+    while b"\r\n\r\n" not in buf:
+        chunk = sock.recv(4096)
+        if not chunk:
+            break
+        buf += chunk
+    head, _, rest = buf.partition(b"\r\n\r\n")
+    n = 0
+    for line in head.split(b"\r\n"):
+        if line.lower().startswith(b"content-length:"):
+            n = int(line.split(b":")[1])
+    while len(rest) < n:
+        chunk = sock.recv(4096)
+        if not chunk:
+            break
+        rest += chunk
+    return head.split(b"\r\n")[0]
+
+def get(sock, url, head=b"", body=b""):
+    sock.sendall(b"GET %s HTTP/1.1\r\nHost: example.com\r\n%s\r\n%s"
+                 % (url.encode(), head, body))
+    return read_reply(sock)
+
+# a plain request after one that carried a body must still be answered
+s = socket.create_connection(("127.0.0.1", port), 10)
+s.settimeout(5)
+r = get(s, "http://example.com/common", b"Content-Length: 4\r\n", b"abcd")
+if b" 200 " not in r:
+    sys.exit("first request: %r" % r)
+r = get(s, "http://example.com/common")
+if b" 200 " not in r:
+    sys.exit("request after a body: %r" % r)
+s.close()
+
+# a refused record is a gateway error, not status -1
+s = socket.create_connection(("127.0.0.1", port), 10)
+s.settimeout(5)
+r = get(s, "http://example.com/bad")
+if b" 502 " not in r:
+    sys.exit("refused record: %r" % r)
+s.close()
+
+# every older URL is still served, with the shared one held by the newer archive
+for i in range(40):
+    s = socket.create_connection(("127.0.0.1", port), 10)
+    s.settimeout(5)
+    r = get(s, "http://example.com/u%d" % i)
+    s.close()
+    if b" 200 " not in r:
+        sys.exit("u%d lost in the merge: %r" % (i, r))
+PY

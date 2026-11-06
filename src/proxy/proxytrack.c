@@ -631,6 +631,8 @@ static PT_Element proxytrack_process_DAV_Request(PT_Indexes indexes,
   if (strncmp(file, "/webdav", 7) != 0) {
     PT_Element elt = PT_ElementNew();
 
+    if (elt == NULL)
+      return NULL;
     elt->statuscode = 405;
     strcpybuff(elt->msg, "Method Not Allowed");
     return elt;
@@ -828,6 +830,20 @@ static size_t element_body_size(const PT_Element element) {
   return (element != NULL && element->adr != NULL) ? element->size : 0;
 }
 
+/* Read exactly len bytes: a slow client may split them over several recv(). */
+static int recv_exact(T_SOC soc, char *buf, int len) {
+  int got = 0;
+
+  while (got < len) {
+    const int n = (int) recv(soc, buf + got, len - got, 0);
+
+    if (n <= 0)
+      return 0;
+    got += n;
+  }
+  return 1;
+}
+
 static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
   int timeout = 30;
   int buffer_size = 32768;
@@ -888,6 +904,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 #endif
 
     /* Clear context */
+    length = 0;
     line[0] = line1[0] = '\0';
     buffer[0] = '\0';
     command = line1;
@@ -949,7 +966,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
       if (length > 0) {
         if (length < 32768) {
           StringRoom(davRequest, length + 1);
-          if (recv(soc_c, StringBuffRW(davRequest), length, 0) == length) {
+          if (recv_exact(soc_c, StringBuffRW(davRequest), length)) {
             StringBuffRW(davRequest)[length] = 0;
           } else {
             msgCode = 500;
@@ -1108,6 +1125,9 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
             element->statuscode = 404;  /* HTML page, but in error */
           }
         }
+        /* a refused record carries -1, which is no HTTP status */
+        if (element != NULL && element->statuscode < 0)
+          element->statuscode = 502;
         if (element != NULL) {
           /* lifted out of the format: a directive inside a macro argument list
              is undefined, and MSVC rejects it */
@@ -1423,9 +1443,52 @@ proxytrack_process_generic(void (*process) (PT_Indexes indexes, T_SOC soc_c),
   return 0;
 }
 
+/* Client threads alive; a flood past the cap gets 503 instead of a thread. */
+#define PROXYTRACK_MAX_CLIENTS 256
+static volatile int proxytrack_clients = 0;
+
+static void close_client(T_SOC soc) {
+#ifdef _WIN32
+  closesocket(soc);
+#else
+  close(soc);
+#endif
+}
+
+static int clients_add(int delta) {
+#ifdef _MSC_VER
+  return (int) InterlockedExchangeAdd((volatile LONG *) &proxytrack_clients,
+                                      delta) +
+         delta;
+#else
+  return __atomic_add_fetch(&proxytrack_clients, delta, __ATOMIC_RELAXED);
+#endif
+}
+
+/* Bound every recv() on a client, so a silent peer cannot pin its thread. */
+static void set_recv_timeout(T_SOC soc, int seconds) {
+#ifdef _WIN32
+  DWORD tv = (DWORD) seconds * 1000;
+#else
+  struct timeval tv;
+
+  tv.tv_sec = seconds;
+  tv.tv_usec = 0;
+#endif
+  (void) setsockopt(soc, SOL_SOCKET, SO_RCVTIMEO, (const char *) &tv,
+                    sizeof(tv));
+}
+
+static void proxytrack_process_HTTP_counted(PT_Indexes indexes, T_SOC soc_c) {
+  set_recv_timeout(soc_c, 30);
+  proxytrack_process_HTTP(indexes, soc_c);
+  clients_add(-1);
+}
+
 /* Process HTTP proxy requests */
 static int proxytrack_process_HTTP_threaded(PT_Indexes indexes, T_SOC soc) {
-  return proxytrack_process_generic(proxytrack_process_HTTP, indexes, soc);
+  return proxytrack_process_generic(proxytrack_process_HTTP_counted, indexes,
+                                    soc);
 }
 
 /* HTTP Server */
@@ -1434,9 +1497,19 @@ static int proxytrack_start_HTTP(PT_Indexes indexes, T_SOC soc) {
     T_SOC soc_c;
 
     if ((soc_c = (T_SOC) accept(soc, NULL, NULL)) != INVALID_SOCKET) {
-      if (!proxytrack_process_HTTP_threaded(indexes, soc_c)) {
+      if (clients_add(1) > PROXYTRACK_MAX_CLIENTS) {
+        static const char busy[] =
+            "HTTP/1.1 503 Too Many Connections\r\nContent-Length: 0\r\n"
+            "Connection: close\r\n\r\n";
+
+        (void) send(soc_c, busy, (int) sizeof(busy) - 1, 0);
+        clients_add(-1);
+        close_client(soc_c);
+      } else if (!proxytrack_process_HTTP_threaded(indexes, soc_c)) {
         proxytrack_print_log(CRITICAL,
                              "proxytrack_start_HTTP::Can not fork a thread");
+        clients_add(-1);
+        close_client(soc_c);
       }
     }
   }
