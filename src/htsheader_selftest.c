@@ -887,6 +887,18 @@ static int st_acceptencoding(httrackp *opt, int argc, char **argv) {
       assertf(hts_zunpack(inpath, outpath) == (int) blen);
       assertf(ae_check_decoded(outpath, body, blen) == 0);
     }
+    /* A cap below the decoded size refuses the body; at the size it passes. */
+    snprintf(inpath, sizeof(inpath), "%s/ae-in-%d.z", argv[0], windowBits[0]);
+    assertf(ae_write_packed(inpath, windowBits[0], body, blen) == 0);
+    assertf(hts_zunpack_max(inpath, outpath, (LLint) blen - 1) ==
+            HTS_CODEC_TOOBIG);
+    assertf(hts_codec_unpack_max(HTS_CODEC_DEFLATE, inpath, outpath,
+                                 (LLint) blen - 1) == HTS_CODEC_TOOBIG);
+    assertf(hts_zunpack_max(inpath, outpath, (LLint) blen) == (int) blen);
+    assertf(hts_zunpack_max(inpath, outpath, 0) == (int) blen);
+    assertf(hts_codec_budget(1, 100) == 100);
+    assertf(hts_codec_budget(1, 0) == hts_codec_maxout(1));
+    assertf(hts_codec_budget(1, -1) == hts_codec_maxout(1));
     /* Fallback teeth: raw deflate misdetected as zlib; -1 without the retry. */
     snprintf(inpath, sizeof(inpath), "%s/ae-collide.z", argv[0]);
     snprintf(outpath, sizeof(outpath), "%s/ae-collide.out", argv[0]);
@@ -908,6 +920,10 @@ static int st_acceptencoding(httrackp *opt, int argc, char **argv) {
       assertf(ae_write_raw(inpath, idbody, ilen) == 0);
       assertf(hts_zunpack(inpath, outpath) == (int) ilen);
       assertf(ae_check_decoded(outpath, idbody, ilen) == 0);
+      /* the identity copy honours a cap too */
+      assertf(hts_zunpack_max(inpath, outpath, (LLint) ilen - 1) ==
+              HTS_CODEC_TOOBIG);
+      assertf(hts_zunpack_max(inpath, outpath, (LLint) ilen) == (int) ilen);
       freet(idbody);
     }
     /* Truncated gzip (CRC+ISIZE cut), zlib (ADLER32 cut) and raw deflate
@@ -1011,7 +1027,9 @@ static int st_contentcodings(httrackp *opt, int argc, char **argv) {
       assertf((LLint) (4 * 1024 * 1024) >
               hts_codec_maxout((LLint) sizeof(cc_br_bomb)));
       assertf(ae_write_raw(inpath, cc_br_bomb, sizeof(cc_br_bomb)) == 0);
-      assertf(hts_codec_unpack(HTS_CODEC_BROTLI, inpath, outpath) < 0);
+      assertf(hts_codec_unpack(HTS_CODEC_BROTLI, inpath, outpath) == -1);
+      assertf(hts_codec_unpack_max(HTS_CODEC_BROTLI, inpath, outpath, 1000) ==
+              HTS_CODEC_TOOBIG);
     }
 #endif
 #if HTS_USEZSTD
@@ -1040,7 +1058,9 @@ static int st_contentcodings(httrackp *opt, int argc, char **argv) {
       /* the fixture must really be past the budget, whatever the ratio is */
       assertf((LLint) bomblen > hts_codec_maxout((LLint) zlen));
       assertf(ae_write_raw(inpath, zbuf, zlen) == 0);
-      assertf(hts_codec_unpack(HTS_CODEC_ZSTD, inpath, outpath) < 0);
+      assertf(hts_codec_unpack(HTS_CODEC_ZSTD, inpath, outpath) == -1);
+      assertf(hts_codec_unpack_max(HTS_CODEC_ZSTD, inpath, outpath, 1000) ==
+              HTS_CODEC_TOOBIG);
       freet(bomb);
       freet(zbuf);
     }
