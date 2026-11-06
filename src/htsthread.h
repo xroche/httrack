@@ -87,6 +87,16 @@ static HTS_INLINE HTS_UNUSED int hts_increment_int(volatile int *dst) {
 #endif
 }
 
+/* Add delta to a counter other threads also update, and return its new value.
+ */
+static HTS_INLINE HTS_UNUSED int hts_add_int(volatile int *dst, int delta) {
+#ifdef _MSC_VER
+  return (int) InterlockedExchangeAdd((volatile LONG *) dst, delta) + delta;
+#else
+  return __atomic_add_fetch(dst, delta, __ATOMIC_RELAXED);
+#endif
+}
+
 /* Relaxed atomic access to a 64-bit counter that another thread updates, such
    as an FTP slot's byte count. 32-bit non-MSVC hosts get a plain access, which
    can tear, because a 64-bit atomic there may need libatomic. */

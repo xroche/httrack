@@ -718,7 +718,7 @@ int PT_IndexMerge(PT_Indexes indexes, PT_Index * pindex) {
             if (previous_index_id >= 0
                 && previous_index_id < indexes->index_size) {
               if (indexes->index[previous_index_id]->slots.common.timestamp > index->slots.common.timestamp)    // existing entry is newer
-                break;
+                continue;
             } else {
               proxytrack_print_log(CRITICAL,
                                    "PT_IndexMerge:Corrupted central index locator");
