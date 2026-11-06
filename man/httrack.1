@@ -294,12 +294,12 @@ preferred language (\-%l "fr, en, jp, *" (\-\-language <param>)
 .IP \-%a
 accepted formats (\-%a "text/html,image/png;q=0.9,*/*;q=0.1"; repeat as \-%a "KIND=formats" for one kind of link: document iframe frame image style script font audio video object embed (\-\-accept <param>)
 .IP \-%X
-additional HTTP header line (\-%X "X\-Magic: 42"; an Accept line replaces every computed Accept, per\-kind values included; Content\-Length, Transfer\-Encoding, Connection, Keep\-Alive, TE, Upgrade and Expect are dropped (\-\-headers <param>)
+additional HTTP header line (\-%X "X\-Magic: 42"; an Accept line replaces every computed Accept, per\-kind values included; Content\-Length, Transfer\-Encoding, Connection, Keep\-Alive, TE, Upgrade and Expect are dropped; the line goes to every host the crawl touches, other sites and redirect targets included, so put no secret in it for a multi\-host crawl (\-\-headers <param>)
 .IP \-%Q
 send the headers a browser \-F implies: its Accept values, header order and Sec\-Fetch\-*, and client hints over HTTPS (%Q0 don't) (\-\-browser\-headers[=0])
 .SS Log, index, cache
 .IP \-C
-create/use a cache for updates and retries (C0 no cache,* C1 cache is prioritary,C2 test update before) (\-\-cache[=N])
+create/use a cache for updates and retries (C0 no cache,C1 cache is prioritary,C2 test update before; the default is C1, or C2 when a finished mirror is in the folder) (\-\-cache[=N])
 .IP \-k
 store all files in cache (not useful if files on disk) (\-\-store\-all\-in\-cache)
 .IP \-%r
@@ -691,6 +691,14 @@ Errors/Warnings are reported to
 by default, or to stderr if the
 .I \-v
 option was specified.
+.SH SECURITY
+A project folder (doit.log, hts-cache) and a ./.httrackrc can carry
+.I \-V
+(run a command) and
+.I \-%W
+(load a plugin). Run
+.B httrack
+only on folders and in directories you trust. Your own \(ti/.httrackrc is yours and fine.
 .SH LIMITS
 These are the principals limits of HTTrack for that moment. Note that we did not heard about any other utility
 that would have solved them.
