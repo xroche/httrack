@@ -3523,12 +3523,14 @@ static int back_abort_limit(httrackp *opt, struct_back *sback,
 static void back_fail_unselectable(httrackp *opt, struct_back *sback, int i) {
   lien_back *const b = &sback->lnk[i];
 
+  hts_log_print(opt, LOG_WARNING, "Socket %d is beyond FD_SETSIZE",
+                (int) b->r.soc);
+  deletehttp(&b->r);
+  b->r.soc = INVALID_SOCKET;
   b->r.statuscode = STATUSCODE_CONNERROR;
   strcpybuff(b->r.msg, "Socket number too high for select()");
   b->status = STATUS_READY;
   back_set_finished(opt, sback, i);
-  hts_log_print(opt, LOG_WARNING, "Socket %d is beyond FD_SETSIZE",
-                (int) b->r.soc);
 }
 
 void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,

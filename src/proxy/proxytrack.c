@@ -190,6 +190,8 @@ static int check_readinput_t(T_SOC soc, int timeout) {
     fd_set fds;                 // poll structures
     struct timeval tv;          // structure for select
 
+    if (!hts_soc_selectable(soc))
+      return 0;
     FD_ZERO(&fds);
     FD_SET(soc, &fds);
     tv.tv_sec = timeout;

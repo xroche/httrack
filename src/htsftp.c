@@ -686,16 +686,18 @@ static hts_boolean ftp_connect(lien_back *back, T_SOC soc, SOCaddr *server,
     if (errno != EINPROGRESS && errno != EINTR)
 #endif
       return HTS_FALSE;
+    int ready;
+
     /* state.stop counts here, unlike in the waits below: a mirror the user
        stopped has nothing to finish on a connection never established. */
-    while (check_socket_connect(soc) == 0) {
+    while ((ready = check_socket_connect(soc)) == 0) {
       if (hts_load_acquire_int(&back->stop_ftp) ||
           (opt != NULL && hts_load_acquire_int(&opt->state.stop)) ||
           (int) (time_local() - started) >= timeout)
         return HTS_FALSE;
       Sleep(100);
     }
-    if (connect_socket_error(soc) != 0)
+    if (ready < 0 || connect_socket_error(soc) != 0)
       return HTS_FALSE;
   }
   /* the rest of the session reads and writes this socket blocking */

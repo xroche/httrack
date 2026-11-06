@@ -1,21 +1,39 @@
 #!/bin/bash
 # A socket numbered FD_SETSIZE or more must fail its slot, not overflow an fd_set.
 
-set -eu
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
 
 : "${top_srcdir:=..}"
 
-# Fill every descriptor below 1100 so the crawl's sockets land above FD_SETSIZE.
-# The limit can be locked on a runner, which skips the test.
-python3 -c '
+python=$(find_python) || skip "python3 missing"
+skip_on_windows "windows: a Winsock fd_set has no descriptor ceiling to test"
+
+crawl() { bash "$top_srcdir/tests/local-crawl.sh" "$@"; }
+
+# Control: with no descriptors burnt the same crawl succeeds and never warns.
+crawl --found 'sitemapdir/start.html' --log-not-found 'beyond FD_SETSIZE' \
+    httrack 'BASEURL/sitemapdir/start.html' -r2
+
+# Fill every descriptor below 1103 so the crawl's sockets land above FD_SETSIZE.
+# A locked limit skips the test.
+"$python" -c '
 import os, resource, sys
-try:
-    resource.setrlimit(resource.RLIMIT_NOFILE, (4096, 4096))
-except (ValueError, OSError):
+soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+want = min(hard, 4096) if hard != resource.RLIM_INFINITY else 4096
+if want < 1300:
     sys.exit(77)
+resource.setrlimit(resource.RLIMIT_NOFILE, (want, hard))
 for _ in range(1100):
     os.set_inheritable(os.open("/dev/null", os.O_RDONLY), True)
 os.execvp(sys.argv[1], sys.argv[1:])
 ' bash "$top_srcdir/tests/local-crawl.sh" --no-host-root \
-    --log-found 'beyond FD_SETSIZE' \
-    httrack 'BASEURL/sitemapdir/start.html' -r2
+    --log-found 'Socket (10[2-9][0-9]|1[1-9][0-9]{2}|[2-9][0-9]{3}|[0-9]{5,}) is beyond FD_SETSIZE' \
+    httrack 'BASEURL/sitemapdir/start.html' -r2 ||
+    {
+        rc=$?
+        test "$rc" -ne 77 || skip "descriptor limit is locked"
+        exit "$rc"
+    }
