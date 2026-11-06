@@ -2649,6 +2649,35 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                          "(no Multipath TCP on this system)\n");
               } break;
 
+              case 'c': { // --check-cert: verify https certificates
+                int on = 1;
+
+                readGluedInt(on, INT_MAX);
+                if (on != 0 && on != 1) {
+                  char s[64];
+
+                  snprintf(s, sizeof(s), "Unknown value for -@c: %d", on);
+                  HTS_PANIC_PRINTF(s);
+                  htsmain_free();
+                  return -1;
+                }
+#ifdef _WIN32
+                // no system CA store is wired up for OpenSSL here yet
+                if (on != 0) {
+                  HTS_PANIC_PRINTF("--check-cert is not supported on Windows "
+                                   "yet");
+                  htsmain_free();
+                  return -1;
+                }
+#endif
+                opt->check_cert = on != 0 ? HTS_TRUE : HTS_FALSE;
+#if !HTS_USEOPENSSL
+                if (on != 0)
+                  printf("Warning, option @c has no effect "
+                         "(no https support compiled)\n");
+#endif
+              } break;
+
               default:{
                 cmdl_bad_option(opt, argv[na], "@", com);
                 htsmain_free();

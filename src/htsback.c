@@ -2273,6 +2273,12 @@ int back_searchlive(httrackp * opt, struct_back * sback, const char *search_addr
   for(i = 0; i < back_max; i++) {
     if (back_status(&back[i]) == STATUS_ALIVE) {
       if (strfield2(back[i].url_adr, search_addr)) {    /* same location (xxc: check also virtual hosts?) */
+#if HTS_USEOPENSSL
+        // opened before --check-cert was turned on, so never verified
+        if (opt->check_cert == HTS_TRUE && back[i].r.ssl_con != NULL &&
+            (SSL_get_verify_mode(back[i].r.ssl_con) & SSL_VERIFY_PEER) == 0)
+          continue;
+#endif
         if (time_local() < back[i].ka_time_start + back[i].r.keep_alive_t) {
           return i;
         }
@@ -3916,7 +3922,15 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                      sizeof(hostname)))
                   SSL_set_tlsext_host_name(back[i].r.ssl_con, hostname);
                 SSL_clear(back[i].r.ssl_con);
-                if (SSL_set_fd(back[i].r.ssl_con, (int) back[i].r.soc) == 1) {
+                if (opt->check_cert == HTS_TRUE &&
+                    !hts_ssl_check_cert(back[i].r.ssl_con, back[i].url_adr)) {
+                  htsblk_failf(&back[i].r,
+                               "cannot check the certificate of %s "
+                               "(--check-cert)",
+                               jump_identification_const(back[i].url_adr));
+                  back[i].r.statuscode = STATUSCODE_SSL_HANDSHAKE;
+                } else if (SSL_set_fd(back[i].r.ssl_con, (int) back[i].r.soc) ==
+                           1) {
                   SSL_set_connect_state(back[i].r.ssl_con);
                   back[i].status = STATUS_SSL_WAIT_HANDSHAKE;   /* handshake wait */
                   // the handshake gets its own timeout window, as connect does
@@ -3929,7 +3943,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             }
             /* Error */
             if (tunnel_ok && back[i].r.statuscode == STATUSCODE_SSL_HANDSHAKE) {
-              strcpybuff(back[i].r.msg, "bad SSL/TLS handshake");
+              if (!strnotempty(back[i].r.msg))
+                strcpybuff(back[i].r.msg, "bad SSL/TLS handshake");
               deletehttp(&back[i].r);
               back[i].r.soc = INVALID_SOCKET;
               back[i].r.statuscode = STATUSCODE_NON_FATAL;
@@ -4006,6 +4021,15 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               strncatbuff(back[i].r.msg, tmp, sizeof(back[i].r.msg) - 2);
               if (!strnotempty(back[i].r.msg)) {
                 htsblk_failf(&back[i].r, "SSL/TLS error %d", err_code);
+              }
+              if (opt->check_cert == HTS_TRUE) {
+                const long verdict = SSL_get_verify_result(back[i].r.ssl_con);
+
+                if (verdict != X509_V_OK)
+                  htsblk_failf(&back[i].r,
+                               "certificate of %s rejected (--check-cert): %s",
+                               jump_identification_const(back[i].url_adr),
+                               X509_verify_cert_error_string(verdict));
               }
               deletehttp(&back[i].r);
               back[i].r.soc = INVALID_SOCKET;

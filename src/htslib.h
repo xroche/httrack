@@ -408,6 +408,13 @@ int hts_basic_auth_value(httrackp *opt, const char *url, char *out,
    literals. */
 hts_boolean hts_sni_hostname(const char *url_adr, char *out, size_t size);
 
+#if HTS_USEOPENSSL
+/* Make ssl's handshake fail unless the server's chain verifies against the
+   system CA store and its certificate names url_adr's host (--check-cert).
+   FALSE when the checks could not be armed: the caller must not connect. */
+hts_boolean hts_ssl_check_cert(SSL *ssl, const char *url_adr);
+#endif
+
 /* TRUE if host[0..len) is an IPv4 or IPv6 address literal. */
 hts_boolean hts_host_is_address(const char *host, size_t len);
 

@@ -69,6 +69,7 @@ httrack \- offline browser : copy websites to a local directory
 [ \fB\-%A, \-\-assume\fR ]
 [ \fB\-@iN, \-\-protocol[=N]\fR ]
 [ \fB\-@mN, \-\-mptcp[=0]\fR ]
+[ \fB\-@cN, \-\-check\-cert[=0]\fR ]
 [ \fB\-%w, \-\-disable\-module\fR ]
 [ \fB\-F, \-\-user\-agent\fR ]
 [ \fB\-%R, \-\-referer\fR ]
@@ -278,6 +279,8 @@ can also be used to force a specific file type: \-\-assume foo.cgi=text/html
 internet protocol (0=both ipv6+ipv4, 4=ipv4 only, 6=ipv6 only) (\-\-protocol[=N])
 .IP \-@mN
 carry connections over Multipath TCP where the system offers it (0=no, 1=yes) (\-\-mptcp[=0])
+.IP \-@cN
+verify https certificates and host names against the system CA store (0=no, 1=yes) (\-\-check\-cert[=0])
 .IP \-%w
 disable a specific external mime module (\-%w httrack\-plugin) (\-\-disable\-module <param>)
 .SS Browser ID:

@@ -4914,6 +4914,9 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
   if (from->browser_headers > -1)
     to->browser_headers = from->browser_headers;
 
+  if (from->check_cert > -1)
+    to->check_cert = from->check_cert;
+
   if (StringNotEmpty(from->user_agent))
     StringCopyS(to->user_agent, from->user_agent);
 

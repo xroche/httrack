@@ -5134,6 +5134,48 @@ hts_boolean hts_sni_hostname(const char *url_adr, char *out, size_t size) {
   return HTS_TRUE;
 }
 
+#if HTS_USEOPENSSL
+static htsmutex ssl_ca_lock = HTSMUTEX_INIT;
+static int ssl_ca_state = 0; /* 0 not tried, 1 loaded, -1 failed */
+
+hts_boolean hts_ssl_check_cert(SSL *ssl, const char *url_adr) {
+  X509_VERIFY_PARAM *const param = SSL_get0_param(ssl);
+  char name[256];
+  int state;
+
+  hts_mutexlock(&ssl_ca_lock);
+  if (ssl_ca_state == 0)
+    ssl_ca_state = SSL_CTX_set_default_verify_paths(openssl_ctx) == 1 ? 1 : -1;
+  state = ssl_ca_state;
+  hts_mutexrelease(&ssl_ca_lock);
+  if (state != 1 || param == NULL)
+    return HTS_FALSE;
+  if (hts_sni_hostname(url_adr, name, sizeof(name))) {
+    const size_t len = strlen(name);
+
+    /* certificates name "host", never the absolute "host." */
+    if (len > 1 && name[len - 1] == '.')
+      name[len - 1] = '\0';
+    if (X509_VERIFY_PARAM_set1_host(param, name, 0) != 1)
+      return HTS_FALSE;
+  } else {
+    /* an address literal must match an IP name of the certificate */
+    const char *const host = jump_identification_const(url_adr);
+    const char *const start = host[0] == '[' ? host + 1 : host;
+    const size_t len = strcspn(start, host[0] == '[' ? "]" : ":/?#");
+
+    if (len == 0 || len >= sizeof(name))
+      return HTS_FALSE;
+    name[0] = '\0';
+    strlncatbuff(name, start, sizeof(name), len);
+    if (X509_VERIFY_PARAM_set1_ip_asc(param, name) != 1)
+      return HTS_FALSE;
+  }
+  SSL_set_verify(ssl, SSL_VERIFY_PEER, NULL);
+  return HTS_TRUE;
+}
+#endif
+
 // find port (:80) or NULL if not found
 // can handle IPV6 addresses
 HTSEXT_API const char *jump_toport_const(const char *source) {
@@ -7946,7 +7988,7 @@ HTSEXT_API int hts_init(void) {
       abortLog("unable to initialize TLS: SSL_CTX_new()");
       assertf("unable to initialize TLS" == NULL);
     }
-    /* Pin a TLS floor (no SSLv3/TLS1.0/1.1); no cert verify, by design. */
+    /* TLS floor (no SSLv3/TLS1.0/1.1); --check-cert verifies certs */
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
     SSL_CTX_set_min_proto_version(openssl_ctx, TLS1_2_VERSION);
 #else
@@ -8270,6 +8312,7 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->transport_failures = 0;
   opt->mptcp = HTS_DEFAULT;
   opt->browser_headers = HTS_DEFAULT;
+  opt->check_cert = HTS_DEFAULT;
   opt->mptcp_connections = 0;
   opt->mptcp_fallbacks = 0;
   opt->upper_links_refused = 0;

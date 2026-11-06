@@ -18,7 +18,7 @@ EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c gaistall.c noba
 	guide-image-check.py check-subshell-errexit.py check-log-logins.py \
 	ci-windows-suite.sh ci-suite-stage.sh ci-windows-watchdog.ps1 install-headers-sweep.sh \
 	wsl2-exe-shim.sh \
-	server.crt server.key \
+	server.crt server.key other.crt other.key \
 	server-root/simple/basic.html server-root/simple/link.html \
 	server-root/stripquery/index.html server-root/stripquery/a.html \
 	server-root/hostalias/index.html server-root/hostalias/a.html \
