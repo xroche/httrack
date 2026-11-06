@@ -36,7 +36,7 @@ httrack \- offline browser : copy websites to a local directory
 [ \fB\-n, \-\-near\fR ]
 [ \fB\-t, \-\-test\fR ]
 [ \fB\-%L, \-\-list\fR ]
-[ \fB\-%S, \-\-urllist\fR ]
+[ \fB\-%S, \-\-filterlist\fR ]
 [ \fB\-%m, \-\-sitemap\fR ]
 [ \fB\-NN, \-\-structure[=N]\fR ]
 [ \fB\-%N, \-\-delayed\-type\-check[=N]\fR ]
@@ -195,7 +195,7 @@ test all URLs (even forbidden ones) (\-\-test)
 .IP \-%L
 <file> add all URL located in this text file (one URL per line) (\-\-list <param>)
 .IP \-%S
-<file> add all scan rules located in this text file (one scan rule per line) (\-\-urllist <param>)
+<file> add all scan rules located in this text file (one scan rule per line) (\-\-filterlist <param>)
 .IP \-%m
 seed the crawl from the site's sitemap (robots.txt Sitemap:, then /sitemap.xml); \-\-sitemap\-url URL names one explicitly. A sitemap you name, or one the site declares, is fetched even under robots.txt Disallow; only the guessed /sitemap.xml obeys it. The URLs found still pass every filter and scope rule (\-\-sitemap)
 .SS Build options:

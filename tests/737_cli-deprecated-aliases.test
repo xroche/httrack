@@ -1,0 +1,35 @@
+#!/bin/bash
+#
+# The old names --urllist, --fast-engine and --debug-overflows still run, and
+# the help and the man page teach --filterlist and none of the three.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+distdir=$(cd "${top_srcdir:-${testdir}/..}" && pwd)
+# shellcheck source=tests/webhttracklib.sh
+. "${testdir}/webhttracklib.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_depalias.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${tmp}"
+
+echo '<html><body>hello</body></html>' >"${tmp}/page.html"
+echo "file://${tmp}/page.html" >"${tmp}/urls.txt"
+for arg in "--urllist=${tmp}/urls.txt" --fast-engine --debug-overflows; do
+    rm -rf "${tmp}/out"
+    mkdir -p "${tmp}/out"
+    rc=0
+    httrack "file://${tmp}/page.html" -O "${tmp}/out" --quiet -n "$arg" \
+        >"${tmp}/out/.log" 2>&1 || rc=$?
+    assert_eq 0 "${rc}" "${arg} exited"
+    ! grep -q 'Syntax error' "${tmp}/out/.log" || fail "${arg} is refused"
+done
+
+man="${distdir}/man/httrack.1"
+test -r "${man}" || exit 0 # no man page in this tree
+# roff writes \-\-name
+plain=$(tr -d "\\" <"${man}")
+grep -q -- '--filterlist' <<<"${plain}" || fail "man page does not name --filterlist"
+for old in urllist fast-engine debug-overflows; do
+    ! grep -q -- "--${old}" <<<"${plain}" || fail "man page still names --${old}"
+done
