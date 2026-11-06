@@ -105,6 +105,42 @@ void index_init(const char *indexpath) {
 #endif
 }
 
+#if HTS_MAKE_KEYWORD_INDEX
+/* End of a word: drop or clean the pending keyword, store it, then clear it. */
+static void index_store_word(coucal WordIndexHash, FILE *tmpfp, char *keyword) {
+  int len = (int) strlen(keyword);
+
+  /* Avoid these words */
+  if (len > 0) {
+    if (strchr(KEYW_NOT_BEG, keyword[0])) {
+      keyword[(len = 0)] = '\0';
+    }
+  }
+
+  /* Strip ending . and so */
+  {
+    int ok = 0;
+
+    while ((len = (int) strlen(keyword)) && (!ok)) {
+      if (strchr(KEYW_STRIP_END, keyword[len - 1])) { /* strip it */
+        keyword[len - 1] = '\0';
+      } else
+        ok = 1;
+    }
+  }
+
+  /* Store it ? */
+  if (len >= KEYW_MIN_LEN) {
+    hts_primindex_words++;
+    if (coucal_inc(WordIndexHash, keyword) == 1) { /* added new */
+      fprintf(tmpfp, "%s\n", keyword);
+    }
+  }
+  keyword[0] = '\0';
+}
+
+#endif
+
 /* 
    Indexing system
    A little bit dirty, (quick'n dirty, in fact)
@@ -169,6 +205,9 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
   // Start indexing this page
   keyword[0] = '\0';
   while(i < size) {
+    /* a tag ends the pending word */
+    if (html_data[i] == '<' && !inscript && !incomment && !intag)
+      index_store_word(WordIndexHash, tmpfp, keyword);
     if (strfield(html_data + i, "<script")) {
       inscript = 1;
     } else if (strfield(html_data + i, "<!--")) {
@@ -206,32 +245,7 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
           }
         } else if ((strchr(KEYW_SPACE, cchar)) || (!cchar)) {
 
-          /* Avoid these words */
-          if (len > 0) {
-            if (strchr(KEYW_NOT_BEG, keyword[0])) {
-              keyword[(len = 0)] = '\0';
-            }
-          }
-
-          /* Strip ending . and so */
-          {
-            int ok = 0;
-
-            while((len = (int) strlen(keyword)) && (!ok)) {
-              if (strchr(KEYW_STRIP_END, keyword[len - 1])) {   /* strip it */
-                keyword[len - 1] = '\0';
-              } else
-                ok = 1;
-            }
-          }
-
-          /* Store it ? */
-          if (len >= KEYW_MIN_LEN) {
-            hts_primindex_words++;
-            if (coucal_inc(WordIndexHash, keyword) == 1) { /* added new */
-              fprintf(tmpfp, "%s\n", keyword);
-            }
-          }
+          index_store_word(WordIndexHash, tmpfp, keyword);
           keyword[(len = 0)] = '\0';
         } else                  /* Invalid */
           keyword[(len = 0)] = '\0';
@@ -245,6 +259,9 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
 
     i++;
   }
+
+  if (!inscript && !incomment && !intag)
+    index_store_word(WordIndexHash, tmpfp, keyword);
 
   // Reset temp file
   fseek(tmpfp, 0, SEEK_SET);
@@ -434,7 +451,8 @@ void index_finish(const char *indexpath, int mode) {
                 fprintf(fp, "</td></tr>\r\n</table>\r\n");
               /* an "ignored" rewind can leave old bytes past the end */
               if (fflush(fp) == 0 && ftell(fp) >= 0)
-                (void) HTS_FTRUNCATE(fp, ftell(fp));
+                if (HTS_FTRUNCATE(fp, ftell(fp)) != 0) {
+                }
               fclose(fp);
             }
           }

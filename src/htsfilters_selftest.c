@@ -254,7 +254,7 @@ static int st_filterbounds(httrackp *opt, int argc, char **argv) {
     const char *seg = "*[A-Z,a-z,0-9]";
     const size_t seglen = strlen(seg), nseg = 16;
 
-    for (i = 0; i < (int) nseg; i++)
+    for (i = 0; i < nseg; i++)
       memcpy(pat + i * seglen, seg, seglen);
     pat[nseg * seglen] = '\0';
     memset(subj, 'a', 512);
