@@ -392,7 +392,7 @@ static hts_boolean write_progress_lock(httrackp *opt, const char *path,
   fprintf(fp, "PID=%d\n", (int) getpid());
 #ifndef _WIN32
   fprintf(fp, "UID=%d\n", (int) getuid());
-  fprintf(fp, "GID=%d\n", (int) getuid());
+  fprintf(fp, "GID=%d\n", (int) getgid());
 #endif
   fprintf(fp, "START=" LLintP "\n", (LLint) time(NULL));
 #endif

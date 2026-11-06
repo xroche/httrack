@@ -3940,7 +3940,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
         // pour les stats du shell si parsing trop long
         if (r->size)
           opt->state._hts_in_html_done =
-            (100 * ((int) (html - r->adr))) / (int) (r->size);
+              (int) ((100 * (LLint) (html - r->adr)) / (LLint) r->size);
         if (opt->state._hts_in_html_poll) {
           opt->state._hts_in_html_poll = 0;
           // temps à attendre, et remplir autant que l'on peut le cache (backing)
