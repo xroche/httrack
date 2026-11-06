@@ -735,7 +735,7 @@ hts_boolean hts_js_scan_link(httrackp *opt, const char *cursor,
         b++;
     } else {
       close_len = 0;
-      // Bounded scan: a link this long is refused later anyway.
+      // Bounded scan: an unclosed url( over 2 KB is not a link.
       while ((*b != quotes_replacement) && (*b != '\0')) {
         if (b - a >= HTS_URLMAXSIZE * 2)
           return HTS_FALSE;
