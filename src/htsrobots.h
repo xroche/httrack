@@ -60,6 +60,8 @@ struct robots_wizard {
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
+/* Bytes scanned by the wildcard matcher so far (self-test hook). */
+extern size_t robots_find_work;
 /* -1 if `fil` disallowed for `adr` (RFC 9309); empty: -1 if rules exist. */
 int checkrobots(const robots_wizard *robots, const char *adr, const char *fil);
 /* Free every node's strings, plus every node below `robots` but not `robots`.

@@ -1730,25 +1730,23 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
                 nspec += map[i];
               }
             }
-            if (map[0] <= r.size / 10 && r.size % 2 == 0 && r.size >= 2 &&
-                ((((unsigned char) r.adr[0]) == 0xff &&
-                  ((unsigned char) r.adr[1]) == 0xfe) ||
-                 (((unsigned char) r.adr[0]) == 0xfe &&
-                  ((unsigned char) r.adr[1]) == 0xff)))
+            const hts_boolean ucs2_bom =
+                (r.size >= 2 && r.size % 2 == 0 &&
+                 ((((unsigned char) r.adr[0]) == 0xff &&
+                   ((unsigned char) r.adr[1]) == 0xfe) ||
+                  (((unsigned char) r.adr[0]) == 0xfe &&
+                   ((unsigned char) r.adr[1]) == 0xff)))
+                    ? HTS_TRUE
+                    : HTS_FALSE;
+
+            if (ucs2_bom && map[0] <= r.size / 10)
               hts_log_print(opt, LOG_WARNING,
-                            "File %s%s looks like UCS2 text but is not "
-                            "converted (too few NUL bytes), links in it are "
-                            "not followed",
+                            "File %s%s has a UCS2 byte order mark but too few "
+                            "NUL bytes, so it is saved as it came and its "
+                            "links are not followed",
                             adr_nologin(opt, urladr()), urlfil());
             /* On-the-fly UCS2 to UTF-8 conversion (note: UCS2 should never be used on the net) */
-            if (map[0] > r.size / 10 && r.size % 2 == 0
-                &&
-                ((((unsigned char) r.adr[0]) == 0xff
-                  && ((unsigned char) r.adr[1]) == 0xfe)
-                 || (((unsigned char) r.adr[0]) == 0xfe
-                     && ((unsigned char) r.adr[1]) == 0xff)
-                )
-              ) {
+            if (ucs2_bom && map[0] > r.size / 10) {
               size_t new_size = 0;
               char *const new_adr = hts_ucs2_to_utf8(
                   (const unsigned char *) r.adr, (size_t) r.size,
