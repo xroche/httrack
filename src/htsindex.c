@@ -40,12 +40,6 @@ Please visit our Website: http://www.httrack.com
 #include "htsio.h"
 
 #if HTS_MAKE_KEYWORD_INDEX
-#ifdef _WIN32
-#include <io.h>
-#define HTS_FTRUNCATE(fp, sz) _chsize_s(_fileno(fp), (sz))
-#else
-#define HTS_FTRUNCATE(fp, sz) ftruncate(fileno(fp), (sz))
-#endif
 #include "htshash.h"
 #include "coucal.h"
 
@@ -61,10 +55,11 @@ Please visit our Website: http://www.httrack.com
 // What characters to accept? - MUST NOT BE EMPTY AND MUST NOT CONTAIN THE SPACE
 // (32) CHARACTER!!!
 #define KEYW_ACCEPT          "abcdefghijklmnopqrstuvwxyz0123456789-_."
-// Letters U+00C0..U+00FF (UTF-8 C3 80..C3 BF) folded to ASCII, '?' if none
+// Letters U+00C0..U+00FF (UTF-8 C3 80..C3 BF) folded to ASCII, '*' if none
+// ('*' is neither accepted nor a space, so such a word is dropped)
 #define KEYW_LATIN1_FOLD                                                       \
-  "aaaaaa?ceeeeiiii?nooooo?ouuuuy??"                                           \
-  "aaaaaa?ceeeeiiii?nooooo?ouuuuy?y"
+  "aaaaaa*ceeeeiiii*nooooo*ouuuuy**"                                           \
+  "aaaaaa*ceeeeiiii*nooooo*ouuuuy*y"
 // These (accepted) characters will be ignored at beginning of a keyword
 #define KEYW_IGNORE_BEG       "-_."
 // These (accepted) characters will be stripped if at the end of a keyword
@@ -267,8 +262,6 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
           if (coucal_read(WordIndexHash, line, &e)) {
             char BIGSTK savelst[HTS_URLMAXSIZE * 2];
 
-            e++;                /* 0 means "once" */
-
             if (strncmp((const char *) fslash(catbuff, sizeof(catbuff), (const char *) indexpath), filename, strlen(indexpath)) == 0)  // couper
               strcpybuff(savelst, filename + strlen(indexpath));
             else
@@ -293,6 +286,29 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
 #endif
   return 1;
 }
+
+#if HTS_MAKE_KEYWORD_INDEX
+/* Close a word's block: its total, or "ignored" over it if it is too common. */
+static void index_close_word(FILE *fp, int mode, LLint total_hit,
+                             LLint total_line, int index, long last_pos) {
+  if (mode == 1) // TEXT
+    fprintf(fp, "\t=%lld\r\n", (long long) total_hit);
+  if ((((total_hit * 1000) / hts_primindex_words) >= KEYW_USELESS1K) ||
+      (((total_line * 1000) / index) >= KEYW_USELESS1KPG)) {
+    fseek(fp, last_pos, SEEK_SET);
+    if (mode == 1) // TEXT
+      fprintf(fp, "\tignored (%d)\r\n",
+              (int) ((total_hit * 1000) / hts_primindex_words));
+    else
+      fprintf(fp, "(ignored) [%lld hits]<br>\r\n", (long long) total_hit);
+  } else {
+    if (mode == 1) // TEXT
+      fprintf(fp, "\t(%d)\r\n",
+              (int) ((total_hit * 1000) / hts_primindex_words));
+  }
+}
+
+#endif
 
 /*
   Sort index!
@@ -352,7 +368,7 @@ void index_finish(const char *indexpath, int mode) {
               int hit;
               LLint total_hit = 0;
               LLint total_line = 0;
-              int last_pos = 0;
+              long last_pos = 0;
               char word0 = '\0';
 
               current_word[0] = '\0';
@@ -382,29 +398,9 @@ void index_finish(const char *indexpath, int mode) {
                   if (a++) {    /* Yes, a++, not ++a :) */
                     hit = KEYW_SORT_MAXCOUNT - hit;
                     if (strcmp(word, current_word)) {   /* New word */
-                      if (total_hit) {
-                        if (mode == 1)  // TEXT
-                          fprintf(fp, "\t=%lld\r\n", (long long) total_hit);
-                        if ((((total_hit * 1000) / hts_primindex_words) >=
-                             KEYW_USELESS1K)
-                            || (((total_line * 1000) / index) >=
-                                KEYW_USELESS1KPG)
-                          ) {
-                          fseek(fp, last_pos, SEEK_SET);
-                          if (mode == 1)        // TEXT
-                            fprintf(fp, "\tignored (%d)\r\n",
-                                    (int) ((total_hit * 1000) /
-                                           hts_primindex_words));
-                          else
-                            fprintf(fp, "(ignored) [%lld hits]<br>\r\n",
-                                    (long long) total_hit);
-                        } else {
-                          if (mode == 1)        // TEXT
-                            fprintf(fp, "\t(%d)\r\n",
-                                    (int) ((total_hit * 1000) /
-                                           hts_primindex_words));
-                        }
-                      }
+                      if (total_hit)
+                        index_close_word(fp, mode, total_hit, total_line, index,
+                                         last_pos);
                       if (mode == 1)    // TEXT
                         fprintf(fp, "%s\r\n", word);
                       else {    // HTML
@@ -431,6 +427,9 @@ void index_finish(const char *indexpath, int mode) {
                   }
                 }
               }
+              if (total_hit)
+                index_close_word(fp, mode, total_hit, total_line, index,
+                                 last_pos);
               if (mode == 2)    // HTML
                 fprintf(fp, "</td></tr>\r\n</table>\r\n");
               /* an "ignored" rewind can leave old bytes past the end */

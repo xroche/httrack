@@ -63,10 +63,6 @@ Please visit our Website: http://www.httrack.com
 // DOS
 #include <process.h>            /* _beginthread, _endthread */
 #endif
-#include <io.h> /* _chsize_s */
-#define HTS_FTRUNCATE(fp, sz) _chsize_s(_fileno(fp), (sz))
-#else
-#define HTS_FTRUNCATE(fp, sz) ftruncate(fileno(fp), (sz))
 #endif
 
 /* Subdirectory for temporaries, beside a mirrored file or at the mirror root.
