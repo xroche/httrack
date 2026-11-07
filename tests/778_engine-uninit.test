@@ -9,4 +9,7 @@ set -euo pipefail
 
 require_httrack
 
-assert_selftest 'released released loaded joined' uninit
+# worker: hts_uninit() from a worker returns and keeps the lock it still needs.
+# uninit twice: the PSL and the lock are freed, and a repeat is harmless.
+# rejoin: hts_init() and a new worker bring both back.
+assert_selftest 'worker:kept uninit:psl-off,lock-off uninit:psl-off,lock-off rejoin:psl-on,lock-on' uninit

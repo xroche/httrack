@@ -96,6 +96,10 @@ void htsthread_uninit(void) {
 #endif
 }
 
+hts_boolean htsthread_lock_live(void) {
+  return process_chain_mutex != HTSMUTEX_INIT;
+}
+
 typedef struct hts_thread_s {
   void *arg;
   void (*fun) (void *arg);
