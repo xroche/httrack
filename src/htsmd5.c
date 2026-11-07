@@ -46,25 +46,36 @@ Please visit our Website: http://www.httrack.com
 #include "md5.h"
 #include "htssafe.h"
 
+void hts_md5_init(struct MD5Context *ctx) {
+  const int endian = 1;
+
+  /* the flag names "no byte swap", which only a little-endian host wants */
+  MD5Init(ctx, *((const char *) &endian));
+}
+
+void hts_md5_hex(const unsigned char bindigest[16], char hex[33]) {
+  static const char digits[] = "0123456789abcdef";
+  int i;
+
+  for (i = 0; i < 16; i++) {
+    hex[2 * i] = digits[bindigest[i] >> 4];
+    hex[2 * i + 1] = digits[bindigest[i] & 0x0f];
+  }
+  hex[32] = '\0';
+}
+
 int domd5mem(const char *buf, size_t len, char *digest, int asAscii) {
-  int endian = 1;
   unsigned char bindigest[16];
   struct MD5Context ctx;
 
-  MD5Init(&ctx, *((char *) &endian));
+  hts_md5_init(&ctx);
   MD5Update(&ctx, (const unsigned char *) buf, (unsigned int) len);
   MD5Final(bindigest, &ctx);
 
   if (!asAscii) {
     memcpy(digest, bindigest, 16);
   } else {
-    sprintf(digest,
-            "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x"
-            "%02x%02x%02x%02x%02x", bindigest[0], bindigest[1], bindigest[2],
-            bindigest[3], bindigest[4], bindigest[5], bindigest[6],
-            bindigest[7], bindigest[8], bindigest[9], bindigest[10],
-            bindigest[11], bindigest[12], bindigest[13], bindigest[14],
-            bindigest[15]);
+    hts_md5_hex(bindigest, digest);
   }
 
   return 0;

@@ -2149,23 +2149,17 @@ void url_savename_addstr(char *d, size_t dsize, const char *s) {
 
 /* "filename" should be at least 64 bytes. */
 void url_savename_refname(const char *adr, const char *fil, char *filename) {
-  const int endian = 1;
   unsigned char bindigest[16];
+  char hex[33];
   struct MD5Context ctx;
 
-  /* standard MD5 on any host: flag 0 byte-swapped little-endian input */
-  MD5Init(&ctx, *((const char *) &endian));
+  hts_md5_init(&ctx);
   MD5Update(&ctx, (const unsigned char *) adr, (int) strlen(adr));
   MD5Update(&ctx, (const unsigned char *) ",", 1);
   MD5Update(&ctx, (const unsigned char *) fil, (int) strlen(fil));
   MD5Final(bindigest, &ctx);
-  sprintf(filename,
-          CACHE_REFNAME "/" "%02x%02x%02x%02x%02x%02x%02x%02x"
-          "%02x%02x%02x%02x%02x%02x%02x%02x" ".ref", bindigest[0], bindigest[1],
-          bindigest[2], bindigest[3], bindigest[4], bindigest[5], bindigest[6],
-          bindigest[7], bindigest[8], bindigest[9], bindigest[10],
-          bindigest[11], bindigest[12], bindigest[13], bindigest[14],
-          bindigest[15]);
+  hts_md5_hex(bindigest, hex);
+  sprintf(filename, CACHE_REFNAME "/%s.ref", hex);
 }
 
 /* note: return a local filename */

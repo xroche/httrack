@@ -40,6 +40,14 @@ Please visit our Website: http://www.httrack.com
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
+struct MD5Context;
+
+/* MD5Init() with the flag that gives the standard digest on this host. */
+void hts_md5_init(struct MD5Context *ctx);
+
+/* Writes the 32 lowercase hex digits of 'bindigest' and a NUL into 'hex'. */
+void hts_md5_hex(const unsigned char bindigest[16], char hex[33]);
+
 int domd5mem(const char *buf, size_t len, char *digest, int asAscii);
 void md5selftest(void);
 #endif
