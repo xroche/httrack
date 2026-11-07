@@ -724,9 +724,9 @@ char *hts_convertStringFromUTF8Strict(const char *s, size_t size,
 #define strncasecmp(a,b,n) strnicmp(a,b,n)
 #endif
 
-/* Whitespace for the <meta> charset prescan: SPACE, TAB, CR, LF. */
+/* WHATWG prescan whitespace: SPACE, TAB, CR, LF, FF, but not VT. */
 static int is_html_space(char c) {
-  return c == ' ' || c == '\t' || c == '\r' || c == '\n';
+  return c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == '\f';
 }
 
 static int is_html_space_or_equal(char c) {

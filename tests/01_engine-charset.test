@@ -84,8 +84,8 @@ meta '<meta http-equiv="refresh" content="0; url=x.html">' '(none)'
 meta '<body charset="utf-8">' '(none)'
 meta '<meta charset="">' '(none)'
 
-# The prescan's whitespace is SPACE, TAB, CR, LF, and nothing else. TAB, CR and
-# LF need the batch path, which carries them where argv rewrites them to a space.
+# The prescan's whitespace is SPACE, TAB, CR, LF and FF, but not VT. Those need
+# the batch path, which carries them where argv rewrites them to a space.
 TAB=$(printf '\011')
 meta "<meta${TAB}charset=\"utf-8\">" 'utf-8'
 meta "<meta${SELFTEST_CR}charset=\"utf-8\">" 'utf-8'
@@ -93,9 +93,18 @@ meta "<meta${TESTLIB_NL}charset=\"utf-8\">" 'utf-8'
 VT=$(printf '\013')
 FF=$(printf '\014')
 meta "<meta${VT}charset=\"utf-8\">" '(none)'
-meta "<meta${FF}charset=\"utf-8\">" '(none)'
+meta "<meta${FF}charset=\"utf-8\">" 'utf-8'
+meta "<meta charset${FF}=${FF}latin1>" 'latin1'
+meta "<meta charset=latin1${FF}>" 'latin1'
 meta "<meta http-equiv=\"Content-Type\"${VT}content=\"text/html; charset=utf-8\">" '(none)'
-meta "<meta http-equiv=\"Content-Type\" content=\"text/html;${FF}charset=utf-8\">" '(none)'
+meta "<meta http-equiv=\"Content-Type\"${FF}content=\"text/html; charset=utf-8\">" 'utf-8'
+meta "<meta http-equiv=\"Content-Type\" content=\"text/html;${FF}charset=utf-8\">" 'utf-8'
+meta "<meta http-equiv=\"Content-Type\" content=\"text/html;${VT}charset=utf-8\">" '(none)'
+meta "<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8${FF}x\">" 'utf-8'
+meta "<meta http-equiv=\"Content-Type\" content=\"text/html; charset${FF}=${FF}utf-8\">" 'utf-8'
+meta "<meta http-equiv=\"Content-Type\" content=\"text/html; charset${VT}=${VT}utf-8\">" '(none)'
+# FF ends an unquoted value rather than joining the next attribute to it
+meta "<meta http-equiv=content-type${FF}content=\"text/html; charset=latin1\">" 'latin1'
 # a quote inside an unquoted value is a value byte, not a terminator
 meta '<meta charset=ut"f8>' 'ut"f8'
 meta "<meta charset=ut'f8>" "ut'f8"
