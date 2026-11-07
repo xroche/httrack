@@ -334,7 +334,7 @@ static hts_boolean optreal_or_alias(const char *token) {
   const char *eq;
   size_t len;
 
-  if (optreal_find(token) >= 0 || optreal_glued(token))
+  if (optreal_find(token) >= 0)
     return HTS_TRUE;
   if (token[0] != '-' || token[1] != '-')
     return HTS_FALSE;
@@ -352,6 +352,27 @@ static hts_boolean optreal_or_alias(const char *token) {
          optalias_find(name + 5) >= 0;
 }
 
+/* Options whose value has always taken a glued spelling (-F -x1, #1179). */
+/* clang-format off */
+static const char *const dashvalue_opt[] = {
+  "-%g", "-%C", "-%A", "-%F", "-%K", "-%L", "-%S", "-%rf", "-%X",
+  "--bundle-dir", "-F", NULL
+};
+/* clang-format on */
+
+/* Does TOKEN name an option, rather than the value of real option OPT? */
+static hts_boolean optparam_names_option(const char *opt, const char *token) {
+  int i;
+
+  if (optreal_or_alias(token))
+    return HTS_TRUE;
+  for (i = 0; dashvalue_opt[i] != NULL; i++) {
+    if (strcmp(opt, dashvalue_opt[i]) == 0)
+      return HTS_FALSE;
+  }
+  return optreal_glued(token);
+}
+
 /* How the option at ARGV[N_ARG] fares for the parameter it needs. */
 typedef enum {
   OPTPARAM_PRESENT,  /* a value follows */
@@ -360,12 +381,12 @@ typedef enum {
 } optparam_state;
 
 static optparam_state optparam_check(int argc, const char *const *argv,
-                                     int n_arg) {
+                                     int n_arg, const char *opt) {
   if (n_arg + 1 >= argc)
     return OPTPARAM_ABSENT;
   /* a value may begin with '-' (#1425), unless it names an option (#1179) */
-  return optreal_or_alias(argv[n_arg + 1]) ? OPTPARAM_AS_OPTION
-                                           : OPTPARAM_PRESENT;
+  return optparam_names_option(opt, argv[n_arg + 1]) ? OPTPARAM_AS_OPTION
+                                                     : OPTPARAM_PRESENT;
 }
 
 /* The short form the --wide-/--tiny- prefix glues onto the alias it prefixes,
@@ -559,7 +580,7 @@ static void optparam_error(optparam_state state, const char *spelling,
                       "Syntax error:\n\tOption %s needs to be followed by a "
                       "parameter: %s <param>\n%s",
                       spelling, spelling, help);
-  else if (optreal_or_alias(next))
+  else if (optparam_names_option(real, next))
     slprintfbuff_clip(return_error, return_error_size,
                       "Syntax error:\n\tOption %s takes a value, and the next "
                       "word \"%s\" names an option\n%s",
@@ -686,7 +707,8 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
         if (strncmp(hts_optalias[pos][2], "param", 5) == 0) {
           /* Copy parameters? */
           if (need_param == 2) {
-            const optparam_state state = optparam_check(argc, argv, n_arg);
+            const optparam_state state =
+                optparam_check(argc, argv, n_arg, command);
 
             if (state != OPTPARAM_PRESENT) {
               optparam_error(state, argv[n_arg], command,
@@ -815,7 +837,7 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
          the template the parse loop takes (htscoremain.c case 'N'), so it is
          never a URL. Keep both tests in step. */
       if (strcmp(hts_optalias[pos][2], "paramn") == 0 &&
-          optparam_check(argc, argv, n_arg) == OPTPARAM_PRESENT) {
+          optparam_check(argc, argv, n_arg, argv[n_arg]) == OPTPARAM_PRESENT) {
         strlcpybuff(return_argv[0], argv[n_arg], return_argv_size);
         strlcpybuff(return_argv[1], argv[n_arg + 1], return_argv_size);
         *return_argc = 2;
@@ -823,7 +845,8 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
       }
       if ((strcmp(hts_optalias[pos][2], "param1") == 0)
           || (strcmp(hts_optalias[pos][2], "param0") == 0)) {
-        const optparam_state state = optparam_check(argc, argv, n_arg);
+        const optparam_state state =
+            optparam_check(argc, argv, n_arg, argv[n_arg]);
 
         if (state != OPTPARAM_PRESENT) {
           optparam_error(state, argv[n_arg], argv[n_arg],

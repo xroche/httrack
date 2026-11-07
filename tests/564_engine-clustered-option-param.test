@@ -87,7 +87,7 @@ test "$rc" -eq 0 || fail "-q%LO exited $rc: $(<"$tmp/lo.out")"
 test -n "$(find "$tmp/lo/OUT" -name listed.html)" || fail "-q%LO LIST OUT: list not mirrored into OUT: $(<"$tmp/lo.out")"
 
 # another option's value is not an -O, and a glued -N number is no value
-for o in "--user-agent -Oz=1 ZZ" -qN4; do
+for o in "--user-agent -Oz ZZ" -qN4; do
     name=${o// /_}
     mkdir -p "$tmp/v$name"
     rc=0

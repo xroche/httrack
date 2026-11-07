@@ -196,6 +196,13 @@ parse --proxy -qO
 refused "--proxy -qO" '"-qO" names an option'
 parse -P -archive
 accepted "-P -archive"
+# The options that took a glued value before #1425 still take one.
+parse --user-agent -Oz
+accepted "--user-agent -Oz"
+parse -F -x1
+accepted "-F -x1"
+parse --strip-query -ab
+accepted "--strip-query -ab"
 # A value option still refuses a real option name (#1179).
 parse --assume -q
 refused "--assume -q" 'Option --assume takes a value' '"-q" names an option'
