@@ -101,6 +101,8 @@ meta "<meta http-equiv=\"Content-Type\"${FF}content=\"text/html; charset=utf-8\"
 meta "<meta http-equiv=\"Content-Type\" content=\"text/html;${FF}charset=utf-8\">" 'utf-8'
 meta "<meta http-equiv=\"Content-Type\" content=\"text/html;${VT}charset=utf-8\">" '(none)'
 meta "<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8${FF}x\">" 'utf-8'
+meta "<meta http-equiv=\"Content-Type\" content=\"text/html; charset${FF}=${FF}utf-8\">" 'utf-8'
+meta "<meta http-equiv=\"Content-Type\" content=\"text/html; charset${VT}=${VT}utf-8\">" '(none)'
 # FF ends an unquoted value rather than joining the next attribute to it
 meta "<meta http-equiv=content-type${FF}content=\"text/html; charset=latin1\">" 'latin1'
 # a quote inside an unquoted value is a value byte, not a terminator
