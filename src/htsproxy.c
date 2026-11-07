@@ -77,11 +77,18 @@ static int proxy_getline(T_SOC soc, char *s, int max, int timeout) {
   return j;
 }
 
+/* The ":port" of adr's authority, or NULL; never one before host. */
+static const char *hts_host_port(const char *adr, const char *host) {
+  const char *const port = jump_toport_const(adr);
+
+  return port != NULL && port >= host ? port : NULL;
+}
+
 int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
                       int timeout) {
   const T_SOC soc = retour->soc;
   const char *const host = jump_identification_const(adr); // host[:port]
-  const char *const portsep = jump_toport_const(adr);      // ":port" or NULL
+  const char *const portsep = hts_host_port(adr, host);    // ":port" or NULL
   char BIGSTK authority[HTS_URLMAXSIZE * 2];
   char BIGSTK req[HTS_URLMAXSIZE * 4 + 1100];
   char line[1024];
@@ -463,7 +470,7 @@ static int socks5_handshake_stream(httrackp *opt, socks5_stream *st,
                                    const char *adr, const char *proxy_name,
                                    int ssl, char *msg, size_t msgsize) {
   const char *const host = jump_identification_const(adr);
-  const char *const portsep = jump_toport_const(adr);
+  const char *const portsep = hts_host_port(adr, host);
   const size_t hostlen =
       portsep != NULL ? (size_t) (portsep - host) : strlen(host);
   // sized for the whole userinfo: decoding shrinks, so an over-long credential
