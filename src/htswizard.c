@@ -826,7 +826,7 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
       // eternal depth first
       // vérifier récursivité extérieure
       if (opt->extdepth > 0) {
-        if ( /*question && */ (ptr > 0) && (!force_mirror)) {
+        if (ptr > 0) {
           // well, this is kinda a hak
           // we don't want to mirror EVERYTHING, and we have to decide where to stop
           // there is no way yet to tag "external" links, and therefore links that are
@@ -837,19 +837,11 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
             *set_prio_to = 1 + (opt->extdepth);
             may_set_prio_to = 0;        // clear may-set flag
             ACCEPT_LINK();              // authorized
-            question = 0;       // résolution auto
-            if (question) {
-              hts_log_print(opt, LOG_DEBUG,
-                            "(wizard) ambiguous link accepted (external "
-                            "depth): link %s at %s%s",
-                            l, adr_nologin(opt, urladr()), urlfil());
-            } else {
-              hts_log_print(opt, LOG_DEBUG,
-                            "(wizard) forced to accept link (external depth): "
-                            "link %s at %s%s",
-                            l, adr_nologin(opt, urladr()), urlfil());
-            }
-
+            question = 0;               // auto-resolved
+            hts_log_print(opt, LOG_DEBUG,
+                          "(wizard) forced to accept link (external depth): "
+                          "link %s at %s%s",
+                          l, adr_nologin(opt, urladr()), urlfil());
           }
         }
       }
@@ -947,14 +939,6 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
                       "(wizard) cancelled foreign domain link: link %s at %s%s",
                       l, adr_nologin(opt, urladr()), urlfil());
       }
-#if BDEBUG==3
-      printf("at %s in %s, wizard says: url %s ", urladr(), urlfil(), l);
-      if (forbidden_url)
-        printf("cancelled");
-      else
-        printf(">SHARED<");
-      printf("\n");
-#endif
     }
 
     /* en cas de question, ou lien primaire (enregistrer autorisations) */

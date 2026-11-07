@@ -1244,24 +1244,7 @@ int url_savename(lien_adrfilsave *const afs,
   if (opt->savename_type == -1) {       // utiliser savename_userdef! (%h%p/%n%q.%t)
     const char *a = StringBuff(opt->savename_userdef);
     char BIGSTK tmpltail[HTS_URLMAXSIZE * 2];
-
-    /*char *nom_pos=NULL,*dot_pos=NULL;  // Position nom et point */
     char tok;
-
-    /*
-       {  // Rechercher premier /
-       char* a=fil+strlen(fil)-1;
-       // passer structures
-       while(((int) a>(int) fil) && (*a != '/') && (*a != '\\')) {
-       if (*a == '.')    // point? noter position
-       if (!dot_pos)
-       dot_pos=a;
-       a--;
-       }
-       if ((*a=='/') || (*a=='\\')) a++;
-       nom_pos = a;
-       }
-     */
 
     // build the name
     tmpltail[0] = '\0';
@@ -1492,16 +1475,6 @@ int url_savename(lien_adrfilsave *const afs,
 
     hts_lowcase(afs->save);
 
-    /*
-       // ne sert à rien car a déja été filtré normalement
-       if ((*fil=='.') && (*(fil+1)=='/'))          // ./index.html ** //
-       url_savename_addstr(save,fil+2);
-       else                                               // index.html ou /index.html
-       url_savename_addstr(save,fil);
-       if (save[strlen(save)-1]=='/') 
-       strcatbuff(save,DEFAULT_HTML);     // nommer page par défaut!!
-     */
-
     /* add name */
     ADD_STANDARD_PATH;
     ADD_STANDARD_NAME(0);
@@ -1616,16 +1589,9 @@ int url_savename(lien_adrfilsave *const afs,
       }
       break;
     default:{                  // noms sans les noms des répertoires
-        // ne garder que le nom, pas la structure
-        /*
-           char* a=fil+strlen(fil)-1;
-           while(((int) a>(int) fil) && (*a != '/') && (*a != '\\')) a--;      
-           if ((*a=='/') || (*a=='\\')) a++;
-           strcatbuff(save,a);
-         */
-
-        /* add name */
-        ADD_STANDARD_NAME(0);
+      // ne garder que le nom, pas la structure
+      /* add name */
+      ADD_STANDARD_NAME(0);
       }
       break;
     }
@@ -1636,20 +1602,8 @@ int url_savename(lien_adrfilsave *const afs,
       strcatbuff(afs->save, DEFAULT_HTML);   // nommer page par défaut!!
   }
 
-  // vérifier qu'on ne doit pas forcer l'extension
-  // par exemple, asp sera sauvé en html, cgi en html ou gif, xbm etc.. selon les cas
-  /*if (ext_chg) {
-     char* a=save+strlen(save)-1;
-     while(((int) a>(int) save) && (*a!='.') && (*a!='/')) a--;
-     if (*a=='.') *a='\0';  // couper
-     // recopier extension
-     strcatbuff(save,".");
-     strcatbuff(save,ext);    // copier ext
-     } */
-
-  // Not used anymore unless non-delayed types.
-  // de même en cas de manque d'extension on en place une de manière forcée..
-  // cela évite les /chez/toto et les /chez/toto/index.html incompatibles
+  // Without an extension, force .html (not used for delayed types)
+  // so /a/b and /a/b/index.html cannot clash.
   if (opt->savename_type != -1 &&
       opt->savename_delayed != HTS_SAVENAME_DELAYED_HARD) {
     char *a = hts_lastcharptr(afs->save);
@@ -1662,27 +1616,6 @@ int url_savename(lien_adrfilsave *const afs,
                     adr_nologin(opt, adr_complete), fil_complete, afs->save);
     }
   }
-  // effacer pass au besoin pour les autentifications
-  // (plus la peine : masqué au début)
-/*
-  {
-    char* a = jump_identification(afs->save);
-    if (a!=afs->save) {
-      char BIGSTK tempo[HTS_URLMAXSIZE*2];
-      char *b;
-      tempo[0]='\0';
-      strcpybuff(tempo,"[");
-      b=strchr(save,':');
-      if (!b) b=strchr(save,'@');
-      if (b)
-        strncatbuff(tempo,save,(int) b-(int) a);
-      strcatbuff(tempo,"]");
-      strcatbuff(tempo,a);
-      strcpybuff(save,a);
-    }
-  }
-*/
-
   // éviter les / au début (cause: N100)
   if (afs->save[0] == '/') {
     char BIGSTK tempo[HTS_URLMAXSIZE * 2];
@@ -2105,15 +2038,6 @@ void standard_name(char *b, size_t bsize, const char *dot_pos,
     else
       htsbuff_catn(&bb, dot_pos + 1, 3);
   }
-  // Allow extensionless
-#ifdef DO_NOT_ALLOW_EXTENSIONLESS
-  else {
-    if (!short_ver) // long names
-      htsbuff_cat(&bb, DEFAULT_EXT);
-    else
-      htsbuff_cat(&bb, DEFAULT_EXT_SHORT);
-  }
-#endif
 }
 
 /* Petit md5 */
