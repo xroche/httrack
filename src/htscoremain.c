@@ -407,6 +407,43 @@ static hts_boolean write_progress_lock(httrackp *opt, const char *path,
   return HTS_TRUE;
 }
 
+/* Removes the regular files of hts-cache/ref, then the directory. A symlinked
+   ref or entry is left alone, so it cannot reach cookies.txt or winprofile.ini.
+ */
+static void purge_ref_dir(httrackp *opt) {
+  const char *const refdir = fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                     StringBuff(opt->path_log), CACHE_REFNAME);
+  DIR *dir = NULL;
+  struct dirent *entry;
+#ifndef _WIN32
+  struct stat st;
+
+  if (lstat(refdir, &st) != 0 || !S_ISDIR(st.st_mode))
+    return;
+#endif
+  dir = opendir(refdir);
+  while (dir != NULL && (entry = readdir(dir)) != NULL) {
+    if (entry->d_name[0] != '\0' && entry->d_name[0] != '.') {
+      char rel[HTS_URLMAXSIZE];
+
+      if (snprintf(rel, sizeof(rel), "%s/%s", CACHE_REFNAME, entry->d_name) <
+          (int) sizeof(rel)) {
+        const char *const path =
+            fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                    StringBuff(opt->path_log), rel);
+#ifndef _WIN32
+        if (lstat(path, &st) == 0 && S_ISREG(st.st_mode))
+#endif
+          (void) UNLINK(path);
+      }
+    }
+  }
+  if (dir != NULL)
+    (void) closedir(dir);
+  (void) RMDIR(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                       StringBuff(opt->path_log), CACHE_REFNAME));
+}
+
 static int hts_main_internal(int argc, char **argv, httrackp * opt);
 static hts_boolean cmdl_shortopt_has(const char *s, char c);
 static hts_boolean cmdl_shortopt_named(const char *s, const char *opt);
@@ -1157,28 +1194,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                              StringBuff(opt->path_log),
                              "hts-in_progress.lock"));
-            {
-              DIR *const dir =
-                  opendir(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                  StringBuff(opt->path_log), CACHE_REFNAME));
-              struct dirent *entry;
-
-              while (dir != NULL && (entry = readdir(dir)) != NULL) {
-                if (entry->d_name[0] != '\0' && entry->d_name[0] != '.') {
-                  char rel[HTS_URLMAXSIZE];
-
-                  if (snprintf(rel, sizeof(rel), "%s/%s", CACHE_REFNAME,
-                               entry->d_name) < (int) sizeof(rel))
-                    (void) UNLINK(fconcat(OPT_GET_BUFF(opt),
-                                          OPT_GET_BUFF_SIZE(opt),
-                                          StringBuff(opt->path_log), rel));
-                }
-              }
-              if (dir != NULL)
-                (void) closedir(dir);
-            }
-            RMDIR(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                          StringBuff(opt->path_log), CACHE_REFNAME));
+            purge_ref_dir(opt);
             RMDIR(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                           StringBuff(opt->path_log), "hts-cache"));
             //
@@ -3505,28 +3521,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
        transfer mid-body (#1595). */
     if (hts_load_acquire_int(&opt->state.exit_xh) == 0 &&
         !opt->abort_left_partial) {
-      // erase ref files if not interrupted
-      DIR *dir;
-      struct dirent *entry;
-
-      for(dir =
-          opendir(fconcat
-                  (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                   CACHE_REFNAME));
-          dir != NULL && (entry = readdir(dir)) != NULL;) {
-        if (entry->d_name[0] != '\0' && entry->d_name[0] != '.') {
-          char *f = OPT_GET_BUFF(opt);
-
-          sprintf(f, "%s/%s", CACHE_REFNAME, entry->d_name);
-          (void) UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                StringBuff(opt->path_log), f));
-        }
-      }
-      if (dir != NULL) {
-        (void) closedir(dir);
-      }
-      (void) RMDIR(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                           StringBuff(opt->path_log), CACHE_REFNAME));
+      purge_ref_dir(opt);
     }
 
     /* Info for wrappers */

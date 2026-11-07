@@ -47,3 +47,17 @@ assert_eq "cookies.txt
 hts-cache
 hts-cache/winprofile.ini" "$(cd "${out}" && find . -mindepth 1 | sed 's|^\./||' | sort)" \
     "files left after --clean with user state"
+
+# A symlinked ref must not be followed into the user state next to it.
+if ! target_is_windows; then
+    for target in .. .; do
+        populate
+        rm -rf "${out}/hts-cache/ref"
+        ln -s "${target}" "${out}/hts-cache/ref"
+        echo x >"${out}/hts-cache/winprofile.ini"
+        echo x >"${out}/cookies.txt"
+        httrack -O "${out}" --clean >"${tmp}/run.log" 2>&1 || true
+        assert_file "${out}/hts-cache/winprofile.ini" "winprofile.ini kept, ref -> ${target}"
+        assert_file "${out}/cookies.txt" "cookies.txt kept, ref -> ${target}"
+    done
+fi
