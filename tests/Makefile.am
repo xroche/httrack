@@ -26,6 +26,7 @@ EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c gaistall.c noba
 	server-root/hostalias/e.html \
 	server-root/fraglink/index.html server-root/fraglink/target.html \
 	server-root/extplaceholder/index.html \
+	server-root/quoteurl/index.html server-root/quoteurl/page.html \
 	fixtures/cache-golden/hts-cache/new.zip \
 	install-manifest.txt \
 	62_lang-untranslated.counts \

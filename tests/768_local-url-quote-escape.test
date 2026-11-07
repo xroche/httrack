@@ -14,18 +14,29 @@ for opts in "" -K -K3 -x; do
         --file-matches "$page" 'example\.invalid/c%27d%3ce%3ef\.html"' \
         --file-matches "$page" 'https://example\.invalid/h%22i\.html"' \
         --file-matches "$page" 'example\.invalid/plain\.html"' \
+        --file-matches "$page" 'ex%22a%3cmple\.invalid/x\.html"' \
         --file-matches "$page" 'q=1&amp;r=2"' \
         --file-not-matches "$page" 'alert\(1\)"' \
         --file-not-matches "$page" "c'd" \
         --file-not-matches "$page" 'd<e>f' \
         --file-not-matches "$page" 'x"y' \
         --file-not-matches "$page" 'h"i' \
+        --file-not-matches "$page" 'ex"a' \
         httrack "BASEURL/$page" -r2 $opts
 done
 
-# The absolute writers also cover a link to this host.
+# The applet writer; -K drops its attributes, on master too.
+for opts in "" -K3; do
+    # shellcheck disable=SC2086 # $opts is one option or none
+    bash "$top_srcdir/tests/local-crawl.sh" --errors 1 \
+        --file-matches "$page" 'codebase="http://example\.invalid/d%22ir&amp;z/" code="x%22y\.Foo\.class"' \
+        httrack "BASEURL/$page" -r2 $opts
+done
+
+# The absolute writers also cover a link to this host, and a script string keeps & raw.
 for opts in -K -K3; do
     bash "$top_srcdir/tests/local-crawl.sh" --errors 1 \
         --file-matches "$page" '/quoteurl/r%22s\.html"' \
+        --file-matches "$page" '/quoteurl/page\.html\?s%3ct&u"' \
         httrack "BASEURL/$page" -r2 "$opts"
 done
