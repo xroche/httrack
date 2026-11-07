@@ -463,6 +463,53 @@ void hts_wizard_apply_verdict(httrackp *opt, int n, const char *adr,
    hts_acceptlink_() and hts_testlinksize() build? Those two buffers gate what
    url_savename_addstr may later append (#1269), so a link that overruns them is
    refused rather than clipped into a URL nobody linked to. */
+/* Copy the host of adr into dst, without scheme, login, port or path. */
+static hts_boolean travel_host(const char *adr, char *dst, size_t size) {
+  const char *const host = jump_identification_const(adr);
+  const char *const port = jump_toport_const(adr);
+  size_t len = strcspn(host, "/");
+
+  if (port != NULL && port >= host && (size_t) (port - host) < len)
+    len = (size_t) (port - host);
+  if (len >= size)
+    return HTS_FALSE;
+  memcpy(dst, host, len);
+  dst[len] = '\0';
+  return HTS_TRUE;
+}
+
+/* 1 when a and b share a domain for -d, 0 when they do not, -1 when one of
+   them has no domain. Without a registrable domain, the last two labels. */
+static int travel_same_domain(const char *a, const char *b) {
+  char ha[HTS_URLMAXSIZE], hb[HTS_URLMAXSIZE];
+  char ra[HTS_URLMAXSIZE], rb[HTS_URLMAXSIZE];
+  size_t i, j;
+
+  if (travel_host(a, ha, sizeof(ha)) && travel_host(b, hb, sizeof(hb)) &&
+      hts_registrable_domain(ha, ra, sizeof(ra)) &&
+      hts_registrable_domain(hb, rb, sizeof(rb)))
+    return strcmp(ra, rb) == 0 ? 1 : 0;
+  i = hts_lastcharoffset(a);
+  j = hts_lastcharoffset(b);
+  if ((i > 0) && (j > 0)) {
+    while ((i > 0) && (a[i] != '.'))
+      i--;
+    while ((j > 0) && (b[j] != '.'))
+      j--;
+    if ((i > 0) && (j > 0)) {
+      i--;
+      j--;
+      while ((i > 0) && (a[i] != '.'))
+        i--;
+      while ((j > 0) && (b[j] != '.'))
+        j--;
+    }
+  }
+  if ((i > 0) && (j > 0))
+    return strfield2(a + i, b + j) ? 1 : 0;
+  return -1;
+}
+
 static hts_boolean hts_wizard_url_fits(const char *adr, const char *fil) {
   const size_t size = HTS_URLMAXSIZE * 2;
   const size_t sep = (*fil != '/') ? 1 : 0;
@@ -682,39 +729,20 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
         forbidden_url = 1;
       break;                    // interdicton de sortir au dela de l'adresse
     case HTS_TRAVEL_SAME_DOMAIN: {
-      size_t i = hts_lastcharoffset(adr);
-      size_t j = hts_lastcharoffset(urladr());
+      const int same = travel_same_domain(adr, urladr());
 
-      if ((i > 0) && (j > 0)) {
-        while ((i > 0) && (adr[i] != '.'))
-          i--;
-        while ((j > 0) && (urladr()[j] != '.'))
-          j--;
-        if ((i > 0) && (j > 0)) {
-          i--;
-          j--;
-          while ((i > 0) && (adr[i] != '.'))
-            i--;
-          while ((j > 0) && (urladr()[j] != '.'))
-            j--;
+      if (same == 0) {
+        if (!opt->wizard) { // mode non wizard
+          forbidden_url = 1;
+          hts_log_print(opt, LOG_DEBUG, "foreign domain link canceled: %s%s",
+                        adr_nologin(opt, adr), fil);
         }
-      }
-      if ((i > 0) && (j > 0)) {
-        if (!strfield2(adr + i, urladr() + j)) { // !=
-          if (!opt->wizard) {                    // mode non wizard
-            forbidden_url = 1; // pas même domaine
-            hts_log_print(opt, LOG_DEBUG, "foreign domain link canceled: %s%s",
-                          adr_nologin(opt, adr), fil);
-          }
-
-        } else {
-          if (opt->wizard) {   // mode wizard
-            ACCEPT_LINK();     // same domain
-            hts_log_print(opt, LOG_DEBUG, "same domain link authorized: %s%s",
-                          adr_nologin(opt, adr), fil);
-          }
+      } else if (same > 0) {
+        if (opt->wizard) { // mode wizard
+          ACCEPT_LINK();
+          hts_log_print(opt, LOG_DEBUG, "same domain link authorized: %s%s",
+                        adr_nologin(opt, adr), fil);
         }
-
       } else
         forbidden_url = 1;
     } break;
