@@ -47,10 +47,11 @@ Please visit our Website: http://www.httrack.com
 #include "htssafe.h"
 
 void hts_md5_init(struct MD5Context *ctx) {
-  const int endian = 1;
+  const int one = 1;
+  const int little_endian = *(const char *) &one;
 
-  /* the flag names "no byte swap", which only a little-endian host wants */
-  MD5Init(ctx, *((const char *) &endian));
+  /* brokenEndian=1 skips MD5's byte swap, right on a little-endian host */
+  MD5Init(ctx, little_endian);
 }
 
 void hts_md5_hex(const unsigned char bindigest[16], char hex[33]) {
