@@ -512,8 +512,8 @@ static hts_boolean ftp_decode_userinfo(const char *src, size_t len, char *dst,
     int h = -1;
 
     if (j >= dst_size - 1)
-      return HTS_FALSE; /* a clipped name is another account's */
-    if (src[i] == '%' && len - i > 2)
+      return HTS_FALSE;               /* a clipped name is another account's */
+    if (src[i] == '%' && i + 2 < len) /* both hex digits in this field */
       h = hts_ehex(&src[i + 1]);
     if (h >= 0) {
       dst[j++] = (char) h;
