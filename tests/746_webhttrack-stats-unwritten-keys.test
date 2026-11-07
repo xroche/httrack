@@ -47,32 +47,25 @@ cport=$(discover_server_port "${clog}" "${csrv}") ||
     fail "content server did not come up"
 
 printf '[a live row publishes no unwritten field] ..\t'
-"${HTS_PYTHON}" - "${HTS_PORT}" "${cport}" "${work}" <<'PY' || fail "see above"
-import re, sys, time, urllib.parse, urllib.request
+htsserver_python - "${HTS_URL}" "${cport}" "${work}" <<'PY' || fail "see above"
+import re, sys, time
 
-port, cport, work = sys.argv[1:4]
-base = "http://127.0.0.1:%s" % port
+from webtestlib import Session
 
-form = urllib.request.urlopen(base + "/server/index.html", timeout=20).read()
-m = re.search(rb'name="sid" value="([0-9a-f]+)"', form)
-if not m:
-    sys.exit("no session id in server/index.html")
-fields = {
-    "sid": m.group(1).decode(), "path": work, "projname": "crawl",
-    "winprofile": "x", "command_do": "start",
-    "command": "httrack --quiet --robots=0 -c2 http://127.0.0.1:%s/trickle/index.html -O %s/crawl"
-               % (cport, work),
-}
-urllib.request.urlopen(urllib.request.Request(
-    base + "/step4.html", data=urllib.parse.urlencode(fields).encode(),
-    method="POST"), timeout=60).read()
+s, cport, work = Session(sys.argv[1], timeout=60), sys.argv[2], sys.argv[3]
+s.post("step4.html", [
+    ("path", work), ("projname", "crawl"), ("winprofile", "x"),
+    ("command_do", "start"),
+    ("command", "httrack --quiet --robots=0 -c2 http://127.0.0.1:%s/trickle/index.html -O %s/crawl"
+     % (cport, work)),
+])
 
 # Positive control: both rows must be live, or empty values prove nothing.
 deadline = time.time() + 90
 while True:
-    body = urllib.request.urlopen(base + "/server/refresh.html",
-                                  timeout=20).read().decode("latin-1")
-    if all(re.search(r"SAV%d=\[[^]\n]*\.bin\]" % i, body) for i in (0, 1)):
+    body = s.get("refresh.html")
+    # A row may still hold the engine's temporary name, such as p3.bin.4.delayed.
+    if all(re.search(r"SAV%d=\[[^]\n]*/trickle/[^]\n]+\]" % i, body) for i in (0, 1)):
         break
     if time.time() > deadline:
         sys.exit("the trickled rows never reached the panel:\n%s" % body[-2000:])
