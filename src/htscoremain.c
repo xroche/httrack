@@ -1519,14 +1519,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             } else
               opt->depth = 3;
             break;
-/*
-          case 'r': opt->wizard=0;
-            if (isdigit((unsigned char)*(com+1))) {
-              sscanf(com+1,"%d",&opt->depth);
-              while(isdigit((unsigned char)*(com+1))) com++;
-            } else opt->depth=3;
-            break;
-*/
             //
             // note: les tests opt->depth sont pour éviter de faire
             // un miroir du web (:-O) accidentelement ;-)
@@ -2107,19 +2099,14 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                     for(a = argv[na]; *a != '\0'; a++) {
                       if (*a == ';') {  /* next one */
                         StringAddchar(opt->mimedefs, '\n');
-                        //*b++ = '\n';
                       } else if (*a == ',' || *a == '\n' || *a == '\r'
                                  || *a == '\t') {
                         StringAddchar(opt->mimedefs, ' ');
-                        //*b++ = ' ';
                       } else {
                         StringAddchar(opt->mimedefs, *a);
-                        //*b++ = *a;
                       }
                     }
                     StringAddchar(opt->mimedefs, '\n');
-                    //*b++ = '\n';    /* next def */
-                    //*b++ = '\0';
                   }
                 }
                 break;
@@ -3259,18 +3246,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       strcpybuff(n_lock,
                  fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                          StringBuff(opt->path_log), "hts-in_progress.lock"));
-      /*do {
-         if (!n)
-         sprintf(n_lock,fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-in_progress.lock"),n);
-         else
-         sprintf(n_lock,fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-in_progress%d.lock"),n);
-         n++;
-         } while((fexist(n_lock)) && opt->quiet);      
-         if (fexist(n_lock)) {
-         if (!recuperer) {
-         remove(n_lock);
-         }
-         } */
 
       // vérifier existence de la structure (path_html/path_log are UTF-8, use
       // the UTF-8 mkdir path)

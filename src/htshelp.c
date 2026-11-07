@@ -73,73 +73,46 @@ Please visit our Website: http://www.httrack.com
 #define HTS_GUI_HINT "the GUI version is 'webhttrack'."
 #endif
 
-#define waitkey if (more) { char s[4]; printf("\nMORE.. q to quit\n"); linput(stdin,s,4); if (strcmp(s,"q")==0) quit=1; else printf("Page %d\n\n",++m); }
 void infomsg(const char *msg) {
-  int l = 0;
-  int m = 0;
-  int more = 0;
-  int quit = 0;
   int done = 0;
 
-  //
   if (msg == NULL)
-    quit = 0;
-  if (msg) {
-    if (!quit) {
-      if (strlen(msg) == 1) {
-        if (msg[0] == '1') {
-          more = 1;
-          return;
-        }
-      }
+    return;
 
-      /* afficher alias? */
-      if (((int) strlen(msg)) > 4) {
-        if (msg[0] == ' ') {
-          if (msg[2] != ' ') {
-            if ((msg[3] == ' ') || (msg[4] == ' ')) {
-              char cmd[32] = "-";
-              int p;
+  /* show the long-option alias? */
+  if (((int) strlen(msg)) > 4 && msg[0] == ' ' && msg[2] != ' ' &&
+      (msg[3] == ' ' || msg[4] == ' ')) {
+    char cmd[32] = "-";
+    int p;
 
-              sscanf(msg, "%30s", cmd + strlen(cmd));
-              /* try the flag as-is, then strip a trailing N as the numeric-arg
-                 placeholder (cN -> c); this order keeps -%N from becoming -% */
-              p = optreal_find(cmd);
-              if (p < 0 && (int) strlen(cmd) > 2 && hts_lastchar(cmd) == 'N') {
-                hts_striplastchar(cmd, 'N');
-                p = optreal_find(cmd);
-              }
-              if (p >= 0) {
-                /* fings type of parameter: number,param,param concatenated,single cmd */
-                if (strcmp(opttype_value(p), "param") == 0 ||
-                    strcmp(opttype_value(p), "paramn") == 0 ||
-                    strcmp(opttype_value(p), "level") == 0)
-                  printf("%s (--%s[=N])\n", msg, optalias_value(p));
-                else if (strcmp(opttype_value(p), "onoff") == 0)
-                  printf("%s (--%s[=0])\n", msg, optalias_value(p));
-                else if (strcmp(opttype_value(p), "param1") == 0)
-                  printf("%s (--%s <param>)\n", msg, optalias_value(p));
-                else if (strcmp(opttype_value(p), "param0") == 0)
-                  printf("%s (--%s<param>)\n", msg, optalias_value(p));
-                else
-                  printf("%s (--%s)\n", msg, optalias_value(p));
-                done = 1;
-              }
-            }
-          }
-        }
-      }
-
-      /* sinon */
-      if (!done)
-        printf("%s\n", msg);
-      l++;
-      if (l > 20) {
-        l = 0;
-        waitkey;
-      }
+    sscanf(msg, "%30s", cmd + strlen(cmd));
+    /* try the flag as-is, then strip a trailing N as the numeric-arg
+       placeholder (cN -> c); this order keeps -%N from becoming -% */
+    p = optreal_find(cmd);
+    if (p < 0 && (int) strlen(cmd) > 2 && hts_lastchar(cmd) == 'N') {
+      hts_striplastchar(cmd, 'N');
+      p = optreal_find(cmd);
+    }
+    if (p >= 0) {
+      /* type of parameter: number, param, param concatenated, single cmd */
+      if (strcmp(opttype_value(p), "param") == 0 ||
+          strcmp(opttype_value(p), "paramn") == 0 ||
+          strcmp(opttype_value(p), "level") == 0)
+        printf("%s (--%s[=N])\n", msg, optalias_value(p));
+      else if (strcmp(opttype_value(p), "onoff") == 0)
+        printf("%s (--%s[=0])\n", msg, optalias_value(p));
+      else if (strcmp(opttype_value(p), "param1") == 0)
+        printf("%s (--%s <param>)\n", msg, optalias_value(p));
+      else if (strcmp(opttype_value(p), "param0") == 0)
+        printf("%s (--%s<param>)\n", msg, optalias_value(p));
+      else
+        printf("%s (--%s)\n", msg, optalias_value(p));
+      done = 1;
     }
   }
+
+  if (!done)
+    printf("%s\n", msg);
 }
 
 typedef struct help_wizard_buffers {
@@ -489,8 +462,6 @@ void help(const char *app, int more) {
   char fields[256];
 
   infomsg("");
-  if (more)
-    infomsg("1");
   if (more != 2) {
     snprintf(info, sizeof(info),
             "HTTrack version " HTTRACK_VERSION "%s",
