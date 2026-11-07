@@ -603,6 +603,31 @@ static long int filesize(const char *filename) {
   return -1;
 }
 
+/* Return the size of an open file, or -1, and keep the read position. */
+static long int stream_size(FILE *fp) {
+  const long int at = ftell(fp);
+  long int size;
+
+  if (at < 0 || fseek(fp, 0, SEEK_END) != 0)
+    return -1;
+  size = ftell(fp);
+  if (fseek(fp, at, SEEK_SET) != 0)
+    return -1;
+  return size;
+}
+
+/** Would reading n bytes at the current offset stay inside the .dat? A size
+    the host could not report is refused rather than waived: filesize() answers
+    in a long int, so a 32-bit build handed a .dat past 2 GB reads back a value
+    that bounds nothing. **/
+static hts_boolean cache_fits(FILE *fp, long int datSize, size_t n) {
+  const long int at = ftell(fp);
+
+  if (at < 0 || datSize < 0)
+    return HTS_FALSE;
+  return at <= datSize && n <= (size_t) (datSize - at) ? HTS_TRUE : HTS_FALSE;
+}
+
 int PT_LookupCache(PT_Index index, const char *url) {
   if (index != NULL && SAFE_INDEX(index)) {
     return _IndexFuncts[index->type].PT_LookupCache(index, url);
@@ -1345,7 +1370,14 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                   } else {
                     FILE *fp = fopen(file_convert(catbuff, sizeof(catbuff), previous_save), "rb");
 
-                    if (fp != NULL) {
+                    if (fp != NULL &&
+                        !cache_fits(fp, stream_size(fp), r->size)) {
+                      /* not a Bad Size, but refused before allocating */
+                      r->statuscode = STATUSCODE_INVALID;
+                      strcpybuff(r->msg, "Read error in cache disk data: "
+                                         "file shorter than X-Size");
+                      fclose(fp);
+                    } else if (fp != NULL) {
                       r->adr = (char *) malloc(r->size + 1);
                       if (r->adr != NULL) {
                         if (r->size > 0 &&
@@ -1376,8 +1408,17 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                   }
                 }
               } else {
-                // lire fichier (d'un coup)
-                if (flags & FETCH_BODY) {
+                // read the whole entry at once
+                unz_file_info zfi;
+
+                if ((flags & FETCH_BODY) &&
+                    (unzGetCurrentFileInfo(index->zFile, &zfi, NULL, 0, NULL, 0,
+                                           NULL, 0) != UNZ_OK ||
+                     r->size > (size_t) zfi.uncompressed_size)) {
+                  r->statuscode = STATUSCODE_INVALID;
+                  strcpybuff(r->msg, "Cache Read Error : Read Data, entry "
+                                     "shorter than X-Size");
+                } else if (flags & FETCH_BODY) {
                   r->adr = (char *) malloc(r->size + 1);
                   if (r->adr != NULL) {
                     if ((size_t) unzReadCurrentFile(index->zFile, r->adr,
@@ -1589,18 +1630,6 @@ static int cache_brstr(char *adr, char *s, size_t s_size) {
     s[0] = '\0';
   }
   return off;
-}
-
-/** Would reading n bytes at the current offset stay inside the .dat? A size
-    the host could not report is refused rather than waived: filesize() answers
-    in a long int, so a 32-bit build handed a .dat past 2 GB reads back a value
-    that bounds nothing. **/
-static hts_boolean cache_fits(FILE *fp, long int datSize, size_t n) {
-  const long int at = ftell(fp);
-
-  if (at < 0 || datSize < 0)
-    return HTS_FALSE;
-  return at <= datSize && n <= (size_t) (datSize - at) ? HTS_TRUE : HTS_FALSE;
 }
 
 /** Read a field's length prefix. HTS_FALSE on a truncated line, an unparseable
