@@ -332,33 +332,7 @@ static hts_boolean optreal_or_alias(const char *token) {
          optalias_find(name + 5) >= 0;
 }
 
-/* Real options whose value is user-written text, a rule or a path and may
-   legitimately begin with '-' (#1179, #1425): they take any following token
-   that does not name an option, and their --name=value form takes even one that
-   does, the escape #1179 documented for --strip-query. Every other option keeps
-   the older guess, that a leading '-' is the next option; relaxing it wholesale
-   would turn a typo into a mirror in a directory named after it. Keep the same
-   options' guards in htscoremain.c in sync, which is what a clustered (-q%A) or
-   quoted ("-%A") spelling lands on. */
-/* one row per option, so each name keeps its tag */
-/* clang-format off */
-static const char *const dashvalue_opt[] = {
-  "-%g",  /* strip-query */
-  "-%C",  /* host-alias */
-  "-%A",  /* assume */
-  "-%F",  /* footer */
-  "-%K",  /* cookies-file */
-  "-%L",  /* list */
-  "-%S",  /* urllist */
-  "-%rf", /* warc-file */
-  "-%X",  /* headers */
-  "--bundle-dir",
-  "-F",   /* user-agent */
-  NULL
-};
-/* clang-format on */
-
-/* How the real option OPT at ARGV[N_ARG] fares for the parameter it needs. */
+/* How the option at ARGV[N_ARG] fares for the parameter it needs. */
 typedef enum {
   OPTPARAM_PRESENT,  /* a value follows */
   OPTPARAM_ABSENT,   /* nothing follows */
@@ -366,19 +340,12 @@ typedef enum {
 } optparam_state;
 
 static optparam_state optparam_check(int argc, const char *const *argv,
-                                     int n_arg, const char *opt) {
-  int i;
-
+                                     int n_arg) {
   if (n_arg + 1 >= argc)
     return OPTPARAM_ABSENT;
-  if (argv[n_arg + 1][0] != '-')
-    return OPTPARAM_PRESENT;
-  for (i = 0; dashvalue_opt[i] != NULL; i++) {
-    if (strcmp(opt, dashvalue_opt[i]) == 0)
-      return optreal_or_alias(argv[n_arg + 1]) ? OPTPARAM_AS_OPTION
-                                               : OPTPARAM_PRESENT;
-  }
-  return OPTPARAM_AS_OPTION;
+  /* a value may begin with '-' (#1425), unless it names an option (#1179) */
+  return optreal_or_alias(argv[n_arg + 1]) ? OPTPARAM_AS_OPTION
+                                           : OPTPARAM_PRESENT;
 }
 
 /* The short form the --wide-/--tiny- prefix glues onto the alias it prefixes,
@@ -556,9 +523,8 @@ static const char *optalias_help_line(char *dest, size_t dest_size,
    needs, in the terms the code decided it: calling a parameter missing when one
    was passed, or naming the internal short option, leaves the user nothing to
    work back from, and the run dies here, before any log file exists to say
-   more. No spelling is suggested: --name=value passes an option name through
-   for the dashvalue_opt options only, and a '--' value dies unrecognized in
-   every one. */
+   more. No spelling is suggested: --name=value passes an option name through,
+   but a '--' value dies unrecognized. */
 static void optparam_error(optparam_state state, const char *spelling,
                            const char *real, const char *next,
                            char *return_error, size_t return_error_size) {
@@ -700,8 +666,7 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
         if (strncmp(hts_optalias[pos][2], "param", 5) == 0) {
           /* Copy parameters? */
           if (need_param == 2) {
-            const optparam_state state =
-                optparam_check(argc, argv, n_arg, command);
+            const optparam_state state = optparam_check(argc, argv, n_arg);
 
             if (state != OPTPARAM_PRESENT) {
               optparam_error(state, argv[n_arg], command,
@@ -826,11 +791,11 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
         *return_argc = 1;
         return 2;
       }
-      /* -N DIGITS is a preset; any other next word not starting with '-' is
+      /* -N DIGITS is a preset; any other next word not naming an option is
          the template the parse loop takes (htscoremain.c case 'N'), so it is
          never a URL. Keep both tests in step. */
-      if (strcmp(hts_optalias[pos][2], "paramn") == 0 && n_arg + 1 < argc &&
-          argv[n_arg + 1][0] != '-') {
+      if (strcmp(hts_optalias[pos][2], "paramn") == 0 &&
+          optparam_check(argc, argv, n_arg) == OPTPARAM_PRESENT) {
         strlcpybuff(return_argv[0], argv[n_arg], return_argv_size);
         strlcpybuff(return_argv[1], argv[n_arg + 1], return_argv_size);
         *return_argc = 2;
@@ -838,8 +803,7 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
       }
       if ((strcmp(hts_optalias[pos][2], "param1") == 0)
           || (strcmp(hts_optalias[pos][2], "param0") == 0)) {
-        const optparam_state state =
-            optparam_check(argc, argv, n_arg, argv[n_arg]);
+        const optparam_state state = optparam_check(argc, argv, n_arg);
 
         if (state != OPTPARAM_PRESENT) {
           optparam_error(state, argv[n_arg], argv[n_arg],

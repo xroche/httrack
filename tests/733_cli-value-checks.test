@@ -50,8 +50,8 @@ accepted -%c0.5
 accepted --connection-per-second=0.5
 
 W='warc-max-size needs a non-negative number'
-refused "warc-max-size needs a blank space and a size" --warc-max-size=-5
-for v in abc 10X +5 "" 99999999999999999999; do
+# a dash value reaches the number check rather than being read as an option
+for v in -5 abc 10X +5 "" 99999999999999999999; do
     refused "${W}" "--warc-max-size=${v}"
     refused "${W}" --warc-max-size "${v}"
 done
