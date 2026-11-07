@@ -2060,7 +2060,7 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
   assertf(sprintfbuff(fpath, "%s/", argv[0]));
   assertf(sprintfbuff(file, "%scookies.txt", fpath));
   assertf(sprintfbuff(saved, "%ssaved.txt", fpath));
-  /* A flag field other than an exact TRUE or FALSE reads as host-only and
+  /* A flag other than TRUE or FALSE, in any case, reads as host-only and
      Secure. */
   {
     static const struct {

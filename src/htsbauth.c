@@ -280,15 +280,15 @@ int cookie_add(t_cookie *cookie, const char *cook_name, const char *cook_value,
 }
 
 /* Is the record at rec host-only? Field 1 is the Netscape include-subdomains
-   flag, and only an exact TRUE widens the cookie, as in curl. */
+   flag, and only TRUE, in any case, widens the cookie, as in curl. */
 static hts_boolean cookie_is_host_only(const char *rec) {
   char buffer[8192];
 
   return strcmpnocase(cookie_get(buffer, rec, 1), "TRUE") != 0;
 }
 
-/* Is the record at rec Secure? Field 3 is the flag, and only an exact FALSE
-   lets the cookie go out over http. */
+/* Is the record at rec Secure? Field 3 is the flag, and only FALSE, in any
+   case, lets the cookie go out over http. */
 static hts_boolean cookie_is_secure(const char *rec) {
   char buffer[8192];
 
