@@ -151,6 +151,19 @@ Please visit our Website: http://www.httrack.com
    HT_ADD_HTMLESCAPED, so no bare & reaches it. */
 #define HT_ADD_HTMLESCAPED_FULL(A) \
   HT_ADD_HTMLESCAPED_ANY(A, escape_for_html_print_full, HTS_HTMLESCAPE_FULL_MAXEXP)
+
+/** Append the URL host or path 'A' with " ' < > percent-encoded, then
+    html-escaped like HT_ADD_HTMLESCAPED. **/
+#define HT_ADD_URLESCAPED(A) do { \
+  if (inscript && !inscript_tag) { \
+    HT_ADD_URLQUOTED(A); \
+  } else { \
+    HT_ADD_HTMLESCAPED_ANY(A, escape_url_quotes_html, HTS_HTMLESCAPE_MAXEXP); \
+  } \
+} while(0)
+
+/** Append the URL piece 'A' with only " ' < > percent-encoded. **/
+#define HT_ADD_URLQUOTED(A) HT_ADD_HTMLESCAPED_ANY(A, escape_url_quotes, 3)
 /* clang-format on */
 
 // does nothing
@@ -901,6 +914,52 @@ static void escape_url_parens(char *const s, const size_t size) {
   }
   buff[j] = '\0';
   strlcpybuff(s, buff, size);
+}
+
+/* Copy a URL piece with " ' < > percent-encoded, so it cannot end the
+   attribute or script string it is written into; with html, & becomes &amp;.
+   Returns the length written, or size on overflow. */
+static size_t escape_url_quotes_any(const char *const s, char *const dest,
+                                    const size_t size, const hts_boolean html) {
+  static const char hex[] = "0123456789abcdef";
+  size_t i, j = 0;
+
+  if (size == 0)
+    return 0;
+  for (i = 0; s[i] != '\0'; i++) {
+    const unsigned char c = (unsigned char) s[i];
+    char out[5];
+    size_t n = 1;
+
+    out[0] = (char) c;
+    if (c == '"' || c == '\'' || c == '<' || c == '>') {
+      out[0] = '%';
+      out[1] = hex[c / 16];
+      out[2] = hex[c % 16];
+      n = 3;
+    } else if (html && c == '&') {
+      memcpy(out, "&amp;", 5);
+      n = 5;
+    }
+    if (n >= size - j) {
+      dest[j] = '\0';
+      return size;
+    }
+    memcpy(dest + j, out, n);
+    j += n;
+  }
+  dest[j] = '\0';
+  return j;
+}
+
+static size_t escape_url_quotes(const char *const s, char *const dest,
+                                const size_t size) {
+  return escape_url_quotes_any(s, dest, size, HTS_FALSE);
+}
+
+static size_t escape_url_quotes_html(const char *const s, char *const dest,
+                                     const size_t size) {
+  return escape_url_quotes_any(s, dest, size, HTS_TRUE);
 }
 
 /* Default port for lien's scheme (case-insensitive), 80 if absent/unknown; so
@@ -3184,13 +3243,15 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         }
 
                         if (!opt->passprivacy) {
-                          HT_ADD_HTMLESCAPED(jump_protocol_const(afs.af.adr));       // Password
+                          HT_ADD_URLESCAPED(
+                              jump_protocol_const(afs.af.adr)); // Password
                         } else {
-                          HT_ADD_HTMLESCAPED(jump_identification_const(afs.af.adr)); // No Password
+                          HT_ADD_URLESCAPED(jump_identification_const(
+                              afs.af.adr)); // No Password
                         }
                         if (afs.af.fil[0] != '/')
                           HT_ADD("/");
-                        HT_ADD_HTMLESCAPED(afs.af.fil);
+                        HT_ADD_URLESCAPED(afs.af.fil);
                       }
                       lastsaved = eadr - 1;     // dernier écrit+1 (enfin euh apres on fait un ++ alors hein)
                       /* */
@@ -3207,13 +3268,14 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             if (!link_has_authority(afs.af.adr)) {
                               HT_ADD("http://");
                               if (!opt->passprivacy) {
-                                HT_ADD_HTMLESCAPED(afs.af.adr);        // Password
+                                HT_ADD_URLESCAPED(afs.af.adr); // Password
                               } else {
-                                HT_ADD_HTMLESCAPED(jump_identification_const(afs.af.adr));   // No Password
+                                HT_ADD_URLESCAPED(jump_identification_const(
+                                    afs.af.adr)); // No Password
                               }
                               if (afs.af.fil[0] != '/')
                                 HT_ADD("/");
-                              HT_ADD_HTMLESCAPED(afs.af.fil);
+                              HT_ADD_URLESCAPED(afs.af.fil);
                             } else {
                               char *aut = strstr(afs.af.adr, "//");
 
@@ -3225,13 +3287,15 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                 HT_ADD(tmp);    // Protocol
                                 HT_ADD("//");
                                 if (!opt->passprivacy) {
-                                  HT_ADD_HTMLESCAPED(jump_protocol_const(afs.af.adr));       // Password
+                                  HT_ADD_URLESCAPED(jump_protocol_const(
+                                      afs.af.adr)); // Password
                                 } else {
-                                  HT_ADD_HTMLESCAPED(jump_identification_const(afs.af.adr)); // No Password
+                                  HT_ADD_URLESCAPED(jump_identification_const(
+                                      afs.af.adr)); // No Password
                                 }
                                 if (afs.af.fil[0] != '/')
                                   HT_ADD("/");
-                                HT_ADD_HTMLESCAPED(afs.af.fil);
+                                HT_ADD_URLESCAPED(afs.af.fil);
                               }
                             }
                             //
@@ -3306,13 +3370,15 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                   if (!link_has_authority(afs.af.adr)) {
                                     HT_ADD("http://");
                                     if (!opt->passprivacy) {
-                                      HT_ADD_HTMLESCAPED(afs.af.adr);  // Password
+                                      HT_ADD_URLESCAPED(afs.af.adr); // Password
                                     } else {
-                                      HT_ADD_HTMLESCAPED(jump_identification_const(afs.af.adr));     // No Password
+                                      HT_ADD_URLESCAPED(
+                                          jump_identification_const(
+                                              afs.af.adr)); // No Password
                                     }
                                     if (afs.af.fil[0] != '/')
                                       HT_ADD("/");
-                                    HT_ADD_HTMLESCAPED(afs.af.fil);
+                                    HT_ADD_URLESCAPED(afs.af.fil);
                                   } else {
                                     char *aut = strstr(afs.af.adr, "//");
 
@@ -3323,13 +3389,16 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                       strncatbuff(tmp, afs.af.adr, (aut - afs.af.adr) + 2);     // scheme
                                       HT_ADD(tmp);
                                       if (!opt->passprivacy) {
-                                        HT_ADD_HTMLESCAPED(jump_protocol_const(afs.af.adr)); // Password
+                                        HT_ADD_URLESCAPED(jump_protocol_const(
+                                            afs.af.adr)); // Password
                                       } else {
-                                        HT_ADD_HTMLESCAPED(jump_identification_const(afs.af.adr));   // No Password
+                                        HT_ADD_URLESCAPED(
+                                            jump_identification_const(
+                                                afs.af.adr)); // No Password
                                       }
                                       if (afs.af.fil[0] != '/')
                                         HT_ADD("/");
-                                      HT_ADD_HTMLESCAPED(afs.af.fil);
+                                      HT_ADD_URLESCAPED(afs.af.fil);
                                     }
                                   }
                                   //
@@ -3369,13 +3438,14 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             } else {    // écrire normalement le nom de fichier
                               HT_ADD("http://");
                               if (!opt->passprivacy) {
-                                HT_ADD_HTMLESCAPED(afs.af.adr);        // Password
+                                HT_ADD_URLESCAPED(afs.af.adr); // Password
                               } else {
-                                HT_ADD_HTMLESCAPED(jump_identification_const(afs.af.adr));   // No Password
+                                HT_ADD_URLESCAPED(jump_identification_const(
+                                    afs.af.adr)); // No Password
                               }
                               if (afs.af.fil[0] != '/')
                                 HT_ADD("/");
-                              HT_ADD_HTMLESCAPED(afs.af.fil);
+                              HT_ADD_URLESCAPED(afs.af.fil);
                             }   // patcher?
                           }     // external
                         } else {        // que le nom de fichier (classe java)
@@ -3421,13 +3491,14 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                               if (strnotempty(tempo_pat)) {
                                 HT_ADD("codebase=\"http://");
                                 if (!opt->passprivacy) {
-                                  HT_ADD_HTMLESCAPED(afs.af.adr);      // Password
+                                  HT_ADD_URLESCAPED(afs.af.adr); // Password
                                 } else {
-                                  HT_ADD_HTMLESCAPED(jump_identification_const(afs.af.adr)); // No Password
+                                  HT_ADD_URLESCAPED(jump_identification_const(
+                                      afs.af.adr)); // No Password
                                 }
                                 if (*tempo_pat != '/')
                                   HT_ADD("/");
-                                HT_ADD(tempo_pat);
+                                HT_ADD_URLQUOTED(tempo_pat);
                                 HT_ADD("\" ");
                               }
 
@@ -3437,7 +3508,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                 HT_ADD_BUF(lastsaved,
                                            (size_t) (p_flush - lastsaved));
                               }
-                              HT_ADD(tempo);
+                              HT_ADD_URLQUOTED(tempo);
                             }
                           }
                         }
@@ -3470,7 +3541,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       lastsaved = eadr - 1;     // dernier écrit+1 (enfin euh apres on fait un ++ alors hein)
                     } else if (opt->urlmode == HTS_URLMODE_ABSOLUTE_URI) {
                       if ((opt->getmode & HTS_GETMODE_HTML) && (ptr > 0)) {
-                        HT_ADD_HTMLESCAPED(afs.af.fil);
+                        HT_ADD_URLESCAPED(afs.af.fil);
                       }
                       lastsaved = eadr - 1;     // dernier écrit+1 (enfin euh apres on fait un ++ alors hein)
                     } else if (opt->urlmode == HTS_URLMODE_TRANSPARENT_PROXY) {
@@ -3517,7 +3588,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           strcatbuff(tempo, pos);
                         }
                         // write it
-                        HT_ADD_HTMLESCAPED(tempo);
+                        HT_ADD_URLESCAPED(tempo);
                       }
                       lastsaved = eadr - 1;     // dernier écrit+1 (enfin euh apres on fait un ++ alors hein)
                     } else if (opt->urlmode == HTS_URLMODE_RELATIVE) {
