@@ -459,10 +459,6 @@ void hts_wizard_apply_verdict(httrackp *opt, int n, const char *adr,
     *forbidden_url = 0;
 }
 
-/* Does "adr" + '/' + "fil" fit the HTS_URLMAXSIZE*2 pair (l, lfull) that
-   hts_acceptlink_() and hts_testlinksize() build? Those two buffers gate what
-   url_savename_addstr may later append (#1269), so a link that overruns them is
-   refused rather than clipped into a URL nobody linked to. */
 /* Copy the host of adr into dst, without scheme, login, port or path. */
 static hts_boolean travel_host(const char *adr, char *dst, size_t size) {
   const char *const host = jump_identification_const(adr);
@@ -478,38 +474,42 @@ static hts_boolean travel_host(const char *adr, char *dst, size_t size) {
   return HTS_TRUE;
 }
 
+/* The last two labels of host with their leading dot, or NULL. */
+static const char *travel_last_two_labels(const char *host) {
+  size_t i = strlen(host);
+  int dots = 0;
+
+  while (i > 0)
+    if (host[--i] == '.' && ++dots == 2)
+      return host + i;
+  return NULL;
+}
+
 /* 1 when a and b share a domain for -d, 0 when they do not, -1 when one of
-   them has no domain. Without a registrable domain, the last two labels. */
+   them has no domain. A host without a registrable domain (an address, a
+   public suffix) compares its last two labels. */
 static int travel_same_domain(const char *a, const char *b) {
   char ha[HTS_URLMAXSIZE], hb[HTS_URLMAXSIZE];
   char ra[HTS_URLMAXSIZE], rb[HTS_URLMAXSIZE];
-  size_t i, j;
+  const char *la, *lb;
 
-  if (travel_host(a, ha, sizeof(ha)) && travel_host(b, hb, sizeof(hb)) &&
-      hts_registrable_domain(ha, ra, sizeof(ra)) &&
+  if (!travel_host(a, ha, sizeof(ha)) || !travel_host(b, hb, sizeof(hb)) ||
+      strlen(ha) >= COOKIE_MAX_DOMAIN || strlen(hb) >= COOKIE_MAX_DOMAIN)
+    return 0; /* too long for the PSL lookup */
+  if (hts_registrable_domain(ha, ra, sizeof(ra)) &&
       hts_registrable_domain(hb, rb, sizeof(rb)))
     return strcmp(ra, rb) == 0 ? 1 : 0;
-  i = hts_lastcharoffset(a);
-  j = hts_lastcharoffset(b);
-  if ((i > 0) && (j > 0)) {
-    while ((i > 0) && (a[i] != '.'))
-      i--;
-    while ((j > 0) && (b[j] != '.'))
-      j--;
-    if ((i > 0) && (j > 0)) {
-      i--;
-      j--;
-      while ((i > 0) && (a[i] != '.'))
-        i--;
-      while ((j > 0) && (b[j] != '.'))
-        j--;
-    }
-  }
-  if ((i > 0) && (j > 0))
-    return strfield2(a + i, b + j) ? 1 : 0;
-  return -1;
+  la = travel_last_two_labels(ha);
+  lb = travel_last_two_labels(hb);
+  if (la == NULL || lb == NULL)
+    return -1;
+  return strfield2(la, lb) ? 1 : 0;
 }
 
+/* Does "adr" + '/' + "fil" fit the HTS_URLMAXSIZE*2 pair (l, lfull) that
+   hts_acceptlink_() and hts_testlinksize() build? Those two buffers gate what
+   url_savename_addstr may later append (#1269), so a link that overruns them is
+   refused rather than clipped into a URL nobody linked to. */
 static hts_boolean hts_wizard_url_fits(const char *adr, const char *fil) {
   const size_t size = HTS_URLMAXSIZE * 2;
   const size_t sep = (*fil != '/') ? 1 : 0;

@@ -57,16 +57,27 @@ refused "-d from example.com" example.net/n.html
 crawl -e http://example.com/
 want "-e control" example.net/n.html
 
-# co.uk is a public suffix, so a.co.uk and b.co.uk are two domains.
+# co.uk is a public suffix, so a.co.uk and b.co.uk are two domains. A host too
+# long for the suffix lookup is refused.
+long=$(printf 'x%.0s' $(seq 60))
+long="$long.$long.$long.$long.$long"
 crawl -d http://a.co.uk/
 want "-d from a.co.uk" www.a.co.uk/w.html
 refused "-d from a.co.uk" b.co.uk/b.html
+refused "-d from a.co.uk" "$long.b.co.uk/long.html"
 crawl -e http://a.co.uk/
 want "-e control" b.co.uk/b.html
+want "-e control" "$long.b.co.uk/long.html"
 
-# An IP address has no registrable domain: only the same address matches.
-crawl -d http://192.0.2.1/
+# Neither the login nor the port counts.
+crawl -d http://user@example.org:8080/
+want "-d with a login and a port" www.example.org/l.html
+
+# A host with no registrable domain, such as an IP address, keeps the old rule:
+# the last two labels must match.
+crawl -d http://192.0.2.1:8080/
 want "-d from an IP" 192.0.2.1/same.html
+want "-d from an IP" 10.9.2.1/f.html
 refused "-d from an IP" 192.0.2.2/other.html
 crawl -e http://192.0.2.1/
 want "-e control" 192.0.2.2/other.html
