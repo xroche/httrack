@@ -1,0 +1,47 @@
+#!/bin/bash
+#
+# A naming-only `X-Kept: 1` line in a new.zip entry is consumed by ProxyTrack
+# and never copied into the ARC record it writes.
+
+set -eu
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+# kept=1 adds the line, kept=0 is the control
+mkzip() {
+    python3 -I - "$1" "$2" <<'PY'
+import sys, zipfile
+out, kept = sys.argv[1], sys.argv[2]
+hdr = "X-In-Cache: 0\r\nX-StatusCode: 200\r\nX-Size: 5\r\n"
+if kept == "1":
+    hdr += "X-Kept: 1\r\n"
+hdr += "Content-Type: text/html\r\nX-Save: example.com/a.html\r\n\r\n"
+zi = zipfile.ZipInfo("http://example.com/a.html")
+zi.extra = hdr.encode("ascii")
+with zipfile.ZipFile(out, "w") as z:
+    z.writestr(zi, b"hello")
+PY
+}
+
+mkdir "$dir/example.com"
+printf hello >"$dir/example.com/a.html"
+mkzip "$dir/kept.zip" 1
+mkzip "$dir/plain.zip" 0
+
+pt=$(cd "$(dirname "$(command -v proxytrack)")" && pwd)/proxytrack
+for n in kept plain; do
+    (cd "$dir" && "$pt" --convert "$n.arc" "$n.zip" >"$dir/$n.log" 2>&1) ||
+        fail "proxytrack died converting $n.zip"
+    grep -q '(1 items added)' "$dir/$n.log" ||
+        fail "$n.zip did not load: $(<"$dir/$n.log")"
+    grep -qa 'hello' "$dir/$n.arc" || fail "$n.zip entry is not served"
+done
+
+# the record is plain text, so a leaked line is visible to grep
+if grep -qai '^X-Kept' "$dir/kept.arc"; then
+    fail "X-Kept leaked into the ARC record"
+fi
