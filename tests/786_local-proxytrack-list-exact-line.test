@@ -33,3 +33,15 @@ printf '%s\r\nsecond-crlf\r\n' "$first" >"$dir/list-crlf"
 got=$(processed "$dir/list-crlf")
 grep -qx 'second-crlf' <<<"$got" ||
     fail "CRLF after a 255-byte line: second entry was skipped"
+
+# A full buffer must not swallow the next byte: 255 and 300 bytes, then LF, CR+byte
+for len in 255 256 300; do
+    printf '%s\nZrest\n' "$(repeat_chars "$len" a)" >"$dir/list-z$len"
+    got=$(processed "$dir/list-z$len")
+    grep -qx 'Zrest' <<<"$got" ||
+        fail "$len-byte first line: next entry is not exactly Zrest: $got"
+done
+printf '%s\rZrest\n' "$(repeat_chars 255 a)" >"$dir/list-crz"
+got=$(processed "$dir/list-crz")
+grep -qx 'Zrest' <<<"$got" ||
+    fail "CR then a non-LF byte after a 255-byte line lost the byte: $got"
