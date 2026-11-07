@@ -1,0 +1,63 @@
+#!/bin/bash
+#
+# --clean left hts-cache/readme.txt, repair.zip and ref/ behind, so the closing
+# rmdir of hts-cache never succeeded on a real mirror.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_clean.XXXXXX") || fail "no tmpdir"
+cleanup() {
+    rm -rf "${tmp}"
+}
+trap 'set +e; cleanup' EXIT
+trap 'set +e; cleanup; exit 1' HUP INT QUIT TERM
+
+require_httrack
+out="${tmp}/out"
+
+populate() {
+    rm -rf "${out}"
+    mkdir -p "${out}/hts-cache/ref"
+    local f
+    for f in hts-log.txt hts-err.txt index.html hts-in_progress.lock \
+        hts-cache/new.zip hts-cache/old.zip hts-cache/new.dat \
+        hts-cache/old.ndx hts-cache/new.lst hts-cache/old.txt \
+        hts-cache/doit.log hts-cache/damaged.zip hts-cache/readme.txt \
+        hts-cache/repair.zip hts-cache/ref/0123456789abcdef; do
+        echo x >"${out}/${f}"
+    done
+}
+
+populate
+httrack -O "${out}" --clean >"${tmp}/run.log" 2>&1 || true
+assert_eq "" "$(cd "${out}" && find . -mindepth 1)" "files left after --clean"
+
+# Control: user state is not cleaned, and keeps hts-cache alive.
+populate
+echo x >"${out}/hts-cache/winprofile.ini"
+echo x >"${out}/cookies.txt"
+httrack -O "${out}" --clean >"${tmp}/run.log" 2>&1 || true
+assert_file "${out}/hts-cache/winprofile.ini" "winprofile.ini kept"
+assert_file "${out}/cookies.txt" "cookies.txt kept"
+assert_eq "cookies.txt
+hts-cache
+hts-cache/winprofile.ini" "$(cd "${out}" && find . -mindepth 1 | sed 's|^\./||' | sort)" \
+    "files left after --clean with user state"
+
+# A symlinked ref must not be followed into the user state next to it.
+if ! target_is_windows; then
+    for target in .. .; do
+        populate
+        rm -rf "${out}/hts-cache/ref"
+        ln -s "${target}" "${out}/hts-cache/ref"
+        echo x >"${out}/hts-cache/winprofile.ini"
+        echo x >"${out}/cookies.txt"
+        httrack -O "${out}" --clean >"${tmp}/run.log" 2>&1 || true
+        assert_file "${out}/hts-cache/winprofile.ini" "winprofile.ini kept, ref -> ${target}"
+        assert_file "${out}/cookies.txt" "cookies.txt kept, ref -> ${target}"
+    done
+fi
