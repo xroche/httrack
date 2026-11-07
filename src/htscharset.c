@@ -1436,5 +1436,42 @@ size_t hts_getUTF8SequenceLength(const char lead) {
   }
 }
 
+void hts_json_string(String *out, const char *s) {
+  const unsigned char *p = (const unsigned char *) s;
+
+  StringAddchar(*out, '"');
+  while (*p != '\0') {
+    const unsigned char c = *p;
+
+    if (c == '"' || c == '\\') {
+      StringAddchar(*out, '\\');
+      StringAddchar(*out, (char) c);
+      p++;
+    } else if (c < 0x20 || c == 0x7f) {
+      char esc[8];
+
+      snprintf(esc, sizeof(esc), "\\u%04x", (unsigned) c);
+      StringCat(*out, esc);
+      p++;
+    } else if (c < 0x80) {
+      StringAddchar(*out, (char) c);
+      p++;
+    } else {
+      /* Emit a sequence verbatim only if it is well-formed UTF-8. */
+      const size_t len = hts_getUTF8SequenceLength((char) c);
+
+      if (len != 0 && strnlen((const char *) p, len) == len &&
+          hts_isStringUTF8((const char *) p, len)) {
+        StringMemcat(*out, (const char *) p, len);
+        p += len;
+      } else {
+        StringCat(*out, "\\ufffd");
+        p++;
+      }
+    }
+  }
+  StringAddchar(*out, '"');
+}
+
 #undef ADD_BYTE
 #undef INCREASE_CAPA

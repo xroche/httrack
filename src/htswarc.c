@@ -41,6 +41,7 @@ Please visit our Website: http://www.httrack.com
 #include "htslines.h"
 #include "htsio.h"
 #include "htsback.h"
+#include "htscharset.h"
 #include "htstools.h"
 #include "htssafe.h"
 #include "htszlib.h"
@@ -560,12 +561,35 @@ static char *path_basename_dup(const char *path) {
   return strdupt(b);
 }
 
+/* Append n bytes of s, percent-encoding any byte that is not part of a
+   well-formed UTF-8 sequence, so the whole CDXJ line stays UTF-8. */
+static int surt_add_utf8(wbuf *out, const char *s, size_t n) {
+  size_t i = 0;
+  while (i < n) {
+    const unsigned char c = (unsigned char) s[i];
+    size_t len = 1;
+    if (c >= 0x80) {
+      len = hts_getUTF8SequenceLength((char) c);
+      if (len == 0 || len > n - i || !hts_isStringUTF8(s + i, len)) {
+        if (wbuf_printf(out, "%%%02X", (unsigned) c) != 0)
+          return -1;
+        i++;
+        continue;
+      }
+    }
+    if (wbuf_add(out, s + i, len) != 0)
+      return -1;
+    i += len;
+  }
+  return 0;
+}
+
 /* SURT-canonicalize url into out (no newline): scheme and userinfo dropped,
    host lowercased with a leading www[digits] label stripped and the scheme
    default port removed, labels reversed and comma-joined then ')', path+query
-   appended verbatim (case preserved, fragment dropped). IPv4 and [IPv6]
-   literals keep their host form. A non-default port is kept as ":port" before
-   the ')'. Returns 0 on success. */
+   appended (case preserved, fragment dropped, invalid UTF-8 as %XX). IPv4 and
+   [IPv6] literals keep their host form. A non-default port is kept as ":port"
+   before the ')'. Returns 0 on success. */
 static int surt_canon(const char *url, wbuf *out) {
   const char *p, *scheme_end, *authend, *host, *hostsep, *port = NULL;
   size_t portlen = 0, hlen, i;
@@ -655,7 +679,7 @@ static int surt_canon(const char *url, wbuf *out) {
         if (llen > 0) {
           if (!first && wbuf_add(out, ",", 1) != 0)
             return -1;
-          if (wbuf_add(out, hostbuf + lstart, llen) != 0)
+          if (surt_add_utf8(out, hostbuf + lstart, llen) != 0)
             return -1;
           first = 0;
         }
@@ -687,7 +711,7 @@ static int surt_canon(const char *url, wbuf *out) {
     const char *frag = authend;
     while (*frag != '\0' && *frag != '#')
       frag++;
-    if (wbuf_add(out, authend, (size_t) (frag - authend)) != 0)
+    if (surt_add_utf8(out, authend, (size_t) (frag - authend)) != 0)
       return -1;
   }
   return 0;
@@ -706,24 +730,15 @@ static void iso8601_to_cdx14(const char *iso, char out[15]) {
   out[14] = '\0';
 }
 
-/* Append s as a JSON string (quoted, with " \ and control chars escaped). */
+/* Append s as a JSON string, see hts_json_string(). */
 static int cdx_json_str(wbuf *b, const char *s) {
-  if (wbuf_add(b, "\"", 1) != 0)
-    return -1;
-  for (; *s != '\0'; s++) {
-    unsigned char c = (unsigned char) *s;
-    if (c == '"' || c == '\\') {
-      char e[2] = {'\\', (char) c};
-      if (wbuf_add(b, e, 2) != 0)
-        return -1;
-    } else if (c < 0x20) {
-      if (wbuf_printf(b, "\\u%04x", (unsigned) c) != 0)
-        return -1;
-    } else if (wbuf_add(b, s, 1) != 0) {
-      return -1;
-    }
-  }
-  return wbuf_add(b, "\"", 1);
+  String json = STRING_EMPTY;
+  int ret;
+
+  hts_json_string(&json, s);
+  ret = wbuf_add(b, StringBuff(json), StringLength(json));
+  StringFree(json);
+  return ret;
 }
 
 /* see htswarc.h */

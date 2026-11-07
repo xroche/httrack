@@ -1,0 +1,20 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# A raw Latin-1 byte in a URL must not make the --warc-cdx JSON invalid UTF-8.
+
+httrack_bin=$(httrack_path)
+
+scratch=$(mktemp -d)
+cleanup_push rm -rf "$scratch"
+
+out=$("$httrack_bin" -O /dev/null -#test=warc-cdx-utf8 "$scratch/")
+echo "$out"
+case "$out" in
+*": OK") ;;
+*) exit 1 ;;
+esac
