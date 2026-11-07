@@ -4260,6 +4260,14 @@ int linput(FILE * fp, char *s, int max) {
       }
     }
   } while((c != -1) && (c != EOF) && (j < (max - 1)));
+  if (j == max - 1 && c != -1 && c != EOF) {
+    /* A line of exactly max-1 bytes: eat its terminator, or it reads back as an
+     * empty line */
+    while ((c = fgetc(fp)) == 13)
+      ;
+    if (c != 10 && c != EOF)
+      ungetc(c, fp);
+  }
   s[j] = '\0';
   return j;
 }

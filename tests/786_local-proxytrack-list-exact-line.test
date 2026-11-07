@@ -1,0 +1,35 @@
+#!/bin/bash
+# A --list line of exactly 255 bytes left its newline unread, so the next read
+# returned an empty line that ended the list and skipped every later entry.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+dir=$(mktemp -d)
+cleanup() { rm -rf "$dir"; }
+cleanup_push cleanup
+
+# Paths processed by proxytrack when it reads list $1.
+processed() {
+    proxytrack --convert "$dir/out.arc" --list "$1" 2>&1 |
+        sed -n 's/^error: could not process //p;s/^processed: \(.*\) (.*items\? added)$/\1/p'
+}
+
+for len in 254 255; do
+    first=$(repeat_chars "$len" a)
+    printf '%s\nsecond-%s\nthird-%s\n' "$first" "$len" "$len" >"$dir/list-$len"
+    got=$(processed "$dir/list-$len")
+    test "$(wc -l <<<"$got")" -eq 3 ||
+        fail "$len-byte first line: expected 3 entries, got: $got"
+    grep -qx "third-$len" <<<"$got" ||
+        fail "$len-byte first line: the third entry was skipped"
+done
+
+# CRLF after an exact-length line
+first=$(repeat_chars 255 a)
+printf '%s\r\nsecond-crlf\r\n' "$first" >"$dir/list-crlf"
+got=$(processed "$dir/list-crlf")
+grep -qx 'second-crlf' <<<"$got" ||
+    fail "CRLF after a 255-byte line: second entry was skipped"
