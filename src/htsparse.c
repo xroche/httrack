@@ -2227,15 +2227,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                 }
                                 if (refused != NULL) {
                                   url_ok = 0;
-                                  if (strcmp(refused, "xmlns") == 0)
-                                    hts_log_print(opt, LOG_DEBUG,
-                                                  "dirty parsing: xmlns "
-                                                  "namespace avoided");
-                                  else
-                                    hts_log_print(opt, LOG_DEBUG,
-                                                  "dirty parsing: bad "
-                                                  "tag avoided: %s",
-                                                  refused);
+                                  hts_log_print(opt, LOG_DEBUG,
+                                                "dirty parsing: %s attribute "
+                                                "avoided",
+                                                refused);
                                 } else if (name != NULL &&
                                            hts_attr_is_js_binding(name, nend)) {
                                   url_ok = 0;
