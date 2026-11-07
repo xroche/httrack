@@ -43,6 +43,7 @@ HTS_STATIC_ASSERT(sizeof(HTS_WIZARD_FILTER_SUFFIX) <= HTS_FILTER_SUFFIX_MAX,
 /* specific definitions */
 #include "htsbase.h"
 #include <ctype.h>
+#include <limits.h>
 /* END specific definitions */
 
 /* "embedded" */
@@ -175,6 +176,17 @@ hts_boolean hts_robots_forbids(httrackp *opt, const char *adr, const char *fil,
 static void wizard_cat_host(htsbuff *f, const char *sign, const char *adr) {
   htsbuff_cpy(f, sign);
   htsbuff_cat(f, jump_identification_const(adr));
+}
+
+/* Reply parsing: see htswizard.h. */
+int hts_wizard_parse_reply(const char *s) {
+  LLint v;
+
+  if (!strnotempty(s))
+    return 0;
+  if (isdigit((unsigned char) *s))
+    return hts_scan_llint(&s, 0, INT_MAX, &v) == HTS_SCAN_OK ? (int) v : -999;
+  return *s == '*' ? -1 : -999;
 }
 
 /* "<sign><host>/" then the first len characters of fil ((size_t) -1: all). */
@@ -956,36 +968,10 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
 
         hts_wizard_prompt_url(tempo, sizeof(tempo), adr, fil);
         s = RUN_CALLBACK1(opt, query3, tempo);
-        if (strnotempty(s) == 0)        // entrée
-          n = 0;
-        else if (isdigit((unsigned char) *s))
-          sscanf(s, "%d", &n);
-        else {
-          switch (*s) {
-          case '*':
-            n = -1;
-            break;
-          case '!':
-            n = -999; {
-              /*char *a;
-                 int i;                                    
-                 a=copie_de_adr-128;
-                 if (a<r.adr) a=r.adr;
-                 for(i=0;i<256;i++) {
-                 if (a==copie_de_adr) printf("\nHERE:\n");
-                 printf("%c",*a++);
-                 }
-                 printf("\n\n");
-               */
-            }
-            break;
-          default:
-            n = -999;
-            printf("What did you say?\n");
-            break;
-
-          }
-        }
+        n = hts_wizard_parse_reply(s);
+        if (n == -999 && strnotempty(s) && *s != '!')
+          hts_log_print(opt, LOG_WARNING,
+                        "wizard: unreadable reply, link refused");
         io_flush;
       } else {                  // lien primaire: autoriser répertoire entier       
         if (!force_mirror) {

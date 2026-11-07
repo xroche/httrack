@@ -468,6 +468,20 @@ static int st_wizardverdict(httrackp *opt, int argc, char **argv) {
 
 #undef PRIO_UNSET
 
+/* Prints the answer code of the reply <text>; with no argument, asserts the
+   empty and NULL replies. */
+static int st_wizardreply(httrackp *opt, int argc, char **argv) {
+  (void) opt;
+  if (argc >= 1) {
+    printf("%d\n", hts_wizard_parse_reply(argv[0]));
+    return 0;
+  }
+  assertf(hts_wizard_parse_reply(NULL) == 0);
+  assertf(hts_wizard_parse_reply("") == 0);
+  printf("wizardreply self-test OK\n");
+  return 0;
+}
+
 /* Prints the prompt the wizard asks about <adr> <fil>; with no argument,
    asserts it. */
 static int st_wizardprompt(httrackp *opt, int argc, char **argv) {
@@ -709,6 +723,8 @@ const struct selftest_entry selftests_wizard[] = {
      st_wizardverdict},
     {"wizardprompt", "[<adr> <fil>]", "URL the wizard prompt asks about",
      st_wizardprompt},
+    {"wizardreply", "[<text>]", "answer code of a wizard reply",
+     st_wizardreply},
     {"wizardinsert", "[<adr> <fil> [answer...] [@ filter...]]",
      "where a wizard answer lands in the filter array", st_wizardinsert},
     {NULL, NULL, NULL, NULL},

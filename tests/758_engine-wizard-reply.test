@@ -1,0 +1,21 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# The wizard reply parse: an over-long number must not wrap into a valid code.
+
+assert_selftest "wizardreply self-test OK" wizardreply
+assert_selftest "5" wizardreply 5
+assert_selftest "5" wizardreply 5abc
+assert_selftest "2147483647" wizardreply 2147483647
+assert_selftest "-999" wizardreply 2147483648
+assert_selftest "-999" wizardreply 4294967297
+assert_selftest "-999" wizardreply 99999999999999999999
+assert_selftest "-1" wizardreply '*'
+assert_selftest "-999" wizardreply '!'
+assert_selftest "-999" wizardreply x
+assert_selftest "-999" wizardreply +5
