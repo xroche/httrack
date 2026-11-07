@@ -48,5 +48,6 @@ selftest_queue "-*.example.co.uk/*" wizardfilter 2001 www.example.co.uk /x
 
 selftest_queue "wizardscope self-test OK" wizardscope
 selftest_queue "wizardfilter self-test OK" wizardfilter
+selftest_queue "wizardscopeanswer self-test OK" wizardscopeanswer
 
 selftest_run_queued
