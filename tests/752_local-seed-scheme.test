@@ -45,6 +45,8 @@ crawl() { # crawl NAME ARGS... -- the seed must be fetched from the server
 }
 
 crawl argv "$seed"
+# The command line escapes the space to %20.
+crawl spaced " http://127.0.0.1:$port/page.html"
 printf '%s\n' "$seed" >"$tmpdir/list.txt"
 crawl list -%L "$tmpdir/list.txt"
 printf '  %s\n' "http://127.0.0.1:$port/page.html" >"$tmpdir/indented.txt"

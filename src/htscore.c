@@ -782,8 +782,14 @@ static const char *bundle_jar_file(httrackp *opt, char buff[CATBUFF_SIZE]) {
 /* Does a start URL lack a scheme? "//host" counts too, so it still becomes
    http:////host. */
 static hts_boolean seed_needs_scheme(const char *url) {
-  while (*url == ' ')
-    url++;
+  for (;;) {
+    if (*url == ' ')
+      url++;
+    else if (strncmp(url, "%20", 3) == 0) /* argv spaces arrive escaped */
+      url += 3;
+    else
+      break;
+  }
   return !link_has_authority(url) || strncmp(url, "//", 2) == 0;
 }
 
