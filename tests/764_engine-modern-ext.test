@@ -22,15 +22,15 @@ for d in "" delayed=0 delayed=1 delayed=2; do
     # the default, like -%N2, names the file by its Content-Type
     *) png=photo.jpg webp=photo.jpg mp4=x.jpg ;;
     esac
-    foo=photo.foo.jpg
-    # -%N0 assumes an unknown extension is HTML
-    [ "$d" = delayed=0 ] && foo=photo.foo.html
+    foo=photo.foo.jpg foo_arg=
+    # -%N0 would probe an unknown type with a HEAD; nosback=1 skips it
+    [ "$d" = delayed=0 ] && foo=photo.foo foo_arg=nosback=1
     # shellcheck disable=SC2086 # an empty $d passes no argument
     {
         name /photo.png image/jpeg "$png" $d
         name /photo.webp image/jpeg "$webp" $d
         name /x.mp4 image/jpeg "$mp4" $d
-        name /photo.foo image/jpeg "$foo" $d
+        name /photo.foo image/jpeg "$foo" $foo_arg $d
     }
 done
 
