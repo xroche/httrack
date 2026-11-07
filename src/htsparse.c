@@ -4738,8 +4738,9 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
         do_pause = 1;
       }
     }
-    // pause?
-    if (do_pause) {
+    /* A run already winding down would pause with nothing left to wake it. */
+    if (do_pause && !hts_is_exiting(opt) &&
+        !hts_load_acquire_int(&opt->state.stop)) {
       hts_log_print(opt, LOG_INFO, "engine: pause requested..");
       while(back_nsoc(sback) > 0) {     // attendre fin des transferts
         back_wait(sback, opt, cache, HTS_STAT.stat_timestart);

@@ -569,7 +569,6 @@ static int webhttrack_runmain(httrackp * opt, int argc, char **argv) {
   CHAIN_FUNCTION(opt, loop, htsshow_loop, NULL);
   CHAIN_FUNCTION(opt, check_link, htsshow_check, NULL);
   CHAIN_FUNCTION(opt, check_mime, htsshow_check_mime, NULL);
-  CHAIN_FUNCTION(opt, pause, htsshow_pause, NULL);
   CHAIN_FUNCTION(opt, filesave, htsshow_filesave, NULL);
   CHAIN_FUNCTION(opt, filesave2, htsshow_filesave2, NULL);
   CHAIN_FUNCTION(opt, linkdetected, htsshow_linkdetected, NULL);
@@ -1031,9 +1030,6 @@ int __cdecl htsshow_check_mime(t_hts_callbackarg * carg, httrackp * opt,
                                const char *adr, const char *fil,
                                const char *mime, int status) {
   return -1;
-}
-void __cdecl htsshow_pause(t_hts_callbackarg * carg, httrackp * opt,
-                           const char *lockfile) {
 }
 void __cdecl htsshow_filesave(t_hts_callbackarg * carg, httrackp * opt,
                               const char *file) {
