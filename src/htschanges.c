@@ -226,7 +226,6 @@ static intptr_t changes_slot(hts_changes *changes, const char *file,
    HTS_FALSE if it cannot be read. */
 static hts_boolean digest_file(const char *path,
                                unsigned char digest[DIGEST_SIZE]) {
-  const int endian = 1;
   struct MD5Context ctx;
   char BIGSTK buffer[32768];
   FILE *fp = FOPEN(path, "rb");
@@ -234,7 +233,7 @@ static hts_boolean digest_file(const char *path,
 
   if (fp == NULL)
     return HTS_FALSE;
-  MD5Init(&ctx, *((const char *) &endian));
+  hts_md5_init(&ctx);
   while ((nread = fread(buffer, 1, sizeof(buffer), fp)) > 0)
     MD5Update(&ctx, (const unsigned char *) buffer, (unsigned int) nread);
   if (ferror(fp) != 0) {
