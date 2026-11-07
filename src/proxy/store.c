@@ -1010,7 +1010,8 @@ int PT_LoadCache__New(PT_Index index_, const char *filename) {
       /* Ready directory entries */
       if (unzGoToFirstFile(zFile) == Z_OK) {
         char comment[128];
-        char filename[HTS_URLMAXSIZE * 4];
+        char filename[CACHE_ENTRYNAME_SIZE];
+        unz_file_info zfi;
         int entries = 0;
         int firstSeen = 0;
 
@@ -1020,12 +1021,15 @@ int PT_LoadCache__New(PT_Index index_, const char *filename) {
 
           filename[0] = '\0';
           comment[0] = '\0';
+          memset(&zfi, 0, sizeof(zfi));
           if (unzOpenCurrentFile(zFile) == Z_OK) {
-            if ((readSizeHeader =
-                 unzGetLocalExtrafield(zFile, comment, sizeof(comment) - 2)) > 0
-                && unzGetCurrentFileInfo(zFile, NULL, filename,
-                                         sizeof(filename) - 2, NULL, 0, NULL,
-                                         0) == Z_OK) {
+            if ((readSizeHeader = unzGetLocalExtrafield(
+                     zFile, comment, sizeof(comment) - 2)) > 0 &&
+                unzGetCurrentFileInfo(zFile, &zfi, filename,
+                                      sizeof(filename) - 2, NULL, 0, NULL,
+                                      0) == Z_OK
+                /* minizip leaves a longer name clipped and unterminated */
+                && zfi.size_filename < sizeof(filename) - 2) {
               long int pos = (long int) unzGetOffset(zFile);
 
               assertf((size_t) readSizeHeader < sizeof(comment));
@@ -1035,7 +1039,7 @@ int PT_LoadCache__New(PT_Index index_, const char *filename) {
                 int dataincache = 0;    // data in cache ?
                 char *filenameIndex = filename;
 
-                if (strncmp(filenameIndex, "http://", 7) == 0) {
+                if (strfield(filenameIndex, "http://")) {
                   filenameIndex += 7;
                 }
                 if (comment[0] != '\0') {
