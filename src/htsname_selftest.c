@@ -33,6 +33,19 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsselftest_int.h"
 
+static int st_refname(httrackp *opt, int argc, char **argv) {
+  char name[64];
+
+  (void) opt;
+  if (argc < 2) {
+    fprintf(stderr, "refname: needs <adr> <fil>\n");
+    return 1;
+  }
+  url_savename_refname(argv[0], argv[1], name);
+  printf("refname=%s\n", name);
+  return 0;
+}
+
 static int st_simplify(httrackp *opt, int argc, char **argv) {
   (void) opt;
   if (argc < 1) {
@@ -1788,6 +1801,7 @@ const struct selftest_entry selftests_name[] = {
      "an over-long path is refused by the wizard and auth consumers",
      st_urlbounds},
     {"simplify", "<path>", "collapse ./ and ../ in a path", st_simplify},
+    {"refname", "<adr> <fil>", "cache ref file name of a URL", st_refname},
     {"expandhome", "<path>", "expand a leading ~/ into $HOME", st_expandhome},
     {"stripquery", "", "--strip-query pattern/key stripping self-test",
      st_stripquery},
