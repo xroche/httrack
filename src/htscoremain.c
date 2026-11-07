@@ -439,10 +439,14 @@ static void cmdl_count_url(int *count) {
 }
 
 /* Steps *AT through cluster WORD as optcluster_next() does, setting *VALUE to
-   the index of the word the option takes from *NEXT on (-qO <path>), or -1. */
+   the index of the word the option takes from *NEXT on (-qO <path>), or -1.
+   PARAM, or NULL, marks the words taken as a value even when they begin with
+   '-'. */
 static hts_boolean cmdl_cluster_step(const char *word, size_t *at, char *name,
                                      size_t name_size, int argc,
-                                     char *const *argv, int *next, int *value) {
+                                     char *const *argv,
+                                     const hts_boolean *param, int *next,
+                                     int *value) {
   int pos;
 
   if (!optcluster_next(word, at, name, name_size))
@@ -451,7 +455,8 @@ static hts_boolean cmdl_cluster_step(const char *word, size_t *at, char *name,
   *value = -1;
   /* only a lone -N reads the next word; a clustered one reads its digits */
   if (pos < 0 || strcmp(opttype_value(pos), "param1") != 0 ||
-      strcmp(name, "-N") == 0 || *next >= argc || argv[*next][0] == '-')
+      strcmp(name, "-N") == 0 || *next >= argc ||
+      (argv[*next][0] == '-' && (param == NULL || !param[*next])))
     return HTS_TRUE;
   *value = (*next)++;
   return HTS_TRUE;
@@ -467,8 +472,8 @@ static int cmdl_cluster_params(cmdl_argv *cmd, const char *word, int argc,
   int next = first;
   int value;
 
-  while (cmdl_cluster_step(word, &at, name, sizeof(name), argc, argv, &next,
-                           &value)) {
+  while (cmdl_cluster_step(word, &at, name, sizeof(name), argc, argv, NULL,
+                           &next, &value)) {
     if (value < 0)
       continue;
     if (!cmdl_add(cmd, argv[value]))
@@ -858,7 +863,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 
           /* the word the parse loop gives -O, past -P's in -PO */
           while (cmdl_cluster_step(word, &at, name, sizeof(name), argc, argv,
-                                   &next, &value)) {
+                                   x_cmd.param, &next, &value)) {
             if (strcmp(name, "-O") == 0) {
               if (value < 0) {
                 HTS_PANIC_PRINTF
@@ -1647,7 +1652,9 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             //
           case 'N':
             if (strcmp(argv[na], "-N") == 0) {  // Tout seul
-              if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {       // erreur
+              if ((na + 1 >= argc) ||
+                  (argv[na + 1][0] == '-' &&
+                   !optparam_dash_ok(&x_cmd, na))) { // erreur
                 HTS_PANIC_PRINTF
                   ("Option N needs a number, or needs to be followed by a blank space, and a string");
                 printf("Example: -N4\n");
@@ -1938,7 +1945,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 }
                 break;
               case 'w':        // disable specific plugin
-                if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
+                if ((na + 1 >= argc) ||
+                    (argv[na + 1][0] == '-' && !optparam_dash_ok(&x_cmd, na))) {
                   HTS_PANIC_PRINTF
                     ("Option %w needs to be followed by a blank space, and a module name");
                   printf("Example: -%%w httrack-plugin\n");
@@ -1976,7 +1984,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 }
                 break;
               case 'b':        // bind
-                if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
+                if ((na + 1 >= argc) ||
+                    (argv[na + 1][0] == '-' && !optparam_dash_ok(&x_cmd, na))) {
                   HTS_PANIC_PRINTF
                     ("Option %b needs to be followed by a blank space, and a local hostname");
                   printf("Example: -%%b \"ip4.localhost\"\n");
@@ -2081,7 +2090,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 break;
                 //
               case 'l': // Accept-language
-                if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
+                if ((na + 1 >= argc) ||
+                    (argv[na + 1][0] == '-' && !optparam_dash_ok(&x_cmd, na))) {
                   HTS_PANIC_PRINTF
                     ("Option %l needs to be followed by a blank space, and an ISO language code");
                   printf("Example: -%%l \"en\"\n");
@@ -2100,7 +2110,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 break;
                 //
               case 'a':  // Accept
-                if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
+                if ((na + 1 >= argc) ||
+                    (argv[na + 1][0] == '-' && !optparam_dash_ok(&x_cmd, na))) {
                   HTS_PANIC_PRINTF
                     ("Option %a needs to be followed by a blank space, and a list of formats");
                   printf("Example: -%%a \"text/html,*/*;q=0.1\"\n");
@@ -2203,7 +2214,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 
               case 'W':        // Wrapper callback
                 // --wrapper check-link=obj.so:check_link
-                if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
+                if ((na + 1 >= argc) ||
+                    (argv[na + 1][0] == '-' && !optparam_dash_ok(&x_cmd, na))) {
                   HTS_PANIC_PRINTF
                     ("Option %W needs to be followed by a blank space, and a <callback-name>=<myfile.so>:<function-name> field");
                   printf("Example: -%%W check-link=checklink.so:check\n");
@@ -2277,7 +2289,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 break;
 
               case 'R':        // Referer
-                if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
+                if ((na + 1 >= argc) ||
+                    (argv[na + 1][0] == '-' && !optparam_dash_ok(&x_cmd, na))) {
                   HTS_PANIC_PRINTF
                     ("Option %R needs to be followed by a blank space, and a referer URL");
                   printf("Example: -%%R \"http://www.example.com/\"\n");
@@ -2294,7 +2307,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 }
                 break;
               case 'E':        // From Email address
-                if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
+                if ((na + 1 >= argc) ||
+                    (argv[na + 1][0] == '-' && !optparam_dash_ok(&x_cmd, na))) {
                   HTS_PANIC_PRINTF
                     ("Option %E needs to be followed by a blank space, and an email");
                   printf("Example: -%%E \"postmaster@example.com\"\n");
@@ -2405,7 +2419,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   StringCopy(opt->warc_file, argv[na]);
                 } else if (*(com + 1) == 's') { // --warc-max-size N: rotation
                   com++;
-                  if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
+                  if ((na + 1 >= argc) || (argv[na + 1][0] == '-' &&
+                                           !optparam_dash_ok(&x_cmd, na))) {
                     HTS_PANIC_PRINTF(
                         "Option warc-max-size needs a blank space and a size");
                     htsmain_free();
@@ -2456,7 +2471,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               case 'Z': // single-file: inline each page's assets as data: URIs
                 if (*(com + 1) == 's') { // --single-file-max-size N
                   com++;
-                  if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
+                  if ((na + 1 >= argc) || (argv[na + 1][0] == '-' &&
+                                           !optparam_dash_ok(&x_cmd, na))) {
                     HTS_PANIC_PRINTF(
                         "Option single-file-max-size needs a blank "
                         "space and a size");
@@ -2503,7 +2519,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               case 'm': // sitemap / sitemap-url: seed the crawl from sitemaps
                 if (*(com + 1) == 'u') { // --sitemap-url URL: explicit sitemap
                   com++;
-                  if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
+                  if ((na + 1 >= argc) || (argv[na + 1][0] == '-' &&
+                                           !optparam_dash_ok(&x_cmd, na))) {
                     HTS_PANIC_PRINTF(
                         "Option sitemap-url needs a blank space and a URL");
                     htsmain_free();
@@ -2521,7 +2538,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 }
                 break;
               case 'Y': // why: explain the filter verdict for a URL, no crawl
-                if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
+                if ((na + 1 >= argc) ||
+                    (argv[na + 1][0] == '-' && !optparam_dash_ok(&x_cmd, na))) {
                   HTS_PANIC_PRINTF("Option why needs a blank space and a URL");
                   printf(
                       "Example: --why \"http://www.example.com/file.zip\"\n");
@@ -2570,7 +2588,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   com++;
               } break;
               case 'G': // pause: randomized inter-file delay MIN[:MAX] seconds
-                if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
+                if ((na + 1 >= argc) ||
+                    (argv[na + 1][0] == '-' && !optparam_dash_ok(&x_cmd, na))) {
                   HTS_PANIC_PRINTF("Option pause needs a blank space and a "
                                    "delay in seconds (MIN[:MAX])");
                   printf("Example: --pause 5:10\n");
@@ -2735,7 +2754,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   int sendb = 0;
 
                   readGluedInt(sendb, INT_MAX);
-                  if (!((na + 1 >= argc) || (argv[na + 1][0] == '-'))) {
+                  if (!((na + 1 >= argc) || (argv[na + 1][0] == '-' &&
+                                             !optparam_dash_ok(&x_cmd, na)))) {
                     na++;
                     hasFilter = 1;
                     filter = argv[na];
@@ -2937,7 +2957,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             na++;               // sauter, déja traité
             break;
           case 'P':            // proxy
-            if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
+            if ((na + 1 >= argc) ||
+                (argv[na + 1][0] == '-' && !optparam_dash_ok(&x_cmd, na))) {
               HTS_PANIC_PRINTF
                 ("Option P needs to be followed by a blank space, and a proxy proxy:port or user:id@proxy:port");
               printf("Example: -P proxy.example.com:8080\n");
@@ -2972,7 +2993,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             break;
             //
           case 'V':            // execute command
-            if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
+            if ((na + 1 >= argc) ||
+                (argv[na + 1][0] == '-' && !optparam_dash_ok(&x_cmd, na))) {
               HTS_PANIC_PRINTF
                 ("Option V needs to be followed by a system-command string");
               printf("Example: -V \"tar uvf some.tar \\$0\"\n");
