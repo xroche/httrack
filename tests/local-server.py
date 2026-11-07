@@ -1979,7 +1979,7 @@ class Handler(SimpleHTTPRequestHandler):
                 fp.write("x")
         log = os.environ.get("RESUME_LOG")
         if log:
-            with open(log, "a") as fp:
+            with open(log, "a", newline="\n") as fp:
                 fp.write(
                     "range=%s referer=%s\n"
                     % (self.headers.get("Range"), self.headers.get("Referer"))
