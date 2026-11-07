@@ -34,6 +34,12 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTSCACHE_DEFH
 #define HTSCACHE_DEFH
 
+/* Cache key: url_adr followed by url_fil, each lien_back-sized. Write, index
+   load and lookup must each hold one whole -- a clipped key aliases another. */
+#define CACHE_KEY_SIZE (HTS_URLMAXSIZE * 4)
+/* The ZIP entry name is the key behind a "http://" the index load strips. */
+#define CACHE_ENTRYNAME_SIZE (CACHE_KEY_SIZE + 8)
+
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 
@@ -114,12 +120,6 @@ void hts_cache_reconcile(httrackp *opt, hts_cache_reconcile_mode mode);
 /* Capacity of the per-entry header block cache_add builds; the self-test
    asserts the writer stays inside it, so both must move together. */
 #define CACHE_HEADERS_SIZE 8192
-
-/* Cache key: url_adr followed by url_fil, each lien_back-sized. Write, index
-   load and lookup must each hold one whole -- a clipped key aliases another. */
-#define CACHE_KEY_SIZE (HTS_URLMAXSIZE * 4)
-/* The ZIP entry name is the key behind a "http://" the index load strips. */
-#define CACHE_ENTRYNAME_SIZE (CACHE_KEY_SIZE + 8)
 
 int cache_brstr(char *adr, char *s, size_t s_size);
 

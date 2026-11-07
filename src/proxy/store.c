@@ -1010,8 +1010,7 @@ int PT_LoadCache__New(PT_Index index_, const char *filename) {
       /* Ready directory entries */
       if (unzGoToFirstFile(zFile) == Z_OK) {
         char comment[128];
-        /* the engine's CACHE_ENTRYNAME_SIZE, so both accept the same names */
-        char filename[HTS_URLMAXSIZE * 4 + 8];
+        char filename[CACHE_ENTRYNAME_SIZE];
         unz_file_info zfi;
         int entries = 0;
         int firstSeen = 0;
@@ -2536,7 +2535,7 @@ int PT_LoadCache__Arc(PT_Index index_, const char *filename) {
               const char *filenameIndex = copyArcField(index->line, 0,
                                                        index->filenameIndexBuff, sizeof(index->filenameIndexBuff) - 1); /* can not be NULL */
 
-              if (strfield(filenameIndex, "http://")) {
+              if (strncmp(filenameIndex, "http://", 7) == 0) {
                 filenameIndex += 7;
               }
               if (*filenameIndex != 0) {
