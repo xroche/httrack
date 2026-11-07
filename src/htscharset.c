@@ -1134,11 +1134,11 @@ char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
 
           /* encode */
           output_length = (punycode_uint) ( capa - destSize );
-          while((status = punycode_encode((punycode_uint) segOutputSize,
-            segInt, NULL, &output_length, &dest[destSize]))
-            == punycode_big_output) {
-              INCREASE_CAPA();
-              output_length = (punycode_uint) ( capa - destSize );
+          while ((status = punycode_encode(
+                      (punycode_uint) segOutputSize, segInt, &output_length,
+                      &dest[destSize])) == punycode_big_output) {
+            INCREASE_CAPA();
+            output_length = (punycode_uint) (capa - destSize);
           }
 
           /* cleanup */
@@ -1221,11 +1221,10 @@ char *hts_convertStringIDNAToUTF8(const char *s, size_t size) {
           FREE_BUFFER();
           return NULL;
         }
-        for(output_length = output_capa 
-          ; (status = punycode_decode((punycode_uint) segSize - 4,
-            &s[startSeg + 4], &output_length, output_dest, NULL))
-            == punycode_big_output 
-          ; ) {
+        for (output_length = output_capa;
+             (status = punycode_decode((punycode_uint) segSize - 4,
+                                       &s[startSeg + 4], &output_length,
+                                       output_dest)) == punycode_big_output;) {
           output_capa <<= 1;
           output_dest = (punycode_uint *) realloct(
               output_dest, output_capa * sizeof(punycode_uint));
