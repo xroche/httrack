@@ -656,7 +656,7 @@ static int st_ftpline(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* ftp_split_userpass: the split itself, and userinfo refused rather than
+/* ftp_split_userpass: the split, the decode, and userinfo refused rather than
    clipped into another account's name (#1032). */
 static int st_ftpuser(httrackp *opt, int argc, char **argv) {
   static const size_t caps[] = {16, 256}; /* asymmetric: a shared bound shows */
@@ -691,6 +691,57 @@ static int st_ftpuser(httrackp *opt, int argc, char **argv) {
                                sizeof(pbuf)) == HTS_TRUE);
     assertf(strcmp(ubuf, "u@relay") == 0);
     assertf(strcmp(pbuf, "pw") == 0);
+  }
+  {
+    /* decoded like HTTP Basic; split on the raw colon, as SOCKS5 does */
+    static const struct {
+      const char *in, *user, *pass; /* user NULL: refused */
+    } rows[] = {
+        {"us%40er:p%3Ass@", "us@er", "p:ss"},
+        {"a%3Ab:c@", "a:b", "c"},
+        {"%41%4:%4@", "A%4", "%4"}, /* an escape cut by its field stays */
+        {"%zz%2:x%7@", "%zz%2", "x%7"},
+        {"u%25%34%31@", "u%41", ""}, /* decoded once, not twice */
+        {"u%0D%0AQUIT:p@", NULL, NULL},
+        {"u:p%0AQUIT@", NULL, NULL},
+        {"u%00x:p@", NULL, NULL}, /* would cut the name at the NUL */
+        {"u:p%00x@", NULL, NULL},
+        {"u:p%09@", NULL, NULL},
+    };
+
+    size_t r;
+
+    for (r = 0; r < sizeof(rows) / sizeof(rows[0]); r++) {
+      const char *const in = rows[r].in;
+      const hts_boolean ok = ftp_split_userpass(
+          in, in + strlen(in), ubuf, sizeof(ubuf), pbuf, sizeof(pbuf));
+
+      assertf(ok == (rows[r].user != NULL ? HTS_TRUE : HTS_FALSE));
+      if (ok) {
+        assertf(strcmp(ubuf, rows[r].user) == 0);
+        assertf(strcmp(pbuf, rows[r].pass) == 0);
+      } else {
+        assertf(ubuf[0] == '\0' && pbuf[0] == '\0');
+      }
+    }
+  }
+  {
+    /* the bound is on the decoded name: 15 escaped bytes fit 16, 16 do not */
+    size_t n;
+
+    for (n = 15; n <= 16; n++) {
+      size_t i;
+
+      for (i = 0; i < n; i++)
+        memcpy(in + 3 * i, "%75", 3);
+      memcpy(in + 3 * n, ":p@", 4);
+      memcpy(ubuf, poison, sizeof(ubuf));
+      assertf(ftp_split_userpass(in, in + 3 * n + 3, ubuf, 16, pbuf,
+                                 sizeof(pbuf)) ==
+              (n < 16 ? HTS_TRUE : HTS_FALSE));
+      assertf(n == 16 || (strlen(ubuf) == n && ubuf[n - 1] == 'u'));
+      assertf(memcmp(ubuf + 16, poison, sizeof(ubuf) - 16) == 0);
+    }
   }
   for (c = 0; c < sizeof(caps) / sizeof(caps[0]); c++) {
     const size_t ucap = caps[c], pcap = caps[1 - c];
@@ -1480,7 +1531,8 @@ const struct selftest_entry selftests_net[] = {
      st_socks5},
     {"ftp-line", "", "get_ftp_line bounds a hostile FTP reply line",
      st_ftpline},
-    {"ftp-userpass", "", "ftp_split_userpass bounds URL userinfo", st_ftpuser},
+    {"ftp-userpass", "", "ftp_split_userpass decodes and bounds URL userinfo",
+     st_ftpuser},
     {"ftp-ctrlchars", "", "send_line rejects a control byte in an FTP command",
      st_ftpctrl},
     {"ftp-cmdlen", "",
