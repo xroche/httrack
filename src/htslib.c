@@ -5178,11 +5178,16 @@ hts_boolean hts_ssl_check_cert(SSL *ssl, const char *url_adr) {
 
 // find the authority's port (:80) or NULL; handles IPv6 literals
 HTSEXT_API const char *jump_toport_const(const char *source) {
-  const char *const a = jump_identification_const(source);
-  // a ':' or ']' in the path, query or fragment is not the authority's
+  const char *a = jump_protocol_const(source);
+  // a '@', ':' or ']' in the path, query or fragment is not the authority's
   const char *const end = a + strcspn(a, "/?#");
-  const char *const bracket = strrchr_limit(a, ']', end);
-  const char *const from = bracket != NULL ? bracket : a;
+  const char *const at = strrchr_limit(a, '@', end);
+  const char *bracket, *from;
+
+  if (at != NULL)
+    a = at;
+  bracket = strrchr_limit(a, ']', end);
+  from = bracket != NULL ? bracket : a;
 
   return memchr(from, ':', (size_t) (end - from));
 }
