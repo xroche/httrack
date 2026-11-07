@@ -923,7 +923,8 @@ struct topindex_chain {
 HTSEXT_API find_handle hts_findfirst(char *path);
 
 /** Advance to the next directory entry. Returns 1 if an entry is available, 0
-   at end of directory. */
+   at end of directory. An entry that cannot be stat()ed is still returned, as
+   neither file nor directory, with size -1. */
 HTSEXT_API hts_boolean hts_findnext(find_handle find);
 
 /** Close the iteration and free @p find. Always returns 0; NULL is accepted. */
@@ -933,7 +934,8 @@ HTSEXT_API int hts_findclose(find_handle find);
     only until the next hts_findnext()/hts_findclose(). */
 HTSEXT_API char *hts_findgetname(find_handle find);
 
-/** Size in bytes of the current entry, or -1 when there is none. */
+/** Size in bytes of the current entry, or -1 when there is none or it cannot
+    be stat()ed. */
 HTSEXT_API LLint hts_findgetsize64(find_handle find);
 
 /** @deprecated Use hts_findgetsize64(). An int cannot carry a size past 2 GB,
