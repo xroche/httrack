@@ -6,13 +6,19 @@ set -e
 
 page=quoteurl/index.html
 
+# Without https support the parser leaves an https link as written.
+https_link='https://example\.invalid/h%22i\.html"'
+if test "$HTTPS_SUPPORT" == "no"; then
+    https_link='https://example\.invalid/h&quot;i\.html"'
+fi
+
 # Every writer: absolute external (default), absolute (-K), root URI (-K3), ?link= (-x).
 for opts in "" -K -K3 -x; do
     # shellcheck disable=SC2086 # $opts is one option or none
     bash "$top_srcdir/tests/local-crawl.sh" --errors 1 \
         --file-matches "$page" 'example\.invalid/a%22onmouseover=alert\(1\)%22b\.html"' \
         --file-matches "$page" 'example\.invalid/c%27d%3ce%3ef\.html"' \
-        --file-matches "$page" 'https://example\.invalid/h%22i\.html"' \
+        --file-matches "$page" "$https_link" \
         --file-matches "$page" 'example\.invalid/plain\.html"' \
         --file-matches "$page" 'ex%22a%3cmple\.invalid/x\.html"' \
         --file-matches "$page" 'q=1&amp;r=2"' \
