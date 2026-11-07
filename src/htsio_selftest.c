@@ -1658,6 +1658,84 @@ static int st_ioexact(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Dangling links sit at both ends of the name order, as readdir order varies.
+ */
+static int st_findall(httrackp *opt, int argc, char **argv) {
+  static const struct {
+    const char *name;
+    hts_boolean is_dir;
+  } ents[] = {
+      {"d01", HTS_TRUE},     {"d02", HTS_TRUE},     {"d03", HTS_TRUE},
+      {"d04", HTS_TRUE},     {"d05", HTS_TRUE},     {"d06", HTS_TRUE},
+      {"d07", HTS_TRUE},     {"d08", HTS_TRUE},     {"d09", HTS_TRUE},
+      {"d10", HTS_TRUE},
+#ifndef _WIN32
+      {"0-gone", HTS_FALSE}, {"m-gone", HTS_FALSE}, {"z-gone", HTS_FALSE},
+#endif
+  };
+  const size_t nnames = sizeof(ents) / sizeof(ents[0]);
+  hts_boolean seen[sizeof(ents) / sizeof(ents[0])] = {HTS_FALSE};
+  char BIGSTK path[HTS_URLMAXSIZE * 2];
+  find_handle h;
+  size_t i;
+  int rc = 0;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "findall: needs a directory\n");
+    return 1;
+  }
+  for (i = 0; i < nnames; i++) {
+    concat(path, sizeof(path), argv[0], "/");
+    strcatbuff(path, ents[i].name);
+#ifdef _WIN32
+    if (mkdir(path) != 0) {
+#else
+    if (!ents[i].is_dir) {
+      if (symlink("no-such-target", path) != 0) {
+        fprintf(stderr, "findall: cannot create link '%s'\n", path);
+        return 1;
+      }
+    } else if (mkdir(path, HTS_PROTECT_FOLDER) != 0) {
+#endif
+      fprintf(stderr, "findall: cannot create '%s'\n", path);
+      return 1;
+    }
+  }
+
+  h = hts_findfirst(argv[0]);
+  if (h != NULL) {
+    do {
+      const char *const name = hts_findgetname(h);
+
+      for (i = 0; name != NULL && i < nnames; i++) {
+        if (strcmp(name, ents[i].name) != 0)
+          continue;
+        seen[i] = HTS_TRUE;
+        if (hts_findisdir(h) != ents[i].is_dir || hts_findisfile(h)) {
+          fprintf(stderr, "findall: '%s' has the wrong type\n", name);
+          rc = 1;
+        }
+        if (!ents[i].is_dir && hts_findgetsize64(h) != -1) {
+          fprintf(stderr, "findall: '%s' size is " LLintP ", expected -1\n",
+                  name, hts_findgetsize64(h));
+          rc = 1;
+        }
+      }
+    } while (hts_findnext(h));
+    hts_findclose(h);
+  }
+  for (i = 0; i < nnames; i++) {
+    if (!seen[i]) {
+      fprintf(stderr, "findall: '%s' was not listed\n", ents[i].name);
+      rc = 1;
+    }
+  }
+  if (rc == 0)
+    printf("findall: listed %d entries\n", (int) nnames);
+  return rc;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
@@ -1667,6 +1745,9 @@ const struct selftest_entry selftests_io[] = {
     {"findsize", "<dir>",
      "directory-enumeration file size past the 2GB signed-32-bit wrap",
      st_findsize},
+    {"findall", "<dir>",
+     "directory enumeration lists an entry that cannot be stat()ed",
+     st_findall},
     {"growsize", "", "buffer capacity for a 64-bit file size (no int wrap)",
      st_growsize},
     {"addlink", "", "htsAddLink codebase walk over an empty current path",
