@@ -19,7 +19,7 @@ out, kept = sys.argv[1], sys.argv[2]
 hdr = "X-In-Cache: 0\r\nX-StatusCode: 200\r\nX-Size: 5\r\n"
 if kept == "1":
     hdr += "X-Kept: 1\r\n"
-hdr += "Content-Type: text/html\r\nX-Save: example.com/a.html\r\n\r\n"
+hdr += "X-Kepts: 1\r\nContent-Type: text/html\r\nX-Save: example.com/a.html\r\n\r\n"
 zi = zipfile.ZipInfo("http://example.com/a.html")
 zi.extra = hdr.encode("ascii")
 with zipfile.ZipFile(out, "w") as z:
@@ -42,6 +42,10 @@ for n in kept plain; do
 done
 
 # the record is plain text, so a leaked line is visible to grep
-if grep -qai '^X-Kept' "$dir/kept.arc"; then
+if grep -qai '^X-Kept:' "$dir/kept.arc"; then
     fail "X-Kept leaked into the ARC record"
 fi
+
+# control: a neighbouring unknown header must still be copied
+grep -qai '^X-Kepts: 1' "$dir/kept.arc" ||
+    fail "unrelated X-Kepts line was dropped from the ARC record"

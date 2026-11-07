@@ -1168,7 +1168,6 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
         char headerBuff[8192 + 2];
         int readSizeHeader;
         int dataincache = 0;
-        int kept_unused = 0;
         /* signed, so a corrupt value is judged before it becomes a size_t */
         LLint declared_size = 0;
 
@@ -1224,7 +1223,8 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
               ZIP_READFIELD_STRING(line, value, "X-Save", previous_save_,
                                    sizeof(previous_save_));
               /* naming-only marker: consumed so it never reaches a reply */
-              ZIP_READFIELD_INT(line, value, "X-Kept", kept_unused);
+              if (line[0] != '\0' && strfield2(line, "X-Kept"))
+                line[0] = '\0';
               if (line[0] != '\0') {
                 PT_AppendHeader(&r->headers, &headersLen, &headersCap, line,
                                 value);
