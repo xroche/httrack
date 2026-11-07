@@ -1977,6 +1977,13 @@ class Handler(SimpleHTTPRequestHandler):
         if counter:
             with open(counter, "a") as fp:
                 fp.write("x")
+        log = os.environ.get("RESUME_LOG")
+        if log:
+            with open(log, "a", newline="\n") as fp:
+                fp.write(
+                    "range=%s referer=%s\n"
+                    % (self.headers.get("Range"), self.headers.get("Referer"))
+                )
         # First GET: stall mid-body so the crawl can be interrupted with a partial.
         if not Handler._resume_started:
             Handler._resume_started = True

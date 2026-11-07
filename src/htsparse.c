@@ -4377,7 +4377,7 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
           heap_top()->refetch_whole = heap(ptr)->refetch_whole;
           heap_top()->fetch = heap(ptr)->fetch;
           heap_top()->premier = heap(ptr)->premier;
-          heap_top()->precedent = ptr;
+          heap_top()->precedent = heap(ptr)->precedent;
           error = 1;
           hts_invalidate_link(opt, ptr); // invalidate hashtable entry
         } else {                         // out of memory
