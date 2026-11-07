@@ -126,7 +126,7 @@ libhttrack_la_SOURCES += htsselftest.c htsselftest_util.c \
 	htswizard_selftest.c
 endif
 
-EXTRA_DIST = httrack.h htsstats.h webhttrack.in \
+EXTRA_DIST = htsstats.h webhttrack.in \
 		version.rc \
 		libhttrack.rc \
 		httrack.rc \

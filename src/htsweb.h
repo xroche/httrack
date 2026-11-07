@@ -39,26 +39,6 @@ Please visit our Website: http://www.httrack.com
 
 #define MAX_LEN_INPROGRESS 40
 
-typedef struct t_InpInfo {
-  int ask_refresh;
-  int refresh;
-  LLint stat_bytes;
-  int stat_time;
-  int lien_n;
-  int lien_tot;
-  int stat_nsocket;
-  int rate;
-  int irate;
-  int ft;
-  LLint stat_written;
-  int stat_updated;
-  int stat_errors;
-  int stat_warnings;
-  int stat_infos;
-  TStamp stat_timestart;
-  int stat_back;
-} t_InpInfo;
-
 // wrappers
 void __cdecl htsshow_init(t_hts_callbackarg * carg);
 void __cdecl htsshow_uninit(t_hts_callbackarg * carg);

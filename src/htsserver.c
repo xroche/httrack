@@ -255,7 +255,6 @@ static void sig_brpipe(int code) {
 HTS_UNUSED static int check_readinput_t(T_SOC soc, int timeout);
 HTS_UNUSED static int recv_bl(T_SOC soc, void *buffer, size_t len, int timeout);
 HTS_UNUSED static int linputsoc(T_SOC soc, char *s, int max);
-HTS_UNUSED static int check_readinput(htsblk * r);
 HTS_UNUSED static int linputsoc_t(T_SOC soc, char *s, int max, int timeout);
 HTS_UNUSED static int linput(FILE * fp, char *s, int max);
 
@@ -3502,27 +3501,6 @@ static int recv_bl(T_SOC soc, void *buffer, size_t len, int timeout) {
     return (int) offs;
   }
   return -1;
-}
-
-// check if data is available
-static int check_readinput(htsblk * r) {
-  if (r->soc != INVALID_SOCKET) {
-    fd_set fds;                 // poll structures
-    struct timeval tv;          // structure for select
-
-    if (!hts_soc_selectable(r->soc))
-      return 0;
-    FD_ZERO(&fds);
-    FD_SET(r->soc, &fds);
-    tv.tv_sec = 0;
-    tv.tv_usec = 0;
-    select((int) r->soc + 1, &fds, NULL, NULL, &tv);
-    if (FD_ISSET(r->soc, &fds))
-      return 1;
-    else
-      return 0;
-  } else
-    return 0;
 }
 
 /*int strfield(const char* f,const char* s) {

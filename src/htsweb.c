@@ -81,13 +81,6 @@ Please visit our Website: http://www.httrack.com
 #else
 #endif
 
-#undef DEBUG
-#if 0
-#define DEBUG(A) do { A; } while(0)
-#else
-#define DEBUG(A) do {} while(0)
-#endif
-
 static htsmutex refreshMutex = HTSMUTEX_INIT;
 
 static int help_server(char *dest_path, int defaultPort, const char *bindAddr);
@@ -511,7 +504,6 @@ static void back_launch_cmd(void *pP) {
 
   back_launch_end(opt);
   back_launch_finished();
-  DEBUG(fprintf(stderr, "commandEnd=1\n"));
 
   /* free */
   free(cmd);
@@ -528,7 +520,6 @@ void webhttrack_main(char *cmd) {
   /* a previous run's flags would stop this one, or show its result */
   commandEnd = commandReturn = commandReturnSet = commandEndRequested = 0;
   hts_store_release_int(&commandRunning, 1);
-  DEBUG(fprintf(stderr, "commandRunning=1\n"));
   if (hts_newthread(back_launch_cmd, (void *) strdup(cmd)) != 0) {
     httrackp *const opt = global_opt;
 
@@ -642,21 +633,16 @@ static int help_server(char *dest_path, int defaultPort, const char *bindAddr) {
 
 /* CALLBACK FUNCTIONS */
 
-void __cdecl htsshow_init(t_hts_callbackarg * carg) {
-}
-void __cdecl htsshow_uninit(t_hts_callbackarg * carg) {
-}
-int __cdecl htsshow_start(t_hts_callbackarg * carg, httrackp * opt) {
-  DEBUG(fprintf(stderr, "htsshow_start()\n"));
-  return 1;
-}
+void __cdecl htsshow_init(t_hts_callbackarg *carg) {}
+
+void __cdecl htsshow_uninit(t_hts_callbackarg *carg) {}
+
+int __cdecl htsshow_start(t_hts_callbackarg *carg, httrackp *opt) { return 1; }
 int __cdecl htsshow_chopt(t_hts_callbackarg * carg, httrackp * opt) {
   return htsshow_start(carg, opt);
 }
-int __cdecl htsshow_end(t_hts_callbackarg * carg, httrackp * opt) {
-  DEBUG(fprintf(stderr, "htsshow_end()\n"));
-  return 1;
-}
+
+int __cdecl htsshow_end(t_hts_callbackarg *carg, httrackp *opt) { return 1; }
 int __cdecl htsshow_preprocesshtml(t_hts_callbackarg * carg, httrackp * opt,
                                    char **html, int *len,
                                    const char *url_address,
