@@ -5740,6 +5740,13 @@ static const char *hts_mime_lookup(const char *(*table)[2], int key,
   return NULL;
 }
 
+// hts_mime_lookup() over the legacy table, then the modern one
+static const char *hts_mime_find(int key, const char *needle) {
+  const char *const found = hts_mime_lookup(hts_mime, key, needle);
+
+  return found != NULL ? found : hts_mime_lookup(hts_mime_modern, key, needle);
+}
+
 // write the mime type for fil into s (capacity ssize)
 // flag: 1 to always return a type (the "application/..." / octet-stream
 // fallback) returns 1 if a type was written to s, 0 otherwise
@@ -5765,9 +5772,7 @@ HTSEXT_API hts_boolean get_httptype_sized(httrackp *opt, char *s, size_t ssize,
       const char *mime;
 
       a++;
-      mime = hts_mime_lookup(hts_mime, 1, a);
-      if (mime == NULL)
-        mime = hts_mime_lookup(hts_mime_modern, 1, a);
+      mime = hts_mime_find(1, a);
       if (mime != NULL) {
         strlcpybuff(s, mime, ssize);
         return 1;
@@ -5917,9 +5922,7 @@ int give_mimext(char *s, size_t ssize, const char *st) {
 
   st = hts_effective_mime(st); /* no declared type: derive an html ext */
   s[0] = '\0';
-  ext = hts_mime_lookup(hts_mime, 0, st);
-  if (ext == NULL)
-    ext = hts_mime_lookup(hts_mime_modern, 0, st);
+  ext = hts_mime_find(0, st);
   if (ext != NULL) {
     strlcpybuff(s, ext, ssize);
     ok = 1;
@@ -5948,27 +5951,16 @@ int give_mimext(char *s, size_t ssize, const char *st) {
   return ok;
 }
 
-// extension connue?..
-//  0 : non
-//  1 : oui
-//  2 : html
-HTSEXT_API int is_knowntype(httrackp * opt, const char *fil) {
+// known extension? 0: no, 1: yes, 2: html
+HTSEXT_API int is_knowntype(httrackp *opt, const char *fil) {
   char catbuff[CATBUFF_SIZE];
-  const char *ext;
-  int j = 0;
+  const char *mime;
 
   if (!fil)
     return 0;
-  ext = get_ext(catbuff, sizeof(catbuff), fil);
-  while(strnotempty(hts_mime[j][1])) {
-    if (strfield2(hts_mime[j][1], ext)) {
-      if (is_html_mime_type(hts_mime[j][0]))
-        return 2;
-      else
-        return 1;
-    }
-    j++;
-  }
+  mime = hts_mime_find(1, get_ext(catbuff, sizeof(catbuff), fil));
+  if (mime != NULL)
+    return is_html_mime_type(mime) ? 2 : 1;
 
   // Known by user?
   return (is_userknowntype(opt, fil));
