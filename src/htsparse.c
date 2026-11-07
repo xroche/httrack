@@ -297,24 +297,28 @@ static hts_boolean hts_attr_is_js_binding(const char *name, const char *nend) {
   return HTS_FALSE;
 }
 
+/* Is the attribute name [name, nend) one whose value is never a link, a
+   hts_nodetect word or an xmlns declaration? Returns the word, or NULL. */
+static const char *hts_dirty_attr_refused(const char *name, const char *nend) {
+  int i;
+  for (i = 0; strnotempty(hts_nodetect[i]); i++) {
+    const int l = strfield(name, hts_nodetect[i]);
+    if (l && name + l == nend)
+      return hts_nodetect[i];
+  }
+  i = strfield(name, "xmlns");
+  if (i && (name + i == nend || name[i] == ':'))
+    return "xmlns";
+  return NULL;
+}
+
 /* Contract in htsparse.h. Resolves the owning attribute itself, since
    intag_startattr is unreliable mid-tag. */
 hts_boolean hts_dirty_attr_detectable(const char *quote,
                                       const char *tag_start) {
   const char *nend;
   const char *name = hts_dirty_attr_name(quote, tag_start, &nend);
-  int i;
-  if (name == NULL)
-    return HTS_FALSE;
-  for (i = 0; strnotempty(hts_nodetect[i]); i++) {
-    const int l = strfield(name, hts_nodetect[i]);
-    if (l && name + l == nend)
-      return HTS_FALSE;
-  }
-  i = strfield(name, "xmlns");
-  if (i && (name + i == nend || name[i] == ':'))
-    return HTS_FALSE;
-  return HTS_TRUE;
+  return name != NULL && hts_dirty_attr_refused(name, nend) == NULL;
 }
 
 /* Advance the cursor by 'steps' bytes, feeding each to the automaton. */
@@ -2201,57 +2205,39 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                             if (url_ok) {
 
-                              // Check if not fodbidden tag (id,name..)
-                              if (intag_start_valid) {
-                                if (intag_start)
-                                  if (intag_startattr)
-                                    if (intag)
-                                      if (!inscript)
-                                        if (!incomment) {
-                                          int i = 0, nop = 0;
-
-                                          while (
-                                              (nop == 0) &&
-                                              (strnotempty(hts_nodetect[i]))) {
-                                            nop = rech_tageq(intag_startattr,
-                                                             hts_nodetect[i]);
-                                            i++;
-                                          }
-                                          // Forbidden tag
-                                          if (nop) {
-                                            url_ok = 0;
-                                            hts_log_print(opt, LOG_DEBUG,
-                                                          "dirty parsing: bad "
-                                                          "tag avoided: %s",
-                                                          hts_nodetect[i - 1]);
-                                          }
-                                          // xmlns / xmlns:prefix declare
-                                          // XML namespaces, not resources
-                                          // (#191)
-                                          else {
-                                            const int xl = strfield(
-                                                intag_startattr, "xmlns");
-                                            const char xc = intag_startattr[xl];
-                                            if (xl && (xc == ':' || xc == '=' ||
-                                                       is_space(xc))) {
-                                              url_ok = 0;
-                                              hts_log_print(
-                                                  opt, LOG_DEBUG,
-                                                  "dirty parsing: xmlns "
-                                                  "namespace avoided");
-                                            }
-                                          }
-                                        }
-                              }
-
-                              if (url_ok && intag && intag_start_valid &&
-                                  intag_start) {
+                              if (intag && intag_start_valid && intag_start) {
                                 const char *nend;
                                 const char *const name = hts_dirty_attr_name(
                                     html, intag_start, &nend);
+                                const char *refused = NULL;
 
-                                if (name != NULL &&
-                                    hts_attr_is_js_binding(name, nend)) {
+                                // a quote nested in a value has no name, so
+                                // also ask the attribute holding it
+                                if (!inscript && !incomment) {
+                                  if (name != NULL)
+                                    refused =
+                                        hts_dirty_attr_refused(name, nend);
+                                  if (refused == NULL &&
+                                      intag_startattr != NULL)
+                                    refused = hts_dirty_attr_refused(
+                                        intag_startattr,
+                                        intag_startattr +
+                                            strcspn(intag_startattr,
+                                                    "=" HTS_SPACES));
+                                }
+                                if (refused != NULL) {
+                                  url_ok = 0;
+                                  if (strcmp(refused, "xmlns") == 0)
+                                    hts_log_print(opt, LOG_DEBUG,
+                                                  "dirty parsing: xmlns "
+                                                  "namespace avoided");
+                                  else
+                                    hts_log_print(opt, LOG_DEBUG,
+                                                  "dirty parsing: bad "
+                                                  "tag avoided: %s",
+                                                  refused);
+                                } else if (name != NULL &&
+                                           hts_attr_is_js_binding(name, nend)) {
                                   url_ok = 0;
                                   hts_log_print(opt, LOG_DEBUG,
                                                 "dirty parsing: binding "
@@ -2259,8 +2245,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                 }
                               }
 
-                              // Accepter URL, on la traitera comme une URL
-                              // normale!!
+                              // accept it, as an ordinary link
                               if (url_ok) {
                                 valid_p = 1;
                                 p = 0;
