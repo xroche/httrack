@@ -2149,10 +2149,12 @@ void url_savename_addstr(char *d, size_t dsize, const char *s) {
 
 /* "filename" should be at least 64 bytes. */
 void url_savename_refname(const char *adr, const char *fil, char *filename) {
+  const int endian = 1;
   unsigned char bindigest[16];
   struct MD5Context ctx;
 
-  MD5Init(&ctx, 0);
+  /* standard MD5 on any host: flag 0 byte-swapped little-endian input */
+  MD5Init(&ctx, *((const char *) &endian));
   MD5Update(&ctx, (const unsigned char *) adr, (int) strlen(adr));
   MD5Update(&ctx, (const unsigned char *) ",", 1);
   MD5Update(&ctx, (const unsigned char *) fil, (int) strlen(fil));
