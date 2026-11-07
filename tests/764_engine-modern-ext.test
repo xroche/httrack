@@ -1,0 +1,43 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# A modern extension (hts_mime_modern) is a known non-HTML type, like .png;
+# .foo is the unknown control.
+
+name() {
+    local fil=$1 ctype=$2 want=$3
+    shift 3
+    selftest_queue_tail "/$want" savename "$fil" "$ctype" "$@"
+}
+
+# the save name in the default mode and the three -%N modes
+for d in "" delayed=0 delayed=1 delayed=2; do
+    case "$d" in
+    delayed=0 | delayed=1) png=photo.png webp=photo.webp mp4=x.mp4 ;;
+    *) png=photo.jpg webp=photo.jpg mp4=x.jpg ;;
+    esac
+    foo=photo.foo.jpg
+    [ "$d" = delayed=0 ] && foo=photo.foo.html
+    # shellcheck disable=SC2086 # an empty $d passes no argument
+    {
+        name /photo.png image/jpeg "$png" $d
+        name /photo.webp image/jpeg "$webp" $d
+        name /x.mp4 image/jpeg "$mp4" $d
+        name /photo.foo image/jpeg "$foo" $d
+    }
+done
+
+# -p1 (HTML only) refuses non-HTML, and -n takes it from another host
+for f in /a.png /a.webp /a.woff2 /a.mjs; do
+    selftest_queue "verdict=1" wizardnonhtml 1 0 www.example.com "$f"
+    selftest_queue "verdict=0" wizardnonhtml 3 1 other.example.org "$f"
+done
+selftest_queue "verdict=0" wizardnonhtml 1 0 www.example.com /a.foo
+selftest_queue "verdict=1" wizardnonhtml 3 1 other.example.org /a.foo
+selftest_queue "verdict=1" wizardnonhtml 3 0 other.example.org /a.webp
+
+selftest_run_queued

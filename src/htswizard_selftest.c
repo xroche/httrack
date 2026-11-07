@@ -694,6 +694,46 @@ done:
   return 0;
 }
 
+/* hts_acceptlink()'s verdict on a link found by the primary page, under -p
+   `getmode` and -n `near`: 1 forbidden, 0 allowed, -1 no opinion. */
+static int st_wizardnonhtml(httrackp *opt, int argc, char **argv) {
+  const hts_wizard savedwizard = opt->wizard;
+  const int savedgetmode = opt->getmode;
+  const hts_tristate savednear = opt->nearlink;
+  const hts_robots savedrobots = opt->robots;
+  const int savedtravel = opt->travel;
+  lien_url **savedliens = opt->liens;
+  char adr[] = "www.example.com", fil[] = "/", sav[] = "index.html";
+  lien_url primary, *liens[1];
+  int prio = 0;
+
+  if (argc != 4) {
+    fprintf(stderr, "wizardnonhtml: <getmode> <near> <adr> <fil>\n");
+    return 1;
+  }
+  memset(&primary, 0, sizeof(primary));
+  primary.adr = adr;
+  primary.fil = fil;
+  primary.sav = sav;
+  primary.depth = 5;
+  liens[0] = &primary;
+  opt->liens = liens;
+  opt->wizard = HTS_WIZARD_NONE;
+  opt->getmode = atoi(argv[0]);
+  opt->nearlink = atoi(argv[1]) ? HTS_TRUE : HTS_FALSE;
+  opt->robots = HTS_ROBOTS_NEVER;
+  opt->travel = HTS_TRAVEL_SAME_ADDRESS;
+  printf("verdict=%d\n", hts_acceptlink(opt, 0, argv[2], argv[3], NULL, NULL,
+                                        HTS_FALSE, &prio, NULL));
+  opt->liens = savedliens;
+  opt->wizard = savedwizard;
+  opt->getmode = savedgetmode;
+  opt->nearlink = savednear;
+  opt->robots = savedrobots;
+  opt->travel = savedtravel;
+  return 0;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
@@ -711,5 +751,7 @@ const struct selftest_entry selftests_wizard[] = {
      st_wizardprompt},
     {"wizardinsert", "[<adr> <fil> [answer...] [@ filter...]]",
      "where a wizard answer lands in the filter array", st_wizardinsert},
+    {"wizardnonhtml", "<getmode> <near> <adr> <fil>",
+     "-p and -n verdict on a link from the primary page", st_wizardnonhtml},
     {NULL, NULL, NULL, NULL},
 };
