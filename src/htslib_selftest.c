@@ -34,6 +34,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsselftest_int.h"
 #include "htsname.h"
 #include "htsfetch.h"
+#include "htspsl.h"
 
 #include <limits.h>
 #include <stdint.h>
@@ -2570,6 +2571,29 @@ static int st_strcmpnocase(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+static void uninit_worker(void *arg) { (void) arg; }
+
+/* hts_uninit() releases the list and the thread lock, and hts_init() rebuilds
+   them. */
+static int st_uninit(httrackp *opt, int argc, char **argv) {
+  int i;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (i = 0; i < 2; i++) {
+    hts_uninit();
+    printf("%s ", hts_psl_loaded() ? "loaded" : "released");
+  }
+  hts_init();
+  printf("%s ", hts_psl_loaded() ? "loaded" : "released");
+  if (hts_newthread(uninit_worker, NULL) != 0)
+    return 1;
+  htsthread_wait();
+  printf("joined\n");
+  return 0;
+}
+
 /* hts_rtrim() and the sets it is called with. The string starts mid-arena, and
    the byte below it is poisoned with '#' rather than 0, or the stray NUL the
    old loop wrote there would read as untouched. */
@@ -4163,6 +4187,8 @@ const struct selftest_entry selftests_lib[] = {
      "last-char helpers never index before the buffer (#770, #781, #821)",
      st_lastchar},
     {"rtrim", "", "hts_rtrim never walks below the buffer", st_rtrim},
+    {"uninit", "", "hts_uninit releases what hts_init sets up, twice safely",
+     st_uninit},
     {"strcmpnocase", "",
      "strcmpnocase compares the whole of both strings, ignoring case",
      st_strcmpnocase},

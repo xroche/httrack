@@ -173,9 +173,6 @@ void back_launch_ftp(void *pP) {
 #endif
   run_launch_ftp(pStruct);
 
-  /* Uninitialize */
-  hts_uninit();
-
   pStruct->body_returned = HTS_TRUE;
 }
 

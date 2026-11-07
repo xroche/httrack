@@ -1,0 +1,12 @@
+#!/bin/bash
+#
+# hts_uninit() releases what hts_init() set up, and hts_init() rebuilds it.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+require_httrack
+
+assert_selftest 'released released loaded joined' uninit

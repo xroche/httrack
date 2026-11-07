@@ -7993,14 +7993,7 @@ HTSEXT_API int hts_init(void) {
   return 1;
 }
 
-/* will not free thread env. */
 HTSEXT_API int hts_uninit(void) {
-  /* hts_init() is a lazy initializer, with limited a allocation (one or two mutexes) ;
-     we won't free anything here as the .h semantic was never being very clear */
-  return 1;
-}
-
-int hts_uninit_module(void) {
   if (!hts_init_ok)
     return 1;
   htsthread_uninit();
