@@ -779,8 +779,11 @@ static const char *bundle_jar_file(httrackp *opt, char buff[CATBUFF_SIZE]) {
   return fconcat(buff, CATBUFF_SIZE, StringBuff(opt->path_log), "cookies.txt");
 }
 
-/* Does a start URL lack a scheme? A "//host" seed keeps its old prefix. */
+/* Does a start URL lack a scheme? "//host" counts too, so it still becomes
+   http:////host. */
 static hts_boolean seed_needs_scheme(const char *url) {
+  while (*url == ' ')
+    url++;
   return !link_has_authority(url) || strncmp(url, "//", 2) == 0;
 }
 
