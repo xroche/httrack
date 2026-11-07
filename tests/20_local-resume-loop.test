@@ -17,7 +17,8 @@ cleanup_push cleanup
 
 # RESUME_COUNTER gets a byte per /resume/blob.txt request (pass-2 delta bounds re-gets).
 counter="${tmpdir}/blobcount"
-local_server_start --env RESUME_COUNTER="$counter" --root "$root"
+reqlog="${tmpdir}/requests"
+local_server_start --env RESUME_COUNTER="$counter" --env RESUME_LOG="$reqlog" --root "$root"
 
 require_httrack
 out="${tmpdir}/crawl"
@@ -43,6 +44,7 @@ crawlpid=
 test -n "$(find "$refdir" -name '*.ref' 2>/dev/null)" || fail "no temp-ref survived pass 1; cannot drive #206"
 echo "OK (temp-ref present)"
 before=$(wc -c <"$counter" 2>/dev/null || echo 0)
+logged=$(wc -l <"$reqlog")
 
 # --- pass 2: --continue -> resume Range -> 416, bounded against the #206 loop -
 # Kill pass 2 after a deadline (portable stand-in for `timeout`, absent on macOS).
@@ -77,3 +79,12 @@ if test "$hits" -gt 8; then
     exit 1
 fi
 echo "OK (${hits} requests)"
+
+# The range-less re-get keeps the parent page as Referer, never the file itself.
+printf '[re-get Referer is the parent] ..\t'
+reget=$(tail -n +$((logged + 1)) "$reqlog" | grep '^range=None ' | tail -n 1 || true)
+test -n "$reget" || fail "no range-less re-get in the request log"
+case "$reget" in
+*"referer=${BASEURL}/resume/index.html") echo OK ;;
+*) fail "re-get sent the wrong Referer: ${reget}" ;;
+esac
