@@ -561,12 +561,35 @@ static char *path_basename_dup(const char *path) {
   return strdupt(b);
 }
 
+/* Append n bytes of s, percent-encoding any byte that is not part of a
+   well-formed UTF-8 sequence, so the whole CDXJ line stays UTF-8. */
+static int surt_add_utf8(wbuf *out, const char *s, size_t n) {
+  size_t i = 0;
+  while (i < n) {
+    const unsigned char c = (unsigned char) s[i];
+    size_t len = 1;
+    if (c >= 0x80) {
+      len = hts_getUTF8SequenceLength((char) c);
+      if (len == 0 || len > n - i || !hts_isStringUTF8(s + i, len)) {
+        if (wbuf_printf(out, "%%%02X", (unsigned) c) != 0)
+          return -1;
+        i++;
+        continue;
+      }
+    }
+    if (wbuf_add(out, s + i, len) != 0)
+      return -1;
+    i += len;
+  }
+  return 0;
+}
+
 /* SURT-canonicalize url into out (no newline): scheme and userinfo dropped,
    host lowercased with a leading www[digits] label stripped and the scheme
    default port removed, labels reversed and comma-joined then ')', path+query
-   appended verbatim (case preserved, fragment dropped). IPv4 and [IPv6]
-   literals keep their host form. A non-default port is kept as ":port" before
-   the ')'. Returns 0 on success. */
+   appended (case preserved, fragment dropped, invalid UTF-8 as %XX). IPv4 and
+   [IPv6] literals keep their host form. A non-default port is kept as ":port"
+   before the ')'. Returns 0 on success. */
 static int surt_canon(const char *url, wbuf *out) {
   const char *p, *scheme_end, *authend, *host, *hostsep, *port = NULL;
   size_t portlen = 0, hlen, i;
@@ -656,7 +679,7 @@ static int surt_canon(const char *url, wbuf *out) {
         if (llen > 0) {
           if (!first && wbuf_add(out, ",", 1) != 0)
             return -1;
-          if (wbuf_add(out, hostbuf + lstart, llen) != 0)
+          if (surt_add_utf8(out, hostbuf + lstart, llen) != 0)
             return -1;
           first = 0;
         }
@@ -688,7 +711,7 @@ static int surt_canon(const char *url, wbuf *out) {
     const char *frag = authend;
     while (*frag != '\0' && *frag != '#')
       frag++;
-    if (wbuf_add(out, authend, (size_t) (frag - authend)) != 0)
+    if (surt_add_utf8(out, authend, (size_t) (frag - authend)) != 0)
       return -1;
   }
   return 0;

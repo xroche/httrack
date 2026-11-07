@@ -700,6 +700,11 @@ static int st_warc_surt(httrackp *opt, int argc, char **argv) {
       {"http://[2001:db8::1]/w", "[2001:db8::1])/w"},
       {"http://sub.a.example.co.uk/deep?x=1#frag",
        "uk,co,example,a,sub)/deep?x=1"},
+      {"http://example.com/caf\xe9", "com,example)/caf%E9"},
+      {"http://example.com/caf\xc3\xa9", "com,example)/caf\xc3\xa9"},
+      {"http://example.com/d\xed\xa0\x80z", "com,example)/d%ED%A0%80z"},
+      {"http://example.com/tr\xe2\x82", "com,example)/tr%E2%82"},
+      {"http://ex\xe9.com/", "com,ex%E9)/"},
   };
 
   int err = 0;
@@ -1098,7 +1103,7 @@ static int st_warc_cdx_utf8(httrackp *opt, int argc, char **argv) {
   unsigned char *cdx;
   size_t cdx_len = 0, i;
   hts_boolean saved_cdx;
-  int err = 0, nlines = 0, nbad = 0, ngood = 0;
+  int err = 0, nlines = 0, nescaped = 0, nverbatim = 0;
   const char *lp, *cend;
 
   if (argc < 1) {
@@ -1131,24 +1136,23 @@ static int st_warc_cdx_utf8(httrackp *opt, int argc, char **argv) {
 
     if (end != lp) {
       nlines++;
-      /* The SURT key keeps the raw bytes; only the JSON must be UTF-8. */
-      if (json == NULL || !hts_isStringUTF8(json, (size_t) (end - json))) {
-        fprintf(stderr, "warc-cdx-utf8: line %d JSON is not UTF-8\n", nlines);
+      if (json == NULL || !hts_isStringUTF8(lp, (size_t) (end - lp))) {
+        fprintf(stderr, "warc-cdx-utf8: line %d is not UTF-8\n", nlines);
         err = 1;
       } else if (warc_memstr(json, "/caf\\ufffd\"", (size_t) (end - json),
                              11) != NULL) {
-        nbad++;
+        nescaped++;
       } else if (warc_memstr(json, "/caf\xc3\xa9\"", (size_t) (end - json),
                              7) != NULL) {
-        ngood++;
+        nverbatim++;
       }
     }
     lp = end < cend ? end + 1 : cend;
   }
   freet(cdx);
-  if (nlines != 2 || nbad != 1 || ngood != 1) {
+  if (nlines != 2 || nescaped != 1 || nverbatim != 1) {
     fprintf(stderr, "warc-cdx-utf8: %d lines, %d escaped, %d verbatim\n",
-            nlines, nbad, ngood);
+            nlines, nescaped, nverbatim);
     err = 1;
   }
   printf("warc-cdx-utf8: %s\n", err ? "FAIL" : "OK");
