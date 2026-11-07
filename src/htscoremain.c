@@ -1131,9 +1131,10 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                              StringBuff(opt->path_log), "hts-cache/old.txt"));
             {
-              static const char *const damaged[] = {"hts-cache/damaged.zip",
-                                                    "hts-cache/damaged.lst",
-                                                    "hts-cache/damaged.txt"};
+              static const char *const damaged[] = {
+                  "hts-cache/damaged.zip", "hts-cache/damaged.lst",
+                  "hts-cache/damaged.txt", "hts-cache/readme.txt",
+                  "hts-cache/repair.zip"};
               size_t i;
 
               for (i = 0; i < sizeof(damaged) / sizeof(damaged[0]); i++) {
@@ -1156,6 +1157,28 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                              StringBuff(opt->path_log),
                              "hts-in_progress.lock"));
+            {
+              DIR *const dir =
+                  opendir(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                  StringBuff(opt->path_log), CACHE_REFNAME));
+              struct dirent *entry;
+
+              while (dir != NULL && (entry = readdir(dir)) != NULL) {
+                if (entry->d_name[0] != '\0' && entry->d_name[0] != '.') {
+                  char rel[HTS_URLMAXSIZE];
+
+                  if (snprintf(rel, sizeof(rel), "%s/%s", CACHE_REFNAME,
+                               entry->d_name) < (int) sizeof(rel))
+                    (void) UNLINK(fconcat(OPT_GET_BUFF(opt),
+                                          OPT_GET_BUFF_SIZE(opt),
+                                          StringBuff(opt->path_log), rel));
+                }
+              }
+              if (dir != NULL)
+                (void) closedir(dir);
+            }
+            RMDIR(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                          StringBuff(opt->path_log), CACHE_REFNAME));
             RMDIR(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                           StringBuff(opt->path_log), "hts-cache"));
             //
