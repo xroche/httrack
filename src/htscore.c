@@ -779,6 +779,19 @@ static const char *bundle_jar_file(httrackp *opt, char buff[CATBUFF_SIZE]) {
   return fconcat(buff, CATBUFF_SIZE, StringBuff(opt->path_log), "cookies.txt");
 }
 
+/* Does a start URL lack a scheme? A "//host" seed keeps its old prefix. */
+static hts_boolean seed_needs_scheme(const char *url) {
+  return !link_has_authority(url) || strncmp(url, "//", 2) == 0;
+}
+
+/* Append one start URL and its newline, defaulting to http://. */
+static void seed_append(htsbuff *primarybuff, const char *url) {
+  if (seed_needs_scheme(url))
+    htsbuff_cat(primarybuff, "http://");
+  htsbuff_cat(primarybuff, url);
+  htsbuff_cat(primarybuff, "\n");
+}
+
 /* Load the login bundles, and add their url lines to the start URLs in
  *primary, which grows. HTS_FALSE after saying why the run must stop. */
 static hts_boolean bundle_start(httrackp *opt, char **primary,
@@ -811,10 +824,7 @@ static hts_boolean bundle_start(httrackp *opt, char **primary,
     primarybuff->cap += room;
   }
   for (i = 0; (extra = hts_bundle_url(opt, i)) != NULL; i++) {
-    if (strstr(extra, ":/") == NULL)
-      htsbuff_cat(primarybuff, "http://");
-    htsbuff_cat(primarybuff, extra);
-    htsbuff_cat(primarybuff, "\n");
+    seed_append(primarybuff, extra);
   }
   return HTS_TRUE;
 }
@@ -1138,10 +1148,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
           continue;
         }
 
-        if (strstr(url, ":/") == NULL)
-          htsbuff_cat(&primarybuff, "http://");
-        htsbuff_cat(&primarybuff, url);
-        htsbuff_cat(&primarybuff, "\n");
+        seed_append(&primarybuff, url);
       }
     } // while
     opt->user_filters = filptr; /* everything so far came from the user */
@@ -1151,7 +1158,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
       char BIGSTK url[HTS_URLMAXSIZE * 2];
       lien_adrfil af;
 
-      if (strstr(StringBuff(opt->why_url), ":/") == NULL)
+      if (seed_needs_scheme(StringBuff(opt->why_url)))
         snprintf(url, sizeof(url), "http://%s", StringBuff(opt->why_url));
       else
         strcpybuff(url, StringBuff(opt->why_url));
@@ -1245,11 +1252,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
           }
           if (line[0]) {
             n++;
-            if (strstr(line, ":/") == NULL) {
-              htsbuff_cat(&primarybuff, "http://");
-            }
-            htsbuff_cat(&primarybuff, line);
-            htsbuff_cat(&primarybuff, "\n");
+            seed_append(&primarybuff, line);
           }
         }
         hts_log_print(opt, LOG_NOTICE, "%d links added from %s", n,
