@@ -969,9 +969,6 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
         hts_wizard_prompt_url(tempo, sizeof(tempo), adr, fil);
         s = RUN_CALLBACK1(opt, query3, tempo);
         n = hts_wizard_parse_reply(s);
-        if (n == -999 && strnotempty(s) && *s != '!')
-          hts_log_print(opt, LOG_WARNING,
-                        "wizard: unreadable reply, link refused");
         io_flush;
       } else {                  // lien primaire: autoriser répertoire entier       
         if (!force_mirror) {
