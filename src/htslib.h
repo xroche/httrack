@@ -928,16 +928,15 @@ HTS_STATIC int strfield(const char *f, const char *s) {
 
 /* clang-format on */
 
+/* Compare a and b ignoring ASCII case, like strcmp: 0 only when both match
+   to the end. */
 HTS_STATIC int strcmpnocase(const char *a, const char *b) {
-  while(*a) {
-    int cmp = hichar(*a) - hichar(*b);
+  for (;; a++, b++) {
+    const int cmp = hichar(*a) - hichar(*b);
 
-    if (cmp != 0)
+    if (cmp != 0 || *a == '\0')
       return cmp;
-    a++;
-    b++;
   }
-  return 0;
 }
 
 #ifdef _WIN32

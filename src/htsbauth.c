@@ -280,11 +280,19 @@ int cookie_add(t_cookie *cookie, const char *cook_name, const char *cook_value,
 }
 
 /* Is the record at rec host-only? Field 1 is the Netscape include-subdomains
-   flag, so only an explicit FALSE says so. */
+   flag, and only TRUE, in any case, widens the cookie, as in curl. */
 static hts_boolean cookie_is_host_only(const char *rec) {
   char buffer[8192];
 
-  return strcmpnocase(cookie_get(buffer, rec, 1), "FALSE") == 0;
+  return strcmpnocase(cookie_get(buffer, rec, 1), "TRUE") != 0;
+}
+
+/* Is the record at rec Secure? Field 3 is the flag, and only FALSE, in any
+   case, lets the cookie go out over http. */
+static hts_boolean cookie_is_secure(const char *rec) {
+  char buffer[8192];
+
+  return strcmpnocase(cookie_get(buffer, rec, 3), "FALSE") != 0;
 }
 
 /* Do two jar domains name the same domain? The leading dot is the Netscape
@@ -294,8 +302,7 @@ static hts_boolean cookie_same_domain(const char *a, const char *b) {
     a++;
   if (b[0] == '.')
     b++;
-  // strcmpnocase stops at the end of a, so "a.com" would match "a.com.evil"
-  return strlen(a) == strlen(b) && strcmpnocase(a, b) == 0;
+  return strcmpnocase(a, b) == 0;
 }
 
 /* A host may hold this many records, or this many bytes of them (a quarter of
@@ -558,7 +565,7 @@ hts_boolean cookie_is_secure_record(t_cookie *cookie, const char *cook_name,
     char other[8192];
 
     if (strcmp(cookie_get(other, rec, 5), cook_name) != 0 ||
-        strcmpnocase(cookie_get(other, rec, 3), "TRUE") != 0)
+        !cookie_is_secure(rec))
       continue;
     if ((cookie_domain_match(rec_dom, new_dom) ||
          cookie_domain_match(new_dom, rec_dom)) &&
@@ -726,12 +733,11 @@ static int64_t cookie_record_expiry(const char *rec) {
 
 /* See htsbauth.h. */
 hts_boolean cookie_sendable(const char *rec, hts_boolean https, int64_t now) {
-  char buffer[8192];
   const int64_t expires = cookie_record_expiry(rec);
 
   if (expires != 0 && expires <= now)
     return HTS_FALSE;
-  return https || strcmpnocase(cookie_get(buffer, rec, 3), "TRUE") != 0;
+  return https || !cookie_is_secure(rec);
 }
 
 // rechercher cookie à partir de la position s (par exemple s=cookie.data)
@@ -1334,7 +1340,7 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, text_src *src,
               cookie_find_exact(seen->data, cook_name, host, path) != NULL;
 
           attr.host_only = cookie_is_host_only(rec);
-          attr.secure = strcmpnocase(cookie_get(buffer, rec, 3), "TRUE") == 0;
+          attr.secure = cookie_is_secure(rec);
           attr.http_only = is_httponly || tabs == 7;
           attr.expires = cookie_record_expiry(rec);
           // an expired one is skipped, because a browser drops it too

@@ -2060,6 +2060,46 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
   assertf(sprintfbuff(fpath, "%s/", argv[0]));
   assertf(sprintfbuff(file, "%scookies.txt", fpath));
   assertf(sprintfbuff(saved, "%ssaved.txt", fpath));
+  /* A flag other than TRUE or FALSE, in any case, reads as host-only and
+     Secure. */
+  {
+    static const struct {
+      const char *line, *to, *pair;
+      hts_boolean want;
+    } flags[] = {
+        {"flag.test\t\t/\tFALSE\t0\th0\t1", "sub.flag.test", "h0=1", HTS_FALSE},
+        {"flag.test\tT\t/\tFALSE\t0\th1\t1", "sub.flag.test", "h1=1",
+         HTS_FALSE},
+        {"flag.test\tTRUEX\t/\tFALSE\t0\th2\t1", "sub.flag.test", "h2=1",
+         HTS_FALSE},
+        {"flag.test\ttrue\t/\tFALSE\t0\th3\t1", "sub.flag.test", "h3=1",
+         HTS_TRUE},
+        {"sec.test\tFALSE\t/\t\t0\ts0\t1", "sec.test", "s0=1", HTS_FALSE},
+        {"sec.test\tFALSE\t/\tT\t0\ts1\t1", "sec.test", "s1=1", HTS_FALSE},
+        {"sec.test\tFALSE\t/\tFALSEX\t0\ts2\t1", "sec.test", "s2=1", HTS_FALSE},
+        {"sec.test\tFALSE\t/\tfalse\t0\ts3\t1", "sec.test", "s3=1", HTS_TRUE},
+        {"sec.test\tFALSE\t/\tT\t0\ts4\t1", "https://sec.test", "s4=1",
+         HTS_TRUE},
+    };
+
+    FILE *fp;
+
+    for (i = 0; i < sizeof(flags) / sizeof(flags[0]); i++) {
+      fp = FOPEN(file, "wb");
+      assertf(fp != NULL);
+      fprintf(fp, "%s\n", flags[i].line);
+      fclose(fp);
+      jar.data[0] = '\0';
+      assertf(cookie_load(NULL, &jar, fpath, "cookies.txt") == 0);
+      http_cookie_header(&jar, flags[i].to, "/", hdr, sizeof(hdr));
+      if (cookie_sent(hdr, flags[i].pair) != flags[i].want) {
+        printf("%s: jar line %s %s sent to %s\n", LABEL, flags[i].line,
+               flags[i].want ? "not" : "wrongly", flags[i].to);
+        err = 1;
+      }
+    }
+    (void) UNLINK(file);
+  }
   {
     static const char *const kept[] = {
         ".load.test\tTRUE\t/\tFALSE\t0\tdom\t1" LF,
