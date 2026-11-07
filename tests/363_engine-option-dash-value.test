@@ -110,14 +110,14 @@ echo OK
 printf '[every string option takes a dash value] ..\t'
 for name in accept bind disable-module from lang language path proxy referer \
     sitemap-url structure user-structure usercommand userdef-cmd why; do
-    parse "--${name}" '-x%n'
-    accepted "--${name} -x%n"
-    parse "--${name}=-x%n"
-    accepted "--${name}=-x%n"
+    parse "--${name}" '-my%n'
+    accepted "--${name} -my%n"
+    parse "--${name}=-my%n"
+    accepted "--${name}=-my%n"
 done
 for opt in -%R -%E -%b -%l -%a -%w -P -V -N; do
-    parse "$opt" '-x%n'
-    accepted "$opt -x%n"
+    parse "$opt" '-my%n'
+    accepted "$opt -my%n"
 done
 echo OK
 
@@ -187,6 +187,15 @@ parse -P --mirror
 refused "-P --mirror" 'Option -P takes a value' '"--mirror" names an option'
 noparam "-O -q" -O -q
 refused "-O -q" 'Option -O takes a value' '"-q" names an option'
+# So does an option glued to its number or to one more option.
+noparam "-O -r6" -O -r6
+refused "-O -r6" '"-r6" names an option'
+parse -P -c8
+refused "-P -c8" '"-c8" names an option'
+parse --proxy -qO
+refused "--proxy -qO" '"-qO" names an option'
+parse -P -archive
+accepted "-P -archive"
 # A value option still refuses a real option name (#1179).
 parse --assume -q
 refused "--assume -q" 'Option --assume takes a value' '"-q" names an option'

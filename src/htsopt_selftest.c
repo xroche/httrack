@@ -944,9 +944,11 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   EXPANDS("-N ", "-N", "");
   assertf(used == 2);
   /* a template may open with '-', but not name an option or be missing */
-  EXPANDS("-N -r1", "-N", "-r1");
+  EXPANDS("-N -my%n", "-N", "-my%n");
   assertf(used == 2);
   EXPANDS("-N", "-N", "-q");
+  assertf(used == 1);
+  EXPANDS("-N", "-N", "-r1");
   assertf(used == 1);
   EXPANDS("-N", "-N", NULL);
   assertf(used == 1);

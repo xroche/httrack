@@ -307,14 +307,34 @@ const char *hts_optalias[][4] = {
 };
 /* clang-format on */
 
-/* Whether TOKEN is an option name, rather than a value that begins with '-'.
-   Only the spellings optalias_check() resolves: a cluster (-c8) is a value. */
+/* Is TOKEN a short option glued to its number or to one more option (-r6,
+   -%c0.5, -qO, -#test)? A longer cluster (-archive) is taken as a value. */
+static hts_boolean optreal_glued(const char *token) {
+  char name[8];
+  size_t at = 1;
+  int pieces = 0;
+
+  if (token[0] != '-' || token[1] == '-')
+    return HTS_FALSE;
+  while (optcluster_next(token, &at, name, sizeof(name))) {
+    if (optreal_find(name) < 0)
+      return HTS_FALSE;
+    pieces++;
+    at += strspn(token + at, "0123456789");
+    while ((token[at] == '.' || token[at] == ',') &&
+           isdigit((unsigned char) token[at + 1]))
+      at += 1 + strspn(token + at + 1, "0123456789");
+  }
+  return pieces > 0 && (pieces <= 2 || token[1] == '#');
+}
+
+/* Is TOKEN an option name, rather than a value that begins with '-'? */
 static hts_boolean optreal_or_alias(const char *token) {
   char name[64];
   const char *eq;
   size_t len;
 
-  if (optreal_find(token) >= 0)
+  if (optreal_find(token) >= 0 || optreal_glued(token))
     return HTS_TRUE;
   if (token[0] != '-' || token[1] != '-')
     return HTS_FALSE;
