@@ -660,8 +660,9 @@ HTSEXT_API char *jump_normalized(char *);
 
 HTSEXT_API const char *jump_normalized_const(const char *);
 
-/** Return a pointer (into the input) to the ":port" part of a URL host, or NULL
-    if there is no explicit port. Handles bracketed IPv6 literals. */
+/** Return a pointer (into the input) to the ":port" part of a URL's authority,
+    or NULL if there is no explicit port. A ':' in the path, query or fragment
+    is never returned. Handles bracketed IPv6 literals. */
 HTSEXT_API char *jump_toport(char *);
 
 HTSEXT_API const char *jump_toport_const(const char *);

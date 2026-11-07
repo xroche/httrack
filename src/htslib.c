@@ -5176,17 +5176,16 @@ hts_boolean hts_ssl_check_cert(SSL *ssl, const char *url_adr) {
 }
 #endif
 
-// find port (:80) or NULL if not found
-// can handle IPV6 addresses
+// find the authority's port (:80) or NULL; handles IPv6 literals
 HTSEXT_API const char *jump_toport_const(const char *source) {
-  const char *a, *trytofind;
+  // start at the host jump_identification_const() picks, so callers agree
+  const char *const host = jump_identification_const(source);
+  // a ':' or ']' in the path, query or fragment is not the authority's
+  const char *const end = host + strcspn(host, "/?#");
+  const char *const bracket = strrchr_limit(host, ']', end);
+  const char *const from = bracket != NULL ? bracket : host;
 
-  a = jump_identification_const(source);
-  // last ] of the authority (http://[3ffe:b80:1234::1]:80/foo.html), bounded
-  // from a: source's own scheme "//" would end the scan before it
-  trytofind = strrchr_limit(a, ']', strchr(a, '/'));
-  a = strchr((trytofind) ? trytofind : a, ':');
-  return a;
+  return memchr(from, ':', (size_t) (end - from));
 }
 
 HTSEXT_API DECLARE_NON_CONST_VERSION(jump_toport)
