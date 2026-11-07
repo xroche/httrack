@@ -6,7 +6,9 @@
 # Three signals are compared, each normalized only where two runs of one binary
 # disagree:
 #   - every mirrored file, byte for byte. The page footer is off (-%F '')
-#     because its {date} is the only wall-clock value a mirrored page carries.
+#     because its {date} is the only wall-clock value a mirrored page carries,
+#     and the footer leg uses a template without it. The -%M archive keeps its
+#     parts but drops its Date, Message-ID and boundary, and sorts the parts.
 #   - hts-changes.json, written by --changes. It names each URL the parser
 #     found, the file it went to and its size, so a link gained or lost shows
 #     up even when no page body changed. Compared sorted, because the file
@@ -14,6 +16,9 @@
 #   - hts-log.txt, the only place a scanned-but-filtered candidate appears. The
 #     corpus carries off-host <loc> entries that are never fetched and never
 #     mirrored, so without this a change to the <loc> scanner would be invisible.
+#
+# Each binary crawls the corpus once per leg, an option set that reaches a
+# writer the default crawl never runs. The legs run in parallel.
 #
 # Dropped: the hts-cache directory, because new.zip and new.lst store mtimes
 # and doit.log carries its own timestamp. Stripped from the two kept text
@@ -41,7 +46,8 @@ die() {
 usage() {
     cat <<'EOF'
 Crawl tools/parser-corpus/ with a released httrack and with the working tree's,
-then diff the two mirrors. Exit 0 when they agree, 1 when they differ, 2 on a
+once per leg, then diff the two mirrors of each leg. A leg is an option set
+such as -K or -%M. Exit 0 when every leg agrees, 1 when one differs, 2 on a
 harness failure. The header comment of this script lists what the diff drops.
 
 Everything is built and crawled under a temporary directory, which is removed
@@ -50,9 +56,9 @@ on exit unless --keep is given. A SIGKILL leaves it behind.
 Options:
   --baseline REF  git ref to build the baseline from (default: newest X.Y.Z tag)
   --keep          keep the temporary directory, to read the two mirrors
-  --self-check    the tree against itself, which must be clean, then against a
-                  mutant that finds more links and one that finds fewer, each of
-                  which must be reported
+  --self-check    the tree against itself, which must be clean on every leg,
+                  then against a mutant that finds more links and one that finds
+                  fewer, each of which every leg must report
 EOF
 }
 
@@ -207,20 +213,65 @@ expand_corpus() {
     done <"$list"
 }
 
-# Crawl the running server into $workdir/mirror-$2 with the binary $1. Reads
-# base_url, entry and sitemap_args, all set below.
-crawl() {
-    local bin=$1 leg=$2 dir
-    dir="$workdir/mirror-$leg"
-    rm -rf "$dir"
-    mkdir -p "$dir"
+# Every leg's name. leg_opts below gives the options each one adds.
+legs="default K K3 K4 x P0 Z M footer N update"
+
+# Set leg_args to the options leg $1 adds to the default crawl.
+leg_opts() {
+    case "$1" in
+    default) leg_args=() ;;
+    K | K3 | K4) leg_args=("-$1") ;;
+    x) leg_args=(-x) ;;
+    P0) leg_args=(-%P0) ;;
+    Z) leg_args=(-%Z) ;;
+    M) leg_args=(-%M) ;;
+    # Every field but {date}, {lastmodified} and {version}, which differ
+    # between runs or between the two builds.
+    footer) leg_args=(-%F '<!-- {url} {addr} {path} {mime} {charset} {status} {size} -->') ;;
+    N) leg_args=(-N '%h%p/%n-%t-%N') ;;
+    # Crawled with no extra option, then updated and continued in place.
+    update) leg_args=() ;;
+    *) die "no such leg: $1" ;;
+    esac
+}
+
+# Run httrack $1 in directory $2 with leg $3's options, appending its output to
+# $4. Any further arguments are passed on.
+run_httrack() {
+    local bin=$1 dir=$2 leg=$3 log=$4
+    shift 4
+    leg_opts "$leg"
     # shellcheck disable=SC2086 # sitemap_args is a deliberate split
     (cd "$dir" && "$bin" "$base_url$entry" -O . -q -%F '' --changes \
-        $sitemap_args) \
-        >"$workdir/crawl-$leg.out" 2>&1 || {
-        tail -20 "$workdir/crawl-$leg.out" >&2
-        die "the $leg crawl failed"
-    }
+        $sitemap_args ${leg_args[@]+"${leg_args[@]}"} "$@") >>"$log" 2>&1
+}
+
+# Crawl the running server into $workdir/mirror-$2-<leg> with the binary $1,
+# one leg per background job. Reads base_url, entry and sitemap_args.
+crawl() {
+    local bin=$1 name=$2 leg dir log pids="" pid failed=""
+    for leg in $legs; do
+        dir="$workdir/mirror-$name-$leg"
+        log="$workdir/crawl-$name-$leg.out"
+        rm -rf "$dir"
+        mkdir -p "$dir"
+        : >"$log"
+        if [ "$leg" = update ]; then
+            (run_httrack "$bin" "$dir" "$leg" "$log" &&
+                run_httrack "$bin" "$dir" "$leg" "$log" --update &&
+                run_httrack "$bin" "$dir" "$leg" "$log" --continue) &
+        else
+            run_httrack "$bin" "$dir" "$leg" "$log" &
+        fi
+        pids="$pids $!:$leg"
+    done
+    for pid in $pids; do
+        wait "${pid%%:*}" || failed="$failed ${pid#*:}"
+    done
+    for leg in $failed; do
+        tail -20 "$workdir/crawl-$name-$leg.out" >&2
+    done
+    [ -z "$failed" ] || die "the $name crawl failed on leg(s):$failed"
 }
 
 # Flatten hts-changes.json into one line per entry. The header comment says what
@@ -237,10 +288,30 @@ for state in ("new", "changed", "unchanged", "gone"):
         print("entry", state, e.get("url"), e.get("file"), e.get("size"))
 '
 
+# Rewrite the -%M archive $1 in place: drop its Date and Message-ID, which
+# carry the clock, name its boundary BOUNDARY, and sort the parts, which are
+# written in completion order.
+mht_py='
+import re, sys
+path = sys.argv[1]
+data = open(path, "rb").read()
+m = re.search(rb"boundary=\"([^\"]+)\"", data)
+if not m:
+    sys.exit("no boundary in " + path)
+data = data.replace(m.group(1), b"BOUNDARY")
+body, end, tail = data.rpartition(b"--BOUNDARY--")
+if not end:
+    sys.exit("no closing boundary in " + path)
+head, *parts = body.split(b"--BOUNDARY\r\n")
+head = re.sub(rb"(?m)^(Date|Message-ID): [^\n]*\n", b"", head)
+parts = b"".join(b"--BOUNDARY\r\n" + p for p in sorted(parts))
+open(path, "wb").write(head + parts + end + tail)
+'
+
 # Snapshot the mirror at $1 into $2, dropping what two runs of one binary
 # disagree on. The header comment says what goes and why.
 normalize() {
-    local src=$1 dst=$2
+    local src=$1 dst=$2 f
     rm -rf "$dst"
     mkdir -p "$dst/files"
     (cd "$src" && tar -cf - .) | (cd "$dst/files" && tar -xf -)
@@ -251,14 +322,19 @@ normalize() {
             die "cannot read $dst/files/hts-changes.json"
         rm -f "$dst/files/hts-changes.json"
     fi
-    # The generated index credits the engine by version, so without this a
-    # release branch's own bump reads as a parser difference. The version alone
-    # goes, which leaves a real change to that line visible.
-    if [ -f "$dst/files/index.html" ]; then
+    # The generated index and the -x error page credit the engine by version,
+    # so without this a release branch's own bump reads as a parser difference.
+    # The version alone goes, which leaves a real change to that line visible.
+    for f in index.html external.html; do
+        [ -f "$dst/files/$f" ] || continue
         sed -e 's|\(Website Copier/\)[^ ]*|\1VERSION|g' \
-            "$dst/files/index.html" >"$dst/files/index.html.pd" ||
-            die "cannot normalize $dst/files/index.html"
-        mv "$dst/files/index.html.pd" "$dst/files/index.html"
+            "$dst/files/$f" >"$dst/files/$f.pd" ||
+            die "cannot normalize $dst/files/$f"
+        mv "$dst/files/$f.pd" "$dst/files/$f"
+    done
+    if [ -f "$dst/files/index.mht" ]; then
+        python3 -c "$mht_py" "$dst/files/index.mht" ||
+            die "cannot normalize $dst/files/index.mht"
     fi
     : >"$dst/LOG"
     if [ -f "$dst/files/hts-log.txt" ]; then
@@ -303,6 +379,19 @@ compare() {
     return "$rc"
 }
 
+# Compare crawl $1 against crawl $2 on every leg, and set legs_differ to the
+# legs where they differ. Returns 1 when one does.
+compare_legs() {
+    local leg
+    legs_differ=
+    for leg in $legs; do
+        echo
+        echo "parser-diff: leg $leg"
+        compare "$1-$leg" "$2-$leg" || legs_differ="$legs_differ $leg"
+    done
+    [ -z "$legs_differ" ]
+}
+
 docroot="$workdir/docroot"
 mkdir -p "$docroot"
 (cd "$corpus" && tar -cf - .) | (cd "$docroot" && tar -xf -)
@@ -345,7 +434,12 @@ release)
     [ -r "$base_httrack" ] || die "no baseline binary at $base_httrack"
     crawl "$base_httrack" baseline
     crawl "$tree_httrack" tree
-    compare baseline tree
+    rc=0
+    compare_legs baseline tree || rc=1
+    echo
+    [ "$rc" = 0 ] && echo "parser-diff: no leg differs" ||
+        echo "parser-diff: legs that differ:$legs_differ"
+    exit "$rc"
     ;;
 self-check)
     # Each mutant edits one hts_detect row, the table deciding whether an
@@ -360,7 +454,19 @@ self-check)
     crawl "$tree_httrack" reference
     crawl "$tree_httrack" rerun
     noise_rc=0
-    compare reference rerun || noise_rc=1
+    compare_legs reference rerun || noise_rc=1
+    noisy_legs=$legs_differ
+
+    # A leg whose mirror equals the default one reaches no writer of its own,
+    # so it would only repeat the default leg's verdict.
+    same_legs=
+    for leg in $legs; do
+        [ "$leg" = default ] && continue
+        if diff -r "$workdir/norm-reference-default" \
+            "$workdir/norm-reference-$leg" >/dev/null 2>&1; then
+            same_legs="$same_legs $leg"
+        fi
+    done
 
     missed=0
     for direction in widen narrow; do
@@ -388,11 +494,19 @@ self-check)
         mv "$mutant/$mutant_file.pd" "$mutant/$mutant_file"
         mutant_httrack=$(build_tree "$mutant" "$workdir/bld-$direction")
         crawl "$mutant_httrack" "$direction"
-        rc=0
-        compare reference "$direction" || rc=1
-        [ "$rc" = 1 ] || missed=$((missed + 1))
-        printf 'self-check: %-23s ... %s\n' "the $direction mutant" \
-            "$([ "$rc" = 1 ] && echo reported || echo MISSED)"
+        # Every leg must report the mutant, so the ones that do are not a pass.
+        mutant_missed=
+        for leg in $legs; do
+            echo
+            echo "parser-diff: leg $leg"
+            if compare "reference-$leg" "$direction-$leg"; then
+                mutant_missed="$mutant_missed $leg"
+            fi
+        done
+        [ -z "$mutant_missed" ] || missed=$((missed + 1))
+        printf 'self-check: %-25s ... %s\n' "the $direction mutant" \
+            "$([ -z "$mutant_missed" ] && echo reported ||
+                echo "MISSED on$mutant_missed")"
     done
 
     # A bumped version must read as no change at all. The two mutants above
@@ -412,14 +526,18 @@ self-check)
     [ -r "$bumped_httrack" ] || die "no version binary at $bumped_httrack"
     crawl "$bumped_httrack" version
     version_rc=0
-    compare reference version || version_rc=1
+    compare_legs reference version || version_rc=1
+    version_legs=$legs_differ
 
     echo
-    printf 'self-check: %-23s ... %s\n' 'the tree against itself' \
-        "$([ "$noise_rc" = 0 ] && echo clean || echo NOISY)"
-    printf 'self-check: %-23s ... %s\n' 'a bumped version' \
-        "$([ "$version_rc" = 0 ] && echo quiet || echo REPORTED)"
+    printf 'self-check: %-25s ... %s\n' 'the tree against itself' \
+        "$([ "$noise_rc" = 0 ] && echo clean || echo "NOISY on$noisy_legs")"
+    printf 'self-check: %-25s ... %s\n' 'every leg against default' \
+        "$([ -z "$same_legs" ] && echo distinct || echo "SAME on$same_legs")"
+    printf 'self-check: %-25s ... %s\n' 'a bumped version' \
+        "$([ "$version_rc" = 0 ] && echo quiet || echo "REPORTED on$version_legs")"
     [ "$noise_rc" = 0 ] || die "the tree does not compare clean against itself"
+    [ -z "$same_legs" ] || die "leg(s)$same_legs mirror the corpus as the default leg does"
     [ "$version_rc" = 0 ] || die "a version bump alone is reported as a difference"
     [ "$missed" = 0 ] || die "$missed mutant(s) went unreported"
     echo "self-check: PASS"
