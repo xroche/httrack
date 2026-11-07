@@ -218,7 +218,7 @@ HTSEXT_API hts_boolean hts_wizard_host_scope(const char *question, int k,
   if (slash != NULL && slash < end)
     end = slash;
   /* the port belongs to the filter, so keep it and only bound the label walk */
-  if (port != NULL && port < end)
+  if (port != NULL)
     slash = port;
   else
     slash = end;

@@ -11,4 +11,8 @@
 <a href="//parser-offhost.invalid/a-protorel-off.html">protocol relative, off host</a>
 <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="data uri">
 <a href="ftp://parser-offhost.invalid/pub/">ftp</a>
+<a href="http://parser-offhost.invalid/p:80.html">colon in the path</a>
+<a href="http://parser-offhost.invalid/q.html?u=1:80">colon in the query</a>
+<a href="http://parser-offhost.invalid:80/d.html">default port, stripped</a>
+<a href="http://parser-offhost.invalid:8080/k.html">real port, kept</a>
 </body></html>
