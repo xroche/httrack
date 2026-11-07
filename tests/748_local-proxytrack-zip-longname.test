@@ -1,0 +1,57 @@
+#!/bin/bash
+#
+# ProxyTrack's new.zip index keeps a long entry name whole and drops one too
+# long for the engine's buffer, rather than indexing it under a clipped key.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+python=$(find_python) || skip "python3 missing"
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+# the engine's entry-name buffer is HTS_URLMAXSIZE*4+8, and names must stay
+# under its size minus 2
+host=example.com/
+kept=$host$(printf 'K%.0s' $(seq 1 $((4101 - ${#host}))))
+dropped=$host$(printf 'D%.0s' $(seq 1 $((4102 - ${#host}))))
+huge=$host$(printf 'H%.0s' $(seq 1 5000))
+
+"$python" - "$(nativepath "$dir/in.zip")" "$kept" "$dropped" "$huge" <<'EOF'
+import sys, zipfile
+
+meta = (
+    "X-In-Cache: 1\r\n"
+    "X-StatusCode: 200\r\n"
+    "X-StatusMessage: ok\r\n"
+    "Content-Type: text/html\r\n"
+    "Last-Modified: Wed, 01 Jan 2025 00:00:00 GMT\r\n"
+).encode()
+names = ["http://example.com/short", "HTTP://example.com/upper"] + sys.argv[2:]
+with zipfile.ZipFile(sys.argv[1], "w") as z:
+    for name in names:
+        zi = zipfile.ZipInfo(name)
+        zi.compress_type = zipfile.ZIP_STORED
+        zi.extra = meta
+        z.writestr(zi, b"<html>x</html>")
+EOF
+
+proxytrack --convert "$dir/out.arc" "$dir/in.zip" >"$dir/log" 2>&1 ||
+    fail "proxytrack died converting the zip: $(<"$dir/log")"
+log=$(<"$dir/log")
+grep -qF '(3 items added)' <<<"$log" ||
+    fail "expected short, upper and the 4101-byte name only: $log"
+
+urls=$(grep -a '^http://' "$dir/out.arc" | cut -d' ' -f1)
+for url in "http://example.com/short" "http://example.com/upper" "http://$kept"; do
+    grep -qxF "$url" <<<"$urls" ||
+        fail "no record for ${url:0:40}... (length ${#url})"
+done
+grep -qF 'DDDD' <<<"$urls" && fail "the 4102-byte name was indexed clipped"
+grep -qF 'HHHH' <<<"$urls" && fail "the 5000-byte name was indexed clipped"
+test "$(grep -c 'Corrupted cache entry' <<<"$log")" -eq 2 ||
+    fail "both over-long names should be reported: $log"
+exit 0
