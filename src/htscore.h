@@ -648,6 +648,9 @@ hts_boolean hts_loop_tick(struct_back *sback, httrackp *opt, int b, int ptr);
 hts_boolean hts_wait_available_socket(struct_back *sback, httrackp *opt,
                                       cache_back *cache, int ptr);
 
+/* Is this run stopping (^C, a cap, hts_request_stop) or exiting (a signal)? */
+hts_boolean hts_run_is_ending(httrackp *opt);
+
 /* Randomized inter-file pause target in [min_ms,max_ms] (#185), derived from a
    timestamp seed so it is stable within one gap and rerolls per launch. */
 int hts_pause_target_ms(TStamp seed, int min_ms, int max_ms);

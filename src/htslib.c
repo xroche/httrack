@@ -8594,8 +8594,7 @@ static void __cdecl htsdefault_pause(t_hts_callbackarg * carg, httrackp * opt,
   StringCopy(progress, StringBuff(opt->path_log));
   StringCat(progress, "hts-in_progress.lock");
   /* A stop, an exit or an abort request aimed at this run ends the wait. */
-  while (fexist_utf8(lockfile) && !hts_is_exiting(opt) &&
-         !hts_load_acquire_int(&opt->state.stop) &&
+  while (fexist_utf8(lockfile) && !hts_run_is_ending(opt) &&
          !hts_file_is_newer(StringBuff(abortlock), StringBuff(progress))) {
     Sleep(1000);
   }

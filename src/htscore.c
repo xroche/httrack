@@ -4678,6 +4678,10 @@ HTSEXT_API int hts_is_exiting(httrackp * opt) {
   return hts_load_acquire_int(&opt->state.exit_xh);
 }
 
+hts_boolean hts_run_is_ending(httrackp *opt) {
+  return hts_is_exiting(opt) || hts_load_acquire_int(&opt->state.stop);
+}
+
 // message d'erreur?
 char *hts_errmsg(httrackp * opt) {
   hts_hide_secrets(opt, opt->state._hts_errmsg, sizeof(opt->state._hts_errmsg));
