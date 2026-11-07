@@ -214,7 +214,7 @@ expand_corpus() {
 }
 
 # Every leg's name. leg_opts below gives the options each one adds.
-legs="default K K3 K4 x P0 Z M footer N update"
+legs="default K K3 K4 x P0 Z M footer N update continue"
 
 # Set leg_args to the options leg $1 adds to the default crawl.
 leg_opts() {
@@ -229,8 +229,9 @@ leg_opts() {
     # between runs or between the two builds.
     footer) leg_args=(-%F '<!-- {url} {addr} {path} {mime} {charset} {status} {size} -->') ;;
     N) leg_args=(-N '%h%p/%n-%t-%N') ;;
-    # Crawled with no extra option, then updated and continued in place.
-    update) leg_args=() ;;
+    # Crawled with no extra option, then updated, and for continue also
+    # continued, in place. Each run rewrites the log, so each needs its own leg.
+    update | continue) leg_args=() ;;
     *) die "no such leg: $1" ;;
     esac
 }
@@ -257,6 +258,9 @@ crawl() {
         mkdir -p "$dir"
         : >"$log"
         if [ "$leg" = update ]; then
+            (run_httrack "$bin" "$dir" "$leg" "$log" &&
+                run_httrack "$bin" "$dir" "$leg" "$log" --update) &
+        elif [ "$leg" = continue ]; then
             (run_httrack "$bin" "$dir" "$leg" "$log" &&
                 run_httrack "$bin" "$dir" "$leg" "$log" --update &&
                 run_httrack "$bin" "$dir" "$leg" "$log" --continue) &
@@ -352,22 +356,22 @@ normalize() {
 
 # Compare the two mirrors. Returns 1 when they differ.
 compare() {
-    local na="$workdir/norm-$1" nb="$workdir/norm-$2" leg files fetched bytes rc=0
+    local na="$workdir/norm-$1" nb="$workdir/norm-$2" side files fetched bytes rc=0
     normalize "$workdir/mirror-$1" "$na"
     normalize "$workdir/mirror-$2" "$nb"
-    for leg in "$1" "$2"; do
-        files=$(find "$workdir/norm-$leg/files" -type f | wc -l)
-        fetched=$(grep -c '^entry ' "$workdir/norm-$leg/CHANGES" || true)
+    for side in "$1" "$2"; do
+        files=$(find "$workdir/norm-$side/files" -type f | wc -l)
+        fetched=$(grep -c '^entry ' "$workdir/norm-$side/CHANGES" || true)
         [ "$files" -ge "$min_files" ] ||
-            die "the $leg mirror holds $files files, under the corpus floor of $min_files"
+            die "the $side mirror holds $files files, under the corpus floor of $min_files"
         [ "$fetched" -ge "$min_files" ] ||
-            die "the $leg crawl fetched $fetched URLs, under the corpus floor of $min_files"
-        bytes=$(find "$workdir/norm-$leg/files" -type f -exec cat {} + | wc -c)
+            die "the $side crawl fetched $fetched URLs, under the corpus floor of $min_files"
+        bytes=$(find "$workdir/norm-$side/files" -type f -exec cat {} + | wc -c)
         [ "$bytes" -ge "$min_bytes" ] ||
-            die "the $leg mirror holds $bytes bytes, under the corpus floor of $min_bytes"
-        [ -s "$workdir/norm-$leg/LOG" ] ||
-            die "the $leg mirror left an empty hts-log.txt, so the scan signal is gone"
-        echo "$leg: $files files, $fetched fetched, $bytes bytes"
+            die "the $side mirror holds $bytes bytes, under the corpus floor of $min_bytes"
+        [ -s "$workdir/norm-$side/LOG" ] ||
+            die "the $side mirror left an empty hts-log.txt, so the scan signal is gone"
+        echo "$side: $files files, $fetched fetched, $bytes bytes"
     done
     diff -ru "$na" "$nb" >"$workdir/diff-$1-$2.txt" 2>&1 || rc=1
     if [ "$rc" = 0 ]; then
@@ -408,7 +412,7 @@ if [ -f "$docroot/corpus-sitemap.xml" ]; then
 fi
 echo "parser-diff: corpus $corpus served at $base_url$entry"
 
-# Before the builds, because two legs at one commit are one binary and print
+# Before the builds, because two sides at one commit are one binary and print
 # the same "no difference" a real pass prints.
 if [ "$mode" = release ]; then
     [ -n "$baseline" ] || baseline=$(newest_tag)
@@ -417,7 +421,7 @@ if [ "$mode" = release ]; then
         die "no such ref: $baseline"
     if git -C "$srcdir" diff --quiet "$baseline" HEAD -- src &&
         git -C "$srcdir" diff --quiet HEAD -- src; then
-        die "src/ is identical at $baseline and in the tree, so both legs are one binary"
+        die "src/ is identical at $baseline and in the tree, so both sides are one binary"
     fi
 fi
 
@@ -516,10 +520,14 @@ self-check)
     echo "parser-diff: planting a version bump in a copy of the tree"
     bumped="$workdir/src-version"
     copy_tree "$srcdir" "$bumped"
-    hits=$(grep -c '^#define HTTRACK_VERSION ' "$bumped/src/htsglobal.h" || true)
-    [ "$hits" = 1 ] ||
-        die "HTTRACK_VERSION is defined $hits times in src/htsglobal.h, not once"
-    sed 's|^#define HTTRACK_VERSION .*$|#define HTTRACK_VERSION "9.99-9"|' \
+    # A release bumps both macros, and the footer's {version} reads the second.
+    for macro in HTTRACK_VERSION HTTRACK_VERSIONID; do
+        hits=$(grep -c "^#define $macro " "$bumped/src/htsglobal.h" || true)
+        [ "$hits" = 1 ] ||
+            die "$macro is defined $hits times in src/htsglobal.h, not once"
+    done
+    sed -e 's|^#define HTTRACK_VERSION .*$|#define HTTRACK_VERSION "9.99-9"|' \
+        -e 's|^#define HTTRACK_VERSIONID .*$|#define HTTRACK_VERSIONID "9.99.9"|' \
         "$bumped/src/htsglobal.h" >"$bumped/src/htsglobal.h.pd"
     mv "$bumped/src/htsglobal.h.pd" "$bumped/src/htsglobal.h"
     bumped_httrack=$(build_tree "$bumped" "$workdir/bld-version")
