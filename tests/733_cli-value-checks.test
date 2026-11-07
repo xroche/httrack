@@ -1,0 +1,66 @@
+#!/bin/bash
+#
+# --warc-max-size and --connection-per-second refuse a bad value with a
+# non-zero exit before any crawl.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_clival.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${tmp}"
+
+echo '<html><body>hello</body></html>' >"${tmp}/page.html"
+out=${tmp}/out
+
+crawl() {
+    rm -rf "${out}"
+    mkdir -p "${out}"
+    RC=0
+    httrack "file://${tmp}/page.html" -O "${out}" --quiet -n "$@" \
+        >"${tmp}/log" 2>&1 || RC=$?
+}
+
+refused() { # refused MESSAGE ARG...
+    local msg=$1
+    shift
+    crawl "$@"
+    { test "${RC}" -ne 0 && test "${RC}" -ne 134 && test "${RC}" -ne 139 && test "${RC}" -ne 136; } ||
+        fail_dump "$* not refused (exit ${RC})" "${tmp}/log"
+    grep -q "${msg}" "${tmp}/log" ||
+        fail_dump "$* refused without ${msg}" "${tmp}/log"
+    test -z "$(find "${out}" -name 'page.html' 2>/dev/null)" ||
+        fail_dump "$* still mirrored" "${tmp}/log"
+}
+
+accepted() {
+    crawl "$@"
+    assert_eq 0 "${RC}" "$* exited"
+    test -n "$(find "${out}" -name 'page.html' 2>/dev/null)" ||
+        fail_dump "$* mirrored nothing" "${tmp}/log"
+}
+
+accepted --warc-max-size 1048576
+accepted --warc-max-size " 10 "
+accepted -%c0
+accepted -%c0.000001
+accepted -%c0.5
+accepted --connection-per-second=0.5
+
+W='warc-max-size needs a non-negative number'
+refused "warc-max-size needs a blank space and a size" --warc-max-size=-5
+for v in abc 10X +5 "" 99999999999999999999; do
+    refused "${W}" "--warc-max-size=${v}"
+    refused "${W}" --warc-max-size "${v}"
+done
+
+C='connection-per-second needs a rate of 0 or at least 0.000001'
+refused "${C}" -%c0.0000001
+refused "${C}" -%c1e-7
+refused "${C}" -%cnan
+refused "${C}" -%cabc
+refused "${C}" -%c
+refused "${C}" -%c1e99
+refused "${C}" -%c1000000000000000000000000000000000000000

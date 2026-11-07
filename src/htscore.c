@@ -4344,7 +4344,9 @@ int back_pluggable_sockets_strict(struct_back * sback, httrackp * opt) {
       HTS_STAT.last_request ? HTS_STAT.last_request : HTS_STAT.last_connect;
     TStamp cTime = mtime_local();
     TStamp lap = (cTime - opTime);
-    TStamp minLap = (TStamp) (1000.0 / opt->maxconn);
+    /* floor the rate: the quotient must fit TStamp for any caller's value */
+    TStamp minLap =
+        (TStamp) (1000.0 / (opt->maxconn >= 1e-6f ? opt->maxconn : 1e-6f));
 
     if (lap < minLap) {
       n = 0;
