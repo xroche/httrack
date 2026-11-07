@@ -42,6 +42,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsio.h"
 #include "htsthread.h"
 #include "htscrashtest.h"
+#include "htsencoding.h"
 
 #include <limits.h>
 #include <stdint.h>
@@ -501,10 +502,34 @@ hts_boolean ftp_split_hostport(const char *adr, char *host, size_t host_size,
   return HTS_TRUE;
 }
 
+/* Percent-decode src[0..len) into dst; HTS_FALSE if it does not fit or
+   decodes to a control byte, which would inject an FTP command. */
+static hts_boolean ftp_decode_userinfo(const char *src, size_t len, char *dst,
+                                       size_t dst_size) {
+  size_t i, j = 0;
+
+  for (i = 0; i < len; i++) {
+    int h = -1;
+
+    if (j >= dst_size - 1)
+      return HTS_FALSE;               /* a clipped name is another account's */
+    if (src[i] == '%' && i + 2 < len) /* both hex digits in this field */
+      h = hts_ehex(&src[i + 1]);
+    if (h >= 0) {
+      dst[j++] = (char) h;
+      i += 2;
+    } else {
+      dst[j++] = src[i];
+    }
+  }
+  dst[j] = '\0';
+  return hts_is_control_free_sized(dst, j);
+}
+
 /* Split a hostile-URL "user[:pass]@" prefix (see htsftp.h). */
 hts_boolean ftp_split_userpass(const char *src, const char *end, char *user,
                                size_t user_size, char *pass, size_t pass_size) {
-  size_t len = 0, user_len, pass_len;
+  size_t len = 0, user_len;
   const char *colon;
 
   assertf(user_size > 0 && pass_size > 0); /* the size-1 math underflows on 0 */
@@ -513,17 +538,14 @@ hts_boolean ftp_split_userpass(const char *src, const char *end, char *user,
   user[0] = pass[0] = '\0'; // fail safe for a caller that ignores the result
   while (len < (size_t) (end - src) - 1 && src[len] != '\0')
     len++;
-  colon = memchr(src, ':', len);
+  colon = memchr(src, ':', len); /* the raw colon, so %3A stays in the name */
   user_len = colon != NULL ? (size_t) (colon - src) : len;
-  pass_len = colon != NULL ? len - user_len - 1 : 0;
-  /* a clipped name is another account's, so refuse rather than log in as it */
-  if (user_len >= user_size || pass_len >= pass_size)
+  if (!ftp_decode_userinfo(src, user_len, user, user_size) ||
+      (colon != NULL &&
+       !ftp_decode_userinfo(colon + 1, len - user_len - 1, pass, pass_size))) {
+    user[0] = pass[0] = '\0';
     return HTS_FALSE;
-  memcpy(user, src, user_len);
-  user[user_len] = '\0';
-  if (pass_len != 0)
-    memcpy(pass, colon + 1, pass_len);
-  pass[pass_len] = '\0';
+  }
   return HTS_TRUE;
 }
 
@@ -793,7 +815,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
   real_adr = ftp_jump_authority(back->url_adr);
   if ((adr = jump_identification(real_adr)) != real_adr) {      // user
     if (!ftp_split_userpass_buf(real_adr, adr, user, pass)) {
-      strcpybuff(back->r.msg, "FTP user name or password too long");
+      strcpybuff(back->r.msg, "FTP user name or password too long or invalid");
       back->r.statuscode = STATUSCODE_INVALID;
       _HALT_FTP return 0;
     }
