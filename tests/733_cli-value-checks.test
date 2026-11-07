@@ -56,9 +56,11 @@ for v in abc 10X +5 "" 99999999999999999999; do
     refused "${W}" --warc-max-size "${v}"
 done
 
-C='connection-per-second needs a rate'
+C='connection-per-second needs a rate of 0 or at least 0.000001'
 refused "${C}" -%c0.0000001
 refused "${C}" -%c1e-7
 refused "${C}" -%cnan
+refused "${C}" -%cabc
+refused "${C}" -%c
 refused "${C}" -%c1e99
 refused "${C}" -%c1000000000000000000000000000000000000000

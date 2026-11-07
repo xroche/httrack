@@ -1801,15 +1801,14 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               case 'c': {
                 float v;
 
-                if (sscanf(com + 1, "%f", &v) == 1) {
-                  if (!(v == 0 || (v >= 1e-6f && v <= FLT_MAX))) {
-                    HTS_PANIC_PRINTF("Option connection-per-second needs a "
-                                     "rate of at least 0.000001");
-                    htsmain_free();
-                    return -1;
-                  }
-                  opt->maxconn = v;
+                if (sscanf(com + 1, "%f", &v) != 1 ||
+                    !(v == 0 || (v >= 1e-6f && v <= FLT_MAX))) {
+                  HTS_PANIC_PRINTF("Option connection-per-second needs a "
+                                   "rate of 0 or at least 0.000001");
+                  htsmain_free();
+                  return -1;
                 }
+                opt->maxconn = v;
               }
                 while(isdigit((unsigned char) *(com + 1)) || *(com + 1) == '.')
                   com++;
