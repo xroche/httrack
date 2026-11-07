@@ -17,10 +17,13 @@ name() {
 # the save name in the default mode and the three -%N modes
 for d in "" delayed=0 delayed=1 delayed=2; do
     case "$d" in
+    # -%N0 and -%N1 trust a known extension and keep it
     delayed=0 | delayed=1) png=photo.png webp=photo.webp mp4=x.mp4 ;;
+    # the default, like -%N2, names the file by its Content-Type
     *) png=photo.jpg webp=photo.jpg mp4=x.jpg ;;
     esac
     foo=photo.foo.jpg
+    # -%N0 assumes an unknown extension is HTML
     [ "$d" = delayed=0 ] && foo=photo.foo.html
     # shellcheck disable=SC2086 # an empty $d passes no argument
     {
