@@ -990,10 +990,6 @@ int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_back * b
                                   int2bytes(&strc, StatsBuffer[i].size));
             smallserver_setkeyarr("info.sizetot[", i, "]",
                                   int2bytes(&strc, StatsBuffer[i].sizetot));
-            smallserver_setkeyarr("info.url_adr[", i, "]",
-                                  StatsBuffer[i].url_adr);
-            smallserver_setkeyarr("info.url_fil[", i, "]",
-                                  StatsBuffer[i].url_fil);
             smallserver_setkeyarr("info.url_sav[", i, "]",
                                   StatsBuffer[i].url_sav);
           }
