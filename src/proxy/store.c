@@ -616,16 +616,51 @@ static long int stream_size(FILE *fp) {
   return size;
 }
 
-/** Would reading n bytes at the current offset stay inside the .dat? A size
-    the host could not report is refused rather than waived: filesize() answers
-    in a long int, so a 32-bit build handed a .dat past 2 GB reads back a value
-    that bounds nothing. **/
-static hts_boolean cache_fits(FILE *fp, long int datSize, size_t n) {
+/** Would reading n bytes at fp's offset stay inside a file of fileSize bytes?
+    An unknown size (< 0), which a 32-bit long gives past 2 GB, is refused. **/
+static hts_boolean cache_fits(FILE *fp, long int fileSize, size_t n) {
   const long int at = ftell(fp);
 
-  if (at < 0 || datSize < 0)
+  if (at < 0 || fileSize < 0)
     return HTS_FALSE;
-  return at <= datSize && n <= (size_t) (datSize - at) ? HTS_TRUE : HTS_FALSE;
+  return at <= fileSize && n <= (size_t) (fileSize - at) ? HTS_TRUE : HTS_FALSE;
+}
+
+/** Read exactly size (< INT_MAX) bytes of the open zip entry into a new
+    NUL-terminated buffer, or NULL with *short_read telling a short entry from
+    an allocation failure. The buffer grows with the data, so a lying size in
+    X-Size or in the zip header cannot buy a large allocation. **/
+static char *read_zip_entry(unzFile z, size_t size, hts_boolean *short_read) {
+  char *buf = malloct(1);
+  size_t got = 0, cap = 0;
+
+  *short_read = HTS_FALSE;
+  while (buf != NULL && got < size) {
+    int n;
+
+    if (got == cap) {
+      const size_t step = cap < 65536 ? 65536 : cap;
+      char *grown;
+
+      cap += step < size - got ? step : size - got;
+      grown = realloct(buf, cap + 1);
+      if (grown == NULL) {
+        freet(buf);
+        return NULL;
+      }
+      buf = grown;
+    }
+    n = unzReadCurrentFile(z, buf + got, (unsigned int) (cap - got));
+    if (n <= 0) {
+      freet(buf);
+      *short_read = HTS_TRUE;
+      return NULL;
+    }
+    got += (size_t) n;
+  }
+  if (buf != NULL)
+    buf[got] = '\0';
+  return buf;
 }
 
 int PT_LookupCache(PT_Index index, const char *url) {
@@ -1409,29 +1444,16 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                 }
               } else {
                 // read the whole entry at once
-                unz_file_info zfi;
+                if (flags & FETCH_BODY) {
+                  hts_boolean short_read;
 
-                if ((flags & FETCH_BODY) &&
-                    (unzGetCurrentFileInfo(index->zFile, &zfi, NULL, 0, NULL, 0,
-                                           NULL, 0) != UNZ_OK ||
-                     r->size > (size_t) zfi.uncompressed_size)) {
-                  r->statuscode = STATUSCODE_INVALID;
-                  strcpybuff(r->msg, "Cache Read Error : Read Data, entry "
-                                     "shorter than X-Size");
-                } else if (flags & FETCH_BODY) {
-                  r->adr = (char *) malloc(r->size + 1);
-                  if (r->adr != NULL) {
-                    if ((size_t) unzReadCurrentFile(index->zFile, r->adr,
-                                                    (unsigned int) r->size) !=
-                        r->size) {
-                      PT_Element_DropBody(r);
-                      r->statuscode = STATUSCODE_INVALID;
-                      strcpybuff(r->msg, "Cache Read Error : Read Data");
-                    } else
-                      *(r->adr + r->size) = '\0';
-                  } else {      // erreur
+                  r->adr = read_zip_entry(index->zFile, r->size, &short_read);
+                  if (r->adr == NULL) {
                     r->statuscode = STATUSCODE_INVALID;
-                    strcpybuff(r->msg, "Cache Memory Error");
+                    strcpybuff(r->msg, short_read
+                                           ? "Cache Read Error : Read Data, "
+                                             "entry shorter than X-Size"
+                                           : "Cache Memory Error");
                   }
                 }
               }
