@@ -41,6 +41,7 @@ Please visit our Website: http://www.httrack.com
 #include "htslines.h"
 #include "htsio.h"
 #include "htsback.h"
+#include "htscharset.h"
 #include "htstools.h"
 #include "htssafe.h"
 #include "htszlib.h"
@@ -706,24 +707,15 @@ static void iso8601_to_cdx14(const char *iso, char out[15]) {
   out[14] = '\0';
 }
 
-/* Append s as a JSON string (quoted, with " \ and control chars escaped). */
+/* Append s as a JSON string, see hts_json_string(). */
 static int cdx_json_str(wbuf *b, const char *s) {
-  if (wbuf_add(b, "\"", 1) != 0)
-    return -1;
-  for (; *s != '\0'; s++) {
-    unsigned char c = (unsigned char) *s;
-    if (c == '"' || c == '\\') {
-      char e[2] = {'\\', (char) c};
-      if (wbuf_add(b, e, 2) != 0)
-        return -1;
-    } else if (c < 0x20) {
-      if (wbuf_printf(b, "\\u%04x", (unsigned) c) != 0)
-        return -1;
-    } else if (wbuf_add(b, s, 1) != 0) {
-      return -1;
-    }
-  }
-  return wbuf_add(b, "\"", 1);
+  String json = STRING_EMPTY;
+  int ret;
+
+  hts_json_string(&json, s);
+  ret = wbuf_add(b, StringBuff(json), StringLength(json));
+  StringFree(json);
+  return ret;
 }
 
 /* see htswarc.h */

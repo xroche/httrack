@@ -36,6 +36,7 @@ Please visit our Website: http://www.httrack.com
 /** Standard includes. **/
 #include "htsglobal.h"
 #include "httrack-library.h"
+#include "htsstrings.h"
 #include <stdlib.h>
 #include <string.h>
 #include "htswin32.h"
@@ -152,6 +153,10 @@ extern size_t hts_readUTF8(const char *src, size_t size, hts_UCS4 *puc);
  * Return 0 upon error (not a leading character).
  **/
 extern size_t hts_getUTF8SequenceLength(const char lead);
+
+/* Append s to out as a quoted JSON string. Byte sequences that are not valid
+   UTF-8 become U+FFFD, so a legacy-charset URL still gives parseable JSON. */
+extern void hts_json_string(String *out, const char *s);
 
 /** WIN32 specific functions. **/
 #ifdef _WIN32

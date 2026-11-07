@@ -1088,6 +1088,73 @@ static int st_warc_cdx(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* A URL carrying a raw Latin-1 byte still gives a CDXJ line whose JSON is
+   valid UTF-8, while a well-formed UTF-8 URL passes through unchanged. */
+static int st_warc_cdx_utf8(httrackp *opt, int argc, char **argv) {
+  static const char *const urls[] = {"http://www.example.com/caf\xe9",
+                                     "http://www.example.com/caf\xc3\xa9"};
+  char wpath[HTS_URLMAXSIZE], cpath[HTS_URLMAXSIZE];
+  warc_writer *w;
+  unsigned char *cdx;
+  size_t cdx_len = 0, i;
+  hts_boolean saved_cdx;
+  int err = 0, nlines = 0, nbad = 0, ngood = 0;
+  const char *lp, *cend;
+
+  if (argc < 1) {
+    fprintf(stderr, "warc-cdx-utf8: needs a writable directory\n");
+    return 1;
+  }
+  fconcat(wpath, sizeof(wpath), argv[0], "warc-cdx-utf8.warc.gz");
+  fconcat(cpath, sizeof(cpath), argv[0], "warc-cdx-utf8.cdx");
+  saved_cdx = opt->warc_cdx;
+  opt->warc_cdx = HTS_TRUE;
+  w = warc_open(opt, wpath);
+  assertf(w != NULL);
+  for (i = 0; i < sizeof(urls) / sizeof(urls[0]); i++)
+    warc_write_transaction(w, urls[i], "127.0.0.1",
+                           "GET /caf HTTP/1.1\r\nHost: www.example.com\r\n\r\n",
+                           "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n",
+                           i == 0 ? "first\n" : "second\n", i == 0 ? 6 : 7,
+                           NULL, NULL, 200, 0, 0);
+  warc_close(w);
+  opt->warc_cdx = saved_cdx;
+
+  cdx = warc_slurp(cpath, &cdx_len);
+  assertf(cdx != NULL);
+  lp = (const char *) cdx;
+  cend = (const char *) cdx + cdx_len;
+  while (lp < cend) {
+    const char *eol = memchr(lp, '\n', (size_t) (cend - lp));
+    const char *end = eol != NULL ? eol : cend;
+    const char *json = memchr(lp, '{', (size_t) (end - lp));
+
+    if (end != lp) {
+      nlines++;
+      /* The SURT key keeps the raw bytes; only the JSON must be UTF-8. */
+      if (json == NULL || !hts_isStringUTF8(json, (size_t) (end - json))) {
+        fprintf(stderr, "warc-cdx-utf8: line %d JSON is not UTF-8\n", nlines);
+        err = 1;
+      } else if (warc_memstr(json, "/caf\\ufffd\"", (size_t) (end - json),
+                             11) != NULL) {
+        nbad++;
+      } else if (warc_memstr(json, "/caf\xc3\xa9\"", (size_t) (end - json),
+                             7) != NULL) {
+        ngood++;
+      }
+    }
+    lp = end < cend ? end + 1 : cend;
+  }
+  freet(cdx);
+  if (nlines != 2 || nbad != 1 || ngood != 1) {
+    fprintf(stderr, "warc-cdx-utf8: %d lines, %d escaped, %d verbatim\n",
+            nlines, nbad, ngood);
+    err = 1;
+  }
+  printf("warc-cdx-utf8: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 static char st_cdx_log[2048];
 
 /* Collect the "WARC:" diagnostics only, so an unrelated message cannot satisfy
@@ -2619,6 +2686,9 @@ const struct selftest_entry selftests_warc[] = {
     {"warc-cdx-errors", "<dir>",
      "--warc-cdx diagnostics when the index cannot be written or is empty",
      st_warc_cdx_errors},
+    {"warc-cdx-utf8", "<dir>",
+     "--warc-cdx JSON stays valid UTF-8 for a raw Latin-1 URL",
+     st_warc_cdx_utf8},
     {"warc-teardown", "<dir>",
      "a closed or abandoned archive is not reopened by a late transaction",
      st_warc_teardown},

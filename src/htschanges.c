@@ -88,59 +88,6 @@ struct hts_changes {
 };
 
 /* ------------------------------------------------------------ */
-/* JSON                                                          */
-/* ------------------------------------------------------------ */
-
-/* Length of the UTF-8 sequence led by c, or 0 if c cannot lead one. */
-static size_t utf8_lead_length(unsigned char c) {
-  if (c >= 0xc2 && c <= 0xdf)
-    return 2;
-  if (c >= 0xe0 && c <= 0xef)
-    return 3;
-  if (c >= 0xf0 && c <= 0xf4)
-    return 4;
-  return 0;
-}
-
-void hts_changes_json_string(String *out, const char *s) {
-  const unsigned char *p = (const unsigned char *) s;
-
-  StringAddchar(*out, '"');
-  while (*p != '\0') {
-    const unsigned char c = *p;
-
-    if (c == '"' || c == '\\') {
-      StringAddchar(*out, '\\');
-      StringAddchar(*out, (char) c);
-      p++;
-    } else if (c < 0x20 || c == 0x7f) {
-      char esc[8];
-
-      snprintf(esc, sizeof(esc), "\\u%04x", (unsigned) c);
-      StringCat(*out, esc);
-      p++;
-    } else if (c < 0x80) {
-      StringAddchar(*out, (char) c);
-      p++;
-    } else {
-      /* Non-ASCII: emit it verbatim only if it is a well-formed sequence, so
-         a legacy-charset URL cannot produce unparseable JSON. */
-      const size_t len = utf8_lead_length(c);
-
-      if (len != 0 && strnlen((const char *) p, len) == len &&
-          hts_isStringUTF8((const char *) p, len)) {
-        StringMemcat(*out, (const char *) p, len);
-        p += len;
-      } else {
-        StringCat(*out, "\\ufffd");
-        p++;
-      }
-    }
-  }
-  StringAddchar(*out, '"');
-}
-
-/* ------------------------------------------------------------ */
 /* Accumulator                                                   */
 /* ------------------------------------------------------------ */
 
@@ -538,9 +485,9 @@ static void changes_serialize(httrackp *opt, String *out) {
   snprintf(scratch, sizeof(scratch), "%d", HTS_CHANGES_SCHEMA);
   StringCat(*out, scratch);
   StringCat(*out, ",\n  \"generator\": ");
-  hts_changes_json_string(out, "HTTrack Website Copier/" HTTRACK_VERSION);
+  hts_json_string(out, "HTTrack Website Copier/" HTTRACK_VERSION);
   StringCat(*out, ",\n  \"date\": ");
-  hts_changes_json_string(out, date);
+  hts_json_string(out, date);
   StringCat(*out, ",\n  \"first_crawl\": ");
   StringCat(*out, !changes->has_index
                       ? "null"
@@ -554,7 +501,7 @@ static void changes_serialize(httrackp *opt, String *out) {
   StringCat(*out, ",\n  \"counts\": {");
   for (bucket = 0; bucket < HTS_CHANGE_BUCKETS; bucket++) {
     StringCat(*out, bucket != 0 ? ", " : " ");
-    hts_changes_json_string(out, bucket_names[bucket]);
+    hts_json_string(out, bucket_names[bucket]);
     snprintf(scratch, sizeof(scratch), ": %d", (int) counts[bucket]);
     StringCat(*out, scratch);
   }
@@ -564,7 +511,7 @@ static void changes_serialize(httrackp *opt, String *out) {
     hts_boolean first = HTS_TRUE;
 
     StringCat(*out, ",\n  ");
-    hts_changes_json_string(out, bucket_names[bucket]);
+    hts_json_string(out, bucket_names[bucket]);
     StringCat(*out, ": [");
     for (i = 0; i < changes->count; i++) {
       const changes_entry *const entry = &changes->entries[i];
@@ -573,9 +520,9 @@ static void changes_serialize(httrackp *opt, String *out) {
         continue;
       StringCat(*out, first ? "\n    { \"url\": " : ",\n    { \"url\": ");
       first = HTS_FALSE;
-      hts_changes_json_string(out, entry->url != NULL ? entry->url : "");
+      hts_json_string(out, entry->url != NULL ? entry->url : "");
       StringCat(*out, ", \"file\": ");
-      hts_changes_json_string(out, entry->file);
+      hts_json_string(out, entry->file);
       if (entry->size >= 0) {
         snprintf(scratch, sizeof(scratch), ", \"size\": " LLintP,
                  (LLint) entry->size);

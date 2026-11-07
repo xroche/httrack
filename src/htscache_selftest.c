@@ -4307,7 +4307,7 @@ static int st_changes(httrackp *opt, int argc, char **argv) {
 #define JSON_IS(SRC, WANT)                                                     \
   do {                                                                         \
     StringClear(out);                                                          \
-    hts_changes_json_string(&out, SRC);                                        \
+    hts_json_string(&out, SRC);                                                \
     if (strcmp(StringBuff(out), WANT) != 0) {                                  \
       fprintf(stderr, "changes: %s -> %s, expected %s\n", #SRC,                \
               StringBuff(out), WANT);                                          \
