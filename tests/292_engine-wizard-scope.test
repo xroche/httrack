@@ -24,6 +24,13 @@ test "$got" = "$want" || fail "wizardscope enumeration: got [$got]"
 selftest_queue "0 example.com" wizardscope example.com/x
 selftest_queue "" wizardscope 192.168.1.1/x
 
+# a '?' or '#' in the userinfo must not put the port before the host
+selftest_queue "0 foo.com:81" wizardscope 'u:p?w@foo.com:81'
+want="0 www.foo.com:81
+1 foo.com:81"
+got=$(httrack -O /dev/null -#test=wizardscope 'u:p#w@www.foo.com:81/x' | tr -d '\r')
+test "$got" = "$want" || fail "wizardscope userinfo '#': got [$got]"
+
 # answer 1000+1 is "example.co.uk and every host below it": two filters, since
 # the starred one misses the apex
 sub=$(httrack -O /dev/null -#test=wizardfilter 1001 www.example.co.uk /x)
