@@ -407,9 +407,8 @@ static hts_boolean write_progress_lock(httrackp *opt, const char *path,
   return HTS_TRUE;
 }
 
-/* Removes the regular files of hts-cache/ref, then the directory. A symlinked
-   ref or entry is left alone, so it cannot reach cookies.txt or winprofile.ini.
- */
+/* Removes the entries of hts-cache/ref, then the directory. A symlinked ref is
+   left alone, so it cannot reach cookies.txt or winprofile.ini. */
 static void purge_ref_dir(httrackp *opt) {
   const char *const refdir = fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                                      StringBuff(opt->path_log), CACHE_REFNAME);
@@ -431,10 +430,7 @@ static void purge_ref_dir(httrackp *opt) {
         const char *const path =
             fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                     StringBuff(opt->path_log), rel);
-#ifndef _WIN32
-        if (lstat(path, &st) == 0 && S_ISREG(st.st_mode))
-#endif
-          (void) UNLINK(path);
+        (void) UNLINK(path);
       }
     }
   }
