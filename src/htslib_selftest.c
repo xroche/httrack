@@ -2537,6 +2537,39 @@ static hts_boolean cc_span_agrees(size_t cls, const char *s) {
   return strspn(s, set) == span && strcspn(s, set) == cspan;
 }
 
+/* -#test=strcmpnocase: equal only when both strings end together, and the
+   order flips with the arguments. */
+static int st_strcmpnocase(httrackp *opt, int argc, char **argv) {
+  static const struct {
+    const char *a, *b;
+    int sign;
+  } cases[] = {
+      {"ab", "abc", -1}, {"", "about.html", -1}, {"a.com", "a.com.evil", -1},
+      {"", "TRUE", -1},  {"abd", "abc", 1},      {"ABC", "abc", 0},
+      {"", "", 0},       {"TRUE", "true", 0},
+  };
+
+  size_t i;
+  int err = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    const int ab = strcmpnocase(cases[i].a, cases[i].b);
+    const int ba = strcmpnocase(cases[i].b, cases[i].a);
+    const int sign = (ab > 0) - (ab < 0);
+
+    if (sign != cases[i].sign || (ba > 0) - (ba < 0) != -sign) {
+      printf("strcmpnocase: (\"%s\", \"%s\") gives %d, reversed %d\n",
+             cases[i].a, cases[i].b, ab, ba);
+      err = 1;
+    }
+  }
+  printf("strcmpnocase: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 /* hts_rtrim() and the sets it is called with. The string starts mid-arena, and
    the byte below it is poisoned with '#' rather than 0, or the stray NUL the
    old loop wrote there would read as untouched. */
@@ -4130,6 +4163,9 @@ const struct selftest_entry selftests_lib[] = {
      "last-char helpers never index before the buffer (#770, #781, #821)",
      st_lastchar},
     {"rtrim", "", "hts_rtrim never walks below the buffer", st_rtrim},
+    {"strcmpnocase", "",
+     "strcmpnocase compares the whole of both strings, ignoring case",
+     st_strcmpnocase},
     {"queryparam", "<url> <name> [size]", "the value %[param] reads for a key",
      st_queryparam},
     {"querysweep", "", "%[param] stays inside every buffer size it is given",
