@@ -118,6 +118,15 @@ typedef struct cookie_attr {
 int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
                const char *domain, const char *path, const cookie_attr *attr);
 
+/** This is cookie_set for a cookie a server sent. When the jar has no room,
+    it evicts the oldest records of the largest host holding over 50 records
+    or 8 KB (the setter's host counts the new one), until it fits, and refuses
+    if no host is over. Oldest is the first record of the shortest path (the
+    jar keeps no age). A cookies file loads with cookie_set, uncapped. */
+int cookie_set_capped(t_cookie *cookie, const char *cook_name,
+                      const char *cook_value, const char *domain,
+                      const char *path, const cookie_attr *attr);
+
 /** This is cookie_set with attr NULL. */
 int cookie_add(t_cookie *cookie, const char *cook_name, const char *cook_value,
                const char *domain, const char *path);

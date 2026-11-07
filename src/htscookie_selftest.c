@@ -33,6 +33,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsselftest_int.h"
 #include "htscookie_selftest.h"
+#include "htsbundle.h"
 
 /* True if a Cookie header line is a whole RFC 6265 list of `count` pairs and
    nothing else. A dropped cookie must take its separator with it, because a
@@ -740,6 +741,303 @@ static int st_cookiedomain(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* Records of host in the jar. */
+static int cookie_count_host(char *data, const char *host) {
+  char buf[8192];
+  int n = 0;
+  char *a;
+
+  for (a = data; *a != '\0'; a = cookie_nextfield(a)) {
+    if (strcmp(cookie_get(buf, a, 0), host) == 0)
+      n++;
+  }
+  return n;
+}
+
+/* Store n records "c000".. of host with cookie_add (uncapped). */
+static int cookie_load_host(t_cookie *jar, const char *host, int n,
+                            const char *value) {
+  int i;
+
+  for (i = 0; i < n; i++) {
+    char name[16];
+
+    snprintf(name, sizeof(name), "c%03d", i);
+    if (cookie_add(jar, name, value, host, "/") != 0)
+      return 1;
+  }
+  return 0;
+}
+
+/* Fill the jar with hosts of 20 records each (all under their share) until it
+   refuses one, then squeeze in tiny ones so no later record fits the slack. */
+static void cookie_fill_jar(t_cookie *jar) {
+  char name[16];
+  char host[32];
+  int i;
+
+  for (i = 0; i < 100000; i++) {
+    snprintf(name, sizeof(name), "f%05d", i);
+    snprintf(host, sizeof(host), "fill%d.test", i / 20);
+    if (cookie_add(jar, name, "v", host, "/") != 0)
+      break;
+  }
+  for (i = 0; i < 20; i++) {
+    snprintf(name, sizeof(name), "z%d", i);
+    if (cookie_add(jar, name, "", "z.t", "/") != 0)
+      return;
+  }
+}
+
+#define HC_FAIL(msg)                                                           \
+  do {                                                                         \
+    printf("cookie-cap: FAIL (%s)\n", msg);                                    \
+    err = 1;                                                                   \
+  } while (0)
+
+/* Rows for cookie_set_capped: it evicts only when the record does not fit and
+   its host is at 50 records or 8 KB. */
+static int cookie_hostcap_rows(void) {
+  static t_cookie jar;
+  static const char H[] = "big.example.com", G[] = "g.example.com";
+  char fat[3001], mid[301];
+  int err = 0;
+  int k;
+
+  memset(fat, 'v', 2900);
+  fat[2900] = '\0';
+  memset(mid, 'v', 300);
+  mid[300] = '\0';
+  jar.max_len = 20000;
+
+  /* Room left: nothing is evicted, 80 loaded records all stay. */
+  jar.data[0] = '\0';
+  if (cookie_load_host(&jar, H, 80, "v") ||
+      cookie_set_capped(&jar, "new", "v", H, "/", NULL) != 0 ||
+      cookie_count_host(jar.data, H) != 81)
+    HC_FAIL("a cookie with room evicted records");
+
+  /* Full jar, host with k records: at 49 the host is under its share. */
+  for (k = 49; k <= 51; k++) {
+    jar.data[0] = '\0';
+    if (cookie_load_host(&jar, H, k, "v"))
+      HC_FAIL("setup");
+    cookie_fill_jar(&jar);
+    if (cookie_set_capped(&jar, "new", "v", H, "/", NULL) == 0) {
+      if (k == 49 || cookie_find_exact(jar.data, "c000", H, "/") != NULL ||
+          cookie_count_host(jar.data, H) != k)
+        HC_FAIL("a host at its count share lost the wrong records");
+    } else if (k != 49 || cookie_count_host(jar.data, H) != 49) {
+      HC_FAIL("a host at 50 records was refused or lost records");
+    }
+  }
+
+  /* Several evictions for a bigger record; nothing of another host goes. */
+  jar.data[0] = '\0';
+  if (cookie_load_host(&jar, H, 60, "v") || cookie_load_host(&jar, G, 60, "v"))
+    HC_FAIL("setup");
+  cookie_fill_jar(&jar);
+  if (cookie_set_capped(&jar, "big", mid, H, "/", NULL) != 0 ||
+      cookie_find_exact(jar.data, "c000", H, "/") != NULL ||
+      cookie_count_host(jar.data, G) != 60 ||
+      cookie_count_host(jar.data, H) >= 60)
+    HC_FAIL("a big record did not evict several of its own host only");
+
+  /* Re-setting the oldest name at the cap never evicts itself. */
+  jar.data[0] = '\0';
+  if (cookie_load_host(&jar, H, 60, "v"))
+    HC_FAIL("setup");
+  cookie_fill_jar(&jar);
+  if (cookie_set_capped(&jar, "c000", "v", H, "/", NULL) != 0 ||
+      cookie_count_host(jar.data, H) != 60)
+    HC_FAIL("a same-size re-set at the cap lost records");
+  if (cookie_set_capped(&jar, "c000", mid, H, "/", NULL) != 0 ||
+      cookie_find_exact(jar.data, "c000", H, "/") == NULL)
+    HC_FAIL("a bigger re-set evicted the record it replaces");
+
+  /* A hand-edited jar holding c000 twice, the second one far larger: the
+     record eviction spares is the one the set replaces (the first), so the
+     set is stored, not refused after the jar was compacted. */
+  jar.data[0] = '\0';
+  if (cookie_load_host(&jar, H, 60, "v"))
+    HC_FAIL("setup");
+  {
+    const size_t end = strlen(jar.data);
+
+    snprintf(jar.data + end, sizeof(jar.data) - end,
+             "%s\tFALSE\t/\tFALSE\t0\tc000\t%s\n", H, fat);
+  }
+  cookie_fill_jar(&jar);
+  if (cookie_set_capped(&jar, "c000", mid, H, "/", NULL) != 0 ||
+      cookie_find_exact(jar.data, "c000", H, "/") == NULL)
+    HC_FAIL("a jar with a duplicate record refused the re-set");
+
+  /* A growing re-set at 50 records is stored, like a new 51st would be: the
+     replaced record counts in its host, so the host evicts its oldest. */
+  jar.data[0] = '\0';
+  if (cookie_load_host(&jar, H, 50, "v"))
+    HC_FAIL("setup");
+  cookie_fill_jar(&jar);
+  {
+    char *rec;
+    const char *const grow = "vvvvvvvvvvvvvvvvvvvv";
+    char buf[8192];
+
+    if (cookie_set_capped(&jar, "c000", grow, H, "/", NULL) != 0 ||
+        (rec = cookie_find_exact(jar.data, "c000", H, "/")) == NULL ||
+        strcmp(cookie_get(buf, rec, 6), grow) != 0 ||
+        cookie_find_exact(jar.data, "c001", H, "/") != NULL)
+      HC_FAIL("a growing re-set at the cap was refused or evicted itself");
+  }
+
+  /* A flooding host cannot starve another: A fills the jar, B still stores. */
+  jar.data[0] = '\0';
+  if (cookie_load_host(&jar, H, 400, "v"))
+    HC_FAIL("setup");
+  cookie_fill_jar(&jar);
+  if (cookie_set_capped(&jar, "bnew", "v", G, "/", NULL) != 0 ||
+      cookie_find_exact(jar.data, "bnew", G, "/") == NULL ||
+      cookie_find_exact(jar.data, "c000", H, "/") != NULL ||
+      cookie_find_exact(jar.data, "c001", H, "/") == NULL)
+    HC_FAIL("a host over its share did not make room for another host");
+
+  /* A longer host that starts with another is a different host. */
+  jar.data[0] = '\0';
+  if (cookie_add(&jar, "n", "mine", "google.com", "/") != 0 ||
+      cookie_add(&jar, "n", "theirs", "google.com.au", "/") != 0 ||
+      cookie_add(&jar, "b", "v", "bank.com", "/") != 0 ||
+      cookie_count_host(jar.data, "google.com") != 1 ||
+      cookie_count_host(jar.data, "google.com.au") != 1 ||
+      strstr(jar.data, "\tn\tmine") == NULL)
+    HC_FAIL("a host that extends another overwrote its cookie");
+  {
+    char name[16];
+
+    jar.max_len = 4000;
+    for (k = 0; k < 80; k++) {
+      snprintf(name, sizeof(name), "e%02d", k);
+      (void) cookie_set_capped(&jar, name, "v", "bank.com.evil.net", "/", NULL);
+    }
+    jar.max_len = 20000;
+    if (cookie_find_exact(jar.data, "b", "bank.com", "/") == NULL)
+      HC_FAIL("a flood from bank.com.evil.net evicted bank.com");
+  }
+
+  /* A refused set leaves the jar byte for byte as it was. */
+  {
+    char val[61], huge[4001];
+    char *snap;
+
+    memset(val, 'v', sizeof(val) - 1);
+    val[sizeof(val) - 1] = '\0';
+    memset(huge, 'v', sizeof(huge) - 1);
+    huge[sizeof(huge) - 1] = '\0';
+    jar.data[0] = '\0';
+    if (cookie_load_host(&jar, H, 51, val))
+      HC_FAIL("setup");
+    cookie_fill_jar(&jar);
+    snap = strdupt(jar.data);
+    if (cookie_set_capped(&jar, "huge", huge, H, "/", NULL) == 0 ||
+        strcmp(jar.data, snap) != 0)
+      HC_FAIL("a refused set changed the jar");
+    freet(snap);
+  }
+
+  /* The largest host over its share loses first, not the first one found. */
+  jar.data[0] = '\0';
+  {
+    char val[101];
+
+    memset(val, 'v', sizeof(val) - 1);
+    val[sizeof(val) - 1] = '\0';
+    if (cookie_load_host(&jar, G, 55, "v") ||
+        cookie_load_host(&jar, H, 60, val))
+      HC_FAIL("setup");
+    cookie_fill_jar(&jar);
+    if (cookie_set_capped(&jar, "x", "v", "c.example.org", "/", NULL) != 0 ||
+        cookie_find_exact(jar.data, "c000", H, "/") != NULL ||
+        cookie_find_exact(jar.data, "c000", G, "/") == NULL)
+      HC_FAIL("the largest host over its share did not lose first");
+  }
+
+  /* Two hosts over their share both give up room when one is not enough. */
+  {
+    char val[400];
+    size_t slack, vlen;
+
+    jar.data[0] = '\0';
+    if (cookie_load_host(&jar, G, 52, "v") ||
+        cookie_load_host(&jar, H, 52, "v"))
+      HC_FAIL("setup");
+    cookie_fill_jar(&jar);
+    slack = jar.max_len - strlen(jar.data);
+    vlen = slack + 100 > 271 ? slack + 100 - 271 : 0;
+    memset(val, 'v', vlen);
+    val[vlen] = '\0';
+    if (cookie_set_capped(&jar, "x", val, "c.example.org", "/", NULL) != 0 ||
+        cookie_count_host(jar.data, G) >= 52 ||
+        cookie_count_host(jar.data, H) >= 52)
+      HC_FAIL("one host over its share was asked for all the room");
+  }
+
+  /* Many hosts a little over their share: a set finishes, and keeps max_len. */
+  {
+    char host[32], name[16], big[4001];
+    int h, r;
+
+    jar.max_len = 30000;
+    jar.data[0] = '\0';
+    for (h = 0; h < 20; h++) {
+      snprintf(host, sizeof(host), "h%02d.t", h);
+      for (r = 0; r < 51; r++) {
+        snprintf(name, sizeof(name), "c%03d", r);
+        if (cookie_add(&jar, name, "v", host, "/") != 0)
+          break;
+      }
+    }
+    memset(big, 'v', sizeof(big) - 1);
+    big[sizeof(big) - 1] = '\0';
+    (void) cookie_set_capped(&jar, "big", big, "h00.t", "/", NULL);
+    if (strlen(jar.data) > jar.max_len)
+      HC_FAIL("a set past many hosts overran the jar");
+    jar.max_len = 20000;
+  }
+
+  /* The oldest is the first record of the shortest path. */
+  jar.data[0] = '\0';
+  if (cookie_add(&jar, "p0", "v", H, "/a/b") != 0 ||
+      cookie_add(&jar, "p1", "v", H, "/a/b") != 0 ||
+      cookie_load_host(&jar, H, 48, "v"))
+    HC_FAIL("setup");
+  cookie_fill_jar(&jar);
+  if (cookie_set_capped(&jar, "new", "v", H, "/", NULL) != 0 ||
+      cookie_find_exact(jar.data, "c000", H, "/") != NULL ||
+      cookie_find_exact(jar.data, "p0", H, "/a/b") == NULL)
+    HC_FAIL("the shortest-path record was not evicted first");
+
+  /* Byte share: one 2.9 KB record leaves the host under 8 KB, three do not. */
+  for (k = 1; k <= 3; k++) {
+    int i;
+
+    jar.data[0] = '\0';
+    for (i = 0; i < k; i++) {
+      char name[16];
+
+      snprintf(name, sizeof(name), "b%d", i);
+      if (cookie_add(&jar, name, fat, H, "/") != 0)
+        HC_FAIL("setup");
+    }
+    cookie_fill_jar(&jar);
+    if (cookie_set_capped(&jar, "bnew", fat, H, "/", NULL) == 0) {
+      if (k < 2 || cookie_find_exact(jar.data, "b0", H, "/") != NULL)
+        HC_FAIL("a host over its byte share lost the wrong record");
+    } else if (k >= 2 || cookie_find_exact(jar.data, "b0", H, "/") == NULL) {
+      HC_FAIL("a host under its byte share was evicted or a fit was refused");
+    }
+  }
+  return err;
+}
+
 /* cookie_add must refuse rather than write past max_len, whatever the caller
    set that to, and must leave the bytes beyond it alone. */
 static int st_cookiecap(httrackp *opt, int argc, char **argv) {
@@ -829,6 +1127,9 @@ static int st_cookiecap(httrackp *opt, int argc, char **argv) {
       break;
     }
   }
+
+  /* A full jar makes a host over its share evict its own oldest records. */
+  err |= cookie_hostcap_rows();
 
   printf("cookie-cap: %s\n", err ? "FAIL" : "OK");
   return err;

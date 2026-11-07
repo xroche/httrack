@@ -159,10 +159,18 @@ hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size) {
 }
 
 static hts_boolean cookie_domain_is_suffix(const char *domain);
+static hts_boolean cookie_fits(char *data, size_t max_len, const char *domain,
+                               const char *cook_name, const char *path,
+                               size_t need);
+static hts_boolean cookie_make_room(char *data, size_t max_len,
+                                    const char *domain, const char *cook_name,
+                                    const char *path, size_t need);
 
 /* See htsbauth.h. Records are kept longest path first. */
-int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
-               const char *domain, const char *path, const cookie_attr *attr) {
+static int cookie_set_impl(t_cookie *cookie, const char *cook_name,
+                           const char *cook_value, const char *domain,
+                           const char *path, const cookie_attr *attr,
+                           hts_boolean cap_host) {
   static const cookie_attr session = {.host_only = HTS_FALSE,
                                       .secure = HTS_FALSE,
                                       .http_only = HTS_FALSE,
@@ -173,6 +181,7 @@ int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
   char *insert;
   char *old;
   size_t used;
+  size_t need;
   char cook[16384];
   hts_boolean host_only;
 
@@ -200,25 +209,20 @@ int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
   // a public suffix such as "com" reaches only that host (RFC 6265 5.3 step 5)
   host_only = attr->host_only || cookie_domain_is_suffix(domain);
   /* The record this one replaces still holds its room, so count it free, but
-     remove it only once the new one is known to fit. */
+     remove it only once the new one is known to fit. The lengths are bounded
+     above, so the sum cannot wrap. */
+  need = strlen(cook_value) + strlen(cook_name) + strlen(domain) +
+         strlen(path) + COOKIE_HEADROOM;
+  if (cap_host && !cookie_fits(cookie->data, cookie->max_len, domain, cook_name,
+                               path, need)) {
+    (void) cookie_make_room(cookie->data, cookie->max_len, domain, cook_name,
+                            path, need);
+  }
   old = cookie_find_exact(cookie->data, cook_name, domain, path);
   used = strlen(cookie->data) -
          (old != NULL ? (size_t) (cookie_nextfield(old) - old) : 0);
-  /* Each part against the room left, never a sum: the sum of five lengths
-     read off the wire can wrap and pass a check it should fail. */
-  {
-    const size_t parts[] = {
-        used,           strlen(cook_value), strlen(cook_name),
-        strlen(domain), strlen(path),       COOKIE_HEADROOM};
-    size_t left = cookie->max_len;
-    size_t i;
-
-    for (i = 0; i < sizeof(parts) / sizeof(parts[0]); i++) {
-      if (parts[i] > left)
-        return -1; // no room to add it
-      left -= parts[i];
-    }
-  }
+  if (need > cookie->max_len || used > cookie->max_len - need)
+    return -1; // no room to add it
   /* The Netscape fields, then an eighth only this jar reads, because the file
      form marks HttpOnly with a "#HttpOnly_" prefix instead (see cookie_save).
      The checks above bound the record far below sizeof(cook). */
@@ -255,6 +259,21 @@ int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
 }
 
 /* See htsbauth.h. */
+int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
+               const char *domain, const char *path, const cookie_attr *attr) {
+  return cookie_set_impl(cookie, cook_name, cook_value, domain, path, attr,
+                         HTS_FALSE);
+}
+
+/* See htsbauth.h. */
+int cookie_set_capped(t_cookie *cookie, const char *cook_name,
+                      const char *cook_value, const char *domain,
+                      const char *path, const cookie_attr *attr) {
+  return cookie_set_impl(cookie, cook_name, cook_value, domain, path, attr,
+                         HTS_TRUE);
+}
+
+/* See htsbauth.h. */
 int cookie_add(t_cookie *cookie, const char *cook_name, const char *cook_value,
                const char *domain, const char *path) {
   return cookie_set(cookie, cook_name, cook_value, domain, path, NULL);
@@ -275,7 +294,223 @@ static hts_boolean cookie_same_domain(const char *a, const char *b) {
     a++;
   if (b[0] == '.')
     b++;
-  return strcmpnocase(a, b) == 0;
+  // strcmpnocase stops at the end of a, so "a.com" would match "a.com.evil"
+  return strlen(a) == strlen(b) && strcmpnocase(a, b) == 0;
+}
+
+/* A host may hold this many records, or this many bytes of them (a quarter of
+   the jar), before a full jar evicts its records. 50 is RFC 6265 6.1's minimum.
+ */
+#define COOKIE_HOST_MAX_COUNT 50
+#define COOKIE_HOST_MAX_BYTES 8192
+
+/* Does a record needing `need` bytes fit in data? The record it replaces is
+   counted free. */
+static hts_boolean cookie_fits(char *data, size_t max_len, const char *domain,
+                               const char *cook_name, const char *path,
+                               size_t need) {
+  char *const old = cookie_find_exact(data, cook_name, domain, path);
+  const size_t used =
+      strlen(data) - (old != NULL ? (size_t) (cookie_nextfield(old) - old) : 0);
+
+  return need <= max_len && used <= max_len - need ? HTS_TRUE : HTS_FALSE;
+}
+
+/* Is a host with this many records and bytes over its share? */
+static hts_boolean cookie_over_share(size_t count, size_t bytes) {
+  return count > COOKIE_HOST_MAX_COUNT || bytes > COOKIE_HOST_MAX_BYTES
+             ? HTS_TRUE
+             : HTS_FALSE;
+}
+
+/* A record of the jar, as the eviction plan sees it. */
+typedef struct cookie_rec {
+  char *p;
+  size_t len;
+  size_t plen; // path length, the age rank
+  size_t pos;  // place in the jar, the tie-break
+  size_t host;
+} cookie_rec;
+
+/* One host: its tally, and its records in eviction order. */
+typedef struct cookie_host_tally {
+  char *dom;
+  size_t count;
+  size_t bytes;
+  size_t cur; // next victim in the sorted records
+  size_t end;
+} cookie_host_tally;
+
+/* Is the record at a the one cookie_set replaces? */
+static hts_boolean cookie_is_self(const char *a, const char *domain,
+                                  const char *cook_name, const char *path) {
+  char buffer[8192];
+
+  return strcmp(cookie_get(buffer, a, 5), cook_name) == 0 &&
+                 cookie_same_domain(cookie_get(buffer, a, 0), domain) &&
+                 strcmp(cookie_get(buffer, a, 2), path) == 0
+             ? HTS_TRUE
+             : HTS_FALSE;
+}
+
+/* Hash of a domain as cookie_same_domain sees it. */
+static size_t cookie_domain_hash(const char *d) {
+  size_t h = 5381;
+
+  if (d[0] == '.')
+    d++;
+  for (; *d != '\0'; d++)
+    h = h * 33 + (size_t) hichar(*d);
+  return h;
+}
+
+/* Oldest first within a host: the shortest path, then the earliest place. */
+static int cookie_rec_cmp(const void *x, const void *y) {
+  const cookie_rec *a = x, *b = y;
+
+  if (a->host != b->host)
+    return a->host < b->host ? -1 : 1;
+  if (a->plen != b->plen)
+    return a->plen < b->plen ? -1 : 1;
+  return a->pos < b->pos ? -1 : a->pos > b->pos ? 1 : 0;
+}
+
+/* Evict the oldest records of the largest host over its share until a record
+   of `need` bytes fits. One pass tallies every host, with the new record
+   added to the setter's, and the victims are picked from that tally and cut
+   out of the jar in one more pass. The oldest is the first record of the
+   shortest path: the jar keeps no age, and records of one path length are
+   stored oldest first. The record being replaced stays, and counts in its
+   host. The jar is untouched unless the record then fits. */
+static hts_boolean cookie_make_room(char *data, size_t max_len,
+                                    const char *domain, const char *cook_name,
+                                    const char *path, size_t need) {
+  char buffer[8192];
+  const size_t rec_len = need - COOKIE_HEADROOM;
+  const size_t total = strlen(data);
+  size_t n = 0, nh = 1, used, self_len = 0, freeable = 0, mask, i, k;
+  size_t self_pos = (size_t) -1;
+  cookie_rec *recs = NULL;
+  cookie_host_tally *hosts = NULL;
+  size_t *table = NULL, *over = NULL;
+  unsigned char *evict = NULL;
+  char *pool = NULL, *pool_end;
+  size_t nover = 0;
+  hts_boolean ok = HTS_FALSE;
+  char *a, *dst;
+
+  if (need > max_len)
+    return HTS_FALSE;
+  for (a = data; *a != '\0'; a = cookie_nextfield(a))
+    n++;
+  for (mask = 1; mask < 2 * (n + 1); mask <<= 1)
+    ;
+  recs = calloct(n + 1, sizeof(*recs));
+  hosts = calloct(n + 1, sizeof(*hosts));
+  table = calloct(mask, sizeof(*table)); // host index + 1, 0 for empty
+  over = calloct(n + 1, sizeof(*over));
+  evict = calloct(n + 1, 1);
+  pool = calloct(total + strlen(domain) + n + 2, 1);
+  if (recs == NULL || hosts == NULL || table == NULL || over == NULL ||
+      evict == NULL || pool == NULL)
+    goto done;
+  pool_end = pool;
+  /* Host 0 is the setter's, holding the new record. */
+  memcpy(pool_end, domain, strlen(domain) + 1);
+  hosts[0].dom = pool_end;
+  hosts[0].count = 1;
+  hosts[0].bytes = rec_len;
+  pool_end += strlen(domain) + 1;
+  table[cookie_domain_hash(domain) & (mask - 1)] = 1;
+  for (a = data, i = 0; *a != '\0'; a = cookie_nextfield(a), i++) {
+    const char *const d = cookie_get(buffer, a, 0);
+    size_t h = cookie_domain_hash(d) & (mask - 1);
+
+    while (table[h] != 0 && !cookie_same_domain(hosts[table[h] - 1].dom, d))
+      h = (h + 1) & (mask - 1);
+    if (table[h] == 0) {
+      hosts[nh].dom = pool_end;
+      memcpy(pool_end, d, strlen(d) + 1);
+      pool_end += strlen(d) + 1;
+      table[h] = ++nh;
+    }
+    recs[i].p = a;
+    recs[i].len = (size_t) (cookie_nextfield(a) - a);
+    recs[i].plen = strlen(cookie_get(buffer, a, 2));
+    recs[i].pos = i;
+    recs[i].host = table[h] - 1;
+    hosts[recs[i].host].count++;
+    hosts[recs[i].host].bytes += recs[i].len;
+    if (recs[i].host == 0 && self_len == 0 &&
+        cookie_is_self(a, domain, cook_name, path)) {
+      self_len = recs[i].len;
+      self_pos = i;
+    }
+  }
+  used = total - self_len;
+  /* The most that evicting can free, so a hopeless set stops before it starts.
+   */
+  for (i = 0; i < nh; i++) {
+    if (cookie_over_share(hosts[i].count, hosts[i].bytes)) {
+      over[nover++] = i;
+      freeable += hosts[i].bytes - (i == 0 ? rec_len + self_len : 0);
+    }
+  }
+  if (used > max_len - need + freeable)
+    goto done;
+  qsort(recs, n, sizeof(*recs), cookie_rec_cmp);
+  for (i = 0; i < n; i++) {
+    if (i == 0 || recs[i].host != recs[i - 1].host)
+      hosts[recs[i].host].cur = i;
+    hosts[recs[i].host].end = i + 1;
+  }
+  while (used > max_len - need) {
+    cookie_host_tally *best = NULL;
+
+    for (k = 0; k < nover; k++) {
+      cookie_host_tally *const h = &hosts[over[k]];
+
+      if (cookie_over_share(h->count, h->bytes) &&
+          (best == NULL || h->bytes > best->bytes))
+        best = h;
+    }
+    if (best == NULL)
+      goto done; // no host is over its share, so the jar stays full
+    if (best->cur < best->end && recs[best->cur].pos == self_pos)
+      best->cur++;
+    if (best->cur >= best->end) {
+      best->count = best->bytes = 0; // only the replaced record is left
+      continue;
+    }
+    evict[recs[best->cur].pos] = 1;
+    used -= recs[best->cur].len;
+    best->count--;
+    best->bytes -= recs[best->cur].len;
+    best->cur++;
+  }
+  /* Cut the victims out in place; the write point never passes the read. */
+  dst = data;
+  for (a = data, i = 0; *a != '\0'; i++) {
+    char *const next = cookie_nextfield(a);
+    const size_t len = (size_t) (next - a);
+
+    if (!evict[i]) {
+      if (dst != a)
+        memmove(dst, a, len);
+      dst += len;
+    }
+    a = next;
+  }
+  *dst = '\0';
+  ok = HTS_TRUE;
+done:
+  freet(recs);
+  freet(hosts);
+  freet(table);
+  freet(over);
+  freet(evict);
+  freet(pool);
+  return ok;
 }
 
 /* See htsbundle.h. The host-only flag is not part of a record's identity
