@@ -959,10 +959,7 @@ static hts_boolean gif_is(const char *dir, const char *name, const char *data,
 static hts_boolean gifs_are_current(const char *dir) {
   return gif_is(dir, "backblue.gif", HTS_DATA_BACK_GIF,
                 HTS_DATA_BACK_GIF_LEN) &&
-                 gif_is(dir, "fade.gif", HTS_DATA_FADE_GIF,
-                        HTS_DATA_FADE_GIF_LEN)
-             ? HTS_TRUE
-             : HTS_FALSE;
+         gif_is(dir, "fade.gif", HTS_DATA_FADE_GIF, HTS_DATA_FADE_GIF_LEN);
 }
 
 /* The top index of a multi-project root, byte for byte against a golden file
