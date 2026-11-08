@@ -61,6 +61,11 @@ selftest_queue "savename: /dev/null/$host/DIR/aaaaaaaa.htm" savename \
 # The rest of the tokens, on a link short enough to assert whole.
 selftest_queue "savename: /dev/null/http/$host/dir/page.html" savename \
     '/dir/page.html' text/html "adr=$host" 'userdef=%r/%H%p/%N'
+selftest_queue "savename: /dev/null/$host/dir/longpage.htm" savename \
+    '/dir/longpagename.html' text/html "adr=$host" 'userdef=%h%p/%sN'
+# An extensionless link takes the type's extension.
+selftest_queue "savename: /dev/null/$host/dir/page.html" savename \
+    '/dir/page' text/html "adr=$host" 'userdef=%h%p/%N'
 selftest_queue "savename: /dev/null/$host/page8803.html" savename \
     '/dir/page.html?id=7' text/html "adr=$host" 'userdef=%h/%n%q.%t'
 selftest_queue \

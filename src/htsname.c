@@ -625,10 +625,9 @@ static hts_boolean user_mime_ext(httrackp *opt, const char *fil, char *ext,
                                                            : HTS_FALSE;
 }
 
-/* Appends the host directory, without "www." in 8-3 mode, then a '/' if
-   slash is set. */
+/* Appends the host directory, without "www." in 8-3 mode. */
 static void add_host_dir(lien_adrfilsave *const afs, const httrackp *opt,
-                         const char *host, int max_char, hts_boolean slash) {
+                         const char *host, int max_char) {
   if (!opt->savename_83) {
     strcatbuff(afs->save, host);
   } else if (strlen(host) > 4 && strfield(host, "www.")) {
@@ -636,8 +635,6 @@ static void add_host_dir(lien_adrfilsave *const afs, const httrackp *opt,
   } else {
     hts_appendStringUTF8(afs->save, host, max_char);
   }
-  if (slash)
-    strcatbuff(afs->save, "/");
 }
 
 // Build the local save name (save) from adr/fil; renames on collision
@@ -1438,7 +1435,9 @@ int url_savename(lien_adrfilsave *const afs,
       if (((opt->savename_type / 1000) % 2) == 0) {
         DECLARE_ADR(final_adr);
 
-        add_host_dir(afs, opt, final_adr, max_char, *fil != '/');
+        add_host_dir(afs, opt, final_adr, max_char);
+        if (*fil != '/')
+          strcatbuff(afs->save, "/");
         RELEASE_ADR();
       }
     }
@@ -1459,7 +1458,8 @@ int url_savename(lien_adrfilsave *const afs,
       if ((opt->savename_type / 100) % 2) {
         DECLARE_ADR(final_adr);
 
-        add_host_dir(afs, opt, final_adr, max_char, HTS_TRUE);
+        add_host_dir(afs, opt, final_adr, max_char);
+        strcatbuff(afs->save, "/");
         RELEASE_ADR();
       } else {
         strcatbuff(afs->save, "web/");       // répertoire général
