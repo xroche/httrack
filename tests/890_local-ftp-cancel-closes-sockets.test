@@ -43,9 +43,25 @@ ftp_server_start --root "$root" --mode-file "$(nativepath "${tmpdir}/modes")" \
 kill_crawl() { test -z "$crawlpid" || kill_tree "$crawlpid"; }
 cleanup_push kill_crawl
 
+# Under the sanitizer stderr shim (tests/stderrwrap.c) the engine is its child.
+engine_pid() {
+    local stat line rest
+    for stat in /proc/[0-9]*/stat; do
+        line=$(cat "$stat" 2>/dev/null) || continue
+        # Fields after the parenthesized command name: state, then ppid.
+        rest=${line##*) }
+        rest=${rest#* }
+        test "${rest%% *}" != "$crawlpid" || {
+            echo "${line%% *}"
+            return
+        }
+    done
+    echo "$crawlpid"
+}
+
 sockets() {
     local fd n=0
-    for fd in /proc/"$crawlpid"/fd/*; do
+    for fd in /proc/"$enginepid"/fd/*; do
         case $(readlink "$fd" 2>/dev/null || true) in
         socket:*) n=$((n + 1)) ;;
         esac
@@ -72,7 +88,9 @@ until test -n "$body" && test -n "$(find "$out" -name anchor.bin)" &&
     body=$(find "$out" -name body.bin)
     poll_wait 1
 done
+enginepid=$(engine_pid)
 before=$(sockets)
+test "$before" -ge 4 || fail "only $before sockets with three transfers in flight"
 
 printf '%s\n%s\n' "$body" "$(dirname "$body")/held.bin" >"${trigger}.tmp"
 mv "${trigger}.tmp" "$trigger"
