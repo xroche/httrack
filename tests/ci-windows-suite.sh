@@ -297,8 +297,9 @@ ci_suite_heartbeat() {
 # ftp-deadhost-interrupt, ftp-sigterm, abort-purge, signal-receive and
 # ftp-stop-window need that same signal (deadhost's --timeout half runs as 245,
 # abort-purge's --max-time half as 268);
-# close-once, threadattr-leak and maxtime-dns-stall interpose through LD_PRELOAD,
-# which MSYS has no equivalent for, and this job sets no interposer's path;
+# close-once, ftp-cancel-closes-sockets, threadattr-leak and maxtime-dns-stall
+# interpose through LD_PRELOAD, which MSYS has no equivalent for, and this job
+# sets no interposer's path;
 # engine-install-paths reads the compiled-in POSIX install paths, which this job
 # has no equivalent of;
 # build-features compares the feature reporter against the automake config.h,
@@ -330,6 +331,7 @@ ci_suite_heartbeat() {
 expected_skips_msys="01_engine-usercommand.test
 01_engine-footer-overflow.test
 253_local-ftp-close-once.test
+890_local-ftp-cancel-closes-sockets.test
 113_engine-threadattr-leak.test
 527_local-maxtime-dns-stall.test
 100_local-purge-longpath.test
@@ -403,6 +405,7 @@ expected_skips_msys="01_engine-usercommand.test
 expected_skips_wsl2="01_engine-usercommand.test
 01_engine-footer-overflow.test
 253_local-ftp-close-once.test
+890_local-ftp-cancel-closes-sockets.test
 113_engine-threadattr-leak.test
 527_local-maxtime-dns-stall.test
 100_local-purge-longpath.test

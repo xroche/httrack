@@ -12,6 +12,7 @@ directory). Each line is "<path> <mode>...", path "*" matching everything:
   trickle   send the body in small chunks, slowly enough to stay in flight
   norest    answer REST with 500, so the client re-fetches from scratch
   nomdtm    answer MDTM with 500, like a server predating RFC 3659
+  hold      never answer RETR, leaving the client's data connection idle
 
 --require-pass answers USER with 331, the only way the client's PASS is sent.
 --mute accepts the control connection and never speaks, not even the greeting.
@@ -134,6 +135,9 @@ class Session(threading.Thread):
         with open(path, "rb") as fp:
             body = fp.read()
         modes = self.modes()
+        if "hold" in modes:
+            time.sleep(QUIET_SECONDS)
+            return
         reply(self.conn, "150 opening binary mode")
         self.send_body(body[self.rest :], modes)
         self.rest = 0
