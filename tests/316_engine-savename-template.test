@@ -42,6 +42,9 @@ for pad in 2000 2030; do
     ends_with_name_and_ext "$pad" "$host" '%h%p/%n.%t'
     leads_with 'hhhhhhhh' "$pad" "$long_host" '%h%p/%n.%t'
     ends_with_name_and_ext "$pad" "$long_host" '%h%p/%n.%t'
+    # %N writes its name as link text, its dot and extension as template.
+    leads_with "$host/dir/" "$pad" "$host" '%h%p/%N'
+    ends_with_name_and_ext "$pad" "$host" '%h%p/%N'
 done
 
 # %M digests host+path in a buffer of its own that held neither at full length.

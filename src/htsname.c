@@ -614,6 +614,32 @@ static hts_boolean savename_walk_skipped(const httrackp *opt, int max_char,
          strcasecmp(node, name) == 0;
 }
 
+/* Sets ext from the user's --assume type for fil. Did it find one? */
+static hts_boolean user_mime_ext(httrackp *opt, const char *fil, char *ext,
+                                 size_t size) {
+  char BIGSTK mime[1024];
+
+  mime[0] = ext[0] = '\0';
+  get_userhttptype(opt, mime, sizeof(mime), fil);
+  return strnotempty(mime) && give_mimext(ext, size, mime) ? HTS_TRUE
+                                                           : HTS_FALSE;
+}
+
+/* Appends the host directory, without "www." in 8-3 mode, then a '/' if
+   slash is set. */
+static void add_host_dir(lien_adrfilsave *const afs, const httrackp *opt,
+                         const char *host, int max_char, hts_boolean slash) {
+  if (!opt->savename_83) {
+    strcatbuff(afs->save, host);
+  } else if (strlen(host) > 4 && strfield(host, "www.")) {
+    hts_appendStringUTF8(afs->save, host + 4, max_char);
+  } else {
+    hts_appendStringUTF8(afs->save, host, max_char);
+  }
+  if (slash)
+    strcatbuff(afs->save, "/");
+}
+
 // Build the local save name (save) from adr/fil; renames on collision
 // (e.g. INDEX.HTML vs index.html).
 int url_savename(lien_adrfilsave *const afs,
@@ -840,16 +866,9 @@ int url_savename(lien_adrfilsave *const afs,
     break;
   case 0:
     if (!strnotempty(ext)) {
-      if (is_userknowntype(opt, fil)) { // mime known by user
-        char BIGSTK mime[1024];
-
-        mime[0] = ext[0] = '\0';
-        get_userhttptype(opt, mime, sizeof(mime), fil);
-        if (strnotempty(mime)) {
-          if (give_mimext(ext, sizeof(ext), mime)) {
-            ext_chg = 1;
-          }
-        }
+      if (is_userknowntype(opt, fil) && // mime known by user
+          user_mime_ext(opt, fil, ext, sizeof(ext))) {
+        ext_chg = 1;
       }
     }
     break;
@@ -888,14 +907,8 @@ int url_savename(lien_adrfilsave *const afs,
                               but also by filename */
             /* Note: "foo.cgi => text/html" means that foo.cgi shall have the
                text/html MIME file type, that is, ".html" */
-            char BIGSTK mime[1024];
-
-            mime[0] = ext[0] = '\0';
-            get_userhttptype(opt, mime, sizeof(mime), fil);
-            if (strnotempty(mime)) {
-              if (give_mimext(ext, sizeof(ext), mime)) {
-                ext_chg = 1;
-              }
+            if (user_mime_ext(opt, fil, ext, sizeof(ext))) {
+              ext_chg = 1;
             }
           }
           // note: if savename_delayed is enabled, the naming will be temporary
@@ -1302,18 +1315,6 @@ int url_savename(lien_adrfilsave *const afs,
           TMPL_TAILC('%');
           break;
         case 'n': // name without extension
-          if (dot_pos) {
-            if (!short_ver)
-              TMPL_CATN(nom_pos, (int) (dot_pos - nom_pos));
-            else
-              TMPL_CATN(nom_pos, min((int) (dot_pos - nom_pos), 8));
-          } else {
-            if (!short_ver)
-              TMPL_CAT(nom_pos);
-            else
-              TMPL_CATN(nom_pos, 8);
-          }
-          break;
         case 'N': // name with extension
           if (dot_pos) {
             if (!short_ver)
@@ -1326,19 +1327,10 @@ int url_savename(lien_adrfilsave *const afs,
             else
               TMPL_CATN(nom_pos, 8);
           }
+          if (tok == 'n')
+            break;
           TMPL_TAILC('.');
-          if (dot_pos) {
-            if (!short_ver)
-              TMPL_TAIL(dot_pos + 1);
-            else
-              TMPL_TAILN(dot_pos + 1, 3);
-          } else {
-            if (!short_ver)
-              TMPL_TAIL(&DEFAULT_EXT[1]); // skip the leading dot
-            else
-              TMPL_TAIL(&DEFAULT_EXT_SHORT[1]); // skip the leading dot
-          }
-          break;
+          HTS_FALLTHROUGH;
         case 't': // extension
           if (dot_pos) {
             if (!short_ver)
@@ -1446,24 +1438,8 @@ int url_savename(lien_adrfilsave *const afs,
       if (((opt->savename_type / 1000) % 2) == 0) {
         DECLARE_ADR(final_adr);
 
-        // adresse url
-        if (!opt->savename_83) {      // noms longs (et pas de .)
-          strcatbuff(afs->save, final_adr);
-        } else {              // noms 8-3
-          if (strlen(final_adr) > 4) {
-            if (strfield(final_adr, "www."))
-              hts_appendStringUTF8(afs->save, final_adr + 4, max_char);
-            else
-              hts_appendStringUTF8(afs->save, final_adr, max_char);
-          } else
-            hts_appendStringUTF8(afs->save, final_adr, max_char);
-        }
-
-        /* release */
+        add_host_dir(afs, opt, final_adr, max_char, *fil != '/');
         RELEASE_ADR();
-
-        if (*fil != '/')
-          strcatbuff(afs->save, "/");
       }
     }
 
@@ -1483,23 +1459,7 @@ int url_savename(lien_adrfilsave *const afs,
       if ((opt->savename_type / 100) % 2) {
         DECLARE_ADR(final_adr);
 
-        if (!opt->savename_83) {      // noms longs
-          strcatbuff(afs->save, final_adr);
-          strcatbuff(afs->save, "/");
-        } else {              // noms 8-3
-          if (strlen(final_adr) > 4) {
-            if (strfield(final_adr, "www."))
-              hts_appendStringUTF8(afs->save, final_adr + 4, max_char);
-            else
-              hts_appendStringUTF8(afs->save, final_adr, max_char);
-            strcatbuff(afs->save, "/");
-          } else {
-            hts_appendStringUTF8(afs->save, final_adr, max_char);
-            strcatbuff(afs->save, "/");
-          }
-        }
-
-        /* release */
+        add_host_dir(afs, opt, final_adr, max_char, HTS_TRUE);
         RELEASE_ADR();
       } else {
         strcatbuff(afs->save, "web/");       // répertoire général
