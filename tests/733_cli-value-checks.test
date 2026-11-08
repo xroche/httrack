@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# --warc-max-size and --connection-per-second refuse a bad value with a
-# non-zero exit before any crawl.
+# A bad --warc-max-size stops the run. A bad -%c rate only warns.
 
 set -euo pipefail
 
@@ -56,11 +55,22 @@ for v in -5 abc 10X +5 "" 99999999999999999999; do
     refused "${W}" --warc-max-size "${v}"
 done
 
-C='connection-per-second needs a rate of 0 or at least 0.000001'
-refused "${C}" -%c0.0000001
-refused "${C}" -%c1e-7
-refused "${C}" -%cnan
-refused "${C}" -%cabc
-refused "${C}" -%c
-refused "${C}" -%c1e99
-refused "${C}" -%c1000000000000000000000000000000000000000
+warned() { # warned MESSAGE ARG...
+    local msg=$1
+    shift
+    accepted "$@"
+    grep -qF "${msg}" "${tmp}/log" || fail_dump "$* did not warn ${msg}" "${tmp}/log"
+    # a bad rate must not become 0, which the security cap logs as a raise to 5
+    ! grep -qF 'connections per second limited' "${out}/hts-log.txt" ||
+        fail_dump "$* set the rate to 0" "${out}/hts-log.txt"
+}
+
+for v in 0.0000001 1e-7; do
+    warned "rate \"${v}\" raised to 0.000001" "-%c${v}"
+done
+for v in abc -1 "" nan inf O 1e99 1e400 5,5 1.2.3; do
+    warned "rate \"${v}\" ignored" "-%c${v}"
+done
+# the rest of a bad value is not read as more options: I0 would drop the top index
+warned 'rate "I0" ignored' -%cI0
+test -f "${out}/index.html" || fail_dump "-%cI0 lost the top index" "${tmp}/log"
