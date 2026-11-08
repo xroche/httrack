@@ -115,6 +115,38 @@ static void basic_selftests(void) {
                (LLint) (idx + 1));
       assertf(strcmp(line, expect) == 0);
     }
+    // j&1 half and j=2: connect shows no URL, INFOSC has no space, 401 too
+    {
+      static const struct {
+        int status, code, j;
+        const char *tag;
+      } c1[] = {{STATUS_CONNECTING, 0, 1, "CONNECT "},
+                {STATUS_WAIT_HEADERS, 0, 1, "INFOS \"http://h.example/p\" "},
+                {STATUS_CHUNK_WAIT, 0, 1, "INFOSC\"http://h.example/p\" "},
+                {STATUS_CHUNK_CR, 0, 1, "INFOSC\"http://h.example/p\" "},
+                {STATUS_TRANSFER, 0, 1, "RECEIVE \"http://h.example/p\" "},
+                {STATUS_READY, 401, 3, "FORBIDDEN \"http://h.example/p\" "},
+                {STATUS_READY, 200, 1, ""},
+                {STATUS_TRANSFER, 0, 2, ""}};
+
+      size_t k;
+
+      for (k = 0; k < sizeof(c1) / sizeof(c1[0]); k++) {
+        lien_back *const slot = &slots[0];
+
+        slot->status = c1[k].status;
+        slot->r.statuscode = c1[k].code;
+        slot->r.size = 7;
+        slot->r.totalsize = 8;
+        snprintf(slot->url_adr, sizeof(slot->url_adr), "http://h.example");
+        snprintf(slot->url_fil, sizeof(slot->url_fil), "/p");
+        line[0] = '\0';
+        back_infostr(&sb, 0, c1[k].j, line, sizeof(line));
+        snprintf(expect, sizeof(expect), "%s%s", c1[k].tag,
+                 c1[k].tag[0] != '\0' && c1[k].tag[0] != 'C' ? "7 8 " : "");
+        assertf(strcmp(line, expect) == 0);
+      }
+    }
     // Near-maximal URL, driven through back_info() (which owns the status
     // buffer internally and prints to a FILE*). url_adr + url_fil together
     // overrun the old HTS_URLMAXSIZE*2+1024 buffer, so the bounded appends
