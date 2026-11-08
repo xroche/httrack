@@ -645,37 +645,6 @@ static const char *hts_mime_modern[][2] = {
   (CIS(c, '-') || CIS(c, '_') || CIS(c, '.') || CIS(c, '!') || CIS(c, '~') ||  \
    CIS(c, '*') || CIS(c, '\'') || CIS(c, '(') || CIS(c, ')'))
 
-const char *hts_strerror(int err, char *buf, size_t size) {
-  assertf(buf != NULL && size != 0);
-  buf[0] = '\0';
-  /* Only the terminator fits, and the libcs disagree on that boundary. */
-  if (size == 1)
-    return buf;
-#if !HTS_STRERROR_REENTRANT
-  /* No reentrant form here, so this build stays as racy as it was. */
-  (void) strclipbuff(buf, size, strerror(err));
-#elif defined(_MSC_VER)
-  (void) strerror_s(buf, size, err);
-#elif defined(__USE_GNU)
-  {
-    /* The GNU variant's return is the message and buf may stay untouched,
-       where the XSI one's return is a status. Only __USE_GNU tells them apart
-       here, since configure's probe sets _GNU_SOURCE and this tree does not. */
-    const char *const msg = strerror_r(err, buf, size);
-
-    if (msg != NULL && msg != buf)
-      (void) strclipbuff(buf, size, msg);
-  }
-#else
-  /* Nonzero is ERANGE or EINVAL, and buf may still hold a partial message. */
-  (void) strerror_r(err, buf, size);
-#endif
-  buf[size - 1] = '\0';
-  if (buf[0] == '\0')
-    (void) strclipbuff(buf, size, "unknown error");
-  return buf;
-}
-
 // Initialize a htsblk structure
 void hts_init_htsblk(htsblk * r) {
   memset(r, 0, sizeof(htsblk)); // effacer
@@ -5299,22 +5268,6 @@ HTSEXT_API size_t escape_for_html_print_full(const char *const s, char *const de
 
 #undef ADD_CHAR
 
-// lower-case conversion into caller buffer (capacity catbuffsize)
-char *convtolower(char *catbuff, size_t catbuffsize, const char *a) {
-  strlcpybuff(catbuff, a, catbuffsize);
-  hts_lowcase(catbuff);         // lower case
-  return catbuff;
-}
-
-// conversion en minuscules
-void hts_lowcase(char *s) {
-  size_t i;
-
-  for(i = 0; s[i] != '\0'; i++)
-    if ((s[i] >= 'A') && (s[i] <= 'Z'))
-      s[i] += ('a' - 'A');
-}
-
 // guess a local file's mime type (e.g. fil="toto.gif" -> s="image/gif")
 // returns 1 if a type was written to s, 0 otherwise
 hts_boolean guess_httptype_sized(httrackp *opt, char *s, size_t ssize,
@@ -6282,25 +6235,6 @@ int fexist_utf8(const char *s) {
 }
 
 /* File size, -1 if absent */
-/* Note: NOT utf-8 */
-LLint fsize(const char *s) {
-  STRUCT_STAT st;
-
-  if (!strnotempty(s)) // empty name: error
-    return -1;
-  /* _stat64, not stat(): the latter is 32-bit on MSVC */
-#ifdef _WIN32
-  if (_stat64(s, &st) == 0 && S_ISREG(st.st_mode)) {
-#else
-  if (stat(s, &st) == 0 && S_ISREG(st.st_mode)) {
-#endif
-    return st.st_size;
-  } else {
-    return -1;
-  }
-}
-
-/* File size, -1 if absent */
 /* Note: utf-8 */
 LLint fsize_utf8(const char *s) {
   STRUCT_STAT st;
@@ -6312,20 +6246,6 @@ LLint fsize_utf8(const char *s) {
   } else {
     return -1;
   }
-}
-
-/* fseeko/ftello, never fseek/ftell: ftell returns long, which cannot carry an
-   offset past 2GB on a 32-bit platform and fails with EOVERFLOW there. */
-LLint fpsize(FILE *fp) {
-  LLint oldpos, size;
-
-  if (!fp)
-    return -1;
-  oldpos = ftello(fp);
-  fseeko(fp, 0, SEEK_END);
-  size = ftello(fp);
-  fseeko(fp, oldpos, SEEK_SET);
-  return size;
 }
 
 /* root dir, with ending / */
@@ -7201,17 +7121,6 @@ static int ssl_vulnerable(const char *version) {
 }
 #endif
 
-/* user abort callback */
-htsErrorCallback htsCallbackErr = NULL;
-
-HTSEXT_API void hts_set_error_callback(htsErrorCallback handler) {
-  htsCallbackErr = handler;
-}
-
-HTSEXT_API htsErrorCallback hts_get_error_callback(void) {
-  return htsCallbackErr;
-}
-
 static void default_coucal_asserthandler(void *arg, const char* exp, const char* file, int line) {
   abortf_(exp, file, line);
 }
@@ -7559,26 +7468,6 @@ static void unplug_wrappers(httrackp * opt) {
     opt->libHandles.handles = NULL;
     opt->libHandles.count = 0;
   }
-}
-
-int multipleStringMatch(const char *s, const char *match) {
-  int ret = 0;
-  String name = STRING_EMPTY;
-
-  if (match == NULL || s == NULL || *s == 0)
-    return 0;
-  for(; *match != 0; match++) {
-    StringClear(name);
-    for(; *match != 0 && *match != '\n'; match++) {
-      StringAddchar(name, *match);
-    }
-    if (StringLength(name) > 0 && strstr(s, StringBuff(name)) != NULL) {
-      ret = 1;
-      break;
-    }
-  }
-  StringFree(name);
-  return ret;
 }
 
 HTSEXT_API httrackp *hts_create_opt(void) {
