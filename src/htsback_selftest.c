@@ -174,7 +174,8 @@ static void threadwait_gated_thread(void *arg) {
   hts_mutexrelease(&threadwait_lock);
 }
 
-/* back_slot_fail() clips a reason too long for r.msg, where a copy aborted. */
+/* back_slot_fail() clips a reason too long for r.msg, where a copy aborted;
+   back_slot_fail_nonfatal() closes and keeps a reason already set. */
 static int st_slotfail(httrackp *opt, int argc, char **argv) {
   struct_back *sback = back_new(opt, 1);
   htsblk *r;
@@ -208,6 +209,21 @@ static int st_slotfail(httrackp *opt, int argc, char **argv) {
   ST_FAIL_IF(err, r->statuscode != STATUSCODE_NON_FATAL);
   ST_FAIL_IF(err, sback->lnk[0].status != STATUS_READY);
   ST_FAIL_IF(err, strcmp(r->msg, "kept") != 0);
+
+  /* the nonfatal close keeps a set reason, else takes the fallback */
+  r->soc = LOCAL_SOCKET_ID;
+  sback->lnk[0].status = STATUS_CONNECTING;
+  back_slot_fail_nonfatal(opt, sback, 0, "fallback");
+  ST_FAIL_IF(err, r->soc != INVALID_SOCKET);
+  ST_FAIL_IF(err, r->statuscode != STATUSCODE_NON_FATAL);
+  ST_FAIL_IF(err, sback->lnk[0].status != STATUS_READY);
+  ST_FAIL_IF(err, strcmp(r->msg, "kept") != 0);
+  r->msg[0] = '\0';
+  r->soc = LOCAL_SOCKET_ID;
+  sback->lnk[0].status = STATUS_CONNECTING;
+  back_slot_fail_nonfatal(opt, sback, 0, "fallback");
+  ST_FAIL_IF(err, r->soc != INVALID_SOCKET);
+  ST_FAIL_IF(err, strcmp(r->msg, "fallback") != 0);
 
   back_free(&sback);
   if (!err)

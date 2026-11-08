@@ -2294,16 +2294,16 @@ void back_slot_fail(httrackp *opt, struct_back *sback, const int p,
   back_set_finished(opt, sback, p);
 }
 
-/* back_slot_fail(), closing the connection first. */
-static void back_slot_close_fail(httrackp *opt, struct_back *sback, const int p,
-                                 const int statuscode, const char *msg) {
+/* back_slot_fail() after deletehttp(), which frees ssl_con even on a closed
+   socket, so sites that test soc first keep their own close. */
+void back_slot_close_fail(httrackp *opt, struct_back *sback, const int p,
+                          const int statuscode, const char *msg) {
   deletehttp(&sback->lnk[p].r);
   back_slot_fail(opt, sback, p, statuscode, msg);
 }
 
-/* Close slot p as non-fatal, keeping a reason already set over fallback. */
-static void back_slot_fail_nonfatal(httrackp *opt, struct_back *sback,
-                                    const int p, const char *fallback) {
+void back_slot_fail_nonfatal(httrackp *opt, struct_back *sback, const int p,
+                             const char *fallback) {
   back_slot_close_fail(opt, sback, p, STATUSCODE_NON_FATAL,
                        strnotempty(sback->lnk[p].r.msg) ? NULL : fallback);
 }
