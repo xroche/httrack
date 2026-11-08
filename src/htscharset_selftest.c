@@ -38,7 +38,6 @@ static int st_charset(httrackp *opt, int argc, char **argv) {
   size_t len;
   char *s;
 
-  (void) opt;
   if (argc < 2) {
     fprintf(stderr, "charset: needs a charset and a string\n");
     return 1;
@@ -68,9 +67,6 @@ static int st_syscharset(httrackp *opt, int argc, char **argv) {
   char *sys, *back, *part;
   int wn, n, lossless;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   wn = MultiByteToWideChar(CP_UTF8, 0, utf8, len, wide,
                            (int) (sizeof(wide) / sizeof(wide[0])));
   assertf(wn > 0);
@@ -108,9 +104,6 @@ static int st_syscharset(httrackp *opt, int argc, char **argv) {
          lossless ? "round-trip" : "one-way");
   return 0;
 #else
-  (void) opt;
-  (void) argc;
-  (void) argv;
   return 77; /* WIN32-only entry point */
 #endif
 }
@@ -138,9 +131,6 @@ static int st_nobestfit(httrackp *opt, int argc, char **argv) {
   char *s;
   int wn, n;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   assertf(cp == 932);
   if (!IsValidCodePage(cp)) {
     printf("nobestfit: CP932 is not installed\n");
@@ -217,9 +207,6 @@ static int st_nobestfit(httrackp *opt, int argc, char **argv) {
   printf("nobestfit: OK\n");
   return 0;
 #else
-  (void) opt;
-  (void) argc;
-  (void) argv;
   return 77; /* WIN32-only entry point */
 #endif
 }
@@ -227,7 +214,6 @@ static int st_nobestfit(httrackp *opt, int argc, char **argv) {
 static int st_metacharset(httrackp *opt, int argc, char **argv) {
   char *s;
 
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "metacharset: needs an html string\n");
     return 1;
@@ -242,7 +228,6 @@ static int st_isutf8(httrackp *opt, int argc, char **argv) {
   char buf[512];
   size_t len;
 
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "isutf8: needs a string\n");
     return 1;
@@ -257,7 +242,6 @@ static int st_idna_encode(httrackp *opt, int argc, char **argv) {
   size_t len;
   char *s;
 
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "idna-encode: needs a hostname\n");
     return 1;
@@ -276,7 +260,6 @@ static int st_idna_encode(httrackp *opt, int argc, char **argv) {
 static int st_idna_decode(httrackp *opt, int argc, char **argv) {
   char *s;
 
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "idna-decode: needs a hostname\n");
     return 1;
@@ -295,7 +278,6 @@ static int st_entities(httrackp *opt, int argc, char **argv) {
   char *s;
   const char *enc;
 
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "entities: needs a string\n");
     return 1;
@@ -318,9 +300,6 @@ static int st_entities(httrackp *opt, int argc, char **argv) {
 static int st_unescape_bounds(httrackp *opt, int argc, char **argv) {
   char dest[4];
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   assertf(hts_unescapeEntities("abcd", dest, sizeof(dest)) == -1);
   assertf(hts_unescapeUrl("abcd", dest, sizeof(dest)) == -1);
   assertf(hts_unescapeEntities("abc", dest, sizeof(dest)) == 0);
@@ -372,9 +351,6 @@ static int st_unescape_form(httrackp *opt, int argc, char **argv) {
 
   size_t i;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     String out = STRING_EMPTY;
     const char *got;
@@ -410,9 +386,6 @@ static int st_escape_append_room(httrackp *opt, int argc, char **argv) {
   char buf[64];
   size_t room;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   for (room = 1; room <= 2 * sizeof(void *); room++) {
     const size_t used = sizeof(buf) - room;
     size_t ret;
@@ -459,7 +432,6 @@ static int st_escape_control(httrackp *opt, int argc, char **argv) {
   char buf[1024];
   size_t k, m;
 
-  (void) opt;
   if (argc > 0) {
     const size_t n = st_decode_body(argv[0], buf, sizeof(buf));
 
@@ -507,10 +479,6 @@ static int st_inplace_escape(httrackp *opt, int argc, char **argv) {
       escape_uri};
   size_t i, f;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
-
   memset(longstr, 'a', sizeof(longstr) - 1);
   for (f = 0; f < sizeof(inplace) / sizeof(inplace[0]); f++) {
     for (i = 0; i < sizeof(samples) / sizeof(samples[0]); i++) {
@@ -535,9 +503,6 @@ static int st_escape_room(httrackp *opt, int argc, char **argv) {
   char *src = malloct(N + 1);
   char *dst;
   size_t room, got;
-  (void) opt;
-  (void) argc;
-  (void) argv;
 
   /* _full worst case: a high byte expands to "&#xHH;" (6 bytes) */
   memset(src, 0xE9, N);
@@ -589,9 +554,6 @@ static int st_unescape_plus(httrackp *opt, int argc, char **argv) {
 
   size_t i;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     char dst[64];
 

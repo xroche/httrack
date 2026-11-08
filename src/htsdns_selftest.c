@@ -784,22 +784,16 @@ static int dns_timeout_selftests(httrackp *opt) {
 #else
 
 static int dns_selftests(httrackp *opt) {
-  (void) opt;
   return 0; /* resolver seam only exists in the IPv6 build */
 }
 
-static int dns_timeout_selftests(httrackp *opt) {
-  (void) opt;
-  return 0;
-}
+static int dns_timeout_selftests(httrackp *opt) { return 0; }
 
 #endif
 
 static int st_dns(httrackp *opt, int argc, char **argv) {
   const int err = dns_selftests(opt);
 
-  (void) argc;
-  (void) argv;
   printf("dns-selftest: %s\n", err ? "FAIL" : "OK");
   return err;
 }
@@ -807,8 +801,6 @@ static int st_dns(httrackp *opt, int argc, char **argv) {
 static int st_dnstimeout(httrackp *opt, int argc, char **argv) {
   const int err = dns_timeout_selftests(opt);
 
-  (void) argc;
-  (void) argv;
   printf("dns-timeout-selftest: %s\n", err ? "FAIL" : "OK");
   return err;
 }

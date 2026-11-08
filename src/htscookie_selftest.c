@@ -79,9 +79,6 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
   int err = 0;
   int added;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   cookie.max_len = sizeof(cookie.data);
   cookie.data[0] = '\0';
   added = cookie_add(&cookie, "name", "value", dom, "/");
@@ -407,10 +404,6 @@ static int st_cookieport(httrackp *opt, int argc, char **argv) {
   size_t i;
   int err = 0;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
-
   for (i = 0; i < sizeof(hosts) / sizeof(hosts[0]); i++) {
     char what[512];
 
@@ -559,10 +552,6 @@ static int st_cookiecase(httrackp *opt, int argc, char **argv) {
   char hdr[1024];
   size_t i;
   int err = 0;
-
-  (void) opt;
-  (void) argc;
-  (void) argv;
 
   for (i = 0; i < sizeof(hosts) / sizeof(hosts[0]); i++) {
     char what[512];
@@ -719,10 +708,6 @@ static int st_cookiedomain(httrackp *opt, int argc, char **argv) {
   char hdr[1024];
   size_t i;
   int err = 0;
-
-  (void) opt;
-  (void) argc;
-  (void) argv;
 
   for (i = 0; i < sizeof(pairs) / sizeof(pairs[0]); i++) {
     err |= cookie_expect_at(
@@ -1049,10 +1034,6 @@ static int st_cookiecap(httrackp *opt, int argc, char **argv) {
   int err = 0;
   size_t i;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
-
   /* A non-zero canary: a stray NUL from an off-by-one terminator is invisible
      against a zero fill, which is the exact bug a capacity check guards. */
   memset(cookie.data, 'C', sizeof(cookie.data));
@@ -1139,7 +1120,6 @@ static int st_cookiecap(httrackp *opt, int argc, char **argv) {
    *@*.txt) from a long, non-ASCII folder via the UTF-8/long-path wrappers
    (#133). POSIX compiles the IE block out; there it is a positive control. */
 static int st_cookieimport(httrackp *opt, int argc, char **argv) {
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "cookieimport: needs a writable base dir\n");
     return 1;
@@ -1316,9 +1296,6 @@ static int st_cookiespandiff(httrackp *opt, int argc, char **argv) {
   size_t i;
   int r;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   assertf(o != NULL && n != NULL);
   for (i = 0; hand[i] != NULL; i++)
     cookiediff_one(&st, hand[i], o, n);
@@ -1360,7 +1337,6 @@ static int st_cookiequote(httrackp *opt, int argc, char **argv) {
   htsblk r;
   size_t i, n;
 
-  (void) opt;
   memset(&r, 0, sizeof(r));
   cookie.max_len = sizeof(cookie.data);
   cookie.data[0] = '\0';
@@ -1578,9 +1554,6 @@ static int st_cookiesetscope(httrackp *opt, int argc, char **argv) {
   size_t i;
   int err = 0;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   jar.max_len = sizeof(jar.data);
   jar.data[0] = '\0';
   for (i = 0; i < sizeof(steps) / sizeof(steps[0]); i++) {
@@ -1733,7 +1706,6 @@ static int st_cookiehttponly(httrackp *opt, int argc, char **argv) {
   char hdr[1024];
   FILE *fp;
 
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "cookiehttponly: needs a writable dir\n");
     return 1;
@@ -3280,7 +3252,6 @@ static int cookiesverdict_logged;
 
 static void cookiesverdict_log(httrackp *opt, int type, const char *format,
                                va_list args) {
-  (void) opt;
   (void) type;
   (void) format;
   (void) args;
@@ -3305,7 +3276,6 @@ static int st_cookiesverdict(httrackp *opt, int argc, char **argv) {
   t_cookie *jar;
   int lost = -1, quiet, loud, ret;
 
-  (void) opt;
   if (argc < 1 || argc > 2) {
     fprintf(stderr, "cookiesverdict: takes a file, then a start URL\n");
     return 1;

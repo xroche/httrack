@@ -165,8 +165,6 @@ static int st_retryafter(httrackp *opt, int argc, char **argv) {
       {"1.5", -1},
   };
 
-  (void) argc;
-  (void) argv;
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     const int got = hts_parse_retry_after(cases[i].value, ref);
 
@@ -203,7 +201,6 @@ static int st_header(httrackp *opt, int argc, char **argv) {
   htsblk r;
   int i;
 
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "header: needs at least one raw header line\n");
     return 1;
@@ -222,7 +219,6 @@ static int st_header(httrackp *opt, int argc, char **argv) {
 
 /* Prints the code hts_status_line_code() reads from argv[0]. */
 static int st_statusline(httrackp *opt, int argc, char **argv) {
-  (void) opt;
   if (argc != 1) {
     fprintf(stderr, "statusline: needs one status line\n");
     return 1;
@@ -243,7 +239,6 @@ static int st_headerline(httrackp *opt, int argc, char **argv) {
   size_t blocklen;
   int max, ptr = 0, i;
 
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "headerline: needs a read size\n");
     return 1;
@@ -295,7 +290,6 @@ static int st_binputline(httrackp *opt, int argc, char **argv) {
   size_t blocklen;
   int max, ptr = 0, i;
 
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "binputline: needs a read size\n");
     return 1;
@@ -342,7 +336,6 @@ static int st_location_logged = 0;
 static HTS_PRINTF_FUN(3, 0) void st_location_log(httrackp *opt, int type,
                                                  const char *format,
                                                  va_list args) {
-  (void) opt;
   (void) type;
   (void) format;
   (void) args;
@@ -365,7 +358,6 @@ static int st_location(httrackp *opt, int argc, char **argv) {
   size_t n, urllen, kept, i;
   int asked, smashed = 0;
 
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "location: needs a Location URL length\n");
     return 1;
@@ -417,7 +409,6 @@ static int st_headerlong(httrackp *opt, int argc, char **argv) {
   const int pad = 1500; /* > tempo[1100] */
   size_t n;
 
-  (void) opt;
   memset(&r, 0, sizeof(r));
   n = (size_t) snprintf(line, sizeof(line), "%s ", name);
   memset(line + n, 'a', pad);
@@ -432,7 +423,6 @@ static int st_headerlong(httrackp *opt, int argc, char **argv) {
 static int st_headerfield(httrackp *opt, int argc, char **argv) {
   char *headers, *field;
 
-  (void) opt;
   if (argc < 2) {
     fprintf(stderr, "headerfield: needs a header block and a field name\n");
     return 1;
@@ -499,8 +489,6 @@ static int st_xfread_limit(httrackp *opt, int argc, char **argv) {
       -1};
   htsblk r;
   size_t i;
-
-  (void) opt;
 
   // Content-Length just over 2 GiB.
   memset(&r, 0, sizeof(r));
@@ -592,7 +580,6 @@ static int st_xfread_limit(httrackp *opt, int argc, char **argv) {
 static int st_crange(httrackp *opt, int argc, char **argv) {
   int i;
 
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "crange: needs at least one raw Content-Range line\n");
     return 1;
@@ -620,7 +607,6 @@ static int st_headerdedup(httrackp *opt, int argc, char **argv) {
   /* Only an exact capacity puts a line's last byte on the buffer's last byte */
   size_t capacity = argc > 2 ? (size_t) atoi(argv[2]) : 2 * half;
 
-  (void) opt;
   if (argc < 2) {
     fprintf(stderr, "headerdedup: needs a request and a header block\n");
     return 1;
@@ -659,8 +645,6 @@ static int st_headerdedup(httrackp *opt, int argc, char **argv) {
 /* Default User-Agent: honest HTTrack token, no resurrected Windows 98. */
 static int st_useragent(httrackp *opt, int argc, char **argv) {
   const char *ua = StringBuff(opt->user_agent);
-  (void) argc;
-  (void) argv;
   assertf(ua != NULL);
   assertf(strcmp(ua, HTS_DEFAULT_USER_AGENT) == 0);
   /* Teeth independent of the macro: honest token + self-identifier, and no
@@ -675,9 +659,6 @@ static int st_useragent(httrackp *opt, int argc, char **argv) {
 /* HTTP status code -> reason phrase, including the modern 429/451. */
 static int st_status(httrackp *opt, int argc, char **argv) {
   const char *s;
-  (void) opt;
-  (void) argc;
-  (void) argv;
   s = infostatuscode_const(429);
   assertf(s != NULL && strcmp(s, "Too Many Requests") == 0);
   s = infostatuscode_const(451);
@@ -707,9 +688,6 @@ static int st_nobody(httrackp *opt, int argc, char **argv) {
   char body[] = "body";
   size_t i;
   htsblk r;
-  (void) opt;
-  (void) argc;
-  (void) argv;
 
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     memset(&r, 0, sizeof(r));
@@ -848,7 +826,6 @@ static int st_acceptencoding(httrackp *opt, int argc, char **argv) {
   const char *on = hts_acceptencoding(HTS_TRUE, HTS_FALSE);
   const char *tls = hts_acceptencoding(HTS_TRUE, HTS_TRUE);
 
-  (void) opt;
   assertf(strcmp(off, "identity") == 0);
   assertf(strstr(on, "gzip") != NULL);
   assertf(strstr(on, "deflate") != NULL); /* fails on the old gzip-only list */
@@ -983,7 +960,6 @@ static int st_contentcodings(httrackp *opt, int argc, char **argv) {
 #endif
   char inpath[HTS_URLMAXSIZE], outpath[HTS_URLMAXSIZE];
 
-  (void) opt;
   assertf(hts_codec_parse("gzip") == HTS_CODEC_DEFLATE);
   assertf(hts_codec_parse("x-deflate") == HTS_CODEC_DEFLATE);
   assertf(hts_codec_parse("") == HTS_CODEC_IDENTITY);
@@ -1087,7 +1063,6 @@ static int st_codecerrno(httrackp *opt, int argc, char **argv) {
   char inpath[HTS_URLMAXSIZE], outpath[HTS_URLMAXSIZE];
   FILE *fp;
 
-  (void) opt;
   if (argc < 2) {
     fprintf(stderr, "usage: -#test=codecerrno <dir> <doomed-out>\n");
     return 1;
@@ -1137,9 +1112,6 @@ static int st_codecerrno(httrackp *opt, int argc, char **argv) {
 /* The library's own view of the structs HTS_INET6 and HTS_USEOPENSSL shape.
    381 diffs it against a consumer compiled from the installed headers alone. */
 static int st_pubheaders(httrackp *opt, int argc, char **argv) {
-  (void) opt;
-  (void) argc;
-  (void) argv;
 #define PUBH_SIZE(t) printf("sizeof %s = %lu\n", #t, (unsigned long) sizeof(t))
 #define PUBH_OFF(t, f)                                                         \
   printf("offsetof %s.%s = %lu\n", #t, #f, (unsigned long) offsetof(t, f))
@@ -1170,7 +1142,6 @@ static int st_intparse(httrackp *opt, int argc, char **argv) {
   const char *end = argv[1];
   LLint min, max, value = -1;
 
-  (void) opt;
   if (argc != 4) {
     fprintf(stderr, "int-parse: needs parse|scan <text> <min> <max>\n");
     return 1;
@@ -1683,7 +1654,6 @@ static int st_intparsediff(httrackp *opt, int argc, char **argv) {
   int compared = 0, changed = 0, failures = 0;
   char in[256], old[256], cur[256], gen[128];
 
-  (void) opt;
   if (argc == 2) { // One input through one site, as it parses now.
     for (s = 0; s < sizeof(st_int_sites) / sizeof(st_int_sites[0]); s++)
       if (strcmp(st_int_sites[s].name, argv[0]) == 0) {
@@ -1750,7 +1720,6 @@ static int st_headerparam(httrackp *opt, int argc, char **argv) {
   int size;
   hts_boolean found;
 
-  (void) opt;
   if (argc != 4) {
     fprintf(stderr, "header-param: needs <value> <seps> <name> <size>\n");
     return 1;
@@ -2102,9 +2071,6 @@ static int st_headerparamdiff(httrackp *opt, int argc, char **argv) {
   int compared = 0, failures = 0, by[HP_COUNT] = {0};
   char in[512], old[512], cur[512], want[512];
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   for (i = 0; i < sizeof(st_hp_cases) / sizeof(st_hp_cases[0]); i++, compared++)
     failures +=
         st_hp_case(st_hp_cases[i].site, st_hp_cases[i].in, st_hp_cases[i].want);

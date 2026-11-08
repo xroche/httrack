@@ -38,9 +38,6 @@ Please visit our Website: http://www.httrack.com
 /* What the build's optional features came out as, so a test gates on the binary
    rather than on the platform it guessed from. */
 static int st_features(httrackp *opt, int argc, char **argv) {
-  (void) opt;
-  (void) argc;
-  (void) argv;
   printf("brotli %d\n", HTS_USEBROTLI ? 1 : 0);
   printf("zstd %d\n", HTS_USEZSTD ? 1 : 0);
 #if (defined(__linux) && defined(HAVE_BACKTRACE))
@@ -80,7 +77,6 @@ static int st_footerfmt(httrackp *opt, int argc, char **argv) {
   char out[1024];
   char tiny[4];
 
-  (void) opt;
   values[HTS_FOOTER_ADDR] = "host.example";
   values[HTS_FOOTER_PATH] = "/dir/page.html";
   values[HTS_FOOTER_URL] = "http://host.example/dir/page.html";
@@ -131,10 +127,6 @@ static int st_cmdlinesplit(httrackp *opt, int argc, char **argv) {
   char line[512];
   char **args;
   int nargs = 0;
-
-  (void) opt;
-  (void) argc;
-  (void) argv;
 
   // control: every separator splits, and argv[0] is the program name
   strcpybuff(line, "httrack http://x/ --quiet\t-c8\n-O out");
@@ -252,9 +244,6 @@ static int st_copyopt(httrackp *opt, int argc, char **argv) {
   httrackp *to = hts_create_opt();
   int err = 0;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   /* from-values differ from both the to-values and the hts_create_opt()
      defaults (nearlink FALSE, errpage/parseall TRUE), so a copy that no-ops or
      just resets to defaults is caught too, not only the unsigned-guard bug. */
@@ -406,10 +395,6 @@ static int st_logcounters(httrackp *opt, int argc, char **argv) {
   const hts_stat_struct *stats;
   int err = 0;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
-
   /* -Q sets no log file and default verbosity. */
   o->log = NULL;
   o->errlog = NULL;
@@ -466,10 +451,6 @@ static int st_upperlinksnote(httrackp *opt, int argc, char **argv) {
   char note[256];
   int err = 0;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
-
   strcpybuff(note, "stale");
   if (hts_upper_links_note(to, note, sizeof(note)) || note[0] != '\0')
     err = 1; /* a fresh opt refused nothing, and must empty the buffer */
@@ -507,9 +488,6 @@ static int st_cachedefault(httrackp *opt, int argc, char **argv) {
   httrackp *const fresh = hts_create_opt();
   int err = 0;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   if (fresh->cache != HTS_CACHE_PRIORITY)
     err = 1;
   hts_free_opt(fresh);
@@ -522,7 +500,6 @@ static char st_log_callback_seen[256];
 static HTS_PRINTF_FUN(3, 0) void st_log_callback(httrackp *opt, int type,
                                                  const char *format,
                                                  va_list args) {
-  (void) opt;
   (void) type;
   (void) vsnprintf(st_log_callback_seen, sizeof(st_log_callback_seen), format,
                    args);
@@ -536,9 +513,6 @@ static int st_logcallback(httrackp *opt, int argc, char **argv) {
   char BIGSTK line[256];
   FILE *fp;
   int rc = 1;
-
-  (void) argc;
-  (void) argv;
 
   fp = tmpfile();
   if (fp == NULL) {
@@ -604,7 +578,6 @@ static FILE *st_crash_fp;
 static HTS_PRINTF_FUN(3, 0) void st_crash_file_log(httrackp *opt, int type,
                                                    const char *format,
                                                    va_list args) {
-  (void) opt;
   (void) type;
   vfprintf(st_crash_fp, format, args);
   fputc('\n', st_crash_fp);
@@ -618,8 +591,6 @@ static HTS_PRINTF_FUN(3, 0) void st_crash_file_log(httrackp *opt, int type,
 static int st_crashannounce(httrackp *opt, int argc, char **argv) {
   static const char want[] = "crash announce 42";
   int rc = 1;
-
-  (void) opt;
 
   if (argc >= 1) {
     st_crash_fp = fopen(argv[0], "wb");
@@ -699,7 +670,6 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   char got[HTS_CDLMAXSIZE * 2], warn[256];
   int i, used, params = 0;
 
-  (void) opt;
   /* -list gives 282 the whole table: the rows to try against the engine's
      own parser, and the class of every name the wizard writes a value to */
   if (argc == 1 && strcmp(argv[0], "-list") == 0) {
@@ -1021,9 +991,6 @@ static int st_scantoken(httrackp *opt, int argc, char **argv) {
   const size_t guard = 64;
   size_t c;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   for (c = 0; c < sizeof(caps) / sizeof(caps[0]); c++) {
     const size_t destsize = caps[c];
     const size_t room = destsize - 1; /* characters, the NUL aside */
@@ -1116,7 +1083,6 @@ static int st_postfile_case(const char *path, size_t start, size_t expect,
 static int st_postfile(httrackp *opt, int argc, char **argv) {
   int err = 0;
 
-  (void) opt;
   if (argc < 4) {
     printf("usage: -#test=postfile <short> <long> <embedded-nul> <empty>\n");
     return 1;
@@ -1372,7 +1338,6 @@ static hts_boolean st_lockrule_setup(const char *dir, const char *name,
 static int st_lockrule_undeletable(httrackp *opt, const char *base,
                                    const char *tag, const char *name) {
 #ifdef _WIN32
-  (void) opt;
   (void) base;
   (void) name;
   /* The real case is a sharing violation, which needs a second process. */
@@ -1617,9 +1582,6 @@ static int st_postprocsize(httrackp *opt, int argc, char **argv) {
   const size_t capa = sizeof(buf);
   size_t size;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   /* the engine's own storage, whatever the reply points at inside it */
   assertf(hts_postprocess_reply_inplace(buf, buf, capa));
   assertf(hts_postprocess_reply_inplace(buf + capa - 1, buf, capa));
@@ -1663,7 +1625,6 @@ static int st_usercmd(httrackp *opt, int argc, char **argv) {
   size_t room = sizeof(dest);
   const char *why = "unnamed";
 
-  (void) opt;
   if (argc < 2) {
     fprintf(stderr, "usercmd: needs a -V template and a filename\n");
     return 1;
@@ -1801,7 +1762,6 @@ static int st_gluedint(httrackp *opt, int argc, char **argv) {
   int compared = 0, unsigned_only = 0, too_large = 0, failures = 0;
   char in[128], cur[128], want[128];
 
-  (void) opt;
   if (argc == 4) {
     st_glued_read(strcmp(argv[0], "llint") == 0, strtoll(argv[1], NULL, 10),
                   strtoll(argv[2], NULL, 10), argv[3], cur, sizeof(cur));

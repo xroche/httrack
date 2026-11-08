@@ -40,7 +40,6 @@ static int st_endtoken(httrackp *opt, int argc, char **argv) {
   const char *value = NULL;
   const int len = rech_endtoken(tail, &value);
 
-  (void) opt;
   printf("len=%d value=[%.*s]\n", len, len, value);
   return 0;
 }
@@ -70,7 +69,6 @@ static int st_profilecharset(httrackp *opt, int argc, char **argv) {
   char path[HTS_URLMAXSIZE];
   size_t i;
 
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "profilecharset: needs a directory\n");
     return 1;
@@ -108,7 +106,6 @@ static int st_profilecharset(httrackp *opt, int argc, char **argv) {
 static int st_getcategory(httrackp *opt, int argc, char **argv) {
   char *categ;
 
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "getcategory: needs a file\n");
     return 1;

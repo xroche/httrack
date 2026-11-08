@@ -42,7 +42,6 @@ static int st_filter(httrackp *opt, int argc, char **argv) {
   char *str, *pat;
   int matched;
 
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "filter: needs a filter pattern and a string\n");
     return 1;
@@ -65,7 +64,6 @@ static int st_filtersize(httrackp *opt, int argc, char **argv) {
   LLint sz;
   int size_flag = 0, verdict, known;
 
-  (void) opt;
   if (argc < 3) {
     fprintf(stderr, "filtersize: needs <size> <string> <filter> [filter...]\n");
     return 1;
@@ -88,7 +86,6 @@ static int st_filtersize(httrackp *opt, int argc, char **argv) {
 static int st_filtermime(httrackp *opt, int argc, char **argv) {
   int verdict;
 
-  (void) opt;
   if (argc < 2) {
     fprintf(stderr, "filtermime: needs <mime> <filter> [filter...]\n");
     return 1;
@@ -122,7 +119,6 @@ static int st_filtermemo(httrackp *opt, int argc, char **argv) {
   int iters = 20000, matched = 0, unmatched = 0;
   int it;
 
-  (void) opt;
   if (argc >= 1)
     sscanf(argv[0], "%d", &iters);
   for (it = 0; it < iters; it++) {
@@ -187,7 +183,6 @@ static int st_filtermemo(httrackp *opt, int argc, char **argv) {
 static int st_filterdual(httrackp *opt, int argc, char **argv) {
   int depth = -1, verdict;
 
-  (void) opt;
   if (argc < 3) {
     fprintf(stderr,
             "filterdual: needs <string1> <string2> <filter> [filter...]\n");
@@ -213,9 +208,6 @@ static int st_filterbounds(httrackp *opt, int argc, char **argv) {
   char *pat = malloct(2 * stars + 2);
   size_t steps = 0, maxsteps = 0, depth = 0, maxdepth = 0, i;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   memset(subj, 'a', big);
   subj[big] = '\0';
   /* '*' matches anything, but an over-length subject trips the length cap */
@@ -319,8 +311,6 @@ static int st_filtercap(httrackp *opt, int argc, char **argv) {
   int filptr = 0;
   int taken, verdict, warned;
 
-  (void) argc;
-  (void) argv;
   memset(atcap, 'a', sizeof(atcap) - 1);
   atcap[0] = '+';
   atcap[sizeof(atcap) - 2] = '*';
@@ -442,8 +432,6 @@ static int st_addfilter(httrackp *opt, int argc, char **argv) {
   size_t k;
   int failed = 0;
 
-  (void) argc;
-  (void) argv;
   for (k = 0; k < sizeof(cases) / sizeof(cases[0]); k++) {
     const char *const r = cases[k].rule != NULL ? cases[k].rule : rule;
     const char *const want = cases[k].stored != NULL ? cases[k].stored : r;
@@ -546,8 +534,6 @@ static int st_filterremove(httrackp *opt, int argc, char **argv) {
   char **filters = NULL;
   int filptr = 0, ok;
 
-  (void) argc;
-  (void) argv;
   assertf(filters_init(&filters, opt->maxfilter, 0) != 0);
   opt->filters.filters = &filters;
   opt->filters.filptr = &filptr;
@@ -580,8 +566,6 @@ static int st_filtergrow(httrackp *opt, int argc, char **argv) {
   char **filters = NULL;
   int filptr, ok, all;
 
-  (void) argc;
-  (void) argv;
   ok = filters_may_grow(HTS_FILTERS_MAX) &&
        !filters_may_grow(HTS_FILTERS_MAX + 1);
   printf("growth bound: ok=%d\n", ok);
@@ -632,8 +616,6 @@ static int st_filterlayout(httrackp *opt, int argc, char **argv) {
   char **filters = NULL;
   int filptr = 0, ok;
 
-  (void) argc;
-  (void) argv;
   assertf(filters_init(&filters, opt->maxfilter, 0) != 0);
   opt->filters.filters = &filters;
   opt->filters.filptr = &filptr;
@@ -672,8 +654,6 @@ static int st_filterkeep(httrackp *opt, int argc, char **argv) {
   char **filters = NULL;
   int filptr = 0, ok;
 
-  (void) argc;
-  (void) argv;
   memset(&cache, 0, sizeof(cache));
   st_mirror_wiring(opt, &sback, &hash, HTS_TRUE);
   assertf(filters_init(&filters, opt->maxfilter, 0) != 0);

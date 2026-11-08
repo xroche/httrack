@@ -42,10 +42,6 @@ static int st_mptcpstats(httrackp *opt, int argc, char **argv) {
   const hts_stat_struct *stats;
   int err = 0;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
-
   if (from->mptcp != HTS_DEFAULT || from->mptcp_connections != 0 ||
       from->mptcp_fallbacks != 0) {
     fprintf(stderr, "mptcp-stats: a fresh opt is not unset and at zero\n");
@@ -108,7 +104,6 @@ static int st_mptcpstats(httrackp *opt, int argc, char **argv) {
 static int st_ftpaddr(httrackp *opt, int argc, char **argv) {
   int i;
 
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "ftpaddr: needs a URL address\n");
     return 1;
@@ -133,7 +128,6 @@ static int st_ftpaddr(httrackp *opt, int argc, char **argv) {
 static int st_sniname(httrackp *opt, int argc, char **argv) {
   int i;
 
-  (void) opt;
   for (i = 0; i < argc; i++) {
     char host[256];
 
@@ -170,7 +164,6 @@ static int st_ftppasv(httrackp *opt, int argc, char **argv) {
   char ip[64];
   int port = -1;
 
-  (void) opt;
   if (argc != 2 ||
       (strcmp(argv[0], "pasv") != 0 && strcmp(argv[0], "epsv") != 0)) {
     fprintf(stderr, "ftp-pasv: needs pasv|epsv and a reply line\n");
@@ -190,7 +183,6 @@ static int st_proxyurl(httrackp *opt, int argc, char **argv) {
   char BIGSTK name[HTS_URLMAXSIZE * 2];
   int port = -1;
 
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "proxyurl: needs a proxy argument\n");
     return 1;
@@ -236,9 +228,6 @@ static int st_socks5(httrackp *opt, int argc, char **argv) {
   unsigned char script[64];
   socks5_test_io io;
   size_t len;
-
-  (void) argc;
-  (void) argv;
 
   /* each reply address type is drained exactly, sentinel untouched */
   len = socks5_reply(script, 0x01, v4, sizeof(v4));
@@ -470,9 +459,6 @@ static void st_addrport_case(int family, unsigned int port,
 }
 
 static int st_addrport(httrackp *opt, int argc, char **argv) {
-  (void) opt;
-  (void) argc;
-  (void) argv;
   st_addrport_case(AF_INET, 65535, "255.255.255.255:65535");
   /* 65535 is byte-swap invariant, so a dropped ntohs() needs this one */
   st_addrport_case(AF_INET, 8080, "255.255.255.255:8080");
@@ -545,9 +531,6 @@ static int st_sigpipe(httrackp *opt, int argc, char **argv) {
   hts_boolean fin_only;
   int i, n;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   inherited = signal(SIGPIPE, SIG_DFL);
   assertf(inherited != SIG_ERR);
 
@@ -638,9 +621,6 @@ static int st_ftpline(httrackp *opt, int argc, char **argv) {
   char line[2048];
   char flood[4096];
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   memset(flood, 'x', sizeof(flood));
   assertf(st_socketpair(sv) == 0);
   // the 4102-byte reply fits the loopback send buffer, so no reader is needed
@@ -664,9 +644,6 @@ static int st_ftpuser(httrackp *opt, int argc, char **argv) {
   char in[2 * 256 + 8];
   size_t c, over;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   memset(poison, '#', sizeof(poison));
   {
     const char ok[] = "bob:secret@host/f"; // '@' at index 10
@@ -796,9 +773,6 @@ static int st_ftpcmdlen(httrackp *opt, int argc, char **argv) {
   size_t c, got = 0;
   T_SOC sv[2];
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   memset(poison, '#', sizeof(poison));
   for (c = 0; c < sizeof(caps) / sizeof(caps[0]); c++) {
     const size_t cap = caps[c];
@@ -885,9 +859,6 @@ static int st_ftpctrl(httrackp *opt, int argc, char **argv) {
   T_SOC sv[2];
   size_t got = 0, dropped = 1, i;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   expect[0] = '\0';
   assertf(st_socketpair(sv) == 0);
   assertf(send_line(sv[0], "USER bob\001") == 0); // any field, not just a path
@@ -1008,9 +979,6 @@ static int st_catchurl(httrackp *opt, int argc, char **argv) {
   st_catchurl_arg arg;
   T_SOC srv;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   assertf(data != NULL);
   srv = st_catchurl_listen(&arg.port);
   arg.pads = pads;
@@ -1098,9 +1066,6 @@ static int st_catchurl_overlong(httrackp *opt, int argc, char **argv) {
   st_catchurl_arg arg;
   T_SOC srv;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   assertf(data != NULL);
   srv = st_catchurl_listen(&arg.port);
   arg.pads = arg.tail = 0;
@@ -1168,10 +1133,6 @@ static int st_catchurl_bind(httrackp *opt, int argc, char **argv) {
   char adr[128];
   T_SOC srv;
   int port = 0;
-
-  (void) opt;
-  (void) argc;
-  (void) argv;
 
   /* poisoned, so a listener that wrote nothing is not read as "127.0.0.1" */
   memset(adr, 'x', sizeof(adr) - 1);
@@ -1325,8 +1286,6 @@ static int st_mptcp(httrackp *opt, int argc, char **argv) {
   int verdict;
   T_SOC soc;
 
-  (void) argc;
-  (void) argv;
   if (!hts_mptcp_available()) {
     printf("mptcp: SKIP (no Multipath TCP on this system)\n");
     return 77;
@@ -1415,9 +1374,6 @@ static int st_mptcp(httrackp *opt, int argc, char **argv) {
   printf("mptcp: %s\n", err ? "FAIL" : "OK");
   return err;
 #else
-  (void) opt;
-  (void) argc;
-  (void) argv;
   printf("mptcp: SKIP (not built with Multipath TCP)\n");
   return 77;
 #endif
@@ -1432,9 +1388,6 @@ static int st_socaddr(httrackp *opt, int argc, char **argv) {
   SOCaddr addr;
   int len = 0;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   {
     struct sockaddr_in sin;
 
@@ -1472,9 +1425,6 @@ static int st_socaddr(httrackp *opt, int argc, char **argv) {
 #ifndef _WIN32
 /* Only the sockets below FD_SETSIZE may go into an fd_set. */
 static int st_selectable(httrackp *opt, int argc, char **argv) {
-  (void) opt;
-  (void) argc;
-  (void) argv;
   assertf(hts_soc_selectable(0));
   assertf(hts_soc_selectable(FD_SETSIZE - 1));
   assertf(!hts_soc_selectable(FD_SETSIZE));

@@ -709,9 +709,6 @@ static int st_warc_surt(httrackp *opt, int argc, char **argv) {
 
   int err = 0;
   size_t i;
-  (void) opt;
-  (void) argc;
-  (void) argv;
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     char out[512];
     if (warc_surt(cases[i].url, out, sizeof(out)) != 0 ||
@@ -745,7 +742,6 @@ static int st_warc_offset(httrackp *opt, int argc, char **argv) {
   size_t i;
   size_t wide = 0; /* offsets measured past what a 32-bit tell could hold */
 
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "warc-offset: needs a writable directory\n");
     return 1;
@@ -1167,7 +1163,6 @@ static HTS_PRINTF_FUN(3, 0) void st_cdx_log_cb(httrackp *opt, int type,
                                                const char *format,
                                                va_list args) {
   char line[512];
-  (void) opt;
   (void) type;
   (void) vsnprintf(line, sizeof(line), format, args);
   if (strncmp(line, "WARC:", 5) == 0)
@@ -2052,7 +2047,6 @@ static int st_singlefileclass(httrackp *opt, int argc, char **argv) {
   const char cls =
       href != NULL ? singlefile_ref_class(tag + 1, href, tag) : '\0';
 
-  (void) opt;
   printf("class=%c\n", cls != '\0' ? cls : '0');
   return 0;
 }
@@ -2622,9 +2616,6 @@ static int st_warcspandiff(httrackp *opt, int argc, char **argv) {
   size_t i;
   int r;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   /* An OUTSZ of 0 leaves OUT alone. */
   {
     char z = 'Z';

@@ -36,7 +36,6 @@ Please visit our Website: http://www.httrack.com
 static int st_refname(httrackp *opt, int argc, char **argv) {
   char name[64];
 
-  (void) opt;
   if (argc < 2) {
     fprintf(stderr, "refname: needs <adr> <fil>\n");
     return 1;
@@ -47,7 +46,6 @@ static int st_refname(httrackp *opt, int argc, char **argv) {
 }
 
 static int st_simplify(httrackp *opt, int argc, char **argv) {
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "simplify: needs a path\n");
     return 1;
@@ -60,7 +58,6 @@ static int st_simplify(httrackp *opt, int argc, char **argv) {
 static int st_expandhome(httrackp *opt, int argc, char **argv) {
   String path = STRING_EMPTY;
 
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "expandhome: needs a path\n");
     return 1;
@@ -75,7 +72,6 @@ static int st_expandhome(httrackp *opt, int argc, char **argv) {
 static int st_relative(httrackp *opt, int argc, char **argv) {
   char s[HTS_URLMAXSIZE * 2];
 
-  (void) opt;
   if (argc < 2) {
     fprintf(stderr, "relative: needs a link and a current-file path\n");
     return 1;
@@ -91,7 +87,6 @@ static int st_resolve(httrackp *opt, int argc, char **argv) {
   lien_adrfil af;
   int r;
 
-  (void) opt;
   if (argc < 3) {
     fprintf(stderr, "resolve: needs a link, an origin address and file\n");
     return 1;
@@ -108,7 +103,6 @@ static int st_resolve(httrackp *opt, int argc, char **argv) {
 static int st_toport(httrackp *opt, int argc, char **argv) {
   int i;
 
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "toport: needs a URL\n");
     return 1;
@@ -133,9 +127,6 @@ static int st_identrel(httrackp *opt, int argc, char **argv) {
   lien_adrfil af;
   size_t k, pad;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   /* origin_fil just under the ceiling its own entry test allows */
   origin[0] = '/';
   memset(origin + 1, 'o', HTS_URLMAXSIZE - 3);
@@ -162,7 +153,6 @@ static int st_identurl(httrackp *opt, int argc, char **argv) {
   char *url;
   size_t len, pad = 0;
 
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "identurl: needs a URL\n");
     return 1;
@@ -190,9 +180,6 @@ static int st_identabs(httrackp *opt, int argc, char **argv) {
       sizeof(af.fil) - 1; /* 2047: max URL the top guard admits */
   char *url = malloct(len + 1);
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   url[0] = '?';
   memset(url + 1, 'a', len - 1);
   url[len] = '\0';
@@ -244,9 +231,6 @@ static int st_stripport(httrackp *opt, int argc, char **argv) {
 
   size_t k;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   for (k = 0; k < sizeof(cases) / sizeof(cases[0]); k++) {
     char BIGSTK buff[HTS_URLMAXSIZE * 2];
 
@@ -343,10 +327,6 @@ static int st_getext(httrackp *opt, int argc, char **argv) {
   const size_t guard = 64;
   size_t c, k;
   int rc = 0;
-
-  (void) opt;
-  (void) argc;
-  (void) argv;
 
   /* the semantics, in a destination nothing here comes close to filling */
   {
@@ -628,8 +608,6 @@ static int st_savename_collide(httrackp *opt, int argc, char **argv) {
   hash_struct hash;
   int pass, k, rc = 0;
 
-  (void) argc;
-  (void) argv;
   StringCopy(opt->path_html_utf8, "");
   opt->savename_delayed = HTS_SAVENAME_DELAYED_NONE;
   memset(&cache, 0, sizeof(cache));
@@ -776,8 +754,6 @@ static int st_savename_sequence(httrackp *opt, int argc, char **argv) {
   size_t c, s;
   int rc = 0;
 
-  (void) argc;
-  (void) argv;
   StringCopy(opt->path_html_utf8, "");
   opt->savename_delayed = HTS_SAVENAME_DELAYED_NONE;
   for (c = 0; c < sizeof(cases) / sizeof(cases[0]) && rc == 0; c++) {
@@ -864,9 +840,6 @@ static int st_savename_addstr(httrackp *opt, int argc, char **argv) {
   size_t k;
   int rc = 0;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   for (k = 0; k < sizeof(cases) / sizeof(cases[0]); k++) {
     const size_t seedlen = strlen(cases[k].seed);
     /* the appender may write up to dsize, and never past a longer seed */
@@ -949,9 +922,6 @@ static int st_savename_addtail(httrackp *opt, int argc, char **argv) {
   size_t k;
   int rc = 0;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   for (k = 0; k < sizeof(cases) / sizeof(cases[0]); k++) {
     const size_t seedlen = strlen(cases[k].seed);
     const size_t guard =
@@ -1006,10 +976,6 @@ static int st_savename_addtail(httrackp *opt, int argc, char **argv) {
 static int st_stripquery(httrackp *opt, int argc, char **argv) {
   char dest[1024], keys[256], ref[1024];
   const char *k;
-
-  (void) opt;
-  (void) argc;
-  (void) argv;
 
   /* empty rules == plain fil_normalized */
   assertf(hts_query_strip_keys(NULL, "h.com", "/p?a=1", keys, sizeof(keys)) ==
@@ -1133,8 +1099,6 @@ static int st_stripquery(httrackp *opt, int argc, char **argv) {
 
 /* -%u url-hack split (#271): each sub-flag must toggle independently. */
 static int st_urlhack(httrackp *opt, int argc, char **argv) {
-  (void) argc;
-  (void) argv;
 #define EQ(aa, fa, ab, fb) hash_url_equals(opt, aa, fa, ab, fb)
   /* urlhack on, no opt-outs: www, // and query order all collapse */
   opt->urlhack = HTS_TRUE;
@@ -1183,9 +1147,6 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
   char dest[HTS_URLMAXSIZE * 2];
   /* two rules, three aliases of a.com */
   static const char *const rules = "b.com=a.com\nc.com,d.com=a.com";
-
-  (void) argc;
-  (void) argv;
 
   /* nothing declared, or nothing matching: the host is left alone */
   assertf(hts_host_alias(NULL, "b.com", HTS_TRUE, dest, sizeof(dest)) == NULL);
@@ -1552,8 +1513,6 @@ static int st_hashkey_bounds(httrackp *opt, int argc, char **argv) {
   char *arena = malloct(keysize + guard);
   int hack;
 
-  (void) argc;
-  (void) argv;
   assertf(adr != NULL && fil != NULL && cat != NULL && arena != NULL);
   opt->no_www_dedup = opt->no_slash_dedup = opt->no_query_dedup = HTS_FALSE;
   /* the crawler's own key buffer, or every maximal URL would collide */
@@ -1632,8 +1591,6 @@ static int st_hashkey_bounds(httrackp *opt, int argc, char **argv) {
 /* #159: hts_redirect_same_savefile decides whether a redirect is a same-file
  * alias. */
 static int st_redirect_samefile(httrackp *opt, int argc, char **argv) {
-  (void) argc;
-  (void) argv;
 #define SAME(aa, fa, ab, fb) hts_redirect_same_savefile(opt, aa, fa, ab, fb)
   /* scheme and userinfo collapse (the #159 case); a different path does not */
   assertf(SAME("http://foo.com", "/a/b", "https://foo.com", "/a/b"));
@@ -1696,8 +1653,6 @@ static int st_urlbounds(httrackp *opt, int argc, char **argv) {
   char **filters = NULL;
   int filptr = 0, prio = 0;
 
-  (void) argc;
-  (void) argv;
   assertf(cookie != NULL);
   opt->log = NULL; /* the paths below are 2 KB of noise */
   assertf(filters_init(&filters, opt->maxfilter, 0) != 0);
