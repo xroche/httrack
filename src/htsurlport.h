@@ -98,7 +98,9 @@ hts_boolean hts_header_param(const char *value, const char *seps,
                              const char *name, char *out, size_t size);
 
 /* Return the reason phrase of the HTTP status CODE, or NULL if unknown. The
-   text is static. Not exported: proxytrack, which has no library, needs it. */
+   text is static. Lives here so proxytrack, which does not link the library,
+   can share it. Not HTSEXT_API, because that breaks the MSVC proxytrack
+   build. */
 const char *hts_status_reason(int code);
 
 #endif
