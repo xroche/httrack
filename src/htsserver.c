@@ -1102,7 +1102,8 @@ static void load_ui_settings(void) {
   while (!feof(fp) && !ferror(fp)) {
     char line[256];
 
-    if (hts_shared_linput(fp, line, sizeof(line) - 2, HTS_TRUE) > 0 &&
+    if (hts_shared_linput(fp, line, sizeof(line) - 2, HTS_LINPUT_SKIP_NUL) >
+            0 &&
         strncmp(line, "uitheme=", 8) == 0 && theme_name_is_valid(line + 8)) {
       strcpybuff(ui_theme, line + 8);
     }
@@ -2292,7 +2293,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                 size_t prevlen = StringLength(output);
                 int nocr = 0;
 
-                if (!hts_shared_linput(fp, line, sizeof(line) - 2, HTS_TRUE)) {
+                if (!hts_shared_linput(fp, line, sizeof(line) - 2,
+                                       HTS_LINPUT_SKIP_NUL)) {
                   *str = '\0';
                 }
                 if (hts_lastchar(str) == '\\') {

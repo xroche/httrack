@@ -1699,7 +1699,7 @@ static hts_boolean cache_rlen(FILE *fp, long int datSize, size_t *len) {
   char buff[256 + 4];
 
   *len = 0;
-  hts_shared_linput(fp, buff, 256, HTS_TRUE);
+  hts_shared_linput(fp, buff, 256, HTS_LINPUT_SKIP_NUL);
   if (sscanf(buff, INTsysP, &i) != 1 || i < 0 || i > CACHE_FIELD_MAXSIZE)
     return HTS_FALSE;
   if (!cache_fits(fp, datSize, (size_t) i))
@@ -2322,7 +2322,7 @@ static time_t getArcTimestamp(const char *const line) {
 static int readArcURLRecord(PT_Index__Arc index) {
   index->line[0] = '\0';
   if (hts_shared_linput(index->file, index->line, sizeof(index->line) - 1,
-                        HTS_TRUE)) {
+                        HTS_LINPUT_SKIP_NUL)) {
     return 0;
   }
   return -1;
@@ -2675,7 +2675,7 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
         /* Read HTTP headers */
         /* HTTP/1.1 404 Not Found */
         if (hts_shared_linput(index->file, index->line, sizeof(index->line) - 1,
-                              HTS_TRUE) &&
+                              HTS_LINPUT_SKIP_NUL) &&
             !arcPastRecordEnd(index->file, fposEnd)) {
           if ((pos = getArcField(index->line, 1)) != NULL) {
             if (sscanf(pos, "%d", &r->statuscode) != 1) {
@@ -2687,7 +2687,8 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
             strncatbuff(r->msg, pos, sizeof(r->msg) - 1);
           }
           while (hts_shared_linput(index->file, index->line,
-                                   sizeof(index->line) - 1, HTS_TRUE) &&
+                                   sizeof(index->line) - 1,
+                                   HTS_LINPUT_SKIP_NUL) &&
                  index->line[0] != '\0') {
             char *const line = index->line;
             char *value = strchr(line, ':');

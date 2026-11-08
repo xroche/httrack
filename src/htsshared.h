@@ -44,6 +44,9 @@ Please visit our Website: http://www.httrack.com
    cut at the bound has its newline consumed, so the next read is not "". */
 int hts_shared_linput(FILE *fp, char *s, int max, hts_boolean skip_nul);
 
+/* The skip_nul value of the htsserver and proxytrack readers. */
+#define HTS_LINPUT_SKIP_NUL HTS_TRUE
+
 /* Is s an existing regular file? A plain stat(), with no path conversion. */
 hts_boolean hts_shared_fexist(const char *s);
 
