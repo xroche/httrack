@@ -939,6 +939,18 @@ static char *golden_slurp(const char *path, size_t *len) {
   return buf;
 }
 
+/* Turns each CR LF into LF in place, and returns the new length. */
+static size_t golden_drop_cr(char *buf, size_t len) {
+  size_t i, o = 0;
+
+  for (i = 0; i < len; i++) {
+    if (!(buf[i] == '\r' && i + 1 < len && buf[i + 1] == '\n'))
+      buf[o++] = buf[i];
+  }
+  buf[o] = '\0';
+  return o;
+}
+
 /* Is the file at dir/name exactly these bytes? */
 static hts_boolean gif_is(const char *dir, const char *name, const char *data,
                           size_t size) {
@@ -1015,6 +1027,8 @@ static int st_topindexgolden(httrackp *opt, int argc, char **argv) {
   got = golden_slurp(path, &gotlen);
   want = golden_slurp(argv[1], &wantlen);
   assertf(got != NULL && want != NULL);
+  /* LF is CR LF on Windows, and the golden is LF only */
+  gotlen = golden_drop_cr(got, gotlen);
   assertf(strstr(got, stamp) != NULL);
   /* the header and the footer each carry one; the mask is shorter */
   while ((at = strstr(got, stamp)) != NULL) {
