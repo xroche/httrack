@@ -69,10 +69,6 @@ static int st_profilecharset(httrackp *opt, int argc, char **argv) {
   char path[HTS_URLMAXSIZE];
   size_t i;
 
-  if (argc < 1) {
-    fprintf(stderr, "profilecharset: needs a directory\n");
-    return 1;
-  }
   assertf(!hts_profile_declares_utf8(argv[0])); /* a directory, not a file */
   snprintf(path, sizeof(path), "%s/winprofile.ini", argv[0]);
   assertf(!hts_profile_declares_utf8(path)); /* missing file */
@@ -106,10 +102,6 @@ static int st_profilecharset(httrackp *opt, int argc, char **argv) {
 static int st_getcategory(httrackp *opt, int argc, char **argv) {
   char *categ;
 
-  if (argc < 1) {
-    fprintf(stderr, "getcategory: needs a file\n");
-    return 1;
-  }
   categ = hts_getcategory(argv[0]);
   printf("category=[%s]\n", categ != NULL ? categ : "(none)");
   freet(categ);
@@ -121,7 +113,7 @@ static int st_getcategory(httrackp *opt, int argc, char **argv) {
 /* ------------------------------------------------------------ */
 
 const struct selftest_entry selftests_tools[] = {
-    {"endtoken", "<tag bytes after attr=>", "value rech_endtoken() reads",
+    {"endtoken", "[tag bytes after attr=]", "value rech_endtoken() reads",
      st_endtoken},
     {"profilecharset", "<dir>",
      "which winprofile.ini files declare Charset=UTF-8", st_profilecharset},

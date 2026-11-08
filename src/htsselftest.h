@@ -41,10 +41,11 @@ Please visit our Website: http://www.httrack.com
 typedef struct httrackp httrackp;
 #endif
 
-/* One self-test: the name `-#test=` takes, a usage hint and a description for
-   the listing, and the handler that runs it over argv[0..argc-1] and returns
-   the process exit code. A module publishes a table of these, ended by a NULL
-   name. */
+/* One self-test: the name `-#test=` takes, the usage, and a description for
+   the listing. Each leading <x> in the usage is required and checked before fn
+   runs, while [x] is optional. Then comes the handler that runs it over
+   argv[0..argc-1] and returns the process exit code. A module publishes a table
+   of these, ended by a NULL name. */
 struct selftest_entry {
   const char *name;
   const char *args;

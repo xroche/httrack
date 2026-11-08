@@ -36,20 +36,12 @@ Please visit our Website: http://www.httrack.com
 static int st_refname(httrackp *opt, int argc, char **argv) {
   char name[64];
 
-  if (argc < 2) {
-    fprintf(stderr, "refname: needs <adr> <fil>\n");
-    return 1;
-  }
   url_savename_refname(argv[0], argv[1], name);
   printf("refname=%s\n", name);
   return 0;
 }
 
 static int st_simplify(httrackp *opt, int argc, char **argv) {
-  if (argc < 1) {
-    fprintf(stderr, "simplify: needs a path\n");
-    return 1;
-  }
   fil_simplifie(argv[0]);
   printf("simplified=%s\n", argv[0]);
   return 0;
@@ -58,10 +50,6 @@ static int st_simplify(httrackp *opt, int argc, char **argv) {
 static int st_expandhome(httrackp *opt, int argc, char **argv) {
   String path = STRING_EMPTY;
 
-  if (argc < 1) {
-    fprintf(stderr, "expandhome: needs a path\n");
-    return 1;
-  }
   StringCopy(path, argv[0]);
   expand_home(&path);
   printf("expanded=%s\n", StringBuff(path));
@@ -72,10 +60,6 @@ static int st_expandhome(httrackp *opt, int argc, char **argv) {
 static int st_relative(httrackp *opt, int argc, char **argv) {
   char s[HTS_URLMAXSIZE * 2];
 
-  if (argc < 2) {
-    fprintf(stderr, "relative: needs a link and a current-file path\n");
-    return 1;
-  }
   if (lienrelatif(s, sizeof(s), argv[0], argv[1]) == 0)
     printf("relative=%s\n", s);
   else
@@ -87,10 +71,6 @@ static int st_resolve(httrackp *opt, int argc, char **argv) {
   lien_adrfil af;
   int r;
 
-  if (argc < 3) {
-    fprintf(stderr, "resolve: needs a link, an origin address and file\n");
-    return 1;
-  }
   r = ident_url_relatif(argv[0], argv[1], argv[2], &af);
   if (r == 0)
     printf("adr=%s fil=%s\n", af.adr, af.fil);
@@ -103,10 +83,6 @@ static int st_resolve(httrackp *opt, int argc, char **argv) {
 static int st_toport(httrackp *opt, int argc, char **argv) {
   int i;
 
-  if (argc < 1) {
-    fprintf(stderr, "toport: needs a URL\n");
-    return 1;
-  }
   for (i = 0; i < argc; i++) {
     const char *const port = jump_toport_const(argv[i]);
 
@@ -153,10 +129,6 @@ static int st_identurl(httrackp *opt, int argc, char **argv) {
   char *url;
   size_t len, pad = 0;
 
-  if (argc < 1) {
-    fprintf(stderr, "identurl: needs a URL\n");
-    return 1;
-  }
   if (argc >= 2)
     pad = (size_t) atoi(argv[1]);
   len = strlen(argv[0]);
@@ -417,10 +389,6 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
   int rc = 0;
   int i;
 
-  if (argc < 2) {
-    fprintf(stderr, "savename: needs a fil and a content-type\n");
-    return 1;
-  }
   /* knobs first: hash_init and the prior links depend on them */
   for (i = 2; i < argc; i++) {
     const char *const a = argv[i];

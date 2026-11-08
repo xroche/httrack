@@ -476,8 +476,7 @@ static int st_cookieport(httrackp *opt, int argc, char **argv) {
   err |= cookie_expect(strstr(jar.data, "kept") != NULL, HTS_TRUE,
                        "the delete took its neighbour with it");
 
-  printf("cookie-port: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("cookie-port", err);
 }
 
 /* Write one raw jar record, the way a file written elsewhere reaches
@@ -593,8 +592,7 @@ static int st_cookiecase(httrackp *opt, int argc, char **argv) {
                        "example.com", "sess=S"),
       HTS_TRUE, "domain=Example.COM never came back to example.com");
 
-  printf("%s: %s\n", LABEL, err ? "FAIL" : "OK");
-  return err;
+  return st_verdict(LABEL, err);
 }
 
 /* RFC 6265 section 5.1.3 lets a jar domain reach a host only when it names
@@ -716,8 +714,7 @@ static int st_cookiedomain(httrackp *opt, int argc, char **argv) {
                             trips[i].what);
   }
 
-  printf("%s: %s\n", LABEL, err ? "FAIL" : "OK");
-  return err;
+  return st_verdict(LABEL, err);
 }
 
 /* Records of host in the jar. */
@@ -1106,18 +1103,13 @@ static int st_cookiecap(httrackp *opt, int argc, char **argv) {
   /* A full jar makes a host over its share evict its own oldest records. */
   err |= cookie_hostcap_rows();
 
-  printf("cookie-cap: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("cookie-cap", err);
 }
 
 /* -#test=cookieimport <dir>: load a jar (and, on Windows, copied IE cookies
    *@*.txt) from a long, non-ASCII folder via the UTF-8/long-path wrappers
    (#133). POSIX compiles the IE block out; there it is a positive control. */
 static int st_cookieimport(httrackp *opt, int argc, char **argv) {
-  if (argc < 1) {
-    fprintf(stderr, "cookieimport: needs a writable base dir\n");
-    return 1;
-  }
   char dir[HTS_URLMAXSIZE * 2];
   size_t base = 0;
   const size_t dirlen =
@@ -1684,8 +1676,7 @@ static int st_cookiesetscope(httrackp *opt, int argc, char **argv) {
       }
     }
   }
-  printf("%s: %s\n", LABEL, err ? "FAIL" : "OK");
-  return err;
+  return st_verdict(LABEL, err);
 #undef FUTURE
 #undef PAST
 }
@@ -1699,10 +1690,6 @@ static int st_cookiehttponly(httrackp *opt, int argc, char **argv) {
   char hdr[1024];
   FILE *fp;
 
-  if (argc < 1) {
-    fprintf(stderr, "cookiehttponly: needs a writable dir\n");
-    return 1;
-  }
   assertf(sprintfbuff(fpath, "%s/", argv[0]));
   assertf(sprintfbuff(file, "%scookies.txt", fpath));
   fp = FOPEN(file, "wb");
@@ -1880,10 +1867,6 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
   size_t i;
   int err = 0;
 
-  if (argc < 1) {
-    fprintf(stderr, "cookiejar: needs a writable dir\n");
-    return 1;
-  }
   jar.max_len = sizeof(jar.data);
   jar.data[0] = '\0';
   for (i = 0; i < sizeof(steps) / sizeof(steps[0]); i++) {
@@ -2947,8 +2930,7 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
     }
   }
 
-  printf("%s: %s\n", LABEL, err ? "FAIL" : "OK");
-  return err;
+  return st_verdict(LABEL, err);
 #undef LABEL
 }
 
@@ -3129,10 +3111,6 @@ static int st_cookieflat(httrackp *opt, int argc, char **argv) {
   int ret;
   int err = 0;
 
-  if (argc < 1) {
-    fprintf(stderr, "%s: needs a writable dir\n", LABEL);
-    return 1;
-  }
   cookieflat_dir = argv[0];
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     const char *const c = cases[i].content;
@@ -3227,8 +3205,7 @@ static int st_cookieflat(httrackp *opt, int argc, char **argv) {
     }
   }
 
-  printf("%s: %s\n", LABEL, err ? "FAIL" : "OK");
-  return err;
+  return st_verdict(LABEL, err);
 #undef BOM
 #undef FLAT_HOST
 #undef FLAT_DOMAIN
@@ -3309,7 +3286,7 @@ const struct selftest_entry selftests_cookie[] = {
      st_cookieimport},
     {"cookiehttponly", "<dir>",
      "a #HttpOnly_ jar line loads, other comments do not", st_cookiehttponly},
-    {"cookiequote", "<Set-Cookie header>",
+    {"cookiequote", "[Set-Cookie header]",
      "what the jar stores of a quoted cookie value and av", st_cookiequote},
     {"cookiejar", "<dir>",
      "the jar keeps host-only, Secure, HttpOnly and expiry, and logs a refusal",

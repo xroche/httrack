@@ -96,18 +96,13 @@ static int st_mptcpstats(httrackp *opt, int argc, char **argv) {
 
   hts_free_opt(from);
   hts_free_opt(to);
-  printf("mptcp-stats: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("mptcp-stats", err);
 }
 
 /* Print the host/port the FTP path splits out of a URL address. */
 static int st_ftpaddr(httrackp *opt, int argc, char **argv) {
   int i;
 
-  if (argc < 1) {
-    fprintf(stderr, "ftpaddr: needs a URL address\n");
-    return 1;
-  }
   for (i = 0; i < argc; i++) {
     char BIGSTK url[HTS_URLMAXSIZE * 2];
     char host[256];
@@ -183,10 +178,6 @@ static int st_proxyurl(httrackp *opt, int argc, char **argv) {
   char BIGSTK name[HTS_URLMAXSIZE * 2];
   int port = -1;
 
-  if (argc < 1) {
-    fprintf(stderr, "proxyurl: needs a proxy argument\n");
-    return 1;
-  }
   hts_parse_proxy(argv[0], name, sizeof(name), &port);
   // host= is the resolved host (scheme/userinfo stripped); kind= the transport
   printf("name=%s port=%d host=%s kind=%s\n", name, port,
@@ -1371,8 +1362,7 @@ static int st_mptcp(httrackp *opt, int argc, char **argv) {
 
   opt->mptcp = saved;
   opt->mptcp_connections = opt->mptcp_fallbacks = 0;
-  printf("mptcp: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("mptcp", err);
 #else
   printf("mptcp: SKIP (not built with Multipath TCP)\n");
   return 77;
@@ -1471,7 +1461,7 @@ const struct selftest_entry selftests_net[] = {
      st_ftpaddr},
     {"proxyauth", "<proxy>", "Basic credentials a proxy name carries",
      st_proxyauth},
-    {"sniname", "<url-address>...", "TLS SNI name taken from a URL address",
+    {"sniname", "[url-address]...", "TLS SNI name taken from a URL address",
      st_sniname},
     {"ftp-pasv", "pasv|epsv <reply>",
      "the address and port a PASV or EPSV reply parses into", st_ftppasv},

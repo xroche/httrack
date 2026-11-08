@@ -507,7 +507,7 @@ static int st_fopen_private(httrackp *opt, int argc, char **argv) {
 /* ------------------------------------------------------------ */
 
 const struct selftest_entry selftests_lines[] = {
-    {"readline", "<cap> <t|n|tn|-> <text> [cpp|alloc]",
+    {"readline", "<cap> <t|n|tn|-> [text] [cpp|alloc]",
      "config-file line reader: [line] per read, ! when cut", st_readline},
     {"linediff", "", "line readers against the legacy ones they replaced",
      st_linediff},

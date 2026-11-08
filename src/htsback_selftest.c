@@ -60,8 +60,7 @@ static int st_mirrorcompleted(httrackp *opt, int argc, char **argv) {
 
   hts_free_opt(from);
   hts_free_opt(to);
-  printf("mirror-completed: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("mirror-completed", err);
 }
 
 /* stat_errors reads the same for a 404 as for a timeout. A front end deciding
@@ -88,8 +87,7 @@ static int st_transportfailures(httrackp *opt, int argc, char **argv) {
 
   hts_free_opt(from);
   hts_free_opt(to);
-  printf("transport-failures: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("transport-failures", err);
 }
 
 static int st_pause(httrackp *opt, int argc, char **argv) {
@@ -116,8 +114,7 @@ static int st_pause(httrackp *opt, int argc, char **argv) {
     (void) hts_pause_target_ms(54321, 5000, 10000);
     ST_FAIL_IF(err, hts_pause_target_ms(99, 5000, 10000) != a);
   }
-  printf("pause: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("pause", err);
 }
 
 /* #747: a thread is outstanding from the moment hts_newthread() returns, not
@@ -292,10 +289,6 @@ static int st_spoolwrite(httrackp *opt, int argc, char **argv) {
   lien_back back;
   int err = 0;
 
-  if (argc < 1) {
-    fprintf(stderr, "spoolwrite: needs a writable base dir\n");
-    return 1;
-  }
   snprintf(base, sizeof(base), "%s/", argv[0]);
   StringCopy(opt->path_html_utf8, base);
   memset(&back, 0, sizeof(back));
@@ -330,8 +323,7 @@ static int st_spoolwrite(httrackp *opt, int argc, char **argv) {
   (void) UNLINK(name);
   back_tmpdir_drop(name);
   freet(back.r.adr);
-  printf("spoolwrite: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("spoolwrite", err);
 }
 
 static hts_boolean st_spool_plant(const char *path) {
@@ -384,10 +376,6 @@ static int st_spoolsweep(httrackp *opt, int argc, char **argv) {
   size_t i;
   int err = 0;
 
-  if (argc < 1) {
-    fprintf(stderr, "spoolsweep: needs a writable base dir\n");
-    return 1;
-  }
   snprintf(base, sizeof(base), "%s/", argv[0]);
   StringCopy(opt->path_html_utf8, base);
   /* a file of our own pid predates this run, so it is stale */
@@ -453,8 +441,7 @@ static int st_spoolsweep(httrackp *opt, int argc, char **argv) {
     fprintf(stderr, "spoolsweep: emptied ~hts-tmp was kept\n");
     err++;
   }
-  printf("spoolsweep: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("spoolsweep", err);
 }
 
 /* TEST-NET-1: routed nowhere, so a connect to it stays pending. */
@@ -839,8 +826,7 @@ cleanup:
   if (skipped)
     return 77;
 
-  printf("backstop self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("backstop self-test", err);
 }
 
 /* back_new() sizes its slot table from -cN, so a user can ask for one that
@@ -1054,8 +1040,7 @@ static int st_relaxedcounter(httrackp *opt, int argc, char **argv) {
             hts_load_relaxed_llint(&relaxed_counter));
     err = 1;
   }
-  printf("relaxedcounter self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("relaxedcounter self-test", err);
 }
 
 static int st_threadwait(httrackp *opt, int argc, char **argv) {
@@ -1106,8 +1091,7 @@ static int st_threadwait(httrackp *opt, int argc, char **argv) {
     err = 1;
   }
 
-  printf("threadwait self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("threadwait self-test", err);
 }
 
 /* Confirms the runner encloses the body exactly once, on the worker. */
@@ -1418,22 +1402,19 @@ static int st_threadrunner(httrackp *opt, int argc, char **argv) {
     err = 1;
   }
 
-  printf("threadrunner self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("threadrunner self-test", err);
 }
 
 static int st_ftpworker(httrackp *opt, int argc, char **argv) {
   const int err = ftp_worker_selftests();
 
-  printf("ftp-worker-selftest: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("ftp-worker-selftest", err);
 }
 
 static int st_ftphandoff(httrackp *opt, int argc, char **argv) {
   const int err = ftp_handoff_selftests(opt);
 
-  printf("ftp-handoff-selftest: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("ftp-handoff-selftest", err);
 }
 
 /* #1697: hts_strerror() must own its output. strerror() answers with a buffer
@@ -1552,8 +1533,7 @@ static int st_strerror(httrackp *opt, int argc, char **argv) {
     err = 1;
   }
 
-  printf("strerror self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("strerror self-test", err);
 }
 
 /* hts_mutexlock() builds a lock on first use, so threads meet an empty slot. */
@@ -1613,8 +1593,7 @@ static int st_mutexlazyinit(httrackp *opt, int argc, char **argv) {
     mutexlazy_count[i] = 0;
   }
 
-  printf("mutexlazyinit self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("mutexlazyinit self-test", err);
 }
 
 /* ------------------------------------------------------------ */
@@ -1712,8 +1691,7 @@ static int st_hostban(httrackp *opt, int argc, char **argv) {
   back_free(&sback);
   freet(filters[0]);
   freet(filters);
-  printf("hostban self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("hostban self-test", err);
 }
 
 /* The clock starts just before a wall-clock second ends, so a whole-second
@@ -1755,8 +1733,7 @@ static int st_maxtime(httrackp *opt, int argc, char **argv) {
   opt->state.stop = 0;
   opt->maxtime = 0;
   opt->log = saved_log;
-  printf("maxtime self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("maxtime self-test", err);
 }
 
 const struct selftest_entry selftests_back[] = {
