@@ -115,43 +115,6 @@ HTS_STATIC char *getHtsOptBuff_(httrackp *opt) {
 #define OPT_GET_BUFF(OPT)      ( getHtsOptBuff_(OPT) )
 #define OPT_GET_BUFF_SIZE(OPT) ( sizeof(opt->state.concat.buff[0]) )
 
-/* ANCIENNE STURCTURE pour cache 1.0 */
-#ifndef HTS_DEF_FWSTRUCT_OLD_t_proxy
-#define HTS_DEF_FWSTRUCT_OLD_t_proxy
-typedef struct OLD_t_proxy OLD_t_proxy;
-#endif
-struct OLD_t_proxy {
-  int active;
-  char name[1024];
-  int port;
-};
-
-#ifndef HTS_DEF_FWSTRUCT_OLD_htsblk
-#define HTS_DEF_FWSTRUCT_OLD_htsblk
-typedef struct OLD_htsblk OLD_htsblk;
-#endif
-struct OLD_htsblk {
-  int statuscode;               // ANCIENNE STURCTURE - status-code, -1=erreur, 200=OK,201=..etc (cf RFC1945)
-  int notmodified;              // ANCIENNE STURCTURE - page ou fichier NON modifié (transféré)
-  int is_write;                 // ANCIENNE STURCTURE - sortie sur disque (out) ou en mémoire (adr)
-  char *adr;                    // ANCIENNE STURCTURE - adresse du bloc de mémoire, NULL=vide
-  FILE *out;                    // ANCIENNE STURCTURE - écriture directe sur disque (si is_write=1)
-  int size;                     // ANCIENNE STURCTURE - taille fichier
-  char msg[80];                 // ANCIENNE STURCTURE - message éventuel si échec ("\0"=non précisé)
-  char contenttype[64];         // ANCIENNE STURCTURE - content-type ("text/html" par exemple)
-  char *location;               // ANCIENNE STURCTURE - on copie dedans éventuellement la véritable 'location'
-  int totalsize;                // ANCIENNE STURCTURE - taille totale à télécharger (-1=inconnue)
-  int is_file;                  // ANCIENNE STURCTURE - ce n'est pas une socket mais un descripteur de fichier si 1
-  T_SOC soc;                    // ANCIENNE STURCTURE - ID socket
-  FILE *fp;                     // ANCIENNE STURCTURE - fichier pour file://
-  OLD_t_proxy proxy;            // ANCIENNE STURCTURE - proxy
-  int user_agent_send;          // ANCIENNE STURCTURE - user agent (ex: httrack/1.0 [sun])
-  char user_agent[64];
-  int http11;                   // ANCIENNE STURCTURE - l'en tête doit être signé HTTP/1.1 et non HTTP/1.0
-};
-
-/* fin ANCIENNE STURCTURE pour cache 1.0 */
-
 // cache pour le dns, pour éviter de faire des gethostbyname sans arrêt
 #ifndef HTS_DEF_FWSTRUCT_t_dnscache
 #define HTS_DEF_FWSTRUCT_t_dnscache
@@ -464,9 +427,6 @@ SOCaddr *hts_dns_resolve_nocache2(const char *const hostname,
                                   SOCaddr *const addr, const char **error);
 SOCaddr *hts_dns_resolve_nocache(const char *const hostname,
                                  SOCaddr *const addr);
-int check_hostname_dns(const char *const hostname);
-
-int ftp_available(void);
 
 #if HTS_DNSCACHE
 /* Return opt's DNS cache hashtable (hostname -> t_dnscache record), creating it
@@ -525,9 +485,7 @@ hts_boolean binput_line(const char *buff, const char *end, char *s, int max,
                         int *offset);
 /* Does treathead() read the header that "line" starts with? Keep in step. */
 hts_boolean hts_header_is_read(const char *line);
-int linput(FILE * fp, char *s, int max);
-int linputsoc(T_SOC soc, char *s, int max);
-int linputsoc_t(T_SOC soc, char *s, int max, int timeout);
+int linput(FILE *fp, char *s, int max);
 const char *strstrcase(const char *s, const char *o);
 int ident_url_absolute(const char *url, lien_adrfil *adrfil);
 void fil_simplifie(char *f);
@@ -774,11 +732,6 @@ int fexist_utf8(const char *s);
 LLint fpsize(FILE *fp);
 LLint fsize(const char *s);
 LLint fsize_utf8(const char *s);
-
-// Threads
-typedef void *(*beginthread_type) (void *);
-
-/*unsigned long _beginthread( beginthread_type start_address, unsigned stack_size, void *arglist );*/
 
 /* variables globales */
 extern int _DEBUG_HEAD;
