@@ -32,7 +32,7 @@ EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c gaistall.c noba
 	62_lang-untranslated.counts \
 	62_lang-linebreaks.counts \
 	834_engine-entities-sweep.pairs \
-	885_topindex.golden
+	topindex.golden
 
 TESTS_ENVIRONMENT =
 TESTS_ENVIRONMENT += PATH=$(top_builddir)/src$(PATH_SEPARATOR)$$PATH

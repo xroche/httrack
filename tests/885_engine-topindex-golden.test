@@ -8,7 +8,7 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-golden="${top_srcdir:-..}/tests/885_topindex.golden"
+golden="${top_srcdir:-..}/tests/topindex.golden"
 dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
 
