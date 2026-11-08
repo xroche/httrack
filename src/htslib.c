@@ -8406,9 +8406,20 @@ static int __cdecl htsdefault_check_mime(t_hts_callbackarg * carg,
 }
 static void __cdecl htsdefault_pause(t_hts_callbackarg * carg, httrackp * opt,
                                      const char *lockfile) {
-  while(fexist(lockfile)) {
+  String abortlock = STRING_EMPTY, progress = STRING_EMPTY;
+
+  /* Strings, because lockfile already holds a rotating OPT_GET_BUFF. */
+  StringCopy(abortlock, StringBuff(opt->path_log));
+  StringCat(abortlock, HTS_ABORT_LOCKNAME);
+  StringCopy(progress, StringBuff(opt->path_log));
+  StringCat(progress, "hts-in_progress.lock");
+  /* A stop, an exit or an abort request aimed at this run ends the wait. */
+  while (fexist_utf8(lockfile) && !hts_run_is_ending(opt) &&
+         !hts_file_is_newer(StringBuff(abortlock), StringBuff(progress))) {
     Sleep(1000);
   }
+  StringFree(progress);
+  StringFree(abortlock);
 }
 static void __cdecl htsdefault_filesave(t_hts_callbackarg * carg,
                                         httrackp * opt, const char *file) {

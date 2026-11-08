@@ -4718,10 +4718,11 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
         do_pause = 1;
       }
     }
-    // pause?
-    if (do_pause) {
+    /* A run already winding down would pause with nothing left to wake it. */
+    if (do_pause && !hts_run_is_ending(opt)) {
       hts_log_print(opt, LOG_INFO, "engine: pause requested..");
-      while(back_nsoc(sback) > 0) {     // attendre fin des transferts
+      /* Drain the transfers, unless the run is ending meanwhile. */
+      while (back_nsoc(sback) > 0 && !hts_run_is_ending(opt)) {
         back_wait(sback, opt, cache, HTS_STAT.stat_timestart);
         Sleep(200);
         {
@@ -4736,27 +4737,29 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
           }
         }
       }
-      {
+      /* A stop during the drain must not pause either. */
+      if (!hts_run_is_ending(opt)) {
         FILE *fp = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                                  StringBuff(opt->path_log), "hts-paused.lock"),
                          "wb");
         if (fp) {
-          fspc(NULL, fp, "info");       // dater
+          fspc(NULL, fp, "info"); // timestamp
           fprintf(fp,
                   "Pause" LF "HTTrack is paused after retreiving " LLintP
                   " bytes" LF "Delete this file to continue the mirror->.." LF
-                  "" LF "", (LLint) HTS_STAT.stat_bytes);
+                  "" LF "",
+                  (LLint) HTS_STAT.stat_bytes);
           fclose(fp);
         }
+        stat_fragment = HTS_STAT.stat_bytes;
+        /* Info for wrappers */
+        hts_log_print(opt, LOG_INFO, "engine: pause: %s",
+                      fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                              StringBuff(opt->path_log), "hts-paused.lock"));
+        RUN_CALLBACK1(opt, pause,
+                      fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                              StringBuff(opt->path_log), "hts-paused.lock"));
       }
-      stat_fragment = HTS_STAT.stat_bytes;
-      /* Info for wrappers */
-      hts_log_print(opt, LOG_INFO, "engine: pause: %s",
-                    fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),  StringBuff(opt->path_log),
-                            "hts-paused.lock"));
-      RUN_CALLBACK1(opt, pause,
-                    fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),  StringBuff(opt->path_log),
-                            "hts-paused.lock"));
     }
     //
   }

@@ -44,7 +44,6 @@ Please visit our Website: http://www.httrack.com
 #include "htsthread.h"
 
 /* Static definitions */
-static int fexist(const char *s);
 static int linput(FILE * fp, char *s, int max);
 
 // htswrap_add
@@ -104,11 +103,9 @@ static const char *__cdecl htsshow_query3(t_hts_callbackarg * carg,
                                           httrackp * opt, const char *question);
 static int __cdecl htsshow_check(t_hts_callbackarg * carg, httrackp * opt,
                                  const char *adr, const char *fil, int status);
-static int __cdecl htsshow_check_mime(t_hts_callbackarg * carg, httrackp * opt,
+static int __cdecl htsshow_check_mime(t_hts_callbackarg *carg, httrackp *opt,
                                       const char *adr, const char *fil,
                                       const char *mime, int status);
-static void __cdecl htsshow_pause(t_hts_callbackarg * carg, httrackp * opt,
-                                  const char *lockfile);
 static void __cdecl htsshow_filesave(t_hts_callbackarg * carg, httrackp * opt,
                                      const char *file);
 static void __cdecl htsshow_filesave2(t_hts_callbackarg * carg, httrackp * opt,
@@ -352,7 +349,6 @@ int main(int argc, char **argv) {
   CHAIN_FUNCTION(opt, loop, htsshow_loop, NULL);
   CHAIN_FUNCTION(opt, check_link, htsshow_check, NULL);
   CHAIN_FUNCTION(opt, check_mime, htsshow_check_mime, NULL);
-  CHAIN_FUNCTION(opt, pause, htsshow_pause, NULL);
   CHAIN_FUNCTION(opt, filesave, htsshow_filesave, NULL);
   CHAIN_FUNCTION(opt, filesave2, htsshow_filesave2, NULL);
   CHAIN_FUNCTION(opt, linkdetected, htsshow_linkdetected, NULL);
@@ -815,27 +811,6 @@ static int __cdecl htsshow_check_mime(t_hts_callbackarg * carg, httrackp * opt,
                                       const char *mime, int status) {
   return -1;
 }
-static void __cdecl htsshow_pause(t_hts_callbackarg * carg, httrackp * opt,
-                                  const char *lockfile) {
-  String abortlock = STRING_EMPTY, progress = STRING_EMPTY;
-
-  /* Strings, because a truncated path would leave a paused engine polling one
-     nothing can create. */
-  StringCopy(abortlock, StringBuff(opt->path_log));
-  StringCat(abortlock, HTS_ABORT_LOCKNAME);
-  StringCopy(progress, StringBuff(opt->path_log));
-  StringCat(progress, "hts-in_progress.lock");
-  /* Leaving the wait is all this has to do, because the engine takes the
-     request at its next check. hts_file_is_newer() is the staleness rule
-     hts_take_lock_request() applies, or a request an earlier run left would
-     defeat the pause. */
-  while (fexist(lockfile) &&
-         !hts_file_is_newer(StringBuff(abortlock), StringBuff(progress))) {
-    Sleep(1000);
-  }
-  StringFree(progress);
-  StringFree(abortlock);
-}
 static void __cdecl htsshow_filesave(t_hts_callbackarg * carg, httrackp * opt,
                                      const char *file) {
 }
@@ -881,19 +856,6 @@ static int __cdecl htsshow_receiveheader(t_hts_callbackarg * carg,
 }
 
 /* *** Various functions *** */
-
-/* Note: utf-8 */
-static int fexist(const char *s) {
-  STRUCT_STAT st;
-
-  memset(&st, 0, sizeof(st));
-  if (STAT(s, &st) == 0) {
-    if (S_ISREG(st.st_mode)) {
-      return 1;
-    }
-  }
-  return 0;
-}
 
 static int linput(FILE * fp, char *s, int max) {
   int c;

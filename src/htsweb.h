@@ -68,11 +68,9 @@ const char *__cdecl htsshow_query3(t_hts_callbackarg * carg, httrackp * opt,
                                    const char *question);
 int __cdecl htsshow_check(t_hts_callbackarg * carg, httrackp * opt,
                           const char *adr, const char *fil, int status);
-int __cdecl htsshow_check_mime(t_hts_callbackarg * carg, httrackp * opt,
+int __cdecl htsshow_check_mime(t_hts_callbackarg *carg, httrackp *opt,
                                const char *adr, const char *fil,
                                const char *mime, int status);
-void __cdecl htsshow_pause(t_hts_callbackarg * carg, httrackp * opt,
-                           const char *lockfile);
 void __cdecl htsshow_filesave(t_hts_callbackarg * carg, httrackp * opt,
                               const char *file);
 void __cdecl htsshow_filesave2(t_hts_callbackarg * carg, httrackp * opt,
