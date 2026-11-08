@@ -1080,6 +1080,82 @@ static void PT_Element_refuse_save(PT_Element r, const char *save) {
   r->statuscode = STATUSCODE_INVALID;
 }
 
+/* Resolve save under root into dst, refusing a name that leaves it. */
+static void PT_resolve_previous_save(char *dst, size_t size, const char *root,
+                                     const char *save, PT_Element r,
+                                     const char *url, int *fixedPath,
+                                     int *safeCache) {
+  int pathLen;
+
+  if (save[0] == '\0')
+    return;
+  if (!hts_path_is_contained(save)) {
+    /* save is opened and its bytes go to the client */
+    proxytrack_print_log(WARNING,
+                         "cache filename holds a \"..\" component, "
+                         "not serving it: %s",
+                         save);
+    PT_Element_refuse_save(r, save);
+    return;
+  }
+  pathLen = (int) strlen(root);
+  /* old (<3.40) buggy format */
+  if (pathLen > 0 && strncmp(save, root, pathLen) == 0) {
+    strlcpybuff(dst, save, size);
+  }
+  // relative ? (hack)
+  else if (*safeCache || (save[0] != '/' // /home/foo/bar.gif
+                          && (!isalpha((unsigned char) save[0]) ||
+                              save[1] != ':')) // c:/home/foo/bar.gif
+  ) {
+    if (!index_join_root(dst, size, root, save)) {
+      PT_Element_refuse_save(r, save);
+    } else {
+      *safeCache = 1;
+    }
+  }
+  // bogus format (includes buggy absolute path)
+  else {
+    /* guess previous path */
+    if (*fixedPath == 0) {
+      const char *start = jump_protocol_and_auth(url);
+      const char *end = start ? strchr(start, '/') : NULL;
+      int len = (int) (end - start);
+
+      if (start != NULL && end != NULL && len > 0 && len < 128) {
+        char piece[128 + 2];
+        const char *where;
+
+        piece[0] = '\0';
+        strncat(piece, start, len);
+        if ((where = save_find_host(save, piece)) != NULL) {
+          *fixedPath = (int) (where - save);
+        }
+      }
+    }
+    if (*fixedPath > 0) {
+      int saveLen = (int) strlen(save);
+
+      if (*fixedPath >= saveLen) {
+        PT_Element_failf(r, "Bogus fixePath prefix for %s (prefixLen=%d)", save,
+                         *fixedPath);
+        r->statuscode = STATUSCODE_INVALID;
+      } else if (!index_join_root(dst, size, root, save + *fixedPath)) {
+        PT_Element_refuse_save(r, save);
+      }
+    } else {
+      /* an absolute name the host guess could not reduce, so no relative
+         part is left to join onto the root */
+      proxytrack_print_log(
+          WARNING,
+          "cache filename is absolute and holds no path to reduce, "
+          "not serving it: %s",
+          save);
+      PT_Element_refuse_save(r, save);
+    }
+  }
+}
+
 int PT_LoadCache__New(PT_Index index_, const char *filename) {
   if (index_ != NULL && filename != NULL) {
     PT_Index__New index = &index_->slots.formatNew;
@@ -1319,82 +1395,9 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
             }
           } while (offset < readSizeHeader && !lineEof);
 
-          /* Previous entry */
-          if (previous_save_[0] != '\0' &&
-              !hts_path_is_contained(previous_save_)) {
-            /* the archive is someone else's file, and previous_save is opened
-               at :1982 and served to the client */
-            proxytrack_print_log(WARNING,
-                                 "cache filename holds a \"..\" component, "
-                                 "not serving it: %s",
-                                 previous_save_);
-            PT_Element_refuse_save(r, previous_save_);
-            previous_save_[0] = '\0';
-          }
-          if (previous_save_[0] != '\0') {
-            int pathLen = (int) strlen(index->path);
-
-            if (pathLen > 0 && strncmp(previous_save_, index->path, pathLen) == 0) {    // old (<3.40) buggy format
-              strcpybuff(previous_save, previous_save_);
-            }
-            // relative ? (hack)
-            else if (index->safeCache ||
-                     (previous_save_[0] != '/' // /home/foo/bar.gif
-                      && (!isalpha((unsigned char) previous_save_[0]) ||
-                          previous_save_[1] != ':')) // c:/home/foo/bar.gif
-            ) {
-              if (!index_join_root(previous_save, sizeof(previous_save),
-                                   index->path, previous_save_)) {
-                PT_Element_refuse_save(r, previous_save_);
-              } else {
-                index->safeCache = 1;
-              }
-            }
-            // bogus format (includes buggy absolute path)
-            else {
-              /* guess previous path */
-              if (index->fixedPath == 0) {
-                const char *start = jump_protocol_and_auth(url);
-                const char *end = start ? strchr(start, '/') : NULL;
-                int len = (int) (end - start);
-
-                if (start != NULL && end != NULL && len > 0 && len < 128) {
-                  char piece[128 + 2];
-                  const char *where;
-
-                  piece[0] = '\0';
-                  strncat(piece, start, len);
-                  if ((where = save_find_host(previous_save_, piece)) != NULL) {
-                    index->fixedPath = (int) (where - previous_save_);
-                  }
-                }
-              }
-              if (index->fixedPath > 0) {
-                int saveLen = (int) strlen(previous_save_);
-
-                if (index->fixedPath >= saveLen) {
-                  PT_Element_failf(
-                      r, "Bogus fixePath prefix for %s (prefixLen=%d)",
-                      previous_save_, (int) index->fixedPath);
-                  r->statuscode = STATUSCODE_INVALID;
-                } else if (!index_join_root(previous_save,
-                                            sizeof(previous_save), index->path,
-                                            previous_save_ +
-                                                index->fixedPath)) {
-                  PT_Element_refuse_save(r, previous_save_);
-                }
-              } else {
-                /* an absolute name the host guess could not reduce, so no
-                   relative part is left to join onto the root */
-                proxytrack_print_log(
-                    WARNING,
-                    "cache filename is absolute and holds no path to reduce, "
-                    "not serving it: %s",
-                    previous_save_);
-                PT_Element_refuse_save(r, previous_save_);
-              }
-            }
-          }
+          PT_resolve_previous_save(previous_save, sizeof(previous_save),
+                                   index->path, previous_save_, r, url,
+                                   &index->fixedPath, &index->safeCache);
 
           /* Corrupt: negative, or in-cache at or above what the 32-bit zip
              writer could store. A headers-only entry above INT_MAX is
@@ -2073,88 +2076,9 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
         r->size = ok ? (size_t) size_read : 0;
       }
 
-      /* Check destination filename */
-
-      {
-        PT_Index__Old index = cache;
-
-        /* -------------------- COPY OF THE __New() CODE -------------------- */
-        if (previous_save_[0] != '\0' &&
-            !hts_path_is_contained(previous_save_)) {
-          /* same reason as the __New() reader: previous_save is opened and its
-             bytes go to the client */
-          proxytrack_print_log(WARNING,
-                               "cache filename holds a \"..\" component, "
-                               "not serving it: %s",
-                               previous_save_);
-          PT_Element_refuse_save(r, previous_save_);
-          previous_save_[0] = '\0';
-        }
-        if (previous_save_[0] != '\0') {
-          int pathLen = (int) strlen(index->path);
-
-          if (pathLen > 0 && strncmp(previous_save_, index->path, pathLen) == 0) {      // old (<3.40) buggy format
-            strcpybuff(previous_save, previous_save_);
-          }
-          // relative ? (hack)
-          else if (index->safeCache ||
-                   (previous_save_[0] != '/' // /home/foo/bar.gif
-                    && (!isalpha((unsigned char) previous_save_[0]) ||
-                        previous_save_[1] != ':')) // c:/home/foo/bar.gif
-          ) {
-            if (!index_join_root(previous_save, sizeof(previous_save),
-                                 index->path, previous_save_)) {
-              PT_Element_refuse_save(r, previous_save_);
-            } else {
-              index->safeCache = 1;
-            }
-          }
-          // bogus format (includes buggy absolute path)
-          else {
-            /* guess previous path */
-            if (index->fixedPath == 0) {
-              const char *start = jump_protocol_and_auth(url);
-              const char *end = start ? strchr(start, '/') : NULL;
-              int len = (int) (end - start);
-
-              if (start != NULL && end != NULL && len > 0 && len < 128) {
-                char piece[128 + 2];
-                const char *where;
-
-                piece[0] = '\0';
-                strncat(piece, start, len);
-                if ((where = save_find_host(previous_save_, piece)) != NULL) {
-                  index->fixedPath = (int) (where - previous_save_);
-                }
-              }
-            }
-            if (index->fixedPath > 0) {
-              int saveLen = (int) strlen(previous_save_);
-
-              if (index->fixedPath >= saveLen) {
-                PT_Element_failf(r,
-                                 "Bogus fixePath prefix for %s (prefixLen=%d)",
-                                 previous_save_, (int) index->fixedPath);
-                r->statuscode = STATUSCODE_INVALID;
-              } else if (!index_join_root(previous_save, sizeof(previous_save),
-                                          index->path,
-                                          previous_save_ + index->fixedPath)) {
-                PT_Element_refuse_save(r, previous_save_);
-              }
-            } else {
-              /* an absolute name the host guess could not reduce, so no
-                 relative part is left to join onto the root */
-              proxytrack_print_log(
-                  WARNING,
-                  "cache filename is absolute and holds no path to reduce, "
-                  "not serving it: %s",
-                  previous_save_);
-              PT_Element_refuse_save(r, previous_save_);
-            }
-          }
-        }
-        /* -------------------- END OF COPY OF THE __New() CODE -------------------- */
-      }
+      PT_resolve_previous_save(previous_save, sizeof(previous_save),
+                               cache->path, previous_save_, r, url,
+                               &cache->fixedPath, &cache->safeCache);
 
       /* Read data */
       if (ok) {
