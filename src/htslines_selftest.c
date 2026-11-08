@@ -109,7 +109,6 @@ static int st_readline(httrackp *opt, int argc, char **argv) {
   const hts_boolean alloc = argc >= 4 && strcmp(argv[3], "alloc") == 0;
   FILE *fp;
 
-  (void) opt;
   if (cap < 1 || cap > ST_LINE_MAXCAP) {
     fprintf(stderr, "readline: needs CAP (1..%d) FLAGS TEXT [cpp|alloc]\n",
             ST_LINE_MAXCAP);
@@ -373,9 +372,6 @@ static int st_linediff(httrackp *opt, int argc, char **argv) {
   size_t i;
   int n;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   for (i = 0; i < sizeof(corpus) / sizeof(corpus[0]); i++)
     st_diff_one(corpus[i], strlen(corpus[i]), &k);
   /* NUL is data too, and the one byte only some readers drop */
@@ -412,7 +408,6 @@ static int st_fopen_private(httrackp *opt, int argc, char **argv) {
   size_t i;
   static const char *const refused[] = {"a", "ab", "r", "r+", "w+", "wb+"};
 
-  (void) opt;
   if (argc < 1) {
     printf("usage: -#test=fopen-private <dir>\n");
     return 1;

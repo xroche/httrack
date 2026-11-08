@@ -93,7 +93,6 @@ static int st_wizardfilter(httrackp *opt, int argc, char **argv) {
   char pattern[HTS_FILTER_SLOT_SIZE];
   htsbuff f = htsbuff_array(pattern);
 
-  (void) opt;
   if (argc >= 3) {
     hts_wizard_answer_filter(
         &f, argc >= 5 ? atoi(argv[4]) : 0, atoi(argv[0]), argv[1], argv[2],
@@ -244,7 +243,6 @@ static int st_wizardscope(httrackp *opt, int argc, char **argv) {
   char scope[HTS_URLMAXSIZE];
   int k;
 
-  (void) opt;
   if (argc >= 1) {
     for (k = 0; hts_wizard_host_scope(argv[0], k, scope, sizeof(scope)); k++)
       printf("%d %s\n", k, scope);
@@ -324,9 +322,6 @@ static int st_wizardscope(httrackp *opt, int argc, char **argv) {
 
 /* #1117: which host-scope range an answer falls in. */
 static int st_wizardscopeanswer(httrackp *opt, int argc, char **argv) {
-  (void) opt;
-  (void) argc;
-  (void) argv;
 #define ANSWER(n, expect) assertf(hts_wizard_scope_answer(n) == (expect))
   /* the plain answers, and the boundary just below the first range */
   ANSWER(-999, HTS_DEFAULT);
@@ -471,7 +466,6 @@ static int st_wizardverdict(httrackp *opt, int argc, char **argv) {
 /* Prints the answer code of the reply <text>; with no argument, asserts the
    empty and NULL replies. */
 static int st_wizardreply(httrackp *opt, int argc, char **argv) {
-  (void) opt;
   if (argc >= 1) {
     printf("%d\n", hts_wizard_parse_reply(argv[0]));
     return 0;
@@ -488,7 +482,6 @@ static int st_wizardprompt(httrackp *opt, int argc, char **argv) {
   char prompt[HTS_URLMAXSIZE * 2];
   char adr[HTS_URLMAXSIZE], fil[HTS_URLMAXSIZE * 2];
 
-  (void) opt;
   if (argc >= 2) {
     hts_wizard_prompt_url(prompt, sizeof(prompt), argv[0], argv[1]);
     printf("%s\n", prompt);

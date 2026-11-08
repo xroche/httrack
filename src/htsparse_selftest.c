@@ -921,7 +921,6 @@ static int parse_selftest_jsimport(httrackp *opt) {
   size_t i;
   int err = 0;
 
-  (void) opt;
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++)
     err |= jsimport_case(cases[i].before, cases[i].want);
   printf("jsimport self-test %s (%d cases)\n", err ? "FAILED" : "OK",
@@ -1124,7 +1123,6 @@ static int parse_selftest_tagattr(httrackp *opt) {
   size_t b, g, i;
   int err = 0;
 
-  (void) opt;
   memset(&sw, 0, sizeof(sw));
   for (b = 0; b < sizeof(before) / sizeof(before[0]); b++) {
     for (g = 0; g < sizeof(gap) / sizeof(gap[0]); g++) {
@@ -1215,9 +1213,6 @@ static int st_linkdir(httrackp *opt, int argc, char **argv) {
       {"/?a=1&b=2", HTS_TRUE, HTS_FALSE},
   };
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     st_linkdir_case(cases[i].lien, cases[i].frag_or_query,
                     cases[i].multisegment);
@@ -1237,14 +1232,10 @@ static int st_jsscan(httrackp *opt, int argc, char **argv) {
 }
 
 static int st_jsimport(httrackp *opt, int argc, char **argv) {
-  (void) argc;
-  (void) argv;
   return parse_selftest_jsimport(opt);
 }
 
 static int st_tagattr(httrackp *opt, int argc, char **argv) {
-  (void) argc;
-  (void) argv;
   return parse_selftest_tagattr(opt);
 }
 
@@ -1286,9 +1277,6 @@ static char *rb_bulk(size_t blobsize) {
 
 static int st_robots(httrackp *opt, int argc, char **argv) {
   robots_wizard robots;
-  (void) opt;
-  (void) argc;
-  (void) argv;
   memset(&robots, 0, sizeof(robots));
 
   /* Longer Allow re-opens subtree under Disallow: / (old matcher couldn't). */
@@ -1632,9 +1620,6 @@ static int sm_scan(const char *doc, int maxurls, hts_boolean *is_index,
 static int st_sitemap(httrackp *opt, int argc, char **argv) {
   sm_collect c;
   hts_boolean idx;
-  (void) opt;
-  (void) argc;
-  (void) argv;
 
   /* A urlset yields its <loc> URLs, in order, unescaped. */
   assertf(sm_scan("<?xml version=\"1.0\"?><urlset>"

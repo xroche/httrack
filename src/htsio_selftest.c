@@ -47,7 +47,6 @@ static int st_fsize(httrackp *opt, int argc, char **argv) {
   LLint got, got_utf8, gotp, gone;
   int rc = 0;
 
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "fsize: needs a directory\n");
     return 1;
@@ -196,7 +195,6 @@ static int st_findsize(httrackp *opt, int argc, char **argv) {
   find_handle h;
   int rc;
 
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "findsize: needs a directory\n");
     return 1;
@@ -315,9 +313,6 @@ static int st_growsize(httrackp *opt, int argc, char **argv) {
   size_t k;
   int rc = 0;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   for (k = 0; k < sizeof(cases) / sizeof(cases[0]); k++) {
     const size_t used = cases[k].used, slack = cases[k].slack;
     const LLint extra = cases[k].extra;
@@ -378,9 +373,6 @@ static int st_addlink(httrackp *opt, int argc, char **argv) {
   int ptr = 0;
   int rc = 0;
   int i;
-
-  (void) argc;
-  (void) argv;
 
   memset(&cache, 0, sizeof(cache));
   cache.hashtable = (void *) coucal_new(0);
@@ -644,7 +636,6 @@ static int st_datadir(httrackp *opt, int argc, char **argv) {
   static const char *const dirs[] = {"share/httrack", "bin", "nest/flat"};
   size_t i;
 
-  (void) opt;
   assertf(argc >= 1);
 
   /* argv[0] is a fallback: what the engine actually resolves from is this. */
@@ -732,8 +723,6 @@ static int st_datadir(httrackp *opt, int argc, char **argv) {
 // -#test=pathbin: report what startup resolved, which -#test=datadir cannot see
 // because it hands hts_resolve_datadir() the path instead (#904).
 static int st_pathbin(httrackp *opt, int argc, char **argv) {
-  (void) argc;
-  (void) argv;
   printf("path_bin=%s\n", StringBuff(opt->path_bin));
   return 0;
 }
@@ -741,9 +730,6 @@ static int st_pathbin(httrackp *opt, int argc, char **argv) {
 // -#test=instpaths: the compiled-in install paths, which must follow configure
 // rather than the hardcoded /usr Termux patched by hand.
 static int st_instpaths(httrackp *opt, int argc, char **argv) {
-  (void) opt;
-  (void) argc;
-  (void) argv;
 #ifdef _WIN32
   return 77; /* Windows defines none of these */
 #else
@@ -931,7 +917,6 @@ static int st_categories(httrackp *opt, int argc, char **argv) {
   static const int types[] = {1, 0};
   unsigned int i;
 
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "categories: needs a directory\n");
     return 1;
@@ -984,7 +969,6 @@ static int st_filesave(httrackp *opt, int argc, char **argv) {
 // -#test=longpath <dir>: round-trip a >MAX_PATH (260) file through the file
 // wrappers, exercising hts_pathToUCS2's \\?\ prefixing on Windows (#133).
 static int st_longpath(httrackp *opt, int argc, char **argv) {
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "longpath: needs a writable base dir\n");
     return 1;
@@ -1032,7 +1016,6 @@ static int st_longpath(httrackp *opt, int argc, char **argv) {
 // via the mirror I/O wrappers — fexist_utf8/fsize_utf8, FOPEN/RENAME/UNLINK,
 // and the new hts_rmdir_utf8 (RMDIR) teardown (#133, #630).
 static int st_mirrorio(httrackp *opt, int argc, char **argv) {
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "mirrorio: needs a writable base dir\n");
     return 1;
@@ -1476,7 +1459,6 @@ static int st_spoolname(httrackp *opt, int argc, char **argv) {
 // -#test=direnum <dir>: enumerate a long+non-ASCII directory via the
 // opendir/readdir wrappers; children must round-trip as UTF-8 (#133,#630).
 static int st_direnum(httrackp *opt, int argc, char **argv) {
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "direnum: needs a writable base dir\n");
     return 1;
@@ -1564,7 +1546,6 @@ static int st_ioexact(httrackp *opt, int argc, char **argv) {
   int plen;
   size_t i;
 
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "ioexact: needs a writable dir\n");
     return 1;
@@ -1680,7 +1661,6 @@ static int st_findall(httrackp *opt, int argc, char **argv) {
   size_t i;
   int rc = 0;
 
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "findall: needs a directory\n");
     return 1;

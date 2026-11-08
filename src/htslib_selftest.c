@@ -792,7 +792,6 @@ static int st_hashtable(httrackp *opt, int argc, char **argv) {
   char *buff = NULL;
   const char **strings = NULL;
 
-  (void) opt;
   basic_selftests();
   if (argc < 1) {
     fprintf(stderr, "hashtable: needs a count or a file\n");
@@ -920,7 +919,6 @@ static int st_hashtable(httrackp *opt, int argc, char **argv) {
 }
 
 static int st_strsafe(httrackp *opt, int argc, char **argv) {
-  (void) opt;
   if (argc >= 1 && strncmp(argv[0], "overflow", 8) == 0) {
     /* Deliberately exceed a sized buffer: the bounded op must abort. The source
        comes from argv so its length is opaque to the compiler (no static
@@ -1038,9 +1036,6 @@ static int st_arena(httrackp *opt, int argc, char **argv) {
   char token[256];
   int i;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   assertf(kept != NULL);
 
   /* Enough tokens to span many chunks, each holding its own index. */
@@ -1117,9 +1112,6 @@ static int ucs2_check(const unsigned short *units, size_t count,
 /* The growth is the UCS4 re-encoder's only allocation, so any return at all
    from a starved run says the refusal was not caught. */
 static int st_ucs4_oom(httrackp *opt, int argc, char **argv) {
-  (void) opt;
-  (void) argc;
-  (void) argv;
 #if defined(__GNU__)
   /* GNU/Hurd does not come back from a starved process. The run dies on
      SIGSEGV before the abort it grades, and the assert's own message never
@@ -1202,7 +1194,6 @@ static int st_ucs2(httrackp *opt, int argc, char **argv) {
   static const unsigned char odd[] = {0xFF, 0xFE, 'a', 0, 'b'};
   static const unsigned short empty[] = {0};
 
-  (void) opt;
   if (argc >= 1 && strcmp(argv[0], "oom") == 0) {
 #ifndef _WIN32
     /* Starve the output allocation. Big enough that the allocator must ask
@@ -1335,7 +1326,6 @@ static int st_arrays(httrackp *opt, int argc, char **argv) {
      than compile-time allocation warnings. */
   volatile size_t room;
 
-  (void) opt;
   if (argc >= 1 && strcmp(argv[0], "overflow-capa") == 0) {
     /* Room whose byte size cannot fit a size_t: capa*width used to wrap and
        hand back a short allocation. */
@@ -1379,9 +1369,6 @@ static int st_random(httrackp *opt, int argc, char **argv) {
   unsigned char buf[want + pad], first[want], touched[want], varies[want];
   int err = 0, live = 0, r, i;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   memset(touched, 0, sizeof(touched));
   memset(varies, 0, sizeof(varies));
   for (r = 0; r < rounds; r++) {
@@ -1453,7 +1440,6 @@ static int st_structcheck(httrackp *opt, int argc, char **argv) {
   char BIGSTK target[HTS_URLMAXSIZE * 2];
   FILE *fp;
 
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "usage: -#test=structcheck <writable directory>\n");
     return 1;
@@ -1586,10 +1572,6 @@ static void gmtime_thread(void *arg) {
 static int st_gmtime(httrackp *opt, int argc, char **argv) {
   static int idx[GMTIME_THREADS];
   int err = 0, i;
-
-  (void) opt;
-  (void) argc;
-  (void) argv;
 
   for (i = 0; i < GMTIME_REFS; i++) {
     struct tm tmv;
@@ -1805,9 +1787,6 @@ static int st_secrets(httrackp *opt, int argc, char **argv) {
   const char *w;
   long at;
   int err = 0;
-  (void) opt;
-  (void) argc;
-  (void) argv;
 
   if (o == NULL || fp == NULL) {
     fprintf(stderr, "secrets: out of memory\n");
@@ -2016,8 +1995,6 @@ static int st_localtime(httrackp *opt, int argc, char **argv) {
   static int idx[LOCALTIME_THREADS];
   int err = 0, i;
 
-  (void) opt;
-
   if (argc < 1) {
     fprintf(stderr, "usage: -#test=localtime <writable directory>\n");
     return 1;
@@ -2130,7 +2107,6 @@ static int st_y2038(httrackp *opt, int argc, char **argv) {
   size_t i;
   int err = 0;
 
-  (void) opt;
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     const int64_t got = hts_parse_date(cases[i].date, 50);
 
@@ -2280,10 +2256,6 @@ static int st_lastchar(httrackp *opt, int argc, char **argv) {
   char *const s = &arena[off];
   const int guard = off - 1; /* what the old idiom clobbers */
   int err = 0;
-
-  (void) opt;
-  (void) argc;
-  (void) argv;
 
 #define REPOISON(str)                                                          \
   do {                                                                         \
@@ -2475,9 +2447,6 @@ static int st_strcmpnocase(httrackp *opt, int argc, char **argv) {
   size_t i;
   int err = 0;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     const int ab = strcmpnocase(cases[i].a, cases[i].b);
     const int ba = strcmpnocase(cases[i].b, cases[i].a);
@@ -2515,9 +2484,6 @@ static void uninit_report(const char *step) {
 static int st_uninit(httrackp *opt, int argc, char **argv) {
   int i;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   hts_init();
   if (hts_newthread(uninit_worker, NULL) != 0)
     return 1;
@@ -2549,10 +2515,6 @@ static int st_rtrim(httrackp *opt, int argc, char **argv) {
   int err = 0;
   int c;
   size_t cls;
-
-  (void) opt;
-  (void) argc;
-  (void) argv;
 
 #define REPOISON(str)                                                          \
   do {                                                                         \
@@ -2676,10 +2638,6 @@ static int st_strsprintf(httrackp *opt, int argc, char **argv) {
   String reused = STRING_EMPTY;
   size_t i, len;
   int err = 0;
-
-  (void) opt;
-  (void) argc;
-  (void) argv;
 
   if (expected == NULL || head == NULL || tail == NULL) {
     printf("strsprintf self-test: FAIL (out of memory)\n");
@@ -2833,8 +2791,6 @@ static int st_sighandlers(httrackp *opt, int argc, char **argv) {
   int err = 0;
   size_t i;
 
-  (void) argc;
-  (void) argv;
   assertf(readonly != -1);
   assertf(capture != NULL);
   capfd = fileno(capture);
@@ -2951,9 +2907,6 @@ static int st_sigterm(httrackp *opt, int argc, char **argv) {
   int err = 0;
   size_t i;
 
-  (void) argc;
-  (void) argv;
-
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     FILE *const errs = tmpfile();
     char marker[8], said[512];
@@ -3039,9 +2992,6 @@ static int st_statrecv(httrackp *opt, int argc, char **argv) {
   int err = 0;
   int i;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   hts_stat_recv_set(0);
   for (i = 0; i < STATRECV_THREADS; i++) {
     if (hts_newthread(statrecv_thread, NULL) != 0) {
@@ -3097,7 +3047,6 @@ static int st_queryparam(httrackp *opt, int argc, char **argv) {
   hts_boolean found;
   size_t i;
 
-  (void) opt;
   if (argc < 2 || argc > 3) {
     fprintf(stderr, "queryparam: takes a url, a name and an optional size\n");
     return 1;
@@ -3184,9 +3133,6 @@ static int st_querysweep(httrackp *opt, int argc, char **argv) {
   size_t i, j;
   int r;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   for (i = 0; i < sizeof(lengths) / sizeof(lengths[0]); i++) {
     char *run = parsediff_run('x', lengths[i]);
     String q = STRING_EMPTY;
@@ -3226,7 +3172,6 @@ static int st_querynext(httrackp *opt, int argc, char **argv) {
   String out = STRING_EMPTY;
   int bad = 0;
 
-  (void) opt;
   if (argc > 1) {
     fprintf(stderr, "querynext: takes one query\n");
     return 1;
@@ -3667,9 +3612,6 @@ static int st_spandiff(httrackp *opt, int argc, char **argv) {
   char *longhost = parsediff_run('x', 2047);
   String longfil = STRING_EMPTY;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   /* Only a clipped pattern, a.com/ followed by *x..x, matches this path,
      because strjoker refuses a longer pattern. */
   StringCat(longfil, "/");
@@ -3805,7 +3747,6 @@ static int st_span(httrackp *opt, int argc, char **argv) {
   hts_span s, a, b;
   int ret = 0;
 
-  (void) opt;
   if (argc < 3 || (strcmp(argv[0], "trim") == 0 && argc < 4)) {
     fprintf(stderr, "span: bad arguments\n");
     return 1;
@@ -3903,9 +3844,6 @@ static int st_pathcontained(httrackp *opt, int argc, char **argv) {
   int failures = 0;
   size_t i;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   for (i = 0; escaping[i] != NULL; i++) {
     if (hts_path_is_contained(escaping[i])) {
       printf("pathcontained: '%s' was accepted\n", escaping[i]);
@@ -3978,10 +3916,6 @@ static int st_contentid(httrackp *opt, int argc, char **argv) {
   int failures = 0;
   int i, c;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
-
   for (i = 0; fils[i] != NULL; i++) {
     make_content_id("www.example.com", fils[i], cid, sizeof(cid));
     snprintf(url, sizeof(url), "www.example.com%s", fils[i]);
@@ -4011,7 +3945,6 @@ static int st_contentid(httrackp *opt, int argc, char **argv) {
 static int st_clienthints(httrackp *opt, int argc, char **argv) {
   hts_client_hints ch;
 
-  (void) opt;
   if (argc != 1) {
     fprintf(stderr, "clienthints: takes a user-agent\n");
     return 1;
@@ -4037,7 +3970,6 @@ static int st_headerverdict(httrackp *opt, int argc, char **argv) {
   hts_header_verdict v;
   int i;
 
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "headerverdict: takes a line, then the earlier lines\n");
     return 1;
@@ -4056,7 +3988,6 @@ static int st_headerverdict(httrackp *opt, int argc, char **argv) {
 
 /* -#test=browserfamily <user-agent> prints the browser whose tables it gets. */
 static int st_browserfamily(httrackp *opt, int argc, char **argv) {
-  (void) opt;
   if (argc != 1) {
     fprintf(stderr, "browserfamily: takes a user-agent\n");
     return 1;
@@ -4074,7 +4005,6 @@ static int st_headerorder(httrackp *opt, int argc, char **argv) {
   hts_browser_family family;
   int dest, i;
 
-  (void) opt;
   if (argc != 2 || n > (int) sizeof(seen)) {
     fprintf(stderr, "headerorder: takes <none|chrome|firefox> <dest>\n");
     return 1;

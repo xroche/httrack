@@ -149,8 +149,6 @@ static int st_batch(httrackp *opt, int argc, char **argv) {
   size_t len = 0;
   int err = 0;
 
-  (void) argc;
-  (void) argv;
   buff = st_batch_slurp(&len);
   if (buff == NULL) {
     fprintf(stderr, "batch: could not read the script on stdin\n");

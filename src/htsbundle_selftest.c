@@ -177,7 +177,6 @@ done:
 static int st_regdomain(httrackp *opt, int argc, char **argv) {
   int i;
 
-  (void) opt;
   for (i = 0; i < argc; i++) {
     char reg[256];
 
@@ -190,7 +189,6 @@ static int st_regdomain(httrackp *opt, int argc, char **argv) {
 /* -#test=bundlescope <cookie domain> <url>...: "keep" when a bundle naming the
    URLs keeps a cookie set for the domain, else "drop". */
 static int st_bundlescope(httrackp *opt, int argc, char **argv) {
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "bundlescope: takes <cookie domain> <url>...\n");
     return 1;
@@ -211,7 +209,6 @@ static int st_bundlenames(httrackp *opt, int argc, char **argv) {
   int n;
   int i;
 
-  (void) opt;
   if (argc < 1 || argc > 2) {
     fprintf(stderr, "bundlenames: takes <urls> [<list file>]\n");
     return 1;
@@ -239,7 +236,6 @@ static int st_bundlenames(httrackp *opt, int argc, char **argv) {
 static int st_bundlename(httrackp *opt, int argc, char **argv) {
   const char *why;
 
-  (void) opt;
   if (argc != 1) {
     fprintf(stderr, "bundlename: takes <name>\n");
     return 1;
@@ -263,7 +259,6 @@ static int st_paste(httrackp *opt, int argc, char **argv) {
   FILE *fp;
   int i;
 
-  (void) opt;
   if (res != NULL)
     res->size = sizeof(*res);
   fp = argc >= 2 ? FOPEN(argv[1], "rb") : NULL;
@@ -344,7 +339,6 @@ static void paste_race_worker(void *arg) {
 static int st_pasterace(httrackp *opt, int argc, char **argv) {
   paste_race race;
 
-  (void) opt;
   if (argc < 2) {
     fprintf(stderr, "pasterace: takes <dir> <rounds>\n");
     return 1;

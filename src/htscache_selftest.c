@@ -3605,10 +3605,6 @@ static int st_cache(httrackp *opt, int argc, char **argv) {
 static int st_cacheindex(httrackp *opt, int argc, char **argv) {
   int fail = 0;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
-
   /* binput_line reads a field while in bounds, but refuses one starting at
      or past end-of-buffer. */
   {
@@ -3737,7 +3733,6 @@ static int st_zip_repair_shift(httrackp *opt, int argc, char **argv) {
   FILE *fp;
   int err;
 
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "zip-repair-shift: needs a directory\n");
     return 1;
@@ -3817,7 +3812,6 @@ static int st_zip_repair_size(httrackp *opt, int argc, char **argv) {
   int fails = 0;
   FILE *fp;
 
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "zip-repair-size: needs a directory\n");
     return 1;
@@ -3899,7 +3893,6 @@ static int st_zip_repair_openfail(httrackp *opt, int argc, char **argv) {
   FILE *fp;
   int fd0;
 
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "zip-repair-openfail: needs a directory\n");
     return 1;
@@ -4071,7 +4064,6 @@ static int st_zip_abandon(httrackp *opt, int argc, char **argv) {
   size_t i;
   int fail = 0;
 
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "zip-abandon: needs a writable directory\n");
     return 1;
@@ -4144,7 +4136,6 @@ static int st_zip_abandon_notrunc(httrackp *opt, int argc, char **argv) {
   int fail = 0;
   unzFile uf;
 
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "zip-abandon-notrunc: needs a writable directory\n");
     return 1;
@@ -4252,10 +4243,6 @@ static int st_reconcile(httrackp *opt, int argc, char **argv) {
 static int st_changes(httrackp *opt, int argc, char **argv) {
   String out = STRING_EMPTY;
   int err = 0;
-
-  (void) opt;
-  (void) argc;
-  (void) argv;
 
   /* A file the crawl did not rewrite is unchanged whatever the wire said. */
   assertf(hts_changes_classify(HTS_FALSE, HTS_TRUE, HTS_FALSE, HTS_FALSE,

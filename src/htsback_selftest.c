@@ -43,10 +43,6 @@ static int st_mirrorcompleted(httrackp *opt, int argc, char **argv) {
   httrackp *to = hts_create_opt();
   int err = 0;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
-
   ST_FAIL_IF(err, hts_mirror_completed(from) != HTS_DEFAULT);
   ST_FAIL_IF(err, hts_mirror_completed(to) != HTS_DEFAULT);
 
@@ -77,10 +73,6 @@ static int st_transportfailures(httrackp *opt, int argc, char **argv) {
   const hts_stat_struct *stats;
   int err = 0;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
-
   ST_FAIL_IF(err, from->transport_failures != 0 || to->transport_failures != 0);
 
   /* Published beside stat_errors, which is where a front end reads it. */
@@ -103,9 +95,6 @@ static int st_transportfailures(httrackp *opt, int argc, char **argv) {
 static int st_pause(httrackp *opt, int argc, char **argv) {
   int err = 0, i, seen_low = 0, seen_high = 0;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   /* Consecutive-ms seeds (production shape: launch timestamps a few ms apart)
      must stay in range and spread, not collapse to a bound -- worst case for a
      weak low-bit mixer. */
@@ -186,9 +175,6 @@ static void threadwait_gated_thread(void *arg) {
 }
 
 static int st_backswap(httrackp *opt, int argc, char **argv) {
-  (void) opt;
-  (void) argc;
-  (void) argv;
   return back_selftest_slot_swap();
 }
 
@@ -198,7 +184,6 @@ typedef enum { ST_CAP_FAIL, ST_CAP_OK, ST_CAP_SKIPPED } st_cap_result;
 static st_cap_result st_spool_capped_write(httrackp *opt,
                                            const lien_back *back) {
 #ifdef _WIN32
-  (void) opt;
   (void) back;
   return ST_CAP_SKIPPED;
 #else
@@ -592,9 +577,6 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
   int round;
   int i;
 
-  (void) argc;
-  (void) argv;
-
   /* no quota may fire instead of the stop, and no slot may time out */
   opt->maxtime = 0;
   opt->maxsite = 0;
@@ -813,9 +795,6 @@ static int st_backnew(httrackp *opt, int argc, char **argv) {
 
   struct_back *sback;
 
-  (void) argc;
-  (void) argv;
-
   /* Control: with memory available the same call hands back a whole table, so
      a NULL below cannot be back_new refusing every size. */
   sback = back_new(opt, slots);
@@ -900,8 +879,6 @@ static int st_recordoom(httrackp *opt, int argc, char **argv) {
   int before;
   int recorded = 0, recorded_cod = 0, after = -1, after_cod = -1;
 
-  (void) argc;
-  (void) argv;
   memset(&cache, 0, sizeof(cache));
   st_mirror_wiring(opt, &sback, &hash, HTS_FALSE);
   if (!hts_record_link(opt, "www.example.com", "/a.html", "/p/a.html", "", "",
@@ -989,10 +966,6 @@ static int st_relaxedcounter(httrackp *opt, int argc, char **argv) {
   long spins;
   int err = 0;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
-
   hts_store_relaxed_llint(&relaxed_counter, 0);
   if (hts_newthread(relaxed_writer, NULL) != 0) {
     fprintf(stderr, "relaxedcounter: cannot spawn\n");
@@ -1031,10 +1004,6 @@ static int st_relaxedcounter(httrackp *opt, int argc, char **argv) {
 static int st_threadwait(httrackp *opt, int argc, char **argv) {
   int err = 0;
   int i, round;
-
-  (void) opt;
-  (void) argc;
-  (void) argv;
 
   /* htsthread_wait() joins a thread spawned just before it */
   for (round = 0; round < THREADWAIT_ROUNDS && !err; round++) {
@@ -1198,9 +1167,6 @@ static int st_threadrunner(httrackp *opt, int argc, char **argv) {
   const threadrunner_id caller = threadrunner_self();
   hts_boolean spawned;
   int err = 0;
-
-  (void) argc;
-  (void) argv;
 
   /* Unlocked, because htsthread_wait() published the worker's writes. */
   threadrunner_reset();
@@ -1402,9 +1368,6 @@ static int st_threadrunner(httrackp *opt, int argc, char **argv) {
 static int st_ftpworker(httrackp *opt, int argc, char **argv) {
   const int err = ftp_worker_selftests();
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   printf("ftp-worker-selftest: %s\n", err ? "FAIL" : "OK");
   return err;
 }
@@ -1412,8 +1375,6 @@ static int st_ftpworker(httrackp *opt, int argc, char **argv) {
 static int st_ftphandoff(httrackp *opt, int argc, char **argv) {
   const int err = ftp_handoff_selftests(opt);
 
-  (void) argc;
-  (void) argv;
   printf("ftp-handoff-selftest: %s\n", err ? "FAIL" : "OK");
   return err;
 }
@@ -1455,10 +1416,6 @@ static int st_strerror(httrackp *opt, int argc, char **argv) {
   char first[HTS_STRERROR_SIZE], second[HTS_STRERROR_SIZE];
   const char *kept;
   int err = 0, i;
-
-  (void) opt;
-  (void) argc;
-  (void) argv;
 
   for (i = 0; i < STRERROR_THREADS; i++) {
     const char *const msg = hts_strerror(
@@ -1574,10 +1531,6 @@ static int st_mutexlazyinit(httrackp *opt, int argc, char **argv) {
   int err = 0;
   int i;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
-
   for (i = 0; i < MUTEXLAZY_THREADS; i++) {
     if (hts_newthread(mutexlazy_thread, NULL) != 0) {
       fprintf(stderr, "mutexlazyinit: cannot spawn\n");
@@ -1642,8 +1595,6 @@ static int st_hostban(httrackp *opt, int argc, char **argv) {
   int filptr = 0;
   int err = 0;
 
-  (void) argc;
-  (void) argv;
   opt->maxfilter = 128;
   if (filters_init(&filters, opt->maxfilter, 0) == 0) {
     fprintf(stderr, "hostban: cannot allocate filters\n");
@@ -1716,8 +1667,6 @@ static int st_maxtime(httrackp *opt, int argc, char **argv) {
   int tries;
   TStamp t0 = 0, elapsed = 0;
 
-  (void) argc;
-  (void) argv;
   opt->log = NULL; /* the stop logs, and this test's own output is exact */
   opt->maxtime = 1;
   /* A starved host can oversleep past the cap, so retry. The window is timed
