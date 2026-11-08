@@ -2893,21 +2893,32 @@ HTSEXT_API hts_boolean dir_exists(const char *path) {
   return 0;                     /* DOES NOT EXIST */
 }
 
+/* Is there something at file? Sets *mode to its st_mode when there is. */
+static hts_boolean structcheck_stat(const char *file, hts_boolean utf8,
+                                    int *mode) {
+  STRUCT_STAT st;
+  struct stat st_ansi;
+
+  if (utf8 ? STAT(file, &st) != 0 : stat(file, &st_ansi) != 0)
+    return HTS_FALSE;
+  *mode = (int) (utf8 ? st.st_mode : st_ansi.st_mode);
+  return HTS_TRUE;
+}
+
 /* Finds a free "<file>.txt" or "<file>.N.txt"; sets errno when none fits. */
 static hts_boolean structcheck_aside(char *aside, size_t size, const char *file,
                                      hts_boolean utf8) {
   int i;
 
   for (i = 0; i < 100; i++) {
-    STRUCT_STAT st;
-    struct stat st8;
+    int mode;
 
     if (!(i == 0 ? slprintfbuff(aside, size, "%s.txt", file)
                  : slprintfbuff(aside, size, "%s.%d.txt", file, i))) {
       errno = ENAMETOOLONG;
       return HTS_FALSE;
     }
-    if ((utf8 ? STAT(aside, &st) : stat(aside, &st8)) != 0)
+    if (!structcheck_stat(aside, utf8, &mode))
       return HTS_TRUE;
   }
   errno = EEXIST;
@@ -2920,8 +2931,7 @@ static int structcheck_mkdir(const char *file, hts_boolean utf8) {
 
 /* path ends with "/" or a file name; utf8 picks the UTF-8 calls, else ANSI */
 static int structcheck_impl(const char *path, hts_boolean utf8) {
-  STRUCT_STAT st;
-  struct stat st8;
+  int mode;
   char BIGSTK tmpbuf[HTS_URLMAXSIZE * 2];
   char BIGSTK file[HTS_URLMAXSIZE * 2];
   int i = 0;
@@ -2951,8 +2961,7 @@ static int structcheck_impl(const char *path, hts_boolean utf8) {
   file[i + 1] = '\0';
 
   /* First check the final dir */
-  if ((utf8 ? STAT(file, &st) : stat(file, &st8)) == 0 &&
-      S_ISDIR(utf8 ? st.st_mode : st8.st_mode)) {
+  if (structcheck_stat(file, utf8, &mode) && S_ISDIR(mode)) {
     return 0;                   /* OK */
   }
 
@@ -2999,11 +3008,11 @@ static int structcheck_impl(const char *path, hts_boolean utf8) {
       file[i] = '\0';
     }
     /* Something exists */
-    if ((utf8 ? STAT(file, &st) : stat(file, &st8)) == 0) {
-      if (!S_ISDIR(utf8 ? st.st_mode : st8.st_mode)) {
+    if (structcheck_stat(file, utf8, &mode)) {
+      if (!S_ISDIR(mode)) {
 #if HTS_REMOVE_ANNOYING_INDEX
         /* Regular file in place: move it and create directory */
-        if (S_ISREG(utf8 ? st.st_mode : st8.st_mode)) {
+        if (S_ISREG(mode)) {
           /* bounded here, not by the path-length guard far above */
           if (!structcheck_aside(tmpbuf, sizeof(tmpbuf), file, utf8))
             return -1;
