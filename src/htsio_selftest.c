@@ -902,6 +902,227 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Reads a whole file into a heap buffer, NUL-terminated, or NULL. */
+static char *golden_slurp(const char *path, size_t *len) {
+  FILE *const fp = fopen(path, "rb");
+  char *buf = NULL;
+  size_t n = 0, cap = 0;
+
+  if (fp == NULL)
+    return NULL;
+  for (;;) {
+    size_t got;
+
+    if (buf == NULL || cap - n < 4097) {
+      char *const grown = realloct(buf, cap == 0 ? 16384 : cap * 2);
+
+      assertf(grown != NULL);
+      buf = grown;
+      cap = cap == 0 ? 16384 : cap * 2;
+    }
+    got = fread(buf + n, 1, cap - n - 1, fp);
+    if (got == 0)
+      break;
+    n += got;
+  }
+  fclose(fp);
+  buf[n] = '\0';
+  *len = n;
+  return buf;
+}
+
+/* Turns each CR LF into LF in place, and returns the new length. */
+static size_t golden_drop_cr(char *buf, size_t len) {
+  size_t i, o = 0;
+
+  for (i = 0; i < len; i++) {
+    if (!(buf[i] == '\r' && i + 1 < len && buf[i + 1] == '\n'))
+      buf[o++] = buf[i];
+  }
+  buf[o] = '\0';
+  return o;
+}
+
+/* Is the file at dir/name exactly these bytes? */
+static hts_boolean gif_is(const char *dir, const char *name, const char *data,
+                          size_t size) {
+  char path[HTS_URLMAXSIZE + 64];
+  size_t len = 0;
+  char *got;
+  hts_boolean ok;
+
+  snprintf(path, sizeof(path), "%s/%s", dir, name);
+  got = golden_slurp(path, &len);
+  ok = got != NULL && len == size && memcmp(got, data, size) == 0 ? HTS_TRUE
+                                                                  : HTS_FALSE;
+  freet(got);
+  return ok;
+}
+
+/* assertf would stringize the expanded gif literals, which MSVC rejects. */
+static hts_boolean gifs_are_current(const char *dir) {
+  return gif_is(dir, "backblue.gif", HTS_DATA_BACK_GIF,
+                HTS_DATA_BACK_GIF_LEN) &&
+         gif_is(dir, "fade.gif", HTS_DATA_FADE_GIF, HTS_DATA_FADE_GIF_LEN);
+}
+
+/* The top index of a multi-project root, byte for byte against a golden file
+   with the version masked. Names are system-charset (CP1252 on Windows) and
+   the golden is UTF-8 either way. argv: <dir> <golden>. */
+static int st_topindexgolden(httrackp *opt, int argc, char **argv) {
+  static const char *const stamp =
+      "Mirror and index made by HTTrack Website Copier/" HTTRACK_VERSION
+      " " HTTRACK_AFF_AUTHORS;
+  static const char *const mask = "Mirror and index made by @VERSION@";
+#ifdef _WIN32
+  static const char *const cafe = "caf\xE9", *const the = "th\xE9";
+#else
+  static const char *const cafe = "caf\xC3\xA9", *const the = "th\xC3\xA9";
+#endif
+  /* the last row has no index.html, so it is not a project */
+  const char *const names[] = {"zeta", "alpha", "Beta", cafe, "Delta", "empty"};
+  const char *const cats[] = {"Games", NULL, NULL, the, "Games", NULL};
+  char topdir[HTS_URLMAXSIZE];
+  char path[HTS_URLMAXSIZE + 64];
+  char *got, *want, *at;
+  size_t gotlen = 0, wantlen = 0;
+  unsigned int i;
+
+  if (argc < 2) {
+    fprintf(stderr, "topindexgolden: needs <dir> <golden>\n");
+    return 1;
+  }
+  snprintf(topdir, sizeof(topdir), "%s/%s", argv[0], cafe);
+  for (i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
+    FILE *fp;
+
+    snprintf(path, sizeof(path), "%s/%s/hts-cache/", topdir, names[i]);
+    assertf(structcheck(path) == 0);
+    if (i + 1 < sizeof(names) / sizeof(names[0])) {
+      snprintf(path, sizeof(path), "%s/%s/index.html", topdir, names[i]);
+      fp = fopen(path, "wb");
+      assertf(fp != NULL);
+      fclose(fp);
+    }
+    if (cats[i] != NULL) {
+      snprintf(path, sizeof(path), "%s/%s/hts-cache/winprofile.ini", topdir,
+               names[i]);
+      fp = fopen(path, "wb");
+      assertf(fp != NULL);
+      fprintf(fp, "category=%s\n", cats[i]);
+      fclose(fp);
+    }
+  }
+  assertf(hts_buildtopindex(opt, topdir, "") != 0);
+
+  snprintf(path, sizeof(path), "%s/index.html", topdir);
+  got = golden_slurp(path, &gotlen);
+  want = golden_slurp(argv[1], &wantlen);
+  assertf(got != NULL && want != NULL);
+  /* LF is CR LF on Windows, and the golden is LF only */
+  gotlen = golden_drop_cr(got, gotlen);
+  assertf(strstr(got, stamp) != NULL);
+  /* the header and the footer each carry one; the mask is shorter */
+  while ((at = strstr(got, stamp)) != NULL) {
+    memmove(at + strlen(mask), at + strlen(stamp),
+            strlen(at + strlen(stamp)) + 1);
+    memcpy(at, mask, strlen(mask));
+    gotlen = strlen(got);
+  }
+  if (gotlen != wantlen || memcmp(got, want, wantlen) != 0) {
+    size_t d = 0;
+
+    while (d < gotlen && d < wantlen && got[d] == want[d])
+      d++;
+    printf("topindexgolden: FAILED (differs at byte %lu of %lu, want %lu)\n",
+           (unsigned long) d, (unsigned long) gotlen, (unsigned long) wantlen);
+    freet(got);
+    freet(want);
+    return 1;
+  }
+  freet(got);
+  freet(want);
+
+  /* the two gifs are written whole, and a stale one is rewritten */
+  assertf(gifs_are_current(topdir));
+  snprintf(path, sizeof(path), "%s/backblue.gif", topdir);
+  assertf(fclose(fopen(path, "wb")) == 0);
+  snprintf(path, sizeof(path), "%s/fade.gif", topdir);
+  assertf(fclose(fopen(path, "wb")) == 0);
+  assertf(hts_buildtopindex(opt, topdir, "") != 0);
+  assertf(gifs_are_current(topdir));
+  printf("topindexgolden OK\n");
+  return 0;
+}
+
+/* A project row that cannot be allocated is skipped, and the rest stay listed.
+ */
+static int st_topindexoom(httrackp *opt, int argc, char **argv) {
+  static const char *const names[] = {"a", "b", "c"};
+  const unsigned int count = sizeof(names) / sizeof(names[0]);
+  char topdir[HTS_URLMAXSIZE];
+  char path[HTS_URLMAXSIZE + 32];
+  unsigned int i;
+  int k;
+  unsigned int lost = 0; /* bit i: names[i] was the skipped row in some run */
+
+  assertf(argc >= 1);
+  snprintf(topdir, sizeof(topdir), "%s/oom", argv[0]);
+  for (i = 0; i < count; i++) {
+    FILE *fp;
+
+    snprintf(path, sizeof(path), "%s/%s/", topdir, names[i]);
+    assertf(structcheck(path) == 0);
+    snprintf(path, sizeof(path), "%s/%s/index.html", topdir, names[i]);
+    fp = fopen(path, "wb");
+    assertf(fp != NULL);
+    fclose(fp);
+  }
+  assertf(hts_buildtopindex(opt, topdir, "") != 0); /* control, no failure */
+
+  /* fail the first, the middle and the last row in turn */
+  for (k = 1; k <= (int) count; k++) {
+    char *got;
+    size_t len;
+    unsigned int missing = 0;
+
+    topindex_failrow = k;
+    assertf(hts_buildtopindex(opt, topdir, "") != 0);
+    assertf(topindex_failrow == 0);
+    snprintf(path, sizeof(path), "%s/index.html", topdir);
+    got = golden_slurp(path, &len);
+    assertf(got != NULL);
+    for (i = 0; i < count; i++) {
+      char needle[32];
+
+      snprintf(needle, sizeof(needle), "HREF=\"%s/index.html\"", names[i]);
+      if (strstr(got, needle) == NULL) {
+        missing++;
+        lost |= 1u << i;
+      }
+    }
+    freet(got);
+    assertf(missing == 1);
+  }
+  assertf(lost == (1u << count) - 1);
+  printf("topindexoom: oom OK\n");
+
+  for (i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
+    snprintf(path, sizeof(path), "%s/%s/index.html", topdir, names[i]);
+    unlink(path);
+    snprintf(path, sizeof(path), "%s/%s", topdir, names[i]);
+    rmdir(path);
+  }
+  snprintf(path, sizeof(path), "%s/index.html", topdir);
+  unlink(path);
+  snprintf(path, sizeof(path), "%s/backblue.gif", topdir);
+  unlink(path);
+  snprintf(path, sizeof(path), "%s/fade.gif", topdir);
+  unlink(path);
+  rmdir(topdir);
+  return 0;
+}
+
 /* hts_getcategories() is what a front end lists for a projects directory: the
    distinct categories (type 1), or the project names (type 0). One tagged line
    per entry, so the caller asserts on the exact set (#1821). */
@@ -1687,6 +1908,12 @@ const struct selftest_entry selftests_io[] = {
     {"topindex", "[dir]",
      "hts_buildtopindex charset handling of a non-ASCII project dir",
      st_topindex},
+    {"topindexoom", "<dir>",
+     "hts_buildtopindex skips a project row it cannot allocate",
+     st_topindexoom},
+    {"topindexgolden", "<dir> <golden>",
+     "hts_buildtopindex output of a multi-project root, byte for byte",
+     st_topindexgolden},
     {"categories", "<dir>",
      "hts_getcategories() lists only the categories the projects carry",
      st_categories},

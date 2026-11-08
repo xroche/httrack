@@ -31,7 +31,8 @@ EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c gaistall.c noba
 	install-manifest.txt \
 	62_lang-untranslated.counts \
 	62_lang-linebreaks.counts \
-	834_engine-entities-sweep.pairs
+	834_engine-entities-sweep.pairs \
+	topindex.golden
 
 TESTS_ENVIRONMENT =
 TESTS_ENVIRONMENT += PATH=$(top_builddir)/src$(PATH_SEPARATOR)$$PATH

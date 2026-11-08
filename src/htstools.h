@@ -84,6 +84,9 @@ void longfile_to_83(int mode, char *n83, size_t n83size, char *save);
    guards read a space as a word boundary. */
 HTS_INLINE char html_prevc(const char *adr, const char *start);
 HTS_INLINE int __rech_tageq(const char *adr, const char *s);
+/* Self-test hook: when N > 0, the Nth project row of the next top index fails
+   to allocate. Reset to 0 once it fires. */
+extern int topindex_failrow;
 HTS_INLINE int __rech_tageqbegdigits(const char *adr, const char *s);
 HTS_INLINE int rech_tageq_all(const char *adr, const char *s);
 
