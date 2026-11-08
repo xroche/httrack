@@ -446,14 +446,14 @@ release)
     exit "$rc"
     ;;
 self-check)
-    # Each mutant edits one hts_detect row, the table deciding whether an
+    # Each mutant edits one hts_attrs row, the table deciding whether an
     # attribute is read as a link. make check stays green on both, so only the
     # corpus sees them: no test names "cite", and the one data-srcset under
     # tests/ (local-server.py, for test 36) carries the same two URLs in a
     # plain srcset on the preceding img, which satisfies that test either way.
     # The corpus spells the data-srcset value with a "1x" descriptor, so the
     # dirty-attribute fallback cannot take it for a path and rescue it.
-    mutant_file=src/htslib.c
+    mutant_file=src/htsparse.c
 
     crawl "$tree_httrack" reference
     crawl "$tree_httrack" rerun
@@ -482,12 +482,12 @@ self-check)
         # The newline is escaped, because BSD sed takes no \n in a replacement.
         case "$direction" in
         widen)
-            match='  "background",'
-            repl='  "background",\
-  "cite",'
+            match='    {"background", HTS_ATTR_LINK},'
+            repl='    {"background", HTS_ATTR_LINK},\
+    {"cite", HTS_ATTR_LINK},'
             ;;
         narrow)
-            match='  "data-srcset",'
+            match='    {"data-srcset", HTS_ATTR_LINK},'
             repl=''
             ;;
         esac

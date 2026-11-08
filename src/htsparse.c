@@ -214,6 +214,74 @@ static hts_boolean hts_attr_is_js_binding(const char *name, const char *nend) {
   return HTS_FALSE;
 }
 
+/* At most one row matches at a byte, because each name must be followed by
+   '=', so row order does not matter. */
+const hts_attr hts_attrs[] = {
+    {"archive", HTS_ATTR_LINK},
+    {"background", HTS_ATTR_LINK},
+    {"data", HTS_ATTR_LINK}, // OBJECT
+    {"data-src", HTS_ATTR_LINK},
+    {"data-srcset", HTS_ATTR_LINK},
+    {"dynsrc", HTS_ATTR_LINK},
+    {"lowsrc", HTS_ATTR_LINK},
+    {"profile", HTS_ATTR_LINK}, // META
+    {"src", HTS_ATTR_LINK},
+    {"srcset", HTS_ATTR_LINK}, // HTML5 responsive images
+    {"swurl", HTS_ATTR_LINK},
+    {"url", HTS_ATTR_LINK},
+    {"usemap", HTS_ATTR_LINK},
+    {"longdesc", HTS_ATTR_LINK},
+    {"xlink:href", HTS_ATTR_LINK}, // XML, SVG
+    {"poster", HTS_ATTR_LINK},     // HTML5
+    {"hotspot", HTS_ATTR_HOTSPOT},
+    {"content", HTS_ATTR_REFRESH},
+    {"action", HTS_ATTR_LEAVE},
+    // The parser also takes any other onXxx= with an upper case X.
+    {"onAbort", HTS_ATTR_EVENT},
+    {"onBlur", HTS_ATTR_EVENT},
+    {"onChange", HTS_ATTR_EVENT},
+    {"onClick", HTS_ATTR_EVENT},
+    {"onDblClick", HTS_ATTR_EVENT},
+    {"onDragDrop", HTS_ATTR_EVENT},
+    {"onError", HTS_ATTR_EVENT},
+    {"onFocus", HTS_ATTR_EVENT},
+    {"onKeyDown", HTS_ATTR_EVENT},
+    {"onKeyPress", HTS_ATTR_EVENT},
+    {"onKeyUp", HTS_ATTR_EVENT},
+    {"onLoad", HTS_ATTR_EVENT},
+    {"onMouseDown", HTS_ATTR_EVENT},
+    {"onMouseMove", HTS_ATTR_EVENT},
+    {"onMouseOut", HTS_ATTR_EVENT},
+    {"onMouseOver", HTS_ATTR_EVENT},
+    {"onMouseUp", HTS_ATTR_EVENT},
+    {"onMove", HTS_ATTR_EVENT},
+    {"onReset", HTS_ATTR_EVENT},
+    {"onResize", HTS_ATTR_EVENT},
+    {"onSelect", HTS_ATTR_EVENT},
+    {"onSubmit", HTS_ATTR_EVENT},
+    {"onUnload", HTS_ATTR_EVENT},
+    {"style", HTS_ATTR_STYLE},
+    {NULL, HTS_ATTR_LINK},
+};
+
+const hts_attr *hts_attr_match(const char *html, hts_boolean scripts,
+                               int *value) {
+  int i;
+
+  *value = 0;
+  for (i = 0; hts_attrs[i].name != NULL; i++) {
+    const hts_attr *const at = &hts_attrs[i];
+
+    if (!scripts && (at->kind == HTS_ATTR_EVENT || at->kind == HTS_ATTR_STYLE))
+      continue;
+    *value = at->kind == HTS_ATTR_HOTSPOT ? rech_tageqbegdigits(html, at->name)
+                                          : rech_tageq(html, at->name);
+    if (*value != 0)
+      return at;
+  }
+  return NULL;
+}
+
 /* Is the attribute name [name, nend) one whose value is never a link, a
    hts_nodetect word or an xmlns declaration? Returns the word, or NULL. */
 static const char *hts_dirty_attr_refused(const char *name, const char *nend) {
@@ -1845,88 +1913,47 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       }
                     }
 
-                    /* Tags supplémentaires à vérifier (<img src=..> etc) */
-                    if (p == 0) {
-                      int i = 0;
+                    /* The other attributes that may hold a link */
+                    const hts_attr *const at =
+                        p == 0 ? hts_attr_match(html, !inscript, &p) : NULL;
+                    const hts_boolean is_script_attr =
+                        at != NULL && (at->kind == HTS_ATTR_EVENT ||
+                                       at->kind == HTS_ATTR_STYLE);
 
-                      while((p == 0) && (strnotempty(hts_detect[i]))) {
-                        p = rech_tageq(html, hts_detect[i]);
-                        if (p) {
-                          dataattr_p = strncmp(hts_detect[i], "data-", 5) == 0;
-                          /* This is a temporary hack to avoid archive=foo.jar,bar.jar .. */
-                          if (strcmp(hts_detect[i], "archive") == 0) {
-                            archivetag_p = 1;
-                          }
-                          /* srcset: a comma-list of candidate URLs, each split
-                             out and rewritten below (#235, #236) */
-                          else if (strcmp(hts_detect[i], "srcset") == 0
-                                   || strcmp(hts_detect[i], "data-srcset") == 0) {
-                            srcset_p = 1;
-                          }
+                    if (at != NULL) {
+                      switch (at->kind) {
+                      case HTS_ATTR_LINK:
+                        dataattr_p = strncmp(at->name, "data-", 5) == 0;
+                        /* A temporary hack to avoid archive=foo.jar,bar.jar */
+                        if (strcmp(at->name, "archive") == 0) {
+                          archivetag_p = 1;
                         }
-                        i++;
-                      }
-                    }
-
-                    /* Tags supplémentaires en début à vérifier (<object .. hotspot1=..> etc) */
-                    if (p == 0) {
-                      int i = 0;
-
-                      while((p == 0) && (strnotempty(hts_detectbeg[i]))) {
-                        p = rech_tageqbegdigits(html, hts_detectbeg[i]);
-                        i++;
-                      }
-                    }
-
-                    /* Tags supplémentaires à vérifier : URL=.. */
-                    if (p == 0) {
-                      int i = 0;
-
-                      while((p == 0) && (strnotempty(hts_detectURL[i]))) {
-                        p = rech_tageq(html, hts_detectURL[i]);
-                        i++;
-                      }
-                      if (p) {
-                        if (intag_ctype == 1) {
-                          p = 0;
+                        /* srcset: a comma-list of candidate URLs, each split
+                           out and rewritten below (#235, #236) */
+                        else if (strcmp(at->name, "srcset") == 0 ||
+                                 strcmp(at->name, "data-srcset") == 0) {
+                          srcset_p = 1;
                         }
-                        // <META HTTP-EQUIV="Refresh" CONTENT="3;URL=http://www.example.com">
-                        else if (intag_ctype == 2) {
+                        break;
+                      case HTS_ATTR_REFRESH:
+                        // <meta http-equiv="Refresh" content="3;URL=a.html">
+                        if (intag_ctype == 2) {
                           p_searchMETAURL = 1;
                         } else {
-                          p = 0;        /* cancel */
+                          p = 0; /* cancel */
                         }
+                        break;
+                      case HTS_ATTR_LEAVE:
+                        p_nocatch = 1; /* rewrite the link, never capture it */
+                        break;
+                      default:
+                        break;
                       }
-
                     }
 
-                    /* Tags supplémentaires à vérifier, mais à ne pas capturer */
-                    if (p == 0) {
-                      int i = 0;
-
-                      while((p == 0) && (strnotempty(hts_detectandleave[i]))) {
-                        p = rech_tageq(html, hts_detectandleave[i]);
-                        i++;
-                      }
-                      if (p)
-                        p_nocatch = 1;  /* ne pas rechercher */
-                    }
-
-                    /* Evénements */
-                    if (p == 0 && !inscript     /* we don't want events inside document.write */
-                      ) {
-                      int i = 0;
-                      int is_style_attr = 0;
-
-                      /* détection onLoad etc */
-                      while((p == 0) && (strnotempty(hts_detect_js[i]))) {
-                        p = rech_tageq(html, hts_detect_js[i]);
-                        if (p != 0)
-                          is_style_attr =
-                              (strfield2(hts_detect_js[i], "style") != 0);
-                        i++;
-                      }
-                      /* non détecté - détecter également les onXxxxx= */
+                    /* Events, but not inside document.write */
+                    if ((p == 0 || is_script_attr) && !inscript) {
+                      /* not in the table: any other onXxx= */
                       if (p == 0) {
                         if ((*html == 'o') && (*(html + 1) == 'n')
                             && isUpperLetter(*(html + 2))) {
@@ -1952,8 +1979,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                            On est désormais dans du code javascript
                          */
                         inscript_name = "";
-                        /* Only style= means CSS in hts_detect_js[]. */
-                        incss = is_style_attr;
+                        incss = at != NULL && at->kind == HTS_ATTR_STYLE;
                         inscript = inscript_tag = 1;
                         inscript_state_pos = INSCRIPT_START;
                         if (opt->parsedebug) {
