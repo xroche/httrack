@@ -217,6 +217,20 @@ static hts_boolean send_all(T_SOC soc, const char *buf, size_t len) {
   return HTS_TRUE;
 }
 
+/* Headers that keep a page out of every cache. */
+#define SMALLSERVER_NO_CACHE                                                   \
+  "Cache-Control: no-cache, must-revalidate, private\r\n"                      \
+  "Pragma: no-cache\r\n"
+
+/* Starts a reply head: status line, then the Server line, then "extra". */
+static void smallserver_head(String *headers, const char *status,
+                             const char *extra) {
+  StringCat(*headers, "HTTP/1.0 ");
+  StringCat(*headers, status);
+  StringCat(*headers, "\r\nServer: httrack small server\r\n");
+  StringCat(*headers, extra);
+}
+
 static int is_html(const char *file) {
   const char *const type = server_content_type(file);
 
@@ -281,12 +295,11 @@ T_SOC smallserver_init_std(int *port_prox, char *adr_prox, size_t adr_size,
   T_SOC soc;
 
   if (defaultPort <= 0) {
-    int try_to_listen_to[] =
-      { 8080, 8081, 8082, 8083, 8084, 8085, 8086, 8087, 8088, 8089,
-      32000, 32001, 32002, 32003, 32004, 32006, 32006, 32007, 32008, 32009,
-      42000, 42001, 42002, 42003, 42004, 42006, 42006, 42007, 42008, 42009,
-      0, -1
-    };
+    int try_to_listen_to[] = {8080,  8081,  8082,  8083,  8084,  8085,  8086,
+                              8087,  8088,  8089,  32000, 32001, 32002, 32003,
+                              32004, 32005, 32006, 32007, 32008, 32009, 42000,
+                              42001, 42002, 42003, 42004, 42005, 42006, 42007,
+                              42008, 42009, 0,     -1};
     int i = 0;
 
     do {
@@ -1503,7 +1516,6 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
   String headers = STRING_EMPTY;
   String output = STRING_EMPTY;
   String tmpbuff = STRING_EMPTY;
-  String tmpbuff2 = STRING_EMPTY;
   String fspath = STRING_EMPTY;
   String profile = STRING_EMPTY;
   /* Project directory this server set up; the only root /website/ serves from,
@@ -1620,12 +1632,10 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
     StringClear(headers);
     StringClear(output);
     StringClear(tmpbuff);
-    StringClear(tmpbuff2);
     StringClear(fspath);
     StringCat(headers, "");
     StringCat(output, "");
     StringCat(tmpbuff, "");
-    StringCat(tmpbuff2, "");
     StringCat(fspath, "");
 
     /* UnLock */
@@ -1680,9 +1690,6 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
       } else if (strfield(line1, "head ")) {    /* yes, we can do that */
         meth = 10;
         is_head = HTS_TRUE;
-      } else {
-#ifdef _DEBUG
-#endif
       }
       if (meth) {
         /* Flush headers */
@@ -2239,15 +2246,9 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
              "path" may hold "..", so only the untrusted halves are checked. */
           if (fsfile[0] && strstr(file, "..") == NULL && fexist(fsfile) &&
               (fp = fopen(fsfile, "rb"))) {
-            char ok[] =
-              "HTTP/1.0 200 OK\r\n" "Connection: close\r\n"
-              "Server: httrack-small-server\r\n" "Content-type: text/html\r\n"
-              "Cache-Control: no-cache, must-revalidate, private\r\n"
-              "Pragma: no-cache\r\n";
-            char ok_other[] = "HTTP/1.0 200 OK\r\n"
-                              "Connection: close\r\n"
-                              "Server: httrack small server\r\n"
-                              "Content-type: ";
+            static const char ok_html[] =
+                "Connection: close\r\n"
+                "Content-type: text/html\r\n" SMALLSERVER_NO_CACHE;
 
             /* register current page */
             coucal_write(NewLangList, "thisfile", (intptr_t) strdup(file));
@@ -2259,9 +2260,6 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
             /* posted data are redirected to get protocol */
             if (meth == 2) {
-              char redir[] =
-                "HTTP/1.0 302 Redirect\r\n" "Connection: close\r\n"
-                "Server: httrack-small-server\r\n";
               intptr_t adr = 0;
               const char *newfile = file;
 
@@ -2272,7 +2270,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                   newfile = newadr;
                 }
               }
-              StringMemcat(headers, redir, strlen(redir));
+              smallserver_head(&headers, "302 Redirect",
+                               "Connection: close\r\n");
               /* client-supplied: a CR/LF here would split the response */
               if (newfile[strcspn(newfile, "\r\n")] == '\0') {
                 StringCat(headers, "Location: ");
@@ -2286,7 +2285,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
               int outputmode = 0;
 
               ini_publish_gated_values();
-              StringMemcat(headers, ok, sizeof(ok) - 1);
+              smallserver_head(&headers, "200 OK", ok_html);
               while (!feof(fp) && !ferror(fp)) {
                 char *str = line;
                 size_t prevlen = StringLength(output);
@@ -2857,11 +2856,12 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 #endif
             } else {
               if (is_html(file)) {
-                StringMemcat(headers, ok, sizeof(ok) - 1);
+                smallserver_head(&headers, "200 OK", ok_html);
               } else {
                 const char *const type = server_content_type(file);
 
-                StringMemcat(headers, ok_other, sizeof(ok_other) - 1);
+                smallserver_head(&headers, "200 OK",
+                                 "Connection: close\r\nContent-type: ");
                 StringCat(headers,
                           type != NULL ? type : "application/octet-stream");
                 StringCat(headers, "\r\n");
@@ -2888,12 +2888,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                folder. Not cached, so a switch shows on the next page. */
             const char *const theme = effective_theme(path);
 
-            StringCat(headers, "HTTP/1.0 200 OK\r\n"
-                               "Server: httrack small server\r\n"
-                               "Content-type: text/css\r\n"
-                               "Cache-Control: no-cache, must-revalidate, "
-                               "private\r\n"
-                               "Pragma: no-cache\r\n");
+            smallserver_head(&headers, "200 OK",
+                             "Content-type: text/css\r\n" SMALLSERVER_NO_CACHE);
             if (strcmp(theme, THEME_CLASSIC) != 0) {
               StringCat(output, "@import url(themes/");
               StringCat(output, theme);
@@ -2902,16 +2898,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
           } else if (strcmp(file, "/ping") == 0) {
             /* A cached heartbeat would never reach us again, and silence is
                what the watchdog reads as a dead window. */
-            char error_hdr[] =
-                "HTTP/1.0 200 Pong\r\n"
-                "Server: httrack small server\r\n"
-                "Content-type: text/html\r\n"
-                "Cache-Control: no-cache, must-revalidate, private\r\n"
-                "Pragma: no-cache\r\n";
-
             char window[SMALLSERVER_WINDOW_ID_MAX + 1];
 
-            StringCat(headers, error_hdr);
+            smallserver_head(
+                &headers, "200 Pong",
+                "Content-type: text/html\r\n" SMALLSERVER_NO_CACHE);
             if (query_alnum_value(window, sizeof(window), query, "w")) {
               char verb[SMALLSERVER_WINDOW_ID_MAX + 1];
 
@@ -2926,33 +2917,16 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                   window);
             }
           } else {
-            char error_hdr[] =
-              "HTTP/1.0 404 Not Found\r\n" "Server: httrack small server\r\n"
-              "Content-type: text/html\r\n";
-            char error[] = "Page not found.\r\n";
-
-            StringCat(headers, error_hdr);
-            StringCat(output, error);
+            smallserver_head(&headers, "404 Not Found",
+                             "Content-type: text/html\r\n");
+            StringCat(output, "Page not found.\r\n");
           }
         }
       } else if (denied != NULL) {
-        StringCat(headers, "HTTP/1.0 ");
-        StringCat(headers, denied_status);
-        StringCat(headers, "\r\n"
-                           "Server: httrack small server\r\n"
-                           "Content-type: text/html\r\n");
+        smallserver_head(&headers, denied_status,
+                         "Content-type: text/html\r\n");
         StringCat(output, denied);
         StringCat(output, "\r\n");
-      } else {
-#ifdef _DEBUG
-        char error_hdr[] =
-          "HTTP/1.0 500 Server Error\r\n" "Server: httrack small server\r\n"
-          "Content-type: text/html\r\n";
-        char error[] = "Server error.\r\n";
-
-        StringCat(headers, error_hdr);
-        StringCat(output, error);
-#endif
       }
       {
         char tmp[256];
@@ -2966,9 +2940,6 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
           !is_head) {
         (void) send_all(soc_c, StringBuff(output), StringLength(output));
       }
-    } else {
-#ifdef _DEBUG
-#endif
     }
 
     /* Shutdown (FIN) and wait until confirmed */
@@ -3018,7 +2989,6 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
   StringFree(headers);
   StringFree(output);
   StringFree(tmpbuff);
-  StringFree(tmpbuff2);
   StringFree(fspath);
   StringFree(profile);
   StringFree(website);
