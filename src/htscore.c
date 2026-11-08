@@ -796,6 +796,38 @@ static hts_boolean bundle_start(httrackp *opt, char **primary,
   return HTS_TRUE;
 }
 
+/* Fill the module context for the link at *ptr; page_charset_ stays NULL. */
+static void mirror_module_str(htsmoduleStruct *str, char *err_msg,
+                              httrackp *opt, struct_back *sback,
+                              cache_back *cache, hash_struct *hashptr,
+                              int numero_passe, int *ptr, htsblk *r) {
+  err_msg[0] = '\0';
+  memset(str, 0, sizeof(*str));
+  str->err_msg = err_msg;
+  str->filename = opt->liens[*ptr]->sav;
+  str->mime = r->contenttype;
+  str->url_host = opt->liens[*ptr]->adr;
+  str->url_file = opt->liens[*ptr]->fil;
+  str->size = (int) r->size;
+  str->addLink = htsAddLink;
+  str->opt = opt;
+  str->sback = sback;
+  str->cache = cache;
+  str->hashptr = hashptr;
+  str->numero_passe = numero_passe;
+  str->ptr_ = ptr;
+}
+
+/* Copy the mirror-wide fields of base, then set the per-link ones. */
+static void mirror_module_stre(htsmoduleStructExtended *stre,
+                               const htsmoduleStructExtended *base, htsblk *r,
+                               int *error, int *store_errpage) {
+  *stre = *base;
+  stre->r_ = r;
+  stre->error_ = error;
+  stre->store_errpage_ = store_errpage;
+}
+
 int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   char *primary = NULL;         // première page, contenant les liens à scanner
   hash_struct hash;             // système de hachage, accélère la recherche dans les liens
@@ -851,6 +883,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
 
   //
   char *template_header = NULL, *template_body = NULL, *template_footer = NULL;
+  htsmoduleStructExtended BIGSTK stre_base; // see mirror_module_stre()
 
   //
   codebase[0] = '\0';
@@ -1429,6 +1462,29 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   }
   // ------------------------------------------------------------
 
+  /* None of these change once the loop starts. */
+  memset(&stre_base, 0, sizeof(stre_base));
+  stre_base.exit_xh_ = &opt->state.exit_xh;
+  stre_base.base = base;
+  stre_base.codebase = codebase;
+  stre_base.filters_ = &filters;
+  stre_base.filptr_ = &filptr;
+  stre_base.robots_ = &robots;
+  stre_base.hash_ = &hash;
+  stre_base.makeindex_done_ = &makeindex_done;
+  stre_base.makeindex_fp_ = &makeindex_fp;
+  stre_base.makeindex_links_ = &makeindex_links;
+  stre_base.makeindex_firstlink_ = makeindex_firstlink;
+  stre_base.template_header_ = template_header;
+  stre_base.template_body_ = template_body;
+  stre_base.template_footer_ = template_footer;
+  stre_base.stat_fragment_ = &stat_fragment;
+  stre_base.makestat_time = makestat_time;
+  stre_base.makestat_fp = makestat_fp;
+  stre_base.makestat_total_ = &makestat_total;
+  stre_base.makestat_lnk_ = &makestat_lnk;
+  stre_base.maketrack_fp = maketrack_fp;
+
   // ------------------------------------------------------------
   // Boucle générale de parcours des liens
   // ------------------------------------------------------------
@@ -1518,59 +1574,9 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
             htsmoduleStruct BIGSTK str;
             htsmoduleStructExtended BIGSTK stre;
 
-            buff_err_msg[0] = '\0';
-            memset(&str, 0, sizeof(str));
-            memset(&stre, 0, sizeof(stre));
-            /* */
-            str.err_msg = buff_err_msg;
-            str.filename = savename();
-            str.mime = r.contenttype;
-            str.url_host = urladr();
-            str.url_file = urlfil();
-            str.size = (const int) r.size;
-            /* */
-            str.addLink = htsAddLink;
-            /* */
-            str.opt = opt;
-            str.sback = sback;
-            str.cache = &cache;
-            str.hashptr = hashptr;
-            str.numero_passe = numero_passe;
-            /* */
-            str.ptr_ = &ptr;
-            /* */
-            str.page_charset_ = NULL;
-            /* */
-            /* */
-            stre.r_ = &r;
-            /* */
-            stre.error_ = &error;
-            stre.exit_xh_ = &opt->state.exit_xh;
-            stre.store_errpage_ = &store_errpage;
-            /* */
-            stre.base = base;
-            stre.codebase = codebase;
-            /* */
-            stre.filters_ = &filters;
-            stre.filptr_ = &filptr;
-            stre.robots_ = &robots;
-            stre.hash_ = &hash;
-            /* */
-            stre.makeindex_done_ = &makeindex_done;
-            stre.makeindex_fp_ = &makeindex_fp;
-            stre.makeindex_links_ = &makeindex_links;
-            stre.makeindex_firstlink_ = makeindex_firstlink;
-            /* */
-            stre.template_header_ = template_header;
-            stre.template_body_ = template_body;
-            stre.template_footer_ = template_footer;
-            /* */
-            stre.stat_fragment_ = &stat_fragment;
-            stre.makestat_time = makestat_time;
-            stre.makestat_fp = makestat_fp;
-            stre.makestat_total_ = &makestat_total;
-            stre.makestat_lnk_ = &makestat_lnk;
-            stre.maketrack_fp = maketrack_fp;
+            mirror_module_str(&str, buff_err_msg, opt, sback, &cache, hashptr,
+                              numero_passe, &ptr, &r);
+            mirror_module_stre(&stre, &stre_base, &r, &error, &store_errpage);
             /* FUNCTION DEPENDANT */
             stre.loc_ = loc;
             stre.last_info_shell_ = &last_info_shell;
@@ -1777,59 +1783,9 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
         htsmoduleStruct BIGSTK str;
         htsmoduleStructExtended BIGSTK stre;
 
-        buff_err_msg[0] = '\0';
-        memset(&str, 0, sizeof(str));
-        memset(&stre, 0, sizeof(stre));
-        /* */
-        str.err_msg = buff_err_msg;
-        str.filename = savename();
-        str.mime = r.contenttype;
-        str.url_host = urladr();
-        str.url_file = urlfil();
-        str.size = (int) r.size;
-        /* */
-        str.addLink = htsAddLink;
-        /* */
-        str.opt = opt;
-        str.sback = sback;
-        str.cache = &cache;
-        str.hashptr = hashptr;
-        str.numero_passe = numero_passe;
-        /* */
-        str.ptr_ = &ptr;
-        /* */
-        str.page_charset_ = NULL;
-        /* */
-        /* */
-        stre.r_ = &r;
-        /* */
-        stre.error_ = &error;
-        stre.exit_xh_ = &opt->state.exit_xh;
-        stre.store_errpage_ = &store_errpage;
-        /* */
-        stre.base = base;
-        stre.codebase = codebase;
-        /* */
-        stre.filters_ = &filters;
-        stre.filptr_ = &filptr;
-        stre.robots_ = &robots;
-        stre.hash_ = &hash;
-        /* */
-        stre.makeindex_done_ = &makeindex_done;
-        stre.makeindex_fp_ = &makeindex_fp;
-        stre.makeindex_links_ = &makeindex_links;
-        stre.makeindex_firstlink_ = makeindex_firstlink;
-        /* */
-        stre.template_header_ = template_header;
-        stre.template_body_ = template_body;
-        stre.template_footer_ = template_footer;
-        /* */
-        stre.stat_fragment_ = &stat_fragment;
-        stre.makestat_time = makestat_time;
-        stre.makestat_fp = makestat_fp;
-        stre.makestat_total_ = &makestat_total;
-        stre.makestat_lnk_ = &makestat_lnk;
-        stre.maketrack_fp = maketrack_fp;
+        mirror_module_str(&str, buff_err_msg, opt, sback, &cache, hashptr,
+                          numero_passe, &ptr, &r);
+        mirror_module_stre(&stre, &stre_base, &r, &error, &store_errpage);
 
         /* Parse */
         {
@@ -1959,61 +1915,12 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
             htsmoduleStruct BIGSTK str;
             htsmoduleStructExtended BIGSTK stre;
 
-            buff_err_msg[0] = '\0';
-            memset(&str, 0, sizeof(str));
-            memset(&stre, 0, sizeof(stre));
-            /* */
-            str.err_msg = buff_err_msg;
-            str.filename = savename();
-            str.mime = r.contenttype;
-            str.url_host = urladr();
-            str.url_file = urlfil();
-            str.size = (int) r.size;
-            /* */
-            str.addLink = htsAddLink;
-            /* */
-            str.opt = opt;
-            str.sback = sback;
-            str.cache = &cache;
-            str.hashptr = hashptr;
-            str.numero_passe = numero_passe;
-            /* */
-            str.ptr_ = &ptr;
-            /* */
+            mirror_module_str(&str, buff_err_msg, opt, sback, &cache, hashptr,
+                              numero_passe, &ptr, &r);
             /* NULL when conversion is off, empty when the document declared no
                charset; the parser tells the two apart */
             str.page_charset_ = opt->convert_utf8 ? page_charset : NULL;
-            /* */
-            /* */
-            stre.r_ = &r;
-            /* */
-            stre.error_ = &error;
-            stre.exit_xh_ = &opt->state.exit_xh;
-            stre.store_errpage_ = &store_errpage;
-            /* */
-            stre.base = base;
-            stre.codebase = codebase;
-            /* */
-            stre.filters_ = &filters;
-            stre.filptr_ = &filptr;
-            stre.robots_ = &robots;
-            stre.hash_ = &hash;
-            /* */
-            stre.makeindex_done_ = &makeindex_done;
-            stre.makeindex_fp_ = &makeindex_fp;
-            stre.makeindex_links_ = &makeindex_links;
-            stre.makeindex_firstlink_ = makeindex_firstlink;
-            /* */
-            stre.template_header_ = template_header;
-            stre.template_body_ = template_body;
-            stre.template_footer_ = template_footer;
-            /* */
-            stre.stat_fragment_ = &stat_fragment;
-            stre.makestat_time = makestat_time;
-            stre.makestat_fp = makestat_fp;
-            stre.makestat_total_ = &makestat_total;
-            stre.makestat_lnk_ = &makestat_lnk;
-            stre.maketrack_fp = maketrack_fp;
+            mirror_module_stre(&stre, &stre_base, &r, &error, &store_errpage);
 
             /* Parse */
             if (htsparse(&str, &stre) != 0) {
@@ -2139,24 +2046,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
           char BIGSTK buff_err_msg[1024];
           htsmoduleStruct BIGSTK str;
 
-          buff_err_msg[0] = '\0';
-          memset(&str, 0, sizeof(str));
-          /* */
-          str.err_msg = buff_err_msg;
-          str.filename = savename();
-          str.mime = r.contenttype;
-          str.url_host = urladr();
-          str.url_file = urlfil();
-          str.size = (int) r.size;
-          /* */
-          str.addLink = htsAddLink;
-          /* */
-          str.opt = opt;
-          str.sback = sback;
-          str.cache = &cache;
-          str.hashptr = hashptr;
-          str.numero_passe = numero_passe;
-          str.ptr_ = &ptr;
+          mirror_module_str(&str, buff_err_msg, opt, sback, &cache, hashptr,
+                            numero_passe, &ptr, &r);
 
           /* Parse if recognized */
           switch (hts_parse_externals(&str)) {
