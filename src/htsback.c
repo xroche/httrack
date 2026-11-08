@@ -4516,9 +4516,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                 // si chunk non nul continuer (ou commencer)
                 if (back_status(&back[i]) == STATUS_CHUNK_CR &&
                     chunk_size > 0) {
-                  back[i].status = STATUS_CHUNK_WAIT; /* waiting for next chunk
-                                                         (NN\r\n<data>\r\nNN\r\n<data>..\r\n0\r\n\r\n)
-                                                       */
+                  /* waiting for the next chunk */
+                  back[i].status = STATUS_CHUNK_WAIT;
                 } else if (back_status(&back[i]) == STATUS_CHUNK_WAIT &&
                            chunk_size == 0) {           /* final chunk */
                   back[i].status = STATUS_CHUNK_CR;     /* final CRLF */
