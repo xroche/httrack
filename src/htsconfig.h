@@ -68,10 +68,6 @@ Please visit our Website: http://www.httrack.com
     display? */
 #define HTS_POLL 1
 
-/** A URL ending with a slash is HTML (example/ is always HTML). Nothing in the
-    tree reads this. */
-#define HTS_SLASH_ISHTML 1
-
 /** Should a plain file be renamed to "<name>.txt" when the mirror needs a
     directory of the same name? */
 #define HTS_REMOVE_ANNOYING_INDEX 1
@@ -79,22 +75,9 @@ Please visit our Website: http://www.httrack.com
 /** Should non-HTML data go straight to disk instead of being held in memory? */
 #define HTS_DIRECTDISK 1
 
-/** Always write straight to disk. Nothing in the tree reads this. */
-#define HTS_DIRECTDISK_ALWAYS 1
-
 /** Should a bare ">" end an HTML comment when no "-->" follows anywhere, the
     way browsers accept <!-- foo >? */
 #define GT_ENDS_COMMENT 1
-
-/** Should a path holding a "~" gain a trailing slash (/~smith -> /~smith/)? */
-#define HTS_TILDE_SLASH 0
-
-/** Should "//" inside a link collapse to "/" when --urlhack is on? */
-#define HTS_STRIP_DOUBLE_SLASH 0
-
-/** Should a failed download delete the partial file? Off, because a retry would
-    then have nothing left to resume. */
-#define HTS_REMOVE_BAD_FILES 0
 
 /** Filter slots the engine adds each time the filter array fills up. */
 #define HTS_FILTERSINC 1000

@@ -2493,40 +2493,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                 "Link %s refused by external wrapper",
                                 url_nologin(opt, lien));
                 }
-#if HTS_STRIP_DOUBLE_SLASH
-                // supprimer les // en / (sauf pour http://)
-                if (opt->urlhack) {
-                  char *a, *p, *q;
-                  int done = 0;
-
-                  a = strchr(lien, ':');        // http://
-                  if (a) {
-                    a++;
-                    while(*a == '/')
-                      a++;      // position après http://
-                  } else {
-                    a = lien;   // début
-                    while(*a == '/')
-                      a++;      // position après http://
-                  }
-                  q = strchr(a, '?');   // ne pas traiter après '?'
-                  if (!q)
-                    q = hts_lastcharptr(a);
-                  while((p = strstr(a, "//")) && (!done)) {     // remplacer // par /
-                    if (p > q) {    // après le ? (toto.cgi?param=1//2.3)
-                      done = 1; // stopper
-                    } else {
-                      char BIGSTK tempo[HTS_URLMAXSIZE * 2];
-
-                      tempo[0] = '\0';
-                      strncatbuff(tempo, a, p - a);
-                      strcatbuff(tempo, p + 1);
-                      strcpybuff(a, tempo);     // recopier
-                    }
-                  }
-                }
-#endif
-
                 // purger espaces de début et fin, CR,LF résiduels
                 // (IMG SRC="foo.<\n><\t>gif<\t>")
                 {
@@ -2708,23 +2674,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 }
                 if (strnotempty(lien) == 0)     // sauf si plus de nom de fichier
                   strcpybuff(lien, "./");
-
-                // vérifie les /~machin -> /~machin/
-                // supposition dangereuse?
-                // OUI!!
-#if HTS_TILDE_SLASH
-                if (hts_lastchar(lien) != '/') {
-                  char *a = hts_lastcharptr(lien);
-
-                  // éviter aussi index~1.html
-                  while(a > lien && (*a != '~') && (*a != '/')
-                        && (*a != '.'))
-                    a--;
-                  if (*a == '~') {
-                    strcatbuff(lien, "/");      // ajouter slash
-                  }
-                }
-#endif
 
                 // APPLET CODE="mixer.MixerApplet.class" --> APPLET CODE="mixer/MixerApplet.class"
                 // yes, this is dirty
