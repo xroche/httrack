@@ -31,12 +31,6 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-#ifndef _WIN32
-#ifndef Sleep
-#define Sleep(a) { if (((a)*1000)%1000000) usleep(((a)*1000)%1000000); if (((a)*1000)/1000000) sleep(((a)*1000)/1000000); }
-#endif
-#endif
-
 #include "httrack-library.h"
 
 #include "htsglobal.h"

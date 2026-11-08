@@ -33,6 +33,7 @@ Please visit our Website: http://www.httrack.com
 #define PROXYTRACK_VERSION "0.5"
 
 /* Store manager */
+#include "../htsbase.h"
 #include "../minizip/mztools.h"
 #include "store.h"
 #include "../htsdate.h"
@@ -211,12 +212,6 @@ HTS_UNUSED static const char *jump_protocol_and_auth(const char *source) {
   return (trytofind != NULL) ? trytofind : a;
 }
 
-#ifndef min
-#define min(a,b) ((a)>(b)?(b):(a))
-#endif
-#ifndef max
-#define max(a,b) ((a)>(b)?(a):(b))
-#endif
 HTS_UNUSED static int linput_trim(FILE * fp, char *s, int max) {
   int rlen = 0;
   char *const ls = (char *) malloc(max + 1);
