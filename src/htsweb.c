@@ -862,7 +862,7 @@ static int __cdecl htsshow_loop(
                 const LLint totalsize =
                     hts_load_relaxed_llint(&back[i].r.totalsize);
 
-                if (totalsize > 0) { // known size
+                if (totalsize >= 0) { // known size
                   StatsBuffer[index].sizetot = totalsize;
                   StatsBuffer[index].size = size;
                 } else {                             // unknown size

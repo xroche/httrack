@@ -448,7 +448,7 @@ static int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_b
       );
 
     // parcourir registre des liens
-    if (back_index >= 0) {      // seulement si index passé
+    if (back_index >= 0 && back_max > 0) { // only with a backing table
       int j, k;
       int index = 0;
       int ok = 0;               // idem
@@ -650,9 +650,7 @@ static int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_b
           printf("%s\n", VT_CLREOL);
         }
       }
-
     }
-
   }
 
   return 1;
