@@ -838,46 +838,6 @@ void *hts_get_callback(t_hts_htmlcheck_callbacks * callbacks,
   GET_CALLBACK(OPT, NAME)(GET_USERARG(OPT, NAME), OPT, ARG1, ARG2, ARG3, ARG4, \
                           ARG5, ARG6, ARG7)
 
-/* UTF-8 aware FILE API */
-#ifndef HTS_DEF_FILEAPI
-#ifdef _WIN32
-#define FOPEN hts_fopen_utf8
-     HTSEXT_API FILE *hts_fopen_utf8(const char *path, const char *mode);
-
-#define STAT hts_stat_utf8
-     /* _stat64: _stat's st_size is a 32-bit long, even in x64 builds */
-     typedef struct _stat64 STRUCT_STAT;
-     HTSEXT_API int hts_stat_utf8(const char *path, STRUCT_STAT * buf);
-
-#define UNLINK hts_unlink_utf8
-     HTSEXT_API int hts_unlink_utf8(const char *pathname);
-
-#define RENAME hts_rename_utf8
-     HTSEXT_API int hts_rename_utf8(const char *oldpath, const char *newpath);
-
-#define MKDIR(F) hts_mkdir_utf8(F)
-     HTSEXT_API int hts_mkdir_utf8(const char *pathname);
-
-#define UTIME(A,B) hts_utime_utf8(A,B)
-     typedef struct _utimbuf STRUCT_UTIMBUF;
-     HTSEXT_API int hts_utime_utf8(const char *filename,
-                                   const STRUCT_UTIMBUF * times);
-#else
-/* The underlying filesystem charset is supposed to be UTF-8 */
-#define FOPEN fopen
-#define STAT stat
-     typedef struct stat STRUCT_STAT;
-
-#define UNLINK unlink
-#define RENAME rename
-#define MKDIR(F) mkdir(F, HTS_ACCESS_FOLDER)
-     typedef struct utimbuf STRUCT_UTIMBUF;
-
-#define UTIME(A,B) utime(A,B)
-#endif
-#define HTS_DEF_FILEAPI
-#endif
-
 #endif // internals
 
 #undef PATH_SEPARATOR

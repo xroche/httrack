@@ -36,6 +36,7 @@ Please visit our Website: http://www.httrack.com
 #define HTS_SERVER_DEFH
 
 #include <sys/stat.h>
+#include "htsbase.h"
 #include "htsnet.h"
 
 /* String */
@@ -85,11 +86,6 @@ extern int NewLangListSz;
 extern coucal NewLangList;
 
 extern httrackp *global_opt;
-
-#undef min
-#undef max
-#define min(a,b) ((a)>(b)?(b):(a))
-#define max(a,b) ((a)>(b)?(a):(b))
 
 /* What the UI just told us about itself, reported to the ping handler. */
 typedef enum {
