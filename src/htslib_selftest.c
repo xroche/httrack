@@ -4045,8 +4045,7 @@ static int __cdecl cp_receivehead(t_hts_callbackarg *carg, httrackp *opt,
                                  ref_fil, incoming);
 }
 
-/* A hook chained onto an unset slot gets a prev answering the engine default.
- */
+/* A hook chained onto an unset slot gets the engine default as prev. */
 static int st_chainprev(httrackp *unused, int argc, char **argv) {
   httrackp *const opt = hts_create_opt();
   char html[] = "<html></html>", link[] = "x.html", save[] = "x.html";
