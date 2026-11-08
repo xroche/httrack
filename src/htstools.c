@@ -595,13 +595,12 @@ int verif_external(httrackp * opt, int nb, int test) {
   return 0;
 }
 
-/* Offset past `name<spaces>=` at adr, or 0 if absent (rech_tageq() is the
-   macro in htstools.h that tests the preceding character first). */
 HTS_INLINE char html_prevc(const char *adr, const char *start) {
   return adr > start ? adr[-1] : ' ';
 }
 
-// Deuxième partie
+/* Offset past `s<spaces>=` at adr, or 0; rech_tageq() in htstools.h checks the
+ * preceding char. */
 HTS_INLINE int __rech_tageq(const char *adr, const char *s) {
   int p;
 
@@ -1004,6 +1003,9 @@ static hts_boolean topindex_commit(httrackp *opt, const char *tmp,
 }
 
 /* Note: NOT utf-8 */
+/* Test hook: the Nth project row of the next top index fails to allocate. */
+int topindex_failrow = 0;
+
 HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
                                  const char *binpath) {
   FILE *fpo;
@@ -1117,7 +1119,9 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
                 level = 1;
               }
 
-              elt = calloct(1, sizeof(struct topindex_chain));
+              elt = topindex_failrow > 0 && --topindex_failrow == 0
+                        ? NULL
+                        : calloct(1, sizeof(struct topindex_chain));
               if (elt == NULL) {
                 hts_log_print(opt, LOG_WARNING,
                               "not enough memory to list %s in the top index",

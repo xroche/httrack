@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# A top index that cannot allocate a project row must skip it, not abort the
-# crawl. The cap is RLIMIT_AS, so a host where it is advisory reports a skip.
+# A project row that cannot be allocated is skipped and the others stay listed.
 
 set -euo pipefail
 
