@@ -1151,12 +1151,9 @@ int url_savename(lien_adrfilsave *const afs,
               }
 
             } else {
-              printf
-                ("PANIC! : Savename Crash adding error, unexpected error found.. [%d]\n",
-                 __LINE__);
-#if BDEBUG==1
-              printf("error while savename crash adding\n");
-#endif
+              printf("PANIC! : Savename Crash adding error, unexpected error "
+                     "found.. [%d]\n",
+                     __LINE__);
               hts_log_print(opt, LOG_ERROR,
                             "Unexpected savename backing error at %s%s",
                             adr_nologin(opt, adr), fil_complete);

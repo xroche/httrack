@@ -865,9 +865,6 @@ struct lien_url {
 typedef struct lien_back lien_back;
 #endif
 struct lien_back {
-#if DEBUG_CHECKINT
-  char magic; /**< leading guard byte, must stay 0 */
-#endif
   char url_adr[HTS_URLMAXSIZE * 2];     /**< host/address part of the URL */
   char url_fil[HTS_URLMAXSIZE * 2];     /**< remote file path */
   char url_sav[HTS_URLMAXSIZE * 2];     /**< local save name (with any path) */
@@ -904,9 +901,6 @@ struct lien_back {
   volatile int stop_ftp; /**< stop flag for FTP, polled without a lock */
   int finalized;  /**< finalized (memory optimization) */
   int early_add;  /**< was added before the link heap saw it */
-#if DEBUG_CHECKINT
-  char magic2; /**< trailing guard byte, must stay 0 */
-#endif
 };
 
 #ifdef __cplusplus

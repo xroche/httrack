@@ -911,9 +911,6 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
               else {
                 file_notify(opt, adr, fil, target_save, 1, 1, 1);       // data in cache
                 r.out = filecreate(&opt->state.strc, target_save);
-#if HDEBUG
-                printf("direct-disk: %s\n", save);
-#endif
                 if (r.out != NULL) {
                   char BIGSTK buff[32768 + 4];
                   LLint size = r.size;
@@ -1264,9 +1261,6 @@ void cache_init(cache_back * cache, httrackp * opt) {
                                           StringBuff(opt->path_log),
                                           "hts-cache/"), (int) cache->ro);
   if (opt->cache) {
-#if DEBUGCA
-    printf("cache init: ");
-#endif
     if (!cache->ro) {
 #ifdef _WIN32
       /* Windows mkdir takes no mode; use the UTF-8 wrapper for #630. */
@@ -1465,9 +1459,6 @@ void cache_init(cache_back * cache, httrackp * opt) {
                             "hts-cache/"));
     }
 
-#if DEBUGCA
-    printf("..create cache\n");
-#endif
     if (!cache->ro) {
       // ouvrir caches actuels
       structcheck_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
@@ -1547,7 +1538,6 @@ void cache_init(cache_back * cache, httrackp * opt) {
   } else {
     hts_log_print(opt, LOG_DEBUG, "Cache: no cache enabled");
   }
-
 }
 
 // lire un fichier.. (compatible \0)

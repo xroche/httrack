@@ -2033,20 +2033,12 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                             tempo[0] = '\0';
                             a = tag_close_within(html, 999);
-#if DEBUG_ROBOTS
-                            printf("robots.txt meta tag detected\n");
-#endif
                             if (a) {
                               if (a - html < 999) {
                                 strncatbuff(tempo, html, a - html);
                                 if (strstrcase(tempo, "content")) {
                                   if (strstrcase(tempo, "robots")) {
                                     if (strstrcase(tempo, "nofollow")) {
-#if DEBUG_ROBOTS
-                                      printf
-                                        ("robots.txt meta tag: nofollow in %s%s\n",
-                                         urladr(), urlfil());
-#endif
                                       nofollow = 1;     // NE PLUS suivre liens dans cette page
                                       hts_log_print(opt, LOG_WARNING,
                                                     "Link %s%s not scanned "
@@ -3835,11 +3827,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                       heap_top()->depth = 0;
                                       heap_top()->pass2 = max(0, numero_passe);
                                       heap_top()->retry = 0;
-#if DEBUG_ROBOTS
-                                      printf
-                                        ("robots.txt: added file robots.txt for %s\n",
-                                         adr);
-#endif
                                       hts_log_print(
                                           opt, LOG_DEBUG,
                                           "robots.txt added at %s",
@@ -4713,10 +4700,6 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
   /* Load engine variables */
   ENGINE_LOAD_CONTEXT();
 
-#if BDEBUG==1
-  printf("\nBack test..\n");
-#endif
-
   /* Windows has no cross-process SIGTERM: a stop request arrives as a file. */
   if (hts_take_lock_request(opt, HTS_ABORT_LOCKNAME)) {
     hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
@@ -4937,31 +4920,19 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
   }
   // si le fichier n'est pas en backing, le mettre..
   if (!back_exist(str->sback, str->opt, urladr(), urlfil(), savename())) {
-#if BDEBUG==1
-    printf("crash backing: %s%s\n", heap(ptr)->adr, heap(ptr)->fil);
-#endif
     if (back_add(sback, opt, cache, urladr(), urlfil(), savename(),
                  heap(heap(ptr)->precedent)->adr,
                  heap(heap(ptr)->precedent)->fil, heap(ptr)->testmode,
                  heap(ptr)->refetch_whole, &heap(ptr)->fetch) == -1) {
       printf("PANIC! : Crash adding error, unexpected error found.. [%d]\n",
              __LINE__);
-#if BDEBUG==1
-      printf("error while crash adding\n");
-#endif
       hts_log_print(opt, LOG_ERROR, "Unexpected backing error for %s%s",
                     adr_nologin(opt, urladr()), urlfil());
     }
   }
-#if BDEBUG==1
-  printf("test number of socks\n");
-#endif
 
   // ajouter autant de socket qu'on peut ajouter
   n = opt->maxsoc - back_nsoc(sback);
-#if BDEBUG==1
-  printf("%d sockets available for backing\n", n);
-#endif
 
   if ((n > 0) && (!opt->state._hts_setpause)) { // si sockets libre et pas en pause, ajouter
     // remplir autant que l'on peut le cache (backing)
@@ -4981,9 +4952,6 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
 
       // index du lien actuel
       b = back_index(opt, sback, urladr(), urlfil(), savename());
-#if BDEBUG==1
-      printf("back index %d, waiting\n", b);
-#endif
       // Continue to the loop if link still present
       if (b < 0)
         break;
@@ -5072,9 +5040,6 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
                 if (strcmp(back[i].url_sav, s) == 0) {  // ok trouvé
                   matched = HTS_TRUE;
                   if (status != 1000) {
-#if HTS_DEBUG_CLOSESOCK
-                    DEBUG_W("user cancel: deletehttp\n");
-#endif
                     if (back[i].r.soc != INVALID_SOCKET)
                       deletehttp(&back[i].r);
                     back[i].r.soc = INVALID_SOCKET;
@@ -5231,19 +5196,6 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
     }
 
     // ------------------------------------------------------------
-    // Vérificateur d'intégrité
-#if DEBUG_CHECKINT
-    _CHECKINT(&back[b], "Retour de back_wait, après le while") {
-      int i;
-
-      for(i = 0; i < back_max; i++) {
-        char si[256];
-
-        sprintf(si, "Test global après back_wait, index %d", i);
-        _CHECKINT(&back[i], si)
-      }
-    }
-#endif
 
     // copier structure réponse htsblk
     if (b >= 0) {
@@ -5257,37 +5209,6 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
       // libérer emplacement backing
       back_maydelete(opt, cache, sback, b);
     }
-    // débug graphique
-#if BDEBUG==2
-    {
-      char s[12];
-      int i = 0;
-
-      _GOTOXY(1, 1);
-      printf("Rate=%d B/sec\n",
-             (int) (hts_stat_recv_get() /
-                    (time_local() - HTS_STAT.stat_timestart)));
-      while(i < minimum(back_max, 160)) {
-        if (back_status(&back[i]) > 0) {
-          sprintf(s, "%d", back[i].r.size);
-        } else if (back_status(&back[i]) == STATUS_READY) {
-          strcpybuff(s, "ENDED");
-        } else
-          strcpybuff(s, "   -   ");
-        while(strlen(s) < 8)
-          strcatbuff(s, " ");
-        printf("%s", s);
-        io_flush;
-        i++;
-      }
-    }
-#endif
-
-#if BDEBUG==1
-    printf("statuscode=%d with %s / msg=%s\n", r->statuscode, r->contenttype,
-           r->msg);
-#endif
-
   }
 
   ENGINE_SAVE_CONTEXT();

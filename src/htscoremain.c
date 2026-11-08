@@ -950,9 +950,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       /* if doit.log exists, or if new URL(s) defined, 
          then DO NOT load standard config files */
       /* (config files are added in doit.log) */
-#if DEBUG_STEPS
-      printf("Loading httrackrc/doit.log\n");
-#endif
       /* recreate a doit.log (no old doit.log or new URLs (and parameters)) */
       if ((strnotempty(StringBuff(opt->path_log)))
           || (strnotempty(StringBuff(opt->path_html))))
@@ -1056,9 +1053,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   }
 
   // No new cache but an old one? promote it
-#if DEBUG_STEPS
-  printf("Checking cache\n");
-#endif
   hts_cache_reconcile(opt, CACHE_RECONCILE_PROMOTE);
 
   /* Interrupted mirror over a pre-3.31 (2003) cache: cache_init() refuses that
@@ -1089,18 +1083,12 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     }
   }
   // remplacer "macros" comme --spider
-  // permet de lancer httrack sans a avoir à se rappeler de syntaxes comme p0C0I0Qc32 ..
-#if DEBUG_STEPS
-  printf("Checking last macros\n");
-#endif
+  // permet de lancer httrack sans a avoir à se rappeler de syntaxes comme
+  // p0C0I0Qc32 ..
   {
     int i;
 
-    for(i = 0; i < argc; i++) {
-#if DEBUG_STEPS
-      printf("Checking #%d:\n", argv[i]);
-      printf("%s\n", argv[i]);
-#endif
+    for (i = 0; i < argc; i++) {
       if (argv[i][0] == '-') {
         if (argv[i][1] == '-') {        // --xxx
           if ((strfield2(argv[i] + 2, "clean")) || (strfield2(argv[i] + 2, "tide"))) {  // nettoyer
@@ -1293,9 +1281,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 #endif
 
   // Pas d'URL
-#if DEBUG_STEPS
-  printf("Checking URLs\n");
-#endif
   if (argv_url == 0) {
     // Présence d'un cache, que faire?..
     if ((fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
@@ -1451,9 +1436,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 
   // Treat parameters
   // Traiter les paramètres
-#if DEBUG_STEPS
-  printf("Analyze parameters\n");
-#endif
   {
     char *com;
     int na;
@@ -1749,9 +1731,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               readGluedEnum(opt->robots, HTS_ROBOTS_ALWAYS_STRICT);
             } else
               opt->robots = HTS_ROBOTS_SOMETIMES;
-#if DEBUG_ROBOTS
-            printf("robots.txt mode set to %d\n", opt->robots);
-#endif
             break;
           case 'o':
             readGluedInt(opt->errpage, HTS_TRUE);
@@ -3106,14 +3085,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       x_cmd.span[prev_opt] = na - prev_opt;
   }
 
-#if BDEBUG==3
-  printf("URLs/filters=%s\n", url);
-#endif
-
-#if DEBUG_STEPS
-  printf("Analyzing parameters done\n");
-#endif
-
 #ifdef _WIN32
 #else
 #ifndef HTS_DO_NOT_USE_UID
@@ -3131,10 +3102,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 #endif
 
   io_flush;
-
-#if DEBUG_STEPS
-  printf("Cache & log settings\n");
-#endif
 
   // If both cache generations exist, keep the most complete one
   hts_cache_reconcile(opt, CACHE_RECONCILE_INTERRUPTED);
@@ -3456,9 +3423,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     RUN_CALLBACK_NOARG(opt, init);
 
     // détourner SIGHUP etc.
-#if DEBUG_STEPS
-    printf("Launching the mirror\n");
-#endif
 
     // Lancement du miroir
     // ------------------------------------------------------------

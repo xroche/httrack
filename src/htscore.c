@@ -93,44 +93,6 @@ Please visit our Website: http://www.httrack.com
 extern int hts_parse_externals(htsmoduleStruct * str);
 extern void htspe_init(void);
 
-/* debug */
-#if DEBUG_SHOWTYPES
-char REG[32768] = "\n";
-#endif
-#if NSDEBUG
-int nsocDEBUG = 0;
-#endif
-
-//
-#define _CLRSCR printf("\33[m\33[2J");
-#define _GOTOXY(X,Y) printf("\33[" X ";" Y "f");
-
-#if DEBUG_CHECKINT
-#define _CHECKINT_FAIL(a) printf("\n%s\n",a); fflush(stdout); abort();
-#define _CHECKINT(obj_ptr,message) \
-   if (obj_ptr) {\
-     if (( * ((char*) (obj_ptr)) != 0) || ( * ((char*) (((char*) (obj_ptr)) + sizeof(*(obj_ptr))-1)) != 0)) {\
-       char msg[1100];\
-       if (( * ((char*) (obj_ptr)) != 0) && ( * ((char*) (((char*) (obj_ptr)) + sizeof(*(obj_ptr))-1)) != 0))\
-         sprintf(msg,"* PANIC: Integrity error (structure crushed)  in: %s",message);\
-       else if ( * ((char*) (obj_ptr)) != 0)\
-         sprintf(msg,"* PANIC: Integrity error (start of structure) in: %s",message);\
-       else\
-         sprintf(msg,"* PANIC: Integrity error (end of structure)   in: %s",message);\
-       _CHECKINT_FAIL(msg);\
-     }\
-   } else {\
-     char msg[1100];\
-     sprintf(msg,"* PANIC: NULL pointer in: %s",message);\
-     _CHECKINT_FAIL(msg);\
-   }
-#endif
-
-#if DEBUG_HASH
-  // longest hash chain?
-int longest_hash[3] = { 0, 0, 0 }, hashnumber = 0;
-#endif
-
 // Début de httpmirror, routines annexes
 
 // au cas où nous devons quitter rapidement xhttpmirror (plus de mémoire, etc)
@@ -1342,28 +1304,12 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
 
   }
 
-#if BDEBUG==3
-  {
-    int i;
-
-    for(i = 0; i < lien_tot; i++) {
-      printf("%d>%s%s as %s\n", i, heap(i)->adr, heap(i)->fil, heap(i)->sav);
-    }
-    for(i = 0; i < filptr; i++) {
-      printf("%d>filters=%s\n", i, filters[i]);
-    }
-  }
-#endif
-
   // backing
   if (opt->maxsoc > 0) {
     /* How many HTML files may sit in memory at once. Sized generously: HTML
        takes little room and everything else is written straight to disk. */
     const int back_max = back_max_slots(opt->maxsoc);
 
-#if BDEBUG==2
-    _CLRSCR;
-#endif
     sback = back_new(opt, back_max);
     if (sback == NULL) {
       hts_log_print(opt, LOG_PANIC,
@@ -1559,11 +1505,6 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
 
         hts_log_print(opt, LOG_DEBUG, "Wait get: %s%s",
                       adr_nologin(opt, urladr()), urlfil());
-#if DEBUG_ROBOTS
-        if (strcmp(urlfil(), "/robots.txt") == 0) {
-          printf("robots.txt detected\n");
-        }
-#endif
         // ------------------------------------------------------------
         // DEBUT --RECUPERATION LIEN---
         if (ptr == 0) {         // premier lien à parcourir: lien primaire construit avant
@@ -1936,14 +1877,6 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
     }                           // if !error
 
     if (!error) {
-#if DEBUG_SHOWTYPES
-      if (strstr(REG, r.contenttype) == NULL) {
-        strcatbuff(REG, r.contenttype);
-        strcatbuff(REG, "\n");
-        printf("%s\n", r.contenttype);
-        io_flush;
-      }
-#endif
 
       /* Load file and decode if necessary, after redirect check. */
       LOAD_IN_MEMORY_IF_NECESSARY();
@@ -1974,20 +1907,6 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
       // ------------------------------------------------------
       // ok, fichier chargé localement
       // ------------------------------------------------------
-
-      // Vérificateur d'intégrité
-#if DEBUG_CHECKINT
-      {
-        int i;
-
-        for(i = 0; i < sback->count; i++) {
-          char si[256];
-
-          sprintf(si, "Test global après back_wait, index %d", i);
-          _CHECKINT(&back[i], si)
-        }
-      }
-#endif
 
       // ------------------------------------------------------
       // traitement (parsing)
@@ -2324,7 +2243,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
         usercommand(opt, 0, NULL, savename(), urladr(), urlfil());
       }
 
-    }                           // if !error
+    } // if !error
 
   jump_if_done:
     // libérer les liens
@@ -2763,9 +2682,6 @@ void host_ban(httrackp * opt, int ptr,
       /* host is a bare name and an FTP url_adr keeps its scheme, so no FTP slot
          matches here, and none may, because its worker is still writing it. */
       if (strfield2(back[i].url_adr, host)) {
-#if HTS_DEBUG_CLOSESOCK
-        DEBUG_W("host control: deletehttp\n");
-#endif
         back[i].status = 0;     // terminé
         back_set_finished(opt, sback, i);
         if (back[i].r.soc != INVALID_SOCKET)
@@ -4483,16 +4399,11 @@ int back_fill(struct_back * sback, httrackp * opt, cache_back * cache,
                        heap(heap(p)->precedent)->fil, heap(p)->testmode,
                        heap(p)->refetch_whole, &heap(p)->fetch) == -1) {
             hts_log_print(opt, LOG_DEBUG,
-                          "error: unable to add more links through back_add for back_fill");
-#if BDEBUG==1
-            printf("error while adding\n");
-#endif
+                          "error: unable to add more links through back_add "
+                          "for back_fill");
             n = 0;              // sortir
           } else {
             n--;
-#if BDEBUG==1
-            printf("backing: %s%s\n", heap(p)->adr, heap(p)->fil);
-#endif
           }
         }
       }

@@ -251,10 +251,6 @@ static int cookie_set_impl(t_cookie *cookie, const char *cook_name,
   }
   cookie_insert(insert, cookie->max_len - (size_t) (insert - cookie->data),
                 cook);
-#if DEBUG_COOK
-  printf("add_new cookie: name=\"%s\" value=\"%s\" domain=\"%s\" path=\"%s\"\n",
-         cook_name, cook_value, domain, path);
-#endif
   return 0;
 }
 
@@ -590,9 +586,6 @@ int cookie_remove(t_cookie *cookie, const char *cook_name, const char *domain,
   if (b) {
     a = cookie_nextfield(b);
     cookie_delete(b, cookie->max_len - (size_t) (b - cookie->data), a - b);
-#if DEBUG_COOK
-    printf("deleted old cookie: %s %s %s\n", cook_name, host, path);
-#endif
   }
   return 0;
 }
@@ -1296,9 +1289,6 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, text_src *src,
         const char *p;
         int tabs = 0;
 
-#if DEBUG_COOK
-        printf("%s\n", rec);
-#endif
         for (p = strchr(rec, '\t'); p != NULL; p = strchr(p + 1, '\t'))
           tabs++;
         if (tabs < 6 || !strnotempty(cookie_get(buffer, rec, 5))) {

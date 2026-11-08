@@ -915,9 +915,6 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
     }
     // vérifier robots.txt
     if (opt->robots && checkrobots(_ROBOTS, adr, fil) == -1) {
-#if DEBUG_ROBOTS
-      printf("robots.txt forbidden: %s%s\n", adr, fil);
-#endif
       if (!hts_robots_forbids(opt, adr, fil,
                               (!question && filters_answer) ? HTS_TRUE
                                                             : HTS_FALSE,
@@ -947,14 +944,6 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
                       "(wizard) cancelled foreign domain link: link %s at %s%s",
                       l, adr_nologin(opt, urladr()), urlfil());
       }
-#if BDEBUG==3
-      printf("at %s in %s, wizard says: url %s ", urladr(), urlfil(), l);
-      if (forbidden_url)
-        printf("cancelled");
-      else
-        printf(">SHARED<");
-      printf("\n");
-#endif
     }
 
     /* en cas de question, ou lien primaire (enregistrer autorisations) */
