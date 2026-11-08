@@ -209,14 +209,16 @@ static unsigned char ascii_lower(unsigned char c) {
   return c >= 'A' && c <= 'Z' ? (unsigned char) (c + 32) : c;
 }
 
-/* Case-insensitive text prefix after an optional UTF-8 BOM and whitespace. */
+/* Case-insensitive text prefix after an optional UTF-8 BOM and WHATWG
+   whitespace (SPACE, TAB, CR, LF, FF, but not VT). */
 static hts_boolean has_text_prefix(const unsigned char *d, size_t n,
                                    const char *prefix) {
   const size_t len = strlen(prefix);
   size_t i, k;
 
   i = n >= 3 && memcmp(d, "\xef\xbb\xbf", 3) == 0 ? 3 : 0;
-  while (i < n && (d[i] == ' ' || d[i] == '\t' || d[i] == '\r' || d[i] == '\n'))
+  while (i < n && (d[i] == ' ' || d[i] == '\t' || d[i] == '\r' ||
+                   d[i] == '\n' || d[i] == '\f'))
     i++;
   if (len > n - i) /* i <= n from the loop above */
     return HTS_FALSE;
