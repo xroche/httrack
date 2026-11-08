@@ -392,9 +392,6 @@ static int st_entities_sweep(httrackp *opt, int argc, char **argv) {
   return failures == 0 ? 0 : 1;
 }
 
-/* The unescapers must reserve one byte for the trailing NUL: a 'max'-byte
-   dest holding 'max' output chars pre-fix wrote dest[max] (1-byte OOB, caught
-   by ASan). Both unescapeEntities and unescapeUrl share the guard. */
 /* Length of the first well-formed sequence of s (Unicode table 3-7), or 0. */
 static size_t utf8_oracle(const unsigned char *s, size_t n) {
   unsigned lo = 0x80, hi = 0xbf;
@@ -541,12 +538,25 @@ static int st_utf8_strict(httrackp *opt, int argc, char **argv) {
     fail = 1;
   }
   freet(u);
+  {
+    static const hts_UCS4 bad[] = {'a', 0xd800, 'b', 0x110000, 'c'};
+    char *s = hts_convertUCS4StringToUTF8(bad, 5);
+
+    fail |= utf8_strict_pin("UCS4", "a D800 b 110000 c", s,
+                            "a\xef\xbf\xbd"
+                            "b\xef\xbf\xbd"
+                            "c");
+    freet(s);
+  }
   if (fail)
     return 1;
   printf("utf8-strict self-test OK\n");
   return 0;
 }
 
+/* The unescapers must reserve one byte for the trailing NUL: a 'max'-byte
+   dest holding 'max' output chars pre-fix wrote dest[max] (1-byte OOB, caught
+   by ASan). Both unescapeEntities and unescapeUrl share the guard. */
 static int st_unescape_bounds(httrackp *opt, int argc, char **argv) {
   char dest[4];
 
