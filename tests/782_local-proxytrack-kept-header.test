@@ -8,12 +8,13 @@ set -eu
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
+python=$(find_python) || skip "python3 not found"
 dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
 
 # kept=1 adds the line, kept=0 is the control
 mkzip() {
-    python3 -I - "$1" "$2" <<'PY'
+    "$python" -I - "$1" "$2" <<'PY'
 import sys, zipfile
 out, kept = sys.argv[1], sys.argv[2]
 hdr = "X-In-Cache: 0\r\nX-StatusCode: 200\r\nX-Size: 5\r\n"
