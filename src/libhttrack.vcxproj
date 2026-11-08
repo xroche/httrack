@@ -194,7 +194,6 @@
     <ClCompile Include="htssitemap.c" />
     <ClCompile Include="md5.c" />
     <ClCompile Include="minizip\ioapi.c" />
-    <ClCompile Include="minizip\iowin32.c" />
     <ClCompile Include="minizip\mztools.c" />
     <ClCompile Include="minizip\unzip.c" />
     <ClCompile Include="minizip\zip.c" />
