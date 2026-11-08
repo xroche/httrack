@@ -94,8 +94,7 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
   }
 
   http_cookie_header(&cookie, dom, "/", hdr, sizeof(hdr));
-  if (strcmp(hdr, expected) != 0)
-    err = 1;
+  ST_FAIL_IF(err, strcmp(hdr, expected) != 0);
 
   /* A hostile over-long request host must not overflow domain[] in
      treathead's default-domain copy (that would abort the mirror). */
@@ -120,8 +119,8 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
     if (strstr(ck2.data, "SID") == NULL) // guard wrongly dropped a valid cookie
       err = 1;
   }
-  if (strstr(hdr, "$Version") != NULL || strstr(hdr, "$Path") != NULL)
-    err = 1;
+  ST_FAIL_IF(err,
+             strstr(hdr, "$Version") != NULL || strstr(hdr, "$Path") != NULL);
   if (strstr(hdr, "junk") != NULL) // wrong-domain cookie leaked
     err = 1;
 
@@ -154,8 +153,9 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
         printf("  accepted a bad line: %s\n", bad[i].line);
       }
     }
-    if (!cookie_line_is_whole("Cookie: a=1; b=2" H_CRLF, 2))
-      err = 1; // the control: a whole line must still pass
+    ST_FAIL_IF(err, !cookie_line_is_whole(
+                        "Cookie: a=1; b=2" H_CRLF,
+                        2)); // the control: a whole line must still pass
   }
 
   /* #101: every matching cookie is sent, not a fixed few. */
@@ -175,20 +175,16 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
 
       snprintf(name, sizeof(name), "c%02d", i);
       snprintf(value, sizeof(value), "v%02d", i);
-      if (cookie_add(&many, name, value, dom, "/") != 0)
-        err = 1;
+      ST_FAIL_IF(err, cookie_add(&many, name, value, dom, "/") != 0);
     }
     sent = http_cookie_header(&many, dom, "/", many_hdr, sizeof(many_hdr));
-    if (sent != n)
-      err = 1;
-    if (!cookie_line_is_whole(many_hdr, n))
-      err = 1;
+    ST_FAIL_IF(err, sent != n);
+    ST_FAIL_IF(err, !cookie_line_is_whole(many_hdr, n));
     for (i = 0; i < n; i++) {
       char pair[32];
 
       snprintf(pair, sizeof(pair), "c%02d=v%02d", i, i);
-      if (strstr(many_hdr, pair) == NULL)
-        err = 1;
+      ST_FAIL_IF(err, strstr(many_hdr, pair) == NULL);
     }
 
     /* A buffer too small for the whole set still ends clean, and the clip
@@ -199,8 +195,7 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
       if (sent < 0 || sent > n)
         err = 1;
       else if (sent == 0) {
-        if (tight[0] != '\0')
-          err = 1;
+        ST_FAIL_IF(err, tight[0] != '\0');
       } else {
         if (sent < n)
           clipped = HTS_TRUE;

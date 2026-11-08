@@ -1028,22 +1028,19 @@ static int array_growth_selftests(void) {
   int err = 0;
 
   TypedArrayEnsureRoom(a, 1);
-  if (TypedArrayRoom(a) < 1 || TypedArrayCapa(a) < 16)
-    err = 1;
+  ST_FAIL_IF(err, TypedArrayRoom(a) < 1 || TypedArrayCapa(a) < 16);
 
   /* A request past the current capacity must be met, not landed short of. */
   TypedArrayAppend(a, "0123456789", 10);
   TypedArrayEnsureRoom(a, 1000);
-  if (TypedArrayRoom(a) < 1000 || TypedArraySize(a) != 10)
-    err = 1;
-  if (memcmp(TypedArrayElts(a), "0123456789", 10) != 0)
-    err = 1;
+  ST_FAIL_IF(err, TypedArrayRoom(a) < 1000 || TypedArraySize(a) != 10);
+  ST_FAIL_IF(err, memcmp(TypedArrayElts(a), "0123456789", 10) != 0);
 
   /* Capacity must always keep capa*width representable. */
   TypedArrayEnsureRoom(w, 3);
-  if (TypedArrayRoom(w) < 3 ||
-      TypedArrayCapa(w) > ((size_t) -1) / sizeof(arrays_wide_t))
-    err = 1;
+  ST_FAIL_IF(err,
+             TypedArrayRoom(w) < 3 ||
+                 TypedArrayCapa(w) > ((size_t) -1) / sizeof(arrays_wide_t));
 
   /* Asking for exactly the room left must not reach the allocator, which on a
      borrowed store aborts. That abort is the assertion, because no field
@@ -1076,8 +1073,7 @@ static int array_growth_selftests(void) {
     err = 1;
   else {
     for (i = 0; i < 5000; i++) {
-      if (TypedArrayNth(a, 10 + i) != (char) ('a' + (i % 26)))
-        err = 1;
+      ST_FAIL_IF(err, TypedArrayNth(a, 10 + i) != (char) ('a' + (i % 26)));
     }
   }
 
@@ -1166,9 +1162,8 @@ static int ucs2_check(const unsigned short *units, size_t count,
     src[i * 2 + (swap ? 1 : 0)] = (unsigned char) (units[i] >> 8);
   }
   got = hts_ucs2_to_utf8(src, count * 2, swap, &got_size);
-  if (got == NULL || got_size != want || memcmp(got, expect, want) != 0 ||
-      got[got_size] != '\0')
-    err = 1;
+  ST_FAIL_IF(err, got == NULL || got_size != want ||
+                      memcmp(got, expect, want) != 0 || got[got_size] != '\0');
   freet(got);
   freet(src);
   return err;
@@ -1310,26 +1305,22 @@ static int st_ucs2(httrackp *opt, int argc, char **argv) {
   } else {
     int err = 0;
 
-    if (ucs2_check(mixed, sizeof(mixed) / sizeof(mixed[0]), mixed_utf8,
-                   HTS_TRUE))
-      err = 1;
-    if (ucs2_check(mixed, sizeof(mixed) / sizeof(mixed[0]), mixed_utf8,
-                   HTS_FALSE))
-      err = 1;
-    if (ucs2_check(pairs, sizeof(pairs) / sizeof(pairs[0]), pairs_utf8,
-                   HTS_TRUE))
-      err = 1;
+    ST_FAIL_IF(err, ucs2_check(mixed, sizeof(mixed) / sizeof(mixed[0]),
+                               mixed_utf8, HTS_TRUE));
+    ST_FAIL_IF(err, ucs2_check(mixed, sizeof(mixed) / sizeof(mixed[0]),
+                               mixed_utf8, HTS_FALSE));
+    ST_FAIL_IF(err, ucs2_check(pairs, sizeof(pairs) / sizeof(pairs[0]),
+                               pairs_utf8, HTS_TRUE));
     {
       size_t n = 0;
       char *got = hts_ucs2_to_utf8(odd, sizeof(odd), HTS_TRUE, &n);
 
-      if (got == NULL || n != 7 ||
-          memcmp(got,
-                 "\xEF\xBB\xBF"
-                 "a"
-                 "\xEF\xBF\xBD",
-                 7) != 0)
-        err = 1;
+      ST_FAIL_IF(err, got == NULL || n != 7 ||
+                          memcmp(got,
+                                 "\xEF\xBB\xBF"
+                                 "a"
+                                 "\xEF\xBF\xBD",
+                                 7) != 0);
       freet(got);
     }
     /* What the crawler converts on: some ASCII, almost nothing suspicious. */
@@ -1340,9 +1331,9 @@ static int st_ucs2(httrackp *opt, int argc, char **argv) {
       unsigned char bad[sizeof(text)];
       size_t k;
 
-      if (!hts_utf16_looks_like_text(text, sizeof(text), HTS_TRUE) ||
-          hts_utf16_looks_like_text(few, sizeof(few), HTS_TRUE))
-        err = 1;
+      ST_FAIL_IF(err,
+                 !hts_utf16_looks_like_text(text, sizeof(text), HTS_TRUE) ||
+                     hts_utf16_looks_like_text(few, sizeof(few), HTS_TRUE));
       /* One unit each: lone high and low halves, private use, noncharacters
          and a C0 control; a dangling byte is not one of them. */
       for (k = 0; k < 6; k++) {
@@ -1352,15 +1343,14 @@ static int st_ucs2(httrackp *opt, int argc, char **argv) {
         memcpy(bad, text, sizeof(text));
         bad[6] = (unsigned char) (units[k] & 0xff);
         bad[7] = (unsigned char) (units[k] >> 8);
-        if (hts_utf16_looks_like_text(bad, sizeof(bad), HTS_TRUE))
-          err = 1;
+        ST_FAIL_IF(err, hts_utf16_looks_like_text(bad, sizeof(bad), HTS_TRUE));
       }
       memcpy(bad, text, sizeof(text));
       bad[6] = 0x01;
       bad[7] = 0;
-      if (hts_utf16_looks_like_text(bad, sizeof(bad), HTS_TRUE) ||
-          !hts_utf16_looks_like_text(text, sizeof(text) - 1, HTS_TRUE))
-        err = 1;
+      ST_FAIL_IF(err, hts_utf16_looks_like_text(bad, sizeof(bad), HTS_TRUE) ||
+                          !hts_utf16_looks_like_text(text, sizeof(text) - 1,
+                                                     HTS_TRUE));
     }
     /* Every code unit alone, to pin the encoder against its ranges. */
     {
@@ -1386,12 +1376,10 @@ static int st_ucs2(httrackp *opt, int argc, char **argv) {
           expect[len++] = (char) (0x80 | (u & 0x3F));
         }
         expect[len] = '\0';
-        if (u != 0 && ucs2_check(&unit, 1, expect, HTS_TRUE))
-          err = 1;
+        ST_FAIL_IF(err, u != 0 && ucs2_check(&unit, 1, expect, HTS_TRUE));
       }
     }
-    if (ucs2_check(empty, 0, "", HTS_TRUE))
-      err = 1;
+    ST_FAIL_IF(err, ucs2_check(empty, 0, "", HTS_TRUE));
     printf("ucs2: %s\n", err ? "FAIL" : "OK");
     return err;
   }
@@ -1423,13 +1411,12 @@ static int st_arrays(httrackp *opt, int argc, char **argv) {
     TypedArrayAppend(a, "kept", 4);
     room = (size_t) -1 - TypedArraySize(a);
     TypedArrayEnsureRoom(a, room);
-    if (TypedArrayHasRoom(a, room))
-      err = 1;
+    ST_FAIL_IF(err, TypedArrayHasRoom(a, room));
     /* The bytes already there survive, and the append that cannot fit is a
        no-op rather than a smash. */
     TypedArrayAppend(a, "lost", room);
-    if (TypedArraySize(a) != 4 || memcmp(TypedArrayElts(a), "kept", 4) != 0)
-      err = 1;
+    ST_FAIL_IF(err, TypedArraySize(a) != 4 ||
+                        memcmp(TypedArrayElts(a), "kept", 4) != 0);
     printf("arrays: growth failure %s\n", err ? "FAIL" : "OK");
     TypedArrayFree(a);
     return err;
@@ -1458,15 +1445,14 @@ static int st_random(httrackp *opt, int argc, char **argv) {
     const unsigned char filler = (unsigned char) (0xa5 + r);
 
     memset(buf, filler, sizeof(buf));
-    if (!hts_random_bytes(buf, want))
-      err = 1;
+    ST_FAIL_IF(err, !hts_random_bytes(buf, want));
     for (i = 0; i < want; i++) {
       if (buf[i] != filler)
         touched[i] = 1;
     }
     for (i = 0; i < pad; i++) {
-      if (buf[want + i] != filler)
-        err = 1; /* wrote past the requested length */
+      ST_FAIL_IF(err,
+                 buf[want + i] != filler); /* wrote past the requested length */
     }
     if (r == 0) {
       memcpy(first, buf, want);
@@ -1478,21 +1464,19 @@ static int st_random(httrackp *opt, int argc, char **argv) {
     }
   }
   for (i = 0; i < want; i++) {
-    if (!touched[i])
-      err = 1; /* a short fill left this byte alone in every round */
+    ST_FAIL_IF(
+        err,
+        !touched[i]); /* a short fill left this byte alone in every round */
     live += varies[i];
   }
   /* Over 8 draws a live source moves all 64 bytes; half is a floor no real one
      misses, and a source stuck on one byte or a constant cannot reach it. */
-  if (live < want / 2)
-    err = 1;
+  ST_FAIL_IF(err, live < want / 2);
   /* a zero-length ask succeeds and writes nothing */
   memset(buf, 0x5a, sizeof(buf));
-  if (!hts_random_bytes(buf, 0))
-    err = 1;
+  ST_FAIL_IF(err, !hts_random_bytes(buf, 0));
   for (i = 0; i < (int) sizeof(buf); i++) {
-    if (buf[i] != 0x5a)
-      err = 1;
+    ST_FAIL_IF(err, buf[i] != 0x5a);
   }
   printf("random: %s\n", err ? "FAIL" : "OK");
   return err;
@@ -2362,13 +2346,7 @@ static int st_lastchar(httrackp *opt, int argc, char **argv) {
     memset(arena, '#', sizeof(arena));                                         \
     strlcpybuff(s, (str), sizeof(arena) - off);                                \
   } while (0)
-#define CHECK(cond)                                                            \
-  do {                                                                         \
-    if (!(cond)) {                                                             \
-      printf("  FAIL line %d: %s\n", __LINE__, #cond);                         \
-      err = 1;                                                                 \
-    }                                                                          \
-  } while (0)
+#define CHECK(cond) ST_CHECK(err, cond)
 
   /* the empty string: every helper must report "nothing" and touch nothing */
   REPOISON("");
@@ -2637,13 +2615,7 @@ static int st_rtrim(httrackp *opt, int argc, char **argv) {
     memset(arena, '#', sizeof(arena));                                         \
     strlcpybuff(s, (str), sizeof(arena) - off);                                \
   } while (0)
-#define CHECK(cond)                                                            \
-  do {                                                                         \
-    if (!(cond)) {                                                             \
-      printf("  FAIL line %d: %s\n", __LINE__, #cond);                         \
-      err = 1;                                                                 \
-    }                                                                          \
-  } while (0)
+#define CHECK(cond) ST_CHECK(err, cond)
 
   /* nothing but spaces: the case that ran the old loop off the front */
   REPOISON("   ");
