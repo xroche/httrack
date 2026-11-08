@@ -39,63 +39,6 @@ Please visit our Website: http://www.httrack.com
 
 #define MAX_LEN_INPROGRESS 40
 
-// wrappers
-void __cdecl htsshow_init(t_hts_callbackarg * carg);
-void __cdecl htsshow_uninit(t_hts_callbackarg * carg);
-int __cdecl htsshow_start(t_hts_callbackarg * carg, httrackp * opt);
-int __cdecl htsshow_chopt(t_hts_callbackarg * carg, httrackp * opt);
-int __cdecl htsshow_end(t_hts_callbackarg * carg, httrackp * opt);
-int __cdecl htsshow_preprocesshtml(t_hts_callbackarg * carg, httrackp * opt,
-                                   char **html, int *len,
-                                   const char *url_address,
-                                   const char *url_file);
-int __cdecl htsshow_postprocesshtml(t_hts_callbackarg * carg, httrackp * opt,
-                                    char **html, int *len,
-                                    const char *url_address,
-                                    const char *url_file);
-int __cdecl htsshow_checkhtml(t_hts_callbackarg * carg, httrackp * opt,
-                              char *html, int len, const char *url_address,
-                              const char *url_file);
-int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt,
-                         lien_back * back, int back_max, int back_index,
-                         int lien_n, int lien_tot, int stat_time,
-                         hts_stat_struct * stats);
-const char *__cdecl htsshow_query(t_hts_callbackarg * carg, httrackp * opt,
-                                  const char *question);
-const char *__cdecl htsshow_query2(t_hts_callbackarg * carg, httrackp * opt,
-                                   const char *question);
-const char *__cdecl htsshow_query3(t_hts_callbackarg * carg, httrackp * opt,
-                                   const char *question);
-int __cdecl htsshow_check(t_hts_callbackarg * carg, httrackp * opt,
-                          const char *adr, const char *fil, int status);
-int __cdecl htsshow_check_mime(t_hts_callbackarg *carg, httrackp *opt,
-                               const char *adr, const char *fil,
-                               const char *mime, int status);
-void __cdecl htsshow_filesave(t_hts_callbackarg * carg, httrackp * opt,
-                              const char *file);
-void __cdecl htsshow_filesave2(t_hts_callbackarg * carg, httrackp * opt,
-                               const char *adr, const char *fil,
-                               const char *save, int is_new, int is_modified,
-                               int not_updated);
-int __cdecl htsshow_linkdetected(t_hts_callbackarg * carg, httrackp * opt,
-                                 char *link);
-int __cdecl htsshow_linkdetected2(t_hts_callbackarg * carg, httrackp * opt,
-                                  char *link, const char *start_tag);
-int __cdecl htsshow_xfrstatus(t_hts_callbackarg * carg, httrackp * opt,
-                              lien_back * back);
-int __cdecl htsshow_savename(t_hts_callbackarg * carg, httrackp * opt,
-                             const char *adr_complete, const char *fil_complete,
-                             const char *referer_adr, const char *referer_fil,
-                             char *save);
-int __cdecl htsshow_sendheader(t_hts_callbackarg * carg, httrackp * opt,
-                               char *buff, const char *adr, const char *fil,
-                               const char *referer_adr, const char *referer_fil,
-                               htsblk * outgoing);
-int __cdecl htsshow_receiveheader(t_hts_callbackarg * carg, httrackp * opt,
-                                  char *buff, const char *adr, const char *fil,
-                                  const char *referer_adr,
-                                  const char *referer_fil, htsblk * incoming);
-
 int main(int argc, char **argv);
 void webhttrack_main(char *cmd);
 void webhttrack_lock(void);
