@@ -686,6 +686,14 @@ static int st_status(httrackp *opt, int argc, char **argv) {
   s = infostatuscode_const(404);
   assertf(s != NULL && strcmp(s, "Not Found") == 0);
   assertf(infostatuscode_const(799) == NULL);
+  s = infostatuscode_const(207);
+  assertf(s != NULL && strcmp(s, "Multi-Status") == 0);
+  s = infostatuscode_const(306);
+  assertf(s != NULL && strcmp(s, "Undefined 306 error") == 0);
+  s = infostatuscode_const(505);
+  assertf(s != NULL && strcmp(s, "HTTP Version Not Supported") == 0);
+  assertf(infostatuscode_const(0) == NULL && infostatuscode_const(-1) == NULL);
+  assertf(infostatuscode_const(208) == NULL);
   printf("status self-test OK\n");
   return 0;
 }

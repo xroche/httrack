@@ -97,4 +97,8 @@ hts_boolean hts_span_copy(hts_span s, char *dst, size_t size);
 hts_boolean hts_header_param(const char *value, const char *seps,
                              const char *name, char *out, size_t size);
 
+/* Return the reason phrase of the HTTP status CODE, or NULL if unknown. The
+   text is static. Not exported: proxytrack, which has no library, needs it. */
+const char *hts_status_reason(int code);
+
 #endif
