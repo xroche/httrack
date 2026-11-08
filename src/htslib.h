@@ -277,8 +277,6 @@ void hts_stat_recv_publish(void);
 
 LLint check_downloadable_bytes(int rate);
 
-int hts_uninit_module(void);
-
 /* Client hints a Chromium browser sends by default (Sec-CH-UA*). */
 typedef struct hts_client_hints {
   char ua[128];       /**< Sec-CH-UA brand list */

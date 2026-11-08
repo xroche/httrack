@@ -152,12 +152,13 @@ typedef void (*htsErrorCallback)(const char *msg, const char *file, int line);
 
 /* Initialization */
 /** Initialize the engine, once per process, before hts_create_opt() or
-    hts_main(). Later calls do nothing, and it is not thread-safe, so call it
-    from one thread. Reads $HTS_LOG for the debug level. Always returns 1. */
+    hts_main(). Later calls do nothing until hts_uninit(), and it is not
+    thread-safe, so call it from one thread. Reads $HTS_LOG for the debug
+    level. Always returns 1. */
 HTSEXT_API int hts_init(void);
 
-/** Does nothing, kept for ABI compatibility. What hts_init() set up is never
-    released. Always returns 1. */
+/** Release what hts_init() set up. Call it only when no other thread uses
+    the engine. A later hts_init() sets it up again. Always returns 1. */
 HTSEXT_API int hts_uninit(void);
 
 /** Block until every worker spawned by hts_newthread() has finished. */

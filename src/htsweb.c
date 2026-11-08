@@ -456,7 +456,6 @@ static void back_launch_end(httrackp *opt) {
   global_opt = NULL;
   webhttrack_release();
   hts_free_opt(opt);
-  hts_uninit();
 }
 
 /* The server thread reads both flags under the lock, and the watchdog reads
@@ -526,7 +525,6 @@ void webhttrack_main(char *cmd) {
     /* back_launch_end() would retake the lock the caller holds */
     global_opt = NULL;
     hts_free_opt(opt);
-    hts_uninit();
     /* Nothing else clears the flag, and while it is set the watchdog holds the
        server open for a mirror that never started. */
     hts_store_release_int(&commandRunning, 0);

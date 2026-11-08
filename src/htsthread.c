@@ -84,10 +84,20 @@ void htsthread_init(void) {
 }
 
 void htsthread_uninit(void) {
-  htsthread_wait();
 #if USE_BEGINTHREAD
-  hts_mutexfree(&process_chain_mutex);
+  hts_boolean idle;
+
+  hts_mutexlock(&process_chain_mutex);
+  idle = process_chain == 0;
+  hts_mutexrelease(&process_chain_mutex);
+  /* a live worker, maybe the caller, still takes the lock when it ends */
+  if (idle)
+    hts_mutexfree(&process_chain_mutex);
 #endif
+}
+
+hts_boolean htsthread_lock_live(void) {
+  return process_chain_mutex != HTSMUTEX_INIT;
 }
 
 typedef struct hts_thread_s {

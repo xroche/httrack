@@ -34,6 +34,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsselftest_int.h"
 #include "htsname.h"
 #include "htsfetch.h"
+#include "htspsl.h"
 
 #include <limits.h>
 #include <stdint.h>
@@ -2570,6 +2571,50 @@ static int st_strcmpnocase(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+static void uninit_worker_noop(void *arg) { (void) arg; }
+
+/* Did the worker's hts_uninit() return with the thread lock still built? */
+static hts_boolean uninit_worker_kept;
+
+static void uninit_worker(void *arg) {
+  (void) arg;
+  hts_uninit();
+  uninit_worker_kept = htsthread_lock_live();
+}
+
+static void uninit_report(const char *step) {
+  printf("%s:psl-%s,lock-%s", step, hts_psl_loaded() ? "on" : "off",
+         htsthread_lock_live() ? "on" : "off");
+}
+
+/* A worker's hts_uninit() must neither wait for itself nor free the lock it
+   still takes. Then two hts_uninit() calls free the Public Suffix List and the
+   thread lock, and hts_init() plus a new worker rebuild both. */
+static int st_uninit(httrackp *opt, int argc, char **argv) {
+  int i;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  hts_init();
+  if (hts_newthread(uninit_worker, NULL) != 0)
+    return 1;
+  htsthread_wait();
+  printf("worker:%s", uninit_worker_kept ? "kept" : "freed");
+  hts_init();
+  for (i = 0; i < 2; i++) {
+    hts_uninit();
+    uninit_report(" uninit");
+  }
+  hts_init();
+  if (hts_newthread(uninit_worker_noop, NULL) != 0)
+    return 1;
+  htsthread_wait();
+  uninit_report(" rejoin");
+  printf("\n");
+  return 0;
+}
+
 /* hts_rtrim() and the sets it is called with. The string starts mid-arena, and
    the byte below it is poisoned with '#' rather than 0, or the stray NUL the
    old loop wrote there would read as untouched. */
@@ -4163,6 +4208,8 @@ const struct selftest_entry selftests_lib[] = {
      "last-char helpers never index before the buffer (#770, #781, #821)",
      st_lastchar},
     {"rtrim", "", "hts_rtrim never walks below the buffer", st_rtrim},
+    {"uninit", "", "hts_uninit releases what hts_init sets up, twice safely",
+     st_uninit},
     {"strcmpnocase", "",
      "strcmpnocase compares the whole of both strings, ignoring case",
      st_strcmpnocase},

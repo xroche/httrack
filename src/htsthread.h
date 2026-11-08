@@ -170,6 +170,8 @@ void hts_worker_fault_clear(void);
 /* Thread initialization */
 void htsthread_init(void);
 void htsthread_uninit(void);
+/* Does the thread-count lock exist? It is built on first use. */
+hts_boolean htsthread_lock_live(void);
 #endif
 
 #endif
