@@ -36,8 +36,6 @@ Please visit our Website: http://www.httrack.com
 
 #define HTS_INTERNAL_BYTECODE
 
-#include "htsparse_selftest.h"
-
 #include "htsselftest_int.h"
 
 #include <ctype.h>
@@ -194,7 +192,11 @@ static void dirtylink_enumerate_tokens(httrackp *opt, selftest_sweep *sw) {
   }
 }
 
-int parse_selftest_dirtylink(httrackp *opt, hts_boolean dump) {
+/* Sweep hts_dirty_link_is_url over every string of up to four bytes across the
+   alphabet it branches on, plus token combinations reaching the scheme and
+   extension branches, against a model of its rules. "dump" prints the whole
+   verdict table instead of judging it. Returns 0 when all agree. */
+static int parse_selftest_dirtylink(httrackp *opt, hts_boolean dump) {
   /* Verdicts to hold whatever the sweep says, each naming why. */
   static const struct {
     const char *str;
@@ -643,7 +645,11 @@ static void jsscan_sweep(httrackp *opt, selftest_sweep *sw) {
   }
 }
 
-int parse_selftest_jsscan(httrackp *opt, hts_boolean dump) {
+/* Sweep hts_js_scan_link over the shapes a script statement takes, one
+   representative per class it branches on, against a model of its rules, and
+   pin a table of named statements. "dump" prints the verdicts instead.
+   Returns 0 when all agree. */
+static int parse_selftest_jsscan(httrackp *opt, hts_boolean dump) {
   /* What the sweep only pins by agreeing with the model. The cursor sits at
      "at", the offset and length are counted from it. */
   static const struct {
@@ -876,7 +882,9 @@ static int jsimport_case(const char *before, hts_boolean want) {
   return 0;
 }
 
-int parse_selftest_jsimport(httrackp *opt) {
+/* Check hts_js_quote_is_import_arg against a table of statements where the
+   keyword is, and is not, a dynamic import call. Returns 0 when all agree. */
+static int parse_selftest_jsimport(httrackp *opt) {
   static const struct {
     const char *before;
     hts_boolean want;
@@ -1101,7 +1109,10 @@ static int tagattr_junk_names(selftest_sweep *sw) {
   return err;
 }
 
-int parse_selftest_tagattr(httrackp *opt) {
+/* Check hts_dirty_attr_name and hts_dirty_attr_detectable twice: against tags
+   built from a known attribute, and against malformed ones where only what the
+   walk may claim can be checked. Returns 0 when both hold. */
+static int parse_selftest_tagattr(httrackp *opt) {
   /* names that may carry a link, and names that never do */
   static const char *const linky[] = {"href",   "src",        "data-src",
                                       "srcset", "background", "longdesc",

@@ -38,8 +38,6 @@ Please visit our Website: http://www.httrack.com
 
 #define HTS_INTERNAL_BYTECODE
 
-#include "htsdns_selftest.h"
-
 #include "htsselftest_int.h"
 
 #include <setjmp.h>
@@ -318,7 +316,11 @@ static int resolve_family_nocache(const char *host) {
   return SOCaddr_sinfamily(addr);
 }
 
-int dns_selftests(httrackp *opt) {
+/* Drive the DNS resolver and cache through a scripted (mock) getaddrinfo,
+   asserting address family, single-address selection, negative caching, the
+   IPv4/IPv6 family filter, and that a cached host is resolved only once.
+   Returns the number of failed checks (0 == success). */
+static int dns_selftests(httrackp *opt) {
   failures = 0;
   hts_dns_set_resolver_backend(&mock_backend);
 
@@ -633,7 +635,11 @@ static void lock_probe_thread(void *arg) {
   hts_mutexrelease(&p->lock);
 }
 
-int dns_timeout_selftests(httrackp *opt) {
+/* Drive a deliberately slow (mock) resolver, asserting that a resolve is
+   bounded by opt->timeout, does not hold opt->state.lock while it runs, and
+   does not cache a timeout as an answer (#606). Takes a few seconds.
+   Returns the number of failed checks (0 == success). */
+static int dns_timeout_selftests(httrackp *opt) {
   SOCaddr addrs[HTS_MAXADDRNUM];
   const char *err = NULL;
   lock_probe probe;
@@ -777,12 +783,12 @@ int dns_timeout_selftests(httrackp *opt) {
 
 #else
 
-int dns_selftests(httrackp *opt) {
+static int dns_selftests(httrackp *opt) {
   (void) opt;
   return 0; /* resolver seam only exists in the IPv6 build */
 }
 
-int dns_timeout_selftests(httrackp *opt) {
+static int dns_timeout_selftests(httrackp *opt) {
   (void) opt;
   return 0;
 }
