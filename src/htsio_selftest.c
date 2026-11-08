@@ -955,6 +955,16 @@ static hts_boolean gif_is(const char *dir, const char *name, const char *data,
   return ok;
 }
 
+/* assertf would stringize the expanded gif literals, which MSVC rejects. */
+static hts_boolean gifs_are_current(const char *dir) {
+  return gif_is(dir, "backblue.gif", HTS_DATA_BACK_GIF,
+                HTS_DATA_BACK_GIF_LEN) &&
+                 gif_is(dir, "fade.gif", HTS_DATA_FADE_GIF,
+                        HTS_DATA_FADE_GIF_LEN)
+             ? HTS_TRUE
+             : HTS_FALSE;
+}
+
 /* The top index of a multi-project root, byte for byte against a golden file
    with the version masked. Names are system-charset (CP1252 on Windows) and
    the golden is UTF-8 either way. argv: <dir> <golden>. */
@@ -1031,17 +1041,13 @@ static int st_topindexgolden(httrackp *opt, int argc, char **argv) {
   freet(want);
 
   /* the two gifs are written whole, and a stale one is rewritten */
-  assertf(
-      gif_is(topdir, "backblue.gif", HTS_DATA_BACK_GIF, HTS_DATA_BACK_GIF_LEN));
-  assertf(gif_is(topdir, "fade.gif", HTS_DATA_FADE_GIF, HTS_DATA_FADE_GIF_LEN));
+  assertf(gifs_are_current(topdir));
   snprintf(path, sizeof(path), "%s/backblue.gif", topdir);
   assertf(fclose(fopen(path, "wb")) == 0);
   snprintf(path, sizeof(path), "%s/fade.gif", topdir);
   assertf(fclose(fopen(path, "wb")) == 0);
   assertf(hts_buildtopindex(opt, topdir, "") != 0);
-  assertf(
-      gif_is(topdir, "backblue.gif", HTS_DATA_BACK_GIF, HTS_DATA_BACK_GIF_LEN));
-  assertf(gif_is(topdir, "fade.gif", HTS_DATA_FADE_GIF, HTS_DATA_FADE_GIF_LEN));
+  assertf(gifs_are_current(topdir));
   printf("topindexgolden OK\n");
   return 0;
 }
