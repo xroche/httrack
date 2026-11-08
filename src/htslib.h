@@ -760,7 +760,8 @@ void *hts_get_callback(t_hts_htmlcheck_callbacks * callbacks,
 #define GET_USERARG(OPT, NAME) ( CBSTRUCT(OPT)-> NAME .carg )
 /* True when a front end registered its own NAME callback */
 #define HAS_CALLBACK(OPT, NAME)                                                \
-  (CBSTRUCT(OPT) != NULL && CBSTRUCT(OPT)->NAME.fun != NULL)
+  (CBSTRUCT(OPT) != NULL && CBSTRUCT(OPT)->NAME.fun != NULL &&                 \
+   CBSTRUCT(OPT)->NAME.fun != default_callbacks.NAME.fun)
 #define GET_CALLBACK(OPT, NAME)                                                \
   (HAS_CALLBACK(OPT, NAME) ? (GET_USERCALLBACK(OPT, NAME))                     \
                            : (default_callbacks.NAME.fun))

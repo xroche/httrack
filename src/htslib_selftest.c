@@ -3926,6 +3926,194 @@ static int cid_unescape(const char *cid, char *dest, const size_t size) {
 
 /* Unescaping every id back to its own URL is what proves the map injective;
    make_content_id() in htslib.c says why that matters. */
+/* A plug-in hook that forwards to prev without checking it (C85). */
+static int chain_hits = 0;
+#define CHAIN_PREV(NAME) (chain_hits++, CALLBACKARG_PREV_FUN(carg, NAME))
+#define CHAIN_PCARG CALLBACKARG_PREV_CARG(carg)
+
+static void __cdecl cp_init(t_hts_callbackarg *carg) {
+  CHAIN_PREV(init)(CHAIN_PCARG);
+}
+
+static void __cdecl cp_uninit(t_hts_callbackarg *carg) {
+  CHAIN_PREV(uninit)(CHAIN_PCARG);
+}
+
+static int __cdecl cp_start(t_hts_callbackarg *carg, httrackp *opt) {
+  return CHAIN_PREV(start)(CHAIN_PCARG, opt);
+}
+
+static int __cdecl cp_end(t_hts_callbackarg *carg, httrackp *opt) {
+  return CHAIN_PREV(end)(CHAIN_PCARG, opt);
+}
+
+static int __cdecl cp_chopt(t_hts_callbackarg *carg, httrackp *opt) {
+  return CHAIN_PREV(chopt)(CHAIN_PCARG, opt);
+}
+
+static int __cdecl cp_preprocess(t_hts_callbackarg *carg, httrackp *opt,
+                                 char **html, int *len, const char *adr,
+                                 const char *fil) {
+  return CHAIN_PREV(preprocess)(CHAIN_PCARG, opt, html, len, adr, fil);
+}
+
+static int __cdecl cp_postprocess(t_hts_callbackarg *carg, httrackp *opt,
+                                  char **html, int *len, const char *adr,
+                                  const char *fil) {
+  return CHAIN_PREV(postprocess)(CHAIN_PCARG, opt, html, len, adr, fil);
+}
+
+static int __cdecl cp_check_html(t_hts_callbackarg *carg, httrackp *opt,
+                                 char *html, int len, const char *adr,
+                                 const char *fil) {
+  return CHAIN_PREV(check_html)(CHAIN_PCARG, opt, html, len, adr, fil);
+}
+
+static const char *__cdecl cp_query(t_hts_callbackarg *carg, httrackp *opt,
+                                    const char *question) {
+  return CHAIN_PREV(query)(CHAIN_PCARG, opt, question);
+}
+
+static const char *__cdecl cp_query2(t_hts_callbackarg *carg, httrackp *opt,
+                                     const char *question) {
+  return CHAIN_PREV(query2)(CHAIN_PCARG, opt, question);
+}
+
+static const char *__cdecl cp_query3(t_hts_callbackarg *carg, httrackp *opt,
+                                     const char *question) {
+  return CHAIN_PREV(query3)(CHAIN_PCARG, opt, question);
+}
+
+static int __cdecl cp_check_link(t_hts_callbackarg *carg, httrackp *opt,
+                                 const char *adr, const char *fil, int status) {
+  return CHAIN_PREV(check_link)(CHAIN_PCARG, opt, adr, fil, status);
+}
+
+static int __cdecl cp_check_mime(t_hts_callbackarg *carg, httrackp *opt,
+                                 const char *adr, const char *fil,
+                                 const char *mime, int status) {
+  return CHAIN_PREV(check_mime)(CHAIN_PCARG, opt, adr, fil, mime, status);
+}
+
+static void __cdecl cp_filesave(t_hts_callbackarg *carg, httrackp *opt,
+                                const char *file) {
+  CHAIN_PREV(filesave)(CHAIN_PCARG, opt, file);
+}
+
+static void __cdecl cp_filesave2(t_hts_callbackarg *carg, httrackp *opt,
+                                 const char *adr, const char *fil,
+                                 const char *sav, int is_new, int is_modified,
+                                 int not_updated) {
+  CHAIN_PREV(filesave2)(CHAIN_PCARG, opt, adr, fil, sav, is_new, is_modified,
+                        not_updated);
+}
+
+static int __cdecl cp_linkdetected(t_hts_callbackarg *carg, httrackp *opt,
+                                   char *link) {
+  return CHAIN_PREV(linkdetected)(CHAIN_PCARG, opt, link);
+}
+
+static int __cdecl cp_linkdetected2(t_hts_callbackarg *carg, httrackp *opt,
+                                    char *link, const char *tag) {
+  return CHAIN_PREV(linkdetected2)(CHAIN_PCARG, opt, link, tag);
+}
+
+static int __cdecl cp_xfrstatus(t_hts_callbackarg *carg, httrackp *opt,
+                                lien_back *back) {
+  return CHAIN_PREV(xfrstatus)(CHAIN_PCARG, opt, back);
+}
+
+static int __cdecl cp_savename(t_hts_callbackarg *carg, httrackp *opt,
+                               const char *adr, const char *fil,
+                               const char *ref_adr, const char *ref_fil,
+                               char *save) {
+  return CHAIN_PREV(savename)(CHAIN_PCARG, opt, adr, fil, ref_adr, ref_fil,
+                              save);
+}
+
+static int __cdecl cp_sendhead(t_hts_callbackarg *carg, httrackp *opt,
+                               char *buff, const char *adr, const char *fil,
+                               const char *ref_adr, const char *ref_fil,
+                               htsblk *outgoing) {
+  return CHAIN_PREV(sendhead)(CHAIN_PCARG, opt, buff, adr, fil, ref_adr,
+                              ref_fil, outgoing);
+}
+
+static int __cdecl cp_receivehead(t_hts_callbackarg *carg, httrackp *opt,
+                                  char *buff, const char *adr, const char *fil,
+                                  const char *ref_adr, const char *ref_fil,
+                                  htsblk *incoming) {
+  return CHAIN_PREV(receivehead)(CHAIN_PCARG, opt, buff, adr, fil, ref_adr,
+                                 ref_fil, incoming);
+}
+
+/* Each hook a plug-in chains onto an empty slot answers what the front-end
+   stubs #2136 deleted answered, and an engine default still reads as unset. */
+static int st_chainprev(httrackp *unused, int argc, char **argv) {
+  httrackp *const opt = hts_create_opt();
+  char html[] = "<html></html>", link[] = "x.html", save[] = "x.html";
+  char *page = html;
+  int len = (int) strlen(html);
+
+  (void) unused;
+  (void) argc;
+  (void) argv;
+  assertf(opt != NULL);
+  assertf(!HAS_CALLBACK(opt, query2) && !HAS_CALLBACK(opt, query3));
+  assertf(htswrap_read(opt, "check-link") == 0);
+
+  CHAIN_FUNCTION(opt, init, cp_init, NULL);
+  CHAIN_FUNCTION(opt, uninit, cp_uninit, NULL);
+  CHAIN_FUNCTION(opt, start, cp_start, NULL);
+  CHAIN_FUNCTION(opt, end, cp_end, NULL);
+  CHAIN_FUNCTION(opt, chopt, cp_chopt, NULL);
+  CHAIN_FUNCTION(opt, preprocess, cp_preprocess, NULL);
+  CHAIN_FUNCTION(opt, postprocess, cp_postprocess, NULL);
+  CHAIN_FUNCTION(opt, check_html, cp_check_html, NULL);
+  CHAIN_FUNCTION(opt, query, cp_query, NULL);
+  CHAIN_FUNCTION(opt, query2, cp_query2, NULL);
+  CHAIN_FUNCTION(opt, query3, cp_query3, NULL);
+  CHAIN_FUNCTION(opt, check_link, cp_check_link, NULL);
+  CHAIN_FUNCTION(opt, check_mime, cp_check_mime, NULL);
+  CHAIN_FUNCTION(opt, filesave, cp_filesave, NULL);
+  CHAIN_FUNCTION(opt, filesave2, cp_filesave2, NULL);
+  CHAIN_FUNCTION(opt, linkdetected, cp_linkdetected, NULL);
+  CHAIN_FUNCTION(opt, linkdetected2, cp_linkdetected2, NULL);
+  CHAIN_FUNCTION(opt, xfrstatus, cp_xfrstatus, NULL);
+  CHAIN_FUNCTION(opt, savename, cp_savename, NULL);
+  CHAIN_FUNCTION(opt, sendhead, cp_sendhead, NULL);
+  CHAIN_FUNCTION(opt, receivehead, cp_receivehead, NULL);
+  assertf(HAS_CALLBACK(opt, query2) && HAS_CALLBACK(opt, query3));
+  assertf(htswrap_read(opt, "check-link") == (uintptr_t) cp_check_link);
+
+  RUN_CALLBACK_NOARG(opt, init);
+  assertf(RUN_CALLBACK0(opt, start) == 1);
+  assertf(RUN_CALLBACK0(opt, chopt) == 1);
+  assertf(RUN_CALLBACK4(opt, preprocess, &page, &len, "h", "/") == 1);
+  assertf(RUN_CALLBACK4(opt, postprocess, &page, &len, "h", "/") == 1);
+  assertf(page == html && len == (int) strlen(html));
+  assertf(RUN_CALLBACK4(opt, check_html, html, len, "h", "/") == 1);
+  assertf(strcmp(RUN_CALLBACK1(opt, query, "q"), "") == 0);
+  assertf(strcmp(RUN_CALLBACK1(opt, query2, "q"), "") == 0);
+  assertf(strcmp(RUN_CALLBACK1(opt, query3, "q"), "") == 0);
+  assertf(RUN_CALLBACK3(opt, check_link, "h", "/", 200) == -1);
+  assertf(RUN_CALLBACK4(opt, check_mime, "h", "/", "text/html", 200) == -1);
+  RUN_CALLBACK1(opt, filesave, "f");
+  RUN_CALLBACK6(opt, filesave2, "h", "/", "f", 1, 1, 0);
+  assertf(RUN_CALLBACK1(opt, linkdetected, link) == 1);
+  assertf(RUN_CALLBACK2(opt, linkdetected2, link, "<a") == 1);
+  assertf(RUN_CALLBACK1(opt, xfrstatus, NULL) == 1);
+  assertf(RUN_CALLBACK5(opt, savename, "h", "/", "r", "/", save) == 1);
+  assertf(RUN_CALLBACK6(opt, sendhead, link, "h", "/", "r", "/", NULL) == 1);
+  assertf(RUN_CALLBACK6(opt, receivehead, link, "h", "/", "r", "/", NULL) == 1);
+  assertf(RUN_CALLBACK0(opt, end) == 1);
+  RUN_CALLBACK_NOARG(opt, uninit);
+  assertf(chain_hits == 21);
+
+  hts_free_opt(opt);
+  return st_verdict("chainprev", 0);
+}
+
 static int st_contentid(httrackp *opt, int argc, char **argv) {
   /* "/p.gif" escapes to "-2egif", and the other two names spell that escape
      out, with the old marker and with the new one */
@@ -4119,5 +4307,8 @@ const struct selftest_entry selftests_lib[] = {
      st_statrecv},
     {"contentid", "", "every .mht Content-ID unescapes back to its own URL",
      st_contentid},
+    {"chainprev", "",
+     "a plug-in that chains to an unset callback reaches the engine default",
+     st_chainprev},
     {NULL, NULL, NULL, NULL},
 };
