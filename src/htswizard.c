@@ -531,6 +531,14 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
    check_link callback can still refuse a link this function accepted. */
 #define ACCEPT_LINK() (upper_refused = 0, forbidden_url = 0)
 #define REFUSE_LINK() (upper_refused = 0, forbidden_url = 1)
+/* A travel rule accepts unless the link was imported after a move. */
+#define ACCEPT_UNLESS_MOVED(msg)                                               \
+  do {                                                                         \
+    if (!heap(ptr)->link_import) {                                             \
+      ACCEPT_LINK();                                                           \
+      hts_log_print(opt, LOG_DEBUG, msg, adr_nologin(opt, adr), fil);          \
+    }                                                                          \
+  } while (0)
 #define _FILTERS     (*opt->filters.filters)
 #define _FILTERS_PTR (opt->filters.filptr)
 #define _ROBOTS      ((robots_wizard*)opt->robotsptr)
@@ -638,11 +646,7 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
               || (tempo2[0] != '\0' && tempo2[1] != '\0'
                   && strchr(tempo2 + 1, '/') == 0)
             ) {
-            if (!heap(ptr)->link_import) {     // ne résulte pas d'un 'moved'
-              ACCEPT_LINK();
-              hts_log_print(opt, LOG_DEBUG, "same level link authorized: %s%s",
-                            adr_nologin(opt, adr), fil);
-            }
+            ACCEPT_UNLESS_MOVED("same level link authorized: %s%s");
           }
           // down
           if ((strncmp(tempo, "../", 3)) || (strncmp(tempo2, "../", 3))) {      // pas montée sinon ne nbous concerne pas
@@ -663,19 +667,11 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
                 hts_log_print(opt, LOG_DEBUG, "lower link canceled: %s%s",
                               adr_nologin(opt, adr), fil);
               } else {                         // autorisé à priori - NEW
-                if (!heap(ptr)->link_import) { // ne résulte pas d'un 'moved'
-                  ACCEPT_LINK();
-                  hts_log_print(opt, LOG_DEBUG, "lower link authorized: %s%s",
-                                adr_nologin(opt, adr), fil);
-                }
+                ACCEPT_UNLESS_MOVED("lower link authorized: %s%s");
               }
             } else if ((test1) || (test2)) {    // on peut descendre pour accéder au lien
               if ((opt->seeker & HTS_SEEKER_DOWN) != 0) {
-                if (!heap(ptr)->link_import) { // ne résulte pas d'un 'moved'
-                  ACCEPT_LINK();
-                  hts_log_print(opt, LOG_DEBUG, "lower link authorized: %s%s",
-                                adr_nologin(opt, adr), fil);
-                }
+                ACCEPT_UNLESS_MOVED("lower link authorized: %s%s");
               }
             }
           }
@@ -688,19 +684,11 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
               hts_log_print(opt, LOG_DEBUG, "upper link canceled: %s%s",
                             adr_nologin(opt, adr), fil);
             } else {                           // autorisé à monter - NEW
-              if (!heap(ptr)->link_import) {   // ne résulte pas d'un 'moved'
-                ACCEPT_LINK();
-                hts_log_print(opt, LOG_DEBUG, "upper link authorized: %s%s",
-                              adr_nologin(opt, adr), fil);
-              }
+              ACCEPT_UNLESS_MOVED("upper link authorized: %s%s");
             }
           } else if ((!strncmp(tempo, "../", 3)) || (!strncmp(tempo2, "../", 3))) {     // Possible en montant
             if ((opt->seeker & HTS_SEEKER_UP) != 0) {
-              if (!heap(ptr)->link_import) {   // ne résulte pas d'un 'moved'
-                ACCEPT_LINK();
-                hts_log_print(opt, LOG_DEBUG, "upper link authorized: %s%s",
-                              adr_nologin(opt, adr), fil);
-              }
+              ACCEPT_UNLESS_MOVED("upper link authorized: %s%s");
             } // sinon autorisé en descente
           }
 
@@ -1044,6 +1032,7 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
   return forbidden_url;
 #undef ACCEPT_LINK
 #undef REFUSE_LINK
+#undef ACCEPT_UNLESS_MOVED
 #undef _FILTERS
 #undef _FILTERS_PTR
 #undef _ROBOTS
