@@ -176,8 +176,7 @@ static int st_retryafter(httrackp *opt, int argc, char **argv) {
       err = 1;
     }
   }
-  if (hts_parse_retry_after(NULL, ref) != -1)
-    err = 1;
+  ST_FAIL_IF(err, hts_parse_retry_after(NULL, ref) != -1);
   /* An HTTP date's "60" is 1960, never 2060 as in a cookie. A time before 1970
      may not convert, so 0 and -1 both pass. */
   if (hts_parse_retry_after("Sunday, 06-Nov-60 08:49:37 GMT", ref) > 0) {
