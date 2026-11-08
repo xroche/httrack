@@ -1066,7 +1066,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
     }
 
     // Indexing!
-#if HTS_MAKE_KEYWORD_INDEX
     if (opt->kindex) {
       if (index_keyword
           (r->adr, r->size, r->contenttype, savename(),
@@ -1076,7 +1075,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
         hts_log_print(opt, LOG_DEBUG, "indexing file..error!");
       }
     }
-#endif
 
     // Now, parsing
     if (!error) {

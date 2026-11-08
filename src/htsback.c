@@ -369,20 +369,13 @@ void back_delete_all(httrackp * opt, cache_back * cache, struct_back * sback) {
       struct_coucal_enum e = coucal_enum_new(sback->ready);
       coucal_item *item;
 
-      while((item = coucal_enum_next(&e))) {
-#ifndef HTS_NO_BACK_ON_DISK
+      while ((item = coucal_enum_next(&e))) {
         const char *filename = (char *) item->value.ptr;
 
         if (filename != NULL) {
           (void) UNLINK(filename);
           back_tmpdir_drop(filename);
         }
-#else
-        /* clear entry content (but not yet the entry) */
-        lien_back *back = (lien_back *) item->value.ptr;
-
-        back_clear_entry(back);
-#endif
       }
       /* delete hashtable & content */
       coucal_delete(&sback->ready);
@@ -452,7 +445,6 @@ static int back_index_ready(httrackp * opt, struct_back * sback, const char *adr
     } else if (ptr != NULL) {
       lien_back *itemback = NULL;
 
-#ifndef HTS_NO_BACK_ON_DISK
       FILE *fp;
       const char *fileback = (char *) ptr;
       char catbuff[CATBUFF_SIZE];
@@ -477,9 +469,6 @@ static int back_index_ready(httrackp * opt, struct_back * sback, const char *adr
       }
       (void) UNLINK(fileback);
       back_tmpdir_drop(fileback);
-#else
-      itemback = (lien_back *) ptr;
-#endif
       if (itemback != NULL) {
         // move from hashtable to fast repository
         int q = back_search(opt, sback);
@@ -754,9 +743,6 @@ int back_cleanup_background(httrackp * opt, cache_back * cache,
   for(i = 0; i < back_max; i++) {
     // ready, not locked and suitable
     if (slot_can_be_cached_on_disk(&back[i])) {
-#ifdef HTS_NO_BACK_ON_DISK
-      lien_back *itemback;
-#endif
       /* Security check */
       int checkIndex =
         back_index_ready(opt, sback, back[i].url_adr, back[i].url_fil,
@@ -780,7 +766,6 @@ int back_cleanup_background(httrackp * opt, cache_back * cache,
         }
 #endif
       }
-#ifndef HTS_NO_BACK_ON_DISK
       /* temporarily serialize the entry on disk */
       {
         /* filecreate() aborts on a longer name */
@@ -812,12 +797,6 @@ int back_cleanup_background(httrackp * opt, cache_back * cache,
                         named ? "memory full" : "temporary filename too long");
         }
       }
-#else
-      itemback = calloct(1, sizeof(lien_back));
-      back_move(&back[i], itemback);
-      coucal_add_pvoid(sback->ready, itemback->url_sav, itemback);
-      nclean++;
-#endif
     }
   }
   return nclean;
@@ -849,20 +828,6 @@ LLint back_incache(const struct_back * sback) {
         sum += max(hts_load_relaxed_llint(&back[i].r.size),
                    hts_load_relaxed_llint(&back[i].r.totalsize));
   // stored (ready) slots
-#ifdef HTS_NO_BACK_ON_DISK
-  if (sback->ready != NULL) {
-    struct_coucal_enum e = coucal_enum_new(sback->ready);
-    coucal_item *item;
-
-    while((item = coucal_enum_next(&e))) {
-      lien_back *ritem = (lien_back *) item->value.ptr;
-
-      if (back_status(ritem) != -1)
-        if (ritem->r.adr)       // ne comptabilier que les blocs en mémoire
-          sum += max(ritem->r.size, ritem->r.totalsize);
-    }
-  }
-#endif
   return sum;
 }
 
@@ -878,19 +843,7 @@ int back_done_incache(const struct_back * sback) {
       n++;
   // stored (ready) slots
   if (sback->ready != NULL) {
-#ifndef HTS_NO_BACK_ON_DISK
     n += (int) coucal_nitems(sback->ready);
-#else
-    struct_coucal_enum e = coucal_enum_new(sback->ready);
-    coucal_item *item;
-
-    while((item = coucal_enum_next(&e))) {
-      lien_back *ritem = (lien_back *) item->value.ptr;
-
-      if (back_status(ritem) == STATUS_READY)
-        n++;
-    }
-#endif
   }
   return n;
 }
@@ -5552,20 +5505,7 @@ LLint back_transferred(LLint nb, struct_back * sback) {
   }
   // stored (ready) slots
   if (sback->ready != NULL) {
-#ifndef HTS_NO_BACK_ON_DISK
     nb += sback->ready_size_bytes;
-#else
-    struct_coucal_enum e = coucal_enum_new(sback->ready);
-    coucal_item *item;
-
-    while((item = coucal_enum_next(&e))) {
-      lien_back *ritem = (lien_back *) item->value.ptr;
-      const int st = back_status(ritem);
-
-      if ((st > 0) && (st < 99 || st >= 1000))
-        nb += ritem->r.size;
-    }
-#endif
   }
   return nb;
 }

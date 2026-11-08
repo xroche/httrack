@@ -1652,15 +1652,12 @@ int url_savename(lien_adrfilsave *const afs,
      user's own output directory is never renamed. */
   escapeReservedNames(afs->save, sizeof(afs->save), hts_tbreserved);
 
-#if HTS_OVERRIDE_DOS_FOLDERS
   escapeReservedNames(afs->save, sizeof(afs->save), hts_tbdev);
 
   /* Strip ending . or ' ' forbidden on windoz */
   cleanEndingSpaceOrDot(afs->save);
   /* Blanking a dots-only component leaves '//' behind. */
   cleanDoubleSlash(afs->save);
-
-#endif
 
   // conversion 8-3 .. y compris pour les répertoires
   if (opt->savename_83) {
