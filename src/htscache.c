@@ -676,10 +676,10 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
           /* the writers store strlen(headers), so a NUL inside is damage */
           const hts_boolean has_nul =
               memchr(headerBuff, '\0', (size_t) readSizeHeader) != NULL;
-          int lineEof = has_nul;
+          int lineEof = 0;
 
           headerBuff[readSizeHeader] = '\0';
-          while (offset < readSizeHeader && !lineEof) {
+          while (!has_nul && offset < readSizeHeader && !lineEof) {
             char *value;
             int adv;
             /* no line we write is this long, so a cut one is foreign or

@@ -1350,10 +1350,10 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
           /* the writers store strlen(headers), so a NUL inside is damage */
           const hts_boolean has_nul =
               memchr(headerBuff, '\0', (size_t) readSizeHeader) != NULL;
-          int lineEof = has_nul;
+          int lineEof = 0;
 
           headerBuff[readSizeHeader] = '\0';
-          while (offset < readSizeHeader && !lineEof) {
+          while (!has_nul && offset < readSizeHeader && !lineEof) {
             char *value;
             hts_boolean cut;
 
