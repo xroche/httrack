@@ -910,6 +910,94 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* A top index that cannot allocate a project row must skip it, not abort. */
+static int st_topindexoom(httrackp *opt, int argc, char **argv) {
+  static const char *const names[] = {"a", "b", "c"};
+  static const size_t block = 2200; /* above sizeof(struct topindex_chain) */
+  char topdir[HTS_URLMAXSIZE];
+  char path[HTS_URLMAXSIZE + 32];
+  unsigned int i;
+  int k, rc = 0;
+  int ret[48];
+
+  assertf(argc >= 1);
+  snprintf(topdir, sizeof(topdir), "%s/oom", argv[0]);
+  for (i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
+    FILE *fp;
+
+    snprintf(path, sizeof(path), "%s/%s/", topdir, names[i]);
+    assertf(structcheck(path) == 0);
+    snprintf(path, sizeof(path), "%s/%s/index.html", topdir, names[i]);
+    fp = fopen(path, "wb");
+    assertf(fp != NULL);
+    fclose(fp);
+  }
+  assertf(hts_buildtopindex(opt, topdir, "") != 0); /* control, no cap */
+
+#ifndef _WIN32
+  {
+    struct rlimit saved, tight;
+
+    if (getrlimit(RLIMIT_AS, &saved) != 0) {
+      rc = -1;
+    } else {
+      tight = saved;
+      tight.rlim_cur = 1024 * 1024;
+      if (setrlimit(RLIMIT_AS, &tight) != 0)
+        rc = -1;
+    }
+    for (k = 0; rc == 0 && k < (int) (sizeof(ret) / sizeof(ret[0])); k++) {
+      void *held = NULL, *blk;
+      int n = 0, j;
+
+      /* take every free block, then give k back for the rebuild to use */
+      while ((blk = malloct(block)) != NULL) {
+        *(void **) blk = held;
+        held = blk;
+        n++;
+      }
+      for (j = 0; j < k && held != NULL; j++) {
+        blk = held;
+        held = *(void **) blk;
+        freet(blk);
+      }
+      ret[k] = hts_buildtopindex(opt, topdir, "");
+      while (held != NULL) {
+        blk = held;
+        held = *(void **) blk;
+        freet(blk);
+      }
+      if (n == 0)
+        rc = -1;
+    }
+    (void) setrlimit(RLIMIT_AS, &saved);
+  }
+#else
+  rc = -1;
+#endif
+  if (rc != 0) {
+    printf("topindexoom: cannot cap memory, skipped\n");
+  } else {
+    /* reached only if no allocation failure aborted the process */
+    printf("topindexoom: oom OK\n");
+  }
+
+  for (i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
+    snprintf(path, sizeof(path), "%s/%s/index.html", topdir, names[i]);
+    unlink(path);
+    snprintf(path, sizeof(path), "%s/%s", topdir, names[i]);
+    rmdir(path);
+  }
+  snprintf(path, sizeof(path), "%s/index.html", topdir);
+  unlink(path);
+  snprintf(path, sizeof(path), "%s/backblue.gif", topdir);
+  unlink(path);
+  snprintf(path, sizeof(path), "%s/fade.gif", topdir);
+  unlink(path);
+  rmdir(topdir);
+  return 0;
+}
+
 /* hts_getcategories() is what a front end lists for a projects directory: the
    distinct categories (type 1), or the project names (type 0). One tagged line
    per entry, so the caller asserts on the exact set (#1821). */
@@ -1739,6 +1827,9 @@ const struct selftest_entry selftests_io[] = {
     {"topindex", "[dir]",
      "hts_buildtopindex charset handling of a non-ASCII project dir",
      st_topindex},
+    {"topindexoom", "<dir>",
+     "hts_buildtopindex skips a project row it cannot allocate",
+     st_topindexoom},
     {"categories", "<dir>",
      "hts_getcategories() lists only the categories the projects carry",
      st_categories},

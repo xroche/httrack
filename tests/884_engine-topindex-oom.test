@@ -1,0 +1,28 @@
+#!/bin/bash
+#
+# A top index that cannot allocate a project row must skip it, not abort the
+# crawl. The cap is RLIMIT_AS, so a host where it is advisory reports a skip.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+rc=0
+out=$(ASAN_OPTIONS="${ASAN_OPTIONS-}${ASAN_OPTIONS:+:}allocator_may_return_null=1" \
+    httrack -O /dev/null -#test=topindexoom "$dir" run 2>&1) || rc=$?
+test "$rc" -eq 0 || fail "-#test=topindexoom: exited $rc, output: $(tail -c 2000 <<<"$out")"
+last=$(tail -n 1 <<<"$out")
+case "$last" in
+"topindexoom: oom OK") ;;
+*skipped*)
+    echo "SKIP: $last" >&2
+    ;;
+*)
+    fail "expected the failed allocation to be survived, got: $out"
+    ;;
+esac
+exit 0

@@ -1107,6 +1107,7 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
               int level = 0;
               char *category = NULL;
               struct topindex_chain *oldchain = chain;
+              struct topindex_chain *elt;
 
               /* Check for an existing category */
               StringCopy(iname, rpath);
@@ -1138,12 +1139,18 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
                 level = 1;
               }
 
-              chain = calloc(sizeof(struct topindex_chain), 1);
-              chainSize++;
-              if (!startchain) {
-                startchain = chain;
-              }
-              if (chain) {
+              elt = calloct(1, sizeof(struct topindex_chain));
+              if (elt == NULL) {
+                hts_log_print(opt, LOG_WARNING,
+                              "not enough memory to list %s in the top index",
+                              hts_findgetname(h));
+                freet(category);
+              } else {
+                chain = elt;
+                chainSize++;
+                if (!startchain) {
+                  startchain = chain;
+                }
                 if (oldchain) {
                   oldchain->next = chain;
                 }
@@ -1173,9 +1180,8 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
         /* Sort chain */
         {
           struct topindex_chain **sortedElts =
-            (struct topindex_chain **) calloct(sizeof(topindex_chain *),
-                                               chainSize);
-          assertf(sortedElts != NULL);
+              (struct topindex_chain **) calloct(sizeof(topindex_chain *),
+                                                 chainSize > 0 ? chainSize : 1);
           if (sortedElts != NULL) {
             int i;
             const char *category = "";
@@ -1215,6 +1221,17 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
 
             /* Return value */
             retval = 1;
+          } else {
+            /* no room to sort: drop the list rather than abort */
+            hts_log_print(opt, LOG_WARNING,
+                          "not enough memory to build the top index");
+            while (startchain != NULL) {
+              struct topindex_chain *const next = startchain->next;
+
+              freet(startchain->category);
+              freet(startchain);
+              startchain = next;
+            }
           }
         }
 
