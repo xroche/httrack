@@ -145,9 +145,6 @@ int verif_external(httrackp * opt, int nb, int test);
 
 int istoobig(httrackp * opt, LLint size, LLint maxhtml, LLint maxnhtml,
              char *type);
-HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
-                                 const char *binpath);
-
 /* Move src onto dst, replacing an existing dst; HTS_TRUE on success. Both paths
    are fconv()'d. A dst in the way is parked under a sibling name rather than
    removed, so the old content survives a failure: back at dst, or under that
