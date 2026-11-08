@@ -69,6 +69,15 @@ Please visit our Website: http://www.httrack.com
 #include "htscharset.h"
 #include "htsrandom.h"
 
+static int __cdecl htsshow_loop(t_hts_callbackarg *carg, httrackp *opt,
+                                lien_back *back, int back_max, int back_index,
+                                int lien_n, int lien_tot, int stat_time,
+                                hts_stat_struct *stats);
+static const char *__cdecl htsshow_query2(t_hts_callbackarg *carg,
+                                          httrackp *opt, const char *question);
+static const char *__cdecl htsshow_query3(t_hts_callbackarg *carg,
+                                          httrackp *opt, const char *question);
+
 #ifdef _WIN32
 #ifndef __cplusplus
 // DOS
@@ -538,28 +547,9 @@ void webhttrack_release(void) {
 static int webhttrack_runmain(httrackp * opt, int argc, char **argv) {
   int ret;
 
-  CHAIN_FUNCTION(opt, init, htsshow_init, NULL);
-  CHAIN_FUNCTION(opt, uninit, htsshow_uninit, NULL);
-  CHAIN_FUNCTION(opt, start, htsshow_start, NULL);
-  CHAIN_FUNCTION(opt, end, htsshow_end, NULL);
-  CHAIN_FUNCTION(opt, chopt, htsshow_chopt, NULL);
-  CHAIN_FUNCTION(opt, preprocess, htsshow_preprocesshtml, NULL);
-  CHAIN_FUNCTION(opt, postprocess, htsshow_postprocesshtml, NULL);
-  CHAIN_FUNCTION(opt, check_html, htsshow_checkhtml, NULL);
-  CHAIN_FUNCTION(opt, query, htsshow_query, NULL);
   CHAIN_FUNCTION(opt, query2, htsshow_query2, NULL);
   CHAIN_FUNCTION(opt, query3, htsshow_query3, NULL);
   CHAIN_FUNCTION(opt, loop, htsshow_loop, NULL);
-  CHAIN_FUNCTION(opt, check_link, htsshow_check, NULL);
-  CHAIN_FUNCTION(opt, check_mime, htsshow_check_mime, NULL);
-  CHAIN_FUNCTION(opt, filesave, htsshow_filesave, NULL);
-  CHAIN_FUNCTION(opt, filesave2, htsshow_filesave2, NULL);
-  CHAIN_FUNCTION(opt, linkdetected, htsshow_linkdetected, NULL);
-  CHAIN_FUNCTION(opt, linkdetected2, htsshow_linkdetected2, NULL);
-  CHAIN_FUNCTION(opt, xfrstatus, htsshow_xfrstatus, NULL);
-  CHAIN_FUNCTION(opt, savename, htsshow_savename, NULL);
-  CHAIN_FUNCTION(opt, sendhead, htsshow_sendheader, NULL);
-  CHAIN_FUNCTION(opt, receivehead, htsshow_receiveheader, NULL);
 
   /* Rock'in! */
   ret = hts_main2(argc, argv, opt);
@@ -624,34 +614,10 @@ static int help_server(char *dest_path, int defaultPort, const char *bindAddr) {
 
 /* CALLBACK FUNCTIONS */
 
-void __cdecl htsshow_init(t_hts_callbackarg *carg) {}
-
-void __cdecl htsshow_uninit(t_hts_callbackarg *carg) {}
-
-int __cdecl htsshow_start(t_hts_callbackarg *carg, httrackp *opt) { return 1; }
-int __cdecl htsshow_chopt(t_hts_callbackarg * carg, httrackp * opt) {
-  return htsshow_start(carg, opt);
-}
-
-int __cdecl htsshow_end(t_hts_callbackarg *carg, httrackp *opt) { return 1; }
-int __cdecl htsshow_preprocesshtml(t_hts_callbackarg * carg, httrackp * opt,
-                                   char **html, int *len,
-                                   const char *url_address,
-                                   const char *url_file) {
-  return 1;
-}
-int __cdecl htsshow_postprocesshtml(t_hts_callbackarg * carg, httrackp * opt,
-                                    char **html, int *len,
-                                    const char *url_address,
-                                    const char *url_file) {
-  return 1;
-}
-int __cdecl htsshow_checkhtml(t_hts_callbackarg * carg, httrackp * opt,
-                              char *html, int len, const char *url_address,
-                              const char *url_file) {
-  return 1;
-}
-int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_back * back, int back_max, int back_index, int lien_n, int lien_tot, int stat_time, hts_stat_struct * stats) {  // appelé à chaque boucle de HTTrack
+static int __cdecl htsshow_loop(
+    t_hts_callbackarg *carg, httrackp *opt, lien_back *back, int back_max,
+    int back_index, int lien_n, int lien_tot, int stat_time,
+    hts_stat_struct *stats) {           // appelé à chaque boucle de HTTrack
   static TStamp prev_mytime = 0;        /* ok */
   static t_InpInfo SInfo;       /* ok */
 
@@ -982,68 +948,17 @@ int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_back * b
 
   return 1;
 }
-const char *__cdecl htsshow_query(t_hts_callbackarg * carg, httrackp * opt,
-                                  const char *question) {
+
+static const char *__cdecl htsshow_query2(t_hts_callbackarg *carg,
+                                          httrackp *opt, const char *question) {
   static char s[] = "";         /* ok */
 
   return s;
 }
-const char *__cdecl htsshow_query2(t_hts_callbackarg * carg, httrackp * opt,
-                                   const char *question) {
+
+static const char *__cdecl htsshow_query3(t_hts_callbackarg *carg,
+                                          httrackp *opt, const char *question) {
   static char s[] = "";         /* ok */
 
   return s;
-}
-const char *__cdecl htsshow_query3(t_hts_callbackarg * carg, httrackp * opt,
-                                   const char *question) {
-  static char s[] = "";         /* ok */
-
-  return s;
-}
-int __cdecl htsshow_check(t_hts_callbackarg * carg, httrackp * opt,
-                          const char *adr, const char *fil, int status) {
-  return -1;
-}
-int __cdecl htsshow_check_mime(t_hts_callbackarg * carg, httrackp * opt,
-                               const char *adr, const char *fil,
-                               const char *mime, int status) {
-  return -1;
-}
-void __cdecl htsshow_filesave(t_hts_callbackarg * carg, httrackp * opt,
-                              const char *file) {
-}
-void __cdecl htsshow_filesave2(t_hts_callbackarg * carg, httrackp * opt,
-                               const char *adr, const char *fil,
-                               const char *save, int is_new, int is_modified,
-                               int not_updated) {
-}
-int __cdecl htsshow_linkdetected(t_hts_callbackarg * carg, httrackp * opt,
-                                 char *link) {
-  return 1;
-}
-int __cdecl htsshow_linkdetected2(t_hts_callbackarg * carg, httrackp * opt,
-                                  char *link, const char *start_tag) {
-  return 1;
-}
-int __cdecl htsshow_xfrstatus(t_hts_callbackarg * carg, httrackp * opt,
-                              lien_back * back) {
-  return 1;
-}
-int __cdecl htsshow_savename(t_hts_callbackarg * carg, httrackp * opt,
-                             const char *adr_complete, const char *fil_complete,
-                             const char *referer_adr, const char *referer_fil,
-                             char *save) {
-  return 1;
-}
-int __cdecl htsshow_sendheader(t_hts_callbackarg * carg, httrackp * opt,
-                               char *buff, const char *adr, const char *fil,
-                               const char *referer_adr, const char *referer_fil,
-                               htsblk * outgoing) {
-  return 1;
-}
-int __cdecl htsshow_receiveheader(t_hts_callbackarg * carg, httrackp * opt,
-                                  char *buff, const char *adr, const char *fil,
-                                  const char *referer_adr,
-                                  const char *referer_fil, htsblk * incoming) {
-  return 1;
 }
