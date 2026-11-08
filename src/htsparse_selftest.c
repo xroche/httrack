@@ -1239,6 +1239,50 @@ static int st_tagattr(httrackp *opt, int argc, char **argv) {
   return parse_selftest_tagattr(opt);
 }
 
+/* Writers: raw, html-escaped, fully escaped, URL-escaped, joined by '|'. */
+static int st_sink(httrackp *opt, int argc, char **argv) {
+  static const char in[] = "a&\"<\xe9";
+
+  static const struct {
+    hts_boolean enabled;
+    int inscript, inscript_tag;
+    const char *want;
+  } cases[] = {
+      {HTS_TRUE, 0, 0,
+       "a&\"<\xe9|a&amp;\"<\xe9|a&amp;\"<&#xe9;|a&amp;%22%3c\xe9"},
+      /* Script text is raw, except the always-escaped full writer. */
+      {HTS_TRUE, 1, 0, "a&\"<\xe9|a&\"<\xe9|a&amp;\"<&#xe9;|a&%22%3c\xe9"},
+      /* An event handler is markup. */
+      {HTS_TRUE, 1, 1,
+       "a&\"<\xe9|a&amp;\"<\xe9|a&amp;\"<&#xe9;|a&amp;%22%3c\xe9"},
+      /* A page not saved as HTML (-p2) buffers nothing. */
+      {HTS_FALSE, 0, 0, ""},
+      {HTS_FALSE, 1, 0, ""},
+      {HTS_FALSE, 1, 1, ""},
+  };
+
+  size_t i;
+  int err = 0;
+
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    char *got = hts_parse_sink_selftest(cases[i].enabled, cases[i].inscript,
+                                        cases[i].inscript_tag, in);
+
+    if (strcmp(got, cases[i].want) != 0) {
+      fprintf(stderr, "sink case %d: got \"%s\", wanted \"%s\"\n", (int) i, got,
+              cases[i].want);
+      err = 1;
+    }
+    freet(got);
+  }
+  if (err) {
+    printf("sink self-test FAILED\n");
+    return 1;
+  }
+  printf("sink self-test OK (%d cases)\n", (int) i);
+  return 0;
+}
+
 /* Each call parses `txt` under a fresh host, then checkrobots() for `path`. */
 static int rb_decide(robots_wizard *r, const char *txt, const char *path) {
   static int n = 0;
@@ -1865,6 +1909,10 @@ const struct selftest_entry selftests_parse[] = {
      "may the dirty parser read this in-tag quoted value? resolves the owning "
      "attribute and refuses the names that carry no link",
      st_tagattr},
+    {"sink", "",
+     "the parser's output writers: escaping per script state, and nothing "
+     "buffered for a page not saved as HTML",
+     st_sink},
     {"robots", "", "robots.txt RFC 9309 Allow/Disallow precedence self-test",
      st_robots},
     {"sitemap", "",
