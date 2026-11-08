@@ -89,8 +89,7 @@ int back_index_peek(httrackp *opt, struct_back *sback, const char *adr,
                     const char *fil, const char *sav);
 HTS_INLINE int back_exist(struct_back * sback, httrackp * opt, const char *adr,
                           const char *fil, const char *sav);
-int back_nsoc(const struct_back * sback);
-int back_nsoc_overall(const struct_back * sback);
+int back_nsoc(const struct_back *sback);
 /* refetch_whole: force a whole-file GET, ignoring any partial/temp-ref resume;
    also the caller's latch marking this link's one free restart spent (#581). */
 int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
@@ -101,18 +100,10 @@ int back_add_if_not_exists(struct_back *sback, httrackp *opt, cache_back *cache,
                            const char *adr, const char *fil, const char *save,
                            const char *referer_adr, const char *referer_fil,
                            int test, const hts_fetch_meta *fetch);
-int back_search(httrackp * opt, struct_back * sback);
 int back_search_quick(struct_back * sback);
-void back_clean(httrackp * opt, cache_back * cache, struct_back * sback);
-int back_cleanup_background(httrackp * opt, cache_back * cache,
-                            struct_back * sback);
-void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
+void back_clean(httrackp *opt, cache_back *cache, struct_back *sback);
+void back_wait(struct_back *sback, httrackp *opt, cache_back *cache,
                TStamp stat_timestart);
-int back_letlive(httrackp * opt, cache_back * cache, struct_back * sback,
-                 const int p);
-int back_searchlive(httrackp * opt, struct_back * sback, const char *search_addr);
-void back_connxfr(htsblk * src, htsblk * dst);
-void back_move(lien_back * src, lien_back * dst);
 void back_copy_static(const lien_back * src, lien_back * dst);
 /* The .ref record's framing, shared with the self-test that pins it. */
 #define HTS_REF_MAGIC "HTSREF1\n"
@@ -162,12 +153,8 @@ int back_clear_entry(lien_back * back);
 int back_flush_output(httrackp * opt, cache_back * cache, struct_back * sback,
                       const int p);
 void back_delete_all(httrackp * opt, cache_back * cache, struct_back * sback);
-int back_maydelete(httrackp * opt, cache_back * cache, struct_back * sback,
+int back_maydelete(httrackp *opt, cache_back *cache, struct_back *sback,
                    const int p);
-void back_maydeletehttp(httrackp * opt, cache_back * cache, struct_back * sback,
-                        const int p);
-int back_trylive(httrackp * opt, cache_back * cache, struct_back * sback,
-                 const int p);
 int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                   const int p);
 /* Did the fetch fail to produce a response, as opposed to the engine

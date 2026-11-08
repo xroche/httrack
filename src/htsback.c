@@ -201,6 +201,12 @@ static hts_mirror_limit back_mirror_limit(httrackp *opt);
 static hts_boolean back_mirror_capped(const httrackp *opt);
 static hts_boolean back_is_live(const int status);
 
+static int back_search(httrackp *opt, struct_back *sback);
+static void back_move(lien_back *src, lien_back *dst);
+static void back_connxfr(htsblk *src, htsblk *dst);
+static int back_searchlive(httrackp *opt, struct_back *sback,
+                           const char *search_addr);
+
 /* Slots for maxsoc connections, clamped to what back_new() can size: it builds
    two tables of back_max + 1, so INT_MAX itself is one too many. Total on
    purpose, so a self-test can check it without allocating anything: -cN is
@@ -289,6 +295,12 @@ int back_connect_fallback_due(int addr_index, int addr_count, int elapsed,
                  ? timeout
                  : HTS_CONNECT_FALLBACK_TIMEOUT;
   return elapsed >= deadline;
+}
+
+/* Log the outcome of a stored link. */
+static void back_log_link(httrackp *opt, const lien_back *b, const char *what) {
+  hts_log_print(opt, LOG_INFO, "engine: transfer-status: link %s: %s%s -> %s",
+                what, adr_nologin(opt, b->url_adr), b->url_fil, b->url_sav);
 }
 
 /* Retry a stuck/failed connecting slot against its next resolved address.
@@ -713,8 +725,8 @@ int back_selftest_slot_swap(void) {
 }
 
 /* Put all backing entries that are ready in the storage hashtable to spare space and CPU */
-int back_cleanup_background(httrackp * opt, cache_back * cache,
-                            struct_back * sback) {
+static int back_cleanup_background(httrackp *opt, cache_back *cache,
+                                   struct_back *sback) {
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
   int nclean = 0;
@@ -847,7 +859,8 @@ int back_nsoc(const struct_back * sback) {
 
   return n;
 }
-int back_nsoc_overall(const struct_back * sback) {
+
+static int back_nsoc_overall(const struct_back *sback) {
   const lien_back *const back = sback->lnk;
   const int back_max = sback->count;
   int n = 0;
@@ -1380,34 +1393,19 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
           }
           strftime(s, 250, "%H:%M:%S", &tmv);
 
-          flags[0] = '\0';
-          /* input flags */
-          if (back[p].is_update)
-            strcatbuff(flags, "U");     // update request
-          else
-            strcatbuff(flags, "-");
-          if (back[p].range_req_size)
-            strcatbuff(flags, "R");     // range request
-          else
-            strcatbuff(flags, "-");
-          /* state flags */
-          if (back[p].r.is_file)        // direct to disk
-            strcatbuff(flags, "F");
-          else
-            strcatbuff(flags, "-");
-          /* output flags */
-          if (!back[p].r.notmodified)
-            strcatbuff(flags, "M");     // modified
-          else
-            strcatbuff(flags, "-");
-          if (back[p].r.is_chunk)       // chunked
-            strcatbuff(flags, "C");
-          else
-            strcatbuff(flags, "-");
-          if (back[p].r.compressed)
-            strcatbuff(flags, "Z"); // content coding
-          else
-            strcatbuff(flags, "-");
+          {
+            /* update, range, direct to disk, modified, chunked, coded */
+            const int on[] = {
+                back[p].is_update != 0,  back[p].range_req_size != 0,
+                back[p].r.is_file != 0,  !back[p].r.notmodified,
+                back[p].r.is_chunk != 0, back[p].r.compressed != 0};
+            const char *const letters = "URFMCZ";
+            size_t k;
+
+            for (k = 0; k < sizeof(on) / sizeof(on[0]); k++)
+              flags[k] = on[k] ? letters[k] : '-';
+            flags[k] = '\0';
+          }
           /* Err I had to split these.. */
           fprintf(cache->txt, "%s\t", s);
           fprintf(cache->txt, LLintP "/", (LLint) back[p].r.size);
@@ -1427,18 +1425,8 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
             }
             if ((!back[p].r.notmodified) && (opt->is_update)) {
               HTS_STAT.stat_updated_files++;    // page modifiée
-              if (back[p].is_update) {
-                hts_log_print(
-                    opt, LOG_INFO,
-                    "engine: transfer-status: link updated: %s%s -> %s",
-                    adr_nologin(opt, back[p].url_adr), back[p].url_fil,
-                    back[p].url_sav);
-              } else {
-                hts_log_print(opt, LOG_INFO,
-                              "engine: transfer-status: link added: %s%s -> %s",
-                              adr_nologin(opt, back[p].url_adr),
-                              back[p].url_fil, back[p].url_sav);
-              }
+              back_log_link(opt, &back[p],
+                            back[p].is_update ? "updated" : "added");
               if (cache->txt) {
                 if (back[p].is_update) {
                   state = "updated";
@@ -1447,11 +1435,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                 }
               }
             } else {
-              hts_log_print(
-                  opt, LOG_INFO,
-                  "engine: transfer-status: link recorded: %s%s -> %s",
-                  adr_nologin(opt, back[p].url_adr), back[p].url_fil,
-                  back[p].url_sav);
+              back_log_link(opt, &back[p], "recorded");
               if (cache->txt) {
                 if (opt->is_update)
                   state = "untouched";
@@ -1563,8 +1547,8 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
 }
 
 /* try to keep the connection alive */
-int back_letlive(httrackp * opt, cache_back * cache, struct_back * sback,
-                 const int p) {
+static int back_letlive(httrackp *opt, cache_back *cache, struct_back *sback,
+                        const int p) {
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
   int checkerror;
@@ -1589,7 +1573,7 @@ int back_letlive(httrackp * opt, cache_back * cache, struct_back * sback,
   return 0;
 }
 
-void back_connxfr(htsblk * src, htsblk * dst) {
+static void back_connxfr(htsblk *src, htsblk *dst) {
   dst->soc = src->soc;
   src->soc = INVALID_SOCKET;
 #if HTS_USEOPENSSL
@@ -1616,7 +1600,7 @@ static void back_free_response(htsblk *r) {
   warc_free_request(r);
 }
 
-void back_move(lien_back * src, lien_back * dst) {
+static void back_move(lien_back *src, lien_back *dst) {
   memcpy(dst, src, sizeof(lien_back));
   memset(src, 0, sizeof(lien_back));
   src->r.soc = INVALID_SOCKET;
@@ -2122,8 +2106,8 @@ int back_maydelete(httrackp * opt, cache_back * cache, struct_back * sback,
 }
 
 // clear, or leave for keep-alive
-void back_maydeletehttp(httrackp * opt, cache_back * cache, struct_back * sback,
-                        const int p) {
+static void back_maydeletehttp(httrackp *opt, cache_back *cache,
+                               struct_back *sback, const int p) {
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
   TStamp lt = 0;
@@ -2174,8 +2158,8 @@ void back_maydeletehttp(httrackp * opt, cache_back * cache, struct_back * sback,
 }
 
 /* attempt to attach a live connection to this slot */
-int back_trylive(httrackp * opt, cache_back * cache, struct_back * sback,
-                 const int p) {
+static int back_trylive(httrackp *opt, cache_back *cache, struct_back *sback,
+                        const int p) {
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
 
@@ -2196,7 +2180,8 @@ int back_trylive(httrackp * opt, cache_back * cache, struct_back * sback,
 }
 
 /* search for a live position, or, if not possible, try to return a new one */
-int back_searchlive(httrackp * opt, struct_back * sback, const char *search_addr) {
+static int back_searchlive(httrackp *opt, struct_back *sback,
+                           const char *search_addr) {
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
   int i;
@@ -2236,7 +2221,7 @@ int back_search_quick(struct_back * sback) {
   return -1;
 }
 
-int back_search(httrackp * opt, struct_back * sback) {
+static int back_search(httrackp *opt, struct_back *sback) {
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
   int i;
@@ -2318,33 +2303,24 @@ static void back_set_too_big(httrackp *opt, struct_back *sback, const int p) {
                                               : "File too big");
 }
 
-void back_set_locked(struct_back * sback, const int p) {
-  lien_back *const back = sback->lnk;
-  const int back_max = sback->count;
+/* Set the lock state of slot p: 0, 1 (locked) or BACK_PINNED. */
+static void back_set_lock(struct_back *sback, const int p, const int state) {
+  assertf(p >= 0 && p < sback->count);
+  if (p >= 0 && p < sback->count)
+    sback->lnk[p].locked = state;
+}
 
-  assertf(p >= 0 && p < back_max);
-  if (p >= 0 && p < sback->count) {
-    /* status: locked (in process, do not swap on disk) */
-    back[p].locked = 1;         /* locked */
-  }
+void back_set_locked(struct_back *sback, const int p) {
+  back_set_lock(sback, p, 1);
 }
 
 /* See htsback.h. back_set_unlocked() releases it. */
 void back_set_pinned(struct_back *sback, const int p) {
-  assertf(p >= 0 && p < sback->count);
-  if (p >= 0 && p < sback->count)
-    sback->lnk[p].locked = BACK_PINNED;
+  back_set_lock(sback, p, BACK_PINNED);
 }
 
-void back_set_unlocked(struct_back * sback, const int p) {
-  lien_back *const back = sback->lnk;
-  const int back_max = sback->count;
-
-  assertf(p >= 0 && p < back_max);
-  if (p >= 0 && p < sback->count) {
-    /* status: unlocked (can be swapped on disk) */
-    back[p].locked = 0;         /* unlocked */
-  }
+void back_set_unlocked(struct_back *sback, const int p) {
+  back_set_lock(sback, p, 0);
 }
 
 int back_flush_output(httrackp * opt, cache_back * cache, struct_back * sback,
@@ -5260,66 +5236,48 @@ void back_infostr(struct_back *sback, int i, int j, char *s, size_t size) {
     int aff = 0;
 
     if (j & 1) {
-      if (back_status(&back[i]) == STATUS_CONNECTING) {
+      const int status = back_status(&back[i]);
+      const char *tag = NULL;
+
+      /* the connect tag is not shown with the URL, and INFOSC has no space */
+      if (status == STATUS_CONNECTING) {
         strlcatbuff(s, "CONNECT ", size);
-      } else if (back_status(&back[i]) == STATUS_WAIT_HEADERS) {
-        strlcatbuff(s, "INFOS ", size);
-        aff = 1;
-      } else if (back_status(&back[i]) == STATUS_CHUNK_WAIT ||
-                 back_status(&back[i]) == STATUS_CHUNK_CR) {
-        strlcatbuff(s, "INFOSC", size); // chunk info
-        aff = 1;
-      } else if (back_status(&back[i]) > 0) {
-        strlcatbuff(s, "RECEIVE ", size);
+      } else if (status == STATUS_WAIT_HEADERS) {
+        tag = "INFOS ";
+      } else if (status == STATUS_CHUNK_WAIT || status == STATUS_CHUNK_CR) {
+        tag = "INFOSC";
+      } else if (status > 0) {
+        tag = "RECEIVE ";
+      }
+      if (tag != NULL) {
+        strlcatbuff(s, tag, size);
         aff = 1;
       }
     }
-    if (j & 2) {
-      if (back_status(&back[i]) == STATUS_READY) {
-        switch (back[i].r.statuscode) {
-        case 200:
-          strlcatbuff(s, "READY ", size);
-          aff = 1;
-          break;
-        case -1:
-          strlcatbuff(s, "ERROR ", size);
-          aff = 1;
-          break;
-        case -2:
-          strlcatbuff(s, "TIMEOUT ", size);
-          aff = 1;
-          break;
-        case -3:
-          strlcatbuff(s, "TOOSLOW ", size);
-          aff = 1;
-          break;
-        case 400:
-          strlcatbuff(s, "BADREQUEST ", size);
-          aff = 1;
-          break;
-        case 401:
-        case 403:
-          strlcatbuff(s, "FORBIDDEN ", size);
-          aff = 1;
-          break;
-        case 404:
-          strlcatbuff(s, "NOT FOUND ", size);
-          aff = 1;
-          break;
-        case 500:
-          strlcatbuff(s, "SERVERROR ", size);
-          aff = 1;
-          break;
-        default:
-          {
-            char s2[256];
+    if ((j & 2) && back_status(&back[i]) == STATUS_READY) {
+      static const struct {
+        int code;
+        const char *text;
+      } names[] = {
+          {200, "READY "},     {-1, "ERROR "},       {-2, "TIMEOUT "},
+          {-3, "TOOSLOW "},    {400, "BADREQUEST "}, {401, "FORBIDDEN "},
+          {403, "FORBIDDEN "}, {404, "NOT FOUND "},  {500, "SERVERROR "}};
 
-            snprintf(s2, sizeof(s2), "ERROR(%d)", back[i].r.statuscode);
-            strlcatbuff(s, s2, size);
-          }
-          aff = 1;
+      size_t k;
+
+      for (k = 0; k < sizeof(names) / sizeof(names[0]); k++) {
+        if (names[k].code == back[i].r.statuscode) {
+          strlcatbuff(s, names[k].text, size);
+          break;
         }
       }
+      if (k == sizeof(names) / sizeof(names[0])) {
+        char s2[256];
+
+        snprintf(s2, sizeof(s2), "ERROR(%d)", back[i].r.statuscode);
+        strlcatbuff(s, s2, size);
+      }
+      aff = 1;
     }
 
     if (aff) {
