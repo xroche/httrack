@@ -86,19 +86,19 @@ static struct {
   int lines;              /* entries in tmp */
   int words;              /* every kept word, repeats included */
   FILE *tmp;              /* "word count url" lines, until index_finish */
-} kx = {HTS_TRUE, 0, 0, NULL};
+} indexer = {HTS_TRUE, 0, 0, NULL};
 
 /* 
   Init index 
 */
 void index_init(const char *indexpath) {
   /* remove(concat(indexpath,"index.txt")); */
-  kx.first_page = HTS_TRUE;
-  kx.lines = 0;
-  kx.words = 0;
-  if (kx.tmp)
-    fclose(kx.tmp);
-  kx.tmp = tmpfile();
+  indexer.first_page = HTS_TRUE;
+  indexer.lines = 0;
+  indexer.words = 0;
+  if (indexer.tmp)
+    fclose(indexer.tmp);
+  indexer.tmp = tmpfile();
 }
 
 /* End of a word: drop or clean the pending keyword, store it, then clear it. */
@@ -126,7 +126,7 @@ static void index_store_word(coucal WordIndexHash, FILE *tmpfp, char *keyword) {
 
   /* Store it ? */
   if (len >= KEYW_MIN_LEN) {
-    kx.words++;
+    indexer.words++;
     if (coucal_inc(WordIndexHash, keyword) == 1) { /* added new */
       fprintf(tmpfp, "%s\n", keyword);
     }
@@ -164,10 +164,10 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
     return 0;
 
   // Init ?
-  if (kx.first_page) {
+  if (indexer.first_page) {
     UNLINK(concat(catbuff, sizeof(catbuff), indexpath, "index.txt"));
     UNLINK(concat(catbuff, sizeof(catbuff), indexpath, "sindex.html"));
-    kx.first_page = HTS_FALSE;
+    indexer.first_page = HTS_FALSE;
   }
   // Check MIME type
   if (is_html_mime_type(mime)) {
@@ -264,7 +264,7 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
 
   // Process indexing for this page
   {
-    if (kx.tmp) {
+    if (indexer.tmp) {
       while(!feof(tmpfp)) {
         char line[KEYW_LEN + 32];
 
@@ -281,9 +281,9 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
               strcpybuff(savelst, filename);
 
             // Add entry for this file and word
-            fprintf(kx.tmp, "%s %d %s\n", line, (int) (KEYW_SORT_MAXCOUNT - e),
-                    savelst);
-            kx.lines++;
+            fprintf(indexer.tmp, "%s %d %s\n", line,
+                    (int) (KEYW_SORT_MAXCOUNT - e), savelst);
+            indexer.lines++;
           }
         }
       }
@@ -304,16 +304,17 @@ static void index_close_word(FILE *fp, int mode, LLint total_hit,
                              LLint total_line, int index, long last_pos) {
   if (mode == 1) // TEXT
     fprintf(fp, "\t=%lld\r\n", (long long) total_hit);
-  if ((((total_hit * 1000) / kx.words) >= KEYW_USELESS1K) ||
+  if ((((total_hit * 1000) / indexer.words) >= KEYW_USELESS1K) ||
       (((total_line * 1000) / index) >= KEYW_USELESS1KPG)) {
     fseek(fp, last_pos, SEEK_SET);
     if (mode == 1) // TEXT
-      fprintf(fp, "\tignored (%d)\r\n", (int) ((total_hit * 1000) / kx.words));
+      fprintf(fp, "\tignored (%d)\r\n",
+              (int) ((total_hit * 1000) / indexer.words));
     else
       fprintf(fp, "(ignored) [%lld hits]<br>\r\n", (long long) total_hit);
   } else {
     if (mode == 1) // TEXT
-      fprintf(fp, "\t(%d)\r\n", (int) ((total_hit * 1000) / kx.words));
+      fprintf(fp, "\t(%d)\r\n", (int) ((total_hit * 1000) / indexer.words));
   }
 }
 
@@ -404,34 +405,34 @@ void index_finish(const char *indexpath, int mode) {
   FILE *fp;
   char *a, *b;
   int index = 0;
-  const LLint fs = fpsize(kx.tmp);
+  const LLint fs = fpsize(indexer.tmp);
   /* fail closed on a size size_t cannot hold: malloct() wraps short while
      the reader and the terminator keep the 64-bit length */
   const size_t size = fs > 0 ? llint_to_size_t(fs) : (size_t) -1;
 
-  if (size == (size_t) -1 || !kx.tmp)
+  if (size == (size_t) -1 || !indexer.tmp)
     goto done;
-  tab = (char **) malloct(sizeof(char *) * (kx.lines + 2));
+  tab = (char **) malloct(sizeof(char *) * (indexer.lines + 2));
   if (!tab)
     goto done;
   blk = malloct(size + 1);
   if (!blk)
     goto done;
-  fseek(kx.tmp, 0, SEEK_SET);
-  if (!hts_fread_exact(blk, size, kx.tmp))
+  fseek(indexer.tmp, 0, SEEK_SET);
+  if (!hts_fread_exact(blk, size, indexer.tmp))
     goto done;
 
   blk[size] = '\0';
   a = blk;
-  while ((b = strchr(a, '\n')) && (index < kx.lines)) {
+  while ((b = strchr(a, '\n')) && (index < indexer.lines)) {
     tab[index++] = a;
     *b = '\0';
     a = b + 1;
   }
   qsort(tab, index, sizeof(char *), mystrcmp);
 
-  fclose(kx.tmp);
-  kx.tmp = NULL;
+  fclose(indexer.tmp);
+  indexer.tmp = NULL;
 
   fp = FOPEN(concat(catbuff, sizeof(catbuff), indexpath,
                     mode == 1 ? "index.txt" : "sindex.html"),
@@ -444,9 +445,9 @@ void index_finish(const char *indexpath, int mode) {
 done:
   freet(blk);
   freet(tab);
-  if (kx.tmp)
-    fclose(kx.tmp);
-  kx.tmp = NULL;
+  if (indexer.tmp)
+    fclose(indexer.tmp);
+  indexer.tmp = NULL;
 }
 
 /* Subroutines */

@@ -32,8 +32,6 @@ would dishonor our work and waste the many hours we have spent on it.
 
 #include "htsindex.h"
 
-#include <dirent.h>
-
 /* How many descriptors this process holds, or -1 if it cannot be told. */
 static int open_fd_count(void) {
 #if defined(_WIN32)
@@ -51,7 +49,7 @@ static int open_fd_count(void) {
 #endif
 }
 
-/* -#test=indexfd: a repeated index_init, then index_finish, must not leave a
+/* -#test=indexfd: a repeated index_init and index_finish must not leave a
    temporary file open. Prints SKIP when descriptors cannot be counted. */
 static int st_indexfd(httrackp *opt, int argc, char **argv) {
   const int before = open_fd_count();
@@ -62,6 +60,8 @@ static int st_indexfd(httrackp *opt, int argc, char **argv) {
     return 0;
   }
   index_init("");
+  index_init("");
+  index_finish("", 1);
   index_init("");
   index_finish("", 1);
   after = open_fd_count();
