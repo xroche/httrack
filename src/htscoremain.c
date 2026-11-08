@@ -1832,13 +1832,13 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               case 'u':
                 readGluedOnOff(opt->urlhack);
                 break;          // url hack
-              case 'j':
+              case 'j':         // --keep-www-prefix: keep www.X != X
                 readGluedOnOff(opt->no_www_dedup);
                 break;
-              case 'o':
+              case 'o': // --keep-double-slashes: keep //
                 readGluedOnOff(opt->no_slash_dedup);
                 break;
-              case 'y':
+              case 'y': // --keep-query-order: keep ?b&a order
                 readGluedOnOff(opt->no_query_dedup);
                 break;
               case 'v':
