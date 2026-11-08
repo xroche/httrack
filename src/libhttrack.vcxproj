@@ -165,6 +165,7 @@
     <ClCompile Include="htshash.c" />
     <ClCompile Include="htshelp.c" />
     <ClCompile Include="htsindex.c" />
+    <ClCompile Include="htsbase.c" />
     <ClCompile Include="htslib.c" />
     <ClCompile Include="htscmdline.c" />
     <ClCompile Include="htslines.c" />
