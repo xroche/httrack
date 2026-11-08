@@ -142,6 +142,7 @@
     <ClCompile Include="htsdns_selftest.c" />
     <ClCompile Include="htsfetch_selftest.c" />
     <ClCompile Include="htspsl_selftest.c" />
+    <ClCompile Include="htsindex_selftest.c" />
     <ClCompile Include="htsbundle_selftest.c" />
     <ClCompile Include="htsfilters_selftest.c" />
     <ClCompile Include="htsheader_selftest.c" />

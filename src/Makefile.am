@@ -117,6 +117,7 @@ libhttrack_la_SOURCES += htsselftest.c htsselftest_util.c \
 	htsback_selftest.c htscache_selftest.c htscharset_selftest.c \
 	htscmdline_selftest.c \
 	htscookie_selftest.c htsdns_selftest.c htsfetch_selftest.c htspsl_selftest.c \
+	htsindex_selftest.c \
 	htsbundle_selftest.c \
 	htsfilters_selftest.c \
 	htsheader_selftest.c htsio_selftest.c htslib_selftest.c \

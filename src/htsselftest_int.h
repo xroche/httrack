@@ -132,6 +132,7 @@ extern const struct selftest_entry selftests_warc[];
 extern const struct selftest_entry selftests_wizard[];
 extern const struct selftest_entry selftests_fetch[];
 extern const struct selftest_entry selftests_psl[];
+extern const struct selftest_entry selftests_index[];
 extern const struct selftest_entry selftests_bundle[];
 
 #endif

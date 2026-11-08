@@ -94,6 +94,8 @@ void index_init(const char *indexpath) {
   hts_index_init = 1;
   hts_primindex_size = 0;
   hts_primindex_words = 0;
+  if (fp_tmpproject)
+    fclose(fp_tmpproject);
   fp_tmpproject = tmpfile();
 }
 
@@ -187,8 +189,10 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
   // Create hash structure
   // Hash tables rulez da world!
   WordIndexHash = coucal_new(0);
-  if (!WordIndexHash)
+  if (!WordIndexHash) {
+    fclose(tmpfp);
     return 0;
+  }
 
   // Start indexing this page
   keyword[0] = '\0';
