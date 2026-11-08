@@ -1,0 +1,17 @@
+#!/bin/bash
+#
+# The top index of a multi-project root with a non-ASCII name stays byte for
+# byte what the golden file holds, on every platform.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+golden="${top_srcdir:-..}/tests/885_topindex.golden"
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+got=$(httrack -O /dev/null -#test=topindexgolden "$(nativepath "$dir")" \
+    "$(nativepath "$golden")" run 2>&1) || fail "topindexgolden: exited $?: $got"
+assert_match "topindexgolden OK" "$got"

@@ -910,6 +910,113 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Reads a whole file into a heap buffer, NUL-terminated, or NULL. */
+static char *golden_slurp(const char *path, size_t *len) {
+  FILE *const fp = fopen(path, "rb");
+  char *buf = NULL;
+  size_t n = 0, cap = 0;
+
+  if (fp == NULL)
+    return NULL;
+  for (;;) {
+    size_t got;
+
+    if (buf == NULL || cap - n < 4097) {
+      char *const grown = realloct(buf, cap == 0 ? 16384 : cap * 2);
+
+      assertf(grown != NULL);
+      buf = grown;
+      cap = cap == 0 ? 16384 : cap * 2;
+    }
+    got = fread(buf + n, 1, cap - n - 1, fp);
+    if (got == 0)
+      break;
+    n += got;
+  }
+  fclose(fp);
+  buf[n] = '\0';
+  *len = n;
+  return buf;
+}
+
+/* The top index of a multi-project root, byte for byte against a golden file
+   with the version masked. Names are system-charset (CP1252 on Windows) and
+   the golden is UTF-8 either way. argv: <dir> <golden>. */
+static int st_topindexgolden(httrackp *opt, int argc, char **argv) {
+  static const char *const stamp =
+      "Mirror and index made by HTTrack Website Copier/" HTTRACK_VERSION
+      " " HTTRACK_AFF_AUTHORS;
+  static const char *const mask = "Mirror and index made by @VERSION@";
+#ifdef _WIN32
+  static const char *const cafe = "caf\xE9", *const the = "th\xE9";
+#else
+  static const char *const cafe = "caf\xC3\xA9", *const the = "th\xC3\xA9";
+#endif
+  /* the last row has no index.html, so it is not a project */
+  const char *const names[] = {"zeta", "alpha", "Beta", cafe, "Delta", "empty"};
+  const char *const cats[] = {"Games", NULL, NULL, the, "Games", NULL};
+  char topdir[HTS_URLMAXSIZE];
+  char path[HTS_URLMAXSIZE + 64];
+  char *got, *want, *at;
+  size_t gotlen = 0, wantlen = 0;
+  unsigned int i;
+
+  if (argc < 2) {
+    fprintf(stderr, "topindexgolden: needs <dir> <golden>\n");
+    return 1;
+  }
+  snprintf(topdir, sizeof(topdir), "%s/%s", argv[0], cafe);
+  for (i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
+    FILE *fp;
+
+    snprintf(path, sizeof(path), "%s/%s/hts-cache/", topdir, names[i]);
+    assertf(structcheck(path) == 0);
+    if (i + 1 < sizeof(names) / sizeof(names[0])) {
+      snprintf(path, sizeof(path), "%s/%s/index.html", topdir, names[i]);
+      fp = fopen(path, "wb");
+      assertf(fp != NULL);
+      fclose(fp);
+    }
+    if (cats[i] != NULL) {
+      snprintf(path, sizeof(path), "%s/%s/hts-cache/winprofile.ini", topdir,
+               names[i]);
+      fp = fopen(path, "wb");
+      assertf(fp != NULL);
+      fprintf(fp, "category=%s\n", cats[i]);
+      fclose(fp);
+    }
+  }
+  assertf(hts_buildtopindex(opt, topdir, "") != 0);
+
+  snprintf(path, sizeof(path), "%s/index.html", topdir);
+  got = golden_slurp(path, &gotlen);
+  want = golden_slurp(argv[1], &wantlen);
+  assertf(got != NULL && want != NULL);
+  assertf(strstr(got, stamp) != NULL);
+  /* the header and the footer each carry one; the mask is shorter */
+  while ((at = strstr(got, stamp)) != NULL) {
+    memmove(at + strlen(mask), at + strlen(stamp),
+            strlen(at + strlen(stamp)) + 1);
+    memcpy(at, mask, strlen(mask));
+    gotlen = strlen(got);
+  }
+  if (gotlen != wantlen || memcmp(got, want, wantlen) != 0) {
+    size_t d = 0;
+
+    while (d < gotlen && d < wantlen && got[d] == want[d])
+      d++;
+    printf("topindexgolden: FAILED (differs at byte %lu of %lu, want %lu)\n",
+           (unsigned long) d, (unsigned long) gotlen, (unsigned long) wantlen);
+    freet(got);
+    freet(want);
+    return 1;
+  }
+  freet(got);
+  freet(want);
+  printf("topindexgolden OK\n");
+  return 0;
+}
+
 /* A top index that cannot allocate a project row must skip it, not abort. */
 static int st_topindexoom(httrackp *opt, int argc, char **argv) {
   static const char *const names[] = {"a", "b", "c"};
@@ -1830,6 +1937,9 @@ const struct selftest_entry selftests_io[] = {
     {"topindexoom", "<dir>",
      "hts_buildtopindex skips a project row it cannot allocate",
      st_topindexoom},
+    {"topindexgolden", "<dir> <golden>",
+     "hts_buildtopindex output of a multi-project root, byte for byte",
+     st_topindexgolden},
     {"categories", "<dir>",
      "hts_getcategories() lists only the categories the projects carry",
      st_categories},
