@@ -452,16 +452,14 @@ static int st_upperlinksnote(httrackp *opt, int argc, char **argv) {
   (void) argv;
 
   strcpybuff(note, "stale");
-  ST_FAIL_IF(err, hts_upper_links_note(to, note, sizeof(note)) ||
-                      note[0] != '\0'); /* a fresh opt refused nothing, and must
-                                           empty the buffer */
+  /* a fresh opt refused nothing, and must empty the buffer */
+  ST_FAIL_IF(err,
+             hts_upper_links_note(to, note, sizeof(note)) || note[0] != '\0');
 
   to->upper_links_refused = HTS_TRUE;
-  ST_FAIL_IF(
-      err,
-      !hts_upper_links_note(to, note, sizeof(note)) ||
-          strstr(note, "-B") ==
-              NULL); /* the note must name the option that lifts the refusal */
+  /* the note must name the option that lifts the refusal */
+  ST_FAIL_IF(err, !hts_upper_links_note(to, note, sizeof(note)) ||
+                      strstr(note, "-B") == NULL);
 
   to->upper_links_refused = HTS_FALSE;
   ST_FAIL_IF(err,

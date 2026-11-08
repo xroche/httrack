@@ -1451,8 +1451,8 @@ static int st_random(httrackp *opt, int argc, char **argv) {
         touched[i] = 1;
     }
     for (i = 0; i < pad; i++) {
-      ST_FAIL_IF(err,
-                 buf[want + i] != filler); /* wrote past the requested length */
+      /* wrote past the requested length */
+      ST_FAIL_IF(err, buf[want + i] != filler);
     }
     if (r == 0) {
       memcpy(first, buf, want);
@@ -1464,9 +1464,8 @@ static int st_random(httrackp *opt, int argc, char **argv) {
     }
   }
   for (i = 0; i < want; i++) {
-    ST_FAIL_IF(
-        err,
-        !touched[i]); /* a short fill left this byte alone in every round */
+    /* a short fill left this byte alone in every round */
+    ST_FAIL_IF(err, !touched[i]);
     live += varies[i];
   }
   /* Over 8 draws a live source moves all 64 bytes; half is a floor no real one

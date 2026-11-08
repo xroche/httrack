@@ -449,10 +449,9 @@ static int st_warc_ftp(httrackp *opt, int argc, char **argv) {
     ST_FAIL_IF(err, warc_rec_split(rec, rlen, &hdr_len, &block_len) != 0);
     if (warc_memstr((char *) rec, "WARC-Type: resource", hdr_len, 19) != NULL) {
       nresource++;
-      ST_FAIL_IF(err,
-                 (size_t) block_len != sizeof(body) - 1 ||
-                     memcmp(rec + hdr_len, body, sizeof(body) - 1) !=
-                         0); /* block is the raw payload, no HTTP envelope */
+      /* block is the raw payload, no HTTP envelope */
+      ST_FAIL_IF(err, (size_t) block_len != sizeof(body) - 1 ||
+                          memcmp(rec + hdr_len, body, sizeof(body) - 1) != 0);
       if (warc_memstr((char *) rec, "WARC-Target-URI: ftp://ftp.local/file.bin",
                       hdr_len, 41) == NULL ||
           warc_memstr((char *) rec, "Content-Type: application/octet-stream",
@@ -1023,8 +1022,8 @@ static int st_warc_cdx(httrackp *opt, int argc, char **argv) {
     memcpy(line, lp, llen);
     line[llen] = '\0';
     nlines++;
-    ST_FAIL_IF(err,
-               prev[0] != '\0' && strcmp(prev, line) > 0); /* must be sorted */
+    /* must be sorted */
+    ST_FAIL_IF(err, prev[0] != '\0' && strcmp(prev, line) > 0);
     strlcpybuff(prev, line, sizeof(prev));
     j = strstr(line, "\"url\": \"");
     o = strstr(line, "\"offset\": \"");
@@ -1070,11 +1069,8 @@ static int st_warc_cdx(httrackp *opt, int argc, char **argv) {
   }
   freet(warc);
   freet(cdx);
-  ST_FAIL_IF(
-      err,
-      nlines != 5 ||
-          nm_lines !=
-              1); /* 4 responses/revisits + 1 resource; no warcinfo/request */
+  /* 4 responses/revisits + 1 resource; no warcinfo/request */
+  ST_FAIL_IF(err, nlines != 5 || nm_lines != 1);
   printf("warc-cdx: %d index lines: %s\n", nlines, err ? "FAIL" : "OK");
   return err;
 }

@@ -153,9 +153,8 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
         printf("  accepted a bad line: %s\n", bad[i].line);
       }
     }
-    ST_FAIL_IF(err, !cookie_line_is_whole(
-                        "Cookie: a=1; b=2" H_CRLF,
-                        2)); // the control: a whole line must still pass
+    // the control: a whole line must still pass
+    ST_FAIL_IF(err, !cookie_line_is_whole("Cookie: a=1; b=2" H_CRLF, 2));
   }
 
   /* #101: every matching cookie is sent, not a fixed few. */
