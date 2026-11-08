@@ -1609,6 +1609,80 @@ static int st_stoplock(httrackp *opt, int argc, char **argv) {
   return st_lockrule(opt, argc, argv, "stoplock", HTS_PAUSE_LOCKNAME);
 }
 
+/* A cancel request whose URL cannot be copied is refused, not stored empty. */
+static int st_cancelpushoom(httrackp *opt, int argc, char **argv) {
+  static const size_t huge = 64 * 1024 * 1024;
+  char *big;
+  char *popped;
+  int ret = 0;
+  int rc = 1;
+
+  (void) argc;
+  (void) argv;
+  big = malloct(huge);
+  assertf(big != NULL);
+  memset(big, 'x', huge - 1);
+  big[huge - 1] = '\0';
+#ifndef _WIN32
+  {
+    struct rlimit saved, tight;
+
+    if (getrlimit(RLIMIT_AS, &saved) != 0) {
+      printf("cancelpushoom: cannot cap memory, skipped\n");
+      rc = 0;
+      goto done;
+    }
+    tight = saved;
+    tight.rlim_cur = 1024 * 1024;
+    if (setrlimit(RLIMIT_AS, &tight) != 0) {
+      printf("cancelpushoom: cannot cap memory, skipped\n");
+      rc = 0;
+      goto done;
+    }
+    ret = hts_cancel_file_push(opt, big);
+    (void) setrlimit(RLIMIT_AS, &saved);
+  }
+#else
+  printf("cancelpushoom: cannot cap memory, skipped\n");
+  rc = 0;
+  goto done;
+#endif
+  if (opt->state.cancel != NULL && opt->state.cancel->url == NULL) {
+    printf("cancelpushoom: FAILED (an entry was stored with no URL)\n");
+    goto done;
+  }
+  if (ret == 0) {
+    printf("cancelpushoom: cap did not bite, skipped\n");
+    rc = 0;
+    goto done;
+  }
+  if (opt->state.cancel != NULL) {
+    printf("cancelpushoom: FAILED (a refused push left an entry)\n");
+    goto done;
+  }
+  if (hts_cancel_file_push(opt, "/a.html") != 0) {
+    printf("cancelpushoom: FAILED (no push after the refusal)\n");
+    goto done;
+  }
+  popped = hts_cancel_file_pop(opt);
+  if (popped == NULL || strcmp(popped, "/a.html") != 0 ||
+      opt->state.cancel != NULL) {
+    printf("cancelpushoom: FAILED (pop did not return the one entry)\n");
+    freet(popped);
+    goto done;
+  }
+  freet(popped);
+  printf("cancelpushoom: oom OK\n");
+  rc = 0;
+
+done:
+  while ((popped = hts_cancel_file_pop(opt)) != NULL) {
+    freet(popped);
+  }
+  freet(big);
+  return rc;
+}
+
 /* What a postprocess-html callback may claim, and out of whose storage. Two
    capacities and every offset, or a bound that ignored "size" or looked only at
    the base pointer would pass. */
@@ -1875,6 +1949,9 @@ const struct selftest_entry selftests_opt[] = {
     {"stoplock", "<writable directory>",
      "a pause request pauses the mirror only if it is fresh and deletable",
      st_stoplock},
+    {"cancelpushoom", "",
+     "a cancel request that cannot be stored is refused, not stored empty",
+     st_cancelpushoom},
     {"postprocsize", "",
      "a postprocess-html callback cannot claim bytes it was not handed",
      st_postprocsize},

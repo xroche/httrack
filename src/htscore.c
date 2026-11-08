@@ -965,7 +965,6 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   cache_kept = coucal_new(0);
   if (cache_hashtable == NULL || cache_tests == NULL || cache_kept == NULL) {
     printf("PANIC! : Not enough memory [%d]\n", __LINE__);
-    filters[0] = NULL;          // uniquement a cause du warning de XH_extuninit
     XH_extuninit;
     return 0;
   }
@@ -4499,6 +4498,8 @@ int nombre_digit(int n) {
 static int hts_cancel_file_push_(httrackp * opt, const char *url) {
   if (url != NULL && url[0] != '\0') {
     htsoptstatecancel **cancel;
+    htsoptstatecancel *node;
+    char *copy;
 
     /* search for available place to store a new htsoptstatecancel* */
     for(cancel = &opt->state.cancel; *cancel != NULL;
@@ -4507,9 +4508,16 @@ static int hts_cancel_file_push_(httrackp * opt, const char *url) {
         return 1;               /* already there */
       }
     }
-    *cancel = malloct(sizeof(htsoptstatecancel));
-    (*cancel)->next = NULL;
-    (*cancel)->url = strdupt(url);
+    node = malloct(sizeof(*node));
+    copy = strdupt(url);
+    if (node == NULL || copy == NULL) {
+      freet(node);
+      freet(copy);
+      return 1;
+    }
+    node->next = NULL;
+    node->url = copy;
+    *cancel = node;
     return 0;
   }
   return 1;
