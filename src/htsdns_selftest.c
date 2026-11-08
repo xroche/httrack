@@ -294,14 +294,7 @@ static void dns_cut_runner(void (*fun)(void *arg), void *arg) {
 
 static int failures = 0;
 
-#define CHECK(cond)                                                            \
-  do {                                                                         \
-    if (!(cond)) {                                                             \
-      failures++;                                                              \
-      fprintf(stderr, "dns-selftest: FAIL at %s:%d: %s\n", __FILE__, __LINE__, \
-              #cond);                                                          \
-    }                                                                          \
-  } while (0)
+#define CHECK(cond) ST_CHECK(failures, cond)
 
 /* Resolve via the uncached entry point; return the address family, or
    AF_UNSPEC if the host did not resolve. */

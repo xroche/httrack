@@ -258,14 +258,10 @@ static int st_copyopt(httrackp *opt, int argc, char **argv) {
 
   copy_htsopt(from, to);
 
-  if (to->retry != 7)
-    err = 1;
-  if (to->nearlink != HTS_TRUE)
-    err = 1;
-  if (to->errpage != HTS_FALSE)
-    err = 1;
-  if (to->parseall != HTS_FALSE)
-    err = 1;
+  ST_FAIL_IF(err, to->retry != 7);
+  ST_FAIL_IF(err, to->nearlink != HTS_TRUE);
+  ST_FAIL_IF(err, to->errpage != HTS_FALSE);
+  ST_FAIL_IF(err, to->parseall != HTS_FALSE);
 
   /* HTS_DEFAULT (-1) is "unspecified": copy_htsopt must skip it, leaving the
      target intact. Only a signed (int-backed) field can hold -1, so this also
@@ -273,8 +269,7 @@ static int st_copyopt(httrackp *opt, int argc, char **argv) {
   from->parseall = HTS_DEFAULT;
   to->parseall = HTS_TRUE;
   copy_htsopt(from, to);
-  if (to->parseall != HTS_TRUE)
-    err = 1;
+  ST_FAIL_IF(err, to->parseall != HTS_TRUE);
 
   /* String field: a non-empty source deep-copies across, an empty source
      leaves the target intact (StringNotEmpty guard). Covers the exported
@@ -282,19 +277,16 @@ static int st_copyopt(httrackp *opt, int argc, char **argv) {
   StringCopy(from->cookies_file, "/tmp/jar.txt");
   StringCopy(to->cookies_file, "");
   copy_htsopt(from, to);
-  if (strcmp(StringBuff(to->cookies_file), "/tmp/jar.txt") != 0)
-    err = 1;
+  ST_FAIL_IF(err, strcmp(StringBuff(to->cookies_file), "/tmp/jar.txt") != 0);
   StringCopy(from->cookies_file, "");
   copy_htsopt(from, to);
-  if (strcmp(StringBuff(to->cookies_file), "/tmp/jar.txt") != 0)
-    err = 1;
+  ST_FAIL_IF(err, strcmp(StringBuff(to->cookies_file), "/tmp/jar.txt") != 0);
 
   /* warc_file: same String deep-copy path as cookies_file */
   StringCopy(from->warc_file, "run.warc.gz");
   StringCopy(to->warc_file, "");
   copy_htsopt(from, to);
-  if (strcmp(StringBuff(to->warc_file), "run.warc.gz") != 0)
-    err = 1;
+  ST_FAIL_IF(err, strcmp(StringBuff(to->warc_file), "run.warc.gz") != 0);
 
   /* accept_kinds deep-copies, and an explicit -%a or -%l carries its flag. */
   StringCopy(from->accept_kinds, "image=a/b");
@@ -303,32 +295,32 @@ static int st_copyopt(httrackp *opt, int argc, char **argv) {
   StringCopy(from->lang_iso, "fr");
   from->lang_given = HTS_TRUE;
   copy_htsopt(from, to);
-  if (strcmp(StringBuff(to->accept_kinds), "image=a/b") != 0 ||
-      strcmp(StringBuff(to->accept), "x/y") != 0 || !to->accept_given ||
-      strcmp(StringBuff(to->lang_iso), "fr") != 0 || !to->lang_given)
-    err = 1;
+  ST_FAIL_IF(err, strcmp(StringBuff(to->accept_kinds), "image=a/b") != 0 ||
+                      strcmp(StringBuff(to->accept), "x/y") != 0 ||
+                      !to->accept_given ||
+                      strcmp(StringBuff(to->lang_iso), "fr") != 0 ||
+                      !to->lang_given);
   /* A default -%a or -%l never overwrites an explicit one. */
   StringCopy(from->accept, HTS_ACCEPT_LEGACY);
   from->accept_given = HTS_FALSE;
   StringCopy(from->lang_iso, HTS_ACCEPT_LANGUAGE_LEGACY);
   from->lang_given = HTS_FALSE;
   copy_htsopt(from, to);
-  if (strcmp(StringBuff(to->accept), "x/y") != 0 || !to->accept_given ||
-      strcmp(StringBuff(to->lang_iso), "fr") != 0 || !to->lang_given)
-    err = 1;
+  ST_FAIL_IF(
+      err, strcmp(StringBuff(to->accept), "x/y") != 0 || !to->accept_given ||
+               strcmp(StringBuff(to->lang_iso), "fr") != 0 || !to->lang_given);
   /* An explicit -%a or -%l equal to the built-in value still overwrites. */
   from->accept_given = HTS_TRUE;
   from->lang_given = HTS_TRUE;
   copy_htsopt(from, to);
-  if (strcmp(StringBuff(to->accept), HTS_ACCEPT_LEGACY) != 0 ||
-      strcmp(StringBuff(to->lang_iso), HTS_ACCEPT_LANGUAGE_LEGACY) != 0)
-    err = 1;
+  ST_FAIL_IF(err, strcmp(StringBuff(to->accept), HTS_ACCEPT_LEGACY) != 0 ||
+                      strcmp(StringBuff(to->lang_iso),
+                             HTS_ACCEPT_LANGUAGE_LEGACY) != 0);
 
   from->changes = HTS_TRUE;
   to->changes = HTS_FALSE;
   copy_htsopt(from, to);
-  if (to->changes != HTS_TRUE)
-    err = 1;
+  ST_FAIL_IF(err, to->changes != HTS_TRUE);
 
   /* single_file pair: the cap is guarded by >0, so an unset source must not
      overwrite the default the target already carries */
@@ -337,12 +329,10 @@ static int st_copyopt(httrackp *opt, int argc, char **argv) {
   to->single_file = HTS_FALSE;
   to->single_file_max_size = SINGLEFILE_DEFAULT_MAX_SIZE;
   copy_htsopt(from, to);
-  if (!to->single_file || to->single_file_max_size != 4096)
-    err = 1;
+  ST_FAIL_IF(err, !to->single_file || to->single_file_max_size != 4096);
   from->single_file_max_size = 0;
   copy_htsopt(from, to);
-  if (to->single_file_max_size != 4096)
-    err = 1;
+  ST_FAIL_IF(err, to->single_file_max_size != 4096);
 
   /* sitemap pair: the flag latches on, the URL takes the String deep copy */
   from->sitemap = HTS_TRUE;
@@ -365,23 +355,19 @@ static int st_copyopt(httrackp *opt, int argc, char **argv) {
   from->pause_max_ms = 10000;
   to->pause_min_ms = to->pause_max_ms = 0;
   copy_htsopt(from, to);
-  if (to->pause_min_ms != 5000 || to->pause_max_ms != 10000)
-    err = 1;
+  ST_FAIL_IF(err, to->pause_min_ms != 5000 || to->pause_max_ms != 10000);
   from->pause_min_ms = from->pause_max_ms = 0;
   copy_htsopt(from, to);
-  if (to->pause_min_ms != 5000 || to->pause_max_ms != 10000)
-    err = 1;
+  ST_FAIL_IF(err, to->pause_min_ms != 5000 || to->pause_max_ms != 10000);
 
   /* max_retry_after: 0 is a real setting (no wait), so only a negative skips */
   from->max_retry_after = 0;
   to->max_retry_after = 60;
   copy_htsopt(from, to);
-  if (to->max_retry_after != 0)
-    err = 1;
+  ST_FAIL_IF(err, to->max_retry_after != 0);
   from->max_retry_after = -1;
   copy_htsopt(from, to);
-  if (to->max_retry_after != 0)
-    err = 1;
+  ST_FAIL_IF(err, to->max_retry_after != 0);
 
   hts_free_opt(from);
   hts_free_opt(to);
@@ -410,33 +396,28 @@ static int st_logcounters(httrackp *opt, int argc, char **argv) {
 
   /* Three distinct totals, so a swapped counter cannot pass. */
   stats = hts_get_stats(o);
-  if (stats == NULL || stats->stat_errors != 2 || stats->stat_warnings != 3 ||
-      stats->stat_infos != 1)
-    err = 1;
+  ST_FAIL_IF(err, stats == NULL || stats->stat_errors != 2 ||
+                      stats->stat_warnings != 3 || stats->stat_infos != 1);
 
   /* Polling hts_get_stats() must not increment the count. */
   stats = hts_get_stats(o);
-  if (stats == NULL || stats->stat_errors != 2)
-    err = 1;
+  ST_FAIL_IF(err, stats == NULL || stats->stat_errors != 2);
 
   /* LOG_INFO is above the default verbosity, so it is not counted. */
   hts_log_print(o, LOG_INFO, "seventh");
   stats = hts_get_stats(o);
-  if (stats == NULL || stats->stat_infos != 1)
-    err = 1;
+  ST_FAIL_IF(err, stats == NULL || stats->stat_infos != 1);
 
   /* Raising the verbosity lets the same level through. */
   o->debug = LOG_INFO;
   hts_log_print(o, LOG_INFO, "eighth");
   stats = hts_get_stats(o);
-  if (stats == NULL || stats->stat_infos != 2)
-    err = 1;
+  ST_FAIL_IF(err, stats == NULL || stats->stat_infos != 2);
 
   /* A panic is fatal, so it counts as an error rather than as nothing. */
   hts_log_print(o, LOG_PANIC, "ninth");
   stats = hts_get_stats(o);
-  if (stats == NULL || stats->stat_errors != 3)
-    err = 1;
+  ST_FAIL_IF(err, stats == NULL || stats->stat_errors != 3);
 
   hts_free_opt(o);
   printf("log-counters: %s\n", err ? "FAIL" : "OK");
@@ -452,23 +433,23 @@ static int st_upperlinksnote(httrackp *opt, int argc, char **argv) {
   int err = 0;
 
   strcpybuff(note, "stale");
-  if (hts_upper_links_note(to, note, sizeof(note)) || note[0] != '\0')
-    err = 1; /* a fresh opt refused nothing, and must empty the buffer */
+  /* a fresh opt refused nothing, and must empty the buffer */
+  ST_FAIL_IF(err,
+             hts_upper_links_note(to, note, sizeof(note)) || note[0] != '\0');
 
   to->upper_links_refused = HTS_TRUE;
-  if (!hts_upper_links_note(to, note, sizeof(note)) ||
-      strstr(note, "-B") == NULL)
-    err = 1; /* the note must name the option that lifts the refusal */
+  /* the note must name the option that lifts the refusal */
+  ST_FAIL_IF(err, !hts_upper_links_note(to, note, sizeof(note)) ||
+                      strstr(note, "-B") == NULL);
 
   to->upper_links_refused = HTS_FALSE;
-  if (hts_upper_links_note(to, note, sizeof(note)) || note[0] != '\0')
-    err = 1;
+  ST_FAIL_IF(err,
+             hts_upper_links_note(to, note, sizeof(note)) || note[0] != '\0');
 
   /* the flag never travels onto another opt */
   from->upper_links_refused = HTS_TRUE;
   copy_htsopt(from, to);
-  if (to->upper_links_refused)
-    err = 1;
+  ST_FAIL_IF(err, to->upper_links_refused);
 
   hts_free_opt(from);
   hts_free_opt(to);
@@ -488,8 +469,7 @@ static int st_cachedefault(httrackp *opt, int argc, char **argv) {
   httrackp *const fresh = hts_create_opt();
   int err = 0;
 
-  if (fresh->cache != HTS_CACHE_PRIORITY)
-    err = 1;
+  ST_FAIL_IF(err, fresh->cache != HTS_CACHE_PRIORITY);
   hts_free_opt(fresh);
   printf("cache-default: %s\n", err ? "FAIL" : "OK");
   return err;
@@ -1574,6 +1554,78 @@ static int st_stoplock(httrackp *opt, int argc, char **argv) {
   return st_lockrule(opt, argc, argv, "stoplock", HTS_PAUSE_LOCKNAME);
 }
 
+/* A cancel request whose URL cannot be copied is refused, not stored empty. */
+static int st_cancelpushoom(httrackp *opt, int argc, char **argv) {
+  static const size_t huge = 64 * 1024 * 1024;
+  char *big;
+  char *popped;
+  int ret = 0;
+  int rc = 1;
+
+  big = malloct(huge);
+  assertf(big != NULL);
+  memset(big, 'x', huge - 1);
+  big[huge - 1] = '\0';
+#ifndef _WIN32
+  {
+    struct rlimit saved, tight;
+
+    if (getrlimit(RLIMIT_AS, &saved) != 0) {
+      printf("cancelpushoom: cannot cap memory, skipped\n");
+      rc = 0;
+      goto done;
+    }
+    tight = saved;
+    tight.rlim_cur = 1024 * 1024;
+    if (setrlimit(RLIMIT_AS, &tight) != 0) {
+      printf("cancelpushoom: cannot cap memory, skipped\n");
+      rc = 0;
+      goto done;
+    }
+    ret = hts_cancel_file_push(opt, big);
+    (void) setrlimit(RLIMIT_AS, &saved);
+  }
+#else
+  printf("cancelpushoom: cannot cap memory, skipped\n");
+  rc = 0;
+  goto done;
+#endif
+  if (opt->state.cancel != NULL && opt->state.cancel->url == NULL) {
+    printf("cancelpushoom: FAILED (an entry was stored with no URL)\n");
+    goto done;
+  }
+  if (ret == 0) {
+    printf("cancelpushoom: cap did not bite, skipped\n");
+    rc = 0;
+    goto done;
+  }
+  if (opt->state.cancel != NULL) {
+    printf("cancelpushoom: FAILED (a refused push left an entry)\n");
+    goto done;
+  }
+  if (hts_cancel_file_push(opt, "/a.html") != 0) {
+    printf("cancelpushoom: FAILED (no push after the refusal)\n");
+    goto done;
+  }
+  popped = hts_cancel_file_pop(opt);
+  if (popped == NULL || strcmp(popped, "/a.html") != 0 ||
+      opt->state.cancel != NULL) {
+    printf("cancelpushoom: FAILED (pop did not return the one entry)\n");
+    freet(popped);
+    goto done;
+  }
+  freet(popped);
+  printf("cancelpushoom: oom OK\n");
+  rc = 0;
+
+done:
+  while ((popped = hts_cancel_file_pop(opt)) != NULL) {
+    freet(popped);
+  }
+  freet(big);
+  return rc;
+}
+
 /* What a postprocess-html callback may claim, and out of whose storage. Two
    capacities and every offset, or a bound that ignored "size" or looked only at
    the base pointer would pass. */
@@ -1835,6 +1887,9 @@ const struct selftest_entry selftests_opt[] = {
     {"stoplock", "<writable directory>",
      "a pause request pauses the mirror only if it is fresh and deletable",
      st_stoplock},
+    {"cancelpushoom", "",
+     "a cancel request that cannot be stored is refused, not stored empty",
+     st_cancelpushoom},
     {"postprocsize", "",
      "a postprocess-html callback cannot claim bytes it was not handed",
      st_postprocsize},

@@ -43,24 +43,20 @@ static int st_mirrorcompleted(httrackp *opt, int argc, char **argv) {
   httrackp *to = hts_create_opt();
   int err = 0;
 
-  if (hts_mirror_completed(from) != HTS_DEFAULT)
-    err = 1;
-  if (hts_mirror_completed(to) != HTS_DEFAULT)
-    err = 1;
+  ST_FAIL_IF(err, hts_mirror_completed(from) != HTS_DEFAULT);
+  ST_FAIL_IF(err, hts_mirror_completed(to) != HTS_DEFAULT);
 
   /* A verdict never travels onto an opt that has none. */
   from->mirror_completed = HTS_TRUE;
   to->mirror_completed = HTS_DEFAULT;
   copy_htsopt(from, to);
-  if (hts_mirror_completed(to) != HTS_DEFAULT)
-    err = 1;
+  ST_FAIL_IF(err, hts_mirror_completed(to) != HTS_DEFAULT);
   /* A verdict never overwrites one the target earned itself, which is what a
      copy_htsopt change would silently break. */
   from->mirror_completed = HTS_FALSE;
   to->mirror_completed = HTS_TRUE;
   copy_htsopt(from, to);
-  if (hts_mirror_completed(to) != HTS_TRUE)
-    err = 1;
+  ST_FAIL_IF(err, hts_mirror_completed(to) != HTS_TRUE);
 
   hts_free_opt(from);
   hts_free_opt(to);
@@ -77,21 +73,18 @@ static int st_transportfailures(httrackp *opt, int argc, char **argv) {
   const hts_stat_struct *stats;
   int err = 0;
 
-  if (from->transport_failures != 0 || to->transport_failures != 0)
-    err = 1;
+  ST_FAIL_IF(err, from->transport_failures != 0 || to->transport_failures != 0);
 
   /* Published beside stat_errors, which is where a front end reads it. */
   to->transport_failures = 7;
   stats = hts_get_stats(to);
-  if (stats == NULL || stats->stat_transport_failures != 7)
-    err = 1;
+  ST_FAIL_IF(err, stats == NULL || stats->stat_transport_failures != 7);
 
   /* A count never travels onto another opt. */
   from->transport_failures = 3;
   to->transport_failures = 0;
   copy_htsopt(from, to);
-  if (to->transport_failures != 0)
-    err = 1;
+  ST_FAIL_IF(err, to->transport_failures != 0);
 
   hts_free_opt(from);
   hts_free_opt(to);
@@ -108,13 +101,11 @@ static int st_pause(httrackp *opt, int argc, char **argv) {
   for (i = 0; i < 10000; i++) {
     int t = hts_pause_target_ms((TStamp) (1719500000000LL + i), 5000, 10000);
 
-    if (t < 5000 || t > 10000)
-      err = 1;
+    ST_FAIL_IF(err, t < 5000 || t > 10000);
     seen_low |= (t < 6000);
     seen_high |= (t > 9000);
   }
-  if (!seen_low || !seen_high)
-    err = 1;
+  ST_FAIL_IF(err, !seen_low || !seen_high);
   if (hts_pause_target_ms(12345, 8000, 8000) != 8000) /* equal bounds = fixed */
     err = 1;
   /* deterministic: a seed yields the same target even after an intervening call
@@ -123,8 +114,7 @@ static int st_pause(httrackp *opt, int argc, char **argv) {
     int a = hts_pause_target_ms(99, 5000, 10000);
 
     (void) hts_pause_target_ms(54321, 5000, 10000);
-    if (hts_pause_target_ms(99, 5000, 10000) != a)
-      err = 1;
+    ST_FAIL_IF(err, hts_pause_target_ms(99, 5000, 10000) != a);
   }
   printf("pause: %s\n", err ? "FAIL" : "OK");
   return err;
@@ -600,13 +590,7 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
 
   memset(&cache, 0, sizeof(cache));
 
-#define CHECK(cond)                                                            \
-  do {                                                                         \
-    if (!(cond)) {                                                             \
-      printf("  FAIL line %d: %s\n", __LINE__, #cond);                         \
-      err = 1;                                                                 \
-    }                                                                          \
-  } while (0)
+#define CHECK(cond) ST_CHECK(err, cond)
 
   /* before the cleanup label has anything to free */
   sback = back_new(opt, SLOTS);
