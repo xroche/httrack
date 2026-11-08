@@ -139,11 +139,6 @@ Please visit our Website: http://www.httrack.com
 #endif
 #endif
 
-// Debugging
-#if _HTS_WIDE
-FILE *DEBUG_fp = NULL;
-#endif
-
 /* variables globales */
 int _DEBUG_HEAD;
 FILE *ioinfo;
@@ -722,18 +717,8 @@ T_SOC http_xfopen(httrackp *opt, int mode, int treat, int waitconnect,
     retour->msg[0] = '\0';
     retour->statuscode = STATUSCODE_NON_FATAL;  // a priori erreur non fatale
   }
-#if HDEBUG
-  printf("adr=%s\nfichier=%s\n", adr, fil);
-#endif
 
   // ouvrir liaison
-#if HDEBUG
-  printf("Création d'une socket sur %s\n", adr);
-#endif
-
-#if CNXDEBUG
-  printf("..newhttp\n");
-#endif
 
   /* connexion */
   if (retour) {
@@ -826,9 +811,6 @@ T_SOC http_xfopen(httrackp *opt, int mode, int treat, int waitconnect,
     char rcvd[1100];
 
     rcvd[0] = '\0';
-#if HDEBUG
-    printf("Ok, connexion réussie, id=%d\n", soc);
-#endif
 
     // connecté?
     if (waitconnect) {
@@ -836,10 +818,6 @@ T_SOC http_xfopen(httrackp *opt, int mode, int treat, int waitconnect,
     }
 
     if (soc != INVALID_SOCKET) {
-
-#if HDEBUG
-      printf("Attente de la réponse:\n");
-#endif
 
       // si GET (réception d'un fichier), réceptionner en-tête d'abord,
       // et ensuite le corps
@@ -857,19 +835,12 @@ T_SOC http_xfopen(httrackp *opt, int mode, int treat, int waitconnect,
         // traiter status-line
         treatfirstline(retour, rcvd);
 
-#if HDEBUG
-        printf("Status-Code=%d\n", retour->statuscode);
-#endif
-
         // en-tête
 
         // header // ** !attention! HTTP/0.9 non supporté
         do {
           const hts_boolean cut = finput_line(soc, rcvd, 1024);
 
-#if HDEBUG
-          printf(">%s\n", rcvd);
-#endif
           if (cut)
             hts_log_print(NULL,
                           hts_header_is_read(rcvd) ? LOG_WARNING : LOG_DEBUG,
@@ -1718,19 +1689,11 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
         !hts_proxy_is_socks(retour->req.proxy.name) &&
         !hts_proxy_is_connect(retour->req.proxy.name) &&
         (strncmp(adr, "https://", 8) != 0)) {
-      if (!link_has_authority(adr)) {   // default http
-#if HDEBUG
-        printf("Proxy Use: for %s%s proxy %d port %d\n", adr, fil,
-               retour->req.proxy.name, retour->req.proxy.port);
-#endif
+      if (!link_has_authority(adr)) { // default http
         print_buffer(&bstr, "http://%s",
                      escape_check_url_addr(jump_identification_const(adr), esc,
                                            sizeof(esc)));
       } else {                  // ftp:// en proxy http
-#if HDEBUG
-        printf("Proxy Use for ftp: for %s%s proxy %d port %d\n", adr, fil,
-               retour->req.proxy.name, retour->req.proxy.port);
-#endif
         direct_url = 1;         // ne pas analyser user/pass
         print_buffer(&bstr, "%s", escape_check_url_addr(adr, esc, sizeof(esc)));
       }
@@ -2082,8 +2045,6 @@ int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
     retour->soc = INVALID_SOCKET;
     return -1;
   }
-#if HDEBUG
-#endif
   if (_DEBUG_HEAD) {
     if (ioinfo) {
       hts_secret_fprintf(opt, ioinfo, "[%d] request for %s%s:\r\n",
@@ -2255,9 +2216,6 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
   int p;
 
   if ((p = strfield(rcvd, "Content-length:")) != 0) {
-#if HDEBUG
-    printf("ok, Content-length: détecté\n");
-#endif
     const char *a = rcvd + p;
     LLint size;
 
@@ -2297,7 +2255,7 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
         strcpybuff(retour->lastmodified, rcvd + p);
       }
     }
-  } else if ((p = strfield(rcvd, "Etag:")) != 0) {      /* Etag */
+  } else if ((p = strfield(rcvd, "Etag:")) != 0) { /* Etag */
     if (retour) {
       while(is_realspace(*(rcvd + p)))
         p++;                    // sauter espaces
@@ -2311,9 +2269,6 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
       p++;                      // sauter espaces
     if (strfield(rcvd + p, "chunked")) {
       retour->is_chunk = 1; // chunked
-#if HDEBUG
-      printf("ok, Transfer-Encoding: détecté\n");
-#endif
     }
   } else if ((p = strfield(rcvd, "Content-type:")) != 0) {
     if (retour) {
@@ -2497,9 +2452,6 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
     char BIGSTK cook_value[8192];       // valeur (ID=toto,S=1234)
     const int64_t now = (int64_t) time(NULL);
 
-#if DEBUG_COOK
-    printf("set-cookie detected\n");
-#endif
     /* Refuse a host cookie_host() cannot scope, and one too long for the
        default-domain copy below (that would abort the mirror). */
     if (adr != NULL && (strlen(adr) >= sizeof(domain) ||
@@ -2571,10 +2523,6 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
             value[0] = '\0';
             strncatbuff(name, token_st, name_len);
             strncatbuff(value, value_st, value_len);
-#if DEBUG_COOK
-            printf("detected cookie-av: name=\"%s\" value=\"%s\"\n", name,
-                   value);
-#endif
             if (first) {
               // the first pair is the cookie, and "name=" may erase one
               strcpybuff(cook_name, name);
@@ -2641,11 +2589,6 @@ void treathead_opt(httrackp *opt, t_cookie *cookie, const char *adr,
             has_max_age ? max_age_when : (has_expires ? expires_when : 0);
         attr.host_only = !has_domain;
 
-#if DEBUG_COOK
-        printf
-          ("new cookie: name=\"%s\" value=\"%s\" domain=\"%s\" path=\"%s\"\n",
-           cook_name, cook_value, domain, path);
-#endif
         // a Domain= the host may not claim drops the cookie (5.3 step 6)
         if (!has_domain ||
             (adr != NULL && cookie_domain_allowed(domain, scoped))) {
@@ -2907,15 +2850,9 @@ LLint http_xfread1(htsblk * r, int bufl) {
       } else {                  // inconnu..
         // réserver de la mémoire?
         if (r->adr == NULL) {
-#if HDEBUG
-          printf("..alloc xfread\n");
-#endif
           r->adr = (char *) malloct(bufl + 1);
           r->size = 0;
         } else {
-#if HDEBUG
-          printf("..realloc xfread1\n");
-#endif
           r->adr = (char *) realloct(r->adr, (int) r->size + bufl + 1);
         }
 
@@ -2931,16 +2868,8 @@ LLint http_xfread1(htsblk * r, int bufl) {
             if (r->adr)
               r->adr[r->size] = '\0';
 
-          }                     // sinon on a fini
-#if HDEBUG
-          else if (nl < 0)
-            printf("..end read (%d)\n", nl);
-#endif
+          } // sinon on a fini
         }
-#if HDEBUG
-        else
-          printf("..-> error\n");
-#endif
       }
 
       // pas de adr=erreur
@@ -3253,10 +3182,6 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
 
     SOCaddr_clear(server);
 
-#if HDEBUG
-    printf("gethostbyname\n");
-#endif
-
     // tester un éventuel port
     if (port == -1) {
       const char *a = jump_toport_const(iadr);
@@ -3313,12 +3238,6 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
     retour->address_size = SOCaddr_size(retour->address);
 
     // créer ("attachement") une socket (point d'accès) internet,en flot
-#if HDEBUG
-    printf("socket\n");
-#endif
-#if HTS_WIDE_DEBUG
-    DEBUG_W("socket\n");
-#endif
     /* -%b pins the source address, and a socket that binds cannot be a
        multipath one. */
     const hts_boolean will_bind =
@@ -3328,9 +3247,6 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
     if (retour != NULL) {
       retour->debugid = HTS_STAT.stat_sockid++;
     }
-#if HTS_WIDE_DEBUG
-    DEBUG_W("socket()=%d\n" _(int) soc);
-#endif
     if (soc == INVALID_SOCKET) {
       if (retour != NULL) {
 #ifdef _WIN32
@@ -3362,9 +3278,6 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
     }
     // structure: connexion au domaine internet, port 80 (ou autre)
     SOCaddr_initport(server, port);
-#if HDEBUG
-    printf("==%d\n", soc);
-#endif
 
     // connexion non bloquante?
     if (!waitconnect) {
@@ -3383,21 +3296,12 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
       }
     }
     // Connexion au serveur lui même
-#if HDEBUG
-    printf("connect\n");
-#endif
     HTS_STAT.last_connect = mtime_local();
 
-#if HTS_WIDE_DEBUG
-    DEBUG_W("connect\n");
-#endif
     if (hts_socket_connect(soc, &SOCaddr_sockaddr(server), SOCaddr_size(server),
                            will_bind ? NULL : opt) != 0) {
       // bloquant
       if (waitconnect) {
-#if HDEBUG
-        printf("unable to connect!\n");
-#endif
         if (retour != NULL) {
 #ifdef _WIN32
           const int last_errno = WSAGetLastError();
@@ -3414,13 +3318,6 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
         return INVALID_SOCKET;
       }
     }
-#if HTS_WIDE_DEBUG
-    DEBUG_W("connect done\n");
-#endif
-
-#if HDEBUG
-    printf("connexion établie\n");
-#endif
 
     // A partir de maintenant, on peut envoyer et recevoir des données
     // via le flot identifié par soc (socket): write(soc,adr,taille) et
@@ -3450,10 +3347,6 @@ int ident_url_absolute(const char *url, lien_adrfil *adrfil) {
   // Reject an over-long URL: a root-relative path is copied whole into fil[].
   if (strlen(url) >= HTS_URLMAXSIZE * 2)
     return -1;
-
-#if HDEBUG
-  printf("protocol: %s\n", url);
-#endif
 
   // Scheme?
   {
@@ -3640,10 +3533,7 @@ static void ssl_shutdown_free(SSL **ssl_con) {
 #endif
 
 // fermer liaison fichier ou socket
-void deletehttp(htsblk * r) {
-#if HTS_DEBUG_CLOSESOCK
-  DEBUG_W("deletehttp: (htsblk*) 0x%p\n" _(void *)r);
-#endif
+void deletehttp(htsblk *r) {
 #if HTS_USEOPENSSL
   /* Free OpenSSL structures */
   if (r->ssl_con)
@@ -3679,9 +3569,6 @@ int deleteaddr(htsblk * r) {
 // fermer une socket
 void deletesoc(T_SOC soc) {
   if (soc != INVALID_SOCKET && soc != LOCAL_SOCKET_ID) {
-#if HTS_WIDE_DEBUG
-    DEBUG_W("close %d\n" _(int) soc);
-#endif
 #ifdef _WIN32
     if (closesocket(soc) != 0) {
       const int err = WSAGetLastError();
@@ -3698,9 +3585,6 @@ void deletesoc(T_SOC soc) {
       fprintf(stderr, "* error closing socket " T_SOCP ": %s\n", soc,
               hts_strerror(err, errbuf, sizeof(errbuf)));
     }
-#endif
-#if HTS_WIDE_DEBUG
-    DEBUG_W(".. done\n");
 #endif
   }
 }
@@ -4133,10 +4017,6 @@ HTSEXT_API char **int2bytes2(strc_int2bytes2 * strc, LLint n) {
 // envoi de texte (en têtes généralement) sur la socket soc
 int sendc(htsblk * r, const char *s) {
   int n, ssz = (int) strlen(s);
-
-#if HDEBUG
-  write(0, s, ssz);
-#endif
 
 #if HTS_USEOPENSSL
   if (r->ssl) {
@@ -6841,9 +6721,6 @@ int hts_read(htsblk * r, char *buff, int size) {
   int retour;
 
   if (r->is_file) {
-#if HTS_WIDE_DEBUG
-    DEBUG_W("read(%p, %d, %d)\n" _(void *)buff _(int) size _(int) r->fp);
-#endif
     if (r->fp) {
       retour = (int) fread(buff, 1, size, r->fp);
       if (retour == 0)  // can happen with directories (!)
@@ -6851,12 +6728,6 @@ int hts_read(htsblk * r, char *buff, int size) {
     } else
       retour = READ_ERROR;
   } else {
-#if HTS_WIDE_DEBUG
-    DEBUG_W("recv(%d, %p, %d)\n" _(int) r->soc _(void *)buff _(int) size);
-
-    if (r->soc == INVALID_SOCKET)
-      printf("!!WIDE_DEBUG ERROR, soc==INVALID hts_read\n");
-#endif
 #if HTS_USEOPENSSL
     if (r->ssl) {
       /* It writes: the SSL_ERROR_WANT_WRITE arm below is that case. */
@@ -6891,9 +6762,6 @@ int hts_read(htsblk * r, char *buff, int size) {
       hts_stat_recv_add(retour);
 #if HTS_USEOPENSSL
   }
-#endif
-#if HTS_WIDE_DEBUG
-  DEBUG_W("recv/read done (%d bytes)\n" _(int) retour);
 #endif
   return retour;
 }
@@ -7480,18 +7348,10 @@ int hts_dns_resolve_all_bounded(httrackp *opt, const char *iadr, SOCaddr *out,
     return count;
   }
 
-#if DEBUGDNS
-  printf("resolving (not cached) %s\n", host);
-#endif
-
   /* Resolve with no lock held: getaddrinfo can block for a long time, and
      state.lock also gates the stop request (#606). */
   count = hts_dns_resolve_nocache_list_bounded(
       host, resolved, HTS_MAXADDRNUM, timeout, cancel, error, &permanent);
-
-#if HTS_WIDE_DEBUG
-  DEBUG_W("gethostbyname done\n");
-#endif
 
   if (count < 0) { /* timed out: no answer to cache, and none to report */
     if (error != NULL)

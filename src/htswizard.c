@@ -935,9 +935,6 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
     }
     // vérifier robots.txt
     if (opt->robots && checkrobots(_ROBOTS, adr, fil) == -1) {
-#if DEBUG_ROBOTS
-      printf("robots.txt forbidden: %s%s\n", adr, fil);
-#endif
       if (!hts_robots_forbids(opt, adr, fil,
                               (!question && filters_answer) ? HTS_TRUE
                                                             : HTS_FALSE,

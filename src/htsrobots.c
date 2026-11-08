@@ -206,9 +206,6 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
     info[0] = '\0';
   if (sitemaps != NULL && sitemapsize > 0)
     sitemaps[0] = '\0';
-#if DEBUG_ROBOTS
-  printf("robots.txt dump:\n%s\n", body);
-#endif
   while (bptr < bodysize) {
     char *comm;
     int adv;
@@ -314,9 +311,6 @@ int checkrobots_set(robots_wizard *robots, const char *adr, const char *data) {
         return 0;
       freet(robots->token);
       robots->token = token;
-#if DEBUG_ROBOTS
-      printf("robots.txt: set %s to %s\n", adr, data);
-#endif
       return -1;
     } else if (!robots->next) {
       robots_wizard *node = (robots_wizard *) calloct(1, sizeof(robots_wizard));
@@ -332,9 +326,6 @@ int checkrobots_set(robots_wizard *robots, const char *adr, const char *data) {
         return 0;
       }
       robots->next = node;
-#if DEBUG_ROBOTS
-      printf("robots.txt: new set %s to %s\n", adr, data);
-#endif
       return -1;
     }
     robots = robots->next;
