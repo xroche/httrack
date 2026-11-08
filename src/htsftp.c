@@ -986,7 +986,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
             }
           } else {
             ftp_fail(&back->r, "PASV/EPSV error: %s", linejmp(line));
-          }                     // sinon on est prêts
+          }
         }
 #else
         // rien à faire avant
@@ -1099,7 +1099,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                 soc_dat = INVALID_SOCKET;
                 //
                 ftp_fail(&back->r, "RETR command error: %s", linejmp(line));
-              } // sinon on est prêts
+              }
             } else {
 #if FTP_DEBUG
               printf("Data: unable to connect\n");
@@ -1108,13 +1108,13 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
               soc_dat = INVALID_SOCKET;
               //
               ftp_fail(&back->r, "Unable to connect");
-            } // sinon on est prêts
+            }
           } else {
             ftp_fail(&back->r, "Unable to create a socket");
-          } // sinon on est prêts
+          }
         } else {
           ftp_fail(&back->r, "PASV incorrect: %s", linejmp(line));
-        }                       // sinon on est prêts
+        }
 #else
         //T_SOC soc_servdat;
         strcpybuff(back->info, "listening");
