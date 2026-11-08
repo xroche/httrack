@@ -1,0 +1,37 @@
+#!/bin/bash
+#
+# A request no page answers gets a 404 status line, not a bare Content-length.
+
+set -euo pipefail
+
+# shellcheck source=tests/webhttracklib.sh
+. "${0%"${0##*/}"}./webhttracklib.sh"
+
+htsserver_require
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_404.XXXXXX") || fail "no tmpdir"
+cleanup_push htsserver_cleanup_dir "${work}"
+htsserver_start --home "${work}"
+
+printf '[a known page still answers 200] ..\t'
+reply=$(htsserver_client --request "GET /server/index.html HTTP/1.0")
+got=$(firstline "$(tr -d '\r' <<<"${reply}")")
+test "${got}" = "HTTP/1.0 200 OK" || fail "index.html: [${got}]"
+printf 'ok\n'
+
+while read -r what request; do
+    printf '[%s gets a 404] ..\t' "${what}"
+    reply=$(htsserver_client --request "${request}")
+    got=$(firstline "$(tr -d '\r' <<<"${reply}")")
+    test "${got}" = "HTTP/1.0 404 Not Found" || fail "${request}: [${got}]"
+    grep -q '^Server: httrack small server' <<<"${reply}" ||
+        fail "${request}: no Server line: ${reply}"
+    grep -q 'Page not found' <<<"${reply}" || fail "${request}: no body: ${reply}"
+    printf 'ok\n'
+done <<'REQUESTS'
+unknown-page GET /no-such-page.html HTTP/1.0
+unknown-method PUT /server/index.html HTTP/1.0
+asterisk GET * HTTP/1.0
+absolute-url GET http://127.0.0.1/server/index.html HTTP/1.0
+no-version GET /server/index.html
+REQUESTS
