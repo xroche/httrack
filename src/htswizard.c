@@ -808,24 +808,12 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
     /* Don't enlarge: the abort gates url_savename_addstr's append (#1269). */
     char BIGSTK l[HTS_URLMAXSIZE * 2];
     char BIGSTK lfull[HTS_URLMAXSIZE * 2];
+    htsbuff lb = htsbuff_array(l), fb = htsbuff_array(lfull);
 
     if (forbidden_url != -1)
       question = 0;             // pas de question, résolu
 
-    // former URL complète du lien actuel
-    strcpybuff(l, jump_identification_const(adr));
-    if (*fil != '/')
-      strcatbuff(l, "/");
-    strcatbuff(l, fil);
-    // full version (http://foo:bar@www.foo.com/bar.html)
-    if (!link_has_authority(adr))
-      strcpybuff(lfull, "http://");
-    else
-      lfull[0] = '\0';
-    strcatbuff(lfull, adr);
-    if (*fil != '/')
-      strcatbuff(lfull, "/");
-    strcatbuff(lfull, fil);
+    hts_url_forms(&lb, &fb, adr, fil);
 
     // tester filters (URLs autorisées ou interdites explicitement)
 
@@ -1108,49 +1096,27 @@ int hts_testlinksize(httrackp * opt, const char *adr, const char *fil, LLint siz
     /* Don't enlarge: the abort gates url_savename_addstr's append (#1269). */
     char BIGSTK l[HTS_URLMAXSIZE * 2];
     char BIGSTK lfull[HTS_URLMAXSIZE * 2];
+    htsbuff lb = htsbuff_array(l), fb = htsbuff_array(lfull);
+    LLint sz = size;
+    int size_flag = 0;
 
-    if (size >= 0) {
-      LLint sz = size;
-      int size_flag = 0;
-
-      // former URL complète du lien actuel
-      strcpybuff(l, jump_identification_const(adr));
-      if (*fil != '/')
-        strcatbuff(l, "/");
-      strcatbuff(l, fil);
-      //
-      if (!link_has_authority(adr))
-        strcpybuff(lfull, "http://");
-      else
-        lfull[0] = '\0';
-      strcatbuff(lfull, adr);
-      if (*fil != '/')
-        strcatbuff(lfull, "/");
-      strcatbuff(lfull, fil);
-
-      // filters, 0=sait pas 1=ok -1=interdit
-      {
-        sz = size;
-        jok = fa_strjoker_dual(/*url */ 0, *opt->filters.filters,
-                               *opt->filters.filptr, lfull, l, &sz, &size_flag,
-                               NULL);
-      }
-
-      // log
-      if (jok == 1) {
+    hts_url_forms(&lb, &fb, adr, fil);
+    // filters: 0 = unknown, 1 = accepted, -1 = refused
+    jok =
+        fa_strjoker_dual(/*url */ 0, *opt->filters.filters,
+                         *opt->filters.filptr, lfull, l, &sz, &size_flag, NULL);
+    if (jok == 1) {
+      hts_log_print(opt, LOG_DEBUG,
+                    "File confirmed (size test): %s%s (" LLintP ")",
+                    adr_nologin(opt, adr), fil, (LLint) (size));
+    } else if (jok == -1) {
+      if (size_flag) { /* refused because of its size */
         hts_log_print(opt, LOG_DEBUG,
-                      "File confirmed (size test): %s%s (" LLintP ")",
-                      adr_nologin(opt, adr), fil, (LLint) (size));
-      } else if (jok == -1) {
-        if (size_flag) {        /* interdit à cause de la taille */
-          hts_log_print(opt, LOG_DEBUG,
-                        "File cancelled due to its size: %s%s (" LLintP
-                        ", limit: " LLintP ")",
-                        adr_nologin(opt, adr), fil, (LLint) (size),
-                        (LLint) (sz));
-        } else {
-          jok = 1;
-        }
+                      "File cancelled due to its size: %s%s (" LLintP
+                      ", limit: " LLintP ")",
+                      adr_nologin(opt, adr), fil, (LLint) (size), (LLint) (sz));
+      } else {
+        jok = 1;
       }
     }
   }

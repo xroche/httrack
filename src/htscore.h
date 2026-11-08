@@ -521,6 +521,11 @@ hts_boolean filters_grow(httrackp *opt, int n);
 /* Same as filters_grow(), but aborts when memory runs out. */
 void filters_make_room(httrackp *opt, int n);
 
+/* Writes adr+fil without credentials to l, and with a default "http://" to
+   lfull: the two forms the filters test. Aborts if either does not fit. */
+void hts_url_forms(htsbuff *l, htsbuff *lfull, const char *adr,
+                   const char *fil);
+
 /* Returns the fa_strjoker_dual() verdict of the nfil filters on adr+fil, in
    both forms the wizard tests, and sets *depth when depth is not NULL. */
 int filters_match_url(char **filters, int nfil, const char *adr,
