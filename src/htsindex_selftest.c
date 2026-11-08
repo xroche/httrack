@@ -22,6 +22,9 @@ Ethical use: we kindly ask that you NOT use this software to harvest email
 addresses or to collect any other private information about people. Doing so
 would dishonor our work and waste the many hours we have spent on it.
 
+Please visit our Website: http://www.httrack.com
+*/
+
 
 /* ------------------------------------------------------------ */
 /* File: htsindex_selftest.c subroutines:                       */
