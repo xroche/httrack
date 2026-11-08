@@ -974,6 +974,29 @@ static void sink_add_url_htmlescaped(parse_sink *const sink,
   }
 }
 
+char *hts_parse_sink_selftest(const hts_boolean enabled, const int inscript,
+                              const int inscript_tag, const char *const s) {
+  parse_sink sink = {EMPTY_TYPED_ARRAY, HTS_FALSE, enabled, &inscript,
+                     &inscript_tag};
+  char *copy;
+
+  sink_add(&sink, s);
+  sink_add(&sink, "|");
+  sink_add_htmlescaped(&sink, s);
+  sink_add(&sink, "|");
+  sink_add_htmlescaped_full(&sink, s);
+  sink_add(&sink, "|");
+  sink_add_url_htmlescaped(&sink, s);
+  assertf(!sink.oom);
+  copy = (char *) malloct(TypedArraySize(sink.buf) + 1);
+  assertf(copy != NULL);
+  if (TypedArraySize(sink.buf) != 0)
+    memcpy(copy, TypedArrayElts(sink.buf), TypedArraySize(sink.buf));
+  copy[TypedArraySize(sink.buf)] = '\0';
+  TypedArrayFree(sink.buf);
+  return copy;
+}
+
 /* Default port for lien's scheme (case-insensitive), 80 if absent/unknown; so
    schemeless and protocol-relative //host links default to 80 (known gap). */
 static int scheme_default_port(const char *lien) {
@@ -3109,6 +3132,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     }
                     /* */
                     else if (opt->urlmode == HTS_URLMODE_ABSOLUTE) {
+                      /* Not only output: also fills tmp[256] below. */
                       if (sink.enabled) {
                         if (!link_has_authority(afs.af.adr)) {
                           HT_ADD("http://");
@@ -3145,6 +3169,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     } else if (forbidden_url ==
                                1) { // le lien ne sera pas chargé, référence
                                     // externe!
+                      /* Not only output: also writes external.html or .gif. */
                       if (sink.enabled) {
                         if (p_type != -1) {     // pas que le nom de fichier (pas classe java)
                           if (!opt->external) {
@@ -3393,6 +3418,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       int i;
                       char *pos;
 
+                      /* Not only output: also fills fixed buffers below. */
                       if (sink.enabled) {
                         if (!link_has_authority(afs.af.adr)) {
                           HT_ADD("http://");
@@ -3507,6 +3533,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           }
                         }
 
+                        /* Not only output: also tags --single-file links. */
                         if (sink.enabled) {
 
                           /* --single-file: tag the reference for the
