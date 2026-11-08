@@ -521,9 +521,9 @@ hts_boolean filters_grow(httrackp *opt, int n);
 /* Same as filters_grow(), but aborts when memory runs out. */
 void filters_make_room(httrackp *opt, int n);
 
-/* Writes adr+fil without credentials to l, and with a default "http://" to
-   lfull: the two forms the filters test. Aborts if either does not fit. */
-void hts_url_forms(htsbuff *l, htsbuff *lfull, const char *adr,
+/* Writes adr+fil to nologin without credentials, and to full with them and a
+   default "http://". Aborts if either does not fit. */
+void hts_url_forms(htsbuff *nologin, htsbuff *full, const char *adr,
                    const char *fil);
 
 /* Returns the fa_strjoker_dual() verdict of the nfil filters on adr+fil, in

@@ -2592,17 +2592,17 @@ void filters_make_room(httrackp *opt, int n) {
     assertf("too many filters - giving up" == NULL);
 }
 
-void hts_url_forms(htsbuff *l, htsbuff *lfull, const char *adr,
+void hts_url_forms(htsbuff *nologin, htsbuff *full, const char *adr,
                    const char *fil) {
-  htsbuff_cpy(l, jump_identification_const(adr));
+  htsbuff_cpy(nologin, jump_identification_const(adr));
   if (*fil != '/')
-    htsbuff_cat(l, "/");
-  htsbuff_cat(l, fil);
-  htsbuff_cpy(lfull, link_has_authority(adr) ? "" : "http://");
-  htsbuff_cat(lfull, adr);
+    htsbuff_cat(nologin, "/");
+  htsbuff_cat(nologin, fil);
+  htsbuff_cpy(full, link_has_authority(adr) ? "" : "http://");
+  htsbuff_cat(full, adr);
   if (*fil != '/')
-    htsbuff_cat(lfull, "/");
-  htsbuff_cat(lfull, fil);
+    htsbuff_cat(full, "/");
+  htsbuff_cat(full, fil);
 }
 
 int filters_match_url(char **filters, int nfil, const char *adr,
