@@ -7519,7 +7519,8 @@ HTSEXT_API httrackp *hts_create_opt(void) {
 
   opt->callbacks_fun =
     (t_hts_htmlcheck_callbacks *) malloct(sizeof(t_hts_htmlcheck_callbacks));
-  memset(opt->callbacks_fun, 0, sizeof(t_hts_htmlcheck_callbacks));
+  /* A plug-in that chains to an empty slot gets the engine default as prev. */
+  *opt->callbacks_fun = default_callbacks;
 
   /* Preload callbacks : java and flash parser, and the automatic user-defined callback */
 
@@ -7875,9 +7876,17 @@ const t_hts_htmlcheck_callbacks default_callbacks = {
   CALLBACK_OP(CB, NAME, OPERATION, "receive-header", receivehead); \
 } while(0)
 
+static void *callback_slot(const t_hts_htmlcheck_callbacks *callbacks,
+                           const char *name);
+
 int hts_set_callback(t_hts_htmlcheck_callbacks * callbacks, const char *name,
                      void *function) {
   int error = 1;
+
+  /* NULL restores the engine default, so a later chain never gets a NULL prev.
+   */
+  if (function == NULL)
+    function = callback_slot(&default_callbacks, name);
 #define CALLBACK_OPERATION(TYPE, FUNCTION) do { \
     FUNCTION = (TYPE) function;                 \
     error = 0;                                  \
@@ -7887,13 +7896,21 @@ int hts_set_callback(t_hts_htmlcheck_callbacks * callbacks, const char *name,
   return error;
 }
 
-void *hts_get_callback(t_hts_htmlcheck_callbacks * callbacks, const char *name) {
+static void *callback_slot(const t_hts_htmlcheck_callbacks *callbacks,
+                           const char *name) {
 #define CALLBACK_OPERATION(TYPE, FUNCTION) do { \
     return (void*) FUNCTION;                    \
   } while(0)
   DISPATCH_CALLBACK(callbacks, name, CALLBACK_OPERATION);
 #undef CALLBACK_OPERATION
   return NULL;
+}
+
+void *hts_get_callback(t_hts_htmlcheck_callbacks *callbacks, const char *name) {
+  void *const fun = callback_slot(callbacks, name);
+
+  /* An engine default reads as no callback. */
+  return fun != callback_slot(&default_callbacks, name) ? fun : NULL;
 }
 
 // end defaut wrappers
