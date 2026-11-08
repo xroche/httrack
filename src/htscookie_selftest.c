@@ -3287,7 +3287,7 @@ const struct selftest_entry selftests_cookie[] = {
      st_cookieimport},
     {"cookiehttponly", "<dir>",
      "a #HttpOnly_ jar line loads, other comments do not", st_cookiehttponly},
-    {"cookiequote", "<Set-Cookie header>",
+    {"cookiequote", "[Set-Cookie header]",
      "what the jar stores of a quoted cookie value and av", st_cookiequote},
     {"cookiejar", "<dir>",
      "the jar keeps host-only, Secure, HttpOnly and expiry, and logs a refusal",

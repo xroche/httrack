@@ -113,7 +113,7 @@ static int st_getcategory(httrackp *opt, int argc, char **argv) {
 /* ------------------------------------------------------------ */
 
 const struct selftest_entry selftests_tools[] = {
-    {"endtoken", "<tag bytes after attr=>", "value rech_endtoken() reads",
+    {"endtoken", "[tag bytes after attr=]", "value rech_endtoken() reads",
      st_endtoken},
     {"profilecharset", "<dir>",
      "which winprofile.ini files declare Charset=UTF-8", st_profilecharset},

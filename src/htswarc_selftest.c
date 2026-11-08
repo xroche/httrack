@@ -2606,7 +2606,7 @@ const struct selftest_entry selftests_warc[] = {
     {"warc-wacz", "<dir>", "--wacz package: layout, STORE mode, sha256 digests",
      st_warc_wacz},
 #endif
-    {"singlefileclass", "<link tag>",
+    {"singlefileclass", "[link tag]",
      "class single-file gives a <link href> reference", st_singlefileclass},
     {"singlefile", "<dir>",
      "--single-file: what is inlined, the per-asset cap, idempotence",

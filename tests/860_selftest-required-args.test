@@ -13,7 +13,7 @@ list=$(httrack -#test 2>&1) || skip "this build has no self-tests"
 # Rows are "  NAME  ARGS  DESC"; ARGS starts with '<' when it is required.
 names=$(sed -n 's/^  \([^ ]*\) *<.*/\1/p' <<<"$list")
 count=$(wc -l <<<"$names")
-[ "$count" -ge 131 ] || fail "only $count rows list a required argument"
+[ "$count" -ge 124 ] || fail "only $count rows list a required argument"
 
 for name in $names; do
     rc=0
@@ -21,6 +21,25 @@ for name in $names; do
     [ "$rc" -eq 1 ] || fail "$name with no argument exited $rc, not 1: $err"
     grep -q "^$name: takes <" <<<"$err" || fail "$name: no 'takes' line: $err"
 done
+
+# One argument short must be refused too, for rows that need two or more.
+multi=0
+while read -r name n; do
+    [ "$n" -ge 2 ] || continue
+    multi=$((multi + 1))
+    set --
+    i=1
+    while [ "$i" -lt "$n" ]; do
+        set -- "$@" 1
+        i=$((i + 1))
+    done
+    rc=0
+    err=$(httrack "-#test=$name" "$@" 2>&1 </dev/null) || rc=$?
+    [ "$rc" -eq 1 ] || fail "$name with $((n - 1)) arguments exited $rc, not 1: $err"
+    grep -q "^$name: takes <" <<<"$err" || fail "$name: no 'takes' line at $((n - 1)) arguments: $err"
+done < <(sed -n 's/^  \([^ ]*\) *\(<.*\)/\1 \2/p' <<<"$list" |
+    perl -ne '($nm,$a)=split(/ /,$_,2); $n=0; while($a=~s/^<[^>]*>(\.\.\.)?\s*//){$n++} print "$nm $n\n"')
+[ "$multi" -ge 20 ] || fail "only $multi rows need two arguments or more"
 
 # A row's optional tail stays optional: filter runs on its pattern alone.
 out=$(httrack "-#test=filter" "*" 2>&1) || fail "filter with one argument: $out"

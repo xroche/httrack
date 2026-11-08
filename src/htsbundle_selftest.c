@@ -361,7 +361,7 @@ const struct selftest_entry selftests_bundle[] = {
      "<dir> <url>... [host:<adr>]... [hide:<text>]... [jar:<file>] [twice] "
      "[b0]",
      "load login bundles and print the identity each host gets", st_bundle},
-    {"regdomain", "<host>...", "the registrable domain of each host",
+    {"regdomain", "[host]...", "the registrable domain of each host",
      st_regdomain},
     {"bundlename", "<name>", "is name a login bundle name?", st_bundlename},
     {"bundlescope", "<cookie domain> [url...]",

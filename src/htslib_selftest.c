@@ -4036,7 +4036,7 @@ const struct selftest_entry selftests_lib[] = {
      st_queryparam},
     {"querysweep", "", "%[param] stays inside every buffer size it is given",
      st_querysweep},
-    {"querynext", "<query>", "the fields the shared query iterator reads",
+    {"querynext", "[query]", "the fields the shared query iterator reads",
      st_querynext},
     {"spandiff", "",
      "the span iterator matches the rule-list parsers it replaced",
@@ -4053,7 +4053,7 @@ const struct selftest_entry selftests_lib[] = {
      "the command-line echo masks the password of a URL login and nothing "
      "else",
      st_maskpw},
-    {"y2038", "<dir>", "dates before and after 2038 read as 64-bit seconds",
+    {"y2038", "[dir]", "dates before and after 2038 read as 64-bit seconds",
      st_y2038},
     {"localtime", "<dir>",
      "hts_localtime() and get_filetime_rfc822()'s GMT labelling (#806)",

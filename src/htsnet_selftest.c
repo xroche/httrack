@@ -1461,7 +1461,7 @@ const struct selftest_entry selftests_net[] = {
      st_ftpaddr},
     {"proxyauth", "<proxy>", "Basic credentials a proxy name carries",
      st_proxyauth},
-    {"sniname", "<url-address>...", "TLS SNI name taken from a URL address",
+    {"sniname", "[url-address]...", "TLS SNI name taken from a URL address",
      st_sniname},
     {"ftp-pasv", "pasv|epsv <reply>",
      "the address and port a PASV or EPSV reply parses into", st_ftppasv},
