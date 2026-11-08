@@ -25,7 +25,6 @@ would dishonor our work and waste the many hours we have spent on it.
 Please visit our Website: http://www.httrack.com
 */
 
-
 /* ------------------------------------------------------------ */
 /* File: htsindex_selftest.c subroutines:                       */
 /*       self-tests for the keyword indexer                     */
