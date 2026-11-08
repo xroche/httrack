@@ -3924,9 +3924,7 @@ static int cid_unescape(const char *cid, char *dest, const size_t size) {
   return 1;
 }
 
-/* Unescaping every id back to its own URL is what proves the map injective;
-   make_content_id() in htslib.c says why that matters. */
-/* A plug-in hook that forwards to prev without checking it (C85). */
+/* A plug-in hook that forwards to prev without checking it. */
 static int chain_hits = 0;
 #define CHAIN_PREV(NAME) (chain_hits++, CALLBACKARG_PREV_FUN(carg, NAME))
 #define CHAIN_PCARG CALLBACKARG_PREV_CARG(carg)
@@ -4047,20 +4045,45 @@ static int __cdecl cp_receivehead(t_hts_callbackarg *carg, httrackp *opt,
                                  ref_fil, incoming);
 }
 
-/* Each hook a plug-in chains onto an empty slot answers what the front-end
-   stubs #2136 deleted answered, and an engine default still reads as unset. */
+/* A hook chained onto an unset slot gets a prev answering the engine default.
+ */
 static int st_chainprev(httrackp *unused, int argc, char **argv) {
   httrackp *const opt = hts_create_opt();
   char html[] = "<html></html>", link[] = "x.html", save[] = "x.html";
   char *page = html;
   int len = (int) strlen(html);
+  static const char *const names[] = {"init",
+                                      "free",
+                                      "start",
+                                      "end",
+                                      "change-options",
+                                      "preprocess-html",
+                                      "postprocess-html",
+                                      "check-html",
+                                      "query",
+                                      "query2",
+                                      "query3",
+                                      "loop",
+                                      "check-link",
+                                      "check-mime",
+                                      "pause",
+                                      "save-file",
+                                      "save-file2",
+                                      "link-detected",
+                                      "link-detected2",
+                                      "transfer-status",
+                                      "save-name",
+                                      "send-header",
+                                      "receive-header"};
+  size_t i;
 
   (void) unused;
   (void) argc;
   (void) argv;
   assertf(opt != NULL);
   assertf(!HAS_CALLBACK(opt, query2) && !HAS_CALLBACK(opt, query3));
-  assertf(htswrap_read(opt, "check-link") == 0);
+  for (i = 0; i < sizeof(names) / sizeof(names[0]); i++)
+    assertf(htswrap_read(opt, names[i]) == 0);
 
   CHAIN_FUNCTION(opt, init, cp_init, NULL);
   CHAIN_FUNCTION(opt, uninit, cp_uninit, NULL);
@@ -4110,10 +4133,19 @@ static int st_chainprev(httrackp *unused, int argc, char **argv) {
   RUN_CALLBACK_NOARG(opt, uninit);
   assertf(chain_hits == 21);
 
+  /* Unsetting a slot restores the default, so a new chain still has a prev. */
+  assertf(htswrap_add(opt, "check-link", NULL) == 0);
+  assertf(htswrap_read(opt, "check-link") == 0);
+  CHAIN_FUNCTION(opt, check_link, cp_check_link, NULL);
+  assertf(RUN_CALLBACK3(opt, check_link, "h", "/", 200) == -1);
+  assertf(chain_hits == 22);
+
   hts_free_opt(opt);
   return st_verdict("chainprev", 0);
 }
 
+/* Unescaping every id back to its own URL is what proves the map injective;
+   make_content_id() in htslib.c says why that matters. */
 static int st_contentid(httrackp *opt, int argc, char **argv) {
   /* "/p.gif" escapes to "-2egif", and the other two names spell that escape
      out, with the old marker and with the new one */

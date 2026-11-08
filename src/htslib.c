@@ -7876,9 +7876,17 @@ const t_hts_htmlcheck_callbacks default_callbacks = {
   CALLBACK_OP(CB, NAME, OPERATION, "receive-header", receivehead); \
 } while(0)
 
+static void *callback_slot(const t_hts_htmlcheck_callbacks *callbacks,
+                           const char *name);
+
 int hts_set_callback(t_hts_htmlcheck_callbacks * callbacks, const char *name,
                      void *function) {
   int error = 1;
+
+  /* NULL restores the engine default, so a later chain never gets a NULL prev.
+   */
+  if (function == NULL)
+    function = callback_slot(&default_callbacks, name);
 #define CALLBACK_OPERATION(TYPE, FUNCTION) do { \
     FUNCTION = (TYPE) function;                 \
     error = 0;                                  \
@@ -7901,7 +7909,7 @@ static void *callback_slot(const t_hts_htmlcheck_callbacks *callbacks,
 void *hts_get_callback(t_hts_htmlcheck_callbacks *callbacks, const char *name) {
   void *const fun = callback_slot(callbacks, name);
 
-  /* An engine default reads as no callback, as it did before slots held one. */
+  /* An engine default reads as no callback. */
   return fun != callback_slot(&default_callbacks, name) ? fun : NULL;
 }
 
