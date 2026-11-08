@@ -324,9 +324,11 @@ static int entity_ref_cmp(const void *a, const void *b) {
   return strcmp(((const entity_ref *) a)->name, ((const entity_ref *) b)->name);
 }
 
-/* Does "&name;" decode to what the oracle holds for name, or stay verbatim? */
-static hts_boolean entity_sweep_one(const entity_ref *refs, const size_t n,
-                                    const char *name) {
+/* Checks that "&name;" decodes to what the oracle holds for name, or stays
+   verbatim, and counts the input and any failure. */
+static void entity_sweep_one(const entity_ref *refs, const size_t n,
+                             const char *name, size_t *inputs,
+                             size_t *failures) {
   char src[48], dest[48], want[48];
   entity_ref key;
   const entity_ref *hit;
@@ -348,9 +350,9 @@ static hts_boolean entity_sweep_one(const entity_ref *refs, const size_t n,
       strcmp(dest, want) != 0) {
     fprintf(stderr, "entities-sweep: '%s' gave '%s', want '%s'\n", src, dest,
             want);
-    return HTS_FALSE;
+    (*failures)++;
   }
-  return HTS_TRUE;
+  (*inputs)++;
 }
 
 /* Decodes every name of a "name cp" file, then each one-byte alphanumeric
@@ -385,25 +387,21 @@ static int st_entities_sweep(httrackp *opt, int argc, char **argv) {
     const size_t len = strlen(refs[i].name);
     size_t p, k;
 
-    failures += entity_sweep_one(refs, n, refs[i].name) ? 0 : 1;
-    inputs++;
+    entity_sweep_one(refs, n, refs[i].name, &inputs, &failures);
     for (p = 0; p < len; p++) {
       for (k = 0; alnum[k] != '\0'; k++) {
         if (alnum[k] != refs[i].name[p]) {
           snprintf(var, sizeof(var), "%s", refs[i].name);
           var[p] = alnum[k];
-          failures += entity_sweep_one(refs, n, var) ? 0 : 1;
-          inputs++;
+          entity_sweep_one(refs, n, var, &inputs, &failures);
         }
       }
     }
     snprintf(var, sizeof(var), "%sx", refs[i].name);
-    failures += entity_sweep_one(refs, n, var) ? 0 : 1;
-    inputs++;
+    entity_sweep_one(refs, n, var, &inputs, &failures);
     if (len > 1) {
       snprintf(var, sizeof(var), "%.*s", (int) (len - 1), refs[i].name);
-      failures += entity_sweep_one(refs, n, var) ? 0 : 1;
-      inputs++;
+      entity_sweep_one(refs, n, var, &inputs, &failures);
     }
   }
   freet(refs);

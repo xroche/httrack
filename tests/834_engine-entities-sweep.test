@@ -11,11 +11,17 @@ set -euo pipefail
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_entsweep.XXXXXX") || exit 1
 trap 'set +e; rm -rf "$tmp"' EXIT
 
-# The oracle is the name comment and code point of each generated row.
-sed -n 's|^    {0x[0-9a-f]*ULL, \([0-9]*\), [0-9]*}, */\* \([A-Za-z0-9]*\) \*/$|\2 \1|p' \
-    "${top_srcdir:-..}/src/htsentities.h" >"$tmp/names"
+# The oracle is a fixture taken from entities.json with jq, not from the header.
+pairs="${top_srcdir:-..}/tests/834_engine-entities-sweep.pairs"
+cp "$pairs" "$tmp/names"
 rows=$(wc -l <"$tmp/names")
-test "$rows" -eq 2032 || fail "parsed $rows entity rows, want 2032"
+test "$rows" -eq 2032 || fail "fixture has $rows entity rows, want 2032"
+
+# Every generated row carries the fixture's code point, and no row is extra.
+sed -n 's|^    {0x[0-9a-f]*ULL, \([0-9]*\), [0-9]*}, */\* \([A-Za-z0-9]*\) \*/$|\2 \1|p' \
+    "${top_srcdir:-..}/src/htsentities.h" | LC_ALL=C sort >"$tmp/header"
+diff "$tmp/header" "$pairs" >"$tmp/diff" ||
+    fail "htsentities.h disagrees with the fixture: $(cat "$tmp/diff")"
 
 # Multi-codepoint names are not generated, so they stay verbatim.
 for name in fjlig acE bne NotEqualTilde ThickSpace; do
