@@ -426,13 +426,16 @@ static void purge_ref_dir(httrackp *opt) {
                        StringBuff(opt->path_log), CACHE_REFNAME));
 }
 
-static int hts_main_internal(int argc, char **argv, httrackp * opt);
+static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
+                        char **url);
 static hts_boolean cmdl_shortopt_has(const char *s, char c);
 static hts_boolean cmdl_shortopt_named(const char *s, const char *opt);
 static void cmdl_doit_line(String *line, const cmdl_argv *cmd);
 
 // Main, récupère les paramètres et appelle le robot
 HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
+  cmdl_argv x_cmd = {NULL, NULL, NULL, 0, 0, {NULL, 0, 0}};
+  char *url = NULL;
   int code;
 
   // Set ended state (3.48-14)
@@ -440,7 +443,9 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
   opt->state.is_ended = 0;
   hts_mutexrelease(&opt->state.lock);
 
-  code = hts_main_internal(argc, argv, opt);
+  code = hts_main_run(argc, argv, opt, &x_cmd, &url);
+  freet(url);
+  cmdl_free(&x_cmd);
 
   // Set ended state (3.48-14)
   hts_mutexlock(&opt->state.lock);
@@ -3376,16 +3381,6 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
   printf("Thanks for using HTTrack!\n");
   io_flush;
   return exit_code;
-}
-
-static int hts_main_internal(int argc, char **argv, httrackp *opt) {
-  cmdl_argv x_cmd = {NULL, NULL, NULL, 0, 0, {NULL, 0, 0}};
-  char *url = NULL;
-  const int code = hts_main_run(argc, argv, opt, &x_cmd, &url);
-
-  freet(url);
-  cmdl_free(&x_cmd);
-  return code;
 }
 
 // main() subroutines
