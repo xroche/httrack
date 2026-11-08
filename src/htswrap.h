@@ -32,9 +32,8 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 /** @file htswrap.h
-    Engine-only copy of the htswrap_init() and htswrap_free() declarations.
-    Everything below sits behind HTS_INTERNAL_BYTECODE, so a consumer reads them
-    from httrack-library.h instead, next to htswrap_add() and htswrap_read(). */
+    The wrapper functions (htswrap_init() and friends) are declared in
+    httrack-library.h. */
 
 #ifndef HTSWRAP_DEFH
 #define HTSWRAP_DEFH
@@ -53,12 +52,6 @@ typedef struct httrackp httrackp;
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/** Does nothing and returns 1, kept for old clients. */
-HTSEXT_API int htswrap_init(void); // LEGACY
-
-/** Does nothing and returns 1, kept for old clients. */
-HTSEXT_API int htswrap_free(void); // LEGACY
 
 #ifdef __cplusplus
 }

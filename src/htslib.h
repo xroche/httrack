@@ -257,9 +257,6 @@ int64_t hts_parse_date(const char *s, int pivot);
 // attach specific project log to hachtable logger
 void hts_set_hash_handler(coucal hashtable, httrackp *opt);
 
-// version
-HTSEXT_API const char* hts_version(void);
-
 // fonctions unix/winsock
 int hts_read(htsblk * r, char *buff, int size);
 

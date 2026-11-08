@@ -102,13 +102,7 @@ done
 # that header include httrack-library.h instead. A call can sit in this list and
 # in the one below, because the two faults are independent.
 LC_ALL=C sort -u >"$work/expected_two_headers" <<'EOF'
-hts_buildtopindex	htstools.h,httrack-library.h
 hts_get_error_callback	htssafe.h,httrack-library.h
-hts_get_version_info	htsmodules.h,httrack-library.h
-hts_is_available	htsmodules.h,httrack-library.h
-hts_version	htslib.h,httrack-library.h
-htswrap_free	htswrap.h,httrack-library.h
-htswrap_init	htswrap.h,httrack-library.h
 EOF
 
 diff -u "$work/expected_two_headers" "$work/actual_two_headers" ||
