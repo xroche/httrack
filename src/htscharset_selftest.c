@@ -344,8 +344,8 @@ static hts_boolean entity_sweep_one(const entity_ref *refs, const size_t n,
 
     want[len] = '\0';
   }
-  if (hts_unescapeEntitiesWithCharset(src, dest, sizeof(dest), "UTF-8") != 0
-      || strcmp(dest, want) != 0) {
+  if (hts_unescapeEntitiesWithCharset(src, dest, sizeof(dest), "UTF-8") != 0 ||
+      strcmp(dest, want) != 0) {
     fprintf(stderr, "entities-sweep: '%s' gave '%s', want '%s'\n", src, dest,
             want);
     return HTS_FALSE;
