@@ -188,8 +188,7 @@ static int st_retryafter(httrackp *opt, int argc, char **argv) {
       return 77;
     err |= gate;
   }
-  printf("retry-after: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("retry-after", err);
 }
 
 /* Extra args are key=value: adr= cdispo= statuscode= status= strip= urlhack=
@@ -200,10 +199,6 @@ static int st_header(httrackp *opt, int argc, char **argv) {
   htsblk r;
   int i;
 
-  if (argc < 1) {
-    fprintf(stderr, "header: needs at least one raw header line\n");
-    return 1;
-  }
   memset(&r, 0, sizeof(r));
   for (i = 0; i < argc; i++) {
     char BIGSTK line[HTS_URLMAXSIZE * 2];
@@ -238,10 +233,6 @@ static int st_headerline(httrackp *opt, int argc, char **argv) {
   size_t blocklen;
   int max, ptr = 0, i;
 
-  if (argc < 1) {
-    fprintf(stderr, "headerline: needs a read size\n");
-    return 1;
-  }
   max = atoi(argv[0]);
   if (max < 2 || (size_t) max > sizeof(line)) {
     fprintf(stderr, "headerline: read size out of probe range\n");
@@ -289,10 +280,6 @@ static int st_binputline(httrackp *opt, int argc, char **argv) {
   size_t blocklen;
   int max, ptr = 0, i;
 
-  if (argc < 1) {
-    fprintf(stderr, "binputline: needs a read size\n");
-    return 1;
-  }
   max = atoi(argv[0]);
   if (max < 1 || (size_t) max >= sizeof(line)) {
     fprintf(stderr, "binputline: read size out of probe range\n");
@@ -357,10 +344,6 @@ static int st_location(httrackp *opt, int argc, char **argv) {
   size_t n, urllen, kept, i;
   int asked, smashed = 0;
 
-  if (argc < 1) {
-    fprintf(stderr, "location: needs a Location URL length\n");
-    return 1;
-  }
   /* subtract, never add: a negative argument must not wrap the range check */
   asked = atoi(argv[0]);
   if (asked <= (int) strlen(prefix) ||
@@ -422,10 +405,6 @@ static int st_headerlong(httrackp *opt, int argc, char **argv) {
 static int st_headerfield(httrackp *opt, int argc, char **argv) {
   char *headers, *field;
 
-  if (argc < 2) {
-    fprintf(stderr, "headerfield: needs a header block and a field name\n");
-    return 1;
-  }
   /* exact-size heap copies so a sanitizer traps an over-read */
   headers = strdupt(argv[0]);
   field = strdupt(argv[1]);
@@ -579,10 +558,6 @@ static int st_xfread_limit(httrackp *opt, int argc, char **argv) {
 static int st_crange(httrackp *opt, int argc, char **argv) {
   int i;
 
-  if (argc < 1) {
-    fprintf(stderr, "crange: needs at least one raw Content-Range line\n");
-    return 1;
-  }
   for (i = 0; i < argc; i++) {
     htsblk r;
     char BIGSTK line[HTS_URLMAXSIZE * 2];
@@ -606,10 +581,6 @@ static int st_headerdedup(httrackp *opt, int argc, char **argv) {
   /* Only an exact capacity puts a line's last byte on the buffer's last byte */
   size_t capacity = argc > 2 ? (size_t) atoi(argv[2]) : 2 * half;
 
-  if (argc < 2) {
-    fprintf(stderr, "headerdedup: needs a request and a header block\n");
-    return 1;
-  }
   req = malloct(capacity > 2 * half ? capacity : 2 * half);
   tmp = malloct(half);
   reqlen = st_decode_body(argv[0], req, half);
@@ -1120,10 +1091,6 @@ static int st_codecerrno(httrackp *opt, int argc, char **argv) {
   char inpath[HTS_URLMAXSIZE], outpath[HTS_URLMAXSIZE];
   FILE *fp;
 
-  if (argc < 2) {
-    fprintf(stderr, "usage: -#test=codecerrno <dir> <doomed-out>\n");
-    return 1;
-  }
   snprintf(inpath, sizeof(inpath), "%s/ce-in.z", argv[0]);
   snprintf(outpath, sizeof(outpath), "%s/ce-out", argv[0]);
   assertf(ae_write_packed(inpath, 16 + MAX_WBITS, body, len) == 0);

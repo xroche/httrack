@@ -64,10 +64,6 @@ static int st_filtersize(httrackp *opt, int argc, char **argv) {
   LLint sz;
   int size_flag = 0, verdict, known;
 
-  if (argc < 3) {
-    fprintf(stderr, "filtersize: needs <size> <string> <filter> [filter...]\n");
-    return 1;
-  }
   known = (argv[0][0] != '-'); /* "-1"/"-" => size unknown */
   sz = -1;
   if (known)
@@ -86,10 +82,6 @@ static int st_filtersize(httrackp *opt, int argc, char **argv) {
 static int st_filtermime(httrackp *opt, int argc, char **argv) {
   int verdict;
 
-  if (argc < 2) {
-    fprintf(stderr, "filtermime: needs <mime> <filter> [filter...]\n");
-    return 1;
-  }
   verdict = fa_strjoker(1, &argv[1], argc - 1, argv[0], NULL, NULL, NULL);
   printf("verdict=%s\n", verdict > 0   ? "allowed"
                          : verdict < 0 ? "forbidden"
@@ -183,11 +175,6 @@ static int st_filtermemo(httrackp *opt, int argc, char **argv) {
 static int st_filterdual(httrackp *opt, int argc, char **argv) {
   int depth = -1, verdict;
 
-  if (argc < 3) {
-    fprintf(stderr,
-            "filterdual: needs <string1> <string2> <filter> [filter...]\n");
-    return 1;
-  }
   verdict = fa_strjoker_dual(0, &argv[2], argc - 2, argv[0], argv[1], NULL,
                              NULL, &depth);
   printf("verdict=%s rule=%d\n",
@@ -700,7 +687,7 @@ static int st_filterkeep(httrackp *opt, int argc, char **argv) {
 /* ------------------------------------------------------------ */
 
 const struct selftest_entry selftests_filters[] = {
-    {"filter", "<pattern> <string>", "match a string against a wildcard filter",
+    {"filter", "<pattern> [string]", "match a string against a wildcard filter",
      st_filter},
     {"filtersize", "<size> <string> <filter>...",
      "size-aware filter verdict (negative size = unknown/scan time)",

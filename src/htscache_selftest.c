@@ -3592,13 +3592,8 @@ static int ref_portable_selftest(httrackp *opt, const char *dir) {
 static int st_cache(httrackp *opt, int argc, char **argv) {
   int err;
 
-  if (argc < 1) {
-    fprintf(stderr, "cache: needs a directory\n");
-    return 1;
-  }
   err = cache_selftests(opt, argv[0]);
-  printf("cache-selftest: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("cache-selftest", err);
 }
 
 /* binput_line must stay inside the buffer it is given. */
@@ -3621,93 +3616,57 @@ static int st_cacheindex(httrackp *opt, int argc, char **argv) {
       fail = 1;
   }
 
-  printf("cacheindex: %s\n", fail ? "FAIL" : "OK");
-  return fail;
+  return st_verdict("cacheindex", fail);
 }
 
 static int st_cache_golden(httrackp *opt, int argc, char **argv) {
   int regen, err;
 
-  if (argc < 1) {
-    fprintf(stderr, "cache-golden: needs a directory\n");
-    return 1;
-  }
   regen = (argc >= 2 && strcmp(argv[1], "regen") == 0);
   err = cache_golden_selftest(opt, argv[0], regen);
-  printf("cache-golden: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("cache-golden", err);
 }
 
 static int st_cache_writefail(httrackp *opt, int argc, char **argv) {
   int err;
 
-  if (argc < 1) {
-    fprintf(stderr, "cache-writefail: needs a directory\n");
-    return 1;
-  }
   err = cache_write_failure_selftest(opt, argv[0]);
-  printf("cache-writefail: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("cache-writefail", err);
 }
 
 static int st_cache_hdrbounds(httrackp *opt, int argc, char **argv) {
   int err;
 
-  if (argc < 1) {
-    fprintf(stderr, "cache-hdrbounds: needs a directory\n");
-    return 1;
-  }
   err = cache_header_bounds_selftest(opt, argv[0]);
-  printf("cache-hdrbounds: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("cache-hdrbounds", err);
 }
 
 static int st_cache_urlbounds(httrackp *opt, int argc, char **argv) {
   int err;
 
-  if (argc < 1) {
-    fprintf(stderr, "cache-urlbounds: needs a directory\n");
-    return 1;
-  }
   err = cache_url_bounds_selftest(opt, argv[0]);
-  printf("cache-urlbounds: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("cache-urlbounds", err);
 }
 
 static int st_cache_savebounds(httrackp *opt, int argc, char **argv) {
   int err;
 
-  if (argc < 1) {
-    fprintf(stderr, "cache-savebounds: needs a directory\n");
-    return 1;
-  }
   err = cache_savename_bounds_selftest(opt, argv[0]);
-  printf("cache-savebounds: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("cache-savebounds", err);
 }
 
 static int st_cache_corrupt(httrackp *opt, int argc, char **argv) {
   int err;
 
-  if (argc < 1) {
-    fprintf(stderr, "cache-corrupt: needs a directory\n");
-    return 1;
-  }
   err = cache_corruption_selftest(opt, argv[0]);
-  printf("cache-corrupt: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("cache-corrupt", err);
 }
 
 static int st_cache_readfail(httrackp *opt, int argc, char **argv) {
   int err;
 
-  if (argc < 1) {
-    fprintf(stderr, "cache-readfail: needs a directory\n");
-    return 1;
-  }
   err = cache_readfail_selftest(opt, argv[0]);
-  printf("cache-readfail: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("cache-readfail", err);
 }
 
 /* Drives unzRepair over a damaged local file header whose CRC field's high
@@ -3733,10 +3692,6 @@ static int st_zip_repair_shift(httrackp *opt, int argc, char **argv) {
   FILE *fp;
   int err;
 
-  if (argc < 1) {
-    fprintf(stderr, "zip-repair-shift: needs a directory\n");
-    return 1;
-  }
   snprintf(in, sizeof(in), "%s/damaged.zip", argv[0]);
   snprintf(out, sizeof(out), "%s/repair.zip", argv[0]);
   snprintf(tmp, sizeof(tmp), "%s/repair.tmp", argv[0]);
@@ -3812,10 +3767,6 @@ static int st_zip_repair_size(httrackp *opt, int argc, char **argv) {
   int fails = 0;
   FILE *fp;
 
-  if (argc < 1) {
-    fprintf(stderr, "zip-repair-size: needs a directory\n");
-    return 1;
-  }
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     uLong nrec, bytes;
     const int err =
@@ -3893,10 +3844,6 @@ static int st_zip_repair_openfail(httrackp *opt, int argc, char **argv) {
   FILE *fp;
   int fd0;
 
-  if (argc < 1) {
-    fprintf(stderr, "zip-repair-openfail: needs a directory\n");
-    return 1;
-  }
   snprintf(in, sizeof(in), "%s/damaged.zip", argv[0]);
   snprintf(out, sizeof(out), "%s/repair.zip", argv[0]);
   snprintf(tmp, sizeof(tmp), "%s/repair.tmp", argv[0]);
@@ -4064,10 +4011,6 @@ static int st_zip_abandon(httrackp *opt, int argc, char **argv) {
   size_t i;
   int fail = 0;
 
-  if (argc < 1) {
-    fprintf(stderr, "zip-abandon: needs a writable directory\n");
-    return 1;
-  }
   fconcat(refpath, sizeof(refpath), argv[0], "zip-abandon-ref.zip");
   if (zip_abandon_build(refpath, 0) != 0 ||
       zip_abandon_slurp(refpath, &ref, &reflen) != 0 || reflen == 0) {
@@ -4120,8 +4063,7 @@ static int st_zip_abandon(httrackp *opt, int argc, char **argv) {
     unzClose(uf);
   }
   freet(ref);
-  printf("zip-abandon: %s\n", fail ? "FAIL" : "OK");
-  return fail;
+  return st_verdict("zip-abandon", fail);
 }
 
 /* A rollback that could only rewind must say so (#1402): reporting ZIP_OK for
@@ -4136,10 +4078,6 @@ static int st_zip_abandon_notrunc(httrackp *opt, int argc, char **argv) {
   int fail = 0;
   unzFile uf;
 
-  if (argc < 1) {
-    fprintf(stderr, "zip-abandon-notrunc: needs a writable directory\n");
-    return 1;
-  }
   fconcat(refpath, sizeof(refpath), argv[0], "zip-notrunc-ref.zip");
   fconcat(path, sizeof(path), argv[0], "zip-notrunc.zip");
 
@@ -4199,44 +4137,28 @@ static int st_zip_abandon_notrunc(httrackp *opt, int argc, char **argv) {
     unzClose(uf);
     fail++;
   }
-  printf("zip-abandon-notrunc: %s\n", fail ? "FAIL" : "OK");
-  return fail;
+  return st_verdict("zip-abandon-notrunc", fail);
 }
 
 static int st_cache_legacy(httrackp *opt, int argc, char **argv) {
   int err;
 
-  if (argc < 1) {
-    fprintf(stderr, "cache-legacy: needs a directory\n");
-    return 1;
-  }
   err = cache_legacy_refused_selftest(opt, argv[0]);
-  printf("cache-legacy: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("cache-legacy", err);
 }
 
 static int st_ref_portable(httrackp *opt, int argc, char **argv) {
   int err;
 
-  if (argc < 1) {
-    fprintf(stderr, "ref-portable: needs a directory\n");
-    return 1;
-  }
   err = ref_portable_selftest(opt, argv[0]);
-  printf("ref-portable: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("ref-portable", err);
 }
 
 static int st_reconcile(httrackp *opt, int argc, char **argv) {
   int err;
 
-  if (argc < 1) {
-    fprintf(stderr, "reconcile: needs a directory\n");
-    return 1;
-  }
   err = cache_reconcile_selftest(opt, argv[0]);
-  printf("cache-reconcile: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("cache-reconcile", err);
 }
 
 /* --changes bucket accounting and JSON escaping (#714). */
@@ -4288,8 +4210,7 @@ static int st_changes(httrackp *opt, int argc, char **argv) {
 
 #undef JSON_IS
   StringFree(out);
-  printf("changes self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("changes self-test", err);
 }
 
 #define CHANGES_RACE_FILES 8
@@ -4337,10 +4258,6 @@ static int st_changes_race(httrackp *opt, int argc, char **argv) {
   int err = 0;
   int i;
 
-  if (argc < 1) {
-    fprintf(stderr, "usage: -#test=changes-race <writable directory>\n");
-    return 1;
-  }
   strcpybuff(base, argv[0]);
   if (base[0] != '\0' && hts_lastchar(base) != '/')
     strcatbuff(base, "/");
@@ -4409,8 +4326,7 @@ static int st_changes_race(httrackp *opt, int argc, char **argv) {
 
   StringFree(out);
   hts_changes_free_opt(opt);
-  printf("changes-race self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("changes-race self-test", err);
 }
 
 /* ------------------------------------------------------------ */

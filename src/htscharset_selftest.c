@@ -38,10 +38,6 @@ static int st_charset(httrackp *opt, int argc, char **argv) {
   size_t len;
   char *s;
 
-  if (argc < 2) {
-    fprintf(stderr, "charset: needs a charset and a string\n");
-    return 1;
-  }
   len = st_decode_body(argv[1], buf, sizeof(buf));
   s = hts_convertStringToUTF8(buf, len, argv[0]);
   if (s != NULL) {
@@ -214,10 +210,6 @@ static int st_nobestfit(httrackp *opt, int argc, char **argv) {
 static int st_metacharset(httrackp *opt, int argc, char **argv) {
   char *s;
 
-  if (argc < 1) {
-    fprintf(stderr, "metacharset: needs an html string\n");
-    return 1;
-  }
   s = hts_getCharsetFromMeta(argv[0], strlen(argv[0]));
   printf("%s\n", s != NULL ? s : "(none)");
   freet(s);
@@ -228,10 +220,6 @@ static int st_isutf8(httrackp *opt, int argc, char **argv) {
   char buf[512];
   size_t len;
 
-  if (argc < 1) {
-    fprintf(stderr, "isutf8: needs a string\n");
-    return 1;
-  }
   len = st_decode_body(argv[0], buf, sizeof(buf));
   printf("%d\n", hts_isStringUTF8(buf, len) ? 1 : 0);
   return 0;
@@ -242,10 +230,6 @@ static int st_idna_encode(httrackp *opt, int argc, char **argv) {
   size_t len;
   char *s;
 
-  if (argc < 1) {
-    fprintf(stderr, "idna-encode: needs a hostname\n");
-    return 1;
-  }
   len = st_decode_body(argv[0], buf, sizeof(buf));
   s = hts_convertStringUTF8ToIDNA(buf, len);
   if (s != NULL) {
@@ -260,10 +244,6 @@ static int st_idna_encode(httrackp *opt, int argc, char **argv) {
 static int st_idna_decode(httrackp *opt, int argc, char **argv) {
   char *s;
 
-  if (argc < 1) {
-    fprintf(stderr, "idna-decode: needs a hostname\n");
-    return 1;
-  }
   s = hts_convertStringIDNAToUTF8(argv[0], strlen(argv[0]));
   if (s != NULL) {
     printf("%s\n", s);
@@ -278,10 +258,6 @@ static int st_entities(httrackp *opt, int argc, char **argv) {
   char *s;
   const char *enc;
 
-  if (argc < 1) {
-    fprintf(stderr, "entities: needs a string\n");
-    return 1;
-  }
   s = strdupt(argv[0]);
   enc = argc >= 2 ? argv[1] : "UTF-8";
   if (s != NULL &&

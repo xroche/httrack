@@ -89,6 +89,10 @@ void st_cache_close(httrackp *opt, cache_back *cache);
 /* mkdir `path`, tolerating one that exists; HTS_FALSE after complaining. */
 hts_boolean st_mkdir_at(const char *path, size_t n, const char *who);
 
+/* Print "<label>: FAIL" if err is non-zero, else "<label>: OK", and return err
+   as the self-test exit code. */
+int st_verdict(const char *label, int err);
+
 /* UTF-16 units s[0..n) costs, which is what Windows measures MAX_PATH in. */
 size_t st_utf16_units(const char *s, size_t n);
 

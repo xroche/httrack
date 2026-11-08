@@ -1,0 +1,30 @@
+#!/bin/bash
+#
+# The -#test registry refuses a call that lacks the leading <..> arguments its
+# row lists, instead of leaving each handler to check (or crash on argv[0]).
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+list=$(httrack -#test 2>&1) || skip "this build has no self-tests"
+
+# Rows are "  NAME  ARGS  DESC"; ARGS starts with '<' when it is required.
+names=$(sed -n 's/^  \([^ ]*\) *<.*/\1/p' <<<"$list")
+count=$(wc -l <<<"$names")
+[ "$count" -ge 131 ] || fail "only $count rows list a required argument"
+
+for name in $names; do
+    rc=0
+    err=$(httrack "-#test=$name" 2>&1 </dev/null) || rc=$?
+    [ "$rc" -eq 1 ] || fail "$name with no argument exited $rc, not 1: $err"
+    grep -q "^$name: takes <" <<<"$err" || fail "$name: no 'takes' line: $err"
+done
+
+# A row's optional tail stays optional: filter runs on its pattern alone.
+out=$(httrack "-#test=filter" "*" 2>&1) || fail "filter with one argument: $out"
+assert_match 'does match' "$out" 'filter with an empty subject'
+# bundlescope accepts a domain and no URL.
+out=$(httrack "-#test=bundlescope" "example.com" 2>&1) || fail "bundlescope with no URL: $out"
+assert_match '^(keep|drop)$' "$out" 'bundlescope with no URL'

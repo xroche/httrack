@@ -785,15 +785,13 @@ static int dns_timeout_selftests(httrackp *opt) { return 0; }
 static int st_dns(httrackp *opt, int argc, char **argv) {
   const int err = dns_selftests(opt);
 
-  printf("dns-selftest: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("dns-selftest", err);
 }
 
 static int st_dnstimeout(httrackp *opt, int argc, char **argv) {
   const int err = dns_timeout_selftests(opt);
 
-  printf("dns-timeout-selftest: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("dns-timeout-selftest", err);
 }
 
 /* ------------------------------------------------------------ */
