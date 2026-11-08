@@ -859,8 +859,7 @@ THREADS_CFLAGS=
 AC_SUBST(THREADS_CFLAGS)
 
 ### Check for socket/nsl (solaris)
-AC_CHECK_LIB(socket, socket, [SOCKET_LIBS="-lnsl -lsocket"
-AC_DEFINE(LIBSOCKET, 1,[Check for libsocket])], AC_MSG_RESULT([not necessary]))
+AC_CHECK_LIB(socket, socket, [SOCKET_LIBS="-lnsl -lsocket"], AC_MSG_RESULT([not necessary]))
 AC_SUBST(SOCKET_LIBS)
 
 ### Charset conversion: iconv(), or the built-in codepage tables
@@ -906,7 +905,6 @@ if test "$iconv_want" != "no"; then
 		AC_LINK_IFELSE([HTS_ICONV_PROG],
 			[iconv_have=yes
 			ICONV_LIBS="-liconv"
-			AC_DEFINE(LIBICONV, 1,[Check for libiconv])
 			AC_MSG_RESULT([yes, in -liconv])],
 			[AC_MSG_RESULT([no])])])
 	CPPFLAGS="$iconv_old_cppflags"
@@ -1037,9 +1035,6 @@ AC_SUBST([PKGCONFIG_LIBS_PRIVATE])
 ### Check for setuid
 AC_CHECK_LIB(c, setuid, [
 AC_DEFINE(SETUID, 1,[Check for setuid])], AC_MSG_RESULT([not found]))
-
-### Check for snprintf
-AC_FUNC_SNPRINTF()
 
 ### Check for strnlen
 AC_CHECK_LIB(c, strnlen, [
