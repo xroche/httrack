@@ -34,7 +34,7 @@ Please visit our Website: http://www.httrack.com
 #include <stdlib.h>
 #include <string.h>
 
-#include "httrack.h"
+#include "htssafe.h"
 #include "httrack-library.h"
 
 // concat, concatène deux chaines et renvoi le résultat

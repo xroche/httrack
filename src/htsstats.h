@@ -70,4 +70,21 @@ HTS_STATIC const char *stats_skip_login(const char *adr, size_t *keep) {
   return host;
 }
 
+/* Console progress snapshot. */
+typedef struct t_InpInfo {
+  LLint stat_bytes;
+  int stat_time;
+  int lien_n;
+  int lien_tot;
+  int stat_nsocket;
+  int rate;
+  int irate;
+  LLint stat_written;
+  int stat_updated;
+  int stat_errors;
+  int stat_warnings;
+  int stat_infos;
+  int stat_back;
+} t_InpInfo;
+
 #endif
