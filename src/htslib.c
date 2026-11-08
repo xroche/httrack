@@ -7472,7 +7472,6 @@ HTSEXT_API int hts_uninit(void) {
   if (!hts_init_ok)
     return 1;
   htsthread_uninit();
-  htspe_uninit();
   hts_psl_uninit();
   hts_init_ok = 0;
   return 1;

@@ -753,7 +753,6 @@ extern void *openFunctionLib(const char *file_);
 extern void *getFunctionPtr(void *handle, const char *fncname);
 extern void closeFunctionLib(void *handle);
 
-extern void clearCallbacks(htscallbacks * chain);
 int hts_set_callback(t_hts_htmlcheck_callbacks * callbacks,
                      const char *name, void *function);
 void *hts_get_callback(t_hts_htmlcheck_callbacks * callbacks,
