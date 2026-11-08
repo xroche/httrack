@@ -1222,6 +1222,9 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                                    r->cdispo, sizeof(r->cdispo));
               ZIP_READFIELD_STRING(line, value, "X-Save", previous_save_,
                                    sizeof(previous_save_));
+              /* naming-only marker: consumed so it never reaches a reply */
+              if (line[0] != '\0' && strfield2(line, "X-Kept"))
+                line[0] = '\0';
               if (line[0] != '\0') {
                 PT_AppendHeader(&r->headers, &headersLen, &headersCap, line,
                                 value);
