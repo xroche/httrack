@@ -581,7 +581,6 @@ static const char *GetHttpMessage(int statuscode) {
   }
 }
 
-#ifndef NO_WEBDAV
 static void proxytrack_add_DAV_Item(String * item, String * buff,
                                     const char *filename, size_t size,
                                     time_t timestamp, const char *mime,
@@ -810,7 +809,6 @@ static PT_Element proxytrack_process_DAV_Request(PT_Indexes indexes,
   }
   return NULL;
 }
-#endif
 
 static PT_Element proxytrack_process_HTTP_List(PT_Indexes indexes,
                                                const char *url) {
@@ -905,10 +903,8 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
   String host = STRING_EMPTY;
   String localhost = STRING_EMPTY;
 
-#ifndef NO_WEBDAV
   String davHeaders = STRING_EMPTY;
   String davRequest = STRING_EMPTY;
-#endif
 
   StringRoom(localhost, 256);
   if (gethostname(StringBuffRW(localhost), (int) StringCapacity(localhost) - 1)
@@ -938,9 +934,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
     int headRequest = 0;
     int listRequest = 0;
 
-#ifndef NO_WEBDAV
     int davDepth = 0;
-#endif
 
     /* Clear context */
     length = 0;
@@ -953,10 +947,8 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
     StringClear(headers);
     StringClear(output);
     StringClear(host);
-#ifndef NO_WEBDAV
     StringClear(davHeaders);
     StringClear(davRequest);
-#endif
 
     /* line1: "GET http://www.example.com/ HTTP/1.0" */
     if (linputsoc_t(soc_c, line1, line1Size - 2, deadline) > 0 &&
@@ -989,20 +981,16 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
           if (*chost == ' ')
             chost++;
           StringCopy(host, chost);
-        }
-#ifndef NO_WEBDAV
-        else if ((p = strfield(line, "Depth: "))) {
+        } else if ((p = strfield(line, "Depth: "))) {
           char *depth = line + p;
 
           if (sscanf(depth, "%d", &davDepth) != 1) {
             davDepth = 0;
           }
         }
-#endif
       }
 
       /* Flush body */
-#ifndef NO_WEBDAV
       if (length > 0) {
         if (length < 32768) {
           StringRoom(davRequest, length + 1);
@@ -1019,24 +1007,16 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
           keepAlive = 0;
         }
       }
-#endif
 
       /* Switch protocol ID */
       if (strcasecmp(command, "post") == 0) {
-#ifndef NO_WEBDAV
         msgCode = 404;
-#else
-        msgCode = 501;
-        keepAlive = 0;
-#endif
         msgError = "Proxy Error (POST Request Forbidden)";
       } else if (strcasecmp(command, "get") == 0) {
         headRequest = 0;
       } else if (strcasecmp(command, "head") == 0) {
         headRequest = 1;
-      }
-#ifndef NO_WEBDAV
-      else if (strcasecmp(command, "options") == 0) {
+      } else if (strcasecmp(command, "options") == 0) {
         const char *options = "GET, HEAD, OPTIONS, POST, PROPFIND, TRACE" ", MKCOL, DELETE, PUT";       /* Not supported */
 
         msgCode = HTTP_OK;
@@ -1054,19 +1034,17 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
         } else {
           listRequest = 2;      /* propfind */
         }
-      } else if (strcasecmp(command, "mkcol") == 0
-                 || strcasecmp(command, "delete") == 0
-                 || strcasecmp(command, "put") == 0
-                 || strcasecmp(command, "proppatch") == 0
-                 || strcasecmp(command, "lock") == 0
-                 || strcasecmp(command, "unlock") == 0
-                 || strcasecmp(command, "copy") == 0
-                 || strcasecmp(command, "trace") == 0) {
+      } else if (strcasecmp(command, "mkcol") == 0 ||
+                 strcasecmp(command, "delete") == 0 ||
+                 strcasecmp(command, "put") == 0 ||
+                 strcasecmp(command, "proppatch") == 0 ||
+                 strcasecmp(command, "lock") == 0 ||
+                 strcasecmp(command, "unlock") == 0 ||
+                 strcasecmp(command, "copy") == 0 ||
+                 strcasecmp(command, "trace") == 0) {
         msgCode = 403;
         msgError = "Method Forbidden";
-      }
-#endif
-      else {
+      } else {
         msgCode = 501;
         msgError = "Proxy Error (Unsupported or Unknown HTTP Command Request)";
         keepAlive = 0;
@@ -1091,15 +1069,12 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
         /* PT_ReadIndex() strips the scheme off this archive lookup key. */
         if (StringLength(host) > 0) {
           /* Direct hit */
-          if (
-#ifndef NO_WEBDAV
-               listRequest != 2 &&
-#endif
-               strncasecmp(StringBuff(host), StringBuff(localhost),
-                           StringLength(localhost)) == 0
-               && (StringBuff(host)[StringLength(localhost)] == '\0'
-                   || StringBuff(host)[StringLength(localhost)] == ':')
-               && surl[0] == '/') {
+          if (listRequest != 2 &&
+              strncasecmp(StringBuff(host), StringBuff(localhost),
+                          StringLength(localhost)) == 0 &&
+              (StringBuff(host)[StringLength(localhost)] == '\0' ||
+               StringBuff(host)[StringLength(localhost)] == ':') &&
+              surl[0] == '/') {
             const char *toHit = surl + 1;
 
             if (strncmp(toHit, "webdav/", 7) == 0) {
@@ -1110,9 +1085,8 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
             if (!link_has_authority(toHit))
               StringCat(url, "http://");
             StringCat(url, toHit);
-          } else
-            if (strncasecmp(surl, "/proxytrack/", sizeof("/proxytrack/") - 1) ==
-                0) {
+          } else if (strncasecmp(surl, "/proxytrack/",
+                                 sizeof("/proxytrack/") - 1) == 0) {
             const char *toHit = surl + sizeof("/proxytrack/") - 1;
 
             /* Direct hit */
@@ -1138,9 +1112,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
       if (msgCode == 0) {
         if (listRequest == 1) {
           element = proxytrack_process_HTTP_List(indexes, StringBuff(url));
-        }
-#ifndef NO_WEBDAV
-        else if (listRequest == 2) {
+        } else if (listRequest == 2) {
           if ((element =
                proxytrack_process_DAV_Request(indexes, StringBuff(url),
                                               davDepth)) != NULL) {
@@ -1149,17 +1121,11 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
                                       "MS-Author-Via: DAV\r\n"
                                       "Cache-Control: private\r\n");
           }
-        }
-#endif
-        else {
+        } else {
           element = PT_ReadIndex(indexes, StringBuff(url), FETCH_BODY);
         }
-        if (element == NULL
-#ifndef NO_WEBDAV
-            && listRequest == 2
-#endif
-            && StringLength(url) > 0
-            && StringBuff(url)[StringLength(url) - 1] == '/') {
+        if (element == NULL && listRequest == 2 && StringLength(url) > 0 &&
+            StringBuff(url)[StringLength(url) - 1] == '/') {
           element = PT_Index_HTML_BuildRootInfo(indexes);
           if (element != NULL) {
             element->statuscode = 404;  /* HTML page, but in error */
@@ -1171,11 +1137,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
         if (element != NULL) {
           /* lifted out of the format: a directive inside a macro argument list
              is undefined, and MSVC rejects it */
-#ifndef NO_WEBDAV
           const char *const davPart = StringBuff(davHeaders);
-#else
-          const char *const davPart = "";
-#endif
 
           msgCode = element->statuscode;
           StringSprintf(
@@ -1384,10 +1346,8 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
   StringFree(output);
   StringFree(host);
   StringFree(localhost);
-#ifndef NO_WEBDAV
   StringFree(davHeaders);
   StringFree(davRequest);
-#endif
 
   if (buffer)
     free(buffer);
