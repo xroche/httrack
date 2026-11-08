@@ -3601,6 +3601,81 @@ static int st_cache(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* Two entries whose headers differ by one byte: a NUL in the first, a space in
+   the control. The fields past it would change the status code to 203. */
+static int nul_write_zip(const char *zippath) {
+  static const char hdr[] = "X-In-Cache: 1\r\nX-StatusCode: 200\r\n"
+                            "X-StatusMessage: OK\r\nX-Size: 4\r\n"
+                            "Content-Type: text/html\r\nX-Note: a"
+                            "\0X-StatusCode: 203\r\n";
+  static const char *const names[] = {"http://example.com/nul.html",
+                                      "http://example.com/clean.html"};
+  char buf[sizeof(hdr)];
+  zip_fileinfo fi;
+  zipFile z = zipOpen(zippath, APPEND_STATUS_CREATE);
+  int err = 0;
+  int i;
+
+  if (z == NULL) {
+    return -1;
+  }
+  memset(&fi, 0, sizeof(fi));
+  for (i = 0; i < 2; i++) {
+    memcpy(buf, hdr, sizeof(hdr));
+    if (i == 1) {
+      *(char *) memchr(buf, '\0', sizeof(buf)) = ' ';
+    }
+    err |=
+        zipOpenNewFileInZip(z, names[i], &fi, buf, (uInt) (sizeof(buf) - 1),
+                            NULL, 0, NULL, Z_DEFLATED, Z_DEFAULT_COMPRESSION);
+    err |= zipWriteInFileInZip(z, "okay", 4);
+    err |= zipCloseFileInZip(z);
+  }
+  err |= zipClose(z, NULL);
+  return err;
+}
+
+/* A NUL inside an entry's header block makes the entry corrupt. Leaves the
+   zip in <dir>/hts-cache/new.zip for the ProxyTrack half of the test. */
+static int st_cache_nul(httrackp *opt, int argc, char **argv) {
+  char zippath[HTS_URLMAXSIZE];
+  cache_back cache;
+  htsblk r;
+  int fail = 0;
+
+  if (argc < 1) {
+    fprintf(stderr, "cache-nul: needs a directory\n");
+    return 1;
+  }
+  selftest_setup_dir(opt, argv[0]);
+  slprintfbuff_clip(zippath, sizeof(zippath), "%shts-cache/new.zip",
+                    StringBuff(opt->path_log));
+  if (nul_write_zip(zippath) != 0) {
+    fprintf(stderr, "cache-nul: could not write the cache\n");
+    return 1;
+  }
+  selftest_open_for_read(&cache, opt);
+  r = cache_readex(opt, &cache, "example.com", "/nul.html", "", NULL, NULL, 1);
+  if (r.statuscode != STATUSCODE_INVALID) {
+    fprintf(stderr, "cache-nul: NUL entry read as %d (%s)\n", r.statuscode,
+            r.msg);
+    fail = 1;
+  }
+  freet(r.adr);
+  r = cache_readex(opt, &cache, "example.com", "/clean.html", "", NULL, NULL,
+                   1);
+  if (r.statuscode != 200 || r.adr == NULL || r.size != 4 ||
+      memcmp(r.adr, "okay", 4) != 0) {
+    fprintf(stderr, "cache-nul: control entry read as %d (%s)\n", r.statuscode,
+            r.msg);
+    fail = 1;
+  }
+  freet(r.adr);
+  selftest_close(&cache);
+  printf("cache-nul: %s\n", fail ? "FAIL" : "OK");
+  return fail;
+}
+
 /* binput_line must stay inside the buffer it is given. */
 static int st_cacheindex(httrackp *opt, int argc, char **argv) {
   int fail = 0;
@@ -4447,6 +4522,8 @@ const struct selftest_entry selftests_cache[] = {
     {"cache-urlbounds", "<dir>",
      "cache store and lookup at max-length URLs must not abort or alias",
      st_cache_urlbounds},
+    {"cache-nul", "<dir>", "a NUL in a cache entry's headers makes it corrupt",
+     st_cache_nul},
     {"cache-savebounds", "<dir>",
      "cached save name rebuilt under a deeper html path must fit or be refused",
      st_cache_savebounds},

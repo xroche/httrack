@@ -673,11 +673,13 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
           /* the longest stored line is "Location: " plus a full-capacity URL;
              a shorter buffer truncates it into a valid-looking wrong target */
           char BIGSTK line[HTS_LOCATION_SIZE + 32];
-          int lineEof = 0;
+          /* the writers store strlen(headers), so a NUL inside is damage */
+          const hts_boolean has_nul =
+              memchr(headerBuff, '\0', (size_t) readSizeHeader) != NULL;
+          int lineEof = has_nul;
 
-          /*readSizeHeader = (int) strlen(headerBuff); */
           headerBuff[readSizeHeader] = '\0';
-          do {
+          while (offset < readSizeHeader && !lineEof) {
             char *value;
             int adv;
             /* no line we write is this long, so a cut one is foreign or
@@ -715,7 +717,15 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
               ZIP_READFIELD_STRING(line, value, "X-Save", previous_save_,
                                    sizeof(previous_save_));
             }
-          } while (offset < readSizeHeader && !lineEof);
+          }
+          if (has_nul) {
+            hts_log_print(opt, LOG_WARNING,
+                          "cached headers hold a NUL byte, "
+                          "not using the cache entry: %s%s",
+                          adr_nologin(opt, adr), fil);
+            r.statuscode = STATUSCODE_INVALID;
+            strcpybuff(r.msg, "Cache Read Error : NUL In Header");
+          }
 
           /* A cache written before the engine refused these, or edited since */
           if (!hts_location_is_safe(r.location)) {

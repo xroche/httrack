@@ -1347,10 +1347,13 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
           /* the longest stored line is "Location: " plus a full-capacity URL;
              a shorter buffer truncates it into a valid-looking wrong target */
           char BIGSTK line[HTS_LOCATION_SIZE + 32];
-          int lineEof = 0;
+          /* the writers store strlen(headers), so a NUL inside is damage */
+          const hts_boolean has_nul =
+              memchr(headerBuff, '\0', (size_t) readSizeHeader) != NULL;
+          int lineEof = has_nul;
 
           headerBuff[readSizeHeader] = '\0';
-          do {
+          while (offset < readSizeHeader && !lineEof) {
             char *value;
             hts_boolean cut;
 
@@ -1393,7 +1396,11 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                                 value);
               }
             }
-          } while (offset < readSizeHeader && !lineEof);
+          }
+          if (has_nul) {
+            r->statuscode = STATUSCODE_INVALID;
+            strcpybuff(r->msg, "Cache Read Error : NUL In Header");
+          }
 
           PT_resolve_previous_save(previous_save, sizeof(previous_save),
                                    index->path, previous_save_, r, url,
