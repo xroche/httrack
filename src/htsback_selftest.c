@@ -486,15 +486,12 @@ static void st_backstop_slot(struct_back *sback, int p, int status,
 /* Refill every slot: a fresh pending connect for each state that owns a socket,
    plus the poison the assertions read back. False if the blackhole answered. */
 static hts_boolean st_backstop_arm(httrackp *opt, struct_back *sback,
-                                   const int *status, htsblk *r, int slots,
-                                   int dnsslot) {
+                                   const int *status, htsblk *r, int slots) {
   int i;
 
   for (i = 0; i < slots; i++) {
     deletehttp(&sback->lnk[i].r); /* whatever the previous round left */
-    if (i == dnsslot) {
-      hts_init_htsblk(&r[i]);
-    } else if (st_backstop_pending(opt, &r[i]) == INVALID_SOCKET) {
+    if (st_backstop_pending(opt, &r[i]) == INVALID_SOCKET) {
       printf("backstop: SKIP (no stalled connect to " ST_BACKSTOP_DEADHOST
              ": %s)\n",
              r[i].msg);
@@ -506,7 +503,7 @@ static hts_boolean st_backstop_arm(httrackp *opt, struct_back *sback,
      ends slots the caller asserts are intact (the powerpc buildds). */
   Sleep(ST_BACKSTOP_SETTLE_MS);
   for (i = 0; i < slots; i++) {
-    if (i != dnsslot && check_socket_connect(sback->lnk[i].r.soc) != 0) {
+    if (check_socket_connect(sback->lnk[i].r.soc) != 0) {
       printf("backstop: SKIP (the network answered for " ST_BACKSTOP_DEADHOST
              " within %d ms)\n",
              ST_BACKSTOP_SETTLE_MS);
@@ -583,8 +580,7 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
   /* the states a stop sweeps, pre-connect then receive, and last the FTP one
      whose socket another thread owns */
   enum {
-    SLOT_DNS = 0,
-    SLOT_CONNECT,
+    SLOT_CONNECT = 0,
     SLOT_SSL,
     SLOT_HEADERS,
     SLOT_XFER,
@@ -594,9 +590,8 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
   };
 
   static const int status[SLOTS] = {
-      STATUS_WAIT_DNS,     STATUS_CONNECTING, STATUS_SSL_WAIT_HANDSHAKE,
-      STATUS_WAIT_HEADERS, STATUS_TRANSFER,   STATUS_CHUNK_WAIT,
-      STATUS_FTP_TRANSFER};
+      STATUS_CONNECTING, STATUS_SSL_WAIT_HANDSHAKE, STATUS_WAIT_HEADERS,
+      STATUS_TRANSFER,   STATUS_CHUNK_WAIT,         STATUS_FTP_TRANSFER};
   T_SOC swept[SLOTS];
   htsblk r[SLOTS];
   struct_back *sback = NULL;
@@ -632,7 +627,7 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
     return 77;
   cache.hashtable = coucal_new(0);
   back = sback->lnk;
-  if (!st_backstop_arm(opt, sback, status, r, SLOTS, SLOT_DNS)) {
+  if (!st_backstop_arm(opt, sback, status, r, SLOTS)) {
     skipped = 1;
     goto cleanup;
   }
@@ -658,7 +653,7 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
      flag goes up after the slots are in place. */
   for (round = 0; round < 2 && !err; round++) {
     opt->state.stop = 0;
-    if (!st_backstop_arm(opt, sback, status, r, SLOTS, SLOT_DNS)) {
+    if (!st_backstop_arm(opt, sback, status, r, SLOTS)) {
       skipped = 1;
       goto cleanup;
     }
@@ -670,7 +665,7 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
 
     /* every slot but the FTP one is gone, its socket closed rather than merely
        forgotten, and reported as fatal so the link is not queued again */
-    for (i = SLOT_DNS; i < SLOT_FTP; i++) {
+    for (i = SLOT_CONNECT; i < SLOT_FTP; i++) {
       CHECK(back[i].status == STATUS_READY);
       CHECK(back[i].r.soc == INVALID_SOCKET);
       CHECK(back[i].r.statuscode == STATUSCODE_INVALID);
@@ -695,7 +690,7 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
     const LLint recv_was = hts_stat_recv_get();
 
     opt->state.stop = 0;
-    if (!st_backstop_arm(opt, sback, status, r, SLOTS, SLOT_DNS)) {
+    if (!st_backstop_arm(opt, sback, status, r, SLOTS)) {
       skipped = 1;
       goto cleanup;
     }
@@ -712,7 +707,7 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
 
     /* nothing it swept was writing, so there is no partial to describe */
     CHECK(!opt->abort_left_partial);
-    for (i = SLOT_DNS; i < SLOT_HEADERS; i++) {
+    for (i = SLOT_CONNECT; i < SLOT_HEADERS; i++) {
       CHECK(back[i].status == STATUS_READY);
       CHECK(back[i].r.statuscode == STATUSCODE_INVALID);
     }
@@ -746,7 +741,7 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
 
     for (c = 0; c < (int) (sizeof(partial) / sizeof(partial[0])) && !err; c++) {
       opt->state.stop = 0;
-      if (!st_backstop_arm(opt, sback, status, r, SLOTS, SLOT_DNS)) {
+      if (!st_backstop_arm(opt, sback, status, r, SLOTS)) {
         skipped = 1;
         goto cleanup;
       }
@@ -774,7 +769,7 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
     const LLint recv_was = hts_stat_recv_get();
 
     opt->state.stop = 0;
-    if (!st_backstop_arm(opt, sback, status, r, SLOTS, SLOT_DNS)) {
+    if (!st_backstop_arm(opt, sback, status, r, SLOTS)) {
       skipped = 1;
       goto cleanup;
     }

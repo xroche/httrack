@@ -4348,7 +4348,7 @@ int back_pluggable_sockets(struct_back * sback, httrackp * opt) {
   n = min(n, back_available(sback) - 8);
 
   // no space left on backing stack - do not back anymore
-  if (back_stack_available(sback) <= 2)
+  if (back_available(sback) <= 2)
     n = 0;
 
   return n;
