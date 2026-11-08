@@ -40,8 +40,6 @@ Please visit our Website: http://www.httrack.com
 
 #define HTS_INTERNAL_BYTECODE
 
-#include "htscache_selftest.h"
-
 #include "htsselftest_int.h"
 
 #include <errno.h>
@@ -494,7 +492,7 @@ static int writefail_read_entry(const char *path, const char *entryname,
 /* Cache write-failure policy (#174/#219): fatal errno or a failure streak
    stops the mirror (exit_xh=-1, no crash); isolated/oversized drops the entry.
  */
-int cache_write_failure_selftest(httrackp *opt, const char *dir) {
+static int cache_write_failure_selftest(httrackp *opt, const char *dir) {
   int fail = 0;
   char path[HTS_URLMAXSIZE];
   /* incompressible + big, so deflate flushes (and fails) mid-write, before
@@ -836,7 +834,9 @@ static int fast_header_selftest(httrackp *opt, const char *location) {
   return fail;
 }
 
-int cache_selftests(httrackp *opt, const char *dir) {
+/* Run the cache create/read/update self-test against a working directory.
+   Returns the number of failed checks (0 == success). */
+static int cache_selftests(httrackp *opt, const char *dir) {
   int failures = 0;
   cache_back cache;
   int i;
@@ -1073,7 +1073,13 @@ static void selftest_setup_dir(httrackp *opt, const char *dir) {
   opt->cache = HTS_CACHE_PRIORITY;
 }
 
-int cache_golden_selftest(httrackp *opt, const char *dir, int regen) {
+/* Read a committed (frozen) cache fixture under <dir>/hts-cache/new.zip and
+   assert a fixed set of entries decodes field- and byte-exact. Unlike
+   cache_selftests (write-then-read with the same build, a round-trip), this
+   reads bytes an earlier build froze, so it catches read-path / format drift.
+   regen!=0 first rewrites the fixture from the same table (to regenerate the
+   committed file, never by the test). Returns the failed-check count. */
+static int cache_golden_selftest(httrackp *opt, const char *dir, int regen) {
   int failures = 0;
   size_t k;
   cache_back cache;
@@ -1342,7 +1348,9 @@ static int reconcile_rotation_cases(httrackp *opt, LLint partial,
   return failures;
 }
 
-int cache_reconcile_selftest(httrackp *opt, const char *dir) {
+/* Exercise the hts_cache_reconcile() generation policies on file fixtures
+   under <dir>. Returns the failed-check count. */
+static int cache_reconcile_selftest(httrackp *opt, const char *dir) {
   int failures = 0;
 
   /* Sidecar byte sizes; only their ordering matters. */
@@ -1633,7 +1641,7 @@ int cache_reconcile_selftest(httrackp *opt, const char *dir) {
 
 /* The pre-3.31 .dat/.ndx import was removed: cache_init must refuse the
    legacy pair, leave the files in place, and not flag an update run. */
-int cache_legacy_refused_selftest(httrackp *opt, const char *dir) {
+static int cache_legacy_refused_selftest(httrackp *opt, const char *dir) {
   int failures = 0;
   int variant;
 
@@ -2029,7 +2037,10 @@ static int corrupt_case_zip(httrackp *opt, const char *pat, const char *rep,
   return corrupt_expect_victim(opt, wantmsg, what);
 }
 
-int cache_corruption_selftest(httrackp *opt, const char *dir) {
+/* Inject read-side corruption (zip byte surgery: bad size, header, deflate)
+   under <dir> and assert every case degrades to STATUSCODE_INVALID without
+   tainting a sibling entry. */
+static int cache_corruption_selftest(httrackp *opt, const char *dir) {
   int failures = 0;
 
   selftest_tag = "cache-corrupt";
@@ -2184,7 +2195,12 @@ static int check_prefix(const char *what, const char *got, const char *want,
   return 0;
 }
 
-int cache_header_bounds_selftest(httrackp *opt, const char *dir) {
+/* A cache entry whose every field sits at its declared cap: the header block
+   the writer builds outgrows its fixed buffer, so this pins that the writer
+   bounds it, drops whole fields rather than halves, and still round-trips
+   everything written before the block filled. Returns the failed-check count.
+ */
+static int cache_header_bounds_selftest(httrackp *opt, const char *dir) {
   int failures = 0;
   cache_back cache;
   /* every htsblk field at the cap its declaration allows */
@@ -2377,7 +2393,9 @@ static int urlbounds_write_foreign_zip(const char *zippath, size_t namelen) {
   return err;
 }
 
-int cache_url_bounds_selftest(httrackp *opt, const char *dir) {
+/* URLs at (and past) the cache API's length cap: store and lookup must neither
+   abort nor alias two keys. Returns the failed-check count. */
+static int cache_url_bounds_selftest(httrackp *opt, const char *dir) {
   int failures = 0;
   cache_back cache;
   /* the largest pair lien_back can hold, and a twin differing only in its last
@@ -2608,7 +2626,10 @@ static void savebounds_store(httrackp *opt, cache_back *cache, const char *adr,
   freet(bodycopy);
 }
 
-int cache_savename_bounds_selftest(httrackp *opt, const char *dir) {
+/* X-Save is stored relative to path_html_utf8; a name rebuilt under a deeper
+   path must fit or the entry be refused, never clipped into a name pointing at
+   another file (#1278). Returns the failed-check count. */
+static int cache_savename_bounds_selftest(httrackp *opt, const char *dir) {
   int failures = 0;
   cache_back cache;
   static const char rel_head[] = "example.com/";
@@ -2777,7 +2798,7 @@ static const char *readfail_unreadable_source(void) {
 /* A short read is indistinguishable from EOF, so a failed read must abandon the
    entry: committing it would leave a truncated body under the X-Size the local
    header already declares, which the reader then has to catch. */
-int cache_readfail_selftest(httrackp *opt, const char *dir) {
+static int cache_readfail_selftest(httrackp *opt, const char *dir) {
   static const char body[] = "cache-readfail body\x00\x01\x02 payload";
   const size_t body_len = sizeof(body) - 1;
   char zippath[HTS_URLMAXSIZE], srcpath[HTS_URLMAXSIZE];
@@ -3345,7 +3366,10 @@ static int ref_st_tail(const lien_back *back) {
   return fail;
 }
 
-int ref_portable_selftest(httrackp *opt, const char *dir) {
+/* The .ref resume state must decode identically on every host: pins the bytes
+   in both directions against a literal record, and proves a legacy, truncated
+   or byte-swapped one is refused rather than misread. */
+static int ref_portable_selftest(httrackp *opt, const char *dir) {
   int fail = 0;
   char path[HTS_URLMAXSIZE * 2];
   lien_back *back;
