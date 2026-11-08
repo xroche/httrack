@@ -34,8 +34,6 @@ Please visit our Website: http://www.httrack.com
 /* The parser decides three things about a quoted string, and each decision is
    swept here over a generated corpus rather than a list of past incidents. */
 
-#define HTS_INTERNAL_BYTECODE
-
 #include "htsselftest_int.h"
 
 #include <ctype.h>

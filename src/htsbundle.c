@@ -30,8 +30,6 @@ Please visit our Website: http://www.httrack.com
 /*       login bundles named by a start URL                     */
 /* ------------------------------------------------------------ */
 
-#define HTS_INTERNAL_BYTECODE
-
 #include "htsbundle.h"
 
 #include "htscore.h"
