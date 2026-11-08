@@ -47,10 +47,6 @@ static int st_fsize(httrackp *opt, int argc, char **argv) {
   LLint got, got_utf8, gotp, gone;
   int rc = 0;
 
-  if (argc < 1) {
-    fprintf(stderr, "fsize: needs a directory\n");
-    return 1;
-  }
   concat(path, sizeof(path), argv[0], "/sparse-5g.bin");
   concat(absent, sizeof(absent), argv[0], "/no-such-file.bin");
 
@@ -195,10 +191,6 @@ static int st_findsize(httrackp *opt, int argc, char **argv) {
   find_handle h;
   int rc;
 
-  if (argc < 1) {
-    fprintf(stderr, "findsize: needs a directory\n");
-    return 1;
-  }
   concat(big, sizeof(big), argv[0], "/find-5g.bin");
   concat(sign, sizeof(sign), argv[0], "/find-6g.bin");
   concat(small, sizeof(small), argv[0], "/find-small.bin");
@@ -917,10 +909,6 @@ static int st_categories(httrackp *opt, int argc, char **argv) {
   static const int types[] = {1, 0};
   unsigned int i;
 
-  if (argc < 1) {
-    fprintf(stderr, "categories: needs a directory\n");
-    return 1;
-  }
   for (i = 0; i < sizeof(types) / sizeof(types[0]); i++) {
     const char *const tag = types[i] == 1 ? "categ" : "profile";
     char *path = strdupt(argv[0]); /* it strips a trailing '/' in place */
@@ -951,10 +939,6 @@ static int st_filesave(httrackp *opt, int argc, char **argv) {
   const int len = (int) sizeof(body) - 1;
   int rc, err;
 
-  if (argc < 2) {
-    fprintf(stderr, "usage: -#test=filesave <doomed-save> <control-save>\n");
-    return 1;
-  }
   errno = 0;
   rc = filesave(opt, body, len, argv[0], "127.0.0.1", "/x.bin");
   err = errno;
@@ -969,10 +953,6 @@ static int st_filesave(httrackp *opt, int argc, char **argv) {
 // -#test=longpath <dir>: round-trip a >MAX_PATH (260) file through the file
 // wrappers, exercising hts_pathToUCS2's \\?\ prefixing on Windows (#133).
 static int st_longpath(httrackp *opt, int argc, char **argv) {
-  if (argc < 1) {
-    fprintf(stderr, "longpath: needs a writable base dir\n");
-    return 1;
-  }
   char path[HTS_URLMAXSIZE * 2];
   size_t n = st_mkdeep(path, sizeof(path), argv[0], NULL, "longpath", NULL);
 
@@ -1016,10 +996,6 @@ static int st_longpath(httrackp *opt, int argc, char **argv) {
 // via the mirror I/O wrappers — fexist_utf8/fsize_utf8, FOPEN/RENAME/UNLINK,
 // and the new hts_rmdir_utf8 (RMDIR) teardown (#133, #630).
 static int st_mirrorio(httrackp *opt, int argc, char **argv) {
-  if (argc < 1) {
-    fprintf(stderr, "mirrorio: needs a writable base dir\n");
-    return 1;
-  }
   char path[HTS_URLMAXSIZE * 2];
   size_t base = 0;
   size_t n = st_mkdeep(path, sizeof(path), argv[0],
@@ -1107,10 +1083,6 @@ static hts_boolean ro_is(const char *path, const char *data) {
 // never lose one it did not replace (#779, #790). Which half is live depends on
 // what rename() does to an existing target, so probe that and name the regime.
 static int st_renameover(httrackp *opt, int argc, char **argv) {
-  if (argc < 1) {
-    fprintf(stderr, "renameover: needs a writable base dir\n");
-    return 1;
-  }
   char src[HTS_URLMAXSIZE * 2], dst[HTS_URLMAXSIZE * 2];
   int err = 0;
 
@@ -1278,8 +1250,7 @@ static int st_renameover(httrackp *opt, int argc, char **argv) {
 
   (void) UNLINK(src);
   (void) UNLINK(dst);
-  printf("renameover: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("renameover", err);
 }
 
 // -#test=refetchbackup <dir>: the #77 re-fetch backup must build its temporary
@@ -1290,10 +1261,6 @@ static int st_refetchbackup(httrackp *opt, int argc, char **argv) {
   char want[HTS_URLMAXSIZE * 2 + 32];
   int err = 0;
 
-  if (argc < 1) {
-    fprintf(stderr, "refetchbackup: needs a writable base dir\n");
-    return 1;
-  }
   back = calloct(1, sizeof(lien_back));
   if (back == NULL) {
     fprintf(stderr, "refetchbackup: out of memory\n");
@@ -1394,8 +1361,7 @@ static int st_refetchbackup(httrackp *opt, int argc, char **argv) {
 
   (void) UNLINK(back->url_sav);
   freet(back);
-  printf("refetchbackup: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("refetchbackup", err);
 }
 
 // -#test=spoolname <dir>: a frozen backlog slot spools into the mirror root's
@@ -1407,11 +1373,6 @@ static int st_spoolname(httrackp *opt, int argc, char **argv) {
   const unsigned long pid = back_self_pid();
   int getmode;
   int err = 0;
-
-  if (argc < 1) {
-    fprintf(stderr, "spoolname: needs a writable base dir\n");
-    return 1;
-  }
 
   snprintf(base, sizeof(base), "%s/", argv[0]);
   StringCopy(opt->path_html_utf8, base);
@@ -1452,17 +1413,12 @@ static int st_spoolname(httrackp *opt, int argc, char **argv) {
     err++;
   }
 
-  printf("spoolname: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("spoolname", err);
 }
 
 // -#test=direnum <dir>: enumerate a long+non-ASCII directory via the
 // opendir/readdir wrappers; children must round-trip as UTF-8 (#133,#630).
 static int st_direnum(httrackp *opt, int argc, char **argv) {
-  if (argc < 1) {
-    fprintf(stderr, "direnum: needs a writable base dir\n");
-    return 1;
-  }
   char path[HTS_URLMAXSIZE * 2];
   size_t base = 0;
   const size_t dirlen =
@@ -1546,10 +1502,6 @@ static int st_ioexact(httrackp *opt, int argc, char **argv) {
   int plen;
   size_t i;
 
-  if (argc < 1) {
-    fprintf(stderr, "ioexact: needs a writable dir\n");
-    return 1;
-  }
   plen = snprintf(path, sizeof(path), "%s/ioexact.bin", argv[0]);
   assertf(plen > 0 && (size_t) plen < sizeof(path));
   payload = malloct(payload_size);
@@ -1661,10 +1613,6 @@ static int st_findall(httrackp *opt, int argc, char **argv) {
   size_t i;
   int rc = 0;
 
-  if (argc < 1) {
-    fprintf(stderr, "findall: needs a directory\n");
-    return 1;
-  }
   for (i = 0; i < nnames; i++) {
     concat(path, sizeof(path), argv[0], "/");
     strcatbuff(path, ents[i].name);

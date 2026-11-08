@@ -169,10 +169,6 @@ static int st_accept(httrackp *opt, int argc, char **argv) {
   hts_browser_family family;
   int dest, i;
 
-  if (argc < 3) {
-    fprintf(stderr, "accept: takes <dest> <family> <-%%a|-> [kind=value...]\n");
-    return 1;
-  }
   if (!st_dest_of(argv[0], &dest) || !st_family_of(argv[1], &family))
     return 1;
   list[0] = '\0';

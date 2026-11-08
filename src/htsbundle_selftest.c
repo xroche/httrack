@@ -339,10 +339,6 @@ static void paste_race_worker(void *arg) {
 static int st_pasterace(httrackp *opt, int argc, char **argv) {
   paste_race race;
 
-  if (argc < 2) {
-    fprintf(stderr, "pasterace: takes <dir> <rounds>\n");
-    return 1;
-  }
   race.dir = argv[0];
   race.rounds = atoi(argv[1]);
   race.failed = 0;
@@ -365,10 +361,10 @@ const struct selftest_entry selftests_bundle[] = {
      "<dir> <url>... [host:<adr>]... [hide:<text>]... [jar:<file>] [twice] "
      "[b0]",
      "load login bundles and print the identity each host gets", st_bundle},
-    {"regdomain", "<host>...", "the registrable domain of each host",
+    {"regdomain", "[host]...", "the registrable domain of each host",
      st_regdomain},
     {"bundlename", "<name>", "is name a login bundle name?", st_bundlename},
-    {"bundlescope", "<cookie domain> <url>...",
+    {"bundlescope", "<cookie domain> [url...]",
      "does a login bundle naming the URLs keep a cookie of that domain?",
      st_bundlescope},
     {"bundlenames", "<urls> [<list file>]",

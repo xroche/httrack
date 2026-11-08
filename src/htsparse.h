@@ -113,6 +113,11 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre);
    place into a buffer of the given size. */
 void hts_strip_default_port(char *lien, size_t size);
 
+/* Self-test hook: 's' through each parser output writer, joined by '|', for a
+   page saved as HTML or not and the given script state. The caller freet()s. */
+char *hts_parse_sink_selftest(const hts_boolean enabled, const int inscript,
+                              const int inscript_tag, const char *const s);
+
 /*
   Does a quoted string the dirty parser found look like a link? "str" and "len"
   are the string as the source spells it. "lastc" is the first non-blank byte

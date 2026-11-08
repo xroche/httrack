@@ -36,10 +36,6 @@ Please visit our Website: http://www.httrack.com
 static int st_mime(httrackp *opt, int argc, char **argv) {
   char mime[256];
 
-  if (argc < 1) {
-    fprintf(stderr, "mime: needs a filename\n");
-    return 1;
-  }
   if (get_httptype_sized(opt, mime, sizeof(mime), argv[0], 0)) {
     char ext[256];
 
@@ -184,10 +180,6 @@ static int st_sniff(httrackp *opt, int argc, char **argv) {
   char BIGSTK body[1024];
   size_t n;
 
-  if (argc < 2) {
-    fprintf(stderr, "sniff: needs a content-type and a body\n");
-    return 1;
-  }
   n = st_decode_body(argv[1], body, sizeof(body));
   printf("sniff: known=%d consistent=%d\n",
          hts_sniff_mime_known(argv[0]) == HTS_TRUE,

@@ -109,10 +109,6 @@ static int st_footerfmt(httrackp *opt, int argc, char **argv) {
   // An empty template yields an empty, terminated string.
   assertf(hts_footer_format(out, sizeof(out), "", values) == 1 &&
           out[0] == '\0');
-  if (argc < 1) {
-    fprintf(stderr, "footerfmt: needs a template\n");
-    return 1;
-  }
   if (hts_footer_format(out, sizeof(out), argv[0], values) < 0) {
     fprintf(stderr, "footerfmt: overflow\n");
     return 1;
@@ -371,8 +367,7 @@ static int st_copyopt(httrackp *opt, int argc, char **argv) {
 
   hts_free_opt(from);
   hts_free_opt(to);
-  printf("copy-htsopt: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("copy-htsopt", err);
 }
 
 /* A run with no log file must still count its errors (#1681). */
@@ -420,8 +415,7 @@ static int st_logcounters(httrackp *opt, int argc, char **argv) {
   ST_FAIL_IF(err, stats == NULL || stats->stat_errors != 3);
 
   hts_free_opt(o);
-  printf("log-counters: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("log-counters", err);
 }
 
 /* The note is built twice from one buffer, so a caller reusing it must never
@@ -453,8 +447,7 @@ static int st_upperlinksnote(httrackp *opt, int argc, char **argv) {
 
   hts_free_opt(from);
   hts_free_opt(to);
-  printf("upper-links-note: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("upper-links-note", err);
 }
 
 /* The handler below pins the enumerator NAME; these pin the NUMBERS, which are
@@ -471,8 +464,7 @@ static int st_cachedefault(httrackp *opt, int argc, char **argv) {
 
   ST_FAIL_IF(err, fresh->cache != HTS_CACHE_PRIORITY);
   hts_free_opt(fresh);
-  printf("cache-default: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("cache-default", err);
 }
 
 static char st_log_callback_seen[256];
@@ -1073,8 +1065,7 @@ static int st_postfile(httrackp *opt, int argc, char **argv) {
   err |= st_postfile_case(argv[2], 8, 8 + 2, "embedded-nul");
   err |= st_postfile_case(argv[3], 8, 8, "empty");
 
-  printf("postfile self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("postfile self-test", err);
 }
 
 // -#test=abortlock|stoplock <dir>: hts_take_lock_request() takes a request only
@@ -1677,10 +1668,6 @@ static int st_usercmd(httrackp *opt, int argc, char **argv) {
   size_t room = sizeof(dest);
   const char *why = "unnamed";
 
-  if (argc < 2) {
-    fprintf(stderr, "usercmd: needs a -V template and a filename\n");
-    return 1;
-  }
   if (argc > 2) {
     const int asked = atoi(argv[2]);
 
@@ -1721,10 +1708,6 @@ static int st_usercmd(httrackp *opt, int argc, char **argv) {
 /* Run a -V template for real, through the engine's own spawn path, and report
    what the shell exited with. The child's output goes to our stdout. */
 static int st_usercmdrun(httrackp *opt, int argc, char **argv) {
-  if (argc < 2) {
-    fprintf(stderr, "usercmdrun: needs a -V template and a filename\n");
-    return 1;
-  }
   fflush(stdout);
   printf("EXIT %d\n", usercommand_exe(opt, argv[0], argv[1]));
   return 0;

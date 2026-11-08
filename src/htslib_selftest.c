@@ -1409,8 +1409,7 @@ static int st_random(httrackp *opt, int argc, char **argv) {
   for (i = 0; i < (int) sizeof(buf); i++) {
     ST_FAIL_IF(err, buf[i] != 0x5a);
   }
-  printf("random: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("random", err);
 }
 
 /* Build a path of exactly len chars under base; returns that length. */
@@ -1439,11 +1438,6 @@ static int st_structcheck(httrackp *opt, int argc, char **argv) {
   char BIGSTK path[HTS_URLMAXSIZE * 2];
   char BIGSTK target[HTS_URLMAXSIZE * 2];
   FILE *fp;
-
-  if (argc < 1) {
-    fprintf(stderr, "usage: -#test=structcheck <writable directory>\n");
-    return 1;
-  }
 
   /* over the guard: refused before a single directory is created */
   st_structcheck_longpath(path, sizeof(path), argv[0], HTS_URLMAXSIZE + 1);
@@ -1618,8 +1612,7 @@ static int st_gmtime(httrackp *opt, int argc, char **argv) {
     err = 1;
   }
 
-  printf("gmtime self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("gmtime self-test", err);
 }
 
 /* Is the masked in exactly want? Prints the difference when it is not. */
@@ -1876,8 +1869,7 @@ static int st_secrets(httrackp *opt, int argc, char **argv) {
   fclose(fp);
   hts_free_opt(o);
   err |= secrets_full();
-  printf("secrets self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("secrets self-test", err);
 }
 
 static int st_maskpw(httrackp *opt, int argc, char **argv) {
@@ -1935,8 +1927,7 @@ static int st_maskpw(httrackp *opt, int argc, char **argv) {
   err |= nologin_rows(opt);
   err |= maskpw_pairs(300);
   err |= maskpw_pairs(10000);
-  printf("maskpw self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("maskpw self-test", err);
 }
 
 /* #806: hts_localtime() must own its output too, same rationale as
@@ -1994,11 +1985,6 @@ static void localtime_thread(void *arg) {
 static int st_localtime(httrackp *opt, int argc, char **argv) {
   static int idx[LOCALTIME_THREADS];
   int err = 0, i;
-
-  if (argc < 1) {
-    fprintf(stderr, "usage: -#test=localtime <writable directory>\n");
-    return 1;
-  }
 
   for (i = 0; i < LOCALTIME_REFS; i++) {
     struct tm tmv;
@@ -2076,8 +2062,7 @@ static int st_localtime(httrackp *opt, int argc, char **argv) {
     }
   }
 
-  printf("localtime self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("localtime self-test", err);
 }
 
 /* Dates on both sides of 2038-01-19T03:14:07Z, where a 32-bit time_t ends.
@@ -2241,8 +2226,7 @@ static int st_y2038(httrackp *opt, int argc, char **argv) {
     }
   }
 
-  printf("y2038: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("y2038", err);
 }
 
 /* The x[strlen(x) - 1] class (#770), its pointer spelling x + strlen(x) - 1
@@ -2385,8 +2369,7 @@ static int st_lastchar(httrackp *opt, int argc, char **argv) {
 #undef REPOISON
 #undef CHECK
 
-  printf("lastchar self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("lastchar self-test", err);
 }
 
 /* The character classes htslib.h defines, paired with the htssafe.h set string
@@ -2458,8 +2441,7 @@ static int st_strcmpnocase(httrackp *opt, int argc, char **argv) {
       err = 1;
     }
   }
-  printf("strcmpnocase: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("strcmpnocase", err);
 }
 
 static void uninit_worker_noop(void *arg) { (void) arg; }
@@ -2603,8 +2585,7 @@ static int st_rtrim(httrackp *opt, int argc, char **argv) {
 #undef REPOISON
 #undef CHECK
 
-  printf("rtrim self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("rtrim self-test", err);
 }
 
 /* Format LEN bytes of EXPECTED into S as two arguments, and check what came
@@ -2742,8 +2723,7 @@ static int st_strsprintf(httrackp *opt, int argc, char **argv) {
   freet(head);
   freet(tail);
 
-  printf("strsprintf self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("strsprintf self-test", err);
 }
 
 #ifndef _WIN32
@@ -2877,8 +2857,7 @@ static int st_sighandlers(httrackp *opt, int argc, char **argv) {
   }
   close(readonly);
   fclose(capture);
-  printf("sighandlers self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("sighandlers self-test", err);
 }
 #endif
 
@@ -2967,8 +2946,7 @@ static int st_sigterm(httrackp *opt, int argc, char **argv) {
     }
     fclose(errs);
   }
-  printf("sigterm self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("sigterm self-test", err);
 }
 #endif
 
@@ -3030,8 +3008,7 @@ static int st_statrecv(httrackp *opt, int argc, char **argv) {
   hts_stat_recv_set(recv_was);
   hts_stat_recv_publish();
 
-  printf("statrecv: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("statrecv", err);
 }
 
 /* An overrun or a stray NUL must disturb this byte. */
@@ -3970,10 +3947,6 @@ static int st_headerverdict(httrackp *opt, int argc, char **argv) {
   hts_header_verdict v;
   int i;
 
-  if (argc < 1) {
-    fprintf(stderr, "headerverdict: takes a line, then the earlier lines\n");
-    return 1;
-  }
   headers[0] = '\0';
   for (i = 1; i < argc; i++) {
     strcatbuff(headers, argv[i]);
@@ -4063,7 +4036,7 @@ const struct selftest_entry selftests_lib[] = {
      st_queryparam},
     {"querysweep", "", "%[param] stays inside every buffer size it is given",
      st_querysweep},
-    {"querynext", "<query>", "the fields the shared query iterator reads",
+    {"querynext", "[query]", "the fields the shared query iterator reads",
      st_querynext},
     {"spandiff", "",
      "the span iterator matches the rule-list parsers it replaced",
@@ -4080,7 +4053,7 @@ const struct selftest_entry selftests_lib[] = {
      "the command-line echo masks the password of a URL login and nothing "
      "else",
      st_maskpw},
-    {"y2038", "<dir>", "dates before and after 2038 read as 64-bit seconds",
+    {"y2038", "[dir]", "dates before and after 2038 read as 64-bit seconds",
      st_y2038},
     {"localtime", "<dir>",
      "hts_localtime() and get_filetime_rfc822()'s GMT labelling (#806)",

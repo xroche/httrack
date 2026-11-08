@@ -221,7 +221,7 @@ static const struct selftest_entry *const selftest_tables[] = {
     selftests_filters, selftests_header,  selftests_io,     selftests_mime,
     selftests_name,    selftests_net,     selftests_opt,    selftests_parse,
     selftests_tools,   selftests_warc,    selftests_wizard, selftests_lines,
-    selftests_fetch,   selftests_psl,     selftests_bundle,
+    selftests_fetch,   selftests_psl,     selftests_bundle, selftests_index,
 };
 
 static void list_selftests(void) {
@@ -237,6 +237,23 @@ static void list_selftests(void) {
   }
 }
 
+/* How many leading <..> groups of `args` the test requires. */
+static int required_args(const char *args) {
+  int n = 0;
+
+  while (*args == '<') {
+    const char *end = strchr(args, '>');
+
+    if (end == NULL)
+      break;
+    n++;
+    args = end + 1;
+    while (*args == ' ' || *args == '.')
+      args++;
+  }
+  return n;
+}
+
 int hts_selftest(httrackp *opt, const char *name, int argc, char **argv) {
   size_t t;
 
@@ -248,8 +265,13 @@ int hts_selftest(httrackp *opt, const char *name, int argc, char **argv) {
     const struct selftest_entry *e;
 
     for (e = selftest_tables[t]; e->name != NULL; e++) {
-      if (strcmp(name, e->name) == 0)
+      if (strcmp(name, e->name) == 0) {
+        if (argc < required_args(e->args)) {
+          fprintf(stderr, "%s: takes %s\n", e->name, e->args);
+          return 1;
+        }
         return e->fn(opt, argc, argv);
+      }
     }
   }
   fprintf(stderr, "Unknown self-test '%s'\n", name);

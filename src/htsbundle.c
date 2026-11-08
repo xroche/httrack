@@ -39,6 +39,7 @@ Please visit our Website: http://www.httrack.com
 #include "htspsl.h"
 #include "htsio.h"
 #include "htscharset.h"
+#include "htsencoding.h"
 #include "htssafe.h"
 
 #include <limits.h>
@@ -1093,24 +1094,13 @@ static size_t curl_join(const char *p) {
   return p[1] == '\r' && p[2] == '\n' ? 3 : 0;
 }
 
-/* The value of the hex digit c, or -1. */
-static int curl_hex(char c) {
-  if (c >= '0' && c <= '9')
-    return c - '0';
-  if (c >= 'a' && c <= 'f')
-    return c - 'a' + 10;
-  if (c >= 'A' && c <= 'F')
-    return c - 'A' + 10;
-  return -1;
-}
-
 /* The value of the n hex digits at p, or -1. */
 static long curl_hex_run(const char *p, int n) {
   long v = 0;
   int i;
 
   for (i = 0; i < n; i++) {
-    const int d = curl_hex(p[i]);
+    const int d = hts_ehexh(p[i]);
 
     if (d < 0)
       return -1;
@@ -1177,20 +1167,12 @@ static const char *curl_ansi_quote(const char **pp, char *dst, size_t *len) {
       return "the text holds a NUL byte";
     if (cp >= 0xd800 && cp <= 0xdfff)
       return "an escape in $'...' is out of range";
-    if (cp < 0x80) {
-      dst[(*len)++] = (char) cp;
-    } else if (cp < 0x800) {
-      dst[(*len)++] = (char) (0xc0 | (cp >> 6));
-      dst[(*len)++] = (char) (0x80 | (cp & 0x3f));
-    } else if (cp < 0x10000) {
-      dst[(*len)++] = (char) (0xe0 | (cp >> 12));
-      dst[(*len)++] = (char) (0x80 | ((cp >> 6) & 0x3f));
-      dst[(*len)++] = (char) (0x80 | (cp & 0x3f));
-    } else {
-      dst[(*len)++] = (char) (0xf0 | (cp >> 18));
-      dst[(*len)++] = (char) (0x80 | ((cp >> 12) & 0x3f));
-      dst[(*len)++] = (char) (0x80 | ((cp >> 6) & 0x3f));
-      dst[(*len)++] = (char) (0x80 | (cp & 0x3f));
+    {
+      char enc[5];
+      const size_t n = hts_writeUTF8((hts_UCS4) cp, enc, sizeof(enc));
+
+      memcpy(dst + *len, enc, n);
+      *len += n;
     }
   }
   *pp = p + 1;

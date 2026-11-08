@@ -130,10 +130,6 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
   int seen_a_body = 0, body_occurrences = 0, a2_bodyless = 0, nm_cl_ok = 0;
   static const char a_body[] = "Hello, WARC!\n";
 
-  if (argc < 1) {
-    fprintf(stderr, "warc: needs a writable directory\n");
-    return 1;
-  }
   fconcat(path, sizeof(path), argv[0], "warc-selftest.warc.gz");
 
   w = warc_open(opt, path);
@@ -340,10 +336,6 @@ static int st_warc_trunc(httrackp *opt, int argc, char **argv) {
       0x50, 0xc8, 0x2a, 0xcd, 0x2d, 0x28, 0xd6, 0xe3, 0x02, 0x00, 0x5e, 0xb8,
       0xe7, 0x66, 0x3a, 0x00, 0x00, 0x00};
 
-  if (argc < 1) {
-    fprintf(stderr, "warc-trunc: needs a writable directory\n");
-    return 1;
-  }
   fconcat(path, sizeof(path), argv[0], "warc-trunc.warc.gz");
   w = warc_open(opt, path);
   assertf(w != NULL);
@@ -405,8 +397,7 @@ static int st_warc_trunc(httrackp *opt, int argc, char **argv) {
   }
   freet(data);
   ST_FAIL_IF(err, !trunc_len || !trunc_gz || nresp != 2);
-  printf("warc-trunc: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("warc-trunc", err);
 }
 
 /* An ftp:// capture is ONE resource record: WARC-Type: resource, the payload's
@@ -422,10 +413,6 @@ static int st_warc_ftp(httrackp *opt, int argc, char **argv) {
                              "FTP payload"
                              "\x02\x03";
 
-  if (argc < 1) {
-    fprintf(stderr, "warc-ftp: needs a writable directory\n");
-    return 1;
-  }
   fconcat(path, sizeof(path), argv[0], "warc-ftp.warc.gz");
   w = warc_open(opt, path);
   assertf(w != NULL);
@@ -483,10 +470,6 @@ static int st_warc_rotate(httrackp *opt, int argc, char **argv) {
   int err = 0, nseg = 0, i;
   size_t j;
 
-  if (argc < 1) {
-    fprintf(stderr, "warc-rotate: needs a writable directory\n");
-    return 1;
-  }
   for (j = 0; j < sizeof(body);
        j++) { /* incompressible: gzip can't shrink it */
     rng ^= rng << 13;
@@ -570,10 +553,6 @@ static int st_warc_verbatim(httrackp *opt, int argc, char **argv) {
       0x50, 0xc8, 0x2a, 0xcd, 0x2d, 0x28, 0xd6, 0xe3, 0x02, 0x00, 0x5e, 0xb8,
       0xe7, 0x66, 0x3a, 0x00, 0x00, 0x00};
 
-  if (argc < 1) {
-    fprintf(stderr, "warc-verbatim: needs a writable directory\n");
-    return 1;
-  }
   fconcat(path, sizeof(path), argv[0], "warc-verbatim.warc.gz");
 
   w = warc_open(opt, path);
@@ -659,8 +638,7 @@ static int st_warc_verbatim(httrackp *opt, int argc, char **argv) {
   }
   freet(data);
   ST_FAIL_IF(err, !checked);
-  printf("warc-verbatim: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("warc-verbatim", err);
 }
 
 /* SURT canonicalization vectors (the CDXJ sort key: www-strip, default-port
@@ -701,8 +679,7 @@ static int st_warc_surt(httrackp *opt, int argc, char **argv) {
       err = 1;
     }
   }
-  printf("warc-surt: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("warc-surt", err);
 }
 
 /* The CDXJ offset is a uint64_t, and the tell behind it must carry the same
@@ -725,10 +702,6 @@ static int st_warc_offset(httrackp *opt, int argc, char **argv) {
   size_t i;
   size_t wide = 0; /* offsets measured past what a 32-bit tell could hold */
 
-  if (argc < 1) {
-    fprintf(stderr, "warc-offset: needs a writable directory\n");
-    return 1;
-  }
   fconcat(path, sizeof(path), argv[0], "warc-offset.bin");
   fp = FOPEN(fconv(catbuff, sizeof(catbuff), path), "wb");
   if (fp == NULL) {
@@ -839,8 +812,7 @@ static int st_warc_offset(httrackp *opt, int argc, char **argv) {
       }
     }
   }
-  printf("warc-offset: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("warc-offset", err);
 }
 
 /* A URL longer than the old 1024-byte header-format buffer must still reach the
@@ -862,10 +834,6 @@ static int st_warc_longurl(httrackp *opt, int argc, char **argv) {
   size_t i, n, nrec = 0;
   int err = 0;
 
-  if (argc < 1) {
-    fprintf(stderr, "warc-longurl: need a writable directory\n");
-    return 1;
-  }
   snprintf(path, sizeof(path), "%s/longurl.warc", argv[0]);
 
   w = warc_open(opt, path);
@@ -934,8 +902,7 @@ static int st_warc_longurl(httrackp *opt, int argc, char **argv) {
   }
 
   freet(blob);
-  printf("warc-longurl: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("warc-longurl", err);
 }
 
 /* End-to-end CDXJ: crawl a handful of records with --warc-cdx, then verify the
@@ -952,10 +919,6 @@ static int st_warc_cdx(httrackp *opt, int argc, char **argv) {
   const char *lp, *cend;
   char prev[2048];
 
-  if (argc < 1) {
-    fprintf(stderr, "warc-cdx: needs a writable directory\n");
-    return 1;
-  }
   fconcat(wpath, sizeof(wpath), argv[0], "warc-cdx.warc.gz");
   fconcat(cpath, sizeof(cpath), argv[0], "warc-cdx.cdx");
   saved_cdx = opt->warc_cdx;
@@ -1084,10 +1047,6 @@ static int st_warc_cdx_utf8(httrackp *opt, int argc, char **argv) {
   int err = 0, nlines = 0, nescaped = 0, nverbatim = 0;
   const char *lp, *cend;
 
-  if (argc < 1) {
-    fprintf(stderr, "warc-cdx-utf8: needs a writable directory\n");
-    return 1;
-  }
   fconcat(wpath, sizeof(wpath), argv[0], "warc-cdx-utf8.warc.gz");
   fconcat(cpath, sizeof(cpath), argv[0], "warc-cdx-utf8.cdx");
   saved_cdx = opt->warc_cdx;
@@ -1133,8 +1092,7 @@ static int st_warc_cdx_utf8(httrackp *opt, int argc, char **argv) {
             nlines, nescaped, nverbatim);
     err = 1;
   }
-  printf("warc-cdx-utf8: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("warc-cdx-utf8", err);
 }
 
 static char st_cdx_log[2048];
@@ -1204,10 +1162,6 @@ static int st_warc_cdx_errors(httrackp *opt, int argc, char **argv) {
   warc_writer *w;
   int err = 0;
 
-  if (argc < 1) {
-    fprintf(stderr, "warc-cdx-errors: needs a writable directory\n");
-    return 1;
-  }
   saved_state = opt->state.warc;
   saved_cdx = opt->warc_cdx;
   opt->warc_cdx = 1;
@@ -1323,8 +1277,7 @@ static int st_warc_cdx_errors(httrackp *opt, int argc, char **argv) {
   hts_set_log_vprint_callback(NULL);
   opt->warc_cdx = saved_cdx;
   opt->state.warc = saved_state;
-  printf("warc-cdx-errors: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("warc-cdx-errors", err);
 }
 
 /* One finished transaction through the engine hook. No stashed headers, so the
@@ -1448,10 +1401,6 @@ static int st_warc_teardown(httrackp *opt, int argc, char **argv) {
   void *saved_state;
   int err = 0;
 
-  if (argc < 1) {
-    fprintf(stderr, "warc-teardown: needs a writable directory\n");
-    return 1;
-  }
   saved_state = opt->state.warc;
   strlcpybuff(saved_file, StringBuff(opt->warc_file), sizeof(saved_file));
 
@@ -1462,8 +1411,7 @@ static int st_warc_teardown(httrackp *opt, int argc, char **argv) {
 
   StringCopy(opt->warc_file, saved_file);
   opt->state.warc = saved_state;
-  printf("warc-teardown: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("warc-teardown", err);
 }
 
 #if HTS_USEOPENSSL
@@ -1512,10 +1460,6 @@ static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
   int have_archive = 0, have_index = 0, all_store = 1;
   LLint good_size;
 
-  if (argc < 1) {
-    fprintf(stderr, "warc-wacz: needs a writable directory\n");
-    return 1;
-  }
   fconcat(wpath, sizeof(wpath), argv[0], "warc-wacz.warc.gz");
   fconcat(waczpath, sizeof(waczpath), argv[0], "warc-wacz.wacz");
   fconcat(cdxpath, sizeof(cdxpath), argv[0], "warc-wacz.cdx");
@@ -2036,10 +1980,6 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
   char *out, *css, *nested;
   size_t outlen = 0, len = 0;
 
-  if (argc < 1) {
-    fprintf(stderr, "singlefile: needs a writable directory\n");
-    return 1;
-  }
   sf_err = 0;
   sf_put(argv[0], "escape.png", sf_png,
          SF_PNG_LEN); /* just outside the mirror */
@@ -2419,8 +2359,7 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
     printf("singlefile: ':' is not a legal filename here, so the scheme guard "
            "only gets the weaker check\n");
   opt->single_file_max_size = saved_cap;
-  printf("singlefile: %s\n", sf_err ? "FAIL" : "OK");
-  return sf_err;
+  return st_verdict("singlefile", sf_err);
 }
 
 /* Compare the WARC header walks with frozen copies. */
@@ -2667,7 +2606,7 @@ const struct selftest_entry selftests_warc[] = {
     {"warc-wacz", "<dir>", "--wacz package: layout, STORE mode, sha256 digests",
      st_warc_wacz},
 #endif
-    {"singlefileclass", "<link tag>",
+    {"singlefileclass", "[link tag]",
      "class single-file gives a <link href> reference", st_singlefileclass},
     {"singlefile", "<dir>",
      "--single-file: what is inlined, the per-asset cap, idempotence",
