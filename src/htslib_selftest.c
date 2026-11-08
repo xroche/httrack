@@ -1493,6 +1493,12 @@ static int st_structcheck(httrackp *opt, int argc, char **argv) {
     assertf(!dir_exists(path));
   }
 
+  /* a bare file name creates nothing (run from a scratch directory) */
+  assertf(structcheck("abc.zip") == 0);
+  assertf(!dir_exists("a/"));
+  assertf(structcheck_utf8("xyz.zip") == 0);
+  assertf(!dir_exists("x/"));
+
   /* a regular file where a directory belongs is renamed to <name>.txt */
   snprintf(path, sizeof(path), "%s/sc", argv[0]);
   fp = fopen(path, "wb");

@@ -2893,31 +2893,45 @@ HTSEXT_API hts_boolean dir_exists(const char *path) {
   return 0;                     /* DOES NOT EXIST */
 }
 
+/* Is there something at file? Sets *mode to its st_mode when there is. */
+static hts_boolean structcheck_stat(const char *file, hts_boolean utf8,
+                                    int *mode) {
+  STRUCT_STAT st;
+  struct stat st_ansi;
+
+  if (utf8 ? STAT(file, &st) != 0 : stat(file, &st_ansi) != 0)
+    return HTS_FALSE;
+  *mode = (int) (utf8 ? st.st_mode : st_ansi.st_mode);
+  return HTS_TRUE;
+}
+
 /* Finds a free "<file>.txt" or "<file>.N.txt"; sets errno when none fits. */
 static hts_boolean structcheck_aside(char *aside, size_t size, const char *file,
                                      hts_boolean utf8) {
   int i;
 
   for (i = 0; i < 100; i++) {
-    STRUCT_STAT st;
-    struct stat st8;
+    int mode;
 
     if (!(i == 0 ? slprintfbuff(aside, size, "%s.txt", file)
                  : slprintfbuff(aside, size, "%s.%d.txt", file, i))) {
       errno = ENAMETOOLONG;
       return HTS_FALSE;
     }
-    if ((utf8 ? STAT(aside, &st) : stat(aside, &st8)) != 0)
+    if (!structcheck_stat(aside, utf8, &mode))
       return HTS_TRUE;
   }
   errno = EEXIST;
   return HTS_FALSE;
 }
 
-/* path must end with "/" or with the finename (/tmp/bar/ or /tmp/bar/foo.zip) */
-/* Note: *not* UTF-8 */
-HTSEXT_API int structcheck(const char *path) {
-  struct stat st;
+static int structcheck_mkdir(const char *file, hts_boolean utf8) {
+  return utf8 ? MKDIR(file) : mkdir_compat(file);
+}
+
+/* path ends with "/" or a file name; utf8 picks the UTF-8 calls, else ANSI */
+static int structcheck_impl(const char *path, hts_boolean utf8) {
+  int mode;
   char BIGSTK tmpbuf[HTS_URLMAXSIZE * 2];
   char BIGSTK file[HTS_URLMAXSIZE * 2];
   int i = 0;
@@ -2941,11 +2955,13 @@ HTSEXT_API int structcheck(const char *path) {
 #endif
   /* Get prefix (note: file can not be empty here) */
   for(i = (int) strlen(file) - 1; i > 0 && file[i] != PATH_SEPARATOR; i--) ;
+  if (file[i] != PATH_SEPARATOR) /* a bare file name has no directory */
+    return 0;
   for(; i > 0 && file[i] == PATH_SEPARATOR; i--) ;
   file[i + 1] = '\0';
 
   /* First check the final dir */
-  if (stat(file, &st) == 0 && S_ISDIR(st.st_mode)) {
+  if (structcheck_stat(file, utf8, &mode) && S_ISDIR(mode)) {
     return 0;                   /* OK */
   }
 
@@ -2991,17 +3007,19 @@ HTSEXT_API int structcheck(const char *path) {
     if (end_char != 0) {
       file[i] = '\0';
     }
-    if (stat(file, &st) == 0) { /* Something exists */
-      if (!S_ISDIR(st.st_mode)) {
+    /* Something exists */
+    if (structcheck_stat(file, utf8, &mode)) {
+      if (!S_ISDIR(mode)) {
 #if HTS_REMOVE_ANNOYING_INDEX
-        if (S_ISREG(st.st_mode)) {      /* Regular file in place ; move it and create directory */
+        /* Regular file in place: move it and create directory */
+        if (S_ISREG(mode)) {
           /* bounded here, not by the path-length guard far above */
-          if (!structcheck_aside(tmpbuf, sizeof(tmpbuf), file, HTS_FALSE))
+          if (!structcheck_aside(tmpbuf, sizeof(tmpbuf), file, utf8))
             return -1;
-          if (rename(file, tmpbuf) != 0) {      /* Can't rename regular file */
+          if ((utf8 ? RENAME(file, tmpbuf) : rename(file, tmpbuf)) != 0) {
             return -1;
           }
-          if (mkdir_compat(file) != 0) {        /* Can't create directory */
+          if (structcheck_mkdir(file, utf8) != 0) { /* Can't create directory */
             return -1;
           }
         }
@@ -3009,8 +3027,8 @@ HTSEXT_API int structcheck(const char *path) {
 #error Not implemented
 #endif
       }
-    } else {                    /* Nothing exists ; create directory */
-      if (mkdir_compat(file) != 0) {    /* Can't create directory */
+    } else { /* Nothing exists ; create directory */
+      if (structcheck_mkdir(file, utf8) != 0) { /* Can't create directory */
         return -1;
       }
     }
@@ -3023,113 +3041,14 @@ HTSEXT_API int structcheck(const char *path) {
   return 0;
 }
 
-/* path must end with "/" or with the finename (/tmp/bar/ or /tmp/bar/foo.zip) */
+/* Note: *not* UTF-8 */
+HTSEXT_API int structcheck(const char *path) {
+  return structcheck_impl(path, HTS_FALSE);
+}
+
 /* Note: UTF-8 */
 HTSEXT_API int structcheck_utf8(const char *path) {
-  STRUCT_STAT st;
-  char BIGSTK tmpbuf[HTS_URLMAXSIZE * 2];
-  char BIGSTK file[HTS_URLMAXSIZE * 2];
-  int i = 0;
-
-  if (strnotempty(path) == 0)
-    return 0;
-  if (strlen(path) > HTS_URLMAXSIZE) {
-    errno = EINVAL;
-    return -1;
-  }
-
-  /* Get a copy */
-  strcpybuff(file, path);
-#ifdef _WIN32
-  /* To system name */
-  for(i = 0; file[i] != 0; i++) {
-    if (file[i] == '/') {
-      file[i] = PATH_SEPARATOR;
-    }
-  }
-#endif
-  /* Get prefix (note: file can not be empty here) */
-  for(i = (int) strlen(file) - 1; i > 0 && file[i] != PATH_SEPARATOR; i--) ;
-  for(; i > 0 && file[i] == PATH_SEPARATOR; i--) ;
-  file[i + 1] = '\0';
-
-  /* First check the final dir */
-  if (STAT(file, &st) == 0 && S_ISDIR(st.st_mode)) {
-    return 0;                   /* OK */
-  }
-
-  /* Start from the beginning */
-  i = 0;
-
-  /* Skip irrelevant part (the root slash, or the drive path) */
-#ifdef _WIN32
-  if (file[0] != 0 && file[1] == ':') { /* f:\ */
-    i += 2;
-    if (file[i] == PATH_SEPARATOR) {    /* f:\ */
-      i++;
-    }
-  } else if (file[0] == PATH_SEPARATOR && file[1] == PATH_SEPARATOR) {  /* \\mch */
-    int j;
-
-    i += 2;
-    // skip machine and first dir (share) or we'll have troubles (TomZ)
-    for(j = 0; j < 2; j++) {
-      // skip segment
-      for(; file[i] != '\0' && file[i] != PATH_SEPARATOR; i++) ;
-      // skip final separator
-      if (file[i] == PATH_SEPARATOR) {  /* f:\ */
-        i++;
-      }
-    }
-  }
-#endif
-
-  /* Check paths */
-  for (;;) {
-    char end_char;
-
-    /* Go to next path */
-
-    /* Skip separator(s) */
-    for(; file[i] == PATH_SEPARATOR; i++) ;
-    /* Next separator */
-    for(; file[i] != 0 && file[i] != PATH_SEPARATOR; i++) ;
-
-    /* Check */
-    end_char = file[i];
-    if (end_char != 0) {
-      file[i] = '\0';
-    }
-    if (STAT(file, &st) == 0) { /* Something exists */
-      if (!S_ISDIR(st.st_mode)) {
-#if HTS_REMOVE_ANNOYING_INDEX
-        if (S_ISREG(st.st_mode)) {      /* Regular file in place ; move it and create directory */
-          /* bounded here, not by the path-length guard far above */
-          if (!structcheck_aside(tmpbuf, sizeof(tmpbuf), file, HTS_TRUE))
-            return -1;
-          if (RENAME(file, tmpbuf) != 0) {      /* Can't rename regular file */
-            return -1;
-          }
-          if (MKDIR(file) != 0) {       /* Can't create directory */
-            return -1;
-          }
-        }
-#else
-#error Not implemented
-#endif
-      }
-    } else {                    /* Nothing exists ; create directory */
-      if (MKDIR(file) != 0) {   /* Can't create directory */
-        return -1;
-      }
-    }
-    if (end_char == 0) {        /* End */
-      break;
-    } else {
-      file[i] = end_char;       /* Restore / */
-    }
-  }
-  return 0;
+  return structcheck_impl(path, HTS_TRUE);
 }
 
 // sauver un fichier
