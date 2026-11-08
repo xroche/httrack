@@ -132,10 +132,6 @@ EXTRA_DIST = htsstats.h webhttrack.in \
 		httrack.rc \
 		coucal/murmurhash3.h.diff \
 		coucal/murmurhash3.h.orig \
-		minizip/iowin32.c \
-		minizip/iowin32.h \
-		minizip/iowin32.c.diff \
-		minizip/iowin32.c.orig \
 		minizip/ioapi.c.diff \
 		minizip/ioapi.h.diff \
 		minizip/zip.c.diff \
