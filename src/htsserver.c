@@ -217,6 +217,11 @@ static hts_boolean send_all(T_SOC soc, const char *buf, size_t len) {
   return HTS_TRUE;
 }
 
+/* Headers that keep a page out of every cache. */
+#define SMALLSERVER_NO_CACHE                                                   \
+  "Cache-Control: no-cache, must-revalidate, private\r\n"                      \
+  "Pragma: no-cache\r\n"
+
 /* Starts a reply head: status line, then the Server line, then "extra". */
 static void smallserver_head(String *headers, const char *status,
                              const char *extra) {
@@ -2244,9 +2249,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
               (fp = fopen(fsfile, "rb"))) {
             static const char ok_html[] =
                 "Connection: close\r\n"
-                "Content-type: text/html\r\n"
-                "Cache-Control: no-cache, must-revalidate, private\r\n"
-                "Pragma: no-cache\r\n";
+                "Content-type: text/html\r\n" SMALLSERVER_NO_CACHE;
 
             /* register current page */
             coucal_write(NewLangList, "thisfile", (intptr_t) strdup(file));
@@ -2887,10 +2890,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             const char *const theme = effective_theme(path);
 
             smallserver_head(&headers, "200 OK",
-                             "Content-type: text/css\r\n"
-                             "Cache-Control: no-cache, must-revalidate, "
-                             "private\r\n"
-                             "Pragma: no-cache\r\n");
+                             "Content-type: text/css\r\n" SMALLSERVER_NO_CACHE);
             if (strcmp(theme, THEME_CLASSIC) != 0) {
               StringCat(output, "@import url(themes/");
               StringCat(output, theme);
@@ -2901,11 +2901,9 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                what the watchdog reads as a dead window. */
             char window[SMALLSERVER_WINDOW_ID_MAX + 1];
 
-            smallserver_head(&headers, "200 Pong",
-                             "Content-type: text/html\r\n"
-                             "Cache-Control: no-cache, must-revalidate, "
-                             "private\r\n"
-                             "Pragma: no-cache\r\n");
+            smallserver_head(
+                &headers, "200 Pong",
+                "Content-type: text/html\r\n" SMALLSERVER_NO_CACHE);
             if (query_alnum_value(window, sizeof(window), query, "w")) {
               char verb[SMALLSERVER_WINDOW_ID_MAX + 1];
 
