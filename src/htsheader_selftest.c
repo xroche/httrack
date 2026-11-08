@@ -672,19 +672,77 @@ static int st_useragent(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* HTTP status code -> reason phrase, including the modern 429/451. */
+/* HTTP status code -> reason phrase: every table row, and the unknown codes. */
 static int st_status(httrackp *opt, int argc, char **argv) {
-  const char *s;
+  static const struct {
+    int code;
+    const char *text;
+  } cases[] = {
+      {100, "Continue"},
+      {101, "Switching Protocols"},
+      {200, "OK"},
+      {201, "Created"},
+      {202, "Accepted"},
+      {203, "Non-Authoritative Information"},
+      {204, "No Content"},
+      {205, "Reset Content"},
+      {206, "Partial Content"},
+      {207, "Multi-Status"},
+      {300, "Multiple Choices"},
+      {301, "Moved Permanently"},
+      {302, "Moved Temporarily"},
+      {303, "See Other"},
+      {304, "Not Modified"},
+      {305, "Use Proxy"},
+      {306, "Undefined 306 error"},
+      {307, "Temporary Redirect"},
+      {400, "Bad Request"},
+      {401, "Unauthorized"},
+      {402, "Payment Required"},
+      {403, "Forbidden"},
+      {404, "Not Found"},
+      {405, "Method Not Allowed"},
+      {406, "Not Acceptable"},
+      {407, "Proxy Authentication Required"},
+      {408, "Request Time-out"},
+      {409, "Conflict"},
+      {410, "Gone"},
+      {411, "Length Required"},
+      {412, "Precondition Failed"},
+      {413, "Request Entity Too Large"},
+      {414, "Request-URI Too Large"},
+      {415, "Unsupported Media Type"},
+      {416, "Requested Range Not Satisfiable"},
+      {417, "Expectation Failed"},
+      {429, "Too Many Requests"},
+      {451, "Unavailable For Legal Reasons"},
+      {500, "Internal Server Error"},
+      {501, "Not Implemented"},
+      {502, "Bad Gateway"},
+      {503, "Service Unavailable"},
+      {504, "Gateway Time-out"},
+      {505, "HTTP Version Not Supported"},
+  };
+
+  size_t i;
+  int c;
+
   (void) opt;
   (void) argc;
   (void) argv;
-  s = infostatuscode_const(429);
-  assertf(s != NULL && strcmp(s, "Too Many Requests") == 0);
-  s = infostatuscode_const(451);
-  assertf(s != NULL && strcmp(s, "Unavailable For Legal Reasons") == 0);
-  /* A spot-check of a long-standing code, and an unknown one. */
-  s = infostatuscode_const(404);
-  assertf(s != NULL && strcmp(s, "Not Found") == 0);
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    const char *const s = infostatuscode_const(cases[i].code);
+
+    assertf(s != NULL && strcmp(s, cases[i].text) == 0);
+  }
+  /* any code outside the table must stay unknown */
+  for (c = -1; c < 600; c++) {
+    int known = 0;
+
+    for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++)
+      known |= cases[i].code == c;
+    assertf((infostatuscode_const(c) != NULL) == (known != 0));
+  }
   assertf(infostatuscode_const(799) == NULL);
   printf("status self-test OK\n");
   return 0;
