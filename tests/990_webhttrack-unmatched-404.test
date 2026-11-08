@@ -13,11 +13,13 @@ work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_404.XXXXXX") || fail "no tmpdir"
 cleanup_push htsserver_cleanup_dir "${work}"
 htsserver_start --home "${work}"
 
-printf '[a known page still answers 200] ..\t'
-reply=$(htsserver_client --request "GET /server/index.html HTTP/1.0")
-got=$(firstline "$(tr -d '\r' <<<"${reply}")")
-test "${got}" = "HTTP/1.0 200 OK" || fail "index.html: [${got}]"
-printf 'ok\n'
+for page in /server/index.html /server/style.css; do
+    printf '[%s still answers 200] ..\t' "${page}"
+    reply=$(htsserver_client --request "GET ${page} HTTP/1.0")
+    got=$(firstline "$(tr -d '\r' <<<"${reply}")")
+    test "${got}" = "HTTP/1.0 200 OK" || fail "${page}: [${got}]"
+    printf 'ok\n'
+done
 
 while read -r what request; do
     printf '[%s gets a 404] ..\t' "${what}"
@@ -26,7 +28,10 @@ while read -r what request; do
     test "${got}" = "HTTP/1.0 404 Not Found" || fail "${request}: [${got}]"
     grep -q '^Server: httrack small server' <<<"${reply}" ||
         fail "${request}: no Server line: ${reply}"
-    grep -q 'Page not found' <<<"${reply}" || fail "${request}: no body: ${reply}"
+    body=${reply#*$'\r\n\r\n'}
+    test "${body}" = $'Page not found.\r' || fail "${request}: body [${body}]"
+    grep -q $'^Content-length: 17\r$' <<<"${reply}" ||
+        fail "${request}: wrong Content-length: ${reply}"
     printf 'ok\n'
 done <<'REQUESTS'
 unknown-page GET /no-such-page.html HTTP/1.0
