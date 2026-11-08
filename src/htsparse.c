@@ -166,11 +166,6 @@ Please visit our Website: http://www.httrack.com
 #define HT_ADD_URL_PCTQUOTES(A) HT_ADD_HTMLESCAPED_ANY(A, escape_url_quotes, 3)
 /* clang-format on */
 
-// does nothing
-#define XH_uninit do {} while(0)
-
-#define HT_ADD_FOP
-
 /* Mutable extended-context fields: one source of truth so the DEFINE/SET/SAVE
    load and store lists can't drift apart. */
 /* clang-format off */
@@ -1080,11 +1075,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 #endif
 
     // Now, parsing
-    if ((opt->getmode & HTS_GETMODE_HTML) && (ptr > 0)) {
-      // créer le fichier html local
-      HT_ADD_FOP;               // écrire peu à peu le fichier
-    }
-
     if (!error) {
       // output HTML
       TypedArray(char) output_buffer = EMPTY_TYPED_ARRAY;
@@ -1750,18 +1740,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       a++;      // sauter (
                     }
                   }
-                  // euhh ??? ???
-                  /* else if (strfield(adr,".href")) {  // détection ...objet.href="...
-                     a=adr+5;
-                     while(is_realspace(*a)) a++; // sauter espaces
-                     if (*a=='=') {  // ohh un égal
-                     check_this_fking_line=1;  // à noter!
-                     must_be_terminated=';';   // et si t'as oublié le ; tu sais pas coder
-                     a++;   // sauter =
-                     }
-
-                     } */
-
                   // on a un truc du genre instruction"code généré" dont on parse le code
                   if (check_this_fking_line) {
                     while(is_realspace(*a))
@@ -1787,22 +1765,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           a++;
                         if (*a == must_be_terminated) { // parenthèse fermante: ("..")
 
-                          // bon, on doit parser une ligne javascript
-                          // 1) si check.. ==1 alors c'est un nom de fichier direct, donc
-                          // on fixe p sur le saut nécessaire pour atteindre le nom du fichier
-                          // et le moteur se débrouillera ensuite tout seul comme un grand
-                          // 2) si check==2 c'est un peu plus tordu car là on génére du
-                          // code html au sein de code javascript au sein de code html
-                          // dans ce cas on doit fixer un flag à un puis ensuite dans la boucle
-                          // on devra parser les instructions standard comme <a href etc
-                          // NOTE: le code javascript autogénéré n'est pas pris en compte!!
-                          // (et ne marche pas dans 50% des cas de toute facon!)
-                          if (check_this_fking_line == 1) {
-                            p = (int) (b - html);        // calculer saut!
-                          } else {
-                            inscriptgen = 1;    // SCRIPTGEN actif
-                            html = b;    // jump
-                          }
+                          // HTML generated inside javascript inside HTML: parse
+                          // it with the standard rules, from the quote on.
+                          inscriptgen = 1;
+                          html = b;
 
                           if ((opt->debug > 1) && (opt->log != NULL)) {
                             char str[64];
@@ -1810,8 +1776,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             hts_log_print(
                                 opt, LOG_DEBUG,
                                 "active code (%s) detected in javascript: %s",
-                                (check_this_fking_line == 2) ? "parse"
-                                                             : "pickup",
+                                "parse",
                                 text_excerpt(opt, str, sizeof(str), b,
                                              (size_t) (a - b + 1), 32));
                           }
@@ -2814,15 +2779,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 }
                 // drop a default :80 port from the authority
                 hts_strip_default_port(lien, sizeof(lien));
-                // filtrer les parazites (mailto & cie)
-                /*
-                   if (strfield(lien,"mailto:")) {  // ne pas traiter
-                   error=1;
-                   } else if (strfield(lien,"news:")) {  // ne pas traiter
-                   error=1;
-                   }
-                 */
-
                 // vérifier que l'on ne doit pas ajouter de .class
                 if (!error) {
                   if (add_class) {
@@ -3303,8 +3259,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             //
                           } else {      // fichier/page externe, mais on veut générer une erreur
                             //
-                            int patch_it = 0;
-                            int add_url = 0;
                             const char *cat_name = NULL;
                             const char *cat_data = NULL;
                             int cat_nb = 0;
@@ -3319,8 +3273,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             case 1:
                             case -2:   // html ou répertoire
                               if (opt->getmode & HTS_GETMODE_HTML) {
-                                patch_it = 1;   // redirect
-                                add_url = 1;    // avec link?
                                 cat_name = "external.html";
                                 cat_nb = 0;
                                 cat_data = HTS_DATA_UNKNOWN_HTML;
@@ -3335,15 +3287,11 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                               if (get_httptype_sized(opt, mime, sizeof(mime),
                                                      afs.af.fil, 0) &&
                                   strfield(mime, "image/")) {
-                                patch_it = 1;   // redirect
-                                add_url = 1;    // with link too
                                 cat_name = "external.gif";
                                 cat_nb = 1;
                                 cat_data = HTS_DATA_UNKNOWN_GIF;
                                 cat_data_len = HTS_DATA_UNKNOWN_GIF_LEN;
                               } else {
-                                patch_it = 1;   // redirect
-                                add_url = 1;    // with link?
                                 cat_name = "external.html";
                                 cat_nb = 0;
                                 cat_data = HTS_DATA_UNKNOWN_HTML;
@@ -3353,105 +3301,89 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             }
                             } // html,gif
 
-                            if (patch_it) {
-                              char BIGSTK save[HTS_URLMAXSIZE * 2];
-                              char BIGSTK tempo[HTS_URLMAXSIZE * 2];
+                            char BIGSTK save[HTS_URLMAXSIZE * 2];
+                            char BIGSTK tempo[HTS_URLMAXSIZE * 2];
 
-                              strcpybuff(save, StringBuff(opt->path_html_utf8));
-                              strcatbuff(save, cat_name);
-                              if (lienrelatif(tempo, sizeof(tempo), save,
-                                              relativesavename()) == 0) {
-                                /* Never escape high-chars (we don't know the encoding!!) */
-                                inplace_escape_uri_utf(
-                                    tempo, sizeof(tempo)); // escape with %xx
-                                HT_ADD_HTMLESCAPED(tempo);      // page externe
-                                if (add_url) {
-                                  HT_ADD("?link=");     // page externe
+                            strcpybuff(save, StringBuff(opt->path_html_utf8));
+                            strcatbuff(save, cat_name);
+                            if (lienrelatif(tempo, sizeof(tempo), save,
+                                            relativesavename()) == 0) {
+                              /* Never escape high-chars (we don't know the
+                               * encoding!!) */
+                              inplace_escape_uri_utf(
+                                  tempo, sizeof(tempo)); // escape with %xx
+                              HT_ADD_HTMLESCAPED(tempo); // page externe
+                              HT_ADD("?link=");          // page externe
 
-                                  // same as above
-                                  if (!link_has_authority(afs.af.adr)) {
-                                    HT_ADD("http://");
-                                    if (!opt->passprivacy) {
-                                      HT_ADD_URL_HTMLESCAPED(
-                                          afs.af.adr); // Password
-                                    } else {
-                                      HT_ADD_URL_HTMLESCAPED(
-                                          jump_identification_const(
-                                              afs.af.adr)); // No Password
-                                    }
-                                    if (afs.af.fil[0] != '/')
-                                      HT_ADD("/");
-                                    HT_ADD_URL_HTMLESCAPED(afs.af.fil);
-                                  } else {
-                                    char *aut = strstr(afs.af.adr, "//");
-
-                                    if (aut) {
-                                      char tmp[256];
-
-                                      tmp[0] = '\0';
-                                      strncatbuff(tmp, afs.af.adr, (aut - afs.af.adr) + 2);     // scheme
-                                      HT_ADD(tmp);
-                                      if (!opt->passprivacy) {
-                                        HT_ADD_URL_HTMLESCAPED(
-                                            jump_protocol_const(
-                                                afs.af.adr)); // Password
-                                      } else {
-                                        HT_ADD_URL_HTMLESCAPED(
-                                            jump_identification_const(
-                                                afs.af.adr)); // No Password
-                                      }
-                                      if (afs.af.fil[0] != '/')
-                                        HT_ADD("/");
-                                      HT_ADD_URL_HTMLESCAPED(afs.af.fil);
-                                    }
-                                  }
-                                  //
-
+                              // same as above
+                              if (!link_has_authority(afs.af.adr)) {
+                                HT_ADD("http://");
+                                if (!opt->passprivacy) {
+                                  HT_ADD_URL_HTMLESCAPED(
+                                      afs.af.adr); // Password
+                                } else {
+                                  HT_ADD_URL_HTMLESCAPED(
+                                      jump_identification_const(
+                                          afs.af.adr)); // No Password
                                 }
-                              }
-                              // écrire fichier?
-                              if (verif_external(opt, cat_nb, 1)) {
-                                FILE *fp =
-                                  filecreate(&opt->state.strc,
-                                             fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), 
-                                                     StringBuff(opt->
-                                                                path_html_utf8),
-                                                     cat_name));
-                                if (fp) {
-                                  if (cat_data_len == 0) {      // texte
-                                    verif_backblue(opt,
-                                                   StringBuff(opt->
-                                                              path_html_utf8));
-                                    fprintf(fp, "%s%s",
-                                            "<!-- Created by HTTrack Website Copier/"
-                                            HTTRACK_VERSION " "
-                                            HTTRACK_AFF_AUTHORS " -->" LF,
-                                            cat_data);
-                                  } else {      // data
-                                    (void) hts_fwrite_exact(
-                                        cat_data, (size_t) cat_data_len, fp);
-                                  }
-                                  fclose(fp);
-                                  usercommand(opt, 0, NULL,
-                                              fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), 
-                                                      StringBuff(opt->
-                                                                 path_html_utf8),
-                                                      cat_name), "", "");
-                                }
-                              }
-                            } else {    // écrire normalement le nom de fichier
-                              HT_ADD("http://");
-                              if (!opt->passprivacy) {
-                                HT_ADD_URL_HTMLESCAPED(afs.af.adr); // Password
+                                if (afs.af.fil[0] != '/')
+                                  HT_ADD("/");
+                                HT_ADD_URL_HTMLESCAPED(afs.af.fil);
                               } else {
-                                HT_ADD_URL_HTMLESCAPED(
-                                    jump_identification_const(
-                                        afs.af.adr)); // No Password
+                                char *aut = strstr(afs.af.adr, "//");
+
+                                if (aut) {
+                                  char tmp[256];
+
+                                  tmp[0] = '\0';
+                                  strncatbuff(tmp, afs.af.adr,
+                                              (aut - afs.af.adr) + 2); // scheme
+                                  HT_ADD(tmp);
+                                  if (!opt->passprivacy) {
+                                    HT_ADD_URL_HTMLESCAPED(jump_protocol_const(
+                                        afs.af.adr)); // Password
+                                  } else {
+                                    HT_ADD_URL_HTMLESCAPED(
+                                        jump_identification_const(
+                                            afs.af.adr)); // No Password
+                                  }
+                                  if (afs.af.fil[0] != '/')
+                                    HT_ADD("/");
+                                  HT_ADD_URL_HTMLESCAPED(afs.af.fil);
+                                }
                               }
-                              if (afs.af.fil[0] != '/')
-                                HT_ADD("/");
-                              HT_ADD_URL_HTMLESCAPED(afs.af.fil);
-                            }   // patcher?
+                            }
+                            // écrire fichier?
+                            if (verif_external(opt, cat_nb, 1)) {
+                              FILE *fp = filecreate(
+                                  &opt->state.strc,
+                                  fconcat(OPT_GET_BUFF(opt),
+                                          OPT_GET_BUFF_SIZE(opt),
+                                          StringBuff(opt->path_html_utf8),
+                                          cat_name));
+                              if (fp) {
+                                if (cat_data_len == 0) { // texte
+                                  verif_backblue(
+                                      opt, StringBuff(opt->path_html_utf8));
+                                  fprintf(fp, "%s%s",
+                                          "<!-- Created by HTTrack Website "
+                                          "Copier/" HTTRACK_VERSION
+                                          " " HTTRACK_AFF_AUTHORS " -->" LF,
+                                          cat_data);
+                                } else { // data
+                                  (void) hts_fwrite_exact(
+                                      cat_data, (size_t) cat_data_len, fp);
+                                }
+                                fclose(fp);
+                                usercommand(
+                                    opt, 0, NULL,
+                                    fconcat(OPT_GET_BUFF(opt),
+                                            OPT_GET_BUFF_SIZE(opt),
+                                            StringBuff(opt->path_html_utf8),
+                                            cat_name),
+                                    "", "");
+                              }
+                            }
                           }     // external
                         } else {        // que le nom de fichier (classe java)
                           // en gros recopie de plus bas: copier codebase et base
@@ -3521,25 +3453,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         }
                       }
                       lastsaved = eadr - 1;
-                    }
-                    /*
-                       else if (opt->urlmode==1) {    // ABSOLU, c'est le cas le
-                       moins courant
-                       //  NE FONCTIONNE PAS!!  (et est inutile)
-                       if ((opt->getmode & 1) && (ptr>0)) {    // ecrire les
-                       html
-                       // écrire le lien modifié, absolu
-                       HT_ADD("file:");
-                       if (*save=='/')
-                       HT_ADD(save+1)
-                       else
-                       HT_ADD(save)
-                       }
-                       lastsaved=eadr-1;    // dernier écrit+1 (enfin euh apres
-                       on fait un ++ alors hein)
-                       }
-                     */
-                    else if (opt->mimehtml) {
+                    } else if (opt->mimehtml) {
                       char BIGSTK cid[HTS_URLMAXSIZE * 3];
 
                       HT_ADD("cid:");
@@ -3763,13 +3677,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         }
 
                         /* If the file seems to be an html file, get depth-1 */
-                        /*
-                           if (strnotempty(save)) {
-                           if (ishtml(opt,save) == 1) {
-                           } else {
-                           }
-                           }
-                         */
 
                         // vérifier que le lien n'a pas déja été noté
                         // si c'est le cas, alors il faut s'assurer que la priorité associée
@@ -3816,16 +3723,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                     checkrobots_set(_ROBOTS, afs.af.adr, "");  // ajouter entrée vide
                                     if (checkrobots(_ROBOTS, afs.af.adr, "") == -1) {  // robots.txt ?
                                       // enregistrer robots.txt (MACRO)
-                                      if (!hts_record_link(opt, afs.af.adr, "/robots.txt", "", "", "", NULL)) {
-                                        if ((opt->getmode & HTS_GETMODE_HTML) &&
-                                            (ptr > 0)) {
-                                          if (fp) {
-                                            fclose(fp);
-                                            fp = NULL;
-                                          }
-                                        }
+                                      if (!hts_record_link(opt, afs.af.adr,
+                                                           "/robots.txt", "",
+                                                           "", "", NULL)) {
                                         TypedArrayFree(output_buffer);
-                                        XH_uninit;      // désallocation mémoire & buffers
                                         return -1;
                                       }
                                       heap_top()->testmode = 0;    // pas mode test
@@ -3857,17 +3758,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           // FIN ROBOTS.TXT AJOUT
 
                           // enregistrer
-                          if (!hts_record_link(opt, afs.af.adr, afs.af.fil, afs.save, 
-                                               former.adr, former.fil, codebase)) {
-                            if ((opt->getmode & HTS_GETMODE_HTML) &&
-                                (ptr > 0)) {
-                              if (fp) {
-                                fclose(fp);
-                                fp = NULL;
-                              }
-                            }
+                          if (!hts_record_link(opt, afs.af.adr, afs.af.fil,
+                                               afs.save, former.adr, former.fil,
+                                               codebase)) {
                             TypedArrayFree(output_buffer);
-                            XH_uninit;  // désallocation mémoire & buffers
                             return -1;
                           }
                           heap_top()->fetch = link_fetch;
@@ -3960,9 +3854,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             }
 
             /* We skipped bytes and skip the " : reset state */
-            /*if (inscript) {
-               inscript_state_pos = INSCRIPT_START;
-               } */
 
  } // if (p)
 
@@ -4041,7 +3932,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
             hts_store_release_int(stre->exit_xh_, 1); // exit requested
             TypedArrayFree(output_buffer);
-            XH_uninit;
             return -1;
           } else if (opt->state._hts_cancel == 1) {
             nofollow = 1;       // moins violent
@@ -4112,13 +4002,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       //
       //
     }                           // if !error
-
-    if (opt->getmode & HTS_GETMODE_HTML) {
-      if (fp) {
-        fclose(fp);
-        fp = NULL;
-      }
-    }
 
   }                             // analyse OK
 
@@ -4348,8 +4231,7 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
                     hts_fetch_through(opt, &heap_top()->fetch, heap(ptr)->adr);
                     heap_top()->premier = heap(ptr)->premier;
                     heap_top()->precedent = heap(ptr)->precedent;
-                  } else {      // oups erreur, plus de mémoire!!
-                    XH_uninit;  // désallocation mémoire & buffers
+                  } else { // oups erreur, plus de mémoire!!
                     return 0;
                   }
                 } else {
@@ -4459,7 +4341,6 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
           error = 1;
           hts_invalidate_link(opt, ptr); // invalidate hashtable entry
         } else {                         // out of memory
-          XH_uninit;
           return 0;
         }
       } else {
@@ -4721,7 +4602,6 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
   if (hts_take_lock_request(opt, HTS_ABORT_LOCKNAME)) {
     hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
     hts_store_release_int(stre->exit_xh_, 1);
-    XH_uninit;
     return;
   }
 
@@ -4751,7 +4631,6 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
           if (!hts_loop_tick(sback, opt, b, ptr) || !back_checkmirror(opt)) {
             hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
             hts_store_release_int(stre->exit_xh_, 1); // exit requested
-            XH_uninit;
             return;
           }
         }
@@ -4842,7 +4721,6 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
               break;
             } else { // out of memory
               hts_addurl_free(addurl);
-              XH_uninit;        // désallocation mémoire & buffers
               return;
             }
           } else {
@@ -4881,7 +4759,6 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
       if (!hts_loop_tick(sback, opt, b, ptr)) {
         hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
         hts_store_release_int(stre->exit_xh_, 1); // exit requested
-        XH_uninit;
         return;
       }
       /* Read here as well, or a mirror down to its last socket sees no stop
@@ -4893,7 +4770,6 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
       /* Same omission as the wait for the current link: with every slot busy
          the mirror parks here instead, and the exit never lands (#1096). */
       if (hts_load_acquire_int(stre->exit_xh_)) {
-        XH_uninit;
         return;
       }
       Sleep(100);               // pause
@@ -5001,13 +4877,11 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
       if (!back_checkmirror(opt)) {
         hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
         hts_store_release_int(stre->exit_xh_, 1); // exit requested
-        XH_uninit;
         return 0;
       }
       /* An exit asked of the engine must leave this wait too: only teardown
          stops a live FTP worker, so waiting on its slot never ends (#1096). */
       if (hts_load_acquire_int(stre->exit_xh_)) {
-        XH_uninit;
         return 0;
       }
       // And fill the backing stack
@@ -5101,7 +4975,6 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
         if (!hts_loop_tick(sback, opt, b, ptr)) {
           hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
           hts_store_release_int(stre->exit_xh_, 1); // exit requested
-          XH_uninit;
           return 0;
         }
       }
@@ -5396,7 +5269,6 @@ int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
         if (b < 0) {
           printf("PANIC! : Crash adding error, unexpected error found.. [%d]\n",
                  __LINE__);
-          XH_uninit;            // désallocation mémoire & buffers
           return -1;
         }
 
@@ -5453,10 +5325,9 @@ int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
             b = back_index(opt, sback, afs->af.adr, afs->af.fil, afs->save);
           }
           if (b < 0) {
-            printf
-              ("PANIC! : Crash adding error, unexpected error found.. [%d]\n",
-               __LINE__);
-            XH_uninit;          // désallocation mémoire & buffers
+            printf(
+                "PANIC! : Crash adding error, unexpected error found.. [%d]\n",
+                __LINE__);
             return -1;
           }
 
@@ -5700,7 +5571,6 @@ int hts_wait_delayed(htsmoduleStruct *str, lien_adrfilsave *afs,
       } else {
         printf("PANIC! : Crash adding error, unexpected error found.. [%d]\n",
                __LINE__);
-        XH_uninit;              // désallocation mémoire & buffers
         return -1;
       }
 
