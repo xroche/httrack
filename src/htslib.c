@@ -2513,70 +2513,34 @@ HTSEXT_API void infostatuscode(char *msg, int statuscode) {
   }
 }
 
-// check if data is available
-int check_readinput(htsblk * r) {
-  if (r->soc != INVALID_SOCKET) {
-    fd_set fds;                 // poll structures
-    struct timeval tv;          // structure for select
-    const int soc = (int) r->soc;
+/* Wait up to timeout seconds for soc to be readable, or writable when for_write
+   is set. No exception set, because POSIX reports urgent data there. */
+static hts_boolean soc_wait(T_SOC soc, int timeout, hts_boolean for_write) {
+  fd_set fds;
+  struct timeval tv;
+  const int isoc = (int) soc;
 
-    assertf(soc == r->soc);
-    if (!hts_soc_selectable(soc))
-      return 0;
-    FD_ZERO(&fds);
-    FD_SET(soc, &fds);
-    tv.tv_sec = 0;
-    tv.tv_usec = 0;
-    select(soc + 1, &fds, NULL, NULL, &tv);
-    if (FD_ISSET(soc, &fds))
-      return 1;
-    else
-      return 0;
-  } else
-    return 0;
+  if (soc == INVALID_SOCKET)
+    return HTS_FALSE;
+  assertf(isoc == soc);
+  if (!hts_soc_selectable(isoc))
+    return HTS_FALSE;
+  FD_ZERO(&fds);
+  FD_SET(isoc, &fds);
+  tv.tv_sec = timeout;
+  tv.tv_usec = 0;
+  select(isoc + 1, for_write ? NULL : &fds, for_write ? &fds : NULL, NULL, &tv);
+  return FD_ISSET(isoc, &fds) ? HTS_TRUE : HTS_FALSE;
 }
 
-// check if data is available
+int check_readinput(htsblk *r) { return soc_wait(r->soc, 0, HTS_FALSE); }
+
 int check_readinput_t(T_SOC soc, int timeout) {
-  if (soc != INVALID_SOCKET) {
-    fd_set fds;                 // poll structures
-    struct timeval tv;          // structure for select
-    const int isoc = (int) soc;
-
-    assertf(isoc == soc);
-    if (!hts_soc_selectable(isoc))
-      return 0;
-    FD_ZERO(&fds);
-    FD_SET(isoc, &fds);
-    tv.tv_sec = timeout;
-    tv.tv_usec = 0;
-    select(isoc + 1, &fds, NULL, NULL, &tv);
-    if (FD_ISSET(isoc, &fds))
-      return 1;
-    else
-      return 0;
-  } else
-    return 0;
+  return soc_wait(soc, timeout, HTS_FALSE);
 }
 
-// wait until the socket is writable, up to timeout seconds
 int check_writeinput_t(T_SOC soc, int timeout) {
-  if (soc != INVALID_SOCKET) {
-    fd_set fds;
-    struct timeval tv;
-    const int isoc = (int) soc;
-
-    assertf(isoc == soc);
-    if (!hts_soc_selectable(isoc))
-      return 0;
-    FD_ZERO(&fds);
-    FD_SET(isoc, &fds);
-    tv.tv_sec = timeout;
-    tv.tv_usec = 0;
-    select(isoc + 1, NULL, &fds, NULL, &tv);
-    return FD_ISSET(isoc, &fds) ? 1 : 0;
-  } else
-    return 0;
+  return soc_wait(soc, timeout, HTS_TRUE);
 }
 
 /* Class the live errno now: back_wait() sees it after free() and fflush() and
