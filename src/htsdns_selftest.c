@@ -36,8 +36,6 @@ Please visit our Website: http://www.httrack.com
    fixed set of scenarios (IPv4/IPv6/dual-stack, errors, family filter,
    cache reuse) with no live DNS. */
 
-#define HTS_INTERNAL_BYTECODE
-
 #include "htsselftest_int.h"
 
 #include <setjmp.h>

@@ -38,8 +38,6 @@ Please visit our Website: http://www.httrack.com
    (index/lookup scale) and a handful of large compressible/incompressible
    bodies (zlib deflate/inflate). Reached via `httrack -#A <dir>`. */
 
-#define HTS_INTERNAL_BYTECODE
-
 #include "htsselftest_int.h"
 
 #include <errno.h>
