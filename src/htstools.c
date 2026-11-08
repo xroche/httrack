@@ -543,40 +543,38 @@ void longfile_to_83(int mode, char *n83, size_t n83size, char *save) {
   }
 }
 
-// écrire backblue.gif
-/* Note: utf-8 */
-int verif_backblue(httrackp * opt, const char *base) {
+/* Writes backblue.gif and fade.gif into base (utf-8) when missing or stale. */
+int verif_backblue(httrackp *opt, const char *base) {
+  static const struct {
+    const char *name;
+    const char *data;
+    size_t size;
+  } gifs[] = {{"backblue.gif", HTS_DATA_BACK_GIF, HTS_DATA_BACK_GIF_LEN},
+              {"fade.gif", HTS_DATA_FADE_GIF, HTS_DATA_FADE_GIF_LEN}};
   int ret = 0;
+  size_t i;
 
-  //
-  if (!base) {                  // init
+  if (!base) { // init
     opt->state.verif_backblue_done = 0;
     return 0;
   }
-  if ((!opt->state.verif_backblue_done)
-      || (fsize_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), base, "backblue.gif")) !=
-          HTS_DATA_BACK_GIF_LEN)) {
-    FILE *fp =
-      filecreate(&opt->state.strc,
-                 fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), base, "backblue.gif"));
-    opt->state.verif_backblue_done = 1;
+  if (opt->state.verif_backblue_done &&
+      fsize_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), base,
+                         gifs[0].name)) == HTS_DATA_BACK_GIF_LEN)
+    return 0;
+  opt->state.verif_backblue_done = 1;
+  for (i = 0; i < sizeof(gifs) / sizeof(gifs[0]); i++) {
+    const char *const path =
+        fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), base, gifs[i].name);
+    FILE *const fp = filecreate(&opt->state.strc, path);
+
     if (fp) {
-      if (!hts_fwrite_exact(HTS_DATA_BACK_GIF, HTS_DATA_BACK_GIF_LEN, fp))
+      if (!hts_fwrite_exact(gifs[i].data, gifs[i].size, fp))
         ret = 1;
       fclose(fp);
       usercommand(opt, 0, NULL,
-                  fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), base, "backblue.gif"), "", "");
-    } else
-      ret = 1;
-    //
-    fp =
-      filecreate(&opt->state.strc,
-                 fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), base, "fade.gif"));
-    if (fp) {
-      if (!hts_fwrite_exact(HTS_DATA_FADE_GIF, HTS_DATA_FADE_GIF_LEN, fp))
-        ret = 1;
-      fclose(fp);
-      usercommand(opt, 0, NULL, fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), base, "fade.gif"),
+                  fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), base,
+                          gifs[i].name),
                   "", "");
     } else
       ret = 1;
@@ -597,28 +595,8 @@ int verif_external(httrackp * opt, int nb, int test) {
   return 0;
 }
 
-// recherche chaîne de type truc<espaces>=
-// renvoi décalage à effectuer ou 0 si non trouvé
-/* SECTION OPTIMISEE:
-#define rech_tageq(adr,s) ( \
-  ( (*(adr-1)=='<') || (is_space(*(adr-1))) ) ? \
-    ( (streql(*adr,*s)) ? \
-      (__rech_tageq(adr,s)) \
-      : 0 \
-    ) \
-    : 0\
-  )
-*/
-/*
-HTS_INLINE int rech_tageq(const char* adr,const char* s) { 
-  if ( (*(adr-1)=='<') || (is_space(*(adr-1))) ) {   // <tag < tag etc
-    if (streql(*adr,*s)) {                           // tester premier octet (optimisation)
-      return __rech_tageq(adr,s);
-    }
-  }
-  return 0;
-}
-*/
+/* Offset past `name<spaces>=` at adr, or 0 if absent (rech_tageq() is the
+   macro in htstools.h that tests the preceding character first). */
 HTS_INLINE char html_prevc(const char *adr, const char *start) {
   return adr > start ? adr[-1] : ' ';
 }
@@ -1412,9 +1390,8 @@ HTSEXT_API find_handle hts_findfirst(char *path) {
   if (path) {
     if (strnotempty(path)) {
       find_handle_struct *find =
-        (find_handle_struct *) calloc(1, sizeof(find_handle_struct));
+          (find_handle_struct *) calloct(1, sizeof(find_handle_struct));
       if (find) {
-        memset(find, 0, sizeof(find_handle_struct));
 #ifdef _WIN32
         {
           char BIGSTK rpath[1024 * 2];

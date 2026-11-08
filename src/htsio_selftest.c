@@ -939,6 +939,22 @@ static char *golden_slurp(const char *path, size_t *len) {
   return buf;
 }
 
+/* Is the file at dir/name exactly these bytes? */
+static hts_boolean gif_is(const char *dir, const char *name, const char *data,
+                          size_t size) {
+  char path[HTS_URLMAXSIZE + 64];
+  size_t len = 0;
+  char *got;
+  hts_boolean ok;
+
+  snprintf(path, sizeof(path), "%s/%s", dir, name);
+  got = golden_slurp(path, &len);
+  ok = got != NULL && len == size && memcmp(got, data, size) == 0 ? HTS_TRUE
+                                                                  : HTS_FALSE;
+  freet(got);
+  return ok;
+}
+
 /* The top index of a multi-project root, byte for byte against a golden file
    with the version masked. Names are system-charset (CP1252 on Windows) and
    the golden is UTF-8 either way. argv: <dir> <golden>. */
@@ -1013,6 +1029,19 @@ static int st_topindexgolden(httrackp *opt, int argc, char **argv) {
   }
   freet(got);
   freet(want);
+
+  /* the two gifs are written whole, and a stale one is rewritten */
+  assertf(
+      gif_is(topdir, "backblue.gif", HTS_DATA_BACK_GIF, HTS_DATA_BACK_GIF_LEN));
+  assertf(gif_is(topdir, "fade.gif", HTS_DATA_FADE_GIF, HTS_DATA_FADE_GIF_LEN));
+  snprintf(path, sizeof(path), "%s/backblue.gif", topdir);
+  assertf(fclose(fopen(path, "wb")) == 0);
+  snprintf(path, sizeof(path), "%s/fade.gif", topdir);
+  assertf(fclose(fopen(path, "wb")) == 0);
+  assertf(hts_buildtopindex(opt, topdir, "") != 0);
+  assertf(
+      gif_is(topdir, "backblue.gif", HTS_DATA_BACK_GIF, HTS_DATA_BACK_GIF_LEN));
+  assertf(gif_is(topdir, "fade.gif", HTS_DATA_FADE_GIF, HTS_DATA_FADE_GIF_LEN));
   printf("topindexgolden OK\n");
   return 0;
 }
