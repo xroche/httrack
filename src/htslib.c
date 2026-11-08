@@ -132,13 +132,6 @@ Please visit our Website: http://www.httrack.com
 #endif
 /* END specific definitions */
 
-/* Windows might be missing va_copy */
-#ifdef _WIN32
-#ifndef va_copy
-#define va_copy(dst, src) ((dst) = (src))
-#endif
-#endif
-
 /* variables globales */
 int _DEBUG_HEAD;
 FILE *ioinfo;

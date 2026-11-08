@@ -107,18 +107,11 @@ hts_boolean hts_location_is_safe(const char *location);
 
 /* concat */
 
-#if ( defined(_WIN32) && defined(_MSC_VER) && ( _MSC_VER >= 1300 ) && (_MSC_VER <= 1310 ) )
-/* NOTE: VC2003 inlining bug in optim mode not respecting function call sequence point */
-#define MSVC2003INLINEBUG __declspec(noinline)
-#else
-#define MSVC2003INLINEBUG
-#endif
-MSVC2003INLINEBUG HTS_STATIC char *getHtsOptBuff_(httrackp * opt) {
+HTS_STATIC char *getHtsOptBuff_(httrackp *opt) {
   opt->state.concat.index = (opt->state.concat.index + 1) % 16;
   return opt->state.concat.buff[opt->state.concat.index];
 }
 
-#undef MSVC2003INLINEBUG
 #define OPT_GET_BUFF(OPT)      ( getHtsOptBuff_(OPT) )
 #define OPT_GET_BUFF_SIZE(OPT) ( sizeof(opt->state.concat.buff[0]) )
 
