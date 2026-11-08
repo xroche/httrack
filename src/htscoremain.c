@@ -1748,12 +1748,13 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 }
                 break;          // Keyword Index
               case 'c': {
-                /* GUIs pass this field as typed: warn, never abort */
+                /* GUIs pass this field as typed, so a bad one only warns */
                 const char *const val = com + 1;
                 char *end;
                 const double v = strtod(val, &end);
 
-                if (end == val || !(v >= 0 && v <= FLT_MAX)) {
+                if (end == val || !(v >= 0 && v <= FLT_MAX) ||
+                    (*end != '\0' && strchr("0123456789.,", *end) != NULL)) {
                   fprintf(stderr,
                           "* Warning: connection-per-second rate \"%s\" "
                           "ignored\n",
