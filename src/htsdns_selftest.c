@@ -522,7 +522,7 @@ static int dns_selftests(httrackp *opt) {
     T_SOC s;
 
     hts_init_htsblk(&r);
-    s = newhttp_addr(opt, "dual.test", &r, 80, 0, 0, &count);
+    s = newhttp_addr(opt, "dual.test", &r, 80, 0, &count);
     CHECK(count == 2);
     CHECK(SOCaddr_sinfamily(r.address) == AF_INET6); /* index 0 = v6 */
     if (s != INVALID_SOCKET)
@@ -530,7 +530,7 @@ static int dns_selftests(httrackp *opt) {
 
     hts_init_htsblk(&r);
     count = -1;
-    s = newhttp_addr(opt, "dual.test", &r, 80, 0, 1, &count);
+    s = newhttp_addr(opt, "dual.test", &r, 80, 1, &count);
     CHECK(count == 2);
     CHECK(SOCaddr_sinfamily(r.address) == AF_INET); /* index 1 = v4 */
     if (s != INVALID_SOCKET)
@@ -538,7 +538,7 @@ static int dns_selftests(httrackp *opt) {
 
     /* out-of-range index: no address selected (address stays unset) */
     hts_init_htsblk(&r);
-    s = newhttp_addr(opt, "dual.test", &r, 80, 0, 2, NULL);
+    s = newhttp_addr(opt, "dual.test", &r, 80, 2, NULL);
     CHECK(s == INVALID_SOCKET);
     if (s != INVALID_SOCKET)
       deletesoc(s);
@@ -567,7 +567,7 @@ static int dns_selftests(httrackp *opt) {
       T_SOC s;
 
       hts_init_htsblk(&r);
-      s = newhttp_addr(opt, good[k], &r, -1, 0, 0, &count);
+      s = newhttp_addr(opt, good[k], &r, -1, 0, &count);
       CHECK(count == 2); /* accepted: reached the resolve */
       if (s != INVALID_SOCKET)
         deletesoc(s);
@@ -579,7 +579,7 @@ static int dns_selftests(httrackp *opt) {
       T_SOC s;
 
       hts_init_htsblk(&r);
-      s = newhttp_addr(opt, bad[k], &r, -1, 0, 0, &count);
+      s = newhttp_addr(opt, bad[k], &r, -1, 0, &count);
       CHECK(s == INVALID_SOCKET);
       CHECK(count == 0); /* refused before resolving, not a failed connect */
       CHECK(strstr(r.msg, "Invalid port") != NULL);

@@ -277,22 +277,6 @@ void back_free(struct_back ** sback) {
    above a normal handshake. The last candidate still gets the full timeout. */
 #define HTS_CONNECT_FALLBACK_TIMEOUT 10
 
-void back_read_ftp_result(FILE *fp, htsblk *r) {
-  size_t j = 0;
-
-  if (fscanf(fp, "%d ", &r->statuscode) != 1)
-    r->statuscode = STATUSCODE_INVALID;
-  // an external helper writes this file: stop at capacity, not at EOF
-  while (j + 1 < sizeof(r->msg)) {
-    const int c = fgetc(fp);
-
-    if (c == EOF)
-      break;
-    r->msg[j++] = (char) c;
-  }
-  r->msg[j] = '\0';
-}
-
 int back_connect_fallback_due(int addr_index, int addr_count, int elapsed,
                               int timeout) {
   int deadline;
@@ -324,7 +308,7 @@ static int back_connect_next(httrackp *opt, struct_back *sback, int i) {
     deletehttp(&back[i].r);
     back[i].r.soc = INVALID_SOCKET;
   }
-  soc = newhttp_addr(opt, back[i].url_adr, &back[i].r, -1, 0, next, NULL);
+  soc = newhttp_addr(opt, back[i].url_adr, &back[i].r, -1, next, NULL);
   if (soc == INVALID_SOCKET)
     return 0;
 
@@ -3121,11 +3105,7 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
           str->pOpt = opt;
           /* */
           back[p].status = STATUS_FTP_TRANSFER; // connexion ftp
-#if USE_BEGINTHREAD
           launch_ftp(str);
-#else
-#error Must have pthreads
-#endif
           return 0;
         }
       } else if (strfield(back[p].url_adr, "https://")) {
@@ -3143,34 +3123,15 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
       }
 
       if (!back_trylive(opt, cache, sback, p)) {
-#if HTS_XGETHOST
         back[p].status = STATUS_WAIT_DNS; // host name resolution attempt
         soc = INVALID_SOCKET;             // not opened yet
         if (host_wait(opt, &back[p])) {   // ready (file, or cached dns)
-          soc =
-            http_xfopen(opt, 0, 0, 0, back[p].send_too, adr, fil, &back[p].r);
+          soc = http_xfopen(opt, adr, fil, &back[p].r);
           if (soc == INVALID_SOCKET) {
             back[p].status = STATUS_READY;      // fini, erreur
             back_set_finished(opt, sback, p);
           }
         }
-        //
-#else
-        //
-
-        if (strnotempty(back[p].send_too))      // envoyer un if-modified-since
-#if HTS_XCONN
-          soc = http_xfopen(0, 0, 0, back[p].send_too, adr, fil, &(back[p].r));
-#else
-          soc = http_xfopen(0, 0, 1, back[p].send_too, adr, fil, &(back[p].r));
-#endif
-        else
-#if HTS_XCONN
-          soc = http_xfopen(test, 0, 0, NULL, adr, fil, &(back[p].r));
-#else
-          soc = http_xfopen(test, 0, 1, NULL, adr, fil, &(back[p].r));
-#endif
-#endif
       } else {
         soc = back[p].r.soc;
 
@@ -3198,31 +3159,13 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
       // cela est rattrapable (exemple: 301,302 moved xxx -> refresh sur la
       // page!)
 
-#if HTS_XGETHOST
       if (soc != INVALID_SOCKET)
         if (back_status(&back[p]) == STATUS_WAIT_DNS) { // no error
           if (!back[p].r.is_file)
-            back[p].status = STATUS_CONNECTING; // connexion en cours
+            back[p].status = STATUS_CONNECTING;
           else
-            back[p].status = 1; // fichier
+            back[p].status = 1; // file
         }
-#else
-      if (soc == INVALID_SOCKET) {      // erreur socket
-        back[p].status = STATUS_READY;  // FINI
-        back_set_finished(opt, sback, p);
-        back[p].r.soc = INVALID_SOCKET;
-      } else {
-        if (!back[p].r.is_file)
-#if HTS_XCONN
-          back[p].status = STATUS_CONNECTING;   // connexion en cours
-#else
-          back[p].status = STATUS_WAIT_HEADERS;  // chargement en tête en cours
-#endif
-        else
-          back[p].status = 1; // chargement fichier
-      }
-#endif
-
     }
 
     // note: si il y a erreur (404,etc) status=2 (terminé/échec) mais
@@ -3276,11 +3219,9 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
   }
 }
 
-#if HTS_XGETHOST
 // Resolution is synchronous inside the connect path; no pre-resolve step, so
 // the host is always immediately ready.
 int host_wait(httrackp *opt, lien_back *back) { return 1; }
-#endif
 
 // élimine les fichiers non html en backing (anticipation)
 // cleanup non-html files in backing to save backing space
@@ -3593,8 +3534,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
       /* clang-format off: an edit reindents this whole #if-split chain. */
       /* clang-format off */
-      // en cas de gestion du connect préemptif
-#if HTS_XCONN
       if (st == STATUS_CONNECTING) {        // connecting
         // a connecting slot always carries a live socket; guard anyway so a
         // stray INVALID_SOCKET can never reach FD_SET (mirrors the recv branch)
@@ -3620,12 +3559,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
         }
 
       } else
-#endif
-#if HTS_XGETHOST
       if (st == STATUS_WAIT_DNS) {  // waiting for DNS
-        // rien à faire..
       } else
-#endif
         // poll pour la lecture sur les sockets
       if ((st > 0) && (st < 100)) {     // receiving http
 
@@ -3986,7 +3921,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               back_set_finished(opt, sback, i);
             }
           } else {                              /* got it! */
-            back[i].status = STATUS_CONNECTING; // back to waitconnect
+            back[i].status = STATUS_CONNECTING; // connecting again
           }
         } else {
           strcpybuff(back[i].r.msg, "unexpected SSL/TLS error");
@@ -3999,7 +3934,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
       }
 #endif
-#if HTS_XGETHOST
       else if (st == STATUS_WAIT_DNS) { // waiting for DNS
 
         if (!gestion_timeout)
@@ -4016,8 +3950,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
           }
 
           back[i].r.soc =
-            http_xfopen(opt, 0, 0, 0, back[i].send_too, back[i].url_adr,
-                        back[i].url_fil, &(back[i].r));
+              http_xfopen(opt, back[i].url_adr, back[i].url_fil, &(back[i].r));
           if (back[i].r.soc == INVALID_SOCKET) {
             back[i].status = STATUS_READY;      // fini, erreur
             back_set_finished(opt, sback, i);
@@ -4031,41 +3964,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
           }
         }
 
-        // ---- FLAG READ MIS A UN?: POUR LA RECEPTION
-      }
-#endif
-#if USE_BEGINTHREAD
-      // ..rien à faire, c'est magic les threads
-#else
-      else if (st == STATUS_FTP_TRANSFER) {     // receiving ftp
-        if (!fexist(back[i].location_buffer)) { // terminé
-          FILE *fp;
-
-          fp =
-            FOPEN(fconcat(OPT_GET_BUFF(opt), back[i].location_buffer, ".ok"),
-                  "rb");
-          if (fp) {
-            back_read_ftp_result(fp, &back[i].r);
-            fclose(fp);
-            UNLINK(fconcat(OPT_GET_BUFF(opt), back[i].location_buffer, ".ok"));
-            strcpybuff(fconcat
-                       (OPT_GET_BUFF(opt), back[i].location_buffer, ".ok"), "");
-          } else {
-            strcpybuff(back[i].r.msg,
-                       "Unknown ftp result, check if file is ok");
-            back[i].r.statuscode = STATUSCODE_INVALID;
-          }
-          back[i].status = STATUS_READY;
-          back_set_finished(opt, sback, i);
-          // finalize transfer
-          if (back[i].r.statuscode > 0) {
-            hts_log_print(opt, LOG_TRACE, "finalizing ftp");
-            back_finalize(opt, cache, sback, i);
-          }
-        }
-      }
-#endif
-      else if (back_ftp_handed_back(&back[i])) {
+      } else if (back_ftp_handed_back(&back[i])) {
         back[i].status = STATUS_READY;
         back_set_finished(opt, sback, i);
         // finalize transfer

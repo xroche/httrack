@@ -292,8 +292,11 @@ const char *http_header_slot_name(int slot);
 int http_header_slot_count(void);
 
 // fonctions principales
-T_SOC http_xfopen(httrackp * opt, int mode, int treat, int waitconnect,
-                  const char *xsend, const char *adr, const char *fil, htsblk * retour);
+/* Start a non-blocking connect to adr (or to retour's proxy) for a GET, or open
+   a file:// target. retour must not be NULL; it gets the socket and any error.
+ */
+T_SOC http_xfopen(httrackp *opt, const char *adr, const char *fil,
+                  htsblk *retour);
 int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
                   const char *adr, const char *fil, const char *referer_adr,
                   const char *referer_fil, const hts_fetch_meta *fetch,
@@ -349,15 +352,16 @@ hts_boolean socket_set_nonblocking(T_SOC soc, hts_boolean nonblocking);
    without blocking. */
 int connect_socket_error(T_SOC soc);
 
-T_SOC newhttp(httrackp * opt, const char *iadr, htsblk * retour, int port,
-              int waitconnect);
+/* Start a non-blocking connect to iadr; port -1 takes it from iadr or the
+   scheme default. */
+T_SOC newhttp(httrackp *opt, const char *iadr, htsblk *retour, int port);
 /* Like newhttp(), but connect to the addr_index-th resolved address of the host
    (0-based) instead of always the first; *addr_count, if non-NULL, is set to
    the total resolved addresses. newhttp() == newhttp_addr(...,0,NULL). Used by
    the slot scheduler to try the next address when a connect fails (dead IPv6
    etc.). */
 T_SOC newhttp_addr(httrackp *opt, const char *iadr, htsblk *retour, int port,
-                   int waitconnect, int addr_index, int *addr_count);
+                   int addr_index, int *addr_count);
 /* Clips the formatted failure reason into r->msg, which also round-trips
    through the cache as X-StatusMessage. Leaves r->statuscode to the caller. */
 #define htsblk_failf(R, ...)                                                   \
@@ -513,13 +517,12 @@ HTS_INLINE int sendc(htsblk * r, const char *s);
 /* Returns the advance past the line's terminator. Unlike binput_line(), "max"
    excludes the NUL: "s" must hold max + 1 bytes. */
 int binput(const char *buff, char *s, int max);
-/* Read one line, from a buffer up to "end" or from a socket, consuming it whole
-   even when it does not fit "s". HTS_TRUE means it was cut: the value is not
-   what was written, so drop it rather than parse a prefix of it.
-   binput_line() reports the advance through *offset. */
+/* Read one line from a buffer up to "end", consuming it whole even when it
+   does not fit "s". HTS_TRUE means it was cut: the value is not what was
+   written, so drop it rather than parse a prefix of it. The advance is reported
+   through *offset. */
 hts_boolean binput_line(const char *buff, const char *end, char *s, int max,
                         int *offset);
-hts_boolean finput_line(T_SOC fd, char *s, int max);
 /* Does treathead() read the header that "line" starts with? Keep in step. */
 hts_boolean hts_header_is_read(const char *line);
 int linput(FILE * fp, char *s, int max);
