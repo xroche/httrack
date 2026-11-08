@@ -101,7 +101,6 @@ int back_add_if_not_exists(struct_back *sback, httrackp *opt, cache_back *cache,
                            const char *adr, const char *fil, const char *save,
                            const char *referer_adr, const char *referer_fil,
                            int test, const hts_fetch_meta *fetch);
-int back_stack_available(struct_back * sback);
 int back_search(httrackp * opt, struct_back * sback);
 int back_search_quick(struct_back * sback);
 void back_clean(httrackp * opt, cache_back * cache, struct_back * sback);
@@ -205,8 +204,6 @@ void back_info(struct_back * sback, int i, int j, FILE * fp);
 void back_infostr(struct_back *sback, int i, int j, char *s, size_t size);
 LLint back_transferred(LLint add, struct_back * sback);
 
-// hostback
-int host_wait(httrackp *opt, lien_back *sback);
 int back_checksize(httrackp * opt, lien_back * eback, int check_only_totalsize);
 /* Enforce -M/-E quotas: smooth-stops when reached; returns 0 once the -M cap
    or -E deadline overruns its grace period (callers must stop waiting). */
