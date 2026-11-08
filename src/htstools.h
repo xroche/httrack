@@ -143,7 +143,7 @@ HTS_INLINE int check_tag(const char *from, const char *tag);
 int verif_backblue(httrackp * opt, const char *base);
 int verif_external(httrackp * opt, int nb, int test);
 
-int istoobig(httrackp * opt, LLint size, LLint maxhtml, LLint maxnhtml,
+int istoobig(httrackp *opt, LLint size, LLint maxhtml, LLint maxnhtml,
              char *type);
 /* Move src onto dst, replacing an existing dst; HTS_TRUE on success. Both paths
    are fconv()'d. A dst in the way is parked under a sibling name rather than
