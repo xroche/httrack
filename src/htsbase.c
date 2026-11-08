@@ -26,7 +26,7 @@ Please visit our Website: http://www.httrack.com
 */
 
 /* ------------------------------------------------------------ */
-/* File: Leaf helpers with no engine dependency                 */
+/* File: libc-only helpers declared in htslib.h                 */
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
