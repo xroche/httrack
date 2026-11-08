@@ -106,39 +106,6 @@ int hts_parse_externals(htsmoduleStruct * str) {
   return -1;
 }
 
-void clearCallbacks(htscallbacks * chain_);
-void clearCallbacks(htscallbacks * chain_) {
-  htscallbacks *chain;
-
-  chain = chain_;
-  while(chain != NULL) {
-    if (chain->exitFnc != NULL) {
-      (void) chain->exitFnc();  /* result ignored */
-      chain->exitFnc = NULL;
-    }
-    chain = chain->next;
-  }
-  chain = chain_;
-  while(chain != NULL) {
-    if (chain->moduleHandle != NULL) {
-#ifdef _WIN32
-      FreeLibrary(chain->moduleHandle);
-#else
-      dlclose(chain->moduleHandle);
-#endif
-    }
-    chain = chain->next;
-  }
-  chain = chain_->next;         // Don't free the block #0
-  while(chain != NULL) {
-    htscallbacks *nextchain = chain->next;
-
-    freet(chain);
-    chain = nextchain;
-  }
-  chain_->next = NULL;          // Empty
-}
-
 void *openFunctionLib(const char *file_) {
   void *handle;
   char *file = malloct(strlen(file_) + 32);
@@ -230,9 +197,6 @@ void htspe_init(void) {
 #endif
             );
   }
-}
-
-void htspe_uninit(void) {
 }
 
 static void htspe_log(htsmoduleStruct * str, const char *msg) {

@@ -121,8 +121,6 @@ void hts_cache_reconcile(httrackp *opt, hts_cache_reconcile_mode mode);
    asserts the writer stays inside it, so both must move together. */
 #define CACHE_HEADERS_SIZE 8192
 
-int cache_brstr(char *adr, char *s, size_t s_size);
-
 /* Consecutive entry write failures before the cache stream is declared dead. */
 #define CACHE_MAX_WRITE_FAILURES 8
 
