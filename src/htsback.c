@@ -31,9 +31,6 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-/* Internal engine bytecode */
-#define HTS_INTERNAL_BYTECODE
-
 /* specific definitions */
 #include "htsnet.h"
 #include "htsbundle.h"
@@ -280,22 +277,6 @@ void back_free(struct_back ** sback) {
    above a normal handshake. The last candidate still gets the full timeout. */
 #define HTS_CONNECT_FALLBACK_TIMEOUT 10
 
-void back_read_ftp_result(FILE *fp, htsblk *r) {
-  size_t j = 0;
-
-  if (fscanf(fp, "%d ", &r->statuscode) != 1)
-    r->statuscode = STATUSCODE_INVALID;
-  // an external helper writes this file: stop at capacity, not at EOF
-  while (j + 1 < sizeof(r->msg)) {
-    const int c = fgetc(fp);
-
-    if (c == EOF)
-      break;
-    r->msg[j++] = (char) c;
-  }
-  r->msg[j] = '\0';
-}
-
 int back_connect_fallback_due(int addr_index, int addr_count, int elapsed,
                               int timeout) {
   int deadline;
@@ -326,7 +307,7 @@ static int back_connect_next(httrackp *opt, struct_back *sback, int i) {
   if (back[i].r.soc != INVALID_SOCKET) {
     deletehttp(&back[i].r);
   }
-  soc = newhttp_addr(opt, back[i].url_adr, &back[i].r, -1, 0, next, NULL);
+  soc = newhttp_addr(opt, back[i].url_adr, &back[i].r, -1, next, NULL);
   if (soc == INVALID_SOCKET)
     return 0;
 
@@ -3084,11 +3065,7 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
           str->pOpt = opt;
           /* */
           back[p].status = STATUS_FTP_TRANSFER; // connexion ftp
-#if USE_BEGINTHREAD
           launch_ftp(str);
-#else
-#error Must have pthreads
-#endif
           return 0;
         }
       } else if (strfield(back[p].url_adr, "https://")) {
@@ -3105,8 +3082,7 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
       }
 
       if (!back_trylive(opt, cache, sback, p)) {
-        const T_SOC soc =
-            http_xfopen(opt, 0, 0, 0, back[p].send_too, adr, fil, &back[p].r);
+        const T_SOC soc = http_xfopen(opt, adr, fil, &back[p].r);
 
         if (soc == INVALID_SOCKET) {
           back_set_finished(opt, sback, p);
@@ -3503,8 +3479,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
       /* clang-format off: an edit reindents this whole #if-split chain. */
       /* clang-format off */
-      // en cas de gestion du connect préemptif
-#if HTS_XCONN
       if (st == STATUS_CONNECTING) {        // connecting
         // a connecting slot always carries a live socket; guard anyway so a
         // stray INVALID_SOCKET can never reach FD_SET (mirrors the recv branch)
@@ -3530,7 +3504,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
         }
 
       } else
-#endif
         // poll pour la lecture sur les sockets
       if ((st > 0) && (st < 100)) {     // receiving http
 
@@ -3877,7 +3850,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               back_set_finished(opt, sback, i);
             }
           } else {                              /* got it! */
-            back[i].status = STATUS_CONNECTING; // back to waitconnect
+            back[i].status = STATUS_CONNECTING; // connecting again
           }
         } else {
           strcpybuff(back[i].r.msg, "unexpected SSL/TLS error");
@@ -3886,36 +3859,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
           back_set_finished(opt, sback, i);
         }
 
-      }
-#endif
-#if USE_BEGINTHREAD
-      // ..rien à faire, c'est magic les threads
-#else
-      else if (st == STATUS_FTP_TRANSFER) {     // receiving ftp
-        if (!fexist(back[i].location_buffer)) { // terminé
-          FILE *fp;
-
-          fp =
-            FOPEN(fconcat(OPT_GET_BUFF(opt), back[i].location_buffer, ".ok"),
-                  "rb");
-          if (fp) {
-            back_read_ftp_result(fp, &back[i].r);
-            fclose(fp);
-            UNLINK(fconcat(OPT_GET_BUFF(opt), back[i].location_buffer, ".ok"));
-            strcpybuff(fconcat
-                       (OPT_GET_BUFF(opt), back[i].location_buffer, ".ok"), "");
-          } else {
-            strcpybuff(back[i].r.msg,
-                       "Unknown ftp result, check if file is ok");
-            back[i].r.statuscode = STATUSCODE_INVALID;
-          }
-          back_set_finished(opt, sback, i);
-          // finalize transfer
-          if (back[i].r.statuscode > 0) {
-            hts_log_print(opt, LOG_TRACE, "finalizing ftp");
-            back_finalize(opt, cache, sback, i);
-          }
-        }
       }
 #endif
       else if (back_ftp_handed_back(&back[i])) {

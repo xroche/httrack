@@ -529,9 +529,6 @@ typedef int T_SOC;
 // Per-connection transfer buffer size, in bytes
 #define TAILLE_BUFFER 65536
 
-#ifdef HTS_DO_NOT_USE_PTHREAD
-#error needs threads support
-#endif
 #define USE_BEGINTHREAD 1
 
 /* Nothing reads this any more. */

@@ -34,8 +34,6 @@ Please visit our Website: http://www.httrack.com
    run a no-op. */
 /* ------------------------------------------------------------ */
 
-#define HTS_INTERNAL_BYTECODE
-
 #include "htssinglefile.h"
 
 #include "htscore.h"

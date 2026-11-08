@@ -30,8 +30,6 @@ Please visit our Website: http://www.httrack.com
 /*       Public Suffix List lookups                             */
 /* ------------------------------------------------------------ */
 
-#define HTS_INTERNAL_BYTECODE
-
 #include "htspsl.h"
 
 #include "htscore.h"

@@ -31,9 +31,6 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-/* Internal engine bytecode */
-#define HTS_INTERNAL_BYTECODE
-
 #include "htscache.h"
 
 /* specific definitions */
