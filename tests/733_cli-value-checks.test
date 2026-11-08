@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# --warc-max-size and --connection-per-second refuse a bad value with a
-# non-zero exit before any crawl.
+# --warc-max-size refuses a bad value before any crawl; a bad
+# --connection-per-second rate only warns, because GUIs pass it as typed.
 
 set -euo pipefail
 
@@ -56,11 +56,16 @@ for v in -5 abc 10X +5 "" 99999999999999999999; do
     refused "${W}" --warc-max-size "${v}"
 done
 
-C='connection-per-second needs a rate of 0 or at least 0.000001'
-refused "${C}" -%c0.0000001
-refused "${C}" -%c1e-7
-refused "${C}" -%cnan
-refused "${C}" -%cabc
-refused "${C}" -%c
-refused "${C}" -%c1e99
-refused "${C}" -%c1000000000000000000000000000000000000000
+warned() { # warned MESSAGE ARG...
+    local msg=$1
+    shift
+    accepted "$@"
+    grep -qF "${msg}" "${tmp}/log" || fail_dump "$* did not warn ${msg}" "${tmp}/log"
+}
+
+for v in 0.0000001 1e-7; do
+    warned "rate \"${v}\" raised to 0.000001" "-%c${v}"
+done
+for v in abc -1 "" nan 1e99 1000000000000000000000000000000000000000; do
+    warned "rate \"${v}\" ignored" "-%c${v}"
+done

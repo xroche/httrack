@@ -1748,19 +1748,28 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 }
                 break;          // Keyword Index
               case 'c': {
-                float v;
+                /* GUIs pass this field as typed: warn, never abort */
+                const char *const val = com + 1;
+                char *end;
+                const double v = strtod(val, &end);
 
-                if (sscanf(com + 1, "%f", &v) != 1 ||
-                    !(v == 0 || (v >= 1e-6f && v <= FLT_MAX))) {
-                  HTS_PANIC_PRINTF("Option connection-per-second needs a "
-                                   "rate of 0 or at least 0.000001");
-                  return -1;
+                if (end == val || !(v >= 0 && v <= FLT_MAX)) {
+                  fprintf(stderr,
+                          "* Warning: connection-per-second rate \"%s\" "
+                          "ignored\n",
+                          val);
+                  end += strlen(end);
+                } else if (v > 0 && v < 1e-6) {
+                  fprintf(stderr,
+                          "* Warning: connection-per-second rate \"%.*s\" "
+                          "raised to 0.000001\n",
+                          (int) (end - val), val);
+                  opt->maxconn = 1e-6f;
+                } else {
+                  opt->maxconn = (float) v;
                 }
-                opt->maxconn = v;
-              }
-                while(isdigit((unsigned char) *(com + 1)) || *(com + 1) == '.')
-                  com++;
-                break;
+                com = end - 1;
+              } break;
               case 'e':
                 readGluedInt(opt->extdepth, INT_MAX);
                 break;
