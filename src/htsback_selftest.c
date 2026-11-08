@@ -175,8 +175,6 @@ static void threadwait_gated_thread(void *arg) {
   hts_mutexrelease(&threadwait_lock);
 }
 
-/* back_slot_fail() clips a reason too long for r.msg, where a copy aborted;
-   back_slot_fail_nonfatal() closes and keeps a reason already set. */
 static void st_statsrows_slot(lien_back *b, int status, LLint size,
                               LLint totalsize, const char *fil) {
   b->status = status;
@@ -187,6 +185,8 @@ static void st_statsrows_slot(lien_back *b, int status, LLint size,
   strcpybuff(b->url_fil, fil);
 }
 
+/* stats_collect_rows() survives an empty table and maps each slot to its row.
+ */
 static int st_statsrows(httrackp *opt, int argc, char **argv) {
   struct_back *sback = back_new(opt, 4);
   t_StatsBuffer rows[NStatsBuffer];
@@ -233,6 +233,50 @@ static int st_statsrows(httrackp *opt, int argc, char **argv) {
   ST_FAIL_IF(err, stats_collect_rows(opt, b, 4, 0, rows, 1, 40) != 1);
   ST_FAIL_IF(err, strlen(rows[0].name) >= 40);
 
+  /* every label, from a rotated start, with the login and a secret hidden */
+  for (i = 0; i < sback->count; i++)
+    b[i].status = STATUS_FREE;
+  back_free(&sback);
+  sback = back_new(opt, 8);
+  if (sback == NULL)
+    return 1;
+  b = sback->lnk;
+  hts_secret_add(opt, "SECRETTOKEN1", 12, HTS_SECRET_HEADER);
+  st_statsrows_slot(&b[0], STATUS_WAIT_DNS, 0, -1, "/dns");
+  st_statsrows_slot(&b[1], STATUS_CONNECTING, 0, -1, "/conn");
+  st_statsrows_slot(&b[2], STATUS_FTP_TRANSFER, 0, -1, "/pub/f");
+  strcpybuff(b[2].url_adr, "FTP://up.example");
+  strcpybuff(b[2].info, "RETR f");
+  st_statsrows_slot(&b[3], STATUS_READY, 0, 0, "/missing");
+  b[3].r.statuscode = 404;
+  st_statsrows_slot(&b[4], STATUS_READY, 0, 0, "/odd");
+  b[4].r.statuscode = 700;
+  st_statsrows_slot(&b[5], STATUS_READY, 5, -1, "/short");
+  st_statsrows_slot(&b[6], 50, 0, -1, "/in");
+  strcpybuff(b[6].url_adr, "http://user:pw@example.com");
+  st_statsrows_slot(&b[7], 98, 0, -1, "/q?t=SECRETTOKEN1");
+  ST_FAIL_IF(err,
+             stats_collect_rows(opt, b, 8, 2, rows, NStatsBuffer, 40) != 8);
+  ST_FAIL_IF(err,
+             strcmp(rows[0].state, "FTP: RETR f") != 0 || rows[0].back != 2);
+  ST_FAIL_IF(err, strcmp(rows[1].state, "receive") != 0 || rows[1].back != 6);
+  ST_FAIL_IF(err, strcmp(rows[1].name, "http://example.com") != 0);
+  ST_FAIL_IF(err, strcmp(rows[2].state, "receive") != 0 || rows[2].back != 7);
+  ST_FAIL_IF(err, strstr(rows[2].file, "SECRETTOKEN1") != NULL);
+  ST_FAIL_IF(err, strcmp(rows[3].state, "search") != 0 || rows[3].back != 0);
+  ST_FAIL_IF(err, strcmp(rows[4].state, "connect") != 0 || rows[4].back != 1);
+  {
+    char notfound[256];
+
+    notfound[0] = '\0';
+    infostatuscode(notfound, 404);
+    ST_FAIL_IF(err, strcmp(rows[5].state, notfound) != 0 || rows[5].back != 3);
+  }
+  ST_FAIL_IF(err, strcmp(rows[6].state, "error") != 0 || rows[6].back != 4);
+  ST_FAIL_IF(err, strcmp(rows[7].state, "ready") != 0 || rows[7].back != 5);
+  /* a finished slot of unknown size shows what it got */
+  ST_FAIL_IF(err, rows[7].sizetot != 5 || rows[7].size != 5);
+
   for (i = 0; i < sback->count; i++)
     b[i].status = STATUS_FREE;
   back_free(&sback);
@@ -241,6 +285,8 @@ static int st_statsrows(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* back_slot_fail() clips a reason too long for r.msg, where a copy aborted;
+   back_slot_fail_nonfatal() closes and keeps a reason already set. */
 static int st_slotfail(httrackp *opt, int argc, char **argv) {
   struct_back *sback = back_new(opt, 1);
   htsblk *r;

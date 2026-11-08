@@ -121,7 +121,16 @@ HTS_STATIC int stats_collect_rows(httrackp *opt, const lien_back *back,
         } else if (j == 1 && slot_status == STATUS_WAIT_DNS) {
           strcpybuff(row->state, "search");
         } else if (j == 1 && slot_status == STATUS_FTP_TRANSFER) {
-          snprintf(row->state, sizeof(row->state), "ftp: %s", b->info);
+          char proto[8] = "ftp";
+          const char *const ep = strchr(b->url_adr, ':');
+          const char *const eps = strchr(b->url_adr, '/');
+
+          /* the slot's own scheme when it is short, as the web GUI showed */
+          if (ep != NULL && eps != NULL && ep < eps && ep - b->url_adr < 4) {
+            proto[0] = '\0';
+            strncatbuff(proto, b->url_adr, (size_t) (ep - b->url_adr));
+          }
+          snprintf(row->state, sizeof(row->state), "%s: %s", proto, b->info);
         } else if (j == 2 && slot_status == STATUS_READY) {
           if (b->r.statuscode == HTTP_OK) {
             strcpybuff(row->state, "ready");
