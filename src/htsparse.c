@@ -1880,33 +1880,35 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         at != NULL && (at->kind == HTS_ATTR_EVENT ||
                                        at->kind == HTS_ATTR_STYLE);
 
-                    switch (at != NULL ? at->kind : HTS_ATTR_EVENT) {
-                    case HTS_ATTR_LINK:
-                      dataattr_p = strncmp(at->name, "data-", 5) == 0;
-                      /* A temporary hack to avoid archive=foo.jar,bar.jar */
-                      if (strcmp(at->name, "archive") == 0) {
-                        archivetag_p = 1;
+                    if (at != NULL) {
+                      switch (at->kind) {
+                      case HTS_ATTR_LINK:
+                        dataattr_p = strncmp(at->name, "data-", 5) == 0;
+                        /* A temporary hack to avoid archive=foo.jar,bar.jar */
+                        if (strcmp(at->name, "archive") == 0) {
+                          archivetag_p = 1;
+                        }
+                        /* srcset: a comma-list of candidate URLs, each split
+                           out and rewritten below (#235, #236) */
+                        else if (strcmp(at->name, "srcset") == 0 ||
+                                 strcmp(at->name, "data-srcset") == 0) {
+                          srcset_p = 1;
+                        }
+                        break;
+                      case HTS_ATTR_REFRESH:
+                        // <meta http-equiv="Refresh" content="3;URL=a.html">
+                        if (intag_ctype == 2) {
+                          p_searchMETAURL = 1;
+                        } else {
+                          p = 0; /* cancel */
+                        }
+                        break;
+                      case HTS_ATTR_LEAVE:
+                        p_nocatch = 1; /* rewrite the link, never capture it */
+                        break;
+                      default:
+                        break;
                       }
-                      /* srcset: a comma-list of candidate URLs, each split
-                         out and rewritten below (#235, #236) */
-                      else if (strcmp(at->name, "srcset") == 0 ||
-                               strcmp(at->name, "data-srcset") == 0) {
-                        srcset_p = 1;
-                      }
-                      break;
-                    case HTS_ATTR_REFRESH:
-                      // <meta http-equiv="Refresh" content="3;URL=a.html">
-                      if (intag_ctype == 2) {
-                        p_searchMETAURL = 1;
-                      } else {
-                        p = 0; /* cancel */
-                      }
-                      break;
-                    case HTS_ATTR_LEAVE:
-                      p_nocatch = 1; /* rewrite the link, never capture it */
-                      break;
-                    default:
-                      break;
                     }
 
                     /* Events, but not inside document.write */
