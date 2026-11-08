@@ -13,7 +13,10 @@ list=$(httrack -#test 2>&1) || skip "this build has no self-tests"
 # Rows are "  NAME  ARGS  DESC"; ARGS starts with '<' when it is required.
 names=$(sed -n 's/^  \([^ ]*\) *<.*/\1/p' <<<"$list")
 count=$(wc -l <<<"$names")
-[ "$count" -ge 124 ] || fail "only $count rows list a required argument"
+# One required-argument row exists only in an OpenSSL build.
+floor=124
+[ "${HTTPS_SUPPORT:-yes}" != "no" ] || floor=123
+[ "$count" -ge "$floor" ] || fail "only $count rows list a required argument"
 
 for name in $names; do
     rc=0
