@@ -2070,8 +2070,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
             hts_sitemap_robots(opt, urladr(), sitemaps);
           }
         } else if (!r.is_write) {
-          // Not on disk yet: save it, and leave a readme beside HTML that was
-          // not scanned.
+          // Not on disk yet: save it, with a readme beside unscanned HTML.
           if ((is_hypertext_mime(opt, r.contenttype, urlfil())) && (!store_errpage) && (r.size > 0)) {    // c'est du html!!
             char BIGSTK tempo[HTS_URLMAXSIZE * 2];
             FILE *fp;
