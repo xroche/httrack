@@ -3605,7 +3605,6 @@ static int st_cache(httrackp *opt, int argc, char **argv) {
 static int st_cacheindex(httrackp *opt, int argc, char **argv) {
   int fail = 0;
 
-
   /* binput_line reads a field while in bounds, but refuses one starting at
      or past end-of-buffer. */
   {
