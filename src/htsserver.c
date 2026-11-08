@@ -83,6 +83,7 @@ coucal NewLangList = NULL;
 /* Language files */
 
 #include "htsserver.h"
+#include "htsshared.h"
 #include "htscmdline.h"
 #include "htslines.h"
 #include "htsthread.h"
@@ -270,7 +271,6 @@ HTS_UNUSED static int check_readinput_t(T_SOC soc, int timeout);
 HTS_UNUSED static int recv_bl(T_SOC soc, void *buffer, size_t len, int timeout);
 HTS_UNUSED static int linputsoc(T_SOC soc, char *s, int max);
 HTS_UNUSED static int linputsoc_t(T_SOC soc, char *s, int max, int timeout);
-HTS_UNUSED static int linput(FILE * fp, char *s, int max);
 
 /* Language files */
 HTS_UNUSED static int htslang_load(char *limit_to, size_t limit_size,
@@ -883,7 +883,7 @@ static hts_boolean find_user_stylesheet(char *dst, size_t size) {
     dst[0] = '\0';
     if (dirs[i] != NULL && dirs[i][0] != '\0' &&
         path_append(dst, size, dirs[i]) &&
-        path_append(dst, size, USER_STYLESHEET) && fexist(dst)) {
+        path_append(dst, size, USER_STYLESHEET) && hts_shared_fexist(dst)) {
       return HTS_TRUE;
     }
   }
@@ -943,7 +943,8 @@ static hts_boolean theme_in(const char *dir, const char *name) {
          path_append(file, sizeof(file), dir) &&
          path_append(file, sizeof(file), "/") &&
          path_append(file, sizeof(file), name) &&
-         path_append(file, sizeof(file), "/theme.css") && fexist(file);
+         path_append(file, sizeof(file), "/theme.css") &&
+         hts_shared_fexist(file);
 }
 
 /* Is name a theme in the user's folder or the installed one? */
@@ -1101,7 +1102,8 @@ static void load_ui_settings(void) {
   while (!feof(fp) && !ferror(fp)) {
     char line[256];
 
-    if (linput(fp, line, sizeof(line) - 2) > 0 &&
+    if (hts_shared_linput(fp, line, sizeof(line) - 2, HTS_LINPUT_SKIP_NUL) >
+            0 &&
         strncmp(line, "uitheme=", 8) == 0 && theme_name_is_valid(line + 8)) {
       strcpybuff(ui_theme, line + 8);
     }
@@ -2244,8 +2246,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
           /* Regular files only: reading a directory or FIFO never ends, and
              "path" may hold "..", so only the untrusted halves are checked. */
-          if (fsfile[0] && strstr(file, "..") == NULL && fexist(fsfile) &&
-              (fp = fopen(fsfile, "rb"))) {
+          if (fsfile[0] && strstr(file, "..") == NULL &&
+              hts_shared_fexist(fsfile) && (fp = fopen(fsfile, "rb"))) {
             static const char ok_html[] =
                 "Connection: close\r\n"
                 "Content-type: text/html\r\n" SMALLSERVER_NO_CACHE;
@@ -2291,7 +2293,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                 size_t prevlen = StringLength(output);
                 int nocr = 0;
 
-                if (!linput(fp, line, sizeof(line) - 2)) {
+                if (!hts_shared_linput(fp, line, sizeof(line) - 2,
+                                       HTS_LINPUT_SKIP_NUL)) {
                   *str = '\0';
                 }
                 if (hts_lastchar(str) == '\\') {
@@ -2427,7 +2430,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                       if (pos2 != NULL) {
                         *pos2 = '\0';
                         if (strstr(name, "..") == NULL) {
-                          if (fexist(fconcat(catbuff, sizeof(catbuff), path, name))) {
+                          if (hts_shared_fexist(fconcat(
+                                  catbuff, sizeof(catbuff), path, name))) {
                             langstr = pos2 + 1;
                           }
                         }
@@ -2458,20 +2462,23 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                         }
                       } else if (strcmp(name, "if-file-exists") == 0) {
                         if (strstr(pos2, "..") == NULL) {
-                          if (!fexist(fconcat(catbuff, sizeof(catbuff), path, pos2))) {
+                          if (!hts_shared_fexist(fconcat(
+                                  catbuff, sizeof(catbuff), path, pos2))) {
                             outputmode = -1;
                           }
                         }
                       } else if (strcmp(name, "if-project-file-exists") == 0) {
                         if (strstr(pos2, "..") == NULL) {
-                          if (!fexist
-                              (fconcat(catbuff, sizeof(catbuff), StringBuff(fspath), pos2))) {
+                          if (!hts_shared_fexist(
+                                  fconcat(catbuff, sizeof(catbuff),
+                                          StringBuff(fspath), pos2))) {
                             outputmode = -1;
                           }
                         }
                       } else if (strcmp(name, "if-file-do-not-exists") == 0) {
                         if (strstr(pos2, "..") == NULL) {
-                          if (fexist(fconcat(catbuff, sizeof(catbuff), path, pos2))) {
+                          if (hts_shared_fexist(fconcat(
+                                  catbuff, sizeof(catbuff), path, pos2))) {
                             outputmode = -1;
                           }
                         }

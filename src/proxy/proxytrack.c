@@ -926,7 +926,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
       }
 
       /* Post-process request */
-      if (link_has_authority(surl)) {
+      if (hts_shared_link_has_authority(surl)) {
         if (strncasecmp(surl, "http://proxytrack/",
                         sizeof("http://proxytrack/") - 1) == 0) {
         }
@@ -948,7 +948,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
             }
             /* Direct hit */
             StringCopy(url, "");
-            if (!link_has_authority(toHit))
+            if (!hts_shared_link_has_authority(toHit))
               StringCat(url, "http://");
             StringCat(url, toHit);
           } else if (strncasecmp(surl, "/proxytrack/",
@@ -957,7 +957,7 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 
             /* Direct hit */
             StringCopy(url, "");
-            if (!link_has_authority(toHit))
+            if (!hts_shared_link_has_authority(toHit))
               StringCat(url, "http://");
             StringCat(url, toHit);
           } else {

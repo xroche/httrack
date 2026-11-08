@@ -37,6 +37,7 @@ Please visit our Website: http://www.httrack.com
 #include "../minizip/mztools.h"
 #include "store.h"
 #include "../htsdate.h"
+#include "../htsshared.h"
 
 #include <sys/stat.h>
 #ifdef _WIN32
@@ -113,57 +114,6 @@ static void proxytrack_print_log(const char *severity, const char *format,
 	"<!-- _-._.--._._-._.--._._-._.--._._-._.--._._-._.--._. -->\r\n" \
 	"<!-- _-._.--._._-._.--._._-._.--._._-._.--._._-._.--._. -->\r\n" \
 	"<!-- End Disable IE Friendly HTTP Error Messages -->\r\n"
-
-HTS_UNUSED static int linput(FILE * fp, char *s, int max) {
-  int c;
-  int j = 0;
-
-  do {
-    c = fgetc(fp);
-    if (c != EOF) {
-      switch (c) {
-      case 13:
-        break;                  // sauter CR
-      case 10:
-        c = -1;
-        break;
-      case 0:
-      case 9:
-      case 12:
-        break;                  // sauter ces caractères
-      default:
-        s[j++] = (char) c;
-        break;
-      }
-    }
-  } while((c != -1) && (c != EOF) && (j < (max - 1)));
-  if (j == max - 1 && c != -1 && c != EOF) {
-    /* Stopped at the bound: consume the newline, or the next read returns "" */
-    while ((c = fgetc(fp)) == 13)
-      ;
-    if (c != 10 && c != EOF)
-      ungetc(c, fp);
-  }
-  s[j] = '\0';
-  return j;
-}
-
-HTS_UNUSED static int link_has_authority(const char *lien) {
-  const char *a = lien;
-
-  if (isalpha((const unsigned char) *a)) {
-    // Skip scheme?
-    while(isalpha((const unsigned char) *a))
-      a++;
-    if (*a == ':')
-      a++;
-    else
-      return 0;
-  }
-  if (strncmp(a, "//", 2) == 0)
-    return 1;
-  return 0;
-}
 
 HTS_UNUSED static const char *jump_protocol(const char *source) {
   int p;
