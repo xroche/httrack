@@ -174,6 +174,63 @@ static void threadwait_gated_thread(void *arg) {
   hts_mutexrelease(&threadwait_lock);
 }
 
+/* back_slot_fail() clips a reason too long for r.msg, where a copy aborted;
+   back_slot_fail_nonfatal() closes and keeps a reason already set. */
+static int st_slotfail(httrackp *opt, int argc, char **argv) {
+  struct_back *sback = back_new(opt, 1);
+  htsblk *r;
+  char longmsg[sizeof(r->msg) + 1];
+  int err = 0;
+
+  if (sback == NULL) {
+    printf("slotfail: SKIP (no slot table)\n");
+    return 77;
+  }
+  r = &sback->lnk[0].r;
+  r->soc = INVALID_SOCKET;
+  /* poisoned, so a stray NUL past msg shows */
+  memset(r->contenttype, '#', sizeof(r->contenttype));
+
+  /* one byte past capacity: the copy keeps all but the last 'x' */
+  memset(longmsg, 'x', sizeof(longmsg) - 1);
+  longmsg[sizeof(longmsg) - 1] = '\0';
+  sback->lnk[0].status = STATUS_CONNECTING;
+  back_slot_fail(opt, sback, 0, STATUSCODE_TIMEOUT, longmsg);
+  ST_FAIL_IF(err, r->statuscode != STATUSCODE_TIMEOUT);
+  ST_FAIL_IF(err, sback->lnk[0].status != STATUS_READY);
+  ST_FAIL_IF(err, strlen(r->msg) != sizeof(r->msg) - 1);
+  ST_FAIL_IF(err, strncmp(r->msg, longmsg, sizeof(r->msg) - 1) != 0);
+  ST_FAIL_IF(err, r->contenttype[0] != '#');
+
+  /* NULL keeps the reason already set */
+  strcpybuff(r->msg, "kept");
+  sback->lnk[0].status = STATUS_CONNECTING;
+  back_slot_fail(opt, sback, 0, STATUSCODE_NON_FATAL, NULL);
+  ST_FAIL_IF(err, r->statuscode != STATUSCODE_NON_FATAL);
+  ST_FAIL_IF(err, sback->lnk[0].status != STATUS_READY);
+  ST_FAIL_IF(err, strcmp(r->msg, "kept") != 0);
+
+  /* the nonfatal close keeps a set reason, else takes the fallback */
+  r->soc = LOCAL_SOCKET_ID;
+  sback->lnk[0].status = STATUS_CONNECTING;
+  back_slot_fail_nonfatal(opt, sback, 0, "fallback");
+  ST_FAIL_IF(err, r->soc != INVALID_SOCKET);
+  ST_FAIL_IF(err, r->statuscode != STATUSCODE_NON_FATAL);
+  ST_FAIL_IF(err, sback->lnk[0].status != STATUS_READY);
+  ST_FAIL_IF(err, strcmp(r->msg, "kept") != 0);
+  r->msg[0] = '\0';
+  r->soc = LOCAL_SOCKET_ID;
+  sback->lnk[0].status = STATUS_CONNECTING;
+  back_slot_fail_nonfatal(opt, sback, 0, "fallback");
+  ST_FAIL_IF(err, r->soc != INVALID_SOCKET);
+  ST_FAIL_IF(err, strcmp(r->msg, "fallback") != 0);
+
+  back_free(&sback);
+  if (!err)
+    printf("slotfail: OK\n");
+  return err;
+}
+
 static int st_backswap(httrackp *opt, int argc, char **argv) {
   return back_selftest_slot_swap();
 }
@@ -1737,6 +1794,8 @@ const struct selftest_entry selftests_back[] = {
      st_mutexlazyinit},
     {"backswap", "", "which backlog slots may be swapped to the ready table",
      st_backswap},
+    {"slotfail", "", "a failed slot clips a reason too long for its message",
+     st_slotfail},
     {"spoolwrite", "<dir>", "a failed spool write leaves no partial file",
      st_spoolwrite},
     {"spoolsweep", "<dir>", "startup removes the spool of a dead process only",

@@ -133,6 +133,16 @@ int back_serialize_ref(httrackp * opt, const lien_back * src);
 int back_unserialize_ref(httrackp * opt, const char *adr, const char *fil,
                          lien_back ** dst);
 void back_set_finished(httrackp *opt, struct_back *sback, const int p);
+/* Fail slot p as statuscode and finish it. msg is clipped into r.msg, and NULL
+   keeps the reason already there. The caller closes the connection. */
+void back_slot_fail(httrackp *opt, struct_back *sback, const int p,
+                    const int statuscode, const char *msg);
+/* back_slot_fail(), closing the connection first. */
+void back_slot_close_fail(httrackp *opt, struct_back *sback, const int p,
+                          const int statuscode, const char *msg);
+/* Close slot p as non-fatal, keeping a reason already set over fallback. */
+void back_slot_fail_nonfatal(httrackp *opt, struct_back *sback, const int p,
+                             const char *fallback);
 /* lien_back.locked: 1 keeps a slot in the table with its body in memory, and
    BACK_PINNED keeps it in the table but lets it write to disk.
    back_set_unlocked() releases both. */
