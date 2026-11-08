@@ -1228,8 +1228,7 @@ static void st_int_treathead(const char *field, const char *in, htsblk *r) {
 
   memset(r, 0, sizeof(*r));
   r->totalsize = -1;
-  line[0] = '\0';
-  strlncatbuff(line, field, sizeof(line), sizeof(line) - 1);
+  strclipbuff(line, sizeof(line), field);
   strlncatbuff(line, in, sizeof(line), sizeof(line) - 1);
   treathead(NULL, "www.example.com", "/", r, line);
 }
@@ -1798,8 +1797,7 @@ static void legacy_ctype(const char *in, char *out, size_t size) {
   char contenttype[HTS_MIMETYPE_SIZE] = "", charset[HTS_MIMETYPE_SIZE] = "";
   char *a;
 
-  line[0] = '\0';
-  strlncatbuff(line, in, sizeof(line), sizeof(line) - 1);
+  strclipbuff(line, sizeof(line), in);
   a = strchr(line, ';');
   if (a) {
     *a = '\0';

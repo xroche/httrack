@@ -39,8 +39,7 @@ static void print_registrable(const char *host) {
   char buf[256];
   const char *reg;
 
-  buf[0] = '\0';
-  strlncatbuff(buf, host, sizeof(buf), sizeof(buf) - 1);
+  strclipbuff(buf, sizeof(buf), host);
   hts_lowcase(buf);
   reg = hts_psl_registrable_domain(buf);
   printf("%s\n", reg != NULL ? reg : "null");

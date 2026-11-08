@@ -123,7 +123,7 @@ the operational checklist: toolchain, invariants, and how to ship a change.
   (`strcpybuff`, `strlcpybuff`, `strcatbuff`) **abort** on overflow. Right for
   our own data, wrong for anything read back from a cache, a header or the
   wire, where it trades a memory smash for a crash on malformed input. Clip
-  with `dst[0] = '\0'; strlncatbuff(dst, src, size, size - 1)`.
+  with `strclipbuff(dst, size, src)`.
 - **A warning class is not the unsafe set.** `-Wformat-truncation` fires only on
   a *bounded* `snprintf` whose return is discarded, so an unbounded `sprintf`
   into the same buffer never appears on it. Before scoping a hardening pass off

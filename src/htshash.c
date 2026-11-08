@@ -408,8 +408,7 @@ static void savename_owner_key(char *key, size_t size, const char *adr,
   char BIGSTK low[HTS_URLMAXSIZE * 2];
   coucal_hashkeys ha, hf;
 
-  low[0] = '\0';
-  strlncatbuff(low, adr, sizeof(low), sizeof(low) - 1);
+  strclipbuff(low, sizeof(low), adr);
   hts_lowcase(low);
   ha = coucal_hash_string(low);
   hf = coucal_hash_string(fil);

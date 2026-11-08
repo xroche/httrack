@@ -156,10 +156,8 @@ static void pingHandler(void *arg, smallserver_client_event ev,
     } else if (i < windowCount) {
       windows[i].last_seen = ticks;
     } else if (windowCount < MAX_WINDOWS) {
-      windows[windowCount].id[0] = '\0';
-      strlncatbuff(windows[windowCount].id, window,
-                   sizeof(windows[windowCount].id),
-                   sizeof(windows[windowCount].id) - 1);
+      strclipbuff(windows[windowCount].id, sizeof(windows[windowCount].id),
+                  window);
       windows[windowCount++].last_seen = ticks;
       anyWindow = HTS_TRUE;
     }

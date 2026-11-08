@@ -273,8 +273,8 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
 
           if (!kept || cut) {
             if (ndropped++ == 0) {
-              dropped[0] = '\0'; // clip, never abort: this is remote data
-              strlncatbuff(dropped, a, sizeof(dropped), sizeof(dropped) - 1);
+              // clip, never abort: this is remote data
+              strclipbuff(dropped, sizeof(dropped), a);
             }
           }
           /* info reports what we honour, not what we read. */
