@@ -46,9 +46,10 @@ EOF
 }
 
 # A 1 GiB address-space cap turns a 2 GiB allocation into "memory exhausted".
-# A sanitized build cannot start under it, so it then runs uncapped.
+# A sanitized build cannot map its shadow under it, so detect one before capping.
 cap=1048576
 capped() { (ulimit -v "$cap" && "$@"); }
+probe=$(ASAN_OPTIONS=help=1:detect_leaks=0 proxytrack --version 2>&1 || true)
 
 convert() { # convert IN-CACHE X-SIZE [HEADER-SIZE]
     craft "$@"
@@ -59,7 +60,10 @@ convert() { # convert IN-CACHE X-SIZE [HEADER-SIZE]
 
 run=capped
 craft 0 "${#BODY}"
-capped proxytrack --convert "$dir/out.arc" "$zip" >/dev/null 2>&1 || run=
+case "$probe" in
+*AddressSanitizer*) run= ;;
+*) capped proxytrack --convert "$dir/out.arc" "$zip" >/dev/null 2>&1 || run= ;;
+esac
 
 # control: an honest size still serves the body on both paths
 for in_cache in 0 1; do
