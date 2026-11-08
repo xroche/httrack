@@ -34,6 +34,7 @@ Please visit our Website: http://www.httrack.com
 #include <limits.h> /* INT_MAX, the backing count back_new() must refuse */
 
 #include "htsselftest_int.h"
+#include "htsstats.h"
 
 /* hts_mirror_completed() answers HTS_DEFAULT until a mirror has run, so a GUI
    whose hts_main2() bailed out early does not read that as an abort. The
@@ -176,6 +177,70 @@ static void threadwait_gated_thread(void *arg) {
 
 /* back_slot_fail() clips a reason too long for r.msg, where a copy aborted;
    back_slot_fail_nonfatal() closes and keeps a reason already set. */
+static void st_statsrows_slot(lien_back *b, int status, LLint size,
+                              LLint totalsize, const char *fil) {
+  b->status = status;
+  b->r.size = size;
+  b->r.totalsize = totalsize;
+  b->r.statuscode = HTTP_OK;
+  strcpybuff(b->url_adr, "http://example.com");
+  strcpybuff(b->url_fil, fil);
+}
+
+static int st_statsrows(httrackp *opt, int argc, char **argv) {
+  struct_back *sback = back_new(opt, 4);
+  t_StatsBuffer rows[NStatsBuffer];
+  lien_back *b;
+  int i, err = 0;
+
+  if (sback == NULL) {
+    printf("statsrows: SKIP (no slot table)\n");
+    return 77;
+  }
+  b = sback->lnk;
+  for (i = 0; i < NStatsBuffer; i++)
+    strcpybuff(rows[i].state, "stale");
+
+  /* no backing table: no row, and no division by zero */
+  ST_FAIL_IF(err,
+             stats_collect_rows(opt, b, 0, 0, rows, NStatsBuffer, 40) != 0);
+  ST_FAIL_IF(err, rows[0].state[0] != '\0');
+  ST_FAIL_IF(err, stats_collect_rows(opt, b, 4, 0, rows, 0, 40) != 0);
+
+  st_statsrows_slot(&b[0], STATUS_WAIT_HEADERS, 0, -1, "/a/b.html");
+  st_statsrows_slot(&b[1], 50, 0, 0, "/empty");
+  st_statsrows_slot(&b[2], STATUS_READY, 3, 3, "/done");
+  st_statsrows_slot(&b[3], 50, 10000, -1, "/unknown");
+  ST_FAIL_IF(err,
+             stats_collect_rows(opt, b, 4, 0, rows, NStatsBuffer, 40) != 4);
+  /* the current slot first, then transfers, then finished slots */
+  ST_FAIL_IF(err, strcmp(rows[0].state, "request") != 0 || rows[0].back != 0);
+  ST_FAIL_IF(err, strcmp(rows[0].name, "http://example.com/a") != 0);
+  ST_FAIL_IF(err, strcmp(rows[0].file, "/b.html") != 0);
+  ST_FAIL_IF(err, strcmp(rows[1].state, "receive") != 0 || rows[1].back != 1);
+  /* a known size of 0 is shown as 0, not as an 8 KB placeholder */
+  ST_FAIL_IF(err, rows[1].sizetot != 0 || rows[1].size != 0);
+  ST_FAIL_IF(err, rows[2].back != 3 || rows[2].sizetot != 8192);
+  ST_FAIL_IF(err, rows[2].size != 10000 % 8192);
+  ST_FAIL_IF(err, strcmp(rows[3].state, "ready") != 0 || rows[3].back != 2);
+  ST_FAIL_IF(err, rows[4].state[0] != '\0');
+
+  /* a URL as wide as both fields is clipped and shortened, never aborted */
+  memset(b[0].url_adr, 'h', sizeof(b[0].url_adr) - 1);
+  b[0].url_adr[sizeof(b[0].url_adr) - 1] = '\0';
+  memset(b[0].url_fil, 'f', sizeof(b[0].url_fil) - 1);
+  b[0].url_fil[sizeof(b[0].url_fil) - 1] = '\0';
+  ST_FAIL_IF(err, stats_collect_rows(opt, b, 4, 0, rows, 1, 40) != 1);
+  ST_FAIL_IF(err, strlen(rows[0].name) >= 40);
+
+  for (i = 0; i < sback->count; i++)
+    b[i].status = STATUS_FREE;
+  back_free(&sback);
+  if (!err)
+    printf("statsrows: OK\n");
+  return err;
+}
+
 static int st_slotfail(httrackp *opt, int argc, char **argv) {
   struct_back *sback = back_new(opt, 1);
   htsblk *r;
@@ -1796,6 +1861,9 @@ const struct selftest_entry selftests_back[] = {
      st_backswap},
     {"slotfail", "", "a failed slot clips a reason too long for its message",
      st_slotfail},
+    {"statsrows", "",
+     "the progress rows survive an empty table and show a known size of 0",
+     st_statsrows},
     {"spoolwrite", "<dir>", "a failed spool write leaves no partial file",
      st_spoolwrite},
     {"spoolsweep", "<dir>", "startup removes the spool of a dead process only",
