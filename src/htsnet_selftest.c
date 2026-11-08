@@ -505,20 +505,36 @@ static int st_socketpair(T_SOC sv[2]) {
   return 0;
 }
 
+static void socwait_delayed_send(void *arg) {
+  Sleep(300);
+  (void) send(*(T_SOC *) arg, "x", 1, 0);
+}
+
 /* Each wait watches its own direction: a fresh, empty socket is writable and
-   not readable. */
+   not readable. check_readinput polls, and the _t forms wait up to timeout. */
 static int st_socwait(httrackp *opt, int argc, char **argv) {
   T_SOC sv[2];
   htsblk r;
+  TStamp t0, dt;
 
   assertf(st_socketpair(sv) == 0);
   memset(&r, 0, sizeof(r));
   r.soc = sv[1];
   assertf(check_readinput_t(sv[1], 0) == 0);
+  t0 = mtime_local();
   assertf(check_readinput(&r) == 0);
+  assertf(mtime_local() - t0 < 500);
   assertf(check_writeinput_t(sv[1], 0) == 1);
-  assertf(send(sv[0], "x", 1, 0) == 1);
+  t0 = mtime_local();
+  assertf(check_readinput_t(sv[1], 1) == 0);
+  dt = mtime_local() - t0;
+  assertf(dt >= 900 && dt < 5000);
+  assertf(hts_newthread(socwait_delayed_send, &sv[0]) == 0);
+  t0 = mtime_local();
   assertf(check_readinput_t(sv[1], 10) == 1);
+  dt = mtime_local() - t0;
+  assertf(dt >= 200 && dt < 5000);
+  htsthread_wait();
   assertf(check_readinput(&r) == 1);
   r.soc = INVALID_SOCKET;
   assertf(check_readinput(&r) == 0);
