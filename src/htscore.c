@@ -796,26 +796,20 @@ static hts_boolean bundle_start(httrackp *opt, char **primary,
   return HTS_TRUE;
 }
 
-/* Fill the module context for the link at *ptr; page_charset_ stays NULL. */
-static void mirror_module_str(htsmoduleStruct *str, char *err_msg,
-                              httrackp *opt, struct_back *sback,
-                              cache_back *cache, hash_struct *hashptr,
-                              int numero_passe, int *ptr, htsblk *r) {
+/* Copy the mirror-wide fields of base, then set the per-link ones. */
+static void mirror_module_str(htsmoduleStruct *str, const htsmoduleStruct *base,
+                              char *err_msg, int numero_passe, htsblk *r) {
+  const lien_url *const link = base->opt->liens[*base->ptr_];
+
+  *str = *base;
   err_msg[0] = '\0';
-  memset(str, 0, sizeof(*str));
   str->err_msg = err_msg;
-  str->filename = opt->liens[*ptr]->sav;
+  str->filename = link->sav;
   str->mime = r->contenttype;
-  str->url_host = opt->liens[*ptr]->adr;
-  str->url_file = opt->liens[*ptr]->fil;
+  str->url_host = link->adr;
+  str->url_file = link->fil;
   str->size = (int) r->size;
-  str->addLink = htsAddLink;
-  str->opt = opt;
-  str->sback = sback;
-  str->cache = cache;
-  str->hashptr = hashptr;
   str->numero_passe = numero_passe;
-  str->ptr_ = ptr;
 }
 
 /* Copy the mirror-wide fields of base, then set the per-link ones. */
@@ -883,6 +877,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
 
   //
   char *template_header = NULL, *template_body = NULL, *template_footer = NULL;
+  htsmoduleStruct BIGSTK str_base;          // see mirror_module_str()
   htsmoduleStructExtended BIGSTK stre_base; // see mirror_module_stre()
 
   //
@@ -1463,6 +1458,13 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   // ------------------------------------------------------------
 
   /* None of these change once the loop starts. */
+  memset(&str_base, 0, sizeof(str_base));
+  str_base.addLink = htsAddLink;
+  str_base.opt = opt;
+  str_base.sback = sback;
+  str_base.cache = &cache;
+  str_base.hashptr = hashptr;
+  str_base.ptr_ = &ptr;
   memset(&stre_base, 0, sizeof(stre_base));
   stre_base.exit_xh_ = &opt->state.exit_xh;
   stre_base.base = base;
@@ -1574,8 +1576,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
             htsmoduleStruct BIGSTK str;
             htsmoduleStructExtended BIGSTK stre;
 
-            mirror_module_str(&str, buff_err_msg, opt, sback, &cache, hashptr,
-                              numero_passe, &ptr, &r);
+            mirror_module_str(&str, &str_base, buff_err_msg, numero_passe, &r);
             mirror_module_stre(&stre, &stre_base, &r, &error, &store_errpage);
             /* FUNCTION DEPENDANT */
             stre.loc_ = loc;
@@ -1783,8 +1784,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
         htsmoduleStruct BIGSTK str;
         htsmoduleStructExtended BIGSTK stre;
 
-        mirror_module_str(&str, buff_err_msg, opt, sback, &cache, hashptr,
-                          numero_passe, &ptr, &r);
+        mirror_module_str(&str, &str_base, buff_err_msg, numero_passe, &r);
         mirror_module_stre(&stre, &stre_base, &r, &error, &store_errpage);
 
         /* Parse */
@@ -1915,8 +1915,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
             htsmoduleStruct BIGSTK str;
             htsmoduleStructExtended BIGSTK stre;
 
-            mirror_module_str(&str, buff_err_msg, opt, sback, &cache, hashptr,
-                              numero_passe, &ptr, &r);
+            mirror_module_str(&str, &str_base, buff_err_msg, numero_passe, &r);
             /* NULL when conversion is off, empty when the document declared no
                charset; the parser tells the two apart */
             str.page_charset_ = opt->convert_utf8 ? page_charset : NULL;
@@ -2046,8 +2045,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
           char BIGSTK buff_err_msg[1024];
           htsmoduleStruct BIGSTK str;
 
-          mirror_module_str(&str, buff_err_msg, opt, sback, &cache, hashptr,
-                            numero_passe, &ptr, &r);
+          mirror_module_str(&str, &str_base, buff_err_msg, numero_passe, &r);
 
           /* Parse if recognized */
           switch (hts_parse_externals(&str)) {
