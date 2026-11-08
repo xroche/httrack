@@ -606,7 +606,8 @@ PT_Index PT_LoadCache(const char *filename) {
           chain = coucal_enum_next(&en);
         }
         if (chain != NULL) {
-          const char *scheme = link_has_authority(chain->name) ? "" : "http://";
+          const char *scheme =
+              hts_shared_link_has_authority(chain->name) ? "" : "http://";
 
           /* dropped rather than truncated: empty already reads as "unset" */
           if (!sprintfbuff(index->slots.common.startUrl, "%s%s", scheme,
@@ -1233,7 +1234,9 @@ int PT_LoadCache__New(PT_Index index_, const char *filename) {
                 if (!firstSeen) {
                   if (strstr(filenameIndex, "/robots.txt") == NULL) {
                     const char *scheme =
-                        link_has_authority(filenameIndex) ? "" : "http://";
+                        hts_shared_link_has_authority(filenameIndex)
+                            ? ""
+                            : "http://";
 
                     /* dropped rather than truncated; try the next entry */
                     if (sprintfbuff(index->startUrl, "%s%s", scheme,
@@ -1696,7 +1699,7 @@ static hts_boolean cache_rlen(FILE *fp, long int datSize, size_t *len) {
   char buff[256 + 4];
 
   *len = 0;
-  linput(fp, buff, 256);
+  hts_shared_linput(fp, buff, 256, HTS_TRUE);
   if (sscanf(buff, INTsysP, &i) != 1 || i < 0 || i > CACHE_FIELD_MAXSIZE)
     return HTS_FALSE;
   if (!cache_fits(fp, datSize, (size_t) i))
@@ -1890,7 +1893,7 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
                 if (strstr(line, "/robots.txt") == NULL) {
                   PT_Index__Old index = cache;
                   const char *scheme =
-                      link_has_authority(line) ? "" : "http://";
+                      hts_shared_link_has_authority(line) ? "" : "http://";
 
                   /* dropped rather than truncated; try the next entry */
                   if (sprintfbuff(index->startUrl, "%s%s", scheme, line))
@@ -2318,7 +2321,8 @@ static time_t getArcTimestamp(const char *const line) {
 
 static int readArcURLRecord(PT_Index__Arc index) {
   index->line[0] = '\0';
-  if (linput(index->file, index->line, sizeof(index->line) - 1)) {
+  if (hts_shared_linput(index->file, index->line, sizeof(index->line) - 1,
+                        HTS_TRUE)) {
     return 0;
   }
   return -1;
@@ -2336,15 +2340,15 @@ static hts_boolean arcPastRecordEnd(FILE *file, long int end) {
   return (end >= 0 && ftell(file) > end) ? HTS_TRUE : HTS_FALSE;
 }
 
-/* Characters linput() returns for one line at most, given the size the walk
-   passes it: one below the buffer it is handed, which is itself one below the
-   field. Matching it exactly is what keeps the scan and the walk from reading
-   the same long line differently. */
+/* Characters hts_shared_linput() returns for one line at most, given the size
+   the walk passes it: one below the buffer it is handed, which is itself one
+   below the field. Matching it exactly is what keeps the scan and the walk from
+   reading the same long line differently. */
 #define ARC_LINE_MAX ((int) sizeof(((PT_Index__Arc) NULL)->line) - 2)
 
-/* Bytes this reader's own linput(), the one in proxytrack.h rather than the one
-   in htslib.c, never returns wherever they sit on the line. NUL is among them,
-   so a record line carrying one is indexed and served all the same. */
+/* Bytes hts_shared_linput() with skip_nul set, unlike htslib.c's linput(),
+   never returns wherever they sit on the line. NUL is among them, so a record
+   line carrying one is indexed and served all the same. */
 static hts_boolean arcDroppedByte(char c) {
   return (c == 0 || c == 9 || c == 12 || c == 13) ? HTS_TRUE : HTS_FALSE;
 }
@@ -2423,7 +2427,8 @@ static hts_boolean arcMayOpenRecord(const char *raw, size_t len) {
   return HTS_FALSE;
 }
 
-/* Append what linput() would have kept of a raw span, to the same cap. */
+/* Append what hts_shared_linput() would have kept of a raw span, to the same
+ * cap. */
 static size_t arcAppendLine(char *line, size_t len, const char *raw,
                             size_t rawlen) {
   size_t i;
@@ -2669,7 +2674,8 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
 
         /* Read HTTP headers */
         /* HTTP/1.1 404 Not Found */
-        if (linput(index->file, index->line, sizeof(index->line) - 1) &&
+        if (hts_shared_linput(index->file, index->line, sizeof(index->line) - 1,
+                              HTS_TRUE) &&
             !arcPastRecordEnd(index->file, fposEnd)) {
           if ((pos = getArcField(index->line, 1)) != NULL) {
             if (sscanf(pos, "%d", &r->statuscode) != 1) {
@@ -2680,8 +2686,9 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
             r->msg[0] = '\0';
             strncatbuff(r->msg, pos, sizeof(r->msg) - 1);
           }
-          while(linput(index->file, index->line, sizeof(index->line) - 1)
-                && index->line[0] != '\0') {
+          while (hts_shared_linput(index->file, index->line,
+                                   sizeof(index->line) - 1, HTS_TRUE) &&
+                 index->line[0] != '\0') {
             char *const line = index->line;
             char *value = strchr(line, ':');
 
@@ -2913,7 +2920,7 @@ static int PT_SaveCache__Arc_Fun(void *arg, const char *url, PT_Element element)
           /* nl */
           "\n",
           /* args */
-          (link_has_authority(url) ? "" : "http://"), url, "0.0.0.0",
+          (hts_shared_link_has_authority(url) ? "" : "http://"), url, "0.0.0.0",
           tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour,
           tm->tm_min, tm->tm_sec, hts_effective_mime(element->contenttype),
           element->statuscode, st->md5,

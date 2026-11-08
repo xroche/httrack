@@ -110,8 +110,6 @@ int htslang_init(void);
 /* Static definitions */
 
 HTS_UNUSED static const char *gethomedir(void);
-HTS_UNUSED static int fexist(const char *s);
-HTS_UNUSED static int linput(FILE * fp, char *s, int max);
 
 /* Time after which the socket reads below give up; 0 means none. */
 HTS_UNUSED static time_t linputsoc_deadline = 0;
@@ -192,51 +190,6 @@ static const char *gethomedir(void) {
 
   /* An empty $HOME would put the base path and httrack.ini at the root */
   return strnotempty(home) ? home : ".";
-}
-
-static int fexist(const char *s) {
-  struct stat st;
-
-  memset(&st, 0, sizeof(st));
-  if (stat(s, &st) == 0) {
-    if (S_ISREG(st.st_mode)) {
-      return 1;
-    }
-  }
-  return 0;
-}
-static int linput(FILE * fp, char *s, int max) {
-  int c;
-  int j = 0;
-
-  do {
-    c = fgetc(fp);
-    if (c != EOF) {
-      switch (c) {
-      case 13:
-        break;                  // sauter CR
-      case 10:
-        c = -1;
-        break;
-      case 0:
-      case 9:
-      case 12:
-        break;                  // sauter ces caractères
-      default:
-        s[j++] = (char) c;
-        break;
-      }
-    }
-  } while((c != -1) && (c != EOF) && (j < (max - 1)));
-  if (j == max - 1 && c != -1 && c != EOF) {
-    /* Stopped at the bound: consume the newline, or the next read returns "" */
-    while ((c = fgetc(fp)) == 13)
-      ;
-    if (c != 10 && c != EOF)
-      ungetc(c, fp);
-  }
-  s[j] = '\0';
-  return j;
 }
 
 #endif

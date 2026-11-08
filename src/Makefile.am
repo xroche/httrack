@@ -61,10 +61,12 @@ htsserver_SOURCES = htsserver.c htsserver.h htsweb.c htsweb.h htsstats.h \
 	htsrandom.c htsrandom.h \
 	htscmdline.c htscmdline.h \
 	htslines.c htslines.h \
-	htsurlport.c htsurlport.h htsescape.c htsescape.h
+	htsurlport.c htsurlport.h htsescape.c htsescape.h \
+	htsshared.c htsshared.h
 proxytrack_SOURCES = proxy/main.c \
 	proxy/proxytrack.c proxy/store.c \
 	htsurlport.c htsurlport.h htsdate.c htsdate.h htsnet.c \
+	htsshared.c htsshared.h \
 	coucal/coucal.c htsmd5.c md5.c \
 	minizip/ioapi.c minizip/mztools.c minizip/unzip.c minizip/zip.c
 
