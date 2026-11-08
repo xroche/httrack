@@ -67,8 +67,6 @@ Please visit our Website: http://www.httrack.com
 
 #define FTP_DEBUG 0
 
-#if USE_BEGINTHREAD
-
 /* Live FTP workers. Each writes through its backlog slot and reads opt for its
    whole run, so neither may be freed while the list is not empty (#1051).
    Registration happens at spawn, not at thread entry: a worker that has not
@@ -442,10 +440,6 @@ void launch_ftp(FTPDownloadStruct * params) {
     ftp_worker_release(params, "Unable to launch FTP thread");
   }
 }
-
-#else
-#error No more supported
-#endif
 
 // pour l'arrêt du ftp
 #ifdef _WIN32

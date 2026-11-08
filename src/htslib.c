@@ -699,164 +699,87 @@ void hts_init_htsblk(htsblk * r) {
   r->retry_after = -1;
 }
 
-// ouverture d'une liaison http, envoi d'une requète
-// mode: 0 GET  1 HEAD  [2 POST]
-// treat: traiter header?
-// waitconnect: attendre le connect()
-// note: dans retour, on met les params du proxy
-T_SOC http_xfopen(httrackp *opt, int mode, int treat, int waitconnect,
-                  const char *xsend, const char *adr, const char *fil,
+T_SOC http_xfopen(httrackp *opt, const char *adr, const char *fil,
                   htsblk *retour) {
   T_SOC soc = INVALID_SOCKET;
   char BIGSTK tempo_fil[HTS_URLMAXSIZE * 2];
 
-  // retour prédéfini: erreur
-  if (retour) {
-    retour->adr = NULL;
-    retour->size = 0;
-    retour->msg[0] = '\0';
-    retour->statuscode = STATUSCODE_NON_FATAL;  // a priori erreur non fatale
-  }
+  // default result: error
+  retour->adr = NULL;
+  retour->size = 0;
+  retour->msg[0] = '\0';
+  retour->statuscode = STATUSCODE_NON_FATAL;
 
-  // ouvrir liaison
-
-  /* connexion */
-  if (retour) {
-    /* no proxy, or proxy not usable here (local file) */
-    if ((!(retour->req.proxy.active)) || (strcmp(adr, "file://") == 0)) {
-      soc = newhttp(opt, adr, retour, -1, waitconnect);
-    } else {
-      // to the proxy; https tunnels to the origin via CONNECT in back_wait
-      // (#85)
-      soc = newhttp(opt, retour->req.proxy.name, retour, retour->req.proxy.port,
-                    waitconnect);
-    }
+  /* no proxy, or proxy not usable here (local file) */
+  if ((!(retour->req.proxy.active)) || (strcmp(adr, "file://") == 0)) {
+    soc = newhttp(opt, adr, retour, -1);
   } else {
-    soc = newhttp(opt, adr, NULL, -1, waitconnect);
+    // to the proxy; https tunnels to the origin via CONNECT in back_wait
+    // (#85)
+    soc = newhttp(opt, retour->req.proxy.name, retour, retour->req.proxy.port);
   }
 
-  // copier index socket retour
-  if (retour)
-    retour->soc = soc;
+  retour->soc = soc;
 
   /* Check for errors */
   if (soc == INVALID_SOCKET) {
-    if (retour) {
-      if (!strnotempty(retour->msg)) {
+    if (!strnotempty(retour->msg)) {
 #ifdef _WIN32
-        const int last_errno = WSAGetLastError();
+      const int last_errno = WSAGetLastError();
 #else
-        const int last_errno = errno;
+      const int last_errno = errno;
 #endif
-        char errbuf[HTS_STRERROR_SIZE];
+      char errbuf[HTS_STRERROR_SIZE];
 
-        htsblk_failf(retour, "Connect error: %s",
-                     hts_strerror(last_errno, errbuf, sizeof(errbuf)));
-      }
+      htsblk_failf(retour, "Connect error: %s",
+                   hts_strerror(last_errno, errbuf, sizeof(errbuf)));
     }
   }
-  // --------------------
-  // court-circuit (court circuite aussi le proxy..)
-  // LOCAL_SOCKET_ID est une pseudo-socket locale
+  // a local file: LOCAL_SOCKET_ID is a pseudo-socket, and no proxy applies
   if (soc == LOCAL_SOCKET_ID) {
-    retour->is_file = 1;        // fichier local
-    if (mode == 0) {            // GET
+    retour->is_file = 1;
 
-      // Test en cas de file:///C|...
-      if (!fexist
-          (fconv(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-          unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), fil))))
-        if (fexist
-            (fconv
-             (OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-             unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), fil + 1)))) {
-          strcpybuff(tempo_fil, fil + 1);
-          fil = tempo_fil;
-        }
-      // Ouvrir
-      retour->totalsize = fsize(fconv(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), 
-        unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), fil)));       // taille du fichier
-      retour->msg[0] = '\0';
-      soc = INVALID_SOCKET;
-      if (retour->totalsize < 0)
-        strcpybuff(retour->msg, "Unable to open local file");
-      else {
-        // Note: On passe par un FILE* (plus propre)
-        retour->fp = FOPEN(fconv(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), 
-          unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), fil)), "rb");      // ouvrir
-        if (retour->fp == NULL)
-          soc = INVALID_SOCKET;
-        else
-          soc = LOCAL_SOCKET_ID;
+    // file:///C|... : retry without the leading slash
+    if (!fexist(fconv(
+            OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+            unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), fil))))
+      if (fexist(fconv(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                       unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                     fil + 1)))) {
+        strcpybuff(tempo_fil, fil + 1);
+        fil = tempo_fil;
       }
-      retour->soc = soc;
-      if (soc != INVALID_SOCKET) {
-        retour->statuscode = HTTP_OK;   // OK
-        strcpybuff(retour->msg, "OK");
-        guess_httptype_sized(opt, retour->contenttype,
-                             sizeof(retour->contenttype), fil);
-      } else if (strnotempty(retour->msg) == 0)
-        strcpybuff(retour->msg, "Unable to open local file");
-      return soc;               // renvoyer
-    } else {                    // HEAD ou POST : interdit sur un local!!!! (c'est idiot!)
-      strcpybuff(retour->msg, "Unexpected Head/Post local request");
-      soc = INVALID_SOCKET;     // erreur
-      retour->soc = soc;
-      return soc;
+    retour->totalsize = fsize(
+        fconv(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+              unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), fil)));
+    retour->msg[0] = '\0';
+    soc = INVALID_SOCKET;
+    if (retour->totalsize < 0)
+      strcpybuff(retour->msg, "Unable to open local file");
+    else {
+      retour->fp = FOPEN(
+          fconv(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), fil)),
+          "rb");
+      if (retour->fp == NULL)
+        soc = INVALID_SOCKET;
+      else
+        soc = LOCAL_SOCKET_ID;
     }
-  }
-  // --------------------
-
-  if (soc != INVALID_SOCKET) {
-    char rcvd[1100];
-
-    rcvd[0] = '\0';
-
-    // connecté?
-    if (waitconnect) {
-      http_sendhead(opt, NULL, mode, xsend, adr, fil, NULL, NULL, NULL, retour);
-    }
-
+    retour->soc = soc;
     if (soc != INVALID_SOCKET) {
-
-      // si GET (réception d'un fichier), réceptionner en-tête d'abord,
-      // et ensuite le corps
-      // si POST on ne réceptionne rien du tout, c'est après que l'on fera
-      // une réception standard pour récupérer l'en tête
-      if ((treat) && (waitconnect)) {   // traiter (attendre!) en-tête
-        // Réception de la status line et de l'en-tête (norme RFC1945)
-
-        // status-line à récupérer
-        finput_line(soc, rcvd, 1024);
-        // some buggy servers send a leading \n (RFC)
-        if (strnotempty(rcvd) == 0)
-          finput_line(soc, rcvd, 1024);
-
-        // traiter status-line
-        treatfirstline(retour, rcvd);
-
-        // en-tête
-
-        // header // ** !attention! HTTP/0.9 non supporté
-        do {
-          const hts_boolean cut = finput_line(soc, rcvd, 1024);
-
-          if (cut)
-            hts_log_print(NULL,
-                          hts_header_is_read(rcvd) ? LOG_WARNING : LOG_DEBUG,
-                          "Over-long header dropped");
-          else if (strnotempty(rcvd))
-            treathead(NULL, NULL, NULL, retour, rcvd);
-
-        } while(strnotempty(rcvd));
-
-      } else { // si GET, on recevra l'en tête APRES
-        if (retour)
-          retour->totalsize = -1;
-      }
-    }
-
+      retour->statuscode = HTTP_OK;
+      strcpybuff(retour->msg, "OK");
+      guess_httptype_sized(opt, retour->contenttype,
+                           sizeof(retour->contenttype), fil);
+    } else if (strnotempty(retour->msg) == 0)
+      strcpybuff(retour->msg, "Unable to open local file");
+    return soc;
   }
+
+  // the header is read later, by back_wait
+  if (soc != INVALID_SOCKET)
+    retour->totalsize = -1;
 
   return soc;
 }
@@ -3153,16 +3076,12 @@ int connect_socket_error(T_SOC soc) {
   return soerr;
 }
 
-// Crée un lien (http) vers une adresse internet iadr
-// retour: structure (adresse, taille, message si erreur (si !adr))
-// peut ouvrir avec des connect() non bloquants: waitconnect=0/1
-T_SOC newhttp(httrackp * opt, const char *_iadr, htsblk * retour, int port,
-              int waitconnect) {
-  return newhttp_addr(opt, _iadr, retour, port, waitconnect, 0, NULL);
+T_SOC newhttp(httrackp *opt, const char *_iadr, htsblk *retour, int port) {
+  return newhttp_addr(opt, _iadr, retour, port, 0, NULL);
 }
 
 T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
-                   int waitconnect, int addr_index, int *addr_count) {
+                   int addr_index, int *addr_count) {
   T_SOC soc;                    // descipteur de la socket
 
   if (addr_count != NULL) {
@@ -3279,45 +3198,25 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
     // structure: connexion au domaine internet, port 80 (ou autre)
     SOCaddr_initport(server, port);
 
-    // connexion non bloquante?
-    if (!waitconnect) {
-      if (!socket_set_nonblocking(soc, HTS_TRUE)) {
+    if (!socket_set_nonblocking(soc, HTS_TRUE)) {
 #ifdef _WIN32
-        const int last_errno = WSAGetLastError();
+      const int last_errno = WSAGetLastError();
 #else
-        const int last_errno = errno;
+      const int last_errno = errno;
 #endif
-        char errbuf[HTS_STRERROR_SIZE];
+      char errbuf[HTS_STRERROR_SIZE];
 
-        htsblk_failf(retour, "Non-blocking socket failed: %s",
-                     hts_strerror(last_errno, errbuf, sizeof(errbuf)));
-        deletesoc(soc);
-        return INVALID_SOCKET;
-      }
+      htsblk_failf(retour, "Non-blocking socket failed: %s",
+                   hts_strerror(last_errno, errbuf, sizeof(errbuf)));
+      deletesoc(soc);
+      return INVALID_SOCKET;
     }
     // Connexion au serveur lui même
     HTS_STAT.last_connect = mtime_local();
 
-    if (hts_socket_connect(soc, &SOCaddr_sockaddr(server), SOCaddr_size(server),
-                           will_bind ? NULL : opt) != 0) {
-      // bloquant
-      if (waitconnect) {
-        if (retour != NULL) {
-#ifdef _WIN32
-          const int last_errno = WSAGetLastError();
-#else
-          const int last_errno = errno;
-#endif
-          char errbuf[HTS_STRERROR_SIZE];
-
-          htsblk_failf(retour, "Unable to connect to the server: %s",
-                       hts_strerror(last_errno, errbuf, sizeof(errbuf)));
-        }
-        /* Close the socket and notify the error!!! */
-        deletesoc(soc);
-        return INVALID_SOCKET;
-      }
-    }
+    // non-blocking: back_wait sees how the connect ended
+    (void) hts_socket_connect(soc, &SOCaddr_sockaddr(server),
+                              SOCaddr_size(server), will_bind ? NULL : opt);
 
     // A partir de maintenant, on peut envoyer et recevoir des données
     // via le flot identifié par soc (socket): write(soc,adr,taille) et
@@ -4095,25 +3994,6 @@ hts_boolean binput_line(const char *buff, const char *end, char *s, int max,
   }
   s[j] = '\0';
   *offset = (int) (p - buff) + 1; /* binput's convention: step over the \n */
-  return cut;
-}
-
-hts_boolean finput_line(T_SOC fd, char *s, int max) {
-  hts_boolean cut = HTS_FALSE;
-  int j = 0;
-  char c;
-
-  for (;;) {
-    if (read((int) fd, &c, 1) <= 0 || c == 10)
-      break;
-    if (c == 13)
-      continue;
-    if (j < max - 1)
-      s[j++] = c;
-    else
-      cut = HTS_TRUE; /* keep draining: the tail must not become more headers */
-  }
-  s[j] = '\0';
   return cut;
 }
 

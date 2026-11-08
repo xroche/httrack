@@ -39,9 +39,6 @@ Please visit our Website: http://www.httrack.com
 #include <pthread.h>
 #endif
 #include "htswin32.h"
-#ifndef USE_BEGINTHREAD
-#error needs USE_BEGINTHREAD
-#endif
 
 #ifdef _WIN32
 struct htsmutex_s {

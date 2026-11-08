@@ -79,10 +79,8 @@ Please visit our Website: http://www.httrack.com
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
-#if USE_BEGINTHREAD
 #ifdef _WIN32
 #include <process.h>
-#endif
 #endif
 #ifdef _WIN32
 #else
@@ -389,14 +387,12 @@ static hts_boolean write_progress_lock(httrackp *opt, const char *path,
   fprintf(fp, "To stop it and keep the mirror: create an empty file named "
               "'" HTS_ABORT_LOCKNAME "' (an earlier run's copy is"
               " ignored, so create it again)" LF);
-#if USE_BEGINTHREAD
   fprintf(fp, "PID=%d\n", (int) getpid());
 #ifndef _WIN32
   fprintf(fp, "UID=%d\n", (int) getuid());
   fprintf(fp, "GID=%d\n", (int) getgid());
 #endif
   fprintf(fp, "START=" LLintP "\n", (LLint) time(NULL));
-#endif
   fclose(fp);
   /* Whole-second filesystems tie two files written in the same second, and the
      backdate is what breaks that tie. */
