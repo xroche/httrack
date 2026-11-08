@@ -325,7 +325,6 @@ static int back_connect_next(httrackp *opt, struct_back *sback, int i) {
 
   if (back[i].r.soc != INVALID_SOCKET) {
     deletehttp(&back[i].r);
-    back[i].r.soc = INVALID_SOCKET;
   }
   soc = newhttp_addr(opt, back[i].url_adr, &back[i].r, -1, 0, next, NULL);
   if (soc == INVALID_SOCKET)
@@ -2236,7 +2235,6 @@ void back_maydeletehttp(httrackp * opt, cache_back * cache, struct_back * sback,
                     back[q].r.debugid, adr_nologin(opt, back[q].url_adr));
     } else {
       deletehttp(&back[p].r);
-      back[p].r.soc = INVALID_SOCKET;
     }
   }
 }
@@ -2362,7 +2360,6 @@ static void back_set_too_big(httrackp *opt, struct_back *sback, const int p) {
   back_set_finished(opt, sback, p);
   back[p].r.statuscode = STATUSCODE_TOO_BIG;
   deletehttp(&back[p].r);
-  back[p].r.soc = INVALID_SOCKET;
   strcpybuff(back[p].r.msg,
              back[p].testmode ? "Test: File too big" : "File too big");
 }
@@ -2674,7 +2671,6 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
     if (hts_load_acquire_int(&opt->state.stop) && !opt->is_update) {
       back[p].r.statuscode = STATUSCODE_INVALID;        // fatal
       strcpybuff(back[p].r.msg, "mirror stopped by user");
-      back[p].status = STATUS_READY;    // terminé
       back_set_finished(opt, sback, p);
       hts_log_print(opt, LOG_WARNING,
                     "File not added due to mirror cancel: %s%s",
@@ -2825,7 +2821,6 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
           /* Interdiction taille par le wizard? --> détruire */
           if (back[p].r.statuscode != -1) {     // pas d'erreur de lecture
             if (!back_checksize(opt, &back[p], 0)) {
-              back[p].status = STATUS_READY;    // FINI
               back_set_finished(opt, sback, p);
               back[p].r.statuscode = STATUSCODE_TOO_BIG;
               if (!back[p].testmode)
@@ -2850,7 +2845,6 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
             back[p].r.notmodified = 1;  // fichier non modifié
             // no request was sent at all, so this is never a server 304 (#839)
             back[p].r.warc_forced_notmodified = HTS_TRUE;
-            back[p].status = STATUS_READY; // OK prêt
             back_set_finished(opt, sback, p);
 
             // finalize transfer
@@ -3021,7 +3015,6 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
             filenote(&opt->state.strc, save, NULL);     // ne pas purger tout de même
             file_notify(opt, back[p].url_adr, back[p].url_fil, back[p].url_sav,
                         0, 0, back[p].r.notmodified);
-            back[p].status = STATUS_READY;      // OK prêt
             back_set_finished(opt, sback, p);
             back[p].r.statuscode = STATUSCODE_INVALID;  // erreur
             strcpybuff(back[p].r.msg, "Null-size file not recaught");
@@ -3043,7 +3036,6 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
     if (hts_load_acquire_int(&opt->state.stop)) {
       back[p].r.statuscode = STATUSCODE_INVALID;        // fatal
       strcpybuff(back[p].r.msg, "mirror stopped by user");
-      back[p].status = STATUS_READY;    // terminé
       back_set_finished(opt, sback, p);
       hts_log_print(opt, LOG_WARNING,
                     "File not added due to mirror cancel: %s%s",
@@ -3107,7 +3099,6 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
           back[p].r.statuscode = STATUSCODE_NON_FATAL;
           strcpybuff(back[p].r.msg,
                      "ftp:// is not supported over a SOCKS proxy");
-          back[p].status = STATUS_READY;
           back_set_finished(opt, sback, p);
           return 0;
         }
@@ -3116,7 +3107,6 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
           if (str == NULL) {
             back[p].r.statuscode = STATUSCODE_CONNERROR;
             strcpybuff(back[p].r.msg, "Out of memory");
-            back[p].status = STATUS_READY;
             back_set_finished(opt, sback, p);
             return 0;
           }
@@ -3139,7 +3129,6 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
         // Transferring it would mean a cleartext request to an https URL.
         back[p].r.statuscode = STATUSCODE_NON_FATAL;
         strcpybuff(back[p].r.msg, "https:// is not supported by this build");
-        back[p].status = STATUS_READY;
         back_set_finished(opt, sback, p);
         return 0;
 #endif
@@ -3153,7 +3142,6 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
           soc =
             http_xfopen(opt, 0, 0, 0, back[p].send_too, adr, fil, &back[p].r);
           if (soc == INVALID_SOCKET) {
-            back[p].status = STATUS_READY;      // fini, erreur
             back_set_finished(opt, sback, p);
           }
         }
@@ -3211,7 +3199,6 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
         }
 #else
       if (soc == INVALID_SOCKET) {      // erreur socket
-        back[p].status = STATUS_READY;  // FINI
         back_set_finished(opt, sback, p);
         back[p].r.soc = INVALID_SOCKET;
       } else {
@@ -3672,7 +3659,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               strcpybuff(back[i].r.msg, "Connect Error");
             else
               strcpybuff(back[i].r.msg, "Receive Error");
-            back[i].status = STATUS_READY;      // terminé
             back_set_finished(opt, sback, i);
             hts_log_print(opt, LOG_WARNING,
                           "Unexpected socket error during pre-loop");
@@ -3736,7 +3722,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               if (back_status(&back[i]) == STATUS_ALIVE) { /* keep-alive */
                 back_delete(opt, cache, sback, i);
               } else {
-                back[i].status = STATUS_READY;  // terminé
                 back_set_finished(opt, sback, i);
               }
             }
@@ -3777,10 +3762,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
           if (connect_socket_error(back[i].r.soc) != 0) {
             if (!back_connect_next(opt, sback, i)) {
               deletehttp(&back[i].r);
-              back[i].r.soc = INVALID_SOCKET;
               back[i].r.statuscode = STATUSCODE_CONNERROR;
               strcpybuff(back[i].r.msg, "Connect Error");
-              back[i].status = STATUS_READY;
               back_set_finished(opt, sback, i);
             }
             continue; // reconnected (stay connecting) or failed
@@ -3811,9 +3794,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               if (!strnotempty(back[i].r.msg))
                 strcpybuff(back[i].r.msg, "SOCKS5 handshake failed");
               deletehttp(&back[i].r);
-              back[i].r.soc = INVALID_SOCKET;
               back[i].r.statuscode = STATUSCODE_NON_FATAL;
-              back[i].status = STATUS_READY;
               back_set_finished(opt, sback, i);
               continue;
             }
@@ -3833,9 +3814,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               if (!strnotempty(back[i].r.msg))
                 strcpybuff(back[i].r.msg, "proxy CONNECT failed");
               deletehttp(&back[i].r);
-              back[i].r.soc = INVALID_SOCKET;
               back[i].r.statuscode = STATUSCODE_NON_FATAL;
-              back[i].status = STATUS_READY;
               back_set_finished(opt, sback, i);
               continue;
             }
@@ -3859,9 +3838,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                 if (!strnotempty(back[i].r.msg))
                   strcpybuff(back[i].r.msg, "proxy CONNECT failed");
                 deletehttp(&back[i].r);
-                back[i].r.soc = INVALID_SOCKET;
                 back[i].r.statuscode = STATUSCODE_NON_FATAL;
-                back[i].status = STATUS_READY;
                 back_set_finished(opt, sback, i);
               }
             }
@@ -3901,9 +3878,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               if (!strnotempty(back[i].r.msg))
                 strcpybuff(back[i].r.msg, "bad SSL/TLS handshake");
               deletehttp(&back[i].r);
-              back[i].r.soc = INVALID_SOCKET;
               back[i].r.statuscode = STATUSCODE_NON_FATAL;
-              back[i].status = STATUS_READY;
               back_set_finished(opt, sback, i);
             }
           }
@@ -3983,9 +3958,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                X509_verify_cert_error_string(verdict));
               }
               deletehttp(&back[i].r);
-              back[i].r.soc = INVALID_SOCKET;
               back[i].r.statuscode = STATUSCODE_NON_FATAL;
-              back[i].status = STATUS_READY;
               back_set_finished(opt, sback, i);
             }
           } else {                              /* got it! */
@@ -3994,9 +3967,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
         } else {
           strcpybuff(back[i].r.msg, "unexpected SSL/TLS error");
           deletehttp(&back[i].r);
-          back[i].r.soc = INVALID_SOCKET;
           back[i].r.statuscode = STATUSCODE_NON_FATAL;
-          back[i].status = STATUS_READY;
           back_set_finished(opt, sback, i);
         }
 
@@ -4022,7 +3993,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             http_xfopen(opt, 0, 0, 0, back[i].send_too, back[i].url_adr,
                         back[i].url_fil, &(back[i].r));
           if (back[i].r.soc == INVALID_SOCKET) {
-            back[i].status = STATUS_READY;      // fini, erreur
             back_set_finished(opt, sback, i);
             if (back[i].r.soc != INVALID_SOCKET) {
               deletehttp(&back[i].r);
@@ -4058,7 +4028,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                        "Unknown ftp result, check if file is ok");
             back[i].r.statuscode = STATUSCODE_INVALID;
           }
-          back[i].status = STATUS_READY;
           back_set_finished(opt, sback, i);
           // finalize transfer
           if (back[i].r.statuscode > 0) {
@@ -4069,7 +4038,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
       }
 #endif
       else if (back_ftp_handed_back(&back[i])) {
-        back[i].status = STATUS_READY;
         back_set_finished(opt, sback, i);
         // finalize transfer
         if (back[i].r.statuscode > 0) {
@@ -4176,11 +4144,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                               "* * Fatal write error, giving up");
                               }
                               back[i].r.is_write = 0;   // erreur, abandonner
-                              back[i].status = STATUS_READY;      // terminé
                               back_set_finished(opt, sback, i);
                               if (back[i].r.soc != INVALID_SOCKET) {
                                 deletehttp(&back[i].r);
-                                back[i].r.soc = INVALID_SOCKET;
                               }
                             } else {
 #ifndef _WIN32
@@ -4203,7 +4169,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                           "File cancelled (non HTML): %s%s",
                                           adr_nologin(opt, back[i].url_adr),
                                           back[i].url_fil);
-                            back[i].status = STATUS_READY;      // terminé
                             back_set_finished(opt, sback, i);
                             if (!back[i].testmode)
                               back[i].r.statuscode = STATUSCODE_INVALID;        // EUHH CANCEL
@@ -4286,7 +4251,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
           }
 
           if (retour_fread < 0) {       // fin réception
-            back[i].status = STATUS_READY;      // terminé
             back_set_finished(opt, sback, i);
             /*KA back[i].r.soc=INVALID_SOCKET; */
             if (retour_fread < 0 && retour_fread != READ_EOF) {
@@ -4526,7 +4490,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                   back[i].status = 1;         // continuer body
                 } else { /* zero-size-chunk-CRLF (end) or error */
                   /* End */
-                  back[i].status = STATUS_READY; // fin
                   back_set_finished(opt, sback, i);
 
                   // finalize transfer if not temporary
@@ -4545,7 +4508,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     /* Error */
                     if (chunk_size < 0) {
                       deletehttp(&back[i].r);
-                      back[i].r.soc = INVALID_SOCKET;
                       deleteaddr(&back[i].r);
                       back[i].r.statuscode = STATUSCODE_INVALID;
                       strcpybuff(back[i].r.msg, "Invalid chunk");
@@ -4696,10 +4658,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                     "breaking connection: %s%s",
                                     adr_nologin(opt, back[i].url_adr),
                                     back[i].url_fil);
-                      back[i].status = STATUS_READY;    // FINI
                       back_set_finished(opt, sback, i);
                       deletehttp(&back[i].r);
-                      back[i].r.soc = INVALID_SOCKET;
                       strcpybuff(back[i].r.msg,
                                  "External wrapper aborted transfer");
                       back[i].r.statuscode = STATUSCODE_INVALID;
@@ -4783,8 +4743,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                       file_notify(opt, back[i].url_adr, back[i].url_fil,
                                   back[i].url_sav, 0, 0, back[i].r.notmodified);
                       deletehttp(&back[i].r);
-                      back[i].r.soc = INVALID_SOCKET;
-                      back[i].status = STATUS_READY;    // READY
                       back_set_finished(opt, sback, i);
                       back[i].r.size = back[i].r.totalsize =
                         back[i].range_req_size;
@@ -4815,7 +4773,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                         adr_nologin(opt, back[i].url_adr), back[i].url_fil);
                     back[i].r.statuscode = HTTP_NOT_MODIFIED;
                     deletehttp(&back[i].r);
-                    back[i].r.soc = INVALID_SOCKET;
                   }
                   // Various hacks to limit re-transfers when updating a mirror
                   // Force update if same size detected
@@ -4850,7 +4807,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                             if (len1 == len2 && ondisk == len2) {
                               back[i].r.statuscode = HTTP_NOT_MODIFIED; // forcer NOT MODIFIED
                               deletehttp(&back[i].r);
-                              back[i].r.soc = INVALID_SOCKET;
                               hts_log_print(
                                   opt, LOG_NOTICE,
                                   "Kept existing file %s (" LLintP
@@ -4887,8 +4843,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                             if (size >= 0) {
                               if (back[i].r.totalsize == size) {        // same size!
                                 deletehttp(&back[i].r);
-                                back[i].r.soc = INVALID_SOCKET;
-                                back[i].status = STATUS_READY;  // READY
                                 back_set_finished(opt, sback, i);
                                 back[i].r.size = back[i].r.totalsize;
                                 filenote(&opt->state.strc, back[i].url_sav,
@@ -4931,8 +4885,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                           back[i]
                                               .r.totalsize) { // And same size
                                         deletehttp(&back[i].r);
-                                        back[i].r.soc = INVALID_SOCKET;
-                                        back[i].status = STATUS_READY;  // READY
                                         back_set_finished(opt, sback, i);
                                         back[i].r.size = back[i].r.totalsize;
                                         filenote(&opt->state.strc,
@@ -4983,13 +4935,11 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                                 back[i].url_fil);
                     UNLINK(back[i].url_sav);
                     deletehttp(&back[i].r);
-                    back[i].r.soc = INVALID_SOCKET;
                     back[i].r.statuscode = STATUSCODE_NON_FATAL;
                     back[i].r.refetch_wholefile =
                         HTS_TRUE; // retry whole, no Range (#581)
                     strcpybuff(back[i].r.msg,
                                "Bogus 304 on resume, restarting");
-                    back[i].status = STATUS_READY;
                     back_set_finished(opt, sback, i);
                   }
 
@@ -5003,9 +4953,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     // Couper connexion
                     if (!back[i].http11) {      /* NO KA */
                       deletehttp(&back[i].r);
-                      back[i].r.soc = INVALID_SOCKET;
                     }
-                    back[i].status = STATUS_READY;      // terminé
                     back_set_finished(opt, sback, i);
                   }
                   // traiter une éventuelle erreur 304 (cache à jour utilisable)
@@ -5056,7 +5004,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     }
                     // Status is okay?
                     if (back[i].r.statuscode != -1) {   // pas d'erreur de lecture
-                      back[i].status = STATUS_READY;    // OK prêt
                       back_set_finished(opt, sback, i);
                       back[i].r.notmodified = 1;        // NON modifié!
                       // WARC must not claim a 304 the server never sent (#839)
@@ -5074,7 +5021,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                       }
 
                     } else {    // erreur
-                      back[i].status = STATUS_READY;    // terminé
                       back_set_finished(opt, sback, i);
                     }
 
@@ -5088,8 +5034,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                           back[i].url_fil,
                                           back[i].r.contenttype) == 1) {
                     deletehttp(&back[i].r);
-                    back[i].r.soc = INVALID_SOCKET;
-                    back[i].status = STATUS_READY;
                     back_set_finished(opt, sback, i);
                     back[i].r.statuscode = STATUSCODE_EXCLUDED;
                     strcpybuff(back[i].r.msg, "Excluded by MIME type filter");
@@ -5150,7 +5094,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                 url_savename_refname_remove(
                                     opt, back[i].url_adr, back[i].url_fil);
                                 UNLINK(back[i].url_sav);
-                                back[i].status = STATUS_READY;
                                 back_set_finished(opt, sback, i);
                                 strcpybuff(back[i].r.msg,
                                            "Can not truncate partial file, "
@@ -5171,7 +5114,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                 }
                               }
                             } else {    // On est dans la m**
-                              back[i].status = STATUS_READY;    // terminé (voir plus loin)
                               back_set_finished(opt, sback, i);
                               strcpybuff(back[i].r.msg,
                                          "Can not open partial file");
@@ -5205,7 +5147,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                 back[i].r.totalsize += resume; // -> full size
                               if (!hts_fread_exact(back[i].r.adr,
                                                    (size_t) resume, fp)) {
-                                back[i].status = STATUS_READY;  // terminé (voir plus loin)
                                 back_set_finished(opt, sback, i);
                                 strcpybuff(back[i].r.msg,
                                            "Can not read partial file");
@@ -5213,7 +5154,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                 back[i].r.statuscode = HTTP_OK; // Forcer 'OK'
                               }
                             } else {
-                              back[i].status = STATUS_READY;    // terminé (voir plus loin)
                               back_set_finished(opt, sback, i);
                               strcpybuff(back[i].r.msg,
                                          "No memory for partial file");
@@ -5221,7 +5161,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                             if (fp != NULL)
                               fclose(fp);
                           } else {                              // open failed
-                            back[i].status = STATUS_READY;      // terminé (voir plus loin)
                             back_set_finished(opt, sback, i);
                             strcpybuff(back[i].r.msg,
                                        "Can not open partial file");
@@ -5240,12 +5179,10 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                         url_savename_refname_remove(opt, back[i].url_adr,
                                                     back[i].url_fil);
                         UNLINK(back[i].url_sav);
-                        back[i].status = STATUS_READY;
                         back_set_finished(opt, sback, i);
                         strcpybuff(back[i].r.msg,
                                    "Unusable partial content, restarting");
                       } else {                          // partial not found
-                        back[i].status = STATUS_READY;  // terminé (voir plus loin)
                         back_set_finished(opt, sback, i);
                         strcpybuff(back[i].r.msg, "Can not find partial file");
                       }
@@ -5272,7 +5209,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                           // Couper connexion
                           back_maydeletehttp(opt, cache, sback, i);
                           /* KA deletehttp(&back[i].r); back[i].r.soc=INVALID_SOCKET; */
-                          back[i].status = STATUS_READY;        // terminé
                           back_set_finished(opt, sback, i);
                           if (deleteaddr(&back[i].r)
                               && (back[i].r.adr = (char *) malloct(2))) {
@@ -5300,10 +5236,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                           back[i].rateout_time = time_local();  // refresh pour transfer rate
                         }
                       } else {  // mode test, ne pas passer en 1!!
-                        back[i].status = STATUS_READY;  // READY
                         back_set_finished(opt, sback, i);
                         deletehttp(&back[i].r);
-                        back[i].r.soc = INVALID_SOCKET;
                         if (back[i].r.statuscode == HTTP_OK) {
                           strcpybuff(back[i].r.msg, "Test: OK");
                           back[i].r.statuscode = STATUSCODE_TEST_OK;    // test réussi
@@ -5384,7 +5318,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                 back[i].r.soc = INVALID_SOCKET;
                 back[i].r.statuscode = STATUSCODE_CONNERROR;
                 strcpybuff(back[i].r.msg, "Connect Error");
-                back[i].status = STATUS_READY;
                 back_set_finished(opt, sback, i);
                 continue;
               }
@@ -5405,12 +5338,10 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                 strcpybuff(back[i].r.msg, "SSL/TLS Handshake Time Out");
               else
                 strcpybuff(back[i].r.msg, "Receive Time Out");
-              back[i].status = STATUS_READY;    // terminé
               back_set_finished(opt, sback, i);
             } else if ((back[i].rateout > 0) && (back_status(&back[i]) < 99)) {
               if (((int) (act - back[i].rateout_time)) >= HTS_WATCHRATE) {      // checker au bout de 15s
                 if ((int) ((back[i].r.size) / (act - back[i].rateout_time)) < back[i].rateout) {        // trop lent
-                  back[i].status = STATUS_READY;        // terminé
                   back_set_finished(opt, sback, i);
                   if (back[i].r.soc != INVALID_SOCKET) {
                     deletehttp(&back[i].r);
