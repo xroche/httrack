@@ -268,6 +268,24 @@ static void cmdl_print_args(httrackp *opt, const cmdl_argv *cmd) {
   } while (0)
 #define readGluedInt(field, max) readGluedOpt_(cmdl_glued_int, field, max)
 #define readGluedLLint(field, max) readGluedOpt_(cmdl_glued_llint, field, max)
+/* Set the on/off option at com, or clear it when a glued 0 follows. */
+#define readGluedOnOff(field)                                                  \
+  do {                                                                         \
+    (field) = HTS_TRUE;                                                        \
+    if (*(com + 1) == '0') {                                                   \
+      (field) = HTS_FALSE;                                                     \
+      com++;                                                                   \
+    }                                                                          \
+  } while (0)
+/* readGluedOnOff() for an option that the 0 turns on. */
+#define readGluedOnOffInv(field)                                               \
+  do {                                                                         \
+    (field) = HTS_FALSE;                                                       \
+    if (*(com + 1) == '0') {                                                   \
+      (field) = HTS_TRUE;                                                      \
+      com++;                                                                   \
+    }                                                                          \
+  } while (0)
 /* readGluedInt() for an enum, narrower than an int under -fshort-enums. */
 #define readGluedEnum(field, max)                                              \
   do {                                                                         \
@@ -1585,27 +1603,15 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
             break;
             //
           case 'I':
-            opt->makeindex = 1;
-            if (*(com + 1) == '0') {
-              opt->makeindex = 0;
-              com++;
-            }
+            readGluedOnOff(opt->makeindex);
             break;
             //
           case 'X':
-            opt->delete_old = 1;
-            if (*(com + 1) == '0') {
-              opt->delete_old = 0;
-              com++;
-            }
+            readGluedOnOff(opt->delete_old);
             break;
             //
           case 'y':
-            opt->background_on_suspend = 1;
-            if (*(com + 1) == '0') {
-              opt->background_on_suspend = 0;
-              com++;
-            }
+            readGluedOnOff(opt->background_on_suspend);
             break;
             //
           case 'b':
@@ -1712,11 +1718,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
               com++;
               switch (*com) {
               case 'M':
-                opt->mimehtml = 1;
-                if (*(com + 1) == '0') {
-                  opt->mimehtml = 0;
-                  com++;
-                }
+                readGluedOnOff(opt->mimehtml);
                 if (opt->mimehtml && opt->single_file) {
                   HTS_PANIC_PRINTF(
                       "-%M and --single-file are two ways to make one "
@@ -1728,32 +1730,16 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 }
                 break;
               case 'k':
-                opt->nokeepalive = 0;
-                if (*(com + 1) == '0') {
-                  opt->nokeepalive = 1;
-                  com++;
-                }
+                readGluedOnOffInv(opt->nokeepalive);
                 break;
               case 'x':
-                opt->passprivacy = 1;
-                if (*(com + 1) == '0') {
-                  opt->passprivacy = 0;
-                  com++;
-                }
+                readGluedOnOff(opt->passprivacy);
                 break;          // No passwords in html files
               case 'q':
-                opt->includequery = 1;
-                if (*(com + 1) == '0') {
-                  opt->includequery = 0;
-                  com++;
-                }
+                readGluedOnOff(opt->includequery);
                 break;          // No passwords in html files
               case 'Q':
-                opt->browser_headers = HTS_TRUE;
-                if (*(com + 1) == '0') {
-                  opt->browser_headers = HTS_FALSE;
-                  com++;
-                }
+                readGluedOnOff(opt->browser_headers);
                 break;
               case 'I':
                 opt->kindex = 1;
@@ -1779,84 +1765,37 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 readGluedInt(opt->extdepth, INT_MAX);
                 break;
               case 'B':
-                opt->tolerant = 1;
-                if (*(com + 1) == '0') {
-                  opt->tolerant = 0;
-                  com++;
-                }
+                readGluedOnOff(opt->tolerant);
                 break;          // HTTP/1.0 notamment
               case 'h':
-                opt->http10 = 1;
-                if (*(com + 1) == '0') {
-                  opt->http10 = 0;
-                  com++;
-                }
+                readGluedOnOff(opt->http10);
                 break;          // HTTP/1.0
               case 'z':
-                opt->nocompression = 1;
-                if (*(com + 1) == '0') {
-                  opt->nocompression = 0;
-                  com++;
-                }
+                readGluedOnOff(opt->nocompression);
                 break;          // pas de compression
               case 'f':
-                opt->ftp_proxy = 1;
-                if (*(com + 1) == '0') {
-                  opt->ftp_proxy = 0;
-                  com++;
-                }
+                readGluedOnOff(opt->ftp_proxy);
                 break;          // proxy http pour ftp
               case 'P':
-                opt->parseall = 1;
-                if (*(com + 1) == '0') {
-                  opt->parseall = 0;
-                  com++;
-                }
+                readGluedOnOff(opt->parseall);
                 break;          // tout parser
               case 'n':
-                opt->norecatch = 1;
-                if (*(com + 1) == '0') {
-                  opt->norecatch = 0;
-                  com++;
-                }
+                readGluedOnOff(opt->norecatch);
                 break;          // ne pas reprendre fichiers effacés localement
               case 's':
-                opt->sizehack = 1;
-                if (*(com + 1) == '0') {
-                  opt->sizehack = 0;
-                  com++;
-                }
+                readGluedOnOff(opt->sizehack);
                 break;          // hack sur content-length
               case 'u':
-                opt->urlhack = 1;
-                if (*(com + 1) == '0') {
-                  opt->urlhack = 0;
-                  com++;
-                }
+                readGluedOnOff(opt->urlhack);
                 break;          // url hack
-              case 'j':
-                opt->no_www_dedup =
-                    HTS_TRUE; // --keep-www-prefix: keep www.X != X
-                if (*(com + 1) == '0') {
-                  opt->no_www_dedup = HTS_FALSE;
-                  com++;
-                }
+              case 'j':         // --keep-www-prefix: keep www.X != X
+                readGluedOnOff(opt->no_www_dedup);
                 break;
-              case 'o':
-                opt->no_slash_dedup =
-                    HTS_TRUE; // --keep-double-slashes: keep //
-                if (*(com + 1) == '0') {
-                  opt->no_slash_dedup = HTS_FALSE;
-                  com++;
-                }
+              case 'o': // --keep-double-slashes: keep //
+                readGluedOnOff(opt->no_slash_dedup);
                 break;
-              case 'y':
-                opt->no_query_dedup =
-                    HTS_TRUE; // --keep-query-order: keep ?b&a order
-                if (*(com + 1) == '0') {
-                  opt->no_query_dedup = HTS_FALSE;
-                  com++;
-                }
+              case 'y': // --keep-query-order: keep ?b&a order
+                readGluedOnOff(opt->no_query_dedup);
                 break;
               case 'v':
                 opt->verbosedisplay = HTS_VERBOSE_FULL;
@@ -1865,11 +1804,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 }
                 break;
               case 'i':
-                opt->dir_topindex = 1;
-                if (*(com + 1) == '0') {
-                  opt->dir_topindex = 0;
-                  com++;
-                }
+                readGluedOnOff(opt->dir_topindex);
                 break;
               case 'N':
                 opt->savename_delayed = HTS_SAVENAME_DELAYED_HARD;
@@ -1879,25 +1814,13 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 }
                 break;
               case 'D':
-                opt->delayed_cached = 1;
-                if (*(com + 1) == '0') {
-                  opt->delayed_cached = 0;
-                  com++;
-                }
+                readGluedOnOff(opt->delayed_cached);
                 break;          // url hack
               case 'T':
-                opt->convert_utf8 = 1;
-                if (*(com + 1) == '0') {
-                  opt->convert_utf8 = 0;
-                  com++;
-                }
+                readGluedOnOff(opt->convert_utf8);
                 break;          // convert to utf-8
               case '!':
-                opt->bypass_limits = 1;
-                if (*(com + 1) == '0') {
-                  opt->bypass_limits = 0;
-                  com++;
-                }
+                readGluedOnOff(opt->bypass_limits);
                 break;
               case 'w':        // disable specific plugin
                 if ((na + 1 >= argc) ||
@@ -2309,11 +2232,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 }
                 break;
               case 'd': // --changes: report what this crawl changed
-                opt->changes = HTS_TRUE;
-                if (*(com + 1) == '0') {
-                  opt->changes = HTS_FALSE;
-                  com++;
-                }
+                readGluedOnOff(opt->changes);
                 break;
               case 'r': // warc / warc-file: write an ISO-28500 WARC archive
                 if (*(com + 1) == 'f') { // --warc-file NAME: explicit basename
@@ -2408,11 +2327,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                   }
                   opt->single_file = HTS_TRUE;
                 } else {
-                  opt->single_file = HTS_TRUE;
-                  if (*(com + 1) == '0') {
-                    opt->single_file = HTS_FALSE;
-                    com++;
-                  }
+                  readGluedOnOff(opt->single_file);
                 }
                 if (opt->single_file && opt->mimehtml) {
                   HTS_PANIC_PRINTF(
@@ -2519,8 +2434,7 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
                 }
                 break;
               case 't':        /* do not change type (ending) of filenames according to the MIME type */
-                opt->no_type_change = 1;
-                if (*(com+1)=='0') { opt->no_type_change = 0; com++; }
+                readGluedOnOff(opt->no_type_change);
                 break;
 
               default:{
