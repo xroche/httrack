@@ -66,102 +66,27 @@ Please visit our Website: http://www.httrack.com
 // arrays
 #include "htsarrays.h"
 
-/* clang-format off: an edit realigns all backslashes, churning the macro. */
-/* clang-format off */
-/** Append 'COUNT' bytes from 'PTR', latching output_oom if the buffer cannot
-    grow to hold them. **/
-#define HT_ADD_N(PTR, COUNT) do { \
-  const size_t want_ = (COUNT); \
-  TypedArrayEnsureRoom(output_buffer, want_); \
-  if (TypedArrayHasRoom(output_buffer, want_)) { \
-    TypedArrayAppend(output_buffer, (PTR), want_); \
-  } else { \
-    output_oom = HTS_TRUE; \
-  } \
-} while(0)
-
-/** Set the output buffer's size, latching output_oom rather than claiming
-    bytes it never had room for. **/
-#define HT_SET_SIZE(N) do { \
-  const size_t size_ = (N); \
-  if (size_ <= TypedArrayCapa(output_buffer)) { \
-    TypedArraySize(output_buffer) = size_; \
-  } else { \
-    output_oom = HTS_TRUE; \
-  } \
-} while(0)
-
-/** Append bytes to the output buffer up to the pointer 'html'. **/
-#define HT_add_adr do { \
-  if ( (opt->getmode & 1) != 0 && ptr > 0 ) { \
-    const size_t sz_ = html - lastsaved; \
-    if (sz_ != 0) { \
-      HT_ADD_N(lastsaved, sz_); \
-      lastsaved = html; \
-    } \
-  } \
-} while(0)
-
-/** Append to the output buffer the string 'A'. **/
-#define HT_ADD(A) HT_ADD_N(A, strlen(A))
-
 /* Room a later stage still needs inside lien[]: a scheme it may prepend
    ("http://") plus a ".class" it may append, and the NUL. */
 #define HTS_LINK_TAIL_ROOM 16
 
-/** Append to the output buffer the first N bytes of 'A' (NUL-stopped). **/
+/* The parse_sink of htsparse(), under the short names its call sites use. */
+#define HT_ADD_N(PTR, COUNT) sink_add_n(&sink, (PTR), (COUNT))
+#define HT_ADD(A) sink_add(&sink, (A))
 #define HT_ADD_BUF(A, N) HT_ADD_N(A, htssafe_strnlen_(A, N))
+#define HT_ADD_HTMLESCAPED(A) sink_add_htmlescaped(&sink, (A))
+#define HT_ADD_HTMLESCAPED_FULL(A) sink_add_htmlescaped_full(&sink, (A))
+#define HT_ADD_URL_HTMLESCAPED(A) sink_add_url_htmlescaped(&sink, (A))
+#define HT_SET_SIZE(N) sink_set_size(&sink, (N))
 
-/** Append 'A' to the output buffer, html-escaped; FACTOR = max byte expansion. **/
-#define HT_ADD_HTMLESCAPED_ANY(A, FUNCTION, FACTOR) do { \
-  if ((opt->getmode & 1) != 0 && ptr>0) { \
-    const char *const str_ = (A); \
-    const size_t want_ = strlen(str_) * (FACTOR) + 1024; \
-    TypedArrayEnsureRoom(output_buffer, want_); \
-    if (TypedArrayHasRoom(output_buffer, want_)) { \
-      TypedArraySize(output_buffer) += \
-        FUNCTION(str_, &TypedArrayTail(output_buffer), \
-                 TypedArrayRoom(output_buffer)); \
-    } else { \
-      output_oom = HTS_TRUE; \
-    } \
-  } \
-} while(0)
-
-/** Append to the output buffer the string 'A', html-escaped for &.
-    A script or style element holds raw text, and so does an external script or
-    stylesheet, so an entity written there would never be decoded. An inline
-    handler such as onclick= is still markup, which inscript_tag marks. **/
-#define HT_ADD_HTMLESCAPED(A) do { \
-  if (inscript && !inscript_tag) { \
-    HT_ADD(A); \
-  } else { \
-    HT_ADD_HTMLESCAPED_ANY(A, escape_for_html_print, HTS_HTMLESCAPE_MAXEXP); \
-  } \
-} while(0)
-
-/**
- * Append to the output buffer the string 'A', html-escaped for & and
- * high chars.
- **/
-/* Its one caller passes a percent-encoded path, and appends any query through
-   HT_ADD_HTMLESCAPED, so no bare & reaches it. */
-#define HT_ADD_HTMLESCAPED_FULL(A) \
-  HT_ADD_HTMLESCAPED_ANY(A, escape_for_html_print_full, HTS_HTMLESCAPE_FULL_MAXEXP)
-
-/** Append the URL host or path 'A' with " ' < > percent-encoded, then
-    html-escaped like HT_ADD_HTMLESCAPED (but not inside a script string). **/
-#define HT_ADD_URL_HTMLESCAPED(A) do { \
-  if (inscript && !inscript_tag) { \
-    HT_ADD_URL_PCTQUOTES(A); \
-  } else { \
-    HT_ADD_HTMLESCAPED_ANY(A, escape_url_quotes_html, HTS_HTMLESCAPE_MAXEXP); \
-  } \
-} while(0)
-
-/** Append the URL piece 'A' with only " ' < > percent-encoded; & stays raw. **/
-#define HT_ADD_URL_PCTQUOTES(A) HT_ADD_HTMLESCAPED_ANY(A, escape_url_quotes, 3)
-/* clang-format on */
+/** Append bytes to the output buffer up to the pointer 'html'. **/
+#define HT_add_adr                                                             \
+  do {                                                                         \
+    if (sink.enabled && html != lastsaved) {                                   \
+      HT_ADD_N(lastsaved, (size_t) (html - lastsaved));                        \
+      lastsaved = html;                                                        \
+    }                                                                          \
+  } while (0)
 
 /* Mutable extended-context fields: one source of truth so the DEFINE/SET/SAVE
    load and store lists can't drift apart. */
@@ -958,6 +883,97 @@ static size_t escape_url_quotes_html(const char *const s, char *const dest,
   return escape_url_quotes_any(s, dest, size, HTS_TRUE);
 }
 
+/* The rewritten page htsparse() builds. */
+typedef struct parse_sink {
+  TypedArray(char) buf;
+  /* Latched when buf cannot grow. */
+  hts_boolean oom;
+  /* FALSE when the page is not saved as HTML: every write is then dropped. */
+  hts_boolean enabled;
+  /* The parser's script state: script text is raw, but a handler is markup. */
+  const int *inscript;
+  const int *inscript_tag;
+} parse_sink;
+
+typedef size_t (*sink_escaper)(const char *const s, char *const dest,
+                               const size_t size);
+
+/* Append 'count' bytes from 'p'. */
+static void sink_add_n(parse_sink *const sink, const char *const p,
+                       const size_t count) {
+  if (!sink->enabled)
+    return;
+  TypedArrayEnsureRoom(sink->buf, count);
+  if (TypedArrayHasRoom(sink->buf, count)) {
+    TypedArrayAppend(sink->buf, p, count);
+  } else {
+    sink->oom = HTS_TRUE;
+  }
+}
+
+static void sink_add(parse_sink *const sink, const char *const s) {
+  sink_add_n(sink, s, strlen(s));
+}
+
+/* Set the buffer's size, latching oom rather than claiming bytes it lacks. */
+static void sink_set_size(parse_sink *const sink, const size_t size) {
+  if (size <= TypedArrayCapa(sink->buf)) {
+    TypedArraySize(sink->buf) = size;
+  } else {
+    sink->oom = HTS_TRUE;
+  }
+}
+
+/* Append 's' through 'escape', which grows a byte to at most 'factor'. */
+static void sink_add_escaped(parse_sink *const sink, const char *const s,
+                             const sink_escaper escape, const size_t factor) {
+  size_t want;
+
+  if (!sink->enabled)
+    return;
+  want = strlen(s) * factor + 1024;
+  TypedArrayEnsureRoom(sink->buf, want);
+  if (TypedArrayHasRoom(sink->buf, want)) {
+    TypedArraySize(sink->buf) +=
+        escape(s, &TypedArrayTail(sink->buf), TypedArrayRoom(sink->buf));
+  } else {
+    sink->oom = HTS_TRUE;
+  }
+}
+
+/* Is the parser inside script or style text, where no entity is decoded? */
+static hts_boolean sink_raw_text(const parse_sink *const sink) {
+  return *sink->inscript && !*sink->inscript_tag;
+}
+
+/* Append 's', with & html-escaped outside raw script text. */
+static void sink_add_htmlescaped(parse_sink *const sink, const char *const s) {
+  if (sink_raw_text(sink)) {
+    sink_add(sink, s);
+  } else {
+    sink_add_escaped(sink, s, escape_for_html_print, HTS_HTMLESCAPE_MAXEXP);
+  }
+}
+
+/* Append 's' with & and high bytes html-escaped. Its one caller passes a
+   percent-encoded path, so no bare & reaches it. */
+static void sink_add_htmlescaped_full(parse_sink *const sink,
+                                      const char *const s) {
+  sink_add_escaped(sink, s, escape_for_html_print_full,
+                   HTS_HTMLESCAPE_FULL_MAXEXP);
+}
+
+/* Append the URL host or path 's' with " ' < > percent-encoded, then
+   html-escaped like sink_add_htmlescaped(). */
+static void sink_add_url_htmlescaped(parse_sink *const sink,
+                                     const char *const s) {
+  if (sink_raw_text(sink)) {
+    sink_add_escaped(sink, s, escape_url_quotes, 3);
+  } else {
+    sink_add_escaped(sink, s, escape_url_quotes_html, HTS_HTMLESCAPE_MAXEXP);
+  }
+}
+
 /* Default port for lien's scheme (case-insensitive), 80 if absent/unknown; so
    schemeless and protocol-relative //host links default to 80 (known gap). */
 static int scheme_default_port(const char *lien) {
@@ -1076,9 +1092,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
     // Now, parsing
     if (!error) {
       // output HTML
-      TypedArray(char) output_buffer = EMPTY_TYPED_ARRAY;
-      /* Latched by the HT_ADD_* macros when output_buffer cannot grow. */
-      hts_boolean output_oom = HTS_FALSE;
+      parse_sink sink = {EMPTY_TYPED_ARRAY, HTS_FALSE, HTS_FALSE, NULL, NULL};
 
       time_t user_interact_timestamp = 0;
       int detect_title = 0;     // détection  du title
@@ -1125,6 +1139,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       //
       int parent_relative = 0;  // the parent is the base path (.js, .css..)
 
+      sink.enabled = (opt->getmode & HTS_GETMODE_HTML) && ptr > 0;
+      sink.inscript = &inscript;
+      sink.inscript_tag = &inscript_tag;
       lastsaved = html;
 
       /* Initialize script automate for comments, quotes.. */
@@ -2255,10 +2272,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
             // écrire codebase avant, flusher avant code
             if ((p_type == -1) || (p_type == -2)) {
-              if ((opt->getmode & HTS_GETMODE_HTML) && (ptr > 0)) {
-                HT_add_adr;     // refresh
-              }
-              lastsaved = html;  // dernier écrit+1
+              HT_add_adr;       // refresh
+              lastsaved = html; // one past the last byte written
             }
             // sauter espaces
             hts_automate_increment(&saut, p);
@@ -2347,10 +2362,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
             // ne pas flusher après code si on doit écrire le codebase avant!
             if ((p_type != -1) && (p_type != 2) && (p_type != -2)) {
-              if ((opt->getmode & HTS_GETMODE_HTML) && (ptr > 0)) {
-                HT_add_adr;     // refresh
-              }
-              lastsaved = html;  // dernier écrit+1
+              HT_add_adr;       // refresh
+              lastsaved = html; // one past the last byte written
               // après on écrira soit les données initiales,
               // soir une URL/lien modifié!
             } else if (p_type == -1)
@@ -2423,9 +2436,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 if (*html != '#') {      // Not empty+unique #
                   if (eadr - html == 1) {    // 1=link empty with delim (end_adr-start_adr)
                     if (quote) {
-                      if ((opt->getmode & HTS_GETMODE_HTML) && (ptr > 0)) {
-                        HT_ADD("#");    // We add this for a <href="">
-                      }
+                      HT_ADD("#"); // We add this for a <href="">
                     }
                   }
                 }
@@ -3098,7 +3109,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     }
                     /* */
                     else if (opt->urlmode == HTS_URLMODE_ABSOLUTE) {
-                      if ((opt->getmode & HTS_GETMODE_HTML) && (ptr > 0)) {
+                      if (sink.enabled) {
                         if (!link_has_authority(afs.af.adr)) {
                           HT_ADD("http://");
                         } else {
@@ -3134,7 +3145,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     } else if (forbidden_url ==
                                1) { // le lien ne sera pas chargé, référence
                                     // externe!
-                      if ((opt->getmode & HTS_GETMODE_HTML) && (ptr > 0)) {
+                      if (sink.enabled) {
                         if (p_type != -1) {     // pas que le nom de fichier (pas classe java)
                           if (!opt->external) {
                             if (!link_has_authority(afs.af.adr)) {
@@ -3338,33 +3349,29 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                               }
                             }
 
-                            // érire codebase="chemin"
-                            if ((opt->getmode & HTS_GETMODE_HTML) &&
-                                (ptr > 0)) {
-                              if (strnotempty(tempo_pat)) {
-                                HT_ADD("codebase=\"http://");
-                                if (!opt->passprivacy) {
-                                  HT_ADD_URL_HTMLESCAPED(
-                                      afs.af.adr); // Password
-                                } else {
-                                  HT_ADD_URL_HTMLESCAPED(
-                                      jump_identification_const(
-                                          afs.af.adr)); // No Password
-                                }
-                                if (*tempo_pat != '/')
-                                  HT_ADD("/");
-                                HT_ADD_URL_HTMLESCAPED(tempo_pat);
-                                HT_ADD("\" ");
+                            // write codebase="path"
+                            if (strnotempty(tempo_pat)) {
+                              HT_ADD("codebase=\"http://");
+                              if (!opt->passprivacy) {
+                                HT_ADD_URL_HTMLESCAPED(afs.af.adr); // Password
+                              } else {
+                                HT_ADD_URL_HTMLESCAPED(
+                                    jump_identification_const(
+                                        afs.af.adr)); // No Password
                               }
-
-                              /* The page picks this span's width, so it goes
-                                 to the growable output, not a fixed buffer. */
-                              if (p_flush > lastsaved) {
-                                HT_ADD_BUF(lastsaved,
-                                           (size_t) (p_flush - lastsaved));
-                              }
-                              HT_ADD_URL_HTMLESCAPED(tempo);
+                              if (*tempo_pat != '/')
+                                HT_ADD("/");
+                              HT_ADD_URL_HTMLESCAPED(tempo_pat);
+                              HT_ADD("\" ");
                             }
+
+                            /* The page picks this span's width, so it goes
+                               to the growable output, not a fixed buffer. */
+                            if (p_flush > lastsaved) {
+                              HT_ADD_BUF(lastsaved,
+                                         (size_t) (p_flush - lastsaved));
+                            }
+                            HT_ADD_URL_HTMLESCAPED(tempo);
                           }
                         }
                       }
@@ -3377,17 +3384,16 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       HT_ADD_HTMLESCAPED(cid);
                       lastsaved = eadr - 1;     // dernier écrit+1 (enfin euh apres on fait un ++ alors hein)
                     } else if (opt->urlmode == HTS_URLMODE_ABSOLUTE_URI) {
-                      if ((opt->getmode & HTS_GETMODE_HTML) && (ptr > 0)) {
-                        HT_ADD_URL_HTMLESCAPED(afs.af.fil);
-                      }
-                      lastsaved = eadr - 1;     // dernier écrit+1 (enfin euh apres on fait un ++ alors hein)
+                      HT_ADD_URL_HTMLESCAPED(afs.af.fil);
+                      lastsaved =
+                          eadr - 1; // resume copying at the closing quote
                     } else if (opt->urlmode == HTS_URLMODE_TRANSPARENT_PROXY) {
                       char BIGSTK tempo[HTS_URLMAXSIZE * 2];
                       const char *uri;
                       int i;
                       char *pos;
 
-                      if ((opt->getmode & HTS_GETMODE_HTML) && (ptr > 0)) {
+                      if (sink.enabled) {
                         if (!link_has_authority(afs.af.adr)) {
                           HT_ADD("http://");
                         } else {
@@ -3485,26 +3491,23 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                               }
                             }
 
-                            // érire codebase="chemin"
-                            if ((opt->getmode & HTS_GETMODE_HTML) &&
-                                (ptr > 0)) {
-                              if (strnotempty(tempo_pat)) {
-                                HT_ADD("codebase=\"");
-                                HT_ADD_HTMLESCAPED(tempo_pat);
-                                HT_ADD("\" ");
-                              }
+                            // write codebase="path"
+                            if (strnotempty(tempo_pat)) {
+                              HT_ADD("codebase=\"");
+                              HT_ADD_HTMLESCAPED(tempo_pat);
+                              HT_ADD("\" ");
+                            }
 
-                              /* The page picks this span's width, so it goes
-                                 to the growable output, not a fixed buffer. */
-                              if (p_flush > lastsaved) {
-                                HT_ADD_BUF(lastsaved,
-                                           (size_t) (p_flush - lastsaved));
-                              }
+                            /* The page picks this span's width, so it goes
+                               to the growable output, not a fixed buffer. */
+                            if (p_flush > lastsaved) {
+                              HT_ADD_BUF(lastsaved,
+                                         (size_t) (p_flush - lastsaved));
                             }
                           }
                         }
 
-                        if ((opt->getmode & HTS_GETMODE_HTML) && (ptr > 0)) {
+                        if (sink.enabled) {
 
                           /* --single-file: tag the reference for the
                              end-of-mirror pass. A fragment, so a mirror left
@@ -3518,7 +3521,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                   ? singlefile_ref_class(sf_tag, tag_attr_start,
                                                          r->adr)
                                   : 0;
-                          const size_t sf_start = TypedArraySize(output_buffer);
+                          const size_t sf_start = TypedArraySize(sink.buf);
 
                           // écrire le lien modifié, relatif
                           // Note: escape all chars, even >127 (no UTF)
@@ -3550,7 +3553,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                             HT_ADD(singlefile_mark(
                                 opt, sf_mark, sizeof(sf_mark), sf_class,
-                                TypedArraySize(output_buffer) - sf_start));
+                                TypedArraySize(sink.buf) - sf_start));
                           }
                         }
                         lastsaved = eadr - 1;   // dernier écrit+1 (enfin euh apres on fait un ++ alors hein)
@@ -3642,7 +3645,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                       if (!hts_record_link(opt, afs.af.adr,
                                                            "/robots.txt", "",
                                                            "", "", NULL)) {
-                                        TypedArrayFree(output_buffer);
+                                        TypedArrayFree(sink.buf);
                                         return -1;
                                       }
                                       heap_top()->testmode = 0;    // pas mode test
@@ -3672,7 +3675,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           if (!hts_record_link(opt, afs.af.adr, afs.af.fil,
                                                afs.save, former.adr, former.fil,
                                                codebase)) {
-                            TypedArrayFree(output_buffer);
+                            TypedArrayFree(sink.buf);
                             return -1;
                           }
                           heap_top()->fetch = link_fetch;
@@ -3808,15 +3811,14 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
           }
         }
         // ----------
-        // écrire peu à peu
-        if ((opt->getmode & HTS_GETMODE_HTML) && (ptr > 0))
-          HT_add_adr;
-        lastsaved = html;        // dernier écrit+1
+        // flush what was scanned
+        HT_add_adr;
+        lastsaved = html; // one past the last byte written
         // ----------
 
         /* The rewritten page outgrew what we can allocate, so end the parse
            here and fail the page rather than the crawl. */
-        if (output_oom) {
+        if (sink.oom) {
           html = r->adr + r->size;
         }
 
@@ -3842,7 +3844,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
           if (!hts_loop_tick(sback, opt, 0, ptr)) {
             hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
             hts_store_release_int(stre->exit_xh_, 1); // exit requested
-            TypedArrayFree(output_buffer);
+            TypedArrayFree(sink.buf);
             return -1;
           } else if (opt->state._hts_cancel == 1) {
             nofollow = 1;       // moins violent
@@ -3859,24 +3861,23 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       opt->state._hts_in_html_parsing = 0;      // flag
       opt->state._hts_cancel = 0;       // pas de cancel
 
-      if ((opt->getmode & HTS_GETMODE_HTML) && (ptr > 0)) {
-        if (!output_oom) {
-          char *cAddr = TypedArrayElts(output_buffer);
-          int cSize = (int) TypedArraySize(output_buffer);
+      if (sink.enabled) {
+        if (!sink.oom) {
+          char *cAddr = TypedArrayElts(sink.buf);
+          int cSize = (int) TypedArraySize(sink.buf);
 
           hts_log_print(opt, LOG_DEBUG, "engine: postprocess-html: %s%s",
                         adr_nologin(opt, urladr()), urlfil());
           if (RUN_CALLBACK4(opt, postprocess, &cAddr, &cSize, urladr(), urlfil()) == 1) {
             hts_log_print(opt, LOG_DEBUG,
               "engine: postprocess-html: callback modified data, applying %d bytes", cSize);
-            /* A reply pointing anywhere into output_buffer edited it in
+            /* A reply pointing anywhere into sink.buf edited it in
                place and is moved down. Appending it onto itself instead would
                memcpy overlapping bytes, after an EnsureRoom whose realloc can
                relocate the block out from under cAddr. */
-            if (!hts_postprocess_reply_ok(cAddr, cSize,
-                                          TypedArrayElts(output_buffer),
-                                          TypedArraySize(output_buffer),
-                                          TypedArrayCapa(output_buffer))) {
+            if (!hts_postprocess_reply_ok(
+                    cAddr, cSize, TypedArrayElts(sink.buf),
+                    TypedArraySize(sink.buf), TypedArrayCapa(sink.buf))) {
               hts_log_print(opt, LOG_ERROR,
                             "engine: postprocess-html: callback returned %d "
                             "bytes for %s%s, page skipped",
@@ -3884,9 +3885,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
               HT_SET_SIZE(0);
               error = 1;
             } else if (hts_postprocess_reply_inplace(
-                           cAddr, TypedArrayElts(output_buffer),
-                           TypedArrayCapa(output_buffer))) {
-              memmove(TypedArrayElts(output_buffer), cAddr, (size_t) cSize);
+                           cAddr, TypedArrayElts(sink.buf),
+                           TypedArrayCapa(sink.buf))) {
+              memmove(TypedArrayElts(sink.buf), cAddr, (size_t) cSize);
               HT_SET_SIZE((size_t) cSize);
             } else {
               HT_SET_SIZE(0);
@@ -3896,19 +3897,19 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
         }
 
         /* Flush and save to disk */
-        if (output_oom) {
+        if (sink.oom) {
           hts_log_print(opt, LOG_ERROR,
                         "Not enough memory to rewrite %s%s, page skipped",
                         adr_nologin(opt, urladr()), urlfil());
           error = 1;
-        } else if (TypedArraySize(output_buffer) != 0) {
-          hts_finish_html_file(
-              opt, cache, r, &fp, TypedArrayElts(output_buffer),
-              TypedArraySize(output_buffer), urladr(), urlfil(), savename());
+        } else if (TypedArraySize(sink.buf) != 0) {
+          hts_finish_html_file(opt, cache, r, &fp, TypedArrayElts(sink.buf),
+                               TypedArraySize(sink.buf), urladr(), urlfil(),
+                               savename());
         }
       }
       /* outside the write: mimehtml appends whatever the output mode is */
-      TypedArrayFree(output_buffer);
+      TypedArrayFree(sink.buf);
       //
       //
       //
