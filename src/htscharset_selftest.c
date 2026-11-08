@@ -312,6 +312,104 @@ static int st_entities(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+#define ENTITY_SWEEP_MAX 4096
+
+/* One oracle row: a name and its code point, or -1 when it stays verbatim. */
+typedef struct entity_ref {
+  char name[40];
+  int cp;
+} entity_ref;
+
+static int entity_ref_cmp(const void *a, const void *b) {
+  return strcmp(((const entity_ref *) a)->name, ((const entity_ref *) b)->name);
+}
+
+/* Checks that "&name;" decodes to what the oracle holds for name, or stays
+   verbatim, and counts the input and any failure. */
+static void entity_sweep_one(const entity_ref *refs, const size_t n,
+                             const char *name, size_t *inputs,
+                             size_t *failures) {
+  char src[48], dest[48], want[48];
+  entity_ref key;
+  const entity_ref *hit;
+
+  snprintf(src, sizeof(src), "&%s;", name);
+  snprintf(key.name, sizeof(key.name), "%s", name);
+  hit = bsearch(&key, refs, n, sizeof(*refs), entity_ref_cmp);
+  if (hit == NULL || hit->cp <= 0) {
+    snprintf(want, sizeof(want), "%s", src);
+  } else if (hit->cp == 160) {
+    /* the caller maps U+00A0 to a space */
+    snprintf(want, sizeof(want), " ");
+  } else {
+    const size_t len = hts_writeUTF8(hit->cp, want, sizeof(want) - 1);
+
+    want[len] = '\0';
+  }
+  if (hts_unescapeEntitiesWithCharset(src, dest, sizeof(dest), "UTF-8") != 0 ||
+      strcmp(dest, want) != 0) {
+    fprintf(stderr, "entities-sweep: '%s' gave '%s', want '%s'\n", src, dest,
+            want);
+    (*failures)++;
+  }
+  (*inputs)++;
+}
+
+/* Decodes every name of a "name cp" file, then each one-byte alphanumeric
+   change, truncation and 'x' suffix of it. */
+static int st_entities_sweep(httrackp *opt, int argc, char **argv) {
+  static const char alnum[] =
+      "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+  FILE *fp;
+  entity_ref *refs;
+  char line[128];
+  size_t n = 0, i, inputs = 0, failures = 0;
+
+  (void) opt;
+  fp = argc >= 1 ? FOPEN(argv[0], "rb") : NULL;
+  if (fp == NULL) {
+    fprintf(stderr, "entities-sweep: needs a readable <file>\n");
+    return 1;
+  }
+  refs = calloct(ENTITY_SWEEP_MAX, sizeof(*refs));
+  assertf(refs != NULL);
+  while (fgets(line, sizeof(line), fp) != NULL) {
+    assertf(n < ENTITY_SWEEP_MAX);
+    if (sscanf(line, "%31s %d", refs[n].name, &refs[n].cp) == 2) {
+      n++;
+    }
+  }
+  fclose(fp);
+  qsort(refs, n, sizeof(*refs), entity_ref_cmp);
+
+  for (i = 0; i < n; i++) {
+    char var[40];
+    const size_t len = strlen(refs[i].name);
+    size_t p, k;
+
+    entity_sweep_one(refs, n, refs[i].name, &inputs, &failures);
+    for (p = 0; p < len; p++) {
+      for (k = 0; alnum[k] != '\0'; k++) {
+        if (alnum[k] != refs[i].name[p]) {
+          snprintf(var, sizeof(var), "%s", refs[i].name);
+          var[p] = alnum[k];
+          entity_sweep_one(refs, n, var, &inputs, &failures);
+        }
+      }
+    }
+    snprintf(var, sizeof(var), "%sx", refs[i].name);
+    entity_sweep_one(refs, n, var, &inputs, &failures);
+    if (len > 1) {
+      snprintf(var, sizeof(var), "%.*s", (int) (len - 1), refs[i].name);
+      entity_sweep_one(refs, n, var, &inputs, &failures);
+    }
+  }
+  freet(refs);
+  printf("entities-sweep: %d names, %d inputs, %d failures\n", (int) n,
+         (int) inputs, (int) failures);
+  return failures == 0 ? 0 : 1;
+}
+
 /* The unescapers must reserve one byte for the trailing NUL: a 'max'-byte
    dest holding 'max' output chars pre-fix wrote dest[max] (1-byte OOB, caught
    by ASan). Both unescapeEntities and unescapeUrl share the guard. */
@@ -622,6 +720,9 @@ const struct selftest_entry selftests_charset[] = {
     {"idna-decode", "<host>", "decode an IDNA/punycode hostname",
      st_idna_decode},
     {"entities", "<string> [encoding]", "unescape HTML entities", st_entities},
+    {"entities-sweep", "<file>",
+     "decode each 'name cp' line of <file> and its one-byte misses",
+     st_entities_sweep},
     {"unescape-bounds", "", "unescapers reserve the NUL byte (no 1-byte OOB)",
      st_unescape_bounds},
     {"unescape-plus", "",

@@ -30,7 +30,8 @@ EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c gaistall.c noba
 	fixtures/cache-golden/hts-cache/new.zip \
 	install-manifest.txt \
 	62_lang-untranslated.counts \
-	62_lang-linebreaks.counts
+	62_lang-linebreaks.counts \
+	834_engine-entities-sweep.pairs
 
 TESTS_ENVIRONMENT =
 TESTS_ENVIRONMENT += PATH=$(top_builddir)/src$(PATH_SEPARATOR)$$PATH
