@@ -5328,15 +5328,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
           } // si pas d'erreurs
         }                       // données dispo
 
-        // en cas d'erreur cl, supprimer éventuel fichier sur disque
-#if HTS_REMOVE_BAD_FILES
-        if (back_status(&back[i]) < 0) {
-          if (!back[i].testmode) {      // pas en test
-            UNLINK(back[i].url_sav);    // éliminer fichier (endommagé)
-          }
-        }
-#endif
-
         /* funny log for commandline users */
         if (opt->verbosedisplay == HTS_VERBOSE_SIMPLE) {
           if (back_status(&back[i]) == STATUS_READY) {
