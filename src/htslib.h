@@ -334,6 +334,8 @@ HTS_INLINE void deletehttp(htsblk * r);
 HTS_INLINE int deleteaddr(htsblk * r);
 HTS_INLINE void deletesoc(T_SOC soc);
 HTS_INLINE void deletesoc_r(htsblk *r);
+/* Return 1 once soc is readable (writable) within timeout seconds, 0 otherwise.
+   check_readinput polls r->soc without waiting. */
 int check_readinput(htsblk * r);
 int check_readinput_t(T_SOC soc, int timeout);
 int check_writeinput_t(T_SOC soc, int timeout);

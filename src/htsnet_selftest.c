@@ -496,6 +496,47 @@ static int st_socketpair(T_SOC sv[2]) {
   return 0;
 }
 
+static void socwait_delayed_send(void *arg) {
+  Sleep(300);
+  (void) send(*(T_SOC *) arg, "x", 1, 0);
+}
+
+/* Each wait watches its own direction: a fresh, empty socket is writable and
+   not readable. check_readinput polls, and the _t forms wait up to timeout. */
+static int st_socwait(httrackp *opt, int argc, char **argv) {
+  T_SOC sv[2];
+  htsblk r;
+  TStamp t0, dt;
+
+  assertf(st_socketpair(sv) == 0);
+  memset(&r, 0, sizeof(r));
+  r.soc = sv[1];
+  assertf(check_readinput_t(sv[1], 0) == 0);
+  t0 = mtime_local();
+  assertf(check_readinput(&r) == 0);
+  assertf(mtime_local() - t0 < 500);
+  assertf(check_writeinput_t(sv[1], 0) == 1);
+  t0 = mtime_local();
+  assertf(check_readinput_t(sv[1], 1) == 0);
+  dt = mtime_local() - t0;
+  assertf(dt >= 900 && dt < 5000);
+  assertf(hts_newthread(socwait_delayed_send, &sv[0]) == 0);
+  t0 = mtime_local();
+  assertf(check_readinput_t(sv[1], 10) == 1);
+  dt = mtime_local() - t0;
+  assertf(dt >= 200 && dt < 5000);
+  htsthread_wait();
+  assertf(check_readinput(&r) == 1);
+  r.soc = INVALID_SOCKET;
+  assertf(check_readinput(&r) == 0);
+  assertf(check_readinput_t(INVALID_SOCKET, 0) == 0);
+  assertf(check_writeinput_t(INVALID_SOCKET, 0) == 0);
+  deletesoc(sv[0]);
+  deletesoc(sv[1]);
+  printf("socwait self-test OK\n");
+  return 0;
+}
+
 #ifndef _WIN32
 /* Drop the peer so a write gets EPIPE, because SO_LINGER with a zero timeout
    asks for a RST rather than a FIN. GNU/Hurd's pfinet sends a FIN anyway. */
@@ -1451,6 +1492,8 @@ const struct selftest_entry selftests_net[] = {
     {"catchurl-bind", "",
      "the capture proxy binds loopback and advertises the address it bound",
      st_catchurl_bind},
+    {"socwait", "", "the read and write waits each watch their own direction",
+     st_socwait},
 #ifndef _WIN32
     {"selectable", "", "which socket numbers may go into an fd_set",
      st_selectable},
