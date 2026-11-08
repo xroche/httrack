@@ -741,12 +741,7 @@ extern FILE *ioinfo;
 extern const char *hts_mime_keep[];
 extern const char *hts_mime[][2];
 extern const char *hts_main_mime[];
-extern const char *hts_detect[];
-extern const char *hts_detectbeg[];
 extern const char *hts_nodetect[];
-extern const char *hts_detectURL[];
-extern const char *hts_detectandleave[];
-extern const char *hts_detect_js[];
 
 // htsmodule.c definitions
 extern void *openFunctionLib(const char *file_);

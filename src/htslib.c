@@ -135,33 +135,6 @@ SSL_CTX *openssl_ctx = NULL;
 #endif
 int IPV6_resolver = 0;
 
-/* détection complémentaire */
-const char *hts_detect[] = {
-  "archive",
-  "background",
-  "data",                       // OBJECT
-  "data-src",
-  "data-srcset",
-  "dynsrc",
-  "lowsrc",
-  "profile",                    // element META
-  "src",
-  "srcset",                     // HTML5 responsive images (<img>, <source>)
-  "swurl",
-  "url",
-  "usemap",
-  "longdesc",                   // accessibility
-  "xlink:href",                 // xml/svg tag
-  "poster",                     // HTML5
-  ""
-};
-
-/* détecter début */
-const char *hts_detectbeg[] = {
-  "hotspot",                    /* hotspot1=..,hotspot2=.. */
-  ""
-};
-
 /* ne pas détcter de liens dedans */
 const char *hts_nodetect[] = {
   "accept-charset",
@@ -202,36 +175,6 @@ const char *hts_nodetect[] = {
   ""
 };
 
-/* détection de mini-code javascript */
-/* ALSO USED: detection based on the name: onXXX="<tag>" where XXX starts with upper case letter */
-const char *hts_detect_js[] = {
-  "onAbort",
-  "onBlur",
-  "onChange",
-  "onClick",
-  "onDblClick",
-  "onDragDrop",
-  "onError",
-  "onFocus",
-  "onKeyDown",
-  "onKeyPress",
-  "onKeyUp",
-  "onLoad",
-  "onMouseDown",
-  "onMouseMove",
-  "onMouseOut",
-  "onMouseOver",
-  "onMouseUp",
-  "onMove",
-  "onReset",
-  "onResize",
-  "onSelect",
-  "onSubmit",
-  "onUnload",
-  "style",                      /* hack for CSS code data */
-  ""
-};
-
 const char *hts_main_mime[] = {
   "application",
   "audio",
@@ -240,18 +183,6 @@ const char *hts_main_mime[] = {
   "multipart",
   "text",
   "video",
-  ""
-};
-
-/* détection "...URL=<url>" */
-const char *hts_detectURL[] = {
-  "content",
-  ""
-};
-
-/* tags où l'URL doit être réécrite mais non capturée */
-const char *hts_detectandleave[] = {
-  "action",
   ""
 };
 

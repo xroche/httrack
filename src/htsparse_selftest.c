@@ -1239,6 +1239,72 @@ static int st_tagattr(httrackp *opt, int argc, char **argv) {
   return parse_selftest_tagattr(opt);
 }
 
+static const char *attr_kind_name(const hts_attr *at) {
+  static const char *const names[] = {"link",  "hotspot", "refresh",
+                                      "leave", "event",   "style"};
+
+  return at == NULL ? "none" : names[at->kind];
+}
+
+/* Does the lookup at text + 1 give want, and the offset past '=' wantp? */
+static int attr_case(const char *text, hts_boolean scripts,
+                     const hts_attr *want, int wantp) {
+  int p = -1;
+  const hts_attr *const got = hts_attr_match(text + 1, scripts, &p);
+
+  if (got != want || p != wantp) {
+    fprintf(stderr, "attrkind \"%s\" scripts=%d: %s at %d, wanted %s at %d\n",
+            text, (int) scripts, got != NULL ? got->name : "(none)", p,
+            want != NULL ? want->name : "(none)", wantp);
+    return 1;
+  }
+  return 0;
+}
+
+/* Each row matches its own name in any case and nothing longer, and the
+   script rows only when asked. Then prints "name kind" for each argument. */
+static int st_attrkind(httrackp *opt, int argc, char **argv) {
+  int err = 0;
+  int rows;
+  int i;
+
+  for (rows = 0; hts_attrs[rows].name != NULL; rows++) {
+    const hts_attr *const at = &hts_attrs[rows];
+    const int len = (int) strlen(at->name);
+    const hts_boolean script =
+        at->kind == HTS_ATTR_EVENT || at->kind == HTS_ATTR_STYLE;
+    char text[64];
+    char upper[32];
+    size_t k;
+
+    snprintf(text, sizeof(text), "<%s=x", at->name);
+    err |= attr_case(text, HTS_TRUE, at, len + 1);
+    err |= attr_case(text, HTS_FALSE, script ? NULL : at, script ? 0 : len + 1);
+    for (k = 0; at->name[k] != '\0' && k + 1 < sizeof(upper); k++)
+      upper[k] = (char) toupper((unsigned char) at->name[k]);
+    upper[k] = '\0';
+    snprintf(text, sizeof(text), " %s = x", upper);
+    err |= attr_case(text, HTS_TRUE, at, len + 2);
+    snprintf(text, sizeof(text), " %s12=x", at->name);
+    err |= attr_case(text, HTS_TRUE, at->kind == HTS_ATTR_HOTSPOT ? at : NULL,
+                     at->kind == HTS_ATTR_HOTSPOT ? len + 3 : 0);
+    snprintf(text, sizeof(text), " %sx=x", at->name);
+    err |= attr_case(text, HTS_TRUE, NULL, 0);
+    snprintf(text, sizeof(text), "a%s=x", at->name);
+    err |= attr_case(text, HTS_TRUE, NULL, 0);
+  }
+  printf("attrkind self-test %s (%d rows)\n", err ? "FAILED" : "OK", rows);
+  for (i = 0; i < argc; i++) {
+    char text[64];
+    int p;
+
+    snprintf(text, sizeof(text), "<%s=x", argv[i]);
+    printf("%s %s\n", argv[i],
+           attr_kind_name(hts_attr_match(text + 1, HTS_TRUE, &p)));
+  }
+  return err;
+}
+
 /* Each call parses `txt` under a fresh host, then checkrobots() for `path`. */
 static int rb_decide(robots_wizard *r, const char *txt, const char *path) {
   static int n = 0;
@@ -1865,6 +1931,10 @@ const struct selftest_entry selftests_parse[] = {
      "may the dirty parser read this in-tag quoted value? resolves the owning "
      "attribute and refuses the names that carry no link",
      st_tagattr},
+    {"attrkind", "[name...]",
+     "which link attribute is written here? each row matches its own name "
+     "only; prints the kind of each name given",
+     st_attrkind},
     {"robots", "", "robots.txt RFC 9309 Allow/Disallow precedence self-test",
      st_robots},
     {"sitemap", "",
