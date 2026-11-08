@@ -127,9 +127,6 @@ Please visit our Website: http://www.httrack.com
 
 #include <sys/stat.h>
 
-#ifdef __ANDROID__
-#define timezone 0
-#endif
 /* END specific definitions */
 
 /* Windows might be missing va_copy */
@@ -4150,44 +4147,6 @@ int linput(FILE * fp, char *s, int max) {
   s[j] = '\0';
   return j;
 }
-int linputsoc(T_SOC soc, char *s, int max) {
-  int c;
-  int j = 0;
-
-  do {
-    unsigned char ch;
-
-    if (recv(soc, &ch, 1, 0) == 1) {
-      c = ch;
-    } else {
-      c = EOF;
-    }
-    if (c != EOF) {
-      switch (c) {
-      case 13:
-        break;                  // sauter CR
-      case 10:
-        c = -1;
-        break;
-      case 9:
-      case 12:
-        break;                  // sauter ces caractères
-      default:
-        s[j++] = (char) c;
-        break;
-      }
-    }
-  } while((c != -1) && (c != EOF) && (j < (max - 1)));
-  s[j] = '\0';
-  return j;
-}
-int linputsoc_t(T_SOC soc, char *s, int max, int timeout) {
-  if (check_readinput_t(soc, timeout)) {
-    return linputsoc(soc, s, max);
-  }
-  return -1;
-}
-
 // case-insensitive strstr()
 const char *strstrcase(const char *s, const char *o) {
   while(*s && strfield(s, o) == 0)
@@ -4196,30 +4155,6 @@ const char *strstrcase(const char *s, const char *o) {
     return NULL;
   return s;
 }
-
-// Unicode detector
-// See http://www.unicode.org/unicode/reports/tr28/
-// (sect Table 3.1B. Legal UTF-8 Byte Sequences)
-typedef struct {
-  unsigned int pos;
-  unsigned char data[4];
-} t_auto_seq;
-
-// char between a and b
-#define CHAR_BETWEEN(c, a, b)       ( (c) >= 0x##a ) && ( (c) <= 0x##b )
-// sequence start
-#define SEQBEG                      ( inseq == 0 )
-// in this block
-#define BLK(n,a, b)                 ( (seq.pos >= n) && ((err = CHAR_BETWEEN(seq.data[n], a, b))) )
-#define ELT(n,a)                    BLK(n,a,a)
-// end
-#define SEQEND                      ((ok = 1))
-// sequence started, character will fail if error
-#define IN_SEQ                      ( (inseq = 1) )
-// decoding error
-#define BAD_SEQ                     ( (ok == 0) && (inseq != 0) && (!err) )
-// no sequence started
-#define NO_SEQ                      ( inseq == 0 )
 
 void map_characters(unsigned char *buffer, unsigned int size, unsigned int *map) {
   unsigned int i;
@@ -7175,11 +7110,6 @@ SOCaddr *hts_dns_resolve_nocache(const char *const hostname,
   return hts_dns_resolve_nocache2(hostname, addr, NULL);
 }
 
-int check_hostname_dns(const char *const hostname) {
-  SOCaddr buffer;
-  return hts_dns_resolve_nocache(hostname, &buffer) != NULL;
-}
-
 /* A resolve in flight. Refcounted: a timed-out resolve is abandoned, not
    cancelled, so the last of caller/worker to leave frees the job. */
 typedef struct dns_resolve_job {
@@ -7429,18 +7359,6 @@ void cut_path(char *fullpath, char *path, size_t path_size, char *pname,
     }
   }
 }
-
-// -- Gestion protocole ftp --
-
-#ifdef _WIN32
-int ftp_available(void) {
-  return 1;
-}
-#else
-int ftp_available(void) {
-  return 1; // ok!
-}
-#endif
 
 static void hts_debug_log_print(const char *format, ...) HTS_PRINTF_FUN(1, 2);
 

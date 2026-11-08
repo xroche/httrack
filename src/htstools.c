@@ -123,12 +123,8 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
     }
   } else if (strfield(lien, "ftp://")) {
     // Note: ftp:foobar.gif is not valid
-    if (ftp_available()) {      // ftp supporté
-      if (ident_url_absolute(lien, adrfil) == -1) {
-        ok = -1;                // erreur URL
-      }
-    } else {
-      ok = -2;                  // non supporté
+    if (ident_url_absolute(lien, adrfil) == -1) {
+      ok = -1; // erreur URL
     }
   } else if (strfield(lien, "https://")) {
     if (ident_url_absolute(lien, adrfil) == -1) {

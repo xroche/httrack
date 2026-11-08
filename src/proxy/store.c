@@ -61,6 +61,33 @@ Please visit our Website: http://www.httrack.com
 #include "proxystrings.h"
 #include "proxytrack.h"
 
+/* Layout of the cache 1.0 record, read back with fread: do not change. */
+typedef struct OLD_t_proxy {
+  int active;
+  char name[1024];
+  int port;
+} OLD_t_proxy;
+
+typedef struct OLD_htsblk {
+  int statuscode;
+  int notmodified;
+  int is_write;
+  char *adr;
+  FILE *out;
+  int size;
+  char msg[80];
+  char contenttype[64];
+  char *location;
+  int totalsize;
+  int is_file;
+  T_SOC soc;
+  FILE *fp;
+  OLD_t_proxy proxy;
+  int user_agent_send;
+  char user_agent[64];
+  int http11;
+} OLD_htsblk;
+
 /* Unlocked functions */
 
 static int PT_LookupCache__New_u(PT_Index index, const char *url);
