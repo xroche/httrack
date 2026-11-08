@@ -720,166 +720,11 @@ static int __cdecl htsshow_loop(
   if (((mytime - prev_mytime) > 100) || ((mytime - prev_mytime) < 0)) {
     prev_mytime = mytime;
 
-    // parcourir registre des liens
-    if (back_index >= 0 && back_max > 0) {      // seulement si index passé
-      int j, k;
-      int index = 0;
-      int ok = 0;               // idem
-      int l;                    // idem
-
-      //
+    if (back_index >= 0 && back_max > 0) { // only with a backing table
       t_StatsBuffer StatsBuffer[NStatsBuffer];
 
-      {
-        int i;
-
-        for(i = 0; i < NStatsBuffer; i++) {
-          strcpybuff(StatsBuffer[i].state, "");
-          strcpybuff(StatsBuffer[i].name, "");
-          strcpybuff(StatsBuffer[i].file, "");
-          strcpybuff(StatsBuffer[i].url_sav, "");
-          StatsBuffer[i].back = 0;
-          StatsBuffer[i].size = 0;
-          StatsBuffer[i].sizetot = 0;
-        }
-      }
-      for(k = 0; k < 2; k++) {  // 0: lien en cours 1: autres liens
-        for(j = 0; (j < 3) && (index < NStatsBuffer); j++) {    // passe de priorité
-          int _i;
-
-          for(_i = 0 + k; (_i < max(back_max * k, 1)) && (index < NStatsBuffer); _i++) {        // no lien
-            int i = (back_index + _i) % back_max;       // commencer par le "premier" (l'actuel)
-            const int slot_status = hts_load_acquire_int(&back[i].status);
-
-            if (slot_status >= 0) { // an active slot
-              ok = 0;
-              switch (j) {
-              case 0:          // prioritaire
-                if ((slot_status > 0) && (slot_status < 99)) {
-                  strcpybuff(StatsBuffer[index].state, "receive");
-                  ok = 1;
-                }
-                break;
-              case 1:
-                if (slot_status == STATUS_WAIT_HEADERS) {
-                  strcpybuff(StatsBuffer[index].state, "request");
-                  ok = 1;
-                } else if (slot_status == STATUS_CONNECTING) {
-                  strcpybuff(StatsBuffer[index].state, "connect");
-                  ok = 1;
-                } else if (slot_status == STATUS_WAIT_DNS) {
-                  strcpybuff(StatsBuffer[index].state, "search");
-                  ok = 1;
-                } else if (slot_status == STATUS_FTP_TRANSFER) { // ftp
-                  char proto[8] = "ftp";
-
-                  if (back[i].url_adr[0]) {
-                    char *ep = strchr(back[i].url_adr, ':');
-                    char *eps = strchr(back[i].url_adr, '/');
-                    int count;
-
-                    if (ep != NULL && eps != NULL && ep < eps &&
-                        (count = (int) (ep - back[i].url_adr)) < 4) {
-                      proto[0] = '\0';
-                      strncatbuff(proto, back[i].url_adr, count);
-                    }
-                  }
-                  snprintf(StatsBuffer[index].state, sizeof(StatsBuffer[index].state),
-                          "%s: %s", proto, back[i].info);
-                  ok = 1;
-                }
-                break;
-              default:
-                if (slot_status == STATUS_READY) { // ready
-                  if (back[i].r.statuscode == HTTP_OK) {
-                    strcpybuff(StatsBuffer[index].state, "ready");
-                    ok = 1;
-                  } else if (back[i].r.statuscode >= 100
-                             && back[i].r.statuscode <= 599) {
-                    char tempo[256];
-
-                    tempo[0] = '\0';
-                    infostatuscode(tempo, back[i].r.statuscode);
-                    strcpybuff(StatsBuffer[index].state, tempo);
-                    ok = 1;
-                  } else {
-                    strcpybuff(StatsBuffer[index].state, "error");
-                    ok = 1;
-                  }
-                }
-                break;
-              }
-
-              if (ok) {
-                char s[HTS_URLMAXSIZE * 2];
-
-                //
-                StatsBuffer[index].back = i;    // index pour + d'infos
-                //
-                s[0] = '\0';
-                strcpybuff(StatsBuffer[index].url_sav, back[i].url_sav);        // pour cancel
-                if (strcmp(back[i].url_adr, "file://")) {
-                  size_t keep;
-                  const char *const host =
-                      stats_skip_login(back[i].url_adr, &keep);
-
-                  strncatbuff(s, back[i].url_adr, keep);
-                  strcatbuff(s, host);
-                } else
-                  strcatbuff(s, "localhost");
-                /* url_adr and url_fil are each as wide as s, and this is
-                   the progress display: clip rather than abort */
-                if (back[i].url_fil[0] != '/')
-                  strlncatbuff(s, "/", sizeof(s), sizeof(s) - 1 - strlen(s));
-                strlncatbuff(s, back[i].url_fil, sizeof(s),
-                             sizeof(s) - 1 - strlen(s));
-                hts_hide_secrets(opt, s, sizeof(s));
-
-                StatsBuffer[index].file[0] = '\0';
-                {
-                  char *a = strrchr(s, '/');
-
-                  if (a) {
-                    strncatbuff(StatsBuffer[index].file, a, 200);
-                    *a = '\0';
-                  }
-                }
-
-                if ((l = (int) strlen(s)) < MAX_LEN_INPROGRESS)
-                  strcpybuff(StatsBuffer[index].name, s);
-                else {
-                  // couper
-                  StatsBuffer[index].name[0] = '\0';
-                  strncatbuff(StatsBuffer[index].name, s,
-                              MAX_LEN_INPROGRESS / 2 - 2);
-                  strcatbuff(StatsBuffer[index].name, "...");
-                  strcatbuff(StatsBuffer[index].name,
-                             s + l - MAX_LEN_INPROGRESS / 2 + 2);
-                }
-
-                /* An FTP worker may be writing the sizes right now. */
-                const LLint size = hts_load_relaxed_llint(&back[i].r.size);
-                const LLint totalsize =
-                    hts_load_relaxed_llint(&back[i].r.totalsize);
-
-                if (totalsize > 0) { // known size
-                  StatsBuffer[index].sizetot = totalsize;
-                  StatsBuffer[index].size = size;
-                } else {                             // unknown size
-                  if (slot_status == STATUS_READY) { // ready
-                    StatsBuffer[index].sizetot = size;
-                    StatsBuffer[index].size = size;
-                  } else {
-                    StatsBuffer[index].sizetot = 8192;
-                    StatsBuffer[index].size = (size % 8192);
-                  }
-                }
-                index++;
-              }
-            }
-          }
-        }
-      }
+      (void) stats_collect_rows(opt, back, back_max, back_index, StatsBuffer,
+                                NStatsBuffer, MAX_LEN_INPROGRESS);
 
       /* Display current job */
       {
@@ -938,9 +783,7 @@ static int __cdecl htsshow_loop(
           }
         }
       }
-
     }
-
   }
 
   /* UnLock */

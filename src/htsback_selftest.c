@@ -34,6 +34,7 @@ Please visit our Website: http://www.httrack.com
 #include <limits.h> /* INT_MAX, the backing count back_new() must refuse */
 
 #include "htsselftest_int.h"
+#include "htsstats.h"
 
 /* hts_mirror_completed() answers HTS_DEFAULT until a mirror has run, so a GUI
    whose hts_main2() bailed out early does not read that as an abort. The
@@ -169,6 +170,116 @@ static void threadwait_gated_thread(void *arg) {
   hts_mutexlock(&threadwait_lock);
   threadwait_done++;
   hts_mutexrelease(&threadwait_lock);
+}
+
+static void st_statsrows_slot(lien_back *b, int status, LLint size,
+                              LLint totalsize, const char *fil) {
+  b->status = status;
+  b->r.size = size;
+  b->r.totalsize = totalsize;
+  b->r.statuscode = HTTP_OK;
+  strcpybuff(b->url_adr, "http://example.com");
+  strcpybuff(b->url_fil, fil);
+}
+
+/* stats_collect_rows() survives an empty table and maps each slot to its row.
+ */
+static int st_statsrows(httrackp *opt, int argc, char **argv) {
+  struct_back *sback = back_new(opt, 4);
+  t_StatsBuffer rows[NStatsBuffer];
+  lien_back *b;
+  int i, err = 0;
+
+  if (sback == NULL) {
+    printf("statsrows: SKIP (no slot table)\n");
+    return 77;
+  }
+  b = sback->lnk;
+  for (i = 0; i < NStatsBuffer; i++)
+    strcpybuff(rows[i].state, "stale");
+
+  /* no backing table: no row, and no division by zero */
+  ST_FAIL_IF(err,
+             stats_collect_rows(opt, b, 0, 0, rows, NStatsBuffer, 40) != 0);
+  ST_FAIL_IF(err, rows[0].state[0] != '\0');
+  ST_FAIL_IF(err, stats_collect_rows(opt, b, 4, 0, rows, 0, 40) != 0);
+
+  st_statsrows_slot(&b[0], STATUS_WAIT_HEADERS, 0, -1, "/a/b.html");
+  st_statsrows_slot(&b[1], 50, 0, 0, "/empty");
+  st_statsrows_slot(&b[2], STATUS_READY, 3, 3, "/done");
+  st_statsrows_slot(&b[3], 50, 10000, -1, "/unknown");
+  ST_FAIL_IF(err,
+             stats_collect_rows(opt, b, 4, 0, rows, NStatsBuffer, 40) != 4);
+  /* the current slot first, then transfers, then finished slots */
+  ST_FAIL_IF(err, strcmp(rows[0].state, "request") != 0 || rows[0].back != 0);
+  ST_FAIL_IF(err, strcmp(rows[0].name, "http://example.com/a") != 0);
+  ST_FAIL_IF(err, strcmp(rows[0].file, "/b.html") != 0);
+  ST_FAIL_IF(err, strcmp(rows[1].state, "receive") != 0 || rows[1].back != 1);
+  /* a known size of 0 is shown as 0, not as an 8 KB placeholder */
+  ST_FAIL_IF(err, rows[1].sizetot != 0 || rows[1].size != 0);
+  ST_FAIL_IF(err, rows[2].back != 3 || rows[2].sizetot != 8192);
+  ST_FAIL_IF(err, rows[2].size != 10000 % 8192);
+  ST_FAIL_IF(err, strcmp(rows[3].state, "ready") != 0 || rows[3].back != 2);
+  ST_FAIL_IF(err, rows[4].state[0] != '\0');
+
+  /* a URL as wide as both fields is clipped and shortened, never aborted */
+  memset(b[0].url_adr, 'h', sizeof(b[0].url_adr) - 1);
+  b[0].url_adr[sizeof(b[0].url_adr) - 1] = '\0';
+  memset(b[0].url_fil, 'f', sizeof(b[0].url_fil) - 1);
+  b[0].url_fil[sizeof(b[0].url_fil) - 1] = '\0';
+  ST_FAIL_IF(err, stats_collect_rows(opt, b, 4, 0, rows, 1, 40) != 1);
+  ST_FAIL_IF(err, strlen(rows[0].name) >= 40);
+
+  /* every label, from a rotated start, with the login and a secret hidden */
+  for (i = 0; i < sback->count; i++)
+    b[i].status = STATUS_FREE;
+  back_free(&sback);
+  sback = back_new(opt, 8);
+  if (sback == NULL)
+    return 1;
+  b = sback->lnk;
+  hts_secret_add(opt, "SECRETTOKEN1", 12, HTS_SECRET_HEADER);
+  st_statsrows_slot(&b[0], STATUS_WAIT_DNS, 0, -1, "/dns");
+  st_statsrows_slot(&b[1], STATUS_CONNECTING, 0, -1, "/conn");
+  st_statsrows_slot(&b[2], STATUS_FTP_TRANSFER, 0, -1, "/pub/f");
+  strcpybuff(b[2].url_adr, "FTP://up.example");
+  strcpybuff(b[2].info, "RETR f");
+  st_statsrows_slot(&b[3], STATUS_READY, 0, 0, "/missing");
+  b[3].r.statuscode = 404;
+  st_statsrows_slot(&b[4], STATUS_READY, 0, 0, "/odd");
+  b[4].r.statuscode = 700;
+  st_statsrows_slot(&b[5], STATUS_READY, 5, -1, "/short");
+  st_statsrows_slot(&b[6], 50, 0, -1, "/in");
+  strcpybuff(b[6].url_adr, "http://user:pw@example.com");
+  st_statsrows_slot(&b[7], 98, 0, -1, "/q?t=SECRETTOKEN1");
+  ST_FAIL_IF(err,
+             stats_collect_rows(opt, b, 8, 2, rows, NStatsBuffer, 40) != 8);
+  ST_FAIL_IF(err,
+             strcmp(rows[0].state, "FTP: RETR f") != 0 || rows[0].back != 2);
+  ST_FAIL_IF(err, strcmp(rows[1].state, "receive") != 0 || rows[1].back != 6);
+  ST_FAIL_IF(err, strcmp(rows[1].name, "http://example.com") != 0);
+  ST_FAIL_IF(err, strcmp(rows[2].state, "receive") != 0 || rows[2].back != 7);
+  ST_FAIL_IF(err, strstr(rows[2].file, "SECRETTOKEN1") != NULL);
+  ST_FAIL_IF(err, strcmp(rows[3].state, "search") != 0 || rows[3].back != 0);
+  ST_FAIL_IF(err, strcmp(rows[4].state, "connect") != 0 || rows[4].back != 1);
+  {
+    char notfound[256];
+
+    notfound[0] = '\0';
+    infostatuscode(notfound, 404);
+    ST_FAIL_IF(err, strcmp(rows[5].state, notfound) != 0 || rows[5].back != 3);
+  }
+  ST_FAIL_IF(err, strcmp(rows[6].state, "error") != 0 || rows[6].back != 4);
+  ST_FAIL_IF(err, strcmp(rows[7].state, "ready") != 0 || rows[7].back != 5);
+  /* a finished slot of unknown size shows what it got */
+  ST_FAIL_IF(err, rows[7].sizetot != 5 || rows[7].size != 5);
+
+  for (i = 0; i < sback->count; i++)
+    b[i].status = STATUS_FREE;
+  back_free(&sback);
+  if (!err)
+    printf("statsrows: OK\n");
+  return err;
 }
 
 /* back_slot_fail() clips a reason too long for r.msg, where a copy aborted;
@@ -1773,6 +1884,9 @@ const struct selftest_entry selftests_back[] = {
      st_backswap},
     {"slotfail", "", "a failed slot clips a reason too long for its message",
      st_slotfail},
+    {"statsrows", "",
+     "the progress rows survive an empty table and show a known size of 0",
+     st_statsrows},
     {"spoolwrite", "<dir>", "a failed spool write leaves no partial file",
      st_spoolwrite},
     {"spoolsweep", "<dir>", "startup removes the spool of a dead process only",
