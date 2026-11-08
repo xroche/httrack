@@ -30,9 +30,6 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-/* Internal engine bytecode */
-#define HTS_INTERNAL_BYTECODE
-
 // Gestion protocole ftp
 // Version .05 (01/2000)
 
@@ -66,8 +63,6 @@ Please visit our Website: http://www.httrack.com
 #endif
 
 #define FTP_DEBUG 0
-
-#if USE_BEGINTHREAD
 
 /* Live FTP workers. Each writes through its backlog slot and reads opt for its
    whole run, so neither may be freed while the list is not empty (#1051).
@@ -442,10 +437,6 @@ void launch_ftp(FTPDownloadStruct * params) {
     ftp_worker_release(params, "Unable to launch FTP thread");
   }
 }
-
-#else
-#error No more supported
-#endif
 
 // pour l'arrêt du ftp
 #ifdef _WIN32

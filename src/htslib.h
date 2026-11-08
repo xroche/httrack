@@ -107,57 +107,13 @@ hts_boolean hts_location_is_safe(const char *location);
 
 /* concat */
 
-#if ( defined(_WIN32) && defined(_MSC_VER) && ( _MSC_VER >= 1300 ) && (_MSC_VER <= 1310 ) )
-/* NOTE: VC2003 inlining bug in optim mode not respecting function call sequence point */
-#define MSVC2003INLINEBUG __declspec(noinline)
-#else
-#define MSVC2003INLINEBUG
-#endif
-MSVC2003INLINEBUG HTS_STATIC char *getHtsOptBuff_(httrackp * opt) {
+HTS_STATIC char *getHtsOptBuff_(httrackp *opt) {
   opt->state.concat.index = (opt->state.concat.index + 1) % 16;
   return opt->state.concat.buff[opt->state.concat.index];
 }
 
-#undef MSVC2003INLINEBUG
 #define OPT_GET_BUFF(OPT)      ( getHtsOptBuff_(OPT) )
 #define OPT_GET_BUFF_SIZE(OPT) ( sizeof(opt->state.concat.buff[0]) )
-
-/* ANCIENNE STURCTURE pour cache 1.0 */
-#ifndef HTS_DEF_FWSTRUCT_OLD_t_proxy
-#define HTS_DEF_FWSTRUCT_OLD_t_proxy
-typedef struct OLD_t_proxy OLD_t_proxy;
-#endif
-struct OLD_t_proxy {
-  int active;
-  char name[1024];
-  int port;
-};
-
-#ifndef HTS_DEF_FWSTRUCT_OLD_htsblk
-#define HTS_DEF_FWSTRUCT_OLD_htsblk
-typedef struct OLD_htsblk OLD_htsblk;
-#endif
-struct OLD_htsblk {
-  int statuscode;               // ANCIENNE STURCTURE - status-code, -1=erreur, 200=OK,201=..etc (cf RFC1945)
-  int notmodified;              // ANCIENNE STURCTURE - page ou fichier NON modifié (transféré)
-  int is_write;                 // ANCIENNE STURCTURE - sortie sur disque (out) ou en mémoire (adr)
-  char *adr;                    // ANCIENNE STURCTURE - adresse du bloc de mémoire, NULL=vide
-  FILE *out;                    // ANCIENNE STURCTURE - écriture directe sur disque (si is_write=1)
-  int size;                     // ANCIENNE STURCTURE - taille fichier
-  char msg[80];                 // ANCIENNE STURCTURE - message éventuel si échec ("\0"=non précisé)
-  char contenttype[64];         // ANCIENNE STURCTURE - content-type ("text/html" par exemple)
-  char *location;               // ANCIENNE STURCTURE - on copie dedans éventuellement la véritable 'location'
-  int totalsize;                // ANCIENNE STURCTURE - taille totale à télécharger (-1=inconnue)
-  int is_file;                  // ANCIENNE STURCTURE - ce n'est pas une socket mais un descripteur de fichier si 1
-  T_SOC soc;                    // ANCIENNE STURCTURE - ID socket
-  FILE *fp;                     // ANCIENNE STURCTURE - fichier pour file://
-  OLD_t_proxy proxy;            // ANCIENNE STURCTURE - proxy
-  int user_agent_send;          // ANCIENNE STURCTURE - user agent (ex: httrack/1.0 [sun])
-  char user_agent[64];
-  int http11;                   // ANCIENNE STURCTURE - l'en tête doit être signé HTTP/1.1 et non HTTP/1.0
-};
-
-/* fin ANCIENNE STURCTURE pour cache 1.0 */
 
 // cache pour le dns, pour éviter de faire des gethostbyname sans arrêt
 #ifndef HTS_DEF_FWSTRUCT_t_dnscache
@@ -299,8 +255,11 @@ const char *http_header_slot_name(int slot);
 int http_header_slot_count(void);
 
 // fonctions principales
-T_SOC http_xfopen(httrackp * opt, int mode, int treat, int waitconnect,
-                  const char *xsend, const char *adr, const char *fil, htsblk * retour);
+/* Start a non-blocking connect to adr (or to retour's proxy) for a GET, or open
+   a file:// target. retour must not be NULL; it gets the socket and any error.
+ */
+T_SOC http_xfopen(httrackp *opt, const char *adr, const char *fil,
+                  htsblk *retour);
 int http_sendhead(httrackp *opt, t_cookie *cookie, int mode, const char *xsend,
                   const char *adr, const char *fil, const char *referer_adr,
                   const char *referer_fil, const hts_fetch_meta *fetch,
@@ -356,15 +315,16 @@ hts_boolean socket_set_nonblocking(T_SOC soc, hts_boolean nonblocking);
    without blocking. */
 int connect_socket_error(T_SOC soc);
 
-T_SOC newhttp(httrackp * opt, const char *iadr, htsblk * retour, int port,
-              int waitconnect);
+/* Start a non-blocking connect to iadr; port -1 takes it from iadr or the
+   scheme default. */
+T_SOC newhttp(httrackp *opt, const char *iadr, htsblk *retour, int port);
 /* Like newhttp(), but connect to the addr_index-th resolved address of the host
    (0-based) instead of always the first; *addr_count, if non-NULL, is set to
    the total resolved addresses. newhttp() == newhttp_addr(...,0,NULL). Used by
    the slot scheduler to try the next address when a connect fails (dead IPv6
    etc.). */
 T_SOC newhttp_addr(httrackp *opt, const char *iadr, htsblk *retour, int port,
-                   int waitconnect, int addr_index, int *addr_count);
+                   int addr_index, int *addr_count);
 /* Clips the formatted failure reason into r->msg, which also round-trips
    through the cache as X-StatusMessage. Leaves r->statuscode to the caller. */
 #define htsblk_failf(R, ...)                                                   \
@@ -467,9 +427,6 @@ SOCaddr *hts_dns_resolve_nocache2(const char *const hostname,
                                   SOCaddr *const addr, const char **error);
 SOCaddr *hts_dns_resolve_nocache(const char *const hostname,
                                  SOCaddr *const addr);
-int check_hostname_dns(const char *const hostname);
-
-int ftp_available(void);
 
 #if HTS_DNSCACHE
 /* Return opt's DNS cache hashtable (hostname -> t_dnscache record), creating it
@@ -520,18 +477,15 @@ HTS_INLINE int sendc(htsblk * r, const char *s);
 /* Returns the advance past the line's terminator. Unlike binput_line(), "max"
    excludes the NUL: "s" must hold max + 1 bytes. */
 int binput(const char *buff, char *s, int max);
-/* Read one line, from a buffer up to "end" or from a socket, consuming it whole
-   even when it does not fit "s". HTS_TRUE means it was cut: the value is not
-   what was written, so drop it rather than parse a prefix of it.
-   binput_line() reports the advance through *offset. */
+/* Read one line from a buffer up to "end", consuming it whole even when it
+   does not fit "s". HTS_TRUE means it was cut: the value is not what was
+   written, so drop it rather than parse a prefix of it. The advance is reported
+   through *offset. */
 hts_boolean binput_line(const char *buff, const char *end, char *s, int max,
                         int *offset);
-hts_boolean finput_line(T_SOC fd, char *s, int max);
 /* Does treathead() read the header that "line" starts with? Keep in step. */
 hts_boolean hts_header_is_read(const char *line);
-int linput(FILE * fp, char *s, int max);
-int linputsoc(T_SOC soc, char *s, int max);
-int linputsoc_t(T_SOC soc, char *s, int max, int timeout);
+int linput(FILE *fp, char *s, int max);
 const char *strstrcase(const char *s, const char *o);
 int ident_url_absolute(const char *url, lien_adrfil *adrfil);
 void fil_simplifie(char *f);
@@ -779,11 +733,6 @@ LLint fpsize(FILE *fp);
 LLint fsize(const char *s);
 LLint fsize_utf8(const char *s);
 
-// Threads
-typedef void *(*beginthread_type) (void *);
-
-/*unsigned long _beginthread( beginthread_type start_address, unsigned stack_size, void *arglist );*/
-
 /* variables globales */
 extern int _DEBUG_HEAD;
 extern FILE *ioinfo;
@@ -804,7 +753,6 @@ extern void *openFunctionLib(const char *file_);
 extern void *getFunctionPtr(void *handle, const char *fncname);
 extern void closeFunctionLib(void *handle);
 
-extern void clearCallbacks(htscallbacks * chain);
 int hts_set_callback(t_hts_htmlcheck_callbacks * callbacks,
                      const char *name, void *function);
 void *hts_get_callback(t_hts_htmlcheck_callbacks * callbacks,

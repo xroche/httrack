@@ -30,8 +30,6 @@ Please visit our Website: http://www.httrack.com
 /*       Fetch Metadata request headers (Sec-Fetch-*)           */
 /* ------------------------------------------------------------ */
 
-#define HTS_INTERNAL_BYTECODE
-
 #include "htsfetch.h"
 
 #include "htscore.h"

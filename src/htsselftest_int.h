@@ -38,8 +38,6 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTSSELFTEST_INT_DEFH
 #define HTSSELFTEST_INT_DEFH
 
-#define HTS_INTERNAL_BYTECODE
-
 #include "htsselftest.h"
 
 #include "htsglobal.h"

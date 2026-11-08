@@ -31,8 +31,6 @@ Please visit our Website: http://www.httrack.com
    cope with the others. */
 /* ------------------------------------------------------------ */
 
-#define HTS_INTERNAL_BYTECODE
-
 #include "htscrashtest.h"
 
 #include "htssafe.h"
