@@ -3539,10 +3539,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   if (url)
     freet(url);
 
-#ifdef HTS_TRACE_MALLOC
-  hts_freeall();
-#endif
-
   printf("Thanks for using HTTrack!\n");
   io_flush;
   htsmain_free();

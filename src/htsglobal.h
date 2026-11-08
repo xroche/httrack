@@ -534,28 +534,6 @@ typedef int T_SOC;
 #endif
 #define USE_BEGINTHREAD 1
 
-#ifdef _DEBUG
-// trace mallocs
-// #define HTS_TRACE_MALLOC
-#ifdef HTS_TRACE_MALLOC
-/* Type of the guard word written on both sides of a traced block. */
-typedef unsigned long int t_htsboundary;
-
-#ifndef HTS_DEF_FWSTRUCT_mlink
-#define HTS_DEF_FWSTRUCT_mlink
-typedef struct mlink mlink;
-#endif
-struct mlink {
-  char *adr;
-  int len;
-  int id; /**< serial number of the allocation */
-  struct mlink *next;
-};
-
-static const t_htsboundary htsboundary = 0xDEADBEEF;
-#endif
-#endif
-
 /* Nothing reads this any more. */
 #ifndef NOSTRDEBUG
 #define STRDEBUG 1
