@@ -80,21 +80,25 @@ Please visit our Website: http://www.httrack.com
 
 int mystrcmp(const void *_e1, const void *_e2);
 
-// Global variables
-int hts_index_init = 1;
-int hts_primindex_size = 0;
-FILE *fp_tmpproject = NULL;
-int hts_primindex_words = 0;
+/* The whole mirror's indexing state: only index_init resets it. */
+static struct {
+  hts_boolean first_page; /* index.txt and sindex.html not yet removed */
+  int lines;              /* entries in tmp */
+  int words;              /* every kept word, repeats included */
+  FILE *tmp;              /* "word count url" lines, until index_finish */
+} indexer = {HTS_TRUE, 0, 0, NULL};
 
 /* 
   Init index 
 */
 void index_init(const char *indexpath) {
   /* remove(concat(indexpath,"index.txt")); */
-  hts_index_init = 1;
-  hts_primindex_size = 0;
-  hts_primindex_words = 0;
-  fp_tmpproject = tmpfile();
+  indexer.first_page = HTS_TRUE;
+  indexer.lines = 0;
+  indexer.words = 0;
+  if (indexer.tmp)
+    fclose(indexer.tmp);
+  indexer.tmp = tmpfile();
 }
 
 /* End of a word: drop or clean the pending keyword, store it, then clear it. */
@@ -122,7 +126,7 @@ static void index_store_word(coucal WordIndexHash, FILE *tmpfp, char *keyword) {
 
   /* Store it ? */
   if (len >= KEYW_MIN_LEN) {
-    hts_primindex_words++;
+    indexer.words++;
     if (coucal_inc(WordIndexHash, keyword) == 1) { /* added new */
       fprintf(tmpfp, "%s\n", keyword);
     }
@@ -160,10 +164,10 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
     return 0;
 
   // Init ?
-  if (hts_index_init) {
+  if (indexer.first_page) {
     UNLINK(concat(catbuff, sizeof(catbuff), indexpath, "index.txt"));
     UNLINK(concat(catbuff, sizeof(catbuff), indexpath, "sindex.html"));
-    hts_index_init = 0;
+    indexer.first_page = HTS_FALSE;
   }
   // Check MIME type
   if (is_html_mime_type(mime)) {
@@ -187,8 +191,10 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
   // Create hash structure
   // Hash tables rulez da world!
   WordIndexHash = coucal_new(0);
-  if (!WordIndexHash)
+  if (!WordIndexHash) {
+    fclose(tmpfp);
     return 0;
+  }
 
   // Start indexing this page
   keyword[0] = '\0';
@@ -258,7 +264,7 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
 
   // Process indexing for this page
   {
-    if (fp_tmpproject) {
+    if (indexer.tmp) {
       while(!feof(tmpfp)) {
         char line[KEYW_LEN + 32];
 
@@ -275,9 +281,9 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
               strcpybuff(savelst, filename);
 
             // Add entry for this file and word
-            fprintf(fp_tmpproject, "%s %d %s\n", line,
+            fprintf(indexer.tmp, "%s %d %s\n", line,
                     (int) (KEYW_SORT_MAXCOUNT - e), savelst);
-            hts_primindex_size++;
+            indexer.lines++;
           }
         }
       }
@@ -298,19 +304,94 @@ static void index_close_word(FILE *fp, int mode, LLint total_hit,
                              LLint total_line, int index, long last_pos) {
   if (mode == 1) // TEXT
     fprintf(fp, "\t=%lld\r\n", (long long) total_hit);
-  if ((((total_hit * 1000) / hts_primindex_words) >= KEYW_USELESS1K) ||
+  if ((((total_hit * 1000) / indexer.words) >= KEYW_USELESS1K) ||
       (((total_line * 1000) / index) >= KEYW_USELESS1KPG)) {
     fseek(fp, last_pos, SEEK_SET);
     if (mode == 1) // TEXT
       fprintf(fp, "\tignored (%d)\r\n",
-              (int) ((total_hit * 1000) / hts_primindex_words));
+              (int) ((total_hit * 1000) / indexer.words));
     else
       fprintf(fp, "(ignored) [%lld hits]<br>\r\n", (long long) total_hit);
   } else {
     if (mode == 1) // TEXT
-      fprintf(fp, "\t(%d)\r\n",
-              (int) ((total_hit * 1000) / hts_primindex_words));
+      fprintf(fp, "\t(%d)\r\n", (int) ((total_hit * 1000) / indexer.words));
   }
+}
+
+/* Write the HTML or text index of the sorted lines tab[0..index-1]. */
+static void index_write(FILE *fp, int mode, char **tab, int index) {
+  char current_word[KEYW_LEN + 32];
+  char word[KEYW_LEN + 32];
+  int hit;
+  int i;
+  LLint total_hit = 0;
+  LLint total_line = 0;
+  long last_pos = 0;
+  char word0 = '\0';
+
+  HTS_STATIC_ASSERT(sizeof(word) == 82, keyw_scan_width_matches);
+  current_word[0] = '\0';
+
+  if (mode == 2) { // HTML
+    for (i = 0; i < index; i++) {
+      if (word0 != tab[i][0]) {
+        word0 = tab[i][0];
+        fprintf(fp, " <a href=\"#%c\">%c</a>\r\n", word0, word0);
+      }
+    }
+    word0 = '\0';
+    fprintf(fp, "<br><br>\r\n");
+    fprintf(fp, "<table width=\"100%%\" "
+                "border=\"0\">\r\n<tr>\r\n<td>word</td>\r\n<td>location\r\n");
+  }
+
+  for (i = 0; i < index; i++) {
+    char *a;
+
+    /* the width is the buffer's, not the keyword cap a hundred
+       lines up that happens to be smaller today */
+    if (sscanf(tab[i], "%" KEYW_SCAN_WIDTH "s %d", word, &hit) != 2)
+      continue;
+    a = strchr(tab[i], ' ');
+    if (a)
+      a = strchr(a + 1, ' ');
+    if (!a++) /* Yes, a++, not ++a :) */
+      continue;
+    hit = KEYW_SORT_MAXCOUNT - hit;
+    if (strcmp(word, current_word)) { /* New word */
+      if (total_hit)
+        index_close_word(fp, mode, total_hit, total_line, index, last_pos);
+      if (mode == 1) // TEXT
+        fprintf(fp, "%s\r\n", word);
+      else { // HTML
+        fprintf(fp, "</td></tr>\r\n");
+        if (word0 != word[0]) {
+          word0 = word[0];
+          fprintf(fp, "<th>%c</th>\r\n", word0);
+          fprintf(fp, "<a name=\"%c\"></a>\r\n", word0);
+        }
+        fprintf(fp, "<tr>\r\n<td>%s</td>\r\n<td>\r\n", word);
+      }
+      fflush(fp);
+      last_pos = ftell(fp);
+      strcpybuff(current_word, word);
+      total_hit = total_line = 0;
+    }
+    total_hit += hit;
+    total_line++;
+    if (mode == 1) // TEXT
+      fprintf(fp, "\t%d %s\r\n", hit, a);
+    else // HTML
+      fprintf(fp, "<a href=\"%s\">%s</a> [%d hits]<br>\r\n", a, a, hit);
+  }
+  if (total_hit)
+    index_close_word(fp, mode, total_hit, total_line, index, last_pos);
+  if (mode == 2) // HTML
+    fprintf(fp, "</td></tr>\r\n</table>\r\n");
+  /* an "ignored" rewind can leave old bytes past the end */
+  if (fflush(fp) == 0 && ftell(fp) >= 0)
+    if (HTS_FTRUNCATE(fp, ftell(fp)) != 0) {
+    }
 }
 
 /*
@@ -319,139 +400,54 @@ static void index_close_word(FILE *fp, int mode, LLint total_hit,
 /* Note: NOT utf-8 */
 void index_finish(const char *indexpath, int mode) {
   char catbuff[CATBUFF_SIZE];
-  char **tab;
-  char *blk;
-  const LLint fs = fpsize(fp_tmpproject);
+  char **tab = NULL;
+  char *blk = NULL;
+  FILE *fp;
+  char *a, *b;
+  int index = 0;
+  const LLint fs = fpsize(indexer.tmp);
   /* fail closed on a size size_t cannot hold: malloct() wraps short while
      the reader and the terminator keep the 64-bit length */
   const size_t size = fs > 0 ? llint_to_size_t(fs) : (size_t) -1;
 
-  if (size != (size_t) -1) {
-    if (fp_tmpproject) {
-      tab = (char **) malloct(sizeof(char *) * (hts_primindex_size + 2));
-      if (tab) {
-        blk = malloct(size + 1);
-        if (blk) {
-          fseek(fp_tmpproject, 0, SEEK_SET);
-          if (hts_fread_exact(blk, size, fp_tmpproject)) {
-            char *a = blk, *b;
-            int index = 0;
-            int i;
-            FILE *fp;
+  if (size == (size_t) -1 || !indexer.tmp)
+    goto done;
+  tab = (char **) malloct(sizeof(char *) * (indexer.lines + 2));
+  if (!tab)
+    goto done;
+  blk = malloct(size + 1);
+  if (!blk)
+    goto done;
+  fseek(indexer.tmp, 0, SEEK_SET);
+  if (!hts_fread_exact(blk, size, indexer.tmp))
+    goto done;
 
-            blk[size] = '\0';
-            while((b = strchr(a, '\n')) && (index < hts_primindex_size)) {
-              tab[index++] = a;
-              *b = '\0';
-              a = b + 1;
-            }
-
-            // Sort it!
-            qsort(tab, index, sizeof(char *), mystrcmp);
-
-            // Delete fp_tmpproject
-            fclose(fp_tmpproject);
-            fp_tmpproject = NULL;
-
-            // Write new file
-            if (mode == 1)      // TEXT
-              fp = FOPEN(
-                  concat(catbuff, sizeof(catbuff), indexpath, "index.txt"),
-                  "wb");
-            else                // HTML
-              fp = FOPEN(
-                  concat(catbuff, sizeof(catbuff), indexpath, "sindex.html"),
-                  "wb");
-            if (fp) {
-              char current_word[KEYW_LEN + 32];
-              char word[KEYW_LEN + 32];
-
-              HTS_STATIC_ASSERT(sizeof(word) == 82, keyw_scan_width_matches);
-              int hit;
-              LLint total_hit = 0;
-              LLint total_line = 0;
-              long last_pos = 0;
-              char word0 = '\0';
-
-              current_word[0] = '\0';
-
-              if (mode == 2) {  // HTML
-                for(i = 0; i < index; i++) {
-                  if (word0 != tab[i][0]) {
-                    word0 = tab[i][0];
-                    fprintf(fp, " <a href=\"#%c\">%c</a>\r\n", word0, word0);
-                  }
-                }
-                word0 = '\0';
-                fprintf(fp, "<br><br>\r\n");
-                fprintf(fp,
-                        "<table width=\"100%%\" border=\"0\">\r\n<tr>\r\n<td>word</td>\r\n<td>location\r\n");
-              }
-
-              for(i = 0; i < index; i++) {
-                /* the width is the buffer's, not the keyword cap a hundred
-                   lines up that happens to be smaller today */
-                if (sscanf(tab[i], "%" KEYW_SCAN_WIDTH "s %d", word, &hit) ==
-                    2) {
-                  char *a = strchr(tab[i], ' ');
-
-                  if (a)
-                    a = strchr(a + 1, ' ');
-                  if (a++) {    /* Yes, a++, not ++a :) */
-                    hit = KEYW_SORT_MAXCOUNT - hit;
-                    if (strcmp(word, current_word)) {   /* New word */
-                      if (total_hit)
-                        index_close_word(fp, mode, total_hit, total_line, index,
-                                         last_pos);
-                      if (mode == 1)    // TEXT
-                        fprintf(fp, "%s\r\n", word);
-                      else {    // HTML
-                        fprintf(fp, "</td></tr>\r\n");
-                        if (word0 != word[0]) {
-                          word0 = word[0];
-                          fprintf(fp, "<th>%c</th>\r\n", word0);
-                          fprintf(fp, "<a name=\"%c\"></a>\r\n", word0);
-                        }
-                        fprintf(fp, "<tr>\r\n<td>%s</td>\r\n<td>\r\n", word);
-                      }
-                      fflush(fp);
-                      last_pos = ftell(fp);
-                      strcpybuff(current_word, word);
-                      total_hit = total_line = 0;
-                    }
-                    total_hit += hit;
-                    total_line++;
-                    if (mode == 1)      // TEXT
-                      fprintf(fp, "\t%d %s\r\n", hit, a);
-                    else        // HTML
-                      fprintf(fp, "<a href=\"%s\">%s</a> [%d hits]<br>\r\n", a,
-                              a, hit);
-                  }
-                }
-              }
-              if (total_hit)
-                index_close_word(fp, mode, total_hit, total_line, index,
-                                 last_pos);
-              if (mode == 2)    // HTML
-                fprintf(fp, "</td></tr>\r\n</table>\r\n");
-              /* an "ignored" rewind can leave old bytes past the end */
-              if (fflush(fp) == 0 && ftell(fp) >= 0)
-                if (HTS_FTRUNCATE(fp, ftell(fp)) != 0) {
-                }
-              fclose(fp);
-            }
-          }
-          freet(blk);
-        }
-        freet(tab);
-      }
-
-    }
-    //qsort
+  blk[size] = '\0';
+  a = blk;
+  while ((b = strchr(a, '\n')) && (index < indexer.lines)) {
+    tab[index++] = a;
+    *b = '\0';
+    a = b + 1;
   }
-  if (fp_tmpproject)
-    fclose(fp_tmpproject);
-  fp_tmpproject = NULL;
+  qsort(tab, index, sizeof(char *), mystrcmp);
+
+  fclose(indexer.tmp);
+  indexer.tmp = NULL;
+
+  fp = FOPEN(concat(catbuff, sizeof(catbuff), indexpath,
+                    mode == 1 ? "index.txt" : "sindex.html"),
+             "wb");
+  if (fp) {
+    index_write(fp, mode, tab, index);
+    fclose(fp);
+  }
+
+done:
+  freet(blk);
+  freet(tab);
+  if (indexer.tmp)
+    fclose(indexer.tmp);
+  indexer.tmp = NULL;
 }
 
 /* Subroutines */
