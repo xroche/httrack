@@ -2941,6 +2941,8 @@ HTSEXT_API int structcheck(const char *path) {
 #endif
   /* Get prefix (note: file can not be empty here) */
   for(i = (int) strlen(file) - 1; i > 0 && file[i] != PATH_SEPARATOR; i--) ;
+  if (file[i] != PATH_SEPARATOR) /* a bare file name has no directory */
+    return 0;
   for(; i > 0 && file[i] == PATH_SEPARATOR; i--) ;
   file[i + 1] = '\0';
 
@@ -3050,6 +3052,8 @@ HTSEXT_API int structcheck_utf8(const char *path) {
 #endif
   /* Get prefix (note: file can not be empty here) */
   for(i = (int) strlen(file) - 1; i > 0 && file[i] != PATH_SEPARATOR; i--) ;
+  if (file[i] != PATH_SEPARATOR) /* a bare file name has no directory */
+    return 0;
   for(; i > 0 && file[i] == PATH_SEPARATOR; i--) ;
   file[i + 1] = '\0';
 
