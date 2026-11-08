@@ -2592,21 +2592,26 @@ void filters_make_room(httrackp *opt, int n) {
     assertf("too many filters - giving up" == NULL);
 }
 
+void hts_url_forms(htsbuff *nologin, htsbuff *full, const char *adr,
+                   const char *fil) {
+  htsbuff_cpy(nologin, jump_identification_const(adr));
+  if (*fil != '/')
+    htsbuff_cat(nologin, "/");
+  htsbuff_cat(nologin, fil);
+  htsbuff_cpy(full, link_has_authority(adr) ? "" : "http://");
+  htsbuff_cat(full, adr);
+  if (*fil != '/')
+    htsbuff_cat(full, "/");
+  htsbuff_cat(full, fil);
+}
+
 int filters_match_url(char **filters, int nfil, const char *adr,
                       const char *fil, int *depth) {
   /* adr and fil each come from a HTS_URLMAXSIZE * 2 array */
   char BIGSTK l[HTS_URLMAXSIZE * 4 + 16], lfull[HTS_URLMAXSIZE * 4 + 16];
   htsbuff lb = htsbuff_array(l), fb = htsbuff_array(lfull);
 
-  htsbuff_cpy(&lb, jump_identification_const(adr));
-  if (*fil != '/')
-    htsbuff_cat(&lb, "/");
-  htsbuff_cat(&lb, fil);
-  htsbuff_cpy(&fb, link_has_authority(adr) ? "" : "http://");
-  htsbuff_cat(&fb, adr);
-  if (*fil != '/')
-    htsbuff_cat(&fb, "/");
-  htsbuff_cat(&fb, fil);
+  hts_url_forms(&lb, &fb, adr, fil);
   return fa_strjoker_dual(0, filters, nfil, lfull, l, NULL, NULL, depth);
 }
 
