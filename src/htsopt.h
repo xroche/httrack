@@ -122,8 +122,7 @@ typedef int (*htscallbacksfncptr)(void);
 
 typedef struct htscallbacks htscallbacks;
 
-/** One module's exit callback. The head entry is embedded in htsoptstate, so
-    the engine frees every entry but that one. */
+/** Reserved for ABI: the engine no longer reads or fills this chain. */
 struct htscallbacks {
   void *moduleHandle;         /**< module to unload once exitFnc has run */
   htscallbacksfncptr exitFnc; /**< called once, before the module is unloaded */
@@ -251,7 +250,7 @@ struct htsoptstate {
   /* */
   filenote_strc strc; /**< filenote() listing state */
   /* Per-call function contexts (thread-local scratch, avoids globals) */
-  htscallbacks callbacks;   /**< user callback chain head */
+  htscallbacks callbacks;   /**< reserved, unused (ABI) */
   concat_strc concat;       /**< concat() rotating buffers */
   usercommand_strc usercmd; /**< pending user shell command */
   fspc_strc fspc;           /**< error/warning/info counters */

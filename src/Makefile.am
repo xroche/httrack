@@ -107,7 +107,8 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	md5.h coucal/murmurhash3.h \
 	minizip/crypt.h minizip/ioapi.h minizip/mztools.h minizip/unzip.h minizip/zip.h
 libhttrack_la_LIBADD = $(THREADS_LIBS) $(ZLIB_LIBS) $(BROTLI_LIBS) $(ZSTD_LIBS) $(OPENSSL_LIBS) $(DL_LIBS) $(SOCKET_LIBS) $(ICONV_LIBS)
-libhttrack_la_CFLAGS = $(AM_CFLAGS) -DLIBHTTRACK_EXPORTS -DZLIB_CONST
+# HTS_INTERNAL_BYTECODE shows the engine-only half of the headers to the library.
+libhttrack_la_CFLAGS = $(AM_CFLAGS) -DLIBHTTRACK_EXPORTS -DZLIB_CONST -DHTS_INTERNAL_BYTECODE
 libhttrack_la_LDFLAGS = $(AM_LDFLAGS) -version-info $(VERSION_INFO)
 
 # --disable-selftests leaves these out and defines HTS_NO_SELFTEST.

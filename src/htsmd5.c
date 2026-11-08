@@ -35,9 +35,9 @@ Please visit our Website: http://www.httrack.com
 /* Modified 2000 by Xavier Roche for domd5mem                   */
 /* ------------------------------------------------------------ */
 
-/* Internal engine bytecode */
+#ifndef HTS_INTERNAL_BYTECODE /* proxytrack and htsweb.c lack the flag */
 #define HTS_INTERNAL_BYTECODE
-
+#endif
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>

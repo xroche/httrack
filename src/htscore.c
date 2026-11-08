@@ -30,9 +30,6 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-/* Internal engine bytecode */
-#define HTS_INTERNAL_BYTECODE
-
 #include <fcntl.h>
 #include <ctype.h>
 #include <limits.h> /* INT_MAX, capping the backing table's size */
@@ -185,7 +182,6 @@ RUN_CALLBACK0(opt, end); \
       template_footer = NULL;                                                  \
     }                                                                          \
     hash_free(&hash);                                                          \
-    clearCallbacks(&opt->state.callbacks);                                     \
   } while (0)
 #define XH_uninit do { XH_extuninit; if (r.adr) { freet(r.adr); r.adr=NULL; } } while(0)
 

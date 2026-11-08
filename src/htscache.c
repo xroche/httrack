@@ -31,9 +31,6 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-/* Internal engine bytecode */
-#define HTS_INTERNAL_BYTECODE
-
 #include "htscache.h"
 
 /* specific definitions */
@@ -1646,36 +1643,6 @@ char *readfile_or(const char *fil, const char *defaultdata) {
     }
   }
   return NULL;
-}
-
-int cache_brstr(char *adr, char *s, size_t s_size) {
-  int i;
-  int off;
-  char buff[256 + 4];
-
-  off = binput(adr, buff, 256);
-  /* binput stops at the buffer's terminating NUL; a value can only follow a
-     real line terminator, so never step past end-of-buffer. */
-  if (adr[off - 1] == '\0') {
-    s[0] = '\0';
-    return off - 1;
-  }
-  /* an empty/non-numeric field leaves i unset: treat as length 0 */
-  if (sscanf(buff, "%d", &i) != 1 || i < 0 || i > 32768)
-    i = 0;
-  if (i > 0) {
-    /* A corrupt/truncated cache may declare a length past the buffer end;
-       bound both the copy and the advance to the bytes actually present. */
-    const size_t avail = strnlen(adr + off, (size_t) i);
-    const size_t store = avail < s_size ? avail : s_size - 1;
-
-    memcpy(s, adr + off, store);
-    s[store] = '\0';
-    off += (int) avail;
-  } else {
-    s[0] = '\0';
-  }
-  return off;
 }
 
 // -- cache --

@@ -133,9 +133,6 @@ typedef int (*t_htsWrapperPlugInit)(char *args);
     or any module load. Calling it again does nothing. */
 extern void htspe_init(void);
 
-/** Tear-down counterpart of htspe_init(). */
-extern void htspe_uninit(void);
-
 /** Offers the object described by @p str to the loaded parser modules.
     @return 1 when a module parsed it, 0 when the module that claimed it failed
     and left the reason in err_msg, and -1 when none claimed it or -%w

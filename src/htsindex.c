@@ -31,15 +31,11 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-/* Internal engine bytecode */
-#define HTS_INTERNAL_BYTECODE
-
 #include "htsindex.h"
 #include "htsglobal.h"
 #include "htslib.h"
 #include "htsio.h"
 
-#if HTS_MAKE_KEYWORD_INDEX
 #include "htshash.h"
 #include "coucal.h"
 
@@ -90,22 +86,17 @@ int hts_primindex_size = 0;
 FILE *fp_tmpproject = NULL;
 int hts_primindex_words = 0;
 
-#endif
-
 /* 
   Init index 
 */
 void index_init(const char *indexpath) {
-#if HTS_MAKE_KEYWORD_INDEX
   /* remove(concat(indexpath,"index.txt")); */
   hts_index_init = 1;
   hts_primindex_size = 0;
   hts_primindex_words = 0;
   fp_tmpproject = tmpfile();
-#endif
 }
 
-#if HTS_MAKE_KEYWORD_INDEX
 /* End of a word: drop or clean the pending keyword, store it, then clear it. */
 static void index_store_word(coucal WordIndexHash, FILE *tmpfp, char *keyword) {
   int len = (int) strlen(keyword);
@@ -139,8 +130,6 @@ static void index_store_word(coucal WordIndexHash, FILE *tmpfp, char *keyword) {
   keyword[0] = '\0';
 }
 
-#endif
-
 /* 
    Indexing system
    A little bit dirty, (quick'n dirty, in fact)
@@ -150,7 +139,6 @@ static void index_store_word(coucal WordIndexHash, FILE *tmpfp, char *keyword) {
 /* Note: utf-8 */
 int index_keyword(const char *html_data, LLint size, const char *mime,
                   const char *filename, const char *indexpath) {
-#if HTS_MAKE_KEYWORD_INDEX
   char catbuff[CATBUFF_SIZE];
   int intag = 0, inscript = 0, incomment = 0;
   char keyword[KEYW_LEN + 32];
@@ -302,11 +290,9 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
 
   // Clear hash table
   coucal_delete(&WordIndexHash);
-#endif
   return 1;
 }
 
-#if HTS_MAKE_KEYWORD_INDEX
 /* Close a word's block: its total, or "ignored" over it if it is too common. */
 static void index_close_word(FILE *fp, int mode, LLint total_hit,
                              LLint total_line, int index, long last_pos) {
@@ -327,14 +313,11 @@ static void index_close_word(FILE *fp, int mode, LLint total_hit,
   }
 }
 
-#endif
-
 /*
   Sort index!
 */
 /* Note: NOT utf-8 */
 void index_finish(const char *indexpath, int mode) {
-#if HTS_MAKE_KEYWORD_INDEX
   char catbuff[CATBUFF_SIZE];
   char **tab;
   char *blk;
@@ -469,16 +452,13 @@ void index_finish(const char *indexpath, int mode) {
   if (fp_tmpproject)
     fclose(fp_tmpproject);
   fp_tmpproject = NULL;
-#endif
 }
 
 /* Subroutines */
 
-#if HTS_MAKE_KEYWORD_INDEX
 int mystrcmp(const void *_e1, const void *_e2) {
   const char *const*const e1 = (const char *const*) _e1;
   const char *const*const e2 = (const char *const*) _e2;
 
   return strcmp(*e1, *e2);
 }
-#endif

@@ -65,7 +65,6 @@ struct FTPDownloadStruct {
 /* Capacity of every FTP control-line buffer; send_line() adds the CRLF. */
 #define FTP_LINE_SIZE 1024
 
-#if USE_BEGINTHREAD
 void launch_ftp(FTPDownloadStruct * params);
 void back_launch_ftp(void *pP);
 /* Cancel every live FTP worker and block until each stops touching its backlog
@@ -79,10 +78,6 @@ int ftp_worker_selftests(void);
    the live list, and that a held list blocks the handoff. Returns the number of
    failed checks. */
 int ftp_handoff_selftests(httrackp *opt);
-#else
-void launch_ftp(FTPDownloadStruct * params, char *path, char *exec);
-int back_launch_ftp(FTPDownloadStruct * params);
-#endif
 
 int run_launch_ftp(FTPDownloadStruct * params);
 int send_line(T_SOC soc, const char *data);

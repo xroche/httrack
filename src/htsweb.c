@@ -69,10 +69,6 @@ Please visit our Website: http://www.httrack.com
 #include "htscharset.h"
 #include "htsrandom.h"
 
-#if USE_BEGINTHREAD==0
-#error fatal: no threads support
-#endif
-
 #ifdef _WIN32
 #ifndef __cplusplus
 // DOS

@@ -419,7 +419,7 @@ static T_SOC st_backstop_pending(httrackp *opt, htsblk *r) {
   T_SOC soc;
 
   hts_init_htsblk(r);
-  soc = newhttp_addr(opt, ST_BACKSTOP_DEADHOST, r, 80, 0, 0, NULL);
+  soc = newhttp_addr(opt, ST_BACKSTOP_DEADHOST, r, 80, 0, NULL);
   if (soc == INVALID_SOCKET)
     return INVALID_SOCKET;
   r->soc = soc;

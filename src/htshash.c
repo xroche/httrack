@@ -31,27 +31,15 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-/* Internal engine bytecode */
-#define HTS_INTERNAL_BYTECODE
-
 #include "htsopt.h"
 #include "htshash.h"
 
 /* specific definitions */
 #include "htsbase.h"
 #include "htsglobal.h"
-#include "htsmd5.h"
 #include "htscore.h"
 #include "coucal.h"
 /* END specific definitions */
-
-/* Specific macros */
-#ifndef malloct
-#define malloct malloc
-#define freet free
-#define calloct calloc
-#define strcpybuff strcpy
-#endif
 
 // GESTION DES TABLES DE HACHAGE
 // Méthode à 2 clés (adr+fil), 2e cle facultative
