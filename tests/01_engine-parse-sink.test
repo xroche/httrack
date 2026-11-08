@@ -1,0 +1,19 @@
+#!/bin/bash
+#
+# Pins the parser's output writers: the escaping each script state picks, and
+# that a page not saved as HTML (-p2) buffers nothing.
+
+set -euo pipefail
+
+out=$(httrack -#test=sink) || {
+    echo "httrack -#test=sink exited non-zero: $out" >&2
+    exit 1
+}
+
+case "$out" in
+"sink self-test OK (6 cases)"*) ;;
+*)
+    echo "expected 'sink self-test OK (6 cases)', got: $out" >&2
+    exit 1
+    ;;
+esac
