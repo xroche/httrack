@@ -961,7 +961,6 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   cache_kept = coucal_new(0);
   if (cache_hashtable == NULL || cache_tests == NULL || cache_kept == NULL) {
     printf("PANIC! : Not enough memory [%d]\n", __LINE__);
-    filters[0] = NULL;          // uniquement a cause du warning de XH_extuninit
     XH_extuninit;
     return 0;
   }
@@ -1445,7 +1444,6 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
 
     // effacer r
     hts_init_htsblk(&r);
-    //memset(&r, 0, sizeof(htsblk)); r.soc=INVALID_SOCKET;
     r.location = loc;           // en cas d'erreur 3xx (moved)
     // recopier proxy
     if ((r.req.proxy.active = opt->proxy.active)) {
@@ -1510,11 +1508,6 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
           r.size = strlen(r.adr);
           r.soc = INVALID_SOCKET;
           strcpybuff(r.contenttype, "text/html");
-          /*} else if (opt->maxsoc<=0) {   // fichiers 1 à 1 en attente (pas de backing)
-             // charger le fichier en mémoire tout bêtement
-             r=xhttpget(urladr(),urlfil());
-             //
-           */
         } else {                // backing, multiples sockets
           /*
            **************************************
@@ -1774,20 +1767,6 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
         }
       }
 
-      // ---stockage en cache---
-      // stocker dans le cache?
-      /*
-         if (!error) {
-         if (ptr>0) {
-         if (heap(ptr)) {
-         xxcache_mayadd(opt,&cache,&r,urladr(),urlfil(),savename());
-         } else
-         error=1;
-         }
-         }
-       */
-      // ---fin stockage en cache---
-
       /*
        **************************************
        Check "Moved permanently" and other similar errors, retrying URLs if necessary and handling
@@ -1956,14 +1935,12 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
             }
             /* Attempt to find a meta charset */
             else if (is_html_mime_type(r.contenttype)) {
-              char *const charset =
-                  hts_getCharsetFromMeta(r.adr, (size_t) r.size);
+              char *charset = hts_getCharsetFromMeta(r.adr, (size_t) r.size);
 
               if (charset != NULL && strlen(charset) < sizeof(page_charset)) {
                 strcpy(page_charset, charset);
               }
-              if (charset != NULL)
-                free(charset);
+              freet(charset);
             }
             /* Left empty when the document declared none: guessing UTF-8 here
                would break links, and the parser picks its own fallback */
@@ -2088,19 +2065,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
                what falls back to the well-known location. */
             hts_sitemap_robots(opt, urladr(), sitemaps);
           }
-        } else if (r.is_write) {        // déja sauvé sur disque
-          /*
-             if (!ishttperror(r.statuscode))
-             HTS_STAT.stat_files++;
-             HTS_STAT.stat_bytes+=r.size;
-           */
-        } else {
-          // Si on doit sauver une page HTML sans la scanner, cela signifie que le niveau de
-          // récursion nous en empêche
-          // Dans ce cas on met un fichier indiquant ce fait
-          // Si par la suite on doit retraiter ce fichier avec un niveau de récursion plus
-          // fort, on supprimera le readme, et on scannera le fichier html!
-          // note: sauté si store_errpage (càd si page d'erreur, non à scanner!)
+        } else if (!r.is_write) {
+          // Not on disk yet: save it, with a readme beside unscanned HTML.
           if ((is_hypertext_mime(opt, r.contenttype, urlfil())) && (!store_errpage) && (r.size > 0)) {    // c'est du html!!
             char BIGSTK tempo[HTS_URLMAXSIZE * 2];
             FILE *fp;
@@ -2163,34 +2129,9 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
               }
               hts_log_print(opt, LOG_ERROR | LOG_ERRNO,
                             "Unable to save file %s", savename());
-            } else {
-              /*
-                 if (!ishttperror(r.statuscode))
-                 HTS_STAT.stat_files++;
-                 HTS_STAT.stat_bytes+=r.size;
-               */
             }
           }
         }
-
-        /* Parsing of other media types (java, ram..) */
-        /*
-           if (strfield2(r.contenttype,"audio/x-pn-realaudio")) {
-           hts_log_print(opt, LOG_DEBUG, "(Real Media): parsing %s",savename());
-           if (fexist(savename())) {   // ok, existe bien!
-           FILE* fp=FOPEN(savename(),"r+b");
-           if (fp) {
-           if (!fseek(fp,0,SEEK_SET)) {
-           char BIGSTK line[HTS_URLMAXSIZE*2];
-           linput(fp,line,HTS_URLMAXSIZE);
-           if (strnotempty(line)) {
-           hts_log_print(opt, LOG_DEBUG, "(Real Media): detected %s",line);
-           }
-           }
-           fclose(fp);
-           }
-           }
-           } else */
 
         /* External modules */
         if (opt->parsejava && (opt->parsejava & HTSPARSE_NO_CLASS) == 0 &&
@@ -4495,6 +4436,8 @@ int nombre_digit(int n) {
 static int hts_cancel_file_push_(httrackp * opt, const char *url) {
   if (url != NULL && url[0] != '\0') {
     htsoptstatecancel **cancel;
+    htsoptstatecancel *node;
+    char *copy;
 
     /* search for available place to store a new htsoptstatecancel* */
     for(cancel = &opt->state.cancel; *cancel != NULL;
@@ -4503,9 +4446,16 @@ static int hts_cancel_file_push_(httrackp * opt, const char *url) {
         return 1;               /* already there */
       }
     }
-    *cancel = malloct(sizeof(htsoptstatecancel));
-    (*cancel)->next = NULL;
-    (*cancel)->url = strdupt(url);
+    node = malloct(sizeof(*node));
+    copy = strdupt(url);
+    if (node == NULL || copy == NULL) {
+      freet(node);
+      freet(copy);
+      return 1;
+    }
+    node->next = NULL;
+    node->url = copy;
+    *cancel = node;
     return 0;
   }
   return 1;
