@@ -39,6 +39,7 @@ Please visit our Website: http://www.httrack.com
 #include "htslines.h"
 
 #include <errno.h>
+#include <float.h>
 #include <limits.h>
 #include <stdint.h>
 
@@ -924,7 +925,27 @@ hts_boolean optcluster_next(const char *token, size_t *at, char *name,
       name[3] = '\0';
   }
   *at = i + len;
+  /* a -%c rate is one value, so a letter in it is not an option (-%cinf) */
+  if (strcmp(name, "-%c") == 0) {
+    double rate;
+
+    *at += optrate_read(token + *at, &rate);
+  }
   return HTS_TRUE;
+}
+
+size_t optrate_read(const char *val, double *rate) {
+  char *end;
+  const double v = strtod(val, &end);
+
+  /* leftover number characters (5,5 or 1.2.3) make the whole value bad */
+  if (end == val || !(v >= 0 && v <= FLT_MAX) ||
+      (*end != '\0' && strchr("0123456789.,", *end) != NULL)) {
+    *rate = -1;
+    return strlen(val);
+  }
+  *rate = v;
+  return (size_t) (end - val);
 }
 
 const char *optreal_value(int p) { return hts_optalias[p][1]; }

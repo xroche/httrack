@@ -61,6 +61,9 @@ int optreal_find(const char *token);
    option of its own (-1), which names none. Returns HTS_FALSE past the end. */
 hts_boolean optcluster_next(const char *token, size_t *at, char *name,
                             size_t name_size);
+/* Reads the -%c rate at VAL. Returns the bytes it spans: the number, or the
+   rest of the word when no usable rate is there, in which case *RATE is -1. */
+size_t optrate_read(const char *val, double *rate);
 const char *optreal_value(int p);
 const char *optalias_value(int p);
 const char *opttype_value(int p);

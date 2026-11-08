@@ -68,7 +68,7 @@ warned() { # warned MESSAGE ARG...
 for v in 0.0000001 1e-7; do
     warned "rate \"${v}\" raised to 0.000001" "-%c${v}"
 done
-for v in abc -1 "" nan 1e99 1e400 5,5 1.2.3; do
+for v in abc -1 "" nan inf O 1e99 1e400 5,5 1.2.3; do
     warned "rate \"${v}\" ignored" "-%c${v}"
 done
 # the rest of a bad value is not read as more options: I0 would drop the top index

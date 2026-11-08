@@ -1750,26 +1750,24 @@ static int hts_main_run(int argc, char **argv, httrackp *opt, cmdl_argv *x_cmd,
               case 'c': {
                 /* GUIs pass this field as typed, so a bad one only warns */
                 const char *const val = com + 1;
-                char *end;
-                const double v = strtod(val, &end);
+                double v;
+                const size_t span = optrate_read(val, &v);
 
-                if (end == val || !(v >= 0 && v <= FLT_MAX) ||
-                    (*end != '\0' && strchr("0123456789.,", *end) != NULL)) {
+                if (v < 0) {
                   fprintf(stderr,
                           "* Warning: connection-per-second rate \"%s\" "
                           "ignored\n",
                           val);
-                  end += strlen(end);
                 } else if (v > 0 && v < 1e-6) {
                   fprintf(stderr,
                           "* Warning: connection-per-second rate \"%.*s\" "
                           "raised to 0.000001\n",
-                          (int) (end - val), val);
+                          (int) span, val);
                   opt->maxconn = 1e-6f;
                 } else {
                   opt->maxconn = (float) v;
                 }
-                com = end - 1;
+                com += span;
               } break;
               case 'e':
                 readGluedInt(opt->extdepth, INT_MAX);
