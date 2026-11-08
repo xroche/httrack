@@ -44,6 +44,7 @@ typedef struct httrackp httrackp;
 #endif
 
 void infomsg(const char *msg);
+/* Print the usage text; more == 2 omits the version and usage banner. */
 void help(const char *app, int more);
 void help_wizard(httrackp * opt);
 int help_query(const char *list, int def);
