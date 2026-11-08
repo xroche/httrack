@@ -1036,10 +1036,8 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                     /* Stamp the mirror as the HTTP path does, so a later pass
                        compares server-clock times instead of crossing clocks.
                      */
-                    back->r.lastmodified[0] = '\0';
-                    strlncatbuff(back->r.lastmodified, date,
-                                 sizeof(back->r.lastmodified),
-                                 sizeof(back->r.lastmodified) - 1);
+                    strclipbuff(back->r.lastmodified,
+                                sizeof(back->r.lastmodified), date);
                     // a clipped date cannot prove the copy matches
                     if (!hts_time_exact(hts_utc_seconds(&remote_tm),
                                         &remote_mtime))
@@ -1096,8 +1094,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
             if (ftp_connect(back, soc_dat, &server, timeout, opt)) {
               strcpybuff(back->info, "retr");
               // clip, never abort: this line is built from a crawled URL
-              line[0] = '\0';
-              strlncatbuff(line, line_retr, sizeof(line), sizeof(line) - 1);
+              strclipbuff(line, sizeof(line), line_retr);
               send_line(soc_ctl, line);
               get_ftp_line(back, soc_ctl, line, sizeof(line), timeout, opt);
               _CHECK_HALT_FTP;
@@ -1139,8 +1136,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
           if (line[0] == '2') { // ok
             strcpybuff(back->info, "retr");
             // clip, never abort: this line is built from a crawled URL
-            line[0] = '\0';
-            strlncatbuff(line, line_retr, sizeof(line), sizeof(line) - 1);
+            strclipbuff(line, sizeof(line), line_retr);
             send_line(soc_ctl, line);
             get_ftp_line(back, soc_ctl, line, sizeof(line), timeout, opt);
             _CHECK_HALT_FTP;

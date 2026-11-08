@@ -5906,8 +5906,7 @@ HTSEXT_API void hts_hide_secrets(httrackp *opt, char *s, size_t size) {
     return;
   masked = secret_mask(opt, s, strlen(s), &n);
   if (masked != NULL) {
-    s[0] = '\0';
-    strlncatbuff(s, masked, size, size - 1);
+    strclipbuff(s, size, masked);
   } else if (n == 0)
     s[0] = '\0';
   freet(masked);

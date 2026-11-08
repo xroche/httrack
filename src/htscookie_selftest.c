@@ -1334,8 +1334,7 @@ static int st_cookiequote(httrackp *opt, int argc, char **argv) {
   memset(&r, 0, sizeof(r));
   cookie.max_len = sizeof(cookie.data);
   cookie.data[0] = '\0';
-  line[0] = '\0';
-  strlncatbuff(line, argc >= 1 ? argv[0] : "", sizeof(line), sizeof(line) - 1);
+  strclipbuff(line, sizeof(line), argc >= 1 ? argv[0] : "");
   treathead(&cookie, "example.com", "/", &r, line);
   n = strlen(cookie.data);
   if (n != 0 && cookie.data[n - 1] == '\n')

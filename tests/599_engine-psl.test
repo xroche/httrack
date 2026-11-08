@@ -55,6 +55,9 @@ selftest_queue b.c.kobe.jp psl 'a.b.c.kobe.jp'
 selftest_queue city.kobe.jp psl 'city.kobe.jp'
 selftest_queue city.kobe.jp psl 'www.city.kobe.jp'
 selftest_queue null psl 'ck'
+# A host longer than the 256-byte buffer is clipped, not rejected or overrun.
+selftest_queue null psl "$(printf 'a%.0s' $(seq 300)).co.uk"
+selftest_queue a.a psl "$(printf 'a.%.0s' $(seq 140))co.uk"
 selftest_queue null psl 'test.ck'
 selftest_queue b.test.ck psl 'b.test.ck'
 selftest_queue b.test.ck psl 'a.b.test.ck'

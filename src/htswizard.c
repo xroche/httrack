@@ -201,8 +201,7 @@ void hts_wizard_prompt_url(char *dst, size_t dstsize, const char *adr,
     return;
   /* clipped, never aborting: adr and fil are cut from a crawled link and
      together outgrow any prompt buffer */
-  dst[0] = '\0';
-  strlncatbuff(dst, adr, dstsize, dstsize - 1);
+  strclipbuff(dst, dstsize, adr);
   if (*fil != '/')
     strlncatbuff(dst, "/", dstsize, dstsize - 1 - strlen(dst));
   strlncatbuff(dst, fil, dstsize, dstsize - 1 - strlen(dst));

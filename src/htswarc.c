@@ -1779,7 +1779,7 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
   warc_http_header_value(resp_hdr, "Content-Type", mimebuf, sizeof(mimebuf));
   /* a 304 declares no type, so index the one only the caller knows */
   if (mimebuf[0] == '\0' && content_type != NULL)
-    strlncatbuff(mimebuf, content_type, sizeof(mimebuf), sizeof(mimebuf) - 1);
+    strclipbuff(mimebuf, sizeof(mimebuf), content_type);
 
   /* A payload exists (for digesting) unless this is a bodyless 304. */
   has_payload = (body_len > 0 && (body != NULL || body_path != NULL) &&

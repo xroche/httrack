@@ -630,8 +630,7 @@ static hts_boolean host_is_self(const char *host, const char *bound) {
 /** Header value with leading blanks dropped, clipped to fit dst. */
 static void copy_header_value(char *dst, size_t size, const char *value) {
   value += strspn(value, HTS_TABORSPACES);
-  dst[0] = '\0';
-  strlncatbuff(dst, value, size, size - 1);
+  strclipbuff(dst, size, value);
 }
 
 /** Copy query parameter "name"'s alphanumeric value into dst, of size >= 1;
@@ -3242,13 +3241,12 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
     char wanted[256];
     char lbasename[1024]; /* the guard below writes it, so it outlives the if */
 
-    wanted[0] = '\0';
-    strlncatbuff(wanted, limit_to, sizeof(wanted), sizeof(wanted) - 1);
+    strclipbuff(wanted, sizeof(wanted), limit_to);
     limit_to[0] = '\0';
     /* Fallback: an empty result ends a caller's loop, so a catalog missing the
        key must not look like the end of the list. */
     if (hashname != NULL)
-      strlncatbuff(limit_to, hashname, limit_size, limit_size - 1);
+      strclipbuff(limit_to, limit_size, hashname);
     if (limit_to[0] != '\0' &&
         lang_catalog_path(lbasename, sizeof(lbasename), hashname)) {
       FILE *fp;
@@ -3262,8 +3260,7 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
         while (!found && !feof(fp)) {
           if (lang_read_pair(fp, extkey, value, 8000) &&
               strcmp(extkey, wanted) == 0 && value[0] != '\0') {
-            limit_to[0] = '\0';
-            strlncatbuff(limit_to, value, limit_size, limit_size - 1);
+            strclipbuff(limit_to, limit_size, value);
             found = HTS_TRUE;
           }
         }
