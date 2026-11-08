@@ -2923,10 +2923,6 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                       : SMALLSERVER_CLIENT_PING,
                   window);
             }
-          } else {
-            smallserver_head(&headers, "404 Not Found",
-                             "Content-type: text/html\r\n");
-            StringCat(output, "Page not found.\r\n");
           }
         }
       } else if (denied != NULL) {
@@ -2934,6 +2930,12 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                          "Content-type: text/html\r\n");
         StringCat(output, denied);
         StringCat(output, "\r\n");
+      }
+      /* Nothing matched: an unknown page or method, or a target not a path. */
+      if (StringLength(headers) == 0) {
+        smallserver_head(&headers, "404 Not Found",
+                         "Content-type: text/html\r\n");
+        StringCat(output, "Page not found.\r\n");
       }
       {
         char tmp[256];
