@@ -70,8 +70,9 @@
       <!-- LIBHTTRACK_EXPORTS turns HTSEXT_API into __declspec(dllexport); ZLIB_DLL
            imports zlib from its DLL, ZLIB_CONST makes its next_in const as the
            autotools build does. HTS_USEBROTLI/HTS_USEZSTD enable the br and zstd
-           content codings. Windows 7 floor, matching WinHTTrack. -->
-      <PreprocessorDefinitions>WIN32;_WINDOWS;_MBCS;_USRDLL;LIBHTTRACK_EXPORTS;ZLIB_DLL;ZLIB_CONST;HTS_USEBROTLI=1;HTS_USEZSTD=1;WINVER=0x0601;_WIN32_WINNT=0x0601;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+           content codings. HTS_INTERNAL_BYTECODE shows the engine-only half of the
+           headers. Windows 7 floor, matching WinHTTrack. -->
+      <PreprocessorDefinitions>WIN32;_WINDOWS;_MBCS;_USRDLL;LIBHTTRACK_EXPORTS;HTS_INTERNAL_BYTECODE;ZLIB_DLL;ZLIB_CONST;HTS_USEBROTLI=1;HTS_USEZSTD=1;WINVER=0x0601;_WIN32_WINNT=0x0601;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(MSBuildThisFileDirectory);$(MSBuildThisFileDirectory)coucal;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WarningLevel>Level3</WarningLevel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -141,6 +142,7 @@
     <ClCompile Include="htsdns_selftest.c" />
     <ClCompile Include="htsfetch_selftest.c" />
     <ClCompile Include="htspsl_selftest.c" />
+    <ClCompile Include="htsindex_selftest.c" />
     <ClCompile Include="htsbundle_selftest.c" />
     <ClCompile Include="htsfilters_selftest.c" />
     <ClCompile Include="htsheader_selftest.c" />
@@ -164,6 +166,7 @@
     <ClCompile Include="htshash.c" />
     <ClCompile Include="htshelp.c" />
     <ClCompile Include="htsindex.c" />
+    <ClCompile Include="htsbase.c" />
     <ClCompile Include="htslib.c" />
     <ClCompile Include="htscmdline.c" />
     <ClCompile Include="htslines.c" />
@@ -194,7 +197,6 @@
     <ClCompile Include="htssitemap.c" />
     <ClCompile Include="md5.c" />
     <ClCompile Include="minizip\ioapi.c" />
-    <ClCompile Include="minizip\iowin32.c" />
     <ClCompile Include="minizip\mztools.c" />
     <ClCompile Include="minizip\unzip.c" />
     <ClCompile Include="minizip\zip.c" />

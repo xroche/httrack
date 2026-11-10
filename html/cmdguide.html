@@ -351,10 +351,12 @@ gives the full method, with the User-Agent and the logout filters.</p>
 
 <p>Two network facts worth stating plainly. Over SOCKS5, HTTrack always resolves
 host names at the proxy (remote DNS) for both <tt>socks5://</tt> and
-<tt>socks5h://</tt>, so your local resolver is never consulted. And HTTrack does
-not verify TLS certificates: HTTPS gives you an encrypted transport, but not an
-authenticated one. That is a deliberate choice for a mirroring tool, not a bug,
-but it is worth knowing if you are relying on it for trust.</p>
+<tt>socks5h://</tt>, so your local resolver is never consulted. And by default
+HTTrack does not verify TLS certificates: HTTPS gives you an encrypted transport,
+but not an authenticated one. Add <tt>--check-cert</tt> (<tt>-@c</tt>) to verify
+each server's certificate and host name against the system CA store, so a
+connection that fails the check is refused. It is not available on Windows
+yet.</p>
 
 <h3 id="update">9. Update and cache</h3>
 

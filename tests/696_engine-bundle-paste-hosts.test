@@ -1,0 +1,245 @@
+#!/bin/bash
+#
+# hts_bundle_from_paste_hosts: the cookies.txt records of the listed hosts are
+# kept under scope lines, never as start URLs.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+tmpdir=$(mktemp -d)
+cleanup_push rm -rf "$tmpdir"
+dir=$(nativepath "$tmpdir")
+mkdir "$tmpdir/in" "$tmpdir/proj"
+proj=$dir/proj
+tab=$(printf '\t')
+
+n=0
+rec() { # rec DOMAIN NAME [VALUE] -- one cookies.txt record
+    printf '%s\tTRUE\t/\tFALSE\t0\t%s\t%s\n' "$1" "$2" "${3:-v}"
+}
+paste_run() { # paste_run CONTENT ARGS... -- the selftest's output in $out
+    n=$((n + 1))
+    printf '%s' "$1" >"$tmpdir/in/p$n"
+    shift
+    out=$(httrack -O /dev/null -#test=paste "$proj" "$dir/in/p$n" "$@" | tr -d '\r')
+}
+bundle() { # bundle NAME -- the bundle file, CRLF dropped
+    tr -d '\r' <"$tmpdir/proj/$1.hts"
+}
+
+# Listed hosts keep their records, each under its registrable domain. A host
+# no scope line can name is skipped, and an unlisted one stays out.
+paste_run "$(rec .a.test A)
+$(rec www.b.test B)
+$(rec .deep.c.test C)
+$(rec 127.0.0.1 I)
+$(rec .tracker.test T)
+$(rec .co.uk P)
+$(rec .x_y.test U)" url:https://www.a.test/ \
+    "hosts:WWW.B.TEST.,x.c.test,localhost,127.0.0.1,co.uk,a.test,unused.test,x_y.test,:8443,z.test y.test,$(printf '%0300d' 0).test"
+test "$out" = "name=a.test cookies=4 hosts=a.test,www.b.test,deep.c.test,127.0.0.1
+url=https://www.a.test/#httrack-bundle=a.test
+agent=
+dropped=0" || fail "listed hosts: $out"
+got=$(bundle a.test)
+test "$(command grep -v "$tab" <<<"$got")" = "# HTTrack bundle 1
+scope a.test
+scope b.test
+scope c.test
+scope 127.0.0.1
+cookies" || fail_dump "listed hosts: the scope lines" "$tmpdir/proj/a.test.hts"
+
+# No scope line unless a listed host kept a record, so the file is as before.
+want=$(printf '# HTTrack bundle 1\ncookies\n%s' "$(rec .a.test A)")
+for hosts in '' 'a.test' 'b.test' ',,'; do
+    paste_run "$(rec .a.test A)
+$(rec .tracker.test T)" url:https://a.test/ "hosts:$hosts"
+    test "$(bundle a.test)" = "$want" || fail_dump "hosts '$hosts'" "$tmpdir/proj/a.test.hts"
+done
+
+# The address's scope line is written even when only a listed host has records.
+# A leading dot and a port are ignored.
+paste_run "$(rec .b.test B)
+$(rec .c.test C)" url:https://a.test/ 'hosts:.b.test,c.test:8443'
+test "$(command grep -v "$tab" <<<"$(bundle a.test)")" = "# HTTrack bundle 1
+scope a.test
+scope b.test
+scope c.test
+cookies" || fail_dump "listed records only" "$tmpdir/proj/a.test.hts"
+
+# A listed record too long, or repeated, is left out without refusing the paste.
+paste_run "$(rec .a.test A)
+$(rec .b.test R)
+$(rec .b.test R)
+$(printf '.b.test\tTRUE\t/\tFALSE\t0\tL\t%05000d' 0)" url:https://a.test/ hosts:b.test
+test "$(sed -n 's/^name=a.test cookies=\([0-9]*\) .*/\1/p;s/^dropped=//p' <<<"$out")" = "2
+1" || fail "long and repeated listed records: $out"
+
+# The address's own long record still refuses.
+paste_run "$(rec .a.test A)
+$(rec .a.test L "$(printf '%05000d' 0)")" url:https://a.test/ hosts:b.test
+test "$out" = "refused: line 2 of the paste: a cookie name and value pass 4096 bytes" ||
+    fail "the address's long record: $out"
+
+# A Unicode host matches the ASCII form a browser exports.
+paste_run "$(rec .a.test A)
+$(rec .xn--bcher-kva.de U)" url:https://a.test/ 'hosts:www.bücher.de'
+command grep -qx 'scope xn--bcher-kva.de' <<<"$(bundle a.test)" ||
+    fail_dump "IDNA host" "$tmpdir/proj/a.test.hts"
+
+# A base host no scope line can name keeps its paste contained.
+paste_run "$(rec intranet A)
+$(rec .b.test B)" url:http://intranet/ hosts:b.test
+test "$out" = "name=intranet cookies=1 hosts=intranet
+url=http://intranet/#httrack-bundle=intranet
+agent=
+dropped=0" || fail "single-label base: $out"
+
+# A cURL paste binds its cookies to the address, so the list changes nothing.
+paste_run "curl https://a.test/ -b K=1" hosts:b.test
+command grep -q '^scope' <<<"$(bundle a.test)" &&
+    fail_dump "cURL with hosts" "$tmpdir/proj/a.test.hts"
+
+# The address's records come first: the listed hosts take the room left and
+# are counted, not refused, past it.
+big=$(printf '%0100d' 0)
+recs=$(for i in $(seq 1 300); do
+    printf '.b.test\tTRUE\t/\tFALSE\t0\tB%d\t%s\n' "$i" "$big"
+done)
+paste_run "$recs
+$(rec .a.test A)" url:https://a.test/ hosts:b.test
+kept=$(command grep -c "^\.b\.test$tab" <<<"$(bundle a.test)" || true)
+test "$kept" -gt 100 || fail "too few listed records kept: $kept"
+command grep -q "^\.a\.test$tab" <<<"$(bundle a.test)" ||
+    fail_dump "the address's record was crowded out" "$tmpdir/proj/a.test.hts"
+test "$(sed -n 's/^dropped=//p' <<<"$out")" -eq $((300 - kept)) ||
+    fail "dropped count, $kept kept: $out"
+# The address's own overflow is still refused.
+paste_run "${recs//.b.test/.a.test}" url:https://a.test/ hosts:b.test
+command grep -q '^refused: line [0-9]* of the paste: the cookie jar did not store a cookie$' <<<"$out" ||
+    fail "the address's overflow: $out"
+
+# Two bundles that signed in through one site load together: the first one's
+# cookie and agent win there, with a warning. A clash on a bundle's own site
+# still refuses, in any order and even after a skip.
+mkdir "$tmpdir/two" "$tmpdir/clash"
+two=$dir/two
+agent=
+pastes() { # pastes SITE:HOSTS:RECORDS... -- write each bundle into $two
+    local spec site hosts
+    for spec in "$@"; do
+        site=${spec%%:*} hosts=${spec#*:} hosts=${hosts%%:*}
+        printf '%s' "${spec#*:*:}" >"$tmpdir/in/$site"
+        httrack -O /dev/null -#test=paste "$two" "$dir/in/$site" \
+            "url:https://$site/" ${hosts:+"hosts:$hosts"} "agent:${agent:-UA-$site}" >/dev/null
+    done
+}
+load() { # load SITE... -- the bundles of the sites, as a mirror loads them
+    local site args=()
+    for site in "$@"; do
+        args+=("https://$site/#httrack-bundle=$site")
+    done
+    out=$(httrack -O /dev/null -#test=bundle "$two" "${args[@]}" \
+        host:https://idp.test 2>"$tmpdir/load.err" | tr -d '\r')
+}
+pastes "a.test:idp.test:$(rec .a.test S)
+$(rec .idp.test ID a)" "b.test:idp.test:$(rec .b.test S)
+$(rec .idp.test ID b)"
+load a.test b.test
+test "$out" = "cookie .a.test S=v
+cookie .idp.test ID=a
+cookie .b.test S=v
+https://idp.test ua=UA-a.test headers=global" || fail "shared sign-in site: $out"
+command grep -q 'b.test.hts: 1 cookie(s) left out, because another bundle gives them another value' \
+    "$tmpdir/load.err" || fail_dump "no clash warning" "$tmpdir/load.err"
+# One agent for all, so only the cookies can refuse.
+two=$dir/clash agent=UA
+pastes "a.test:idp.test:$(rec .idp.test ID a)" "b.test:idp.test:$(rec .idp.test ID b)"
+refuses() { # refuses SITE... -- loading the bundles must refuse on a clash
+    load "$@"
+    command grep -q '^refused: .* has another value in another bundle$' <<<"$out" ||
+        fail "a clash on a bundle's own site, $*: $out"
+}
+for value in a b; do
+    other=a.test
+    test "$value" = b || other=b.test
+    pastes "idp.test::$(rec .idp.test ID "$value")"
+    refuses "$other" idp.test
+    refuses idp.test "$other"
+    refuses a.test b.test idp.test
+    refuses b.test a.test idp.test
+done
+# A site that is a bundle's home refuses a clash on any of its hosts, even on
+# a cookie that bundle does not hold.
+pastes "a.test:idp.test:$(rec login.idp.test ID a)" "b.test:idp.test:$(rec login.idp.test ID b)" \
+    "idp.test::$(rec .idp.test OTHER x)"
+refuses a.test b.test idp.test
+# A repeated record is checked against the other bundles too.
+hand() { # hand SITE LINES... -- write the bundle of SITE by hand
+    local site=$1
+    shift
+    printf '%s\n' '# HTTrack bundle 1' 'ua UA' "$@" >"$tmpdir/clash/$site.hts"
+}
+hand idp.test cookies "$(rec .idp.test ID a)"
+hand a.test 'scope a.test' 'scope idp.test' cookies "$(rec .idp.test ID a)" "$(rec .idp.test ID b)"
+refuses idp.test a.test
+refuses a.test idp.test
+# A bundle repeating its own cookie is no clash, even when a newer -%K jar
+# turns its first copy away.
+hand rep.test cookies "$(rec .rep.test S one)" "$(rec .rep.test S two)"
+rec .rep.test S jar >"$tmpdir/clash/jar.txt"
+touch -t 203001010000 "$tmpdir/clash/jar.txt"
+out=$(httrack -O /dev/null -#test=bundle "$two" 'https://rep.test/#httrack-bundle=rep.test' \
+    "jar:$dir/clash/jar.txt" 2>/dev/null | tr -d '\r')
+command grep -qx 'cookie .rep.test S=jar' <<<"$out" || fail "a repeat behind a newer jar: $out"
+rec .rep.test OTHER jar >"$tmpdir/clash/jar.txt"
+touch -t 203001010000 "$tmpdir/clash/jar.txt"
+out=$(httrack -O /dev/null -#test=bundle "$two" 'https://rep.test/#httrack-bundle=rep.test' \
+    "jar:$dir/clash/jar.txt" 2>/dev/null | tr -d '\r')
+command grep -qx 'cookie .rep.test S=two' <<<"$out" || fail "a repeat beside a newer jar: $out"
+# A home keeps all 257 hosts: the start URL plus 256 url lines.
+{
+    printf '# HTTrack bundle 1\nua UA\nscope idp.test\n'
+    for i in $(seq 1 255); do
+        printf 'url http://d%d.test/\n' "$i"
+    done
+    printf 'url https://www.idp.test/\ncookies\n'
+    rec .idp.test ID a
+} >"$tmpdir/clash/home.hts"
+hand b.test 'scope b.test' 'scope idp.test' cookies "$(rec .idp.test ID b)"
+for order in 'b.test home' 'home b.test'; do
+    read -r first second <<<"$order"
+    out=$(httrack -O /dev/null -#test=bundle "$two" "https://$first.example/#httrack-bundle=$first" \
+        "https://$second.example/#httrack-bundle=$second" 2>/dev/null | tr -d '\r')
+    command grep -q '^refused: .* has another value in another bundle$' <<<"$out" ||
+        fail "a home of 257 hosts, $order: $out"
+done
+
+pastes "own.test:idp.test:$(rec .own.test S one)
+$(rec .idp.test ID a)" "other.test:own.test:$(rec .own.test S two)"
+refuses own.test other.test
+refuses other.test own.test
+
+# A bundle with scope lines keeps every url line, past 256 domains.
+mkdir "$tmpdir/many"
+{
+    printf '# HTTrack bundle 1\nscope x.test\n'
+    for i in $(seq 1 256); do
+        printf 'url http://h%d.test/\n' "$i"
+    done
+    printf 'cookies\n'
+    rec .x.test X
+} >"$tmpdir/many/x.test.hts"
+out=$(httrack -O /dev/null -#test=bundle "$dir/many" 'https://x.test/#httrack-bundle=x.test' 2>/dev/null |
+    tr -d '\r')
+command grep -qx 'cookie .x.test X=v' <<<"$out" || fail "256 url lines and a scope line: $(tail -1 <<<"$out")"
+# A start URL with no host is fine once a scope line names the site.
+mkdir "$tmpdir/nohost"
+printf '%s\n' '# HTTrack bundle 1' 'scope x.test' cookies "$(rec .x.test X)" >"$tmpdir/nohost/x.test.hts"
+out=$(httrack -O /dev/null -#test=bundle "$dir/nohost" 'file:///x#httrack-bundle=x.test' 2>/dev/null |
+    tr -d '\r')
+command grep -qx 'cookie .x.test X=v' <<<"$out" || fail "a start URL with no host: $out"
+
+echo PASS

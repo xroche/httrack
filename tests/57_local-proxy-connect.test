@@ -125,6 +125,17 @@ if grep -qi "proxy-authorization" "$ok/origin-headers.log"; then
 fi
 echo "OK: proxy credentials carried on CONNECT, not leaked to origin"
 
+# 5. a proxy credential too long to send is refused, never sent clipped
+long="$tmpdir/long"
+start_server "$long" ok
+run_crawl "$long/out" "connect://u:$(printf 'a%.0s' $(seq 1 800))@127.0.0.1:${proxy_port}" "$origin_port" || true
+if grep -q '^CONNECT ' "$long/proxy.log"; then
+    fail_dump "an over-long proxy credential reached the proxy" "$long/proxy.log"
+fi
+grep -q "credentials too long" "$long/out/hts-log.txt" ||
+    fail_dump "the over-long proxy credential was not reported" "$long/out/hts-log.txt"
+echo "OK: over-long proxy credential refused"
+
 # --- hostile proxy ----------------------------------------------------------
 # A CONNECT status of 2^32+200 must refuse the tunnel, not wrap to 200.
 wrap="$tmpdir/wrap"

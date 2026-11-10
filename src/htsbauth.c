@@ -30,9 +30,6 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-/* Internal engine bytecode */
-#define HTS_INTERNAL_BYTECODE
-
 #include "htsbauth.h"
 
 #include <limits.h>
@@ -159,10 +156,18 @@ hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size) {
 }
 
 static hts_boolean cookie_domain_is_suffix(const char *domain);
+static hts_boolean cookie_fits(char *data, size_t max_len, const char *domain,
+                               const char *cook_name, const char *path,
+                               size_t need);
+static hts_boolean cookie_make_room(char *data, size_t max_len,
+                                    const char *domain, const char *cook_name,
+                                    const char *path, size_t need);
 
 /* See htsbauth.h. Records are kept longest path first. */
-int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
-               const char *domain, const char *path, const cookie_attr *attr) {
+static int cookie_set_impl(t_cookie *cookie, const char *cook_name,
+                           const char *cook_value, const char *domain,
+                           const char *path, const cookie_attr *attr,
+                           hts_boolean cap_host) {
   static const cookie_attr session = {.host_only = HTS_FALSE,
                                       .secure = HTS_FALSE,
                                       .http_only = HTS_FALSE,
@@ -173,6 +178,7 @@ int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
   char *insert;
   char *old;
   size_t used;
+  size_t need;
   char cook[16384];
   hts_boolean host_only;
 
@@ -200,25 +206,20 @@ int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
   // a public suffix such as "com" reaches only that host (RFC 6265 5.3 step 5)
   host_only = attr->host_only || cookie_domain_is_suffix(domain);
   /* The record this one replaces still holds its room, so count it free, but
-     remove it only once the new one is known to fit. */
+     remove it only once the new one is known to fit. The lengths are bounded
+     above, so the sum cannot wrap. */
+  need = strlen(cook_value) + strlen(cook_name) + strlen(domain) +
+         strlen(path) + COOKIE_HEADROOM;
+  if (cap_host && !cookie_fits(cookie->data, cookie->max_len, domain, cook_name,
+                               path, need)) {
+    (void) cookie_make_room(cookie->data, cookie->max_len, domain, cook_name,
+                            path, need);
+  }
   old = cookie_find_exact(cookie->data, cook_name, domain, path);
   used = strlen(cookie->data) -
          (old != NULL ? (size_t) (cookie_nextfield(old) - old) : 0);
-  /* Each part against the room left, never a sum: the sum of five lengths
-     read off the wire can wrap and pass a check it should fail. */
-  {
-    const size_t parts[] = {
-        used,           strlen(cook_value), strlen(cook_name),
-        strlen(domain), strlen(path),       COOKIE_HEADROOM};
-    size_t left = cookie->max_len;
-    size_t i;
-
-    for (i = 0; i < sizeof(parts) / sizeof(parts[0]); i++) {
-      if (parts[i] > left)
-        return -1; // no room to add it
-      left -= parts[i];
-    }
-  }
+  if (need > cookie->max_len || used > cookie->max_len - need)
+    return -1; // no room to add it
   /* The Netscape fields, then an eighth only this jar reads, because the file
      form marks HttpOnly with a "#HttpOnly_" prefix instead (see cookie_save).
      The checks above bound the record far below sizeof(cook). */
@@ -247,11 +248,22 @@ int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
   }
   cookie_insert(insert, cookie->max_len - (size_t) (insert - cookie->data),
                 cook);
-#if DEBUG_COOK
-  printf("add_new cookie: name=\"%s\" value=\"%s\" domain=\"%s\" path=\"%s\"\n",
-         cook_name, cook_value, domain, path);
-#endif
   return 0;
+}
+
+/* See htsbauth.h. */
+int cookie_set(t_cookie *cookie, const char *cook_name, const char *cook_value,
+               const char *domain, const char *path, const cookie_attr *attr) {
+  return cookie_set_impl(cookie, cook_name, cook_value, domain, path, attr,
+                         HTS_FALSE);
+}
+
+/* See htsbauth.h. */
+int cookie_set_capped(t_cookie *cookie, const char *cook_name,
+                      const char *cook_value, const char *domain,
+                      const char *path, const cookie_attr *attr) {
+  return cookie_set_impl(cookie, cook_name, cook_value, domain, path, attr,
+                         HTS_TRUE);
 }
 
 /* See htsbauth.h. */
@@ -261,11 +273,19 @@ int cookie_add(t_cookie *cookie, const char *cook_name, const char *cook_value,
 }
 
 /* Is the record at rec host-only? Field 1 is the Netscape include-subdomains
-   flag, so only an explicit FALSE says so. */
+   flag, and only TRUE, in any case, widens the cookie, as in curl. */
 static hts_boolean cookie_is_host_only(const char *rec) {
   char buffer[8192];
 
-  return strcmpnocase(cookie_get(buffer, rec, 1), "FALSE") == 0;
+  return strcmpnocase(cookie_get(buffer, rec, 1), "TRUE") != 0;
+}
+
+/* Is the record at rec Secure? Field 3 is the flag, and only FALSE, in any
+   case, lets the cookie go out over http. */
+static hts_boolean cookie_is_secure(const char *rec) {
+  char buffer[8192];
+
+  return strcmpnocase(cookie_get(buffer, rec, 3), "FALSE") != 0;
 }
 
 /* Do two jar domains name the same domain? The leading dot is the Netscape
@@ -276,6 +296,221 @@ static hts_boolean cookie_same_domain(const char *a, const char *b) {
   if (b[0] == '.')
     b++;
   return strcmpnocase(a, b) == 0;
+}
+
+/* A host may hold this many records, or this many bytes of them (a quarter of
+   the jar), before a full jar evicts its records. 50 is RFC 6265 6.1's minimum.
+ */
+#define COOKIE_HOST_MAX_COUNT 50
+#define COOKIE_HOST_MAX_BYTES 8192
+
+/* Does a record needing `need` bytes fit in data? The record it replaces is
+   counted free. */
+static hts_boolean cookie_fits(char *data, size_t max_len, const char *domain,
+                               const char *cook_name, const char *path,
+                               size_t need) {
+  char *const old = cookie_find_exact(data, cook_name, domain, path);
+  const size_t used =
+      strlen(data) - (old != NULL ? (size_t) (cookie_nextfield(old) - old) : 0);
+
+  return need <= max_len && used <= max_len - need ? HTS_TRUE : HTS_FALSE;
+}
+
+/* Is a host with this many records and bytes over its share? */
+static hts_boolean cookie_over_share(size_t count, size_t bytes) {
+  return count > COOKIE_HOST_MAX_COUNT || bytes > COOKIE_HOST_MAX_BYTES
+             ? HTS_TRUE
+             : HTS_FALSE;
+}
+
+/* A record of the jar, as the eviction plan sees it. */
+typedef struct cookie_rec {
+  char *p;
+  size_t len;
+  size_t plen; // path length, the age rank
+  size_t pos;  // place in the jar, the tie-break
+  size_t host;
+} cookie_rec;
+
+/* One host: its tally, and its records in eviction order. */
+typedef struct cookie_host_tally {
+  char *dom;
+  size_t count;
+  size_t bytes;
+  size_t cur; // next victim in the sorted records
+  size_t end;
+} cookie_host_tally;
+
+/* Is the record at a the one cookie_set replaces? */
+static hts_boolean cookie_is_self(const char *a, const char *domain,
+                                  const char *cook_name, const char *path) {
+  char buffer[8192];
+
+  return strcmp(cookie_get(buffer, a, 5), cook_name) == 0 &&
+                 cookie_same_domain(cookie_get(buffer, a, 0), domain) &&
+                 strcmp(cookie_get(buffer, a, 2), path) == 0
+             ? HTS_TRUE
+             : HTS_FALSE;
+}
+
+/* Hash of a domain as cookie_same_domain sees it. */
+static size_t cookie_domain_hash(const char *d) {
+  size_t h = 5381;
+
+  if (d[0] == '.')
+    d++;
+  for (; *d != '\0'; d++)
+    h = h * 33 + (size_t) hichar(*d);
+  return h;
+}
+
+/* Oldest first within a host: the shortest path, then the earliest place. */
+static int cookie_rec_cmp(const void *x, const void *y) {
+  const cookie_rec *a = x, *b = y;
+
+  if (a->host != b->host)
+    return a->host < b->host ? -1 : 1;
+  if (a->plen != b->plen)
+    return a->plen < b->plen ? -1 : 1;
+  return a->pos < b->pos ? -1 : a->pos > b->pos ? 1 : 0;
+}
+
+/* Evict the oldest records of the largest host over its share until a record
+   of `need` bytes fits. One pass tallies every host, with the new record
+   added to the setter's, and the victims are picked from that tally and cut
+   out of the jar in one more pass. The oldest is the first record of the
+   shortest path: the jar keeps no age, and records of one path length are
+   stored oldest first. The record being replaced stays, and counts in its
+   host. The jar is untouched unless the record then fits. */
+static hts_boolean cookie_make_room(char *data, size_t max_len,
+                                    const char *domain, const char *cook_name,
+                                    const char *path, size_t need) {
+  char buffer[8192];
+  const size_t rec_len = need - COOKIE_HEADROOM;
+  const size_t total = strlen(data);
+  size_t n = 0, nh = 1, used, self_len = 0, freeable = 0, mask, i, k;
+  size_t self_pos = (size_t) -1;
+  cookie_rec *recs = NULL;
+  cookie_host_tally *hosts = NULL;
+  size_t *table = NULL, *over = NULL;
+  unsigned char *evict = NULL;
+  char *pool = NULL, *pool_end;
+  size_t nover = 0;
+  hts_boolean ok = HTS_FALSE;
+  char *a, *dst;
+
+  if (need > max_len)
+    return HTS_FALSE;
+  for (a = data; *a != '\0'; a = cookie_nextfield(a))
+    n++;
+  for (mask = 1; mask < 2 * (n + 1); mask <<= 1)
+    ;
+  recs = calloct(n + 1, sizeof(*recs));
+  hosts = calloct(n + 1, sizeof(*hosts));
+  table = calloct(mask, sizeof(*table)); // host index + 1, 0 for empty
+  over = calloct(n + 1, sizeof(*over));
+  evict = calloct(n + 1, 1);
+  pool = calloct(total + strlen(domain) + n + 2, 1);
+  if (recs == NULL || hosts == NULL || table == NULL || over == NULL ||
+      evict == NULL || pool == NULL)
+    goto done;
+  pool_end = pool;
+  /* Host 0 is the setter's, holding the new record. */
+  memcpy(pool_end, domain, strlen(domain) + 1);
+  hosts[0].dom = pool_end;
+  hosts[0].count = 1;
+  hosts[0].bytes = rec_len;
+  pool_end += strlen(domain) + 1;
+  table[cookie_domain_hash(domain) & (mask - 1)] = 1;
+  for (a = data, i = 0; *a != '\0'; a = cookie_nextfield(a), i++) {
+    const char *const d = cookie_get(buffer, a, 0);
+    size_t h = cookie_domain_hash(d) & (mask - 1);
+
+    while (table[h] != 0 && !cookie_same_domain(hosts[table[h] - 1].dom, d))
+      h = (h + 1) & (mask - 1);
+    if (table[h] == 0) {
+      hosts[nh].dom = pool_end;
+      memcpy(pool_end, d, strlen(d) + 1);
+      pool_end += strlen(d) + 1;
+      table[h] = ++nh;
+    }
+    recs[i].p = a;
+    recs[i].len = (size_t) (cookie_nextfield(a) - a);
+    recs[i].plen = strlen(cookie_get(buffer, a, 2));
+    recs[i].pos = i;
+    recs[i].host = table[h] - 1;
+    hosts[recs[i].host].count++;
+    hosts[recs[i].host].bytes += recs[i].len;
+    if (recs[i].host == 0 && self_len == 0 &&
+        cookie_is_self(a, domain, cook_name, path)) {
+      self_len = recs[i].len;
+      self_pos = i;
+    }
+  }
+  used = total - self_len;
+  /* The most that evicting can free, so a hopeless set stops before it starts.
+   */
+  for (i = 0; i < nh; i++) {
+    if (cookie_over_share(hosts[i].count, hosts[i].bytes)) {
+      over[nover++] = i;
+      freeable += hosts[i].bytes - (i == 0 ? rec_len + self_len : 0);
+    }
+  }
+  if (used > max_len - need + freeable)
+    goto done;
+  qsort(recs, n, sizeof(*recs), cookie_rec_cmp);
+  for (i = 0; i < n; i++) {
+    if (i == 0 || recs[i].host != recs[i - 1].host)
+      hosts[recs[i].host].cur = i;
+    hosts[recs[i].host].end = i + 1;
+  }
+  while (used > max_len - need) {
+    cookie_host_tally *best = NULL;
+
+    for (k = 0; k < nover; k++) {
+      cookie_host_tally *const h = &hosts[over[k]];
+
+      if (cookie_over_share(h->count, h->bytes) &&
+          (best == NULL || h->bytes > best->bytes))
+        best = h;
+    }
+    if (best == NULL)
+      goto done; // no host is over its share, so the jar stays full
+    if (best->cur < best->end && recs[best->cur].pos == self_pos)
+      best->cur++;
+    if (best->cur >= best->end) {
+      best->count = best->bytes = 0; // only the replaced record is left
+      continue;
+    }
+    evict[recs[best->cur].pos] = 1;
+    used -= recs[best->cur].len;
+    best->count--;
+    best->bytes -= recs[best->cur].len;
+    best->cur++;
+  }
+  /* Cut the victims out in place; the write point never passes the read. */
+  dst = data;
+  for (a = data, i = 0; *a != '\0'; i++) {
+    char *const next = cookie_nextfield(a);
+    const size_t len = (size_t) (next - a);
+
+    if (!evict[i]) {
+      if (dst != a)
+        memmove(dst, a, len);
+      dst += len;
+    }
+    a = next;
+  }
+  *dst = '\0';
+  ok = HTS_TRUE;
+done:
+  freet(recs);
+  freet(hosts);
+  freet(table);
+  freet(over);
+  freet(evict);
+  freet(pool);
+  return ok;
 }
 
 /* See htsbundle.h. The host-only flag is not part of a record's identity
@@ -294,6 +529,45 @@ char *cookie_find_exact(char *s, const char *cook_name, const char *domain,
   return NULL;
 }
 
+/* RFC 6265 5.1.4: does chk_path cover path on a "/" boundary? The query is
+   not part of the path. */
+static hts_boolean cookie_path_covers(const char *chk_path, const char *path) {
+  const size_t chk_len = strlen(chk_path);
+
+  return chk_len <= strlen(path) && strncmp(path, chk_path, chk_len) == 0 &&
+                 (chk_len == 0 || chk_path[chk_len - 1] == '/' ||
+                  path[chk_len] == '\0' || path[chk_len] == '/' ||
+                  path[chk_len] == '?')
+             ? HTS_TRUE
+             : HTS_FALSE;
+}
+
+/* See htsbauth.h. */
+hts_boolean cookie_is_secure_record(t_cookie *cookie, const char *cook_name,
+                                    const char *domain, const char *path) {
+  char buffer[8192];
+  char host[COOKIE_MAX_DOMAIN];
+  const char *new_dom;
+  char *rec;
+
+  if (!cookie_host(domain, host, sizeof(host)))
+    return HTS_FALSE;
+  new_dom = host[0] == '.' ? host + 1 : host;
+  for (rec = cookie->data; *rec != '\0'; rec = cookie_nextfield((char *) rec)) {
+    const char *const rec_dom = cookie_get(buffer, rec, 0);
+    char other[8192];
+
+    if (strcmp(cookie_get(other, rec, 5), cook_name) != 0 ||
+        !cookie_is_secure(rec))
+      continue;
+    if ((cookie_domain_match(rec_dom, new_dom) ||
+         cookie_domain_match(new_dom, rec_dom)) &&
+        cookie_path_covers(cookie_get(other, rec, 2), path))
+      return HTS_TRUE;
+  }
+  return HTS_FALSE;
+}
+
 /* See htsbauth.h. */
 int cookie_remove(t_cookie *cookie, const char *cook_name, const char *domain,
                   const char *path) {
@@ -309,9 +583,6 @@ int cookie_remove(t_cookie *cookie, const char *cook_name, const char *domain,
   if (b) {
     a = cookie_nextfield(b);
     cookie_delete(b, cookie->max_len - (size_t) (b - cookie->data), a - b);
-#if DEBUG_COOK
-    printf("deleted old cookie: %s %s %s\n", cook_name, host, path);
-#endif
   }
   return 0;
 }
@@ -452,12 +723,11 @@ static int64_t cookie_record_expiry(const char *rec) {
 
 /* See htsbauth.h. */
 hts_boolean cookie_sendable(const char *rec, hts_boolean https, int64_t now) {
-  char buffer[8192];
   const int64_t expires = cookie_record_expiry(rec);
 
   if (expires != 0 && expires <= now)
     return HTS_FALSE;
-  return https || strcmpnocase(cookie_get(buffer, rec, 3), "TRUE") != 0;
+  return https || !cookie_is_secure(rec);
 }
 
 // rechercher cookie à partir de la position s (par exemple s=cookie.data)
@@ -486,11 +756,8 @@ char *cookie_find(char *s, const char *cook_name, const char *domain, const char
         //
         const char *chk_path = cookie_get(buffer, a, 2);    // chemin concerné par le cookie
 
-        if (strlen(chk_path) <= strlen(path)) {
-          if (strncmp(path, chk_path, strlen(chk_path)) == 0) {       // même chemin
-            return a;
-          }
-        }
+        if (cookie_path_covers(chk_path, path))
+          return a;
       }
     }
     a = cookie_nextfield(a);
@@ -511,17 +778,26 @@ char *cookie_nextfield(char *a) {
   return a;
 }
 
-/* Warn about the line just read, with fmt for -%K and cookies.txt. A bundle's
-   warning gives the line number and reason, never a byte that can be secret. */
+/* Count a refused line, saturating like lineno. */
+static void cookie_refuse(int *refused) {
+  if (*refused < INT_MAX)
+    (*refused)++;
+}
+
+/* Warn about the line just read, with fmt for -%K and cookies.txt, and count it
+   in refused when not NULL. A bundle's warning gives the line number and
+   reason, never a byte that can be secret. */
 static void cookie_warn(httrackp *opt, const cookie_filter *filter,
-                        const char *given, const char *reason, const char *fmt,
-                        ...) HTS_PRINTF_FUN(5, 6);
+                        const char *given, int *refused, const char *reason,
+                        const char *fmt, ...) HTS_PRINTF_FUN(6, 7);
 
 static void cookie_warn(httrackp *opt, const cookie_filter *filter,
-                        const char *given, const char *reason, const char *fmt,
-                        ...) {
+                        const char *given, int *refused, const char *reason,
+                        const char *fmt, ...) {
   va_list args;
 
+  if (refused != NULL)
+    cookie_refuse(refused);
   if (filter != NULL) {
     hts_log_print(opt, LOG_WARNING, "Bundle %s, line %d: %s", given,
                   filter->line, reason);
@@ -532,17 +808,19 @@ static void cookie_warn(httrackp *opt, const cookie_filter *filter,
   va_end(args);
 }
 
-/* Copy Netscape-jar field <param> into dst, or refuse the line and say so: a
-   shortened domain or path would silently change where the cookie is sent. */
+/* Copy Netscape-jar field <param> into dst, or count the line in refused and
+   say so: a shortened domain or path would silently change where the cookie is
+   sent. */
 static hts_boolean cookie_load_field(httrackp *opt, char *dst, size_t dst_size,
                                      char *buffer, const char *line, int param,
                                      const char *field_name, const char *given,
-                                     const cookie_filter *filter) {
+                                     const cookie_filter *filter,
+                                     int *refused) {
   const char *const value = cookie_get(buffer, line, param);
   const size_t len = strlen(value);
 
   if (len >= dst_size) {
-    cookie_warn(opt, filter, given, "a cookie field is too long",
+    cookie_warn(opt, filter, given, refused, "a cookie field is too long",
                 "Cookies: ignoring a line whose %s field is %d bytes "
                 "(maximum %d): %s",
                 field_name, (int) len, (int) dst_size - 1, given);
@@ -930,12 +1208,6 @@ static int cookie_load_flat(httrackp *opt, t_cookie *cookie, FILE *fp,
   return COOKIE_LOAD_KEEP;
 }
 
-/* Count a refused line, saturating like lineno. */
-static void cookie_refuse(int *refused) {
-  if (*refused < INT_MAX)
-    (*refused)++;
-}
-
 /* Read the Netscape records from fp's position to its end into cookie, and
    name the file as given in warnings. A UTF-8 BOM is skipped on the first line
    when first_line is HTS_TRUE. filter, when not NULL, picks the records.
@@ -1006,10 +1278,9 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, text_src *src,
       if (rec[0] == '#') {
         if (!cookie_known_comment(rec)) {
           // no line text, because any part of it can hold a cookie value
-          cookie_warn(opt, filter, given, "an unknown comment",
+          cookie_warn(opt, filter, given, &refused, "an unknown comment",
                       "Cookies: ignoring an unknown comment on line %d of %s",
                       lineno, given);
-          cookie_refuse(&refused);
         }
       } else {
         char domain[COOKIE_MAX_DOMAIN];             // .netscape.com
@@ -1019,43 +1290,38 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, text_src *src,
         const char *p;
         int tabs = 0;
 
-#if DEBUG_COOK
-        printf("%s\n", rec);
-#endif
         for (p = strchr(rec, '\t'); p != NULL; p = strchr(p + 1, '\t'))
           tabs++;
         if (tabs < 6 || !strnotempty(cookie_get(buffer, rec, 5))) {
-          cookie_warn(opt, filter, given,
+          cookie_warn(opt, filter, given, &refused,
                       "a cookie line has fewer than 7 fields or no name",
                       "Cookies: ignoring a line with fewer than 7 "
                       "fields or no name: %s",
                       given);
-          cookie_refuse(&refused);
         } else if (tabs > 7 ||
                    (tabs == 7 && strcmp(cookie_get(buffer, rec, 7),
                                         COOKIE_HTTPONLY_FIELD) != 0)) {
           // a TAB in the value, because only HTTrack writes an eighth field
-          cookie_warn(opt, filter, given,
+          cookie_warn(opt, filter, given, &refused,
                       "a cookie line has more than 7 fields",
                       "Cookies: ignoring a line with more than 7 "
                       "fields: %s",
                       given);
-          cookie_refuse(&refused);
         } else if (!cookie_is_expiry(cookie_get(buffer, rec, 4))) {
-          cookie_warn(opt, filter, given,
+          cookie_warn(opt, filter, given, &refused,
                       "a cookie expiry is not a whole number",
                       "Cookies: ignoring a line whose expiry is not a "
                       "whole number: %s",
                       given);
-          cookie_refuse(&refused);
         } else if (cookie_load_field(opt, domain, sizeof(domain), buffer, rec,
-                                     0, "domain", given, filter) &&
+                                     0, "domain", given, filter, &refused) &&
                    cookie_load_field(opt, path, sizeof(path), buffer, rec, 2,
-                                     "path", given, filter) &&
+                                     "path", given, filter, &refused) &&
                    cookie_load_field(opt, cook_name, sizeof(cook_name), buffer,
-                                     rec, 5, "name", given, filter) &&
+                                     rec, 5, "name", given, filter, &refused) &&
                    cookie_load_field(opt, cook_value, sizeof(cook_value),
-                                     buffer, rec, 6, "value", given, filter)) {
+                                     buffer, rec, 6, "value", given, filter,
+                                     &refused)) {
           cookie_attr attr;
           char host[COOKIE_MAX_DOMAIN];
           const hts_boolean repeated =
@@ -1063,7 +1329,7 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, text_src *src,
               cookie_find_exact(seen->data, cook_name, host, path) != NULL;
 
           attr.host_only = cookie_is_host_only(rec);
-          attr.secure = strcmpnocase(cookie_get(buffer, rec, 3), "TRUE") == 0;
+          attr.secure = cookie_is_secure(rec);
           attr.http_only = is_httponly || tabs == 7;
           attr.expires = cookie_record_expiry(rec);
           // an expired one is skipped, because a browser drops it too
@@ -1073,23 +1339,21 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, text_src *src,
                              domain, path, &attr))) {
             // cookie_set stores it host-only
             if (!attr.host_only && cookie_domain_is_suffix(domain))
-              cookie_warn(opt, filter, given,
+              cookie_warn(opt, filter, given, NULL,
                           "a cookie for a public suffix is now host-only",
                           "Cookies: '%.64s' for the public suffix %s is "
                           "now host-only: %s",
                           cook_name, domain, given);
             // the last one wins, as curl reads it, but a rewrite loses one
-            if (repeated) {
-              cookie_warn(opt, filter, given, "a cookie appears twice",
-                          "Cookies: '%.64s' appears twice in %s", cook_name,
-                          given);
-              cookie_refuse(&refused);
-            }
+            if (repeated)
+              cookie_warn(
+                  opt, filter, given, &refused, "a cookie appears twice",
+                  "Cookies: '%.64s' appears twice in %s", cook_name, given);
             if (cookie_set(cookie, cook_name, cook_value, domain, path,
                            &attr) != 0) {
               // with full_skips, the bundles alone fit, so -%K filled the jar
               if (filter != NULL && filter->full_skips)
-                cookie_warn(opt, filter, given,
+                cookie_warn(opt, filter, given, NULL,
                             "the cookie jar is full, so a cookie is left out",
                             "Cookies: the jar is full: %s", given);
               else if (filter != NULL)
@@ -1104,17 +1368,13 @@ static int cookie_load_records(httrackp *opt, t_cookie *cookie, text_src *src,
               (void) cookie_set(seen, cook_name, "", domain, path, NULL);
             }
           }
-        } else {
-          cookie_refuse(&refused);
         }
       }
     }
   }
-  if (!src->eof && (filter == NULL || filter->why == NULL)) {
-    cookie_warn(opt, filter, given, "stopped reading before the end",
+  if (!src->eof && (filter == NULL || filter->why == NULL))
+    cookie_warn(opt, filter, given, &refused, "stopped reading before the end",
                 "Cookies: stopped reading before the end of %s", given);
-    cookie_refuse(&refused);
-  }
   freet(seen);
   return keep ? COOKIE_LOAD_KEEP : refused;
 }
@@ -1365,7 +1625,7 @@ void cookie_records_text(const t_cookie *cookie, String *out) {
 /* Write the jar to name, or only a header if it is empty. Return 0 on
    success. */
 static int cookie_write(t_cookie *cookie, const char *name) {
-  FILE *fp = hts_fopen_private(name, "wb");
+  FILE *fp = hts_fopen_private_new(name, "wb");
 
   if (fp) {
     String text = STRING_EMPTY;
@@ -1396,7 +1656,7 @@ static hts_boolean cookie_copy(const char *src, const char *dst) {
   const int fault = cookie_save_fault_selftest;
   char buf[8192];
   FILE *const in = FOPEN(src, "rb");
-  FILE *const out = in != NULL ? hts_fopen_private(dst, "wb") : NULL;
+  FILE *const out = in != NULL ? hts_fopen_private_new(dst, "wb") : NULL;
   hts_boolean ok = out != NULL;
   size_t n;
 
@@ -1528,7 +1788,7 @@ hts_boolean cookie_write_replace(const char *file, const char *data,
     return HTS_FALSE;
   }
   (void) UNLINK(tmp);
-  fp = hts_fopen_private(tmp, "wb");
+  fp = hts_fopen_private_new(tmp, "wb");
   if (fp == NULL)
     return HTS_FALSE;
   ok = hts_fwrite_exact(data, len, fp);
@@ -1680,17 +1940,29 @@ const char *cookie_get(char *buffer, const char *cookie_base, int param) {
 
 // -- basic auth --
 
+/* First stored credential whose prefix starts key, or NULL. */
+static char *bauth_find(t_cookie *cookie, const char *key) {
+  bauth_chain *chain = &cookie->auth;
+
+  for (; chain != NULL; chain = chain->next) {
+    if (strnotempty(chain->prefix) &&
+        strncmp(key, chain->prefix, strlen(chain->prefix)) == 0)
+      return chain->auth;
+  }
+  return NULL;
+}
+
 /* déclarer un répertoire comme possédant une authentification propre */
 int bauth_add(t_cookie * cookie, const char *adr, const char *fil, const char *auth) {
   char buffer[HTS_URLMAXSIZE * 2];
 
   if (cookie) {
-    if (!bauth_check(cookie, adr, fil)) {       // n'existe pas déja
-      bauth_chain *chain = &cookie->auth;
-      char *prefix = bauth_prefix(buffer, adr, fil);
+    char *prefix = bauth_prefix(buffer, adr, fil);
 
-      if (prefix == NULL)
-        return 0;
+    /* exact scheme: an http entry must not hide an https login */
+    if (prefix != NULL && !bauth_find(cookie, prefix)) {
+      bauth_chain *chain = &cookie->auth;
+
       /* A clipped prefix matches more URLs than were authenticated. */
       if (strlen(prefix) >= sizeof(chain->prefix) ||
           strlen(auth) >= sizeof(chain->auth)) {
@@ -1734,19 +2006,19 @@ char *bauth_check(t_cookie * cookie, const char *adr, const char *fil) {
   char buffer[HTS_URLMAXSIZE * 2];
 
   if (cookie) {
-    bauth_chain *chain = &cookie->auth;
     char *prefix = bauth_prefix(buffer, adr, fil);
+    char *found;
 
     if (prefix == NULL)
       return NULL;
-    while(chain) {
-      if (strnotempty(chain->prefix)) {
-        if (strncmp(prefix, chain->prefix, strlen(chain->prefix)) == 0) {
-          return chain->auth;
-        }
-      }
-      chain = chain->next;
+    found = bauth_find(cookie, prefix);
+    /* an http login may follow a redirect to https, never the reverse */
+    if (found == NULL && strfield(adr, "https://")) {
+      prefix = bauth_prefix(buffer, adr + 8, fil);
+      if (prefix != NULL)
+        found = bauth_find(cookie, prefix);
     }
+    return found;
   }
   return NULL;
 }
@@ -1756,13 +2028,16 @@ char *bauth_check(t_cookie * cookie, const char *adr, const char *fil) {
 char *bauth_prefix(char *prefix, const char *adr, const char *fil) {
   const size_t size = HTS_URLMAXSIZE * 2;
   const char *const host = jump_identification_const(adr);
-  const size_t used = strlen(host);
+  /* the key carries the scheme, so an https login never matches plain http */
+  const char *const scheme = strfield(adr, "https://") ? "https://" : "http://";
+  const size_t used = strlen(scheme) + strlen(host);
   char *a;
 
   /* a clipped prefix matches URLs nobody authenticated, so refuse instead */
   if (used >= size || strlen(fil) >= size - used)
     return NULL;
-  strlcpybuff(prefix, host, size);
+  strlcpybuff(prefix, scheme, size);
+  strlcatbuff(prefix, host, size);
   strlcatbuff(prefix, fil, size);
   a = strchr(prefix, '?');
   if (a)

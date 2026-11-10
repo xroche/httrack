@@ -113,11 +113,6 @@ hts_change_bucket hts_changes_classify(hts_boolean rewritten,
                                        hts_boolean have_digests,
                                        hts_boolean digests_equal);
 
-/* Append `s` to `out` as a quoted JSON string. Byte sequences that are not
-   valid UTF-8 become U+FFFD, so a mirror carrying legacy-charset URLs still
-   produces parseable JSON. */
-void hts_changes_json_string(String *out, const char *s);
-
 #ifdef __cplusplus
 }
 #endif

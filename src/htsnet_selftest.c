@@ -42,10 +42,6 @@ static int st_mptcpstats(httrackp *opt, int argc, char **argv) {
   const hts_stat_struct *stats;
   int err = 0;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
-
   if (from->mptcp != HTS_DEFAULT || from->mptcp_connections != 0 ||
       from->mptcp_fallbacks != 0) {
     fprintf(stderr, "mptcp-stats: a fresh opt is not unset and at zero\n");
@@ -100,19 +96,13 @@ static int st_mptcpstats(httrackp *opt, int argc, char **argv) {
 
   hts_free_opt(from);
   hts_free_opt(to);
-  printf("mptcp-stats: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("mptcp-stats", err);
 }
 
 /* Print the host/port the FTP path splits out of a URL address. */
 static int st_ftpaddr(httrackp *opt, int argc, char **argv) {
   int i;
 
-  (void) opt;
-  if (argc < 1) {
-    fprintf(stderr, "ftpaddr: needs a URL address\n");
-    return 1;
-  }
   for (i = 0; i < argc; i++) {
     char BIGSTK url[HTS_URLMAXSIZE * 2];
     char host[256];
@@ -129,12 +119,46 @@ static int st_ftpaddr(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Print the SNI host name a URL address yields. */
+static int st_sniname(httrackp *opt, int argc, char **argv) {
+  int i;
+
+  for (i = 0; i < argc; i++) {
+    char host[256];
+
+    if (hts_sni_hostname(argv[i], host, sizeof(host)))
+      printf("sni=%s\n", host);
+    else
+      printf("sni=none\n");
+  }
+  return 0;
+}
+
+/* Print the Proxy-Authorization value a proxy name yields. */
+static int st_proxyauth(httrackp *opt, int argc, char **argv) {
+  char autorisation[1100];
+
+  if (argc != 1) {
+    fprintf(stderr, "proxyauth: needs a proxy argument\n");
+    return 1;
+  }
+  const int got =
+      hts_basic_auth_value(opt, argv[0], autorisation, sizeof(autorisation));
+
+  if (got > 0 && strlen(autorisation) > 64) /* long: print the length only */
+    printf("auth=len%d\n", (int) strlen(autorisation));
+  else if (got > 0)
+    printf("auth=%s\n", autorisation);
+  else
+    printf("auth=%s\n", got < 0 ? "toolong" : "none");
+  return 0;
+}
+
 /* Print what a PASV or EPSV reply parses into, or "refused". */
 static int st_ftppasv(httrackp *opt, int argc, char **argv) {
   char ip[64];
   int port = -1;
 
-  (void) opt;
   if (argc != 2 ||
       (strcmp(argv[0], "pasv") != 0 && strcmp(argv[0], "epsv") != 0)) {
     fprintf(stderr, "ftp-pasv: needs pasv|epsv and a reply line\n");
@@ -154,11 +178,6 @@ static int st_proxyurl(httrackp *opt, int argc, char **argv) {
   char BIGSTK name[HTS_URLMAXSIZE * 2];
   int port = -1;
 
-  (void) opt;
-  if (argc < 1) {
-    fprintf(stderr, "proxyurl: needs a proxy argument\n");
-    return 1;
-  }
   hts_parse_proxy(argv[0], name, sizeof(name), &port);
   // host= is the resolved host (scheme/userinfo stripped); kind= the transport
   printf("name=%s port=%d host=%s kind=%s\n", name, port,
@@ -200,9 +219,6 @@ static int st_socks5(httrackp *opt, int argc, char **argv) {
   unsigned char script[64];
   socks5_test_io io;
   size_t len;
-
-  (void) argc;
-  (void) argv;
 
   /* each reply address type is drained exactly, sentinel untouched */
   len = socks5_reply(script, 0x01, v4, sizeof(v4));
@@ -434,9 +450,6 @@ static void st_addrport_case(int family, unsigned int port,
 }
 
 static int st_addrport(httrackp *opt, int argc, char **argv) {
-  (void) opt;
-  (void) argc;
-  (void) argv;
   st_addrport_case(AF_INET, 65535, "255.255.255.255:65535");
   /* 65535 is byte-swap invariant, so a dropped ntohs() needs this one */
   st_addrport_case(AF_INET, 8080, "255.255.255.255:8080");
@@ -483,6 +496,47 @@ static int st_socketpair(T_SOC sv[2]) {
   return 0;
 }
 
+static void socwait_delayed_send(void *arg) {
+  Sleep(300);
+  (void) send(*(T_SOC *) arg, "x", 1, 0);
+}
+
+/* Each wait watches its own direction: a fresh, empty socket is writable and
+   not readable. check_readinput polls, and the _t forms wait up to timeout. */
+static int st_socwait(httrackp *opt, int argc, char **argv) {
+  T_SOC sv[2];
+  htsblk r;
+  TStamp t0, dt;
+
+  assertf(st_socketpair(sv) == 0);
+  memset(&r, 0, sizeof(r));
+  r.soc = sv[1];
+  assertf(check_readinput_t(sv[1], 0) == 0);
+  t0 = mtime_local();
+  assertf(check_readinput(&r) == 0);
+  assertf(mtime_local() - t0 < 500);
+  assertf(check_writeinput_t(sv[1], 0) == 1);
+  t0 = mtime_local();
+  assertf(check_readinput_t(sv[1], 1) == 0);
+  dt = mtime_local() - t0;
+  assertf(dt >= 900 && dt < 5000);
+  assertf(hts_newthread(socwait_delayed_send, &sv[0]) == 0);
+  t0 = mtime_local();
+  assertf(check_readinput_t(sv[1], 10) == 1);
+  dt = mtime_local() - t0;
+  assertf(dt >= 200 && dt < 5000);
+  htsthread_wait();
+  assertf(check_readinput(&r) == 1);
+  r.soc = INVALID_SOCKET;
+  assertf(check_readinput(&r) == 0);
+  assertf(check_readinput_t(INVALID_SOCKET, 0) == 0);
+  assertf(check_writeinput_t(INVALID_SOCKET, 0) == 0);
+  deletesoc(sv[0]);
+  deletesoc(sv[1]);
+  printf("socwait self-test OK\n");
+  return 0;
+}
+
 #ifndef _WIN32
 /* Drop the peer so a write gets EPIPE, because SO_LINGER with a zero timeout
    asks for a RST rather than a FIN. GNU/Hurd's pfinet sends a FIN anyway. */
@@ -509,9 +563,6 @@ static int st_sigpipe(httrackp *opt, int argc, char **argv) {
   hts_boolean fin_only;
   int i, n;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   inherited = signal(SIGPIPE, SIG_DFL);
   assertf(inherited != SIG_ERR);
 
@@ -602,9 +653,6 @@ static int st_ftpline(httrackp *opt, int argc, char **argv) {
   char line[2048];
   char flood[4096];
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   memset(flood, 'x', sizeof(flood));
   assertf(st_socketpair(sv) == 0);
   // the 4102-byte reply fits the loopback send buffer, so no reader is needed
@@ -620,7 +668,7 @@ static int st_ftpline(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* ftp_split_userpass: the split itself, and userinfo refused rather than
+/* ftp_split_userpass: the split, the decode, and userinfo refused rather than
    clipped into another account's name (#1032). */
 static int st_ftpuser(httrackp *opt, int argc, char **argv) {
   static const size_t caps[] = {16, 256}; /* asymmetric: a shared bound shows */
@@ -628,9 +676,6 @@ static int st_ftpuser(httrackp *opt, int argc, char **argv) {
   char in[2 * 256 + 8];
   size_t c, over;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   memset(poison, '#', sizeof(poison));
   {
     const char ok[] = "bob:secret@host/f"; // '@' at index 10
@@ -655,6 +700,57 @@ static int st_ftpuser(httrackp *opt, int argc, char **argv) {
                                sizeof(pbuf)) == HTS_TRUE);
     assertf(strcmp(ubuf, "u@relay") == 0);
     assertf(strcmp(pbuf, "pw") == 0);
+  }
+  {
+    /* decoded like HTTP Basic; split on the raw colon, as SOCKS5 does */
+    static const struct {
+      const char *in, *user, *pass; /* user NULL: refused */
+    } rows[] = {
+        {"us%40er:p%3Ass@", "us@er", "p:ss"},
+        {"a%3Ab:c@", "a:b", "c"},
+        {"%41%4:%4@", "A%4", "%4"}, /* an escape cut by its field stays */
+        {"%zz%2:x%7@", "%zz%2", "x%7"},
+        {"u%25%34%31@", "u%41", ""}, /* decoded once, not twice */
+        {"u%0D%0AQUIT:p@", NULL, NULL},
+        {"u:p%0AQUIT@", NULL, NULL},
+        {"u%00x:p@", NULL, NULL}, /* would cut the name at the NUL */
+        {"u:p%00x@", NULL, NULL},
+        {"u:p%09@", NULL, NULL},
+    };
+
+    size_t r;
+
+    for (r = 0; r < sizeof(rows) / sizeof(rows[0]); r++) {
+      const char *const in = rows[r].in;
+      const hts_boolean ok = ftp_split_userpass(
+          in, in + strlen(in), ubuf, sizeof(ubuf), pbuf, sizeof(pbuf));
+
+      assertf(ok == (rows[r].user != NULL ? HTS_TRUE : HTS_FALSE));
+      if (ok) {
+        assertf(strcmp(ubuf, rows[r].user) == 0);
+        assertf(strcmp(pbuf, rows[r].pass) == 0);
+      } else {
+        assertf(ubuf[0] == '\0' && pbuf[0] == '\0');
+      }
+    }
+  }
+  {
+    /* the bound is on the decoded name: 15 escaped bytes fit 16, 16 do not */
+    size_t n;
+
+    for (n = 15; n <= 16; n++) {
+      size_t i;
+
+      for (i = 0; i < n; i++)
+        memcpy(in + 3 * i, "%75", 3);
+      memcpy(in + 3 * n, ":p@", 4);
+      memcpy(ubuf, poison, sizeof(ubuf));
+      assertf(ftp_split_userpass(in, in + 3 * n + 3, ubuf, 16, pbuf,
+                                 sizeof(pbuf)) ==
+              (n < 16 ? HTS_TRUE : HTS_FALSE));
+      assertf(n == 16 || (strlen(ubuf) == n && ubuf[n - 1] == 'u'));
+      assertf(memcmp(ubuf + 16, poison, sizeof(ubuf) - 16) == 0);
+    }
   }
   for (c = 0; c < sizeof(caps) / sizeof(caps[0]); c++) {
     const size_t ucap = caps[c], pcap = caps[1 - c];
@@ -709,9 +805,6 @@ static int st_ftpcmdlen(httrackp *opt, int argc, char **argv) {
   size_t c, got = 0;
   T_SOC sv[2];
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   memset(poison, '#', sizeof(poison));
   for (c = 0; c < sizeof(caps) / sizeof(caps[0]); c++) {
     const size_t cap = caps[c];
@@ -798,9 +891,6 @@ static int st_ftpctrl(httrackp *opt, int argc, char **argv) {
   T_SOC sv[2];
   size_t got = 0, dropped = 1, i;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   expect[0] = '\0';
   assertf(st_socketpair(sv) == 0);
   assertf(send_line(sv[0], "USER bob\001") == 0); // any field, not just a path
@@ -921,9 +1011,6 @@ static int st_catchurl(httrackp *opt, int argc, char **argv) {
   st_catchurl_arg arg;
   T_SOC srv;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   assertf(data != NULL);
   srv = st_catchurl_listen(&arg.port);
   arg.pads = pads;
@@ -1011,9 +1098,6 @@ static int st_catchurl_overlong(httrackp *opt, int argc, char **argv) {
   st_catchurl_arg arg;
   T_SOC srv;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   assertf(data != NULL);
   srv = st_catchurl_listen(&arg.port);
   arg.pads = arg.tail = 0;
@@ -1081,10 +1165,6 @@ static int st_catchurl_bind(httrackp *opt, int argc, char **argv) {
   char adr[128];
   T_SOC srv;
   int port = 0;
-
-  (void) opt;
-  (void) argc;
-  (void) argv;
 
   /* poisoned, so a listener that wrote nothing is not read as "127.0.0.1" */
   memset(adr, 'x', sizeof(adr) - 1);
@@ -1238,8 +1318,6 @@ static int st_mptcp(httrackp *opt, int argc, char **argv) {
   int verdict;
   T_SOC soc;
 
-  (void) argc;
-  (void) argv;
   if (!hts_mptcp_available()) {
     printf("mptcp: SKIP (no Multipath TCP on this system)\n");
     return 77;
@@ -1325,12 +1403,8 @@ static int st_mptcp(httrackp *opt, int argc, char **argv) {
 
   opt->mptcp = saved;
   opt->mptcp_connections = opt->mptcp_fallbacks = 0;
-  printf("mptcp: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("mptcp", err);
 #else
-  (void) opt;
-  (void) argc;
-  (void) argv;
   printf("mptcp: SKIP (not built with Multipath TCP)\n");
   return 77;
 #endif
@@ -1345,9 +1419,6 @@ static int st_socaddr(httrackp *opt, int argc, char **argv) {
   SOCaddr addr;
   int len = 0;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   {
     struct sockaddr_in sin;
 
@@ -1382,6 +1453,18 @@ static int st_socaddr(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+#ifndef _WIN32
+/* Only the sockets below FD_SETSIZE may go into an fd_set. */
+static int st_selectable(httrackp *opt, int argc, char **argv) {
+  assertf(hts_soc_selectable(0));
+  assertf(hts_soc_selectable(FD_SETSIZE - 1));
+  assertf(!hts_soc_selectable(FD_SETSIZE));
+  assertf(!hts_soc_selectable(INVALID_SOCKET));
+  printf("selectable OK\n");
+  return 0;
+}
+#endif
+
 /* ------------------------------------------------------------ */
 /* Registry: this module's tests, in the order -#test lists them. */
 /* ------------------------------------------------------------ */
@@ -1409,12 +1492,20 @@ const struct selftest_entry selftests_net[] = {
     {"catchurl-bind", "",
      "the capture proxy binds loopback and advertises the address it bound",
      st_catchurl_bind},
+    {"socwait", "", "the read and write waits each watch their own direction",
+     st_socwait},
 #ifndef _WIN32
+    {"selectable", "", "which socket numbers may go into an fd_set",
+     st_selectable},
     {"sigpipe", "", "a write to a vanished peer must not kill the process",
      st_sigpipe},
 #endif
     {"ftpaddr", "<url-address>...", "host/port the FTP path splits out",
      st_ftpaddr},
+    {"proxyauth", "<proxy>", "Basic credentials a proxy name carries",
+     st_proxyauth},
+    {"sniname", "[url-address]...", "TLS SNI name taken from a URL address",
+     st_sniname},
     {"ftp-pasv", "pasv|epsv <reply>",
      "the address and port a PASV or EPSV reply parses into", st_ftppasv},
     {"proxyurl", "<proxy-arg>", "parse a -P proxy URL into host/port",
@@ -1423,7 +1514,8 @@ const struct selftest_entry selftests_net[] = {
      st_socks5},
     {"ftp-line", "", "get_ftp_line bounds a hostile FTP reply line",
      st_ftpline},
-    {"ftp-userpass", "", "ftp_split_userpass bounds URL userinfo", st_ftpuser},
+    {"ftp-userpass", "", "ftp_split_userpass decodes and bounds URL userinfo",
+     st_ftpuser},
     {"ftp-ctrlchars", "", "send_line rejects a control byte in an FTP command",
      st_ftpctrl},
     {"ftp-cmdlen", "",

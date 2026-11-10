@@ -78,6 +78,11 @@ void hts_wizard_answer_filter(htsbuff *f, int slot, int n, const char *adr,
    against the whole (adr,fil). */
 void hts_wizard_prompt_url(char *dst, size_t dstsize, const char *adr,
                            const char *fil);
+/* Returns the answer code in the front end's reply `s`: 0 for NULL or empty,
+   the number for a leading digit run (trailing text is ignored), -1 for `*`,
+   and -999 for `!`, any other first byte, or a number above INT_MAX. */
+int hts_wizard_parse_reply(const char *s);
+
 /* Records the filters answer `n` leaves behind for the link (adr,fil), on top
    of the wizard's block at the low indices of opt->filters: last match wins, so
    a later answer outranks an earlier one and the command-line filters above the

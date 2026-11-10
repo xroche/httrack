@@ -1,0 +1,15 @@
+#!/bin/bash
+#
+# Cache ref file names are the standard MD5 of "adr,fil" (vectors from md5sum).
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+ref=refname=hts-cache/ref
+selftest_queue "$ref/d9355c9caf12d6addfc2cb67e36ad31b.ref" refname abc def
+selftest_queue "$ref/eda7b93f0bdfbf0437c77144aed6ffbc.ref" refname example.com /partial.bin
+# Longer than one 64-byte MD5 block.
+long="/$(printf 'p%.0s' $(seq 100))?q=1"
+selftest_queue "$ref/708e5206cd9d51911999ff0293135f70.ref" refname www.example.com "$long"
+selftest_run_queued

@@ -18,11 +18,11 @@ SCREENS = {
     "project-name": ("02_project_name", "01_project_name", "02_project_name"),
     "project-setup": ("03_project_setup", "02_project_setup", "03_project_setup"),
     "ready": ("15_ready_to_start", "15_ready_to_start", None),
-    "progress": ("16_mirror_progress", "16_mirror_progress", "16_mirror_progress"),
-    "finished": ("17_mirror_finished", "17_mirror_finished", "17_mirror_finished"),
+    "progress": ("16_mirror_progress", "16_mirror_progress", "17_mirror_progress"),
+    "finished": ("17_mirror_finished", "17_mirror_finished", "18_mirror_finished"),
     # platform-specific extras
     "language": ("00_language_preference", None, None),
-    "add-url": (None, "03_add_url", None),
+    "add-url": ("03b_insert_url", "03_add_url", None),
     "permission": (None, None, "00a_first_run_permission"),
     "legacy-import": (None, None, "00_legacy_import_dialog"),
     "options-menu": (None, None, "04_options_menu"),
@@ -45,23 +45,27 @@ SCREENS = {
         "10_options_browser_id",
         "10_options_browser_id",
     ),
-    "opt-accept-headers": ("12b_options_accept_headers", None, None),
-    "opt-spider": ("10_options_spider", "12_options_spider", "11_options_spider"),
-    "opt-proxy": ("04_options_proxy", "14_options_proxy", "12_options_proxy_address"),
+    "opt-accept-headers": (
+        "12b_options_accept_headers",
+        None,
+        "11_options_accept_headers",
+    ),
+    "opt-spider": ("10_options_spider", "12_options_spider", "12_options_spider"),
+    "opt-proxy": ("04_options_proxy", "14_options_proxy", "13_options_proxy_address"),
     "opt-log-index-cache": (
         "13_options_log_index_cache",
         "13_options_log_index_cache",
-        "13_options_log_index_cache",
+        "14_options_log_index_cache",
     ),
     "opt-mime-types": (
         "11_options_mime_types",
         "09_options_mime_types",
-        "14_options_type_mime_associations",
+        "15_options_type_mime_associations",
     ),
     "opt-experts-only": (
         "14_options_experts_only",
         "06_options_experts_only",
-        "15_options_experts_only",
+        "16_options_experts_only",
     ),
 }
 

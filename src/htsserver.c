@@ -83,6 +83,7 @@ coucal NewLangList = NULL;
 /* Language files */
 
 #include "htsserver.h"
+#include "htsshared.h"
 #include "htscmdline.h"
 #include "htslines.h"
 #include "htsthread.h"
@@ -217,6 +218,20 @@ static hts_boolean send_all(T_SOC soc, const char *buf, size_t len) {
   return HTS_TRUE;
 }
 
+/* Headers that keep a page out of every cache. */
+#define SMALLSERVER_NO_CACHE                                                   \
+  "Cache-Control: no-cache, must-revalidate, private\r\n"                      \
+  "Pragma: no-cache\r\n"
+
+/* Starts a reply head: status line, then the Server line, then "extra". */
+static void smallserver_head(String *headers, const char *status,
+                             const char *extra) {
+  StringCat(*headers, "HTTP/1.0 ");
+  StringCat(*headers, status);
+  StringCat(*headers, "\r\nServer: httrack small server\r\n");
+  StringCat(*headers, extra);
+}
+
 static int is_html(const char *file) {
   const char *const type = server_content_type(file);
 
@@ -255,9 +270,7 @@ static void sig_brpipe(int code) {
 HTS_UNUSED static int check_readinput_t(T_SOC soc, int timeout);
 HTS_UNUSED static int recv_bl(T_SOC soc, void *buffer, size_t len, int timeout);
 HTS_UNUSED static int linputsoc(T_SOC soc, char *s, int max);
-HTS_UNUSED static int check_readinput(htsblk * r);
 HTS_UNUSED static int linputsoc_t(T_SOC soc, char *s, int max, int timeout);
-HTS_UNUSED static int linput(FILE * fp, char *s, int max);
 
 /* Language files */
 HTS_UNUSED static int htslang_load(char *limit_to, size_t limit_size,
@@ -282,12 +295,11 @@ T_SOC smallserver_init_std(int *port_prox, char *adr_prox, size_t adr_size,
   T_SOC soc;
 
   if (defaultPort <= 0) {
-    int try_to_listen_to[] =
-      { 8080, 8081, 8082, 8083, 8084, 8085, 8086, 8087, 8088, 8089,
-      32000, 32001, 32002, 32003, 32004, 32006, 32006, 32007, 32008, 32009,
-      42000, 42001, 42002, 42003, 42004, 42006, 42006, 42007, 42008, 42009,
-      0, -1
-    };
+    int try_to_listen_to[] = {8080,  8081,  8082,  8083,  8084,  8085,  8086,
+                              8087,  8088,  8089,  32000, 32001, 32002, 32003,
+                              32004, 32005, 32006, 32007, 32008, 32009, 42000,
+                              42001, 42002, 42003, 42004, 42005, 42006, 42007,
+                              42008, 42009, 0,     -1};
     int i = 0;
 
     do {
@@ -631,8 +643,7 @@ static hts_boolean host_is_self(const char *host, const char *bound) {
 /** Header value with leading blanks dropped, clipped to fit dst. */
 static void copy_header_value(char *dst, size_t size, const char *value) {
   value += strspn(value, HTS_TABORSPACES);
-  dst[0] = '\0';
-  strlncatbuff(dst, value, size, size - 1);
+  strclipbuff(dst, size, value);
 }
 
 /** Copy query parameter "name"'s alphanumeric value into dst, of size >= 1;
@@ -872,7 +883,7 @@ static hts_boolean find_user_stylesheet(char *dst, size_t size) {
     dst[0] = '\0';
     if (dirs[i] != NULL && dirs[i][0] != '\0' &&
         path_append(dst, size, dirs[i]) &&
-        path_append(dst, size, USER_STYLESHEET) && fexist(dst)) {
+        path_append(dst, size, USER_STYLESHEET) && hts_shared_fexist(dst)) {
       return HTS_TRUE;
     }
   }
@@ -932,7 +943,8 @@ static hts_boolean theme_in(const char *dir, const char *name) {
          path_append(file, sizeof(file), dir) &&
          path_append(file, sizeof(file), "/") &&
          path_append(file, sizeof(file), name) &&
-         path_append(file, sizeof(file), "/theme.css") && fexist(file);
+         path_append(file, sizeof(file), "/theme.css") &&
+         hts_shared_fexist(file);
 }
 
 /* Is name a theme in the user's folder or the installed one? */
@@ -1090,7 +1102,8 @@ static void load_ui_settings(void) {
   while (!feof(fp) && !ferror(fp)) {
     char line[256];
 
-    if (linput(fp, line, sizeof(line) - 2) > 0 &&
+    if (hts_shared_linput(fp, line, sizeof(line) - 2, HTS_LINPUT_SKIP_NUL) >
+            0 &&
         strncmp(line, "uitheme=", 8) == 0 && theme_name_is_valid(line + 8)) {
       strcpybuff(ui_theme, line + 8);
     }
@@ -1505,7 +1518,6 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
   String headers = STRING_EMPTY;
   String output = STRING_EMPTY;
   String tmpbuff = STRING_EMPTY;
-  String tmpbuff2 = STRING_EMPTY;
   String fspath = STRING_EMPTY;
   String profile = STRING_EMPTY;
   /* Project directory this server set up; the only root /website/ serves from,
@@ -1622,12 +1634,10 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
     StringClear(headers);
     StringClear(output);
     StringClear(tmpbuff);
-    StringClear(tmpbuff2);
     StringClear(fspath);
     StringCat(headers, "");
     StringCat(output, "");
     StringCat(tmpbuff, "");
-    StringCat(tmpbuff2, "");
     StringCat(fspath, "");
 
     /* UnLock */
@@ -1639,13 +1649,36 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 #endif
 
     /* Accept */
-    while((soc_c = (T_SOC) accept(soc, NULL, NULL)) == INVALID_SOCKET) ;
+    while ((soc_c = (T_SOC) accept(soc, NULL, NULL)) == INVALID_SOCKET) {
+    }
+
+    /* A stalled client must not wedge the single-threaded server */
+#ifdef _WIN32
+    {
+      DWORD tv = (DWORD) timeout * 1000;
+
+      (void) setsockopt(soc_c, SOL_SOCKET, SO_RCVTIMEO, (const char *) &tv,
+                        sizeof(tv));
+    }
+#else
+    {
+      struct timeval tv;
+
+      tv.tv_sec = timeout;
+      tv.tv_usec = 0;
+      (void) setsockopt(soc_c, SOL_SOCKET, SO_RCVTIMEO, (const void *) &tv,
+                        sizeof(tv));
+    }
+#endif
 
     /* Ping */
     client_event(SMALLSERVER_CLIENT_REQUEST, NULL);
 
     /* Lock */
     webhttrack_lock();
+
+    /* One total deadline for the whole request, against a slow drip */
+    linputsoc_deadline = time(NULL) + timeout;
 
     if (linputsoc_t(soc_c, line1, sizeof(line1) - 2, timeout) > 0) {
       int meth = 0;
@@ -1659,9 +1692,6 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
       } else if (strfield(line1, "head ")) {    /* yes, we can do that */
         meth = 10;
         is_head = HTS_TRUE;
-      } else {
-#ifdef _DEBUG
-#endif
       }
       if (meth) {
         /* Flush headers */
@@ -1712,6 +1742,10 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             meth = 0;
           } else if ((size_t) sz > SMALLSERVER_BODY_MAX) {
             too_large = HTS_TRUE;
+          } else if (length >= 0 && (LLint) sz != length) {
+            meth = 0;
+            denied_status = "400 Bad Request";
+            denied = "Incomplete request body.";
           } else {
             buffer[sz] = '\0';
           }
@@ -2212,17 +2246,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
           /* Regular files only: reading a directory or FIFO never ends, and
              "path" may hold "..", so only the untrusted halves are checked. */
-          if (fsfile[0] && strstr(file, "..") == NULL && fexist(fsfile) &&
-              (fp = fopen(fsfile, "rb"))) {
-            char ok[] =
-              "HTTP/1.0 200 OK\r\n" "Connection: close\r\n"
-              "Server: httrack-small-server\r\n" "Content-type: text/html\r\n"
-              "Cache-Control: no-cache, must-revalidate, private\r\n"
-              "Pragma: no-cache\r\n";
-            char ok_other[] = "HTTP/1.0 200 OK\r\n"
-                              "Connection: close\r\n"
-                              "Server: httrack small server\r\n"
-                              "Content-type: ";
+          if (fsfile[0] && strstr(file, "..") == NULL &&
+              hts_shared_fexist(fsfile) && (fp = fopen(fsfile, "rb"))) {
+            static const char ok_html[] =
+                "Connection: close\r\n"
+                "Content-type: text/html\r\n" SMALLSERVER_NO_CACHE;
 
             /* register current page */
             coucal_write(NewLangList, "thisfile", (intptr_t) strdup(file));
@@ -2234,9 +2262,6 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
             /* posted data are redirected to get protocol */
             if (meth == 2) {
-              char redir[] =
-                "HTTP/1.0 302 Redirect\r\n" "Connection: close\r\n"
-                "Server: httrack-small-server\r\n";
               intptr_t adr = 0;
               const char *newfile = file;
 
@@ -2247,7 +2272,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                   newfile = newadr;
                 }
               }
-              StringMemcat(headers, redir, strlen(redir));
+              smallserver_head(&headers, "302 Redirect",
+                               "Connection: close\r\n");
               /* client-supplied: a CR/LF here would split the response */
               if (newfile[strcspn(newfile, "\r\n")] == '\0') {
                 StringCat(headers, "Location: ");
@@ -2261,13 +2287,14 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
               int outputmode = 0;
 
               ini_publish_gated_values();
-              StringMemcat(headers, ok, sizeof(ok) - 1);
+              smallserver_head(&headers, "200 OK", ok_html);
               while (!feof(fp) && !ferror(fp)) {
                 char *str = line;
                 size_t prevlen = StringLength(output);
                 int nocr = 0;
 
-                if (!linput(fp, line, sizeof(line) - 2)) {
+                if (!hts_shared_linput(fp, line, sizeof(line) - 2,
+                                       HTS_LINPUT_SKIP_NUL)) {
                   *str = '\0';
                 }
                 if (hts_lastchar(str) == '\\') {
@@ -2403,7 +2430,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                       if (pos2 != NULL) {
                         *pos2 = '\0';
                         if (strstr(name, "..") == NULL) {
-                          if (fexist(fconcat(catbuff, sizeof(catbuff), path, name))) {
+                          if (hts_shared_fexist(fconcat(
+                                  catbuff, sizeof(catbuff), path, name))) {
                             langstr = pos2 + 1;
                           }
                         }
@@ -2434,20 +2462,23 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                         }
                       } else if (strcmp(name, "if-file-exists") == 0) {
                         if (strstr(pos2, "..") == NULL) {
-                          if (!fexist(fconcat(catbuff, sizeof(catbuff), path, pos2))) {
+                          if (!hts_shared_fexist(fconcat(
+                                  catbuff, sizeof(catbuff), path, pos2))) {
                             outputmode = -1;
                           }
                         }
                       } else if (strcmp(name, "if-project-file-exists") == 0) {
                         if (strstr(pos2, "..") == NULL) {
-                          if (!fexist
-                              (fconcat(catbuff, sizeof(catbuff), StringBuff(fspath), pos2))) {
+                          if (!hts_shared_fexist(
+                                  fconcat(catbuff, sizeof(catbuff),
+                                          StringBuff(fspath), pos2))) {
                             outputmode = -1;
                           }
                         }
                       } else if (strcmp(name, "if-file-do-not-exists") == 0) {
                         if (strstr(pos2, "..") == NULL) {
-                          if (fexist(fconcat(catbuff, sizeof(catbuff), path, pos2))) {
+                          if (hts_shared_fexist(fconcat(
+                                  catbuff, sizeof(catbuff), path, pos2))) {
                             outputmode = -1;
                           }
                         }
@@ -2832,11 +2863,12 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 #endif
             } else {
               if (is_html(file)) {
-                StringMemcat(headers, ok, sizeof(ok) - 1);
+                smallserver_head(&headers, "200 OK", ok_html);
               } else {
                 const char *const type = server_content_type(file);
 
-                StringMemcat(headers, ok_other, sizeof(ok_other) - 1);
+                smallserver_head(&headers, "200 OK",
+                                 "Connection: close\r\nContent-type: ");
                 StringCat(headers,
                           type != NULL ? type : "application/octet-stream");
                 StringCat(headers, "\r\n");
@@ -2863,12 +2895,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                folder. Not cached, so a switch shows on the next page. */
             const char *const theme = effective_theme(path);
 
-            StringCat(headers, "HTTP/1.0 200 OK\r\n"
-                               "Server: httrack small server\r\n"
-                               "Content-type: text/css\r\n"
-                               "Cache-Control: no-cache, must-revalidate, "
-                               "private\r\n"
-                               "Pragma: no-cache\r\n");
+            smallserver_head(&headers, "200 OK",
+                             "Content-type: text/css\r\n" SMALLSERVER_NO_CACHE);
             if (strcmp(theme, THEME_CLASSIC) != 0) {
               StringCat(output, "@import url(themes/");
               StringCat(output, theme);
@@ -2877,16 +2905,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
           } else if (strcmp(file, "/ping") == 0) {
             /* A cached heartbeat would never reach us again, and silence is
                what the watchdog reads as a dead window. */
-            char error_hdr[] =
-                "HTTP/1.0 200 Pong\r\n"
-                "Server: httrack small server\r\n"
-                "Content-type: text/html\r\n"
-                "Cache-Control: no-cache, must-revalidate, private\r\n"
-                "Pragma: no-cache\r\n";
-
             char window[SMALLSERVER_WINDOW_ID_MAX + 1];
 
-            StringCat(headers, error_hdr);
+            smallserver_head(
+                &headers, "200 Pong",
+                "Content-type: text/html\r\n" SMALLSERVER_NO_CACHE);
             if (query_alnum_value(window, sizeof(window), query, "w")) {
               char verb[SMALLSERVER_WINDOW_ID_MAX + 1];
 
@@ -2900,34 +2923,19 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                       : SMALLSERVER_CLIENT_PING,
                   window);
             }
-          } else {
-            char error_hdr[] =
-              "HTTP/1.0 404 Not Found\r\n" "Server: httrack small server\r\n"
-              "Content-type: text/html\r\n";
-            char error[] = "Page not found.\r\n";
-
-            StringCat(headers, error_hdr);
-            StringCat(output, error);
           }
         }
       } else if (denied != NULL) {
-        StringCat(headers, "HTTP/1.0 ");
-        StringCat(headers, denied_status);
-        StringCat(headers, "\r\n"
-                           "Server: httrack small server\r\n"
-                           "Content-type: text/html\r\n");
+        smallserver_head(&headers, denied_status,
+                         "Content-type: text/html\r\n");
         StringCat(output, denied);
         StringCat(output, "\r\n");
-      } else {
-#ifdef _DEBUG
-        char error_hdr[] =
-          "HTTP/1.0 500 Server Error\r\n" "Server: httrack small server\r\n"
-          "Content-type: text/html\r\n";
-        char error[] = "Server error.\r\n";
-
-        StringCat(headers, error_hdr);
-        StringCat(output, error);
-#endif
+      }
+      /* Nothing matched: an unknown page or method, or a target not a path. */
+      if (StringLength(headers) == 0) {
+        smallserver_head(&headers, "404 Not Found",
+                         "Content-type: text/html\r\n");
+        StringCat(output, "Page not found.\r\n");
       }
       {
         char tmp[256];
@@ -2941,9 +2949,6 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
           !is_head) {
         (void) send_all(soc_c, StringBuff(output), StringLength(output));
       }
-    } else {
-#ifdef _DEBUG
-#endif
     }
 
     /* Shutdown (FIN) and wait until confirmed */
@@ -2956,7 +2961,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
       shutdown(soc_c, 1);
 #endif
       /* IE may send a CRLF after the POST data, and a refused body is unread */
-      while (recv(soc_c, c, sizeof(c), 0) > 0)
+      while (check_readinput_t(soc_c, timeout) &&
+             recv(soc_c, c, sizeof(c), 0) > 0)
         ;
     }
 
@@ -2992,7 +2998,6 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
   StringFree(headers);
   StringFree(output);
   StringFree(tmpbuff);
-  StringFree(tmpbuff2);
   StringFree(fspath);
   StringFree(profile);
   StringFree(website);
@@ -3215,13 +3220,12 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
     char wanted[256];
     char lbasename[1024]; /* the guard below writes it, so it outlives the if */
 
-    wanted[0] = '\0';
-    strlncatbuff(wanted, limit_to, sizeof(wanted), sizeof(wanted) - 1);
+    strclipbuff(wanted, sizeof(wanted), limit_to);
     limit_to[0] = '\0';
     /* Fallback: an empty result ends a caller's loop, so a catalog missing the
        key must not look like the end of the list. */
     if (hashname != NULL)
-      strlncatbuff(limit_to, hashname, limit_size, limit_size - 1);
+      strclipbuff(limit_to, limit_size, hashname);
     if (limit_to[0] != '\0' &&
         lang_catalog_path(lbasename, sizeof(lbasename), hashname)) {
       FILE *fp;
@@ -3235,8 +3239,7 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
         while (!found && !feof(fp)) {
           if (lang_read_pair(fp, extkey, value, 8000) &&
               strcmp(extkey, wanted) == 0 && value[0] != '\0') {
-            limit_to[0] = '\0';
-            strlncatbuff(limit_to, value, limit_size, limit_size - 1);
+            strclipbuff(limit_to, limit_size, value);
             found = HTS_TRUE;
           }
         }
@@ -3463,7 +3466,8 @@ static int recv_bl(T_SOC soc, void *buffer, size_t len, int timeout) {
     size_t size = len;
     size_t offs = 0;
 
-    while(n > 0 && size > 0) {
+    while (n > 0 && size > 0 &&
+           (linputsoc_deadline == 0 || check_readinput_t(soc, timeout))) {
       n = recv(soc, ((char *) buffer) + offs, (int) size, 0);
       if (n > 0) {
         offs += n;
@@ -3473,25 +3477,6 @@ static int recv_bl(T_SOC soc, void *buffer, size_t len, int timeout) {
     return (int) offs;
   }
   return -1;
-}
-
-// check if data is available
-static int check_readinput(htsblk * r) {
-  if (r->soc != INVALID_SOCKET) {
-    fd_set fds;                 // poll structures
-    struct timeval tv;          // structure for select
-
-    FD_ZERO(&fds);
-    FD_SET(r->soc, &fds);
-    tv.tv_sec = 0;
-    tv.tv_usec = 0;
-    select((int) r->soc + 1, &fds, NULL, NULL, &tv);
-    if (FD_ISSET(r->soc, &fds))
-      return 1;
-    else
-      return 0;
-  } else
-    return 0;
 }
 
 /*int strfield(const char* f,const char* s) {

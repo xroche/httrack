@@ -38,8 +38,6 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTSSELFTEST_INT_DEFH
 #define HTSSELFTEST_INT_DEFH
 
-#define HTS_INTERNAL_BYTECODE
-
 #include "htsselftest.h"
 
 #include "htsglobal.h"
@@ -56,9 +54,6 @@ Please visit our Website: http://www.httrack.com
 #include "htsarrays.h"
 #include "htsparse.h"
 #include "htscache.h"
-#include "htscache_selftest.h"
-#include "htsdns_selftest.h"
-#include "htsparse_selftest.h"
 #include "htscatchurl.h"
 #include "htscharset.h"
 #include "htscmdline.h"
@@ -137,6 +132,7 @@ extern const struct selftest_entry selftests_warc[];
 extern const struct selftest_entry selftests_wizard[];
 extern const struct selftest_entry selftests_fetch[];
 extern const struct selftest_entry selftests_psl[];
+extern const struct selftest_entry selftests_index[];
 extern const struct selftest_entry selftests_bundle[];
 
 #endif

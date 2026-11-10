@@ -1,7 +1,7 @@
 /* ------------------------------------------------------------ */
 /*
 HTTrack Website Copier, Offline Browser for Windows and Unix
-Copyright (C) 2026 Xavier Roche and other contributors
+Copyright (C) 1998 Xavier Roche and other contributors
 
 SPDX-License-Identifier: GPL-3.0-or-later
 
@@ -24,34 +24,33 @@ would dishonor our work and waste the many hours we have spent on it.
 
 Please visit our Website: http://www.httrack.com
 */
-
 /* ------------------------------------------------------------ */
-/* File: htsdns_selftest.h                                      */
+/* File: file and URL helpers that htsserver and proxytrack     */
+/*       compile in, because libhttrack does not export them    */
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-#ifndef HTSDNS_SELFTEST_DEFH
-#define HTSDNS_SELFTEST_DEFH
+#ifndef HTSSHARED_DEFH
+#define HTSSHARED_DEFH
 
-#ifdef HTS_INTERNAL_BYTECODE
+#include "htsglobal.h"
 
-#ifndef HTS_DEF_FWSTRUCT_httrackp
-#define HTS_DEF_FWSTRUCT_httrackp
-typedef struct httrackp httrackp;
-#endif
+#include <stdio.h>
 
-/* Drive the DNS resolver and cache through a scripted (mock) getaddrinfo,
-   asserting address family, single-address selection, negative caching, the
-   IPv4/IPv6 family filter, and that a cached host is resolved only once.
-   Returns the number of failed checks (0 == success). */
-int dns_selftests(httrackp *opt);
+/* Not HTSEXT_API, because that breaks the MSVC proxytrack build. */
 
-/* Drive a deliberately slow (mock) resolver, asserting that a resolve is
-   bounded by opt->timeout, does not hold opt->state.lock while it runs, and
-   does not cache a timeout as an answer (#606). Takes a few seconds.
-   Returns the number of failed checks (0 == success). */
-int dns_timeout_selftests(httrackp *opt);
+/* Read one line of fp into s (max bytes, NUL included) and return its length.
+   CR, TAB and form feed are dropped, and NUL too when skip_nul is set. A line
+   cut at the bound has its newline consumed, so the next read is not "". */
+int hts_shared_linput(FILE *fp, char *s, int max, hts_boolean skip_nul);
 
-#endif
+/* The skip_nul value of the htsserver and proxytrack readers. */
+#define HTS_LINPUT_SKIP_NUL HTS_TRUE
+
+/* Is s an existing regular file? A plain stat(), with no path conversion. */
+hts_boolean hts_shared_fexist(const char *s);
+
+/* Does the link carry an authority ("//host"), after an optional scheme? */
+hts_boolean hts_shared_link_has_authority(const char *lien);
 
 #endif

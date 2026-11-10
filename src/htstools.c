@@ -31,9 +31,6 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-/* Internal engine bytecode */
-#define HTS_INTERNAL_BYTECODE
-
 /* String */
 #include <ctype.h>
 #include <limits.h>
@@ -123,12 +120,8 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
     }
   } else if (strfield(lien, "ftp://")) {
     // Note: ftp:foobar.gif is not valid
-    if (ftp_available()) {      // ftp supporté
-      if (ident_url_absolute(lien, adrfil) == -1) {
-        ok = -1;                // erreur URL
-      }
-    } else {
-      ok = -2;                  // non supporté
+    if (ident_url_absolute(lien, adrfil) == -1) {
+      ok = -1; // erreur URL
     }
   } else if (strfield(lien, "https://")) {
     if (ident_url_absolute(lien, adrfil) == -1) {
@@ -550,40 +543,38 @@ void longfile_to_83(int mode, char *n83, size_t n83size, char *save) {
   }
 }
 
-// écrire backblue.gif
-/* Note: utf-8 */
-int verif_backblue(httrackp * opt, const char *base) {
+/* Writes backblue.gif and fade.gif into base (utf-8) when missing or stale. */
+int verif_backblue(httrackp *opt, const char *base) {
+  static const struct {
+    const char *name;
+    const char *data;
+    size_t size;
+  } gifs[] = {{"backblue.gif", HTS_DATA_BACK_GIF, HTS_DATA_BACK_GIF_LEN},
+              {"fade.gif", HTS_DATA_FADE_GIF, HTS_DATA_FADE_GIF_LEN}};
   int ret = 0;
+  size_t i;
 
-  //
-  if (!base) {                  // init
+  if (!base) { // init
     opt->state.verif_backblue_done = 0;
     return 0;
   }
-  if ((!opt->state.verif_backblue_done)
-      || (fsize_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), base, "backblue.gif")) !=
-          HTS_DATA_BACK_GIF_LEN)) {
-    FILE *fp =
-      filecreate(&opt->state.strc,
-                 fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), base, "backblue.gif"));
-    opt->state.verif_backblue_done = 1;
+  if (opt->state.verif_backblue_done &&
+      fsize_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), base,
+                         gifs[0].name)) == HTS_DATA_BACK_GIF_LEN)
+    return 0;
+  opt->state.verif_backblue_done = 1;
+  for (i = 0; i < sizeof(gifs) / sizeof(gifs[0]); i++) {
+    const char *const path =
+        fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), base, gifs[i].name);
+    FILE *const fp = filecreate(&opt->state.strc, path);
+
     if (fp) {
-      if (!hts_fwrite_exact(HTS_DATA_BACK_GIF, HTS_DATA_BACK_GIF_LEN, fp))
+      if (!hts_fwrite_exact(gifs[i].data, gifs[i].size, fp))
         ret = 1;
       fclose(fp);
       usercommand(opt, 0, NULL,
-                  fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), base, "backblue.gif"), "", "");
-    } else
-      ret = 1;
-    //
-    fp =
-      filecreate(&opt->state.strc,
-                 fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), base, "fade.gif"));
-    if (fp) {
-      if (!hts_fwrite_exact(HTS_DATA_FADE_GIF, HTS_DATA_FADE_GIF_LEN, fp))
-        ret = 1;
-      fclose(fp);
-      usercommand(opt, 0, NULL, fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), base, "fade.gif"),
+                  fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), base,
+                          gifs[i].name),
                   "", "");
     } else
       ret = 1;
@@ -604,33 +595,12 @@ int verif_external(httrackp * opt, int nb, int test) {
   return 0;
 }
 
-// recherche chaîne de type truc<espaces>=
-// renvoi décalage à effectuer ou 0 si non trouvé
-/* SECTION OPTIMISEE:
-#define rech_tageq(adr,s) ( \
-  ( (*(adr-1)=='<') || (is_space(*(adr-1))) ) ? \
-    ( (streql(*adr,*s)) ? \
-      (__rech_tageq(adr,s)) \
-      : 0 \
-    ) \
-    : 0\
-  )
-*/
-/*
-HTS_INLINE int rech_tageq(const char* adr,const char* s) { 
-  if ( (*(adr-1)=='<') || (is_space(*(adr-1))) ) {   // <tag < tag etc
-    if (streql(*adr,*s)) {                           // tester premier octet (optimisation)
-      return __rech_tageq(adr,s);
-    }
-  }
-  return 0;
-}
-*/
 HTS_INLINE char html_prevc(const char *adr, const char *start) {
   return adr > start ? adr[-1] : ' ';
 }
 
-// Deuxième partie
+/* Offset past `s<spaces>=` at adr, or 0; rech_tageq() in htstools.h checks the
+ * preceding char. */
 HTS_INLINE int __rech_tageq(const char *adr, const char *s) {
   int p;
 
@@ -653,7 +623,8 @@ HTS_INLINE int rech_tageq_all(const char *adr, const char *s) {
   if (adr == NULL) {
     return 0;
   }
-  for(p = 0; adr[p] != 0; p++) {
+  /* Bounded, so a tag with no '>' is not rescanned to the page end per tag. */
+  for (p = 0; p < 4096 && adr[p] != 0; p++) {
     if (quot == 0) {
       if (adr[p] == '"' || adr[p] == '\'') {
         quot = adr[p];
@@ -1032,6 +1003,9 @@ static hts_boolean topindex_commit(httrackp *opt, const char *tmp,
 }
 
 /* Note: NOT utf-8 */
+/* Test hook: the Nth project row of the next top index fails to allocate. */
+int topindex_failrow = 0;
+
 HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
                                  const char *binpath) {
   FILE *fpo;
@@ -1113,6 +1087,7 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
               int level = 0;
               char *category = NULL;
               struct topindex_chain *oldchain = chain;
+              struct topindex_chain *elt;
 
               /* Check for an existing category */
               StringCopy(iname, rpath);
@@ -1144,12 +1119,20 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
                 level = 1;
               }
 
-              chain = calloc(sizeof(struct topindex_chain), 1);
-              chainSize++;
-              if (!startchain) {
-                startchain = chain;
-              }
-              if (chain) {
+              elt = topindex_failrow > 0 && --topindex_failrow == 0
+                        ? NULL
+                        : calloct(1, sizeof(struct topindex_chain));
+              if (elt == NULL) {
+                hts_log_print(opt, LOG_WARNING,
+                              "not enough memory to list %s in the top index",
+                              hts_findgetname(h));
+                freet(category);
+              } else {
+                chain = elt;
+                chainSize++;
+                if (!startchain) {
+                  startchain = chain;
+                }
                 if (oldchain) {
                   oldchain->next = chain;
                 }
@@ -1179,9 +1162,8 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
         /* Sort chain */
         {
           struct topindex_chain **sortedElts =
-            (struct topindex_chain **) calloct(sizeof(topindex_chain *),
-                                               chainSize);
-          assertf(sortedElts != NULL);
+              (struct topindex_chain **) calloct(sizeof(topindex_chain *),
+                                                 chainSize > 0 ? chainSize : 1);
           if (sortedElts != NULL) {
             int i;
             const char *category = "";
@@ -1221,6 +1203,17 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
 
             /* Return value */
             retval = 1;
+          } else {
+            /* no room to sort: drop the list rather than abort */
+            hts_log_print(opt, LOG_WARNING,
+                          "not enough memory to build the top index");
+            while (startchain != NULL) {
+              struct topindex_chain *const next = startchain->next;
+
+              freet(startchain->category);
+              freet(startchain);
+              startchain = next;
+            }
           }
         }
 
@@ -1401,9 +1394,8 @@ HTSEXT_API find_handle hts_findfirst(char *path) {
   if (path) {
     if (strnotempty(path)) {
       find_handle_struct *find =
-        (find_handle_struct *) calloc(1, sizeof(find_handle_struct));
+          (find_handle_struct *) calloct(1, sizeof(find_handle_struct));
       if (find) {
-        memset(find, 0, sizeof(find_handle_struct));
 #ifdef _WIN32
         {
           char BIGSTK rpath[1024 * 2];
@@ -1448,11 +1440,15 @@ HTSEXT_API hts_boolean hts_findnext(find_handle find) {
     char catbuff[CATBUFF_SIZE];
 
     memset(&(find->filestat), 0, sizeof(find->filestat));
-    if ((find->dirp = readdir(find->hdir)))
-      if (!STAT(
-              concat(catbuff, sizeof(catbuff), find->path, find->dirp->d_name),
-              &find->filestat))
-        return HTS_TRUE;
+    if ((find->dirp = readdir(find->hdir))) {
+      /* a dangling link is listed as neither file nor dir, not ended on */
+      if (STAT(concat(catbuff, sizeof(catbuff), find->path, find->dirp->d_name),
+               &find->filestat) != 0) {
+        memset(&(find->filestat), 0, sizeof(find->filestat));
+        find->filestat.st_size = -1;
+      }
+      return HTS_TRUE;
+    }
 #endif
   }
   return HTS_FALSE;

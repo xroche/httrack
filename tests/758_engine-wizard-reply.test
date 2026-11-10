@@ -1,0 +1,38 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# The wizard reply parse: an over-long number must not wrap into a valid code.
+
+assert_selftest "wizardreply self-test OK" wizardreply
+assert_selftest "5" wizardreply 5
+assert_selftest "5" wizardreply 5abc
+assert_selftest "2147483647" wizardreply 2147483647
+assert_selftest "-999" wizardreply 2147483648
+assert_selftest "-999" wizardreply 4294967297
+assert_selftest "-999" wizardreply 99999999999999999999
+assert_selftest "-1" wizardreply '*'
+assert_selftest "-999" wizardreply '!'
+assert_selftest "-999" wizardreply x
+assert_selftest "-999" wizardreply +5
+
+# End to end: an oversized reply must refuse the link and say so in the log,
+# not wrap into the code 1 that sscanf("%d") made of it.
+bin=$(httrack_path)
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_wizreply.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+mkdir "$tmp/site"
+printf '<a href="http://other.invalid/x.html">e</a>' >"$tmp/site/index.html"
+printf '%s\n' 4294967297 4294967297 4294967297 >"$tmp/answers"
+"$bin" "file://$tmp/site/index.html" -O "$tmp/m" --quiet -W \
+    <"$tmp/answers" >"$tmp/out" 2>&1 || true
+log="$tmp/m/hts-log.txt"
+grep -q "(wizard) could not read your answer at other.invalid/x.html" "$log" ||
+    fail "the unreadable reply is not logged in $log"
+if grep -q "could not read your answer" "$tmp/out"; then
+    fail "the message went to stdout"
+fi

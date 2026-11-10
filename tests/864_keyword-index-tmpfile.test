@@ -1,0 +1,18 @@
+#!/bin/bash
+#
+# The keyword indexer leaves no temporary file open after a repeated
+# index_init followed by index_finish.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+require_httrack
+
+got=$(httrack -O /dev/null -#test=indexfd) || fail "indexfd failed: $got"
+case $got in
+*SKIP*) skip "cannot count descriptors here" ;;
+*"indexfd OK"*) ;;
+*) fail "unexpected output: $got" ;;
+esac

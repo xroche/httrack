@@ -113,6 +113,11 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre);
    place into a buffer of the given size. */
 void hts_strip_default_port(char *lien, size_t size);
 
+/* Self-test hook: 's' through each parser output writer, joined by '|', for a
+   page saved as HTML or not and the given script state. The caller freet()s. */
+char *hts_parse_sink_selftest(const hts_boolean enabled, const int inscript,
+                              const int inscript_tag, const char *const s);
+
 /*
   Does a quoted string the dirty parser found look like a link? "str" and "len"
   are the string as the source spells it. "lastc" is the first non-blank byte
@@ -151,6 +156,33 @@ typedef struct hts_js_link {
   comment, so this is never asked there.
 */
 hts_boolean hts_js_quote_is_import_arg(const char *quote, const char *buffer);
+
+/* What the parser does with the value of a known attribute. */
+typedef enum hts_attr_kind {
+  HTS_ATTR_LINK,    /* src=, background=: a link to capture */
+  HTS_ATTR_HOTSPOT, /* hotspot=, hotspot1=: the name may end in digits */
+  HTS_ATTR_REFRESH, /* content=: a link only in a META refresh */
+  HTS_ATTR_LEAVE,   /* action=: rewrite the link, never capture it */
+  HTS_ATTR_EVENT,   /* onClick=: inline script */
+  HTS_ATTR_STYLE    /* style=: inline CSS */
+} hts_attr_kind;
+
+typedef struct hts_attr {
+  const char *name;
+  hts_attr_kind kind;
+} hts_attr;
+
+/* The known attributes, ending with a NULL name. */
+extern const hts_attr hts_attrs[];
+
+/*
+  Which known attribute is written at "html", followed by '='? The byte before
+  "html" must be '<' or a space. The event and style rows are skipped unless
+  "scripts". Returns the row and sets *value to the offset just past the '=',
+  or returns NULL and sets *value to 0.
+*/
+const hts_attr *hts_attr_match(const char *html, hts_boolean scripts,
+                               int *value);
 
 /*
   Does the script or CSS at "cursor" hand a URL to .src, .location, .href,

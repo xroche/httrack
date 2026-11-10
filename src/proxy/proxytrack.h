@@ -33,9 +33,11 @@ Please visit our Website: http://www.httrack.com
 #define PROXYTRACK_VERSION "0.5"
 
 /* Store manager */
+#include "../htsbase.h"
 #include "../minizip/mztools.h"
 #include "store.h"
 #include "../htsdate.h"
+#include "../htsshared.h"
 
 #include <sys/stat.h>
 #ifdef _WIN32
@@ -113,58 +115,6 @@ static void proxytrack_print_log(const char *severity, const char *format,
 	"<!-- _-._.--._._-._.--._._-._.--._._-._.--._._-._.--._. -->\r\n" \
 	"<!-- End Disable IE Friendly HTTP Error Messages -->\r\n"
 
-/* Same contract as hts_gethome(): proxytrack does not link libhttrack */
-HTS_UNUSED static const char *gethomedir(void) {
-  const char *home = getenv("HOME");
-
-  /* An empty $HOME would resolve a relative path against the root */
-  return strnotempty(home) ? home : ".";
-}
-
-HTS_UNUSED static int linput(FILE * fp, char *s, int max) {
-  int c;
-  int j = 0;
-
-  do {
-    c = fgetc(fp);
-    if (c != EOF) {
-      switch (c) {
-      case 13:
-        break;                  // sauter CR
-      case 10:
-        c = -1;
-        break;
-      case 0:
-      case 9:
-      case 12:
-        break;                  // sauter ces caractères
-      default:
-        s[j++] = (char) c;
-        break;
-      }
-    }
-  } while((c != -1) && (c != EOF) && (j < (max - 1)));
-  s[j] = '\0';
-  return j;
-}
-
-HTS_UNUSED static int link_has_authority(const char *lien) {
-  const char *a = lien;
-
-  if (isalpha((const unsigned char) *a)) {
-    // Skip scheme?
-    while(isalpha((const unsigned char) *a))
-      a++;
-    if (*a == ':')
-      a++;
-    else
-      return 0;
-  }
-  if (strncmp(a, "//", 2) == 0)
-    return 1;
-  return 0;
-}
-
 HTS_UNUSED static const char *jump_protocol(const char *source) {
   int p;
 
@@ -211,58 +161,6 @@ HTS_UNUSED static const char *jump_protocol_and_auth(const char *source) {
   return (trytofind != NULL) ? trytofind : a;
 }
 
-#ifndef min
-#define min(a,b) ((a)>(b)?(b):(a))
-#endif
-#ifndef max
-#define max(a,b) ((a)>(b)?(a):(b))
-#endif
-HTS_UNUSED static int linput_trim(FILE * fp, char *s, int max) {
-  int rlen = 0;
-  char *const ls = (char *) malloc(max + 1);
-
-  s[0] = '\0';
-  if (ls) {
-    char *a;
-
-    // lire ligne
-    rlen = linput(fp, ls, max);
-    if (rlen) {
-      // sauter espaces et tabs en fin
-      while((rlen > 0) && is_realspace(ls[max(rlen - 1, 0)]))
-        ls[--rlen] = '\0';
-      // sauter espaces en début
-      a = ls;
-      while((rlen > 0) && ((*a == ' ') || (*a == '\t'))) {
-        a++;
-        rlen--;
-      }
-      if (rlen > 0) {
-        memcpy(s, a, rlen);     // can copy \0 chars
-        s[rlen] = '\0';
-      }
-    }
-    //
-    free(ls);
-  }
-  return rlen;
-}
-
-#ifndef S_ISREG
-#define S_ISREG(m) ((m) & _S_IFREG)
-#endif
-HTS_UNUSED static int fexist(char *s) {
-  struct stat st;
-
-  memset(&st, 0, sizeof(st));
-  if (stat(s, &st) == 0) {
-    if (S_ISREG(st.st_mode)) {
-      return 1;
-    }
-  }
-  return 0;
-}
-
 HTS_UNUSED static struct tm PT_GetTime(time_t t) {
   struct tm tmbuf;
 
@@ -288,15 +186,6 @@ HTS_UNUSED static int set_filetime_time_t(const char *file, time_t t) {
     return set_filetime(file, &tm);
   }
   return -1;
-}
-HTS_UNUSED static int set_filetime_rfc822(const char *file, const char *date) {
-  struct tm buffer;
-  struct tm *tm_s = convert_time_rfc822(&buffer, date);
-
-  if (tm_s) {
-    return set_filetime(file, tm_s);
-  } else
-    return -1;
 }
 
 #endif

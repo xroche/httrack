@@ -1,0 +1,33 @@
+#!/bin/bash
+# The -%P scan skips hts_nodetect and xmlns attributes whatever the spacing
+# around their '=', and still skips a quote nested in such a value.
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_dirtyspaced.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+
+cat >"$tmp/index.html" <<'HTML'
+<!DOCTYPE html>
+<html><body>
+<a class = "spc1.gif">class</a>
+<a xmlns = "spc2.gif">xmlns</a>
+<a xmlns:x = "spc3.gif">xmlns prefix</a>
+<a class="ctl.gif">class, no spaces</a>
+<a data-x = "pos.gif">not refused</a>
+<div class="f('nest.gif')">nested in class</div>
+<div title=f('bare.gif')>nested in a bare title</div>
+<a href="real.html">real</a>
+</body></html>
+HTML
+for n in spc1 spc2 spc3 ctl pos nest bare; do printf 'GIF89a' >"$tmp/$n.gif"; done
+echo 'real' >"$tmp/real.html"
+
+# pos.gif proves the scan reads a spaced '=' at all.
+bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$tmp")" \
+    --errors 0 --found real.html --found pos.gif \
+    --not-found spc1.gif --not-found spc2.gif --not-found spc3.gif \
+    --not-found ctl.gif --not-found nest.gif --not-found bare.gif \
+    httrack 'BASEURL/index.html' -r3

@@ -32,14 +32,14 @@ Please visit our Website: http://www.httrack.com
    to the stored length (like wget --warc / Heritrix). */
 /* ------------------------------------------------------------ */
 
-#define HTS_INTERNAL_BYTECODE
-
 #include "htswarc.h"
 
 #include "htscore.h"
 #include "htslib.h"
+#include "htslines.h"
 #include "htsio.h"
 #include "htsback.h"
+#include "htscharset.h"
 #include "htstools.h"
 #include "htssafe.h"
 #include "htszlib.h"
@@ -559,12 +559,35 @@ static char *path_basename_dup(const char *path) {
   return strdupt(b);
 }
 
+/* Append n bytes of s, percent-encoding any byte that is not part of a
+   well-formed UTF-8 sequence, so the whole CDXJ line stays UTF-8. */
+static int surt_add_utf8(wbuf *out, const char *s, size_t n) {
+  size_t i = 0;
+  while (i < n) {
+    const unsigned char c = (unsigned char) s[i];
+    size_t len = 1;
+    if (c >= 0x80) {
+      len = hts_readUTF8(s + i, n - i, NULL);
+      if (len == 0) {
+        if (wbuf_printf(out, "%%%02X", (unsigned) c) != 0)
+          return -1;
+        i++;
+        continue;
+      }
+    }
+    if (wbuf_add(out, s + i, len) != 0)
+      return -1;
+    i += len;
+  }
+  return 0;
+}
+
 /* SURT-canonicalize url into out (no newline): scheme and userinfo dropped,
    host lowercased with a leading www[digits] label stripped and the scheme
    default port removed, labels reversed and comma-joined then ')', path+query
-   appended verbatim (case preserved, fragment dropped). IPv4 and [IPv6]
-   literals keep their host form. A non-default port is kept as ":port" before
-   the ')'. Returns 0 on success. */
+   appended (case preserved, fragment dropped, invalid UTF-8 as %XX). IPv4 and
+   [IPv6] literals keep their host form. A non-default port is kept as ":port"
+   before the ')'. Returns 0 on success. */
 static int surt_canon(const char *url, wbuf *out) {
   const char *p, *scheme_end, *authend, *host, *hostsep, *port = NULL;
   size_t portlen = 0, hlen, i;
@@ -654,7 +677,7 @@ static int surt_canon(const char *url, wbuf *out) {
         if (llen > 0) {
           if (!first && wbuf_add(out, ",", 1) != 0)
             return -1;
-          if (wbuf_add(out, hostbuf + lstart, llen) != 0)
+          if (surt_add_utf8(out, hostbuf + lstart, llen) != 0)
             return -1;
           first = 0;
         }
@@ -671,7 +694,8 @@ static int surt_canon(const char *url, wbuf *out) {
         ok = 0;
         break;
       }
-      pv = pv * 10 + (port[k] - '0');
+      if (pv <= 65535) /* stop past 65535 so pv cannot overflow */
+        pv = pv * 10 + (port[k] - '0');
     }
     if (ok && pv != def_port &&
         (wbuf_add(out, ":", 1) != 0 || wbuf_add(out, port, portlen) != 0))
@@ -685,7 +709,7 @@ static int surt_canon(const char *url, wbuf *out) {
     const char *frag = authend;
     while (*frag != '\0' && *frag != '#')
       frag++;
-    if (wbuf_add(out, authend, (size_t) (frag - authend)) != 0)
+    if (surt_add_utf8(out, authend, (size_t) (frag - authend)) != 0)
       return -1;
   }
   return 0;
@@ -704,24 +728,15 @@ static void iso8601_to_cdx14(const char *iso, char out[15]) {
   out[14] = '\0';
 }
 
-/* Append s as a JSON string (quoted, with " \ and control chars escaped). */
+/* Append s as a JSON string, see hts_json_string(). */
 static int cdx_json_str(wbuf *b, const char *s) {
-  if (wbuf_add(b, "\"", 1) != 0)
-    return -1;
-  for (; *s != '\0'; s++) {
-    unsigned char c = (unsigned char) *s;
-    if (c == '"' || c == '\\') {
-      char e[2] = {'\\', (char) c};
-      if (wbuf_add(b, e, 2) != 0)
-        return -1;
-    } else if (c < 0x20) {
-      if (wbuf_printf(b, "\\u%04x", (unsigned) c) != 0)
-        return -1;
-    } else if (wbuf_add(b, s, 1) != 0) {
-      return -1;
-    }
-  }
-  return wbuf_add(b, "\"", 1);
+  String json = STRING_EMPTY;
+  int ret;
+
+  hts_json_string(&json, s);
+  ret = wbuf_add(b, StringBuff(json), StringLength(json));
+  StringFree(json);
+  return ret;
 }
 
 /* see htswarc.h */
@@ -865,7 +880,6 @@ static int cdx_cmp(const void *a, const void *b) {
 /* Sort and write the accumulated CDXJ lines to <base>.cdx. */
 static void warc_cdx_flush(warc_writer *w) {
   FILE *f;
-  char catbuff[CATBUFF_SIZE];
   size_t i;
   int werr, cerr;
   if (!w->cdx_on || w->cdx_path == NULL)
@@ -880,7 +894,7 @@ static void warc_cdx_flush(warc_writer *w) {
     return;
   }
   qsort(w->cdx_lines, w->cdx_count, sizeof(char *), cdx_cmp);
-  f = FOPEN(fconv(catbuff, sizeof(catbuff), w->cdx_path), "wb");
+  f = hts_fopen_private(w->cdx_path, "wb");
   if (f == NULL) {
     hts_log_print(w->opt, LOG_ERROR | LOG_ERRNO,
                   "WARC: could not write the index %s", w->cdx_path);
@@ -1052,7 +1066,18 @@ static void warc_wacz_package(warc_writer *w) {
   snprintf(tmppath, sizeof(tmppath), "%s.wacz.tmp", w->base_path);
   /* Build into a temp; only full success replaces <base>.wacz, so a zero-record
      re-run can't destroy a good archive (#522). */
-  zf = hts_zipOpen_utf8(fconv(catbuff, sizeof(catbuff), tmppath), 0);
+  /* the zip library reopens this file and keeps its owner-only mode */
+  zf = NULL;
+  {
+    FILE *const pre = hts_fopen_private(tmppath, "wb");
+
+    if (pre != NULL) {
+      fclose(pre);
+      zf = hts_zipOpen_utf8(fconv(catbuff, sizeof(catbuff), tmppath), 0);
+      if (zf == NULL)
+        (void) UNLINK(tmppath);
+    }
+  }
   if (zf == NULL) {
     hts_log_print(w->opt, LOG_WARNING, "WACZ: could not create %s", tmppath);
     return;
@@ -1348,16 +1373,14 @@ static int warc_write_warcinfo_record(warc_writer *w) {
 static int warc_rotate(warc_writer *w) {
   char namebuf[HTS_URLMAXSIZE * 2];
   char openbuf[HTS_URLMAXSIZE * 2 + sizeof(WARC_TMP_SUFFIX)];
-  char catbuff[CATBUFF_SIZE];
   const unsigned next = w->seg + 1;
   FILE *f;
   snprintf(namebuf, sizeof(namebuf), "%s-%05u%s", w->seg_base, next,
            w->seg_ext);
   /* Open before advancing: w->seg must only ever name a segment that exists,
      or close-time packaging and swapping would work on a missing file. */
-  f = FOPEN(fconv(catbuff, sizeof(catbuff),
-                  warc_open_path(w, namebuf, openbuf, sizeof(openbuf))),
-            "wb");
+  f = hts_fopen_private(warc_open_path(w, namebuf, openbuf, sizeof(openbuf)),
+                        "wb");
   if (f == NULL)
     return -1;
   if (w->f != NULL)
@@ -1581,9 +1604,9 @@ warc_writer *warc_open(httrackp *opt, const char *path) {
   }
   /* Set only once arc_path is recorded, so a half-built writer never swaps. */
   w->protect_prev = fsize_utf8(path) > 0 ? HTS_TRUE : HTS_FALSE;
-  w->f = FOPEN(fconv(catbuff, sizeof(catbuff),
-                     warc_open_path(w, path, openbuf, sizeof(openbuf))),
-               "wb");
+  /* the archive keeps Cookie and Authorization headers: owner-only */
+  w->f = hts_fopen_private(warc_open_path(w, path, openbuf, sizeof(openbuf)),
+                           "wb");
   if (w->f == NULL) {
     warc_close(w);
     return NULL;
@@ -1756,7 +1779,7 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
   warc_http_header_value(resp_hdr, "Content-Type", mimebuf, sizeof(mimebuf));
   /* a 304 declares no type, so index the one only the caller knows */
   if (mimebuf[0] == '\0' && content_type != NULL)
-    strlncatbuff(mimebuf, content_type, sizeof(mimebuf), sizeof(mimebuf) - 1);
+    strclipbuff(mimebuf, sizeof(mimebuf), content_type);
 
   /* A payload exists (for digesting) unless this is a bodyless 304. */
   has_payload = (body_len > 0 && (body != NULL || body_path != NULL) &&

@@ -1,0 +1,30 @@
+#!/bin/bash
+#
+# The data connection goes to the host the control connection reached, never to
+# the address in the 227 reply. A NAT'd or hostile server names another host
+# there; the server below names 127.0.0.2, where nothing listens.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+require_httrack
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftppasv.XXXXXX")
+cleanup_push rm -rf "$tmpdir"
+
+root="${tmpdir}/root"
+out="${tmpdir}/crawl"
+mkdir -p "$root" "$out"
+printf 'data-over-the-control-peer\n' >"${root}/f.txt"
+
+ftp_server_start --root "$root" --pasv-host 127.0.0.2
+
+run_with_timeout 60 httrack "ftp://127.0.0.1:${FTP_PORT}/f.txt" -O "$out" \
+    --quiet --disable-security-limits --robots=0 --timeout=10 \
+    --max-time=45 --retries=1 -c1 >"${tmpdir}/log" 2>&1 ||
+    fail "the crawl never finished"
+cmp -s "${out}/127.0.0.1_${FTP_PORT}/f.txt" "${root}/f.txt" ||
+    fail "the data did not come from the control peer; mirror holds $(find "$out" -type f)"
+ok "a 227 reply naming another host still transfers over the control peer"

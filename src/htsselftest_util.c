@@ -130,6 +130,11 @@ void st_mirror_wiring_free(httrackp *opt, cache_back *cache,
   opt->hash = NULL; /* it pointed at the caller's stack frame */
 }
 
+int st_verdict(const char *label, int err) {
+  printf("%s: %s\n", label, err ? "FAIL" : "OK");
+  return err;
+}
+
 // mkdir path, tolerating one that already exists.
 hts_boolean st_mkdir_at(const char *path, size_t n, const char *who) {
   if (MKDIR(path) != 0 && errno != EEXIST) {

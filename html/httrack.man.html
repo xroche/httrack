@@ -49,6 +49,7 @@
 <a href="#FILES">FILES</a><br>
 <a href="#ENVIRONMENT">ENVIRONMENT</a><br>
 <a href="#DIAGNOSTICS">DIAGNOSTICS</a><br>
+<a href="#SECURITY">SECURITY</a><br>
 <a href="#LIMITS">LIMITS</a><br>
 <a href="#BUGS">BUGS</a><br>
 <a href="#COPYRIGHT">COPYRIGHT</a><br>
@@ -88,10 +89,10 @@ offline browser : copy websites to a local directory</p>
 [ <b>-JN, --min-rate[=N]</b> ] [ <b>-HN,
 --host-control[=N]</b> ] [ <b>-%P,
 --extended-parsing[=0]</b> ] [ <b>-n, --near</b> ] [ <b>-t,
---test</b> ] [ <b>-%L, --list</b> ] [ <b>-%S, --urllist</b>
-] [ <b>-%m, --sitemap</b> ] [ <b>-NN, --structure[=N]</b> ]
-[ <b>-%N, --delayed-type-check[=N]</b> ] [ <b>-%D,
---cached-delayed-type-check[=0]</b> ] [ <b>-%M,
+--test</b> ] [ <b>-%L, --list</b> ] [ <b>-%S,
+--filterlist</b> ] [ <b>-%m, --sitemap</b> ] [ <b>-NN,
+--structure[=N]</b> ] [ <b>-%N, --delayed-type-check[=N]</b>
+] [ <b>-%D, --cached-delayed-type-check[=0]</b> ] [ <b>-%M,
 --mime-html[=0]</b> ] [ <b>-%Z, --single-file[=0]</b> ] [
 <b>-LN, --long-names[=N]</b> ] [ <b>-KN,
 --keep-links[=N]</b> ] [ <b>-x, --replace-external</b> ] [
@@ -108,8 +109,9 @@ offline browser : copy websites to a local directory</p>
 --tolerant[=0]</b> ] [ <b>-%s, --updatehack[=0]</b> ] [
 <b>-%u, --urlhack[=0]</b> ] [ <b>-%A, --assume</b> ] [
 <b>-@iN, --protocol[=N]</b> ] [ <b>-@mN, --mptcp[=0]</b> ] [
-<b>-%w, --disable-module</b> ] [ <b>-F, --user-agent</b> ] [
-<b>-%R, --referer</b> ] [ <b>-%E, --from</b> ] [ <b>-%F,
+<b>-@cN, --check-cert[=0]</b> ] [ <b>-%w,
+--disable-module</b> ] [ <b>-F, --user-agent</b> ] [ <b>-%R,
+--referer</b> ] [ <b>-%E, --from</b> ] [ <b>-%F,
 --footer</b> ] [ <b>-%l, --language</b> ] [ <b>-%a,
 --accept</b> ] [ <b>-%X, --headers</b> ] [ <b>-%Q,
 --browser-headers[=0]</b> ] [ <b>-C, --cache[=N]</b> ] [
@@ -370,7 +372,9 @@ r9999) (--depth[=N])</p></td></tr>
 <td width="82%">
 
 
-<p>maximum file length for non html (N) and html (N2)</p></td></tr>
+<p>maximum file length for non html (N) and html (N2); with
+no limit for its kind, a compressed file stops at 256 MiB
+once decoded</p></td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="8%">
@@ -593,7 +597,8 @@ URL per line) (--list &lt;param&gt;)</p></td></tr>
 
 
 <p>&lt;file&gt; add all scan rules located in this text
-file (one scan rule per line) (--urllist &lt;param&gt;)</p></td></tr>
+file (one scan rule per line) (--filterlist
+&lt;param&gt;)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="4%">
@@ -1080,6 +1085,18 @@ offers it (0=no, 1=yes) (--mptcp[=0])</p></td></tr>
 <td width="5%">
 
 
+<p>-@cN</p></td>
+<td width="4%"></td>
+<td width="82%">
+
+
+<p>verify https certificates and host names against the
+system CA store (0=no, 1=yes) (--check-cert[=0])</p></td></tr>
+<tr valign="top" align="left">
+<td width="9%"></td>
+<td width="5%">
+
+
 <p>-%w</p></td>
 <td width="4%"></td>
 <td width="82%">
@@ -1187,8 +1204,10 @@ embed (--accept &lt;param&gt;)</p></td></tr>
 <p>additional HTTP header line (-%X &quot;X-Magic:
 42&quot;; an Accept line replaces every computed Accept,
 per-kind values included; Content-Length, Transfer-Encoding,
-Connection, Keep-Alive, TE, Upgrade and Expect are dropped
-(--headers &lt;param&gt;)</p></td></tr>
+Connection, Keep-Alive, TE, Upgrade and Expect are dropped;
+the line goes to every host the crawl touches, other sites
+and redirect targets included, so put no secret in it for a
+multi-host crawl (--headers &lt;param&gt;)</p></td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="4%">
@@ -1222,8 +1241,9 @@ HTTPS (%Q0 don&rsquo;t) (--browser-headers[=0])</p></td></tr>
 
 
 <p style="margin-top: 1em">create/use a cache for updates
-and retries (C0 no cache,* C1 cache is prioritary,C2 test
-update before) (--cache[=N])</p></td></tr>
+and retries (C0 no cache,C1 cache is prioritary,C2 test
+update before; the default is C1, or C2 when a finished
+mirror is in the folder) (--cache[=N])</p></td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="4%">
@@ -2593,6 +2613,17 @@ would otherwise fire on every later poll.</p>
 <p style="margin-left:9%; margin-top: 1em">Errors/Warnings
 are reported to <i>hts-log.txt</i> by default, or to stderr
 if the <i>-v</i> option was specified.</p>
+
+<h2>SECURITY
+<a name="SECURITY"></a>
+</h2>
+
+
+<p style="margin-left:9%; margin-top: 1em">A project folder
+(doit.log, hts-cache) and a ./.httrackrc can carry <i>-V</i>
+(run a command) and <i>-%W</i> (load a plugin). Run
+<b>httrack</b> only on folders and in directories you trust.
+Your own ~/.httrackrc is yours and fine.</p>
 
 <h2>LIMITS
 <a name="LIMITS"></a>
