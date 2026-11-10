@@ -91,8 +91,9 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
   /* Name the bundles the way a start URL does; the https naming URL makes the
      merged headers https-only when the input contains an https url line. */
-  strcpybuff(url, (data[0] & 1) ? "https://fuzz.example/members/"
-                                : "http://fuzz.example/members/");
+  strcpybuff(url, (data[0] & 1)
+                      ? "https://fuzz.example/members/#httrack-bundle=fuzz"
+                      : "http://fuzz.example/members/#httrack-bundle=fuzz");
   (void) hts_bundle_take(opt, url);
   strcpybuff(url, "https://fuzz.example/other#httrack-bundle=fuzz2");
   (void) hts_bundle_take(opt, url);
