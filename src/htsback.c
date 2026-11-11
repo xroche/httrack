@@ -3330,18 +3330,18 @@ static int back_abort_limit(httrackp *opt, struct_back *sback,
 
 /* Keep the file already on disk: end the transfer and report it as a 304. */
 static void back_keep_existing(httrackp *opt, struct_back *sback, int i,
-                               LLint size, const char *why) {
+                               LLint size_on_disk, const char *why) {
   lien_back *const b = &sback->lnk[i];
 
   deletehttp(&b->r);
   back_set_finished(opt, sback, i);
-  b->r.size = b->r.totalsize = size;
+  b->r.size = b->r.totalsize = size_on_disk;
   filenote(&opt->state.strc, b->url_sav, NULL);
   file_notify(opt, b->url_adr, b->url_fil, b->url_sav, 0, 0, b->r.notmodified);
   b->r.statuscode = HTTP_NOT_MODIFIED;
   hts_log_print(
       opt, LOG_NOTICE, "Kept existing file %s (" LLintP " bytes), %s: %s%s",
-      b->url_sav, size, why, adr_nologin(opt, b->url_adr), b->url_fil);
+      b->url_sav, size_on_disk, why, adr_nologin(opt, b->url_adr), b->url_fil);
 }
 
 // attente (gestion des buffers des sockets)
