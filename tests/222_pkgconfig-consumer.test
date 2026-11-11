@@ -111,8 +111,8 @@ if [ ! -f "${staged_libdir}/libhttrack.a" ] ||
     echo "no libhttrack.a, or no working -static here; skipping the archive link" >&2
 elif ! LC_ALL=C "${cc_argv[@]}" "${static_cflags_argv[@]}" -static -o "${work}/consumer-static" \
     "${work}/consumer.c" "${static_libs_argv[@]}" 2>"${work}/cc-static.log"; then
-    # Archives the linker could not find, and whether only a dependency's .pc named them.
-    own_libs=$(grep '^Libs' "${staged_libdir}/pkgconfig/libhttrack.pc")
+    # Did only a dependency's .pc name the archives the linker could not find?
+    own_libs=$(grep '^Libs' "${staged_libdir}/pkgconfig/libhttrack.pc" | tr '\n' ' ')
     missing=$(sed -n 's/.*cannot find \(-l[^ :]*\(:[^ :][^ :]*\)\{0,1\}\).*/\1/p' \
         "${work}/cc-static.log" | sort -u | tr '\n' ' ')
     foreign=${missing:+yes}
@@ -123,7 +123,7 @@ elif ! LC_ALL=C "${cc_argv[@]}" "${static_cflags_argv[@]}" -static -o "${work}/c
     if grep -q -e __asan -e __ubsan -e __tsan -e __msan "${work}/cc-static.log"; then
         echo "the build is sanitized, its archive does not link -static; skipping" >&2
     elif [ -n "${foreign}" ]; then
-        # Ubuntu's libcrypto.pc names -l:libjitterentropy.a, which libssl-dev does not install.
+        # Ubuntu's libcrypto.pc names an archive libssl-dev does not ship (LP #2158026).
         echo "a dependency's .pc names archives not installed here (${missing% }); skipping" >&2
     else
         head -20 "${work}/cc-static.log" >&2
