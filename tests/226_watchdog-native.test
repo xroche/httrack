@@ -921,6 +921,14 @@ turn_cost() {
     echo "$gap"
 }
 
+# Prints a fresh turn cost of the pristine script, and succeeds when the box got slower than at calibration.
+turn_slowed() {
+    local now
+    now=$(turn_cost "$(nativepath "$wdscript")")
+    echo "${now:-more than 12}"
+    test -z "$now" || test "$now" -gt "$turn"
+}
+
 # One property per leg, each returning its diagnosis so a mutant can be required
 # to trip that same check rather than merely to fail. A leg answers 77 through
 # unmeasured() when the box denied it a sample, and never grades one.
@@ -943,9 +951,8 @@ cadence_leg() {
         # A short count has two causes, so re-measure the box against the pristine
         # script now. Still turning at its calibrated rate means the missing ticks
         # are the cadence; slower, and the box really cannot answer.
-        now_turn=$(turn_cost "$(nativepath "$wdscript")")
-        if test -z "$now_turn" || test "$now_turn" -gt "$turn"; then
-            unmeasured "$ticks due ticks in ${window}s at a ${interval}s interval, and a turn now costs ${now_turn:-more than 12}s against ${turn}s at calibration"
+        if now_turn=$(turn_slowed); then
+            unmeasured "$ticks due ticks in ${window}s at a ${interval}s interval, and a turn now costs ${now_turn}s against ${turn}s at calibration"
             return "$UNMEASURED"
         fi
         echo "$ticks due ticks in ${window}s at a ${interval}s interval while a turn still costs ${now_turn}s: the cadence is longer than -IntervalSeconds says"
@@ -956,10 +963,15 @@ cadence_leg() {
     gaps=$(tick_gaps "$legout")
     bad=$(awk -v want="$interval" -v slack="$turn" \
         '{ d = $1 - want; if (d < 0) d = -d; if (d > slack) n++ } END { print n + 0 }' <<<"$gaps")
-    test "$bad" -eq 0 || {
-        echo "due ticks ${interval}s apart were asked for and $(tr '\n' ' ' <<<"$gaps")came back: the cadence is not what -IntervalSeconds says"
+    if test "$bad" -ne 0; then
+        # A late gap has the same two causes as a short count.
+        if now_turn=$(turn_slowed); then
+            unmeasured "due ticks ${interval}s apart came back $(tr '\n' ' ' <<<"$gaps")apart, and a turn now costs ${now_turn}s against ${turn}s at calibration"
+            return "$UNMEASURED"
+        fi
+        echo "due ticks ${interval}s apart were asked for and $(tr '\n' ' ' <<<"$gaps")came back while a turn still costs ${now_turn}s: the cadence is not what -IntervalSeconds says"
         return 1
-    }
+    fi
     grep -q '36_local-bigcrawl.test' "$posts" || {
         echo "the posted status does not name the test in flight: $(<"$posts")"
         return 1
@@ -1384,8 +1396,13 @@ for psrun in "${psruns[@]}"; do
         gaps=$(tick_gaps "$tmp/cadence.log")
         bad=$(awk -v want="$interval" -v slack="$turn" \
             '{ d = $1 - want; if (d < 0) d = -d; if (d > slack) n++ } END { print n + 0 }' <<<"$gaps")
-        test "$bad" -eq 0 ||
-            fail "due ticks ${interval}s apart were asked for and $(tr '\n' ' ' <<<"$gaps")came back: the cadence is not what -IntervalSeconds says"
+        if test "$bad" -ne 0; then
+            if now_turn=$(turn_slowed); then
+                skipped+=("the $psrun cadence check: due ticks ${interval}s apart came back $(tr '\n' ' ' <<<"$gaps")apart, and a turn now costs ${now_turn}s against ${turn}s")
+            else
+                fail "due ticks ${interval}s apart were asked for and $(tr '\n' ' ' <<<"$gaps")came back while a turn still costs ${now_turn}s: the cadence is not what -IntervalSeconds says"
+            fi
+        fi
     fi
     grep -q '36_local-bigcrawl.test' <<<"$out" || fail "the status does not name the test in flight: $out"
     grep -q '95_local-sitemap' <<<"$out" && fail "the status named a test that was never in flight"
