@@ -4326,8 +4326,9 @@ HTSEXT_API int hts_is_parsing(httrackp * opt, int flag) {
     return 0;                   // non
   }
 }
-HTSEXT_API int hts_is_testing(httrackp * opt) { // 0 non 1 test 2 purge
-  /* phases 2 to 6 (test, purge, 4, scheduling, wait for slot) map to 1 to 5 */
+
+HTSEXT_API int hts_is_testing(httrackp *opt) {
+  /* engine phases 2..6 report 1..5, named in httrack-library.h */
   const int phase = opt->state._hts_in_html_parsing;
 
   return phase >= 2 && phase <= 6 ? phase - 1 : 0;
