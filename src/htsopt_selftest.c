@@ -646,7 +646,7 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
      own parser, and the class of every name the wizard writes a value to */
   if (argc == 1 && strcmp(argv[0], "-list") == 0) {
     for (i = 0; optalias_value(i)[0] != '\0'; i++)
-      printf("%s %s\n", opttype_value(i), optalias_value(i));
+      printf("%s %s\n", optclass_name(optclass_of(i)), optalias_value(i));
     return 0;
   }
   if (argc >= 1) {
@@ -764,7 +764,7 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
     const int p = optalias_find(optalias_value(i));
     char word[HTS_CDLMAXSIZE], want[HTS_CDLMAXSIZE];
 
-    if (strcmp(opttype_value(p), "param") != 0)
+    if (optclass_of(p) != HTS_OPT_PARAM)
       continue;
     params++;
     snprintf(word, sizeof(word), "--%s=yes", optalias_value(i));
@@ -918,8 +918,11 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
     char word[HTS_CDLMAXSIZE];
 
     assertf(p >= 0);
+    /* every row's class is one of the seven, and its name reads back */
+    assertf(optclass_of(i) != HTS_OPT_UNKNOWN);
+    assertf(strcmp(optclass_name(optclass_of(i)), hts_optalias[i][2]) == 0);
     snprintf(word, sizeof(word), "--%s", optalias_value(i));
-    if (strncmp(opttype_value(p), "param", 5) == 0) {
+    if (optclass_takes_param(optclass_of(p))) {
       REFUSES(word, NULL);
     } else {
       EXPANDS(optreal_value(p), word, NULL);
