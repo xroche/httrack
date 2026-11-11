@@ -65,7 +65,7 @@ htsserver_SOURCES = htsserver.c htsserver.h htsweb.c htsweb.h htsstats.h \
 	htsshared.c htsshared.h
 proxytrack_SOURCES = proxy/main.c \
 	proxy/proxytrack.c proxy/store.c \
-	htsurlport.c htsurlport.h htsdate.c htsdate.h htsnet.c \
+	htsurlport.c htsurlport.h htsdate.c htsdate.h htsnet.c htscachecodec.h \
 	htsshared.c htsshared.h \
 	coucal/coucal.c htsmd5.c md5.c \
 	minizip/ioapi.c minizip/mztools.c minizip/unzip.c minizip/zip.c
@@ -94,7 +94,7 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	md5.c \
 	minizip/ioapi.c minizip/mztools.c minizip/unzip.c minizip/zip.c \
 	hts-indextmpl.h htsalias.h htsback.h htsbase.h htssafe.h htsdate.h \
-	htsbasenet.h htsbauth.h htsbundle.h htscache.h htscookie_selftest.h \
+	htsbasenet.h htsbauth.h htsbundle.h htscache.h htscachecodec.h htscookie_selftest.h \
 	htsselftest.h htsselftest_int.h htsselftest_util.h htscatchurl.h  \
 	htscmdline.h htsconfig.h htscore.h htsparse.h htscoremain.h htsdefines.h  \
 	htsfilters.h htsftp.h htsglobal.h htshash.h coucal/coucal.h \
