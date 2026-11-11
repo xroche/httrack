@@ -129,7 +129,7 @@ hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size) {
   strlncatbuff(dst, host, dst_size, len);
   // host names are case-insensitive, so one folded spelling reaches one entry
   hts_lowcase(dst);
-  // the request names an international host in its ASCII form, so a jar must
+  // a request names an international host in ASCII, so the jar keys on ASCII
   if (!hts_isStringAscii(dst, strlen(dst)) &&
       cookie_host_refusal(dst, strlen(dst)) != NULL)
     return HTS_FALSE;
