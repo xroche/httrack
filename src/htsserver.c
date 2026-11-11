@@ -2301,7 +2301,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
                 if (!hts_shared_linput(fp, line, sizeof(line) - 2,
                                        HTS_LINPUT_SKIP_NUL |
-                                           HTS_LINPUT_DRAIN)) {
+                                           HTS_LINPUT_DROP_TAIL)) {
                   *str = '\0';
                 }
                 if (hts_lastchar(str) == '\\') {

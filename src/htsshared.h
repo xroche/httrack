@@ -44,12 +44,12 @@ Please visit our Website: http://www.httrack.com
 /* Read one line of fp into s (max bytes, NUL included) and return its length.
    CR, TAB and form feed are dropped, and NUL too with HTS_LINPUT_SKIP_NUL. A
    line cut at the bound has its newline consumed, so the next read is not "",
-   and with HTS_LINPUT_DRAIN its tail is dropped rather than read as a line. */
+   and with HTS_LINPUT_DROP_TAIL the rest of the line is skipped. */
 int hts_shared_linput(FILE *fp, char *s, int max, int flags);
 
 /* hts_shared_linput() flags. */
 #define HTS_LINPUT_SKIP_NUL 1
-#define HTS_LINPUT_DRAIN 2
+#define HTS_LINPUT_DROP_TAIL 2
 
 /* Is s an existing regular file? A plain stat(), with no path conversion. */
 hts_boolean hts_shared_fexist(const char *s);

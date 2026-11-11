@@ -67,7 +67,7 @@ int hts_shared_linput(FILE *fp, char *s, int max, int flags) {
   } while ((c != -1) && (c != EOF) && (j < (max - 1)));
   if (j == max - 1 && c != -1 && c != EOF) {
     /* Stopped at the bound: consume the newline, or the next read returns "" */
-    if ((flags & HTS_LINPUT_DRAIN) != 0) {
+    if ((flags & HTS_LINPUT_DROP_TAIL) != 0) {
       while ((c = fgetc(fp)) != 10 && c != EOF)
         ;
     } else {
