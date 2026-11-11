@@ -496,7 +496,7 @@ static hts_boolean cmdl_cluster_step(const char *word, size_t *at, char *name,
   pos = optreal_find(name);
   *value = -1;
   /* only a lone -N reads the next word; a clustered one reads its digits */
-  if (pos < 0 || strcmp(opttype_value(pos), "param1") != 0 ||
+  if (pos < 0 || opttype_class(pos) != HTS_OPT_PARAM1 ||
       strcmp(name, "-N") == 0 || *next >= argc ||
       (argv[*next][0] == '-' && (param == NULL || !param[*next])))
     return HTS_TRUE;

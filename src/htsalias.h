@@ -66,7 +66,26 @@ hts_boolean optcluster_next(const char *token, size_t *at, char *name,
 size_t optrate_read(const char *val, double *rate);
 const char *optreal_value(int p);
 const char *optalias_value(int p);
-const char *opttype_value(int p);
+
+/* Class of an option row: how its value is written (see hts_optalias). */
+typedef enum hts_optclass {
+  HTS_OPT_UNKNOWN = 0,
+  HTS_OPT_SINGLE,
+  HTS_OPT_ONOFF,
+  HTS_OPT_LEVEL,
+  HTS_OPT_PARAM,
+  HTS_OPT_PARAM1,
+  HTS_OPT_PARAM0,
+  HTS_OPT_PARAMN
+} hts_optclass;
+
+/* Class of row P; HTS_OPT_UNKNOWN when its class string is not one of the
+ * seven. */
+hts_optclass opttype_class(int p);
+/* Table spelling of CLS ("param1"), or "unknown". */
+const char *hts_optclass_name(hts_optclass cls);
+/* Does CLS take a value (param, param1, param0, paramn)? */
+hts_boolean optclass_takes_param(hts_optclass cls);
 const char *hts_gethome(void);
 void expand_home(String * str);
 
