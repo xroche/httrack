@@ -92,7 +92,7 @@ void infomsg(const char *msg) {
     }
     if (p >= 0) {
       /* type of parameter: number, param, param concatenated, single cmd */
-      const hts_optclass cls = opttype_class(p);
+      const hts_optclass cls = optclass_of(p);
 
       if (cls == HTS_OPT_PARAM || cls == HTS_OPT_PARAMN || cls == HTS_OPT_LEVEL)
         printf("%s (--%s[=N])\n", msg, optalias_value(p));

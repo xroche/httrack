@@ -677,7 +677,7 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
       /* Now solve the alias */
       pos = optalias_find(command);
       if (pos >= 0) {
-        const hts_optclass cls = opttype_class(pos);
+        const hts_optclass cls = optclass_of(pos);
 
         /* Copy real name */
         strcpybuff(command, hts_optalias[pos][1]);
@@ -820,7 +820,7 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
     int pos;
 
     if ((pos = optreal_find(argv[n_arg])) >= 0) {
-      const hts_optclass cls = opttype_class(pos);
+      const hts_optclass cls = optclass_of(pos);
 
       /* -N 1 is preset 1; anything else stays detached, since a template may
          legitimately open with a digit (-N 2col/%n.%t) */
@@ -961,7 +961,7 @@ static const struct {
     {HTS_OPT_PARAMN, "paramn"},
 };
 
-hts_optclass opttype_class(int p) {
+hts_optclass optclass_of(int p) {
   size_t i;
 
   for (i = 0; i < sizeof(optclass_names) / sizeof(optclass_names[0]); i++) {
@@ -971,7 +971,7 @@ hts_optclass opttype_class(int p) {
   return HTS_OPT_UNKNOWN;
 }
 
-const char *hts_optclass_name(hts_optclass cls) {
+const char *optclass_name(hts_optclass cls) {
   size_t i;
 
   for (i = 0; i < sizeof(optclass_names) / sizeof(optclass_names[0]); i++) {
@@ -1107,7 +1107,7 @@ static void optinclude_fold(const char *key, char *value) {
     hts_lowcase(value);
     return;
   }
-  type = opttype_class(pos);
+  type = optclass_of(pos);
   if (type == HTS_OPT_PARAM0)
     return;
   keywords = type == HTS_OPT_PARAM1 ? none : onoff;

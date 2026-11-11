@@ -81,9 +81,9 @@ typedef enum hts_optclass {
 
 /* Class of row P; HTS_OPT_UNKNOWN when its class string is not one of the
  * seven. */
-hts_optclass opttype_class(int p);
+hts_optclass optclass_of(int p);
 /* Table spelling of CLS ("param1"), or "unknown". */
-const char *hts_optclass_name(hts_optclass cls);
+const char *optclass_name(hts_optclass cls);
 /* Does CLS take a value (param, param1, param0, paramn)? */
 hts_boolean optclass_takes_param(hts_optclass cls);
 const char *hts_gethome(void);
