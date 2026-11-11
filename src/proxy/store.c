@@ -57,6 +57,7 @@ Please visit our Website: http://www.httrack.com
 #include "htslib.h" /* hts_effective_mime */
 #include "htsio.h"
 #include "htsurlport.h"
+#include "htscachecodec.h"
 
 #include "store.h"
 #include "proxystrings.h"
@@ -956,59 +957,6 @@ static PT_Element PT_ReadCache__New(PT_Index index, const char *url, int flags) 
 /* New HTTrack cache (new.zip) format                           */
 /* ------------------------------------------------------------ */
 
-/* Values read back off a cache, so the block is bounded rather than trusted to
-   the element caps; a field that does not fit is dropped whole and counted,
-   since a clipped one reads back as valid. `headers` must be an array. */
-#define ZIP_FIELD_STRING(headers, headersSize, dropped, field, value)          \
-  do {                                                                         \
-    if ((value) != NULL && (value)[0] != '\0' &&                               \
-        !slcatprintfbuff(headers, sizeof(headers), &(headersSize),             \
-                         "%s: %s\r\n", field, value)) {                        \
-      (dropped)++;                                                             \
-    }                                                                          \
-  } while (0)
-#define ZIP_FIELD_INT(headers, headersSize, dropped, field, value)             \
-  do {                                                                         \
-    if ((value) != 0 &&                                                        \
-        !slcatprintfbuff(headers, sizeof(headers), &(headersSize),             \
-                         "%s: " LLintP "\r\n", field, (LLint) (value))) {      \
-      (dropped)++;                                                             \
-    }                                                                          \
-  } while (0)
-#define ZIP_FIELD_INT_FORCE(headers, headersSize, dropped, field, value)       \
-  do {                                                                         \
-    if (!slcatprintfbuff(headers, sizeof(headers), &(headersSize),             \
-                         "%s: " LLintP "\r\n", field, (LLint) (value))) {      \
-      (dropped)++;                                                             \
-    }                                                                          \
-  } while (0)
-/* refvalue_size is mandatory: the cache line is bounded only by the line
-   buffer, not by the destination. */
-#define ZIP_READFIELD_STRING(line, value, refline, refvalue, refvalue_size)    \
-  do {                                                                         \
-    if (line[0] != '\0' && strfield2(line, refline)) {                         \
-      (void) strclipbuff(refvalue, refvalue_size, value);                      \
-      line[0] = '\0';                                                          \
-    }                                                                          \
-  } while (0)
-#define ZIP_READFIELD_INT(line, value, refline, refvalue) do { \
-  if (line[0] != '\0' && strfield2(line, refline)) { \
-    int intval = 0; \
-    sscanf(value, "%d", &intval); \
-    (refvalue) = intval; \
-    line[0] = '\0'; \
-	} \
-} while(0)
-#define ZIP_READFIELD_LLINT(line, value, refline, refvalue)                    \
-  do {                                                                         \
-    if (line[0] != '\0' && strfield2(line, refline)) {                         \
-      LLint intval = 0;                                                        \
-      sscanf(value, LLintP, &intval);                                          \
-      (refvalue) = intval;                                                     \
-      line[0] = '\0';                                                          \
-    }                                                                          \
-  } while (0)
-
 /* Set path (capacity size) to filename's parent directory, separator included,
    from an absolute filename. Empty when there is none, or when it would not
    fit: a truncated prefix names a different directory. */
@@ -1549,20 +1497,9 @@ static int PT_SaveCache__New_Fun(void *arg, const char *url, PT_Element element)
   /* Fields */
   headers[0] = '\0';
   /* */
-  {
-    const char *message;
-
-    if (strlen(element->msg) < 32) {
-      message = element->msg;
-    } else {
-      message = "(See X-StatusMessage)";
-    }
-    /* 64 characters MAX for first line */
-    if (!slcatprintfbuff(headers, sizeof(headers), &headersSize,
-                         "HTTP/1.%c %d %s\r\n", '1', element->statuscode,
-                         message)) {
-      headersDropped++;
-    }
+  if (!hts_cache_status_line(headers, sizeof(headers), &headersSize,
+                             element->statuscode, element->msg)) {
+    headersDropped++;
   }
 
   /* Second line MUST ALWAYS be X-In-Cache */
@@ -1597,20 +1534,7 @@ static int PT_SaveCache__New_Fun(void *arg, const char *url, PT_Element element)
   }
 
   /* Time */
-  memset(&fi, 0, sizeof(fi));
-  if (element->lastmodified[0] != '\0') {
-    struct tm buffer;
-    struct tm *tm_s = convert_time_rfc822(&buffer, element->lastmodified);
-
-    if (tm_s) {
-      fi.tmz_date.tm_sec = (uInt) tm_s->tm_sec;
-      fi.tmz_date.tm_min = (uInt) tm_s->tm_min;
-      fi.tmz_date.tm_hour = (uInt) tm_s->tm_hour;
-      fi.tmz_date.tm_mday = (uInt) tm_s->tm_mday;
-      fi.tmz_date.tm_mon = (uInt) tm_s->tm_mon;
-      fi.tmz_date.tm_year = (uInt) tm_s->tm_year;
-    }
-  }
+  hts_cache_zip_date(&fi, element->lastmodified);
 
   /* Open file - NOTE: headers in "comment" */
   if ((zErr = zipOpenNewFileInZip(zFileOut, url, &fi,
@@ -2627,15 +2551,6 @@ int PT_LoadCache__Arc(PT_Index index_, const char *filename) {
   return 0;
 }
 
-/* Same contract as ZIP_READFIELD_STRING, for the ARC reader's header lines. */
-#define HTTP_READFIELD_STRING(line, value, refline, refvalue, refvalue_size)   \
-  do {                                                                         \
-    if (line[0] != '\0' && strfield2(line, refline)) {                         \
-      (void) strclipbuff(refvalue, refvalue_size, value);                      \
-      line[0] = '\0';                                                          \
-    }                                                                          \
-  } while (0)
-
 static PT_Element PT_ReadCache__Arc(PT_Index index, const char *url, int flags) {
   PT_Element retCode;
 
@@ -2706,16 +2621,16 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
               for(value++; *value == ' ' || *value == '\t'; value++) ;
               ZIP_READFIELD_LLINT(line, value, "Content-Length",
                                   declaredLength);
-              HTTP_READFIELD_STRING(line, value, "Content-Type", r->contenttype,
-                                    sizeof(r->contenttype));
-              HTTP_READFIELD_STRING(line, value, "Last-Modified",
-                                    r->lastmodified, sizeof(r->lastmodified));
-              HTTP_READFIELD_STRING(line, value, "Etag", r->etag,
-                                    sizeof(r->etag));
-              HTTP_READFIELD_STRING(line, value, "Location", r->location,
-                                    sizeof(location_default));
-              HTTP_READFIELD_STRING(line, value, "Content-Disposition",
-                                    r->cdispo, sizeof(r->cdispo));
+              ZIP_READFIELD_STRING(line, value, "Content-Type", r->contenttype,
+                                   sizeof(r->contenttype));
+              ZIP_READFIELD_STRING(line, value, "Last-Modified",
+                                   r->lastmodified, sizeof(r->lastmodified));
+              ZIP_READFIELD_STRING(line, value, "Etag", r->etag,
+                                   sizeof(r->etag));
+              ZIP_READFIELD_STRING(line, value, "Location", r->location,
+                                   sizeof(location_default));
+              ZIP_READFIELD_STRING(line, value, "Content-Disposition",
+                                   r->cdispo, sizeof(r->cdispo));
               if (line[0] != '\0') {
                 PT_AppendHeader(&r->headers, &headersLen, &headersCap, line,
                                 value);
@@ -2734,7 +2649,7 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
 
             if (pos != NULL) {
               /*char *chs = strchr(pos, "charset="); */
-              /*HTTP_READFIELD_STRING(line, value, "X-Charset", r->charset); */
+              /*ZIP_READFIELD_STRING(line, value, "X-Charset", r->charset); */
               *pos = 0;
               if ((pos = strchr(r->contenttype, ' ')) != NULL) {
                 *pos = 0;
