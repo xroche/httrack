@@ -15,6 +15,12 @@ for opts in "" -K -x; do
     # Without https support the parser leaves an https link as written.
     https_login=()
     https_nologin=()
+    # -K strips a scheme word from an adr with no "//", the other two keep it.
+    raw=()
+    if test "$opts" != "-K"; then
+        raw=(--file-matches "$page" "${pre}http://ftp:pw@example\.invalid/u\.html\""
+            --file-matches "$page" "${pre}http://http:evil\.invalid/n\.html\"")
+    fi
     if test "$HTTPS_SUPPORT" != "no"; then
         https_login=(--file-matches "$page" "${pre}https://user:pw@example\.invalid/slogin\.html\"")
         https_nologin=(--file-matches "$page" "${pre}https://example\.invalid/slogin\.html\""
@@ -25,7 +31,7 @@ for opts in "" -K -x; do
         --file-matches "$page" "${pre}http://user:pw@example\.invalid/login\.html\"" \
         --file-matches "$page" "${pre}ftp://example\.invalid/f\.txt\"" \
         --file-matches "$page" "${pre}http://user:pw@example\.invalid/\"" \
-        "${https_login[@]}" \
+        "${https_login[@]}" "${raw[@]}" \
         httrack "BASEURL/$page" -r2 $opts
     # shellcheck disable=SC2086 # $opts is one option or none
     bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
