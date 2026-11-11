@@ -3841,7 +3841,7 @@ static void postprocess_file(httrackp *opt, const char *save, const char *adr,
           mimehtml_create(opt, cid);
         }
         if (opt->state.mimefp != NULL) {
-          char buff[60 * 100 + 2];
+          char buff[60 * 100];
           char mimebuff[256];
           size_t len;
 
@@ -3858,7 +3858,7 @@ static void postprocess_file(httrackp *opt, const char *save, const char *adr,
                   "Content-ID: <%s>\r\n"
                   "\r\n",
                   mimebuff, isHtml ? "8bit" : "base64", cid);
-          while ((len = fread(buff, 1, sizeof(buff) - 2, fp)) > 0) {
+          while ((len = fread(buff, 1, sizeof(buff), fp)) > 0) {
             if (!isHtml) {
               char base64buff[60 * 100 * 2];
 
