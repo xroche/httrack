@@ -231,18 +231,11 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
   // IDNA / RFC 3492 (Punycode) handling for HTTP(s)
   if (!link_has_authority(adrfil->adr) || strfield(adrfil->adr, "https:")) {
     char *const a = jump_identification(adrfil->adr);
-    // Non-ASCII characters (theorically forbidden, but browsers are lenient)
-    if (!hts_isStringAscii(a, strlen(a))) {
-      char *const idna = hts_convertStringUTF8ToIDNA(a, strlen(a));
-      if (idna != NULL) {
-        if (strlen(idna) < HTS_URLMAXSIZE) {
-          /* a points within adrfil->adr; bound by the remaining capacity */
-          strlcpybuff(a, idna,
-                      sizeof(adrfil->adr) - (size_t) (a - adrfil->adr));
-        }
-        free(idna);
-      }
-    }
+    const size_t room = sizeof(adrfil->adr) - (size_t) (a - adrfil->adr);
+
+    // a host with no ASCII form, or too long once converted, is kept raw
+    (void) hts_host_to_ascii(a, room < HTS_URLMAXSIZE ? room : HTS_URLMAXSIZE,
+                             a, strlen(a));
   }
 
   return ok;

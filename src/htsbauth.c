@@ -130,20 +130,11 @@ hts_boolean cookie_host(const char *adr, char *dst, size_t dst_size) {
   // host names are case-insensitive, so one folded spelling reaches one entry
   hts_lowcase(dst);
   // the request names an international host in its ASCII form, so a jar must
-  if (!hts_isStringAscii(dst, strlen(dst))) {
-    char *idna;
-    hts_boolean fits;
-
-    if (cookie_host_refusal(dst, strlen(dst)) != NULL)
-      return HTS_FALSE;
-    idna = hts_convertStringUTF8ToIDNA(dst, strlen(dst));
-    fits = idna != NULL && strlen(idna) < dst_size;
-    if (fits)
-      strlcpybuff(dst, idna, dst_size);
-    freet(idna);
-    if (!fits)
-      return HTS_FALSE;
-  }
+  if (!hts_isStringAscii(dst, strlen(dst)) &&
+      cookie_host_refusal(dst, strlen(dst)) != NULL)
+    return HTS_FALSE;
+  if (!hts_host_to_ascii(dst, dst_size, dst, strlen(dst)))
+    return HTS_FALSE;
   /* "%25" is RFC 6874's URI spelling of a zone id's '%'. Only a bracketed
      literal carries it, because a bare host's '%' is already literal. */
   if (literal) {
