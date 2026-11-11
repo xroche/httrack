@@ -6,25 +6,30 @@ set -e
 
 page=appletscheme/index.html
 
-# Without https support the parser leaves an https codebase as written.
-https_dir='codebase="https://example\.invalid/sdir/" code="s\.Foo\.class"'
-login_dir='codebase="https://user:pw@example\.invalid/ldir/" code="l\.Foo\.class"'
-nologin_dir="$login_dir"
-if test "$HTTPS_SUPPORT" != "no"; then
-    nologin_dir='codebase="https://example\.invalid/ldir/" code="l\.Foo\.class"'
-fi
+https_codebase='codebase="https://example\.invalid/sdir/" code="s\.Foo\.class"'
+login_codebase='codebase="https://user:pw@example\.invalid/ldir/" code="l\.Foo\.class"'
+nologin_codebase='codebase="https://example\.invalid/ldir/" code="l\.Foo\.class"'
+http_codebase='codebase="http://example\.invalid/hdir/" code="h\.Foo\.class"'
+amp_codebase='codebase="http://example\.invalid/q&amp;x/" code="a\.Foo\.class"'
 
-# -%x drops the login from the external codebase.
-for opts in "" -%x; do
-    expect_login="$login_dir"
-    if test -n "$opts"; then
-        expect_login="$nologin_dir"
-    fi
-    # shellcheck disable=SC2086 # $opts is one option or none
-    bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
-        --file-matches "$page" "$https_dir" \
-        --file-matches "$page" "$expect_login" \
-        --file-matches "$page" 'codebase="http://example\.invalid/hdir/" code="h\.Foo\.class"' \
-        --file-not-matches "$page" 'http://https' \
-        httrack "BASEURL/$page" -r2 $opts
-done
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    --file-matches "$page" "$https_codebase" \
+    --file-matches "$page" "$login_codebase" \
+    --file-matches "$page" "$http_codebase" \
+    --file-matches "$page" "$amp_codebase" \
+    --file-not-matches "$page" 'http://https' \
+    httrack "BASEURL/$page" -r2
+
+# -%x drops the login, but without https support the parser leaves an https
+# codebase as written.
+privacy_codebase="$login_codebase"
+if test "$HTTPS_SUPPORT" != "no"; then
+    privacy_codebase="$nologin_codebase"
+fi
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    --file-matches "$page" "$https_codebase" \
+    --file-matches "$page" "$privacy_codebase" \
+    --file-matches "$page" "$http_codebase" \
+    --file-matches "$page" "$amp_codebase" \
+    --file-not-matches "$page" 'http://https' \
+    httrack "BASEURL/$page" -r2 -%x
