@@ -4599,13 +4599,7 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
             // record the link
             if (hts_record_link(opt, add.af.adr, add.af.fil, add.save,
                                 former.adr, former.fil, NULL)) {
-              heap_top()->testmode = 0;    // mode test?
-              heap_top()->link_import = 0; // mode normal
-              heap_top()->depth = opt->depth;
-              heap_top()->pass2 = max(0, numero_passe);
-              heap_top()->retry = opt->retry;
-              heap_top()->premier = heap_top_index();
-              heap_top()->precedent = heap_top_index();
+              hts_link_set_self_parented(opt, opt->depth, max(0, numero_passe));
               //
               hts_log_print(opt, LOG_INFO, "Link added by user: %s%s",
                             adr_nologin(opt, add.af.adr), add.af.fil);
