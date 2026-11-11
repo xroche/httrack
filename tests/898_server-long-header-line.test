@@ -1,0 +1,94 @@
+#!/bin/bash
+#
+# A request header too long for the line buffer of the WebHTTrack server or of
+# ProxyTrack is dropped whole, so its tail cannot pose as a header of its own.
+
+set -euo pipefail
+
+# shellcheck source=tests/webhttracklib.sh
+. "${0%"${0##*/}"}./webhttracklib.sh"
+
+htsserver_require
+python=${HTS_PYTHON}
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/long_header.XXXXXX") || fail "no tmpdir"
+ptpid=
+cleanup() {
+    stop_server "${ptpid}"
+    htsserver_cleanup
+    rm -rf "${work}"
+}
+cleanup_push cleanup
+
+# The status line of a GET carrying the extra header lines $4 names.
+status() { # status PORT PATH HOST short|own|cut|cut1|cutnext
+    "${python}" - "$@" <<'PY'
+import socket, sys
+
+sys.stdout.reconfigure(newline="\n")  # the status is compared byte for byte
+port, path, host, kind = int(sys.argv[1]), sys.argv[2], sys.argv[3], sys.argv[4]
+# 8189 bytes, the most either server keeps of one line.
+pad = b"X-Pad: " + b"A" * 8182
+evil = b"Host: evil.example\r\n"
+extra = {
+    "short": b"X-Pad: A\r\n",
+    "own": evil,
+    "cut": pad + evil,
+    "cut1": pad + b"X" + evil,
+    "cutnext": pad + b"tail\r\n" + evil,
+}[kind]
+s = socket.create_connection(("127.0.0.1", port), 10)
+s.settimeout(30)
+s.sendall(b"GET %s HTTP/1.0\r\nHost: %s\r\n%s\r\n" % (path.encode(), host.encode(), extra))
+buf = b""
+try:
+    while b"\r\n" not in buf:
+        chunk = s.recv(4096)
+        if not chunk:
+            break
+        buf += chunk
+except OSError:
+    pass
+print(buf.split(b"\r\n")[0].decode("latin-1"))
+PY
+}
+
+# Rows of "kind expected-status": "own" proves a foreign Host is seen, "cut1"
+# that the whole tail is drained, and "cutnext" that the next line is read.
+check() { # check NAME PORT PATH HOST FOREIGN-HOST-STATUS
+    local kind want got
+    for row in "short 200" "own $5" "cut 200" "cut1 200" "cutnext $5"; do
+        read -r kind want <<<"${row}"
+        got=$(status "$2" "$3" "$4" "${kind}")
+        case ${got} in
+        "HTTP/1."?" ${want} "*) ;;
+        *) fail "$1, ${kind}: wanted ${want}, got '${got}'" ;;
+        esac
+    done
+    echo "ok: $1"
+}
+
+htsserver_start --home "${work}/home"
+check htsserver "${HTS_PORT}" /server/index.html 127.0.0.1 403
+
+"${python}" - "$(nativepath "${work}")" <<'PY'
+import os, sys, zipfile
+
+meta = (
+    b"X-In-Cache: 1\r\nX-StatusCode: 200\r\nX-StatusMessage: ok\r\n"
+    b"X-Size: 3\r\nContent-Type: text/html\r\n"
+)
+with zipfile.ZipFile(os.path.join(sys.argv[1], "new.zip"), "w") as z:
+    zi = zipfile.ZipInfo("example.com/page")
+    zi.compress_type = zipfile.ZIP_STORED
+    zi.extra = meta
+    z.writestr(zi, b"HIT")
+PY
+
+launch_proxytrack() {
+    proxytrack "127.0.0.1:${proxyport}" "127.0.0.1:${icpport}" \
+        "${work}/new.zip" >"${ptlog}" 2>&1 &
+    ptpid=$!
+}
+start_proxytrack "${work}/pt" launch_proxytrack
+check proxytrack "${proxyport}" /page example.com 404

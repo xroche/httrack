@@ -34,8 +34,10 @@ Please visit our Website: http://www.httrack.com
 #define HTSSHARED_DEFH
 
 #include "htsglobal.h"
+#include "htsbasenet.h"
 
 #include <stdio.h>
+#include <time.h>
 
 /* Not HTSEXT_API, because that breaks the MSVC proxytrack build. */
 
@@ -52,5 +54,16 @@ hts_boolean hts_shared_fexist(const char *s);
 
 /* Does the link carry an authority ("//host"), after an optional scheme? */
 hts_boolean hts_shared_link_has_authority(const char *lien);
+
+/* Wait until soc is readable or deadline passes; a deadline of 0 never
+   passes. */
+hts_boolean hts_shared_readable(T_SOC soc, time_t deadline);
+
+/* Read one line off soc into s (max bytes, NUL included) and return its
+   length, or -1 when no byte came before deadline (0: none). CR, TAB and form
+   feed are dropped. A line longer than s is drained to its newline and sets
+   *cut, so its tail is never read as a line of its own. */
+int hts_shared_linputsoc(T_SOC soc, char *s, int max, time_t deadline,
+                         hts_boolean *cut);
 
 #endif

@@ -267,10 +267,8 @@ static void sig_brpipe(int code) {
   /* ignore */
 }
 
-HTS_UNUSED static int check_readinput_t(T_SOC soc, int timeout);
-HTS_UNUSED static int recv_bl(T_SOC soc, void *buffer, size_t len, int timeout);
-HTS_UNUSED static int linputsoc(T_SOC soc, char *s, int max);
-HTS_UNUSED static int linputsoc_t(T_SOC soc, char *s, int max, int timeout);
+HTS_UNUSED static int recv_bl(T_SOC soc, void *buffer, size_t len,
+                              time_t deadline);
 
 /* Language files */
 HTS_UNUSED static int htslang_load(char *limit_to, size_t limit_size,
@@ -1626,6 +1624,9 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
     hts_boolean authed = HTS_FALSE;
     char origin[256];
     char host[256];
+    /* When reads on this request give up. */
+    time_t deadline;
+    hts_boolean cut;
 
     line[0] = '\0';
     buffer[0] = '\0';
@@ -1678,9 +1679,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
     webhttrack_lock();
 
     /* One total deadline for the whole request, against a slow drip */
-    linputsoc_deadline = time(NULL) + timeout;
+    deadline = time(NULL) + timeout;
 
-    if (linputsoc_t(soc_c, line1, sizeof(line1) - 2, timeout) > 0) {
+    /* A request line too long for line1 is served clipped. */
+    if (hts_shared_linputsoc(soc_c, line1, sizeof(line1) - 2, deadline, &cut) >
+        0) {
       int meth = 0;
       /* meth is rewritten later, so HEAD needs its own flag */
       hts_boolean is_head = HTS_FALSE;
@@ -1696,10 +1699,13 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
       if (meth) {
         /* Flush headers */
         length = -1;
-        while(linputsoc_t(soc_c, line, sizeof(line) - 2, timeout) > 0) {
+        while (hts_shared_linputsoc(soc_c, line, sizeof(line) - 2, deadline,
+                                    &cut) > 0) {
           int p;
 
-          if ((p = strfield(line, "Content-length:")) != 0) {
+          if (cut) {
+            /* A clipped header is not the one the client sent. */
+          } else if ((p = strfield(line, "Content-length:")) != 0) {
             const char *a = line + p;
 
             if (hts_scan_llint(&a, 0, INT64_MAX, &length) != HTS_SCAN_OK) {
@@ -1738,7 +1744,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
           } else if (too_large || !grow_buffer(&buffer, &buffer_size, want)) {
             too_large = HTS_TRUE;
           } else if (want > 0 &&
-                     (sz = recv_bl(soc_c, buffer, want, timeout)) < 0) {
+                     (sz = recv_bl(soc_c, buffer, want, deadline)) < 0) {
             meth = 0;
           } else if ((size_t) sz > SMALLSERVER_BODY_MAX) {
             too_large = HTS_TRUE;
@@ -2961,7 +2967,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
       shutdown(soc_c, 1);
 #endif
       /* IE may send a CRLF after the POST data, and a refused body is unread */
-      while (check_readinput_t(soc_c, timeout) &&
+      while (hts_shared_readable(soc_c, deadline) &&
              recv(soc_c, c, sizeof(c), 0) > 0)
         ;
     }
@@ -3460,14 +3466,13 @@ const char* LANGINTKEY(const char* name) {
 
 /* *** Various functions *** */
 
-static int recv_bl(T_SOC soc, void *buffer, size_t len, int timeout) {
-  if (check_readinput_t(soc, timeout)) {
+static int recv_bl(T_SOC soc, void *buffer, size_t len, time_t deadline) {
+  if (hts_shared_readable(soc, deadline)) {
     int n = 1;
     size_t size = len;
     size_t offs = 0;
 
-    while (n > 0 && size > 0 &&
-           (linputsoc_deadline == 0 || check_readinput_t(soc, timeout))) {
+    while (n > 0 && size > 0 && hts_shared_readable(soc, deadline)) {
       n = recv(soc, ((char *) buffer) + offs, (int) size, 0);
       if (n > 0) {
         offs += n;
