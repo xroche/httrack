@@ -172,8 +172,8 @@ static int st_readline(httrackp *opt, int argc, char **argv) {
 /* Set when a legacy read stopped for want of room, not at the line's end. */
 static hts_boolean st_legacy_full;
 
-/* htslib.c's linput() (TAB and FF), rawlinput() (none) and htsserver.h's
-   linput() (both), which differ only in the bytes they drop. */
+/* Copies the removed readers: the old htslib.c linput() (TAB and FF),
+   rawlinput() (none) and htsserver.h linput() (both). */
 static int legacy_linput(FILE *fp, char *s, int max, int flags) {
   int c;
   int j = 0;
