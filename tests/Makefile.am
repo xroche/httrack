@@ -27,6 +27,7 @@ EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c gaistall.c noba
 	server-root/fraglink/index.html server-root/fraglink/target.html \
 	server-root/extplaceholder/index.html \
 	server-root/quoteurl/index.html server-root/quoteurl/page.html \
+	server-root/appletscheme/index.html \
 	server-root/abslogin/index.html \
 	fixtures/cache-golden/hts-cache/new.zip \
 	install-manifest.txt \
