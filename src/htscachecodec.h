@@ -26,7 +26,7 @@ Please visit our Website: http://www.httrack.com
 */
 
 /* ------------------------------------------------------------ */
-/* File: ZIP cache entry fields, shared by the engine and proxytrack */
+/* File: ZIP and ARC cache entry fields, shared by engine and proxytrack */
 /* Author: Xavier Roche                                          */
 /* ------------------------------------------------------------ */
 
@@ -72,14 +72,14 @@ Please visit our Website: http://www.httrack.com
 
 /* A corrupt cache can carry a field wider than ours; clipping it keeps the
    entry, where aborting would take the crawl down. */
-#define ZIP_READFIELD_STRING(line, value, refline, refvalue, refvalue_size)    \
+#define CACHE_READFIELD_STRING(line, value, refline, refvalue, refvalue_size)  \
   do {                                                                         \
     if (line[0] != '\0' && strfield2(line, refline)) {                         \
       (void) strclipbuff(refvalue, refvalue_size, value);                      \
       line[0] = '\0';                                                          \
     }                                                                          \
   } while (0)
-#define ZIP_READFIELD_INT(line, value, refline, refvalue)                      \
+#define CACHE_READFIELD_INT(line, value, refline, refvalue)                    \
   do {                                                                         \
     if (line[0] != '\0' && strfield2(line, refline)) {                         \
       int intval = 0;                                                          \
@@ -88,7 +88,7 @@ Please visit our Website: http://www.httrack.com
       line[0] = '\0';                                                          \
     }                                                                          \
   } while (0)
-#define ZIP_READFIELD_LLINT(line, value, refline, refvalue)                    \
+#define CACHE_READFIELD_LLINT(line, value, refline, refvalue)                  \
   do {                                                                         \
     if (line[0] != '\0' && strfield2(line, refline)) {                         \
       LLint intval = 0;                                                        \

@@ -1321,25 +1321,26 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
               *value++ = '\0';
               if (*value == ' ' || *value == '\t')
                 value++;
-              ZIP_READFIELD_INT(line, value, "X-In-Cache", dataincache);
-              ZIP_READFIELD_INT(line, value, "X-Statuscode", r->statuscode);
-              ZIP_READFIELD_STRING(line, value, "X-StatusMessage", r->msg,
-                                   sizeof(r->msg));
-              ZIP_READFIELD_LLINT(line, value, "X-Size", declared_size); // size
-              ZIP_READFIELD_STRING(line, value, "Content-Type", r->contenttype,
-                                   sizeof(r->contenttype));
-              ZIP_READFIELD_STRING(line, value, "X-Charset", r->charset,
-                                   sizeof(r->charset));
-              ZIP_READFIELD_STRING(line, value, "Last-Modified",
-                                   r->lastmodified, sizeof(r->lastmodified));
-              ZIP_READFIELD_STRING(line, value, "Etag", r->etag,
-                                   sizeof(r->etag));
-              ZIP_READFIELD_STRING(line, value, "Location", r->location,
-                                   sizeof(location_default));
-              ZIP_READFIELD_STRING(line, value, "Content-Disposition",
-                                   r->cdispo, sizeof(r->cdispo));
-              ZIP_READFIELD_STRING(line, value, "X-Save", previous_save_,
-                                   sizeof(previous_save_));
+              CACHE_READFIELD_INT(line, value, "X-In-Cache", dataincache);
+              CACHE_READFIELD_INT(line, value, "X-Statuscode", r->statuscode);
+              CACHE_READFIELD_STRING(line, value, "X-StatusMessage", r->msg,
+                                     sizeof(r->msg));
+              CACHE_READFIELD_LLINT(line, value, "X-Size",
+                                    declared_size); // size
+              CACHE_READFIELD_STRING(line, value, "Content-Type",
+                                     r->contenttype, sizeof(r->contenttype));
+              CACHE_READFIELD_STRING(line, value, "X-Charset", r->charset,
+                                     sizeof(r->charset));
+              CACHE_READFIELD_STRING(line, value, "Last-Modified",
+                                     r->lastmodified, sizeof(r->lastmodified));
+              CACHE_READFIELD_STRING(line, value, "Etag", r->etag,
+                                     sizeof(r->etag));
+              CACHE_READFIELD_STRING(line, value, "Location", r->location,
+                                     sizeof(location_default));
+              CACHE_READFIELD_STRING(line, value, "Content-Disposition",
+                                     r->cdispo, sizeof(r->cdispo));
+              CACHE_READFIELD_STRING(line, value, "X-Save", previous_save_,
+                                     sizeof(previous_save_));
               /* naming-only marker: consumed so it never reaches a reply */
               if (line[0] != '\0' && strfield2(line, "X-Kept"))
                 line[0] = '\0';
@@ -2619,18 +2620,18 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
             if (value != NULL) {
               *value = '\0';
               for(value++; *value == ' ' || *value == '\t'; value++) ;
-              ZIP_READFIELD_LLINT(line, value, "Content-Length",
-                                  declaredLength);
-              ZIP_READFIELD_STRING(line, value, "Content-Type", r->contenttype,
-                                   sizeof(r->contenttype));
-              ZIP_READFIELD_STRING(line, value, "Last-Modified",
-                                   r->lastmodified, sizeof(r->lastmodified));
-              ZIP_READFIELD_STRING(line, value, "Etag", r->etag,
-                                   sizeof(r->etag));
-              ZIP_READFIELD_STRING(line, value, "Location", r->location,
-                                   sizeof(location_default));
-              ZIP_READFIELD_STRING(line, value, "Content-Disposition",
-                                   r->cdispo, sizeof(r->cdispo));
+              CACHE_READFIELD_LLINT(line, value, "Content-Length",
+                                    declaredLength);
+              CACHE_READFIELD_STRING(line, value, "Content-Type",
+                                     r->contenttype, sizeof(r->contenttype));
+              CACHE_READFIELD_STRING(line, value, "Last-Modified",
+                                     r->lastmodified, sizeof(r->lastmodified));
+              CACHE_READFIELD_STRING(line, value, "Etag", r->etag,
+                                     sizeof(r->etag));
+              CACHE_READFIELD_STRING(line, value, "Location", r->location,
+                                     sizeof(location_default));
+              CACHE_READFIELD_STRING(line, value, "Content-Disposition",
+                                     r->cdispo, sizeof(r->cdispo));
               if (line[0] != '\0') {
                 PT_AppendHeader(&r->headers, &headersLen, &headersCap, line,
                                 value);
@@ -2648,8 +2649,6 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
             char *pos = strchr(r->contenttype, ';');
 
             if (pos != NULL) {
-              /*char *chs = strchr(pos, "charset="); */
-              /*ZIP_READFIELD_STRING(line, value, "X-Charset", r->charset); */
               *pos = 0;
               if ((pos = strchr(r->contenttype, ' ')) != NULL) {
                 *pos = 0;

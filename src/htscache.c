@@ -622,25 +622,26 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
               *value++ = '\0';
               if (*value == ' ' || *value == '\t')
                 value++;
-              ZIP_READFIELD_INT(line, value, "X-In-Cache", dataincache);
-              ZIP_READFIELD_INT(line, value, "X-Statuscode", r.statuscode);
-              ZIP_READFIELD_INT(line, value, "X-Kept", kept);
-              ZIP_READFIELD_STRING(line, value, "X-StatusMessage", r.msg,
-                                   sizeof(r.msg));
-              ZIP_READFIELD_LLINT(line, value, "X-Size", r.size);       // size
-              ZIP_READFIELD_STRING(line, value, "Content-Type", r.contenttype,
-                                   sizeof(r.contenttype));
-              ZIP_READFIELD_STRING(line, value, "X-Charset", r.charset,
-                                   sizeof(r.charset));
-              ZIP_READFIELD_STRING(line, value, "Last-Modified", r.lastmodified,
-                                   sizeof(r.lastmodified));
-              ZIP_READFIELD_STRING(line, value, "Etag", r.etag, sizeof(r.etag));
-              ZIP_READFIELD_STRING(line, value, "Location", r.location,
-                                   HTS_LOCATION_SIZE);
-              ZIP_READFIELD_STRING(line, value, "Content-Disposition", r.cdispo,
-                                   sizeof(r.cdispo));
-              ZIP_READFIELD_STRING(line, value, "X-Save", previous_save_,
-                                   sizeof(previous_save_));
+              CACHE_READFIELD_INT(line, value, "X-In-Cache", dataincache);
+              CACHE_READFIELD_INT(line, value, "X-Statuscode", r.statuscode);
+              CACHE_READFIELD_INT(line, value, "X-Kept", kept);
+              CACHE_READFIELD_STRING(line, value, "X-StatusMessage", r.msg,
+                                     sizeof(r.msg));
+              CACHE_READFIELD_LLINT(line, value, "X-Size", r.size); // size
+              CACHE_READFIELD_STRING(line, value, "Content-Type", r.contenttype,
+                                     sizeof(r.contenttype));
+              CACHE_READFIELD_STRING(line, value, "X-Charset", r.charset,
+                                     sizeof(r.charset));
+              CACHE_READFIELD_STRING(line, value, "Last-Modified",
+                                     r.lastmodified, sizeof(r.lastmodified));
+              CACHE_READFIELD_STRING(line, value, "Etag", r.etag,
+                                     sizeof(r.etag));
+              CACHE_READFIELD_STRING(line, value, "Location", r.location,
+                                     HTS_LOCATION_SIZE);
+              CACHE_READFIELD_STRING(line, value, "Content-Disposition",
+                                     r.cdispo, sizeof(r.cdispo));
+              CACHE_READFIELD_STRING(line, value, "X-Save", previous_save_,
+                                     sizeof(previous_save_));
             }
           }
           if (has_nul) {
