@@ -347,6 +347,10 @@ int hts_record_link(httrackp * opt,
                     const char *ref_address, const char *ref_file,
                     const char *codebase);
 
+/* Make the most recently recorded link its own parent: a normal fetch (no
+   test, no import) at the given depth and pass, with the full retry budget. */
+void hts_link_set_self_parented(httrackp *opt, int depth, int pass2);
+
 /* Index of the most recently recorded link. */
 size_t hts_record_link_latest(httrackp *opt);
 
