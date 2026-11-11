@@ -1,0 +1,39 @@
+#!/bin/bash
+# The absolute writers (default external, -K, -x ?link=) keep the scheme and
+# the login, and -%x drops the login.
+set -e
+
+: "${top_srcdir:=..}"
+
+page=abslogin/index.html
+
+for opts in "" -K -x; do
+    pre='href="'
+    if test "$opts" == "-x"; then
+        pre='\?link='
+    fi
+    # Without https support the parser leaves an https link as written.
+    https_login=()
+    https_nologin=()
+    if test "$HTTPS_SUPPORT" != "no"; then
+        https_login=(--file-matches "$page" "${pre}https://user:pw@example\.invalid/slogin\.html\"")
+        https_nologin=(--file-matches "$page" "${pre}https://example\.invalid/slogin\.html\""
+            --file-not-matches "$page" 'pw@example\.invalid/slogin')
+    fi
+    # shellcheck disable=SC2086 # $opts is one option or none
+    bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+        --file-matches "$page" "${pre}http://user:pw@example\.invalid/login\.html\"" \
+        --file-matches "$page" "${pre}ftp://example\.invalid/f\.txt\"" \
+        --file-matches "$page" "${pre}http://user:pw@example\.invalid/\"" \
+        "${https_login[@]}" \
+        httrack "BASEURL/$page" -r2 $opts
+    # shellcheck disable=SC2086 # $opts is one option or none
+    bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+        --file-matches "$page" "${pre}http://example\.invalid/login\.html\"" \
+        --file-matches "$page" "${pre}ftp://example\.invalid/f\.txt\"" \
+        --file-matches "$page" "${pre}http://example\.invalid/\"" \
+        --file-not-matches "$page" 'pw@example\.invalid/login' \
+        --file-not-matches "$page" 'pw@example\.invalid/"' \
+        "${https_nologin[@]}" \
+        httrack "BASEURL/$page" -r2 $opts -%x
+done
