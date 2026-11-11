@@ -42,12 +42,14 @@ Please visit our Website: http://www.httrack.com
 /* Not HTSEXT_API, because that breaks the MSVC proxytrack build. */
 
 /* Read one line of fp into s (max bytes, NUL included) and return its length.
-   CR, TAB and form feed are dropped, and NUL too when skip_nul is set. A line
-   cut at the bound has its newline consumed, so the next read is not "". */
-int hts_shared_linput(FILE *fp, char *s, int max, hts_boolean skip_nul);
+   CR, TAB and form feed are dropped, and NUL too with HTS_LINPUT_SKIP_NUL. A
+   line cut at the bound has its newline consumed, so the next read is not "",
+   and with HTS_LINPUT_DRAIN its tail is dropped rather than read as a line. */
+int hts_shared_linput(FILE *fp, char *s, int max, int flags);
 
-/* The skip_nul value of the htsserver and proxytrack readers. */
-#define HTS_LINPUT_SKIP_NUL HTS_TRUE
+/* hts_shared_linput() flags. */
+#define HTS_LINPUT_SKIP_NUL 1
+#define HTS_LINPUT_DRAIN 2
 
 /* Is s an existing regular file? A plain stat(), with no path conversion. */
 hts_boolean hts_shared_fexist(const char *s);

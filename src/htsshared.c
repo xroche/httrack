@@ -38,7 +38,7 @@ Please visit our Website: http://www.httrack.com
 #include <sys/stat.h>
 #include <sys/types.h>
 
-int hts_shared_linput(FILE *fp, char *s, int max, hts_boolean skip_nul) {
+int hts_shared_linput(FILE *fp, char *s, int max, int flags) {
   int c;
   int j = 0;
 
@@ -55,7 +55,7 @@ int hts_shared_linput(FILE *fp, char *s, int max, hts_boolean skip_nul) {
       case 12:
         break;
       case 0:
-        if (skip_nul)
+        if ((flags & HTS_LINPUT_SKIP_NUL) != 0)
           break;
         s[j++] = (char) c;
         break;
@@ -67,10 +67,15 @@ int hts_shared_linput(FILE *fp, char *s, int max, hts_boolean skip_nul) {
   } while ((c != -1) && (c != EOF) && (j < (max - 1)));
   if (j == max - 1 && c != -1 && c != EOF) {
     /* Stopped at the bound: consume the newline, or the next read returns "" */
-    while ((c = fgetc(fp)) == 13)
-      ;
-    if (c != 10 && c != EOF)
-      ungetc(c, fp);
+    if ((flags & HTS_LINPUT_DRAIN) != 0) {
+      while ((c = fgetc(fp)) != 10 && c != EOF)
+        ;
+    } else {
+      while ((c = fgetc(fp)) == 13)
+        ;
+      if (c != 10 && c != EOF)
+        ungetc(c, fp);
+    }
   }
   s[j] = '\0';
   return j;
