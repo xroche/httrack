@@ -537,10 +537,9 @@ static hts_boolean optparam_dash_ok(const cmdl_argv *cmd, int na) {
   return na + 1 < cmd->argc && cmd->param[na + 1];
 }
 
-/* Steps *NA onto the value of the option it names, for an option that reads the
-   next word. After a panic with MSG and the usage EXAMPLE (may be NULL) it
-   returns HTS_FALSE, leaving *NA alone, when that word is missing or is read as
-   an option. */
+/* Advances *NA to the word after the option, its value. HTS_FALSE after a panic
+   with MSG and EXAMPLE (NULL for none) when that word is missing or reads as an
+   option. */
 static hts_boolean cmdl_take_value(httrackp *opt, const cmdl_argv *cmd, int *na,
                                    const char *msg, const char *example) {
   if (*na + 1 >= cmd->argc ||
