@@ -1,6 +1,7 @@
 #!/bin/bash
 #
-# htscharset.c must allocate through the htssafe.h wrappers, not raw libc.
+# Files listed below must allocate through the htssafe.h wrappers, not raw libc.
+# Extend `files` as each file is converted.
 # Reads the tracked source, so it is named outside the Windows CI globs.
 
 set -euo pipefail
@@ -10,8 +11,7 @@ set -euo pipefail
 
 top="${abs_top_srcdir:-}"
 test -n "$top" || fail "not run under make check"
-src="$top/src/htscharset.c"
-test -r "$src" || skip "sources not shipped"
+files="htscharset.c"
 
 raw() { # raw FILE -> the lines calling a raw libc allocator
     LC_ALL=C grep -nE '(^|[^A-Za-z0-9_])(malloc|calloc|realloc|free|strdup)[[:space:]]*\(' "$1" || true
@@ -25,6 +25,10 @@ test -n "$(raw "$work/dirty.c")" || fail "the scan cannot see a raw free"
 printf 'void f(void) {\n  freet(p);\n  q = strdupt(s);\n}\n' >"$work/clean.c"
 test -z "$(raw "$work/clean.c")" || fail "the scan flags a wrapped call"
 
-found=$(raw "$src")
-test -z "$found" || fail "raw allocator calls in htscharset.c: $found"
-echo "htscharset.c has no raw allocator call"
+for f in $files; do
+    src="$top/src/$f"
+    test -r "$src" || skip "sources not shipped"
+    found=$(raw "$src")
+    test -z "$found" || fail "raw allocator calls in $f: $found"
+done
+echo "no raw allocator call in: $files"
