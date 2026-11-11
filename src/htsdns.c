@@ -26,7 +26,8 @@ Please visit our Website: http://www.httrack.com
 */
 
 /* ------------------------------------------------------------ */
-/* File: DNS cache and host name resolution                     */
+/* File: htsdns.c subroutines:                                  */
+/* DNS cache and host name resolution, declared in htslib.h     */
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
@@ -39,8 +40,6 @@ Please visit our Website: http://www.httrack.com
 
 /* 0 = v4+v6, 1 = v4 only, 2 = v6 only (htscoremain -@i) */
 int IPV6_resolver = 0;
-
-/* DNS cache and resolver backends */
 
 // Free a DNS cache record (coucal value handler).
 static void hts_cache_value_free(coucal_opaque arg, coucal_value value) {
