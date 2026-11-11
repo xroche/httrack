@@ -1215,8 +1215,8 @@ int PT_LoadCache__New(PT_Index index_, const char *filename) {
 
                     line[0] = '\0';
                     a += binput(a, line, sizeof(line) - 2, NULL);
-                    if (strncmp(line, "X-In-Cache:", 11) == 0) {
-                      if (strcmp(line, "X-In-Cache: 1") == 0) {
+                    if (strfield(line, "X-In-Cache:")) {
+                      if (strfield2(line, "X-In-Cache: 1")) {
                         dataincache = 1;
                       } else {
                         dataincache = 0;
