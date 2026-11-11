@@ -113,8 +113,9 @@ hts_boolean hts_shared_readable(T_SOC soc, time_t deadline) {
   FD_SET(soc, &fds);
   tv.tv_sec = (long) left;
   tv.tv_usec = 0;
-  return select((int) soc + 1, &fds, NULL, NULL, deadline != 0 ? &tv : NULL) >
-             0 &&
+  /* No deadline: wait forever. */
+  struct timeval *const timeout = deadline != 0 ? &tv : NULL;
+  return select((int) soc + 1, &fds, NULL, NULL, timeout) > 0 &&
          FD_ISSET(soc, &fds);
 }
 
