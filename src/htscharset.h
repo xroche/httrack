@@ -69,6 +69,13 @@ extern char *hts_convertStringFromUTF8Strict(const char *s, size_t size,
 extern char *hts_convertStringUTF8ToIDNA(const char *s, size_t size);
 
 /**
+ * Write the ASCII (IDNA) form of the len-byte host into dst, of size bytes;
+ * dst may be host. HTS_FALSE, dst untouched, if it has none or does not fit.
+ **/
+extern hts_boolean hts_host_to_ascii(char *dst, size_t size, const char *host,
+                                     size_t len);
+
+/**
  * Convert an IDNA (RFC 3492) string to an UTF-8 string.
  **/
 extern char *hts_convertStringIDNAToUTF8(const char *s, size_t size);

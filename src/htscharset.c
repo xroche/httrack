@@ -1057,6 +1057,30 @@ char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
   return dest;
 }
 
+hts_boolean hts_host_to_ascii(char *dst, size_t size, const char *host,
+                              size_t len) {
+  char *idna = NULL;
+  const char *src = host;
+  size_t n = len;
+  hts_boolean fits;
+
+  if (!hts_isStringAscii(host, len)) {
+    idna = hts_convertStringUTF8ToIDNA(host, len);
+    if (idna == NULL)
+      return HTS_FALSE;
+    src = idna;
+    n = strlen(idna);
+  }
+  fits = n < size;
+  if (fits) {
+    // dst may be host itself
+    memmove(dst, src, n);
+    dst[n] = '\0';
+  }
+  freet(idna);
+  return fits;
+}
+
 int hts_isStringIDNA(const char *s, size_t size) {
   size_t i, startSeg;
   for(i = startSeg = 0 ; i <= size ; i++) {
