@@ -58,8 +58,8 @@ check() { # check FILE FUNCTION WANT-ALLOCATIONS
         fail "$file:$fn uses an allocation without answering for NULL:${TESTLIB_NL}$got"
 }
 
-check src/htslib.c resolver_dup_chain 2
-check src/htslib.c resolver_make_ai 4
+check src/htsdns.c resolver_dup_chain 2
+check src/htsdns.c resolver_make_ai 4
 check src/htsmodules.c openFunctionLib 1
 check src/htsthread.c hts_mutexinit 1
 
