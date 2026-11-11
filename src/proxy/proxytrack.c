@@ -113,6 +113,7 @@ Remark: If no cache newer than the added one is found, all entries can be added 
 #include "htsglobal.h"
 #include "htsurlport.h"
 #include <limits.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -792,11 +793,13 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
             chost++;
           StringCopy(host, chost);
         } else if ((p = strfield(line, "Depth: "))) {
-          char *depth = line + p;
+          const char *depth = line + p;
+          LLint value;
 
-          if (sscanf(depth, "%d", &davDepth) != 1) {
-            davDepth = 0;
-          }
+          /* past 1 is refused below, so clamp rather than let it wrap */
+          davDepth = hts_scan_llint(&depth, 0, INT64_MAX, &value) == HTS_SCAN_OK
+                         ? (int) (value < 2 ? value : 2)
+                         : 0;
         }
       }
 
