@@ -3757,39 +3757,6 @@ hts_boolean binput_line(const char *buff, const char *end, char *s, int max,
   return cut;
 }
 
-// Lecture d'une ligne (peut être unicode à priori)
-int linput(FILE * fp, char *s, int max) {
-  int c;
-  int j = 0;
-
-  do {
-    c = fgetc(fp);
-    if (c != EOF) {
-      switch (c) {
-      case 13:
-        break;                  // sauter CR
-      case 10:
-        c = -1;
-        break;
-      case 9:
-      case 12:
-        break;                  // sauter ces caractères
-      default:
-        s[j++] = (char) c;
-        break;
-      }
-    }
-  } while((c != -1) && (c != EOF) && (j < (max - 1)));
-  if (j == max - 1 && c != -1 && c != EOF) {
-    /* Stopped at the bound: consume the newline, or the next read returns "" */
-    while ((c = fgetc(fp)) == 13)
-      ;
-    if (c != 10 && c != EOF)
-      ungetc(c, fp);
-  }
-  s[j] = '\0';
-  return j;
-}
 // case-insensitive strstr()
 const char *strstrcase(const char *s, const char *o) {
   while(*s && strfield(s, o) == 0)

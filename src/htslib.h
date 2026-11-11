@@ -487,7 +487,6 @@ hts_boolean binput_line(const char *buff, const char *end, char *s, int max,
                         int *offset);
 /* Does treathead() read the header that "line" starts with? Keep in step. */
 hts_boolean hts_header_is_read(const char *line);
-int linput(FILE *fp, char *s, int max);
 const char *strstrcase(const char *s, const char *o);
 int ident_url_absolute(const char *url, lien_adrfil *adrfil);
 void fil_simplifie(char *f);
