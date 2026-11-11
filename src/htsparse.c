@@ -3335,17 +3335,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                             // write codebase="path"
                             if (strnotempty(tempo_pat)) {
-                              HT_ADD("codebase=\"http://");
-                              if (!opt->passprivacy) {
-                                HT_ADD_URL_HTMLESCAPED(afs.af.adr); // Password
-                              } else {
-                                HT_ADD_URL_HTMLESCAPED(
-                                    jump_identification_const(
-                                        afs.af.adr)); // No Password
-                              }
-                              if (*tempo_pat != '/')
-                                HT_ADD("/");
-                              HT_ADD_URL_HTMLESCAPED(tempo_pat);
+                              HT_ADD("codebase=\"");
+                              sink_add_absolute_url(&sink, afs.af.adr,
+                                                    tempo_pat, opt->passprivacy,
+                                                    HTS_TRUE);
                               HT_ADD("\" ");
                             }
 
