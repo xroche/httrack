@@ -263,7 +263,7 @@ LPWSTR hts_convertStringToUCS2(const char *s, int size, UINT cp, int *pwsize) {
 
   if (wsize > 0) {
     LPSTR uoutput = NULL;
-    LPWSTR woutput = malloc((wsize + 1) * sizeof(WCHAR));
+    LPWSTR woutput = malloct((wsize + 1) * sizeof(WCHAR));
 
     if (woutput != NULL
         && MultiByteToWideChar(cp, 0, (LPCSTR) s, size, woutput,
@@ -277,8 +277,7 @@ LPWSTR hts_convertStringToUCS2(const char *s, int size, UINT cp, int *pwsize) {
         return woutput;
       }
     }
-    if (woutput != NULL)
-      free(woutput);
+    freet(woutput);
   }
   return NULL;
 }
@@ -317,7 +316,7 @@ static char *hts_convertUCS2StringToCPEx(LPWSTR woutput, int wsize, UINT cp,
     *plossy = HTS_FALSE;
   }
   if (usize > 0) {
-    char *const uoutput = malloc((usize + 1) * sizeof(char));
+    char *uoutput = malloct((usize + 1) * sizeof(char));
 
     if (uoutput != NULL) {
       BOOL usedDefault = FALSE;
@@ -335,7 +334,7 @@ static char *hts_convertUCS2StringToCPEx(LPWSTR woutput, int wsize, UINT cp,
         }
         return uoutput;
       } else {
-        free(uoutput);
+        freet(uoutput);
       }
     }
   }
@@ -368,7 +367,7 @@ char *hts_convertStringCPToUTF8(const char *s, size_t size, UINT cp) {
     if (woutput != NULL) {
       char *const uoutput = hts_convertUCS2StringToUTF8(woutput, wsize);
 
-      free(woutput);
+      freet(woutput);
       return uoutput;
     }
   }
@@ -400,7 +399,7 @@ static char *hts_convertStringCPFromUTF8Ex(const char *s, size_t size, UINT cp,
       char *const uoutput =
           hts_convertUCS2StringToCPEx(woutput, wsize, cp, plossy);
 
-      free(woutput);
+      freet(woutput);
       return uoutput;
     }
   }
@@ -429,11 +428,11 @@ char *hts_convertStringFromUTF8(const char *s, size_t size, const char *charset)
 char *hts_convertStringFromUTF8Strict(const char *s, size_t size,
                                       const char *charset) {
   hts_boolean lossy = HTS_FALSE;
-  char *const out =
+  char *out =
       hts_convertStringCPFromUTF8Ex(s, size, hts_getCodepage(charset), &lossy);
 
   if (lossy) {
-    free(out);
+    freet(out);
     return NULL;
   }
   return out;
@@ -583,7 +582,7 @@ static char *hts_convertStringCharset(const char *s, size_t size,
                                       const char *to, const char *from) {
   /* Empty string ? */
   if (size == 0) {
-    return strdup("");
+    return strdupt("");
   }
   /* Already on correct charset ? */
   if (hts_equalsAlphanum(from, to)) {
@@ -604,7 +603,7 @@ static char *hts_convertStringCharset(const char *s, size_t size,
 
       /* Initial size to around the string size */
       for(outbufCapa = 16; outbufCapa < size + 1; outbufCapa *= 2) ;
-      outbuf = malloc(outbufCapa);
+      outbuf = malloct(outbufCapa);
       outbytesleft = outbufCapa;
 
       /* Convert */
@@ -629,7 +628,7 @@ static char *hts_convertStringCharset(const char *s, size_t size,
             outbuf = grown;
             outbytesleft = outbufCapa - used;
           } else {
-            free(outbuf);
+            freet(outbuf);
             outbuf = NULL;
             break;
           }
@@ -674,7 +673,7 @@ HTSEXT_API char *hts_convertStringToUTF8(const char *s, size_t size,
                                          const char *charset) {
   /* Empty string ? */
   if (size == 0) {
-    return strdup("");
+    return strdupt("");
   }
   /* Already UTF-8 ? */
   if (hts_isCharsetUTF8(charset) || hts_isStringAscii(s, size)) {
@@ -689,7 +688,7 @@ HTSEXT_API char *hts_convertStringToUTF8(const char *s, size_t size,
 char *hts_convertStringFromUTF8(const char *s, size_t size, const char *charset) {
   /* Empty string ? */
   if (size == 0) {
-    return strdup("");
+    return strdupt("");
   }
   /* Already UTF-8 ? */
   if (hts_isCharsetUTF8(charset) || hts_isStringAscii(s, size)) {
@@ -958,12 +957,7 @@ static size_t utf8_encode(hts_UCS4 uc, unsigned char *out) {
   } \
   dest[destSize++] = (C); \
 } while(0)
-#define FREE_BUFFER() do { \
-  if (dest != NULL) { \
-    free(dest); \
-    dest = NULL; \
-  } \
-} while(0)
+#define FREE_BUFFER() freet(dest)
 
 char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
   char *dest = NULL;
@@ -994,7 +988,7 @@ char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
           ADD_BYTE('-');
           
           /* copy utf-8 to integers. note: buffer is sufficient! */
-          segInt = (punycode_uint*) malloc(segSize*sizeof(punycode_uint));
+          segInt = (punycode_uint *) malloct(segSize * sizeof(punycode_uint));
           if (segInt == NULL) {
             FREE_BUFFER();
             return NULL;
@@ -1021,7 +1015,7 @@ char *hts_convertStringUTF8ToIDNA(const char *s, size_t size) {
           }
 
           /* cleanup */
-          free(segInt);
+          freet(segInt);
 
           /* success ? */
           if (status == punycode_success) {
@@ -1119,7 +1113,7 @@ char *hts_convertStringIDNAToUTF8(const char *s, size_t size) {
         for(output_capa = 16 ; output_capa < segSize 
           ; output_capa <<= 1) ;
         output_dest =
-          (punycode_uint*) malloc(output_capa*sizeof(punycode_uint));
+            (punycode_uint *) malloct(output_capa * sizeof(punycode_uint));
         if (output_dest == NULL) {
           FREE_BUFFER();
           return NULL;
@@ -1154,7 +1148,7 @@ char *hts_convertStringIDNAToUTF8(const char *s, size_t size) {
         }
 
         /* cleanup */
-        free(output_dest);
+        freet(output_dest);
 
         /* error ? */
         if (status != punycode_success) {
