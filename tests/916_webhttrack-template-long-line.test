@@ -1,0 +1,63 @@
+#!/bin/bash
+#
+# A WebHTTrack template line longer than the renderer's buffer is cut, and its
+# tail is dropped rather than printed as a line of its own.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/webhttracklib.sh
+. "${testdir}/webhttracklib.sh"
+
+htsserver_require
+htsserver_distroot
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_tpl.XXXXXX") || fail "no tmpdir"
+cleanup_push htsserver_cleanup_dir "${work}"
+root="${work}/root"
+mkdir -p "${root}/html/server"
+for entry in "${HTS_DISTROOT}"/*; do
+    test "${entry##*/}" = html || ln -s "${entry}" "${root}/${entry##*/}"
+done
+for entry in "${HTS_DISTROOT}"/html/*; do
+    test "${entry##*/}" = server || ln -s "${entry}" "${root}/html/${entry##*/}"
+done
+for entry in "${HTS_DISTROOT}"/html/server/*; do
+    ln -s "${entry}" "${root}/html/server/${entry##*/}"
+done
+
+# The renderer keeps 8189 bytes of a line: one line well over, one exactly at it.
+{
+    printf 'HEAD%sTAILMARK\n' "$(repeat_chars 9000 a)"
+    printf 'NEXTMARK\n'
+    printf 'EXACT%s\n' "$(repeat_chars 8184 b)"
+    printf 'LASTMARK\n'
+} >"${root}/html/server/longline.html"
+
+htsserver_start --root "${root}" --home "${work}"
+
+htsserver_python - "${HTS_URL}" <<'PY' || fail "see above"
+import sys
+
+from webtestlib import Session
+
+page = Session(sys.argv[1]).get("longline.html")
+if "HEAD" + "a" * 8185 not in page:
+    sys.exit("the head of the long line is missing")
+if "TAILMARK" in page:
+    sys.exit("the tail of the long line was printed")
+lines = page.replace("\r", "").split("\n")
+exact = "EXACT" + "b" * 8184
+for want, after in (("NEXTMARK", "HEAD"), (exact, "NEXTMARK"), ("LASTMARK", exact)):
+    if want not in lines:
+        sys.exit("%.20s is not a line of its own" % want)
+    i = lines.index(want)
+    if not lines[i - 1].startswith(after):
+        sys.exit("%.20s does not follow %.20s: %r" % (want, after, lines[i - 1][:20]))
+print("ok: the tail was dropped and the next lines line up")
+PY
+
+htsserver_cleanup
+htsserver_assert_reaped
+
+echo "PASS"
