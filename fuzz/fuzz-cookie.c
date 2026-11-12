@@ -78,10 +78,10 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     return 0;
   buf = fuzz_strdup(data + 1, size - 1);
   nlines = fuzz_lines(buf, lines, sizeof(lines) / sizeof(lines[0]));
-  /* Missing fields read as empty strings, never as wild pointers. */
+  /* Missing fields point at buf's NUL: empty, never a wild pointer. */
   for (i = 0; i < sizeof(lines) / sizeof(lines[0]); i++)
     if (lines[i] == NULL)
-      lines[i] = (char *) "";
+      lines[i] = buf + strlen(buf);
 
   /* From the second line on: the literal jar-file bytes for the loaders,
      i.e. the rest of the buffer from lines[1] to its NUL (in bounds). */
@@ -146,23 +146,26 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   case 2: {                       /* jar file load, save and reload */
     char dir[] = "/tmp/fuzz-cookie-XXXXXX";
     char path[256];
+    char base[256]; /* the loaders join base and name with no separator */
 
     if (mkdtemp(dir) != NULL) {
       FILE *fp;
 
+      snprintf(base, sizeof(base), "%s/", dir);
       snprintf(path, sizeof(path), "%s/cookies.txt", dir);
       fp = fopen(path, "wb");
       if (fp != NULL) {
         fwrite(file_bytes, 1, file_size, fp);
         fclose(fp);
       }
-      (void) cookie_load(NULL, &jar, dir, "cookies.txt");
-      (void) cookie_load_from(NULL, &jar, dir, "cookies.txt",
+      (void) cookie_load(NULL, &jar, base, "cookies.txt");
+      (void) cookie_load_from(NULL, &jar, base, "cookies.txt",
                               nlines > 0 ? lines[0] : "https://fuzz.example/");
       (void) cookie_save(NULL, &jar, path);
-      (void) cookie_load(NULL, &jar, dir, "cookies.txt");
+      (void) cookie_load(NULL, &jar, base, "cookies.txt");
       (void) cookie_save_replacing(NULL, &jar, path);
-      snprintf(path, sizeof(path), "%s/cookies.txt", dir);
+      (void) unlink(path);
+      snprintf(path, sizeof(path), "%s/cookies.txt.bak", dir);
       (void) unlink(path);
       (void) rmdir(dir);
     }
@@ -195,8 +198,10 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   case 5: {                       /* jar text surgery */
     char s[1024];
 
-    strlcpybuff(s, lines[0], sizeof(s));
-    if (nlines > 1)
+    s[0] = '\0';
+    strlncatbuff(s, lines[0], sizeof(s), sizeof(s) - 1);
+    /* cookie_set checks the room before inserting, so the harness does too. */
+    if (nlines > 1 && strlen(lines[1]) < sizeof(s) - strlen(s))
       cookie_insert(s, sizeof(s), lines[1]);
     if (nlines > 2) {
       /* Callers guarantee pos <= strlen(s) (both pass within-string
@@ -222,7 +227,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     if (bind != NULL) {
       int ignored = 0;
 
-      strlcpybuff(pair, lines[0], sizeof(pair));
+      pair[0] = '\0';
+      strlncatbuff(pair, lines[0], sizeof(pair), sizeof(pair) - 1);
       (void) cookie_flat_pair(NULL, &jar, pair, bind, &attr, lines[0],
                               &ignored);
       cookie_sink += (unsigned long) ignored;
