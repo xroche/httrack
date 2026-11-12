@@ -41,6 +41,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsio.h"
 #include "htsmd5.h"
 #include "htssafe.h"
+#include "htsarrays.h"
 #include "htsthread.h"
 #include "htstools.h"
 #include "coucal/coucal.h"
@@ -76,9 +77,7 @@ typedef struct {
 
 struct hts_changes {
   coucal index; /* mirror-relative path -> entry slot + 1 */
-  changes_entry *entries;
-  size_t count;
-  size_t capacity;
+  TypedArray(changes_entry) entries;
   hts_boolean has_index; /* the run keeps a mirror index (the cache is on) */
   hts_boolean old_index; /* the previous mirror's index was read */
   hts_boolean overflow;  /* an allocation failed; the report is partial */
@@ -104,18 +103,15 @@ static hts_changes *changes_new(void) {
 
 static void changes_free(hts_changes **pchanges) {
   hts_changes *changes = *pchanges;
+  size_t i;
 
   if (changes == NULL)
     return;
-  if (changes->entries != NULL) {
-    size_t i;
-
-    for (i = 0; i < changes->count; i++) {
-      freet(changes->entries[i].url);
-      freet(changes->entries[i].file);
-    }
-    freet(changes->entries);
+  for (i = 0; i < TypedArraySize(changes->entries); i++) {
+    freet(TypedArrayNth(changes->entries, i).url);
+    freet(TypedArrayNth(changes->entries, i).file);
   }
+  TypedArrayFree(changes->entries);
   if (changes->index != NULL)
     coucal_delete(&changes->index);
   freet(changes);
@@ -134,33 +130,28 @@ static intptr_t changes_find(const hts_changes *changes, const char *file) {
 static intptr_t changes_slot(hts_changes *changes, const char *file,
                              hts_boolean *is_new) {
   intptr_t slot = 0;
+  changes_entry *entry;
 
   *is_new = HTS_FALSE;
   if (coucal_read(changes->index, file, &slot))
     return slot - 1;
 
-  if (changes->count == changes->capacity) {
-    const size_t capacity = changes->capacity != 0 ? changes->capacity * 2 : 64;
-    changes_entry *const entries =
-        realloct(changes->entries, capacity * sizeof(*entries));
-
-    if (entries == NULL) {
-      changes->overflow = HTS_TRUE;
-      return -1;
-    }
-    changes->entries = entries;
-    changes->capacity = capacity;
-  }
-  slot = (intptr_t) changes->count;
-  memset(&changes->entries[slot], 0, sizeof(changes->entries[slot]));
-  changes->entries[slot].file = strdupt(file);
-  changes->entries[slot].prev_size = -1;
-  changes->entries[slot].size = -1;
-  if (changes->entries[slot].file == NULL) {
+  TypedArrayEnsureRoom(changes->entries, 1);
+  if (!TypedArrayHasRoom(changes->entries, 1)) {
     changes->overflow = HTS_TRUE;
     return -1;
   }
-  changes->count++;
+  slot = (intptr_t) TypedArraySize(changes->entries);
+  entry = &TypedArrayTail(changes->entries);
+  memset(entry, 0, sizeof(*entry));
+  entry->file = strdupt(file);
+  entry->prev_size = -1;
+  entry->size = -1;
+  if (entry->file == NULL) {
+    changes->overflow = HTS_TRUE;
+    return -1;
+  }
+  TypedArraySize(changes->entries)++;
   coucal_write(changes->index, file, slot + 1);
   *is_new = HTS_TRUE;
   return slot;
@@ -262,8 +253,8 @@ void hts_changes_notify(httrackp *opt, const char *adr, const char *fil,
     if (slot >= 0 && !is_new) {
       /* Retry, or a second call site for the same file: the pre-run state was
          already sampled and the copy on disk may no longer be it. */
-      changes->entries[slot].rewritten =
-          changes->entries[slot].rewritten || rewritten;
+      TypedArrayNth(changes->entries, slot).rewritten =
+          TypedArrayNth(changes->entries, slot).rewritten || rewritten;
     }
   }
   hts_mutexrelease(&changes_mutex);
@@ -285,8 +276,8 @@ void hts_changes_notify(httrackp *opt, const char *adr, const char *fil,
   hts_mutexlock(&changes_mutex);
   changes = changes_get(opt);
   /* The slot index is stable, entries being append-only; the array is not. */
-  if (changes != NULL && (size_t) slot < changes->count) {
-    changes_entry *const entry = &changes->entries[slot];
+  if (changes != NULL && (size_t) slot < TypedArraySize(changes->entries)) {
+    changes_entry *const entry = &TypedArrayNth(changes->entries, slot);
 
     entry->url = strdupt(url);
     if (entry->url == NULL)
@@ -341,7 +332,7 @@ void hts_changes_html(httrackp *opt, cache_back *cache, const htsblk *r,
     hts_savename_listed(StringBuff(opt->path_html), save, file, sizeof(file));
     slot = changes_find(changes, file);
     if (slot >= 0) {
-      changes_entry *const entry = &changes->entries[slot];
+      changes_entry *const entry = &TypedArrayNth(changes->entries, slot);
 
       entry->has_new = HTS_TRUE;
       memcpy(entry->new_digest, new_digest, DIGEST_SIZE);
@@ -365,11 +356,11 @@ void hts_changes_dropped(httrackp *opt, const char *file, hts_boolean kept) {
   if (changes != NULL) {
     slot = changes_slot(changes, file, &is_new);
     if (slot >= 0 && is_new) {
-      changes->entries[slot].url = strdupt("");
-      changes->entries[slot].listed_prev = HTS_TRUE;
+      TypedArrayNth(changes->entries, slot).url = strdupt("");
+      TypedArrayNth(changes->entries, slot).listed_prev = HTS_TRUE;
       /* A kept file leaves rewritten clear, which resolves to unchanged. */
       if (!kept)
-        changes->entries[slot].bucket = HTS_CHANGE_GONE;
+        TypedArrayNth(changes->entries, slot).bucket = HTS_CHANGE_GONE;
     }
   }
   hts_mutexrelease(&changes_mutex);
@@ -388,7 +379,7 @@ void hts_changes_previous(httrackp *opt, const char *file) {
     changes->old_index = HTS_TRUE;
     slot = changes_find(changes, file);
     if (slot >= 0)
-      changes->entries[slot].listed_prev = HTS_TRUE;
+      TypedArrayNth(changes->entries, slot).listed_prev = HTS_TRUE;
   }
   hts_mutexrelease(&changes_mutex);
 }
@@ -414,8 +405,8 @@ static void changes_resolve(hts_changes *changes, httrackp *opt) {
   char catbuff[CATBUFF_SIZE];
   size_t i;
 
-  for (i = 0; i < changes->count; i++) {
-    changes_entry *const entry = &changes->entries[i];
+  for (i = 0; i < TypedArraySize(changes->entries); i++) {
+    changes_entry *const entry = &TypedArrayNth(changes->entries, i);
     const char *path;
     unsigned char digest[DIGEST_SIZE];
     hts_boolean have_digests = HTS_FALSE;
@@ -474,8 +465,8 @@ static void changes_serialize(httrackp *opt, String *out) {
   changes_resolve(changes, opt);
 
   memset(counts, 0, sizeof(counts));
-  for (i = 0; i < changes->count; i++)
-    counts[changes->entries[i].bucket]++;
+  for (i = 0; i < TypedArraySize(changes->entries); i++)
+    counts[TypedArrayNth(changes->entries, i).bucket]++;
 
   hts_now_iso8601(date);
   StringCat(*out, "{\n  \"schema\": ");
@@ -510,8 +501,8 @@ static void changes_serialize(httrackp *opt, String *out) {
     StringCat(*out, ",\n  ");
     hts_json_string(out, bucket_names[bucket]);
     StringCat(*out, ": [");
-    for (i = 0; i < changes->count; i++) {
-      const changes_entry *const entry = &changes->entries[i];
+    for (i = 0; i < TypedArraySize(changes->entries); i++) {
+      const changes_entry *const entry = &TypedArrayNth(changes->entries, i);
 
       if (entry->bucket != bucket)
         continue;
@@ -566,9 +557,9 @@ void hts_changes_close_opt(httrackp *opt) {
     }
     changes_serialize(opt, &report);
     memset(counts, 0, sizeof(counts));
-    for (i = 0; i < changes->count; i++)
-      counts[changes->entries[i].bucket]++;
-    total = changes->count;
+    for (i = 0; i < TypedArraySize(changes->entries); i++)
+      counts[TypedArrayNth(changes->entries, i).bucket]++;
+    total = TypedArraySize(changes->entries);
     has_index = changes->has_index;
     old_index = changes->old_index;
     /* Sticky: whatever the crawl's stragglers do next is not in this report. */

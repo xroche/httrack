@@ -42,6 +42,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscharset.h"
 #include "htstools.h"
 #include "htssafe.h"
+#include "htsarrays.h"
 #include "htszlib.h"
 #include "coucal/coucal.h"
 
@@ -83,9 +84,7 @@ struct warc_writer {
   int cdx_on;       /* --warc-cdx enabled */
   char *cdx_path;   /* <base>.cdx output path, or NULL */
   char *cur_seg;    /* basename of the current segment file (CDXJ filename) */
-  char **cdx_lines; /* NUL-terminated CDXJ lines (no newline), owned */
-  size_t cdx_count; /* lines in use */
-  size_t cdx_cap;   /* lines allocated */
+  TypedArray(char *) cdx_lines; /* NUL-terminated CDXJ lines (no newline) */
   /* --wacz: at crawl end, package the segment(s) + .cdx + a generated
      pages.jsonl into <base>.wacz (WACZ 1.1.1). SHA-256 needs OpenSSL. */
   int wacz_on;          /* --wacz enabled (and OpenSSL present) */
@@ -98,9 +97,7 @@ struct warc_writer {
   hts_boolean failed;         /* a record or segment was lost: swap nothing */
   uint64_t unbacked_revisits; /* URLs this pass didn't capture here: an
                                   unbacked revisit, or nothing written at all */
-  char **page_lines; /* one JSON page line per 200 text/html response, owned */
-  size_t page_count;
-  size_t page_cap;
+  TypedArray(char *) page_lines; /* one JSON line per 200 text/html response */
   char *main_url;  /* first captured page URL (datapackage mainPageUrl) */
   char *main_date; /* its WARC-Date (mainPageDate) */
 };
@@ -792,22 +789,13 @@ char *warc_normalized_headers(const char *resp_hdr, long long set_cl) {
 
 /* Take ownership of a CDXJ line; frees it and returns -1 on OOM. */
 static int cdx_lines_add(warc_writer *w, char *line) {
-  if (w->cdx_count == w->cdx_cap) {
-    size_t ncap = w->cdx_cap ? w->cdx_cap * 2 : 64;
-    char **n;
-    if (ncap > (size_t) -1 / sizeof(char *)) {
-      freet(line);
-      return -1;
-    }
-    n = realloct(w->cdx_lines, ncap * sizeof(char *));
-    if (n == NULL) {
-      freet(line);
-      return -1;
-    }
-    w->cdx_lines = n;
-    w->cdx_cap = ncap;
+  TypedArrayEnsureRoom(w->cdx_lines, 1);
+  if (!TypedArrayHasRoom(w->cdx_lines, 1)) {
+    freet(line);
+    return -1;
   }
-  w->cdx_lines[w->cdx_count++] = line;
+  TypedArrayTail(w->cdx_lines) = line;
+  TypedArraySize(w->cdx_lines)++;
   return 0;
 }
 
@@ -884,7 +872,7 @@ static void warc_cdx_flush(warc_writer *w) {
   int werr, cerr;
   if (!w->cdx_on || w->cdx_path == NULL)
     return;
-  if (w->cdx_count == 0) {
+  if (TypedArraySize(w->cdx_lines) == 0) {
     /* Stale only if an index is still on disk and this run wrote an archive
        over what it describes: opened covers the swap and the in-place run. */
     if (w->opened && fsize_utf8(w->cdx_path) > 0)
@@ -893,15 +881,16 @@ static void warc_cdx_flush(warc_writer *w) {
                     w->cdx_path);
     return;
   }
-  qsort(w->cdx_lines, w->cdx_count, sizeof(char *), cdx_cmp);
+  qsort(TypedArrayElts(w->cdx_lines), TypedArraySize(w->cdx_lines),
+        sizeof(char *), cdx_cmp);
   f = hts_fopen_private(w->cdx_path, "wb");
   if (f == NULL) {
     hts_log_print(w->opt, LOG_ERROR | LOG_ERRNO,
                   "WARC: could not write the index %s", w->cdx_path);
     return;
   }
-  for (i = 0; i < w->cdx_count; i++) {
-    fputs(w->cdx_lines[i], f);
+  for (i = 0; i < TypedArraySize(w->cdx_lines); i++) {
+    fputs(TypedArrayNth(w->cdx_lines, i), f);
     fputc('\n', f);
   }
   werr = ferror(f) != 0;
@@ -924,29 +913,20 @@ static void warc_page_add(warc_writer *w, const char *url, const char *date) {
   wbuf line;
   memset(&line, 0, sizeof(line));
   if (wbuf_printf(&line, "{\"id\": \"p%llu\", \"url\": ",
-                  (unsigned long long) w->page_count) != 0 ||
+                  (unsigned long long) TypedArraySize(w->page_lines)) != 0 ||
       cdx_json_str(&line, url) != 0 || wbuf_puts(&line, ", \"ts\": ") != 0 ||
       cdx_json_str(&line, date) != 0 || wbuf_puts(&line, "}") != 0 ||
       wbuf_add(&line, "", 1) != 0) {
     wbuf_free(&line);
     return;
   }
-  if (w->page_count == w->page_cap) {
-    size_t ncap = w->page_cap ? w->page_cap * 2 : 32;
-    char **n;
-    if (ncap > (size_t) -1 / sizeof(char *)) {
-      wbuf_free(&line);
-      return;
-    }
-    n = realloct(w->page_lines, ncap * sizeof(char *));
-    if (n == NULL) {
-      wbuf_free(&line);
-      return;
-    }
-    w->page_lines = n;
-    w->page_cap = ncap;
+  TypedArrayEnsureRoom(w->page_lines, 1);
+  if (!TypedArrayHasRoom(w->page_lines, 1)) {
+    wbuf_free(&line);
+    return;
   }
-  w->page_lines[w->page_count++] = line.data;
+  TypedArrayTail(w->page_lines) = line.data;
+  TypedArraySize(w->page_lines)++;
   if (w->main_url == NULL) {
     w->main_url = strdupt(url);
     w->main_date = strdupt(date);
@@ -1118,8 +1098,8 @@ static void warc_wacz_package(warc_writer *w) {
       wbuf_puts(&pages, "{\"format\": \"json-pages-1.0\", \"id\": \"pages\", "
                         "\"title\": \"All Pages\"}\n") != 0)
     err = 1;
-  for (i = 0; i < w->page_count && !err; i++)
-    if (wbuf_puts(&pages, w->page_lines[i]) != 0 ||
+  for (i = 0; i < TypedArraySize(w->page_lines) && !err; i++)
+    if (wbuf_puts(&pages, TypedArrayNth(w->page_lines, i)) != 0 ||
         wbuf_add(&pages, "\n", 1) != 0)
       err = 1;
   if (!err && wacz_add_mem(zf, "pages/pages.jsonl", pages.data, pages.len,
@@ -1699,13 +1679,13 @@ void warc_close(warc_writer *w) {
   }
   if (w->seen != NULL)
     coucal_delete(&w->seen);
-  for (i = 0; i < w->cdx_count; i++)
-    freet(w->cdx_lines[i]);
-  freet(w->cdx_lines);
+  for (i = 0; i < TypedArraySize(w->cdx_lines); i++)
+    freet(TypedArrayNth(w->cdx_lines, i));
+  TypedArrayFree(w->cdx_lines);
   freet(w->cdx_path);
-  for (i = 0; i < w->page_count; i++)
-    freet(w->page_lines[i]);
-  freet(w->page_lines);
+  for (i = 0; i < TypedArraySize(w->page_lines); i++)
+    freet(TypedArrayNth(w->page_lines, i));
+  TypedArrayFree(w->page_lines);
   freet(w->base_path);
   freet(w->arc_path);
   freet(w->main_url);
