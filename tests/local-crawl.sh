@@ -323,7 +323,7 @@ function run_pass {
     crawlpid=$!
     wait_bounded "$crawlpid" "$deadline" || rc=$?
     crawlpid=
-    test "$rc" -ne 124 || warning "${label} watchdog fired after ${deadline}s"
+    test "$rc" -ne 124 || warning "${label} watchdog fired after ${deadline}s (at ${WATCHDOG_FIRED_AT}s)"
     return "$rc"
 }
 

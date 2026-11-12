@@ -1,0 +1,10 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# A slot failure reason longer than r.msg is clipped, where the copy aborted.
+selftest_queue "slotfail: OK" slotfail
+selftest_run_queued

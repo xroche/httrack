@@ -55,6 +55,9 @@ selftest_queue b.c.kobe.jp psl 'a.b.c.kobe.jp'
 selftest_queue city.kobe.jp psl 'city.kobe.jp'
 selftest_queue city.kobe.jp psl 'www.city.kobe.jp'
 selftest_queue null psl 'ck'
+# A host longer than the 256-byte buffer is clipped, not rejected or overrun.
+selftest_queue null psl "$(printf 'a%.0s' $(seq 300)).co.uk"
+selftest_queue a.a psl "$(printf 'a.%.0s' $(seq 140))co.uk"
 selftest_queue null psl 'test.ck'
 selftest_queue b.test.ck psl 'b.test.ck'
 selftest_queue b.test.ck psl 'a.b.test.ck'
@@ -128,6 +131,8 @@ selftest_queue example.co.uk psl a.example.co.uk
 # real list, and the built-in list stays the fallback.
 builtin=$(httrack -#test=pslinit "${work}/missing.dat") || fail "pslinit failed"
 [[ ${builtin} =~ ^20[0-9]{2}-[0-9]{2}-[0-9]{2}_ ]] || fail "built-in stamp: '${builtin}'"
+inuse=$(httrack -#test=pslversion) || fail "pslversion failed"
+[[ ${inuse} =~ ^20[0-9]{2}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2}_UTC[[:space:]]*$ ]] || fail "pslversion stamp: '${inuse}'"
 big=${work}/big.dat
 {
     printf '// VERSION: 2000-01-02_00-00-00_UTC\n'

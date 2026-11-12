@@ -1,0 +1,70 @@
+#!/bin/bash
+#
+# -S, -D, -U and -B decide which links above and below the start page are
+# followed, and filters written in the full http:// form refuse a link or a size.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+bin=$(httrack_path)
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_888.XXXXXX")
+cleanup_push rm -rf "$tmpdir"
+root=$tmpdir/root
+
+page() { # page PATH LINK... -- one HTML page linking each LINK
+    local f=$root/$1 l
+    shift
+    mkdir -p "${f%/*}"
+    {
+        echo "<html><body>"
+        for l in "$@"; do echo "<a href=\"$l\">$l</a>"; done
+        echo "</body></html>"
+    } >"$f"
+}
+page t/a/b/start.html same.html sub/down.html ../up.html big.bin
+page t/a/b/same.html
+page t/a/b/back.html
+page t/a/b/sub/down.html ../../up2.html
+page t/a/up.html b/back.html
+page t/a/up2.html
+head -c 3000 /dev/zero >"$root/t/a/b/big.bin"
+
+local_server_start --root "$root"
+url=$BASEURL/t/a/b/start.html
+n=0
+crawl() { # crawl ARG... -- a fresh mirror of url
+    n=$((n + 1))
+    out=$tmpdir/m$n
+    run_with_timeout 120 "$bin" -O "$out" -q -c1 --robots=0 -%v0 "$@" "$url" \
+        >"$tmpdir/crawl$n.log" 2>&1 || fail "crawl $* exited $?"
+    host=$out/127.0.0.1_$SRV_PORT/t/a
+}
+want() { test -f "$host/$2" || fail "$1: $2 was not fetched"; }
+refused() { test ! -f "$host/$2" || fail "$1: $2 was fetched"; }
+
+# up.html needs going up, down.html going down; up2.html needs both, and
+# back.html is the start's own level, reached through up.html
+crawl -S
+want -S b/same.html
+refused -S b/sub/down.html
+refused -S up.html
+crawl -D
+want -D b/sub/down.html
+refused -D up.html
+refused -D up2.html
+crawl -U
+want -U up.html
+want -U b/back.html
+refused -U b/sub/down.html
+crawl -B
+want -B up2.html
+want -B b/back.html
+want -B b/big.bin
+
+crawl -B "-http://127.0.0.1:$SRV_PORT/t/a/b/sub/down.html" \
+    "-http://127.0.0.1:$SRV_PORT/t/a/b/big.bin*[>1]"
+refused "full-form filter" b/sub/down.html
+refused "full-form size filter" b/big.bin
+want "full-form filters" up.html

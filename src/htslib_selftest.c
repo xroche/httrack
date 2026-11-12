@@ -34,6 +34,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsselftest_int.h"
 #include "htsname.h"
 #include "htsfetch.h"
+#include "htspsl.h"
 
 #include <limits.h>
 #include <stdint.h>
@@ -114,6 +115,44 @@ static void basic_selftests(void) {
                (LLint) (idx + 1));
       assertf(strcmp(line, expect) == 0);
     }
+    // j&1 half and j=2: connect shows no URL, INFOSC has no space, 401 too
+    {
+      static const struct {
+        int status, code, j;
+        const char *expect;
+      } by_status[] = {
+          {STATUS_CONNECTING, 0, 1, "CONNECT "},
+          {STATUS_WAIT_HEADERS, 0, 1, "INFOS \"http://h.example/p\" 7 8 "},
+          {STATUS_CHUNK_WAIT, 0, 1, "INFOSC\"http://h.example/p\" 7 8 "},
+          {STATUS_CHUNK_CR, 0, 1, "INFOSC\"http://h.example/p\" 7 8 "},
+          {STATUS_TRANSFER, 0, 1, "RECEIVE \"http://h.example/p\" 7 8 "},
+          {STATUS_READY, 401, 3, "FORBIDDEN \"http://h.example/p\" 7 8 "},
+          {STATUS_READY, 200, 1, ""},
+          {STATUS_TRANSFER, 0, 2, ""}};
+
+      size_t k;
+
+      for (k = 0; k < sizeof(by_status) / sizeof(by_status[0]); k++) {
+        lien_back *const slot = &slots[0];
+
+        slot->status = by_status[k].status;
+        slot->r.statuscode = by_status[k].code;
+        slot->r.size = 7;
+        slot->r.totalsize = 8;
+        snprintf(slot->url_adr, sizeof(slot->url_adr), "http://h.example");
+        snprintf(slot->url_fil, sizeof(slot->url_fil), "/p");
+        line[0] = '\0';
+        back_infostr(&sb, 0, by_status[k].j, line, sizeof(line));
+        assertf(strcmp(line, by_status[k].expect) == 0);
+      }
+    }
+    // Lock setters store 1, BACK_PINNED and 0
+    back_set_locked(&sb, 0);
+    assertf(slots[0].locked == 1);
+    back_set_pinned(&sb, 0);
+    assertf(slots[0].locked == BACK_PINNED);
+    back_set_unlocked(&sb, 0);
+    assertf(slots[0].locked == 0);
     // Near-maximal URL, driven through back_info() (which owns the status
     // buffer internally and prints to a FILE*). url_adr + url_fil together
     // overrun the old HTS_URLMAXSIZE*2+1024 buffer, so the bounded appends
@@ -695,61 +734,6 @@ static int string_safety_selftests(void) {
 #undef NEIGHBOURS_INTACT
   }
 
-  /* back_read_ftp_result: the helper's result file is external input, so an
-     over-long message must stop at msg[]'s capacity */
-  {
-    htsblk r;
-    size_t k;
-
-    /* poisoned so a short message cannot pass on leftovers, and so a stray
-       NUL past msg[] is visible in the neighbour */
-#define FTP_RESULT_CASE(BODY)                                                  \
-  do {                                                                         \
-    FILE *fp_ = tmpfile();                                                     \
-                                                                               \
-    if (fp_ == NULL)                                                           \
-      return 1;                                                                \
-    BODY;                                                                      \
-    rewind(fp_);                                                               \
-    memset(&r, 0, sizeof(r));                                                  \
-    memset(r.msg, '#', sizeof(r.msg));                                         \
-    memset(r.contenttype, '#', sizeof(r.contenttype));                         \
-    back_read_ftp_result(fp_, &r);                                             \
-    fclose(fp_);                                                               \
-    if (r.contenttype[0] != '#')                                               \
-      return 1;                                                                \
-  } while (0)
-
-    /* over capacity: clipped to 79 payload bytes plus the NUL */
-    FTP_RESULT_CASE({
-      fprintf(fp_, "226 ");
-      for (k = 0; k < 4 * sizeof(r.msg); k++)
-        fputc('q', fp_);
-    });
-    if (r.statuscode != 226 || strlen(r.msg) != sizeof(r.msg) - 1)
-      return 1;
-    for (k = 0; k < sizeof(r.msg) - 1; k++) {
-      if (r.msg[k] != 'q')
-        return 1;
-    }
-
-    /* well under capacity: nothing padded, nothing eaten off the end */
-    FTP_RESULT_CASE(fprintf(fp_, "550 no such file"));
-    if (r.statuscode != 550 || strcmp(r.msg, "no such file") != 0)
-      return 1;
-
-    /* a byte over 0x7f must not read as EOF and cut the message short */
-    FTP_RESULT_CASE(fprintf(fp_, "226 \xff ok"));
-    if (r.statuscode != 226 || strcmp(r.msg, "\xff ok") != 0)
-      return 1;
-
-    /* unparseable status: the message still loads, the code reports failure */
-    FTP_RESULT_CASE(fprintf(fp_, "not-a-number here"));
-    if (r.statuscode != STATUSCODE_INVALID)
-      return 1;
-#undef FTP_RESULT_CASE
-  }
-
   /* StringCatN/StringSetLength must eval SIZE once: (n_eval++, V) leaves
      n_eval == 2 on a double-eval macro. */
   {
@@ -846,7 +830,6 @@ static int st_hashtable(httrackp *opt, int argc, char **argv) {
   char *buff = NULL;
   const char **strings = NULL;
 
-  (void) opt;
   basic_selftests();
   if (argc < 1) {
     fprintf(stderr, "hashtable: needs a count or a file\n");
@@ -974,7 +957,6 @@ static int st_hashtable(httrackp *opt, int argc, char **argv) {
 }
 
 static int st_strsafe(httrackp *opt, int argc, char **argv) {
-  (void) opt;
   if (argc >= 1 && strncmp(argv[0], "overflow", 8) == 0) {
     /* Deliberately exceed a sized buffer: the bounded op must abort. The source
        comes from argv so its length is opaque to the compiler (no static
@@ -1027,22 +1009,19 @@ static int array_growth_selftests(void) {
   int err = 0;
 
   TypedArrayEnsureRoom(a, 1);
-  if (TypedArrayRoom(a) < 1 || TypedArrayCapa(a) < 16)
-    err = 1;
+  ST_FAIL_IF(err, TypedArrayRoom(a) < 1 || TypedArrayCapa(a) < 16);
 
   /* A request past the current capacity must be met, not landed short of. */
   TypedArrayAppend(a, "0123456789", 10);
   TypedArrayEnsureRoom(a, 1000);
-  if (TypedArrayRoom(a) < 1000 || TypedArraySize(a) != 10)
-    err = 1;
-  if (memcmp(TypedArrayElts(a), "0123456789", 10) != 0)
-    err = 1;
+  ST_FAIL_IF(err, TypedArrayRoom(a) < 1000 || TypedArraySize(a) != 10);
+  ST_FAIL_IF(err, memcmp(TypedArrayElts(a), "0123456789", 10) != 0);
 
   /* Capacity must always keep capa*width representable. */
   TypedArrayEnsureRoom(w, 3);
-  if (TypedArrayRoom(w) < 3 ||
-      TypedArrayCapa(w) > ((size_t) -1) / sizeof(arrays_wide_t))
-    err = 1;
+  ST_FAIL_IF(err,
+             TypedArrayRoom(w) < 3 ||
+                 TypedArrayCapa(w) > ((size_t) -1) / sizeof(arrays_wide_t));
 
   /* Asking for exactly the room left must not reach the allocator, which on a
      borrowed store aborts. That abort is the assertion, because no field
@@ -1075,8 +1054,7 @@ static int array_growth_selftests(void) {
     err = 1;
   else {
     for (i = 0; i < 5000; i++) {
-      if (TypedArrayNth(a, 10 + i) != (char) ('a' + (i % 26)))
-        err = 1;
+      ST_FAIL_IF(err, TypedArrayNth(a, 10 + i) != (char) ('a' + (i % 26)));
     }
   }
 
@@ -1096,9 +1074,6 @@ static int st_arena(httrackp *opt, int argc, char **argv) {
   char token[256];
   int i;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   assertf(kept != NULL);
 
   /* Enough tokens to span many chunks, each holding its own index. */
@@ -1165,9 +1140,8 @@ static int ucs2_check(const unsigned short *units, size_t count,
     src[i * 2 + (swap ? 1 : 0)] = (unsigned char) (units[i] >> 8);
   }
   got = hts_ucs2_to_utf8(src, count * 2, swap, &got_size);
-  if (got == NULL || got_size != want || memcmp(got, expect, want) != 0 ||
-      got[got_size] != '\0')
-    err = 1;
+  ST_FAIL_IF(err, got == NULL || got_size != want ||
+                      memcmp(got, expect, want) != 0 || got[got_size] != '\0');
   freet(got);
   freet(src);
   return err;
@@ -1176,9 +1150,6 @@ static int ucs2_check(const unsigned short *units, size_t count,
 /* The growth is the UCS4 re-encoder's only allocation, so any return at all
    from a starved run says the refusal was not caught. */
 static int st_ucs4_oom(httrackp *opt, int argc, char **argv) {
-  (void) opt;
-  (void) argc;
-  (void) argv;
 #if defined(__GNU__)
   /* GNU/Hurd does not come back from a starved process. The run dies on
      SIGSEGV before the abort it grades, and the assert's own message never
@@ -1224,17 +1195,43 @@ static int st_ucs4_oom(httrackp *opt, int argc, char **argv) {
 }
 
 static int st_ucs2(httrackp *opt, int argc, char **argv) {
-  /* A BOM, ASCII, a two-byte and a three-byte code point, and an unpaired
-     surrogate: only the ASCII one is a single output byte. */
-  static const unsigned short mixed[] = {0xFEFF, 'a', 0x00E9, 0x20AC, 0xD800};
+  /* A BOM, ASCII, a two-byte and a three-byte code point, a surrogate pair
+     and an unpaired surrogate: only the ASCII one is a single output byte. */
+  static const unsigned short mixed[] = {0xFEFF, 'a',    0x00E9, 0x20AC,
+                                         0xD83D, 0xDE00, 0xD800};
   static const char mixed_utf8[] = "\xEF\xBB\xBF"
                                    "a"
                                    "\xC3\xA9"
                                    "\xE2\x82\xAC"
-                                   "?";
+                                   "\xF0\x9F\x98\x80"
+                                   "\xEF\xBF\xBD";
+  /* The ends of the supplementary range, planes 2 and 3, and halves out of
+     order, doubled, or followed by a BMP unit. */
+  static const unsigned short pairs[] = {
+      0xD800, 0xDC00, 0xDBFF, 0xDFFF, 0xD840, 0xDC00, 0xD869, 0xDED6,
+      0xD880, 0xDC3F, 0xDC00, 0xD800, 'b',    0xDC00, 0xDC00, 0xD800,
+      0xD800, 0xD800, 0xDBFF, 0xD800, 0xE000, 0xDBFF};
+  static const char pairs_utf8[] = "\xF0\x90\x80\x80"
+                                   "\xF4\x8F\xBF\xBF"
+                                   "\xF0\xA0\x80\x80"
+                                   "\xF0\xAA\x9B\x96"
+                                   "\xF0\xB0\x80\xBF"
+                                   "\xEF\xBF\xBD"
+                                   "\xEF\xBF\xBD"
+                                   "b"
+                                   "\xEF\xBF\xBD"
+                                   "\xEF\xBF\xBD"
+                                   "\xEF\xBF\xBD"
+                                   "\xEF\xBF\xBD"
+                                   "\xEF\xBF\xBD"
+                                   "\xEF\xBF\xBD"
+                                   "\xEF\xBF\xBD"
+                                   "\xEE\x80\x80"
+                                   "\xEF\xBF\xBD";
+  /* A BOM, 'a', then one dangling byte: an odd-length (truncated) body. */
+  static const unsigned char odd[] = {0xFF, 0xFE, 'a', 0, 'b'};
   static const unsigned short empty[] = {0};
 
-  (void) opt;
   if (argc >= 1 && strcmp(argv[0], "oom") == 0) {
 #ifndef _WIN32
     /* Starve the output allocation. Big enough that the allocator must ask
@@ -1282,13 +1279,54 @@ static int st_ucs2(httrackp *opt, int argc, char **argv) {
   } else {
     int err = 0;
 
-    if (ucs2_check(mixed, sizeof(mixed) / sizeof(mixed[0]), mixed_utf8,
-                   HTS_TRUE))
-      err = 1;
-    if (ucs2_check(mixed, sizeof(mixed) / sizeof(mixed[0]), mixed_utf8,
-                   HTS_FALSE))
-      err = 1;
-    /* Every BMP code unit, to pin the encoder against its ranges. */
+    ST_FAIL_IF(err, ucs2_check(mixed, sizeof(mixed) / sizeof(mixed[0]),
+                               mixed_utf8, HTS_TRUE));
+    ST_FAIL_IF(err, ucs2_check(mixed, sizeof(mixed) / sizeof(mixed[0]),
+                               mixed_utf8, HTS_FALSE));
+    ST_FAIL_IF(err, ucs2_check(pairs, sizeof(pairs) / sizeof(pairs[0]),
+                               pairs_utf8, HTS_TRUE));
+    {
+      size_t n = 0;
+      char *got = hts_ucs2_to_utf8(odd, sizeof(odd), HTS_TRUE, &n);
+
+      ST_FAIL_IF(err, got == NULL || n != 7 ||
+                          memcmp(got,
+                                 "\xEF\xBB\xBF"
+                                 "a"
+                                 "\xEF\xBF\xBD",
+                                 7) != 0);
+      freet(got);
+    }
+    /* What the crawler converts on: some ASCII, almost nothing suspicious. */
+    {
+      static const unsigned char text[] = {'<', 0, 'p', 0, '>', 0, 0x2D, 0x4E,
+                                           '<', 0, '/', 0, 'p', 0, '>',  0};
+      static const unsigned char few[] = {'<', 0, 'p', 0, '>', 0, 0x2D, 0x4E};
+      unsigned char bad[sizeof(text)];
+      size_t k;
+
+      ST_FAIL_IF(err,
+                 !hts_utf16_looks_like_text(text, sizeof(text), HTS_TRUE) ||
+                     hts_utf16_looks_like_text(few, sizeof(few), HTS_TRUE));
+      /* One unit each: lone high and low halves, private use, noncharacters
+         and a C0 control; a dangling byte is not one of them. */
+      for (k = 0; k < 6; k++) {
+        static const unsigned short units[] = {0xD800, 0xDC00, 0xE000,
+                                               0xF8FF, 0xFDD0, 0xFFFE};
+
+        memcpy(bad, text, sizeof(text));
+        bad[6] = (unsigned char) (units[k] & 0xff);
+        bad[7] = (unsigned char) (units[k] >> 8);
+        ST_FAIL_IF(err, hts_utf16_looks_like_text(bad, sizeof(bad), HTS_TRUE));
+      }
+      memcpy(bad, text, sizeof(text));
+      bad[6] = 0x01;
+      bad[7] = 0;
+      ST_FAIL_IF(err, hts_utf16_looks_like_text(bad, sizeof(bad), HTS_TRUE) ||
+                          !hts_utf16_looks_like_text(text, sizeof(text) - 1,
+                                                     HTS_TRUE));
+    }
+    /* Every code unit alone, to pin the encoder against its ranges. */
     {
       unsigned int u;
 
@@ -1302,20 +1340,20 @@ static int st_ucs2(httrackp *opt, int argc, char **argv) {
         else if (u <= 0x7FF) {
           expect[len++] = (char) (0xC0 | (u >> 6));
           expect[len++] = (char) (0x80 | (u & 0x3F));
-        } else if (u >= 0xD800 && u <= 0xDFFF)
-          expect[len++] = '?';
-        else {
+        } else if (u >= 0xD800 && u <= 0xDFFF) {
+          expect[len++] = (char) 0xEF;
+          expect[len++] = (char) 0xBF;
+          expect[len++] = (char) 0xBD;
+        } else {
           expect[len++] = (char) (0xE0 | (u >> 12));
           expect[len++] = (char) (0x80 | ((u >> 6) & 0x3F));
           expect[len++] = (char) (0x80 | (u & 0x3F));
         }
         expect[len] = '\0';
-        if (u != 0 && ucs2_check(&unit, 1, expect, HTS_TRUE))
-          err = 1;
+        ST_FAIL_IF(err, u != 0 && ucs2_check(&unit, 1, expect, HTS_TRUE));
       }
     }
-    if (ucs2_check(empty, 0, "", HTS_TRUE))
-      err = 1;
+    ST_FAIL_IF(err, ucs2_check(empty, 0, "", HTS_TRUE));
     printf("ucs2: %s\n", err ? "FAIL" : "OK");
     return err;
   }
@@ -1326,7 +1364,6 @@ static int st_arrays(httrackp *opt, int argc, char **argv) {
      than compile-time allocation warnings. */
   volatile size_t room;
 
-  (void) opt;
   if (argc >= 1 && strcmp(argv[0], "overflow-capa") == 0) {
     /* Room whose byte size cannot fit a size_t: capa*width used to wrap and
        hand back a short allocation. */
@@ -1347,13 +1384,12 @@ static int st_arrays(httrackp *opt, int argc, char **argv) {
     TypedArrayAppend(a, "kept", 4);
     room = (size_t) -1 - TypedArraySize(a);
     TypedArrayEnsureRoom(a, room);
-    if (TypedArrayHasRoom(a, room))
-      err = 1;
+    ST_FAIL_IF(err, TypedArrayHasRoom(a, room));
     /* The bytes already there survive, and the append that cannot fit is a
        no-op rather than a smash. */
     TypedArrayAppend(a, "lost", room);
-    if (TypedArraySize(a) != 4 || memcmp(TypedArrayElts(a), "kept", 4) != 0)
-      err = 1;
+    ST_FAIL_IF(err, TypedArraySize(a) != 4 ||
+                        memcmp(TypedArrayElts(a), "kept", 4) != 0);
     printf("arrays: growth failure %s\n", err ? "FAIL" : "OK");
     TypedArrayFree(a);
     return err;
@@ -1371,9 +1407,6 @@ static int st_random(httrackp *opt, int argc, char **argv) {
   unsigned char buf[want + pad], first[want], touched[want], varies[want];
   int err = 0, live = 0, r, i;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   memset(touched, 0, sizeof(touched));
   memset(varies, 0, sizeof(varies));
   for (r = 0; r < rounds; r++) {
@@ -1382,15 +1415,14 @@ static int st_random(httrackp *opt, int argc, char **argv) {
     const unsigned char filler = (unsigned char) (0xa5 + r);
 
     memset(buf, filler, sizeof(buf));
-    if (!hts_random_bytes(buf, want))
-      err = 1;
+    ST_FAIL_IF(err, !hts_random_bytes(buf, want));
     for (i = 0; i < want; i++) {
       if (buf[i] != filler)
         touched[i] = 1;
     }
     for (i = 0; i < pad; i++) {
-      if (buf[want + i] != filler)
-        err = 1; /* wrote past the requested length */
+      /* wrote past the requested length */
+      ST_FAIL_IF(err, buf[want + i] != filler);
     }
     if (r == 0) {
       memcpy(first, buf, want);
@@ -1402,24 +1434,20 @@ static int st_random(httrackp *opt, int argc, char **argv) {
     }
   }
   for (i = 0; i < want; i++) {
-    if (!touched[i])
-      err = 1; /* a short fill left this byte alone in every round */
+    /* a short fill left this byte alone in every round */
+    ST_FAIL_IF(err, !touched[i]);
     live += varies[i];
   }
   /* Over 8 draws a live source moves all 64 bytes; half is a floor no real one
      misses, and a source stuck on one byte or a constant cannot reach it. */
-  if (live < want / 2)
-    err = 1;
+  ST_FAIL_IF(err, live < want / 2);
   /* a zero-length ask succeeds and writes nothing */
   memset(buf, 0x5a, sizeof(buf));
-  if (!hts_random_bytes(buf, 0))
-    err = 1;
+  ST_FAIL_IF(err, !hts_random_bytes(buf, 0));
   for (i = 0; i < (int) sizeof(buf); i++) {
-    if (buf[i] != 0x5a)
-      err = 1;
+    ST_FAIL_IF(err, buf[i] != 0x5a);
   }
-  printf("random: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("random", err);
 }
 
 /* Build a path of exactly len chars under base; returns that length. */
@@ -1449,12 +1477,6 @@ static int st_structcheck(httrackp *opt, int argc, char **argv) {
   char BIGSTK target[HTS_URLMAXSIZE * 2];
   FILE *fp;
 
-  (void) opt;
-  if (argc < 1) {
-    fprintf(stderr, "usage: -#test=structcheck <writable directory>\n");
-    return 1;
-  }
-
   /* over the guard: refused before a single directory is created */
   st_structcheck_longpath(path, sizeof(path), argv[0], HTS_URLMAXSIZE + 1);
   errno = 0;
@@ -1470,6 +1492,12 @@ static int st_structcheck(httrackp *opt, int argc, char **argv) {
     sep[1] = '\0'; /* the outermost component it would have created */
     assertf(!dir_exists(path));
   }
+
+  /* a bare file name creates nothing (run from a scratch directory) */
+  assertf(structcheck("abc.zip") == 0);
+  assertf(!dir_exists("a/"));
+  assertf(structcheck_utf8("xyz.zip") == 0);
+  assertf(!dir_exists("x/"));
 
   /* a regular file where a directory belongs is renamed to <name>.txt */
   snprintf(path, sizeof(path), "%s/sc", argv[0]);
@@ -1492,6 +1520,42 @@ static int st_structcheck(httrackp *opt, int argc, char **argv) {
   assertf(dir_exists(path));
   snprintf(target, sizeof(target), "%s/u8.txt", argv[0]);
   assertf(fexist_utf8(target));
+
+  /* an existing <name>.txt is never replaced */
+  for (int u8 = 0; u8 < 2; u8++) {
+    const char *const nm = u8 ? "k8" : "kp";
+    char got[16];
+
+    snprintf(path, sizeof(path), "%s/%s.txt", argv[0], nm);
+    fp = FOPEN(path, "wb");
+    assertf(fp != NULL);
+    fputs("KEEP", fp);
+    fclose(fp);
+    snprintf(path, sizeof(path), "%s/%s.1.txt", argv[0], nm);
+    fp = FOPEN(path, "wb");
+    assertf(fp != NULL);
+    fputs("TAKEN", fp);
+    fclose(fp);
+    snprintf(path, sizeof(path), "%s/%s", argv[0], nm);
+    fp = FOPEN(path, "wb");
+    assertf(fp != NULL);
+    fputs("PAGE", fp);
+    fclose(fp);
+    snprintf(path, sizeof(path), "%s/%s/sub/", argv[0], nm);
+    assertf((u8 ? structcheck_utf8(path) : structcheck(path)) == 0);
+    assertf(dir_exists(path));
+    snprintf(path, sizeof(path), "%s/%s.txt", argv[0], nm);
+    fp = FOPEN(path, "rb");
+    assertf(fp != NULL);
+    memset(got, 0, sizeof(got));
+    assertf(fread(got, 1, 4, fp) == 4 && memcmp(got, "KEEP", 4) == 0);
+    fclose(fp);
+    snprintf(path, sizeof(path), "%s/%s.2.txt", argv[0], nm);
+    fp = FOPEN(path, "rb");
+    assertf(fp != NULL);
+    assertf(fread(got, 1, 4, fp) == 4 && memcmp(got, "PAGE", 4) == 0);
+    fclose(fp);
+  }
 
   printf("structcheck self-test OK\n");
   return 0;
@@ -1547,10 +1611,6 @@ static int st_gmtime(httrackp *opt, int argc, char **argv) {
   static int idx[GMTIME_THREADS];
   int err = 0, i;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
-
   for (i = 0; i < GMTIME_REFS; i++) {
     struct tm tmv;
 
@@ -1596,8 +1656,7 @@ static int st_gmtime(httrackp *opt, int argc, char **argv) {
     err = 1;
   }
 
-  printf("gmtime self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("gmtime self-test", err);
 }
 
 /* Is the masked in exactly want? Prints the difference when it is not. */
@@ -1765,9 +1824,6 @@ static int st_secrets(httrackp *opt, int argc, char **argv) {
   const char *w;
   long at;
   int err = 0;
-  (void) opt;
-  (void) argc;
-  (void) argv;
 
   if (o == NULL || fp == NULL) {
     fprintf(stderr, "secrets: out of memory\n");
@@ -1857,8 +1913,7 @@ static int st_secrets(httrackp *opt, int argc, char **argv) {
   fclose(fp);
   hts_free_opt(o);
   err |= secrets_full();
-  printf("secrets self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("secrets self-test", err);
 }
 
 static int st_maskpw(httrackp *opt, int argc, char **argv) {
@@ -1916,8 +1971,7 @@ static int st_maskpw(httrackp *opt, int argc, char **argv) {
   err |= nologin_rows(opt);
   err |= maskpw_pairs(300);
   err |= maskpw_pairs(10000);
-  printf("maskpw self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("maskpw self-test", err);
 }
 
 /* #806: hts_localtime() must own its output too, same rationale as
@@ -1975,13 +2029,6 @@ static void localtime_thread(void *arg) {
 static int st_localtime(httrackp *opt, int argc, char **argv) {
   static int idx[LOCALTIME_THREADS];
   int err = 0, i;
-
-  (void) opt;
-
-  if (argc < 1) {
-    fprintf(stderr, "usage: -#test=localtime <writable directory>\n");
-    return 1;
-  }
 
   for (i = 0; i < LOCALTIME_REFS; i++) {
     struct tm tmv;
@@ -2059,8 +2106,7 @@ static int st_localtime(httrackp *opt, int argc, char **argv) {
     }
   }
 
-  printf("localtime self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("localtime self-test", err);
 }
 
 /* Dates on both sides of 2038-01-19T03:14:07Z, where a 32-bit time_t ends.
@@ -2090,7 +2136,6 @@ static int st_y2038(httrackp *opt, int argc, char **argv) {
   size_t i;
   int err = 0;
 
-  (void) opt;
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     const int64_t got = hts_parse_date(cases[i].date, 50);
 
@@ -2177,6 +2222,7 @@ static int st_y2038(httrackp *opt, int argc, char **argv) {
   if (argc >= 1) {
     char path[HTS_URLMAXSIZE];
     FILE *fp;
+    hts_boolean wide_fs = HTS_TRUE;
 
     snprintf(path, sizeof(path), "%s/y2038.bin", argv[0]);
     structcheck(path);
@@ -2186,7 +2232,22 @@ static int st_y2038(httrackp *opt, int argc, char **argv) {
       return 1;
     }
     fclose(fp);
-    for (i = 5; i <= 6; i++) {
+#ifndef _WIN32
+    /* XFS without bigtime and ext4 with 128-byte inodes clip past 2038. Raw
+       calls, so a clipping get_filetime() cannot switch its own check off. */
+    if (!narrow) {
+      struct utimbuf tim;
+      struct stat st;
+
+      tim.actime = tim.modtime = (time_t) cases[6].secs;
+      (void) utime(path, &tim);
+      if (stat(path, &st) != 0 || (int64_t) st.st_mtime != cases[6].secs) {
+        printf("y2038: this filesystem clips dates past 2038, skipped\n");
+        wide_fs = HTS_FALSE;
+      }
+    }
+#endif
+    for (i = 5; wide_fs && i <= 6; i++) {
       const int64_t want = narrow ? 2147483647LL : cases[i].secs;
       time_t got;
 
@@ -2209,8 +2270,7 @@ static int st_y2038(httrackp *opt, int argc, char **argv) {
     }
   }
 
-  printf("y2038: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("y2038", err);
 }
 
 /* The x[strlen(x) - 1] class (#770), its pointer spelling x + strlen(x) - 1
@@ -2225,22 +2285,12 @@ static int st_lastchar(httrackp *opt, int argc, char **argv) {
   const int guard = off - 1; /* what the old idiom clobbers */
   int err = 0;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
-
 #define REPOISON(str)                                                          \
   do {                                                                         \
     memset(arena, '#', sizeof(arena));                                         \
     strlcpybuff(s, (str), sizeof(arena) - off);                                \
   } while (0)
-#define CHECK(cond)                                                            \
-  do {                                                                         \
-    if (!(cond)) {                                                             \
-      printf("  FAIL line %d: %s\n", __LINE__, #cond);                         \
-      err = 1;                                                                 \
-    }                                                                          \
-  } while (0)
+#define CHECK(cond) ST_CHECK(err, cond)
 
   /* the empty string: every helper must report "nothing" and touch nothing */
   REPOISON("");
@@ -2363,8 +2413,7 @@ static int st_lastchar(httrackp *opt, int argc, char **argv) {
 #undef REPOISON
 #undef CHECK
 
-  printf("lastchar self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("lastchar self-test", err);
 }
 
 /* The character classes htslib.h defines, paired with the htssafe.h set string
@@ -2410,6 +2459,76 @@ static hts_boolean cc_span_agrees(size_t cls, const char *s) {
   return strspn(s, set) == span && strcspn(s, set) == cspan;
 }
 
+/* -#test=strcmpnocase: equal only when both strings end together, and the
+   order flips with the arguments. */
+static int st_strcmpnocase(httrackp *opt, int argc, char **argv) {
+  static const struct {
+    const char *a, *b;
+    int sign;
+  } cases[] = {
+      {"ab", "abc", -1}, {"", "about.html", -1}, {"a.com", "a.com.evil", -1},
+      {"", "TRUE", -1},  {"abd", "abc", 1},      {"ABC", "abc", 0},
+      {"", "", 0},       {"TRUE", "true", 0},
+  };
+
+  size_t i;
+  int err = 0;
+
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    const int ab = strcmpnocase(cases[i].a, cases[i].b);
+    const int ba = strcmpnocase(cases[i].b, cases[i].a);
+    const int sign = (ab > 0) - (ab < 0);
+
+    if (sign != cases[i].sign || (ba > 0) - (ba < 0) != -sign) {
+      printf("strcmpnocase: (\"%s\", \"%s\") gives %d, reversed %d\n",
+             cases[i].a, cases[i].b, ab, ba);
+      err = 1;
+    }
+  }
+  return st_verdict("strcmpnocase", err);
+}
+
+static void uninit_worker_noop(void *arg) { (void) arg; }
+
+/* Did the worker's hts_uninit() return with the thread lock still built? */
+static hts_boolean uninit_worker_kept;
+
+static void uninit_worker(void *arg) {
+  (void) arg;
+  hts_uninit();
+  uninit_worker_kept = htsthread_lock_live();
+}
+
+static void uninit_report(const char *step) {
+  printf("%s:psl-%s,lock-%s", step, hts_psl_loaded() ? "on" : "off",
+         htsthread_lock_live() ? "on" : "off");
+}
+
+/* A worker's hts_uninit() must neither wait for itself nor free the lock it
+   still takes. Then two hts_uninit() calls free the Public Suffix List and the
+   thread lock, and hts_init() plus a new worker rebuild both. */
+static int st_uninit(httrackp *opt, int argc, char **argv) {
+  int i;
+
+  hts_init();
+  if (hts_newthread(uninit_worker, NULL) != 0)
+    return 1;
+  htsthread_wait();
+  printf("worker:%s", uninit_worker_kept ? "kept" : "freed");
+  hts_init();
+  for (i = 0; i < 2; i++) {
+    hts_uninit();
+    uninit_report(" uninit");
+  }
+  hts_init();
+  if (hts_newthread(uninit_worker_noop, NULL) != 0)
+    return 1;
+  htsthread_wait();
+  uninit_report(" rejoin");
+  printf("\n");
+  return 0;
+}
+
 /* hts_rtrim() and the sets it is called with. The string starts mid-arena, and
    the byte below it is poisoned with '#' rather than 0, or the stray NUL the
    old loop wrote there would read as untouched. */
@@ -2423,22 +2542,12 @@ static int st_rtrim(httrackp *opt, int argc, char **argv) {
   int c;
   size_t cls;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
-
 #define REPOISON(str)                                                          \
   do {                                                                         \
     memset(arena, '#', sizeof(arena));                                         \
     strlcpybuff(s, (str), sizeof(arena) - off);                                \
   } while (0)
-#define CHECK(cond)                                                            \
-  do {                                                                         \
-    if (!(cond)) {                                                             \
-      printf("  FAIL line %d: %s\n", __LINE__, #cond);                         \
-      err = 1;                                                                 \
-    }                                                                          \
-  } while (0)
+#define CHECK(cond) ST_CHECK(err, cond)
 
   /* nothing but spaces: the case that ran the old loop off the front */
   REPOISON("   ");
@@ -2520,8 +2629,7 @@ static int st_rtrim(httrackp *opt, int argc, char **argv) {
 #undef REPOISON
 #undef CHECK
 
-  printf("rtrim self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("rtrim self-test", err);
 }
 
 /* Format LEN bytes of EXPECTED into S as two arguments, and check what came
@@ -2555,10 +2663,6 @@ static int st_strsprintf(httrackp *opt, int argc, char **argv) {
   String reused = STRING_EMPTY;
   size_t i, len;
   int err = 0;
-
-  (void) opt;
-  (void) argc;
-  (void) argv;
 
   if (expected == NULL || head == NULL || tail == NULL) {
     printf("strsprintf self-test: FAIL (out of memory)\n");
@@ -2663,8 +2767,7 @@ static int st_strsprintf(httrackp *opt, int argc, char **argv) {
   freet(head);
   freet(tail);
 
-  printf("strsprintf self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("strsprintf self-test", err);
 }
 
 #ifndef _WIN32
@@ -2712,8 +2815,6 @@ static int st_sighandlers(httrackp *opt, int argc, char **argv) {
   int err = 0;
   size_t i;
 
-  (void) argc;
-  (void) argv;
   assertf(readonly != -1);
   assertf(capture != NULL);
   capfd = fileno(capture);
@@ -2800,8 +2901,7 @@ static int st_sighandlers(httrackp *opt, int argc, char **argv) {
   }
   close(readonly);
   fclose(capture);
-  printf("sighandlers self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("sighandlers self-test", err);
 }
 #endif
 
@@ -2829,9 +2929,6 @@ static int st_sigterm(httrackp *opt, int argc, char **argv) {
 
   int err = 0;
   size_t i;
-
-  (void) argc;
-  (void) argv;
 
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     FILE *const errs = tmpfile();
@@ -2893,8 +2990,7 @@ static int st_sigterm(httrackp *opt, int argc, char **argv) {
     }
     fclose(errs);
   }
-  printf("sigterm self-test: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("sigterm self-test", err);
 }
 #endif
 
@@ -2918,9 +3014,6 @@ static int st_statrecv(httrackp *opt, int argc, char **argv) {
   int err = 0;
   int i;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   hts_stat_recv_set(0);
   for (i = 0; i < STATRECV_THREADS; i++) {
     if (hts_newthread(statrecv_thread, NULL) != 0) {
@@ -2959,8 +3052,7 @@ static int st_statrecv(httrackp *opt, int argc, char **argv) {
   hts_stat_recv_set(recv_was);
   hts_stat_recv_publish();
 
-  printf("statrecv: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("statrecv", err);
 }
 
 /* An overrun or a stray NUL must disturb this byte. */
@@ -2976,7 +3068,6 @@ static int st_queryparam(httrackp *opt, int argc, char **argv) {
   hts_boolean found;
   size_t i;
 
-  (void) opt;
   if (argc < 2 || argc > 3) {
     fprintf(stderr, "queryparam: takes a url, a name and an optional size\n");
     return 1;
@@ -3063,9 +3154,6 @@ static int st_querysweep(httrackp *opt, int argc, char **argv) {
   size_t i, j;
   int r;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   for (i = 0; i < sizeof(lengths) / sizeof(lengths[0]); i++) {
     char *run = parsediff_run('x', lengths[i]);
     String q = STRING_EMPTY;
@@ -3105,7 +3193,6 @@ static int st_querynext(httrackp *opt, int argc, char **argv) {
   String out = STRING_EMPTY;
   int bad = 0;
 
-  (void) opt;
   if (argc > 1) {
     fprintf(stderr, "querynext: takes one query\n");
     return 1;
@@ -3546,9 +3633,6 @@ static int st_spandiff(httrackp *opt, int argc, char **argv) {
   char *longhost = parsediff_run('x', 2047);
   String longfil = STRING_EMPTY;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   /* Only a clipped pattern, a.com/ followed by *x..x, matches this path,
      because strjoker refuses a longer pattern. */
   StringCat(longfil, "/");
@@ -3684,7 +3768,6 @@ static int st_span(httrackp *opt, int argc, char **argv) {
   hts_span s, a, b;
   int ret = 0;
 
-  (void) opt;
   if (argc < 3 || (strcmp(argv[0], "trim") == 0 && argc < 4)) {
     fprintf(stderr, "span: bad arguments\n");
     return 1;
@@ -3782,9 +3865,6 @@ static int st_pathcontained(httrackp *opt, int argc, char **argv) {
   int failures = 0;
   size_t i;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   for (i = 0; escaping[i] != NULL; i++) {
     if (hts_path_is_contained(escaping[i])) {
       printf("pathcontained: '%s' was accepted\n", escaping[i]);
@@ -3844,6 +3924,225 @@ static int cid_unescape(const char *cid, char *dest, const size_t size) {
   return 1;
 }
 
+/* A plug-in hook that forwards to prev without checking it. */
+static int chain_hits = 0;
+#define CHAIN_PREV(NAME) (chain_hits++, CALLBACKARG_PREV_FUN(carg, NAME))
+#define CHAIN_PCARG CALLBACKARG_PREV_CARG(carg)
+
+static void __cdecl cp_init(t_hts_callbackarg *carg) {
+  CHAIN_PREV(init)(CHAIN_PCARG);
+}
+
+static void __cdecl cp_uninit(t_hts_callbackarg *carg) {
+  CHAIN_PREV(uninit)(CHAIN_PCARG);
+}
+
+static int __cdecl cp_start(t_hts_callbackarg *carg, httrackp *opt) {
+  return CHAIN_PREV(start)(CHAIN_PCARG, opt);
+}
+
+static int __cdecl cp_end(t_hts_callbackarg *carg, httrackp *opt) {
+  return CHAIN_PREV(end)(CHAIN_PCARG, opt);
+}
+
+static int __cdecl cp_chopt(t_hts_callbackarg *carg, httrackp *opt) {
+  return CHAIN_PREV(chopt)(CHAIN_PCARG, opt);
+}
+
+static int __cdecl cp_preprocess(t_hts_callbackarg *carg, httrackp *opt,
+                                 char **html, int *len, const char *adr,
+                                 const char *fil) {
+  return CHAIN_PREV(preprocess)(CHAIN_PCARG, opt, html, len, adr, fil);
+}
+
+static int __cdecl cp_postprocess(t_hts_callbackarg *carg, httrackp *opt,
+                                  char **html, int *len, const char *adr,
+                                  const char *fil) {
+  return CHAIN_PREV(postprocess)(CHAIN_PCARG, opt, html, len, adr, fil);
+}
+
+static int __cdecl cp_check_html(t_hts_callbackarg *carg, httrackp *opt,
+                                 char *html, int len, const char *adr,
+                                 const char *fil) {
+  return CHAIN_PREV(check_html)(CHAIN_PCARG, opt, html, len, adr, fil);
+}
+
+static const char *__cdecl cp_query(t_hts_callbackarg *carg, httrackp *opt,
+                                    const char *question) {
+  return CHAIN_PREV(query)(CHAIN_PCARG, opt, question);
+}
+
+static const char *__cdecl cp_query2(t_hts_callbackarg *carg, httrackp *opt,
+                                     const char *question) {
+  return CHAIN_PREV(query2)(CHAIN_PCARG, opt, question);
+}
+
+static const char *__cdecl cp_query3(t_hts_callbackarg *carg, httrackp *opt,
+                                     const char *question) {
+  return CHAIN_PREV(query3)(CHAIN_PCARG, opt, question);
+}
+
+static int __cdecl cp_check_link(t_hts_callbackarg *carg, httrackp *opt,
+                                 const char *adr, const char *fil, int status) {
+  return CHAIN_PREV(check_link)(CHAIN_PCARG, opt, adr, fil, status);
+}
+
+static int __cdecl cp_check_mime(t_hts_callbackarg *carg, httrackp *opt,
+                                 const char *adr, const char *fil,
+                                 const char *mime, int status) {
+  return CHAIN_PREV(check_mime)(CHAIN_PCARG, opt, adr, fil, mime, status);
+}
+
+static void __cdecl cp_filesave(t_hts_callbackarg *carg, httrackp *opt,
+                                const char *file) {
+  CHAIN_PREV(filesave)(CHAIN_PCARG, opt, file);
+}
+
+static void __cdecl cp_filesave2(t_hts_callbackarg *carg, httrackp *opt,
+                                 const char *adr, const char *fil,
+                                 const char *sav, int is_new, int is_modified,
+                                 int not_updated) {
+  CHAIN_PREV(filesave2)(CHAIN_PCARG, opt, adr, fil, sav, is_new, is_modified,
+                        not_updated);
+}
+
+static int __cdecl cp_linkdetected(t_hts_callbackarg *carg, httrackp *opt,
+                                   char *link) {
+  return CHAIN_PREV(linkdetected)(CHAIN_PCARG, opt, link);
+}
+
+static int __cdecl cp_linkdetected2(t_hts_callbackarg *carg, httrackp *opt,
+                                    char *link, const char *tag) {
+  return CHAIN_PREV(linkdetected2)(CHAIN_PCARG, opt, link, tag);
+}
+
+static int __cdecl cp_xfrstatus(t_hts_callbackarg *carg, httrackp *opt,
+                                lien_back *back) {
+  return CHAIN_PREV(xfrstatus)(CHAIN_PCARG, opt, back);
+}
+
+static int __cdecl cp_savename(t_hts_callbackarg *carg, httrackp *opt,
+                               const char *adr, const char *fil,
+                               const char *ref_adr, const char *ref_fil,
+                               char *save) {
+  return CHAIN_PREV(savename)(CHAIN_PCARG, opt, adr, fil, ref_adr, ref_fil,
+                              save);
+}
+
+static int __cdecl cp_sendhead(t_hts_callbackarg *carg, httrackp *opt,
+                               char *buff, const char *adr, const char *fil,
+                               const char *ref_adr, const char *ref_fil,
+                               htsblk *outgoing) {
+  return CHAIN_PREV(sendhead)(CHAIN_PCARG, opt, buff, adr, fil, ref_adr,
+                              ref_fil, outgoing);
+}
+
+static int __cdecl cp_receivehead(t_hts_callbackarg *carg, httrackp *opt,
+                                  char *buff, const char *adr, const char *fil,
+                                  const char *ref_adr, const char *ref_fil,
+                                  htsblk *incoming) {
+  return CHAIN_PREV(receivehead)(CHAIN_PCARG, opt, buff, adr, fil, ref_adr,
+                                 ref_fil, incoming);
+}
+
+/* A hook chained onto an unset slot gets the engine default as prev. */
+static int st_chainprev(httrackp *unused, int argc, char **argv) {
+  httrackp *const opt = hts_create_opt();
+  char html[] = "<html></html>", link[] = "x.html", save[] = "x.html";
+  char *page = html;
+  int len = (int) strlen(html);
+  static const char *const names[] = {"init",
+                                      "free",
+                                      "start",
+                                      "end",
+                                      "change-options",
+                                      "preprocess-html",
+                                      "postprocess-html",
+                                      "check-html",
+                                      "query",
+                                      "query2",
+                                      "query3",
+                                      "loop",
+                                      "check-link",
+                                      "check-mime",
+                                      "pause",
+                                      "save-file",
+                                      "save-file2",
+                                      "link-detected",
+                                      "link-detected2",
+                                      "transfer-status",
+                                      "save-name",
+                                      "send-header",
+                                      "receive-header"};
+  size_t i;
+
+  (void) unused;
+  (void) argc;
+  (void) argv;
+  assertf(opt != NULL);
+  assertf(!HAS_CALLBACK(opt, query2) && !HAS_CALLBACK(opt, query3));
+  for (i = 0; i < sizeof(names) / sizeof(names[0]); i++)
+    assertf(htswrap_read(opt, names[i]) == 0);
+
+  CHAIN_FUNCTION(opt, init, cp_init, NULL);
+  CHAIN_FUNCTION(opt, uninit, cp_uninit, NULL);
+  CHAIN_FUNCTION(opt, start, cp_start, NULL);
+  CHAIN_FUNCTION(opt, end, cp_end, NULL);
+  CHAIN_FUNCTION(opt, chopt, cp_chopt, NULL);
+  CHAIN_FUNCTION(opt, preprocess, cp_preprocess, NULL);
+  CHAIN_FUNCTION(opt, postprocess, cp_postprocess, NULL);
+  CHAIN_FUNCTION(opt, check_html, cp_check_html, NULL);
+  CHAIN_FUNCTION(opt, query, cp_query, NULL);
+  CHAIN_FUNCTION(opt, query2, cp_query2, NULL);
+  CHAIN_FUNCTION(opt, query3, cp_query3, NULL);
+  CHAIN_FUNCTION(opt, check_link, cp_check_link, NULL);
+  CHAIN_FUNCTION(opt, check_mime, cp_check_mime, NULL);
+  CHAIN_FUNCTION(opt, filesave, cp_filesave, NULL);
+  CHAIN_FUNCTION(opt, filesave2, cp_filesave2, NULL);
+  CHAIN_FUNCTION(opt, linkdetected, cp_linkdetected, NULL);
+  CHAIN_FUNCTION(opt, linkdetected2, cp_linkdetected2, NULL);
+  CHAIN_FUNCTION(opt, xfrstatus, cp_xfrstatus, NULL);
+  CHAIN_FUNCTION(opt, savename, cp_savename, NULL);
+  CHAIN_FUNCTION(opt, sendhead, cp_sendhead, NULL);
+  CHAIN_FUNCTION(opt, receivehead, cp_receivehead, NULL);
+  assertf(HAS_CALLBACK(opt, query2) && HAS_CALLBACK(opt, query3));
+  assertf(htswrap_read(opt, "check-link") == (uintptr_t) cp_check_link);
+
+  RUN_CALLBACK_NOARG(opt, init);
+  assertf(RUN_CALLBACK0(opt, start) == 1);
+  assertf(RUN_CALLBACK0(opt, chopt) == 1);
+  assertf(RUN_CALLBACK4(opt, preprocess, &page, &len, "h", "/") == 1);
+  assertf(RUN_CALLBACK4(opt, postprocess, &page, &len, "h", "/") == 1);
+  assertf(page == html && len == (int) strlen(html));
+  assertf(RUN_CALLBACK4(opt, check_html, html, len, "h", "/") == 1);
+  assertf(strcmp(RUN_CALLBACK1(opt, query, "q"), "") == 0);
+  assertf(strcmp(RUN_CALLBACK1(opt, query2, "q"), "") == 0);
+  assertf(strcmp(RUN_CALLBACK1(opt, query3, "q"), "") == 0);
+  assertf(RUN_CALLBACK3(opt, check_link, "h", "/", 200) == -1);
+  assertf(RUN_CALLBACK4(opt, check_mime, "h", "/", "text/html", 200) == -1);
+  RUN_CALLBACK1(opt, filesave, "f");
+  RUN_CALLBACK6(opt, filesave2, "h", "/", "f", 1, 1, 0);
+  assertf(RUN_CALLBACK1(opt, linkdetected, link) == 1);
+  assertf(RUN_CALLBACK2(opt, linkdetected2, link, "<a") == 1);
+  assertf(RUN_CALLBACK1(opt, xfrstatus, NULL) == 1);
+  assertf(RUN_CALLBACK5(opt, savename, "h", "/", "r", "/", save) == 1);
+  assertf(RUN_CALLBACK6(opt, sendhead, link, "h", "/", "r", "/", NULL) == 1);
+  assertf(RUN_CALLBACK6(opt, receivehead, link, "h", "/", "r", "/", NULL) == 1);
+  assertf(RUN_CALLBACK0(opt, end) == 1);
+  RUN_CALLBACK_NOARG(opt, uninit);
+  assertf(chain_hits == 21);
+
+  /* Unsetting a slot restores the default, so a new chain still has a prev. */
+  assertf(htswrap_add(opt, "check-link", NULL) == 0);
+  assertf(htswrap_read(opt, "check-link") == 0);
+  CHAIN_FUNCTION(opt, check_link, cp_check_link, NULL);
+  assertf(RUN_CALLBACK3(opt, check_link, "h", "/", 200) == -1);
+  assertf(chain_hits == 22);
+
+  hts_free_opt(opt);
+  return st_verdict("chainprev", 0);
+}
+
 /* Unescaping every id back to its own URL is what proves the map injective;
    make_content_id() in htslib.c says why that matters. */
 static int st_contentid(httrackp *opt, int argc, char **argv) {
@@ -3856,10 +4155,6 @@ static int st_contentid(httrackp *opt, int argc, char **argv) {
   char fil[8];
   int failures = 0;
   int i, c;
-
-  (void) opt;
-  (void) argc;
-  (void) argv;
 
   for (i = 0; fils[i] != NULL; i++) {
     make_content_id("www.example.com", fils[i], cid, sizeof(cid));
@@ -3890,7 +4185,6 @@ static int st_contentid(httrackp *opt, int argc, char **argv) {
 static int st_clienthints(httrackp *opt, int argc, char **argv) {
   hts_client_hints ch;
 
-  (void) opt;
   if (argc != 1) {
     fprintf(stderr, "clienthints: takes a user-agent\n");
     return 1;
@@ -3916,11 +4210,6 @@ static int st_headerverdict(httrackp *opt, int argc, char **argv) {
   hts_header_verdict v;
   int i;
 
-  (void) opt;
-  if (argc < 1) {
-    fprintf(stderr, "headerverdict: takes a line, then the earlier lines\n");
-    return 1;
-  }
   headers[0] = '\0';
   for (i = 1; i < argc; i++) {
     strcatbuff(headers, argv[i]);
@@ -3935,7 +4224,6 @@ static int st_headerverdict(httrackp *opt, int argc, char **argv) {
 
 /* -#test=browserfamily <user-agent> prints the browser whose tables it gets. */
 static int st_browserfamily(httrackp *opt, int argc, char **argv) {
-  (void) opt;
   if (argc != 1) {
     fprintf(stderr, "browserfamily: takes a user-agent\n");
     return 1;
@@ -3953,7 +4241,6 @@ static int st_headerorder(httrackp *opt, int argc, char **argv) {
   hts_browser_family family;
   int dest, i;
 
-  (void) opt;
   if (argc != 2 || n > (int) sizeof(seen)) {
     fprintf(stderr, "headerorder: takes <none|chrome|firefox> <dest>\n");
     return 1;
@@ -4003,11 +4290,16 @@ const struct selftest_entry selftests_lib[] = {
      "last-char helpers never index before the buffer (#770, #781, #821)",
      st_lastchar},
     {"rtrim", "", "hts_rtrim never walks below the buffer", st_rtrim},
+    {"uninit", "", "hts_uninit releases what hts_init sets up, twice safely",
+     st_uninit},
+    {"strcmpnocase", "",
+     "strcmpnocase compares the whole of both strings, ignoring case",
+     st_strcmpnocase},
     {"queryparam", "<url> <name> [size]", "the value %[param] reads for a key",
      st_queryparam},
     {"querysweep", "", "%[param] stays inside every buffer size it is given",
      st_querysweep},
-    {"querynext", "<query>", "the fields the shared query iterator reads",
+    {"querynext", "[query]", "the fields the shared query iterator reads",
      st_querynext},
     {"spandiff", "",
      "the span iterator matches the rule-list parsers it replaced",
@@ -4024,7 +4316,7 @@ const struct selftest_entry selftests_lib[] = {
      "the command-line echo masks the password of a URL login and nothing "
      "else",
      st_maskpw},
-    {"y2038", "<dir>", "dates before and after 2038 read as 64-bit seconds",
+    {"y2038", "[dir]", "dates before and after 2038 read as 64-bit seconds",
      st_y2038},
     {"localtime", "<dir>",
      "hts_localtime() and get_filetime_rfc822()'s GMT labelling (#806)",
@@ -4046,5 +4338,8 @@ const struct selftest_entry selftests_lib[] = {
      st_statrecv},
     {"contentid", "", "every .mht Content-ID unescapes back to its own URL",
      st_contentid},
+    {"chainprev", "",
+     "a plug-in that chains to an unset callback reaches the engine default",
+     st_chainprev},
     {NULL, NULL, NULL, NULL},
 };

@@ -109,7 +109,6 @@ static int st_readline(httrackp *opt, int argc, char **argv) {
   const hts_boolean alloc = argc >= 4 && strcmp(argv[3], "alloc") == 0;
   FILE *fp;
 
-  (void) opt;
   if (cap < 1 || cap > ST_LINE_MAXCAP) {
     fprintf(stderr, "readline: needs CAP (1..%d) FLAGS TEXT [cpp|alloc]\n",
             ST_LINE_MAXCAP);
@@ -373,9 +372,6 @@ static int st_linediff(httrackp *opt, int argc, char **argv) {
   size_t i;
   int n;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   for (i = 0; i < sizeof(corpus) / sizeof(corpus[0]); i++)
     st_diff_one(corpus[i], strlen(corpus[i]), &k);
   /* NUL is data too, and the one byte only some readers drop */
@@ -412,7 +408,6 @@ static int st_fopen_private(httrackp *opt, int argc, char **argv) {
   size_t i;
   static const char *const refused[] = {"a", "ab", "r", "r+", "w+", "wb+"};
 
-  (void) opt;
   if (argc < 1) {
     printf("usage: -#test=fopen-private <dir>\n");
     return 1;
@@ -466,6 +461,40 @@ static int st_fopen_private(httrackp *opt, int argc, char **argv) {
       if (fp != NULL)
         fclose(fp);
     }
+    /* _new: a fresh file is 0600, an existing file or a link is refused
+     * (O_EXCL) */
+    {
+      char lnk[HTS_URLMAXSIZE * 2];
+      struct stat st;
+
+      snprintf(path, sizeof(path), "%s/newfile", argv[0]);
+      snprintf(lnk, sizeof(lnk), "%s/newlink", argv[0]);
+      (void) unlink(path);
+      (void) unlink(lnk);
+      fp = hts_fopen_private_new(path, "wb");
+      if (fp == NULL || fstat(fileno(fp), &st) != 0 ||
+          (st.st_mode & 0777) != 0600) {
+        printf("fopen-private: _new did not make a 0600 file\n");
+        failures++;
+      }
+      if (fp != NULL)
+        fclose(fp);
+      fp = hts_fopen_private_new(path, "wb");
+      if (fp != NULL) {
+        printf("fopen-private: _new reopened an existing file\n");
+        failures++;
+        fclose(fp);
+      }
+      if (symlink("kept", lnk) != 0 ||
+          (fp = hts_fopen_private_new(lnk, "wb")) != NULL) {
+        printf("fopen-private: _new did not refuse a link\n");
+        failures++;
+        if (fp != NULL)
+          fclose(fp);
+      }
+      (void) unlink(path);
+      (void) unlink(lnk);
+    }
     (void) umask(old);
   }
 #endif
@@ -478,7 +507,7 @@ static int st_fopen_private(httrackp *opt, int argc, char **argv) {
 /* ------------------------------------------------------------ */
 
 const struct selftest_entry selftests_lines[] = {
-    {"readline", "<cap> <t|n|tn|-> <text> [cpp|alloc]",
+    {"readline", "<cap> <t|n|tn|-> [text] [cpp|alloc]",
      "config-file line reader: [line] per read, ! when cut", st_readline},
     {"linediff", "", "line readers against the legacy ones they replaced",
      st_linediff},

@@ -49,6 +49,10 @@ Please visit our Website: http://www.httrack.com
    body provably in no deflate framing is copied verbatim. On -1, errno is the
    local failure's, and 0 when the coded body was the problem. */
 extern int hts_zunpack(const char *filename, const char *newfile);
+/* As hts_zunpack(), with the decoded size also capped at cap when cap > 0;
+   HTS_CODEC_TOOBIG when that cap was exceeded. */
+extern int hts_zunpack_max(const char *filename, const char *newfile,
+                           LLint cap);
 /* Inflate the head of a gzip/zlib stream, out_len max; 0 if undecodable */
 extern size_t hts_zhead(const void *in, size_t in_len, void *out,
                         size_t out_len);

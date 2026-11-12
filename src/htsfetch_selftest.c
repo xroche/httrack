@@ -44,7 +44,6 @@ static int st_fetchdest(httrackp *opt, int argc, char **argv) {
   char needle[64];
   int page = HTS_FETCH_DEST_DOCUMENT;
 
-  (void) opt;
   if (argc < 2 || argc > 4 || strlen(argv[1]) + 2 > sizeof(needle)) {
     fprintf(stderr, "fetchdest: takes <tag> <attr> [fil [page]]\n");
     return 1;
@@ -77,7 +76,6 @@ static int st_fetchdest(httrackp *opt, int argc, char **argv) {
 /* -#test=fetchsite <from> <to>: Sec-Fetch-Site for a request to <to> from a
    page at <from>. */
 static int st_fetchsite(httrackp *opt, int argc, char **argv) {
-  (void) opt;
   if (argc != 2) {
     fprintf(stderr, "fetchsite: takes <from> <to>\n");
     return 1;
@@ -88,7 +86,6 @@ static int st_fetchsite(httrackp *opt, int argc, char **argv) {
 
 /* -#test=fetchtrust <adr>: does a browser send Sec-Fetch-* to this host? */
 static int st_fetchtrust(httrackp *opt, int argc, char **argv) {
-  (void) opt;
   if (argc != 1) {
     fprintf(stderr, "fetchtrust: takes <adr>\n");
     return 1;
@@ -99,7 +96,6 @@ static int st_fetchtrust(httrackp *opt, int argc, char **argv) {
 
 /* -#test=fetchbasetarget <html>: does the page carry a <base target>? */
 static int st_fetchbasetarget(httrackp *opt, int argc, char **argv) {
-  (void) opt;
   if (argc != 1) {
     fprintf(stderr, "fetchbasetarget: takes <html>\n");
     return 1;
@@ -119,8 +115,6 @@ static int st_fetchscale(httrackp *opt, int argc, char **argv) {
   hts_boolean found;
   size_t i;
 
-  (void) opt;
-  (void) argv;
   if (argc != 0 || page == NULL)
     return 1;
   for (i = 0; i < count; i++)
@@ -144,7 +138,6 @@ static int st_fetchscale(httrackp *opt, int argc, char **argv) {
 static int st_fetchorigin(httrackp *opt, int argc, char **argv) {
   char adr[HTS_URLMAXSIZE], origin[HTS_URLMAXSIZE * 2];
 
-  (void) opt;
   if (argc != 1) {
     fprintf(stderr, "fetchorigin: takes an address\n");
     return 1;
@@ -159,7 +152,6 @@ static int st_fetchorigin(httrackp *opt, int argc, char **argv) {
 static int st_acceptkind(httrackp *opt, int argc, char **argv) {
   int kind;
 
-  (void) opt;
   if (argc != 1) {
     fprintf(stderr, "acceptkind: takes an --accept argument\n");
     return 1;
@@ -177,11 +169,6 @@ static int st_accept(httrackp *opt, int argc, char **argv) {
   hts_browser_family family;
   int dest, i;
 
-  (void) opt;
-  if (argc < 3) {
-    fprintf(stderr, "accept: takes <dest> <family> <-%%a|-> [kind=value...]\n");
-    return 1;
-  }
   if (!st_dest_of(argv[0], &dest) || !st_family_of(argv[1], &family))
     return 1;
   list[0] = '\0';
@@ -205,7 +192,6 @@ static int st_accept(httrackp *opt, int argc, char **argv) {
 static int st_acceptpreset(httrackp *opt, int argc, char **argv) {
   const char *v;
 
-  (void) opt;
   if (argc == 0) {
     const char *const *k;
     int dest;

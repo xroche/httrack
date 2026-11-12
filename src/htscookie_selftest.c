@@ -33,6 +33,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsselftest_int.h"
 #include "htscookie_selftest.h"
+#include "htsbundle.h"
 
 /* True if a Cookie header line is a whole RFC 6265 list of `count` pairs and
    nothing else. A dropped cookie must take its separator with it, because a
@@ -78,9 +79,6 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
   int err = 0;
   int added;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   cookie.max_len = sizeof(cookie.data);
   cookie.data[0] = '\0';
   added = cookie_add(&cookie, "name", "value", dom, "/");
@@ -93,8 +91,7 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
   }
 
   http_cookie_header(&cookie, dom, "/", hdr, sizeof(hdr));
-  if (strcmp(hdr, expected) != 0)
-    err = 1;
+  ST_FAIL_IF(err, strcmp(hdr, expected) != 0);
 
   /* A hostile over-long request host must not overflow domain[] in
      treathead's default-domain copy (that would abort the mirror). */
@@ -119,8 +116,8 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
     if (strstr(ck2.data, "SID") == NULL) // guard wrongly dropped a valid cookie
       err = 1;
   }
-  if (strstr(hdr, "$Version") != NULL || strstr(hdr, "$Path") != NULL)
-    err = 1;
+  ST_FAIL_IF(err,
+             strstr(hdr, "$Version") != NULL || strstr(hdr, "$Path") != NULL);
   if (strstr(hdr, "junk") != NULL) // wrong-domain cookie leaked
     err = 1;
 
@@ -153,8 +150,8 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
         printf("  accepted a bad line: %s\n", bad[i].line);
       }
     }
-    if (!cookie_line_is_whole("Cookie: a=1; b=2" H_CRLF, 2))
-      err = 1; // the control: a whole line must still pass
+    // the control: a whole line must still pass
+    ST_FAIL_IF(err, !cookie_line_is_whole("Cookie: a=1; b=2" H_CRLF, 2));
   }
 
   /* #101: every matching cookie is sent, not a fixed few. */
@@ -174,20 +171,16 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
 
       snprintf(name, sizeof(name), "c%02d", i);
       snprintf(value, sizeof(value), "v%02d", i);
-      if (cookie_add(&many, name, value, dom, "/") != 0)
-        err = 1;
+      ST_FAIL_IF(err, cookie_add(&many, name, value, dom, "/") != 0);
     }
     sent = http_cookie_header(&many, dom, "/", many_hdr, sizeof(many_hdr));
-    if (sent != n)
-      err = 1;
-    if (!cookie_line_is_whole(many_hdr, n))
-      err = 1;
+    ST_FAIL_IF(err, sent != n);
+    ST_FAIL_IF(err, !cookie_line_is_whole(many_hdr, n));
     for (i = 0; i < n; i++) {
-      char pair[24];
+      char pair[32];
 
       snprintf(pair, sizeof(pair), "c%02d=v%02d", i, i);
-      if (strstr(many_hdr, pair) == NULL)
-        err = 1;
+      ST_FAIL_IF(err, strstr(many_hdr, pair) == NULL);
     }
 
     /* A buffer too small for the whole set still ends clean, and the clip
@@ -198,8 +191,7 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
       if (sent < 0 || sent > n)
         err = 1;
       else if (sent == 0) {
-        if (tight[0] != '\0')
-          err = 1;
+        ST_FAIL_IF(err, tight[0] != '\0');
       } else {
         if (sent < n)
           clipped = HTS_TRUE;
@@ -406,10 +398,6 @@ static int st_cookieport(httrackp *opt, int argc, char **argv) {
   size_t i;
   int err = 0;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
-
   for (i = 0; i < sizeof(hosts) / sizeof(hosts[0]); i++) {
     char what[512];
 
@@ -488,8 +476,7 @@ static int st_cookieport(httrackp *opt, int argc, char **argv) {
   err |= cookie_expect(strstr(jar.data, "kept") != NULL, HTS_TRUE,
                        "the delete took its neighbour with it");
 
-  printf("cookie-port: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("cookie-port", err);
 }
 
 /* Write one raw jar record, the way a file written elsewhere reaches
@@ -559,10 +546,6 @@ static int st_cookiecase(httrackp *opt, int argc, char **argv) {
   size_t i;
   int err = 0;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
-
   for (i = 0; i < sizeof(hosts) / sizeof(hosts[0]); i++) {
     char what[512];
 
@@ -609,8 +592,7 @@ static int st_cookiecase(httrackp *opt, int argc, char **argv) {
                        "example.com", "sess=S"),
       HTS_TRUE, "domain=Example.COM never came back to example.com");
 
-  printf("%s: %s\n", LABEL, err ? "FAIL" : "OK");
-  return err;
+  return st_verdict(LABEL, err);
 }
 
 /* RFC 6265 section 5.1.3 lets a jar domain reach a host only when it names
@@ -719,10 +701,6 @@ static int st_cookiedomain(httrackp *opt, int argc, char **argv) {
   size_t i;
   int err = 0;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
-
   for (i = 0; i < sizeof(pairs) / sizeof(pairs[0]); i++) {
     err |= cookie_expect_at(
         LABEL, cookie_domain_match(pairs[i].jar_dom, pairs[i].host),
@@ -736,7 +714,303 @@ static int st_cookiedomain(httrackp *opt, int argc, char **argv) {
                             trips[i].what);
   }
 
-  printf("%s: %s\n", LABEL, err ? "FAIL" : "OK");
+  return st_verdict(LABEL, err);
+}
+
+/* Records of host in the jar. */
+static int cookie_count_host(char *data, const char *host) {
+  char buf[8192];
+  int n = 0;
+  char *a;
+
+  for (a = data; *a != '\0'; a = cookie_nextfield(a)) {
+    if (strcmp(cookie_get(buf, a, 0), host) == 0)
+      n++;
+  }
+  return n;
+}
+
+/* Store n records "c000".. of host with cookie_add (uncapped). */
+static int cookie_load_host(t_cookie *jar, const char *host, int n,
+                            const char *value) {
+  int i;
+
+  for (i = 0; i < n; i++) {
+    char name[16];
+
+    snprintf(name, sizeof(name), "c%03d", i);
+    if (cookie_add(jar, name, value, host, "/") != 0)
+      return 1;
+  }
+  return 0;
+}
+
+/* Fill the jar with hosts of 20 records each (all under their share) until it
+   refuses one, then squeeze in tiny ones so no later record fits the slack. */
+static void cookie_fill_jar(t_cookie *jar) {
+  char name[16];
+  char host[32];
+  int i;
+
+  for (i = 0; i < 100000; i++) {
+    snprintf(name, sizeof(name), "f%05d", i);
+    snprintf(host, sizeof(host), "fill%d.test", i / 20);
+    if (cookie_add(jar, name, "v", host, "/") != 0)
+      break;
+  }
+  for (i = 0; i < 20; i++) {
+    snprintf(name, sizeof(name), "z%d", i);
+    if (cookie_add(jar, name, "", "z.t", "/") != 0)
+      return;
+  }
+}
+
+#define HC_FAIL(msg)                                                           \
+  do {                                                                         \
+    printf("cookie-cap: FAIL (%s)\n", msg);                                    \
+    err = 1;                                                                   \
+  } while (0)
+
+/* Rows for cookie_set_capped: it evicts only when the record does not fit and
+   its host is at 50 records or 8 KB. */
+static int cookie_hostcap_rows(void) {
+  static t_cookie jar;
+  static const char H[] = "big.example.com", G[] = "g.example.com";
+  char fat[3001], mid[301];
+  int err = 0;
+  int k;
+
+  memset(fat, 'v', 2900);
+  fat[2900] = '\0';
+  memset(mid, 'v', 300);
+  mid[300] = '\0';
+  jar.max_len = 20000;
+
+  /* Room left: nothing is evicted, 80 loaded records all stay. */
+  jar.data[0] = '\0';
+  if (cookie_load_host(&jar, H, 80, "v") ||
+      cookie_set_capped(&jar, "new", "v", H, "/", NULL) != 0 ||
+      cookie_count_host(jar.data, H) != 81)
+    HC_FAIL("a cookie with room evicted records");
+
+  /* Full jar, host with k records: at 49 the host is under its share. */
+  for (k = 49; k <= 51; k++) {
+    jar.data[0] = '\0';
+    if (cookie_load_host(&jar, H, k, "v"))
+      HC_FAIL("setup");
+    cookie_fill_jar(&jar);
+    if (cookie_set_capped(&jar, "new", "v", H, "/", NULL) == 0) {
+      if (k == 49 || cookie_find_exact(jar.data, "c000", H, "/") != NULL ||
+          cookie_count_host(jar.data, H) != k)
+        HC_FAIL("a host at its count share lost the wrong records");
+    } else if (k != 49 || cookie_count_host(jar.data, H) != 49) {
+      HC_FAIL("a host at 50 records was refused or lost records");
+    }
+  }
+
+  /* Several evictions for a bigger record; nothing of another host goes. */
+  jar.data[0] = '\0';
+  if (cookie_load_host(&jar, H, 60, "v") || cookie_load_host(&jar, G, 60, "v"))
+    HC_FAIL("setup");
+  cookie_fill_jar(&jar);
+  if (cookie_set_capped(&jar, "big", mid, H, "/", NULL) != 0 ||
+      cookie_find_exact(jar.data, "c000", H, "/") != NULL ||
+      cookie_count_host(jar.data, G) != 60 ||
+      cookie_count_host(jar.data, H) >= 60)
+    HC_FAIL("a big record did not evict several of its own host only");
+
+  /* Re-setting the oldest name at the cap never evicts itself. */
+  jar.data[0] = '\0';
+  if (cookie_load_host(&jar, H, 60, "v"))
+    HC_FAIL("setup");
+  cookie_fill_jar(&jar);
+  if (cookie_set_capped(&jar, "c000", "v", H, "/", NULL) != 0 ||
+      cookie_count_host(jar.data, H) != 60)
+    HC_FAIL("a same-size re-set at the cap lost records");
+  if (cookie_set_capped(&jar, "c000", mid, H, "/", NULL) != 0 ||
+      cookie_find_exact(jar.data, "c000", H, "/") == NULL)
+    HC_FAIL("a bigger re-set evicted the record it replaces");
+
+  /* A hand-edited jar holding c000 twice, the second one far larger: the
+     record eviction spares is the one the set replaces (the first), so the
+     set is stored, not refused after the jar was compacted. */
+  jar.data[0] = '\0';
+  if (cookie_load_host(&jar, H, 60, "v"))
+    HC_FAIL("setup");
+  {
+    const size_t end = strlen(jar.data);
+
+    snprintf(jar.data + end, sizeof(jar.data) - end,
+             "%s\tFALSE\t/\tFALSE\t0\tc000\t%s\n", H, fat);
+  }
+  cookie_fill_jar(&jar);
+  if (cookie_set_capped(&jar, "c000", mid, H, "/", NULL) != 0 ||
+      cookie_find_exact(jar.data, "c000", H, "/") == NULL)
+    HC_FAIL("a jar with a duplicate record refused the re-set");
+
+  /* A growing re-set at 50 records is stored, like a new 51st would be: the
+     replaced record counts in its host, so the host evicts its oldest. */
+  jar.data[0] = '\0';
+  if (cookie_load_host(&jar, H, 50, "v"))
+    HC_FAIL("setup");
+  cookie_fill_jar(&jar);
+  {
+    char *rec;
+    const char *const grow = "vvvvvvvvvvvvvvvvvvvv";
+    char buf[8192];
+
+    if (cookie_set_capped(&jar, "c000", grow, H, "/", NULL) != 0 ||
+        (rec = cookie_find_exact(jar.data, "c000", H, "/")) == NULL ||
+        strcmp(cookie_get(buf, rec, 6), grow) != 0 ||
+        cookie_find_exact(jar.data, "c001", H, "/") != NULL)
+      HC_FAIL("a growing re-set at the cap was refused or evicted itself");
+  }
+
+  /* A flooding host cannot starve another: A fills the jar, B still stores. */
+  jar.data[0] = '\0';
+  if (cookie_load_host(&jar, H, 400, "v"))
+    HC_FAIL("setup");
+  cookie_fill_jar(&jar);
+  if (cookie_set_capped(&jar, "bnew", "v", G, "/", NULL) != 0 ||
+      cookie_find_exact(jar.data, "bnew", G, "/") == NULL ||
+      cookie_find_exact(jar.data, "c000", H, "/") != NULL ||
+      cookie_find_exact(jar.data, "c001", H, "/") == NULL)
+    HC_FAIL("a host over its share did not make room for another host");
+
+  /* A longer host that starts with another is a different host. */
+  jar.data[0] = '\0';
+  if (cookie_add(&jar, "n", "mine", "google.com", "/") != 0 ||
+      cookie_add(&jar, "n", "theirs", "google.com.au", "/") != 0 ||
+      cookie_add(&jar, "b", "v", "bank.com", "/") != 0 ||
+      cookie_count_host(jar.data, "google.com") != 1 ||
+      cookie_count_host(jar.data, "google.com.au") != 1 ||
+      strstr(jar.data, "\tn\tmine") == NULL)
+    HC_FAIL("a host that extends another overwrote its cookie");
+  {
+    char name[16];
+
+    jar.max_len = 4000;
+    for (k = 0; k < 80; k++) {
+      snprintf(name, sizeof(name), "e%02d", k);
+      (void) cookie_set_capped(&jar, name, "v", "bank.com.evil.net", "/", NULL);
+    }
+    jar.max_len = 20000;
+    if (cookie_find_exact(jar.data, "b", "bank.com", "/") == NULL)
+      HC_FAIL("a flood from bank.com.evil.net evicted bank.com");
+  }
+
+  /* A refused set leaves the jar byte for byte as it was. */
+  {
+    char val[61], huge[4001];
+    char *snap;
+
+    memset(val, 'v', sizeof(val) - 1);
+    val[sizeof(val) - 1] = '\0';
+    memset(huge, 'v', sizeof(huge) - 1);
+    huge[sizeof(huge) - 1] = '\0';
+    jar.data[0] = '\0';
+    if (cookie_load_host(&jar, H, 51, val))
+      HC_FAIL("setup");
+    cookie_fill_jar(&jar);
+    snap = strdupt(jar.data);
+    if (cookie_set_capped(&jar, "huge", huge, H, "/", NULL) == 0 ||
+        strcmp(jar.data, snap) != 0)
+      HC_FAIL("a refused set changed the jar");
+    freet(snap);
+  }
+
+  /* The largest host over its share loses first, not the first one found. */
+  jar.data[0] = '\0';
+  {
+    char val[101];
+
+    memset(val, 'v', sizeof(val) - 1);
+    val[sizeof(val) - 1] = '\0';
+    if (cookie_load_host(&jar, G, 55, "v") ||
+        cookie_load_host(&jar, H, 60, val))
+      HC_FAIL("setup");
+    cookie_fill_jar(&jar);
+    if (cookie_set_capped(&jar, "x", "v", "c.example.org", "/", NULL) != 0 ||
+        cookie_find_exact(jar.data, "c000", H, "/") != NULL ||
+        cookie_find_exact(jar.data, "c000", G, "/") == NULL)
+      HC_FAIL("the largest host over its share did not lose first");
+  }
+
+  /* Two hosts over their share both give up room when one is not enough. */
+  {
+    char val[400];
+    size_t slack, vlen;
+
+    jar.data[0] = '\0';
+    if (cookie_load_host(&jar, G, 52, "v") ||
+        cookie_load_host(&jar, H, 52, "v"))
+      HC_FAIL("setup");
+    cookie_fill_jar(&jar);
+    slack = jar.max_len - strlen(jar.data);
+    vlen = slack + 100 > 271 ? slack + 100 - 271 : 0;
+    memset(val, 'v', vlen);
+    val[vlen] = '\0';
+    if (cookie_set_capped(&jar, "x", val, "c.example.org", "/", NULL) != 0 ||
+        cookie_count_host(jar.data, G) >= 52 ||
+        cookie_count_host(jar.data, H) >= 52)
+      HC_FAIL("one host over its share was asked for all the room");
+  }
+
+  /* Many hosts a little over their share: a set finishes, and keeps max_len. */
+  {
+    char host[32], name[16], big[4001];
+    int h, r;
+
+    jar.max_len = 30000;
+    jar.data[0] = '\0';
+    for (h = 0; h < 20; h++) {
+      snprintf(host, sizeof(host), "h%02d.t", h);
+      for (r = 0; r < 51; r++) {
+        snprintf(name, sizeof(name), "c%03d", r);
+        if (cookie_add(&jar, name, "v", host, "/") != 0)
+          break;
+      }
+    }
+    memset(big, 'v', sizeof(big) - 1);
+    big[sizeof(big) - 1] = '\0';
+    (void) cookie_set_capped(&jar, "big", big, "h00.t", "/", NULL);
+    if (strlen(jar.data) > jar.max_len)
+      HC_FAIL("a set past many hosts overran the jar");
+    jar.max_len = 20000;
+  }
+
+  /* The oldest is the first record of the shortest path. */
+  jar.data[0] = '\0';
+  if (cookie_add(&jar, "p0", "v", H, "/a/b") != 0 ||
+      cookie_add(&jar, "p1", "v", H, "/a/b") != 0 ||
+      cookie_load_host(&jar, H, 48, "v"))
+    HC_FAIL("setup");
+  cookie_fill_jar(&jar);
+  if (cookie_set_capped(&jar, "new", "v", H, "/", NULL) != 0 ||
+      cookie_find_exact(jar.data, "c000", H, "/") != NULL ||
+      cookie_find_exact(jar.data, "p0", H, "/a/b") == NULL)
+    HC_FAIL("the shortest-path record was not evicted first");
+
+  /* Byte share: one 2.9 KB record leaves the host under 8 KB, three do not. */
+  for (k = 1; k <= 3; k++) {
+    int i;
+
+    jar.data[0] = '\0';
+    for (i = 0; i < k; i++) {
+      char name[16];
+
+      snprintf(name, sizeof(name), "b%d", i);
+      if (cookie_add(&jar, name, fat, H, "/") != 0)
+        HC_FAIL("setup");
+    }
+    cookie_fill_jar(&jar);
+    if (cookie_set_capped(&jar, "bnew", fat, H, "/", NULL) == 0) {
+      if (k < 2 || cookie_find_exact(jar.data, "b0", H, "/") != NULL)
+        HC_FAIL("a host over its byte share lost the wrong record");
+    } else if (k >= 2 || cookie_find_exact(jar.data, "b0", H, "/") == NULL) {
+      HC_FAIL("a host under its byte share was evicted or a fit was refused");
+    }
+  }
   return err;
 }
 
@@ -750,10 +1024,6 @@ static int st_cookiecap(httrackp *opt, int argc, char **argv) {
   char big[1024];
   int err = 0;
   size_t i;
-
-  (void) opt;
-  (void) argc;
-  (void) argv;
 
   /* A non-zero canary: a stray NUL from an off-by-one terminator is invisible
      against a zero fill, which is the exact bug a capacity check guards. */
@@ -830,19 +1100,16 @@ static int st_cookiecap(httrackp *opt, int argc, char **argv) {
     }
   }
 
-  printf("cookie-cap: %s\n", err ? "FAIL" : "OK");
-  return err;
+  /* A full jar makes a host over its share evict its own oldest records. */
+  err |= cookie_hostcap_rows();
+
+  return st_verdict("cookie-cap", err);
 }
 
 /* -#test=cookieimport <dir>: load a jar (and, on Windows, copied IE cookies
    *@*.txt) from a long, non-ASCII folder via the UTF-8/long-path wrappers
    (#133). POSIX compiles the IE block out; there it is a positive control. */
 static int st_cookieimport(httrackp *opt, int argc, char **argv) {
-  (void) opt;
-  if (argc < 1) {
-    fprintf(stderr, "cookieimport: needs a writable base dir\n");
-    return 1;
-  }
   char dir[HTS_URLMAXSIZE * 2];
   size_t base = 0;
   const size_t dirlen =
@@ -1015,9 +1282,6 @@ static int st_cookiespandiff(httrackp *opt, int argc, char **argv) {
   size_t i;
   int r;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   assertf(o != NULL && n != NULL);
   for (i = 0; hand[i] != NULL; i++)
     cookiediff_one(&st, hand[i], o, n);
@@ -1059,12 +1323,10 @@ static int st_cookiequote(httrackp *opt, int argc, char **argv) {
   htsblk r;
   size_t i, n;
 
-  (void) opt;
   memset(&r, 0, sizeof(r));
   cookie.max_len = sizeof(cookie.data);
   cookie.data[0] = '\0';
-  line[0] = '\0';
-  strlncatbuff(line, argc >= 1 ? argv[0] : "", sizeof(line), sizeof(line) - 1);
+  strclipbuff(line, sizeof(line), argc >= 1 ? argv[0] : "");
   treathead(&cookie, "example.com", "/", &r, line);
   n = strlen(cookie.data);
   if (n != 0 && cookie.data[n - 1] == '\n')
@@ -1235,6 +1497,41 @@ static int st_cookiesetscope(httrackp *opt, int argc, char **argv) {
       {"victim.test", "Set-Cookie: v=1", "victim.test", "v=1", HTS_TRUE},
       {"evil.test", "Set-Cookie: v=; Domain=victim.test; Max-Age=0",
        "victim.test", "v=1", HTS_TRUE},
+      // plain http cannot replace, erase or set a Secure cookie (6265bis 5.7)
+      {"https://sec.test", "Set-Cookie: sid=GOOD; Secure", "https://sec.test",
+       "sid=GOOD", HTS_TRUE},
+      {"http://sec.test", "Set-Cookie: sid=EVIL", "https://sec.test",
+       "sid=GOOD", HTS_TRUE},
+      {"http://sec.test", "Set-Cookie: sid=EVIL", "https://sec.test",
+       "sid=EVIL", HTS_FALSE},
+      // a parent Domain= would sit beside the Secure host cookie
+      {"https://www.dom.test", "Set-Cookie: sid=GOOD; Secure",
+       "https://www.dom.test", "sid=GOOD", HTS_TRUE},
+      {"http://a.dom.test", "Set-Cookie: sid=EVIL; Domain=dom.test",
+       "https://www.dom.test", "sid=EVIL", HTS_FALSE},
+      {"http://sec.test", "Set-Cookie: sid=; Max-Age=0", "https://sec.test",
+       "sid=GOOD", HTS_TRUE},
+      {"http://sec.test", "Set-Cookie: sn=1; Secure", "https://sec.test",
+       "sn=1", HTS_FALSE},
+      {"http://sec.test", "Set-Cookie: pl=1", "http://sec.test", "pl=1",
+       HTS_TRUE},
+      // controls: https still replaces and erases it
+      {"https://sec.test", "Set-Cookie: sid=NEW; Secure", "https://sec.test",
+       "sid=NEW", HTS_TRUE},
+      {"https://sec.test", "Set-Cookie: sid=; Max-Age=0", "https://sec.test",
+       "sid=NEW", HTS_FALSE},
+  };
+
+  /* a cookie path matches on a "/" boundary (RFC 6265 5.1.4) */
+  static const struct {
+    const char *cpath, *qpath;
+    hts_boolean want;
+  } paths[] = {
+      {"/foo", "/foo", HTS_TRUE},        {"/foo", "/foo/x", HTS_TRUE},
+      {"/foo", "/foo?a=b", HTS_TRUE},    {"/foo", "/foobar/x", HTS_FALSE},
+      {"/foo", "/foobar", HTS_FALSE},    {"/foo/", "/foo/x", HTS_TRUE},
+      {"/foo/", "/foobar/x", HTS_FALSE}, {"/", "/anything", HTS_TRUE},
+      {"/foo", "/fo", HTS_FALSE},
   };
 
   static t_cookie jar;
@@ -1242,9 +1539,6 @@ static int st_cookiesetscope(httrackp *opt, int argc, char **argv) {
   size_t i;
   int err = 0;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   jar.max_len = sizeof(jar.data);
   jar.data[0] = '\0';
   for (i = 0; i < sizeof(steps) / sizeof(steps[0]); i++) {
@@ -1275,8 +1569,114 @@ static int st_cookiesetscope(httrackp *opt, int argc, char **argv) {
       err = 1;
     }
   }
-  printf("%s: %s\n", LABEL, err ? "FAIL" : "OK");
-  return err;
+  for (i = 0; i < sizeof(paths) / sizeof(paths[0]); i++) {
+    cookie_seed(&jar, "path.test", paths[i].cpath);
+    http_cookie_header(&jar, "path.test", paths[i].qpath, hdr, sizeof(hdr));
+    if (cookie_sent(hdr, "id=A") != paths[i].want) {
+      printf("%s: cookie path %s %s %s\n", LABEL, paths[i].cpath,
+             paths[i].want ? "does not reach" : "wrongly reaches",
+             paths[i].qpath);
+      err = 1;
+    }
+  }
+  /* an http cookie on a deeper path would be sent before the Secure one */
+  {
+    static const char *const hdrs[] = {
+        "Set-Cookie: sid=GOOD; Path=/; Secure",
+        "Set-Cookie: sid=EVIL; Path=/app",
+    };
+    const char *const origin[] = {"https://deep.test", "http://deep.test"};
+    htsblk r;
+    char line[256];
+
+    jar.data[0] = '\0';
+    memset(&r, 0, sizeof(r));
+    for (i = 0; i < 2; i++) {
+      strcpybuff(line, hdrs[i]);
+      treathead(&jar, origin[i], "/", &r, line);
+    }
+    http_cookie_header(&jar, "https://deep.test", "/app/x", hdr, sizeof(hdr));
+    if (cookie_sent(hdr, "sid=EVIL") || !cookie_sent(hdr, "sid=GOOD")) {
+      printf("%s: plain http shadowed a Secure cookie on a deeper path: %s\n",
+             LABEL, hdr);
+      err = 1;
+    }
+  }
+  /* RFC 6265 5.1.4 default-path, and 5.2.4 for a Path= not starting "/" */
+  {
+    static const struct {
+      const char *fil, *attr, *qpath;
+      hts_boolean want;
+    } dp[] = {
+        {"/a/b/c", "", "/a/b/x", HTS_TRUE},
+        {"/a/b/c", "", "/a/bc", HTS_FALSE},
+        {"/a/b/c", "", "/", HTS_FALSE},
+        {"/a//c", "", "/a/x", HTS_TRUE},
+        {"/a", "", "/z", HTS_TRUE},
+        {"a/b/c", "", "/z", HTS_TRUE},
+        {"/a/b?q=/c/d", "", "/a/z", HTS_TRUE},
+        {"/a/b?q=/c/d", "", "/z", HTS_FALSE},
+        {"/a/b", "; Path=foo", "/a/z", HTS_TRUE},
+        {"/a/b", "; Path=foo", "/z", HTS_FALSE},
+        {"/a/b", "; Path=", "/z", HTS_FALSE},
+        {"/a/b", "; Path=/z", "/z/q", HTS_TRUE},
+        {"/a/b", "; Path=/z; Path=foo", "/z/q", HTS_FALSE},
+    };
+
+    char line[256];
+    htsblk r;
+
+    for (i = 0; i < sizeof(dp) / sizeof(dp[0]); i++) {
+      jar.data[0] = '\0';
+      memset(&r, 0, sizeof(r));
+      snprintf(line, sizeof(line), "Set-Cookie: dp=1%s", dp[i].attr);
+      treathead(&jar, "dp.test", dp[i].fil, &r, line);
+      http_cookie_header(&jar, "dp.test", dp[i].qpath, hdr, sizeof(hdr));
+      if (cookie_sent(hdr, "dp=1") != dp[i].want) {
+        printf("%s: dp=1%s set by %s %s %s\n", LABEL, dp[i].attr, dp[i].fil,
+               dp[i].want ? "does not reach" : "wrongly reaches", dp[i].qpath);
+        err = 1;
+      }
+    }
+    // a directory must fit the jar's path, or it backs off to "/p"
+    {
+      static const struct {
+        int dirlen;
+        const char *qpath; // "" means the directory itself plus "/x"
+        hts_boolean want;
+      } fit[] = {
+          {COOKIE_MAX_PATH - 1, "", HTS_TRUE},
+          {COOKIE_MAX_PATH - 1, "/p/q", HTS_FALSE},
+          {COOKIE_MAX_PATH, "/p/q", HTS_TRUE},
+          {COOKIE_MAX_PATH, "/q", HTS_FALSE},
+      };
+
+      char dir[COOKIE_MAX_PATH + 1];
+      char longfil[COOKIE_MAX_PATH + 8];
+      char q[COOKIE_MAX_PATH + 8];
+
+      for (i = 0; i < sizeof(fit) / sizeof(fit[0]); i++) {
+        snprintf(dir, sizeof(dir), "/p/%0*d", fit[i].dirlen - 3, 0);
+        snprintf(longfil, sizeof(longfil), "%s/f", dir);
+        snprintf(q, sizeof(q), "%s", fit[i].qpath);
+        if (q[0] == '\0')
+          snprintf(q, sizeof(q), "%s/x", dir);
+        jar.data[0] = '\0';
+        memset(&r, 0, sizeof(r));
+        strcpybuff(line, "Set-Cookie: dp=1");
+        treathead(&jar, "dp.test", longfil, &r, line);
+        http_cookie_header(&jar, "dp.test", q, hdr, sizeof(hdr));
+        if (cookie_sent(hdr, "dp=1") != fit[i].want) {
+          printf("%s: dp=1 set under a %d-byte directory %s %s\n", LABEL,
+                 fit[i].dirlen,
+                 fit[i].want ? "does not reach" : "wrongly reaches",
+                 fit[i].qpath[0] != '\0' ? fit[i].qpath : "its /x");
+          err = 1;
+        }
+      }
+    }
+  }
+  return st_verdict(LABEL, err);
 #undef FUTURE
 #undef PAST
 }
@@ -1290,11 +1690,6 @@ static int st_cookiehttponly(httrackp *opt, int argc, char **argv) {
   char hdr[1024];
   FILE *fp;
 
-  (void) opt;
-  if (argc < 1) {
-    fprintf(stderr, "cookiehttponly: needs a writable dir\n");
-    return 1;
-  }
   assertf(sprintfbuff(fpath, "%s/", argv[0]));
   assertf(sprintfbuff(file, "%scookies.txt", fpath));
   fp = FOPEN(file, "wb");
@@ -1472,10 +1867,6 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
   size_t i;
   int err = 0;
 
-  if (argc < 1) {
-    fprintf(stderr, "cookiejar: needs a writable dir\n");
-    return 1;
-  }
   jar.max_len = sizeof(jar.data);
   jar.data[0] = '\0';
   for (i = 0; i < sizeof(steps) / sizeof(steps[0]); i++) {
@@ -1617,6 +2008,46 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
   assertf(sprintfbuff(fpath, "%s/", argv[0]));
   assertf(sprintfbuff(file, "%scookies.txt", fpath));
   assertf(sprintfbuff(saved, "%ssaved.txt", fpath));
+  /* A flag other than TRUE or FALSE, in any case, reads as host-only and
+     Secure. */
+  {
+    static const struct {
+      const char *line, *to, *pair;
+      hts_boolean want;
+    } flags[] = {
+        {"flag.test\t\t/\tFALSE\t0\th0\t1", "sub.flag.test", "h0=1", HTS_FALSE},
+        {"flag.test\tT\t/\tFALSE\t0\th1\t1", "sub.flag.test", "h1=1",
+         HTS_FALSE},
+        {"flag.test\tTRUEX\t/\tFALSE\t0\th2\t1", "sub.flag.test", "h2=1",
+         HTS_FALSE},
+        {"flag.test\ttrue\t/\tFALSE\t0\th3\t1", "sub.flag.test", "h3=1",
+         HTS_TRUE},
+        {"sec.test\tFALSE\t/\t\t0\ts0\t1", "sec.test", "s0=1", HTS_FALSE},
+        {"sec.test\tFALSE\t/\tT\t0\ts1\t1", "sec.test", "s1=1", HTS_FALSE},
+        {"sec.test\tFALSE\t/\tFALSEX\t0\ts2\t1", "sec.test", "s2=1", HTS_FALSE},
+        {"sec.test\tFALSE\t/\tfalse\t0\ts3\t1", "sec.test", "s3=1", HTS_TRUE},
+        {"sec.test\tFALSE\t/\tT\t0\ts4\t1", "https://sec.test", "s4=1",
+         HTS_TRUE},
+    };
+
+    FILE *fp;
+
+    for (i = 0; i < sizeof(flags) / sizeof(flags[0]); i++) {
+      fp = FOPEN(file, "wb");
+      assertf(fp != NULL);
+      fprintf(fp, "%s\n", flags[i].line);
+      fclose(fp);
+      jar.data[0] = '\0';
+      assertf(cookie_load(NULL, &jar, fpath, "cookies.txt") == 0);
+      http_cookie_header(&jar, flags[i].to, "/", hdr, sizeof(hdr));
+      if (cookie_sent(hdr, flags[i].pair) != flags[i].want) {
+        printf("%s: jar line %s %s sent to %s\n", LABEL, flags[i].line,
+               flags[i].want ? "not" : "wrongly", flags[i].to);
+        err = 1;
+      }
+    }
+    (void) UNLINK(file);
+  }
   {
     static const char *const kept[] = {
         ".load.test\tTRUE\t/\tFALSE\t0\tdom\t1" LF,
@@ -2499,8 +2930,7 @@ static int st_cookiejar(httrackp *opt, int argc, char **argv) {
     }
   }
 
-  printf("%s: %s\n", LABEL, err ? "FAIL" : "OK");
-  return err;
+  return st_verdict(LABEL, err);
 #undef LABEL
 }
 
@@ -2681,10 +3111,6 @@ static int st_cookieflat(httrackp *opt, int argc, char **argv) {
   int ret;
   int err = 0;
 
-  if (argc < 1) {
-    fprintf(stderr, "%s: needs a writable dir\n", LABEL);
-    return 1;
-  }
   cookieflat_dir = argv[0];
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     const char *const c = cases[i].content;
@@ -2779,8 +3205,7 @@ static int st_cookieflat(httrackp *opt, int argc, char **argv) {
     }
   }
 
-  printf("%s: %s\n", LABEL, err ? "FAIL" : "OK");
-  return err;
+  return st_verdict(LABEL, err);
 #undef BOM
 #undef FLAT_HOST
 #undef FLAT_DOMAIN
@@ -2797,7 +3222,6 @@ static int cookiesverdict_logged;
 
 static void cookiesverdict_log(httrackp *opt, int type, const char *format,
                                va_list args) {
-  (void) opt;
   (void) type;
   (void) format;
   (void) args;
@@ -2822,7 +3246,6 @@ static int st_cookiesverdict(httrackp *opt, int argc, char **argv) {
   t_cookie *jar;
   int lost = -1, quiet, loud, ret;
 
-  (void) opt;
   if (argc < 1 || argc > 2) {
     fprintf(stderr, "cookiesverdict: takes a file, then a start URL\n");
     return 1;
@@ -2863,7 +3286,7 @@ const struct selftest_entry selftests_cookie[] = {
      st_cookieimport},
     {"cookiehttponly", "<dir>",
      "a #HttpOnly_ jar line loads, other comments do not", st_cookiehttponly},
-    {"cookiequote", "<Set-Cookie header>",
+    {"cookiequote", "[Set-Cookie header]",
      "what the jar stores of a quoted cookie value and av", st_cookiequote},
     {"cookiejar", "<dir>",
      "the jar keeps host-only, Secure, HttpOnly and expiry, and logs a refusal",

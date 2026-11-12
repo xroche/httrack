@@ -33,12 +33,15 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsselftest_int.h"
 
+static int st_refname(httrackp *opt, int argc, char **argv) {
+  char name[64];
+
+  url_savename_refname(argv[0], argv[1], name);
+  printf("refname=%s\n", name);
+  return 0;
+}
+
 static int st_simplify(httrackp *opt, int argc, char **argv) {
-  (void) opt;
-  if (argc < 1) {
-    fprintf(stderr, "simplify: needs a path\n");
-    return 1;
-  }
   fil_simplifie(argv[0]);
   printf("simplified=%s\n", argv[0]);
   return 0;
@@ -47,11 +50,6 @@ static int st_simplify(httrackp *opt, int argc, char **argv) {
 static int st_expandhome(httrackp *opt, int argc, char **argv) {
   String path = STRING_EMPTY;
 
-  (void) opt;
-  if (argc < 1) {
-    fprintf(stderr, "expandhome: needs a path\n");
-    return 1;
-  }
   StringCopy(path, argv[0]);
   expand_home(&path);
   printf("expanded=%s\n", StringBuff(path));
@@ -62,11 +60,6 @@ static int st_expandhome(httrackp *opt, int argc, char **argv) {
 static int st_relative(httrackp *opt, int argc, char **argv) {
   char s[HTS_URLMAXSIZE * 2];
 
-  (void) opt;
-  if (argc < 2) {
-    fprintf(stderr, "relative: needs a link and a current-file path\n");
-    return 1;
-  }
   if (lienrelatif(s, sizeof(s), argv[0], argv[1]) == 0)
     printf("relative=%s\n", s);
   else
@@ -78,11 +71,6 @@ static int st_resolve(httrackp *opt, int argc, char **argv) {
   lien_adrfil af;
   int r;
 
-  (void) opt;
-  if (argc < 3) {
-    fprintf(stderr, "resolve: needs a link, an origin address and file\n");
-    return 1;
-  }
   r = ident_url_relatif(argv[0], argv[1], argv[2], &af);
   if (r == 0)
     printf("adr=%s fil=%s\n", af.adr, af.fil);
@@ -95,11 +83,6 @@ static int st_resolve(httrackp *opt, int argc, char **argv) {
 static int st_toport(httrackp *opt, int argc, char **argv) {
   int i;
 
-  (void) opt;
-  if (argc < 1) {
-    fprintf(stderr, "toport: needs a URL\n");
-    return 1;
-  }
   for (i = 0; i < argc; i++) {
     const char *const port = jump_toport_const(argv[i]);
 
@@ -120,9 +103,6 @@ static int st_identrel(httrackp *opt, int argc, char **argv) {
   lien_adrfil af;
   size_t k, pad;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   /* origin_fil just under the ceiling its own entry test allows */
   origin[0] = '/';
   memset(origin + 1, 'o', HTS_URLMAXSIZE - 3);
@@ -149,11 +129,6 @@ static int st_identurl(httrackp *opt, int argc, char **argv) {
   char *url;
   size_t len, pad = 0;
 
-  (void) opt;
-  if (argc < 1) {
-    fprintf(stderr, "identurl: needs a URL\n");
-    return 1;
-  }
   if (argc >= 2)
     pad = (size_t) atoi(argv[1]);
   len = strlen(argv[0]);
@@ -177,9 +152,6 @@ static int st_identabs(httrackp *opt, int argc, char **argv) {
       sizeof(af.fil) - 1; /* 2047: max URL the top guard admits */
   char *url = malloct(len + 1);
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   url[0] = '?';
   memset(url + 1, 'a', len - 1);
   url[len] = '\0';
@@ -215,13 +187,22 @@ static int st_stripport(httrackp *opt, int argc, char **argv) {
       {"ftp://127.0.0.1:21/x", "ftp://127.0.0.1/x"},
       {"ftp://127.0.0.1:80/x", "ftp://127.0.0.1:80/x"},
       {"http://127.0.0.1:443/x", "http://127.0.0.1:443/x"},
+      // A ":80" past the authority is part of the path, query or fragment.
+      {"http://127.0.0.1/x:80", "http://127.0.0.1/x:80"},
+      {"http://127.0.0.1/a:80b", "http://127.0.0.1/a:80b"},
+      {"http://127.0.0.1/q?u=1:80", "http://127.0.0.1/q?u=1:80"},
+      {"http://127.0.0.1?u=1:80", "http://127.0.0.1?u=1:80"},
+      {"http://127.0.0.1?u=a@b:80", "http://127.0.0.1?u=a@b"}, /* host is b */
+      {"http://127.0.0.1#f:80", "http://127.0.0.1#f:80"},
+      {"http://[::1]/x:80", "http://[::1]/x:80"},
+      {"https://127.0.0.1/x:443", "https://127.0.0.1/x:443"},
+      {"http://127.0.0.1:80/x:80", "http://127.0.0.1/x:80"},
+      {"http://127.0.0.1:80?x]", "http://127.0.0.1?x]"},
+      {"http://[::1]:80/x", "http://[::1]/x"},
   };
 
   size_t k;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   for (k = 0; k < sizeof(cases) / sizeof(cases[0]); k++) {
     char BIGSTK buff[HTS_URLMAXSIZE * 2];
 
@@ -319,10 +300,6 @@ static int st_getext(httrackp *opt, int argc, char **argv) {
   size_t c, k;
   int rc = 0;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
-
   /* the semantics, in a destination nothing here comes close to filling */
   {
     char *arena = malloct(256 + guard);
@@ -412,10 +389,6 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
   int rc = 0;
   int i;
 
-  if (argc < 2) {
-    fprintf(stderr, "savename: needs a fil and a content-type\n");
-    return 1;
-  }
   /* knobs first: hash_init and the prior links depend on them */
   for (i = 2; i < argc; i++) {
     const char *const a = argv[i];
@@ -592,6 +565,221 @@ cleanup:
   return rc;
 }
 
+/* Case variants of one name each take the next free suffix, and the walk to it
+   must not probe every suffix already taken: a page can list thousands. */
+static int st_savename_collide(httrackp *opt, int argc, char **argv) {
+  /* letters whose case varies, so 2^11 distinct paths */
+  static const char word[] = "abcdefghijk";
+  const int count = 2048;
+  cache_back cache;
+  struct_back *sback = NULL;
+  hash_struct hash;
+  int pass, k, rc = 0;
+
+  StringCopy(opt->path_html_utf8, "");
+  opt->savename_delayed = HTS_SAVENAME_DELAYED_NONE;
+  memset(&cache, 0, sizeof(cache));
+  cache.hashtable = coucal_new(0);
+  cache.cached_tests = coucal_new(0);
+  coucal_value_is_malloc(cache.cached_tests, 1);
+  st_mirror_wiring(opt, &sback, &hash, HTS_FALSE);
+
+  /* the second pass names the same links with the host's case changed */
+  for (pass = 0; pass < 2 && rc == 0; pass++) {
+    for (k = 0; k < count && rc == 0; k++) {
+      lien_adrfilsave afs;
+      char want[64];
+      size_t j;
+
+      memset(&afs, 0, sizeof(afs));
+      strcpybuff(afs.af.adr, pass == 0 ? "example.com" : "EXAMPLE.com");
+      strcpybuff(afs.af.fil, "/");
+      strcatbuff(afs.af.fil, word);
+      for (j = 0; j < sizeof(word) - 1; j++) {
+        if ((k >> j) & 1)
+          afs.af.fil[1 + j] = (char) toupper(afs.af.fil[1 + j]);
+      }
+      strcatbuff(afs.af.fil, ".html");
+      url_savename(&afs, NULL, NULL, NULL, opt, sback, &cache, &hash, 0, 0,
+                   NULL);
+      snprintf(want, sizeof(want), "example.com%.*s", (int) sizeof(word),
+               afs.af.fil);
+      if (k != 0)
+        snprintf(want + strlen(want), sizeof(want) - strlen(want), "-%d",
+                 k + 1);
+      strcatbuff(want, ".html");
+      if (strcmp(afs.save, want) != 0) {
+        fprintf(stderr, "savename-collide: %s%s named %s, not %s\n", afs.af.adr,
+                afs.af.fil, afs.save, want);
+        rc = 1;
+      } else if (pass == 0 && !hts_record_link(opt, afs.af.adr, afs.af.fil,
+                                               afs.save, "", "", NULL)) {
+        rc = 1;
+      }
+    }
+  }
+  /* each name costs a few probes; probing every taken suffix costs count^2/2 */
+  if (rc == 0 && hash.savename_probes > (size_t) count * 8) {
+    fprintf(stderr, "savename-collide: %d names took %lu probes\n", count,
+            (unsigned long) hash.savename_probes);
+    rc = 1;
+  }
+  if (rc == 0)
+    printf("savename-collide: %d names, %lu probes\n", count,
+           (unsigned long) hash.savename_probes);
+  coucal_delete(&cache.cached_tests);
+  st_mirror_wiring_free(opt, &cache, &sback, &hash);
+  return rc;
+}
+
+/* Replays url_savename() calls and checks that each name is the one a walk
+   name by name gives, whatever jumps earlier calls recorded. */
+static int st_savename_sequence(httrackp *opt, int argc, char **argv) {
+  /* A step "host path=name" names a link, "!host path name" records one as is
+     and "@N" switches the 8.3 mode. FLAGS hold the 8.3 mode | urlhack << 2. */
+  static const struct {
+    int flags;
+    const char *const steps[10];
+  } cases[] = {
+      /* a -0 suffix walks from 1 */
+      {0,
+       {"example.com /A-0.html=example.com/A-0.html",
+        "example.com /a-0.html=example.com/a-1.html",
+        "example.com /a-0.HTML=example.com/a-2.HTML",
+        "EXAMPLE.com /a-0.html=example.com/a-1.html"}},
+      /* the same in ISO9660 names */
+      {2,
+       {"example.com /A-0.html=EXAMPLE_C/A_0.HTM",
+        "example.com /a-0.html=EXAMPLE_C/A_1.HTM",
+        "example.com /a-0.HTML=EXAMPLE_C/A_2.HTM",
+        "EXAMPLE.com /a-0.html=EXAMPLE_C/A_1.HTM"}},
+      /* links sharing a fingerprint with distinct names block jumps */
+      {0,
+       {"!Example.COM /a--3.htm example.com/a-10-3.gif",
+        "!Example.COM /a-10.gif example.com/a--3.htm",
+        "EXAMPLE.com /a--3.htm=example.com/a--4.htm",
+        "EXAMPLE.com /A--3.htm=example.com/A--5.htm",
+        "example.com /a--3.htm=example.com/a--4.htm"}},
+      /* a naming-mode switch keeps its own jump table */
+      {0,
+       {"x /ABCDEFGH.htm=x/ABCDEFGH.htm", "x /AbCdefgh.htm=x/AbCdefgh-2.htm",
+        "x /ABcdefgh.htm=x/ABcdefgh-3.htm", "@1",
+        "x.y /abcdefgh.htm=X/ABCDEF-2.HTM"}},
+      /* a link recorded again keeps its first fingerprint owner */
+      {0,
+       {"EXAMPLE.com /A-01.HTML=example.com/A-01.HTML",
+        "EXAMPLE.com /A-01.html=example.com/A-2.html",
+        "!EXAMPLE.com /A-01.html example.com/a-01_10.php",
+        "EXAMPLE.com /a-01.html=example.com/a-3.html",
+        "example.com /A-01.html=example.com/A-2.html"}},
+      /* a walk reaching INT_MAX records no jump */
+      {2,
+       {"example.com /a-2147483646.HTML=EXAMPLE_C/A_2147483646.HTM",
+        "Example.COM /a-2147483646.htm=EXAMPLE_C/A_2147483647.HTM",
+        "Example.COM /A-2147483646.HTML=EXAMPLE_C/A_2147483647_2.HTM",
+        "EXAMPLE.com /a-2147483646=EXAMPLE_C/A_2147483647_3.HTM",
+        "EXAMPLE.com /A-2147483646.HTML=EXAMPLE_C/A_2147483647_2.HTM"}},
+      /* an irregular walk restarts name by name */
+      {0,
+       {"example.com /a-2147483640.html=example.com/a-2147483640.html",
+        "example.com /A-2147483640.html=example.com/A-2147483641.html",
+        "example.com /a-2147483640.HTML=example.com/a-2147483642.HTML",
+        "example.com /a-2147483640.htMl=example.com/a-2147483643.htMl",
+        "example.com /a-2147483640.htmL=example.com/a-2147483644.htmL",
+        "example.com /A-2147483640.htmL=example.com/A-2147483645.htmL",
+        "example.com /a-2147483640.HTml=example.com/a-2147483646.HTml",
+        "example.com /a-2147483640.HTMl=example.com/a-2147483647.HTMl",
+        "EXAMPLE.com /a-2147483640.HTML=example.com/a-2147483642.HTML"}},
+      /* a jump never passes the link's own name */
+      {0,
+       {"!example.com /a-00.HTML example.com/a-9.HTML",
+        "example.com /A-00.HTML=example.com/A-00.HTML",
+        "EXAMPLE.com /a-00.HTML=example.com/a-1.HTML"}},
+      /* only the very name the walk passed counts as passed */
+      {4,
+       {"www.example.com /abCDEf-9.gif=www.example.com/abCDEf-9.gif",
+        "!www.example.com /a-.gif example.com/ABCDEf-9.gif",
+        "EXAMPLE.com /abcdef-9.gif=example.com/abcdef-10.gif",
+        "www.example.com /AbcDef-9.gif=www.example.com/AbcDef-10.gif",
+        "www.example.com /abcdef-9.gif=www.example.com/abcdef-11.gif"}},
+      /* the passed name must be this link's */
+      {0,
+       {"EXAMPLE.com /a-2.HTML=example.com/a-2.HTML",
+        "Example.COM /a-2.html=example.com/a-3.html",
+        "!EXAMPLE.com /A-2.html example.com/a-3.HTML",
+        "EXAMPLE.com /a-2.html=example.com/a-4.html"}},
+      /* a forced high suffix does not swallow the link's name */
+      {0,
+       {"!example.com /c example.com/c-27.html",
+        "EXAMPLE.com /C=example.com/C.html",
+        "example.com /c=example.com/c-27.html"}},
+      /* a stored 8-digit suffix cuts no further back than the name start */
+      {1, {"!X /foo X-99999999", "!x /bar FOO.HTM", "x /foo=FOO-2.HTM"}},
+  };
+
+  const hts_savename_83 mode = opt->savename_83;
+  const hts_boolean urlhack = opt->urlhack;
+  size_t c, s;
+  int rc = 0;
+
+  StringCopy(opt->path_html_utf8, "");
+  opt->savename_delayed = HTS_SAVENAME_DELAYED_NONE;
+  for (c = 0; c < sizeof(cases) / sizeof(cases[0]) && rc == 0; c++) {
+    cache_back cache;
+    struct_back *sback = NULL;
+    hash_struct hash;
+
+    opt->savename_83 = (hts_savename_83) (cases[c].flags & 3);
+    opt->urlhack = (cases[c].flags & 4) != 0;
+    memset(&cache, 0, sizeof(cache));
+    cache.hashtable = coucal_new(0);
+    cache.cached_tests = coucal_new(0);
+    coucal_value_is_malloc(cache.cached_tests, 1);
+    st_mirror_wiring(opt, &sback, &hash, HTS_FALSE);
+    assertf(
+        hts_record_link(opt, "example.com", "/", "/dev/null", "", "", NULL));
+    for (s = 0; s < 10 && cases[c].steps[s] != NULL && rc == 0; s++) {
+      const char *const step = cases[c].steps[s];
+      char adr[64], fil[64], name[64];
+      lien_adrfilsave afs;
+      lien_adrfil former;
+
+      if (step[0] == '@') {
+        opt->savename_83 = (hts_savename_83) (step[1] - '0');
+        continue;
+      }
+      if (step[0] == '!') {
+        assertf(sscanf(step + 1, "%63s %63s %63s", adr, fil, name) == 3);
+        assertf(hts_record_link(opt, adr, fil, name, "", "", NULL));
+        continue;
+      }
+      assertf(sscanf(step, "%63s %63[^=]=%63s", adr, fil, name) == 3);
+      memset(&afs, 0, sizeof(afs));
+      memset(&former, 0, sizeof(former));
+      strcpybuff(afs.af.adr, adr);
+      strcpybuff(afs.af.fil, fil);
+      url_savename(&afs, &former, "example.com", "/", opt, sback, &cache, &hash,
+                   1, 0, NULL);
+      if (strcmp(afs.save, name) != 0) {
+        fprintf(stderr,
+                "savename-sequence: case %u step %u: %s%s named %s, not %s\n",
+                (unsigned) c, (unsigned) s, adr, fil, afs.save, name);
+        rc = 1;
+      } else if (hash_read(&hash, afs.save, NULL, HASH_STRUCT_FILENAME) < 0) {
+        assertf(hts_record_link(opt, adr, fil, afs.save, "", "", NULL));
+      }
+    }
+    coucal_delete(&cache.cached_tests);
+    st_mirror_wiring_free(opt, &cache, &sback, &hash);
+  }
+  /* queued self-tests share this opt */
+  opt->savename_83 = mode;
+  opt->urlhack = urlhack;
+  if (rc == 0)
+    printf("savename-sequence: %u cases\n", (unsigned) c);
+  return rc;
+}
+
 /* url_savename_addstr() takes attacker-controlled link text and must clip to
    the destination size it is handed, at every capacity (#1269). */
 static int st_savename_addstr(httrackp *opt, int argc, char **argv) {
@@ -620,9 +808,6 @@ static int st_savename_addstr(httrackp *opt, int argc, char **argv) {
   size_t k;
   int rc = 0;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   for (k = 0; k < sizeof(cases) / sizeof(cases[0]); k++) {
     const size_t seedlen = strlen(cases[k].seed);
     /* the appender may write up to dsize, and never past a longer seed */
@@ -705,9 +890,6 @@ static int st_savename_addtail(httrackp *opt, int argc, char **argv) {
   size_t k;
   int rc = 0;
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   for (k = 0; k < sizeof(cases) / sizeof(cases[0]); k++) {
     const size_t seedlen = strlen(cases[k].seed);
     const size_t guard =
@@ -762,10 +944,6 @@ static int st_savename_addtail(httrackp *opt, int argc, char **argv) {
 static int st_stripquery(httrackp *opt, int argc, char **argv) {
   char dest[1024], keys[256], ref[1024];
   const char *k;
-
-  (void) opt;
-  (void) argc;
-  (void) argv;
 
   /* empty rules == plain fil_normalized */
   assertf(hts_query_strip_keys(NULL, "h.com", "/p?a=1", keys, sizeof(keys)) ==
@@ -889,8 +1067,6 @@ static int st_stripquery(httrackp *opt, int argc, char **argv) {
 
 /* -%u url-hack split (#271): each sub-flag must toggle independently. */
 static int st_urlhack(httrackp *opt, int argc, char **argv) {
-  (void) argc;
-  (void) argv;
 #define EQ(aa, fa, ab, fb) hash_url_equals(opt, aa, fa, ab, fb)
   /* urlhack on, no opt-outs: www, // and query order all collapse */
   opt->urlhack = HTS_TRUE;
@@ -939,9 +1115,6 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
   char dest[HTS_URLMAXSIZE * 2];
   /* two rules, three aliases of a.com */
   static const char *const rules = "b.com=a.com\nc.com,d.com=a.com";
-
-  (void) argc;
-  (void) argv;
 
   /* nothing declared, or nothing matching: the host is left alone */
   assertf(hts_host_alias(NULL, "b.com", HTS_TRUE, dest, sizeof(dest)) == NULL);
@@ -1308,8 +1481,6 @@ static int st_hashkey_bounds(httrackp *opt, int argc, char **argv) {
   char *arena = malloct(keysize + guard);
   int hack;
 
-  (void) argc;
-  (void) argv;
   assertf(adr != NULL && fil != NULL && cat != NULL && arena != NULL);
   opt->no_www_dedup = opt->no_slash_dedup = opt->no_query_dedup = HTS_FALSE;
   /* the crawler's own key buffer, or every maximal URL would collide */
@@ -1388,8 +1559,6 @@ static int st_hashkey_bounds(httrackp *opt, int argc, char **argv) {
 /* #159: hts_redirect_same_savefile decides whether a redirect is a same-file
  * alias. */
 static int st_redirect_samefile(httrackp *opt, int argc, char **argv) {
-  (void) argc;
-  (void) argv;
 #define SAME(aa, fa, ab, fb) hts_redirect_same_savefile(opt, aa, fa, ab, fb)
   /* scheme and userinfo collapse (the #159 case); a different path does not */
   assertf(SAME("http://foo.com", "/a/b", "https://foo.com", "/a/b"));
@@ -1439,10 +1608,12 @@ static int st_urlbounds(httrackp *opt, int argc, char **argv) {
   /* lien_url holds non-const strings, so the primary link owns its own */
   char adrbuf[] = "www.example.com", filroot[] = "/", savname[] = "index.html";
   const char *const adr = adrbuf;
-  /* the wizard builds "http://" + adr + fil, basic auth builds adr + fil */
+  /* the wizard builds "http://" + adr + fil, basic auth builds "http://" + adr
+   * + fil */
   const size_t wzfits =
       HTS_URLMAXSIZE * 2 - strlen("http://") - strlen(adr) - 1;
-  const size_t bafits = HTS_URLMAXSIZE * 2 - strlen(adr) - 1;
+  const size_t bafits =
+      HTS_URLMAXSIZE * 2 - strlen("http://") - strlen(adr) - 1;
   char BIGSTK fil[HTS_URLMAXSIZE * 2];
   char BIGSTK prefix[HTS_URLMAXSIZE * 2];
   lien_url primary, *liens[1];
@@ -1450,8 +1621,6 @@ static int st_urlbounds(httrackp *opt, int argc, char **argv) {
   char **filters = NULL;
   int filptr = 0, prio = 0;
 
-  (void) argc;
-  (void) argv;
   assertf(cookie != NULL);
   opt->log = NULL; /* the paths below are 2 KB of noise */
   assertf(filters_init(&filters, opt->maxfilter, 0) != 0);
@@ -1469,9 +1638,31 @@ static int st_urlbounds(httrackp *opt, int argc, char **argv) {
      bauth_check() never touches it, and a missing NULL guard would show. */
   strcpybuff(fil, "/secure/page.html?a=b");
   assertf(bauth_prefix(prefix, adr, fil) == prefix);
-  assertf(strcmp(prefix, "www.example.com/secure/") == 0);
+  assertf(strcmp(prefix, "http://www.example.com/secure/") == 0);
   assertf(bauth_add(cookie, adr, fil, "dXNlcjpwYXNz") == 1);
   assertf(bauth_check(cookie, adr, fil) != NULL);
+
+  /* A login learned on https is not offered to plain http, and vice versa. */
+  assertf(bauth_add(cookie, "https://www.example.com", "/s/p.html",
+                    "aHR0cHM=") == 1);
+  assertf(bauth_check(cookie, "https://www.example.com", "/s/q.html") != NULL);
+  assertf(bauth_check(cookie, "http://www.example.com", "/s/q.html") == NULL);
+  assertf(bauth_check(cookie, "www.example.com", "/s/q.html") == NULL);
+  /* a host that reads as "https:" must not reach the https entry */
+  assertf(bauth_check(cookie, "http://https:", "//www.example.com/s/q.html") ==
+          NULL);
+  /* an http login follows a redirect to https, and a later https login is
+     still stored beside it */
+  assertf(bauth_add(cookie, "old.example.com", "/d/p.html", "aHR0cA==") == 1);
+  assertf(bauth_check(cookie, "https://old.example.com", "/d/q.html") != NULL);
+  assertf(bauth_add(cookie, "https://old.example.com", "/d/p.html",
+                    "aHR0cHM=") == 1);
+  assertf(strcmp(bauth_check(cookie, "https://old.example.com", "/d/q.html"),
+                 "aHR0cHM=") == 0);
+  assertf(strcmp(bauth_check(cookie, "old.example.com", "/d/q.html"),
+                 "aHR0cA==") == 0);
+  assertf(bauth_check(cookie, "https://other.example.com", "/s/q.html") ==
+          NULL);
 
   /* bauth_prefix(): the key it keeps fills its buffer to the last byte, and
      #1561's guard then refuses to store a key wider than bauth_chain */
@@ -1545,6 +1736,7 @@ const struct selftest_entry selftests_name[] = {
      "an over-long path is refused by the wizard and auth consumers",
      st_urlbounds},
     {"simplify", "<path>", "collapse ./ and ../ in a path", st_simplify},
+    {"refname", "<adr> <fil>", "cache ref file name of a URL", st_refname},
     {"expandhome", "<path>", "expand a leading ~/ into $HOME", st_expandhome},
     {"stripquery", "", "--strip-query pattern/key stripping self-test",
      st_stripquery},
@@ -1573,6 +1765,12 @@ const struct selftest_entry selftests_name[] = {
      st_getext},
     {"savename", "<fil> <content-type> [key=value ...]",
      "local save-name for a URL", st_savename},
+    {"savename-collide", "",
+     "case variants of one name rename without probing every suffix",
+     st_savename_collide},
+    {"savename-sequence", "",
+     "save-names of url_savename() call sequences match a name-by-name walk",
+     st_savename_sequence},
     {"savename-addstr", "",
      "save-name append clips to the destination size (#1269)",
      st_savename_addstr},

@@ -1,0 +1,54 @@
+#!/bin/bash
+#
+# WebHTTrack takes the engine's default pause, so a -G mirror started from the
+# GUI stops at hts-paused.lock and goes on once the file is deleted.
+
+set -euo pipefail
+
+# shellcheck source=tests/webhttracklib.sh
+. "${0%"${0##*/}"}./webhttracklib.sh"
+
+htsserver_require
+
+work=$(mktemp -d)
+csrv=
+cleanup_push htsserver_cleanup_dir "${work}"
+cleanup_push htsserver_reap_vars csrv
+
+htsserver_start --home "${work}"
+
+clog="${work}/content.log"
+"${HTS_PYTHON}" "${testdir}/local-server.py" --root "${work}" >"${clog}" 2>&1 &
+csrv=$!
+cport=$(discover_server_port "${clog}" "${csrv}") ||
+    fail "content server did not come up"
+
+out="${work}/crawl"
+htsserver_python - "${HTS_URL}" "${cport}" "${out}" <<'PY' || fail "see above"
+import sys
+
+from webtestlib import Session
+
+s, cport, out = Session(sys.argv[1], timeout=60), sys.argv[2], sys.argv[3]
+s.post("step4.html", [
+    ("path", out), ("projname", "crawl"), ("winprofile", "x"),
+    ("command_do", "start"),
+    ("command", "httrack --quiet --robots=0 -c1 --max-rate=400000 "
+     "--max-pause=30000 http://127.0.0.1:%s/bigfiles/index.html -O %s"
+     % (cport, out)),
+])
+PY
+
+printf '[a GUI mirror stops at the pause lock] ..\t'
+wait_until "test -e '${out}/hts-paused.lock'" "the mirror never paused" 600
+# The wait re-reads once a second, and a running 400KB/s transfer would grow
+# the mirror by more than a block in three.
+frozen=$(du -sk "$out")
+sleep 3
+test "$(du -sk "$out")" = "$frozen" || fail "the mirror kept downloading while paused"
+echo OK
+
+printf '[deleting the lock resumes it] ..\t'
+rm -f "${out}/hts-paused.lock"
+wait_until "test \"\$(du -sk '$out')\" != \"$frozen\"" "the mirror never resumed" 300
+echo OK

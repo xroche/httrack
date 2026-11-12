@@ -1,0 +1,27 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# Every UTF-8 reader refuses what hts_isStringUTF8 refuses: overlongs,
+# surrogates, code points above U+10FFFF, and 5- or 6-byte forms.
+assert_selftest "utf8-strict self-test OK" utf8-strict
+
+# a surrogate entity stays verbatim rather than becoming CESU bytes
+selftest_queue '&#xD800;' entities '&#xD800;'
+selftest_queue 'a&#xDBFF;&#xDC00;b' entities 'a&#xDBFF;&#xDC00;b'
+selftest_queue 'é' entities '&#xE9;'
+selftest_run_queued
+
+# an overlong or a surrogate in a host has no IDNA form
+for host in 68c0af2e636f6d 68eda0802e636f6d 68f88880808080 68c3a9a92e636f6d; do
+    assert_eq "" "$(httrack -O /dev/null -#test=idna-encode "hex:$host" 2>/dev/null)" "idna-encode $host"
+done
+assert_selftest 'xn--h-bga.com' idna-encode 'hé.com'
+
+# punycode for U+D800 decodes to nothing
+assert_eq "" "$(httrack -O /dev/null -#test=idna-decode 'xn--a-rc4g.com' 2>/dev/null)" "idna-decode U+D800"
+assert_selftest 'á.com' idna-decode 'xn--1ca.com'

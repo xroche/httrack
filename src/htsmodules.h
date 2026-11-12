@@ -129,22 +129,9 @@ typedef int (*t_htsWrapperPlugInit)(char *args);
 
 #include "htsglobal.h"
 
-/** Capabilities string of the build ("-noV6", "-nossl", ...) followed by
-    "+name" for each module loaded into @p opt. The result is a scratch buffer
-    inside @p opt, so never free it and read it before the next call. */
-HTSEXT_API const char *hts_get_version_info(httrackp *opt);
-
-/** Capabilities string of the build, without the loaded-module list. The engine
-    owns it for the life of the process, and it stays empty until htspe_init()
-    has run. */
-HTSEXT_API const char *hts_is_available(void);
-
 /** Prepares the module subsystem, which must happen before hts_is_available()
     or any module load. Calling it again does nothing. */
 extern void htspe_init(void);
-
-/** Tear-down counterpart of htspe_init(). */
-extern void htspe_uninit(void);
 
 /** Offers the object described by @p str to the loaded parser modules.
     @return 1 when a module parsed it, 0 when the module that claimed it failed

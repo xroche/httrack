@@ -1,0 +1,31 @@
+#!/bin/bash
+#
+# A NUL inside a cache entry's header block makes the entry corrupt, for the
+# engine (-#test=cache-nul) and for ProxyTrack reading the same zip. A control
+# entry differing by that one byte must still read.
+
+set -eu
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+mkdir "$dir/hts-cache"
+
+httrack -#test=cache-nul "$dir" >"$dir/out" 2>"$dir/err" ||
+    fail_dump "the engine self-test failed" "$dir/out" "$dir/err"
+# stdout also carries the engine's refusal warning
+out=$(tail -n1 "$dir/out")
+test "$out" = "cache-nul: OK" ||
+    fail_dump "expected 'cache-nul: OK', got: $out" "$dir/out" "$dir/err"
+
+proxytrack --convert "$dir/out.arc" "$dir/hts-cache/new.zip" >"$dir/log" 2>&1 ||
+    fail_dump "proxytrack died reading the cache" "$dir/log"
+arc=$(<"$dir/out.arc")
+grep -qF 'http://example.com/clean.html' <<<"$arc" ||
+    fail "the control entry is missing from the ARC"
+# exactly one: the entry holding the NUL must not read as 200 too
+test "$(grep -cF 'HTTP/1.0 200 OK' <<<"$arc")" = 1 ||
+    fail "expected only the control entry to read as 200"
+grep -qF 'Cache Read Error : NUL In Header' <<<"$arc" ||
+    fail "ProxyTrack did not refuse the entry holding a NUL"

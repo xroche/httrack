@@ -237,6 +237,12 @@ struct hash_struct {
   coucal adrfil;
   /* former address+path -> link index (renamed/moved entries) */
   coucal former_adrfil;
+  /* taken save-name -> the suffix its collision walk reached (htsname.c) */
+  coucal savename_next;
+  /* host+path fingerprint -> its link, or -2 when its links' names differ */
+  coucal savename_owner;
+  /* save-names the collision walk probed; a self-test reads it */
+  size_t savename_probes;
   /* effective urlhack sub-flags: www.==host / // collapse / query-arg sort */
   hts_boolean norm_host;
   hts_boolean norm_slash;
@@ -340,6 +346,10 @@ int hts_record_link(httrackp * opt,
                     const char *address, const char *file, const char *save,
                     const char *ref_address, const char *ref_file,
                     const char *codebase);
+
+/* Make the most recently recorded link its own parent: a normal fetch (no
+   test, no import) at the given depth and pass, with the full retry budget. */
+void hts_link_set_self_parented(httrackp *opt, int depth, int pass2);
 
 /* Index of the most recently recorded link. */
 size_t hts_record_link_latest(httrackp *opt);
@@ -452,12 +462,17 @@ void hts_finish_makeindex(httrackp *opt, int *makeindex_done,
                           const char *template_footer, const char *adr,
                           const char *fil);
 
-/* Re-encode 'size' bytes of UCS2 (UTF-16, BMP only) as UTF-8. 'swap' selects
-   little-endian input, 'size' must be even. Returns a NUL-terminated buffer to
-   release with freet(), its length (NUL excluded) in *outsize, or NULL when the
-   result does not fit memory. */
+/* Re-encode 'size' bytes of UTF-16 as UTF-8, a surrogate outside a pair or a
+   dangling last byte as U+FFFD. 'swap' selects little-endian input. Returns a
+   NUL-terminated buffer to release with freet(), its length (NUL excluded) in
+   *outsize, or NULL when the result does not fit memory. */
 char *hts_ucs2_to_utf8(const unsigned char *src, size_t size, hts_boolean swap,
                        size_t *outsize);
+
+/* Does 'size' bytes of UTF-16 read as text: some ASCII, and next to no lone
+   surrogates, private-use, noncharacters or C0 controls? */
+hts_boolean hts_utf16_looks_like_text(const unsigned char *src, size_t size,
+                                      hts_boolean swap);
 
 // Flush ht_buff[0..ht_len] to save on disk; *fp closed+NULLed on write.
 // Precondition: ht_len>0.
@@ -509,6 +524,11 @@ hts_boolean filters_grow(httrackp *opt, int n);
 
 /* Same as filters_grow(), but aborts when memory runs out. */
 void filters_make_room(httrackp *opt, int n);
+
+/* Writes adr+fil to nologin without credentials, and to full with them and a
+   default "http://". Aborts if either does not fit. */
+void hts_url_forms(htsbuff *nologin, htsbuff *full, const char *adr,
+                   const char *fil);
 
 /* Returns the fa_strjoker_dual() verdict of the nfil filters on adr+fil, in
    both forms the wizard tests, and sets *depth when depth is not NULL. */
@@ -636,6 +656,9 @@ hts_boolean hts_loop_tick(struct_back *sback, httrackp *opt, int b, int ptr);
    loop callback; gives up past the -E deadline. HTS_FALSE = callback abort. */
 hts_boolean hts_wait_available_socket(struct_back *sback, httrackp *opt,
                                       cache_back *cache, int ptr);
+
+/* Is this run stopping (^C, a cap, hts_request_stop) or exiting (a signal)? */
+hts_boolean hts_run_is_ending(httrackp *opt);
 
 /* Randomized inter-file pause target in [min_ms,max_ms] (#185), derived from a
    timestamp seed so it is stable within one gap and rerolls per launch. */

@@ -1,0 +1,83 @@
+#!/bin/bash
+#
+# -d stays on the start site's registrable domain: a bare example.com reaches its
+# subdomains, and two .co.uk sites are not one domain. The hosts are faked by a
+# proxy, and -e proves each refused link was there to follow.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+python=$(find_python) || skip "python3 missing"
+
+bin=$(httrack_path)
+server=$(nativepath "$top_srcdir/tests/bundle-server.py")
+tmpdir=$(mktemp -d)
+serverpid=
+log=$tmpdir/crawl.log
+fail_dump_var log
+
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+"$python" "$server" >"$tmpdir/srv.out" 2>"$tmpdir/srv.err" &
+serverpid=$!
+port=$(discover_server_port "$tmpdir/srv.out" "$serverpid") || exit 1
+
+n=0
+from=0
+crawl() { # crawl SCOPE URL -- one fresh mirror of URL under SCOPE
+    local rc=0
+    n=$((n + 1))
+    from=$(wc -l <"$tmpdir/srv.out")
+    (cd "$tmpdir" && run_with_timeout 120 "$bin" -P "127.0.0.1:$port" \
+        "$1" -O "m$n" -r3 -c1 --robots=0 -%v0 -q "$2") >>"$log" 2>&1 || rc=$?
+    test "$rc" -ne 124 || fail "crawl hit the deadline"
+    test "$rc" -eq 0 || fail "crawl $1 $2 exited $rc"
+    tail -n "+$((from + 1))" "$tmpdir/srv.out" | cut -d' ' -f1-2 >"$tmpdir/new.out"
+}
+fetched() { command grep -qxF "HIT $1" "$tmpdir/new.out"; }
+want() { # want MODE PATH
+    fetched "$2" || fail_dump "$1: $2 was not fetched" "$tmpdir/new.out"
+}
+refused() { # refused MODE PATH
+    ! fetched "$2" || fail_dump "$1: $2 was fetched" "$tmpdir/new.out"
+}
+
+# A bare registrable domain reaches its subdomains, never another domain.
+crawl -d http://example.com/
+want "-d from example.com" example.com/
+want "-d from example.com" www.example.com/w.html
+want "-d from example.com" sub.example.com/s.html
+refused "-d from example.com" example.net/n.html
+crawl -e http://example.com/
+want "-e control" example.net/n.html
+
+# co.uk is a public suffix, so a.co.uk and b.co.uk are two domains. A host too
+# long for the suffix lookup is refused.
+long=$(printf 'x%.0s' $(seq 60))
+long="$long.$long.$long.$long.$long"
+crawl -d http://a.co.uk/
+want "-d from a.co.uk" www.a.co.uk/w.html
+refused "-d from a.co.uk" b.co.uk/b.html
+refused "-d from a.co.uk" "$long.b.co.uk/long.html"
+crawl -e http://a.co.uk/
+want "-e control" b.co.uk/b.html
+want "-e control" "$long.b.co.uk/long.html"
+
+# Neither the login nor the port counts.
+crawl -d http://user@example.org:8080/
+want "-d with a login and a port" www.example.org/l.html
+
+# A host with no registrable domain, such as an IP address, keeps the old rule:
+# the last two labels must match.
+crawl -d http://192.0.2.1:8080/
+want "-d from an IP" 192.0.2.1/same.html
+want "-d from an IP" 10.9.2.1/f.html
+refused "-d from an IP" 192.0.2.2/other.html
+crawl -e http://192.0.2.1/
+want "-e control" 192.0.2.2/other.html

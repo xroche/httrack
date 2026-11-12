@@ -31,26 +31,19 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-#ifndef _WIN32
-#ifndef Sleep
-#define Sleep(a) { if (((a)*1000)%1000000) usleep(((a)*1000)%1000000); if (((a)*1000)/1000000) sleep(((a)*1000)/1000000); }
-#endif
-#endif
-
 #include "httrack-library.h"
 
 #include "htsglobal.h"
 #include "htsbase.h"
 #include "htsopt.h"
 #include "htsdefines.h"
-#include "httrack.h"
+#include "htsstats.h"
 #include "htslib.h"
 #include "htscharset.h"
 #include "htsbacktrace.h"
 #include "htsthread.h"
 
 /* Static definitions */
-static int fexist(const char *s);
 static int linput(FILE * fp, char *s, int max);
 
 // htswrap_add
@@ -81,23 +74,9 @@ static int linput(FILE * fp, char *s, int max);
 #include <ctype.h>
 /* END specific definitions */
 
-static void __cdecl htsshow_init(t_hts_callbackarg * carg);
-static void __cdecl htsshow_uninit(t_hts_callbackarg * carg);
 static int __cdecl htsshow_start(t_hts_callbackarg * carg, httrackp * opt);
 static int __cdecl htsshow_chopt(t_hts_callbackarg * carg, httrackp * opt);
-static int __cdecl htsshow_end(t_hts_callbackarg * carg, httrackp * opt);
-static int __cdecl htsshow_preprocesshtml(t_hts_callbackarg * carg,
-                                          httrackp * opt, char **html, int *len,
-                                          const char *url_address,
-                                          const char *url_file);
-static int __cdecl htsshow_postprocesshtml(t_hts_callbackarg * carg,
-                                           httrackp * opt, char **html,
-                                           int *len, const char *url_address,
-                                           const char *url_file);
-static int __cdecl htsshow_checkhtml(t_hts_callbackarg * carg, httrackp * opt,
-                                     char *html, int len,
-                                     const char *url_address,
-                                     const char *url_file);
+static int __cdecl htsshow_end(t_hts_callbackarg *carg, httrackp *opt);
 static int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt,
                                 lien_back * back, int back_max, int back_index,
                                 int lien_n, int lien_tot, int stat_time,
@@ -106,84 +85,26 @@ static const char *__cdecl htsshow_query(t_hts_callbackarg * carg,
                                          httrackp * opt, const char *question);
 static const char *__cdecl htsshow_query2(t_hts_callbackarg * carg,
                                           httrackp * opt, const char *question);
-static const char *__cdecl htsshow_query3(t_hts_callbackarg * carg,
-                                          httrackp * opt, const char *question);
-static int __cdecl htsshow_check(t_hts_callbackarg * carg, httrackp * opt,
-                                 const char *adr, const char *fil, int status);
-static int __cdecl htsshow_check_mime(t_hts_callbackarg * carg, httrackp * opt,
-                                      const char *adr, const char *fil,
-                                      const char *mime, int status);
-static void __cdecl htsshow_pause(t_hts_callbackarg * carg, httrackp * opt,
-                                  const char *lockfile);
-static void __cdecl htsshow_filesave(t_hts_callbackarg * carg, httrackp * opt,
-                                     const char *file);
-static void __cdecl htsshow_filesave2(t_hts_callbackarg * carg, httrackp * opt,
-                                      const char *adr, const char *fil,
-                                      const char *save, int is_new,
-                                      int is_modified, int not_updated);
-static int __cdecl htsshow_linkdetected(t_hts_callbackarg * carg,
-                                        httrackp * opt, char *link);
-static int __cdecl htsshow_linkdetected2(t_hts_callbackarg * carg,
-                                         httrackp * opt, char *link,
-                                         const char *start_tag);
-static int __cdecl htsshow_xfrstatus(t_hts_callbackarg * carg, httrackp * opt,
-                                     lien_back * back);
-static int __cdecl htsshow_savename(t_hts_callbackarg * carg, httrackp * opt,
-                                    const char *adr_complete,
-                                    const char *fil_complete,
-                                    const char *referer_adr,
-                                    const char *referer_fil, char *save);
-static int __cdecl htsshow_sendheader(t_hts_callbackarg * carg, httrackp * opt,
-                                      char *buff, const char *adr,
-                                      const char *fil, const char *referer_adr,
-                                      const char *referer_fil,
-                                      htsblk * outgoing);
-static int __cdecl htsshow_receiveheader(t_hts_callbackarg * carg,
-                                         httrackp * opt, char *buff,
-                                         const char *adr, const char *fil,
-                                         const char *referer_adr,
-                                         const char *referer_fil,
-                                         htsblk * incoming);
+static const char *__cdecl htsshow_query3(t_hts_callbackarg *carg,
+                                          httrackp *opt, const char *question);
 
 static void vt_clear(void);
 static void vt_home(void);
 
 // ISO VT100/220 definitions
-#define VT_COL_TEXT_BLACK    "30"
-#define VT_COL_TEXT_RED      "31"
-#define VT_COL_TEXT_GREEN    "32"
-#define VT_COL_TEXT_YELLOW   "33"
-#define VT_COL_TEXT_BLUE     "34"
-#define VT_COL_TEXT_MAGENTA  "35"
-#define VT_COL_TEXT_CYAN     "36"
-#define VT_COL_TEXT_WHITE    "37"
-#define VT_COL_BACK_BLACK    "40"
-#define VT_COL_BACK_RED      "41"
-#define VT_COL_BACK_GREEN    "42"
-#define VT_COL_BACK_YELLOW   "43"
-#define VT_COL_BACK_BLUE     "44"
-#define VT_COL_BACK_MAGENTA  "45"
-#define VT_COL_BACK_CYAN     "46"
-#define VT_COL_BACK_WHITE    "47"
+#define VT_COL_TEXT_BLACK "30"
+#define VT_COL_TEXT_BLUE "34"
 //
 #define VT_GOTOXY(X,Y)  "\33["Y";"X"f"
 #define VT_COLOR(C)     "\33["C"m"
-#define VT_RESET        "\33[m"
-#define VT_REVERSE      "\33[7m"
-#define VT_UNREVERSE    "\33[27m"
+#define VT_RESET "\33[m"
 #define VT_BOLD         "\33[1m"
-#define VT_UNBOLD       "\33[22m"
-#define VT_BLINK        "\33[5m"
-#define VT_UNBLINK      "\33[25m"
+#define VT_UNBOLD "\33[22m"
 //
-#define VT_CLREOL       "\33[K"
-#define VT_CLRSOL       "\33[1K"
-#define VT_CLRLIN       "\33[2K"
-#define VT_CLREOS       "\33[J"
-#define VT_CLRSOS       "\33[1J"
-#define VT_CLRSCR       "\33[2J"
+#define VT_CLREOL "\33[K"
+#define VT_CLRSCR "\33[2J"
+
 //
-#define csi(X)          printf(s_csi( X ));
 static void vt_clear(void) {
   printf("%s%s%s", VT_RESET, VT_CLRSCR, VT_GOTOXY("1", "0"));
 }
@@ -366,29 +287,13 @@ int main(int argc, char **argv) {
   opt = global_opt = hts_create_opt();
   assert(opt->size_httrackp >= sizeof(httrackp));
 
-  CHAIN_FUNCTION(opt, init, htsshow_init, NULL);
-  CHAIN_FUNCTION(opt, uninit, htsshow_uninit, NULL);
   CHAIN_FUNCTION(opt, start, htsshow_start, NULL);
   CHAIN_FUNCTION(opt, end, htsshow_end, NULL);
   CHAIN_FUNCTION(opt, chopt, htsshow_chopt, NULL);
-  CHAIN_FUNCTION(opt, preprocess, htsshow_preprocesshtml, NULL);
-  CHAIN_FUNCTION(opt, postprocess, htsshow_postprocesshtml, NULL);
-  CHAIN_FUNCTION(opt, check_html, htsshow_checkhtml, NULL);
   CHAIN_FUNCTION(opt, query, htsshow_query, NULL);
   CHAIN_FUNCTION(opt, query2, htsshow_query2, NULL);
   CHAIN_FUNCTION(opt, query3, htsshow_query3, NULL);
   CHAIN_FUNCTION(opt, loop, htsshow_loop, NULL);
-  CHAIN_FUNCTION(opt, check_link, htsshow_check, NULL);
-  CHAIN_FUNCTION(opt, check_mime, htsshow_check_mime, NULL);
-  CHAIN_FUNCTION(opt, pause, htsshow_pause, NULL);
-  CHAIN_FUNCTION(opt, filesave, htsshow_filesave, NULL);
-  CHAIN_FUNCTION(opt, filesave2, htsshow_filesave2, NULL);
-  CHAIN_FUNCTION(opt, linkdetected, htsshow_linkdetected, NULL);
-  CHAIN_FUNCTION(opt, linkdetected2, htsshow_linkdetected2, NULL);
-  CHAIN_FUNCTION(opt, xfrstatus, htsshow_xfrstatus, NULL);
-  CHAIN_FUNCTION(opt, savename, htsshow_savename, NULL);
-  CHAIN_FUNCTION(opt, sendhead, htsshow_sendheader, NULL);
-  CHAIN_FUNCTION(opt, receivehead, htsshow_receiveheader, NULL);
 
   ret = hts_main2(argc, argv, opt);
   if (ret) {
@@ -413,11 +318,6 @@ int main(int argc, char **argv) {
 
 /* CALLBACK FUNCTIONS */
 
-/* Initialize the Winsock */
-static void __cdecl htsshow_init(t_hts_callbackarg * carg) {
-}
-static void __cdecl htsshow_uninit(t_hts_callbackarg * carg) {
-}
 static int __cdecl htsshow_start(t_hts_callbackarg * carg, httrackp * opt) {
   use_show = 0;
   /* Cursor addressing needs a screen; the ENTER toggle re-enters here. */
@@ -433,24 +333,6 @@ static int __cdecl htsshow_chopt(t_hts_callbackarg * carg, httrackp * opt) {
 }
 static int __cdecl htsshow_end(t_hts_callbackarg * carg, httrackp * opt) {
   sig_drain_pending(opt);
-  return 1;
-}
-static int __cdecl htsshow_preprocesshtml(t_hts_callbackarg * carg,
-                                          httrackp * opt, char **html, int *len,
-                                          const char *url_address,
-                                          const char *url_file) {
-  return 1;
-}
-static int __cdecl htsshow_postprocesshtml(t_hts_callbackarg * carg,
-                                           httrackp * opt, char **html,
-                                           int *len, const char *url_address,
-                                           const char *url_file) {
-  return 1;
-}
-static int __cdecl htsshow_checkhtml(t_hts_callbackarg * carg, httrackp * opt,
-                                     char *html, int len,
-                                     const char *url_address,
-                                     const char *url_file) {
   return 1;
 }
 static int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_back * back, int back_max, int back_index, int lien_n, int lien_tot, int stat_time, hts_stat_struct * stats) {   // appelé à chaque boucle de HTTrack
@@ -565,14 +447,7 @@ static int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_b
            /* */
       );
 
-    // parcourir registre des liens
-    if (back_index >= 0) {      // seulement si index passé
-      int j, k;
-      int index = 0;
-      int ok = 0;               // idem
-      int l;                    // idem
-
-      //
+    if (back_index >= 0 && back_max > 0) { // only with a backing table
       t_StatsBuffer StatsBuffer[NStatsBuffer];
 
       /* Keep the frame within the terminal, or it scrolls the stats away. */
@@ -582,139 +457,8 @@ static int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_b
       const int maxurl =
           min((int) sizeof(StatsBuffer[0].name) - 1, max(16, term_cols / 2));
 
-      {
-        int i;
-
-        for(i = 0; i < NStatsBuffer; i++) {
-          strcpybuff(StatsBuffer[i].state, "");
-          strcpybuff(StatsBuffer[i].name, "");
-          strcpybuff(StatsBuffer[i].file, "");
-          strcpybuff(StatsBuffer[i].url_sav, "");
-          StatsBuffer[i].back = 0;
-          StatsBuffer[i].size = 0;
-          StatsBuffer[i].sizetot = 0;
-        }
-      }
-      for(k = 0; k < 2; k++) {  // 0: lien en cours 1: autres liens
-        for (j = 0; (j < 3) && (index < nstats); j++) { // passe de priorité
-          int _i;
-
-          for (_i = 0 + k; (_i < max(back_max * k, 1)) && (index < nstats);
-               _i++) {                                  // no lien
-            int i = (back_index + _i) % back_max;       // commencer par le "premier" (l'actuel)
-            const int slot_status = hts_load_acquire_int(&back[i].status);
-
-            if (slot_status >= 0) { // an active slot
-              ok = 0;
-              switch (j) {
-              case 0:          // prioritaire
-                if ((slot_status > 0) && (slot_status < 99)) {
-                  strcpybuff(StatsBuffer[index].state, "receive");
-                  ok = 1;
-                }
-                break;
-              case 1:
-                if (slot_status == STATUS_WAIT_HEADERS) {
-                  strcpybuff(StatsBuffer[index].state, "request");
-                  ok = 1;
-                } else if (slot_status == STATUS_CONNECTING) {
-                  strcpybuff(StatsBuffer[index].state, "connect");
-                  ok = 1;
-                } else if (slot_status == STATUS_WAIT_DNS) {
-                  strcpybuff(StatsBuffer[index].state, "search");
-                  ok = 1;
-                } else if (slot_status == STATUS_FTP_TRANSFER) { // ftp
-                  snprintf(StatsBuffer[index].state, sizeof(StatsBuffer[index].state),
-                           "ftp: %s", back[i].info);
-                  ok = 1;
-                }
-                break;
-              default:
-                if (slot_status == STATUS_READY) { // ready
-                  if (back[i].r.statuscode == 200) {
-                    strcpybuff(StatsBuffer[index].state, "ready");
-                    ok = 1;
-                  } else if (back[i].r.statuscode >= 100
-                             && back[i].r.statuscode <= 599) {
-                    char tempo[256];
-
-                    tempo[0] = '\0';
-                    infostatuscode(tempo, back[i].r.statuscode);
-                    strcpybuff(StatsBuffer[index].state, tempo);
-                    ok = 1;
-                  } else {
-                    strcpybuff(StatsBuffer[index].state, "error");
-                    ok = 1;
-                  }
-                }
-                break;
-              }
-
-              if (ok) {
-                char BIGSTK s[HTS_URLMAXSIZE * 2];
-
-                //
-                StatsBuffer[index].back = i;    // index pour + d'infos
-                //
-                s[0] = '\0';
-                strcpybuff(StatsBuffer[index].url_sav, back[i].url_sav);        // pour cancel
-                if (strcmp(back[i].url_adr, "file://")) {
-                  size_t keep;
-                  const char *const host =
-                      stats_skip_login(back[i].url_adr, &keep);
-
-                  strncatbuff(s, back[i].url_adr, keep);
-                  strcatbuff(s, host);
-                } else
-                  strcatbuff(s, "localhost");
-                if (back[i].url_fil[0] != '/')
-                  strcatbuff(s, "/");
-                strcatbuff(s, back[i].url_fil);
-                hts_hide_secrets(opt, s, sizeof(s));
-
-                StatsBuffer[index].file[0] = '\0';
-                {
-                  char *a = strrchr(s, '/');
-
-                  if (a) {
-                    strncatbuff(StatsBuffer[index].file, a, 200);
-                    *a = '\0';
-                  }
-                }
-
-                if ((l = (int) strlen(s)) < maxurl)
-                  strcpybuff(StatsBuffer[index].name, s);
-                else {
-                  // couper
-                  StatsBuffer[index].name[0] = '\0';
-                  strncatbuff(StatsBuffer[index].name, s, maxurl / 2 - 2);
-                  strcatbuff(StatsBuffer[index].name, "...");
-                  strcatbuff(StatsBuffer[index].name, s + l - maxurl / 2 + 2);
-                }
-
-                /* An FTP worker may be writing the sizes right now. */
-                const LLint size = hts_load_relaxed_llint(&back[i].r.size);
-                const LLint totalsize =
-                    hts_load_relaxed_llint(&back[i].r.totalsize);
-
-                if (totalsize >= 0) { // known size
-                  StatsBuffer[index].sizetot = totalsize;
-                  StatsBuffer[index].size = size;
-                } else {                             // unknown size
-                  if (slot_status == STATUS_READY) { // ready
-                    StatsBuffer[index].sizetot = size;
-                    StatsBuffer[index].size = size;
-                  } else {
-                    StatsBuffer[index].sizetot = 8192;
-                    StatsBuffer[index].size = (size % 8192);
-                  }
-                }
-                index++;
-              }
-            }
-          }
-        }
-      }
+      (void) stats_collect_rows(opt, back, back_max, back_index, StatsBuffer,
+                                nstats, maxurl);
 
       /* LF */
       printf("%s\n", VT_CLREOL);
@@ -768,9 +512,7 @@ static int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_b
           printf("%s\n", VT_CLREOL);
         }
       }
-
     }
-
   }
 
   return 1;
@@ -834,94 +576,8 @@ static const char *__cdecl htsshow_query3(t_hts_callbackarg * carg,
   printf("ok..\n");
   return line;
 }
-static int __cdecl htsshow_check(t_hts_callbackarg * carg, httrackp * opt,
-                                 const char *adr, const char *fil, int status) {
-  return -1;
-}
-static int __cdecl htsshow_check_mime(t_hts_callbackarg * carg, httrackp * opt,
-                                      const char *adr, const char *fil,
-                                      const char *mime, int status) {
-  return -1;
-}
-static void __cdecl htsshow_pause(t_hts_callbackarg * carg, httrackp * opt,
-                                  const char *lockfile) {
-  String abortlock = STRING_EMPTY, progress = STRING_EMPTY;
-
-  /* Strings, because a truncated path would leave a paused engine polling one
-     nothing can create. */
-  StringCopy(abortlock, StringBuff(opt->path_log));
-  StringCat(abortlock, HTS_ABORT_LOCKNAME);
-  StringCopy(progress, StringBuff(opt->path_log));
-  StringCat(progress, "hts-in_progress.lock");
-  /* Leaving the wait is all this has to do, because the engine takes the
-     request at its next check. hts_file_is_newer() is the staleness rule
-     hts_take_lock_request() applies, or a request an earlier run left would
-     defeat the pause. */
-  while (fexist(lockfile) &&
-         !hts_file_is_newer(StringBuff(abortlock), StringBuff(progress))) {
-    Sleep(1000);
-  }
-  StringFree(progress);
-  StringFree(abortlock);
-}
-static void __cdecl htsshow_filesave(t_hts_callbackarg * carg, httrackp * opt,
-                                     const char *file) {
-}
-static void __cdecl htsshow_filesave2(t_hts_callbackarg * carg, httrackp * opt,
-                                      const char *adr, const char *fil,
-                                      const char *save, int is_new,
-                                      int is_modified, int not_updated) {
-}
-static int __cdecl htsshow_linkdetected(t_hts_callbackarg * carg,
-                                        httrackp * opt, char *link) {
-  return 1;
-}
-static int __cdecl htsshow_linkdetected2(t_hts_callbackarg * carg,
-                                         httrackp * opt, char *link,
-                                         const char *start_tag) {
-  return 1;
-}
-static int __cdecl htsshow_xfrstatus(t_hts_callbackarg * carg, httrackp * opt,
-                                     lien_back * back) {
-  return 1;
-}
-static int __cdecl htsshow_savename(t_hts_callbackarg * carg, httrackp * opt,
-                                    const char *adr_complete,
-                                    const char *fil_complete,
-                                    const char *referer_adr,
-                                    const char *referer_fil, char *save) {
-  return 1;
-}
-static int __cdecl htsshow_sendheader(t_hts_callbackarg * carg, httrackp * opt,
-                                      char *buff, const char *adr,
-                                      const char *fil, const char *referer_adr,
-                                      const char *referer_fil,
-                                      htsblk * outgoing) {
-  return 1;
-}
-static int __cdecl htsshow_receiveheader(t_hts_callbackarg * carg,
-                                         httrackp * opt, char *buff,
-                                         const char *adr, const char *fil,
-                                         const char *referer_adr,
-                                         const char *referer_fil,
-                                         htsblk * incoming) {
-  return 1;
-}
 
 /* *** Various functions *** */
-
-/* Note: utf-8 */
-static int fexist(const char *s) {
-  STRUCT_STAT st;
-
-  memset(&st, 0, sizeof(st));
-  if (STAT(s, &st) == 0) {
-    if (S_ISREG(st.st_mode)) {
-      return 1;
-    }
-  }
-  return 0;
-}
 
 static int linput(FILE * fp, char *s, int max) {
   int c;
@@ -945,6 +601,13 @@ static int linput(FILE * fp, char *s, int max) {
       }
     }
   } while((c != -1) && (c != EOF) && (j < (max - 1)));
+  if (j == max - 1 && c != -1 && c != EOF) {
+    /* Stopped at the bound: consume the newline, or the next read returns "" */
+    while ((c = fgetc(fp)) == 13)
+      ;
+    if (c != 10 && c != EOF)
+      ungetc(c, fp);
+  }
   s[j] = '\0';
   return j;
 }

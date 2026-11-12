@@ -84,6 +84,9 @@ void longfile_to_83(int mode, char *n83, size_t n83size, char *save);
    guards read a space as a word boundary. */
 HTS_INLINE char html_prevc(const char *adr, const char *start);
 HTS_INLINE int __rech_tageq(const char *adr, const char *s);
+/* Self-test hook: when N > 0, the Nth project row of the next top index fails
+   to allocate. Reset to 0 once it fires. */
+extern int topindex_failrow;
 HTS_INLINE int __rech_tageqbegdigits(const char *adr, const char *s);
 HTS_INLINE int rech_tageq_all(const char *adr, const char *s);
 
@@ -143,11 +146,8 @@ HTS_INLINE int check_tag(const char *from, const char *tag);
 int verif_backblue(httrackp * opt, const char *base);
 int verif_external(httrackp * opt, int nb, int test);
 
-int istoobig(httrackp * opt, LLint size, LLint maxhtml, LLint maxnhtml,
+int istoobig(httrackp *opt, LLint size, LLint maxhtml, LLint maxnhtml,
              char *type);
-HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
-                                 const char *binpath);
-
 /* Move src onto dst, replacing an existing dst; HTS_TRUE on success. Both paths
    are fconv()'d. A dst in the way is parked under a sibling name rather than
    removed, so the old content survives a failure: back at dst, or under that

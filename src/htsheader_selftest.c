@@ -165,8 +165,6 @@ static int st_retryafter(httrackp *opt, int argc, char **argv) {
       {"1.5", -1},
   };
 
-  (void) argc;
-  (void) argv;
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     const int got = hts_parse_retry_after(cases[i].value, ref);
 
@@ -176,8 +174,7 @@ static int st_retryafter(httrackp *opt, int argc, char **argv) {
       err = 1;
     }
   }
-  if (hts_parse_retry_after(NULL, ref) != -1)
-    err = 1;
+  ST_FAIL_IF(err, hts_parse_retry_after(NULL, ref) != -1);
   /* An HTTP date's "60" is 1960, never 2060 as in a cookie. A time before 1970
      may not convert, so 0 and -1 both pass. */
   if (hts_parse_retry_after("Sunday, 06-Nov-60 08:49:37 GMT", ref) > 0) {
@@ -191,8 +188,7 @@ static int st_retryafter(httrackp *opt, int argc, char **argv) {
       return 77;
     err |= gate;
   }
-  printf("retry-after: %s\n", err ? "FAIL" : "OK");
-  return err;
+  return st_verdict("retry-after", err);
 }
 
 /* Extra args are key=value: adr= cdispo= statuscode= status= strip= urlhack=
@@ -203,11 +199,6 @@ static int st_header(httrackp *opt, int argc, char **argv) {
   htsblk r;
   int i;
 
-  (void) opt;
-  if (argc < 1) {
-    fprintf(stderr, "header: needs at least one raw header line\n");
-    return 1;
-  }
   memset(&r, 0, sizeof(r));
   for (i = 0; i < argc; i++) {
     char BIGSTK line[HTS_URLMAXSIZE * 2];
@@ -222,7 +213,6 @@ static int st_header(httrackp *opt, int argc, char **argv) {
 
 /* Prints the code hts_status_line_code() reads from argv[0]. */
 static int st_statusline(httrackp *opt, int argc, char **argv) {
-  (void) opt;
   if (argc != 1) {
     fprintf(stderr, "statusline: needs one status line\n");
     return 1;
@@ -243,11 +233,6 @@ static int st_headerline(httrackp *opt, int argc, char **argv) {
   size_t blocklen;
   int max, ptr = 0, i;
 
-  (void) opt;
-  if (argc < 1) {
-    fprintf(stderr, "headerline: needs a read size\n");
-    return 1;
-  }
   max = atoi(argv[0]);
   if (max < 2 || (size_t) max > sizeof(line)) {
     fprintf(stderr, "headerline: read size out of probe range\n");
@@ -295,11 +280,6 @@ static int st_binputline(httrackp *opt, int argc, char **argv) {
   size_t blocklen;
   int max, ptr = 0, i;
 
-  (void) opt;
-  if (argc < 1) {
-    fprintf(stderr, "binputline: needs a read size\n");
-    return 1;
-  }
   max = atoi(argv[0]);
   if (max < 1 || (size_t) max >= sizeof(line)) {
     fprintf(stderr, "binputline: read size out of probe range\n");
@@ -342,7 +322,6 @@ static int st_location_logged = 0;
 static HTS_PRINTF_FUN(3, 0) void st_location_log(httrackp *opt, int type,
                                                  const char *format,
                                                  va_list args) {
-  (void) opt;
   (void) type;
   (void) format;
   (void) args;
@@ -365,11 +344,6 @@ static int st_location(httrackp *opt, int argc, char **argv) {
   size_t n, urllen, kept, i;
   int asked, smashed = 0;
 
-  (void) opt;
-  if (argc < 1) {
-    fprintf(stderr, "location: needs a Location URL length\n");
-    return 1;
-  }
   /* subtract, never add: a negative argument must not wrap the range check */
   asked = atoi(argv[0]);
   if (asked <= (int) strlen(prefix) ||
@@ -417,7 +391,6 @@ static int st_headerlong(httrackp *opt, int argc, char **argv) {
   const int pad = 1500; /* > tempo[1100] */
   size_t n;
 
-  (void) opt;
   memset(&r, 0, sizeof(r));
   n = (size_t) snprintf(line, sizeof(line), "%s ", name);
   memset(line + n, 'a', pad);
@@ -432,11 +405,6 @@ static int st_headerlong(httrackp *opt, int argc, char **argv) {
 static int st_headerfield(httrackp *opt, int argc, char **argv) {
   char *headers, *field;
 
-  (void) opt;
-  if (argc < 2) {
-    fprintf(stderr, "headerfield: needs a header block and a field name\n");
-    return 1;
-  }
   /* exact-size heap copies so a sanitizer traps an over-read */
   headers = strdupt(argv[0]);
   field = strdupt(argv[1]);
@@ -499,8 +467,6 @@ static int st_xfread_limit(httrackp *opt, int argc, char **argv) {
       -1};
   htsblk r;
   size_t i;
-
-  (void) opt;
 
   // Content-Length just over 2 GiB.
   memset(&r, 0, sizeof(r));
@@ -592,11 +558,6 @@ static int st_xfread_limit(httrackp *opt, int argc, char **argv) {
 static int st_crange(httrackp *opt, int argc, char **argv) {
   int i;
 
-  (void) opt;
-  if (argc < 1) {
-    fprintf(stderr, "crange: needs at least one raw Content-Range line\n");
-    return 1;
-  }
   for (i = 0; i < argc; i++) {
     htsblk r;
     char BIGSTK line[HTS_URLMAXSIZE * 2];
@@ -620,11 +581,6 @@ static int st_headerdedup(httrackp *opt, int argc, char **argv) {
   /* Only an exact capacity puts a line's last byte on the buffer's last byte */
   size_t capacity = argc > 2 ? (size_t) atoi(argv[2]) : 2 * half;
 
-  (void) opt;
-  if (argc < 2) {
-    fprintf(stderr, "headerdedup: needs a request and a header block\n");
-    return 1;
-  }
   req = malloct(capacity > 2 * half ? capacity : 2 * half);
   tmp = malloct(half);
   reqlen = st_decode_body(argv[0], req, half);
@@ -659,8 +615,6 @@ static int st_headerdedup(httrackp *opt, int argc, char **argv) {
 /* Default User-Agent: honest HTTrack token, no resurrected Windows 98. */
 static int st_useragent(httrackp *opt, int argc, char **argv) {
   const char *ua = StringBuff(opt->user_agent);
-  (void) argc;
-  (void) argv;
   assertf(ua != NULL);
   assertf(strcmp(ua, HTS_DEFAULT_USER_AGENT) == 0);
   /* Teeth independent of the macro: honest token + self-identifier, and no
@@ -672,19 +626,74 @@ static int st_useragent(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* HTTP status code -> reason phrase, including the modern 429/451. */
+/* HTTP status code -> reason phrase: every table row, and the unknown codes. */
 static int st_status(httrackp *opt, int argc, char **argv) {
-  const char *s;
-  (void) opt;
-  (void) argc;
-  (void) argv;
-  s = infostatuscode_const(429);
-  assertf(s != NULL && strcmp(s, "Too Many Requests") == 0);
-  s = infostatuscode_const(451);
-  assertf(s != NULL && strcmp(s, "Unavailable For Legal Reasons") == 0);
-  /* A spot-check of a long-standing code, and an unknown one. */
-  s = infostatuscode_const(404);
-  assertf(s != NULL && strcmp(s, "Not Found") == 0);
+  static const struct {
+    int code;
+    const char *text;
+  } cases[] = {
+      {100, "Continue"},
+      {101, "Switching Protocols"},
+      {200, "OK"},
+      {201, "Created"},
+      {202, "Accepted"},
+      {203, "Non-Authoritative Information"},
+      {204, "No Content"},
+      {205, "Reset Content"},
+      {206, "Partial Content"},
+      {207, "Multi-Status"},
+      {300, "Multiple Choices"},
+      {301, "Moved Permanently"},
+      {302, "Moved Temporarily"},
+      {303, "See Other"},
+      {304, "Not Modified"},
+      {305, "Use Proxy"},
+      {306, "Undefined 306 error"},
+      {307, "Temporary Redirect"},
+      {400, "Bad Request"},
+      {401, "Unauthorized"},
+      {402, "Payment Required"},
+      {403, "Forbidden"},
+      {404, "Not Found"},
+      {405, "Method Not Allowed"},
+      {406, "Not Acceptable"},
+      {407, "Proxy Authentication Required"},
+      {408, "Request Time-out"},
+      {409, "Conflict"},
+      {410, "Gone"},
+      {411, "Length Required"},
+      {412, "Precondition Failed"},
+      {413, "Request Entity Too Large"},
+      {414, "Request-URI Too Large"},
+      {415, "Unsupported Media Type"},
+      {416, "Requested Range Not Satisfiable"},
+      {417, "Expectation Failed"},
+      {429, "Too Many Requests"},
+      {451, "Unavailable For Legal Reasons"},
+      {500, "Internal Server Error"},
+      {501, "Not Implemented"},
+      {502, "Bad Gateway"},
+      {503, "Service Unavailable"},
+      {504, "Gateway Time-out"},
+      {505, "HTTP Version Not Supported"},
+  };
+
+  size_t i;
+  int c;
+
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    const char *const s = infostatuscode_const(cases[i].code);
+
+    assertf(s != NULL && strcmp(s, cases[i].text) == 0);
+  }
+  /* any code outside the table must stay unknown */
+  for (c = -1; c < 600; c++) {
+    int known = 0;
+
+    for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++)
+      known |= cases[i].code == c;
+    assertf((infostatuscode_const(c) != NULL) == (known != 0));
+  }
   assertf(infostatuscode_const(799) == NULL);
   printf("status self-test OK\n");
   return 0;
@@ -707,9 +716,6 @@ static int st_nobody(httrackp *opt, int argc, char **argv) {
   char body[] = "body";
   size_t i;
   htsblk r;
-  (void) opt;
-  (void) argc;
-  (void) argv;
 
   for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
     memset(&r, 0, sizeof(r));
@@ -848,7 +854,6 @@ static int st_acceptencoding(httrackp *opt, int argc, char **argv) {
   const char *on = hts_acceptencoding(HTS_TRUE, HTS_FALSE);
   const char *tls = hts_acceptencoding(HTS_TRUE, HTS_TRUE);
 
-  (void) opt;
   assertf(strcmp(off, "identity") == 0);
   assertf(strstr(on, "gzip") != NULL);
   assertf(strstr(on, "deflate") != NULL); /* fails on the old gzip-only list */
@@ -887,6 +892,18 @@ static int st_acceptencoding(httrackp *opt, int argc, char **argv) {
       assertf(hts_zunpack(inpath, outpath) == (int) blen);
       assertf(ae_check_decoded(outpath, body, blen) == 0);
     }
+    /* A cap below the decoded size refuses the body; at the size it passes. */
+    snprintf(inpath, sizeof(inpath), "%s/ae-in-%d.z", argv[0], windowBits[0]);
+    assertf(ae_write_packed(inpath, windowBits[0], body, blen) == 0);
+    assertf(hts_zunpack_max(inpath, outpath, (LLint) blen - 1) ==
+            HTS_CODEC_TOOBIG);
+    assertf(hts_codec_unpack_max(HTS_CODEC_DEFLATE, inpath, outpath,
+                                 (LLint) blen - 1) == HTS_CODEC_TOOBIG);
+    assertf(hts_zunpack_max(inpath, outpath, (LLint) blen) == (int) blen);
+    assertf(hts_zunpack_max(inpath, outpath, 0) == (int) blen);
+    assertf(hts_codec_budget(1, 100) == 100);
+    assertf(hts_codec_budget(1, 0) == hts_codec_maxout(1));
+    assertf(hts_codec_budget(1, -1) == hts_codec_maxout(1));
     /* Fallback teeth: raw deflate misdetected as zlib; -1 without the retry. */
     snprintf(inpath, sizeof(inpath), "%s/ae-collide.z", argv[0]);
     snprintf(outpath, sizeof(outpath), "%s/ae-collide.out", argv[0]);
@@ -908,6 +925,10 @@ static int st_acceptencoding(httrackp *opt, int argc, char **argv) {
       assertf(ae_write_raw(inpath, idbody, ilen) == 0);
       assertf(hts_zunpack(inpath, outpath) == (int) ilen);
       assertf(ae_check_decoded(outpath, idbody, ilen) == 0);
+      /* the identity copy honours a cap too */
+      assertf(hts_zunpack_max(inpath, outpath, (LLint) ilen - 1) ==
+              HTS_CODEC_TOOBIG);
+      assertf(hts_zunpack_max(inpath, outpath, (LLint) ilen) == (int) ilen);
       freet(idbody);
     }
     /* Truncated gzip (CRC+ISIZE cut), zlib (ADLER32 cut) and raw deflate
@@ -967,7 +988,6 @@ static int st_contentcodings(httrackp *opt, int argc, char **argv) {
 #endif
   char inpath[HTS_URLMAXSIZE], outpath[HTS_URLMAXSIZE];
 
-  (void) opt;
   assertf(hts_codec_parse("gzip") == HTS_CODEC_DEFLATE);
   assertf(hts_codec_parse("x-deflate") == HTS_CODEC_DEFLATE);
   assertf(hts_codec_parse("") == HTS_CODEC_IDENTITY);
@@ -988,6 +1008,12 @@ static int st_contentcodings(httrackp *opt, int argc, char **argv) {
   assertf(hts_codec_maxout(1) == 1024 * 1024);
   assertf(hts_codec_maxout(1024) == 4096 * 1024);
   assertf(hts_codec_maxout(1024 * 1024) == INT_MAX);
+  /* without -m one body decodes to 256 MiB; -m moves it either way */
+  assertf(hts_codec_decode_cap(-1) == (LLint) 256 * 1024 * 1024);
+  assertf(hts_codec_decode_cap(0) == (LLint) 256 * 1024 * 1024);
+  assertf(hts_codec_decode_cap(100) == 100);
+  assertf(hts_codec_decode_cap((LLint) 1 << 30) == (LLint) 1 << 30);
+  assertf(hts_codec_cap_binds(1024 * 1024, hts_codec_decode_cap(-1)));
 
   if (argc >= 1) {
     snprintf(inpath, sizeof(inpath), "%s/cc-in", argv[0]);
@@ -1011,7 +1037,9 @@ static int st_contentcodings(httrackp *opt, int argc, char **argv) {
       assertf((LLint) (4 * 1024 * 1024) >
               hts_codec_maxout((LLint) sizeof(cc_br_bomb)));
       assertf(ae_write_raw(inpath, cc_br_bomb, sizeof(cc_br_bomb)) == 0);
-      assertf(hts_codec_unpack(HTS_CODEC_BROTLI, inpath, outpath) < 0);
+      assertf(hts_codec_unpack(HTS_CODEC_BROTLI, inpath, outpath) == -1);
+      assertf(hts_codec_unpack_max(HTS_CODEC_BROTLI, inpath, outpath, 1000) ==
+              HTS_CODEC_TOOBIG);
     }
 #endif
 #if HTS_USEZSTD
@@ -1040,7 +1068,9 @@ static int st_contentcodings(httrackp *opt, int argc, char **argv) {
       /* the fixture must really be past the budget, whatever the ratio is */
       assertf((LLint) bomblen > hts_codec_maxout((LLint) zlen));
       assertf(ae_write_raw(inpath, zbuf, zlen) == 0);
-      assertf(hts_codec_unpack(HTS_CODEC_ZSTD, inpath, outpath) < 0);
+      assertf(hts_codec_unpack(HTS_CODEC_ZSTD, inpath, outpath) == -1);
+      assertf(hts_codec_unpack_max(HTS_CODEC_ZSTD, inpath, outpath, 1000) ==
+              HTS_CODEC_TOOBIG);
       freet(bomb);
       freet(zbuf);
     }
@@ -1061,11 +1091,6 @@ static int st_codecerrno(httrackp *opt, int argc, char **argv) {
   char inpath[HTS_URLMAXSIZE], outpath[HTS_URLMAXSIZE];
   FILE *fp;
 
-  (void) opt;
-  if (argc < 2) {
-    fprintf(stderr, "usage: -#test=codecerrno <dir> <doomed-out>\n");
-    return 1;
-  }
   snprintf(inpath, sizeof(inpath), "%s/ce-in.z", argv[0]);
   snprintf(outpath, sizeof(outpath), "%s/ce-out", argv[0]);
   assertf(ae_write_packed(inpath, 16 + MAX_WBITS, body, len) == 0);
@@ -1111,9 +1136,6 @@ static int st_codecerrno(httrackp *opt, int argc, char **argv) {
 /* The library's own view of the structs HTS_INET6 and HTS_USEOPENSSL shape.
    381 diffs it against a consumer compiled from the installed headers alone. */
 static int st_pubheaders(httrackp *opt, int argc, char **argv) {
-  (void) opt;
-  (void) argc;
-  (void) argv;
 #define PUBH_SIZE(t) printf("sizeof %s = %lu\n", #t, (unsigned long) sizeof(t))
 #define PUBH_OFF(t, f)                                                         \
   printf("offsetof %s.%s = %lu\n", #t, #f, (unsigned long) offsetof(t, f))
@@ -1144,7 +1166,6 @@ static int st_intparse(httrackp *opt, int argc, char **argv) {
   const char *end = argv[1];
   LLint min, max, value = -1;
 
-  (void) opt;
   if (argc != 4) {
     fprintf(stderr, "int-parse: needs parse|scan <text> <min> <max>\n");
     return 1;
@@ -1174,8 +1195,7 @@ static void st_int_treathead(const char *field, const char *in, htsblk *r) {
 
   memset(r, 0, sizeof(*r));
   r->totalsize = -1;
-  line[0] = '\0';
-  strlncatbuff(line, field, sizeof(line), sizeof(line) - 1);
+  strclipbuff(line, sizeof(line), field);
   strlncatbuff(line, in, sizeof(line), sizeof(line) - 1);
   treathead(NULL, "www.example.com", "/", r, line);
 }
@@ -1588,6 +1608,11 @@ static const struct {
     {"date", "Sun, 06 Nov 1994 08:49:37 \t+1", NULL},
     {"date", "Sun, 06 Nov 1994 08:49:37 ++1", NULL},
     {"date", "4294967302 Nov 1994 08:49:37", "none"},
+    /* a zone letter or a month fragment is not a month */
+    {"date", "Sun, 06 Nov 1994 08:49:37 N", "y=94 m=10 d=6 8:49:37"},
+    {"date", "Sun, 06 Nov 1994 08:49:37 C", "y=94 m=10 d=6 8:49:37"},
+    {"date", "Sun, 06 Nov 1994 08:49:37 S", "y=94 m=10 d=6 8:49:37"},
+    {"date", "Sun, 06 ov 1994 08:49:37 GMT", "none"},
     {"server-length", " 50", NULL},
     {"server-length", " abc", NULL},
     {"server-length", " -5", NULL},
@@ -1652,7 +1677,6 @@ static int st_intparsediff(httrackp *opt, int argc, char **argv) {
   int compared = 0, changed = 0, failures = 0;
   char in[256], old[256], cur[256], gen[128];
 
-  (void) opt;
   if (argc == 2) { // One input through one site, as it parses now.
     for (s = 0; s < sizeof(st_int_sites) / sizeof(st_int_sites[0]); s++)
       if (strcmp(st_int_sites[s].name, argv[0]) == 0) {
@@ -1719,7 +1743,6 @@ static int st_headerparam(httrackp *opt, int argc, char **argv) {
   int size;
   hts_boolean found;
 
-  (void) opt;
   if (argc != 4) {
     fprintf(stderr, "header-param: needs <value> <seps> <name> <size>\n");
     return 1;
@@ -1741,8 +1764,7 @@ static void legacy_ctype(const char *in, char *out, size_t size) {
   char contenttype[HTS_MIMETYPE_SIZE] = "", charset[HTS_MIMETYPE_SIZE] = "";
   char *a;
 
-  line[0] = '\0';
-  strlncatbuff(line, in, sizeof(line), sizeof(line) - 1);
+  strclipbuff(line, sizeof(line), in);
   a = strchr(line, ';');
   if (a) {
     *a = '\0';
@@ -2071,9 +2093,6 @@ static int st_headerparamdiff(httrackp *opt, int argc, char **argv) {
   int compared = 0, failures = 0, by[HP_COUNT] = {0};
   char in[512], old[512], cur[512], want[512];
 
-  (void) opt;
-  (void) argc;
-  (void) argv;
   for (i = 0; i < sizeof(st_hp_cases) / sizeof(st_hp_cases[0]); i++, compared++)
     failures +=
         st_hp_case(st_hp_cases[i].site, st_hp_cases[i].in, st_hp_cases[i].want);

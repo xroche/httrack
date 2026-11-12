@@ -1,0 +1,93 @@
+#!/bin/bash
+# A tiny zip cache declaring X-Size 2147483646 made proxytrack allocate 2 GiB
+# for a body it could never read, on both the on-disk and the in-zip path.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+python=$(find_python) || skip "python3 missing"
+
+# X-Save is relative to the cache's grandparent, so keep HTTrack's own layout
+mkdir -p "$dir/m/hts-cache"
+zip="$dir/m/hts-cache/new.zip"
+BODY='<html>hello</html>'
+printf '%s' "$BODY" >"$dir/m/body.html"
+
+craft() { # craft IN-CACHE X-SIZE [HEADER-SIZE]
+    "$python" - "$(nativepath "$zip")" "$1" "$2" "$BODY" "${3:-}" <<'EOF'
+import struct, sys, zipfile
+
+meta = (
+    "X-In-Cache: %s\r\n"
+    "X-StatusCode: 200\r\n"
+    "X-StatusMessage: ok\r\n"
+    "X-Size: %s\r\n"
+    "Content-Type: text/html\r\n"
+    "Last-Modified: Wed, 01 Jan 2025 00:00:00 GMT\r\n"
+    "X-Save: body.html\r\n" % (sys.argv[2], sys.argv[3])
+).encode()
+zi = zipfile.ZipInfo("example.com/page.html")
+zi.compress_type = zipfile.ZIP_STORED
+zi.extra = meta
+with zipfile.ZipFile(sys.argv[1], "w") as z:
+    z.writestr(zi, sys.argv[4].encode() if sys.argv[2] == "1" else b"")
+if sys.argv[5]:
+    # the local and central headers both lie about the uncompressed size
+    data = bytearray(open(sys.argv[1], "rb").read())
+    central = data.index(b"PK\x01\x02")
+    for at in (22, central + 24):
+        struct.pack_into("<I", data, at, int(sys.argv[5]))
+    open(sys.argv[1], "wb").write(data)
+EOF
+}
+
+# A 1 GiB address-space cap turns a 2 GiB allocation into "memory exhausted".
+# A sanitized build cannot map its shadow under it, so detect one before capping.
+cap=1048576
+capped() { (ulimit -v "$cap" && "$@"); }
+probe=$(ASAN_OPTIONS=help=1:detect_leaks=0 proxytrack --version 2>&1 || true)
+
+convert() { # convert IN-CACHE X-SIZE [HEADER-SIZE]
+    craft "$@"
+    rm -f "$dir/out.arc"
+    $run proxytrack --convert "$dir/out.arc" "$zip" >/dev/null 2>&1 ||
+        fail "proxytrack died on X-In-Cache $1, X-Size $2"
+}
+
+run=capped
+craft 0 "${#BODY}"
+case "$probe" in
+*AddressSanitizer*) run= ;;
+*) capped proxytrack --convert "$dir/out.arc" "$zip" >/dev/null 2>&1 || run= ;;
+esac
+
+# control: an honest size still serves the body on both paths
+for in_cache in 0 1; do
+    convert "$in_cache" "${#BODY}"
+    grep -qaF "$BODY" "$dir/out.arc" ||
+        fail "an honest X-Size lost the body (X-In-Cache $in_cache)"
+done
+
+disk_msg='file shorter than X-Size'
+zip_msg='entry shorter than X-Size'
+# one byte over the data, a holdable size, and the 2 GiB claim
+for size in $((${#BODY} + 1)) 4096 2147483646; do
+    convert 0 "$size"
+    grep -qaF "$disk_msg" "$dir/out.arc" ||
+        fail "on-disk X-Size $size was not refused before allocating"
+    if grep -qa 'Bad Size' "$dir/out.arc"; then
+        fail "on-disk X-Size $size was called a bad size"
+    fi
+    convert 1 "$size"
+    grep -qaF "$zip_msg" "$dir/out.arc" ||
+        fail "in-zip X-Size $size was not refused before allocating"
+    convert 1 "$size" 2147483647
+    grep -qaF "$zip_msg" "$dir/out.arc" ||
+        fail "in-zip X-Size $size behind a lying zip header was not refused"
+done
+
+exit 0

@@ -65,7 +65,6 @@ struct FTPDownloadStruct {
 /* Capacity of every FTP control-line buffer; send_line() adds the CRLF. */
 #define FTP_LINE_SIZE 1024
 
-#if USE_BEGINTHREAD
 void launch_ftp(FTPDownloadStruct * params);
 void back_launch_ftp(void *pP);
 /* Cancel every live FTP worker and block until each stops touching its backlog
@@ -79,10 +78,6 @@ int ftp_worker_selftests(void);
    the live list, and that a held list blocks the handoff. Returns the number of
    failed checks. */
 int ftp_handoff_selftests(httrackp *opt);
-#else
-void launch_ftp(FTPDownloadStruct * params, char *path, char *exec);
-int back_launch_ftp(FTPDownloadStruct * params);
-#endif
 
 int run_launch_ftp(FTPDownloadStruct * params);
 int send_line(T_SOC soc, const char *data);
@@ -99,9 +94,10 @@ char *ftp_jump_authority(char *url_adr);
    caller's default port (#614). */
 hts_boolean ftp_split_hostport(const char *adr, char *host, size_t host_size,
                                int *port, char *err, size_t err_size);
-/* Split a "user[:pass]@" prefix (end = jump_identification result) into
-   NUL-terminated user/pass buffers. Returns HTS_FALSE and empties both when a
-   field does not fit, as a clipped one would name another account.
+/* Split a "user[:pass]@" prefix (end = jump_identification result) on its
+   first raw colon and percent-decode each field into NUL-terminated user/pass
+   buffers. Returns HTS_FALSE and empties both when a decoded field does not
+   fit, as a clipped one would name another account, or holds a control byte.
    Both sizes must be nonzero. */
 hts_boolean ftp_split_userpass(const char *src, const char *end, char *user,
                                size_t user_size, char *pass, size_t pass_size);

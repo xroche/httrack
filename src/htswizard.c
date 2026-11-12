@@ -31,9 +31,6 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-/* Internal engine bytecode */
-#define HTS_INTERNAL_BYTECODE
-
 #include "htscore.h"
 #include "htswizard.h"
 
@@ -43,6 +40,7 @@ HTS_STATIC_ASSERT(sizeof(HTS_WIZARD_FILTER_SUFFIX) <= HTS_FILTER_SUFFIX_MAX,
 /* specific definitions */
 #include "htsbase.h"
 #include <ctype.h>
+#include <limits.h>
 /* END specific definitions */
 
 /* "embedded" */
@@ -177,6 +175,17 @@ static void wizard_cat_host(htsbuff *f, const char *sign, const char *adr) {
   htsbuff_cat(f, jump_identification_const(adr));
 }
 
+/* Reply parsing: see htswizard.h. */
+int hts_wizard_parse_reply(const char *s) {
+  LLint v;
+
+  if (!strnotempty(s))
+    return 0;
+  if (isdigit((unsigned char) *s))
+    return hts_scan_llint(&s, 0, INT_MAX, &v) == HTS_SCAN_OK ? (int) v : -999;
+  return *s == '*' ? -1 : -999;
+}
+
 /* "<sign><host>/" then the first len characters of fil ((size_t) -1: all). */
 static void wizard_cat_path(htsbuff *f, const char *sign, const char *adr,
                             const char *fil, size_t len) {
@@ -192,8 +201,7 @@ void hts_wizard_prompt_url(char *dst, size_t dstsize, const char *adr,
     return;
   /* clipped, never aborting: adr and fil are cut from a crawled link and
      together outgrow any prompt buffer */
-  dst[0] = '\0';
-  strlncatbuff(dst, adr, dstsize, dstsize - 1);
+  strclipbuff(dst, dstsize, adr);
   if (*fil != '/')
     strlncatbuff(dst, "/", dstsize, dstsize - 1 - strlen(dst));
   strlncatbuff(dst, fil, dstsize, dstsize - 1 - strlen(dst));
@@ -218,7 +226,7 @@ HTSEXT_API hts_boolean hts_wizard_host_scope(const char *question, int k,
   if (slash != NULL && slash < end)
     end = slash;
   /* the port belongs to the filter, so keep it and only bound the label walk */
-  if (port != NULL && port < end)
+  if (port != NULL && port >= host)
     slash = port;
   else
     slash = end;
@@ -447,6 +455,53 @@ void hts_wizard_apply_verdict(httrackp *opt, int n, const char *adr,
     *forbidden_url = 0;
 }
 
+/* Copy the host of adr into dst, without scheme, login, port or path. */
+static hts_boolean travel_host(const char *adr, char *dst, size_t size) {
+  const char *const host = jump_identification_const(adr);
+  const char *const port = jump_toport_const(adr);
+  size_t len = strcspn(host, "/");
+
+  if (port != NULL && port >= host && (size_t) (port - host) < len)
+    len = (size_t) (port - host);
+  if (len >= size)
+    return HTS_FALSE;
+  memcpy(dst, host, len);
+  dst[len] = '\0';
+  return HTS_TRUE;
+}
+
+/* The last two labels of host with their leading dot, or NULL. */
+static const char *travel_last_two_labels(const char *host) {
+  size_t i = strlen(host);
+  int dots = 0;
+
+  while (i > 0)
+    if (host[--i] == '.' && ++dots == 2)
+      return host + i;
+  return NULL;
+}
+
+/* 1 when a and b share a domain for -d, 0 when they do not, -1 when one of
+   them has no domain. A host without a registrable domain (an address, a
+   public suffix) compares its last two labels. */
+static int travel_same_domain(const char *a, const char *b) {
+  char ha[HTS_URLMAXSIZE], hb[HTS_URLMAXSIZE];
+  char ra[HTS_URLMAXSIZE], rb[HTS_URLMAXSIZE];
+  const char *la, *lb;
+
+  if (!travel_host(a, ha, sizeof(ha)) || !travel_host(b, hb, sizeof(hb)) ||
+      strlen(ha) >= COOKIE_MAX_DOMAIN || strlen(hb) >= COOKIE_MAX_DOMAIN)
+    return 0; /* too long for the PSL lookup */
+  if (hts_registrable_domain(ha, ra, sizeof(ra)) &&
+      hts_registrable_domain(hb, rb, sizeof(rb)))
+    return strcmp(ra, rb) == 0 ? 1 : 0;
+  la = travel_last_two_labels(ha);
+  lb = travel_last_two_labels(hb);
+  if (la == NULL || lb == NULL)
+    return -1;
+  return strfield2(la, lb) ? 1 : 0;
+}
+
 /* Does "adr" + '/' + "fil" fit the HTS_URLMAXSIZE*2 pair (l, lfull) that
    hts_acceptlink_() and hts_testlinksize() build? Those two buffers gate what
    url_savename_addstr may later append (#1269), so a link that overruns them is
@@ -476,6 +531,14 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
    check_link callback can still refuse a link this function accepted. */
 #define ACCEPT_LINK() (upper_refused = 0, forbidden_url = 0)
 #define REFUSE_LINK() (upper_refused = 0, forbidden_url = 1)
+/* A travel rule accepts unless the link was imported after a move. */
+#define ACCEPT_UNLESS_MOVED(msg)                                               \
+  do {                                                                         \
+    if (!heap(ptr)->link_import) {                                             \
+      ACCEPT_LINK();                                                           \
+      hts_log_print(opt, LOG_DEBUG, msg, adr_nologin(opt, adr), fil);          \
+    }                                                                          \
+  } while (0)
 #define _FILTERS     (*opt->filters.filters)
 #define _FILTERS_PTR (opt->filters.filptr)
 #define _ROBOTS      ((robots_wizard*)opt->robotsptr)
@@ -583,11 +646,7 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
               || (tempo2[0] != '\0' && tempo2[1] != '\0'
                   && strchr(tempo2 + 1, '/') == 0)
             ) {
-            if (!heap(ptr)->link_import) {     // ne résulte pas d'un 'moved'
-              ACCEPT_LINK();
-              hts_log_print(opt, LOG_DEBUG, "same level link authorized: %s%s",
-                            adr_nologin(opt, adr), fil);
-            }
+            ACCEPT_UNLESS_MOVED("same level link authorized: %s%s");
           }
           // down
           if ((strncmp(tempo, "../", 3)) || (strncmp(tempo2, "../", 3))) {      // pas montée sinon ne nbous concerne pas
@@ -608,19 +667,11 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
                 hts_log_print(opt, LOG_DEBUG, "lower link canceled: %s%s",
                               adr_nologin(opt, adr), fil);
               } else {                         // autorisé à priori - NEW
-                if (!heap(ptr)->link_import) { // ne résulte pas d'un 'moved'
-                  ACCEPT_LINK();
-                  hts_log_print(opt, LOG_DEBUG, "lower link authorized: %s%s",
-                                adr_nologin(opt, adr), fil);
-                }
+                ACCEPT_UNLESS_MOVED("lower link authorized: %s%s");
               }
             } else if ((test1) || (test2)) {    // on peut descendre pour accéder au lien
               if ((opt->seeker & HTS_SEEKER_DOWN) != 0) {
-                if (!heap(ptr)->link_import) { // ne résulte pas d'un 'moved'
-                  ACCEPT_LINK();
-                  hts_log_print(opt, LOG_DEBUG, "lower link authorized: %s%s",
-                                adr_nologin(opt, adr), fil);
-                }
+                ACCEPT_UNLESS_MOVED("lower link authorized: %s%s");
               }
             }
           }
@@ -633,19 +684,11 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
               hts_log_print(opt, LOG_DEBUG, "upper link canceled: %s%s",
                             adr_nologin(opt, adr), fil);
             } else {                           // autorisé à monter - NEW
-              if (!heap(ptr)->link_import) {   // ne résulte pas d'un 'moved'
-                ACCEPT_LINK();
-                hts_log_print(opt, LOG_DEBUG, "upper link authorized: %s%s",
-                              adr_nologin(opt, adr), fil);
-              }
+              ACCEPT_UNLESS_MOVED("upper link authorized: %s%s");
             }
           } else if ((!strncmp(tempo, "../", 3)) || (!strncmp(tempo2, "../", 3))) {     // Possible en montant
             if ((opt->seeker & HTS_SEEKER_UP) != 0) {
-              if (!heap(ptr)->link_import) {   // ne résulte pas d'un 'moved'
-                ACCEPT_LINK();
-                hts_log_print(opt, LOG_DEBUG, "upper link authorized: %s%s",
-                              adr_nologin(opt, adr), fil);
-              }
+              ACCEPT_UNLESS_MOVED("upper link authorized: %s%s");
             } // sinon autorisé en descente
           }
 
@@ -670,39 +713,20 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
         forbidden_url = 1;
       break;                    // interdicton de sortir au dela de l'adresse
     case HTS_TRAVEL_SAME_DOMAIN: {
-      size_t i = hts_lastcharoffset(adr);
-      size_t j = hts_lastcharoffset(urladr());
+      const int same = travel_same_domain(adr, urladr());
 
-      if ((i > 0) && (j > 0)) {
-        while ((i > 0) && (adr[i] != '.'))
-          i--;
-        while ((j > 0) && (urladr()[j] != '.'))
-          j--;
-        if ((i > 0) && (j > 0)) {
-          i--;
-          j--;
-          while ((i > 0) && (adr[i] != '.'))
-            i--;
-          while ((j > 0) && (urladr()[j] != '.'))
-            j--;
+      if (same == 0) {
+        if (!opt->wizard) { // mode non wizard
+          forbidden_url = 1;
+          hts_log_print(opt, LOG_DEBUG, "foreign domain link canceled: %s%s",
+                        adr_nologin(opt, adr), fil);
         }
-      }
-      if ((i > 0) && (j > 0)) {
-        if (!strfield2(adr + i, urladr() + j)) { // !=
-          if (!opt->wizard) {                    // mode non wizard
-            forbidden_url = 1; // pas même domaine
-            hts_log_print(opt, LOG_DEBUG, "foreign domain link canceled: %s%s",
-                          adr_nologin(opt, adr), fil);
-          }
-
-        } else {
-          if (opt->wizard) {   // mode wizard
-            ACCEPT_LINK();     // same domain
-            hts_log_print(opt, LOG_DEBUG, "same domain link authorized: %s%s",
-                          adr_nologin(opt, adr), fil);
-          }
+      } else if (same > 0) {
+        if (opt->wizard) { // mode wizard
+          ACCEPT_LINK();
+          hts_log_print(opt, LOG_DEBUG, "same domain link authorized: %s%s",
+                        adr_nologin(opt, adr), fil);
         }
-
       } else
         forbidden_url = 1;
     } break;
@@ -784,24 +808,12 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
     /* Don't enlarge: the abort gates url_savename_addstr's append (#1269). */
     char BIGSTK l[HTS_URLMAXSIZE * 2];
     char BIGSTK lfull[HTS_URLMAXSIZE * 2];
+    htsbuff lb = htsbuff_array(l), fb = htsbuff_array(lfull);
 
     if (forbidden_url != -1)
       question = 0;             // pas de question, résolu
 
-    // former URL complète du lien actuel
-    strcpybuff(l, jump_identification_const(adr));
-    if (*fil != '/')
-      strcatbuff(l, "/");
-    strcatbuff(l, fil);
-    // full version (http://foo:bar@www.foo.com/bar.html)
-    if (!link_has_authority(adr))
-      strcpybuff(lfull, "http://");
-    else
-      lfull[0] = '\0';
-    strcatbuff(lfull, adr);
-    if (*fil != '/')
-      strcatbuff(lfull, "/");
-    strcatbuff(lfull, fil);
+    hts_url_forms(&lb, &fb, adr, fil);
 
     // tester filters (URLs autorisées ou interdites explicitement)
 
@@ -814,7 +826,7 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
       // eternal depth first
       // vérifier récursivité extérieure
       if (opt->extdepth > 0) {
-        if ( /*question && */ (ptr > 0) && (!force_mirror)) {
+        if (ptr > 0) {
           // well, this is kinda a hak
           // we don't want to mirror EVERYTHING, and we have to decide where to stop
           // there is no way yet to tag "external" links, and therefore links that are
@@ -825,19 +837,11 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
             *set_prio_to = 1 + (opt->extdepth);
             may_set_prio_to = 0;        // clear may-set flag
             ACCEPT_LINK();              // authorized
-            question = 0;       // résolution auto
-            if (question) {
-              hts_log_print(opt, LOG_DEBUG,
-                            "(wizard) ambiguous link accepted (external "
-                            "depth): link %s at %s%s",
-                            l, adr_nologin(opt, urladr()), urlfil());
-            } else {
-              hts_log_print(opt, LOG_DEBUG,
-                            "(wizard) forced to accept link (external depth): "
-                            "link %s at %s%s",
-                            l, adr_nologin(opt, urladr()), urlfil());
-            }
-
+            question = 0;               // auto-resolved
+            hts_log_print(opt, LOG_DEBUG,
+                          "(wizard) forced to accept link (external depth): "
+                          "link %s at %s%s",
+                          l, adr_nologin(opt, urladr()), urlfil());
           }
         }
       }
@@ -903,9 +907,6 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
     }
     // vérifier robots.txt
     if (opt->robots && checkrobots(_ROBOTS, adr, fil) == -1) {
-#if DEBUG_ROBOTS
-      printf("robots.txt forbidden: %s%s\n", adr, fil);
-#endif
       if (!hts_robots_forbids(opt, adr, fil,
                               (!question && filters_answer) ? HTS_TRUE
                                                             : HTS_FALSE,
@@ -935,14 +936,6 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
                       "(wizard) cancelled foreign domain link: link %s at %s%s",
                       l, adr_nologin(opt, urladr()), urlfil());
       }
-#if BDEBUG==3
-      printf("at %s in %s, wizard says: url %s ", urladr(), urlfil(), l);
-      if (forbidden_url)
-        printf("cancelled");
-      else
-        printf(">SHARED<");
-      printf("\n");
-#endif
     }
 
     /* en cas de question, ou lien primaire (enregistrer autorisations) */
@@ -956,36 +949,7 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
 
         hts_wizard_prompt_url(tempo, sizeof(tempo), adr, fil);
         s = RUN_CALLBACK1(opt, query3, tempo);
-        if (strnotempty(s) == 0)        // entrée
-          n = 0;
-        else if (isdigit((unsigned char) *s))
-          sscanf(s, "%d", &n);
-        else {
-          switch (*s) {
-          case '*':
-            n = -1;
-            break;
-          case '!':
-            n = -999; {
-              /*char *a;
-                 int i;                                    
-                 a=copie_de_adr-128;
-                 if (a<r.adr) a=r.adr;
-                 for(i=0;i<256;i++) {
-                 if (a==copie_de_adr) printf("\nHERE:\n");
-                 printf("%c",*a++);
-                 }
-                 printf("\n\n");
-               */
-            }
-            break;
-          default:
-            n = -999;
-            printf("What did you say?\n");
-            break;
-
-          }
-        }
+        n = hts_wizard_parse_reply(s);
         io_flush;
       } else {                  // lien primaire: autoriser répertoire entier       
         if (!force_mirror) {
@@ -1056,6 +1020,7 @@ static int hts_acceptlink_(httrackp *opt, int ptr, const char *adr,
   return forbidden_url;
 #undef ACCEPT_LINK
 #undef REFUSE_LINK
+#undef ACCEPT_UNLESS_MOVED
 #undef _FILTERS
 #undef _FILTERS_PTR
 #undef _ROBOTS
@@ -1131,49 +1096,27 @@ int hts_testlinksize(httrackp * opt, const char *adr, const char *fil, LLint siz
     /* Don't enlarge: the abort gates url_savename_addstr's append (#1269). */
     char BIGSTK l[HTS_URLMAXSIZE * 2];
     char BIGSTK lfull[HTS_URLMAXSIZE * 2];
+    htsbuff lb = htsbuff_array(l), fb = htsbuff_array(lfull);
+    LLint sz = size;
+    int size_flag = 0;
 
-    if (size >= 0) {
-      LLint sz = size;
-      int size_flag = 0;
-
-      // former URL complète du lien actuel
-      strcpybuff(l, jump_identification_const(adr));
-      if (*fil != '/')
-        strcatbuff(l, "/");
-      strcatbuff(l, fil);
-      //
-      if (!link_has_authority(adr))
-        strcpybuff(lfull, "http://");
-      else
-        lfull[0] = '\0';
-      strcatbuff(lfull, adr);
-      if (*fil != '/')
-        strcatbuff(lfull, "/");
-      strcatbuff(lfull, fil);
-
-      // filters, 0=sait pas 1=ok -1=interdit
-      {
-        sz = size;
-        jok = fa_strjoker_dual(/*url */ 0, *opt->filters.filters,
-                               *opt->filters.filptr, lfull, l, &sz, &size_flag,
-                               NULL);
-      }
-
-      // log
-      if (jok == 1) {
+    hts_url_forms(&lb, &fb, adr, fil);
+    // filters: 0 = unknown, 1 = accepted, -1 = refused
+    jok =
+        fa_strjoker_dual(/*url */ 0, *opt->filters.filters,
+                         *opt->filters.filptr, lfull, l, &sz, &size_flag, NULL);
+    if (jok == 1) {
+      hts_log_print(opt, LOG_DEBUG,
+                    "File confirmed (size test): %s%s (" LLintP ")",
+                    adr_nologin(opt, adr), fil, (LLint) (size));
+    } else if (jok == -1) {
+      if (size_flag) { /* refused because of its size */
         hts_log_print(opt, LOG_DEBUG,
-                      "File confirmed (size test): %s%s (" LLintP ")",
-                      adr_nologin(opt, adr), fil, (LLint) (size));
-      } else if (jok == -1) {
-        if (size_flag) {        /* interdit à cause de la taille */
-          hts_log_print(opt, LOG_DEBUG,
-                        "File cancelled due to its size: %s%s (" LLintP
-                        ", limit: " LLintP ")",
-                        adr_nologin(opt, adr), fil, (LLint) (size),
-                        (LLint) (sz));
-        } else {
-          jok = 1;
-        }
+                      "File cancelled due to its size: %s%s (" LLintP
+                      ", limit: " LLintP ")",
+                      adr_nologin(opt, adr), fil, (LLint) (size), (LLint) (sz));
+      } else {
+        jok = 1;
       }
     }
   }
