@@ -71,17 +71,17 @@ Please visit our Website: http://www.httrack.com
   } while (0)
 
 typedef enum hts_cache_field_kind {
-  HTS_CACHE_FIELD_INT,    /* value is an int */
-  HTS_CACHE_FIELD_LLINT,  /* value is an LLint */
-  HTS_CACHE_FIELD_STRING, /* value is a char[size], clipped to it */
-  HTS_CACHE_FIELD_SKIP    /* consumed, value unused */
+  HTS_CACHE_FIELD_INT,    /* dest is an int */
+  HTS_CACHE_FIELD_LLINT,  /* dest is an LLint */
+  HTS_CACHE_FIELD_STRING, /* dest is a char[dest_size], clipped to it */
+  HTS_CACHE_FIELD_SKIP    /* consumed, dest unused */
 } hts_cache_field_kind;
 
 typedef struct hts_cache_field {
   const char *name;
   hts_cache_field_kind kind;
-  void *value;
-  size_t size;
+  void *dest;
+  size_t dest_size;
 } hts_cache_field;
 
 /* Store value into the field called name, matched case-insensitively.
@@ -99,16 +99,16 @@ hts_cache_store_field(const hts_cache_field *fields, size_t count,
     int intval = 0;
 
     sscanf(value, "%d", &intval);
-    *(int *) fields[i].value = intval;
+    *(int *) fields[i].dest = intval;
   } else if (fields[i].kind == HTS_CACHE_FIELD_LLINT) {
     LLint intval = 0;
 
     sscanf(value, LLintP, &intval);
-    *(LLint *) fields[i].value = intval;
+    *(LLint *) fields[i].dest = intval;
   } else if (fields[i].kind == HTS_CACHE_FIELD_STRING) {
     /* a corrupt cache can carry a field wider than ours; clipping keeps the
        entry, where aborting would take the crawl down */
-    (void) strclipbuff((char *) fields[i].value, fields[i].size, value);
+    (void) strclipbuff(fields[i].dest, fields[i].dest_size, value);
   }
   return HTS_TRUE;
 }

@@ -3597,14 +3597,20 @@ static int st_cache(httrackp *opt, int argc, char **argv) {
 }
 
 /* Two entries whose headers differ by one byte: a NUL in the first, a space in
-   the control. The fields past it would change the status code to 203. */
+   the control. The fields past it would change the status code to 203. A third
+   holds a nameless line, and fields past a blank line that must not be read. */
 static int nul_write_zip(const char *zippath) {
   static const char hdr[] = "X-In-Cache: 1\r\nX-StatusCode: 200\r\n"
                             "X-StatusMessage: OK\r\nX-Size: 4\r\n"
                             "Content-Type: text/html\r\nX-Note: a"
                             "\0X-StatusCode: 203\r\n";
+  static const char blank[] = "X-In-Cache: 1\r\nX-StatusCode: 200\r\n"
+                              "X-StatusMessage: OK\r\nX-Size: 4\r\n"
+                              "Content-Type: text/html\r\n: nameless\r\n"
+                              "\r\nX-StatusCode: 203\r\nX-Late: 1\r\n";
   static const char *const names[] = {"http://example.com/nul.html",
-                                      "http://example.com/clean.html"};
+                                      "http://example.com/clean.html",
+                                      "http://example.com/blank.html"};
   char buf[sizeof(hdr)];
   zip_fileinfo fi;
   zipFile z = zipOpen(zippath, APPEND_STATUS_CREATE);
@@ -3615,14 +3621,19 @@ static int nul_write_zip(const char *zippath) {
     return -1;
   }
   memset(&fi, 0, sizeof(fi));
-  for (i = 0; i < 2; i++) {
+  for (i = 0; i < 3; i++) {
+    const char *extra = buf;
+    uInt len = (uInt) (sizeof(buf) - 1);
+
     memcpy(buf, hdr, sizeof(hdr));
     if (i == 1) {
       *(char *) memchr(buf, '\0', sizeof(buf)) = ' ';
+    } else if (i == 2) {
+      extra = blank;
+      len = (uInt) (sizeof(blank) - 1);
     }
-    err |=
-        zipOpenNewFileInZip(z, names[i], &fi, buf, (uInt) (sizeof(buf) - 1),
-                            NULL, 0, NULL, Z_DEFLATED, Z_DEFAULT_COMPRESSION);
+    err |= zipOpenNewFileInZip(z, names[i], &fi, extra, len, NULL, 0, NULL,
+                               Z_DEFLATED, Z_DEFAULT_COMPRESSION);
     err |= zipWriteInFileInZip(z, "okay", 4);
     err |= zipCloseFileInZip(z);
   }
@@ -3663,6 +3674,14 @@ static int st_cache_nul(httrackp *opt, int argc, char **argv) {
       memcmp(r.adr, "okay", 4) != 0) {
     fprintf(stderr, "cache-nul: control entry read as %d (%s)\n", r.statuscode,
             r.msg);
+    fail = 1;
+  }
+  freet(r.adr);
+  r = cache_readex(opt, &cache, "example.com", "/blank.html", "", NULL, NULL,
+                   1);
+  if (r.statuscode != 200 || r.adr == NULL || r.size != 4) {
+    fprintf(stderr, "cache-nul: a field past the blank line read as %d (%s)\n",
+            r.statuscode, r.msg);
     fail = 1;
   }
   freet(r.adr);
