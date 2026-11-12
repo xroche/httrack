@@ -1,0 +1,3 @@
+uri ftp://ftp.example.com/pub/file.bin
+body 00ff10ff00
+ctype application/octet-stream

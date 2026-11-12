@@ -5,7 +5,8 @@ noinst_PROGRAMS = fuzz-charset fuzz-codepage fuzz-meta fuzz-idna fuzz-entities \
 	fuzz-htsparse fuzz-singlefile fuzz-sitemap fuzz-arc fuzz-cookie \
 	fuzz-robots \
 	fuzz-bundle \
-	fuzz-savename
+	fuzz-savename \
+	fuzz-warc
 endif
 
 AM_CPPFLAGS = \
@@ -57,6 +58,8 @@ fuzz_bundle_SOURCES = fuzz-bundle.c fuzz.h
 
 # The save-name builder: hostile URLs in, on-disk paths out.
 fuzz_savename_SOURCES = fuzz-savename.c fuzz.h
+
+fuzz_warc_SOURCES = fuzz-warc.c fuzz.h
 
 # Corpus list comes from configure: automake does not expand EXTRA_DIST globs.
 EXTRA_DIST = README.md run-fuzzers.sh check-corpus-list.sh ubsan-ignorelist.txt $(FUZZ_CORPUS_LIST)
