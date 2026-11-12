@@ -251,10 +251,11 @@ void hts_changes_notify(httrackp *opt, const char *adr, const char *fil,
   if (changes != NULL) {
     slot = changes_slot(changes, file, &is_new);
     if (slot >= 0 && !is_new) {
+      changes_entry *const entry = &TypedArrayNth(changes->entries, slot);
+
       /* Retry, or a second call site for the same file: the pre-run state was
          already sampled and the copy on disk may no longer be it. */
-      TypedArrayNth(changes->entries, slot).rewritten =
-          TypedArrayNth(changes->entries, slot).rewritten || rewritten;
+      entry->rewritten = entry->rewritten || rewritten;
     }
   }
   hts_mutexrelease(&changes_mutex);
@@ -356,11 +357,13 @@ void hts_changes_dropped(httrackp *opt, const char *file, hts_boolean kept) {
   if (changes != NULL) {
     slot = changes_slot(changes, file, &is_new);
     if (slot >= 0 && is_new) {
-      TypedArrayNth(changes->entries, slot).url = strdupt("");
-      TypedArrayNth(changes->entries, slot).listed_prev = HTS_TRUE;
+      changes_entry *const entry = &TypedArrayNth(changes->entries, slot);
+
+      entry->url = strdupt("");
+      entry->listed_prev = HTS_TRUE;
       /* A kept file leaves rewritten clear, which resolves to unchanged. */
       if (!kept)
-        TypedArrayNth(changes->entries, slot).bucket = HTS_CHANGE_GONE;
+        entry->bucket = HTS_CHANGE_GONE;
     }
   }
   hts_mutexrelease(&changes_mutex);

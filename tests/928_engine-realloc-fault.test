@@ -16,4 +16,15 @@ done
 out=$(httrack -O /dev/null -#test=xfread-limit)
 grep -q '^oom: refused=1 adr=kept ' <<<"$out" || fail "xfread: $out"
 grep -q '^oom body: BODYREAD$' <<<"$out" || fail "xfread body: $out"
+grep -q '^shrink body: BODYREADMORE size=12$' <<<"$out" || fail "xfread shrink: $out"
+
+if [ "${EXAMPLE_LIBS:-yes}" = yes ] && [ -n "${CHANGECONTENT_LIB:-}" ] &&
+    [ -r "${CHANGECONTENT_LIB%/*}/libsimple.so" ]; then
+    lib=${CHANGECONTENT_LIB%/*}/libsimple.so
+    out=$(httrack -O /dev/null "-#test=plugoom" "$lib" 2>&1) || fail "plugoom: $out"
+    grep -q "plugoom self-test OK" <<<"$out" || fail "plugoom: $out"
+    # The example's hts_unplug prints this: once for the refused load, once at exit.
+    n=$(grep -o "Module unplugged" <<<"$out" | wc -l)
+    [ "$n" -eq 2 ] || fail "plugoom unplugged $n times: $out"
+fi
 echo "realloc faults keep their data"

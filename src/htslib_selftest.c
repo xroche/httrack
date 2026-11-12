@@ -4294,7 +4294,33 @@ static int st_libhandlesoom(httrackp *opt, int argc, char **argv) {
   return all ? 0 : 1;
 }
 
+/* plug_wrapper refuses, and unplugs, a module it cannot record. */
+static int st_plugoom(httrackp *opt, int argc, char **argv) {
+  const int before = opt->libHandles.count;
+  int ret, ok, all;
+
+  if (argc < 1) {
+    printf("usage: -#test=plugoom <module>\n");
+    return 1;
+  }
+  hts_realloct_fault_selftest = 1;
+  ret = plug_wrapper(opt, argv[0], argv[0]);
+  hts_realloct_fault_selftest = 0;
+  ok = ret == 0 && opt->libHandles.count == before;
+  printf("refused: ret=%d ok=%d\n", ret, ok);
+  all = ok;
+
+  ret = plug_wrapper(opt, argv[0], argv[0]);
+  ok = ret == 1 && opt->libHandles.count == before + 1;
+  printf("control: ret=%d ok=%d\n", ret, ok);
+  all = all && ok;
+  printf("plugoom self-test %s\n", all ? "OK" : "FAILED");
+  return all ? 0 : 1;
+}
+
 const struct selftest_entry selftests_lib[] = {
+    {"plugoom", "<module>", "a module that cannot be recorded is unplugged",
+     st_plugoom},
     {"libhandlesoom", "", "a module that cannot be recorded changes nothing",
      st_libhandlesoom},
     {"clienthints", "<user-agent>",

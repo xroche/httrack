@@ -616,6 +616,41 @@ static int st_filtersoom(httrackp *opt, int argc, char **argv) {
       freet(filters[0]);
     freet(filters);
   }
+
+  /* filters_grow keeps maxfilter when the list cannot grow. */
+  for (fault = 1; fault <= 3; fault++) {
+    const htsfilters saved = opt->filters;
+    const int savedmax = opt->maxfilter;
+    char **filters = NULL;
+    int filptr, i, grew, ok;
+
+    opt->maxfilter = 128;
+    assertf(filters_init(&filters, opt->maxfilter, 0) == 128);
+    opt->filters.filters = &filters;
+    opt->filters.filptr = &filptr;
+    filptr = opt->maxfilter;
+    for (i = 0; i < filptr; i++)
+      snprintf(filters[i], HTS_FILTER_SLOT_SIZE, "+r%d*", i);
+    hts_realloct_fault_selftest = fault;
+    grew = filters_grow(opt, 1);
+    hts_realloct_fault_selftest = 0;
+    ok = grew == (fault == 3) &&
+         opt->maxfilter == (fault == 3 ? 128 + HTS_FILTERSINC : 128);
+    for (i = 0; i < filptr && ok; i++) {
+      char want[16];
+
+      snprintf(want, sizeof(want), "+r%d*", i);
+      ok = filters[i] == filters[0] + (size_t) i * HTS_FILTER_SLOT_SIZE &&
+           strcmp(filters[i], want) == 0;
+    }
+    printf("grow fault %d: grew=%d maxfilter=%d ok=%d\n", fault, grew,
+           opt->maxfilter, ok);
+    all = all && ok;
+    opt->filters = saved;
+    opt->maxfilter = savedmax;
+    freet(filters[0]);
+    freet(filters);
+  }
   printf("filtersoom self-test %s\n", all ? "OK" : "FAILED");
   return all ? 0 : 1;
 }

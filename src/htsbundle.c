@@ -752,15 +752,19 @@ hts_boolean hts_bundle_load_all(httrackp *opt, const char *jar_file, char *err,
   t_cookie *all_bundles;
   t_cookie *alone = NULL;
   bundle_clashes clashes;
+  bundle *items;
+  size_t n;
   size_t *group;
   hts_boolean ok = HTS_TRUE;
   size_t i, j;
 
   if (st == NULL)
     return HTS_TRUE;
+  items = TypedArrayElts(st->items);
+  n = TypedArraySize(st->items);
   memset(&clashes, 0, sizeof(clashes));
   all_bundles = calloct(1, sizeof(t_cookie));
-  group = calloct(TypedArraySize(st->items), sizeof(size_t));
+  group = calloct(n, sizeof(size_t));
   if (opt->cookie != NULL)
     alone = calloct(1, sizeof(t_cookie));
   if (all_bundles == NULL || group == NULL ||
@@ -773,35 +777,32 @@ hts_boolean hts_bundle_load_all(httrackp *opt, const char *jar_file, char *err,
   all_bundles->max_len = sizeof(all_bundles->data);
   if (alone != NULL)
     alone->max_len = opt->cookie->max_len;
-  for (i = 0; i < TypedArraySize(st->items); i++)
+  for (i = 0; i < n; i++)
     group[i] = i;
-  for (i = 0; i < TypedArraySize(st->items) && ok; i++)
-    ok = bundle_load(opt, &TypedArrayNth(st->items, i), jar_file, all_bundles,
-                     &clashes, alone, err, err_size);
+  for (i = 0; i < n && ok; i++)
+    ok = bundle_load(opt, &items[i], jar_file, all_bundles, &clashes, alone,
+                     err, err_size);
   // refuse a skipped clash on a site that is a bundle's home
   for (i = 0; i < clashes.count && ok; i++) {
-    for (j = 0; j < TypedArraySize(st->items) && ok; j++) {
-      if (scope_list_covers(TypedArrayNth(st->items, j).home,
-                            TypedArrayNth(st->items, j).nhome,
-                            clashes.hosts[i])) {
+    for (j = 0; j < n && ok; j++) {
+      if (scope_list_covers(items[j].home, items[j].nhome, clashes.hosts[i])) {
         snprintf(err, err_size,
                  "%s: a cookie for %s has another value in another bundle",
-                 TypedArrayNth(st->items, j).file, clashes.hosts[i]);
+                 items[j].file, clashes.hosts[i]);
         ok = HTS_FALSE;
       }
     }
   }
   // the log backstop hides a bundle's tokens and url-line passwords too
-  for (i = 0; i < TypedArraySize(st->items) && ok; i++) {
-    for (j = 0; j < TypedArrayNth(st->items, i).nurls; j++)
-      hts_secret_add_login(opt, TypedArrayNth(st->items, i).urls[j]);
-    hts_secret_add_headers(opt,
-                           StringBuff(TypedArrayNth(st->items, i).headers));
+  for (i = 0; i < n && ok; i++) {
+    for (j = 0; j < items[i].nurls; j++)
+      hts_secret_add_login(opt, items[i].urls[j]);
+    hts_secret_add_headers(opt, StringBuff(items[i].headers));
   }
-  for (i = 0; i < TypedArraySize(st->items) && ok; i++) {
-    for (j = i + 1; j < TypedArraySize(st->items) && ok; j++) {
-      const bundle *const a = &TypedArrayNth(st->items, i);
-      const bundle *const b = &TypedArrayNth(st->items, j);
+  for (i = 0; i < n && ok; i++) {
+    for (j = i + 1; j < n && ok; j++) {
+      const bundle *const a = &items[i];
+      const bundle *const b = &items[j];
 
       if (!bundle_scopes_overlap(a, b))
         continue;
@@ -817,13 +818,12 @@ hts_boolean hts_bundle_load_all(httrackp *opt, const char *jar_file, char *err,
     }
   }
   // an https URL in any merged bundle makes the headers of all https-only
-  for (i = 0; i < TypedArraySize(st->items); i++) {
-    if (TypedArrayNth(st->items, i).https_only)
-      TypedArrayNth(st->items, bundle_group(group, i)).https_only = HTS_TRUE;
+  for (i = 0; i < n; i++) {
+    if (items[i].https_only)
+      items[bundle_group(group, i)].https_only = HTS_TRUE;
   }
-  for (i = 0; i < TypedArraySize(st->items); i++)
-    TypedArrayNth(st->items, i).https_only =
-        TypedArrayNth(st->items, bundle_group(group, i)).https_only;
+  for (i = 0; i < n; i++)
+    items[i].https_only = items[bundle_group(group, i)].https_only;
   freet(group);
   freet(all_bundles);
   strlist_free(&clashes.hosts, &clashes.count);
@@ -836,9 +836,11 @@ const char *hts_bundle_url(httrackp *opt, size_t i) {
   size_t k;
 
   for (k = 0; st != NULL && k < TypedArraySize(st->items); k++) {
-    if (i < TypedArrayNth(st->items, k).nurls)
-      return TypedArrayNth(st->items, k).urls[i];
-    i -= TypedArrayNth(st->items, k).nurls;
+    const bundle *const b = &TypedArrayNth(st->items, k);
+
+    if (i < b->nurls)
+      return b->urls[i];
+    i -= b->nurls;
   }
   return NULL;
 }
