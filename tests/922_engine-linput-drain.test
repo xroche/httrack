@@ -1,0 +1,20 @@
+#!/bin/bash
+#
+# linput(), the engine's text-file reader: a line too long for the buffer is
+# clipped and its tail dropped, never read as the next line.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# readline CAP FLAGS TEXT linput prints [line] per read; CAP counts the NUL.
+selftest_queue "[abcd][x]" readline 5 - 'abcdefg\nx' linput
+selftest_queue "[abcd][x]" readline 5 - 'abcd\nx' linput
+selftest_queue "[abcd][x]" readline 5 - 'abcd\r\nx' linput
+selftest_queue "[abc][x]" readline 5 - 'abc\nx' linput
+# TAB and form feed are dropped, NUL is kept.
+selftest_queue "[ab][x]" readline 5 - 'a\tb\f\nx' linput
+selftest_queue "[a\\x00b]" readline 5 - 'a\0b' linput
+selftest_queue "[a][][b]" readline 5 - 'a\n\nb' linput
+
+selftest_run_queued

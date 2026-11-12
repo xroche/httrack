@@ -148,6 +148,17 @@ hts_boolean hts_readline(FILE *fp, char *s, size_t max, int flags) {
   return readline_end(fp, s, max, flags, &len, &end);
 }
 
+int linput(FILE *fp, char *s, int max) {
+  size_t len;
+  line_end end;
+
+  if (max < 1)
+    return 0;
+  (void) readline_end(fp, s, (size_t) max, HTS_LINE_DROP_TAB | HTS_LINE_DROP_FF,
+                      &len, &end);
+  return (int) len;
+}
+
 hts_boolean hts_readline_raw(FILE *fp, char *s, size_t max, size_t *len) {
   line_end end;
 
