@@ -254,26 +254,24 @@ static int st_paste(httrackp *opt, int argc, char **argv) {
   unsigned int flags;
   hts_paste_result *res = calloct(1, sizeof(*res));
   String paste = STRING_EMPTY;
-  char buf[4096];
-  size_t n;
-  FILE *fp;
+  char *file = NULL;
+  LLint filesize = 0;
   int i;
 
   if (res != NULL)
     res->size = sizeof(*res);
-  fp = argc >= 2 ? FOPEN(argv[1], "rb") : NULL;
-  if (fp == NULL || res == NULL) {
+  if (argc >= 2)
+    file = readfile2_utf8(argv[1], &filesize);
+  if (file == NULL || res == NULL) {
     fprintf(stderr, "paste: takes <dir> <file> [agent:<ua>] [url:<url>] "
                     "[hosts:<list>] "
                     "[dry] [keep]\n");
-    if (fp != NULL)
-      fclose(fp);
+    freet(file);
     freet(res);
     return 1;
   }
-  while ((n = fread(buf, 1, sizeof(buf), fp)) > 0)
-    StringMemcat(paste, buf, n);
-  fclose(fp);
+  StringMemcat(paste, file, (size_t) filesize);
+  freet(file);
   for (i = 2; i < argc; i++) {
     if (strncmp(argv[i], "agent:", 6) == 0)
       agent = argv[i] + 6;

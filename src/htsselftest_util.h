@@ -56,6 +56,21 @@ Please visit our Website: http://www.httrack.com
 
 size_t st_decode_body(const char *arg, char *buf, size_t size);
 
+/* Write size bytes of data to path, replacing it. Abort when that fails. */
+void st_put_file(const char *path, const void *data, size_t size);
+
+/* Copy the file at path into buf, clipped to size - 1 bytes. buf holds "" when
+   the file cannot be read. */
+void st_read_file(const char *path, char *buf, size_t size);
+
+/* Read the whole file at path into a heap buffer, NUL-terminated, and set *len.
+   Return NULL when it cannot be read. The caller frees it with freet(). */
+char *st_slurp(const char *path, size_t *len);
+
+/* Same as st_slurp, but path is in the system charset (not UTF-8 on Windows).
+ */
+char *st_slurp_ansi(const char *path, size_t *len);
+
 /* Set *dest to the Sec-Fetch-Dest named name, "empty" being UNKNOWN. Return
    HTS_FALSE, after complaining, when name is no destination. */
 hts_boolean st_dest_of(const char *name, int *dest);

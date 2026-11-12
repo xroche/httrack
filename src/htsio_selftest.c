@@ -422,38 +422,16 @@ static void makeindex_run(httrackp *opt, const char *path, const char *footer,
                           size_t size) {
   FILE *fp = fopen(path, "wb");
   int done = 0;
-  size_t n;
 
   assertf(fp != NULL);
   hts_finish_makeindex(opt, &done, &fp, links, firstlink, footer, "", "");
   assertf(fp == NULL); /* the function closed and cleared it */
   assertf(done != 0);
-  fp = fopen(path, "rb");
-  assertf(fp != NULL);
-  n = fread(buf, 1, size - 1, fp);
-  fclose(fp);
-  buf[n] = '\0';
+  st_read_file(path, buf, size);
 }
 
 // Whole file as a NUL-terminated heap string, or NULL when it cannot be read.
-static char *makeindex_slurp(const char *path) {
-  FILE *fp = fopen(path, "rb");
-  long size;
-  char *buf;
-
-  if (fp == NULL)
-    return NULL;
-  assertf(fseek(fp, 0, SEEK_END) == 0);
-  size = ftell(fp);
-  assertf(size >= 0);
-  rewind(fp);
-  buf = malloct((size_t) size + 1);
-  /* a read error would otherwise render a silently truncated template */
-  assertf(hts_fread_exact(buf, (size_t) size, fp));
-  buf[size] = '\0';
-  fclose(fp);
-  return buf;
-}
+static char *makeindex_slurp(const char *path) { return readfile_utf8(path); }
 
 // Whether `at` sits in live markup rather than inside an HTML comment.
 static hts_boolean makeindex_outside_comment(const char *buf, const char *at) {
@@ -800,11 +778,20 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
 
   /* #216: the listed name is utf-8, not raw system-charset mojibake */
   snprintf(path, sizeof(path), "%s/index.html", topdir);
-  fp = fopen(path, "rb");
-  assertf(fp != NULL);
-  n = fread(buf, 1, sizeof(buf) - 1, fp);
-  fclose(fp);
-  buf[n] = '\0';
+  /* ANSI fopen: on Windows the dir name is in the system charset, which a
+     UTF-8 reader cannot open */
+  {
+    FILE *const rf = fopen(path, "rb");
+    size_t n = 0;
+
+    buf[0] = '\0';
+    if (rf != NULL) {
+      n = fread(buf, 1, sizeof(buf) - 1, rf);
+      fclose(rf);
+    }
+    buf[n] = '\0';
+  }
+  assertf(buf[0] != '\0');
   assertf(strstr(buf, projUTF8) != NULL);
   assertf(strstr(buf, catUTF8) != NULL);
   assertf(strstr(buf, declUTF8) != NULL);
@@ -902,35 +889,6 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* Reads a whole file into a heap buffer, NUL-terminated, or NULL. */
-static char *golden_slurp(const char *path, size_t *len) {
-  FILE *const fp = fopen(path, "rb");
-  char *buf = NULL;
-  size_t n = 0, cap = 0;
-
-  if (fp == NULL)
-    return NULL;
-  for (;;) {
-    size_t got;
-
-    if (buf == NULL || cap - n < 4097) {
-      char *const grown = realloct(buf, cap == 0 ? 16384 : cap * 2);
-
-      assertf(grown != NULL);
-      buf = grown;
-      cap = cap == 0 ? 16384 : cap * 2;
-    }
-    got = fread(buf + n, 1, cap - n - 1, fp);
-    if (got == 0)
-      break;
-    n += got;
-  }
-  fclose(fp);
-  buf[n] = '\0';
-  *len = n;
-  return buf;
-}
-
 /* Turns each CR LF into LF in place, and returns the new length. */
 static size_t golden_drop_cr(char *buf, size_t len) {
   size_t i, o = 0;
@@ -952,7 +910,7 @@ static hts_boolean gif_is(const char *dir, const char *name, const char *data,
   hts_boolean ok;
 
   snprintf(path, sizeof(path), "%s/%s", dir, name);
-  got = golden_slurp(path, &len);
+  got = st_slurp_ansi(path, &len);
   ok = got != NULL && len == size && memcmp(got, data, size) == 0 ? HTS_TRUE
                                                                   : HTS_FALSE;
   freet(got);
@@ -1016,8 +974,8 @@ static int st_topindexgolden(httrackp *opt, int argc, char **argv) {
   assertf(hts_buildtopindex(opt, topdir, "") != 0);
 
   snprintf(path, sizeof(path), "%s/index.html", topdir);
-  got = golden_slurp(path, &gotlen);
-  want = golden_slurp(argv[1], &wantlen);
+  got = st_slurp_ansi(path, &gotlen);
+  want = st_slurp_ansi(argv[1], &wantlen);
   assertf(got != NULL && want != NULL);
   /* LF is CR LF on Windows, and the golden is LF only */
   gotlen = golden_drop_cr(got, gotlen);
@@ -1090,7 +1048,7 @@ static int st_topindexoom(httrackp *opt, int argc, char **argv) {
     assertf(hts_buildtopindex(opt, topdir, "") != 0);
     assertf(topindex_failrow == 0);
     snprintf(path, sizeof(path), "%s/index.html", topdir);
-    got = golden_slurp(path, &len);
+    got = st_slurp(path, &len);
     assertf(got != NULL);
     for (i = 0; i < count; i++) {
       char needle[32];
@@ -1280,11 +1238,7 @@ static int st_mirrorio(httrackp *opt, int argc, char **argv) {
 }
 
 static void ro_put(const char *path, const char *data) {
-  FILE *const fp = FOPEN(path, "wb");
-
-  assertf(fp != NULL);
-  assertf(hts_fwrite_exact(data, strlen(data), fp));
-  fclose(fp);
+  st_put_file(path, data, strlen(data));
 }
 
 /* HTS_TRUE if path holds exactly data. */

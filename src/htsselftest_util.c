@@ -61,6 +61,42 @@ const char *st_family_name(hts_browser_family family) {
   return st_families[family];
 }
 
+void st_put_file(const char *path, const void *data, size_t size) {
+  FILE *const fp = FOPEN(path, "wb");
+
+  assertf(fp != NULL);
+  assertf(hts_fwrite_exact(data, size, fp));
+  fclose(fp);
+}
+
+void st_read_file(const char *path, char *buf, size_t size) {
+  char *all = readfile_utf8(path);
+
+  buf[0] = '\0';
+  if (all != NULL) {
+    strlncatbuff(buf, all, size, size - 1);
+    freet(all);
+  }
+}
+
+char *st_slurp(const char *path, size_t *len) {
+  LLint size;
+  char *const buf = readfile2_utf8(path, &size);
+
+  if (buf != NULL)
+    *len = (size_t) size;
+  return buf;
+}
+
+char *st_slurp_ansi(const char *path, size_t *len) {
+  LLint size;
+  char *const buf = readfile2(path, &size);
+
+  if (buf != NULL)
+    *len = (size_t) size;
+  return buf;
+}
+
 /* Decode an argument ("hex:FFD8.." or literal text) into buf. Raw non-UTF-8
    bytes cannot survive a Windows command line, so hostile inputs go as hex. */
 size_t st_decode_body(const char *arg, char *buf, size_t size) {
